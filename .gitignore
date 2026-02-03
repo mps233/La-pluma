@@ -4,3 +4,7 @@ dist
 *.log
 .env
 .env.local
+
+# IDE 配置
+.kiro/
+.vscode/
