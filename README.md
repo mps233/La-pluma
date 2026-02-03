@@ -18,10 +18,25 @@
 
 ## 📋 前置要求
 
-- **macOS** 系统
+- **操作系统**: macOS / Linux / Windows
 - **Node.js** 18+
-- **MAA CLI** 已安装：`brew install MaaAssistantArknights/tap/maa-cli`
+- **MAA CLI** 已安装
+  - macOS: `brew install MaaAssistantArknights/tap/maa-cli`
+  - Linux: 参考 [MAA CLI 文档](https://maa.plus/docs/manual/cli/)
+  - Windows: 参考 [MAA CLI 文档](https://maa.plus/docs/manual/cli/)
 - 已执行 `maa install` 安装 MaaCore 及资源
+
+## 🖥️ 跨平台支持
+
+La Pluma 支持 macOS、Linux 和 Windows 系统。项目会自动检测操作系统并使用对应的配置路径：
+
+### 配置文件路径
+
+- **macOS**: `~/Library/Application Support/com.loong.maa/`
+- **Linux**: `~/.config/maa/` (遵循 XDG 标准)
+- **Windows**: `%APPDATA%\maa\`
+
+服务器启动时会自动显示当前系统的路径配置。
 
 ## 🚀 快速开始
 

@@ -6,6 +6,7 @@ import maaRoutes from './routes/maa.js';
 import notificationRoutes from './routes/notification.js';
 import { setSocketIO } from './services/schedulerService.js';
 import { networkInterfaces } from 'os';
+import { printPathConfig } from './config/paths.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -82,6 +83,8 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`  - 本地: http://localhost:${PORT}`);
   console.log(`  - 网络: http://${localIp}:${PORT}`);
   console.log(`\n手机访问请使用: http://${localIp}:5173`);
+  console.log('');
+  printPathConfig();
 });
 
 export { io };

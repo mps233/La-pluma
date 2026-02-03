@@ -1,7 +1,14 @@
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { homedir } from 'os';
+import { 
+  getMaaLogPath, 
+  getItemIndexPath, 
+  getItemTablePath, 
+  getRecruitmentDataPath, 
+  getBattleDataPath,
+  getMaaResourceDir
+} from '../config/paths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -12,41 +19,6 @@ const DATA_DIR = join(__dirname, '..', 'data');
 // 物品索引缓存
 let itemIndexCache = null;
 let itemTableCache = null;
-
-/**
- * 获取 MAA 日志文件路径
- */
-function getMaaLogPath() {
-  return join(homedir(), 'Library', 'Application Support', 'com.loong.maa', 'debug', 'asst.log');
-}
-
-/**
- * 获取 MAA 物品索引文件路径
- */
-function getItemIndexPath() {
-  return join(homedir(), 'Library', 'Application Support', 'com.loong.maa', 'resource', 'item_index.json');
-}
-
-/**
- * 获取游戏物品表文件路径
- */
-function getItemTablePath() {
-  return join(homedir(), 'Library', 'Application Support', 'com.loong.maa', 'resource', 'gamedata', 'excel', 'item_table.json');
-}
-
-/**
- * 获取 MAA 干员招募数据文件路径
- */
-function getRecruitmentDataPath() {
-  return join(homedir(), 'Library', 'Application Support', 'com.loong.maa', 'resource', 'recruitment.json');
-}
-
-/**
- * 获取 MAA 战斗数据文件路径（包含所有干员）
- */
-function getBattleDataPath() {
-  return join(homedir(), 'Library', 'Application Support', 'com.loong.maa', 'resource', 'battle_data.json');
-}
 
 /**
  * 加载物品索引
@@ -98,7 +70,8 @@ async function loadItemTable() {
       console.log('[物品表] 从网络加载成功，共', Object.keys(itemTableCache).length, '种物品');
       
       // 保存到本地以便下次使用
-      await mkdir(join(homedir(), 'Library', 'Application Support', 'com.loong.maa', 'resource', 'gamedata', 'excel'), { recursive: true });
+      const resourceDir = getMaaResourceDir();
+      await mkdir(join(resourceDir, 'gamedata', 'excel'), { recursive: true });
       await writeFile(itemTablePath, JSON.stringify(data, null, 2), 'utf-8');
       console.log('[物品表] 已缓存到本地');
       
