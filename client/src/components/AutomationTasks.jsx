@@ -24,10 +24,15 @@ export default function AutomationTasks() {
   // 轮询定时任务执行状态
   useEffect(() => {
     let intervalId = null
+    let isSubscribed = true // 用于防止组件卸载后的状态更新
     
     const checkScheduleStatus = async () => {
+      if (!isSubscribed) return
+      
       try {
         const result = await maaApi.getScheduleExecutionStatus()
+        if (!isSubscribed) return // 再次检查
+        
         if (result.success && result.data) {
           const status = result.data
           setScheduleExecutionStatus(status)
@@ -38,24 +43,30 @@ export default function AutomationTasks() {
             
             // 根据任务 ID 找到在 taskFlow 中的实际索引
             if (status.currentTaskId) {
-              const actualIndex = taskFlow.findIndex(t => t.id === status.currentTaskId)
-              if (actualIndex !== -1) {
-                setCurrentStep(actualIndex)
-              }
+              setCurrentStep(prev => {
+                const actualIndex = taskFlow.findIndex(t => t.id === status.currentTaskId)
+                return actualIndex !== -1 ? actualIndex : prev
+              })
             } else {
               setCurrentStep(status.currentStep)
             }
             
             setMessage(status.message || `正在执行: ${status.currentTask}`)
-          } else if (isRunning && scheduleExecutionStatus?.isRunning) {
-            // 定时任务刚完成
-            setIsRunning(false)
-            setCurrentStep(-1)
-            setMessage('')
+          } else {
+            setIsRunning(prev => {
+              if (prev) {
+                // 定时任务刚完成
+                setCurrentStep(-1)
+                setMessage('')
+              }
+              return false
+            })
           }
         }
       } catch (error) {
-        console.error('获取定时任务状态失败:', error)
+        if (isSubscribed) {
+          console.error('获取定时任务状态失败:', error)
+        }
       }
     }
     
@@ -64,9 +75,10 @@ export default function AutomationTasks() {
     checkScheduleStatus() // 立即执行一次
     
     return () => {
+      isSubscribed = false
       if (intervalId) clearInterval(intervalId)
     }
-  }, [isRunning, scheduleExecutionStatus, taskFlow])
+  }, [taskFlow]) // 只依赖 taskFlow
 
   // 可用的任务列表
   const availableTasks = [

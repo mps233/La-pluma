@@ -114,19 +114,29 @@ export default function LogViewer() {
   }
 
   useEffect(() => {
+    let isSubscribed = true
+    
     // 初始化
     loadHistoryFiles()
-    loadRealtimeLogs()
-
-    // 每1秒轮询一次实时日志
-    pollIntervalRef.current = setInterval(loadRealtimeLogs, 1000)
+    
+    // 只在非历史查看模式下轮询实时日志
+    if (!viewingHistory) {
+      loadRealtimeLogs()
+      pollIntervalRef.current = setInterval(() => {
+        if (isSubscribed && !viewingHistory) {
+          loadRealtimeLogs()
+        }
+      }, 1000)
+    }
 
     return () => {
+      isSubscribed = false
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
       }
     }
-  }, [viewingHistory]) // 添加依赖
+  }, [viewingHistory])
 
   useEffect(() => {
     if (autoScroll && !viewingHistory && logContainerRef.current) {

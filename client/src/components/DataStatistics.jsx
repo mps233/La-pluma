@@ -30,8 +30,13 @@ export default function DataStatistics() {
 
   // 点击外部关闭菜单
   useEffect(() => {
+    if (!openMenu) return // 如果没有打开的菜单，不添加监听器
+
     const handleClickOutside = (event) => {
-      if (openMenu && !event.target.closest('.relative')) {
+      // 检查点击是否在下拉菜单外部
+      const target = event.target
+      const isInsideMenu = target.closest('.relative')
+      if (!isInsideMenu) {
         setOpenMenu(null)
       }
     }
@@ -41,6 +46,28 @@ export default function DataStatistics() {
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [openMenu])
+
+  // 当筛选条件变化时，清理不再显示的干员图片加载状态，避免内存泄漏
+  useEffect(() => {
+    const currentOperIds = new Set(getFilteredAndSortedOperators.map(op => op.id))
+    
+    setLoadedImages(prev => {
+      const loadedIds = Object.keys(prev)
+      
+      // 如果加载的图片数量超过500个，进行清理
+      if (loadedIds.length > 500) {
+        const newLoadedImages = {}
+        loadedIds.forEach(id => {
+          if (currentOperIds.has(id)) {
+            newLoadedImages[id] = prev[id]
+          }
+        })
+        return newLoadedImages
+      }
+      
+      return prev
+    })
+  }, [filterRarity, filterElite, filterPotential, filterOwnership, filterProfession, sortBy])
 
   const loadSavedData = async () => {
     try {
