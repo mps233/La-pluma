@@ -2,12 +2,14 @@
 
 <div align="center">
   <img src="client/public/logo.webp" alt="La Pluma Logo" width="120" />
-  <p><em>Mac 上 MAA CLI 的现代化 WebUI 界面</em></p>
+  <p><em>MAA CLI 的现代化 WebUI 界面</em></p>
   
   [![Docker Pulls](https://img.shields.io/docker/pulls/miaona/la-pluma)](https://hub.docker.com/r/miaona/la-pluma)
   [![Docker Image Size](https://img.shields.io/docker/image-size/miaona/la-pluma/latest)](https://hub.docker.com/r/miaona/la-pluma)
   [![GitHub Actions](https://github.com/mps233/La-pluma/workflows/Docker%20Build%20and%20Push/badge.svg)](https://github.com/mps233/La-pluma/actions)
 </div>
+
+> **项目名称由来**：La Pluma（羽毛笔）是《明日方舟》中的五星近卫干员，本项目以此命名，致敬这位优雅的女士。
 
 ## ✨ 特性
 
@@ -40,23 +42,21 @@
 
 ## 📋 前置要求
 
-- **操作系统**: macOS / Linux / Windows
+- **操作系统**: macOS / Linux
 - **Node.js** 18+
 - **MAA CLI** 已安装
   - macOS: `brew install MaaAssistantArknights/tap/maa-cli`
   - Linux: 参考 [MAA CLI 文档](https://maa.plus/docs/manual/cli/)
-  - Windows: 参考 [MAA CLI 文档](https://maa.plus/docs/manual/cli/)
 - 已执行 `maa install` 安装 MaaCore 及资源
 
 ## 🖥️ 跨平台支持
 
-La Pluma 支持 macOS、Linux 和 Windows 系统。项目会自动检测操作系统并使用对应的配置路径：
+La Pluma 支持 macOS 和 Linux 系统。项目会自动检测操作系统并使用对应的配置路径：
 
 ### 配置文件路径
 
 - **macOS**: `~/Library/Application Support/com.loong.maa/`
 - **Linux**: `~/.config/maa/` (遵循 XDG 标准)
-- **Windows**: `%APPDATA%\maa\`
 
 服务器启动时会自动显示当前系统的路径配置。
 
