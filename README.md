@@ -3,6 +3,10 @@
 <div align="center">
   <img src="client/public/logo.webp" alt="La Pluma Logo" width="120" />
   <p><em>Mac 上 MAA CLI 的现代化 WebUI 界面</em></p>
+  
+  [![Docker Pulls](https://img.shields.io/docker/pulls/mps233/la-pluma)](https://hub.docker.com/r/mps233/la-pluma)
+  [![Docker Image Size](https://img.shields.io/docker/image-size/mps233/la-pluma/latest)](https://hub.docker.com/r/mps233/la-pluma)
+  [![GitHub Actions](https://github.com/mps233/la-pluma/workflows/Docker%20Build%20and%20Push/badge.svg)](https://github.com/mps233/la-pluma/actions)
 </div>
 
 ## ✨ 特性
@@ -73,42 +77,63 @@ npm run dev:server  # 后端: http://localhost:3000
 
 ### 方式 2: Docker 部署
 
-> ✨ **完整支持**: Docker 镜像包含 WebUI + MAA CLI + MaaCore，开箱即用！
+> ✨ **推荐方式**：使用 Docker Hub 预构建镜像，开箱即用！
+
+#### 使用 Docker Hub 镜像（推荐）
+
+```bash
+# 拉取最新镜像
+docker pull mps233/la-pluma:latest
+
+# 运行容器
+docker run -d \
+  --name la-pluma \
+  -p 3055:3000 \
+  -v /path/to/data:/app/server/data \
+  -v /path/to/config:/root/.config/maa \
+  -v /path/to/maacore:/root/.local/share/maa \
+  -e ADB_ADDRESS=192.168.x.x:5555 \
+  mps233/la-pluma:latest
+
+# 访问应用
+# 浏览器打开 http://localhost:3055
+```
+
+#### 使用 Docker Compose（推荐）
 
 ```bash
 # 1. 克隆仓库
 git clone https://github.com/mps233/la-pluma.git
 cd la-pluma
 
-# 2. 启动服务（首次启动会自动安装 MaaCore，需要 5-10 分钟）
+# 2. 编辑 docker-compose.yml，修改 volumes 和环境变量
+
+# 3. 启动服务
 docker-compose up -d
 
-# 3. 查看日志
+# 4. 查看日志
 docker-compose logs -f
+```
 
-# 4. 访问应用
-# 浏览器打开 http://localhost:3055
+#### 本地构建镜像
+
+```bash
+# 构建镜像
+docker-compose build
+
+# 启动容器
+docker-compose up -d
 ```
 
 **配置说明**：
 - 宿主机端口：`3055`，容器内端口：`3000`
 - 数据持久化：`./docker-data/` 和 `./server/data/`
 - ADB 连接：在 WebUI 中配置设备地址（如 `127.0.0.1:5555`）
+- 首次启动会自动下载 MaaCore（约 5-10 分钟）
 
-**常用命令**：
-```bash
-# 重启服务
-docker-compose restart
-
-# 停止服务
-docker-compose down
-
-# 更新镜像
-git pull && docker-compose up -d --build
-
-# 进入容器
-docker-compose exec la-pluma sh
-```
+**支持架构**：
+- `linux/amd64` - x86_64 服务器、PC
+- `linux/arm64` - ARM64 服务器、Apple Silicon
 
 ## 📦 项目结构
 
