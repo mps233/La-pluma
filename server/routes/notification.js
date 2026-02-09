@@ -11,11 +11,14 @@ import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { asyncHandler, successResponse, errorResponse } from '../utils/apiHelper.js';
+import { createLogger } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const router = express.Router();
+const logger = createLogger('NotificationRoutes');
 
 // 配置文件路径
 const CONFIG_DIR = join(__dirname, '../data/user-configs');
@@ -29,7 +32,7 @@ async function loadConfig() {
     setNotificationConfig(config);
     return config;
   } catch (error) {
-    console.log('通知配置文件不存在，使用默认配置');
+    logger.debug('通知配置文件不存在，使用默认配置');
     return null;
   }
 }
@@ -48,89 +51,67 @@ async function saveConfig(config) {
 export { loadConfig };
 
 // 获取通知配置
-router.get('/config', async (req, res) => {
-  try {
-    const config = getNotificationConfig();
-    res.json({ success: true, data: config });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+router.get('/config', asyncHandler(async (req, res) => {
+  const config = getNotificationConfig();
+  res.json(successResponse(config));
+}));
 
 // 更新通知配置
-router.post('/config', async (req, res) => {
-  try {
-    const config = req.body;
-    setNotificationConfig(config);
-    await saveConfig(config);
+router.post('/config', asyncHandler(async (req, res) => {
+  const config = req.body;
+  setNotificationConfig(config);
+  await saveConfig(config);
+  
+  // 重启 Telegram Bot
+  if (config.channels?.telegram) {
+    logger.info('重启 Telegram Bot');
+    stopTelegramBot();
     
-    // 重启 Telegram Bot
-    if (config.channels?.telegram) {
-      console.log('[通知配置] 重启 Telegram Bot...');
-      stopTelegramBot();
-      
-      // 等待一下再启动
-      setTimeout(() => {
-        initTelegramBot({
-          enabled: config.channels.telegram.enabled,
-          botToken: config.channels.telegram.botToken,
-          chatId: config.channels.telegram.chatId
-        });
-      }, 1000);
-    }
-    
-    res.json({ success: true, message: '配置已保存，Telegram Bot 已重启' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    setTimeout(() => {
+      initTelegramBot({
+        enabled: config.channels.telegram.enabled,
+        botToken: config.channels.telegram.botToken,
+        chatId: config.channels.telegram.chatId
+      });
+    }, 1000);
   }
-});
+  
+  res.json(successResponse(null, '配置已保存，Telegram Bot 已重启'));
+}));
 
 // 测试通知渠道
-router.post('/test/:channel', async (req, res) => {
-  try {
-    const { channel } = req.params;
-    console.log(`[通知测试] 测试渠道: ${channel}`);
-    
-    const result = await testNotificationChannel(channel);
-    console.log(`[通知测试] 结果:`, result);
-    
-    res.json({ success: result.success, message: result.message });
-  } catch (error) {
-    console.error(`[通知测试] 错误:`, error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+router.post('/test/:channel', asyncHandler(async (req, res) => {
+  const { channel } = req.params;
+  logger.info('测试通知渠道', { channel });
+  
+  const result = await testNotificationChannel(channel);
+  logger.info('测试结果', { channel, success: result.success });
+  
+  res.json({ success: result.success, message: result.message });
+}));
 
 // 发送测试通知
-router.post('/send-test', async (req, res) => {
-  try {
-    const { title, content, level = 'info' } = req.body;
-    const result = await sendNotification({
-      title: title || '测试通知',
-      content: content || '这是一条测试通知',
-      level,
-    });
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+router.post('/send-test', asyncHandler(async (req, res) => {
+  const { title, content, level = 'info' } = req.body;
+  const result = await sendNotification({
+    title: title || '测试通知',
+    content: content || '这是一条测试通知',
+    level,
+  });
+  res.json(result);
+}));
 
 // 发送通知到指定渠道
-router.post('/send/:channel', async (req, res) => {
-  try {
-    const { channel } = req.params;
-    const { title, content, level = 'info', data } = req.body;
-    const result = await sendToChannel(channel, {
-      title,
-      content,
-      level,
-      data,
-    });
-    res.json({ success: true, data: result });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+router.post('/send/:channel', asyncHandler(async (req, res) => {
+  const { channel } = req.params;
+  const { title, content, level = 'info', data } = req.body;
+  const result = await sendToChannel(channel, {
+    title,
+    content,
+    level,
+    data,
+  });
+  res.json(successResponse(result));
+}));
 
 export default router;

@@ -3,8 +3,12 @@ import { promisify } from 'util';
 import { readFile, writeFile, mkdir, readdir, stat, unlink } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
+import { createLogger } from '../utils/logger.js';
 
 const execPromise = promisify(exec);
+
+// 创建日志记录器
+const logger = createLogger('MaaService');
 
 // MAA CLI 路径
 // Docker 环境使用完整路径，本地环境使用 'maa' 依赖 PATH
@@ -53,7 +57,13 @@ function addLog(level, message) {
     level: level,
     message: message
   });
-  console.log(`[${level}] ${message}`);
+  // 使用结构化日志，不再使用 console.log
+  const logLevel = level.toLowerCase();
+  if (logger[logLevel]) {
+    logger[logLevel](message);
+  } else {
+    logger.info(message);
+  }
 }
 
 /**
@@ -328,7 +338,7 @@ export async function getConfig(profileName = 'default') {
     // 简单解析 TOML (实际项目中应使用 toml 库)
     return parseSimpleToml(content);
   } catch (error) {
-    console.log('配置文件不存在，返回默认配置');
+    logger.debug('配置文件不存在，返回默认配置');
     return {
       adb_path: 'adb',
       address: '127.0.0.1:5555',
@@ -352,7 +362,7 @@ export async function saveConfig(profileName = 'default', config) {
     const tomlContent = generateToml(config);
     
     await writeFile(configPath, tomlContent, 'utf-8');
-    console.log(`配置已保存到: ${configPath}`);
+    logger.debug('配置已保存', { configPath });
   } catch (error) {
     throw new Error(`保存配置失败: ${error.message}`);
   }
@@ -420,8 +430,11 @@ export async function execDynamicTask(taskId, taskConfig, taskName = null, taskT
     // 生成临时任务文件名
     const tempTaskFile = join(tasksDir, `${taskId}_temp.toml`);
     
-    // 将 taskConfig JSON 转换为 TOML 格式
-    const tomlContent = generateTaskToml(JSON.parse(taskConfig));
+    // 将 taskConfig 转换为对象（如果是字符串则解析，如果已经是对象则直接使用）
+    const configObj = typeof taskConfig === 'string' ? JSON.parse(taskConfig) : taskConfig;
+    
+    // 将配置对象转换为 TOML 格式
+    const tomlContent = generateTaskToml(configObj);
     
     // 写入临时文件
     await writeFile(tempTaskFile, tomlContent, 'utf-8');
@@ -520,7 +533,7 @@ export async function testAdbConnection(adbPath = '/opt/homebrew/bin/adb', addre
     }
     
     // 尝试连接
-    console.log(`尝试连接到 ${address}...`);
+    logger.debug('尝试连接设备', { address });
     const { stdout: connectOutput } = await execPromise(`${adbPath} connect ${address}`);
     
     // 等待连接稳定
@@ -566,14 +579,14 @@ export async function captureScreen(adbPath = '/opt/homebrew/bin/adb', address =
     const isConnected = devicesOutput.includes(address);
     
     if (!isConnected) {
-      console.log(`设备 ${address} 未连接，尝试连接...`);
+      logger.debug('设备未连接，尝试连接', { address });
       // 尝试连接设备
       const connectCommand = `${adbPath} connect ${address}`;
       const { stdout: connectOutput, stderr: connectError } = await execPromise(connectCommand);
-      console.log(`连接结果: ${connectOutput}`);
+      logger.debug('连接结果', { output: connectOutput });
       
       if (connectError) {
-        console.error('连接警告:', connectError);
+        logger.warn('连接警告', { error: connectError });
       }
       
       // 等待连接稳定
@@ -582,7 +595,7 @@ export async function captureScreen(adbPath = '/opt/homebrew/bin/adb', address =
     
     // 使用 adb screencap 命令截图并转换为 base64
     const command = `${adbPath} -s ${address} exec-out screencap -p | base64`;
-    console.log(`执行截图命令: ${command}`);
+    logger.debug('执行截图命令', { command });
     
     const { stdout, stderr } = await execPromise(command, {
       maxBuffer: 50 * 1024 * 1024, // 50MB buffer for screenshot
@@ -590,7 +603,7 @@ export async function captureScreen(adbPath = '/opt/homebrew/bin/adb', address =
     });
     
     if (stderr) {
-      console.error('截图警告:', stderr);
+      logger.warn('截图警告', { error: stderr });
     }
     
     // 返回 base64 编码的图片
@@ -622,7 +635,7 @@ export async function getCurrentActivity(clientType = 'Official') {
     if (activityCache.code && activityCache.timestamp) {
       const now = Date.now();
       if (now - activityCache.timestamp < activityCache.ttl) {
-        console.log('使用缓存的活动信息:', activityCache.code, activityCache.name);
+        logger.debug('使用缓存的活动信息', { code: activityCache.code, name: activityCache.name });
         return { code: activityCache.code, name: activityCache.name };
       }
     }
@@ -631,7 +644,7 @@ export async function getCurrentActivity(clientType = 'Official') {
     const result = await execMaaCommand('activity', [clientType]);
     const output = result.stdout;
     
-    console.log('maa activity 原始输出:', output);
+    logger.debug('maa activity 原始输出', { output });
     
     let activityName = null;
     let activityCode = null;
@@ -668,8 +681,7 @@ export async function getCurrentActivity(clientType = 'Official') {
     
     if (match && match[1]) {
       activityCode = match[1].toUpperCase();
-      console.log('获取到活动代号:', activityCode);
-      console.log('获取到活动名称:', activityName);
+      logger.debug('获取到活动信息', { code: activityCode, name: activityName });
       
       // 更新缓存
       activityCache.code = activityCode;
@@ -679,11 +691,10 @@ export async function getCurrentActivity(clientType = 'Official') {
       return { code: activityCode, name: activityName };
     }
     
-    console.log('未找到活动代号，可能当前没有活动');
-    console.log('完整输出:', output);
+    logger.debug('未找到活动代号，可能当前没有活动');
     return { code: null, name: null };
   } catch (error) {
-    console.error('获取活动信息失败:', error.message);
+    logger.error('获取活动信息失败', { error: error.message });
     // 如果获取失败，返回缓存的信息（如果有）
     return { code: activityCache.code || null, name: activityCache.name || null };
   }
@@ -708,11 +719,11 @@ export async function replaceActivityCode(stage, clientType = 'Official') {
   
   if (activityInfo.code) {
     const realStage = `${activityInfo.code}-${stageNumber}`;
-    console.log(`关卡代号替换: ${stage} -> ${realStage}`);
+    logger.debug('关卡代号替换', { original: stage, replaced: realStage });
     return realStage;
   }
   
-  console.warn('无法获取活动代号，保持原关卡代号:', stage);
+  logger.warn('无法获取活动代号，保持原关卡代号', { stage });
   return stage;
 }
 
@@ -725,19 +736,19 @@ export function stopCurrentTask() {
   }
   
   if (taskStatus.process) {
-    console.log('终止任务:', taskStatus.taskName);
+    logger.warn('终止任务', { taskName: taskStatus.taskName });
     addLog('WARN', `正在终止任务: ${taskStatus.taskName}`);
     
     try {
       // 直接使用 SIGKILL 强制终止，不等待
-      console.log('使用 SIGKILL 强制终止进程');
+      logger.warn('使用 SIGKILL 强制终止进程');
       addLog('WARN', '使用 SIGKILL 强制终止进程');
       taskStatus.process.kill('SIGKILL');
       
       setTaskStatus(false);
       return { success: true, message: '已强制终止任务' };
     } catch (error) {
-      console.error('终止任务失败:', error);
+      logger.error('终止任务失败', { error: error.message });
       addLog('ERROR', `终止任务失败: ${error.message}`);
       setTaskStatus(false);
       return { success: false, message: `终止失败: ${error.message}` };
@@ -802,7 +813,7 @@ export async function getLogFiles() {
     
     return files;
   } catch (error) {
-    console.error('获取日志文件列表失败:', error);
+    logger.error('获取日志文件列表失败', { error: error.message });
     return [];
   }
 }
@@ -828,7 +839,7 @@ async function cleanupOldLogs(files) {
       await unlink(file.path);
       addLog('INFO', `已删除旧日志文件: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
     } catch (error) {
-      console.error(`删除日志文件失败: ${file.path}`, error);
+      logger.error('删除日志文件失败', { path: file.path, error: error.message });
     }
   }
   
@@ -921,7 +932,7 @@ export async function getDebugScreenshots() {
     const configDir = await getMaaConfigDir();
     const debugDir = join(configDir.trim(), '..', 'debug');
     
-    console.log('调试目录:', debugDir);
+    logger.debug('调试目录', { debugDir });
     
     // 读取 debug 目录下的所有文件
     const files = await readdir(debugDir);
@@ -950,7 +961,7 @@ export async function getDebugScreenshots() {
     
     return screenshots;
   } catch (error) {
-    console.error('获取调试截图失败:', error);
+    logger.error('获取调试截图失败', { error: error.message });
     return [];
   }
 }

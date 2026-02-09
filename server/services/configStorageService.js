@@ -1,6 +1,11 @@
-import fs from 'fs/promises';
+import { readdir } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { readJsonFile, writeJsonFile, ensureDir, fileExists } from '../utils/fileHelper.js';
+import { successResponse, errorResponse } from '../utils/apiHelper.js';
+import { createLogger } from '../utils/logger.js';
+
+const logger = createLogger('ConfigStorage');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -8,49 +13,42 @@ const __dirname = path.dirname(__filename);
 // 配置存储目录
 const CONFIG_STORAGE_DIR = path.join(__dirname, '../data/user-configs');
 
-// 确保配置目录存在
-async function ensureConfigDir() {
-  try {
-    await fs.mkdir(CONFIG_STORAGE_DIR, { recursive: true });
-  } catch (error) {
-    console.error('创建配置目录失败:', error);
-  }
+// 获取配置文件路径
+function getConfigPath(configType) {
+  return path.join(CONFIG_STORAGE_DIR, `${configType}.json`);
 }
 
 // 保存用户配置
 export async function saveUserConfig(configType, data) {
   try {
-    await ensureConfigDir();
-    const configPath = path.join(CONFIG_STORAGE_DIR, `${configType}.json`);
-    await fs.writeFile(configPath, JSON.stringify(data, null, 2), 'utf-8');
-    return { success: true, message: '配置保存成功' };
+    await ensureDir(CONFIG_STORAGE_DIR);
+    const configPath = getConfigPath(configType);
+    await writeJsonFile(configPath, data);
+    // 移除 DEBUG 日志，保存配置太频繁
+    return successResponse(null, '配置保存成功');
   } catch (error) {
-    console.error('保存配置失败:', error);
-    return { success: false, error: error.message };
+    logger.error('保存配置失败', { configType, error: error.message });
+    return errorResponse(error, '保存配置失败');
   }
 }
 
 // 读取用户配置
 export async function loadUserConfig(configType) {
   try {
-    const configPath = path.join(CONFIG_STORAGE_DIR, `${configType}.json`);
-    const data = await fs.readFile(configPath, 'utf-8');
-    return { success: true, data: JSON.parse(data) };
+    const configPath = getConfigPath(configType);
+    const data = await readJsonFile(configPath, null);
+    return successResponse(data);
   } catch (error) {
-    if (error.code === 'ENOENT') {
-      // 文件不存在，返回空配置
-      return { success: true, data: null };
-    }
-    console.error('读取配置失败:', error);
-    return { success: false, error: error.message };
+    logger.error('读取配置失败', { configType, error: error.message });
+    return errorResponse(error, '读取配置失败');
   }
 }
 
 // 获取所有配置
 export async function getAllUserConfigs() {
   try {
-    await ensureConfigDir();
-    const files = await fs.readdir(CONFIG_STORAGE_DIR);
+    await ensureDir(CONFIG_STORAGE_DIR);
+    const files = await readdir(CONFIG_STORAGE_DIR);
     const configs = {};
     
     for (const file of files) {
@@ -63,24 +61,29 @@ export async function getAllUserConfigs() {
       }
     }
     
-    return { success: true, data: configs };
+    return successResponse(configs);
   } catch (error) {
-    console.error('获取所有配置失败:', error);
-    return { success: false, error: error.message };
+    logger.error('获取所有配置失败', { error: error.message });
+    return errorResponse(error, '获取所有配置失败');
   }
 }
 
 // 删除配置
 export async function deleteUserConfig(configType) {
   try {
-    const configPath = path.join(CONFIG_STORAGE_DIR, `${configType}.json`);
-    await fs.unlink(configPath);
-    return { success: true, message: '配置删除成功' };
-  } catch (error) {
-    if (error.code === 'ENOENT') {
-      return { success: true, message: '配置不存在' };
+    const configPath = getConfigPath(configType);
+    const exists = await fileExists(configPath);
+    
+    if (!exists) {
+      return successResponse(null, '配置不存在');
     }
-    console.error('删除配置失败:', error);
-    return { success: false, error: error.message };
+    
+    const { unlink } = await import('fs/promises');
+    await unlink(configPath);
+    logger.info('配置删除成功', { configType });
+    return successResponse(null, '配置删除成功');
+  } catch (error) {
+    logger.error('删除配置失败', { configType, error: error.message });
+    return errorResponse(error, '删除配置失败');
   }
 }

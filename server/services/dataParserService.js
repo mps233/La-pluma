@@ -1,6 +1,8 @@
-import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { readJsonFile, writeJsonFile, ensureDir } from '../utils/fileHelper.js';
+import { successResponse, errorResponse, safeJsonParse } from '../utils/apiHelper.js';
+import { createLogger } from '../utils/logger.js';
 import { 
   getMaaLogPath, 
   getItemIndexPath, 
@@ -12,6 +14,7 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const logger = createLogger('DataParser');
 
 // 项目数据目录
 const DATA_DIR = join(__dirname, '..', 'data');
@@ -30,12 +33,11 @@ async function loadItemIndex() {
   
   try {
     const itemIndexPath = getItemIndexPath();
-    const content = await readFile(itemIndexPath, 'utf-8');
-    itemIndexCache = JSON.parse(content);
-    console.log('[物品索引] 加载成功，共', Object.keys(itemIndexCache).length, '种物品');
+    itemIndexCache = await readJsonFile(itemIndexPath, {});
+    logger.info(`物品索引加载成功，共 ${Object.keys(itemIndexCache).length} 种物品`);
     return itemIndexCache;
   } catch (error) {
-    console.error('[物品索引] 加载失败:', error.message);
+    logger.error('物品索引加载失败', { error: error.message });
     return {};
   }
 }
@@ -49,36 +51,37 @@ async function loadItemTable() {
   }
   
   try {
-    // 尝试从本地加载
     const itemTablePath = getItemTablePath();
-    try {
-      const content = await readFile(itemTablePath, 'utf-8');
-      const data = JSON.parse(content);
-      itemTableCache = data.items || {};
-      console.log('[物品表] 从本地加载成功，共', Object.keys(itemTableCache).length, '种物品');
-      return itemTableCache;
-    } catch (localError) {
-      console.log('[物品表] 本地文件不存在，尝试从网络获取...');
-      
-      // 从 GitHub 获取
-      const response = await fetch('https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/gamedata/excel/item_table.json');
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      itemTableCache = data.items || {};
-      console.log('[物品表] 从网络加载成功，共', Object.keys(itemTableCache).length, '种物品');
-      
-      // 保存到本地以便下次使用
-      const resourceDir = getMaaResourceDir();
-      await mkdir(join(resourceDir, 'gamedata', 'excel'), { recursive: true });
-      await writeFile(itemTablePath, JSON.stringify(data, null, 2), 'utf-8');
-      console.log('[物品表] 已缓存到本地');
-      
+    
+    // 尝试从本地加载
+    const localData = await readJsonFile(itemTablePath, null);
+    if (localData) {
+      itemTableCache = localData.items || {};
+      logger.info(`物品表从本地加载成功，共 ${Object.keys(itemTableCache).length} 种物品`);
       return itemTableCache;
     }
+    
+    // 从网络获取
+    logger.info('本地文件不存在，尝试从网络获取物品表...');
+    const response = await fetch('https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/gamedata/excel/item_table.json');
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    itemTableCache = data.items || {};
+    logger.success(`物品表从网络加载成功，共 ${Object.keys(itemTableCache).length} 种物品`);
+    
+    // 保存到本地
+    const resourceDir = getMaaResourceDir();
+    await ensureDir(join(resourceDir, 'gamedata', 'excel'));
+    await writeJsonFile(itemTablePath, data);
+    logger.info('物品表已缓存到本地');
+    
+    return itemTableCache;
   } catch (error) {
-    console.error('[物品表] 加载失败:', error.message);
+    logger.error('物品表加载失败', { error: error.message });
     return {};
   }
 }
@@ -118,77 +121,50 @@ async function getItemInfo(itemId) {
 export async function parseDepotData() {
   try {
     const logPath = getMaaLogPath();
-    console.log('[数据解析] 读取日志文件:', logPath);
+    logger.info('开始解析仓库数据', { logPath });
     
+    const { readFile } = await import('fs/promises');
     let logContent = await readFile(logPath, 'utf-8');
     
     // 移除日志中的换行符（MAA 日志可能在单词中间换行）
-    // 保留真正的 JSON 结构换行，只移除单词中间的换行
     logContent = logContent.replace(/([a-zA-Z])\n([a-z])/g, '$1$2');
     
     // 查找最后一次 DepotInfo 数据
-    // 实际格式: "what":"DepotInfo","details":{"data":"{\"2001\":10000,...}","done":true}
-    // 使用更宽松的正则匹配，允许跨行
     const depotMatches = [...logContent.matchAll(/"what"\s*:\s*"DepotInfo"[\s\S]*?"details"\s*:\s*\{[\s\S]*?"data"\s*:\s*"((?:[^"\\]|\\.)*)"/g)];
     
     if (depotMatches.length === 0) {
-      console.log('[数据解析] 未找到 DepotInfo 数据');
+      logger.warn('未找到 DepotInfo 数据');
       return null;
     }
     
     // 取最后一次识别结果（done:true 的那个）
-    let dataStr = null;
-    for (let i = depotMatches.length - 1; i >= 0; i--) {
-      const match = depotMatches[i];
-      // 检查这条记录是否包含 "done":true
-      const contextStart = match.index;
-      const contextEnd = Math.min(contextStart + 5000, logContent.length);
-      const context = logContent.substring(contextStart, contextEnd);
-      
-      if (context.includes('"done":true')) {
-        dataStr = match[1];
-        console.log('[数据解析] 找到完成的 DepotInfo 数据');
-        break;
-      }
-    }
+    let dataStr = findCompletedDepotData(logContent, depotMatches);
     
     if (!dataStr) {
-      // 如果没有找到 done:true 的，就用最后一个
       dataStr = depotMatches[depotMatches.length - 1][1];
-      console.log('[数据解析] 使用最后一次 DepotInfo 数据');
+      logger.info('使用最后一次 DepotInfo 数据');
     }
     
-    console.log('[数据解析] 数据字符串长度:', dataStr.length);
+    logger.debug('数据字符串长度', { length: dataStr.length });
     
-    // 数据是转义的 JSON 字符串，需要先解转义再解析
-    // 将 \" 替换为 "
+    // 解析数据
     const unescapedStr = dataStr.replace(/\\"/g, '"');
-    const depotData = JSON.parse(unescapedStr);
+    const depotData = safeJsonParse(unescapedStr, {});
     
-    console.log('[数据解析] 解析成功，物品数量:', Object.keys(depotData).length);
+    if (!depotData || Object.keys(depotData).length === 0) {
+      throw new Error('解析仓库数据失败');
+    }
+    
+    logger.success(`解析成功，物品数量: ${Object.keys(depotData).length}`);
     
     // 加载物品索引，添加物品名称
-    const itemIndex = await loadItemIndex();
-    const enrichedData = {};
-    
-    for (const [itemId, count] of Object.entries(depotData)) {
-      const itemInfo = await getItemInfo(itemId);
-      enrichedData[itemId] = {
-        id: itemId,
-        name: itemInfo.name,
-        count: count,
-        icon: itemInfo.icon,
-        iconId: itemInfo.iconId,
-        classifyType: itemInfo.classifyType,
-        sortId: itemInfo.sortId
-      };
-    }
+    const enrichedData = await enrichDepotData(depotData);
     
     // 按 sortId 排序
     const sortedData = Object.values(enrichedData).sort((a, b) => a.sortId - b.sortId);
     
     // 保存到文件
-    await mkdir(DATA_DIR, { recursive: true });
+    await ensureDir(DATA_DIR);
     const outputPath = join(DATA_DIR, 'depot.json');
     
     const output = {
@@ -197,20 +173,53 @@ export async function parseDepotData() {
       items: sortedData
     };
     
-    await writeFile(outputPath, JSON.stringify(output, null, 2), 'utf-8');
-    console.log('[数据解析] 仓库数据已保存到:', outputPath);
+    await writeJsonFile(outputPath, output);
+    logger.success('仓库数据已保存', { path: outputPath });
     
-    return {
-      success: true,
+    return successResponse({
       path: outputPath,
       itemCount: Object.keys(depotData).length,
       items: sortedData
-    };
+    });
   } catch (error) {
-    console.error('[数据解析] 解析仓库数据失败:', error.message);
-    console.error('[数据解析] 错误堆栈:', error.stack);
-    throw new Error(`解析仓库数据失败: ${error.message}`);
+    logger.error('解析仓库数据失败', { error: error.message, stack: error.stack });
+    return errorResponse(error, '解析仓库数据失败');
   }
+}
+
+// 辅助函数：查找完成的 DepotInfo 数据
+function findCompletedDepotData(logContent, depotMatches) {
+  for (let i = depotMatches.length - 1; i >= 0; i--) {
+    const match = depotMatches[i];
+    const contextStart = match.index;
+    const contextEnd = Math.min(contextStart + 5000, logContent.length);
+    const context = logContent.substring(contextStart, contextEnd);
+    
+    if (context.includes('"done":true')) {
+      return match[1];
+    }
+  }
+  return null;
+}
+
+// 辅助函数：丰富仓库数据（添加物品信息）
+async function enrichDepotData(depotData) {
+  const enrichedData = {};
+  
+  for (const [itemId, count] of Object.entries(depotData)) {
+    const itemInfo = await getItemInfo(itemId);
+    enrichedData[itemId] = {
+      id: itemId,
+      name: itemInfo.name,
+      count: count,
+      icon: itemInfo.icon,
+      iconId: itemInfo.iconId,
+      classifyType: itemInfo.classifyType,
+      sortId: itemInfo.sortId
+    };
+  }
+  
+  return enrichedData;
 }
 
 /**
@@ -219,8 +228,9 @@ export async function parseDepotData() {
 export async function parseOperBoxData() {
   try {
     const logPath = getMaaLogPath();
-    console.log('[数据解析] 读取日志文件:', logPath);
+    logger.info('开始解析干员数据', { logPath });
     
+    const { readFile } = await import('fs/promises');
     const logContent = await readFile(logPath, 'utf-8');
     
     // 查找所有 OperBoxInfo 行
@@ -228,13 +238,13 @@ export async function parseOperBoxData() {
     const operBoxLines = lines.filter(line => line.includes('"what":"OperBoxInfo"'));
     
     if (operBoxLines.length === 0) {
-      console.log('[数据解析] 未找到 OperBoxInfo 数据');
+      logger.warn('未找到 OperBoxInfo 数据');
       return null;
     }
     
     // 取最后一行
     const lastLine = operBoxLines[operBoxLines.length - 1];
-    console.log('[数据解析] 找到 OperBoxInfo 数据');
+    logger.info('找到 OperBoxInfo 数据');
     
     // 找到 JSON 对象的开始位置
     const jsonStart = lastLine.indexOf('{"class');
@@ -244,18 +254,22 @@ export async function parseOperBoxData() {
     
     // 解析 JSON
     const jsonStr = lastLine.substring(jsonStart);
-    const data = JSON.parse(jsonStr);
+    const data = safeJsonParse(jsonStr);
+    
+    if (!data || !data.details) {
+      throw new Error('解析 JSON 失败');
+    }
     
     // 检查是否完成
     if (!data.details.done) {
-      console.log('[数据解析] 识别未完成，使用部分数据');
+      logger.warn('识别未完成，使用部分数据');
     }
     
     const opers = data.details.own_opers || [];
-    console.log('[数据解析] 解析成功，干员数量:', opers.length);
+    logger.success(`解析成功，干员数量: ${opers.length}`);
     
     // 保存到文件
-    await mkdir(DATA_DIR, { recursive: true });
+    await ensureDir(DATA_DIR);
     const outputPath = join(DATA_DIR, 'operbox.json');
     
     const output = {
@@ -264,19 +278,17 @@ export async function parseOperBoxData() {
       data: opers
     };
     
-    await writeFile(outputPath, JSON.stringify(output, null, 2), 'utf-8');
-    console.log('[数据解析] 干员数据已保存到:', outputPath);
+    await writeJsonFile(outputPath, output);
+    logger.success('干员数据已保存', { path: outputPath });
     
-    return {
-      success: true,
+    return successResponse({
       path: outputPath,
       operCount: opers.length,
       data: opers
-    };
+    });
   } catch (error) {
-    console.error('[数据解析] 解析干员数据失败:', error.message);
-    console.error('[数据解析] 错误堆栈:', error.stack);
-    throw new Error(`解析干员数据失败: ${error.message}`);
+    logger.error('解析干员数据失败', { error: error.message, stack: error.stack });
+    return errorResponse(error, '解析干员数据失败');
   }
 }
 
@@ -284,26 +296,16 @@ export async function parseOperBoxData() {
  * 读取已保存的仓库数据
  */
 export async function getDepotData() {
-  try {
-    const filePath = join(DATA_DIR, 'depot.json');
-    const content = await readFile(filePath, 'utf-8');
-    return JSON.parse(content);
-  } catch (error) {
-    return null;
-  }
+  const filePath = join(DATA_DIR, 'depot.json');
+  return await readJsonFile(filePath, null);
 }
 
 /**
  * 读取已保存的干员数据
  */
 export async function getOperBoxData() {
-  try {
-    const filePath = join(DATA_DIR, 'operbox.json');
-    const content = await readFile(filePath, 'utf-8');
-    return JSON.parse(content);
-  } catch (error) {
-    return null;
-  }
+  const filePath = join(DATA_DIR, 'operbox.json');
+  return await readJsonFile(filePath, null);
 }
 
 /**
@@ -312,12 +314,15 @@ export async function getOperBoxData() {
 export async function getAllOperators() {
   try {
     const battleDataPath = getBattleDataPath();
-    const content = await readFile(battleDataPath, 'utf-8');
-    const data = JSON.parse(content);
+    const data = await readJsonFile(battleDataPath);
+    
+    if (!data || !data.chars) {
+      throw new Error('无法读取干员数据');
+    }
     
     // 从 chars 对象中提取所有干员
-    const operators = Object.entries(data.chars || {})
-      .filter(([id, char]) => {
+    const operators = Object.entries(data.chars)
+      .filter(([id]) => {
         // 过滤条件：
         // 1. ID以 char_ 开头（排除召唤物、陷阱等）
         // 2. 排除预备干员（char_5xx 和 char_6xx）
@@ -329,7 +334,7 @@ export async function getAllOperators() {
         return true;
       })
       .map(([id, char]) => ({
-        id: id,
+        id,
         name: char.name,
         rarity: char.rarity,
         profession: char.profession,
@@ -343,10 +348,10 @@ export async function getAllOperators() {
         return a.name.localeCompare(b.name, 'zh-CN');
       });
     
-    console.log(`[所有干员] 加载成功，共 ${operators.length} 名干员（已过滤预备干员）`);
+    logger.success(`加载所有干员成功，共 ${operators.length} 名干员（已过滤预备干员）`);
     return operators;
   } catch (error) {
-    console.error('[所有干员] 加载失败:', error.message);
+    logger.error('加载所有干员失败', { error: error.message });
     throw error;
   }
 }

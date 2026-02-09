@@ -1,10 +1,17 @@
 import cron from 'node-cron';
 import { execMaaCommand, execDynamicTask, replaceActivityCode, captureScreen } from './maaService.js';
 import { sendTaskCompletionNotification, isStageOpenToday } from './notificationService.js';
+import { loadUserConfig, saveUserConfig } from './configStorageService.js';
+import operatorTrainingService from './operatorTrainingService.js';
+import { recordDrops } from './dropRecordService.js';
+import { createLogger } from '../utils/logger.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
+
+// 创建日志记录器
+const logger = createLogger('Scheduler');
 
 // MAA CLI 路径
 // Docker 环境使用完整路径，本地环境使用 'maa' 依赖 PATH
@@ -37,7 +44,7 @@ export function getScheduleExecutionStatus() {
  */
 export function stopScheduleExecution() {
   if (scheduleExecutionStatus.isRunning) {
-    console.log(`[定时任务] 设置停止标志，将在当前任务完成后终止流程`);
+    logger.warn('设置停止标志，将在当前任务完成后终止流程');
     scheduleExecutionStatus.shouldStop = true;
     return true;
   }
@@ -49,7 +56,7 @@ export function stopScheduleExecution() {
  */
 function updateScheduleStatus(updates) {
   Object.assign(scheduleExecutionStatus, updates);
-  console.log(`[定时任务状态] ${JSON.stringify(scheduleExecutionStatus)}`);
+  logger.debug('定时任务状态更新', scheduleExecutionStatus);
 }
 
 // Socket.io 实例（从 server.js 导入）
@@ -60,7 +67,7 @@ let io = null;
  */
 export function setSocketIO(socketIO) {
   io = socketIO;
-  console.log('Socket.io 已设置到 schedulerService');
+  logger.info('Socket.io 已设置');
 }
 
 /**
@@ -186,7 +193,7 @@ function buildCommand(task) {
 
 // 执行任务流程
 async function executeTaskFlow(taskFlow, scheduleId) {
-  console.log(`[定时任务 ${scheduleId}] 开始执行任务流程`);
+  logger.info('开始执行任务流程', { scheduleId });
   
   // 更新状态：开始执行
   updateScheduleStatus({
@@ -214,7 +221,7 @@ async function executeTaskFlow(taskFlow, scheduleId) {
   for (let i = 0; i < enabledTasks.length; i++) {
     // 检查是否需要停止
     if (scheduleExecutionStatus.shouldStop) {
-      console.log(`[定时任务 ${scheduleId}] 检测到停止信号，终止任务流程`);
+      logger.warn('检测到停止信号，终止任务流程', { scheduleId });
       updateScheduleStatus({
         message: '任务流程已被用户终止'
       });
@@ -224,7 +231,12 @@ async function executeTaskFlow(taskFlow, scheduleId) {
     const task = enabledTasks[i];
     const commandId = task.commandId || task.id.split('-')[0];
     
-    console.log(`[定时任务 ${scheduleId}] 执行任务 ${i + 1}/${enabledTasks.length}: ${task.name}`);
+    logger.info('执行任务', { 
+      scheduleId,
+      taskIndex: i + 1,
+      totalTasks: enabledTasks.length,
+      taskName: task.name
+    });
     
     // 更新状态：执行中
     updateScheduleStatus({
@@ -240,15 +252,131 @@ async function executeTaskFlow(taskFlow, scheduleId) {
       if (task.params.address) adbConfig.address = task.params.address;
     }
     
-    // 如果是关闭游戏任务，先截图
-    if (commandId === 'closedown' && !screenshot) {
+    // 如果是领取奖励任务，执行后截图（此时在主界面）
+    if (commandId === 'award' && !screenshot) {
+      // 先执行领取奖励任务
       try {
-        console.log(`[定时任务 ${scheduleId}] 关闭游戏前截图...`);
-        const screenshotResult = await captureScreen(adbConfig.adbPath, adbConfig.address);
-        screenshot = screenshotResult.image;
-        console.log(`[定时任务 ${scheduleId}] 截图成功`);
+        const { command, params, taskConfig } = buildCommand(task);
+        
+        if (taskConfig) {
+          const taskId = params;
+          const result = await execDynamicTask(taskId, taskConfig, task.name, null, true);
+          
+          if (result.stdout) {
+            const summary = parseTaskSummary(task.name, result.stdout);
+            if (summary) {
+              taskSummaries.push(summary);
+            }
+          }
+        } else {
+          let args = params ? params.split(' ').filter(arg => arg) : [];
+          const result = await execMaaCommand(command, args, task.name, null, true);
+          
+          if (result.stdout) {
+            const summary = parseTaskSummary(task.name, result.stdout);
+            if (summary) {
+              taskSummaries.push(summary);
+            }
+          }
+        }
+        
+        successCount++;
+        
+        // 领取奖励完成后，等待2秒再截图（确保回到主界面）
+        logger.info('领取奖励完成，等待后截图', { scheduleId });
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // 截图
+        try {
+          logger.debug('领取奖励后截图', { scheduleId });
+          const screenshotResult = await captureScreen(adbConfig.adbPath, adbConfig.address);
+          screenshot = screenshotResult.image;
+          logger.success('截图成功', { scheduleId });
+        } catch (error) {
+          logger.error('截图失败', { scheduleId, error: error.message });
+        }
+        
+        // 任务完成后的延迟
+        let delayTime = 2000;
+        logger.debug('任务完成，等待后继续', { 
+          scheduleId, 
+          taskName: task.name, 
+          delaySeconds: delayTime / 1000 
+        });
+        await new Promise(resolve => setTimeout(resolve, delayTime));
+        
+        // 跳过后面的通用任务执行逻辑
+        continue;
       } catch (error) {
-        console.error(`[定时任务 ${scheduleId}] 截图失败:`, error.message);
+        failedCount++;
+        errors.push(task.name);
+        logger.error('任务执行失败', { 
+          scheduleId, 
+          taskName: task.name, 
+          error: error.message 
+        });
+        continue;
+      }
+    }
+    
+    // 如果是关闭游戏任务，先识别仓库（不再截图）
+    if (commandId === 'closedown') {
+      // 识别仓库
+      try {
+        logger.info('关闭游戏前先识别仓库', { scheduleId });
+        
+        // 等待3秒确保游戏回到主界面
+        logger.debug('等待游戏回到主界面', { scheduleId, waitSeconds: 3 });
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        updateScheduleStatus({
+          message: '正在识别仓库...'
+        });
+        
+        // 构建 Depot 任务配置
+        const depotTaskConfig = {
+          name: '仓库识别',
+          type: 'Depot',
+          params: {
+            enable: true
+          }
+        };
+        
+        // execDynamicTask 需要 JSON 字符串
+        // execDynamicTask 成功时不抛出异常，失败时抛出异常
+        try {
+          await execDynamicTask('Depot_temp', JSON.stringify(depotTaskConfig), '仓库识别', 'depot', true);
+          logger.success('仓库识别命令执行完成', { scheduleId });
+          
+          // 解析并保存仓库数据
+          logger.debug('开始解析仓库数据', { scheduleId });
+          const { parseDepotData } = await import('./dataParserService.js');
+          const parseResult = await parseDepotData();
+          if (parseResult && parseResult.success) {
+            logger.success('仓库数据已保存', { 
+              scheduleId, 
+              itemCount: parseResult.itemCount 
+            });
+          } else {
+            logger.warn('仓库数据解析失败', { scheduleId });
+          }
+        } catch (depotError) {
+          logger.error('仓库识别失败', { 
+            scheduleId, 
+            error: depotError.message 
+          });
+          // 即使识别失败也继续执行后续任务
+        }
+        
+        // 等待2秒
+        logger.debug('等待后继续', { scheduleId, waitSeconds: 2 });
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error) {
+        logger.error('仓库识别异常', { 
+          scheduleId, 
+          error: error.message 
+        });
+        // 即使识别失败也继续
       }
     }
     
@@ -261,7 +389,11 @@ async function executeTaskFlow(taskFlow, scheduleId) {
       while (retryCount <= maxRetries && !startupSuccess) {
         try {
           if (retryCount > 0) {
-            console.log(`[定时任务 ${scheduleId}] 启动游戏重试 ${retryCount}/${maxRetries}...`);
+            logger.info('启动游戏重试', { 
+              scheduleId, 
+              retryCount, 
+              maxRetries 
+            });
             await new Promise(resolve => setTimeout(resolve, 3000)); // 重试前等待3秒
           }
           
@@ -269,18 +401,20 @@ async function executeTaskFlow(taskFlow, scheduleId) {
           let args = params ? params.split(' ').filter(arg => arg) : [];
           await execMaaCommand(command, args);
           
-          console.log(`[定时任务 ${scheduleId}] 启动游戏命令执行完成，等待15秒...`);
-          await new Promise(resolve => setTimeout(resolve, 15000));
+          logger.info('启动游戏命令执行完成', { scheduleId });
           
           // 检测游戏是否还在运行（通过截图）
           try {
-            console.log(`[定时任务 ${scheduleId}] 检测游戏是否运行中...`);
+            logger.debug('检测游戏是否运行中', { scheduleId });
             await captureScreen(adbConfig.adbPath, adbConfig.address);
-            console.log(`[定时任务 ${scheduleId}] 游戏运行正常`);
+            logger.success('游戏运行正常', { scheduleId });
             startupSuccess = true;
             successCount++;
           } catch (error) {
-            console.error(`[定时任务 ${scheduleId}] 游戏可能已闪退: ${error.message}`);
+            logger.error('游戏可能已闪退', { 
+              scheduleId, 
+              error: error.message 
+            });
             retryCount++;
             if (retryCount > maxRetries) {
               throw new Error('游戏启动后闪退，已达到最大重试次数');
@@ -290,7 +424,11 @@ async function executeTaskFlow(taskFlow, scheduleId) {
           if (retryCount >= maxRetries) {
             failedCount++;
             errors.push(task.name);
-            console.error(`[定时任务 ${scheduleId}] 任务 ${task.name} 执行失败:`, error.message);
+            logger.error('任务执行失败', { 
+              scheduleId, 
+              taskName: task.name, 
+              error: error.message 
+            });
             break;
           }
           retryCount++;
@@ -335,7 +473,10 @@ async function executeTaskFlow(taskFlow, scheduleId) {
           
           if (stageEntries.length > 1) {
             // 多个关卡，依次执行
-            console.log(`[定时任务 ${scheduleId}] 检测到多个关卡: ${stageEntries.map(e => `${e.stage}${e.times ? `:${e.times}` : ''}`).join(', ')}`);
+            logger.info('检测到多个关卡', { 
+              scheduleId, 
+              stages: stageEntries.map(e => `${e.stage}${e.times ? `:${e.times}` : ''}`).join(', ')
+            });
             
             let sanityDepleted = false; // 理智耗尽标记
             
@@ -344,7 +485,7 @@ async function executeTaskFlow(taskFlow, scheduleId) {
               
               // 如果理智已耗尽，跳过剩余关卡
               if (sanityDepleted) {
-                console.log(`[定时任务 ${scheduleId}] 理智已耗尽，跳过关卡 ${stage}`);
+                logger.info('理智已耗尽，跳过关卡', { scheduleId, stage });
                 skippedCount++;
                 skipped.push({
                   task: `${task.name} (${stage})`,
@@ -356,7 +497,11 @@ async function executeTaskFlow(taskFlow, scheduleId) {
               // 检查关卡是否开放
               const openCheck = isStageOpenToday(stage);
               if (!openCheck.isOpen) {
-                console.log(`[定时任务 ${scheduleId}] 关卡 ${stage} 今日未开放: ${openCheck.reason}，跳过`);
+                logger.info('关卡今日未开放，跳过', { 
+                  scheduleId, 
+                  stage, 
+                  reason: openCheck.reason 
+                });
                 skippedCount++;
                 skipped.push({
                   task: `${task.name} (${stage})`,
@@ -365,12 +510,22 @@ async function executeTaskFlow(taskFlow, scheduleId) {
                 continue; // 跳过这个关卡
               }
               
-              console.log(`[定时任务 ${scheduleId}] 执行关卡 ${i + 1}/${stageEntries.length}: ${stage}${times ? ` (${times}次)` : ''}`);
+              logger.info('执行关卡', { 
+                scheduleId, 
+                stageIndex: i + 1, 
+                totalStages: stageEntries.length, 
+                stage, 
+                times 
+              });
               
               // 替换活动代号
               const realStage = await replaceActivityCode(stage, clientType);
               if (realStage !== stage) {
-                console.log(`[定时任务 ${scheduleId}] 关卡代号已替换: ${stage} -> ${realStage}`);
+                logger.debug('关卡代号已替换', { 
+                  scheduleId, 
+                  originalStage: stage, 
+                  realStage 
+                });
               }
               
               // 构建当前关卡的参数（移除第一个参数，添加当前关卡和次数）
@@ -397,16 +552,23 @@ async function executeTaskFlow(taskFlow, scheduleId) {
               try {
                 const result = await execMaaCommand(command, currentArgs, `${task.name} (${stage})`, null, true);
                 
-                // 检查是否理智耗尽（传入关卡名称用于排除剿灭）
+                // 检查理智状态（传入关卡名称用于排除剿灭）
                 const output = (result.stdout || '') + (result.stderr || '');
-                console.log(`[定时任务 ${scheduleId}] 检查理智状态，关卡: ${stage}，输出长度: ${output.length}`);
-                console.log(`[定时任务 ${scheduleId}] 输出内容预览: ${output.substring(0, 200)}`);
+                logger.debug('检查理智状态', { 
+                  scheduleId, 
+                  stage, 
+                  outputLength: output.length 
+                });
+                logger.debug('输出内容预览', { 
+                  scheduleId, 
+                  preview: output.substring(0, 200) 
+                });
                 
                 if (checkSanityDepleted(output, stage)) {
-                  console.log(`[定时任务 ${scheduleId}] ✓ 检测到理智已耗尽`);
+                  logger.info('检测到理智已耗尽', { scheduleId, stage });
                   sanityDepleted = true;
                 } else {
-                  console.log(`[定时任务 ${scheduleId}] ✗ 未检测到理智耗尽`);
+                  logger.debug('未检测到理智耗尽', { scheduleId, stage });
                 }
                 
                 // 提取任务总结
@@ -421,11 +583,14 @@ async function executeTaskFlow(taskFlow, scheduleId) {
                 const errorMsg = error.message || '';
                 const errorOutput = (error.stdout || '') + (error.stderr || '');
                 
-                console.log(`[定时任务 ${scheduleId}] 任务执行出错，检查是否理智不足`);
-                console.log(`[定时任务 ${scheduleId}] 错误信息: ${errorMsg}`);
+                logger.debug('任务执行出错，检查是否理智不足', { 
+                  scheduleId, 
+                  stage, 
+                  errorMsg 
+                });
                 
                 if (checkSanityDepleted(errorOutput, stage) || errorMsg.includes('理智不足') || errorMsg.includes('sanity')) {
-                  console.log(`[定时任务 ${scheduleId}] ✓ 检测到理智已耗尽（从错误信息）`);
+                  logger.info('检测到理智已耗尽（从错误信息）', { scheduleId, stage });
                   sanityDepleted = true;
                   // 理智耗尽不算失败，跳过即可
                   skippedCount++;
@@ -438,7 +603,7 @@ async function executeTaskFlow(taskFlow, scheduleId) {
                 
                 // 检查是否是因为关卡未开放导致的错误
                 if (errorMsg.includes('stage not open') || errorMsg.includes('关卡未开放') || errorMsg.includes('MaaCore returned an error')) {
-                  console.log(`[定时任务 ${scheduleId}] 关卡 ${stage} 可能未开放或不存在，跳过`);
+                  logger.info('关卡可能未开放或不存在，跳过', { scheduleId, stage });
                   skippedCount++;
                   skipped.push({
                     task: `${task.name} (${stage})`,
@@ -449,7 +614,7 @@ async function executeTaskFlow(taskFlow, scheduleId) {
                 
                 // 检查是否是剿灭奖励已领完（MAA 无法识别剿灭入口）
                 if (stage.includes('Annihilation') || stage.includes('@Annihilation')) {
-                  console.log(`[定时任务 ${scheduleId}] 剿灭关卡 ${stage} 可能奖励已领完或未找到入口，跳过`);
+                  logger.info('剿灭关卡可能奖励已领完或未找到入口，跳过', { scheduleId, stage });
                   skippedCount++;
                   skipped.push({
                     task: `${task.name} (${stage})`,
@@ -459,7 +624,7 @@ async function executeTaskFlow(taskFlow, scheduleId) {
                 }
                 
                 // 其他错误，记录失败但继续执行
-                console.log(`[定时任务 ${scheduleId}] 关卡 ${stage} 执行失败: ${errorMsg}`);
+                logger.error('关卡执行失败', { scheduleId, stage, error: errorMsg });
                 failedCount++;
                 errors.push({
                   task: `${task.name} (${stage})`,
@@ -470,7 +635,7 @@ async function executeTaskFlow(taskFlow, scheduleId) {
               
               // 关卡之间等待2秒
               if (i < stageEntries.length - 1) {
-                console.log(`[定时任务 ${scheduleId}] 等待 2 秒后继续下一个关卡...`);
+                logger.debug('等待后继续下一个关卡', { scheduleId, waitSeconds: 2 });
                 await new Promise(resolve => setTimeout(resolve, 2000));
               }
             }
@@ -479,7 +644,11 @@ async function executeTaskFlow(taskFlow, scheduleId) {
             
             // 所有关卡完成后的延迟
             let delayTime = 2000;
-            console.log(`[定时任务 ${scheduleId}] 任务 ${task.name} 完成，等待 ${delayTime / 1000} 秒后继续...`);
+            logger.debug('任务完成，等待后继续', { 
+              scheduleId, 
+              taskName: task.name, 
+              delaySeconds: delayTime / 1000 
+            });
             await new Promise(resolve => setTimeout(resolve, delayTime));
             
             continue; // 跳过后面的单关卡处理
@@ -490,7 +659,11 @@ async function executeTaskFlow(taskFlow, scheduleId) {
             // 检查关卡是否开放
             const openCheck = isStageOpenToday(stage);
             if (!openCheck.isOpen) {
-              console.log(`[定时任务 ${scheduleId}] 关卡 ${stage} 今日未开放: ${openCheck.reason}，跳过`);
+              logger.info('关卡今日未开放，跳过', { 
+                scheduleId, 
+                stage, 
+                reason: openCheck.reason 
+              });
               skippedCount++;
               skipped.push({
                 task: `${task.name} (${stage})`,
@@ -498,7 +671,11 @@ async function executeTaskFlow(taskFlow, scheduleId) {
               });
               
               // 跳过后的延迟
-              console.log(`[定时任务 ${scheduleId}] 任务 ${task.name} 已跳过，等待 2 秒后继续...`);
+              logger.debug('任务已跳过，等待后继续', { 
+                scheduleId, 
+                taskName: task.name, 
+                waitSeconds: 2 
+              });
               await new Promise(resolve => setTimeout(resolve, 2000));
               continue; // 跳过这个任务
             }
@@ -507,7 +684,11 @@ async function executeTaskFlow(taskFlow, scheduleId) {
             const realStage = await replaceActivityCode(stage, clientType);
             if (realStage !== stage) {
               args[0] = realStage; // 只保留关卡名，不要拼接次数
-              console.log(`[定时任务 ${scheduleId}] 关卡代号已替换: ${stage} -> ${realStage}`);
+              logger.debug('关卡代号已替换', { 
+                scheduleId, 
+                originalStage: stage, 
+                realStage 
+              });
             } else if (times) {
               // 如果没有替换但有次数，也要更新 args[0] 为纯关卡名
               args[0] = stage;
@@ -534,6 +715,33 @@ async function executeTaskFlow(taskFlow, scheduleId) {
           const summary = parseTaskSummary(task.name, result.stdout);
           if (summary) {
             taskSummaries.push(summary);
+            
+            // 如果是战斗任务且有掉落数据，记录到数据库
+            if (summary.stage && summary.dropItems && summary.dropItems.length > 0) {
+              try {
+                // 估算理智消耗（简化计算，实际应该从关卡数据获取）
+                const sanityPerRun = 20; // 默认每次20理智
+                const totalSanity = parseInt(summary.times || 1) * sanityPerRun;
+                
+                await recordDrops({
+                  stage: summary.stage,
+                  times: parseInt(summary.times || 1),
+                  items: summary.dropItems,
+                  sanity: totalSanity,
+                  medicine: parseInt(summary.medicine || 0),
+                  stone: parseInt(summary.stone || 0)
+                });
+                logger.debug('掉落记录已保存', { 
+                  scheduleId, 
+                  stage: summary.stage 
+                });
+              } catch (error) {
+                logger.error('掉落记录保存失败', { 
+                  scheduleId, 
+                  error: error.message 
+                });
+              }
+            }
           }
         }
       }
@@ -549,18 +757,32 @@ async function executeTaskFlow(taskFlow, scheduleId) {
         delayTime = 3000; // 关闭游戏等待3秒
       }
       
-      console.log(`[定时任务 ${scheduleId}] 任务 ${task.name} 完成，等待 ${delayTime / 1000} 秒后继续...`);
+      logger.debug('任务完成，等待后继续', { 
+        scheduleId, 
+        taskName: task.name, 
+        delaySeconds: delayTime / 1000 
+      });
       await new Promise(resolve => setTimeout(resolve, delayTime));
     } catch (error) {
       failedCount++;
       errors.push(task.name);
-      console.error(`[定时任务 ${scheduleId}] 任务 ${task.name} 执行失败:`, error.message);
+      logger.error('任务执行失败', { 
+        scheduleId, 
+        taskName: task.name, 
+        error: error.message 
+      });
       // 继续执行下一个任务
     }
   }
   
   const duration = Date.now() - startTime;
-  console.log(`[定时任务 ${scheduleId}] 任务流程执行完成 - 成功: ${successCount}, 失败: ${failedCount}, 跳过: ${skippedCount}, 耗时: ${Math.floor(duration / 1000)}秒`);
+  logger.info('任务流程执行完成', { 
+    scheduleId, 
+    successCount, 
+    failedCount, 
+    skippedCount, 
+    durationSeconds: Math.floor(duration / 1000) 
+  });
   
   // 更新状态：完成
   updateScheduleStatus({
@@ -570,6 +792,16 @@ async function executeTaskFlow(taskFlow, scheduleId) {
     scheduleId: null,
     currentTask: null
   });
+  
+  // 动态更新智能养成关卡
+  try {
+    await updateSmartTrainingStages(scheduleId);
+  } catch (error) {
+    logger.error('动态更新智能养成关卡失败', { 
+      scheduleId, 
+      error: error.message 
+    });
+  }
   
   // 发送完成通知
   try {
@@ -586,7 +818,10 @@ async function executeTaskFlow(taskFlow, scheduleId) {
       screenshot,
     });
   } catch (error) {
-    console.error(`[定时任务 ${scheduleId}] 发送通知失败:`, error.message);
+    logger.error('发送通知失败', { 
+      scheduleId, 
+      error: error.message 
+    });
   }
 }
 
@@ -635,11 +870,11 @@ function checkSanityDepleted(output, stage = '') {
     if (!hasFightRecord) {
       // 如果是剿灭关卡，不判定为理智不足（可能是奖励领完了）
       if (lowerStage.includes('annihilation') || lowerStage.includes('剿灭')) {
-        console.log(`[理智检测] 剿灭关卡无战斗记录，可能是奖励已领完，不判定为理智不足`);
+        logger.debug('理智检测：剿灭关卡无战斗记录，可能是奖励已领完，不判定为理智不足', { stage });
         return false;
       }
       // 其他关卡没有战斗记录，说明理智不足
-      console.log(`[理智检测] 非剿灭关卡无战斗记录，判定为理智不足`);
+      logger.debug('理智检测：非剿灭关卡无战斗记录，判定为理智不足', { stage });
       return true;
     }
   }
@@ -654,9 +889,11 @@ function parseTaskSummary(taskName, output) {
   const summary = { task: taskName };
   
   // 调试：打印原始输出
-  console.log(`[解析任务总结] 任务: ${taskName}`);
-  console.log(`[解析任务总结] 输出长度: ${output.length} 字符`);
-  console.log(`[解析任务总结] 完整输出:\n${output}`);
+  logger.debug('解析任务总结', { 
+    taskName, 
+    outputLength: output.length 
+  });
+  logger.debug('任务总结完整输出', { output });
   
   // 解析 MAA 的实际输出格式
   // 格式示例: Fight OR-7 1 times, drops:
@@ -676,13 +913,16 @@ function parseTaskSummary(taskName, output) {
     // 解析每个物品
     const itemMatches = dropsText.matchAll(/(?:"([^"]+)"|([^\s,×]+))\s*×\s*(\d+)/g);
     const drops = [];
+    const dropItems = []; // 用于记录的结构化数据
     for (const match of itemMatches) {
       const itemName = match[1] || match[2];
-      const count = match[3];
+      const count = parseInt(match[3]);
       drops.push(`${itemName} × ${count}`);
+      dropItems.push({ name: itemName, count });
     }
     if (drops.length > 0) {
       summary.drops = drops.join(', ');
+      summary.dropItems = dropItems; // 保存结构化数据
     }
   }
   
@@ -726,22 +966,26 @@ function parseTaskSummary(taskName, output) {
     }
   }
   
-  console.log(`[解析任务总结] 解析结果:`, JSON.stringify(summary, null, 2));
+  logger.debug('任务总结解析结果', { summary });
   
   return Object.keys(summary).length > 1 ? summary : null;
 }
 
 // 创建或更新定时任务
 export function setupSchedule(scheduleId, times, taskFlow) {
-  // 先停止已存在的任务
-  stopSchedule(scheduleId);
+  // 先停止已存在的任务（静默停止，不输出日志）
+  const existingJobs = scheduledJobs.get(scheduleId);
+  if (existingJobs) {
+    existingJobs.forEach(({ job }) => job.stop());
+    scheduledJobs.delete(scheduleId);
+  }
   
   if (!times || times.length === 0) {
-    console.log(`[定时任务 ${scheduleId}] 没有设置时间，跳过`);
     return { success: false, message: '没有设置执行时间' };
   }
   
   const jobs = [];
+  const failedTimes = [];
   
   times.forEach((time, index) => {
     if (!time) return;
@@ -755,7 +999,7 @@ export function setupSchedule(scheduleId, times, taskFlow) {
     
     try {
       const job = cron.schedule(cronExpression, () => {
-        console.log(`[定时任务 ${scheduleId}-${index}] 触发执行，时间: ${time}`);
+        logger.info('定时任务触发执行', { scheduleId: `${scheduleId}-${index}`, time });
         executeTaskFlow(taskFlow, `${scheduleId}-${index}`);
       }, {
         scheduled: true,
@@ -763,14 +1007,23 @@ export function setupSchedule(scheduleId, times, taskFlow) {
       });
       
       jobs.push({ time, job });
-      console.log(`[定时任务 ${scheduleId}-${index}] 已设置，执行时间: ${time}`);
     } catch (error) {
-      console.error(`[定时任务 ${scheduleId}-${index}] 设置失败:`, error.message);
+      failedTimes.push(time);
+      logger.error('定时任务设置失败', { 
+        scheduleId: `${scheduleId}-${index}`, 
+        time,
+        error: error.message 
+      });
     }
   });
   
   if (jobs.length > 0) {
     scheduledJobs.set(scheduleId, jobs);
+    logger.info('定时任务已设置', { 
+      scheduleId, 
+      count: jobs.length,
+      times: jobs.map(j => j.time).join(', ')
+    });
     return { 
       success: true, 
       message: `已设置 ${jobs.length} 个定时任务`,
@@ -785,11 +1038,13 @@ export function setupSchedule(scheduleId, times, taskFlow) {
 export function stopSchedule(scheduleId) {
   const jobs = scheduledJobs.get(scheduleId);
   if (jobs) {
-    jobs.forEach(({ time, job }) => {
-      job.stop();
-      console.log(`[定时任务 ${scheduleId}] 已停止，时间: ${time}`);
-    });
+    jobs.forEach(({ job }) => job.stop());
     scheduledJobs.delete(scheduleId);
+    logger.debug('定时任务已停止', { 
+      scheduleId, 
+      count: jobs.length,
+      times: jobs.map(j => j.time).join(', ')
+    });
     return { success: true, message: '定时任务已停止' };
   }
   return { success: false, message: '没有找到该定时任务' };
@@ -810,7 +1065,7 @@ export function getScheduleStatus() {
 
 // 立即执行一次定时任务（用于测试）
 export async function executeScheduleNow(scheduleId, taskFlow) {
-  console.log(`[定时任务 ${scheduleId}] 手动触发执行`);
+  logger.info('手动触发执行', { scheduleId });
   await executeTaskFlow(taskFlow, scheduleId);
   return { success: true, message: '任务执行完成' };
 }
@@ -819,11 +1074,14 @@ export async function executeScheduleNow(scheduleId, taskFlow) {
 export function setupAutoUpdate(config) {
   const { enabled, time, updateCore, updateCli } = config;
   
-  // 先停止已存在的自动更新任务
-  stopSchedule('auto-update');
+  // 先停止已存在的自动更新任务（静默停止）
+  const existingJobs = scheduledJobs.get('auto-update');
+  if (existingJobs) {
+    existingJobs.forEach(({ job }) => job.stop());
+    scheduledJobs.delete('auto-update');
+  }
   
   if (!enabled || !time) {
-    console.log('[自动更新] 未启用或未设置时间');
     return { success: false, message: '自动更新未启用' };
   }
   
@@ -838,17 +1096,17 @@ export function setupAutoUpdate(config) {
   
   try {
     const job = cron.schedule(cronExpression, async () => {
-      console.log(`[自动更新] 触发执行，时间: ${time}`);
+      logger.info('自动更新触发执行', { time });
       
       try {
         if (updateCore) {
-          console.log('[自动更新] 开始更新 MaaCore...');
+          logger.info('开始更新 MaaCore');
           await execMaaCommand('update', []);
-          console.log('[自动更新] MaaCore 更新完成');
+          logger.success('MaaCore 更新完成');
         }
         
         if (updateCli) {
-          console.log('[自动更新] 开始更新 MAA CLI...');
+          logger.info('开始更新 MAA CLI');
           
           // 检查是否在 Docker 环境
           const isDocker = process.env.NODE_ENV === 'production' && 
@@ -858,9 +1116,9 @@ export function setupAutoUpdate(config) {
             // Docker 环境：支持更新，更新会持久化
             try {
               await execAsync(`${MAA_CLI_PATH} self update`);
-              console.log('[自动更新] MAA CLI 更新完成（Docker 环境，已持久化）');
+              logger.success('MAA CLI 更新完成', { environment: 'Docker', persistent: true });
             } catch (error) {
-              console.error('[自动更新] MAA CLI 更新失败:', error.message);
+              logger.error('MAA CLI 更新失败', { error: error.message });
             }
           } else {
             // 根据操作系统选择更新方式
@@ -877,13 +1135,13 @@ export function setupAutoUpdate(config) {
             }
             
             await execAsync(command);
-            console.log(`[自动更新] MAA CLI 更新完成 (${platform})`);
+            logger.success('MAA CLI 更新完成', { platform });
           }
         }
         
-        console.log('[自动更新] 所有更新任务完成');
+        logger.success('所有自动更新任务完成');
       } catch (error) {
-        console.error('[自动更新] 更新失败:', error.message);
+        logger.error('自动更新失败', { error: error.message });
       }
     }, {
       scheduled: true,
@@ -891,7 +1149,7 @@ export function setupAutoUpdate(config) {
     });
     
     scheduledJobs.set('auto-update', [{ time, job }]);
-    console.log(`[自动更新] 已设置，执行时间: ${time}`);
+    logger.info('自动更新已设置', { time });
     
     return { 
       success: true, 
@@ -899,7 +1157,7 @@ export function setupAutoUpdate(config) {
       config
     };
   } catch (error) {
-    console.error('[自动更新] 设置失败:', error.message);
+    logger.error('自动更新设置失败', { error: error.message });
     return { success: false, message: `设置失败: ${error.message}` };
   }
 }
@@ -917,4 +1175,178 @@ export function getAutoUpdateStatus() {
     enabled: false,
     time: null
   };
+}
+
+/**
+ * 动态更新智能养成关卡
+ * 在任务执行完成后，重新生成刷取计划并更新任务流程
+ */
+async function updateSmartTrainingStages(scheduleId) {
+  logger.info('智能养成开始动态更新关卡', { scheduleId });
+  
+  try {
+    // 1. 加载当前的任务流程配置
+    const configResult = await loadUserConfig('automation-tasks');
+    if (!configResult.success || !configResult.data || !configResult.data.taskFlow) {
+      logger.info('智能养成未找到任务流程配置，跳过更新', { scheduleId });
+      return;
+    }
+    
+    const { taskFlow } = configResult.data;
+    
+    // 2. 查找包含智能养成关卡的任务
+    let hasSmartStages = false;
+    let fightTaskIndex = -1;
+    
+    for (let i = 0; i < taskFlow.length; i++) {
+      const task = taskFlow[i];
+      if (task.commandId === 'fight' && task.params && task.params.stages) {
+        const stages = task.params.stages;
+        const smartStages = stages.filter(s => typeof s === 'object' && s.smart);
+        if (smartStages.length > 0) {
+          hasSmartStages = true;
+          fightTaskIndex = i;
+          break;
+        }
+      }
+    }
+    
+    if (!hasSmartStages) {
+      logger.info('智能养成未找到智能养成关卡，跳过更新', { scheduleId });
+      return;
+    }
+    
+    logger.info('智能养成找到智能养成关卡，开始重新生成刷取计划', { scheduleId });
+    
+    // 3. 加载养成队列
+    const queueResult = await loadUserConfig('training-queue');
+    if (!queueResult.success || !queueResult.data || !queueResult.data.queue || queueResult.data.queue.length === 0) {
+      logger.info('智能养成队列为空，移除所有智能养成关卡', { scheduleId });
+      
+      // 移除所有智能养成关卡
+      const task = taskFlow[fightTaskIndex];
+      const newStages = task.params.stages.filter(s => !(typeof s === 'object' && s.smart));
+      task.params.stages = newStages.length > 0 ? newStages : [{ stage: '', times: '' }];
+      
+      // 保存更新后的配置
+      await saveUserConfig('automation-tasks', { taskFlow, schedule: configResult.data.schedule });
+      logger.success('智能养成已移除所有智能养成关卡', { scheduleId });
+      return;
+    }
+    
+    // 4. 重新生成刷取计划（仅当前干员）
+    const plan = await operatorTrainingService.generateTrainingPlan('current');
+    if (!plan || !plan.stages) {
+      logger.warn('智能养成生成刷取计划失败', { scheduleId });
+      return;
+    }
+    
+    // 5. 检查是否还有需要刷的关卡
+    if (plan.stages.length === 0) {
+      logger.info('智能养成当前干员材料已集齐，检查是否需要切换到下一个干员', { scheduleId });
+      
+      // 6. 自动切换到下一个干员
+      const queue = queueResult.data.queue;
+      if (queue.length > 1) {
+        // 移除第一个干员（已完成）
+        const completedOperator = queue.shift();
+        await saveUserConfig('training-queue', { queue, settings: queueResult.data.settings });
+        logger.success('智能养成已切换到下一个干员', { 
+          scheduleId, 
+          completedOperator: completedOperator.name,
+          nextOperator: queue[0].name 
+        });
+        
+        // 重新生成刷取计划
+        const newPlan = await operatorTrainingService.generateTrainingPlan('current');
+        if (newPlan && newPlan.stages && newPlan.stages.length > 0) {
+          const trainingOperatorNames = newPlan.operators && newPlan.operators.length > 0
+            ? newPlan.operators.map(op => op.name)
+            : [];
+          
+          // 更新智能养成关卡
+          const newSmartStages = newPlan.stages.map(stage => ({
+            stage: stage.stage,
+            times: stage.totalTimes.toString(),
+            smart: true,
+            trainingOperators: trainingOperatorNames
+          }));
+          
+          // 替换智能养成关卡
+          const task = taskFlow[fightTaskIndex];
+          const pinnedStages = task.params.stages.filter(s => typeof s === 'object' && s.pinned && s.stage && s.stage.trim());
+          const normalStages = task.params.stages.filter(s => 
+            (typeof s === 'string' && s.trim()) || 
+            (typeof s === 'object' && !s.pinned && !s.smart && s.stage && s.stage.trim())
+          );
+          
+          task.params.stages = [...pinnedStages, ...newSmartStages, ...normalStages];
+          
+          // 保存更新后的配置
+          await saveUserConfig('automation-tasks', { taskFlow, schedule: configResult.data.schedule });
+          logger.success('智能养成已更新智能养成关卡', { 
+            scheduleId,
+            operators: trainingOperatorNames,
+            stageCount: newSmartStages.length 
+          });
+        } else {
+          // 新干员也没有需要刷的材料，移除智能养成关卡
+          const task = taskFlow[fightTaskIndex];
+          const newStages = task.params.stages.filter(s => !(typeof s === 'object' && s.smart));
+          task.params.stages = newStages.length > 0 ? newStages : [{ stage: '', times: '' }];
+          
+          await saveUserConfig('automation-tasks', { taskFlow, schedule: configResult.data.schedule });
+          logger.info('智能养成新干员也无需刷取材料，已移除所有智能养成关卡', { scheduleId });
+        }
+      } else {
+        // 队列中只有一个干员且已完成，移除智能养成关卡
+        logger.info('智能养成队列已全部完成，移除所有智能养成关卡', { scheduleId });
+        
+        const task = taskFlow[fightTaskIndex];
+        const newStages = task.params.stages.filter(s => !(typeof s === 'object' && s.smart));
+        task.params.stages = newStages.length > 0 ? newStages : [{ stage: '', times: '' }];
+        
+        await saveUserConfig('automation-tasks', { taskFlow, schedule: configResult.data.schedule });
+        logger.success('智能养成已移除所有智能养成关卡', { scheduleId });
+      }
+    } else {
+      // 7. 还有关卡需要刷，更新关卡和次数
+      logger.info('智能养成更新剩余关卡', { 
+        scheduleId, 
+        stageCount: plan.stages.length 
+      });
+      
+      const trainingOperatorNames = plan.operators && plan.operators.length > 0
+        ? plan.operators.map(op => op.name)
+        : [];
+      
+      const newSmartStages = plan.stages.map(stage => ({
+        stage: stage.stage,
+        times: stage.totalTimes.toString(),
+        smart: true,
+        trainingOperators: trainingOperatorNames
+      }));
+      
+      // 替换智能养成关卡
+      const task = taskFlow[fightTaskIndex];
+      const pinnedStages = task.params.stages.filter(s => typeof s === 'object' && s.pinned && s.stage && s.stage.trim());
+      const normalStages = task.params.stages.filter(s => 
+        (typeof s === 'string' && s.trim()) || 
+        (typeof s === 'object' && !s.pinned && !s.smart && s.stage && s.stage.trim())
+      );
+      
+      task.params.stages = [...pinnedStages, ...newSmartStages, ...normalStages];
+      
+      // 保存更新后的配置
+      await saveUserConfig('automation-tasks', { taskFlow, schedule: configResult.data.schedule });
+      logger.success('智能养成已更新智能养成关卡', { 
+        scheduleId,
+        stages: newSmartStages.map(s => `${s.stage}×${s.times}`)
+      });
+    }
+    
+  } catch (error) {
+    logger.error('智能养成动态更新失败', { scheduleId, error: error.message });
+    throw error;
+  }
 }

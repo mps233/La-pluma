@@ -5,11 +5,15 @@
 import fetch from 'node-fetch';
 import { executeScheduleNow } from './schedulerService.js';
 import { execMaaCommand, getTaskStatus, stopCurrentTask, captureScreen } from './maaService.js';
+import { createLogger } from '../utils/logger.js';
+
+const logger = createLogger('TelegramBot');
 
 let botConfig = {
   enabled: false,
   botToken: '',
   chatId: '',
+  allowedUserIds: [], // 新增：允许的用户 ID 列表
   adbPath: '/opt/homebrew/bin/adb',
   adbAddress: '127.0.0.1:16384',
   allowedCommands: ['start', 'stop', 'status', 'fight', 'roguelike', 'copilot', 'startup', 'closedown', 'screenshot', 'help']
@@ -23,7 +27,7 @@ let lastUpdateId = 0;
  */
 export function initTelegramBot(config) {
   if (!config || !config.botToken || !config.chatId) {
-    console.log('[Telegram Bot] 配置不完整，跳过初始化');
+    logger.debug('配置不完整，跳过初始化');
     return;
   }
 
@@ -32,7 +36,7 @@ export function initTelegramBot(config) {
   if (botConfig.enabled && !isPolling) {
     startPolling();
     setupBotCommands(); // 设置 Bot 命令菜单
-    console.log('[Telegram Bot] 已启动，等待命令...');
+    logger.info('已启动，等待命令');
   }
 }
 
@@ -41,7 +45,7 @@ export function initTelegramBot(config) {
  */
 export function stopTelegramBot() {
   isPolling = false;
-  console.log('[Telegram Bot] 已停止');
+  logger.info('已停止');
 }
 
 /**
@@ -58,7 +62,7 @@ async function startPolling() {
         for (const update of updates) {
           // 不等待 handleUpdate 完成，让它在后台异步执行
           handleUpdate(update).catch(error => {
-            console.error('[Telegram Bot] 处理消息错误:', error);
+            logger.error('处理消息错误', { error: error.message });
           });
           lastUpdateId = update.update_id + 1;
         }
@@ -67,7 +71,7 @@ async function startPolling() {
       // 等待 2 秒后继续轮询
       await new Promise(resolve => setTimeout(resolve, 2000));
     } catch (error) {
-      console.error('[Telegram Bot] 轮询错误:', error.message);
+      logger.error('轮询错误', { error: error.message });
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
@@ -110,14 +114,30 @@ async function handleUpdate(update) {
   const chatId = message.chat.id.toString();
   const userId = message.from.id.toString();
   
-  // 验证 chat ID 或 user ID
-  // 如果配置的是群组 ID（负数），则验证 chat ID
-  // 如果配置的是个人 ID（正数），则验证 user ID
+  // 忽略 Bot 自己发送的消息
+  if (message.from.is_bot) {
+    return;
+  }
+  
+  // 验证授权
+  // 1. 如果配置了 allowedUserIds，检查用户 ID 是否在列表中
+  // 2. 如果配置的是群组 ID（负数），验证 chat ID
+  // 3. 如果配置的是个人 ID（正数），验证 user ID
   const configuredId = botConfig.chatId;
-  const isAuthorized = (chatId === configuredId) || (userId === configuredId);
+  const allowedUserIds = botConfig.allowedUserIds || [];
+  
+  let isAuthorized = false;
+  
+  // 优先检查 allowedUserIds 列表
+  if (allowedUserIds.length > 0) {
+    isAuthorized = allowedUserIds.includes(userId);
+  } else {
+    // 兼容旧的单 ID 配置
+    isAuthorized = (chatId === configuredId) || (userId === configuredId);
+  }
   
   if (!isAuthorized) {
-    console.log(`[Telegram Bot] 拒绝未授权的请求 - Chat ID: ${chatId}, User ID: ${userId}, 配置的 ID: ${configuredId}`);
+    logger.warn('拒绝未授权的请求', { chatId, userId, configuredId, allowedUserIds });
     return;
   }
   
@@ -125,7 +145,7 @@ async function handleUpdate(update) {
   
   // 检查是否是 maa:// URI（直接发送作业链接）
   if (text.startsWith('maa://')) {
-    console.log(`[Telegram Bot] 检测到作业 URI: ${text}`);
+    logger.debug('检测到作业 URI', { uri: text });
     await handleCommand(chatId, 'copilot', [text]);
     return;
   }
@@ -158,7 +178,7 @@ async function handleUpdate(update) {
   
   // 检查是否是关键词（不带参数的命令）
   if (keywordMap[text]) {
-    console.log(`[Telegram Bot] 检测到关键词: ${text} -> ${keywordMap[text]}`);
+    logger.debug('检测到关键词', { keyword: text, command: keywordMap[text] });
     await handleCommand(chatId, keywordMap[text], []);
     return;
   }
@@ -170,35 +190,35 @@ async function handleUpdate(update) {
   
   // 刷关卡：刷 1-7, 刷关卡 1-7, fight 1-7
   if ((firstWord === '刷' || firstWord === '刷关卡' || firstWord === 'fight') && restWords.length > 0) {
-    console.log(`[Telegram Bot] 检测到刷关卡命令: ${text}`);
+    logger.debug('检测到刷关卡命令', { text });
     await handleCommand(chatId, 'fight', restWords);
     return;
   }
   
   // 肉鸽：肉鸽 Sami, 刷肉鸽 Sami, roguelike Sami
   if ((firstWord === '肉鸽' || firstWord === '刷肉鸽' || firstWord === 'roguelike') && restWords.length > 0) {
-    console.log(`[Telegram Bot] 检测到肉鸽命令: ${text}`);
+    logger.debug('检测到肉鸽命令', { text });
     await handleCommand(chatId, 'roguelike', restWords);
     return;
   }
   
   // 启动游戏：启动 Official, 启动游戏 Official, 开启 Official, 打开 Official
   if ((firstWord === '启动' || firstWord === '启动游戏' || firstWord === '开启' || firstWord === '打开' || firstWord === '开启游戏' || firstWord === '打开游戏' || firstWord === 'startup') && restWords.length > 0) {
-    console.log(`[Telegram Bot] 检测到启动游戏命令: ${text}`);
+    logger.debug('检测到启动游戏命令', { text });
     await handleCommand(chatId, 'startup', restWords);
     return;
   }
   
   // 关闭游戏：关闭 Official, 关闭游戏 Official
   if ((firstWord === '关闭' || firstWord === '关闭游戏' || firstWord === 'closedown') && restWords.length > 0) {
-    console.log(`[Telegram Bot] 检测到关闭游戏命令: ${text}`);
+    logger.debug('检测到关闭游戏命令', { text });
     await handleCommand(chatId, 'closedown', restWords);
     return;
   }
   
   // 运行流程：运行 automation, 运行流程 automation, run automation
   if ((firstWord === '运行' || firstWord === '运行流程' || firstWord === '执行流程' || firstWord === 'run' || firstWord === 'flow') && restWords.length > 0) {
-    console.log(`[Telegram Bot] 检测到运行流程命令: ${text}`);
+    logger.debug('检测到运行流程命令', { text });
     await handleCommand(chatId, 'run', restWords);
     return;
   }
@@ -211,7 +231,7 @@ async function handleUpdate(update) {
   const command = text.split(' ')[0].replace('/', '');
   const args = text.split(' ').slice(1);
   
-  console.log(`[Telegram Bot] 收到命令: ${command}, 参数: ${args.join(' ')}`);
+  logger.info('收到命令', { command, args: args.join(' ') });
   
   await handleCommand(chatId, command, args);
 }
@@ -228,7 +248,7 @@ async function handleCommand(chatId, command, args) {
     if (taskCommands.includes(command)) {
       const status = getTaskStatus();
       if (status.isRunning) {
-        console.log(`[Telegram Bot] 检测到新任务命令，停止当前任务: ${status.taskName}`);
+        logger.info('检测到新任务命令，停止当前任务', { currentTask: status.taskName, newCommand: command });
         const stopResult = stopCurrentTask();
         
         if (stopResult.success) {
@@ -578,7 +598,7 @@ async function getStageInfoFromCopilot(uri) {
       
       const response = await fetch(apiUrl);
       if (!response.ok) {
-        console.error('[Copilot] API 请求失败:', response.statusText);
+        logger.error('Copilot API 请求失败', { status: response.statusText });
         return null;
       }
       
@@ -589,7 +609,7 @@ async function getStageInfoFromCopilot(uri) {
         
         // 标题在 content.doc.title 里面（不是 data.data.doc.title）
         const title = content.doc?.title || '';
-        console.log(`[Copilot] 作业标题: "${title}"`);
+        logger.debug('Copilot 作业标题', { title });
         
         // 从标题提取显示名称（最重要）
         let displayName = null;
@@ -630,11 +650,11 @@ async function getStageInfoFromCopilot(uri) {
         if (!displayName && content.stage_name) {
           displayName = STAGE_NAME_MAP[content.stage_name] || null;
           if (displayName) {
-            console.log(`[Copilot] 从映射表找到关卡名: ${displayName}`);
+            logger.debug('从映射表找到关卡名', { displayName });
           }
         }
         
-        console.log(`[Copilot] 关卡信息 - 显示名: ${displayName}, 内部代号: ${content.stage_name}`);
+        logger.debug('Copilot 关卡信息', { displayName, stageName: content.stage_name });
         
         return {
           stageName: content.stage_name,  // 内部代号
@@ -653,7 +673,7 @@ async function getStageInfoFromCopilot(uri) {
     
     return null;
   } catch (error) {
-    console.error('[Copilot] 获取关卡信息失败:', error.message);
+    logger.error('Copilot 获取关卡信息失败', { error: error.message });
     return null;
   }
 }
@@ -733,7 +753,7 @@ async function executeTaskFlow(flowType = 'automation') {
     
     // 从 services 目录向上两级到项目根目录，然后进入 data/user-configs
     const configPath = join(__dirname, '..', 'data', 'user-configs', configFileName);
-    console.log(`[Telegram Bot] 读取配置文件: ${configPath}`);
+    logger.debug('读取配置文件', { configPath });
     
     const configContent = await readFile(configPath, 'utf-8');
     const config = JSON.parse(configContent);
@@ -794,14 +814,14 @@ async function executeTaskFlow(flowType = 'automation') {
           }, 3000); // 每3秒更新一次
           
         } catch (error) {
-          console.error('[Telegram Bot] 状态更新失败:', error);
+          logger.error('状态更新失败', { error: error.message });
         }
       })();
     }
     
     // 执行流程（不等待完成）
     executeScheduleNow(flowType, taskFlow).catch(error => {
-      console.error('[Telegram Bot] 任务流程执行失败:', error);
+      logger.error('任务流程执行失败', { error: error.message });
       if (messageId) {
         editMessage(botConfig.chatId, messageId, `❌ ${flowName}执行失败
 
@@ -835,12 +855,12 @@ async function sendMessage(chatId, text) {
     const data = await response.json();
     
     if (!data.ok) {
-      console.error('[Telegram Bot] 发送消息失败:', data.description);
+      logger.error('发送消息失败', { description: data.description });
     }
     
     return data; // 返回完整响应，包含 message_id
   } catch (error) {
-    console.error('[Telegram Bot] 发送消息错误:', error.message);
+    logger.error('发送消息错误', { error: error.message });
   }
 }
 
@@ -867,13 +887,13 @@ async function editMessage(chatId, messageId, text) {
     if (!data.ok) {
       // 如果消息内容没有变化，Telegram 会返回错误，这是正常的
       if (!data.description.includes('message is not modified')) {
-        console.error('[Telegram Bot] 编辑消息失败:', data.description);
+        logger.error('编辑消息失败', { description: data.description });
       }
     }
     
     return data;
   } catch (error) {
-    console.error('[Telegram Bot] 编辑消息错误:', error.message);
+    logger.error('编辑消息错误', { error: error.message });
   }
 }
 
@@ -903,11 +923,11 @@ async function sendPhoto(chatId, caption, imageBase64) {
     const data = await response.json();
     
     if (!data.ok) {
-      console.error('[Telegram Bot] 发送图片失败:', data.description);
+      logger.error('发送图片失败', { description: data.description });
       throw new Error(data.description);
     }
   } catch (error) {
-    console.error('[Telegram Bot] 发送图片错误:', error.message);
+    logger.error('发送图片错误', { error: error.message });
     throw error;
   }
 }
@@ -925,9 +945,9 @@ async function setupBotCommands() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({})
     });
-    console.log('[Telegram Bot] 已删除旧命令');
+    logger.debug('已删除旧命令');
   } catch (error) {
-    console.error('[Telegram Bot] 删除旧命令失败:', error.message);
+    logger.error('删除旧命令失败', { error: error.message });
   }
   
   // 设置新命令
@@ -955,12 +975,12 @@ async function setupBotCommands() {
     const data = await response.json();
     
     if (data.ok) {
-      console.log('[Telegram Bot] 命令菜单设置成功');
+      logger.debug('命令菜单设置成功');
     } else {
-      console.error('[Telegram Bot] 命令菜单设置失败:', data.description);
+      logger.error('命令菜单设置失败', { description: data.description });
     }
   } catch (error) {
-    console.error('[Telegram Bot] 设置命令菜单错误:', error.message);
+    logger.error('设置命令菜单错误', { error: error.message });
   }
 }
 

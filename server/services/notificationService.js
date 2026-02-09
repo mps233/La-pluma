@@ -5,6 +5,10 @@
  */
 
 import fetch from 'node-fetch';
+import { createLogger } from '../utils/logger.js';
+
+// 创建日志记录器
+const logger = createLogger('Notification');
 
 // 资源本开放时间表
 const RESOURCE_STAGES = {
@@ -185,10 +189,10 @@ class TelegramChannel extends NotificationChannel {
     
     // 检查图片大小（Telegram 限制 10MB）
     const imageSizeMB = imageBuffer.length / 1024 / 1024;
-    console.log(`图片大小: ${imageSizeMB.toFixed(2)} MB`);
+    logger.debug('图片大小检查', { sizeMB: imageSizeMB.toFixed(2) });
     
     if (imageSizeMB > 10) {
-      console.warn('图片超过 10MB，尝试不发送图片');
+      logger.warn('图片超过 10MB，尝试不发送图片', { sizeMB: imageSizeMB.toFixed(2) });
       // 图片太大，改为发送纯文本消息
       return await this.send({ title, content, level, data });
     }
@@ -207,7 +211,7 @@ class TelegramChannel extends NotificationChannel {
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`发送 Telegram 图片，尝试 ${attempt}/${maxRetries}...`);
+        logger.debug('发送 Telegram 图片', { attempt, maxRetries });
         
         const response = await fetch(url, {
           method: 'POST',
@@ -222,23 +226,27 @@ class TelegramChannel extends NotificationChannel {
           throw new Error(`Telegram 发送图片失败: ${result.description || '未知错误'}`);
         }
         
-        console.log('Telegram 图片发送成功');
+        logger.success('Telegram 图片发送成功');
         return result;
       } catch (error) {
         lastError = error;
-        console.error(`发送 Telegram 图片失败 (尝试 ${attempt}/${maxRetries}):`, error.message);
+        logger.error('发送 Telegram 图片失败', { 
+          attempt, 
+          maxRetries, 
+          error: error.message 
+        });
         
         if (attempt < maxRetries) {
           // 等待后重试
           const waitTime = attempt * 2000; // 2秒、4秒
-          console.log(`等待 ${waitTime}ms 后重试...`);
+          logger.debug('等待后重试', { waitMs: waitTime });
           await new Promise(resolve => setTimeout(resolve, waitTime));
         }
       }
     }
     
     // 所有重试都失败，尝试发送不带图片的消息
-    console.warn('发送图片失败，改为发送纯文本消息');
+    logger.warn('发送图片失败，改为发送纯文本消息');
     try {
       return await this.send({ title, content, level, data });
     } catch (textError) {
@@ -289,7 +297,7 @@ class NotificationManager {
    */
   async sendToAll(message) {
     if (!notificationConfig.enabled) {
-      console.log('通知功能未启用');
+      logger.info('通知功能未启用');
       return { success: true, message: '通知功能未启用' };
     }
 
@@ -307,10 +315,13 @@ class NotificationManager {
         const channel = new ChannelClass(channelConfig);
         await channel.send(message);
         results.push({ channel: channelName, success: true });
-        console.log(`✅ 通知已发送到 ${channelName}`);
+        logger.success('通知已发送', { channel: channelName });
       } catch (error) {
         errors.push({ channel: channelName, error: error.message });
-        console.error(`❌ 发送到 ${channelName} 失败:`, error.message);
+        logger.error('发送通知失败', { 
+          channel: channelName, 
+          error: error.message 
+        });
       }
     }
 
@@ -373,7 +384,7 @@ const notificationManager = new NotificationManager();
  */
 export function setNotificationConfig(config) {
   notificationConfig = { ...notificationConfig, ...config };
-  console.log('通知配置已更新');
+  logger.info('通知配置已更新');
 }
 
 /**
@@ -487,7 +498,12 @@ export async function sendTaskCompletionNotification(taskInfo) {
   if (errors.length > 0) {
     content += `\n\n❌ *失败任务*`;
     errors.forEach(e => {
-      content += `\n• ${e}`;
+      // 处理对象格式 { task: '任务名', error: '错误信息' } 或字符串格式
+      if (typeof e === 'object' && e.task) {
+        content += `\n• ${e.task}${e.error ? ` - ${e.error}` : ''}`;
+      } else {
+        content += `\n• ${e}`;
+      }
     });
   }
   
