@@ -746,6 +746,16 @@ export async function applyTrainingPlan(data: ApplyTrainingPlanData): Promise<Ap
   return response.json()
 }
 
+/**
+ * 获取干员材料数据
+ */
+export async function fetchOperatorMaterials(): Promise<ApiResponse> {
+  const response = await fetch(`${API_BASE_URL}/operator-training/fetch-materials`, {
+    method: 'POST'
+  })
+  return response.json()
+}
+
 // ========== 悖论模拟 API ==========
 
 /**

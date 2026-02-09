@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { maaApi, getTodayDrops, getDropStatistics } from '../services/api'
+import { maaApi, getTodayDrops, getDropStatistics, fetchOperatorMaterials } from '../services/api'
 import { motion } from 'framer-motion'
 import Icons from './Icons'
 import DropRecords from './DropRecords'
@@ -371,6 +371,37 @@ export default function DataStatistics({}: DataStatisticsProps) {
     }
   }
 
+  // 获取干员材料数据
+  const handleFetchMaterials = async () => {
+    if (isRunning) return
+
+    setIsRunning(true)
+    setStatusMessage('正在获取干员材料数据...')
+
+    try {
+      const result = await fetchOperatorMaterials()
+
+      if (result.success) {
+        setStatusMessage('✓ 干员材料数据获取成功！')
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        setStatusMessage('')
+        
+        // 重新加载干员列表以显示材料数据
+        await loadAllOperators()
+      } else {
+        setStatusMessage(`❌ 获取失败: ${result.error || '未知错误'}`)
+        await new Promise(resolve => setTimeout(resolve, 3000))
+        setStatusMessage('')
+      }
+    } catch (error: any) {
+      setStatusMessage(`❌ 获取失败: ${error.message}`)
+      await new Promise(resolve => setTimeout(resolve, 3000))
+      setStatusMessage('')
+    } finally {
+      setIsRunning(false)
+    }
+  }
+
   // 执行干员识别
   const executeOperBox = async () => {
     if (isRunning) return
@@ -545,7 +576,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
               </div>
               
               {/* 执行按钮 */}
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 flex items-center gap-2">
                 {activeTask === 'operbox' && isRunning ? (
                   <div className="w-7 h-7 flex items-center justify-center">
                     <svg className="w-5 h-5 animate-spin text-cyan-400" fill="none" viewBox="0 0 24 24">
@@ -554,20 +585,35 @@ export default function DataStatistics({}: DataStatisticsProps) {
                     </svg>
                   </div>
                 ) : (
-                  <Button
-                    onClick={executeOperBox}
-                    disabled={isRunning}
-                    variant="gradient"
-                    gradientFrom="cyan-500"
-                    gradientTo="blue-500"
-                    icon={
-                      <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                      </svg>
-                    }
-                  >
-                    立即执行
-                  </Button>
+                  <>
+                    <Button
+                      onClick={handleFetchMaterials}
+                      disabled={isRunning}
+                      variant="outline"
+                      size="sm"
+                      icon={
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                      }
+                    >
+                      获取材料数据
+                    </Button>
+                    <Button
+                      onClick={executeOperBox}
+                      disabled={isRunning}
+                      variant="gradient"
+                      gradientFrom="cyan-500"
+                      gradientTo="blue-500"
+                      icon={
+                        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                        </svg>
+                      }
+                    >
+                      立即执行
+                    </Button>
+                  </>
                 )}
               </div>
             </div>

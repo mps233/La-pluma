@@ -117,4 +117,52 @@ router.post('/apply', asyncHandler(async (req, res) => {
   res.json(successResponse(result, '养成计划已应用到任务流程'));
 }));
 
+/**
+ * POST /api/operator-training/fetch-materials
+ * 获取干员材料数据
+ */
+router.post('/fetch-materials', asyncHandler(async (req, res) => {
+  logger.info('开始获取干员材料数据');
+  
+  const { spawn } = await import('child_process');
+  const { fileURLToPath } = await import('url');
+  const { dirname, join } = await import('path');
+  
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+  const scriptPath = join(__dirname, '../scripts/fetch-operator-materials.js');
+  
+  // 使用 spawn 执行脚本
+  const child = spawn('node', [scriptPath], {
+    cwd: join(__dirname, '..'),
+    stdio: 'pipe'
+  });
+  
+  let output = '';
+  let errorOutput = '';
+  
+  child.stdout.on('data', (data) => {
+    output += data.toString();
+  });
+  
+  child.stderr.on('data', (data) => {
+    errorOutput += data.toString();
+  });
+  
+  child.on('close', (code) => {
+    if (code === 0) {
+      logger.success('干员材料数据获取成功');
+      res.json(successResponse({ output }, '干员材料数据获取成功'));
+    } else {
+      logger.error('干员材料数据获取失败', { code, errorOutput });
+      res.status(500).json(errorResponse(new Error(`获取失败: ${errorOutput || '未知错误'}`)));
+    }
+  });
+  
+  child.on('error', (error) => {
+    logger.error('执行脚本失败', { error: error.message });
+    res.status(500).json(errorResponse(error));
+  });
+}));
+
 export default router;
