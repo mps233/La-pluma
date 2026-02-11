@@ -430,9 +430,13 @@ export const maaApi = {
   /**
    * 更新 MaaCore
    */
-  async updateMaaCore(): Promise<ApiResponse> {
+  async updateMaaCore(version?: string): Promise<ApiResponse> {
     const response = await fetch(`${API_BASE_URL}/maa/update-core`, {
       method: 'POST',
+      headers: version ? {
+        'Content-Type': 'application/json',
+      } : undefined,
+      body: version ? JSON.stringify({ version }) : undefined,
     })
     return response.json()
   },
@@ -442,6 +446,16 @@ export const maaApi = {
    */
   async updateMaaCli(): Promise<ApiResponse> {
     const response = await fetch(`${API_BASE_URL}/maa/update-cli`, {
+      method: 'POST',
+    })
+    return response.json()
+  },
+
+  /**
+   * 热更新资源文件
+   */
+  async hotUpdateResources(): Promise<ApiResponse> {
+    const response = await fetch(`${API_BASE_URL}/maa/hot-update`, {
       method: 'POST',
     })
     return response.json()
@@ -466,6 +480,22 @@ export const maaApi = {
    */
   async getAutoUpdateStatus(): Promise<ApiResponse> {
     const response = await fetch(`${API_BASE_URL}/maa/auto-update/status`)
+    return response.json()
+  },
+
+  /**
+   * 获取 MaaCore 更新日志（最新的 Beta 和正式版）
+   */
+  async getMaaCoreChangelog(): Promise<ApiResponse> {
+    const response = await fetch(`${API_BASE_URL}/maa/changelog/core`)
+    return response.json()
+  },
+
+  /**
+   * 获取 MAA CLI 更新日志（最新的正式版）
+   */
+  async getMaaCliChangelog(): Promise<ApiResponse> {
+    const response = await fetch(`${API_BASE_URL}/maa/changelog/cli`)
     return response.json()
   },
 

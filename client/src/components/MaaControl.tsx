@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { 
   MaaControlProps, 
   MaaTask, 
@@ -13,6 +13,12 @@ import type {
 
 import { maaApi } from '../services/api'
 
+interface MaaVersionInfo {
+  cli: string
+  core: string
+  raw: string
+}
+
 export default function MaaControl(_props: MaaControlProps = {}) {
   const [isRunning, setIsRunning] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string>('')
@@ -24,6 +30,22 @@ export default function MaaControl(_props: MaaControlProps = {}) {
   const [expandedCategory, setExpandedCategory] = useState<string>('automation')
   const [showAdvanced, setShowAdvanced] = useState<MaaShowAdvanced>({})
   const [advancedParams, setAdvancedParams] = useState<MaaAdvancedParams>({})
+  const [versionInfo, setVersionInfo] = useState<MaaVersionInfo | null>(null)
+
+  // 加载版本信息
+  useEffect(() => {
+    const loadVersion = async () => {
+      try {
+        const result = await maaApi.getVersion()
+        if (result.success && result.data) {
+          setVersionInfo(result.data)
+        }
+      } catch (error) {
+        // 静默失败
+      }
+    }
+    loadVersion()
+  }, [])
 
   const taskCategories: Record<string, MaaTaskCategory> = {
     automation: {
@@ -457,9 +479,25 @@ export default function MaaControl(_props: MaaControlProps = {}) {
       {/* 状态卡片 */}
       <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex-1">
             <h2 className="text-2xl font-bold">MAA 控制中心</h2>
             <p className="text-blue-100 mt-1">明日方舟自动化助手</p>
+            {versionInfo && (
+              <div className="mt-2 flex items-center gap-4 text-xs text-blue-100">
+                <span className="flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  MAA CLI {versionInfo.cli}
+                </span>
+                <span className="flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                  </svg>
+                  MaaCore {versionInfo.core}
+                </span>
+              </div>
+            )}
           </div>
           <div className="flex items-center space-x-3">
             <div className={`w-4 h-4 rounded-full ${isRunning ? 'bg-green-400 animate-pulse' : 'bg-white/50'}`}></div>

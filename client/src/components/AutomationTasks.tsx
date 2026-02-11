@@ -329,7 +329,25 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     const currentTask = newFlow[index]
     if (!currentTask) return
     
-    currentTask.params[key] = value
+    // 如果修改的是 stages 参数，需要对关卡进行排序
+    if (key === 'stages' && Array.isArray(value)) {
+      // 分类：置顶关卡、智能养成关卡、普通关卡
+      const pinnedStages = value.filter((s): s is StageConfig => 
+        typeof s === 'object' && s.pinned === true && !!s.stage && s.stage.trim() !== ''
+      );
+      const smartStages = value.filter((s): s is StageConfig => 
+        typeof s === 'object' && s.smart === true && !!s.stage && s.stage.trim() !== ''
+      );
+      const normalStages = value.filter((s): s is string | StageConfig => 
+        (typeof s === 'string' && s.trim() !== '') || 
+        (typeof s === 'object' && !s.pinned && !s.smart && !!s.stage && s.stage.trim() !== '')
+      );
+      
+      // 重新组合：置顶 -> 智能养成 -> 普通
+      currentTask.params[key] = [...pinnedStages, ...smartStages, ...normalStages];
+    } else {
+      currentTask.params[key] = value;
+    }
     
     // 如果修改的是启动游戏的客户端类型，同步到关闭游戏
     if (currentTask.commandId === 'startup' && key === 'clientType') {

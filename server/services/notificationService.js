@@ -200,6 +200,10 @@ class TelegramChannel extends NotificationChannel {
     // 使用 FormData 发送图片
     const FormData = (await import('form-data')).default;
     const formData = new FormData();
+    
+    // 增加事件监听器限制，避免内存泄漏警告
+    formData.setMaxListeners(20);
+    
     formData.append('chat_id', this.config.chatId);
     formData.append('photo', imageBuffer, { filename: 'screenshot.png' });
     formData.append('caption', caption);

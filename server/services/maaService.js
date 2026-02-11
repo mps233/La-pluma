@@ -301,7 +301,26 @@ export async function execMaaCommand(command, args = [], taskName = null, taskTy
  */
 export async function getMaaVersion(silent = false) {
   const result = await execMaaCommand('version', [], false, silent);
-  return result.stdout;
+  const output = result.stdout;
+  
+  // 解析版本信息
+  // 输出格式: "maa-cli v0.7.0\nMaaCore v6.2.3\n"
+  const lines = output.trim().split('\n');
+  const versions = {
+    raw: output,
+    cli: '',
+    core: ''
+  };
+  
+  for (const line of lines) {
+    if (line.startsWith('maa-cli')) {
+      versions.cli = line.replace('maa-cli', '').trim();
+    } else if (line.startsWith('MaaCore')) {
+      versions.core = line.replace('MaaCore', '').trim();
+    }
+  }
+  
+  return versions;
 }
 
 /**

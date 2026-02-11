@@ -272,8 +272,29 @@ router.post('/logs/cleanup', asyncHandler(async (req, res) => {
 
 // 更新 MaaCore
 router.post('/update-core', asyncHandler(async (req, res) => {
-  const result = await execMaaCommand('update', []);
-  res.json(successResponse(result));
+  const { version } = req.body;
+  
+  try {
+    if (version === 'beta') {
+      // 切换到 Beta 渠道
+      logger.info('切换到 Beta 渠道');
+      const result = await execMaaCommand('install', ['beta', '--force']);
+      res.json(successResponse(result, '已切换到 Beta 渠道'));
+    } else if (version === 'stable') {
+      // 切换到正式版渠道
+      logger.info('切换到正式版渠道');
+      const result = await execMaaCommand('install', ['stable', '--force']);
+      res.json(successResponse(result, '已切换到正式版渠道'));
+    } else {
+      // 更新当前渠道到最新版本
+      logger.info('更新 MaaCore 到最新版本');
+      const result = await execMaaCommand('update', []);
+      res.json(successResponse(result, '已更新 MaaCore 到最新版本'));
+    }
+  } catch (error) {
+    logger.error('更新 MaaCore 失败', { error: error.message, version });
+    res.json(errorResponse(error, `更新失败: ${error.message}`));
+  }
 }));
 
 // 更新 MAA CLI
@@ -314,6 +335,46 @@ router.post('/update-cli', asyncHandler(async (req, res) => {
   }
 }));
 
+// 热更新资源文件
+router.post('/hot-update', asyncHandler(async (req, res) => {
+  logger.info('开始热更新资源文件');
+  
+  const { spawn } = await import('child_process');
+  const { fileURLToPath } = await import('url');
+  const { dirname, join } = await import('path');
+  
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+  const scriptPath = join(__dirname, '../scripts/update-maa-resources.js');
+  
+  // 使用 spawn 执行脚本
+  const child = spawn('node', [scriptPath], {
+    cwd: join(__dirname, '..'),
+    stdio: 'pipe'
+  });
+  
+  let output = '';
+  let errorOutput = '';
+  
+  child.stdout.on('data', (data) => {
+    output += data.toString();
+  });
+  
+  child.stderr.on('data', (data) => {
+    errorOutput += data.toString();
+  });
+  
+  child.on('close', (code) => {
+    if (code === 0) {
+      logger.success('资源文件热更新成功');
+      res.json(successResponse({ output }, '资源文件更新成功'));
+    } else {
+      logger.error('资源文件热更新失败', { code, errorOutput });
+      res.status(500).json(errorResponse(new Error(`更新失败: ${errorOutput || output || '未知错误'}`)));
+    }
+  });
+}));
+
 // 设置自动更新
 router.post('/auto-update', asyncHandler(async (req, res) => {
   const config = req.body;
@@ -325,6 +386,99 @@ router.post('/auto-update', asyncHandler(async (req, res) => {
 router.get('/auto-update/status', asyncHandler(async (req, res) => {
   const status = getAutoUpdateStatus();
   res.json(successResponse(status));
+}));
+
+// 获取 MaaCore 更新日志
+router.get('/changelog/core', asyncHandler(async (req, res) => {
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/MaaAssistantArknights/MaaAssistantArknights/releases?per_page=100`,
+      {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'MAA-WebUI'
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`GitHub API 请求失败: ${response.status}`);
+    }
+    
+    const releases = await response.json();
+    
+    // 找到最新的 Beta 版本和最新的正式版本
+    const latestBeta = releases.find(release => release.prerelease);
+    const latestStable = releases.find(release => !release.prerelease);
+    
+    const changelog = [];
+    
+    // Beta 版在前
+    if (latestBeta) {
+      changelog.push({
+        version: latestBeta.tag_name,
+        name: latestBeta.name,
+        body: latestBeta.body,
+        publishedAt: latestBeta.published_at,
+        htmlUrl: latestBeta.html_url,
+        prerelease: latestBeta.prerelease
+      });
+    }
+    
+    // 正式版在后
+    if (latestStable) {
+      changelog.push({
+        version: latestStable.tag_name,
+        name: latestStable.name,
+        body: latestStable.body,
+        publishedAt: latestStable.published_at,
+        htmlUrl: latestStable.html_url,
+        prerelease: latestStable.prerelease
+      });
+    }
+    
+    res.json(successResponse(changelog));
+  } catch (error) {
+    logger.error('获取 MaaCore 更新日志失败', { error: error.message });
+    res.json(errorResponse(`获取更新日志失败: ${error.message}`));
+  }
+}));
+
+// 获取 MAA CLI 更新日志
+router.get('/changelog/cli', asyncHandler(async (req, res) => {
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/MaaAssistantArknights/maa-cli/releases?per_page=100`,
+      {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'MAA-WebUI'
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`GitHub API 请求失败: ${response.status}`);
+    }
+    
+    const releases = await response.json();
+    // MAA CLI 只显示最新的正式版
+    const latestStable = releases.find(release => !release.prerelease);
+    
+    const changelog = latestStable ? [{
+      version: latestStable.tag_name,
+      name: latestStable.name,
+      body: latestStable.body,
+      publishedAt: latestStable.published_at,
+      htmlUrl: latestStable.html_url,
+      prerelease: latestStable.prerelease
+    }] : [];
+    
+    res.json(successResponse(changelog));
+  } catch (error) {
+    logger.error('获取 MAA CLI 更新日志失败', { error: error.message });
+    res.json(errorResponse(`获取更新日志失败: ${error.message}`));
+  }
 }));
 
 // ========== 用户配置存储 API ==========
@@ -576,25 +730,88 @@ router.get('/copilot/search', asyncHandler(async (req, res) => {
     return res.status(400).json(errorResponse(new Error('请提供关卡名称')));
   }
   
-  const response = await fetch(`https://prts.maa.plus/copilot/query?level_keyword=${encodeURIComponent(stage)}&page=1&limit=10&order_by=hot`);
+  // 标准化关卡名称（去除空格、转大写）
+  const normalizedStage = stage.trim().toUpperCase();
+  
+  // 不使用 levelKeyword，直接获取热门作业列表，然后本地过滤
+  const response = await fetch(`https://prts.maa.plus/copilot/query?page=1&limit=100&orderBy=hot&desc=true`);
   const data = await response.json();
   
   if (data.status_code === 200 && data.data && data.data.data && data.data.data.length > 0) {
-    const copilots = data.data.data.map(item => ({
-      id: item.id,
-      uri: `maa://${item.id}`,
-      views: item.views,
-      hotScore: item.hot_score,
-      uploader: item.uploader_id,
-      title: item.doc?.title || '无标题',
-      stageName: item.stage_name || stage
-    }));
+    // 映射并过滤结果
+    let copilots = data.data.data
+      .map(item => {
+        let title = '无标题';
+        let stageName = stage;
+        
+        try {
+          // content 是 JSON 字符串，需要解析
+          const content = JSON.parse(item.content);
+          title = content.doc?.title || '无标题';
+          stageName = content.stage_name || stage;
+        } catch (e) {
+          console.error('解析作业内容失败:', e);
+        }
+        
+        return {
+          id: item.id,
+          uri: `maa://${item.id}`,
+          views: item.views,
+          hotScore: item.hot_score,
+          uploader: item.uploader_id,
+          title: title,
+          stageName: stageName,
+          normalizedStageName: stageName.trim().toUpperCase()
+        };
+      })
+      // 过滤：只保留关卡名完全匹配的结果
+      .filter(item => item.normalizedStageName === normalizedStage);
     
-    res.json(successResponse({
-      stage: stage,
-      copilots,
-      recommended: copilots[0]
-    }));
+    // 如果精确匹配没有结果，尝试包含匹配
+    if (copilots.length === 0) {
+      copilots = data.data.data
+        .map(item => {
+          let title = '无标题';
+          let stageName = stage;
+          
+          try {
+            const content = JSON.parse(item.content);
+            title = content.doc?.title || '无标题';
+            stageName = content.stage_name || stage;
+          } catch (e) {
+            console.error('解析作业内容失败:', e);
+          }
+          
+          return {
+            id: item.id,
+            uri: `maa://${item.id}`,
+            views: item.views,
+            hotScore: item.hot_score,
+            uploader: item.uploader_id,
+            title: title,
+            stageName: stageName,
+            normalizedStageName: stageName.trim().toUpperCase()
+          };
+        })
+        // 包含匹配：关卡名包含搜索词
+        .filter(item => item.normalizedStageName.includes(normalizedStage));
+    }
+    
+    // 移除 normalizedStageName 字段
+    copilots = copilots.map(({ normalizedStageName, ...rest }) => rest);
+    
+    if (copilots.length > 0) {
+      res.json(successResponse({
+        stage: stage,
+        copilots: copilots.slice(0, 10), // 最多返回10个结果
+        recommended: copilots[0]
+      }));
+    } else {
+      res.json(errorResponse(
+        new Error(`未找到关卡"${stage}"的作业`),
+        `未找到关卡"${stage}"的作业`
+      ));
+    }
   } else {
     res.json(errorResponse(
       new Error(`未找到关卡"${stage}"的作业`),
