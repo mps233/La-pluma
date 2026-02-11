@@ -207,7 +207,7 @@ export default function LogViewer({}: LogViewerProps) {
         gradientTo="indigo-400"
       />
 
-      <Card animated delay={0.1}>
+      <Card animated delay={0.1} theme="cyan">
         <CardContent>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -239,8 +239,8 @@ export default function LogViewer({}: LogViewerProps) {
               <Button
                 onClick={exportLogs}
                 variant="gradient"
-                gradientFrom="cyan-500"
-                gradientTo="blue-500"
+                gradientFrom="cyan"
+                gradientTo="blue"
                 size="sm"
               >
                 导出日志
@@ -250,7 +250,7 @@ export default function LogViewer({}: LogViewerProps) {
         </CardContent>
       </Card>
 
-      <Card animated delay={0.2}>
+      <Card animated delay={0.2} theme="cyan">
         <CardHeader 
           title={viewingHistory ? `历史日志: ${selectedFile?.name}` : '实时日志'}
           actions={
@@ -306,7 +306,7 @@ export default function LogViewer({}: LogViewerProps) {
         </CardContent>
       </Card>
 
-      <Card animated delay={0.3}>
+      <Card animated delay={0.3} theme="cyan">
         <CardHeader 
           title="历史日志文件"
           actions={

@@ -8,7 +8,7 @@ export default function DropRecords({ dropStatistics, dropDays, setDropDays, onR
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="border rounded-3xl p-6 border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/60"
+        className="border rounded-3xl p-6 border-cyan-200 dark:border-cyan-500/20 bg-gradient-to-br from-cyan-50/50 to-blue-50/50 dark:from-cyan-900/5 dark:to-blue-900/5"
       >
         <div className="text-center py-12">
           <Icons.TrendingUp className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
@@ -120,7 +120,7 @@ export default function DropRecords({ dropStatistics, dropDays, setDropDays, onR
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="border rounded-3xl p-6 border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/60"
+        className="border rounded-3xl p-6 border-cyan-200 dark:border-cyan-500/20 bg-gradient-to-br from-cyan-50/50 to-blue-50/50 dark:from-cyan-900/5 dark:to-blue-900/5"
       >
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center space-x-2">
           {/* @ts-ignore - Icons component className */}
@@ -181,7 +181,7 @@ export default function DropRecords({ dropStatistics, dropDays, setDropDays, onR
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="border rounded-3xl p-6 border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/60"
+        className="border rounded-3xl p-6 border-cyan-200 dark:border-cyan-500/20 bg-gradient-to-br from-cyan-50/50 to-blue-50/50 dark:from-cyan-900/5 dark:to-blue-900/5"
       >
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center space-x-2">
           {/* @ts-ignore - Icons component className */}

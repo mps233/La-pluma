@@ -306,7 +306,7 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
           return (
             <Card 
               key={task.id}
-              hover
+              theme="purple"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center space-x-3">
@@ -319,8 +319,8 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
                   onClick={() => handleExecute(task)}
                   disabled={isRunning}
                   variant="gradient"
-                  gradientFrom="purple-500"
-                  gradientTo="fuchsia-500"
+                  gradientFrom="purple"
+                  gradientTo="fuchsia"
                   size="sm"
                   icon={
                     <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">

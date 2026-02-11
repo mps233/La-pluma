@@ -57,8 +57,26 @@ export default function Button({
     danger: 'bg-gradient-to-r from-rose-500 to-red-500 text-white hover:from-rose-600 hover:to-red-600 shadow-lg shadow-rose-500/25 hover:shadow-xl hover:shadow-rose-500/30 disabled:from-gray-700 disabled:to-gray-700 disabled:shadow-none',
     success: 'bg-gradient-to-r from-emerald-500 to-green-500 text-white hover:from-emerald-600 hover:to-green-600 shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 disabled:from-gray-700 disabled:to-gray-700 disabled:shadow-none',
     ghost: 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5',
-    gradient: 'bg-gradient-to-r from-violet-500 to-purple-500 text-white hover:from-violet-600 hover:to-purple-600 shadow-lg shadow-violet-500/25 hover:shadow-xl hover:shadow-violet-500/30 disabled:from-gray-700 disabled:to-gray-700 disabled:shadow-none',
+    gradient: 'bg-gradient-to-r text-white shadow-lg hover:shadow-xl disabled:from-gray-700 disabled:to-gray-700 disabled:shadow-none',
     outline: 'text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-gray-800/60',
+  }
+  
+  // 预定义的渐变色组合
+  const gradientPresets: Record<string, string> = {
+    // 紫色系 (自动化任务)
+    'violet-purple': 'from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 shadow-violet-500/25 hover:shadow-violet-500/30',
+    // 绿色系 (自动战斗 - 旧版)
+    'emerald-teal': 'from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-emerald-500/25 hover:shadow-emerald-500/30',
+    // 青绿色系 (自动战斗 - 新版)
+    'teal-cyan': 'from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 shadow-teal-500/25 hover:shadow-teal-500/30',
+    // 粉紫色系 (肉鸽)
+    'purple-fuchsia': 'from-purple-500 to-fuchsia-500 hover:from-purple-600 hover:to-fuchsia-600 shadow-purple-500/25 hover:shadow-purple-500/30',
+    // 橙红色系 (配置管理)
+    'orange-red': 'from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 shadow-orange-500/25 hover:shadow-orange-500/30',
+    // 青蓝色系 (数据统计/日志)
+    'cyan-blue': 'from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 shadow-cyan-500/25 hover:shadow-cyan-500/30',
+    // 黄橙色系 (智能养成)
+    'amber-yellow': 'from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 shadow-amber-500/25 hover:shadow-amber-500/30',
   }
   
   const sizeStyles: Record<string, string> = {
@@ -69,6 +87,13 @@ export default function Button({
   
   const widthStyles = fullWidth ? 'w-full' : ''
   
+  // 处理自定义渐变色
+  let gradientStyles = ''
+  if (variant === 'gradient' && gradientFrom && gradientTo) {
+    const presetKey = `${gradientFrom}-${gradientTo}`
+    gradientStyles = gradientPresets[presetKey] || gradientPresets['violet-purple']
+  }
+  
   const isDisabled = disabled || loading
   
   return (
@@ -76,7 +101,7 @@ export default function Button({
       type={type}
       onClick={onClick}
       disabled={isDisabled}
-      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${widthStyles} ${isDisabled ? 'cursor-not-allowed opacity-50' : ''} ${className}`}
+      className={`${baseStyles} ${variantStyles[variant]} ${variant === 'gradient' ? gradientStyles : ''} ${sizeStyles[size]} ${widthStyles} ${isDisabled ? 'cursor-not-allowed opacity-50' : ''} ${className}`}
       whileHover={isDisabled ? {} : { scale: 1.02 }}
       whileTap={isDisabled ? {} : { scale: 0.98 }}
       {...props}

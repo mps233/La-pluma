@@ -1212,7 +1212,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                         currentStep === index 
                           ? 'border-violet-500/60 bg-gradient-to-br from-violet-500/10 to-purple-500/10 shadow-[0_8px_20px_rgb(139,92,246,0.25)] ring-1 ring-violet-500/30' 
                           : task.enabled 
-                            ? 'border-gray-200 dark:border-white/10 hover:border-violet-500/30 hover:shadow-[0_4px_12px_rgb(0,0,0,0.2)] bg-white dark:bg-[rgba(15,15,15,0.6)]' 
+                            ? 'border-violet-200 dark:border-violet-500/20 hover:border-violet-500/30 hover:shadow-[0_4px_12px_rgba(139,92,246,0.15)] bg-gradient-to-br from-violet-50/50 to-purple-50/50 dark:from-violet-900/5 dark:to-purple-900/5' 
                             : 'border-gray-100 dark:border-white/5 opacity-60 bg-gray-50 dark:bg-[rgba(15,15,15,0.3)]'
                       }`}
                     >

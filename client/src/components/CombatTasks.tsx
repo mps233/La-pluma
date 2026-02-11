@@ -470,9 +470,9 @@ export default function CombatTasks(_props: CombatTasksProps) {
                   type="checkbox"
                   checked={advanced[option.key] as boolean || false}
                   onChange={(e) => handleAdvancedChange(task.id, option.key, e.target.checked)}
-                  className="custom-checkbox-emerald cursor-pointer"
+                  className="custom-checkbox-teal cursor-pointer"
                 />
-                <span className="group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{option.label}</span>
+                <span className="group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">{option.label}</span>
               </label>
             ) : option.type === 'select' && option.options ? (
               <div className="flex items-center space-x-2 flex-1">
@@ -480,7 +480,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                 <select
                   value={(advanced[option.key] as string) || (option.options[0]?.value || '')}
                   onChange={(e) => handleAdvancedChange(task.id, option.key, e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-white/10 hover:border-emerald-400 dark:hover:border-emerald-500/50 rounded-xl text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-white/10 hover:border-teal-400 dark:hover:border-teal-500/50 rounded-xl text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
                 >
                   {option.options.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -495,7 +495,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                   value={advanced[option.key] as string || ''}
                   onChange={(e) => handleAdvancedChange(task.id, option.key, e.target.value)}
                   placeholder={option.placeholder}
-                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-white/10 hover:border-emerald-400 dark:hover:border-emerald-500/50 rounded-xl text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-white/10 hover:border-teal-400 dark:hover:border-teal-500/50 rounded-xl text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
                 />
               </div>
             )}
@@ -512,16 +512,16 @@ export default function CombatTasks(_props: CombatTasksProps) {
           icon={<Icons.TargetIcon />}
           title="自动战斗"
           subtitle="使用作业自动完成关卡 - 所有修改自动保存"
-          gradientFrom="emerald-400"
-          gradientVia="green-400"
-          gradientTo="teal-400"
+          gradientFrom="teal-400"
+          gradientVia="cyan-400"
+          gradientTo="blue-400"
           actions={
             <StatusIndicator
               isActive={isRunning}
               message={statusMessage}
               activeText="运行中"
               inactiveText="就绪"
-              activeColor="emerald-400"
+              activeColor="teal-400"
             />
           }
         />
@@ -533,7 +533,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
             return (
               <div 
                 key={task.id} 
-                className="rounded-3xl p-6 border border-gray-200 dark:border-white/10 hover:border-emerald-400 dark:hover:border-emerald-500/30 transition-all bg-white dark:bg-gray-900/60"
+                className="rounded-3xl p-6 border border-gray-200 dark:border-white/10 hover:border-teal-400 dark:hover:border-teal-500/30 transition-all bg-white dark:bg-gray-900/60 hover:shadow-lg"
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-3">
@@ -547,8 +547,8 @@ export default function CombatTasks(_props: CombatTasksProps) {
                     onClick={() => handleExecute(task)}
                     disabled={isRunning}
                     variant="gradient"
-                    gradientFrom="emerald-500"
-                    gradientTo="teal-500"
+                    gradientFrom="teal"
+                    gradientTo="cyan"
                     size="md"
                     icon={
                       <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -568,12 +568,12 @@ export default function CombatTasks(_props: CombatTasksProps) {
                   {/* 左侧：输入区域 */}
                   <div className="space-y-3">
                     {/* 关卡搜索 */}
-                    <div className="rounded-2xl p-4 border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-900/10">
+                    <div className="rounded-2xl p-4 border border-teal-200 dark:border-teal-500/20 bg-teal-50 dark:bg-teal-900/10">
                       <div className="flex items-center space-x-2 mb-3">
-                        <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
-                        <h5 className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">快速搜索</h5>
+                        <h5 className="text-sm font-semibold text-teal-900 dark:text-teal-100">快速搜索</h5>
                       </div>
                       <div className="flex space-x-2">
                         <input
@@ -582,7 +582,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                           value={copilotSearchStage}
                           onChange={(e) => setCopilotSearchStage(e.target.value)}
                           onKeyPress={(e) => e.key === 'Enter' && handleSearchCopilot()}
-                          className="flex-1 px-4 py-2 border border-emerald-300 dark:border-emerald-500/30 rounded-xl text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          className="flex-1 px-4 py-2 border border-teal-300 dark:border-teal-500/30 rounded-xl text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
                         />
                         <Button
                           onClick={handleSearchCopilot}
@@ -606,7 +606,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                       {/* 搜索结果 */}
                       {copilotSearchResult && copilotSearchResult.copilots && (
                         <div className="mt-3 space-y-2">
-                          <div className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">
+                          <div className="text-xs text-teal-700 dark:text-teal-300 font-medium">
                             找到 {copilotSearchResult.stage} 的 {copilotSearchResult.copilots.length} 个作业：
                           </div>
                           <div className="space-y-1 max-h-32 overflow-y-auto">
@@ -620,19 +620,19 @@ export default function CombatTasks(_props: CombatTasksProps) {
                                   onClick={() => {
                                     setTaskInputs({ ...taskInputs, copilot: copilot.uri })
                                   }}
-                                  className="w-full text-left px-3 py-2 rounded-lg bg-white dark:bg-gray-800/60 border border-emerald-200 dark:border-emerald-500/20 hover:border-emerald-400 dark:hover:border-emerald-500/40 transition-all text-xs"
+                                  className="w-full text-left px-3 py-2 rounded-lg bg-white dark:bg-gray-800/60 border border-teal-200 dark:border-teal-500/20 hover:border-teal-400 dark:hover:border-teal-500/40 transition-all text-xs"
                                 >
                                   <div className="flex items-center justify-between mb-1">
                                     <div className="flex items-center space-x-2">
-                                      <span className="px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded font-mono text-xs font-medium">{copilot.stageName}</span>
+                                      <span className="px-1.5 py-0.5 bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded font-mono text-xs font-medium">{copilot.stageName}</span>
                                       <span className="text-gray-900 dark:text-gray-100 font-medium">{copilot.title}</span>
                                     </div>
                                     {idx === 0 && (
-                                      <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded text-xs font-medium">推荐</span>
+                                      <span className="px-2 py-0.5 bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded text-xs font-medium">推荐</span>
                                     )}
                                   </div>
                                   <div className="flex items-center justify-between">
-                                    <span className="font-mono text-emerald-600 dark:text-emerald-400 text-xs">{copilot.uri}</span>
+                                    <span className="font-mono text-teal-600 dark:text-teal-400 text-xs">{copilot.uri}</span>
                                   </div>
                                   <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400 mt-1">
                                     <span>浏览 {copilot.views.toLocaleString()}</span>
@@ -659,7 +659,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                         value={taskInputs[task.id] || ''}
                         onChange={(e) => handleInputChange(task.id, e.target.value)}
                         rows={3}
-                        className="flex-1 px-4 py-3 border border-gray-300 dark:border-white/10 rounded-2xl text-sm font-medium text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none font-mono transition-all"
+                        className="flex-1 px-4 py-3 border border-gray-300 dark:border-white/10 rounded-2xl text-sm font-medium text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none font-mono transition-all"
                       />
                       <Button
                         onClick={handlePreviewCopilotSet}
@@ -727,7 +727,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                         <span>使用说明</span>
                       </h3>
                       <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-                        <li>• 访问 <a href="https://zoot.plus/" target="_blank" rel="noopener noreferrer" className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:underline transition-colors">zoot.plus</a> 获取作业 URI</li>
+                        <li>• 访问 <a href="https://zoot.plus/" target="_blank" rel="noopener noreferrer" className="text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 hover:underline transition-colors">zoot.plus</a> 获取作业 URI</li>
                         <li>• <strong className="text-gray-800 dark:text-gray-300">单个作业</strong>：maa://1234</li>
                         <li>• <strong className="text-gray-800 dark:text-gray-300">作业集</strong>：maa://1234s</li>
                         <li>• 支持多行输入，每行一个 URI</li>
@@ -746,9 +746,9 @@ export default function CombatTasks(_props: CombatTasksProps) {
                           type="checkbox"
                           checked={autoFormation[task.id] !== false}
                           onChange={(e) => setAutoFormation({ ...autoFormation, [task.id]: e.target.checked })}
-                          className="custom-checkbox-emerald cursor-pointer"
+                          className="custom-checkbox-teal cursor-pointer"
                         />
-                        <span className="group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">自动编队</span>
+                        <span className="group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">自动编队</span>
                       </label>
                       
                       {/* 突袭模式 */}
@@ -760,7 +760,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                         <select
                           value={advancedParams[task.id]?.raid as string || '0'}
                           onChange={(e) => handleAdvancedChange(task.id, 'raid', e.target.value)}
-                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-white/10 hover:border-emerald-400 dark:hover:border-emerald-500/50 rounded-xl text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-white/10 hover:border-teal-400 dark:hover:border-teal-500/50 rounded-xl text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
                         >
                           <option value="0">普通模式</option>
                           <option value="1">突袭模式</option>
@@ -788,7 +788,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
               return (
                 <div 
                   key={task.id} 
-                  className="rounded-3xl p-6 border border-gray-200 dark:border-white/10 hover:border-emerald-400 dark:hover:border-emerald-500/30 transition-all bg-white dark:bg-gray-900/60"
+                  className="rounded-3xl p-6 border border-gray-200 dark:border-white/10 hover:border-teal-400 dark:hover:border-teal-500/30 transition-all bg-white dark:bg-gray-900/60 hover:shadow-lg"
                 >
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-3">
@@ -802,8 +802,8 @@ export default function CombatTasks(_props: CombatTasksProps) {
                       onClick={() => handleExecute(task)}
                       disabled={isRunning}
                       variant="gradient"
-                      gradientFrom="emerald-500"
-                      gradientTo="teal-500"
+                      gradientFrom="teal"
+                      gradientTo="cyan"
                       size="md"
                       icon={
                         <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -822,12 +822,12 @@ export default function CombatTasks(_props: CombatTasksProps) {
                   <div className="grid grid-cols-1 gap-4 mb-5">
                     {/* 悖论模拟：干员名字搜索 */}
                     {task.id === 'paradoxcopilot' && (
-                      <div className="rounded-2xl p-4 border border-emerald-200 dark:border-emerald-500/20 bg-emerald-50 dark:bg-emerald-900/10">
+                      <div className="rounded-2xl p-4 border border-teal-200 dark:border-teal-500/20 bg-teal-50 dark:bg-teal-900/10">
                         <div className="flex items-center space-x-2 mb-3">
-                          <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                           </svg>
-                          <h5 className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">快速搜索</h5>
+                          <h5 className="text-sm font-semibold text-teal-900 dark:text-teal-100">快速搜索</h5>
                         </div>
                         <div className="flex space-x-2">
                           <input
@@ -836,7 +836,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                             value={paradoxSearchName}
                             onChange={(e) => setParadoxSearchName(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && handleSearchParadox()}
-                            className="flex-1 px-4 py-2 border border-emerald-300 dark:border-emerald-500/30 rounded-xl text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                            className="flex-1 px-4 py-2 border border-teal-300 dark:border-teal-500/30 rounded-xl text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
                           />
                           <Button
                             onClick={handleSearchParadox}
@@ -860,7 +860,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                         {/* 搜索结果 */}
                         {paradoxSearchResult && paradoxSearchResult.copilots && (
                           <div className="mt-3 space-y-2">
-                            <div className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">
+                            <div className="text-xs text-teal-700 dark:text-teal-300 font-medium">
                               找到 {paradoxSearchResult.operator} 的 {paradoxSearchResult.copilots.length} 个作业：
                             </div>
                             <div className="space-y-1 max-h-32 overflow-y-auto">
@@ -874,12 +874,12 @@ export default function CombatTasks(_props: CombatTasksProps) {
                                     onClick={() => {
                                       setTaskInputs({ ...taskInputs, paradoxcopilot: copilot.uri })
                                     }}
-                                    className="w-full text-left px-3 py-2 rounded-lg bg-white dark:bg-gray-800/60 border border-emerald-200 dark:border-emerald-500/20 hover:border-emerald-400 dark:hover:border-emerald-500/40 transition-all text-xs"
+                                    className="w-full text-left px-3 py-2 rounded-lg bg-white dark:bg-gray-800/60 border border-teal-200 dark:border-teal-500/20 hover:border-teal-400 dark:hover:border-teal-500/40 transition-all text-xs"
                                   >
                                     <div className="flex items-center justify-between">
-                                      <span className="font-mono text-emerald-600 dark:text-emerald-400">{copilot.uri}</span>
+                                      <span className="font-mono text-teal-600 dark:text-teal-400">{copilot.uri}</span>
                                       {idx === 0 && (
-                                        <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded text-xs font-medium">推荐</span>
+                                        <span className="px-2 py-0.5 bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded text-xs font-medium">推荐</span>
                                       )}
                                     </div>
                                     <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400 mt-1">
@@ -908,7 +908,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                       value={taskInputs[task.id] || ''}
                       onChange={(e) => handleInputChange(task.id, e.target.value)}
                       rows={2}
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-white/10 rounded-2xl text-sm font-medium text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none font-mono transition-all"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-white/10 rounded-2xl text-sm font-medium text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none font-mono transition-all"
                     />
                     
                     {/* 选项区域 */}

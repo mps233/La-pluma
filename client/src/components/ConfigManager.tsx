@@ -369,7 +369,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
           }
         />
 
-        <Card animated delay={0.1}>
+        <Card animated delay={0.1} theme="orange">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">配置目录</h2>
@@ -385,7 +385,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
           </div>
         </Card>
 
-        <Card animated delay={0.15}>
+        <Card animated delay={0.15} theme="orange">
           <CardHeader title="更新管理" />
           <CardContent>
             {/* 自动更新设置 */}
@@ -452,8 +452,8 @@ export default function ConfigManager({}: ConfigManagerProps) {
                         onClick={handleHotUpdate}
                         disabled={hotUpdating}
                         variant="gradient"
-                        gradientFrom="orange-500"
-                        gradientTo="red-500"
+                        gradientFrom="orange"
+                        gradientTo="red"
                         fullWidth
                         icon={hotUpdating ? (
                           <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -508,8 +508,8 @@ export default function ConfigManager({}: ConfigManagerProps) {
                     onClick={handleUpdateCore}
                     disabled={updating.core}
                     variant="gradient"
-                    gradientFrom="orange-500"
-                    gradientTo="red-500"
+                    gradientFrom="orange"
+                    gradientTo="red"
                     className="flex-1"
                     icon={updating.core ? (
                       <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -631,8 +631,8 @@ export default function ConfigManager({}: ConfigManagerProps) {
                   onClick={handleUpdateCli}
                   disabled={updating.cli}
                   variant="gradient"
-                  gradientFrom="orange-500"
-                  gradientTo="red-500"
+                  gradientFrom="orange"
+                  gradientTo="red"
                   fullWidth
                   icon={updating.cli ? (
                     <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -695,7 +695,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
           {/* 配置类型选择 */}
           <div className="lg:col-span-1">
             <motion.div 
-              className="rounded-3xl border border-gray-200 dark:border-white/10 overflow-hidden bg-white dark:bg-gray-900/60"
+              className="rounded-3xl border border-orange-200 dark:border-orange-500/20 overflow-hidden bg-gradient-to-br from-orange-50/50 to-red-50/50 dark:from-orange-900/5 dark:to-red-900/5"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
@@ -730,7 +730,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
 
           {/* 配置编辑器 */}
           <div className="lg:col-span-3">
-            <Card animated delay={0.2}>
+            <Card animated delay={0.2} theme="orange">
               <CardHeader 
                 title={configSections.find(s => s.id === configType)?.name || '配置'}
                 actions={

@@ -559,7 +559,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
             className={`border rounded-3xl p-6 transition-all ${
               activeTask === 'operbox' && isRunning
                 ? 'border-cyan-500/60 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 shadow-[0_8px_20px_rgb(34,211,238,0.25)] ring-1 ring-cyan-500/30'
-                : 'border-gray-200 dark:border-white/10 hover:border-cyan-400 dark:hover:border-cyan-500/30 hover:shadow-[0_4px_12px_rgb(0,0,0,0.2)] bg-white dark:bg-gray-900/60'
+                : 'border-cyan-200 dark:border-cyan-500/20 hover:border-cyan-400 dark:hover:border-cyan-500/30 hover:shadow-[0_4px_12px_rgba(6,182,212,0.15)] bg-gradient-to-br from-cyan-50/50 to-blue-50/50 dark:from-cyan-900/5 dark:to-blue-900/5'
             }`}
           >
             {/* 顶部行：图标 + 标题 + 执行按钮 */}
@@ -603,8 +603,8 @@ export default function DataStatistics({}: DataStatisticsProps) {
                       onClick={executeOperBox}
                       disabled={isRunning}
                       variant="gradient"
-                      gradientFrom="cyan-500"
-                      gradientTo="blue-500"
+                      gradientFrom="cyan"
+                      gradientTo="blue"
                       icon={
                         <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
@@ -1067,7 +1067,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
             className={`border rounded-3xl p-6 transition-all ${
               activeTask === 'depot' && isRunning
                 ? 'border-cyan-500/60 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 shadow-[0_8px_20px_rgb(34,211,238,0.25)] ring-1 ring-cyan-500/30'
-                : 'border-gray-200 dark:border-white/10 hover:border-cyan-400 dark:hover:border-cyan-500/30 hover:shadow-[0_4px_12px_rgb(0,0,0,0.2)] bg-white dark:bg-gray-900/60'
+                : 'border-cyan-200 dark:border-cyan-500/20 hover:border-cyan-400 dark:hover:border-cyan-500/30 hover:shadow-[0_4px_12px_rgba(6,182,212,0.15)] bg-gradient-to-br from-cyan-50/50 to-blue-50/50 dark:from-cyan-900/5 dark:to-blue-900/5'
             }`}
           >
             {/* 顶部行：图标 + 标题 + 执行按钮 */}
@@ -1097,8 +1097,8 @@ export default function DataStatistics({}: DataStatisticsProps) {
                     onClick={executeDepot}
                     disabled={isRunning}
                     variant="gradient"
-                    gradientFrom="cyan-500"
-                    gradientTo="blue-500"
+                    gradientFrom="cyan"
+                    gradientTo="blue"
                     icon={
                       <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />

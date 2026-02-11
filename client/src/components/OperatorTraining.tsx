@@ -782,8 +782,8 @@ export default function OperatorTraining() {
                         onClick={() => handleAddToQueue(operator)}
                         disabled={!canAdd}
                         variant="gradient"
-                        gradientFrom="amber-500"
-                        gradientTo="yellow-500"
+                        gradientFrom="amber"
+                        gradientTo="yellow"
                         size="sm"
                         fullWidth
                         className="text-xs"
@@ -833,8 +833,8 @@ export default function OperatorTraining() {
                     onClick={handleGeneratePlan}
                     disabled={loading}
                     variant="gradient"
-                    gradientFrom="amber-500"
-                    gradientTo="yellow-500"
+                    gradientFrom="amber"
+                    gradientTo="yellow"
                   >
                     {loading ? '生成中...' : '生成计划'}
                   </Button>
@@ -1027,8 +1027,8 @@ export default function OperatorTraining() {
                     onClick={handleApplyPlan}
                     disabled={loading || !plan.stages || plan.stages.length === 0}
                     variant="gradient"
-                    gradientFrom="amber-500"
-                    gradientTo="yellow-500"
+                    gradientFrom="amber"
+                    gradientTo="yellow"
                   >
                     {loading ? '应用中...' : '应用到作战任务'}
                   </Button>
