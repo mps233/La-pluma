@@ -11,6 +11,7 @@ dist
 
 # 用户配置和数据（包含敏感信息，不要提交）
 server/data/
+server/debug/
 
 # Docker 数据目录
 docker-data/

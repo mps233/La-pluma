@@ -362,7 +362,14 @@ class SklandService {
     }
     
     const elapsed = Date.now() - config.loginTime;
-    return elapsed > this.tokenRefreshThreshold;
+    const needRefresh = elapsed > this.tokenRefreshThreshold;
+    
+    // 调试日志
+    if (needRefresh) {
+      logger.debug(`[Skland] Token 需要刷新: 已过 ${Math.floor(elapsed / 1000 / 60 / 60)} 小时`);
+    }
+    
+    return needRefresh;
   }
 
   /**
@@ -378,27 +385,14 @@ class SklandService {
 
       logger.info('[Skland] 开始刷新 token...');
 
-      // 使用现有的 token 获取新的授权代码
-      const path = '/api/v1/user/auth/generate_cred_by_code';
-      const headers = this.generateHeaders(config.token, config.cred, path, '');
-      
-      // 先尝试获取绑定信息，验证当前 token 是否有效
-      const bindingResult = await this.getPlayerBinding();
-      if (!bindingResult.success) {
-        // Token 已失效，尝试自动重登
-        if (config.autoRelogin && config.savedPhone && config.savedPassword) {
-          logger.info('[Skland] Token 已失效，尝试自动重登...');
-          return await this.autoRelogin();
-        }
-        
-        logger.warn('[Skland] Token 已失效，需要重新登录');
-        return { success: false, error: 'Token 已失效，请重新登录', needRelogin: true };
-      }
-
-      // Token 仍然有效，更新登录时间即可
+      // Token 仍然有效，只需更新登录时间即可
       config.loginTime = Date.now();
       await writeJsonFile(this.configPath, config);
       logger.info('[Skland] Token 刷新成功（更新时间戳）');
+
+      // 清除缓存，强制下次重新获取数据
+      this.cache.playerInfo = null;
+      this.cache.timestamp = 0;
 
       return { success: true, message: 'Token 已刷新' };
     } catch (error) {
@@ -452,12 +446,20 @@ class SklandService {
       return { success: false, error: '未登录' };
     }
 
-    if (this.needsRefresh(config)) {
-      logger.info('[Skland] Token 即将过期，自动刷新...');
-      return await this.refreshToken();
+    // 检查是否需要刷新
+    if (!this.needsRefresh(config)) {
+      return { success: true, message: 'Token 仍然有效' };
     }
 
-    return { success: true, message: 'Token 仍然有效' };
+    // 避免重复刷新：如果上次刷新时间距离现在不到 1 分钟，跳过
+    const lastRefreshElapsed = Date.now() - config.loginTime;
+    if (lastRefreshElapsed < 60 * 1000) {
+      logger.debug('[Skland] Token 刚刚刷新过，跳过本次刷新');
+      return { success: true, message: 'Token 刚刚刷新过' };
+    }
+
+    logger.info('[Skland] Token 即将过期，自动刷新...');
+    return await this.refreshToken();
   }
 
   /**
