@@ -12,10 +12,28 @@ import stageDataService from './stageDataService.js';
 
 const logger = createLogger('SklandService');
 
+// 制造站配方 ID 到名称的映射 (来源: ArknightsGameData item_table.json)
+const MANUFACTURE_FORMULA_MAP = {
+  '1': '基础作战记录',
+  '2': '初级作战记录',
+  '3': '中级作战记录',
+  '4': '赤金',
+  '5': '先锋双芯片',
+  '6': '近卫双芯片',
+  '7': '重装双芯片',
+  '8': '狙击双芯片',
+  '9': '术师双芯片',
+  '10': '医疗双芯片',
+  '11': '辅助双芯片',
+  '12': '特种双芯片',
+  '13': '源石碎片',
+};
+
 class SklandService {
   constructor() {
     this.configPath = 'data/user-configs/skland-account.json';
     this.charactersPath = 'data/characters.json';
+    this.itemsPath = 'data/items.json';
     this.cacheExpiry = 5 * 60 * 1000; // 5分钟缓存
     this.tokenExpiry = 24 * 60 * 60 * 1000; // Token 24小时有效期
     this.tokenRefreshThreshold = 23 * 60 * 60 * 1000; // 23小时后刷新
@@ -24,6 +42,7 @@ class SklandService {
       timestamp: 0
     };
     this.characters = null; // 干员数据缓存
+    this.items = null; // 物品数据缓存
   }
 
   /**
@@ -33,13 +52,29 @@ class SklandService {
     if (this.characters) {
       return this.characters;
     }
-    
+
     try {
       this.characters = await readJsonFile(this.charactersPath);
-      logger.debug('[Skland] 干员数据加载成功，共', Object.keys(this.characters).length, '个干员');
       return this.characters;
     } catch (error) {
       logger.error('[Skland] 加载干员数据失败:', error.message);
+      return {};
+    }
+  }
+
+  /**
+   * 加载物品数据
+   */
+  async loadItems() {
+    if (this.items) {
+      return this.items;
+    }
+
+    try {
+      this.items = await readJsonFile(this.itemsPath);
+      return this.items;
+    } catch (error) {
+      logger.error('[Skland] 加载物品数据失败:', error.message);
       return {};
     }
   }
@@ -50,6 +85,14 @@ class SklandService {
   async getCharacterName(charId) {
     const characters = await this.loadCharacters();
     return characters[charId]?.name || charId;
+  }
+
+  /**
+   * 根据 itemId 获取物品名称
+   */
+  async getItemName(itemId) {
+    const items = await this.loadItems();
+    return items[itemId]?.name || itemId;
   }
 
   /**
@@ -360,16 +403,9 @@ class SklandService {
     if (!config || !config.loginTime) {
       return false;
     }
-    
+
     const elapsed = Date.now() - config.loginTime;
-    const needRefresh = elapsed > this.tokenRefreshThreshold;
-    
-    // 调试日志
-    if (needRefresh) {
-      logger.debug(`[Skland] Token 需要刷新: 已过 ${Math.floor(elapsed / 1000 / 60 / 60)} 小时`);
-    }
-    
-    return needRefresh;
+    return elapsed > this.tokenRefreshThreshold;
   }
 
   /**
@@ -454,7 +490,6 @@ class SklandService {
     // 避免重复刷新：如果上次刷新时间距离现在不到 1 分钟，跳过
     const lastRefreshElapsed = Date.now() - config.loginTime;
     if (lastRefreshElapsed < 60 * 1000) {
-      logger.debug('[Skland] Token 刚刚刷新过，跳过本次刷新');
       return { success: true, message: 'Token 刚刚刷新过' };
     }
 
@@ -510,130 +545,97 @@ class SklandService {
     try {
       const path = '/api/v1/game/player/binding';
       const headers = this.generateHeaders(config.token, config.cred, path, '');
-      
-      logger.debug('[Skland] 请求绑定角色, URL:', `https://zonai.skland.com${path}`);
-      logger.debug('[Skland] 请求头:', JSON.stringify(headers, null, 2));
-      
+
       const response = await fetch(`https://zonai.skland.com${path}`, {
         method: 'GET',
         headers: headers
       });
 
       if (!response.ok) {
-        logger.error('[Skland] HTTP 请求失败, 状态码:', response.status);
-        
         // 401 表示未授权，token 已失效
         if (response.status === 401) {
-          logger.warn('[Skland] 收到 401 错误，Token 已失效');
-          
+          logger.warn('[Skland] Token 已失效');
+
           // 如果配置了自动重新登录且保存了密码，尝试重新登录
           if (config.autoRelogin && config.savedPassword) {
             const password = this.decryptPassword(config.savedPassword);
             if (password) {
-              logger.info('[Skland] 尝试使用保存的密码自动重新登录');
               const loginResult = await this.login(config.savedPhone, password, true);
               if (loginResult.success) {
-                logger.info('[Skland] 自动重新登录成功，重试获取绑定角色');
                 // 重新获取配置后再次尝试（只重试一次）
                 const newConfig = await this.getConfig();
                 if (newConfig && newConfig.token && newConfig.cred) {
-                  logger.debug('[Skland] 使用新 token 重试, cred:', newConfig.cred);
-                  // 直接重新发起请求，不递归调用
-                  // 重要：必须重新生成 headers，因为 timestamp 和 sign 都需要更新
                   try {
                     const retryHeaders = this.generateHeaders(newConfig.token, newConfig.cred, path, '');
-                    logger.debug('[Skland] 重试请求头（新生成）:', JSON.stringify(retryHeaders, null, 2));
-                    
+
                     const retryResponse = await fetch(`https://zonai.skland.com${path}`, {
                       method: 'GET',
                       headers: retryHeaders
                     });
-                    
-                    logger.info('[Skland] 重试请求状态码:', retryResponse.status);
-                    
+
                     if (retryResponse.ok) {
                       const retryData = await retryResponse.json();
-                      logger.debug('[Skland] 重试响应数据:', JSON.stringify(retryData, null, 2));
-                      
+
                       if (retryData.code === 0) {
                         const arknights = retryData.data.list.find(game => game.appCode === 'arknights');
                         if (arknights && arknights.bindingList.length > 0) {
                           const uid = arknights.bindingList[0].uid;
-                          logger.info('[Skland] 重试成功，获取绑定角色成功, UID:', uid);
+                          logger.info('[Skland] 自动重登成功，获取绑定角色成功');
                           return { success: true, uid, data: retryData.data };
-                        } else {
-                          logger.warn('[Skland] 重试成功但未找到明日方舟角色');
                         }
-                      } else {
-                        logger.error('[Skland] 重试失败, code:', retryData.code, 'message:', retryData.message);
                       }
-                    } else {
-                      logger.error('[Skland] 重试请求失败, 状态码:', retryResponse.status);
-                      const retryText = await retryResponse.text();
-                      logger.error('[Skland] 重试响应内容:', retryText);
                     }
                   } catch (retryError) {
-                    logger.error('[Skland] 重试请求异常:', retryError.message);
-                    logger.error('[Skland] 重试错误堆栈:', retryError.stack);
+                    logger.error('[Skland] 重试请求失败:', retryError.message);
                   }
-                } else {
-                  logger.error('[Skland] 重新登录后无法获取新配置');
                 }
-              } else {
-                logger.error('[Skland] 自动重新登录失败:', loginResult.error);
               }
             }
           }
-          
+
           return { success: false, error: '登录已过期，请重新登录', needRelogin: true };
         }
-        
+
         return { success: false, error: `HTTP ${response.status}: ${response.statusText}` };
       }
 
       const data = await response.json();
-      logger.debug('[Skland] 响应数据:', JSON.stringify(data, null, 2));
-      
+
       // 检查是否是 token 失效错误
       if (data.code === 10001 || data.message === '未登录') {
         logger.warn('[Skland] Token 已失效');
-        
+
         // 如果配置了自动重新登录且保存了密码，尝试重新登录
         if (config.autoRelogin && config.savedPassword) {
           const password = this.decryptPassword(config.savedPassword);
           if (password) {
-            logger.info('[Skland] Token 失效，尝试使用保存的密码自动重新登录');
             const loginResult = await this.loginByPassword(config.savedPhone, password);
             if (loginResult.success) {
-              logger.info('[Skland] 自动重新登录成功，重试获取绑定角色');
               // 递归调用自己（只重试一次）
               return await this.getPlayerBinding();
-            } else {
-              logger.error('[Skland] 自动重新登录失败:', loginResult.error);
             }
           }
         }
-        
+
         return { success: false, error: '登录已过期，请重新登录', needRelogin: true };
       }
-      
+
       if (data.code === 0) {
         // 查找明日方舟角色
         const arknights = data.data.list.find(game => game.appCode === 'arknights');
         if (arknights && arknights.bindingList.length > 0) {
           const uid = arknights.bindingList[0].uid;
-          logger.info('[Skland] 获取绑定角色成功, UID:', uid);
+          logger.info('[Skland] 获取绑定角色成功');
           return { success: true, uid, data: data.data };
         } else {
           return { success: false, error: '未找到明日方舟角色' };
         }
       } else {
-        logger.error('[Skland] 获取绑定角色失败, code:', data.code, 'message:', data.message);
+        logger.error('[Skland] 获取绑定角色失败:', data.message);
         return { success: false, error: data.message };
       }
     } catch (error) {
-      logger.error('[Skland] 获取绑定角色请求异常:', error);
-      logger.error('[Skland] 错误堆栈:', error.stack);
+      logger.error('[Skland] 获取绑定角色请求失败:', error.message);
       return { success: false, error: `请求异常: ${error.message}` };
     }
   }
@@ -686,11 +688,11 @@ class SklandService {
       
       if (result.code === 0) {
         logger.info('[Skland] 获取玩家数据成功');
-        
+
         // 更新缓存
         this.cache.playerInfo = result.data;
         this.cache.timestamp = Date.now();
-        
+
         return { success: true, data: result.data };
       } else {
         logger.error('[Skland] 获取玩家数据失败:', result.message);
@@ -733,30 +735,13 @@ class SklandService {
   /**
    * 获取 Dashboard 摘要数据
    */
-  async getDashboardSummary() {
-    const result = await this.getPlayerInfo();
+  async getDashboardSummary(useCache = true) {
+    const result = await this.getPlayerInfo(useCache);
     if (!result.success) {
       return result;
     }
 
     const data = result.data;
-    
-    // 调试：打印原始数据结构（包括 assistChars）
-    logger.debug('[Skland] 原始数据中的助战干员字段:');
-    logger.debug('[Skland] - data.assistCharList:', JSON.stringify(data.assistCharList || null));
-    logger.debug('[Skland] - data.assistChars:', JSON.stringify(data.assistChars || null));
-    logger.debug('[Skland] - data.social:', JSON.stringify(data.social || null));
-    logger.debug('[Skland] - data.social?.assistCharList:', JSON.stringify(data.social?.assistCharList || null));
-    
-    // 如果 assistChars 存在，打印详细信息
-    if (data.assistChars && data.assistChars.length > 0) {
-      logger.info('[Skland] 找到助战干员数据，数量:', data.assistChars.length);
-      data.assistChars.forEach((char, index) => {
-        logger.debug(`[Skland] 助战干员 ${index + 1}:`, JSON.stringify(char));
-      });
-    } else {
-      logger.warn('[Skland] 未找到助战干员数据，将使用前3个精二干员');
-    }
     
     // 提取关键数据
     const summary = {
@@ -810,13 +795,59 @@ class SklandService {
       building: {
         furniture: data.building.furniture.total || data.building.furniture,
         labor: data.building.labor,
-        // 添加更多基建数据
-        manufactures: data.building.manufactures || [],
-        trading: data.building.trading || [],
-        dormitories: data.building.dormitories || [],
+        // 制造站 - 添加产出进度
+        manufactures: (data.building.manufactures || []).map((mfg) => {
+          const formulaName = MANUFACTURE_FORMULA_MAP[mfg.formulaId] || `配方${mfg.formulaId}`;
+
+          return {
+            ...mfg,
+            formulaName: formulaName,
+            itemName: formulaName,
+            workers: mfg.chars || [],
+            // 产出进度
+            outputProgress: mfg.remain !== undefined ? {
+              current: mfg.complete || 0,
+              total: mfg.capacity || 0,
+              remain: mfg.remain,
+              completeTime: mfg.completeWorkTime
+            } : null
+          };
+        }),
+        // 贸易站 - 添加订单进度
+        trading: (data.building.trading || []).map((trade) => ({
+          ...trade,
+          workers: trade.chars || [],
+          // 订单进度
+          orderProgress: {
+            current: trade.stock?.length || 0,
+            max: trade.stockLimit || 0,
+            strategy: trade.strategy === 'O_GOLD' ? '龙门币' : trade.strategy === 'O_ORIGINIUM' ? '合成玉' : trade.strategy,
+            completeTime: trade.completeWorkTime
+          }
+        })),
+        dormitories: (data.building.dormitories || []).map((dorm) => ({
+          ...dorm,
+          workers: dorm.chars || [],
+          // 心情值统计
+          moodStats: dorm.chars ? {
+            avg: Math.round(dorm.chars.reduce((sum, c) => sum + (c.ap || 0), 0) / dorm.chars.length / 86400),
+            min: Math.min(...dorm.chars.map(c => Math.floor((c.ap || 0) / 86400))),
+            max: Math.max(...dorm.chars.map(c => Math.floor((c.ap || 0) / 86400)))
+          } : null
+        })),
         meeting: data.building.meeting || {},
         hire: data.building.hire || {},
-        training: data.building.training || {}
+        // 训练室 - 添加详细信息
+        training: data.building.training ? {
+          ...data.building.training,
+          // 训练进度
+          trainingProgress: data.building.training.trainee ? {
+            trainee: data.building.training.trainee,
+            trainer: data.building.training.trainer,
+            remainSecs: data.building.training.remainSecs,
+            speed: data.building.training.speed
+          } : null
+        } : {}
       },
       
       // 公招

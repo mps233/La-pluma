@@ -725,93 +725,75 @@ router.get('/paradox/search', asyncHandler(async (req, res) => {
 // 搜索普通关卡作业
 router.get('/copilot/search', asyncHandler(async (req, res) => {
   const { stage } = req.query;
-  
+
   if (!stage) {
     return res.status(400).json(errorResponse(new Error('请提供关卡名称')));
   }
-  
+
   // 标准化关卡名称（去除空格、转大写）
   const normalizedStage = stage.trim().toUpperCase();
-  
-  // 不使用 levelKeyword，直接获取热门作业列表，然后本地过滤
-  const response = await fetch(`https://prts.maa.plus/copilot/query?page=1&limit=100&orderBy=hot&desc=true`);
-  const data = await response.json();
-  
-  if (data.status_code === 200 && data.data && data.data.data && data.data.data.length > 0) {
-    // 映射并过滤结果
-    let copilots = data.data.data
-      .map(item => {
-        let title = '无标题';
-        let stageName = stage;
-        
-        try {
-          // content 是 JSON 字符串，需要解析
-          const content = JSON.parse(item.content);
-          title = content.doc?.title || '无标题';
-          stageName = content.stage_name || stage;
-        } catch (e) {
-          console.error('解析作业内容失败:', e);
+
+  // 搜索多页，直到找到足够的结果
+  const allCopilots = [];
+  let page = 1;
+  const maxPages = 5; // 最多搜索5页
+  const targetCount = 10; // 目标找到10个匹配结果
+
+  while (page <= maxPages && allCopilots.length < targetCount) {
+    const response = await fetch(`https://prts.maa.plus/copilot/query?level_keyword=${encodeURIComponent(normalizedStage)}&page=${page}&limit=50&order_by=hot`);
+    const data = await response.json();
+
+    if (data.status_code !== 200 || !data.data?.data?.length) {
+      break;
+    }
+
+    // 解析并过滤结果
+    for (const item of data.data.data) {
+      let title = '无标题';
+      let stageName = stage;
+      let titleStageCode = '';
+
+      try {
+        const content = JSON.parse(item.content);
+        title = content.doc?.title || '无标题';
+        stageName = content.stage_name || stage;
+
+        // 从标题开头提取关卡代号，如 "CG-7 - xxx" -> "CG-7"
+        const titleMatch = title.match(/^([A-Z]{2,4}-\d+[A-Z]?)/i);
+        if (titleMatch) {
+          titleStageCode = titleMatch[1].toUpperCase();
         }
-        
-        return {
+      } catch (e) {
+        // 解析失败使用默认值
+      }
+
+      // 精确匹配标题中的关卡代号
+      if (titleStageCode === normalizedStage) {
+        allCopilots.push({
           id: item.id,
           uri: `maa://${item.id}`,
           views: item.views,
           hotScore: item.hot_score,
           uploader: item.uploader_id,
           title: title,
-          stageName: stageName,
-          normalizedStageName: stageName.trim().toUpperCase()
-        };
-      })
-      // 过滤：只保留关卡名完全匹配的结果
-      .filter(item => item.normalizedStageName === normalizedStage);
-    
-    // 如果精确匹配没有结果，尝试包含匹配
-    if (copilots.length === 0) {
-      copilots = data.data.data
-        .map(item => {
-          let title = '无标题';
-          let stageName = stage;
-          
-          try {
-            const content = JSON.parse(item.content);
-            title = content.doc?.title || '无标题';
-            stageName = content.stage_name || stage;
-          } catch (e) {
-            console.error('解析作业内容失败:', e);
-          }
-          
-          return {
-            id: item.id,
-            uri: `maa://${item.id}`,
-            views: item.views,
-            hotScore: item.hot_score,
-            uploader: item.uploader_id,
-            title: title,
-            stageName: stageName,
-            normalizedStageName: stageName.trim().toUpperCase()
-          };
-        })
-        // 包含匹配：关卡名包含搜索词
-        .filter(item => item.normalizedStageName.includes(normalizedStage));
+          stageName: stageName
+        });
+      }
     }
-    
-    // 移除 normalizedStageName 字段
-    copilots = copilots.map(({ normalizedStageName, ...rest }) => rest);
-    
-    if (copilots.length > 0) {
-      res.json(successResponse({
-        stage: stage,
-        copilots: copilots.slice(0, 10), // 最多返回10个结果
-        recommended: copilots[0]
-      }));
-    } else {
-      res.json(errorResponse(
-        new Error(`未找到关卡"${stage}"的作业`),
-        `未找到关卡"${stage}"的作业`
-      ));
+
+    // 检查是否还有下一页
+    if (!data.data.has_next) {
+      break;
     }
+    page++;
+  }
+
+  if (allCopilots.length > 0) {
+    res.json(successResponse({
+      stage: stage,
+      copilots: allCopilots.slice(0, targetCount),
+      recommended: allCopilots[0]
+    }));
   } else {
     res.json(errorResponse(
       new Error(`未找到关卡"${stage}"的作业`),

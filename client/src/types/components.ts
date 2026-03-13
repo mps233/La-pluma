@@ -339,6 +339,15 @@ export interface AutoFormationConfig {
   [taskId: string]: boolean
 }
 
+// 作业集中的单个作业信息
+export interface CopilotSetItem {
+  id: number
+  name?: string
+  stage?: string
+  operators?: string
+  uri?: string
+}
+
 export interface CopilotSetInfo {
   type: 'single' | 'set'
   id: string
@@ -347,6 +356,10 @@ export interface CopilotSetInfo {
   operators?: string
   note?: string
   autoAddS?: boolean
+  // 作业集包含的作业列表
+  copilots?: CopilotSetItem[]
+  // 当前执行到的作业索引（用于顺序执行）
+  currentIndex?: number
 }
 
 export interface CopilotSearchResult {

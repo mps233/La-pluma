@@ -86,7 +86,7 @@ router.get('/player-data', asyncHandler(async (req, res) => {
   const useCache = req.query.cache !== 'false';
   
   // 使用 getDashboardSummary 返回格式化的摘要数据
-  const result = await sklandService.getDashboardSummary();
+  const result = await sklandService.getDashboardSummary(useCache);
   
   if (result.success) {
     return res.json(successResponse(result.data, result.cached ? '使用缓存数据' : '获取成功'));

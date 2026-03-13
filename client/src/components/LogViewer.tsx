@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Icons from './Icons'
 import { maaApi } from '../services/api'
 import { PageHeader, Card, CardHeader, CardContent, Button, Select, Checkbox, Loading } from './common'
+import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type { LogViewerProps, LogEntry, LogFile } from '@/types/components'
 
 export default function LogViewer({}: LogViewerProps) {
@@ -205,6 +206,7 @@ export default function LogViewer({}: LogViewerProps) {
         gradientFrom="cyan-400"
         gradientVia="blue-400"
         gradientTo="indigo-400"
+        actions={<FloatingStatusIndicator />}
       />
 
       <Card animated delay={0.1} theme="cyan">

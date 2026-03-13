@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { maaApi } from '../services/api'
 import Icons from './Icons'
-import { PageHeader, StatusIndicator, Card, InfoCard, Input, Select, Checkbox, Button } from './common'
-import type { 
-  RoguelikeTasksProps, 
-  RoguelikeTask, 
+import { PageHeader, Card, InfoCard, Input, Select, Checkbox, Button } from './common'
+import { useStatusStore } from '../store/statusStore'
+import FloatingStatusIndicator from './FloatingStatusIndicator'
+import type {
+  RoguelikeTasksProps,
+  RoguelikeTask,
   RoguelikeAdvancedOption,
   RoguelikeTaskInputs,
   RoguelikeAdvancedParams
@@ -12,7 +14,7 @@ import type {
 
 export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
   const [isRunning, setIsRunning] = useState(false)
-  const [statusMessage, setStatusMessage] = useState<string>('')
+  const { message: statusMessage, setMessage: setStatusMessage } = useStatusStore()
   const [taskInputs, setTaskInputs] = useState<RoguelikeTaskInputs>({})
   const [advancedParams, setAdvancedParams] = useState<RoguelikeAdvancedParams>({})
 
@@ -43,7 +45,7 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
                 if (statusResult.success && !statusResult.data.isRunning) {
                   // 任务已完成
                   setIsRunning(false)
-                  setStatusMessage('✓ 任务已完成')
+                  setStatusMessage('任务已完成')
                   await new Promise(resolve => setTimeout(resolve, 2000))
                   setStatusMessage('')
                   clearInterval(pollInterval)
@@ -185,24 +187,34 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
   }
 
   const handleExecute = async (task: RoguelikeTask) => {
+    // 验证输入
+    const inputValue = taskInputs[task.id] || ''
+    if (task.id === 'roguelike' || task.id === 'reclamation') {
+      if (!inputValue.trim()) {
+        setStatusMessage('请输入主题名称')
+        setTimeout(() => setStatusMessage(''), 2000)
+        return
+      }
+    }
+
     setIsRunning(true)
     setStatusMessage('正在执行命令...')
-    
+
     try {
       const params = buildCommandParams(task)
       const result = await maaApi.executePredefinedTask(task.command, params, null, null, task.name, 'roguelike')
-      
+
       if (result.success) {
-        setStatusMessage(`✓ ${task.name} 执行成功`)
+        setStatusMessage(`${task.name} 执行成功`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       } else {
-        setStatusMessage(`❌ 执行失败: ${result.error}`)
+        setStatusMessage(`执行失败: ${result.error}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
     } catch (error) {
-      setStatusMessage(`❌ 网络错误: ${(error as Error).message}`)
+      setStatusMessage(`网络错误: ${(error as Error).message}`)
       await new Promise(resolve => setTimeout(resolve, 2000))
       setStatusMessage('')
     } finally {
@@ -273,15 +285,7 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
         gradientFrom="purple-400"
         gradientVia="fuchsia-400"
         gradientTo="pink-400"
-        actions={
-          <StatusIndicator
-            isActive={isRunning}
-            message={statusMessage}
-            activeText="运行中"
-            inactiveText="就绪"
-            activeColor="fuchsia-400"
-          />
-        }
+        actions={<FloatingStatusIndicator />}
       />
 
       <InfoCard type="warning">

@@ -6,7 +6,9 @@ import maaRoutes from './routes/maa.js';
 import notificationRoutes, { loadConfig as loadNotificationConfig } from './routes/notification.js';
 import operatorTrainingRoutes from './routes/operatorTraining.js';
 import sklandRoutes from './routes/skland.js';
-import { setSocketIO } from './services/schedulerService.js';
+import operatorQuotesRoutes from './routes/operatorQuotes.js';
+import { setSocketIO as setSchedulerSocketIO } from './services/schedulerService.js';
+import { setSocketIO as setMaaSocketIO } from './services/maaService.js';
 import { initTelegramBot } from './services/telegramBotService.js';
 import { getNotificationConfig } from './services/notificationService.js';
 import { networkInterfaces } from 'os';
@@ -74,6 +76,7 @@ app.use('/api/maa', maaRoutes);
 app.use('/api/notification', notificationRoutes);
 app.use('/api/operator-training', operatorTrainingRoutes);
 app.use('/api/skland', sklandRoutes);
+app.use('/api/operator-quotes', operatorQuotesRoutes);
 
 // WebSocket 连接
 io.on('connection', (socket) => {
@@ -84,8 +87,9 @@ io.on('connection', (socket) => {
   });
 });
 
-// 设置 Socket.io 到 schedulerService
-setSocketIO(io);
+// 设置 Socket.io 到 schedulerService 和 maaService
+setSchedulerSocketIO(io);
+setMaaSocketIO(io);
 
 const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, '0.0.0.0', async () => {

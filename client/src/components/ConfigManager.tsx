@@ -2,14 +2,16 @@ import { useState, useEffect } from 'react'
 import { maaApi } from '../services/api'
 import { motion } from 'framer-motion'
 import Icons from './Icons'
-import { PageHeader, StatusIndicator, Card, CardHeader, CardContent, Button, Input, Select, Checkbox } from './common'
+import { PageHeader, Card, CardHeader, CardContent, Button, Input, Select, Checkbox } from './common'
+import { useStatusStore } from '../store/statusStore'
 import SklandConfig from './SklandConfig'
-import type { 
-  ConfigManagerProps, 
-  MaaConnectionConfig, 
-  AutoUpdateConfig, 
-  ConfigSection, 
-  UpdateStatus 
+import FloatingStatusIndicator from './FloatingStatusIndicator'
+import type {
+  ConfigManagerProps,
+  MaaConnectionConfig,
+  AutoUpdateConfig,
+  ConfigSection,
+  UpdateStatus
 } from '@/types/components'
 
 interface MaaVersionInfo {
@@ -28,7 +30,7 @@ interface ChangelogItem {
 }
 
 export default function ConfigManager({}: ConfigManagerProps) {
-  const [statusMessage, setStatusMessage] = useState<string>('')
+  const { message: statusMessage, setMessage: setStatusMessage } = useStatusStore()
   const [configType, setConfigType] = useState<'connection' | 'resource' | 'instance' | 'skland'>('connection')
   const [configData, setConfigData] = useState<MaaConnectionConfig>({
     adb_path: 'adb',
@@ -123,18 +125,18 @@ export default function ConfigManager({}: ConfigManagerProps) {
       
       // 同步到后端调度器
       const result = await maaApi.setupAutoUpdate(config)
-      
+
       if (result.success) {
-        setStatusMessage(config.enabled ? `✓ 自动更新已启用，每天 ${config.time} 执行` : '✓ 自动更新已禁用')
+        setStatusMessage(config.enabled ? `自动更新已启用，每天 ${config.time} 执行` : '自动更新已禁用')
         await new Promise(resolve => setTimeout(resolve, 1500))
         setStatusMessage('')
       } else {
-        setStatusMessage(`❌ 设置失败: ${result.message}`)
+        setStatusMessage(`设置失败: ${result.message}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
     } catch (error) {
-      setStatusMessage(`❌ 设置失败: ${(error as Error).message}`)
+      setStatusMessage(`设置失败: ${(error as Error).message}`)
       await new Promise(resolve => setTimeout(resolve, 2000))
       setStatusMessage('')
     }
@@ -174,18 +176,18 @@ export default function ConfigManager({}: ConfigManagerProps) {
     
     try {
       const result = await maaApi.saveConfig('default', { connection: configData })
-      
+
       if (result.success) {
-        setStatusMessage('✓ 配置保存成功')
+        setStatusMessage('配置保存成功')
         await new Promise(resolve => setTimeout(resolve, 1500))
         setStatusMessage('')
       } else {
-        setStatusMessage(`❌ 保存失败: ${result.error}`)
+        setStatusMessage(`保存失败: ${result.error}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
     } catch (error) {
-      setStatusMessage(`❌ 网络错误: ${(error as Error).message}`)
+      setStatusMessage(`网络错误: ${(error as Error).message}`)
       await new Promise(resolve => setTimeout(resolve, 2000))
       setStatusMessage('')
     } finally {
@@ -199,7 +201,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
       address: '127.0.0.1:5555',
       config: 'CompatMac',
     })
-    setStatusMessage('✓ 已重置为默认值')
+    setStatusMessage('已重置为默认值')
     await new Promise(resolve => setTimeout(resolve, 1500))
     setStatusMessage('')
   }
@@ -207,26 +209,26 @@ export default function ConfigManager({}: ConfigManagerProps) {
   const handleUpdateCore = async () => {
     setUpdating({ ...updating, core: true })
     setStatusMessage('正在更新 MaaCore...')
-    
+
     try {
       // 更新到当前渠道的最新版本
       // 不传版本号，后端会使用 maa update 命令
       const result = await maaApi.updateMaaCore()
-      
+
       if (result.success) {
-        setStatusMessage('✓ MaaCore 更新成功')
+        setStatusMessage('MaaCore 更新成功')
         await new Promise(resolve => setTimeout(resolve, 1500))
         setStatusMessage('')
         // 更新成功后重新加载版本信息和更新日志
         await loadVersion()
         await loadCoreChangelog()
       } else {
-        setStatusMessage(`❌ 更新失败: ${result.error}`)
+        setStatusMessage(`更新失败: ${result.error}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
     } catch (error) {
-      setStatusMessage(`❌ 网络错误: ${(error as Error).message}`)
+      setStatusMessage(`网络错误: ${(error as Error).message}`)
       await new Promise(resolve => setTimeout(resolve, 2000))
       setStatusMessage('')
     } finally {
@@ -237,23 +239,23 @@ export default function ConfigManager({}: ConfigManagerProps) {
   const handleUpdateCli = async () => {
     setUpdating({ ...updating, cli: true })
     setStatusMessage('正在更新 MAA CLI...')
-    
+
     try {
       const result = await maaApi.updateMaaCli()
-      
+
       if (result.success) {
-        setStatusMessage('✓ MAA CLI 更新成功')
+        setStatusMessage('MAA CLI 更新成功')
         await new Promise(resolve => setTimeout(resolve, 1500))
         setStatusMessage('')
         // 更新成功后重新加载版本信息
         await loadVersion()
       } else {
-        setStatusMessage(`❌ 更新失败: ${result.error}`)
+        setStatusMessage(`更新失败: ${result.error}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
     } catch (error) {
-      setStatusMessage(`❌ 网络错误: ${(error as Error).message}`)
+      setStatusMessage(`网络错误: ${(error as Error).message}`)
       await new Promise(resolve => setTimeout(resolve, 2000))
       setStatusMessage('')
     } finally {
@@ -296,21 +298,21 @@ export default function ConfigManager({}: ConfigManagerProps) {
       // 切换渠道并安装
       const versionToInstall = targetIsBeta ? 'beta' : 'stable'
       const result = await maaApi.updateMaaCore(versionToInstall)
-      
+
       if (result.success) {
-        setStatusMessage(`✓ 已切换到 ${targetChannel} 渠道`)
+        setStatusMessage(`已切换到 ${targetChannel} 渠道`)
         await new Promise(resolve => setTimeout(resolve, 1500))
         setStatusMessage('')
         // 更新成功后重新加载版本信息和更新日志
         await loadVersion()
         await loadCoreChangelog()
       } else {
-        setStatusMessage(`❌ 切换失败: ${result.error}`)
+        setStatusMessage(`切换失败: ${result.error}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
     } catch (error) {
-      setStatusMessage(`❌ 网络错误: ${(error as Error).message}`)
+      setStatusMessage(`网络错误: ${(error as Error).message}`)
       await new Promise(resolve => setTimeout(resolve, 2000))
       setStatusMessage('')
     } finally {
@@ -321,21 +323,21 @@ export default function ConfigManager({}: ConfigManagerProps) {
   const handleHotUpdate = async () => {
     setHotUpdating(true)
     setStatusMessage('正在热更新资源文件...')
-    
+
     try {
       const result = await maaApi.hotUpdateResources()
-      
+
       if (result.success) {
-        setStatusMessage('✓ 资源文件更新成功')
+        setStatusMessage('资源文件更新成功')
         await new Promise(resolve => setTimeout(resolve, 1500))
         setStatusMessage('')
       } else {
-        setStatusMessage(`❌ 更新失败: ${result.error}`)
+        setStatusMessage(`更新失败: ${result.error}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
     } catch (error) {
-      setStatusMessage(`❌ 网络错误: ${(error as Error).message}`)
+      setStatusMessage(`网络错误: ${(error as Error).message}`)
       await new Promise(resolve => setTimeout(resolve, 2000))
       setStatusMessage('')
     } finally {
@@ -360,15 +362,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
           gradientFrom="orange-400"
           gradientVia="red-400"
           gradientTo="pink-400"
-          actions={
-            <StatusIndicator
-              isActive={loading || updating.core || updating.cli}
-              message={statusMessage}
-              activeText="处理中"
-              inactiveText="就绪"
-              activeColor="orange-400"
-            />
-          }
+          actions={<FloatingStatusIndicator />}
         />
 
         <Card animated delay={0.1} theme="orange">

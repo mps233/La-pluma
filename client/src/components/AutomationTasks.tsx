@@ -4,7 +4,9 @@ import { motion } from 'framer-motion'
 import Icons from './Icons'
 import ScreenMonitor from './ScreenMonitor'
 import NotificationSettings from './NotificationSettings'
-import { PageHeader, StatusIndicator, Button } from './common'
+import { PageHeader, Button } from './common'
+import { useStatusStore } from '../store/statusStore'
+import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type {
   AutomationTasksProps,
   AutomationAvailableTask,
@@ -15,17 +17,7 @@ import type {
 } from '@/types/components'
 
 export default function AutomationTasks({}: AutomationTasksProps) {
-  // 辅助函数：保留接口兼容性,实际不执行任何操作
-  // AutomationTasks 使用 scheduleExecutionStatus.message 来显示状态
-  const showSuccess = async (_msg: string) => {
-    // 空函数 - 状态通过 scheduleExecutionStatus 显示
-  }
-  const showError = async (_msg: string) => {
-    // 空函数 - 状态通过 scheduleExecutionStatus 显示
-  }
-  const showInfo = (_msg: string) => {
-    // 空函数 - 状态通过 scheduleExecutionStatus 显示
-  }
+  const { setMessage: setStatusMessage, setActive: setIsActiveStatus } = useStatusStore()
   
   const [isRunning, setIsRunning] = useState(false)
   const [taskFlow, setTaskFlow] = useState<TaskFlowItem[]>([])
@@ -59,11 +51,12 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         if (result.success && result.data) {
           const status = result.data
           setScheduleExecutionStatus(status)
-          
+
           // 如果定时任务正在运行，更新 UI 状态
           if (status.isRunning) {
             setIsRunning(true)
-            
+            setIsActiveStatus(true)
+
             // 根据任务 ID 找到在 taskFlow 中的实际索引
             if (status.currentTaskId) {
               setCurrentStep(prev => {
@@ -73,14 +66,15 @@ export default function AutomationTasks({}: AutomationTasksProps) {
             } else {
               setCurrentStep(status.currentStep)
             }
-            
-            showInfo(status.message || `正在执行: ${status.currentTask}`)
+
+            setStatusMessage(status.message || `正在执行: ${status.currentTask}`)
           } else {
+            setIsActiveStatus(false)
             setIsRunning(prev => {
               if (prev) {
                 // 定时任务刚完成
                 setCurrentStep(-1)
-                
+
               }
               return false
             })
@@ -930,12 +924,13 @@ export default function AutomationTasks({}: AutomationTasksProps) {
           gradientTo="fuchsia-400"
           actions={
             <div className="flex items-center space-x-4">
+              <FloatingStatusIndicator />
               {/* 活动状态 */}
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium border flex items-center space-x-1.5 sm:space-x-2 ${
-                  currentActivity 
+                  currentActivity
                     ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-500/30'
                     : 'bg-gray-50 dark:bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-500/30'
                 }`}
@@ -960,18 +955,6 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                   </>
                 )}
               </motion.div>
-              
-              <StatusIndicator
-                isActive={isRunning}
-                message={
-                  isRunning 
-                    ? (message && message.includes('正在执行:') 
-                        ? message.replace('正在执行: ', '') 
-                        : `${currentStep + 1}/${taskFlow.filter(t => t.enabled).length}`)
-                    : (message || '就绪')
-                }
-                activeColor="violet-400"
-              />
             </div>
           }
         />
@@ -1016,8 +999,8 @@ export default function AutomationTasks({}: AutomationTasksProps) {
               </div>
             </div>
             
-            {scheduleEnabled && (
-              <motion.div 
+            {scheduleEnabled ? (
+              <motion.div
                 className="space-y-3"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
@@ -1098,6 +1081,16 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                   ✨ 提示：定时任务在后台运行，无需保持浏览器打开。所有修改自动保存。
                 </p>
               </motion.div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8">
+                <div className="w-16 h-16 mb-4 rounded-2xl bg-violet-100 dark:bg-violet-500/10 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-violet-400 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">定时执行未启用</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">开启后可设置自动执行时间</p>
+              </div>
             )}
           </div>
         </div>

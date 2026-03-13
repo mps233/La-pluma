@@ -3,7 +3,9 @@ import { maaApi, getTodayDrops, getDropStatistics, fetchOperatorMaterials } from
 import { motion } from 'framer-motion'
 import Icons from './Icons'
 import DropRecords from './DropRecords'
-import { PageHeader, StatusIndicator, InfoCard, Button } from './common'
+import { PageHeader, InfoCard, Button } from './common'
+import { useStatusStore } from '../store/statusStore'
+import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type {
   DataStatisticsProps,
   DepotDataDetailed,
@@ -23,7 +25,7 @@ import type {
 export default function DataStatistics({}: DataStatisticsProps) {
   const [isRunning, setIsRunning] = useState(false)
   const [activeTask, setActiveTask] = useState<ActiveTask>(null)
-  const [statusMessage, setStatusMessage] = useState<string>('')
+  const { message: statusMessage, setMessage: setStatusMessage } = useStatusStore()
   const [depotData, setDepotData] = useState<DepotDataDetailed | null>(null)
   const [operBoxData, setOperBoxData] = useState<OperBoxData | null>(null)
   const [allOperators, setAllOperators] = useState<OperatorDetailed[]>([])
@@ -336,33 +338,33 @@ export default function DataStatistics({}: DataStatisticsProps) {
             setStatusMessage('正在更新智能养成系统...')
             const { getTrainingQueue } = await import('../services/api')
             const queueResult = await getTrainingQueue()
-            
+
             if (queueResult.success && queueResult.data && queueResult.data.length > 0) {
-              setStatusMessage(`✓ 识别完成！共识别 ${parseResult.data.itemCount} 种物品，已更新养成进度`)
+              setStatusMessage(`识别完成！共识别 ${parseResult.data.itemCount} 种物品，已更新养成进度`)
               await new Promise(resolve => setTimeout(resolve, 2000))
               setStatusMessage('')
             } else {
-              setStatusMessage(`✓ 识别完成！共识别 ${parseResult.data.itemCount} 种物品`)
+              setStatusMessage(`识别完成！共识别 ${parseResult.data.itemCount} 种物品`)
               await new Promise(resolve => setTimeout(resolve, 2000))
               setStatusMessage('')
             }
           } catch (error) {
-            setStatusMessage(`✓ 识别完成！共识别 ${parseResult.data.itemCount} 种物品`)
+            setStatusMessage(`识别完成！共识别 ${parseResult.data.itemCount} 种物品`)
             await new Promise(resolve => setTimeout(resolve, 2000))
             setStatusMessage('')
           }
         } else {
-          setStatusMessage(`❌ 识别完成，但数据解析失败: ${parseResult.error}`)
+          setStatusMessage(`识别完成，但数据解析失败: ${parseResult.error}`)
           await new Promise(resolve => setTimeout(resolve, 2000))
           setStatusMessage('')
         }
       } else {
-        setStatusMessage(`❌ 识别失败: ${result.error || '未知错误'}`)
+        setStatusMessage(`识别失败: ${result.error || '未知错误'}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
     } catch (error: any) {
-      setStatusMessage(`❌ 识别失败: ${error.message}`)
+      setStatusMessage(`识别失败: ${error.message}`)
       await new Promise(resolve => setTimeout(resolve, 2000))
       setStatusMessage('')
     } finally {
@@ -382,19 +384,19 @@ export default function DataStatistics({}: DataStatisticsProps) {
       const result = await fetchOperatorMaterials()
 
       if (result.success) {
-        setStatusMessage('✓ 干员材料数据获取成功！')
+        setStatusMessage('干员材料数据获取成功！')
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
-        
+
         // 重新加载干员列表以显示材料数据
         await loadAllOperators()
       } else {
-        setStatusMessage(`❌ 获取失败: ${result.error || '未知错误'}`)
+        setStatusMessage(`获取失败: ${result.error || '未知错误'}`)
         await new Promise(resolve => setTimeout(resolve, 3000))
         setStatusMessage('')
       }
     } catch (error: any) {
-      setStatusMessage(`❌ 获取失败: ${error.message}`)
+      setStatusMessage(`获取失败: ${error.message}`)
       await new Promise(resolve => setTimeout(resolve, 3000))
       setStatusMessage('')
     } finally {
@@ -428,12 +430,12 @@ export default function DataStatistics({}: DataStatisticsProps) {
         
         // 等待一下让 MAA 写入日志
         await new Promise(resolve => setTimeout(resolve, 2000))
-        
+
         // 解析并保存数据
         const parseResult = await maaApi.parseOperBoxData()
-        
+
         if (parseResult.success) {
-          setStatusMessage(`✓ 识别完成！共识别 ${parseResult.data.operCount} 名干员`)
+          setStatusMessage(`识别完成！共识别 ${parseResult.data.operCount} 名干员`)
           setOperBoxData({
             operCount: parseResult.data.operCount,
             data: parseResult.data.data || [],
@@ -443,17 +445,17 @@ export default function DataStatistics({}: DataStatisticsProps) {
           await new Promise(resolve => setTimeout(resolve, 2000))
           setStatusMessage('')
         } else {
-          setStatusMessage(`❌ 识别完成，但数据解析失败: ${parseResult.error}`)
+          setStatusMessage(`识别完成，但数据解析失败: ${parseResult.error}`)
           await new Promise(resolve => setTimeout(resolve, 2000))
           setStatusMessage('')
         }
       } else {
-        setStatusMessage(`❌ 识别失败: ${result.error || '未知错误'}`)
+        setStatusMessage(`识别失败: ${result.error || '未知错误'}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
     } catch (error: any) {
-      setStatusMessage(`❌ 识别失败: ${error.message}`)
+      setStatusMessage(`识别失败: ${error.message}`)
       await new Promise(resolve => setTimeout(resolve, 2000))
       setStatusMessage('')
     } finally {
@@ -473,15 +475,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
           gradientFrom="cyan-400"
           gradientVia="blue-400"
           gradientTo="indigo-400"
-          actions={
-            <StatusIndicator
-              isActive={isRunning}
-              message={statusMessage}
-              activeText="运行中"
-              inactiveText="就绪"
-              activeColor="cyan-400"
-            />
-          }
+          actions={<FloatingStatusIndicator />}
         />
 
         {/* 标签页切换 */}

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { getOperatorList, getTrainingQueue, addToTrainingQueue, removeFromTrainingQueue, updateTrainingSettings, generateTrainingPlan, applyTrainingPlan } from '../services/api'
-import { PageHeader, Button, Checkbox, IconButton, StatusIndicator } from './common'
+import { PageHeader, Button, Checkbox, IconButton } from './common'
+import { useStatusStore } from '../store/statusStore'
+import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type {
   MaterialHierarchyNodeProps,
   TrainingOperator,
@@ -223,16 +225,16 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
 }
 
 export default function OperatorTraining() {
-  const [statusMessage, setStatusMessage] = useState<string>('')
-  
+  const { message: statusMessage, setMessage: setStatusMessage } = useStatusStore()
+
   // 辅助函数：使用 statusMessage 显示消息
   const showSuccess = async (msg: string) => {
-    setStatusMessage(`✓ ${msg}`)
+    setStatusMessage(msg)
     await new Promise(resolve => setTimeout(resolve, 1500))
     setStatusMessage('')
   }
   const showError = async (msg: string) => {
-    setStatusMessage(`❌ ${msg}`)
+    setStatusMessage(msg)
     await new Promise(resolve => setTimeout(resolve, 2000))
     setStatusMessage('')
   }
@@ -328,55 +330,55 @@ export default function OperatorTraining() {
       const response = await addToTrainingQueue({
         operatorId: operator.id,
       } as any);
-      
+
       if (response.success) {
         await loadQueue();
-        setStatusMessage(`✓ ${operator.name} 添加成功！`);
+        setStatusMessage(`${operator.name} 添加成功！`);
         await new Promise(resolve => setTimeout(resolve, 800));
-        
+
         setStatusMessage('正在生成刷取计划...');
-        
+
         // 自动生成刷取计划（仅当前干员）
         try {
           const planResponse = await generateTrainingPlan({ mode: 'current' });
           if (planResponse.success && planResponse.data) {
             const generatedPlan = planResponse.data;
             setPlan(generatedPlan);
-            
+
             setStatusMessage('正在应用到作战任务...');
-            
+
             // 自动应用到作战任务
             try {
               const applyResponse = await applyTrainingPlan({
                 plan: generatedPlan,
               } as any);
               if (applyResponse.success) {
-                setStatusMessage('✓ 刷取计划已应用到作战任务！');
+                setStatusMessage('刷取计划已应用到作战任务！');
                 await new Promise(resolve => setTimeout(resolve, 1500));
                 setStatusMessage('');
               } else {
-                setStatusMessage('❌ 应用失败');
+                setStatusMessage('应用失败');
                 await new Promise(resolve => setTimeout(resolve, 2000));
                 setStatusMessage('');
               }
             } catch (applyError) {
-              setStatusMessage('❌ 应用失败');
+              setStatusMessage('应用失败');
               await new Promise(resolve => setTimeout(resolve, 2000));
               setStatusMessage('');
             }
           } else {
-            setStatusMessage('❌ 生成计划失败');
+            setStatusMessage('生成计划失败');
             await new Promise(resolve => setTimeout(resolve, 2000));
             setStatusMessage('');
           }
         } catch (planError) {
-          setStatusMessage('❌ 生成计划失败');
+          setStatusMessage('生成计划失败');
           await new Promise(resolve => setTimeout(resolve, 2000));
           setStatusMessage('');
         }
       }
     } catch (error: any) {
-      setStatusMessage('❌ 添加失败');
+      setStatusMessage('添加失败');
       await new Promise(resolve => setTimeout(resolve, 2000));
       setStatusMessage('');
     } finally {
@@ -391,12 +393,12 @@ export default function OperatorTraining() {
       const response = await removeFromTrainingQueue(operatorId);
       if (response.success) {
         await loadQueue();
-        setStatusMessage('✓ 删除成功！');
+        setStatusMessage('删除成功！');
         await new Promise(resolve => setTimeout(resolve, 1500));
         setStatusMessage('');
       }
     } catch (error) {
-      setStatusMessage('❌ 删除失败');
+      setStatusMessage('删除失败');
       await new Promise(resolve => setTimeout(resolve, 2000));
       setStatusMessage('');
     } finally {
@@ -488,16 +490,7 @@ export default function OperatorTraining() {
           gradientFrom="amber-400"
           gradientVia="yellow-400"
           gradientTo="orange-400"
-          actions={
-            <StatusIndicator
-              isActive={loading}
-              activeText="加载中"
-              inactiveText="就绪"
-              activeColor="amber-400"
-              inactiveColor="emerald-400"
-              message={statusMessage}
-            />
-          }
+          actions={<FloatingStatusIndicator />}
         />
 
       {/* 标签页切换 */}

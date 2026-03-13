@@ -71,7 +71,10 @@ async function startPolling() {
       // 等待 2 秒后继续轮询
       await new Promise(resolve => setTimeout(resolve, 2000));
     } catch (error) {
-      logger.error('轮询错误', { error: error.message });
+      // 忽略多实例冲突错误（通常是因为开发时热重载导致）
+      if (!error.message?.includes('Conflict: terminated by other getUpdates')) {
+        logger.error('轮询错误', { error: error.message });
+      }
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }

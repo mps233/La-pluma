@@ -199,18 +199,18 @@ export default function MaaControl(_props: MaaControlProps = {}) {
     try {
       const params = buildCommandParams(task)
       const result = await maaApi.executePredefinedTask(task.command, params)
-      
+
       if (result.success) {
-        setStatusMessage(`✓ ${task.name} 执行成功`)
+        setStatusMessage(`${task.name} 执行成功`)
         await new Promise(resolve => setTimeout(resolve, 1500))
         setStatusMessage('')
       } else {
-        setStatusMessage(`❌ 执行失败: ${result.error}`)
+        setStatusMessage(`执行失败: ${result.error}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
     } catch (error) {
-      setStatusMessage(`❌ 网络错误: ${(error as Error).message}`)
+      setStatusMessage(`网络错误: ${(error as Error).message}`)
       await new Promise(resolve => setTimeout(resolve, 2000))
       setStatusMessage('')
     } finally {
@@ -240,22 +240,22 @@ export default function MaaControl(_props: MaaControlProps = {}) {
   const handlePreviewCopilotSet = async () => {
     const input = taskInputs['copilot'] || ''
     const match = input.trim().match(/^maa:\/\/(\d+)(s?)$/)
-    
+
     if (!match) {
-      setStatusMessage('❌ 请输入有效的作业 URI（如: maa://26766）')
+      setStatusMessage('请输入有效的作业 URI（如: maa://26766）')
       await new Promise(resolve => setTimeout(resolve, 2000))
       setStatusMessage('')
       return
     }
-    
+
     const copilotId = match[1]!  // 非空断言：match[1] 一定存在
     const hasS = match[2] === 's'
     setIsLoadingSet(true)
     setStatusMessage('正在获取作业信息...')
-    
+
     try {
       const copilotResponse = await maaApi.getCopilotInfo(copilotId)
-      
+
       if ((copilotResponse as any).status_code === 200 && copilotResponse.data) {
         const content = JSON.parse((copilotResponse.data as any).content)
         setCopilotSetInfo({
@@ -265,7 +265,7 @@ export default function MaaControl(_props: MaaControlProps = {}) {
           stage: content.stage_name,
           operators: content.opers?.map((op: any) => op.name).join('、') || '未知'
         })
-        setStatusMessage(`✓ 找到作业：${content.doc?.title || content.stage_name || '未命名'}`)
+        setStatusMessage(`找到作业：${content.doc?.title || content.stage_name || '未命名'}`)
         await new Promise(resolve => setTimeout(resolve, 1500))
         setStatusMessage('')
       } else if ((copilotResponse as any).status_code === 404) {
@@ -276,11 +276,11 @@ export default function MaaControl(_props: MaaControlProps = {}) {
           note: '这是一个作业集，包含多个关卡。执行时会自动添加 "s" 后缀。',
           autoAddS: !hasS
         })
-        setStatusMessage(`✓ 识别为作业集 ID: ${copilotId}${!hasS ? '（将自动添加 s 后缀）' : ''}`)
+        setStatusMessage(`识别为作业集 ID: ${copilotId}${!hasS ? '（将自动添加 s 后缀）' : ''}`)
         await new Promise(resolve => setTimeout(resolve, 1500))
         setStatusMessage('')
       } else {
-        setStatusMessage('❌ 作业不存在')
+        setStatusMessage('作业不存在')
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
@@ -293,7 +293,7 @@ export default function MaaControl(_props: MaaControlProps = {}) {
         note: '这是一个作业集，包含多个关卡。执行时会自动添加 "s" 后缀。',
         autoAddS: !hasS
       })
-      setStatusMessage(`✓ 识别为作业集 ID: ${copilotId}${!hasS ? '（将自动添加 s 后缀）' : ''}`)
+      setStatusMessage(`识别为作业集 ID: ${copilotId}${!hasS ? '（将自动添加 s 后缀）' : ''}`)
       await new Promise(resolve => setTimeout(resolve, 1500))
       setStatusMessage('')
     } finally {

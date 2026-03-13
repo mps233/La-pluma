@@ -1,8 +1,8 @@
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { readFile, writeFile, mkdir, readdir, stat, unlink } from 'fs/promises';
+import { createReadStream } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
 import { createLogger } from '../utils/logger.js';
 
 const execPromise = promisify(exec);
@@ -23,6 +23,17 @@ const taskStatus = {
   process: null, // 保存子进程引用
   logs: [] // 保存实时日志
 };
+
+// Socket.IO 实例（从 server.js 注入）
+let socketIO = null;
+
+/**
+ * 设置 Socket.IO 实例
+ */
+export function setSocketIO(io) {
+  socketIO = io;
+  logger.debug('Socket.IO 实例已设置');
+}
 
 /**
  * 获取当前任务执行状态
@@ -99,11 +110,14 @@ export async function execMaaCommand(command, args = [], taskName = null, taskTy
     addLog('INFO', `执行命令: ${fullCommand}, 等待完成: ${waitForCompletion}`);
   }
   
+  // 准备最终的参数列表
+  let finalArgs = [...args];
+  
   // 如果有任务名称且不需要等待完成，使用后台异步执行
   if (taskName && !waitForCompletion) {
     return new Promise((resolve, reject) => {
       // 使用 spawn 而不是 exec，这样可以独立运行
-      const childProcess = spawn(MAA_CLI_PATH, [command, ...args], {
+      const childProcess = spawn(MAA_CLI_PATH, [command, ...finalArgs], {
         detached: false,
         stdio: ['ignore', 'pipe', 'pipe']
       });
@@ -181,7 +195,7 @@ export async function execMaaCommand(command, args = [], taskName = null, taskTy
   // 需要等待完成（任务流程中的串行执行）
   else if (taskName && waitForCompletion) {
     return new Promise((resolve, reject) => {
-      const childProcess = spawn(MAA_CLI_PATH, [command, ...args], {
+      const childProcess = spawn(MAA_CLI_PATH, [command, ...finalArgs], {
         detached: false,
         stdio: ['ignore', 'pipe', 'pipe']
       });
