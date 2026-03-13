@@ -30,7 +30,7 @@ interface ChangelogItem {
 }
 
 export default function ConfigManager({}: ConfigManagerProps) {
-  const { message: statusMessage, setMessage: setStatusMessage } = useStatusStore()
+  const { setMessage: setStatusMessage } = useStatusStore()
   const [configType, setConfigType] = useState<'connection' | 'resource' | 'instance' | 'skland'>('connection')
   const [configData, setConfigData] = useState<MaaConnectionConfig>({
     adb_path: 'adb',

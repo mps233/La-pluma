@@ -225,7 +225,7 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
 }
 
 export default function OperatorTraining() {
-  const { message: statusMessage, setMessage: setStatusMessage } = useStatusStore()
+  const { setMessage: setStatusMessage } = useStatusStore()
 
   // 辅助函数：使用 statusMessage 显示消息
   const showSuccess = async (msg: string) => {

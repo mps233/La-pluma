@@ -12,13 +12,27 @@ import type {
   AutomationAvailableTask,
   TaskFlowItem,
   ConnectionTestStatus,
-  ScheduleExecutionStatus,
   StageConfig
 } from '@/types/components'
 
 export default function AutomationTasks({}: AutomationTasksProps) {
   const { setMessage: setStatusMessage, setActive: setIsActiveStatus } = useStatusStore()
-  
+
+  // 辅助函数：显示消息
+  const showSuccess = async (msg: string) => {
+    setStatusMessage(msg)
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    setStatusMessage('')
+  }
+  const showError = async (msg: string) => {
+    setStatusMessage(msg)
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    setStatusMessage('')
+  }
+  const showInfo = (msg: string) => {
+    setStatusMessage(msg)
+  }
+
   const [isRunning, setIsRunning] = useState(false)
   const [taskFlow, setTaskFlow] = useState<TaskFlowItem[]>([])
   const [scheduleEnabled, setScheduleEnabled] = useState(false)
@@ -31,11 +45,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   const [notificationSettingsOpen, setNotificationSettingsOpen] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<Record<string, ConnectionTestStatus>>({})
   const [testingConnection, setTestingConnection] = useState<Record<string, boolean>>({})
-  const [scheduleExecutionStatus, setScheduleExecutionStatus] = useState<ScheduleExecutionStatus | null>(null)
-  
-  // 从 scheduleExecutionStatus 中提取 message
-  const message = scheduleExecutionStatus?.message || ''
-  
+
   // 轮询定时任务执行状态
   useEffect(() => {
     let intervalId = null
@@ -50,7 +60,6 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         
         if (result.success && result.data) {
           const status = result.data
-          setScheduleExecutionStatus(status)
 
           // 如果定时任务正在运行，更新 UI 状态
           if (status.isRunning) {

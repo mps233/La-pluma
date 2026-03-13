@@ -14,7 +14,7 @@ import type {
 
 export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
   const [isRunning, setIsRunning] = useState(false)
-  const { message: statusMessage, setMessage: setStatusMessage } = useStatusStore()
+  const { setMessage: setStatusMessage } = useStatusStore()
   const [taskInputs, setTaskInputs] = useState<RoguelikeTaskInputs>({})
   const [advancedParams, setAdvancedParams] = useState<RoguelikeAdvancedParams>({})
 

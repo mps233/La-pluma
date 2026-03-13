@@ -25,7 +25,7 @@ import type {
 export default function DataStatistics({}: DataStatisticsProps) {
   const [isRunning, setIsRunning] = useState(false)
   const [activeTask, setActiveTask] = useState<ActiveTask>(null)
-  const { message: statusMessage, setMessage: setStatusMessage } = useStatusStore()
+  const { setMessage: setStatusMessage } = useStatusStore()
   const [depotData, setDepotData] = useState<DepotDataDetailed | null>(null)
   const [operBoxData, setOperBoxData] = useState<OperBoxData | null>(null)
   const [allOperators, setAllOperators] = useState<OperatorDetailed[]>([])
