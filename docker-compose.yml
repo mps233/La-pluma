@@ -21,6 +21,10 @@ services:
       - PORT=3000  # 容器内监听 3000 端口
       # ADB 设备地址（bridge 模式下使用宿主机 IP）
       - ADB_ADDRESS=192.168.50.103:16384
+      # 可选：设置后所有 /api/* 请求需要携带 Bearer Token 或 X-La-Pluma-Token
+      # - LA_PLUMA_TOKEN=change-me
+      # 可选：实时日志内存缓存上限，默认 5000 行
+      # - LA_PLUMA_MAX_REALTIME_LOGS=5000
     
     # 使用 bridge 网络模式
     ports:

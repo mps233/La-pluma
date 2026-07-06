@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { fetchWithAuth } from '@/services/api'
 
 const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? `http://localhost:${window.location.port || '3000'}`
@@ -49,7 +50,7 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
 
   const loadConfig = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/notification/config`)
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/notification/config`)
       const data = await response.json()
       if (data.success) {
         setConfig(data.data || data)
@@ -61,7 +62,7 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
 
   const saveConfig = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/notification/config`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/notification/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
@@ -79,7 +80,7 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
     setTesting(true)
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/notification/test/${channel}`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/api/notification/test/${channel}`, {
         method: 'POST'
       })
       const data = await response.json()

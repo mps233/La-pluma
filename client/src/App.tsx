@@ -1,45 +1,39 @@
+import { lazy, Suspense } from 'react'
 import Layout from './components/Layout'
-import Dashboard from './components/Dashboard'
-import AutomationTasks from './components/AutomationTasks'
-import CombatTasks from './components/CombatTasks'
-import RoguelikeTasks from './components/RoguelikeTasks'
-import LogViewer from './components/LogViewer'
-import ConfigManager from './components/ConfigManager'
-import DataStatistics from './components/DataStatistics'
-import OperatorTraining from './components/OperatorTraining'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
+import { Loading } from './components/common'
+
+const Dashboard = lazy(() => import('./components/Dashboard'))
+const AutomationTasks = lazy(() => import('./components/AutomationTasks'))
+const CombatTasks = lazy(() => import('./components/CombatTasks'))
+const RoguelikeTasks = lazy(() => import('./components/RoguelikeTasks'))
+const OperatorTraining = lazy(() => import('./components/OperatorTraining'))
+const LogViewer = lazy(() => import('./components/LogViewer'))
+const DataStatistics = lazy(() => import('./components/DataStatistics'))
+const ConfigManager = lazy(() => import('./components/ConfigManager'))
 
 function App() {
+  const renderActivePage = (activeTab: string) => {
+    switch (activeTab) {
+      case 'automation': return <AutomationTasks />
+      case 'combat': return <CombatTasks />
+      case 'roguelike': return <RoguelikeTasks />
+      case 'training': return <OperatorTraining />
+      case 'logs': return <LogViewer />
+      case 'statistics': return <DataStatistics />
+      case 'config': return <ConfigManager />
+      case 'dashboard':
+      default: return <Dashboard />
+    }
+  }
+
   return (
     <>
       <Layout>
         {({ activeTab }) => (
-          <>
-            <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>
-              <Dashboard />
-            </div>
-            <div style={{ display: activeTab === 'automation' ? 'block' : 'none' }}>
-              <AutomationTasks />
-            </div>
-            <div style={{ display: activeTab === 'combat' ? 'block' : 'none' }}>
-              <CombatTasks />
-            </div>
-            <div style={{ display: activeTab === 'roguelike' ? 'block' : 'none' }}>
-              <RoguelikeTasks />
-            </div>
-            <div style={{ display: activeTab === 'training' ? 'block' : 'none' }}>
-              <OperatorTraining />
-            </div>
-            <div style={{ display: activeTab === 'logs' ? 'block' : 'none' }}>
-              <LogViewer />
-            </div>
-            <div style={{ display: activeTab === 'statistics' ? 'block' : 'none' }}>
-              <DataStatistics />
-            </div>
-            <div style={{ display: activeTab === 'config' ? 'block' : 'none' }}>
-              <ConfigManager />
-            </div>
-          </>
+          <Suspense fallback={<div className="p-6"><Loading text="页面加载中..." /></div>}>
+            {renderActivePage(activeTab)}
+          </Suspense>
         )}
       </Layout>
       <PWAInstallPrompt />

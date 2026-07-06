@@ -17,62 +17,31 @@ export default function Layout({ children }: LayoutProps) {
 
   const tabs = [
     { id: 'dashboard', name: '控制台', color: 'cyan' as const },
-    { id: 'automation', name: '自动化任务', color: 'violet' as const },
-    { id: 'combat', name: '自动战斗', color: 'teal' as const },
-    { id: 'roguelike', name: '肉鸽模式', color: 'fuchsia' as const },
-    { id: 'training', name: '干员养成', color: 'amber' as const },
-    { id: 'logs', name: '日志查看', color: 'blue' as const },
-    { id: 'statistics', name: '数据统计', color: 'emerald' as const },
-    { id: 'config', name: '配置管理', color: 'orange' as const },
+    { id: 'automation', name: '自动化', color: 'cyan' as const },
+    { id: 'combat', name: '作业', color: 'cyan' as const },
+    { id: 'roguelike', name: '肉鸽', color: 'cyan' as const },
+    { id: 'training', name: '养成', color: 'cyan' as const },
+    { id: 'logs', name: '日志', color: 'cyan' as const },
+    { id: 'statistics', name: '数据', color: 'cyan' as const },
+    { id: 'config', name: '配置', color: 'cyan' as const },
   ]
 
   type TabColor = 'violet' | 'emerald' | 'fuchsia' | 'amber' | 'blue' | 'cyan' | 'teal' | 'orange'
 
-  const getTabColors = (color: TabColor, isActive: boolean) => {
-    const colors: Record<TabColor, { active: string; inactive: string }> = {
-      violet: {
-        active: 'text-violet-700 dark:text-white bg-gradient-to-r from-violet-100 to-purple-100 dark:from-violet-500/20 dark:to-purple-500/20 border-violet-300 dark:border-violet-500/30',
-        inactive: 'text-gray-600 dark:text-gray-400 hover:text-violet-700 dark:hover:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-500/5 border-transparent hover:border-violet-200 dark:hover:border-violet-500/20'
-      },
-      emerald: {
-        active: 'text-emerald-700 dark:text-white bg-gradient-to-r from-emerald-100 to-green-100 dark:from-emerald-500/20 dark:to-green-500/20 border-emerald-300 dark:border-emerald-500/30',
-        inactive: 'text-gray-600 dark:text-gray-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-500/5 border-transparent hover:border-emerald-200 dark:hover:border-emerald-500/20'
-      },
-      fuchsia: {
-        active: 'text-fuchsia-700 dark:text-white bg-gradient-to-r from-fuchsia-100 to-pink-100 dark:from-fuchsia-500/20 dark:to-pink-500/20 border-fuchsia-300 dark:border-fuchsia-500/30',
-        inactive: 'text-gray-600 dark:text-gray-400 hover:text-fuchsia-700 dark:hover:text-fuchsia-300 hover:bg-fuchsia-50 dark:hover:bg-fuchsia-500/5 border-transparent hover:border-fuchsia-200 dark:hover:border-fuchsia-500/20'
-      },
-      blue: {
-        active: 'text-blue-700 dark:text-white bg-gradient-to-r from-blue-100 to-cyan-100 dark:from-blue-500/20 dark:to-cyan-500/20 border-blue-300 dark:border-blue-500/30',
-        inactive: 'text-gray-600 dark:text-gray-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/5 border-transparent hover:border-blue-200 dark:hover:border-blue-500/20'
-      },
-      cyan: {
-        active: 'text-cyan-700 dark:text-white bg-gradient-to-r from-cyan-100 to-teal-100 dark:from-cyan-500/20 dark:to-teal-500/20 border-cyan-300 dark:border-cyan-500/30',
-        inactive: 'text-gray-600 dark:text-gray-400 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-cyan-50 dark:hover:bg-cyan-500/5 border-transparent hover:border-cyan-200 dark:hover:border-cyan-500/20'
-      },
-      teal: {
-        active: 'text-teal-700 dark:text-white bg-gradient-to-r from-teal-100 to-cyan-100 dark:from-teal-500/20 dark:to-cyan-500/20 border-teal-300 dark:border-teal-500/30',
-        inactive: 'text-gray-600 dark:text-gray-400 hover:text-teal-700 dark:hover:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-500/5 border-transparent hover:border-teal-200 dark:hover:border-teal-500/20'
-      },
-      orange: {
-        active: 'text-orange-700 dark:text-white bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-500/20 dark:to-amber-500/20 border-orange-300 dark:border-orange-500/30',
-        inactive: 'text-gray-600 dark:text-gray-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-500/5 border-transparent hover:border-orange-200 dark:hover:border-orange-500/20'
-      },
-      amber: {
-        active: 'text-amber-700 dark:text-white bg-gradient-to-r from-amber-100 to-yellow-100 dark:from-amber-500/20 dark:to-yellow-500/20 border-amber-300 dark:border-amber-500/30',
-        inactive: 'text-gray-600 dark:text-gray-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-500/5 border-transparent hover:border-amber-200 dark:hover:border-amber-500/20'
-      }
-    }
-    return isActive ? colors[color].active : colors[color].inactive
+  const getTabColors = (_color: TabColor, isActive: boolean) => {
+    return isActive
+      ? 'text-cyan-700 dark:text-white bg-white dark:bg-cyan-500/20 shadow-[0_6px_16px_rgba(6,182,212,0.10),0_0_0_1px_rgba(6,182,212,0.12)] dark:shadow-[0_0_0_1px_rgba(34,211,238,0.15)]'
+      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
   }
 
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#070707] transition-colors">
+    <div className="min-h-screen transition-colors">
       {/* 顶部导航栏 - 包含标题和标签页 */}
       <motion.nav 
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        className="border-b border-gray-300 dark:border-white/10 shadow-sm dark:shadow-lg sticky top-0 z-50 bg-white/30 dark:bg-[rgba(7,7,7,0.3)] backdrop-blur-md transition-colors"
+        className="sticky top-0 z-50 bg-white/72 shadow-[0_1px_0_rgba(15,23,42,0.07),0_18px_46px_rgba(15,23,42,0.05)] backdrop-blur-2xl transition-colors dark:bg-slate-950/58 dark:shadow-[0_1px_0_rgba(255,255,255,0.08),0_18px_46px_rgba(0,0,0,0.28)]"
       >
         <div className="max-w-7xl mx-auto px-3 sm:px-6">
           <div className="flex justify-between items-center h-14 sm:h-16">
@@ -81,23 +50,23 @@ export default function Layout({ children }: LayoutProps) {
               <img 
                 src="/logo.webp?v=2" 
                 alt="La Pluma Logo" 
-                className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg object-cover"
+                className="w-6 h-6 sm:w-7 sm:h-7 rounded-xl object-cover shadow-[0_0_0_1px_rgba(15,23,42,0.08),0_8px_20px_rgba(6,182,212,0.16)]"
               />
-              <h1 className="text-base sm:text-lg font-bold bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-400 bg-clip-text text-transparent">
+              <h1 className="text-base sm:text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
                 La Pluma
               </h1>
             </div>
 
             {/* 右侧：标签页导航 + 系统信息 */}
-            <div className="flex items-center space-x-2 sm:space-x-4">
+            <div className="flex items-center gap-3 sm:gap-5">
               {/* 桌面端标签页导航 */}
-              <div className="hidden md:flex space-x-2">
+              <div className="hidden lg:flex gap-1 rounded-2xl bg-slate-950/[0.035] p-1.5 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.05)] dark:bg-white/[0.045] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]">
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={`
-                      relative flex items-center px-3 sm:px-4 py-2 font-medium text-xs sm:text-sm rounded-lg transition-colors border
+                      relative flex items-center px-3.5 py-2 font-medium text-sm rounded-xl transition-colors
                       ${getTabColors(tab.color, activeTab === tab.id)}
                     `}
                   >
@@ -107,7 +76,7 @@ export default function Layout({ children }: LayoutProps) {
               </div>
 
               {/* 主题切换器 */}
-              <ThemeToggle color={tabs.find(t => t.id === activeTab)?.color || 'violet'} />
+              <ThemeToggle color="cyan" />
 
               {/* 移动端汉堡菜单按钮 */}
               <button
@@ -125,7 +94,7 @@ export default function Layout({ children }: LayoutProps) {
 
               {/* GitHub 链接 */}
               <a
-                href="https://github.com/your-username/your-repo"
+                href="https://github.com/mps233/La-pluma"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hidden sm:flex items-center justify-center p-2 rounded-lg text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-all group"
@@ -157,7 +126,7 @@ export default function Layout({ children }: LayoutProps) {
                         setMobileMenuOpen(false)
                       }}
                       className={`
-                        flex items-center px-4 py-3 font-medium text-sm rounded-lg transition-colors border
+                        flex items-center px-4 py-3 font-medium text-sm rounded-xl transition-colors
                         ${getTabColors(tab.color, activeTab === tab.id)}
                       `}
                     >
@@ -172,7 +141,7 @@ export default function Layout({ children }: LayoutProps) {
       </motion.nav>
 
       {/* 主内容区域 */}
-      <main className="max-w-7xl mx-auto py-2 sm:py-6 px-2 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto py-3 sm:py-8 px-2 sm:px-6 lg:px-8">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

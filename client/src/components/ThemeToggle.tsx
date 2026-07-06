@@ -79,17 +79,17 @@ export default function ThemeToggle({ color = 'violet' }: ThemeToggleProps) {
   }
 
   return (
-    <div className="flex items-center space-x-2 bg-gray-100 dark:bg-white/5 rounded-lg p-1 border border-gray-200 dark:border-white/10">
+    <div className="flex items-center gap-1.5 rounded-2xl bg-slate-950/[0.035] p-1.5 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)] dark:bg-white/[0.045] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
       {/* 亮色模式 */}
       <motion.button
         onClick={() => handleThemeChange('light')}
-        className={`theme-toggle-btn p-1.5 rounded-md transition-all ${
+        className={`theme-toggle-btn p-1.5 rounded-xl transition-all ${
           theme === 'light'
-            ? `${getColorClasses()} text-white shadow-lg`
-            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-white/10'
+            ? `${getColorClasses()} text-white shadow-[0_8px_18px_rgba(6,182,212,0.20)]`
+            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 hover:bg-white/70 dark:hover:bg-white/10'
         }`}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{ y: -1 }}
+        whileTap={{ y: 0, scale: 0.96 }}
         title="亮色模式"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -100,13 +100,13 @@ export default function ThemeToggle({ color = 'violet' }: ThemeToggleProps) {
       {/* 暗色模式 */}
       <motion.button
         onClick={() => handleThemeChange('dark')}
-        className={`theme-toggle-btn p-1.5 rounded-md transition-all ${
+        className={`theme-toggle-btn p-1.5 rounded-xl transition-all ${
           theme === 'dark'
-            ? `${getColorClasses()} text-white shadow-lg`
-            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-white/10'
+            ? `${getColorClasses()} text-white shadow-[0_8px_18px_rgba(6,182,212,0.20)]`
+            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 hover:bg-white/70 dark:hover:bg-white/10'
         }`}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{ y: -1 }}
+        whileTap={{ y: 0, scale: 0.96 }}
         title="暗色模式"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -117,13 +117,13 @@ export default function ThemeToggle({ color = 'violet' }: ThemeToggleProps) {
       {/* 跟随系统 */}
       <motion.button
         onClick={() => handleThemeChange('system')}
-        className={`theme-toggle-btn p-1.5 rounded-md transition-all ${
+        className={`theme-toggle-btn p-1.5 rounded-xl transition-all ${
           theme === 'system'
-            ? `${getColorClasses()} text-white shadow-lg`
-            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-white/10'
+            ? `${getColorClasses()} text-white shadow-[0_8px_18px_rgba(6,182,212,0.20)]`
+            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 hover:bg-white/70 dark:hover:bg-white/10'
         }`}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{ y: -1 }}
+        whileTap={{ y: 0, scale: 0.96 }}
         title="跟随系统"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>

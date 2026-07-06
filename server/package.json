@@ -9,7 +9,9 @@
     "fetch-formulas": "node scripts/fetch-material-formulas.js && node scripts/merge-formulas.js",
     "fetch-all-materials": "node scripts/fetch-all-materials.js",
     "fetch-stages": "node scripts/fetch-stage-data.js",
-    "fetch-assets": "node scripts/fetch-game-assets.js"
+    "fetch-assets": "node scripts/fetch-game-assets.js",
+    "fetch-paradox": "node scripts/fetch-paradox-operators.js",
+    "fetch-game-data": "npm run fetch-stages && npm run fetch-paradox"
   },
   "dependencies": {
     "cors": "^2.8.5",

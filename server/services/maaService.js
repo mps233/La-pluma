@@ -1,11 +1,11 @@
-import { exec, spawn } from 'child_process';
+import { spawn, execFile } from 'child_process';
 import { promisify } from 'util';
 import { readFile, writeFile, mkdir, readdir, stat, unlink } from 'fs/promises';
 import { createReadStream } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { createLogger } from '../utils/logger.js';
 
-const execPromise = promisify(exec);
+const execFilePromise = promisify(execFile);
 
 // 创建日志记录器
 const logger = createLogger('MaaService');
@@ -13,6 +13,7 @@ const logger = createLogger('MaaService');
 // MAA CLI 路径
 // Docker 环境使用完整路径，本地环境使用 'maa' 依赖 PATH
 const MAA_CLI_PATH = process.env.MAA_CLI_PATH || (process.env.DOCKER_ENV ? '/usr/local/bin/maa' : 'maa');
+const MAX_REALTIME_LOGS = Number(process.env.LA_PLUMA_MAX_REALTIME_LOGS || 5000);
 
 // 全局任务状态追踪
 const taskStatus = {
@@ -59,15 +60,26 @@ export function clearRealtimeLogs() {
   taskStatus.logs = [];
 }
 
+function trimRealtimeLogs() {
+  if (taskStatus.logs.length > MAX_REALTIME_LOGS) {
+    taskStatus.logs.splice(0, taskStatus.logs.length - MAX_REALTIME_LOGS);
+  }
+}
+
+function appendRealtimeLog(level, message) {
+  taskStatus.logs.push({
+    time: new Date().toISOString(),
+    level,
+    message
+  });
+  trimRealtimeLogs();
+}
+
 /**
  * 添加日志到缓存
  */
 function addLog(level, message) {
-  taskStatus.logs.push({
-    time: new Date().toISOString(),
-    level: level,
-    message: message
-  });
+  appendRealtimeLog(level, message);
   // 使用结构化日志，不再使用 console.log
   const logLevel = level.toLowerCase();
   if (logger[logLevel]) {
@@ -133,11 +145,7 @@ export async function execMaaCommand(command, args = [], taskName = null, taskTy
         // 将输出按行分割并添加到日志
         const lines = text.split('\n').filter(line => line.trim());
         lines.forEach(line => {
-          taskStatus.logs.push({
-            time: new Date().toISOString(),
-            level: 'INFO',
-            message: line.trim()
-          });
+          appendRealtimeLog('INFO', line.trim());
         });
       });
       
@@ -149,11 +157,7 @@ export async function execMaaCommand(command, args = [], taskName = null, taskTy
         const lines = text.split('\n').filter(line => line.trim());
         lines.forEach(line => {
           const level = line.includes('ERROR') ? 'ERROR' : line.includes('WARN') ? 'WARN' : 'INFO';
-          taskStatus.logs.push({
-            time: new Date().toISOString(),
-            level: level,
-            message: line.trim()
-          });
+          appendRealtimeLog(level, line.trim());
         });
       });
       
@@ -210,11 +214,7 @@ export async function execMaaCommand(command, args = [], taskName = null, taskTy
         
         const lines = text.split('\n').filter(line => line.trim());
         lines.forEach(line => {
-          taskStatus.logs.push({
-            time: new Date().toISOString(),
-            level: 'INFO',
-            message: line.trim()
-          });
+          appendRealtimeLog('INFO', line.trim());
         });
       });
       
@@ -225,11 +225,7 @@ export async function execMaaCommand(command, args = [], taskName = null, taskTy
         const lines = text.split('\n').filter(line => line.trim());
         lines.forEach(line => {
           const level = line.includes('ERROR') ? 'ERROR' : line.includes('WARN') ? 'WARN' : 'INFO';
-          taskStatus.logs.push({
-            time: new Date().toISOString(),
-            level: level,
-            message: line.trim()
-          });
+          appendRealtimeLog(level, line.trim());
         });
       });
       
@@ -271,7 +267,7 @@ export async function execMaaCommand(command, args = [], taskName = null, taskTy
   // 没有任务名称，使用同步执行（用于配置查询等操作）
   else {
     try {
-      const { stdout, stderr } = await execPromise(fullCommand, {
+      const { stdout, stderr } = await execFilePromise(MAA_CLI_PATH, [command, ...finalArgs], {
         maxBuffer: 10 * 1024 * 1024
       });
       
@@ -314,7 +310,7 @@ export async function execMaaCommand(command, args = [], taskName = null, taskTy
  * 获取 MAA 版本信息
  */
 export async function getMaaVersion(silent = false) {
-  const result = await execMaaCommand('version', [], false, silent);
+  const result = await execMaaCommand('version', [], null, null, false, silent);
   const output = result.stdout;
   
   // 解析版本信息
@@ -373,8 +369,8 @@ export async function getConfig(profileName = 'default') {
   } catch (error) {
     logger.debug('配置文件不存在，返回默认配置');
     return {
-      adb_path: 'adb',
-      address: '127.0.0.1:5555',
+      adb_path: '/opt/homebrew/bin/adb',
+      address: '127.0.0.1:16384',
       config: 'CompatMac',
     };
   }
@@ -537,6 +533,36 @@ function generateTaskToml(taskConfig) {
   return toml;
 }
 
+function validateAdbPath(adbPath) {
+  if (typeof adbPath !== 'string' || !adbPath.trim()) {
+    throw new Error('ADB 路径不能为空');
+  }
+  // 允许命令名或普通绝对/相对路径，拒绝 shell 元字符。
+  if (!/^[\w@%+=:,./~-]+$/.test(adbPath)) {
+    throw new Error('ADB 路径包含非法字符');
+  }
+  return adbPath;
+}
+
+function validateAdbAddress(address) {
+  if (typeof address !== 'string' || !address.trim()) {
+    throw new Error('ADB 地址不能为空');
+  }
+  // 常见形态：127.0.0.1:5555、192.168.1.2:5555、localhost:5555、emulator-5554
+  if (!/^([a-zA-Z0-9_.-]+)(:\d{1,5})?$/.test(address)) {
+    throw new Error('ADB 地址格式不合法');
+  }
+  return address;
+}
+
+async function adbExec(adbPath, args, options = {}) {
+  validateAdbPath(adbPath);
+  return execFilePromise(adbPath, args, {
+    maxBuffer: 50 * 1024 * 1024,
+    ...options
+  });
+}
+
 /**
  * 测试 ADB 连接
  */
@@ -544,7 +570,7 @@ export async function testAdbConnection(adbPath = '/opt/homebrew/bin/adb', addre
   try {
     // 检查 ADB 是否可用
     try {
-      await execPromise(`${adbPath} version`);
+      await adbExec(adbPath, ['version']);
     } catch (error) {
       return {
         success: false,
@@ -554,7 +580,8 @@ export async function testAdbConnection(adbPath = '/opt/homebrew/bin/adb', addre
     }
     
     // 检查设备列表
-    const { stdout: devicesOutput } = await execPromise(`${adbPath} devices`);
+    validateAdbAddress(address);
+    const { stdout: devicesOutput } = await adbExec(adbPath, ['devices']);
     const isConnected = devicesOutput.includes(address) && devicesOutput.includes('device');
     
     if (isConnected) {
@@ -567,13 +594,13 @@ export async function testAdbConnection(adbPath = '/opt/homebrew/bin/adb', addre
     
     // 尝试连接
     logger.debug('尝试连接设备', { address });
-    const { stdout: connectOutput } = await execPromise(`${adbPath} connect ${address}`);
+    const { stdout: connectOutput } = await adbExec(adbPath, ['connect', address]);
     
     // 等待连接稳定
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     // 再次检查连接状态
-    const { stdout: devicesOutput2 } = await execPromise(`${adbPath} devices`);
+    const { stdout: devicesOutput2 } = await adbExec(adbPath, ['devices']);
     const isConnectedNow = devicesOutput2.includes(address) && devicesOutput2.includes('device');
     
     if (isConnectedNow) {
@@ -604,44 +631,36 @@ export async function testAdbConnection(adbPath = '/opt/homebrew/bin/adb', addre
  */
 export async function captureScreen(adbPath = '/opt/homebrew/bin/adb', address = '127.0.0.1:16384') {
   try {
+    validateAdbPath(adbPath);
+    validateAdbAddress(address);
+
     // 先检查设备是否已连接
-    const checkCommand = `${adbPath} devices`;
-    const { stdout: devicesOutput } = await execPromise(checkCommand);
-    
-    // 检查设备是否在列表中
+    const { stdout: devicesOutput } = await adbExec(adbPath, ['devices']);
     const isConnected = devicesOutput.includes(address);
     
     if (!isConnected) {
       logger.debug('设备未连接，尝试连接', { address });
-      // 尝试连接设备
-      const connectCommand = `${adbPath} connect ${address}`;
-      const { stdout: connectOutput, stderr: connectError } = await execPromise(connectCommand);
+      const { stdout: connectOutput, stderr: connectError } = await adbExec(adbPath, ['connect', address]);
       logger.debug('连接结果', { output: connectOutput });
       
       if (connectError) {
         logger.warn('连接警告', { error: connectError });
       }
       
-      // 等待连接稳定
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
-    // 使用 adb screencap 命令截图并转换为 base64
-    const command = `${adbPath} -s ${address} exec-out screencap -p | base64`;
-    logger.debug('执行截图命令', { command });
-    
-    const { stdout, stderr } = await execPromise(command, {
-      maxBuffer: 50 * 1024 * 1024, // 50MB buffer for screenshot
-      encoding: 'utf-8'
+    logger.debug('执行截图命令', { adbPath, address });
+    const { stdout, stderr } = await adbExec(adbPath, ['-s', address, 'exec-out', 'screencap', '-p'], {
+      encoding: 'buffer'
     });
     
-    if (stderr) {
-      logger.warn('截图警告', { error: stderr });
+    if (stderr && stderr.length) {
+      logger.warn('截图警告', { error: stderr.toString() });
     }
     
-    // 返回 base64 编码的图片
     return {
-      image: stdout.trim(),
+      image: Buffer.from(stdout).toString('base64'),
       timestamp: new Date().toISOString()
     };
   } catch (error) {
@@ -940,7 +959,13 @@ export async function cleanupLogs(maxSizeMB = 10) {
  */
 export async function readLogFile(filePath, lines = 1000) {
   try {
-    const content = await readFile(filePath, 'utf-8');
+    const logDir = resolve(await getMaaLogDir());
+    const requestedPath = resolve(filePath);
+    const relativePath = requestedPath === logDir ? '' : requestedPath.slice(logDir.length + 1);
+    if (!requestedPath.startsWith(logDir) || relativePath.startsWith('..')) {
+      throw new Error('只能读取 MAA 日志目录内的文件');
+    }
+    const content = await readFile(requestedPath, 'utf-8');
     const allLines = content.split('\n');
     
     // 只返回最后 N 行

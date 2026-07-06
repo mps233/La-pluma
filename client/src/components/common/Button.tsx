@@ -49,16 +49,16 @@ export default function Button({
   gradientTo,
   ...props
 }: ButtonProps) {
-  const baseStyles = 'inline-flex items-center justify-center font-semibold rounded-xl transition-all focus:outline-none'
+  const baseStyles = 'inline-flex items-center justify-center font-semibold rounded-xl transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950'
   
   const variantStyles: Record<string, string> = {
-    primary: 'bg-gradient-to-r from-violet-500 to-purple-500 text-white hover:from-violet-600 hover:to-purple-600 shadow-lg shadow-violet-500/25 hover:shadow-xl hover:shadow-violet-500/30 disabled:from-gray-700 disabled:to-gray-700 disabled:shadow-none',
-    secondary: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-200 dark:border-white/10',
-    danger: 'bg-gradient-to-r from-rose-500 to-red-500 text-white hover:from-rose-600 hover:to-red-600 shadow-lg shadow-rose-500/25 hover:shadow-xl hover:shadow-rose-500/30 disabled:from-gray-700 disabled:to-gray-700 disabled:shadow-none',
-    success: 'bg-gradient-to-r from-emerald-500 to-green-500 text-white hover:from-emerald-600 hover:to-green-600 shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 disabled:from-gray-700 disabled:to-gray-700 disabled:shadow-none',
-    ghost: 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5',
-    gradient: 'bg-gradient-to-r text-white shadow-lg hover:shadow-xl disabled:from-gray-700 disabled:to-gray-700 disabled:shadow-none',
-    outline: 'text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-gray-800/60',
+    primary: 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-[0_10px_24px_rgba(6,182,212,0.22)] hover:shadow-[0_14px_32px_rgba(6,182,212,0.28)] disabled:from-gray-500 disabled:to-gray-500 disabled:shadow-none',
+    secondary: 'bg-white/70 dark:bg-white/10 text-slate-700 dark:text-slate-200 shadow-[0_0_0_1px_rgba(15,23,42,0.07)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08)] hover:bg-white dark:hover:bg-white/10',
+    danger: 'bg-gradient-to-r from-rose-500 to-red-500 text-white shadow-[0_10px_24px_rgba(244,63,94,0.22)] hover:shadow-[0_14px_32px_rgba(244,63,94,0.28)] disabled:from-gray-500 disabled:to-gray-500 disabled:shadow-none',
+    success: 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-[0_10px_24px_rgba(16,185,129,0.22)] hover:shadow-[0_14px_32px_rgba(16,185,129,0.28)] disabled:from-gray-500 disabled:to-gray-500 disabled:shadow-none',
+    ghost: 'text-slate-700 dark:text-slate-300 hover:bg-white/65 dark:hover:bg-white/10',
+    gradient: 'bg-gradient-to-r text-white shadow-[0_10px_24px_rgba(6,182,212,0.22)] hover:shadow-[0_14px_32px_rgba(6,182,212,0.28)] disabled:from-gray-500 disabled:to-gray-500 disabled:shadow-none',
+    outline: 'text-slate-700 dark:text-slate-200 bg-white/50 dark:bg-white/[0.03] shadow-[0_0_0_1px_rgba(15,23,42,0.08)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.09)] hover:bg-white/80 dark:hover:bg-white/10',
   }
   
   // 预定义的渐变色组合
@@ -102,8 +102,8 @@ export default function Button({
       onClick={onClick}
       disabled={isDisabled}
       className={`${baseStyles} ${variantStyles[variant]} ${variant === 'gradient' ? gradientStyles : ''} ${sizeStyles[size]} ${widthStyles} ${isDisabled ? 'cursor-not-allowed opacity-50' : ''} ${className}`}
-      whileHover={isDisabled ? {} : { scale: 1.02 }}
-      whileTap={isDisabled ? {} : { scale: 0.98 }}
+      whileHover={isDisabled ? {} : { y: -1 }}
+      whileTap={isDisabled ? {} : { y: 0, scale: 0.98 }}
       {...props}
     >
       {loading ? (
@@ -138,7 +138,7 @@ export function IconButton({
   title,
   ...props
 }: IconButtonProps) {
-  const baseStyles = 'inline-flex items-center justify-center font-semibold rounded-xl transition-all focus:outline-none'
+  const baseStyles = 'inline-flex items-center justify-center font-semibold rounded-xl transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60'
   
   const variantStyles: Record<string, string> = {
     primary: 'bg-gradient-to-r from-violet-500 to-purple-500 text-white hover:from-violet-600 hover:to-purple-600',

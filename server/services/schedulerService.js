@@ -138,7 +138,7 @@ function buildCommand(task) {
     }
     // 添加账号切换参数
     if (commandId === 'startup' && task.params.accountName) {
-      extraArgs.push(`--account ${task.params.accountName}`);
+      extraArgs.push(`--account-name ${task.params.accountName}`);
     }
   } else if (commandId === 'fight') {
     // 支持多个关卡（stages 数组，每个元素是 {stage, times}）或单个关卡（stage 字符串）

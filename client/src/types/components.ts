@@ -322,6 +322,7 @@ export interface CombatAdvancedOption {
   type: 'text' | 'number' | 'select' | 'checkbox'
   param: string
   placeholder?: string
+  helper?: string
   options?: Array<{ value: string; label: string }>
 }
 
@@ -416,7 +417,7 @@ export interface AutoUpdateConfig {
 export interface ConfigSection {
   id: 'connection' | 'resource' | 'instance' | 'skland'
   name: string
-  icon: string
+  icon: ReactNode
 }
 
 export interface UpdateStatus {

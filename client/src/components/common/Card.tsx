@@ -65,31 +65,31 @@ export function Card({
 
   // 主题色样式
   const themeStyles: Record<string, string> = {
-    default: 'border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/60',
-    violet: 'border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/60',
-    emerald: 'border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/60',
-    purple: 'border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/60',
-    orange: 'border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/60',
-    cyan: 'border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/60',
-    amber: 'border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/60',
-    teal: 'border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/60',
+    default: 'surface-panel',
+    violet: 'surface-panel',
+    emerald: 'surface-panel',
+    purple: 'surface-panel',
+    orange: 'surface-panel',
+    cyan: 'surface-panel',
+    amber: 'surface-panel',
+    teal: 'surface-panel',
   }
 
   // 主题色 hover 样式
   const hoverStyles: Record<string, string> = {
-    default: 'hover:border-gray-300 dark:hover:border-white/20 hover:shadow-lg',
-    violet: 'hover:border-violet-400 dark:hover:border-violet-500/30 hover:shadow-[0_4px_12px_rgba(139,92,246,0.15)]',
-    emerald: 'hover:border-emerald-400 dark:hover:border-emerald-500/30 hover:shadow-[0_4px_12px_rgba(16,185,129,0.15)]',
-    purple: 'hover:border-purple-400 dark:hover:border-purple-500/30 hover:shadow-[0_4px_12px_rgba(168,85,247,0.15)]',
-    orange: 'hover:border-orange-400 dark:hover:border-orange-500/30 hover:shadow-[0_4px_12px_rgba(249,115,22,0.15)]',
-    cyan: 'hover:border-cyan-400 dark:hover:border-cyan-500/30 hover:shadow-[0_4px_12px_rgba(6,182,212,0.15)]',
-    amber: 'hover:border-amber-400 dark:hover:border-amber-500/30 hover:shadow-[0_4px_12px_rgba(245,158,11,0.15)]',
-    teal: 'hover:border-teal-400 dark:hover:border-teal-500/30 hover:shadow-[0_4px_12px_rgba(20,184,166,0.15)]',
+    default: 'surface-panel-hover',
+    violet: 'surface-panel-hover',
+    emerald: 'surface-panel-hover',
+    purple: 'surface-panel-hover',
+    orange: 'surface-panel-hover',
+    cyan: 'surface-panel-hover',
+    amber: 'surface-panel-hover',
+    teal: 'surface-panel-hover',
   }
 
   return (
     <Container 
-      className={`rounded-3xl p-6 border ${themeStyles[theme]} ${hoverStyles[theme]} transition-all ${className}`}
+      className={`rounded-3xl p-6 ${themeStyles[theme]} ${hoverStyles[theme]} transition-all ${className}`}
       {...animationProps}
       {...hoverProps}
     >
@@ -103,10 +103,10 @@ export function Card({
  */
 export function CardHeader({ icon, title, actions }: CardHeaderProps) {
   return (
-    <div className="px-6 py-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between">
+    <div className="px-6 py-4 shadow-[inset_0_-1px_0_rgba(15,23,42,0.06)] dark:shadow-[inset_0_-1px_0_rgba(255,255,255,0.07)] flex items-center justify-between">
       <div className="flex items-center space-x-2">
         {icon}
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+        <h3 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">
           {title}
         </h3>
       </div>
@@ -138,7 +138,7 @@ export function InfoCard({ children, type = 'info', className = '' }: InfoCardPr
   }
 
   return (
-    <div className={`rounded-3xl p-5 border ${typeStyles[type]} ${className}`}>
+    <div className={`rounded-2xl p-5 border ${typeStyles[type]} ${className}`}>
       {children}
     </div>
   )

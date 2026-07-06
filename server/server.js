@@ -7,6 +7,7 @@ import notificationRoutes, { loadConfig as loadNotificationConfig } from './rout
 import operatorTrainingRoutes from './routes/operatorTraining.js';
 import sklandRoutes from './routes/skland.js';
 import operatorQuotesRoutes from './routes/operatorQuotes.js';
+import agentRoutes from './routes/agent.js';
 import { setSocketIO as setSchedulerSocketIO } from './services/schedulerService.js';
 import { setSocketIO as setMaaSocketIO } from './services/maaService.js';
 import { initTelegramBot } from './services/telegramBotService.js';
@@ -37,6 +38,23 @@ const getLocalIpAddress = () => {
 };
 
 const localIp = getLocalIpAddress();
+
+const API_TOKEN = process.env.LA_PLUMA_TOKEN || '';
+
+function optionalApiAuth(req, res, next) {
+  if (!API_TOKEN) return next();
+
+  const authHeader = req.headers.authorization || '';
+  const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  const headerToken = req.headers['x-la-pluma-token'];
+
+  if (bearerToken === API_TOKEN || headerToken === API_TOKEN) {
+    return next();
+  }
+
+  return res.status(401).json({ success: false, error: 'Unauthorized', message: '需要有效的 LA_PLUMA_TOKEN' });
+}
+
 
 const io = new Server(httpServer, {
   cors: {
@@ -72,6 +90,8 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // API 路由
+app.use('/api', optionalApiAuth);
+app.use('/api/agent', agentRoutes);
 app.use('/api/maa', maaRoutes);
 app.use('/api/notification', notificationRoutes);
 app.use('/api/operator-training', operatorTrainingRoutes);

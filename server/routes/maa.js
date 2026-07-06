@@ -10,12 +10,320 @@ import { createLogger } from '../utils/logger.js';
 const router = express.Router();
 const logger = createLogger('MaaRoutes');
 
+function normalizeStageIdForPrts(stageId = '') {
+  return String(stageId).replace(/#[fn]#/g, '');
+}
+
+async function loadLocalJson(relativePath, fallback) {
+  const fs = await import('fs/promises');
+  const path = await import('path');
+  const { fileURLToPath } = await import('url');
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+
+  try {
+    const filePath = path.join(__dirname, relativePath);
+    return JSON.parse(await fs.readFile(filePath, 'utf-8'));
+  } catch (error) {
+    if (error.code === 'ENOENT') return fallback;
+    throw error;
+  }
+}
+
+async function resolveStageSearchKeyword(input) {
+  const raw = String(input || '').trim();
+  if (!raw) return '';
+
+  const stages = await loadLocalJson('../data/stages.json', {});
+  const upper = raw.toUpperCase();
+  const stage = stages[upper]
+    || Object.values(stages).find(item =>
+      String(item.code || '').toUpperCase() === upper
+      || String(item.name || '').trim() === raw
+      || String(item.id || '').toUpperCase() === upper
+    );
+
+  return stage?.id ? normalizeStageIdForPrts(stage.id) : raw;
+}
+
+async function loadParadoxOperators() {
+  const cached = await loadLocalJson('../data/paradox-operators.json', null);
+  if (Array.isArray(cached)) return cached;
+
+  const [handbookResponse, characterResponse] = await Promise.all([
+    fetch('https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/excel/handbook_info_table.json'),
+    fetch('https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/excel/character_table.json')
+  ]);
+
+  if (!handbookResponse.ok || !characterResponse.ok) {
+    throw new Error('无法获取悖论模拟干员数据');
+  }
+
+  const handbook = await handbookResponse.json();
+  const characters = await characterResponse.json();
+
+  return Object.entries(handbook.handbookStageData || {})
+    .map(([charId, stage]) => ({
+      id: charId,
+      name: characters[charId]?.name || handbook.handbookDict?.[charId]?.infoName || charId,
+      stage_id: stage.stageId || stage.code,
+      stage_name: stage.name || ''
+    }))
+    .filter(item => item.stage_id);
+}
+
+
 // 检查关卡是否今日开放的辅助函数
 function isStageOpenToday(stage) {
   // 这个函数的实现需要从 maaService 导入
   // 暂时返回默认值
   return { isOpen: true, reason: '' };
 }
+
+
+// WebRTC 实时预览（托管 ScrcpyOverWebRTC）
+const WEBRTC_DIR = process.env.LA_PLUMA_WEBRTC_DIR || `${process.env.HOME || ''}/ScrcpyOverWebRTC`;
+const WEBRTC_PORT = Number(process.env.LA_PLUMA_WEBRTC_PORT || 8443);
+let webrtcServerProcess = null;
+let webrtcAgentProcess = null;
+let webrtcTurnProcess = null;
+
+async function pathExists(filePath) {
+  const fs = await import('fs/promises');
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function getWebrtcBinaryPath() {
+  const path = await import('path');
+  const arch = process.arch === 'arm64' ? 'darwin_arm64' : 'darwin_amd64';
+  return path.join(WEBRTC_DIR, 'bin', arch, 'webrtc-signaling');
+}
+
+async function getMacLanIp() {
+  const { execFile } = await import('child_process');
+  const { promisify } = await import('util');
+  const execFileAsync = promisify(execFile);
+  const interfaces = ['en0', 'en1'];
+  for (const name of interfaces) {
+    try {
+      const { stdout } = await execFileAsync('ipconfig', ['getifaddr', name], { timeout: 2000 });
+      const ip = stdout.trim();
+      if (ip) return ip;
+    } catch {
+      // try next interface
+    }
+  }
+  return '127.0.0.1';
+}
+
+async function getWebrtcLogPaths() {
+  const path = await import('path');
+  return {
+    serverLog: path.join(WEBRTC_DIR, 'la-pluma-webrtc-server.log'),
+    agentLog: path.join(WEBRTC_DIR, 'la-pluma-webrtc-agent.log'),
+    turnLog: path.join(WEBRTC_DIR, 'la-pluma-webrtc-turn.log')
+  };
+}
+
+async function isWebrtcServerReachable() {
+  try {
+    const response = await fetch(`http://127.0.0.1:${WEBRTC_PORT}`, { signal: AbortSignal.timeout(1500) });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function isDeviceAgentRunning(address = '127.0.0.1:16384') {
+  const { execFile } = await import('child_process');
+  const { promisify } = await import('util');
+  const execFileAsync = promisify(execFile);
+  try {
+    const { stdout } = await execFileAsync('/opt/homebrew/bin/adb', ['-s', address, 'shell', 'ps | grep cloudphone-agent || true'], { timeout: 5000 });
+    return stdout.includes('cloudphone-agent');
+  } catch {
+    return false;
+  }
+}
+
+async function getIceServersConfig() {
+  const lanIp = await getMacLanIp();
+  return `turn:cloudphone_user:cloudphone_secure_password@${lanIp}:3478?transport=udp,stun:${lanIp}:3478`;
+}
+
+async function startLocalTurnServer() {
+  if (webrtcTurnProcess && !webrtcTurnProcess.killed) return;
+  const { spawn } = await import('child_process');
+  const fs = await import('fs');
+  const { turnLog } = await getWebrtcLogPaths();
+  const logFd = fs.openSync(turnLog, 'a');
+  const turnserver = '/opt/homebrew/bin/turnserver';
+  if (!await pathExists(turnserver)) return;
+  webrtcTurnProcess = spawn(turnserver, [
+    '-n',
+    '--no-cli',
+    '--no-tls',
+    '--no-dtls',
+    '-L', '0.0.0.0',
+    '-p', '3478',
+    '-a',
+    '-u', 'cloudphone_user:cloudphone_secure_password',
+    '-r', 'cloudphone'
+  ], {
+    cwd: WEBRTC_DIR,
+    stdio: ['ignore', logFd, logFd],
+    detached: false
+  });
+  webrtcTurnProcess.on('exit', () => { webrtcTurnProcess = null; });
+}
+
+async function getWebrtcStatus() {
+  const path = await import('path');
+  const binaryPath = await getWebrtcBinaryPath();
+  const assetsPath = path.join(WEBRTC_DIR, 'assets', 'v1');
+  const lanIp = await getMacLanIp();
+  const logPaths = await getWebrtcLogPaths();
+  const deviceAddress = '127.0.0.1:16384';
+  const serverReachable = await isWebrtcServerReachable();
+  const deviceAgentRunning = await isDeviceAgentRunning(deviceAddress);
+  return {
+    installed: await pathExists(WEBRTC_DIR),
+    built: await pathExists(binaryPath) && await pathExists(assetsPath),
+    dir: WEBRTC_DIR,
+    port: WEBRTC_PORT,
+    url: `http://127.0.0.1:${WEBRTC_PORT}`,
+    lanUrl: `http://${lanIp}:${WEBRTC_PORT}`,
+    signalingUrl: `ws://${lanIp}:${WEBRTC_PORT}`,
+    turnRunning: !!webrtcTurnProcess && !webrtcTurnProcess.killed,
+    iceServers: await getIceServersConfig(),
+    serverRunning: (!!webrtcServerProcess && !webrtcServerProcess.killed) || serverReachable,
+    agentRunning: (!!webrtcAgentProcess && !webrtcAgentProcess.killed) || deviceAgentRunning,
+    deviceAddress,
+    ...logPaths
+  };
+}
+
+router.get('/webrtc/status', asyncHandler(async (req, res) => {
+  res.json(successResponse(await getWebrtcStatus()));
+}));
+
+router.post('/webrtc/install', asyncHandler(async (req, res) => {
+  const { spawn } = await import('child_process');
+  const fs = await import('fs/promises');
+  const path = await import('path');
+  const home = process.env.HOME || process.cwd();
+  const parentDir = path.dirname(WEBRTC_DIR) || home;
+
+  if (!await pathExists(WEBRTC_DIR)) {
+    await new Promise((resolve, reject) => {
+      const child = spawn('git', ['clone', 'https://github.com/hqw700/ScrcpyOverWebRTC.git', WEBRTC_DIR], {
+        cwd: parentDir,
+        stdio: 'ignore'
+      });
+      child.on('close', code => code === 0 ? resolve() : reject(new Error(`git clone 失败: ${code}`)));
+      child.on('error', reject);
+    });
+  }
+
+  const buildScript = path.join(WEBRTC_DIR, 'build.sh');
+  await fs.chmod(buildScript, 0o755).catch(() => {});
+  await new Promise((resolve, reject) => {
+    const child = spawn('bash', ['build.sh'], { cwd: WEBRTC_DIR, stdio: 'ignore' });
+    child.on('close', code => code === 0 ? resolve() : reject(new Error(`build.sh 失败: ${code}`)));
+    child.on('error', reject);
+  });
+
+  res.json(successResponse(await getWebrtcStatus(), 'WebRTC 组件已安装'));
+}));
+
+router.post('/webrtc/start-server', asyncHandler(async (req, res) => {
+  if (webrtcServerProcess && !webrtcServerProcess.killed) {
+    return res.json(successResponse(await getWebrtcStatus(), 'WebRTC 服务已在运行'));
+  }
+  const { spawn } = await import('child_process');
+  const path = await import('path');
+  const binaryPath = await getWebrtcBinaryPath();
+  const assetsPath = path.join(WEBRTC_DIR, 'assets', 'v1');
+  if (!await pathExists(binaryPath) || !await pathExists(assetsPath)) {
+    return res.status(400).json(errorResponse(new Error('WebRTC 组件未安装或未构建')));
+  }
+  await startLocalTurnServer();
+  const fs = await import('fs');
+  const { serverLog } = await getWebrtcLogPaths();
+  const logFd = fs.openSync(serverLog, 'a');
+  const iceServers = await getIceServersConfig();
+  webrtcServerProcess = spawn(binaryPath, ['-host', '0.0.0.0', '-port', String(WEBRTC_PORT), '-assets', assetsPath, '-ice_servers', iceServers], {
+    cwd: WEBRTC_DIR,
+    stdio: ['ignore', logFd, logFd],
+    detached: false,
+    env: { ...process.env, PORT: String(WEBRTC_PORT), PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH || ''}` }
+  });
+  webrtcServerProcess.on('exit', () => { webrtcServerProcess = null; });
+  res.json(successResponse(await getWebrtcStatus(), 'WebRTC 服务已启动'));
+}));
+
+router.post('/webrtc/stop-server', asyncHandler(async (req, res) => {
+  if (webrtcAgentProcess && !webrtcAgentProcess.killed) {
+    webrtcAgentProcess.kill('SIGTERM');
+    webrtcAgentProcess = null;
+  }
+  if (webrtcServerProcess && !webrtcServerProcess.killed) {
+    webrtcServerProcess.kill('SIGTERM');
+    webrtcServerProcess = null;
+  }
+  if (webrtcTurnProcess && !webrtcTurnProcess.killed) {
+    webrtcTurnProcess.kill('SIGTERM');
+    webrtcTurnProcess = null;
+  }
+  res.json(successResponse(await getWebrtcStatus(), 'WebRTC 服务已停止'));
+}));
+
+router.post('/webrtc/start-agent', asyncHandler(async (req, res) => {
+  if (webrtcAgentProcess && !webrtcAgentProcess.killed) {
+    return res.json(successResponse(await getWebrtcStatus(), 'MuMu Agent 已在运行'));
+  }
+  const { spawn } = await import('child_process');
+  const path = await import('path');
+  const address = req.body?.address || '127.0.0.1:16384';
+  const runScript = path.join(WEBRTC_DIR, 'agentd', 'run.sh');
+  if (!await pathExists(runScript)) {
+    return res.status(400).json(errorResponse(new Error('WebRTC agent 未安装')));
+  }
+  const fs = await import('fs');
+  const { agentLog } = await getWebrtcLogPaths();
+  const logFd = fs.openSync(agentLog, 'a');
+  const lanIp = await getMacLanIp();
+  // Agent 运行在 Android 内，不能用 127.0.0.1；必须连 Mac 局域网 IP。
+  // MuMu 同一实例可能有 127.0.0.1:16384 / 127.0.0.1:5555 / emulator-5554 多个 serial，只部署一份 agent。
+  const iceServers = await getIceServersConfig();
+  webrtcAgentProcess = spawn('bash', [runScript, address, '-id', 'mumu-la-pluma', '-signaling', `ws://${lanIp}:${WEBRTC_PORT}`, '-ice-servers', iceServers, '-webrtc-port', '50000'], {
+    cwd: path.join(WEBRTC_DIR, 'agentd'),
+    stdio: ['ignore', logFd, logFd],
+    detached: false,
+    env: { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH || ''}` }
+  });
+  webrtcAgentProcess.on('exit', () => { webrtcAgentProcess = null; });
+  res.json(successResponse(await getWebrtcStatus(), 'MuMu Agent 已启动'));
+}));
+
+router.post('/webrtc/stop-agent', asyncHandler(async (req, res) => {
+  if (webrtcAgentProcess && !webrtcAgentProcess.killed) {
+    webrtcAgentProcess.kill('SIGTERM');
+    webrtcAgentProcess = null;
+  }
+  const { execFile } = await import('child_process');
+  const { promisify } = await import('util');
+  const execFileAsync = promisify(execFile);
+  const address = req.body?.address || '127.0.0.1:16384';
+  await execFileAsync('/opt/homebrew/bin/adb', ['-s', address, 'shell', 'pkill -f cloudphone-agent || true'], { timeout: 5000 }).catch(() => {});
+  await execFileAsync('/opt/homebrew/bin/adb', ['-s', address, 'shell', 'pkill -f scrcpy.Server || true'], { timeout: 5000 }).catch(() => {});
+  res.json(successResponse(await getWebrtcStatus(), 'MuMu Agent 已停止'));
+}));
 
 // 获取任务执行状态
 router.get('/task-status', asyncHandler(async (req, res) => {
@@ -44,15 +352,16 @@ router.post('/stop-task', asyncHandler(async (req, res) => {
   // 2. 停止整个定时任务流程
   const scheduleStopped = stopScheduleExecution();
   
-  if (taskStopped || scheduleStopped) {
-    const message = taskStopped && scheduleStopped 
-      ? '已终止当前任务并停止任务流程' 
-      : taskStopped 
-        ? '已终止当前任务' 
+  const taskStopSuccess = !!taskStopped?.success;
+  if (taskStopSuccess || scheduleStopped) {
+    const message = taskStopSuccess && scheduleStopped
+      ? '已终止当前任务并停止任务流程'
+      : taskStopSuccess
+        ? taskStopped.message || '已终止当前任务'
         : '已设置停止标志，将在当前任务完成后终止流程';
     res.json(successResponse(null, message));
   } else {
-    res.json(errorResponse('没有正在运行的任务'));
+    res.json(errorResponse(taskStopped?.message || '没有正在运行的任务'));
   }
 }));
 
@@ -68,6 +377,23 @@ router.get('/version', asyncHandler(async (req, res) => {
 router.get('/config-dir', asyncHandler(async (req, res) => {
   const configDir = await getMaaConfigDir();
   res.json(successResponse(configDir));
+}));
+
+
+router.post('/config-dir/open', asyncHandler(async (req, res) => {
+  const configDir = await getMaaConfigDir();
+  const { execFile } = await import('child_process');
+  const { promisify } = await import('util');
+  const execFileAsync = promisify(execFile);
+
+  const command = process.platform === 'darwin'
+    ? 'open'
+    : process.platform === 'win32'
+      ? 'explorer.exe'
+      : 'xdg-open';
+
+  await execFileAsync(command, [configDir]);
+  res.json(successResponse(configDir, '配置目录已打开'));
 }));
 
 // 获取配置
@@ -90,6 +416,18 @@ router.post('/execute', asyncHandler(async (req, res) => {
   let { command, args = [], taskConfig, taskName, taskType, waitForCompletion = false } = req.body;
   
   logger.debug('收到执行请求', { command, argsCount: args.length, hasTaskConfig: !!taskConfig });
+
+  const allowedCommands = new Set([
+    'version', 'dir', 'list', 'run', 'fight', 'copilot', 'sscopilot', 'ssscopilot',
+    'paradoxcopilot', 'roguelike', 'reclamation', 'startup', 'closedown', 'infrast',
+    'recruit', 'mall', 'award', 'depot', 'operbox', 'activity'
+  ]);
+  if (!allowedCommands.has(command)) {
+    return res.status(400).json(errorResponse(new Error('不支持的 MAA 命令'), '不支持的 MAA 命令'));
+  }
+  if (!Array.isArray(args) || args.some(arg => typeof arg !== 'string')) {
+    return res.status(400).json(errorResponse(new Error('args 必须是字符串数组'), '参数格式错误'));
+  }
   
   // 对于需要交互式输入的命令，自动添加 --batch 参数
   const batchCommands = ['copilot', 'ssscopilot', 'paradoxcopilot'];
@@ -182,20 +520,6 @@ router.get('/activity', asyncHandler(async (req, res) => {
       ? `当前活动: ${activityInfo.name || activityInfo.code}` 
       : '当前没有活动或无法获取活动信息'
   }));
-}));
-
-// 获取模拟器截图 (GET)
-router.get('/screenshot', asyncHandler(async (req, res) => {
-  const { adbPath, address } = req.query;
-  const screenshot = await captureScreen(adbPath, address);
-  res.json({ success: true, screenshot });
-}));
-
-// 获取模拟器截图 (POST)
-router.post('/screenshot', asyncHandler(async (req, res) => {
-  const { adbPath, address } = req.body;
-  const screenshot = await captureScreen(adbPath, address);
-  res.json({ success: true, data: screenshot });
 }));
 
 // 测试 ADB 连接
@@ -668,6 +992,14 @@ router.get('/copilot/get/:id', asyncHandler(async (req, res) => {
   res.json(data);
 }));
 
+// 代理 PRTS 作业集 API（解决 CORS 问题）
+router.get('/copilot/set/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const response = await fetch(`https://prts.maa.plus/set/get?id=${encodeURIComponent(id)}`);
+  const data = await response.json();
+  res.json(data);
+}));
+
 // 搜索悖论模拟作业
 router.get('/paradox/search', asyncHandler(async (req, res) => {
   const { name } = req.query;
@@ -676,15 +1008,7 @@ router.get('/paradox/search', asyncHandler(async (req, res) => {
     return res.status(400).json(errorResponse(new Error('请提供干员名字')));
   }
   
-  const fs = await import('fs/promises');
-  const path = await import('path');
-  const { fileURLToPath } = await import('url');
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  
-  const paradoxFile = path.join(__dirname, '../data/paradox-operators.json');
-  const paradoxData = JSON.parse(await fs.readFile(paradoxFile, 'utf-8'));
-  
+  const paradoxData = await loadParadoxOperators();
   const operator = paradoxData.find(op => op.name.includes(name) || name.includes(op.name));
   
   if (!operator) {
@@ -694,19 +1018,28 @@ router.get('/paradox/search', asyncHandler(async (req, res) => {
     ));
   }
   
-  const stageKeyword = operator.stage_id.replace('mem_', '').replace('_1', '');
+  const stageKeyword = operator.stage_id;
   const response = await fetch(`https://prts.maa.plus/copilot/query?level_keyword=${stageKeyword}&page=1&limit=10&order_by=hot`);
   const data = await response.json();
   
   if (data.status_code === 200 && data.data && data.data.data && data.data.data.length > 0) {
-    const copilots = data.data.data.map(item => ({
-      id: item.id,
-      uri: `maa://${item.id}`,
-      views: item.views,
-      hotScore: item.hot_score,
-      uploader: item.uploader_id,
-      title: item.doc?.title || '无标题'
-    }));
+    const copilots = data.data.data.map(item => {
+      let title = item.doc?.title || '无标题';
+      try {
+        const content = JSON.parse(item.content || '{}');
+        title = content.doc?.title || title;
+      } catch {
+        // 使用接口默认标题
+      }
+      return {
+        id: item.id,
+        uri: `maa://${item.id}`,
+        views: item.views,
+        hotScore: item.hot_score,
+        uploader: item.uploader_id,
+        title
+      };
+    });
     
     res.json(successResponse({
       operator: operator.name,
@@ -730,8 +1063,9 @@ router.get('/copilot/search', asyncHandler(async (req, res) => {
     return res.status(400).json(errorResponse(new Error('请提供关卡名称')));
   }
 
-  // 标准化关卡名称（去除空格、转大写）
+  // 标准化关卡名称（去除空格、转大写），查询 PRTS 时优先使用游戏内部 stage id
   const normalizedStage = stage.trim().toUpperCase();
+  const searchKeyword = await resolveStageSearchKeyword(stage);
 
   // 搜索多页，直到找到足够的结果
   const allCopilots = [];
@@ -740,7 +1074,7 @@ router.get('/copilot/search', asyncHandler(async (req, res) => {
   const targetCount = 10; // 目标找到10个匹配结果
 
   while (page <= maxPages && allCopilots.length < targetCount) {
-    const response = await fetch(`https://prts.maa.plus/copilot/query?level_keyword=${encodeURIComponent(normalizedStage)}&page=${page}&limit=50&order_by=hot`);
+    const response = await fetch(`https://prts.maa.plus/copilot/query?level_keyword=${encodeURIComponent(searchKeyword)}&page=${page}&limit=50&order_by=hot`);
     const data = await response.json();
 
     if (data.status_code !== 200 || !data.data?.data?.length) {
@@ -767,8 +1101,10 @@ router.get('/copilot/search', asyncHandler(async (req, res) => {
         // 解析失败使用默认值
       }
 
-      // 精确匹配标题中的关卡代号
-      if (titleStageCode === normalizedStage) {
+      const normalizedStageName = String(stageName || '').trim().toUpperCase();
+      const normalizedSearchKeyword = String(searchKeyword || '').trim().toUpperCase();
+      // 优先匹配作业 JSON 的 stage_name/内部 stage id，标题关卡代号仅作辅助
+      if (normalizedStageName === normalizedStage || normalizedStageName === normalizedSearchKeyword || titleStageCode === normalizedStage) {
         allCopilots.push({
           id: item.id,
           uri: `maa://${item.id}`,
@@ -804,15 +1140,7 @@ router.get('/copilot/search', asyncHandler(async (req, res) => {
 
 // 获取所有悖论模拟干员列表
 router.get('/paradox/operators', asyncHandler(async (req, res) => {
-  const fs = await import('fs/promises');
-  const path = await import('path');
-  const { fileURLToPath } = await import('url');
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  
-  const paradoxFile = path.join(__dirname, '../data/paradox-operators.json');
-  const paradoxData = JSON.parse(await fs.readFile(paradoxFile, 'utf-8'));
-  
+  const paradoxData = await loadParadoxOperators();
   res.json(successResponse(paradoxData));
 }));
 

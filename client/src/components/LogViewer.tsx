@@ -10,6 +10,7 @@ export default function LogViewer({}: LogViewerProps) {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [autoScroll, setAutoScroll] = useState<boolean>(true)
   const [filter, setFilter] = useState<'all' | 'ERROR' | 'WARN' | 'INFO' | 'DEBUG'>('all')
+  const [collapseRepeats, setCollapseRepeats] = useState<boolean>(true)
   const [historyFiles, setHistoryFiles] = useState<LogFile[]>([])
   const [loading, setLoading] = useState<boolean>(false)
   const [selectedFile, setSelectedFile] = useState<LogFile | null>(null)
@@ -157,9 +158,22 @@ export default function LogViewer({}: LogViewerProps) {
     }
   }
 
-  const filteredLogs = filter === 'all' 
-    ? logs 
+  const filteredLogs = filter === 'all'
+    ? logs
     : logs.filter(log => log.level === filter)
+
+  const visibleLogs = collapseRepeats
+    ? filteredLogs.reduce<Array<LogEntry & { count?: number }>>((acc, log) => {
+        const prev = acc[acc.length - 1]
+        if (prev && prev.level === log.level && prev.message === log.message) {
+          prev.count = (prev.count || 1) + 1
+          prev.time = log.time || prev.time
+        } else {
+          acc.push({ ...log, count: 1 })
+        }
+        return acc
+      }, [])
+    : filteredLogs.map(log => ({ ...log, count: 1 }))
 
   const clearLogs = async () => {
     try {
@@ -171,7 +185,7 @@ export default function LogViewer({}: LogViewerProps) {
   }
 
   const exportLogs = () => {
-    const logText = logs.map(log => `[${log.time}] [${log.level}] ${log.message}`).join('\n')
+    const logText = filteredLogs.map(log => `[${log.time}] [${log.level}] ${log.message}`).join('\n')
     const blob = new Blob([logText], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -217,6 +231,11 @@ export default function LogViewer({}: LogViewerProps) {
                 checked={autoScroll}
                 onChange={(checked: boolean) => setAutoScroll(checked)}
                 label="自动滚动"
+              />
+              <Checkbox
+                checked={collapseRepeats}
+                onChange={(checked: boolean) => setCollapseRepeats(checked)}
+                label="折叠重复"
               />
               <Select
                 value={filter}
@@ -285,7 +304,7 @@ export default function LogViewer({}: LogViewerProps) {
                 className="rounded-2xl p-5 h-96 overflow-y-auto font-mono text-sm bg-gray-50 dark:bg-[#000000]"
               >
                 <AnimatePresence>
-                  {filteredLogs.map((log, index) => (
+                  {visibleLogs.map((log, index) => (
                     <motion.div 
                       key={index} 
                       className="flex items-start space-x-3 mb-2"
@@ -297,7 +316,14 @@ export default function LogViewer({}: LogViewerProps) {
                       <span className={`px-2 py-0.5 rounded-lg text-xs font-semibold flex-shrink-0 border ${getLevelColor(log.level)}`}>
                         {log.level}
                       </span>
-                      <span className="text-gray-800 dark:text-gray-300 flex-1 break-all">{log.message}</span>
+                      <span className="text-gray-800 dark:text-gray-300 flex-1 break-all">
+                        {log.message}
+                        {collapseRepeats && (log.count || 1) > 1 && (
+                          <span className="ml-2 rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300">
+                            ×{log.count}
+                          </span>
+                        )}
+                      </span>
                     </motion.div>
                   ))}
                 </AnimatePresence>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { maaApi } from '../services/api'
+import { maaApi, searchCopilot, searchParadoxCopilot } from '../services/api'
 import { motion } from 'framer-motion'
 import Icons from './Icons'
 import { PageHeader, Button } from './common'
@@ -27,7 +27,9 @@ export default function CombatTasks(_props: CombatTasksProps) {
   const [copilotSetInfo, setCopilotSetInfo] = useState<CopilotSetInfo | null>(null)
   const [isLoadingSet, setIsLoadingSet] = useState(false)
   const [advancedParams, setAdvancedParams] = useState<CombatAdvancedParams>({
-    copilot: { ignoreRequirements: true }
+    copilot: { ignoreRequirements: true, loopTimes: '1', executionStrategy: 'continue' },
+    paradoxcopilot: { executionStrategy: 'continue' },
+    ssscopilot: { loopTimes: '1' }
   })
   const [autoFormation, setAutoFormation] = useState<AutoFormationConfig>({ copilot: true, paradoxcopilot: true })
 
@@ -56,6 +58,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
   const [copilotSearchStage, setCopilotSearchStage] = useState('')
   const [copilotSearchResult, setCopilotSearchResult] = useState<CopilotSearchResult | null>(null)
   const [isSearchingCopilot, setIsSearchingCopilot] = useState(false)
+  const [activeCombatMode, setActiveCombatMode] = useState<'copilot' | 'ssscopilot' | 'paradoxcopilot'>('copilot')
 
   // 页面加载时从服务器或 localStorage 加载配置和恢复执行状态
   useEffect(() => {
@@ -66,7 +69,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
         if (result.success && result.data.isRunning) {
           // 后端确实有任务在运行
           const { taskName, startTime, taskType } = result.data
-          
+
           // 只恢复属于自动战斗的任务
           if (taskType === 'combat') {
             const elapsedMinutes = (Date.now() - startTime) / 1000 / 60
@@ -76,7 +79,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
             } else {
               setStatusMessage(`正在执行: ${taskName}`)
             }
-            
+
             // 启动轮询，持续检查任务状态
             const pollInterval = setInterval(async () => {
               try {
@@ -93,7 +96,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                 clearInterval(pollInterval)
               }
             }, 2000) // 每2秒检查一次
-            
+
             // 组件卸载时清除轮询
             return () => clearInterval(pollInterval)
           }
@@ -102,9 +105,9 @@ export default function CombatTasks(_props: CombatTasksProps) {
         // 静默失败，不影响用户体验
       }
     }
-    
+
     checkBackendStatus()
-    
+
     // 加载保存的配置 - 优先从服务器加载
     const loadConfig = async () => {
       try {
@@ -128,12 +131,12 @@ export default function CombatTasks(_props: CombatTasksProps) {
       } catch (error) {
         // 服务器加载失败，静默处理
       }
-      
+
       // 服务器加载失败，从 localStorage 加载
       const savedInputs = localStorage.getItem('combatTaskInputs')
       const savedAdvanced = localStorage.getItem('combatAdvancedParams')
       const savedFormation = localStorage.getItem('combatAutoFormation')
-      
+
       if (savedInputs) {
         setTaskInputs(JSON.parse(savedInputs))
       }
@@ -144,52 +147,52 @@ export default function CombatTasks(_props: CombatTasksProps) {
         setAutoFormation(JSON.parse(savedFormation))
       }
     }
-    
+
     loadConfig()
   }, [])
-  
+
   // 自动保存配置
   useEffect(() => {
     localStorage.setItem('combatTaskInputs', JSON.stringify(taskInputs))
     // 同时保存到服务器（静默失败）
     maaApi.saveUserConfig('combat-tasks', { taskInputs, advancedParams, autoFormation }).catch(() => {})
   }, [taskInputs, advancedParams, autoFormation])
-  
+
   useEffect(() => {
     localStorage.setItem('combatAdvancedParams', JSON.stringify(advancedParams))
   }, [advancedParams])
-  
+
   useEffect(() => {
     localStorage.setItem('combatAutoFormation', JSON.stringify(autoFormation))
   }, [autoFormation])
 
   const tasks: CombatTask[] = [
-    { 
-      id: 'copilot', 
-      name: '自动抄作业', 
-      command: 'copilot', 
-      placeholder: 'maa://1234 或本地文件路径', 
-      icon: <Icons.Document />, 
+    {
+      id: 'copilot',
+      name: '自动战斗作业',
+      command: 'copilot',
+      placeholder: 'maa://1234、作业站链接或本地文件路径',
+      icon: <Icons.Document />,
       hasAdvanced: true,
-      description: '使用作业自动完成关卡，支持单个作业和作业集'
+      description: '基于最新 MaaCore/copilot 能力，支持单作业、作业集、作业站链接、循环次数与队列策略'
     },
-    { 
-      id: 'ssscopilot', 
-      name: '保全派驻', 
-      command: 'ssscopilot', 
-      placeholder: 'maa://1234 或本地文件路径', 
-      icon: <Icons.Shield />, 
+    {
+      id: 'ssscopilot',
+      name: '保全派驻',
+      command: 'ssscopilot',
+      placeholder: 'maa://1234 或本地文件路径',
+      icon: <Icons.Shield />,
       hasAdvanced: true,
-      description: '自动保全派驻作业'
+      description: '保全派驻 SSS 作业入口，适合独立管理 ssscopilot 参数'
     },
-    { 
-      id: 'paradoxcopilot', 
-      name: '悖论模拟', 
-      command: 'paradoxcopilot', 
-      placeholder: 'maa://1234 或本地文件路径', 
-      icon: <Icons.Puzzle />, 
-      hasAdvanced: false,
-      description: '自动悖论模拟作业'
+    {
+      id: 'paradoxcopilot',
+      name: '悖论模拟',
+      command: 'paradoxcopilot',
+      placeholder: 'maa://1234 或本地文件路径',
+      icon: <Icons.Puzzle />,
+      hasAdvanced: true,
+      description: '悖论模拟已拆分为独立 copilot 命令，适合批量跳过失败与单独诊断'
     },
   ]
 
@@ -197,6 +200,11 @@ export default function CombatTasks(_props: CombatTasksProps) {
     const options: Record<string, CombatAdvancedOption[]> = {
       copilot: [
         { key: 'ignoreRequirements', label: '忽略干员要求', type: 'checkbox', param: '--ignore-requirements' },
+        { key: 'loopTimes', label: '循环次数', type: 'number', param: '--loop-times', placeholder: '1' },
+        { key: 'executionStrategy', label: '队列策略', type: 'select', param: '', options: [
+          { value: 'continue', label: '失败继续下一个' },
+          { value: 'stop', label: '失败后停止' },
+        ]},
         { key: 'formationIndex', label: '编队选择', type: 'select', param: '--formation-index', options: [
           { value: '', label: '当前编队' },
           { value: '1', label: '编队 1' },
@@ -217,93 +225,119 @@ export default function CombatTasks(_props: CombatTasksProps) {
       ssscopilot: [
         { key: 'loopTimes', label: '循环次数', type: 'number', param: '--loop-times', placeholder: '1' },
       ],
+      paradoxcopilot: [
+        { key: 'executionStrategy', label: '队列策略', type: 'select', param: '', options: [
+          { value: 'continue', label: '失败继续' },
+          { value: 'stop', label: '失败停止' },
+        ]},
+      ],
     }
     return options[taskId] || []
   }
 
-  const buildCommandParams = (task: CombatTask): string => {
-    let params = taskInputs[task.id] || ''
-    
-    // 处理多行输入
-    if ((task.id === 'copilot' || task.id === 'paradoxcopilot') && params.includes('\n')) {
-      const uris = params.split('\n').filter(line => line.trim())
-      params = uris.join(' ')
-    }
-    
-    // 作业集自动添加 s 后缀
-    if (task.id === 'copilot' && copilotSetInfo?.type === 'set' && copilotSetInfo?.autoAddS) {
-      params = params.replace(/maa:\/\/(\d+)(?!s)/g, 'maa://$1s')
-    }
-    
-    // copilot 任务根据开关决定是否添加 --formation
-    // 注意：paradoxcopilot 不支持 --formation 参数
-    if (task.id === 'copilot' && autoFormation[task.id]) {
-      params = params ? `${params} --formation` : '--formation'
-    }
-    
-    // 添加高级参数
-    const advanced = advancedParams[task.id] || {}
-    const options = getAdvancedOptions(task.id)
+  const normalizeCopilotInput = (input: string): string => {
+    return input
+      .split(/\n+/)
+      .map(line => line.trim())
+      .filter(Boolean)
+      .map(item => {
+        const maaMatch = item.match(/^maa:\/\/(\d+)(s?)$/i)
+        if (maaMatch) {
+          return `maa://${maaMatch[1]}${maaMatch[2] || ''}`
+        }
+        if (!/^https?:\/\//i.test(item)) return item
 
-    // 先处理突袭模式 - 修复：确保正确读取 raid 参数
+        try {
+          const url = new URL(item)
+          const idMatch = `${url.pathname} ${url.search}`.match(/(\d+)(s?)(?!.*\d)/)
+          const looksLikeSet = /set|collection|合集|作业集/i.test(url.pathname + url.search)
+          if (idMatch) {
+            const suffix = looksLikeSet || idMatch[2] === 's' ? 's' : ''
+            return `maa://${idMatch[1]}${suffix}`
+          }
+        } catch {
+          // URL 解析失败时保留原始输入，交给 maa-cli 报错
+        }
+
+        return item
+      })
+      .join(' ')
+  }
+
+  const splitCopilotInputToArgs = (input: string): string[] => {
+    const normalized = normalizeCopilotInput(input)
+    return normalized
+      ? (normalized.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [])
+          .map(arg => arg.replace(/^("|')|("|')$/g, ''))
+          .filter(Boolean)
+      : []
+  }
+
+
+  const buildCommandArgs = (task: CombatTask): string[] => {
+    const args = splitCopilotInputToArgs(taskInputs[task.id] || '')
+
+    if (task.id === 'copilot' && copilotSetInfo?.type === 'set' && copilotSetInfo?.autoAddS) {
+      for (let i = 0; i < args.length; i++) {
+        args[i] = (args[i] || '').replace(/^maa:\/\/(\d+)(?!s)$/i, 'maa://$1s')
+      }
+    }
+
+    if (task.id === 'copilot' && autoFormation[task.id]) {
+      args.push('--formation')
+    }
+
+    const advanced = advancedParams[task.id] || {}
     const raidValue = advanced.raid as string | undefined
     if (task.id === 'copilot' && raidValue && raidValue !== '0') {
-      params += ` --raid ${raidValue}`
+      args.push('--raid', raidValue)
     }
-    
-    options.forEach(option => {
+
+    getAdvancedOptions(task.id).forEach(option => {
       const value = advanced[option.key]
-      if (value !== undefined && value !== '' && value !== false) {
-        if (option.type === 'checkbox' && value === true) {
-          params += ` ${option.param}`
-        } else if (option.type !== 'checkbox') {
-          params += ` ${option.param} ${value}`
-        }
+      if (!option.param || value === undefined || value === '' || value === false) return
+      if (option.type === 'checkbox' && value === true) {
+        args.push(option.param)
+      } else if (option.type !== 'checkbox') {
+        args.push(option.param, String(value))
       }
     })
-    
-    return params
+
+    return args
   }
 
   // 执行单个作业（等待完成）
-  const executeSingleCopilot = async (task: CombatTask, params: string): Promise<{ success: boolean; error?: string }> => {
+  const executeSingleCopilot = async (task: CombatTask, args: string[]): Promise<{ success: boolean; error?: string }> => {
     // waitForCompletion: true 表示等待命令执行完成后再返回
-    const result = await maaApi.executePredefinedTask(task.command, params, null, null, task.name, 'combat', true)
+    const result = await maaApi.executePredefinedTaskArgs(task.command, args, null, null, task.name, 'combat', true)
     return result
   }
 
   // 构建作业参数
-  const buildCopilotParams = (copilotId: number, task: CombatTask): string => {
-    let params = `maa://${copilotId}`
+  const buildCopilotArgs = (copilotId: number, task: CombatTask): string[] => {
+    const args = [`maa://${copilotId}`]
 
-    // 添加自动编队
-    if (autoFormation[task.id]) {
-      params += ' --formation'
+    if (task.id === 'copilot' && autoFormation[task.id]) {
+      args.push('--formation')
     }
 
-    // 添加高级参数
     const advanced = advancedParams[task.id] || {}
-
-    // 突袭模式 - 修复：确保正确读取 raid 参数
     const raidValue = advanced.raid as string | undefined
-    if (raidValue && raidValue !== '0') {
-      params += ` --raid ${raidValue}`
+    if (task.id === 'copilot' && raidValue && raidValue !== '0') {
+      args.push('--raid', raidValue)
     }
 
-    // 其他高级选项
-    const options = getAdvancedOptions(task.id)
-    options.forEach(option => {
+    getAdvancedOptions(task.id).forEach(option => {
       const value = advanced[option.key]
-      if (value !== undefined && value !== '' && value !== false) {
-        if (option.type === 'checkbox' && value === true) {
-          params += ` ${option.param}`
-        } else if (option.type !== 'checkbox') {
-          params += ` ${option.param} ${value}`
-        }
+      if (!option.param || value === undefined || value === '' || value === false) return
+      if (option.type === 'checkbox' && value === true) {
+        args.push(option.param)
+      } else if (option.type !== 'checkbox') {
+        args.push(option.param, String(value))
       }
     })
 
-    return params
+    return args
   }
 
   // 执行作业集中的单个作业
@@ -321,10 +355,10 @@ export default function CombatTasks(_props: CombatTasksProps) {
     setCopilotSetInfo(prev => prev ? { ...prev, currentIndex: index } : null)
     setStatusMessage(`正在执行作业 ${index + 1}/${copilotSetInfo.copilots.length}: ${copilot.name || `maa://${copilot.id}`}`)
 
-    const params = buildCopilotParams(copilot.id, task)
+    const args = buildCopilotArgs(copilot.id, task)
 
     try {
-      const result = await executeSingleCopilot(task, params)
+      const result = await executeSingleCopilot(task, args)
       return result
     } catch (error) {
       return { success: false, error: (error as Error).message }
@@ -365,7 +399,11 @@ export default function CombatTasks(_props: CombatTasksProps) {
         finishCopilotSet()
       }
     } else {
-      if (remainingSelected > 0) {
+      const strategy = advancedParams.copilot?.executionStrategy || 'continue'
+      if (strategy === 'stop') {
+        setStatusMessage(`作业 ${firstSelectedIndex + 1} 执行失败: ${result.error}，已按策略停止`)
+        finishCopilotSet()
+      } else if (remainingSelected > 0) {
         setStatusMessage(`作业 ${firstSelectedIndex + 1} 执行失败: ${result.error}，等待开始下一关`)
         setWaitingForNextCopilot(true)
       } else {
@@ -414,7 +452,11 @@ export default function CombatTasks(_props: CombatTasksProps) {
         finishCopilotSet()
       }
     } else {
-      if (remainingSelected > 0) {
+      const strategy = advancedParams.copilot?.executionStrategy || 'continue'
+      if (strategy === 'stop') {
+        setStatusMessage(`作业 ${nextIndex + 1} 执行失败: ${result.error}，已按策略停止`)
+        finishCopilotSet()
+      } else if (remainingSelected > 0) {
         setStatusMessage(`作业 ${nextIndex + 1} 执行失败: ${result.error}，等待开始下一关`)
         setWaitingForNextCopilot(true)
       } else {
@@ -470,8 +512,8 @@ export default function CombatTasks(_props: CombatTasksProps) {
       setStatusMessage(`正在执行: ${task.name}`)
 
       try {
-        const params = buildCommandParams(task)
-        const result = await maaApi.executePredefinedTask(task.command, params, null, null, task.name, 'combat')
+        const args = buildCommandArgs(task)
+        const result = await maaApi.executePredefinedTaskArgs(task.command, args, null, null, task.name, 'combat')
 
         if (result.success) {
           setStatusMessage(`${task.name} 执行成功`)
@@ -522,9 +564,9 @@ export default function CombatTasks(_props: CombatTasksProps) {
   // 获取单个作业详情
   const fetchCopilotDetail = async (copilotId: number): Promise<CopilotSetItem | null> => {
     try {
-      const response = await fetch(`https://prts.maa.plus/copilot/get/${copilotId}`)
-      if (response.ok) {
-        const data = await response.json()
+      const response = await maaApi.getCopilotInfo(String(copilotId))
+      if ((response as any).status_code === 200 && (response as any).data) {
+        const data = response as any
         if (data.status_code === 200 && data.data) {
           const content = JSON.parse(data.data.content)
           return {
@@ -545,11 +587,10 @@ export default function CombatTasks(_props: CombatTasksProps) {
   // 获取作业集详情（包含所有作业列表）
   const fetchCopilotSetDetails = async (setId: string): Promise<CopilotSetItem[]> => {
     try {
-      const response = await fetch(`https://prts.maa.plus/set/get?id=${setId}`)
-      if (response.ok) {
-        const data = await response.json()
-        if (data.status_code === 200 && data.data?.copilot_ids) {
-          const copilotIds: number[] = data.data.copilot_ids
+      const data = await maaApi.getCopilotSet(setId)
+      if ((data as any).status_code === 200 || (data as any).success) {
+        if ((data as any).status_code === 200 && (data as any).data?.copilot_ids) {
+          const copilotIds: number[] = (data as any).data.copilot_ids
           // 并行获取所有作业详情
           const details = await Promise.all(copilotIds.map(id => fetchCopilotDetail(id)))
           return details.filter((item): item is CopilotSetItem => item !== null)
@@ -581,11 +622,10 @@ export default function CombatTasks(_props: CombatTasksProps) {
       // 根据用户选择或自动检测模式
       if (copilotType === 'single') {
         // 强制单个作业模式
-        const copilotResponse = await fetch(`https://prts.maa.plus/copilot/get/${copilotId}`)
-        if (copilotResponse.ok) {
-          const copilotData = await copilotResponse.json()
-          if (copilotData.status_code === 200 && copilotData.data) {
-            const content = JSON.parse(copilotData.data.content)
+        const copilotData = await maaApi.getCopilotInfo(copilotId)
+        if ((copilotData as any).status_code === 200 || copilotData.success) {
+          if ((copilotData as any).status_code === 200 && (copilotData as any).data) {
+            const content = JSON.parse((copilotData as any).data.content)
             setCopilotSetInfo({
               type: 'single',
               id: copilotId,
@@ -622,25 +662,25 @@ export default function CombatTasks(_props: CombatTasksProps) {
       } else {
         // 自动检测模式：同时请求两个接口，哪个成功就用哪个
         const [copilotResult, setResult] = await Promise.allSettled([
-          fetch(`https://prts.maa.plus/copilot/get/${copilotId}`).then(r => r.json()),
-          fetch(`https://prts.maa.plus/set/get?id=${copilotId}`).then(r => r.json())
+          maaApi.getCopilotInfo(copilotId),
+          maaApi.getCopilotSet(copilotId)
         ])
 
         let foundSingle = false
         let foundSet = false
-        let singleData = null
-        let setData = null
+        let singleData: any = null
+        let setData: any = null
 
         // 检查单个作业
-        if (copilotResult.status === 'fulfilled' && copilotResult.value.status_code === 200 && copilotResult.value.data) {
+        if (copilotResult.status === 'fulfilled' && (copilotResult.value as any).status_code === 200 && (copilotResult.value as any).data) {
           foundSingle = true
-          singleData = copilotResult.value
+          singleData = copilotResult.value as any
         }
 
         // 检查作业集
-        if (setResult.status === 'fulfilled' && setResult.value.status_code === 200 && setResult.value.data?.copilot_ids) {
+        if (setResult.status === 'fulfilled' && (setResult.value as any).status_code === 200 && (setResult.value as any).data?.copilot_ids) {
           foundSet = true
-          setData = setResult.value
+          setData = setResult.value as any
         }
 
         // 根据结果决定使用哪个
@@ -719,7 +759,6 @@ export default function CombatTasks(_props: CombatTasksProps) {
     setParadoxSearchResult(null)
 
     try {
-      const { searchParadoxCopilot } = await import('../services/api')
       const result = await searchParadoxCopilot(paradoxSearchName.trim())
 
       // 适配新的响应格式：数据在 result.data 中
@@ -765,7 +804,6 @@ export default function CombatTasks(_props: CombatTasksProps) {
     setCopilotSearchResult(null)
 
     try {
-      const { searchCopilot } = await import('../services/api')
       const result = await searchCopilot(copilotSearchStage.trim())
 
       // 适配新的响应格式：数据在 result.data 中
@@ -801,11 +839,11 @@ export default function CombatTasks(_props: CombatTasksProps) {
   const renderAdvancedOptions = (task: CombatTask) => {
     const options = getAdvancedOptions(task.id)
     if (options.length === 0) return null
-    
+
     const advanced = advancedParams[task.id] || {}
-    
+
     return (
-      <motion.div 
+      <motion.div
         className="mt-4 space-y-3 border-t border-gray-200 dark:border-white/10 pt-4"
         initial={{ opacity: 0, height: 0 }}
         animate={{ opacity: 1, height: "auto" }}
@@ -860,17 +898,40 @@ export default function CombatTasks(_props: CombatTasksProps) {
         <PageHeader
           icon={<Icons.TargetIcon />}
           title="自动战斗"
-          subtitle="使用作业自动完成关卡 - 所有修改自动保存"
+          subtitle="单作业 / 作业集 / SSS / 悖论模拟 / 链接识别 - 跟进最新 MaaCore 作业能力"
           gradientFrom="teal-400"
           gradientVia="cyan-400"
           gradientTo="blue-400"
           actions={<FloatingStatusIndicator />}
         />
 
+        <div className="rounded-2xl bg-white dark:bg-gray-900/60 p-2 shadow-[0_0_0_1px_rgba(0,0,0,0.06)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08)]">
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              ['copilot', '普通作业', '单作业 / 作业集 / 链接识别'],
+              ['ssscopilot', '保全派驻', 'SSS 作业独立入口'],
+              ['paradoxcopilot', '悖论模拟', '按干员搜索作业']
+            ].map(([id, title, desc]) => (
+              <button
+                key={id}
+                onClick={() => setActiveCombatMode(id as typeof activeCombatMode)}
+                className={`rounded-xl px-4 py-3 text-left transition-all ${
+                  activeCombatMode === id
+                    ? 'bg-cyan-50 dark:bg-cyan-500/15 text-cyan-700 dark:text-cyan-200 shadow-[0_0_0_1px_rgba(6,182,212,0.18)]'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5'
+                }`}
+              >
+                <div className="text-sm font-semibold">{title}</div>
+                <div className="mt-0.5 text-xs opacity-75">{desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* 任务列表 */}
         <div className="space-y-6">
           {/* 自动抄作业 - 单独一行 */}
-          {tasks.filter(task => task.id === 'copilot').map((task) => {
+          {activeCombatMode === 'copilot' && tasks.filter(task => task.id === 'copilot').map((task) => {
             return (
               <div
                 key={task.id}
@@ -901,7 +962,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                     立即执行
                   </Button>
                 </div>
-                
+
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-5 leading-relaxed">{task.description}</p>
 
                 {/* 三栏布局 */}
@@ -951,8 +1012,8 @@ export default function CombatTasks(_props: CombatTasksProps) {
                       <h5 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">使用说明</h5>
                       <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
                         <p>• 访问 <a href="https://zoot.plus/" target="_blank" rel="noopener noreferrer" className="text-teal-600 dark:text-teal-400 hover:underline">zoot.plus</a> 获取作业 URI</p>
-                        <p>• 单个作业：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">maa://1234</code></p>
-                        <p>• 作业集：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">maa://1234s</code></p>
+                        <p>• 单作业：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">maa://1234</code>；作业集：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">maa://1234s</code></p>
+                        <p>• maa-cli 新版支持 loop-times；作业站链接会先转换为 maa:// ID</p>
                       </div>
                     </div>
                   </div>
@@ -963,7 +1024,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                     <div className="flex space-x-2">
                       <input
                         type="text"
-                        placeholder="粘贴作业 URI，如 maa://1234 或 maa://1234s"
+                        placeholder="maa://1234、maa://1234s、作业站链接或本地路径"
                         value={taskInputs[task.id] || ''}
                         onChange={(e) => handleInputChange(task.id, e.target.value)}
                         className="flex-1 px-3 py-2 border border-gray-300 dark:border-white/10 rounded-xl text-sm font-mono text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
@@ -987,6 +1048,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                         {!isLoadingSet && '预览'}
                       </Button>
                     </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">支持 maa://1234、maa://1234s、作业站链接和本地 JSON 路径。</p>
 
                     {/* 作业类型选择 */}
                     <div className="flex items-center space-x-2 text-xs">
@@ -1172,8 +1234,8 @@ export default function CombatTasks(_props: CombatTasksProps) {
                           <svg className="w-12 h-12 mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
-                          <p>输入作业 URI 后点击预览</p>
-                          <p className="mt-1">查看作业详情</p>
+                          <p>输入 maa:// 作业可预览</p>
+                          <p className="mt-1">作业站链接会自动提取 ID，本地路径可直接执行</p>
                         </div>
                       )}
                     </div>
@@ -1209,6 +1271,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                           {!isSearchingCopilot && '搜索'}
                         </Button>
                       </div>
+                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">支持关卡代号或关卡名，例如 1-7、CE-6。</p>
 
                       {/* 搜索结果 */}
                       {copilotSearchResult && copilotSearchResult.copilots && (
@@ -1345,10 +1408,10 @@ export default function CombatTasks(_props: CombatTasksProps) {
 
           {/* 保全派驻和悖论模拟 - 两个卡片在一行 */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {tasks.filter(task => task.id !== 'copilot').map((task) => {
+            {tasks.filter(task => task.id === activeCombatMode && task.id !== 'copilot').map((task) => {
               return (
-                <div 
-                  key={task.id} 
+                <div
+                  key={task.id}
                   className="rounded-3xl p-6 border border-gray-200 dark:border-white/10 hover:border-teal-400 dark:hover:border-teal-500/30 transition-all bg-white dark:bg-gray-900/60 hover:shadow-lg"
                 >
                   <div className="flex items-center justify-between mb-4">
@@ -1357,7 +1420,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                       <h4 className="font-bold text-gray-900 dark:text-white text-xl">{task.name}</h4>
                       <span className="text-xs text-gray-500 dark:text-gray-500 px-3 py-1.5 rounded-full font-mono border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-800/60">{task.command}</span>
                     </div>
-                    
+
                     {/* 执行按钮 - 右上角 */}
                     <Button
                       onClick={() => handleExecute(task)}
@@ -1376,9 +1439,9 @@ export default function CombatTasks(_props: CombatTasksProps) {
                       立即执行
                     </Button>
                   </div>
-                  
+
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-5 leading-relaxed">{task.description}</p>
-                
+
                   {/* 左右布局 */}
                   <div className="grid grid-cols-1 gap-4 mb-5">
                     {/* 悖论模拟：干员名字搜索 */}
@@ -1396,7 +1459,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                             placeholder="输入干员名字，如：古米、能天使"
                             value={paradoxSearchName}
                             onChange={(e) => setParadoxSearchName(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && handleSearchParadox()}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSearchParadox()}
                             className="flex-1 px-4 py-2 border border-teal-300 dark:border-teal-500/30 rounded-xl text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
                           />
                           <Button
@@ -1417,7 +1480,8 @@ export default function CombatTasks(_props: CombatTasksProps) {
                             {!isSearchingParadox && '搜索'}
                           </Button>
                         </div>
-                        
+                        <p className="mt-2 text-xs text-teal-700/80 dark:text-teal-300/80">输入干员名后会自动填入推荐 maa:// 作业。</p>
+
                         {/* 搜索结果 */}
                         {paradoxSearchResult && paradoxSearchResult.copilots && (
                           <div className="mt-3 space-y-2">
@@ -1428,7 +1492,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                               {paradoxSearchResult.copilots.slice(0, 5).map((copilot, idx) => {
                                 // 计算星星数量（热度评分向上取整，最多5颗星）
                                 const stars = Math.min(5, Math.max(1, Math.ceil(copilot.hotScore)))
-                                
+
                                 return (
                                   <button
                                     key={copilot.id}
@@ -1445,7 +1509,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                                     </div>
                                     <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400 mt-1">
                                       <span>浏览 {copilot.views.toLocaleString()}</span>
-                                      <span>·</span>
+                                      <span>/</span>
                                       <div className="flex items-center">
                                         {[...Array(stars)].map((_, i) => (
                                           <svg key={i} className="w-3.5 h-3.5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
@@ -1462,7 +1526,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                         )}
                       </div>
                     )}
-                    
+
                     {/* 输入区域 */}
                     <textarea
                       placeholder={task.placeholder + '\n支持多行，每行一个作业 URI'}
@@ -1471,7 +1535,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                       rows={2}
                       className="w-full px-4 py-3 border border-gray-300 dark:border-white/10 rounded-2xl text-sm font-medium text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none font-mono transition-all"
                     />
-                    
+
                     {/* 选项区域 */}
                     <div className="space-y-3">
                       {/* 高级选项 */}

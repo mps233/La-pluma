@@ -4,6 +4,7 @@ import Icons from './Icons'
 import { PageHeader, Card, Button } from './common'
 import { DashboardSkeleton } from './common/Loading'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
+import { useUIStore } from '@/stores'
 
 interface SklandData {
   uid: string
@@ -78,6 +79,7 @@ interface SklandData {
 }
 
 export default function Dashboard() {
+  const setActiveTab = useUIStore(state => state.setActiveTab)
   const [sklandData, setSklandData] = useState<SklandData | null>(null)
   const [sklandStatus, setSklandStatus] = useState<{ isLoggedIn: boolean; phone: string | null }>({ 
     isLoggedIn: false, 
@@ -191,27 +193,49 @@ export default function Dashboard() {
   if (!sklandStatus.isLoggedIn) {
     return (
       <div className="p-6">
-        <div className="max-w-2xl mx-auto pt-20">
+        <div className="max-w-4xl mx-auto pt-10 space-y-5">
           <Card className="text-center">
-            <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-              <Icons.Users />
+            <div className="w-20 h-20 mx-auto mb-5 rounded-2xl bg-cyan-50 dark:bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 flex items-center justify-center shadow-[0_0_0_1px_rgba(6,182,212,0.14)]">
+              <Icons.Dashboard />
             </div>
-            <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
-              未登录森空岛账号
+            <h3 className="text-2xl font-bold mb-3 text-gray-900 dark:text-white">
+              MAA 已可直接使用
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-8">
-              登录后可查看实时理智、干员数据、基建状态等详细信息
+            <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-xl mx-auto">
+              森空岛登录只影响理智和账号数据看板，不影响 MuMu 连接、启动游戏和执行作业。
             </p>
-            <Button
-              onClick={() => window.location.href = '#/skland-config'}
-              variant="gradient"
-              gradientFrom="cyan"
-              gradientTo="blue"
-              size="lg"
-            >
-              前往登录
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button onClick={() => setActiveTab('automation')} variant="gradient" gradientFrom="cyan" gradientTo="blue" size="lg">
+                去自动化任务
+              </Button>
+              <Button onClick={() => setActiveTab('combat')} variant="secondary" size="lg">
+                去自动战斗
+              </Button>
+              <Button
+                onClick={() => {
+                  localStorage.setItem('laPlumaConfigSection', 'skland')
+                  window.dispatchEvent(new CustomEvent('la-pluma-config-section', { detail: 'skland' }))
+                  setActiveTab('config')
+                }}
+                variant="ghost"
+                size="lg"
+              >
+                森空岛登录
+              </Button>
+            </div>
           </Card>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+            {[
+              ['MuMu', '默认 127.0.0.1:16384'],
+              ['MAA CLI', '已使用 /opt/homebrew/bin/maa'],
+              ['森空岛', '可选登录，不阻塞任务']
+            ].map(([title, desc]) => (
+              <div key={title} className="rounded-2xl bg-white dark:bg-gray-900/60 p-4 shadow-[0_0_0_1px_rgba(0,0,0,0.06)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08)]">
+                <div className="font-semibold text-gray-900 dark:text-white">{title}</div>
+                <div className="text-gray-500 dark:text-gray-400 mt-1">{desc}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     )

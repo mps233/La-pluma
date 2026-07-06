@@ -31,10 +31,15 @@ interface ChangelogItem {
 
 export default function ConfigManager({}: ConfigManagerProps) {
   const { setMessage: setStatusMessage } = useStatusStore()
-  const [configType, setConfigType] = useState<'connection' | 'resource' | 'instance' | 'skland'>('connection')
+  const [configType, setConfigType] = useState<'connection' | 'resource' | 'instance' | 'skland'>(() => {
+    const saved = localStorage.getItem('laPlumaConfigSection')
+    return ['connection', 'resource', 'instance', 'skland'].includes(saved || '')
+      ? saved as 'connection' | 'resource' | 'instance' | 'skland'
+      : 'connection'
+  })
   const [configData, setConfigData] = useState<MaaConnectionConfig>({
-    adb_path: 'adb',
-    address: '127.0.0.1:5555',
+    adb_path: '/opt/homebrew/bin/adb',
+    address: '127.0.0.1:16384',
     config: 'CompatMac',
   })
   const [configDir, setConfigDir] = useState<string>('')
@@ -51,6 +56,8 @@ export default function ConfigManager({}: ConfigManagerProps) {
   const [coreChangelog, setCoreChangelog] = useState<ChangelogItem[]>([])
   const [cliChangelog, setCliChangelog] = useState<ChangelogItem[]>([])
   const [showCoreChangelogType, setShowCoreChangelogType] = useState<'stable' | 'beta'>('stable')
+  const [showCoreChangelog, setShowCoreChangelog] = useState(false)
+  const [showCliChangelog, setShowCliChangelog] = useState(false)
 
   useEffect(() => {
     loadConfigDir()
@@ -59,6 +66,19 @@ export default function ConfigManager({}: ConfigManagerProps) {
     loadVersion()
     loadCoreChangelog()
     loadCliChangelog()
+  }, [])
+
+
+  useEffect(() => {
+    const handleSectionChange = (event: Event) => {
+      const section = (event as CustomEvent).detail
+      if (['connection', 'resource', 'instance', 'skland'].includes(section)) {
+        handleConfigTypeChange(section as 'connection' | 'resource' | 'instance' | 'skland')
+      }
+    }
+
+    window.addEventListener('la-pluma-config-section', handleSectionChange)
+    return () => window.removeEventListener('la-pluma-config-section', handleSectionChange)
   }, [])
 
   // 当版本信息加载后，根据当前版本设置默认显示的日志类型
@@ -197,11 +217,27 @@ export default function ConfigManager({}: ConfigManagerProps) {
 
   const handleReset = async () => {
     setConfigData({
-      adb_path: 'adb',
-      address: '127.0.0.1:5555',
+      adb_path: '/opt/homebrew/bin/adb',
+      address: '127.0.0.1:16384',
       config: 'CompatMac',
     })
     setStatusMessage('已重置为默认值')
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    setStatusMessage('')
+  }
+
+  const handleConfigTypeChange = (section: 'connection' | 'resource' | 'instance' | 'skland') => {
+    localStorage.setItem('laPlumaConfigSection', section)
+    setConfigType(section)
+  }
+
+  const handleOpenConfigDir = async () => {
+    try {
+      const result = await maaApi.openConfigDir()
+      setStatusMessage(result.success ? '已打开配置目录' : `打开失败: ${result.message || result.error}`)
+    } catch (error) {
+      setStatusMessage(`打开失败: ${(error as Error).message}`)
+    }
     await new Promise(resolve => setTimeout(resolve, 1500))
     setStatusMessage('')
   }
@@ -346,10 +382,10 @@ export default function ConfigManager({}: ConfigManagerProps) {
   }
 
   const configSections: ConfigSection[] = [
-    { id: 'connection', name: '连接配置', icon: '🔌' },
-    { id: 'resource', name: '资源配置', icon: '📦' },
-    { id: 'instance', name: '实例选项', icon: '⚡' },
-    { id: 'skland', name: '森空岛', icon: '🏝️' },
+    { id: 'connection', name: '连接配置', icon: <Icons.Monitor /> },
+    { id: 'resource', name: '资源配置', icon: <Icons.Package /> },
+    { id: 'instance', name: '实例选项', icon: <Icons.Lightning /> },
+    { id: 'skland', name: '森空岛', icon: <Icons.Users /> },
   ]
 
   return (
@@ -372,6 +408,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
               <p className="text-sm text-gray-600 dark:text-gray-400 font-mono">{configDir || '加载中...'}</p>
             </div>
             <Button
+              onClick={handleOpenConfigDir}
               variant="outline"
               size="sm"
               className="text-orange-700 dark:text-orange-400 border-orange-300 dark:border-orange-500/30 bg-orange-50 dark:bg-transparent hover:bg-orange-100 dark:hover:bg-orange-500/10"
@@ -528,6 +565,14 @@ export default function ConfigManager({}: ConfigManagerProps) {
                 {/* 更新日志 */}
                 {coreChangelog.length > 0 && (
                   <div className="mt-4">
+                    <button
+                      onClick={() => setShowCoreChangelog(!showCoreChangelog)}
+                      className="w-full rounded-xl bg-white dark:bg-gray-900/50 px-3 py-2 text-left text-xs text-gray-600 dark:text-gray-300 shadow-[0_0_0_1px_rgba(0,0,0,0.06)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08)] hover:text-orange-600 dark:hover:text-orange-300"
+                    >
+                      {showCoreChangelog ? '收起 MaaCore 更新日志' : `查看 MaaCore 更新日志（${coreChangelog[0]?.version || '最新'}）`}
+                    </button>
+                    {showCoreChangelog && (
+                      <div className="mt-3">
                     {coreChangelog
                       .filter(changelog => {
                         const isBeta = changelog.prerelease || changelog.version.includes('beta') || changelog.version.includes('alpha')
@@ -599,6 +644,8 @@ export default function ConfigManager({}: ConfigManagerProps) {
                           </div>
                         </div>
                       ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -642,8 +689,16 @@ export default function ConfigManager({}: ConfigManagerProps) {
                 
                 {/* 更新日志 */}
                 {cliChangelog.length > 0 && (
-                  <div className="mt-4 space-y-3 max-h-96 overflow-y-auto">
-                    {cliChangelog.map((changelog, index) => (
+                  <div className="mt-4">
+                    <button
+                      onClick={() => setShowCliChangelog(!showCliChangelog)}
+                      className="w-full rounded-xl bg-white dark:bg-gray-900/50 px-3 py-2 text-left text-xs text-gray-600 dark:text-gray-300 shadow-[0_0_0_1px_rgba(0,0,0,0.06)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08)] hover:text-orange-600 dark:hover:text-orange-300"
+                    >
+                      {showCliChangelog ? '收起 MAA CLI 更新日志' : `查看 MAA CLI 更新日志（${cliChangelog[0]?.version || '最新'}）`}
+                    </button>
+                    {showCliChangelog && (
+                      <div className="mt-3 space-y-3 max-h-96 overflow-y-auto">
+                        {cliChangelog.map((changelog, index) => (
                       <div key={changelog.version} className="p-4 bg-white dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-white/5">
                         <div className="flex items-start justify-between mb-3">
                           <div>
@@ -679,7 +734,9 @@ export default function ConfigManager({}: ConfigManagerProps) {
                           {changelog.body || '无更新说明'}
                         </div>
                       </div>
-                    ))}
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -703,7 +760,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                 {configSections.map((section, index) => (
                   <motion.button
                     key={section.id}
-                    onClick={() => setConfigType(section.id)}
+                    onClick={() => handleConfigTypeChange(section.id)}
                     className={`
                       w-full flex items-center space-x-3 px-4 py-3 rounded-2xl text-left transition-all mb-2
                       ${configType === section.id
@@ -716,7 +773,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                     transition={{ delay: 0.3 + index * 0.1 }}
                     whileHover={{ x: 4 }}
                   >
-                    <span className="text-xl">{section.icon}</span>
+                    <span className="flex h-8 w-8 items-center justify-center [&>*]:!h-8 [&>*]:!w-8">{section.icon}</span>
                     <span className="text-sm font-medium">{section.name}</span>
                   </motion.button>
                 ))}

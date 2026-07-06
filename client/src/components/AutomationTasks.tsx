@@ -332,22 +332,28 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     const currentTask = newFlow[index]
     if (!currentTask) return
     
-    // 如果修改的是 stages 参数，需要对关卡进行排序
+    // 如果修改的是 stages 参数，需要对关卡进行排序，但保留空白行用于继续输入。
+    // 之前这里会把 { stage: '', times: '' } 过滤掉，导致“添加关卡”点击后看起来没反应。
     if (key === 'stages' && Array.isArray(value)) {
-      // 分类：置顶关卡、智能养成关卡、普通关卡
-      const pinnedStages = value.filter((s): s is StageConfig => 
-        typeof s === 'object' && s.pinned === true && !!s.stage && s.stage.trim() !== ''
+      const hasStageText = (s: string | StageConfig) =>
+        typeof s === 'string' ? s.trim() !== '' : !!s.stage && s.stage.trim() !== '';
+
+      const pinnedStages = value.filter((s): s is StageConfig =>
+        typeof s === 'object' && s.pinned === true && hasStageText(s)
       );
-      const smartStages = value.filter((s): s is StageConfig => 
-        typeof s === 'object' && s.smart === true && !!s.stage && s.stage.trim() !== ''
+      const smartStages = value.filter((s): s is StageConfig =>
+        typeof s === 'object' && s.smart === true && hasStageText(s)
       );
-      const normalStages = value.filter((s): s is string | StageConfig => 
-        (typeof s === 'string' && s.trim() !== '') || 
-        (typeof s === 'object' && !s.pinned && !s.smart && !!s.stage && s.stage.trim() !== '')
+      const normalStages = value.filter((s): s is string | StageConfig =>
+        hasStageText(s) && (
+          typeof s === 'string' ||
+          (typeof s === 'object' && !s.pinned && !s.smart)
+        )
       );
-      
-      // 重新组合：置顶 -> 智能养成 -> 普通
-      currentTask.params[key] = [...pinnedStages, ...smartStages, ...normalStages];
+      const blankStages = value.filter((s): s is string | StageConfig => !hasStageText(s));
+
+      // 重新组合：置顶 -> 智能养成 -> 普通 -> 空白输入行
+      currentTask.params[key] = [...pinnedStages, ...smartStages, ...normalStages, ...blankStages];
     } else {
       currentTask.params[key] = value;
     }
@@ -968,8 +974,8 @@ export default function AutomationTasks({}: AutomationTasksProps) {
           }
         />
 
-        {/* 上半部分：截图监控 + 定时执行 */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
+        {/* 实时预览独占一行，定时执行放到下一行 */}
+        <div className="space-y-4 sm:space-y-6">
           {/* 模拟器监控 */}
           <div className="rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-gray-200 dark:border-white/10 bg-white dark:bg-[rgba(15,15,15,0.6)] transition-colors">
             <ScreenMonitor 
@@ -1523,7 +1529,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                                         </svg>
-                                        <span>添加关卡</span>
+                                        <span className="pointer-events-none">添加关卡</span>
                                       </button>
                                       <button
                                         type="button"

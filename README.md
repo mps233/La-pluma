@@ -41,6 +41,57 @@
   <p><em>移动端 - 浅色模式 & 深色模式</em></p>
 </div>
 
+## 🤖 Agent API
+
+La Pluma 提供一层给 AI/Agent 使用的轻量控制接口。它不是前端内部 API 的简单暴露，而是更语义化的 manifest/status/actions 层，方便 Hermes、Claude、Cursor 或自定义自动化直接发现能力、读取状态和执行安全动作。
+
+### 发现能力
+
+```bash
+curl http://localhost:3000/api/agent/manifest
+curl http://localhost:3000/api/agent/openapi.json
+```
+
+### 读取状态
+
+```bash
+curl http://localhost:3000/api/agent/status
+```
+
+返回内容会汇总：MAA 版本、任务状态、ADB 连接、前台窗口、WebRTC 预览可用性、最近日志和下一步建议。
+
+### 常用动作
+
+```bash
+# 检查模拟器连接
+curl -X POST http://localhost:3000/api/agent/actions/test-connection \
+  -H 'Content-Type: application/json' \
+  -d '{"adbPath":"/opt/homebrew/bin/adb","address":"127.0.0.1:16384"}'
+
+# WebRTC 实时预览
+curl -X POST http://localhost:3000/api/agent/webrtc/start \
+  -H 'Content-Type: application/json' \
+  -d '{"address":"127.0.0.1:16384","deviceId":"mumu-la-pluma"}'
+
+# 读取实时预览状态
+curl http://localhost:3000/api/agent/webrtc/status
+
+# 启动游戏
+curl -X POST http://localhost:3000/api/agent/actions/start-game \
+  -H 'Content-Type: application/json' \
+  -d '{"clientType":"Official","address":"127.0.0.1:16384","waitForCompletion":true}'
+
+# 执行白名单 maa-cli 任务
+curl -X POST http://localhost:3000/api/agent/actions/run-task \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"award","args":["Official","-a","127.0.0.1:16384"],"waitForCompletion":true}'
+
+# 停止当前任务
+curl -X POST http://localhost:3000/api/agent/actions/stop
+```
+
+如果设置了 `LA_PLUMA_TOKEN`，Agent API 和其它 `/api/*` 一样需要 Bearer token 或 `X-La-Pluma-Token`。
+
 ## 📋 前置要求
 
 - **操作系统**: macOS / Linux
@@ -112,10 +163,19 @@ docker run -d \
   -v /path/to/config:/root/.config/maa \
   -v /path/to/maacore:/root/.local/share/maa \
   -e ADB_ADDRESS=192.168.x.x:5555 \
+  # 可选：-e LA_PLUMA_TOKEN=change-me \
   miaona/la-pluma:latest
 
 # 访问应用
 # 浏览器打开 http://localhost:3055
+```
+
+可选环境变量：
+
+| 变量 | 说明 | 默认值 |
+| --- | --- | --- |
+| `LA_PLUMA_TOKEN` | 设置后 `/api/*` 需要 `Authorization: Bearer <token>` 或 `X-La-Pluma-Token` | 空，不启用 |
+| `LA_PLUMA_MAX_REALTIME_LOGS` | 实时日志内存缓存最大行数 | `5000` |
 ```
 
 #### 使用 Docker Compose（推荐）
@@ -273,7 +333,7 @@ la-pluma/
 - **后端**: Express + Socket.io 实现实时通信
 - **MAA 集成**: 通过 Node.js 子进程调用 maa CLI 命令
 - **定时任务**: 使用 node-cron 实现任务调度
-- **通知服务**: Telegram Bot API + 截图功能
+- **通知服务**: Telegram Bot API + 任务完成通知
 
 ## 🤝 贡献
 

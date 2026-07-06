@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { maaApi, getTodayDrops, getDropStatistics, fetchOperatorMaterials } from '../services/api'
+import { maaApi, getTodayDrops, getDropStatistics, fetchOperatorMaterials, getTrainingQueue } from '../services/api'
 import { motion } from 'framer-motion'
 import Icons from './Icons'
 import DropRecords from './DropRecords'
@@ -336,7 +336,6 @@ export default function DataStatistics({}: DataStatisticsProps) {
           
           try {
             setStatusMessage('正在更新智能养成系统...')
-            const { getTrainingQueue } = await import('../services/api')
             const queueResult = await getTrainingQueue()
 
             if (queueResult.success && queueResult.data && queueResult.data.length > 0) {
