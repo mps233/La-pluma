@@ -5,6 +5,7 @@
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
 import type { TaskConfigState } from '@/types/store'
+import { maaApi } from '@/services/api'
 import { createErrorHandler, withErrorHandling } from './errorHandler'
 
 const handleError = createErrorHandler('TaskConfigStore')
@@ -19,25 +20,21 @@ export const useTaskConfigStore = create<TaskConfigState>()(
         roguelikeTasks: {},
         scheduleEnabled: false,
         scheduleTimes: ['08:00', '14:00', '20:00'],
-        
+
         // Actions
         setAutomationTasks: (tasks) => set({ automationTasks: tasks }),
-        
         setCombatTasks: (tasks) => set({ combatTasks: tasks }),
-        
         setRoguelikeTasks: (tasks) => set({ roguelikeTasks: tasks }),
-        
-        setSchedule: (enabled, times) => set({ 
+        setSchedule: (enabled, times) => set({
           scheduleEnabled: enabled,
-          scheduleTimes: times
+          scheduleTimes: times,
         }),
-        
+
         loadConfig: async (type) => {
           await withErrorHandling(
             async () => {
-              const response = await fetch(`/api/maa/load-user-config?type=${type}`)
-              const result = await response.json()
-              
+              const result = await maaApi.loadUserConfig(type)
+
               if (result.success && result.data) {
                 switch (type) {
                   case 'automation-tasks':
@@ -54,16 +51,16 @@ export const useTaskConfigStore = create<TaskConfigState>()(
             },
             handleError,
             'loadConfig',
-            undefined
+            undefined,
           )
         },
-        
+
         saveConfig: async (type) => {
           await withErrorHandling(
             async () => {
               const state = get()
               let data: any
-              
+
               switch (type) {
                 case 'automation-tasks':
                   data = { taskFlow: state.automationTasks }
@@ -75,49 +72,40 @@ export const useTaskConfigStore = create<TaskConfigState>()(
                   data = state.roguelikeTasks
                   break
               }
-              
-              const response = await fetch('/api/maa/save-user-config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type, data })
-              })
-              
-              const result = await response.json()
+
+              const result = await maaApi.saveUserConfig(type, data)
               if (!result.success) {
-                throw new Error(result.error || '保存配置失败')
+                throw new Error(maaApi.getErrorMessage(result) || '保存配置失败')
               }
             },
             handleError,
             'saveConfig',
-            undefined
+            undefined,
           )
-        }
+        },
       }),
       {
         name: 'task-config-storage',
         version: 1,
-        // 持久化任务配置
         partialize: (state) => ({
           automationTasks: state.automationTasks,
           combatTasks: state.combatTasks,
           roguelikeTasks: state.roguelikeTasks,
           scheduleEnabled: state.scheduleEnabled,
-          scheduleTimes: state.scheduleTimes
+          scheduleTimes: state.scheduleTimes,
         }),
-        // 版本迁移
         migrate: (persistedState: any, version: number) => {
           if (version === 0) {
-            // 从 v0 迁移到 v1
             return {
               ...persistedState,
               scheduleEnabled: persistedState.scheduleEnabled ?? false,
-              scheduleTimes: persistedState.scheduleTimes ?? ['08:00', '14:00', '20:00']
+              scheduleTimes: persistedState.scheduleTimes ?? ['08:00', '14:00', '20:00'],
             }
           }
           return persistedState
-        }
-      }
+        },
+      },
     ),
-    { name: 'TaskConfigStore' }
-  )
+    { name: 'TaskConfigStore' },
+  ),
 )

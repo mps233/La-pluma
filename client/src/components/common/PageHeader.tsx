@@ -47,7 +47,6 @@ export default function PageHeader({
           </div>
         )}
         <div>
-          <div className="mb-1 h-1 w-10 rounded-full bg-gradient-to-r from-cyan-400 to-blue-400" />
           <h2 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-50">
             {title}
           </h2>

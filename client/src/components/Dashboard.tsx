@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { getSklandPlayerData, getSklandStatus } from '../services/api'
+import { Cpu, HardDrive, Database, Thermometer } from 'lucide-react'
+import { getOpenTodayStages, getSklandPlayerData, getSklandStatus, getTodayDrops, getTrainingQueue, maaApi } from '../services/api'
 import Icons from './Icons'
 import { PageHeader, Card, Button } from './common'
 import { DashboardSkeleton } from './common/Loading'
@@ -78,6 +79,39 @@ interface SklandData {
   clue?: any
 }
 
+interface ActivitySummary {
+  available: boolean
+  code?: string
+  name?: string
+  tip?: string
+}
+
+interface ScheduleSummary {
+  isRunning: boolean
+  currentTask?: string
+  message?: string
+  lastTask?: string
+  lastResult?: string
+}
+
+interface TrainingSummary {
+  count: number
+  topNames: string[]
+}
+
+interface DropSummary {
+  count: number
+  recent: Array<{
+    stage: string
+    items: string
+  }>
+}
+
+interface OpenStageSummary {
+  open: Array<{ stage: string; name: string }>
+  closed: Array<{ stage: string; name: string }>
+}
+
 export default function Dashboard() {
   const setActiveTab = useUIStore(state => state.setActiveTab)
   const [sklandData, setSklandData] = useState<SklandData | null>(null)
@@ -87,8 +121,21 @@ export default function Dashboard() {
   })
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [activitySummary, setActivitySummary] = useState<ActivitySummary>({ available: false })
+  const [scheduleSummary, setScheduleSummary] = useState<ScheduleSummary>({ isRunning: false })
+  const [trainingSummary, setTrainingSummary] = useState<TrainingSummary>({ count: 0, topNames: [] })
+  const [dropSummary, setDropSummary] = useState<DropSummary>({ count: 0, recent: [] })
+  const [openStageSummary, setOpenStageSummary] = useState<OpenStageSummary>({ open: [], closed: [] })
+  const [quickStartLoading, setQuickStartLoading] = useState(false)
+  const [quickStartMessage, setQuickStartMessage] = useState('')
   const [currentTime, setCurrentTime] = useState(Date.now())
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [deviceStats, setDeviceStats] = useState<{
+    cpuPct?: number; load1m?: number;
+    memPct?: number; memUsed?: string; memTotal?: string;
+    diskPct?: number; diskUsed?: string; diskTotal?: string;
+    temp?: number;
+  } | null>(null)
 
   // 检测深色模式
   useEffect(() => {
@@ -114,6 +161,15 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [])
 
+  // 设备状态轮询（CPU/内存）
+  useEffect(() => {
+    const fetch = () => { maaApi.getDeviceStats().then(r => { if (r.success) setDeviceStats(r.data) }).catch(() => {}) }
+    fetch()
+    const timer = setInterval(fetch, 5000)
+    return () => clearInterval(timer)
+  }, [])
+
+
   // 每秒更新当前时间，用于倒计时
   useEffect(() => {
     const timer = setInterval(() => {
@@ -127,19 +183,97 @@ export default function Dashboard() {
       setLoading(true)
     }
     try {
-      const statusResult = await getSklandStatus()
-      if (statusResult.success && statusResult.data) {
-        setSklandStatus(statusResult.data)
+      const [statusResult, activityResult, scheduleResult, trainingResult, dropResult, openTodayResult, sklandResult] = await Promise.allSettled([
+        getSklandStatus(),
+        maaApi.getActivity('Official'),
+        maaApi.getScheduleExecutionStatus(),
+        getTrainingQueue(),
+        getTodayDrops(),
+        getOpenTodayStages(),
+        getSklandPlayerData(!forceRefresh),
+      ])
 
-        if (statusResult.data.isLoggedIn) {
-          const sklandResult = await getSklandPlayerData(!forceRefresh)
-          if (sklandResult.success && sklandResult.data) {
-            setSklandData(sklandResult.data)
-          } else if (sklandResult.error && sklandResult.error.includes('登录已过期')) {
-            console.warn('森空岛登录已过期')
-            setSklandStatus({ isLoggedIn: false, phone: null })
-          }
+      if (statusResult.status === 'fulfilled' && statusResult.value.success && statusResult.value.data) {
+        setSklandStatus(statusResult.value.data)
+
+        if (statusResult.value.data.isLoggedIn && sklandResult.status === 'fulfilled' && sklandResult.value.success && sklandResult.value.data) {
+          setSklandData(sklandResult.value.data)
+        } else if (
+          sklandResult.status === 'fulfilled' &&
+          typeof sklandResult.value.error === 'string' &&
+          sklandResult.value.error.includes('登录已过期')
+        ) {
+          console.warn('森空岛登录已过期')
+          setSklandStatus({ isLoggedIn: false, phone: null })
+          setSklandData(null)
+        } else if (!statusResult.value.data.isLoggedIn) {
+          setSklandData(null)
         }
+      }
+
+      if (activityResult.status === 'fulfilled' && activityResult.value.success) {
+        const activity = activityResult.value.data
+        setActivitySummary({
+          available: Boolean(activity?.isActive || activity?.available || activity?.code || activity?.name),
+          code: activity?.code || activity?.id || undefined,
+          name: activity?.name || activity?.displayName || activity?.stageName || undefined,
+          tip: activity?.tip || activity?.description || undefined,
+        })
+      } else {
+        setActivitySummary({ available: false })
+      }
+
+      if (scheduleResult.status === 'fulfilled' && scheduleResult.value.success) {
+        const execution = scheduleResult.value.data || {}
+        setScheduleSummary({
+          isRunning: Boolean(execution?.isRunning || execution?.running || execution?.executing),
+          currentTask: execution?.taskName || execution?.currentTask || execution?.task?.name || undefined,
+          message: execution?.message || execution?.status || undefined,
+          lastTask: execution?.lastTaskName || execution?.lastTask || execution?.completedTask || undefined,
+          lastResult: execution?.lastResult || execution?.result || execution?.lastMessage || undefined,
+        })
+      } else {
+        setScheduleSummary({ isRunning: false })
+      }
+
+      if (trainingResult.status === 'fulfilled' && trainingResult.value.success) {
+        const queue = Array.isArray(trainingResult.value.data) ? trainingResult.value.data : []
+        setTrainingSummary({
+          count: queue.length,
+          topNames: queue
+            .map((item: any) => item?.operatorName || item?.name || item?.nickname)
+            .filter(Boolean)
+            .slice(0, 3),
+        })
+      } else {
+        setTrainingSummary({ count: 0, topNames: [] })
+      }
+
+      if (dropResult.status === 'fulfilled' && dropResult.value.success) {
+        const drops = Array.isArray(dropResult.value.data) ? dropResult.value.data : []
+        setDropSummary({
+          count: drops.length,
+          recent: drops.slice(0, 3).map((record: any) => ({
+            stage: record?.stageName || record?.stageCode || record?.stage || '未知关卡',
+            items: Array.isArray(record?.drops)
+              ? record.drops
+                  .slice(0, 3)
+                  .map((drop: any) => `${drop?.name || drop?.itemName || '材料'}×${drop?.count || 1}`)
+                  .join('、')
+              : record?.itemName || record?.items || '暂无掉落详情',
+          })),
+        })
+      } else {
+        setDropSummary({ count: 0, recent: [] })
+      }
+
+      if (openTodayResult.status === 'fulfilled' && openTodayResult.value.success && openTodayResult.value.data) {
+        setOpenStageSummary({
+          open: Array.isArray(openTodayResult.value.data.open) ? openTodayResult.value.data.open : [],
+          closed: Array.isArray(openTodayResult.value.data.closed) ? openTodayResult.value.data.closed : [],
+        })
+      } else {
+        setOpenStageSummary({ open: [], closed: [] })
       }
 
       setLastUpdate(new Date())
@@ -186,67 +320,49 @@ export default function Dashboard() {
     return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
   }
 
+  const openSklandConfig = () => {
+    localStorage.setItem('laPlumaConfigSection', 'skland')
+    window.dispatchEvent(new CustomEvent('la-pluma-config-section', { detail: 'skland' }))
+    setActiveTab('config')
+  }
+
+  const runTodayFlow = async () => {
+    setQuickStartLoading(true)
+    setQuickStartMessage('')
+    try {
+      const configResult = await maaApi.loadUserConfig('automation-tasks')
+      const savedFlow = Array.isArray(configResult?.data?.taskFlow) ? configResult.data.taskFlow : []
+      if (!configResult.success || savedFlow.length === 0) {
+        setQuickStartMessage('还没有配置今日流程，先去自动化页保存任务流。')
+        setActiveTab('automation')
+        return
+      }
+
+      const result = await maaApi.executeScheduleNow('dashboard-quick-start', savedFlow)
+      if (result.success) {
+        setQuickStartMessage(result.message || '今日流程已开始执行')
+        await loadDashboardData(true)
+      } else {
+        setQuickStartMessage(result.message || '今日流程启动失败')
+      }
+    } catch (error: any) {
+      setQuickStartMessage(error?.message || '今日流程启动失败')
+    } finally {
+      setQuickStartLoading(false)
+    }
+  }
+
   if (loading) {
     return <DashboardSkeleton />
   }
 
-  if (!sklandStatus.isLoggedIn) {
-    return (
-      <div className="p-6">
-        <div className="max-w-4xl mx-auto pt-10 space-y-5">
-          <Card className="text-center">
-            <div className="w-20 h-20 mx-auto mb-5 rounded-2xl bg-cyan-50 dark:bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 flex items-center justify-center shadow-[0_0_0_1px_rgba(6,182,212,0.14)]">
-              <Icons.Dashboard />
-            </div>
-            <h3 className="text-2xl font-bold mb-3 text-gray-900 dark:text-white">
-              MAA 已可直接使用
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-xl mx-auto">
-              森空岛登录只影响理智和账号数据看板，不影响 MuMu 连接、启动游戏和执行作业。
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button onClick={() => setActiveTab('automation')} variant="gradient" gradientFrom="cyan" gradientTo="blue" size="lg">
-                去自动化任务
-              </Button>
-              <Button onClick={() => setActiveTab('combat')} variant="secondary" size="lg">
-                去自动战斗
-              </Button>
-              <Button
-                onClick={() => {
-                  localStorage.setItem('laPlumaConfigSection', 'skland')
-                  window.dispatchEvent(new CustomEvent('la-pluma-config-section', { detail: 'skland' }))
-                  setActiveTab('config')
-                }}
-                variant="ghost"
-                size="lg"
-              >
-                森空岛登录
-              </Button>
-            </div>
-          </Card>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-            {[
-              ['MuMu', '默认 127.0.0.1:16384'],
-              ['MAA CLI', '已使用 /opt/homebrew/bin/maa'],
-              ['森空岛', '可选登录，不阻塞任务']
-            ].map(([title, desc]) => (
-              <div key={title} className="rounded-2xl bg-white dark:bg-gray-900/60 p-4 shadow-[0_0_0_1px_rgba(0,0,0,0.06)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08)]">
-                <div className="font-semibold text-gray-900 dark:text-white">{title}</div>
-                <div className="text-gray-500 dark:text-gray-400 mt-1">{desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
   return (
     <div className="p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <PageHeader
           icon={<Icons.Dashboard />}
           title="控制台"
-          subtitle="实时查看游戏数据和账号状态"
+          subtitle="今日活动、自动化进度、养成与掉落总览"
           gradientFrom="cyan-400"
           gradientVia="blue-400"
           gradientTo="purple-400"
@@ -266,6 +382,257 @@ export default function Dashboard() {
             </div>
           }
         />
+
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr] gap-5">
+          <Card theme="cyan" animated delay={0.18} className="!bg-white dark:!bg-[rgba(15,15,15,0.4)] !p-5">
+            <div className="flex items-center justify-between gap-4 mb-3">
+              <div>
+                <div className="text-sm font-bold text-gray-900 dark:text-white">今日流程</div>
+                <div className="text-[10px] text-gray-400 mt-0.5">活动、自动化、养成与掉落一览</div>
+              </div>
+              <div className="text-right text-[10px] text-gray-400">
+                <div>{lastUpdate ? `更新于 ${lastUpdate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}` : '等待首次刷新'}</div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 mb-3">
+              {[
+                { label: '今日活动', value: activitySummary.available ? (activitySummary.name || activitySummary.code || '进行中') : '暂无', sub: activitySummary.tip || '' },
+                { label: '自动化', value: scheduleSummary.isRunning ? '执行中' : '空闲', sub: scheduleSummary.currentTask || scheduleSummary.message || '可开始今日流程' },
+                { label: '养成目标', value: `${trainingSummary.count} 项`, sub: trainingSummary.topNames.length > 0 ? trainingSummary.topNames.join('、') : '还没有养成目标' },
+                { label: '今日掉落', value: `${dropSummary.count} 条`, sub: dropSummary.recent[0]?.items || '执行作战后自动汇总' },
+              ].map(item => (
+                <div key={item.label} className="rounded-lg border border-gray-100 dark:border-white/5 bg-gray-50/30 dark:bg-white/[0.02] p-2.5">
+                  <div className="text-[9px] text-gray-400 uppercase tracking-wider">{item.label}</div>
+                  <div className="mt-1 text-base font-bold text-gray-900 dark:text-white">{item.value}</div>
+                  <div className="mt-0.5 text-[9px] text-gray-400 truncate">{item.sub}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={runTodayFlow} variant="gradient" gradientFrom="cyan" gradientTo="blue" disabled={quickStartLoading}>
+                {quickStartLoading ? '启动中...' : '一键开始今日流程'}
+              </Button>
+              <Button onClick={() => setActiveTab('automation')} variant="secondary">去自动化</Button>
+              <Button onClick={() => setActiveTab('combat')} variant="secondary">去作业</Button>
+              <Button onClick={() => setActiveTab('training')} variant="secondary">去养成</Button>
+            </div>
+            {quickStartMessage && (
+              <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">{quickStartMessage}</div>
+            )}
+          </Card>
+
+          <div className="rounded-2xl border border-gray-100 dark:border-white/5 bg-white dark:bg-[rgba(15,15,15,0.4)] overflow-hidden">
+            <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-gray-50 dark:border-white/5">
+              <div className="flex items-center gap-2">
+                <div className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
+                <span className="text-xs font-medium text-gray-500">模拟器实时预览</span>
+              </div>
+              <Button onClick={() => setActiveTab('automation')} variant="ghost" size="sm">打开</Button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('automation')}
+              className="group relative flex aspect-video w-full items-center justify-center bg-black text-left transition-colors hover:bg-slate-950"
+            >
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,211,238,0.16),transparent_45%)] opacity-80" />
+              <div className="relative text-center">
+                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-cyan-300 transition-transform group-hover:scale-105">
+                  <Icons.Monitor />
+                </div>
+                <div className="text-sm font-semibold text-white">进入实时预览</div>
+                <div className="mt-1 text-xs text-slate-400">启动 WebRTC 画面、触控、返回/Home/全屏</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {deviceStats && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="h-0.5 flex-1 bg-gray-100 dark:bg-white/5 rounded-full" />
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider shrink-0">设备状态</span>
+              <div className="h-0.5 flex-1 bg-gray-100 dark:bg-white/5 rounded-full" />
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {([
+                { label: 'CPU', pct: deviceStats.cpuPct, sub: deviceStats.load1m != null ? `负载 ${deviceStats.load1m.toFixed(1)}` : '', color: 'cyan', Icon: Cpu, value: undefined as string | undefined },
+                { label: '内存', pct: deviceStats.memPct, sub: `${deviceStats.memUsed ?? '--'} / ${deviceStats.memTotal ?? '--'}`, color: 'violet', Icon: Database, value: undefined as string | undefined },
+                { label: '磁盘', pct: deviceStats.diskPct, sub: `${deviceStats.diskUsed ?? '--'} / ${deviceStats.diskTotal ?? '--'}`, color: 'amber', Icon: HardDrive, value: undefined as string | undefined },
+                { label: '温度', pct: undefined, sub: '', color: 'rose', Icon: Thermometer, value: deviceStats.temp != null ? `${deviceStats.temp}°C` : '--' },
+              ] as const).map(({ label, pct, sub, color, Icon, value }) => {
+                const bars: Record<string, string> = {
+                  cyan: 'bg-cyan-400', violet: 'bg-violet-400', amber: 'bg-amber-400', rose: 'bg-rose-400'
+                }
+                const trackBars: Record<string, string> = {
+                  cyan: 'bg-cyan-100 dark:bg-cyan-500/10', violet: 'bg-violet-100 dark:bg-violet-500/10', amber: 'bg-amber-100 dark:bg-amber-500/10', rose: 'bg-rose-100 dark:bg-rose-500/10'
+                }
+                return (
+                  <div key={label} className="group rounded-2xl border border-gray-100 dark:border-white/5 bg-white dark:bg-[rgba(15,15,15,0.4)] p-4 hover:border-gray-200 dark:hover:border-white/10 transition-colors">
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <div className="shrink-0 h-8 w-8 rounded-lg bg-gray-50 dark:bg-white/5 flex items-center justify-center">
+                        <Icon className="h-4 w-4 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
+                      </div>
+                      <div>
+                        <div className="text-xs font-medium text-gray-700 dark:text-gray-300">{label}</div>
+                        <div className="text-[10px] text-gray-400">{sub}</div>
+                      </div>
+                      {value != null && (
+                        <div className="ml-auto text-sm font-semibold text-gray-900 dark:text-white">{value}</div>
+                      )}
+                    </div>
+                    {pct != null && (
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] text-gray-400">使用率</span>
+                          <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300">{pct}%</span>
+                        </div>
+                        <div className={`h-1.5 rounded-full ${trackBars[color]}`}>
+                          <div className={`h-full rounded-full ${bars[color]} transition-all duration-700`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+          <Card theme="violet" animated delay={0.23} className="!bg-white dark:!bg-[rgba(15,15,15,0.4)]">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <div className="text-base font-bold text-gray-900 dark:text-white">执行状态</div>
+                <div className="text-xs text-gray-400 mt-0.5">当前进度与最近一次结果</div>
+              </div>
+              <Button onClick={() => loadDashboardData(true)} variant="ghost" size="sm">刷新</Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <div className="text-[10px] text-gray-400 uppercase tracking-wider">当前执行</div>
+                <div className="mt-1 text-base font-semibold text-gray-900 dark:text-white">{scheduleSummary.isRunning ? '执行中' : '空闲中'}</div>
+                <div className="mt-0.5 text-[10px] text-gray-400">{scheduleSummary.currentTask || scheduleSummary.message || '暂无进行中的流程'}</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-gray-400 uppercase tracking-wider">最近结果</div>
+                <div className="mt-1 text-base font-semibold text-gray-900 dark:text-white">{scheduleSummary.lastTask || '暂无记录'}</div>
+                <div className="mt-0.5 text-[10px] text-gray-400">{scheduleSummary.lastResult || '执行一次自动化流程后显示'}</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card theme="amber" animated delay={0.24} className="!bg-white dark:!bg-[rgba(15,15,15,0.4)]">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <div className="text-base font-bold text-gray-900 dark:text-white">今日开放关卡</div>
+                <div className="text-xs text-gray-400 mt-0.5">资源本开放情况</div>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <div className="text-[11px] text-gray-400 uppercase tracking-wider mb-2">开放</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {openStageSummary.open.map(item => (
+                    <span key={item.stage} className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-medium">{item.stage} · {item.name}</span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] text-gray-400 uppercase tracking-wider mb-2">未开放</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {openStageSummary.closed.map(item => (
+                    <span key={item.stage} className="px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400 text-xs">{item.stage} · {item.name}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <Card theme="amber" animated delay={0.24} className="!bg-white dark:!bg-[rgba(15,15,15,0.4)]">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <div className="text-base font-bold text-gray-900 dark:text-white">养成摘要</div>
+                <div className="text-xs text-gray-400 mt-0.5">当前优先培养的干员目标</div>
+              </div>
+              <Button onClick={() => setActiveTab('training')} variant="ghost" size="sm">去养成</Button>
+            </div>
+            {trainingSummary.count > 0 ? (
+              <div className="space-y-3">
+                <div className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">{trainingSummary.count}</div>
+                <div className="text-xs text-gray-400">队列中的前几个目标</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {trainingSummary.topNames.map(name => (
+                    <span key={name} className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs font-medium">{name}</span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-gray-400">还没有养成目标，去添加首个干员。</div>
+            )}
+          </Card>
+
+          <Card theme="emerald" animated delay={0.26} className="!bg-white dark:!bg-[rgba(15,15,15,0.4)]">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <div className="text-base font-bold text-gray-900 dark:text-white">今日掉落摘要</div>
+                <div className="text-xs text-gray-400 mt-0.5">最近作战产出</div>
+              </div>
+              <Button onClick={() => setActiveTab('statistics')} variant="ghost" size="sm">去数据</Button>
+            </div>
+            {dropSummary.count > 0 ? (
+              <div className="space-y-2.5">
+                {dropSummary.recent.map((record, index) => (
+                  <div key={`${record.stage}-${index}`} className="rounded-xl border border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.03] p-3.5">
+                    <div className="text-xs font-semibold text-gray-900 dark:text-white">{record.stage}</div>
+                    <div className="mt-1 text-[10px] text-gray-400 leading-relaxed">{record.items}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-gray-400">今天还没有掉落记录，执行作战后会自动出现。</div>
+            )}
+          </Card>
+        </div>
+
+        <Card theme="purple" animated delay={0.22} className="!bg-gradient-to-br !from-purple-50/80 !to-white dark:!from-purple-500/[0.04] dark:!to-[rgba(15,15,15,0.4)]">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <div className="text-base font-bold text-gray-900 dark:text-white">森空岛摘要</div>
+              <div className="text-xs text-gray-400 mt-0.5">不登录也不阻塞核心功能</div>
+            </div>
+          </div>
+
+          {sklandStatus.isLoggedIn && sklandData ? (
+            <div className="space-y-3">
+              <div>
+                <div className="text-xs text-gray-400">当前理智</div>
+                <div className="mt-1 text-3xl font-bold text-gray-900 dark:text-white tracking-tight">{sklandData.ap.current}<span className="text-lg font-normal text-gray-300">/{sklandData.ap.max}</span></div>
+                <div className="mt-1 text-[10px] text-gray-400">{sklandData.ap.current >= sklandData.ap.max ? '已满' : `预计 ${formatFullRecoveryTime(sklandData.ap.completeRecoveryTime)} 回满`}</div>
+              </div>
+              <div className="flex gap-6 pt-3 border-t border-gray-100 dark:border-white/5">
+                <div>
+                  <div className="text-[10px] text-gray-400">日常</div>
+                  <div className="mt-0.5 text-sm font-semibold text-gray-900 dark:text-white">{sklandData.routine ? `${sklandData.routine.daily.current}/${sklandData.routine.daily.total}` : '--'}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-gray-400">公招</div>
+                  <div className="mt-0.5 text-sm font-semibold text-gray-900 dark:text-white">{sklandData.recruit?.length || 0} 个</div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <div className="text-sm font-semibold text-gray-600 dark:text-gray-300">MAA 已可直接使用</div>
+              <div className="mt-1 text-xs text-gray-400">森空岛登录只影响看板数据，不影响作业。</div>
+              <div className="mt-4 flex justify-center gap-2">
+                <Button onClick={openSklandConfig} variant="ghost" size="sm">登录森空岛</Button>
+                <Button onClick={() => setActiveTab('combat')} variant="secondary" size="sm">去作业</Button>
+              </div>
+            </div>
+          )}
+        </Card>
 
         {sklandData && (
           <div className="flex gap-5">

@@ -19,6 +19,32 @@ const RESOURCE_STAGES = {
   'LS-6': { name: '作战记录', days: [0, 1, 2, 3, 4, 5, 6] }, // 每天
 };
 
+export function getTodayOpenStages() {
+  const today = new Date().getDay();
+  const open = [];
+  const closed = [];
+
+  Object.entries(RESOURCE_STAGES).forEach(([stage, info]) => {
+    const item = {
+      stage,
+      name: info.name,
+      isOpen: info.days.includes(today)
+    };
+
+    if (item.isOpen) {
+      open.push(item);
+    } else {
+      closed.push(item);
+    }
+  });
+
+  return {
+    weekday: today,
+    open,
+    closed
+  };
+}
+
 /**
  * 检查关卡是否在今天开放
  */

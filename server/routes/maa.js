@@ -88,6 +88,47 @@ let webrtcServerProcess = null;
 let webrtcAgentProcess = null;
 let webrtcTurnProcess = null;
 
+async function execFileQuiet(command, args, options = {}) {
+  const { execFile } = await import('child_process');
+  const { promisify } = await import('util');
+  const execFileAsync = promisify(execFile);
+  try {
+    return await execFileAsync(command, args, { timeout: 5000, ...options });
+  } catch (error) {
+    return { stdout: error.stdout || '', stderr: error.stderr || '', error };
+  }
+}
+
+async function getListeningPidsOnTcpPort(port) {
+  const { stdout } = await execFileQuiet('/usr/sbin/lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t']);
+  return stdout.trim().split(/\s+/).filter(Boolean);
+}
+
+async function isProcessListeningOnTcpPort(port) {
+  return (await getListeningPidsOnTcpPort(port)).length > 0;
+}
+
+async function killListeningPidsOnTcpPort(port) {
+  const pids = await getListeningPidsOnTcpPort(port);
+  await Promise.all(pids.map(pid => execFileQuiet('/bin/kill', ['-TERM', pid])));
+}
+
+async function killLocalWebrtcInfrastructure(address = '127.0.0.1:16384') {
+  if (webrtcAgentProcess && !webrtcAgentProcess.killed) webrtcAgentProcess.kill('SIGTERM');
+  if (webrtcServerProcess && !webrtcServerProcess.killed) webrtcServerProcess.kill('SIGTERM');
+  if (webrtcTurnProcess && !webrtcTurnProcess.killed) webrtcTurnProcess.kill('SIGTERM');
+  webrtcAgentProcess = null;
+  webrtcServerProcess = null;
+  webrtcTurnProcess = null;
+
+  // Backend restarts lose ChildProcess refs, so also clean up orphaned processes
+  // La-pluma started earlier. These ports are owned by its WebRTC stack.
+  await killListeningPidsOnTcpPort(WEBRTC_PORT);
+  await killListeningPidsOnTcpPort(3478);
+  await execFileQuiet('/opt/homebrew/bin/adb', ['-s', address, 'shell', 'pkill -f cloudphone-agent || true']);
+  await execFileQuiet('/opt/homebrew/bin/adb', ['-s', address, 'shell', 'pkill -f scrcpy.Server || true']);
+}
+
 async function pathExists(filePath) {
   const fs = await import('fs/promises');
   try {
@@ -158,6 +199,7 @@ async function getIceServersConfig() {
 
 async function startLocalTurnServer() {
   if (webrtcTurnProcess && !webrtcTurnProcess.killed) return;
+  if (await isProcessListeningOnTcpPort(3478)) return;
   const { spawn } = await import('child_process');
   const fs = await import('fs');
   const { turnLog } = await getWebrtcLogPaths();
@@ -245,6 +287,9 @@ router.post('/webrtc/start-server', asyncHandler(async (req, res) => {
   if (webrtcServerProcess && !webrtcServerProcess.killed) {
     return res.json(successResponse(await getWebrtcStatus(), 'WebRTC 服务已在运行'));
   }
+  if (await isWebrtcServerReachable()) {
+    return res.json(successResponse(await getWebrtcStatus(), 'WebRTC 服务已在运行'));
+  }
   const { spawn } = await import('child_process');
   const path = await import('path');
   const binaryPath = await getWebrtcBinaryPath();
@@ -268,28 +313,20 @@ router.post('/webrtc/start-server', asyncHandler(async (req, res) => {
 }));
 
 router.post('/webrtc/stop-server', asyncHandler(async (req, res) => {
-  if (webrtcAgentProcess && !webrtcAgentProcess.killed) {
-    webrtcAgentProcess.kill('SIGTERM');
-    webrtcAgentProcess = null;
-  }
-  if (webrtcServerProcess && !webrtcServerProcess.killed) {
-    webrtcServerProcess.kill('SIGTERM');
-    webrtcServerProcess = null;
-  }
-  if (webrtcTurnProcess && !webrtcTurnProcess.killed) {
-    webrtcTurnProcess.kill('SIGTERM');
-    webrtcTurnProcess = null;
-  }
+  await killLocalWebrtcInfrastructure(req.body?.address || '127.0.0.1:16384');
   res.json(successResponse(await getWebrtcStatus(), 'WebRTC 服务已停止'));
 }));
 
 router.post('/webrtc/start-agent', asyncHandler(async (req, res) => {
+  const address = req.body?.address || '127.0.0.1:16384';
   if (webrtcAgentProcess && !webrtcAgentProcess.killed) {
+    return res.json(successResponse(await getWebrtcStatus(), 'MuMu Agent 已在运行'));
+  }
+  if (await isDeviceAgentRunning(address)) {
     return res.json(successResponse(await getWebrtcStatus(), 'MuMu Agent 已在运行'));
   }
   const { spawn } = await import('child_process');
   const path = await import('path');
-  const address = req.body?.address || '127.0.0.1:16384';
   const runScript = path.join(WEBRTC_DIR, 'agentd', 'run.sh');
   if (!await pathExists(runScript)) {
     return res.status(400).json(errorResponse(new Error('WebRTC agent 未安装')));
@@ -533,6 +570,13 @@ router.post('/test-connection', asyncHandler(async (req, res) => {
 router.get('/debug-screenshots', asyncHandler(async (req, res) => {
   const screenshots = await getDebugScreenshots();
   res.json(successResponse(screenshots));
+}));
+
+// 获取当前模拟器快照，用于 WebRTC 未连接时的预览占位
+router.post('/screenshot', asyncHandler(async (req, res) => {
+  const { adbPath = '/opt/homebrew/bin/adb', address = '127.0.0.1:16384' } = req.body || {};
+  const screenshot = await captureScreen(adbPath, address);
+  res.json(successResponse(screenshot));
 }));
 
 // 设置定时任务

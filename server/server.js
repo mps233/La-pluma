@@ -2,10 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import maaRoutes from './routes/maa.js';
-import notificationRoutes, { loadConfig as loadNotificationConfig } from './routes/notification.js';
-import operatorTrainingRoutes from './routes/operatorTraining.js';
-import sklandRoutes from './routes/skland.js';
 import operatorQuotesRoutes from './routes/operatorQuotes.js';
 import agentRoutes from './routes/agent.js';
 import { setSocketIO as setSchedulerSocketIO } from './services/schedulerService.js';
@@ -92,10 +88,6 @@ if (process.env.NODE_ENV === 'production') {
 // API 路由
 app.use('/api', optionalApiAuth);
 app.use('/api/agent', agentRoutes);
-app.use('/api/maa', maaRoutes);
-app.use('/api/notification', notificationRoutes);
-app.use('/api/operator-training', operatorTrainingRoutes);
-app.use('/api/skland', sklandRoutes);
 app.use('/api/operator-quotes', operatorQuotesRoutes);
 
 // WebSocket 连接
@@ -118,9 +110,6 @@ httpServer.listen(PORT, '0.0.0.0', async () => {
   console.log(`  - 网络: http://${localIp}:${PORT}`);
   console.log('');
   printPathConfig();
-  
-  // 先加载通知配置
-  await loadNotificationConfig();
   
   // 初始化 Telegram Bot
   try {

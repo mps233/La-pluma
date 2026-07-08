@@ -57,6 +57,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
   // 普通关卡搜索相关状态
   const [copilotSearchStage, setCopilotSearchStage] = useState('')
   const [copilotSearchResult, setCopilotSearchResult] = useState<CopilotSearchResult | null>(null)
+  const [selectedSearchCopilotUri, setSelectedSearchCopilotUri] = useState<string>('')
   const [isSearchingCopilot, setIsSearchingCopilot] = useState(false)
   const [activeCombatMode, setActiveCombatMode] = useState<'copilot' | 'ssscopilot' | 'paradoxcopilot'>('copilot')
 
@@ -66,9 +67,10 @@ export default function CombatTasks(_props: CombatTasksProps) {
     const checkBackendStatus = async () => {
       try {
         const result = await maaApi.getTaskStatus()
-        if (result.success && result.data.isRunning) {
+        const taskStatus = result.data
+        if (result.success && taskStatus?.isRunning) {
           // 后端确实有任务在运行
-          const { taskName, startTime, taskType } = result.data
+          const { taskName, startTime, taskType } = taskStatus
 
           // 只恢复属于自动战斗的任务
           if (taskType === 'combat') {
@@ -384,7 +386,8 @@ export default function CombatTasks(_props: CombatTasksProps) {
     setCurrentCopilotTask(task)
 
     const result = await executeCopilotAtIndex(task, firstSelectedIndex)
-    setCopilotSetResults([{ index: firstSelectedIndex, success: result.success, error: result.error }])
+    const errorMessage = result.error || maaApi.getErrorMessage({ message: result.error }) || '未知错误'
+    setCopilotSetResults([{ index: firstSelectedIndex, success: result.success, error: errorMessage }])
 
     // 计算剩余选中的作业数量
     const remainingSelected = copilotSetInfo.copilots.filter((_, idx) => selectedCopilotIndexes.has(idx) && idx !== firstSelectedIndex).length
@@ -401,13 +404,13 @@ export default function CombatTasks(_props: CombatTasksProps) {
     } else {
       const strategy = advancedParams.copilot?.executionStrategy || 'continue'
       if (strategy === 'stop') {
-        setStatusMessage(`作业 ${firstSelectedIndex + 1} 执行失败: ${result.error}，已按策略停止`)
+        setStatusMessage(`作业 ${firstSelectedIndex + 1} 执行失败: ${errorMessage}，已按策略停止`)
         finishCopilotSet()
       } else if (remainingSelected > 0) {
-        setStatusMessage(`作业 ${firstSelectedIndex + 1} 执行失败: ${result.error}，等待开始下一关`)
+        setStatusMessage(`作业 ${firstSelectedIndex + 1} 执行失败: ${errorMessage}，等待开始下一关`)
         setWaitingForNextCopilot(true)
       } else {
-        setStatusMessage(`作业执行失败: ${result.error}`)
+        setStatusMessage(`作业执行失败: ${errorMessage}`)
         finishCopilotSet()
       }
     }
@@ -435,7 +438,8 @@ export default function CombatTasks(_props: CombatTasksProps) {
     setIsRunning(true)
 
     const result = await executeCopilotAtIndex(currentCopilotTask, nextIndex)
-    setCopilotSetResults(prev => [...prev, { index: nextIndex, success: result.success, error: result.error }])
+    const nextErrorMessage = result.error || maaApi.getErrorMessage({ message: result.error }) || '未知错误'
+    setCopilotSetResults(prev => [...prev, { index: nextIndex, success: result.success, error: nextErrorMessage }])
 
     // 计算剩余选中的作业数量
     const remainingSelected = copilotSetInfo.copilots.filter((_, idx) =>
@@ -454,13 +458,13 @@ export default function CombatTasks(_props: CombatTasksProps) {
     } else {
       const strategy = advancedParams.copilot?.executionStrategy || 'continue'
       if (strategy === 'stop') {
-        setStatusMessage(`作业 ${nextIndex + 1} 执行失败: ${result.error}，已按策略停止`)
+        setStatusMessage(`作业 ${nextIndex + 1} 执行失败: ${nextErrorMessage}，已按策略停止`)
         finishCopilotSet()
       } else if (remainingSelected > 0) {
-        setStatusMessage(`作业 ${nextIndex + 1} 执行失败: ${result.error}，等待开始下一关`)
+        setStatusMessage(`作业 ${nextIndex + 1} 执行失败: ${nextErrorMessage}，等待开始下一关`)
         setWaitingForNextCopilot(true)
       } else {
-        setStatusMessage(`作业 ${nextIndex + 1} 执行失败: ${result.error}`)
+        setStatusMessage(`作业 ${nextIndex + 1} 执行失败: ${nextErrorMessage}`)
         finishCopilotSet()
       }
     }
@@ -520,7 +524,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
           await new Promise(resolve => setTimeout(resolve, 2000))
           setStatusMessage('')
         } else {
-          setStatusMessage(`执行失败: ${result.error}`)
+          setStatusMessage(`执行失败: ${maaApi.getErrorMessage(result)}`)
           await new Promise(resolve => setTimeout(resolve, 2000))
           setStatusMessage('')
         }
@@ -540,6 +544,9 @@ export default function CombatTasks(_props: CombatTasksProps) {
     setTaskInputs({ ...taskInputs, [taskId]: value })
     if (taskId === 'copilot') {
       setCopilotSetInfo(null)
+      if (value.trim() !== selectedSearchCopilotUri) {
+        setSelectedSearchCopilotUri('')
+      }
     }
   }
 
@@ -562,20 +569,39 @@ export default function CombatTasks(_props: CombatTasksProps) {
   }
 
   // 获取单个作业详情
+  const unwrapApiPayload = (response: any) => {
+    if (!response || typeof response !== 'object') return null
+    if (response.success === true && response.data) return response.data
+    return response
+  }
+
+  const getCopilotContent = (response: any) => {
+    const payload = unwrapApiPayload(response)
+    if (payload?.status_code !== 200 || !payload?.data?.content) return null
+    try {
+      return JSON.parse(payload.data.content)
+    } catch {
+      return null
+    }
+  }
+
+  const getCopilotSetIds = (response: any): number[] => {
+    const payload = unwrapApiPayload(response)
+    const rawIds = payload?.data?.copilot_ids
+    return Array.isArray(rawIds) ? rawIds.map((id: unknown) => Number(id)).filter(Number.isFinite) : []
+  }
+
   const fetchCopilotDetail = async (copilotId: number): Promise<CopilotSetItem | null> => {
     try {
       const response = await maaApi.getCopilotInfo(String(copilotId))
-      if ((response as any).status_code === 200 && (response as any).data) {
-        const data = response as any
-        if (data.status_code === 200 && data.data) {
-          const content = JSON.parse(data.data.content)
-          return {
-            id: copilotId,
-            name: content.doc?.title || '未命名作业',
-            stage: content.stage_name,
-            operators: extractOperators(content),
-            uri: `maa://${copilotId}`
-          }
+      const content = getCopilotContent(response)
+      if (content) {
+        return {
+          id: copilotId,
+          name: content.doc?.title || '未命名作业',
+          stage: content.stage_name,
+          operators: extractOperators(content),
+          uri: `maa://${copilotId}`
         }
       }
     } catch {
@@ -588,13 +614,11 @@ export default function CombatTasks(_props: CombatTasksProps) {
   const fetchCopilotSetDetails = async (setId: string): Promise<CopilotSetItem[]> => {
     try {
       const data = await maaApi.getCopilotSet(setId)
-      if ((data as any).status_code === 200 || (data as any).success) {
-        if ((data as any).status_code === 200 && (data as any).data?.copilot_ids) {
-          const copilotIds: number[] = (data as any).data.copilot_ids
-          // 并行获取所有作业详情
-          const details = await Promise.all(copilotIds.map(id => fetchCopilotDetail(id)))
-          return details.filter((item): item is CopilotSetItem => item !== null)
-        }
+      const copilotIds = getCopilotSetIds(data)
+      if (copilotIds.length > 0) {
+        // 并行获取所有作业详情
+        const details = await Promise.all(copilotIds.map(id => fetchCopilotDetail(id)))
+        return details.filter((item): item is CopilotSetItem => item !== null)
       }
     } catch {
       // 忽略错误
@@ -602,12 +626,22 @@ export default function CombatTasks(_props: CombatTasksProps) {
     return []
   }
 
-  const handlePreviewCopilotSet = async () => {
-    const input = taskInputs['copilot'] || ''
-    const match = input.trim().match(/^maa:\/\/(\d+)(s?)$/)
+  const applyCopilotUri = async (uri: string) => {
+    const normalizedUri = normalizeCopilotInput(uri).trim()
+    setTaskInputs(prev => ({ ...prev, copilot: normalizedUri }))
+    setSelectedSearchCopilotUri(normalizedUri)
+    setCopilotSetInfo(null)
+    await handlePreviewCopilotSetWithInput(normalizedUri)
+  }
+
+  const handlePreviewCopilotSetWithInput = async (rawValue?: string) => {
+    const rawInput = rawValue ?? (taskInputs['copilot'] || '')
+    const normalizedInput = normalizeCopilotInput(rawInput).trim()
+    const firstToken = normalizedInput.split(/\s+/)[0] || ''
+    const match = firstToken.match(/^maa:\/\/(\d+)(s?)$/)
 
     if (!match) {
-      setStatusMessage('请输入有效的作业 URI（如: maa://26766）')
+      setStatusMessage('请输入有效的作业 URI / 作业站链接（如: maa://26766）')
       await new Promise(resolve => setTimeout(resolve, 2000))
       setStatusMessage('')
       return
@@ -623,22 +657,18 @@ export default function CombatTasks(_props: CombatTasksProps) {
       if (copilotType === 'single') {
         // 强制单个作业模式
         const copilotData = await maaApi.getCopilotInfo(copilotId)
-        if ((copilotData as any).status_code === 200 || copilotData.success) {
-          if ((copilotData as any).status_code === 200 && (copilotData as any).data) {
-            const content = JSON.parse((copilotData as any).data.content)
-            setCopilotSetInfo({
-              type: 'single',
-              id: copilotId,
-              name: content.doc?.title || '未命名作业',
-              stage: content.stage_name,
-              operators: extractOperators(content)
-            })
-            setStatusMessage(`找到作业：${content.doc?.title || content.stage_name}`)
-          } else {
-            setStatusMessage('作业不存在')
-          }
+        const content = getCopilotContent(copilotData)
+        if (content) {
+          setCopilotSetInfo({
+            type: 'single',
+            id: copilotId,
+            name: content.doc?.title || '未命名作业',
+            stage: content.stage_name,
+            operators: extractOperators(content)
+          })
+          setStatusMessage(`已加载作业：${content.doc?.title || content.stage_name}`)
         } else {
-          setStatusMessage('无法获取作业信息')
+          setStatusMessage('作业不存在')
         }
       } else if (copilotType === 'set') {
         // 强制作业集模式
@@ -655,7 +685,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
           })
           // 默认选中所有作业
           setSelectedCopilotIndexes(new Set(copilots.map((_, idx) => idx)))
-          setStatusMessage(`找到作业集，包含 ${copilots.length} 个作业`)
+          setStatusMessage(`已加载作业集：${copilots.length} 个作业`)
         } else {
           setStatusMessage('作业集不存在或为空')
         }
@@ -672,21 +702,27 @@ export default function CombatTasks(_props: CombatTasksProps) {
         let setData: any = null
 
         // 检查单个作业
-        if (copilotResult.status === 'fulfilled' && (copilotResult.value as any).status_code === 200 && (copilotResult.value as any).data) {
-          foundSingle = true
-          singleData = copilotResult.value as any
+        if (copilotResult.status === 'fulfilled') {
+          const content = getCopilotContent(copilotResult.value)
+          if (content) {
+            foundSingle = true
+            singleData = content
+          }
         }
 
         // 检查作业集
-        if (setResult.status === 'fulfilled' && (setResult.value as any).status_code === 200 && (setResult.value as any).data?.copilot_ids) {
-          foundSet = true
-          setData = setResult.value as any
+        if (setResult.status === 'fulfilled') {
+          const copilotIds = getCopilotSetIds(setResult.value)
+          if (copilotIds.length > 0) {
+            foundSet = true
+            setData = copilotIds
+          }
         }
 
         // 根据结果决定使用哪个
         if (foundSingle && foundSet) {
           // 两个都存在，优先使用作业集（因为作业集更少见，用户可能更想要）
-          const copilotIds: number[] = setData.data.copilot_ids
+          const copilotIds: number[] = setData
           const copilots = await Promise.all(copilotIds.map(id => fetchCopilotDetail(id)))
           const validCopilots = copilots.filter((item): item is CopilotSetItem => item !== null)
           setCopilotSetInfo({
@@ -700,10 +736,10 @@ export default function CombatTasks(_props: CombatTasksProps) {
           })
           // 默认选中所有作业
           setSelectedCopilotIndexes(new Set(validCopilots.map((_, idx) => idx)))
-          setStatusMessage(`识别为作业集，包含 ${validCopilots.length} 个作业`)
+          setStatusMessage(`已识别作业集：${validCopilots.length} 个作业`)
         } else if (foundSet) {
           // 只有作业集
-          const copilotIds: number[] = setData.data.copilot_ids
+          const copilotIds: number[] = setData
           const copilots = await Promise.all(copilotIds.map(id => fetchCopilotDetail(id)))
           const validCopilots = copilots.filter((item): item is CopilotSetItem => item !== null)
           setCopilotSetInfo({
@@ -717,10 +753,10 @@ export default function CombatTasks(_props: CombatTasksProps) {
           })
           // 默认选中所有作业
           setSelectedCopilotIndexes(new Set(validCopilots.map((_, idx) => idx)))
-          setStatusMessage(`找到作业集，包含 ${validCopilots.length} 个作业`)
+          setStatusMessage(`已加载作业集：${validCopilots.length} 个作业`)
         } else if (foundSingle) {
           // 只有单个作业
-          const content = JSON.parse(singleData.data.content)
+          const content = singleData
           setCopilotSetInfo({
             type: 'single',
             id: copilotId,
@@ -728,9 +764,27 @@ export default function CombatTasks(_props: CombatTasksProps) {
             stage: content.stage_name,
             operators: extractOperators(content)
           })
-          setStatusMessage(`找到作业：${content.doc?.title || content.stage_name}`)
+          setStatusMessage(`已加载作业：${content.doc?.title || content.stage_name}`)
         } else {
-          setStatusMessage('未找到作业或作业集')
+          const singlePayload = copilotResult.status === 'fulfilled' ? unwrapApiPayload(copilotResult.value) : null
+          const setPayload = setResult.status === 'fulfilled' ? unwrapApiPayload(setResult.value) : null
+          const looksLikeSetFallback = singlePayload?.status_code === 404 && setPayload?.status_code === 400
+
+          if (looksLikeSetFallback) {
+            setCopilotSetInfo({
+              type: 'set',
+              id: copilotId,
+              name: '作业集',
+              note: `当前接口未返回 ${copilotId} 的明细，执行时将按作业集处理${!hasS ? '（自动补 s）' : ''}`,
+              autoAddS: !hasS,
+              copilots: [],
+              currentIndex: 0
+            })
+            setSelectedCopilotIndexes(new Set())
+            setStatusMessage(`已按作业集处理：maa://${copilotId}${!hasS ? '（执行时自动补 s）' : ''}`)
+          } else {
+            setStatusMessage('未找到作业或作业集')
+          }
         }
       }
 
@@ -810,14 +864,16 @@ export default function CombatTasks(_props: CombatTasksProps) {
       const data = result.data || result
 
       if (result.success && data.copilots && data.copilots.length > 0) {
+        console.log('[copilot-search]', data)
         setCopilotSearchResult(data)
-        setStatusMessage(`找到 ${data.copilots.length} 个作业`)
-        await new Promise(resolve => setTimeout(resolve, 1500))
-        setStatusMessage('')
 
-        // 自动填充推荐作业
-        if (data.recommended) {
-          setTaskInputs({ ...taskInputs, copilot: data.recommended.uri })
+        // 自动填充并预览推荐作业
+        if (data.recommended?.uri) {
+          await applyCopilotUri(data.recommended.uri)
+        } else {
+          setStatusMessage(`找到 ${data.copilots.length} 个作业`)
+          await new Promise(resolve => setTimeout(resolve, 1500))
+          setStatusMessage('')
         }
       } else {
         setStatusMessage(result.message || data.error || '未找到作业')
@@ -1003,18 +1059,15 @@ export default function CombatTasks(_props: CombatTasksProps) {
                         </select>
                       </div>
 
-                      {/* 高级选项 - 直接显示 */}
-                      {task.hasAdvanced && renderAdvancedOptions(task)}
-                    </div>
-
-                    {/* 使用说明 - 直接显示 */}
-                    <div className="rounded-2xl p-4 border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-800/40">
-                      <h5 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">使用说明</h5>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                        <p>• 访问 <a href="https://zoot.plus/" target="_blank" rel="noopener noreferrer" className="text-teal-600 dark:text-teal-400 hover:underline">zoot.plus</a> 获取作业 URI</p>
-                        <p>• 单作业：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">maa://1234</code>；作业集：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">maa://1234s</code></p>
-                        <p>• maa-cli 新版支持 loop-times；作业站链接会先转换为 maa:// ID</p>
-                      </div>
+                      {/* 高级选项 */}
+                      {task.hasAdvanced && (
+                        <details className="mt-4 rounded-xl border border-gray-200 dark:border-white/10 bg-white/70 dark:bg-gray-900/40 px-3 py-2">
+                          <summary className="cursor-pointer list-none text-sm font-medium text-gray-700 dark:text-gray-300">
+                            高级设置
+                          </summary>
+                          {renderAdvancedOptions(task)}
+                        </details>
+                      )}
                     </div>
                   </div>
 
@@ -1030,7 +1083,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                         className="flex-1 px-3 py-2 border border-gray-300 dark:border-white/10 rounded-xl text-sm font-mono text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
                       />
                       <Button
-                        onClick={handlePreviewCopilotSet}
+                        onClick={() => handlePreviewCopilotSetWithInput()}
                         disabled={isLoadingSet || !taskInputs[task.id]?.trim()}
                         loading={isLoadingSet}
                         variant="secondary"
@@ -1048,7 +1101,17 @@ export default function CombatTasks(_props: CombatTasksProps) {
                         {!isLoadingSet && '预览'}
                       </Button>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">支持 maa://1234、maa://1234s、作业站链接和本地 JSON 路径。</p>
+                    <div className="flex items-center justify-between gap-3 text-xs text-gray-500 dark:text-gray-400">
+                      <p>支持 maa://1234、maa://1234s、作业站链接、HTTP(S) 远程 JSON 和本地 JSON 路径。</p>
+                      <details className="shrink-0">
+                        <summary className="cursor-pointer list-none text-teal-600 dark:text-teal-400 hover:underline">使用说明</summary>
+                        <div className="mt-2 w-72 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/95 p-3 text-left shadow-lg space-y-1.5">
+                          <p>• 访问 <a href="https://zoot.plus/" target="_blank" rel="noopener noreferrer" className="text-teal-600 dark:text-teal-400 hover:underline">zoot.plus</a> 获取作业 URI</p>
+                          <p>• 单作业：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">maa://1234</code>；作业集：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">maa://1234s</code></p>
+                          <p>• 作业站链接会自动提取 ID，也支持远程 JSON 和本地路径</p>
+                        </div>
+                      </details>
+                    </div>
 
                     {/* 作业类型选择 */}
                     <div className="flex items-center space-x-2 text-xs">
@@ -1279,16 +1342,25 @@ export default function CombatTasks(_props: CombatTasksProps) {
                           {copilotSearchResult.copilots.slice(0, 5).map((copilot, idx) => (
                             <button
                               key={copilot.id}
-                              onClick={() => setTaskInputs({ ...taskInputs, copilot: copilot.uri })}
-                              className="w-full text-left px-3 py-1.5 rounded-lg bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-white/10 hover:border-teal-400 transition-all text-xs flex items-center justify-between"
+                              onClick={() => void applyCopilotUri(copilot.uri)}
+                              className={`w-full text-left px-3 py-1.5 rounded-lg border transition-all text-xs flex items-center justify-between ${
+                                selectedSearchCopilotUri === copilot.uri
+                                  ? 'bg-teal-50 dark:bg-teal-900/20 border-teal-400 shadow-[0_0_0_1px_rgba(45,212,191,0.18)]'
+                                  : 'bg-white dark:bg-gray-800/60 border-gray-200 dark:border-white/10 hover:border-teal-400'
+                              }`}
                             >
                               <div className="flex items-center space-x-2">
                                 <span className="font-mono text-teal-600 dark:text-teal-400">{copilot.uri}</span>
                                 <span className="text-gray-600 dark:text-gray-400 truncate max-w-[80px]">{copilot.title}</span>
                               </div>
-                              {idx === 0 && (
-                                <span className="px-1.5 py-0.5 bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded text-xs whitespace-nowrap">推荐</span>
-                              )}
+                              <div className="flex items-center gap-1.5">
+                                {selectedSearchCopilotUri === copilot.uri && (
+                                  <span className="px-1.5 py-0.5 bg-teal-500 text-white rounded text-xs whitespace-nowrap">已选中</span>
+                                )}
+                                {idx === 0 && (
+                                  <span className="px-1.5 py-0.5 bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded text-xs whitespace-nowrap">推荐</span>
+                                )}
+                              </div>
                             </button>
                           ))}
                         </div>

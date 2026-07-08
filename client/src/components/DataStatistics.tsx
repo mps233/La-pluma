@@ -41,6 +41,39 @@ export default function DataStatistics({}: DataStatisticsProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('operbox')
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({})
   
+  const depotTypeLabelMap: Record<string, string> = {
+    MATERIAL: '材料',
+    CARD_EXP: '经验书',
+    ACTIVITY_ITEM: '活动道具',
+    CONSUME: '消耗品',
+    CHARM: '养成凭证',
+    DIAMOND: '源石/至纯源石',
+    EXP_ITEM: '经验材料',
+    FURN: '家具',
+    FURN_PART: '家具零件',
+    HGG_SHD: '黄票/凭证',
+    LGG_SHD: '绿票/凭证',
+    RECRUIT_TAG: '公招相关',
+    TKT: '票券',
+  }
+
+  const getDepotTypeLabel = (classifyType?: string) => {
+    if (!classifyType) return '未分类'
+    return depotTypeLabelMap[classifyType] || classifyType.replace(/_/g, ' ')
+  }
+
+  const depotTypeSummary = useMemo(() => {
+    const grouped = new Map<string, { count: number; kinds: number }>()
+    for (const item of depotData?.items || []) {
+      const key = item.classifyType || 'UNKNOWN'
+      const prev = grouped.get(key) || { count: 0, kinds: 0 }
+      grouped.set(key, { count: prev.count + item.count, kinds: prev.kinds + 1 })
+    }
+    return Array.from(grouped.entries())
+      .map(([type, value]) => ({ type, ...value, label: getDepotTypeLabel(type) }))
+      .sort((a, b) => b.count - a.count)
+  }, [depotData])
+
   // 掉落记录相关状态
   const [dropData, setDropData] = useState<any>(null)
   const [dropStatistics, setDropStatistics] = useState<any>(null)
@@ -353,12 +386,12 @@ export default function DataStatistics({}: DataStatisticsProps) {
             setStatusMessage('')
           }
         } else {
-          setStatusMessage(`识别完成，但数据解析失败: ${parseResult.error}`)
+          setStatusMessage(`识别完成，但数据解析失败: ${maaApi.getErrorMessage(parseResult)}`)
           await new Promise(resolve => setTimeout(resolve, 2000))
           setStatusMessage('')
         }
       } else {
-        setStatusMessage(`识别失败: ${result.error || '未知错误'}`)
+        setStatusMessage(`识别失败: ${maaApi.getErrorMessage(result)}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
@@ -390,7 +423,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
         // 重新加载干员列表以显示材料数据
         await loadAllOperators()
       } else {
-        setStatusMessage(`获取失败: ${result.error || '未知错误'}`)
+        setStatusMessage(`获取失败: ${maaApi.getErrorMessage(result)}`)
         await new Promise(resolve => setTimeout(resolve, 3000))
         setStatusMessage('')
       }
@@ -444,12 +477,12 @@ export default function DataStatistics({}: DataStatisticsProps) {
           await new Promise(resolve => setTimeout(resolve, 2000))
           setStatusMessage('')
         } else {
-          setStatusMessage(`识别完成，但数据解析失败: ${parseResult.error}`)
+          setStatusMessage(`识别完成，但数据解析失败: ${maaApi.getErrorMessage(parseResult)}`)
           await new Promise(resolve => setTimeout(resolve, 2000))
           setStatusMessage('')
         }
       } else {
-        setStatusMessage(`识别失败: ${result.error || '未知错误'}`)
+        setStatusMessage(`识别失败: ${maaApi.getErrorMessage(result)}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
@@ -1121,6 +1154,12 @@ export default function DataStatistics({}: DataStatisticsProps) {
                       {depotData.items.filter(i => i.classifyType === 'MATERIAL').length}
                     </p>
                   </div>
+                  <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-200 dark:border-indigo-500/20">
+                    <p className="text-xs text-indigo-600 dark:text-indigo-400 mb-1">识别分类</p>
+                    <p className="text-lg font-bold text-indigo-900 dark:text-indigo-300">
+                      {depotTypeSummary.length}
+                    </p>
+                  </div>
                   <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-2xl border border-green-200 dark:border-green-500/20">
                     <p className="text-xs text-green-600 dark:text-green-400 mb-1">总数量</p>
                     <p className="text-lg font-bold text-green-900 dark:text-green-300">
@@ -1143,6 +1182,24 @@ export default function DataStatistics({}: DataStatisticsProps) {
                     </div>
                   )}
                 </div>
+
+                {/* 分类汇总 */}
+                {depotTypeSummary.length > 0 && (
+                  <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/70 dark:bg-white/5 p-3">
+                    <div className="text-sm font-semibold text-gray-900 dark:text-white mb-2">分类汇总</div>
+                    <div className="flex flex-wrap gap-2">
+                      {depotTypeSummary.map((group) => (
+                        <div key={group.type} className="rounded-full border border-violet-200 dark:border-violet-500/20 bg-violet-50 dark:bg-violet-500/10 px-3 py-1 text-xs text-violet-700 dark:text-violet-200">
+                          <span className="font-medium">{group.label}</span>
+                          <span className="mx-1 text-violet-400">·</span>
+                          <span>{group.kinds} 种</span>
+                          <span className="mx-1 text-violet-400">/</span>
+                          <span>{group.count.toLocaleString()} 件</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* 物品卡片网格 */}
                 {depotData.items && depotData.items.length > 0 && (
@@ -1180,7 +1237,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                           <div className="flex items-center gap-2 mt-1">
                             {item.classifyType && (
                               <span className="px-2 py-0.5 bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 rounded-full text-xs whitespace-nowrap">
-                                {item.classifyType === 'MATERIAL' ? '材料' : item.classifyType}
+                                {getDepotTypeLabel(item.classifyType)}
                               </span>
                             )}
                             <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 rounded-full font-semibold text-xs whitespace-nowrap">

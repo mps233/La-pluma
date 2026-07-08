@@ -25,6 +25,7 @@ const getApiBaseUrl = (): string => {
 }
 
 export const API_BASE_URL = getApiBaseUrl()
+export const APP_ORIGIN_BASE_URL = API_BASE_URL.replace(/\/api$/, '')
 
 export const getAuthHeaders = (): Record<string, string> => {
   const token = localStorage.getItem('laPlumaToken') || ''
@@ -140,6 +141,12 @@ interface CopilotSetInfo {
  * MAA API 客户端
  */
 export const maaApi = {
+  // ========== 工具 ==========
+
+  getErrorMessage(result?: Partial<ApiResponse> | null): string {
+    return result?.message || result?.errorInfo?.message || result?.error || '未知错误'
+  },
+
   // ========== 基础信息 ==========
   
   /**
@@ -368,27 +375,27 @@ export const maaApi = {
   },
 
   async getWebrtcStatus(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/webrtc/status`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/status`)
     return response.json()
   },
 
   async installWebrtc(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/webrtc/install`, { method: 'POST' })
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/install`, { method: 'POST' })
     return response.json()
   },
 
   async startWebrtcServer(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/webrtc/start-server`, { method: 'POST' })
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/start-server`, { method: 'POST' })
     return response.json()
   },
 
   async stopWebrtcServer(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/webrtc/stop-server`, { method: 'POST' })
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/stop-server`, { method: 'POST' })
     return response.json()
   },
 
   async startWebrtcAgent(address: string): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/webrtc/start-agent`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/start-agent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ address })
@@ -397,7 +404,13 @@ export const maaApi = {
   },
 
   async stopWebrtcAgent(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/webrtc/stop-agent`, { method: 'POST' })
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/stop-agent`, { method: 'POST' })
+    return response.json()
+  },
+
+  async getDeviceStats(address?: string): Promise<ApiResponse> {
+    const qs = address ? `?address=${encodeURIComponent(address)}` : ''
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/device-stats${qs}`)
     return response.json()
   },
 
@@ -968,6 +981,11 @@ export async function refreshSklandPlayerData(): Promise<ApiResponse> {
   const response = await fetchWithAuth(`${API_BASE_URL}/skland/refresh`, {
     method: 'POST'
   })
+  return response.json()
+}
+
+export async function getOpenTodayStages(): Promise<ApiResponse> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/stages/open-today`)
   return response.json()
 }
 

@@ -5,6 +5,7 @@
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
 import type { ConnectionState } from '@/types/store'
+import { maaApi } from '@/services/api'
 import { createErrorHandler } from './errorHandler'
 
 const handleError = createErrorHandler('ConnectionStore')
@@ -19,28 +20,20 @@ export const useConnectionStore = create<ConnectionState>()(
         address: '127.0.0.1:16384',
         clientType: 'Official',
         lastTestTime: null,
-        
+
         // Actions
         testConnection: async () => {
           set({ status: 'connecting' })
           try {
             const { adbPath, address } = get()
-            
-            // 调用后端 API 测试连接
-            const response = await fetch('/api/maa/test-connection', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ adbPath, address })
-            })
-            
-            const result = await response.json()
+            const result = await maaApi.testConnection(adbPath, address)
             const success = result.success
-            
-            set({ 
+
+            set({
               status: success ? 'connected' : 'disconnected',
-              lastTestTime: Date.now()
+              lastTestTime: Date.now(),
             })
-            
+
             return success
           } catch (error) {
             handleError(error as Error, 'testConnection')
@@ -48,13 +41,13 @@ export const useConnectionStore = create<ConnectionState>()(
             return false
           }
         },
-        
+
         updateConfig: (config) => set((state) => ({
           ...state,
-          ...config
+          ...config,
         })),
-        
-        setStatus: (status) => set({ status })
+
+        setStatus: (status) => set({ status }),
       }),
       {
         name: 'connection-storage',
@@ -62,10 +55,10 @@ export const useConnectionStore = create<ConnectionState>()(
         partialize: (state) => ({
           adbPath: state.adbPath,
           address: state.address,
-          clientType: state.clientType
-        })
-      }
+          clientType: state.clientType,
+        }),
+      },
     ),
-    { name: 'ConnectionStore' }
-  )
+    { name: 'ConnectionStore' },
+  ),
 )

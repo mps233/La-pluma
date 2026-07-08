@@ -24,9 +24,10 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
     const checkBackendStatus = async () => {
       try {
         const result = await maaApi.getTaskStatus()
-        if (result.success && result.data.isRunning) {
+        const taskStatus = result.data
+        if (result.success && taskStatus?.isRunning) {
           // 后端确实有任务在运行
-          const { taskName, startTime, taskType } = result.data
+          const { taskName, startTime, taskType } = taskStatus
           
           // 只恢复属于肉鸽模式的任务
           if (taskType === 'roguelike') {
@@ -209,7 +210,7 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       } else {
-        setStatusMessage(`执行失败: ${result.error}`)
+        setStatusMessage(`执行失败: ${maaApi.getErrorMessage(result)}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }

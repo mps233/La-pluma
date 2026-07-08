@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { maaApi } from '../services/api'
 import { motion } from 'framer-motion'
 import Icons from './Icons'
@@ -41,6 +41,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
     adb_path: '/opt/homebrew/bin/adb',
     address: '127.0.0.1:16384',
     config: 'CompatMac',
+    auto_reconnect: true,
   })
   const [configDir, setConfigDir] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
@@ -58,14 +59,20 @@ export default function ConfigManager({}: ConfigManagerProps) {
   const [showCoreChangelogType, setShowCoreChangelogType] = useState<'stable' | 'beta'>('stable')
   const [showCoreChangelog, setShowCoreChangelog] = useState(false)
   const [showCliChangelog, setShowCliChangelog] = useState(false)
+  const didInitializeRef = useRef(false)
 
   useEffect(() => {
-    loadConfigDir()
-    loadConfig()
-    loadAutoUpdateConfig()
-    loadVersion()
-    loadCoreChangelog()
-    loadCliChangelog()
+    if (didInitializeRef.current) return
+    didInitializeRef.current = true
+
+    void Promise.allSettled([
+      loadConfigDir(),
+      loadConfig(),
+      loadAutoUpdateConfig(),
+      loadVersion(),
+      loadCoreChangelog(),
+      loadCliChangelog(),
+    ])
   }, [])
 
 
@@ -172,7 +179,12 @@ export default function ConfigManager({}: ConfigManagerProps) {
     try {
       const result = await maaApi.getConfigDir()
       if (result.success) {
-        setConfigDir(result.data || '')
+        const nextConfigDir = typeof result.data === 'string'
+          ? result.data
+          : (result.data && typeof result.data === 'object' && 'path' in result.data && typeof (result.data as { path?: unknown }).path === 'string'
+              ? (result.data as { path: string }).path
+              : '')
+        setConfigDir(nextConfigDir)
       }
     } catch (error) {
       // 静默失败，不影响用户体验
@@ -202,7 +214,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
         await new Promise(resolve => setTimeout(resolve, 1500))
         setStatusMessage('')
       } else {
-        setStatusMessage(`保存失败: ${result.error}`)
+        setStatusMessage(`保存失败: ${maaApi.getErrorMessage(result)}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
@@ -220,6 +232,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
       adb_path: '/opt/homebrew/bin/adb',
       address: '127.0.0.1:16384',
       config: 'CompatMac',
+      auto_reconnect: true,
     })
     setStatusMessage('已重置为默认值')
     await new Promise(resolve => setTimeout(resolve, 1500))
@@ -234,7 +247,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
   const handleOpenConfigDir = async () => {
     try {
       const result = await maaApi.openConfigDir()
-      setStatusMessage(result.success ? '已打开配置目录' : `打开失败: ${result.message || result.error}`)
+      setStatusMessage(result.success ? '已打开配置目录' : `打开失败: ${maaApi.getErrorMessage(result)}`)
     } catch (error) {
       setStatusMessage(`打开失败: ${(error as Error).message}`)
     }
@@ -259,7 +272,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
         await loadVersion()
         await loadCoreChangelog()
       } else {
-        setStatusMessage(`更新失败: ${result.error}`)
+        setStatusMessage(`更新失败: ${maaApi.getErrorMessage(result)}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
@@ -286,7 +299,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
         // 更新成功后重新加载版本信息
         await loadVersion()
       } else {
-        setStatusMessage(`更新失败: ${result.error}`)
+        setStatusMessage(`更新失败: ${maaApi.getErrorMessage(result)}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
@@ -343,7 +356,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
         await loadVersion()
         await loadCoreChangelog()
       } else {
-        setStatusMessage(`切换失败: ${result.error}`)
+        setStatusMessage(`切换失败: ${maaApi.getErrorMessage(result)}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
@@ -368,7 +381,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
         await new Promise(resolve => setTimeout(resolve, 1500))
         setStatusMessage('')
       } else {
-        setStatusMessage(`更新失败: ${result.error}`)
+        setStatusMessage(`更新失败: ${maaApi.getErrorMessage(result)}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
@@ -381,12 +394,12 @@ export default function ConfigManager({}: ConfigManagerProps) {
     }
   }
 
-  const configSections: ConfigSection[] = [
+  const configSections = [
     { id: 'connection', name: '连接配置', icon: <Icons.Monitor /> },
     { id: 'resource', name: '资源配置', icon: <Icons.Package /> },
     { id: 'instance', name: '实例选项', icon: <Icons.Lightning /> },
     { id: 'skland', name: '森空岛', icon: <Icons.Users /> },
-  ]
+  ] satisfies ConfigSection[]
 
   return (
     <>
@@ -563,7 +576,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                 </div>
                 
                 {/* 更新日志 */}
-                {coreChangelog.length > 0 && (
+                {coreChangelog.length > 0 && false && (
                   <div className="mt-4">
                     <button
                       onClick={() => setShowCoreChangelog(!showCoreChangelog)}
@@ -688,7 +701,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                 </Button>
                 
                 {/* 更新日志 */}
-                {cliChangelog.length > 0 && (
+                {cliChangelog.length > 0 && false && (
                   <div className="mt-4">
                     <button
                       onClick={() => setShowCliChangelog(!showCliChangelog)}
@@ -839,6 +852,19 @@ export default function ConfigManager({}: ConfigManagerProps) {
                       ]}
                       hint="平台相关配置"
                     />
+                    <div className="rounded-xl border border-gray-200/80 bg-gray-50/80 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">自动重连</div>
+                          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">maa-cli 0.7.3+ 支持。开启后游戏服务断开时自动重连；关闭则保持断开，适合手动排障。</div>
+                        </div>
+                        <Checkbox
+                          label="启用"
+                          checked={configData.auto_reconnect !== false}
+                          onChange={(checked: boolean) => setConfigData({ ...configData, auto_reconnect: checked })}
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
                 {configType === 'resource' && (

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { ArrowLeft, Home, Maximize2, Minimize2, PanelsTopLeft } from 'lucide-react'
 import { Button } from './common'
 import { useScrcpyWebRTC } from '../hooks/useScrcpyWebRTC'
 
@@ -16,13 +18,9 @@ interface ScrcpyDeviceViewProps {
     agentRunning?: boolean
   } | null
   infrastructureLoading?: string | null
-  maaControlLoading?: string | null
   onInstall?: () => Promise<void> | void
   onToggleServer?: () => Promise<void> | void
   onToggleAgent?: () => Promise<void> | void
-  onStartPreview?: () => Promise<void> | void
-  onStartGame?: () => Promise<void> | void
-  onCloseGame?: () => Promise<void> | void
 }
 
 const statusLabel: Record<string, string> = {
@@ -56,21 +54,20 @@ export default function ScrcpyDeviceView({
   onStatusChange,
   infrastructureStatus,
   infrastructureLoading,
-  maaControlLoading,
   onInstall,
   onToggleServer,
-  onToggleAgent,
-  onStartPreview,
-  onStartGame,
-  onCloseGame
+  onToggleAgent
 }: ScrcpyDeviceViewProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const immersiveVideoRef = useRef<HTMLVideoElement | null>(null)
+  const immersiveStreamRef = useRef<MediaStream | null>(null)
   const pointerDownRef = useRef(false)
   const autoConnectStartedRef = useRef(false)
   const [quality, setQuality] = useState<QualityPreset>('crisp')
   const [customFps, setCustomFps] = useState<number>(qualityPresets.crisp.fps)
   const [customMaxSize, setCustomMaxSize] = useState<number>(qualityPresets.crisp.maxSize)
   const [customBitrateMbps, setCustomBitrateMbps] = useState<number>(qualityPresets.crisp.bitrateMbps)
+  const [immersiveMode, setImmersiveMode] = useState(false)
   const scrcpyOptions = useMemo(() => ({
     max_fps: customFps,
     max_size: customMaxSize,
@@ -85,7 +82,7 @@ export default function ScrcpyDeviceView({
     deviceId,
     signalingUrl,
     videoRef,
-    connectionPath: 'relay',
+    connectionPath: 'auto',
     ipPreference: 'ipv4',
     scrcpyOptions
   })
@@ -93,7 +90,6 @@ export default function ScrcpyDeviceView({
   const applyPreset = (preset: QualityPreset) => {
     const next = qualityPresets[preset]
     setQuality(preset)
-    setCustomFps(next.fps)
     setCustomMaxSize(next.maxSize)
     setCustomBitrateMbps(next.bitrateMbps)
   }
@@ -131,12 +127,52 @@ export default function ScrcpyDeviceView({
   const finishPointer = (event: React.PointerEvent<HTMLVideoElement>) => {
     if (!pointerDownRef.current) return
     pointerDownRef.current = false
-    webrtc.sendTouch(1, event.clientX, event.clientY, event.pointerId)
+    webrtc.sendTouch(1, event.clientX, event.clientY, event.pointerId, event.currentTarget)
+  }
+
+  const onImmersivePointerDown = (event: React.PointerEvent<HTMLVideoElement>) => {
+    pointerDownRef.current = true
+    event.currentTarget.setPointerCapture(event.pointerId)
+    webrtc.sendTouch(0, event.clientX, event.clientY, event.pointerId, event.currentTarget)
+  }
+
+  const onImmersivePointerMove = (event: React.PointerEvent<HTMLVideoElement>) => {
+    if (!pointerDownRef.current) return
+    webrtc.sendTouch(2, event.clientX, event.clientY, event.pointerId, event.currentTarget)
+  }
+
+  const finishImmersivePointer = (event: React.PointerEvent<HTMLVideoElement>) => {
+    if (!pointerDownRef.current) return
+    pointerDownRef.current = false
+    webrtc.sendTouch(1, event.clientX, event.clientY, event.pointerId, event.currentTarget)
   }
 
   const fullscreen = () => {
-    void videoRef.current?.parentElement?.requestFullscreen?.()
+    // 不走浏览器真实 fullscreen，直接打开应用内“画面全屏”遮罩，手机上更可靠。
+    setImmersiveMode(true)
   }
+
+  const exitImmersive = () => setImmersiveMode(false)
+
+  useEffect(() => {
+    const mainVideo = videoRef.current
+    const overlayVideo = immersiveVideoRef.current
+    if (!immersiveMode || !mainVideo || !overlayVideo) return
+
+    const sourceStream = mainVideo.srcObject as MediaStream | null
+    if (sourceStream) {
+      const cloned = new MediaStream(sourceStream.getVideoTracks().map(track => track.clone()))
+      immersiveStreamRef.current = cloned
+      overlayVideo.srcObject = cloned
+      void overlayVideo.play().catch(() => {})
+    }
+
+    return () => {
+      immersiveStreamRef.current?.getTracks().forEach(track => track.stop())
+      immersiveStreamRef.current = null
+      if (overlayVideo) overlayVideo.srcObject = null
+    }
+  }, [immersiveMode])
 
   const statusCards = [
     ['信令', statusLabel[webrtc.status] || webrtc.status],
@@ -150,6 +186,7 @@ export default function ScrcpyDeviceView({
   ]
 
   return (
+    <>
     <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_200px] 2xl:grid-cols-[minmax(0,1fr)_220px] gap-4 items-start">
       <div className="space-y-3 min-w-0">
         <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -159,9 +196,7 @@ export default function ScrcpyDeviceView({
               <span className="text-sm font-semibold text-gray-900 dark:text-white">模拟器实时预览</span>
               <span className="text-xs text-gray-500 dark:text-gray-400">{statusLabel[webrtc.status] || webrtc.status}</span>
             </div>
-            <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-500 truncate">
-              {deviceId} · {customFps}fps / {customMaxSize}p / {customBitrateMbps}Mbps {webrtc.stats ? `· 实际 ${webrtc.stats.fps}fps · ${webrtc.stats.connectionType}` : ''}
-            </div>
+
           </div>
           <div className="flex flex-wrap gap-2 text-xs justify-end">
             <span className="px-2 py-1 rounded-full bg-cyan-50 dark:bg-white/5 text-gray-700 dark:text-gray-300">
@@ -188,7 +223,7 @@ export default function ScrcpyDeviceView({
           ))}
         </div>
 
-        <div className="relative aspect-video bg-black rounded-2xl overflow-hidden flex items-center justify-center shadow-sm">
+        <div className="relative aspect-video rounded-2xl bg-black overflow-hidden flex items-center justify-center shadow-sm">
           <video
             ref={videoRef}
             autoPlay
@@ -214,40 +249,31 @@ export default function ScrcpyDeviceView({
             </div>
           )}
         </div>
-
         <div className="flex items-center justify-center gap-2 bg-transparent px-2 py-1">
           {[
-            {
-              label: '启动游戏',
-              disabled: maaControlLoading !== null,
-              loading: maaControlLoading === '启动游戏',
-              onClick: onStartGame,
-              icon: <path d="M6.3 2.84A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.27l9.34-5.89a1.5 1.5 0 000-2.54L6.3 2.84z" />
-            },
             {
               label: '返回',
               disabled: webrtc.status !== 'connected',
               onClick: () => webrtc.sendCommand('input keyevent 4'),
-              icon: <path fillRule="evenodd" d="M9.71 4.29a1 1 0 010 1.42L6.41 9H15a5 5 0 010 10h-2a1 1 0 110-2h2a3 3 0 000-6H6.41l3.3 3.29a1 1 0 01-1.42 1.42l-5-5a1 1 0 010-1.42l5-5a1 1 0 011.42 0z" clipRule="evenodd" />
+              icon: <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
             },
             {
               label: 'Home',
               disabled: webrtc.status !== 'connected',
               onClick: () => webrtc.sendCommand('input keyevent 3'),
-              icon: <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7A1 1 0 003 11h1v6a2 2 0 002 2h3v-5h2v5h3a2 2 0 002-2v-6h1a1 1 0 00.707-1.707l-7-7z" />
+              icon: <Home className="h-3.5 w-3.5" strokeWidth={1.8} />
             },
             {
               label: '全屏',
               disabled: webrtc.status !== 'connected',
               onClick: fullscreen,
-              icon: <path fillRule="evenodd" d="M3 4a1 1 0 011-1h4a1 1 0 010 2H5v3a1 1 0 01-2 0V4zm9 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 11-2 0V5h-3a1 1 0 110-2zM4 11a1 1 0 011 1v3h3a1 1 0 110 2H4a1 1 0 01-1-1v-4a1 1 0 011-1zm13 0a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 110-2h3v-3a1 1 0 011-1z" clipRule="evenodd" />
+              icon: <Maximize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
             },
             {
-              label: '关闭游戏',
-              disabled: maaControlLoading !== null,
-              loading: maaControlLoading === '关闭游戏',
-              onClick: onCloseGame,
-              icon: <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
+              label: '后台任务',
+              disabled: webrtc.status !== 'connected',
+              onClick: () => webrtc.sendCommand('input keyevent 187'),
+              icon: <PanelsTopLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
             }
           ].map(action => (
             <button
@@ -259,14 +285,7 @@ export default function ScrcpyDeviceView({
               aria-label={action.label}
               className="group flex h-8 w-8 items-center justify-center rounded-full border border-gray-200/60 dark:border-white/10 bg-white/25 dark:bg-white/[0.03] text-gray-500 dark:text-gray-400 backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-cyan-400/50 hover:bg-cyan-500/10 hover:text-cyan-500 disabled:opacity-35 disabled:hover:translate-y-0 disabled:cursor-not-allowed"
             >
-              {action.loading ? (
-                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                </svg>
-              ) : (
-                <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">{action.icon}</svg>
-              )}
+              {action.icon}
             </button>
           ))}
         </div>
@@ -275,17 +294,25 @@ export default function ScrcpyDeviceView({
       <aside className="space-y-4 xl:pt-0">
         <section className="space-y-3">
           <div className="text-xs font-semibold text-gray-700 dark:text-gray-300">连接与服务</div>
-          <div className="grid grid-cols-2 xl:grid-cols-1 gap-2">
-            <Button size="sm" variant="gradient" gradientFrom="cyan" gradientTo="blue" onClick={onStartPreview} disabled={infrastructureLoading !== null} loading={infrastructureLoading === 'preview'}>
-              启动实时预览
+          <div className="space-y-2">
+            <Button
+              size="sm"
+              variant="gradient"
+              gradientFrom="cyan"
+              gradientTo="blue"
+              fullWidth
+              onClick={connect}
+              disabled={infrastructureLoading !== null || ['connecting', 'signaling', 'waiting_offer', 'connecting_webrtc'].includes(webrtc.status)}
+              loading={infrastructureLoading === 'preview'}
+            >
+              {webrtc.status === 'connected' ? '重连预览' : '启动预览'}
             </Button>
-            <Button size="sm" variant="outline" onClick={connect} disabled={!enabled || ['connecting', 'signaling', 'waiting_offer', 'connecting_webrtc'].includes(webrtc.status)}>
-              {webrtc.status === 'connected' ? '重连' : '连接'}
-            </Button>
-            <Button size="sm" variant="outline" onClick={webrtc.disconnect} disabled={webrtc.status === 'idle' || webrtc.status === 'disconnected'}>断开</Button>
-            <Button size="sm" variant="outline" onClick={onInstall} loading={infrastructureLoading === 'install'}>安装组件</Button>
-            <Button size="sm" variant="outline" onClick={onToggleServer} loading={infrastructureLoading === 'server'}>{infrastructureStatus?.serverRunning ? '停止服务' : '启动服务'}</Button>
-            <Button size="sm" variant="outline" onClick={onToggleAgent} loading={infrastructureLoading === 'agent'} disabled={!infrastructureStatus?.serverRunning}>{infrastructureStatus?.agentRunning ? '停止 Agent' : '连接 Agent'}</Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button size="sm" variant="outline" onClick={webrtc.disconnect} disabled={webrtc.status === 'idle' || webrtc.status === 'disconnected'}>断开</Button>
+              <Button size="sm" variant="outline" onClick={onInstall} loading={infrastructureLoading === 'install'}>安装组件</Button>
+              <Button size="sm" variant="outline" onClick={onToggleServer} loading={infrastructureLoading === 'server'}>{infrastructureStatus?.serverRunning ? '停止服务' : '启动服务'}</Button>
+              <Button size="sm" variant="outline" onClick={onToggleAgent} loading={infrastructureLoading === 'agent'} disabled={!infrastructureStatus?.serverRunning}>{infrastructureStatus?.agentRunning ? '停止 Agent' : '连接 Agent'}</Button>
+            </div>
           </div>
         </section>
 
@@ -293,15 +320,22 @@ export default function ScrcpyDeviceView({
           <div className="text-xs font-semibold text-gray-700 dark:text-gray-300">画质设置</div>
           <label className="space-y-1 block">
             <span className="text-gray-500 dark:text-gray-400">画质预设</span>
-            <select
-              value={quality}
-              onChange={(event) => applyPreset(event.target.value as QualityPreset)}
-              className="w-full rounded-lg bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 px-2 py-1.5 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-            >
+            <div className="grid grid-cols-2 gap-1.5">
               {Object.entries(qualityPresets).map(([key, preset]) => (
-                <option key={key} value={key}>{preset.label}</option>
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => applyPreset(key as QualityPreset)}
+                  className={`rounded-lg border px-2 py-1.5 text-left transition-all ${quality === key
+                    ? 'border-cyan-400 bg-cyan-500/15 text-cyan-600 dark:text-cyan-300'
+                    : 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 text-gray-600 dark:text-gray-300 hover:border-cyan-400/60'
+                  }`}
+                >
+                  <div className="text-xs font-semibold">{preset.label}</div>
+                  <div className="mt-0.5 text-[10px] opacity-70">{preset.maxSize}p · {preset.bitrateMbps}Mbps</div>
+                </button>
               ))}
-            </select>
+            </div>
           </label>
           <label className="space-y-1 block">
             <span className="text-gray-500 dark:text-gray-400">帧率</span>
@@ -323,22 +357,6 @@ export default function ScrcpyDeviceView({
           </label>
           <label className="space-y-2 block rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/70 dark:bg-black/20 px-3 py-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-gray-500 dark:text-gray-400">清晰度上限</span>
-              <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-600 dark:text-cyan-300">{customMaxSize}p</span>
-            </div>
-            <input
-              type="range"
-              min={720}
-              max={1920}
-              step={80}
-              value={customMaxSize}
-              onChange={(event) => setCustomMaxSize(Number(event.target.value))}
-              style={{ background: `linear-gradient(to right, #22d3ee ${((customMaxSize - 720) / (1920 - 720)) * 100}%, rgba(148,163,184,0.28) ${((customMaxSize - 720) / (1920 - 720)) * 100}%)` }}
-              className="h-2 w-full cursor-pointer appearance-none rounded-full outline-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:shadow-[0_0_0_4px_rgba(34,211,238,0.18)] [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-cyan-400"
-            />
-          </label>
-          <label className="space-y-2 block rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/70 dark:bg-black/20 px-3 py-2">
-            <div className="flex items-center justify-between gap-2">
               <span className="text-gray-500 dark:text-gray-400">码率</span>
               <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-[11px] font-semibold text-violet-600 dark:text-violet-300">{customBitrateMbps} Mbps</span>
             </div>
@@ -357,5 +375,65 @@ export default function ScrcpyDeviceView({
         </section>
       </aside>
     </div>
+    {immersiveMode && createPortal(
+      <div className="fixed inset-0 z-[9999] bg-black flex flex-col landscape:flex-row items-center justify-center gap-2 p-2">
+        <div className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center self-stretch">
+          <video
+            ref={immersiveVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className="h-full w-full object-contain touch-none select-none"
+          onPointerDown={onImmersivePointerDown}
+          onPointerMove={onImmersivePointerMove}
+          onPointerUp={finishImmersivePointer}
+          onPointerCancel={finishImmersivePointer}
+          onPointerLeave={finishImmersivePointer}
+          />
+        </div>
+        <div className="flex shrink-0 items-center justify-center gap-2 landscape:flex-col">
+          {[
+            {
+              label: '返回',
+              disabled: webrtc.status !== 'connected',
+              onClick: () => webrtc.sendCommand('input keyevent 4'),
+              icon: <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
+            },
+            {
+              label: 'Home',
+              disabled: webrtc.status !== 'connected',
+              onClick: () => webrtc.sendCommand('input keyevent 3'),
+              icon: <Home className="h-3.5 w-3.5" strokeWidth={1.8} />
+            },
+            {
+              label: '退出全屏',
+              disabled: false,
+              onClick: exitImmersive,
+              icon: <Minimize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
+            },
+            {
+              label: '后台任务',
+              disabled: webrtc.status !== 'connected',
+              onClick: () => webrtc.sendCommand('input keyevent 187'),
+              icon: <PanelsTopLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
+            }
+          ].map(action => (
+            <button
+              key={action.label}
+              type="button"
+              onClick={action.onClick}
+              disabled={action.disabled}
+              title={action.label}
+              aria-label={action.label}
+              className="group flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20 disabled:opacity-35 disabled:cursor-not-allowed"
+            >
+              {action.icon}
+            </button>
+          ))}
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   )
 }

@@ -3,6 +3,7 @@
  */
 
 import { useState, useCallback } from 'react'
+import { maaApi } from '../services/api'
 
 interface ApiRequestOptions {
   onSuccess?: (result: any) => void
@@ -47,13 +48,12 @@ export function useApiRequest(): UseApiRequestReturn {
       if (result.success) {
         if (successMessage) {
           // 可以在这里触发全局通知
-          console.log('✅', successMessage)
         }
         if (onSuccess) {
           onSuccess(result)
         }
       } else {
-        throw new Error(result.error || result.message || errorMessage)
+        throw new Error(maaApi.getErrorMessage(result) || errorMessage)
       }
 
       return result

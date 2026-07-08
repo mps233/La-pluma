@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
+import { APP_ORIGIN_BASE_URL } from '../services/api'
 import { useStatusStore } from '../store/statusStore'
 import { useEffect, useRef, useState, useCallback } from 'react'
 
@@ -22,7 +23,7 @@ export default function FloatingStatusIndicator() {
   useEffect(() => {
     const fetchRandomQuote = async () => {
       try {
-        const response = await fetch('/api/operator-quotes/random')
+        const response = await fetch(`${APP_ORIGIN_BASE_URL}/api/operator-quotes/random`)
         if (response.ok) {
           const data = await response.json()
           setDailyQuote(data)

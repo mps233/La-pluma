@@ -38,10 +38,11 @@ export default function LogViewer({}: LogViewerProps) {
     
     try {
       const result = await maaApi.getRealtimeLogs(200)
-      if (result.success && result.data.length > 0) {
-        const parsedLogs = result.data.map(parseLogLine)
+      const logLines = Array.isArray(result.data) ? result.data : []
+      if (result.success && logLines.length > 0) {
+        const parsedLogs = logLines.map(parseLogLine)
         setLogs(parsedLogs)
-      } else if (result.success && result.data.length === 0) {
+      } else if (result.success && logLines.length === 0) {
         // 没有日志时显示提示
         if (logs.length === 0) {
           const now = new Date()

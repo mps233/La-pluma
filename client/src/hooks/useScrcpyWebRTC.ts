@@ -308,9 +308,9 @@ export function useScrcpyWebRTC({
       })
   }, [createPeerConnection, deviceId, disconnect, filterSdpCandidates, ipPreference, connectionPath, sendAnswer, sendForward, signalingUrl])
 
-  const sendTouch = useCallback((action: number, clientX: number, clientY: number, id = 0) => {
+  const sendTouch = useCallback((action: number, clientX: number, clientY: number, id = 0, targetVideo?: HTMLVideoElement | null) => {
     const channel = inputChannelRef.current
-    const video = videoRef.current
+    const video = targetVideo || videoRef.current
     if (!channel || channel.readyState !== 'open' || !video || !video.videoWidth || !video.videoHeight) return false
 
     const rect = video.getBoundingClientRect()

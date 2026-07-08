@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
+    "check": "node --check server.js && node --check routes/agent.js && node --check services/copilotService.js",
+    "build": "npm run check",
     "fetch-materials": "node scripts/fetch-operator-materials.js",
     "fetch-formulas": "node scripts/fetch-material-formulas.js && node scripts/merge-formulas.js",
     "fetch-all-materials": "node scripts/fetch-all-materials.js",

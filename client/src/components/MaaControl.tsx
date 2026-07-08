@@ -205,7 +205,7 @@ export default function MaaControl(_props: MaaControlProps = {}) {
         await new Promise(resolve => setTimeout(resolve, 1500))
         setStatusMessage('')
       } else {
-        setStatusMessage(`执行失败: ${result.error}`)
+        setStatusMessage(`执行失败: ${maaApi.getErrorMessage(result)}`)
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }

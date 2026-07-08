@@ -202,8 +202,8 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       },
       paramFields: [
         { key: 'refresh', label: '刷新标签', type: 'checkbox' },
-        { key: 'select', label: '招募星级', type: 'star-select', helper: '选择要招募的干员星级' },
-        { key: 'confirm', label: '确认星级', type: 'star-select', helper: '选择招募完成后自动确认的干员星级' },
+        { key: 'select', label: '招募星级', type: 'star-select', helper: '支持 6 星自动公招；勾选 6 星后会保留高价值标签并自动选择对应组合' },
+        { key: 'confirm', label: '确认星级', type: 'star-select', helper: '建议至少保留 5/6 星确认，避免高价值标签被跳过' },
         { key: 'times', label: '招募次数', type: 'number', placeholder: '4' },
         { key: 'set_time', label: '设置时间', type: 'checkbox' },
         { key: 'expedite', label: '使用加急', type: 'checkbox' },
@@ -715,8 +715,8 @@ export default function AutomationTasks({}: AutomationTasksProps) {
               
               const loadedTasks = JSON.parse(savedTaskFlow)
               
-              // 如果后端有任务在运行，找到对应的卡片并显示转圈
-              if (result.success && result.data.isRunning) {
+              const currentRun = result.data
+              if (result.success && currentRun?.isRunning) {
                 const currentTaskInfo = tasks[currentIndex]
                 if (currentTaskInfo) {
                   // 找到当前任务在 taskFlow 中的索引
@@ -731,7 +731,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                   }
                 }
                 
-                showInfo(`正在执行: ${result.data.taskName}`)
+                showInfo(`正在执行: ${currentRun.taskName}`)
                 
                 // 等待当前任务完成
                 await new Promise<void>((resolve) => {
@@ -790,7 +790,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                     )
                     
                     if (!result.success) {
-                      showError(`${task.name} 提交失败: ${result.error}`)
+                      showError(`${task.name} 提交失败: ${maaApi.getErrorMessage(result)}`)
                       break
                     }
                     
@@ -832,9 +832,9 @@ export default function AutomationTasks({}: AutomationTasksProps) {
           }
         }
         
-        // 没有任务流程，检查单个任务
-        if (result.success && result.data.isRunning) {
-          const { taskName, startTime, taskType } = result.data
+        const currentRun = result.data
+        if (result.success && currentRun?.isRunning) {
+          const { taskName, startTime, taskType } = currentRun
           
           if (taskType === 'automation') {
             const elapsedMinutes = (Date.now() - startTime) / 1000 / 60
@@ -932,7 +932,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         {/* 页面标题 */}
         <PageHeader
           icon={<Icons.Robot />}
-          title="自动化任务流程"
+          title="自动化任务"
           subtitle="编排日常任务流程，一键执行或定时运行"
           gradientFrom="violet-400"
           gradientVia="purple-400"
@@ -944,7 +944,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium border flex items-center space-x-1.5 sm:space-x-2 ${
+                className={`hidden sm:flex px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium border items-center space-x-1.5 sm:space-x-2 ${
                   currentActivity
                     ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-500/30'
                     : 'bg-gray-50 dark:bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-500/30'
@@ -963,10 +963,10 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                   </>
                 ) : (
                   <>
-                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <svg className="hidden sm:block w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                     </svg>
-                    <span>长草中～</span>
+                    <span className="hidden sm:inline">长草中～</span>
                   </>
                 )}
               </motion.div>
@@ -1717,6 +1717,11 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                       );
                                     })}
                                   </div>
+                                  {task.id === 'recruit' && field.key === 'select' && Array.isArray(task.params.select) && task.params.select.includes(6) && (
+                                    <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                                      已开启 6 星自动公招：遇到高级资深干员等高价值标签时，会按 MaaCore 新能力优先保留并自动选择。
+                                    </div>
+                                  )}
                                 </div>
                               ) : field.type === 'facility-select' ? (
                                 <div>

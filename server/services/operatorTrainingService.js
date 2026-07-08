@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { readJsonFile, writeJsonFile } from '../utils/fileHelper.js';
 import { createLogger } from '../utils/logger.js';
+import { getTodayOpenStages, isStageOpenToday } from './notificationService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -848,16 +849,33 @@ async function generateTrainingPlan(mode = 'current') {
     }
   }
   
-  const stages = Array.from(stagesMap.values());
+  const stages = Array.from(stagesMap.values()).map(stage => ({
+    ...stage,
+    isOpen: isStageOpenToday(stage.stage)
+  }));
+  const todayOpen = getTodayOpenStages();
+  const openStages = stages.filter(stage => stage.isOpen !== false);
+  const closedStages = stages.filter(stage => stage.isOpen === false);
+  const focusOperator = operators[0] || null;
   
   return {
     operators,
     materialHierarchy,
     stages,
+    openStages,
+    closedStages,
+    focusOperator,
     totalSanity,
     estimatedTime: Math.ceil(totalSanity / 240 * 60), // 假设每天240理智，转换为分钟
     warnings,
-    mode
+    mode,
+    summary: {
+      backlogCount: Math.max(operators.length - 1, 0),
+      openStageCount: openStages.length,
+      closedStageCount: closedStages.length,
+      todayOpenResourceStages: todayOpen.open,
+      todayClosedResourceStages: todayOpen.closed
+    }
   };
 }
 

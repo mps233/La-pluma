@@ -853,8 +853,25 @@ export default function OperatorTraining() {
 
           {/* 队列列表 */}
           {queue.length === 0 ? (
-            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-              养成队列为空，请从干员列表中添加
+            <div className="rounded-3xl border border-dashed border-amber-300 dark:border-amber-500/20 bg-gradient-to-br from-amber-50/80 to-yellow-50/80 dark:from-amber-900/10 dark:to-yellow-900/10 px-6 py-12 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300">
+                <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">养成队列还是空的</h3>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">先去“干员列表”添加要养成的干员，生成计划后这里会显示材料进度和队列顺序。</p>
+              <div className="mt-5">
+                <Button
+                  onClick={() => setActiveTab('operators')}
+                  variant="gradient"
+                  gradientFrom="amber"
+                  gradientTo="yellow"
+                  size="sm"
+                >
+                  去添加干员
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -996,8 +1013,32 @@ export default function OperatorTraining() {
           className="space-y-4"
         >
           {!plan ? (
-            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-              请先在养成队列中生成刷取计划
+            <div className="rounded-3xl border border-dashed border-blue-300 dark:border-blue-500/20 bg-gradient-to-br from-blue-50/80 to-cyan-50/80 dark:from-blue-900/10 dark:to-cyan-900/10 px-6 py-12 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
+                <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">还没有刷取计划</h3>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">先在“养成队列”里添加干员并生成计划，系统会在这里展示推荐关卡、材料层级和总理智消耗。</p>
+              <div className="mt-5 flex items-center justify-center gap-3">
+                <Button
+                  onClick={() => setActiveTab('queue')}
+                  variant="gradient"
+                  gradientFrom="blue"
+                  gradientTo="cyan"
+                  size="sm"
+                >
+                  去养成队列
+                </Button>
+                <Button
+                  onClick={() => setActiveTab('operators')}
+                  variant="outline"
+                  size="sm"
+                >
+                  查看干员列表
+                </Button>
+              </div>
             </div>
           ) : (
             <>
@@ -1010,12 +1051,12 @@ export default function OperatorTraining() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                       </svg>
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                      养成计划概览
-                    </h3>
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">养成计划概览</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">默认只回答：养谁、今天刷哪、怎么开始</p>
+                    </div>
                   </div>
-                  
-                  {/* 应用按钮 */}
+
                   <Button
                     onClick={handleApplyPlan}
                     disabled={loading || !plan.stages || plan.stages.length === 0}
@@ -1023,203 +1064,169 @@ export default function OperatorTraining() {
                     gradientFrom="amber"
                     gradientTo="yellow"
                   >
-                    {loading ? '应用中...' : '应用到作战任务'}
+                    {loading ? '应用中...' : '加入今日流程'}
                   </Button>
                 </div>
+
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="p-4 rounded-2xl bg-white dark:bg-gray-900/40 border border-amber-200 dark:border-amber-500/20">
-                    <div className="flex items-center gap-2 mb-2">
-                      <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                      <div className="text-xs text-gray-600 dark:text-gray-400 font-medium">养成干员</div>
-                    </div>
-                    <div className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-600 to-yellow-600 dark:from-amber-400 dark:to-yellow-400">
-                      {plan.operators?.length || 0}
-                    </div>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-white dark:bg-gray-900/40 border border-blue-200 dark:border-blue-500/20">
-                    <div className="flex items-center gap-2 mb-2">
-                      <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                      </svg>
-                      <div className="text-xs text-gray-600 dark:text-gray-400 font-medium">需要材料</div>
-                    </div>
-                    <div className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400">
-                      {plan.materials?.length || 0}
-                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400 font-medium">当前主养</div>
+                    <div className="mt-2 text-xl font-bold text-gray-900 dark:text-white">{plan.focusOperator?.name || plan.operators?.[0]?.name || '未设置'}</div>
+                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{((plan.summary?.backlogCount ?? 0) > 0) ? `后面还有 ${plan.summary?.backlogCount ?? 0} 个目标` : '当前只聚焦一个目标'}</div>
                   </div>
                   <div className="p-4 rounded-2xl bg-white dark:bg-gray-900/40 border border-green-200 dark:border-green-500/20">
-                    <div className="flex items-center gap-2 mb-2">
-                      <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                      </svg>
-                      <div className="text-xs text-gray-600 dark:text-gray-400 font-medium">刷取关卡</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400 font-medium">今日可刷</div>
+                    <div className="mt-2 text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-400 dark:to-emerald-400">
+                      {plan.openStages?.length || 0}
                     </div>
-                    <div className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-400 dark:to-emerald-400">
-                      {plan.stages?.length || 0}
+                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">优先刷今天开着的关卡</div>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-white dark:bg-gray-900/40 border border-red-200 dark:border-red-500/20">
+                    <div className="text-xs text-gray-600 dark:text-gray-400 font-medium">今日不可刷</div>
+                    <div className="mt-2 text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-orange-600 dark:from-red-400 dark:to-orange-400">
+                      {plan.closedStages?.length || 0}
                     </div>
+                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">这部分今天先别排主流程</div>
                   </div>
                   <div className="p-4 rounded-2xl bg-white dark:bg-gray-900/40 border border-orange-200 dark:border-orange-500/20">
-                    <div className="flex items-center gap-2 mb-2">
-                      <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                      <div className="text-xs text-gray-600 dark:text-gray-400 font-medium">总理智消耗</div>
-                    </div>
-                    <div className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-red-600 dark:from-orange-400 dark:to-red-400">
+                    <div className="text-xs text-gray-600 dark:text-gray-400 font-medium">总理智消耗</div>
+                    <div className="mt-2 text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-red-600 dark:from-orange-400 dark:to-red-400">
                       {plan.totalSanity || 0}
                     </div>
+                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">完整计划估算</div>
                   </div>
                 </div>
               </div>
 
-              {/* 警告信息 */}
-              {plan.warnings && plan.warnings.length > 0 && (
-                <div className="rounded-2xl p-4 border border-yellow-300 dark:border-yellow-500/20 bg-yellow-50 dark:bg-yellow-500/5">
-                  <div className="flex items-start space-x-3">
-                    <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
-                        ⚠️ 注意事项
-                      </h4>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <div className="rounded-3xl border border-green-200 dark:border-green-500/20 bg-white dark:bg-gray-900/40 p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">今日推荐刷图</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">今天能推进养成的关卡</p>
+                    </div>
+                    <Button onClick={handleApplyPlan} disabled={loading || !plan.openStages || plan.openStages.length === 0} variant="ghost" size="sm">加入今日流程</Button>
+                  </div>
+                  {plan.openStages && plan.openStages.length > 0 ? (
+                    <div className="space-y-3">
+                      {plan.openStages.map((stage, idx) => (
+                        <div key={`${stage.stage}-${idx}`} className="rounded-2xl border border-green-200 dark:border-green-500/20 bg-green-50/70 dark:bg-green-500/5 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-bold text-gray-900 dark:text-white">{stage.stage}</div>
+                              <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                {stage.materials?.slice(0, 2).map((mat: any) => `${mat.name}×${mat.count}`).join('、') || '今日可直接推进'}
+                              </div>
+                            </div>
+                            <div className="px-3 py-1 rounded-xl bg-white dark:bg-gray-900/60 text-sm font-semibold text-green-700 dark:text-green-300">×{stage.totalTimes || 0}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500 dark:text-gray-400">今天没有可直接推进的养成关卡。</div>
+                  )}
+                </div>
+
+                <div className="rounded-3xl border border-red-200 dark:border-red-500/20 bg-white dark:bg-gray-900/40 p-5 space-y-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">今天先别刷</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">这些关卡今天没开，先不塞进主流程</p>
+                  </div>
+                  {plan.closedStages && plan.closedStages.length > 0 ? (
+                    <div className="space-y-3">
+                      {plan.closedStages.map((stage, idx) => (
+                        <div key={`${stage.stage}-${idx}`} className="rounded-2xl border border-red-200 dark:border-red-500/20 bg-red-50/70 dark:bg-red-500/5 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-bold text-gray-900 dark:text-white">{stage.stage}</div>
+                              <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                {stage.materials?.slice(0, 2).map((mat: any) => `${mat.name}×${mat.count}`).join('、') || '等待开放后再推进'}
+                              </div>
+                            </div>
+                            <div className="px-3 py-1 rounded-xl bg-white dark:bg-gray-900/60 text-xs font-semibold text-red-700 dark:text-red-300">未开放</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500 dark:text-gray-400">当前计划里的关卡今天都能刷。</div>
+                  )}
+                </div>
+              </div>
+
+              <details className="rounded-3xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/40 p-5">
+                <summary className="cursor-pointer text-sm font-semibold text-gray-900 dark:text-white">查看计算详情（材料树 / 完整关卡 / warnings）</summary>
+                <div className="mt-5 space-y-5">
+                  {plan.warnings && plan.warnings.length > 0 && (
+                    <div className="rounded-2xl p-4 border border-yellow-300 dark:border-yellow-500/20 bg-yellow-50 dark:bg-yellow-500/5">
+                      <h4 className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">注意事项</h4>
                       <ul className="space-y-1 text-sm text-yellow-700 dark:text-yellow-300">
                         {plan.warnings.map((warning, index) => (
                           <li key={index}>• {warning}</li>
                         ))}
                       </ul>
                     </div>
-                  </div>
-                </div>
-              )}
+                  )}
 
-              {/* 材料需求列表（层级显示） */}
-              {plan.materialHierarchy && plan.materialHierarchy.length > 0 && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 shadow-lg shadow-blue-500/25">
-                      <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                      </svg>
+                  {plan.materialHierarchy && plan.materialHierarchy.length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">材料需求</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {plan.materialHierarchy.map((hierarchy, index) => (
+                          <MaterialHierarchyNode key={`${hierarchy.id}-${index}`} node={hierarchy} />
+                        ))}
+                      </div>
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                      材料需求
-                    </h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {plan.materialHierarchy.map((hierarchy, index) => (
-                      <MaterialHierarchyNode key={`${hierarchy.id}-${index}`} node={hierarchy} />
-                    ))}
-                  </div>
-                </div>
-              )}
+                  )}
 
-              {/* 关卡列表 */}
-              {plan.stages && plan.stages.length > 0 && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 shadow-lg shadow-green-500/25">
-                      <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                      刷取关卡
-                    </h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {plan.stages.map((stage, idx) => (
-                      <motion.div
-                        key={`${stage.stage}-${idx}`}
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: idx * 0.05 }}
-                        className={`group relative p-5 rounded-3xl border transition-all overflow-hidden ${
-                          stage.isOpen !== false
-                            ? 'border-gray-200 dark:border-white/10 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900/60 dark:to-gray-800/40 hover:border-green-400 dark:hover:border-green-500/30 hover:shadow-xl'
-                            : 'border-red-300 dark:border-red-500/30 bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-900/10 dark:to-orange-900/10'
-                        }`}
-                      >
-                        {/* 背景装饰 */}
-                        <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-3xl ${
-                          stage.isOpen !== false
-                            ? 'bg-gradient-to-br from-green-500/5 to-emerald-500/5' 
-                            : 'bg-gradient-to-br from-red-500/5 to-orange-500/5'
-                        }`}></div>
-                        
-                        <div className="relative">
-                          {/* 关卡代号 */}
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <div className={`px-3 py-1.5 rounded-xl font-bold text-sm shadow-lg ${
-                                stage.isOpen !== false
-                                  ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-green-500/25'
-                                  : 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-red-500/25'
-                              }`}>
-                                {stage.stage}
+                  {plan.stages && plan.stages.length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">完整关卡列表</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {plan.stages.map((stage, idx) => (
+                          <motion.div
+                            key={`${stage.stage}-${idx}`}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: idx * 0.05 }}
+                            className={`group relative p-5 rounded-3xl border transition-all overflow-hidden ${
+                              stage.isOpen !== false
+                                ? 'border-gray-200 dark:border-white/10 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900/60 dark:to-gray-800/40 hover:border-green-400 dark:hover:border-green-500/30 hover:shadow-xl'
+                                : 'border-red-300 dark:border-red-500/30 bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-900/10 dark:to-orange-900/10'
+                            }`}
+                          >
+                            <div className="relative">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                  <div className={`px-3 py-1.5 rounded-xl font-bold text-sm shadow-lg ${
+                                    stage.isOpen !== false
+                                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-green-500/25'
+                                      : 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-red-500/25'
+                                  }`}>
+                                    {stage.stage}
+                                  </div>
+                                  {stage.isOpen === false && <div className="text-xs text-red-600 dark:text-red-400 font-medium">未开放</div>}
+                                </div>
+                                <div className="px-3 py-1.5 rounded-xl bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-500/30 text-sm font-bold text-blue-700 dark:text-blue-300">×{stage.totalTimes || 0}</div>
                               </div>
-                              {stage.isOpen === false && (
-                                <div className="flex items-center gap-1 px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-xs font-medium">
-                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                  </svg>
-                                  <span>未开放</span>
+                              {stage.materials && stage.materials.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                  {stage.materials.map((mat, matIdx) => (
+                                    <div key={matIdx} className="px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-500/20 text-xs font-medium text-purple-700 dark:text-purple-300">
+                                      {mat.name} ×{mat.count}
+                                    </div>
+                                  ))}
                                 </div>
                               )}
                             </div>
-                            
-                            {/* 次数徽章 */}
-                            <div className="flex items-center gap-2">
-                              <div className="px-3 py-1.5 rounded-xl bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-500/30">
-                                <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">×</span>
-                                <span className="text-sm font-bold text-blue-700 dark:text-blue-300 ml-0.5">
-                                  {stage.totalTimes || 0}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* 掉落材料 */}
-                          {stage.materials && stage.materials.length > 0 && (
-                            <div className="mb-3">
-                              <div className="flex flex-wrap gap-2">
-                                {stage.materials.map((mat, matIdx) => (
-                                  <div 
-                                    key={matIdx}
-                                    className="px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-500/20 text-xs font-medium text-purple-700 dark:text-purple-300"
-                                  >
-                                    {mat.name} ×{mat.needed}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* 理智消耗 */}
-                          <div className="flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 border border-orange-200 dark:border-orange-500/20">
-                            <div className="flex items-center gap-2">
-                              <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                              </svg>
-                              <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">理智消耗</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-gray-500 dark:text-gray-400">
-                                {stage.sanityPerRun || 0} × {stage.totalTimes || 0} =
-                              </span>
-                              <span className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-red-600 dark:from-orange-400 dark:to-red-400">
-                                {(stage.sanityPerRun || 0) * (stage.totalTimes || 0)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              </details>
             </>
           )}
         </motion.div>

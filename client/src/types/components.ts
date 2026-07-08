@@ -405,6 +405,7 @@ export interface MaaConnectionConfig {
   adb_path: string
   address: string
   config: string
+  auto_reconnect?: boolean
 }
 
 export interface AutoUpdateConfig {
@@ -680,6 +681,11 @@ export interface TrainingPlan {
     currentElite: number
     targetElite: number
   }>
+  focusOperator?: {
+    id: string
+    name: string
+    rarity: number
+  } | null
   materials?: Array<{
     id: string
     name: string
@@ -694,16 +700,40 @@ export interface TrainingPlan {
     isOpen?: boolean
     materials?: Array<{
       name: string
-      needed: number
+      needed?: number
+      count?: number
+    }>
+  }>
+  openStages?: Array<{
+    stage: string
+    totalTimes?: number
+    isOpen?: boolean
+    materials?: Array<{
+      name: string
+      needed?: number
+      count?: number
+    }>
+  }>
+  closedStages?: Array<{
+    stage: string
+    totalTimes?: number
+    isOpen?: boolean
+    materials?: Array<{
+      name: string
+      needed?: number
+      count?: number
     }>
   }>
   totalSanity?: number
   estimatedTime?: string
   warnings?: string[]
   summary?: {
-    totalStages: number
-    totalTimes: number
-    totalSanity: number
+    totalStages?: number
+    totalTimes?: number
+    totalSanity?: number
+    backlogCount?: number
+    openStageCount?: number
+    closedStageCount?: number
   }
 }
 
