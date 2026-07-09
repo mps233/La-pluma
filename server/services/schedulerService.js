@@ -399,7 +399,7 @@ async function executeTaskFlow(taskFlow, scheduleId) {
           
           const { command, params, taskConfig } = buildCommand(task);
           let args = params ? params.split(' ').filter(arg => arg) : [];
-          await execMaaCommand(command, args);
+          await execMaaCommand(command, args, task.name, null, true);
           
           logger.info('启动游戏命令执行完成', { scheduleId });
           

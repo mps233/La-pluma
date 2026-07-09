@@ -27,8 +27,19 @@ const getApiBaseUrl = (): string => {
 export const API_BASE_URL = getApiBaseUrl()
 export const APP_ORIGIN_BASE_URL = API_BASE_URL.replace(/\/api$/, '')
 
+const getStoredToken = (): string => {
+  const rawToken = localStorage.getItem('laPlumaToken') || ''
+  const token = rawToken.replace(/^Bearer\s+/i, '').trim()
+
+  // Headers.set() throws "The string did not match the expected pattern" when
+  // the value contains CR/LF or other control characters. Treat malformed
+  // stored tokens as absent so API calls can return a normal 401 instead of
+  // crashing the UI action.
+  return /[\u0000-\u001f\u007f]/.test(token) ? '' : token
+}
+
 export const getAuthHeaders = (): Record<string, string> => {
-  const token = localStorage.getItem('laPlumaToken') || ''
+  const token = getStoredToken()
   return token ? { Authorization: `Bearer ${token}`, 'X-La-Pluma-Token': token } : {}
 }
 
@@ -153,7 +164,7 @@ export const maaApi = {
    * 获取版本信息
    */
   async getVersion(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/version`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/version`)
     return response.json()
   },
 
@@ -161,7 +172,7 @@ export const maaApi = {
    * 获取配置目录
    */
   async getConfigDir(): Promise<ApiResponse<string>> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/config-dir`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/config-directory`)
     return response.json()
   },
 
@@ -169,7 +180,7 @@ export const maaApi = {
    * 在本机文件管理器中打开配置目录
    */
   async openConfigDir(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/config-dir/open`, { method: 'POST' })
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/open-config-directory`, { method: 'POST' })
     return response.json()
   },
 
@@ -216,7 +227,7 @@ export const maaApi = {
       fetchOptions.signal = signal
     }
     
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/execute`, fetchOptions)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/run-task`, fetchOptions)
     return response.json()
   },
 
@@ -260,7 +271,7 @@ export const maaApi = {
    * 获取任务执行状态
    */
   async getTaskStatus(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/task-status`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/tasks/status`)
     return response.json()
   },
 
@@ -268,7 +279,7 @@ export const maaApi = {
    * 终止当前任务
    */
   async stopTask(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/stop-task`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/stop`, {
       method: 'POST',
     })
     return response.json()
@@ -280,7 +291,7 @@ export const maaApi = {
    * 获取实时日志
    */
   async getRealtimeLogs(lines: number = 100): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/realtime-logs?lines=${lines}`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/logs/recent?lines=${lines}`)
     return response.json()
   },
 
@@ -288,7 +299,7 @@ export const maaApi = {
    * 清空实时日志
    */
   async clearRealtimeLogs(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/realtime-logs/clear`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/logs/recent/clear`, {
       method: 'POST',
     })
     return response.json()
@@ -298,7 +309,7 @@ export const maaApi = {
    * 获取日志文件列表
    */
   async getLogFiles(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/logs`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/logs/files`)
     return response.json()
   },
 
@@ -307,7 +318,7 @@ export const maaApi = {
    */
   async readLogFile(filePath: string, lines: number = 1000): Promise<ApiResponse> {
     const encodedPath = encodeURIComponent(filePath)
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/logs/${encodedPath}?lines=${lines}`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/logs/files/${encodedPath}?lines=${lines}`)
     return response.json()
   },
 
@@ -315,7 +326,7 @@ export const maaApi = {
    * 手动清理日志文件
    */
   async cleanupLogs(maxSizeMB: number = 10): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/logs/cleanup`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/logs/cleanup`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -340,7 +351,7 @@ export const maaApi = {
    * 获取配置
    */
   async getConfig(profileName: string = 'default'): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/config/${profileName}`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/config/maa/${profileName}`)
     return response.json()
   },
 
@@ -348,7 +359,7 @@ export const maaApi = {
    * 保存配置
    */
   async saveConfig(profileName: string = 'default', config: any): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/config/${profileName}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/config/maa/${profileName}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -364,7 +375,7 @@ export const maaApi = {
    * 测试 ADB 连接
    */
   async testConnection(adbPath: string, address: string): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/test-connection`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/test-connection`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -438,7 +449,7 @@ export const maaApi = {
    * 获取当前活动信息
    */
   async getActivity(clientType: string = 'Official'): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/activity?clientType=${clientType}`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/activity?clientType=${clientType}`)
     return response.json()
   },
 
@@ -452,7 +463,7 @@ export const maaApi = {
     times: string[],
     taskFlow: any[]
   ): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/schedule`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/schedules`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -466,7 +477,7 @@ export const maaApi = {
    * 停止定时任务
    */
   async stopSchedule(scheduleId: string = 'default'): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/schedule/${scheduleId}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/schedules/${scheduleId}`, {
       method: 'DELETE',
     })
     return response.json()
@@ -476,7 +487,7 @@ export const maaApi = {
    * 获取定时任务状态
    */
   async getScheduleStatus(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/schedule/status`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/schedules/status`)
     return response.json()
   },
 
@@ -484,7 +495,7 @@ export const maaApi = {
    * 获取定时任务执行状态
    */
   async getScheduleExecutionStatus(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/schedule/execution-status`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/schedules/execution`)
     return response.json()
   },
 
@@ -492,7 +503,7 @@ export const maaApi = {
    * 立即执行定时任务
    */
   async executeScheduleNow(scheduleId: string = 'default', taskFlow: any[]): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/schedule/${scheduleId}/execute`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/schedules/${scheduleId}/execute`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -508,7 +519,7 @@ export const maaApi = {
    * 更新 MaaCore
    */
   async updateMaaCore(version?: string): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/update-core`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/update-core`, {
       method: 'POST',
       headers: version ? {
         'Content-Type': 'application/json',
@@ -522,7 +533,7 @@ export const maaApi = {
    * 更新 MAA CLI
    */
   async updateMaaCli(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/update-cli`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/update-cli`, {
       method: 'POST',
     })
     return response.json()
@@ -532,7 +543,7 @@ export const maaApi = {
    * 热更新资源文件
    */
   async hotUpdateResources(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/hot-update`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/hot-update-resources`, {
       method: 'POST',
     })
     return response.json()
@@ -542,7 +553,7 @@ export const maaApi = {
    * 设置自动更新
    */
   async setupAutoUpdate(config: AutoUpdateConfig): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/auto-update`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/configure-auto-update`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -556,7 +567,7 @@ export const maaApi = {
    * 获取自动更新状态
    */
   async getAutoUpdateStatus(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/auto-update/status`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/auto-update/status`)
     return response.json()
   },
 
@@ -564,7 +575,7 @@ export const maaApi = {
    * 获取 MaaCore 更新日志（最新的 Beta 和正式版）
    */
   async getMaaCoreChangelog(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/changelog/core`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/changelog/core`)
     return response.json()
   },
 
@@ -572,7 +583,7 @@ export const maaApi = {
    * 获取 MAA CLI 更新日志（最新的正式版）
    */
   async getMaaCliChangelog(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/changelog/cli`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/changelog/cli`)
     return response.json()
   },
 
@@ -582,7 +593,7 @@ export const maaApi = {
    * 保存用户配置到服务器
    */
   async saveUserConfig(configType: string, data: any): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/user-config/${configType}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/config/user/${configType}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -596,7 +607,7 @@ export const maaApi = {
    * 从服务器读取用户配置
    */
   async loadUserConfig(configType: string): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/user-config/${configType}`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/config/user/${configType}`)
     return response.json()
   },
 
@@ -604,7 +615,7 @@ export const maaApi = {
    * 获取所有用户配置
    */
   async getAllUserConfigs(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/user-configs`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/config/user`)
     return response.json()
   },
 
@@ -612,7 +623,7 @@ export const maaApi = {
    * 删除用户配置
    */
   async deleteUserConfig(configType: string): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/user-config/${configType}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/config/user/${configType}`, {
       method: 'DELETE',
     })
     return response.json()
@@ -624,7 +635,7 @@ export const maaApi = {
    * 解析并保存仓库数据
    */
   async parseDepotData(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/data/depot/parse`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/depot-recognition`, {
       method: 'POST',
     })
     return response.json()
@@ -634,7 +645,7 @@ export const maaApi = {
    * 解析并保存干员数据
    */
   async parseOperBoxData(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/data/operbox/parse`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/operbox-recognition`, {
       method: 'POST',
     })
     return response.json()
@@ -644,7 +655,7 @@ export const maaApi = {
    * 获取已保存的仓库数据
    */
   async getDepotData(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/data/depot`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/data/depot`)
     return response.json()
   },
 
@@ -652,7 +663,7 @@ export const maaApi = {
    * 获取已保存的干员数据
    */
   async getOperBoxData(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/data/operbox`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/data/operbox`)
     return response.json()
   },
 
@@ -660,7 +671,7 @@ export const maaApi = {
    * 获取所有干员列表
    */
   async getAllOperators(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/data/all-operators`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/data/operators`)
     return response.json()
   },
 
@@ -668,7 +679,7 @@ export const maaApi = {
    * 获取作业信息（通过后端代理，避免 CORS）
    */
   async getCopilotInfo(copilotId: string): Promise<ApiResponse<CopilotSetInfo>> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/copilot/get/${copilotId}`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/copilots/${copilotId}`)
     return response.json()
   },
 
@@ -676,7 +687,7 @@ export const maaApi = {
    * 获取作业集信息（通过后端代理，避免 CORS）
    */
   async getCopilotSet(copilotId: string): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/maa/copilot/set/${copilotId}`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/copilot-sets/${copilotId}`)
     return response.json()
   },
 
@@ -758,7 +769,7 @@ export const maaApi = {
    * 生成养成计划
    */
   async generateTrainingPlan(mode: 'current' | 'all' = 'current'): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/operator-training/plan`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/plan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode })
@@ -779,7 +790,7 @@ export async function getOperatorList(filters: OperatorFilters = {}): Promise<Ap
   if (filters.owned !== undefined) params.append('owned', filters.owned.toString())
   if (filters.needsElite2) params.append('needsElite2', 'true')
   
-  const response = await fetchWithAuth(`${API_BASE_URL}/operator-training/operators?${params}`)
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/operators?${params}`)
   return response.json()
 }
 
@@ -787,7 +798,7 @@ export async function getOperatorList(filters: OperatorFilters = {}): Promise<Ap
  * 获取养成队列
  */
 export async function getTrainingQueue(): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/operator-training/queue`)
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/queue`)
   return response.json()
 }
 
@@ -795,7 +806,7 @@ export async function getTrainingQueue(): Promise<ApiResponse> {
  * 添加干员到养成队列
  */
 export async function addToTrainingQueue(data: TrainingQueueData): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/operator-training/queue`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/queue`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -807,7 +818,7 @@ export async function addToTrainingQueue(data: TrainingQueueData): Promise<ApiRe
  * 从养成队列中移除干员
  */
 export async function removeFromTrainingQueue(operatorId: string): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/operator-training/queue/${operatorId}`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/queue/${operatorId}`, {
     method: 'DELETE'
   })
   return response.json()
@@ -817,7 +828,7 @@ export async function removeFromTrainingQueue(operatorId: string): Promise<ApiRe
  * 更新队列顺序
  */
 export async function updateTrainingQueueOrder(operatorIds: string[]): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/operator-training/queue/order`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/queue/order`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ operatorIds })
@@ -829,7 +840,7 @@ export async function updateTrainingQueueOrder(operatorIds: string[]): Promise<A
  * 更新养成设置
  */
 export async function updateTrainingSettings(settings: TrainingSettings): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/operator-training/settings`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/settings`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(settings)
@@ -841,7 +852,7 @@ export async function updateTrainingSettings(settings: TrainingSettings): Promis
  * 生成养成计划
  */
 export async function generateTrainingPlan(options: TrainingPlanOptions): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/operator-training/plan`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/plan`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(options)
@@ -853,7 +864,7 @@ export async function generateTrainingPlan(options: TrainingPlanOptions): Promis
  * 应用养成计划到任务流程
  */
 export async function applyTrainingPlan(data: ApplyTrainingPlanData): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/operator-training/apply`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/apply-training-plan`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -865,7 +876,7 @@ export async function applyTrainingPlan(data: ApplyTrainingPlanData): Promise<Ap
  * 获取干员材料数据
  */
 export async function fetchOperatorMaterials(): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/operator-training/fetch-materials`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/fetch-training-materials`, {
     method: 'POST'
   })
   return response.json()
@@ -877,7 +888,7 @@ export async function fetchOperatorMaterials(): Promise<ApiResponse> {
  * 搜索悖论模拟作业
  */
 export async function searchParadoxCopilot(operatorName: string): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/maa/paradox/search?name=${encodeURIComponent(operatorName)}`)
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/paradox/search?name=${encodeURIComponent(operatorName)}`)
   return response.json()
 }
 
@@ -885,7 +896,7 @@ export async function searchParadoxCopilot(operatorName: string): Promise<ApiRes
  * 获取所有悖论模拟干员列表
  */
 export async function getParadoxOperators(): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/maa/paradox/operators`)
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/paradox/operators`)
   return response.json()
 }
 
@@ -893,7 +904,7 @@ export async function getParadoxOperators(): Promise<ApiResponse> {
  * 搜索普通关卡作业
  */
 export async function searchCopilot(stageName: string): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/maa/copilot/search?stage=${encodeURIComponent(stageName)}`)
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/copilot/search?stage=${encodeURIComponent(stageName)}`)
   return response.json()
 }
 
@@ -903,7 +914,7 @@ export async function searchCopilot(stageName: string): Promise<ApiResponse> {
  * 获取今日掉落记录
  */
 export async function getTodayDrops(): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/maa/drops/today`)
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/drops/today`)
   return response.json()
 }
 
@@ -911,7 +922,7 @@ export async function getTodayDrops(): Promise<ApiResponse> {
  * 获取最近几天的掉落记录
  */
 export async function getRecentDrops(days: number = 7): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/maa/drops/recent?days=${days}`)
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/drops/recent?days=${days}`)
   return response.json()
 }
 
@@ -919,7 +930,7 @@ export async function getRecentDrops(days: number = 7): Promise<ApiResponse> {
  * 获取掉落统计数据
  */
 export async function getDropStatistics(days: number = 7): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/maa/drops/statistics?days=${days}`)
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/drops/statistics?days=${days}`)
   return response.json()
 }
 
@@ -929,7 +940,7 @@ export async function getDropStatistics(days: number = 7): Promise<ApiResponse> 
  * 发送森空岛验证码
  */
 export async function sklandSendCode(phone: string): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/skland/send-code`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/skland/send-code`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ phone })
@@ -941,7 +952,7 @@ export async function sklandSendCode(phone: string): Promise<ApiResponse> {
  * 森空岛登录（使用验证码或密码）
  */
 export async function sklandLogin(phone: string, codeOrPassword: string, savePassword: boolean = false): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/skland/login`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/skland/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ phone, code: codeOrPassword, savePassword })
@@ -953,7 +964,7 @@ export async function sklandLogin(phone: string, codeOrPassword: string, savePas
  * 森空岛登出
  */
 export async function sklandLogout(): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/skland/logout`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/skland/logout`, {
     method: 'POST'
   })
   return response.json()
@@ -963,7 +974,7 @@ export async function sklandLogout(): Promise<ApiResponse> {
  * 获取森空岛登录状态
  */
 export async function getSklandStatus(): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/skland/status`)
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/skland/status`)
   return response.json()
 }
 
@@ -972,7 +983,7 @@ export async function getSklandStatus(): Promise<ApiResponse> {
  */
 export async function getSklandPlayerData(useCache: boolean = true): Promise<ApiResponse> {
   try {
-    const response = await fetchWithAuth(`${API_BASE_URL}/skland/player-data?cache=${useCache}`)
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/skland/player?cache=${useCache}`)
     const data = await response.json()
     
     // 如果响应不是 200，返回错误
@@ -996,7 +1007,7 @@ export async function getSklandPlayerData(useCache: boolean = true): Promise<Api
  * 刷新森空岛玩家数据（强制从服务器获取最新数据）
  */
 export async function refreshSklandPlayerData(): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/skland/refresh`, {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/skland/refresh`, {
     method: 'POST'
   })
   return response.json()

@@ -647,6 +647,10 @@ router.get('/runs/current', asyncHandler(async (req, res) => {
   });
 }));
 
+router.get('/tasks/status', asyncHandler(async (req, res) => {
+  return sendSuccess(res, req, getTaskStatus());
+}));
+
 router.post('/screen/screenshot', asyncHandler(async (req, res) => {
   const { adbPath = DEFAULT_ADB_PATH, address = DEFAULT_ADB_ADDRESS } = req.body || {};
   const screenshot = await captureScreen(adbPath, address);
