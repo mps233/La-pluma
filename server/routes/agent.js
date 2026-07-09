@@ -224,6 +224,22 @@ const AGENT_ACTIONS = [
     method: 'POST',
     path: '/api/agent/webrtc/stop',
     description: 'Stop MuMu agent and signaling/TURN managed by La Pluma.'
+  },
+  {
+    id: 'preview_orientation',
+    method: 'POST',
+    path: '/api/agent/preview/orientation',
+    description: 'Set Android emulator orientation for the live preview/device. Uses ADB settings + keyevent fallback and returns observed display state.',
+    body_schema: {
+      type: 'object',
+      required: ['orientation'],
+      properties: {
+        orientation: { type: 'string', enum: ['portrait', 'landscape', 'auto'] },
+        adbPath: { type: 'string', default: DEFAULT_ADB_PATH },
+        address: { type: 'string', default: DEFAULT_ADB_ADDRESS },
+        dryRun: { type: 'boolean', default: false }
+      }
+    }
   }
 ];
 
@@ -283,6 +299,7 @@ function getOpenApiSpec() {
       endpoint('GET', '/agent/webrtc/devices', 'Get online WebRTC device ids.'),
       endpoint('POST', '/agent/webrtc/start', 'Start WebRTC infrastructure.', AGENT_ACTIONS.find(a => a.id === 'webrtc_start').body_schema),
       endpoint('POST', '/agent/webrtc/stop', 'Stop WebRTC infrastructure.'),
+      endpoint('POST', '/agent/preview/orientation', 'Set emulator orientation and return observed display state.', AGENT_ACTIONS.find(a => a.id === 'preview_orientation').body_schema),
       endpoint('POST', '/agent/actions/test-connection', 'Test ADB connection.', AGENT_ACTIONS.find(a => a.id === 'test_connection').body_schema),
       endpoint('POST', '/agent/actions/start-game', 'Start Arknights through MAA.', AGENT_ACTIONS.find(a => a.id === 'start_game').body_schema),
       endpoint('POST', '/agent/actions/fight', 'Run semantic 理智作战 through MAA.', AGENT_ACTIONS.find(a => a.id === 'fight').body_schema),
@@ -399,6 +416,98 @@ function pngDimensions(base64) {
   return { width: null, height: null };
 }
 
+async function getAndroidDisplayState(adbPath = DEFAULT_ADB_PATH, address = DEFAULT_ADB_ADDRESS) {
+  const readSetting = async (name) => {
+    try {
+      const { stdout } = await execFileAsync(adbPath, ['-s', address, 'shell', 'settings', 'get', 'system', name], { timeout: 5000 });
+      return stdout.trim();
+    } catch {
+      return null;
+    }
+  };
+
+  let display = '';
+  try {
+    const { stdout } = await execFileAsync(adbPath, ['-s', address, 'shell', 'dumpsys', 'display'], { timeout: 7000, maxBuffer: 512 * 1024 });
+    display = stdout;
+  } catch {
+    display = '';
+  }
+
+  const rotationMatch = display.match(/mCurrentOrientation\s*=\s*(\d+)/)
+    || display.match(/mDisplayInfo=.*?rotation\s+(\d+)/)
+    || display.match(/rotation\s*=\s*(\d+)/i);
+  const sizeMatch = display.match(/real\s+(\d+)\s+x\s+(\d+)/i)
+    || display.match(/logicalWidth=(\d+).*?logicalHeight=(\d+)/s);
+  const width = sizeMatch ? Number(sizeMatch[1]) : null;
+  const height = sizeMatch ? Number(sizeMatch[2]) : null;
+
+  return {
+    adbPath,
+    address,
+    rotation: rotationMatch ? Number(rotationMatch[1]) : null,
+    accelerometerRotation: await readSetting('accelerometer_rotation'),
+    userRotation: await readSetting('user_rotation'),
+    width,
+    height,
+    inferredOrientation: width && height ? (width > height ? 'landscape' : 'portrait') : null
+  };
+}
+
+function buildOrientationPlan({ orientation, adbPath = DEFAULT_ADB_PATH, address = DEFAULT_ADB_ADDRESS } = {}) {
+  const normalized = String(orientation || '').trim().toLowerCase();
+  const rotationByOrientation = { portrait: '0', landscape: '1' };
+
+  if (!['portrait', 'landscape', 'auto'].includes(normalized)) {
+    throw agentError('AGENT_VALIDATION_ORIENTATION_INVALID', 'orientation 必须是 portrait、landscape 或 auto', {
+      statusCode: 400,
+      details: { orientation },
+      retryable: false
+    });
+  }
+
+  const commands = normalized === 'auto'
+    ? [
+        ['settings', 'put', 'system', 'accelerometer_rotation', '1']
+      ]
+    : [
+        ['settings', 'put', 'system', 'accelerometer_rotation', '0'],
+        ['settings', 'put', 'system', 'user_rotation', rotationByOrientation[normalized]],
+        ['cmd', 'window', 'set-user-rotation', 'lock', rotationByOrientation[normalized]]
+      ];
+
+  return {
+    action: 'preview-orientation',
+    orientation: normalized,
+    adbPath,
+    address,
+    commands: commands.map(args => ({ command: adbPath, args: ['-s', address, 'shell', ...args] }))
+  };
+}
+
+async function setAndroidOrientation(options = {}) {
+  const plan = buildOrientationPlan(options);
+  const results = [];
+
+  for (const item of plan.commands) {
+    try {
+      const { stdout, stderr } = await execFileAsync(item.command, item.args, { timeout: 7000, maxBuffer: 256 * 1024 });
+      results.push({ ok: true, args: item.args, stdout: stdout.trim(), stderr: stderr.trim() });
+    } catch (error) {
+      const optionalCmdWindow = item.args.includes('cmd') && item.args.includes('window') && item.args.includes('set-user-rotation');
+      results.push({ ok: optionalCmdWindow, optional: optionalCmdWindow, args: item.args, error: error.message, stdout: (error.stdout || '').trim(), stderr: (error.stderr || '').trim() });
+      if (!optionalCmdWindow) throw error;
+    }
+  }
+
+  await new Promise(resolve => setTimeout(resolve, 500));
+  return {
+    ...plan,
+    results,
+    observed: await getAndroidDisplayState(plan.adbPath, plan.address)
+  };
+}
+
 function buildFightArgs({ stages, stage, times, medicine = 0, expiringMedicine = 0, stone = 0, series = 0 } = {}) {
   const rawStages = Array.isArray(stages) ? stages : [{ stage: stage || '', times: times || '' }];
   const stageList = rawStages
@@ -456,10 +565,11 @@ function buildTaskFlowPlan(taskFlow) {
 async function buildAgentStatus(req) {
   const adbPath = req.query.adbPath || req.body?.adbPath || DEFAULT_ADB_PATH;
   const address = req.query.address || req.body?.address || DEFAULT_ADB_ADDRESS;
-  const [version, adb, webrtc] = await Promise.all([
+  const [version, adb, webrtc, orientation] = await Promise.all([
     getMaaVersion(true).catch(error => ({ error: error.message })),
     getAdbSummary(adbPath, address).catch(error => ({ connected: false, error: error.message, adbPath, address })),
-    getWebrtcSummary()
+    getWebrtcSummary(),
+    getAndroidDisplayState(adbPath, address).catch(error => ({ error: error.message, adbPath, address }))
   ]);
   const task = getTaskStatus();
   const logs = getRealtimeLogs(25);
@@ -483,7 +593,8 @@ async function buildAgentStatus(req) {
     },
     device: adb,
     screen: {
-      webrtc
+      webrtc,
+      orientation
     },
     recentLogs: logs,
     recommendations
@@ -984,6 +1095,17 @@ router.post('/webrtc/start', asyncHandler(async (req, res) => {
 
 router.post('/webrtc/stop', asyncHandler(async (req, res) => {
   return sendSuccess(res, req, await stopWebrtc(req.body?.address || DEFAULT_DEVICE_ADDRESS));
+}));
+
+router.post('/preview/orientation', asyncHandler(async (req, res) => {
+  const { orientation, adbPath = DEFAULT_ADB_PATH, address = DEFAULT_ADB_ADDRESS, dryRun = false } = req.body || {};
+  const plan = buildOrientationPlan({ orientation, adbPath, address });
+
+  if (dryRun) {
+    return sendDryRun(res, req, plan);
+  }
+
+  return sendSuccess(res, req, await setAndroidOrientation({ orientation, adbPath, address }), '屏幕方向已设置');
 }));
 
 router.post('/webrtc/install', asyncHandler(async (req, res) => {

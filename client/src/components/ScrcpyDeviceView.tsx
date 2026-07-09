@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, Home, Maximize2, Minimize2, PanelsTopLeft } from 'lucide-react'
+import { ArrowLeft, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone } from 'lucide-react'
 import { Button } from './common'
 import { useScrcpyWebRTC } from '../hooks/useScrcpyWebRTC'
+import { maaApi } from '../services/api'
 
 interface ScrcpyDeviceViewProps {
   enabled: boolean
@@ -68,6 +69,8 @@ export default function ScrcpyDeviceView({
   const [customMaxSize, setCustomMaxSize] = useState<number>(qualityPresets.crisp.maxSize)
   const [customBitrateMbps, setCustomBitrateMbps] = useState<number>(qualityPresets.crisp.bitrateMbps)
   const [immersiveMode, setImmersiveMode] = useState(false)
+  const [previewOrientation, setPreviewOrientation] = useState<'portrait' | 'landscape'>('portrait')
+  const [orientationLoading, setOrientationLoading] = useState(false)
   const scrcpyOptions = useMemo(() => ({
     max_fps: customFps,
     max_size: customMaxSize,
@@ -151,8 +154,19 @@ export default function ScrcpyDeviceView({
     // 不走浏览器真实 fullscreen，直接打开应用内“画面全屏”遮罩，手机上更可靠。
     setImmersiveMode(true)
   }
-
   const exitImmersive = () => setImmersiveMode(false)
+
+  const togglePreviewOrientation = async () => {
+    if (orientationLoading) return
+    const next = previewOrientation === 'portrait' ? 'landscape' : 'portrait'
+    setOrientationLoading(true)
+    try {
+      const result = await maaApi.setPreviewOrientation(next)
+      if (result.success) setPreviewOrientation(next)
+    } finally {
+      setOrientationLoading(false)
+    }
+  }
 
   useEffect(() => {
     const mainVideo = videoRef.current
@@ -270,6 +284,12 @@ export default function ScrcpyDeviceView({
               icon: <Maximize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
             },
             {
+              label: previewOrientation === 'portrait' ? '横屏' : '竖屏',
+              disabled: orientationLoading,
+              onClick: togglePreviewOrientation,
+              icon: <RotateCw className="h-3.5 w-3.5" strokeWidth={1.8} />
+            },
+            {
               label: '后台任务',
               disabled: webrtc.status !== 'connected',
               onClick: () => webrtc.sendCommand('input keyevent 187'),
@@ -291,9 +311,22 @@ export default function ScrcpyDeviceView({
         </div>
       </div>
 
-      <aside className="space-y-4 xl:pt-0">
-        <section className="space-y-3">
-          <div className="text-xs font-semibold text-gray-700 dark:text-gray-300">连接与服务</div>
+      <aside className="space-y-3 xl:pt-0">
+        <section className="rounded-2xl bg-white/80 dark:bg-white/[0.035] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_0_0_1px_rgba(15,23,42,0.06),0_10px_30px_rgba(15,23,42,0.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_0_1px_rgba(255,255,255,0.08)]">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-300">
+                <Plug className="h-3.5 w-3.5" strokeWidth={1.8} />
+              </span>
+              <div>
+                <div className="text-[11px] font-semibold text-gray-900 dark:text-white">连接与服务</div>
+                <div className="text-[10px] text-gray-400">预览链路</div>
+              </div>
+            </div>
+            <span className={`rounded-lg px-2 py-1 text-[10px] font-medium ${webrtc.status === 'connected' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-400'}`}>
+              {statusLabel[webrtc.status] || webrtc.status}
+            </span>
+          </div>
           <div className="space-y-2">
             <Button
               size="sm"
@@ -307,71 +340,105 @@ export default function ScrcpyDeviceView({
             >
               {webrtc.status === 'connected' ? '重连预览' : '启动预览'}
             </Button>
-            <div className="grid grid-cols-2 gap-2">
-              <Button size="sm" variant="outline" onClick={webrtc.disconnect} disabled={webrtc.status === 'idle' || webrtc.status === 'disconnected'}>断开</Button>
-              <Button size="sm" variant="outline" onClick={onInstall} loading={infrastructureLoading === 'install'}>安装组件</Button>
-              <Button size="sm" variant="outline" onClick={onToggleServer} loading={infrastructureLoading === 'server'}>{infrastructureStatus?.serverRunning ? '停止服务' : '启动服务'}</Button>
-              <Button size="sm" variant="outline" onClick={onToggleAgent} loading={infrastructureLoading === 'agent'} disabled={!infrastructureStatus?.serverRunning}>{infrastructureStatus?.agentRunning ? '停止 Agent' : '连接 Agent'}</Button>
+            <div className="grid grid-cols-2 gap-1.5">
+              {[
+                { label: '断开', icon: Plug, onClick: webrtc.disconnect, disabled: webrtc.status === 'idle' || webrtc.status === 'disconnected', loading: false },
+                { label: '安装组件', icon: Package, onClick: onInstall, disabled: false, loading: infrastructureLoading === 'install' },
+                { label: infrastructureStatus?.serverRunning ? '停止服务' : '启动服务', icon: Server, onClick: onToggleServer, disabled: false, loading: infrastructureLoading === 'server' },
+                { label: infrastructureStatus?.agentRunning ? '停止 Agent' : '连接 Agent', icon: Smartphone, onClick: onToggleAgent, disabled: !infrastructureStatus?.serverRunning, loading: infrastructureLoading === 'agent' }
+              ].map(action => {
+                const Icon = action.icon
+                return (
+                  <button
+                    key={action.label}
+                    type="button"
+                    onClick={action.onClick}
+                    disabled={action.disabled || action.loading}
+                    className="flex h-9 items-center justify-center gap-1.5 rounded-xl bg-gray-50 text-[11px] font-medium text-gray-600 shadow-[0_0_0_1px_rgba(15,23,42,0.06)] transition hover:bg-white hover:text-gray-900 hover:shadow-[0_0_0_1px_rgba(6,182,212,0.35),0_6px_16px_rgba(15,23,42,0.06)] disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white/[0.04] dark:text-gray-300 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08)] dark:hover:bg-white/[0.07] dark:hover:text-white"
+                  >
+                    <Icon className="h-3.5 w-3.5" strokeWidth={1.7} />
+                    <span>{action.loading ? '处理中' : action.label}</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </section>
 
-        <section className="space-y-3 pt-3 border-t border-gray-200 dark:border-white/10 text-xs">
-          <div className="text-xs font-semibold text-gray-700 dark:text-gray-300">画质设置</div>
-          <label className="space-y-1 block">
-            <span className="text-gray-500 dark:text-gray-400">画质预设</span>
-            <div className="grid grid-cols-2 gap-1.5">
-              {Object.entries(qualityPresets).map(([key, preset]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => applyPreset(key as QualityPreset)}
-                  className={`rounded-lg border px-2 py-1.5 text-left transition-all ${quality === key
-                    ? 'border-cyan-400 bg-cyan-500/15 text-cyan-600 dark:text-cyan-300'
-                    : 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 text-gray-600 dark:text-gray-300 hover:border-cyan-400/60'
-                  }`}
-                >
-                  <div className="text-xs font-semibold">{preset.label}</div>
-                  <div className="mt-0.5 text-[10px] opacity-70">{preset.maxSize}p · {preset.bitrateMbps}Mbps</div>
-                </button>
-              ))}
+        <section className="rounded-2xl bg-white/80 dark:bg-white/[0.035] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_0_0_1px_rgba(15,23,42,0.06),0_10px_30px_rgba(15,23,42,0.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_0_1px_rgba(255,255,255,0.08)] text-xs">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-300">
+                <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.8} />
+              </span>
+              <div>
+                <div className="text-[11px] font-semibold text-gray-900 dark:text-white">画质设置</div>
+                <div className="text-[10px] text-gray-400">重连后生效</div>
+              </div>
             </div>
-          </label>
-          <label className="space-y-1 block">
-            <span className="text-gray-500 dark:text-gray-400">帧率</span>
-            <div className="grid grid-cols-2 gap-1.5">
-              {fpsOptions.map(fps => (
-                <button
-                  key={fps}
-                  type="button"
-                  onClick={() => setCustomFps(fps)}
-                  className={`rounded-lg border px-2 py-1.5 text-xs font-medium transition-all ${customFps === fps
-                    ? 'border-cyan-400 bg-cyan-500/15 text-cyan-600 dark:text-cyan-300'
-                    : 'border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/30 text-gray-600 dark:text-gray-300 hover:border-cyan-400/60'
-                  }`}
-                >
-                  {fps}
-                </button>
-              ))}
+            <span className="rounded-lg bg-gray-100 px-2 py-1 text-[10px] font-medium text-gray-500 dark:bg-white/[0.06] dark:text-gray-400">
+              {customFps} FPS
+            </span>
+          </div>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-medium text-gray-400">画质预设</div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {Object.entries(qualityPresets).map(([key, preset]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => applyPreset(key as QualityPreset)}
+                    className={`rounded-xl px-2 py-2 text-left shadow-[0_0_0_1px_rgba(15,23,42,0.06)] transition ${quality === key
+                      ? 'bg-cyan-50 text-cyan-700 shadow-[0_0_0_1px_rgba(6,182,212,0.26),0_8px_18px_rgba(8,145,178,0.08)] dark:bg-cyan-400/[0.12] dark:text-cyan-100 dark:shadow-[0_0_0_1px_rgba(34,211,238,0.22)]'
+                      : 'bg-gray-50 text-gray-600 hover:bg-white hover:text-gray-900 dark:bg-white/[0.04] dark:text-gray-300 dark:hover:bg-white/[0.07] dark:hover:text-white'
+                    }`}
+                  >
+                    <div className="text-[11px] font-semibold">{preset.label}</div>
+                    <div className={`mt-0.5 text-[10px] ${quality === key ? 'text-cyan-600/70 dark:text-cyan-100/55' : 'text-gray-400'}`}>{preset.maxSize}p · {preset.bitrateMbps}Mbps</div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </label>
-          <label className="space-y-2 block rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/70 dark:bg-black/20 px-3 py-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-gray-500 dark:text-gray-400">码率</span>
-              <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-[11px] font-semibold text-violet-600 dark:text-violet-300">{customBitrateMbps} Mbps</span>
+
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-medium text-gray-400">帧率</div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {fpsOptions.map(fps => (
+                  <button
+                    key={fps}
+                    type="button"
+                    onClick={() => setCustomFps(fps)}
+                    className={`h-8 rounded-xl text-[11px] font-semibold shadow-[0_0_0_1px_rgba(15,23,42,0.06)] transition ${customFps === fps
+                      ? 'bg-cyan-50 text-cyan-700 shadow-[0_0_0_1px_rgba(6,182,212,0.26)] dark:bg-cyan-400/[0.12] dark:text-cyan-100 dark:shadow-[0_0_0_1px_rgba(34,211,238,0.22)]'
+                      : 'bg-gray-50 text-gray-500 hover:bg-white hover:text-gray-900 dark:bg-white/[0.04] dark:text-gray-300 dark:hover:bg-white/[0.07] dark:hover:text-white'
+                    }`}
+                  >
+                    {fps}
+                  </button>
+                ))}
+              </div>
             </div>
-            <input
-              type="range"
-              min={2}
-              max={32}
-              step={1}
-              value={customBitrateMbps}
-              onChange={(event) => setCustomBitrateMbps(Number(event.target.value))}
-              style={{ background: `linear-gradient(to right, #8b5cf6 ${((customBitrateMbps - 2) / (32 - 2)) * 100}%, rgba(148,163,184,0.28) ${((customBitrateMbps - 2) / (32 - 2)) * 100}%)` }}
-              className="h-2 w-full cursor-pointer appearance-none rounded-full outline-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-violet-400 [&::-webkit-slider-thumb]:shadow-[0_0_0_4px_rgba(139,92,246,0.18)] [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-violet-400"
-            />
-          </label>
-          <div className="text-[11px] text-gray-500">修改后点“重连”生效。</div>
+
+            <div className="space-y-2 rounded-xl bg-white/45 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_0_0_1px_rgba(15,23,42,0.05)] backdrop-blur-md dark:bg-white/[0.045] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_1px_rgba(255,255,255,0.07)]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 text-[10px] font-medium text-gray-400">
+                  <Gauge className="h-3 w-3" strokeWidth={1.8} />码率
+                </span>
+                <span className="text-[11px] font-semibold text-gray-900 dark:text-white">{customBitrateMbps} Mbps</span>
+              </div>
+              <input
+                type="range"
+                min={2}
+                max={32}
+                step={1}
+                value={customBitrateMbps}
+                onChange={(event) => setCustomBitrateMbps(Number(event.target.value))}
+                style={{ background: `linear-gradient(to right, rgba(8,145,178,0.52) ${((customBitrateMbps - 2) / (32 - 2)) * 100}%, rgba(100,116,139,0.22) ${((customBitrateMbps - 2) / (32 - 2)) * 100}%)` }}
+                className="h-1.5 w-full cursor-pointer appearance-none rounded-full outline-none shadow-[inset_0_1px_1px_rgba(15,23,42,0.08)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-cyan-700/25 [&::-webkit-slider-thumb]:bg-white/90 [&::-webkit-slider-thumb]:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_3px_rgba(8,145,178,0.12),0_2px_10px_rgba(15,23,42,0.16)] dark:[&::-webkit-slider-thumb]:border-white/20 dark:[&::-webkit-slider-thumb]:bg-white/35 dark:[&::-webkit-slider-thumb]:shadow-[inset_0_1px_0_rgba(255,255,255,0.32),0_2px_12px_rgba(0,0,0,0.28)] [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-cyan-700/25 [&::-moz-range-thumb]:bg-white/90 dark:[&::-moz-range-thumb]:border-white/20 dark:[&::-moz-range-thumb]:bg-white/35"
+              />
+            </div>
+          </div>
         </section>
       </aside>
     </div>
@@ -410,6 +477,12 @@ export default function ScrcpyDeviceView({
               disabled: false,
               onClick: exitImmersive,
               icon: <Minimize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
+            },
+            {
+              label: previewOrientation === 'portrait' ? '横屏' : '竖屏',
+              disabled: orientationLoading,
+              onClick: togglePreviewOrientation,
+              icon: <RotateCw className="h-3.5 w-3.5" strokeWidth={1.8} />
             },
             {
               label: '后台任务',
