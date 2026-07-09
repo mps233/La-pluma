@@ -5,11 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { fetchWithAuth } from '@/services/api'
-
-const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? `http://localhost:${window.location.port || '3000'}`
-  : `http://${window.location.hostname}:${window.location.port || '3000'}`
+import { API_BASE_URL, fetchWithAuth } from '@/services/api'
 
 interface TelegramConfig {
   enabled: boolean
@@ -50,7 +46,7 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
 
   const loadConfig = async () => {
     try {
-      const response = await fetchWithAuth(`${API_BASE_URL}/api/notification/config`)
+      const response = await fetchWithAuth(`${API_BASE_URL}/agent/notifications/config`)
       const data = await response.json()
       if (data.success) {
         setConfig(data.data || data)
@@ -62,7 +58,7 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
 
   const saveConfig = async () => {
     try {
-      const response = await fetchWithAuth(`${API_BASE_URL}/api/notification/config`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/agent/notifications/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
@@ -80,8 +76,10 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
     setTesting(true)
     
     try {
-      const response = await fetchWithAuth(`${API_BASE_URL}/api/notification/test/${channel}`, {
-        method: 'POST'
+      const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/test-notification-channel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel })
       })
       const data = await response.json()
       setTesting(false)

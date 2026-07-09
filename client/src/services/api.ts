@@ -27,6 +27,9 @@ const getApiBaseUrl = (): string => {
 export const API_BASE_URL = getApiBaseUrl()
 export const APP_ORIGIN_BASE_URL = API_BASE_URL.replace(/\/api$/, '')
 
+export const getItemIconUrl = (iconId: string | number): string =>
+  `https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/refs/heads/main/item/${encodeURIComponent(String(iconId))}.png`
+
 const getStoredToken = (): string => {
   const rawToken = localStorage.getItem('laPlumaToken') || ''
   const token = rawToken.replace(/^Bearer\s+/i, '').trim()
@@ -64,36 +67,6 @@ interface AutoUpdateConfig {
   time: string
   updateCore: boolean
   updateCli: boolean
-}
-
-/**
- * 材料目标接口
- */
-interface MaterialGoal {
-  materialId: string
-  targetAmount: number
-}
-
-/**
- * 材料计划接口
- */
-interface MaterialPlan {
-  stages: Array<{
-    stageId: string
-    stageName: string
-    times: number
-    sanity: number
-  }>
-  totalSanity: number
-}
-
-/**
- * 材料计划转换选项
- */
-interface MaterialPlanOptions {
-  useMedicine?: number
-  useStone?: number
-  series?: number
 }
 
 /**
@@ -688,78 +661,6 @@ export const maaApi = {
    */
   async getCopilotSet(copilotId: string): Promise<ApiResponse> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/copilot-sets/${copilotId}`)
-    return response.json()
-  },
-
-  // ========== 材料规划相关 API ==========
-  
-  /**
-   * 获取材料列表
-   */
-  async getMaterialsList(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/material-planner/materials`)
-    return response.json()
-  },
-
-  /**
-   * 获取用户材料计划
-   */
-  async getUserMaterialPlans(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/material-planner/plans`)
-    return response.json()
-  },
-
-  /**
-   * 保存用户材料计划
-   */
-  async saveUserMaterialPlans(plans: MaterialGoal[]): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/material-planner/plans`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(plans)
-    })
-    return response.json()
-  },
-
-  /**
-   * 生成材料刷取计划
-   */
-  async generateMaterialPlan(
-    materialGoals: MaterialGoal[],
-    currentInventory: Record<string, number>
-  ): Promise<ApiResponse<MaterialPlan>> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/material-planner/generate-plan`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ materialGoals, currentInventory })
-    })
-    return response.json()
-  },
-
-  /**
-   * 将材料计划转换为任务流程
-   */
-  async convertMaterialPlanToTasks(
-    plan: MaterialPlan,
-    options: MaterialPlanOptions
-  ): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/material-planner/convert-to-tasks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan, options })
-    })
-    return response.json()
-  },
-
-  /**
-   * 更新材料进度
-   */
-  async updateMaterialProgress(materialId: string, amount: number): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/material-planner/update-progress`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ materialId, amount })
-    })
     return response.json()
   },
 

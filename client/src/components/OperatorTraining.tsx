@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { getOperatorList, getTrainingQueue, addToTrainingQueue, removeFromTrainingQueue, updateTrainingSettings, generateTrainingPlan, applyTrainingPlan } from '../services/api'
+import { getOperatorList, getTrainingQueue, addToTrainingQueue, removeFromTrainingQueue, updateTrainingSettings, generateTrainingPlan, applyTrainingPlan, getItemIconUrl } from '../services/api'
 import { PageHeader, Button, Checkbox, IconButton } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
@@ -57,7 +57,7 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
             <div className="flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center">
               {node.iconId ? (
                 <img
-                  src={`/api/maa/item-icon/${node.iconId}`}
+                  src={getItemIconUrl(node.iconId)}
                   alt={node.name}
                   className="w-full h-full object-cover"
                   onError={(e) => {
@@ -153,7 +153,7 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
         <div className="flex-shrink-0 w-9 h-9 rounded-lg overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center">
           {node.iconId ? (
             <img
-              src={`/api/maa/item-icon/${node.iconId}`}
+              src={getItemIconUrl(node.iconId)}
               alt={node.name}
               className="w-full h-full object-cover"
               onError={(e) => {

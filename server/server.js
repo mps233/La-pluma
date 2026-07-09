@@ -66,6 +66,10 @@ app.use(cors({
 }));
 app.use(express.json());
 
+app.get('/health', (_req, res) => {
+  res.json({ success: true, status: 'ok' });
+});
+
 // 生产环境：服务前端静态文件
 if (process.env.NODE_ENV === 'production') {
   const { fileURLToPath } = await import('url');
@@ -150,4 +154,3 @@ httpServer.listen(PORT, '0.0.0.0', async () => {
 });
 
 export { io };
-

@@ -630,7 +630,7 @@ export default function Dashboard() {
                     {sklandData.avatarUrl ? (
                       <div className="relative w-24 h-24">
                         <img 
-                          src={`/api/skland/avatar-proxy?url=${encodeURIComponent(sklandData.avatarUrl)}`}
+                          src={sklandData.avatarUrl}
                           alt={sklandData.nickname}
                           className="w-full h-full object-cover shadow-lg"
                           onError={(e) => {

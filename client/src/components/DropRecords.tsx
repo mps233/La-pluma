@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import Icons from './Icons'
+import { getItemIconUrl } from '../services/api'
 import type { DropRecordsProps } from '@/types/components'
 
 export default function DropRecords({ dropStatistics, dropDays, setDropDays, onRefresh }: DropRecordsProps) {
@@ -144,7 +145,7 @@ export default function DropRecords({ dropStatistics, dropDays, setDropDays, onR
               {itemData.iconId && (
                 <div className="flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-900/30 dark:to-purple-900/30 flex items-center justify-center">
                   <img
-                    src={`/api/maa/item-icon/${itemData.iconId}`}
+                    src={getItemIconUrl(itemData.iconId)}
                     alt={itemName}
                     className="w-full h-full object-cover"
                     onError={(e) => {

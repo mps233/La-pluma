@@ -55,7 +55,7 @@ La Pluma 是一个面向《明日方舟》自动化的本地 Web 控制台。前
 - `/api/agent` - 主控制接口，覆盖 MAA 命令、任务状态、日志、截图、WebRTC、森空岛、养成、调度、通知和数据接口。
 - `/api/operator-quotes` - 干员语音/台词相关接口。
 
-仓库中仍保留部分历史路由文件作为迁移参考，但当前前端 API 封装主要对接 `/api/agent`。
+历史 `/api/maa`、`/api/skland`、`/api/notification` 等拆分路由已清理；新增功能应优先接入 `/api/agent`。
 
 ## 🤖 Agent API
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { maaApi, getTodayDrops, getDropStatistics, fetchOperatorMaterials, getTrainingQueue } from '../services/api'
+import { maaApi, getTodayDrops, getDropStatistics, fetchOperatorMaterials, getTrainingQueue, getItemIconUrl } from '../services/api'
 import { motion } from 'framer-motion'
 import Icons from './Icons'
 import DropRecords from './DropRecords'
@@ -1215,7 +1215,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                         {/* 物品图标 */}
                         <div className="flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-900/30 dark:to-purple-900/30 flex items-center justify-center">
                           <img
-                            src={`/api/maa/item-icon/${item.iconId}`}
+                            src={getItemIconUrl(item.iconId)}
                             alt={item.name}
                             className="w-full h-full object-cover"
                             onError={(e) => {
