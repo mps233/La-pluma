@@ -4,7 +4,6 @@ import { motion } from 'framer-motion'
 import Icons from './Icons'
 import ScreenMonitor from './ScreenMonitor'
 import NotificationSettings from './NotificationSettings'
-import AutomationTimeline from './AutomationTimeline'
 import { PageHeader, Button } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
@@ -984,8 +983,6 @@ export default function AutomationTasks({}: AutomationTasksProps) {
               address={taskFlow.find(t => t.commandId === 'startup')?.params?.address || '127.0.0.1:16384'}
             />
           </div>
-
-          <AutomationTimeline taskFlow={taskFlow} currentStep={currentStep} isRunning={isRunning} />
 
           {/* 定时执行 */}
           <div className="rounded-3xl p-6 border border-gray-200 dark:border-white/10 bg-white dark:bg-[rgba(15,15,15,0.6)] transition-colors">
