@@ -4,6 +4,7 @@
  */
 
 import type { ApiResponse } from '@/types/api'
+import type { TrainingPlan, TrainingSettings } from '@/types/components'
 
 /**
  * 自动检测 API 地址
@@ -70,25 +71,18 @@ interface TrainingPlanOptions {
  */
 interface TrainingQueueData {
   operatorId: string
+  currentElite?: number
+  targetElite?: number
   priority?: number
-}
-
-/**
- * 养成设置
- */
-interface TrainingSettings {
-  autoSwitch: boolean
-  notify: boolean
-  useMedicine?: number
-  useStone?: number
 }
 
 /**
  * 养成计划应用数据
  */
 interface ApplyTrainingPlanData {
-  plan: any
-  options?: any
+  plan: TrainingPlan
+  settings?: TrainingSettings
+  taskType?: 'combat'
 }
 
 /**

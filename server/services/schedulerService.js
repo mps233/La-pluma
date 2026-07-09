@@ -1181,6 +1181,46 @@ export function getAutoUpdateStatus() {
  * 动态更新智能养成关卡
  * 在任务执行完成后，重新生成刷取计划并更新任务流程
  */
+function getPlanOpenStages(plan = {}) {
+  const stages = Array.isArray(plan.openStages) && plan.openStages.length > 0
+    ? plan.openStages
+    : Array.isArray(plan.stages)
+      ? plan.stages.filter(stage => stage?.isOpen !== false)
+      : [];
+
+  return stages.filter(stage => stage?.stage && Number(stage.totalTimes ?? stage.times ?? 0) > 0);
+}
+
+function buildSmartTrainingStages(plan = {}) {
+  const trainingOperatorNames = Array.isArray(plan.operators)
+    ? plan.operators.map(op => op.name).filter(Boolean)
+    : [];
+
+  return getPlanOpenStages(plan).map(stage => ({
+    stage: stage.stage,
+    times: String(stage.totalTimes ?? stage.times ?? 0),
+    smart: true,
+    trainingOperators: trainingOperatorNames
+  }));
+}
+
+function replaceSmartTrainingStages(task, smartStages = []) {
+  const currentStages = task.params.stages || [];
+  const pinnedStages = currentStages.filter(s => typeof s === 'object' && s.pinned && s.stage && s.stage.trim());
+  const normalStages = currentStages.filter(s =>
+    (typeof s === 'string' && s.trim()) ||
+    (typeof s === 'object' && !s.pinned && !s.smart && s.stage && s.stage.trim())
+  );
+
+  task.params.stages = [...pinnedStages, ...smartStages, ...normalStages];
+}
+
+function clearSmartTrainingStagesFromTask(task) {
+  const currentStages = task.params.stages || [];
+  const newStages = currentStages.filter(s => !(typeof s === 'object' && s.smart));
+  task.params.stages = newStages.length > 0 ? newStages : [{ stage: '', times: '' }];
+}
+
 async function updateSmartTrainingStages(scheduleId) {
   logger.info('智能养成开始动态更新关卡', { scheduleId });
   
@@ -1223,16 +1263,16 @@ async function updateSmartTrainingStages(scheduleId) {
     if (!queueResult.success || !queueResult.data || !queueResult.data.queue || queueResult.data.queue.length === 0) {
       logger.info('智能养成队列为空，移除所有智能养成关卡', { scheduleId });
       
-      // 移除所有智能养成关卡
       const task = taskFlow[fightTaskIndex];
-      const newStages = task.params.stages.filter(s => !(typeof s === 'object' && s.smart));
-      task.params.stages = newStages.length > 0 ? newStages : [{ stage: '', times: '' }];
+      clearSmartTrainingStagesFromTask(task);
       
-      // 保存更新后的配置
       await saveUserConfig('automation-tasks', { taskFlow, schedule: configResult.data.schedule });
       logger.success('智能养成已移除所有智能养成关卡', { scheduleId });
       return;
     }
+
+    const trainingSettings = queueResult.data.settings || {};
+    const shouldAutoSwitch = trainingSettings.autoSwitch !== false;
     
     // 4. 重新生成刷取计划（仅当前干员）
     const plan = await operatorTrainingService.generateTrainingPlan('current');
@@ -1240,6 +1280,8 @@ async function updateSmartTrainingStages(scheduleId) {
       logger.warn('智能养成生成刷取计划失败', { scheduleId });
       return;
     }
+
+    const openSmartStages = buildSmartTrainingStages(plan);
     
     // 5. 检查是否还有需要刷的关卡
     if (plan.stages.length === 0) {
@@ -1247,101 +1289,78 @@ async function updateSmartTrainingStages(scheduleId) {
       
       // 6. 自动切换到下一个干员
       const queue = queueResult.data.queue;
-      if (queue.length > 1) {
+      if (shouldAutoSwitch && queue.length > 1) {
         // 移除第一个干员（已完成）
         const completedOperator = queue.shift();
-        await saveUserConfig('training-queue', { queue, settings: queueResult.data.settings });
+        await saveUserConfig('training-queue', {
+          ...queueResult.data,
+          queue,
+          settings: trainingSettings,
+          lastUpdated: new Date().toISOString()
+        });
         logger.success('智能养成已切换到下一个干员', { 
           scheduleId, 
-          completedOperator: completedOperator.name,
-          nextOperator: queue[0].name 
+          completedOperator: completedOperator.name || completedOperator.operatorId,
+          nextOperator: queue[0].name || queue[0].operatorId
         });
         
         // 重新生成刷取计划
         const newPlan = await operatorTrainingService.generateTrainingPlan('current');
-        if (newPlan && newPlan.stages && newPlan.stages.length > 0) {
-          const trainingOperatorNames = newPlan.operators && newPlan.operators.length > 0
-            ? newPlan.operators.map(op => op.name)
-            : [];
-          
-          // 更新智能养成关卡
-          const newSmartStages = newPlan.stages.map(stage => ({
-            stage: stage.stage,
-            times: stage.totalTimes.toString(),
-            smart: true,
-            trainingOperators: trainingOperatorNames
-          }));
-          
-          // 替换智能养成关卡
+        const newSmartStages = buildSmartTrainingStages(newPlan || {});
+        if (newPlan && newPlan.stages && newPlan.stages.length > 0 && newSmartStages.length > 0) {
           const task = taskFlow[fightTaskIndex];
-          const pinnedStages = task.params.stages.filter(s => typeof s === 'object' && s.pinned && s.stage && s.stage.trim());
-          const normalStages = task.params.stages.filter(s => 
-            (typeof s === 'string' && s.trim()) || 
-            (typeof s === 'object' && !s.pinned && !s.smart && s.stage && s.stage.trim())
-          );
+          replaceSmartTrainingStages(task, newSmartStages);
           
-          task.params.stages = [...pinnedStages, ...newSmartStages, ...normalStages];
-          
-          // 保存更新后的配置
           await saveUserConfig('automation-tasks', { taskFlow, schedule: configResult.data.schedule });
           logger.success('智能养成已更新智能养成关卡', { 
             scheduleId,
-            operators: trainingOperatorNames,
+            operators: newSmartStages[0]?.trainingOperators || [],
             stageCount: newSmartStages.length 
           });
         } else {
-          // 新干员也没有需要刷的材料，移除智能养成关卡
           const task = taskFlow[fightTaskIndex];
-          const newStages = task.params.stages.filter(s => !(typeof s === 'object' && s.smart));
-          task.params.stages = newStages.length > 0 ? newStages : [{ stage: '', times: '' }];
+          clearSmartTrainingStagesFromTask(task);
           
           await saveUserConfig('automation-tasks', { taskFlow, schedule: configResult.data.schedule });
-          logger.info('智能养成新干员也无需刷取材料，已移除所有智能养成关卡', { scheduleId });
+          logger.info('智能养成新目标今天没有可刷关卡，已移除所有智能养成关卡', { scheduleId });
         }
       } else {
-        // 队列中只有一个干员且已完成，移除智能养成关卡
-        logger.info('智能养成队列已全部完成，移除所有智能养成关卡', { scheduleId });
+        logger.info('智能养成不切换到下一个干员，移除所有智能养成关卡', {
+          scheduleId,
+          autoSwitch: shouldAutoSwitch,
+          queueLength: queue.length
+        });
         
         const task = taskFlow[fightTaskIndex];
-        const newStages = task.params.stages.filter(s => !(typeof s === 'object' && s.smart));
-        task.params.stages = newStages.length > 0 ? newStages : [{ stage: '', times: '' }];
+        clearSmartTrainingStagesFromTask(task);
         
         await saveUserConfig('automation-tasks', { taskFlow, schedule: configResult.data.schedule });
         logger.success('智能养成已移除所有智能养成关卡', { scheduleId });
       }
+    } else if (openSmartStages.length === 0) {
+      logger.info('智能养成当前计划今天没有开放关卡，移除所有智能养成关卡', {
+        scheduleId,
+        stageCount: plan.stages.length
+      });
+
+      const task = taskFlow[fightTaskIndex];
+      clearSmartTrainingStagesFromTask(task);
+
+      await saveUserConfig('automation-tasks', { taskFlow, schedule: configResult.data.schedule });
     } else {
       // 7. 还有关卡需要刷，更新关卡和次数
       logger.info('智能养成更新剩余关卡', { 
         scheduleId, 
-        stageCount: plan.stages.length 
+        stageCount: openSmartStages.length
       });
       
-      const trainingOperatorNames = plan.operators && plan.operators.length > 0
-        ? plan.operators.map(op => op.name)
-        : [];
-      
-      const newSmartStages = plan.stages.map(stage => ({
-        stage: stage.stage,
-        times: stage.totalTimes.toString(),
-        smart: true,
-        trainingOperators: trainingOperatorNames
-      }));
-      
-      // 替换智能养成关卡
       const task = taskFlow[fightTaskIndex];
-      const pinnedStages = task.params.stages.filter(s => typeof s === 'object' && s.pinned && s.stage && s.stage.trim());
-      const normalStages = task.params.stages.filter(s => 
-        (typeof s === 'string' && s.trim()) || 
-        (typeof s === 'object' && !s.pinned && !s.smart && s.stage && s.stage.trim())
-      );
+      replaceSmartTrainingStages(task, openSmartStages);
       
-      task.params.stages = [...pinnedStages, ...newSmartStages, ...normalStages];
-      
-      // 保存更新后的配置
       await saveUserConfig('automation-tasks', { taskFlow, schedule: configResult.data.schedule });
       logger.success('智能养成已更新智能养成关卡', { 
         scheduleId,
-        stages: newSmartStages.map(s => `${s.stage}×${s.times}`)
+        stages: openSmartStages.map(s => `${s.stage}×${s.times}`)
       });
     }
     

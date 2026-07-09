@@ -22,6 +22,35 @@ const OPERATOR_MATERIALS_PATH = path.join(__dirname, '../data/operator-materials
 const OPERBOX_PATH = path.join(__dirname, '../data/operbox.json');
 const DEPOT_PATH = path.join(__dirname, '../data/depot.json');
 
+const DEFAULT_TRAINING_SETTINGS = {
+  autoSwitch: true,
+  notifyOnComplete: true,
+  useMedicine: 0,
+  useStone: 0
+};
+
+function normalizeTrainingSettings(settings = {}) {
+  const normalized = { ...settings };
+  if (typeof normalized.notify === 'boolean' && typeof normalized.notifyOnComplete !== 'boolean') {
+    normalized.notifyOnComplete = normalized.notify;
+  }
+  delete normalized.notify;
+  return {
+    ...DEFAULT_TRAINING_SETTINGS,
+    ...normalized
+  };
+}
+
+function getApplicableStages(plan = {}) {
+  const candidateStages = Array.isArray(plan.openStages) && plan.openStages.length > 0
+    ? plan.openStages
+    : Array.isArray(plan.stages)
+      ? plan.stages.filter(stage => stage?.isOpen !== false)
+      : [];
+
+  return candidateStages.filter(stage => stage?.stage && Number(stage.totalTimes ?? stage.times ?? 0) > 0);
+}
+
 /**
  * 关卡代号映射表
  * 将数据库中的关卡代号转换为 MAA 可识别的关卡名称
@@ -230,16 +259,16 @@ async function loadDepot() {
 async function loadTrainingQueue() {
   const defaultQueue = {
     queue: [],
-    settings: {
-      autoSwitch: true,
-      notifyOnComplete: true,
-      useMedicine: 0,
-      useStone: 0
-    },
+    settings: DEFAULT_TRAINING_SETTINGS,
     lastUpdated: new Date().toISOString()
   };
   
-  return await readJsonFile(TRAINING_QUEUE_PATH, defaultQueue);
+  const queueData = await readJsonFile(TRAINING_QUEUE_PATH, defaultQueue);
+  return {
+    ...defaultQueue,
+    ...queueData,
+    settings: normalizeTrainingSettings(queueData.settings)
+  };
 }
 
 /**
@@ -278,6 +307,7 @@ async function getOperatorList(filters = {}) {
         profession: opData?.profession || '未知',
         currentElite: operBoxOp.elite || 0,
         currentLevel: operBoxOp.level || 1,
+        targetElite: 2,
         owned: true,
         potential: operBoxOp.potential || 1,
         hasMaterialData: !!opData, // 标记是否有材料数据
@@ -313,10 +343,11 @@ async function getOperatorList(filters = {}) {
 function calculateOperatorMaterials(operator, depot = {}) {
   const materials = [];
   const totalLMD = { needed: 0, have: 0 };
+  const targetElite = operator.targetElite ?? 2;
   
   // 根据当前精英等级决定需要哪些材料
-  const needElite1 = operator.currentElite < 1;
-  const needElite2 = operator.currentElite < 2;
+  const needElite1 = operator.currentElite < 1 && targetElite >= 1;
+  const needElite2 = operator.currentElite < 2 && targetElite >= 2;
   
   // 收集所有需要的材料
   const allMaterials = {};
@@ -411,8 +442,8 @@ async function getTrainingQueue() {
       name: opData.name,
       rarity: opData.rarity,
       profession: opData.profession,
-      currentElite: queueItem.currentElite || 0,
-      targetElite: queueItem.targetElite || 2,
+      currentElite: queueItem.currentElite ?? 0,
+      targetElite: queueItem.targetElite ?? 2,
       materials: {
         elite1: opData.elite1,
         elite2: opData.elite2
@@ -486,8 +517,8 @@ async function addToQueue(operatorId, options = {}) {
   // 添加到队列
   const queueItem = {
     operatorId,
-    currentElite: options.currentElite || 0,
-    targetElite: options.targetElite || 2,
+    currentElite: options.currentElite ?? operBoxOp?.elite ?? 0,
+    targetElite: options.targetElite ?? 2,
     priority: queueData.queue.length + 1,
     status: 'pending',
     addedAt: new Date().toISOString()
@@ -608,7 +639,7 @@ async function updateQueueOrder(orderedOperatorIds) {
  */
 async function updateSettings(settings) {
   const queueData = await loadTrainingQueue();
-  queueData.settings = { ...queueData.settings, ...settings };
+  queueData.settings = normalizeTrainingSettings({ ...queueData.settings, ...settings });
   await saveTrainingQueue(queueData);
   return queueData.settings;
 }
@@ -714,7 +745,8 @@ async function generateTrainingPlan(mode = 'current') {
       name: opData.name,
       rarity: opData.rarity,
       profession: opData.profession,
-      currentElite: queueItem.currentElite || 0,
+      currentElite: queueItem.currentElite ?? 0,
+      targetElite: queueItem.targetElite ?? 2,
       materials: {
         elite1: opData.elite1,
         elite2: opData.elite2
@@ -729,6 +761,8 @@ async function generateTrainingPlan(mode = 'current') {
         id: operator.id,
         name: operator.name,
         rarity: operator.rarity,
+        currentElite: operator.currentElite,
+        targetElite: operator.targetElite,
         materials: materialCalc.materials.filter(m => m.stillNeeded > 0)
       });
       
@@ -883,9 +917,14 @@ async function generateTrainingPlan(mode = 'current') {
  * 应用养成计划到任务流程
  */
 async function applyPlanToTasks(plan, settings = {}) {
+  const queueData = await loadTrainingQueue();
+  const effectiveSettings = normalizeTrainingSettings({ ...queueData.settings, ...settings });
+  const applicableStages = getApplicableStages(plan);
+
   logger.info('开始应用养成计划');
   logger.debug('计划详情', { 
     stageCount: plan.stages?.length || 0,
+    applicableStageCount: applicableStages.length,
     operatorCount: plan.operators?.length || 0
   });
   
@@ -914,9 +953,9 @@ async function applyPlanToTasks(plan, settings = {}) {
         params: {
           stage: '1-7',
           stages: [],
-          medicine: settings.useMedicine || 0,
+          medicine: effectiveSettings.useMedicine || 0,
           expiringMedicine: 0,
-          stone: settings.useStone || 0,
+          stone: effectiveSettings.useStone || 0,
           series: 0
         }
       };
@@ -946,11 +985,11 @@ async function applyPlanToTasks(plan, settings = {}) {
     
     logger.debug('养成干员', { operators: trainingOperatorNames });
     
-    if (plan.stages && plan.stages.length > 0) {
-      plan.stages.forEach(stage => {
+    if (applicableStages.length > 0) {
+      applicableStages.forEach(stage => {
         smartStages.push({
           stage: stage.stage,
-          times: stage.totalTimes.toString(),
+          times: String(stage.totalTimes ?? stage.times ?? 0),
           smart: true,
           trainingOperators: trainingOperatorNames
         });
@@ -959,14 +998,14 @@ async function applyPlanToTasks(plan, settings = {}) {
     }
     
     // 添加 fallback 关卡（理智用完后刷什么）
-    if (settings.fallbackStage && settings.fallbackStage.trim()) {
+    if (effectiveSettings.fallbackStage && effectiveSettings.fallbackStage.trim()) {
       smartStages.push({
-        stage: settings.fallbackStage.trim(),
-        times: (settings.fallbackTimes || 999).toString(),
+        stage: effectiveSettings.fallbackStage.trim(),
+        times: (effectiveSettings.fallbackTimes || 999).toString(),
         smart: true,
         trainingOperators: trainingOperatorNames
       });
-      logger.debug('添加 fallback 关卡', { stage: settings.fallbackStage });
+      logger.debug('添加 fallback 关卡', { stage: effectiveSettings.fallbackStage });
     }
     
     // 重新组合关卡顺序：置顶 -> 智能 -> 普通
@@ -981,9 +1020,9 @@ async function applyPlanToTasks(plan, settings = {}) {
     fightTask.params = {
       ...fightTask.params,
       stages: newStages,
-      medicine: settings.useMedicine || 0,
+      medicine: effectiveSettings.useMedicine || 0,
       expiringMedicine: 0,
-      stone: settings.useStone || 0,
+      stone: effectiveSettings.useStone || 0,
       series: fightTask.params.series || 0
     };
     
@@ -995,7 +1034,7 @@ async function applyPlanToTasks(plan, settings = {}) {
       success: true, 
       stageCount: smartStages.length,
       totalStages: newStages.length,
-      hasFallback: !!settings.fallbackStage
+      hasFallback: !!effectiveSettings.fallbackStage
     };
   } catch (error) {
     logger.error('应用任务流程失败', { error: error.message });

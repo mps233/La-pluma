@@ -264,6 +264,16 @@ export default function OperatorTraining() {
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({});
   const [openMenu, setOpenMenu] = useState<TrainingOpenMenu>(null);
 
+  const getOpenStagePlan = (sourcePlan: TrainingPlan): TrainingPlan => ({
+    ...sourcePlan,
+    stages: sourcePlan.openStages ?? sourcePlan.stages?.filter(stage => stage.isOpen !== false) ?? []
+  });
+
+  const getOpenStageCount = (sourcePlan: TrainingPlan | null): number => {
+    if (!sourcePlan) return 0;
+    return sourcePlan.openStages?.length ?? sourcePlan.stages?.filter(stage => stage.isOpen !== false).length ?? 0;
+  };
+
   // 加载干员列表
   useEffect(() => {
     loadOperators();
@@ -316,10 +326,12 @@ export default function OperatorTraining() {
       if (response.success) {
         setQueue(response.data.queue);
         setSettings(response.data.settings);
+        return response.data;
       }
     } catch (error) {
       // 静默失败
     }
+    return null;
   };
 
   const handleAddToQueue = async (operator: TrainingOperator) => {
@@ -329,30 +341,52 @@ export default function OperatorTraining() {
       
       const response = await addToTrainingQueue({
         operatorId: operator.id,
-      } as any);
+        currentElite: operator.currentElite ?? 0,
+        targetElite: operator.targetElite ?? 2
+      });
 
       if (response.success) {
-        await loadQueue();
+        const queueData = await loadQueue();
         setStatusMessage(`${operator.name} 添加成功！`);
         await new Promise(resolve => setTimeout(resolve, 800));
 
+        const addedIsCurrent = queueData?.queue?.[0]?.operatorId === operator.id;
+        if (!addedIsCurrent) {
+          setStatusMessage(`${operator.name} 已加入队列，将在当前目标完成后处理`);
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          setStatusMessage('');
+          return;
+        }
+
         setStatusMessage('正在生成刷取计划...');
 
-        // 自动生成刷取计划（仅当前干员）
+        // 首个队列目标可以直接生成并加入今日流程。
         try {
           const planResponse = await generateTrainingPlan({ mode: 'current' });
           if (planResponse.success && planResponse.data) {
             const generatedPlan = planResponse.data;
             setPlan(generatedPlan);
 
+            const todayPlan = getOpenStagePlan(generatedPlan);
+            if (!todayPlan.stages || todayPlan.stages.length === 0) {
+              setStatusMessage('今天没有可直接加入流程的开放关卡');
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              setStatusMessage('');
+              return;
+            }
+
             setStatusMessage('正在应用到作战任务...');
 
             // 自动应用到作战任务
             try {
               const applyResponse = await applyTrainingPlan({
-                plan: generatedPlan,
-              } as any);
+                plan: todayPlan,
+                settings
+              });
               if (applyResponse.success) {
+                window.dispatchEvent(new CustomEvent('training-plan-applied', {
+                  detail: { stageCount: applyResponse.data?.stageCount ?? todayPlan.stages.length }
+                }));
                 setStatusMessage('刷取计划已应用到作战任务！');
                 await new Promise(resolve => setTimeout(resolve, 1500));
                 setStatusMessage('');
@@ -430,20 +464,26 @@ export default function OperatorTraining() {
 
   const handleApplyPlan = async () => {
     if (!plan) return;
+    const todayPlan = getOpenStagePlan(plan);
+    if (!todayPlan.stages || todayPlan.stages.length === 0) {
+      showError('今天没有可加入流程的开放关卡');
+      return;
+    }
     
     try {
       setLoading(true);
       showInfo('应用中...');
       const response = await applyTrainingPlan({
-        plan,
-      } as any);
+        plan: todayPlan,
+        settings
+      });
       
       if (response.success) {
         showSuccess('养成计划已应用到作战任务流程！');
         
         // 触发事件通知其他组件重新加载配置
         window.dispatchEvent(new CustomEvent('training-plan-applied', {
-          detail: { stageCount: response.data.stageCount }
+          detail: { stageCount: response.data?.stageCount ?? todayPlan.stages.length }
         }));
       }
     } catch (error: any) {
@@ -455,10 +495,7 @@ export default function OperatorTraining() {
 
   const handleUpdateSettings = async (newSettings: TrainingSettings) => {
     try {
-      const response = await updateTrainingSettings({
-        ...newSettings,
-        notify: newSettings.notifyOnComplete ?? false
-      } as any);
+      const response = await updateTrainingSettings(newSettings);
       if (response.success) {
         setSettings(response.data);
       }
@@ -474,6 +511,7 @@ export default function OperatorTraining() {
     }
     return true;
   });
+  const openStageCount = getOpenStageCount(plan);
 
   return (
     <div className="p-6">
@@ -1059,7 +1097,7 @@ export default function OperatorTraining() {
 
                   <Button
                     onClick={handleApplyPlan}
-                    disabled={loading || !plan.stages || plan.stages.length === 0}
+                    disabled={loading || openStageCount === 0}
                     variant="gradient"
                     gradientFrom="amber"
                     gradientTo="yellow"
@@ -1105,7 +1143,7 @@ export default function OperatorTraining() {
                       <h3 className="text-lg font-bold text-gray-900 dark:text-white">今日推荐刷图</h3>
                       <p className="text-sm text-gray-500 dark:text-gray-400">今天能推进养成的关卡</p>
                     </div>
-                    <Button onClick={handleApplyPlan} disabled={loading || !plan.openStages || plan.openStages.length === 0} variant="ghost" size="sm">加入今日流程</Button>
+                    <Button onClick={handleApplyPlan} disabled={loading || openStageCount === 0} variant="ghost" size="sm">加入今日流程</Button>
                   </div>
                   {plan.openStages && plan.openStages.length > 0 ? (
                     <div className="space-y-3">
