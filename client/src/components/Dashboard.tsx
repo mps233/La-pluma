@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Cpu, HardDrive, Database, Thermometer } from 'lucide-react'
 import { getOpenTodayStages, getSklandPlayerData, getSklandStatus, getTodayDrops, getTrainingQueue, maaApi } from '../services/api'
 import Icons from './Icons'
@@ -6,7 +6,7 @@ import { PageHeader, Card, Button } from './common'
 import { DashboardSkeleton } from './common/Loading'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useUIStore } from '@/stores'
-import { useScrcpyWebRTC } from '../hooks/useScrcpyWebRTC'
+import DashboardPreviewEntry from './DashboardPreviewEntry'
 
 interface SklandData {
   uid: string
@@ -112,89 +112,6 @@ interface OpenStageSummary {
   open: Array<{ stage: string; name: string }>
   closed: Array<{ stage: string; name: string }>
 }
-
-const DashboardPreviewEntry = memo(function DashboardPreviewEntry({ onOpen }: { onOpen: () => void }) {
-  const previewVideoRef = useRef<HTMLVideoElement | null>(null)
-  const previewAutoConnectRef = useRef(false)
-  const [webrtcStatus, setWebrtcStatus] = useState<any>(null)
-  const dashboardPreview = useScrcpyWebRTC({
-    videoRef: previewVideoRef,
-    deviceId: 'mumu-la-pluma',
-    signalingUrl: webrtcStatus?.signalingUrl || 'ws://127.0.0.1:8443',
-    connectionPath: 'auto',
-    ipPreference: 'ipv4',
-    scrcpyOptions: {
-      max_fps: 30,
-      max_size: 960,
-      bitrate: 2500000,
-      min_bitrate: 1000000,
-      max_bitrate: 5000000,
-      bwe: true,
-      audio: false,
-      snapshot_interval: 10
-    }
-  })
-
-  useEffect(() => {
-    const fetch = () => { maaApi.getWebrtcStatus().then(r => { if (r.success) setWebrtcStatus(r.data) }).catch(() => {}) }
-    fetch()
-    const timer = setInterval(fetch, 5000)
-    return () => clearInterval(timer)
-  }, [])
-
-  useEffect(() => {
-    if (!webrtcStatus?.serverRunning || !webrtcStatus?.agentRunning || previewAutoConnectRef.current) return
-    previewAutoConnectRef.current = true
-    dashboardPreview.connect()
-  }, [dashboardPreview, webrtcStatus?.agentRunning, webrtcStatus?.serverRunning])
-
-  return (
-    <div className="rounded-2xl border border-gray-100 dark:border-white/5 bg-white dark:bg-[rgba(15,15,15,0.4)] overflow-hidden">
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-gray-50 dark:border-white/5">
-        <div className="flex items-center gap-2">
-          <div className={`h-1.5 w-1.5 rounded-full ${dashboardPreview.stats?.videoLive ? 'bg-emerald-400' : 'bg-cyan-400'}`} />
-          <span className="text-xs font-medium text-gray-500">模拟器实时预览</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="hidden sm:inline text-[10px] text-gray-400">
-            {dashboardPreview.stats?.videoLive ? `${dashboardPreview.stats?.width || 0}×${dashboardPreview.stats?.height || 0}` : '自动连接中'}
-          </span>
-          <Button onClick={onOpen} variant="ghost" size="sm">打开</Button>
-        </div>
-      </div>
-      <div className="relative aspect-video w-full overflow-hidden bg-black">
-        <video
-          ref={previewVideoRef}
-          autoPlay
-          muted
-          playsInline
-          className="relative h-full w-full bg-black object-contain"
-        />
-        <button
-          type="button"
-          onClick={onOpen}
-          className={`absolute inset-0 flex items-center justify-center text-left ${dashboardPreview.stats?.videoLive ? 'bg-transparent' : 'bg-black'}`}
-        >
-          {!dashboardPreview.stats?.videoLive && (
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,211,238,0.16),transparent_45%)] opacity-80" />
-          )}
-          {!dashboardPreview.stats?.videoLive && (
-            <div className="relative text-center">
-              <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-cyan-300">
-                <Icons.Monitor />
-              </div>
-              <div className="text-sm font-semibold text-white">等待 Live 画面</div>
-              <div className="mt-1 text-xs text-slate-400">点击进入完整控制台</div>
-            </div>
-          )}
-        </button>
-        <div className="pointer-events-none absolute left-2 top-2 rounded-lg border border-white/10 bg-black/35 px-2 py-1 text-[10px] text-zinc-200">
-          {dashboardPreview.stats?.videoLive ? 'Live' : dashboardPreview.error || dashboardPreview.status}
-        </div>
-      </div>
-    </div>
-  )
-})
 
 export default function Dashboard() {
   const setActiveTab = useUIStore(state => state.setActiveTab)

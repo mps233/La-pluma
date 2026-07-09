@@ -417,6 +417,15 @@ export const maaApi = {
     return response.json()
   },
 
+  async captureScreen(address = '127.0.0.1:16384'): Promise<ApiResponse> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/screen/screenshot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address })
+    })
+    return response.json()
+  },
+
   async getDeviceStats(address?: string): Promise<ApiResponse> {
     const qs = address ? `?address=${encodeURIComponent(address)}` : ''
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/device-stats${qs}`)
