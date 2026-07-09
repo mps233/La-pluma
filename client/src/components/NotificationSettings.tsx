@@ -37,9 +37,14 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
     }
   })
   const [testing, setTesting] = useState(false)
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const getResponseMessage = (data: any, fallback: string) =>
+    data?.message || data?.errorInfo?.message || data?.error || fallback
 
   useEffect(() => {
     if (isOpen) {
+      setNotice(null)
       loadConfig()
     }
   }, [isOpen])
@@ -50,13 +55,16 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
       const data = await response.json()
       if (data.success) {
         setConfig(data.data || data)
+      } else {
+        setNotice({ type: 'error', text: getResponseMessage(data, '加载通知配置失败') })
       }
     } catch (error) {
-      // 静默失败
+      setNotice({ type: 'error', text: (error as Error).message || '加载通知配置失败' })
     }
   }
 
   const saveConfig = async () => {
+    setNotice(null)
     try {
       const response = await fetchWithAuth(`${API_BASE_URL}/agent/notifications/config`, {
         method: 'POST',
@@ -65,15 +73,18 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
       })
       const data = await response.json()
       if (data.success) {
-        // 配置已保存
+        setNotice({ type: 'success', text: data.message || '通知配置已保存' })
+      } else {
+        setNotice({ type: 'error', text: getResponseMessage(data, '通知配置保存失败') })
       }
     } catch (error) {
-      // 静默失败
+      setNotice({ type: 'error', text: (error as Error).message || '通知配置保存失败' })
     }
   }
 
   const testNotification = async (channel: string) => {
     setTesting(true)
+    setNotice(null)
     
     try {
       const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/test-notification-channel`, {
@@ -85,11 +96,13 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
       setTesting(false)
       
       if (data.success) {
-        // 测试通知已发送
+        setNotice({ type: 'success', text: data.message || '测试通知已发送' })
+      } else {
+        setNotice({ type: 'error', text: getResponseMessage(data, '测试通知失败') })
       }
     } catch (error) {
       setTesting(false)
-      // 静默失败
+      setNotice({ type: 'error', text: (error as Error).message || '测试通知失败' })
     }
   }
 
@@ -130,6 +143,16 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
               </svg>
             </button>
           </div>
+
+          {notice && (
+            <div className={`mb-5 rounded-2xl border px-4 py-3 text-sm font-medium ${
+              notice.type === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300'
+                : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300'
+            }`}>
+              {notice.text}
+            </div>
+          )}
 
           {/* 全局开关 */}
           <div className="mb-6 p-4 rounded-2xl bg-gray-50 dark:bg-[rgba(20,20,20,0.6)] border border-gray-200 dark:border-white/10">

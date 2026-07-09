@@ -495,8 +495,6 @@ export interface DropStatistics {
 }
 
 // ============================================
-// MaaControl Component Types
-// ============================================
 // DataStatistics 组件类型
 // ============================================
 
@@ -549,66 +547,6 @@ export type SortBy = 'default' | 'level' | 'rarity' | 'potential';
 export type ActiveTask = 'depot' | 'operbox' | null;
 export type ActiveTab = 'operbox' | 'depot' | 'drops';
 export type OpenMenu = 'ownership' | 'rarity' | 'profession' | 'elite' | 'potential' | 'sort' | null;
-
-// ============================================
-
-export interface MaaControlProps {
-  // 目前没有 props，但定义接口以备将来扩展
-}
-
-export interface MaaTask {
-  id: string
-  name: string
-  command: string
-  placeholder: string
-  icon: string
-  supportsDryRun?: boolean
-  hasAdvanced?: boolean
-}
-
-export interface MaaTaskCategory {
-  name: string
-  icon: string
-  description: string
-  tasks: MaaTask[]
-}
-
-export interface MaaAdvancedOption {
-  key: string
-  label: string
-  type: 'text' | 'number' | 'select' | 'checkbox'
-  param: string
-  placeholder?: string
-  options?: Array<{ value: string; label: string }>
-}
-
-export interface MaaTaskInputs {
-  [taskId: string]: string
-}
-
-export interface MaaDryRunMode {
-  [taskId: string]: boolean
-}
-
-export interface MaaShowAdvanced {
-  [taskId: string]: boolean
-}
-
-export interface MaaAdvancedParams {
-  [taskId: string]: {
-    [key: string]: string | number | boolean
-  }
-}
-
-export interface MaaCopilotSetInfo {
-  type: 'single' | 'set'
-  id: string
-  name: string
-  stage?: string
-  operators?: string
-  note?: string
-  autoAddS?: boolean
-}
 
 // ============================================
 // OperatorTraining Component Types

@@ -7,25 +7,14 @@ import type { ApiResponse } from '@/types/api'
 
 /**
  * 自动检测 API 地址
- * 如果是 localhost，使用 localhost
- * 如果是通过 IP 访问，使用相同的 IP 地址
+ * 始终使用当前页面同源地址。
+ * 开发环境由 Vite proxy 转发 /api，生产环境由 Express 同源服务前端和 API。
  */
 const getApiBaseUrl = (): string => {
-  const hostname = window.location.hostname
-  // 直接使用当前页面的端口，不使用环境变量
-  const port = window.location.port || '3000'
-  
-  // 如果是 localhost 或 127.0.0.1，使用 localhost
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return `http://localhost:${port}/api`
-  }
-  
-  // 否则使用当前访问的 IP 地址
-  return `http://${hostname}:${port}/api`
+  return `${window.location.origin}/api`
 }
 
 export const API_BASE_URL = getApiBaseUrl()
-export const APP_ORIGIN_BASE_URL = API_BASE_URL.replace(/\/api$/, '')
 
 export const getItemIconUrl = (iconId: string | number): string =>
   `https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/refs/heads/main/item/${encodeURIComponent(String(iconId))}.png`
