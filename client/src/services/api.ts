@@ -93,6 +93,7 @@ interface OperatorFilters {
   profession?: string
   owned?: boolean
   needsElite2?: boolean
+  status?: 'trainable' | 'owned' | 'all'
 }
 
 /**
@@ -673,8 +674,25 @@ export async function getOperatorList(filters: OperatorFilters = {}): Promise<Ap
   if (filters.profession) params.append('profession', filters.profession)
   if (filters.owned !== undefined) params.append('owned', filters.owned.toString())
   if (filters.needsElite2) params.append('needsElite2', 'true')
+  if (filters.status) params.append('status', filters.status)
   
   const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/operators?${params}`)
+  return response.json()
+}
+
+/**
+ * 获取全量干员列表
+ */
+export async function getAllOperators(): Promise<ApiResponse> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/data/operators`)
+  return response.json()
+}
+
+/**
+ * 获取已识别的持有干员数据
+ */
+export async function getOperBoxData(): Promise<ApiResponse> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/data/operbox`)
   return response.json()
 }
 

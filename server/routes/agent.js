@@ -1007,7 +1007,8 @@ router.get('/training/operators', asyncHandler(async (req, res) => {
     rarity: req.query.rarity ? parseInt(req.query.rarity) : undefined,
     profession: req.query.profession,
     owned: req.query.owned === 'true' ? true : req.query.owned === 'false' ? false : undefined,
-    needsElite2: req.query.needsElite2 === 'true'
+    needsElite2: req.query.needsElite2 === 'true',
+    status: req.query.status || 'trainable'
   };
   const operators = await operatorTrainingService.getOperatorList(filters);
   return sendSuccess(res, req, { operators, count: operators.length });

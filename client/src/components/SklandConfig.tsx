@@ -129,7 +129,7 @@ export default function SklandConfig() {
 
   return (
     <div className="space-y-6">
-      <Card theme="orange">
+      <Card>
         <div className="flex items-start justify-between mb-6">
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
@@ -173,7 +173,7 @@ export default function SklandConfig() {
               </div>
             </div>
 
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className="p-4 surface-soft rounded-lg">
               <div className="flex items-start gap-3">
                 <Icons.Lightning />
                 <div className="text-sm text-gray-700 dark:text-gray-300">
@@ -196,7 +196,7 @@ export default function SklandConfig() {
                 onClick={() => setLoginMethod('password')}
                 className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${
                   loginMethod === 'password'
-                    ? 'bg-white dark:bg-gray-700 text-orange-600 dark:text-orange-400 shadow-sm'
+                    ? 'bg-white dark:bg-gray-700 brand-text shadow-sm'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                 }`}
               >
@@ -206,7 +206,7 @@ export default function SklandConfig() {
                 onClick={() => setLoginMethod('code')}
                 className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${
                   loginMethod === 'code'
-                    ? 'bg-white dark:bg-gray-700 text-orange-600 dark:text-orange-400 shadow-sm'
+                    ? 'bg-white dark:bg-gray-700 brand-text shadow-sm'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                 }`}
               >
@@ -240,7 +240,7 @@ export default function SklandConfig() {
                     type="checkbox"
                     checked={savePassword}
                     onChange={(e) => setSavePassword(e.target.checked)}
-                    className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 dark:focus:ring-orange-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                    className="custom-checkbox"
                   />
                   <span className="text-sm text-gray-700 dark:text-gray-300">
                     记住密码（启用自动重登）
@@ -275,15 +275,13 @@ export default function SklandConfig() {
             <Button
               onClick={handleLogin}
               variant="gradient"
-              gradientFrom="orange"
-              gradientTo="red"
               fullWidth
               disabled={loading}
             >
               {loading ? '登录中...' : '登录'}
             </Button>
 
-            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <div className="p-4 status-warning rounded-lg">
               <div className="flex items-start gap-3">
                 <Icons.Lightning />
                 <div className="text-sm text-gray-700 dark:text-gray-300">
@@ -326,7 +324,7 @@ export default function SklandConfig() {
         )}
       </Card>
 
-      <Card theme="orange">
+      <Card>
         <div className="flex items-start justify-between mb-4">
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">

@@ -37,11 +37,11 @@ export default function Loading({
   }
   
   const colorStyles: Record<string, string> = {
-    violet: 'text-violet-500 dark:text-violet-400',
-    emerald: 'text-emerald-500 dark:text-emerald-400',
-    cyan: 'text-cyan-500 dark:text-cyan-400',
-    orange: 'text-orange-500 dark:text-orange-400',
-    fuchsia: 'text-fuchsia-500 dark:text-fuchsia-400',
+    violet: 'brand-text',
+    emerald: 'brand-text',
+    cyan: 'brand-text',
+    orange: 'brand-text',
+    fuchsia: 'brand-text',
   }
   
   return (
@@ -67,7 +67,7 @@ export default function Loading({
       </svg>
       
       {text && (
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+        <p className="text-sm text-secondary">
           {text}
         </p>
       )}
@@ -80,7 +80,7 @@ export default function Loading({
  */
 export function FullScreenLoading({ text = '加载中...' }: FullScreenLoadingProps) {
   return (
-    <div className="fixed inset-0 bg-white/80 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm dark:bg-black/80">
       <Loading size="lg" text={text} />
     </div>
   )
@@ -99,7 +99,7 @@ export function Skeleton({ className = '', variant = 'text' }: SkeletonProps) {
 
   return (
     <div
-      className={`relative overflow-hidden bg-gray-200 dark:bg-gray-800 ${variantStyles[variant]} ${className}`}
+      className={`surface-soft relative overflow-hidden ${variantStyles[variant]} ${className}`}
     >
       {/* Shimmer effect */}
       <div
@@ -114,7 +114,7 @@ export function Skeleton({ className = '', variant = 'text' }: SkeletonProps) {
  */
 export function CardSkeleton() {
   return (
-    <div className="rounded-3xl p-6 border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/60 space-y-4">
+    <div className="app-card app-stack-card surface-panel">
       <Skeleton variant="title" className="w-1/3" />
       <Skeleton variant="text" className="w-full" />
       <Skeleton variant="text" className="w-2/3" />
@@ -128,8 +128,8 @@ export function CardSkeleton() {
  */
 export function DashboardSkeleton() {
   return (
-    <div className="p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="app-page">
+      <div className="mx-auto max-w-7xl app-stack-section">
         {/* PageHeader 骨架 */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -142,16 +142,16 @@ export function DashboardSkeleton() {
           <Skeleton variant="rect" className="w-24 h-9 rounded-xl" />
         </div>
 
-        <div className="flex gap-5">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[2fr_1fr]">
           {/* 左列 */}
-          <div className="flex-[2] flex flex-col gap-5">
+          <div className="app-stack-section">
             {/* 博士信息卡片骨架 */}
-            <div className="rounded-3xl p-6 border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/60">
-              <div className="flex items-center gap-2 mb-6 pb-3 border-b border-gray-100 dark:border-white/5">
+            <div className="app-card surface-panel">
+              <div className="mb-6 flex items-center gap-2 border-b border-[var(--app-border)] pb-3">
                 <Skeleton variant="rect" className="w-1 h-6 rounded-full" />
                 <Skeleton variant="title" className="w-20" />
               </div>
-              <div className="flex items-start gap-6">
+              <div className="grid gap-5 md:grid-cols-[auto_1fr]">
                 {/* 头像骨架 */}
                 <div className="flex-shrink-0 space-y-3">
                   <Skeleton variant="circle" className="w-24 h-24" />
@@ -164,7 +164,7 @@ export function DashboardSkeleton() {
                     <Skeleton variant="rect" className="w-28 h-6 rounded-lg" />
                     <Skeleton variant="rect" className="w-20 h-6 rounded-lg" />
                   </div>
-                  <div className="flex gap-4">
+                  <div className="grid gap-4 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
                     <Skeleton variant="rect" className="w-48 h-24 rounded-xl" />
                     <Skeleton variant="rect" className="w-32 h-24 rounded-xl" />
                   </div>
@@ -173,9 +173,9 @@ export function DashboardSkeleton() {
             </div>
 
             {/* 2x2 网格骨架 */}
-            <div className="grid grid-cols-2 gap-5">
+            <div className="app-grid-section grid-cols-1 sm:grid-cols-2">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="rounded-3xl p-6 border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/60 space-y-4">
+                <div key={i} className="app-card app-stack-card surface-panel">
                   <div className="flex items-center gap-2">
                     <Skeleton variant="rect" className="w-1 h-5 rounded-full" />
                     <Skeleton variant="title" className="w-16" />
@@ -192,9 +192,9 @@ export function DashboardSkeleton() {
           </div>
 
           {/* 右列 */}
-          <div className="flex-1 flex flex-col gap-5">
+          <div className="app-stack-section">
             {/* 主线进度卡片骨架 */}
-            <div className="rounded-3xl p-6 border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/60 space-y-4">
+            <div className="app-card app-stack-card surface-panel">
               <div className="flex items-center gap-2 mb-4">
                 <Skeleton variant="rect" className="w-1 h-6 rounded-full" />
                 <Skeleton variant="title" className="w-20" />
@@ -208,7 +208,7 @@ export function DashboardSkeleton() {
             </div>
 
             {/* 基建详情卡片骨架 */}
-            <div className="rounded-3xl p-6 border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/60 space-y-4">
+            <div className="app-card app-stack-card surface-panel">
               <div className="flex items-center gap-2 mb-4">
                 <Skeleton variant="rect" className="w-1 h-6 rounded-full" />
                 <Skeleton variant="title" className="w-20" />

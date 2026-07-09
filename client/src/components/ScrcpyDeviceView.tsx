@@ -331,8 +331,6 @@ export default function ScrcpyDeviceView({
             <Button
               size="sm"
               variant="gradient"
-              gradientFrom="cyan"
-              gradientTo="blue"
               fullWidth
               onClick={connect}
               disabled={infrastructureLoading !== null || ['connecting', 'signaling', 'waiting_offer', 'connecting_webrtc'].includes(webrtc.status)}

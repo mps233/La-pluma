@@ -10,25 +10,12 @@ interface ThemeToggleProps {
   color?: ColorVariant
 }
 
-export default function ThemeToggle({ color = 'violet' }: ThemeToggleProps) {
+export default function ThemeToggle({ color: _color = 'violet' }: ThemeToggleProps) {
+  void _color
+
   // 使用 UI Store 管理主题
   const theme = useUIStore(state => state.theme)
   const setTheme = useUIStore(state => state.setTheme)
-
-  // 根据颜色生成对应的 Tailwind 类
-  const getColorClasses = (): string => {
-    const colorMap: Record<ColorVariant, string> = {
-      violet: 'bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-400',
-      emerald: 'bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400',
-      fuchsia: 'bg-gradient-to-r from-purple-400 via-fuchsia-400 to-pink-400',
-      blue: 'bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400',
-      cyan: 'bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400',
-      teal: 'bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-400',
-      orange: 'bg-gradient-to-r from-orange-400 via-red-400 to-pink-400',
-      amber: 'bg-gradient-to-r from-amber-400 via-orange-400 to-red-400',
-    }
-    return colorMap[color] || colorMap.violet
-  }
 
   useEffect(() => {
     // 应用主题到 DOM
@@ -79,14 +66,14 @@ export default function ThemeToggle({ color = 'violet' }: ThemeToggleProps) {
   }
 
   return (
-    <div className="flex items-center gap-1.5 rounded-2xl bg-slate-950/[0.035] p-1.5 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)] dark:bg-white/[0.045] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
+    <div className="surface-soft flex items-center gap-1.5 rounded-2xl p-1.5">
       {/* 亮色模式 */}
       <motion.button
         onClick={() => handleThemeChange('light')}
         className={`theme-toggle-btn p-1.5 rounded-xl transition-all ${
           theme === 'light'
-            ? `${getColorClasses()} text-white shadow-[0_8px_18px_rgba(6,182,212,0.20)]`
-            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 hover:bg-white/70 dark:hover:bg-white/10'
+            ? 'brand-action text-white'
+            : 'text-tertiary hover:bg-white/70 hover:text-primary dark:hover:bg-white/10'
         }`}
         whileHover={{ y: -1 }}
         whileTap={{ y: 0, scale: 0.96 }}
@@ -102,8 +89,8 @@ export default function ThemeToggle({ color = 'violet' }: ThemeToggleProps) {
         onClick={() => handleThemeChange('dark')}
         className={`theme-toggle-btn p-1.5 rounded-xl transition-all ${
           theme === 'dark'
-            ? `${getColorClasses()} text-white shadow-[0_8px_18px_rgba(6,182,212,0.20)]`
-            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 hover:bg-white/70 dark:hover:bg-white/10'
+            ? 'brand-action text-white'
+            : 'text-tertiary hover:bg-white/70 hover:text-primary dark:hover:bg-white/10'
         }`}
         whileHover={{ y: -1 }}
         whileTap={{ y: 0, scale: 0.96 }}
@@ -119,8 +106,8 @@ export default function ThemeToggle({ color = 'violet' }: ThemeToggleProps) {
         onClick={() => handleThemeChange('system')}
         className={`theme-toggle-btn p-1.5 rounded-xl transition-all ${
           theme === 'system'
-            ? `${getColorClasses()} text-white shadow-[0_8px_18px_rgba(6,182,212,0.20)]`
-            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 hover:bg-white/70 dark:hover:bg-white/10'
+            ? 'brand-action text-white'
+            : 'text-tertiary hover:bg-white/70 hover:text-primary dark:hover:bg-white/10'
         }`}
         whileHover={{ y: -1 }}
         whileTap={{ y: 0, scale: 0.96 }}

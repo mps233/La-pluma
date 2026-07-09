@@ -278,14 +278,11 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="app-page app-stack-section">
       <PageHeader
         icon={<Icons.DiceIcon />}
         title="肉鸽模式"
         subtitle="集成战略和生息演算 - 所有修改自动保存"
-        gradientFrom="purple-400"
-        gradientVia="fuchsia-400"
-        gradientTo="pink-400"
         actions={<FloatingStatusIndicator />}
       />
 
@@ -304,7 +301,7 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
         </ul>
       </InfoCard>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="app-grid-section grid-cols-1 lg:grid-cols-2">
         {tasks.map((task) => {
           const IconComponent = Icons[task.icon as keyof typeof Icons]
           
@@ -324,8 +321,6 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
                   onClick={() => handleExecute(task)}
                   disabled={isRunning}
                   variant="gradient"
-                  gradientFrom="purple"
-                  gradientTo="fuchsia"
                   size="sm"
                   icon={
                     <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">

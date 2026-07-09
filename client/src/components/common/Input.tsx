@@ -74,22 +74,22 @@ export default function Input({
   className = '',
   ...props
 }: InputProps) {
-  const baseStyles = 'w-full px-4 py-3 border rounded-2xl text-sm font-medium transition-all focus:outline-none focus:ring-2'
-  const normalStyles = 'border-gray-300 dark:border-white/10 hover:border-violet-400 dark:hover:border-violet-500/50 text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:ring-violet-500 focus:border-transparent'
-  const errorStyles = 'border-rose-300 dark:border-rose-500/50 text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:ring-rose-500 focus:border-transparent'
+  const baseStyles = 'app-input focus:ring-2'
+  const normalStyles = 'control-surface focus:ring-[var(--app-accent-soft)]'
+  const errorStyles = 'control-surface form-error-surface focus:ring-[color-mix(in_srgb,var(--app-danger)_24%,transparent)]'
   const disabledStyles = 'opacity-50 cursor-not-allowed'
   
   return (
     <div className={className}>
       {label && (
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-secondary mb-2">
           {label}
         </label>
       )}
       
       <div className="relative">
         {icon && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-tertiary">
             {icon}
           </div>
         )}
@@ -106,13 +106,13 @@ export default function Input({
       </div>
       
       {error && (
-        <p className="text-xs text-rose-600 dark:text-rose-400 mt-2">
+        <p className="text-xs form-error-text mt-2">
           {error}
         </p>
       )}
       
       {hint && !error && (
-        <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+        <p className="text-xs text-tertiary mt-2">
           {hint}
         </p>
       )}
@@ -135,15 +135,15 @@ export function Textarea({
   className = '',
   ...props
 }: TextareaProps) {
-  const baseStyles = 'w-full px-4 py-3 border rounded-2xl text-sm font-medium transition-all focus:outline-none focus:ring-2 resize-none'
-  const normalStyles = 'border-gray-300 dark:border-white/10 hover:border-violet-400 dark:hover:border-violet-500/50 text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:ring-violet-500 focus:border-transparent'
-  const errorStyles = 'border-rose-300 dark:border-rose-500/50 text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:ring-rose-500 focus:border-transparent'
+  const baseStyles = 'app-input focus:ring-2 resize-none'
+  const normalStyles = 'control-surface focus:ring-[var(--app-accent-soft)]'
+  const errorStyles = 'control-surface form-error-surface focus:ring-[color-mix(in_srgb,var(--app-danger)_24%,transparent)]'
   const disabledStyles = 'opacity-50 cursor-not-allowed'
   
   return (
     <div className={className}>
       {label && (
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-secondary mb-2">
           {label}
         </label>
       )}
@@ -159,13 +159,13 @@ export function Textarea({
       />
       
       {error && (
-        <p className="text-xs text-rose-600 dark:text-rose-400 mt-2">
+        <p className="text-xs form-error-text mt-2">
           {error}
         </p>
       )}
       
       {hint && !error && (
-        <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+        <p className="text-xs text-tertiary mt-2">
           {hint}
         </p>
       )}
@@ -187,15 +187,15 @@ export function Select({
   className = '',
   ...props
 }: SelectProps) {
-  const baseStyles = 'w-full px-4 py-3 border rounded-2xl text-sm font-medium transition-all focus:outline-none focus:ring-2'
-  const normalStyles = 'border-gray-300 dark:border-white/10 hover:border-violet-400 dark:hover:border-violet-500/50 text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:ring-violet-500 focus:border-transparent'
-  const errorStyles = 'border-rose-300 dark:border-rose-500/50 text-gray-900 dark:text-gray-200 bg-white dark:bg-[#070707] focus:ring-rose-500 focus:border-transparent'
+  const baseStyles = 'app-input focus:ring-2'
+  const normalStyles = 'control-surface focus:ring-[var(--app-accent-soft)]'
+  const errorStyles = 'control-surface form-error-surface focus:ring-[color-mix(in_srgb,var(--app-danger)_24%,transparent)]'
   const disabledStyles = 'opacity-50 cursor-not-allowed'
   
   return (
     <div className={className}>
       {label && (
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-secondary mb-2">
           {label}
         </label>
       )}
@@ -215,13 +215,13 @@ export function Select({
       </select>
       
       {error && (
-        <p className="text-xs text-rose-600 dark:text-rose-400 mt-2">
+        <p className="text-xs form-error-text mt-2">
           {error}
         </p>
       )}
       
       {hint && !error && (
-        <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+        <p className="text-xs text-tertiary mt-2">
           {hint}
         </p>
       )}
@@ -250,7 +250,7 @@ export function Checkbox({
   }
   
   return (
-    <label className={`flex items-center space-x-2 cursor-pointer group ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
+    <label className={`app-checkbox group ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
       <input
         type="checkbox"
         checked={checked}
@@ -260,7 +260,7 @@ export function Checkbox({
         {...props}
       />
       {label && (
-        <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">
+        <span className="text-sm text-secondary transition-colors group-hover:text-[var(--app-accent)]">
           {label}
         </span>
       )}

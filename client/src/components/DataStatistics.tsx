@@ -22,6 +22,39 @@ import type {
   OpenMenu
 } from '@/types/components'
 
+const tabButtonClass = (isActive: boolean) =>
+  `relative flex items-center space-x-2 px-4 py-3 text-sm font-medium transition-all ${
+    isActive
+      ? 'brand-text'
+      : 'text-secondary hover:text-primary'
+  }`
+
+const filterButtonClass = (isActive: boolean) =>
+  `w-full sm:w-auto flex items-center justify-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+    isActive
+      ? 'brand-action'
+      : 'control-surface text-secondary'
+  }`
+
+const menuSurfaceClass = 'absolute top-full left-0 mt-1 rounded-lg surface-panel py-1 z-50'
+
+const menuOptionClass = (isActive: boolean) =>
+  `w-full text-left px-3 py-1.5 text-xs transition-colors ${
+    isActive
+      ? 'brand-chip font-medium'
+      : 'text-secondary hover:bg-[var(--app-surface-muted)] hover:text-primary'
+  }`
+
+const taskPanelClass = (isActive: boolean) =>
+  `app-card transition-all ${
+    isActive
+      ? 'status-info ring-1 ring-[color-mix(in_srgb,var(--app-info)_24%,transparent)]'
+      : 'surface-panel surface-panel-hover'
+  }`
+
+const statCardClass = 'rounded-2xl border border-[var(--app-border)] p-3 surface-soft'
+const chipClass = 'brand-chip rounded-full px-2 py-0.5 text-xs whitespace-nowrap'
+
 export default function DataStatistics({}: DataStatisticsProps) {
   const [isRunning, setIsRunning] = useState(false)
   const [activeTask, setActiveTask] = useState<ActiveTask>(null)
@@ -497,16 +530,13 @@ export default function DataStatistics({}: DataStatisticsProps) {
   }
 
   return (
-    <div className="p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="app-page">
+      <div className="max-w-7xl mx-auto app-stack-section">
         {/* 页面标题 */}
         <PageHeader
-          icon={<Icons.Info className="w-6 h-6 text-cyan-600 dark:text-cyan-400" />}
+          icon={<Icons.Info className="w-6 h-6" />}
           title="数据统计"
           subtitle="识别仓库物品和干员 Box 数据"
-          gradientFrom="cyan-400"
-          gradientVia="blue-400"
-          gradientTo="indigo-400"
           actions={<FloatingStatusIndicator />}
         />
 
@@ -514,22 +544,18 @@ export default function DataStatistics({}: DataStatisticsProps) {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-2 border-b border-gray-200 dark:border-white/10"
+          className="flex items-center gap-2 border-b border-[var(--app-border)]"
         >
           <button
             onClick={() => setActiveTab('operbox')}
-            className={`flex items-center space-x-2 px-4 py-3 text-sm font-medium transition-all relative ${
-              activeTab === 'operbox'
-                ? 'text-cyan-600 dark:text-cyan-400'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
+            className={tabButtonClass(activeTab === 'operbox')}
           >
             <Icons.Users />
             <span>干员识别</span>
             {activeTab === 'operbox' && (
               <motion.div
                 layoutId="activeTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--app-accent)]"
                 initial={false}
                 transition={{ type: "spring", stiffness: 500, damping: 30 }}
               />
@@ -537,18 +563,14 @@ export default function DataStatistics({}: DataStatisticsProps) {
           </button>
           <button
             onClick={() => setActiveTab('depot')}
-            className={`flex items-center space-x-2 px-4 py-3 text-sm font-medium transition-all relative ${
-              activeTab === 'depot'
-                ? 'text-cyan-600 dark:text-cyan-400'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
+            className={tabButtonClass(activeTab === 'depot')}
           >
             <Icons.Package />
             <span>仓库识别</span>
             {activeTab === 'depot' && (
               <motion.div
                 layoutId="activeTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--app-accent)]"
                 initial={false}
                 transition={{ type: "spring", stiffness: 500, damping: 30 }}
               />
@@ -556,18 +578,14 @@ export default function DataStatistics({}: DataStatisticsProps) {
           </button>
           <button
             onClick={() => setActiveTab('drops')}
-            className={`flex items-center space-x-2 px-4 py-3 text-sm font-medium transition-all relative ${
-              activeTab === 'drops'
-                ? 'text-cyan-600 dark:text-cyan-400'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
+            className={tabButtonClass(activeTab === 'drops')}
           >
             <Icons.TrendingUp />
             <span>掉落记录</span>
             {activeTab === 'drops' && (
               <motion.div
                 layoutId="activeTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--app-accent)]"
                 initial={false}
                 transition={{ type: "spring", stiffness: 500, damping: 30 }}
               />
@@ -576,27 +594,23 @@ export default function DataStatistics({}: DataStatisticsProps) {
         </motion.div>
 
         {/* 功能卡片 */}
-        <div className="space-y-6">
+        <div className="app-stack-section">
           {/* 干员识别 */}
           {activeTab === 'operbox' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`border rounded-3xl p-6 transition-all ${
-              activeTask === 'operbox' && isRunning
-                ? 'border-cyan-500/60 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 shadow-[0_8px_20px_rgb(34,211,238,0.25)] ring-1 ring-cyan-500/30'
-                : 'border-cyan-200 dark:border-cyan-500/20 hover:border-cyan-400 dark:hover:border-cyan-500/30 hover:shadow-[0_4px_12px_rgba(6,182,212,0.15)] bg-gradient-to-br from-cyan-50/50 to-blue-50/50 dark:from-cyan-900/5 dark:to-blue-900/5'
-            }`}
+            className={taskPanelClass(activeTask === 'operbox' && isRunning)}
           >
             {/* 顶部行：图标 + 标题 + 执行按钮 */}
             <div className="flex items-start gap-3 mb-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-2 flex-wrap mb-2">
                   <span className="text-xl"><Icons.Users /></span>
-                  <span className="font-bold text-gray-900 dark:text-white text-base">干员识别</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-white/10 px-2 py-0.5 rounded-full border border-gray-200 dark:border-white/10">operbox</span>
+                  <span className="font-bold text-primary text-base">干员识别</span>
+                  <span className="brand-chip rounded-full px-2 py-0.5 text-xs">operbox</span>
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                <p className="text-sm text-secondary leading-relaxed">
                   识别所有干员信息
                 </p>
               </div>
@@ -605,7 +619,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
               <div className="flex-shrink-0 flex items-center gap-2">
                 {activeTask === 'operbox' && isRunning ? (
                   <div className="w-7 h-7 flex items-center justify-center">
-                    <svg className="w-5 h-5 animate-spin text-cyan-400" fill="none" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 animate-spin brand-text" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -629,8 +643,6 @@ export default function DataStatistics({}: DataStatisticsProps) {
                       onClick={executeOperBox}
                       disabled={isRunning}
                       variant="gradient"
-                      gradientFrom="cyan"
-                      gradientTo="blue"
                       icon={
                         <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
@@ -659,11 +671,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                     <div className="relative w-[calc(33.333%-0.5rem)] sm:w-auto">
                       <button
                         onClick={() => setOpenMenu(openMenu === 'ownership' ? null : 'ownership')}
-                        className={`w-full sm:w-auto flex items-center justify-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                          filterOwnership !== 'all'
-                            ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/25'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                        }`}
+                        className={filterButtonClass(filterOwnership !== 'all')}
                       >
                         <span className="truncate">
                           {filterOwnership === 'all' ? '拥有状态' : 
@@ -674,7 +682,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                         </svg>
                       </button>
                       {openMenu === 'ownership' && (
-                        <div className="absolute top-full left-0 mt-1 w-32 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50">
+                        <div className={`${menuSurfaceClass} w-32`}>
                           {[
                             { value: 'all', label: '全部' },
                             { value: 'owned', label: '已拥有' },
@@ -686,11 +694,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                                 setFilterOwnership(option.value as FilterOwnership)
                                 setOpenMenu(null)
                               }}
-                              className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
-                                filterOwnership === option.value
-                                  ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400 font-medium'
-                                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                              }`}
+                              className={menuOptionClass(filterOwnership === option.value)}
                             >
                               {option.label}
                             </button>
@@ -703,11 +707,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                     <div className="relative w-[calc(33.333%-0.5rem)] sm:w-auto">
                       <button
                         onClick={() => setOpenMenu(openMenu === 'rarity' ? null : 'rarity')}
-                        className={`w-full sm:w-auto flex items-center justify-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                          filterRarity !== 'all'
-                            ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/25'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                        }`}
+                        className={filterButtonClass(filterRarity !== 'all')}
                       >
                         <span className="truncate">
                           {filterRarity === 'all' ? '星级' : `${filterRarity}星`}
@@ -717,7 +717,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                         </svg>
                       </button>
                       {openMenu === 'rarity' && (
-                        <div className="absolute top-full left-0 mt-1 w-28 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50">
+                        <div className={`${menuSurfaceClass} w-28`}>
                           {[
                             { value: 'all', label: '全部' },
                             { value: '6', label: '6星' },
@@ -733,11 +733,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                                 setFilterRarity(option.value as FilterRarity)
                                 setOpenMenu(null)
                               }}
-                              className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
-                                filterRarity === option.value
-                                  ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 font-medium'
-                                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                              }`}
+                              className={menuOptionClass(filterRarity === option.value)}
                             >
                               {option.label}
                             </button>
@@ -750,11 +746,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                     <div className="relative w-[calc(33.333%-0.5rem)] sm:w-auto">
                       <button
                         onClick={() => setOpenMenu(openMenu === 'profession' ? null : 'profession')}
-                        className={`w-full sm:w-auto flex items-center justify-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                          filterProfession !== 'all'
-                            ? 'bg-green-500 text-white shadow-lg shadow-green-500/25'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                        }`}
+                        className={filterButtonClass(filterProfession !== 'all')}
                       >
                         <span className="truncate">
                           {filterProfession === 'all' ? '职业' :
@@ -772,7 +764,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                         </svg>
                       </button>
                       {openMenu === 'profession' && (
-                        <div className="absolute top-full left-0 mt-1 w-32 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50">
+                        <div className={`${menuSurfaceClass} w-32`}>
                           {[
                             { value: 'all', label: '全部' },
                             { value: 'PIONEER', label: '先锋' },
@@ -790,11 +782,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                                 setFilterProfession(option.value as FilterProfession)
                                 setOpenMenu(null)
                               }}
-                              className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
-                                filterProfession === option.value
-                                  ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 font-medium'
-                                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                              }`}
+                              className={menuOptionClass(filterProfession === option.value)}
                             >
                               {option.label}
                             </button>
@@ -807,11 +795,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                     <div className="relative w-[calc(33.333%-0.5rem)] sm:w-auto">
                       <button
                         onClick={() => setOpenMenu(openMenu === 'elite' ? null : 'elite')}
-                        className={`w-full sm:w-auto flex items-center justify-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                          filterElite !== 'all'
-                            ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/25'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                        }`}
+                        className={filterButtonClass(filterElite !== 'all')}
                       >
                         <span className="truncate">
                           {filterElite === 'all' ? '精英化' : `精英${filterElite}`}
@@ -821,7 +805,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                         </svg>
                       </button>
                       {openMenu === 'elite' && (
-                        <div className="absolute top-full left-0 mt-1 w-28 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50">
+                        <div className={`${menuSurfaceClass} w-28`}>
                           {[
                             { value: 'all', label: '全部' },
                             { value: '2', label: '精英2' },
@@ -834,11 +818,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                                 setFilterElite(option.value as FilterElite)
                                 setOpenMenu(null)
                               }}
-                              className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
-                                filterElite === option.value
-                                  ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400 font-medium'
-                                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                              }`}
+                              className={menuOptionClass(filterElite === option.value)}
                             >
                               {option.label}
                             </button>
@@ -851,11 +831,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                     <div className="relative w-[calc(33.333%-0.5rem)] sm:w-auto">
                       <button
                         onClick={() => setOpenMenu(openMenu === 'potential' ? null : 'potential')}
-                        className={`w-full sm:w-auto flex items-center justify-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                          filterPotential !== 'all'
-                            ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/25'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                        }`}
+                        className={filterButtonClass(filterPotential !== 'all')}
                       >
                         <span className="truncate">
                           {filterPotential === 'all' ? '潜能' : `潜能${filterPotential}`}
@@ -865,7 +841,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                         </svg>
                       </button>
                       {openMenu === 'potential' && (
-                        <div className="absolute top-full left-0 mt-1 w-28 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50">
+                        <div className={`${menuSurfaceClass} w-28`}>
                           {[
                             { value: 'all', label: '全部' },
                             { value: '6', label: '潜能6' },
@@ -881,11 +857,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                                 setFilterPotential(option.value as FilterPotential)
                                 setOpenMenu(null)
                               }}
-                              className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
-                                filterPotential === option.value
-                                  ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 font-medium'
-                                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                              }`}
+                              className={menuOptionClass(filterPotential === option.value)}
                             >
                               {option.label}
                             </button>
@@ -898,11 +870,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                     <div className="relative w-[calc(33.333%-0.5rem)] sm:w-auto">
                       <button
                         onClick={() => setOpenMenu(openMenu === 'sort' ? null : 'sort')}
-                        className={`w-full sm:w-auto flex items-center justify-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                          sortBy !== 'default'
-                            ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                        }`}
+                        className={filterButtonClass(sortBy !== 'default')}
                       >
                         <span className="truncate">
                           {sortBy === 'default' ? '排序' :
@@ -915,7 +883,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                         </svg>
                       </button>
                       {openMenu === 'sort' && (
-                        <div className="absolute top-full left-0 mt-1 w-32 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50">
+                        <div className={`${menuSurfaceClass} w-32`}>
                           {[
                             { value: 'default', label: '默认顺序' },
                             { value: 'rarity', label: '星级降序' },
@@ -928,11 +896,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                                 setSortBy(option.value as SortBy)
                                 setOpenMenu(null)
                               }}
-                              className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
-                                sortBy === option.value
-                                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium'
-                                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                              }`}
+                              className={menuOptionClass(sortBy === option.value)}
                             >
                               {option.label}
                             </button>
@@ -952,7 +916,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                           setFilterProfession('all')
                           setSortBy('default')
                         }}
-                        className="w-[calc(33.333%-0.5rem)] sm:w-auto px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
+                        className="w-[calc(33.333%-0.5rem)] sm:w-auto px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-secondary hover:text-primary hover:bg-[var(--app-surface-muted)] transition-all"
                       >
                         重置
                       </button>
@@ -960,8 +924,8 @@ export default function DataStatistics({}: DataStatisticsProps) {
                   </div>
 
                   {/* 统计信息 */}
-                  <div className="text-xs text-gray-600 dark:text-gray-400 w-full sm:w-auto text-right sm:text-left mt-2 sm:mt-0">
-                    <span className="font-semibold text-cyan-600 dark:text-cyan-400">{getFilteredAndSortedOperators.length}</span> / {
+                  <div className="text-xs text-secondary w-full sm:w-auto text-right sm:text-left mt-2 sm:mt-0">
+                    <span className="font-semibold brand-text">{getFilteredAndSortedOperators.length}</span> / {
                       filterOwnership === 'all' ? allOperators.length : 
                       filterOwnership === 'unowned' ? allOperators.length : 
                       (operBoxData?.data?.length || 0)
@@ -993,24 +957,24 @@ export default function DataStatistics({}: DataStatisticsProps) {
                         transition={{ delay: idx * 0.01 }}
                         className={`group relative p-3 rounded-2xl border transition-all overflow-hidden ${
                           isOwned
-                            ? 'bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-cyan-900/20 dark:to-blue-900/20 border-cyan-200 dark:border-cyan-500/20 hover:border-cyan-400 dark:hover:border-cyan-500/40 hover:shadow-lg'
-                            : 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/20 dark:to-gray-800/20 border-gray-300 dark:border-gray-600/20'
+                            ? 'surface-soft border-[var(--app-border)] hover:border-[var(--app-accent)] hover:shadow-lg'
+                            : 'surface-soft border-[var(--app-border)] opacity-75 grayscale-[0.15]'
                         }`}
                       >
                         {/* 未拥有标识 */}
                         {!isOwned && (
-                          <div className="absolute top-2 left-2 z-10 px-2 py-0.5 bg-gray-500/90 text-white text-xs font-bold rounded backdrop-blur-sm">
+                          <div className="absolute top-2 left-2 z-10 px-2 py-0.5 surface-panel text-secondary text-xs font-bold rounded-md border border-[var(--app-border)] backdrop-blur-sm">
                             未拥有
                           </div>
                         )}
                         
                         {/* 干员头像 */}
-                        <div className="relative w-full aspect-square mb-2 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900">
+                        <div className="relative w-full aspect-square mb-2 rounded-xl overflow-hidden surface-soft">
                           {oper.id ? (
                             <>
                               {/* 骨架屏 */}
                               {!imageLoaded && (
-                                <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-amber-100 via-amber-200 to-amber-100 dark:from-amber-900/30 dark:via-amber-800/30 dark:to-amber-900/30"></div>
+                                <div className="absolute inset-0 animate-pulse bg-[var(--app-surface-muted)]"></div>
                               )}
                               <img
                                 src={`https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/avatar/${oper.id}.png`}
@@ -1034,42 +998,42 @@ export default function DataStatistics({}: DataStatisticsProps) {
                               />
                               {/* 未拥有白色半透明蒙版 */}
                               {!isOwned && imageLoaded && (
-                                <div className="absolute inset-0 bg-white/60 dark:bg-white/40"></div>
+                                <div className="absolute inset-0 bg-[color-mix(in_srgb,var(--app-bg)_62%,transparent)]"></div>
                               )}
                             </>
                           ) : (
-                            <div className="absolute inset-0 flex items-center justify-center text-gray-400 dark:text-gray-600">
+                            <div className="absolute inset-0 flex items-center justify-center text-secondary">
                               无头像
                             </div>
                           )}
                           {/* 稀有度标识 */}
                           {oper.rarity !== undefined && oper.rarity > 0 && (
-                            <div className="absolute top-1 right-1 px-1.5 py-0.5 bg-amber-500/90 text-white text-xs font-bold rounded backdrop-blur-sm">
+                            <div className="absolute top-1 right-1 px-1.5 py-0.5 brand-action text-xs font-bold rounded-md backdrop-blur-sm">
                               {Math.min(oper.rarity, 6)}★
                             </div>
                           )}
                         </div>
                         
                         <div className="text-center space-y-2">
-                          <div className="text-sm font-bold text-gray-900 dark:text-white truncate" title={oper.name}>
+                          <div className="text-sm font-bold text-primary truncate" title={oper.name}>
                             {oper.name || '未知干员'}
                           </div>
                           {isOwned && (
                             <>
                               <div className="flex flex-wrap items-center justify-center gap-1 text-xs">
                                 {oper.elite !== undefined && (
-                                  <span className="px-2 py-0.5 bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300 rounded-full whitespace-nowrap">
+                                  <span className={chipClass}>
                                     精{oper.elite}
                                   </span>
                                 )}
                                 {oper.level !== undefined && (
-                                  <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded-full whitespace-nowrap">
+                                  <span className={chipClass}>
                                     Lv.{oper.level}
                                   </span>
                                 )}
                               </div>
                               {oper.potential !== undefined && (
-                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                <div className="text-xs text-secondary">
                                   潜能 {oper.potential}
                                 </div>
                               )}
@@ -1090,21 +1054,17 @@ export default function DataStatistics({}: DataStatisticsProps) {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`border rounded-3xl p-6 transition-all ${
-              activeTask === 'depot' && isRunning
-                ? 'border-cyan-500/60 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 shadow-[0_8px_20px_rgb(34,211,238,0.25)] ring-1 ring-cyan-500/30'
-                : 'border-cyan-200 dark:border-cyan-500/20 hover:border-cyan-400 dark:hover:border-cyan-500/30 hover:shadow-[0_4px_12px_rgba(6,182,212,0.15)] bg-gradient-to-br from-cyan-50/50 to-blue-50/50 dark:from-cyan-900/5 dark:to-blue-900/5'
-            }`}
+            className={taskPanelClass(activeTask === 'depot' && isRunning)}
           >
             {/* 顶部行：图标 + 标题 + 执行按钮 */}
             <div className="flex items-start gap-3 mb-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-2 flex-wrap mb-2">
                   <span className="text-xl"><Icons.Package /></span>
-                  <span className="font-bold text-gray-900 dark:text-white text-base">仓库识别</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-white/10 px-2 py-0.5 rounded-full border border-gray-200 dark:border-white/10">depot</span>
+                  <span className="font-bold text-primary text-base">仓库识别</span>
+                  <span className="brand-chip rounded-full px-2 py-0.5 text-xs">depot</span>
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                <p className="text-sm text-secondary leading-relaxed">
                   识别仓库中的所有物品
                 </p>
               </div>
@@ -1113,7 +1073,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
               <div className="flex-shrink-0">
                 {activeTask === 'depot' && isRunning ? (
                   <div className="w-7 h-7 flex items-center justify-center">
-                    <svg className="w-5 h-5 animate-spin text-cyan-400" fill="none" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 animate-spin brand-text" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -1123,8 +1083,6 @@ export default function DataStatistics({}: DataStatisticsProps) {
                     onClick={executeDepot}
                     disabled={isRunning}
                     variant="gradient"
-                    gradientFrom="cyan"
-                    gradientTo="blue"
                     icon={
                       <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
@@ -1142,41 +1100,41 @@ export default function DataStatistics({}: DataStatisticsProps) {
               <div className="space-y-3">
                 {/* 统计信息 */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <div className="p-3 bg-cyan-50 dark:bg-cyan-900/20 rounded-2xl border border-cyan-200 dark:border-cyan-500/20">
-                    <p className="text-xs text-cyan-600 dark:text-cyan-400 mb-1">总物品数</p>
-                    <p className="text-lg font-bold text-cyan-900 dark:text-cyan-300">
+                  <div className={statCardClass}>
+                    <p className="text-xs text-secondary mb-1">总物品数</p>
+                    <p className="text-lg font-bold text-primary">
                       {depotData.itemCount}
                     </p>
                   </div>
-                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-200 dark:border-blue-500/20">
-                    <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">材料类</p>
-                    <p className="text-lg font-bold text-blue-900 dark:text-blue-300">
+                  <div className={statCardClass}>
+                    <p className="text-xs text-secondary mb-1">材料类</p>
+                    <p className="text-lg font-bold text-primary">
                       {depotData.items.filter(i => i.classifyType === 'MATERIAL').length}
                     </p>
                   </div>
-                  <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-200 dark:border-indigo-500/20">
-                    <p className="text-xs text-indigo-600 dark:text-indigo-400 mb-1">识别分类</p>
-                    <p className="text-lg font-bold text-indigo-900 dark:text-indigo-300">
+                  <div className={statCardClass}>
+                    <p className="text-xs text-secondary mb-1">识别分类</p>
+                    <p className="text-lg font-bold text-primary">
                       {depotTypeSummary.length}
                     </p>
                   </div>
-                  <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-2xl border border-green-200 dark:border-green-500/20">
-                    <p className="text-xs text-green-600 dark:text-green-400 mb-1">总数量</p>
-                    <p className="text-lg font-bold text-green-900 dark:text-green-300">
+                  <div className={statCardClass}>
+                    <p className="text-xs text-secondary mb-1">总数量</p>
+                    <p className="text-lg font-bold text-primary">
                       {depotData.items.reduce((sum, i) => sum + i.count, 0).toLocaleString()}
                     </p>
                   </div>
-                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-200 dark:border-amber-500/20">
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mb-1">最多物品</p>
-                    <p className="text-sm font-bold text-amber-900 dark:text-amber-300 truncate">
+                  <div className={statCardClass}>
+                    <p className="text-xs text-secondary mb-1">最多物品</p>
+                    <p className="text-sm font-bold text-primary truncate">
                       {depotData.items.length > 0 && depotData.items[0]
                         ? depotData.items.reduce((max, i) => i.count > max.count ? i : max, depotData.items[0]).name 
                         : '-'}
                     </p>
                   </div>
                   {depotData.timestamp && (
-                    <div className="col-span-2 md:col-span-4 p-3 bg-gray-50 dark:bg-gray-900/20 rounded-2xl border border-gray-200 dark:border-white/10">
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <div className={`col-span-2 md:col-span-4 ${statCardClass}`}>
+                      <p className="text-xs text-secondary">
                         识别时间: {new Date(depotData.timestamp).toLocaleString('zh-CN')}
                       </p>
                     </div>
@@ -1185,15 +1143,15 @@ export default function DataStatistics({}: DataStatisticsProps) {
 
                 {/* 分类汇总 */}
                 {depotTypeSummary.length > 0 && (
-                  <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white/70 dark:bg-white/5 p-3">
-                    <div className="text-sm font-semibold text-gray-900 dark:text-white mb-2">分类汇总</div>
+                  <div className="rounded-2xl border border-[var(--app-border)] surface-soft p-3">
+                    <div className="text-sm font-semibold text-primary mb-2">分类汇总</div>
                     <div className="flex flex-wrap gap-2">
                       {depotTypeSummary.map((group) => (
-                        <div key={group.type} className="rounded-full border border-violet-200 dark:border-violet-500/20 bg-violet-50 dark:bg-violet-500/10 px-3 py-1 text-xs text-violet-700 dark:text-violet-200">
+                        <div key={group.type} className="rounded-full border border-[var(--app-border)] surface-panel px-3 py-1 text-xs text-secondary">
                           <span className="font-medium">{group.label}</span>
-                          <span className="mx-1 text-violet-400">·</span>
+                          <span className="mx-1 brand-text">·</span>
                           <span>{group.kinds} 种</span>
-                          <span className="mx-1 text-violet-400">/</span>
+                          <span className="mx-1 brand-text">/</span>
                           <span>{group.count.toLocaleString()} 件</span>
                         </div>
                       ))}
@@ -1210,10 +1168,10 @@ export default function DataStatistics({}: DataStatisticsProps) {
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: idx * 0.01 }}
-                        className="group flex items-center gap-3 p-3 bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 rounded-2xl border border-violet-200 dark:border-violet-500/20 hover:border-violet-400 dark:hover:border-violet-500/40 hover:shadow-lg transition-all"
+                        className="group flex items-center gap-3 p-3 surface-soft rounded-2xl border border-[var(--app-border)] hover:border-[var(--app-accent)] hover:shadow-lg transition-all"
                       >
                         {/* 物品图标 */}
-                        <div className="flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-900/30 dark:to-purple-900/30 flex items-center justify-center">
+                        <div className="flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden surface-panel flex items-center justify-center">
                           <img
                             src={getItemIconUrl(item.iconId)}
                             alt={item.name}
@@ -1223,7 +1181,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                               target.style.display = 'none'
                               const parent = target.parentElement
                               if (parent) {
-                                parent.innerHTML = '<svg class="w-6 h-6 text-violet-400 dark:text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>'
+                                parent.innerHTML = '<svg class="w-6 h-6 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>'
                               }
                             }}
                           />
@@ -1231,16 +1189,16 @@ export default function DataStatistics({}: DataStatisticsProps) {
                         
                         {/* 物品信息 */}
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-bold text-gray-900 dark:text-white truncate" title={item.name}>
+                          <div className="text-sm font-bold text-primary truncate" title={item.name}>
                             {item.name}
                           </div>
                           <div className="flex items-center gap-2 mt-1">
                             {item.classifyType && (
-                              <span className="px-2 py-0.5 bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 rounded-full text-xs whitespace-nowrap">
+                              <span className={chipClass}>
                                 {getDepotTypeLabel(item.classifyType)}
                               </span>
                             )}
-                            <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 rounded-full font-semibold text-xs whitespace-nowrap">
+                            <span className={`${chipClass} font-semibold`}>
                               ×{item.count.toLocaleString()}
                             </span>
                           </div>
@@ -1269,16 +1227,16 @@ export default function DataStatistics({}: DataStatisticsProps) {
         {/* 说明信息 */}
         <InfoCard type="info">
           <div className="flex items-start space-x-3">
-            <Icons.Info className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-blue-800 dark:text-blue-300">
-              <p className="font-medium mb-1">使用说明</p>
+            <Icons.Info className="w-5 h-5 brand-text mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-secondary">
+              <p className="font-medium text-primary mb-1">使用说明</p>
               <ul className="space-y-1 list-disc list-inside text-xs">
                 <li>识别前请确保游戏已启动并进入主界面</li>
                 <li>仓库识别：需要打开仓库界面</li>
                 <li>干员识别：需要打开干员界面</li>
                 <li>识别完成后可点击"查看详情"展开完整清单</li>
                 <li>数据按游戏内顺序排序，包含物品名称和数量</li>
-                <li>识别结果保存到：<code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-900/50 rounded text-xs">server/data/</code></li>
+                <li>识别结果保存到：<code className="px-1 py-0.5 brand-chip rounded text-xs">server/data/</code></li>
               </ul>
             </div>
           </div>

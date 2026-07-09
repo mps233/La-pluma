@@ -95,18 +95,18 @@ export default function Modal({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ type: 'spring', duration: 0.3 }}
-              className={`w-full ${sizeStyles[size]} bg-white dark:bg-gray-900 rounded-3xl shadow-2xl pointer-events-auto overflow-hidden border border-gray-200 dark:border-white/10`}
+              className={`surface-panel pointer-events-auto w-full ${sizeStyles[size]} overflow-hidden rounded-3xl`}
             >
               {/* 标题栏 */}
               {(title || showClose) && (
-                <div className="px-6 py-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                <div className="flex items-center justify-between px-6 py-4 shadow-[inset_0_-1px_0_var(--app-border)]">
+                  <h3 className="text-lg font-bold text-primary">
                     {title}
                   </h3>
                   {showClose && (
                     <button
                       onClick={onClose}
-                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                      className="text-tertiary transition-colors hover:text-primary"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -123,7 +123,7 @@ export default function Modal({
               
               {/* 底部操作区域 */}
               {footer && (
-                <div className="px-6 py-4 border-t border-gray-200 dark:border-white/10 flex items-center justify-end space-x-3">
+                <div className="flex items-center justify-end space-x-3 px-6 py-4 shadow-[inset_0_1px_0_var(--app-border)]">
                   {footer}
                 </div>
               )}
@@ -149,9 +149,9 @@ export function ConfirmDialog({
   variant = 'danger',
 }: ConfirmDialogProps) {
   const variantStyles: Record<string, string> = {
-    danger: 'bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-600 hover:to-red-600',
-    primary: 'bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600',
-    success: 'bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-600 hover:to-green-600',
+    danger: 'bg-rose-600 hover:bg-rose-700',
+    primary: 'brand-action',
+    success: 'bg-emerald-600 hover:bg-emerald-700',
   }
   
   return (
@@ -164,7 +164,7 @@ export function ConfirmDialog({
         <>
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
+            className="control-surface rounded-xl px-4 py-2 text-sm transition-all"
           >
             {cancelText}
           </button>
@@ -180,7 +180,7 @@ export function ConfirmDialog({
         </>
       }
     >
-      <p className="text-gray-700 dark:text-gray-300">
+      <p className="text-secondary">
         {message}
       </p>
     </Modal>

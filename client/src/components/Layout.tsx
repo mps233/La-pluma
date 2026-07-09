@@ -29,9 +29,8 @@ export default function Layout({ children }: LayoutProps) {
   type TabColor = 'violet' | 'emerald' | 'fuchsia' | 'amber' | 'blue' | 'cyan' | 'teal' | 'orange'
 
   const getTabColors = (_color: TabColor, isActive: boolean) => {
-    return isActive
-      ? 'text-cyan-700 dark:text-white bg-white dark:bg-cyan-500/20 shadow-[0_6px_16px_rgba(6,182,212,0.10),0_0_0_1px_rgba(6,182,212,0.12)] dark:shadow-[0_0_0_1px_rgba(34,211,238,0.15)]'
-      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
+    void _color
+    return isActive ? 'nav-item-active' : 'nav-item-idle'
   }
 
 
@@ -41,7 +40,7 @@ export default function Layout({ children }: LayoutProps) {
       <motion.nav 
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        className="sticky top-0 z-50 bg-white/72 shadow-[0_1px_0_rgba(15,23,42,0.07),0_18px_46px_rgba(15,23,42,0.05)] backdrop-blur-2xl transition-colors dark:bg-slate-950/58 dark:shadow-[0_1px_0_rgba(255,255,255,0.08),0_18px_46px_rgba(0,0,0,0.28)]"
+        className="nav-shell sticky top-0 z-50 transition-colors"
       >
         <div className="max-w-7xl mx-auto px-3 sm:px-6">
           <div className="flex justify-between items-center h-14 sm:h-16">
@@ -52,7 +51,7 @@ export default function Layout({ children }: LayoutProps) {
                 alt="La Pluma Logo" 
                 className="w-6 h-6 sm:w-7 sm:h-7 rounded-xl object-cover shadow-[0_0_0_1px_rgba(15,23,42,0.08),0_8px_20px_rgba(6,182,212,0.16)]"
               />
-              <h1 className="text-base sm:text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
+              <h1 className="text-primary text-base font-semibold tracking-tight sm:text-lg">
                 La Pluma
               </h1>
             </div>
@@ -60,13 +59,13 @@ export default function Layout({ children }: LayoutProps) {
             {/* 右侧：标签页导航 + 系统信息 */}
             <div className="flex items-center gap-3 sm:gap-5">
               {/* 桌面端标签页导航 */}
-              <div className="hidden lg:flex gap-1 rounded-2xl bg-slate-950/[0.035] p-1.5 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.05)] dark:bg-white/[0.045] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]">
+              <div className="surface-soft hidden gap-1 rounded-2xl p-1.5 lg:flex">
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={`
-                      relative flex items-center px-3.5 py-2 font-medium text-sm rounded-xl transition-colors
+                      relative flex items-center px-3.5 py-2 font-medium text-sm rounded-xl transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]
                       ${getTabColors(tab.color, activeTab === tab.id)}
                     `}
                   >
@@ -81,7 +80,7 @@ export default function Layout({ children }: LayoutProps) {
               {/* 移动端汉堡菜单按钮 */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 rounded-lg text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                className="text-secondary hover:text-primary md:hidden rounded-lg p-2 transition-colors hover:bg-white/60 dark:hover:bg-white/10"
               >
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   {mobileMenuOpen ? (
@@ -97,7 +96,7 @@ export default function Layout({ children }: LayoutProps) {
                 href="https://github.com/mps233/La-pluma"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden sm:flex items-center justify-center p-2 rounded-lg text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-all group"
+                className="text-secondary hover:text-primary hidden items-center justify-center rounded-lg p-2 transition-all hover:bg-white/60 dark:hover:bg-white/10 sm:flex"
                 title="GitHub 仓库"
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -115,7 +114,7 @@ export default function Layout({ children }: LayoutProps) {
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2 }}
-                className="md:hidden border-t border-gray-200 dark:border-white/10 py-2"
+                className="md:hidden py-2 shadow-[inset_0_1px_0_var(--app-border)]"
               >
                 <div className="flex flex-col space-y-1">
                   {tabs.map((tab) => (
@@ -126,7 +125,7 @@ export default function Layout({ children }: LayoutProps) {
                         setMobileMenuOpen(false)
                       }}
                       className={`
-                        flex items-center px-4 py-3 font-medium text-sm rounded-xl transition-colors
+                        flex items-center px-4 py-3 font-medium text-sm rounded-xl transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]
                         ${getTabColors(tab.color, activeTab === tab.id)}
                       `}
                     >

@@ -403,18 +403,15 @@ export default function ConfigManager({}: ConfigManagerProps) {
 
   return (
     <>
-      <div className="p-6 space-y-6">
+      <div className="app-page app-stack-section">
         <PageHeader
           icon={<Icons.CogIcon />}
           title="配置管理"
           subtitle="管理 MAA CLI 连接和运行配置"
-          gradientFrom="orange-400"
-          gradientVia="red-400"
-          gradientTo="pink-400"
           actions={<FloatingStatusIndicator />}
         />
 
-        <Card animated delay={0.1} theme="orange">
+        <Card animated delay={0.1}>
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">配置目录</h2>
@@ -424,14 +421,14 @@ export default function ConfigManager({}: ConfigManagerProps) {
               onClick={handleOpenConfigDir}
               variant="outline"
               size="sm"
-              className="text-orange-700 dark:text-orange-400 border-orange-300 dark:border-orange-500/30 bg-orange-50 dark:bg-transparent hover:bg-orange-100 dark:hover:bg-orange-500/10"
+              className="brand-chip"
             >
               打开目录
             </Button>
           </div>
         </Card>
 
-        <Card animated delay={0.15} theme="orange">
+        <Card animated delay={0.15}>
           <CardHeader title="更新管理" />
           <CardContent>
             {/* 自动更新设置 */}
@@ -448,7 +445,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                     onChange={(e) => handleAutoUpdateChange('enabled', e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-orange-500 peer-checked:to-red-500"></div>
+                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--app-accent-soft)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--app-accent)]"></div>
                 </label>
               </div>
               
@@ -498,8 +495,6 @@ export default function ConfigManager({}: ConfigManagerProps) {
                         onClick={handleHotUpdate}
                         disabled={hotUpdating}
                         variant="gradient"
-                        gradientFrom="orange"
-                        gradientTo="red"
                         fullWidth
                         icon={hotUpdating ? (
                           <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -531,12 +526,12 @@ export default function ConfigManager({}: ConfigManagerProps) {
                         MaaCore
                       </h3>
                       {versionInfo && (
-                        <span className="text-sm font-normal text-purple-600 dark:text-purple-400">
+                        <span className="text-sm font-normal brand-text">
                           {versionInfo.core}
                         </span>
                       )}
                       {versionInfo && versionInfo.core.includes('beta') && (
-                        <span className="px-2 py-0.5 text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400 rounded">
+                        <span className="px-2 py-0.5 text-xs status-warning rounded">
                           Beta
                         </span>
                       )}
@@ -554,8 +549,6 @@ export default function ConfigManager({}: ConfigManagerProps) {
                     onClick={handleUpdateCore}
                     disabled={updating.core}
                     variant="gradient"
-                    gradientFrom="orange"
-                    gradientTo="red"
                     className="flex-1"
                     icon={updating.core ? (
                       <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -580,7 +573,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                   <div className="mt-4">
                     <button
                       onClick={() => setShowCoreChangelog(!showCoreChangelog)}
-                      className="w-full rounded-xl bg-white dark:bg-gray-900/50 px-3 py-2 text-left text-xs text-gray-600 dark:text-gray-300 shadow-[0_0_0_1px_rgba(0,0,0,0.06)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08)] hover:text-orange-600 dark:hover:text-orange-300"
+                      className="w-full rounded-xl control-surface px-3 py-2 text-left text-xs text-secondary hover:text-[var(--app-accent)]"
                     >
                       {showCoreChangelog ? '收起 MaaCore 更新日志' : `查看 MaaCore 更新日志（${coreChangelog[0]?.version || '最新'}）`}
                     </button>
@@ -599,11 +592,11 @@ export default function ConfigManager({}: ConfigManagerProps) {
                               <h4 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                                 {changelog.version}
                                 {changelog.prerelease && (
-                                  <span className="px-2 py-0.5 text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400 rounded">
+                                  <span className="px-2 py-0.5 text-xs status-warning rounded">
                                     预发布
                                   </span>
                                 )}
-                                <span className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded">
+                                <span className="px-2 py-0.5 text-xs brand-chip rounded">
                                   最新
                                 </span>
                               </h4>
@@ -643,7 +636,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                                 href={changelog.htmlUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                                className="text-xs brand-text hover:underline flex items-center gap-1"
                               >
                                 <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                                   <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
@@ -672,7 +665,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                         MAA CLI
                       </h3>
                       {versionInfo && (
-                        <span className="text-sm font-normal text-blue-600 dark:text-blue-400">
+                        <span className="text-sm font-normal brand-text">
                           {versionInfo.cli}
                         </span>
                       )}
@@ -687,8 +680,6 @@ export default function ConfigManager({}: ConfigManagerProps) {
                   onClick={handleUpdateCli}
                   disabled={updating.cli}
                   variant="gradient"
-                  gradientFrom="orange"
-                  gradientTo="red"
                   fullWidth
                   icon={updating.cli ? (
                     <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -705,7 +696,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                   <div className="mt-4">
                     <button
                       onClick={() => setShowCliChangelog(!showCliChangelog)}
-                      className="w-full rounded-xl bg-white dark:bg-gray-900/50 px-3 py-2 text-left text-xs text-gray-600 dark:text-gray-300 shadow-[0_0_0_1px_rgba(0,0,0,0.06)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08)] hover:text-orange-600 dark:hover:text-orange-300"
+                      className="w-full rounded-xl control-surface px-3 py-2 text-left text-xs text-secondary hover:text-[var(--app-accent)]"
                     >
                       {showCliChangelog ? '收起 MAA CLI 更新日志' : `查看 MAA CLI 更新日志（${cliChangelog[0]?.version || '最新'}）`}
                     </button>
@@ -718,7 +709,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                             <h4 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                               {changelog.version}
                               {index === 0 && (
-                                <span className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded">
+                                <span className="px-2 py-0.5 text-xs brand-chip rounded">
                                   最新
                                 </span>
                               )}
@@ -735,7 +726,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                             href={changelog.htmlUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                            className="text-xs brand-text hover:underline flex items-center gap-1"
                           >
                             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                               <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
@@ -761,7 +752,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
           {/* 配置类型选择 */}
           <div className="lg:col-span-1">
             <motion.div 
-              className="rounded-3xl border border-orange-200 dark:border-orange-500/20 overflow-hidden bg-gradient-to-br from-orange-50/50 to-red-50/50 dark:from-orange-900/5 dark:to-red-900/5"
+              className="rounded-3xl overflow-hidden surface-panel"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
@@ -775,9 +766,9 @@ export default function ConfigManager({}: ConfigManagerProps) {
                     key={section.id}
                     onClick={() => handleConfigTypeChange(section.id)}
                     className={`
-                      w-full flex items-center space-x-3 px-4 py-3 rounded-2xl text-left transition-all mb-2
+                      w-full flex items-center space-x-3 px-4 py-3 rounded-2xl text-left transition-all mb-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]
                       ${configType === section.id
-                        ? 'bg-gradient-to-r from-orange-100 to-red-100 dark:from-orange-500/20 dark:to-red-500/20 text-orange-700 dark:text-orange-300 border border-orange-300 dark:border-orange-500/30 shadow-[0_4px_12px_rgba(251,146,60,0.15)]'
+                        ? 'brand-action-subtle'
                         : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] border border-transparent'
                       }
                     `}
@@ -796,7 +787,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
 
           {/* 配置编辑器 */}
           <div className="lg:col-span-3">
-            <Card animated delay={0.2} theme="orange">
+            <Card animated delay={0.2}>
               <CardHeader 
                 title={configSections.find(s => s.id === configType)?.name || '配置'}
                 actions={
@@ -814,7 +805,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                       disabled={loading}
                       variant="outline"
                       size="sm"
-                      className="bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-300 dark:border-orange-500/30 hover:bg-orange-200 dark:hover:bg-orange-500/30"
+                      className="brand-chip"
                       icon={
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M17 16v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-7a2 2 0 012-2h2m3-4H5a2 2 0 00-2 2v7a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-1m-4 0V3m0 0L9 6m1.5-3L12 6" />

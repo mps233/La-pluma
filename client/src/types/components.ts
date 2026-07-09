@@ -336,8 +336,10 @@ export interface CombatAdvancedParams {
   }
 }
 
+export type FormationMode = 'auto' | 'on' | 'off'
+
 export interface AutoFormationConfig {
-  [taskId: string]: boolean
+  [taskId: string]: boolean | FormationMode
 }
 
 // 作业集中的单个作业信息
@@ -575,7 +577,11 @@ export interface TrainingOperator {
   currentElite: number
   currentLevel?: number
   targetElite: number
+  owned?: boolean
   hasMaterialData?: boolean
+  canTrain?: boolean
+  disabledReason?: 'unowned' | 'missing_material_data' | 'already_elite2' | null
+  trainingStatus?: 'trainable' | 'unowned' | 'missing_material_data' | 'already_elite2'
   materials?: MaterialNode[]
   progress?: number
 }
@@ -678,18 +684,15 @@ export interface TrainingPlan {
 // 筛选条件
 export interface TrainingFilters {
   rarity: string
-  profession: string
   needsElite2: boolean
+  status: 'trainable' | 'owned' | 'all'
 }
-
-// 活动标签页
-export type TrainingActiveTab = 'operators' | 'queue' | 'plan'
 
 // 计划模式
 export type TrainingPlanMode = 'current' | 'all'
 
 // 打开的菜单
-export type TrainingOpenMenu = 'rarity' | 'profession' | null
+export type TrainingOpenMenu = 'rarity' | null
 
 // 材料层级节点组件 Props
 export interface MaterialHierarchyNodeProps {

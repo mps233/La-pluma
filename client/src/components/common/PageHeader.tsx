@@ -8,9 +8,6 @@ export interface PageHeaderProps {
   icon?: ReactNode
   title: string
   subtitle?: string
-  gradientFrom?: string
-  gradientVia?: string
-  gradientTo?: string
   actions?: ReactNode
   animated?: boolean
 }
@@ -23,9 +20,6 @@ export default function PageHeader({
   icon,
   title,
   subtitle,
-  gradientFrom: _gradientFrom = 'violet-400',
-  gradientVia: _gradientVia = 'purple-400',
-  gradientTo: _gradientTo = 'fuchsia-400',
   actions,
   animated = true,
 }: PageHeaderProps) {
@@ -42,16 +36,16 @@ export default function PageHeader({
     >
       <div className="flex items-center space-x-4">
         {icon && (
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/70 text-cyan-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_0_0_1px_rgba(6,182,212,0.14),0_10px_26px_rgba(6,182,212,0.12)] dark:bg-white/[0.06] dark:text-cyan-300 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_1px_rgba(255,255,255,0.08)]">
+          <div className="icon-well flex h-11 w-11 items-center justify-center rounded-2xl [&_*]:text-current">
             {icon}
           </div>
         )}
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-slate-50">
+          <h2 className="text-2xl font-semibold tracking-tight text-primary">
             {title}
           </h2>
           {subtitle && (
-            <p className="mt-1 text-slate-600 dark:text-slate-400 text-sm hidden sm:block">
+            <p className="mt-1 hidden text-sm text-secondary sm:block">
               {subtitle}
             </p>
           )}

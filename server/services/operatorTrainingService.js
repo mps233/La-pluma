@@ -9,6 +9,7 @@ import { dirname } from 'path';
 import { readJsonFile, writeJsonFile } from '../utils/fileHelper.js';
 import { createLogger } from '../utils/logger.js';
 import { getTodayOpenStages, isStageOpenToday } from './notificationService.js';
+import { getAllOperators } from './dataParserService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -231,6 +232,19 @@ async function loadOperBox() {
   }
 }
 
+function getOperBoxOperators(operBoxData) {
+  if (Array.isArray(operBoxData?.data)) return operBoxData.data;
+  if (Array.isArray(operBoxData?.operators)) return operBoxData.operators;
+  return [];
+}
+
+function getTrainingDisabledReason(operator) {
+  if (!operator.owned) return 'unowned';
+  if (!operator.hasMaterialData) return 'missing_material_data';
+  if (operator.currentElite >= operator.targetElite) return 'already_elite2';
+  return null;
+}
+
 /**
  * 加载仓库数据
  */
@@ -286,55 +300,90 @@ async function saveTrainingQueue(queueData) {
 }
 
 /**
- * 获取干员列表（以 OperBox 为主，材料数据库为辅）
+ * 获取干员列表（全量干员为主，OperBox 和材料数据库补充养成状态）
  */
 async function getOperatorList(filters = {}) {
   const operatorMaterialsData = await loadOperatorMaterials();
   const operBoxData = await loadOperBox();
-  
-  const operators = [];
-  
-  // 遍历 OperBox 中的所有干员（实际拥有的干员）
-  if (operBoxData.data && Array.isArray(operBoxData.data)) {
-    for (const operBoxOp of operBoxData.data) {
-      // 尝试从材料数据库中查找对应的材料数据
-      const opData = operatorMaterialsData.operators[operBoxOp.id];
-      
-      const operator = {
-        id: operBoxOp.id,
-        name: operBoxOp.name,
-        rarity: operBoxOp.rarity,
-        profession: opData?.profession || '未知',
-        currentElite: operBoxOp.elite || 0,
-        currentLevel: operBoxOp.level || 1,
-        targetElite: 2,
-        owned: true,
-        potential: operBoxOp.potential || 1,
-        hasMaterialData: !!opData, // 标记是否有材料数据
-        materials: opData ? {
-          elite1: opData.elite1,
-          elite2: opData.elite2
-        } : null
-      };
-      
-      // 应用过滤器
-      if (filters.rarity && operator.rarity !== filters.rarity) continue;
-      if (filters.profession && operator.profession !== filters.profession) continue;
-      if (filters.owned !== undefined && operator.owned !== filters.owned) continue;
-      if (filters.needsElite2 && operator.currentElite >= 2) continue;
-      
-      operators.push(operator);
-    }
+
+  const ownedOperators = getOperBoxOperators(operBoxData);
+  const ownedMap = new Map(ownedOperators.map(operator => [operator.id, operator]));
+  let allOperators = [];
+
+  try {
+    allOperators = await getAllOperators();
+  } catch (error) {
+    logger.warn('加载全量干员失败，降级为仅显示已识别干员', { error: error.message });
+    allOperators = ownedOperators.map(operator => ({
+      id: operator.id,
+      name: operator.name,
+      rarity: operator.rarity,
+      profession: operator.profession || '未知'
+    }));
   }
-  
-  // 排序：六星优先，然后按稀有度降序，最后按名称
-  operators.sort((a, b) => {
+
+  const operators = allOperators.map(baseOperator => {
+    const ownedOperator = ownedMap.get(baseOperator.id);
+    const opData = operatorMaterialsData.operators?.[baseOperator.id];
+    const owned = Boolean(ownedOperator);
+    const operator = {
+      id: baseOperator.id,
+      name: ownedOperator?.name || baseOperator.name,
+      rarity: ownedOperator?.rarity ?? baseOperator.rarity,
+      profession: opData?.profession || baseOperator.profession || ownedOperator?.profession || '未知',
+      position: baseOperator.position,
+      currentElite: owned ? (ownedOperator.elite || 0) : 0,
+      currentLevel: owned ? (ownedOperator.level || 1) : 0,
+      targetElite: 2,
+      owned,
+      potential: owned ? (ownedOperator.potential || 1) : 0,
+      hasMaterialData: !!opData,
+      materials: opData ? {
+        elite1: opData.elite1,
+        elite2: opData.elite2
+      } : null
+    };
+
+    const disabledReason = getTrainingDisabledReason(operator);
+    return {
+      ...operator,
+      canTrain: disabledReason === null,
+      disabledReason,
+      trainingStatus: disabledReason === null
+        ? 'trainable'
+        : owned
+          ? disabledReason
+          : 'unowned'
+    };
+  });
+
+  const filteredOperators = operators.filter(operator => {
+    if (filters.rarity && operator.rarity !== filters.rarity) return false;
+    if (filters.profession && operator.profession !== filters.profession) return false;
+    if (filters.owned !== undefined && operator.owned !== filters.owned) return false;
+    if (filters.needsElite2 && operator.owned && operator.currentElite >= 2) return false;
+
+    switch (filters.status) {
+      case 'trainable':
+        return operator.canTrain;
+      case 'owned':
+        return operator.owned;
+      case 'all':
+      default:
+        return true;
+    }
+  });
+
+  // 排序：可养成优先，已拥有其次，未拥有最后；同组按稀有度和名称排序
+  filteredOperators.sort((a, b) => {
+    if (a.canTrain !== b.canTrain) return a.canTrain ? -1 : 1;
+    if (a.owned !== b.owned) return a.owned ? -1 : 1;
     if (a.rarity !== b.rarity) return b.rarity - a.rarity;
     if (a.currentElite !== b.currentElite) return a.currentElite - b.currentElite;
     return a.name.localeCompare(b.name, 'zh-CN');
   });
-  
-  return operators;
+
+  return filteredOperators;
 }
 
 /**

@@ -4,21 +4,37 @@
  */
 
 // 卡片样式
-export const cardBg: string = 'bg-white dark:bg-[rgba(15,15,15,0.6)]'
-export const cardBorder: string = 'border-gray-200 dark:border-white/10'
-export const cardBgSolid: string = 'bg-gray-50 dark:bg-[rgba(20,20,20,0.6)]'
+export const cardBg: string = 'surface-panel'
+export const cardBorder: string = ''
+export const cardBgSolid: string = 'surface-soft'
+export const cardSurface: string = 'app-card surface-panel'
+export const cardSoft: string = 'app-card surface-soft'
+export const stackCard: string = 'app-stack-card'
+export const stackSection: string = 'app-stack-section'
+export const gridCard: string = 'app-grid-card'
 
 // 文本样式
-export const textPrimary: string = 'text-gray-900 dark:text-white'
-export const textSecondary: string = 'text-gray-600 dark:text-gray-400'
-export const textTertiary: string = 'text-gray-500 dark:text-gray-500'
+export const textPrimary: string = 'text-primary'
+export const textSecondary: string = 'text-secondary'
+export const textTertiary: string = 'text-tertiary'
 
 // 输入和按钮样式
-export const inputBg: string = 'bg-white dark:bg-[#070707]'
-export const buttonBg: string = 'bg-gray-100 dark:bg-white/5'
-export const buttonHover: string = 'hover:bg-gray-200 dark:hover:bg-white/10'
+export const inputBg: string = 'control-surface'
+export const buttonBg: string = 'control-surface'
+export const buttonHover: string = ''
+export const inputControl: string = 'app-input control-surface'
+export const buttonControl: string = 'app-button control-surface'
+
+// 品牌强调与状态
+export const brandAction: string = 'brand-action'
+export const brandSubtle: string = 'brand-action-subtle'
+export const statusSuccess: string = 'status-success'
+export const statusWarning: string = 'status-warning'
+export const statusDanger: string = 'status-danger'
+export const statusInfo: string = 'status-info'
 
 // 组合样式
 export const card: string = `${cardBg} ${cardBorder}`
+export const panel: string = cardSurface
 export const text: string = textPrimary
 export const textMuted: string = textSecondary

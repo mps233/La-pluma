@@ -155,7 +155,7 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
           )}
 
           {/* 全局开关 */}
-          <div className="mb-6 p-4 rounded-2xl bg-gray-50 dark:bg-[rgba(20,20,20,0.6)] border border-gray-200 dark:border-white/10">
+          <div className="mb-6 p-4 rounded-2xl surface-soft border border-gray-200 dark:border-white/10">
             <label className="flex items-center justify-between cursor-pointer group">
               <div className="flex items-center space-x-3">
                 <div className="text-orange-400">
@@ -228,7 +228,7 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
                       }
                     })}
                     placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
-                    className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#070707] text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+                    className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-white/10 control-surface text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/35 transition-all"
                   />
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     从 <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:text-orange-600">@BotFather</a> 获取
@@ -253,7 +253,7 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
                       }
                     })}
                     placeholder="123456789"
-                    className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#070707] text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+                    className="w-full px-4 py-2 rounded-xl border border-gray-200 dark:border-white/10 control-surface text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/35 transition-all"
                   />
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     从 <a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:text-orange-600">@userinfobot</a> 获取
@@ -272,7 +272,7 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
           </div>
 
           {/* 未来扩展提示 */}
-          <div className="mt-6 p-4 rounded-2xl bg-gray-50 dark:bg-[rgba(20,20,20,0.6)] border border-dashed border-gray-300 dark:border-white/20">
+          <div className="mt-6 p-4 rounded-2xl surface-soft border border-dashed border-gray-300 dark:border-white/20">
             <p className="text-sm text-gray-400 dark:text-gray-500 text-center flex items-center justify-center gap-2">
               <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
@@ -291,7 +291,7 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
             </button>
             <button
               onClick={saveConfig}
-              className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold hover:from-orange-600 hover:to-red-600 transition-all shadow-[0_4px_12px_rgb(249,115,22,0.3)]"
+              className="flex-1 px-4 py-2.5 rounded-xl brand-action text-white font-bold transition-all"
             >
               保存配置
             </button>

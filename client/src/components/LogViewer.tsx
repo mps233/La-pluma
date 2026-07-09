@@ -213,14 +213,11 @@ export default function LogViewer({}: LogViewerProps) {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="app-page app-stack-section">
       <PageHeader
         icon={<Icons.DocumentTextIcon />}
         title="日志查看器"
         subtitle="实时查看和管理 MAA 运行日志"
-        gradientFrom="cyan-400"
-        gradientVia="blue-400"
-        gradientTo="indigo-400"
         actions={<FloatingStatusIndicator />}
       />
 
@@ -261,8 +258,6 @@ export default function LogViewer({}: LogViewerProps) {
               <Button
                 onClick={exportLogs}
                 variant="gradient"
-                gradientFrom="cyan"
-                gradientTo="blue"
                 size="sm"
               >
                 导出日志
@@ -356,7 +351,7 @@ export default function LogViewer({}: LogViewerProps) {
                 <motion.div 
                   key={file.path} 
                   onClick={() => viewHistoryFile(file)}
-                  className="flex items-center justify-between p-4 border border-gray-200 dark:border-white/10 rounded-2xl hover:border-cyan-400 dark:hover:border-cyan-500/30 hover:shadow-[0_4px_12px_rgba(6,182,212,0.1)] transition-all cursor-pointer bg-gray-50 dark:bg-gray-800/40"
+                  className="flex items-center justify-between p-4 border border-gray-200 dark:border-white/10 rounded-2xl hover:border-[var(--app-accent)] hover:shadow-[0_4px_12px_rgba(6,182,212,0.1)] transition-all cursor-pointer bg-gray-50 dark:bg-gray-800/40"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.4 + index * 0.1 }}

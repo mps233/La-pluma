@@ -50,14 +50,14 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   useEffect(() => {
     let intervalId = null
     let isSubscribed = true // 用于防止组件卸载后的状态更新
-    
+
     const checkScheduleStatus = async () => {
       if (!isSubscribed) return
-      
+
       try {
         const result = await maaApi.getScheduleExecutionStatus()
         if (!isSubscribed) return // 再次检查
-        
+
         if (result.success && result.data) {
           const status = result.data
 
@@ -93,11 +93,11 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         // 静默失败，不影响用户体验
       }
     }
-    
+
     // 每秒检查一次
     intervalId = setInterval(checkScheduleStatus, 1000)
     checkScheduleStatus() // 立即执行一次
-    
+
     return () => {
       isSubscribed = false
       if (intervalId) clearInterval(intervalId)
@@ -106,12 +106,12 @@ export default function AutomationTasks({}: AutomationTasksProps) {
 
   // 可用的任务列表
   const availableTasks: AutomationAvailableTask[] = [
-    { 
-      id: 'startup' as const, 
-      name: '启动游戏', 
+    {
+      id: 'startup' as const,
+      name: '启动游戏',
       icon: <Icons.Play />,
       description: '启动游戏并进入主界面',
-      defaultParams: { 
+      defaultParams: {
         clientType: 'Official',
         adbPath: '/opt/homebrew/bin/adb',
         address: '127.0.0.1:16384',
@@ -131,9 +131,9 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         { key: 'address', label: '连接地址', type: 'text', placeholder: '127.0.0.1:16384', helper: 'MuMu 模拟器默认端口：16384' }
       ]
     },
-    { 
-      id: 'fight' as const, 
-      name: '理智作战', 
+    {
+      id: 'fight' as const,
+      name: '理智作战',
       icon: <Icons.Sword />,
       description: '自动刷关卡消耗理智',
       defaultParams: { stage: '1-7', stages: [{ stage: '1-7', times: '' }], medicine: 0, expiringMedicine: 0, stone: 0, series: '1' },
@@ -154,12 +154,12 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         ], helper: '单次代理作战重复次数（需要游戏支持）' },
       ]
     },
-    { 
-      id: 'infrast' as const, 
-      name: '基建换班', 
+    {
+      id: 'infrast' as const,
+      name: '基建换班',
       icon: <Icons.Building />,
       description: '自动基建换班收菜',
-      defaultParams: { 
+      defaultParams: {
         mode: '0',
         facility: ['Mfg', 'Trade', 'Power', 'Control', 'Reception', 'Office', 'Dorm'],
         drones: 'Money',
@@ -185,9 +185,9 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       ],
       taskType: 'Infrast'
     },
-    { 
-      id: 'recruit' as const, 
-      name: '自动公招', 
+    {
+      id: 'recruit' as const,
+      name: '自动公招',
       icon: <Icons.Users />,
       description: '自动公开招募',
       defaultParams: {
@@ -212,9 +212,9 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       ],
       taskType: 'Recruit'
     },
-    { 
-      id: 'mall' as const, 
-      name: '信用收支', 
+    {
+      id: 'mall' as const,
+      name: '信用收支',
       icon: <Icons.Cash />,
       description: '访问好友、收取信用',
       defaultParams: {
@@ -231,9 +231,9 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       ],
       taskType: 'Mall'
     },
-    { 
-      id: 'award' as const, 
-      name: '领取奖励', 
+    {
+      id: 'award' as const,
+      name: '领取奖励',
       icon: <Icons.Gift />,
       description: '领取每日/每周奖励',
       defaultParams: {
@@ -254,9 +254,9 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       ],
       taskType: 'Award'
     },
-    { 
-      id: 'closedown' as const, 
-      name: '关闭游戏', 
+    {
+      id: 'closedown' as const,
+      name: '关闭游戏',
       icon: <Icons.Stop />,
       description: '关闭游戏客户端',
       defaultParams: { clientType: 'Official' },
@@ -310,14 +310,14 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault()
     if (draggedIndex === null || draggedIndex === index) return
-    
+
     const newFlow = [...taskFlow]
     const draggedItem = newFlow[draggedIndex]
     if (!draggedItem) return
-    
+
     newFlow.splice(draggedIndex, 1)
     newFlow.splice(index, 0, draggedItem)
-    
+
     setTaskFlow(newFlow)
     setDraggedIndex(index)
   }
@@ -331,7 +331,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     const newFlow = [...taskFlow]
     const currentTask = newFlow[index]
     if (!currentTask) return
-    
+
     // 如果修改的是 stages 参数，需要对关卡进行排序，但保留空白行用于继续输入。
     // 之前这里会把 { stage: '', times: '' } 过滤掉，导致“添加关卡”点击后看起来没反应。
     if (key === 'stages' && Array.isArray(value)) {
@@ -357,7 +357,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     } else {
       currentTask.params[key] = value;
     }
-    
+
     // 如果修改的是启动游戏的客户端类型，同步到关闭游戏
     if (currentTask.commandId === 'startup' && key === 'clientType') {
       newFlow.forEach((task, i) => {
@@ -374,7 +374,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         }
       })
     }
-    
+
     setTaskFlow(newFlow)
     autoSave(newFlow, scheduleEnabled, scheduleTimes)
   }
@@ -382,18 +382,18 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   const testConnection = async (taskId: string, adbPath: string, address: string) => {
     setTestingConnection(prev => ({ ...prev, [taskId]: true }))
     setConnectionStatus(prev => ({ ...prev, [taskId]: { success: false, message: '' } }))
-    
+
     try {
       const result = await maaApi.testConnection(adbPath, address)
       setConnectionStatus(prev => ({ ...prev, [taskId]: result as ConnectionTestStatus }))
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : '未知错误'
-      setConnectionStatus(prev => ({ 
-        ...prev, 
-        [taskId]: { 
-          success: false, 
+      setConnectionStatus(prev => ({
+        ...prev,
+        [taskId]: {
+          success: false,
           message: '测试失败: ' + errorMessage
-        } 
+        }
       }))
     } finally {
       setTestingConnection(prev => ({ ...prev, [taskId]: false }))
@@ -405,11 +405,11 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       const { icon, paramFields, ...rest } = task
       return rest
     })
-    
+
     // 保存到 localStorage（快速访问）
     localStorage.setItem('maa-task-flow', JSON.stringify(taskFlowToSave))
     localStorage.setItem('maa-schedule', JSON.stringify({ enabled, times }))
-    
+
     // 保存到服务器（跨设备同步）
     try {
       await maaApi.saveUserConfig('automation-tasks', {
@@ -419,7 +419,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     } catch (error) {
       // 静默失败，不影响用户体验
     }
-    
+
     if (enabled && times.length > 0) {
       try {
         await maaApi.setupSchedule('default', times, taskFlowToSave)
@@ -443,14 +443,14 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         type: task.taskType,
         params: {}
       }
-      
+
       // 某些字段应该保持字符串格式，不要转换为数字
       const keepAsString = ['mode']
-      
+
       Object.keys(params).forEach(key => {
         const value = params[key]
         if (value === undefined || value === '' || value === null) return
-        
+
         if (typeof value === 'boolean') {
           taskConfig.params[key] = value
         }
@@ -475,9 +475,9 @@ export default function AutomationTasks({}: AutomationTasksProps) {
           taskConfig.params[key] = value
         }
       })
-      
-      return { 
-        command: 'run', 
+
+      return {
+        command: 'run',
         params: task.commandId || task.id,
         taskConfig: JSON.stringify(taskConfig)
       }
@@ -486,7 +486,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     const commandId = task.commandId || task.id.split('-')[0]
     let params = ''
     const extraArgs: string[] = []
-    
+
     if (commandId === 'startup' || commandId === 'closedown') {
       params = task.params?.clientType || 'Official'
       if (task.params?.address) {
@@ -507,11 +507,11 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         params += ` --series ${task.params.series}`
       }
     }
-    
+
     if (extraArgs.length > 0) {
       params = `${extraArgs.join(' ')} ${params}`
     }
-    
+
     return { command: commandId, params }
   }
 
@@ -530,10 +530,10 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         params: task.params,
         enabled: task.enabled
       }))
-      
+
       // 直接调用后端的定时任务执行接口，复用所有逻辑
       const result = await maaApi.executeScheduleNow('manual', cleanTaskFlow)
-      
+
       if (result.success) {
         showSuccess('任务流程执行完成')
       } else {
@@ -551,7 +551,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     if (abortController) {
       abortController.abort()
     }
-    
+
     // 调用后端 API 终止任务
     try {
       const result = await maaApi.stopTask()
@@ -563,7 +563,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     } catch (error) {
       showError('终止任务失败')
     }
-    
+
     setIsRunning(false)
     setCurrentStep(-1)
     setAbortController(null)
@@ -574,11 +574,11 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     try {
       // 优先从服务器加载配置
       const serverConfig = await maaApi.loadUserConfig('automation-tasks')
-      
+
       if (serverConfig.success && serverConfig.data) {
         // 服务器有配置，使用服务器配置
         const { taskFlow: loadedTasks, schedule } = serverConfig.data
-        
+
         if (loadedTasks) {
           const restoredTasks = loadedTasks.map((task: any) => {
             const originalTask = availableTasks.find(t => t.id === task.commandId || t.id === task.id.split('-')[0])
@@ -589,21 +589,21 @@ export default function AutomationTasks({}: AutomationTasksProps) {
             }
           })
           setTaskFlow(restoredTasks)
-          
+
           // 同步到 localStorage
           localStorage.setItem('maa-task-flow', JSON.stringify(loadedTasks))
         }
-        
+
         if (schedule) {
           const { enabled, times } = schedule
           setScheduleEnabled(enabled)
           if (times && Array.isArray(times)) {
             setScheduleTimes(times)
           }
-          
+
           // 同步到 localStorage
           localStorage.setItem('maa-schedule', JSON.stringify(schedule))
-          
+
           if (enabled && times && times.length > 0) {
             try {
               await maaApi.setupSchedule('default', times, loadedTasks)
@@ -612,13 +612,13 @@ export default function AutomationTasks({}: AutomationTasksProps) {
             }
           }
         }
-        
+
         return
       }
     } catch (error) {
       // 静默失败，尝试从 localStorage 加载
     }
-    
+
     // 服务器加载失败，从 localStorage 加载
     const saved = localStorage.getItem('maa-task-flow')
     const schedule = localStorage.getItem('maa-schedule')
@@ -633,14 +633,14 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         }
       })
       setTaskFlow(restoredTasks)
-      
+
       if (schedule) {
         const { enabled, times } = JSON.parse(schedule)
         setScheduleEnabled(enabled)
         if (times && Array.isArray(times)) {
           setScheduleTimes(times)
         }
-        
+
         if (enabled && times && times.length > 0) {
           try {
             await maaApi.setupSchedule('default', times, loadedTasks)
@@ -676,7 +676,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     const initializeAndRestore = async () => {
       // 1. 先加载任务流程
       await loadTaskFlow()
-      
+
       // 2. 获取当前活动信息
       try {
         const activityResult = await maaApi.getActivity('Official')
@@ -687,21 +687,21 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       } catch (error) {
         // 静默失败，不影响用户体验
       }
-      
+
       // 3. 然后检查是否需要恢复执行
       try {
         const result = await maaApi.getTaskStatus()
-        
+
         // 检查是否有任务流程正在执行
         const flowExecution = localStorage.getItem('maa-task-flow-execution')
-        
+
         if (flowExecution) {
           const { isExecuting, tasks, currentIndex } = JSON.parse(flowExecution)
-          
+
           if (isExecuting && tasks && tasks.length > 0) {
             setIsRunning(true)
             showInfo(`恢复任务流程执行...`)
-            
+
             const continueTaskFlow = async () => {
               // 从 localStorage 加载任务流程，找到当前执行的任务
               const savedTaskFlow = localStorage.getItem('maa-task-flow')
@@ -712,9 +712,9 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                 localStorage.removeItem('maa-task-flow-execution')
                 return
               }
-              
+
               const loadedTasks = JSON.parse(savedTaskFlow)
-              
+
               const currentRun = result.data
               if (result.success && currentRun?.isRunning) {
                 const currentTaskInfo = tasks[currentIndex]
@@ -724,15 +724,15 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                     const tCommandId = t.commandId || t.id.split('-')[0]
                     return tCommandId === currentTaskInfo.commandId
                   })
-                  
+
                   if (currentTask) {
                     const actualIndex = loadedTasks.findIndex((t: any) => t.id === currentTask.id)
                     setCurrentStep(actualIndex)
                   }
                 }
-                
+
                 showInfo(`正在执行: ${currentRun.taskName}`)
-                
+
                 // 等待当前任务完成
                 await new Promise<void>((resolve) => {
                   const checkInterval = setInterval(async () => {
@@ -748,52 +748,52 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                   }, 1000)
                 })
               }
-              
+
               // 继续执行剩余任务
               const remainingTasks = tasks.slice(currentIndex + 1)
-              
+
               if (remainingTasks.length > 0) {
                 for (let i = 0; i < remainingTasks.length; i++) {
                   const taskInfo = remainingTasks[i]
-                  
+
                   // 使用 commandId 匹配任务
                   const task = loadedTasks.find((t: any) => {
                     const tCommandId = t.commandId || t.id.split('-')[0]
                     return tCommandId === taskInfo.commandId && t.enabled
                   })
-                  
+
                   if (!task) {
                     continue
                   }
-                  
+
                   const actualIndex = loadedTasks.findIndex((t: any) => t.id === task.id)
                   setCurrentStep(actualIndex)
                   showInfo(`正在执行: ${task.name}`)
-                  
+
                   localStorage.setItem('maa-task-flow-execution', JSON.stringify({
                     isExecuting: true,
                     tasks,
                     currentIndex: currentIndex + i + 1,
                     startTime: Date.now()
                   }))
-                  
+
                   try {
                     const { command, params, taskConfig } = buildCommand(task)
                     const result = await maaApi.executePredefinedTask(
-                      command, 
-                      params, 
-                      taskConfig as any, 
+                      command,
+                      params,
+                      taskConfig as any,
                       null,
                       task.name,
                       'automation',
                       false
                     )
-                    
+
                     if (!result.success) {
                       showError(`${task.name} 提交失败: ${maaApi.getErrorMessage(result)}`)
                       break
                     }
-                    
+
                     await new Promise<void>((resolve) => {
                       const checkInterval = setInterval(async () => {
                         try {
@@ -807,12 +807,12 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                         }
                       }, 1000)
                     })
-                    
+
                     // 任务完成后的延迟时间
                     // 启动游戏需要更长的等待时间，确保游戏完全启动
                     const commandId = task.commandId || task.id.split('-')[0]
                     const delayTime = commandId === 'startup' ? 15000 : commandId === 'closedown' ? 3000 : 2000
-                    
+
                     showInfo(`${task.name} 完成，等待 ${delayTime / 1000} 秒后继续...`)
                     await new Promise<void>(resolve => setTimeout(resolve, delayTime))
                   } catch (error) {
@@ -820,22 +820,22 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                   }
                 }
               }
-              
+
               showSuccess('所有任务执行完成！')
               setIsRunning(false)
               setCurrentStep(-1)
               localStorage.removeItem('maa-task-flow-execution')
             }
-            
+
             continueTaskFlow()
             return
           }
         }
-        
+
         const currentRun = result.data
         if (result.success && currentRun?.isRunning) {
           const { taskName, startTime, taskType } = currentRun
-          
+
           if (taskType === 'automation') {
             const elapsedMinutes = (Date.now() - startTime) / 1000 / 60
             setIsRunning(true)
@@ -845,7 +845,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
             } else {
               showInfo(`正在执行: ${taskName}`)
             }
-            
+
             const pollInterval = setInterval(async () => {
               try {
                 const statusResult = await maaApi.getTaskStatus()
@@ -859,7 +859,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                 clearInterval(pollInterval)
               }
             }, 2000)
-            
+
             return () => clearInterval(pollInterval)
           }
         }
@@ -867,7 +867,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         // 静默失败，不影响用户体验
       }
     }
-    
+
     initializeAndRestore()
   }, [])
 
@@ -879,7 +879,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     }
 
     window.addEventListener('training-plan-applied', handleTrainingPlanApplied)
-    
+
     return () => {
       window.removeEventListener('training-plan-applied', handleTrainingPlanApplied)
     }
@@ -895,7 +895,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
@@ -927,16 +927,13 @@ export default function AutomationTasks({}: AutomationTasksProps) {
 
   return (
     <>
-      <div className="p-6" data-automation-tasks>
-        <div className="max-w-7xl mx-auto space-y-6">
+      <div className="app-page" data-automation-tasks>
+        <div className="max-w-7xl mx-auto app-stack-section">
         {/* 页面标题 */}
         <PageHeader
           icon={<Icons.Robot />}
           title="自动化任务"
           subtitle="编排日常任务流程，一键执行或定时运行"
-          gradientFrom="violet-400"
-          gradientVia="purple-400"
-          gradientTo="fuchsia-400"
           actions={
             <div className="flex items-center space-x-4">
               <FloatingStatusIndicator />
@@ -946,7 +943,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                 animate={{ opacity: 1, x: 0 }}
                 className={`hidden sm:flex px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium border items-center space-x-1.5 sm:space-x-2 ${
                   currentActivity
-                    ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-500/30'
+                    ? 'brand-action-subtle border-transparent'
                     : 'bg-gray-50 dark:bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-500/30'
                 }`}
               >
@@ -977,15 +974,15 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         {/* 实时预览独占一行，定时执行放到下一行 */}
         <div className="space-y-4 sm:space-y-6">
           {/* 模拟器监控 */}
-          <div className="rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-gray-200 dark:border-white/10 bg-white dark:bg-[rgba(15,15,15,0.6)] transition-colors">
-            <ScreenMonitor 
+          <div className="rounded-2xl sm:rounded-3xl p-4 sm:p-5 surface-panel transition-colors">
+            <ScreenMonitor
               adbPath={taskFlow.find(t => t.commandId === 'startup')?.params?.adbPath || '/opt/homebrew/bin/adb'}
               address={taskFlow.find(t => t.commandId === 'startup')?.params?.address || '127.0.0.1:16384'}
             />
           </div>
 
           {/* 定时执行 */}
-          <div className="rounded-3xl p-6 border border-gray-200 dark:border-white/10 bg-white dark:bg-[rgba(15,15,15,0.6)] transition-colors">
+          <div className="rounded-3xl p-6 surface-panel transition-colors">
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center space-x-2">
                 <Icons.Clock />
@@ -994,7 +991,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
               <div className="flex items-center space-x-3">
                 <button
                   onClick={() => setNotificationSettingsOpen(true)}
-                  className="p-2 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-500/10 text-orange-500 transition-all"
+                  className="p-2 rounded-lg brand-text hover:bg-[var(--app-accent-soft)] transition-all"
                   title="通知设置"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -1009,11 +1006,11 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                     disabled={isRunning}
                     className="custom-checkbox cursor-pointer"
                   />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200 group-hover:text-purple-400 transition-colors">启用</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200 group-hover:text-[var(--app-accent)] transition-colors">启用</span>
                 </label>
               </div>
             </div>
-            
+
             {scheduleEnabled ? (
               <motion.div
                 className="space-y-3"
@@ -1021,7 +1018,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                 animate={{ opacity: 1, height: "auto" }}
                 transition={{ duration: 0.3 }}
               >
-                <div className="backdrop-blur-sm p-4 rounded-2xl border border-gray-200 dark:border-white/10 space-y-3 bg-gray-50 dark:bg-[rgba(20,20,20,0.6)] transition-colors">
+                <div className="backdrop-blur-sm p-4 rounded-2xl border border-gray-200 dark:border-white/10 space-y-3 surface-soft transition-colors">
                   <label className="text-sm text-gray-700 dark:text-gray-300 font-medium">执行时间</label>
                   {scheduleTimes.map((time, index) => {
                     const [hour, minute] = time.split(':');
@@ -1083,7 +1080,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                     <button
                       onClick={addScheduleTime}
                       disabled={isRunning}
-                      className="w-full flex items-center justify-center p-2 rounded-xl border border-dashed border-gray-300 dark:border-white/20 hover:border-purple-500/50 hover:bg-purple-500/10 text-gray-500 dark:text-gray-400 hover:text-purple-400 dark:hover:text-purple-300 transition-all"
+                      className="w-full flex items-center justify-center p-2 rounded-xl border border-dashed border-gray-300 dark:border-white/20 hover:border-[var(--app-accent)] hover:bg-[var(--app-accent-soft)] text-gray-500 dark:text-gray-400 hover:text-[var(--app-accent)] transition-all"
                     >
                       <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -1092,14 +1089,14 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                     </button>
                   )}
                 </div>
-                <p className="text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 backdrop-blur-sm p-3 rounded-xl border border-emerald-300 dark:border-emerald-500/20">
+                <p className="text-xs text-secondary surface-soft p-3 rounded-xl">
                   ✨ 提示：定时任务在后台运行，无需保持浏览器打开。所有修改自动保存。
                 </p>
               </motion.div>
             ) : (
               <div className="flex flex-col items-center justify-center py-8">
-                <div className="w-16 h-16 mb-4 rounded-2xl bg-violet-100 dark:bg-violet-500/10 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-violet-400 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <div className="w-16 h-16 mb-4 rounded-2xl icon-well flex items-center justify-center">
+                  <svg className="w-8 h-8 text-current" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
@@ -1114,7 +1111,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* 可用任务列表 */}
           <div className="lg:col-span-1">
-            <div className="rounded-3xl p-6 border border-gray-200 dark:border-white/10 bg-white dark:bg-[rgba(15,15,15,0.6)] transition-colors">
+            <div className="rounded-3xl p-6 surface-panel transition-colors">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-5 flex items-center space-x-2">
                 <Icons.Package />
                 <span>可用任务</span>
@@ -1125,13 +1122,13 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                     key={task.id}
                     onClick={() => addTaskToFlow(task)}
                     disabled={isRunning}
-                    className="w-full text-left p-4 border border-gray-200 dark:border-white/10 rounded-2xl hover:border-violet-500/50 hover:shadow-[0_8px_16px_rgb(139,92,246,0.2)] transition-all disabled:opacity-50 disabled:cursor-not-allowed group bg-gray-50 dark:bg-[rgba(20,20,20,0.6)]"
+                    className="w-full text-left p-4 border border-gray-200 dark:border-white/10 rounded-2xl hover:border-[var(--app-accent)] hover:shadow-[0_8px_16px_rgba(14,116,144,0.16)] transition-all disabled:opacity-50 disabled:cursor-not-allowed group surface-soft"
                   >
                     <div className="flex items-center space-x-3 mb-2">
                       <span className="text-2xl">{task.icon}</span>
-                      <span className="font-semibold text-gray-800 dark:text-gray-200 group-hover:text-violet-400 transition-colors">{task.name}</span>
+                      <span className="font-semibold text-gray-800 dark:text-gray-200 group-hover:text-[var(--app-accent)] transition-colors">{task.name}</span>
                       {task.taskType && (
-                        <span className="text-xs bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300 px-2.5 py-1 rounded-full font-medium border border-violet-300 dark:border-violet-500/30">{task.taskType}</span>
+                        <span className="text-xs px-2.5 py-1 rounded-full font-medium brand-chip">{task.taskType}</span>
                       )}
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-500 ml-9 leading-relaxed">{task.description}</p>
@@ -1143,12 +1140,12 @@ export default function AutomationTasks({}: AutomationTasksProps) {
 
           {/* 任务流程 */}
           <div className="lg:col-span-2">
-            <div className="rounded-3xl p-6 border border-gray-200 dark:border-white/10 bg-white dark:bg-[rgba(15,15,15,0.6)] transition-colors">
+            <div className="rounded-3xl p-6 surface-panel transition-colors">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center space-x-2">
                   <Icons.Clipboard />
                   <span>任务流程</span>
-                  <span className="text-sm text-gray-600 dark:text-gray-400 font-normal px-3 py-1 rounded-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[rgba(20,20,20,0.6)] transition-colors">
+                  <span className="text-sm text-gray-600 dark:text-gray-400 font-normal px-3 py-1 rounded-full border border-gray-200 dark:border-white/10 surface-soft transition-colors">
                     {taskFlow.filter(t => t.enabled).length}/{taskFlow.length} 已启用
                   </span>
                 </h3>
@@ -1159,8 +1156,6 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                         onClick={executeTaskFlow}
                         disabled={isRunning || taskFlow.filter(t => t.enabled).length === 0}
                         variant="gradient"
-                        gradientFrom="violet-500"
-                        gradientTo="purple-500"
                         icon={
                           isRunning ? (
                             <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -1180,8 +1175,6 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                         <Button
                           onClick={stopTaskFlow}
                           variant="gradient"
-                          gradientFrom="rose-500"
-                          gradientTo="rose-600"
                           icon={
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
@@ -1198,7 +1191,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
 
               {taskFlow.length === 0 ? (
                 <div className="text-center py-16 text-slate-400">
-                  <motion.div 
+                  <motion.div
                     className="text-6xl mb-4"
                     animate={{ x: [-10, 0, -10] }}
                     transition={{ duration: 2, repeat: Infinity }}
@@ -1217,10 +1210,10 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                       className={`border rounded-3xl p-6 transition-all ${
                         draggedIndex === index ? 'opacity-50 scale-95' : ''
                       } ${
-                        currentStep === index 
-                          ? 'border-violet-500/60 bg-gradient-to-br from-violet-500/10 to-purple-500/10 shadow-[0_8px_20px_rgb(139,92,246,0.25)] ring-1 ring-violet-500/30' 
-                          : task.enabled 
-                            ? 'border-violet-200 dark:border-violet-500/20 hover:border-violet-500/30 hover:shadow-[0_4px_12px_rgba(139,92,246,0.15)] bg-gradient-to-br from-violet-50/50 to-purple-50/50 dark:from-violet-900/5 dark:to-purple-900/5' 
+                        currentStep === index
+                          ? 'border-[var(--app-accent)] brand-action-subtle'
+                          : task.enabled
+                            ? 'border-[var(--app-border)] hover:border-[var(--app-accent)] hover:shadow-[0_4px_12px_rgba(14,116,144,0.15)] surface-soft'
                             : 'border-gray-100 dark:border-white/5 opacity-60 bg-gray-50 dark:bg-[rgba(15,15,15,0.3)]'
                       }`}
                     >
@@ -1234,16 +1227,16 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                           disabled={isRunning}
                           className="mt-1 custom-checkbox cursor-pointer flex-shrink-0"
                         />
-                        
+
                         {/* 标题信息 */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2 flex-wrap">
                             {!isRunning && (
-                              <span 
+                              <span
                                 draggable={true}
                                 onDragStart={() => handleDragStart(index)}
                                 onDragEnd={handleDragEnd}
-                                className="text-gray-400 cursor-move hover:text-gray-600 dark:hover:text-gray-300 transition-colors" 
+                                className="text-gray-400 cursor-move hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                                 title="拖拽排序"
                               >
                                 ⋮⋮
@@ -1254,12 +1247,12 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                             <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-white/10 px-2 py-0.5 rounded-full border border-gray-200 dark:border-white/10">#{index + 1}</span>
                           </div>
                         </div>
-                        
+
                         {/* 删除按钮 */}
                         <div className="flex-shrink-0">
                           {currentStep === index ? (
                             <div className="w-7 h-7 flex items-center justify-center">
-                              <svg className="w-5 h-5 animate-spin text-violet-400" fill="none" viewBox="0 0 24 24">
+                              <svg className="w-5 h-5 animate-spin brand-text" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                               </svg>
@@ -1297,7 +1290,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                     disabled={isRunning || !task.enabled}
                                     className="custom-checkbox cursor-pointer"
                                   />
-                                  <span className="group-hover:text-violet-400 transition-colors">{field.label}</span>
+                                  <span className="group-hover:text-[var(--app-accent)] transition-colors">{field.label}</span>
                                 </label>
                               ) : field.type === 'multi-stages' ? (
                                 <div className="space-y-2">
@@ -1311,12 +1304,12 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                           <div style={{ width: '80px', flexShrink: 0 }}></div>
                                         )}
                                         <div className="flex items-center space-x-2 flex-1">
-                                        <div className={`relative inline-flex items-center border rounded-xl focus-within:ring-2 focus-within:ring-violet-500 transition-all overflow-hidden ${
+                                        <div className={`relative inline-flex items-center border rounded-xl focus-within:ring-2 focus-within:ring-[var(--app-accent)] transition-all overflow-hidden ${
                                           typeof stageItem === 'object' && stageItem.pinned
-                                            ? 'border-amber-300 dark:border-amber-500/50 bg-amber-50 dark:bg-amber-500/10'
+                                            ? 'border-[var(--app-accent)] bg-[var(--app-accent-soft)]'
                                             : typeof stageItem === 'object' && stageItem.smart
-                                              ? 'border-blue-300 dark:border-blue-500/50 bg-blue-50 dark:bg-blue-500/10'
-                                              : 'border-gray-200 dark:border-white/10 bg-white dark:bg-[#070707]'
+                                              ? 'border-[var(--app-accent)] bg-[var(--app-accent-soft)]'
+                                              : 'border-gray-200 dark:border-white/10 control-surface'
                                         }`}>
                                         {/* 置顶/智能标识按钮 - 绝对定位在输入框内部左侧 */}
                                         <button
@@ -1335,16 +1328,16 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                           disabled={isRunning || !task.enabled || (typeof stageItem === 'object' && stageItem.smart)}
                                           className={`absolute left-1 top-1/2 -translate-y-1/2 p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10 ${
                                             (typeof stageItem === 'object' && stageItem.smart)
-                                              ? 'text-blue-500 dark:text-blue-400'
+                                              ? 'brand-text'
                                               : (typeof stageItem === 'object' && stageItem.pinned)
-                                                ? 'text-amber-500 hover:bg-amber-500/20'
+                                                ? 'brand-text hover:bg-[var(--app-accent-soft)]'
                                                 : 'text-gray-300/50 dark:text-gray-600/50 hover:bg-gray-500/10'
                                           }`}
                                           title={
-                                            typeof stageItem === 'object' && stageItem.smart 
-                                              ? '智能养成关卡' 
-                                              : typeof stageItem === 'object' && stageItem.pinned 
-                                                ? '取消置顶' 
+                                            typeof stageItem === 'object' && stageItem.smart
+                                              ? '智能养成关卡'
+                                              : typeof stageItem === 'object' && stageItem.pinned
+                                                ? '取消置顶'
                                                 : '置顶'
                                           }
                                         >
@@ -1489,20 +1482,20 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                           .map((s: any, idx: number) => ({ stage: s, index: idx }))
                                           .filter((item: any) => typeof item.stage === 'object' && item.stage.smart)
                                           .map((item: any) => item.index);
-                                        
+
                                         // 检查当前是否是最后一个智能养成关卡
-                                        const isLastSmartStage = smartStageIndices.length > 0 && 
+                                        const isLastSmartStage = smartStageIndices.length > 0 &&
                                           stageIndex === smartStageIndices[smartStageIndices.length - 1];
-                                        
+
                                         // 只在最后一个智能养成关卡下显示
-                                        return isLastSmartStage && 
-                                          typeof stageItem === 'object' && 
-                                          stageItem.smart && 
-                                          stageItem.trainingOperators && 
+                                        return isLastSmartStage &&
+                                          typeof stageItem === 'object' &&
+                                          stageItem.smart &&
+                                          stageItem.trainingOperators &&
                                           stageItem.trainingOperators.length > 0 && (
                                           <div className="flex items-center space-x-2 -mb-1 mt-1">
                                             <div style={{ width: '80px', flexShrink: 0 }}></div>
-                                            <div className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-3 py-1.5 rounded-lg border border-blue-200 dark:border-blue-500/30 flex items-center space-x-1.5">
+                                            <div className="text-xs brand-chip px-3 py-1.5 rounded-lg flex items-center space-x-1.5">
                                               <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                               </svg>
@@ -1524,7 +1517,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                           updateTaskParam(index, 'stages', [...currentStages, { stage: '', times: '' }]);
                                         }}
                                         disabled={isRunning || !task.enabled}
-                                        className="flex items-center justify-center space-x-1 border border-dashed border-gray-300 dark:border-gray-600 hover:border-violet-400 dark:hover:border-violet-500 rounded-xl py-1.5 px-3 text-sm text-gray-500 dark:text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-white dark:bg-[#070707]"
+                                        className="flex items-center justify-center space-x-1 border border-dashed border-gray-300 dark:border-gray-600 hover:border-[var(--app-accent)] rounded-xl py-1.5 px-3 text-sm text-gray-500 dark:text-gray-400 hover:text-[var(--app-accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed control-surface"
                                       >
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -1537,26 +1530,26 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                           try {
                                             // 获取当前关卡列表
                                             const currentStages = task.params.stages || [{ stage: '', times: '' }];
-                                            
+
                                             // 检查是否已有智能关卡
                                             const hasSmartStages = currentStages.some(s => typeof s === 'object' && s.smart);
-                                            
+
                                             if (hasSmartStages) {
                                               // 如果已有智能关卡，则移除所有智能关卡
-                                              const pinnedStages = currentStages.filter(s => 
+                                              const pinnedStages = currentStages.filter(s =>
                                                 typeof s === 'object' && s.pinned && s.stage && s.stage.trim()
                                               );
-                                              const normalStages = currentStages.filter(s => 
-                                                (typeof s === 'string' && s.trim()) || 
+                                              const normalStages = currentStages.filter(s =>
+                                                (typeof s === 'string' && s.trim()) ||
                                                 (typeof s === 'object' && !s.pinned && !s.smart && s.stage && s.stage.trim())
                                               );
-                                              
+
                                               const allStages = [...pinnedStages, ...normalStages];
                                               updateTaskParam(index, 'stages', allStages.length > 0 ? allStages : [{ stage: '', times: '' }]);
                                               showSuccess('已移除智能养成关卡');
                                               return;
                                             }
-                                            
+
                                             // 如果没有智能关卡，则添加
                                             // 从智能养成加载刷取计划
                                             const result = await maaApi.loadUserConfig('training-queue');
@@ -1564,25 +1557,25 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                               showError('智能养成队列为空，请先添加干员');
                                               return;
                                             }
-                                            
+
                                             // 生成刷取计划
                                             const planResult = await maaApi.generateTrainingPlan('current');
                                             if (!planResult.success || !planResult.data) {
                                               showError('生成刷取计划失败');
                                               return;
                                             }
-                                            
+
                                             const plan = planResult.data;
                                             if (!plan.stages || plan.stages.length === 0) {
                                               showSuccess('当前干员材料已集齐！');
                                               return;
                                             }
-                                            
+
                                             // 获取正在养成的干员名称
                                             const trainingOperatorNames = plan.operators && plan.operators.length > 0
                                               ? plan.operators.map((op: any) => op.name)
                                               : [];
-                                            
+
                                             // 将刷取计划转换为关卡列表，标记为智能养成
                                             const newStages = plan.stages.map((stage: any) => ({
                                               stage: stage.stage,
@@ -1590,19 +1583,19 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                               smart: true, // 标记为智能养成关卡
                                               trainingOperators: trainingOperatorNames // 添加干员信息
                                             }));
-                                            
+
                                             // 分类：置顶关卡、普通关卡
-                                            const pinnedStages = currentStages.filter((s): s is StageConfig => 
+                                            const pinnedStages = currentStages.filter((s): s is StageConfig =>
                                               typeof s === 'object' && s.pinned === true && !!s.stage && s.stage.trim() !== ''
                                             );
-                                            const normalStages = currentStages.filter((s): s is string | StageConfig => 
-                                              (typeof s === 'string' && s.trim() !== '') || 
+                                            const normalStages = currentStages.filter((s): s is string | StageConfig =>
+                                              (typeof s === 'string' && s.trim() !== '') ||
                                               (typeof s === 'object' && !s.pinned && !s.smart && !!s.stage && s.stage.trim() !== '')
                                             );
-                                            
+
                                             // 重新组合：置顶 -> 智能养成 -> 普通
                                             const allStages = [...pinnedStages, ...newStages, ...normalStages];
-                                            
+
                                             updateTaskParam(index, 'stages', allStages);
                                             showSuccess(`已添加智能养成计划：${newStages.length} 个关卡`);
                                           } catch (error: unknown) {
@@ -1613,8 +1606,8 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                         disabled={isRunning || !task.enabled}
                                         className={`flex items-center justify-center space-x-1 border border-dashed rounded-xl py-1.5 px-3 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                                           (task.params.stages || []).some(s => typeof s === 'object' && s.smart)
-                                            ? 'border-blue-500 dark:border-blue-400 bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 hover:border-blue-600 dark:hover:border-blue-300 hover:bg-blue-200 dark:hover:bg-blue-500/30'
-                                            : 'border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-700 dark:hover:text-blue-300'
+                                            ? 'border-[var(--app-accent)] brand-action-subtle'
+                                            : 'border-[var(--app-border)] brand-chip hover:border-[var(--app-accent)]'
                                         }`}
                                       >
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -1634,7 +1627,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                               ) : field.type === 'stage-with-times' ? (
                                 <div className="flex items-center space-x-2">
                                   <label className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap w-20">{field.label}:</label>
-                                  <div className="flex items-center border border-gray-200 dark:border-white/10 rounded-xl focus-within:ring-2 focus-within:ring-violet-500 transition-all flex-1 max-w-[280px] bg-white dark:bg-[#070707]">
+                                  <div className="flex items-center border border-gray-200 dark:border-white/10 rounded-xl focus-within:ring-2 focus-within:ring-[var(--app-accent)] transition-all flex-1 max-w-[280px] control-surface">
                                     <input
                                       type="text"
                                       value={task.params[field.key] || ''}
@@ -1707,9 +1700,9 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                             disabled={isRunning || !task.enabled}
                                             className="custom-checkbox cursor-pointer"
                                           />
-                                          <span className="group-hover:text-violet-400 transition-colors flex items-center space-x-1">
+                                          <span className="group-hover:text-[var(--app-accent)] transition-colors flex items-center space-x-1">
                                             <span>{star}</span>
-                                            <svg className="w-3.5 h-3.5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                                            <svg className="w-3.5 h-3.5 brand-text" fill="currentColor" viewBox="0 0 20 20">
                                               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                                             </svg>
                                           </span>
@@ -1718,7 +1711,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                     })}
                                   </div>
                                   {task.id === 'recruit' && field.key === 'select' && Array.isArray(task.params.select) && task.params.select.includes(6) && (
-                                    <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                                    <div className="mt-2 rounded-xl px-3 py-2 text-xs brand-chip">
                                       已开启 6 星自动公招：遇到高级资深干员等高价值标签时，会按 MaaCore 新能力优先保留并自动选择。
                                     </div>
                                   )}
@@ -1752,7 +1745,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                             disabled={isRunning || !task.enabled}
                                             className="custom-checkbox cursor-pointer"
                                           />
-                                          <span className="group-hover:text-violet-400 transition-colors">{facility.label}</span>
+                                          <span className="group-hover:text-[var(--app-accent)] transition-colors">{facility.label}</span>
                                         </label>
                                       );
                                     })}
@@ -1765,7 +1758,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                     value={task.params[field.key] || (Array.isArray(field.options) && field.options.length > 0 ? (typeof field.options[0] === 'object' ? field.options[0].value : field.options[0]) : '')}
                                     onChange={(e) => updateTaskParam(index, field.key, e.target.value)}
                                     disabled={isRunning || !task.enabled}
-                                    className="flex-1 px-3 py-2 border border-gray-200 dark:border-white/10 hover:border-violet-400 dark:hover:border-violet-500/50 rounded-xl text-sm text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all bg-white dark:bg-[#070707]"
+                                    className="flex-1 px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[var(--app-accent)] transition-all control-surface"
                                   >
                                     {Array.isArray(field.options) && field.options.map((opt) => {
                                       const value = typeof opt === 'object' ? opt.value : opt
@@ -1788,7 +1781,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                         min={field.min}
                                         max={field.max}
                                         disabled={isRunning || !task.enabled}
-                                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 hover:border-violet-400 dark:hover:border-violet-500/50 rounded-xl text-sm text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all bg-white dark:bg-[#070707]"
+                                        className="w-full px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[var(--app-accent)] transition-all control-surface"
                                       />
                                       <div className="number-input-controls">
                                         <button
@@ -1833,7 +1826,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                       min={field.min}
                                       max={field.max}
                                       disabled={isRunning || !task.enabled}
-                                      className="flex-1 px-3 py-2 border border-gray-200 dark:border-white/10 hover:border-violet-400 dark:hover:border-violet-500/50 rounded-xl text-sm text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all bg-white dark:bg-[#070707]"
+                                      className="flex-1 px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[var(--app-accent)] transition-all control-surface"
                                     />
                                   )}
                                 </div>
@@ -1851,14 +1844,14 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                           })}
                         </div>
                       )}
-                      
+
                       {/* 启动游戏任务的测试连接按钮 */}
                       {task.commandId === 'startup' && task.params?.adbPath && task.params?.address && (
                         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-white/10">
                           <button
                             onClick={() => testConnection(task.id, task.params.adbPath || '', task.params.address || '')}
                             disabled={isRunning || !task.enabled || testingConnection[task.id]}
-                            className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 disabled:from-violet-500/50 disabled:to-purple-500/50 text-white rounded-xl text-sm font-medium transition-all disabled:cursor-not-allowed shadow-[0_4px_12px_rgb(139,92,246,0.3)] hover:shadow-[0_6px_20px_rgb(139,92,246,0.4)] disabled:shadow-none"
+                            className="w-full flex items-center justify-center space-x-2 px-4 py-2 brand-action text-white rounded-xl text-sm font-medium transition-all disabled:cursor-not-allowed disabled:shadow-none"
                           >
                             {testingConnection[task.id] ? (
                               <>
@@ -1877,11 +1870,11 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                               </>
                             )}
                           </button>
-                          
+
                           {/* 连接状态显示 */}
                           {connectionStatus[task.id] && (
                             <div className={`mt-3 p-3 rounded-xl text-sm flex items-start space-x-2 ${
-                              connectionStatus[task.id]?.success 
+                              connectionStatus[task.id]?.success
                                 ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30'
                                 : 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-500/30'
                             }`}>
@@ -1908,11 +1901,11 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         </div>
         </div>
       </div>
-      
+
       {/* 通知设置弹窗 */}
-      <NotificationSettings 
-        isOpen={notificationSettingsOpen} 
-        onClose={() => setNotificationSettingsOpen(false)} 
+      <NotificationSettings
+        isOpen={notificationSettingsOpen}
+        onClose={() => setNotificationSettingsOpen(false)}
       />
     </>
   )

@@ -91,7 +91,7 @@ export default function PWAInstallPrompt() {
               <div className="flex space-x-2">
                 <button
                   onClick={handleInstall}
-                  className="flex-1 px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-500 text-white rounded-xl text-sm font-semibold hover:from-violet-600 hover:to-purple-600 transition-all"
+                  className="flex-1 px-4 py-2 brand-action text-white rounded-xl text-sm font-semibold transition-all"
                 >
                   安装
                 </button>

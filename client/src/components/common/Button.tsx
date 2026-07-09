@@ -13,8 +13,6 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
   fullWidth?: boolean
   icon?: ReactNode
   type?: 'button' | 'submit' | 'reset'
-  gradientFrom?: string
-  gradientTo?: string
   onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void
 }
 
@@ -45,38 +43,18 @@ export default function Button({
   className = '',
   icon,
   type = 'button',
-  gradientFrom,
-  gradientTo,
   ...props
 }: ButtonProps) {
-  const baseStyles = 'inline-flex items-center justify-center font-semibold rounded-xl transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950'
+  const baseStyles = 'app-button'
   
   const variantStyles: Record<string, string> = {
-    primary: 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-[0_10px_24px_rgba(6,182,212,0.22)] hover:shadow-[0_14px_32px_rgba(6,182,212,0.28)] disabled:from-gray-500 disabled:to-gray-500 disabled:shadow-none',
-    secondary: 'bg-white/70 dark:bg-white/10 text-slate-700 dark:text-slate-200 shadow-[0_0_0_1px_rgba(15,23,42,0.07)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08)] hover:bg-white dark:hover:bg-white/10',
-    danger: 'bg-gradient-to-r from-rose-500 to-red-500 text-white shadow-[0_10px_24px_rgba(244,63,94,0.22)] hover:shadow-[0_14px_32px_rgba(244,63,94,0.28)] disabled:from-gray-500 disabled:to-gray-500 disabled:shadow-none',
-    success: 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-[0_10px_24px_rgba(16,185,129,0.22)] hover:shadow-[0_14px_32px_rgba(16,185,129,0.28)] disabled:from-gray-500 disabled:to-gray-500 disabled:shadow-none',
-    ghost: 'text-slate-700 dark:text-slate-300 hover:bg-white/65 dark:hover:bg-white/10',
-    gradient: 'bg-gradient-to-r text-white shadow-[0_10px_24px_rgba(6,182,212,0.22)] hover:shadow-[0_14px_32px_rgba(6,182,212,0.28)] disabled:from-gray-500 disabled:to-gray-500 disabled:shadow-none',
-    outline: 'text-slate-700 dark:text-slate-200 bg-white/50 dark:bg-white/[0.03] shadow-[0_0_0_1px_rgba(15,23,42,0.08)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.09)] hover:bg-white/80 dark:hover:bg-white/10',
-  }
-  
-  // 预定义的渐变色组合
-  const gradientPresets: Record<string, string> = {
-    // 紫色系 (自动化任务)
-    'violet-purple': 'from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 shadow-violet-500/25 hover:shadow-violet-500/30',
-    // 绿色系 (自动战斗 - 旧版)
-    'emerald-teal': 'from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-emerald-500/25 hover:shadow-emerald-500/30',
-    // 青绿色系 (自动战斗 - 新版)
-    'teal-cyan': 'from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 shadow-teal-500/25 hover:shadow-teal-500/30',
-    // 粉紫色系 (肉鸽)
-    'purple-fuchsia': 'from-purple-500 to-fuchsia-500 hover:from-purple-600 hover:to-fuchsia-600 shadow-purple-500/25 hover:shadow-purple-500/30',
-    // 橙红色系 (配置管理)
-    'orange-red': 'from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 shadow-orange-500/25 hover:shadow-orange-500/30',
-    // 青蓝色系 (数据统计/日志)
-    'cyan-blue': 'from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 shadow-cyan-500/25 hover:shadow-cyan-500/30',
-    // 黄橙色系 (智能养成)
-    'amber-yellow': 'from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 shadow-amber-500/25 hover:shadow-amber-500/30',
+    primary: 'brand-action disabled:!bg-slate-400 disabled:!shadow-none',
+    secondary: 'control-surface text-primary',
+    danger: 'status-danger-action disabled:!bg-slate-400 disabled:!shadow-none',
+    success: 'status-success-action disabled:!bg-slate-400 disabled:!shadow-none',
+    ghost: 'text-secondary hover:bg-white/65 hover:text-primary dark:hover:bg-white/10',
+    gradient: 'brand-action disabled:!bg-slate-400 disabled:!shadow-none',
+    outline: 'control-surface text-primary',
   }
   
   const sizeStyles: Record<string, string> = {
@@ -87,13 +65,6 @@ export default function Button({
   
   const widthStyles = fullWidth ? 'w-full' : ''
   
-  // 处理自定义渐变色
-  let gradientStyles = ''
-  if (variant === 'gradient' && gradientFrom && gradientTo) {
-    const presetKey = `${gradientFrom}-${gradientTo}` as keyof typeof gradientPresets
-    gradientStyles = (presetKey in gradientPresets ? gradientPresets[presetKey] : gradientPresets['violet-purple']) as string
-  }
-  
   const isDisabled = disabled || loading
   
   return (
@@ -101,7 +72,7 @@ export default function Button({
       type={type}
       onClick={onClick}
       disabled={isDisabled}
-      className={`${baseStyles} ${variantStyles[variant]} ${variant === 'gradient' ? gradientStyles : ''} ${sizeStyles[size]} ${widthStyles} ${isDisabled ? 'cursor-not-allowed opacity-50' : ''} ${className}`}
+      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${widthStyles} ${isDisabled ? 'cursor-not-allowed opacity-50' : ''} ${className}`}
       whileHover={isDisabled ? {} : { y: -1 }}
       whileTap={isDisabled ? {} : { y: 0, scale: 0.98 }}
       {...props}
@@ -138,13 +109,13 @@ export function IconButton({
   title,
   ...props
 }: IconButtonProps) {
-  const baseStyles = 'inline-flex items-center justify-center font-semibold rounded-xl transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60'
+  const baseStyles = 'app-icon-button'
   
   const variantStyles: Record<string, string> = {
-    primary: 'bg-gradient-to-r from-violet-500 to-purple-500 text-white hover:from-violet-600 hover:to-purple-600',
-    secondary: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700',
-    danger: 'bg-gradient-to-r from-rose-500 to-red-500 text-white hover:from-rose-600 hover:to-red-600',
-    ghost: 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5',
+    primary: 'brand-action',
+    secondary: 'control-surface text-primary',
+    danger: 'status-danger-action',
+    ghost: 'text-secondary hover:bg-white/65 hover:text-primary dark:hover:bg-white/10',
   }
   
   const sizeStyles: Record<string, string> = {
