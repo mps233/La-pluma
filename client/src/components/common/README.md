@@ -2,6 +2,8 @@
 
 本目录包含项目中可复用的通用 UI 组件，用于统一代码风格和减少重复代码。
 
+当前组件均为 TSX 文件，并通过 `index.ts` 统一导出。页面中优先从 `@/components/common` 或相邻路径的 `./common` 引入。
+
 ## 组件列表
 
 ### 1. PageHeader - 页面标题组件
@@ -10,7 +12,7 @@
 
 **使用示例**：
 
-```jsx
+```tsx
 import { PageHeader } from '../components/common'
 import Icons from './Icons'
 
@@ -68,7 +70,7 @@ import Icons from './Icons'
 
 **使用示例**：
 
-```jsx
+```tsx
 import { StatusIndicator } from '../components/common'
 
 // 基础用法
@@ -119,7 +121,7 @@ import { StatusIndicator } from '../components/common'
 
 **使用示例**：
 
-```jsx
+```tsx
 import { Card, CardHeader, CardContent, InfoCard } from '../components/common'
 
 // 基础卡片
@@ -191,7 +193,7 @@ import { Card, CardHeader, CardContent, InfoCard } from '../components/common'
 
 #### 1. 页面标题（所有页面）
 **当前代码**：
-```jsx
+```tsx
 <motion.div className="flex items-center justify-between" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
   <div className="flex items-center space-x-3">
     <Icons.TargetIcon />
@@ -206,7 +208,7 @@ import { Card, CardHeader, CardContent, InfoCard } from '../components/common'
 ```
 
 **重构后**：
-```jsx
+```tsx
 <PageHeader
   icon={<Icons.TargetIcon />}
   title="自动战斗"
@@ -223,7 +225,7 @@ import { Card, CardHeader, CardContent, InfoCard } from '../components/common'
 
 #### 2. 状态指示器（所有页面）
 **当前代码**：
-```jsx
+```tsx
 <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-900/60 rounded-xl px-3 sm:px-4 py-1.5 sm:py-2 border border-gray-200 dark:border-white/10 shadow-sm text-xs">
   <motion.div 
     className={`w-2 h-2 rounded-full flex-shrink-0 ${isRunning ? 'bg-fuchsia-400' : 'bg-emerald-400'}`}
@@ -241,7 +243,7 @@ import { Card, CardHeader, CardContent, InfoCard } from '../components/common'
 ```
 
 **重构后**：
-```jsx
+```tsx
 <StatusIndicator
   isActive={isRunning}
   message={message}
@@ -256,7 +258,7 @@ import { Card, CardHeader, CardContent, InfoCard } from '../components/common'
 
 #### 3. 卡片容器（所有页面）
 **当前代码**：
-```jsx
+```tsx
 <motion.div 
   className="rounded-3xl p-6 border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/60"
   initial={{ opacity: 0, y: 20 }}
@@ -273,7 +275,7 @@ import { Card, CardHeader, CardContent, InfoCard } from '../components/common'
 ```
 
 **重构后**：
-```jsx
+```tsx
 <Card animated delay={0.1}>
   <CardHeader title="标题" />
   <CardContent>
@@ -289,16 +291,16 @@ import { Card, CardHeader, CardContent, InfoCard } from '../components/common'
 ## 重构优先级
 
 ### 高优先级（建议立即重构）
-1. **CombatTasks.jsx** - 页面标题 + 状态指示器
-2. **RoguelikeTasks.jsx** - 页面标题 + 状态指示器
-3. **ConfigManager.jsx** - 页面标题 + 状态指示器 + 多个卡片
-4. **DataStatistics.jsx** - 页面标题 + 状态指示器
-5. **OperatorTraining.jsx** - 页面标题 + 状态指示器
-6. **AutomationTasks.jsx** - 页面标题 + 状态指示器
+1. **CombatTasks.tsx** - 页面标题 + 状态指示器
+2. **RoguelikeTasks.tsx** - 页面标题 + 状态指示器
+3. **ConfigManager.tsx** - 页面标题 + 状态指示器 + 多个卡片
+4. **DataStatistics.tsx** - 页面标题 + 状态指示器
+5. **OperatorTraining.tsx** - 页面标题 + 状态指示器
+6. **AutomationTasks.tsx** - 页面标题 + 状态指示器
 
 ### 中优先级
-7. **LogViewer.jsx** - 页面标题 + 卡片
-8. **ScreenMonitor.jsx** - 卡片
+7. **LogViewer.tsx** - 页面标题 + 卡片
+8. **ScreenMonitor.tsx** - 卡片
 
 ### 预期收益
 - **代码减少**：约 500-800 行
@@ -315,7 +317,7 @@ import { Card, CardHeader, CardContent, InfoCard } from '../components/common'
 ⚠️ **重要**：Tailwind CSS 不支持动态拼接类名！
 
 **错误示例**：
-```jsx
+```tsx
 // ❌ 这样不会生效！
 className={`bg-${color}`}
 className={`from-${gradientFrom}`}
@@ -324,7 +326,7 @@ className={`from-${gradientFrom}`}
 **解决方案**：
 
 1. **使用完整的类名映射**（推荐）：
-```jsx
+```tsx
 const colorMap = {
   'violet-400': 'bg-violet-400',
   'purple-400': 'bg-purple-400',
@@ -346,7 +348,7 @@ module.exports = {
 ```
 
 3. **使用内联样式**（不推荐，失去 Tailwind 优势）：
-```jsx
+```tsx
 style={{ backgroundColor: color }}
 ```
 

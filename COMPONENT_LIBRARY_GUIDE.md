@@ -4,6 +4,8 @@
 
 为了减少代码重复、统一视觉风格、提升开发效率，我们创建了一套通用组件库。这些组件提取自项目中多次出现的 UI 模式。
 
+当前通用组件位于 `client/src/components/common/*.tsx`，统一通过 `client/src/components/common/index.ts` 导出。示例以 TSX 写法为准。
+
 ---
 
 ## 🎯 设计目标
@@ -19,7 +21,7 @@
 
 ### 1. PageHeader - 页面标题组件
 
-**文件位置**: `client/src/components/common/PageHeader.jsx`
+**文件位置**: `client/src/components/common/PageHeader.tsx`
 
 **适用场景**：所有页面的顶部标题区域
 
@@ -38,7 +40,7 @@
 ```
 
 **使用示例**：
-```jsx
+```tsx
 import { PageHeader } from './components/common'
 import Icons from './components/Icons'
 
@@ -69,7 +71,7 @@ import Icons from './components/Icons'
 
 ### 2. StatusIndicator - 状态指示器组件
 
-**文件位置**: `client/src/components/common/StatusIndicator.jsx`
+**文件位置**: `client/src/components/common/StatusIndicator.tsx`
 
 **适用场景**：显示任务运行状态、加载状态等
 
@@ -86,7 +88,7 @@ import Icons from './components/Icons'
 ```
 
 **使用示例**：
-```jsx
+```tsx
 import { StatusIndicator } from './components/common'
 
 // 基础用法
@@ -116,7 +118,7 @@ import { StatusIndicator } from './components/common'
 
 ### 3. Card - 卡片组件系列
 
-**文件位置**: `client/src/components/common/Card.jsx`
+**文件位置**: `client/src/components/common/Card.tsx`
 
 **适用场景**：所有需要卡片容器的地方
 
@@ -134,7 +136,7 @@ import { StatusIndicator } from './components/common'
 ```
 
 **使用示例**：
-```jsx
+```tsx
 import { Card } from './components/common'
 
 <Card animated delay={0.1}>
@@ -176,7 +178,7 @@ import { Card } from './components/common'
 ```
 
 **完整示例**：
-```jsx
+```tsx
 import { Card, CardHeader, CardContent, InfoCard } from './components/common'
 
 // 带标题的卡片
@@ -212,7 +214,7 @@ import { Card, CardHeader, CardContent, InfoCard } from './components/common'
 #### 示例 1：页面标题
 
 **重构前**（约 15 行）：
-```jsx
+```tsx
 <motion.div 
   className="flex items-center justify-between"
   initial={{ opacity: 0, y: -20 }}
@@ -233,7 +235,7 @@ import { Card, CardHeader, CardContent, InfoCard } from './components/common'
 ```
 
 **重构后**（1 行）：
-```jsx
+```tsx
 <PageHeader
   icon={<Icons.TargetIcon />}
   title="自动战斗"
@@ -251,7 +253,7 @@ import { Card, CardHeader, CardContent, InfoCard } from './components/common'
 #### 示例 2：状态指示器
 
 **重构前**（约 20 行）：
-```jsx
+```tsx
 <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-900/60 rounded-xl px-3 sm:px-4 py-1.5 sm:py-2 border border-gray-200 dark:border-white/10 shadow-sm text-xs">
   <motion.div 
     className={`w-2 h-2 rounded-full flex-shrink-0 ${isRunning ? 'bg-fuchsia-400' : 'bg-emerald-400'}`}
@@ -269,7 +271,7 @@ import { Card, CardHeader, CardContent, InfoCard } from './components/common'
 ```
 
 **重构后**（1 行）：
-```jsx
+```tsx
 <StatusIndicator
   isActive={isRunning}
   message={message}
@@ -285,7 +287,7 @@ import { Card, CardHeader, CardContent, InfoCard } from './components/common'
 ### 重构步骤
 
 1. **导入组件**：
-```jsx
+```tsx
 import { PageHeader, StatusIndicator, Card } from './components/common'
 ```
 
@@ -311,14 +313,14 @@ import { PageHeader, StatusIndicator, Card } from './components/common'
 
 | 组件 | 页面标题 | 状态指示器 | 卡片 | 预计减少代码 |
 |------|---------|-----------|------|-------------|
-| CombatTasks.jsx | ✅ | ✅ | ✅ | ~80 行 |
-| RoguelikeTasks.jsx | ✅ | ✅ | ✅ | ~70 行 |
-| ConfigManager.jsx | ✅ | ✅ | ✅ | ~100 行 |
-| DataStatistics.jsx | ✅ | ✅ | ✅ | ~80 行 |
-| OperatorTraining.jsx | ✅ | ✅ | ✅ | ~90 行 |
-| AutomationTasks.jsx | ✅ | ✅ | ✅ | ~100 行 |
-| LogViewer.jsx | ✅ | - | ✅ | ~60 行 |
-| ScreenMonitor.jsx | - | - | ✅ | ~30 行 |
+| CombatTasks.tsx | ✅ | ✅ | ✅ | ~80 行 |
+| RoguelikeTasks.tsx | ✅ | ✅ | ✅ | ~70 行 |
+| ConfigManager.tsx | ✅ | ✅ | ✅ | ~100 行 |
+| DataStatistics.tsx | ✅ | ✅ | ✅ | ~80 行 |
+| OperatorTraining.tsx | ✅ | ✅ | ✅ | ~90 行 |
+| AutomationTasks.tsx | ✅ | ✅ | ✅ | ~100 行 |
+| LogViewer.tsx | ✅ | - | ✅ | ~60 行 |
+| ScreenMonitor.tsx | - | - | ✅ | ~30 行 |
 
 **总计**：约 **610 行代码** 可以减少
 
@@ -338,7 +340,7 @@ import { PageHeader, StatusIndicator, Card } from './components/common'
 Tailwind CSS 不支持动态拼接类名！
 
 **错误示例**：
-```jsx
+```tsx
 // ❌ 这样不会生效！
 className={`bg-${color}`}
 className={`from-${gradientFrom}`}
@@ -348,7 +350,7 @@ className={`from-${gradientFrom}`}
 
 我们的组件已经使用了完整类名映射的方式，可以安全使用：
 
-```jsx
+```tsx
 // ✅ 组件内部实现
 const colorMap = {
   'violet-400': 'bg-violet-400',
@@ -370,10 +372,10 @@ className={colorMap[color]}
 ## 🚀 下一步计划
 
 ### 短期（1-2 周）
-- [ ] 重构 CombatTasks.jsx
-- [ ] 重构 RoguelikeTasks.jsx
-- [ ] 重构 ConfigManager.jsx
-- [ ] 重构 DataStatistics.jsx
+- [ ] 重构 CombatTasks.tsx
+- [ ] 重构 RoguelikeTasks.tsx
+- [ ] 重构 ConfigManager.tsx
+- [ ] 重构 DataStatistics.tsx
 
 ### 中期（1 个月）
 - [ ] 重构所有主要组件
@@ -395,6 +397,6 @@ className={colorMap[color]}
 
 ---
 
-**创建时间**: 2026-02-09  
-**最后更新**: 2026-02-09  
+**创建时间**: 2026-02-09
+**最后更新**: 2026-07-09
 **维护者**: @mps233

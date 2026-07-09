@@ -177,15 +177,23 @@ const allMaterials = gameAssetsService.getMaterials();
 
 ## 🖼️ 图片代理
 
-所有图片 URL 都指向官方 CDN，但可能存在防盗链问题。建议通过后端代理访问：
+资源数据中的图片 URL 通常指向官方 CDN 或镜像 CDN。当前 `server.js` 主要挂载 `/api/agent`，没有挂载历史的 `/api/skland/avatar-proxy` 图片代理；前端应优先直接使用资源 URL，并提供加载失败降级。
 
-```javascript
+```tsx
 // 前端使用
-const proxyUrl = `/api/skland/avatar-proxy?url=${encodeURIComponent(imageUrl)}`;
+const imageSrc = imageUrl || '/icon.svg';
 
 // 示例
-<img src={`/api/skland/avatar-proxy?url=${encodeURIComponent(char.avatar)}`} alt={char.name} />
+<img
+  src={char.avatar || '/icon.svg'}
+  alt={char.name}
+  onError={(event) => {
+    event.currentTarget.src = '/icon.svg'
+  }}
+/>
 ```
+
+如果确实需要后端代理，建议在 `/api/agent` 下新增明确的图片代理接口后再接入前端，避免继续依赖未挂载的历史路由。
 
 ## 🔄 更新数据
 
@@ -228,7 +236,7 @@ const getCharAvatarUrl = (charId: string) => {
 }
 
 // 使用
-<img src={`/api/skland/avatar-proxy?url=${encodeURIComponent(getCharAvatarUrl(charId))}`} />
+<img src={getCharAvatarUrl(charId) || '/icon.svg'} />
 ```
 
 ### 2. 材料计划显示物品图标
@@ -241,7 +249,7 @@ const getMaterialIcon = (itemId: string) => {
 }
 
 // 使用
-<img src={`/api/skland/avatar-proxy?url=${encodeURIComponent(getMaterialIcon('30012'))}`} />
+<img src={getMaterialIcon('30012') || '/icon.svg'} />
 ```
 
 ### 3. 干员养成显示技能图标
@@ -254,7 +262,7 @@ const getSkillIcon = (skillId: string) => {
 }
 
 // 使用
-<img src={`/api/skland/avatar-proxy?url=${encodeURIComponent(getSkillIcon(skillId))}`} />
+<img src={getSkillIcon(skillId) || '/icon.svg'} />
 ```
 
 ### 4. 搜索功能
@@ -354,7 +362,8 @@ npm run fetch-assets
 3. 网络问题
 
 **解决方法**：
-- 使用后端代理：`/api/skland/avatar-proxy?url=...`
+- 优先直连资源 URL，并在前端添加 `onError` 降级
+- 如果需要后端代理，先在当前主路由 `/api/agent` 下新增图片代理接口
 - 添加降级处理：显示默认图标或首字母
 
 ### 问题：服务启动时报错
