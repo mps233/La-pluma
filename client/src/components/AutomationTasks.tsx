@@ -15,6 +15,7 @@ import type {
   ConnectionTestStatus,
   StageConfig
 } from '@/types/components'
+import { formatExecutionActionSummary } from '../utils/executionSummary'
 
 const scheduleTimePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/
 
@@ -59,13 +60,53 @@ interface AutomationExecutionSummary {
   }>
   actions: Array<{
     task: string
-    action: 'startup' | 'closedown' | 'depot' | 'award'
+    action: 'startup' | 'closedown' | 'depot' | 'award' | 'recruit' | 'infrast' | 'mall' | 'fight'
     status: 'success' | 'skipped' | 'failed'
     message: string
+    startedCount?: number
+    collectedCount?: number
+    expeditedCount?: number
+    refreshCount?: number
+    highestLevel?: number
+    detectedTags?: string[]
+    finalTags?: string[]
+    preservedTags?: string[]
+    configuredFacilities?: string[]
+    observedFacilities?: string[]
+    rewardCollected?: boolean
+    rotationApplied?: boolean
+    droneUsed?: boolean
+    cluesReceived?: number
+    cluesSent?: number
+    clueExchange?: boolean
+    trainingContinued?: boolean
+    trainingCompleted?: boolean
+    trainingProcessing?: boolean
+    visitedCount?: number
+    creditCollected?: boolean
+    purchasedCount?: number
+    noMoney?: boolean
+    visitLimited?: boolean
+    noFriends?: boolean
+    stage?: string
+    times?: number
+    dropCount?: number
+    drops?: string
+    medicine?: number
+    stone?: number
+    duration?: string
+    sanityDepleted?: boolean
   }>
   errors: Array<string | { task: string; error: string }>
   warnings: string[]
 }
+
+const executionSummaryHasFailure = (summary: AutomationExecutionSummary) => Boolean(
+  summary.failedCount > 0
+  || summary.errors?.length
+  || summary.actions?.some(action => action.status === 'failed')
+  || summary.reports?.some(report => report.status === 'failed')
+)
 
 const migrateTaskParams = (task: any) => {
   const commandId = task.commandId || String(task.id || '').split('-')[0]
@@ -167,13 +208,24 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   const [connectionStatus, setConnectionStatus] = useState<Record<string, ConnectionTestStatus>>({})
   const [testingConnection, setTestingConnection] = useState<Record<string, boolean>>({})
   const [lastExecutionSummary, setLastExecutionSummary] = useState<AutomationExecutionSummary | null>(null)
+  const [executionDetailsOpen, setExecutionDetailsOpen] = useState(false)
   const autoSaveQueueRef = useRef<Promise<void>>(Promise.resolve())
   const autoSaveRevisionRef = useRef(0)
   const scheduleWasRunningRef = useRef(false)
   const stopRequestInFlightRef = useRef(false)
+  const lastExecutionFingerprintRef = useRef('')
   const activeTaskId = selectedTaskId && taskFlow.some(task => task.id === selectedTaskId)
     ? selectedTaskId
     : taskFlow[0]?.id ?? null
+
+  const applyExecutionSummary = (summary: AutomationExecutionSummary) => {
+    const fingerprint = JSON.stringify(summary)
+    if (lastExecutionFingerprintRef.current === fingerprint) return
+
+    lastExecutionFingerprintRef.current = fingerprint
+    setLastExecutionSummary(summary)
+    setExecutionDetailsOpen(executionSummaryHasFailure(summary))
+  }
 
   // 轮询定时任务执行状态
   useEffect(() => {
@@ -217,7 +269,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
             setIsActiveStatus(false)
             setIsRunning(false)
             if (status.lastResult) {
-              setLastExecutionSummary(status.lastResult as AutomationExecutionSummary)
+              applyExecutionSummary(status.lastResult as AutomationExecutionSummary)
             }
 
             if (justFinished) {
@@ -840,7 +892,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       const result = await maaApi.executeScheduleNow('manual', cleanTaskFlow)
       const executionSummary = result.data?.summary as AutomationExecutionSummary | undefined
       if (executionSummary) {
-        setLastExecutionSummary(executionSummary)
+        applyExecutionSummary(executionSummary)
       }
 
       if (result.success && result.data?.stopped) {
@@ -1474,79 +1526,117 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                     </span>
                   </div>
 
-                  {lastExecutionSummary.summaries.some(summary => summary.stage || summary.drops) && (
-                    <div className="mt-2 space-y-2">
-                      {lastExecutionSummary.summaries
-                        .filter(summary => summary.stage || summary.drops)
-                        .map((summary, summaryIndex) => (
-                          <div key={`${summary.task}-${summary.stage || summaryIndex}`} className="min-w-0 text-xs">
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-gray-700 dark:text-gray-200">
-                              <span className="font-semibold">{summary.stage || summary.task}</span>
-                              {summary.times && <span className="text-gray-400">{summary.times} 次</span>}
-                              {summary.duration && <span className="text-gray-400">{summary.duration}</span>}
+                  <div className="mt-2 flex min-w-0 items-center gap-2">
+                    {executionSummaryHasFailure(lastExecutionSummary)
+                      ? <AlertTriangle size={14} className="shrink-0 text-red-500" strokeWidth={2} />
+                      : lastExecutionSummary.skippedCount > 0 && lastExecutionSummary.successCount === 0
+                        ? <CircleMinus size={14} className="shrink-0 text-gray-400" strokeWidth={2} />
+                        : <CheckCircle2 size={14} className="shrink-0 text-emerald-500" strokeWidth={2} />}
+                    <span className="min-w-0 flex-1 text-xs leading-5 text-gray-600 dark:text-gray-300">
+                      {formatExecutionActionSummary(lastExecutionSummary.actions)
+                        || (lastExecutionSummary.failedCount > 0
+                          ? `${lastExecutionSummary.failedCount} 项任务执行失败`
+                          : lastExecutionSummary.skippedCount > 0
+                            ? `${lastExecutionSummary.skippedCount} 项任务已跳过`
+                            : '任务流程执行完成')}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setExecutionDetailsOpen(open => !open)}
+                      aria-expanded={executionDetailsOpen}
+                      aria-label={executionDetailsOpen ? '收起执行详情' : '展开执行详情'}
+                      title={executionDetailsOpen ? '收起详情' : '展开详情'}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                    >
+                      <ChevronDown
+                        size={15}
+                        strokeWidth={2}
+                        className={`transition-transform duration-200 ${executionDetailsOpen ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+                  </div>
+
+                  {executionDetailsOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="overflow-hidden"
+                    >
+                      {lastExecutionSummary.summaries.some(summary => summary.stage || summary.drops) && (
+                        <div className="mt-2 space-y-2 border-t border-[var(--app-border)] pt-2">
+                          {lastExecutionSummary.summaries
+                            .filter(summary => summary.stage || summary.drops)
+                            .map((summary, summaryIndex) => (
+                              <div key={`${summary.task}-${summary.stage || summaryIndex}`} className="min-w-0 text-xs">
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-gray-700 dark:text-gray-200">
+                                  <span className="font-semibold">{summary.stage || summary.task}</span>
+                                  {summary.times && <span className="text-gray-400">{summary.times} 次</span>}
+                                  {summary.duration && <span className="text-gray-400">{summary.duration}</span>}
+                                </div>
+                                {summary.drops && (
+                                  <p className="mt-1 break-words leading-5 text-gray-500 dark:text-gray-400">{summary.drops}</p>
+                                )}
+                              </div>
+                            ))}
+                        </div>
+                      )}
+
+                      {lastExecutionSummary.reports.length > 0 && (
+                        <div className="mt-2 space-y-1.5 border-t border-[var(--app-border)] pt-2">
+                          {lastExecutionSummary.reports.map((report, reportIndex) => (
+                            <div
+                              key={`${report.provider}-${report.stage || reportIndex}-${reportIndex}`}
+                              className={`flex min-w-0 items-start gap-2 text-xs ${report.status === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}
+                            >
+                              {report.status === 'success'
+                                ? <CheckCircle2 size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
+                                : <AlertTriangle size={14} className="mt-0.5 shrink-0" strokeWidth={2} />}
+                              <span className="min-w-0 break-words">
+                                {report.message}{report.stage ? ` · ${report.stage}` : ''}
+                              </span>
                             </div>
-                            {summary.drops && (
-                              <p className="mt-1 break-words leading-5 text-gray-500 dark:text-gray-400">{summary.drops}</p>
-                            )}
-                          </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {lastExecutionSummary.actions?.length > 0 && (
+                        <div className="mt-2 space-y-1.5 border-t border-[var(--app-border)] pt-2">
+                          {lastExecutionSummary.actions.map((action, actionIndex) => (
+                            <div
+                              key={`${action.action}-${action.task}-${actionIndex}`}
+                              className={`flex min-w-0 items-start gap-2 text-xs ${action.status === 'success' ? 'text-emerald-600 dark:text-emerald-400' : action.status === 'skipped' ? 'text-gray-500 dark:text-gray-400' : 'text-red-600 dark:text-red-400'}`}
+                            >
+                              {action.status === 'success'
+                                ? <CheckCircle2 size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
+                                : action.status === 'skipped'
+                                  ? <CircleMinus size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
+                                  : <AlertTriangle size={14} className="mt-0.5 shrink-0" strokeWidth={2} />}
+                              <span className="min-w-0 break-words">{action.message}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {lastExecutionSummary.errors
+                        ?.filter(error => {
+                          const taskName = typeof error === 'string' ? error : error.task
+                          return !lastExecutionSummary.actions?.some(action => action.status === 'failed' && action.task === taskName)
+                        })
+                        .map((error, errorIndex) => (
+                          <p key={`${typeof error === 'string' ? error : error.task}-${errorIndex}`} className="mt-2 flex items-start gap-2 text-xs leading-5 text-red-600 dark:text-red-400">
+                            <AlertTriangle size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
+                            <span>{typeof error === 'string' ? error : `${error.task}：${error.error}`}</span>
+                          </p>
                         ))}
-                    </div>
-                  )}
 
-                  {lastExecutionSummary.reports.length > 0 && (
-                    <div className="mt-2 space-y-1.5 border-t border-[var(--app-border)] pt-2">
-                      {lastExecutionSummary.reports.map((report, reportIndex) => (
-                        <div
-                          key={`${report.provider}-${report.stage || reportIndex}-${reportIndex}`}
-                          className={`flex min-w-0 items-start gap-2 text-xs ${report.status === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}
-                        >
-                          {report.status === 'success'
-                            ? <CheckCircle2 size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
-                            : <AlertTriangle size={14} className="mt-0.5 shrink-0" strokeWidth={2} />}
-                          <span className="min-w-0 break-words">
-                            {report.message}{report.stage ? ` · ${report.stage}` : ''}
-                          </span>
-                        </div>
+                      {lastExecutionSummary.warnings.map((warning, warningIndex) => (
+                        <p key={`${warning}-${warningIndex}`} className="mt-2 flex items-start gap-2 text-xs leading-5 text-amber-600 dark:text-amber-400">
+                          <AlertTriangle size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
+                          <span>{warning}</span>
+                        </p>
                       ))}
-                    </div>
+                    </motion.div>
                   )}
-
-                  {lastExecutionSummary.actions?.length > 0 && (
-                    <div className="mt-2 space-y-1.5 border-t border-[var(--app-border)] pt-2">
-                      {lastExecutionSummary.actions.map((action, actionIndex) => (
-                        <div
-                          key={`${action.action}-${action.task}-${actionIndex}`}
-                          className={`flex min-w-0 items-start gap-2 text-xs ${action.status === 'success' ? 'text-emerald-600 dark:text-emerald-400' : action.status === 'skipped' ? 'text-gray-500 dark:text-gray-400' : 'text-red-600 dark:text-red-400'}`}
-                        >
-                          {action.status === 'success'
-                            ? <CheckCircle2 size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
-                            : action.status === 'skipped'
-                              ? <CircleMinus size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
-                              : <AlertTriangle size={14} className="mt-0.5 shrink-0" strokeWidth={2} />}
-                          <span className="min-w-0 break-words">{action.message}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {lastExecutionSummary.errors
-                    ?.filter(error => {
-                      const taskName = typeof error === 'string' ? error : error.task
-                      return !lastExecutionSummary.actions?.some(action => action.status === 'failed' && action.task === taskName)
-                    })
-                    .map((error, errorIndex) => (
-                      <p key={`${typeof error === 'string' ? error : error.task}-${errorIndex}`} className="mt-2 flex items-start gap-2 text-xs leading-5 text-red-600 dark:text-red-400">
-                        <AlertTriangle size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
-                        <span>{typeof error === 'string' ? error : `${error.task}：${error.error}`}</span>
-                      </p>
-                    ))}
-
-                  {lastExecutionSummary.warnings.map((warning, warningIndex) => (
-                    <p key={`${warning}-${warningIndex}`} className="mt-2 flex items-start gap-2 text-xs leading-5 text-amber-600 dark:text-amber-400">
-                      <AlertTriangle size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
-                      <span>{warning}</span>
-                    </p>
-                  ))}
                 </section>
               )}
             </div>

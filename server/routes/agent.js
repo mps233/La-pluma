@@ -739,6 +739,10 @@ router.get('/activity', asyncHandler(async (req, res) => {
   return sendSuccess(res, req, {
     code: activityInfo.code,
     name: activityInfo.name,
+    source: activityInfo.source || null,
+    startTime: activityInfo.startTime || null,
+    endTime: activityInfo.endTime || null,
+    stages: activityInfo.stages || [],
     available: !!activityInfo.code,
     message: activityInfo.code ? `当前活动: ${activityInfo.name || activityInfo.code}` : '当前没有活动或无法获取活动信息'
   });

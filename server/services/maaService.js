@@ -4,6 +4,7 @@ import { readFile, writeFile, mkdir, readdir, stat, unlink, realpath, open } fro
 import { createReadStream } from 'fs';
 import { extname, isAbsolute, join, relative, resolve, sep } from 'path';
 import { createLogger } from '../utils/logger.js';
+import { getFallbackActivity } from './activityFallbackService.js';
 
 const execFilePromise = promisify(execFile);
 
@@ -786,27 +787,49 @@ export async function captureScreen(adbPath = '/opt/homebrew/bin/adb', address =
 /**
  * 活动代号缓存
  */
-let activityCache = {
-  code: null,
-  name: null,
-  timestamp: null,
-  ttl: 24 * 60 * 60 * 1000 // 24小时缓存
-};
+const ACTIVITY_CACHE_TTL = 24 * 60 * 60 * 1000;
+const activityCache = new Map();
+
+function cacheActivity(clientType, activity) {
+  activityCache.set(clientType, {
+    ...activity,
+    timestamp: Date.now(),
+    ttl: ACTIVITY_CACHE_TTL
+  });
+  return { ...activity };
+}
 
 /**
  * 获取当前活动代号和名称
  */
 export async function getCurrentActivity(clientType = 'Official') {
-  try {
-    // 检查缓存是否有效
-    if (activityCache.code && activityCache.timestamp) {
-      const now = Date.now();
-      if (now - activityCache.timestamp < activityCache.ttl) {
-        logger.debug('使用缓存的活动信息', { code: activityCache.code, name: activityCache.name });
-        return { code: activityCache.code, name: activityCache.name };
-      }
+  const now = Date.now();
+  const cachedActivity = activityCache.get(clientType);
+  if (cachedActivity?.code && cachedActivity.timestamp) {
+    const ttlExpiresAt = cachedActivity.timestamp + cachedActivity.ttl;
+    const expiresAt = cachedActivity.endTime
+      ? Math.min(ttlExpiresAt, cachedActivity.endTime)
+      : ttlExpiresAt;
+    if (now < expiresAt) {
+      logger.debug('使用缓存的活动信息', {
+        clientType,
+        code: cachedActivity.code,
+        name: cachedActivity.name,
+        source: cachedActivity.source
+      });
+      return {
+        code: cachedActivity.code,
+        name: cachedActivity.name,
+        source: cachedActivity.source,
+        startTime: cachedActivity.startTime,
+        endTime: cachedActivity.endTime,
+        stages: cachedActivity.stages
+      };
     }
-    
+    activityCache.delete(clientType);
+  }
+
+  try {
     // 获取活动信息
     const result = await execMaaCommand('activity', [clientType], null, null, false, true);
     const output = result.stdout;
@@ -849,22 +872,32 @@ export async function getCurrentActivity(clientType = 'Official') {
     if (match && match[1]) {
       activityCode = match[1].toUpperCase();
       logger.debug('获取到活动信息', { code: activityCode, name: activityName });
-      
-      // 更新缓存
-      activityCache.code = activityCode;
-      activityCache.name = activityName;
-      activityCache.timestamp = Date.now();
-      
-      return { code: activityCode, name: activityName };
+      return cacheActivity(clientType, {
+        code: activityCode,
+        name: activityName,
+        source: 'maa',
+        startTime: null,
+        endTime: null,
+        stages: []
+      });
     }
-    
-    logger.debug('未找到活动代号，可能当前没有活动');
-    return { code: null, name: null };
+
+    logger.debug('MAA 活动表未返回当前活动，尝试备用数据源');
   } catch (error) {
-    logger.error('获取活动信息失败', { error: error.message });
-    // 如果获取失败，返回缓存的信息（如果有）
-    return { code: activityCache.code || null, name: activityCache.name || null };
+    logger.warn('获取 MAA 活动信息失败，尝试备用数据源', { error: error.message });
   }
+
+  try {
+    const fallbackActivity = await getFallbackActivity(clientType);
+    if (fallbackActivity?.code) {
+      logger.info('从备用数据源获取到活动信息', fallbackActivity);
+      return cacheActivity(clientType, fallbackActivity);
+    }
+  } catch (error) {
+    logger.warn('备用活动数据源不可用', { error: error.message });
+  }
+
+  return { code: null, name: null, source: null, startTime: null, endTime: null, stages: [] };
 }
 
 /**

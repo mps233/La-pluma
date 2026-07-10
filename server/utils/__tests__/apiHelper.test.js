@@ -31,7 +31,15 @@ describe('apiHelper', () => {
       
       assert.strictEqual(result.success, false);
       assert.strictEqual(result.message, '操作失败');
-      assert.strictEqual(result.error, '测试错误');
+      assert.deepStrictEqual(result.error, {
+        code: 'AGENT_INTERNAL_ERROR',
+        details: {},
+        retryable: false
+      });
+      assert.deepStrictEqual(result.meta, {
+        requestId: null,
+        dryRun: false
+      });
     });
 
     it('应该使用错误消息作为默认消息', () => {

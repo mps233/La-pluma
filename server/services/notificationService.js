@@ -489,7 +489,7 @@ export async function testNotificationChannel(channelName, configOverride = null
 /**
  * 发送任务完成通知
  */
-export async function sendTaskCompletionNotification(taskInfo) {
+export function buildTaskCompletionMessage(taskInfo = {}) {
   const { 
     taskName = '自动化任务', 
     totalTasks = 0, 
@@ -500,30 +500,72 @@ export async function sendTaskCompletionNotification(taskInfo) {
     errors = [],
     skipped = [],
     summaries = [],
+    actions = [],
+    reports = [],
+    warnings = [],
     screenshot = null
   } = taskInfo;
 
+  const normalizedActions = Array.isArray(actions) ? actions : [];
+  const normalizedReports = Array.isArray(reports) ? reports : [];
+  const normalizedWarnings = Array.isArray(warnings) ? warnings : [];
+  const normalizedSkipped = Array.isArray(skipped) ? skipped : [];
+  const normalizedErrors = Array.isArray(errors) ? errors : [];
+  const normalizedSummaries = Array.isArray(summaries) ? summaries : [];
+  const hasStructuredFailure = normalizedActions.some(action => action?.status === 'failed')
+    || normalizedReports.some(report => report?.status === 'failed');
+  const hasStructuredSkip = normalizedActions.some(action => action?.status === 'skipped');
+  const hasFailure = failedTasks > 0 || hasStructuredFailure;
+  const hasSkip = skippedTasks > 0 || hasStructuredSkip;
+
   // 根据任务结果确定通知级别和标题
   let level = 'success';
-  let title = '✅ 任务完成';
+  let title = '任务完成';
   
-  if (failedTasks > 0 && skippedTasks > 0) {
+  if (hasFailure && hasSkip) {
     level = 'warning';
-    title = '⚠️ 任务完成（部分失败/跳过）';
-  } else if (failedTasks > 0) {
+    title = '任务完成（部分失败/跳过）';
+  } else if (hasFailure) {
     level = 'warning';
-    title = '⚠️ 任务完成（部分失败）';
-  } else if (skippedTasks > 0) {
+    title = '任务完成（部分失败）';
+  } else if (hasSkip) {
     level = 'info';
-    title = 'ℹ️ 任务完成（部分跳过）';
+    title = '任务完成（部分跳过）';
   }
   
   let content = `*${taskName}* 执行完成`;
+
+  if (normalizedActions.length > 0) {
+    const statusIcons = { success: '✅', skipped: '⏭️', failed: '❌' };
+    content += '\n\n🔎 *执行结果*';
+    normalizedActions.forEach(action => {
+      const icon = statusIcons[action?.status] || '•';
+      const taskLabel = action?.task ? `${action.task}: ` : '';
+      content += `\n${icon} ${taskLabel}${action?.message || '状态未知'}`;
+    });
+  }
+
+  if (normalizedReports.length > 0) {
+    const providerLabels = { penguin: '企鹅物流', yituliu: '一图流' };
+    content += '\n\n📡 *掉落汇报*';
+    normalizedReports.forEach(report => {
+      const icon = report?.status === 'success' ? '✅' : '❌';
+      const provider = providerLabels[report?.provider] || report?.provider || '未知平台';
+      content += `\n${icon} ${provider}: ${report?.message || '状态未知'}`;
+    });
+  }
+
+  if (normalizedWarnings.length > 0) {
+    content += '\n\n⚠️ *执行提示*';
+    normalizedWarnings.forEach(warning => {
+      content += `\n• ${warning}`;
+    });
+  }
   
   // 添加任务总结信息
-  if (summaries && summaries.length > 0) {
+  if (normalizedSummaries.length > 0) {
     content += '\n\n📋 *任务总结*';
-    summaries.forEach(summary => {
+    normalizedSummaries.forEach(summary => {
       content += `\n\n*${summary.task}*`;
       
       // 理智作战总结
@@ -556,17 +598,27 @@ export async function sendTaskCompletionNotification(taskInfo) {
   }
   
   // 跳过的任务（资源本未开放等）
-  if (skipped.length > 0) {
+  const representedTasks = new Set(normalizedActions.map(action => action?.task).filter(Boolean));
+  const remainingSkipped = normalizedSkipped.filter(item => {
+    const task = typeof item === 'string' ? item : item?.task;
+    return !task || !representedTasks.has(task);
+  });
+  if (remainingSkipped.length > 0) {
     content += `\n\n⏭️ *跳过任务*`;
-    skipped.forEach(s => {
-      content += `\n• ${s.task}${s.reason ? ` - ${s.reason}` : ''}`;
+    remainingSkipped.forEach(s => {
+      if (typeof s === 'string') content += `\n• ${s}`;
+      else content += `\n• ${s.task}${s.reason ? ` - ${s.reason}` : ''}`;
     });
   }
   
   // 失败的任务
-  if (errors.length > 0) {
+  const remainingErrors = normalizedErrors.filter(item => {
+    const task = typeof item === 'string' ? item : item?.task;
+    return !task || !representedTasks.has(task);
+  });
+  if (remainingErrors.length > 0) {
     content += `\n\n❌ *失败任务*`;
-    errors.forEach(e => {
+    remainingErrors.forEach(e => {
       // 处理对象格式 { task: '任务名', error: '错误信息' } 或字符串格式
       if (typeof e === 'object' && e.task) {
         content += `\n• ${e.task}${e.error ? ` - ${e.error}` : ''}`;
@@ -581,16 +633,23 @@ export async function sendTaskCompletionNotification(taskInfo) {
     '成功': successTasks,
     ...(skippedTasks > 0 && { '跳过': skippedTasks }),
     ...(failedTasks > 0 && { '失败': failedTasks }),
+    ...(normalizedReports.some(report => report?.status === 'failed') && {
+      '汇报失败': normalizedReports.filter(report => report?.status === 'failed').length
+    }),
     '耗时': `${Math.floor(duration / 1000)} 秒`,
   };
 
-  return await sendNotification({
+  return {
     title,
     content,
     level,
     data,
-    image: screenshot,
-  });
+    image: screenshot
+  };
+}
+
+export async function sendTaskCompletionNotification(taskInfo) {
+  return await sendNotification(buildTaskCompletionMessage(taskInfo));
 }
 
 export default {
@@ -600,6 +659,7 @@ export default {
   sendNotification,
   sendToChannel,
   testNotificationChannel,
+  buildTaskCompletionMessage,
   sendTaskCompletionNotification,
   isStageOpenToday,
 };

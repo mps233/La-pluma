@@ -2,6 +2,10 @@ import cron from 'node-cron';
 import { execMaaCommand, execDynamicTask, replaceActivityCode, captureScreen, getGameClientState, getMaaExecutionDiagnostics, testAdbConnection, createMaaLogCheckpoint, readMaaLogSince } from './maaService.js';
 import { sendTaskCompletionNotification, isStageOpenToday, shouldCaptureNotificationScreenshot } from './notificationService.js';
 import { getEnabledAwardItems, parseAwardExecutionActions } from './awardResultService.js';
+import { parseRecruitExecutionAction } from './recruitResultService.js';
+import { parseInfrastExecutionAction } from './infrastResultService.js';
+import { parseMallExecutionAction } from './mallResultService.js';
+import { createFightExecutionAction, isFightSanityDepleted } from './fightResultService.js';
 import { loadUserConfig, saveUserConfig } from './configStorageService.js';
 import operatorTrainingService from './operatorTrainingService.js';
 import { recordDrops } from './dropRecordService.js';
@@ -78,6 +82,25 @@ function getFightReportResults(task, stage, result) {
   );
 
   return { reportResults, diagnostics };
+}
+
+async function recordFightDrops(summary, scheduleId) {
+  if (!summary?.stage || !Array.isArray(summary.dropItems) || summary.dropItems.length === 0) return;
+
+  try {
+    const times = Math.max(1, Number(summary.times) || 1);
+    await recordDrops({
+      stage: summary.stage,
+      times,
+      items: summary.dropItems,
+      sanity: times * 20,
+      medicine: Math.max(0, Number(summary.medicine) || 0),
+      stone: Math.max(0, Number(summary.stone) || 0)
+    });
+    logger.debug('掉落记录已保存', { scheduleId, stage: summary.stage });
+  } catch (error) {
+    logger.error('掉落记录保存失败', { scheduleId, error: error.message });
+  }
 }
 
 // 定时任务执行状态
@@ -377,6 +400,19 @@ async function executeTaskFlow(taskFlow, scheduleId) {
   const reportResults = [];
   const executionWarnings = new Set();
   const actionResults = [];
+  const addFightAction = (action) => {
+    actionResults.push(action);
+    if (action.status === 'failed') {
+      errors.push({ task: action.task, error: action.message });
+    } else if (action.status === 'skipped') {
+      skipped.push({ task: action.task, reason: action.message });
+    }
+  };
+  const countFightTaskResult = (actions) => {
+    if (actions.some(action => action.status === 'failed')) failedCount++;
+    else if (actions.some(action => action.status === 'success')) successCount++;
+    else skippedCount++;
+  };
   let screenshot = null;
   const startupConnection = taskFlow.find(task => (task.commandId || String(task.id || '').split('-')[0]) === 'startup')?.params || {};
   let adbConfig = {
@@ -669,6 +705,183 @@ async function executeTaskFlow(taskFlow, scheduleId) {
       // 启动游戏任务已处理完成，继续下一个任务
       continue;
     }
+
+    if (commandId === 'recruit') {
+      try {
+        const { command, params, taskConfig } = buildCommand(task, adbConfig);
+        const logCheckpoint = await createMaaLogCheckpoint();
+        let result;
+
+        if (taskConfig) {
+          result = await execDynamicTask(params, taskConfig, task.name, null, true);
+        } else {
+          const args = params ? params.split(' ').filter(arg => arg) : [];
+          result = await execMaaCommand(command, args, task.name, null, true);
+        }
+
+        if (result?.stdout) {
+          const summary = parseTaskSummary(task.name, result.stdout);
+          if (summary) taskSummaries.push(summary);
+        }
+
+        const recruitAction = parseRecruitExecutionAction(
+          task.name,
+          task.params,
+          await readMaaLogSince(logCheckpoint)
+        );
+        actionResults.push(recruitAction);
+
+        if (recruitAction.status === 'failed') {
+          failedCount++;
+          errors.push({ task: task.name, error: recruitAction.message });
+        } else if (recruitAction.status === 'skipped') {
+          skippedCount++;
+          skipped.push({ task: task.name, reason: recruitAction.message });
+        } else {
+          successCount++;
+        }
+
+        const delayCompleted = await waitForScheduleDelay(2000);
+        if (!delayCompleted) break;
+        continue;
+      } catch (error) {
+        if (scheduleExecutionStatus.shouldStop) break;
+        failedCount++;
+        errors.push({ task: task.name, error: error.message });
+        actionResults.push({
+          task: task.name,
+          action: 'recruit',
+          status: 'failed',
+          message: `自动公招失败：${error.message}`
+        });
+        logger.error('自动公招执行失败', { scheduleId, taskName: task.name, error: error.message });
+        continue;
+      }
+    }
+
+    if (commandId === 'infrast') {
+      try {
+        if (!Array.isArray(task.params?.facility) || task.params.facility.length === 0) {
+          const infrastAction = parseInfrastExecutionAction(task.name, task.params);
+          skippedCount++;
+          skipped.push({ task: task.name, reason: infrastAction.message });
+          actionResults.push(infrastAction);
+          continue;
+        }
+
+        const { command, params, taskConfig } = buildCommand(task, adbConfig);
+        const logCheckpoint = await createMaaLogCheckpoint();
+        let result;
+
+        if (taskConfig) {
+          result = await execDynamicTask(params, taskConfig, task.name, null, true);
+        } else {
+          const args = params ? params.split(' ').filter(arg => arg) : [];
+          result = await execMaaCommand(command, args, task.name, null, true);
+        }
+
+        if (result?.stdout) {
+          const summary = parseTaskSummary(task.name, result.stdout);
+          if (summary) taskSummaries.push(summary);
+        }
+
+        const infrastAction = parseInfrastExecutionAction(
+          task.name,
+          task.params,
+          await readMaaLogSince(logCheckpoint)
+        );
+        actionResults.push(infrastAction);
+
+        if (infrastAction.status === 'failed') {
+          failedCount++;
+          errors.push({ task: task.name, error: infrastAction.message });
+        } else if (infrastAction.status === 'skipped') {
+          skippedCount++;
+          skipped.push({ task: task.name, reason: infrastAction.message });
+        } else {
+          successCount++;
+        }
+
+        const delayCompleted = await waitForScheduleDelay(2000);
+        if (!delayCompleted) break;
+        continue;
+      } catch (error) {
+        if (scheduleExecutionStatus.shouldStop) break;
+        failedCount++;
+        errors.push({ task: task.name, error: error.message });
+        actionResults.push({
+          task: task.name,
+          action: 'infrast',
+          status: 'failed',
+          message: `基建任务失败：${error.message}`
+        });
+        logger.error('基建任务执行失败', { scheduleId, taskName: task.name, error: error.message });
+        continue;
+      }
+    }
+
+    if (commandId === 'mall') {
+      try {
+        if (task.params?.visit_friends === false
+          && task.params?.shopping === false
+          && task.params?.credit_fight === false) {
+          const mallAction = parseMallExecutionAction(task.name, task.params);
+          skippedCount++;
+          skipped.push({ task: task.name, reason: mallAction.message });
+          actionResults.push(mallAction);
+          continue;
+        }
+
+        const { command, params, taskConfig } = buildCommand(task, adbConfig);
+        const logCheckpoint = await createMaaLogCheckpoint();
+        let result;
+
+        if (taskConfig) {
+          result = await execDynamicTask(params, taskConfig, task.name, null, true);
+        } else {
+          const args = params ? params.split(' ').filter(arg => arg) : [];
+          result = await execMaaCommand(command, args, task.name, null, true);
+        }
+
+        if (result?.stdout) {
+          const summary = parseTaskSummary(task.name, result.stdout);
+          if (summary) taskSummaries.push(summary);
+        }
+
+        const mallAction = parseMallExecutionAction(
+          task.name,
+          task.params,
+          await readMaaLogSince(logCheckpoint)
+        );
+        actionResults.push(mallAction);
+
+        if (mallAction.status === 'failed') {
+          failedCount++;
+          errors.push({ task: task.name, error: mallAction.message });
+        } else if (mallAction.status === 'skipped') {
+          skippedCount++;
+          skipped.push({ task: task.name, reason: mallAction.message });
+        } else {
+          successCount++;
+        }
+
+        const delayCompleted = await waitForScheduleDelay(2000);
+        if (!delayCompleted) break;
+        continue;
+      } catch (error) {
+        if (scheduleExecutionStatus.shouldStop) break;
+        failedCount++;
+        errors.push({ task: task.name, error: error.message });
+        actionResults.push({
+          task: task.name,
+          action: 'mall',
+          status: 'failed',
+          message: `信用收支失败：${error.message}`
+        });
+        logger.error('信用收支执行失败', { scheduleId, taskName: task.name, error: error.message });
+        continue;
+      }
+    }
     
     try {
       const { command, params, taskConfig } = buildCommand(task, adbConfig);
@@ -709,7 +922,8 @@ async function executeTaskFlow(taskFlow, scheduleId) {
               stages: stageEntries.map(e => `${e.stage}${e.times ? `:${e.times}` : ''}`).join(', ')
             });
             
-            let sanityDepleted = false; // 理智耗尽标记
+            let sanityDepleted = false;
+            const fightActionStartIndex = actionResults.length;
             
             for (let i = 0; i < stageEntries.length; i++) {
               const { stage, times } = stageEntries[i];
@@ -717,11 +931,9 @@ async function executeTaskFlow(taskFlow, scheduleId) {
               // 如果理智已耗尽，跳过剩余关卡
               if (sanityDepleted) {
                 logger.info('理智已耗尽，跳过关卡', { scheduleId, stage });
-                skippedCount++;
-                skipped.push({
-                  task: `${task.name} (${stage})`,
-                  reason: '理智已耗尽'
-                });
+                addFightAction(createFightExecutionAction(`${task.name} (${stage})`, stage, {
+                  skipReason: '理智已耗尽'
+                }));
                 continue;
               }
               
@@ -733,11 +945,9 @@ async function executeTaskFlow(taskFlow, scheduleId) {
                   stage, 
                   reason: openCheck.reason 
                 });
-                skippedCount++;
-                skipped.push({
-                  task: `${task.name} (${stage})`,
-                  reason: openCheck.reason
-                });
+                addFightAction(createFightExecutionAction(`${task.name} (${stage})`, stage, {
+                  skipReason: openCheck.reason
+                }));
                 continue; // 跳过这个关卡
               }
               
@@ -798,7 +1008,7 @@ async function executeTaskFlow(taskFlow, scheduleId) {
                   preview: output.substring(0, 200) 
                 });
                 
-                if (checkSanityDepleted(output, stage)) {
+                if (isFightSanityDepleted(output, stage)) {
                   logger.info('检测到理智已耗尽', { scheduleId, stage });
                   sanityDepleted = true;
                 } else {
@@ -806,14 +1016,18 @@ async function executeTaskFlow(taskFlow, scheduleId) {
                 }
                 
                 // 提取任务总结
-                if (result.stdout) {
-                  const summary = parseTaskSummary(`${task.name} (${stage})`, result.stdout);
-                  if (summary) {
-                    taskSummaries.push(summary);
-                  }
+                const summary = result.stdout
+                  ? parseTaskSummary(`${task.name} (${stage})`, result.stdout)
+                  : null;
+                if (summary) {
+                  taskSummaries.push(summary);
+                  await recordFightDrops(summary, scheduleId);
                 }
+                addFightAction(createFightExecutionAction(`${task.name} (${stage})`, stage, {
+                  summary,
+                  output
+                }));
               } catch (error) {
-                // 检查错误信息中是否包含理智不足
                 const errorMsg = error.message || '';
                 const errorOutput = (error.stdout || '') + (error.stderr || '');
                 
@@ -823,48 +1037,19 @@ async function executeTaskFlow(taskFlow, scheduleId) {
                   errorMsg 
                 });
                 
-                if (checkSanityDepleted(errorOutput, stage) || errorMsg.includes('理智不足') || errorMsg.includes('sanity')) {
+                const fightAction = createFightExecutionAction(`${task.name} (${stage})`, stage, {
+                  output: errorOutput,
+                  error
+                });
+                if (fightAction.sanityDepleted) {
                   logger.info('检测到理智已耗尽（从错误信息）', { scheduleId, stage });
                   sanityDepleted = true;
-                  // 理智耗尽不算失败，跳过即可
-                  skippedCount++;
-                  skipped.push({
-                    task: `${task.name} (${stage})`,
-                    reason: '理智已耗尽'
-                  });
-                  continue;
+                } else if (fightAction.status === 'skipped') {
+                  logger.info('关卡未执行，已跳过', { scheduleId, stage, reason: fightAction.message });
+                } else {
+                  logger.error('关卡执行失败', { scheduleId, stage, error: errorMsg });
                 }
-                
-                // 检查是否是因为关卡未开放导致的错误
-                if (errorMsg.includes('stage not open') || errorMsg.includes('关卡未开放') || errorMsg.includes('MaaCore returned an error')) {
-                  logger.info('关卡可能未开放或不存在，跳过', { scheduleId, stage });
-                  skippedCount++;
-                  skipped.push({
-                    task: `${task.name} (${stage})`,
-                    reason: '关卡未开放或不存在'
-                  });
-                  continue; // 继续执行下一个关卡
-                }
-                
-                // 检查是否是剿灭奖励已领完（MAA 无法识别剿灭入口）
-                if (stage.includes('Annihilation') || stage.includes('@Annihilation')) {
-                  logger.info('剿灭关卡可能奖励已领完或未找到入口，跳过', { scheduleId, stage });
-                  skippedCount++;
-                  skipped.push({
-                    task: `${task.name} (${stage})`,
-                    reason: '剿灭奖励已领完或未找到入口'
-                  });
-                  continue; // 继续执行下一个关卡
-                }
-                
-                // 其他错误，记录失败但继续执行
-                logger.error('关卡执行失败', { scheduleId, stage, error: errorMsg });
-                failedCount++;
-                errors.push({
-                  task: `${task.name} (${stage})`,
-                  error: errorMsg
-                });
-                // 不再抛出错误，继续执行下一个关卡
+                addFightAction(fightAction);
               }
               
               // 关卡之间等待2秒
@@ -873,8 +1058,8 @@ async function executeTaskFlow(taskFlow, scheduleId) {
                 await new Promise(resolve => setTimeout(resolve, 2000));
               }
             }
-            
-            successCount++;
+
+            countFightTaskResult(actionResults.slice(fightActionStartIndex));
             
             // 所有关卡完成后的延迟
             let delayTime = 2000;
@@ -898,11 +1083,11 @@ async function executeTaskFlow(taskFlow, scheduleId) {
                 stage, 
                 reason: openCheck.reason 
               });
-              skippedCount++;
-              skipped.push({
-                task: `${task.name} (${stage})`,
-                reason: openCheck.reason
+              const fightAction = createFightExecutionAction(`${task.name} (${stage})`, stage, {
+                skipReason: openCheck.reason
               });
+              addFightAction(fightAction);
+              countFightTaskResult([fightAction]);
               
               // 跳过后的延迟
               logger.debug('任务已跳过，等待后继续', { 
@@ -951,50 +1136,36 @@ async function executeTaskFlow(taskFlow, scheduleId) {
             message: '游戏客户端已关闭'
           });
         }
+        const fightStage = command === 'fight' ? (args[0] || task.params?.stage || '') : '';
         if (command === 'fight') {
-          const stage = args[0] || task.params?.stage || '';
+          const stage = fightStage;
           const reportSummary = getFightReportResults(task, stage, result);
           reportResults.push(...reportSummary.reportResults);
           reportSummary.diagnostics.forEach(diagnostic => executionWarnings.add(diagnostic.message));
         }
         
         // 尝试从输出中提取任务总结
+        let parsedTaskSummary = null;
         if (result.stdout) {
-          const summary = parseTaskSummary(task.name, result.stdout);
-          if (summary) {
-            taskSummaries.push(summary);
-            
-            // 如果是战斗任务且有掉落数据，记录到数据库
-            if (summary.stage && summary.dropItems && summary.dropItems.length > 0) {
-              try {
-                // 估算理智消耗（简化计算，实际应该从关卡数据获取）
-                const sanityPerRun = 20; // 默认每次20理智
-                const totalSanity = parseInt(summary.times || 1) * sanityPerRun;
-                
-                await recordDrops({
-                  stage: summary.stage,
-                  times: parseInt(summary.times || 1),
-                  items: summary.dropItems,
-                  sanity: totalSanity,
-                  medicine: parseInt(summary.medicine || 0),
-                  stone: parseInt(summary.stone || 0)
-                });
-                logger.debug('掉落记录已保存', { 
-                  scheduleId, 
-                  stage: summary.stage 
-                });
-              } catch (error) {
-                logger.error('掉落记录保存失败', { 
-                  scheduleId, 
-                  error: error.message 
-                });
-              }
-            }
+          parsedTaskSummary = parseTaskSummary(task.name, result.stdout);
+          if (parsedTaskSummary) {
+            taskSummaries.push(parsedTaskSummary);
+            if (command === 'fight') await recordFightDrops(parsedTaskSummary, scheduleId);
           }
+        }
+
+        if (command === 'fight') {
+          const output = (result.stdout || '') + (result.stderr || '');
+          const fightAction = createFightExecutionAction(task.name, fightStage, {
+            summary: parsedTaskSummary,
+            output
+          });
+          addFightAction(fightAction);
+          countFightTaskResult([fightAction]);
         }
       }
       
-      successCount++;
+      if (commandId !== 'fight') successCount++;
       
       // 任务完成后的延迟时间
       // 启动游戏需要更长的等待时间，确保游戏完全启动
@@ -1023,6 +1194,17 @@ async function executeTaskFlow(taskFlow, scheduleId) {
 
       failedCount++;
       errors.push({ task: task.name, error: error.message });
+      if (commandId === 'fight') {
+        const configuredStage = task.params?.stages?.[0]?.stage || task.params?.stage || '';
+        const action = createFightExecutionAction(task.name, configuredStage, { error });
+        actionResults.push(action);
+        if (action.status === 'skipped') {
+          failedCount--;
+          errors.pop();
+          skippedCount++;
+          skipped.push({ task: action.task, reason: action.message });
+        }
+      }
       if (commandId === 'closedown') {
         actionResults.push({
           task: task.name,
@@ -1107,6 +1289,9 @@ async function executeTaskFlow(taskFlow, scheduleId) {
       errors,
       skipped,
       summaries: taskSummaries,
+      actions: actionResults,
+      reports: reportResults,
+      warnings: [...executionWarnings],
       screenshot,
     });
   } catch (error) {
