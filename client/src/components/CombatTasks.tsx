@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { maaApi, searchCopilot, searchParadoxCopilot } from '../services/api'
 import { motion } from 'framer-motion'
 import Icons from './Icons'
@@ -21,6 +21,7 @@ import type {
 
 type CopilotSetExecutionMode = 'app' | 'manual' | 'cli'
 type CopilotSetSelections = Record<string, number[]>
+type CombatMode = 'copilot' | 'ssscopilot' | 'paradoxcopilot'
 
 export default function CombatTasks(_props: CombatTasksProps) {
   const [isRunning, setIsRunning] = useState(false)
@@ -63,7 +64,35 @@ export default function CombatTasks(_props: CombatTasksProps) {
   const [copilotSearchResult, setCopilotSearchResult] = useState<CopilotSearchResult | null>(null)
   const [selectedSearchCopilotUri, setSelectedSearchCopilotUri] = useState<string>('')
   const [isSearchingCopilot, setIsSearchingCopilot] = useState(false)
-  const [activeCombatMode, setActiveCombatMode] = useState<'copilot' | 'ssscopilot' | 'paradoxcopilot'>('copilot')
+  const [activeCombatMode, setActiveCombatMode] = useState<CombatMode>('copilot')
+  const combatModeTabsRef = useRef<HTMLDivElement>(null)
+  const combatModeTabRefs = useRef<Record<CombatMode, HTMLButtonElement | null>>({
+    copilot: null,
+    ssscopilot: null,
+    paradoxcopilot: null,
+  })
+  const [activeCombatModeRect, setActiveCombatModeRect] = useState({ x: 0, y: 0, width: 0, height: 0 })
+
+  useLayoutEffect(() => {
+    const updateActiveCombatModeRect = () => {
+      const container = combatModeTabsRef.current
+      const activeTab = combatModeTabRefs.current[activeCombatMode]
+      if (!container || !activeTab) return
+
+      const containerRect = container.getBoundingClientRect()
+      const activeRect = activeTab.getBoundingClientRect()
+      setActiveCombatModeRect({
+        x: activeRect.left - containerRect.left,
+        y: activeRect.top - containerRect.top,
+        width: activeRect.width,
+        height: activeRect.height,
+      })
+    }
+
+    updateActiveCombatModeRect()
+    window.addEventListener('resize', updateActiveCombatModeRect)
+    return () => window.removeEventListener('resize', updateActiveCombatModeRect)
+  }, [activeCombatMode])
 
   const normalizeFormationMode = (value: AutoFormationConfig[string] | undefined): FormationMode => {
     if (value === true) return 'on'
@@ -1182,6 +1211,13 @@ export default function CombatTasks(_props: CombatTasksProps) {
     )
   }
 
+  const combatModeOptions = [
+    { id: 'copilot' as const, title: '普通作业', desc: '单作业 / 作业集 / 链接识别', icon: <Icons.Document /> },
+    { id: 'ssscopilot' as const, title: '保全派驻', desc: 'SSS 作业独立入口', icon: <Icons.Shield /> },
+    { id: 'paradoxcopilot' as const, title: '悖论模拟', desc: '按干员搜索作业', icon: <Icons.Puzzle /> },
+  ]
+  const activeCombatModeOption = combatModeOptions.find(option => option.id === activeCombatMode)
+
   return (
     <>
       <div className="app-page app-stack-section">
@@ -1193,31 +1229,50 @@ export default function CombatTasks(_props: CombatTasksProps) {
         />
 
         <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur">
-          <div className="grid grid-cols-1 gap-1 sm:grid-cols-3">
-            {[
-              { id: 'copilot', title: '普通作业', desc: '单作业 / 作业集 / 链接识别', icon: <Icons.Document /> },
-              { id: 'ssscopilot', title: '保全派驻', desc: 'SSS 作业独立入口', icon: <Icons.Shield /> },
-              { id: 'paradoxcopilot', title: '悖论模拟', desc: '按干员搜索作业', icon: <Icons.Puzzle /> }
-            ].map(({ id, title, desc, icon }) => (
+          <div ref={combatModeTabsRef} className="relative grid grid-cols-1 gap-1 sm:grid-cols-3">
+            {activeCombatModeOption && activeCombatModeRect.width > 0 && (
+              <motion.div
+                data-testid="combat-mode-highlight"
+                aria-hidden="true"
+                className="pointer-events-none absolute z-20 flex items-center gap-3 rounded-lg bg-[var(--app-accent)] px-3.5 py-2.5 text-left text-white shadow-[0_10px_24px_color-mix(in_srgb,var(--app-accent)_22%,transparent)]"
+                initial={false}
+                animate={activeCombatModeRect}
+                transition={{ type: 'spring', stiffness: 360, damping: 34, mass: 0.8 }}
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/16 text-white [&_*]:h-4 [&_*]:w-4">
+                  {activeCombatModeOption.icon}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold">{activeCombatModeOption.title}</span>
+                  <span className="mt-0.5 block truncate text-xs text-white/75">{activeCombatModeOption.desc}</span>
+                </span>
+              </motion.div>
+            )}
+            {combatModeOptions.map(({ id, title, desc, icon }) => (
               <button
                 key={id}
-                onClick={() => setActiveCombatMode(id as typeof activeCombatMode)}
-                className={`group flex min-w-0 items-center gap-3 rounded-lg px-3.5 py-2.5 text-left transition-all ${
+                ref={(element) => {
+                  combatModeTabRefs.current[id] = element
+                }}
+                type="button"
+                onClick={() => setActiveCombatMode(id)}
+                aria-pressed={activeCombatMode === id}
+                className={`group relative z-10 flex min-w-0 items-center gap-3 rounded-lg px-3.5 py-2.5 text-left transition-colors ${
                   activeCombatMode === id
-                    ? 'bg-[var(--app-accent)] text-white shadow-[0_10px_24px_color-mix(in_srgb,var(--app-accent)_22%,transparent)]'
+                    ? 'text-transparent'
                     : 'text-secondary hover:bg-white/70 hover:text-primary dark:hover:bg-white/10'
                 }`}
               >
                 <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors [&_*]:h-4 [&_*]:w-4 ${
                   activeCombatMode === id
-                    ? 'bg-white/16 text-white'
+                    ? 'opacity-0'
                     : 'bg-[var(--app-surface-muted)] text-[var(--app-accent-strong)] group-hover:bg-[var(--app-accent-soft)]'
                 }`}>
                   {icon}
                 </span>
-                <span className="min-w-0">
+                <span className={`min-w-0 ${activeCombatMode === id ? 'opacity-0' : ''}`}>
                   <span className="block truncate text-sm font-semibold">{title}</span>
-                  <span className={`mt-0.5 block truncate text-xs ${activeCombatMode === id ? 'text-white/75' : 'text-tertiary'}`}>{desc}</span>
+                  <span className="mt-0.5 block truncate text-xs text-tertiary">{desc}</span>
                 </span>
               </button>
             ))}

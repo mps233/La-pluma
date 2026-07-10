@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { motion } from 'framer-motion'
 import { maaApi } from '../services/api'
 import Icons from './Icons'
-import { PageHeader, Card, InfoCard, Input, Select, Checkbox, Button } from './common'
+import { PageHeader, Card, Input, Select, Checkbox, Button } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type {
@@ -12,18 +13,45 @@ import type {
   RoguelikeAdvancedParams
 } from '@/types/components'
 
+type RoguelikeMode = 'roguelike' | 'reclamation'
+
+const THEME_PRESETS: Record<RoguelikeMode, Array<{ value: string; label: string }>> = {
+  roguelike: [
+    { value: 'Phantom', label: '傀影' },
+    { value: 'Mizuki', label: '水月' },
+    { value: 'Sami', label: '萨米' },
+    { value: 'Sarkaz', label: '萨卡兹' },
+    { value: 'JieGarden', label: '界园' },
+  ],
+  reclamation: [
+    { value: 'Tales', label: '沙中之火' },
+  ],
+}
+
 export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
   const [isRunning, setIsRunning] = useState(false)
   const { setMessage: setStatusMessage } = useStatusStore()
   const [taskInputs, setTaskInputs] = useState<RoguelikeTaskInputs>({})
   const [advancedParams, setAdvancedParams] = useState<RoguelikeAdvancedParams>({})
+  const [configLoaded, setConfigLoaded] = useState(false)
+  const [activeMode, setActiveMode] = useState<RoguelikeMode>('roguelike')
+  const modeTabsRef = useRef<HTMLDivElement>(null)
+  const modeTabRefs = useRef<Record<RoguelikeMode, HTMLButtonElement | null>>({
+    roguelike: null,
+    reclamation: null,
+  })
+  const [activeModeRect, setActiveModeRect] = useState({ x: 0, y: 0, width: 0, height: 0 })
 
   // 页面加载时从服务器或 localStorage 加载配置和恢复执行状态
   useEffect(() => {
+    let cancelled = false
+    let pollInterval: ReturnType<typeof setInterval> | null = null
+
     // 从后端获取真实的任务执行状态
     const checkBackendStatus = async () => {
       try {
         const result = await maaApi.getTaskStatus()
+        if (cancelled) return
         const taskStatus = result.data
         if (result.success && taskStatus?.isRunning) {
           // 后端确实有任务在运行
@@ -40,25 +68,23 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
             }
             
             // 启动轮询，持续检查任务状态
-            const pollInterval = setInterval(async () => {
+            pollInterval = setInterval(async () => {
               try {
                 const statusResult = await maaApi.getTaskStatus()
+                if (cancelled) return
                 if (statusResult.success && !statusResult.data.isRunning) {
                   // 任务已完成
                   setIsRunning(false)
                   setStatusMessage('任务已完成')
                   await new Promise(resolve => setTimeout(resolve, 2000))
                   setStatusMessage('')
-                  clearInterval(pollInterval)
+                  if (pollInterval) clearInterval(pollInterval)
                 }
               } catch (error) {
                 // 静默失败，不影响用户体验
-                clearInterval(pollInterval)
+                if (pollInterval) clearInterval(pollInterval)
               }
             }, 2000) // 每2秒检查一次
-            
-            // 组件卸载时清除轮询
-            return () => clearInterval(pollInterval)
           }
         }
       } catch (error) {
@@ -100,32 +126,37 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
       }
     }
     
-    loadConfig()
+    void loadConfig().finally(() => {
+      if (!cancelled) setConfigLoaded(true)
+    })
+
+    return () => {
+      cancelled = true
+      if (pollInterval) clearInterval(pollInterval)
+    }
   }, [])
 
   // 自动保存配置
   useEffect(() => {
+    if (!configLoaded) return
+
     localStorage.setItem('roguelikeTaskInputs', JSON.stringify(taskInputs))
-    // 同时保存到服务器（静默失败）
-    maaApi.saveUserConfig('roguelike-tasks', { taskInputs, advancedParams }).catch(() => {
-      // 静默失败，不影响用户体验
-    })
-  }, [taskInputs, advancedParams])
-  
-  useEffect(() => {
     localStorage.setItem('roguelikeAdvancedParams', JSON.stringify(advancedParams))
-    // 同时保存到服务器（静默失败）
-    maaApi.saveUserConfig('roguelike-tasks', { taskInputs, advancedParams }).catch(() => {
-      // 静默失败，不影响用户体验
-    })
-  }, [advancedParams, taskInputs])
+    const saveTimer = window.setTimeout(() => {
+      maaApi.saveUserConfig('roguelike-tasks', { taskInputs, advancedParams }).catch(() => {
+        // 静默失败，不影响用户体验
+      })
+    }, 300)
+
+    return () => window.clearTimeout(saveTimer)
+  }, [advancedParams, configLoaded, taskInputs])
 
   const tasks: RoguelikeTask[] = [
     { 
       id: 'roguelike', 
       name: '集成战略', 
       command: 'roguelike', 
-      placeholder: '主题 (Phantom/Mizuki/Sami/Sarkaz/JieGarden)', 
+      placeholder: '输入主题代号',
       icon: 'Map', 
       hasAdvanced: true,
       description: '自动刷集成战略（肉鸽），支持多个主题'
@@ -134,12 +165,33 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
       id: 'reclamation', 
       name: '生息演算', 
       command: 'reclamation', 
-      placeholder: '主题 (Tales)', 
+      placeholder: '输入主题代号',
       icon: 'Plant', 
       hasAdvanced: true,
       description: '自动生息演算模式'
     },
   ]
+
+  useLayoutEffect(() => {
+    const updateActiveModeRect = () => {
+      const container = modeTabsRef.current
+      const activeTab = modeTabRefs.current[activeMode]
+      if (!container || !activeTab) return
+
+      const containerRect = container.getBoundingClientRect()
+      const activeRect = activeTab.getBoundingClientRect()
+      setActiveModeRect({
+        x: activeRect.left - containerRect.left,
+        y: activeRect.top - containerRect.top,
+        width: activeRect.width,
+        height: activeRect.height,
+      })
+    }
+
+    updateActiveModeRect()
+    window.addEventListener('resize', updateActiveModeRect)
+    return () => window.removeEventListener('resize', updateActiveModeRect)
+  }, [activeMode])
 
   const getAdvancedOptions = (taskId: string): RoguelikeAdvancedOption[] => {
     const options: Record<string, RoguelikeAdvancedOption[]> = {
@@ -245,113 +297,176 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
     
     const advanced = advancedParams[task.id] || {}
     
+    const fieldOptions = options.filter(option => option.type !== 'checkbox')
+    const toggleOptions = options.filter(option => option.type === 'checkbox')
+
     return (
-      <div className="space-y-3">
-        {options.map(option => (
-          <div key={option.key}>
-            {option.type === 'checkbox' ? (
-              <Checkbox
-                checked={advanced[option.key] as boolean || false}
-                onChange={(checked: boolean) => handleAdvancedChange(task.id, option.key, checked)}
-                label={option.label}
-              />
-            ) : option.type === 'select' && option.options ? (
-              <Select
-                label={option.label}
-                value={(advanced[option.key] as string) || (option.options[0]?.value || '')}
-                onChange={(value: string) => handleAdvancedChange(task.id, option.key, value)}
-                options={option.options}
-              />
-            ) : (
-              <Input
-                type={option.type === 'number' ? 'number' : 'text'}
-                label={option.label}
-                value={advanced[option.key] as string || ''}
-                onChange={(value: string) => handleAdvancedChange(task.id, option.key, value)}
-                placeholder={option.placeholder}
-              />
-            )}
+      <>
+        <div className="roguelike-field-grid">
+          {fieldOptions.map(option => (
+            <div key={option.key}>
+              {option.type === 'select' && option.options ? (
+                <Select
+                  label={option.label}
+                  value={String(advanced[option.key] ?? option.options[0]?.value ?? '')}
+                  onChange={(value: string) => handleAdvancedChange(task.id, option.key, value)}
+                  options={option.options}
+                />
+              ) : (
+                <Input
+                  type={option.type === 'number' ? 'number' : 'text'}
+                  label={option.label}
+                  value={advanced[option.key] as string | number ?? ''}
+                  onChange={(value: string) => handleAdvancedChange(task.id, option.key, value)}
+                  placeholder={option.placeholder}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+        {toggleOptions.length > 0 && (
+          <div className="roguelike-toggle-list">
+            {toggleOptions.map(option => (
+              <div key={option.key} className="roguelike-toggle-row">
+                <Checkbox
+                  checked={advanced[option.key] as boolean || false}
+                  onChange={(checked: boolean) => handleAdvancedChange(task.id, option.key, checked)}
+                  label={option.label}
+                  color="cyan"
+                />
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        )}
+      </>
     )
   }
 
+  const activeTask = tasks.find(task => task.id === activeMode) ?? tasks[0]
+  if (!activeTask) return null
+  const ActiveIcon = Icons[activeTask.icon as keyof typeof Icons]
+  const activeTheme = taskInputs[activeTask.id] || ''
+
   return (
-    <div className="app-page app-stack-section">
+    <div className="app-page app-stack-section roguelike-page">
       <PageHeader
         icon={<Icons.DiceIcon />}
         title="肉鸽模式"
-        subtitle="集成战略和生息演算 - 所有修改自动保存"
+        subtitle="集成战略与生息演算配置"
         actions={<FloatingStatusIndicator />}
       />
 
-      <InfoCard type="warning">
-        <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-400 mb-3 flex items-center space-x-2">
-          <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-          </svg>
-          <span>使用说明</span>
-        </h3>
-        <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1.5">
-          <li>• <strong className="text-gray-800 dark:text-gray-300">集成战略</strong>：支持 Phantom（傀影）、Mizuki（水月）、Sami（萨米）、Sarkaz（萨卡兹）、JieGarden（界园）</li>
-          <li>• <strong className="text-gray-800 dark:text-gray-300">生息演算</strong>：支持 Tales（沙中之火）主题</li>
-          <li>• 可以设置刷分模式或刷源石锭模式</li>
-          <li>• 点击"高级选项"可以配置起始分队、核心干员、运行次数等</li>
-        </ul>
-      </InfoCard>
-
-      <div className="app-grid-section grid-cols-1 lg:grid-cols-2">
-        {tasks.map((task) => {
-          const IconComponent = Icons[task.icon as keyof typeof Icons]
-          
-          return (
-            <Card 
-              key={task.id}
-              theme="purple"
+      <div className="roguelike-mode-shell">
+        <div ref={modeTabsRef} className="roguelike-mode-tabs">
+          {activeModeRect.width > 0 && (
+            <motion.div
+              data-testid="roguelike-mode-highlight"
+              aria-hidden="true"
+              className="roguelike-mode-highlight"
+              initial={false}
+              animate={activeModeRect}
+              transition={{ type: 'spring', stiffness: 360, damping: 34, mass: 0.8 }}
             >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  {IconComponent && <IconComponent />}
-                  <h4 className="font-bold text-gray-900 dark:text-white text-xl">{task.name}</h4>
-                  <span className="text-xs text-gray-500 dark:text-gray-500 px-3 py-1.5 rounded-full font-mono border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-800/60">{task.command}</span>
-                </div>
-                
-                <Button
-                  onClick={() => handleExecute(task)}
-                  disabled={isRunning}
-                  variant="gradient"
-                  size="sm"
-                  icon={
-                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                    </svg>
-                  }
-                >
-                  立即执行
-                </Button>
-              </div>
-              
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-5 leading-relaxed">{task.description}</p>
-              
-              <Input
-                type="text"
-                placeholder={task.placeholder}
-                value={taskInputs[task.id] || ''}
-                onChange={(value: string) => handleInputChange(task.id, value)}
-                className="mb-5"
-              />
-              
-              {task.hasAdvanced && (
-                <div className="rounded-2xl p-4 border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-800/40">
-                  <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">高级选项</h5>
-                  {renderAdvancedOptions(task)}
-                </div>
-              )}
-            </Card>
-          )
-        })}
+              {ActiveIcon && <span className="roguelike-mode-icon is-active"><ActiveIcon /></span>}
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold">{activeTask.name}</span>
+                <span className="mt-0.5 block truncate text-xs text-white/75">{activeTask.description}</span>
+              </span>
+            </motion.div>
+          )}
+          {tasks.map(task => {
+            const IconComponent = Icons[task.icon as keyof typeof Icons]
+            const selected = activeMode === task.id
+            return (
+              <button
+                key={task.id}
+                ref={(element) => {
+                  modeTabRefs.current[task.id as RoguelikeMode] = element
+                }}
+                type="button"
+                onClick={() => setActiveMode(task.id as RoguelikeMode)}
+                aria-pressed={selected}
+                className={`roguelike-mode-button ${selected ? 'is-selected' : ''}`}
+              >
+                {IconComponent && <span className="roguelike-mode-icon"><IconComponent /></span>}
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold">{task.name}</span>
+                  <span className="mt-0.5 block truncate text-xs text-tertiary">{task.description}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
+
+      <Card className="roguelike-workspace" theme="cyan" animated>
+        <div className="roguelike-workspace-header">
+          <div className="roguelike-workspace-heading">
+            {ActiveIcon && <span className="roguelike-workspace-icon"><ActiveIcon /></span>}
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-lg font-semibold text-primary">{activeTask.name}</h3>
+                <span className="roguelike-command-chip">{activeTask.command}</span>
+              </div>
+              <p className="mt-1 text-xs text-secondary">{activeTask.description}</p>
+            </div>
+          </div>
+          <Button
+            onClick={() => handleExecute(activeTask)}
+            disabled={isRunning}
+            loading={isRunning}
+            variant="primary"
+            size="md"
+            icon={
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+              </svg>
+            }
+            className="roguelike-run-button"
+          >
+            立即执行
+          </Button>
+        </div>
+
+        <div className="roguelike-workspace-grid">
+          <section className="roguelike-workspace-section">
+            <div className="roguelike-section-heading">
+              <span>主题</span>
+              <small>{THEME_PRESETS[activeMode].length} 个可用</small>
+            </div>
+            <div className="roguelike-theme-grid">
+              {THEME_PRESETS[activeMode].map(theme => (
+                <button
+                  key={theme.value}
+                  type="button"
+                  onClick={() => handleInputChange(activeTask.id, theme.value)}
+                  aria-pressed={activeTheme === theme.value}
+                  className={`roguelike-theme-option ${activeTheme === theme.value ? 'is-active' : ''}`}
+                >
+                  <span>{theme.label}</span>
+                  <small>{theme.value}</small>
+                </button>
+              ))}
+            </div>
+            <Input
+              type="text"
+              label="自定义主题代号"
+              placeholder={activeTask.placeholder}
+              value={activeTheme}
+              onChange={(value: string) => handleInputChange(activeTask.id, value)}
+              className="roguelike-custom-theme"
+            />
+          </section>
+
+          <section className="roguelike-workspace-section is-settings">
+            <div className="roguelike-section-heading">
+              <span>策略设置</span>
+              <small>{getAdvancedOptions(activeTask.id).length} 项</small>
+            </div>
+            {renderAdvancedOptions(activeTask)}
+          </section>
+        </div>
+      </Card>
     </div>
   )
 }

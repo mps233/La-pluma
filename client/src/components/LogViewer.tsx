@@ -26,6 +26,7 @@ import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type { LogViewerProps, LogEntry, LogFile } from '@/types/components'
 
 type LogFilter = 'all' | LogEntry['level']
+type LogContentMode = 'summary' | 'raw'
 type ConfirmAction = 'clear' | 'cleanup'
 type Notice = { type: 'success' | 'error'; text: string }
 type VisibleLog = LogEntry & { count: number }
@@ -62,10 +63,14 @@ function formatLogTime(value: unknown): string {
 
 function parseRealtimeLog(value: unknown): LogEntry {
   const log = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const message = String(log.message ?? '')
+  const parsedOutput = parseHistoryLine(message)
+  if (parsedOutput.time) return parsedOutput
+
   return {
     time: formatLogTime(log.time),
     level: normalizeLevel(log.level),
-    message: String(log.message ?? ''),
+    message,
   }
 }
 
@@ -93,9 +98,169 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
 }
 
+const TASK_NAMES: Record<string, string> = {
+  StartUp: '启动游戏',
+  CloseDown: '关闭游戏',
+  Fight: '作战',
+  Award: '领取奖励',
+  Mall: '信用商店',
+  Recruit: '自动公招',
+  Infrast: '基建换班',
+  Depot: '仓库识别',
+  Roguelike: '集成战略',
+  ReclamationAlgorithm: '生息演算',
+  Copilot: '作业执行',
+  SSSCopilot: '保全作业',
+}
+
+function getTaskName(value: unknown): string {
+  const name = String(value || '').trim()
+  return TASK_NAMES[name] || name.replace(/Task(?:Plugin)?$/, '') || '未知任务'
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : {}
+}
+
+function summarizeCallback(log: LogEntry): LogEntry | null {
+  const match = log.message.match(/^Assistant::append_callback \| (\w+)\s+(\{.*\})$/)
+  if (!match) return null
+
+  let payload: Record<string, unknown>
+  try {
+    payload = asRecord(JSON.parse(match[2] || '{}'))
+  } catch {
+    return log
+  }
+
+  const event = match[1]
+  const details = asRecord(payload.details)
+  const taskName = getTaskName(payload.taskchain || payload.subtask || payload.class)
+
+  switch (event) {
+    case 'TaskChainStart':
+      return { ...log, message: `任务开始：${taskName}` }
+    case 'TaskChainCompleted':
+      return { ...log, message: `任务完成：${taskName}` }
+    case 'TaskChainError':
+      return { ...log, level: 'ERROR', message: `任务失败：${taskName}` }
+    case 'SubTaskError':
+      return { ...log, level: 'ERROR', message: `执行步骤失败：${taskName}` }
+    case 'AllTasksCompleted':
+    case 'SubTaskStart':
+    case 'SubTaskCompleted':
+      return null
+    case 'SubTaskExtraInfo':
+      return payload.what === 'DepotInfo'
+        ? { ...log, message: '仓库识别数据已生成' }
+        : null
+    case 'AsyncCallInfo':
+      if (payload.what !== 'Connect') return null
+      return {
+        ...log,
+        message: details.ret === true
+          ? `设备连接完成${details.cost ? `，耗时 ${details.cost} ms` : ''}`
+          : '设备连接失败',
+        level: details.ret === true ? log.level : 'ERROR',
+      }
+    case 'ConnectionInfo':
+      switch (payload.what) {
+        case 'Connected':
+          return { ...log, message: `设备连接成功${details.address ? `：${details.address}` : ''}` }
+        case 'ResolutionGot':
+        case 'ResolutionInfo':
+          return details.width && details.height
+            ? { ...log, message: `设备分辨率：${details.width} x ${details.height}` }
+            : null
+        case 'FastestWayToScreencap':
+          return details.method
+            ? { ...log, message: `已选择截图方式：${details.method}${details.cost ? `（${details.cost} ms）` : ''}` }
+            : null
+        default:
+          return null
+      }
+    default:
+      return null
+  }
+}
+
+function summarizeLog(log: LogEntry): LogEntry | null {
+  if (log.level === 'DEBUG' || !log.time) return null
+
+  const callback = summarizeCallback(log)
+  if (log.message.startsWith('Assistant::append_callback |')) return callback
+
+  const message = log.message.trim()
+  if (!message || /^[{}"]/.test(message) || message.startsWith('{')) return null
+
+  if (/^执行命令:\s+maa\s+(?:dir log|activity\b)/.test(message)) return null
+
+  const stateUpdate = message.match(/^任务状态更新:\s+(\{.*\})$/)
+  if (stateUpdate) {
+    try {
+      const state = asRecord(JSON.parse(stateUpdate[1] || '{}'))
+      return state.isRunning === true
+        ? { ...log, message: `任务开始：${getTaskName(state.taskName || state.taskType)}` }
+        : { ...log, message: '任务执行结束' }
+    } catch {
+      return null
+    }
+  }
+
+  const commandStart = message.match(/^执行命令:\s+maa\s+(\w+)(?:\s+.*?)?,\s*等待完成:\s*(?:true|false)$/)
+  if (commandStart) {
+    const commandNames: Record<string, string> = {
+      run: '自动化任务',
+      startup: '启动游戏',
+      fight: '理智作战',
+      roguelike: '集成战略',
+      copilot: '作业执行',
+    }
+    return { ...log, message: `开始执行：${commandNames[commandStart[1] || ''] || commandStart[1]}` }
+  }
+
+  const commandEnd = message.match(/^命令执行完成:\s+maa\s+(.+?),\s*退出码:\s*(-?\d+)$/)
+  if (commandEnd) {
+    const exitCode = Number(commandEnd[2])
+    return {
+      ...log,
+      level: exitCode === 0 ? log.level : 'ERROR',
+      message: exitCode === 0 ? 'MAA 命令执行完成' : `MAA 命令执行失败，退出码 ${exitCode}`,
+    }
+  }
+
+  if (message.startsWith('临时任务文件已创建:')) return null
+  if (message.startsWith('stdout:')) return { ...log, message: `MAA 输出：${message.slice(7).trim()}` }
+  if (message.startsWith('stderr:')) return { ...log, level: 'WARN', message: `MAA 提示：${message.slice(7).trim()}` }
+
+  const queuedTask = message.match(/^append_task\s+(\w+)\s*\{?$/)
+  if (queuedTask) return { ...log, message: `任务已加入队列：${getTaskName(queuedTask[1])}` }
+
+  if (message === 'Start | block') return { ...log, message: '任务执行开始' }
+  if (message === 'Stop | block') return { ...log, message: '任务执行结束' }
+  if (message.startsWith('timeout when waiting socket connection')) {
+    return { ...log, level: 'WARN', message: '截图通道连接超时，正在切换备用方案' }
+  }
+  if (message.startsWith('Killing child `')) {
+    return { ...log, level: 'ERROR', message: '已终止超时的截图进程' }
+  }
+  if (message.startsWith('Call `') && message.endsWith('failed')) {
+    return { ...log, level: 'WARN', message: 'ADB 调用失败，正在尝试备用方案' }
+  }
+  if (message === 'data is empty!') {
+    return { ...log, level: 'WARN', message: '截图数据为空，正在切换备用方案' }
+  }
+
+  const noisyInfo = /^(Call `|record path |load |already loaded |load ret |set_instance_option |append_task \| task_id|Candidate templates count:|Item id:|command server start |touch_program |pipe str|minitouch key props|adb -s |Try to find |Raw\w+ is not supported|screencap_end_of_line|Encode cost |The fastest way is )/
+  if (log.level === 'INFO' && noisyInfo.test(message)) return null
+
+  return { ...log, message }
+}
+
 export default function LogViewer({}: LogViewerProps) {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [autoScroll, setAutoScroll] = useState(true)
+  const [contentMode, setContentMode] = useState<LogContentMode>('summary')
   const [filter, setFilter] = useState<LogFilter>('all')
   const [search, setSearch] = useState('')
   const [collapseRepeats, setCollapseRepeats] = useState(true)
@@ -240,14 +405,19 @@ export default function LogViewer({}: LogViewerProps) {
     }
   }, [logs, autoScroll, viewingHistory])
 
+  const readableLogs = useMemo(() => {
+    if (contentMode === 'raw') return logs
+    return logs.map(summarizeLog).filter((log): log is LogEntry => log !== null)
+  }, [contentMode, logs])
+
   const filteredLogs = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('zh-CN')
-    return logs.filter(log => {
+    return readableLogs.filter(log => {
       const matchesLevel = filter === 'all' || log.level === filter
       const matchesSearch = !query || `${log.time} ${log.level} ${log.message}`.toLocaleLowerCase('zh-CN').includes(query)
       return matchesLevel && matchesSearch
     })
-  }, [filter, logs, search])
+  }, [filter, readableLogs, search])
 
   const visibleLogs = useMemo<VisibleLog[]>(() => {
     if (!collapseRepeats) return filteredLogs.map(log => ({ ...log, count: 1 }))
@@ -316,7 +486,8 @@ export default function LogViewer({}: LogViewerProps) {
   }
 
   const activeError = viewingHistory ? historyError : realtimeError
-  const isFilteredEmpty = logs.length > 0 && visibleLogs.length === 0
+  const isSummaryEmpty = logs.length > 0 && readableLogs.length === 0
+  const isFilteredEmpty = readableLogs.length > 0 && visibleLogs.length === 0
 
   return (
     <div className="app-page app-stack-section log-viewer">
@@ -340,6 +511,24 @@ export default function LogViewer({}: LogViewerProps) {
       <Card className="log-card log-toolbar-card" animated delay={0.1} theme="cyan">
         <CardContent className="log-toolbar">
           <div className="log-toolbar-controls">
+            <div className="log-mode-switch" role="group" aria-label="日志内容模式">
+              <button
+                type="button"
+                className={contentMode === 'summary' ? 'is-active' : ''}
+                onClick={() => setContentMode('summary')}
+                aria-pressed={contentMode === 'summary'}
+              >
+                摘要
+              </button>
+              <button
+                type="button"
+                className={contentMode === 'raw' ? 'is-active' : ''}
+                onClick={() => setContentMode('raw')}
+                aria-pressed={contentMode === 'raw'}
+              >
+                原始
+              </button>
+            </div>
             <Checkbox
               checked={autoScroll}
               onChange={setAutoScroll}
@@ -434,6 +623,12 @@ export default function LogViewer({}: LogViewerProps) {
                 <div className="log-console-state">
                   <FileText className="h-5 w-5" aria-hidden="true" />
                   <span>{viewingHistory ? '这个日志文件没有内容' : '暂无实时日志，等待任务执行'}</span>
+                </div>
+              )}
+              {!activeError && isSummaryEmpty && (
+                <div className="log-console-state">
+                  <FileText className="h-5 w-5" aria-hidden="true" />
+                  <span>当前日志没有需要关注的事件</span>
                 </div>
               )}
               {!activeError && isFilteredEmpty && (

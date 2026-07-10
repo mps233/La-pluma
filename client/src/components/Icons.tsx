@@ -120,6 +120,14 @@ const Icons = {
       </svg>
     </div>
   ),
+  Settings: () => (
+    <div className="icon-well flex h-8 w-8 items-center justify-center rounded-xl">
+      <svg className="w-3.5 h-3.5 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h10M18 6h2M4 12h2m4 0h10M4 18h8m4 0h4" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M14 4v4M6 10v4m6 2v4" />
+      </svg>
+    </div>
+  ),
   Clock: () => (
     <div className="icon-well flex h-8 w-8 items-center justify-center rounded-xl">
       <svg className="w-3.5 h-3.5 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>

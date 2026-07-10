@@ -39,7 +39,9 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
   const { message } = useStatusStore()
   const [shouldFloat, setShouldFloat] = useState(false)
   const [dailyQuote, setDailyQuote] = useState<OperatorQuote>(() => getFallbackReadyQuote())
+  const [isTextOverflowing, setIsTextOverflowing] = useState(false)
   const sentinelRef = useRef<HTMLDivElement>(null)
+  const textRef = useRef<HTMLDivElement>(null)
 
   // 从 API 获取随机台词
   useEffect(() => {
@@ -102,6 +104,21 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
   // 使用 key 强制重新渲染以触发动画
   const indicatorKey = `${displayText}-${detectedType}`
 
+  useEffect(() => {
+    const textElement = textRef.current
+    if (!textElement) return
+
+    const updateOverflow = () => {
+      setIsTextOverflowing(textElement.scrollWidth > textElement.clientWidth + 1)
+    }
+
+    updateOverflow()
+    const observer = new ResizeObserver(updateOverflow)
+    observer.observe(textElement)
+
+    return () => observer.disconnect()
+  }, [displayText, shouldFloat])
+
   const indicatorContent = (
     <motion.div
       key={indicatorKey}
@@ -124,11 +141,12 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
         transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
       />
       <div
+        ref={textRef}
         className={`min-w-0 flex-1 overflow-hidden whitespace-nowrap ${textClassName}`}
-        style={{
+        style={isTextOverflowing ? {
           WebkitMaskImage: 'linear-gradient(90deg, #000 calc(100% - 16px), transparent)',
           maskImage: 'linear-gradient(90deg, #000 calc(100% - 16px), transparent)'
-        }}
+        } : undefined}
       >
         {isReady ? (
           <>

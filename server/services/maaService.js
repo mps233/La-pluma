@@ -693,7 +693,7 @@ export async function getCurrentActivity(clientType = 'Official') {
     }
     
     // 获取活动信息
-    const result = await execMaaCommand('activity', [clientType]);
+    const result = await execMaaCommand('activity', [clientType], null, null, false, true);
     const output = result.stdout;
     
     logger.debug('maa activity 原始输出', { output });
@@ -819,7 +819,7 @@ export function stopCurrentTask() {
  */
 export async function getMaaLogDir() {
   try {
-    const result = await execMaaCommand('dir', ['log']);
+    const result = await execMaaCommand('dir', ['log'], null, null, false, true);
     return result.stdout.trim();
   } catch (error) {
     throw new Error(`获取日志目录失败: ${error.message}`);
