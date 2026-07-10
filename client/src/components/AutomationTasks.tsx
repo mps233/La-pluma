@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { maaApi } from '../services/api'
 import { motion } from 'framer-motion'
-import { ChevronDown, GripVertical, ListPlus, Plus, SlidersHorizontal, Trash2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronDown, CircleMinus, GripVertical, ListPlus, LoaderCircle, Plus, SlidersHorizontal, Square, Trash2 } from 'lucide-react'
 import Icons from './Icons'
 import ScreenMonitor from './ScreenMonitor'
 import NotificationSettings from './NotificationSettings'
@@ -21,25 +21,140 @@ const scheduleTimePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/
 const normalizeScheduleTimes = (times: string[]) =>
   [...new Set(times.filter(time => scheduleTimePattern.test(time)))]
 
+const commaSeparatedArrayKeys = new Set(['buy_first', 'blacklist', 'first_tags', 'preserve_tags'])
+
+const parseDropTargetEntries = (value: unknown): string[] | null => {
+  if (value === undefined || value === null || value === '') return []
+
+  const rawEntries = typeof value === 'object' && !Array.isArray(value)
+    ? Object.entries(value as Record<string, unknown>).map(([itemId, count]) => `${itemId}=${count}`)
+    : String(value).split(',').map(entry => entry.trim()).filter(Boolean)
+
+  const normalizedEntries: string[] = []
+  for (const entry of rawEntries) {
+    const match = entry.match(/^([A-Za-z0-9_-]+)\s*=\s*(\d+)$/)
+    if (!match || Number(match[2]) <= 0) return null
+    normalizedEntries.push(`${match[1]}=${Number(match[2])}`)
+  }
+  return normalizedEntries
+}
+
+interface AutomationExecutionSummary {
+  successCount: number
+  failedCount: number
+  skippedCount: number
+  durationMs: number
+  summaries: Array<{
+    task: string
+    stage?: string
+    times?: string
+    drops?: string
+    duration?: string
+  }>
+  reports: Array<{
+    provider: 'penguin' | 'yituliu'
+    stage?: string
+    status: 'success' | 'failed'
+    message: string
+  }>
+  actions: Array<{
+    task: string
+    action: 'startup' | 'closedown' | 'depot' | 'award'
+    status: 'success' | 'skipped' | 'failed'
+    message: string
+  }>
+  errors: Array<string | { task: string; error: string }>
+  warnings: string[]
+}
+
+const migrateTaskParams = (task: any) => {
+  const commandId = task.commandId || String(task.id || '').split('-')[0]
+  if (!task.params) return task
+
+  const params = { ...task.params }
+  if (commandId === 'fight') {
+    params.drops ??= ''
+    params.clientType ??= ''
+    params.DrGrandet ??= false
+    params.report_to_penguin ??= false
+    params.penguin_id ??= ''
+    params.report_to_yituliu ??= false
+    params.yituliu_id ??= ''
+  } else if (commandId === 'closedown') {
+    params.adbPath ??= '/opt/homebrew/bin/adb'
+    params.address ??= '127.0.0.1:16384'
+    params.recognizeDepotBeforeClose ??= true
+  } else if (commandId === 'recruit') {
+    if (params.preserve_tags === undefined && params.skip_robot === true) {
+      params.preserve_tags = '支援机械'
+    }
+    params.force_refresh ??= true
+    params.first_tags ??= ''
+    params.extra_tags_mode ??= 0
+    params.recruitment_time ??= { '3': 540, '4': 540 }
+    delete params.skip_robot
+  } else if (commandId === 'infrast') {
+    params.filename ??= ''
+    params.plan_index ??= 0
+    params.continue_training ??= false
+    params.dorm_notstationed_enabled ??= false
+    params.dorm_trust_enabled ??= false
+    params.reception_message_board ??= true
+    params.reception_clue_exchange ??= true
+    params.reception_send_clue ??= true
+  } else if (commandId === 'mall') {
+    params.visit_friends ??= true
+    params.shopping ??= true
+    params.buy_first ??= ''
+    params.blacklist ??= ''
+    params.force_shopping_if_credit_full ??= false
+    params.only_buy_discount ??= false
+    params.reserve_max_credit ??= false
+    params.credit_fight ??= false
+    params.formation_index ??= 0
+  }
+  return { ...task, params }
+}
+
+const synchronizeConnectionParams = (tasks: any[]) => {
+  const startupTask = tasks.find(task => (task.commandId || String(task.id || '').split('-')[0]) === 'startup')
+  if (!startupTask?.params) return tasks
+
+  return tasks.map(task => {
+    const commandId = task.commandId || String(task.id || '').split('-')[0]
+    if (commandId !== 'closedown') return task
+    return {
+      ...task,
+      params: {
+        ...task.params,
+        clientType: startupTask.params.clientType || task.params?.clientType || 'Official',
+        adbPath: startupTask.params.adbPath || task.params?.adbPath || '/opt/homebrew/bin/adb',
+        address: startupTask.params.address || task.params?.address || '127.0.0.1:16384'
+      }
+    }
+  })
+}
+
 export default function AutomationTasks({}: AutomationTasksProps) {
   const { setMessage: setStatusMessage, setActive: setIsActiveStatus } = useStatusStore()
 
   // 辅助函数：显示消息
   const showSuccess = async (msg: string) => {
-    setStatusMessage(msg)
+    setStatusMessage(msg, 'success')
     await new Promise(resolve => setTimeout(resolve, 1500))
     setStatusMessage('')
   }
   const showError = async (msg: string) => {
-    setStatusMessage(msg)
+    setStatusMessage(msg, 'error')
     await new Promise(resolve => setTimeout(resolve, 2000))
     setStatusMessage('')
   }
   const showInfo = (msg: string) => {
-    setStatusMessage(msg)
+    setStatusMessage(msg, 'info')
   }
 
   const [isRunning, setIsRunning] = useState(false)
+  const [isStopping, setIsStopping] = useState(false)
   const [taskFlow, setTaskFlow] = useState<TaskFlowItem[]>([])
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [taskPickerOpen, setTaskPickerOpen] = useState(false)
@@ -47,13 +162,15 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   const [scheduleTimes, setScheduleTimes] = useState<string[]>(['08:00', '14:00', '20:00'])
   const [currentStep, setCurrentStep] = useState(-1)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
-  const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [currentActivity, setCurrentActivity] = useState<any>(null)
   const [activityName, setActivityName] = useState<string | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<Record<string, ConnectionTestStatus>>({})
   const [testingConnection, setTestingConnection] = useState<Record<string, boolean>>({})
+  const [lastExecutionSummary, setLastExecutionSummary] = useState<AutomationExecutionSummary | null>(null)
   const autoSaveQueueRef = useRef<Promise<void>>(Promise.resolve())
   const autoSaveRevisionRef = useRef(0)
+  const scheduleWasRunningRef = useRef(false)
+  const stopRequestInFlightRef = useRef(false)
   const activeTaskId = selectedTaskId && taskFlow.some(task => task.id === selectedTaskId)
     ? selectedTaskId
     : taskFlow[0]?.id ?? null
@@ -75,7 +192,12 @@ export default function AutomationTasks({}: AutomationTasksProps) {
 
           // 如果定时任务正在运行，更新 UI 状态
           if (status.isRunning) {
+            scheduleWasRunningRef.current = true
             setIsRunning(true)
+            if (String(status.message || '').includes('正在终止')) {
+              stopRequestInFlightRef.current = true
+              setIsStopping(true)
+            }
             setIsActiveStatus(true)
 
             // 根据任务 ID 找到在 taskFlow 中的实际索引
@@ -88,17 +210,22 @@ export default function AutomationTasks({}: AutomationTasksProps) {
               setCurrentStep(status.currentStep)
             }
 
-            setStatusMessage(status.message || `正在执行: ${status.currentTask}`)
+            setStatusMessage(status.message || `正在执行: ${status.currentTask}`, 'info')
           } else {
+            const justFinished = scheduleWasRunningRef.current
+            scheduleWasRunningRef.current = false
             setIsActiveStatus(false)
-            setIsRunning(prev => {
-              if (prev) {
-                // 定时任务刚完成
-                setCurrentStep(-1)
+            setIsRunning(false)
+            if (status.lastResult) {
+              setLastExecutionSummary(status.lastResult as AutomationExecutionSummary)
+            }
 
-              }
-              return false
-            })
+            if (justFinished) {
+              setCurrentStep(-1)
+              const completionMessage = status.message || '任务流程执行完成'
+              const completionType = /终止|取消|失败/.test(completionMessage) ? 'warning' : 'success'
+              setStatusMessage(completionMessage, completionType)
+            }
           }
         }
       } catch (error) {
@@ -148,11 +275,26 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       name: '理智作战',
       icon: <Icons.Sword />,
       description: '自动刷关卡消耗理智',
-      defaultParams: { stage: '1-7', stages: [{ stage: '1-7', times: '' }], medicine: 0, expiringMedicine: 0, stone: 0, series: '1' },
+      defaultParams: {
+        stage: '1-7',
+        stages: [{ stage: '1-7', times: '' }],
+        medicine: 0,
+        expiringMedicine: 0,
+        stone: 0,
+        series: '1',
+        drops: '',
+        clientType: '',
+        DrGrandet: false,
+        report_to_penguin: false,
+        penguin_id: '',
+        report_to_yituliu: false,
+        yituliu_id: ''
+      },
       paramFields: [
         { key: 'stages', label: '关卡', type: 'multi-stages', placeholder: '1-7 或 HD-7', timesPlaceholder: '次数', helper: '使用 HD-数字 代表当前活动关卡，点击 + 添加更多关卡' },
+        { key: 'drops', label: '掉落目标', type: 'text', placeholder: '30011=10,30062=5', helper: '任一物品达到目标数量后停止；格式为物品 ID=数量，多个目标用逗号分隔' },
         { key: 'medicine', label: '理智药', type: 'number', placeholder: '0', helper: '使用理智药数量' },
-        { key: 'expiringMedicine', label: '过期理智药', type: 'number', placeholder: '0', helper: '优先使用 48 小时内过期的理智药' },
+        { key: 'expiringMedicine', label: '临期药数量', type: 'number', placeholder: '0', helper: '最多使用多少瓶临期理智药；当前 maa-cli 参数按数量计算' },
         { key: 'stone', label: '源石', type: 'number', placeholder: '0', helper: '使用源石数量' },
         { key: 'series', label: '连战', type: 'select', options: [
           { value: '-1', label: '禁用' },
@@ -176,24 +318,36 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         facility: ['Mfg', 'Trade', 'Power', 'Control', 'Reception', 'Office', 'Dorm'],
         drones: 'Money',
         threshold: '0.3',
-        replenish: false
+        replenish: false,
+        filename: '',
+        plan_index: 0,
+        continue_training: false,
+        dorm_notstationed_enabled: false,
+        dorm_trust_enabled: false,
+        reception_message_board: true,
+        reception_clue_exchange: true,
+        reception_send_clue: true
       },
       paramFields: [
         { key: 'mode', label: '换班模式', type: 'select', options: [
           { value: '0', label: '默认换班' },
-          { value: '10000', label: '自定义换班' }
-        ]},
+          { value: '10000', label: '自定义换班' },
+          { value: '20000', label: '一键轮换' }
+        ], helper: '一键轮换使用游戏内队列，并保留无人机、会客室等基础操作' },
         { key: 'facility', label: '设施选择', type: 'facility-select', helper: '选择要换班的设施' },
         { key: 'drones', label: '无人机用途', type: 'select', options: [
+          { value: '_NotUse', label: '不使用无人机' },
           { value: 'Money', label: '龙门币' },
           { value: 'SyntheticJade', label: '合成玉' },
           { value: 'CombatRecord', label: '作战记录' },
           { value: 'PureGold', label: '赤金' },
           { value: 'OriginStone', label: '源石碎片' },
           { value: 'Chip', label: '芯片' }
-        ]},
+        ], hiddenWhen: { key: 'mode', value: '10000' } },
         { key: 'threshold', label: '心情阈值', type: 'number', placeholder: '0.3', step: '0.1', min: '0', max: '1' },
         { key: 'replenish', label: '自动补货', type: 'checkbox' },
+        { key: 'filename', label: '排班文件', type: 'text', placeholder: 'schedules/base.json', helper: '自定义换班使用的排班配置文件路径', visibleWhen: { key: 'mode', value: '10000' } },
+        { key: 'plan_index', label: '方案序号', type: 'number', placeholder: '0', min: '0', helper: '配置文件中的方案序号，从 0 开始', visibleWhen: { key: 'mode', value: '10000' } },
       ],
       taskType: 'Infrast'
     },
@@ -204,23 +358,28 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       description: '自动公开招募',
       defaultParams: {
         refresh: true,
+        force_refresh: true,
         select: [4, 5, 6],
         confirm: [3, 4],
+        first_tags: '',
+        extra_tags_mode: 0,
         times: '4',
         set_time: true,
         expedite: false,
         expedite_times: 0,
-        skip_robot: true
+        preserve_tags: '支援机械',
+        recruitment_time: { '3': 540, '4': 540 }
       },
       paramFields: [
         { key: 'refresh', label: '刷新标签', type: 'checkbox' },
+        { key: 'force_refresh', label: '无许可时仍刷新', type: 'checkbox', helper: '招聘许可耗尽后，仍会使用可用刷新次数', visibleWhen: { key: 'refresh', value: true } },
         { key: 'select', label: '招募星级', type: 'star-select', helper: '支持 6 星自动公招；勾选 6 星后会保留高价值标签并自动选择对应组合' },
         { key: 'confirm', label: '确认星级', type: 'star-select', helper: '建议至少保留 5/6 星确认，避免高价值标签被跳过' },
         { key: 'times', label: '招募次数', type: 'number', placeholder: '4' },
         { key: 'set_time', label: '设置时间', type: 'checkbox' },
         { key: 'expedite', label: '使用加急', type: 'checkbox' },
-        { key: 'expedite_times', label: '加急次数', type: 'number', placeholder: '0' },
-        { key: 'skip_robot', label: '跳过小车', type: 'checkbox' },
+        { key: 'expedite_times', label: '加急次数', type: 'number', placeholder: '0', visibleWhen: { key: 'expedite', value: true } },
+        { key: 'preserve_tags', label: '保留标签', type: 'text', placeholder: '支援机械,高级资深干员', helper: '识别到任一标签时保留该公招槽位，多个标签用逗号分隔' },
       ],
       taskType: 'Recruit'
     },
@@ -230,16 +389,32 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       icon: <Icons.Cash />,
       description: '访问好友、收取信用',
       defaultParams: {
+        visit_friends: true,
         shopping: true,
         buy_first: '',
         blacklist: '',
-        force_shopping_if_credit_full: false
+        force_shopping_if_credit_full: false,
+        only_buy_discount: false,
+        reserve_max_credit: false,
+        credit_fight: false,
+        formation_index: 0
       },
       paramFields: [
+        { key: 'visit_friends', label: '访问好友', type: 'checkbox' },
         { key: 'shopping', label: '自动购物', type: 'checkbox' },
-        { key: 'buy_first', label: '优先购买', type: 'text', placeholder: '招聘许可,龙门币（逗号分隔）' },
-        { key: 'blacklist', label: '黑名单', type: 'text', placeholder: '家具,碳（逗号分隔）' },
-        { key: 'force_shopping_if_credit_full', label: '信用满强制购物', type: 'checkbox' },
+        { key: 'buy_first', label: '优先购买', type: 'text', placeholder: '招聘许可,龙门币（逗号分隔）', visibleWhen: { key: 'shopping', value: true } },
+        { key: 'blacklist', label: '黑名单', type: 'text', placeholder: '家具零件,碳（逗号分隔）', visibleWhen: { key: 'shopping', value: true } },
+        { key: 'only_buy_discount', label: '只买折扣商品', type: 'checkbox', helper: '仅影响优先购买之外的普通购物', visibleWhen: { key: 'shopping', value: true } },
+        { key: 'reserve_max_credit', label: '保留 300 信用', type: 'checkbox', helper: '普通购物时信用低于 300 就停止购买', visibleWhen: { key: 'shopping', value: true } },
+        { key: 'force_shopping_if_credit_full', label: '信用溢出时无视黑名单', type: 'checkbox', visibleWhen: { key: 'shopping', value: true } },
+        { key: 'credit_fight', label: '信用助战', type: 'checkbox', helper: '借助战完成一次 OF-1，以便次日获得更多信用' },
+        { key: 'formation_index', label: '助战编队', type: 'select', options: [
+          { value: '0', label: '当前编队' },
+          { value: '1', label: '编队 1' },
+          { value: '2', label: '编队 2' },
+          { value: '3', label: '编队 3' },
+          { value: '4', label: '编队 4' }
+        ], visibleWhen: { key: 'credit_fight', value: true } },
       ],
       taskType: 'Mall'
     },
@@ -271,7 +446,12 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       name: '关闭游戏',
       icon: <Icons.Stop />,
       description: '关闭游戏客户端',
-      defaultParams: { clientType: 'Official' },
+      defaultParams: {
+        clientType: 'Official',
+        adbPath: '/opt/homebrew/bin/adb',
+        address: '127.0.0.1:16384',
+        recognizeDepotBeforeClose: false
+      },
       paramFields: [
         { key: 'clientType', label: '客户端类型', type: 'select', options: [
           { value: 'Official', label: '官服' },
@@ -280,7 +460,8 @@ export default function AutomationTasks({}: AutomationTasksProps) {
           { value: 'YoStarJP', label: '日服' },
           { value: 'YoStarKR', label: '韩服' },
           { value: 'Txwy', label: '繁中服' }
-        ]}
+        ]},
+        { key: 'recognizeDepotBeforeClose', label: '关闭前识别仓库', type: 'checkbox', helper: '启用后会先识别并保存仓库数据，再关闭游戏客户端' }
       ]
     },
   ]
@@ -297,6 +478,14 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       enabled: true,
       commandId: task.id,
       id: `${task.id}-${Date.now()}`
+    }
+    if (task.id === 'closedown') {
+      const startupTask = taskFlow.find(flowTask => flowTask.commandId === 'startup')
+      if (startupTask) {
+        newTask.params.clientType = startupTask.params.clientType || 'Official'
+        newTask.params.adbPath = startupTask.params.adbPath || '/opt/homebrew/bin/adb'
+        newTask.params.address = startupTask.params.address || '127.0.0.1:16384'
+      }
     }
     const newFlow = task.id === 'closedown'
       ? [...taskFlow, newTask]
@@ -385,7 +574,8 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     }
 
     // 如果修改的是启动游戏的客户端类型，同步到关闭游戏
-    if (currentTask.commandId === 'startup' && key === 'clientType') {
+    const connectionKeys = new Set(['clientType', 'adbPath', 'address'])
+    if (currentTask.commandId === 'startup' && connectionKeys.has(key)) {
       newFlow.forEach((task, i) => {
         if (task.commandId === 'closedown' && newFlow[i]) {
           newFlow[i]!.params.clientType = value
@@ -393,7 +583,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       })
     }
     // 如果修改的是关闭游戏的客户端类型，同步到启动游戏
-    else if (currentTask.commandId === 'closedown' && key === 'clientType') {
+    else if (currentTask.commandId === 'closedown' && connectionKeys.has(key)) {
       newFlow.forEach((task, i) => {
         if (task.commandId === 'startup' && newFlow[i]) {
           newFlow[i]!.params.clientType = value
@@ -511,9 +701,6 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         params: {}
       }
 
-      // 某些字段应该保持字符串格式，不要转换为数字
-      const keepAsString = ['mode']
-
       Object.keys(params).forEach(key => {
         const value = params[key]
         if (value === undefined || value === '' || value === null) return
@@ -529,13 +716,13 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         else if (typeof value === 'string' && value.trim().startsWith('[') && value.trim().endsWith(']')) {
           taskConfig.params[key] = value.trim()
         }
-        else if (typeof value === 'string' && value.includes(',') && !value.includes('[')) {
+        else if (typeof value === 'string' && (commaSeparatedArrayKeys.has(key) || (value.includes(',') && !value.includes('[')))) {
           taskConfig.params[key] = value.split(',').map(v => v.trim()).filter(v => v)
         }
         else if (typeof value === 'number') {
           taskConfig.params[key] = value
         }
-        else if (typeof value === 'string' && !isNaN(Number(value)) && value.trim() !== '' && !keepAsString.includes(key)) {
+        else if (typeof value === 'string' && !isNaN(Number(value)) && value.trim() !== '') {
           taskConfig.params[key] = Number(value)
         }
         else if (value) {
@@ -559,19 +746,46 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       if (task.params?.address) {
         extraArgs.push(`-a ${task.params.address}`)
       }
+      if (commandId === 'startup' && task.params?.accountName?.trim()) {
+        extraArgs.push(`--account-name ${task.params.accountName.trim()}`)
+      }
     } else if (commandId === 'fight') {
-      // 对于 fight 命令，如果有多个关卡，只返回第一个关卡
-      // 多关卡的处理在 executeTaskFlow 中进行
-      params = task.params?.stage || ''
+      const stages = task.params?.stages || [{ stage: task.params?.stage || '', times: task.params?.times || '' }]
+      params = stages
+        .map(stageConfig => typeof stageConfig === 'string'
+          ? { stage: stageConfig, times: '' }
+          : stageConfig)
+        .filter(stageConfig => stageConfig.stage?.trim())
+        .map(stageConfig => `${stageConfig.stage.trim()}${stageConfig.times ? `:${stageConfig.times}` : ''}`)
+        .join(',')
       if (task.params?.medicine !== undefined && task.params.medicine !== '' && task.params.medicine !== null) {
         params += ` -m ${task.params.medicine}`
+      }
+      if (task.params?.expiringMedicine !== undefined && task.params.expiringMedicine !== '' && task.params.expiringMedicine !== null) {
+        params += ` --expiring-medicine ${task.params.expiringMedicine}`
       }
       if (task.params?.stone !== undefined && task.params.stone !== '' && task.params.stone !== null) {
         params += ` --stone ${task.params.stone}`
       }
-      if (task.params?.times) params += ` --times ${task.params.times}`
       if (task.params?.series !== undefined && task.params.series !== '' && String(task.params.series) !== '1') {
         params += ` --series ${task.params.series}`
+      }
+      const dropTargets = parseDropTargetEntries(task.params?.drops)
+      if (dropTargets === null) {
+        throw new Error('掉落目标格式应为物品 ID=数量，多个目标用逗号分隔')
+      }
+      dropTargets.forEach(target => {
+        params += ` -D${target}`
+      })
+      if (task.params?.clientType) params += ` --client-type ${task.params.clientType}`
+      if (task.params?.DrGrandet) params += ' --dr-grandet'
+      if (task.params?.report_to_penguin) {
+        params += ' --report-to-penguin'
+        if (task.params.penguin_id?.trim()) params += ` --penguin-id ${task.params.penguin_id.trim()}`
+      }
+      if (task.params?.report_to_yituliu) {
+        params += ' --report-to-yituliu'
+        if (task.params.yituliu_id?.trim()) params += ` --yituliu-id ${task.params.yituliu_id.trim()}`
       }
     }
 
@@ -583,6 +797,30 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   }
 
   const executeTaskFlow = async () => {
+    const invalidTask = taskFlow.find(task =>
+      task.enabled &&
+      task.taskType === 'Infrast' &&
+      Number(task.params.mode) === 10000 &&
+      !String(task.params.filename || '').trim()
+    )
+    if (invalidTask) {
+      setSelectedTaskId(invalidTask.id)
+      void showError('自定义换班需要填写排班文件路径')
+      return
+    }
+
+    const invalidFightDrops = taskFlow.find(task => {
+      const commandId = task.commandId || task.id.split('-')[0]
+      return task.enabled && commandId === 'fight' && parseDropTargetEntries(task.params.drops) === null
+    })
+    if (invalidFightDrops) {
+      setSelectedTaskId(invalidFightDrops.id)
+      void showError('掉落目标格式应为物品 ID=数量，多个目标用逗号分隔')
+      return
+    }
+
+    stopRequestInFlightRef.current = false
+    setIsStopping(false)
     setIsRunning(true)
     setCurrentStep(-1)
     showInfo('开始执行任务流程...')
@@ -600,42 +838,65 @@ export default function AutomationTasks({}: AutomationTasksProps) {
 
       // 直接调用后端的定时任务执行接口，复用所有逻辑
       const result = await maaApi.executeScheduleNow('manual', cleanTaskFlow)
+      const executionSummary = result.data?.summary as AutomationExecutionSummary | undefined
+      if (executionSummary) {
+        setLastExecutionSummary(executionSummary)
+      }
 
-      if (result.success) {
-        showSuccess('任务流程执行完成')
+      if (result.success && result.data?.stopped) {
+        setStatusMessage(result.message || '任务流程已终止', 'warning')
+      } else if (result.success) {
+        const hasWarnings = Boolean(executionSummary?.warnings?.length || executionSummary?.reports?.some(report => report.status === 'failed'))
+        setStatusMessage(result.message || '任务流程执行完成', hasWarnings ? 'warning' : 'success')
       } else {
         showError(`任务流程执行失败: ${result.message || '未知错误'}`)
       }
     } catch (error: any) {
       showError(`执行失败: ${error.message}`)
     } finally {
+      stopRequestInFlightRef.current = false
+      setIsStopping(false)
       setIsRunning(false)
       setCurrentStep(-1)
     }
   }
 
   const stopTaskFlow = async () => {
-    if (abortController) {
-      abortController.abort()
-    }
+    if (stopRequestInFlightRef.current) return
+
+    stopRequestInFlightRef.current = true
+    setIsStopping(true)
+    showInfo('正在终止任务流程...')
 
     // 调用后端 API 终止任务
     try {
       const result = await maaApi.stopTask()
-      if (result.success) {
-        showSuccess('任务已终止')
-      } else {
-        showError('终止失败: ' + result.message)
+      const taskStopped = Boolean(result.data?.task?.success)
+      const scheduleStopRequested = Boolean(result.data?.scheduleStopped)
+
+      if (!result.success || (!taskStopped && !scheduleStopRequested)) {
+        const detail = result.data?.task?.message || result.message || '当前没有可终止的任务'
+        stopRequestInFlightRef.current = false
+        setIsStopping(false)
+        void showError(`终止失败: ${detail}`)
+        return
       }
+
+      setStatusMessage('正在终止任务流程...', 'warning')
     } catch (error) {
-      showError('终止任务失败')
+      stopRequestInFlightRef.current = false
+      setIsStopping(false)
+      void showError('终止任务失败')
     }
 
-    setIsRunning(false)
-    setCurrentStep(-1)
-    setAbortController(null)
     localStorage.removeItem('maa-task-flow-execution')
   }
+
+  useEffect(() => {
+    if (isRunning) return
+    stopRequestInFlightRef.current = false
+    setIsStopping(false)
+  }, [isRunning])
 
   const loadTaskFlow = async () => {
     try {
@@ -645,7 +906,9 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       if (serverConfig.success && serverConfig.data) {
         // 服务器有配置，使用服务器配置
         const { taskFlow: savedTasks, schedule } = serverConfig.data
-        const loadedTasks = savedTasks ? placeClosedownLast(savedTasks) : savedTasks
+        const loadedTasks = savedTasks
+          ? placeClosedownLast(synchronizeConnectionParams(savedTasks.map(migrateTaskParams)))
+          : savedTasks
 
         if (loadedTasks) {
           const restoredTasks = loadedTasks.map((task: any) => {
@@ -686,7 +949,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     const saved = localStorage.getItem('maa-task-flow')
     const schedule = localStorage.getItem('maa-schedule')
     if (saved) {
-      const loadedTasks = placeClosedownLast(JSON.parse(saved))
+      const loadedTasks = placeClosedownLast(synchronizeConnectionParams(JSON.parse(saved).map(migrateTaskParams)))
       const restoredTasks = loadedTasks.map((task: any) => {
         const originalTask = availableTasks.find(t => t.id === task.commandId || t.id === task.id.split('-')[0])
         return {
@@ -1082,17 +1345,16 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                       onDragOver={(e) => handleDragOver(e, index)}
                       className={`automation-sequence-item${activeTaskId === task.id ? ' is-selected' : ''}${currentStep === index ? ' is-current' : ''}${!task.enabled ? ' is-disabled' : ''}${draggedIndex === index ? ' is-dragging' : ''}`}
                     >
-                      {!isRunning && (
-                        <span
-                          draggable={true}
-                          onDragStart={() => handleDragStart(index)}
-                          onDragEnd={handleDragEnd}
-                          className="automation-sequence-drag"
-                          title="拖拽排序"
-                        >
-                          <GripVertical size={16} strokeWidth={1.8} />
-                        </span>
-                      )}
+                      <span
+                        draggable={!isRunning}
+                        onDragStart={isRunning ? undefined : () => handleDragStart(index)}
+                        onDragEnd={isRunning ? undefined : handleDragEnd}
+                        className={`automation-sequence-drag${isRunning ? ' is-placeholder' : ''}`}
+                        title={isRunning ? undefined : '拖拽排序'}
+                        aria-hidden={isRunning}
+                      >
+                        {!isRunning && <GripVertical size={16} strokeWidth={1.8} />}
+                      </span>
                       <button
                         type="button"
                         className="automation-sequence-select"
@@ -1117,10 +1379,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                       </label>
                       {currentStep === index ? (
                         <span className="automation-current-spinner">
-                          <svg className="animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
+                          <LoaderCircle className="animate-spin" strokeWidth={2.2} />
                         </span>
                       ) : (
                         <button
@@ -1175,13 +1434,10 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                     onClick={executeTaskFlow}
                     disabled={isRunning || taskFlow.filter(t => t.enabled).length === 0}
                     variant="gradient"
-                    className="w-full justify-center whitespace-nowrap"
+                    className={`automation-run-button w-full justify-center whitespace-nowrap${isRunning ? ' is-running' : ''}`}
                     icon={
                       isRunning ? (
-                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
+                        <LoaderCircle size={16} className="animate-spin" strokeWidth={2.2} />
                       ) : (
                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
@@ -1192,11 +1448,107 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                     {isRunning ? '执行中...' : '立即执行'}
                   </Button>
                   {isRunning && (
-                    <Button onClick={stopTaskFlow} variant="danger" className="w-full justify-center">
-                      终止执行
+                    <Button
+                      onClick={stopTaskFlow}
+                      disabled={isStopping}
+                      variant={isStopping ? 'secondary' : 'danger'}
+                      className={`automation-stop-button w-full justify-center${isStopping ? ' is-stopping' : ''}`}
+                      icon={isStopping
+                        ? <LoaderCircle size={16} className="animate-spin" strokeWidth={2.2} />
+                        : <Square size={14} fill="currentColor" />}
+                    >
+                      {isStopping ? '正在终止...' : '终止执行'}
                     </Button>
                   )}
               </div>
+
+              {lastExecutionSummary && (
+                <section className="border-t border-[var(--app-border)] px-3.5 py-3 sm:px-4" aria-label="最近执行结果">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-200">最近执行</h4>
+                    <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                      成功 {lastExecutionSummary.successCount}
+                      {lastExecutionSummary.failedCount > 0 && ` · 失败 ${lastExecutionSummary.failedCount}`}
+                      {lastExecutionSummary.skippedCount > 0 && ` · 跳过 ${lastExecutionSummary.skippedCount}`}
+                      {` · ${Math.max(1, Math.round(lastExecutionSummary.durationMs / 1000))} 秒`}
+                    </span>
+                  </div>
+
+                  {lastExecutionSummary.summaries.some(summary => summary.stage || summary.drops) && (
+                    <div className="mt-2 space-y-2">
+                      {lastExecutionSummary.summaries
+                        .filter(summary => summary.stage || summary.drops)
+                        .map((summary, summaryIndex) => (
+                          <div key={`${summary.task}-${summary.stage || summaryIndex}`} className="min-w-0 text-xs">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-gray-700 dark:text-gray-200">
+                              <span className="font-semibold">{summary.stage || summary.task}</span>
+                              {summary.times && <span className="text-gray-400">{summary.times} 次</span>}
+                              {summary.duration && <span className="text-gray-400">{summary.duration}</span>}
+                            </div>
+                            {summary.drops && (
+                              <p className="mt-1 break-words leading-5 text-gray-500 dark:text-gray-400">{summary.drops}</p>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  )}
+
+                  {lastExecutionSummary.reports.length > 0 && (
+                    <div className="mt-2 space-y-1.5 border-t border-[var(--app-border)] pt-2">
+                      {lastExecutionSummary.reports.map((report, reportIndex) => (
+                        <div
+                          key={`${report.provider}-${report.stage || reportIndex}-${reportIndex}`}
+                          className={`flex min-w-0 items-start gap-2 text-xs ${report.status === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}
+                        >
+                          {report.status === 'success'
+                            ? <CheckCircle2 size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
+                            : <AlertTriangle size={14} className="mt-0.5 shrink-0" strokeWidth={2} />}
+                          <span className="min-w-0 break-words">
+                            {report.message}{report.stage ? ` · ${report.stage}` : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {lastExecutionSummary.actions?.length > 0 && (
+                    <div className="mt-2 space-y-1.5 border-t border-[var(--app-border)] pt-2">
+                      {lastExecutionSummary.actions.map((action, actionIndex) => (
+                        <div
+                          key={`${action.action}-${action.task}-${actionIndex}`}
+                          className={`flex min-w-0 items-start gap-2 text-xs ${action.status === 'success' ? 'text-emerald-600 dark:text-emerald-400' : action.status === 'skipped' ? 'text-gray-500 dark:text-gray-400' : 'text-red-600 dark:text-red-400'}`}
+                        >
+                          {action.status === 'success'
+                            ? <CheckCircle2 size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
+                            : action.status === 'skipped'
+                              ? <CircleMinus size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
+                              : <AlertTriangle size={14} className="mt-0.5 shrink-0" strokeWidth={2} />}
+                          <span className="min-w-0 break-words">{action.message}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {lastExecutionSummary.errors
+                    ?.filter(error => {
+                      const taskName = typeof error === 'string' ? error : error.task
+                      return !lastExecutionSummary.actions?.some(action => action.status === 'failed' && action.task === taskName)
+                    })
+                    .map((error, errorIndex) => (
+                      <p key={`${typeof error === 'string' ? error : error.task}-${errorIndex}`} className="mt-2 flex items-start gap-2 text-xs leading-5 text-red-600 dark:text-red-400">
+                        <AlertTriangle size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
+                        <span>{typeof error === 'string' ? error : `${error.task}：${error.error}`}</span>
+                      </p>
+                    ))}
+
+                  {lastExecutionSummary.warnings.map((warning, warningIndex) => (
+                    <p key={`${warning}-${warningIndex}`} className="mt-2 flex items-start gap-2 text-xs leading-5 text-amber-600 dark:text-amber-400">
+                      <AlertTriangle size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
+                      <span>{warning}</span>
+                    </p>
+                  ))}
+                </section>
+              )}
             </div>
           </div>
 
@@ -1262,10 +1614,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                           </label>
                           {currentStep === index ? (
                             <span className="automation-current-spinner">
-                              <svg className="animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
+                              <LoaderCircle className="animate-spin" strokeWidth={2.2} />
                             </span>
                           ) : (
                             <button
@@ -1285,6 +1634,12 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                       {task.paramFields && task.paramFields.length > 0 && (
                         <div className="space-y-3">
                           {task.paramFields.map((field) => {
+                            if (field.visibleWhen && String(task.params[field.visibleWhen.key] ?? '') !== String(field.visibleWhen.value)) {
+                              return null
+                            }
+                            if (field.hiddenWhen && String(task.params[field.hiddenWhen.key] ?? '') === String(field.hiddenWhen.value)) {
+                              return null
+                            }
                             return (
                             <div key={field.key}>
                               {field.type === 'checkbox' ? (
@@ -1737,7 +2092,9 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                       { value: 'Control', label: '控制中枢' },
                                       { value: 'Reception', label: '会客室' },
                                       { value: 'Office', label: '办公室' },
-                                      { value: 'Dorm', label: '宿舍' }
+                                      { value: 'Dorm', label: '宿舍' },
+                                      { value: 'Processing', label: '加工站' },
+                                      { value: 'Training', label: '训练室' }
                                     ].map(facility => {
                                       const currentValue = Array.isArray(task.params[field.key]) ? task.params[field.key] : [];
                                       const isChecked = currentValue.includes(facility.value);
@@ -1857,6 +2214,276 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                         </div>
                       )}
 
+                      {task.commandId === 'fight' && (
+                        <details className="group mt-3 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] px-3 py-2">
+                          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
+                            <span className="flex items-center gap-2">
+                              <SlidersHorizontal size={15} strokeWidth={1.9} />
+                              高级设置
+                            </span>
+                            <ChevronDown size={15} strokeWidth={2} className="transition-transform group-open:rotate-180" />
+                          </summary>
+
+                          <div className="mt-3 space-y-3 border-t border-[var(--app-border)] pt-3">
+                            <div className="flex items-center gap-2">
+                              <label className="w-24 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">闪退重启:</label>
+                              <div className="automation-select-control min-w-0 flex-1">
+                                <select
+                                  value={task.params.clientType || ''}
+                                  onChange={(e) => updateTaskParam(index, 'clientType', e.target.value)}
+                                  disabled={isRunning || !task.enabled}
+                                >
+                                  <option value="">不启用</option>
+                                  <option value="Official">官服</option>
+                                  <option value="Bilibili">B服</option>
+                                  <option value="YoStarEN">美服</option>
+                                  <option value="YoStarJP">日服</option>
+                                  <option value="YoStarKR">韩服</option>
+                                  <option value="Txwy">繁中服</option>
+                                </select>
+                                <ChevronDown size={15} strokeWidth={2} aria-hidden="true" />
+                              </div>
+                            </div>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">选择客户端后，游戏闪退时会自动重新启动。</p>
+
+                            <label className="flex cursor-pointer items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(task.params.DrGrandet)}
+                                onChange={(e) => updateTaskParam(index, 'DrGrandet', e.target.checked)}
+                                disabled={isRunning || !task.enabled}
+                                className="custom-checkbox mt-0.5 cursor-pointer"
+                              />
+                              <span>
+                                <span className="block">葛朗台碎石模式</span>
+                                <span className="mt-0.5 block text-xs text-gray-400 dark:text-gray-500">使用源石前等待自然恢复 1 点理智，尽量减少碎石浪费。</span>
+                              </span>
+                            </label>
+
+                            <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
+                              <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(task.params.report_to_penguin)}
+                                  onChange={(e) => updateTaskParam(index, 'report_to_penguin', e.target.checked)}
+                                  disabled={isRunning || !task.enabled}
+                                  className="custom-checkbox cursor-pointer"
+                                />
+                                汇报掉落至企鹅物流
+                              </label>
+                              {task.params.report_to_penguin && (
+                                <div className="flex items-center gap-2 pl-6">
+                                  <label className="w-20 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">用户 ID:</label>
+                                  <input
+                                    type="text"
+                                    value={task.params.penguin_id || ''}
+                                    onChange={(e) => updateTaskParam(index, 'penguin_id', e.target.value)}
+                                    placeholder="留空则匿名汇报"
+                                    disabled={isRunning || !task.enabled}
+                                    className="automation-text-control min-w-0 flex-1"
+                                  />
+                                </div>
+                              )}
+                            </section>
+
+                            <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
+                              <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(task.params.report_to_yituliu)}
+                                  onChange={(e) => updateTaskParam(index, 'report_to_yituliu', e.target.checked)}
+                                  disabled={isRunning || !task.enabled}
+                                  className="custom-checkbox cursor-pointer"
+                                />
+                                汇报掉落至一图流
+                              </label>
+                              {task.params.report_to_yituliu && (
+                                <div className="flex items-center gap-2 pl-6">
+                                  <label className="w-20 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">用户 ID:</label>
+                                  <input
+                                    type="text"
+                                    value={task.params.yituliu_id || ''}
+                                    onChange={(e) => updateTaskParam(index, 'yituliu_id', e.target.value)}
+                                    placeholder="留空则匿名汇报"
+                                    disabled={isRunning || !task.enabled}
+                                    className="automation-text-control min-w-0 flex-1"
+                                  />
+                                </div>
+                              )}
+                            </section>
+                          </div>
+                        </details>
+                      )}
+
+                      {task.commandId === 'infrast' && (
+                        <details className="group mt-3 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] px-3 py-2">
+                          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
+                            <span className="flex items-center gap-2">
+                              <SlidersHorizontal size={15} strokeWidth={1.9} />
+                              高级设置
+                            </span>
+                            <ChevronDown size={15} strokeWidth={2} className="transition-transform group-open:rotate-180" />
+                          </summary>
+
+                          <div className="mt-3 space-y-3 border-t border-[var(--app-border)] pt-3">
+                            {Array.isArray(task.params.facility) && task.params.facility.includes('Dorm') && (
+                              <section className="space-y-2">
+                                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">宿舍</h4>
+                                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(task.params.dorm_notstationed_enabled)}
+                                    onChange={(e) => updateTaskParam(index, 'dorm_notstationed_enabled', e.target.checked)}
+                                    disabled={isRunning || !task.enabled}
+                                    className="custom-checkbox cursor-pointer"
+                                  />
+                                  使用“未进驻”筛选
+                                </label>
+                                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(task.params.dorm_trust_enabled)}
+                                    onChange={(e) => updateTaskParam(index, 'dorm_trust_enabled', e.target.checked)}
+                                    disabled={isRunning || !task.enabled}
+                                    className="custom-checkbox cursor-pointer"
+                                  />
+                                  空位补入未满信赖干员
+                                </label>
+                              </section>
+                            )}
+
+                            {Array.isArray(task.params.facility) && task.params.facility.includes('Reception') && (
+                              <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
+                                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">会客室</h4>
+                                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(task.params.reception_message_board)}
+                                    onChange={(e) => updateTaskParam(index, 'reception_message_board', e.target.checked)}
+                                    disabled={isRunning || !task.enabled}
+                                    className="custom-checkbox cursor-pointer"
+                                  />
+                                  领取信息板信用
+                                </label>
+                                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(task.params.reception_clue_exchange)}
+                                    onChange={(e) => updateTaskParam(index, 'reception_clue_exchange', e.target.checked)}
+                                    disabled={isRunning || !task.enabled}
+                                    className="custom-checkbox cursor-pointer"
+                                  />
+                                  发起线索交流
+                                </label>
+                                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(task.params.reception_send_clue)}
+                                    onChange={(e) => updateTaskParam(index, 'reception_send_clue', e.target.checked)}
+                                    disabled={isRunning || !task.enabled}
+                                    className="custom-checkbox cursor-pointer"
+                                  />
+                                  自动赠送线索
+                                </label>
+                              </section>
+                            )}
+
+                            {Array.isArray(task.params.facility) && task.params.facility.includes('Training') && (
+                              <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
+                                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">训练室</h4>
+                                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(task.params.continue_training)}
+                                    onChange={(e) => updateTaskParam(index, 'continue_training', e.target.checked)}
+                                    disabled={isRunning || !task.enabled}
+                                    className="custom-checkbox cursor-pointer"
+                                  />
+                                  完成后继续专精
+                                </label>
+                              </section>
+                            )}
+                          </div>
+                        </details>
+                      )}
+
+                      {task.commandId === 'recruit' && (
+                        <details className="group mt-3 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] px-3 py-2">
+                          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
+                            <span className="flex items-center gap-2">
+                              <SlidersHorizontal size={15} strokeWidth={1.9} />
+                              高级设置
+                            </span>
+                            <ChevronDown size={15} strokeWidth={2} className="transition-transform group-open:rotate-180" />
+                          </summary>
+
+                          <div className="mt-3 space-y-3 border-t border-[var(--app-border)] pt-3">
+                            <div className="flex items-center gap-2">
+                              <label className="w-20 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">额外标签:</label>
+                              <div className="automation-select-control min-w-0 flex-1">
+                                <select
+                                  value={String(task.params.extra_tags_mode ?? 0)}
+                                  onChange={(e) => updateTaskParam(index, 'extra_tags_mode', Number(e.target.value))}
+                                  disabled={isRunning || !task.enabled}
+                                >
+                                  <option value="0">标准选择</option>
+                                  <option value="1">选满 3 个标签</option>
+                                  <option value="2">尽量多选高星标签</option>
+                                </select>
+                                <ChevronDown size={15} strokeWidth={2} aria-hidden="true" />
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <label className="w-20 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">三星首选:</label>
+                              <input
+                                type="text"
+                                value={Array.isArray(task.params.first_tags) ? task.params.first_tags.join(',') : (task.params.first_tags || '')}
+                                onChange={(e) => updateTaskParam(index, 'first_tags', e.target.value)}
+                                placeholder="近卫干员,治疗"
+                                disabled={isRunning || !task.enabled}
+                                className="automation-text-control min-w-0 flex-1"
+                              />
+                            </div>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">仅在三星组合中优先选择，多个标签用逗号分隔。</p>
+
+                            <div>
+                              <label className="mb-2 block text-sm text-gray-600 dark:text-gray-400">招募时长:</label>
+                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                {[3, 4].map(star => {
+                                  const key = String(star)
+                                  const recruitmentTime = task.params.recruitment_time || { '3': 540, '4': 540 }
+                                  return (
+                                    <label key={star} className="flex min-w-0 items-center gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] px-2.5 py-2">
+                                      <span className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-200">{star} 星</span>
+                                      <input
+                                        type="number"
+                                        value={recruitmentTime[key] ?? 540}
+                                        onChange={(e) => updateTaskParam(index, 'recruitment_time', { ...recruitmentTime, [key]: e.target.value })}
+                                        onBlur={(e) => {
+                                          const rawValue = Number(e.target.value)
+                                          const normalizedValue = Number.isFinite(rawValue)
+                                            ? Math.min(540, Math.max(60, Math.round(rawValue / 10) * 10))
+                                            : 540
+                                          updateTaskParam(index, 'recruitment_time', { ...recruitmentTime, [key]: normalizedValue })
+                                        }}
+                                        min="60"
+                                        max="540"
+                                        step="10"
+                                        disabled={isRunning || !task.enabled}
+                                        className="min-w-0 flex-1 bg-transparent text-right text-sm text-gray-900 outline-none dark:text-gray-100"
+                                      />
+                                      <span className="shrink-0 text-xs text-gray-400">分钟</span>
+                                    </label>
+                                  )
+                                })}
+                              </div>
+                              <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">可设置 60 至 540 分钟，按 10 分钟调整；五星和六星固定为 540 分钟。</p>
+                            </div>
+                          </div>
+                        </details>
+                      )}
+
                       {/* 启动游戏任务的测试连接按钮 */}
                       {task.commandId === 'startup' && task.params?.adbPath && task.params?.address && (
                         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-white/10">
@@ -1867,10 +2494,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                           >
                             {testingConnection[task.id] ? (
                               <>
-                                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
+                                <LoaderCircle size={16} className="animate-spin" strokeWidth={2.2} />
                                 <span>测试中...</span>
                               </>
                             ) : (

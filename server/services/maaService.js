@@ -1,6 +1,6 @@
 import { spawn, execFile } from 'child_process';
 import { promisify } from 'util';
-import { readFile, writeFile, mkdir, readdir, stat, unlink, realpath } from 'fs/promises';
+import { readFile, writeFile, mkdir, readdir, stat, unlink, realpath, open } from 'fs/promises';
 import { createReadStream } from 'fs';
 import { extname, isAbsolute, join, relative, resolve, sep } from 'path';
 import { createLogger } from '../utils/logger.js';
@@ -14,6 +14,14 @@ const logger = createLogger('MaaService');
 // Docker 环境使用完整路径，本地环境使用 'maa' 依赖 PATH
 const MAA_CLI_PATH = process.env.MAA_CLI_PATH || (process.env.DOCKER_ENV ? '/usr/local/bin/maa' : 'maa');
 const MAX_REALTIME_LOGS = Number(process.env.LA_PLUMA_MAX_REALTIME_LOGS || 5000);
+const GAME_PACKAGES = {
+  Official: 'com.hypergryph.arknights',
+  Bilibili: 'com.hypergryph.arknights.bilibili',
+  YoStarEN: 'com.YoStarEN.Arknights',
+  YoStarJP: 'com.YoStarJP.Arknights',
+  YoStarKR: 'com.YoStarKR.Arknights',
+  Txwy: 'tw.txwy.and.arknights'
+};
 
 // 全局任务状态追踪
 const taskStatus = {
@@ -87,6 +95,65 @@ function addLog(level, message) {
   } else {
     logger.info(message);
   }
+}
+
+export function getMaaExecutionDiagnostics(stderr = '') {
+  const output = String(stderr || '');
+  const diagnostics = [];
+
+  if (output.includes('UnknownDrops')) {
+    diagnostics.push({
+      code: 'UNKNOWN_DROPS',
+      level: 'WARN',
+      message: '掉落汇报未发送：结算中存在未识别物品，请更新 MaaCore 和资源后重试'
+    });
+    return diagnostics;
+  }
+
+  if (/FailedToReportToPenguinStats/i.test(output)) {
+    diagnostics.push({
+      code: 'PENGUIN_REPORT_FAILED',
+      level: 'WARN',
+      message: '企鹅物流汇报失败，请检查网络或用户 ID'
+    });
+  }
+  if (/FailedToReportToYituliu/i.test(output)) {
+    diagnostics.push({
+      code: 'YITULIU_REPORT_FAILED',
+      level: 'WARN',
+      message: '一图流汇报失败，请检查网络或用户 ID'
+    });
+  }
+
+  if (/FailedToConnect|ConnectionError|device\s+[^\s]+\s+not found|no devices\/emulators found|cannot connect to adb/i.test(output)) {
+    diagnostics.push({
+      code: 'ADB_CONNECTION_FAILED',
+      level: 'ERROR',
+      message: '模拟器连接失败，请检查 ADB 地址和模拟器状态'
+    });
+  }
+  if (/account.*(?:not found|failed)|(?:switch|select).*account.*failed/i.test(output)) {
+    diagnostics.push({
+      code: 'ACCOUNT_SWITCH_FAILED',
+      level: 'ERROR',
+      message: '账号切换失败，请检查账号关键字是否能唯一匹配已登录账号'
+    });
+  }
+  if (/FailedToStartGame|StartGame.*Failed|game client.*not found/i.test(output)) {
+    diagnostics.push({
+      code: 'GAME_START_FAILED',
+      level: 'ERROR',
+      message: '游戏启动失败，请检查客户端类型和游戏安装状态'
+    });
+  }
+
+  return diagnostics;
+}
+
+function addExecutionDiagnostics(stderr) {
+  getMaaExecutionDiagnostics(stderr).forEach(diagnostic => {
+    addLog(diagnostic.level, diagnostic.message);
+  });
 }
 
 /**
@@ -179,6 +246,7 @@ export async function execMaaCommand(command, args = [], taskName = null, taskTy
           addLog('INFO', `stdout: ${stdout.trim()}`);
         }
         if (stderr) {
+          addExecutionDiagnostics(stderr);
           addLog('WARN', `stderr: ${stderr.trim()}`);
         }
         
@@ -239,6 +307,7 @@ export async function execMaaCommand(command, args = [], taskName = null, taskTy
           addLog('INFO', `stdout: ${stdout.trim()}`);
         }
         if (stderr) {
+          addExecutionDiagnostics(stderr);
           addLog('WARN', `stderr: ${stderr.trim()}`);
         }
         
@@ -247,7 +316,12 @@ export async function execMaaCommand(command, args = [], taskName = null, taskTy
         
         if (code !== 0) {
           addLog('ERROR', `命令执行失败: ${fullCommand}`);
-          reject(new Error(`命令执行失败，退出码: ${code}`));
+          const diagnostic = getMaaExecutionDiagnostics(stderr)[0];
+          const commandError = new Error(diagnostic?.message || `命令执行失败，退出码: ${code}`);
+          commandError.stdout = stdout.trim();
+          commandError.stderr = stderr.trim();
+          commandError.exitCode = code;
+          reject(commandError);
         } else {
           resolve({
             stdout: stdout.trim(),
@@ -483,10 +557,35 @@ export async function execDynamicTask(taskId, taskConfig, taskName = null, taskT
 /**
  * 生成任务 TOML 内容
  */
-function generateTaskToml(taskConfig) {
+function formatTomlValue(value) {
+  if (typeof value === 'boolean') {
+    return String(value);
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new TypeError(`TOML 数值必须是有限数字: ${value}`);
+    }
+    return String(value);
+  }
+  if (typeof value === 'string') {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(formatTomlValue).join(', ')}]`;
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value)
+      .filter(([, nestedValue]) => nestedValue !== undefined && nestedValue !== null && nestedValue !== '')
+      .map(([nestedKey, nestedValue]) => `${JSON.stringify(nestedKey)} = ${formatTomlValue(nestedValue)}`);
+    return `{ ${entries.join(', ')} }`;
+  }
+  throw new TypeError(`不支持的 TOML 参数类型: ${typeof value}`);
+}
+
+export function generateTaskToml(taskConfig) {
   let toml = '[[tasks]]\n';
-  toml += `name = "${taskConfig.name}"\n`;
-  toml += `type = "${taskConfig.type}"\n`;
+  toml += `name = ${formatTomlValue(taskConfig.name)}\n`;
+  toml += `type = ${formatTomlValue(taskConfig.type)}\n`;
   
   if (taskConfig.params && Object.keys(taskConfig.params).length > 0) {
     toml += '\n[tasks.params]\n';
@@ -504,7 +603,7 @@ function generateTaskToml(taskConfig) {
           const arrayValue = JSON.parse(cleanValue);
           if (Array.isArray(arrayValue)) {
             addLog('DEBUG', `  -> 解析为数组: ${JSON.stringify(arrayValue)}`);
-            toml += `${key} = [${arrayValue.join(', ')}]\n`;
+            toml += `${key} = ${formatTomlValue(arrayValue)}\n`;
             continue;
           }
         } catch (e) {
@@ -513,19 +612,7 @@ function generateTaskToml(taskConfig) {
         }
       }
       
-      if (typeof value === 'boolean') {
-        toml += `${key} = ${value}\n`;
-      } else if (typeof value === 'number') {
-        toml += `${key} = ${value}\n`;
-      } else if (Array.isArray(value)) {
-        // 处理数组中的字符串和数字
-        const formattedArray = value.map(v => 
-          typeof v === 'string' ? `"${v}"` : v
-        ).join(', ');
-        toml += `${key} = [${formattedArray}]\n`;
-      } else {
-        toml += `${key} = "${value}"\n`;
-      }
+      toml += `${key} = ${formatTomlValue(value)}\n`;
     }
   }
   
@@ -561,6 +648,34 @@ async function adbExec(adbPath, args, options = {}) {
     maxBuffer: 50 * 1024 * 1024,
     ...options
   });
+}
+
+export async function getGameClientState(
+  adbPath = '/opt/homebrew/bin/adb',
+  address = '127.0.0.1:16384',
+  clientType = 'Official'
+) {
+  validateAdbPath(adbPath);
+  validateAdbAddress(address);
+
+  const expectedPackage = GAME_PACKAGES[clientType] || GAME_PACKAGES.Official;
+  const { stdout } = await adbExec(adbPath, ['-s', address, 'shell', 'dumpsys', 'window']);
+  const foregroundPackage = parseForegroundPackage(stdout);
+
+  return {
+    running: foregroundPackage === expectedPackage,
+    expectedPackage,
+    foregroundPackage
+  };
+}
+
+export function parseForegroundPackage(output = '') {
+  const lines = String(output).split('\n');
+  const focusLine = lines.find(line => line.includes('mCurrentFocus'))
+    || lines.find(line => line.includes('mFocusedApp'))
+    || '';
+  const packageMatch = focusLine.match(/\s([A-Za-z0-9_.]+)\/[A-Za-z0-9_.$]+/);
+  return packageMatch?.[1] || null;
 }
 
 /**
@@ -823,6 +938,41 @@ export async function getMaaLogDir() {
     return result.stdout.trim();
   } catch (error) {
     throw new Error(`获取日志目录失败: ${error.message}`);
+  }
+}
+
+export async function createMaaLogCheckpoint() {
+  try {
+    const logPath = join(await getMaaLogDir(), 'asst.log');
+    const logStats = await stat(logPath);
+    return { logPath, size: logStats.size };
+  } catch (error) {
+    logger.debug('无法创建 Maa 日志检查点', { error: error.message });
+    return null;
+  }
+}
+
+export async function readMaaLogSince(checkpoint, maxBytes = 2 * 1024 * 1024) {
+  if (!checkpoint?.logPath) return '';
+
+  try {
+    const logStats = await stat(checkpoint.logPath);
+    if (logStats.size <= checkpoint.size) return '';
+
+    const availableBytes = logStats.size - checkpoint.size;
+    const bytesToRead = Math.min(availableBytes, maxBytes);
+    const start = logStats.size - bytesToRead;
+    const buffer = Buffer.alloc(bytesToRead);
+    const handle = await open(checkpoint.logPath, 'r');
+    try {
+      await handle.read(buffer, 0, bytesToRead, start);
+    } finally {
+      await handle.close();
+    }
+    return buffer.toString('utf-8');
+  } catch (error) {
+    logger.debug('无法读取 Maa 增量日志', { error: error.message });
+    return '';
   }
 }
 

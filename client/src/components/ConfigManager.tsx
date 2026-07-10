@@ -18,6 +18,19 @@ interface MaaVersionInfo {
   cli: string
   core: string
   raw: string
+  resource?: {
+    lastUpdated: string | null
+    modifiedAt: string | null
+    ageDays: number | null
+    status: 'current' | 'stale' | 'unknown'
+    message: string
+  }
+}
+
+interface UpdateFeedback {
+  type: 'success' | 'error'
+  message: string
+  resourceRetry?: boolean
 }
 
 interface ChangelogItem {
@@ -59,6 +72,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
   const [showCoreChangelogType, setShowCoreChangelogType] = useState<'stable' | 'beta'>('stable')
   const [showCoreChangelog, setShowCoreChangelog] = useState(false)
   const [showCliChangelog, setShowCliChangelog] = useState(false)
+  const [updateFeedback, setUpdateFeedback] = useState<UpdateFeedback | null>(null)
   const didInitializeRef = useRef(false)
 
   useEffect(() => {
@@ -256,8 +270,9 @@ export default function ConfigManager({}: ConfigManagerProps) {
   }
 
   const handleUpdateCore = async () => {
-    setUpdating({ ...updating, core: true })
-    setStatusMessage('正在更新 MaaCore...')
+    setUpdating(current => ({ ...current, core: true }))
+    setUpdateFeedback(null)
+    setStatusMessage('正在更新 MaaCore 并同步最新资源...')
 
     try {
       // 更新到当前渠道的最新版本
@@ -265,23 +280,34 @@ export default function ConfigManager({}: ConfigManagerProps) {
       const result = await maaApi.updateMaaCore()
 
       if (result.success) {
-        setStatusMessage('MaaCore 更新成功')
+        const message = result.message || 'MaaCore 和资源已更新'
+        setUpdateFeedback({ type: 'success', message })
+        setStatusMessage(message)
         await new Promise(resolve => setTimeout(resolve, 1500))
         setStatusMessage('')
         // 更新成功后重新加载版本信息和更新日志
         await loadVersion()
         await loadCoreChangelog()
       } else {
-        setStatusMessage(`更新失败: ${maaApi.getErrorMessage(result)}`)
+        const details = (result as any).error?.details || result.errorInfo?.details || {}
+        const message = maaApi.getErrorMessage(result)
+        setUpdateFeedback({
+          type: 'error',
+          message,
+          resourceRetry: details.failedStep === 'resources' || details.coreUpdated === true
+        })
+        setStatusMessage(message, 'error')
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
     } catch (error) {
-      setStatusMessage(`网络错误: ${(error as Error).message}`)
+      const message = `网络错误: ${(error as Error).message}`
+      setUpdateFeedback({ type: 'error', message })
+      setStatusMessage(message, 'error')
       await new Promise(resolve => setTimeout(resolve, 2000))
       setStatusMessage('')
     } finally {
-      setUpdating({ ...updating, core: false })
+      setUpdating(current => ({ ...current, core: false }))
     }
   }
 
@@ -340,7 +366,8 @@ export default function ConfigManager({}: ConfigManagerProps) {
     const targetIsBeta = !currentIsBeta
     const targetChannel = targetIsBeta ? 'Beta' : '正式版'
     
-    setUpdating({ ...updating, core: true })
+    setUpdating(current => ({ ...current, core: true }))
+    setUpdateFeedback(null)
     setStatusMessage(`正在切换到 ${targetChannel} 渠道...`)
     
     try {
@@ -349,44 +376,63 @@ export default function ConfigManager({}: ConfigManagerProps) {
       const result = await maaApi.updateMaaCore(versionToInstall)
 
       if (result.success) {
-        setStatusMessage(`已切换到 ${targetChannel} 渠道`)
+        const message = `已切换到 ${targetChannel} 渠道并同步最新资源`
+        setUpdateFeedback({ type: 'success', message })
+        setStatusMessage(message)
         await new Promise(resolve => setTimeout(resolve, 1500))
         setStatusMessage('')
         // 更新成功后重新加载版本信息和更新日志
         await loadVersion()
         await loadCoreChangelog()
       } else {
-        setStatusMessage(`切换失败: ${maaApi.getErrorMessage(result)}`)
+        const details = (result as any).error?.details || result.errorInfo?.details || {}
+        const message = maaApi.getErrorMessage(result)
+        setUpdateFeedback({
+          type: 'error',
+          message,
+          resourceRetry: details.failedStep === 'resources' || details.coreUpdated === true
+        })
+        setStatusMessage(message, 'error')
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
     } catch (error) {
-      setStatusMessage(`网络错误: ${(error as Error).message}`)
+      const message = `网络错误: ${(error as Error).message}`
+      setUpdateFeedback({ type: 'error', message })
+      setStatusMessage(message, 'error')
       await new Promise(resolve => setTimeout(resolve, 2000))
       setStatusMessage('')
     } finally {
-      setUpdating({ ...updating, core: false })
+      setUpdating(current => ({ ...current, core: false }))
     }
   }
 
   const handleHotUpdate = async () => {
     setHotUpdating(true)
+    setUpdateFeedback(null)
     setStatusMessage('正在热更新资源文件...')
 
     try {
       const result = await maaApi.hotUpdateResources()
 
       if (result.success) {
-        setStatusMessage('资源文件更新成功')
+        const message = result.message || '资源文件更新成功'
+        setUpdateFeedback({ type: 'success', message })
+        setStatusMessage(message)
         await new Promise(resolve => setTimeout(resolve, 1500))
         setStatusMessage('')
+        await loadVersion()
       } else {
-        setStatusMessage(`更新失败: ${maaApi.getErrorMessage(result)}`)
+        const message = maaApi.getErrorMessage(result)
+        setUpdateFeedback({ type: 'error', message, resourceRetry: true })
+        setStatusMessage(message, 'error')
         await new Promise(resolve => setTimeout(resolve, 2000))
         setStatusMessage('')
       }
     } catch (error) {
-      setStatusMessage(`网络错误: ${(error as Error).message}`)
+      const message = `网络错误: ${(error as Error).message}`
+      setUpdateFeedback({ type: 'error', message, resourceRetry: true })
+      setStatusMessage(message, 'error')
       await new Promise(resolve => setTimeout(resolve, 2000))
       setStatusMessage('')
     } finally {
@@ -493,7 +539,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                       </div>
                       <Button
                         onClick={handleHotUpdate}
-                        disabled={hotUpdating}
+                        disabled={hotUpdating || updating.core}
                         variant="gradient"
                         fullWidth
                         icon={hotUpdating ? (
@@ -542,14 +588,35 @@ export default function ConfigManager({}: ConfigManagerProps) {
                       )}
                     </div>
                     <p className="text-xs text-gray-600 dark:text-gray-400">更新 MAA 核心组件和资源文件</p>
+                    {versionInfo?.resource && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                        <span className="text-gray-500 dark:text-gray-400">
+                          资源更新：{versionInfo.resource.lastUpdated
+                            ? new Date(versionInfo.resource.lastUpdated.replace(' ', 'T')).toLocaleString('zh-CN', { hour12: false })
+                            : '未知'}
+                        </span>
+                        <span className={`rounded px-1.5 py-0.5 font-medium ${
+                          versionInfo.resource.status === 'current'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                        }`}>
+                          {versionInfo.resource.status === 'current' ? '资源正常' : '需要同步'}
+                        </span>
+                      </div>
+                    )}
+                    {versionInfo?.resource && versionInfo.resource.status !== 'current' && (
+                      <p className="mt-1.5 text-xs leading-5 text-amber-600 dark:text-amber-400">
+                        {versionInfo.resource.message}
+                      </p>
+                    )}
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <Button
                     onClick={handleUpdateCore}
-                    disabled={updating.core}
+                    disabled={updating.core || hotUpdating}
                     variant="gradient"
-                    className="flex-1"
+                    className="w-full"
                     icon={updating.core ? (
                       <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -557,16 +624,50 @@ export default function ConfigManager({}: ConfigManagerProps) {
                       </svg>
                     ) : <Icons.Download />}
                   >
-                    {updating.core ? '更新中...' : '更新 MaaCore'}
+                    {updating.core ? '同步中...' : '更新 MaaCore'}
                   </Button>
                   <button
                     onClick={handleToggleCoreVersion}
-                    disabled={updating.core}
+                    disabled={updating.core || hotUpdating}
                     className="px-4 py-2 text-sm rounded-xl transition-colors bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {versionInfo?.core.includes('beta') || versionInfo?.core.includes('alpha') ? '切换到正式版' : '切换到 Beta'}
                   </button>
+                  <Button
+                    onClick={handleHotUpdate}
+                    disabled={hotUpdating || updating.core}
+                    variant="outline"
+                    className="w-full sm:col-span-2"
+                    icon={hotUpdating ? (
+                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                    ) : <Icons.RefreshCw />}
+                  >
+                    {hotUpdating ? '正在同步资源...' : '仅同步最新资源'}
+                  </Button>
                 </div>
+
+                {updateFeedback && (
+                  <div className={`mt-3 border-t border-gray-200 pt-3 text-xs leading-5 dark:border-white/10 ${
+                    updateFeedback.type === 'success'
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-amber-600 dark:text-amber-400'
+                  }`}>
+                    <p>{updateFeedback.message}</p>
+                    {updateFeedback.resourceRetry && (
+                      <button
+                        type="button"
+                        onClick={handleHotUpdate}
+                        disabled={hotUpdating || updating.core}
+                        className="mt-1 font-semibold underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        重试资源同步
+                      </button>
+                    )}
+                  </div>
+                )}
                 
                 {/* 更新日志 */}
                 {coreChangelog.length > 0 && false && (

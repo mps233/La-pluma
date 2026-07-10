@@ -24,7 +24,7 @@ const THEME_PRESETS: Record<RoguelikeMode, Array<{ value: string; label: string 
     { value: 'JieGarden', label: '界园' },
   ],
   reclamation: [
-    { value: 'Tales', label: '沙中之火' },
+    { value: 'Tales', label: '沙洲遗闻' },
   ],
 }
 

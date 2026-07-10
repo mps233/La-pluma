@@ -136,12 +136,20 @@ class NotificationChannel {
   async test() {
     throw new Error('子类必须实现 test 方法');
   }
+
+  canSendImage() {
+    return false;
+  }
 }
 
 /**
  * Telegram 通知渠道
  */
 class TelegramChannel extends NotificationChannel {
+  canSendImage() {
+    return Boolean(this.config.botToken && this.config.chatId);
+  }
+
   async send(message) {
     if (!this.config.botToken || !this.config.chatId) {
       throw new Error('Telegram 配置不完整');
@@ -338,6 +346,17 @@ class NotificationManager {
     this.channels.set(name, ChannelClass);
   }
 
+  hasReadyImageChannel() {
+    if (!notificationConfig.enabled) return false;
+
+    for (const [channelName, ChannelClass] of this.channels.entries()) {
+      const channelConfig = notificationConfig.channels[channelName];
+      if (!channelConfig?.enabled) continue;
+      if (new ChannelClass(channelConfig).canSendImage()) return true;
+    }
+    return false;
+  }
+
   /**
    * 发送通知到所有启用的渠道
    */
@@ -440,6 +459,10 @@ export function getNotificationConfig() {
   // 返回完整配置（不隐藏敏感信息）
   // 前端需要完整的 token 才能正确保存
   return JSON.parse(JSON.stringify(notificationConfig));
+}
+
+export function shouldCaptureNotificationScreenshot() {
+  return notificationManager.hasReadyImageChannel();
 }
 
 /**
@@ -573,6 +596,7 @@ export async function sendTaskCompletionNotification(taskInfo) {
 export default {
   setNotificationConfig,
   getNotificationConfig,
+  shouldCaptureNotificationScreenshot,
   sendNotification,
   sendToChannel,
   testNotificationChannel,

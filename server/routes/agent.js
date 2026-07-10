@@ -26,6 +26,7 @@ import { loadUserConfig, saveUserConfig, getAllUserConfigs, deleteUserConfig } f
 import sklandService from '../services/sklandService.js';
 import { getNotificationConfig, sendNotification, sendToChannel, testNotificationChannel, setNotificationConfig, getTodayOpenStages } from '../services/notificationService.js';
 import operatorTrainingService from '../services/operatorTrainingService.js';
+import { getMaaResourceInfo, updateMaaResources } from '../services/resourceUpdateService.js';
 import { parseDepotData, parseOperBoxData, getDepotData, getOperBoxData, getAllOperators } from '../services/dataParserService.js';
 import { getTodayDrops, getRecentDrops, getDropStatistics } from '../services/dropRecordService.js';
 import { loadParadoxOperators, resolveStageSearchKeyword } from '../services/copilotService.js';
@@ -1363,24 +1364,59 @@ router.post('/actions/open-config-directory', asyncHandler(async (req, res) => {
 
 router.post('/actions/update-core', asyncHandler(async (req, res) => {
   const { version, dryRun = false } = req.body || {};
-  const plan = version === 'beta'
+  const corePlan = version === 'beta'
     ? { action: 'update-core', targetChannel: 'beta', command: 'install', args: ['beta', '--force'] }
     : version === 'stable'
       ? { action: 'update-core', targetChannel: 'stable', command: 'install', args: ['stable', '--force'] }
       : { action: 'update-core', targetChannel: 'current', command: 'update', args: [] };
+  const plan = {
+    action: 'update-core-and-resources',
+    steps: [corePlan, { action: 'hot-update-resources', script: 'server/scripts/update-maa-resources.js' }]
+  };
 
   if (dryRun) return sendDryRun(res, req, plan);
 
+  let coreResult;
   try {
-    const result = version === 'beta'
+    coreResult = version === 'beta'
       ? await execMaaCommand('install', ['beta', '--force'])
       : version === 'stable'
         ? await execMaaCommand('install', ['stable', '--force'])
         : await execMaaCommand('update', []);
-    return sendSuccess(res, req, { ...result, plan }, version ? `已切换到 ${version} 渠道` : '已更新 MaaCore 到最新版本');
   } catch (error) {
     logger.error('更新 MaaCore 失败', { error: error.message, version });
-    return sendError(res, req, agentError('AGENT_MAA_UPDATE_CORE_FAILED', `更新失败: ${error.message}`, { statusCode: 500, details: { version } }));
+    return sendError(res, req, agentError('AGENT_MAA_UPDATE_CORE_FAILED', `MaaCore 更新失败: ${error.message}`, {
+      statusCode: 500,
+      retryable: true,
+      details: { version, failedStep: 'core', coreUpdated: false }
+    }));
+  }
+
+  try {
+    const resourceResult = await updateMaaResources();
+    const runtime = await getMaaVersion(true);
+    return sendSuccess(res, req, {
+      plan,
+      steps: {
+        core: { success: true, output: coreResult.stdout || coreResult.stderr || '' },
+        resources: { success: true, output: resourceResult.output }
+      },
+      runtime: { ...runtime, resource: resourceResult.resource }
+    }, version ? `已切换到 ${version} 渠道并同步最新资源` : 'MaaCore 和资源已更新');
+  } catch (error) {
+    const runtime = await getMaaVersion(true).catch(() => null);
+    const resource = await getMaaResourceInfo().catch(() => null);
+    logger.error('MaaCore 已更新，但资源同步失败', { error: error.message, version });
+    return sendError(res, req, agentError('AGENT_MAA_UPDATE_RESOURCE_FAILED', `MaaCore 已更新，但资源同步失败: ${error.message}`, {
+      statusCode: 500,
+      retryable: true,
+      details: {
+        version,
+        failedStep: 'resources',
+        coreUpdated: true,
+        runtime: runtime ? { ...runtime, resource } : null
+      }
+    }));
   }
 }));
 
@@ -1401,22 +1437,16 @@ router.post('/actions/update-cli', asyncHandler(async (req, res) => {
 router.post('/actions/hot-update-resources', asyncHandler(async (req, res) => {
   const plan = { action: 'hot-update-resources', script: 'server/scripts/update-maa-resources.js' };
   if (req.body?.dryRun) return sendDryRun(res, req, plan);
-  const { spawn } = await import('child_process');
-  const { fileURLToPath } = await import('url');
-  const { dirname, join } = await import('path');
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-  const scriptPath = join(__dirname, '../scripts/update-maa-resources.js');
-  const child = spawn('node', [scriptPath], { cwd: join(__dirname, '..'), stdio: 'pipe' });
-  let output = '';
-  let errorOutput = '';
-  child.stdout.on('data', data => { output += data.toString(); });
-  child.stderr.on('data', data => { errorOutput += data.toString(); });
-  await new Promise((resolve, reject) => {
-    child.on('close', code => code === 0 ? resolve() : reject(new Error(errorOutput || output || `exit ${code}`)));
-    child.on('error', reject);
-  });
-  return sendSuccess(res, req, { output, plan }, '资源文件更新成功');
+  try {
+    const result = await updateMaaResources();
+    return sendSuccess(res, req, { ...result, plan }, '资源文件更新成功');
+  } catch (error) {
+    return sendError(res, req, agentError('AGENT_MAA_RESOURCE_UPDATE_FAILED', `资源同步失败: ${error.message}`, {
+      statusCode: 500,
+      retryable: true,
+      details: { failedStep: 'resources' }
+    }));
+  }
 }));
 
 router.post('/actions/test-connection', asyncHandler(async (req, res) => {
@@ -1425,7 +1455,19 @@ router.post('/actions/test-connection', asyncHandler(async (req, res) => {
 }));
 
 router.get('/version', asyncHandler(async (req, res) => {
-  return sendSuccess(res, req, await getMaaVersion(true));
+  const [version, resource] = await Promise.all([
+    getMaaVersion(true),
+    getMaaResourceInfo().catch(error => ({
+      lastUpdated: null,
+      modifiedAt: null,
+      ageDays: null,
+      status: 'unknown',
+      message: `资源版本读取失败: ${error.message}`,
+      activity: null,
+      gacha: null
+    }))
+  ]);
+  return sendSuccess(res, req, { ...version, resource });
 }));
 
 router.get('/config-directory', asyncHandler(async (req, res) => {

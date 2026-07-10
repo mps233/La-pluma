@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { API_BASE_URL, fetchWithAuth } from '../services/api'
 import { useStatusStore } from '../store/statusStore'
 import { detectStatusMessageType, getStatusVisualConfig } from '../utils/statusMessage'
@@ -36,7 +36,8 @@ const getFallbackReadyQuote = () =>
  * 其他状态在原位置可见时显示在原位置，不可见时悬浮到右上角
  */
 export default function FloatingStatusIndicator({ className = '', textClassName = '' }: FloatingStatusIndicatorProps) {
-  const { message } = useStatusStore()
+  const { message, messageType, isActive } = useStatusStore()
+  const shouldReduceMotion = useReducedMotion()
   const [shouldFloat, setShouldFloat] = useState(false)
   const [dailyQuote, setDailyQuote] = useState<OperatorQuote>(() => getFallbackReadyQuote())
   const [isTextOverflowing, setIsTextOverflowing] = useState(false)
@@ -65,9 +66,9 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
     fetchRandomQuote()
   }, [])
 
-  // 显示文本：有消息显示消息，否则显示干员台词
-  const displayText = message || `${dailyQuote.operator}：${dailyQuote.quote}`
-  const isReady = !message
+  // 显示文本：有消息显示消息，运行中显示运行态，否则显示干员台词
+  const displayText = message || (isActive ? '任务执行中' : `${dailyQuote.operator}：${dailyQuote.quote}`)
+  const isReady = !message && !isActive
 
   // 检测哨兵位置
   const checkPosition = useCallback(() => {
@@ -98,7 +99,7 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
     }
   }, [checkPosition])
 
-  const detectedType = detectStatusMessageType(message)
+  const detectedType = messageType ?? (message ? detectStatusMessageType(message) : (isActive ? 'info' : 'default'))
   const config = getStatusVisualConfig(detectedType)
 
   // 使用 key 强制重新渲染以触发动画
@@ -122,23 +123,24 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
   const indicatorContent = (
     <motion.div
       key={indicatorKey}
-      initial={{ opacity: 0, y: -10 }}
+      initial={shouldReduceMotion ? false : { opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 10 }}
-      transition={{ duration: 0.2 }}
+      transition={{ duration: shouldReduceMotion ? 0 : 0.2 }}
+      aria-hidden="true"
       className={`inline-flex max-w-full items-center space-x-2 rounded-xl px-3 py-1.5 text-xs font-medium sm:px-4 sm:py-2 sm:text-sm ${config.className} ${className}`}
     >
       <motion.div
         className="h-2 w-2 flex-shrink-0 rounded-full"
         style={{ backgroundColor: config.dotColor }}
-        animate={{
+        animate={shouldReduceMotion ? { boxShadow: 'none' } : {
           boxShadow: [
             `0 0 0 0 rgba(${config.pulseRgb}, 0.7)`,
             `0 0 0 4px rgba(${config.pulseRgb}, 0)`,
             `0 0 0 0 rgba(${config.pulseRgb}, 0)`
           ]
         }}
-        transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
+        transition={shouldReduceMotion ? { duration: 0 } : { duration: 2, repeat: Infinity, ease: "easeOut" }}
       />
       <div
         ref={textRef}
@@ -162,6 +164,10 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
 
   return (
     <>
+      <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {displayText}
+      </span>
+
       {/* 哨兵元素 - 始终存在用于检测位置 */}
       <div ref={sentinelRef} className="inline-block min-w-[1px] min-h-[1px]">
         {/* "就绪"状态始终显示，其他状态只在不需要悬浮时显示 */}
@@ -174,10 +180,11 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
       <AnimatePresence>
         {!isReady && shouldFloat && (
           <motion.div
-            initial={{ opacity: 0, y: -20, x: 20 }}
+            initial={shouldReduceMotion ? false : { opacity: 0, y: -20, x: 20 }}
             animate={{ opacity: 1, y: 0, x: 0 }}
             exit={{ opacity: 0, y: -20, x: 20 }}
-            className="fixed top-[4.5rem] sm:top-[5rem] right-4 z-40"
+            transition={{ duration: shouldReduceMotion ? 0 : 0.2 }}
+            className="fixed top-[4.5rem] sm:top-[5rem] right-4 z-40 max-w-[calc(100vw-2rem)]"
           >
             {indicatorContent}
           </motion.div>

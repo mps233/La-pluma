@@ -916,6 +916,11 @@
   cursor: grabbing;
 }
 
+.automation-sequence-drag.is-placeholder {
+  visibility: hidden;
+  cursor: default;
+}
+
 .automation-sequence-delete {
   width: 1.75rem;
   height: 1.75rem;
@@ -1009,6 +1014,24 @@
   gap: 0.5rem;
   padding: 0.75rem;
   border-top: 1px solid var(--app-border);
+}
+
+[data-automation-tasks] .automation-run-button.is-running:disabled {
+  cursor: progress;
+  opacity: 1;
+  background: var(--app-accent) !important;
+  color: white;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, white 12%, transparent),
+    0 8px 20px color-mix(in srgb, var(--app-accent) 18%, transparent) !important;
+}
+
+[data-automation-tasks] .automation-stop-button.is-stopping:disabled {
+  cursor: progress;
+  opacity: 1;
+  background: var(--app-accent-soft) !important;
+  color: var(--app-accent-strong);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 28%, var(--app-border)) !important;
 }
 
 .automation-task-picker-toggle {
@@ -1616,7 +1639,11 @@
 }
 
 .automation-task-editor.is-current {
-  box-shadow: inset 3px 0 0 var(--app-accent);
+  box-shadow: none;
+}
+
+.automation-task-editor.is-current .automation-flow-card-header {
+  border-bottom-color: color-mix(in srgb, var(--app-accent) 42%, var(--app-border));
 }
 
 .automation-task-editor .automation-flow-card-header {

@@ -8,6 +8,7 @@ import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useUIStore } from '@/stores'
 import { useDashboardFlowLayout } from '../hooks/useDashboardFlowLayout'
 import DashboardPreviewEntry from './DashboardPreviewEntry'
+import { formatExecutionSummary, getExecutionLastTask } from '../utils/executionSummary'
 
 interface SklandData {
   uid: string
@@ -250,12 +251,13 @@ export default function Dashboard() {
 
       if (scheduleResult.status === 'fulfilled' && scheduleResult.value.success) {
         const execution = scheduleResult.value.data || {}
+        const rawLastResult = execution?.lastResult || execution?.result || execution?.lastMessage
         setScheduleSummary({
           isRunning: Boolean(execution?.isRunning || execution?.running || execution?.executing),
           currentTask: execution?.taskName || execution?.currentTask || execution?.task?.name || undefined,
           message: execution?.message || execution?.status || undefined,
-          lastTask: execution?.lastTaskName || execution?.lastTask || execution?.completedTask || undefined,
-          lastResult: execution?.lastResult || execution?.result || execution?.lastMessage || undefined,
+          lastTask: execution?.lastTaskName || execution?.lastTask || execution?.completedTask || getExecutionLastTask(rawLastResult),
+          lastResult: formatExecutionSummary(rawLastResult),
         })
       } else {
         setScheduleSummary({ isRunning: false })
