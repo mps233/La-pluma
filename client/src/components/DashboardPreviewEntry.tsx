@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import Icons from './Icons'
+import { Monitor } from 'lucide-react'
 import { Button } from './common'
 import { useDashboardPreview } from '../hooks/useDashboardPreview'
 
@@ -48,8 +48,8 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry({ onOpen }: Da
           )}
           {!showLivePreview && !fallbackSnapshot && (
             <div className="relative text-center">
-              <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--app-border)] surface-soft brand-text">
-                <Icons.Monitor />
+              <div className="icon-well mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl">
+                <Monitor size={17} strokeWidth={2} />
               </div>
               <div className="text-sm font-semibold text-white">等待 Live 画面</div>
               <div className="mt-1 text-xs text-secondary">点击进入完整控制台</div>

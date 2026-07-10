@@ -28,7 +28,7 @@ export default defineConfig({
       devOptions: {
         enabled: false // 开发模式下禁用 Service Worker
       },
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      includeAssets: ['favicon-graphite.png', 'apple-touch-icon-graphite.png'],
       manifest: {
         name: 'La Pluma - MAA WebUI',
         short_name: 'La Pluma',
@@ -41,17 +41,17 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: 'pwa-192x192.png',
+            src: 'pwa-graphite-192x192.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'pwa-graphite-512x512.png',
             sizes: '512x512',
             type: 'image/png'
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'pwa-graphite-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'

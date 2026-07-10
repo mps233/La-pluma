@@ -47,9 +47,9 @@ export default function Layout({ children }: LayoutProps) {
             {/* 左侧：Logo 和标题 */}
             <div className="flex items-center gap-2 sm:gap-3">
               <img 
-                src="/logo.webp?v=2" 
+                src="/logo-graphite.svg?v=1"
                 alt="La Pluma Logo" 
-                className="w-6 h-6 sm:w-7 sm:h-7 rounded-xl object-cover shadow-[0_0_0_1px_rgba(15,23,42,0.08),0_8px_20px_rgba(6,182,212,0.16)]"
+                className="h-7 w-7 object-contain sm:h-8 sm:w-8"
               />
               <h1 className="text-primary text-base font-semibold tracking-tight sm:text-lg">
                 La Pluma

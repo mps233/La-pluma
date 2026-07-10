@@ -77,9 +77,9 @@ export default function PWAInstallPrompt() {
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-white/10 p-5">
           <div className="flex items-start space-x-4">
             <img 
-              src="/logo.webp" 
+              src="/logo-graphite.svg?v=1"
               alt="La Pluma" 
-              className="w-12 h-12 rounded-xl flex-shrink-0"
+              className="h-12 w-12 flex-shrink-0"
             />
             <div className="flex-1">
               <h3 className="font-bold text-gray-900 dark:text-white mb-1">
