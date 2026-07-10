@@ -11,8 +11,8 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry({ onOpen }: Da
   const { videoRef, fallbackSnapshot, showLivePreview, statusText, headerStatusText } = useDashboardPreview()
 
   return (
-    <div data-dashboard-preview-card className="rounded-2xl border border-[var(--app-border)] surface-panel overflow-hidden">
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-[var(--app-border)]">
+    <div data-dashboard-preview-card className="rounded-2xl surface-panel overflow-hidden">
+      <div className="dashboard-preview-header flex items-center justify-between gap-3 px-4 py-2.5 border-b border-[var(--app-border)]">
         <div className="flex items-center gap-2">
           <div className={`h-1.5 w-1.5 rounded-full ${showLivePreview ? 'bg-[var(--app-success)]' : 'bg-[var(--app-accent)]'}`} />
           <span className="text-xs font-medium text-secondary">模拟器实时预览</span>

@@ -1,147 +1,238 @@
-import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  AlertCircle,
+  ArrowLeft,
+  ChevronRight,
+  Download,
+  FileText,
+  Search,
+  Trash2,
+} from 'lucide-react'
 import Icons from './Icons'
 import { maaApi } from '../services/api'
-import { PageHeader, Card, CardHeader, CardContent, Button, Select, Checkbox, Loading } from './common'
+import {
+  PageHeader,
+  Card,
+  CardHeader,
+  CardContent,
+  Button,
+  Select,
+  Checkbox,
+  Input,
+  Loading,
+  ConfirmDialog,
+} from './common'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type { LogViewerProps, LogEntry, LogFile } from '@/types/components'
 
+type LogFilter = 'all' | LogEntry['level']
+type ConfirmAction = 'clear' | 'cleanup'
+type Notice = { type: 'success' | 'error'; text: string }
+type VisibleLog = LogEntry & { count: number }
+
+const LOG_LEVELS: LogEntry['level'][] = ['ERROR', 'WARN', 'INFO', 'DEBUG']
+const LOG_LEVEL_ALIASES: Record<string, LogEntry['level']> = {
+  ERR: 'ERROR',
+  ERROR: 'ERROR',
+  WRN: 'WARN',
+  WARN: 'WARN',
+  WARNING: 'WARN',
+  INF: 'INFO',
+  INFO: 'INFO',
+  DBG: 'DEBUG',
+  DEBUG: 'DEBUG',
+  TRC: 'DEBUG',
+  TRACE: 'DEBUG',
+}
+
+function normalizeLevel(value: unknown): LogEntry['level'] {
+  const rawLevel = String(value || '').toUpperCase()
+  const level = LOG_LEVEL_ALIASES[rawLevel] || rawLevel as LogEntry['level']
+  return LOG_LEVELS.includes(level) ? level : 'INFO'
+}
+
+function formatLogTime(value: unknown): string {
+  const date = new Date(String(value || ''))
+  if (Number.isNaN(date.getTime())) return ''
+
+  return [date.getHours(), date.getMinutes(), date.getSeconds()]
+    .map(part => part.toString().padStart(2, '0'))
+    .join(':')
+}
+
+function parseRealtimeLog(value: unknown): LogEntry {
+  const log = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  return {
+    time: formatLogTime(log.time),
+    level: normalizeLevel(log.level),
+    message: String(log.message ?? ''),
+  }
+}
+
+function parseHistoryLine(line: string): LogEntry {
+  const bracketedMatch = line.match(/^\[(\d{4}-\d{2}-\d{2} (\d{2}:\d{2}:\d{2})(?:\.\d+)?)\]\[([A-Za-z]+)\](?:\[[^\]]*\])*\s*(.*)$/)
+  if (bracketedMatch) {
+    return {
+      time: bracketedMatch[2] || '',
+      level: normalizeLevel(bracketedMatch[3]),
+      message: bracketedMatch[4] || line,
+    }
+  }
+
+  const match = line.match(/\[(\d{4}-\d{2}-\d{2} (\d{2}:\d{2}:\d{2})) (\w+)\] (.+)/)
+  if (!match) return { time: '', level: 'INFO', message: line }
+
+  return {
+    time: match[2] || '',
+    level: normalizeLevel(match[3]),
+    message: match[4] || line,
+  }
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback
+}
+
 export default function LogViewer({}: LogViewerProps) {
   const [logs, setLogs] = useState<LogEntry[]>([])
-  const [autoScroll, setAutoScroll] = useState<boolean>(true)
-  const [filter, setFilter] = useState<'all' | 'ERROR' | 'WARN' | 'INFO' | 'DEBUG'>('all')
-  const [collapseRepeats, setCollapseRepeats] = useState<boolean>(true)
+  const [autoScroll, setAutoScroll] = useState(true)
+  const [filter, setFilter] = useState<LogFilter>('all')
+  const [search, setSearch] = useState('')
+  const [collapseRepeats, setCollapseRepeats] = useState(true)
   const [historyFiles, setHistoryFiles] = useState<LogFile[]>([])
-  const [loading, setLoading] = useState<boolean>(false)
+  const [loading, setLoading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<LogFile | null>(null)
-  const [viewingHistory, setViewingHistory] = useState<boolean>(false)
-  const logEndRef = useRef<HTMLDivElement>(null)
+  const [viewingHistory, setViewingHistory] = useState(false)
+  const [realtimeError, setRealtimeError] = useState<string | null>(null)
+  const [historyError, setHistoryError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<Notice | null>(null)
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
+  const [actionBusy, setActionBusy] = useState(false)
   const logContainerRef = useRef<HTMLDivElement>(null)
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const viewingHistoryRef = useRef(false)
+  const mountedRef = useRef(true)
+  const realtimeAbortRef = useRef<AbortController | null>(null)
+  const realtimeRequestIdRef = useRef(0)
+  const realtimePausedRef = useRef(false)
+  const historyRequestIdRef = useRef(0)
 
-  // 解析日志行
-  const parseLogLine = (log: any): LogEntry => {
-    // 后端返回的日志格式: { time: ISO时间, level: 'INFO', message: '消息' }
-    const date = new Date(log.time)
-    const timeStr = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`
-    
-    return {
-      time: timeStr,
-      level: log.level,
-      message: log.message
-    }
-  }
+  const loadRealtimeLogs = useCallback(async () => {
+    if (viewingHistoryRef.current || realtimePausedRef.current || document.hidden || realtimeAbortRef.current) return
 
-  // 获取实时日志
-  const loadRealtimeLogs = async () => {
-    if (viewingHistory) return // 查看历史日志时不更新
-    
+    const controller = new AbortController()
+    const requestId = ++realtimeRequestIdRef.current
+    realtimeAbortRef.current = controller
+
     try {
-      const result = await maaApi.getRealtimeLogs(200)
-      const logLines = Array.isArray(result.data) ? result.data : []
-      if (result.success && logLines.length > 0) {
-        const parsedLogs = logLines.map(parseLogLine)
-        setLogs(parsedLogs)
-      } else if (result.success && logLines.length === 0) {
-        // 没有日志时显示提示
-        if (logs.length === 0) {
-          const now = new Date()
-          const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`
-          setLogs([
-            { time: timeStr, level: 'INFO', message: 'MAA WebUI 已启动，等待任务执行...' }
-          ])
-        }
+      const result = await maaApi.getRealtimeLogs(200, controller.signal)
+      if (!result.success) throw new Error(result.message || '实时日志请求失败')
+
+      if (
+        mountedRef.current
+        && requestId === realtimeRequestIdRef.current
+        && !viewingHistoryRef.current
+        && !document.hidden
+      ) {
+        const values = Array.isArray(result.data) ? result.data : []
+        setLogs(values.map(parseRealtimeLog))
+        setRealtimeError(null)
       }
     } catch (error) {
-      // 静默失败，不影响用户体验
+      if (
+        mountedRef.current
+        && !controller.signal.aborted
+        && requestId === realtimeRequestIdRef.current
+        && !viewingHistoryRef.current
+      ) {
+        setRealtimeError(getErrorMessage(error, '暂时无法获取实时日志'))
+      }
+    } finally {
+      if (realtimeAbortRef.current === controller) realtimeAbortRef.current = null
     }
-  }
+  }, [])
 
-  // 获取历史日志文件列表
-  const loadHistoryFiles = async () => {
+  const loadHistoryFiles = useCallback(async () => {
     try {
       const result = await maaApi.getLogFiles()
-      if (result.success) {
-        setHistoryFiles(result.data)
-      }
-    } catch (error) {
-      // 静默失败，不影响用户体验
-    }
-  }
+      if (!result.success) throw new Error(result.message || '历史日志请求失败')
+      if (!mountedRef.current) return
 
-  // 查看历史日志文件
+      setHistoryFiles(Array.isArray(result.data) ? result.data : [])
+      setHistoryError(null)
+    } catch (error) {
+      if (mountedRef.current) {
+        setHistoryError(getErrorMessage(error, '暂时无法获取历史日志'))
+      }
+    }
+  }, [])
+
+  const stopRealtimeRequest = useCallback(() => {
+    realtimeRequestIdRef.current += 1
+    realtimeAbortRef.current?.abort()
+    realtimeAbortRef.current = null
+  }, [])
+
   const viewHistoryFile = async (file: LogFile) => {
-    setLoading(true)
+    const requestId = ++historyRequestIdRef.current
+    viewingHistoryRef.current = true
+    stopRealtimeRequest()
     setViewingHistory(true)
     setSelectedFile(file)
-    setAutoScroll(false) // 查看历史日志时禁用自动滚动
-    
+    setAutoScroll(false)
+    setLoading(true)
+    setRealtimeError(null)
+    setHistoryError(null)
+
     try {
       const result = await maaApi.readLogFile(file.path, 1000)
-      if (result.success) {
-        const lines = result.data.content.split('\n').filter((line: string) => line.trim())
-        const parsedLogs = lines.map((line: string) => {
-          // MAA 日志格式: [2026-02-01 18:23:28 ERROR] 消息内容
-          const match = line.match(/\[(\d{4}-\d{2}-\d{2} (\d{2}:\d{2}:\d{2})) (\w+)\] (.+)/)
-          if (match) {
-            return {
-              time: match[2],
-              level: match[3] as LogEntry['level'],
-              message: match[4]
-            }
-          }
-          return {
-            time: '',
-            level: 'INFO' as const,
-            message: line
-          }
-        })
-        setLogs(parsedLogs)
-      }
+      if (!result.success) throw new Error(result.message || '读取日志文件失败')
+      if (!mountedRef.current || !viewingHistoryRef.current || requestId !== historyRequestIdRef.current) return
+
+      const content = typeof result.data?.content === 'string' ? result.data.content : ''
+      setLogs(content.split('\n').filter((line: string) => line.trim()).map(parseHistoryLine))
     } catch (error) {
-      // 显示错误信息给用户
-      const now = new Date()
-      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`
-      setLogs([
-        { time: timeStr, level: 'ERROR', message: `读取日志文件失败: ${(error as Error).message}` }
-      ])
+      if (!mountedRef.current || !viewingHistoryRef.current || requestId !== historyRequestIdRef.current) return
+      setLogs([])
+      setHistoryError(getErrorMessage(error, '读取日志文件失败'))
     } finally {
-      setLoading(false)
+      if (mountedRef.current && requestId === historyRequestIdRef.current) setLoading(false)
     }
   }
 
-  // 返回实时日志
   const backToRealtime = () => {
+    historyRequestIdRef.current += 1
+    viewingHistoryRef.current = false
     setViewingHistory(false)
     setSelectedFile(null)
-    setAutoScroll(true) // 返回实时日志时启用自动滚动
-    loadRealtimeLogs()
+    setAutoScroll(true)
+    setHistoryError(null)
+    setLoading(false)
+    setLogs([])
+    void loadRealtimeLogs()
   }
 
   useEffect(() => {
-    let isSubscribed = true
-    
-    // 初始化
-    loadHistoryFiles()
-    
-    // 只在非历史查看模式下轮询实时日志
-    if (!viewingHistory) {
-      loadRealtimeLogs()
-      pollIntervalRef.current = setInterval(() => {
-        if (isSubscribed && !viewingHistory) {
-          loadRealtimeLogs()
-        }
-      }, 1000)
-    }
+    mountedRef.current = true
+    void loadHistoryFiles()
+    void loadRealtimeLogs()
 
-    return () => {
-      isSubscribed = false
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current)
-        pollIntervalRef.current = null
+    const intervalId = window.setInterval(() => void loadRealtimeLogs(), 1250)
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopRealtimeRequest()
+      } else if (!viewingHistoryRef.current) {
+        void loadRealtimeLogs()
       }
     }
-  }, [viewingHistory])
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      mountedRef.current = false
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      stopRealtimeRequest()
+    }
+  }, [loadHistoryFiles, loadRealtimeLogs, stopRealtimeRequest])
 
   useEffect(() => {
     if (autoScroll && !viewingHistory && logContainerRef.current) {
@@ -149,241 +240,289 @@ export default function LogViewer({}: LogViewerProps) {
     }
   }, [logs, autoScroll, viewingHistory])
 
-  const getLevelColor = (level: LogEntry['level']): string => {
-    switch (level) {
-      case 'ERROR': return 'text-rose-700 dark:text-rose-400 bg-rose-100 dark:bg-rose-500/10 border-rose-300 dark:border-rose-500/30'
-      case 'WARN': return 'text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-500/10 border-amber-300 dark:border-amber-500/30'
-      case 'INFO': return 'text-sky-700 dark:text-sky-400 bg-sky-100 dark:bg-sky-500/10 border-sky-300 dark:border-sky-500/30'
-      case 'DEBUG': return 'text-gray-700 dark:text-gray-400 bg-gray-100 dark:bg-gray-500/10 border-gray-300 dark:border-gray-500/30'
-      default: return 'text-gray-700 dark:text-gray-400 bg-gray-100 dark:bg-gray-500/10 border-gray-300 dark:border-gray-500/30'
+  const filteredLogs = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase('zh-CN')
+    return logs.filter(log => {
+      const matchesLevel = filter === 'all' || log.level === filter
+      const matchesSearch = !query || `${log.time} ${log.level} ${log.message}`.toLocaleLowerCase('zh-CN').includes(query)
+      return matchesLevel && matchesSearch
+    })
+  }, [filter, logs, search])
+
+  const visibleLogs = useMemo<VisibleLog[]>(() => {
+    if (!collapseRepeats) return filteredLogs.map(log => ({ ...log, count: 1 }))
+
+    return filteredLogs.reduce<VisibleLog[]>((entries, log) => {
+      const previous = entries[entries.length - 1]
+      if (previous && previous.level === log.level && previous.message === log.message) {
+        previous.count += 1
+        previous.time = log.time || previous.time
+      } else {
+        entries.push({ ...log, count: 1 })
+      }
+      return entries
+    }, [])
+  }, [collapseRepeats, filteredLogs])
+
+  const clearLogs = async () => {
+    if (viewingHistoryRef.current) return
+    realtimePausedRef.current = true
+    stopRealtimeRequest()
+    setActionBusy(true)
+    setNotice(null)
+    try {
+      const result = await maaApi.clearRealtimeLogs()
+      if (!result.success) throw new Error(result.message || '清空实时日志失败')
+      setLogs([])
+      setRealtimeError(null)
+      setNotice({ type: 'success', text: result.message || '实时日志已清空' })
+    } catch (error) {
+      setNotice({ type: 'error', text: getErrorMessage(error, '清空实时日志失败') })
+    } finally {
+      realtimePausedRef.current = false
+      setActionBusy(false)
     }
   }
 
-  const filteredLogs = filter === 'all'
-    ? logs
-    : logs.filter(log => log.level === filter)
-
-  const visibleLogs = collapseRepeats
-    ? filteredLogs.reduce<Array<LogEntry & { count?: number }>>((acc, log) => {
-        const prev = acc[acc.length - 1]
-        if (prev && prev.level === log.level && prev.message === log.message) {
-          prev.count = (prev.count || 1) + 1
-          prev.time = log.time || prev.time
-        } else {
-          acc.push({ ...log, count: 1 })
-        }
-        return acc
-      }, [])
-    : filteredLogs.map(log => ({ ...log, count: 1 }))
-
-  const clearLogs = async () => {
+  const cleanupHistoryLogs = async () => {
+    setActionBusy(true)
+    setNotice(null)
     try {
-      await maaApi.clearRealtimeLogs()
-      setLogs([])
+      const result = await maaApi.cleanupLogs(10)
+      if (!result.success) throw new Error(result.message || '清理历史日志失败')
+      setNotice({ type: 'success', text: result.message || '历史日志清理完成' })
+      await loadHistoryFiles()
     } catch (error) {
-      // 静默失败，不影响用户体验
+      setNotice({ type: 'error', text: getErrorMessage(error, '清理历史日志失败') })
+    } finally {
+      setActionBusy(false)
     }
+  }
+
+  const handleConfirm = () => {
+    if (confirmAction === 'clear') void clearLogs()
+    if (confirmAction === 'cleanup') void cleanupHistoryLogs()
   }
 
   const exportLogs = () => {
     const logText = filteredLogs.map(log => `[${log.time}] [${log.level}] ${log.message}`).join('\n')
-    const blob = new Blob([logText], { type: 'text/plain' })
+    const blob = new Blob([logText], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `maa-log-${new Date().toISOString().split('T')[0]}.txt`
-    a.click()
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `maa-log-${new Date().toISOString().split('T')[0]}.txt`
+    anchor.click()
     URL.revokeObjectURL(url)
   }
 
-  const cleanupHistoryLogs = async () => {
-    if (!confirm('确定要清理旧日志文件吗？只会保留最新 10MB 的日志。')) {
-      return
-    }
-    
-    try {
-      const result = await maaApi.cleanupLogs(10)
-      if (result.success) {
-        alert(result.message)
-        loadHistoryFiles() // 重新加载日志列表
-      }
-    } catch (error) {
-      alert('清理日志失败: ' + (error as Error).message)
-    }
-  }
+  const activeError = viewingHistory ? historyError : realtimeError
+  const isFilteredEmpty = logs.length > 0 && visibleLogs.length === 0
 
   return (
-    <div className="app-page app-stack-section">
-      <PageHeader
-        icon={<Icons.DocumentTextIcon />}
-        title="日志查看器"
-        subtitle="实时查看和管理 MAA 运行日志"
-        actions={<FloatingStatusIndicator />}
-      />
+    <div className="app-page app-stack-section log-viewer">
+      <div className="log-page-header">
+        <PageHeader
+          icon={<Icons.DocumentTextIcon />}
+          title="日志查看器"
+          subtitle="实时查看和管理 MAA 运行日志"
+          actions={<FloatingStatusIndicator />}
+        />
+      </div>
 
-      <Card animated delay={0.1} theme="cyan">
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Checkbox
-                checked={autoScroll}
-                onChange={(checked: boolean) => setAutoScroll(checked)}
-                label="自动滚动"
-              />
-              <Checkbox
-                checked={collapseRepeats}
-                onChange={(checked: boolean) => setCollapseRepeats(checked)}
-                label="折叠重复"
-              />
-              <Select
-                value={filter}
-                onChange={(value: string) => setFilter(value as typeof filter)}
-                options={[
-                  { value: 'all', label: '全部日志' },
-                  { value: 'ERROR', label: '错误' },
-                  { value: 'WARN', label: '警告' },
-                  { value: 'INFO', label: '信息' },
-                  { value: 'DEBUG', label: '调试' }
-                ]}
-              />
-            </div>
-            <div className="flex items-center space-x-2">
+      {notice && (
+        <div className={`log-notice ${notice.type === 'error' ? 'is-error' : 'is-success'}`} role="status">
+          <AlertCircle className="h-4 w-4" aria-hidden="true" />
+          <span>{notice.text}</span>
+          <button type="button" onClick={() => setNotice(null)} aria-label="关闭提示">关闭</button>
+        </div>
+      )}
+
+      <Card className="log-card log-toolbar-card" animated delay={0.1} theme="cyan">
+        <CardContent className="log-toolbar">
+          <div className="log-toolbar-controls">
+            <Checkbox
+              checked={autoScroll}
+              onChange={setAutoScroll}
+              label="自动滚动"
+              disabled={viewingHistory}
+              color="cyan"
+            />
+            <Checkbox
+              checked={collapseRepeats}
+              onChange={setCollapseRepeats}
+              label="折叠重复"
+              color="cyan"
+            />
+            <Select
+              value={filter}
+              onChange={value => setFilter(value as LogFilter)}
+              aria-label="日志级别"
+              className="log-filter"
+              options={[
+                { value: 'all', label: '全部级别' },
+                { value: 'ERROR', label: '错误' },
+                { value: 'WARN', label: '警告' },
+                { value: 'INFO', label: '信息' },
+                { value: 'DEBUG', label: '调试' },
+              ]}
+            />
+            <Input
+              value={search}
+              onChange={setSearch}
+              placeholder="搜索日志内容"
+              aria-label="搜索日志内容"
+              icon={<Search className="h-4 w-4" aria-hidden="true" />}
+              className="log-search"
+            />
+          </div>
+          <div className="log-toolbar-actions">
+            {!viewingHistory && (
               <Button
-                onClick={clearLogs}
+                onClick={() => setConfirmAction('clear')}
                 variant="outline"
                 size="sm"
+                icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
+                disabled={actionBusy}
               >
-                清空日志
+                清空
               </Button>
-              <Button
-                onClick={exportLogs}
-                variant="gradient"
-                size="sm"
-              >
-                导出日志
-              </Button>
-            </div>
+            )}
+            <Button
+              onClick={exportLogs}
+              variant="primary"
+              size="sm"
+              icon={<Download className="h-4 w-4" aria-hidden="true" />}
+              disabled={filteredLogs.length === 0}
+            >
+              导出
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      <Card animated delay={0.2} theme="cyan">
-        <CardHeader 
-          title={viewingHistory ? `历史日志: ${selectedFile?.name}` : '实时日志'}
+      <Card className="log-card" animated delay={0.16} theme="cyan">
+        <CardHeader
+          title={viewingHistory ? selectedFile?.name || '历史日志' : '实时日志'}
           actions={
-            viewingHistory ? (
-              <Button
-                onClick={backToRealtime}
-                variant="outline"
-                size="sm"
-                className="text-cyan-700 dark:text-cyan-400 border-cyan-300 dark:border-cyan-500/30 hover:bg-cyan-50 dark:hover:bg-cyan-500/10"
-              >
-                返回实时日志
-              </Button>
-            ) : undefined
+            <div className="log-console-heading-actions">
+              <span className="log-count">{visibleLogs.length} 条</span>
+              {viewingHistory && (
+                <Button
+                  onClick={backToRealtime}
+                  variant="outline"
+                  size="sm"
+                  icon={<ArrowLeft className="h-4 w-4" aria-hidden="true" />}
+                >
+                  返回实时
+                </Button>
+              )}
+            </div>
           }
         />
-        <CardContent>
+        <CardContent className="log-console-content">
           {loading ? (
-            <Loading text="加载中..." />
+            <Loading text="正在读取日志..." />
           ) : (
-            <>
-              {!viewingHistory && logs.length === 0 && (
-                <div className="mb-3 p-3 rounded-xl bg-gray-100 dark:bg-gray-500/10 border border-gray-200 dark:border-gray-500/30">
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
-                    等待任务执行...
-                  </p>
+            <div ref={logContainerRef} className="log-console" role="log" aria-label="日志内容">
+              {activeError && (
+                <div className="log-console-state is-error" role="alert">
+                  <AlertCircle className="h-5 w-5" aria-hidden="true" />
+                  <span>{activeError}</span>
                 </div>
               )}
-              <div 
-                ref={logContainerRef}
-                className="rounded-2xl p-5 h-96 overflow-y-auto font-mono text-sm bg-gray-50 dark:bg-[#000000]"
-              >
-                <AnimatePresence>
-                  {visibleLogs.map((log, index) => (
-                    <motion.div 
-                      key={index} 
-                      className="flex items-start space-x-3 mb-2"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.01 }}
-                    >
-                      {log.time && <span className="text-gray-500 dark:text-gray-600 flex-shrink-0">{log.time}</span>}
-                      <span className={`px-2 py-0.5 rounded-lg text-xs font-semibold flex-shrink-0 border ${getLevelColor(log.level)}`}>
-                        {log.level}
-                      </span>
-                      <span className="text-gray-800 dark:text-gray-300 flex-1 break-all">
-                        {log.message}
-                        {collapseRepeats && (log.count || 1) > 1 && (
-                          <span className="ml-2 rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-semibold text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300">
-                            ×{log.count}
-                          </span>
-                        )}
-                      </span>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-                <div ref={logEndRef} />
-              </div>
-            </>
+              {!activeError && logs.length === 0 && (
+                <div className="log-console-state">
+                  <FileText className="h-5 w-5" aria-hidden="true" />
+                  <span>{viewingHistory ? '这个日志文件没有内容' : '暂无实时日志，等待任务执行'}</span>
+                </div>
+              )}
+              {!activeError && isFilteredEmpty && (
+                <div className="log-console-state">
+                  <Search className="h-5 w-5" aria-hidden="true" />
+                  <span>没有符合当前筛选条件的日志</span>
+                </div>
+              )}
+              {!activeError && visibleLogs.map((log, index) => (
+                <div className="log-row" key={`${log.time}-${log.level}-${log.message}-${index}`}>
+                  <div className="log-row-meta">
+                    {log.time && <time>{log.time}</time>}
+                    <span className={`log-level is-${log.level.toLowerCase()}`}>{log.level}</span>
+                  </div>
+                  <div className="log-message">
+                    <span>{log.message}</span>
+                    {collapseRepeats && log.count > 1 && <span className="log-repeat">x{log.count}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
 
-      <Card animated delay={0.3} theme="cyan">
-        <CardHeader 
+      <Card className="log-card" animated delay={0.22} theme="cyan">
+        <CardHeader
           title="历史日志文件"
           actions={
             <Button
-              onClick={cleanupHistoryLogs}
+              onClick={() => setConfirmAction('cleanup')}
               variant="outline"
               size="sm"
-              className="text-rose-700 dark:text-rose-400 border-rose-300 dark:border-rose-500/30 bg-rose-50 dark:bg-transparent hover:bg-rose-100 dark:hover:bg-rose-500/10"
+              icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
+              disabled={actionBusy || historyFiles.length === 0 || viewingHistory}
             >
               清理旧日志
             </Button>
           }
         />
-        <CardContent>
-          <div className="space-y-3">
-            {historyFiles.length > 0 ? (
-              historyFiles.map((file, index) => (
-                <motion.div 
-                  key={file.path} 
-                  onClick={() => viewHistoryFile(file)}
-                  className="flex items-center justify-between p-4 border border-gray-200 dark:border-white/10 rounded-2xl hover:border-[var(--app-accent)] hover:shadow-[0_4px_12px_rgba(6,182,212,0.1)] transition-all cursor-pointer bg-gray-50 dark:bg-gray-800/40"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4 + index * 0.1 }}
-                  whileHover={{ x: 4 }}
-                >
-                  <div className="flex items-center space-x-3 flex-1">
-                    <span className="text-2xl">📄</span>
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-gray-900 dark:text-gray-200">{file.name}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                        {new Date(file.modified).toLocaleString('zh-CN')} · {(file.size / 1024).toFixed(2)} KB
-                      </div>
-                    </div>
-                  </div>
-                  <motion.button 
-                    className="text-sm text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 font-medium transition-colors"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    查看
-                  </motion.button>
-                </motion.div>
-              ))
-            ) : (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-500">
-                <p className="text-sm">暂无历史日志文件</p>
-                <p className="text-xs mt-2">执行任务后会自动生成日志文件</p>
+        <CardContent className="log-history-content">
+          {historyError && !viewingHistory && (
+            <div className="log-history-state is-error" role="alert">
+              <AlertCircle className="h-5 w-5" aria-hidden="true" />
+              <span>{historyError}</span>
+            </div>
+          )}
+          {!historyError && historyFiles.length === 0 && (
+            <div className="log-history-state">
+              <FileText className="h-5 w-5" aria-hidden="true" />
+              <div>
+                <p>暂无历史日志文件</p>
+                <span>执行任务后会自动生成</span>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+          {!historyError && historyFiles.length > 0 && (
+            <div className="log-history-list">
+              {historyFiles.map(file => (
+                <button
+                  type="button"
+                  key={file.path}
+                  onClick={() => void viewHistoryFile(file)}
+                  className={`log-history-row ${selectedFile?.path === file.path ? 'is-active' : ''}`}
+                >
+                  <span className="log-history-icon"><FileText className="h-4 w-4" aria-hidden="true" /></span>
+                  <span className="log-history-copy">
+                    <strong>{file.name}</strong>
+                    <small>{new Date(file.modified).toLocaleString('zh-CN')} · {(file.size / 1024).toFixed(2)} KB</small>
+                  </span>
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        isOpen={confirmAction !== null}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={handleConfirm}
+        title={confirmAction === 'clear' ? '清空实时日志？' : '清理旧日志文件？'}
+        message={confirmAction === 'clear'
+          ? '这会清空当前会话中的实时日志缓存，历史日志文件不会受到影响。'
+          : '系统会删除较旧的日志文件，只保留最新的 10 MB。此操作无法撤销。'}
+        confirmText={confirmAction === 'clear' ? '确认清空' : '确认清理'}
+        variant="danger"
+      />
     </div>
   )
 }

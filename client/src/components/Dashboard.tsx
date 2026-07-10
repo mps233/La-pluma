@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
-import { Activity, Bot, CalendarDays, Cpu, HardDrive, Database, PackageOpen, Play, Target, Thermometer } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Activity, Bot, CalendarDays, ChevronRight, Cpu, HardDrive, Database, PackageOpen, Play, Target, Thermometer } from 'lucide-react'
 import { getOpenTodayStages, getSklandPlayerData, getSklandStatus, getTodayDrops, getTrainingQueue, maaApi } from '../services/api'
 import Icons from './Icons'
 import { PageHeader, Card, Button, IconButton } from './common'
 import { DashboardSkeleton } from './common/Loading'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useUIStore } from '@/stores'
+import { useDashboardFlowLayout } from '../hooks/useDashboardFlowLayout'
 import DashboardPreviewEntry from './DashboardPreviewEntry'
 
 interface SklandData {
@@ -153,24 +153,16 @@ const getUsageValueClass = (pct?: number) => {
   return 'text-primary'
 }
 
-const flowGridColumnsFallback = 'minmax(0, 0.78fr) minmax(0, 1.22fr)'
-const flowPreviewAspectRatio = 16 / 9
-const flowGridMinLeftWidth = 360
-const flowGridMinPreviewWidth = 520
-
 export default function Dashboard() {
   const setActiveTab = useUIStore(state => state.setActiveTab)
   const openAutomation = useCallback(() => setActiveTab('automation'), [setActiveTab])
-  const flowGridRef = useRef<HTMLDivElement | null>(null)
-  const flowCardRef = useRef<HTMLDivElement | null>(null)
-  const flowPreviewRef = useRef<HTMLDivElement | null>(null)
-  const [flowGridColumns, setFlowGridColumns] = useState(flowGridColumnsFallback)
+  const [loading, setLoading] = useState(true)
+  const { flowGridRef, flowCardRef, flowPreviewRef, flowGridStyle } = useDashboardFlowLayout(!loading)
   const [sklandData, setSklandData] = useState<SklandData | null>(null)
   const [sklandStatus, setSklandStatus] = useState<{ isLoggedIn: boolean; phone: string | null }>({ 
     isLoggedIn: false, 
     phone: null 
   })
-  const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [activitySummary, setActivitySummary] = useState<ActivitySummary>({ available: false })
   const [scheduleSummary, setScheduleSummary] = useState<ScheduleSummary>({ isRunning: false })
@@ -209,91 +201,6 @@ export default function Dashboard() {
     }, 1000)
     return () => clearInterval(timer)
   }, [])
-
-  useLayoutEffect(() => {
-    if (loading) return
-
-    const grid = flowGridRef.current
-    const flowCard = flowCardRef.current
-    const previewShell = flowPreviewRef.current
-
-    if (!grid || !flowCard || !previewShell) return
-
-    const mediaQuery = window.matchMedia('(min-width: 1280px)')
-    let frameId = 0
-
-    const updateColumns = (columns: string) => {
-      setFlowGridColumns(current => current === columns ? current : columns)
-    }
-
-    const syncColumns = () => {
-      window.cancelAnimationFrame(frameId)
-      frameId = window.requestAnimationFrame(() => {
-        if (!mediaQuery.matches) {
-          updateColumns(flowGridColumnsFallback)
-          return
-        }
-
-        const previewCard = previewShell.querySelector<HTMLElement>('[data-dashboard-preview-card]')
-        const previewFrame = previewShell.querySelector<HTMLElement>('[data-dashboard-preview-frame]')
-
-        if (!previewCard || !previewFrame) {
-          updateColumns(flowGridColumnsFallback)
-          return
-        }
-
-        const gridRect = grid.getBoundingClientRect()
-        const flowRect = flowCard.getBoundingClientRect()
-        const previewCardRect = previewCard.getBoundingClientRect()
-        const previewFrameRect = previewFrame.getBoundingClientRect()
-
-        if (
-          gridRect.width <= 0 ||
-          flowRect.height <= 0 ||
-          previewCardRect.width <= 0 ||
-          previewFrameRect.width <= 0
-        ) {
-          return
-        }
-
-        const gridStyle = window.getComputedStyle(grid)
-        const columnGap = Number.parseFloat(gridStyle.columnGap) || 20
-        const previewChromeHeight = Math.max(0, previewCardRect.height - previewFrameRect.height)
-        const previewChromeWidth = Math.max(0, previewCardRect.width - previewFrameRect.width)
-        const targetFrameHeight = Math.max(180, flowRect.height - previewChromeHeight)
-        const desiredPreviewWidth = targetFrameHeight * flowPreviewAspectRatio + previewChromeWidth
-        const minLeftWidth = Math.min(420, Math.max(flowGridMinLeftWidth, gridRect.width * 0.32))
-        const minPreviewWidth = Math.min(560, Math.max(flowGridMinPreviewWidth, gridRect.width * 0.42))
-        const maxPreviewWidth = Math.max(minPreviewWidth, gridRect.width - columnGap - minLeftWidth)
-        const nextPreviewWidth = Math.round(Math.min(Math.max(desiredPreviewWidth, minPreviewWidth), maxPreviewWidth))
-        const nextLeftWidth = Math.max(0, Math.round(gridRect.width - columnGap - nextPreviewWidth))
-
-        updateColumns(`minmax(0, ${nextLeftWidth}px) minmax(0, ${nextPreviewWidth}px)`)
-      })
-    }
-
-    const resizeObserver = new ResizeObserver(syncColumns)
-    resizeObserver.observe(grid)
-    resizeObserver.observe(flowCard)
-    resizeObserver.observe(previewShell)
-
-    const previewCard = previewShell.querySelector<HTMLElement>('[data-dashboard-preview-card]')
-    const previewFrame = previewShell.querySelector<HTMLElement>('[data-dashboard-preview-frame]')
-
-    if (previewCard) resizeObserver.observe(previewCard)
-    if (previewFrame) resizeObserver.observe(previewFrame)
-
-    mediaQuery.addEventListener('change', syncColumns)
-    window.addEventListener('resize', syncColumns)
-    syncColumns()
-
-    return () => {
-      window.cancelAnimationFrame(frameId)
-      resizeObserver.disconnect()
-      mediaQuery.removeEventListener('change', syncColumns)
-      window.removeEventListener('resize', syncColumns)
-    }
-  }, [loading])
 
   const loadDashboardData = async (forceRefresh: boolean = false) => {
     // 只在首次加载且没有数据时显示骨架屏
@@ -474,9 +381,13 @@ export default function Dashboard() {
     return <DashboardSkeleton />
   }
 
-  const flowGridStyle = {
-    '--dashboard-flow-columns': flowGridColumns,
-  } as CSSProperties
+  const flowIsRunning = scheduleSummary.isRunning
+  const flowCommandTitle = flowIsRunning
+    ? (scheduleSummary.currentTask || '流程执行中')
+    : '准备就绪'
+  const flowCommandDescription = flowIsRunning
+    ? (scheduleSummary.message || '自动化任务正在按计划推进')
+    : (scheduleSummary.message || '设备待命，可以开始今天的自动化任务')
 
   return (
     <div className="app-page">
@@ -512,47 +423,98 @@ export default function Dashboard() {
 
         <div
           ref={flowGridRef}
-          className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[var(--dashboard-flow-columns)]"
+          className="dashboard-flow-layout"
           style={flowGridStyle}
         >
           <div ref={flowCardRef} className="min-w-0">
-            <Card theme="cyan" animated delay={0.18} className="!p-4 sm:!p-5">
-              <div className="flex items-center justify-between gap-4 mb-3">
-                <div>
-                  <div className="text-sm font-bold text-primary">今日流程</div>
-                  <div className={`text-[10px] ${labelClass} mt-0.5`}>活动、自动化、养成与掉落一览</div>
+            <div className="dashboard-flow-glow-shell">
+              <Card theme="cyan" animated delay={0.18} className="dashboard-flow-card !p-0">
+              <div className="dashboard-flow-header">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="dashboard-flow-mark" aria-hidden="true">
+                    <Activity className="h-4 w-4" strokeWidth={1.8} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold uppercase text-[var(--app-accent-strong)]">Daily operations</div>
+                    <div className="mt-0.5 text-base font-bold text-primary">今日流程</div>
+                  </div>
                 </div>
-                <div className={`text-right text-[10px] ${labelClass}`}>
-                  <div>{lastUpdate ? `更新于 ${lastUpdate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}` : '等待首次刷新'}</div>
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <div className={`dashboard-flow-status ${flowIsRunning ? 'is-running' : ''}`}>
+                    <span className="dashboard-flow-status-dot" />
+                    {flowIsRunning ? '执行中' : '待命'}
+                  </div>
+                  <span className={`text-[9px] ${labelClass}`}>
+                    {lastUpdate ? lastUpdate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '--:--'} 更新
+                  </span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5 mb-3">
+              <div className="dashboard-flow-command">
+                <div className="flex min-w-0 items-center gap-3.5">
+                  <div className={`dashboard-flow-command-icon ${flowIsRunning ? 'is-running' : ''}`}>
+                    {flowIsRunning
+                      ? <Activity className="h-5 w-5" strokeWidth={1.8} />
+                      : <Play className="ml-0.5 h-5 w-5" strokeWidth={1.9} />}
+                  </div>
+                  <div className="min-w-0">
+                    <div className={`text-[10px] font-medium ${labelClass}`}>{flowIsRunning ? '当前任务' : '运行状态'}</div>
+                    <div className="mt-0.5 truncate text-xl font-bold text-primary">{flowCommandTitle}</div>
+                    <div className={`mt-1 truncate text-[10px] ${labelClass}`}>{flowCommandDescription}</div>
+                  </div>
+                </div>
+                <Button
+                  onClick={runTodayFlow}
+                  variant="gradient"
+                  disabled={quickStartLoading || flowIsRunning}
+                  className="dashboard-flow-primary-action justify-center whitespace-nowrap"
+                  icon={<Play className="h-4 w-4" strokeWidth={2} />}
+                >
+                  {quickStartLoading ? '启动中...' : flowIsRunning ? '正在运行' : '开始今日流程'}
+                </Button>
+              </div>
+
+              <div className="dashboard-flow-metrics">
                 {[
-                  { label: '今日活动', value: activitySummary.available ? (activitySummary.name || activitySummary.code || '进行中') : '暂无', sub: activitySummary.tip || '等待活动数据', Icon: CalendarDays },
-                  { label: '自动化', value: scheduleSummary.isRunning ? '执行中' : '空闲', sub: scheduleSummary.currentTask || scheduleSummary.message || '可开始今日流程', Icon: Bot },
-                  { label: '养成目标', value: `${trainingSummary.count} 项`, sub: trainingSummary.topNames.length > 0 ? trainingSummary.topNames.join('、') : '还没有养成目标', Icon: Target },
-                  { label: '今日掉落', value: `${dropSummary.count} 条`, sub: dropSummary.recent[0]?.items || '执行作战后自动汇总', Icon: PackageOpen },
+                  {
+                    label: '今日活动',
+                    value: activitySummary.available ? (activitySummary.name || activitySummary.code || '进行中') : '暂无活动',
+                    sub: activitySummary.tip || '等待活动数据',
+                    Icon: CalendarDays,
+                  },
+                  {
+                    label: '养成目标',
+                    value: `${trainingSummary.count} 项`,
+                    sub: trainingSummary.topNames.length > 0 ? trainingSummary.topNames.join('、') : '尚未添加目标',
+                    Icon: Target,
+                  },
+                  {
+                    label: '今日掉落',
+                    value: `${dropSummary.count} 条`,
+                    sub: dropSummary.recent[0]?.items || '作战后自动汇总',
+                    Icon: PackageOpen,
+                  },
                 ].map(({ Icon, ...item }) => (
-                  <div key={item.label} className={`${compactTileClass} min-h-[5.25rem] transition-colors hover:brand-border`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className={`text-[9px] ${labelClass} uppercase tracking-wider`}>{item.label}</div>
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg surface-soft">
-                        <Icon className="h-3.5 w-3.5 text-secondary" strokeWidth={1.8} />
-                      </span>
+                  <div key={item.label} className="dashboard-flow-metric">
+                    <div className="flex items-center gap-2">
+                      <Icon className="h-3.5 w-3.5 text-[var(--app-accent-strong)]" strokeWidth={1.8} />
+                      <span className={`text-[9px] font-medium ${labelClass}`}>{item.label}</span>
                     </div>
-                    <div className="mt-1 text-base font-bold text-primary">{item.value}</div>
+                    <div className="mt-2 truncate text-sm font-bold text-primary">{item.value}</div>
                     <div className={`mt-0.5 truncate text-[9px] ${labelClass}`}>{item.sub}</div>
                   </div>
                 ))}
               </div>
 
-              <div className="mb-3 rounded-xl px-3 py-2.5 surface-soft">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <span className={`text-[10px] ${labelClass} uppercase tracking-wider`}>今日开放</span>
-                  <span className="text-[10px] font-medium text-primary">{openStageSummary.open.length} 个日常本</span>
+              <div className="dashboard-flow-stages">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="dashboard-flow-rail-dot" />
+                    <span className="text-[10px] font-semibold text-primary">今日开放关卡</span>
+                  </div>
+                  <span className={`text-[9px] ${labelClass}`}>{openStageSummary.open.length} 个日常本</span>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="mt-2 flex flex-wrap gap-1.5">
                   {openStageSummary.open.length > 0 ? (
                     openStageSummary.open.map(item => (
                       <span key={item.stage} className={dashboardChipClass}>{item.stage} · {item.name}</span>
@@ -563,29 +525,32 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap xl:flex-nowrap">
-                <Button
-                  onClick={runTodayFlow}
-                  variant="gradient"
-                  disabled={quickStartLoading}
-                  className="col-span-2 justify-center whitespace-nowrap sm:col-span-1"
-                  icon={<Play className="h-4 w-4" strokeWidth={2} />}
-                >
-                  {quickStartLoading ? '启动中...' : (
-                    <>
-                      <span className="xl:hidden">一键开始今日流程</span>
-                      <span className="hidden xl:inline">一键开始</span>
-                    </>
-                  )}
-                </Button>
-                <Button onClick={() => setActiveTab('automation')} variant="secondary" className="justify-center whitespace-nowrap" icon={<Bot className="h-4 w-4" strokeWidth={1.8} />}>自动化</Button>
-                <Button onClick={() => setActiveTab('combat')} variant="secondary" className="justify-center whitespace-nowrap" icon={<Activity className="h-4 w-4" strokeWidth={1.8} />}>作业</Button>
-                <Button onClick={() => setActiveTab('training')} variant="secondary" className="col-span-2 justify-center whitespace-nowrap sm:col-span-1" icon={<Target className="h-4 w-4" strokeWidth={1.8} />}>养成</Button>
+              <div className="dashboard-flow-shortcuts" aria-label="快捷入口">
+                {[
+                  { label: '自动化', tab: 'automation', Icon: Bot },
+                  { label: '作业', tab: 'combat', Icon: Activity },
+                  { label: '养成', tab: 'training', Icon: Target },
+                ].map(({ label, tab, Icon }) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveTab(tab)}
+                    className="dashboard-flow-shortcut"
+                    aria-label={`打开${label}`}
+                  >
+                    <span className="dashboard-flow-shortcut-icon" aria-hidden="true">
+                      <Icon className="h-3.5 w-3.5" strokeWidth={1.8} />
+                    </span>
+                    <span className="truncate">{label}</span>
+                    <ChevronRight className="dashboard-flow-shortcut-arrow" aria-hidden="true" />
+                  </button>
+                ))}
               </div>
               {quickStartMessage && (
-                <div className={`mt-4 rounded-xl px-3 py-2 text-xs ${labelClass} surface-soft`}>{quickStartMessage}</div>
+                <div className={`dashboard-flow-message text-xs ${labelClass}`}>{quickStartMessage}</div>
               )}
-            </Card>
+              </Card>
+            </div>
           </div>
 
           <div ref={flowPreviewRef} className="min-w-0">
@@ -594,13 +559,13 @@ export default function Dashboard() {
         </div>
 
         {deviceStats && (
-          <div className="space-y-3">
+          <div className="dashboard-device-section">
             <div className="flex items-center gap-2">
               <div className="h-0.5 flex-1 bg-[var(--app-border)] rounded-full" />
               <span className={`text-xs font-medium ${labelClass} uppercase tracking-wider shrink-0`}>设备状态</span>
               <div className="h-0.5 flex-1 bg-[var(--app-border)] rounded-full" />
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="dashboard-device-grid">
               {([
                 { label: 'CPU', pct: deviceStats.cpuPct, sub: deviceStats.load1m != null ? `负载 ${deviceStats.load1m.toFixed(1)}` : '', Icon: Cpu, value: undefined as string | undefined },
                 { label: '内存', pct: deviceStats.memPct, sub: `${deviceStats.memUsed ?? '--'} / ${deviceStats.memTotal ?? '--'}`, Icon: Database, value: undefined as string | undefined },
@@ -608,7 +573,7 @@ export default function Dashboard() {
                 { label: '温度', pct: undefined, sub: '', Icon: Thermometer, value: deviceStats.temp != null ? `${deviceStats.temp}°C` : '--' },
               ] as const).map(({ label, pct, sub, Icon, value }) => {
                 return (
-                  <div key={label} className="group rounded-2xl border border-[var(--app-border)] surface-panel surface-panel-hover p-3.5 transition-colors sm:p-4">
+                  <div key={label} className="dashboard-device-card group surface-panel surface-panel-hover transition-colors">
                     <div className="flex items-center gap-2.5 mb-3">
                       <div className="shrink-0 h-8 w-8 rounded-lg surface-soft flex items-center justify-center">
                         <Icon className={`h-4 w-4 ${labelClass}`} strokeWidth={1.5} />
@@ -639,107 +604,198 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-          <Card theme="violet" animated delay={0.23}>
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <div className={sectionTitleClass}>执行状态</div>
-                <div className={`text-xs ${labelClass} mt-0.5`}>当前进度与最近一次结果</div>
+        <div className="dashboard-summary-grid">
+          <Card theme="violet" animated delay={0.23} className="dashboard-summary-card is-status !p-0">
+            <div className="dashboard-summary-header">
+              <div className="dashboard-summary-heading">
+                <span className="dashboard-summary-icon" aria-hidden="true">
+                  <Activity className="h-4 w-4" strokeWidth={1.8} />
+                </span>
+                <div className="min-w-0">
+                  <div className={sectionTitleClass}>执行状态</div>
+                  <div className={`mt-0.5 text-[10px] ${labelClass}`}>当前进度与最近一次结果</div>
+                </div>
               </div>
-              <Button onClick={() => loadDashboardData(true)} variant="ghost" size="sm">刷新</Button>
+              <IconButton
+                onClick={() => loadDashboardData(true)}
+                icon={<Icons.RefreshCw />}
+                variant="ghost"
+                size="sm"
+                title="刷新执行状态"
+                aria-label="刷新执行状态"
+                className="dashboard-summary-action"
+              />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <div className={`text-[10px] ${labelClass} uppercase tracking-wider`}>当前执行</div>
-                <div className="mt-1 text-base font-semibold text-primary">{scheduleSummary.isRunning ? '执行中' : '空闲中'}</div>
-                <div className={`mt-0.5 text-[10px] ${labelClass}`}>{scheduleSummary.currentTask || scheduleSummary.message || '暂无进行中的流程'}</div>
+            <div className="dashboard-status-grid">
+              <div className="dashboard-status-block">
+                <div className="dashboard-summary-label">
+                  <span className={`dashboard-summary-dot ${scheduleSummary.isRunning ? 'is-active' : ''}`} />
+                  当前执行
+                </div>
+                <div className="dashboard-summary-value">{scheduleSummary.isRunning ? '执行中' : '空闲中'}</div>
+                <div className="dashboard-summary-detail">{scheduleSummary.currentTask || scheduleSummary.message || '暂无进行中的流程'}</div>
               </div>
-              <div>
-                <div className={`text-[10px] ${labelClass} uppercase tracking-wider`}>最近结果</div>
-                <div className="mt-1 text-base font-semibold text-primary">{scheduleSummary.lastTask || '暂无记录'}</div>
-                <div className={`mt-0.5 text-[10px] ${labelClass}`}>{scheduleSummary.lastResult || '执行一次自动化流程后显示'}</div>
+              <div className="dashboard-status-block">
+                <div className="dashboard-summary-label">
+                  <span className="dashboard-summary-dot is-muted" />
+                  最近结果
+                </div>
+                <div className="dashboard-summary-value">{scheduleSummary.lastTask || '暂无记录'}</div>
+                <div className="dashboard-summary-detail">{scheduleSummary.lastResult || '执行一次自动化流程后显示'}</div>
               </div>
             </div>
           </Card>
 
-          <Card theme="amber" animated delay={0.24}>
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <div className={sectionTitleClass}>今日开放关卡</div>
-                <div className={`text-xs ${labelClass} mt-0.5`}>资源本与芯片本开放情况</div>
+          <Card theme="amber" animated delay={0.24} className="dashboard-summary-card is-stages !p-0">
+            <div className="dashboard-summary-header">
+              <div className="dashboard-summary-heading">
+                <span className="dashboard-summary-icon" aria-hidden="true">
+                  <CalendarDays className="h-4 w-4" strokeWidth={1.8} />
+                </span>
+                <div className="min-w-0">
+                  <div className={sectionTitleClass}>今日开放关卡</div>
+                  <div className={`mt-0.5 text-[10px] ${labelClass}`}>资源本与芯片本开放情况</div>
+                </div>
               </div>
+              <span className="dashboard-summary-count">{openStageSummary.open.length} 开放</span>
             </div>
-            <div className="space-y-3">
-              <div>
-                <div className={`text-[11px] ${labelClass} uppercase tracking-wider mb-2`}>开放</div>
-                <div className="flex flex-wrap gap-1.5">
+            <div className="dashboard-stage-groups">
+              <div className="dashboard-stage-group">
+                <div className="dashboard-stage-group-heading">
+                  <span className="dashboard-summary-label"><span className="dashboard-summary-dot is-active" />开放</span>
+                  <span className="dashboard-stage-count">{openStageSummary.open.length}</span>
+                </div>
+                <div className="dashboard-stage-list">
                   {openStageSummary.open.length > 0 ? (
                     openStageSummary.open.map(item => (
-                      <span key={item.stage} className={dashboardChipClass}>{item.stage} · {item.name}</span>
+                      <span key={item.stage} className="dashboard-stage-chip is-open">{item.stage} · {item.name}</span>
                     ))
                   ) : (
-                    <span className={mutedChipClass}>暂无开放数据</span>
+                    <span className="dashboard-stage-chip is-empty">暂无开放数据</span>
                   )}
                 </div>
               </div>
-              <div>
-                <div className={`text-[11px] ${labelClass} uppercase tracking-wider mb-2`}>未开放</div>
-                <div className="flex flex-wrap gap-1.5">
+              <div className="dashboard-stage-group">
+                <div className="dashboard-stage-group-heading">
+                  <span className="dashboard-summary-label"><span className="dashboard-summary-dot is-muted" />未开放</span>
+                  <span className="dashboard-stage-count">{openStageSummary.closed.length}</span>
+                </div>
+                <div className="dashboard-stage-list">
                   {openStageSummary.closed.length > 0 ? (
                     openStageSummary.closed.map(item => (
-                      <span key={item.stage} className={mutedChipClass}>{item.stage} · {item.name}</span>
+                      <span key={item.stage} className="dashboard-stage-chip">{item.stage} · {item.name}</span>
                     ))
                   ) : (
-                    <span className={mutedChipClass}>暂无未开放数据</span>
+                    <span className="dashboard-stage-chip is-empty">暂无未开放数据</span>
                   )}
                 </div>
               </div>
             </div>
           </Card>
 
-          <Card theme="amber" animated delay={0.24}>
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <div className={sectionTitleClass}>养成摘要</div>
-                <div className={`text-xs ${labelClass} mt-0.5`}>当前优先培养的干员目标</div>
-              </div>
-              <Button onClick={() => setActiveTab('training')} variant="ghost" size="sm">去养成</Button>
-            </div>
-            {trainingSummary.count > 0 ? (
-              <div className="space-y-3">
-                <div className="text-3xl font-bold text-primary tracking-tight">{trainingSummary.count}</div>
-                <div className={`text-xs ${labelClass}`}>队列中的前几个目标</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {trainingSummary.topNames.map(name => (
-                    <span key={name} className={dashboardChipClass}>{name}</span>
-                  ))}
+          <Card theme="amber" animated delay={0.24} className="dashboard-summary-card is-training !p-0">
+            <div className="dashboard-summary-header">
+              <div className="dashboard-summary-heading">
+                <span className="dashboard-summary-icon" aria-hidden="true">
+                  <Target className="h-4 w-4" strokeWidth={1.8} />
+                </span>
+                <div className="min-w-0">
+                  <div className={sectionTitleClass}>养成摘要</div>
+                  <div className={`mt-0.5 text-[10px] ${labelClass}`}>当前优先培养的干员目标</div>
                 </div>
               </div>
-            ) : (
-              <div className={`text-xs ${labelClass}`}>还没有养成目标，去添加首个干员。</div>
-            )}
+              <IconButton
+                onClick={() => setActiveTab('training')}
+                icon={<ChevronRight className="h-4 w-4" />}
+                variant="ghost"
+                size="sm"
+                title="打开养成"
+                aria-label="打开养成"
+                className="dashboard-summary-action"
+              />
+            </div>
+            <div className="dashboard-summary-body">
+              <div className="dashboard-summary-statline">
+                <div>
+                  <div className="dashboard-summary-number">{trainingSummary.count}</div>
+                  <div className="dashboard-summary-number-label">培养目标</div>
+                </div>
+                <div className="dashboard-summary-copy">
+                  <div className="text-sm font-semibold text-primary">{trainingSummary.count > 0 ? '队列已建立' : '等待添加目标'}</div>
+                  <div className="dashboard-summary-detail">
+                    {trainingSummary.count > 0 ? '按优先级推进当前培养计划' : '添加干员后会在这里汇总优先目标'}
+                  </div>
+                </div>
+              </div>
+              <div className="dashboard-summary-footer">
+                {trainingSummary.topNames.length > 0 ? (
+                  <div className="dashboard-stage-list">
+                    {trainingSummary.topNames.map(name => (
+                      <span key={name} className="dashboard-stage-chip is-accent">{name}</span>
+                    ))}
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setActiveTab('training')} className="dashboard-summary-link">
+                    添加首个培养目标
+                    <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+            </div>
           </Card>
 
-          <Card theme="emerald" animated delay={0.26}>
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <div className={sectionTitleClass}>今日掉落摘要</div>
-                <div className={`text-xs ${labelClass} mt-0.5`}>最近作战产出</div>
+          <Card theme="emerald" animated delay={0.26} className="dashboard-summary-card is-drops !p-0">
+            <div className="dashboard-summary-header">
+              <div className="dashboard-summary-heading">
+                <span className="dashboard-summary-icon" aria-hidden="true">
+                  <PackageOpen className="h-4 w-4" strokeWidth={1.8} />
+                </span>
+                <div className="min-w-0">
+                  <div className={sectionTitleClass}>今日掉落摘要</div>
+                  <div className={`mt-0.5 text-[10px] ${labelClass}`}>最近作战产出</div>
+                </div>
               </div>
-              <Button onClick={() => setActiveTab('statistics')} variant="ghost" size="sm">去数据</Button>
+              <IconButton
+                onClick={() => setActiveTab('statistics')}
+                icon={<ChevronRight className="h-4 w-4" />}
+                variant="ghost"
+                size="sm"
+                title="打开数据"
+                aria-label="打开数据"
+                className="dashboard-summary-action"
+              />
             </div>
-            {dropSummary.count > 0 ? (
-              <div className="space-y-2.5">
-                {dropSummary.recent.map((record, index) => (
-                  <div key={`${record.stage}-${index}`} className={`${dashboardTileClass} p-3.5`}>
-                    <div className="text-xs font-semibold text-primary">{record.stage}</div>
-                    <div className={`mt-1 text-[10px] ${labelClass} leading-relaxed`}>{record.items}</div>
+            <div className="dashboard-summary-body">
+              <div className="dashboard-summary-statline">
+                <div>
+                  <div className="dashboard-summary-number">{dropSummary.count}</div>
+                  <div className="dashboard-summary-number-label">掉落记录</div>
+                </div>
+                <div className="dashboard-summary-copy">
+                  <div className="text-sm font-semibold text-primary">{dropSummary.count > 0 ? '今日已记录' : '尚无作战产出'}</div>
+                  <div className="dashboard-summary-detail">
+                    {dropSummary.count > 0 ? '最近的关卡与材料已完成汇总' : '完成作战后会自动记录关卡与材料'}
                   </div>
-                ))}
+                </div>
               </div>
-            ) : (
-              <div className={`text-xs ${labelClass}`}>今天还没有掉落记录，执行作战后会自动出现。</div>
-            )}
+              <div className="dashboard-summary-footer">
+                {dropSummary.count > 0 ? (
+                  <div className="dashboard-drop-list">
+                    {dropSummary.recent.map((record, index) => (
+                      <div key={`${record.stage}-${index}`} className="dashboard-drop-row">
+                        <span className="dashboard-drop-stage">{record.stage}</span>
+                        <span className="dashboard-drop-items">{record.items}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setActiveTab('statistics')} className="dashboard-summary-link">
+                    查看掉落数据
+                    <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+            </div>
           </Card>
         </div>
 

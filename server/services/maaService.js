@@ -1,8 +1,8 @@
 import { spawn, execFile } from 'child_process';
 import { promisify } from 'util';
-import { readFile, writeFile, mkdir, readdir, stat, unlink } from 'fs/promises';
+import { readFile, writeFile, mkdir, readdir, stat, unlink, realpath } from 'fs/promises';
 import { createReadStream } from 'fs';
-import { join, resolve } from 'path';
+import { extname, isAbsolute, join, relative, resolve, sep } from 'path';
 import { createLogger } from '../utils/logger.js';
 
 const execFilePromise = promisify(execFile);
@@ -860,9 +860,6 @@ export async function getLogFiles() {
     // 按修改时间倒序排序
     files.sort((a, b) => new Date(b.modified) - new Date(a.modified));
     
-    // 清理旧日志文件，只保留最新的10MB
-    await cleanupOldLogs(files);
-    
     return files;
   } catch (error) {
     logger.error('获取日志文件列表失败', { error: error.message });
@@ -871,40 +868,15 @@ export async function getLogFiles() {
 }
 
 /**
- * 清理旧日志文件，只保留最新的10MB
- */
-async function cleanupOldLogs(files) {
-  const maxSize = 10 * 1024 * 1024; // 10MB
-  let totalSize = 0;
-  const filesToDelete = [];
-  
-  for (const file of files) {
-    totalSize += file.size;
-    if (totalSize > maxSize) {
-      filesToDelete.push(file);
-    }
-  }
-  
-  // 删除超出限制的文件
-  for (const file of filesToDelete) {
-    try {
-      await unlink(file.path);
-      addLog('INFO', `已删除旧日志文件: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
-    } catch (error) {
-      logger.error('删除日志文件失败', { path: file.path, error: error.message });
-    }
-  }
-  
-  if (filesToDelete.length > 0) {
-    addLog('INFO', `日志清理完成，删除了 ${filesToDelete.length} 个文件，释放 ${(filesToDelete.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024).toFixed(2)} MB`);
-  }
-}
-
-/**
  * 手动清理日志文件
  */
 export async function cleanupLogs(maxSizeMB = 10) {
   try {
+    const sizeLimit = Number(maxSizeMB);
+    if (!Number.isFinite(sizeLimit) || sizeLimit < 1 || sizeLimit > 1024) {
+      throw new Error('日志保留上限必须在 1 到 1024 MB 之间');
+    }
+
     const logDir = await getMaaLogDir();
     const files = [];
     
@@ -930,7 +902,7 @@ export async function cleanupLogs(maxSizeMB = 10) {
     await scanDir(logDir);
     files.sort((a, b) => new Date(b.modified) - new Date(a.modified));
     
-    const maxSize = maxSizeMB * 1024 * 1024;
+    const maxSize = sizeLimit * 1024 * 1024;
     let totalSize = 0;
     const filesToDelete = [];
     
@@ -959,10 +931,14 @@ export async function cleanupLogs(maxSizeMB = 10) {
  */
 export async function readLogFile(filePath, lines = 1000) {
   try {
-    const logDir = resolve(await getMaaLogDir());
-    const requestedPath = resolve(filePath);
-    const relativePath = requestedPath === logDir ? '' : requestedPath.slice(logDir.length + 1);
-    if (!requestedPath.startsWith(logDir) || relativePath.startsWith('..')) {
+    const logDir = await realpath(resolve(await getMaaLogDir()));
+    const requestedPath = await realpath(resolve(filePath));
+    const relativePath = relative(logDir, requestedPath);
+    const isOutsideLogDir = relativePath === '..'
+      || relativePath.startsWith(`..${sep}`)
+      || isAbsolute(relativePath);
+
+    if (!relativePath || isOutsideLogDir || extname(requestedPath).toLowerCase() !== '.log') {
       throw new Error('只能读取 MAA 日志目录内的文件');
     }
     const content = await readFile(requestedPath, 'utf-8');

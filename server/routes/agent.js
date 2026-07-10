@@ -688,7 +688,14 @@ router.get('/logs/files/:filePath(*)', asyncHandler(async (req, res) => {
 }));
 
 router.post('/logs/cleanup', asyncHandler(async (req, res) => {
-  const maxSizeMB = Number(req.body?.maxSizeMB || 10);
+  const maxSizeMB = Number(req.body?.maxSizeMB ?? 10);
+  if (!Number.isFinite(maxSizeMB) || maxSizeMB < 1 || maxSizeMB > 1024) {
+    return sendError(res, req, agentError(
+      'AGENT_VALIDATION_LOG_SIZE_INVALID',
+      '日志保留上限必须在 1 到 1024 MB 之间',
+      { statusCode: 400, details: { maxSizeMB: req.body?.maxSizeMB } }
+    ));
+  }
   const result = await cleanupLogs(maxSizeMB);
   return sendSuccess(res, req, result, `已清理 ${result.deletedCount} 个日志文件，释放 ${(result.freedSpace / 1024 / 1024).toFixed(2)} MB 空间`);
 }));

@@ -247,8 +247,8 @@ export const maaApi = {
   /**
    * 获取实时日志
    */
-  async getRealtimeLogs(lines: number = 100): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/logs/recent?lines=${lines}`)
+  async getRealtimeLogs(lines: number = 100, signal?: AbortSignal): Promise<ApiResponse> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/logs/recent?lines=${lines}`, { signal })
     return response.json()
   },
 
