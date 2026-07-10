@@ -1868,6 +1868,31 @@
     padding: 0.875rem;
   }
 
+  button.automation-schedule-add[type="button"],
+  .automation-notification-buttons button[type="button"] {
+    min-height: 2.75rem;
+    padding: 0 0.875rem;
+    border-radius: var(--app-radius-lg);
+    font-size: 0.75rem;
+  }
+
+  [data-automation-tasks] .app-button,
+  .automation-task-picker-toggle,
+  .automation-task-picker-option,
+  .automation-sequence-select {
+    min-height: 2.75rem;
+  }
+
+  .automation-schedule-add svg,
+  .automation-notification-buttons button svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .automation-notification-buttons {
+    gap: 0.625rem;
+  }
+
   .automation-task-editor .automation-flow-card-header {
     align-items: flex-start;
     flex-direction: column;
@@ -1963,23 +1988,8 @@
 
 /* 移动端触摸优化 */
 @media (max-width: 768px) {
-  /* 增加触摸目标大小 - 但排除输入框和内部按钮 */
-  button:not(.number-input-controls button):not([type="button"]):not(.flex-1):not(.text-xs):not(.theme-toggle-btn) {
-    min-height: 44px;
-  }
-  
   /* 输入框不强制最小高度 */
   input, textarea, select {
-    min-height: auto !important;
-  }
-  
-  /* 确保按钮不被强制高度 */
-  button[type="button"] {
-    min-height: auto !important;
-  }
-  
-  /* 小按钮不强制最小高度 */
-  button.text-xs {
     min-height: auto !important;
   }
   

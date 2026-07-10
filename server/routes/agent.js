@@ -1277,20 +1277,24 @@ router.get('/notifications/config', asyncHandler(async (req, res) => {
 }));
 
 router.post('/notifications/config', asyncHandler(async (req, res) => {
-  setNotificationConfig(req.body || {});
   const result = await saveUserConfig('notification', req.body || {});
   if (!result.success) {
     return sendError(res, req, agentError('AGENT_NOTIFICATION_CONFIG_SAVE_FAILED', result.message || '通知配置保存失败', { statusCode: 500 }));
   }
+  setNotificationConfig(req.body || {});
   return sendSuccess(res, req, null, '通知配置已保存');
 }));
 
 router.post('/actions/test-notification-channel', asyncHandler(async (req, res) => {
   const channel = req.body?.channel;
+  const config = req.body?.config;
   if (!channel) {
     return sendError(res, req, agentError('AGENT_VALIDATION_CHANNEL_REQUIRED', '缺少通知渠道', { statusCode: 400 }));
   }
-  const result = await testNotificationChannel(channel);
+  if (config != null && (typeof config !== 'object' || Array.isArray(config))) {
+    return sendError(res, req, agentError('AGENT_VALIDATION_NOTIFICATION_CONFIG_INVALID', '通知渠道配置格式无效', { statusCode: 400 }));
+  }
+  const result = await testNotificationChannel(channel, config || null);
   if (!result.success) {
     return sendError(res, req, agentError('AGENT_NOTIFICATION_TEST_FAILED', result.message || '测试通知失败', { statusCode: 400, details: { channel } }));
   }
@@ -1314,7 +1318,11 @@ router.get('/schedules/execution', asyncHandler(async (req, res) => {
 
 router.post('/schedules', asyncHandler(async (req, res) => {
   const { scheduleId = 'default', times, taskFlow } = req.body || {};
-  return sendSuccess(res, req, setupSchedule(scheduleId, times, taskFlow));
+  const result = setupSchedule(scheduleId, times, taskFlow);
+  if (!result.success) {
+    return sendError(res, req, agentError('AGENT_SCHEDULE_SETUP_FAILED', result.message, { statusCode: 400 }));
+  }
+  return sendSuccess(res, req, result, result.message);
 }));
 
 router.delete('/schedules/:scheduleId', asyncHandler(async (req, res) => {
@@ -1324,7 +1332,14 @@ router.delete('/schedules/:scheduleId', asyncHandler(async (req, res) => {
 router.post('/schedules/:scheduleId/execute', asyncHandler(async (req, res) => {
   const { scheduleId } = req.params;
   const { taskFlow } = req.body || {};
-  return sendSuccess(res, req, await executeScheduleNow(scheduleId, taskFlow));
+  if (!Array.isArray(taskFlow)) {
+    return sendError(res, req, agentError('AGENT_VALIDATION_TASK_FLOW_INVALID', '任务流程格式无效', { statusCode: 400 }));
+  }
+  const result = await executeScheduleNow(scheduleId, taskFlow);
+  if (!result.success) {
+    return sendError(res, req, agentError('AGENT_SCHEDULE_ALREADY_RUNNING', result.message, { statusCode: 409 }));
+  }
+  return sendSuccess(res, req, result, result.message);
 }));
 
 router.post('/actions/configure-auto-update', asyncHandler(async (req, res) => {

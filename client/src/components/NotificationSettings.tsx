@@ -28,6 +28,7 @@ const emptyConfig: NotificationConfig = {
 
 export default function NotificationSettings() {
   const [config, setConfig] = useState<NotificationConfig>(emptyConfig)
+  const [loading, setLoading] = useState(true)
   const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -36,10 +37,14 @@ export default function NotificationSettings() {
     data?.message || data?.errorInfo?.message || data?.error || fallback
 
   useEffect(() => {
+    let cancelled = false
+
     const loadConfig = async () => {
       try {
         const response = await fetchWithAuth(`${API_BASE_URL}/agent/notifications/config`)
         const data = await response.json()
+
+        if (cancelled) return
 
         if (data.success) {
           setConfig(data.data || data)
@@ -47,11 +52,18 @@ export default function NotificationSettings() {
           setNotice({ type: 'error', text: getResponseMessage(data, '加载通知配置失败') })
         }
       } catch (error) {
+        if (cancelled) return
         setNotice({ type: 'error', text: (error as Error).message || '加载通知配置失败' })
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     }
 
     loadConfig()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const updateTelegram = (patch: Partial<TelegramConfig>) => {
@@ -97,7 +109,7 @@ export default function NotificationSettings() {
       const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/test-notification-channel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel: 'telegram' })
+        body: JSON.stringify({ channel: 'telegram', config: telegram })
       })
       const data = await response.json()
 
@@ -126,6 +138,7 @@ export default function NotificationSettings() {
             type="checkbox"
             checked={config.enabled}
             onChange={(event) => setConfig(current => ({ ...current, enabled: event.target.checked }))}
+            disabled={loading || saving}
             className="custom-checkbox cursor-pointer"
           />
           <span>{config.enabled ? '已启用' : '未启用'}</span>
@@ -147,6 +160,7 @@ export default function NotificationSettings() {
               type="checkbox"
               checked={telegram.enabled}
               onChange={(event) => updateTelegram({ enabled: event.target.checked })}
+              disabled={loading || saving}
               className="custom-checkbox cursor-pointer"
             />
             <span>{telegram.enabled ? '已启用' : '未启用'}</span>
@@ -160,7 +174,7 @@ export default function NotificationSettings() {
             value={telegram.botToken}
             onChange={(event) => updateTelegram({ botToken: event.target.value })}
             placeholder="Telegram Bot Token"
-            disabled={!telegram.enabled}
+            disabled={loading || saving || !telegram.enabled}
             autoComplete="off"
           />
         </label>
@@ -172,19 +186,19 @@ export default function NotificationSettings() {
             value={telegram.chatId}
             onChange={(event) => updateTelegram({ chatId: event.target.value })}
             placeholder="Telegram Chat ID"
-            disabled={!telegram.enabled}
+            disabled={loading || saving || !telegram.enabled}
             autoComplete="off"
           />
         </label>
 
         <div className="automation-notification-buttons">
-          <button type="button" onClick={testNotification} disabled={testing || !canTest}>
+          <button type="button" onClick={testNotification} disabled={loading || saving || testing || !canTest}>
             <Send size={14} />
-            <span>{testing ? '发送中' : '测试'}</span>
+            <span>{loading ? '加载中' : testing ? '发送中' : '测试'}</span>
           </button>
-          <button type="button" onClick={saveConfig} disabled={saving} className="is-primary">
+          <button type="button" onClick={saveConfig} disabled={loading || saving || testing} className="is-primary">
             <Save size={14} />
-            <span>{saving ? '保存中' : '保存'}</span>
+            <span>{loading ? '加载中' : saving ? '保存中' : '保存'}</span>
           </button>
         </div>
       </div>

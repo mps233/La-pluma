@@ -404,14 +404,14 @@ class NotificationManager {
   /**
    * 测试指定渠道
    */
-  async testChannel(channelName) {
+  async testChannel(channelName, configOverride = null) {
     const ChannelClass = this.channels.get(channelName);
     
     if (!ChannelClass) {
       throw new Error(`未知的通知渠道: ${channelName}`);
     }
 
-    const channelConfig = notificationConfig.channels[channelName];
+    const channelConfig = configOverride || notificationConfig.channels[channelName];
     
     if (!channelConfig) {
       throw new Error(`通知渠道 ${channelName} 未配置`);
@@ -459,8 +459,8 @@ export async function sendToChannel(channelName, message) {
 /**
  * 测试通知渠道
  */
-export async function testNotificationChannel(channelName) {
-  return await notificationManager.testChannel(channelName);
+export async function testNotificationChannel(channelName, configOverride = null) {
+  return await notificationManager.testChannel(channelName, configOverride);
 }
 
 /**

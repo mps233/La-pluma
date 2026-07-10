@@ -79,7 +79,11 @@ export default function Layout({ children }: LayoutProps) {
 
               {/* 移动端汉堡菜单按钮 */}
               <button
+                type="button"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label={mobileMenuOpen ? '关闭导航菜单' : '打开导航菜单'}
+                aria-expanded={mobileMenuOpen}
+                aria-controls="mobile-navigation"
                 className="text-secondary hover:text-primary md:hidden rounded-lg p-2 transition-colors hover:bg-white/60 dark:hover:bg-white/10"
               >
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -110,6 +114,7 @@ export default function Layout({ children }: LayoutProps) {
           <AnimatePresence>
             {mobileMenuOpen && (
               <motion.div
+                id="mobile-navigation"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}

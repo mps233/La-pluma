@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { maaApi } from '../services/api'
 import { motion } from 'framer-motion'
 import { ChevronDown, GripVertical, ListPlus, Plus, SlidersHorizontal, Trash2 } from 'lucide-react'
@@ -15,6 +15,11 @@ import type {
   ConnectionTestStatus,
   StageConfig
 } from '@/types/components'
+
+const scheduleTimePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/
+
+const normalizeScheduleTimes = (times: string[]) =>
+  [...new Set(times.filter(time => scheduleTimePattern.test(time)))]
 
 export default function AutomationTasks({}: AutomationTasksProps) {
   const { setMessage: setStatusMessage, setActive: setIsActiveStatus } = useStatusStore()
@@ -47,6 +52,8 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   const [activityName, setActivityName] = useState<string | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<Record<string, ConnectionTestStatus>>({})
   const [testingConnection, setTestingConnection] = useState<Record<string, boolean>>({})
+  const autoSaveQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const autoSaveRevisionRef = useRef(0)
   const activeTaskId = selectedTaskId && taskFlow.some(task => task.id === selectedTaskId)
     ? selectedTaskId
     : taskFlow[0]?.id ?? null
@@ -419,38 +426,79 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     }
   }
 
-  const autoSave = async (flow: TaskFlowItem[], enabled: boolean, times: string[]) => {
+  const autoSave = (flow: TaskFlowItem[], enabled: boolean, times: string[]) => {
     const taskFlowToSave = flow.map(task => {
       const { icon, paramFields, ...rest } = task
       return rest
     })
+    const normalizedTimes = normalizeScheduleTimes(times)
+    const revision = ++autoSaveRevisionRef.current
 
     // 保存到 localStorage（快速访问）
     localStorage.setItem('maa-task-flow', JSON.stringify(taskFlowToSave))
-    localStorage.setItem('maa-schedule', JSON.stringify({ enabled, times }))
+    localStorage.setItem('maa-schedule', JSON.stringify({ enabled, times: normalizedTimes }))
 
-    // 保存到服务器（跨设备同步）
-    try {
-      await maaApi.saveUserConfig('automation-tasks', {
-        taskFlow: taskFlowToSave,
-        schedule: { enabled, times }
+    autoSaveQueueRef.current = autoSaveQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        // 连续编辑时只提交队列中最新的一版，避免旧请求覆盖新配置。
+        if (revision !== autoSaveRevisionRef.current) return
+
+        const saveResult = await maaApi.saveUserConfig('automation-tasks', {
+          taskFlow: taskFlowToSave,
+          schedule: { enabled, times: normalizedTimes }
+        })
+        if (!saveResult.success) {
+          throw new Error(maaApi.getErrorMessage(saveResult))
+        }
+
+        if (revision !== autoSaveRevisionRef.current) return
+
+        const scheduleResult = enabled && normalizedTimes.length > 0
+          ? await maaApi.setupSchedule('default', normalizedTimes, taskFlowToSave)
+          : await maaApi.stopSchedule('default')
+
+        if (!scheduleResult.success) {
+          throw new Error(maaApi.getErrorMessage(scheduleResult))
+        }
       })
+      .catch((error: unknown) => {
+        if (revision !== autoSaveRevisionRef.current) return
+        const message = error instanceof Error ? error.message : '未知错误'
+        void showError(`配置同步失败: ${message}`)
+      })
+  }
+
+  const syncLoadedSchedule = async (times: string[], flow: any[]) => {
+    const normalizedTimes = normalizeScheduleTimes(times)
+    if (normalizedTimes.length === 0) return
+
+    try {
+      const result = await maaApi.setupSchedule('default', normalizedTimes, flow)
+      if (!result.success) {
+        throw new Error(maaApi.getErrorMessage(result))
+      }
     } catch (error) {
-      // 静默失败，不影响用户体验
+      const message = error instanceof Error ? error.message : '未知错误'
+      void showError(`定时任务恢复失败: ${message}`)
+    }
+  }
+
+  const updateScheduleTime = (index: number, nextTime: string) => {
+    if (scheduleTimes.some((time, itemIndex) => itemIndex !== index && time === nextTime)) {
+      void showError('该执行时间已经存在')
+      return
     }
 
+    const newTimes = [...scheduleTimes]
+    newTimes[index] = nextTime
+    setScheduleTimes(newTimes)
+    autoSave(taskFlow, scheduleEnabled, newTimes)
+  }
+
+  const restoreSchedule = async (enabled: boolean, times: string[], flow: any[]) => {
     if (enabled && times.length > 0) {
-      try {
-        await maaApi.setupSchedule('default', times, taskFlowToSave)
-      } catch (error) {
-        // 静默失败，不影响用户体验
-      }
-    } else {
-      try {
-        await maaApi.stopSchedule('default')
-      } catch (error) {
-        // 静默失败，不影响用户体验
-      }
+      await syncLoadedSchedule(times, flow)
     }
   }
 
@@ -616,21 +664,16 @@ export default function AutomationTasks({}: AutomationTasksProps) {
 
         if (schedule) {
           const { enabled, times } = schedule
+          const normalizedTimes = normalizeScheduleTimes(Array.isArray(times) ? times : [])
           setScheduleEnabled(enabled)
-          if (times && Array.isArray(times)) {
-            setScheduleTimes(times)
+          if (normalizedTimes.length > 0) {
+            setScheduleTimes(normalizedTimes)
           }
 
           // 同步到 localStorage
-          localStorage.setItem('maa-schedule', JSON.stringify(schedule))
+          localStorage.setItem('maa-schedule', JSON.stringify({ ...schedule, times: normalizedTimes }))
 
-          if (enabled && times && times.length > 0) {
-            try {
-              await maaApi.setupSchedule('default', times, loadedTasks)
-            } catch (error) {
-              // 静默失败，不影响用户体验
-            }
-          }
+          await restoreSchedule(enabled, normalizedTimes, loadedTasks || [])
         }
 
         return
@@ -656,18 +699,13 @@ export default function AutomationTasks({}: AutomationTasksProps) {
 
       if (schedule) {
         const { enabled, times } = JSON.parse(schedule)
+        const normalizedTimes = normalizeScheduleTimes(Array.isArray(times) ? times : [])
         setScheduleEnabled(enabled)
-        if (times && Array.isArray(times)) {
-          setScheduleTimes(times)
+        if (normalizedTimes.length > 0) {
+          setScheduleTimes(normalizedTimes)
         }
 
-        if (enabled && times && times.length > 0) {
-          try {
-            await maaApi.setupSchedule('default', times, loadedTasks)
-          } catch (error) {
-            // 静默失败，不影响用户体验
-          }
-        }
+        await restoreSchedule(enabled, normalizedTimes, loadedTasks)
       }
     }
   }
@@ -680,7 +718,16 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   }
 
   const addScheduleTime = () => {
-    const newTimes = [...scheduleTimes, '12:00']
+    const candidates = Array.from({ length: 24 }, (_, offset) =>
+      `${String((12 + offset) % 24).padStart(2, '0')}:00`
+    )
+    const nextTime = candidates.find(time => !scheduleTimes.includes(time))
+    if (!nextTime) {
+      void showError('没有可添加的执行时间')
+      return
+    }
+
+    const newTimes = [...scheduleTimes, nextTime]
     setScheduleTimes(newTimes)
     autoSave(taskFlow, scheduleEnabled, newTimes)
   }
@@ -1909,10 +1956,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                             <select
                               value={hour}
                               onChange={(e) => {
-                                const newTimes = [...scheduleTimes]
-                                newTimes[index] = `${e.target.value.padStart(2, '0')}:${minute}`
-                                setScheduleTimes(newTimes)
-                                autoSave(taskFlow, scheduleEnabled, newTimes)
+                                updateScheduleTime(index, `${e.target.value.padStart(2, '0')}:${minute}`)
                               }}
                               disabled={isRunning}
                               aria-label={`第 ${index + 1} 个执行时间的小时`}
@@ -1926,10 +1970,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                             <select
                               value={minute}
                               onChange={(e) => {
-                                const newTimes = [...scheduleTimes]
-                                newTimes[index] = `${hour}:${e.target.value.padStart(2, '0')}`
-                                setScheduleTimes(newTimes)
-                                autoSave(taskFlow, scheduleEnabled, newTimes)
+                                updateScheduleTime(index, `${hour}:${e.target.value.padStart(2, '0')}`)
                               }}
                               disabled={isRunning}
                               aria-label={`第 ${index + 1} 个执行时间的分钟`}

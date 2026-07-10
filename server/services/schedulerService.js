@@ -193,6 +193,18 @@ function buildCommand(task) {
 
 // 执行任务流程
 async function executeTaskFlow(taskFlow, scheduleId) {
+  if (!Array.isArray(taskFlow)) {
+    return { success: false, message: '任务流程格式无效' };
+  }
+
+  if (scheduleExecutionStatus.isRunning) {
+    logger.warn('任务流程已在执行，忽略重复触发', {
+      activeScheduleId: scheduleExecutionStatus.scheduleId,
+      requestedScheduleId: scheduleId
+    });
+    return { success: false, message: '已有任务流程正在执行' };
+  }
+
   logger.info('开始执行任务流程', { scheduleId });
   
   // 更新状态：开始执行
@@ -823,6 +835,8 @@ async function executeTaskFlow(taskFlow, scheduleId) {
       error: error.message 
     });
   }
+
+  return { success: true, message: '任务流程执行完成' };
 }
 
 /**
@@ -973,21 +987,29 @@ function parseTaskSummary(taskName, output) {
 
 // 创建或更新定时任务
 export function setupSchedule(scheduleId, times, taskFlow) {
-  // 先停止已存在的任务（静默停止，不输出日志）
+  if (!Array.isArray(taskFlow)) {
+    return { success: false, message: '任务流程格式无效' };
+  }
+
+  const normalizedTimes = Array.isArray(times)
+    ? [...new Set(times.filter(time => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)))]
+    : [];
+
+  if (normalizedTimes.length === 0) {
+    return { success: false, message: '没有设置执行时间' };
+  }
+
+  // 仅在新配置通过校验后替换现有任务，避免错误输入清空有效计划。
   const existingJobs = scheduledJobs.get(scheduleId);
   if (existingJobs) {
     existingJobs.forEach(({ job }) => job.stop());
     scheduledJobs.delete(scheduleId);
   }
   
-  if (!times || times.length === 0) {
-    return { success: false, message: '没有设置执行时间' };
-  }
-  
   const jobs = [];
   const failedTimes = [];
   
-  times.forEach((time, index) => {
+  normalizedTimes.forEach((time, index) => {
     if (!time) return;
     
     // 解析时间 (HH:MM)
@@ -1066,8 +1088,7 @@ export function getScheduleStatus() {
 // 立即执行一次定时任务（用于测试）
 export async function executeScheduleNow(scheduleId, taskFlow) {
   logger.info('手动触发执行', { scheduleId });
-  await executeTaskFlow(taskFlow, scheduleId);
-  return { success: true, message: '任务执行完成' };
+  return await executeTaskFlow(taskFlow, scheduleId);
 }
 
 // 自动更新任务
