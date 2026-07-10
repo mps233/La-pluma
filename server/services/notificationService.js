@@ -10,13 +10,27 @@ import { createLogger } from '../utils/logger.js';
 // 创建日志记录器
 const logger = createLogger('Notification');
 
-// 资源本开放时间表
+// 日常关卡开放时间表。days: 0=周日, 1=周一, ..., 6=周六
 const RESOURCE_STAGES = {
   'CE-6': { name: '龙门币', days: [0, 2, 4, 6] }, // 周日、周二、周四、周六
-  'AP-5': { name: '技能书', days: [0, 1, 3, 5] }, // 周日、周一、周三、周五
-  'CA-5': { name: '芯片', days: [0, 2, 4, 6] },   // 周日、周二、周四、周六
-  'SK-5': { name: '碳', days: [0, 1, 3, 5] },     // 周日、周一、周三、周五
+  'AP-5': { name: '采购凭证', days: [0, 1, 3, 5] }, // 周日、周一、周三、周五
+  'CA-5': { name: '技巧概要', days: [0, 2, 4, 6] }, // 周日、周二、周四、周六
   'LS-6': { name: '作战记录', days: [0, 1, 2, 3, 4, 5, 6] }, // 每天
+
+  'PR-A': { name: '重装/医疗芯片', days: [0, 1, 4, 5] }, // 周日、周一、周四、周五
+  'PR-A-1': { name: '重装/医疗芯片', days: [0, 1, 4, 5], hidden: true },
+  'PR-A-2': { name: '重装/医疗芯片组', days: [0, 1, 4, 5], hidden: true },
+  'PR-B': { name: '狙击/术师芯片', days: [1, 2, 5, 6] }, // 周一、周二、周五、周六
+  'PR-B-1': { name: '狙击/术师芯片', days: [1, 2, 5, 6], hidden: true },
+  'PR-B-2': { name: '狙击/术师芯片组', days: [1, 2, 5, 6], hidden: true },
+  'PR-C': { name: '先锋/辅助芯片', days: [0, 3, 4, 6] }, // 周日、周三、周四、周六
+  'PR-C-1': { name: '先锋/辅助芯片', days: [0, 3, 4, 6], hidden: true },
+  'PR-C-2': { name: '先锋/辅助芯片组', days: [0, 3, 4, 6], hidden: true },
+  'PR-D': { name: '近卫/特种芯片', days: [0, 2, 3, 6] }, // 周日、周二、周三、周六
+  'PR-D-1': { name: '近卫/特种芯片', days: [0, 2, 3, 6], hidden: true },
+  'PR-D-2': { name: '近卫/特种芯片组', days: [0, 2, 3, 6], hidden: true },
+
+  'SK-5': { name: '碳', days: [0, 1, 3, 5] },     // 周日、周一、周三、周五
 };
 
 export function getTodayOpenStages() {
@@ -25,6 +39,8 @@ export function getTodayOpenStages() {
   const closed = [];
 
   Object.entries(RESOURCE_STAGES).forEach(([stage, info]) => {
+    if (info.hidden) return;
+
     const item = {
       stage,
       name: info.name,
@@ -60,7 +76,7 @@ export function isStageOpenToday(stage) {
   
   return {
     isOpen,
-    reason: isOpen ? null : `${stageInfo.name}本今日未开放`,
+    reason: isOpen ? null : `${stageInfo.name}今日未开放`,
     stageName: stageInfo.name
   };
 }

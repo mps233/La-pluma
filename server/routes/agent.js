@@ -737,7 +737,7 @@ router.get('/activity', asyncHandler(async (req, res) => {
 }));
 
 router.get('/stages/open-today', asyncHandler(async (_req, res) => {
-  return sendSuccess(res, _req, getTodayOpenStages(), '已获取今日开放资源本');
+  return sendSuccess(res, _req, getTodayOpenStages(), '已获取今日开放日常关卡');
 }));
 
 router.get('/drops/today', asyncHandler(async (req, res) => {

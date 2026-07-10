@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone } from 'lucide-react'
 import { Button } from './common'
 import { useScrcpyWebRTC } from '../hooks/useScrcpyWebRTC'
 import { maaApi } from '../services/api'
@@ -71,6 +71,7 @@ export default function ScrcpyDeviceView({
   const [immersiveMode, setImmersiveMode] = useState(false)
   const [previewOrientation, setPreviewOrientation] = useState<'portrait' | 'landscape'>('portrait')
   const [orientationLoading, setOrientationLoading] = useState(false)
+  const [qualitySettingsOpen, setQualitySettingsOpen] = useState(false)
   const scrcpyOptions = useMemo(() => ({
     max_fps: customFps,
     max_size: customMaxSize,
@@ -364,21 +365,31 @@ export default function ScrcpyDeviceView({
         </section>
 
         <section className="rounded-2xl bg-white/80 dark:bg-white/[0.035] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_0_0_1px_rgba(15,23,42,0.06),0_10px_30px_rgba(15,23,42,0.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_0_1px_rgba(255,255,255,0.08)] text-xs">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setQualitySettingsOpen(open => !open)}
+            aria-expanded={qualitySettingsOpen}
+            className="flex w-full items-center justify-between gap-2 text-left xl:cursor-default"
+          >
+            <div className="flex min-w-0 items-center gap-2">
               <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-300">
                 <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.8} />
               </span>
-              <div>
+              <div className="min-w-0">
                 <div className="text-[11px] font-semibold text-gray-900 dark:text-white">画质设置</div>
-                <div className="text-[10px] text-gray-400">重连后生效</div>
+                <div className="truncate text-[10px] text-gray-400">
+                  {qualityPresets[quality].label} · {customMaxSize}p · {customBitrateMbps}Mbps
+                </div>
               </div>
             </div>
-            <span className="rounded-lg bg-gray-100 px-2 py-1 text-[10px] font-medium text-gray-500 dark:bg-white/[0.06] dark:text-gray-400">
-              {customFps} FPS
+            <span className="flex shrink-0 items-center gap-1.5">
+              <span className="rounded-lg bg-gray-100 px-2 py-1 text-[10px] font-medium text-gray-500 dark:bg-white/[0.06] dark:text-gray-400">
+                {customFps} FPS
+              </span>
+              <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform xl:hidden ${qualitySettingsOpen ? 'rotate-180' : ''}`} strokeWidth={1.8} />
             </span>
-          </div>
-          <div className="space-y-3">
+          </button>
+          <div className={`${qualitySettingsOpen ? 'block' : 'hidden'} mt-3 space-y-3 xl:block`}>
             <div className="space-y-1.5">
               <div className="text-[10px] font-medium text-gray-400">画质预设</div>
               <div className="grid grid-cols-2 gap-1.5">

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Cpu, HardDrive, Database, Thermometer } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
+import { Activity, Bot, CalendarDays, Cpu, HardDrive, Database, PackageOpen, Play, Target, Thermometer } from 'lucide-react'
 import { getOpenTodayStages, getSklandPlayerData, getSklandStatus, getTodayDrops, getTrainingQueue, maaApi } from '../services/api'
 import Icons from './Icons'
-import { PageHeader, Card, Button } from './common'
+import { PageHeader, Card, Button, IconButton } from './common'
 import { DashboardSkeleton } from './common/Loading'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useUIStore } from '@/stores'
@@ -120,6 +121,7 @@ const labelClass = 'text-secondary'
 const progressTrackClass = 'h-1.5 rounded-full bg-[var(--app-surface-muted)] overflow-hidden'
 const progressFillClass = 'h-full rounded-full bg-[var(--app-accent)] transition-all duration-700'
 const dashboardChipClass = 'brand-chip rounded-lg px-2.5 py-1 text-xs font-medium'
+const mutedChipClass = 'rounded-lg px-2.5 py-1 surface-soft text-secondary text-xs'
 const recruitSlotClass = (displayState: number) =>
   `relative rounded-lg p-2 ${
     displayState === 2
@@ -137,9 +139,32 @@ const recruitBadgeClass = (displayState: number) =>
       : 'surface-soft text-secondary'
   }`
 
+const getUsageBarClass = (pct?: number) => {
+  if (pct == null) return 'bg-[var(--app-accent)]'
+  if (pct >= 90) return 'bg-[var(--app-danger)]'
+  if (pct >= 75) return 'bg-[var(--app-warning)]'
+  return 'bg-[var(--app-accent)]'
+}
+
+const getUsageValueClass = (pct?: number) => {
+  if (pct == null) return 'text-primary'
+  if (pct >= 90) return 'text-[var(--app-danger)]'
+  if (pct >= 75) return 'text-[var(--app-warning)]'
+  return 'text-primary'
+}
+
+const flowGridColumnsFallback = 'minmax(0, 0.78fr) minmax(0, 1.22fr)'
+const flowPreviewAspectRatio = 16 / 9
+const flowGridMinLeftWidth = 360
+const flowGridMinPreviewWidth = 520
+
 export default function Dashboard() {
   const setActiveTab = useUIStore(state => state.setActiveTab)
   const openAutomation = useCallback(() => setActiveTab('automation'), [setActiveTab])
+  const flowGridRef = useRef<HTMLDivElement | null>(null)
+  const flowCardRef = useRef<HTMLDivElement | null>(null)
+  const flowPreviewRef = useRef<HTMLDivElement | null>(null)
+  const [flowGridColumns, setFlowGridColumns] = useState(flowGridColumnsFallback)
   const [sklandData, setSklandData] = useState<SklandData | null>(null)
   const [sklandStatus, setSklandStatus] = useState<{ isLoggedIn: boolean; phone: string | null }>({ 
     isLoggedIn: false, 
@@ -184,6 +209,92 @@ export default function Dashboard() {
     }, 1000)
     return () => clearInterval(timer)
   }, [])
+
+  useLayoutEffect(() => {
+    if (loading) return
+
+    const grid = flowGridRef.current
+    const flowCard = flowCardRef.current
+    const previewShell = flowPreviewRef.current
+
+    if (!grid || !flowCard || !previewShell) return
+
+    const mediaQuery = window.matchMedia('(min-width: 1280px)')
+    let frameId = 0
+
+    const updateColumns = (columns: string) => {
+      setFlowGridColumns(current => current === columns ? current : columns)
+    }
+
+    const syncColumns = () => {
+      window.cancelAnimationFrame(frameId)
+      frameId = window.requestAnimationFrame(() => {
+        if (!mediaQuery.matches) {
+          updateColumns(flowGridColumnsFallback)
+          return
+        }
+
+        const previewCard = previewShell.querySelector<HTMLElement>('[data-dashboard-preview-card]')
+        const previewFrame = previewShell.querySelector<HTMLElement>('[data-dashboard-preview-frame]')
+
+        if (!previewCard || !previewFrame) {
+          updateColumns(flowGridColumnsFallback)
+          return
+        }
+
+        const gridRect = grid.getBoundingClientRect()
+        const flowRect = flowCard.getBoundingClientRect()
+        const previewCardRect = previewCard.getBoundingClientRect()
+        const previewFrameRect = previewFrame.getBoundingClientRect()
+
+        if (
+          gridRect.width <= 0 ||
+          flowRect.height <= 0 ||
+          previewCardRect.width <= 0 ||
+          previewFrameRect.width <= 0
+        ) {
+          return
+        }
+
+        const gridStyle = window.getComputedStyle(grid)
+        const columnGap = Number.parseFloat(gridStyle.columnGap) || 20
+        const previewChromeHeight = Math.max(0, previewCardRect.height - previewFrameRect.height)
+        const previewChromeWidth = Math.max(0, previewCardRect.width - previewFrameRect.width)
+        const targetFrameHeight = Math.max(180, flowRect.height - previewChromeHeight)
+        const desiredPreviewWidth = targetFrameHeight * flowPreviewAspectRatio + previewChromeWidth
+        const minLeftWidth = Math.min(420, Math.max(flowGridMinLeftWidth, gridRect.width * 0.32))
+        const minPreviewWidth = Math.min(560, Math.max(flowGridMinPreviewWidth, gridRect.width * 0.42))
+        const maxPreviewWidth = Math.max(minPreviewWidth, gridRect.width - columnGap - minLeftWidth)
+        const nextPreviewWidth = Math.round(Math.min(Math.max(desiredPreviewWidth, minPreviewWidth), maxPreviewWidth))
+        const nextLeftWidth = Math.max(0, Math.round(gridRect.width - columnGap - nextPreviewWidth))
+
+        updateColumns(`minmax(0, ${nextLeftWidth}px) minmax(0, ${nextPreviewWidth}px)`)
+      })
+    }
+
+    const resizeObserver = new ResizeObserver(syncColumns)
+    resizeObserver.observe(grid)
+    resizeObserver.observe(flowCard)
+    resizeObserver.observe(previewShell)
+
+    const previewCard = previewShell.querySelector<HTMLElement>('[data-dashboard-preview-card]')
+    const previewFrame = previewShell.querySelector<HTMLElement>('[data-dashboard-preview-frame]')
+
+    if (previewCard) resizeObserver.observe(previewCard)
+    if (previewFrame) resizeObserver.observe(previewFrame)
+
+    mediaQuery.addEventListener('change', syncColumns)
+    window.addEventListener('resize', syncColumns)
+    syncColumns()
+
+    return () => {
+      window.cancelAnimationFrame(frameId)
+      resizeObserver.disconnect()
+      mediaQuery.removeEventListener('change', syncColumns)
+      window.removeEventListener('resize', syncColumns)
+    }
+  }, [loading])
+
   const loadDashboardData = async (forceRefresh: boolean = false) => {
     // 只在首次加载且没有数据时显示骨架屏
     if (!sklandData) {
@@ -363,6 +474,10 @@ export default function Dashboard() {
     return <DashboardSkeleton />
   }
 
+  const flowGridStyle = {
+    '--dashboard-flow-columns': flowGridColumns,
+  } as CSSProperties
+
   return (
     <div className="app-page">
       <div className="max-w-7xl mx-auto app-stack-section">
@@ -371,61 +486,111 @@ export default function Dashboard() {
           title="控制台"
           subtitle="今日活动、自动化进度、养成与掉落总览"
           actions={
-            <div className="flex items-center gap-3">
-              <FloatingStatusIndicator />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <FloatingStatusIndicator className="max-w-[8rem] sm:max-w-none" />
+              <IconButton
+                onClick={() => loadDashboardData(true)}
+                variant="secondary"
+                size="lg"
+                title="刷新数据"
+                aria-label="刷新数据"
+                className="sm:hidden text-[var(--app-accent-strong)]"
+                icon={<Icons.RefreshCw className="h-4 w-4" />}
+              />
               <Button
                 onClick={() => loadDashboardData(true)}
                 variant="gradient"
                 size="md"
+                className="hidden shrink-0 sm:inline-flex"
                 icon={<Icons.RefreshCw />}
               >
-                <span className="hidden sm:inline">刷新数据</span>
+                刷新数据
               </Button>
             </div>
           }
         />
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr] gap-5">
-          <Card theme="cyan" animated delay={0.18} className="!p-5">
-            <div className="flex items-center justify-between gap-4 mb-3">
-              <div>
-                <div className="text-sm font-bold text-primary">今日流程</div>
-                <div className={`text-[10px] ${labelClass} mt-0.5`}>活动、自动化、养成与掉落一览</div>
-              </div>
-              <div className={`text-right text-[10px] ${labelClass}`}>
-                <div>{lastUpdate ? `更新于 ${lastUpdate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}` : '等待首次刷新'}</div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5 mb-3">
-              {[
-                { label: '今日活动', value: activitySummary.available ? (activitySummary.name || activitySummary.code || '进行中') : '暂无', sub: activitySummary.tip || '' },
-                { label: '自动化', value: scheduleSummary.isRunning ? '执行中' : '空闲', sub: scheduleSummary.currentTask || scheduleSummary.message || '可开始今日流程' },
-                { label: '养成目标', value: `${trainingSummary.count} 项`, sub: trainingSummary.topNames.length > 0 ? trainingSummary.topNames.join('、') : '还没有养成目标' },
-                { label: '今日掉落', value: `${dropSummary.count} 条`, sub: dropSummary.recent[0]?.items || '执行作战后自动汇总' },
-              ].map(item => (
-                <div key={item.label} className={compactTileClass}>
-                  <div className={`text-[9px] ${labelClass} uppercase tracking-wider`}>{item.label}</div>
-                  <div className="mt-1 text-base font-bold text-primary">{item.value}</div>
-                  <div className={`mt-0.5 text-[9px] ${labelClass} truncate`}>{item.sub}</div>
+        <div
+          ref={flowGridRef}
+          className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[var(--dashboard-flow-columns)]"
+          style={flowGridStyle}
+        >
+          <div ref={flowCardRef} className="min-w-0">
+            <Card theme="cyan" animated delay={0.18} className="!p-4 sm:!p-5">
+              <div className="flex items-center justify-between gap-4 mb-3">
+                <div>
+                  <div className="text-sm font-bold text-primary">今日流程</div>
+                  <div className={`text-[10px] ${labelClass} mt-0.5`}>活动、自动化、养成与掉落一览</div>
                 </div>
-              ))}
-            </div>
+                <div className={`text-right text-[10px] ${labelClass}`}>
+                  <div>{lastUpdate ? `更新于 ${lastUpdate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}` : '等待首次刷新'}</div>
+                </div>
+              </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={runTodayFlow} variant="gradient" disabled={quickStartLoading}>
-                {quickStartLoading ? '启动中...' : '一键开始今日流程'}
-              </Button>
-              <Button onClick={() => setActiveTab('automation')} variant="secondary">去自动化</Button>
-              <Button onClick={() => setActiveTab('combat')} variant="secondary">去作业</Button>
-              <Button onClick={() => setActiveTab('training')} variant="secondary">去养成</Button>
-            </div>
-            {quickStartMessage && (
-              <div className={`mt-4 text-sm ${labelClass}`}>{quickStartMessage}</div>
-            )}
-          </Card>
+              <div className="grid grid-cols-2 gap-2.5 mb-3">
+                {[
+                  { label: '今日活动', value: activitySummary.available ? (activitySummary.name || activitySummary.code || '进行中') : '暂无', sub: activitySummary.tip || '等待活动数据', Icon: CalendarDays },
+                  { label: '自动化', value: scheduleSummary.isRunning ? '执行中' : '空闲', sub: scheduleSummary.currentTask || scheduleSummary.message || '可开始今日流程', Icon: Bot },
+                  { label: '养成目标', value: `${trainingSummary.count} 项`, sub: trainingSummary.topNames.length > 0 ? trainingSummary.topNames.join('、') : '还没有养成目标', Icon: Target },
+                  { label: '今日掉落', value: `${dropSummary.count} 条`, sub: dropSummary.recent[0]?.items || '执行作战后自动汇总', Icon: PackageOpen },
+                ].map(({ Icon, ...item }) => (
+                  <div key={item.label} className={`${compactTileClass} min-h-[5.25rem] transition-colors hover:brand-border`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className={`text-[9px] ${labelClass} uppercase tracking-wider`}>{item.label}</div>
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg surface-soft">
+                        <Icon className="h-3.5 w-3.5 text-secondary" strokeWidth={1.8} />
+                      </span>
+                    </div>
+                    <div className="mt-1 text-base font-bold text-primary">{item.value}</div>
+                    <div className={`mt-0.5 truncate text-[9px] ${labelClass}`}>{item.sub}</div>
+                  </div>
+                ))}
+              </div>
 
-          <DashboardPreviewEntry onOpen={openAutomation} />
+              <div className="mb-3 rounded-xl px-3 py-2.5 surface-soft">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <span className={`text-[10px] ${labelClass} uppercase tracking-wider`}>今日开放</span>
+                  <span className="text-[10px] font-medium text-primary">{openStageSummary.open.length} 个日常本</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {openStageSummary.open.length > 0 ? (
+                    openStageSummary.open.map(item => (
+                      <span key={item.stage} className={dashboardChipClass}>{item.stage} · {item.name}</span>
+                    ))
+                  ) : (
+                    <span className={mutedChipClass}>等待开放关卡数据</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap xl:flex-nowrap">
+                <Button
+                  onClick={runTodayFlow}
+                  variant="gradient"
+                  disabled={quickStartLoading}
+                  className="col-span-2 justify-center whitespace-nowrap sm:col-span-1"
+                  icon={<Play className="h-4 w-4" strokeWidth={2} />}
+                >
+                  {quickStartLoading ? '启动中...' : (
+                    <>
+                      <span className="xl:hidden">一键开始今日流程</span>
+                      <span className="hidden xl:inline">一键开始</span>
+                    </>
+                  )}
+                </Button>
+                <Button onClick={() => setActiveTab('automation')} variant="secondary" className="justify-center whitespace-nowrap" icon={<Bot className="h-4 w-4" strokeWidth={1.8} />}>自动化</Button>
+                <Button onClick={() => setActiveTab('combat')} variant="secondary" className="justify-center whitespace-nowrap" icon={<Activity className="h-4 w-4" strokeWidth={1.8} />}>作业</Button>
+                <Button onClick={() => setActiveTab('training')} variant="secondary" className="col-span-2 justify-center whitespace-nowrap sm:col-span-1" icon={<Target className="h-4 w-4" strokeWidth={1.8} />}>养成</Button>
+              </div>
+              {quickStartMessage && (
+                <div className={`mt-4 rounded-xl px-3 py-2 text-xs ${labelClass} surface-soft`}>{quickStartMessage}</div>
+              )}
+            </Card>
+          </div>
+
+          <div ref={flowPreviewRef} className="min-w-0">
+            <DashboardPreviewEntry onOpen={openAutomation} />
+          </div>
         </div>
 
         {deviceStats && (
@@ -443,14 +608,14 @@ export default function Dashboard() {
                 { label: '温度', pct: undefined, sub: '', Icon: Thermometer, value: deviceStats.temp != null ? `${deviceStats.temp}°C` : '--' },
               ] as const).map(({ label, pct, sub, Icon, value }) => {
                 return (
-                  <div key={label} className="group rounded-2xl border border-[var(--app-border)] surface-panel surface-panel-hover p-4 transition-colors">
+                  <div key={label} className="group rounded-2xl border border-[var(--app-border)] surface-panel surface-panel-hover p-3.5 transition-colors sm:p-4">
                     <div className="flex items-center gap-2.5 mb-3">
                       <div className="shrink-0 h-8 w-8 rounded-lg surface-soft flex items-center justify-center">
                         <Icon className={`h-4 w-4 ${labelClass}`} strokeWidth={1.5} />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="text-xs font-medium text-primary">{label}</div>
-                        <div className={`text-[10px] ${labelClass}`}>{sub}</div>
+                        <div className={`truncate text-[10px] ${labelClass}`}>{sub || '实时采样'}</div>
                       </div>
                       {value != null && (
                         <div className="ml-auto text-sm font-semibold text-primary">{value}</div>
@@ -460,10 +625,10 @@ export default function Dashboard() {
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <span className={`text-[10px] ${labelClass}`}>使用率</span>
-                          <span className="text-[10px] font-medium text-primary">{pct}%</span>
+                          <span className={`text-[10px] font-medium ${getUsageValueClass(pct)}`}>{pct}%</span>
                         </div>
                         <div className={progressTrackClass}>
-                          <div className={progressFillClass} style={{ width: `${Math.min(pct, 100)}%` }} />
+                          <div className={`h-full rounded-full transition-all duration-700 ${getUsageBarClass(pct)}`} style={{ width: `${Math.min(pct, 100)}%` }} />
                         </div>
                       </div>
                     )}
@@ -501,24 +666,32 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-5">
               <div>
                 <div className={sectionTitleClass}>今日开放关卡</div>
-                <div className={`text-xs ${labelClass} mt-0.5`}>资源本开放情况</div>
+                <div className={`text-xs ${labelClass} mt-0.5`}>资源本与芯片本开放情况</div>
               </div>
             </div>
             <div className="space-y-3">
               <div>
                 <div className={`text-[11px] ${labelClass} uppercase tracking-wider mb-2`}>开放</div>
                 <div className="flex flex-wrap gap-1.5">
-                  {openStageSummary.open.map(item => (
-                    <span key={item.stage} className={dashboardChipClass}>{item.stage} · {item.name}</span>
-                  ))}
+                  {openStageSummary.open.length > 0 ? (
+                    openStageSummary.open.map(item => (
+                      <span key={item.stage} className={dashboardChipClass}>{item.stage} · {item.name}</span>
+                    ))
+                  ) : (
+                    <span className={mutedChipClass}>暂无开放数据</span>
+                  )}
                 </div>
               </div>
               <div>
                 <div className={`text-[11px] ${labelClass} uppercase tracking-wider mb-2`}>未开放</div>
                 <div className="flex flex-wrap gap-1.5">
-                  {openStageSummary.closed.map(item => (
-                    <span key={item.stage} className="rounded-lg px-2.5 py-1 surface-soft text-secondary text-xs">{item.stage} · {item.name}</span>
-                  ))}
+                  {openStageSummary.closed.length > 0 ? (
+                    openStageSummary.closed.map(item => (
+                      <span key={item.stage} className={mutedChipClass}>{item.stage} · {item.name}</span>
+                    ))
+                  ) : (
+                    <span className={mutedChipClass}>暂无未开放数据</span>
+                  )}
                 </div>
               </div>
             </div>

@@ -11,7 +11,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry({ onOpen }: Da
   const { videoRef, fallbackSnapshot, showLivePreview, statusText, headerStatusText } = useDashboardPreview()
 
   return (
-    <div className="rounded-2xl border border-[var(--app-border)] surface-panel overflow-hidden">
+    <div data-dashboard-preview-card className="rounded-2xl border border-[var(--app-border)] surface-panel overflow-hidden">
       <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-[var(--app-border)]">
         <div className="flex items-center gap-2">
           <div className={`h-1.5 w-1.5 rounded-full ${showLivePreview ? 'bg-[var(--app-success)]' : 'bg-[var(--app-accent)]'}`} />
@@ -22,7 +22,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry({ onOpen }: Da
           <Button onClick={onOpen} variant="ghost" size="sm">打开</Button>
         </div>
       </div>
-      <div className="relative aspect-video w-full overflow-hidden bg-black">
+      <div data-dashboard-preview-frame className="relative aspect-video w-full overflow-hidden bg-black">
         <video
           ref={videoRef}
           autoPlay

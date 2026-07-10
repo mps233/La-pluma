@@ -1140,22 +1140,28 @@ export default function AutomationTasks({}: AutomationTasksProps) {
 
           {/* 任务流程 */}
           <div className="lg:col-span-2">
-            <div className="rounded-3xl p-6 surface-panel transition-colors">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center space-x-2">
-                  <Icons.Clipboard />
-                  <span>任务流程</span>
-                  <span className="text-sm text-gray-600 dark:text-gray-400 font-normal px-3 py-1 rounded-full border border-gray-200 dark:border-white/10 surface-soft transition-colors">
+            <div className="rounded-3xl p-4 sm:p-6 surface-panel transition-colors">
+              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <h3 className="flex items-center gap-2 text-base font-bold text-gray-900 dark:text-white sm:text-lg">
+                    <Icons.Clipboard />
+                    <span className="truncate">任务流程</span>
+                  </h3>
+                  <span className="mt-2 inline-flex rounded-full border border-gray-200 px-2.5 py-1 text-xs font-normal text-gray-600 transition-colors surface-soft dark:border-white/10 dark:text-gray-400 sm:hidden">
                     {taskFlow.filter(t => t.enabled).length}/{taskFlow.length} 已启用
                   </span>
-                </h3>
-                <div className="flex space-x-2">
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                  <span className="hidden rounded-full border border-gray-200 px-3 py-1 text-sm font-normal text-gray-600 transition-colors surface-soft dark:border-white/10 dark:text-gray-400 sm:inline-flex">
+                    {taskFlow.filter(t => t.enabled).length}/{taskFlow.length} 已启用
+                  </span>
                   {taskFlow.length > 0 && (
-                    <>
+                    <div className="grid w-full grid-cols-1 gap-2 min-[390px]:grid-cols-2 sm:flex sm:w-auto">
                       <Button
                         onClick={executeTaskFlow}
                         disabled={isRunning || taskFlow.filter(t => t.enabled).length === 0}
                         variant="gradient"
+                        className="w-full justify-center whitespace-nowrap sm:w-auto"
                         icon={
                           isRunning ? (
                             <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -1175,6 +1181,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                         <Button
                           onClick={stopTaskFlow}
                           variant="gradient"
+                          className="w-full justify-center whitespace-nowrap sm:w-auto"
                           icon={
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
@@ -1184,7 +1191,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                           终止执行
                         </Button>
                       )}
-                    </>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1375,9 +1382,13 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                           <option value="S5-9">S5-9 (异铁)</option>
                                           <option value="CE-6">CE-6 (龙门币)</option>
                                           <option value="LS-6">LS-6 (作战记录)</option>
-                                          <option value="AP-5">AP-5 (技能书)</option>
-                                          <option value="CA-5">CA-5 (芯片)</option>
+                                          <option value="AP-5">AP-5 (采购凭证)</option>
+                                          <option value="CA-5">CA-5 (技巧概要)</option>
                                           <option value="SK-5">SK-5 (碳)</option>
+                                          <option value="PR-A-2">PR-A-2 (重装/医疗芯片组)</option>
+                                          <option value="PR-B-2">PR-B-2 (狙击/术师芯片组)</option>
+                                          <option value="PR-C-2">PR-C-2 (先锋/辅助芯片组)</option>
+                                          <option value="PR-D-2">PR-D-2 (近卫/特种芯片组)</option>
                                           <option value="Annihilation">Annihilation (剿灭)</option>
                                           <option value="HD-1">HD-1 (活动)</option>
                                           <option value="HD-2">HD-2 (活动)</option>
