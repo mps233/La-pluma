@@ -5,7 +5,7 @@ import { AlertTriangle, Check, CheckCircle2, ChevronDown, CircleMinus, GripVerti
 import Icons from './Icons'
 import ScreenMonitor from './ScreenMonitor'
 import NotificationSettings from './NotificationSettings'
-import { PageHeader, Button } from './common'
+import { EmptyState, PageHeader, Button } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type {
@@ -1385,11 +1385,13 @@ export default function AutomationTasks({}: AutomationTasksProps) {
               </div>
 
               {taskFlow.length === 0 ? (
-                <div className="automation-sequence-empty">
-                  <ListPlus size={20} strokeWidth={1.8} />
-                  <strong>流程为空</strong>
-                  <span>使用下方入口添加任务</span>
-                </div>
+                <EmptyState
+                  className="automation-sequence-empty"
+                  compact
+                  icon={<ListPlus size={20} strokeWidth={1.8} />}
+                  title="流程为空"
+                  description="使用下方入口添加任务"
+                />
               ) : (
                 <div className="automation-sequence-list">
                   {taskFlow.map((task, index) => {

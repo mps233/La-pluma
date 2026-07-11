@@ -3109,6 +3109,51 @@ svg.w-5.h-5 {
     transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
   }
 
+  .app-empty-state {
+    display: flex;
+    min-height: 11rem;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    padding: 1.5rem;
+    color: var(--app-text-soft);
+    text-align: center;
+  }
+
+  .app-empty-state.is-compact {
+    min-height: 0;
+  }
+
+  .app-empty-state-icon {
+    display: inline-flex;
+    width: 2.75rem;
+    height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.75rem;
+    border-radius: var(--app-radius-lg);
+    background: var(--app-accent-soft);
+    color: var(--app-accent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 16%, transparent);
+  }
+
+  .app-empty-state strong {
+    color: var(--app-text);
+    font-size: 0.8125rem;
+    font-weight: 750;
+  }
+
+  .app-empty-state > span {
+    max-width: 28rem;
+    margin-top: 0.3rem;
+    font-size: 0.6875rem;
+    line-height: 1.55;
+  }
+
+  .app-empty-state-action {
+    margin-top: 0.875rem;
+  }
+
   .app-input {
     width: 100%;
     border-radius: var(--app-radius-lg);

@@ -1,10 +1,11 @@
-import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { maaApi, searchCopilot, searchParadoxCopilot } from '../services/api'
 import { motion, useReducedMotion } from 'framer-motion'
 import Icons from './Icons'
 import { PageHeader, Button } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
+import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
 import type {
   CombatTasksProps,
   CombatTask,
@@ -66,41 +67,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
   const [selectedSearchCopilotUri, setSelectedSearchCopilotUri] = useState<string>('')
   const [isSearchingCopilot, setIsSearchingCopilot] = useState(false)
   const [activeCombatMode, setActiveCombatMode] = useState<CombatMode>('copilot')
-  const combatModeTabsRef = useRef<HTMLDivElement>(null)
-  const combatModeTabRefs = useRef<Record<CombatMode, HTMLButtonElement | null>>({
-    copilot: null,
-    ssscopilot: null,
-    paradoxcopilot: null,
-  })
-  const [activeCombatModeRect, setActiveCombatModeRect] = useState({ x: 0, y: 0, width: 0, height: 0 })
-
-  useLayoutEffect(() => {
-    const updateActiveCombatModeRect = () => {
-      const container = combatModeTabsRef.current
-      const activeTab = combatModeTabRefs.current[activeCombatMode]
-      if (!container || !activeTab) return
-
-      const containerRect = container.getBoundingClientRect()
-      const activeRect = activeTab.getBoundingClientRect()
-      setActiveCombatModeRect({
-        x: activeRect.left - containerRect.left,
-        y: activeRect.top - containerRect.top,
-        width: activeRect.width,
-        height: activeRect.height,
-      })
-    }
-
-    updateActiveCombatModeRect()
-    const resizeObserver = typeof ResizeObserver === 'undefined'
-      ? null
-      : new ResizeObserver(updateActiveCombatModeRect)
-    if (combatModeTabsRef.current) resizeObserver?.observe(combatModeTabsRef.current)
-    window.addEventListener('resize', updateActiveCombatModeRect)
-    return () => {
-      resizeObserver?.disconnect()
-      window.removeEventListener('resize', updateActiveCombatModeRect)
-    }
-  }, [activeCombatMode])
+  const { containerRef: combatModeTabsRef, activeRect: activeCombatModeRect, setTabRef: setCombatModeTabRef } = useFluidTabIndicator(activeCombatMode)
 
   const normalizeFormationMode = (value: AutoFormationConfig[string] | undefined): FormationMode => {
     if (value === true) return 'on'
@@ -1291,7 +1258,12 @@ export default function CombatTasks(_props: CombatTasksProps) {
                 aria-hidden="true"
                 className="pointer-events-none absolute z-20 flex items-center gap-3 rounded-lg bg-[var(--app-accent)] px-3.5 py-2.5 text-left text-white shadow-[0_10px_24px_color-mix(in_srgb,var(--app-accent)_22%,transparent)]"
                 initial={false}
-                animate={activeCombatModeRect}
+                animate={{
+                  x: activeCombatModeRect.x,
+                  y: activeCombatModeRect.y,
+                  width: activeCombatModeRect.width,
+                  height: activeCombatModeRect.height,
+                }}
                 transition={shouldReduceMotion
                   ? { duration: 0 }
                   : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
@@ -1309,7 +1281,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
               <button
                 key={id}
                 ref={(element) => {
-                  combatModeTabRefs.current[id] = element
+                  setCombatModeTabRef(id)(element)
                 }}
                 type="button"
                 onClick={() => setActiveCombatMode(id)}

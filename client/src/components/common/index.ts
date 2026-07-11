@@ -15,3 +15,4 @@ export { default as Input, Textarea, Select, Checkbox } from './Input.tsx'
 // 反馈组件
 export { default as Modal, ConfirmDialog } from './Modal.tsx'
 export { default as Loading, FullScreenLoading, Skeleton, CardSkeleton, DashboardSkeleton } from './Loading.tsx'
+export { default as EmptyState } from './EmptyState.tsx'

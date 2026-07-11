@@ -1,10 +1,11 @@
-import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { maaApi } from '../services/api'
 import Icons from './Icons'
 import { PageHeader, Card, Input, Select, Checkbox, Button } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
+import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
 import type {
   RoguelikeTasksProps,
   RoguelikeTask,
@@ -35,12 +36,7 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
   const [advancedParams, setAdvancedParams] = useState<RoguelikeAdvancedParams>({})
   const [configLoaded, setConfigLoaded] = useState(false)
   const [activeMode, setActiveMode] = useState<RoguelikeMode>('roguelike')
-  const modeTabsRef = useRef<HTMLDivElement>(null)
-  const modeTabRefs = useRef<Record<RoguelikeMode, HTMLButtonElement | null>>({
-    roguelike: null,
-    reclamation: null,
-  })
-  const [activeModeRect, setActiveModeRect] = useState({ x: 0, y: 0, width: 0, height: 0 })
+  const { containerRef: modeTabsRef, activeRect: activeModeRect, setTabRef: setModeTabRef } = useFluidTabIndicator(activeMode)
 
   // 页面加载时从服务器或 localStorage 加载配置和恢复执行状态
   useEffect(() => {
@@ -171,27 +167,6 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
       description: '自动生息演算模式'
     },
   ]
-
-  useLayoutEffect(() => {
-    const updateActiveModeRect = () => {
-      const container = modeTabsRef.current
-      const activeTab = modeTabRefs.current[activeMode]
-      if (!container || !activeTab) return
-
-      const containerRect = container.getBoundingClientRect()
-      const activeRect = activeTab.getBoundingClientRect()
-      setActiveModeRect({
-        x: activeRect.left - containerRect.left,
-        y: activeRect.top - containerRect.top,
-        width: activeRect.width,
-        height: activeRect.height,
-      })
-    }
-
-    updateActiveModeRect()
-    window.addEventListener('resize', updateActiveModeRect)
-    return () => window.removeEventListener('resize', updateActiveModeRect)
-  }, [activeMode])
 
   const getAdvancedOptions = (taskId: string): RoguelikeAdvancedOption[] => {
     const options: Record<string, RoguelikeAdvancedOption[]> = {
@@ -364,7 +339,12 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
               aria-hidden="true"
               className="roguelike-mode-highlight"
               initial={false}
-              animate={activeModeRect}
+              animate={{
+                x: activeModeRect.x,
+                y: activeModeRect.y,
+                width: activeModeRect.width,
+                height: activeModeRect.height,
+              }}
               transition={{ type: 'spring', stiffness: 360, damping: 34, mass: 0.8 }}
             >
               {ActiveIcon && <span className="roguelike-mode-icon is-active"><ActiveIcon /></span>}
@@ -381,7 +361,7 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
               <button
                 key={task.id}
                 ref={(element) => {
-                  modeTabRefs.current[task.id as RoguelikeMode] = element
+                  setModeTabRef(task.id as RoguelikeMode)(element)
                 }}
                 type="button"
                 onClick={() => setActiveMode(task.id as RoguelikeMode)}

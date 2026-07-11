@@ -2,19 +2,18 @@ import { motion } from 'framer-motion'
 import Icons from './Icons'
 import { getItemIconUrl } from '../services/api'
 import type { DropRecordsProps } from '@/types/components'
-import { Button, Card } from './common'
+import { Button, Card, EmptyState } from './common'
 
 export default function DropRecords({ dropStatistics, dropDays, setDropDays, onRefresh }: DropRecordsProps) {
   if (!dropStatistics) {
     return (
       <Card animated className="surface-soft">
-        <div className="text-center py-12">
-          <Icons.TrendingUp className="mx-auto mb-4 h-16 w-16 text-tertiary" />
-          <p className="text-secondary">暂无掉落记录</p>
-          <p className="mt-2 text-sm text-tertiary">
-            执行作战任务后会自动记录掉落数据
-          </p>
-        </div>
+        <EmptyState
+          className="py-12"
+          icon={<Icons.TrendingUp className="h-8 w-8" />}
+          title="暂无掉落记录"
+          description="执行作战任务后会自动记录掉落数据"
+        />
       </Card>
     )
   }
