@@ -42,14 +42,6 @@ export function initTelegramBot(config) {
 }
 
 /**
- * 停止 Telegram Bot
- */
-export function stopTelegramBot() {
-  isPolling = false;
-  logger.info('已停止');
-}
-
-/**
  * 开始轮询消息
  */
 async function startPolling() {
@@ -442,7 +434,7 @@ async function getStatus() {
     statusText += `\n使用 /help 查看可用命令`;
     
     return statusText;
-  } catch (error) {
+  } catch {
     return `📊 系统状态\n\n✅ Bot 运行中\n⏰ 等待命令...\n\n使用 /help 查看可用命令`;
   }
 }
@@ -992,5 +984,3 @@ async function setupBotCommands() {
     logger.error('设置命令菜单错误', { error: error.message });
   }
 }
-
-export { botConfig };

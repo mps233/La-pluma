@@ -1,5 +1,5 @@
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
-import { API_BASE_URL, fetchWithAuth } from '../services/api'
+import { API_BASE_URL, fetchWithAuth, parseJsonResponse } from '../services/api'
 import { useStatusStore } from '../store/statusStore'
 import { detectStatusMessageType, getStatusVisualConfig } from '../utils/statusMessage'
 import { useEffect, useRef, useState, useCallback } from 'react'
@@ -51,7 +51,7 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
         const response = await fetchWithAuth(`${API_BASE_URL}/operator-quotes/random`)
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
-        const data = await response.json()
+        const data = await parseJsonResponse<OperatorQuote>(response)
         if (!data?.operator || !data?.quote) throw new Error('Invalid quote payload')
 
         setDailyQuote({

@@ -116,7 +116,3 @@ export async function withMaaExecutionLease(owner, callback) {
     await lease.release();
   }
 }
-
-export function getActiveMaaExecutionContext() {
-  return executionContext.getStore() || null;
-}

@@ -303,7 +303,7 @@ class TelegramChannel extends NotificationChannel {
     logger.warn('发送图片失败，改为发送纯文本消息');
     try {
       return await this.send({ title, content, level, data });
-    } catch (textError) {
+    } catch {
       throw new Error(`发送图片和文本消息都失败: ${lastError.message}`);
     }
   }
@@ -651,15 +651,3 @@ export function buildTaskCompletionMessage(taskInfo = {}) {
 export async function sendTaskCompletionNotification(taskInfo) {
   return await sendNotification(buildTaskCompletionMessage(taskInfo));
 }
-
-export default {
-  setNotificationConfig,
-  getNotificationConfig,
-  shouldCaptureNotificationScreenshot,
-  sendNotification,
-  sendToChannel,
-  testNotificationChannel,
-  buildTaskCompletionMessage,
-  sendTaskCompletionNotification,
-  isStageOpenToday,
-};

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { maaApi } from '../services/api'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { AlertTriangle, Check, CheckCircle2, ChevronDown, CircleMinus, GripVertical, ListPlus, LoaderCircle, Plus, SlidersHorizontal, Square, Trash2 } from 'lucide-react'
+import { AlertTriangle, Cable, Check, CheckCircle2, ChevronDown, CircleMinus, GripVertical, ListPlus, LoaderCircle, Plus, SlidersHorizontal, Square, Trash2 } from 'lucide-react'
 import Icons from './Icons'
 import ScreenMonitor from './ScreenMonitor'
 import NotificationSettings from './NotificationSettings'
@@ -207,13 +207,16 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   const [currentActivity, setCurrentActivity] = useState<any>(null)
   const [activityName, setActivityName] = useState<string | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<Record<string, ConnectionTestStatus>>({})
-  const [testingConnection, setTestingConnection] = useState<Record<string, boolean>>({})
+  const [testingConnectionTaskId, setTestingConnectionTaskId] = useState<string | null>(null)
   const [lastExecutionSummary, setLastExecutionSummary] = useState<AutomationExecutionSummary | null>(null)
   const [executionDetailsOpen, setExecutionDetailsOpen] = useState(false)
   const autoSaveQueueRef = useRef<Promise<void>>(Promise.resolve())
   const autoSaveRevisionRef = useRef(0)
   const scheduleWasRunningRef = useRef(false)
   const stopRequestInFlightRef = useRef(false)
+  const connectionTestInFlightRef = useRef(false)
+  const connectionTestAbortRef = useRef<AbortController | null>(null)
+  const connectionTestMountedRef = useRef(true)
   const lastExecutionFingerprintRef = useRef('')
   const activeTaskId = selectedTaskId && taskFlow.some(task => task.id === selectedTaskId)
     ? selectedTaskId
@@ -227,6 +230,14 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     setLastExecutionSummary(summary)
     setExecutionDetailsOpen(executionSummaryHasFailure(summary))
   }
+
+  useEffect(() => {
+    connectionTestMountedRef.current = true
+    return () => {
+      connectionTestMountedRef.current = false
+      connectionTestAbortRef.current?.abort()
+    }
+  }, [])
 
   // 轮询定时任务执行状态
   useEffect(() => {
@@ -641,24 +652,54 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   }
 
   const testConnection = async (taskId: string) => {
-    setTestingConnection(prev => ({ ...prev, [taskId]: true }))
-    setConnectionStatus(prev => ({ ...prev, [taskId]: { success: false, message: '' } }))
+    if (connectionTestInFlightRef.current) return
+
+    const controller = new AbortController()
+    const startedAt = Date.now()
+    const waitForStableFeedback = async () => {
+      const remaining = 450 - (Date.now() - startedAt)
+      if (remaining > 0) await new Promise(resolve => setTimeout(resolve, remaining))
+    }
+    connectionTestInFlightRef.current = true
+    connectionTestAbortRef.current = controller
+    setTestingConnectionTaskId(taskId)
+    setConnectionStatus(prev => {
+      const next = { ...prev }
+      delete next[taskId]
+      return next
+    })
 
     try {
-      const result = await maaApi.testConnection()
+      const result = await maaApi.testConnection(undefined, undefined, controller.signal)
+      await waitForStableFeedback()
+      if (controller.signal.aborted) return
       const payload = result.data as ConnectionTestStatus | undefined
-      setConnectionStatus(prev => ({ ...prev, [taskId]: payload || { success: false, message: maaApi.getErrorMessage(result) } }))
+      const success = Boolean(result.success && payload?.success)
+      setConnectionStatus(prev => ({
+        ...prev,
+        [taskId]: {
+          success,
+          message: payload?.message || maaApi.getErrorMessage(result),
+        },
+      }))
     } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') return
+      await waitForStableFeedback()
+      if (controller.signal.aborted) return
       const errorMessage = error instanceof Error ? error.message : '未知错误'
       setConnectionStatus(prev => ({
         ...prev,
         [taskId]: {
           success: false,
-          message: '测试失败: ' + errorMessage
+          message: errorMessage,
         }
       }))
     } finally {
-      setTestingConnection(prev => ({ ...prev, [taskId]: false }))
+      if (connectionTestAbortRef.current === controller) {
+        connectionTestInFlightRef.current = false
+        connectionTestAbortRef.current = null
+        if (connectionTestMountedRef.current) setTestingConnectionTaskId(null)
+      }
     }
   }
 
@@ -1678,6 +1719,8 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                 <div className="automation-editor-content">
                   {taskFlow.filter(task => task.id === activeTaskId).map((task) => {
                     const index = taskFlow.findIndex(item => item.id === task.id)
+                    const connectionFeedback = connectionStatus[task.id]
+                    const isTestingConnection = testingConnectionTaskId === task.id
 
                     return (
                     <div
@@ -2591,45 +2634,48 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                       {/* 启动游戏任务的测试连接按钮 */}
                       {task.commandId === 'startup' && (
                         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-white/10">
-                          <button
-                            onClick={() => testConnection(task.id)}
-                            disabled={isRunning || !task.enabled || testingConnection[task.id]}
-                            className="w-full flex items-center justify-center space-x-2 px-4 py-2 brand-action text-white rounded-xl text-sm font-medium transition-all disabled:cursor-not-allowed disabled:shadow-none"
+                          <Button
+                            type="button"
+                            fullWidth
+                            size="md"
+                            onClick={() => void testConnection(task.id)}
+                            disabled={isRunning || !task.enabled || testingConnectionTaskId !== null}
+                            loading={isTestingConnection}
+                            loadingText="正在检查"
+                            statusKey={isTestingConnection ? 'testing' : connectionFeedback?.success ? 'success' : connectionFeedback ? 'error' : 'idle'}
+                            icon={connectionFeedback?.success
+                              ? <CheckCircle2 size={16} strokeWidth={2.2} aria-hidden="true" />
+                              : connectionFeedback
+                                ? <AlertTriangle size={16} strokeWidth={2.2} aria-hidden="true" />
+                                : <Cable size={16} strokeWidth={2.1} aria-hidden="true" />}
+                            aria-busy={isTestingConnection}
+                            className={isTestingConnection
+                              ? 'disabled:!bg-[var(--app-accent)] disabled:!text-white disabled:!opacity-80'
+                              : ''}
                           >
-                            {testingConnection[task.id] ? (
-                              <>
-                                <LoaderCircle size={16} className="animate-spin" strokeWidth={2.2} />
-                                <span>测试中...</span>
-                              </>
-                            ) : (
-                              <>
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
-                                <span>测试连接</span>
-                              </>
-                            )}
-                          </button>
+                            {connectionFeedback ? '重新测试' : '测试连接'}
+                          </Button>
 
                           {/* 连接状态显示 */}
-                          {connectionStatus[task.id] && (
-                            <div className={`mt-3 p-3 rounded-xl text-sm flex items-start space-x-2 ${
-                              connectionStatus[task.id]?.success
-                                ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30'
-                                : 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-500/30'
-                            }`}>
-                              {connectionStatus[task.id]?.success ? (
-                                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                              ) : (
-                                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                              )}
-                              <span>{connectionStatus[task.id]?.message}</span>
-                            </div>
-                          )}
+                          <AnimatePresence initial={false}>
+                            {connectionFeedback && (
+                              <motion.div
+                                key={task.id}
+                                initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, height: 0, y: -6 }}
+                                animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, height: 'auto', y: 0 }}
+                                exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, height: 0, y: -4 }}
+                                transition={{ duration: shouldReduceMotion ? 0.08 : 0.18, ease: 'easeOut' }}
+                                className={`app-info-card mt-3 flex min-w-0 items-start gap-2 overflow-hidden text-sm ${connectionFeedback.success ? 'status-success' : 'status-danger'}`}
+                                role={connectionFeedback.success ? 'status' : 'alert'}
+                                aria-live={connectionFeedback.success ? 'polite' : undefined}
+                              >
+                                {connectionFeedback.success
+                                  ? <CheckCircle2 size={18} className="mt-0.5 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+                                  : <AlertTriangle size={18} className="mt-0.5 shrink-0" strokeWidth={2.2} aria-hidden="true" />}
+                                <span className="min-w-0 break-words leading-5">{connectionFeedback.message}</span>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
                       )}
                     </div>

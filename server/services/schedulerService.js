@@ -177,29 +177,6 @@ function updateScheduleStatus(updates) {
   logger.debug('定时任务状态更新', scheduleExecutionStatus);
 }
 
-// Socket.io 实例（从 server.js 导入）
-let io = null;
-
-/**
- * 设置 Socket.io 实例
- */
-export function setSocketIO(socketIO) {
-  io = socketIO;
-  logger.info('Socket.io 已设置');
-}
-
-/**
- * 发送任务进度事件到前端
- */
-function emitTaskProgress(scheduleId, data) {
-  if (io) {
-    io.emit('schedule-progress', {
-      scheduleId,
-      ...data
-    });
-  }
-}
-
 // 构建 MAA 命令
 function buildCommand(task, connectionDefaults = {}) {
   if (task.taskType) {
@@ -1339,63 +1316,6 @@ async function executeTaskFlow(taskFlow, scheduleId) {
   } finally {
     if (!scheduleExecutionStatus.isRunning) activeScheduleAbortController = null;
   }
-}
-
-/**
- * 检测理智是否耗尽
- * 通过分析 MAA 输出判断理智是否用完
- * @param {string} output - MAA 命令输出
- * @param {string} stage - 关卡名称（用于排除剿灭等特殊关卡）
- */
-function checkSanityDepleted(output, stage = '') {
-  if (!output) return false;
-  
-  const lowerOutput = output.toLowerCase();
-  const lowerStage = stage.toLowerCase();
-  
-  // MAA 可能的理智不足提示
-  const sanityDepletedPatterns = [
-    'sanity is not enough',
-    '理智不足',
-    '理智已耗尽',
-    'not enough sanity',
-    'insufficient sanity',
-    'no sanity',
-    'sanity depleted',
-  ];
-  
-  // 检查文本模式
-  for (const pattern of sanityDepletedPatterns) {
-    if (lowerOutput.includes(pattern)) {
-      return true;
-    }
-  }
-  
-  // 检查是否打了 0 次（理智不足的典型表现）
-  // 格式: "Fight 关卡名 0 times" 或 "Fight 0 times"
-  if (/fight\s+(?:[a-z0-9-]+\s+)?0\s+times?/i.test(output)) {
-    return true;
-  }
-  
-  // 关键检测：如果有 Summary 和 [Fight] Completed，但没有 "Fight 关卡名 X times" 这一行
-  // 说明理智不足，MAA 没有实际打关卡就退出了
-  // 但要排除剿灭关卡（Annihilation），因为剿灭奖励领完也是这个表现
-  if (output.includes('Summary') && output.includes('[Fight]') && output.includes('Completed')) {
-    // 检查是否有 "Fight 关卡名 数字 times" 这样的行
-    const hasFightRecord = /Fight\s+[A-Z0-9-]+\s+\d+\s+times?/i.test(output);
-    if (!hasFightRecord) {
-      // 如果是剿灭关卡，不判定为理智不足（可能是奖励领完了）
-      if (lowerStage.includes('annihilation') || lowerStage.includes('剿灭')) {
-        logger.debug('理智检测：剿灭关卡无战斗记录，可能是奖励已领完，不判定为理智不足', { stage });
-        return false;
-      }
-      // 其他关卡没有战斗记录，说明理智不足
-      logger.debug('理智检测：非剿灭关卡无战斗记录，判定为理智不足', { stage });
-      return true;
-    }
-  }
-  
-  return false;
 }
 
 /**

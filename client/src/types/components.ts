@@ -3,141 +3,14 @@
  */
 
 import type { ReactNode } from 'react'
-import type { TaskFlow } from './api'
-
-// Common Component Props
-export interface PageHeaderProps {
-  icon?: ReactNode
-  title: string
-  subtitle?: string
-  gradientFrom?: string
-  gradientVia?: string
-  gradientTo?: string
-  rightContent?: ReactNode
-}
-
-export interface StatusIndicatorProps {
-  isActive: boolean
-  message?: string
-  activeText?: string
-  inactiveText?: string
-  activeColor?: string
-  inactiveColor?: string
-}
-
-export interface ButtonProps {
-  children: ReactNode
-  onClick?: () => void
-  disabled?: boolean
-  loading?: boolean
-  variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'ghost'
-  size?: 'sm' | 'md' | 'lg'
-  icon?: ReactNode
-  className?: string
-  type?: 'button' | 'submit' | 'reset'
-  gradientFrom?: string
-  gradientTo?: string
-}
-
-export interface InputProps {
-  label?: string
-  value: string | number
-  onChange: (value: string) => void
-  placeholder?: string
-  hint?: string
-  error?: string
-  disabled?: boolean
-  type?: 'text' | 'number' | 'password' | 'email'
-  icon?: ReactNode
-  className?: string
-}
-
-export interface SelectProps {
-  label?: string
-  value: string | number
-  onChange: (value: string) => void
-  options: Array<{ value: string | number; label: string }>
-  disabled?: boolean
-  hint?: string
-  error?: string
-  className?: string
-}
-
-export interface CheckboxProps {
-  label: string
-  checked: boolean
-  onChange: (checked: boolean) => void
-  disabled?: boolean
-  color?: string
-  className?: string
-}
-
-export interface CardProps {
-  children: ReactNode
-  className?: string
-  animated?: boolean
-  delay?: number
-}
-
-export interface ModalProps {
-  isOpen: boolean
-  onClose: () => void
-  title?: string
-  children: ReactNode
-  footer?: ReactNode
-  size?: 'sm' | 'md' | 'lg' | 'xl'
-  closeOnEscape?: boolean
-  closeOnOverlayClick?: boolean
-}
-
-export interface LoadingProps {
-  text?: string
-  size?: 'sm' | 'md' | 'lg'
-  color?: string
-}
-
-// Task Component Props
-export interface TaskCardProps {
-  task: TaskFlow
-  isActive: boolean
-  isRunning: boolean
-  onEdit: (task: TaskFlow) => void
-  onDelete: (taskId: string) => void
-  onToggle: (taskId: string) => void
-  onTest?: (taskId: string) => Promise<void>
-}
-
-export interface TaskFlowEditorProps {
-  tasks: TaskFlow[]
-  availableTasks: AvailableTask[]
-  onTasksChange: (tasks: TaskFlow[]) => void
-  onTaskAdd: (taskType: string) => void
-  onTaskRemove: (taskId: string) => void
-  onTaskReorder: (fromIndex: number, toIndex: number) => void
-}
-
-export interface AvailableTask {
-  type: string
-  name: string
-  description: string
-  icon: ReactNode
-  defaultParams: Record<string, any>
-}
-
-export interface ScheduleConfigProps {
-  enabled: boolean
-  times: string[]
-  onEnabledChange: (enabled: boolean) => void
-  onTimesChange: (times: string[]) => void
-}
 
 // ============================================
 // AutomationTasks Component Types
 // ============================================
 
-export type TaskCommandId = 'startup' | 'fight' | 'infrast' | 'recruit' | 'mall' | 'award' | 'closedown'
+type TaskCommandId = 'startup' | 'fight' | 'infrast' | 'recruit' | 'mall' | 'award' | 'closedown'
 
-export type TaskParamFieldType = 
+type TaskParamFieldType =
   | 'text' 
   | 'number' 
   | 'select' 
@@ -147,7 +20,7 @@ export type TaskParamFieldType =
   | 'star-select' 
   | 'facility-select'
 
-export interface TaskParamField {
+interface TaskParamField {
   key: string
   label: string
   type: TaskParamFieldType
@@ -170,7 +43,7 @@ export interface StageConfig {
   trainingOperators?: string[]
 }
 
-export interface TaskParams {
+interface TaskParams {
   // 启动游戏
   clientType?: string
   adbPath?: string
@@ -275,14 +148,6 @@ export interface TaskFlowItem {
 export interface ConnectionTestStatus {
   success: boolean
   message: string
-}
-
-export interface ScheduleExecutionStatus {
-  isRunning: boolean
-  currentStep: number
-  currentTask: string
-  currentTaskId?: string
-  message?: string
 }
 
 export interface AutomationTasksProps {
@@ -493,12 +358,12 @@ export interface DropRecordsProps {
   onRefresh: () => void
 }
 
-export interface DropData {
+interface DropData {
   // 今日掉落数据结构（根据实际 API 返回调整）
   [key: string]: any
 }
 
-export interface DropStatistics {
+interface DropStatistics {
   total: {
     sanity: number
     battles: number
@@ -535,7 +400,7 @@ export interface DropStatistics {
 export interface DataStatisticsProps {}
 
 // 仓库数据 (组件专用,包含详细的 items 数组)
-export interface DepotItem {
+interface DepotItem {
   id: string;
   name: string;
   iconId: string;
@@ -585,8 +450,6 @@ export type OpenMenu = 'ownership' | 'rarity' | 'profession' | 'elite' | 'potent
 // ============================================
 // OperatorTraining Component Types
 // ============================================
-
-export interface OperatorTrainingProps {}
 
 // 材料节点（层级结构）
 export interface MaterialNode {

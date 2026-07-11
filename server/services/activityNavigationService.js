@@ -97,7 +97,7 @@ export async function getActivityRunPreflight(clientType = 'Official') {
   try {
     const tasks = await loadActivityStageTasks(String(activity.code).toUpperCase());
     return assessActivityNavigation(activity, tasks);
-  } catch (error) {
+  } catch {
     return blocked(
       activity,
       'navigation-resource-unavailable',

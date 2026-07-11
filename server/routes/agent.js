@@ -18,9 +18,7 @@ import {
   readLogFile,
   cleanupLogs,
   getDebugScreenshots,
-  clearRealtimeLogs,
-  replaceActivityCode,
-  execDynamicTask
+  clearRealtimeLogs
 } from '../services/maaService.js';
 import { executeScheduleNow, getScheduleExecutionStatus, stopScheduleExecution, getScheduleStatus, setupSchedule, stopSchedule, setupAutoUpdate, getAutoUpdateStatus } from '../services/schedulerService.js';
 import { loadUserConfig, saveUserConfig, getAllUserConfigs, deleteUserConfig } from '../services/configStorageService.js';
@@ -39,7 +37,6 @@ import { withMaaExecutionLease } from '../services/executionCoordinatorService.j
 import {
   asyncHandler,
   successResponse,
-  dryRunResponse,
   agentError,
   sendSuccess,
   sendDryRun,
@@ -56,8 +53,6 @@ import {
   stopWebrtcAgent,
   startWebrtc,
   stopWebrtc,
-  getMacLanIp,
-  getIceServersConfig,
   isWebrtcServerReachable,
   WEBRTC_PORT,
   DEFAULT_DEVICE_ADDRESS,

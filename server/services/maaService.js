@@ -2,7 +2,6 @@ import { spawn, execFile } from 'child_process';
 import { promisify } from 'util';
 import { createConnection } from 'net';
 import { readFile, writeFile, mkdir, readdir, stat, unlink, realpath, open } from 'fs/promises';
-import { createReadStream } from 'fs';
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'path';
 import { createLogger } from '../utils/logger.js';
 import { getFallbackActivity } from './activityFallbackService.js';
@@ -50,17 +49,6 @@ const taskStatus = {
   process: null, // 保存子进程引用
   logs: [] // 保存实时日志
 };
-
-// Socket.IO 实例（从 server.js 注入）
-let socketIO = null;
-
-/**
- * 设置 Socket.IO 实例
- */
-export function setSocketIO(io) {
-  socketIO = io;
-  logger.debug('Socket.IO 实例已设置');
-}
 
 /**
  * 获取当前任务执行状态
@@ -476,14 +464,6 @@ export async function getMaaConfigDir() {
 }
 
 /**
- * 列出所有可用任务
- */
-export async function listMaaTasks() {
-  const result = await execMaaCommand('list');
-  return result.stdout;
-}
-
-/**
  * 获取配置文件路径
  */
 async function getConfigPath(profileName = 'default') {
@@ -500,7 +480,7 @@ export async function getConfig(profileName = 'default') {
     const content = await readFile(configPath, 'utf-8');
     // 简单解析 TOML (实际项目中应使用 toml 库)
     return parseSimpleToml(content);
-  } catch (error) {
+  } catch {
     logger.debug('配置文件不存在，返回环境默认配置');
     return {
       adb_path: process.env.ADB_PATH || '/opt/homebrew/bin/adb',
@@ -740,6 +720,10 @@ function parseAdbDeviceList(output = '') {
     .filter(device => device.address);
 }
 
+export function getAdbDeviceState(output, address) {
+  return parseAdbDeviceList(output).find(device => device.address === address)?.state || null;
+}
+
 function probeLocalAddress(address, timeout = 280) {
   const [host, portValue] = address.split(':');
   const port = Number(portValue);
@@ -977,57 +961,78 @@ export async function testAdbConnection(adbPath = '/opt/homebrew/bin/adb', addre
   try {
     // 检查 ADB 是否可用
     try {
-      await adbExec(adbPath, ['version']);
+      await adbExec(adbPath, ['version'], { timeout: 5000, windowsHide: true });
     } catch (error) {
       return {
         success: false,
-        message: 'ADB 不可用，请检查 ADB 路径是否正确',
+        message: `ADB 不可用，请检查 ADB 路径：${error.message}`,
         error: error.message
       };
     }
     
     // 检查设备列表
     validateAdbAddress(address);
-    const { stdout: devicesOutput } = await adbExec(adbPath, ['devices']);
-    const isConnected = devicesOutput.includes(address) && devicesOutput.includes('device');
+    const { stdout: devicesOutput } = await adbExec(adbPath, ['devices'], { timeout: 6000, windowsHide: true });
+    const deviceState = getAdbDeviceState(devicesOutput, address);
     
-    if (isConnected) {
+    if (deviceState === 'device') {
       return {
         success: true,
         message: `已连接到 ${address}`,
         connected: true
       };
     }
+
+    if (deviceState === 'unauthorized') {
+      return {
+        success: false,
+        message: `设备 ${address} 未授权，请在模拟器中允许 USB 调试`,
+        connected: false
+      };
+    }
+
+    if (deviceState === 'offline') {
+      return {
+        success: false,
+        message: `设备 ${address} 已离线，请重启模拟器或 ADB`,
+        connected: false
+      };
+    }
     
     // 尝试连接
     logger.debug('尝试连接设备', { address });
-    const { stdout: connectOutput } = await adbExec(adbPath, ['connect', address]);
+    const { stdout: connectOutput } = await adbExec(adbPath, ['connect', address], { timeout: 8000, windowsHide: true });
     
     // 等待连接稳定
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     // 再次检查连接状态
-    const { stdout: devicesOutput2 } = await adbExec(adbPath, ['devices']);
-    const isConnectedNow = devicesOutput2.includes(address) && devicesOutput2.includes('device');
+    const { stdout: devicesOutput2 } = await adbExec(adbPath, ['devices'], { timeout: 6000, windowsHide: true });
+    const currentDeviceState = getAdbDeviceState(devicesOutput2, address);
     
-    if (isConnectedNow) {
+    if (currentDeviceState === 'device') {
       return {
         success: true,
         message: `成功连接到 ${address}`,
         connected: true
       };
-    } else {
-      return {
-        success: false,
-        message: `无法连接到 ${address}，请确保模拟器已启动`,
-        connected: false,
-        output: connectOutput
-      };
     }
+
+    const stateMessage = currentDeviceState === 'unauthorized'
+      ? `设备 ${address} 未授权，请在模拟器中允许 USB 调试`
+      : currentDeviceState === 'offline'
+        ? `设备 ${address} 已离线，请重启模拟器或 ADB`
+        : `无法连接到 ${address}，请确保模拟器已启动`;
+    return {
+      success: false,
+      message: stateMessage,
+      connected: false,
+      output: connectOutput
+    };
   } catch (error) {
     return {
       success: false,
-      message: '连接测试失败',
+      message: `连接测试失败：${error.message}`,
       error: error.message
     };
   }

@@ -152,18 +152,6 @@ async function saveProgress(progress) {
   await writeFile(progressPath, JSON.stringify(progress, null, 2));
 }
 
-export async function getCopilotSetCompletion(setId, raid = 'normal') {
-  const plan = await buildCopilotPlan(setId, raid);
-  const completedEntries = plan.entries.filter(entry => entry.completed);
-  return {
-    known: true,
-    complete: plan.entries.length > 0 && completedEntries.length === plan.entries.length,
-    completedCount: completedEntries.length,
-    totalCount: plan.entries.length,
-    source: 'local-copilot-progress'
-  };
-}
-
 export function mergePresetFormationTasks(installedTasks, userTasks = {}) {
   return {
     ...userTasks,

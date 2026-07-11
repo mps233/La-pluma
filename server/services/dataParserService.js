@@ -7,7 +7,6 @@ import {
   getMaaLogPath, 
   getItemIndexPath, 
   getItemTablePath, 
-  getRecruitmentDataPath, 
   getBattleDataPath,
   getMaaResourceDir
 } from '../config/paths.js';

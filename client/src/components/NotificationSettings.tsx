@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Bell, Save, Send } from 'lucide-react'
-import { API_BASE_URL, fetchWithAuth } from '@/services/api'
+import { API_BASE_URL, fetchWithAuth, parseJsonResponse } from '@/services/api'
 
 interface TelegramConfig {
   enabled: boolean
@@ -42,12 +42,18 @@ export default function NotificationSettings() {
     const loadConfig = async () => {
       try {
         const response = await fetchWithAuth(`${API_BASE_URL}/agent/notifications/config`)
-        const data = await response.json()
+        const data = await parseJsonResponse<{
+          success: boolean
+          data?: NotificationConfig
+          message?: string
+          error?: string
+          errorInfo?: { message?: string }
+        }>(response)
 
         if (cancelled) return
 
         if (data.success) {
-          setConfig(data.data || data)
+          setConfig(data.data || emptyConfig)
         } else {
           setNotice({ type: 'error', text: getResponseMessage(data, '加载通知配置失败') })
         }
@@ -89,7 +95,7 @@ export default function NotificationSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
       })
-      const data = await response.json()
+      const data = await parseJsonResponse(response)
 
       setNotice(data.success
         ? { type: 'success', text: data.message || '通知配置已保存' }
@@ -111,7 +117,7 @@ export default function NotificationSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ channel: 'telegram', config: telegram })
       })
-      const data = await response.json()
+      const data = await parseJsonResponse(response)
 
       setNotice(data.success
         ? { type: 'success', text: data.message || '测试通知已发送' }

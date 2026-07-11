@@ -3,7 +3,6 @@
  * 记录和管理每日的材料掉落数据
  */
 
-import { readdir, unlink } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { readJsonFile, ensureDir, updateJsonFile } from '../utils/fileHelper.js';
@@ -278,41 +277,5 @@ function processRecordForStatistics(record, statistics, materialsMap) {
       statistics.stages[stageName].items[itemName] = 0;
     }
     statistics.stages[stageName].items[itemName] += item.count;
-  }
-}
-
-/**
- * 清理旧记录
- */
-export async function cleanOldRecords(keepDays = 30) {
-  try {
-    await ensureDir(DROP_RECORDS_DIR);
-    
-    const files = await readdir(DROP_RECORDS_DIR);
-    const today = new Date();
-    const cutoffDate = new Date(today);
-    cutoffDate.setDate(cutoffDate.getDate() - keepDays);
-    
-    let deletedCount = 0;
-    
-    for (const file of files) {
-      if (!file.endsWith('.json')) continue;
-      
-      const dateStr = file.replace('.json', '');
-      const fileDate = new Date(dateStr);
-      
-      if (fileDate < cutoffDate) {
-        const filePath = path.join(DROP_RECORDS_DIR, file);
-        await unlink(filePath);
-        deletedCount++;
-        logger.debug('已删除旧记录', { file });
-      }
-    }
-    
-    logger.info('清理旧记录完成', { deletedCount });
-    return successResponse({ deletedCount });
-  } catch (error) {
-    logger.error('清理旧记录失败', { error: error.message });
-    return errorResponse(error, '清理旧记录失败');
   }
 }

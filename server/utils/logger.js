@@ -34,7 +34,6 @@ export class Logger {
     // 输出到控制台
     if (this.enableConsole) {
       const emoji = this.getLevelEmoji(level);
-      const color = this.getLevelColor(level);
       console.log(`${emoji} [${this.name}][${level}] ${message}`, data || '');
     }
 
@@ -53,20 +52,6 @@ export class Logger {
       SUCCESS: '✅'
     };
     return emojis[level] || 'ℹ️';
-  }
-
-  /**
-   * 获取日志级别对应的颜色（用于终端输出）
-   */
-  getLevelColor(level) {
-    const colors = {
-      DEBUG: '\x1b[36m', // 青色
-      INFO: '\x1b[37m',  // 白色
-      WARN: '\x1b[33m',  // 黄色
-      ERROR: '\x1b[31m', // 红色
-      SUCCESS: '\x1b[32m' // 绿色
-    };
-    return colors[level] || '\x1b[37m';
   }
 
   /**
@@ -188,6 +173,3 @@ export const loggerManager = new LoggerManager();
 export function createLogger(name, options) {
   return loggerManager.getLogger(name, options);
 }
-
-// 导出默认 Logger
-export default createLogger('app');

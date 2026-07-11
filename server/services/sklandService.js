@@ -391,7 +391,7 @@ class SklandService {
     try {
       const config = await readJsonFile(this.configPath);
       return config;
-    } catch (error) {
+    } catch {
       return null;
     }
   }

@@ -1,24 +1,14 @@
 import express from 'express';
 import cors from 'cors';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
 import operatorQuotesRoutes from './routes/operatorQuotes.js';
 import agentRoutes from './routes/agent.js';
-import { setSocketIO as setSchedulerSocketIO } from './services/schedulerService.js';
-import { setSocketIO as setMaaSocketIO } from './services/maaService.js';
 import { initTelegramBot } from './services/telegramBotService.js';
 import { getNotificationConfig } from './services/notificationService.js';
 import { resolveConnection } from './services/connectionService.js';
 import { networkInterfaces } from 'os';
 import { printPathConfig } from './config/paths.js';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 const app = express();
-const httpServer = createServer(app);
 
 // 获取本机 IP 地址
 const getLocalIpAddress = () => {
@@ -52,13 +42,6 @@ function optionalApiAuth(req, res, next) {
   return res.status(401).json({ success: false, error: 'Unauthorized', message: '需要有效的 LA_PLUMA_TOKEN' });
 }
 
-
-const io = new Server(httpServer, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
-});
 
 app.use(cors({
   origin: '*',
@@ -95,21 +78,8 @@ app.use('/api', optionalApiAuth);
 app.use('/api/agent', agentRoutes);
 app.use('/api/operator-quotes', operatorQuotesRoutes);
 
-// WebSocket 连接
-io.on('connection', (socket) => {
-  console.log('客户端已连接');
-  
-  socket.on('disconnect', () => {
-    console.log('客户端已断开');
-  });
-});
-
-// 设置 Socket.io 到 schedulerService 和 maaService
-setSchedulerSocketIO(io);
-setMaaSocketIO(io);
-
 const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT, '0.0.0.0', async () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`服务器运行在:`);
   console.log(`  - 本地: http://localhost:${PORT}`);
   console.log(`  - 网络: http://${localIp}:${PORT}`);
@@ -134,5 +104,3 @@ httpServer.listen(PORT, '0.0.0.0', async () => {
     console.error('[Telegram Bot] 初始化失败:', error.message);
   }
 });
-
-export { io };

@@ -28,7 +28,7 @@
 
 ### 反馈、图标与布局
 
-- 字段问题用表单组件的 `error`；已知结构加载用 `Skeleton`；局部加载用 `Loading`；无数据用 `EmptyState`；不可逆操作用 `ConfirmDialog`。区域错误必须就地展示和重试，不要伪装成空状态。
+- 字段问题用表单组件的 `error`；控制台初始加载由专用的 `DashboardSkeleton` 维持结构；局部加载用 `Loading`；无数据用 `EmptyState`；不可逆操作用 `ConfirmDialog`。区域错误必须就地展示和重试，不要伪装成空状态。
 - 全局短消息使用 `useStatusStore.setMessage` 和 `FloatingStatusIndicator`，不要新增独立 toast 或自行清除定时器。
 - 普通功能图标优先用 `lucide-react`，业务身份图标复用 `Icons`。无文字操作用 `IconButton` 并同时提供 `title` 与 `aria-label`；装饰图标加 `aria-hidden`。
 - 页面内容使用既有 `max-w-7xl` 与 `app-page`，区块用 `app-stack-section`，卡片内用 `app-stack-card`。不要为凑版式嵌套卡片或硬塞多栏；每列保持 `min-w-0`，窄屏优先折叠。
@@ -63,7 +63,7 @@
 
 - 卡片：`Card`、`CardHeader`、`CardContent`、`InfoCard`，或 `app-card surface-panel`。
 - 按钮：`Button`、`IconButton`，或 `app-button` / `app-icon-button`。
-- 输入：`Input`、`Textarea`、`Select`、`Checkbox`，或 `app-input control-surface`。
+- 输入：`Input`、`Select`、`Checkbox`，或 `app-input control-surface`；多行文本使用同一语义类的原生 `textarea`。
 
 移动端间距由 token 自动收缩，不要再用全局 `.p-4`、`.p-6` 覆盖来修页面。
 
@@ -76,26 +76,15 @@
 统一的页面标题样式，包含图标、标题、副标题和操作区域。
 
 ```tsx
-import { PageHeader, StatusIndicator } from '@/components/common'
+import { PageHeader } from '@/components/common'
+import FloatingStatusIndicator from '@/components/FloatingStatusIndicator'
 import Icons from '../Icons'
 
 <PageHeader
   icon={<Icons.TargetIcon />}
   title="自动战斗"
   subtitle="配置自动刷关卡任务"
-/>
-
-<PageHeader
-  icon={<Icons.CogIcon />}
-  title="配置管理"
-  subtitle="管理 MAA CLI 连接和运行配置"
-  actions={
-    <StatusIndicator
-      isActive={loading}
-      activeText="处理中"
-      inactiveText="就绪"
-    />
-  }
+  actions={<FloatingStatusIndicator />}
 />
 ```
 
@@ -108,39 +97,6 @@ Props：
 - `animated` (boolean) - 是否启用动画，默认 `true`
 
 页面标题统一使用全局品牌色，不再按页面传入独立渐变。
-
----
-
-### StatusIndicator - 状态指示器组件
-
-统一的状态显示样式，包含动画圆点和状态文本。
-
-```tsx
-import { StatusIndicator } from '@/components/common'
-
-<StatusIndicator
-  isActive={isRunning}
-  activeText="运行中"
-  inactiveText="就绪"
-/>
-
-<StatusIndicator
-  isActive={true}
-  message={message || '等待任务'}
-  type="info"
-/>
-```
-
-Props：
-
-- `isActive` (boolean) - 是否处于活动状态，默认 `false`
-- `activeText` (string) - 活动状态文本，默认 `运行中`
-- `inactiveText` (string) - 非活动状态文本，默认 `就绪`
-- `message` (string) - 自定义消息，优先级高于 `activeText` / `inactiveText`
-- `type` ('success' | 'error' | 'warning' | 'info' | 'default') - 状态语义
-- `activeColor` / `inactiveColor` - 旧调用兼容参数，新代码不再推荐使用
-
-页面级、会跟随滚动悬浮的执行状态使用 `../FloatingStatusIndicator`；`StatusIndicator` 只用于卡片或表单中的局部静态状态。
 
 ---
 
@@ -205,7 +161,7 @@ import { Button, IconButton } from '@/components/common'
 
 ---
 
-### Input / Textarea / Select / Checkbox - 表单组件
+### Input / Select / Checkbox - 表单组件
 
 统一输入、选择、错误和提示样式。
 
@@ -233,7 +189,7 @@ import { Input, Select, Checkbox } from '@/components/common'
 />
 ```
 
-表单错误态使用 `error` prop，不要在页面里单独手写红色边框和错误文字。`Input`、`Textarea`、`Select` 均支持 `hint`；`Input` 额外支持前置 `icon`。`Checkbox.color` 是历史兼容参数，新代码不要按页面传入不同颜色。
+表单错误态使用 `error` prop，不要在页面里单独手写红色边框和错误文字。`Input`、`Select` 均支持 `hint`；`Input` 额外支持前置 `icon`。多行文本使用带 `app-input control-surface` 的原生 `textarea`。`Checkbox.color` 是历史兼容参数，新代码不要按页面传入不同颜色。
 
 ---
 
@@ -265,13 +221,13 @@ Props：
 
 ---
 
-### Modal / ConfirmDialog / Loading - 反馈组件
+### ConfirmDialog / Loading - 反馈组件
 
-`Modal`、`ConfirmDialog`、`Loading`、`FullScreenLoading`、`Skeleton`、`CardSkeleton`、`DashboardSkeleton` 均从 common 导出。
+`ConfirmDialog` 和 `Loading` 从 common 导出。
 
-- `Modal` / `ConfirmDialog`：需要阻断或确认用户操作时使用；优先传入明确的 `title`、`footer` 和关闭行为。
-- `Loading` / `FullScreenLoading`：短时局部或全屏等待状态。
-- `Skeleton` / `CardSkeleton` / `DashboardSkeleton`：初次加载时保留内容结构，避免布局跳动。控制台使用 `DashboardSkeleton`，不要另行复制其布局。
+- `ConfirmDialog`：删除、清空等不可逆操作的确认弹窗，传入明确的标题、说明和关闭行为。
+- `Loading`：短时局部等待状态。
+- `DashboardSkeleton`：控制台专用骨架，由 `Dashboard` 直接从 `Loading.tsx` 引入，不属于 common 的公共导出。
 
 ## 重构建议
 
@@ -280,9 +236,9 @@ Props：
 1. 页面外层使用 `app-page`，主内容使用 `app-stack-section`。
 2. 页面标题使用 `PageHeader`。
 3. 大面板使用 `Card` 或 `app-card surface-panel`。
-4. 表单使用 `Input`、`Textarea`、`Select`、`Checkbox`。
+4. 表单使用 `Input`、`Select`、`Checkbox`；多行文本复用 `app-input control-surface`。
 5. 没有内容时使用 `EmptyState`，不要新增孤立的空态样式。
-6. 页面全局执行状态使用 `FloatingStatusIndicator`；局部静态状态才使用 `StatusIndicator`。
+6. 页面全局执行状态使用 `FloatingStatusIndicator`；局部状态使用既有 `status-*` 语义类并紧邻相关操作。
 7. 操作用 `Button`、`IconButton`。
 8. 新颜色、新圆角、新间距优先抽为 token 或语义类。
 
@@ -290,7 +246,7 @@ Props：
 
 1. ✅ 创建通用组件。
 2. ✅ 接入统一色彩、圆角、间距 token。
-3. ✅ Button、Input、Modal、Loading 等组件纳入 common。
+3. ✅ Button、Input、ConfirmDialog、Loading 等组件纳入 common。
 4. ⏳ 持续把零散手写卡片迁移到 `Card` 或 `app-card`。
 5. ⏳ 为核心通用组件补充单元测试或视觉回归检查。
 

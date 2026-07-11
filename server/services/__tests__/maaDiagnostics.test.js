@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { getMaaExecutionDiagnostics, parseForegroundPackage } from '../maaService.js';
+import { getAdbDeviceState, getMaaExecutionDiagnostics, parseForegroundPackage } from '../maaService.js';
 
 describe('getMaaExecutionDiagnostics', () => {
   it('translates unknown drop report failures into one actionable warning', () => {
@@ -55,5 +55,22 @@ describe('parseForegroundPackage', () => {
 
   it('returns null when no focused package is available', () => {
     assert.equal(parseForegroundPackage('Window manager state unavailable'), null);
+  });
+});
+
+describe('getAdbDeviceState', () => {
+  const header = 'List of devices attached\n';
+
+  it('accepts only a device in the ready state', () => {
+    assert.equal(getAdbDeviceState(`${header}127.0.0.1:16384\tdevice\n`, '127.0.0.1:16384'), 'device');
+  });
+
+  it('distinguishes offline and unauthorized devices from connected devices', () => {
+    assert.equal(getAdbDeviceState(`${header}127.0.0.1:16384\toffline\n`, '127.0.0.1:16384'), 'offline');
+    assert.equal(getAdbDeviceState(`${header}127.0.0.1:16384\tunauthorized\n`, '127.0.0.1:16384'), 'unauthorized');
+  });
+
+  it('does not match another connected device or the devices header', () => {
+    assert.equal(getAdbDeviceState(`${header}emulator-5554\tdevice\n`, '127.0.0.1:16384'), null);
   });
 });

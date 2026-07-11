@@ -36,13 +36,6 @@ export function successResponse(data, message = '操作成功', meta = {}) {
 }
 
 /**
- * dryRun 成功响应
- */
-export function dryRunResponse(plan, message = 'Dry run only', meta = {}) {
-  return successResponse({ plan }, message, { ...meta, dryRun: true });
-}
-
-/**
  * 错误响应
  */
 export function errorResponse(error, message, meta = {}) {

@@ -4,7 +4,7 @@ import { useEffect, type ReactNode } from 'react'
 /**
  * 模态框组件 Props
  */
-export interface ModalProps {
+interface ModalProps {
   isOpen: boolean
   onClose: () => void
   title?: string
@@ -33,7 +33,7 @@ export interface ConfirmDialogProps {
  * 模态框组件
  * 统一的弹窗样式
  */
-export default function Modal({
+function Modal({
   isOpen,
   onClose,
   title,

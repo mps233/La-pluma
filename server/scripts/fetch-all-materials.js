@@ -70,7 +70,7 @@ async function fetchAllMaterials() {
     try {
       const data = await readFile(materialsPath, 'utf-8');
       existingData = JSON.parse(data);
-    } catch (error) {
+    } catch {
       existingData = { materials: {}, recipes: {}, stageSchedule: {} };
     }
     

@@ -11,16 +11,9 @@ export interface LoadingProps {
 }
 
 /**
- * 全屏加载组件 Props
- */
-export interface FullScreenLoadingProps {
-  text?: string
-}
-
-/**
  * 骨架屏组件 Props
  */
-export interface SkeletonProps {
+interface SkeletonProps {
   className?: string
   variant?: 'text' | 'title' | 'circle' | 'rect'
   style?: CSSProperties
@@ -80,20 +73,9 @@ export default function Loading({
 }
 
 /**
- * 全屏加载组件
- */
-export function FullScreenLoading({ text = '加载中...' }: FullScreenLoadingProps) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm dark:bg-black/80">
-      <Loading size="lg" text={text} />
-    </div>
-  )
-}
-
-/**
  * 骨架屏组件
  */
-export function Skeleton({ className = '', variant = 'text', style }: SkeletonProps) {
+function Skeleton({ className = '', variant = 'text', style }: SkeletonProps) {
   const variantStyles: Record<string, string> = {
     text: 'h-4 rounded',
     title: 'h-6 rounded',
@@ -110,20 +92,6 @@ export function Skeleton({ className = '', variant = 'text', style }: SkeletonPr
       <div
         className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent"
       />
-    </div>
-  )
-}
-
-/**
- * 卡片骨架屏
- */
-export function CardSkeleton() {
-  return (
-    <div className="app-card app-stack-card surface-panel">
-      <Skeleton variant="title" className="w-1/3" />
-      <Skeleton variant="text" className="w-full" />
-      <Skeleton variant="text" className="w-2/3" />
-      <Skeleton variant="rect" className="w-full h-32" />
     </div>
   )
 }

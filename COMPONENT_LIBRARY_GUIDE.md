@@ -105,7 +105,7 @@ Tailwind 中 `rounded-xl`、`rounded-2xl`、`rounded-3xl` 已统一映射到 `--
 
 ### 表单与按钮
 
-新增表单优先使用 `Input`、`Textarea`、`Select`、`Checkbox`。必须手写原生控件时，使用：
+新增表单优先使用 `Input`、`Select`、`Checkbox`。多行文本和其他必须手写的原生控件使用：
 
 - 输入控件：`app-input control-surface`
 - 复选项外层：`app-checkbox`
@@ -128,9 +128,9 @@ Tailwind 中 `rounded-xl`、`rounded-2xl`、`rounded-3xl` 已统一映射到 `--
 
 | 情况 | 使用方式 |
 | --- | --- |
-| 字段校验失败 | `Input`、`Textarea`、`Select` 的 `error` prop；`hint` 只在没有错误时显示 |
-| 已知结构正在加载 | `Skeleton`、`CardSkeleton`；控制台仅使用 `DashboardSkeleton` |
-| 局部内容正在读取 | `Loading`；`FullScreenLoading` 仅用于短暂阻断整页操作 |
+| 字段校验失败 | `Input`、`Select` 的 `error` prop；`hint` 只在没有错误时显示 |
+| 控制台结构正在加载 | 控制台内部的 `DashboardSkeleton`，不要在其他页面复制其布局 |
+| 局部内容正在读取 | `Loading` |
 | 列表、流程或卡片无数据 | `EmptyState`，按容器选择 `compact` |
 | 区域读取失败 | 在原区域显示可恢复的错误与重试操作；不要改成空状态 |
 | 全局、短生命周期的结果 | `useStatusStore.setMessage`，由 `FloatingStatusIndicator` 展示；不要自行写清除定时器 |
@@ -198,37 +198,6 @@ import FloatingStatusIndicator from '@/components/FloatingStatusIndicator'
 
 页面标题统一使用全局品牌色和 `icon-well`，不再支持页面单独传入渐变色。
 
-### StatusIndicator - 状态指示器组件
-
-**文件位置**：`client/src/components/common/StatusIndicator.tsx`
-
-**适用场景**：卡片、表单或局部区域中的任务状态、加载状态、结果消息。页面顶部的全局执行状态请使用 `FloatingStatusIndicator`，它处理滚动悬浮、状态播报和长文案截断。
-
-```typescript
-{
-  isActive?: boolean
-  activeText?: string
-  inactiveText?: string
-  activeColor?: string
-  inactiveColor?: string
-  message?: string
-  type?: 'success' | 'error' | 'warning' | 'info' | 'default'
-}
-```
-
-```tsx
-import { StatusIndicator } from '@/components/common'
-
-<StatusIndicator
-  isActive={isRunning}
-  message={message}
-  activeText="运行中"
-  inactiveText="就绪"
-/>
-```
-
-`activeColor` 和 `inactiveColor` 仅作为旧调用兼容参数保留，新代码优先使用 `type` 或让组件根据 `message` 自动识别状态语义。
-
 ### Card - 卡片组件系列
 
 **文件位置**：`client/src/components/common/Card.tsx`
@@ -271,7 +240,7 @@ import { Button, IconButton } from '@/components/common'
 
 `Button` 支持 `primary`、`secondary`、`outline`、`success`、`danger`、`ghost`；`gradient` 是保留的 `primary` 兼容别名。`IconButton` 仅支持 `primary`、`secondary`、`danger`、`ghost`。新增按钮优先走 `variant`，不要在页面里手写一套按钮颜色、阴影和圆角。
 
-### Input / Textarea / Select / Checkbox
+### Input / Select / Checkbox
 
 **文件位置**：`client/src/components/common/Input.tsx`
 
@@ -301,7 +270,7 @@ import { Input, Select, Checkbox } from '@/components/common'
 />
 ```
 
-`Input`、`Textarea`、`Select` 均支持 `error` 和 `hint`，`Input` 额外支持前置 `icon`。`Checkbox.color` 是历史兼容参数，新代码不要以它建立页面级配色。
+`Input`、`Select` 均支持 `error` 和 `hint`，`Input` 额外支持前置 `icon`。多行文本使用带 `app-input control-surface` 的原生 `textarea`。`Checkbox.color` 是历史兼容参数，新代码不要以它建立页面级配色。
 
 ### EmptyState
 
@@ -323,11 +292,11 @@ import { EmptyState, Button } from '@/components/common'
 
 `title` 为必填；`icon`、`description`、`action` 均可选。卡片内部使用 `compact`，页面级空状态保留默认尺寸。已有自动化流程和掉落记录页使用该组件。
 
-### Modal / ConfirmDialog / Loading
+### ConfirmDialog / Loading
 
 **文件位置**：`client/src/components/common/Modal.tsx`、`client/src/components/common/Loading.tsx`
 
-**适用场景**：需要确认的破坏性操作使用 `ConfirmDialog`；自定义对话框使用 `Modal`；短时等待使用 `Loading` 或 `FullScreenLoading`；初次加载需要维持页面结构时使用 `Skeleton`、`CardSkeleton` 或 `DashboardSkeleton`。这些组件都由 common 的 `index.ts` 导出。
+**适用场景**：需要确认的破坏性操作使用 `ConfirmDialog`；短时局部等待使用 `Loading`。两者都由 common 的 `index.ts` 导出。控制台专用的 `DashboardSkeleton` 由 `Dashboard` 直接从 `Loading.tsx` 引入，不属于公共组件导出。
 
 ```tsx
 import { ConfirmDialog, Loading } from '@/components/common'
@@ -378,10 +347,10 @@ const { containerRef, activeRect, setTabRef } = useFluidTabIndicator(activeTab)
 1. 页面外层使用 `app-page`，主内容使用 `app-stack-section`。
 2. 页面标题使用 `PageHeader`。
 3. 大面板使用 `Card` 或 `app-card surface-panel`。
-4. 表单使用 `Input`、`Select`、`Textarea`、`Checkbox`。
+4. 表单使用 `Input`、`Select`、`Checkbox`；多行文本复用 `app-input control-surface`。
 5. 没有内容时使用 `EmptyState`，不要重复手写空状态。
 6. 动态分段标签优先使用 `useFluidTabIndicator`，不要复制测量逻辑。
-7. 页面全局执行状态使用 `FloatingStatusIndicator`；局部静态状态才使用 `StatusIndicator`。
+7. 页面全局执行状态使用 `FloatingStatusIndicator`；局部状态使用既有 `status-*` 语义类并紧邻相关操作。
 8. 操作用 `Button`、`IconButton`。
 9. 如果出现新的颜色、圆角、间距需求，优先抽成 token 或语义类。
 

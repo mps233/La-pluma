@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes, ReactNode, ChangeEvent } from 'react'
+import type { InputHTMLAttributes, SelectHTMLAttributes, ReactNode, ChangeEvent } from 'react'
 
 /**
  * 输入框组件 Props
@@ -13,21 +13,6 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
   error?: string
   hint?: string
   icon?: ReactNode
-  className?: string
-}
-
-/**
- * 文本域组件 Props
- */
-export interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'onChange'> {
-  label?: string
-  placeholder?: string
-  value: string
-  onChange: (value: string) => void
-  disabled?: boolean
-  error?: string
-  hint?: string
-  rows?: number
   className?: string
 }
 
@@ -104,59 +89,6 @@ export default function Input({
           {...props}
         />
       </div>
-      
-      {error && (
-        <p className="text-xs form-error-text mt-2">
-          {error}
-        </p>
-      )}
-      
-      {hint && !error && (
-        <p className="text-xs text-tertiary mt-2">
-          {hint}
-        </p>
-      )}
-    </div>
-  )
-}
-
-/**
- * 文本域组件
- */
-export function Textarea({
-  label,
-  placeholder,
-  value,
-  onChange,
-  disabled = false,
-  error,
-  hint,
-  rows = 4,
-  className = '',
-  ...props
-}: TextareaProps) {
-  const baseStyles = 'app-input focus:ring-2 resize-none'
-  const normalStyles = 'control-surface focus:ring-[var(--app-accent-soft)]'
-  const errorStyles = 'control-surface form-error-surface focus:ring-[color-mix(in_srgb,var(--app-danger)_24%,transparent)]'
-  const disabledStyles = 'opacity-50 cursor-not-allowed'
-  
-  return (
-    <div className={className}>
-      {label && (
-        <label className="block text-sm font-medium text-secondary mb-2">
-          {label}
-        </label>
-      )}
-      
-      <textarea
-        value={value}
-        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => onChange(e.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
-        rows={rows}
-        className={`${baseStyles} ${error ? errorStyles : normalStyles} ${disabled ? disabledStyles : ''}`}
-        {...props}
-      />
       
       {error && (
         <p className="text-xs form-error-text mt-2">

@@ -108,13 +108,6 @@ export function getItemTablePath() {
 }
 
 /**
- * 获取 MAA 干员招募数据文件路径
- */
-export function getRecruitmentDataPath() {
-  return join(getMaaResourceDir(), 'recruitment.json');
-}
-
-/**
  * 获取 MAA 战斗数据文件路径（包含所有干员）
  */
 export function getBattleDataPath() {
