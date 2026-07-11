@@ -3,6 +3,7 @@ import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { execMaaCommand, execDynamicTask, getMaaConfigDir, createMaaLogCheckpoint, readMaaLogSince } from './maaService.js';
 import { withMaaExecutionLease } from './executionCoordinatorService.js';
+import { recordDrops } from './dropRecordService.js';
 
 const dataDir = fileURLToPath(new URL('../data/', import.meta.url));
 const progressPath = join(dataDir, 'copilot-progress.json');
@@ -60,9 +61,33 @@ async function loadStageCodeMap(stageIds) {
       if (!filename) return;
       try {
         const metadata = JSON.parse(await readFile(join(tileDir, filename), 'utf8'));
-        if (metadata.code) result.set(stageId, metadata.code);
+        if (metadata.code) result.set(stageId, { code: metadata.code, apCost: 0 });
       } catch {}
     }));
+    try {
+      const stages = JSON.parse(await readFile(join(resourceDir, 'stages.json'), 'utf8'));
+      for (const stage of stages) {
+        if (!stage?.stageId || !stage?.code) continue;
+        const existing = result.get(stage.stageId);
+        result.set(stage.stageId, {
+          code: existing?.code || stage.code,
+          apCost: Math.max(0, Number(stage.apCost) || 0)
+        });
+      }
+    } catch {}
+    const missingStageIds = [...new Set(stageIds.filter(stageId => stageId && !result.get(stageId)?.apCost))];
+    if (missingStageIds.length > 0) {
+      try {
+        const penguinStages = await fetchJson('https://penguin-stats.io/PenguinStats/api/v2/stages?server=CN');
+        for (const stage of penguinStages) {
+          if (!missingStageIds.includes(stage?.stageId) || !stage?.code) continue;
+          result.set(stage.stageId, {
+            code: stage.code,
+            apCost: Math.max(0, Number(stage.apCost) || 0)
+          });
+        }
+      } catch {}
+    }
     return result;
   } catch {
     return new Map();
@@ -82,7 +107,8 @@ export async function buildCopilotPlan(setId, raid = 'normal') {
     return {
       id: Number(id),
       stageId: content.stage_name || '',
-      stage: stageCodes.get(content.stage_name) || getNavigationStage(content) || `maa://${id}`,
+      stage: stageCodes.get(content.stage_name)?.code || getNavigationStage(content) || `maa://${id}`,
+      apCost: stageCodes.get(content.stage_name)?.apCost || 0,
       presetFormation: isPresetFormationCopilot(content),
       supportsRaid: !isPresetFormationCopilot(content),
       operators: content.opers || [],
@@ -101,6 +127,7 @@ export async function buildCopilotPlan(setId, raid = 'normal') {
         copilotId: copilot.id,
         stageId: copilot.stageId,
         displayStage: copilot.stage,
+        apCost: copilot.apCost,
         mode,
         presetFormation: copilot.presetFormation
       });
@@ -180,6 +207,21 @@ export function buildCopilotRepeatFiles(entry, loopTimes, planDir) {
   }));
 }
 
+async function recordCompletedCopilotEntries(entries, loopTimes) {
+  for (const entry of entries) {
+    await recordDrops({
+      stage: entry.displayStage,
+      times: loopTimes,
+      sanity: entry.apCost * loopTimes,
+      medicine: 0,
+      stone: 0,
+      items: [],
+      source: 'copilot',
+      mode: entry.mode
+    });
+  }
+}
+
 function groupEntries(entries) {
   const groups = [];
   for (const entry of entries) {
@@ -238,6 +280,7 @@ export async function executeCopilotPlan({ setId, raid = 'normal', selectedIndex
           completed.add(entry.key);
           results.push({ ...entry, success: true });
         }
+        await recordCompletedCopilotEntries(group.entries, loopTimes);
         progress[String(setId)] = [...completed];
         await saveProgress(progress);
       } catch (error) {
@@ -247,14 +290,19 @@ export async function executeCopilotPlan({ setId, raid = 'normal', selectedIndex
           .map(match => match[1]);
         const currentFile = loadedFiles.at(-1) || '';
         const currentIndex = executionItems.findIndex(item => currentFile === item.filename || currentFile.endsWith(item.filename));
+        const successfulEntries = [];
         group.entries.forEach(entry => {
           const entryIndexes = executionItems
             .map((item, index) => item.entry.key === entry.key ? index : -1)
             .filter(index => index >= 0);
           const success = currentIndex > 0 && entryIndexes.every(index => index < currentIndex);
-          if (success) completed.add(entry.key);
+          if (success) {
+            completed.add(entry.key);
+            successfulEntries.push(entry);
+          }
           results.push({ ...entry, success, error: success ? undefined : message });
         });
+        await recordCompletedCopilotEntries(successfulEntries, loopTimes);
         progress[String(setId)] = [...completed];
         await saveProgress(progress);
         error.code = error.code || 'COPILOT_PLAN_FAILED';

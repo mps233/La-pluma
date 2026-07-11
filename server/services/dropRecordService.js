@@ -18,19 +18,25 @@ const __dirname = path.dirname(__filename);
 const DROP_RECORDS_DIR = path.join(__dirname, '../data/drop-records');
 const MATERIALS_PATH = path.join(__dirname, '../data/materials.json');
 
-// 获取今天的日期字符串 (YYYY-MM-DD)
-function getTodayString() {
-  const now = new Date();
-  return now.toISOString().split('T')[0];
+// 业务日期统一使用服务器配置时区，避免北京时间凌晨落到前一天。
+export function getLocalDateString(date = new Date(), timeZone = process.env.TZ || 'Asia/Shanghai') {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
 // 获取今天的记录文件路径
 function getTodayRecordPath() {
-  return path.join(DROP_RECORDS_DIR, `${getTodayString()}.json`);
+  return path.join(DROP_RECORDS_DIR, `${getLocalDateString()}.json`);
 }
 
 // 创建空记录结构
-function createEmptyRecord(date = getTodayString()) {
+function createEmptyRecord(date = getLocalDateString()) {
   return {
     date,
     records: [],
@@ -66,7 +72,9 @@ export async function recordDrops(dropData) {
           sanity: dropData.sanity || 0,
           medicine: dropData.medicine || 0,
           stone: dropData.stone || 0,
-          items: dropData.items || []
+          items: dropData.items || [],
+          source: dropData.source || 'fight',
+          mode: dropData.mode || 'normal'
         };
         
         record.records.push(newRecord);
@@ -126,7 +134,7 @@ export async function getRecentDrops(days = 7) {
     for (let i = 0; i < days; i++) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = getLocalDateString(date);
       const recordPath = path.join(DROP_RECORDS_DIR, `${dateStr}.json`);
       
       const record = await readJsonFile(recordPath, null);

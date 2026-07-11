@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { getOperatorList, getAllOperators, getOperBoxData, getTrainingQueue, addToTrainingQueue, removeFromTrainingQueue, updateTrainingSettings, generateTrainingPlan, applyTrainingPlan, getItemIconUrl } from '../services/api'
 import { PageHeader, Button, Checkbox, IconButton } from './common'
 import { useStatusStore } from '../store/statusStore'
@@ -294,6 +294,7 @@ type TrainingStatusCounts = Record<TrainingFilters['status'], number>
 const OPERATOR_RENDER_BATCH_SIZE = 72
 
 export default function OperatorTraining() {
+  const shouldReduceMotion = useReducedMotion();
   const { setMessage: setStatusMessage } = useStatusStore()
 
   // 辅助函数：使用 statusMessage 显示消息
@@ -439,8 +440,15 @@ export default function OperatorTraining() {
     };
 
     updateActiveTabRect();
+    const resizeObserver = typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(updateActiveTabRect);
+    if (statusTabsRef.current) resizeObserver?.observe(statusTabsRef.current);
     window.addEventListener('resize', updateActiveTabRect);
-    return () => window.removeEventListener('resize', updateActiveTabRect);
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', updateActiveTabRect);
+    };
   }, [filters.status, trainingStatusCounts.trainable, trainingStatusCounts.owned, trainingStatusCounts.all]);
 
   // 加载养成队列
@@ -810,7 +818,9 @@ export default function OperatorTraining() {
                   className="pointer-events-none absolute z-20 flex items-center justify-between gap-3 rounded-lg bg-[var(--app-accent)] px-3.5 py-2.5 text-left text-white shadow-[0_10px_24px_color-mix(in_srgb,var(--app-accent)_22%,transparent)]"
                   initial={false}
                   animate={activeStatusTabRect}
-                  transition={{ type: 'spring', stiffness: 360, damping: 34, mass: 0.8 }}
+                  transition={shouldReduceMotion
+                    ? { duration: 0 }
+                    : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
                 >
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold">{activeTrainingStatusOption.label}</span>

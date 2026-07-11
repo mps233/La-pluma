@@ -154,6 +154,49 @@ const getUsageValueClass = (pct?: number) => {
   return 'text-primary'
 }
 
+const TemperatureSparkline = ({ values }: { values: number[] }) => {
+  const chartValues = values.length > 1 ? values : values.length === 1 ? [values[0]!, values[0]!] : []
+  if (chartValues.length === 0) {
+    return <div className="dashboard-temperature-empty">等待温度采样</div>
+  }
+
+  const min = Math.min(...chartValues)
+  const max = Math.max(...chartValues)
+  const isStable = max - min < 0.1
+  const chartMin = isStable ? min - 1 : min
+  const chartMax = isStable ? max + 1 : max
+  const spread = chartMax - chartMin
+  const points = chartValues.map((value, index) => {
+    const x = chartValues.length === 1 ? 0 : (index / (chartValues.length - 1)) * 100
+    const y = 25 - ((value - chartMin) / spread) * 18
+    return `${x.toFixed(2)},${y.toFixed(2)}`
+  }).join(' ')
+  const areaPoints = `0,28 ${points} 100,28`
+  const lastPoint = points.split(' ').slice(-1)[0]?.split(',')
+
+  return (
+    <div className="dashboard-temperature-chart" aria-label={`最近温度 ${min.toFixed(1)} 到 ${max.toFixed(1)} 摄氏度`}>
+      <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="dashboard-temperature-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--app-accent)" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="var(--app-accent)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <line x1="0" y1="14" x2="100" y2="14" className="dashboard-temperature-gridline" />
+        <polygon points={areaPoints} fill="url(#dashboard-temperature-fill)" />
+        <polyline points={points} className="dashboard-temperature-line" />
+        <circle cx={lastPoint?.[0]} cy={lastPoint?.[1]} r="1.6" className="dashboard-temperature-dot" />
+      </svg>
+      <div className="dashboard-temperature-range">
+        <span>{min.toFixed(0)}°</span>
+        <span>近 {Math.max(5, (values.length - 1) * 5)} 秒</span>
+        <span>{max.toFixed(0)}°</span>
+      </div>
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const setActiveTab = useUIStore(state => state.setActiveTab)
   const openAutomation = useCallback(() => setActiveTab('automation'), [setActiveTab])
@@ -179,6 +222,7 @@ export default function Dashboard() {
     diskPct?: number; diskUsed?: string; diskTotal?: string;
     temp?: number;
   } | null>(null)
+  const [temperatureHistory, setTemperatureHistory] = useState<number[]>([])
 
 
   useEffect(() => {
@@ -189,7 +233,15 @@ export default function Dashboard() {
 
   // 设备状态轮询（CPU/内存）
   useEffect(() => {
-    const fetch = () => { maaApi.getDeviceStats().then(r => { if (r.success) setDeviceStats(r.data) }).catch(() => {}) }
+    const fetch = () => {
+      maaApi.getDeviceStats().then(r => {
+        if (!r.success) return
+        setDeviceStats(r.data)
+        if (Number.isFinite(r.data?.temp)) {
+          setTemperatureHistory(history => [...history, Number(r.data.temp)].slice(-36))
+        }
+      }).catch(() => {})
+    }
     fetch()
     const timer = setInterval(fetch, 5000)
     return () => clearInterval(timer)
@@ -277,17 +329,27 @@ export default function Dashboard() {
       }
 
       if (dropResult.status === 'fulfilled' && dropResult.value.success) {
-        const drops = Array.isArray(dropResult.value.data) ? dropResult.value.data : []
+        const payload = dropResult.value.data
+        const drops = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.records)
+            ? payload.records
+            : []
         setDropSummary({
           count: drops.length,
-          recent: drops.slice(0, 3).map((record: any) => ({
+          recent: [...drops].reverse().slice(0, 3).map((record: any) => ({
             stage: record?.stageName || record?.stageCode || record?.stage || '未知关卡',
-            items: Array.isArray(record?.drops)
+            items: Array.isArray(record?.drops) && record.drops.length > 0
               ? record.drops
                   .slice(0, 3)
                   .map((drop: any) => `${drop?.name || drop?.itemName || '材料'}×${drop?.count || 1}`)
                   .join('、')
-              : record?.itemName || record?.items || '暂无掉落详情',
+              : Array.isArray(record?.items) && record.items.length > 0
+                ? record.items
+                    .slice(0, 3)
+                    .map((item: any) => `${item?.name || item?.itemName || '材料'}×${item?.count || 1}`)
+                    .join('、')
+                : record?.itemName || '已记录作战，暂无材料明细',
           })),
         })
       } else {
@@ -397,7 +459,7 @@ export default function Dashboard() {
         <PageHeader
           icon={<Icons.Dashboard />}
           title="控制台"
-          subtitle="今日活动、自动化进度、养成与掉落总览"
+          subtitle="当前活动、自动化进度、养成与掉落总览"
           actions={
             <div className="flex items-center gap-2 sm:gap-3">
               <FloatingStatusIndicator className="max-w-[8rem] sm:max-w-none" />
@@ -469,17 +531,20 @@ export default function Dashboard() {
                   onClick={runTodayFlow}
                   variant="gradient"
                   disabled={quickStartLoading || flowIsRunning}
-                  className="dashboard-flow-primary-action justify-center whitespace-nowrap"
+                  loading={quickStartLoading}
+                  loadingText="启动中"
+                  statusKey={quickStartLoading ? 'starting' : flowIsRunning ? 'running' : 'ready'}
+                  className="dashboard-flow-primary-action dashboard-flow-shining-action justify-center whitespace-nowrap"
                   icon={<Play className="h-4 w-4" strokeWidth={2} />}
                 >
-                  {quickStartLoading ? '启动中...' : flowIsRunning ? '正在运行' : '开始今日流程'}
+                  {flowIsRunning ? '正在运行' : '开始今日流程'}
                 </Button>
               </div>
 
               <div className="dashboard-flow-metrics">
                 {[
                   {
-                    label: '今日活动',
+                    label: '当前活动',
                     value: activitySummary.available ? (activitySummary.name || activitySummary.code || '进行中') : '暂无活动',
                     sub: activitySummary.tip || '等待活动数据',
                     Icon: CalendarDays,
@@ -588,7 +653,9 @@ export default function Dashboard() {
                         <div className="ml-auto text-sm font-semibold text-primary">{value}</div>
                       )}
                     </div>
-                    {pct != null && (
+                    {label === '温度' ? (
+                      <TemperatureSparkline values={temperatureHistory} />
+                    ) : pct != null && (
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <span className={`text-[10px] ${labelClass}`}>使用率</span>

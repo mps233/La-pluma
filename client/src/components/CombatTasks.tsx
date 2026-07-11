@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { maaApi, searchCopilot, searchParadoxCopilot } from '../services/api'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import Icons from './Icons'
 import { PageHeader, Button } from './common'
 import { useStatusStore } from '../store/statusStore'
@@ -24,6 +24,7 @@ type CopilotSetSelections = Record<string, number[]>
 type CombatMode = 'copilot' | 'ssscopilot' | 'paradoxcopilot'
 
 export default function CombatTasks(_props: CombatTasksProps) {
+  const shouldReduceMotion = useReducedMotion()
   const [isRunning, setIsRunning] = useState(false)
   const { setMessage: setStatusMessage, setActive: setIsActiveStatus } = useStatusStore()
   const [taskInputs, setTaskInputs] = useState<CombatTaskInputs>({})
@@ -90,8 +91,15 @@ export default function CombatTasks(_props: CombatTasksProps) {
     }
 
     updateActiveCombatModeRect()
+    const resizeObserver = typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(updateActiveCombatModeRect)
+    if (combatModeTabsRef.current) resizeObserver?.observe(combatModeTabsRef.current)
     window.addEventListener('resize', updateActiveCombatModeRect)
-    return () => window.removeEventListener('resize', updateActiveCombatModeRect)
+    return () => {
+      resizeObserver?.disconnect()
+      window.removeEventListener('resize', updateActiveCombatModeRect)
+    }
   }, [activeCombatMode])
 
   const normalizeFormationMode = (value: AutoFormationConfig[string] | undefined): FormationMode => {
@@ -1284,7 +1292,9 @@ export default function CombatTasks(_props: CombatTasksProps) {
                 className="pointer-events-none absolute z-20 flex items-center gap-3 rounded-lg bg-[var(--app-accent)] px-3.5 py-2.5 text-left text-white shadow-[0_10px_24px_color-mix(in_srgb,var(--app-accent)_22%,transparent)]"
                 initial={false}
                 animate={activeCombatModeRect}
-                transition={{ type: 'spring', stiffness: 360, damping: 34, mass: 0.8 }}
+                transition={shouldReduceMotion
+                  ? { duration: 0 }
+                  : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
               >
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/16 text-white [&_*]:h-4 [&_*]:w-4">
                   {activeCombatModeOption.icon}

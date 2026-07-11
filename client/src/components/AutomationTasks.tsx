@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { maaApi } from '../services/api'
-import { motion } from 'framer-motion'
-import { AlertTriangle, CheckCircle2, ChevronDown, CircleMinus, GripVertical, ListPlus, LoaderCircle, Plus, SlidersHorizontal, Square, Trash2 } from 'lucide-react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { AlertTriangle, Check, CheckCircle2, ChevronDown, CircleMinus, GripVertical, ListPlus, LoaderCircle, Plus, SlidersHorizontal, Square, Trash2 } from 'lucide-react'
 import Icons from './Icons'
 import ScreenMonitor from './ScreenMonitor'
 import NotificationSettings from './NotificationSettings'
@@ -177,6 +177,7 @@ const synchronizeConnectionParams = (tasks: any[]) => {
 }
 
 export default function AutomationTasks({}: AutomationTasksProps) {
+  const shouldReduceMotion = useReducedMotion()
   const { setMessage: setStatusMessage, setActive: setIsActiveStatus } = useStatusStore()
 
   // 辅助函数：显示消息
@@ -1391,12 +1392,17 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                 </div>
               ) : (
                 <div className="automation-sequence-list">
-                  {taskFlow.map((task, index) => (
-                    <div
-                      key={task.id}
-                      onDragOver={(e) => handleDragOver(e, index)}
-                      className={`automation-sequence-item${activeTaskId === task.id ? ' is-selected' : ''}${currentStep === index ? ' is-current' : ''}${!task.enabled ? ' is-disabled' : ''}${draggedIndex === index ? ' is-dragging' : ''}`}
-                    >
+                  {taskFlow.map((task, index) => {
+                    const isCurrentStep = currentStep === index
+                    const isCompletedStep = isRunning && task.enabled && currentStep > index
+
+                    return (
+                      <motion.div
+                        key={task.id}
+                        layout={!shouldReduceMotion}
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        className={`automation-sequence-item${activeTaskId === task.id ? ' is-selected' : ''}${isCurrentStep ? ' is-current' : ''}${isCompletedStep ? ' is-completed' : ''}${!task.enabled ? ' is-disabled' : ''}${draggedIndex === index ? ' is-dragging' : ''}`}
+                      >
                       <span
                         draggable={!isRunning}
                         onDragStart={isRunning ? undefined : () => handleDragStart(index)}
@@ -1412,11 +1418,25 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                         className="automation-sequence-select"
                         onClick={() => setSelectedTaskId(task.id)}
                       >
-                        <span className="automation-sequence-number">{String(index + 1).padStart(2, '0')}</span>
+                        <span className="automation-sequence-node" aria-hidden="true">
+                          <AnimatePresence initial={false} mode="wait">
+                            <motion.span
+                              key={isCompletedStep ? 'completed' : isCurrentStep ? 'current' : 'pending'}
+                              initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7 }}
+                              transition={{ duration: 0.16 }}
+                            >
+                              {isCompletedStep
+                                ? <Check size={11} strokeWidth={2.8} />
+                                : String(index + 1).padStart(2, '0')}
+                            </motion.span>
+                          </AnimatePresence>
+                        </span>
                         <span className="automation-sequence-icon">{task.icon}</span>
                         <span className="automation-sequence-copy">
                           <strong>{task.name}</strong>
-                          <small>{currentStep === index ? '正在执行' : task.description}</small>
+                          <small>{isCurrentStep ? '正在执行' : isCompletedStep ? '已完成' : task.description}</small>
                         </span>
                       </button>
                       <label className="automation-sequence-enabled" title={task.enabled ? '停用任务' : '启用任务'}>
@@ -1429,9 +1449,13 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                         />
                         <span className="sr-only">{task.enabled ? '已启用' : '已停用'}</span>
                       </label>
-                      {currentStep === index ? (
+                      {isCurrentStep ? (
                         <span className="automation-current-spinner">
                           <LoaderCircle className="animate-spin" strokeWidth={2.2} />
+                        </span>
+                      ) : isCompletedStep ? (
+                        <span className="automation-completed-mark" title="已完成">
+                          <Check size={14} strokeWidth={2.4} />
                         </span>
                       ) : (
                         <button
@@ -1444,8 +1468,9 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                           <Trash2 size={14} strokeWidth={1.9} />
                         </button>
                       )}
-                    </div>
-                  ))}
+                      </motion.div>
+                    )
+                  })}
                 </div>
               )}
 
@@ -1485,31 +1510,31 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                   <Button
                     onClick={executeTaskFlow}
                     disabled={isRunning || taskFlow.filter(t => t.enabled).length === 0}
+                    loading={isRunning}
+                    loadingText="执行中"
+                    statusKey={isRunning ? 'running' : 'ready'}
                     variant="gradient"
                     className={`automation-run-button w-full justify-center whitespace-nowrap${isRunning ? ' is-running' : ''}`}
                     icon={
-                      isRunning ? (
-                        <LoaderCircle size={16} className="animate-spin" strokeWidth={2.2} />
-                      ) : (
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                        </svg>
-                      )
+                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                      </svg>
                     }
                   >
-                    {isRunning ? '执行中...' : '立即执行'}
+                    立即执行
                   </Button>
                   {isRunning && (
                     <Button
                       onClick={stopTaskFlow}
                       disabled={isStopping}
+                      loading={isStopping}
+                      loadingText="正在终止"
+                      statusKey={isStopping ? 'stopping' : 'stop-ready'}
                       variant={isStopping ? 'secondary' : 'danger'}
                       className={`automation-stop-button w-full justify-center${isStopping ? ' is-stopping' : ''}`}
-                      icon={isStopping
-                        ? <LoaderCircle size={16} className="animate-spin" strokeWidth={2.2} />
-                        : <Square size={14} fill="currentColor" />}
+                      icon={<Square size={14} fill="currentColor" />}
                     >
-                      {isStopping ? '正在终止...' : '终止执行'}
+                      终止执行
                     </Button>
                   )}
               </div>

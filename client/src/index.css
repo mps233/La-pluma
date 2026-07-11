@@ -885,7 +885,12 @@
 }
 
 .automation-sequence-item.is-current {
+  background: color-mix(in srgb, var(--app-accent-soft) 72%, transparent);
   box-shadow: inset 3px 0 0 var(--app-accent), inset 0 0 0 1px var(--app-accent);
+}
+
+.automation-sequence-item.is-completed {
+  background: color-mix(in srgb, var(--app-accent-soft) 36%, transparent);
 }
 
 .automation-sequence-item.is-disabled {
@@ -948,11 +953,71 @@
   outline-offset: 2px;
 }
 
-.automation-sequence-number {
+.automation-sequence-node {
+  position: relative;
+  z-index: 0;
+  display: inline-flex;
+  width: 1.5rem;
+  height: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--app-surface);
   color: var(--app-accent);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.5625rem;
   font-weight: 750;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 30%, var(--app-border));
+  transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.automation-sequence-node > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.automation-sequence-item:not(:last-child) .automation-sequence-node::after {
+  position: absolute;
+  z-index: -1;
+  top: 1.5rem;
+  left: 50%;
+  width: 1px;
+  height: 1.125rem;
+  background: var(--app-border);
+  content: '';
+  transform: translateX(-50%);
+  transition: background 180ms ease;
+}
+
+.automation-sequence-item.is-completed .automation-sequence-node,
+.automation-sequence-item.is-current .automation-sequence-node {
+  background: var(--app-accent);
+  color: white;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 16%, transparent);
+}
+
+.automation-sequence-item.is-completed .automation-sequence-node::after {
+  background: color-mix(in srgb, var(--app-accent) 68%, var(--app-border));
+}
+
+.automation-sequence-item.is-current .automation-sequence-node {
+  animation: automation-node-pulse 1.8s ease-out infinite;
+}
+
+@keyframes automation-node-pulse {
+  0%, 100% {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, white 16%, transparent), 0 0 0 0 color-mix(in srgb, var(--app-accent) 22%, transparent);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, white 16%, transparent), 0 0 0 0.25rem transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .automation-sequence-item.is-current .automation-sequence-node {
+    animation: none;
+  }
 }
 
 .automation-sequence-icon {
@@ -969,6 +1034,15 @@
 .automation-sequence-icon svg {
   width: 0.875rem;
   height: 0.875rem;
+}
+
+.automation-completed-mark {
+  display: inline-flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  color: var(--app-accent);
 }
 
 .automation-sequence-copy {
@@ -2152,8 +2226,8 @@ svg.w-5.h-5 {
   }
 
   .brand-action:hover {
-    background: var(--app-accent-strong);
-    box-shadow: 0 14px 32px color-mix(in srgb, var(--app-accent) 28%, transparent);
+    background: color-mix(in srgb, var(--app-accent) 78%, black);
+    box-shadow: 0 9px 22px color-mix(in srgb, var(--app-accent) 22%, transparent);
   }
 
   .brand-action-subtle {
@@ -2217,6 +2291,63 @@ svg.w-5.h-5 {
     min-width: 0;
     border-radius: var(--app-radius-lg);
     padding: 1rem;
+  }
+
+  .dashboard-temperature-chart {
+    height: 2.25rem;
+    min-width: 0;
+  }
+
+  .dashboard-temperature-chart svg {
+    display: block;
+    width: 100%;
+    height: 1.75rem;
+    overflow: visible;
+  }
+
+  .dashboard-temperature-gridline {
+    stroke: var(--app-border);
+    stroke-width: 0.6;
+    stroke-dasharray: 2 3;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .dashboard-temperature-line {
+    fill: none;
+    stroke: var(--app-accent);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .dashboard-temperature-dot {
+    fill: var(--app-accent);
+    stroke: var(--app-surface-solid);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .dashboard-temperature-range {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    margin-top: 0.125rem;
+    color: var(--app-text-tertiary);
+    font-size: 0.5625rem;
+    line-height: 1;
+  }
+
+  .dashboard-temperature-range span:last-child {
+    text-align: right;
+  }
+
+  .dashboard-temperature-empty {
+    display: flex;
+    height: 2.25rem;
+    align-items: center;
+    color: var(--app-text-tertiary);
+    font-size: 0.625rem;
   }
 
   .dashboard-preview-header {
@@ -2417,6 +2548,65 @@ svg.w-5.h-5 {
 
   .dashboard-flow-primary-action {
     min-width: 8.75rem;
+  }
+
+  .dashboard-flow-shining-action {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, white 12%, transparent),
+      0 8px 20px color-mix(in srgb, var(--app-accent) 20%, transparent);
+  }
+
+  .dashboard-flow-shining-action::before {
+    position: absolute;
+    z-index: 0;
+    top: -45%;
+    left: -3.25rem;
+    width: 2rem;
+    height: 190%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.17), transparent);
+    content: '';
+    opacity: 0;
+    pointer-events: none;
+    transform: rotate(22deg);
+  }
+
+  .dashboard-flow-shining-action > span {
+    position: relative;
+    z-index: 1;
+  }
+
+  .dashboard-flow-shining-action:not(:disabled):hover {
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, white 14%, transparent),
+      0 0 0 2px color-mix(in srgb, var(--app-accent) 9%, transparent),
+      0 9px 22px color-mix(in srgb, var(--app-accent) 22%, transparent);
+  }
+
+  .dashboard-flow-shining-action:not(:disabled):hover::before {
+    left: calc(100% + 1.5rem);
+    opacity: 1;
+    transition: left 680ms ease-in-out, opacity 180ms ease;
+  }
+
+  .dashboard-flow-shining-action:not(:disabled) svg {
+    transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .dashboard-flow-shining-action:not(:disabled):hover svg {
+    transform: translateX(0.18rem) scale(1.08);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dashboard-flow-shining-action::before {
+      display: none;
+    }
+
+    .dashboard-flow-shining-action:not(:disabled) svg {
+      transition: none;
+    }
   }
 
   .dashboard-flow-metrics {
@@ -3039,12 +3229,25 @@ svg.w-5.h-5 {
   }
 
   .control-surface:hover {
-    background: var(--app-surface-solid);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 24%, transparent);
+    background: color-mix(in srgb, var(--app-accent-soft) 24%, var(--app-surface-solid));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 18%, var(--app-border));
   }
 
   .dark .control-surface {
     background: var(--app-surface-muted);
+  }
+
+  .dark .control-surface:hover {
+    background: color-mix(in srgb, var(--app-accent-soft) 20%, var(--app-surface-muted));
+  }
+
+  .app-button-ghost:hover {
+    background: color-mix(in srgb, var(--app-accent-soft) 36%, transparent);
+    color: var(--app-text);
+  }
+
+  .dark .app-button-ghost:hover {
+    background: color-mix(in srgb, var(--app-accent-soft) 28%, transparent);
   }
 
   .control-active {
@@ -3126,8 +3329,8 @@ svg.w-5.h-5 {
   }
 
   .status-success-action:hover {
-    background: color-mix(in srgb, var(--app-success) 84%, black);
-    box-shadow: 0 14px 32px color-mix(in srgb, var(--app-success) 26%, transparent);
+    background: color-mix(in srgb, var(--app-success) 80%, black);
+    box-shadow: 0 9px 22px color-mix(in srgb, var(--app-success) 20%, transparent);
   }
 
   .status-warning {
@@ -3149,8 +3352,8 @@ svg.w-5.h-5 {
   }
 
   .status-danger-action:hover {
-    background: color-mix(in srgb, var(--app-danger) 84%, black);
-    box-shadow: 0 14px 32px color-mix(in srgb, var(--app-danger) 26%, transparent);
+    background: color-mix(in srgb, var(--app-danger) 80%, black);
+    box-shadow: 0 9px 22px color-mix(in srgb, var(--app-danger) 20%, transparent);
   }
 
   .status-info {
