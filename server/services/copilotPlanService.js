@@ -15,12 +15,23 @@ function parseCopilotContent(data) {
   }
 }
 
-async function fetchJson(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`作业站请求失败: ${response.status}`);
-  const payload = await response.json();
-  if (payload.status_code && payload.status_code !== 200) throw new Error(payload.message || '作业站返回失败');
-  return payload.data || payload;
+async function fetchJson(url, maxAttempts = 3) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      if (!response.ok) throw new Error(`作业站请求失败: ${response.status}`);
+      const payload = await response.json();
+      if (payload.status_code && payload.status_code !== 200) throw new Error(payload.message || '作业站返回失败');
+      return payload.data || payload;
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, attempt * 500));
+      }
+    }
+  }
+  throw new Error(`作业站请求失败: ${lastError?.message || '网络异常'}`, { cause: lastError });
 }
 
 export function isPresetFormationCopilot(copilot = {}) {
@@ -61,10 +72,11 @@ async function loadStageCodeMap(stageIds) {
 export async function buildCopilotPlan(setId, raid = 'normal') {
   const set = await fetchJson(`https://prts.maa.plus/set/get?id=${encodeURIComponent(setId)}`);
   const ids = Array.isArray(set.copilot_ids) ? set.copilot_ids : [];
-  const copilotContents = await Promise.all(ids.map(async id => {
+  const copilotContents = [];
+  for (const id of ids) {
     const data = await fetchJson(`https://prts.maa.plus/copilot/get/${id}`);
-    return { id, content: parseCopilotContent(data) };
-  }));
+    copilotContents.push({ id, content: parseCopilotContent(data) });
+  }
   const stageCodes = await loadStageCodeMap(copilotContents.map(item => item.content.stage_name));
   const copilots = copilotContents.map(({ id, content }) => {
     return {
