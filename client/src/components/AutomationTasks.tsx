@@ -113,6 +113,10 @@ const migrateTaskParams = (task: any) => {
   if (!task.params) return task
 
   const params = { ...task.params }
+  if (commandId === 'startup' || commandId === 'closedown') {
+    delete params.adbPath
+    delete params.address
+  }
   if (commandId === 'fight') {
     params.drops ??= ''
     params.clientType ??= ''
@@ -122,8 +126,6 @@ const migrateTaskParams = (task: any) => {
     params.report_to_yituliu ??= false
     params.yituliu_id ??= ''
   } else if (commandId === 'closedown') {
-    params.adbPath ??= '/opt/homebrew/bin/adb'
-    params.address ??= '127.0.0.1:16384'
     params.recognizeDepotBeforeClose ??= true
   } else if (commandId === 'recruit') {
     if (params.preserve_tags === undefined && params.skip_robot === true) {
@@ -168,9 +170,7 @@ const synchronizeConnectionParams = (tasks: any[]) => {
       ...task,
       params: {
         ...task.params,
-        clientType: startupTask.params.clientType || task.params?.clientType || 'Official',
-        adbPath: startupTask.params.adbPath || task.params?.adbPath || '/opt/homebrew/bin/adb',
-        address: startupTask.params.address || task.params?.address || '127.0.0.1:16384'
+        clientType: startupTask.params.clientType || task.params?.clientType || 'Official'
       }
     }
   })
@@ -305,8 +305,6 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       description: '启动游戏并进入主界面',
       defaultParams: {
         clientType: 'Official',
-        adbPath: '/opt/homebrew/bin/adb',
-        address: '127.0.0.1:16384',
         accountName: ''
       },
       paramFields: [
@@ -318,9 +316,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
           { value: 'YoStarKR', label: '韩服' },
           { value: 'Txwy', label: '繁中服' }
         ]},
-        { key: 'accountName', label: '切换账号', type: 'text', placeholder: '留空则不切换', helper: '输入已登录账号的部分字符即可，如 "123****4567" 可输入 "4567"' },
-        { key: 'adbPath', label: 'ADB 路径', type: 'text', placeholder: '/opt/homebrew/bin/adb', helper: 'macOS 默认路径' },
-        { key: 'address', label: '连接地址', type: 'text', placeholder: '127.0.0.1:16384', helper: 'MuMu 模拟器默认端口：16384' }
+        { key: 'accountName', label: '切换账号', type: 'text', placeholder: '留空则不切换', helper: '输入已登录账号的部分字符即可，如 "123****4567" 可输入 "4567"' }
       ]
     },
     {
@@ -501,8 +497,6 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       description: '关闭游戏客户端',
       defaultParams: {
         clientType: 'Official',
-        adbPath: '/opt/homebrew/bin/adb',
-        address: '127.0.0.1:16384',
         recognizeDepotBeforeClose: false
       },
       paramFields: [
@@ -536,8 +530,6 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       const startupTask = taskFlow.find(flowTask => flowTask.commandId === 'startup')
       if (startupTask) {
         newTask.params.clientType = startupTask.params.clientType || 'Official'
-        newTask.params.adbPath = startupTask.params.adbPath || '/opt/homebrew/bin/adb'
-        newTask.params.address = startupTask.params.address || '127.0.0.1:16384'
       }
     }
     const newFlow = task.id === 'closedown'
@@ -627,7 +619,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     }
 
     // 如果修改的是启动游戏的客户端类型，同步到关闭游戏
-    const connectionKeys = new Set(['clientType', 'adbPath', 'address'])
+    const connectionKeys = new Set(['clientType'])
     if (currentTask.commandId === 'startup' && connectionKeys.has(key)) {
       newFlow.forEach((task, i) => {
         if (task.commandId === 'closedown' && newFlow[i]) {
@@ -648,13 +640,14 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     autoSave(newFlow, scheduleEnabled, scheduleTimes)
   }
 
-  const testConnection = async (taskId: string, adbPath: string, address: string) => {
+  const testConnection = async (taskId: string) => {
     setTestingConnection(prev => ({ ...prev, [taskId]: true }))
     setConnectionStatus(prev => ({ ...prev, [taskId]: { success: false, message: '' } }))
 
     try {
-      const result = await maaApi.testConnection(adbPath, address)
-      setConnectionStatus(prev => ({ ...prev, [taskId]: result as ConnectionTestStatus }))
+      const result = await maaApi.testConnection()
+      const payload = result.data as ConnectionTestStatus | undefined
+      setConnectionStatus(prev => ({ ...prev, [taskId]: payload || { success: false, message: maaApi.getErrorMessage(result) } }))
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : '未知错误'
       setConnectionStatus(prev => ({
@@ -796,9 +789,6 @@ export default function AutomationTasks({}: AutomationTasksProps) {
 
     if (commandId === 'startup' || commandId === 'closedown') {
       params = task.params?.clientType || 'Official'
-      if (task.params?.address) {
-        extraArgs.push(`-a ${task.params.address}`)
-      }
       if (commandId === 'startup' && task.params?.accountName?.trim()) {
         extraArgs.push(`--account-name ${task.params.accountName.trim()}`)
       }
@@ -1358,10 +1348,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         <div>
           {/* 模拟器监控 */}
           <div className="rounded-2xl sm:rounded-3xl p-[var(--app-space-panel)] surface-panel transition-colors">
-            <ScreenMonitor
-              adbPath={taskFlow.find(t => t.commandId === 'startup')?.params?.adbPath || '/opt/homebrew/bin/adb'}
-              address={taskFlow.find(t => t.commandId === 'startup')?.params?.address || '127.0.0.1:16384'}
-            />
+            <ScreenMonitor />
           </div>
 
         </div>
@@ -2602,10 +2589,10 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                       )}
 
                       {/* 启动游戏任务的测试连接按钮 */}
-                      {task.commandId === 'startup' && task.params?.adbPath && task.params?.address && (
+                      {task.commandId === 'startup' && (
                         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-white/10">
                           <button
-                            onClick={() => testConnection(task.id, task.params.adbPath || '', task.params.address || '')}
+                            onClick={() => testConnection(task.id)}
                             disabled={isRunning || !task.enabled || testingConnection[task.id]}
                             className="w-full flex items-center justify-center space-x-2 px-4 py-2 brand-action text-white rounded-xl text-sm font-medium transition-all disabled:cursor-not-allowed disabled:shadow-none"
                           >

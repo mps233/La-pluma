@@ -8,6 +8,7 @@ import { setSocketIO as setSchedulerSocketIO } from './services/schedulerService
 import { setSocketIO as setMaaSocketIO } from './services/maaService.js';
 import { initTelegramBot } from './services/telegramBotService.js';
 import { getNotificationConfig } from './services/notificationService.js';
+import { resolveConnection } from './services/connectionService.js';
 import { networkInterfaces } from 'os';
 import { printPathConfig } from './config/paths.js';
 import { fileURLToPath } from 'url';
@@ -119,33 +120,14 @@ httpServer.listen(PORT, '0.0.0.0', async () => {
   try {
     const notifConfig = getNotificationConfig();
     if (notifConfig.channels?.telegram) {
-      // 尝试从自动化任务配置中读取 ADB 配置
-      let adbPath = '/opt/homebrew/bin/adb';
-      let adbAddress = '127.0.0.1:16384';
-      
-      try {
-        const { readFile } = await import('fs/promises');
-        const { join } = await import('path');
-        const configPath = join(__dirname, 'data/user-configs/automation-tasks.json');
-        const configData = await readFile(configPath, 'utf-8');
-        const config = JSON.parse(configData);
-        
-        // 从启动游戏任务中获取 ADB 配置
-        const startupTask = config.taskFlow?.find(t => t.commandId === 'startup');
-        if (startupTask?.params) {
-          adbPath = startupTask.params.adbPath || adbPath;
-          adbAddress = startupTask.params.address || adbAddress;
-        }
-      } catch (error) {
-        console.log('[Telegram Bot] 无法读取 ADB 配置，使用默认值');
-      }
+      const connection = await resolveConnection();
       
       initTelegramBot({
         enabled: notifConfig.channels.telegram.enabled,
         botToken: notifConfig.channels.telegram.botToken,
         chatId: notifConfig.channels.telegram.chatId,
-        adbPath,
-        adbAddress
+        adbPath: connection.adbPath,
+        adbAddress: connection.address
       });
     }
   } catch (error) {

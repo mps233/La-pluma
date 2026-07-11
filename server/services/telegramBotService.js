@@ -5,6 +5,7 @@
 import fetch from 'node-fetch';
 import { executeScheduleNow } from './schedulerService.js';
 import { execMaaCommand, getTaskStatus, stopCurrentTask, captureScreen } from './maaService.js';
+import { resolveConnection } from './connectionService.js';
 import { createLogger } from '../utils/logger.js';
 
 const logger = createLogger('TelegramBot');
@@ -484,7 +485,8 @@ async function executeScreenshot(chatId) {
     await sendMessage(chatId, '📸 正在截图...');
     
     // 执行截图
-    const result = await captureScreen(botConfig.adbPath, botConfig.adbAddress);
+    const connection = await resolveConnection();
+    const result = await captureScreen(connection.adbPath, connection.address);
     
     if (result.image) {
       // 发送图片

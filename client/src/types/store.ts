@@ -2,7 +2,7 @@
  * Store 状态类型定义
  */
 
-import type { TaskFlow, ScheduleStatus, ConnectionConfig } from './api'
+import type { TaskFlow, ScheduleStatus } from './api'
 
 // Task Execution Store
 export interface TaskExecutionState {
@@ -37,20 +37,6 @@ export interface TaskConfigState {
   setSchedule: (enabled: boolean, times: string[]) => void
   loadConfig: (type: string) => Promise<void>
   saveConfig: (type: string) => Promise<void>
-}
-
-// Connection Store
-export interface ConnectionState {
-  status: 'connected' | 'disconnected' | 'connecting'
-  adbPath: string
-  address: string
-  clientType: string
-  lastTestTime: number | null
-  
-  // Actions
-  testConnection: () => Promise<boolean>
-  updateConfig: (config: Partial<ConnectionConfig>) => void
-  setStatus: (status: ConnectionState['status']) => void
 }
 
 // UI Store

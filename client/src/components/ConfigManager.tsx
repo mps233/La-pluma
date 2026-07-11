@@ -42,6 +42,26 @@ interface ChangelogItem {
   prerelease: boolean
 }
 
+interface DiscoveredDevice {
+  address: string
+  state: 'device' | 'offline' | 'unauthorized' | 'unknown' | 'candidate'
+  details?: string
+  adbPath?: string
+  source: 'adb' | 'local-port' | 'emulator-adb'
+}
+
+interface DiscoveryResult {
+  success: boolean
+  message: string
+  devices: DiscoveredDevice[]
+  candidates: DiscoveredDevice[]
+}
+
+interface ConnectionFeedback {
+  success: boolean
+  message: string
+}
+
 export default function ConfigManager({}: ConfigManagerProps) {
   const { setMessage: setStatusMessage } = useStatusStore()
   const [configType, setConfigType] = useState<'connection' | 'resource' | 'instance' | 'skland'>(() => {
@@ -73,6 +93,12 @@ export default function ConfigManager({}: ConfigManagerProps) {
   const [showCoreChangelog, setShowCoreChangelog] = useState(false)
   const [showCliChangelog, setShowCliChangelog] = useState(false)
   const [updateFeedback, setUpdateFeedback] = useState<UpdateFeedback | null>(null)
+  const [discoveredDevices, setDiscoveredDevices] = useState<DiscoveredDevice[]>([])
+  const [discoveryMessage, setDiscoveryMessage] = useState<string | null>(null)
+  const [hasSearchedDevices, setHasSearchedDevices] = useState(false)
+  const [discoveringDevices, setDiscoveringDevices] = useState(false)
+  const [testingConnection, setTestingConnection] = useState(false)
+  const [connectionFeedback, setConnectionFeedback] = useState<ConnectionFeedback | null>(null)
   const didInitializeRef = useRef(false)
 
   useEffect(() => {
@@ -251,6 +277,64 @@ export default function ConfigManager({}: ConfigManagerProps) {
     setStatusMessage('已重置为默认值')
     await new Promise(resolve => setTimeout(resolve, 1500))
     setStatusMessage('')
+  }
+
+  const handleDiscoverDevices = async () => {
+    setDiscoveringDevices(true)
+    setDiscoveryMessage(null)
+    setConnectionFeedback(null)
+
+    try {
+      const result = await maaApi.discoverDevices(configData.adb_path)
+      const discovery = result.data as DiscoveryResult | undefined
+      const devices = discovery ? [...(discovery.devices || []), ...(discovery.candidates || [])] : []
+      setDiscoveredDevices(devices)
+      setDiscoveryMessage(discovery?.message || maaApi.getErrorMessage(result))
+    } catch (error) {
+      setDiscoveredDevices([])
+      setDiscoveryMessage(`查找设备失败: ${(error as Error).message}`)
+    } finally {
+      setHasSearchedDevices(true)
+      setDiscoveringDevices(false)
+    }
+  }
+
+  const handleTestConnection = async (address = configData.address) => {
+    setTestingConnection(true)
+    setConnectionFeedback(null)
+
+    try {
+      const result = await maaApi.testConnection(configData.adb_path, address)
+      const feedback = result.data as ConnectionFeedback | undefined
+      setConnectionFeedback({
+        success: Boolean(result.success && feedback?.success),
+        message: feedback?.message || maaApi.getErrorMessage(result)
+      })
+    } catch (error) {
+      setConnectionFeedback({ success: false, message: `连接测试失败: ${(error as Error).message}` })
+    } finally {
+      setTestingConnection(false)
+    }
+  }
+
+  const handleUseDiscoveredDevice = async (device: DiscoveredDevice) => {
+    const adbPath = device.adbPath || configData.adb_path
+    setConfigData(current => ({ ...current, adb_path: adbPath, address: device.address }))
+    setTestingConnection(true)
+    setConnectionFeedback(null)
+
+    try {
+      const result = await maaApi.testConnection(adbPath, device.address)
+      const feedback = result.data as ConnectionFeedback | undefined
+      setConnectionFeedback({
+        success: Boolean(result.success && feedback?.success),
+        message: feedback?.message || maaApi.getErrorMessage(result)
+      })
+    } catch (error) {
+      setConnectionFeedback({ success: false, message: `连接测试失败: ${(error as Error).message}` })
+    } finally {
+      setTestingConnection(false)
+    }
   }
 
   const handleConfigTypeChange = (section: 'connection' | 'resource' | 'instance' | 'skland') => {
@@ -930,9 +1014,88 @@ export default function ConfigManager({}: ConfigManagerProps) {
                     <Input
                       label="连接地址"
                       value={configData.address}
-                      onChange={(value: string) => setConfigData({ ...configData, address: value })}
+                      onChange={(value: string) => {
+                        setConfigData({ ...configData, address: value })
+                        setConnectionFeedback(null)
+                      }}
                       hint="模拟器连接地址，格式: IP:端口"
                     />
+                    <section className="border-t border-[var(--app-border)] pt-4" aria-label="模拟器查找与连接测试">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-sm font-semibold text-primary">模拟器查找</h3>
+                          <p className="mt-1 text-xs text-tertiary">查找已连接设备和常见本机模拟器端口，选用后会填入连接地址。</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            loading={discoveringDevices}
+                            loadingText="查找中..."
+                            onClick={() => void handleDiscoverDevices()}
+                          >
+                            查找模拟器
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            loading={testingConnection}
+                            loadingText="测试中..."
+                            onClick={() => void handleTestConnection()}
+                          >
+                            测试连接
+                          </Button>
+                        </div>
+                      </div>
+
+                      {discoveryMessage && (
+                        <p className="mt-3 text-xs text-secondary" role="status">{discoveryMessage}</p>
+                      )}
+
+                      {discoveredDevices.length > 0 && (
+                        <div className="mt-3 divide-y divide-[var(--app-border)] overflow-hidden rounded-lg border border-[var(--app-border)]">
+                          {discoveredDevices.map(device => {
+                            const selectable = device.state === 'device' || device.state === 'candidate'
+                            const stateLabel = device.state === 'device'
+                              ? '已连接'
+                              : device.state === 'candidate'
+                                ? '可尝试连接'
+                                : device.state === 'offline'
+                                  ? '设备离线'
+                                  : device.state === 'unauthorized'
+                                    ? '等待授权'
+                                    : '状态未知'
+                            return (
+                              <button
+                                key={`${device.source}-${device.address}`}
+                                type="button"
+                                disabled={!selectable || testingConnection}
+                                onClick={() => void handleUseDiscoveredDevice(device)}
+                                className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--app-accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <span className="min-w-0">
+                                  <span className="block truncate text-sm font-medium text-primary">{device.address}</span>
+                                  <span className="mt-0.5 block truncate text-xs text-tertiary">{device.details || (device.source === 'adb' ? 'ADB 已识别设备' : device.source === 'emulator-adb' ? '模拟器内置 ADB' : '本机端口')}</span>
+                                </span>
+                                <span className="shrink-0 text-xs text-secondary">{stateLabel}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {hasSearchedDevices && !discoveredDevices.length && (
+                        <p className="mt-3 text-xs text-tertiary">未找到已连接的设备。启动模拟器后重新查找，或手动填写连接地址。</p>
+                      )}
+
+                      {connectionFeedback && (
+                        <div className={`mt-3 app-info-card text-xs ${connectionFeedback.success ? 'status-success' : 'status-danger'}`} role={connectionFeedback.success ? 'status' : 'alert'}>
+                          {connectionFeedback.message}
+                        </div>
+                      )}
+                    </section>
                     <Select
                       label="平台配置"
                       value={configData.config}

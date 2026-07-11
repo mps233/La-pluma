@@ -7,6 +7,7 @@ const execFileAsync = promisify(execFile)
 export const WEBRTC_DIR = process.env.LA_PLUMA_WEBRTC_DIR || `${process.env.HOME || ''}/ScrcpyOverWebRTC`
 export const WEBRTC_PORT = Number(process.env.LA_PLUMA_WEBRTC_PORT || 8443)
 export const DEFAULT_DEVICE_ADDRESS = process.env.ADB_ADDRESS || '127.0.0.1:16384'
+export const DEFAULT_ADB_PATH = process.env.ADB_PATH || '/opt/homebrew/bin/adb'
 export const DEFAULT_DEVICE_ID = 'mumu-la-pluma'
 
 let webrtcServerProcess = null
@@ -81,9 +82,9 @@ export async function isWebrtcServerReachable() {
   }
 }
 
-export async function isDeviceAgentRunning(address = DEFAULT_DEVICE_ADDRESS) {
+export async function isDeviceAgentRunning(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
   try {
-    const { stdout } = await execFileAsync('/opt/homebrew/bin/adb', ['-s', address, 'shell', 'ps | grep cloudphone-agent || true'], { timeout: 5000 })
+    const { stdout } = await execFileAsync(adbPath, ['-s', address, 'shell', 'ps | grep cloudphone-agent || true'], { timeout: 5000 })
     return stdout.includes('cloudphone-agent')
   } catch {
     return false
@@ -121,7 +122,7 @@ export async function startLocalTurnServer() {
   webrtcTurnProcess.on('exit', () => { webrtcTurnProcess = null })
 }
 
-export async function killLocalWebrtcInfrastructure(address = DEFAULT_DEVICE_ADDRESS) {
+export async function killLocalWebrtcInfrastructure(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
   if (webrtcAgentProcess && !webrtcAgentProcess.killed) webrtcAgentProcess.kill('SIGTERM')
   if (webrtcServerProcess && !webrtcServerProcess.killed) webrtcServerProcess.kill('SIGTERM')
   if (webrtcTurnProcess && !webrtcTurnProcess.killed) webrtcTurnProcess.kill('SIGTERM')
@@ -131,17 +132,17 @@ export async function killLocalWebrtcInfrastructure(address = DEFAULT_DEVICE_ADD
 
   await killListeningPidsOnTcpPort(WEBRTC_PORT)
   await killListeningPidsOnTcpPort(3478)
-  await execFileQuiet('/opt/homebrew/bin/adb', ['-s', address, 'shell', 'pkill -f cloudphone-agent || true'])
-  await execFileQuiet('/opt/homebrew/bin/adb', ['-s', address, 'shell', 'pkill -f scrcpy.Server || true'])
+  await execFileQuiet(adbPath, ['-s', address, 'shell', 'pkill -f cloudphone-agent || true'])
+  await execFileQuiet(adbPath, ['-s', address, 'shell', 'pkill -f scrcpy.Server || true'])
 }
 
-export async function getWebrtcStatus(address = DEFAULT_DEVICE_ADDRESS) {
+export async function getWebrtcStatus(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
   const binaryPath = await getWebrtcBinaryPath()
   const assetsPath = path.join(WEBRTC_DIR, 'assets', 'v1')
   const lanIp = await getMacLanIp()
   const logPaths = await getWebrtcLogPaths()
   const serverReachable = await isWebrtcServerReachable()
-  const deviceAgentRunning = await isDeviceAgentRunning(address)
+  const deviceAgentRunning = await isDeviceAgentRunning(address, adbPath)
   return {
     installed: await pathExists(WEBRTC_DIR),
     built: await pathExists(binaryPath) && await pathExists(assetsPath),
@@ -185,12 +186,12 @@ export async function installWebrtc() {
   return getWebrtcStatus()
 }
 
-export async function startWebrtcServer(address = DEFAULT_DEVICE_ADDRESS) {
+export async function startWebrtcServer(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
   if (webrtcServerProcess && !webrtcServerProcess.killed) {
-    return getWebrtcStatus(address)
+    return getWebrtcStatus(address, adbPath)
   }
   if (await isWebrtcServerReachable()) {
-    return getWebrtcStatus(address)
+    return getWebrtcStatus(address, adbPath)
   }
 
   const binaryPath = await getWebrtcBinaryPath()
@@ -211,20 +212,20 @@ export async function startWebrtcServer(address = DEFAULT_DEVICE_ADDRESS) {
     env: { ...process.env, PORT: String(WEBRTC_PORT), PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH || ''}` }
   })
   webrtcServerProcess.on('exit', () => { webrtcServerProcess = null })
-  return getWebrtcStatus(address)
+  return getWebrtcStatus(address, adbPath)
 }
 
-export async function stopWebrtcServer(address = DEFAULT_DEVICE_ADDRESS) {
-  await killLocalWebrtcInfrastructure(address)
-  return getWebrtcStatus(address)
+export async function stopWebrtcServer(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
+  await killLocalWebrtcInfrastructure(address, adbPath)
+  return getWebrtcStatus(address, adbPath)
 }
 
-export async function startWebrtcAgent(address = DEFAULT_DEVICE_ADDRESS, deviceId = DEFAULT_DEVICE_ID) {
+export async function startWebrtcAgent(address = DEFAULT_DEVICE_ADDRESS, deviceId = DEFAULT_DEVICE_ID, adbPath = DEFAULT_ADB_PATH) {
   if (webrtcAgentProcess && !webrtcAgentProcess.killed) {
-    return getWebrtcStatus(address)
+    return getWebrtcStatus(address, adbPath)
   }
-  if (await isDeviceAgentRunning(address)) {
-    return getWebrtcStatus(address)
+  if (await isDeviceAgentRunning(address, adbPath)) {
+    return getWebrtcStatus(address, adbPath)
   }
 
   const runScript = path.join(WEBRTC_DIR, 'agentd', 'run.sh')
@@ -241,31 +242,31 @@ export async function startWebrtcAgent(address = DEFAULT_DEVICE_ADDRESS, deviceI
     cwd: path.join(WEBRTC_DIR, 'agentd'),
     stdio: ['ignore', logFd, logFd],
     detached: false,
-    env: { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH || ''}` }
+    env: { ...process.env, ADB_PATH: adbPath, PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH || ''}` }
   })
   webrtcAgentProcess.on('exit', () => { webrtcAgentProcess = null })
-  return getWebrtcStatus(address)
+  return getWebrtcStatus(address, adbPath)
 }
 
-export async function stopWebrtcAgent(address = DEFAULT_DEVICE_ADDRESS) {
+export async function stopWebrtcAgent(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
   if (webrtcAgentProcess && !webrtcAgentProcess.killed) {
     webrtcAgentProcess.kill('SIGTERM')
     webrtcAgentProcess = null
   }
-  await execFileAsync('/opt/homebrew/bin/adb', ['-s', address, 'shell', 'pkill -f cloudphone-agent || true'], { timeout: 5000 }).catch(() => {})
-  await execFileAsync('/opt/homebrew/bin/adb', ['-s', address, 'shell', 'pkill -f scrcpy.Server || true'], { timeout: 5000 }).catch(() => {})
-  return getWebrtcStatus(address)
+  await execFileAsync(adbPath, ['-s', address, 'shell', 'pkill -f cloudphone-agent || true'], { timeout: 5000 }).catch(() => {})
+  await execFileAsync(adbPath, ['-s', address, 'shell', 'pkill -f scrcpy.Server || true'], { timeout: 5000 }).catch(() => {})
+  return getWebrtcStatus(address, adbPath)
 }
 
-export async function startWebrtc(address = DEFAULT_DEVICE_ADDRESS, deviceId = DEFAULT_DEVICE_ID) {
-  await startWebrtcServer(address)
-  await startWebrtcAgent(address, deviceId)
+export async function startWebrtc(address = DEFAULT_DEVICE_ADDRESS, deviceId = DEFAULT_DEVICE_ID, adbPath = DEFAULT_ADB_PATH) {
+  await startWebrtcServer(address, adbPath)
+  await startWebrtcAgent(address, deviceId, adbPath)
   await new Promise(resolve => setTimeout(resolve, 1200))
-  return getWebrtcStatus(address)
+  return getWebrtcStatus(address, adbPath)
 }
 
-export async function stopWebrtc(address = DEFAULT_DEVICE_ADDRESS) {
-  await stopWebrtcAgent(address).catch(() => null)
-  await stopWebrtcServer(address).catch(() => null)
+export async function stopWebrtc(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
+  await stopWebrtcAgent(address, adbPath).catch(() => null)
+  await stopWebrtcServer(address, adbPath).catch(() => null)
   return { stopped: true }
 }

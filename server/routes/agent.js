@@ -8,6 +8,7 @@ import {
   getTaskStatus,
   stopCurrentTask,
   testAdbConnection,
+  discoverAdbDevices,
   captureScreen,
   getMaaConfigDir,
   getConfig,
@@ -42,6 +43,7 @@ import {
   sendError
 } from '../utils/apiHelper.js';
 import { createLogger } from '../utils/logger.js'
+import { resolveConnection } from '../services/connectionService.js'
 import {
   getWebrtcStatus,
   installWebrtc,
@@ -85,6 +87,18 @@ const AGENT_ACTIONS = [
       properties: {
         adbPath: { type: 'string', default: DEFAULT_ADB_PATH },
         address: { type: 'string', default: DEFAULT_ADB_ADDRESS }
+      }
+    }
+  },
+  {
+    id: 'discover_devices',
+    method: 'GET',
+    path: '/api/agent/actions/discover-devices',
+    description: 'List ADB-visible devices and reachable common local emulator ports.',
+    query_schema: {
+      type: 'object',
+      properties: {
+        adbPath: { type: 'string', default: DEFAULT_ADB_PATH }
       }
     }
   },
@@ -304,6 +318,7 @@ function getOpenApiSpec() {
       endpoint('POST', '/agent/webrtc/stop', 'Stop WebRTC infrastructure.'),
       endpoint('POST', '/agent/preview/orientation', 'Set emulator orientation and return observed display state.', AGENT_ACTIONS.find(a => a.id === 'preview_orientation').body_schema),
       endpoint('POST', '/agent/actions/test-connection', 'Test ADB connection.', AGENT_ACTIONS.find(a => a.id === 'test_connection').body_schema),
+      endpoint('GET', '/agent/actions/discover-devices', 'Discover ADB devices and common local emulator ports.', AGENT_ACTIONS.find(a => a.id === 'discover_devices').query_schema),
       endpoint('POST', '/agent/actions/start-game', 'Start Arknights through MAA.', AGENT_ACTIONS.find(a => a.id === 'start_game').body_schema),
       endpoint('POST', '/agent/actions/fight', 'Run semantic 理智作战 through MAA.', AGENT_ACTIONS.find(a => a.id === 'fight').body_schema),
       endpoint('POST', '/agent/actions/run-daily-flow', 'Run saved daily task flow or return a dry-run plan.', AGENT_ACTIONS.find(a => a.id === 'run_daily_flow').body_schema),
@@ -358,9 +373,9 @@ async function getAdbSummary(adbPath = DEFAULT_ADB_PATH, address = DEFAULT_ADB_A
   };
 }
 
-async function getWebrtcSummary(address = DEFAULT_DEVICE_ADDRESS) {
+async function getWebrtcSummary(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
   const [status, reachable] = await Promise.all([
-    getWebrtcStatus(address).catch(() => null),
+    getWebrtcStatus(address, adbPath).catch(() => null),
     isWebrtcServerReachable()
   ])
   return {
@@ -372,6 +387,18 @@ async function getWebrtcSummary(address = DEFAULT_DEVICE_ADDRESS) {
     installed: Boolean(status?.installed),
     built: Boolean(status?.built),
     note: reachable ? 'WebRTC page is reachable. Use browser UI to connect the device.' : 'WebRTC page is not reachable. Start it from /api/agent/webrtc/start or the Web UI.'
+  }
+}
+
+async function resolveRequestConnection(req, { allowOverrides = false } = {}) {
+  const input = { ...(req.query || {}), ...(req.body || {}) }
+  const base = await resolveConnection(input.profileId)
+  if (!allowOverrides) return base
+  return {
+    ...base,
+    adbPath: typeof input.adbPath === 'string' && input.adbPath.trim() ? input.adbPath : base.adbPath,
+    address: typeof input.address === 'string' && input.address.trim() ? input.address : base.address,
+    clientType: typeof input.clientType === 'string' && input.clientType.trim() ? input.clientType : base.clientType
   }
 }
 
@@ -566,12 +593,12 @@ function buildTaskFlowPlan(taskFlow) {
 }
 
 async function buildAgentStatus(req) {
-  const adbPath = req.query.adbPath || req.body?.adbPath || DEFAULT_ADB_PATH;
-  const address = req.query.address || req.body?.address || DEFAULT_ADB_ADDRESS;
+  const connection = await resolveRequestConnection(req)
+  const { adbPath, address } = connection
   const [version, adb, webrtc, orientation] = await Promise.all([
     getMaaVersion(true).catch(error => ({ error: error.message })),
     getAdbSummary(adbPath, address).catch(error => ({ connected: false, error: error.message, adbPath, address })),
-    getWebrtcSummary(),
+    getWebrtcSummary(address, adbPath),
     getAndroidDisplayState(adbPath, address).catch(error => ({ error: error.message, adbPath, address }))
   ]);
   const task = getTaskStatus();
@@ -655,14 +682,15 @@ router.get('/tasks/status', asyncHandler(async (req, res) => {
 }));
 
 router.post('/screen/screenshot', asyncHandler(async (req, res) => {
-  const { adbPath = DEFAULT_ADB_PATH, address = DEFAULT_ADB_ADDRESS } = req.body || {};
+  const { adbPath, address, profileId } = await resolveRequestConnection(req)
   const screenshot = await captureScreen(adbPath, address);
   res.json(successResponse({
     ...screenshot,
     ...pngDimensions(screenshot.image),
     mediaType: 'image/png',
     adbPath,
-    address
+    address,
+    profileId
   }));
 }));
 
@@ -1104,8 +1132,9 @@ router.post('/actions/fetch-training-materials', asyncHandler(async (req, res) =
 }));
 
 router.get('/webrtc/status', asyncHandler(async (req, res) => {
-  const summary = await getWebrtcSummary(req.query?.address || DEFAULT_DEVICE_ADDRESS);
-  res.json(successResponse({ ...summary, devices: await getWebrtcDevices() }));
+  const { address, adbPath, profileId } = await resolveRequestConnection(req)
+  const summary = await getWebrtcSummary(address, adbPath);
+  res.json(successResponse({ ...summary, profileId, devices: await getWebrtcDevices() }));
 }));
 
 router.get('/webrtc/devices', asyncHandler(async (req, res) => {
@@ -1113,16 +1142,17 @@ router.get('/webrtc/devices', asyncHandler(async (req, res) => {
 }));
 
 router.post('/webrtc/start', asyncHandler(async (req, res) => {
-  const address = req.body?.address || DEFAULT_DEVICE_ADDRESS;
+  const { address, adbPath, profileId } = await resolveRequestConnection(req)
   const deviceId = req.body?.deviceId || DEFAULT_DEVICE_ID;
-  const status = await startWebrtc(address, deviceId);
-  const summary = await getWebrtcSummary(address);
+  const status = await startWebrtc(address, deviceId, adbPath);
+  const summary = await getWebrtcSummary(address, adbPath);
   res.json(successResponse({
     ...summary,
     ...status,
     devices: await getWebrtcDevices(),
     deviceId,
     address,
+    profileId,
     protocol: {
       websocket: `${summary.url.replace(/^http/, 'ws')}/connect_client?token=`,
       connectMessage: { message_type: 'connect', device_id: deviceId },
@@ -1133,11 +1163,13 @@ router.post('/webrtc/start', asyncHandler(async (req, res) => {
 }));
 
 router.post('/webrtc/stop', asyncHandler(async (req, res) => {
-  return sendSuccess(res, req, await stopWebrtc(req.body?.address || DEFAULT_DEVICE_ADDRESS));
+  const { address, adbPath } = await resolveRequestConnection(req)
+  return sendSuccess(res, req, await stopWebrtc(address, adbPath));
 }));
 
 router.post('/preview/orientation', asyncHandler(async (req, res) => {
-  const { orientation, adbPath = DEFAULT_ADB_PATH, address = DEFAULT_ADB_ADDRESS, dryRun = false } = req.body || {};
+  const { orientation, dryRun = false } = req.body || {};
+  const { adbPath, address } = await resolveRequestConnection(req)
   const plan = buildOrientationPlan({ orientation, adbPath, address });
 
   if (dryRun) {
@@ -1153,24 +1185,27 @@ router.post('/webrtc/install', asyncHandler(async (req, res) => {
 }));
 
 router.post('/webrtc/start-server', asyncHandler(async (req, res) => {
-  const result = await startWebrtcServer(req.body?.address || DEFAULT_DEVICE_ADDRESS);
+  const { address, adbPath } = await resolveRequestConnection(req)
+  const result = await startWebrtcServer(address, adbPath);
   return sendSuccess(res, req, result, 'WebRTC 服务已启动');
 }));
 
 router.post('/webrtc/stop-server', asyncHandler(async (req, res) => {
-  const result = await stopWebrtcServer(req.body?.address || DEFAULT_DEVICE_ADDRESS);
+  const { address, adbPath } = await resolveRequestConnection(req)
+  const result = await stopWebrtcServer(address, adbPath);
   return sendSuccess(res, req, result, 'WebRTC 服务已停止');
 }));
 
 router.post('/webrtc/start-agent', asyncHandler(async (req, res) => {
-  const address = req.body?.address || DEFAULT_DEVICE_ADDRESS;
+  const { address, adbPath } = await resolveRequestConnection(req)
   const deviceId = req.body?.deviceId || DEFAULT_DEVICE_ID;
-  const result = await startWebrtcAgent(address, deviceId);
+  const result = await startWebrtcAgent(address, deviceId, adbPath);
   return sendSuccess(res, req, result, 'MuMu Agent 已启动');
 }));
 
 router.post('/webrtc/stop-agent', asyncHandler(async (req, res) => {
-  const result = await stopWebrtcAgent(req.body?.address || DEFAULT_DEVICE_ADDRESS);
+  const { address, adbPath } = await resolveRequestConnection(req)
+  const result = await stopWebrtcAgent(address, adbPath);
   return sendSuccess(res, req, result, 'MuMu Agent 已停止');
 }));
 
@@ -1230,8 +1265,7 @@ async function getDeviceStats(adbPath, address) {
 }
 
 router.get('/device-stats', asyncHandler(async (req, res) => {
-  const adbPath = req.query.adbPath || DEFAULT_ADB_PATH;
-  const address = req.query.address || DEFAULT_DEVICE_ADDRESS;
+  const { adbPath, address } = await resolveRequestConnection(req)
   const stats = await getDeviceStats(adbPath, address);
   return sendSuccess(res, req, stats);
 }));
@@ -1480,8 +1514,13 @@ router.post('/actions/hot-update-resources', asyncHandler(async (req, res) => {
 }));
 
 router.post('/actions/test-connection', asyncHandler(async (req, res) => {
-  const { adbPath = DEFAULT_ADB_PATH, address = DEFAULT_ADB_ADDRESS } = req.body || {};
+  const { adbPath, address } = await resolveRequestConnection(req, { allowOverrides: true })
   return sendSuccess(res, req, await testAdbConnection(adbPath, address));
+}));
+
+router.get('/actions/discover-devices', asyncHandler(async (req, res) => {
+  const { adbPath } = await resolveRequestConnection(req, { allowOverrides: true })
+  return sendSuccess(res, req, await discoverAdbDevices(adbPath));
 }));
 
 router.get('/version', asyncHandler(async (req, res) => {
@@ -1505,11 +1544,8 @@ router.get('/config-directory', asyncHandler(async (req, res) => {
 }));
 
 router.post('/actions/start-game', asyncHandler(async (req, res) => {
-  const {
-    clientType = DEFAULT_CLIENT_TYPE,
-    address = DEFAULT_ADB_ADDRESS,
-    waitForCompletion = true
-  } = req.body || {};
+  const { waitForCompletion = true } = req.body || {};
+  const { clientType, address } = await resolveRequestConnection(req)
   const result = await execMaaCommand('startup', [clientType, '-a', address], '启动游戏', 'agent', waitForCompletion);
   res.json(successResponse(result));
 }));

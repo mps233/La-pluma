@@ -3,6 +3,5 @@
  */
 
 export { useUIStore } from './uiStore'
-export { useConnectionStore } from './connectionStore'
 export { useTaskExecutionStore } from './taskExecutionStore'
 export { useTaskConfigStore } from './taskConfigStore'

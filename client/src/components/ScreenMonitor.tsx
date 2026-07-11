@@ -7,14 +7,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { maaApi } from '../services/api'
 import ScrcpyDeviceView from './ScrcpyDeviceView'
 
-interface ScreenMonitorProps {
-  adbPath?: string
-  address?: string
-}
-
-export default function ScreenMonitor({
-  address = '127.0.0.1:16384'
-}: ScreenMonitorProps) {
+export default function ScreenMonitor() {
   const [webrtcStatus, setWebrtcStatus] = useState<any>(null)
   const [webrtcLoading, setWebrtcLoading] = useState<string | null>(null)
 
@@ -50,7 +43,7 @@ export default function ScreenMonitor({
       setWebrtcStatus(status)
     }
     if (!status?.agentRunning) {
-      const result = await maaApi.startWebrtcAgent(address)
+      const result = await maaApi.startWebrtcAgent()
       status = result.data
       setWebrtcStatus(status)
     }
@@ -67,7 +60,7 @@ export default function ScreenMonitor({
       infrastructureLoading={webrtcLoading}
       onInstall={() => runWebrtcAction('install', () => maaApi.installWebrtc())}
       onToggleServer={() => runWebrtcAction('server', () => webrtcStatus?.serverRunning ? maaApi.stopWebrtcServer() : maaApi.startWebrtcServer())}
-      onToggleAgent={() => runWebrtcAction('agent', () => webrtcStatus?.agentRunning ? maaApi.stopWebrtcAgent() : maaApi.startWebrtcAgent(address))}
+      onToggleAgent={() => runWebrtcAction('agent', () => webrtcStatus?.agentRunning ? maaApi.stopWebrtcAgent() : maaApi.startWebrtcAgent())}
     />
   )
 }

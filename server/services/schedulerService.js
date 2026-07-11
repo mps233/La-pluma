@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import { execMaaCommand, execDynamicTask, replaceActivityCode, captureScreen, getGameClientState, getMaaExecutionDiagnostics, testAdbConnection, createMaaLogCheckpoint, readMaaLogSince } from './maaService.js';
+import { resolveConnection } from './connectionService.js';
 import { sendTaskCompletionNotification, isStageOpenToday, shouldCaptureNotificationScreenshot } from './notificationService.js';
 import { getEnabledAwardItems, parseAwardExecutionActions } from './awardResultService.js';
 import { parseRecruitExecutionAction } from './recruitResultService.js';
@@ -264,7 +265,7 @@ function buildCommand(task, connectionDefaults = {}) {
   
   if (commandId === 'startup' || commandId === 'closedown') {
     params = task.params.clientType || 'Official';
-    const address = task.params.address || connectionDefaults.address;
+    const address = connectionDefaults.address;
     if (address) {
       extraArgs.push(`-a ${address}`);
     }
@@ -421,10 +422,10 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId) {
     else skippedCount++;
   };
   let screenshot = null;
-  const startupConnection = taskFlow.find(task => (task.commandId || String(task.id || '').split('-')[0]) === 'startup')?.params || {};
-  let adbConfig = {
-    adbPath: startupConnection.adbPath || '/opt/homebrew/bin/adb',
-    address: startupConnection.address || '127.0.0.1:16384'
+  const sharedConnection = await resolveConnection();
+  const adbConfig = {
+    adbPath: sharedConnection.adbPath,
+    address: sharedConnection.address
   };
   
   for (let i = 0; i < enabledTasks.length; i++) {
@@ -454,12 +455,6 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId) {
       currentTaskId: task.id, // 添加任务 ID
       message: `正在执行: ${task.name} (${i + 1}/${enabledTasks.length})`
     });
-    
-    // 保存 ADB 配置（从启动游戏任务中获取）
-    if (commandId === 'startup' && task.params) {
-      if (task.params.adbPath) adbConfig.adbPath = task.params.adbPath;
-      if (task.params.address) adbConfig.address = task.params.address;
-    }
     
     if (commandId === 'award') {
       try {

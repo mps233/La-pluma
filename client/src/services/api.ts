@@ -331,14 +331,19 @@ export const maaApi = {
   /**
    * 测试 ADB 连接
    */
-  async testConnection(adbPath: string, address: string): Promise<ApiResponse> {
+  async testConnection(adbPath?: string, address?: string): Promise<ApiResponse> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/test-connection`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ adbPath, address }),
+      body: JSON.stringify({ ...(adbPath ? { adbPath } : {}), ...(address ? { address } : {}) }),
     })
+    return response.json()
+  },
+
+  async discoverDevices(adbPath: string): Promise<ApiResponse> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/discover-devices?adbPath=${encodeURIComponent(adbPath)}`)
     return response.json()
   },
 
@@ -362,11 +367,11 @@ export const maaApi = {
     return response.json()
   },
 
-  async startWebrtcAgent(address: string): Promise<ApiResponse> {
+  async startWebrtcAgent(profileId: string = 'default'): Promise<ApiResponse> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/start-agent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address })
+      body: JSON.stringify({ profileId })
     })
     return response.json()
   },
@@ -376,20 +381,20 @@ export const maaApi = {
     return response.json()
   },
 
-  async setPreviewOrientation(orientation: 'portrait' | 'landscape' | 'auto', address = '127.0.0.1:16384'): Promise<ApiResponse> {
+  async setPreviewOrientation(orientation: 'portrait' | 'landscape' | 'auto', profileId: string = 'default'): Promise<ApiResponse> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/preview/orientation`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orientation, address })
+      body: JSON.stringify({ orientation, profileId })
     })
     return response.json()
   },
 
-  async captureScreen(address = '127.0.0.1:16384'): Promise<ApiResponse> {
+  async captureScreen(profileId: string = 'default'): Promise<ApiResponse> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/screen/screenshot`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address })
+      body: JSON.stringify({ profileId })
     })
     return response.json()
   },
