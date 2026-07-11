@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildCopilotPlan,
+  buildCurrentMapStageTasks,
   buildCopilotRepeatFiles,
   buildCopilotTaskParams,
+  extractLoadedCopilotFiles,
   getNavigationStage,
   isPresetFormationCopilot,
   mergePresetFormationTasks
@@ -20,6 +22,13 @@ test('preset formation stages are normal-only candidates', () => {
     opers: [{ name: '德克萨斯' }],
     groups: []
   }), false);
+});
+
+test('current map resource maps stages directly to OCR without navigation tasks', () => {
+  assert.deepEqual(buildCurrentMapStageTasks(['bd-1', 'BD-2', 'BD-1']), {
+    'BD-1': { text: ['BD-1'] },
+    'BD-2': { text: ['BD-2'] }
+  });
 });
 
 test('navigation uses the visible stage code instead of the internal stage id', () => {
@@ -54,6 +63,11 @@ test('multi-copilot loop count expands into repeated native entries', () => {
   assert.equal(files.length, 3);
   assert.ok(files[0].filename.endsWith('2-99-raid-1.json'));
   assert.ok(files[2].filename.endsWith('2-99-raid-3.json'));
+});
+
+test('copilot recovery finds MAA loaded files in callback field order', () => {
+  const log = '{"details":{"file_name":"/tmp/6-97353-normal-1.json"},"what":"CopilotListLoadTaskFileSuccess"}';
+  assert.deepEqual(extractLoadedCopilotFiles(log), ['/tmp/6-97353-normal-1.json']);
 });
 
 test('preset resource merge preserves existing user BattleStart settings', () => {

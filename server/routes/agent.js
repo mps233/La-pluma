@@ -32,6 +32,9 @@ import { parseDepotData, parseOperBoxData, getDepotData, getOperBoxData, getAllO
 import { getTodayDrops, getRecentDrops, getDropStatistics } from '../services/dropRecordService.js';
 import { loadParadoxOperators, resolveStageSearchKeyword } from '../services/copilotService.js';
 import { buildCopilotPlan, executeCopilotPlan, resetCopilotPlanProgress } from '../services/copilotPlanService.js';
+import { getActivityRunPreflight } from '../services/activityNavigationService.js';
+import { findActivityCopilotCandidates } from '../services/activityCopilotDiscoveryService.js';
+import { getActivityCompletion, runCurrentActivityCopilots } from '../services/activityCopilotRunService.js';
 import { withMaaExecutionLease } from '../services/executionCoordinatorService.js';
 import {
   asyncHandler,
@@ -101,6 +104,24 @@ const AGENT_ACTIONS = [
         adbPath: { type: 'string', default: DEFAULT_ADB_PATH }
       }
     }
+  },
+  {
+    id: 'activity_run_preflight',
+    method: 'GET',
+    path: '/api/agent/activity/preflight',
+    description: 'Check the current activity and whether MAA has reliable home-screen navigation. This never starts a copilot.'
+  },
+  {
+    id: 'activity_copilot_candidates',
+    method: 'GET',
+    path: '/api/agent/activity/copilot-candidates',
+    description: 'Find manual-selection copilot candidates for the current activity. This never starts a copilot.'
+  },
+  {
+    id: 'run_current_activity_copilots',
+    method: 'POST',
+    path: '/api/agent/activity/run',
+    description: 'Run the server-built current-activity copilot plan. It blocks when navigation or a reliable candidate is unavailable.'
   },
   {
     id: 'start_game',
@@ -310,6 +331,9 @@ function getOpenApiSpec() {
       endpoint('GET', '/agent/status', 'Get compact current status.'),
       endpoint('GET', '/agent/logs/recent', 'Get recent runtime logs.'),
       endpoint('GET', '/agent/openapi.json', 'Get this OpenAPI schema.'),
+      endpoint('GET', '/agent/activity/preflight', 'Check activity-run navigation readiness without starting a copilot.'),
+      endpoint('GET', '/agent/activity/copilot-candidates', 'Find current-activity copilot candidates without starting a copilot.'),
+      endpoint('POST', '/agent/activity/run', 'Build and run the current-activity copilot plan.'),
       endpoint('GET', '/agent/runs/current', 'Poll current task/schedule state.'),
       endpoint('POST', '/agent/screen/screenshot', 'Capture emulator screenshot.', AGENT_ACTIONS.find(a => a.id === 'get_screenshot').body_schema),
       endpoint('GET', '/agent/webrtc/status', 'Get WebRTC preview status hints.'),
@@ -766,6 +790,7 @@ router.delete('/config/user/:configType', asyncHandler(async (req, res) => {
 router.get('/activity', asyncHandler(async (req, res) => {
   const clientType = req.query.clientType || DEFAULT_CLIENT_TYPE;
   const activityInfo = await getCurrentActivity(clientType);
+  const completion = await getActivityCompletion(activityInfo);
   return sendSuccess(res, req, {
     code: activityInfo.code,
     name: activityInfo.name,
@@ -773,9 +798,28 @@ router.get('/activity', asyncHandler(async (req, res) => {
     startTime: activityInfo.startTime || null,
     endTime: activityInfo.endTime || null,
     stages: activityInfo.stages || [],
+    completion,
     available: !!activityInfo.code,
     message: activityInfo.code ? `当前活动: ${activityInfo.name || activityInfo.code}` : '当前没有活动或无法获取活动信息'
   });
+}));
+
+router.get('/activity/preflight', asyncHandler(async (req, res) => {
+  const { clientType } = await resolveRequestConnection(req);
+  const preflight = await getActivityRunPreflight(clientType);
+  return sendSuccess(res, req, preflight, preflight.reason);
+}));
+
+router.get('/activity/copilot-candidates', asyncHandler(async (req, res) => {
+  const { clientType } = await resolveRequestConnection(req);
+  const candidates = await findActivityCopilotCandidates(clientType);
+  return sendSuccess(res, req, candidates, candidates.reason);
+}));
+
+router.post('/activity/run', asyncHandler(async (req, res) => {
+  const { clientType } = await resolveRequestConnection(req);
+  const result = await runCurrentActivityCopilots(clientType);
+  return sendSuccess(res, req, result, result.plan.reason);
 }));
 
 router.get('/stages/open-today', asyncHandler(async (_req, res) => {

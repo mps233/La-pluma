@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Activity, Bot, CalendarDays, ChevronRight, Cpu, HardDrive, Database, PackageOpen, Play, Target, Thermometer } from 'lucide-react'
+import { Activity, Bot, CalendarDays, CheckCircle2, ChevronRight, Cpu, HardDrive, Database, PackageOpen, Play, Target, Thermometer } from 'lucide-react'
 import { getOpenTodayStages, getSklandPlayerData, getSklandStatus, getTodayDrops, getTrainingQueue, maaApi } from '../services/api'
 import Icons from './Icons'
 import { PageHeader, Card, Button, IconButton } from './common'
@@ -87,6 +87,12 @@ interface ActivitySummary {
   code?: string
   name?: string
   tip?: string
+  completion?: {
+    known?: boolean
+    complete?: boolean
+    completedStages?: string[]
+    totalStages?: number
+  }
 }
 
 interface ScheduleSummary {
@@ -214,6 +220,7 @@ export default function Dashboard() {
   const [dropSummary, setDropSummary] = useState<DropSummary>({ count: 0, recent: [] })
   const [openStageSummary, setOpenStageSummary] = useState<OpenStageSummary>({ open: [], closed: [] })
   const [quickStartLoading, setQuickStartLoading] = useState(false)
+  const [activityPreflightLoading, setActivityPreflightLoading] = useState(false)
   const [quickStartMessage, setQuickStartMessage] = useState('')
   const [currentTime, setCurrentTime] = useState(Date.now())
   const [deviceStats, setDeviceStats] = useState<{
@@ -296,6 +303,7 @@ export default function Dashboard() {
           code: activity?.code || activity?.id || undefined,
           name: activity?.name || activity?.displayName || activity?.stageName || undefined,
           tip: activity?.tip || activity?.description || undefined,
+          completion: activity?.completion,
         })
       } else {
         setActivitySummary({ available: false })
@@ -441,6 +449,26 @@ export default function Dashboard() {
     }
   }
 
+  const runCurrentActivity = async () => {
+    setActivityPreflightLoading(true)
+    setQuickStartMessage('')
+    try {
+      const runResult = await maaApi.runCurrentActivity()
+      const runData = runResult.data as { executed?: boolean; plan?: { reason?: string }; execution?: { results?: unknown[] } } | undefined
+      if (runResult.success && runData?.executed) {
+        const completedCount = Array.isArray(runData.execution?.results) ? runData.execution.results.length : 0
+        setQuickStartMessage(completedCount > 0 ? `当前活动作业已完成 ${completedCount} 项。` : '当前活动作业已完成。')
+        await loadDashboardData(true)
+      } else {
+        setQuickStartMessage(runData?.plan?.reason || maaApi.getErrorMessage(runResult) || '当前活动暂未准备就绪。')
+      }
+    } catch (error: any) {
+      setQuickStartMessage(error?.message || '当前活动预检失败')
+    } finally {
+      setActivityPreflightLoading(false)
+    }
+  }
+
   if (loading) {
     return <DashboardSkeleton />
   }
@@ -452,6 +480,7 @@ export default function Dashboard() {
   const flowCommandDescription = flowIsRunning
     ? (scheduleSummary.message || '自动化任务正在按计划推进')
     : (scheduleSummary.message || '设备待命，可以开始今天的自动化任务')
+  const activityCompleted = activitySummary.completion?.complete === true
 
   return (
     <div className="app-page">
@@ -527,18 +556,43 @@ export default function Dashboard() {
                     <div className={`mt-1 truncate text-[10px] ${labelClass}`}>{flowCommandDescription}</div>
                   </div>
                 </div>
-                <Button
-                  onClick={runTodayFlow}
-                  variant="gradient"
-                  disabled={quickStartLoading || flowIsRunning}
-                  loading={quickStartLoading}
-                  loadingText="启动中"
-                  statusKey={quickStartLoading ? 'starting' : flowIsRunning ? 'running' : 'ready'}
-                  className="dashboard-flow-primary-action dashboard-flow-shining-action justify-center whitespace-nowrap"
-                  icon={<Play className="h-4 w-4" strokeWidth={2} />}
-                >
-                  {flowIsRunning ? '正在运行' : '开始今日流程'}
-                </Button>
+                <div className="dashboard-flow-actions">
+                  {activitySummary.available && (
+                    <Button
+                      onClick={runCurrentActivity}
+                      variant="secondary"
+                      disabled={quickStartLoading || activityPreflightLoading || flowIsRunning}
+                      loading={activityPreflightLoading}
+                      loadingText="执行中"
+                      statusKey={activityPreflightLoading ? 'running' : 'ready'}
+                      className={`dashboard-flow-activity-action justify-center whitespace-nowrap ${activityCompleted ? 'is-completed' : ''}`}
+                      title={activityCompleted ? '重新执行当前活动' : '检查活动导航并执行已保存偏好的活动作业'}
+                      aria-label={activityCompleted ? '重新执行当前活动' : '打当前活动'}
+                      icon={activityCompleted
+                        ? <CheckCircle2 className="h-4 w-4" strokeWidth={2} />
+                        : <Target className="h-4 w-4" strokeWidth={2} />}
+                    >
+                      {activityCompleted ? (
+                        <>
+                          <span className="dashboard-flow-activity-completed-label">活动已通关</span>
+                          <span className="dashboard-flow-activity-run-label">打当前活动</span>
+                        </>
+                      ) : '打当前活动'}
+                    </Button>
+                  )}
+                  <Button
+                    onClick={runTodayFlow}
+                    variant="gradient"
+                    disabled={quickStartLoading || activityPreflightLoading || flowIsRunning}
+                    loading={quickStartLoading}
+                    loadingText="启动中"
+                    statusKey={quickStartLoading ? 'starting' : flowIsRunning ? 'running' : 'ready'}
+                    className="dashboard-flow-primary-action dashboard-flow-shining-action justify-center whitespace-nowrap"
+                    icon={<Play className="h-4 w-4" strokeWidth={2} />}
+                  >
+                    {flowIsRunning ? '正在运行' : '开始今日流程'}
+                  </Button>
+                </div>
               </div>
 
               <div className="dashboard-flow-metrics">

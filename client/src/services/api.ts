@@ -224,6 +224,19 @@ export const maaApi = {
     return this.executeCommand(taskType, args, taskConfig, signal, taskName, taskTypeLabel, waitForCompletion)
   },
 
+  async getActivityRunPreflight(): Promise<ApiResponse> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/activity/preflight`)
+    return response.json()
+  },
+
+  async runCurrentActivity(): Promise<ApiResponse> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/activity/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    return response.json()
+  },
+
   /**
    * 获取任务执行状态
    */

@@ -2563,6 +2563,45 @@ svg.w-5.h-5 {
     min-width: 8.75rem;
   }
 
+  .dashboard-flow-actions {
+    display: flex;
+    min-width: 8.75rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .dashboard-flow-activity-action {
+    min-width: 0;
+    border: 1px solid color-mix(in srgb, var(--app-accent) 38%, var(--app-border));
+    background: color-mix(in srgb, var(--app-accent-soft) 72%, var(--app-surface));
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent), 0 6px 16px color-mix(in srgb, var(--app-accent) 12%, transparent);
+  }
+
+  .dashboard-flow-activity-action:not(:disabled):hover {
+    background: color-mix(in srgb, var(--app-accent-soft) 88%, var(--app-surface));
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent), 0 8px 18px color-mix(in srgb, var(--app-accent) 16%, transparent);
+  }
+
+  .dashboard-flow-activity-completed-label,
+  .dashboard-flow-activity-run-label {
+    display: none;
+  }
+
+  .dashboard-flow-activity-action.is-completed .dashboard-flow-activity-completed-label {
+    display: inline;
+  }
+
+  .dashboard-flow-activity-action.is-completed:hover .dashboard-flow-activity-completed-label,
+  .dashboard-flow-activity-action.is-completed:focus-visible .dashboard-flow-activity-completed-label {
+    display: none;
+  }
+
+  .dashboard-flow-activity-action.is-completed:hover .dashboard-flow-activity-run-label,
+  .dashboard-flow-activity-action.is-completed:focus-visible .dashboard-flow-activity-run-label {
+    display: inline;
+  }
+
   .dashboard-flow-shining-action {
     position: relative;
     isolation: isolate;
@@ -3228,6 +3267,17 @@ svg.w-5.h-5 {
     }
 
     .dashboard-flow-primary-action {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .dashboard-flow-actions {
+      display: grid;
+      width: 100%;
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .dashboard-flow-activity-action {
       width: 100%;
       min-width: 0;
     }

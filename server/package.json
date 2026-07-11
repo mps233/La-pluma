@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "check": "node --check server.js && node --check routes/agent.js && node --check services/maaService.js && node --check services/schedulerService.js && node --check services/copilotService.js && node --check services/copilotPlanService.js && node --check services/executionCoordinatorService.js",
+    "check": "node --check server.js && node --check routes/agent.js && node --check services/maaService.js && node --check services/schedulerService.js && node --check services/activityNavigationService.js && node --check services/activityCopilotDiscoveryService.js && node --check services/activityCopilotRunService.js && node --check services/copilotService.js && node --check services/copilotPlanService.js && node --check services/executionCoordinatorService.js",
     "build": "npm run check",
     "fetch-materials": "node scripts/fetch-operator-materials.js",
     "fetch-formulas": "node scripts/fetch-material-formulas.js && node scripts/merge-formulas.js",

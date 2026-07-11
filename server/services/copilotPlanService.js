@@ -152,6 +152,18 @@ async function saveProgress(progress) {
   await writeFile(progressPath, JSON.stringify(progress, null, 2));
 }
 
+export async function getCopilotSetCompletion(setId, raid = 'normal') {
+  const plan = await buildCopilotPlan(setId, raid);
+  const completedEntries = plan.entries.filter(entry => entry.completed);
+  return {
+    known: true,
+    complete: plan.entries.length > 0 && completedEntries.length === plan.entries.length,
+    completedCount: completedEntries.length,
+    totalCount: plan.entries.length,
+    source: 'local-copilot-progress'
+  };
+}
+
 export function mergePresetFormationTasks(installedTasks, userTasks = {}) {
   return {
     ...userTasks,
@@ -169,6 +181,22 @@ export function mergePresetFormationTasks(installedTasks, userTasks = {}) {
       next: ['BattleOfficiallyBegin', 'LaPlumaPresetBattleConfirm', 'SkipThePreBattlePlot', 'Stop']
     }
   };
+}
+
+export function buildCurrentMapStageTasks(stages = []) {
+  return Object.fromEntries([...new Set(stages.map(stage => String(stage || '').trim().toUpperCase()).filter(Boolean))]
+    .map(stage => [stage, { text: [stage] }]));
+}
+
+export async function ensureCurrentMapActivityResource(configDir, activityCode, stages) {
+  const code = String(activityCode || '').trim().toUpperCase();
+  if (!/^[A-Z0-9]{2,8}$/.test(code)) throw new Error('活动代号格式不合法');
+  const tasks = buildCurrentMapStageTasks(stages);
+  if (!Object.keys(tasks).length) throw new Error('没有可写入的活动关卡');
+  const stagesDir = join(configDir, 'resource', 'tasks', 'Stages');
+  await mkdir(stagesDir, { recursive: true });
+  await writeFile(join(stagesDir, `${code}.json`), JSON.stringify(tasks, null, 2));
+  return { stageFile: join(stagesDir, `${code}.json`), stages: Object.keys(tasks) };
 }
 
 export async function ensurePresetFormationResource(configDir) {
@@ -198,6 +226,13 @@ export function buildCopilotTaskParams(list, presetFormation, options = {}) {
 
 export function normalizeCopilotLoopTimes(value) {
   return Math.max(1, Math.min(99, Number.parseInt(String(value || 1), 10) || 1));
+}
+
+export function extractLoadedCopilotFiles(logText = '') {
+  // MAA writes `file_name` inside `details` before the trailing `what`
+  // discriminator for a successfully loaded copilot entry.
+  return [...String(logText).matchAll(/"file_name"\s*:\s*"([^"]+)"[\s\S]{0,500}?"what"\s*:\s*"CopilotListLoadTaskFileSuccess"/g)]
+    .map(match => match[1]);
 }
 
 export function buildCopilotRepeatFiles(entry, loopTimes, planDir) {
@@ -230,6 +265,53 @@ function groupEntries(entries) {
     else groups.push({ presetFormation: entry.presetFormation, entries: [entry] });
   }
   return groups;
+}
+
+/**
+ * Runs an already-selected list of copilot ids through the same dynamic MAA
+ * Copilot task used by copilot sets. Callers must decide selection separately.
+ */
+export async function executeSelectedCopilotEntries({ planId, name, entries, options = {} }) {
+  const normalizedEntries = entries.filter(entry => Number.isInteger(Number(entry.copilotId)) && entry.displayStage);
+  if (!normalizedEntries.length) throw new Error('没有可执行的作业条目');
+
+  const results = [];
+  const loopTimes = normalizeCopilotLoopTimes(options.loopTimes);
+  await withMaaExecutionLease({ source: 'activity-copilot', taskName: name, command: 'copilot-plan' }, async () => {
+    const configDir = (await getMaaConfigDir()).trim();
+    const planDir = join(configDir, 'copilot-plans', String(planId));
+    await mkdir(planDir, { recursive: true });
+
+    for (const [groupIndex, group] of groupEntries(normalizedEntries).entries()) {
+      const list = [];
+      for (const entry of group.entries) {
+        const data = await fetchJson(`https://prts.maa.plus/copilot/get/${entry.copilotId}`);
+        const content = parseCopilotContent(data);
+        for (const { filename } of buildCopilotRepeatFiles(entry, loopTimes, planDir)) {
+          await writeFile(filename, JSON.stringify(content, null, 2));
+          list.push({
+            id: list.length,
+            filename,
+            stage_name: entry.displayStage,
+            is_raid: entry.mode === 'raid'
+          });
+        }
+      }
+      if (!list.length) continue;
+
+      const taskId = `activity_copilot_${planId}_${groupIndex}`;
+      const taskConfig = {
+        name: taskId,
+        type: 'Copilot',
+        params: buildCopilotTaskParams(list, group.presetFormation, options)
+      };
+      if (group.presetFormation) await ensurePresetFormationResource(configDir);
+      await execDynamicTask(taskId, taskConfig, name, 'copilot', true, group.presetFormation || options.userResource === true);
+      results.push(...group.entries.map(entry => ({ ...entry, success: true })));
+    }
+  });
+
+  return { success: true, results, loopTimes };
 }
 
 export async function executeCopilotPlan({ setId, raid = 'normal', selectedIndexes = [], options = {} }) {
@@ -275,7 +357,7 @@ export async function executeCopilotPlan({ setId, raid = 'normal', selectedIndex
       const checkpoint = await createMaaLogCheckpoint();
       try {
         if (group.presetFormation) await ensurePresetFormationResource(configDir);
-        await execDynamicTask(taskId, taskConfig, `作业集 ${plan.name}`, 'copilot', true, group.presetFormation);
+        await execDynamicTask(taskId, taskConfig, `作业集 ${plan.name}`, 'copilot', true, group.presetFormation || options.userResource === true);
         for (const entry of group.entries) {
           completed.add(entry.key);
           results.push({ ...entry, success: true });
@@ -286,8 +368,7 @@ export async function executeCopilotPlan({ setId, raid = 'normal', selectedIndex
       } catch (error) {
         const message = error.message || '作业集执行失败';
         const logText = await readMaaLogSince(checkpoint).catch(() => '');
-        const loadedFiles = [...String(logText).matchAll(/CopilotListLoadTaskFileSuccess[\s\S]{0,500}?"file_name"\s*:\s*"([^"]+)"/g)]
-          .map(match => match[1]);
+        const loadedFiles = extractLoadedCopilotFiles(logText);
         const currentFile = loadedFiles.at(-1) || '';
         const currentIndex = executionItems.findIndex(item => currentFile === item.filename || currentFile.endsWith(item.filename));
         const successfulEntries = [];

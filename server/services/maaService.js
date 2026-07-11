@@ -7,6 +7,7 @@ import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'path
 import { createLogger } from '../utils/logger.js';
 import { getFallbackActivity } from './activityFallbackService.js';
 import { acquireMaaExecutionLease } from './executionCoordinatorService.js';
+import { loadUserConfig, saveUserConfig } from './configStorageService.js';
 
 const execFilePromise = promisify(execFile);
 
@@ -1081,12 +1082,31 @@ const ACTIVITY_CACHE_TTL = 24 * 60 * 60 * 1000;
 const activityCache = new Map();
 
 function cacheActivity(clientType, activity) {
-  activityCache.set(clientType, {
+  const cached = {
     ...activity,
     timestamp: Date.now(),
     ttl: ACTIVITY_CACHE_TTL
-  });
+  };
+  activityCache.set(clientType, cached);
+  void saveUserConfig('activity-cache', { [clientType]: cached });
   return { ...activity };
+}
+
+function getValidCachedActivity(clientType, cachedActivity, now = Date.now()) {
+  if (!cachedActivity?.code || !cachedActivity.timestamp) return null;
+  const ttlExpiresAt = cachedActivity.timestamp + (cachedActivity.ttl || ACTIVITY_CACHE_TTL);
+  const expiresAt = cachedActivity.endTime
+    ? Math.min(ttlExpiresAt, cachedActivity.endTime)
+    : ttlExpiresAt;
+  if (now >= expiresAt) return null;
+  return {
+    code: cachedActivity.code,
+    name: cachedActivity.name,
+    source: cachedActivity.source,
+    startTime: cachedActivity.startTime,
+    endTime: cachedActivity.endTime,
+    stages: cachedActivity.stages
+  };
 }
 
 /**
@@ -1095,28 +1115,23 @@ function cacheActivity(clientType, activity) {
 export async function getCurrentActivity(clientType = 'Official') {
   const now = Date.now();
   const cachedActivity = activityCache.get(clientType);
-  if (cachedActivity?.code && cachedActivity.timestamp) {
-    const ttlExpiresAt = cachedActivity.timestamp + cachedActivity.ttl;
-    const expiresAt = cachedActivity.endTime
-      ? Math.min(ttlExpiresAt, cachedActivity.endTime)
-      : ttlExpiresAt;
-    if (now < expiresAt) {
+  const cached = getValidCachedActivity(clientType, cachedActivity, now);
+  if (cached) {
       logger.debug('使用缓存的活动信息', {
-        clientType,
-        code: cachedActivity.code,
-        name: cachedActivity.name,
-        source: cachedActivity.source
+        clientType, code: cached.code, name: cached.name, source: cached.source
       });
-      return {
-        code: cachedActivity.code,
-        name: cachedActivity.name,
-        source: cachedActivity.source,
-        startTime: cachedActivity.startTime,
-        endTime: cachedActivity.endTime,
-        stages: cachedActivity.stages
-      };
-    }
+    return cached;
+  }
+  if (cachedActivity) {
     activityCache.delete(clientType);
+  }
+
+  const persistedResult = await loadUserConfig('activity-cache');
+  const persisted = getValidCachedActivity(clientType, persistedResult.success ? persistedResult.data?.[clientType] : null, now);
+  if (persisted) {
+    activityCache.set(clientType, { ...persisted, timestamp: persistedResult.data[clientType].timestamp, ttl: persistedResult.data[clientType].ttl || ACTIVITY_CACHE_TTL });
+    logger.debug('使用持久化活动缓存', { clientType, code: persisted.code, name: persisted.name, source: persisted.source });
+    return persisted;
   }
 
   try {
