@@ -758,7 +758,7 @@ export default function OperatorTraining() {
           actions={<FloatingStatusIndicator />}
         />
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_430px] gap-6 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_430px] gap-[var(--app-space-section)] items-start">
           <section className={`space-y-4 ${currentTarget ? 'order-2 xl:order-1' : 'order-1'}`}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>

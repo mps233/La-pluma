@@ -1355,9 +1355,9 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         />
 
         {/* 实时预览独占一行 */}
-        <div className="space-y-4 sm:space-y-6">
+        <div>
           {/* 模拟器监控 */}
-          <div className="rounded-2xl sm:rounded-3xl p-4 sm:p-5 surface-panel transition-colors">
+          <div className="rounded-2xl sm:rounded-3xl p-[var(--app-space-panel)] surface-panel transition-colors">
             <ScreenMonitor
               adbPath={taskFlow.find(t => t.commandId === 'startup')?.params?.adbPath || '/opt/homebrew/bin/adb'}
               address={taskFlow.find(t => t.commandId === 'startup')?.params?.address || '127.0.0.1:16384'}

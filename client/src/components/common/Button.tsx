@@ -63,9 +63,9 @@ export default function Button({
   }
   
   const sizeStyles: Record<string, string> = {
-    sm: 'px-3 py-1.5 text-xs',
-    md: 'px-4 py-2 text-sm',
-    lg: 'px-6 py-3 text-base',
+    sm: 'app-button-size-sm text-xs',
+    md: 'app-button-size-md text-sm',
+    lg: 'app-button-size-lg text-base',
   }
 
   const contentGapStyles: Record<string, string> = {
