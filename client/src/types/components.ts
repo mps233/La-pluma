@@ -375,8 +375,12 @@ export interface CopilotSetItem {
   id: number
   name?: string
   stage?: string
+  stageId?: string
   operators?: string
   uri?: string
+  presetFormation?: boolean
+  supportsRaid?: boolean
+  completedModes?: Array<'normal' | 'raid'>
 }
 
 export interface CopilotSetInfo {

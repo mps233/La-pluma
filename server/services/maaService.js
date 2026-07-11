@@ -5,6 +5,7 @@ import { createReadStream } from 'fs';
 import { extname, isAbsolute, join, relative, resolve, sep } from 'path';
 import { createLogger } from '../utils/logger.js';
 import { getFallbackActivity } from './activityFallbackService.js';
+import { acquireMaaExecutionLease } from './executionCoordinatorService.js';
 
 const execFilePromise = promisify(execFile);
 
@@ -182,7 +183,7 @@ export function setTaskStatus(isRunning, taskName = null, taskType = null, proce
 /**
  * 执行 MAA CLI 命令（支持后台异步执行）
  */
-export async function execMaaCommand(command, args = [], taskName = null, taskType = null, waitForCompletion = false, silent = false) {
+async function execMaaCommandUnlocked(command, args = [], taskName = null, taskType = null, waitForCompletion = false, silent = false, onSettled = null) {
   const fullCommand = `${MAA_CLI_PATH} ${command} ${args.join(' ')}`;
   
   // 静默模式下不输出日志（用于健康检查等频繁调用）
@@ -198,7 +199,7 @@ export async function execMaaCommand(command, args = [], taskName = null, taskTy
     return new Promise((resolve, reject) => {
       // 使用 spawn 而不是 exec，这样可以独立运行
       const childProcess = spawn(MAA_CLI_PATH, [command, ...finalArgs], {
-        detached: false,
+        detached: process.platform !== 'win32',
         stdio: ['ignore', 'pipe', 'pipe']
       });
       
@@ -257,11 +258,13 @@ export async function execMaaCommand(command, args = [], taskName = null, taskTy
         if (code !== 0) {
           addLog('ERROR', `命令执行失败: ${fullCommand}`);
         }
+        onSettled?.();
       });
       
       childProcess.on('error', (error) => {
         addLog('ERROR', `命令执行错误: ${fullCommand} - ${error.message}`);
         setTaskStatus(false);
+        onSettled?.();
       });
     });
   } 
@@ -269,7 +272,7 @@ export async function execMaaCommand(command, args = [], taskName = null, taskTy
   else if (taskName && waitForCompletion) {
     return new Promise((resolve, reject) => {
       const childProcess = spawn(MAA_CLI_PATH, [command, ...finalArgs], {
-        detached: false,
+        detached: process.platform !== 'win32',
         stdio: ['ignore', 'pipe', 'pipe']
       });
       
@@ -378,6 +381,46 @@ export async function execMaaCommand(command, args = [], taskName = null, taskTy
       
       throw new Error(`命令执行失败: ${errorMessage}`);
     }
+  }
+}
+
+const DEVICE_MUTATING_COMMANDS = new Set([
+  'startup', 'closedown', 'fight', 'run', 'copilot', 'ssscopilot', 'paradoxcopilot',
+  'roguelike', 'reclamation', 'infrast', 'recruit', 'mall', 'award', 'depot', 'operbox',
+  'install', 'update', 'hot-update'
+]);
+
+export function requiresMaaExecutionLease(command) {
+  return DEVICE_MUTATING_COMMANDS.has(command);
+}
+
+export async function execMaaCommand(command, args = [], taskName = null, taskType = null, waitForCompletion = false, silent = false) {
+  if (!requiresMaaExecutionLease(command)) {
+    return execMaaCommandUnlocked(command, args, taskName, taskType, waitForCompletion, silent);
+  }
+
+  const lease = await acquireMaaExecutionLease({
+    source: taskType || 'maa-command',
+    taskName: taskName || command,
+    command
+  });
+  let releaseOnReturn = true;
+  try {
+    if (taskName && !waitForCompletion) {
+      releaseOnReturn = false;
+      return await execMaaCommandUnlocked(
+        command,
+        args,
+        taskName,
+        taskType,
+        waitForCompletion,
+        silent,
+        () => lease.release().catch(error => logger.error('释放 MAA 执行锁失败', { error: error.message }))
+      );
+    }
+    return await execMaaCommandUnlocked(command, args, taskName, taskType, waitForCompletion, silent);
+  } finally {
+    if (releaseOnReturn) await lease.release();
   }
 }
 
@@ -523,7 +566,7 @@ function generateToml(config) {
 /**
  * 创建临时任务文件并执行
  */
-export async function execDynamicTask(taskId, taskConfig, taskName = null, taskType = null, waitForCompletion = false) {
+export async function execDynamicTask(taskId, taskConfig, taskName = null, taskType = null, waitForCompletion = false, userResource = false) {
   try {
     const configDir = await getMaaConfigDir();
     const tasksDir = join(configDir.trim(), 'tasks');
@@ -546,7 +589,9 @@ export async function execDynamicTask(taskId, taskConfig, taskName = null, taskT
     addLog('DEBUG', `任务内容:\n${tomlContent}`);
     
     // 执行任务
-    const result = await execMaaCommand('run', [`${taskId}_temp`], taskName, taskType, waitForCompletion);
+    const runArgs = [`${taskId}_temp`];
+    if (userResource) runArgs.push('--user-resource');
+    const result = await execMaaCommand('run', runArgs, taskName, taskType, waitForCompletion);
     
     return result;
   } catch (error) {
@@ -940,13 +985,36 @@ export function stopCurrentTask() {
     addLog('WARN', `正在终止任务: ${taskStatus.taskName}`);
     
     try {
-      // 直接使用 SIGKILL 强制终止，不等待
-      logger.warn('使用 SIGKILL 强制终止进程');
-      addLog('WARN', '使用 SIGKILL 强制终止进程');
-      taskStatus.process.kill('SIGKILL');
-      
-      setTaskStatus(false);
-      return { success: true, message: '已强制终止任务' };
+      const runningProcess = taskStatus.process;
+      const sendSignal = (signal) => {
+        if (process.platform !== 'win32' && runningProcess.pid) {
+          try {
+            process.kill(-runningProcess.pid, signal);
+            return;
+          } catch (error) {
+            if (error?.code !== 'ESRCH') throw error;
+          }
+        }
+        runningProcess.kill(signal);
+      };
+
+      logger.warn('使用 SIGTERM 请求任务正常退出');
+      addLog('WARN', '正在请求任务正常退出');
+      sendSignal('SIGTERM');
+
+      const forceKillTimer = setTimeout(() => {
+        if (taskStatus.process !== runningProcess || runningProcess.exitCode !== null) return;
+        try {
+          logger.warn('任务未及时退出，升级为 SIGKILL');
+          addLog('WARN', '任务未及时退出，正在强制终止');
+          sendSignal('SIGKILL');
+        } catch (error) {
+          logger.error('强制终止任务失败', { error: error.message });
+        }
+      }, 3000);
+      forceKillTimer.unref?.();
+
+      return { success: true, message: '已发送终止请求' };
     } catch (error) {
       logger.error('终止任务失败', { error: error.message });
       addLog('ERROR', `终止任务失败: ${error.message}`);

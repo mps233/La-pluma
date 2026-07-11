@@ -3,6 +3,7 @@ import { readFile, stat } from 'fs/promises';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { execMaaCommand } from './maaService.js';
+import { withMaaExecutionLease } from './executionCoordinatorService.js';
 
 const serviceDir = dirname(fileURLToPath(import.meta.url));
 const serverDir = resolve(serviceDir, '..');
@@ -74,7 +75,11 @@ async function performResourceUpdate() {
 export async function updateMaaResources() {
   if (activeResourceUpdate) return activeResourceUpdate;
 
-  activeResourceUpdate = performResourceUpdate();
+  activeResourceUpdate = withMaaExecutionLease({
+    source: 'resource-update',
+    taskName: '同步 MAA 资源',
+    command: 'hot-update'
+  }, performResourceUpdate);
   try {
     return await activeResourceUpdate;
   } finally {

@@ -648,6 +648,32 @@ export const maaApi = {
     return response.json()
   },
 
+  async getCopilotSetPlan(copilotId: string, raid: 'normal' | 'raid' | 'both' = 'normal'): Promise<ApiResponse> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/copilot-sets/${encodeURIComponent(copilotId)}/plan?raid=${raid}`)
+    return response.json()
+  },
+
+  async executeCopilotSetPlan(copilotId: string, payload: {
+    raid: 'normal' | 'raid' | 'both'
+    selectedIndexes: number[]
+    options?: Record<string, unknown>
+  }): Promise<ApiResponse> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/copilot-sets/${encodeURIComponent(copilotId)}/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    return response.json()
+  },
+
+  async resetCopilotSetProgress(copilotId: string): Promise<ApiResponse> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/copilot-sets/${encodeURIComponent(copilotId)}/reset-progress`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    })
+    return response.json()
+  },
+
   // ========== 干员养成相关 API ==========
   
   /**

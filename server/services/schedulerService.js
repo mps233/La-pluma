@@ -13,6 +13,7 @@ import { updateMaaResources } from './resourceUpdateService.js';
 import { createLogger } from '../utils/logger.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { withMaaExecutionLease } from './executionCoordinatorService.js';
 
 const execAsync = promisify(exec);
 
@@ -117,16 +118,19 @@ const scheduleExecutionStatus = {
 };
 
 let cancelActiveScheduleDelay = null;
+let activeScheduleAbortController = null;
 
 function waitForScheduleDelay(delayMs) {
   return new Promise((resolve) => {
     let settled = false;
     let timeoutId = null;
+    const signal = activeScheduleAbortController?.signal;
 
     const finish = (completed) => {
       if (settled) return;
       settled = true;
       if (timeoutId) clearTimeout(timeoutId);
+      signal?.removeEventListener('abort', cancel);
       if (cancelActiveScheduleDelay === cancel) cancelActiveScheduleDelay = null;
       resolve(completed);
     };
@@ -134,6 +138,7 @@ function waitForScheduleDelay(delayMs) {
     const cancel = () => finish(false);
     cancelActiveScheduleDelay = cancel;
     timeoutId = setTimeout(() => finish(true), delayMs);
+    signal?.addEventListener('abort', cancel, { once: true });
 
     if (scheduleExecutionStatus.shouldStop) cancel();
   });
@@ -156,6 +161,7 @@ export function stopScheduleExecution() {
       shouldStop: true,
       message: '正在终止任务流程'
     });
+    activeScheduleAbortController?.abort(new Error('任务流程已被用户终止'));
     cancelActiveScheduleDelay?.();
     return true;
   }
@@ -343,7 +349,7 @@ function buildCommand(task, connectionDefaults = {}) {
 }
 
 // 执行任务流程
-async function executeTaskFlow(taskFlow, scheduleId) {
+async function executeTaskFlowUnlocked(taskFlow, scheduleId) {
   if (!Array.isArray(taskFlow)) {
     return { success: false, message: '任务流程格式无效' };
   }
@@ -375,6 +381,7 @@ async function executeTaskFlow(taskFlow, scheduleId) {
   }
 
   logger.info('开始执行任务流程', { scheduleId });
+  activeScheduleAbortController = new AbortController();
   
   // 更新状态：开始执行
   updateScheduleStatus({
@@ -926,6 +933,10 @@ async function executeTaskFlow(taskFlow, scheduleId) {
             const fightActionStartIndex = actionResults.length;
             
             for (let i = 0; i < stageEntries.length; i++) {
+              if (scheduleExecutionStatus.shouldStop || activeScheduleAbortController.signal.aborted) {
+                logger.warn('多关卡任务收到停止信号，不再进入下一关', { scheduleId });
+                break;
+              }
               const { stage, times } = stageEntries[i];
               
               // 如果理智已耗尽，跳过剩余关卡
@@ -992,6 +1003,7 @@ async function executeTaskFlow(taskFlow, scheduleId) {
               // 执行命令
               try {
                 const result = await execMaaCommand(command, currentArgs, `${task.name} (${stage})`, null, true);
+                if (scheduleExecutionStatus.shouldStop || activeScheduleAbortController.signal.aborted) break;
                 const reportSummary = getFightReportResults(task, stage, result);
                 reportResults.push(...reportSummary.reportResults);
                 reportSummary.diagnostics.forEach(diagnostic => executionWarnings.add(diagnostic.message));
@@ -1028,6 +1040,10 @@ async function executeTaskFlow(taskFlow, scheduleId) {
                   output
                 }));
               } catch (error) {
+                if (scheduleExecutionStatus.shouldStop || activeScheduleAbortController.signal.aborted) {
+                  logger.warn('当前关卡已被终止，不再执行后续关卡', { scheduleId, stage });
+                  break;
+                }
                 const errorMsg = error.message || '';
                 const errorOutput = (error.stdout || '') + (error.stderr || '');
                 
@@ -1055,7 +1071,8 @@ async function executeTaskFlow(taskFlow, scheduleId) {
               // 关卡之间等待2秒
               if (i < stageEntries.length - 1) {
                 logger.debug('等待后继续下一个关卡', { scheduleId, waitSeconds: 2 });
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                const delayCompleted = await waitForScheduleDelay(2000);
+                if (!delayCompleted) break;
               }
             }
 
@@ -1068,7 +1085,8 @@ async function executeTaskFlow(taskFlow, scheduleId) {
               taskName: task.name, 
               delaySeconds: delayTime / 1000 
             });
-            await new Promise(resolve => setTimeout(resolve, delayTime));
+            const delayCompleted = await waitForScheduleDelay(delayTime);
+            if (!delayCompleted) break;
             
             continue; // 跳过后面的单关卡处理
           } else {
@@ -1262,6 +1280,7 @@ async function executeTaskFlow(taskFlow, scheduleId) {
     shouldStop: false,
     lastResult: executionSummary
   });
+  activeScheduleAbortController = null;
 
   if (wasStopped) {
     return { success: true, stopped: true, message: completionMessage, summary: executionSummary };
@@ -1302,6 +1321,29 @@ async function executeTaskFlow(taskFlow, scheduleId) {
   }
 
   return { success: true, stopped: false, message: completionMessage, summary: executionSummary };
+}
+
+async function executeTaskFlow(taskFlow, scheduleId) {
+  try {
+    return await withMaaExecutionLease({
+      source: 'schedule',
+      taskName: `任务流程 ${scheduleId}`,
+      command: 'schedule'
+    }, () => executeTaskFlowUnlocked(taskFlow, scheduleId));
+  } catch (error) {
+    if (error?.code === 'MAA_EXECUTION_BUSY') {
+      logger.warn('设备正被其他 MAA 任务占用，跳过任务流程', { scheduleId, owner: error.owner });
+      return {
+        success: false,
+        message: error.message,
+        busy: true,
+        owner: error.owner
+      };
+    }
+    throw error;
+  } finally {
+    if (!scheduleExecutionStatus.isRunning) activeScheduleAbortController = null;
+  }
 }
 
 /**
@@ -1585,52 +1627,54 @@ export function setupAutoUpdate(config) {
       logger.info('自动更新触发执行', { time });
       
       try {
-        if (updateCore) {
-          logger.info('开始更新 MaaCore');
-          await execMaaCommand('update', []);
-          logger.success('MaaCore 更新完成');
-          logger.info('开始同步最新 MaaResource');
-          const resourceResult = await updateMaaResources();
-          logger.success('MaaResource 同步完成', {
-            lastUpdated: resourceResult.resource.lastUpdated
-          });
-        }
-        
-        if (updateCli) {
-          logger.info('开始更新 MAA CLI');
-          
-          // 检查是否在 Docker 环境
-          const isDocker = process.env.NODE_ENV === 'production' && 
-                           await execAsync('test -f /.dockerenv').then(() => true).catch(() => false);
-          
-          if (isDocker) {
-            // Docker 环境：支持更新，更新会持久化
-            try {
-              await execAsync(`${MAA_CLI_PATH} self update`);
-              logger.success('MAA CLI 更新完成', { environment: 'Docker', persistent: true });
-            } catch (error) {
-              logger.error('MAA CLI 更新失败', { error: error.message });
-            }
-          } else {
-            // 根据操作系统选择更新方式
-            const os = await import('os');
-            const platform = os.platform();
-            let command;
-            
-            if (platform === 'darwin') {
-              command = 'brew upgrade maa-cli';
-            } else if (platform === 'linux' || platform === 'win32') {
-              command = `${MAA_CLI_PATH} self update`;
-            } else {
-              throw new Error(`不支持的操作系统: ${platform}`);
-            }
-            
-            await execAsync(command);
-            logger.success('MAA CLI 更新完成', { platform });
+        await withMaaExecutionLease({ source: 'auto-update', taskName: '自动更新 MAA', command: 'update' }, async () => {
+          if (updateCore) {
+            logger.info('开始更新 MaaCore');
+            await execMaaCommand('update', []);
+            logger.success('MaaCore 更新完成');
+            logger.info('开始同步最新 MaaResource');
+            const resourceResult = await updateMaaResources();
+            logger.success('MaaResource 同步完成', {
+              lastUpdated: resourceResult.resource.lastUpdated
+            });
           }
-        }
-        
-        logger.success('所有自动更新任务完成');
+
+          if (updateCli) {
+            logger.info('开始更新 MAA CLI');
+
+            // 检查是否在 Docker 环境
+            const isDocker = process.env.NODE_ENV === 'production' &&
+              await execAsync('test -f /.dockerenv').then(() => true).catch(() => false);
+
+            if (isDocker) {
+              // Docker 环境：支持更新，更新会持久化
+              try {
+                await execAsync(`${MAA_CLI_PATH} self update`);
+                logger.success('MAA CLI 更新完成', { environment: 'Docker', persistent: true });
+              } catch (error) {
+                logger.error('MAA CLI 更新失败', { error: error.message });
+              }
+            } else {
+              // 根据操作系统选择更新方式
+              const os = await import('os');
+              const platform = os.platform();
+              let command;
+
+              if (platform === 'darwin') {
+                command = 'brew upgrade maa-cli';
+              } else if (platform === 'linux' || platform === 'win32') {
+                command = `${MAA_CLI_PATH} self update`;
+              } else {
+                throw new Error(`不支持的操作系统: ${platform}`);
+              }
+
+              await execAsync(command);
+              logger.success('MAA CLI 更新完成', { platform });
+            }
+          }
+
+          logger.success('所有自动更新任务完成');
+        });
       } catch (error) {
         logger.error('自动更新失败', { error: error.message });
       }

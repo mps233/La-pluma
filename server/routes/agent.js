@@ -30,6 +30,8 @@ import { getMaaResourceInfo, updateMaaResources } from '../services/resourceUpda
 import { parseDepotData, parseOperBoxData, getDepotData, getOperBoxData, getAllOperators } from '../services/dataParserService.js';
 import { getTodayDrops, getRecentDrops, getDropStatistics } from '../services/dropRecordService.js';
 import { loadParadoxOperators, resolveStageSearchKeyword } from '../services/copilotService.js';
+import { buildCopilotPlan, executeCopilotPlan, resetCopilotPlanProgress } from '../services/copilotPlanService.js';
+import { withMaaExecutionLease } from '../services/executionCoordinatorService.js';
 import {
   asyncHandler,
   successResponse,
@@ -908,6 +910,26 @@ router.get('/copilot-sets/:id', asyncHandler(async (req, res) => {
   return sendSuccess(res, req, data);
 }));
 
+router.get('/copilot-sets/:id/plan', asyncHandler(async (req, res) => {
+  const raid = ['normal', 'raid', 'both'].includes(req.query.raid) ? req.query.raid : 'normal';
+  return sendSuccess(res, req, await buildCopilotPlan(req.params.id, raid));
+}));
+
+router.post('/copilot-sets/:id/execute', asyncHandler(async (req, res) => {
+  const { raid = 'normal', selectedIndexes = [], options = {} } = req.body || {};
+  const result = await executeCopilotPlan({
+    setId: req.params.id,
+    raid,
+    selectedIndexes: Array.isArray(selectedIndexes) ? selectedIndexes : [],
+    options
+  });
+  return sendSuccess(res, req, result);
+}));
+
+router.post('/copilot-sets/:id/reset-progress', asyncHandler(async (req, res) => {
+  return sendSuccess(res, req, await resetCopilotPlanProgress(req.params.id));
+}));
+
 router.get('/paradox/search', asyncHandler(async (req, res) => {
   const name = String(req.query.name || '').trim();
   if (!name) {
@@ -1380,48 +1402,50 @@ router.post('/actions/update-core', asyncHandler(async (req, res) => {
 
   if (dryRun) return sendDryRun(res, req, plan);
 
-  let coreResult;
-  try {
-    coreResult = version === 'beta'
-      ? await execMaaCommand('install', ['beta', '--force'])
-      : version === 'stable'
-        ? await execMaaCommand('install', ['stable', '--force'])
-        : await execMaaCommand('update', []);
-  } catch (error) {
-    logger.error('更新 MaaCore 失败', { error: error.message, version });
-    return sendError(res, req, agentError('AGENT_MAA_UPDATE_CORE_FAILED', `MaaCore 更新失败: ${error.message}`, {
-      statusCode: 500,
-      retryable: true,
-      details: { version, failedStep: 'core', coreUpdated: false }
-    }));
-  }
+  return withMaaExecutionLease({ source: 'core-update', taskName: '更新 MaaCore 与资源', command: 'update' }, async () => {
+    let coreResult;
+    try {
+      coreResult = version === 'beta'
+        ? await execMaaCommand('install', ['beta', '--force'])
+        : version === 'stable'
+          ? await execMaaCommand('install', ['stable', '--force'])
+          : await execMaaCommand('update', []);
+    } catch (error) {
+      logger.error('更新 MaaCore 失败', { error: error.message, version });
+      return sendError(res, req, agentError('AGENT_MAA_UPDATE_CORE_FAILED', `MaaCore 更新失败: ${error.message}`, {
+        statusCode: 500,
+        retryable: true,
+        details: { version, failedStep: 'core', coreUpdated: false }
+      }));
+    }
 
-  try {
-    const resourceResult = await updateMaaResources();
-    const runtime = await getMaaVersion(true);
-    return sendSuccess(res, req, {
-      plan,
-      steps: {
-        core: { success: true, output: coreResult.stdout || coreResult.stderr || '' },
-        resources: { success: true, output: resourceResult.output }
-      },
-      runtime: { ...runtime, resource: resourceResult.resource }
-    }, version ? `已切换到 ${version} 渠道并同步最新资源` : 'MaaCore 和资源已更新');
-  } catch (error) {
-    const runtime = await getMaaVersion(true).catch(() => null);
-    const resource = await getMaaResourceInfo().catch(() => null);
-    logger.error('MaaCore 已更新，但资源同步失败', { error: error.message, version });
-    return sendError(res, req, agentError('AGENT_MAA_UPDATE_RESOURCE_FAILED', `MaaCore 已更新，但资源同步失败: ${error.message}`, {
-      statusCode: 500,
-      retryable: true,
-      details: {
-        version,
-        failedStep: 'resources',
-        coreUpdated: true,
-        runtime: runtime ? { ...runtime, resource } : null
-      }
-    }));
-  }
+    try {
+      const resourceResult = await updateMaaResources();
+      const runtime = await getMaaVersion(true);
+      return sendSuccess(res, req, {
+        plan,
+        steps: {
+          core: { success: true, output: coreResult.stdout || coreResult.stderr || '' },
+          resources: { success: true, output: resourceResult.output }
+        },
+        runtime: { ...runtime, resource: resourceResult.resource }
+      }, version ? `已切换到 ${version} 渠道并同步最新资源` : 'MaaCore 和资源已更新');
+    } catch (error) {
+      const runtime = await getMaaVersion(true).catch(() => null);
+      const resource = await getMaaResourceInfo().catch(() => null);
+      logger.error('MaaCore 已更新，但资源同步失败', { error: error.message, version });
+      return sendError(res, req, agentError('AGENT_MAA_UPDATE_RESOURCE_FAILED', `MaaCore 已更新，但资源同步失败: ${error.message}`, {
+        statusCode: 500,
+        retryable: true,
+        details: {
+          version,
+          failedStep: 'resources',
+          coreUpdated: true,
+          runtime: runtime ? { ...runtime, resource } : null
+        }
+      }));
+    }
+  });
 }));
 
 router.post('/actions/update-cli', asyncHandler(async (req, res) => {
@@ -1434,8 +1458,10 @@ router.post('/actions/update-cli', asyncHandler(async (req, res) => {
   const command = isDocker ? `${MAA_CLI_PATH} self update` : (os.platform() === 'darwin' ? 'brew upgrade maa-cli' : `${MAA_CLI_PATH} self update`);
   const plan = { action: 'update-cli', command };
   if (req.body?.dryRun) return sendDryRun(res, req, plan);
-  const { stdout, stderr } = await execAsync(command);
-  return sendSuccess(res, req, { output: stdout || stderr, plan }, `MAA CLI 更新完成${isDocker ? '（Docker 环境）' : ''}`);
+  return withMaaExecutionLease({ source: 'cli-update', taskName: '更新 MAA CLI', command: 'update-cli' }, async () => {
+    const { stdout, stderr } = await execAsync(command);
+    return sendSuccess(res, req, { output: stdout || stderr, plan }, `MAA CLI 更新完成${isDocker ? '（Docker 环境）' : ''}`);
+  });
 }));
 
 router.post('/actions/hot-update-resources', asyncHandler(async (req, res) => {

@@ -35,7 +35,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
     ssscopilot: { loopTimes: '1' }
   })
   const [autoFormation, setAutoFormation] = useState<AutoFormationConfig>({ copilot: 'auto' })
-  const [copilotSetExecutionMode, setCopilotSetExecutionMode] = useState<CopilotSetExecutionMode>('app')
+  const [copilotSetExecutionMode, setCopilotSetExecutionMode] = useState<CopilotSetExecutionMode>('cli')
 
   // 作业类型选择：'auto' 自动检测，'single' 单个作业，'set' 作业集
   const [copilotType, setCopilotType] = useState<'auto' | 'single' | 'set'>('auto')
@@ -147,9 +147,20 @@ export default function CombatTasks(_props: CombatTasksProps) {
 
   const restoreSelectedCopilots = (setId: string, copilots: CopilotSetItem[]) => {
     const savedIndexes = copilotSetSelections[setId]
+    const raid = normalizeRaidValue(advancedParams.copilot?.raid)
+    const pendingIndexes = copilots
+      .map((copilot, index) => {
+        const requiredModes: Array<'normal' | 'raid'> = copilot.presetFormation
+          ? ['normal']
+          : raid === 'both'
+            ? ['normal', 'raid']
+            : [raid === 'raid' ? 'raid' : 'normal']
+        return requiredModes.every(mode => copilot.completedModes?.includes(mode)) ? -1 : index
+      })
+      .filter(index => index >= 0)
     const indexes = Array.isArray(savedIndexes)
-      ? savedIndexes.filter(index => Number.isInteger(index) && index >= 0 && index < copilots.length)
-      : copilots.map((_, index) => index)
+      ? savedIndexes.filter(index => Number.isInteger(index) && pendingIndexes.includes(index))
+      : pendingIndexes
     applySelectedCopilotIndexes(new Set(indexes), setId)
   }
 
@@ -158,6 +169,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
     applySelectedCopilotIndexes(new Set(copilotSetInfo.copilots.map((_, index) => index)), copilotSetInfo.id)
     setCopilotSetResults([])
     setCopilotSetInfo(prev => prev ? { ...prev, currentIndex: 0 } : prev)
+    maaApi.resetCopilotSetProgress(copilotSetInfo.id).catch(() => {})
     setStatusMessage('已重置作业集进度，将从第一关开始')
     setTimeout(() => setStatusMessage(''), 2000)
   }
@@ -237,8 +249,9 @@ export default function CombatTasks(_props: CombatTasksProps) {
             localStorage.setItem('combatAutoFormation', JSON.stringify(formation))
           }
           if (savedSetMode === 'app' || savedSetMode === 'manual' || savedSetMode === 'cli') {
-            setCopilotSetExecutionMode(savedSetMode)
-            localStorage.setItem('combatCopilotSetExecutionMode', savedSetMode)
+            const migratedSetMode = savedSetMode === 'app' ? 'cli' : savedSetMode
+            setCopilotSetExecutionMode(migratedSetMode)
+            localStorage.setItem('combatCopilotSetExecutionMode', migratedSetMode)
           }
           if (savedSelections && typeof savedSelections === 'object') {
             setCopilotSetSelections(savedSelections)
@@ -267,7 +280,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
         setAutoFormation(JSON.parse(savedFormation))
       }
       if (savedSetMode === 'app' || savedSetMode === 'manual' || savedSetMode === 'cli') {
-        setCopilotSetExecutionMode(savedSetMode)
+        setCopilotSetExecutionMode(savedSetMode === 'app' ? 'cli' : savedSetMode)
       }
       if (savedSelections) {
         setCopilotSetSelections(JSON.parse(savedSelections))
@@ -569,12 +582,28 @@ export default function CombatTasks(_props: CombatTasksProps) {
     setStatusMessage('正在执行作业集（CLI 原生连续）')
 
     try {
-      const args = buildCopilotSetCliArgs(task)
-      const result = await maaApi.executePredefinedTaskArgs(task.command, args, null, null, task.name, 'combat', true)
+      const raid = normalizeRaidValue(advancedParams.copilot?.raid)
+      const result = copilotSetInfo?.type === 'set'
+        ? await maaApi.executeCopilotSetPlan(copilotSetInfo.id, {
+            raid,
+            selectedIndexes,
+            options: {
+              ignoreRequirements: advancedParams.copilot?.ignoreRequirements,
+              loopTimes: advancedParams.copilot?.loopTimes,
+              useSanityPotion: advancedParams.copilot?.useSanityPotion,
+              addTrust: advancedParams.copilot?.addTrust,
+              formationIndex: advancedParams.copilot?.formationIndex,
+              supportUsage: advancedParams.copilot?.supportUsage,
+              supportName: advancedParams.copilot?.supportName,
+              formationMode: getFormationMode(task.id)
+            }
+          })
+        : await maaApi.executePredefinedTaskArgs(task.command, buildCopilotSetCliArgs(task), null, null, task.name, 'combat', true)
 
       if (result.success) {
-        applySelectedCopilotIndexes(new Set(), copilotSetInfo?.id)
-        setStatusMessage('作业集执行完成')
+        const pendingIndexes = new Set<number>((result.data?.pending || []).map((entry: { itemIndex: number }) => entry.itemIndex))
+        applySelectedCopilotIndexes(pendingIndexes, copilotSetInfo?.id)
+        setStatusMessage(pendingIndexes.size ? `作业集已完成部分关卡，剩余 ${pendingIndexes.size} 个待执行` : '作业集执行完成')
       } else {
         setStatusMessage(`作业集执行失败: ${maaApi.getErrorMessage(result)}`)
       }
@@ -874,6 +903,24 @@ export default function CombatTasks(_props: CombatTasksProps) {
   // 获取作业集详情（包含所有作业列表）
   const fetchCopilotSetDetails = async (setId: string): Promise<CopilotSetItem[]> => {
     try {
+      const planResponse = await maaApi.getCopilotSetPlan(setId, normalizeRaidValue(advancedParams.copilot?.raid))
+      const plan = unwrapApiPayload(planResponse)
+      if (Array.isArray(plan?.items) && plan.items.length > 0) {
+        return plan.items.map((item: any, itemIndex: number) => ({
+          id: Number(item.id),
+          name: item.stage || `作业 #${item.id}`,
+          stage: item.stage,
+          stageId: item.stageId,
+          presetFormation: Boolean(item.presetFormation),
+          supportsRaid: item.supportsRaid !== false,
+          completedModes: Array.isArray(plan.entries)
+            ? plan.entries
+                .filter((entry: any) => entry.itemIndex === itemIndex && entry.completed)
+                .map((entry: any) => entry.mode as 'normal' | 'raid')
+            : [],
+          uri: `maa://${item.id}`
+        }))
+      }
       const data = await maaApi.getCopilotSet(setId)
       const copilotIds = getCopilotSetIds(data)
       if (copilotIds.length > 0) {
@@ -1655,7 +1702,17 @@ export default function CombatTasks(_props: CombatTasksProps) {
                                       {isCompleted ? (isSuccess ? '✓' : '✗') : isPersistedDone ? '✓' : idx + 1}
                                     </span>
                                     <div className="min-w-0">
-                                      <div className="truncate text-primary">{copilot.name || `作业 #${copilot.id}`}</div>
+                                      <div className="flex min-w-0 items-center gap-1.5">
+                                        <span className="truncate text-primary">{copilot.name || `作业 #${copilot.id}`}</span>
+                                        {copilot.presetFormation && (
+                                          <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] brand-chip">预设编队 · 仅普通</span>
+                                        )}
+                                        {copilot.completedModes?.map(mode => (
+                                          <span key={mode} className="shrink-0 rounded px-1.5 py-0.5 text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+                                            {mode === 'raid' ? '突袭已完成' : '普通已完成'}
+                                          </span>
+                                        ))}
+                                      </div>
                                       {copilot.stage && <div className="mt-0.5 truncate text-[11px] text-tertiary">{copilot.stage}</div>}
                                     </div>
                                   </div>
