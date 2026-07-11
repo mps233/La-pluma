@@ -124,7 +124,7 @@ export function useDashboardPreview() {
     videoRef,
     fallbackSnapshot,
     showLivePreview,
-    statusText: showLivePreview ? 'Live' : fallbackSnapshot ? '截图兜底 · 10s' : preview.error || preview.status,
-    headerStatusText: showLivePreview ? `${preview.stats?.width || 0}×${preview.stats?.height || 0}` : fallbackSnapshot ? '截图兜底' : '自动连接中'
+    statusText: showLivePreview ? 'Live' : fallbackSnapshot ? '画面快照 · 10s' : preview.error || preview.status,
+    headerStatusText: showLivePreview ? `${preview.stats?.width || 0}×${preview.stats?.height || 0}` : fallbackSnapshot ? '画面快照' : '自动连接中'
   }
 }

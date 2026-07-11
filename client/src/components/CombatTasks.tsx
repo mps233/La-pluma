@@ -311,7 +311,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
       placeholder: 'maa://1234 或本地文件路径',
       icon: <Icons.Shield />,
       hasAdvanced: true,
-      description: '保全派驻 SSS 作业入口，当前 maa-cli 一次只执行一个 SSS 作业'
+      description: '保全派驻作业入口，一次只能执行一份作业'
     },
     {
       id: 'paradoxcopilot',
@@ -554,7 +554,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
     setWaitingForNextCopilot(false)
     setCopilotSetResults([])
     setCurrentCopilotTask(task)
-    setStatusMessage('正在执行作业集（CLI 原生连续）')
+    setStatusMessage('正在连续执行作业集')
 
     try {
       const raid = normalizeRaidValue(advancedParams.copilot?.raid)
@@ -1246,7 +1246,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
         <PageHeader
           icon={<Icons.TargetIcon />}
           title="自动战斗"
-          subtitle="单作业 / 作业集 / SSS / 悖论模拟 / 链接识别 - 跟进最新 MaaCore 作业能力"
+          subtitle="支持单作业、作业集、保全派驻、悖论模拟与链接识别"
           actions={<FloatingStatusIndicator />}
         />
 
@@ -1369,13 +1369,13 @@ export default function CombatTasks(_props: CombatTasksProps) {
                             onChange={(e) => setAutoFormation({ ...autoFormation, [task.id]: e.target.value as FormationMode })}
                             className="min-w-0 flex-1 rounded-lg border border-[var(--app-border)] px-2 py-1.5 text-xs text-primary control-surface focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
                           >
-                            <option value="auto">跟随 CLI</option>
-                            <option value="on">强制自动编队</option>
-                            <option value="off">不传编队参数</option>
+                            <option value="auto">自动决定</option>
+                            <option value="on">自动编队</option>
+                            <option value="off">保留当前编队</option>
                           </select>
                         </div>
                         <p className="pl-14 text-[11px] leading-relaxed text-tertiary">
-                          作业集拆分执行时，“跟随 CLI”会自动启用编队；单作业按 maa-cli 默认处理。
+                          作业集拆分执行时，“自动决定”会启用自动编队；单作业会使用默认设置。
                         </p>
                       </div>
 
@@ -1402,13 +1402,13 @@ export default function CombatTasks(_props: CombatTasksProps) {
                             onChange={(e) => setCopilotSetExecutionMode(e.target.value as CopilotSetExecutionMode)}
                             className="min-w-0 flex-1 rounded-lg border border-[var(--app-border)] px-2 py-1.5 text-xs text-primary control-surface focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
                           >
-                            <option value="app">应用内连续</option>
+                            <option value="app">顺序执行</option>
                             <option value="manual">手动逐关</option>
-                            <option value="cli">CLI 原生连续</option>
+                            <option value="cli">连续执行</option>
                           </select>
                         </div>
                         <p className="pl-14 text-[11px] leading-relaxed text-tertiary">
-                          应用内连续会保存断点：成功项自动移出待执行，失败项保留待重试。
+                          顺序执行会保存进度：成功项自动移出待执行，失败项保留待重试。
                         </p>
                       </div>
 
@@ -1461,13 +1461,13 @@ export default function CombatTasks(_props: CombatTasksProps) {
                         </Button>
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-3 px-1 text-xs text-tertiary">
-                        <p className="truncate">支持作业 URI、作业站链接、HTTP(S) JSON 和本地 JSON 路径。</p>
+                        <p className="truncate">支持作业链接、导入文件和本地作业。</p>
                         <details className="relative shrink-0">
                           <summary className="cursor-pointer list-none brand-text hover:underline">说明</summary>
                           <div className="absolute z-20 mt-2 w-72 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-solid)] p-3 text-left shadow-lg space-y-1.5">
-                            <p>• 访问 <a href="https://zoot.plus/" target="_blank" rel="noopener noreferrer" className="brand-text hover:underline">zoot.plus</a> 获取作业 URI</p>
+                            <p>• 在 <a href="https://zoot.plus/" target="_blank" rel="noopener noreferrer" className="brand-text hover:underline">zoot.plus</a> 获取作业链接</p>
                             <p>• 单作业：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">maa://1234</code>；作业集：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">maa://1234s</code></p>
-                            <p>• 作业站链接会自动提取 ID，也支持远程 JSON 和本地路径</p>
+                            <p>• 作业站链接会自动识别，也可导入远程或本地作业文件</p>
                           </div>
                         </details>
                       </div>

@@ -347,7 +347,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         { key: 'stages', label: '关卡', type: 'multi-stages', placeholder: '1-7 或 HD-7', timesPlaceholder: '次数', helper: '使用 HD-数字 代表当前活动关卡，点击 + 添加更多关卡' },
         { key: 'drops', label: '掉落目标', type: 'text', placeholder: '30011=10,30062=5', helper: '任一物品达到目标数量后停止；格式为物品 ID=数量，多个目标用逗号分隔' },
         { key: 'medicine', label: '理智药', type: 'number', placeholder: '0', helper: '使用理智药数量' },
-        { key: 'expiringMedicine', label: '临期药数量', type: 'number', placeholder: '0', helper: '最多使用多少瓶临期理智药；当前 maa-cli 参数按数量计算' },
+        { key: 'expiringMedicine', label: '临期药数量', type: 'number', placeholder: '0', helper: '按瓶数设置可使用的临期理智药' },
         { key: 'stone', label: '源石', type: 'number', placeholder: '0', helper: '使用源石数量' },
         { key: 'series', label: '连战', type: 'select', options: [
           { value: '-1', label: '禁用' },
@@ -2194,7 +2194,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                   </div>
                                   {task.id === 'recruit' && field.key === 'select' && Array.isArray(task.params.select) && task.params.select.includes(6) && (
                                     <div className="mt-2 rounded-xl px-3 py-2 text-xs brand-chip">
-                                      已开启 6 星自动公招：遇到高级资深干员等高价值标签时，会按 MaaCore 新能力优先保留并自动选择。
+                                      已开启 6 星自动公招：遇到高级资深干员等高价值标签时，会优先保留并自动选择。
                                     </div>
                                   )}
                                 </div>

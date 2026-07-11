@@ -495,7 +495,7 @@ export default function LogViewer({}: LogViewerProps) {
         <PageHeader
           icon={<Icons.DocumentTextIcon />}
           title="日志查看器"
-          subtitle="实时查看和管理 MAA 运行日志"
+          subtitle="实时查看任务执行与历史记录"
           actions={<FloatingStatusIndicator />}
         />
       </div>

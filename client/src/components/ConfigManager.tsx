@@ -453,7 +453,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
         <PageHeader
           icon={<Icons.CogIcon />}
           title="配置管理"
-          subtitle="管理 MAA CLI 连接和运行配置"
+          subtitle="管理游戏连接、运行设置与资源更新"
           actions={<FloatingStatusIndicator />}
         />
 

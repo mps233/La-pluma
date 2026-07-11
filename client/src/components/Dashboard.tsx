@@ -896,7 +896,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="text-center py-6">
-              <div className="text-sm font-semibold text-primary">MAA 已可直接使用</div>
+              <div className="text-sm font-semibold text-primary">自动化服务已就绪</div>
               <div className={`mt-1 text-xs ${labelClass}`}>森空岛登录只影响看板数据，不影响作业。</div>
               <div className="mt-4 flex justify-center gap-2">
                 <Button onClick={openSklandConfig} variant="ghost" size="sm">登录森空岛</Button>

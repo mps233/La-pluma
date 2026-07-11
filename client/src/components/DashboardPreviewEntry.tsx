@@ -33,7 +33,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry({ onOpen }: Da
         {!showLivePreview && fallbackSnapshot && (
           <img
             src={fallbackSnapshot}
-            alt="模拟器截图兜底"
+            alt="模拟器画面快照"
             draggable={false}
             className="absolute inset-0 h-full w-full select-none object-contain pointer-events-none"
           />

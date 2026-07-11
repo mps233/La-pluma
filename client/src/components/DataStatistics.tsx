@@ -475,7 +475,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
 
     setIsRunning(true)
     setActiveTask('operbox')
-    setStatusMessage('正在识别干员 Box...')
+    setStatusMessage('正在识别干员数据...')
     setOperBoxData(null)
 
     try {
@@ -536,7 +536,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
         <PageHeader
           icon={<Icons.Info className="w-6 h-6" />}
           title="数据统计"
-          subtitle="识别仓库物品和干员 Box 数据"
+          subtitle="识别并查看仓库、干员与掉落数据"
           actions={<FloatingStatusIndicator />}
         />
 
