@@ -30,7 +30,10 @@ function applyTheme(selectedTheme: ThemeMode, systemTheme?: 'dark' | 'light') {
   }
 
   const metaThemeColor = document.querySelector('meta[name="theme-color"]')
-  metaThemeColor?.setAttribute('content', isDark ? '#070707' : '#f9fafb')
+  metaThemeColor?.setAttribute('content', isDark ? '#05090c' : '#f6f8fb')
+
+  const metaStatusBarStyle = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
+  metaStatusBarStyle?.setAttribute('content', isDark ? 'black-translucent' : 'default')
 }
 
 export default function ThemeToggle({ color: _color = 'violet' }: ThemeToggleProps) {

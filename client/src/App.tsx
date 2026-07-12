@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from 'react'
 import Layout from './components/Layout'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
 import { Loading } from './components/common'
+import { useBackendStatusMonitor } from './hooks/useBackendStatusMonitor'
 
 const Dashboard = lazy(() => import('./components/Dashboard'))
 const AutomationTasks = lazy(() => import('./components/AutomationTasks'))
@@ -48,6 +49,8 @@ class PageErrorBoundary extends React.Component<{ activeKey: string; children: R
 }
 
 function App() {
+  useBackendStatusMonitor()
+
   const renderActivePage = (activeTab: string) => {
     switch (activeTab) {
       case 'automation': return <AutomationTasks />

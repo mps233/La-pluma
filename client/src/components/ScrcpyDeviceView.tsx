@@ -6,6 +6,8 @@ import { useScrcpyWebRTC } from '../hooks/useScrcpyWebRTC'
 
 interface ScrcpyDeviceViewProps {
   enabled: boolean
+  automationAvailable?: boolean
+  automationUnavailableMessage?: string
   variant?: 'full' | 'compact'
   deviceId?: string
   signalingUrl?: string
@@ -49,6 +51,8 @@ type QualityPreset = keyof typeof qualityPresets
 
 export default function ScrcpyDeviceView({
   enabled,
+  automationAvailable = true,
+  automationUnavailableMessage = '后端服务暂不可用，请稍后重试',
   variant = 'full',
   deviceId = 'mumu-la-pluma',
   signalingUrl = 'ws://127.0.0.1:8443',
@@ -113,13 +117,28 @@ export default function ScrcpyDeviceView({
   }
 
   const connect = useCallback(async () => {
+    if (!automationAvailable) return
     try {
       const freshSignalingUrl = await onStartInfrastructure?.()
+      if (onStartInfrastructure && !freshSignalingUrl) return
       webrtc.connect(freshSignalingUrl)
     } catch {
       // 基础设施错误由 ScreenMonitor 显示，连接流程到此停止。
     }
-  }, [onStartInfrastructure, webrtc])
+  }, [automationAvailable, onStartInfrastructure, webrtc])
+
+  const runInfrastructureAction = (
+    action: (() => Promise<void> | void) | undefined,
+    allowWhenUnavailable = false
+  ) => {
+    if (!action || (!automationAvailable && !allowWhenUnavailable)) return
+    void action()
+  }
+
+  const sendDeviceCommand = (command: string) => {
+    if (!automationAvailable) return
+    webrtc.sendCommand(command)
+  }
 
   useEffect(() => {
     onStatusChange?.(webrtc.status, webrtc.stats, webrtc.error)
@@ -130,19 +149,20 @@ export default function ScrcpyDeviceView({
       autoConnectStartedRef.current = false
       return
     }
-    if (!enabled || autoConnectStartedRef.current) return
+    if (!enabled || !automationAvailable || autoConnectStartedRef.current) return
     autoConnectStartedRef.current = true
     void connect()
-  }, [autoConnect, connect, enabled])
+  }, [autoConnect, automationAvailable, connect, enabled])
 
   const onPointerDown = (event: React.PointerEvent<HTMLVideoElement>) => {
+    if (!automationAvailable) return
     pointerDownRef.current = true
     event.currentTarget.setPointerCapture(event.pointerId)
     webrtc.sendTouch(0, event.clientX, event.clientY, event.pointerId)
   }
 
   const onPointerMove = (event: React.PointerEvent<HTMLVideoElement>) => {
-    if (!pointerDownRef.current) return
+    if (!automationAvailable || !pointerDownRef.current) return
     webrtc.sendTouch(2, event.clientX, event.clientY, event.pointerId)
   }
 
@@ -153,13 +173,14 @@ export default function ScrcpyDeviceView({
   }
 
   const onImmersivePointerDown = (event: React.PointerEvent<HTMLVideoElement>) => {
+    if (!automationAvailable) return
     pointerDownRef.current = true
     event.currentTarget.setPointerCapture(event.pointerId)
     webrtc.sendTouch(0, event.clientX, event.clientY, event.pointerId, event.currentTarget)
   }
 
   const onImmersivePointerMove = (event: React.PointerEvent<HTMLVideoElement>) => {
-    if (!pointerDownRef.current) return
+    if (!automationAvailable || !pointerDownRef.current) return
     webrtc.sendTouch(2, event.clientX, event.clientY, event.pointerId, event.currentTarget)
   }
 
@@ -291,7 +312,9 @@ export default function ScrcpyDeviceView({
                   {visibleError ? '预览启动失败' : '等待实时画面'}
                 </div>
                 <div className="mx-auto max-w-md text-xs leading-5 text-secondary">
-                  {visibleError || (isCompact
+                  {visibleError || (!automationAvailable
+                    ? automationUnavailableMessage
+                    : isCompact
                     ? '点击按钮连接模拟器。'
                     : '点击“启动实时预览”后，La-pluma 会自动启动服务、连接 MuMu 并显示实时画面。')}
                 </div>
@@ -303,8 +326,11 @@ export default function ScrcpyDeviceView({
                     icon={needsInstall
                       ? <Package className="h-3.5 w-3.5" strokeWidth={1.8} />
                       : <Plug className="h-3.5 w-3.5" strokeWidth={1.8} />}
-                    onClick={needsInstall ? onInstall : connect}
-                    disabled={infrastructureLoading !== null || isConnecting}
+                    onClick={needsInstall
+                      ? () => runInfrastructureAction(onInstall)
+                      : connect}
+                    disabled={!automationAvailable || infrastructureLoading !== null || isConnecting}
+                    title={!automationAvailable ? automationUnavailableMessage : undefined}
                     loading={infrastructureLoading === 'install' || infrastructureLoading === 'preview' || isConnecting}
                   >
                     {needsInstall
@@ -323,25 +349,29 @@ export default function ScrcpyDeviceView({
             {
               label: '返回',
               disabled: webrtc.status !== 'connected',
-              onClick: () => webrtc.sendCommand('input keyevent 4'),
+              onClick: () => sendDeviceCommand('input keyevent 4'),
+              requiresAutomation: true,
               icon: <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
             },
             {
               label: 'Home',
               disabled: webrtc.status !== 'connected',
-              onClick: () => webrtc.sendCommand('input keyevent 3'),
+              onClick: () => sendDeviceCommand('input keyevent 3'),
+              requiresAutomation: true,
               icon: <Home className="h-3.5 w-3.5" strokeWidth={1.8} />
             },
             {
               label: '后台任务',
               disabled: webrtc.status !== 'connected',
-              onClick: () => webrtc.sendCommand('input keyevent 187'),
+              onClick: () => sendDeviceCommand('input keyevent 187'),
+              requiresAutomation: true,
               icon: <PanelsTopLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
             },
             {
               label: '全屏',
               disabled: webrtc.status !== 'connected',
               onClick: fullscreen,
+              requiresAutomation: false,
               icon: <Maximize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
             }
           ].map(action => (
@@ -349,8 +379,8 @@ export default function ScrcpyDeviceView({
               key={action.label}
               type="button"
               onClick={action.onClick}
-              disabled={action.disabled}
-              title={action.label}
+              disabled={action.disabled || (action.requiresAutomation && !automationAvailable)}
+              title={action.requiresAutomation && !automationAvailable ? automationUnavailableMessage : action.label}
               aria-label={action.label}
               className={`control-surface flex items-center justify-center rounded-full text-secondary transition-colors hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35 ${isCompact ? 'h-10 w-10' : 'h-8 w-8'}`}
             >
@@ -382,7 +412,8 @@ export default function ScrcpyDeviceView({
               className="scrcpy-preview-action"
               icon={<RotateCw className="h-3.5 w-3.5" strokeWidth={1.8} />}
               onClick={connect}
-              disabled={infrastructureLoading !== null}
+              disabled={!automationAvailable || infrastructureLoading !== null}
+              title={!automationAvailable ? automationUnavailableMessage : undefined}
               loading={infrastructureLoading === 'preview'}
             >
               重连预览
@@ -391,16 +422,17 @@ export default function ScrcpyDeviceView({
 
           <div className="scrcpy-service-grid">
             {[
-              { label: infrastructureStatus?.serverRunning ? '停止服务' : '启动服务', icon: Server, onClick: onToggleServer, disabled: false, loading: infrastructureLoading === 'server' },
-              { label: infrastructureStatus?.agentRunning ? '停止 Agent' : '连接 Agent', icon: Smartphone, onClick: onToggleAgent, disabled: !infrastructureStatus?.serverRunning, loading: infrastructureLoading === 'agent' }
+              { label: infrastructureStatus?.serverRunning ? '停止服务' : '启动服务', icon: Server, onClick: onToggleServer, disabled: !infrastructureStatus?.serverRunning && !automationAvailable, allowWhenUnavailable: !!infrastructureStatus?.serverRunning, loading: infrastructureLoading === 'server' },
+              { label: infrastructureStatus?.agentRunning ? '停止 Agent' : '连接 Agent', icon: Smartphone, onClick: onToggleAgent, disabled: infrastructureStatus?.agentRunning ? false : !infrastructureStatus?.serverRunning || !automationAvailable, allowWhenUnavailable: !!infrastructureStatus?.agentRunning, loading: infrastructureLoading === 'agent' }
             ].map(action => {
               const Icon = action.icon
               return (
                 <button
                   key={action.label}
                   type="button"
-                  onClick={action.onClick}
+                  onClick={() => runInfrastructureAction(action.onClick, action.allowWhenUnavailable)}
                   disabled={action.disabled || action.loading}
+                  title={action.disabled && !automationAvailable ? automationUnavailableMessage : action.label}
                   className="scrcpy-service-action control-surface"
                 >
                   <Icon className="h-3.5 w-3.5" strokeWidth={1.7} />
@@ -422,8 +454,9 @@ export default function ScrcpyDeviceView({
             </button>
             <button
               type="button"
-              onClick={onInstall}
-              disabled={infrastructureLoading !== null}
+              onClick={() => runInfrastructureAction(onInstall)}
+              disabled={!automationAvailable || infrastructureLoading !== null}
+              title={!automationAvailable ? automationUnavailableMessage : undefined}
               className="scrcpy-utility-action"
             >
               <Package className="h-3.5 w-3.5" strokeWidth={1.8} />
@@ -534,25 +567,29 @@ export default function ScrcpyDeviceView({
             {
               label: '返回',
               disabled: webrtc.status !== 'connected',
-              onClick: () => webrtc.sendCommand('input keyevent 4'),
+              onClick: () => sendDeviceCommand('input keyevent 4'),
+              requiresAutomation: true,
               icon: <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
             },
             {
               label: 'Home',
               disabled: webrtc.status !== 'connected',
-              onClick: () => webrtc.sendCommand('input keyevent 3'),
+              onClick: () => sendDeviceCommand('input keyevent 3'),
+              requiresAutomation: true,
               icon: <Home className="h-3.5 w-3.5" strokeWidth={1.8} />
             },
             {
               label: '后台任务',
               disabled: webrtc.status !== 'connected',
-              onClick: () => webrtc.sendCommand('input keyevent 187'),
+              onClick: () => sendDeviceCommand('input keyevent 187'),
+              requiresAutomation: true,
               icon: <PanelsTopLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
             },
             {
               label: '退出全屏',
               disabled: false,
               onClick: exitImmersive,
+              requiresAutomation: false,
               icon: <Minimize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
             }
           ].map(action => (
@@ -560,8 +597,8 @@ export default function ScrcpyDeviceView({
               key={action.label}
               type="button"
               onClick={action.onClick}
-              disabled={action.disabled}
-              title={action.label}
+              disabled={action.disabled || (action.requiresAutomation && !automationAvailable)}
+              title={action.requiresAutomation && !automationAvailable ? automationUnavailableMessage : action.label}
               aria-label={action.label}
               className="group flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20 disabled:opacity-35 disabled:cursor-not-allowed"
             >

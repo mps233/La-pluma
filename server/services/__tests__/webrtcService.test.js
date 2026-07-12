@@ -207,6 +207,8 @@ fi
 
     assert.equal(first.serverRunning, true)
     assert.equal(first.agentRunning, true)
+    assert.equal(first.signalingUrl, '/webrtc-signaling')
+    assert.match(first.directSignalingUrl, /^ws:\/\//)
     assert.equal(second.serverRunning, true)
     assert.equal(second.agentRunning, true)
     assert.deepEqual(await service.getWebrtcDevices({ throwOnError: true }), ['preview-device'])

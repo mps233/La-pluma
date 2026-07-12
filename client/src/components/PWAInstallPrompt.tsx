@@ -1,111 +1,259 @@
-/**
- * PWA Install Prompt Component
- * Shows a prompt to install the app as a PWA
- */
-
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useCallback, useEffect, useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { Download, RefreshCw, Share2, SquarePlus } from 'lucide-react'
+import { useRegisterSW } from 'virtual:pwa-register/react'
+import { useStatusStore } from '@/store/statusStore'
+import { Button } from '@/components/common'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
+interface NavigatorWithStandalone extends Navigator {
+  standalone?: boolean
+}
+
+const INSTALL_DISMISS_KEY = 'pwa-install-dismissed-at'
+const INSTALL_REMINDER_DELAY_MS = 7 * 24 * 60 * 60 * 1000
+
+const isStandalone = () =>
+  window.matchMedia('(display-mode: standalone)').matches
+  || (window.navigator as NavigatorWithStandalone).standalone === true
+
+const isIosDevice = () => {
+  const { userAgent, maxTouchPoints } = window.navigator
+  return /iPad|iPhone|iPod/i.test(userAgent)
+    || (/Macintosh/i.test(userAgent) && maxTouchPoints > 1)
+}
+
+const canOfferInstallation = () =>
+  window.isSecureContext
+  || ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)
+
+const shouldRemindAboutInstall = () => {
+  try {
+    const dismissedAt = Number(window.localStorage.getItem(INSTALL_DISMISS_KEY))
+    return !Number.isFinite(dismissedAt)
+      || dismissedAt <= 0
+      || Date.now() - dismissedAt >= INSTALL_REMINDER_DELAY_MS
+  } catch {
+    return true
+  }
+}
+
+const rememberInstallDismissal = () => {
+  try {
+    window.localStorage.setItem(INSTALL_DISMISS_KEY, String(Date.now()))
+  } catch {
+    // Installation remains available when storage is unavailable.
+  }
+}
+
+const clearInstallDismissal = () => {
+  try {
+    window.localStorage.removeItem(INSTALL_DISMISS_KEY)
+  } catch {
+    // Nothing else is required when storage is unavailable.
+  }
+}
+
 export default function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
-  const [showPrompt, setShowPrompt] = useState(false)
+  const [isIos] = useState(isIosDevice)
+  const [showInstallPrompt, setShowInstallPrompt] = useState(() =>
+    !isStandalone()
+    && canOfferInstallation()
+    && isIosDevice()
+    && shouldRemindAboutInstall())
+  const [isUpdateCollapsed, setIsUpdateCollapsed] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const shouldReduceMotion = useReducedMotion()
+  const setStatusMessage = useStatusStore(state => state.setMessage)
+
+  const handleOfflineReady = useCallback(() => {
+    setStatusMessage('界面已准备好；自动化操作仍需连接服务', 'success')
+  }, [setStatusMessage])
+
+  const handleRegisterError = useCallback(() => {
+    setStatusMessage('应用安装服务启动失败，请刷新页面重试', 'error')
+  }, [setStatusMessage])
+
+  const {
+    needRefresh: [needRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    immediate: true,
+    onOfflineReady: handleOfflineReady,
+    onRegisterError: handleRegisterError,
+  })
 
   useEffect(() => {
-    // 检查是否已经安装
-    const isInstalled = window.matchMedia('(display-mode: standalone)').matches || 
-                       (window.navigator as any).standalone === true
+    if (isStandalone() || !canOfferInstallation()) return
 
-    if (isInstalled) {
-      return
-    }
-
-    // 监听安装提示事件
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
       const promptEvent = e as BeforeInstallPromptEvent
       setDeferredPrompt(promptEvent)
-      
-      // 检查用户是否之前关闭过提示
-      const dismissed = localStorage.getItem('pwa-install-dismissed')
-      if (!dismissed) {
-        setShowPrompt(true)
-      }
+      if (shouldRemindAboutInstall()) setShowInstallPrompt(true)
+    }
+
+    const handleAppInstalled = () => {
+      clearInstallDismissal()
+      setDeferredPrompt(null)
+      setShowInstallPrompt(false)
+      setStatusMessage('La Pluma 已安装', 'success')
     }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    window.addEventListener('appinstalled', handleAppInstalled)
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      window.removeEventListener('appinstalled', handleAppInstalled)
     }
-  }, [])
+  }, [setStatusMessage])
 
   const handleInstall = async () => {
-    if (!deferredPrompt) {
-      return
+    if (!deferredPrompt) return
+
+    try {
+      await deferredPrompt.prompt()
+      const { outcome } = await deferredPrompt.userChoice
+      if (outcome === 'dismissed') rememberInstallDismissal()
+      else clearInstallDismissal()
+      setDeferredPrompt(null)
+      setShowInstallPrompt(false)
+    } catch {
+      setStatusMessage('未能打开安装窗口，请稍后重试', 'error')
     }
-
-    await deferredPrompt.prompt()
-    await deferredPrompt.userChoice
-    
-    // 用户已做出选择
-    setDeferredPrompt(null)
-    setShowPrompt(false)
   }
 
-  const handleDismiss = () => {
-    setShowPrompt(false)
-    localStorage.setItem('pwa-install-dismissed', 'true')
+  const handleInstallDismiss = () => {
+    rememberInstallDismissal()
+    setShowInstallPrompt(false)
   }
 
-  if (!showPrompt) {
-    return null
+  const handleUpdate = async () => {
+    setIsUpdating(true)
+    try {
+      await updateServiceWorker(true)
+    } catch {
+      setIsUpdating(false)
+      setStatusMessage('更新失败，请检查连接后重试', 'error')
+    }
   }
+
+  const showUpdateCard = needRefresh && !isUpdateCollapsed
+  const showInstallCard = !needRefresh && showInstallPrompt
+  const announcement = showUpdateCard
+    ? '发现新版本，可以立即更新'
+    : showInstallCard
+      ? (isIos ? '可以将 La Pluma 添加到主屏幕' : '可以安装 La Pluma')
+      : ''
+  const logoUrl = `${import.meta.env.BASE_URL}logo-graphite.svg?v=1`
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0, y: 50 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 50 }}
-        className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 z-50"
-      >
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-white/10 p-5">
-          <div className="flex items-start space-x-4">
-            <img 
-              src="/logo-graphite.svg?v=1"
-              alt="La Pluma" 
-              className="h-12 w-12 flex-shrink-0"
-            />
-            <div className="flex-1">
-              <h3 className="font-bold text-gray-900 dark:text-white mb-1">
-                安装 La Pluma
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                安装到主屏幕，获得更好的使用体验
-              </p>
-              <div className="flex space-x-2">
-                <button
-                  onClick={handleInstall}
-                  className="flex-1 px-4 py-2 brand-action text-white rounded-xl text-sm font-semibold transition-all"
-                >
-                  安装
-                </button>
-                <button
-                  onClick={handleDismiss}
-                  className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm font-medium transition-colors"
-                >
-                  稍后
-                </button>
+    <>
+      <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </span>
+
+      <AnimatePresence>
+        {(showUpdateCard || showInstallCard) && (
+          <motion.section
+            key={showUpdateCard ? 'update' : 'install'}
+            role="region"
+            aria-labelledby="pwa-prompt-title"
+            initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
+            transition={{ duration: shouldReduceMotion ? 0.08 : 0.18, ease: 'easeOut' }}
+            className="pwa-install-prompt surface-panel fixed z-[60] rounded-xl p-4 shadow-xl sm:w-96"
+          >
+            <div className="flex items-start gap-3">
+              <img
+                src={logoUrl}
+                alt=""
+                aria-hidden="true"
+                className="h-11 w-11 shrink-0"
+              />
+              <div className="min-w-0 flex-1">
+                <h2 id="pwa-prompt-title" className="text-base font-semibold text-primary">
+                  {showUpdateCard ? '发现新版本' : '安装 La Pluma'}
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-secondary">
+                  {showUpdateCard
+                    ? '刷新页面后即可使用最新版本。'
+                    : isIos
+                      ? '添加到主屏幕后，可以像普通应用一样打开。'
+                      : '安装到设备后，可以从桌面快速打开。'}
+                </p>
+
+                {showInstallCard && isIos && (
+                  <ol className="surface-soft mt-3 space-y-2 rounded-lg p-3 text-xs leading-5 text-secondary">
+                    <li className="flex items-center gap-2">
+                      <Share2 className="h-4 w-4 shrink-0 brand-text" aria-hidden="true" />
+                      在 Safari 工具栏中点击“分享”
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <SquarePlus className="h-4 w-4 shrink-0 brand-text" aria-hidden="true" />
+                      选择“添加到主屏幕”
+                    </li>
+                  </ol>
+                )}
+
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    loading={showUpdateCard && isUpdating}
+                    loadingText="更新中..."
+                    icon={showUpdateCard
+                      ? <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                      : <Download className="h-4 w-4" aria-hidden="true" />}
+                    onClick={showUpdateCard ? handleUpdate : handleInstall}
+                    disabled={showInstallCard && isIos}
+                    className={showInstallCard && isIos ? 'hidden' : ''}
+                  >
+                    {showUpdateCard ? '立即更新' : '安装'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={showUpdateCard
+                      ? () => setIsUpdateCollapsed(true)
+                      : handleInstallDismiss}
+                    className={showInstallCard && isIos ? 'col-span-2' : ''}
+                  >
+                    稍后
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      </motion.div>
-    </AnimatePresence>
+          </motion.section>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {needRefresh && isUpdateCollapsed && (
+          <motion.div
+            initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="pwa-update-chip fixed z-[60]"
+          >
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<RefreshCw className="h-4 w-4 brand-text" aria-hidden="true" />}
+              onClick={() => setIsUpdateCollapsed(false)}
+            >
+              应用更新
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   )
 }

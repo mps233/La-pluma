@@ -217,10 +217,11 @@ async function requestWebrtcAuthToken() {
   return data.token
 }
 
-export async function getWebrtcAuthToken() {
+export async function getWebrtcAuthToken({ throwOnError = false } = {}) {
   try {
     return await requestWebrtcAuthToken()
-  } catch {
+  } catch (error) {
+    if (throwOnError) throw error
     return ''
   }
 }
@@ -406,7 +407,8 @@ export async function getWebrtcStatus(address = DEFAULT_DEVICE_ADDRESS, adbPath 
     port: WEBRTC_PORT,
     url: `http://127.0.0.1:${WEBRTC_PORT}`,
     lanUrl: `http://${lanIp}:${WEBRTC_PORT}`,
-    signalingUrl: `ws://${lanIp}:${WEBRTC_PORT}`,
+    signalingUrl: '/webrtc-signaling',
+    directSignalingUrl: `ws://${lanIp}:${WEBRTC_PORT}`,
     turnRunning: !!webrtcTurnProcess && !webrtcTurnProcess.killed,
     iceServers: await getIceServersConfig(),
     serverRunning: (!!webrtcServerProcess && !webrtcServerProcess.killed) || serverReachable,

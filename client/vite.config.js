@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
@@ -8,8 +8,32 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+export const normalizeBasePath = (value = '/') => {
+  const trimmed = value.trim()
+  if (!trimmed || trimmed === '/') return '/'
+
+  const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+  return `${withLeadingSlash.replace(/\/+$/, '')}/`
+}
+
+export const createNavigateFallbackDenylist = (basePath) => {
+  const denylist = [
+    /^\/api(?:[/?]|$)/,
+    /^\/health(?:[/?]|$)/,
+    /^\/webrtc-signaling(?:[/?]|$)/,
+  ]
+
+  if (basePath !== '/') {
+    const escapedBasePath = basePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    denylist.push(new RegExp(`^${escapedBasePath}(?:api|health|webrtc-signaling)(?:[/?]|$)`))
+  }
+
+  return denylist
+}
+
 // https://vite.dev/config/
-export default defineConfig({
+export const createViteConfig = (basePath) => ({
+  base: basePath,
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -24,7 +48,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       devOptions: {
         enabled: false // 开发模式下禁用 Service Worker
       },
@@ -33,12 +57,12 @@ export default defineConfig({
         name: 'La Pluma - MAA WebUI',
         short_name: 'La Pluma',
         description: 'MAA CLI 的现代化 Web 界面',
-        theme_color: '#000000',
-        background_color: '#000000',
+        lang: 'zh-CN',
+        theme_color: '#05090c',
+        background_color: '#05090c',
         display: 'standalone',
-        orientation: 'portrait',
-        scope: '/',
-        start_url: '/',
+        scope: basePath,
+        start_url: basePath,
         icons: [
           {
             src: 'pwa-graphite-192x192.png',
@@ -51,15 +75,16 @@ export default defineConfig({
             type: 'image/png'
           },
           {
-            src: 'pwa-graphite-512x512.png',
+            src: 'pwa-maskable-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'maskable'
           }
         ]
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        navigateFallbackDenylist: createNavigateFallbackDenylist(basePath),
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -87,7 +112,17 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
+      },
+      '/webrtc-signaling': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        ws: true,
       }
     }
   }
+})
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, __dirname)
+  return createViteConfig(normalizeBasePath(env.VITE_BASE_PATH))
 })

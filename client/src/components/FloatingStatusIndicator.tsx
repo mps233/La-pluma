@@ -3,6 +3,7 @@ import { API_BASE_URL, fetchWithAuth, parseJsonResponse } from '../services/api'
 import { useStatusStore } from '../store/statusStore'
 import { detectStatusMessageType, getStatusVisualConfig } from '../utils/statusMessage'
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 
 interface OperatorQuote {
   operator: string
@@ -36,7 +37,8 @@ const getFallbackReadyQuote = () =>
  * 其他状态在原位置可见时显示在原位置，不可见时悬浮到右上角
  */
 export default function FloatingStatusIndicator({ className = '', textClassName = '' }: FloatingStatusIndicatorProps) {
-  const { message, messageType, isActive } = useStatusStore()
+  const { message, messageType, isActive, backendStatus, backendMessage } = useStatusStore()
+  const isOnline = useOnlineStatus()
   const shouldReduceMotion = useReducedMotion()
   const [shouldFloat, setShouldFloat] = useState(false)
   const [dailyQuote, setDailyQuote] = useState<OperatorQuote>(() => getFallbackReadyQuote())
@@ -67,8 +69,16 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
   }, [])
 
   // 显示文本：有消息显示消息，运行中显示运行态，否则显示干员台词
-  const displayText = message || (isActive ? '任务执行中' : `${dailyQuote.operator}：${dailyQuote.quote}`)
-  const isReady = !message && !isActive
+  const isBackendChecking = isOnline && (backendStatus === 'unknown' || backendStatus === 'checking')
+  const connectionMessage = !isOnline
+    ? '网络连接已断开，页面控制暂不可用'
+    : isBackendChecking
+      ? '正在检查后端服务'
+      : backendStatus === 'unavailable'
+        ? (backendMessage || '无法连接后端服务，请确认服务已启动')
+        : ''
+  const displayText = connectionMessage || message || (isActive ? '任务执行中' : `${dailyQuote.operator}：${dailyQuote.quote}`)
+  const isReady = !connectionMessage && !message && !isActive
 
   // 检测哨兵位置
   const checkPosition = useCallback(() => {
@@ -99,7 +109,11 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
     }
   }, [checkPosition])
 
-  const detectedType = messageType ?? (message ? detectStatusMessageType(message) : (isActive ? 'info' : 'default'))
+  const detectedType = isBackendChecking
+    ? 'info'
+    : connectionMessage
+      ? (isOnline ? 'error' : 'warning')
+      : messageType ?? (message ? detectStatusMessageType(message) : (isActive ? 'info' : 'default'))
   const config = getStatusVisualConfig(detectedType)
 
   // 使用 key 强制重新渲染以触发动画
@@ -184,7 +198,7 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
             animate={{ opacity: 1, y: 0, x: 0 }}
             exit={{ opacity: 0, y: -20, x: 20 }}
             transition={{ duration: shouldReduceMotion ? 0 : 0.2 }}
-            className="fixed top-[4.5rem] sm:top-[5rem] right-4 z-40 max-w-[calc(100vw-2rem)]"
+            className="floating-status-overlay fixed z-40 max-w-[calc(100vw-2rem)]"
           >
             {indicatorContent}
           </motion.div>

@@ -6,10 +6,12 @@ describe('statusStore', () => {
     vi.useFakeTimers()
     useStatusStore.getState().clearMessage()
     useStatusStore.getState().setActive(false)
+    useStatusStore.getState().setBackendStatus('unknown')
   })
 
   afterEach(() => {
     useStatusStore.getState().clearMessage()
+    useStatusStore.getState().setBackendStatus('unknown')
     vi.useRealTimers()
   })
 
@@ -50,5 +52,19 @@ describe('statusStore', () => {
     vi.advanceTimersByTime(500)
 
     expect(useStatusStore.getState().message).toBe('')
+  })
+
+  it('keeps backend availability separate from temporary messages', () => {
+    useStatusStore.getState().setBackendStatus('unavailable', '无法连接后端服务')
+    useStatusStore.getState().setMessage('正在刷新', 'info')
+
+    vi.advanceTimersByTime(20000)
+
+    expect(useStatusStore.getState().message).toBe('')
+    expect(useStatusStore.getState().backendStatus).toBe('unavailable')
+    expect(useStatusStore.getState().backendMessage).toBe('无法连接后端服务')
+
+    useStatusStore.getState().setBackendStatus('available')
+    expect(useStatusStore.getState().backendMessage).toBe('')
   })
 })

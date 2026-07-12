@@ -445,7 +445,7 @@ export const AGENT_OPERATIONS = Object.freeze([
     id: 'webrtc_status',
     method: 'GET',
     path: '/api/agent/webrtc/status',
-    description: 'Return lightweight WebRTC endpoint hints for the browser preview.',
+    description: 'Return lightweight WebRTC endpoint hints, including the same-origin browser signaling path.',
     tags: ['Preview'],
     query_schema: {
       type: 'object',
@@ -467,7 +467,7 @@ export const AGENT_OPERATIONS = Object.freeze([
     id: 'webrtc_start',
     method: 'POST',
     path: '/api/agent/webrtc/start',
-    description: 'Start signaling/TURN and MuMu agent, then return signaling URL, ICE servers, and device id.',
+    description: 'Start signaling/TURN and MuMu agent, then return the same-origin signaling path, ICE servers, and device id.',
     tags: ['Preview'],
     safety: lowRiskWrite(['start_local_webrtc_services'], { mutatesDevice: true }),
     execution: execution({ mode: 'long-running' }),

@@ -60,6 +60,7 @@ import {
 } from '../utils/apiHelper.js';
 import { createLogger } from '../utils/logger.js'
 import { resolveConnectionInput } from '../services/connectionService.js'
+import { WEBRTC_SIGNALING_PATH } from '../services/webrtcSignalingGateway.js'
 import { API_VERSION, buildAgentManifest, buildOpenApiSpec } from './agentContract.js';
 import {
   getWebrtcStatus,
@@ -86,6 +87,15 @@ const DEFAULT_ADB_ADDRESS = process.env.ADB_ADDRESS || '127.0.0.1:16384';
 const DEFAULT_CLIENT_TYPE = process.env.MAA_CLIENT_TYPE || 'Official';
 const ACTIVE_RUN_STATES = new Set(['accepted', 'running', 'stopping']);
 const TERMINAL_RUN_STATES = new Set(['succeeded', 'failed', 'stopped', 'interrupted']);
+
+export function buildWebrtcBrowserProtocol(deviceId) {
+  return {
+    websocket: `${WEBRTC_SIGNALING_PATH}/connect_client?token=`,
+    connectMessage: { message_type: 'connect', device_id: deviceId },
+    requestOfferPayload: { type: 'request-offer', ip_preference: 'ipv4' },
+    candidatePolicy: 'relay preferred / ipv4'
+  };
+}
 
 function getIdempotencyKey(req) {
   return req.get?.('Idempotency-Key')
@@ -1199,12 +1209,7 @@ router.post('/webrtc/start', asyncHandler(async (req, res) => {
     deviceId,
     address,
     profileId,
-    protocol: {
-      websocket: `${summary.url.replace(/^http/, 'ws')}/connect_client?token=`,
-      connectMessage: { message_type: 'connect', device_id: deviceId },
-      requestOfferPayload: { type: 'request-offer', ip_preference: 'ipv4' },
-      candidatePolicy: 'relay preferred / ipv4'
-    }
+    protocol: buildWebrtcBrowserProtocol(deviceId)
   });
 }));
 

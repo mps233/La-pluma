@@ -25,7 +25,7 @@
 - 🤖 **Bot 远程控制** - 通过 Telegram Bot 远程执行任务
 - 🤖 **Agent API** - 通过 `/api/agent` 暴露 manifest/status/actions，方便 AI 或脚本调用
 - 🎨 **现代化 UI** - Tailwind CSS + Framer Motion，支持深色模式
-- 📲 **PWA 支持** - 可安装为独立应用，支持离线使用
+- 📲 **PWA 支持** - 在 HTTPS 或 localhost 下可安装，离线可打开已缓存界面
 - 🔄 **实时更新** - WebSocket 实时推送任务状态和日志
 
 ## 📸 界面预览
@@ -147,12 +147,12 @@ curl -X POST http://localhost:3000/api/agent/actions/run-task \
   -d '{"command":"run","args":["agent-award"],"taskConfig":{"name":"领取奖励","type":"Award","params":{"award":true}},"waitForCompletion":true}'
 ```
 
-如果设置了 `LA_PLUMA_TOKEN`，Agent API 和其它 `/api/*` 一样需要 `Authorization: Bearer <token>` 或 `X-La-Pluma-Token`。未设置时认证关闭。
+如果设置了 `LA_PLUMA_TOKEN`，Agent API、其它 `/api/*` 以及 WebRTC 同源网关的票据入口都需要 `Authorization: Bearer <token>` 或 `X-La-Pluma-Token`。未设置时认证关闭。
 
 ## 📋 前置要求
 
 - **操作系统**: macOS / Linux
-- **Node.js** 18+
+- **Node.js** 22.12+
 - **MAA CLI** 已安装
   - macOS: `brew install MaaAssistantArknights/tap/maa-cli`
   - Linux: 参考 [MAA CLI 文档](https://maa.plus/docs/manual/cli/)
@@ -234,15 +234,70 @@ docker run -d \
 | 变量 | 说明 | 默认值 |
 | --- | --- | --- |
 | `PORT` | 后端监听端口 | `3000` |
+| `LA_PLUMA_BASE_PATH` | 生产环境前端挂载路径，需与构建时 `VITE_BASE_PATH` 一致 | `/` |
 | `ADB_PATH` | ADB 可执行文件路径 | `/opt/homebrew/bin/adb` |
 | `ADB_ADDRESS` | 默认 ADB 设备地址 | `127.0.0.1:16384` |
 | `MAA_CLI_PATH` | `maa` CLI 可执行文件路径 | 本地为 `maa`，Docker 为 `/usr/local/bin/maa` |
 | `MAA_CLIENT_TYPE` | 默认客户端类型 | `Official` |
-| `LA_PLUMA_TOKEN` | 设置后 `/api/*` 需要 `Authorization: Bearer <token>` 或 `X-La-Pluma-Token` | 空，不启用 |
+| `LA_PLUMA_TOKEN` | 设置后 `/api/*` 与 WebRTC 票据入口需要 Bearer Token 或 `X-La-Pluma-Token` | 空，不启用 |
 | `LA_PLUMA_AGENT_RUN_STORE` | Agent Run 与幂等记录的持久化文件 | `server/data/agent-runs.json` |
 | `LA_PLUMA_MAX_REALTIME_LOGS` | 实时日志内存缓存最大行数 | `5000` |
 | `LA_PLUMA_WEBRTC_DIR` | ScrcpyOverWebRTC 工作目录 | `$HOME/ScrcpyOverWebRTC` |
 | `LA_PLUMA_WEBRTC_PORT` | ScrcpyOverWebRTC 本地端口 | `8443` |
+| `LA_PLUMA_HTTPS_CERT_PATH` | 可选 HTTPS 证书链路径，必须与私钥同时配置 | 空，使用 HTTP |
+| `LA_PLUMA_HTTPS_KEY_PATH` | 可选 HTTPS 私钥路径，必须与证书同时配置 | 空，使用 HTTP |
+
+#### PWA、HTTPS 与实时预览
+
+PWA 的 Service Worker 只会在 HTTPS 或浏览器认可的本机 `localhost` 安全上下文中启用。生产构建在电脑本机通过 `http://localhost:*` 打开时可以安装；手机通过 `http://192.168.x.x:*` 访问时不能安装，也不会获得离线界面缓存。Vite 开发模式默认不注册 Service Worker。
+
+La Pluma 可以直接使用可信证书启动 HTTPS：
+
+```bash
+npm run build --prefix client
+
+NODE_ENV=production \
+LA_PLUMA_HTTPS_CERT_PATH=/path/to/fullchain.pem \
+LA_PLUMA_HTTPS_KEY_PATH=/path/to/privkey.pem \
+npm run start --prefix server
+```
+
+Docker 部署时把证书只读挂载到容器，并同时设置这两个变量：
+
+```bash
+docker run -d \
+  --name la-pluma \
+  -p 3055:3000 \
+  -v /path/to/certs:/app/certs:ro \
+  -v /path/to/data:/app/server/data \
+  -e LA_PLUMA_HTTPS_CERT_PATH=/app/certs/fullchain.pem \
+  -e LA_PLUMA_HTTPS_KEY_PATH=/app/certs/privkey.pem \
+  -e LA_PLUMA_TOKEN=change-me \
+  miaona/la-pluma:latest
+```
+
+证书必须受访问设备信任，并覆盖实际使用的域名或 IP。仅在浏览器中临时忽略自签名证书警告，不能可靠满足 PWA 安装要求。网络访问建议始终配置 `LA_PLUMA_TOKEN`。
+
+HTTPS 下的实时预览使用同源 `/webrtc-signaling` 网关并自动升级为 WSS，不再让浏览器直连不安全的 `ws://`。如果由 Caddy、Nginx 或 NAS 反向代理终止 TLS，需要把 `/api`、`/health` 和 `/webrtc-signaling` 一并转发到 La Pluma，并允许 `/webrtc-signaling` 的 WebSocket Upgrade。
+
+PWA 缓存范围仅包含界面资源。断网时可以打开已缓存页面，但 MAA、ADB、实时预览、状态读取和所有自动化操作仍需要连接 La Pluma 后端；页面会持续显示断连状态并禁用控制台执行入口。
+
+##### 子路径部署
+
+部署到 `/la-pluma/` 等子路径时，需要在构建前设置：
+
+```bash
+VITE_BASE_PATH=/la-pluma/ npm run build --prefix client
+
+NODE_ENV=production \
+LA_PLUMA_BASE_PATH=/la-pluma/ \
+npm run start --prefix server
+
+# Docker 本地构建
+docker build --build-arg VITE_BASE_PATH=/la-pluma/ -t la-pluma:local .
+```
+
+本地运行时要让 `LA_PLUMA_BASE_PATH` 与构建时的 `VITE_BASE_PATH` 保持一致；通过 Docker build arg 构建时，镜像会自动写入对应的运行时挂载路径。反向代理应保留 `/la-pluma/` 前缀转发，同时继续同源转发根路径 `/api`、`/health` 与 `/webrtc-signaling`。路径建议以前导和结尾 `/` 表示，构建与服务端都会自动规范常见写法。
 
 #### 使用 Docker Compose（推荐）
 

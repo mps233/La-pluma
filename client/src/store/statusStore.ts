@@ -22,9 +22,12 @@ export interface StatusState {
   message: string
   messageType: StatusMessageType | null
   isActive: boolean
+  backendStatus: 'unknown' | 'checking' | 'available' | 'unavailable'
+  backendMessage: string
   setMessage: (message: string, type?: StatusMessageType) => number
   clearMessage: (expectedRevision?: number) => void
   setActive: (active: boolean) => void
+  setBackendStatus: (status: StatusState['backendStatus'], message?: string) => void
 }
 
 export const useStatusStore = create<StatusState>((set, get) => {
@@ -43,6 +46,8 @@ export const useStatusStore = create<StatusState>((set, get) => {
     message: '',
     messageType: null,
     isActive: false,
+    backendStatus: 'unknown',
+    backendMessage: '',
     setMessage: (message, type) => {
       // Existing callers clear after their own delay. Ignore those stale clears;
       // the store owns dismissal so a previous operation cannot erase a newer one.
@@ -72,6 +77,9 @@ export const useStatusStore = create<StatusState>((set, get) => {
 
       const { message, messageType } = get()
       if (message && messageType) scheduleDismiss(messageType, messageRevision)
+    },
+    setBackendStatus: (backendStatus, backendMessage = '') => {
+      set({ backendStatus, backendMessage })
     },
   }
 })

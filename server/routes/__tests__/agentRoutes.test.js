@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, it } from 'node:test'
-import router, { executeTrackedAgentAction } from '../agent.js'
+import router, { buildWebrtcBrowserProtocol, executeTrackedAgentAction } from '../agent.js'
 import { API_VERSION } from '../agentContract.js'
 import { getTaskStatus, setTaskStatus } from '../../services/maaService.js'
 import { loggerManager } from '../../utils/logger.js'
@@ -48,6 +48,15 @@ function createResponse() {
 }
 
 describe('Agent discovery routes', () => {
+  it('documents the same-origin browser signaling endpoint', () => {
+    assert.deepEqual(buildWebrtcBrowserProtocol('preview-device'), {
+      websocket: '/webrtc-signaling/connect_client?token=',
+      connectMessage: { message_type: 'connect', device_id: 'preview-device' },
+      requestOfferPayload: { type: 'request-offer', ip_preference: 'ipv4' },
+      candidatePolicy: 'relay preferred / ipv4'
+    })
+  })
+
   it('serves the generated manifest through the public route', async () => {
     const res = createResponse()
     await findHandler('get', '/manifest')({ headers: { 'x-request-id': 'manifest-test' } }, res)

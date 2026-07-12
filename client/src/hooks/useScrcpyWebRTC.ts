@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { fetchWithAuth } from '../services/api'
 
 export type WebRTCStatus = 'idle' | 'connecting' | 'signaling' | 'waiting_offer' | 'connecting_webrtc' | 'connected' | 'disconnected' | 'error'
 
@@ -44,26 +45,77 @@ export interface VideoStats {
   inputReady: boolean
 }
 
-function signalingHttpBase(url: string) {
-  return url.replace(/^ws/, 'http').replace(/\/$/, '')
-}
-
 const SIGNALING_TOKEN_KEY = 'scrcpy_webrtc_auth_token'
+const DEFAULT_SIGNALING_PATH = '/webrtc-signaling'
 const SIGNALING_RETRY_DELAYS_MS = [300, 800]
 const SIGNALING_ATTEMPT_TIMEOUT_MS = 4000
 
-async function getSignalingToken(signalingUrl: string, signal: AbortSignal) {
+interface SignalingEndpoints {
+  httpBase: string
+  websocketBase: string
+}
+
+function endpointBase(url: URL) {
+  const pathname = url.pathname.replace(/\/+$/, '')
+  return `${url.origin}${pathname === '/' ? '' : pathname}`
+}
+
+export function resolveSignalingEndpoints(
+  signalingUrl: string,
+  pageUrl = window.location.href
+): SignalingEndpoints {
+  const page = new URL(pageUrl)
+  const fallback = new URL(DEFAULT_SIGNALING_PATH, page)
+  let endpoint: URL
+  try {
+    endpoint = new URL(signalingUrl || DEFAULT_SIGNALING_PATH, page)
+  } catch {
+    endpoint = fallback
+  }
+
+  if (!['http:', 'https:', 'ws:', 'wss:'].includes(endpoint.protocol)) endpoint = fallback
+  if (page.protocol === 'https:' && (endpoint.protocol === 'http:' || endpoint.protocol === 'ws:')) {
+    endpoint = fallback
+  }
+  endpoint.search = ''
+  endpoint.hash = ''
+
+  const httpEndpoint = new URL(endpoint)
+  httpEndpoint.protocol = endpoint.protocol === 'wss:' ? 'https:'
+    : endpoint.protocol === 'ws:' ? 'http:'
+      : endpoint.protocol
+  const websocketEndpoint = new URL(endpoint)
+  websocketEndpoint.protocol = endpoint.protocol === 'https:' ? 'wss:'
+    : endpoint.protocol === 'http:' ? 'ws:'
+      : endpoint.protocol
+
+  return {
+    httpBase: endpointBase(httpEndpoint),
+    websocketBase: endpointBase(websocketEndpoint)
+  }
+}
+
+async function getSignalingToken(httpBase: string, signal: AbortSignal) {
   // The signaling server can restart between previews, invalidating its old token.
   window.localStorage.removeItem(SIGNALING_TOKEN_KEY)
+  const loginUrl = `${httpBase}/api/login`
+  const gatewayLoginUrl = new URL(`${DEFAULT_SIGNALING_PATH}/api/login`, window.location.href).toString()
+  const usesSameOriginGateway = new URL(loginUrl).toString() === gatewayLoginUrl
   let response: Response
   try {
-    response = await fetch(`${signalingHttpBase(signalingUrl)}/api/login`, {
-      method: 'POST',
-      cache: 'no-store',
-      signal,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: 'admin', password: 'admin123' })
-    })
+    response = usesSameOriginGateway
+      ? await fetchWithAuth(loginUrl, {
+          method: 'POST',
+          cache: 'no-store',
+          signal
+        })
+      : await fetch(loginUrl, {
+          method: 'POST',
+          cache: 'no-store',
+          signal,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: 'admin', password: 'admin123' })
+        })
   } catch {
     throw new Error('暂时无法连接信令服务')
   }
@@ -74,9 +126,8 @@ async function getSignalingToken(signalingUrl: string, signal: AbortSignal) {
   return data.token as string
 }
 
-function normalizeSignalingUrl(url: string, token: string) {
-  const trimmed = url.replace(/\/$/, '')
-  return `${trimmed}/connect_client?token=${encodeURIComponent(token)}`
+function normalizeSignalingUrl(websocketBase: string, token: string) {
+  return `${websocketBase}/connect_client?token=${encodeURIComponent(token)}`
 }
 
 function candidateHasIpv6(candidate: string) {
@@ -99,7 +150,7 @@ function shouldKeepCandidate(candidate: string, connectionPath: 'auto' | 'relay'
 
 export function useScrcpyWebRTC({
   deviceId = 'mumu-la-pluma',
-  signalingUrl = 'ws://127.0.0.1:8443',
+  signalingUrl = DEFAULT_SIGNALING_PATH,
   videoRef,
   connectionPath = 'relay',
   ipPreference = 'ipv4',
@@ -245,6 +296,7 @@ export function useScrcpyWebRTC({
     const generation = connectionGenerationRef.current
     teardownConnection()
     const targetSignalingUrl = signalingUrlOverride || signalingUrl
+    const signalingEndpoints = resolveSignalingEndpoints(targetSignalingUrl)
     setStatus('connecting')
     setError(null)
 
@@ -300,10 +352,10 @@ export function useScrcpyWebRTC({
       }, SIGNALING_ATTEMPT_TIMEOUT_MS)
       attemptTimeoutRef.current = attemptTimeout
 
-      void getSignalingToken(targetSignalingUrl, authAbortController.signal)
+      void getSignalingToken(signalingEndpoints.httpBase, authAbortController.signal)
         .then(token => {
           if (attemptFinished || connectionGenerationRef.current !== generation) return
-          const ws = new WebSocket(normalizeSignalingUrl(targetSignalingUrl, token))
+          const ws = new WebSocket(normalizeSignalingUrl(signalingEndpoints.websocketBase, token))
           socket = ws
           wsRef.current = ws
           let opened = false

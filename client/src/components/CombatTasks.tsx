@@ -20,6 +20,7 @@ import type {
   ParadoxSearchResult,
   CopilotSetItem
 } from '@/types/components'
+import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
 
 type CopilotSetExecutionMode = 'app' | 'manual' | 'cli'
 type CopilotSetSelections = Record<string, number[]>
@@ -29,6 +30,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
   const shouldReduceMotion = useReducedMotion()
   const [isRunning, setIsRunning] = useState(false)
   const { setMessage: setStatusMessage, setActive: setIsActiveStatus } = useStatusStore()
+  const { isAvailable: automationAvailable, unavailableMessage } = useAutomationAvailability()
   const [taskInputs, setTaskInputs] = useState<CombatTaskInputs>({})
   const [copilotSetInfo, setCopilotSetInfo] = useState<CopilotSetInfo | null>(null)
   const [isLoadingSet, setIsLoadingSet] = useState(false)
@@ -680,6 +682,10 @@ export default function CombatTasks(_props: CombatTasksProps) {
 
   // 执行下一个作业
   const handleStartNextCopilot = async () => {
+    if (!automationAvailable) {
+      setStatusMessage(unavailableMessage, 'error')
+      return
+    }
     if (!copilotSetInfo?.copilots || !currentCopilotTask) return
 
     // 找到下一个选中且未完成的作业
@@ -760,6 +766,11 @@ export default function CombatTasks(_props: CombatTasksProps) {
   }
 
   const handleExecute = async (task: CombatTask) => {
+    if (!automationAvailable) {
+      setStatusMessage(unavailableMessage, 'error')
+      return
+    }
+
     // 验证输入
     const inputValue = taskInputs[task.id] || ''
     if (task.id === 'copilot' || task.id === 'paradoxcopilot' || task.id === 'ssscopilot') {
@@ -1346,7 +1357,8 @@ export default function CombatTasks(_props: CombatTasksProps) {
 
                   <Button
                     onClick={() => handleExecute(task)}
-                    disabled={isRunning}
+                    disabled={!automationAvailable || isRunning}
+                    title={!automationAvailable ? unavailableMessage : undefined}
                     variant="gradient"
                     size="md"
                     icon={
@@ -1628,7 +1640,14 @@ export default function CombatTasks(_props: CombatTasksProps) {
                                 <div className="mt-3 pt-3 border-t border-[var(--app-border)]">
                                   <p className="text-xs brand-text mb-2">请在游戏中进入下一关界面后点击继续</p>
                                   <div className="flex space-x-2">
-                                    <Button onClick={handleStartNextCopilot} variant="gradient" size="md" fullWidth>
+                                    <Button
+                                      onClick={handleStartNextCopilot}
+                                      disabled={!automationAvailable}
+                                      title={!automationAvailable ? unavailableMessage : undefined}
+                                      variant="gradient"
+                                      size="md"
+                                      fullWidth
+                                    >
                                       开始下一关
                                     </Button>
                                     <Button onClick={handleCancelCopilotSet} variant="secondary" size="md">取消</Button>
@@ -1954,7 +1973,8 @@ export default function CombatTasks(_props: CombatTasksProps) {
 
                     <Button
                       onClick={() => handleExecute(task)}
-                      disabled={isRunning}
+                      disabled={!automationAvailable || isRunning}
+                      title={!automationAvailable ? unavailableMessage : undefined}
                       variant="gradient"
                       size="md"
                       icon={

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Activity, Bot, CalendarDays, CheckCircle2, ChevronRight, Cpu, HardDrive, Database, PackageOpen, Play, Target, Thermometer } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Activity, Bot, CalendarDays, CheckCircle2, ChevronRight, Cpu, HardDrive, Database, PackageOpen, Play, ServerOff, Target, Thermometer, WifiOff } from 'lucide-react'
 import { getOpenTodayStages, getSklandPlayerData, getSklandStatus, getTodayDrops, getTrainingQueue, maaApi } from '../services/api'
 import Icons from './Icons'
 import { PageHeader, Card, Button, IconButton } from './common'
@@ -9,6 +9,9 @@ import { useUIStore } from '@/stores'
 import { useDashboardFlowLayout } from '../hooks/useDashboardFlowLayout'
 import DashboardPreviewEntry from './DashboardPreviewEntry'
 import { formatExecutionSummary, getExecutionLastTask } from '../utils/executionSummary'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
+import { useStatusStore } from '../store/statusStore'
+import { probeBackendAvailability } from '../hooks/useBackendStatusMonitor'
 
 interface SklandData {
   uid: string
@@ -205,8 +208,12 @@ const TemperatureSparkline = ({ values }: { values: number[] }) => {
 
 export default function Dashboard() {
   const setActiveTab = useUIStore(state => state.setActiveTab)
+  const { backendStatus, backendMessage } = useStatusStore()
+  const isOnline = useOnlineStatus()
   const openAutomation = useCallback(() => setActiveTab('automation'), [setActiveTab])
   const [loading, setLoading] = useState(true)
+  const initialLoadCompleteRef = useRef(false)
+  const wasOnlineRef = useRef(isOnline)
   const { flowGridRef, flowCardRef, flowPreviewRef, flowGridStyle } = useDashboardFlowLayout(!loading)
   const [sklandData, setSklandData] = useState<SklandData | null>(null)
   const [sklandStatus, setSklandStatus] = useState<{ isLoggedIn: boolean; phone: string | null }>({ 
@@ -231,13 +238,8 @@ export default function Dashboard() {
   } | null>(null)
   const [temperatureHistory, setTemperatureHistory] = useState<number[]>([])
 
-
-  useEffect(() => {
-    loadDashboardData()
-    const interval = setInterval(loadDashboardData, 5 * 60 * 1000)
-    return () => clearInterval(interval)
-  }, [])
-
+  const serviceStatus = isOnline ? backendStatus : 'offline'
+  const automationAvailable = serviceStatus === 'available'
   // 设备状态轮询（CPU/内存）
   useEffect(() => {
     const fetch = () => {
@@ -262,13 +264,21 @@ export default function Dashboard() {
     return () => clearInterval(timer)
   }, [])
 
-  const loadDashboardData = async (forceRefresh: boolean = false) => {
-    // 只在首次加载且没有数据时显示骨架屏
-    if (!sklandData) {
+  const loadDashboardData = useCallback(async (forceRefresh: boolean = false) => {
+    // 后续刷新保留现有内容，只在首次进入时显示整页骨架屏。
+    if (!initialLoadCompleteRef.current) {
       setLoading(true)
     }
+
+    if (!navigator.onLine) {
+      initialLoadCompleteRef.current = true
+      setLoading(false)
+      return
+    }
+
     try {
-      const [statusResult, activityResult, scheduleResult, trainingResult, dropResult, openTodayResult, sklandResult] = await Promise.allSettled([
+      const [backendResult, statusResult, activityResult, scheduleResult, trainingResult, dropResult, openTodayResult, sklandResult] = await Promise.allSettled([
+        probeBackendAvailability({ showChecking: useStatusStore.getState().backendStatus !== 'available' }),
         getSklandStatus(),
         maaApi.getActivity('Official'),
         maaApi.getScheduleExecutionStatus(),
@@ -277,6 +287,8 @@ export default function Dashboard() {
         getOpenTodayStages(),
         getSklandPlayerData(!forceRefresh),
       ])
+
+      const backendAvailable = backendResult.status === 'fulfilled' && backendResult.value
 
       if (statusResult.status === 'fulfilled' && statusResult.value.success && statusResult.value.data) {
         setSklandStatus(statusResult.value.data)
@@ -305,8 +317,6 @@ export default function Dashboard() {
           tip: activity?.tip || activity?.description || undefined,
           completion: activity?.completion,
         })
-      } else {
-        setActivitySummary({ available: false })
       }
 
       if (scheduleResult.status === 'fulfilled' && scheduleResult.value.success) {
@@ -319,8 +329,6 @@ export default function Dashboard() {
           lastTask: execution?.lastTaskName || execution?.lastTask || execution?.completedTask || getExecutionLastTask(rawLastResult),
           lastResult: formatExecutionSummary(rawLastResult),
         })
-      } else {
-        setScheduleSummary({ isRunning: false })
       }
 
       if (trainingResult.status === 'fulfilled' && trainingResult.value.success) {
@@ -332,8 +340,6 @@ export default function Dashboard() {
             .filter(Boolean)
             .slice(0, 3),
         })
-      } else {
-        setTrainingSummary({ count: 0, topNames: [] })
       }
 
       if (dropResult.status === 'fulfilled' && dropResult.value.success) {
@@ -360,8 +366,6 @@ export default function Dashboard() {
                 : record?.itemName || '已记录作战，暂无材料明细',
           })),
         })
-      } else {
-        setDropSummary({ count: 0, recent: [] })
       }
 
       if (openTodayResult.status === 'fulfilled' && openTodayResult.value.success && openTodayResult.value.data) {
@@ -369,17 +373,31 @@ export default function Dashboard() {
           open: Array.isArray(openTodayResult.value.data.open) ? openTodayResult.value.data.open : [],
           closed: Array.isArray(openTodayResult.value.data.closed) ? openTodayResult.value.data.closed : [],
         })
-      } else {
-        setOpenStageSummary({ open: [], closed: [] })
       }
 
-      setLastUpdate(new Date())
+      if (backendAvailable) {
+        setLastUpdate(new Date())
+      }
     } catch (error) {
       console.error('加载 Dashboard 数据失败:', error)
     } finally {
+      initialLoadCompleteRef.current = true
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    void loadDashboardData()
+    const interval = setInterval(loadDashboardData, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [loadDashboardData])
+
+  useEffect(() => {
+    if (isOnline && !wasOnlineRef.current) {
+      void loadDashboardData(true)
+    }
+    wasOnlineRef.current = isOnline
+  }, [isOnline, loadDashboardData])
 
 
 
@@ -424,6 +442,10 @@ export default function Dashboard() {
   }
 
   const runTodayFlow = async () => {
+    if (!automationAvailable) {
+      setQuickStartMessage(serviceStatus === 'offline' ? '当前网络已断开，恢复连接后再试。' : '后端服务暂不可用，请重试连接。')
+      return
+    }
     setQuickStartLoading(true)
     setQuickStartMessage('')
     try {
@@ -450,6 +472,10 @@ export default function Dashboard() {
   }
 
   const runCurrentActivity = async () => {
+    if (!automationAvailable) {
+      setQuickStartMessage(serviceStatus === 'offline' ? '当前网络已断开，恢复连接后再试。' : '后端服务暂不可用，请重试连接。')
+      return
+    }
     setActivityPreflightLoading(true)
     setQuickStartMessage('')
     try {
@@ -474,12 +500,33 @@ export default function Dashboard() {
   }
 
   const flowIsRunning = scheduleSummary.isRunning
-  const flowCommandTitle = flowIsRunning
-    ? (scheduleSummary.currentTask || '流程执行中')
-    : '准备就绪'
-  const flowCommandDescription = flowIsRunning
-    ? (scheduleSummary.message || '自动化任务正在按计划推进')
-    : (scheduleSummary.message || '设备待命，可以开始今天的自动化任务')
+  const connectionTitle = serviceStatus === 'offline'
+    ? '当前网络离线'
+    : serviceStatus === 'unavailable'
+      ? '后端服务不可用'
+      : '正在检查服务'
+  const connectionDescription = serviceStatus === 'offline'
+    ? '恢复网络连接后会自动重新检查服务'
+    : serviceStatus === 'unavailable'
+      ? (backendMessage || '确认 La Pluma 服务已启动后重试')
+      : '正在确认自动化服务状态'
+  const flowCommandTitle = !automationAvailable
+    ? connectionTitle
+    : flowIsRunning
+      ? (scheduleSummary.currentTask || '流程执行中')
+      : '准备就绪'
+  const flowCommandDescription = !automationAvailable
+    ? connectionDescription
+    : flowIsRunning
+      ? (scheduleSummary.message || '自动化任务正在按计划推进')
+      : (scheduleSummary.message || '设备待命，可以开始今天的自动化任务')
+  const flowStatusLabel = serviceStatus === 'offline'
+    ? '网络离线'
+    : serviceStatus === 'unavailable'
+      ? '服务不可用'
+      : serviceStatus === 'checking' || serviceStatus === 'unknown'
+        ? '检查中'
+        : flowIsRunning ? '执行中' : '待命'
   const activityCompleted = activitySummary.completion?.complete === true
 
   return (
@@ -514,6 +561,31 @@ export default function Dashboard() {
           }
         />
 
+        {(serviceStatus === 'offline' || serviceStatus === 'unavailable') && (
+          <div
+            className={`app-info-card flex min-w-0 flex-wrap items-center gap-3 ${serviceStatus === 'offline' ? 'status-warning' : 'status-danger'}`}
+            role="alert"
+          >
+            {serviceStatus === 'offline'
+              ? <WifiOff className="h-5 w-5 shrink-0" aria-hidden="true" />
+              : <ServerOff className="h-5 w-5 shrink-0" aria-hidden="true" />}
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold">{connectionTitle}</div>
+              <div className="mt-0.5 text-xs opacity-80">{connectionDescription}</div>
+            </div>
+            {serviceStatus === 'unavailable' && (
+              <Button
+                onClick={() => loadDashboardData(true)}
+                variant="secondary"
+                size="sm"
+                icon={<Icons.RefreshCw />}
+              >
+                重试连接
+              </Button>
+            )}
+          </div>
+        )}
+
         <div
           ref={flowGridRef}
           className="dashboard-flow-layout"
@@ -533,9 +605,9 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
-                  <div className={`dashboard-flow-status ${flowIsRunning ? 'is-running' : ''}`}>
+                  <div className={`dashboard-flow-status ${automationAvailable && flowIsRunning ? 'is-running' : ''} ${serviceStatus === 'offline' ? 'status-warning' : serviceStatus === 'unavailable' ? 'status-danger' : ''}`}>
                     <span className="dashboard-flow-status-dot" />
-                    {flowIsRunning ? '执行中' : '待命'}
+                    {flowStatusLabel}
                   </div>
                   <span className={`text-[11px] ${labelClass}`}>
                     {lastUpdate ? lastUpdate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '--:--'} 更新
@@ -545,13 +617,17 @@ export default function Dashboard() {
 
               <div className="dashboard-flow-command">
                 <div className="flex min-w-0 items-center gap-3.5">
-                  <div className={`dashboard-flow-command-icon ${flowIsRunning ? 'is-running' : ''}`}>
-                    {flowIsRunning
-                      ? <Activity className="h-5 w-5" strokeWidth={1.8} />
-                      : <Play className="ml-0.5 h-5 w-5" strokeWidth={1.9} />}
+                  <div className={`dashboard-flow-command-icon ${automationAvailable && flowIsRunning ? 'is-running' : ''}`}>
+                    {serviceStatus === 'offline'
+                      ? <WifiOff className="h-5 w-5" strokeWidth={1.8} />
+                      : serviceStatus === 'unavailable'
+                        ? <ServerOff className="h-5 w-5" strokeWidth={1.8} />
+                        : flowIsRunning
+                          ? <Activity className="h-5 w-5" strokeWidth={1.8} />
+                          : <Play className="ml-0.5 h-5 w-5" strokeWidth={1.9} />}
                   </div>
                   <div className="min-w-0">
-                    <div className={`text-xs font-medium ${labelClass}`}>{flowIsRunning ? '当前任务' : '运行状态'}</div>
+                    <div className={`text-xs font-medium ${labelClass}`}>{automationAvailable && flowIsRunning ? '当前任务' : '运行状态'}</div>
                     <div className="mt-0.5 truncate text-xl font-bold text-primary">{flowCommandTitle}</div>
                     <div className={`mt-1 truncate text-xs ${labelClass}`}>{flowCommandDescription}</div>
                   </div>
@@ -561,7 +637,7 @@ export default function Dashboard() {
                     <Button
                       onClick={runCurrentActivity}
                       variant="secondary"
-                      disabled={quickStartLoading || activityPreflightLoading || flowIsRunning}
+                      disabled={quickStartLoading || activityPreflightLoading || flowIsRunning || !automationAvailable}
                       loading={activityPreflightLoading}
                       loadingText="执行中"
                       statusKey={activityPreflightLoading ? 'running' : 'ready'}
@@ -583,7 +659,7 @@ export default function Dashboard() {
                   <Button
                     onClick={runTodayFlow}
                     variant="gradient"
-                    disabled={quickStartLoading || activityPreflightLoading || flowIsRunning}
+                    disabled={quickStartLoading || activityPreflightLoading || flowIsRunning || !automationAvailable}
                     loading={quickStartLoading}
                     loadingText="启动中"
                     statusKey={quickStartLoading ? 'starting' : flowIsRunning ? 'running' : 'ready'}
@@ -755,8 +831,8 @@ export default function Dashboard() {
                   <span className={`dashboard-summary-dot ${scheduleSummary.isRunning ? 'is-active' : ''}`} />
                   当前执行
                 </div>
-                <div className="dashboard-summary-value">{scheduleSummary.isRunning ? '执行中' : '空闲中'}</div>
-                <div className="dashboard-summary-detail">{scheduleSummary.currentTask || scheduleSummary.message || '暂无进行中的流程'}</div>
+                <div className="dashboard-summary-value">{automationAvailable ? (scheduleSummary.isRunning ? '执行中' : '空闲中') : '状态不可用'}</div>
+                <div className="dashboard-summary-detail">{automationAvailable ? (scheduleSummary.currentTask || scheduleSummary.message || '暂无进行中的流程') : connectionDescription}</div>
               </div>
               <div className="dashboard-status-block">
                 <div className="dashboard-summary-label">
@@ -950,7 +1026,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="text-center py-6">
-              <div className="text-sm font-semibold text-primary">自动化服务已就绪</div>
+              <div className="text-sm font-semibold text-primary">森空岛暂未登录</div>
               <div className={`mt-1 text-xs ${labelClass}`}>森空岛登录只影响看板数据，不影响作业。</div>
               <div className="mt-4 flex justify-center gap-2">
                 <Button onClick={openSklandConfig} variant="ghost" size="sm">登录森空岛</Button>

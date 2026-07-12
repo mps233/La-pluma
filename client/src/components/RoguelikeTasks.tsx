@@ -14,6 +14,7 @@ import type {
   RoguelikeTaskInputs,
   RoguelikeAdvancedParams
 } from '@/types/components'
+import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
 
 type RoguelikeMode = 'roguelike' | 'reclamation'
 
@@ -33,6 +34,7 @@ const THEME_PRESETS: Record<RoguelikeMode, Array<{ value: string; label: string 
 export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
   const [isRunning, setIsRunning] = useState(false)
   const { setMessage: setStatusMessage } = useStatusStore()
+  const { isAvailable: automationAvailable, unavailableMessage } = useAutomationAvailability()
   const [taskInputs, setTaskInputs] = useState<RoguelikeTaskInputs>({})
   const [advancedParams, setAdvancedParams] = useState<RoguelikeAdvancedParams>({})
   const [configLoaded, setConfigLoaded] = useState(false)
@@ -216,6 +218,11 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
   }
 
   const handleExecute = async (task: RoguelikeTask) => {
+    if (!automationAvailable) {
+      setStatusMessage(unavailableMessage, 'error')
+      return
+    }
+
     // 验证输入
     const inputValue = taskInputs[task.id] || ''
     if (task.id === 'roguelike' || task.id === 'reclamation') {
@@ -396,7 +403,8 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
           </div>
           <Button
             onClick={() => handleExecute(activeTask)}
-            disabled={isRunning}
+            disabled={!automationAvailable || isRunning}
+            title={!automationAvailable ? unavailableMessage : undefined}
             loading={isRunning}
             variant="primary"
             size="md"

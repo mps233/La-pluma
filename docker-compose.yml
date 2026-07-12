@@ -16,15 +16,22 @@ services:
       - /vol1/1000/la-pluma/config:/root/.config/maa
       # 持久化 MAA 数据目录（MaaCore、资源文件等）
       - /vol1/1000/la-pluma/maacore:/root/.local/share/maa
+      # 可选：HTTPS 证书目录，只读挂载
+      # - /path/to/certs:/app/certs:ro
     environment:
       - NODE_ENV=production
       - PORT=3000  # 容器内监听 3000 端口
+      # 自定义镜像若使用 VITE_BASE_PATH 构建，运行路径会自动匹配；手动覆盖时两者需一致
+      # - LA_PLUMA_BASE_PATH=/la-pluma/
       # ADB 设备地址（bridge 模式下使用宿主机 IP）
       - ADB_ADDRESS=192.168.50.103:16384
-      # 可选：设置后所有 /api/* 请求需要携带 Bearer Token 或 X-La-Pluma-Token
+      # 可选：保护 /api/* 与 WebRTC 同源网关票据入口
       # - LA_PLUMA_TOKEN=change-me
       # 可选：实时日志内存缓存上限，默认 5000 行
       # - LA_PLUMA_MAX_REALTIME_LOGS=5000
+      # 可选：手机安装 PWA 时使用可信 HTTPS，证书与私钥必须同时配置
+      # - LA_PLUMA_HTTPS_CERT_PATH=/app/certs/fullchain.pem
+      # - LA_PLUMA_HTTPS_KEY_PATH=/app/certs/privkey.pem
     
     # 使用 bridge 网络模式
     ports:
@@ -32,7 +39,7 @@ services:
     
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD-SHELL", "scheme=http; if [ -n \"$$LA_PLUMA_HTTPS_CERT_PATH\" ]; then scheme=https; fi; curl -fk \"$$scheme://localhost:$${PORT:-3000}/health\""]
       interval: 60s
       timeout: 10s
       retries: 3

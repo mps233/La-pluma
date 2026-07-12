@@ -6,7 +6,10 @@
 # ============================================
 # 阶段 1: 构建前端
 # ============================================
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
+
+ARG VITE_BASE_PATH=/
+ENV VITE_BASE_PATH=${VITE_BASE_PATH}
 
 WORKDIR /app/client
 
@@ -26,7 +29,9 @@ RUN npm run build
 # ============================================
 # 阶段 2: 后端运行环境 + MAA CLI
 # ============================================
-FROM node:20-slim
+FROM node:22-slim
+
+ARG VITE_BASE_PATH=/
 
 WORKDIR /app
 
@@ -83,12 +88,13 @@ EXPOSE 3000
 # 设置环境变量
 ENV NODE_ENV=production \
     PORT=3000 \
+    LA_PLUMA_BASE_PATH=${VITE_BASE_PATH} \
     MAA_CONFIG_DIR=/root/.config/maa \
     DOCKER_ENV=true
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:3000/health || exit 1
+    CMD scheme=http; if [ -n "$LA_PLUMA_HTTPS_CERT_PATH" ]; then scheme=https; fi; curl -fk "$scheme://localhost:${PORT:-3000}/health" || exit 1
 
 # 启动服务器
 WORKDIR /app/server

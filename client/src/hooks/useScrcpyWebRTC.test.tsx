@@ -3,7 +3,7 @@
 import { act, useEffect, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useScrcpyWebRTC } from './useScrcpyWebRTC'
+import { resolveSignalingEndpoints, useScrcpyWebRTC } from './useScrcpyWebRTC'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -100,11 +100,27 @@ describe('useScrcpyWebRTC startup', () => {
 
     expect(fetch).toHaveBeenCalledWith('http://fresh-host:8443/api/login', expect.objectContaining({
       method: 'POST',
-      cache: 'no-store'
+      cache: 'no-store',
+      body: JSON.stringify({ username: 'admin', password: 'admin123' })
     }))
+    const directHeaders = new Headers(vi.mocked(fetch).mock.calls[0]?.[1]?.headers)
+    expect(directHeaders.has('Authorization')).toBe(false)
     expect(MockWebSocket.instances).toHaveLength(1)
     expect(MockWebSocket.instances[0]!.url).toBe('ws://fresh-host:8443/connect_client?token=fresh-token')
     expect(window.localStorage.getItem('scrcpy_webrtc_auth_token')).toBe('fresh-token')
+  })
+
+  it('uses an authenticated same-origin ticket request when API auth is configured', async () => {
+    window.localStorage.setItem('laPlumaToken', 'la-pluma-secret')
+
+    act(() => hook!.connect('/webrtc-signaling'))
+    await flushAsyncWork()
+
+    const [url, init] = vi.mocked(fetch).mock.calls[0]!
+    const headers = new Headers(init?.headers)
+    expect(url).toBe('http://localhost:3000/webrtc-signaling/api/login')
+    expect(headers.get('Authorization')).toBe('Bearer la-pluma-secret')
+    expect(MockWebSocket.instances[0]!.url).toBe('ws://localhost:3000/webrtc-signaling/connect_client?token=fresh-token')
   })
 
   it('retries one transient startup failure without creating duplicate sockets', async () => {
@@ -222,5 +238,28 @@ describe('useScrcpyWebRTC startup', () => {
     expect(MockWebSocket.instances[0]!.readyState).toBe(MockWebSocket.CLOSED)
     expect(hook!.status).toBe('disconnected')
     expect(hook!.error).toBeNull()
+  })
+})
+
+describe('WebRTC signaling endpoint normalization', () => {
+  it('derives HTTPS and WSS endpoints from the same-origin proxy path', () => {
+    expect(resolveSignalingEndpoints('/webrtc-signaling', 'https://console.example/settings')).toEqual({
+      httpBase: 'https://console.example/webrtc-signaling',
+      websocketBase: 'wss://console.example/webrtc-signaling'
+    })
+  })
+
+  it('replaces an insecure legacy address when the application is on HTTPS', () => {
+    expect(resolveSignalingEndpoints('ws://192.168.1.2:8443', 'https://console.example/')).toEqual({
+      httpBase: 'https://console.example/webrtc-signaling',
+      websocketBase: 'wss://console.example/webrtc-signaling'
+    })
+  })
+
+  it('preserves direct signaling compatibility on an HTTP page', () => {
+    expect(resolveSignalingEndpoints('ws://192.168.1.2:8443', 'http://console.local/')).toEqual({
+      httpBase: 'http://192.168.1.2:8443',
+      websocketBase: 'ws://192.168.1.2:8443'
+    })
   })
 })

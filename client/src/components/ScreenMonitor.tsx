@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { maaApi, type WebrtcStatusData } from '../services/api'
+import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
 import ScrcpyDeviceView from './ScrcpyDeviceView'
 
 interface ScreenMonitorProps {
@@ -12,6 +13,7 @@ interface ScreenMonitorProps {
 }
 
 export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) {
+  const { isAvailable: automationAvailable, unavailableMessage } = useAutomationAvailability()
   const [webrtcStatus, setWebrtcStatus] = useState<WebrtcStatusData | null>(null)
   const [webrtcLoading, setWebrtcLoading] = useState<string | null>(null)
   const [webrtcActionError, setWebrtcActionError] = useState<string | null>(null)
@@ -29,7 +31,11 @@ export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) 
     refreshWebrtcStatus()
   }, [refreshWebrtcStatus])
 
-  const runWebrtcAction = async (action: string, fn: () => Promise<any>) => {
+  const runWebrtcAction = async (action: string, fn: () => Promise<any>, allowWhenUnavailable = false) => {
+    if (!automationAvailable && !allowWhenUnavailable) {
+      setWebrtcActionError(unavailableMessage)
+      return
+    }
     setWebrtcLoading(action)
     setWebrtcActionError(null)
     try {
@@ -44,7 +50,11 @@ export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) 
     }
   }
 
-  const startWebrtcInfrastructure = async (): Promise<string> => {
+  const startWebrtcInfrastructure = async (): Promise<string | undefined> => {
+    if (!automationAvailable) {
+      setWebrtcActionError(unavailableMessage)
+      return undefined
+    }
     setWebrtcLoading('preview')
     setWebrtcActionError(null)
     try {
@@ -66,6 +76,8 @@ export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) 
       <ScrcpyDeviceView
         variant={variant}
         enabled={!!webrtcStatus?.serverRunning}
+        automationAvailable={automationAvailable}
+        automationUnavailableMessage={unavailableMessage}
         deviceId="mumu-la-pluma"
         signalingUrl={webrtcStatus?.signalingUrl || 'ws://127.0.0.1:8443'}
         onStartInfrastructure={startWebrtcInfrastructure}
@@ -73,8 +85,16 @@ export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) 
         infrastructureLoading={webrtcLoading}
         infrastructureError={webrtcActionError}
         onInstall={() => runWebrtcAction('install', () => maaApi.installWebrtc())}
-        onToggleServer={() => runWebrtcAction('server', () => webrtcStatus?.serverRunning ? maaApi.stopWebrtcServer() : maaApi.startWebrtcServer())}
-        onToggleAgent={() => runWebrtcAction('agent', () => webrtcStatus?.agentRunning ? maaApi.stopWebrtcAgent() : maaApi.startWebrtcAgent())}
+        onToggleServer={() => runWebrtcAction(
+          'server',
+          () => webrtcStatus?.serverRunning ? maaApi.stopWebrtcServer() : maaApi.startWebrtcServer(),
+          !!webrtcStatus?.serverRunning
+        )}
+        onToggleAgent={() => runWebrtcAction(
+          'agent',
+          () => webrtcStatus?.agentRunning ? maaApi.stopWebrtcAgent() : maaApi.startWebrtcAgent(),
+          !!webrtcStatus?.agentRunning
+        )}
       />
     </div>
   )

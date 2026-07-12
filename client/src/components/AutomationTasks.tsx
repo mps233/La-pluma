@@ -16,6 +16,7 @@ import type {
   StageConfig
 } from '@/types/components'
 import { formatExecutionActionSummary } from '../utils/executionSummary'
+import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
 
 const scheduleTimePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/
 const RECOVERY_STATUS_POLL_MS = 1000
@@ -183,6 +184,7 @@ const synchronizeConnectionParams = (tasks: any[]) => {
 export default function AutomationTasks({}: AutomationTasksProps) {
   const shouldReduceMotion = useReducedMotion()
   const { setMessage: setStatusMessage, setActive: setIsActiveStatus } = useStatusStore()
+  const { isAvailable: automationAvailable, unavailableMessage } = useAutomationAvailability()
 
   // 辅助函数：显示消息
   const showSuccess = async (msg: string) => {
@@ -885,6 +887,11 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   }
 
   const executeTaskFlow = async () => {
+    if (!automationAvailable) {
+      void showError(unavailableMessage)
+      return
+    }
+
     const invalidTask = taskFlow.find(task =>
       task.enabled &&
       task.taskType === 'Infrast' &&
@@ -1734,7 +1741,8 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                   )}
                   <Button
                     onClick={executeTaskFlow}
-                    disabled={isRunning || taskFlow.filter(t => t.enabled).length === 0}
+                    disabled={!automationAvailable || isRunning || taskFlow.filter(t => t.enabled).length === 0}
+                    title={!automationAvailable ? unavailableMessage : undefined}
                     loading={isRunning}
                     loadingText="执行中"
                     statusKey={isRunning ? 'running' : 'ready'}

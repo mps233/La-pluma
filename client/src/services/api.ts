@@ -47,6 +47,9 @@ export const fetchWithAuth = async (input: RequestInfo | URL, init: RequestInit 
     return await fetch(input, { ...init, headers })
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') throw error
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new Error('当前网络已断开，请恢复连接后重试')
+    }
     throw new Error('无法连接后端服务，请确认服务已启动')
   }
 }
@@ -100,6 +103,7 @@ export interface WebrtcStatusData {
   serverRunning?: boolean
   agentRunning?: boolean
   signalingUrl?: string
+  directSignalingUrl?: string
   deviceId?: string
   devices?: string[]
   [key: string]: any

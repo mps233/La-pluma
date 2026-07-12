@@ -47,7 +47,7 @@ export default function Layout({ children }: LayoutProps) {
             {/* 左侧：Logo 和标题 */}
             <div className="flex items-center gap-2 sm:gap-3">
               <img 
-                src="/logo-graphite.svg?v=1"
+                src={`${import.meta.env.BASE_URL}logo-graphite.svg?v=1`}
                 alt="La Pluma Logo" 
                 className="h-7 w-7 object-contain sm:h-8 sm:w-8"
               />
