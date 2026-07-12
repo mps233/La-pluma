@@ -166,7 +166,7 @@ export function DashboardSkeleton() {
 
   return (
     <div className="app-page" aria-busy="true" aria-label="控制台加载中">
-      <div className="mx-auto max-w-7xl app-stack-section">
+      <div className="app-stack-section">
         <div className="flex items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <Skeleton variant="rect" className="h-11 w-11 shrink-0 rounded-xl" />

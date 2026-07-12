@@ -388,7 +388,7 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
                 <h3 className="text-lg font-semibold text-primary">{activeTask.name}</h3>
                 <span className="roguelike-command-chip">{activeTask.command}</span>
               </div>
-              <p className="mt-1 text-xs text-secondary">{activeTask.description}</p>
+              <p className="mt-1 text-sm text-secondary">{activeTask.description}</p>
             </div>
           </div>
           <Button

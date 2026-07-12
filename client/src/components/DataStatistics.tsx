@@ -531,7 +531,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
 
   return (
     <div className="app-page">
-      <div className="max-w-7xl mx-auto app-stack-section">
+      <div className="app-stack-section">
         {/* 页面标题 */}
         <PageHeader
           icon={<Icons.Info className="w-6 h-6" />}
@@ -593,8 +593,9 @@ export default function DataStatistics({}: DataStatisticsProps) {
           </button>
         </motion.div>
 
-        {/* 功能卡片 */}
-        <div className="app-stack-section">
+        <div className="data-statistics-layout">
+          {/* 功能卡片 */}
+          <div className="min-w-0 app-stack-section">
           {/* 干员识别 */}
           {activeTab === 'operbox' && (
           <motion.div
@@ -631,6 +632,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                       disabled={isRunning}
                       variant="outline"
                       size="sm"
+                      className="min-h-10"
                       icon={
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -1222,25 +1224,26 @@ export default function DataStatistics({}: DataStatisticsProps) {
               onRefresh={loadDropData}
             />
           )}
-        </div>
-
-        {/* 说明信息 */}
-        <InfoCard type="info">
-          <div className="flex items-start space-x-3">
-            <Icons.Info className="w-5 h-5 brand-text mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-secondary">
-              <p className="font-medium text-primary mb-1">使用说明</p>
-              <ul className="space-y-1 list-disc list-inside text-xs">
-                <li>识别前请确保游戏已启动并进入主界面</li>
-                <li>仓库识别：需要打开仓库界面</li>
-                <li>干员识别：需要打开干员界面</li>
-                <li>识别完成后可点击"查看详情"展开完整清单</li>
-                <li>数据按游戏内顺序排序，包含物品名称和数量</li>
-                <li>识别结果保存到：<code className="px-1 py-0.5 brand-chip rounded text-xs">server/data/</code></li>
-              </ul>
-            </div>
           </div>
-        </InfoCard>
+
+          {/* 说明信息 */}
+          <InfoCard type="info" className="data-statistics-help">
+            <div className="flex items-start space-x-3">
+              <Icons.Info className="w-5 h-5 brand-text mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-secondary">
+                <p className="font-semibold text-primary mb-2">使用说明</p>
+                <ul className="space-y-1.5 list-disc list-inside text-xs leading-5">
+                  <li>识别前请确保游戏已启动并进入主界面</li>
+                  <li>仓库识别需要打开仓库界面</li>
+                  <li>干员识别需要打开干员界面</li>
+                  <li>识别完成后可展开查看完整清单</li>
+                  <li>数据按游戏内顺序保存名称和数量</li>
+                  <li>结果目录：<code className="px-1 py-0.5 brand-chip rounded text-xs">server/data/</code></li>
+                </ul>
+              </div>
+            </div>
+          </InfoCard>
+        </div>
       </div>
     </div>
   )

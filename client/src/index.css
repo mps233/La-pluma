@@ -40,6 +40,14 @@
     --app-space-panel: var(--app-space-5);
     --app-space-control-x: var(--app-space-4);
     --app-space-control-y: var(--app-space-3);
+    --app-content-max: 100rem;
+    --app-page-gutter: 2rem;
+    --app-font-page-title: 1.5rem;
+    --app-font-section-title: 1.125rem;
+    --app-font-card-title: 1rem;
+    --app-font-body: 0.875rem;
+    --app-font-caption: 0.75rem;
+    --app-font-meta: 0.6875rem;
   }
 
   html.dark {
@@ -62,12 +70,14 @@
     --app-info: #60a5fa;
   }
 
-  @media (max-width: 640px) {
+@media (max-width: 640px) {
     :root {
       --app-space-card: 0.75rem;
       --app-space-section: 0.875rem;
       --app-space-page: var(--app-space-3);
       --app-space-panel: 0.875rem;
+      --app-page-gutter: 0.875rem;
+      --app-font-page-title: 1.25rem;
     }
   }
 
@@ -254,6 +264,13 @@
     width: 0.75rem;
     height: 0.75rem;
   }
+
+}
+
+@media (min-width: 1600px) {
+  :root {
+    --app-page-gutter: 2.5rem;
+  }
 }
 
 /* Automation task builder */
@@ -297,8 +314,8 @@
   align-items: center;
   gap: 0.5rem;
   color: var(--app-text);
-  font-size: 0.9375rem;
-  font-weight: 750;
+  font-size: var(--app-font-card-title);
+  font-weight: 600;
 }
 
 .automation-panel-header h3 svg,
@@ -312,7 +329,8 @@
 .automation-flow-header p {
   margin-top: 0.25rem;
   color: var(--app-text-soft);
-  font-size: 0.6875rem;
+  font-size: var(--app-font-caption);
+  line-height: 1.5;
 }
 
 .automation-panel-count,
@@ -406,8 +424,8 @@
   gap: 0.125rem;
   overflow: hidden;
   color: var(--app-text-soft);
-  font-size: 0.625rem;
-  line-height: 1.4;
+  font-size: var(--app-font-caption);
+  line-height: 1.45;
 }
 
 .automation-task-option-copy > span:last-child {
@@ -425,8 +443,8 @@
 .automation-task-option-title strong {
   overflow: hidden;
   color: var(--app-text);
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: var(--app-font-body);
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -435,7 +453,7 @@
   overflow: hidden;
   color: var(--app-text-soft);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.5rem;
+  font-size: var(--app-font-meta);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -449,8 +467,8 @@
   border-radius: 999px;
   background: var(--app-accent);
   color: white;
-  font-size: 0.5625rem;
-  font-weight: 750;
+  font-size: var(--app-font-meta);
+  font-weight: 700;
 }
 
 .automation-task-add,
@@ -580,7 +598,7 @@
   color: var(--app-accent);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.625rem;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .automation-drag-handle {
@@ -621,8 +639,8 @@
 .automation-flow-task-name strong {
   overflow: hidden;
   color: var(--app-text);
-  font-size: 0.8125rem;
-  font-weight: 750;
+  font-size: var(--app-font-body);
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -631,7 +649,7 @@
   overflow: hidden;
   color: var(--app-text-soft);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.5625rem;
+  font-size: var(--app-font-meta);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -641,8 +659,8 @@
   align-items: center;
   gap: 0.4rem;
   color: var(--app-text-muted);
-  font-size: 0.625rem;
-  font-weight: 650;
+  font-size: var(--app-font-caption);
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -698,14 +716,14 @@
 .automation-empty-state strong {
   color: var(--app-text);
   font-size: 0.875rem;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .automation-empty-state p {
   max-width: 20rem;
   margin-top: 0.375rem;
   color: var(--app-text-soft);
-  font-size: 0.6875rem;
+  font-size: var(--app-font-caption);
   line-height: 1.6;
 }
 
@@ -850,14 +868,14 @@
 .automation-sequence-empty strong,
 .automation-editor-empty strong {
   color: var(--app-text);
-  font-size: 0.75rem;
-  font-weight: 750;
+  font-size: var(--app-font-body);
+  font-weight: 600;
 }
 
 .automation-sequence-empty span,
 .automation-editor-empty span {
   margin-top: 0.25rem;
-  font-size: 0.625rem;
+  font-size: var(--app-font-caption);
 }
 
 .automation-sequence-list {
@@ -979,7 +997,7 @@
   color: var(--app-accent);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.5625rem;
-  font-weight: 750;
+  font-weight: 700;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 30%, var(--app-border));
   transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
@@ -1073,13 +1091,13 @@
 
 .automation-sequence-copy strong {
   color: var(--app-text);
-  font-size: 0.6875rem;
-  font-weight: 750;
+  font-size: var(--app-font-body);
+  font-weight: 600;
 }
 
 .automation-sequence-copy small {
   color: var(--app-text-soft);
-  font-size: 0.5625rem;
+  font-size: var(--app-font-caption);
 }
 
 .automation-sequence-enabled {
@@ -1149,7 +1167,7 @@
 }
 
 .automation-task-picker-toggle span {
-  font-size: 0.6875rem;
+  font-size: var(--app-font-caption);
   font-weight: 700;
 }
 
@@ -1163,7 +1181,7 @@
   background: var(--app-accent-soft);
   color: var(--app-accent);
   font-size: 0.5625rem;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .automation-task-picker {
@@ -1224,7 +1242,7 @@
 .automation-task-picker-option strong {
   overflow: hidden;
   color: var(--app-text);
-  font-size: 0.6875rem;
+  font-size: var(--app-font-caption);
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1240,7 +1258,7 @@
   background: var(--app-accent);
   color: white;
   font-size: 0.5rem;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .automation-editor-panel {
@@ -1268,8 +1286,8 @@
   align-items: center;
   gap: 0.5rem;
   color: var(--app-text);
-  font-size: 0.9375rem;
-  font-weight: 750;
+  font-size: var(--app-font-card-title);
+  font-weight: 600;
 }
 
 .automation-editor-heading h3 svg {
@@ -1279,7 +1297,8 @@
 .automation-editor-heading p {
   margin-top: 0.25rem;
   color: var(--app-text-soft);
-  font-size: 0.6875rem;
+  font-size: var(--app-font-caption);
+  line-height: 1.5;
 }
 
 .automation-editor-heading > span {
@@ -1293,7 +1312,7 @@
   color: var(--app-accent);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.625rem;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .automation-schedule-heading {
@@ -1311,8 +1330,8 @@
   align-items: center;
   gap: 0.5rem;
   color: var(--app-text);
-  font-size: 0.875rem;
-  font-weight: 750;
+  font-size: var(--app-font-card-title);
+  font-weight: 600;
 }
 
 .automation-schedule-heading h3 svg {
@@ -1331,7 +1350,7 @@
 .automation-schedule-heading p {
   margin-top: 0.25rem;
   color: var(--app-text-soft);
-  font-size: 0.625rem;
+  font-size: var(--app-font-caption);
   white-space: nowrap;
 }
 
@@ -1374,7 +1393,7 @@
   align-items: center;
   gap: 0.35rem;
   color: var(--app-text-muted);
-  font-size: 0.5625rem;
+  font-size: var(--app-font-caption);
   font-weight: 700;
   cursor: pointer;
 }
@@ -1395,13 +1414,13 @@
   justify-content: space-between;
   margin-bottom: 0.625rem;
   color: var(--app-text-muted);
-  font-size: 0.6875rem;
+  font-size: var(--app-font-caption);
   font-weight: 700;
 }
 
 .automation-schedule-list-heading small {
   color: var(--app-accent);
-  font-size: 0.5625rem;
+  font-size: var(--app-font-meta);
 }
 
 .automation-schedule-times {
@@ -1421,7 +1440,7 @@
   color: var(--app-accent);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.5625rem;
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .automation-schedule-time-control {
@@ -1441,7 +1460,7 @@
   padding: 0 0.25rem;
   background: transparent;
   color: var(--app-text);
-  font-size: 0.6875rem;
+  font-size: var(--app-font-body);
   font-weight: 700;
   text-align: center;
   outline: 0;
@@ -1453,7 +1472,7 @@
 
 .automation-schedule-time-control strong {
   color: var(--app-text-soft);
-  font-size: 0.6875rem;
+  font-size: var(--app-font-body);
 }
 
 .automation-schedule-remove,
@@ -1485,7 +1504,7 @@
   border-radius: var(--app-radius-md);
   color: var(--app-text-muted);
   box-shadow: inset 0 0 0 1px var(--app-border);
-  font-size: 0.625rem;
+  font-size: var(--app-font-caption);
   font-weight: 700;
   transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
@@ -1525,14 +1544,14 @@
 
 .automation-schedule-empty strong {
   color: var(--app-text);
-  font-size: 0.75rem;
-  font-weight: 750;
+  font-size: var(--app-font-body);
+  font-weight: 600;
 }
 
 .automation-schedule-empty p {
   margin-top: 0.25rem;
   color: var(--app-text-soft);
-  font-size: 0.625rem;
+  font-size: var(--app-font-caption);
 }
 
 .automation-notification-panel {
@@ -1556,8 +1575,8 @@
   align-items: center;
   gap: 0.45rem;
   color: var(--app-text);
-  font-size: 0.75rem;
-  font-weight: 750;
+  font-size: var(--app-font-body);
+  font-weight: 600;
 }
 
 .automation-notification-heading h4 svg {
@@ -1567,7 +1586,7 @@
 .automation-notification-heading p {
   margin-top: 0.2rem;
   color: var(--app-text-soft);
-  font-size: 0.5625rem;
+  font-size: var(--app-font-caption);
 }
 
 .automation-notification-heading > label,
@@ -1577,7 +1596,7 @@
   align-items: center;
   gap: 0.35rem;
   color: var(--app-text-muted);
-  font-size: 0.5625rem;
+  font-size: var(--app-font-caption);
   font-weight: 700;
   cursor: pointer;
 }
@@ -1593,8 +1612,8 @@
   margin: 0 1rem 0.75rem;
   border-radius: var(--app-radius-md);
   padding: 0.5rem 0.625rem;
-  font-size: 0.625rem;
-  font-weight: 650;
+  font-size: var(--app-font-caption);
+  font-weight: 600;
 }
 
 .automation-notification-notice.is-success {
@@ -1623,13 +1642,13 @@
 
 .automation-notification-channel-heading strong {
   color: var(--app-text);
-  font-size: 0.6875rem;
-  font-weight: 750;
+  font-size: var(--app-font-body);
+  font-weight: 600;
 }
 
 .automation-notification-channel-heading small {
   color: var(--app-text-soft);
-  font-size: 0.5625rem;
+  font-size: var(--app-font-caption);
 }
 
 .automation-notification-field {
@@ -1639,7 +1658,7 @@
 
 .automation-notification-field > span {
   color: var(--app-text-muted);
-  font-size: 0.5625rem;
+  font-size: var(--app-font-caption);
   font-weight: 700;
 }
 
@@ -1653,7 +1672,7 @@
   background: var(--app-surface-muted);
   color: var(--app-text);
   box-shadow: inset 0 0 0 1px var(--app-border);
-  font-size: 0.6875rem;
+  font-size: var(--app-font-body);
   outline: 0;
   transition: box-shadow 160ms ease, opacity 160ms ease;
 }
@@ -1682,7 +1701,7 @@
   border-radius: var(--app-radius-md);
   color: var(--app-text-muted);
   box-shadow: inset 0 0 0 1px var(--app-border);
-  font-size: 0.625rem;
+  font-size: var(--app-font-body);
   font-weight: 700;
   transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
@@ -1773,7 +1792,7 @@
   color: var(--app-text);
   box-shadow: inset 0 0 0 1px var(--app-border);
   font-size: 0.75rem;
-  font-weight: 650;
+  font-weight: 600;
   outline: 0;
   cursor: pointer;
   transition: background 160ms ease, box-shadow 160ms ease, color 160ms ease;
@@ -2707,7 +2726,7 @@ svg.w-5.h-5 {
     background: color-mix(in srgb, var(--app-surface-solid) 78%, var(--app-surface-muted));
     color: var(--app-text-muted);
     font-size: 0.6875rem;
-    font-weight: 650;
+    font-weight: 600;
     text-align: left;
     transition: color 180ms ease, background 180ms ease;
   }
@@ -2838,7 +2857,7 @@ svg.w-5.h-5 {
     background: color-mix(in srgb, var(--summary-accent) 10%, transparent);
     color: var(--summary-accent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--summary-accent) 20%, transparent);
-    font-size: 0.625rem;
+    font-size: var(--app-font-meta);
     font-weight: 700;
   }
 
@@ -2865,8 +2884,8 @@ svg.w-5.h-5 {
     align-items: center;
     gap: 0.45rem;
     color: var(--app-text-muted);
-    font-size: 0.625rem;
-    font-weight: 650;
+    font-size: var(--app-font-caption);
+    font-weight: 600;
   }
 
   .dashboard-summary-dot {
@@ -2891,7 +2910,7 @@ svg.w-5.h-5 {
     overflow: hidden;
     color: var(--app-text);
     font-size: 1.125rem;
-    font-weight: 750;
+    font-weight: 700;
     line-height: 1.25;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2901,7 +2920,7 @@ svg.w-5.h-5 {
     margin-top: 0.35rem;
     overflow: hidden;
     color: var(--app-text-muted);
-    font-size: 0.625rem;
+    font-size: var(--app-font-caption);
     line-height: 1.45;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2929,7 +2948,7 @@ svg.w-5.h-5 {
 
   .dashboard-stage-count {
     color: var(--app-text-soft);
-    font-size: 0.625rem;
+    font-size: var(--app-font-meta);
     font-variant-numeric: tabular-nums;
   }
 
@@ -2949,7 +2968,7 @@ svg.w-5.h-5 {
     background: var(--app-surface-muted);
     color: var(--app-text-muted);
     box-shadow: inset 0 0 0 1px var(--app-border);
-    font-size: 0.625rem;
+    font-size: var(--app-font-caption);
     font-weight: 600;
     line-height: 1.2;
   }
@@ -2983,17 +3002,17 @@ svg.w-5.h-5 {
   .dashboard-summary-number {
     min-width: 3.25rem;
     color: var(--summary-accent);
-    font-size: 2.5rem;
-    font-weight: 780;
-    line-height: 0.95;
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
     font-variant-numeric: tabular-nums;
   }
 
   .dashboard-summary-number-label {
     margin-top: 0.45rem;
     color: var(--app-text-soft);
-    font-size: 0.5625rem;
-    font-weight: 650;
+    font-size: var(--app-font-caption);
+    font-weight: 600;
   }
 
   .dashboard-summary-copy {
@@ -3017,7 +3036,7 @@ svg.w-5.h-5 {
     align-items: center;
     gap: 0.3rem;
     color: color-mix(in srgb, var(--summary-accent) 76%, var(--app-text));
-    font-size: 0.625rem;
+    font-size: var(--app-font-caption);
     font-weight: 700;
     transition: color 180ms ease;
   }
@@ -3045,14 +3064,14 @@ svg.w-5.h-5 {
 
   .dashboard-drop-stage {
     color: var(--summary-accent);
-    font-size: 0.625rem;
-    font-weight: 750;
+    font-size: var(--app-font-caption);
+    font-weight: 700;
   }
 
   .dashboard-drop-items {
     overflow: hidden;
     color: var(--app-text-muted);
-    font-size: 0.625rem;
+    font-size: var(--app-font-caption);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -3087,8 +3106,40 @@ svg.w-5.h-5 {
     }
   }
 
+  .app-shell {
+    width: 100%;
+    max-width: var(--app-content-max);
+    margin-inline: auto;
+    padding-inline: var(--app-page-gutter);
+  }
+
   .app-page {
-    padding: var(--app-space-page);
+    padding-block: var(--app-space-page);
+  }
+
+  .app-page-title {
+    font-size: var(--app-font-page-title);
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .app-page-subtitle {
+    display: none;
+    margin-top: var(--app-space-1);
+    font-size: var(--app-font-body);
+    line-height: 1.5;
+  }
+
+  .app-section-title {
+    font-size: var(--app-font-section-title);
+    font-weight: 600;
+    line-height: 1.45;
+  }
+
+  @media (min-width: 640px) {
+    .app-page-subtitle {
+      display: block;
+    }
   }
 
   .app-stack-card {
@@ -3111,6 +3162,28 @@ svg.w-5.h-5 {
   .app-grid-section {
     display: grid;
     gap: var(--app-space-section);
+  }
+
+  .data-statistics-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+    align-items: start;
+    gap: var(--app-space-section);
+  }
+
+  .data-statistics-help {
+    position: sticky;
+    top: 5rem;
+  }
+
+  @media (max-width: 1099px) {
+    .data-statistics-layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .data-statistics-help {
+      position: static;
+    }
   }
 
   .app-card {
@@ -3204,7 +3277,7 @@ svg.w-5.h-5 {
   .app-empty-state strong {
     color: var(--app-text);
     font-size: 0.8125rem;
-    font-weight: 750;
+    font-weight: 700;
   }
 
   .app-empty-state > span {
@@ -3688,7 +3761,7 @@ svg.w-5.h-5 {
     color: var(--app-text-muted);
     box-shadow: inset 0 0 0 1px var(--app-border);
     font-size: 0.625rem;
-    font-weight: 750;
+    font-weight: 700;
     line-height: 1;
   }
 
@@ -3725,7 +3798,7 @@ svg.w-5.h-5 {
     background: var(--app-accent-soft);
     color: var(--app-accent-strong);
     font-size: 0.625rem;
-    font-weight: 750;
+    font-weight: 700;
   }
 
   .log-console-state,
@@ -3816,7 +3889,7 @@ svg.w-5.h-5 {
   .log-history-copy strong {
     color: var(--app-text);
     font-size: 0.75rem;
-    font-weight: 650;
+    font-weight: 600;
   }
 
   .log-history-copy small {
@@ -3831,7 +3904,7 @@ svg.w-5.h-5 {
 
   .log-history-state p {
     color: var(--app-text-muted);
-    font-weight: 650;
+    font-weight: 600;
   }
 
   .log-history-state span {
@@ -4000,7 +4073,7 @@ svg.w-5.h-5 {
     color: var(--app-text-soft);
     box-shadow: inset 0 0 0 1px var(--app-border);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 0.625rem;
+    font-size: var(--app-font-meta);
   }
 
   .roguelike-run-button {
@@ -4029,14 +4102,14 @@ svg.w-5.h-5 {
     gap: var(--app-space-card);
     margin-bottom: var(--app-space-card);
     color: var(--app-text);
-    font-size: 0.8125rem;
-    font-weight: 700;
+    font-size: var(--app-font-card-title);
+    font-weight: 600;
   }
 
   .roguelike-section-heading small {
     color: var(--app-text-soft);
-    font-size: 0.625rem;
-    font-weight: 650;
+    font-size: var(--app-font-caption);
+    font-weight: 600;
   }
 
   .roguelike-theme-grid {
@@ -4079,8 +4152,8 @@ svg.w-5.h-5 {
 
   .roguelike-theme-option span {
     overflow: hidden;
-    font-size: 0.75rem;
-    font-weight: 700;
+    font-size: var(--app-font-body);
+    font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -4089,7 +4162,7 @@ svg.w-5.h-5 {
     overflow: hidden;
     color: var(--app-text-soft);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 0.5625rem;
+    font-size: var(--app-font-meta);
     text-overflow: ellipsis;
     white-space: nowrap;
   }

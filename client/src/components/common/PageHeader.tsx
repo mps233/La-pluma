@@ -41,11 +41,11 @@ export default function PageHeader({
           </div>
         )}
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-primary">
+          <h2 className="app-page-title text-primary">
             {title}
           </h2>
           {subtitle && (
-            <p className="mt-1 hidden text-sm text-secondary sm:block">
+            <p className="app-page-subtitle text-secondary">
               {subtitle}
             </p>
           )}

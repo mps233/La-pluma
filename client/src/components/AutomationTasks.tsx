@@ -1342,7 +1342,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   return (
     <>
       <div className="app-page" data-automation-tasks>
-        <div className="max-w-7xl mx-auto app-stack-section">
+        <div className="app-stack-section">
         {/* 页面标题 */}
         <PageHeader
           icon={<Icons.Robot />}

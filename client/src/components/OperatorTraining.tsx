@@ -745,7 +745,7 @@ export default function OperatorTraining() {
 
   return (
     <div className="app-page">
-      <div className="max-w-7xl mx-auto app-stack-section">
+      <div className="app-stack-section">
         {/* 页面标题 */}
         <PageHeader
           icon={
@@ -762,7 +762,7 @@ export default function OperatorTraining() {
           <section className={`space-y-4 ${currentTarget ? 'order-2 xl:order-1' : 'order-1'}`}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">添加干员</h2>
+                <h2 className="text-lg font-semibold text-slate-950 dark:text-white">添加干员</h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400">筛选并加入养成队列</p>
               </div>
               <div className="rounded-full border border-slate-200/80 bg-white/70 px-3 py-1 text-xs font-medium text-slate-500 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-400">
@@ -927,7 +927,7 @@ export default function OperatorTraining() {
             <OperatorEmptyState {...operatorEmptyState} />
           ) : (
             <div className="min-h-[260px]">
-              <div className="grid grid-cols-3 gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+              <div className="grid grid-cols-3 gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
                 {visibleOperators.map((operator, idx) => {
                   const isInQueue = queue.some(q => q.operatorId === operator.id);
                   const imageLoaded = loadedImages[operator.id] || false;
@@ -1099,7 +1099,7 @@ export default function OperatorTraining() {
               <div className="absolute inset-x-0 top-0 h-px bg-[var(--app-accent)]/45" />
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <span className="rounded-md brand-action px-2 py-1 text-xs font-semibold shadow-sm">当前养成</span>
-                <h3 className="min-w-0 flex-1 truncate text-xl font-semibold tracking-tight text-slate-950 dark:text-white">{currentTarget.operator.name}</h3>
+                <h3 className="min-w-0 flex-1 truncate text-xl font-semibold text-slate-950 dark:text-white">{currentTarget.operator.name}</h3>
                 <span className="rounded-md px-2 py-0.5 text-xs font-bold brand-chip">
                   {currentTarget.operator.rarity}★
                 </span>
@@ -1119,15 +1119,15 @@ export default function OperatorTraining() {
 
               <div className="mt-4 grid grid-cols-3 gap-2">
                 <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-white/10 dark:bg-white/[0.035] dark:shadow-none">
-                  <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">阶段</div>
+                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400">阶段</div>
                   <div className="mt-1 text-sm font-semibold text-slate-950 dark:text-white">精{currentTarget.currentElite} → 精{currentTarget.targetElite}</div>
                 </div>
                 <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-white/10 dark:bg-white/[0.035] dark:shadow-none">
-                  <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">缺口</div>
+                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400">缺口</div>
                   <div className="mt-1 text-sm font-semibold text-slate-950 dark:text-white">{currentMissingMaterials.length} 种</div>
                 </div>
                 <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-white/10 dark:bg-white/[0.035] dark:shadow-none">
-                  <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">后续</div>
+                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400">后续</div>
                   <div className="mt-1 text-sm font-semibold text-slate-950 dark:text-white">{backlogCount} 个</div>
                 </div>
               </div>
@@ -1280,7 +1280,7 @@ export default function OperatorTraining() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] brand-text">今日流程</div>
-                    <h3 className="mt-1 text-lg font-semibold tracking-tight text-slate-950 dark:text-white">{planFocusName}</h3>
+                    <h3 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">{planFocusName}</h3>
                     <div className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
                       可刷 {openStageCount} 个关卡 · 预计 {todayRunCount} 次 · 完整计划约 {plan.totalSanity || 0} 理智
                     </div>
@@ -1306,7 +1306,7 @@ export default function OperatorTraining() {
 
               <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/85 shadow-[0_12px_28px_rgba(15,23,42,0.045),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur dark:border-white/10 dark:bg-white/[0.045] dark:shadow-none">
                 <div className="flex items-center justify-between border-b border-slate-200/80 px-4 py-3 dark:border-white/10">
-                  <h3 className="text-base font-semibold tracking-tight text-slate-950 dark:text-white">今日推荐刷图</h3>
+                  <h3 className="text-base font-semibold text-slate-950 dark:text-white">今日推荐刷图</h3>
                   <span className="rounded-full px-2.5 py-1 text-xs font-semibold brand-chip">
                     {previewStages.length} 个优先
                   </span>

@@ -42,7 +42,7 @@ export default function Layout({ children }: LayoutProps) {
         animate={{ y: 0 }}
         className="nav-shell sticky top-0 z-50 transition-colors"
       >
-        <div className="max-w-7xl mx-auto px-3 sm:px-6">
+        <div className="app-shell">
           <div className="flex justify-between items-center h-14 sm:h-16">
             {/* 左侧：Logo 和标题 */}
             <div className="flex items-center gap-2 sm:gap-3">
@@ -145,7 +145,7 @@ export default function Layout({ children }: LayoutProps) {
       </motion.nav>
 
       {/* 主内容区域 */}
-      <main className="max-w-7xl mx-auto py-3 sm:py-8 px-2 sm:px-6 lg:px-8">
+      <main className="app-shell py-3 sm:py-8">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

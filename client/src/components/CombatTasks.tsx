@@ -1324,7 +1324,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <h4 className="truncate text-xl font-semibold tracking-tight text-primary">{task.name}</h4>
+                        <h4 className="truncate text-xl font-semibold text-primary">{task.name}</h4>
                         <span className="shrink-0 rounded-md border border-[var(--app-border)] px-2 py-0.5 font-mono text-[11px] text-tertiary">{task.command}</span>
                       </div>
                       <p className="mt-1 text-sm leading-relaxed text-secondary">{task.description}</p>
@@ -1341,7 +1341,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                         <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                       </svg>
                     }
-                    className="text-xs sm:text-sm px-4 sm:px-6 py-1.5 sm:py-2.5"
+                    className="min-h-10 px-4 text-sm sm:px-6"
                   >
                     立即执行
                   </Button>
@@ -1374,7 +1374,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                             <option value="off">保留当前编队</option>
                           </select>
                         </div>
-                        <p className="pl-14 text-[11px] leading-relaxed text-tertiary">
+                        <p className="pl-14 text-xs leading-relaxed text-tertiary">
                           作业集拆分执行时，“自动决定”会启用自动编队；单作业会使用默认设置。
                         </p>
                       </div>
@@ -1407,7 +1407,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                             <option value="cli">连续执行</option>
                           </select>
                         </div>
-                        <p className="pl-14 text-[11px] leading-relaxed text-tertiary">
+                        <p className="pl-14 text-xs leading-relaxed text-tertiary">
                           顺序执行会保存进度：成功项自动移出待执行，失败项保留待重试。
                         </p>
                       </div>
@@ -1558,7 +1558,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                               <div className="mb-3 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] p-3">
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                   <div className="min-w-0">
-                                    <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-tertiary">续跑进度</div>
+                                    <div className="text-xs font-medium text-tertiary">续跑进度</div>
                                     <div className="mt-1 text-sm font-semibold text-primary">
                                       {nextCopilot ? `下次从第 ${nextIndex + 1} 关继续` : '作业集已完成'}
                                     </div>
@@ -1695,7 +1695,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                                           </span>
                                         ))}
                                       </div>
-                                      {copilot.stage && <div className="mt-0.5 truncate text-[11px] text-tertiary">{copilot.stage}</div>}
+                                      {copilot.stage && <div className="mt-0.5 truncate text-xs text-tertiary">{copilot.stage}</div>}
                                     </div>
                                   </div>
                                   <div className="flex shrink-0 items-center gap-2">
@@ -1932,7 +1932,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <h4 className="truncate text-xl font-semibold tracking-tight text-primary">{task.name}</h4>
+                          <h4 className="truncate text-xl font-semibold text-primary">{task.name}</h4>
                           <span className="shrink-0 rounded-md border border-[var(--app-border)] px-2 py-0.5 font-mono text-[11px] text-tertiary">{task.command}</span>
                         </div>
                         <p className="mt-1 text-sm leading-relaxed text-secondary">{task.description}</p>
@@ -1949,7 +1949,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                           <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                         </svg>
                       }
-                      className="text-xs sm:text-sm px-4 sm:px-5 py-1.5 sm:py-2"
+                      className="min-h-10 px-4 text-sm sm:px-5"
                     >
                       立即执行
                     </Button>

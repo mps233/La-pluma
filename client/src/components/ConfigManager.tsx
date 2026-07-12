@@ -933,9 +933,9 @@ export default function ConfigManager({}: ConfigManagerProps) {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-[var(--app-space-section)] lg:grid-cols-[17rem_minmax(0,1fr)]">
           {/* 配置类型选择 */}
-          <div className="lg:col-span-1">
+          <div>
             <motion.div 
               className="rounded-3xl overflow-hidden surface-panel"
               initial={{ opacity: 0, x: -20 }}
@@ -971,7 +971,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
           </div>
 
           {/* 配置编辑器 */}
-          <div className="lg:col-span-3">
+          <div className="min-w-0">
             <Card animated delay={0.2}>
               <CardHeader 
                 title={configSections.find(s => s.id === configType)?.name || '配置'}
@@ -982,6 +982,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                       disabled={loading}
                       variant="outline"
                       size="sm"
+                      className="min-h-10"
                     >
                       重置
                     </Button>
@@ -990,7 +991,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                       disabled={loading}
                       variant="outline"
                       size="sm"
-                      className="brand-chip"
+                      className="min-h-10 brand-chip"
                       icon={
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M17 16v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-7a2 2 0 012-2h2m3-4H5a2 2 0 00-2 2v7a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-1m-4 0V3m0 0L9 6m1.5-3L12 6" />

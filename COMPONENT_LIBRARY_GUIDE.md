@@ -44,15 +44,19 @@
 
 | 层级 | 推荐样式 | 用途 |
 | --- | --- | --- |
-| 页面标题 | `text-2xl font-semibold text-primary` | 仅 `PageHeader` 的页面主标题 |
+| 页面标题 | `text-xl sm:text-2xl font-semibold text-primary` | 仅 `PageHeader` 的页面主标题 |
 | 常规卡片标题 | `text-lg font-semibold text-primary` | `CardHeader`、主要内容区标题 |
 | 紧凑区块标题 | `text-base font-bold text-primary` | 总览卡片内的次级区块 |
 | 列表标题、字段名 | `text-sm font-semibold` | 列表项、配置字段、主要操作文案 |
 | 正文、表单标签 | `text-sm text-secondary` | 描述、输入标签、普通按钮 |
 | 辅助说明、标签 | `text-xs text-tertiary` | 元数据、提示、筛选标签 |
-| KPI 主数值 | `text-3xl font-bold text-primary` | 仅控制台总览或统计主指标 |
+| KPI 主数值 | `text-3xl font-bold text-primary` | 仅控制台总览或统计主指标，默认不超过 32px |
 
-多行正文和说明使用 `leading-6` 或 `leading-relaxed`；单行标签和数值保持默认紧凑行高。标题和中文正文不要新增 letter spacing；现有页面/卡片标题的 `tracking-tight` 是兼容保留，英文全大写微标签才可使用更宽字距。`8px` 至 `11px` 仅用于控制台、设备预览等高密度既有界面，新增普通页面不得使用。
+多行正文和说明使用 `leading-6` 或 `leading-relaxed`；单行标签和数值保持默认紧凑行高。标题和中文正文不要新增 letter spacing，英文全大写微标签才可使用更宽字距。字重使用 `400`、`500`、`600`、`700`，不要使用依赖系统字体插值的 `650`、`750`、`780`。`11px` 仅用于序号、时间戳和短元数据；`8px` 至 `10px` 不得承载中文正文、操作名或重要状态。
+
+### 页面宽度
+
+高密度工具页面使用统一的 `app-shell`：内容最大宽度为 `1600px`，桌面左右留白通常为 `32px`，超宽屏为 `40px`，移动端为 `14px`。页面内部不要再次嵌套 `max-w-7xl` 或重复水平 padding；阅读型长文本应在自己的内容区单独限制行宽。
 
 ### 圆角
 

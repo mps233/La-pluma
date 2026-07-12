@@ -484,7 +484,7 @@ export default function Dashboard() {
 
   return (
     <div className="app-page">
-      <div className="max-w-7xl mx-auto app-stack-section">
+      <div className="app-stack-section">
         <PageHeader
           icon={<Icons.Dashboard />}
           title="控制台"
@@ -528,7 +528,7 @@ export default function Dashboard() {
                     <Activity className="h-4 w-4" strokeWidth={1.8} />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[10px] font-semibold uppercase text-[var(--app-accent-strong)]">Daily operations</div>
+                    <div className="text-[11px] font-semibold uppercase text-[var(--app-accent-strong)]">Daily operations</div>
                     <div className="mt-0.5 text-base font-bold text-primary">今日流程</div>
                   </div>
                 </div>
@@ -537,7 +537,7 @@ export default function Dashboard() {
                     <span className="dashboard-flow-status-dot" />
                     {flowIsRunning ? '执行中' : '待命'}
                   </div>
-                  <span className={`text-[9px] ${labelClass}`}>
+                  <span className={`text-[11px] ${labelClass}`}>
                     {lastUpdate ? lastUpdate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '--:--'} 更新
                   </span>
                 </div>
@@ -551,9 +551,9 @@ export default function Dashboard() {
                       : <Play className="ml-0.5 h-5 w-5" strokeWidth={1.9} />}
                   </div>
                   <div className="min-w-0">
-                    <div className={`text-[10px] font-medium ${labelClass}`}>{flowIsRunning ? '当前任务' : '运行状态'}</div>
+                    <div className={`text-xs font-medium ${labelClass}`}>{flowIsRunning ? '当前任务' : '运行状态'}</div>
                     <div className="mt-0.5 truncate text-xl font-bold text-primary">{flowCommandTitle}</div>
-                    <div className={`mt-1 truncate text-[10px] ${labelClass}`}>{flowCommandDescription}</div>
+                    <div className={`mt-1 truncate text-xs ${labelClass}`}>{flowCommandDescription}</div>
                   </div>
                 </div>
                 <div className="dashboard-flow-actions">
@@ -619,10 +619,10 @@ export default function Dashboard() {
                   <div key={item.label} className="dashboard-flow-metric">
                     <div className="flex items-center gap-2">
                       <Icon className="h-3.5 w-3.5 text-[var(--app-accent-strong)]" strokeWidth={1.8} />
-                      <span className={`text-[9px] font-medium ${labelClass}`}>{item.label}</span>
+                      <span className={`text-xs font-medium ${labelClass}`}>{item.label}</span>
                     </div>
                     <div className="mt-2 truncate text-sm font-bold text-primary">{item.value}</div>
-                    <div className={`mt-0.5 truncate text-[9px] ${labelClass}`}>{item.sub}</div>
+                    <div className={`mt-0.5 truncate text-xs ${labelClass}`}>{item.sub}</div>
                   </div>
                 ))}
               </div>
@@ -631,9 +631,9 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <span className="dashboard-flow-rail-dot" />
-                    <span className="text-[10px] font-semibold text-primary">今日开放关卡</span>
+                    <span className="text-xs font-semibold text-primary">今日开放关卡</span>
                   </div>
-                  <span className={`text-[9px] ${labelClass}`}>{openStageSummary.open.length} 个日常本</span>
+                  <span className={`text-[11px] ${labelClass}`}>{openStageSummary.open.length} 个日常本</span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {openStageSummary.open.length > 0 ? (
@@ -701,7 +701,7 @@ export default function Dashboard() {
                       </div>
                       <div className="min-w-0">
                         <div className="text-xs font-medium text-primary">{label}</div>
-                        <div className={`truncate text-[10px] ${labelClass}`}>{sub || '实时采样'}</div>
+                        <div className={`truncate text-xs ${labelClass}`}>{sub || '实时采样'}</div>
                       </div>
                       {value != null && (
                         <div className="ml-auto text-sm font-semibold text-primary">{value}</div>
@@ -712,8 +712,8 @@ export default function Dashboard() {
                     ) : pct != null && (
                       <div>
                         <div className="flex items-center justify-between mb-1">
-                          <span className={`text-[10px] ${labelClass}`}>使用率</span>
-                          <span className={`text-[10px] font-medium ${getUsageValueClass(pct)}`}>{pct}%</span>
+                          <span className={`text-xs ${labelClass}`}>使用率</span>
+                          <span className={`text-xs font-medium ${getUsageValueClass(pct)}`}>{pct}%</span>
                         </div>
                         <div className={progressTrackClass}>
                           <div className={`h-full rounded-full transition-all duration-700 ${getUsageBarClass(pct)}`} style={{ width: `${Math.min(pct, 100)}%` }} />
@@ -736,7 +736,7 @@ export default function Dashboard() {
                 </span>
                 <div className="min-w-0">
                   <div className={sectionTitleClass}>执行状态</div>
-                  <div className={`mt-0.5 text-[10px] ${labelClass}`}>当前进度与最近一次结果</div>
+                  <div className={`mt-0.5 text-xs ${labelClass}`}>当前进度与最近一次结果</div>
                 </div>
               </div>
               <IconButton
@@ -777,7 +777,7 @@ export default function Dashboard() {
                 </span>
                 <div className="min-w-0">
                   <div className={sectionTitleClass}>今日开放关卡</div>
-                  <div className={`mt-0.5 text-[10px] ${labelClass}`}>资源本与芯片本开放情况</div>
+                  <div className={`mt-0.5 text-xs ${labelClass}`}>资源本与芯片本开放情况</div>
                 </div>
               </div>
               <span className="dashboard-summary-count">{openStageSummary.open.length} 开放</span>
@@ -824,7 +824,7 @@ export default function Dashboard() {
                 </span>
                 <div className="min-w-0">
                   <div className={sectionTitleClass}>养成摘要</div>
-                  <div className={`mt-0.5 text-[10px] ${labelClass}`}>当前优先培养的干员目标</div>
+                  <div className={`mt-0.5 text-xs ${labelClass}`}>当前优先培养的干员目标</div>
                 </div>
               </div>
               <IconButton
@@ -875,7 +875,7 @@ export default function Dashboard() {
                 </span>
                 <div className="min-w-0">
                   <div className={sectionTitleClass}>今日掉落摘要</div>
-                  <div className={`mt-0.5 text-[10px] ${labelClass}`}>最近作战产出</div>
+                  <div className={`mt-0.5 text-xs ${labelClass}`}>最近作战产出</div>
                 </div>
               </div>
               <IconButton
@@ -935,15 +935,15 @@ export default function Dashboard() {
               <div>
                 <div className={`text-xs ${labelClass}`}>当前理智</div>
                 <div className="mt-1 text-3xl font-bold text-primary tracking-tight">{sklandData.ap.current}<span className={`text-lg font-normal ${labelClass}`}>/{sklandData.ap.max}</span></div>
-                <div className={`mt-1 text-[10px] ${labelClass}`}>{sklandData.ap.current >= sklandData.ap.max ? '已满' : `预计 ${formatFullRecoveryTime(sklandData.ap.completeRecoveryTime)} 回满`}</div>
+                <div className={`mt-1 text-xs ${labelClass}`}>{sklandData.ap.current >= sklandData.ap.max ? '已满' : `预计 ${formatFullRecoveryTime(sklandData.ap.completeRecoveryTime)} 回满`}</div>
               </div>
               <div className="flex gap-6 pt-3 border-t border-[var(--app-border)]">
                 <div>
-                  <div className={`text-[10px] ${labelClass}`}>日常</div>
+                  <div className={`text-xs ${labelClass}`}>日常</div>
                   <div className="mt-0.5 text-sm font-semibold text-primary">{sklandData.routine ? `${sklandData.routine.daily.current}/${sklandData.routine.daily.total}` : '--'}</div>
                 </div>
                 <div>
-                  <div className={`text-[10px] ${labelClass}`}>公招</div>
+                  <div className={`text-xs ${labelClass}`}>公招</div>
                   <div className="mt-0.5 text-sm font-semibold text-primary">{sklandData.recruit?.length || 0} 个</div>
                 </div>
               </div>
