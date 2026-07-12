@@ -225,7 +225,7 @@ export default function ScrcpyDeviceView({
     <>
     <div className={`scrcpy-device-layout ${isCompact ? 'is-compact' : ''}`}>
       <div className="space-y-3 min-w-0">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className={`scrcpy-view-header flex items-start justify-between gap-3 flex-wrap ${isCompact ? 'is-compact' : ''}`}>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className={`h-2 w-2 rounded-full ${statusDotClass}`} />
@@ -242,9 +242,9 @@ export default function ScrcpyDeviceView({
               onClick={webrtc.disconnect}
               title="断开预览"
               aria-label="断开预览"
-              className="control-surface flex h-8 w-8 items-center justify-center rounded-lg text-secondary transition-colors hover:text-primary"
+              className="scrcpy-compact-disconnect control-surface flex h-7 w-7 items-center justify-center rounded-md text-secondary transition-colors hover:text-primary"
             >
-              <Unplug className="h-3.5 w-3.5" strokeWidth={1.8} />
+              <Unplug className="h-4 w-4" strokeWidth={1.8} />
             </button>
           )}
           {!isCompact && <div className="flex flex-wrap gap-2 text-xs justify-end">

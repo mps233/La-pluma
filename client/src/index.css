@@ -4470,20 +4470,43 @@ svg.w-5.h-5 {
   }
 
   .task-monitor-panel.is-compact {
+    --scrcpy-compact-inset: 0.375rem;
     position: relative;
     overflow: visible;
-    padding: var(--app-space-3);
+    padding: var(--scrcpy-compact-inset);
     padding-bottom: 0;
   }
 
+  .scrcpy-view-header.is-compact {
+    position: relative;
+    min-height: 1.75rem;
+    padding-right: 2.25rem;
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+
+  .scrcpy-compact-disconnect {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    flex: none;
+    transform: translateY(-50%);
+  }
+
+  .scrcpy-compact-disconnect::before {
+    content: '';
+    position: absolute;
+    inset: -0.25rem;
+  }
+
   .task-monitor-panel.is-compact .scrcpy-device-layout.is-compact > .space-y-3 > :not([hidden]) ~ :not([hidden]) {
-    margin-top: var(--app-space-2);
+    margin-top: var(--scrcpy-compact-inset);
   }
 
   .task-monitor-panel.is-compact .scrcpy-video-frame {
-    width: calc(100% + (var(--app-space-3) * 2));
-    margin-right: calc(var(--app-space-3) * -1);
-    margin-left: calc(var(--app-space-3) * -1);
+    width: calc(100% + (var(--scrcpy-compact-inset) * 2));
+    margin-right: calc(var(--scrcpy-compact-inset) * -1);
+    margin-left: calc(var(--scrcpy-compact-inset) * -1);
     border-radius: 0 0 var(--app-radius-lg) var(--app-radius-lg);
   }
 
