@@ -542,10 +542,10 @@ export default function ConfigManager({}: ConfigManagerProps) {
         />
 
         <Card animated delay={0.1}>
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">配置目录</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 font-mono">{configDir || '加载中...'}</p>
+              <p className="break-all font-mono text-sm text-gray-600 dark:text-gray-400">{configDir || '加载中...'}</p>
             </div>
             <Button
               onClick={handleOpenConfigDir}
@@ -937,7 +937,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
           {/* 配置类型选择 */}
           <div>
             <motion.div 
-              className="rounded-3xl overflow-hidden surface-panel"
+              className="overflow-hidden rounded-2xl surface-panel"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
@@ -951,16 +951,15 @@ export default function ConfigManager({}: ConfigManagerProps) {
                     key={section.id}
                     onClick={() => handleConfigTypeChange(section.id)}
                     className={`
-                      w-full flex items-center space-x-3 px-4 py-3 rounded-2xl text-left transition-all mb-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]
+                      mb-2 flex min-h-12 w-full items-center space-x-3 rounded-xl px-4 py-2.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]
                       ${configType === section.id
                         ? 'brand-action-subtle'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] border border-transparent'
+                        : 'border border-transparent text-secondary hover:border-[var(--app-border)] hover:bg-[var(--app-surface-muted)] hover:text-primary'
                       }
                     `}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 + index * 0.1 }}
-                    whileHover={{ x: 4 }}
                   >
                     <span className="flex h-8 w-8 items-center justify-center [&>*]:!h-8 [&>*]:!w-8">{section.icon}</span>
                     <span className="text-sm font-medium">{section.name}</span>

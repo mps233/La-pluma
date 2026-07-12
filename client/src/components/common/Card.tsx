@@ -51,7 +51,7 @@ export function Card({
   hover = false,
   theme = 'default',
 }: CardProps) {
-  const Container = animated ? motion.div : 'div'
+  const Container = animated || hover ? motion.div : 'div'
   const animationProps = animated ? {
     initial: { opacity: 0, y: 20 },
     animate: { opacity: 1, y: 0 },
@@ -75,21 +75,9 @@ export function Card({
     teal: 'surface-panel',
   }
 
-  // 主题色 hover 样式
-  const hoverStyles: Record<string, string> = {
-    default: 'surface-panel-hover',
-    violet: 'surface-panel-hover',
-    emerald: 'surface-panel-hover',
-    purple: 'surface-panel-hover',
-    orange: 'surface-panel-hover',
-    cyan: 'surface-panel-hover',
-    amber: 'surface-panel-hover',
-    teal: 'surface-panel-hover',
-  }
-
   return (
     <Container 
-      className={`app-card ${themeStyles[theme]} ${hoverStyles[theme]} transition-all ${className}`}
+      className={`app-card ${themeStyles[theme]} ${hover ? 'surface-panel-hover' : ''} ${className}`}
       {...animationProps}
       {...hoverProps}
     >

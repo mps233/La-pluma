@@ -959,7 +959,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                         transition={{ delay: idx * 0.01 }}
                         className={`group relative p-3 rounded-2xl border transition-all overflow-hidden ${
                           isOwned
-                            ? 'surface-soft border-[var(--app-border)] hover:border-[var(--app-accent)] hover:shadow-lg'
+                            ? 'surface-soft border-[var(--app-border)] hover:border-[color-mix(in_srgb,var(--app-accent)_42%,var(--app-border))] hover:bg-[var(--app-accent-soft)]'
                             : 'surface-soft border-[var(--app-border)] opacity-75 grayscale-[0.15]'
                         }`}
                       >
@@ -1170,7 +1170,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: idx * 0.01 }}
-                        className="group flex items-center gap-3 p-3 surface-soft rounded-2xl border border-[var(--app-border)] hover:border-[var(--app-accent)] hover:shadow-lg transition-all"
+                        className="group flex items-center gap-3 rounded-2xl border border-[var(--app-border)] p-3 transition-colors surface-soft hover:border-[color-mix(in_srgb,var(--app-accent)_42%,var(--app-border))] hover:bg-[var(--app-accent-soft)]"
                       >
                         {/* 物品图标 */}
                         <div className="flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden surface-panel flex items-center justify-center">

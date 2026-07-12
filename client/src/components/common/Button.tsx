@@ -53,12 +53,12 @@ export default function Button({
   const baseStyles = 'app-button'
   
   const variantStyles: Record<string, string> = {
-    primary: 'brand-action disabled:!bg-slate-400 disabled:!shadow-none',
+    primary: 'brand-action',
     secondary: 'control-surface text-primary',
-    danger: 'status-danger-action disabled:!bg-slate-400 disabled:!shadow-none',
-    success: 'status-success-action disabled:!bg-slate-400 disabled:!shadow-none',
+    danger: 'status-danger-action',
+    success: 'status-success-action',
     ghost: 'app-button-ghost text-secondary',
-    gradient: 'brand-action disabled:!bg-slate-400 disabled:!shadow-none',
+    gradient: 'brand-action',
     outline: 'control-surface text-primary',
   }
   
@@ -142,9 +142,9 @@ export function IconButton({
   }
   
   const sizeStyles: Record<string, string> = {
-    sm: 'w-7 h-7 text-xs',
-    md: 'w-9 h-9 text-sm',
-    lg: 'w-11 h-11 text-base',
+    sm: 'app-icon-button-size-sm text-xs',
+    md: 'app-icon-button-size-md text-sm',
+    lg: 'app-icon-button-size-lg text-base',
   }
   
   return (

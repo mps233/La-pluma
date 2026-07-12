@@ -214,13 +214,13 @@ export default function ScrcpyDeviceView({
 
           </div>
           <div className="flex flex-wrap gap-2 text-xs justify-end">
-            <span className="px-2 py-1 rounded-full bg-cyan-50 dark:bg-white/5 text-gray-700 dark:text-gray-300">
+            <span className="surface-soft rounded-full px-2 py-1 text-secondary">
               组件：{infrastructureStatus?.built ? '已安装' : infrastructureStatus?.installed ? '待构建' : '未安装'}
             </span>
-            <span className="px-2 py-1 rounded-full bg-cyan-50 dark:bg-white/5 text-gray-700 dark:text-gray-300">
+            <span className="surface-soft rounded-full px-2 py-1 text-secondary">
               服务：{infrastructureStatus?.serverRunning ? '运行中' : '已停止'}
             </span>
-            <span className="px-2 py-1 rounded-full bg-cyan-50 dark:bg-white/5 text-gray-700 dark:text-gray-300">
+            <span className="surface-soft rounded-full px-2 py-1 text-secondary">
               Agent：{infrastructureStatus?.agentRunning ? '运行中' : '已停止'}
             </span>
             {webrtc.error && (
@@ -231,9 +231,9 @@ export default function ScrcpyDeviceView({
 
         <div className="grid grid-cols-4 gap-2 text-xs lg:grid-cols-8">
           {statusCards.map(([label, value]) => (
-            <div key={label} className="rounded-lg bg-white/70 dark:bg-black/25 border border-cyan-100 dark:border-white/10 px-2 py-1.5">
-              <div className="text-gray-500 dark:text-gray-500">{label}</div>
-              <div className="font-medium text-gray-800 dark:text-gray-200 truncate">{value}</div>
+            <div key={label} className="surface-soft rounded-lg px-2 py-1.5">
+              <div className="text-tertiary">{label}</div>
+              <div className="truncate font-medium text-primary">{value}</div>
             </div>
           ))}
         </div>
@@ -304,7 +304,7 @@ export default function ScrcpyDeviceView({
               disabled={action.disabled}
               title={action.label}
               aria-label={action.label}
-              className="group flex h-8 w-8 items-center justify-center rounded-full border border-gray-200/60 dark:border-white/10 bg-white/25 dark:bg-white/[0.03] text-gray-500 dark:text-gray-400 backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-cyan-400/50 hover:bg-cyan-500/10 hover:text-cyan-500 disabled:opacity-35 disabled:hover:translate-y-0 disabled:cursor-not-allowed"
+              className="control-surface flex h-8 w-8 items-center justify-center rounded-full text-secondary transition-colors hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35"
             >
               {action.icon}
             </button>
@@ -313,10 +313,10 @@ export default function ScrcpyDeviceView({
       </div>
 
       <aside className="space-y-3 xl:pt-0">
-        <section className="rounded-2xl bg-white/80 dark:bg-white/[0.035] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_0_0_1px_rgba(15,23,42,0.06),0_10px_30px_rgba(15,23,42,0.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_0_1px_rgba(255,255,255,0.08)]">
+        <section className="surface-soft rounded-2xl p-3">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-300">
+              <span className="surface-soft flex h-7 w-7 items-center justify-center rounded-xl text-secondary">
                 <Plug className="h-3.5 w-3.5" strokeWidth={1.8} />
               </span>
               <div>
@@ -333,6 +333,7 @@ export default function ScrcpyDeviceView({
               size="sm"
               variant="gradient"
               fullWidth
+              className="h-10"
               onClick={connect}
               disabled={infrastructureLoading !== null || ['connecting', 'signaling', 'waiting_offer', 'connecting_webrtc'].includes(webrtc.status)}
               loading={infrastructureLoading === 'preview'}
@@ -353,7 +354,7 @@ export default function ScrcpyDeviceView({
                     type="button"
                     onClick={action.onClick}
                     disabled={action.disabled || action.loading}
-                    className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-gray-50 text-xs font-medium text-gray-600 shadow-[0_0_0_1px_rgba(15,23,42,0.06)] transition hover:bg-white hover:text-gray-900 hover:shadow-[0_0_0_1px_rgba(6,182,212,0.35),0_6px_16px_rgba(15,23,42,0.06)] disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white/[0.04] dark:text-gray-300 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08)] dark:hover:bg-white/[0.07] dark:hover:text-white"
+                    className="control-surface flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-medium text-secondary transition-colors hover:text-primary disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Icon className="h-3.5 w-3.5" strokeWidth={1.7} />
                     <span>{action.loading ? '处理中' : action.label}</span>
@@ -364,26 +365,29 @@ export default function ScrcpyDeviceView({
           </div>
         </section>
 
-        <section className="rounded-2xl bg-white/80 dark:bg-white/[0.035] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_0_0_1px_rgba(15,23,42,0.06),0_10px_30px_rgba(15,23,42,0.06)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_0_0_1px_rgba(255,255,255,0.08)] text-xs">
+        <section className="surface-soft rounded-2xl p-3 text-xs">
           <button
             type="button"
             onClick={() => setQualitySettingsOpen(open => !open)}
             aria-expanded={qualitySettingsOpen}
-            className="flex w-full items-center justify-between gap-2 text-left xl:cursor-default"
+            className="flex min-h-10 w-full items-center justify-between gap-2 text-left xl:cursor-default"
           >
             <div className="flex min-w-0 items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-300">
+              <span className="surface-soft flex h-7 w-7 items-center justify-center rounded-xl text-secondary">
                 <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.8} />
               </span>
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-gray-900 dark:text-white">画质设置</div>
-                <div className="truncate text-xs text-gray-400">
-                  {qualityPresets[quality].label} · {customMaxSize}p · {customBitrateMbps}Mbps
+                <div
+                  className="truncate text-[11px] leading-4 text-gray-400"
+                  title={`${qualityPresets[quality].label} · ${customMaxSize}p · ${customBitrateMbps}Mbps`}
+                >
+                  {qualityPresets[quality].label} · {customMaxSize}p · {customBitrateMbps}M
                 </div>
               </div>
             </div>
             <span className="flex shrink-0 items-center gap-1.5">
-              <span className="rounded-lg bg-gray-100 px-2 py-1 text-xs font-medium text-gray-500 dark:bg-white/[0.06] dark:text-gray-400">
+              <span className="surface-soft rounded-lg px-2 py-1 text-xs font-medium text-secondary">
                 {customFps} FPS
               </span>
               <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform xl:hidden ${qualitySettingsOpen ? 'rotate-180' : ''}`} strokeWidth={1.8} />
@@ -398,13 +402,15 @@ export default function ScrcpyDeviceView({
                     key={key}
                     type="button"
                     onClick={() => applyPreset(key as QualityPreset)}
-                    className={`rounded-xl px-2 py-2 text-left shadow-[0_0_0_1px_rgba(15,23,42,0.06)] transition ${quality === key
-                      ? 'bg-cyan-50 text-cyan-700 shadow-[0_0_0_1px_rgba(6,182,212,0.26),0_8px_18px_rgba(8,145,178,0.08)] dark:bg-cyan-400/[0.12] dark:text-cyan-100 dark:shadow-[0_0_0_1px_rgba(34,211,238,0.22)]'
-                      : 'bg-gray-50 text-gray-600 hover:bg-white hover:text-gray-900 dark:bg-white/[0.04] dark:text-gray-300 dark:hover:bg-white/[0.07] dark:hover:text-white'
+                    className={`flex h-14 min-w-0 flex-col items-start justify-center gap-0.5 rounded-xl px-2 py-2 text-left transition-colors ${quality === key
+                      ? 'brand-action-subtle'
+                      : 'control-surface text-secondary hover:text-primary'
                     }`}
                   >
-                    <div className="text-xs font-semibold">{preset.label}</div>
-                    <div className={`mt-0.5 text-xs ${quality === key ? 'text-cyan-600/70 dark:text-cyan-100/55' : 'text-gray-400'}`}>{preset.maxSize}p · {preset.bitrateMbps}Mbps</div>
+                    <div className="text-xs font-semibold leading-4">{preset.label}</div>
+                    <div className={`whitespace-nowrap text-[11px] leading-4 ${quality === key ? 'brand-text opacity-70' : 'text-tertiary'}`}>
+                      {preset.maxSize}p · {preset.bitrateMbps}Mbps
+                    </div>
                   </button>
                 ))}
               </div>
@@ -418,9 +424,9 @@ export default function ScrcpyDeviceView({
                     key={fps}
                     type="button"
                     onClick={() => setCustomFps(fps)}
-                    className={`h-9 rounded-xl text-xs font-semibold shadow-[0_0_0_1px_rgba(15,23,42,0.06)] transition ${customFps === fps
-                      ? 'bg-cyan-50 text-cyan-700 shadow-[0_0_0_1px_rgba(6,182,212,0.26)] dark:bg-cyan-400/[0.12] dark:text-cyan-100 dark:shadow-[0_0_0_1px_rgba(34,211,238,0.22)]'
-                      : 'bg-gray-50 text-gray-500 hover:bg-white hover:text-gray-900 dark:bg-white/[0.04] dark:text-gray-300 dark:hover:bg-white/[0.07] dark:hover:text-white'
+                    className={`h-10 rounded-xl text-xs font-semibold transition-colors ${customFps === fps
+                      ? 'brand-action-subtle'
+                      : 'control-surface text-secondary hover:text-primary'
                     }`}
                   >
                     {fps}
@@ -429,7 +435,7 @@ export default function ScrcpyDeviceView({
               </div>
             </div>
 
-            <div className="space-y-2 rounded-xl bg-white/45 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_0_0_1px_rgba(15,23,42,0.05)] backdrop-blur-md dark:bg-white/[0.045] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_1px_rgba(255,255,255,0.07)]">
+            <div className="surface-soft space-y-2 rounded-xl px-3 py-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-1.5 text-xs font-medium text-gray-400">
                   <Gauge className="h-3 w-3" strokeWidth={1.8} />码率
@@ -443,8 +449,8 @@ export default function ScrcpyDeviceView({
                 step={1}
                 value={customBitrateMbps}
                 onChange={(event) => setCustomBitrateMbps(Number(event.target.value))}
-                style={{ background: `linear-gradient(to right, rgba(8,145,178,0.52) ${((customBitrateMbps - 2) / (32 - 2)) * 100}%, rgba(100,116,139,0.22) ${((customBitrateMbps - 2) / (32 - 2)) * 100}%)` }}
-                className="h-1.5 w-full cursor-pointer appearance-none rounded-full outline-none shadow-[inset_0_1px_1px_rgba(15,23,42,0.08)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-cyan-700/25 [&::-webkit-slider-thumb]:bg-white/90 [&::-webkit-slider-thumb]:shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_3px_rgba(8,145,178,0.12),0_2px_10px_rgba(15,23,42,0.16)] dark:[&::-webkit-slider-thumb]:border-white/20 dark:[&::-webkit-slider-thumb]:bg-white/35 dark:[&::-webkit-slider-thumb]:shadow-[inset_0_1px_0_rgba(255,255,255,0.32),0_2px_12px_rgba(0,0,0,0.28)] [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-cyan-700/25 [&::-moz-range-thumb]:bg-white/90 dark:[&::-moz-range-thumb]:border-white/20 dark:[&::-moz-range-thumb]:bg-white/35"
+                style={{ background: `linear-gradient(to right, var(--app-accent) ${((customBitrateMbps - 2) / (32 - 2)) * 100}%, var(--app-border) ${((customBitrateMbps - 2) / (32 - 2)) * 100}%)` }}
+                className="h-1.5 w-full cursor-pointer appearance-none rounded-full outline-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-[var(--app-accent)] [&::-webkit-slider-thumb]:bg-[var(--app-surface-solid)] [&::-webkit-slider-thumb]:shadow-[0_0_0_3px_var(--app-accent-soft)] [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-[var(--app-accent)] [&::-moz-range-thumb]:bg-[var(--app-surface-solid)] [&::-moz-range-thumb]:shadow-[0_0_0_3px_var(--app-accent-soft)]"
               />
             </div>
           </div>

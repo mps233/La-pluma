@@ -59,10 +59,8 @@ export default function Input({
   className = '',
   ...props
 }: InputProps) {
-  const baseStyles = 'app-input focus:ring-2'
-  const normalStyles = 'control-surface focus:ring-[var(--app-accent-soft)]'
-  const errorStyles = 'control-surface form-error-surface focus:ring-[color-mix(in_srgb,var(--app-danger)_24%,transparent)]'
-  const disabledStyles = 'opacity-50 cursor-not-allowed'
+  const baseStyles = 'app-input control-surface'
+  const errorStyles = 'form-error-surface'
   
   return (
     <div className={className}>
@@ -85,7 +83,8 @@ export default function Input({
           onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
           placeholder={placeholder}
           disabled={disabled}
-          className={`${baseStyles} ${error ? errorStyles : normalStyles} ${disabled ? disabledStyles : ''} ${icon ? 'pl-10' : ''}`}
+          aria-invalid={error ? true : undefined}
+          className={`${baseStyles} ${error ? errorStyles : ''} ${icon ? 'pl-10' : ''}`}
           {...props}
         />
       </div>
@@ -119,10 +118,8 @@ export function Select({
   className = '',
   ...props
 }: SelectProps) {
-  const baseStyles = 'app-input focus:ring-2'
-  const normalStyles = 'control-surface focus:ring-[var(--app-accent-soft)]'
-  const errorStyles = 'control-surface form-error-surface focus:ring-[color-mix(in_srgb,var(--app-danger)_24%,transparent)]'
-  const disabledStyles = 'opacity-50 cursor-not-allowed'
+  const baseStyles = 'app-input control-surface'
+  const errorStyles = 'form-error-surface'
   
   return (
     <div className={className}>
@@ -136,7 +133,8 @@ export function Select({
         value={value}
         onChange={(e: ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)}
         disabled={disabled}
-        className={`${baseStyles} ${error ? errorStyles : normalStyles} ${disabled ? disabledStyles : ''}`}
+        aria-invalid={error ? true : undefined}
+        className={`${baseStyles} ${error ? errorStyles : ''}`}
         {...props}
       >
         {options.map((option) => (

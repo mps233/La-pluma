@@ -95,7 +95,7 @@ Tailwind 中 `rounded-xl`、`rounded-2xl`、`rounded-3xl` 已统一映射到 `--
 | `--app-space-card` | `1rem` | `0.75rem` | 卡片内部、紧密列表 |
 | `--app-space-section` | `1.25rem` | `0.875rem` | 页面区块、主网格 |
 
-基础尺度遵循 4px 基线：`--app-space-1` 至 `--app-space-6` 分别为 4、8、12、16、20、24px。新增全局或通用组件间距时优先用这些 token；页面外层使用 `--app-space-page`，通用卡片内边距使用 `--app-space-panel`，表单控件使用 `--app-space-control-x` / `--app-space-control-y`。移动端会自动收缩页面、卡片和区块尺度。
+基础尺度遵循 4px 基线：`--app-space-1` 至 `--app-space-6` 分别为 4、8、12、16、20、24px。新增全局或通用组件间距时优先用这些 token；页面外层使用 `--app-space-page`，通用卡片内边距使用 `--app-space-panel`，表单控件使用 `--app-space-control-x`。移动端会自动收缩页面、卡片和区块尺度。
 
 不要在页面里继续散写大量 `space-y-6`、`gap-6`、`p-6` 来做版式基准。需要页面级布局时优先使用 `app-page`、`app-stack-section`、`app-grid-section`。
 
@@ -116,12 +116,12 @@ Tailwind 中 `rounded-xl`、`rounded-2xl`、`rounded-3xl` 已统一映射到 `--
 - 普通按钮：`app-button`
 - 图标按钮：`app-icon-button`
 
-三档 `Button` 的内边距由 `app-button-size-sm`、`app-button-size-md`、`app-button-size-lg` 统一管理，不要在调用处再叠加 `px-*`、`py-*` 改变标准按钮密度。
+三档 `Button` 的高度固定为 36、40、44px，由 `app-button-size-sm`、`app-button-size-md`、`app-button-size-lg` 统一管理；`Input` 和 `Select` 固定为 40px。不要在调用处再叠加 `h-*`、`px-*`、`py-*` 改变标准控件密度。图标专用工具条可明确使用更紧凑的尺寸，但不能承载文字。
 
 ### 交互状态与动效
 
 - 交互元素优先复用 `Button`、`IconButton`、`control-surface` 和 `surface-panel-hover`。不要为同类控件新增亮色渐变、强光晕或重投影。
-- 主、成功、危险操作的 hover 只做主题色压暗；次级与幽灵操作只使用弱主题背景或轻描边。普通卡片默认使用 `surface-panel-hover`；只有卡片本身可点击时才启用 `Card hover` 的缩放反馈。
+- 主、成功、危险操作的 hover 只做主题色压暗；次级与幽灵操作只使用弱主题背景或轻描边。普通卡片默认保持稳定，只有卡片本身可点击时才使用 `surface-panel-hover` 或启用 `Card hover`；不要给静态内容卡片增加投影闪动或位移。
 - 所有可点击元素必须有明确的 `focus-visible` 状态。优先复用 `Button`，手写控件至少添加 `focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]`，不能只提供 hover。
 - disabled 状态需关闭点击与 hover，并使用 `opacity-50`、`cursor-not-allowed`；loading 期间按钮自动禁用，仅显示加载内容。
 - 通用颜色、背景、阴影、变形过渡保持约 160 至 180ms；新增 CSS 或 Framer Motion 动效必须尊重 reduced motion。专用高光动画可例外，但不可用于普通按钮。
@@ -147,7 +147,7 @@ Tailwind 中 `rounded-xl`、`rounded-2xl`、`rounded-3xl` 已统一映射到 `--
 - 普通功能图标优先使用已引入的 `lucide-react`；业务身份、页面标题和概览图标优先复用 `Icons.tsx`。不要在普通页面重复手写 SVG。
 - 行内或文字旁图标使用 16px，常规操作和字段图标使用 20px，页面标题或大操作使用 24px。`icon-well` 只用于页面、概览和卡片的内容身份图标，不能包裹普通按钮图标。
 - 无文字操作使用 `IconButton`，调用时必须提供 `title` 和 `aria-label`；有文字的操作使用 `Button icon`，不要在调用处额外覆盖图标与文字间距或按钮尺寸。
-- `IconButton` 的 `sm`、`md`、`lg` 已固定为 28、36、44px。不要页面自行缩小点击面积；触控不足时使用更大的规格或调整外层布局。
+- `IconButton` 的 `sm`、`md`、`lg` 已固定为 36、40、44px。不要页面自行缩小点击面积；32px 仅保留给明确的高密度图标工具条，不得承载文字。
 - 装饰图标加 `aria-hidden="true"`；状态和结果必须同时提供可读文字或 `aria-label`，不能只依赖颜色和图标。
 
 按钮颜色按语义选择 `brand-action`、`status-success-action`、`status-danger-action`，不要按页面重新定义按钮渐变。

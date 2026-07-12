@@ -23,7 +23,7 @@
 
 - 页面标题使用 `PageHeader`；常规卡片标题使用 `text-lg font-semibold`；字段标题和正文使用 `text-sm`；说明、标签和元数据使用 `text-xs text-tertiary`。
 - 多行正文使用 `leading-6` 或 `leading-relaxed`；普通中文文本不要新增 letter spacing，也不要在普通页面新建 `8px` 至 `11px` 微文案。
-- 可点击元素优先使用 `Button`、`IconButton`、`control-surface` 或 `surface-panel-hover`，并保留 `focus-visible`。禁用与 loading 状态必须关闭交互，不能只降低透明度。
+- 可点击元素优先使用 `Button`、`IconButton`、`control-surface` 或 `surface-panel-hover`，并保留 `focus-visible`。静态卡片不添加 hover 位移或投影；禁用与 loading 状态必须关闭交互，不能只降低透明度。
 - 普通 hover 只做轻微压暗、弱主题背景或 1px 描边；不要新增高亮渐变、重投影或无意义缩放。新增动效应尊重 reduced motion。
 
 ### 反馈、图标与布局
@@ -41,7 +41,7 @@
 - `gap-3` / `gap-4` 和 `space-y-4` 映射到 `--app-space-card`。
 - `gap-5` / `gap-6` 和 `space-y-5` / `space-y-6` 映射到 `--app-space-section`。
 
-通用间距遵循 4px 基线：`--app-space-1` 至 `--app-space-6` 依次为 4、8、12、16、20、24px。页面、卡片、输入控件和按钮分别使用 `--app-space-page`、`--app-space-panel`、`--app-space-control-*` 与 `app-button-size-*`，不要在调用处覆盖标准控件的 `px-*`、`py-*`。
+通用间距遵循 4px 基线：`--app-space-1` 至 `--app-space-6` 依次为 4、8、12、16、20、24px。页面、卡片、输入控件和按钮分别使用 `--app-space-page`、`--app-space-panel`、`--app-space-control-x` 与 `app-button-size-*`。按钮高度固定为 36/40/44px，输入与选择框固定为 40px；不要在调用处覆盖标准控件的 `h-*`、`px-*`、`py-*`。
 
 页面布局优先使用：
 

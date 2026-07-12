@@ -104,7 +104,7 @@ export default function DropRecords({ dropStatistics, dropDays, setDropDays, onR
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: idx * 0.02 }}
-              className="group flex items-center gap-3 rounded-2xl border border-[var(--app-border)] p-3 surface-soft transition-all hover:border-[var(--app-accent)] hover:shadow-lg"
+              className="group flex items-center gap-3 rounded-2xl border border-[var(--app-border)] p-3 transition-colors surface-soft hover:border-[color-mix(in_srgb,var(--app-accent)_42%,var(--app-border))] hover:bg-[var(--app-accent-soft)]"
             >
               {/* 物品图标 */}
               {itemData.iconId && (

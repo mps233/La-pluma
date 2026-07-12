@@ -23,7 +23,7 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
   
   const getColorByDepth = (_d: number): string => 'bg-[var(--app-accent)] text-white';
   
-  const getBgColorByDepth = (): string => 'surface-soft border-[var(--app-border)]';
+  const getBgColorByDepth = (): string => 'surface-soft';
   
   // 只有顶层材料才返回完整的卡片结构
   if (depth === 0) {
@@ -32,10 +32,10 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.3 }}
-        className="p-4 rounded-2xl surface-soft hover:shadow-xl transition-all space-y-3"
+        className="space-y-3 rounded-2xl p-4 surface-soft"
       >
         {/* 顶层材料 */}
-        <div className={`p-3 rounded-xl border ${getBgColorByDepth()}`}>
+        <div className="rounded-xl p-3">
           <div className="flex items-center gap-3">
             {/* 材料图标 */}
             <div className="flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center">
@@ -76,7 +76,7 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
             
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-2">
-                <span className="font-bold text-gray-900 dark:text-white text-sm">
+                <span className="text-sm font-bold text-primary">
                   {node.name}
                 </span>
                 {hasChildren && (
@@ -89,18 +89,18 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 text-xs">
                   <div>
-                    <span className="text-gray-500 dark:text-gray-400">拥有 </span>
-                    <span className="font-bold text-green-600 dark:text-green-400">{node.have}</span>
+                    <span className="text-tertiary">拥有 </span>
+                    <span className="font-bold text-[var(--app-success)]">{node.have}</span>
                   </div>
-                  <span className="text-gray-400">/</span>
+                  <span className="text-tertiary">/</span>
                   <div>
-                    <span className="text-gray-500 dark:text-gray-400">需要 </span>
-                    <span className="font-bold text-gray-700 dark:text-gray-300">{node.needed}</span>
+                    <span className="text-tertiary">需要 </span>
+                    <span className="font-bold text-secondary">{node.needed}</span>
                   </div>
                 </div>
                 
                 {node.stillNeeded > 0 ? (
-                  <div className="px-3 py-1 rounded-lg text-center brand-action">
+                  <div className="rounded-lg px-3 py-1 text-center brand-chip">
                     <div className="text-xs font-bold">{hasChildren ? '还需合成' : '还需刷'} {node.stillNeeded}</div>
                   </div>
                 ) : (
@@ -115,7 +115,7 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
         
         {/* 子材料 */}
         {hasChildren && node.children && (
-          <div className="space-y-2 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+          <div className="space-y-2 border-l-2 border-[var(--app-border)] pl-4">
             {node.children.map((child, index) => (
               <MaterialHierarchyNode key={`${child.id}-${index}`} node={child} depth={depth + 1} />
             ))}
@@ -127,7 +127,7 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
   
   // 子材料的简化显示
   return (
-    <div className={`p-2.5 rounded-lg border ${getBgColorByDepth()}`}>
+    <div className={`rounded-lg p-2.5 ${getBgColorByDepth()}`}>
       <div className="flex items-center gap-2">
         {/* 材料图标 */}
         <div className="flex-shrink-0 w-9 h-9 rounded-lg overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center">
@@ -168,11 +168,11 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
         
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
-            <span className="font-semibold text-gray-900 dark:text-white text-xs truncate">
+            <span className="truncate text-xs font-semibold text-primary">
               {node.name}
             </span>
             {node.stillNeeded > 0 ? (
-              <span className="px-2 py-0.5 rounded font-bold text-xs brand-action">
+              <span className="rounded px-2 py-0.5 text-xs font-bold brand-chip">
                 -{node.stillNeeded}
               </span>
             ) : (
@@ -181,8 +181,8 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
           </div>
           
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-gray-500 dark:text-gray-400">
-              <span className="font-semibold text-green-600 dark:text-green-400">{node.have}</span> / {node.needed}
+            <span className="text-tertiary">
+              <span className="font-semibold text-[var(--app-success)]">{node.have}</span> / {node.needed}
             </span>
           </div>
         </div>
@@ -190,7 +190,7 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
       
       {/* 递归子材料 */}
       {hasChildren && node.children && (
-        <div className="mt-2 space-y-1.5 pl-3 border-l border-gray-300 dark:border-gray-600">
+        <div className="mt-2 space-y-1.5 border-l border-[var(--app-border)] pl-3">
           {node.children.map((child, index) => (
             <MaterialHierarchyNode key={`${child.id}-${index}`} node={child} depth={depth + 1} />
           ))}
@@ -219,7 +219,7 @@ function MaterialGapList({
 
   if (visibleMaterials.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-200/80 bg-slate-50/70 px-4 py-5 text-sm text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400 dark:shadow-none">
+      <div className="rounded-xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface-muted)] px-4 py-5 text-sm text-tertiary">
         {emptyText}
       </div>
     );
@@ -230,7 +230,7 @@ function MaterialGapList({
       {visibleMaterials.map((material) => (
         <div
           key={material.id}
-          className="flex min-h-[60px] items-center gap-3 rounded-xl border border-slate-200/80 bg-white/85 px-3 py-2 shadow-[0_8px_22px_rgba(15,23,42,0.035),inset_0_1px_0_rgba(255,255,255,0.8)] dark:border-white/10 dark:bg-white/[0.045] dark:shadow-none"
+          className="flex min-h-[60px] items-center gap-3 rounded-xl px-3 py-2 surface-soft"
         >
           <div className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-slate-100 to-slate-50 text-slate-400 ring-1 ring-slate-200/70 dark:from-slate-800 dark:to-slate-900 dark:text-slate-500 dark:ring-white/10">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -248,16 +248,16 @@ function MaterialGapList({
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">{material.name}</div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+            <div className="truncate text-sm font-semibold text-primary">{material.name}</div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-tertiary">
               <span>{material.have}/{material.needed}</span>
-              <span className="rounded-full bg-rose-50 px-1.5 py-0.5 font-semibold text-rose-600 dark:bg-rose-500/10 dark:text-rose-300">缺 {material.stillNeeded}</span>
+              <span className="rounded-full px-1.5 py-0.5 font-semibold status-danger">缺 {material.stillNeeded}</span>
             </div>
           </div>
         </div>
       ))}
       {hiddenCount > 0 && (
-        <div className="flex min-h-[60px] items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 text-sm font-medium text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400 dark:shadow-none">
+        <div className="flex min-h-[60px] items-center justify-center rounded-xl px-3 py-2 text-sm font-medium text-tertiary surface-soft">
           还有 {hiddenCount} 种材料
         </div>
       )}
@@ -272,14 +272,14 @@ interface OperatorEmptyStateProps {
 
 function OperatorEmptyState({ title, description }: OperatorEmptyStateProps) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-200/80 bg-white/70 px-6 py-12 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-white/10 dark:bg-white/[0.025] dark:shadow-none">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 ring-1 ring-slate-200/70 dark:bg-white/[0.06] dark:text-slate-500 dark:ring-white/10">
+    <div className="rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface-muted)] px-6 py-12 text-center">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl icon-well">
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2m-9 4h10M5 7h14a1 1 0 011 1v11a2 2 0 01-2 2H6a2 2 0 01-2-2V8a1 1 0 011-1z" />
         </svg>
       </div>
-      <h3 className="mt-4 text-base font-semibold text-slate-950 dark:text-white">{title}</h3>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">{description}</p>
+      <h3 className="mt-4 text-base font-semibold text-primary">{title}</h3>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-secondary">{description}</p>
     </div>
   );
 }
@@ -762,10 +762,10 @@ export default function OperatorTraining() {
           <section className={`space-y-4 ${currentTarget ? 'order-2 xl:order-1' : 'order-1'}`}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-slate-950 dark:text-white">添加干员</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">筛选并加入养成队列</p>
+                <h2 className="text-lg font-semibold text-primary">添加干员</h2>
+                <p className="text-sm text-secondary">筛选并加入养成队列</p>
               </div>
-              <div className="rounded-full border border-slate-200/80 bg-white/70 px-3 py-1 text-xs font-medium text-slate-500 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-400">
+              <div className="rounded-full px-3 py-1 text-xs font-medium text-tertiary surface-soft">
                 队列 {queue.length} · 今日计划 {openStageCount} 个关卡
               </div>
             </div>
@@ -778,7 +778,7 @@ export default function OperatorTraining() {
           <div className="flex flex-col gap-3">
             <div
               ref={statusTabsRef}
-              className="relative grid grid-cols-1 gap-1 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur sm:grid-cols-3"
+              className="relative grid grid-cols-1 gap-1 rounded-xl p-1 surface-soft sm:grid-cols-3"
             >
               {activeTrainingStatusOption && activeStatusTabRect.width > 0 && (
                 <motion.div
@@ -818,10 +818,10 @@ export default function OperatorTraining() {
                       needsElite2: option.value === 'all' ? false : filters.needsElite2
                     })}
                     aria-pressed={selected}
-                    className={`group relative z-10 flex min-w-0 items-center justify-between gap-3 rounded-lg px-3.5 py-2.5 text-left transition-colors ${
+                    className={`group relative z-10 flex min-w-0 items-center justify-between gap-3 rounded-lg px-3.5 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] ${
                       selected
                         ? 'text-transparent'
-                        : 'text-secondary hover:bg-white/70 hover:text-primary dark:hover:bg-white/10'
+                        : 'text-secondary hover:bg-[var(--app-surface-muted)] hover:text-primary'
                     }`}
                   >
                     <span className={`min-w-0 ${selected ? 'opacity-0' : ''}`}>
@@ -840,7 +840,7 @@ export default function OperatorTraining() {
             {/* 搜索框 */}
             <div className="flex-1 relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="h-5 w-5 text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
@@ -849,7 +849,7 @@ export default function OperatorTraining() {
                 placeholder="搜索干员名称..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200/80 bg-white/85 py-3 pl-10 pr-4 text-sm text-slate-900 shadow-[0_10px_26px_rgba(15,23,42,0.05),inset_0_1px_0_rgba(255,255,255,0.75)] outline-none transition-all placeholder:text-slate-400 focus:border-[var(--app-accent)] focus:ring-4 focus:ring-[var(--app-accent-soft)] dark:border-white/10 dark:bg-white/[0.055] dark:text-white dark:shadow-none"
+                className="app-input control-surface !h-10 !min-h-10 pl-10 pr-4 placeholder:text-tertiary"
               />
             </div>
             
@@ -858,11 +858,12 @@ export default function OperatorTraining() {
               {/* 稀有度 */}
               <div className="relative filter-menu-container">
                 <button
+                  type="button"
                   onClick={() => setOpenMenu(openMenu === 'rarity' ? null : 'rarity')}
-                  className={`h-11 flex items-center space-x-1.5 px-3 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap shadow-sm ${
+                  className={`flex h-10 items-center space-x-1.5 whitespace-nowrap rounded-xl px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] ${
                     filters.rarity
-                      ? 'bg-slate-950 text-white shadow-slate-900/15 dark:bg-white dark:text-slate-950'
-                      : 'border border-slate-200/80 bg-white/70 text-slate-600 hover:bg-white dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300 dark:hover:bg-white/10'
+                      ? 'control-active'
+                      : 'text-secondary control-surface'
                   }`}
                 >
                   <span>
@@ -873,7 +874,7 @@ export default function OperatorTraining() {
                   </svg>
                 </button>
                 {openMenu === 'rarity' && (
-                  <div className="absolute top-full left-0 mt-1 w-32 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50">
+                  <div className="absolute left-0 top-full z-50 mt-1 w-32 rounded-xl py-1 surface-panel">
                     {[
                       { value: '', label: '全部' },
                       { value: '6', label: '6星' },
@@ -882,14 +883,15 @@ export default function OperatorTraining() {
                     ].map((option) => (
                       <button
                         key={option.value}
+                        type="button"
                         onClick={() => {
                           setFilters({ ...filters, rarity: option.value });
                           setOpenMenu(null);
                         }}
-                        className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                        className={`h-10 w-full px-3 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--app-accent)] ${
                           filters.rarity === option.value
                             ? 'brand-action-subtle font-medium'
-                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            : 'text-secondary hover:bg-[var(--app-surface-muted)] hover:text-primary'
                         }`}
                       >
                         {option.label}
@@ -901,11 +903,12 @@ export default function OperatorTraining() {
 
               {/* 仅未精二 */}
               <button
+                type="button"
                 onClick={() => setFilters({ ...filters, needsElite2: !filters.needsElite2 })}
-                className={`h-11 flex items-center space-x-1.5 px-3 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap shadow-sm ${
+                className={`flex h-10 items-center space-x-1.5 whitespace-nowrap rounded-xl px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] ${
                   filters.needsElite2
-                    ? 'brand-action'
-                    : 'border border-slate-200/80 bg-white/70 text-slate-600 hover:bg-white dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-300 dark:hover:bg-white/10'
+                    ? 'control-active'
+                    : 'text-secondary control-surface'
                 }`}
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -921,7 +924,7 @@ export default function OperatorTraining() {
           {operatorsLoading ? (
             <div className="text-center py-12">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--app-accent)]"></div>
-              <p className="mt-2 text-gray-600 dark:text-gray-400">加载中...</p>
+              <p className="mt-2 text-secondary">加载中...</p>
             </div>
           ) : operatorEmptyState ? (
             <OperatorEmptyState {...operatorEmptyState} />
@@ -959,12 +962,12 @@ export default function OperatorTraining() {
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: Math.min(idx, 24) * 0.004 }}
-                      className={`group relative overflow-hidden rounded-2xl border p-3 transition-all duration-200 ${
+                      className={`group relative overflow-hidden rounded-2xl border p-3 transition-colors duration-200 ${
                         canAdd
-                          ? 'border-[var(--app-border)] bg-white/80 shadow-[0_10px_26px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,0.8)] hover:-translate-y-0.5 hover:border-[var(--app-accent)] hover:bg-[var(--app-accent-soft)] hover:shadow-[0_16px_34px_rgba(14,116,144,0.14)] dark:bg-white/[0.045] dark:shadow-none'
+                          ? 'border-transparent surface-soft hover:bg-[var(--app-accent-soft)]'
                           : isOwned
-                            ? 'border-slate-200/80 bg-slate-50/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-white/10 dark:bg-white/[0.03] dark:shadow-none'
-                            : 'border-slate-200/70 bg-slate-50/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] dark:border-white/10 dark:bg-white/[0.025] dark:shadow-none'
+                            ? 'border-transparent surface-soft'
+                            : 'border-transparent opacity-75 surface-soft'
                       }`}
                     >
                     <div className={`absolute top-2 left-2 z-10 rounded-md px-2 py-0.5 text-xs font-bold text-white shadow-sm backdrop-blur-sm ${
@@ -994,7 +997,7 @@ export default function OperatorTraining() {
                             decoding="async"
                             className={`w-full h-full object-cover transition-opacity duration-500 ${
                               imageLoaded ? 'opacity-100' : 'opacity-0'
-                            } ${canAdd && imageLoaded ? 'group-hover:scale-110 transition-transform duration-300' : ''}`}
+                            } ${canAdd && imageLoaded ? 'transition-transform duration-200 group-hover:scale-[1.03]' : ''}`}
                             onLoad={() => setLoadedImages(prev => prev[operator.id] ? prev : ({ ...prev, [operator.id]: true }))}
                             onError={(e) => {
                               // 如果加载失败，尝试带 _2 后缀的版本（用于异格干员）
@@ -1018,7 +1021,7 @@ export default function OperatorTraining() {
                           )}
                         </>
                       ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-gray-400 dark:text-gray-600">
+                        <div className="absolute inset-0 flex items-center justify-center text-tertiary">
                           无头像
                         </div>
                       )}
@@ -1031,7 +1034,7 @@ export default function OperatorTraining() {
                     </div>
                     
                     <div className="text-center space-y-2">
-                      <div className="truncate text-sm font-semibold text-slate-950 dark:text-white" title={operator.name}>
+                      <div className="truncate text-sm font-semibold text-primary" title={operator.name}>
                         {operator.name || '未知干员'}
                       </div>
                       <div className="flex flex-wrap items-center justify-center gap-1 text-xs">
@@ -1059,7 +1062,7 @@ export default function OperatorTraining() {
                         variant="gradient"
                         size="sm"
                         fullWidth
-                        className="h-8 rounded-lg text-xs"
+                        className="h-10 rounded-lg text-xs"
                       >
                         {actionLabel}
                       </Button>
@@ -1074,7 +1077,7 @@ export default function OperatorTraining() {
                     onClick={() => setVisibleOperatorLimit(limit => limit + OPERATOR_RENDER_BATCH_SIZE)}
                     variant="secondary"
                     size="md"
-                    className="min-w-36"
+                    className="h-10 min-w-36"
                   >
                     继续显示 {Math.min(OPERATOR_RENDER_BATCH_SIZE, hiddenOperatorCount)} 个
                   </Button>
@@ -1095,11 +1098,11 @@ export default function OperatorTraining() {
           className="space-y-4"
         >
           {currentTarget && (
-            <div className="relative overflow-hidden rounded-2xl border border-[var(--app-border)] bg-white/90 px-4 py-4 shadow-[0_18px_44px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur dark:bg-white/[0.055] dark:shadow-none">
+            <div className="relative overflow-hidden rounded-2xl px-4 py-4 surface-panel">
               <div className="absolute inset-x-0 top-0 h-px bg-[var(--app-accent)]/45" />
               <div className="flex flex-wrap items-center gap-2 pt-1">
-                <span className="rounded-md brand-action px-2 py-1 text-xs font-semibold shadow-sm">当前养成</span>
-                <h3 className="min-w-0 flex-1 truncate text-xl font-semibold text-slate-950 dark:text-white">{currentTarget.operator.name}</h3>
+                <span className="rounded-md px-2 py-1 text-xs font-semibold brand-chip">当前养成</span>
+                <h3 className="min-w-0 flex-1 truncate text-xl font-semibold text-primary">{currentTarget.operator.name}</h3>
                 <span className="rounded-md px-2 py-0.5 text-xs font-bold brand-chip">
                   {currentTarget.operator.rarity}★
                 </span>
@@ -1118,21 +1121,21 @@ export default function OperatorTraining() {
               </div>
 
               <div className="mt-4 grid grid-cols-3 gap-2">
-                <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-white/10 dark:bg-white/[0.035] dark:shadow-none">
-                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400">阶段</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-950 dark:text-white">精{currentTarget.currentElite} → 精{currentTarget.targetElite}</div>
+                <div className="rounded-xl px-3 py-2 surface-soft">
+                  <div className="text-xs font-medium text-tertiary">阶段</div>
+                  <div className="mt-1 text-sm font-semibold text-primary">精{currentTarget.currentElite} → 精{currentTarget.targetElite}</div>
                 </div>
-                <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-white/10 dark:bg-white/[0.035] dark:shadow-none">
-                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400">缺口</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-950 dark:text-white">{currentMissingMaterials.length} 种</div>
+                <div className="rounded-xl px-3 py-2 surface-soft">
+                  <div className="text-xs font-medium text-tertiary">缺口</div>
+                  <div className="mt-1 text-sm font-semibold text-primary">{currentMissingMaterials.length} 种</div>
                 </div>
-                <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-white/10 dark:bg-white/[0.035] dark:shadow-none">
-                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400">后续</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-950 dark:text-white">{backlogCount} 个</div>
+                <div className="rounded-xl px-3 py-2 surface-soft">
+                  <div className="text-xs font-medium text-tertiary">后续</div>
+                  <div className="mt-1 text-sm font-semibold text-primary">{backlogCount} 个</div>
                 </div>
               </div>
 
-              <div className="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
+              <div className="mt-3 text-sm leading-6 text-secondary">
                 {currentMissingPreview ? `优先补：${currentMissingPreview}` : '当前目标材料已接近完成'}
               </div>
 
@@ -1144,7 +1147,7 @@ export default function OperatorTraining() {
                 <select
                   value={planMode}
                   onChange={(e) => setPlanMode(e.target.value as TrainingPlanMode)}
-                  className="h-10 rounded-xl border border-slate-200/80 bg-white/85 px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition focus:border-[var(--app-accent)] focus:ring-4 focus:ring-[var(--app-accent-soft)] dark:border-white/10 dark:bg-slate-950/70 dark:text-white"
+                  className="app-input control-surface !h-10 !min-h-10"
                 >
                   <option value="current">仅当前</option>
                   <option value="all">全部队列</option>
@@ -1154,7 +1157,7 @@ export default function OperatorTraining() {
                   disabled={loading}
                   variant="gradient"
                   size="sm"
-                  className="h-10 rounded-xl"
+                  className="h-11 rounded-xl"
                   icon={
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -1168,8 +1171,8 @@ export default function OperatorTraining() {
           )}
 
           {/* 设置 */}
-          <details className="rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3 shadow-[0_12px_28px_rgba(15,23,42,0.045),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur dark:border-white/10 dark:bg-white/[0.045] dark:shadow-none">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-900 marker:text-slate-400 dark:text-white">自动化设置</summary>
+          <details className="rounded-2xl px-4 py-3 surface-panel">
+            <summary className="cursor-pointer text-sm font-semibold text-primary marker:text-tertiary">自动化设置</summary>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <Checkbox
                 checked={settings.autoSwitch}
@@ -1189,32 +1192,32 @@ export default function OperatorTraining() {
 
           {/* 队列列表 */}
           {queue.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-white/70 px-6 py-12 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] dark:bg-white/[0.025] dark:shadow-none">
+            <div className="rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface-muted)] px-6 py-12 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl icon-well">
                 <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                 </svg>
               </div>
-              <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">养成队列还是空的</h3>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">在左侧添加要养成的干员，系统会自动接上计划和今日流程。</p>
+              <h3 className="mt-4 text-lg font-semibold text-primary">养成队列还是空的</h3>
+              <p className="mt-2 text-sm text-secondary">在左侧添加要养成的干员，系统会自动接上计划和今日流程。</p>
             </div>
           ) : (
-            <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/80 shadow-[0_12px_28px_rgba(15,23,42,0.045),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur dark:border-white/10 dark:bg-white/[0.045] dark:shadow-none">
-              <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-white/10">
-                <h3 className="text-sm font-bold text-slate-950 dark:text-white">后续队列</h3>
-                <span className="text-xs text-slate-500 dark:text-slate-400">{upcomingQueue.length} 个待处理</span>
+            <div className="overflow-hidden rounded-2xl surface-panel">
+              <div className="flex items-center justify-between border-b border-[var(--app-border)] px-4 py-3">
+                <h3 className="text-sm font-bold text-primary">后续队列</h3>
+                <span className="text-xs text-tertiary">{upcomingQueue.length} 个待处理</span>
               </div>
               {upcomingQueue.length === 0 ? (
-                <div className="px-4 py-5 text-sm text-slate-500 dark:text-slate-400">当前只有一个养成目标。</div>
+                <div className="px-4 py-5 text-sm text-secondary">当前只有一个养成目标。</div>
               ) : (
-                <div className="divide-y divide-slate-200 dark:divide-white/10">
+                <div className="divide-y divide-[var(--app-border)]">
                   {upcomingQueue.map((item, index) => (
                     <motion.div
                       key={item.operatorId}
                       initial={{ opacity: 0, scale: 0.98 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: index * 0.04 }}
-                      className="px-4 py-3 transition-colors hover:bg-slate-50/80 dark:hover:bg-white/[0.035]"
+                      className="px-4 py-3 transition-colors hover:bg-[var(--app-surface-muted)]"
                     >
                       <div className="flex items-center gap-3">
                         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-600 dark:bg-white/10 dark:text-slate-300">
@@ -1222,7 +1225,7 @@ export default function OperatorTraining() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <h3 className="truncate text-sm font-bold text-slate-950 dark:text-white">
+                            <h3 className="truncate text-sm font-bold text-primary">
                               {item.operator.name}
                             </h3>
                             <span className="rounded-full px-2 py-0.5 text-xs font-bold brand-chip">
@@ -1265,23 +1268,23 @@ export default function OperatorTraining() {
           className="space-y-4"
         >
           {!plan ? (
-            <div className="rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-white/70 px-6 py-12 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] dark:bg-white/[0.025] dark:shadow-none">
+            <div className="rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface-muted)] px-6 py-12 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl icon-well">
                 <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                 </svg>
               </div>
-              <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">还没有刷取计划</h3>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">先在“养成队列”里添加干员并生成计划，系统会在这里展示推荐关卡、材料层级和总理智消耗。</p>
+              <h3 className="mt-4 text-lg font-semibold text-primary">还没有刷取计划</h3>
+              <p className="mt-2 text-sm text-secondary">先在“养成队列”里添加干员并生成计划，系统会在这里展示推荐关卡、材料层级和总理智消耗。</p>
             </div>
           ) : (
             <>
-              <div className="rounded-2xl border border-slate-200/80 bg-white/85 px-4 py-4 shadow-[0_12px_28px_rgba(15,23,42,0.045),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur dark:border-white/10 dark:bg-white/[0.045] dark:shadow-none">
+              <div className="rounded-2xl px-4 py-4 surface-panel">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] brand-text">今日流程</div>
-                    <h3 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">{planFocusName}</h3>
-                    <div className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    <h3 className="mt-1 text-lg font-semibold text-primary">{planFocusName}</h3>
+                    <div className="mt-1 text-sm leading-6 text-secondary">
                       可刷 {openStageCount} 个关卡 · 预计 {todayRunCount} 次 · 完整计划约 {plan.totalSanity || 0} 理智
                     </div>
                   </div>
@@ -1291,7 +1294,7 @@ export default function OperatorTraining() {
                       disabled={loading || openStageCount === 0}
                       variant="success"
                       size="sm"
-                      className="h-10 rounded-xl"
+                      className="h-11 rounded-xl"
                       icon={
                         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -1304,24 +1307,24 @@ export default function OperatorTraining() {
                 </div>
               </div>
 
-              <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/85 shadow-[0_12px_28px_rgba(15,23,42,0.045),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur dark:border-white/10 dark:bg-white/[0.045] dark:shadow-none">
-                <div className="flex items-center justify-between border-b border-slate-200/80 px-4 py-3 dark:border-white/10">
-                  <h3 className="text-base font-semibold text-slate-950 dark:text-white">今日推荐刷图</h3>
+              <div className="overflow-hidden rounded-2xl surface-panel">
+                <div className="flex items-center justify-between border-b border-[var(--app-border)] px-4 py-3">
+                  <h3 className="text-base font-semibold text-primary">今日推荐刷图</h3>
                   <span className="rounded-full px-2.5 py-1 text-xs font-semibold brand-chip">
                     {previewStages.length} 个优先
                   </span>
                 </div>
                 {previewStages.length > 0 ? (
-                  <div className="divide-y divide-slate-200 dark:divide-white/10">
+                  <div className="divide-y divide-[var(--app-border)]">
                     {previewStages.map((stage, idx) => (
-                      <div key={`${stage.stage}-${idx}`} className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-slate-50/80 dark:hover:bg-white/[0.035]">
+                      <div key={`${stage.stage}-${idx}`} className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-[var(--app-surface-muted)]">
                         <div className="flex min-w-0 items-center gap-3">
                           <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-500 ring-1 ring-slate-200/70 dark:bg-white/10 dark:text-slate-300 dark:ring-white/10">
                             {idx + 1}
                           </div>
                           <div className="min-w-0">
-                            <div className="font-semibold text-slate-950 dark:text-white">{stage.stage}</div>
-                            <div className="mt-1 truncate text-sm text-slate-500 dark:text-slate-400">
+                            <div className="font-semibold text-primary">{stage.stage}</div>
+                            <div className="mt-1 truncate text-sm text-secondary">
                               {stage.materials?.slice(0, 2).map((mat: any) => `${mat.name}×${mat.count}`).join('、') || '今日可直接推进'}
                             </div>
                           </div>
@@ -1330,18 +1333,18 @@ export default function OperatorTraining() {
                       </div>
                     ))}
                     {hiddenStageCount > 0 && (
-                      <div className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
+                      <div className="px-4 py-3 text-sm text-secondary">
                         还有 {hiddenStageCount} 个关卡，展开详情查看完整列表。
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="px-4 py-6 text-sm text-slate-500 dark:text-slate-400">今天没有可直接推进的养成关卡。</div>
+                  <div className="px-4 py-6 text-sm text-secondary">今天没有可直接推进的养成关卡。</div>
                 )}
               </div>
 
-              <details className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-[0_12px_28px_rgba(15,23,42,0.045),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur dark:border-white/10 dark:bg-white/[0.045] dark:shadow-none">
-                <summary className="cursor-pointer text-sm font-semibold text-slate-900 marker:text-slate-400 dark:text-white">查看材料、未开放关卡和计算详情</summary>
+              <details className="rounded-2xl p-4 surface-panel">
+                <summary className="cursor-pointer text-sm font-semibold text-primary marker:text-tertiary">查看材料、未开放关卡和计算详情</summary>
                 <div className="mt-5 space-y-5">
                   {plan.warnings && plan.warnings.length > 0 && (
                     <div className="rounded-2xl p-4 status-warning">
@@ -1356,14 +1359,14 @@ export default function OperatorTraining() {
 
                   {plan.closedStages && plan.closedStages.length > 0 && (
                     <div className="space-y-3">
-                      <h3 className="text-sm font-bold text-gray-900 dark:text-white">今日未开放</h3>
+                      <h3 className="text-sm font-bold text-primary">今日未开放</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {plan.closedStages.map((stage, idx) => (
                           <div key={`${stage.stage}-${idx}`} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 dark:border-red-500/20 dark:bg-red-500/5">
                             <div className="flex items-center justify-between gap-3">
                               <div>
-                                <div className="text-sm font-bold text-gray-900 dark:text-white">{stage.stage}</div>
-                                <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                <div className="text-sm font-bold text-primary">{stage.stage}</div>
+                                <div className="mt-1 text-xs text-tertiary">
                                   {stage.materials?.slice(0, 2).map((mat: any) => `${mat.name}×${mat.count}`).join('、') || '等待开放后再推进'}
                                 </div>
                               </div>
@@ -1377,14 +1380,14 @@ export default function OperatorTraining() {
 
                   {plan.materialHierarchy && plan.materialHierarchy.length > 0 && (
                     <div className="space-y-3">
-                      <h3 className="text-sm font-bold text-gray-900 dark:text-white">材料缺口</h3>
+                      <h3 className="text-sm font-bold text-primary">材料缺口</h3>
                       <MaterialGapList materials={plan.materialHierarchy} limit={8} emptyText="计划内材料已集齐" />
                     </div>
                   )}
 
                   {plan.materialHierarchy && plan.materialHierarchy.length > 0 && (
                     <div className="space-y-4">
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">材料需求</h3>
+                      <h3 className="text-lg font-bold text-primary">材料需求</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {plan.materialHierarchy.map((hierarchy, index) => (
                           <MaterialHierarchyNode key={`${hierarchy.id}-${index}`} node={hierarchy} />
@@ -1395,7 +1398,7 @@ export default function OperatorTraining() {
 
                   {plan.stages && plan.stages.length > 0 && (
                     <div className="space-y-4">
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">完整关卡列表</h3>
+                      <h3 className="text-lg font-bold text-primary">完整关卡列表</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {plan.stages.map((stage, idx) => (
                           <motion.div
@@ -1403,18 +1406,18 @@ export default function OperatorTraining() {
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ delay: idx * 0.05 }}
-                            className={`group relative p-5 rounded-3xl border transition-all overflow-hidden ${
+                            className={`relative overflow-hidden rounded-3xl p-5 ${
                               stage.isOpen !== false
-                                ? 'border-[var(--app-border)] surface-soft hover:border-[var(--app-accent)] hover:shadow-xl'
+                                ? 'surface-soft'
                                 : 'status-danger'
                             }`}
                           >
                             <div className="relative">
                               <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-3">
-                                  <div className={`px-3 py-1.5 rounded-xl font-bold text-sm shadow-lg ${
+                                  <div className={`px-3 py-1.5 rounded-xl font-bold text-sm ${
                                     stage.isOpen !== false
-                                      ? 'brand-action'
+                                      ? 'brand-chip'
                                       : 'bg-[var(--app-danger)] text-white'
                                   }`}>
                                     {stage.stage}

@@ -32,14 +32,15 @@
     --app-space-4: 1rem;
     --app-space-5: 1.25rem;
     --app-space-6: 1.5rem;
-    --app-space-button-sm-y: 0.375rem;
     --app-space-empty-action: 0.875rem;
     --app-space-card: var(--app-space-4);
     --app-space-section: var(--app-space-5);
     --app-space-page: var(--app-space-6);
     --app-space-panel: var(--app-space-5);
     --app-space-control-x: var(--app-space-4);
-    --app-space-control-y: var(--app-space-3);
+    --app-control-height-sm: 2.25rem;
+    --app-control-height-md: 2.5rem;
+    --app-control-height-lg: 2.75rem;
     --app-content-max: 100rem;
     --app-page-gutter: 2rem;
     --app-font-page-title: 1.5rem;
@@ -2254,12 +2255,16 @@ svg.w-5.h-5 {
   .brand-action {
     background: var(--app-accent);
     color: white;
-    box-shadow: 0 10px 24px color-mix(in srgb, var(--app-accent) 24%, transparent);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, white 12%, transparent),
+      0 5px 14px color-mix(in srgb, var(--app-accent) 18%, transparent);
   }
 
-  .brand-action:hover {
+  .brand-action:hover:not(:disabled) {
     background: color-mix(in srgb, var(--app-accent) 78%, black);
-    box-shadow: 0 9px 22px color-mix(in srgb, var(--app-accent) 22%, transparent);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, white 14%, transparent),
+      0 7px 18px color-mix(in srgb, var(--app-accent) 22%, transparent);
   }
 
   .brand-action-subtle {
@@ -2283,7 +2288,7 @@ svg.w-5.h-5 {
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.78),
       0 0 0 1px var(--app-border),
-      0 18px 48px rgba(15, 23, 42, 0.06);
+      0 12px 32px rgba(15, 23, 42, 0.055);
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
   }
@@ -2292,7 +2297,7 @@ svg.w-5.h-5 {
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
       0 0 0 1px var(--app-border),
-      0 22px 56px rgba(0, 0, 0, 0.34);
+      0 16px 40px rgba(0, 0, 0, 0.28);
   }
 
   .surface-soft {
@@ -3189,6 +3194,7 @@ svg.w-5.h-5 {
   .app-card {
     border-radius: var(--app-radius-lg);
     padding: var(--app-space-panel);
+    transition: background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
   }
 
   .app-card-header {
@@ -3211,39 +3217,78 @@ svg.w-5.h-5 {
 
   .app-button {
     display: inline-flex;
+    box-sizing: border-box;
+    flex-shrink: 0;
     align-items: center;
     justify-content: center;
+    border: 0;
     border-radius: var(--app-radius-lg);
     font-weight: 600;
+    line-height: 1.25;
+    white-space: nowrap;
     transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
   }
 
   .app-button:focus-visible {
-    outline: none;
-    box-shadow:
-      0 0 0 2px var(--app-bg),
-      0 0 0 4px color-mix(in srgb, var(--app-accent) 34%, transparent);
+    outline: 2px solid color-mix(in srgb, var(--app-accent) 62%, transparent);
+    outline-offset: 2px;
+  }
+
+  .app-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
   }
 
   .app-button-size-sm {
-    padding: var(--app-space-button-sm-y) var(--app-space-3);
+    height: var(--app-control-height-sm);
+    padding: 0 var(--app-space-3);
   }
 
   .app-button-size-md {
-    padding: var(--app-space-2) var(--app-space-control-x);
+    height: var(--app-control-height-md);
+    padding: 0 var(--app-space-control-x);
   }
 
   .app-button-size-lg {
-    padding: var(--app-space-control-y) var(--app-space-6);
+    height: var(--app-control-height-lg);
+    padding: 0 var(--app-space-6);
   }
 
   .app-icon-button {
     display: inline-flex;
+    box-sizing: border-box;
+    flex: none;
     align-items: center;
     justify-content: center;
+    border: 0;
     border-radius: var(--app-radius-lg);
     font-weight: 600;
     transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  .app-icon-button:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--app-accent) 62%, transparent);
+    outline-offset: 2px;
+  }
+
+  .app-icon-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .app-icon-button-size-sm {
+    width: var(--app-control-height-sm);
+    height: var(--app-control-height-sm);
+  }
+
+  .app-icon-button-size-md {
+    width: var(--app-control-height-md);
+    height: var(--app-control-height-md);
+  }
+
+  .app-icon-button-size-lg {
+    width: var(--app-control-height-lg);
+    height: var(--app-control-height-lg);
   }
 
   .app-empty-state {
@@ -3293,16 +3338,45 @@ svg.w-5.h-5 {
 
   .app-input {
     width: 100%;
+    height: var(--app-control-height-md);
+    min-height: var(--app-control-height-md);
+    box-sizing: border-box;
+    border: 0;
     border-radius: var(--app-radius-lg);
-    padding: var(--app-space-control-y) var(--app-space-control-x);
+    padding: 0 var(--app-space-3);
     color: var(--app-text);
     font-size: 0.875rem;
     font-weight: 500;
+    line-height: 1.25;
     transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease;
   }
 
-  .app-input:focus {
+  select.app-input {
+    padding-right: 2.5rem;
+  }
+
+  .app-input:focus,
+  .app-input:focus-visible {
     outline: none;
+  }
+
+  .app-input:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .app-input:disabled:hover {
+    background: color-mix(in srgb, var(--app-surface-solid) 78%, transparent);
+    box-shadow:
+      inset 0 0 0 1px var(--app-border-strong),
+      0 1px 2px rgba(15, 23, 42, 0.025);
+  }
+
+  .dark .app-input:disabled:hover {
+    background: var(--app-surface-muted);
+    box-shadow:
+      inset 0 0 0 1px var(--app-border-strong),
+      0 1px 3px rgba(0, 0, 0, 0.18);
   }
 
   .app-checkbox {
@@ -3379,59 +3453,63 @@ svg.w-5.h-5 {
     transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
   }
 
-  .surface-panel-hover:hover {
+  .surface-panel-hover:hover:not(:disabled) {
     transform: translateY(-1px);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.82),
-      0 0 0 1px rgba(6, 182, 212, 0.18),
-      0 22px 58px rgba(6, 95, 110, 0.10);
+      0 0 0 1px color-mix(in srgb, var(--app-accent) 20%, var(--app-border)),
+      0 16px 38px color-mix(in srgb, var(--app-accent) 9%, rgba(15, 23, 42, 0.07));
   }
 
-  .dark .surface-panel-hover:hover {
+  .dark .surface-panel-hover:hover:not(:disabled) {
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      0 0 0 1px rgba(34, 211, 238, 0.18),
-      0 22px 58px rgba(0, 0, 0, 0.42);
-  }
-
-  .dashboard-flow-card.surface-panel-hover:hover {
-    transform: none;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.72),
-      0 24px 56px rgba(15, 23, 42, 0.09);
-  }
-
-  .dark .dashboard-flow-card.surface-panel-hover:hover {
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 26px 64px rgba(0, 0, 0, 0.42);
+      0 0 0 1px color-mix(in srgb, var(--app-accent) 24%, var(--app-border)),
+      0 18px 44px rgba(0, 0, 0, 0.34);
   }
 
   .control-surface {
     background: color-mix(in srgb, var(--app-surface-solid) 78%, transparent);
     color: var(--app-text);
-    box-shadow: inset 0 0 0 1px var(--app-border);
+    box-shadow:
+      inset 0 0 0 1px var(--app-border-strong),
+      0 1px 2px rgba(15, 23, 42, 0.025);
   }
 
-  .control-surface:hover {
+  .control-surface:hover:not(:disabled) {
     background: color-mix(in srgb, var(--app-accent-soft) 24%, var(--app-surface-solid));
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 18%, var(--app-border));
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 26%, var(--app-border-strong)),
+      0 2px 5px rgba(15, 23, 42, 0.045);
   }
 
   .dark .control-surface {
     background: var(--app-surface-muted);
+    box-shadow:
+      inset 0 0 0 1px var(--app-border-strong),
+      0 1px 3px rgba(0, 0, 0, 0.18);
   }
 
-  .dark .control-surface:hover {
+  .dark .control-surface:hover:not(:disabled) {
     background: color-mix(in srgb, var(--app-accent-soft) 20%, var(--app-surface-muted));
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--app-accent-strong) 24%, var(--app-border-strong)),
+      0 2px 6px rgba(0, 0, 0, 0.24);
   }
 
-  .app-button-ghost:hover {
+  .app-input.control-surface:focus,
+  .app-input.control-surface:focus-visible {
+    box-shadow:
+      inset 0 0 0 1px var(--app-accent),
+      0 0 0 3px var(--app-accent-soft);
+  }
+
+  .app-button-ghost:hover:not(:disabled) {
     background: color-mix(in srgb, var(--app-accent-soft) 36%, transparent);
     color: var(--app-text);
   }
 
-  .dark .app-button-ghost:hover {
+  .dark .app-button-ghost:hover:not(:disabled) {
     background: color-mix(in srgb, var(--app-accent-soft) 28%, transparent);
   }
 
@@ -3510,12 +3588,16 @@ svg.w-5.h-5 {
   .status-success-action {
     background: var(--app-success);
     color: white;
-    box-shadow: 0 10px 24px color-mix(in srgb, var(--app-success) 22%, transparent);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, white 12%, transparent),
+      0 5px 14px color-mix(in srgb, var(--app-success) 18%, transparent);
   }
 
-  .status-success-action:hover {
+  .status-success-action:hover:not(:disabled) {
     background: color-mix(in srgb, var(--app-success) 80%, black);
-    box-shadow: 0 9px 22px color-mix(in srgb, var(--app-success) 20%, transparent);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, white 14%, transparent),
+      0 7px 18px color-mix(in srgb, var(--app-success) 22%, transparent);
   }
 
   .status-warning {
@@ -3533,12 +3615,16 @@ svg.w-5.h-5 {
   .status-danger-action {
     background: var(--app-danger);
     color: white;
-    box-shadow: 0 10px 24px color-mix(in srgb, var(--app-danger) 22%, transparent);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, white 12%, transparent),
+      0 5px 14px color-mix(in srgb, var(--app-danger) 18%, transparent);
   }
 
-  .status-danger-action:hover {
+  .status-danger-action:hover:not(:disabled) {
     background: color-mix(in srgb, var(--app-danger) 80%, black);
-    box-shadow: 0 9px 22px color-mix(in srgb, var(--app-danger) 20%, transparent);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, white 14%, transparent),
+      0 7px 18px color-mix(in srgb, var(--app-danger) 22%, transparent);
   }
 
   .status-info {
@@ -3555,6 +3641,13 @@ svg.w-5.h-5 {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-danger) 34%, transparent);
   }
 
+  .app-input.form-error-surface:focus,
+  .app-input.form-error-surface:focus-visible {
+    box-shadow:
+      inset 0 0 0 1px var(--app-danger),
+      0 0 0 3px color-mix(in srgb, var(--app-danger) 18%, transparent);
+  }
+
   .log-viewer {
     --log-row-divider: color-mix(in srgb, var(--app-border) 72%, transparent);
   }
@@ -3562,21 +3655,6 @@ svg.w-5.h-5 {
   .log-card {
     overflow: hidden;
     padding: 0;
-  }
-
-  .log-card.surface-panel-hover:hover {
-    transform: none;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.78),
-      0 0 0 1px var(--app-border),
-      0 18px 48px rgba(15, 23, 42, 0.06);
-  }
-
-  .dark .log-card.surface-panel-hover:hover {
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 0 0 1px var(--app-border),
-      0 22px 56px rgba(0, 0, 0, 0.34);
   }
 
   .log-notice {
@@ -4004,21 +4082,6 @@ svg.w-5.h-5 {
   .roguelike-workspace {
     overflow: hidden;
     padding: 0;
-  }
-
-  .roguelike-workspace.surface-panel-hover:hover {
-    transform: none;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.78),
-      0 0 0 1px var(--app-border),
-      0 18px 48px rgba(15, 23, 42, 0.06);
-  }
-
-  .dark .roguelike-workspace.surface-panel-hover:hover {
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 0 0 1px var(--app-border),
-      0 22px 56px rgba(0, 0, 0, 0.34);
   }
 
   .roguelike-workspace-header {
