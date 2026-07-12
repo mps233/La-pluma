@@ -811,9 +811,41 @@
   }
 }
 
-/* Automation three-pane composer */
+/* Automation overview and task composer */
+.automation-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: var(--app-space-section);
+}
+
+.automation-monitor-column,
+.automation-overview-grid .automation-schedule-column {
+  min-width: 0;
+}
+
+.automation-monitor-panel,
+.automation-overview-grid .automation-schedule-panel {
+  height: 100%;
+}
+
+.automation-overview-grid .automation-schedule-panel {
+  position: static;
+  top: auto;
+}
+
+@media (min-width: 1280px) {
+  .automation-overview-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
+  }
+
+  .automation-builder-grid {
+    max-width: calc(100% - 24rem - var(--app-space-section));
+  }
+}
+
 .automation-builder-grid {
-  grid-template-columns: minmax(16rem, 0.62fr) repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(16rem, 0.62fr) minmax(0, 1.75fr);
   gap: var(--app-space-card);
 }
 
@@ -1953,14 +1985,6 @@
 @media (min-width: 900px) and (max-width: 1199px) {
   .automation-builder-grid {
     grid-template-columns: minmax(18rem, 0.75fr) minmax(0, 1.5fr);
-  }
-
-  .automation-schedule-column {
-    grid-column: 1 / -1;
-  }
-
-  .automation-schedule-panel {
-    position: static;
   }
 }
 
@@ -4001,6 +4025,165 @@ svg.w-5.h-5 {
       inset 0 1px 0 rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
+  }
+
+  .scrcpy-device-container {
+    container-type: inline-size;
+  }
+
+  .scrcpy-device-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: var(--app-space-card);
+  }
+
+  .scrcpy-status-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--app-space-2);
+    font-size: var(--app-font-caption);
+  }
+
+  .scrcpy-quality-content {
+    display: none;
+  }
+
+  .scrcpy-quality-content.is-open {
+    display: block;
+  }
+
+  @container (min-width: 20rem) {
+    .scrcpy-status-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  @container (min-width: 40rem) {
+    .scrcpy-device-layout:not(.is-compact) {
+      grid-template-columns: minmax(0, 1fr) 12.5rem;
+    }
+
+    .scrcpy-quality-toggle {
+      cursor: default;
+    }
+
+    .scrcpy-quality-chevron {
+      display: none;
+    }
+
+    .scrcpy-quality-content {
+      display: block;
+    }
+  }
+
+  @container (min-width: 44rem) {
+    .scrcpy-status-grid {
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+    }
+  }
+
+  @container (min-width: 64rem) {
+    .scrcpy-device-layout:not(.is-compact) {
+      grid-template-columns: minmax(0, 1fr) 13.75rem;
+    }
+  }
+
+  .task-monitor-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: var(--app-space-section);
+  }
+
+  .task-monitor-main {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: var(--app-space-section);
+    container-type: inline-size;
+  }
+
+  .task-monitor-column {
+    position: relative;
+    min-width: 0;
+    width: 100%;
+    max-width: 48rem;
+    justify-self: center;
+    padding-bottom: 3.5rem;
+  }
+
+  .task-monitor-panel {
+    border-radius: var(--app-radius-lg);
+    padding: var(--app-space-panel);
+  }
+
+  .task-monitor-panel.is-compact {
+    position: relative;
+    overflow: visible;
+    padding: var(--app-space-3);
+    padding-bottom: 0;
+  }
+
+  .task-monitor-panel.is-compact .scrcpy-device-layout.is-compact > .space-y-3 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: var(--app-space-2);
+  }
+
+  .task-monitor-panel.is-compact .scrcpy-video-frame {
+    width: calc(100% + (var(--app-space-3) * 2));
+    margin-right: calc(var(--app-space-3) * -1);
+    margin-left: calc(var(--app-space-3) * -1);
+    border-radius: 0 0 var(--app-radius-lg) var(--app-radius-lg);
+  }
+
+  .task-monitor-panel.is-compact .scrcpy-preview-toolbar {
+    position: absolute;
+    top: calc(100% + var(--app-space-2));
+    left: 50%;
+    z-index: 2;
+    padding: 0;
+    transform: translateX(-50%);
+  }
+
+  .task-monitor-panel.is-compact .scrcpy-preview-toolbar button {
+    box-shadow:
+      inset 0 0 0 1px var(--app-border),
+      0 8px 18px rgba(15, 23, 42, 0.12);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+  }
+
+  @media (min-width: 1280px) {
+    .task-monitor-layout {
+      grid-template-columns: minmax(0, 1fr) 24rem;
+    }
+  }
+
+  .combat-copilot-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--app-space-card);
+  }
+
+  @container (min-width: 48rem) {
+    .combat-copilot-layout {
+      grid-template-columns: minmax(16rem, 17rem) minmax(0, 1fr);
+    }
+
+    .combat-copilot-layout > :first-child {
+      grid-row: 1 / span 2;
+      align-self: start;
+    }
+  }
+
+  @container (min-width: 60rem) {
+    .combat-copilot-layout {
+      grid-template-columns: 20rem minmax(0, 1fr) 20rem;
+    }
+
+    .combat-copilot-layout > :first-child {
+      grid-row: auto;
+    }
   }
 
   .roguelike-mode-tabs {

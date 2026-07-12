@@ -7,9 +7,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { maaApi } from '../services/api'
 import ScrcpyDeviceView from './ScrcpyDeviceView'
 
-export default function ScreenMonitor() {
+interface ScreenMonitorProps {
+  variant?: 'full' | 'compact'
+}
+
+export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) {
   const [webrtcStatus, setWebrtcStatus] = useState<any>(null)
   const [webrtcLoading, setWebrtcLoading] = useState<string | null>(null)
+  const [webrtcActionError, setWebrtcActionError] = useState<string | null>(null)
 
   const refreshWebrtcStatus = useCallback(async () => {
     try {
@@ -26,41 +31,60 @@ export default function ScreenMonitor() {
 
   const runWebrtcAction = async (action: string, fn: () => Promise<any>) => {
     setWebrtcLoading(action)
+    setWebrtcActionError(null)
     try {
       const result = await fn()
+      if (result?.success === false) throw new Error(maaApi.getErrorMessage(result))
       if (result?.data) setWebrtcStatus(result.data)
       await refreshWebrtcStatus()
+    } catch (error) {
+      setWebrtcActionError(error instanceof Error ? error.message : '预览操作失败')
     } finally {
       setWebrtcLoading(null)
     }
   }
 
   const startWebrtcInfrastructure = async () => {
-    let status = webrtcStatus
-    if (!status?.serverRunning) {
-      const result = await maaApi.startWebrtcServer()
-      status = result.data
-      setWebrtcStatus(status)
+    setWebrtcLoading('preview')
+    setWebrtcActionError(null)
+    try {
+      let status = webrtcStatus
+      if (!status?.serverRunning) {
+        const result = await maaApi.startWebrtcServer()
+        if (!result.success) throw new Error(maaApi.getErrorMessage(result))
+        status = result.data
+        setWebrtcStatus(status)
+      }
+      if (!status?.agentRunning) {
+        const result = await maaApi.startWebrtcAgent()
+        if (!result.success) throw new Error(maaApi.getErrorMessage(result))
+        status = result.data
+        setWebrtcStatus(status)
+      }
+      await refreshWebrtcStatus()
+    } catch (error) {
+      setWebrtcActionError(error instanceof Error ? error.message : '无法启动实时预览')
+      throw error
+    } finally {
+      setWebrtcLoading(null)
     }
-    if (!status?.agentRunning) {
-      const result = await maaApi.startWebrtcAgent()
-      status = result.data
-      setWebrtcStatus(status)
-    }
-    await refreshWebrtcStatus()
   }
 
   return (
-    <ScrcpyDeviceView
-      enabled={!!webrtcStatus?.serverRunning}
-      deviceId="mumu-la-pluma"
-      signalingUrl={webrtcStatus?.signalingUrl || 'ws://127.0.0.1:8443'}
-      onStartInfrastructure={startWebrtcInfrastructure}
-      infrastructureStatus={webrtcStatus}
-      infrastructureLoading={webrtcLoading}
-      onInstall={() => runWebrtcAction('install', () => maaApi.installWebrtc())}
-      onToggleServer={() => runWebrtcAction('server', () => webrtcStatus?.serverRunning ? maaApi.stopWebrtcServer() : maaApi.startWebrtcServer())}
-      onToggleAgent={() => runWebrtcAction('agent', () => webrtcStatus?.agentRunning ? maaApi.stopWebrtcAgent() : maaApi.startWebrtcAgent())}
-    />
+    <div className="scrcpy-device-container">
+      <ScrcpyDeviceView
+        variant={variant}
+        enabled={!!webrtcStatus?.serverRunning}
+        deviceId="mumu-la-pluma"
+        signalingUrl={webrtcStatus?.signalingUrl || 'ws://127.0.0.1:8443'}
+        onStartInfrastructure={startWebrtcInfrastructure}
+        infrastructureStatus={webrtcStatus}
+        infrastructureLoading={webrtcLoading}
+        infrastructureError={webrtcActionError}
+        onInstall={() => runWebrtcAction('install', () => maaApi.installWebrtc())}
+        onToggleServer={() => runWebrtcAction('server', () => webrtcStatus?.serverRunning ? maaApi.stopWebrtcServer() : maaApi.startWebrtcServer())}
+        onToggleAgent={() => runWebrtcAction('agent', () => webrtcStatus?.agentRunning ? maaApi.stopWebrtcAgent() : maaApi.startWebrtcAgent())}
+      />
+    </div>
   )
 }

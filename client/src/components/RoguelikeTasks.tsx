@@ -5,6 +5,7 @@ import Icons from './Icons'
 import { PageHeader, Card, Input, Select, Checkbox, Button } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
+import ScreenMonitor from './ScreenMonitor'
 import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
 import type {
   RoguelikeTasksProps,
@@ -331,6 +332,8 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
         actions={<FloatingStatusIndicator />}
       />
 
+      <div className="task-monitor-layout">
+        <div className="task-monitor-main">
       <div className="roguelike-mode-shell">
         <div ref={modeTabsRef} className="roguelike-mode-tabs">
           {activeModeRect.width > 0 && (
@@ -447,6 +450,14 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
           </section>
         </div>
       </Card>
+        </div>
+
+        <aside className="task-monitor-column" aria-label="模拟器实时预览">
+          <div className="task-monitor-panel is-compact surface-panel">
+            <ScreenMonitor variant="compact" />
+          </div>
+        </aside>
+      </div>
     </div>
   )
 }

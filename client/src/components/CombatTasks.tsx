@@ -5,6 +5,7 @@ import Icons from './Icons'
 import { PageHeader, Button } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
+import ScreenMonitor from './ScreenMonitor'
 import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
 import type {
   CombatTasksProps,
@@ -1242,7 +1243,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
 
   return (
     <>
-      <div className="app-page app-stack-section">
+      <div className="app-page app-stack-section combat-page">
         <PageHeader
           icon={<Icons.TargetIcon />}
           title="自动战斗"
@@ -1250,6 +1251,8 @@ export default function CombatTasks(_props: CombatTasksProps) {
           actions={<FloatingStatusIndicator />}
         />
 
+        <div className="task-monitor-layout">
+          <div className="task-monitor-main">
         <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur">
           <div ref={combatModeTabsRef} className="relative grid grid-cols-1 gap-1 sm:grid-cols-3">
             {activeCombatModeOption && activeCombatModeRect.width > 0 && (
@@ -1348,7 +1351,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                 </div>
 
                 {/* 作业配置区 */}
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)_320px]">
+                <div className="combat-copilot-layout">
                   {/* 左栏：设置项 */}
                   <div className="space-y-3 xl:sticky xl:top-24">
                     <div className="rounded-lg border border-[var(--app-border)] p-4 surface-soft">
@@ -2126,6 +2129,14 @@ export default function CombatTasks(_props: CombatTasksProps) {
               )
             })}
           </div>
+        </div>
+          </div>
+
+          <aside className="task-monitor-column" aria-label="模拟器实时预览">
+            <div className="task-monitor-panel is-compact surface-panel">
+              <ScreenMonitor variant="compact" />
+            </div>
+          </aside>
         </div>
       </div>
     </>

@@ -1339,6 +1339,115 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     }
   }, [])
 
+  const schedulePanel = (
+    <div className="automation-schedule-column">
+      <div className="automation-schedule-panel surface-panel">
+        <div className="automation-schedule-heading">
+          <div>
+            <h3><Icons.Clock /><span>定时与通知</span></h3>
+            <p>自动运行与结果推送</p>
+          </div>
+          <div className="automation-schedule-actions">
+            <label className="automation-schedule-enabled">
+              <input
+                type="checkbox"
+                checked={scheduleEnabled}
+                onChange={(e) => handleScheduleEnabledChange(e.target.checked)}
+                disabled={isRunning}
+                className="custom-checkbox cursor-pointer"
+              />
+              <span>{scheduleEnabled ? '已启用' : '未启用'}</span>
+            </label>
+          </div>
+        </div>
+
+        {scheduleEnabled ? (
+          <motion.div
+            className="automation-schedule-body"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="automation-schedule-list-heading">
+              <span>执行时间</span>
+              <small>{scheduleTimes.length}/6</small>
+            </div>
+            <div className="automation-schedule-times">
+              {scheduleTimes.map((time, index) => {
+                const [hour, minute] = time.split(':')
+
+                return (
+                  <div key={`${time}-${index}`} className="automation-schedule-time-row">
+                    <span>{String(index + 1).padStart(2, '0')}</span>
+                    <div className="automation-schedule-time-control">
+                      <select
+                        value={hour}
+                        onChange={(e) => {
+                          updateScheduleTime(index, `${e.target.value.padStart(2, '0')}:${minute}`)
+                        }}
+                        disabled={isRunning}
+                        aria-label={`第 ${index + 1} 个执行时间的小时`}
+                      >
+                        {Array.from({ length: 24 }, (_, i) => {
+                          const value = i.toString().padStart(2, '0')
+                          return <option key={value} value={value}>{value}</option>
+                        })}
+                      </select>
+                      <strong>:</strong>
+                      <select
+                        value={minute}
+                        onChange={(e) => {
+                          updateScheduleTime(index, `${hour}:${e.target.value.padStart(2, '0')}`)
+                        }}
+                        disabled={isRunning}
+                        aria-label={`第 ${index + 1} 个执行时间的分钟`}
+                      >
+                        {Array.from({ length: 60 }, (_, i) => {
+                          const value = i.toString().padStart(2, '0')
+                          return <option key={value} value={value}>{value}</option>
+                        })}
+                      </select>
+                    </div>
+                    {scheduleTimes.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => removeScheduleTime(index)}
+                        disabled={isRunning}
+                        className="automation-schedule-remove"
+                        title="删除时间点"
+                      >
+                        <Trash2 size={14} strokeWidth={1.9} />
+                      </button>
+                    ) : <span className="automation-schedule-remove-placeholder" />}
+                  </div>
+                )
+              })}
+            </div>
+            {scheduleTimes.length < 6 && (
+              <button
+                type="button"
+                onClick={addScheduleTime}
+                disabled={isRunning}
+                className="automation-schedule-add"
+              >
+                <Plus size={15} strokeWidth={2} />
+                <span>添加时间点</span>
+              </button>
+            )}
+          </motion.div>
+        ) : (
+          <div className="automation-schedule-empty">
+            <span><Icons.Clock /></span>
+            <strong>尚未启用</strong>
+            <p>启用后设置自动执行时间</p>
+          </div>
+        )}
+
+        <NotificationSettings />
+      </div>
+    </div>
+  )
+
   return (
     <>
       <div className="app-page" data-automation-tasks>
@@ -1385,13 +1494,15 @@ export default function AutomationTasks({}: AutomationTasksProps) {
           }
         />
 
-        {/* 实时预览独占一行 */}
-        <div>
-          {/* 模拟器监控 */}
-          <div className="rounded-2xl sm:rounded-3xl p-[var(--app-space-panel)] surface-panel transition-colors">
-            <ScreenMonitor />
+        {/* 实时预览 + 定时与通知 */}
+        <div className="automation-overview-grid">
+          <div className="automation-monitor-column">
+            <div className="automation-monitor-panel rounded-2xl p-[var(--app-space-panel)] surface-panel transition-colors sm:rounded-3xl">
+              <ScreenMonitor />
+            </div>
           </div>
 
+          {schedulePanel}
         </div>
 
         {/* 下半部分：任务流程 + 当前配置 */}
@@ -2683,114 +2794,6 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                   })}
                 </div>
               )}
-            </div>
-          </div>
-
-          {/* 定时执行 */}
-          <div className="automation-schedule-column">
-            <div className="automation-schedule-panel surface-panel">
-              <div className="automation-schedule-heading">
-                <div>
-                  <h3><Icons.Clock /><span>定时与通知</span></h3>
-                  <p>自动运行与结果推送</p>
-                </div>
-                <div className="automation-schedule-actions">
-                  <label className="automation-schedule-enabled">
-                    <input
-                      type="checkbox"
-                      checked={scheduleEnabled}
-                      onChange={(e) => handleScheduleEnabledChange(e.target.checked)}
-                      disabled={isRunning}
-                      className="custom-checkbox cursor-pointer"
-                    />
-                    <span>{scheduleEnabled ? '已启用' : '未启用'}</span>
-                  </label>
-                </div>
-              </div>
-
-              {scheduleEnabled ? (
-                <motion.div
-                  className="automation-schedule-body"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <div className="automation-schedule-list-heading">
-                    <span>执行时间</span>
-                    <small>{scheduleTimes.length}/6</small>
-                  </div>
-                  <div className="automation-schedule-times">
-                    {scheduleTimes.map((time, index) => {
-                      const [hour, minute] = time.split(':')
-
-                      return (
-                        <div key={`${time}-${index}`} className="automation-schedule-time-row">
-                          <span>{String(index + 1).padStart(2, '0')}</span>
-                          <div className="automation-schedule-time-control">
-                            <select
-                              value={hour}
-                              onChange={(e) => {
-                                updateScheduleTime(index, `${e.target.value.padStart(2, '0')}:${minute}`)
-                              }}
-                              disabled={isRunning}
-                              aria-label={`第 ${index + 1} 个执行时间的小时`}
-                            >
-                              {Array.from({ length: 24 }, (_, i) => {
-                                const value = i.toString().padStart(2, '0')
-                                return <option key={value} value={value}>{value}</option>
-                              })}
-                            </select>
-                            <strong>:</strong>
-                            <select
-                              value={minute}
-                              onChange={(e) => {
-                                updateScheduleTime(index, `${hour}:${e.target.value.padStart(2, '0')}`)
-                              }}
-                              disabled={isRunning}
-                              aria-label={`第 ${index + 1} 个执行时间的分钟`}
-                            >
-                              {Array.from({ length: 60 }, (_, i) => {
-                                const value = i.toString().padStart(2, '0')
-                                return <option key={value} value={value}>{value}</option>
-                              })}
-                            </select>
-                          </div>
-                          {scheduleTimes.length > 1 ? (
-                            <button
-                              type="button"
-                              onClick={() => removeScheduleTime(index)}
-                              disabled={isRunning}
-                              className="automation-schedule-remove"
-                              title="删除时间点"
-                            >
-                              <Trash2 size={14} strokeWidth={1.9} />
-                            </button>
-                          ) : <span className="automation-schedule-remove-placeholder" />}
-                        </div>
-                      )
-                    })}
-                  </div>
-                  {scheduleTimes.length < 6 && (
-                    <button
-                      type="button"
-                      onClick={addScheduleTime}
-                      disabled={isRunning}
-                      className="automation-schedule-add"
-                    >
-                      <Plus size={15} strokeWidth={2} />
-                      <span>添加时间点</span>
-                    </button>
-                  )}
-                </motion.div>
-              ) : (
-                <div className="automation-schedule-empty">
-                  <span><Icons.Clock /></span>
-                  <strong>尚未启用</strong>
-                  <p>启用后设置自动执行时间</p>
-                </div>
-              )}
-
-              <NotificationSettings />
             </div>
           </div>
         </div>

@@ -108,6 +108,7 @@ export function useScrcpyWebRTC({
   const streamRef = useRef<MediaStream | null>(null)
   const iceServersRef = useRef<RTCIceServer[]>([{ urls: 'stun:stun.l.google.com:19302' }])
   const touchSeqRef = useRef(0)
+  const connectionGenerationRef = useRef(0)
   const prevStatsRef = useRef({ timestamp: 0, bytesReceived: 0, framesDecoded: 0 })
 
   const sendForward = useCallback((payload: unknown) => {
@@ -190,6 +191,7 @@ export function useScrcpyWebRTC({
   }, [connectionPath, ipPreference, sendForward, videoRef])
 
   const disconnect = useCallback(() => {
+    connectionGenerationRef.current += 1
     inputChannelRef.current = null
     pcRef.current?.close()
     pcRef.current = null
@@ -205,19 +207,26 @@ export function useScrcpyWebRTC({
 
   const connect = useCallback(() => {
     disconnect()
+    const generation = connectionGenerationRef.current
     setStatus('connecting')
     setError(null)
     void getSignalingToken(signalingUrl)
       .then(token => {
+        if (connectionGenerationRef.current !== generation) return
         const ws = new WebSocket(normalizeSignalingUrl(signalingUrl, token))
         wsRef.current = ws
 
         ws.onopen = () => {
+      if (connectionGenerationRef.current !== generation) {
+        ws.close()
+        return
+      }
       setStatus('signaling')
       ws.send(JSON.stringify({ message_type: 'connect', device_id: deviceId }))
     }
 
     ws.onmessage = event => {
+      if (connectionGenerationRef.current !== generation) return
       const msg = JSON.parse(event.data)
       const type = msg.message_type || msg.type
       if (type === 'config') {
@@ -292,10 +301,12 @@ export function useScrcpyWebRTC({
     }
 
         ws.onerror = () => {
+          if (connectionGenerationRef.current !== generation) return
           setError('WebSocket error')
           setStatus('error')
         }
         ws.onclose = event => {
+          if (connectionGenerationRef.current !== generation) return
           if (event.code === 1008 || event.code === 1006) {
             window.localStorage.removeItem('scrcpy_webrtc_auth_token')
           }
@@ -303,6 +314,7 @@ export function useScrcpyWebRTC({
         }
       })
       .catch(err => {
+        if (connectionGenerationRef.current !== generation) return
         setError(err instanceof Error ? err.message : 'Signaling auth failed')
         setStatus('error')
       })
