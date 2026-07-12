@@ -30,28 +30,20 @@
 
 ## 📸 界面预览
 
-### 控制台
+### Web 端
 
 <p align="center">
-  <img src="screenshots/dashboard-web-theme-split.png" alt="控制台桌面端明暗主题斜切对比" width="70%" />
-  &nbsp;
-  <img src="screenshots/dashboard-mobile-theme-split.png" alt="控制台移动端明暗主题斜切对比" width="20%" />
+  <img src="screenshots/automation-web-theme-split.png" alt="自动化任务桌面端" width="92%" />
+  <br />
+  <em>自动化任务桌面端</em>
 </p>
 
-### 自动化
+### 移动端
 
 <p align="center">
-  <img src="screenshots/automation-web-theme-split.png" alt="自动化桌面端明暗主题斜切对比" width="70%" />
-  &nbsp;
-  <img src="screenshots/automation-mobile-theme-split.png" alt="自动化移动端明暗主题斜切对比" width="20%" />
-</p>
-
-### 作业
-
-<p align="center">
-  <img src="screenshots/combat-web-theme-split.png" alt="作业桌面端明暗主题斜切对比" width="70%" />
-  &nbsp;
-  <img src="screenshots/combat-mobile-theme-split.png" alt="作业移动端明暗主题斜切对比" width="20%" />
+  <img src="screenshots/automation-mobile-theme-split.png" alt="自动化任务移动端" width="36%" />
+  <br />
+  <em>自动化任务移动端</em>
 </p>
 
 ## 🧭 当前架构
