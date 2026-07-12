@@ -7,7 +7,7 @@
     "start": "node server.js",
     "check": "node scripts/check-syntax.js",
     "build": "npm run check",
-    "test": "node --test --test-concurrency=1",
+    "test": "node scripts/run-tests.js",
     "test:coverage": "node --test --test-concurrency=1 --experimental-test-coverage",
     "verify": "npm run check && npm run test",
     "fetch-materials": "node scripts/fetch-operator-materials.js",
