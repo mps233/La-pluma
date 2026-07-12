@@ -1222,7 +1222,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                 <select
                   value={(advanced[option.key] as string) || (option.options[0]?.value || '')}
                   onChange={(e) => handleAdvancedChange(task.id, option.key, e.target.value)}
-                  className="min-w-0 rounded-lg border border-[var(--app-border)] px-3 py-2 text-sm text-primary control-surface focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
+                  className="min-w-0 rounded-lg border border-[var(--app-border)] py-2 pl-3 pr-9 text-sm text-primary control-surface focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
                 >
                   {option.options.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -1271,13 +1271,13 @@ export default function CombatTasks(_props: CombatTasksProps) {
 
         <div className="task-monitor-layout">
           <div className="task-monitor-main">
-        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur">
+        <div className="combat-mode-shell">
           <div ref={combatModeTabsRef} className="relative grid grid-cols-1 gap-1 sm:grid-cols-3">
             {activeCombatModeOption && activeCombatModeRect.width > 0 && (
               <motion.div
                 data-testid="combat-mode-highlight"
                 aria-hidden="true"
-                className="pointer-events-none absolute z-20 flex items-center gap-3 rounded-lg bg-[var(--app-accent)] px-3.5 py-2.5 text-left text-white shadow-[0_10px_24px_color-mix(in_srgb,var(--app-accent)_22%,transparent)]"
+                className="combat-mode-highlight"
                 initial={false}
                 animate={{
                   x: activeCombatModeRect.x,
@@ -1289,12 +1289,12 @@ export default function CombatTasks(_props: CombatTasksProps) {
                   ? { duration: 0 }
                   : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/16 text-white [&_*]:h-4 [&_*]:w-4">
+                <span className="combat-mode-active-icon">
                   {activeCombatModeOption.icon}
                 </span>
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-semibold">{activeCombatModeOption.title}</span>
-                  <span className="mt-0.5 block truncate text-xs text-white/75">{activeCombatModeOption.desc}</span>
+                  <span className="combat-mode-active-description">{activeCombatModeOption.desc}</span>
                 </span>
               </motion.div>
             )}
@@ -1307,20 +1307,12 @@ export default function CombatTasks(_props: CombatTasksProps) {
                 type="button"
                 onClick={() => setActiveCombatMode(id)}
                 aria-pressed={activeCombatMode === id}
-                className={`group relative z-10 flex min-w-0 items-center gap-3 rounded-lg px-3.5 py-2.5 text-left transition-colors ${
-                  activeCombatMode === id
-                    ? 'text-transparent'
-                    : 'text-secondary hover:bg-white/70 hover:text-primary dark:hover:bg-white/10'
-                }`}
+                className={`combat-mode-button ${activeCombatMode === id ? 'is-selected' : ''}`}
               >
-                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors [&_*]:h-4 [&_*]:w-4 ${
-                  activeCombatMode === id
-                    ? 'opacity-0'
-                    : 'bg-[var(--app-surface-muted)] text-[var(--app-accent-strong)] group-hover:bg-[var(--app-accent-soft)]'
-                }`}>
+                <span className="combat-mode-icon">
                   {icon}
                 </span>
-                <span className={`min-w-0 ${activeCombatMode === id ? 'opacity-0' : ''}`}>
+                <span className="min-w-0">
                   <span className="block truncate text-sm font-semibold">{title}</span>
                   <span className="mt-0.5 block truncate text-xs text-tertiary">{desc}</span>
                 </span>
@@ -1336,11 +1328,11 @@ export default function CombatTasks(_props: CombatTasksProps) {
             return (
               <div
                 key={task.id}
-                className="rounded-xl border border-[var(--app-border)] p-5 surface-panel"
+                className="combat-task-card rounded-xl surface-panel"
               >
-                <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="combat-task-heading flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg brand-action-subtle [&_*]:h-4 [&_*]:w-4">
+                    <div className="combat-task-icon">
                       {task.icon}
                     </div>
                     <div className="min-w-0">
@@ -1362,7 +1354,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                         <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                       </svg>
                     }
-                    className="min-h-10 px-4 text-sm sm:px-6"
+                    className="combat-task-run-button min-h-10 px-4 text-sm sm:px-6"
                   >
                     立即执行
                   </Button>
@@ -1388,7 +1380,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                           <select
                             value={getFormationMode(task.id)}
                             onChange={(e) => setAutoFormation({ ...autoFormation, [task.id]: e.target.value as FormationMode })}
-                            className="min-w-0 flex-1 rounded-lg border border-[var(--app-border)] px-2 py-1.5 text-xs text-primary control-surface focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
+                            className="min-w-0 flex-1 rounded-lg border border-[var(--app-border)] py-1.5 pl-2 pr-8 text-xs text-primary control-surface focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
                           >
                             <option value="auto">自动决定</option>
                             <option value="on">自动编队</option>
@@ -1406,7 +1398,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                         <select
                           value={normalizeRaidValue(advancedParams[task.id]?.raid)}
                           onChange={(e) => handleAdvancedChange(task.id, 'raid', e.target.value)}
-                          className="min-w-0 flex-1 rounded-lg border border-[var(--app-border)] px-2 py-1.5 text-xs text-primary control-surface focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
+                          className="min-w-0 flex-1 rounded-lg border border-[var(--app-border)] py-1.5 pl-2 pr-8 text-xs text-primary control-surface focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
                         >
                           <option value="normal">普通模式</option>
                           <option value="raid">突袭模式</option>
@@ -1421,7 +1413,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                           <select
                             value={copilotSetExecutionMode}
                             onChange={(e) => setCopilotSetExecutionMode(e.target.value as CopilotSetExecutionMode)}
-                            className="min-w-0 flex-1 rounded-lg border border-[var(--app-border)] px-2 py-1.5 text-xs text-primary control-surface focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
+                            className="min-w-0 flex-1 rounded-lg border border-[var(--app-border)] py-1.5 pl-2 pr-8 text-xs text-primary control-surface focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
                           >
                             <option value="app">顺序执行</option>
                             <option value="manual">手动逐关</option>
@@ -1447,7 +1439,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
 
                   {/* 中栏：输入框 + 作业列表 */}
                   <div className="flex min-w-0 flex-col space-y-3">
-                    <div className="rounded-lg border border-[var(--app-border)] p-2 surface-soft">
+                    <div className="rounded-lg border border-[var(--app-border)] p-4 surface-soft">
                       <div className="flex gap-2">
                         <input
                           type="text"
@@ -1481,7 +1473,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                           {!isLoadingSet && '预览'}
                         </Button>
                       </div>
-                      <div className="mt-2 flex items-center justify-between gap-3 px-1 text-xs text-tertiary">
+                      <div className="mt-2 flex items-center justify-between gap-3 text-xs text-tertiary">
                         <p className="truncate">支持作业链接、导入文件和本地作业。</p>
                         <details className="relative shrink-0">
                           <summary className="cursor-pointer list-none brand-text hover:underline">说明</summary>
@@ -1495,14 +1487,14 @@ export default function CombatTasks(_props: CombatTasksProps) {
                     </div>
 
                     {/* 作业类型选择 */}
-                    <div className="flex items-center justify-between gap-2 text-xs">
-                      <span className="font-medium text-secondary">识别方式</span>
-                      <div className="flex overflow-hidden rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] p-0.5">
+                    <div className="flex items-center justify-between gap-3 px-4 text-xs">
+                      <span className="shrink-0 font-medium text-secondary">识别方式</span>
+                      <div className="flex min-w-0 max-w-full overflow-hidden rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] p-0.5">
                         <button
                           onClick={() => setCopilotType('auto')}
                           className={`rounded-md px-3 py-1 transition-colors ${
                             copilotType === 'auto'
-                              ? 'brand-action'
+                              ? 'combat-segment-active'
                               : 'text-secondary hover:bg-white/70 hover:text-primary dark:hover:bg-white/10'
                           }`}
                         >
@@ -1512,7 +1504,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                           onClick={() => setCopilotType('single')}
                           className={`rounded-md px-3 py-1 transition-colors ${
                             copilotType === 'single'
-                              ? 'brand-action'
+                              ? 'combat-segment-active'
                               : 'text-secondary hover:bg-white/70 hover:text-primary dark:hover:bg-white/10'
                           }`}
                         >
@@ -1522,7 +1514,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                           onClick={() => setCopilotType('set')}
                           className={`rounded-md px-3 py-1 transition-colors ${
                             copilotType === 'set'
-                              ? 'brand-action'
+                              ? 'combat-segment-active'
                               : 'text-secondary hover:bg-white/70 hover:text-primary dark:hover:bg-white/10'
                           }`}
                         >
@@ -1810,7 +1802,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                               </div>
                               <div className="flex items-center gap-1.5">
                                 {selectedSearchCopilotUri === copilot.uri && (
-                                  <span className="whitespace-nowrap rounded-md px-1.5 py-0.5 text-xs brand-action">已选中</span>
+                                  <span className="whitespace-nowrap rounded-md px-1.5 py-0.5 text-xs brand-chip">已选中</span>
                                 )}
                                 {idx === 0 && (
                                   <span className="whitespace-nowrap rounded-md px-1.5 py-0.5 text-xs brand-chip">推荐</span>
@@ -1944,11 +1936,11 @@ export default function CombatTasks(_props: CombatTasksProps) {
               return (
                 <div
                   key={task.id}
-                  className="rounded-xl border border-[var(--app-border)] p-5 surface-panel"
+                  className="combat-task-card rounded-xl surface-panel"
                 >
-                  <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="combat-task-heading flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg brand-action-subtle [&_*]:h-4 [&_*]:w-4">
+                      <div className="combat-task-icon">
                         {task.icon}
                       </div>
                       <div className="min-w-0">
@@ -1970,13 +1962,13 @@ export default function CombatTasks(_props: CombatTasksProps) {
                           <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                         </svg>
                       }
-                      className="min-h-10 px-4 text-sm sm:px-5"
+                      className="combat-task-run-button min-h-10 px-4 text-sm sm:px-5"
                     >
                       立即执行
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+                  <div className="combat-special-layout">
                     <div className="min-w-0 space-y-4">
                       <div className="rounded-lg border border-[var(--app-border)] p-4 surface-soft">
                         <div className="mb-3 flex items-center justify-between gap-3">

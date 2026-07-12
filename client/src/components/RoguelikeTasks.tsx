@@ -353,7 +353,7 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
               {ActiveIcon && <span className="roguelike-mode-icon is-active"><ActiveIcon /></span>}
               <span className="min-w-0">
                 <span className="block truncate text-sm font-semibold">{activeTask.name}</span>
-                <span className="mt-0.5 block truncate text-xs text-white/75">{activeTask.description}</span>
+                <span className="roguelike-mode-description">{activeTask.description}</span>
               </span>
             </motion.div>
           )}

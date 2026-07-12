@@ -22,7 +22,10 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry({ onOpen }: Da
           <Button onClick={onOpen} variant="ghost" size="sm">打开</Button>
         </div>
       </div>
-      <div data-dashboard-preview-frame className="relative aspect-video w-full overflow-hidden bg-black">
+      <div
+        data-dashboard-preview-frame
+        className={`dashboard-preview-frame relative aspect-video w-full overflow-hidden ${showLivePreview || fallbackSnapshot ? 'bg-black' : 'is-empty'}`}
+      >
         <video
           ref={videoRef}
           autoPlay
@@ -41,17 +44,14 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry({ onOpen }: Da
         <button
           type="button"
           onClick={onOpen}
-          className={`absolute inset-0 flex items-center justify-center text-left ${showLivePreview || fallbackSnapshot ? 'bg-transparent' : 'bg-black'}`}
+          className={`absolute inset-0 flex items-center justify-center text-left ${showLivePreview || fallbackSnapshot ? 'bg-transparent' : 'dashboard-preview-empty'}`}
         >
           {!showLivePreview && !fallbackSnapshot && (
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,color-mix(in_srgb,var(--app-accent)_18%,transparent),transparent_45%)] opacity-80" />
-          )}
-          {!showLivePreview && !fallbackSnapshot && (
             <div className="relative text-center">
-              <div className="icon-well mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl">
+              <div className="device-preview-empty-icon mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg">
                 <Monitor size={17} strokeWidth={2} />
               </div>
-              <div className="text-sm font-semibold text-white">等待 Live 画面</div>
+              <div className="text-sm font-semibold text-primary">等待 Live 画面</div>
               <div className="mt-1 text-xs text-secondary">点击进入完整控制台</div>
             </div>
           )}

@@ -1581,7 +1581,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         {/* 实时预览 + 定时与通知 */}
         <div className="automation-overview-grid">
           <div className="automation-monitor-column">
-            <div className="automation-monitor-panel rounded-2xl p-[var(--app-space-panel)] surface-panel transition-colors sm:rounded-3xl">
+            <div className="automation-monitor-panel p-[var(--app-space-panel)] surface-panel transition-colors">
               <ScreenMonitor />
             </div>
           </div>
@@ -2833,6 +2833,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                             type="button"
                             fullWidth
                             size="md"
+                            variant="secondary"
                             onClick={() => void testConnection(task.id)}
                             disabled={isRunning || !task.enabled || testingConnectionTaskId !== null}
                             loading={isTestingConnection}
@@ -2844,9 +2845,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                 ? <AlertTriangle size={16} strokeWidth={2.2} aria-hidden="true" />
                                 : <Cable size={16} strokeWidth={2.1} aria-hidden="true" />}
                             aria-busy={isTestingConnection}
-                            className={isTestingConnection
-                              ? 'disabled:!bg-[var(--app-accent)] disabled:!text-white disabled:!opacity-80'
-                              : ''}
+                            className={`automation-test-connection${isTestingConnection ? ' is-testing' : ''}`}
                           >
                             {connectionFeedback ? '重新测试' : '测试连接'}
                           </Button>

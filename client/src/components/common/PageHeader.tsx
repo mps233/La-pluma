@@ -31,16 +31,16 @@ export default function PageHeader({
 
   return (
     <Container 
-      className="flex items-center justify-between"
+      className="app-page-header"
       {...animationProps}
     >
-      <div className="flex items-center space-x-4">
+      <div className="app-page-heading">
         {icon && (
-          <div className="icon-well flex h-11 w-11 items-center justify-center rounded-2xl [&_*]:text-current">
+          <div className="app-page-header-icon icon-well [&_*]:text-current">
             {icon}
           </div>
         )}
-        <div>
+        <div className="min-w-0">
           <h2 className="app-page-title text-primary">
             {title}
           </h2>
@@ -53,7 +53,7 @@ export default function PageHeader({
       </div>
       
       {actions && (
-        <div className="flex items-center space-x-4">
+        <div className="app-page-actions">
           {actions}
         </div>
       )}

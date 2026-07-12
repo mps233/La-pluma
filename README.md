@@ -30,21 +30,29 @@
 
 ## 📸 界面预览
 
-### Web 端
+### 控制台
 
-<div align="center">
-  <img src="screenshots/web-light.png" alt="自动化任务桌面端浅色界面" width="45%" />
-  <img src="screenshots/web-dark.png" alt="自动化任务桌面端深色界面" width="45%" />
-  <p><em>自动化任务桌面端 - 浅色模式 & 深色模式</em></p>
-</div>
+<p align="center">
+  <img src="screenshots/dashboard-web-theme-split.png" alt="控制台桌面端明暗主题斜切对比" width="70%" />
+  &nbsp;
+  <img src="screenshots/dashboard-mobile-theme-split.png" alt="控制台移动端明暗主题斜切对比" width="20%" />
+</p>
 
-### 移动端
+### 自动化
 
-<div align="center">
-  <img src="screenshots/m-light.png" alt="自动化任务移动端浅色界面" width="30%" />
-  <img src="screenshots/m-dark.png" alt="自动化任务移动端深色界面" width="30%" />
-  <p><em>自动化任务移动端 - 浅色模式 & 深色模式</em></p>
-</div>
+<p align="center">
+  <img src="screenshots/automation-web-theme-split.png" alt="自动化桌面端明暗主题斜切对比" width="70%" />
+  &nbsp;
+  <img src="screenshots/automation-mobile-theme-split.png" alt="自动化移动端明暗主题斜切对比" width="20%" />
+</p>
+
+### 作业
+
+<p align="center">
+  <img src="screenshots/combat-web-theme-split.png" alt="作业桌面端明暗主题斜切对比" width="70%" />
+  &nbsp;
+  <img src="screenshots/combat-mobile-theme-split.png" alt="作业移动端明暗主题斜切对比" width="20%" />
+</p>
 
 ## 🧭 当前架构
 

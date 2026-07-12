@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import { ArrowLeft, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
 import { Button } from './common'
 import { useScrcpyWebRTC } from '../hooks/useScrcpyWebRTC'
-import { maaApi } from '../services/api'
 
 interface ScrcpyDeviceViewProps {
   enabled: boolean
@@ -73,8 +72,6 @@ export default function ScrcpyDeviceView({
   const [customMaxSize, setCustomMaxSize] = useState<number>(qualityPresets.smooth.maxSize)
   const [customBitrateMbps, setCustomBitrateMbps] = useState<number>(qualityPresets.smooth.bitrateMbps)
   const [immersiveMode, setImmersiveMode] = useState(false)
-  const [previewOrientation, setPreviewOrientation] = useState<'portrait' | 'landscape'>('portrait')
-  const [orientationLoading, setOrientationLoading] = useState(false)
   const bitrateProgress = ((customBitrateMbps - 2) / (32 - 2)) * 100
   const scrcpyOptions = useMemo(() => ({
     max_fps: customFps,
@@ -178,18 +175,6 @@ export default function ScrcpyDeviceView({
   }
   const exitImmersive = () => setImmersiveMode(false)
 
-  const togglePreviewOrientation = async () => {
-    if (orientationLoading) return
-    const next = previewOrientation === 'portrait' ? 'landscape' : 'portrait'
-    setOrientationLoading(true)
-    try {
-      const result = await maaApi.setPreviewOrientation(next)
-      if (result.success) setPreviewOrientation(next)
-    } finally {
-      setOrientationLoading(false)
-    }
-  }
-
   useEffect(() => {
     const mainVideo = videoRef.current
     const overlayVideo = immersiveVideoRef.current
@@ -272,7 +257,13 @@ export default function ScrcpyDeviceView({
           ))}
         </div>}
 
-        <div className="scrcpy-video-frame relative aspect-video rounded-2xl bg-black overflow-hidden flex items-center justify-center shadow-sm">
+        <div
+          className={`scrcpy-video-frame relative aspect-video overflow-hidden flex items-center justify-center shadow-sm ${
+            webrtc.status === 'connected'
+              ? 'is-connected bg-black'
+              : 'is-empty ring-1 ring-inset ring-[var(--app-border)]'
+          }`}
+        >
           <video
             ref={videoRef}
             autoPlay
@@ -288,40 +279,41 @@ export default function ScrcpyDeviceView({
           />
           {webrtc.status !== 'connected' && (
             <div
-              className="absolute inset-0 flex items-center justify-center bg-black/60 text-center px-6"
+              className="scrcpy-empty-state absolute inset-0 flex items-center justify-center px-6 text-center"
               role={visibleError ? 'alert' : 'status'}
               aria-live="polite"
             >
-              <div>
-                <div className="text-sm font-semibold text-white mb-1">
+              <div className="w-full max-w-sm">
+                <div className="device-preview-empty-icon mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-lg">
+                  <Smartphone className="h-5 w-5" strokeWidth={1.6} aria-hidden="true" />
+                </div>
+                <div className="mb-1 text-sm font-semibold text-primary">
                   {visibleError ? '预览启动失败' : '等待实时画面'}
                 </div>
-                <div className="text-xs text-gray-300 max-w-md">
+                <div className="mx-auto max-w-md text-xs leading-5 text-secondary">
                   {visibleError || (isCompact
                     ? '点击按钮连接模拟器。'
                     : '点击“启动实时预览”后，La-pluma 会自动启动服务、连接 MuMu 并显示实时画面。')}
                 </div>
-                {isCompact && (
-                  <div className="mt-4 flex justify-center">
-                    <Button
-                      size="sm"
-                      variant="gradient"
-                      className="min-w-32 px-4"
-                      icon={needsInstall
-                        ? <Package className="h-3.5 w-3.5" strokeWidth={1.8} />
-                        : <Plug className="h-3.5 w-3.5" strokeWidth={1.8} />}
-                      onClick={needsInstall ? onInstall : connect}
-                      disabled={infrastructureLoading !== null || isConnecting}
-                      loading={infrastructureLoading === 'install' || infrastructureLoading === 'preview' || isConnecting}
-                    >
-                      {needsInstall
-                        ? '安装预览组件'
-                        : visibleError
-                          ? '重试预览'
-                          : '启动预览'}
-                    </Button>
-                  </div>
-                )}
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    size="sm"
+                    variant="gradient"
+                    className="min-w-32 px-4"
+                    icon={needsInstall
+                      ? <Package className="h-3.5 w-3.5" strokeWidth={1.8} />
+                      : <Plug className="h-3.5 w-3.5" strokeWidth={1.8} />}
+                    onClick={needsInstall ? onInstall : connect}
+                    disabled={infrastructureLoading !== null || isConnecting}
+                    loading={infrastructureLoading === 'install' || infrastructureLoading === 'preview' || isConnecting}
+                  >
+                    {needsInstall
+                      ? '安装预览组件'
+                      : visibleError
+                        ? '重试预览'
+                        : '启动预览'}
+                  </Button>
+                </div>
               </div>
             </div>
           )}
@@ -341,24 +333,18 @@ export default function ScrcpyDeviceView({
               icon: <Home className="h-3.5 w-3.5" strokeWidth={1.8} />
             },
             {
-              label: '全屏',
-              disabled: webrtc.status !== 'connected',
-              onClick: fullscreen,
-              icon: <Maximize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
-            },
-            {
-              label: previewOrientation === 'portrait' ? '横屏' : '竖屏',
-              disabled: orientationLoading,
-              onClick: togglePreviewOrientation,
-              icon: <RotateCw className="h-3.5 w-3.5" strokeWidth={1.8} />
-            },
-            {
               label: '后台任务',
               disabled: webrtc.status !== 'connected',
               onClick: () => webrtc.sendCommand('input keyevent 187'),
               icon: <PanelsTopLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
+            },
+            {
+              label: '全屏',
+              disabled: webrtc.status !== 'connected',
+              onClick: fullscreen,
+              icon: <Maximize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
             }
-          ].filter(action => !isCompact || action.label !== '后台任务').map(action => (
+          ].map(action => (
             <button
               key={action.label}
               type="button"
@@ -388,20 +374,20 @@ export default function ScrcpyDeviceView({
             </span>
           </div>
 
-          <Button
-            size="sm"
-            variant="gradient"
-            fullWidth
-            className="scrcpy-preview-action"
-            icon={webrtc.status === 'connected'
-              ? <RotateCw className="h-3.5 w-3.5" strokeWidth={1.8} />
-              : <Plug className="h-3.5 w-3.5" strokeWidth={1.8} />}
-            onClick={connect}
-            disabled={infrastructureLoading !== null || isConnecting}
-            loading={infrastructureLoading === 'preview' || isConnecting}
-          >
-            {webrtc.status === 'connected' ? '重连预览' : '启动预览'}
-          </Button>
+          {webrtc.status === 'connected' && (
+            <Button
+              size="sm"
+              variant="secondary"
+              fullWidth
+              className="scrcpy-preview-action"
+              icon={<RotateCw className="h-3.5 w-3.5" strokeWidth={1.8} />}
+              onClick={connect}
+              disabled={infrastructureLoading !== null}
+              loading={infrastructureLoading === 'preview'}
+            >
+              重连预览
+            </Button>
+          )}
 
           <div className="scrcpy-service-grid">
             {[
@@ -558,22 +544,16 @@ export default function ScrcpyDeviceView({
               icon: <Home className="h-3.5 w-3.5" strokeWidth={1.8} />
             },
             {
-              label: '退出全屏',
-              disabled: false,
-              onClick: exitImmersive,
-              icon: <Minimize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
-            },
-            {
-              label: previewOrientation === 'portrait' ? '横屏' : '竖屏',
-              disabled: orientationLoading,
-              onClick: togglePreviewOrientation,
-              icon: <RotateCw className="h-3.5 w-3.5" strokeWidth={1.8} />
-            },
-            {
               label: '后台任务',
               disabled: webrtc.status !== 'connected',
               onClick: () => webrtc.sendCommand('input keyevent 187'),
               icon: <PanelsTopLeft className="h-3.5 w-3.5" strokeWidth={1.8} />
+            },
+            {
+              label: '退出全屏',
+              disabled: false,
+              onClick: exitImmersive,
+              icon: <Minimize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
             }
           ].map(action => (
             <button
