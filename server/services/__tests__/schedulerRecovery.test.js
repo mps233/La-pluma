@@ -24,11 +24,15 @@ after(async () => {
 const malformedTaskFlow = [{ enabled: true, name: 'Malformed task', params: {} }];
 
 test('unexpected execution errors always reset scheduler state', async () => {
+  let started = 0;
   await assert.rejects(
-    executeScheduleNow('unexpected-error', malformedTaskFlow),
+    executeScheduleNow('unexpected-error', malformedTaskFlow, {
+      onStarted: () => { started += 1; }
+    }),
     error => error instanceof TypeError
   );
 
+  assert.equal(started, 1);
   const status = getScheduleExecutionStatus();
   assert.equal(status.isRunning, false);
   assert.equal(status.scheduleId, null);

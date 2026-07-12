@@ -68,7 +68,7 @@ export function sendDryRun(res, req, plan, message = 'Dry run only', meta = {}) 
   sendSuccess(res, req, { plan }, message, { ...meta, dryRun: true });
 }
 
-export function sendError(res, req, error, fallbackMessage) {
+export function sendError(res, req, error, fallbackMessage, meta = {}) {
   const normalized = typeof error === 'string'
     ? agentError('AGENT_INTERNAL_ERROR', error)
     : error;
@@ -81,7 +81,7 @@ export function sendError(res, req, error, fallbackMessage) {
       details: normalized?.details || {},
       retryable: normalized?.retryable ?? false
     },
-    meta: responseMeta(req)
+    meta: responseMeta(req, meta)
   });
 }
 

@@ -259,13 +259,14 @@ function groupEntries(entries) {
  * Runs an already-selected list of copilot ids through the same dynamic MAA
  * Copilot task used by copilot sets. Callers must decide selection separately.
  */
-export async function executeSelectedCopilotEntries({ planId, name, entries, options = {} }) {
+export async function executeSelectedCopilotEntries({ planId, name, entries, options = {}, lifecycle = {} }) {
   const normalizedEntries = entries.filter(entry => Number.isInteger(Number(entry.copilotId)) && entry.displayStage);
   if (!normalizedEntries.length) throw new Error('没有可执行的作业条目');
 
   const results = [];
   const loopTimes = normalizeCopilotLoopTimes(options.loopTimes);
   await withMaaExecutionLease({ source: 'activity-copilot', taskName: name, command: 'copilot-plan' }, async () => {
+    lifecycle.onStarted?.();
     const configDir = (await getMaaConfigDir()).trim();
     const planDir = join(configDir, 'copilot-plans', String(planId));
     await mkdir(planDir, { recursive: true });
@@ -302,7 +303,7 @@ export async function executeSelectedCopilotEntries({ planId, name, entries, opt
   return { success: true, results, loopTimes };
 }
 
-export async function executeCopilotPlan({ setId, raid = 'normal', selectedIndexes = [], options = {} }) {
+export async function executeCopilotPlan({ setId, raid = 'normal', selectedIndexes = [], options = {}, lifecycle = {} }) {
   const plan = await buildCopilotPlan(setId, raid);
   const selected = new Set(selectedIndexes.map(Number));
   const selectedEntries = plan.entries.filter(entry => selected.size === 0 || selected.has(entry.itemIndex));
@@ -313,6 +314,7 @@ export async function executeCopilotPlan({ setId, raid = 'normal', selectedIndex
   const loopTimes = normalizeCopilotLoopTimes(options.loopTimes);
 
   await withMaaExecutionLease({ source: 'copilot-set', taskName: plan.name, command: 'copilot-plan' }, async () => {
+    lifecycle.onStarted?.();
     const configDir = (await getMaaConfigDir()).trim();
     const planDir = join(configDir, 'copilot-plans', String(setId));
     await mkdir(planDir, { recursive: true });

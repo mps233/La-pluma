@@ -2,7 +2,7 @@
  * API 响应类型定义
  */
 
-interface ApiErrorPayload {
+export interface ApiErrorPayload {
   code?: string
   message?: string
   details?: any

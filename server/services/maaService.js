@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import { createConnection } from 'net';
 import { readFile, writeFile, mkdir, readdir, stat, unlink, realpath, open } from 'fs/promises';
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'path';
+import { randomBytes } from 'crypto';
 import TOML from '@iarna/toml';
 import { createLogger } from '../utils/logger.js';
 import { getFallbackActivity } from './activityFallbackService.js';
@@ -48,6 +49,8 @@ const taskStatus = {
   startTime: null,
   taskType: null, // 'automation', 'combat', 'roguelike'
   process: null, // 保存子进程引用
+  stopRequested: false,
+  forceKillTimer: null,
   logs: [] // 保存实时日志
 };
 
@@ -55,7 +58,7 @@ const taskStatus = {
  * 获取当前任务执行状态
  */
 export function getTaskStatus() {
-  const { process, ...status } = taskStatus; // 不返回 process 对象
+  const { process, forceKillTimer, ...status } = taskStatus; // 不返回进程和定时器对象
   return { ...status };
 }
 
@@ -167,28 +170,56 @@ function addExecutionDiagnostics(stderr) {
  * 设置任务状态
  */
 export function setTaskStatus(isRunning, taskName = null, taskType = null, process = null) {
+  if (taskStatus.forceKillTimer) {
+    clearTimeout(taskStatus.forceKillTimer);
+  }
   taskStatus.isRunning = isRunning;
   taskStatus.taskName = taskName;
   taskStatus.taskType = taskType;
   taskStatus.startTime = isRunning ? Date.now() : null;
   taskStatus.process = process;
-  
-  if (!isRunning) {
-    // 任务结束时，保留日志一段时间
-    setTimeout(() => {
-      if (!taskStatus.isRunning) {
-        taskStatus.logs = [];
-      }
-    }, 60000); // 1分钟后清空
-  }
+  taskStatus.stopRequested = false;
+  taskStatus.forceKillTimer = null;
   
   addLog('INFO', `任务状态更新: ${JSON.stringify({ isRunning, taskName, taskType, hasProcess: !!process })}`);
+}
+
+function clearTaskStatusForProcess(childProcess) {
+  if (taskStatus.process !== childProcess) return false;
+  setTaskStatus(false);
+  return true;
+}
+
+function createCommandOutcome({ code = null, signal = null, stdout = '', stderr = '', command, error = null, childProcess }) {
+  const stopped = Boolean(
+    signal || childProcess?.killed || (taskStatus.process === childProcess && taskStatus.stopRequested)
+  );
+  const result = {
+    stdout: stdout.trim(),
+    stderr: stderr.trim(),
+    command,
+    exitCode: code,
+    signal: signal || null
+  };
+  return {
+    ok: !error && code === 0 && !stopped,
+    stopped,
+    result,
+    error: error || (code !== 0 && !stopped
+      ? Object.assign(new Error(`命令执行失败，退出码: ${code}`), {
+          stdout: result.stdout,
+          stderr: result.stderr,
+          exitCode: code,
+          signal: signal || null
+        })
+      : null)
+  };
 }
 
 /**
  * 执行 MAA CLI 命令（支持后台异步执行）
  */
-async function execMaaCommandUnlocked(command, args = [], taskName = null, taskType = null, waitForCompletion = false, silent = false, onSettled = null) {
+async function execMaaCommandUnlocked(command, args = [], taskName = null, taskType = null, waitForCompletion = false, silent = false, onSettled = null, lifecycle = {}) {
   const fullCommand = `${MAA_CLI_PATH} ${command} ${args.join(' ')}`;
   
   // 静默模式下不输出日志（用于健康检查等频繁调用）
@@ -237,6 +268,19 @@ async function execMaaCommandUnlocked(command, args = [], taskName = null, taskT
       
       // 设置任务开始状态
       setTaskStatus(true, taskName, taskType, childProcess);
+      lifecycle.onStarted?.({ childProcess, command: fullCommand });
+
+      let settled = false;
+      const settle = (outcome) => {
+        if (settled) return;
+        settled = true;
+        if (stderr) {
+          addExecutionDiagnostics(stderr);
+        }
+        clearTaskStatusForProcess(childProcess);
+        onSettled?.(outcome);
+        lifecycle.onSettled?.(outcome);
+      };
       
       // 立即返回，不等待命令完成
       resolve({
@@ -247,29 +291,25 @@ async function execMaaCommandUnlocked(command, args = [], taskName = null, taskT
       });
       
       // 在后台继续执行
-      childProcess.on('close', (code) => {
+      childProcess.on('close', (code, signal) => {
         addLog('INFO', `命令执行完成: ${fullCommand}, 退出码: ${code}`);
         if (stdout.trim()) {
           addLog('INFO', `stdout: ${stdout.trim()}`);
         }
         if (stderr) {
-          addExecutionDiagnostics(stderr);
           addLog('WARN', `stderr: ${stderr.trim()}`);
         }
-        
-        // 任务完成，清除状态
-        setTaskStatus(false);
-        
+
+        const outcome = createCommandOutcome({ code, signal, stdout, stderr, command: fullCommand, childProcess });
         if (code !== 0) {
           addLog('ERROR', `命令执行失败: ${fullCommand}`);
         }
-        onSettled?.();
+        settle(outcome);
       });
       
       childProcess.on('error', (error) => {
         addLog('ERROR', `命令执行错误: ${fullCommand} - ${error.message}`);
-        setTaskStatus(false);
-        onSettled?.();
+        settle(createCommandOutcome({ stdout, stderr, command: fullCommand, error, childProcess }));
       });
     });
   } 
@@ -308,9 +348,21 @@ async function execMaaCommandUnlocked(command, args = [], taskName = null, taskT
       
       // 设置任务开始状态
       setTaskStatus(true, taskName, taskType, childProcess);
+      lifecycle.onStarted?.({ childProcess, command: fullCommand });
+
+      let settled = false;
+      const settle = (outcome) => {
+        if (settled) return false;
+        settled = true;
+        clearTaskStatusForProcess(childProcess);
+        lifecycle.onSettled?.(outcome);
+        return true;
+      };
       
       // 等待命令完成
-      childProcess.on('close', (code) => {
+      childProcess.on('close', (code, signal) => {
+        const outcome = createCommandOutcome({ code, signal, stdout, stderr, command: fullCommand, childProcess });
+        if (!settle(outcome)) return;
         addLog('INFO', `命令执行完成: ${fullCommand}, 退出码: ${code}`);
         if (stdout.trim()) {
           addLog('INFO', `stdout: ${stdout.trim()}`);
@@ -320,16 +372,16 @@ async function execMaaCommandUnlocked(command, args = [], taskName = null, taskT
           addLog('WARN', `stderr: ${stderr.trim()}`);
         }
         
-        // 任务完成，清除状态
-        setTaskStatus(false);
-        
-        if (code !== 0) {
+        if (!outcome.ok) {
           addLog('ERROR', `命令执行失败: ${fullCommand}`);
           const diagnostic = getMaaExecutionDiagnostics(stderr)[0];
-          const commandError = new Error(diagnostic?.message || `命令执行失败，退出码: ${code}`);
+          const commandError = outcome.error || new Error(diagnostic?.message || '任务已终止');
+          if (diagnostic && !outcome.stopped) commandError.message = diagnostic.message;
           commandError.stdout = stdout.trim();
           commandError.stderr = stderr.trim();
           commandError.exitCode = code;
+          commandError.signal = signal || null;
+          commandError.stopped = outcome.stopped;
           reject(commandError);
         } else {
           resolve({
@@ -341,8 +393,9 @@ async function execMaaCommandUnlocked(command, args = [], taskName = null, taskT
       });
       
       childProcess.on('error', (error) => {
+        const outcome = createCommandOutcome({ stdout, stderr, command: fullCommand, error, childProcess });
+        if (!settle(outcome)) return;
         addLog('ERROR', `命令执行错误: ${fullCommand} - ${error.message}`);
-        setTaskStatus(false);
         reject(error);
       });
     });
@@ -399,9 +452,9 @@ export function requiresMaaExecutionLease(command) {
   return DEVICE_MUTATING_COMMANDS.has(command);
 }
 
-export async function execMaaCommand(command, args = [], taskName = null, taskType = null, waitForCompletion = false, silent = false) {
+export async function execMaaCommand(command, args = [], taskName = null, taskType = null, waitForCompletion = false, silent = false, lifecycle = {}) {
   if (!requiresMaaExecutionLease(command)) {
-    return execMaaCommandUnlocked(command, args, taskName, taskType, waitForCompletion, silent);
+    return execMaaCommandUnlocked(command, args, taskName, taskType, waitForCompletion, silent, null, lifecycle);
   }
 
   const lease = await acquireMaaExecutionLease({
@@ -412,18 +465,32 @@ export async function execMaaCommand(command, args = [], taskName = null, taskTy
   let releaseOnReturn = true;
   try {
     if (taskName && !waitForCompletion) {
-      releaseOnReturn = false;
-      return await execMaaCommandUnlocked(
+      const { onSettled: lifecycleOnSettled, ...processLifecycle } = lifecycle;
+      const result = await execMaaCommandUnlocked(
         command,
         args,
         taskName,
         taskType,
         waitForCompletion,
         silent,
-        () => lease.release().catch(error => logger.error('释放 MAA 执行锁失败', { error: error.message }))
+        async (outcome) => {
+          try {
+            await lease.release();
+          } catch (error) {
+            logger.error('释放 MAA 执行锁失败', { error: error.message });
+          }
+          try {
+            await lifecycleOnSettled?.(outcome);
+          } catch (error) {
+            logger.error('处理 MAA 后台任务终态失败', { error: error.message });
+          }
+        },
+        processLifecycle
       );
+      releaseOnReturn = false;
+      return result;
     }
-    return await execMaaCommandUnlocked(command, args, taskName, taskType, waitForCompletion, silent);
+    return await execMaaCommandUnlocked(command, args, taskName, taskType, waitForCompletion, silent, null, lifecycle);
   } finally {
     if (releaseOnReturn) await lease.release();
   }
@@ -566,16 +633,53 @@ export async function saveConfig(profileName = 'default', config) {
 /**
  * 创建临时任务文件并执行
  */
-export async function execDynamicTask(taskId, taskConfig, taskName = null, taskType = null, waitForCompletion = false, userResource = false) {
+export async function execDynamicTask(taskId, taskConfig, taskName = null, taskType = null, waitForCompletion = false, userResource = false, runtime = {}) {
+  const acquireExecutionLease = runtime.acquireExecutionLease || acquireMaaExecutionLease;
+  const resolveConfigDir = runtime.getConfigDir || getMaaConfigDir;
+  const makeDirectory = runtime.mkdir || mkdir;
+  const writeTaskFile = runtime.writeFile || writeFile;
+  const removeTaskFile = runtime.unlink || unlink;
+  const executeCommand = runtime.executeCommand || execMaaCommandUnlocked;
+  const createNonce = runtime.createNonce || (() => `${process.pid}_${Date.now()}_${randomBytes(6).toString('hex')}`);
+  const lifecycle = runtime.lifecycle || {};
+
+  const lease = await acquireExecutionLease({
+    source: taskType || 'dynamic-task',
+    taskName: taskName || String(taskId || 'dynamic-task'),
+    command: 'run'
+  });
+  let tempTaskFile = null;
+  let releaseOnReturn = true;
+
+  const cleanup = async () => {
+    if (!tempTaskFile) return;
+    await removeTaskFile(tempTaskFile).catch(error => {
+      if (error?.code !== 'ENOENT') throw error;
+    });
+  };
+
+  const cleanupAndRelease = async () => {
+    try {
+      await cleanup();
+    } catch (error) {
+      logger.warn('清理动态任务文件失败', { tempTaskFile, error: error.message });
+    } finally {
+      await lease.release();
+    }
+  };
+
   try {
-    const configDir = await getMaaConfigDir();
+    const configDir = await resolveConfigDir();
     const tasksDir = join(configDir.trim(), 'tasks');
     
     // 确保 tasks 目录存在
-    await mkdir(tasksDir, { recursive: true });
+    await makeDirectory(tasksDir, { recursive: true });
     
-    // 生成临时任务文件名
-    const tempTaskFile = join(tasksDir, `${taskId}_temp.toml`);
+    const taskPrefix = String(taskId || 'dynamic-task')
+      .replace(/[^A-Za-z0-9_-]/g, '_')
+      .slice(0, 64) || 'dynamic-task';
+    const taskFileId = `${taskPrefix}_temp_${createNonce()}`;
+    tempTaskFile = join(tasksDir, `${taskFileId}.toml`);
     
     // 将 taskConfig 转换为对象（如果是字符串则解析，如果已经是对象则直接使用）
     const configObj = typeof taskConfig === 'string' ? JSON.parse(taskConfig) : taskConfig;
@@ -584,19 +688,54 @@ export async function execDynamicTask(taskId, taskConfig, taskName = null, taskT
     const tomlContent = generateTaskToml(configObj);
     
     // 写入临时文件
-    await writeFile(tempTaskFile, tomlContent, 'utf-8');
+    await writeTaskFile(tempTaskFile, tomlContent, 'utf-8');
     addLog('INFO', `临时任务文件已创建: ${tempTaskFile}`);
     addLog('DEBUG', `任务内容:\n${tomlContent}`);
     
     // 执行任务
-    const runArgs = [`${taskId}_temp`];
+    const runArgs = [taskFileId];
     if (userResource) runArgs.push('--user-resource');
-    const result = await execMaaCommand('run', runArgs, taskName, taskType, waitForCompletion);
-    
-    return result;
+    if (taskName && !waitForCompletion) {
+      const { onSettled: lifecycleOnSettled, ...processLifecycle } = lifecycle;
+      const result = await executeCommand(
+        'run',
+        runArgs,
+        taskName,
+        taskType,
+        false,
+        false,
+        async (outcome) => {
+          try {
+            await cleanupAndRelease();
+          } catch (error) {
+            logger.error('释放动态任务资源失败', { error: error.message });
+          }
+          try {
+            await lifecycleOnSettled?.(outcome);
+          } catch (error) {
+            logger.error('处理动态任务终态失败', { error: error.message });
+          }
+        },
+        processLifecycle
+      );
+      releaseOnReturn = false;
+      return result;
+    }
+
+    return await executeCommand('run', runArgs, taskName, taskType, waitForCompletion, false, null, lifecycle);
   } catch (error) {
     addLog('ERROR', `执行动态任务失败: ${error.message}`);
-    throw new Error(`执行动态任务失败: ${error.message}`);
+    if (error?.code === 'MAA_EXECUTION_BUSY' || error?.stopped) throw error;
+    const dynamicTaskError = new Error(`执行动态任务失败: ${error.message}`, { cause: error });
+    dynamicTaskError.code = error?.code;
+    dynamicTaskError.statusCode = error?.statusCode;
+    dynamicTaskError.details = error?.details;
+    dynamicTaskError.retryable = error?.retryable;
+    dynamicTaskError.exitCode = error?.exitCode;
+    dynamicTaskError.signal = error?.signal;
+    throw dynamicTaskError;
+  } finally {
+    if (releaseOnReturn) await cleanupAndRelease();
   }
 }
 
@@ -1253,8 +1392,12 @@ export function stopCurrentTask() {
     logger.warn('终止任务', { taskName: taskStatus.taskName });
     addLog('WARN', `正在终止任务: ${taskStatus.taskName}`);
     
+    const runningProcess = taskStatus.process;
     try {
-      const runningProcess = taskStatus.process;
+      if (taskStatus.stopRequested) {
+        return { success: true, message: '终止请求已发送，正在等待任务退出' };
+      }
+      taskStatus.stopRequested = true;
       const sendSignal = (signal) => {
         if (process.platform !== 'win32' && runningProcess.pid) {
           try {
@@ -1271,7 +1414,7 @@ export function stopCurrentTask() {
       addLog('WARN', '正在请求任务正常退出');
       sendSignal('SIGTERM');
 
-      const forceKillTimer = setTimeout(() => {
+      taskStatus.forceKillTimer = setTimeout(() => {
         if (taskStatus.process !== runningProcess || runningProcess.exitCode !== null) return;
         try {
           logger.warn('任务未及时退出，升级为 SIGKILL');
@@ -1281,21 +1424,22 @@ export function stopCurrentTask() {
           logger.error('强制终止任务失败', { error: error.message });
         }
       }, 3000);
-      forceKillTimer.unref?.();
+      taskStatus.forceKillTimer.unref?.();
 
       return { success: true, message: '已发送终止请求' };
     } catch (error) {
       logger.error('终止任务失败', { error: error.message });
       addLog('ERROR', `终止任务失败: ${error.message}`);
-      setTaskStatus(false);
+      if (taskStatus.process === runningProcess) {
+        taskStatus.stopRequested = false;
+      }
       return { success: false, message: `终止失败: ${error.message}` };
     }
   } else {
     // 进程引用不存在，但状态显示正在运行
     // 这种情况可能是任务刚启动还没有进程引用
     addLog('WARN', '任务正在启动中，无法立即终止');
-    setTaskStatus(false);
-    return { success: true, message: '任务正在启动中，已标记为停止' };
+    return { success: false, message: '任务正在启动中，暂时无法终止' };
   }
 }
 

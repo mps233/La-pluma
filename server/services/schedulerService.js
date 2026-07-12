@@ -179,7 +179,7 @@ function updateScheduleStatus(updates) {
 }
 
 // 构建 MAA 命令
-function buildCommand(task, connectionDefaults = {}) {
+export function buildScheduledTaskCommand(task, connectionDefaults = {}) {
   if (task.taskType) {
     // MaaCore 内置任务类型
     const params = { ...(task.params || {}) };
@@ -327,18 +327,18 @@ function buildCommand(task, connectionDefaults = {}) {
   return { command: commandId, params };
 }
 
-// 执行任务流程
-async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId) {
+export function validateScheduledTaskFlow(taskFlow) {
   if (!Array.isArray(taskFlow)) {
     return { success: false, message: '任务流程格式无效' };
   }
 
-  if (scheduleExecutionStatus.isRunning) {
-    logger.warn('任务流程已在执行，忽略重复触发', {
-      activeScheduleId: scheduleExecutionStatus.scheduleId,
-      requestedScheduleId: scheduleId
-    });
-    return { success: false, message: '已有任务流程正在执行' };
+  const invalidTaskIndex = taskFlow.findIndex(task => !task || typeof task !== 'object' || Array.isArray(task));
+  if (invalidTaskIndex >= 0) {
+    return {
+      success: false,
+      message: '任务流程中的每一项都必须是对象',
+      details: { index: invalidTaskIndex }
+    };
   }
 
   const invalidCustomInfrast = taskFlow.find(task =>
@@ -359,6 +359,70 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId) {
     return { success: false, message: '掉落目标格式应为物品 ID=数量，多个目标用逗号分隔' };
   }
 
+  return { success: true };
+}
+
+export function buildScheduledTaskFlowPlan(taskFlow, connectionDefaults = {}) {
+  const validation = validateScheduledTaskFlow(taskFlow);
+  if (!validation.success) return validation;
+
+  try {
+    const steps = taskFlow
+      .filter(task => task.enabled)
+      .map((task, index) => {
+        const { command, params, taskConfig } = buildScheduledTaskCommand(task, connectionDefaults);
+        const args = params ? params.split(' ').filter(Boolean) : [];
+        return {
+          index: index + 1,
+          id: task.id,
+          name: task.name || task.commandId || task.id,
+          command,
+          args,
+          dynamicTask: Boolean(taskConfig),
+          ...(taskConfig ? { taskConfig: JSON.parse(taskConfig) } : {}),
+          ...(command === 'closedown' && task.params?.recognizeDepotBeforeClose === true
+            ? { preActions: [{ action: 'depot-recognition' }] }
+            : {})
+        };
+      });
+
+    return { success: true, totalSteps: steps.length, steps };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+}
+
+export async function getScheduledTaskFlowPlan(taskFlow) {
+  const validation = validateScheduledTaskFlow(taskFlow);
+  if (!validation.success) return validation;
+
+  const needsConnection = Array.isArray(taskFlow) && taskFlow.some(task => {
+    if (!task.enabled) return false;
+    const commandId = task.commandId || String(task.id || '').split('-')[0];
+    return commandId === 'startup' || commandId === 'closedown';
+  });
+  const connection = needsConnection ? await resolveConnection() : {};
+  return buildScheduledTaskFlowPlan(taskFlow, connection);
+}
+
+// 执行任务流程
+async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = {}) {
+  if (!Array.isArray(taskFlow)) {
+    return { success: false, message: '任务流程格式无效' };
+  }
+
+  if (scheduleExecutionStatus.isRunning) {
+    logger.warn('任务流程已在执行，忽略重复触发', {
+      activeScheduleId: scheduleExecutionStatus.scheduleId,
+      requestedScheduleId: scheduleId
+    });
+    return { success: false, message: '已有任务流程正在执行' };
+  }
+
+  const validation = validateScheduledTaskFlow(taskFlow);
+  if (!validation.success) return validation;
+
+  lifecycle.onStarted?.();
   logger.info('开始执行任务流程', { scheduleId });
   activeScheduleRunId = runId;
   activeScheduleAbortController = new AbortController();
@@ -437,7 +501,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId) {
     
     if (commandId === 'award') {
       try {
-        const { command, params, taskConfig } = buildCommand(task, adbConfig);
+        const { command, params, taskConfig } = buildScheduledTaskCommand(task, adbConfig);
         const enabledAwardItems = getEnabledAwardItems(task.params);
 
         if (enabledAwardItems.length === 0) {
@@ -623,7 +687,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId) {
             await new Promise(resolve => setTimeout(resolve, 3000)); // 重试前等待3秒
           }
           
-          const { command, params } = buildCommand(task, adbConfig);
+          const { command, params } = buildScheduledTaskCommand(task, adbConfig);
           let args = params ? params.split(' ').filter(arg => arg) : [];
           await execMaaCommand(command, args, task.name, null, true);
           
@@ -689,7 +753,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId) {
 
     if (commandId === 'recruit') {
       try {
-        const { command, params, taskConfig } = buildCommand(task, adbConfig);
+        const { command, params, taskConfig } = buildScheduledTaskCommand(task, adbConfig);
         const logCheckpoint = await createMaaLogCheckpoint();
         let result;
 
@@ -750,7 +814,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId) {
           continue;
         }
 
-        const { command, params, taskConfig } = buildCommand(task, adbConfig);
+        const { command, params, taskConfig } = buildScheduledTaskCommand(task, adbConfig);
         const logCheckpoint = await createMaaLogCheckpoint();
         let result;
 
@@ -813,7 +877,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId) {
           continue;
         }
 
-        const { command, params, taskConfig } = buildCommand(task, adbConfig);
+        const { command, params, taskConfig } = buildScheduledTaskCommand(task, adbConfig);
         const logCheckpoint = await createMaaLogCheckpoint();
         let result;
 
@@ -865,7 +929,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId) {
     }
     
     try {
-      const { command, params, taskConfig } = buildCommand(task, adbConfig);
+      const { command, params, taskConfig } = buildScheduledTaskCommand(task, adbConfig);
       
       if (taskConfig) {
         const taskId = params;
@@ -1298,7 +1362,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId) {
   return { success: true, stopped: false, message: completionMessage, summary: executionSummary };
 }
 
-async function executeTaskFlow(taskFlow, scheduleId) {
+async function executeTaskFlow(taskFlow, scheduleId, lifecycle = {}) {
   const runId = Symbol(scheduleId);
   let unexpectedError = null;
   try {
@@ -1306,7 +1370,7 @@ async function executeTaskFlow(taskFlow, scheduleId) {
       source: 'schedule',
       taskName: `任务流程 ${scheduleId}`,
       command: 'schedule'
-    }, () => executeTaskFlowUnlocked(taskFlow, scheduleId, runId));
+    }, () => executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle));
   } catch (error) {
     if (error?.code === 'MAA_EXECUTION_BUSY') {
       logger.warn('设备正被其他 MAA 任务占用，跳过任务流程', { scheduleId, owner: error.owner });
@@ -1552,9 +1616,9 @@ export function getScheduleStatus() {
 }
 
 // 立即执行一次定时任务（用于测试）
-export async function executeScheduleNow(scheduleId, taskFlow) {
+export async function executeScheduleNow(scheduleId, taskFlow, lifecycle = {}) {
   logger.info('手动触发执行', { scheduleId });
-  return await executeTaskFlow(taskFlow, scheduleId);
+  return await executeTaskFlow(taskFlow, scheduleId, lifecycle);
 }
 
 // 自动更新任务

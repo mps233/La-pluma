@@ -3,8 +3,13 @@ import cors from 'cors';
 import operatorQuotesRoutes from './routes/operatorQuotes.js';
 import agentRoutes from './routes/agent.js';
 import { initializeRuntimeState } from './services/runtimeInitializationService.js';
+import {
+  getAgentRunStoreStatus,
+  initializeAgentRunStore
+} from './services/agentRunService.js';
 import { networkInterfaces } from 'os';
 import { printPathConfig } from './config/paths.js';
+import { agentError, sendError } from './utils/apiHelper.js';
 
 const app = express();
 
@@ -37,7 +42,12 @@ function optionalApiAuth(req, res, next) {
     return next();
   }
 
-  return res.status(401).json({ success: false, error: 'Unauthorized', message: '需要有效的 LA_PLUMA_TOKEN' });
+  res.set('WWW-Authenticate', 'Bearer realm="la-pluma"');
+  return sendError(res, req, agentError(
+    'AGENT_AUTH_REQUIRED',
+    '需要有效的 LA_PLUMA_TOKEN',
+    { statusCode: 401, retryable: false }
+  ));
 }
 
 
@@ -77,6 +87,25 @@ app.use('/api/agent', agentRoutes);
 app.use('/api/operator-quotes', operatorQuotesRoutes);
 
 const PORT = process.env.PORT || 3000;
+
+// Run 状态必须先恢复并持久化，执行接口才能安全接受新的副作用请求。
+// 恢复失败时仍启动 UI 和只读接口；Run 服务会保持 fail-closed。
+try {
+  const summary = await initializeAgentRunStore();
+  console.log('[AgentRun] 存储已就绪:', {
+    filePath: summary.filePath,
+    restoredRuns: summary.restoredRuns,
+    interruptedRuns: summary.interruptedRuns,
+    prunedRuns: summary.prunedRuns
+  });
+} catch (error) {
+  const status = getAgentRunStoreStatus();
+  console.error('[AgentRun] 存储初始化失败，执行接口已关闭:', {
+    filePath: status.filePath,
+    error: status.error || error.message
+  });
+}
+
 app.listen(PORT, '0.0.0.0', async () => {
   console.log(`服务器运行在:`);
   console.log(`  - 本地: http://localhost:${PORT}`);

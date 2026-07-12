@@ -1,4 +1,27 @@
-import type { ApiResponse } from '@/types/api'
+import type { ApiErrorPayload, ApiResponse } from '@/types/api'
+
+const normalizeApiEnvelope = (value: unknown): unknown => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value
+
+  const envelope = value as Record<string, unknown>
+  if (envelope.success !== false || !envelope.error || typeof envelope.error !== 'object' || Array.isArray(envelope.error)) {
+    return value
+  }
+
+  const structuredError = envelope.error as ApiErrorPayload
+  const message = typeof envelope.message === 'string' && envelope.message.trim()
+    ? envelope.message
+    : structuredError.message || structuredError.code || '操作失败'
+
+  return {
+    ...envelope,
+    error: message,
+    errorInfo: {
+      ...structuredError,
+      message
+    }
+  }
+}
 
 const getResponseFailureMessage = (response: Response, hasBody: boolean) => {
   if (response.status >= 500) {
@@ -46,7 +69,7 @@ export async function parseJsonResponse<T = ApiResponse>(response: Response): Pr
   }
 
   try {
-    return JSON.parse(trimmedBody) as T
+    return normalizeApiEnvelope(JSON.parse(trimmedBody)) as T
   } catch {
     return createFailureResponse<T>(response, true)
   }

@@ -3,6 +3,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import {
   execMaaCommand,
+  execDynamicTask,
   getMaaVersion,
   getRealtimeLogs,
   getTaskStatus,
@@ -20,7 +21,7 @@ import {
   getDebugScreenshots,
   clearRealtimeLogs
 } from '../services/maaService.js';
-import { executeScheduleNow, getScheduleExecutionStatus, stopScheduleExecution, getScheduleStatus, setupSchedule, stopSchedule, setupAutoUpdate, getAutoUpdateStatus } from '../services/schedulerService.js';
+import { executeScheduleNow, getScheduledTaskFlowPlan, getScheduleExecutionStatus, stopScheduleExecution, getScheduleStatus, setupSchedule, stopSchedule, setupAutoUpdate, getAutoUpdateStatus } from '../services/schedulerService.js';
 import { loadUserConfig, saveUserConfig, getAllUserConfigs, deleteUserConfig } from '../services/configStorageService.js';
 import sklandService from '../services/sklandService.js';
 import { getNotificationConfig, sendNotification, sendToChannel, testNotificationChannel, setNotificationConfig, getTodayOpenStages } from '../services/notificationService.js';
@@ -34,16 +35,32 @@ import { getActivityRunPreflight } from '../services/activityNavigationService.j
 import { findActivityCopilotCandidates } from '../services/activityCopilotDiscoveryService.js';
 import { getActivityCompletion, runCurrentActivityCopilots } from '../services/activityCopilotRunService.js';
 import { withMaaExecutionLease } from '../services/executionCoordinatorService.js';
+import { createDailyFlowExecutionError, executeAgentTask, normalizeDailyFlowRequest } from '../services/agentActionService.js';
+import {
+  beginAgentRun,
+  startAgentRun,
+  markAgentRunStopping,
+  completeAgentRun,
+  failAgentRun,
+  stopAgentRun,
+  getAgentRun,
+  listAgentRuns,
+  getCurrentAgentRun,
+  releaseAgentRunIdempotency,
+  setAgentRunAcceptedResult,
+  flushAgentRunStore,
+  withFlushedAgentRunSnapshot
+} from '../services/agentRunService.js';
 import {
   asyncHandler,
-  successResponse,
   agentError,
   sendSuccess,
   sendDryRun,
   sendError
 } from '../utils/apiHelper.js';
 import { createLogger } from '../utils/logger.js'
-import { resolveConnection } from '../services/connectionService.js'
+import { resolveConnectionInput } from '../services/connectionService.js'
+import { API_VERSION, buildAgentManifest, buildOpenApiSpec } from './agentContract.js';
 import {
   getWebrtcStatus,
   installWebrtc,
@@ -67,7 +84,326 @@ const logger = createLogger('AgentRoutes');
 const DEFAULT_ADB_PATH = process.env.ADB_PATH || '/opt/homebrew/bin/adb';
 const DEFAULT_ADB_ADDRESS = process.env.ADB_ADDRESS || '127.0.0.1:16384';
 const DEFAULT_CLIENT_TYPE = process.env.MAA_CLIENT_TYPE || 'Official';
-const API_VERSION = '2026-07-07';
+const ACTIVE_RUN_STATES = new Set(['accepted', 'running', 'stopping']);
+const TERMINAL_RUN_STATES = new Set(['succeeded', 'failed', 'stopped', 'interrupted']);
+
+function getIdempotencyKey(req) {
+  return req.get?.('Idempotency-Key')
+    ?? req.headers?.['idempotency-key']
+    ?? req.headers?.['Idempotency-Key']
+    ?? null;
+}
+
+function setRunResponseHeaders(res, run, replayed, includeLocation = false) {
+  const headers = {
+    'X-La-Pluma-Run-Id': run.runId,
+    'Idempotency-Replayed': String(Boolean(replayed))
+  };
+  if (includeLocation) headers.Location = run.links.self;
+
+  for (const [name, value] of Object.entries(headers)) {
+    if (typeof res.set === 'function') res.set(name, value);
+    else if (typeof res.setHeader === 'function') res.setHeader(name, value);
+  }
+}
+
+function enrichAgentRun(run) {
+  if (!run || !ACTIVE_RUN_STATES.has(run.state)) return run;
+
+  const schedule = getScheduleExecutionStatus();
+  const task = getTaskStatus();
+  if (run.operationId === 'run_daily_flow') {
+    return {
+      ...run,
+      progress: {
+        currentStep: schedule.currentStep,
+        totalSteps: schedule.totalSteps,
+        currentTask: schedule.currentTask,
+        message: schedule.message || (schedule.isRunning ? '今日流程执行中' : '今日流程正在收尾')
+      }
+    };
+  }
+  return {
+    ...run,
+    progress: {
+      currentStep: null,
+      totalSteps: null,
+      currentTask: task.taskName,
+      message: task.stopRequested ? '正在终止任务' : task.isRunning ? '任务执行中' : '等待任务启动'
+    }
+  };
+}
+
+function runResponseData(result, run) {
+  const base = result && typeof result === 'object' && !Array.isArray(result)
+    ? { ...result }
+    : { result };
+  return {
+    ...base,
+    runId: run.runId,
+    state: run.state,
+    pollUrl: run.links.self,
+    stopUrl: run.links.stop,
+    run
+  };
+}
+
+function sendRunSuccess(res, req, result, run, {
+  message = '操作成功',
+  replayed = false,
+  accepted = false
+} = {}) {
+  const enrichedRun = enrichAgentRun(run);
+  setRunResponseHeaders(res, enrichedRun, replayed, accepted);
+  if (accepted) res.status(202);
+  return sendSuccess(
+    res,
+    req,
+    runResponseData(result, enrichedRun),
+    message,
+    { runId: enrichedRun.runId, idempotentReplay: replayed }
+  );
+}
+
+function sendRunFailure(res, req, run, replayed = false) {
+  const error = agentError(run.error?.code || 'AGENT_RUN_FAILED', run.error?.message || 'Agent run 执行失败', {
+    statusCode: run.error?.statusCode || 500,
+    details: {
+      ...(run.error?.details || {}),
+      runId: run.runId,
+      run
+    },
+    retryable: run.error?.retryable ?? false
+  });
+  setRunResponseHeaders(res, run, replayed);
+  return sendError(res, req, error, undefined, { runId: run.runId, idempotentReplay: replayed });
+}
+
+function respondWithExistingRun(res, req, run, message = '返回已有执行') {
+  if (run.state === 'failed' || run.state === 'interrupted') {
+    return sendRunFailure(res, req, run, true);
+  }
+  const accepted = ACTIVE_RUN_STATES.has(run.state);
+  return sendRunSuccess(res, req, run.result, run, {
+    message,
+    replayed: true,
+    accepted
+  });
+}
+
+function isPreExecutionError(error) {
+  return error?.code === 'MAA_EXECUTION_BUSY'
+    || error?.code === 'AGENT_EXECUTION_BUSY'
+    || String(error?.code || '').startsWith('AGENT_VALIDATION_');
+}
+
+async function settleBackgroundRun(runId, outcome) {
+  const current = getAgentRun(runId);
+  if (!current || TERMINAL_RUN_STATES.has(current.state)) return current;
+  try {
+    let run;
+    if (outcome?.stopped || current.state === 'stopping') {
+      run = stopAgentRun(runId, outcome?.result || null);
+    } else if (outcome?.ok) {
+      run = completeAgentRun(runId, outcome.result);
+    } else {
+      run = failAgentRun(runId, outcome?.error || new Error('后台任务执行失败'));
+    }
+    await flushAgentRunStore();
+    return run;
+  } catch (error) {
+    logger.error('更新或持久化 Agent run 终态失败', { runId, error: error.message });
+    return getAgentRun(runId);
+  }
+}
+
+async function persistAgentRunMutation(runId, context) {
+  try {
+    await flushAgentRunStore();
+    return null;
+  } catch (error) {
+    logger.error(context, { runId, error: error.message });
+    return error;
+  }
+}
+
+async function respondWithPersistedAgentRun(res, req, runId, context, respond) {
+  try {
+    return await withFlushedAgentRunSnapshot(runId, respond);
+  } catch (error) {
+    logger.error(context, { runId, error: error.message });
+    return sendRunPersistenceFailure(res, req, runId, error);
+  }
+}
+
+function sendRunPersistenceFailure(res, req, runId, error) {
+  const run = getAgentRun(runId);
+  const persistenceError = agentError(
+    error?.code || 'AGENT_RUN_PERSISTENCE_FAILED',
+    error?.message || 'Agent run 持久化失败',
+    {
+      statusCode: error?.statusCode || error?.status || 503,
+      details: {
+        ...(error?.details || {}),
+        runId,
+        run
+      },
+      retryable: error?.retryable ?? true
+    }
+  );
+  return sendError(res, req, persistenceError, undefined, { runId });
+}
+
+function mergeBackgroundOutcome(outcome, acceptedResult) {
+  const accepted = acceptedResult && typeof acceptedResult === 'object' && !Array.isArray(acceptedResult)
+    ? acceptedResult
+    : { acceptedResult };
+  const terminal = outcome?.result && typeof outcome.result === 'object' && !Array.isArray(outcome.result)
+    ? outcome.result
+    : { result: outcome?.result ?? null };
+  return {
+    ...outcome,
+    result: { ...accepted, ...terminal }
+  };
+}
+
+export async function executeTrackedAgentAction(req, res, {
+  operationId,
+  input,
+  waitForCompletion = true,
+  metadata = {},
+  execute,
+  successMessage = '操作成功',
+  acceptedMessage = '任务已接受'
+}) {
+  const reservation = beginAgentRun({
+    operationId,
+    idempotencyKey: getIdempotencyKey(req),
+    input,
+    metadata
+  });
+  if (reservation.replayed) {
+    return respondWithPersistedAgentRun(
+      res,
+      req,
+      reservation.run.runId,
+      'Agent run 重放响应前持久化失败',
+      run => respondWithExistingRun(res, req, run || reservation.run)
+    );
+  }
+
+  const runId = reservation.run.runId;
+  const admissionPersistenceError = await persistAgentRunMutation(
+    runId,
+    'Agent run 接受状态持久化失败，已阻止执行'
+  );
+  if (admissionPersistenceError) {
+    const rejectedRun = failAgentRun(runId, admissionPersistenceError);
+    releaseAgentRunIdempotency(runId);
+    await persistAgentRunMutation(runId, 'Agent run 持久化失败终态写入失败');
+    return sendRunFailure(res, req, rejectedRun);
+  }
+
+  const ensureRunStarted = () => {
+    const run = getAgentRun(runId);
+    return run?.state === 'accepted' ? startAgentRun(runId) : run;
+  };
+  let acceptedResult;
+  let hasAcceptedResult = false;
+  let pendingOutcome = null;
+  const settleAcceptedBackgroundRun = async (outcome) => {
+    if (!hasAcceptedResult) {
+      pendingOutcome = outcome;
+      return null;
+    }
+    return settleBackgroundRun(runId, mergeBackgroundOutcome(outcome, acceptedResult));
+  };
+  const lifecycle = {
+    onStarted: ensureRunStarted,
+    ...(!waitForCompletion ? { onSettled: settleAcceptedBackgroundRun } : {})
+  };
+
+  try {
+    const result = await execute(lifecycle);
+    acceptedResult = result;
+    hasAcceptedResult = true;
+    if (pendingOutcome) {
+      const outcome = pendingOutcome;
+      pendingOutcome = null;
+      await settleAcceptedBackgroundRun(outcome);
+    }
+    let run = getAgentRun(runId);
+    if (!waitForCompletion && ACTIVE_RUN_STATES.has(run.state)) {
+      run = setAgentRunAcceptedResult(runId, result);
+    }
+    if (waitForCompletion && !TERMINAL_RUN_STATES.has(run.state)) {
+      run = run.state === 'stopping'
+        ? stopAgentRun(runId, result)
+        : completeAgentRun(runId, result);
+    }
+    return respondWithPersistedAgentRun(
+      res,
+      req,
+      runId,
+      'Agent run 响应状态持久化失败',
+      persistedRun => {
+        run = persistedRun || run;
+        if (run.state === 'failed' || run.state === 'interrupted') {
+          return sendRunFailure(res, req, run);
+        }
+        if (run.state === 'stopped') {
+          return sendRunSuccess(res, req, run.result, run, { message: '任务已终止' });
+        }
+        const accepted = !waitForCompletion && ACTIVE_RUN_STATES.has(run.state);
+        return sendRunSuccess(res, req, TERMINAL_RUN_STATES.has(run.state) ? run.result : result, run, {
+          message: accepted ? acceptedMessage : successMessage,
+          accepted
+        });
+      }
+    );
+  } catch (error) {
+    const current = getAgentRun(runId);
+    if (isPreExecutionError(error) && current && !TERMINAL_RUN_STATES.has(current.state)) {
+      const rejectedRun = failAgentRun(runId, error);
+      releaseAgentRunIdempotency(runId);
+      const persistenceError = await persistAgentRunMutation(runId, 'Agent run 拒绝状态持久化失败');
+      if (persistenceError) return sendRunPersistenceFailure(res, req, runId, persistenceError);
+      return sendRunFailure(res, req, rejectedRun);
+    }
+    const run = error?.stopped || current?.state === 'stopping'
+      ? stopAgentRun(runId, {
+          message: error.message,
+          exitCode: error.exitCode ?? null,
+          signal: error.signal ?? null
+        })
+      : failAgentRun(runId, error);
+    return respondWithPersistedAgentRun(
+      res,
+      req,
+      runId,
+      'Agent run 终态持久化失败',
+      persistedRun => {
+        const terminalRun = persistedRun || run;
+        if (terminalRun.state === 'stopped') {
+          return sendRunSuccess(res, req, terminalRun.result, terminalRun, { message: '任务已终止' });
+        }
+        return sendRunFailure(res, req, terminalRun);
+      }
+    );
+  }
+}
+
+function parseWaitForCompletion(value, defaultValue = true) {
+  const normalized = value ?? defaultValue;
+  if (typeof normalized !== 'boolean') {
+    throw agentError('AGENT_VALIDATION_WAIT_FOR_COMPLETION_INVALID', 'waitForCompletion 必须是布尔值', {
+      statusCode: 400,
+      details: { receivedType: typeof normalized },
+      retryable: false
+    });
+  }
+  return normalized;
+}
 
 function sendConfigStorageError(res, req, result, fallbackCode, fallbackMessage) {
   const invalidType = result?.error?.code === 'AGENT_CONFIG_TYPE_INVALID';
@@ -80,298 +416,6 @@ function sendConfigStorageError(res, req, result, fallbackCode, fallbackMessage)
       retryable: !invalidType
     }
   ));
-}
-
-const AGENT_ACTIONS = [
-  {
-    id: 'get_status',
-    method: 'GET',
-    path: '/api/agent/status',
-    description: 'Return a compact, AI-readable summary of La Pluma, MAA, ADB, WebRTC, and recent logs.'
-  },
-  {
-    id: 'test_connection',
-    method: 'POST',
-    path: '/api/agent/actions/test-connection',
-    description: 'Check ADB availability and emulator connectivity.',
-    body_schema: {
-      type: 'object',
-      properties: {
-        adbPath: { type: 'string', default: DEFAULT_ADB_PATH },
-        address: { type: 'string', default: DEFAULT_ADB_ADDRESS }
-      }
-    }
-  },
-  {
-    id: 'discover_devices',
-    method: 'GET',
-    path: '/api/agent/actions/discover-devices',
-    description: 'List ADB-visible devices and reachable common local emulator ports.',
-    query_schema: {
-      type: 'object',
-      properties: {
-        adbPath: { type: 'string', default: DEFAULT_ADB_PATH }
-      }
-    }
-  },
-  {
-    id: 'activity_run_preflight',
-    method: 'GET',
-    path: '/api/agent/activity/preflight',
-    description: 'Check the current activity and whether MAA has reliable home-screen navigation. This never starts a copilot.'
-  },
-  {
-    id: 'activity_copilot_candidates',
-    method: 'GET',
-    path: '/api/agent/activity/copilot-candidates',
-    description: 'Find manual-selection copilot candidates for the current activity. This never starts a copilot.'
-  },
-  {
-    id: 'run_current_activity_copilots',
-    method: 'POST',
-    path: '/api/agent/activity/run',
-    description: 'Run the server-built current-activity copilot plan. It blocks when navigation or a reliable candidate is unavailable.'
-  },
-  {
-    id: 'start_game',
-    method: 'POST',
-    path: '/api/agent/actions/start-game',
-    description: 'Run maa startup for the selected client. Default is Official.',
-    body_schema: {
-      type: 'object',
-      properties: {
-        clientType: { type: 'string', default: DEFAULT_CLIENT_TYPE },
-        address: { type: 'string', default: DEFAULT_ADB_ADDRESS },
-        waitForCompletion: { type: 'boolean', default: true }
-      }
-    }
-  },
-  {
-    id: 'fight',
-    method: 'POST',
-    path: '/api/agent/actions/fight',
-    description: 'Semantic action for 理智作战. Agents can pass stages/medicine/stone/series without knowing maa-cli flags.',
-    body_schema: {
-      type: 'object',
-      required: ['stages'],
-      properties: {
-        stages: {
-          type: 'array',
-          items: {
-            oneOf: [
-              { type: 'string', examples: ['1-7'] },
-              {
-                type: 'object',
-                required: ['stage'],
-                properties: {
-                  stage: { type: 'string', examples: ['CE-6'] },
-                  times: { type: ['integer', 'string'], description: 'Optional per-stage run count.' }
-                }
-              }
-            ]
-          },
-          examples: [['HD-7', 'CE-6', 'AP-5']]
-        },
-        medicine: { type: ['integer', 'string'], default: 0, description: 'Normal sanity medicine count for -m.' },
-        expiringMedicine: { type: ['integer', 'string'], default: 0, description: 'Expiring sanity medicine count.' },
-        stone: { type: ['integer', 'string'], default: 0, description: 'Originium stone count.' },
-        series: { type: ['integer', 'string'], default: 0, description: 'MAA --series value; omit or set 1 to use maa-cli default.' },
-        dryRun: { type: 'boolean', default: false },
-        waitForCompletion: { type: 'boolean', default: true }
-      }
-    }
-  },
-  {
-    id: 'run_task',
-    method: 'POST',
-    path: '/api/agent/actions/run-task',
-    description: 'Run one whitelisted maa-cli task with explicit args. Prefer semantic actions when available.',
-    body_schema: {
-      type: 'object',
-      required: ['command'],
-      properties: {
-        command: { type: 'string', enum: ['startup', 'closedown', 'fight', 'infrast', 'recruit', 'mall', 'award', 'copilot', 'ssscopilot', 'paradoxcopilot', 'roguelike', 'depot', 'operbox', 'activity'] },
-        args: { type: 'array', items: { type: 'string' }, default: [] },
-        waitForCompletion: { type: 'boolean', default: true }
-      }
-    }
-  },
-  {
-    id: 'stop_task',
-    method: 'POST',
-    path: '/api/agent/actions/stop',
-    description: 'Stop the currently running MAA task if any.'
-  },
-  {
-    id: 'get_current_run',
-    method: 'GET',
-    path: '/api/agent/runs/current',
-    description: 'Return current MAA task, schedule execution state, and recent logs for polling.'
-  },
-  {
-    id: 'get_screenshot',
-    method: 'POST',
-    path: '/api/agent/screen/screenshot',
-    description: 'Capture the emulator screen as base64 PNG with timestamp and dimensions.',
-    body_schema: {
-      type: 'object',
-      properties: {
-        adbPath: { type: 'string', default: DEFAULT_ADB_PATH },
-        address: { type: 'string', default: DEFAULT_ADB_ADDRESS }
-      }
-    }
-  },
-  {
-    id: 'run_daily_flow',
-    method: 'POST',
-    path: '/api/agent/actions/run-daily-flow',
-    description: 'Run the saved enabled automation task flow. Use dryRun=true first to inspect the command plan.',
-    body_schema: {
-      type: 'object',
-      properties: {
-        dryRun: { type: 'boolean', default: false },
-        scheduleId: { type: 'string', default: 'agent-daily-flow' },
-        taskFlow: { type: 'array', items: { type: 'object' }, description: 'Optional task flow override; defaults to saved automation-tasks config.' }
-      }
-    }
-  },
-  {
-    id: 'recent_logs',
-    method: 'GET',
-    path: '/api/agent/logs/recent?lines=80',
-    description: 'Return recent in-memory MAA logs with optional line count.'
-  },
-  {
-    id: 'webrtc_status',
-    method: 'GET',
-    path: '/api/agent/webrtc/status',
-    description: 'Return lightweight WebRTC endpoint hints for the browser preview.'
-  },
-  {
-    id: 'webrtc_devices',
-    method: 'GET',
-    path: '/api/agent/webrtc/devices',
-    description: 'Return online ScrcpyOverWebRTC device ids in an AI-readable shape.'
-  },
-  {
-    id: 'webrtc_start',
-    method: 'POST',
-    path: '/api/agent/webrtc/start',
-    description: 'Start signaling/TURN and MuMu agent, then return signaling URL, ICE servers, and device id.',
-    body_schema: {
-      type: 'object',
-      properties: {
-        address: { type: 'string', default: DEFAULT_ADB_ADDRESS },
-        deviceId: { type: 'string', default: 'mumu-la-pluma' }
-      }
-    }
-  },
-  {
-    id: 'webrtc_stop',
-    method: 'POST',
-    path: '/api/agent/webrtc/stop',
-    description: 'Stop MuMu agent and signaling/TURN managed by La Pluma.'
-  },
-  {
-    id: 'preview_orientation',
-    method: 'POST',
-    path: '/api/agent/preview/orientation',
-    description: 'Set Android emulator orientation for the live preview/device. Uses ADB settings + keyevent fallback and returns observed display state.',
-    body_schema: {
-      type: 'object',
-      required: ['orientation'],
-      properties: {
-        orientation: { type: 'string', enum: ['portrait', 'landscape', 'auto'] },
-        adbPath: { type: 'string', default: DEFAULT_ADB_PATH },
-        address: { type: 'string', default: DEFAULT_ADB_ADDRESS },
-        dryRun: { type: 'boolean', default: false }
-      }
-    }
-  }
-];
-
-function endpoint(method, path, description, requestBody = null) {
-  const operation = {
-    summary: description,
-    responses: {
-      200: {
-        description: 'Standard La Pluma API response',
-        content: {
-          'application/json': {
-            schema: { $ref: '#/components/schemas/ApiResponse' }
-          }
-        }
-      }
-    }
-  };
-  if (requestBody) {
-    operation.requestBody = {
-      required: !!requestBody.required,
-      content: {
-        'application/json': {
-          schema: requestBody
-        }
-      }
-    };
-  }
-  return { [path]: { [method.toLowerCase()]: operation } };
-}
-
-function mergePaths(items) {
-  return items.reduce((acc, item) => {
-    Object.entries(item).forEach(([path, value]) => {
-      acc[path] = { ...(acc[path] || {}), ...value };
-    });
-    return acc;
-  }, {});
-}
-
-function getOpenApiSpec() {
-  return {
-    openapi: '3.1.0',
-    info: {
-      title: 'La Pluma Agent API',
-      version: API_VERSION,
-      description: 'AI-friendly action and status surface for La Pluma / maa-cli automation.'
-    },
-    servers: [{ url: '/api' }],
-    paths: mergePaths([
-      endpoint('GET', '/agent/manifest', 'Discover AI-readable capabilities and action contracts.'),
-      endpoint('GET', '/agent/status', 'Get compact current status.'),
-      endpoint('GET', '/agent/logs/recent', 'Get recent runtime logs.'),
-      endpoint('GET', '/agent/openapi.json', 'Get this OpenAPI schema.'),
-      endpoint('GET', '/agent/activity/preflight', 'Check activity-run navigation readiness without starting a copilot.'),
-      endpoint('GET', '/agent/activity/copilot-candidates', 'Find current-activity copilot candidates without starting a copilot.'),
-      endpoint('POST', '/agent/activity/run', 'Build and run the current-activity copilot plan.'),
-      endpoint('GET', '/agent/runs/current', 'Poll current task/schedule state.'),
-      endpoint('POST', '/agent/screen/screenshot', 'Capture emulator screenshot.', AGENT_ACTIONS.find(a => a.id === 'get_screenshot').body_schema),
-      endpoint('GET', '/agent/webrtc/status', 'Get WebRTC preview status hints.'),
-      endpoint('GET', '/agent/webrtc/devices', 'Get online WebRTC device ids.'),
-      endpoint('POST', '/agent/webrtc/start', 'Start WebRTC infrastructure.', AGENT_ACTIONS.find(a => a.id === 'webrtc_start').body_schema),
-      endpoint('POST', '/agent/webrtc/stop', 'Stop WebRTC infrastructure.'),
-      endpoint('POST', '/agent/preview/orientation', 'Set emulator orientation and return observed display state.', AGENT_ACTIONS.find(a => a.id === 'preview_orientation').body_schema),
-      endpoint('POST', '/agent/actions/test-connection', 'Test ADB connection.', AGENT_ACTIONS.find(a => a.id === 'test_connection').body_schema),
-      endpoint('GET', '/agent/actions/discover-devices', 'Discover ADB devices and common local emulator ports.', AGENT_ACTIONS.find(a => a.id === 'discover_devices').query_schema),
-      endpoint('POST', '/agent/actions/start-game', 'Start Arknights through MAA.', AGENT_ACTIONS.find(a => a.id === 'start_game').body_schema),
-      endpoint('POST', '/agent/actions/fight', 'Run semantic 理智作战 through MAA.', AGENT_ACTIONS.find(a => a.id === 'fight').body_schema),
-      endpoint('POST', '/agent/actions/run-daily-flow', 'Run saved daily task flow or return a dry-run plan.', AGENT_ACTIONS.find(a => a.id === 'run_daily_flow').body_schema),
-      endpoint('POST', '/agent/actions/run-task', 'Run a whitelisted maa-cli command.', AGENT_ACTIONS.find(a => a.id === 'run_task').body_schema),
-      endpoint('POST', '/agent/actions/stop', 'Stop the current MAA task.')
-    ]),
-    components: {
-      schemas: {
-        ApiResponse: {
-          type: 'object',
-          properties: {
-            success: { type: 'boolean' },
-            message: { type: 'string' },
-            data: { type: 'object' },
-            error: { type: 'string' }
-          }
-        }
-      }
-    }
-  };
 }
 
 async function getAdbSummary(adbPath = DEFAULT_ADB_PATH, address = DEFAULT_ADB_ADDRESS) {
@@ -425,14 +469,7 @@ async function getWebrtcSummary(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFA
 
 async function resolveRequestConnection(req, { allowOverrides = false } = {}) {
   const input = { ...(req.query || {}), ...(req.body || {}) }
-  const base = await resolveConnection(input.profileId)
-  if (!allowOverrides) return base
-  return {
-    ...base,
-    adbPath: typeof input.adbPath === 'string' && input.adbPath.trim() ? input.adbPath : base.adbPath,
-    address: typeof input.address === 'string' && input.address.trim() ? input.address : base.address,
-    clientType: typeof input.clientType === 'string' && input.clientType.trim() ? input.clientType : base.clientType
-  }
+  return resolveConnectionInput(input, { allowOverrides })
 }
 
 function pngDimensions(base64) {
@@ -557,44 +594,14 @@ function buildFightArgs({ stages, stage, times, medicine = 0, expiringMedicine =
   return args;
 }
 
-function normalizeTaskCommand(task) {
-  const command = task.commandId || String(task.id || '').split('-')[0];
-  const params = task.params || {};
-
-  if (command === 'startup' || command === 'closedown') {
-    const args = [params.clientType || DEFAULT_CLIENT_TYPE];
-    if (params.address) args.push('-a', String(params.address));
-    if (command === 'startup' && params.accountName) args.push('--account-name', String(params.accountName));
-    return { command, args };
-  }
-
-  if (command === 'fight') {
-    return { command, args: buildFightArgs(params) };
-  }
-
-  return { command, args: [] };
-}
-
 async function loadAutomationTaskFlow(overrideTaskFlow = null) {
   if (Array.isArray(overrideTaskFlow)) return overrideTaskFlow;
   const saved = await loadUserConfig('automation-tasks');
   return saved.success && Array.isArray(saved.data?.taskFlow) ? saved.data.taskFlow : [];
 }
 
-function buildTaskFlowPlan(taskFlow) {
-  return taskFlow
-    .filter(task => task.enabled !== false)
-    .map((task, index) => ({
-      index: index + 1,
-      id: task.id,
-      name: task.name || task.commandId || task.id,
-      enabled: task.enabled !== false,
-      ...normalizeTaskCommand(task)
-    }));
-}
-
 async function buildAgentStatus(req) {
-  const connection = await resolveRequestConnection(req)
+  const connection = await resolveRequestConnection(req, { allowOverrides: true })
   const { adbPath, address } = connection
   const [version, adb, webrtc, orientation] = await Promise.all([
     getMaaVersion(true).catch(error => ({ error: error.message })),
@@ -633,37 +640,23 @@ async function buildAgentStatus(req) {
 }
 
 router.get('/manifest', (req, res) => {
-  res.json(successResponse({
-    name: 'La Pluma Agent API',
-    id: 'la-pluma-agent-api',
-    version: API_VERSION,
-    description: 'AI-readable control surface for MAA / Arknights automation through La Pluma.',
-    auth: {
-      type: 'optional-bearer-or-x-la-pluma-token',
-      note: 'Required only when LA_PLUMA_TOKEN is set on the backend.'
-    },
-    defaults: {
-      adbPath: DEFAULT_ADB_PATH,
-      adbAddress: DEFAULT_ADB_ADDRESS,
-      clientType: DEFAULT_CLIENT_TYPE
-    },
-    links: {
-      status: '/api/agent/status',
-      openapi: '/api/agent/openapi.json',
-      currentRun: '/api/agent/runs/current',
-      screenshot: '/api/agent/screen/screenshot',
-      recentLogs: '/api/agent/logs/recent?lines=80'
-    },
-    actions: AGENT_ACTIONS
+  return sendSuccess(res, req, buildAgentManifest({
+    adbPath: DEFAULT_ADB_PATH,
+    adbAddress: DEFAULT_ADB_ADDRESS,
+    clientType: DEFAULT_CLIENT_TYPE
   }));
 });
 
 router.get('/openapi.json', (req, res) => {
-  res.json(getOpenApiSpec());
+  res.json(buildOpenApiSpec({
+    adbPath: DEFAULT_ADB_PATH,
+    adbAddress: DEFAULT_ADB_ADDRESS,
+    clientType: DEFAULT_CLIENT_TYPE
+  }));
 });
 
 router.get('/status', asyncHandler(async (req, res) => {
-  res.json(successResponse(await buildAgentStatus(req)));
+  return sendSuccess(res, req, await buildAgentStatus(req));
 }));
 
 router.get('/runs/current', asyncHandler(async (req, res) => {
@@ -671,11 +664,29 @@ router.get('/runs/current', asyncHandler(async (req, res) => {
   const task = getTaskStatus();
   const schedule = getScheduleExecutionStatus();
   const recentLogs = getRealtimeLogs(lines);
+  const currentRun = enrichAgentRun(getCurrentAgentRun());
+  const lastRun = listAgentRuns({ limit: 500 })
+    .filter(run => TERMINAL_RUN_STATES.has(run.state))
+    .sort((left, right) => String(right.finishedAt).localeCompare(String(left.finishedAt)))[0] || null;
   return sendSuccess(res, req, {
     ...task,
     schedule,
-    recentLogs
+    recentLogs,
+    run: currentRun,
+    lastRun
   });
+}));
+
+router.get('/runs/:runId', asyncHandler(async (req, res) => {
+  const run = getAgentRun(req.params.runId);
+  if (!run) {
+    return sendError(res, req, agentError('AGENT_RUN_NOT_FOUND', `未找到 Agent run: ${req.params.runId}`, {
+      statusCode: 404,
+      details: { runId: req.params.runId },
+      retryable: false
+    }));
+  }
+  return sendSuccess(res, req, enrichAgentRun(run));
 }));
 
 router.get('/tasks/status', asyncHandler(async (req, res) => {
@@ -683,16 +694,16 @@ router.get('/tasks/status', asyncHandler(async (req, res) => {
 }));
 
 router.post('/screen/screenshot', asyncHandler(async (req, res) => {
-  const { adbPath, address, profileId } = await resolveRequestConnection(req)
+  const { adbPath, address, profileId } = await resolveRequestConnection(req, { allowOverrides: true })
   const screenshot = await captureScreen(adbPath, address);
-  res.json(successResponse({
+  return sendSuccess(res, req, {
     ...screenshot,
     ...pngDimensions(screenshot.image),
     mediaType: 'image/png',
     adbPath,
     address,
     profileId
-  }));
+  });
 }));
 
 router.get('/logs/recent', asyncHandler(async (req, res) => {
@@ -774,7 +785,7 @@ router.delete('/config/user/:configType', asyncHandler(async (req, res) => {
 }));
 
 router.get('/activity', asyncHandler(async (req, res) => {
-  const clientType = req.query.clientType || DEFAULT_CLIENT_TYPE;
+  const { clientType } = await resolveRequestConnection(req, { allowOverrides: true });
   const activityInfo = await getCurrentActivity(clientType);
   const completion = await getActivityCompletion(activityInfo);
   return sendSuccess(res, req, {
@@ -791,21 +802,26 @@ router.get('/activity', asyncHandler(async (req, res) => {
 }));
 
 router.get('/activity/preflight', asyncHandler(async (req, res) => {
-  const { clientType } = await resolveRequestConnection(req);
+  const { clientType } = await resolveRequestConnection(req, { allowOverrides: true });
   const preflight = await getActivityRunPreflight(clientType);
   return sendSuccess(res, req, preflight, preflight.reason);
 }));
 
 router.get('/activity/copilot-candidates', asyncHandler(async (req, res) => {
-  const { clientType } = await resolveRequestConnection(req);
+  const { clientType } = await resolveRequestConnection(req, { allowOverrides: true });
   const candidates = await findActivityCopilotCandidates(clientType);
   return sendSuccess(res, req, candidates, candidates.reason);
 }));
 
 router.post('/activity/run', asyncHandler(async (req, res) => {
-  const { clientType } = await resolveRequestConnection(req);
-  const result = await runCurrentActivityCopilots(clientType);
-  return sendSuccess(res, req, result, result.plan.reason);
+  const { clientType } = await resolveRequestConnection(req, { allowOverrides: true });
+  return executeTrackedAgentAction(req, res, {
+    operationId: 'run_current_activity_copilots',
+    input: { clientType },
+    metadata: { taskName: '当前活动作业', taskType: 'activity' },
+    execute: lifecycle => runCurrentActivityCopilots(clientType, lifecycle),
+    successMessage: '当前活动作业执行完成'
+  });
 }));
 
 router.get('/stages/open-today', asyncHandler(async (_req, res) => {
@@ -1162,21 +1178,21 @@ router.post('/actions/fetch-training-materials', asyncHandler(async (req, res) =
 }));
 
 router.get('/webrtc/status', asyncHandler(async (req, res) => {
-  const { address, adbPath, profileId } = await resolveRequestConnection(req)
+  const { address, adbPath, profileId } = await resolveRequestConnection(req, { allowOverrides: true })
   const summary = await getWebrtcSummary(address, adbPath);
-  res.json(successResponse({ ...summary, profileId, devices: await getWebrtcDevices() }));
+  return sendSuccess(res, req, { ...summary, profileId, devices: await getWebrtcDevices() });
 }));
 
 router.get('/webrtc/devices', asyncHandler(async (req, res) => {
-  res.json(successResponse({ devices: await getWebrtcDevices() }));
+  return sendSuccess(res, req, { devices: await getWebrtcDevices() });
 }));
 
 router.post('/webrtc/start', asyncHandler(async (req, res) => {
-  const { address, adbPath, profileId } = await resolveRequestConnection(req)
+  const { address, adbPath, profileId } = await resolveRequestConnection(req, { allowOverrides: true })
   const deviceId = req.body?.deviceId || DEFAULT_DEVICE_ID;
   const status = await startWebrtc(address, deviceId, adbPath);
   const summary = await getWebrtcSummary(address, adbPath);
-  res.json(successResponse({
+  return sendSuccess(res, req, {
     ...summary,
     ...status,
     devices: await getWebrtcDevices(),
@@ -1189,17 +1205,17 @@ router.post('/webrtc/start', asyncHandler(async (req, res) => {
       requestOfferPayload: { type: 'request-offer', ip_preference: 'ipv4' },
       candidatePolicy: 'relay preferred / ipv4'
     }
-  }));
+  });
 }));
 
 router.post('/webrtc/stop', asyncHandler(async (req, res) => {
-  const { address, adbPath } = await resolveRequestConnection(req)
+  const { address, adbPath } = await resolveRequestConnection(req, { allowOverrides: true })
   return sendSuccess(res, req, await stopWebrtc(address, adbPath));
 }));
 
 router.post('/preview/orientation', asyncHandler(async (req, res) => {
   const { orientation, dryRun = false } = req.body || {};
-  const { adbPath, address } = await resolveRequestConnection(req)
+  const { adbPath, address } = await resolveRequestConnection(req, { allowOverrides: true })
   const plan = buildOrientationPlan({ orientation, adbPath, address });
 
   if (dryRun) {
@@ -1215,26 +1231,26 @@ router.post('/webrtc/install', asyncHandler(async (req, res) => {
 }));
 
 router.post('/webrtc/start-server', asyncHandler(async (req, res) => {
-  const { address, adbPath } = await resolveRequestConnection(req)
+  const { address, adbPath } = await resolveRequestConnection(req, { allowOverrides: true })
   const result = await startWebrtcServer(address, adbPath);
   return sendSuccess(res, req, result, 'WebRTC 服务已启动');
 }));
 
 router.post('/webrtc/stop-server', asyncHandler(async (req, res) => {
-  const { address, adbPath } = await resolveRequestConnection(req)
+  const { address, adbPath } = await resolveRequestConnection(req, { allowOverrides: true })
   const result = await stopWebrtcServer(address, adbPath);
   return sendSuccess(res, req, result, 'WebRTC 服务已停止');
 }));
 
 router.post('/webrtc/start-agent', asyncHandler(async (req, res) => {
-  const { address, adbPath } = await resolveRequestConnection(req)
+  const { address, adbPath } = await resolveRequestConnection(req, { allowOverrides: true })
   const deviceId = req.body?.deviceId || DEFAULT_DEVICE_ID;
   const result = await startWebrtcAgent(address, deviceId, adbPath);
   return sendSuccess(res, req, result, 'MuMu Agent 已启动');
 }));
 
 router.post('/webrtc/stop-agent', asyncHandler(async (req, res) => {
-  const { address, adbPath } = await resolveRequestConnection(req)
+  const { address, adbPath } = await resolveRequestConnection(req, { allowOverrides: true })
   const result = await stopWebrtcAgent(address, adbPath);
   return sendSuccess(res, req, result, 'MuMu Agent 已停止');
 }));
@@ -1295,7 +1311,7 @@ async function getDeviceStats(adbPath, address) {
 }
 
 router.get('/device-stats', asyncHandler(async (req, res) => {
-  const { adbPath, address } = await resolveRequestConnection(req)
+  const { adbPath, address } = await resolveRequestConnection(req, { allowOverrides: true })
   const stats = await getDeviceStats(adbPath, address);
   return sendSuccess(res, req, stats);
 }));
@@ -1574,25 +1590,36 @@ router.get('/config-directory', asyncHandler(async (req, res) => {
 }));
 
 router.post('/actions/start-game', asyncHandler(async (req, res) => {
-  const { waitForCompletion = true } = req.body || {};
-  const { clientType, address } = await resolveRequestConnection(req)
-  const result = await execMaaCommand('startup', [clientType, '-a', address], '启动游戏', 'agent', waitForCompletion);
-  res.json(successResponse(result));
+  const waitForCompletion = parseWaitForCompletion(req.body?.waitForCompletion);
+  const { clientType, address } = await resolveRequestConnection(req, { allowOverrides: true })
+  return executeTrackedAgentAction(req, res, {
+    operationId: 'start_game',
+    input: { clientType, address, waitForCompletion },
+    waitForCompletion,
+    metadata: { taskName: '启动游戏', taskType: 'agent' },
+    execute: lifecycle => execMaaCommand(
+      'startup',
+      [clientType, '-a', address],
+      '启动游戏',
+      'agent',
+      waitForCompletion,
+      false,
+      lifecycle
+    ),
+    successMessage: '游戏启动命令执行完成',
+    acceptedMessage: '游戏启动命令已接受'
+  });
 }));
 
 router.post('/actions/run-daily-flow', asyncHandler(async (req, res) => {
-  const { dryRun = false, scheduleId = 'agent-daily-flow', taskFlow: overrideTaskFlow = null } = req.body || {};
+  const { dryRun, scheduleId, taskFlow: overrideTaskFlow } = normalizeDailyFlowRequest(req.body || {});
   const taskFlow = await loadAutomationTaskFlow(overrideTaskFlow);
-  const plan = buildTaskFlowPlan(taskFlow);
-
-  if (dryRun) {
-    return res.json(successResponse({
-      dryRun: true,
-      scheduleId,
-      totalSteps: plan.length,
-      plan
-    }));
+  const planResult = await getScheduledTaskFlowPlan(taskFlow);
+  const planError = createDailyFlowExecutionError(planResult);
+  if (planError) {
+    return sendError(res, req, planError);
   }
+  const plan = planResult.steps;
 
   if (!plan.length) {
     return sendError(res, req, agentError('AGENT_VALIDATION_EMPTY_TASK_FLOW', '没有可执行的自动化任务', {
@@ -1602,12 +1629,33 @@ router.post('/actions/run-daily-flow', asyncHandler(async (req, res) => {
     }));
   }
 
-  const result = await executeScheduleNow(scheduleId, taskFlow);
-  return sendSuccess(res, req, { ...result, scheduleId, totalSteps: plan.length, plan });
+  if (dryRun) {
+    return sendSuccess(res, req, {
+      dryRun: true,
+      scheduleId,
+      totalSteps: planResult.totalSteps,
+      plan
+    }, 'Dry run only', { dryRun: true });
+  }
+
+  return executeTrackedAgentAction(req, res, {
+    operationId: 'run_daily_flow',
+    input: { scheduleId, taskFlow },
+    metadata: { taskName: `今日流程 ${scheduleId}`, taskType: 'schedule' },
+    execute: async lifecycle => {
+      const result = await executeScheduleNow(scheduleId, taskFlow, lifecycle);
+      const executionError = createDailyFlowExecutionError(result);
+      if (executionError) throw executionError;
+      return { ...result, scheduleId, totalSteps: planResult.totalSteps, plan };
+    },
+    successMessage: '今日流程执行完成'
+  });
 }));
 
 router.post('/actions/fight', asyncHandler(async (req, res) => {
-  const { dryRun = false, waitForCompletion = true, ...fightOptions } = req.body || {};
+  const { dryRun = false, ...requestOptions } = req.body || {};
+  const waitForCompletion = parseWaitForCompletion(requestOptions.waitForCompletion);
+  const { waitForCompletion: _ignoredWait, ...fightOptions } = requestOptions;
   const args = buildFightArgs(fightOptions);
   if (!args.length) {
     return sendError(res, req, agentError('AGENT_VALIDATION_MISSING_STAGES', '至少需要一个有效关卡', {
@@ -1632,35 +1680,110 @@ router.post('/actions/fight', asyncHandler(async (req, res) => {
     return sendDryRun(res, req, plan);
   }
 
-  const result = await execMaaCommand('fight', args, 'Agent: 理智作战', 'agent', waitForCompletion);
-  return sendSuccess(res, req, { ...result, plan });
+  return executeTrackedAgentAction(req, res, {
+    operationId: 'fight',
+    input: { ...plan.semantic, waitForCompletion },
+    waitForCompletion,
+    metadata: { taskName: 'Agent: 理智作战', taskType: 'agent', plan },
+    execute: async lifecycle => ({
+      ...(await execMaaCommand(
+        'fight',
+        args,
+        'Agent: 理智作战',
+        'agent',
+        waitForCompletion,
+        false,
+        lifecycle
+      )),
+      plan
+    }),
+    successMessage: '理智作战执行完成',
+    acceptedMessage: '理智作战已接受'
+  });
 }));
 
 router.post('/actions/run-task', asyncHandler(async (req, res) => {
-  const { command, args = [], waitForCompletion = true } = req.body || {};
-  const allowedCommands = new Set([
-    'startup', 'closedown', 'fight', 'infrast', 'recruit', 'mall', 'award',
-    'copilot', 'ssscopilot', 'paradoxcopilot', 'roguelike', 'depot', 'operbox', 'activity'
-  ]);
-
-  if (!allowedCommands.has(command)) {
-    return sendError(res, req, agentError('AGENT_VALIDATION_COMMAND_NOT_ALLOWED', `不允许的 command: ${command}`, {
-      statusCode: 400,
-      details: { command, allowed: [...allowedCommands] },
-      retryable: false
-    }));
-  }
-
-  const normalizedArgs = Array.isArray(args) ? args.map(String) : [];
-  const result = await execMaaCommand(command, normalizedArgs, `Agent: ${command}`, 'agent', waitForCompletion);
-  return sendSuccess(res, req, result);
+  const input = req.body || {};
+  const requestedWait = parseWaitForCompletion(input.waitForCompletion);
+  const waitForCompletion = input.command === 'activity' || input.command === 'list'
+    ? true
+    : requestedWait;
+  return executeTrackedAgentAction(req, res, {
+    operationId: 'run_task',
+    input: { ...input, waitForCompletion },
+    waitForCompletion,
+    metadata: { taskName: input.taskName || `Agent: ${input.command || 'task'}`, taskType: input.taskType || 'agent' },
+    execute: lifecycle => executeAgentTask(
+      { ...input, waitForCompletion },
+      {
+        execMaaCommand: (command, args, taskName, taskType, shouldWait, silent = false) =>
+          execMaaCommand(command, args, taskName, taskType, shouldWait, silent, lifecycle),
+        execDynamicTask: (taskId, taskConfig, taskName, taskType, shouldWait, userResource) =>
+          execDynamicTask(taskId, taskConfig, taskName, taskType, shouldWait, userResource, { lifecycle })
+      }
+    ),
+    successMessage: '任务执行完成',
+    acceptedMessage: '任务已接受'
+  });
 }));
 
 router.post('/actions/stop', asyncHandler(async (req, res) => {
+  const requestedRunId = req.body?.runId || null;
+  const currentRun = getCurrentAgentRun();
+
+  if (requestedRunId) {
+    const requestedRun = getAgentRun(requestedRunId);
+    if (!requestedRun) {
+      return sendError(res, req, agentError('AGENT_RUN_NOT_FOUND', `未找到 Agent run: ${requestedRunId}`, {
+        statusCode: 404,
+        details: { runId: requestedRunId },
+        retryable: false
+      }));
+    }
+    if (TERMINAL_RUN_STATES.has(requestedRun.state)) {
+      return sendSuccess(res, req, { stopped: false, alreadyTerminal: true, run: requestedRun }, '任务已经结束');
+    }
+    if (requestedRun.state === 'accepted') {
+      return sendError(res, req, agentError('AGENT_RUN_NOT_STARTED', '目标 run 尚未获得执行权，未发送终止命令', {
+        statusCode: 409,
+        details: { requestedRunId, state: requestedRun.state },
+        retryable: true
+      }));
+    }
+    if (!currentRun || currentRun.runId !== requestedRunId) {
+      return sendError(res, req, agentError('AGENT_RUN_NOT_CURRENT', '目标 run 不是当前执行，未发送终止命令', {
+        statusCode: 409,
+        details: { requestedRunId, currentRunId: currentRun?.runId || null },
+        retryable: false
+      }));
+    }
+  }
+
+  const task = stopCurrentTask();
+  const scheduleStopped = stopScheduleExecution();
+  const stopRequested = task.success || scheduleStopped;
+  let run = currentRun;
+  if (stopRequested && run && ACTIVE_RUN_STATES.has(run.state)) {
+    if (run.state !== 'stopping') run = markAgentRunStopping(run.runId);
+    return respondWithPersistedAgentRun(
+      res,
+      req,
+      run.runId,
+      'Agent run 停止状态持久化失败',
+      persistedRun => sendSuccess(res, req, {
+        task,
+        scheduleStopped,
+        stopRequested,
+        run: enrichAgentRun(persistedRun || run)
+      }, '已发送终止请求')
+    );
+  }
   return sendSuccess(res, req, {
-    task: stopCurrentTask(),
-    scheduleStopped: stopScheduleExecution()
-  });
+    task,
+    scheduleStopped,
+    stopRequested,
+    run: enrichAgentRun(run)
+  }, stopRequested ? '已发送终止请求' : '当前没有可终止的任务');
 }));
 
 export default router;

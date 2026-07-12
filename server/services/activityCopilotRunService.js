@@ -135,7 +135,7 @@ export function buildActivityCopilotRunPlan(candidatePlan, preferences = {}) {
   };
 }
 
-export async function runCurrentActivityCopilots(clientType = 'Official') {
+export async function runCurrentActivityCopilots(clientType = 'Official', lifecycle = {}) {
   let candidates = await findActivityCopilotCandidates(clientType, { allowCurrentMap: true });
   let resourceRefresh = null;
   const activityCode = String(candidates.preflight?.activity?.code || '').toUpperCase();
@@ -184,7 +184,8 @@ export async function runCurrentActivityCopilots(clientType = 'Official') {
         setId: candidates.matchingSet.id,
         raid: preferences.raid,
         selectedIndexes,
-        options: executionOptions
+        options: executionOptions,
+        lifecycle
       });
       await recordActivityCompletion(plan.activity, plan.entries);
       return {
@@ -207,7 +208,8 @@ export async function runCurrentActivityCopilots(clientType = 'Official') {
     planId,
     name: `${plan.activity.name || plan.activity.code} 活动作业`,
     entries: plan.entries,
-    options: executionOptions
+    options: executionOptions,
+    lifecycle
   });
   await recordActivityCompletion(plan.activity, execution.results);
   return { executed: true, source: 'composed-candidates', candidates, preferences, plan: { ...plan, planId }, execution, resourceRefresh };
