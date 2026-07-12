@@ -120,6 +120,7 @@ const scheduleExecutionStatus = {
 
 let cancelActiveScheduleDelay = null;
 let activeScheduleAbortController = null;
+let activeScheduleRunId = null;
 
 function waitForScheduleDelay(delayMs) {
   return new Promise((resolve) => {
@@ -327,7 +328,7 @@ function buildCommand(task, connectionDefaults = {}) {
 }
 
 // 执行任务流程
-async function executeTaskFlowUnlocked(taskFlow, scheduleId) {
+async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId) {
   if (!Array.isArray(taskFlow)) {
     return { success: false, message: '任务流程格式无效' };
   }
@@ -359,6 +360,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId) {
   }
 
   logger.info('开始执行任务流程', { scheduleId });
+  activeScheduleRunId = runId;
   activeScheduleAbortController = new AbortController();
   
   // 更新状态：开始执行
@@ -1253,6 +1255,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId) {
     lastResult: executionSummary
   });
   activeScheduleAbortController = null;
+  activeScheduleRunId = null;
 
   if (wasStopped) {
     return { success: true, stopped: true, message: completionMessage, summary: executionSummary };
@@ -1296,12 +1299,14 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId) {
 }
 
 async function executeTaskFlow(taskFlow, scheduleId) {
+  const runId = Symbol(scheduleId);
+  let unexpectedError = null;
   try {
     return await withMaaExecutionLease({
       source: 'schedule',
       taskName: `任务流程 ${scheduleId}`,
       command: 'schedule'
-    }, () => executeTaskFlowUnlocked(taskFlow, scheduleId));
+    }, () => executeTaskFlowUnlocked(taskFlow, scheduleId, runId));
   } catch (error) {
     if (error?.code === 'MAA_EXECUTION_BUSY') {
       logger.warn('设备正被其他 MAA 任务占用，跳过任务流程', { scheduleId, owner: error.owner });
@@ -1312,9 +1317,48 @@ async function executeTaskFlow(taskFlow, scheduleId) {
         owner: error.owner
       };
     }
+    unexpectedError = error;
     throw error;
   } finally {
-    if (!scheduleExecutionStatus.isRunning) activeScheduleAbortController = null;
+    const ownsActiveExecution = activeScheduleRunId === runId;
+    if (ownsActiveExecution && scheduleExecutionStatus.isRunning) {
+      const wasStopped = scheduleExecutionStatus.shouldStop;
+      const message = wasStopped
+        ? '任务流程已被用户终止'
+        : `任务流程异常终止${unexpectedError?.message ? `: ${unexpectedError.message}` : ''}`;
+
+      logger.error('任务流程未正常收尾，已复位执行状态', {
+        scheduleId,
+        stopped: wasStopped,
+        error: unexpectedError?.message || null
+      });
+      updateScheduleStatus({
+        isRunning: false,
+        scheduleId: null,
+        currentStep: -1,
+        totalSteps: 0,
+        currentTask: null,
+        currentTaskId: null,
+        message,
+        startTime: null,
+        shouldStop: false
+      });
+    }
+
+    if (ownsActiveExecution || !scheduleExecutionStatus.isRunning) {
+      cancelActiveScheduleDelay = null;
+      activeScheduleAbortController = null;
+      if (ownsActiveExecution) activeScheduleRunId = null;
+    }
+  }
+}
+
+export async function executeScheduledTaskFromCron(taskFlow, scheduleId) {
+  try {
+    return await executeTaskFlow(taskFlow, scheduleId);
+  } catch (error) {
+    logger.error('定时任务回调执行失败', { scheduleId, error: error.message });
+    return { success: false, message: error.message };
   }
 }
 
@@ -1444,7 +1488,7 @@ export function setupSchedule(scheduleId, times, taskFlow) {
     try {
       const job = cron.schedule(cronExpression, () => {
         logger.info('定时任务触发执行', { scheduleId: `${scheduleId}-${index}`, time });
-        executeTaskFlow(taskFlow, `${scheduleId}-${index}`);
+        void executeScheduledTaskFromCron(taskFlow, `${scheduleId}-${index}`);
       }, {
         scheduled: true,
         timezone: "Asia/Shanghai"

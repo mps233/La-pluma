@@ -54,6 +54,7 @@ import {
   startWebrtc,
   stopWebrtc,
   isWebrtcServerReachable,
+  getWebrtcDevices,
   WEBRTC_PORT,
   DEFAULT_DEVICE_ADDRESS,
   DEFAULT_DEVICE_ID
@@ -67,6 +68,19 @@ const DEFAULT_ADB_PATH = process.env.ADB_PATH || '/opt/homebrew/bin/adb';
 const DEFAULT_ADB_ADDRESS = process.env.ADB_ADDRESS || '127.0.0.1:16384';
 const DEFAULT_CLIENT_TYPE = process.env.MAA_CLIENT_TYPE || 'Official';
 const API_VERSION = '2026-07-07';
+
+function sendConfigStorageError(res, req, result, fallbackCode, fallbackMessage) {
+  const invalidType = result?.error?.code === 'AGENT_CONFIG_TYPE_INVALID';
+  return sendError(res, req, agentError(
+    invalidType ? 'AGENT_CONFIG_TYPE_INVALID' : fallbackCode,
+    result?.message || fallbackMessage,
+    {
+      statusCode: invalidType ? 400 : 500,
+      details: result?.error?.details || {},
+      retryable: !invalidType
+    }
+  ));
+}
 
 const AGENT_ACTIONS = [
   {
@@ -421,38 +435,6 @@ async function resolveRequestConnection(req, { allowOverrides = false } = {}) {
   }
 }
 
-async function getWebrtcAuthToken() {
-  try {
-    const response = await fetch(`http://127.0.0.1:${WEBRTC_PORT}/api/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: 'admin', password: 'admin123' }),
-      signal: AbortSignal.timeout(2000)
-    })
-    if (!response.ok) return ''
-    const data = await response.json()
-    return data.token || ''
-  } catch {
-    return ''
-  }
-}
-
-async function getWebrtcDevices() {
-  try {
-    const token = await getWebrtcAuthToken()
-    const response = await fetch(`http://127.0.0.1:${WEBRTC_PORT}/devices`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      signal: AbortSignal.timeout(2000)
-    })
-    if (!response.ok) return []
-    const data = await response.json()
-    if (!Array.isArray(data)) return []
-    return data.map(item => typeof item === 'string' ? item : (item.device_id || item.id)).filter(Boolean)
-  } catch {
-    return []
-  }
-}
-
 function pngDimensions(base64) {
   try {
     const buffer = Buffer.from(base64, 'base64');
@@ -761,24 +743,33 @@ router.post('/config/maa/:profileName', asyncHandler(async (req, res) => {
 
 router.get('/config/user/:configType', asyncHandler(async (req, res) => {
   const result = await loadUserConfig(req.params.configType);
+  if (!result.success) {
+    return sendConfigStorageError(res, req, result, 'AGENT_CONFIG_LOAD_FAILED', '读取配置失败');
+  }
   return sendSuccess(res, req, result.data, result.message || '操作成功');
 }));
 
 router.post('/config/user/:configType', asyncHandler(async (req, res) => {
   const result = await saveUserConfig(req.params.configType, req.body);
   if (!result.success) {
-    return sendError(res, req, agentError('AGENT_CONFIG_SAVE_FAILED', result.message || '保存配置失败', { statusCode: 500 }));
+    return sendConfigStorageError(res, req, result, 'AGENT_CONFIG_SAVE_FAILED', '保存配置失败');
   }
   return sendSuccess(res, req, null, result.message || '配置保存成功');
 }));
 
 router.get('/config/user', asyncHandler(async (req, res) => {
   const result = await getAllUserConfigs();
+  if (!result.success) {
+    return sendConfigStorageError(res, req, result, 'AGENT_CONFIG_LIST_FAILED', '获取配置列表失败');
+  }
   return sendSuccess(res, req, result.data || {}, result.message || '操作成功');
 }));
 
 router.delete('/config/user/:configType', asyncHandler(async (req, res) => {
   const result = await deleteUserConfig(req.params.configType);
+  if (!result.success) {
+    return sendConfigStorageError(res, req, result, 'AGENT_CONFIG_DELETE_FAILED', '删除配置失败');
+  }
   return sendSuccess(res, req, null, result.message || '配置删除成功');
 }));
 

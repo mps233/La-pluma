@@ -5,8 +5,11 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "check": "node --check server.js && node --check routes/agent.js && node --check services/maaService.js && node --check services/schedulerService.js && node --check services/activityNavigationService.js && node --check services/activityCopilotDiscoveryService.js && node --check services/activityCopilotRunService.js && node --check services/copilotService.js && node --check services/copilotPlanService.js && node --check services/executionCoordinatorService.js",
+    "check": "node scripts/check-syntax.js",
     "build": "npm run check",
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage",
+    "verify": "npm run check && npm run test",
     "fetch-materials": "node scripts/fetch-operator-materials.js",
     "fetch-formulas": "node scripts/fetch-material-formulas.js && node scripts/merge-formulas.js",
     "fetch-all-materials": "node scripts/fetch-all-materials.js",
@@ -16,6 +19,7 @@
     "fetch-game-data": "npm run fetch-stages && npm run fetch-paradox"
   },
   "dependencies": {
+    "@iarna/toml": "^2.2.5",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "form-data": "^4.0.0",

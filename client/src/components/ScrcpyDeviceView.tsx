@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, ChevronDown, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
+import { ArrowLeft, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
 import { Button } from './common'
 import { useScrcpyWebRTC } from '../hooks/useScrcpyWebRTC'
 import { maaApi } from '../services/api'
@@ -10,7 +10,7 @@ interface ScrcpyDeviceViewProps {
   variant?: 'full' | 'compact'
   deviceId?: string
   signalingUrl?: string
-  onStartInfrastructure?: () => Promise<void> | void
+  onStartInfrastructure?: () => Promise<string | undefined> | string | undefined
   autoConnect?: boolean
   onStatusChange?: (status: string, stats: any, error: string | null) => void
   infrastructureStatus?: {
@@ -75,7 +75,7 @@ export default function ScrcpyDeviceView({
   const [immersiveMode, setImmersiveMode] = useState(false)
   const [previewOrientation, setPreviewOrientation] = useState<'portrait' | 'landscape'>('portrait')
   const [orientationLoading, setOrientationLoading] = useState(false)
-  const [qualitySettingsOpen, setQualitySettingsOpen] = useState(false)
+  const bitrateProgress = ((customBitrateMbps - 2) / (32 - 2)) * 100
   const scrcpyOptions = useMemo(() => ({
     max_fps: customFps,
     max_size: customMaxSize,
@@ -117,8 +117,8 @@ export default function ScrcpyDeviceView({
 
   const connect = useCallback(async () => {
     try {
-      if (onStartInfrastructure) await onStartInfrastructure()
-      webrtc.connect()
+      const freshSignalingUrl = await onStartInfrastructure?.()
+      webrtc.connect(freshSignalingUrl)
     } catch {
       // 基础设施错误由 ScreenMonitor 显示，连接流程到此停止。
     }
@@ -375,146 +375,153 @@ export default function ScrcpyDeviceView({
 
       </div>
 
-      {!isCompact && <aside className="space-y-3 xl:pt-0">
-        <section className="surface-soft rounded-2xl p-3">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="surface-soft flex h-7 w-7 items-center justify-center rounded-xl text-secondary">
-                <Plug className="h-3.5 w-3.5" strokeWidth={1.8} />
-              </span>
-              <div>
-                <div className="text-sm font-semibold text-gray-900 dark:text-white">连接与服务</div>
-                <div className="text-xs text-gray-400">预览链路</div>
-              </div>
+      {!isCompact && <aside className="scrcpy-control-rail surface-soft">
+        <section className="scrcpy-control-section">
+          <div className="scrcpy-control-header">
+            <div className="scrcpy-control-title">
+              <Plug className="h-4 w-4" strokeWidth={1.8} />
+              <span>连接与服务</span>
             </div>
-            <span className={`rounded-lg px-2 py-1 text-xs font-medium ${webrtc.status === 'connected' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-400'}`}>
+            <span className="scrcpy-inline-status" role="status" aria-live="polite">
+              <span className={`h-1.5 w-1.5 rounded-full ${statusDotClass}`} />
               {statusLabel[webrtc.status] || webrtc.status}
             </span>
           </div>
-          <div className="space-y-2">
-            <Button
-              size="sm"
-              variant="gradient"
-              fullWidth
-              className="h-10"
-              onClick={connect}
-              disabled={infrastructureLoading !== null || isConnecting}
-              loading={infrastructureLoading === 'preview' || isConnecting}
+
+          <Button
+            size="sm"
+            variant="gradient"
+            fullWidth
+            className="scrcpy-preview-action"
+            icon={webrtc.status === 'connected'
+              ? <RotateCw className="h-3.5 w-3.5" strokeWidth={1.8} />
+              : <Plug className="h-3.5 w-3.5" strokeWidth={1.8} />}
+            onClick={connect}
+            disabled={infrastructureLoading !== null || isConnecting}
+            loading={infrastructureLoading === 'preview' || isConnecting}
+          >
+            {webrtc.status === 'connected' ? '重连预览' : '启动预览'}
+          </Button>
+
+          <div className="scrcpy-service-grid">
+            {[
+              { label: infrastructureStatus?.serverRunning ? '停止服务' : '启动服务', icon: Server, onClick: onToggleServer, disabled: false, loading: infrastructureLoading === 'server' },
+              { label: infrastructureStatus?.agentRunning ? '停止 Agent' : '连接 Agent', icon: Smartphone, onClick: onToggleAgent, disabled: !infrastructureStatus?.serverRunning, loading: infrastructureLoading === 'agent' }
+            ].map(action => {
+              const Icon = action.icon
+              return (
+                <button
+                  key={action.label}
+                  type="button"
+                  onClick={action.onClick}
+                  disabled={action.disabled || action.loading}
+                  className="scrcpy-service-action control-surface"
+                >
+                  <Icon className="h-3.5 w-3.5" strokeWidth={1.7} />
+                  <span>{action.loading ? '处理中' : action.label}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="scrcpy-service-utilities">
+            <button
+              type="button"
+              onClick={webrtc.disconnect}
+              disabled={webrtc.status === 'idle' || webrtc.status === 'disconnected'}
+              className="scrcpy-utility-action"
             >
-              {webrtc.status === 'connected' ? '重连预览' : '启动预览'}
-            </Button>
-            <div className="grid grid-cols-2 gap-1.5">
-              {[
-                { label: '断开', icon: Plug, onClick: webrtc.disconnect, disabled: webrtc.status === 'idle' || webrtc.status === 'disconnected', loading: false },
-                { label: '安装组件', icon: Package, onClick: onInstall, disabled: false, loading: infrastructureLoading === 'install' },
-                { label: infrastructureStatus?.serverRunning ? '停止服务' : '启动服务', icon: Server, onClick: onToggleServer, disabled: false, loading: infrastructureLoading === 'server' },
-                { label: infrastructureStatus?.agentRunning ? '停止 Agent' : '连接 Agent', icon: Smartphone, onClick: onToggleAgent, disabled: !infrastructureStatus?.serverRunning, loading: infrastructureLoading === 'agent' }
-              ].map(action => {
-                const Icon = action.icon
-                return (
-                  <button
-                    key={action.label}
-                    type="button"
-                    onClick={action.onClick}
-                    disabled={action.disabled || action.loading}
-                    className="control-surface flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-medium text-secondary transition-colors hover:text-primary disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Icon className="h-3.5 w-3.5" strokeWidth={1.7} />
-                    <span>{action.loading ? '处理中' : action.label}</span>
-                  </button>
-                )
-              })}
-            </div>
+              <Unplug className="h-3.5 w-3.5" strokeWidth={1.8} />
+              <span>断开</span>
+            </button>
+            <button
+              type="button"
+              onClick={onInstall}
+              disabled={infrastructureLoading !== null}
+              className="scrcpy-utility-action"
+            >
+              <Package className="h-3.5 w-3.5" strokeWidth={1.8} />
+              <span>{infrastructureLoading === 'install' ? '安装中' : infrastructureStatus?.built ? '重装组件' : '安装组件'}</span>
+            </button>
           </div>
         </section>
 
-        <section className="surface-soft rounded-2xl p-3 text-xs">
-          <button
-            type="button"
-            onClick={() => setQualitySettingsOpen(open => !open)}
-            aria-expanded={qualitySettingsOpen}
-            className="scrcpy-quality-toggle flex min-h-10 w-full items-center justify-between gap-2 text-left"
-          >
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="surface-soft flex h-7 w-7 items-center justify-center rounded-xl text-secondary">
-                <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.8} />
-              </span>
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-gray-900 dark:text-white">画质设置</div>
-                <div
-                  className="truncate text-[11px] leading-4 text-gray-400"
-                  title={`${qualityPresets[quality].label} · ${customMaxSize}p · ${customBitrateMbps}Mbps`}
-                >
-                  {qualityPresets[quality].label} · {customMaxSize}p · {customBitrateMbps}M
+        <section className="scrcpy-control-section">
+          <div className="scrcpy-quality-header">
+            <div className="scrcpy-control-title">
+              <SlidersHorizontal className="h-4 w-4" strokeWidth={1.8} />
+              <span>画质设置</span>
+            </div>
+            <span className="scrcpy-quality-current">{customMaxSize}p · {customFps} FPS</span>
+          </div>
+
+          <div className="scrcpy-quality-content">
+            <div className="scrcpy-quality-body">
+              <div className="scrcpy-setting-group">
+                <div className="scrcpy-setting-label">画质预设</div>
+                <div className="scrcpy-preset-grid">
+                  {Object.entries(qualityPresets).map(([key, preset]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => applyPreset(key as QualityPreset)}
+                      aria-pressed={quality === key}
+                      className={`scrcpy-preset-option ${quality === key ? 'is-active' : ''}`}
+                    >
+                      <span>{preset.label}</span>
+                      <small>{preset.maxSize}p · {preset.bitrateMbps}M</small>
+                    </button>
+                  ))}
                 </div>
               </div>
-            </div>
-            <span className="flex shrink-0 items-center gap-1.5">
-              <span className="surface-soft rounded-lg px-2 py-1 text-xs font-medium text-secondary">
-                {customFps} FPS
-              </span>
-              <ChevronDown className={`scrcpy-quality-chevron h-3.5 w-3.5 text-gray-400 transition-transform ${qualitySettingsOpen ? 'rotate-180' : ''}`} strokeWidth={1.8} />
-            </span>
-          </button>
-          <div className={`scrcpy-quality-content mt-3 space-y-3 ${qualitySettingsOpen ? 'is-open' : ''}`}>
-            <div className="space-y-1.5">
-              <div className="text-xs font-medium text-gray-400">画质预设</div>
-              <div className="grid grid-cols-2 gap-1.5">
-                {Object.entries(qualityPresets).map(([key, preset]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => applyPreset(key as QualityPreset)}
-                    className={`flex h-14 min-w-0 flex-col items-start justify-center gap-0.5 rounded-xl px-2 py-2 text-left transition-colors ${quality === key
-                      ? 'brand-action-subtle'
-                      : 'control-surface text-secondary hover:text-primary'
-                    }`}
-                  >
-                    <div className="text-xs font-semibold leading-4">{preset.label}</div>
-                    <div className={`whitespace-nowrap text-[11px] leading-4 ${quality === key ? 'brand-text opacity-70' : 'text-tertiary'}`}>
-                      {preset.maxSize}p · {preset.bitrateMbps}Mbps
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <div className="text-xs font-medium text-gray-400">帧率</div>
-              <div className="grid grid-cols-4 gap-1.5">
-                {fpsOptions.map(fps => (
-                  <button
-                    key={fps}
-                    type="button"
-                    onClick={() => setCustomFps(fps)}
-                    className={`h-10 rounded-xl text-xs font-semibold transition-colors ${customFps === fps
-                      ? 'brand-action-subtle'
-                      : 'control-surface text-secondary hover:text-primary'
-                    }`}
-                  >
-                    {fps}
-                  </button>
-                ))}
+              <div className="scrcpy-setting-group">
+                <div className="scrcpy-setting-label">帧率</div>
+                <div className="scrcpy-fps-segment">
+                  {fpsOptions.map(fps => (
+                    <button
+                      key={fps}
+                      type="button"
+                      onClick={() => setCustomFps(fps)}
+                      aria-pressed={customFps === fps}
+                      className={customFps === fps ? 'is-active' : ''}
+                    >
+                      {fps}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div className="surface-soft space-y-2 rounded-xl px-3 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-xs font-medium text-gray-400">
-                  <Gauge className="h-3 w-3" strokeWidth={1.8} />码率
-                </span>
-                <span className="text-xs font-semibold text-gray-900 dark:text-white">{customBitrateMbps} Mbps</span>
+              <div className="scrcpy-bitrate-control">
+                <div className="scrcpy-bitrate-header">
+                  <span className="scrcpy-bitrate-label">
+                    <Gauge className="h-3.5 w-3.5" strokeWidth={1.8} />码率
+                  </span>
+                  <output htmlFor="scrcpy-bitrate" className="scrcpy-bitrate-value">
+                    <strong>{customBitrateMbps}</strong>
+                    <span>Mbps</span>
+                  </output>
+                </div>
+                <div
+                  className="scrcpy-bitrate-slider"
+                  style={{ '--scrcpy-range-progress': `${bitrateProgress}%` } as CSSProperties}
+                >
+                  <div className="scrcpy-bitrate-track" aria-hidden="true">
+                    <span className="scrcpy-bitrate-fill" />
+                    <span className="scrcpy-bitrate-handle" />
+                  </div>
+                  <input
+                    id="scrcpy-bitrate"
+                    type="range"
+                    min={2}
+                    max={32}
+                    step={1}
+                    value={customBitrateMbps}
+                    aria-label="视频码率"
+                    onChange={(event) => setCustomBitrateMbps(Number(event.target.value))}
+                  />
+                </div>
               </div>
-              <input
-                type="range"
-                min={2}
-                max={32}
-                step={1}
-                value={customBitrateMbps}
-                onChange={(event) => setCustomBitrateMbps(Number(event.target.value))}
-                style={{ background: `linear-gradient(to right, var(--app-accent) ${((customBitrateMbps - 2) / (32 - 2)) * 100}%, var(--app-border) ${((customBitrateMbps - 2) / (32 - 2)) * 100}%)` }}
-                className="h-1.5 w-full cursor-pointer appearance-none rounded-full outline-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-[var(--app-accent)] [&::-webkit-slider-thumb]:bg-[var(--app-surface-solid)] [&::-webkit-slider-thumb]:shadow-[0_0_0_3px_var(--app-accent-soft)] [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-[var(--app-accent)] [&::-moz-range-thumb]:bg-[var(--app-surface-solid)] [&::-moz-range-thumb]:shadow-[0_0_0_3px_var(--app-accent-soft)]"
-              />
             </div>
           </div>
         </section>

@@ -2,9 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import operatorQuotesRoutes from './routes/operatorQuotes.js';
 import agentRoutes from './routes/agent.js';
-import { initTelegramBot } from './services/telegramBotService.js';
-import { getNotificationConfig } from './services/notificationService.js';
-import { resolveConnection } from './services/connectionService.js';
+import { initializeRuntimeState } from './services/runtimeInitializationService.js';
 import { networkInterfaces } from 'os';
 import { printPathConfig } from './config/paths.js';
 
@@ -86,21 +84,10 @@ app.listen(PORT, '0.0.0.0', async () => {
   console.log('');
   printPathConfig();
   
-  // 初始化 Telegram Bot
+  // 恢复持久化的通知、调度和自动更新运行时状态。
   try {
-    const notifConfig = getNotificationConfig();
-    if (notifConfig.channels?.telegram) {
-      const connection = await resolveConnection();
-      
-      initTelegramBot({
-        enabled: notifConfig.channels.telegram.enabled,
-        botToken: notifConfig.channels.telegram.botToken,
-        chatId: notifConfig.channels.telegram.chatId,
-        adbPath: connection.adbPath,
-        adbAddress: connection.address
-      });
-    }
+    await initializeRuntimeState();
   } catch (error) {
-    console.error('[Telegram Bot] 初始化失败:', error.message);
+    console.error('[Runtime] 初始化失败:', error.message);
   }
 });

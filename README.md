@@ -1,7 +1,7 @@
 # La Pluma
 
 <div align="center">
-  <img src="client/public/logo.webp" alt="La Pluma Logo" width="120" />
+  <img src="client/public/logo-graphite.svg" alt="La Pluma Logo" width="120" />
   <p><em>MAA CLI 的现代化 WebUI 与本地 Agent 控制台</em></p>
   
   [![Docker Pulls](https://img.shields.io/docker/pulls/miaona/la-pluma)](https://hub.docker.com/r/miaona/la-pluma)
@@ -33,17 +33,17 @@
 ### Web 端
 
 <div align="center">
-  <img src="screenshots/web-light.png" alt="Web 端浅色模式" width="45%" />
-  <img src="screenshots/web-dark.png" alt="Web 端深色模式" width="45%" />
-  <p><em>Web 端 - 浅色模式 & 深色模式</em></p>
+  <img src="screenshots/web-light.png" alt="自动化任务桌面端浅色界面" width="45%" />
+  <img src="screenshots/web-dark.png" alt="自动化任务桌面端深色界面" width="45%" />
+  <p><em>自动化任务桌面端 - 浅色模式 & 深色模式</em></p>
 </div>
 
 ### 移动端
 
 <div align="center">
-  <img src="screenshots/m-light.png" alt="移动端浅色模式" width="30%" />
-  <img src="screenshots/m-dark.png" alt="移动端深色模式" width="30%" />
-  <p><em>移动端 - 浅色模式 & 深色模式</em></p>
+  <img src="screenshots/m-light.png" alt="自动化任务移动端浅色界面" width="30%" />
+  <img src="screenshots/m-dark.png" alt="自动化任务移动端深色界面" width="30%" />
+  <p><em>自动化任务移动端 - 浅色模式 & 深色模式</em></p>
 </div>
 
 ## 🧭 当前架构

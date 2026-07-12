@@ -10,6 +10,29 @@ interface ThemeToggleProps {
   color?: ColorVariant
 }
 
+function applyTheme(selectedTheme: ThemeMode, systemTheme?: 'dark' | 'light') {
+  const root = document.documentElement
+  let isDark = false
+
+  if (selectedTheme === 'system') {
+    const actualSystemTheme = systemTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    if (actualSystemTheme === 'dark') {
+      root.classList.add('dark')
+      isDark = true
+    } else {
+      root.classList.remove('dark')
+    }
+  } else if (selectedTheme === 'dark') {
+    root.classList.add('dark')
+    isDark = true
+  } else {
+    root.classList.remove('dark')
+  }
+
+  const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+  metaThemeColor?.setAttribute('content', isDark ? '#070707' : '#f9fafb')
+}
+
 export default function ThemeToggle({ color: _color = 'violet' }: ThemeToggleProps) {
   void _color
 
@@ -32,34 +55,6 @@ export default function ThemeToggle({ color: _color = 'violet' }: ThemeTogglePro
     mediaQuery.addEventListener('change', handleChange)
     return () => mediaQuery.removeEventListener('change', handleChange)
   }, [theme])
-
-  const applyTheme = (selectedTheme: ThemeMode, systemTheme?: 'dark' | 'light') => {
-    const root = document.documentElement
-    let isDark = false
-    
-    if (selectedTheme === 'system') {
-      const actualSystemTheme = systemTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-      if (actualSystemTheme === 'dark') {
-        root.classList.add('dark')
-        isDark = true
-      } else {
-        root.classList.remove('dark')
-        isDark = false
-      }
-    } else if (selectedTheme === 'dark') {
-      root.classList.add('dark')
-      isDark = true
-    } else {
-      root.classList.remove('dark')
-      isDark = false
-    }
-    
-    // 更新手机状态栏颜色（主要针对 Android Chrome）
-    const metaThemeColor = document.querySelector('meta[name="theme-color"]')
-    if (metaThemeColor) {
-      metaThemeColor.setAttribute('content', isDark ? '#070707' : '#f9fafb')
-    }
-  }
 
   const handleThemeChange = (newTheme: ThemeMode) => {
     setTheme(newTheme)

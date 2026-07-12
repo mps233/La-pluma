@@ -1,18 +1,136 @@
 import { execFile, spawn } from 'child_process'
+import { closeSync, openSync } from 'fs'
 import { promisify } from 'util'
 import path from 'path'
+import { setTimeout as delay } from 'timers/promises'
 
 const execFileAsync = promisify(execFile)
 
 export const WEBRTC_DIR = process.env.LA_PLUMA_WEBRTC_DIR || `${process.env.HOME || ''}/ScrcpyOverWebRTC`
 export const WEBRTC_PORT = Number(process.env.LA_PLUMA_WEBRTC_PORT || 8443)
+export const WEBRTC_TURN_PORT = Number(process.env.LA_PLUMA_WEBRTC_TURN_PORT || 3478)
 export const DEFAULT_DEVICE_ADDRESS = process.env.ADB_ADDRESS || '127.0.0.1:16384'
 export const DEFAULT_ADB_PATH = process.env.ADB_PATH || '/opt/homebrew/bin/adb'
 export const DEFAULT_DEVICE_ID = 'mumu-la-pluma'
 
+const WEBRTC_REQUEST_TIMEOUT_MS = readPositiveInteger(process.env.LA_PLUMA_WEBRTC_REQUEST_TIMEOUT_MS, 1500)
+const WEBRTC_SERVER_START_TIMEOUT_MS = readPositiveInteger(process.env.LA_PLUMA_WEBRTC_SERVER_START_TIMEOUT_MS, 15000)
+const WEBRTC_AGENT_START_TIMEOUT_MS = readPositiveInteger(process.env.LA_PLUMA_WEBRTC_AGENT_START_TIMEOUT_MS, 20000)
+const WEBRTC_START_POLL_INTERVAL_MS = readPositiveInteger(process.env.LA_PLUMA_WEBRTC_START_POLL_INTERVAL_MS, 250)
+const WEBRTC_USERNAME = process.env.LA_PLUMA_WEBRTC_USERNAME || 'admin'
+const WEBRTC_PASSWORD = process.env.LA_PLUMA_WEBRTC_PASSWORD || 'admin123'
+
 let webrtcServerProcess = null
 let webrtcAgentProcess = null
 let webrtcTurnProcess = null
+let webrtcLifecycleQueue = Promise.resolve()
+let registeredAgentOwner = null
+const processStartupErrors = new WeakMap()
+
+function readPositiveInteger(value, fallback) {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
+function enqueueLifecycle(operation) {
+  const pending = webrtcLifecycleQueue.then(operation, operation)
+  webrtcLifecycleQueue = pending.then(() => undefined, () => undefined)
+  return pending
+}
+
+function isChildProcessRunning(child) {
+  return Boolean(child && !child.killed && child.exitCode === null && child.signalCode === null)
+}
+
+function terminateAgentDeployment(child) {
+  if (!isChildProcessRunning(child)) return
+  if (child.pid) {
+    try {
+      process.kill(-child.pid, 'SIGTERM')
+      return
+    } catch {
+      // Fall back when the child did not establish its process group.
+    }
+  }
+  child.kill('SIGTERM')
+}
+
+function clearManagedProcess(type, child) {
+  if (type === 'server' && webrtcServerProcess === child) webrtcServerProcess = null
+  if (type === 'agent' && webrtcAgentProcess === child) webrtcAgentProcess = null
+  if (type === 'turn' && webrtcTurnProcess === child) webrtcTurnProcess = null
+}
+
+function trackManagedProcess(child, type) {
+  child.once('error', error => {
+    processStartupErrors.set(child, error)
+    clearManagedProcess(type, child)
+  })
+  child.once('exit', () => clearManagedProcess(type, child))
+  return child
+}
+
+function spawnWithLog(command, args, logPath, options) {
+  const logFd = openSync(logPath, 'a')
+  try {
+    return spawn(command, args, {
+      ...options,
+      stdio: ['ignore', logFd, logFd]
+    })
+  } finally {
+    closeSync(logFd)
+  }
+}
+
+function processStartupFailure(child, label, { allowSuccessfulExit = false } = {}) {
+  if (!child) return null
+  const spawnError = processStartupErrors.get(child)
+  if (spawnError) {
+    const error = new Error(`${label}进程启动失败：${spawnError.message}`)
+    error.code = 'WEBRTC_PROCESS_START_FAILED'
+    error.retryable = false
+    return error
+  }
+  if (child.signalCode !== null || (child.exitCode !== null && (!allowSuccessfulExit || child.exitCode !== 0))) {
+    const reason = child.signalCode ? `信号 ${child.signalCode}` : `退出码 ${child.exitCode}`
+    const error = new Error(`${label}进程在就绪前退出（${reason}）`)
+    error.code = 'WEBRTC_PROCESS_EXITED'
+    error.retryable = false
+    return error
+  }
+  return null
+}
+
+export async function waitForCondition(check, {
+  timeoutMs,
+  pollIntervalMs = WEBRTC_START_POLL_INTERVAL_MS,
+  timeoutMessage,
+  timeoutCode = 'WEBRTC_START_TIMEOUT'
+}) {
+  const startedAt = Date.now()
+  let lastError = null
+
+  while (true) {
+    try {
+      const result = await check()
+      if (result) return result
+      lastError = null
+    } catch (error) {
+      if (error?.retryable === false) throw error
+      lastError = error
+    }
+
+    const elapsed = Date.now() - startedAt
+    if (elapsed >= timeoutMs) {
+      const detail = lastError?.message ? `；最后一次检查失败：${lastError.message}` : ''
+      const error = new Error(`${timeoutMessage}${detail}`)
+      error.code = timeoutCode
+      if (lastError) error.cause = lastError
+      throw error
+    }
+    await delay(Math.min(pollIntervalMs, timeoutMs - elapsed))
+  }
+}
 
 async function execFileQuiet(command, args, options = {}) {
   try {
@@ -75,11 +193,131 @@ export async function getWebrtcLogPaths() {
 
 export async function isWebrtcServerReachable() {
   try {
-    const response = await fetch(`http://127.0.0.1:${WEBRTC_PORT}`, { signal: AbortSignal.timeout(1500) })
+    const response = await fetch(`http://127.0.0.1:${WEBRTC_PORT}`, {
+      signal: AbortSignal.timeout(WEBRTC_REQUEST_TIMEOUT_MS)
+    })
     return response.ok
   } catch {
     return false
   }
+}
+
+async function requestWebrtcAuthToken() {
+  const response = await fetch(`http://127.0.0.1:${WEBRTC_PORT}/api/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: WEBRTC_USERNAME, password: WEBRTC_PASSWORD }),
+    signal: AbortSignal.timeout(WEBRTC_REQUEST_TIMEOUT_MS)
+  })
+  if (!response.ok) {
+    throw new Error(`WebRTC 登录失败（HTTP ${response.status}）`)
+  }
+  const data = await response.json()
+  if (!data?.token) throw new Error('WebRTC 登录响应缺少 token')
+  return data.token
+}
+
+export async function getWebrtcAuthToken() {
+  try {
+    return await requestWebrtcAuthToken()
+  } catch {
+    return ''
+  }
+}
+
+function normalizeDeviceIds(data) {
+  if (!Array.isArray(data)) throw new Error('WebRTC /devices 响应格式无效')
+  return data
+    .map(item => typeof item === 'string' ? item : (item?.device_id || item?.id))
+    .filter(Boolean)
+}
+
+export async function getWebrtcDevices({ throwOnError = false } = {}) {
+  try {
+    const token = await requestWebrtcAuthToken()
+    const response = await fetch(`http://127.0.0.1:${WEBRTC_PORT}/devices`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(WEBRTC_REQUEST_TIMEOUT_MS)
+    })
+    if (!response.ok) {
+      throw new Error(`WebRTC 设备列表请求失败（HTTP ${response.status}）`)
+    }
+    return normalizeDeviceIds(await response.json())
+  } catch (error) {
+    if (throwOnError) throw error
+    return []
+  }
+}
+
+export async function waitForWebrtcServerReady({
+  timeoutMs = WEBRTC_SERVER_START_TIMEOUT_MS,
+  pollIntervalMs = WEBRTC_START_POLL_INTERVAL_MS,
+  isReachable = isWebrtcServerReachable,
+  childProcess = null
+} = {}) {
+  return waitForCondition(async () => {
+    const failure = processStartupFailure(childProcess, 'WebRTC 服务')
+    if (failure) throw failure
+    return isReachable()
+  }, {
+    timeoutMs,
+    pollIntervalMs,
+    timeoutMessage: `WebRTC 服务启动超时（${timeoutMs}ms）：http://127.0.0.1:${WEBRTC_PORT} 未就绪`,
+    timeoutCode: 'WEBRTC_SERVER_START_TIMEOUT'
+  })
+}
+
+async function waitForWebrtcDevicesApi({
+  timeoutMs = WEBRTC_SERVER_START_TIMEOUT_MS,
+  pollIntervalMs = WEBRTC_START_POLL_INTERVAL_MS
+} = {}) {
+  const result = await waitForCondition(async () => ({
+    devices: await getWebrtcDevices({ throwOnError: true })
+  }), {
+    timeoutMs,
+    pollIntervalMs,
+    timeoutMessage: `WebRTC 鉴权设备接口启动超时（${timeoutMs}ms）：/devices 未就绪`,
+    timeoutCode: 'WEBRTC_DEVICES_API_TIMEOUT'
+  })
+  return result.devices
+}
+
+export async function waitForWebrtcDevice(deviceId, {
+  timeoutMs = WEBRTC_AGENT_START_TIMEOUT_MS,
+  pollIntervalMs = WEBRTC_START_POLL_INTERVAL_MS,
+  getDevices = () => getWebrtcDevices({ throwOnError: true }),
+  childProcess = null,
+  isAgentRunning = null
+} = {}) {
+  return waitForCondition(async () => {
+    const failure = processStartupFailure(childProcess, 'WebRTC Agent 部署', { allowSuccessfulExit: true })
+    if (failure) throw failure
+    if (childProcess && childProcess.exitCode !== 0) return false
+    const devices = await getDevices()
+    if (!devices.includes(deviceId)) return false
+    if (isAgentRunning && !await isAgentRunning()) return false
+    return devices
+  }, {
+    timeoutMs,
+    pollIntervalMs,
+    timeoutMessage: `WebRTC Agent 启动超时（${timeoutMs}ms）：设备 ${deviceId} 未出现在鉴权 /devices 列表中`,
+    timeoutCode: 'WEBRTC_AGENT_START_TIMEOUT'
+  })
+}
+
+async function waitForWebrtcDeviceUnavailable(deviceId, {
+  timeoutMs = WEBRTC_AGENT_START_TIMEOUT_MS,
+  pollIntervalMs = WEBRTC_START_POLL_INTERVAL_MS
+} = {}) {
+  return waitForCondition(async () => {
+    const devices = await getWebrtcDevices({ throwOnError: true })
+    return devices.includes(deviceId) ? false : devices
+  }, {
+    timeoutMs,
+    pollIntervalMs,
+    timeoutMessage: `WebRTC Agent 停止超时（${timeoutMs}ms）：设备 ${deviceId} 仍在鉴权 /devices 列表中`,
+    timeoutCode: 'WEBRTC_AGENT_STOP_TIMEOUT'
+  })
 }
 
 export async function isDeviceAgentRunning(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
@@ -93,47 +331,65 @@ export async function isDeviceAgentRunning(address = DEFAULT_DEVICE_ADDRESS, adb
 
 export async function getIceServersConfig() {
   const lanIp = await getMacLanIp()
-  return `turn:cloudphone_user:cloudphone_secure_password@${lanIp}:3478?transport=udp,stun:${lanIp}:3478`
+  return `turn:cloudphone_user:cloudphone_secure_password@${lanIp}:${WEBRTC_TURN_PORT}?transport=udp,stun:${lanIp}:${WEBRTC_TURN_PORT}`
 }
 
-export async function startLocalTurnServer() {
+function isSameAgentOwner(owner, address, deviceId) {
+  return owner?.address === address && owner?.deviceId === deviceId
+}
+
+async function stopRemoteWebrtcAgent(address, adbPath) {
+  await execFileAsync(adbPath, ['-s', address, 'shell', 'pkill -f cloudphone-agent || true'], { timeout: 5000 }).catch(() => {})
+  await execFileAsync(adbPath, ['-s', address, 'shell', 'pkill -f scrcpy.Server || true'], { timeout: 5000 }).catch(() => {})
+}
+
+async function startLocalTurnServerUnlocked() {
   if (webrtcTurnProcess && !webrtcTurnProcess.killed) return
-  if (await isProcessListeningOnTcpPort(3478)) return
-  const fs = await import('fs')
-  const { turnLog } = await getWebrtcLogPaths()
-  const logFd = fs.openSync(turnLog, 'a')
+  if (await isProcessListeningOnTcpPort(WEBRTC_TURN_PORT)) return
   const turnserver = '/opt/homebrew/bin/turnserver'
   if (!await pathExists(turnserver)) return
-  webrtcTurnProcess = spawn(turnserver, [
+  const { turnLog } = await getWebrtcLogPaths()
+  const child = spawnWithLog(turnserver, [
     '-n',
     '--no-cli',
     '--no-tls',
     '--no-dtls',
     '-L', '0.0.0.0',
-    '-p', '3478',
+    '-p', String(WEBRTC_TURN_PORT),
     '-a',
     '-u', 'cloudphone_user:cloudphone_secure_password',
     '-r', 'cloudphone'
-  ], {
+  ], turnLog, {
     cwd: WEBRTC_DIR,
-    stdio: ['ignore', logFd, logFd],
     detached: false
   })
-  webrtcTurnProcess.on('exit', () => { webrtcTurnProcess = null })
+  webrtcTurnProcess = trackManagedProcess(child, 'turn')
 }
 
-export async function killLocalWebrtcInfrastructure(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
-  if (webrtcAgentProcess && !webrtcAgentProcess.killed) webrtcAgentProcess.kill('SIGTERM')
+export async function startLocalTurnServer() {
+  return enqueueLifecycle(startLocalTurnServerUnlocked)
+}
+
+async function killLocalWebrtcInfrastructureUnlocked(address, adbPath) {
+  const owner = registeredAgentOwner
+  terminateAgentDeployment(webrtcAgentProcess)
   if (webrtcServerProcess && !webrtcServerProcess.killed) webrtcServerProcess.kill('SIGTERM')
   if (webrtcTurnProcess && !webrtcTurnProcess.killed) webrtcTurnProcess.kill('SIGTERM')
   webrtcAgentProcess = null
   webrtcServerProcess = null
   webrtcTurnProcess = null
+  registeredAgentOwner = null
 
   await killListeningPidsOnTcpPort(WEBRTC_PORT)
-  await killListeningPidsOnTcpPort(3478)
-  await execFileQuiet(adbPath, ['-s', address, 'shell', 'pkill -f cloudphone-agent || true'])
-  await execFileQuiet(adbPath, ['-s', address, 'shell', 'pkill -f scrcpy.Server || true'])
+  await killListeningPidsOnTcpPort(WEBRTC_TURN_PORT)
+  if (owner && owner.address !== address) {
+    await stopRemoteWebrtcAgent(owner.address, owner.adbPath)
+  }
+  await stopRemoteWebrtcAgent(address, adbPath)
+}
+
+export async function killLocalWebrtcInfrastructure(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
+  return enqueueLifecycle(() => killLocalWebrtcInfrastructureUnlocked(address, adbPath))
 }
 
 export async function getWebrtcStatus(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
@@ -186,46 +442,70 @@ export async function installWebrtc() {
   return getWebrtcStatus()
 }
 
-export async function startWebrtcServer(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
-  if (webrtcServerProcess && !webrtcServerProcess.killed) {
-    return getWebrtcStatus(address, adbPath)
-  }
+async function startWebrtcServerUnlocked(address, adbPath) {
   if (await isWebrtcServerReachable()) {
     return getWebrtcStatus(address, adbPath)
   }
 
-  const binaryPath = await getWebrtcBinaryPath()
-  const assetsPath = path.join(WEBRTC_DIR, 'assets', 'v1')
-  if (!await pathExists(binaryPath) || !await pathExists(assetsPath)) {
-    throw new Error('WebRTC 组件未安装或未构建')
+  let child = webrtcServerProcess
+  let spawned = false
+  if (!isChildProcessRunning(child)) {
+    const binaryPath = await getWebrtcBinaryPath()
+    const assetsPath = path.join(WEBRTC_DIR, 'assets', 'v1')
+    if (!await pathExists(binaryPath) || !await pathExists(assetsPath)) {
+      throw new Error('WebRTC 组件未安装或未构建')
+    }
+
+    await startLocalTurnServerUnlocked()
+    const { serverLog } = await getWebrtcLogPaths()
+    const iceServers = await getIceServersConfig()
+    child = spawnWithLog(binaryPath, ['-host', '0.0.0.0', '-port', String(WEBRTC_PORT), '-assets', assetsPath, '-ice_servers', iceServers], serverLog, {
+      cwd: WEBRTC_DIR,
+      detached: false,
+      env: { ...process.env, PORT: String(WEBRTC_PORT), PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH || ''}` }
+    })
+    webrtcServerProcess = trackManagedProcess(child, 'server')
+    spawned = true
   }
 
-  await startLocalTurnServer()
-  const fs = await import('fs')
-  const { serverLog } = await getWebrtcLogPaths()
-  const logFd = fs.openSync(serverLog, 'a')
-  const iceServers = await getIceServersConfig()
-  webrtcServerProcess = spawn(binaryPath, ['-host', '0.0.0.0', '-port', String(WEBRTC_PORT), '-assets', assetsPath, '-ice_servers', iceServers], {
-    cwd: WEBRTC_DIR,
-    stdio: ['ignore', logFd, logFd],
-    detached: false,
-    env: { ...process.env, PORT: String(WEBRTC_PORT), PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH || ''}` }
-  })
-  webrtcServerProcess.on('exit', () => { webrtcServerProcess = null })
+  try {
+    await waitForWebrtcServerReady({ childProcess: child })
+  } catch (error) {
+    if (spawned && isChildProcessRunning(child)) child.kill('SIGTERM')
+    clearManagedProcess('server', child)
+    throw error
+  }
+  return getWebrtcStatus(address, adbPath)
+}
+
+export async function startWebrtcServer(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
+  return enqueueLifecycle(() => startWebrtcServerUnlocked(address, adbPath))
+}
+
+async function stopWebrtcServerUnlocked(address, adbPath) {
+  await killLocalWebrtcInfrastructureUnlocked(address, adbPath)
   return getWebrtcStatus(address, adbPath)
 }
 
 export async function stopWebrtcServer(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
-  await killLocalWebrtcInfrastructure(address, adbPath)
-  return getWebrtcStatus(address, adbPath)
+  return enqueueLifecycle(() => stopWebrtcServerUnlocked(address, adbPath))
 }
 
-export async function startWebrtcAgent(address = DEFAULT_DEVICE_ADDRESS, deviceId = DEFAULT_DEVICE_ID, adbPath = DEFAULT_ADB_PATH) {
-  if (webrtcAgentProcess && !webrtcAgentProcess.killed) {
-    return getWebrtcStatus(address, adbPath)
+async function startWebrtcAgentUnlocked(address, deviceId, adbPath) {
+  await waitForWebrtcServerReady()
+  const onlineDevices = await waitForWebrtcDevicesApi()
+  const currentOwner = registeredAgentOwner
+  if (isSameAgentOwner(currentOwner, address, deviceId)
+    && onlineDevices.includes(deviceId)
+    && await isDeviceAgentRunning(address, adbPath)) {
+    registeredAgentOwner = { address, deviceId, adbPath }
+    return { ...await getWebrtcStatus(address, adbPath), agentRunning: true }
   }
-  if (await isDeviceAgentRunning(address, adbPath)) {
-    return getWebrtcStatus(address, adbPath)
+
+  if (currentOwner) {
+    registeredAgentOwner = null
+    await stopRemoteWebrtcAgent(currentOwner.address, currentOwner.adbPath)
+    await waitForWebrtcDeviceUnavailable(currentOwner.deviceId)
   }
 
   const runScript = path.join(WEBRTC_DIR, 'agentd', 'run.sh')
@@ -233,40 +513,62 @@ export async function startWebrtcAgent(address = DEFAULT_DEVICE_ADDRESS, deviceI
     throw new Error('WebRTC agent 未安装')
   }
 
-  const fs = await import('fs')
   const { agentLog } = await getWebrtcLogPaths()
-  const logFd = fs.openSync(agentLog, 'a')
   const lanIp = await getMacLanIp()
   const iceServers = await getIceServersConfig()
-  webrtcAgentProcess = spawn('bash', [runScript, address, '-id', deviceId, '-signaling', `ws://${lanIp}:${WEBRTC_PORT}`, '-ice-servers', iceServers, '-webrtc-port', '50000'], {
+  const child = spawnWithLog('bash', [runScript, address, '-id', deviceId, '-signaling', `ws://${lanIp}:${WEBRTC_PORT}`, '-ice-servers', iceServers, '-webrtc-port', '50000'], agentLog, {
     cwd: path.join(WEBRTC_DIR, 'agentd'),
-    stdio: ['ignore', logFd, logFd],
-    detached: false,
+    detached: true,
     env: { ...process.env, ADB_PATH: adbPath, PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH || ''}` }
   })
-  webrtcAgentProcess.on('exit', () => { webrtcAgentProcess = null })
+  webrtcAgentProcess = trackManagedProcess(child, 'agent')
+  try {
+    await waitForWebrtcDevice(deviceId, {
+      childProcess: child,
+      isAgentRunning: () => isDeviceAgentRunning(address, adbPath)
+    })
+    registeredAgentOwner = { address, deviceId, adbPath }
+    return { ...await getWebrtcStatus(address, adbPath), agentRunning: true }
+  } catch (error) {
+    terminateAgentDeployment(child)
+    clearManagedProcess('agent', child)
+    if (isSameAgentOwner(registeredAgentOwner, address, deviceId)) registeredAgentOwner = null
+    await stopRemoteWebrtcAgent(address, adbPath)
+    throw error
+  }
+}
+
+export async function startWebrtcAgent(address = DEFAULT_DEVICE_ADDRESS, deviceId = DEFAULT_DEVICE_ID, adbPath = DEFAULT_ADB_PATH) {
+  return enqueueLifecycle(() => startWebrtcAgentUnlocked(address, deviceId, adbPath))
+}
+
+async function stopWebrtcAgentUnlocked(address, adbPath) {
+  const owner = registeredAgentOwner
+  terminateAgentDeployment(webrtcAgentProcess)
+  webrtcAgentProcess = null
+  registeredAgentOwner = null
+  if (owner && owner.address !== address) {
+    await stopRemoteWebrtcAgent(owner.address, owner.adbPath)
+  }
+  await stopRemoteWebrtcAgent(address, adbPath)
   return getWebrtcStatus(address, adbPath)
 }
 
 export async function stopWebrtcAgent(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
-  if (webrtcAgentProcess && !webrtcAgentProcess.killed) {
-    webrtcAgentProcess.kill('SIGTERM')
-    webrtcAgentProcess = null
-  }
-  await execFileAsync(adbPath, ['-s', address, 'shell', 'pkill -f cloudphone-agent || true'], { timeout: 5000 }).catch(() => {})
-  await execFileAsync(adbPath, ['-s', address, 'shell', 'pkill -f scrcpy.Server || true'], { timeout: 5000 }).catch(() => {})
-  return getWebrtcStatus(address, adbPath)
+  return enqueueLifecycle(() => stopWebrtcAgentUnlocked(address, adbPath))
 }
 
 export async function startWebrtc(address = DEFAULT_DEVICE_ADDRESS, deviceId = DEFAULT_DEVICE_ID, adbPath = DEFAULT_ADB_PATH) {
-  await startWebrtcServer(address, adbPath)
-  await startWebrtcAgent(address, deviceId, adbPath)
-  await new Promise(resolve => setTimeout(resolve, 1200))
-  return getWebrtcStatus(address, adbPath)
+  return enqueueLifecycle(async () => {
+    await startWebrtcServerUnlocked(address, adbPath)
+    return startWebrtcAgentUnlocked(address, deviceId, adbPath)
+  })
 }
 
 export async function stopWebrtc(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
-  await stopWebrtcAgent(address, adbPath).catch(() => null)
-  await stopWebrtcServer(address, adbPath).catch(() => null)
-  return { stopped: true }
+  return enqueueLifecycle(async () => {
+    await stopWebrtcAgentUnlocked(address, adbPath).catch(() => null)
+    await stopWebrtcServerUnlocked(address, adbPath).catch(() => null)
+    return { stopped: true }
+  })
 }

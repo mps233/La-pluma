@@ -84,7 +84,7 @@ export default function Layout({ children }: LayoutProps) {
                 aria-label={mobileMenuOpen ? '关闭导航菜单' : '打开导航菜单'}
                 aria-expanded={mobileMenuOpen}
                 aria-controls="mobile-navigation"
-                className="text-secondary hover:text-primary md:hidden rounded-lg p-2 transition-colors hover:bg-white/60 dark:hover:bg-white/10"
+                className="text-secondary hover:text-primary lg:hidden rounded-lg p-2 transition-colors hover:bg-white/60 dark:hover:bg-white/10"
               >
                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   {mobileMenuOpen ? (
@@ -119,7 +119,7 @@ export default function Layout({ children }: LayoutProps) {
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2 }}
-                className="md:hidden py-2 shadow-[inset_0_1px_0_var(--app-border)]"
+                className="lg:hidden py-2 shadow-[inset_0_1px_0_var(--app-border)]"
               >
                 <div className="flex flex-col space-y-1">
                   {tabs.map((tab) => (

@@ -18,6 +18,10 @@ import type {
 import { formatExecutionActionSummary } from '../utils/executionSummary'
 
 const scheduleTimePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/
+const RECOVERY_STATUS_POLL_MS = 1000
+const RECOVERY_STATUS_TIMEOUT_MS = 30 * 60 * 1000
+
+type RecoveryWaitResult = 'completed' | 'timeout' | 'cancelled'
 
 const normalizeScheduleTimes = (times: string[]) =>
   [...new Set(times.filter(time => scheduleTimePattern.test(time)))]
@@ -1086,15 +1090,96 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   }
 
   useEffect(() => {
+    let cancelled = false
+    const controller = new AbortController()
+    const cancellationHandlers = new Set<() => void>()
+
+    const cancelRecoveryWork = () => {
+      cancelled = true
+      controller.abort()
+      Array.from(cancellationHandlers).forEach(cancel => cancel())
+      cancellationHandlers.clear()
+    }
+
+    const waitForDelay = (durationMs: number) => new Promise<boolean>((resolve) => {
+      if (cancelled) {
+        resolve(false)
+        return
+      }
+
+      let settled = false
+      const timer = window.setTimeout(() => finish(true), durationMs)
+      const finish = (completed: boolean) => {
+        if (settled) return
+        settled = true
+        window.clearTimeout(timer)
+        cancellationHandlers.delete(cancel)
+        resolve(completed)
+      }
+      const cancel = () => finish(false)
+      cancellationHandlers.add(cancel)
+    })
+
+    const waitForTaskCompletion = () => new Promise<RecoveryWaitResult>((resolve) => {
+      if (cancelled) {
+        resolve('cancelled')
+        return
+      }
+
+      let settled = false
+      let requestInFlight = false
+      let intervalId: number | null = null
+      let timeoutId: number | null = null
+
+      const finish = (result: RecoveryWaitResult) => {
+        if (settled) return
+        settled = true
+        if (intervalId !== null) window.clearInterval(intervalId)
+        if (timeoutId !== null) window.clearTimeout(timeoutId)
+        cancellationHandlers.delete(cancel)
+        resolve(result)
+      }
+      const cancel = () => finish('cancelled')
+      const checkStatus = async () => {
+        if (cancelled || requestInFlight || settled) return
+        requestInFlight = true
+        try {
+          const statusResult = await maaApi.getTaskStatus(controller.signal)
+          if (cancelled) {
+            finish('cancelled')
+          } else if (statusResult.success && statusResult.data?.isRunning === false) {
+            finish('completed')
+          }
+        } catch (error) {
+          if (cancelled || (error instanceof Error && error.name === 'AbortError')) {
+            finish('cancelled')
+          }
+        } finally {
+          requestInFlight = false
+        }
+      }
+
+      cancellationHandlers.add(cancel)
+      intervalId = window.setInterval(() => void checkStatus(), RECOVERY_STATUS_POLL_MS)
+      timeoutId = window.setTimeout(() => finish('timeout'), RECOVERY_STATUS_TIMEOUT_MS)
+      void checkStatus()
+    })
+
+    const reportWaitTimeout = (taskName: string) => {
+      setStatusMessage(`${taskName} 状态等待超时，已停止前端续跑，请检查后端任务状态`, 'warning')
+    }
+
     // 先加载任务流程
     const initializeAndRestore = async () => {
       // 1. 先加载任务流程
       await loadTaskFlow()
+      if (cancelled) return
 
       // 2. 获取当前活动信息
       try {
         const activityResult = await maaApi.getActivity('Official')
-        if (activityResult.success && activityResult.data.code) {
+        if (cancelled) return
+        if (activityResult.success && activityResult.data?.code) {
           setCurrentActivity(activityResult.data.code)
           setActivityName(activityResult.data.name)
         }
@@ -1104,15 +1189,18 @@ export default function AutomationTasks({}: AutomationTasksProps) {
 
       // 3. 然后检查是否需要恢复执行
       try {
-        const result = await maaApi.getTaskStatus()
+        const result = await maaApi.getTaskStatus(controller.signal)
+        if (cancelled) return
 
         // 检查是否有任务流程正在执行
         const flowExecution = localStorage.getItem('maa-task-flow-execution')
 
         if (flowExecution) {
           const { isExecuting, tasks, currentIndex } = JSON.parse(flowExecution)
+          const restoredTasks = Array.isArray(tasks) ? tasks : []
+          const restoredCurrentIndex = Number.isInteger(currentIndex) ? currentIndex : -1
 
-          if (isExecuting && tasks && tasks.length > 0) {
+          if (isExecuting && restoredTasks.length > 0) {
             setIsRunning(true)
             showInfo(`恢复任务流程执行...`)
 
@@ -1120,18 +1208,20 @@ export default function AutomationTasks({}: AutomationTasksProps) {
               // 从 localStorage 加载任务流程，找到当前执行的任务
               const savedTaskFlow = localStorage.getItem('maa-task-flow')
               if (!savedTaskFlow) {
-                showError('无法恢复任务流程')
+                setStatusMessage('无法恢复任务流程', 'error')
                 setIsRunning(false)
                 setCurrentStep(-1)
                 localStorage.removeItem('maa-task-flow-execution')
                 return
               }
 
-              const loadedTasks = JSON.parse(savedTaskFlow)
+              const parsedTasks = JSON.parse(savedTaskFlow)
+              const loadedTasks = Array.isArray(parsedTasks) ? parsedTasks : []
+              if (cancelled) return
 
               const currentRun = result.data
               if (result.success && currentRun?.isRunning) {
-                const currentTaskInfo = tasks[currentIndex]
+                const currentTaskInfo = restoredTasks[restoredCurrentIndex]
                 if (currentTaskInfo) {
                   // 找到当前任务在 taskFlow 中的索引
                   const currentTask = loadedTasks.find((t: any) => {
@@ -1148,27 +1238,21 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                 showInfo(`正在执行: ${currentRun.taskName}`)
 
                 // 等待当前任务完成
-                await new Promise<void>((resolve) => {
-                  const checkInterval = setInterval(async () => {
-                    try {
-                      const statusResult = await maaApi.getTaskStatus()
-                      if (statusResult.success && !statusResult.data.isRunning) {
-                        clearInterval(checkInterval)
-                        resolve()
-                      }
-                    } catch (error) {
-                      // 静默失败，继续检查
-                    }
-                  }, 1000)
-                })
+                const waitResult = await waitForTaskCompletion()
+                if (waitResult === 'cancelled') return
+                if (waitResult === 'timeout') {
+                  reportWaitTimeout(currentRun.taskName || '当前任务')
+                  return
+                }
               }
 
               // 继续执行剩余任务
-              const remainingTasks = tasks.slice(currentIndex + 1)
+              const remainingTasks = restoredTasks.slice(restoredCurrentIndex + 1)
 
               if (remainingTasks.length > 0) {
                 for (let i = 0; i < remainingTasks.length; i++) {
                   const taskInfo = remainingTasks[i]
+                  if (cancelled || !taskInfo) return
 
                   // 使用 commandId 匹配任务
                   const task = loadedTasks.find((t: any) => {
@@ -1186,8 +1270,8 @@ export default function AutomationTasks({}: AutomationTasksProps) {
 
                   localStorage.setItem('maa-task-flow-execution', JSON.stringify({
                     isExecuting: true,
-                    tasks,
-                    currentIndex: currentIndex + i + 1,
+                    tasks: restoredTasks,
+                    currentIndex: restoredCurrentIndex + i + 1,
                     startTime: Date.now()
                   }))
 
@@ -1197,30 +1281,27 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                       command,
                       params,
                       taskConfig as any,
-                      null,
+                      controller.signal,
                       task.name,
                       'automation',
                       false
                     )
+                    if (cancelled) return
 
                     if (!result.success) {
-                      showError(`${task.name} 提交失败: ${maaApi.getErrorMessage(result)}`)
-                      break
+                      setStatusMessage(`${task.name} 提交失败: ${maaApi.getErrorMessage(result)}`, 'error')
+                      setIsRunning(false)
+                      setCurrentStep(-1)
+                      localStorage.removeItem('maa-task-flow-execution')
+                      return
                     }
 
-                    await new Promise<void>((resolve) => {
-                      const checkInterval = setInterval(async () => {
-                        try {
-                          const statusResult = await maaApi.getTaskStatus()
-                          if (statusResult.success && !statusResult.data.isRunning) {
-                            clearInterval(checkInterval)
-                            resolve()
-                          }
-                        } catch (error) {
-                          // 静默失败，继续检查
-                        }
-                      }, 1000)
-                    })
+                    const waitResult = await waitForTaskCompletion()
+                    if (waitResult === 'cancelled') return
+                    if (waitResult === 'timeout') {
+                      reportWaitTimeout(task.name)
+                      return
+                    }
 
                     // 任务完成后的延迟时间
                     // 启动游戏需要更长的等待时间，确保游戏完全启动
@@ -1228,20 +1309,26 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                     const delayTime = commandId === 'startup' ? 15000 : commandId === 'closedown' ? 3000 : 2000
 
                     showInfo(`${task.name} 完成，等待 ${delayTime / 1000} 秒后继续...`)
-                    await new Promise<void>(resolve => setTimeout(resolve, delayTime))
+                    if (!await waitForDelay(delayTime)) return
                   } catch (error) {
-                    break
+                    if (cancelled || (error instanceof Error && error.name === 'AbortError')) return
+                    setStatusMessage(`${task.name} 恢复执行失败`, 'error')
+                    setIsRunning(false)
+                    setCurrentStep(-1)
+                    localStorage.removeItem('maa-task-flow-execution')
+                    return
                   }
                 }
               }
 
-              showSuccess('所有任务执行完成！')
+              if (cancelled) return
+              setStatusMessage('所有任务执行完成！', 'success')
               setIsRunning(false)
               setCurrentStep(-1)
               localStorage.removeItem('maa-task-flow-execution')
             }
 
-            continueTaskFlow()
+            await continueTaskFlow()
             return
           }
         }
@@ -1260,21 +1347,14 @@ export default function AutomationTasks({}: AutomationTasksProps) {
               showInfo(`正在执行: ${taskName}`)
             }
 
-            const pollInterval = setInterval(async () => {
-              try {
-                const statusResult = await maaApi.getTaskStatus()
-                if (statusResult.success && !statusResult.data.isRunning) {
-                  setIsRunning(false)
-                  setCurrentStep(-1)
-                  showSuccess('任务已完成')
-                  clearInterval(pollInterval)
-                }
-              } catch (error) {
-                clearInterval(pollInterval)
-              }
-            }, 2000)
-
-            return () => clearInterval(pollInterval)
+            const waitResult = await waitForTaskCompletion()
+            if (waitResult === 'completed' && !cancelled) {
+              setIsRunning(false)
+              setCurrentStep(-1)
+              setStatusMessage('任务已完成', 'success')
+            } else if (waitResult === 'timeout' && !cancelled) {
+              reportWaitTimeout(taskName || '当前任务')
+            }
           }
         }
       } catch (error) {
@@ -1282,7 +1362,11 @@ export default function AutomationTasks({}: AutomationTasksProps) {
       }
     }
 
-    initializeAndRestore()
+    void initializeAndRestore()
+
+    return cancelRecoveryWork
+    // Recovery is mount-scoped; rerunning it would create a second task runner.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 监听养成计划应用事件，自动刷新任务流程

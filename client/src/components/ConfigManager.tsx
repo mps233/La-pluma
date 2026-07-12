@@ -14,6 +14,8 @@ import type {
   UpdateStatus
 } from '@/types/components'
 
+const CHANGELOGS_ENABLED: boolean = false
+
 interface MaaVersionInfo {
   cli: string
   core: string
@@ -754,7 +756,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                 )}
                 
                 {/* 更新日志 */}
-                {coreChangelog.length > 0 && false && (
+                {CHANGELOGS_ENABLED && coreChangelog.length > 0 && (
                   <div className="mt-4">
                     <button
                       onClick={() => setShowCoreChangelog(!showCoreChangelog)}
@@ -877,7 +879,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                 </Button>
                 
                 {/* 更新日志 */}
-                {cliChangelog.length > 0 && false && (
+                {CHANGELOGS_ENABLED && cliChangelog.length > 0 && (
                   <div className="mt-4">
                     <button
                       onClick={() => setShowCliChangelog(!showCliChangelog)}

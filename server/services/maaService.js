@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import { createConnection } from 'net';
 import { readFile, writeFile, mkdir, readdir, stat, unlink, realpath, open } from 'fs/promises';
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'path';
+import TOML from '@iarna/toml';
 import { createLogger } from '../utils/logger.js';
 import { getFallbackActivity } from './activityFallbackService.js';
 import { acquireMaaExecutionLease } from './executionCoordinatorService.js';
@@ -466,20 +467,67 @@ export async function getMaaConfigDir() {
 /**
  * 获取配置文件路径
  */
+export function validateMaaProfileName(profileName = 'default') {
+  if (typeof profileName !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(profileName)) {
+    throw new Error('连接配置名称不合法');
+  }
+  return profileName;
+}
+
 async function getConfigPath(profileName = 'default') {
+  const normalizedProfileName = validateMaaProfileName(profileName);
   const configDir = await getMaaConfigDir();
-  return join(configDir.trim(), 'profiles', `${profileName}.toml`);
+  const profilesDir = resolve(configDir.trim(), 'profiles');
+  const configPath = resolve(profilesDir, `${normalizedProfileName}.toml`);
+  if (dirname(configPath) !== profilesDir) {
+    throw new Error('连接配置路径不合法');
+  }
+  return configPath;
+}
+
+export function parseMaaProfile(content) {
+  return TOML.parse(String(content || ''));
+}
+
+export function mergeMaaProfileConnection(profileDocument = {}, config = {}) {
+  if (!profileDocument || typeof profileDocument !== 'object' || Array.isArray(profileDocument)) {
+    throw new TypeError('MAA profile 文档格式不合法');
+  }
+
+  const connectionUpdates = Object.prototype.hasOwnProperty.call(config, 'connection')
+    ? config.connection
+    : config;
+  if (!connectionUpdates || typeof connectionUpdates !== 'object' || Array.isArray(connectionUpdates)) {
+    throw new TypeError('connection 配置格式不合法');
+  }
+
+  const existingConnection = profileDocument.connection;
+  if (existingConnection != null && (typeof existingConnection !== 'object' || Array.isArray(existingConnection))) {
+    throw new TypeError('现有 connection section 格式不合法');
+  }
+
+  const normalizedUpdates = Object.fromEntries(
+    Object.entries(connectionUpdates).filter(([, value]) => value !== undefined)
+  );
+  return {
+    ...profileDocument,
+    connection: {
+      ...(existingConnection || {}),
+      ...normalizedUpdates
+    }
+  };
 }
 
 /**
  * 读取配置文件
  */
 export async function getConfig(profileName = 'default') {
+  const normalizedProfileName = validateMaaProfileName(profileName);
   try {
-    const configPath = await getConfigPath(profileName);
+    const configPath = await getConfigPath(normalizedProfileName);
     const content = await readFile(configPath, 'utf-8');
-    // 简单解析 TOML (实际项目中应使用 toml 库)
-    return parseSimpleToml(content);
+    const profile = parseMaaProfile(content);
+    return profile.connection || profile;
   } catch {
     logger.debug('配置文件不存在，返回环境默认配置');
     return {
@@ -495,68 +543,24 @@ export async function getConfig(profileName = 'default') {
  */
 export async function saveConfig(profileName = 'default', config) {
   try {
-    const configDir = await getMaaConfigDir();
-    const profilesDir = join(configDir.trim(), 'profiles');
-    
-    // 确保目录存在
-    await mkdir(profilesDir, { recursive: true });
-    
-    const configPath = join(profilesDir, `${profileName}.toml`);
-    const tomlContent = generateToml(config);
-    
+    const normalizedProfileName = validateMaaProfileName(profileName);
+    const configPath = await getConfigPath(normalizedProfileName);
+    await mkdir(dirname(configPath), { recursive: true });
+
+    let existingProfile = {};
+    try {
+      existingProfile = parseMaaProfile(await readFile(configPath, 'utf-8'));
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+
+    const mergedProfile = mergeMaaProfileConnection(existingProfile, config);
+    const tomlContent = TOML.stringify(mergedProfile);
     await writeFile(configPath, tomlContent, 'utf-8');
     logger.debug('配置已保存', { configPath });
   } catch (error) {
     throw new Error(`保存配置失败: ${error.message}`);
   }
-}
-
-/**
- * 简单的 TOML 解析器 (仅用于演示)
- */
-function parseSimpleToml(content) {
-  const config = {};
-  const lines = content.split('\n');
-  let currentSection = null;
-  
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    
-    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-      currentSection = trimmed.slice(1, -1);
-      config[currentSection] = {};
-    } else if (trimmed.includes('=')) {
-      const [key, value] = trimmed.split('=').map(s => s.trim());
-      const cleanValue = value.replace(/^["']|["']$/g, '');
-      if (currentSection) {
-        config[currentSection][key] = cleanValue;
-      } else {
-        config[key] = cleanValue;
-      }
-    }
-  }
-  
-  return config.connection || config;
-}
-
-/**
- * 生成 TOML 内容
- */
-function generateToml(config) {
-  let toml = '[connection]\n';
-  
-  if (config.connection) {
-    for (const [key, value] of Object.entries(config.connection)) {
-      toml += `${key} = "${value}"\n`;
-    }
-  } else {
-    for (const [key, value] of Object.entries(config)) {
-      toml += `${key} = "${value}"\n`;
-    }
-  }
-  
-  return toml;
 }
 
 /**

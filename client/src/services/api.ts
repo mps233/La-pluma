@@ -94,6 +94,17 @@ interface ApplyTrainingPlanData {
   taskType?: 'combat'
 }
 
+export interface WebrtcStatusData {
+  installed?: boolean
+  built?: boolean
+  serverRunning?: boolean
+  agentRunning?: boolean
+  signalingUrl?: string
+  deviceId?: string
+  devices?: string[]
+  [key: string]: any
+}
+
 /**
  * 干员筛选条件
  */
@@ -249,8 +260,8 @@ export const maaApi = {
   /**
    * 获取任务执行状态
    */
-  async getTaskStatus(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/tasks/status`)
+  async getTaskStatus(signal?: AbortSignal): Promise<ApiResponse> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/tasks/status`, { signal })
     return parseJsonResponse(response)
   },
 
@@ -370,8 +381,17 @@ export const maaApi = {
     return parseJsonResponse(response)
   },
 
-  async getWebrtcStatus(): Promise<ApiResponse> {
+  async getWebrtcStatus(): Promise<ApiResponse<WebrtcStatusData>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/status`)
+    return parseJsonResponse(response)
+  },
+
+  async startWebrtc(profileId: string = 'default', deviceId: string = 'mumu-la-pluma'): Promise<ApiResponse<WebrtcStatusData>> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId, deviceId })
+    })
     return parseJsonResponse(response)
   },
 

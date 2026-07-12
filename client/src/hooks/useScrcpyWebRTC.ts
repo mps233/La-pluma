@@ -48,18 +48,29 @@ function signalingHttpBase(url: string) {
   return url.replace(/^ws/, 'http').replace(/\/$/, '')
 }
 
-async function getSignalingToken(signalingUrl: string) {
-  const stored = window.localStorage.getItem('scrcpy_webrtc_auth_token')
-  if (stored) return stored
-  const response = await fetch(`${signalingHttpBase(signalingUrl)}/api/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'admin', password: 'admin123' })
-  })
-  if (!response.ok) throw new Error(`Signaling auth failed: HTTP ${response.status}`)
-  const data = await response.json()
-  if (!data.token) throw new Error('Signaling auth failed: missing token')
-  window.localStorage.setItem('scrcpy_webrtc_auth_token', data.token)
+const SIGNALING_TOKEN_KEY = 'scrcpy_webrtc_auth_token'
+const SIGNALING_RETRY_DELAYS_MS = [300, 800]
+const SIGNALING_ATTEMPT_TIMEOUT_MS = 4000
+
+async function getSignalingToken(signalingUrl: string, signal: AbortSignal) {
+  // The signaling server can restart between previews, invalidating its old token.
+  window.localStorage.removeItem(SIGNALING_TOKEN_KEY)
+  let response: Response
+  try {
+    response = await fetch(`${signalingHttpBase(signalingUrl)}/api/login`, {
+      method: 'POST',
+      cache: 'no-store',
+      signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'admin', password: 'admin123' })
+    })
+  } catch {
+    throw new Error('暂时无法连接信令服务')
+  }
+  if (!response.ok) throw new Error(`信令服务登录失败 (HTTP ${response.status})`)
+  const data = await response.json().catch(() => null)
+  if (typeof data?.token !== 'string' || !data.token.trim()) throw new Error('信令服务返回了无效凭证')
+  window.localStorage.setItem(SIGNALING_TOKEN_KEY, data.token)
   return data.token as string
 }
 
@@ -109,6 +120,9 @@ export function useScrcpyWebRTC({
   const iceServersRef = useRef<RTCIceServer[]>([{ urls: 'stun:stun.l.google.com:19302' }])
   const touchSeqRef = useRef(0)
   const connectionGenerationRef = useRef(0)
+  const retryTimerRef = useRef<number | null>(null)
+  const attemptTimeoutRef = useRef<number | null>(null)
+  const authAbortControllerRef = useRef<AbortController | null>(null)
   const prevStatsRef = useRef({ timestamp: 0, bytesReceived: 0, framesDecoded: 0 })
 
   const sendForward = useCallback((payload: unknown) => {
@@ -190,135 +204,229 @@ export function useScrcpyWebRTC({
     return pc
   }, [connectionPath, ipPreference, sendForward, videoRef])
 
-  const disconnect = useCallback(() => {
-    connectionGenerationRef.current += 1
+  const teardownConnection = useCallback(() => {
+    if (retryTimerRef.current !== null) {
+      window.clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
+    if (attemptTimeoutRef.current !== null) {
+      window.clearTimeout(attemptTimeoutRef.current)
+      attemptTimeoutRef.current = null
+    }
+    authAbortControllerRef.current?.abort()
+    authAbortControllerRef.current = null
     inputChannelRef.current = null
-    pcRef.current?.close()
+    const pc = pcRef.current
     pcRef.current = null
-    wsRef.current?.close()
+    if (pc) {
+      pc.oniceconnectionstatechange = null
+      pc.onconnectionstatechange = null
+      pc.close()
+    }
+    const ws = wsRef.current
     wsRef.current = null
+    if (ws && ws.readyState < WebSocket.CLOSING) ws.close()
     streamRef.current?.getTracks().forEach(track => track.stop())
     streamRef.current = null
     if (videoRef.current) videoRef.current.srcObject = null
     prevStatsRef.current = { timestamp: 0, bytesReceived: 0, framesDecoded: 0 }
     setStats(null)
-    setStatus('disconnected')
   }, [videoRef])
 
-  const connect = useCallback(() => {
-    disconnect()
+  const disconnect = useCallback(() => {
+    connectionGenerationRef.current += 1
+    teardownConnection()
+    setError(null)
+    setStatus('disconnected')
+  }, [teardownConnection])
+
+  const connect = useCallback((signalingUrlOverride?: string) => {
+    connectionGenerationRef.current += 1
     const generation = connectionGenerationRef.current
+    teardownConnection()
+    const targetSignalingUrl = signalingUrlOverride || signalingUrl
     setStatus('connecting')
     setError(null)
-    void getSignalingToken(signalingUrl)
-      .then(token => {
-        if (connectionGenerationRef.current !== generation) return
-        const ws = new WebSocket(normalizeSignalingUrl(signalingUrl, token))
-        wsRef.current = ws
 
-        ws.onopen = () => {
-      if (connectionGenerationRef.current !== generation) {
-        ws.close()
-        return
-      }
-      setStatus('signaling')
-      ws.send(JSON.stringify({ message_type: 'connect', device_id: deviceId }))
-    }
-
-    ws.onmessage = event => {
+    const attemptConnection = (attemptIndex: number) => {
       if (connectionGenerationRef.current !== generation) return
-      const msg = JSON.parse(event.data)
-      const type = msg.message_type || msg.type
-      if (type === 'config') {
-        if (Array.isArray(msg.ice_servers) && msg.ice_servers.length > 0) iceServersRef.current = msg.ice_servers
-        setStatus('waiting_offer')
-        sendForward({
-          type: 'request-offer',
-          ip_preference: ipPreference,
-          scrcpy_options: {
-            max_fps: 30,
-            max_size: 1280,
-            bitrate: 4000000,
-            min_bitrate: 1000000,
-            max_bitrate: 8000000,
-            bwe: true,
-            audio: false,
-            snapshot_interval: 10,
-            ...scrcpyOptionsRef.current
-          }
-        })
-        return
+      let attemptFinished = false
+      let socket: WebSocket | null = null
+      let attemptTimeout: number | null = null
+      const authAbortController = new AbortController()
+      authAbortControllerRef.current = authAbortController
+
+      const clearAttemptResources = () => {
+        if (attemptTimeout !== null) {
+          window.clearTimeout(attemptTimeout)
+          if (attemptTimeoutRef.current === attemptTimeout) attemptTimeoutRef.current = null
+          attemptTimeout = null
+        }
+        if (authAbortControllerRef.current === authAbortController) authAbortControllerRef.current = null
+        authAbortController.abort()
       }
-      if (type === 'device_info' && msg.device_info?.displays?.[0]) {
-        const display = msg.device_info.displays[0]
-        setDeviceSize({ width: display.x_res || 1080, height: display.y_res || 1920 })
-        return
-      }
-      if (type === 'error') {
-        setError(msg.error || 'Signaling server error')
+
+      const finishStartupFailure = (reason: unknown) => {
+        if (attemptFinished || connectionGenerationRef.current !== generation) return
+        attemptFinished = true
+        clearAttemptResources()
+        if (socket) {
+          socket.onopen = null
+          socket.onmessage = null
+          socket.onerror = null
+          socket.onclose = null
+          if (wsRef.current === socket) wsRef.current = null
+          if (socket.readyState < WebSocket.CLOSING) socket.close()
+        }
+        window.localStorage.removeItem(SIGNALING_TOKEN_KEY)
+
+        const retryDelay = SIGNALING_RETRY_DELAYS_MS[attemptIndex]
+        if (retryDelay !== undefined) {
+          setError(null)
+          setStatus('connecting')
+          retryTimerRef.current = window.setTimeout(() => {
+            retryTimerRef.current = null
+            attemptConnection(attemptIndex + 1)
+          }, retryDelay)
+          return
+        }
+
+        setError(reason instanceof Error ? reason.message : '信令服务暂时不可用，请稍后重试')
         setStatus('error')
-        return
       }
-      if (type !== 'device_msg' || !msg.payload?.type) return
-      const payload = msg.payload
-      if (payload.type === 'offer') {
-        setStatus('connecting_webrtc')
-        const pc = createPeerConnection()
-        void pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: filterSdpCandidates(payload.sdp) }))
-          .then(() => pc.createAnswer())
-          .then(answer => {
-            let sdp = answer.sdp || ''
-            const answerBitrateKbps = Math.max(1000, Math.round((scrcpyOptionsRef.current.max_bitrate || scrcpyOptionsRef.current.bitrate || 8000000) / 1000))
-            sdp = sdp.replace(/m=video (.*)\r\n/g, `m=video $1\r\nb=AS:${answerBitrateKbps}\r\n`)
-            return pc.setLocalDescription(new RTCSessionDescription({ type: 'answer', sdp }))
-          })
-          .then(() => {
-            if (pc.iceGatheringState === 'complete') {
-              sendAnswer()
+
+      attemptTimeout = window.setTimeout(() => {
+        finishStartupFailure(new Error('信令连接超时，请稍后重试'))
+      }, SIGNALING_ATTEMPT_TIMEOUT_MS)
+      attemptTimeoutRef.current = attemptTimeout
+
+      void getSignalingToken(targetSignalingUrl, authAbortController.signal)
+        .then(token => {
+          if (attemptFinished || connectionGenerationRef.current !== generation) return
+          const ws = new WebSocket(normalizeSignalingUrl(targetSignalingUrl, token))
+          socket = ws
+          wsRef.current = ws
+          let opened = false
+
+          ws.onopen = () => {
+            if (connectionGenerationRef.current !== generation) {
+              ws.close()
               return
             }
-            let sent = false
-            const finish = () => {
-              if (sent) return
-              sent = true
-              pc.removeEventListener('icegatheringstatechange', finish)
-              sendAnswer()
+            opened = true
+            attemptFinished = true
+            clearAttemptResources()
+            setError(null)
+            setStatus('signaling')
+            ws.send(JSON.stringify({ message_type: 'connect', device_id: deviceId }))
+          }
+
+          ws.onmessage = event => {
+            if (connectionGenerationRef.current !== generation) return
+            let msg: any
+            try {
+              msg = JSON.parse(event.data)
+            } catch {
+              setError('收到无效的信令消息')
+              setStatus('error')
+              return
             }
-            pc.addEventListener('icegatheringstatechange', () => {
-              if (pc.iceGatheringState === 'complete') finish()
-            })
-            window.setTimeout(finish, 2000)
-          })
-          .catch(err => {
-            setError(`SDP error: ${err.message}`)
-            setStatus('error')
-          })
-      } else if (payload.type === 'ice-candidate' && payload.candidate) {
-        const candidate = payload.candidate.candidate
-        if (!shouldKeepCandidate(candidate, connectionPath, ipPreference)) return
-        void pcRef.current?.addIceCandidate(new RTCIceCandidate(payload.candidate)).catch(() => {})
-      }
+            const type = msg.message_type || msg.type
+            if (type === 'config') {
+              if (Array.isArray(msg.ice_servers) && msg.ice_servers.length > 0) iceServersRef.current = msg.ice_servers
+              setStatus('waiting_offer')
+              sendForward({
+                type: 'request-offer',
+                ip_preference: ipPreference,
+                scrcpy_options: {
+                  max_fps: 30,
+                  max_size: 1280,
+                  bitrate: 4000000,
+                  min_bitrate: 1000000,
+                  max_bitrate: 8000000,
+                  bwe: true,
+                  audio: false,
+                  snapshot_interval: 10,
+                  ...scrcpyOptionsRef.current
+                }
+              })
+              return
+            }
+            if (type === 'device_info' && msg.device_info?.displays?.[0]) {
+              const display = msg.device_info.displays[0]
+              setDeviceSize({ width: display.x_res || 1080, height: display.y_res || 1920 })
+              return
+            }
+            if (type === 'error') {
+              setError(msg.error || '信令服务返回错误')
+              setStatus('error')
+              return
+            }
+            if (type !== 'device_msg' || !msg.payload?.type) return
+            const payload = msg.payload
+            if (payload.type === 'offer') {
+              setStatus('connecting_webrtc')
+              const pc = createPeerConnection()
+              void pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: filterSdpCandidates(payload.sdp) }))
+                .then(() => pc.createAnswer())
+                .then(answer => {
+                  let sdp = answer.sdp || ''
+                  const answerBitrateKbps = Math.max(1000, Math.round((scrcpyOptionsRef.current.max_bitrate || scrcpyOptionsRef.current.bitrate || 8000000) / 1000))
+                  sdp = sdp.replace(/m=video (.*)\r\n/g, `m=video $1\r\nb=AS:${answerBitrateKbps}\r\n`)
+                  return pc.setLocalDescription(new RTCSessionDescription({ type: 'answer', sdp }))
+                })
+                .then(() => {
+                  if (pc.iceGatheringState === 'complete') {
+                    sendAnswer()
+                    return
+                  }
+                  let sent = false
+                  const finish = () => {
+                    if (sent) return
+                    sent = true
+                    pc.removeEventListener('icegatheringstatechange', finish)
+                    sendAnswer()
+                  }
+                  pc.addEventListener('icegatheringstatechange', () => {
+                    if (pc.iceGatheringState === 'complete') finish()
+                  })
+                  window.setTimeout(finish, 2000)
+                })
+                .catch(err => {
+                  setError(`SDP 处理失败: ${err.message}`)
+                  setStatus('error')
+                })
+            } else if (payload.type === 'ice-candidate' && payload.candidate) {
+              const candidate = payload.candidate.candidate
+              if (!shouldKeepCandidate(candidate, connectionPath, ipPreference)) return
+              void pcRef.current?.addIceCandidate(new RTCIceCandidate(payload.candidate)).catch(() => {})
+            }
+          }
+
+          ws.onerror = () => {
+            if (!opened) finishStartupFailure(new Error('信令连接暂时不可用，请稍后重试'))
+          }
+          ws.onclose = event => {
+            if (connectionGenerationRef.current !== generation) return
+            if (!opened) {
+              finishStartupFailure(new Error(event.code === 1008 ? '信令认证失败，请稍后重试' : '信令连接暂时不可用，请稍后重试'))
+              return
+            }
+            if (wsRef.current === ws) wsRef.current = null
+            if (event.code === 1000) {
+              setError(null)
+              setStatus('disconnected')
+            } else {
+              setError('信令连接已中断，请重新启动预览')
+              setStatus('error')
+            }
+          }
+        })
+        .catch(finishStartupFailure)
     }
 
-        ws.onerror = () => {
-          if (connectionGenerationRef.current !== generation) return
-          setError('WebSocket error')
-          setStatus('error')
-        }
-        ws.onclose = event => {
-          if (connectionGenerationRef.current !== generation) return
-          if (event.code === 1008 || event.code === 1006) {
-            window.localStorage.removeItem('scrcpy_webrtc_auth_token')
-          }
-          setStatus(prev => prev === 'error' ? prev : 'disconnected')
-        }
-      })
-      .catch(err => {
-        if (connectionGenerationRef.current !== generation) return
-        setError(err instanceof Error ? err.message : 'Signaling auth failed')
-        setStatus('error')
-      })
-  }, [createPeerConnection, deviceId, disconnect, filterSdpCandidates, ipPreference, connectionPath, sendAnswer, sendForward, signalingUrl])
+    attemptConnection(0)
+  }, [connectionPath, createPeerConnection, deviceId, filterSdpCandidates, ipPreference, sendAnswer, sendForward, signalingUrl, teardownConnection])
 
   const sendTouch = useCallback((action: number, clientX: number, clientY: number, id = 0, targetVideo?: HTMLVideoElement | null) => {
     const channel = inputChannelRef.current
@@ -402,7 +510,7 @@ export function useScrcpyWebRTC({
       }
     }, 1000)
     return () => window.clearInterval(timer)
-  }, [])
+  }, [videoRef])
 
   useEffect(() => disconnect, [disconnect])
 

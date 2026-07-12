@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { maaApi } from '../services/api'
+import { maaApi, type WebrtcStatusData } from '../services/api'
 import ScrcpyDeviceView from './ScrcpyDeviceView'
 
 interface ScreenMonitorProps {
@@ -12,14 +12,14 @@ interface ScreenMonitorProps {
 }
 
 export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) {
-  const [webrtcStatus, setWebrtcStatus] = useState<any>(null)
+  const [webrtcStatus, setWebrtcStatus] = useState<WebrtcStatusData | null>(null)
   const [webrtcLoading, setWebrtcLoading] = useState<string | null>(null)
   const [webrtcActionError, setWebrtcActionError] = useState<string | null>(null)
 
   const refreshWebrtcStatus = useCallback(async () => {
     try {
       const result = await maaApi.getWebrtcStatus()
-      if (result.success) setWebrtcStatus(result.data)
+      if (result.success && result.data) setWebrtcStatus(result.data)
     } catch {
       // WebRTC 不可用时只保留页面，不再回退到 ADB 截图监控
     }
@@ -44,24 +44,15 @@ export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) 
     }
   }
 
-  const startWebrtcInfrastructure = async () => {
+  const startWebrtcInfrastructure = async (): Promise<string> => {
     setWebrtcLoading('preview')
     setWebrtcActionError(null)
     try {
-      let status = webrtcStatus
-      if (!status?.serverRunning) {
-        const result = await maaApi.startWebrtcServer()
-        if (!result.success) throw new Error(maaApi.getErrorMessage(result))
-        status = result.data
-        setWebrtcStatus(status)
-      }
-      if (!status?.agentRunning) {
-        const result = await maaApi.startWebrtcAgent()
-        if (!result.success) throw new Error(maaApi.getErrorMessage(result))
-        status = result.data
-        setWebrtcStatus(status)
-      }
-      await refreshWebrtcStatus()
+      const result = await maaApi.startWebrtc()
+      if (!result.success) throw new Error(maaApi.getErrorMessage(result))
+      if (!result.data?.signalingUrl) throw new Error('预览服务未返回信令地址')
+      setWebrtcStatus(result.data)
+      return result.data.signalingUrl
     } catch (error) {
       setWebrtcActionError(error instanceof Error ? error.message : '无法启动实时预览')
       throw error

@@ -39,6 +39,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
   })
   const [autoFormation, setAutoFormation] = useState<AutoFormationConfig>({ copilot: 'auto' })
   const [copilotSetExecutionMode, setCopilotSetExecutionMode] = useState<CopilotSetExecutionMode>('cli')
+  const [configLoaded, setConfigLoaded] = useState(false)
 
   // 作业类型选择：'auto' 自动检测，'single' 单个作业，'set' 作业集
   const [copilotType, setCopilotType] = useState<'auto' | 'single' | 'set'>('auto')
@@ -152,10 +153,21 @@ export default function CombatTasks(_props: CombatTasksProps) {
 
   // 页面加载时从服务器或 localStorage 加载配置和恢复执行状态
   useEffect(() => {
+    let cancelled = false
+    let pollInterval: ReturnType<typeof setInterval> | null = null
+    const controller = new AbortController()
+
+    const stopStatusPolling = () => {
+      if (!pollInterval) return
+      clearInterval(pollInterval)
+      pollInterval = null
+    }
+
     // 从后端获取真实的任务执行状态
     const checkBackendStatus = async () => {
       try {
-        const result = await maaApi.getTaskStatus()
+        const result = await maaApi.getTaskStatus(controller.signal)
+        if (cancelled) return
         const taskStatus = result.data
         if (result.success && taskStatus?.isRunning) {
           // 后端确实有任务在运行
@@ -172,24 +184,20 @@ export default function CombatTasks(_props: CombatTasksProps) {
             }
 
             // 启动轮询，持续检查任务状态
-            const pollInterval = setInterval(async () => {
+            pollInterval = setInterval(async () => {
               try {
-                const statusResult = await maaApi.getTaskStatus()
-                if (statusResult.success && !statusResult.data.isRunning) {
+                const statusResult = await maaApi.getTaskStatus(controller.signal)
+                if (cancelled) return
+                if (statusResult.success && statusResult.data?.isRunning === false) {
                   // 任务已完成
                   setIsRunning(false)
                   setStatusMessage('任务已完成')
-                  await new Promise(resolve => setTimeout(resolve, 2000))
-                  setStatusMessage('')
-                  clearInterval(pollInterval)
+                  stopStatusPolling()
                 }
               } catch (error) {
-                clearInterval(pollInterval)
+                if (!cancelled) stopStatusPolling()
               }
             }, 2000) // 每2秒检查一次
-
-            // 组件卸载时清除轮询
-            return () => clearInterval(pollInterval)
           }
         }
       } catch (error) {
@@ -197,12 +205,13 @@ export default function CombatTasks(_props: CombatTasksProps) {
       }
     }
 
-    checkBackendStatus()
+    void checkBackendStatus()
 
     // 加载保存的配置 - 优先从服务器加载
     const loadConfig = async () => {
       try {
         const serverConfig = await maaApi.loadUserConfig('combat-tasks')
+        if (cancelled) return
         if (serverConfig.success && serverConfig.data) {
           const {
             taskInputs: inputs,
@@ -236,8 +245,11 @@ export default function CombatTasks(_props: CombatTasksProps) {
           return
         }
       } catch (error) {
+        if (cancelled) return
         // 服务器加载失败，静默处理
       }
+
+      if (cancelled) return
 
       // 服务器加载失败，从 localStorage 加载
       const savedInputs = localStorage.getItem('combatTaskInputs')
@@ -263,37 +275,43 @@ export default function CombatTasks(_props: CombatTasksProps) {
       }
     }
 
-    loadConfig()
+    void loadConfig()
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setConfigLoaded(true)
+      })
+
+    return () => {
+      cancelled = true
+      controller.abort()
+      stopStatusPolling()
+    }
+    // Hydration and status recovery are intentionally scoped to this mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 自动保存配置
   useEffect(() => {
+    if (!configLoaded) return
+
     localStorage.setItem('combatTaskInputs', JSON.stringify(taskInputs))
-    // 同时保存到服务器（静默失败）
-    maaApi.saveUserConfig('combat-tasks', {
-      taskInputs,
-      advancedParams,
-      autoFormation,
-      copilotSetExecutionMode,
-      copilotSetSelections
-    }).catch(() => {})
-  }, [taskInputs, advancedParams, autoFormation, copilotSetExecutionMode, copilotSetSelections])
-
-  useEffect(() => {
     localStorage.setItem('combatAdvancedParams', JSON.stringify(advancedParams))
-  }, [advancedParams])
-
-  useEffect(() => {
     localStorage.setItem('combatAutoFormation', JSON.stringify(autoFormation))
-  }, [autoFormation])
-
-  useEffect(() => {
     localStorage.setItem('combatCopilotSetExecutionMode', copilotSetExecutionMode)
-  }, [copilotSetExecutionMode])
-
-  useEffect(() => {
     localStorage.setItem('combatCopilotSetSelections', JSON.stringify(copilotSetSelections))
-  }, [copilotSetSelections])
+
+    const saveTimer = window.setTimeout(() => {
+      maaApi.saveUserConfig('combat-tasks', {
+        taskInputs,
+        advancedParams,
+        autoFormation,
+        copilotSetExecutionMode,
+        copilotSetSelections
+      }).catch(() => {})
+    }, 300)
+
+    return () => window.clearTimeout(saveTimer)
+  }, [advancedParams, autoFormation, configLoaded, copilotSetExecutionMode, copilotSetSelections, taskInputs])
 
   const tasks: CombatTask[] = [
     {
