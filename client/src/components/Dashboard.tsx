@@ -273,6 +273,7 @@ export default function Dashboard() {
     }
     wasOnlineRef.current = isOnline
   }, [isOnline, loadDashboardData])
+
   const runTodayFlow = async () => {
     if (!automationAvailable) {
       setQuickStartMessage(serviceStatus === 'offline' ? '当前网络已断开，恢复连接后再试。' : '后端服务暂不可用，请重试连接。')
@@ -362,23 +363,25 @@ export default function Dashboard() {
   const activityCompleted = activitySummary.completion?.complete === true
 
   return (
-    <div className="app-page">
+    <div className="app-page dashboard-page" data-page="dashboard">
       <div className="app-stack-section">
         <PageHeader
           icon={<Icons.Dashboard />}
           title="控制台"
           subtitle="当前活动、自动化进度、养成与掉落总览"
-          mobileLayout="inline"
+          mobileLayout="stack"
           actions={
-            <div className="flex items-center gap-2 sm:gap-3">
-              <FloatingStatusIndicator className="w-[clamp(4rem,30vw,7.25rem)] sm:w-auto sm:max-w-none" textClassName="truncate whitespace-nowrap" />
+            <div className="dashboard-page-actions flex w-full items-center gap-2 sm:w-auto sm:gap-3">
+              <div className="dashboard-status-slot min-w-0 flex-1 sm:flex-none">
+                <FloatingStatusIndicator className="dashboard-status-indicator w-full sm:w-auto sm:max-w-none" textClassName="truncate whitespace-nowrap" />
+              </div>
               <IconButton
                 onClick={() => loadDashboardData()}
                 variant="secondary"
                 size="lg"
                 title="刷新数据"
                 aria-label="刷新数据"
-                className="sm:hidden text-[var(--app-accent-strong)]"
+                className="dashboard-mobile-refresh shrink-0 text-[var(--app-accent-strong)] sm:hidden"
                 icon={<Icons.RefreshCw className="h-4 w-4" />}
               />
               <Button
@@ -436,11 +439,11 @@ export default function Dashboard() {
                     <Activity className="h-4 w-4" strokeWidth={1.8} />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[11px] font-semibold uppercase text-[var(--app-accent-strong)]">Daily operations</div>
-                    <div className="mt-0.5 text-base font-bold text-primary">今日流程</div>
+                    <div className="dashboard-flow-eyebrow text-[11px] font-semibold uppercase text-[var(--app-accent-strong)]">Daily operations</div>
+                    <div className="dashboard-flow-title mt-0.5 text-base font-bold text-primary">今日流程</div>
                   </div>
                 </div>
-                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                <div className="dashboard-flow-meta flex shrink-0 flex-col items-end gap-1.5">
                   <div className={`dashboard-flow-status ${automationAvailable && flowIsRunning ? 'is-running' : ''} ${serviceStatus === 'offline' ? 'status-warning' : serviceStatus === 'unavailable' ? 'status-danger' : ''}`}>
                     <span className="dashboard-flow-status-dot" />
                     {flowStatusLabel}

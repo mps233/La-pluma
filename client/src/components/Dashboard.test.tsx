@@ -63,7 +63,7 @@ vi.mock('./common', () => ({
   Button: ({ children, icon: _icon, loading, loadingText, statusKey: _statusKey, variant: _variant, size: _size, className: _className, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { loading?: boolean; loadingText?: React.ReactNode; statusKey?: string; variant?: string; size?: string; icon?: React.ReactNode }) => (
     <button {...props}>{loading ? loadingText : children}</button>
   ),
-  IconButton: ({ icon: _icon, variant: _variant, size: _size, className: _className, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: React.ReactNode; variant?: string; size?: string }) => <button {...props} />,
+  IconButton: ({ icon: _icon, variant: _variant, size: _size, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: React.ReactNode; variant?: string; size?: string }) => <button {...props} />,
 }))
 
 let online = true
@@ -161,6 +161,18 @@ describe('Dashboard connectivity state', () => {
 
     await act(async () => resolveBackendCheck?.({ success: true, data: { isRunning: false } }))
     await flushDashboard()
+  })
+
+  it('keeps refresh available as a compact mobile action', async () => {
+    await act(async () => root.render(<Dashboard />))
+    await flushDashboard()
+
+    const refreshButton = container.querySelector<HTMLButtonElement>('.dashboard-mobile-refresh')
+    expect(refreshButton).toBeTruthy()
+
+    const activityCallsBeforeClick = apiMocks.getActivity.mock.calls.length
+    await act(async () => refreshButton?.click())
+    expect(apiMocks.getActivity).toHaveBeenCalledTimes(activityCallsBeforeClick + 1)
   })
 
   it('activates the status beam while the daily flow is running', async () => {
