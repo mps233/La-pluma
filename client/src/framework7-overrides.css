@@ -84,10 +84,13 @@
   --la-pluma-tabbar-content-height: var(--f7-tabbar-icons-height, var(--f7-toolbar-height));
   --la-pluma-tabbar-safe-bottom: max(var(--f7-safe-area-bottom, 0px), env(safe-area-inset-bottom, 0px));
   --la-pluma-tabbar-floating-height: 4rem;
-  --la-pluma-tabbar-floating-offset: 1.25rem;
+  --la-pluma-tabbar-floating-offset: 0.5rem;
+  --la-pluma-tabbar-bottom-clearance: max(
+    var(--la-pluma-tabbar-safe-bottom),
+    var(--la-pluma-tabbar-floating-offset)
+  );
   --la-pluma-tabbar-reserved-height: calc(
-    var(--la-pluma-tabbar-floating-height) + var(--la-pluma-tabbar-floating-offset) +
-      var(--la-pluma-tabbar-safe-bottom)
+    var(--la-pluma-tabbar-floating-height) + var(--la-pluma-tabbar-bottom-clearance)
   );
   --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.16);
   --la-pluma-tabbar-shadow: 0 1rem 2.25rem rgba(60, 60, 67, 0.18);
@@ -457,7 +460,7 @@ body {
   position: absolute !important;
   top: auto !important;
   right: 0;
-  bottom: calc(var(--la-pluma-tabbar-safe-bottom) + var(--la-pluma-tabbar-floating-offset));
+  bottom: var(--la-pluma-tabbar-bottom-clearance);
   left: 0;
   display: flex;
   align-items: stretch;
