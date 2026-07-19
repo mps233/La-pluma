@@ -31,7 +31,7 @@ vi.mock('../components/Layout', () => ({
 }))
 
 vi.mock('../components/PWAInstallPrompt', () => ({ default: () => null }))
-vi.mock('../components/common', () => ({ Loading: () => null }))
+vi.mock('../components/common', () => ({ PageSkeleton: () => null }))
 vi.mock('../components/AutomationTasks', async () => {
   const { useStatusStore: useMockStatusStore } = await import('../store/statusStore')
 
@@ -85,6 +85,7 @@ describe('useBackendStatusMonitor', () => {
     })
     apiMocks.getTaskStatus.mockReset()
     useStatusStore.getState().setBackendStatus('unknown')
+    useStatusStore.getState().setActive(false)
     invalidateBackendStatusProbe()
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -95,6 +96,7 @@ describe('useBackendStatusMonitor', () => {
     await act(async () => root.unmount())
     container.remove()
     useStatusStore.getState().setBackendStatus('unknown')
+    useStatusStore.getState().setActive(false)
     invalidateBackendStatusProbe()
   })
 
@@ -153,6 +155,18 @@ describe('useBackendStatusMonitor', () => {
 
     expect(useStatusStore.getState().backendStatus).toBe('available')
     expect(useStatusStore.getState().backendMessage).toBe('')
+  })
+
+  it('publishes the backend task lifecycle to the global status store', async () => {
+    apiMocks.getTaskStatus
+      .mockResolvedValueOnce({ success: true, data: { isRunning: true } })
+      .mockResolvedValueOnce({ success: true, data: { isRunning: false } })
+
+    await expect(probeBackendAvailability({ showChecking: false })).resolves.toBe(true)
+    expect(useStatusStore.getState().isActive).toBe(true)
+
+    await expect(probeBackendAvailability({ showChecking: false })).resolves.toBe(true)
+    expect(useStatusStore.getState().isActive).toBe(false)
   })
 
   it('keeps a restored non-dashboard page blocked during the global startup probe', async () => {

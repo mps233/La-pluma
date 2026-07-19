@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import type { ReactNode } from 'react'
 
 /**
@@ -10,6 +10,7 @@ export interface PageHeaderProps {
   subtitle?: string
   actions?: ReactNode
   animated?: boolean
+  mobileLayout?: 'stack' | 'inline'
 }
 
 /**
@@ -21,17 +22,20 @@ export default function PageHeader({
   title,
   subtitle,
   actions,
-  animated = true,
+  animated = false,
+  mobileLayout = 'stack',
 }: PageHeaderProps) {
+  const shouldReduceMotion = useReducedMotion()
   const Container = animated ? motion.div : 'div'
   const animationProps = animated ? {
-    initial: { opacity: 0, y: -20 },
+    initial: shouldReduceMotion ? false : { opacity: 0, y: -12 },
     animate: { opacity: 1, y: 0 },
+    transition: { duration: shouldReduceMotion ? 0 : 0.2 },
   } : {}
 
   return (
     <Container 
-      className="app-page-header"
+      className={`app-page-header ${mobileLayout === 'inline' ? 'is-mobile-inline' : ''}`}
       {...animationProps}
     >
       <div className="app-page-heading">

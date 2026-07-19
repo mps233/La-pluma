@@ -1,17 +1,29 @@
-import React, { lazy, Suspense } from 'react'
+import React, { lazy, Suspense, useEffect } from 'react'
+import { MotionConfig } from 'framer-motion'
 import Layout from './components/Layout'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
-import { Loading } from './components/common'
+import { PageSkeleton } from './components/common'
 import { useBackendStatusMonitor } from './hooks/useBackendStatusMonitor'
 
-const Dashboard = lazy(() => import('./components/Dashboard'))
-const AutomationTasks = lazy(() => import('./components/AutomationTasks'))
-const CombatTasks = lazy(() => import('./components/CombatTasks'))
-const RoguelikeTasks = lazy(() => import('./components/RoguelikeTasks'))
-const OperatorTraining = lazy(() => import('./components/OperatorTraining'))
-const LogViewer = lazy(() => import('./components/LogViewer'))
-const DataStatistics = lazy(() => import('./components/DataStatistics'))
-const ConfigManager = lazy(() => import('./components/ConfigManager'))
+const pageLoaders = {
+  dashboard: () => import('./components/Dashboard'),
+  automation: () => import('./components/AutomationTasks'),
+  combat: () => import('./components/CombatTasks'),
+  roguelike: () => import('./components/RoguelikeTasks'),
+  training: () => import('./components/OperatorTraining'),
+  logs: () => import('./components/LogViewer'),
+  statistics: () => import('./components/DataStatistics'),
+  config: () => import('./components/ConfigManager'),
+}
+
+const Dashboard = lazy(pageLoaders.dashboard)
+const AutomationTasks = lazy(pageLoaders.automation)
+const CombatTasks = lazy(pageLoaders.combat)
+const RoguelikeTasks = lazy(pageLoaders.roguelike)
+const OperatorTraining = lazy(pageLoaders.training)
+const LogViewer = lazy(pageLoaders.logs)
+const DataStatistics = lazy(pageLoaders.statistics)
+const ConfigManager = lazy(pageLoaders.config)
 
 class PageErrorBoundary extends React.Component<{ activeKey: string; children: React.ReactNode }, { hasError: boolean; errorMessage: string }> {
   constructor(props: { activeKey: string; children: React.ReactNode }) {
@@ -51,6 +63,24 @@ class PageErrorBoundary extends React.Component<{ activeKey: string; children: R
 function App() {
   useBackendStatusMonitor()
 
+  useEffect(() => {
+    const preloadPages = () => {
+      void Promise.allSettled(Object.values(pageLoaders).map(loadPage => loadPage()))
+    }
+    const idleWindow = window as unknown as {
+      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number
+      cancelIdleCallback?: (handle: number) => void
+    }
+
+    if (typeof idleWindow.requestIdleCallback === 'function') {
+      const idleId = idleWindow.requestIdleCallback(preloadPages, { timeout: 2000 })
+      return () => idleWindow.cancelIdleCallback?.(idleId)
+    }
+
+    const timer = window.setTimeout(preloadPages, 600)
+    return () => window.clearTimeout(timer)
+  }, [])
+
   const renderActivePage = (activeTab: string) => {
     switch (activeTab) {
       case 'automation': return <AutomationTasks />
@@ -66,18 +96,18 @@ function App() {
   }
 
   return (
-    <>
+    <MotionConfig reducedMotion="user">
       <Layout>
         {({ activeTab }) => (
           <PageErrorBoundary activeKey={activeTab}>
-            <Suspense fallback={<div className="p-6"><Loading text="页面加载中..." /></div>}>
+            <Suspense fallback={<PageSkeleton variant={activeTab} />}>
               {renderActivePage(activeTab)}
             </Suspense>
           </PageErrorBoundary>
         )}
       </Layout>
       <PWAInstallPrompt />
-    </>
+    </MotionConfig>
   )
 }
 

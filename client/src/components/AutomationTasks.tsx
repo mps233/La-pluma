@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { maaApi } from '../services/api'
+import { generateTrainingPlan, maaApi } from '../services/api'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { AlertTriangle, Cable, Check, CheckCircle2, ChevronDown, CircleMinus, GripVertical, ListPlus, LoaderCircle, Plus, SlidersHorizontal, Square, Trash2 } from 'lucide-react'
 import Icons from './Icons'
@@ -9,7 +9,6 @@ import { EmptyState, PageHeader, Button } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type {
-  AutomationTasksProps,
   AutomationAvailableTask,
   TaskFlowItem,
   ConnectionTestStatus,
@@ -21,8 +20,69 @@ import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
 const scheduleTimePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/
 const RECOVERY_STATUS_POLL_MS = 1000
 const RECOVERY_STATUS_TIMEOUT_MS = 30 * 60 * 1000
+const POINTER_SORT_ACTIVATION_PX = 10
 
 type RecoveryWaitResult = 'completed' | 'timeout' | 'cancelled'
+
+interface PointerSortSession {
+  pointerId: number
+  startX: number
+  startY: number
+  itemId: string
+  originalFlow: TaskFlowItem[]
+  activated: boolean
+  changed: boolean
+}
+
+interface DeletedTaskSnapshot {
+  task: TaskFlowItem
+  index: number
+}
+
+// Exported for focused ordering tests; this component intentionally keeps the small reducer local.
+// eslint-disable-next-line react-refresh/only-export-components
+export const moveTaskFlowItem = (flow: TaskFlowItem[], fromIndex: number, toIndex: number) => {
+  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= flow.length || toIndex >= flow.length) return flow
+  const nextFlow = [...flow]
+  const [movedTask] = nextFlow.splice(fromIndex, 1)
+  if (!movedTask) return flow
+  nextFlow.splice(toIndex, 0, movedTask)
+  return nextFlow
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export const hasPointerSortActivated = (startX: number, startY: number, clientX: number, clientY: number) =>
+  Math.hypot(clientX - startX, clientY - startY) >= POINTER_SORT_ACTIVATION_PX
+
+// eslint-disable-next-line react-refresh/only-export-components
+export const getPointerSortTargetIndex = (
+  flow: TaskFlowItem[],
+  itemId: string,
+  clientY: number,
+  getItemMidpoint: (taskId: string) => number | null
+) => {
+  const currentIndex = flow.findIndex(task => task.id === itemId)
+  if (currentIndex < 0) return -1
+
+  const remainingTasks = flow.filter(task => task.id !== itemId)
+  let insertionIndex = remainingTasks.length
+  for (let index = 0; index < remainingTasks.length; index += 1) {
+    const task = remainingTasks[index]
+    if (!task) continue
+    const midpoint = getItemMidpoint(task.id)
+    if (midpoint !== null && clientY < midpoint) {
+      insertionIndex = index
+      break
+    }
+  }
+  return insertionIndex
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export const placeClosedownLast = <T extends { id: string; commandId?: string },>(tasks: T[]) => [
+  ...tasks.filter(task => task.commandId !== 'closedown' && !task.id.startsWith('closedown-')),
+  ...tasks.filter(task => task.commandId === 'closedown' || task.id.startsWith('closedown-'))
+]
 
 const normalizeScheduleTimes = (times: string[]) =>
   [...new Set(times.filter(time => scheduleTimePattern.test(time)))]
@@ -181,21 +241,17 @@ const synchronizeConnectionParams = (tasks: any[]) => {
   })
 }
 
-export default function AutomationTasks({}: AutomationTasksProps) {
+export default function AutomationTasks() {
   const shouldReduceMotion = useReducedMotion()
   const { setMessage: setStatusMessage, setActive: setIsActiveStatus } = useStatusStore()
   const { isAvailable: automationAvailable, unavailableMessage } = useAutomationAvailability()
 
   // 辅助函数：显示消息
-  const showSuccess = async (msg: string) => {
+  const showSuccess = (msg: string) => {
     setStatusMessage(msg, 'success')
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setStatusMessage('')
   }
-  const showError = async (msg: string) => {
+  const showError = (msg: string) => {
     setStatusMessage(msg, 'error')
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setStatusMessage('')
   }
   const showInfo = (msg: string) => {
     setStatusMessage(msg, 'info')
@@ -204,12 +260,15 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   const [isRunning, setIsRunning] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
   const [taskFlow, setTaskFlow] = useState<TaskFlowItem[]>([])
+  const taskFlowRef = useRef<TaskFlowItem[]>([])
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [taskPickerOpen, setTaskPickerOpen] = useState(false)
   const [scheduleEnabled, setScheduleEnabled] = useState(false)
   const [scheduleTimes, setScheduleTimes] = useState<string[]>(['08:00', '14:00', '20:00'])
   const [currentStep, setCurrentStep] = useState(-1)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [lastDeletedTask, setLastDeletedTask] = useState<DeletedTaskSnapshot | null>(null)
+  const [sortAnnouncement, setSortAnnouncement] = useState('')
   const [currentActivity, setCurrentActivity] = useState<any>(null)
   const [activityName, setActivityName] = useState<string | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<Record<string, ConnectionTestStatus>>({})
@@ -224,9 +283,15 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   const connectionTestAbortRef = useRef<AbortController | null>(null)
   const connectionTestMountedRef = useRef(true)
   const lastExecutionFingerprintRef = useRef('')
+  const pointerSortRef = useRef<PointerSortSession | null>(null)
+  const sequenceItemRefs = useRef(new Map<string, HTMLDivElement>())
   const activeTaskId = selectedTaskId && taskFlow.some(task => task.id === selectedTaskId)
     ? selectedTaskId
     : taskFlow[0]?.id ?? null
+
+  useEffect(() => {
+    taskFlowRef.current = taskFlow
+  }, [taskFlow])
 
   const applyExecutionSummary = (summary: AutomationExecutionSummary) => {
     const fingerprint = JSON.stringify(summary)
@@ -249,9 +314,11 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   useEffect(() => {
     let intervalId = null
     let isSubscribed = true // 用于防止组件卸载后的状态更新
+    let requestInFlight = false
 
     const checkScheduleStatus = async () => {
-      if (!isSubscribed) return
+      if (!isSubscribed || requestInFlight) return
+      requestInFlight = true
 
       try {
         const result = await maaApi.getScheduleExecutionStatus()
@@ -284,7 +351,6 @@ export default function AutomationTasks({}: AutomationTasksProps) {
           } else {
             const justFinished = scheduleWasRunningRef.current
             scheduleWasRunningRef.current = false
-            setIsActiveStatus(false)
             setIsRunning(false)
             if (status.lastResult) {
               applyExecutionSummary(status.lastResult as AutomationExecutionSummary)
@@ -300,6 +366,8 @@ export default function AutomationTasks({}: AutomationTasksProps) {
         }
       } catch (error) {
         // 静默失败，不影响用户体验
+      } finally {
+        requestInFlight = false
       }
     }
 
@@ -530,11 +598,6 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     },
   ]
 
-  const placeClosedownLast = <T extends { id: string; commandId?: string },>(tasks: T[]) => [
-    ...tasks.filter(task => task.commandId !== 'closedown' && !task.id.startsWith('closedown-')),
-    ...tasks.filter(task => task.commandId === 'closedown' || task.id.startsWith('closedown-'))
-  ]
-
   const addTaskToFlow = (task: AutomationAvailableTask) => {
     const newTask: TaskFlowItem = {
       ...task,
@@ -560,11 +623,28 @@ export default function AutomationTasks({}: AutomationTasksProps) {
   }
 
   const removeTaskFromFlow = (index: number) => {
+    const removedTask = taskFlow[index]
+    if (!removedTask) return
     const newFlow = taskFlow.filter((_, i) => i !== index)
-    if (taskFlow[index]?.id === activeTaskId) {
+    if (removedTask.id === activeTaskId) {
       setSelectedTaskId(newFlow[Math.min(index, newFlow.length - 1)]?.id ?? null)
     }
+    setLastDeletedTask({ task: removedTask, index })
     setTaskFlow(newFlow)
+    taskFlowRef.current = newFlow
+    autoSave(newFlow, scheduleEnabled, scheduleTimes)
+  }
+
+  const restoreDeletedTask = () => {
+    if (!lastDeletedTask || isRunning) return
+    const insertionIndex = Math.min(lastDeletedTask.index, taskFlow.length)
+    const restoredFlow = [...taskFlow]
+    restoredFlow.splice(insertionIndex, 0, lastDeletedTask.task)
+    const newFlow = placeClosedownLast(restoredFlow)
+    setTaskFlow(newFlow)
+    taskFlowRef.current = newFlow
+    setSelectedTaskId(lastDeletedTask.task.id)
+    setLastDeletedTask(null)
     autoSave(newFlow, scheduleEnabled, scheduleTimes)
   }
 
@@ -578,31 +658,116 @@ export default function AutomationTasks({}: AutomationTasksProps) {
     }
   }
 
-  // moveTask 函数已被拖拽功能替代，已移除
-
-  const handleDragStart = (index: number) => {
-    setDraggedIndex(index)
-  }
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault()
-    if (draggedIndex === null || draggedIndex === index) return
-
-    const newFlow = [...taskFlow]
-    const draggedItem = newFlow[draggedIndex]
-    if (!draggedItem) return
-
-    newFlow.splice(draggedIndex, 1)
-    newFlow.splice(index, 0, draggedItem)
-
-    setTaskFlow(newFlow)
-    setDraggedIndex(index)
-  }
-
-  const handleDragEnd = () => {
+  const restorePointerSort = () => {
+    const session = pointerSortRef.current
+    if (!session) return
+    pointerSortRef.current = null
     setDraggedIndex(null)
-    autoSave(taskFlow, scheduleEnabled, scheduleTimes)
+    if (session.changed) {
+      taskFlowRef.current = session.originalFlow
+      setTaskFlow(session.originalFlow)
+      setSortAnnouncement('已取消排序')
+    }
   }
+
+  const handleSortPointerDown = (event: React.PointerEvent<HTMLButtonElement>, taskId: string) => {
+    if (isRunning || event.button !== 0 || pointerSortRef.current) return
+    pointerSortRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      itemId: taskId,
+      originalFlow: [...taskFlowRef.current],
+      activated: false,
+      changed: false
+    }
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      // Capture can fail if the pointer already ended.
+    }
+  }
+
+  const handleSortPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const session = pointerSortRef.current
+    if (!session || session.pointerId !== event.pointerId) return
+
+    if (!session.activated) {
+      if (!hasPointerSortActivated(session.startX, session.startY, event.clientX, event.clientY)) return
+      session.activated = true
+    }
+
+    const currentFlow = taskFlowRef.current
+    const currentIndex = currentFlow.findIndex(task => task.id === session.itemId)
+    if (currentIndex < 0) return
+    setDraggedIndex(currentIndex)
+
+    const targetIndex = getPointerSortTargetIndex(currentFlow, session.itemId, event.clientY, taskId => {
+      const rect = sequenceItemRefs.current.get(taskId)?.getBoundingClientRect()
+      return rect ? rect.top + rect.height / 2 : null
+    })
+    if (targetIndex === currentIndex) return
+
+    const newFlow = moveTaskFlowItem(currentFlow, currentIndex, targetIndex)
+    taskFlowRef.current = newFlow
+    session.changed = true
+    setTaskFlow(newFlow)
+    setDraggedIndex(targetIndex)
+  }
+
+  const handleSortPointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const session = pointerSortRef.current
+    if (!session || session.pointerId !== event.pointerId) return
+    pointerSortRef.current = null
+    setDraggedIndex(null)
+    if (session.activated && session.changed) {
+      const committedFlow = taskFlowRef.current
+      const committedIndex = committedFlow.findIndex(task => task.id === session.itemId)
+      setSortAnnouncement(`${committedFlow[committedIndex]?.name || '任务'}已移动到第 ${committedIndex + 1} 位`)
+      autoSave(committedFlow, scheduleEnabled, scheduleTimes)
+    }
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    } catch {
+      // The browser may have released capture before this handler runs.
+    }
+  }
+
+  const handleSortPointerCancel = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const session = pointerSortRef.current
+    if (!session || session.pointerId !== event.pointerId) return
+    restorePointerSort()
+  }
+
+  const handleSortKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, taskId: string) => {
+    if (isRunning || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
+    event.preventDefault()
+    const currentIndex = taskFlow.findIndex(task => task.id === taskId)
+    const targetIndex = event.key === 'ArrowUp' ? currentIndex - 1 : currentIndex + 1
+    const newFlow = moveTaskFlowItem(taskFlow, currentIndex, targetIndex)
+    if (newFlow === taskFlow) return
+    setTaskFlow(newFlow)
+    taskFlowRef.current = newFlow
+    setSortAnnouncement(`${newFlow[targetIndex]?.name || '任务'}已移动到第 ${targetIndex + 1} 位`)
+    autoSave(newFlow, scheduleEnabled, scheduleTimes)
+  }
+
+  useEffect(() => {
+    const cancelSortOnEscape = (event: KeyboardEvent) => {
+      const session = pointerSortRef.current
+      if (event.key !== 'Escape' || !session) return
+      event.preventDefault()
+      pointerSortRef.current = null
+      setDraggedIndex(null)
+      if (session.changed) {
+        taskFlowRef.current = session.originalFlow
+        setTaskFlow(session.originalFlow)
+        setSortAnnouncement('已取消排序')
+      }
+    }
+    window.addEventListener('keydown', cancelSortOnEscape)
+    return () => window.removeEventListener('keydown', cancelSortOnEscape)
+  }, [])
 
   const updateTaskParam = (index: number, key: string, value: any) => {
     const newFlow = [...taskFlow]
@@ -1612,6 +1777,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                 <span className="automation-flow-summary">
                   {taskFlow.filter(t => t.enabled).length}/{taskFlow.length}
                 </span>
+                <span className="sr-only" aria-live="polite">{sortAnnouncement}</span>
               </div>
 
               {taskFlow.length === 0 ? (
@@ -1632,19 +1798,27 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                       <motion.div
                         key={task.id}
                         layout={!shouldReduceMotion}
-                        onDragOver={(e) => handleDragOver(e, index)}
+                        ref={(node) => {
+                          if (node) sequenceItemRefs.current.set(task.id, node)
+                          else sequenceItemRefs.current.delete(task.id)
+                        }}
                         className={`automation-sequence-item${activeTaskId === task.id ? ' is-selected' : ''}${isCurrentStep ? ' is-current' : ''}${isCompletedStep ? ' is-completed' : ''}${!task.enabled ? ' is-disabled' : ''}${draggedIndex === index ? ' is-dragging' : ''}`}
                       >
-                      <span
-                        draggable={!isRunning}
-                        onDragStart={isRunning ? undefined : () => handleDragStart(index)}
-                        onDragEnd={isRunning ? undefined : handleDragEnd}
-                        className={`automation-sequence-drag${isRunning ? ' is-placeholder' : ''}`}
-                        title={isRunning ? undefined : '拖拽排序'}
-                        aria-hidden={isRunning}
+                      <button
+                        type="button"
+                        onPointerDown={(event) => handleSortPointerDown(event, task.id)}
+                        onPointerMove={handleSortPointerMove}
+                        onPointerUp={handleSortPointerUp}
+                        onPointerCancel={handleSortPointerCancel}
+                        onLostPointerCapture={handleSortPointerCancel}
+                        onKeyDown={(event) => handleSortKeyDown(event, task.id)}
+                        className={`automation-sequence-drag min-h-11 min-w-11 touch-none${isRunning ? ' is-placeholder' : ''}`}
+                        title={isRunning ? '执行期间不能排序' : '拖动排序，或使用上下方向键调整'}
+                        aria-label={`调整${task.name}顺序，当前第 ${index + 1} 位`}
+                        disabled={isRunning}
                       >
-                        {!isRunning && <GripVertical size={16} strokeWidth={1.8} />}
-                      </span>
+                        <GripVertical size={16} strokeWidth={1.8} />
+                      </button>
                       <button
                         type="button"
                         className="automation-sequence-select"
@@ -1657,7 +1831,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                               initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7 }}
                               animate={{ opacity: 1, scale: 1 }}
                               exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7 }}
-                              transition={{ duration: 0.16 }}
+                              transition={{ duration: shouldReduceMotion ? 0 : 0.16 }}
                             >
                               {isCompletedStep
                                 ? <Check size={11} strokeWidth={2.8} />
@@ -1671,7 +1845,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                           <small>{isCurrentStep ? '正在执行' : isCompletedStep ? '已完成' : task.description}</small>
                         </span>
                       </button>
-                      <label className="automation-sequence-enabled" title={task.enabled ? '停用任务' : '启用任务'}>
+                      <label className="automation-sequence-enabled flex min-h-11 min-w-11 items-center justify-center" title={task.enabled ? '停用任务' : '启用任务'}>
                         <input
                           type="checkbox"
                           checked={task.enabled}
@@ -1694,8 +1868,9 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                           type="button"
                           onClick={() => removeTaskFromFlow(index)}
                           disabled={isRunning}
-                          className="automation-sequence-delete"
+                          className="automation-sequence-delete min-h-11 min-w-11"
                           title="删除任务"
+                          aria-label={`删除${task.name}`}
                         >
                           <Trash2 size={14} strokeWidth={1.9} />
                         </button>
@@ -1703,6 +1878,20 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                       </motion.div>
                     )
                   })}
+                </div>
+              )}
+
+              {lastDeletedTask && (
+                <div className="mx-3.5 flex min-h-11 items-center justify-between gap-3 border-t border-[var(--app-border)] text-xs text-secondary sm:mx-4" role="status">
+                  <span className="min-w-0 truncate">已删除“{lastDeletedTask.task.name}”</span>
+                  <button
+                    type="button"
+                    onClick={restoreDeletedTask}
+                    disabled={isRunning}
+                    className="min-h-11 shrink-0 px-2 font-medium text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    恢复
+                  </button>
                 </div>
               )}
 
@@ -1746,7 +1935,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                     loading={isRunning}
                     loadingText="执行中"
                     statusKey={isRunning ? 'running' : 'ready'}
-                    variant="gradient"
+                    variant="primary"
                     className={`automation-run-button w-full justify-center whitespace-nowrap${isRunning ? ' is-running' : ''}`}
                     icon={
                       <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
@@ -1809,15 +1998,16 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                       <ChevronDown
                         size={15}
                         strokeWidth={2}
-                        className={`transition-transform duration-200 ${executionDetailsOpen ? 'rotate-180' : ''}`}
+                        className={`${shouldReduceMotion ? '' : 'transition-transform duration-200'} ${executionDetailsOpen ? 'rotate-180' : ''}`}
                       />
                     </button>
                   </div>
 
                   {executionDetailsOpen && (
                     <motion.div
-                      initial={{ opacity: 0, height: 0 }}
+                      initial={shouldReduceMotion ? false : { opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
+                      transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.18, ease: 'easeOut' }}
                       className="overflow-hidden"
                     >
                       {lastExecutionSummary.summaries.some(summary => summary.stage || summary.drops) && (
@@ -1933,18 +2123,6 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                       <div className="automation-flow-card-header">
                         <div className="automation-flow-card-identity">
                           <span className="automation-flow-sequence">{String(index + 1).padStart(2, '0')}</span>
-                          {!isRunning && (
-                            <span
-                              draggable={true}
-                              onDragStart={() => handleDragStart(index)}
-                              onDragEnd={handleDragEnd}
-                              className="automation-drag-handle"
-                              title="拖拽排序"
-                              aria-label="拖拽排序"
-                            >
-                              <GripVertical size={18} strokeWidth={1.8} />
-                            </span>
-                          )}
                           <span className="automation-flow-task-icon">{task.icon}</span>
                           <span className="automation-flow-task-name">
                             <strong>{task.name}</strong>
@@ -2274,7 +2452,7 @@ export default function AutomationTasks({}: AutomationTasksProps) {
                                             }
 
                                             // 生成刷取计划
-                                            const planResult = await maaApi.generateTrainingPlan('current');
+                                            const planResult = await generateTrainingPlan({ mode: 'current' });
                                             if (!planResult.success || !planResult.data) {
                                               showError('生成刷取计划失败');
                                               return;

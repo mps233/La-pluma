@@ -40,11 +40,23 @@ interface MockDeviceViewProps {
   onInstall?: () => Promise<void> | void
   onToggleServer?: () => Promise<void> | void
   onToggleAgent?: () => Promise<void> | void
+  infrastructureStatus?: { serverRunning?: boolean } | null
+  infrastructureStatusState?: string
+  infrastructureLoading?: string | null
+  infrastructureError?: string | null
 }
 
 vi.mock('./ScrcpyDeviceView', () => ({
   default: (props: MockDeviceViewProps) => (
-    <div data-available={String(props.automationAvailable)} data-message={props.automationUnavailableMessage}>
+    <div
+      data-available={String(props.automationAvailable)}
+      data-message={props.automationUnavailableMessage}
+      data-status-state={props.infrastructureStatusState}
+      data-loading={props.infrastructureLoading || ''}
+      data-error={props.infrastructureError || ''}
+      data-has-status={String(Boolean(props.infrastructureStatus))}
+      data-server-running={String(Boolean(props.infrastructureStatus?.serverRunning))}
+    >
       <button type="button" onClick={() => void props.onStartInfrastructure?.()}>start</button>
       <button type="button" onClick={() => void props.onInstall?.()}>install</button>
       <button type="button" onClick={() => void props.onToggleServer?.()}>server</button>
@@ -134,5 +146,85 @@ describe('ScreenMonitor automation availability guard', () => {
     expect(apiMocks.stopWebrtcAgent).toHaveBeenCalledOnce()
     expect(apiMocks.startWebrtcServer).not.toHaveBeenCalled()
     expect(apiMocks.startWebrtcAgent).not.toHaveBeenCalled()
+  })
+
+  it('reports an explicit error state instead of treating an unknown status as stopped', async () => {
+    availabilityMock.isAvailable = true
+    apiMocks.getWebrtcStatus.mockRejectedValueOnce(new Error('状态读取失败'))
+    await act(async () => root.render(<ScreenMonitor />))
+    await flush()
+
+    const view = container.firstElementChild?.firstElementChild
+    expect(view?.getAttribute('data-status-state')).toBe('error')
+    expect(view?.getAttribute('data-has-status')).toBe('false')
+    expect(view?.getAttribute('data-error')).toBe('状态读取失败')
+  })
+
+  it('serializes service operations so a second action cannot overtake the first', async () => {
+    availabilityMock.isAvailable = true
+    let resolveInstall: ((value: { success: boolean }) => void) | undefined
+    apiMocks.installWebrtc.mockImplementationOnce(() => new Promise(resolve => {
+      resolveInstall = resolve
+    }))
+    await act(async () => root.render(<ScreenMonitor />))
+    await flush()
+
+    await click('install')
+    await click('server')
+
+    expect(apiMocks.installWebrtc).toHaveBeenCalledOnce()
+    expect(apiMocks.startWebrtcServer).not.toHaveBeenCalled()
+
+    await act(async () => resolveInstall?.({ success: true }))
+    await flush()
+    await click('server')
+    await flush()
+
+    expect(apiMocks.startWebrtcServer).toHaveBeenCalledOnce()
+  })
+
+  it('does not start preview while another infrastructure action is pending', async () => {
+    availabilityMock.isAvailable = true
+    let resolveAgent: ((value: { success: boolean }) => void) | undefined
+    apiMocks.startWebrtcAgent.mockImplementationOnce(() => new Promise(resolve => {
+      resolveAgent = resolve
+    }))
+    apiMocks.getWebrtcStatus.mockResolvedValue({
+      success: true,
+      data: { installed: true, built: true, serverRunning: true, agentRunning: false },
+    })
+    await act(async () => root.render(<ScreenMonitor />))
+    await flush()
+
+    await click('agent')
+    await click('start')
+
+    expect(apiMocks.startWebrtcAgent).toHaveBeenCalledOnce()
+    expect(apiMocks.startWebrtc).not.toHaveBeenCalled()
+
+    await act(async () => resolveAgent?.({ success: true }))
+    await flush()
+  })
+
+  it('ignores an initial status response that resolves after preview startup', async () => {
+    availabilityMock.isAvailable = true
+    let resolveInitial: ((value: { success: boolean; data: { serverRunning: boolean } }) => void) | undefined
+    apiMocks.getWebrtcStatus.mockImplementationOnce(() => new Promise(resolve => {
+      resolveInitial = resolve
+    }))
+    apiMocks.startWebrtc.mockResolvedValueOnce({
+      success: true,
+      data: { signalingUrl: '/webrtc-signaling', serverRunning: true, agentRunning: true },
+    })
+
+    await act(async () => root.render(<ScreenMonitor />))
+    await click('start')
+    await flush()
+    expect(container.firstElementChild?.firstElementChild?.getAttribute('data-server-running')).toBe('true')
+
+    await act(async () => resolveInitial?.({ success: true, data: { serverRunning: false } }))
+    await flush()
+
+    expect(container.firstElementChild?.firstElementChild?.getAttribute('data-server-running')).toBe('true')
   })
 })

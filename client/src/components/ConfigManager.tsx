@@ -4,17 +4,13 @@ import { motion } from 'framer-motion'
 import Icons from './Icons'
 import { PageHeader, Card, CardHeader, CardContent, Button, Input, Select, Checkbox } from './common'
 import { useStatusStore } from '../store/statusStore'
-import SklandConfig from './SklandConfig'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type {
-  ConfigManagerProps,
   MaaConnectionConfig,
   AutoUpdateConfig,
   ConfigSection,
   UpdateStatus
 } from '@/types/components'
-
-const CHANGELOGS_ENABLED: boolean = false
 
 interface MaaVersionInfo {
   cli: string
@@ -33,15 +29,6 @@ interface UpdateFeedback {
   type: 'success' | 'error'
   message: string
   resourceRetry?: boolean
-}
-
-interface ChangelogItem {
-  version: string
-  name: string
-  body: string
-  publishedAt: string
-  htmlUrl: string
-  prerelease: boolean
 }
 
 interface DiscoveredDevice {
@@ -64,12 +51,12 @@ interface ConnectionFeedback {
   message: string
 }
 
-export default function ConfigManager({}: ConfigManagerProps) {
+export default function ConfigManager() {
   const { setMessage: setStatusMessage } = useStatusStore()
-  const [configType, setConfigType] = useState<'connection' | 'resource' | 'instance' | 'skland'>(() => {
+  const [configType, setConfigType] = useState<'connection' | 'resource' | 'instance'>(() => {
     const saved = localStorage.getItem('laPlumaConfigSection')
-    return ['connection', 'resource', 'instance', 'skland'].includes(saved || '')
-      ? saved as 'connection' | 'resource' | 'instance' | 'skland'
+    return ['connection', 'resource', 'instance'].includes(saved || '')
+      ? saved as 'connection' | 'resource' | 'instance'
       : 'connection'
   })
   const [configData, setConfigData] = useState<MaaConnectionConfig>({
@@ -89,11 +76,6 @@ export default function ConfigManager({}: ConfigManagerProps) {
     updateCli: true
   })
   const [versionInfo, setVersionInfo] = useState<MaaVersionInfo | null>(null)
-  const [coreChangelog, setCoreChangelog] = useState<ChangelogItem[]>([])
-  const [cliChangelog, setCliChangelog] = useState<ChangelogItem[]>([])
-  const [showCoreChangelogType, setShowCoreChangelogType] = useState<'stable' | 'beta'>('stable')
-  const [showCoreChangelog, setShowCoreChangelog] = useState(false)
-  const [showCliChangelog, setShowCliChangelog] = useState(false)
   const [updateFeedback, setUpdateFeedback] = useState<UpdateFeedback | null>(null)
   const [discoveredDevices, setDiscoveredDevices] = useState<DiscoveredDevice[]>([])
   const [discoveryMessage, setDiscoveryMessage] = useState<string | null>(null)
@@ -112,8 +94,6 @@ export default function ConfigManager({}: ConfigManagerProps) {
       loadConfig(),
       loadAutoUpdateConfig(),
       loadVersion(),
-      loadCoreChangelog(),
-      loadCliChangelog(),
     ])
   }, [])
 
@@ -121,22 +101,14 @@ export default function ConfigManager({}: ConfigManagerProps) {
   useEffect(() => {
     const handleSectionChange = (event: Event) => {
       const section = (event as CustomEvent).detail
-      if (['connection', 'resource', 'instance', 'skland'].includes(section)) {
-        handleConfigTypeChange(section as 'connection' | 'resource' | 'instance' | 'skland')
+      if (['connection', 'resource', 'instance'].includes(section)) {
+        handleConfigTypeChange(section as 'connection' | 'resource' | 'instance')
       }
     }
 
     window.addEventListener('la-pluma-config-section', handleSectionChange)
     return () => window.removeEventListener('la-pluma-config-section', handleSectionChange)
   }, [])
-
-  // 当版本信息加载后，根据当前版本设置默认显示的日志类型
-  useEffect(() => {
-    if (versionInfo) {
-      const isBeta = versionInfo.core.includes('beta') || versionInfo.core.includes('alpha')
-      setShowCoreChangelogType(isBeta ? 'beta' : 'stable')
-    }
-  }, [versionInfo])
 
   const loadVersion = async () => {
     try {
@@ -197,17 +169,11 @@ export default function ConfigManager({}: ConfigManagerProps) {
 
       if (result.success) {
         setStatusMessage(config.enabled ? `自动更新已启用，每天 ${config.time} 执行` : '自动更新已禁用')
-        await new Promise(resolve => setTimeout(resolve, 1500))
-        setStatusMessage('')
       } else {
         setStatusMessage(`设置失败: ${result.message}`)
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        setStatusMessage('')
       }
     } catch (error) {
       setStatusMessage(`设置失败: ${(error as Error).message}`)
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStatusMessage('')
     }
   }
 
@@ -253,23 +219,17 @@ export default function ConfigManager({}: ConfigManagerProps) {
 
       if (result.success) {
         setStatusMessage('配置保存成功')
-        await new Promise(resolve => setTimeout(resolve, 1500))
-        setStatusMessage('')
       } else {
         setStatusMessage(`保存失败: ${maaApi.getErrorMessage(result)}`)
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        setStatusMessage('')
       }
     } catch (error) {
       setStatusMessage(`网络错误: ${(error as Error).message}`)
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStatusMessage('')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleReset = async () => {
+  const handleReset = () => {
     setConfigData({
       adb_path: '/opt/homebrew/bin/adb',
       address: '127.0.0.1:16384',
@@ -277,8 +237,6 @@ export default function ConfigManager({}: ConfigManagerProps) {
       auto_reconnect: true,
     })
     setStatusMessage('已重置为默认值')
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setStatusMessage('')
   }
 
   const handleDiscoverDevices = async () => {
@@ -339,7 +297,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
     }
   }
 
-  const handleConfigTypeChange = (section: 'connection' | 'resource' | 'instance' | 'skland') => {
+  const handleConfigTypeChange = (section: 'connection' | 'resource' | 'instance') => {
     localStorage.setItem('laPlumaConfigSection', section)
     setConfigType(section)
   }
@@ -351,8 +309,6 @@ export default function ConfigManager({}: ConfigManagerProps) {
     } catch (error) {
       setStatusMessage(`打开失败: ${(error as Error).message}`)
     }
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setStatusMessage('')
   }
 
   const handleUpdateCore = async () => {
@@ -369,11 +325,8 @@ export default function ConfigManager({}: ConfigManagerProps) {
         const message = result.message || 'MaaCore 和资源已更新'
         setUpdateFeedback({ type: 'success', message })
         setStatusMessage(message)
-        await new Promise(resolve => setTimeout(resolve, 1500))
-        setStatusMessage('')
-        // 更新成功后重新加载版本信息和更新日志
+        // 更新成功后重新加载版本信息
         await loadVersion()
-        await loadCoreChangelog()
       } else {
         const details = (result as any).error?.details || result.errorInfo?.details || {}
         const message = maaApi.getErrorMessage(result)
@@ -383,15 +336,11 @@ export default function ConfigManager({}: ConfigManagerProps) {
           resourceRetry: details.failedStep === 'resources' || details.coreUpdated === true
         })
         setStatusMessage(message, 'error')
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        setStatusMessage('')
       }
     } catch (error) {
       const message = `网络错误: ${(error as Error).message}`
       setUpdateFeedback({ type: 'error', message })
       setStatusMessage(message, 'error')
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStatusMessage('')
     } finally {
       setUpdating(current => ({ ...current, core: false }))
     }
@@ -406,43 +355,15 @@ export default function ConfigManager({}: ConfigManagerProps) {
 
       if (result.success) {
         setStatusMessage('MAA CLI 更新成功')
-        await new Promise(resolve => setTimeout(resolve, 1500))
-        setStatusMessage('')
         // 更新成功后重新加载版本信息
         await loadVersion()
       } else {
         setStatusMessage(`更新失败: ${maaApi.getErrorMessage(result)}`)
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        setStatusMessage('')
       }
     } catch (error) {
       setStatusMessage(`网络错误: ${(error as Error).message}`)
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStatusMessage('')
     } finally {
       setUpdating({ ...updating, cli: false })
-    }
-  }
-
-  const loadCoreChangelog = async () => {
-    try {
-      const result = await maaApi.getMaaCoreChangelog()
-      if (result.success && result.data) {
-        setCoreChangelog(result.data)
-      }
-    } catch (error) {
-      console.error('加载 MaaCore 更新日志失败:', error)
-    }
-  }
-
-  const loadCliChangelog = async () => {
-    try {
-      const result = await maaApi.getMaaCliChangelog()
-      if (result.success && result.data) {
-        setCliChangelog(result.data)
-      }
-    } catch (error) {
-      console.error('加载 MAA CLI 更新日志失败:', error)
     }
   }
 
@@ -465,11 +386,8 @@ export default function ConfigManager({}: ConfigManagerProps) {
         const message = `已切换到 ${targetChannel} 渠道并同步最新资源`
         setUpdateFeedback({ type: 'success', message })
         setStatusMessage(message)
-        await new Promise(resolve => setTimeout(resolve, 1500))
-        setStatusMessage('')
-        // 更新成功后重新加载版本信息和更新日志
+        // 更新成功后重新加载版本信息
         await loadVersion()
-        await loadCoreChangelog()
       } else {
         const details = (result as any).error?.details || result.errorInfo?.details || {}
         const message = maaApi.getErrorMessage(result)
@@ -479,15 +397,11 @@ export default function ConfigManager({}: ConfigManagerProps) {
           resourceRetry: details.failedStep === 'resources' || details.coreUpdated === true
         })
         setStatusMessage(message, 'error')
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        setStatusMessage('')
       }
     } catch (error) {
       const message = `网络错误: ${(error as Error).message}`
       setUpdateFeedback({ type: 'error', message })
       setStatusMessage(message, 'error')
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStatusMessage('')
     } finally {
       setUpdating(current => ({ ...current, core: false }))
     }
@@ -505,22 +419,16 @@ export default function ConfigManager({}: ConfigManagerProps) {
         const message = result.message || '资源文件更新成功'
         setUpdateFeedback({ type: 'success', message })
         setStatusMessage(message)
-        await new Promise(resolve => setTimeout(resolve, 1500))
-        setStatusMessage('')
         await loadVersion()
       } else {
         const message = maaApi.getErrorMessage(result)
         setUpdateFeedback({ type: 'error', message, resourceRetry: true })
         setStatusMessage(message, 'error')
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        setStatusMessage('')
       }
     } catch (error) {
       const message = `网络错误: ${(error as Error).message}`
       setUpdateFeedback({ type: 'error', message, resourceRetry: true })
       setStatusMessage(message, 'error')
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStatusMessage('')
     } finally {
       setHotUpdating(false)
     }
@@ -530,7 +438,6 @@ export default function ConfigManager({}: ConfigManagerProps) {
     { id: 'connection', name: '连接配置', icon: <Icons.Monitor /> },
     { id: 'resource', name: '资源配置', icon: <Icons.Package /> },
     { id: 'instance', name: '实例选项', icon: <Icons.Lightning /> },
-    { id: 'skland', name: '森空岛', icon: <Icons.Users /> },
   ] satisfies ConfigSection[]
 
   return (
@@ -626,7 +533,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                       <Button
                         onClick={handleHotUpdate}
                         disabled={hotUpdating || updating.core}
-                        variant="gradient"
+                        variant="primary"
                         fullWidth
                         icon={hotUpdating ? (
                           <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -701,7 +608,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                   <Button
                     onClick={handleUpdateCore}
                     disabled={updating.core || hotUpdating}
-                    variant="gradient"
+                    variant="primary"
                     className="w-full"
                     icon={updating.core ? (
                       <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -755,92 +662,6 @@ export default function ConfigManager({}: ConfigManagerProps) {
                   </div>
                 )}
                 
-                {/* 更新日志 */}
-                {CHANGELOGS_ENABLED && coreChangelog.length > 0 && (
-                  <div className="mt-4">
-                    <button
-                      onClick={() => setShowCoreChangelog(!showCoreChangelog)}
-                      className="w-full rounded-xl control-surface px-3 py-2 text-left text-xs text-secondary hover:text-[var(--app-accent)]"
-                    >
-                      {showCoreChangelog ? '收起 MaaCore 更新日志' : `查看 MaaCore 更新日志（${coreChangelog[0]?.version || '最新'}）`}
-                    </button>
-                    {showCoreChangelog && (
-                      <div className="mt-3">
-                    {coreChangelog
-                      .filter(changelog => {
-                        const isBeta = changelog.prerelease || changelog.version.includes('beta') || changelog.version.includes('alpha')
-                        return showCoreChangelogType === 'beta' ? isBeta : !isBeta
-                      })
-                      .slice(0, 1)
-                      .map((changelog) => (
-                        <div key={changelog.version} className="p-4 bg-white dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-white/5">
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <h4 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                {changelog.version}
-                                {changelog.prerelease && (
-                                  <span className="px-2 py-0.5 text-xs status-warning rounded">
-                                    预发布
-                                  </span>
-                                )}
-                                <span className="px-2 py-0.5 text-xs brand-chip rounded">
-                                  最新
-                                </span>
-                              </h4>
-                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                {new Date(changelog.publishedAt).toLocaleDateString('zh-CN', { 
-                                  year: 'numeric', 
-                                  month: 'long', 
-                                  day: 'numeric' 
-                                })}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {/* 切换按钮 */}
-                              <div className="inline-flex rounded-2xl bg-gray-300 dark:bg-gray-800 p-1">
-                                <button
-                                  onClick={() => setShowCoreChangelogType('stable')}
-                                  className={`px-2.5 py-1 text-xs font-medium rounded-xl transition-colors ${
-                                    showCoreChangelogType === 'stable'
-                                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                                      : 'text-gray-700 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                                  }`}
-                                >
-                                  正式版
-                                </button>
-                                <button
-                                  onClick={() => setShowCoreChangelogType('beta')}
-                                  className={`px-2.5 py-1 text-xs font-medium rounded-xl transition-colors ${
-                                    showCoreChangelogType === 'beta'
-                                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                                      : 'text-gray-700 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                                  }`}
-                                >
-                                  Beta
-                                </button>
-                              </div>
-                              <a
-                                href={changelog.htmlUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs brand-text hover:underline flex items-center gap-1"
-                              >
-                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                                  <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                                </svg>
-                                GitHub
-                              </a>
-                            </div>
-                          </div>
-                          <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap max-h-96 overflow-y-auto">
-                            {changelog.body || '无更新说明'}
-                          </div>
-                        </div>
-                      ))}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* 更新 MAA CLI */}
@@ -866,7 +687,7 @@ export default function ConfigManager({}: ConfigManagerProps) {
                 <Button
                   onClick={handleUpdateCli}
                   disabled={updating.cli}
-                  variant="gradient"
+                  variant="primary"
                   fullWidth
                   icon={updating.cli ? (
                     <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -878,58 +699,6 @@ export default function ConfigManager({}: ConfigManagerProps) {
                   {updating.cli ? '更新中...' : '更新 MAA CLI'}
                 </Button>
                 
-                {/* 更新日志 */}
-                {CHANGELOGS_ENABLED && cliChangelog.length > 0 && (
-                  <div className="mt-4">
-                    <button
-                      onClick={() => setShowCliChangelog(!showCliChangelog)}
-                      className="w-full rounded-xl control-surface px-3 py-2 text-left text-xs text-secondary hover:text-[var(--app-accent)]"
-                    >
-                      {showCliChangelog ? '收起 MAA CLI 更新日志' : `查看 MAA CLI 更新日志（${cliChangelog[0]?.version || '最新'}）`}
-                    </button>
-                    {showCliChangelog && (
-                      <div className="mt-3 space-y-3 max-h-96 overflow-y-auto">
-                        {cliChangelog.map((changelog, index) => (
-                      <div key={changelog.version} className="p-4 bg-white dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-white/5">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                              {changelog.version}
-                              {index === 0 && (
-                                <span className="px-2 py-0.5 text-xs brand-chip rounded">
-                                  最新
-                                </span>
-                              )}
-                            </h4>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                              {new Date(changelog.publishedAt).toLocaleDateString('zh-CN', { 
-                                year: 'numeric', 
-                                month: 'long', 
-                                day: 'numeric' 
-                              })}
-                            </p>
-                          </div>
-                          <a
-                            href={changelog.htmlUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs brand-text hover:underline flex items-center gap-1"
-                          >
-                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                            </svg>
-                            GitHub
-                          </a>
-                        </div>
-                        <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap max-h-96 overflow-y-auto">
-                          {changelog.body || '无更新说明'}
-                        </div>
-                      </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
           </CardContent>
@@ -1175,7 +944,6 @@ export default function ConfigManager({}: ConfigManagerProps) {
                     </div>
                   </div>
                 )}
-                {configType === 'skland' && <SklandConfig />}
               </CardContent>
             </Card>
           </div>

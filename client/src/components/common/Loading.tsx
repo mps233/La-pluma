@@ -6,7 +6,6 @@ import { useDashboardFlowLayout } from '../../hooks/useDashboardFlowLayout'
  */
 export interface LoadingProps {
   size?: 'sm' | 'md' | 'lg'
-  color?: 'violet' | 'emerald' | 'cyan' | 'orange' | 'fuchsia'
   text?: string
 }
 
@@ -24,7 +23,6 @@ interface SkeletonProps {
  */
 export default function Loading({
   size = 'md',
-  color = 'violet',
   text,
 }: LoadingProps) {
   const sizeStyles: Record<string, string> = {
@@ -33,20 +31,18 @@ export default function Loading({
     lg: 'w-12 h-12',
   }
   
-  const colorStyles: Record<string, string> = {
-    violet: 'brand-text',
-    emerald: 'brand-text',
-    cyan: 'brand-text',
-    orange: 'brand-text',
-    fuchsia: 'brand-text',
-  }
-  
   return (
-    <div className="flex flex-col items-center justify-center space-y-3">
+    <div
+      className="flex flex-col items-center justify-center space-y-3"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
       <svg
-        className={`${sizeStyles[size]} ${colorStyles[color]} animate-spin`}
+        className={`${sizeStyles[size]} brand-text app-spinner`}
         fill="none"
         viewBox="0 0 24 24"
+        aria-hidden="true"
       >
         <circle
           className="opacity-25"
@@ -68,6 +64,7 @@ export default function Loading({
           {text}
         </p>
       )}
+      {!text && <span className="sr-only">加载中</span>}
     </div>
   )
 }
@@ -85,13 +82,192 @@ function Skeleton({ className = '', variant = 'text', style }: SkeletonProps) {
 
   return (
     <div
-      className={`surface-soft relative overflow-hidden ${variantStyles[variant]} ${className}`}
+      className={`app-skeleton surface-soft relative overflow-hidden ${variantStyles[variant]} ${className}`}
       style={style}
     >
-      {/* Shimmer effect */}
       <div
-        className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent"
+        className="app-skeleton-shimmer absolute inset-y-0 left-0 w-[55%]"
+        aria-hidden="true"
       />
+    </div>
+  )
+}
+
+function PageHeaderSkeleton() {
+  return (
+    <div className="flex min-h-12 items-center justify-between gap-4" aria-hidden="true">
+      <div className="flex min-w-0 items-center gap-3">
+        <Skeleton variant="rect" className="h-11 w-11 shrink-0 rounded-xl" />
+        <div className="min-w-0 space-y-2">
+          <Skeleton variant="title" className="h-6 w-28" />
+          <Skeleton variant="text" className="h-3 w-56 max-w-[58vw]" />
+        </div>
+      </div>
+      <Skeleton variant="rect" className="h-9 w-24 shrink-0 rounded-xl" />
+    </div>
+  )
+}
+
+function PanelSkeleton({
+  className = '',
+  rows = 4,
+}: {
+  className?: string
+  rows?: number
+}) {
+  return (
+    <div className={`surface-panel min-w-0 overflow-hidden rounded-xl ${className}`} aria-hidden="true">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <Skeleton variant="rect" className="h-8 w-8 rounded-lg" />
+          <div className="space-y-1.5">
+            <Skeleton variant="text" className="h-4 w-24" />
+            <Skeleton variant="text" className="h-2.5 w-32" />
+          </div>
+        </div>
+        <Skeleton variant="rect" className="h-8 w-16 rounded-lg" />
+      </div>
+      <div className="space-y-3 p-4">
+        {Array.from({ length: rows }, (_, index) => (
+          <div key={index} className="surface-soft flex min-h-14 items-center gap-3 rounded-lg px-3 py-2.5">
+            <Skeleton variant="rect" className="h-8 w-8 shrink-0 rounded-lg" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton variant="text" className="h-3" style={{ width: `${48 + (index % 3) * 12}%` }} />
+              <Skeleton variant="text" className="h-2.5" style={{ width: `${68 + (index % 2) * 14}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function WorkbenchSkeleton({ variant }: { variant: 'combat' | 'roguelike' }) {
+  return (
+    <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
+      <div className="surface-panel min-w-0 overflow-hidden rounded-xl" aria-hidden="true">
+        <div className="flex gap-2 border-b border-[var(--app-border)] p-3">
+          {[1, 2, 3].slice(0, variant === 'roguelike' ? 2 : 3).map(item => (
+            <Skeleton key={item} variant="rect" className="h-9 flex-1 rounded-lg" />
+          ))}
+        </div>
+        <div className="space-y-4 p-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Skeleton variant="rect" className="h-10 rounded-lg" />
+            <Skeleton variant="rect" className="h-10 rounded-lg" />
+          </div>
+          <Skeleton variant="rect" className="h-28 rounded-lg" />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Skeleton variant="rect" className="h-20 rounded-lg" />
+            <Skeleton variant="rect" className="h-20 rounded-lg" />
+          </div>
+          <Skeleton variant="rect" className="h-10 w-32 rounded-lg" />
+        </div>
+      </div>
+      <div className="surface-panel min-w-0 overflow-hidden rounded-xl" aria-hidden="true">
+        <div className="flex items-center justify-between border-b border-[var(--app-border)] px-4 py-3">
+          <Skeleton variant="text" className="h-4 w-28" />
+          <Skeleton variant="rect" className="h-8 w-20 rounded-lg" />
+        </div>
+        <div className="p-3">
+          <Skeleton variant="rect" className="aspect-video w-full rounded-lg" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Lazy route skeletons keep each workspace close to its final proportions.
+ */
+export function PageSkeleton({ variant }: { variant: string }) {
+  if (variant === 'dashboard') return <DashboardSkeleton />
+
+  return (
+    <div className="app-page" aria-busy="true" aria-label="页面内容加载中">
+      <div className="app-stack-section">
+        <PageHeaderSkeleton />
+
+        {variant === 'automation' && (
+          <>
+            <div className="automation-overview-grid">
+              <div className="automation-monitor-column">
+                <div className="automation-monitor-panel surface-panel p-[var(--app-space-panel)]" aria-hidden="true">
+                  <div className="flex items-center justify-between gap-3">
+                    <Skeleton variant="text" className="h-4 w-32" />
+                    <div className="flex gap-2">
+                      <Skeleton variant="rect" className="h-6 w-16 rounded-lg" />
+                      <Skeleton variant="rect" className="h-6 w-16 rounded-lg" />
+                    </div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-8">
+                    {Array.from({ length: 8 }, (_, index) => (
+                      <Skeleton key={index} variant="rect" className="h-12 rounded-lg" />
+                    ))}
+                  </div>
+                  <Skeleton variant="rect" className="mt-3 aspect-video w-full rounded-lg" />
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {[1, 2, 3, 4].map(item => <Skeleton key={item} variant="rect" className="h-9 rounded-lg" />)}
+                  </div>
+                </div>
+              </div>
+              <div className="automation-schedule-column">
+                <PanelSkeleton className="automation-schedule-panel" rows={3} />
+              </div>
+            </div>
+            <div className="automation-builder-grid">
+              <div className="automation-sequence-column"><PanelSkeleton className="automation-sequence-panel" rows={5} /></div>
+              <div className="automation-editor-column"><PanelSkeleton className="automation-editor-panel" rows={4} /></div>
+            </div>
+          </>
+        )}
+
+        {(variant === 'combat' || variant === 'roguelike') && <WorkbenchSkeleton variant={variant} />}
+
+        {variant === 'training' && (
+          <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(18rem,0.75fr)]">
+            <div className="min-w-0 space-y-4">
+              <div className="grid grid-cols-3 gap-2" aria-hidden="true">
+                {[1, 2, 3].map(item => <Skeleton key={item} variant="rect" className="h-16 rounded-xl" />)}
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2" aria-hidden="true">
+                {[1, 2, 3, 4].map(item => <Skeleton key={item} variant="rect" className="h-28 rounded-xl" />)}
+              </div>
+            </div>
+            <PanelSkeleton rows={4} />
+          </div>
+        )}
+
+        {variant === 'logs' && (
+          <div className="surface-panel min-w-0 overflow-hidden rounded-xl" aria-hidden="true">
+            <div className="flex flex-wrap items-center gap-2 border-b border-[var(--app-border)] p-3">
+              <Skeleton variant="rect" className="h-9 w-32 rounded-lg" />
+              <Skeleton variant="rect" className="h-9 w-24 rounded-lg" />
+              <Skeleton variant="rect" className="ml-auto h-9 w-20 rounded-lg" />
+            </div>
+            <div className="space-y-3 p-4 sm:p-5">
+              {Array.from({ length: 12 }, (_, index) => (
+                <div key={index} className="flex min-w-0 items-center gap-3">
+                  <Skeleton variant="text" className="h-3 w-16 shrink-0" />
+                  <Skeleton variant="text" className="h-3 min-w-0" style={{ width: `${52 + (index % 4) * 10}%` }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(variant === 'statistics' || variant === 'config') && (
+          <div className="space-y-4">
+            <div className="flex gap-2" aria-hidden="true">
+              {[1, 2, 3].map(item => <Skeleton key={item} variant="rect" className="h-9 w-24 rounded-lg" />)}
+            </div>
+            <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+              <PanelSkeleton rows={4} />
+              <PanelSkeleton rows={4} />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

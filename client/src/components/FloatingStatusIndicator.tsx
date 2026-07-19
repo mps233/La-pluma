@@ -1,4 +1,5 @@
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { X } from 'lucide-react'
 import { API_BASE_URL, fetchWithAuth, parseJsonResponse } from '../services/api'
 import { useStatusStore } from '../store/statusStore'
 import { detectStatusMessageType, getStatusVisualConfig } from '../utils/statusMessage'
@@ -37,14 +38,12 @@ const getFallbackReadyQuote = () =>
  * 其他状态在原位置可见时显示在原位置，不可见时悬浮到右上角
  */
 export default function FloatingStatusIndicator({ className = '', textClassName = '' }: FloatingStatusIndicatorProps) {
-  const { message, messageType, isActive, backendStatus, backendMessage } = useStatusStore()
+  const { message, messageType, isActive, backendStatus, backendMessage, clearMessage } = useStatusStore()
   const isOnline = useOnlineStatus()
   const shouldReduceMotion = useReducedMotion()
   const [shouldFloat, setShouldFloat] = useState(false)
   const [dailyQuote, setDailyQuote] = useState<OperatorQuote>(() => getFallbackReadyQuote())
-  const [isTextOverflowing, setIsTextOverflowing] = useState(false)
   const sentinelRef = useRef<HTMLDivElement>(null)
-  const textRef = useRef<HTMLDivElement>(null)
 
   // 从 API 获取随机台词
   useEffect(() => {
@@ -116,36 +115,14 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
       : messageType ?? (message ? detectStatusMessageType(message) : (isActive ? 'info' : 'default'))
   const config = getStatusVisualConfig(detectedType)
 
-  // 使用 key 强制重新渲染以触发动画
-  const indicatorKey = `${displayText}-${detectedType}`
-
-  useEffect(() => {
-    const textElement = textRef.current
-    if (!textElement) return
-
-    const updateOverflow = () => {
-      setIsTextOverflowing(textElement.scrollWidth > textElement.clientWidth + 1)
-    }
-
-    updateOverflow()
-    const observer = new ResizeObserver(updateOverflow)
-    observer.observe(textElement)
-
-    return () => observer.disconnect()
-  }, [displayText, shouldFloat])
+  const canDismiss = Boolean(message) && !connectionMessage
 
   const indicatorContent = (
-    <motion.div
-      key={indicatorKey}
-      initial={shouldReduceMotion ? false : { opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 10 }}
-      transition={{ duration: shouldReduceMotion ? 0 : 0.2 }}
-      aria-hidden="true"
-      className={`inline-flex max-w-full items-center space-x-2 rounded-xl px-3 py-1.5 text-xs font-medium sm:px-4 sm:py-2 sm:text-sm ${config.className} ${className}`}
+    <div
+      className={`inline-flex max-w-full items-start gap-2 rounded-xl px-3 py-1.5 text-xs font-medium sm:px-4 sm:py-2 sm:text-sm ${config.className} ${className}`}
     >
       <motion.div
-        className="h-2 w-2 flex-shrink-0 rounded-full"
+        className="mt-1 h-2 w-2 flex-shrink-0 rounded-full sm:mt-1.5"
         style={{ backgroundColor: config.dotColor }}
         animate={shouldReduceMotion ? { boxShadow: 'none' } : {
           boxShadow: [
@@ -157,12 +134,7 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
         transition={shouldReduceMotion ? { duration: 0 } : { duration: 2, repeat: Infinity, ease: "easeOut" }}
       />
       <div
-        ref={textRef}
-        className={`min-w-0 flex-1 overflow-hidden whitespace-nowrap ${textClassName}`}
-        style={isTextOverflowing ? {
-          WebkitMaskImage: 'linear-gradient(90deg, #000 calc(100% - 16px), transparent)',
-          maskImage: 'linear-gradient(90deg, #000 calc(100% - 16px), transparent)'
-        } : undefined}
+        className={`min-w-0 flex-1 break-words whitespace-normal leading-5 ${textClassName}`}
       >
         {isReady ? (
           <>
@@ -173,7 +145,18 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
           displayText
         )}
       </div>
-    </motion.div>
+      {canDismiss && (
+        <button
+          type="button"
+          onClick={() => clearMessage()}
+          className="floating-status-dismiss -mr-1 inline-flex shrink-0 items-center justify-center rounded-lg opacity-70 transition-colors hover:bg-black/5 hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 dark:hover:bg-white/10"
+          title="关闭状态提示"
+          aria-label="关闭状态提示"
+        >
+          <X className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      )}
+    </div>
   )
 
   return (
@@ -185,9 +168,7 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
       {/* 哨兵元素 - 始终存在用于检测位置 */}
       <div ref={sentinelRef} className="inline-block min-w-[1px] min-h-[1px]">
         {/* "就绪"状态始终显示，其他状态只在不需要悬浮时显示 */}
-        <AnimatePresence mode="wait">
-          {(isReady || !shouldFloat) && indicatorContent}
-        </AnimatePresence>
+        {(isReady || !shouldFloat) && indicatorContent}
       </div>
 
       {/* 当有消息且原位置滚出视口时，悬浮显示在右上角 */}

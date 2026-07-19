@@ -13,14 +13,13 @@
 
 ## ✨ 特性
 
-- 🧭 **控制台总览** - 汇总今日活动、森空岛数据、任务状态、实时预览和掉落信息
+- 🧭 **控制台总览** - 汇总今日活动、任务状态、实时预览和掉落信息
 - 🎮 **自动化任务流程** - 启动游戏、理智作战、基建换班、自动公招、信用收支、领取奖励、关闭游戏
 - 🎯 **多关卡支持** - 每个关卡独立设置次数，支持活动关卡代号自动替换（HD-X → OR-X）
 - 🧠 **智能检测** - 日常/芯片本开放日检测、理智耗尽自动停止、游戏状态监控
 - ⏰ **定时任务** - 支持多个定时任务，实时显示执行状态和进度
 - 🖥️ **模拟器预览** - 集成 ScrcpyOverWebRTC，支持网页内查看和基础设备控制
 - 📊 **数据与养成** - 识别仓库和干员 Box，统计掉落，生成干员养成材料计划
-- 🏝️ **森空岛集成** - 登录森空岛并读取博士、基建、干员和资源数据
 - 📱 **Telegram 通知** - 任务完成后发送通知，包含截图和详细总结
 - 🤖 **Bot 远程控制** - 通过 Telegram Bot 远程执行任务
 - 🤖 **Agent API** - 通过 `/api/agent` 暴露 manifest/status/actions，方便 AI 或脚本调用
@@ -48,14 +47,14 @@
 
 ## 🧭 当前架构
 
-La Pluma 是一个面向《明日方舟》自动化的本地 Web 控制台。前端负责配置、编排和可视化；后端负责调用 `maa` CLI、ADB、ScrcpyOverWebRTC、森空岛 API 和本地 JSON 配置。
+La Pluma 是一个面向《明日方舟》自动化的本地 Web 控制台。前端负责配置、编排和可视化；后端负责调用 `maa` CLI、ADB、ScrcpyOverWebRTC 和本地 JSON 配置。
 
 当前后端入口主要挂载两类 API：
 
-- `/api/agent` - 主控制接口，覆盖 MAA 命令、任务状态、日志、截图、WebRTC、森空岛、养成、调度、通知和数据接口。
+- `/api/agent` - 主控制接口，覆盖 MAA 命令、任务状态、日志、截图、WebRTC、养成、调度、通知和数据接口。
 - `/api/operator-quotes` - 干员语音/台词相关接口。
 
-历史 `/api/maa`、`/api/skland`、`/api/notification` 等拆分路由已清理；新增功能应优先接入 `/api/agent`。
+历史拆分路由已清理；新增功能应优先接入 `/api/agent`。
 
 ## 🤖 Agent API
 
@@ -371,7 +370,6 @@ la-pluma/
 │   │   ├── maaService.js      # MAA CLI、ADB、截图、实时日志
 │   │   ├── schedulerService.js # 定时任务调度
 │   │   ├── notificationService.js # 通知服务
-│   │   ├── sklandService.js   # 森空岛登录和数据读取
 │   │   ├── operatorTrainingService.js # 养成计划和材料计算
 │   │   ├── webrtcService.js   # ScrcpyOverWebRTC 管理
 │   │   └── configStorageService.js # 配置存储
@@ -387,7 +385,6 @@ la-pluma/
 ### 控制台总览
 
 - ✅ **今日活动** - 查看当前活动、开放日常本和推荐操作
-- ✅ **博士信息** - 通过森空岛读取账号、资源、基建和干员概览
 - ✅ **实时预览** - 通过 ScrcpyOverWebRTC 查看模拟器画面
 - ✅ **状态汇总** - 聚合当前任务、调度、掉落和养成数据
 
@@ -472,7 +469,7 @@ la-pluma/
 - **实时通信**: Socket.io
 - **MAA 集成**: 通过子进程调用 `maa` CLI 命令
 - **模拟器连接**: ADB + ScrcpyOverWebRTC
-- **数据来源**: MAA 识别结果、森空岛 API、本地游戏数据 JSON
+- **数据来源**: MAA 识别结果和本地游戏数据 JSON
 - **通知服务**: Telegram Bot API 和任务完成通知
 
 ## 📝 开发指南

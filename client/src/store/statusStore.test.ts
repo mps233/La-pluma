@@ -25,6 +25,15 @@ describe('statusStore', () => {
     expect(useStatusStore.getState().message).toBe('正在执行任务')
   })
 
+  it('keeps errors visible until the user dismisses them', () => {
+    useStatusStore.getState().setMessage('连接失败', 'error')
+    vi.advanceTimersByTime(60000)
+
+    expect(useStatusStore.getState().message).toBe('连接失败')
+    useStatusStore.getState().clearMessage()
+    expect(useStatusStore.getState().message).toBe('')
+  })
+
   it('ignores legacy delayed empty-message clears', () => {
     useStatusStore.getState().setMessage('旧提示', 'success')
     useStatusStore.getState().setMessage('新提示', 'error')

@@ -23,7 +23,7 @@ import {
   ConfirmDialog,
 } from './common'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
-import type { LogViewerProps, LogEntry, LogFile } from '@/types/components'
+import type { LogEntry, LogFile } from '@/types/components'
 
 type LogFilter = 'all' | LogEntry['level']
 type LogContentMode = 'summary' | 'raw'
@@ -257,7 +257,7 @@ function summarizeLog(log: LogEntry): LogEntry | null {
   return { ...log, message }
 }
 
-export default function LogViewer({}: LogViewerProps) {
+export default function LogViewer() {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [autoScroll, setAutoScroll] = useState(true)
   const [contentMode, setContentMode] = useState<LogContentMode>('summary')
@@ -435,7 +435,7 @@ export default function LogViewer({}: LogViewerProps) {
   }, [collapseRepeats, filteredLogs])
 
   const clearLogs = async () => {
-    if (viewingHistoryRef.current) return
+    if (viewingHistoryRef.current) return false
     realtimePausedRef.current = true
     stopRealtimeRequest()
     setActionBusy(true)
@@ -447,7 +447,9 @@ export default function LogViewer({}: LogViewerProps) {
       setRealtimeError(null)
       setNotice({ type: 'success', text: result.message || '实时日志已清空' })
     } catch (error) {
-      setNotice({ type: 'error', text: getErrorMessage(error, '清空实时日志失败') })
+      const message = getErrorMessage(error, '清空实时日志失败')
+      setNotice({ type: 'error', text: message })
+      throw new Error(message)
     } finally {
       realtimePausedRef.current = false
       setActionBusy(false)
@@ -463,15 +465,18 @@ export default function LogViewer({}: LogViewerProps) {
       setNotice({ type: 'success', text: result.message || '历史日志清理完成' })
       await loadHistoryFiles()
     } catch (error) {
-      setNotice({ type: 'error', text: getErrorMessage(error, '清理历史日志失败') })
+      const message = getErrorMessage(error, '清理历史日志失败')
+      setNotice({ type: 'error', text: message })
+      throw new Error(message)
     } finally {
       setActionBusy(false)
     }
   }
 
-  const handleConfirm = () => {
-    if (confirmAction === 'clear') void clearLogs()
-    if (confirmAction === 'cleanup') void cleanupHistoryLogs()
+  const handleConfirm = async () => {
+    if (confirmAction === 'clear') return clearLogs()
+    if (confirmAction === 'cleanup') return cleanupHistoryLogs()
+    return false
   }
 
   const exportLogs = () => {
@@ -508,7 +513,7 @@ export default function LogViewer({}: LogViewerProps) {
         </div>
       )}
 
-      <Card className="log-card log-toolbar-card" animated delay={0.1} theme="cyan">
+      <Card className="log-card log-toolbar-card" animated delay={0.1}>
         <CardContent className="log-toolbar">
           <div className="log-toolbar-controls">
             <div className="log-mode-switch" role="group" aria-label="日志内容模式">
@@ -534,13 +539,11 @@ export default function LogViewer({}: LogViewerProps) {
               onChange={setAutoScroll}
               label="自动滚动"
               disabled={viewingHistory}
-              color="cyan"
             />
             <Checkbox
               checked={collapseRepeats}
               onChange={setCollapseRepeats}
               label="折叠重复"
-              color="cyan"
             />
             <Select
               value={filter}
@@ -589,7 +592,7 @@ export default function LogViewer({}: LogViewerProps) {
         </CardContent>
       </Card>
 
-      <Card className="log-card" animated delay={0.16} theme="cyan">
+      <Card className="log-card" animated delay={0.16}>
         <CardHeader
           title={viewingHistory ? selectedFile?.name || '历史日志' : '实时日志'}
           actions={
@@ -654,7 +657,7 @@ export default function LogViewer({}: LogViewerProps) {
         </CardContent>
       </Card>
 
-      <Card className="log-card" animated delay={0.22} theme="cyan">
+      <Card className="log-card" animated delay={0.22}>
         <CardHeader
           title="历史日志文件"
           actions={

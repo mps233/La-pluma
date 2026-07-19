@@ -12,6 +12,8 @@ const webrtcMock = vi.hoisted(() => ({
   status: 'idle',
   error: null as string | null,
   stats: null,
+  inputReady: false,
+  mediaStream: null as MediaStream | null,
   connect: vi.fn(),
   disconnect: vi.fn(),
   sendTouch: vi.fn(),
@@ -58,8 +60,12 @@ const findButton = (label: string) => Array.from(container.querySelectorAll('but
 
 describe('ScrcpyDeviceView automation availability', () => {
   beforeEach(() => {
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
     webrtcMock.status = 'idle'
     webrtcMock.error = null
+    webrtcMock.inputReady = false
+    webrtcMock.mediaStream = null
+    webrtcMock.sendTouch.mockReturnValue(true)
     vi.clearAllMocks()
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -69,6 +75,8 @@ describe('ScrcpyDeviceView automation availability', () => {
   afterEach(async () => {
     await act(async () => root.unmount())
     container.remove()
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
   })
 
   it('disables startup, installation, connection, and device controls while unavailable', async () => {
@@ -110,6 +118,32 @@ describe('ScrcpyDeviceView automation availability', () => {
     expect(webrtcMock.sendTouch).not.toHaveBeenCalled()
   })
 
+  it('shows the status beam only while the preview is connecting', async () => {
+    webrtcMock.status = 'connecting'
+    await act(async () => root.render(
+      <ScrcpyDeviceView
+        enabled
+        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
+      />
+    ))
+
+    const frame = container.querySelector('.scrcpy-video-frame')
+    expect(frame?.classList.contains('status-border-beam')).toBe(true)
+    expect(frame?.classList.contains('is-active')).toBe(true)
+    expect(frame?.getAttribute('aria-busy')).toBe('true')
+
+    webrtcMock.status = 'connected'
+    await act(async () => root.render(
+      <ScrcpyDeviceView
+        enabled
+        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
+      />
+    ))
+
+    expect(frame?.classList.contains('is-active')).toBe(false)
+    expect(frame?.getAttribute('aria-busy')).toBe('false')
+  })
+
   it('keeps recovery controls available while blocking new device actions', async () => {
     webrtcMock.status = 'connected'
     const onToggleServer = vi.fn()
@@ -142,5 +176,208 @@ describe('ScrcpyDeviceView automation availability', () => {
     expect(onToggleAgent).toHaveBeenCalledOnce()
     expect(webrtcMock.disconnect).toHaveBeenCalledOnce()
     expect(webrtcMock.sendCommand).not.toHaveBeenCalled()
+  })
+
+  it('disables every infrastructure control while one operation is running', async () => {
+    webrtcMock.status = 'connected'
+    await act(async () => root.render(
+      <ScrcpyDeviceView
+        enabled
+        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
+        infrastructureLoading="server"
+        onToggleServer={vi.fn()}
+        onToggleAgent={vi.fn()}
+        onInstall={vi.fn()}
+      />
+    ))
+
+    expect(findButton('重连预览')?.disabled).toBe(true)
+    expect(findButton('处理中')?.disabled).toBe(true)
+    expect(findButton('停止 Agent')?.disabled).toBe(true)
+    expect(findButton('重装组件')?.disabled).toBe(true)
+  })
+
+  it('shows input readiness and never starts a gesture while the input channel is unavailable', async () => {
+    webrtcMock.status = 'connected'
+    await act(async () => root.render(
+      <ScrcpyDeviceView
+        enabled
+        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
+      />
+    ))
+
+    expect(container.textContent).toContain('触控连接中，画面暂不可操作')
+    const video = container.querySelector('video')!
+    const event = new MouseEvent('pointerdown', { bubbles: true, clientX: 20, clientY: 20, button: 0 })
+    Object.defineProperty(event, 'pointerId', { value: 1 })
+    video.dispatchEvent(event)
+
+    expect(webrtcMock.sendTouch).not.toHaveBeenCalled()
+  })
+
+  it('renders an unknown infrastructure state without calling it uninstalled', async () => {
+    await act(async () => root.render(
+      <ScrcpyDeviceView
+        enabled={false}
+        infrastructureStatus={null}
+        infrastructureStatusState="error"
+        infrastructureError="状态读取失败"
+      />
+    ))
+
+    expect(container.textContent).toContain('组件：未知')
+    expect(container.textContent).toContain('服务：未知')
+    expect(container.textContent).not.toContain('组件：未安装')
+  })
+
+  it('applies preset FPS and marks manual quality changes as custom', async () => {
+    await act(async () => root.render(
+      <ScrcpyDeviceView
+        enabled={false}
+        infrastructureStatus={{ installed: true, built: true, serverRunning: false, agentRunning: false }}
+      />
+    ))
+
+    await act(async () => findButton('均衡画质')?.click())
+    expect(container.textContent).toContain('1280p · 45 FPS')
+    expect(container.textContent).toContain('画质已修改，重连预览后生效')
+
+    await act(async () => findButton('60')?.click())
+    expect(container.textContent).toContain('自定义 · 1280p · 60 FPS')
+  })
+
+  it('tracks pointers independently, coalesces moves per frame, and releases every pointer', async () => {
+    webrtcMock.status = 'connected'
+    webrtcMock.inputReady = true
+    let frameCallback: FrameRequestCallback | null = null
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
+      frameCallback = callback
+      return 1
+    }))
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    await act(async () => root.render(
+      <ScrcpyDeviceView
+        enabled
+        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
+      />
+    ))
+
+    const video = container.querySelector('video')!
+    Object.assign(video, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: vi.fn(() => true),
+      releasePointerCapture: vi.fn(),
+    })
+    const dispatchPointer = (type: string, pointerId: number, clientX: number, clientY: number) => {
+      const event = new MouseEvent(type, { bubbles: true, clientX, clientY, button: 0 })
+      Object.defineProperty(event, 'pointerId', { value: pointerId })
+      video.dispatchEvent(event)
+    }
+
+    act(() => {
+      dispatchPointer('pointerdown', 1, 10, 20)
+      dispatchPointer('pointerdown', 2, 30, 40)
+      dispatchPointer('pointermove', 1, 11, 21)
+      dispatchPointer('pointermove', 1, 12, 22)
+      dispatchPointer('pointermove', 2, 32, 42)
+    })
+
+    expect(webrtcMock.sendTouch).toHaveBeenCalledTimes(2)
+    act(() => frameCallback?.(16))
+    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(2, 12, 22, 1, video)
+    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(2, 32, 42, 2, video)
+
+    act(() => {
+      dispatchPointer('pointerup', 1, 13, 23)
+      dispatchPointer('pointercancel', 2, 33, 43)
+    })
+    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(1, 13, 23, 1, video)
+    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(3, 32, 42, 2, video)
+  })
+
+  it('does not track a pointer when the initial touch is rejected', async () => {
+    webrtcMock.status = 'connected'
+    webrtcMock.inputReady = true
+    webrtcMock.sendTouch.mockReturnValueOnce(false)
+    await act(async () => root.render(
+      <ScrcpyDeviceView
+        enabled
+        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
+      />
+    ))
+
+    const video = container.querySelector('video')!
+    Object.assign(video, { setPointerCapture: vi.fn() })
+    const dispatchPointer = (type: string) => {
+      const event = new MouseEvent(type, { bubbles: true, clientX: 2, clientY: 2, button: 0 })
+      Object.defineProperty(event, 'pointerId', { value: 7 })
+      video.dispatchEvent(event)
+    }
+    act(() => {
+      dispatchPointer('pointerdown')
+      dispatchPointer('pointermove')
+      dispatchPointer('pointerup')
+    })
+
+    expect(webrtcMock.sendTouch).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens an accessible immersive dialog, locks scrolling, and closes with Escape', async () => {
+    webrtcMock.status = 'connected'
+    webrtcMock.inputReady = true
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
+      callback(0)
+      return 1
+    }))
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+    vi.spyOn(window.history, 'back').mockImplementation(() => {})
+
+    await act(async () => root.render(
+      <ScrcpyDeviceView
+        enabled
+        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
+      />
+    ))
+    const fullscreenButton = findButton('全屏')!
+    fullscreenButton.focus()
+    await act(async () => fullscreenButton.click())
+
+    const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]')
+    expect(dialog?.getAttribute('aria-modal')).toBe('true')
+    expect(document.activeElement).toBe(dialog)
+    expect(container.inert).toBe(true)
+    expect(container.getAttribute('aria-hidden')).toBe('true')
+    expect(document.body.style.overflow).toBe('hidden')
+    expect(dialog?.querySelector('[aria-label="退出全屏"]')?.className).toContain('h-11')
+
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+    expect(document.body.style.overflow).toBe('')
+    expect(container.inert).toBeFalsy()
+    expect(container.hasAttribute('aria-hidden')).toBe(false)
+    expect(document.activeElement).toBe(fullscreenButton)
+  })
+
+  it('binds a media stream that arrives after immersive mode opens', async () => {
+    webrtcMock.status = 'connected'
+    webrtcMock.inputReady = true
+    vi.spyOn(window.history, 'back').mockImplementation(() => {})
+
+    const props = {
+      enabled: true,
+      infrastructureStatus: { installed: true, built: true, serverRunning: true, agentRunning: true },
+    }
+    await act(async () => root.render(<ScrcpyDeviceView {...props} />))
+    await act(async () => findButton('全屏')?.click())
+    const immersiveVideo = document.body.querySelector<HTMLVideoElement>('[aria-label="模拟器沉浸画面"]')
+    expect(immersiveVideo?.srcObject == null).toBe(true)
+
+    const lateStream = { getTracks: () => [] } as unknown as MediaStream
+    webrtcMock.mediaStream = lateStream
+    await act(async () => root.render(<ScrcpyDeviceView {...props} />))
+
+    expect(immersiveVideo?.srcObject).toBe(lateStream)
+    await act(async () => document.body.querySelector<HTMLButtonElement>('[aria-label="退出全屏"]')?.click())
   })
 })

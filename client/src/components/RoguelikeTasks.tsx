@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useEffect, useRef } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 import { maaApi } from '../services/api'
 import Icons from './Icons'
 import { PageHeader, Card, Input, Select, Checkbox, Button } from './common'
@@ -7,8 +7,8 @@ import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import ScreenMonitor from './ScreenMonitor'
 import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
+import { waitForTaskIdle } from '../utils/taskStatus'
 import type {
-  RoguelikeTasksProps,
   RoguelikeTask,
   RoguelikeAdvancedOption,
   RoguelikeTaskInputs,
@@ -31,9 +31,15 @@ const THEME_PRESETS: Record<RoguelikeMode, Array<{ value: string; label: string 
   ],
 }
 
-export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
+export default function RoguelikeTasks() {
+  const shouldReduceMotion = useReducedMotion()
   const [isRunning, setIsRunning] = useState(false)
-  const { setMessage: setStatusMessage } = useStatusStore()
+  const [isStopping, setIsStopping] = useState(false)
+  const stopRequestInFlightRef = useRef(false)
+  const stopRequestedRef = useRef(false)
+  const executionGenerationRef = useRef(0)
+  const stopWaitControllerRef = useRef<AbortController | null>(null)
+  const { setMessage: setStatusMessage, setActive: setIsActiveStatus } = useStatusStore()
   const { isAvailable: automationAvailable, unavailableMessage } = useAutomationAvailability()
   const [taskInputs, setTaskInputs] = useState<RoguelikeTaskInputs>({})
   const [advancedParams, setAdvancedParams] = useState<RoguelikeAdvancedParams>({})
@@ -41,15 +47,47 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
   const [activeMode, setActiveMode] = useState<RoguelikeMode>('roguelike')
   const { containerRef: modeTabsRef, activeRect: activeModeRect, setTabRef: setModeTabRef } = useFluidTabIndicator(activeMode)
 
+  useEffect(() => {
+    setIsActiveStatus(isRunning)
+  }, [isRunning, setIsActiveStatus])
+
+  useEffect(() => () => {
+    executionGenerationRef.current += 1
+    stopWaitControllerRef.current?.abort()
+  }, [])
+
+  const beginExecution = () => {
+    stopWaitControllerRef.current?.abort()
+    stopWaitControllerRef.current = null
+    stopRequestedRef.current = false
+    stopRequestInFlightRef.current = false
+    setIsStopping(false)
+    setIsRunning(true)
+    executionGenerationRef.current += 1
+    return executionGenerationRef.current
+  }
+
+  const isCurrentExecution = (generation: number) =>
+    executionGenerationRef.current === generation && !stopRequestedRef.current
+
   // 页面加载时从服务器或 localStorage 加载配置和恢复执行状态
   useEffect(() => {
     let cancelled = false
     let pollInterval: ReturnType<typeof setInterval> | null = null
+    let pollFailures = 0
+    let pollRequestInFlight = false
+    const controller = new AbortController()
+
+    const stopStatusPolling = () => {
+      if (!pollInterval) return
+      clearInterval(pollInterval)
+      pollInterval = null
+    }
 
     // 从后端获取真实的任务执行状态
     const checkBackendStatus = async () => {
       try {
-        const result = await maaApi.getTaskStatus()
+        const result = await maaApi.getTaskStatus(controller.signal)
         if (cancelled) return
         const taskStatus = result.data
         if (result.success && taskStatus?.isRunning) {
@@ -68,20 +106,27 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
             
             // 启动轮询，持续检查任务状态
             pollInterval = setInterval(async () => {
+              if (pollRequestInFlight) return
+              pollRequestInFlight = true
               try {
-                const statusResult = await maaApi.getTaskStatus()
+                const statusResult = await maaApi.getTaskStatus(controller.signal)
                 if (cancelled) return
                 if (statusResult.success && !statusResult.data.isRunning) {
                   // 任务已完成
                   setIsRunning(false)
                   setStatusMessage('任务已完成')
-                  await new Promise(resolve => setTimeout(resolve, 2000))
-                  setStatusMessage('')
-                  if (pollInterval) clearInterval(pollInterval)
+                  stopStatusPolling()
+                } else if (statusResult.success) {
+                  pollFailures = 0
                 }
               } catch (error) {
-                // 静默失败，不影响用户体验
-                if (pollInterval) clearInterval(pollInterval)
+                if (cancelled || (error instanceof Error && error.name === 'AbortError')) return
+                pollFailures += 1
+                if (pollFailures === 3) {
+                  setStatusMessage('暂时无法确认肉鸽任务状态，将继续重试；需要时可手动终止', 'warning')
+                }
+              } finally {
+                pollRequestInFlight = false
               }
             }, 2000) // 每2秒检查一次
           }
@@ -131,9 +176,10 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
 
     return () => {
       cancelled = true
-      if (pollInterval) clearInterval(pollInterval)
+      controller.abort()
+      stopStatusPolling()
     }
-  }, [])
+  }, [setStatusMessage])
 
   // 自动保存配置
   useEffect(() => {
@@ -228,35 +274,79 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
     if (task.id === 'roguelike' || task.id === 'reclamation') {
       if (!inputValue.trim()) {
         setStatusMessage('请输入主题名称')
-        setTimeout(() => setStatusMessage(''), 2000)
         return
       }
     }
 
-    setIsRunning(true)
+    const generation = beginExecution()
     setStatusMessage('正在执行命令...')
 
     try {
       const params = buildCommandParams(task)
-      const result = await maaApi.executePredefinedTask(task.command, params, null, null, task.name, 'roguelike')
+      const result = await maaApi.executePredefinedTask(task.command, params, null, null, task.name, 'roguelike', true)
 
+      if (!isCurrentExecution(generation)) return
       if (result.success) {
-        setStatusMessage(`${task.name} 执行成功`)
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        setStatusMessage('')
+        setStatusMessage(`${task.name} 执行成功`, 'success')
       } else {
-        setStatusMessage(`执行失败: ${maaApi.getErrorMessage(result)}`)
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        setStatusMessage('')
+        setStatusMessage(`执行失败: ${maaApi.getErrorMessage(result)}`, 'error')
       }
     } catch (error) {
-      setStatusMessage(`网络错误: ${(error as Error).message}`)
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStatusMessage('')
+      if (!isCurrentExecution(generation)) return
+      setStatusMessage(`网络错误: ${(error as Error).message}`, 'error')
     } finally {
-      setTimeout(() => {
+      if (isCurrentExecution(generation)) {
+        stopRequestedRef.current = false
         setIsRunning(false)
-      }, 1000)
+        stopRequestInFlightRef.current = false
+        setIsStopping(false)
+      }
+    }
+  }
+
+  const handleStopTask = async () => {
+    if (!isRunning || stopRequestInFlightRef.current) return
+
+    const activeGeneration = executionGenerationRef.current
+    let operationGeneration = activeGeneration
+    let waitController: AbortController | null = null
+    stopRequestedRef.current = true
+    stopRequestInFlightRef.current = true
+    setIsStopping(true)
+    setStatusMessage('正在终止肉鸽任务...', 'warning')
+
+    try {
+      const result = await maaApi.stopTask()
+      if (executionGenerationRef.current !== activeGeneration) return
+      const taskStopped = Boolean(result.data?.task?.success)
+      if (!result.success || !taskStopped) {
+        throw new Error(result.data?.task?.message || result.message || '当前任务未能终止')
+      }
+
+      executionGenerationRef.current += 1
+      operationGeneration = executionGenerationRef.current
+      stopWaitControllerRef.current?.abort()
+      waitController = new AbortController()
+      stopWaitControllerRef.current = waitController
+      const confirmedIdle = await waitForTaskIdle(maaApi.getTaskStatus.bind(maaApi), { signal: waitController.signal })
+      if (waitController.signal.aborted || executionGenerationRef.current !== operationGeneration) return
+      if (!confirmedIdle) {
+        throw new Error('终止请求已发送，但尚未确认任务停止')
+      }
+
+      stopRequestedRef.current = false
+      setIsRunning(false)
+      setStatusMessage('肉鸽任务已终止', 'warning')
+    } catch (error) {
+      if (waitController?.signal.aborted || executionGenerationRef.current !== operationGeneration) return
+      stopRequestedRef.current = false
+      setStatusMessage(`终止失败: ${(error as Error).message}`, 'error')
+    } finally {
+      if (stopWaitControllerRef.current === waitController) stopWaitControllerRef.current = null
+      if (executionGenerationRef.current === operationGeneration) {
+        stopRequestInFlightRef.current = false
+        setIsStopping(false)
+      }
     }
   }
 
@@ -315,7 +405,6 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
                   checked={advanced[option.key] as boolean || false}
                   onChange={(checked: boolean) => handleAdvancedChange(task.id, option.key, checked)}
                   label={option.label}
-                  color="cyan"
                 />
               </div>
             ))}
@@ -355,7 +444,9 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
                 width: activeModeRect.width,
                 height: activeModeRect.height,
               }}
-              transition={{ type: 'spring', stiffness: 360, damping: 34, mass: 0.8 }}
+              transition={shouldReduceMotion
+                ? { duration: 0 }
+                : { type: 'spring', stiffness: 360, damping: 34, mass: 0.8 }}
             >
               {ActiveIcon && <span className="roguelike-mode-icon is-active"><ActiveIcon /></span>}
               <span className="min-w-0">
@@ -389,7 +480,7 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
         </div>
       </div>
 
-      <Card className="roguelike-workspace" theme="cyan" animated>
+      <Card className="roguelike-workspace" animated>
         <div className="roguelike-workspace-header">
           <div className="roguelike-workspace-heading">
             {ActiveIcon && <span className="roguelike-workspace-icon"><ActiveIcon /></span>}
@@ -401,22 +492,36 @@ export default function RoguelikeTasks(_props: RoguelikeTasksProps) {
               <p className="mt-1 text-sm text-secondary">{activeTask.description}</p>
             </div>
           </div>
-          <Button
-            onClick={() => handleExecute(activeTask)}
-            disabled={!automationAvailable || isRunning}
-            title={!automationAvailable ? unavailableMessage : undefined}
-            loading={isRunning}
-            variant="primary"
-            size="md"
-            icon={
-              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-              </svg>
-            }
-            className="roguelike-run-button"
-          >
-            立即执行
-          </Button>
+          {isRunning ? (
+            <Button
+              onClick={handleStopTask}
+              disabled={isStopping}
+              loading={isStopping}
+              loadingText="正在终止"
+              variant="danger"
+              size="md"
+              icon={<span className="h-3 w-3 rounded-[2px] bg-current" aria-hidden="true" />}
+              className="roguelike-run-button"
+            >
+              终止执行
+            </Button>
+          ) : (
+            <Button
+              onClick={() => handleExecute(activeTask)}
+              disabled={!automationAvailable}
+              title={!automationAvailable ? unavailableMessage : undefined}
+              variant="primary"
+              size="md"
+              icon={
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                </svg>
+              }
+              className="roguelike-run-button"
+            >
+              立即执行
+            </Button>
+          )}
         </div>
 
         <div className="roguelike-workspace-grid">

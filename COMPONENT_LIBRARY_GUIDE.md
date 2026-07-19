@@ -125,6 +125,7 @@ Tailwind 中 `rounded-xl`、`rounded-2xl`、`rounded-3xl` 已统一映射到 `--
 - 所有可点击元素必须有明确的 `focus-visible` 状态。优先复用 `Button`，手写控件至少添加 `focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]`，不能只提供 hover。
 - disabled 状态需关闭点击与 hover，并使用 `opacity-50`、`cursor-not-allowed`；loading 期间按钮自动禁用，仅显示加载内容。
 - 通用颜色、背景、阴影、变形过渡保持约 160 至 180ms；新增 CSS 或 Framer Motion 动效必须尊重 reduced motion。专用高光动画可例外，但不可用于普通按钮。
+- `status-border-beam` 仅用于启动、连接或执行中的局部状态反馈，并通过 `is-active` 控制；完成、空闲和静态卡片不得常驻光效，也不要叠加第二条可见边框。
 
 ### 反馈状态
 
@@ -137,10 +138,12 @@ Tailwind 中 `rounded-xl`、`rounded-2xl`、`rounded-3xl` 已统一映射到 `--
 | 局部内容正在读取 | `Loading` |
 | 列表、流程或卡片无数据 | `EmptyState`，按容器选择 `compact` |
 | 区域读取失败 | 在原区域显示可恢复的错误与重试操作；不要改成空状态 |
-| 全局、短生命周期的结果 | `useStatusStore.setMessage`，由 `FloatingStatusIndicator` 展示；不要自行写清除定时器 |
+| 全局结果与错误 | `useStatusStore.setMessage`，由 `FloatingStatusIndicator` 展示；错误持续到用户关闭，其他短消息由 store 自动收起，不要自行写清除定时器 |
 | 删除、清空等不可逆操作 | `ConfirmDialog`；新代码不得使用 `window.confirm` |
 
 日志控制台、养成筛选空结果等固定高度或高密度区域可保留专用状态样式。局部表单成功提示、日志提示等需要紧邻操作区或可手动关闭时，也可保留在面板内。项目没有通用 Toast 组件，`FloatingStatusIndicator` 是全局任务状态和短消息载体，不应被当作普通 toast 复刻。
+
+`ConfirmDialog.onConfirm` 可以返回 Promise。返回 `false` 或抛出错误时弹窗保持打开；错误会在弹窗内展示，调用方不要提前关闭弹窗或吞掉失败结果。
 
 ### 图标
 
@@ -185,6 +188,7 @@ Tailwind 中 `rounded-xl`、`rounded-2xl`、`rounded-3xl` 已统一映射到 `--
   subtitle?: string
   actions?: ReactNode
   animated?: boolean
+  mobileLayout?: 'stack' | 'inline'
 }
 ```
 
@@ -201,6 +205,7 @@ import FloatingStatusIndicator from '@/components/FloatingStatusIndicator'
 ```
 
 页面标题统一使用全局品牌色和 `icon-well`，不再支持页面单独传入渐变色。
+手机端默认使用 `stack` 保护长标题和多操作；只有控制台这类标题与操作都能稳定收缩的紧凑标题栏才使用 `mobileLayout="inline"`。
 
 ### Card - 卡片组件系列
 
@@ -226,7 +231,7 @@ import { Card, CardHeader, CardContent, InfoCard } from '@/components/common'
 </InfoCard>
 ```
 
-`Card` 支持 `animated`、`delay`、`hover` 和 `className`。`theme` 为旧调用兼容参数，所有取值目前均映射同一套主题表面；新代码不要用它区分模块配色。`CardHeader` 可传入 `actions`，`CardContent` 与 `InfoCard` 均支持 `className`。
+`Card` 支持 `animated`、`delay` 和 `className`。`CardHeader` 可传入 `actions`，`CardContent` 与 `InfoCard` 均支持 `className`。
 
 ### Button / IconButton
 
@@ -242,7 +247,7 @@ import { Button, IconButton } from '@/components/common'
 <IconButton icon={<Icons.RefreshCw />} title="刷新" />
 ```
 
-`Button` 支持 `primary`、`secondary`、`outline`、`success`、`danger`、`ghost`；`gradient` 是保留的 `primary` 兼容别名。`IconButton` 仅支持 `primary`、`secondary`、`danger`、`ghost`。新增按钮优先走 `variant`，不要在页面里手写一套按钮颜色、阴影和圆角。
+`Button` 支持 `primary`、`secondary`、`outline`、`success`、`danger`、`ghost`。`IconButton` 仅支持 `primary`、`secondary`、`danger`、`ghost`。新增按钮优先走 `variant`，不要在页面里手写一套按钮颜色、阴影和圆角。
 
 ### Input / Select / Checkbox
 
@@ -274,7 +279,7 @@ import { Input, Select, Checkbox } from '@/components/common'
 />
 ```
 
-`Input`、`Select` 均支持 `error` 和 `hint`，`Input` 额外支持前置 `icon`。多行文本使用带 `app-input control-surface` 的原生 `textarea`。`Checkbox.color` 是历史兼容参数，新代码不要以它建立页面级配色。
+`Input`、`Select` 均支持 `error` 和 `hint`，`Input` 额外支持前置 `icon`。多行文本使用带 `app-input control-surface` 的原生 `textarea`。
 
 ### EmptyState
 

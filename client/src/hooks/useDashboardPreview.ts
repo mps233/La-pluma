@@ -10,6 +10,7 @@ const LIVE_STALE_MS = 1500
 const FRAME_SAMPLE_INTERVAL_MS = 500
 const STATUS_POLL_INTERVAL_MS = 5000
 const FALLBACK_SNAPSHOT_INTERVAL_MS = 10000
+const CONNECTING_STATUSES = new Set(['connecting', 'signaling', 'waiting_offer', 'connecting_webrtc'])
 
 export function useDashboardPreview() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -124,6 +125,7 @@ export function useDashboardPreview() {
     videoRef,
     fallbackSnapshot,
     showLivePreview,
+    isConnecting: CONNECTING_STATUSES.has(preview.status),
     statusText: showLivePreview ? 'Live' : fallbackSnapshot ? '画面快照 · 10s' : preview.error || preview.status,
     headerStatusText: showLivePreview ? `${preview.stats?.width || 0}×${preview.stats?.height || 0}` : fallbackSnapshot ? '画面快照' : '自动连接中'
   }

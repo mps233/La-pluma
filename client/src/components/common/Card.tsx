@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import type { ReactNode } from 'react'
 
 /**
@@ -9,8 +9,6 @@ export interface CardProps {
   className?: string
   animated?: boolean
   delay?: number
-  hover?: boolean
-  theme?: 'default' | 'violet' | 'emerald' | 'purple' | 'orange' | 'cyan' | 'amber'
 }
 
 /**
@@ -46,40 +44,21 @@ export interface InfoCardProps {
 export function Card({
   children,
   className = '',
-  animated = true,
+  animated = false,
   delay = 0,
-  hover = false,
-  theme = 'default',
 }: CardProps) {
-  const Container = animated || hover ? motion.div : 'div'
+  const shouldReduceMotion = useReducedMotion()
+  const Container = animated ? motion.div : 'div'
   const animationProps = animated ? {
-    initial: { opacity: 0, y: 20 },
+    initial: shouldReduceMotion ? false : { opacity: 0, y: 12 },
     animate: { opacity: 1, y: 0 },
-    transition: { delay },
+    transition: { delay: shouldReduceMotion ? 0 : delay, duration: shouldReduceMotion ? 0 : 0.22 },
   } : {}
-
-  const hoverProps = hover ? {
-    whileHover: { scale: 1.02 },
-    whileTap: { scale: 0.98 },
-  } : {}
-
-  // 主题色样式
-  const themeStyles: Record<string, string> = {
-    default: 'surface-panel',
-    violet: 'surface-panel',
-    emerald: 'surface-panel',
-    purple: 'surface-panel',
-    orange: 'surface-panel',
-    cyan: 'surface-panel',
-    amber: 'surface-panel',
-    teal: 'surface-panel',
-  }
 
   return (
     <Container 
-      className={`app-card ${themeStyles[theme]} ${hover ? 'surface-panel-hover' : ''} ${className}`}
+      className={`app-card surface-panel ${className}`}
       {...animationProps}
-      {...hoverProps}
     >
       {children}
     </Container>

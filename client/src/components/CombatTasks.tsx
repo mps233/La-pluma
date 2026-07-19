@@ -1,14 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { maaApi, searchCopilot, searchParadoxCopilot } from '../services/api'
 import { motion, useReducedMotion } from 'framer-motion'
 import Icons from './Icons'
-import { PageHeader, Button } from './common'
+import { PageHeader, Button, ConfirmDialog } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import ScreenMonitor from './ScreenMonitor'
 import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
+import { waitForTaskIdle } from '../utils/taskStatus'
 import type {
-  CombatTasksProps,
   CombatTask,
   CombatAdvancedOption,
   CombatTaskInputs,
@@ -26,9 +26,16 @@ type CopilotSetExecutionMode = 'app' | 'manual' | 'cli'
 type CopilotSetSelections = Record<string, number[]>
 type CombatMode = 'copilot' | 'ssscopilot' | 'paradoxcopilot'
 
-export default function CombatTasks(_props: CombatTasksProps) {
+export default function CombatTasks() {
   const shouldReduceMotion = useReducedMotion()
   const [isRunning, setIsRunning] = useState(false)
+  const [isStopping, setIsStopping] = useState(false)
+  const [isResettingProgress, setIsResettingProgress] = useState(false)
+  const [resetProgressDialogOpen, setResetProgressDialogOpen] = useState(false)
+  const stopRequestInFlightRef = useRef(false)
+  const stopRequestedRef = useRef(false)
+  const executionGenerationRef = useRef(0)
+  const stopWaitControllerRef = useRef<AbortController | null>(null)
   const { setMessage: setStatusMessage, setActive: setIsActiveStatus } = useStatusStore()
   const { isAvailable: automationAvailable, unavailableMessage } = useAutomationAvailability()
   const [taskInputs, setTaskInputs] = useState<CombatTaskInputs>({})
@@ -64,6 +71,25 @@ export default function CombatTasks(_props: CombatTasksProps) {
   useEffect(() => {
     setIsActiveStatus(isRunning)
   }, [isRunning, setIsActiveStatus])
+
+  useEffect(() => () => {
+    executionGenerationRef.current += 1
+    stopWaitControllerRef.current?.abort()
+  }, [])
+
+  const beginExecution = () => {
+    stopWaitControllerRef.current?.abort()
+    stopWaitControllerRef.current = null
+    stopRequestedRef.current = false
+    stopRequestInFlightRef.current = false
+    setIsStopping(false)
+    setIsRunning(true)
+    executionGenerationRef.current += 1
+    return executionGenerationRef.current
+  }
+
+  const isCurrentExecution = (generation: number) =>
+    executionGenerationRef.current === generation && !stopRequestedRef.current
 
   // 普通关卡搜索相关状态
   const [copilotSearchStage, setCopilotSearchStage] = useState('')
@@ -143,20 +169,35 @@ export default function CombatTasks(_props: CombatTasksProps) {
     applySelectedCopilotIndexes(new Set(indexes), setId)
   }
 
-  const resetCopilotSetProgress = () => {
-    if (!copilotSetInfo?.copilots?.length) return
-    applySelectedCopilotIndexes(new Set(copilotSetInfo.copilots.map((_, index) => index)), copilotSetInfo.id)
-    setCopilotSetResults([])
-    setCopilotSetInfo(prev => prev ? { ...prev, currentIndex: 0 } : prev)
-    maaApi.resetCopilotSetProgress(copilotSetInfo.id).catch(() => {})
-    setStatusMessage('已重置作业集进度，将从第一关开始')
-    setTimeout(() => setStatusMessage(''), 2000)
+  const resetCopilotSetProgress = async () => {
+    if (!copilotSetInfo?.copilots?.length) return false
+    if (isResettingProgress) return false
+
+    setIsResettingProgress(true)
+    try {
+      const result = await maaApi.resetCopilotSetProgress(copilotSetInfo.id)
+      if (!result.success) {
+        throw new Error(maaApi.getErrorMessage(result))
+      }
+      applySelectedCopilotIndexes(new Set(copilotSetInfo.copilots.map((_, index) => index)), copilotSetInfo.id)
+      setCopilotSetResults([])
+      setCopilotSetInfo(prev => prev ? { ...prev, currentIndex: 0 } : prev)
+      setStatusMessage('已重置作业集进度，将从第一关开始', 'success')
+      return true
+    } catch (error) {
+      setStatusMessage(`重置失败: ${(error as Error).message}`, 'error')
+      return false
+    } finally {
+      setIsResettingProgress(false)
+    }
   }
 
   // 页面加载时从服务器或 localStorage 加载配置和恢复执行状态
   useEffect(() => {
     let cancelled = false
     let pollInterval: ReturnType<typeof setInterval> | null = null
+    let pollFailures = 0
+    let pollRequestInFlight = false
     const controller = new AbortController()
 
     const stopStatusPolling = () => {
@@ -187,6 +228,8 @@ export default function CombatTasks(_props: CombatTasksProps) {
 
             // 启动轮询，持续检查任务状态
             pollInterval = setInterval(async () => {
+              if (pollRequestInFlight) return
+              pollRequestInFlight = true
               try {
                 const statusResult = await maaApi.getTaskStatus(controller.signal)
                 if (cancelled) return
@@ -195,9 +238,17 @@ export default function CombatTasks(_props: CombatTasksProps) {
                   setIsRunning(false)
                   setStatusMessage('任务已完成')
                   stopStatusPolling()
+                } else if (statusResult.success) {
+                  pollFailures = 0
                 }
               } catch (error) {
-                if (!cancelled) stopStatusPolling()
+                if (cancelled || (error instanceof Error && error.name === 'AbortError')) return
+                pollFailures += 1
+                if (pollFailures === 3) {
+                  setStatusMessage('暂时无法确认作业状态，将继续重试；需要时可手动终止', 'warning')
+                }
+              } finally {
+                pollRequestInFlight = false
               }
             }, 2000) // 每2秒检查一次
           }
@@ -513,7 +564,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
   }
 
   // 应用内连续执行作业集，可确定按前端策略跳过失败作业
-  const startCopilotSetSequentially = async (task: CombatTask) => {
+  const startCopilotSetSequentially = async (task: CombatTask, generation: number) => {
     if (!copilotSetInfo?.copilots || copilotSetInfo.copilots.length === 0) {
       setStatusMessage('作业集为空')
       return
@@ -536,7 +587,9 @@ export default function CombatTasks(_props: CombatTasksProps) {
     const setId = copilotSetInfo.id
 
     for (const [order, index] of selectedIndexes.entries()) {
+      if (!isCurrentExecution(generation)) return
       const result = await executeCopilotAtIndex(task, index)
+      if (!isCurrentExecution(generation)) return
       const errorMessage = result.error || maaApi.getErrorMessage({ message: result.error }) || '未知错误'
       results.push({ index, success: result.success, error: errorMessage })
       setCopilotSetResults([...results])
@@ -549,7 +602,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
       if (!result.success) {
         if (strategy === 'stop') {
           setStatusMessage(`作业 ${index + 1} 执行失败: ${errorMessage}，已按策略停止`)
-          finishCopilotSet()
+          finishCopilotSet(generation)
           return
         }
         if (!isLast) {
@@ -559,12 +612,13 @@ export default function CombatTasks(_props: CombatTasksProps) {
     }
 
     const successCount = results.filter(result => result.success).length
+    if (!isCurrentExecution(generation)) return
     setStatusMessage(`作业集执行完成 (${successCount}/${selectedIndexes.length} 成功)`)
-    finishCopilotSet()
+    finishCopilotSet(generation)
   }
 
   // 交给 maa-cli 原生作业集/多 URI 流程执行
-  const startCopilotSetWithCli = async (task: CombatTask) => {
+  const startCopilotSetWithCli = async (task: CombatTask, generation: number) => {
     const selectedIndexes = getSelectedCopilotIndexes()
     if (!selectedIndexes.length) {
       setStatusMessage('请至少选择一个作业')
@@ -596,6 +650,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
           })
         : await maaApi.executePredefinedTaskArgs(task.command, buildCopilotSetCliArgs(task), null, null, task.name, 'combat', true)
 
+      if (!isCurrentExecution(generation)) return
       if (result.success) {
         const pendingIndexes = new Set<number>((result.data?.pending || []).map((entry: { itemIndex: number }) => entry.itemIndex))
         applySelectedCopilotIndexes(pendingIndexes, copilotSetInfo?.id)
@@ -603,19 +658,16 @@ export default function CombatTasks(_props: CombatTasksProps) {
       } else {
         setStatusMessage(`作业集执行失败: ${maaApi.getErrorMessage(result)}`)
       }
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStatusMessage('')
     } catch (error) {
+      if (!isCurrentExecution(generation)) return
       setStatusMessage(`网络错误: ${(error as Error).message}`)
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStatusMessage('')
     } finally {
-      finishCopilotSet()
+      finishCopilotSet(generation)
     }
   }
 
   // 手动逐关执行作业集（执行第一个选中的作业）
-  const startCopilotSetManually = async (task: CombatTask) => {
+  const startCopilotSetManually = async (task: CombatTask, generation: number) => {
     if (!copilotSetInfo?.copilots || copilotSetInfo.copilots.length === 0) {
       setStatusMessage('作业集为空')
       return
@@ -633,6 +685,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
     setCurrentCopilotTask(task)
 
     const result = await executeCopilotAtIndex(task, firstSelectedIndex)
+    if (!isCurrentExecution(generation)) return
     const errorMessage = result.error || maaApi.getErrorMessage({ message: result.error }) || '未知错误'
     setCopilotSetResults([{ index: firstSelectedIndex, success: result.success, error: errorMessage }])
     const remainingIndexes = new Set(selectedCopilotIndexes)
@@ -648,36 +701,38 @@ export default function CombatTasks(_props: CombatTasksProps) {
       if (remainingSelected > 0) {
         setStatusMessage(`作业 ${firstSelectedIndex + 1}/${copilotSetInfo.copilots.length} 完成，等待开始下一关`)
         setWaitingForNextCopilot(true)
+        setIsRunning(false)
       } else {
         const selectedCount = selectedCopilotIndexes.size
         setStatusMessage(`作业集执行完成 (${selectedCount} 个作业)`)
-        finishCopilotSet()
+        finishCopilotSet(generation)
       }
     } else {
       const strategy = advancedParams.copilot?.executionStrategy || 'continue'
       if (strategy === 'stop') {
         setStatusMessage(`作业 ${firstSelectedIndex + 1} 执行失败: ${errorMessage}，已按策略停止`)
-        finishCopilotSet()
+        finishCopilotSet(generation)
       } else if (remainingSelected > 0) {
         setStatusMessage(`作业 ${firstSelectedIndex + 1} 执行失败: ${errorMessage}，等待开始下一关`)
         setWaitingForNextCopilot(true)
+        setIsRunning(false)
       } else {
         setStatusMessage(`作业执行失败: ${errorMessage}`)
-        finishCopilotSet()
+        finishCopilotSet(generation)
       }
     }
   }
 
-  const startCopilotSet = async (task: CombatTask) => {
+  const startCopilotSet = async (task: CombatTask, generation: number) => {
     if (copilotSetExecutionMode === 'cli') {
-      await startCopilotSetWithCli(task)
+      await startCopilotSetWithCli(task, generation)
       return
     }
     if (copilotSetExecutionMode === 'manual') {
-      await startCopilotSetManually(task)
+      await startCopilotSetManually(task, generation)
       return
     }
-    await startCopilotSetSequentially(task)
+    await startCopilotSetSequentially(task, generation)
   }
 
   // 执行下一个作业
@@ -703,9 +758,10 @@ export default function CombatTasks(_props: CombatTasksProps) {
     }
 
     setWaitingForNextCopilot(false)
-    setIsRunning(true)
+    const generation = beginExecution()
 
     const result = await executeCopilotAtIndex(currentCopilotTask, nextIndex)
+    if (!isCurrentExecution(generation)) return
     const nextErrorMessage = result.error || maaApi.getErrorMessage({ message: result.error }) || '未知错误'
     setCopilotSetResults(prev => [...prev, { index: nextIndex, success: result.success, error: nextErrorMessage }])
     const remainingIndexes = new Set(selectedCopilotIndexes)
@@ -721,34 +777,36 @@ export default function CombatTasks(_props: CombatTasksProps) {
       if (remainingSelected > 0) {
         setStatusMessage(`作业 ${nextIndex + 1}/${copilotSetInfo.copilots.length} 完成，等待开始下一关`)
         setWaitingForNextCopilot(true)
+        setIsRunning(false)
       } else {
         const selectedCount = selectedCopilotIndexes.size
         setStatusMessage(`作业集全部执行完成 (${selectedCount} 个作业)`)
-        finishCopilotSet()
+        finishCopilotSet(generation)
       }
     } else {
       const strategy = advancedParams.copilot?.executionStrategy || 'continue'
       if (strategy === 'stop') {
         setStatusMessage(`作业 ${nextIndex + 1} 执行失败: ${nextErrorMessage}，已按策略停止`)
-        finishCopilotSet()
+        finishCopilotSet(generation)
       } else if (remainingSelected > 0) {
         setStatusMessage(`作业 ${nextIndex + 1} 执行失败: ${nextErrorMessage}，等待开始下一关`)
         setWaitingForNextCopilot(true)
+        setIsRunning(false)
       } else {
         setStatusMessage(`作业 ${nextIndex + 1} 执行失败: ${nextErrorMessage}`)
-        finishCopilotSet()
+        finishCopilotSet(generation)
       }
     }
   }
 
   // 完成作业集执行
-  const finishCopilotSet = () => {
-    setTimeout(() => {
-      setIsRunning(false)
-      setWaitingForNextCopilot(false)
-      setCurrentCopilotTask(null)
-      setCopilotSetInfo(prev => prev ? { ...prev, currentIndex: 0 } : null)
-    }, 1000)
+  const finishCopilotSet = (generation?: number) => {
+    if (generation !== undefined && executionGenerationRef.current !== generation) return
+    stopRequestedRef.current = false
+    setIsRunning(false)
+    setWaitingForNextCopilot(false)
+    setCurrentCopilotTask(null)
+    setCopilotSetInfo(prev => prev ? { ...prev, currentIndex: 0 } : null)
   }
 
   // 取消作业集执行
@@ -762,7 +820,57 @@ export default function CombatTasks(_props: CombatTasksProps) {
       setStatusMessage(`作业集已取消: ${successCount} 个成功，${failCount} 个失败`)
     }
 
+    executionGenerationRef.current += 1
+    stopRequestedRef.current = true
     finishCopilotSet()
+  }
+
+  const handleStopTask = async () => {
+    if (!isRunning || stopRequestInFlightRef.current) return
+
+    const activeGeneration = executionGenerationRef.current
+    let operationGeneration = activeGeneration
+    let waitController: AbortController | null = null
+    stopRequestedRef.current = true
+    stopRequestInFlightRef.current = true
+    setIsStopping(true)
+    setStatusMessage('正在终止自动战斗...', 'warning')
+
+    try {
+      const result = await maaApi.stopTask()
+      if (executionGenerationRef.current !== activeGeneration) return
+      const taskStopped = Boolean(result.data?.task?.success)
+      if (!result.success || !taskStopped) {
+        throw new Error(result.data?.task?.message || result.message || '当前任务未能终止')
+      }
+
+      executionGenerationRef.current += 1
+      operationGeneration = executionGenerationRef.current
+      stopWaitControllerRef.current?.abort()
+      waitController = new AbortController()
+      stopWaitControllerRef.current = waitController
+      const confirmedIdle = await waitForTaskIdle(maaApi.getTaskStatus.bind(maaApi), { signal: waitController.signal })
+      if (waitController.signal.aborted || executionGenerationRef.current !== operationGeneration) return
+      if (!confirmedIdle) {
+        throw new Error('终止请求已发送，但尚未确认任务停止')
+      }
+
+      stopRequestedRef.current = false
+      setIsRunning(false)
+      setWaitingForNextCopilot(false)
+      setCurrentCopilotTask(null)
+      setStatusMessage('自动战斗已终止', 'warning')
+    } catch (error) {
+      if (waitController?.signal.aborted || executionGenerationRef.current !== operationGeneration) return
+      stopRequestedRef.current = false
+      setStatusMessage(`终止失败: ${(error as Error).message}`, 'error')
+    } finally {
+      if (stopWaitControllerRef.current === waitController) stopWaitControllerRef.current = null
+      if (executionGenerationRef.current === operationGeneration) {
+        stopRequestInFlightRef.current = false
+        setIsStopping(false)
+      }
+    }
   }
 
   const handleExecute = async (task: CombatTask) => {
@@ -777,7 +885,6 @@ export default function CombatTasks(_props: CombatTasksProps) {
       // copilot 任务需要输入作业 URI
       if (!inputValue.trim()) {
         setStatusMessage('请输入作业链接')
-        setTimeout(() => setStatusMessage(''), 2000)
         return
       }
     }
@@ -786,7 +893,6 @@ export default function CombatTasks(_props: CombatTasksProps) {
       const args = splitCopilotInputToArgs(inputValue)
       if (args.length !== 1) {
         setStatusMessage('保全派驻一次只能执行一个 SSS 作业 URI')
-        setTimeout(() => setStatusMessage(''), 2000)
         return
       }
     }
@@ -796,7 +902,6 @@ export default function CombatTasks(_props: CombatTasksProps) {
       if (/^maa:\/\/\d+s$/i.test(firstArg)) {
         await handlePreviewCopilotSetWithInput(inputValue)
         setStatusMessage('已恢复作业集进度，请确认待执行关卡后再次执行')
-        setTimeout(() => setStatusMessage(''), 2500)
         return
       }
     }
@@ -804,33 +909,33 @@ export default function CombatTasks(_props: CombatTasksProps) {
     // 检查是否是作业集模式
     if (task.id === 'copilot' && copilotSetInfo?.type === 'set' && copilotSetInfo.copilots && copilotSetInfo.copilots.length > 0) {
       // 作业集模式：开始执行第一个作业
-      await startCopilotSet(task)
+      const generation = beginExecution()
+      await startCopilotSet(task, generation)
     } else {
       // 单个作业模式
-      setIsRunning(true)
+      const generation = beginExecution()
       setStatusMessage(`正在执行: ${task.name}`)
 
       try {
         const args = buildCommandArgs(task)
-        const result = await maaApi.executePredefinedTaskArgs(task.command, args, null, null, task.name, 'combat')
+        const result = await maaApi.executePredefinedTaskArgs(task.command, args, null, null, task.name, 'combat', true)
 
+        if (!isCurrentExecution(generation)) return
         if (result.success) {
-          setStatusMessage(`${task.name} 执行成功`)
-          await new Promise(resolve => setTimeout(resolve, 2000))
-          setStatusMessage('')
+          setStatusMessage(`${task.name} 执行成功`, 'success')
         } else {
-          setStatusMessage(`执行失败: ${maaApi.getErrorMessage(result)}`)
-          await new Promise(resolve => setTimeout(resolve, 2000))
-          setStatusMessage('')
+          setStatusMessage(`执行失败: ${maaApi.getErrorMessage(result)}`, 'error')
         }
       } catch (error) {
-        setStatusMessage(`网络错误: ${(error as Error).message}`)
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        setStatusMessage('')
+        if (!isCurrentExecution(generation)) return
+        setStatusMessage(`网络错误: ${(error as Error).message}`, 'error')
       } finally {
-        setTimeout(() => {
+        if (isCurrentExecution(generation)) {
+          stopRequestedRef.current = false
           setIsRunning(false)
-        }, 1000)
+          stopRequestInFlightRef.current = false
+          setIsStopping(false)
+        }
       }
     }
   }
@@ -955,8 +1060,6 @@ export default function CombatTasks(_props: CombatTasksProps) {
 
     if (!match) {
       setStatusMessage('请输入有效的作业 URI / 作业站链接（如: maa://26766）')
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStatusMessage('')
       return
     }
 
@@ -1098,12 +1201,8 @@ export default function CombatTasks(_props: CombatTasksProps) {
         }
       }
 
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      setStatusMessage('')
     } catch (error) {
       setStatusMessage(`网络错误: ${(error as Error).message}`)
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStatusMessage('')
     } finally {
       setIsLoadingSet(false)
     }
@@ -1113,8 +1212,6 @@ export default function CombatTasks(_props: CombatTasksProps) {
   const handleSearchParadox = async () => {
     if (!paradoxSearchName.trim()) {
       setStatusMessage('请输入干员名字')
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStatusMessage('')
       return
     }
 
@@ -1131,8 +1228,6 @@ export default function CombatTasks(_props: CombatTasksProps) {
       if (result.success && data.copilots && data.copilots.length > 0) {
         setParadoxSearchResult(data)
         setStatusMessage(`找到 ${data.copilots.length} 个作业`)
-        await new Promise(resolve => setTimeout(resolve, 1500))
-        setStatusMessage('')
 
         // 自动填充推荐作业
         if (data.recommended) {
@@ -1140,14 +1235,10 @@ export default function CombatTasks(_props: CombatTasksProps) {
         }
       } else {
         setStatusMessage(result.message || data.error || '未找到作业')
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        setStatusMessage('')
         setParadoxSearchResult(null)
       }
     } catch (error) {
       setStatusMessage(`搜索失败: ${(error as Error).message}`)
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStatusMessage('')
       setParadoxSearchResult(null)
     } finally {
       setIsSearchingParadox(false)
@@ -1158,8 +1249,6 @@ export default function CombatTasks(_props: CombatTasksProps) {
   const handleSearchCopilot = async () => {
     if (!copilotSearchStage.trim()) {
       setStatusMessage('请输入关卡名称')
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStatusMessage('')
       return
     }
 
@@ -1174,7 +1263,6 @@ export default function CombatTasks(_props: CombatTasksProps) {
       const data = result.data || result
 
       if (result.success && data.copilots && data.copilots.length > 0) {
-        console.log('[copilot-search]', data)
         setCopilotSearchResult(data)
 
         // 自动填充并预览推荐作业
@@ -1182,19 +1270,13 @@ export default function CombatTasks(_props: CombatTasksProps) {
           await applyCopilotUri(data.recommended.uri)
         } else {
           setStatusMessage(`找到 ${data.copilots.length} 个作业`)
-          await new Promise(resolve => setTimeout(resolve, 1500))
-          setStatusMessage('')
         }
       } else {
         setStatusMessage(result.message || data.error || '未找到作业')
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        setStatusMessage('')
         setCopilotSearchResult(null)
       }
     } catch (error) {
       setStatusMessage(`搜索失败: ${(error as Error).message}`)
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStatusMessage('')
       setCopilotSearchResult(null)
     } finally {
       setIsSearchingCopilot(false)
@@ -1355,21 +1437,36 @@ export default function CombatTasks(_props: CombatTasksProps) {
                     </div>
                   </div>
 
-                  <Button
-                    onClick={() => handleExecute(task)}
-                    disabled={!automationAvailable || isRunning}
-                    title={!automationAvailable ? unavailableMessage : undefined}
-                    variant="gradient"
-                    size="md"
-                    icon={
-                      <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                      </svg>
-                    }
-                    className="combat-task-run-button min-h-10 px-4 text-sm sm:px-6"
-                  >
-                    立即执行
-                  </Button>
+                  {isRunning ? (
+                    <Button
+                      onClick={handleStopTask}
+                      disabled={isStopping}
+                      loading={isStopping}
+                      loadingText="正在终止"
+                      variant="danger"
+                      size="md"
+                      icon={<span className="h-3 w-3 rounded-[2px] bg-current" aria-hidden="true" />}
+                      className="combat-task-run-button min-h-10 px-4 text-sm sm:px-6"
+                    >
+                      终止执行
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => handleExecute(task)}
+                      disabled={!automationAvailable || waitingForNextCopilot}
+                      title={!automationAvailable ? unavailableMessage : waitingForNextCopilot ? '请先继续或取消当前作业集' : undefined}
+                      variant="primary"
+                      size="md"
+                      icon={
+                        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                        </svg>
+                      }
+                      className="combat-task-run-button min-h-10 px-4 text-sm sm:px-6"
+                    >
+                      立即执行
+                    </Button>
+                  )}
                 </div>
 
                 {/* 作业配置区 */}
@@ -1487,9 +1584,9 @@ export default function CombatTasks(_props: CombatTasksProps) {
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-3 text-xs text-tertiary">
                         <p className="truncate">支持作业链接、导入文件和本地作业。</p>
-                        <details className="relative shrink-0">
+                        <details className="group relative shrink-0">
                           <summary className="cursor-pointer list-none brand-text hover:underline">说明</summary>
-                          <div className="absolute z-20 mt-2 w-72 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-solid)] p-3 text-left shadow-lg space-y-1.5">
+                          <div className="absolute right-0 z-20 mt-2 hidden w-72 space-y-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-solid)] p-3 text-left shadow-lg group-open:block">
                             <p>• 在 <a href="https://zoot.plus/" target="_blank" rel="noopener noreferrer" className="brand-text hover:underline">zoot.plus</a> 获取作业链接</p>
                             <p>• 单作业：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">maa://1234</code>；作业集：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">maa://1234s</code></p>
                             <p>• 作业站链接会自动识别，也可导入远程或本地作业文件</p>
@@ -1547,10 +1644,11 @@ export default function CombatTasks(_props: CombatTasksProps) {
                         {copilotSetInfo?.type === 'set' && copilotSetInfo.copilots && !isRunning && (
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={resetCopilotSetProgress}
-                              className="text-xs text-gray-500 dark:text-gray-400 hover:text-[var(--app-accent)] transition-colors"
+                              onClick={() => setResetProgressDialogOpen(true)}
+                              disabled={isResettingProgress}
+                              className="text-xs text-gray-500 transition-colors hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-400"
                             >
-                              重置进度
+                              {isResettingProgress ? '重置中...' : '重置进度'}
                             </button>
                             <span className="h-3 w-px bg-gray-200 dark:bg-white/10" />
                             <button
@@ -1644,7 +1742,7 @@ export default function CombatTasks(_props: CombatTasksProps) {
                                       onClick={handleStartNextCopilot}
                                       disabled={!automationAvailable}
                                       title={!automationAvailable ? unavailableMessage : undefined}
-                                      variant="gradient"
+                                      variant="primary"
                                       size="md"
                                       fullWidth
                                     >
@@ -1693,19 +1791,24 @@ export default function CombatTasks(_props: CombatTasksProps) {
                                   <div className="flex min-w-0 items-center space-x-2">
                                     {/* 勾选框 */}
                                     <button
+                                      type="button"
                                       onClick={handleToggleSelect}
                                       disabled={isRunning}
-                                      className={`flex h-4 w-4 items-center justify-center rounded border transition-all ${
-                                        isSelected
-                                          ? 'bg-[var(--app-accent)] border-[var(--app-accent)] text-white'
-                                          : 'border-[var(--app-border-strong)] bg-[var(--app-surface-solid)]'
-                                      } ${isRunning ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:border-[var(--app-accent)]'}`}
+                                      aria-pressed={isSelected}
+                                      aria-label={`${isSelected ? '取消选择' : '选择'}第 ${idx + 1} 个作业`}
+                                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg transition-colors ${isRunning ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-[var(--app-accent-soft)]'}`}
                                     >
-                                      {isSelected && (
-                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                        </svg>
-                                      )}
+                                      <span className={`flex h-4 w-4 items-center justify-center rounded border ${
+                                          isSelected
+                                            ? 'border-[var(--app-accent)] bg-[var(--app-accent)] text-white'
+                                            : 'border-[var(--app-border-strong)] bg-[var(--app-surface-solid)]'
+                                        }`}>
+                                        {isSelected && (
+                                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                          </svg>
+                                        )}
+                                      </span>
                                     </button>
                                     <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${
                                       isCurrent ? 'bg-[var(--app-accent)] text-white animate-pulse' :
@@ -1971,21 +2074,36 @@ export default function CombatTasks(_props: CombatTasksProps) {
                       </div>
                     </div>
 
-                    <Button
-                      onClick={() => handleExecute(task)}
-                      disabled={!automationAvailable || isRunning}
-                      title={!automationAvailable ? unavailableMessage : undefined}
-                      variant="gradient"
-                      size="md"
-                      icon={
-                        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                        </svg>
-                      }
-                      className="combat-task-run-button min-h-10 px-4 text-sm sm:px-5"
-                    >
-                      立即执行
-                    </Button>
+                    {isRunning ? (
+                      <Button
+                        onClick={handleStopTask}
+                        disabled={isStopping}
+                        loading={isStopping}
+                        loadingText="正在终止"
+                        variant="danger"
+                        size="md"
+                        icon={<span className="h-3 w-3 rounded-[2px] bg-current" aria-hidden="true" />}
+                        className="combat-task-run-button min-h-10 px-4 text-sm sm:px-5"
+                      >
+                        终止执行
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => handleExecute(task)}
+                        disabled={!automationAvailable || waitingForNextCopilot}
+                        title={!automationAvailable ? unavailableMessage : waitingForNextCopilot ? '请先继续或取消当前作业集' : undefined}
+                        variant="primary"
+                        size="md"
+                        icon={
+                          <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                          </svg>
+                        }
+                        className="combat-task-run-button min-h-10 px-4 text-sm sm:px-5"
+                      >
+                        立即执行
+                      </Button>
+                    )}
                   </div>
 
                   <div className="combat-special-layout">
@@ -2169,6 +2287,15 @@ export default function CombatTasks(_props: CombatTasksProps) {
           </aside>
         </div>
       </div>
+      <ConfirmDialog
+        isOpen={resetProgressDialogOpen}
+        onClose={() => setResetProgressDialogOpen(false)}
+        onConfirm={resetCopilotSetProgress}
+        title="重置作业集进度？"
+        message="已记录的通关进度会被清除，下次将从第一关重新开始。"
+        confirmText="确认重置"
+        variant="danger"
+      />
     </>
   )
 }

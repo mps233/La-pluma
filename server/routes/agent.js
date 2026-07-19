@@ -23,7 +23,6 @@ import {
 } from '../services/maaService.js';
 import { executeScheduleNow, getScheduledTaskFlowPlan, getScheduleExecutionStatus, stopScheduleExecution, getScheduleStatus, setupSchedule, stopSchedule, setupAutoUpdate, getAutoUpdateStatus } from '../services/schedulerService.js';
 import { loadUserConfig, saveUserConfig, getAllUserConfigs, deleteUserConfig } from '../services/configStorageService.js';
-import sklandService from '../services/sklandService.js';
 import { getNotificationConfig, sendNotification, sendToChannel, testNotificationChannel, setNotificationConfig, getTodayOpenStages } from '../services/notificationService.js';
 import operatorTrainingService from '../services/operatorTrainingService.js';
 import { getMaaResourceInfo, updateMaaResources } from '../services/resourceUpdateService.js';
@@ -1319,69 +1318,6 @@ router.get('/device-stats', asyncHandler(async (req, res) => {
   const { adbPath, address } = await resolveRequestConnection(req, { allowOverrides: true })
   const stats = await getDeviceStats(adbPath, address);
   return sendSuccess(res, req, stats);
-}));
-
-router.get('/skland/status', asyncHandler(async (req, res) => {
-  const isLoggedIn = await sklandService.isLoggedIn();
-  const config = await sklandService.getConfig();
-  return sendSuccess(res, req, {
-    isLoggedIn,
-    phone: config?.phone || null,
-    loginTime: config?.loginTime || null
-  });
-}));
-
-router.get('/skland/player', asyncHandler(async (req, res) => {
-  const useCache = req.query.cache !== 'false';
-  const result = await sklandService.getDashboardSummary(useCache);
-  if (!result.success) {
-    return sendError(res, req, agentError(result.error === '未登录' ? 'AGENT_SKLAND_NOT_LOGGED_IN' : 'AGENT_SKLAND_FETCH_FAILED', result.error || '获取森空岛数据失败', {
-      statusCode: result.error === '未登录' ? 401 : 400,
-      details: { useCache },
-      retryable: result.error !== '未登录'
-    }));
-  }
-  return sendSuccess(res, req, result.data, result.cached ? '使用缓存数据' : '获取成功');
-}));
-
-router.post('/skland/send-code', asyncHandler(async (req, res) => {
-  const phone = req.body?.phone;
-  if (!phone) {
-    return sendError(res, req, agentError('AGENT_VALIDATION_PHONE_REQUIRED', '手机号不能为空', { statusCode: 400 }));
-  }
-  const result = await sklandService.sendCode(phone);
-  if (!result.success) {
-    return sendError(res, req, agentError('AGENT_SKLAND_SEND_CODE_FAILED', result.error || '发送失败', { statusCode: 400 }));
-  }
-  return sendSuccess(res, req, null, result.message || '验证码已发送');
-}));
-
-router.post('/skland/login', asyncHandler(async (req, res) => {
-  const { phone, code, savePassword } = req.body || {};
-  if (!phone || !code) {
-    return sendError(res, req, agentError('AGENT_VALIDATION_SKLAND_LOGIN_REQUIRED', '手机号和验证码/密码不能为空', { statusCode: 400 }));
-  }
-  const result = await sklandService.login(phone, code, savePassword || false);
-  if (!result.success) {
-    return sendError(res, req, agentError('AGENT_SKLAND_LOGIN_FAILED', result.error || '登录失败', { statusCode: 400 }));
-  }
-  return sendSuccess(res, req, null, result.message || '登录成功');
-}));
-
-router.post('/skland/logout', asyncHandler(async (req, res) => {
-  const result = await sklandService.logout();
-  if (!result.success) {
-    return sendError(res, req, agentError('AGENT_SKLAND_LOGOUT_FAILED', result.error || '登出失败', { statusCode: 400 }));
-  }
-  return sendSuccess(res, req, null, '登出成功');
-}));
-
-router.post('/skland/refresh', asyncHandler(async (req, res) => {
-  const result = await sklandService.getPlayerData(false);
-  if (!result.success) {
-    return sendError(res, req, agentError('AGENT_SKLAND_REFRESH_FAILED', result.error || '刷新失败', { statusCode: 400 }));
-  }
-  return sendSuccess(res, req, result.data, '刷新成功');
 }));
 
 router.get('/notifications/config', asyncHandler(async (req, res) => {

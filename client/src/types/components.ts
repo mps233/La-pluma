@@ -150,17 +150,9 @@ export interface ConnectionTestStatus {
   message: string
 }
 
-export interface AutomationTasksProps {
-  // 目前没有 props，但定义接口以备将来扩展
-}
-
 // ============================================
 // RoguelikeTasks Component Types
 // ============================================
-
-export interface RoguelikeTasksProps {
-  // 目前没有 props，但定义接口以备将来扩展
-}
 
 export interface RoguelikeTask {
   id: string
@@ -194,10 +186,6 @@ export interface RoguelikeAdvancedParams {
 // ============================================
 // CombatTasks Component Types
 // ============================================
-
-export interface CombatTasksProps {
-  // 目前没有 props，但定义接口以备将来扩展
-}
 
 export interface CombatTask {
   id: string
@@ -296,10 +284,6 @@ export interface ParadoxSearchResult {
 // ConfigManager Component Types
 // ============================================
 
-export interface ConfigManagerProps {
-  // 目前没有 props，但定义接口以备将来扩展
-}
-
 export interface MaaConnectionConfig {
   adb_path: string
   address: string
@@ -315,7 +299,7 @@ export interface AutoUpdateConfig {
 }
 
 export interface ConfigSection {
-  id: 'connection' | 'resource' | 'instance' | 'skland'
+  id: 'connection' | 'resource' | 'instance'
   name: string
   icon: ReactNode
 }
@@ -328,10 +312,6 @@ export interface UpdateStatus {
 // ============================================
 // LogViewer Component Types
 // ============================================
-
-export interface LogViewerProps {
-  // 目前没有 props，但定义接口以备将来扩展
-}
 
 export interface LogEntry {
   time: string
@@ -351,16 +331,10 @@ export interface LogFile {
 // ============================================
 
 export interface DropRecordsProps {
-  dropData: DropData | null
   dropStatistics: DropStatistics | null
   dropDays: number
   setDropDays: (days: number) => void
   onRefresh: () => void
-}
-
-interface DropData {
-  // 今日掉落数据结构（根据实际 API 返回调整）
-  [key: string]: any
 }
 
 interface DropStatistics {
@@ -396,8 +370,6 @@ interface DropStatistics {
 // ============================================
 // DataStatistics 组件类型
 // ============================================
-
-export interface DataStatisticsProps {}
 
 // 仓库数据 (组件专用,包含详细的 items 数组)
 interface DepotItem {

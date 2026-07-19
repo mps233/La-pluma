@@ -28,15 +28,6 @@ export default {
         5: 'var(--app-space-section)',
         6: 'var(--app-space-section)',
       },
-      animation: {
-        'shimmer': 'shimmer 2s infinite linear',
-      },
-      keyframes: {
-        shimmer: {
-          '0%': { backgroundPosition: '-200% 0' },
-          '100%': { backgroundPosition: '200% 0' },
-        },
-      },
     },
   },
   plugins: [],

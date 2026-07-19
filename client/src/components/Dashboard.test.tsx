@@ -16,8 +16,6 @@ const apiMocks = vi.hoisted(() => ({
   loadUserConfig: vi.fn(),
   executeScheduleNow: vi.fn(),
   runCurrentActivity: vi.fn(),
-  getSklandStatus: vi.fn(),
-  getSklandPlayerData: vi.fn(),
   getTrainingQueue: vi.fn(),
   getTodayDrops: vi.fn(),
   getOpenTodayStages: vi.fn(),
@@ -34,8 +32,6 @@ vi.mock('../services/api', () => ({
     runCurrentActivity: apiMocks.runCurrentActivity,
     getErrorMessage: (result?: { message?: string; error?: string }) => result?.message || result?.error || '未知错误',
   },
-  getSklandStatus: apiMocks.getSklandStatus,
-  getSklandPlayerData: apiMocks.getSklandPlayerData,
   getTrainingQueue: apiMocks.getTrainingQueue,
   getTodayDrops: apiMocks.getTodayDrops,
   getOpenTodayStages: apiMocks.getOpenTodayStages,
@@ -96,8 +92,6 @@ describe('Dashboard connectivity state', () => {
     apiMocks.getDeviceStats.mockResolvedValue({ success: false })
     apiMocks.getActivity.mockResolvedValue({ success: true, data: { available: true, name: '测试活动' } })
     apiMocks.getScheduleExecutionStatus.mockResolvedValue({ success: true, data: { isRunning: false } })
-    apiMocks.getSklandStatus.mockResolvedValue({ success: true, data: { isLoggedIn: false, phone: null } })
-    apiMocks.getSklandPlayerData.mockResolvedValue({ success: false })
     apiMocks.getTrainingQueue.mockResolvedValue({ success: true, data: [] })
     apiMocks.getTodayDrops.mockResolvedValue({ success: true, data: [] })
     apiMocks.getOpenTodayStages.mockResolvedValue({ success: true, data: { open: [], closed: [] } })
@@ -167,5 +161,20 @@ describe('Dashboard connectivity state', () => {
 
     await act(async () => resolveBackendCheck?.({ success: true, data: { isRunning: false } }))
     await flushDashboard()
+  })
+
+  it('activates the status beam while the daily flow is running', async () => {
+    apiMocks.getScheduleExecutionStatus.mockResolvedValueOnce({
+      success: true,
+      data: { isRunning: true, currentTask: '收取信用' },
+    })
+
+    await act(async () => root.render(<Dashboard />))
+    await flushDashboard()
+
+    const flow = container.querySelector('.dashboard-flow-glow-shell')
+    expect(flow?.classList.contains('status-border-beam')).toBe(true)
+    expect(flow?.classList.contains('is-active')).toBe(true)
+    expect(flow?.getAttribute('aria-busy')).toBe('true')
   })
 })

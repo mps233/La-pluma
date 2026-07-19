@@ -139,8 +139,9 @@ export default function PWAInstallPrompt() {
     try {
       await updateServiceWorker(true)
     } catch {
-      setIsUpdating(false)
       setStatusMessage('更新失败，请检查连接后重试', 'error')
+    } finally {
+      setIsUpdating(false)
     }
   }
 
@@ -165,11 +166,12 @@ export default function PWAInstallPrompt() {
             key={showUpdateCard ? 'update' : 'install'}
             role="region"
             aria-labelledby="pwa-prompt-title"
+            aria-busy={showUpdateCard && isUpdating}
             initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
             transition={{ duration: shouldReduceMotion ? 0.08 : 0.18, ease: 'easeOut' }}
-            className="pwa-install-prompt surface-panel fixed z-[60] rounded-xl p-4 shadow-xl sm:w-96"
+            className="pwa-install-prompt surface-panel fixed z-50 rounded-xl p-4 shadow-xl sm:w-96"
           >
             <div className="flex items-start gap-3">
               <img
@@ -241,7 +243,7 @@ export default function PWAInstallPrompt() {
             initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="pwa-update-chip fixed z-[60]"
+            className="pwa-update-chip fixed z-50"
           >
             <Button
               variant="secondary"

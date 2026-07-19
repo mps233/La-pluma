@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, SelectHTMLAttributes, ReactNode, ChangeEvent } from 'react'
+import { useId, type InputHTMLAttributes, type SelectHTMLAttributes, type ReactNode, type ChangeEvent } from 'react'
 
 /**
  * 输入框组件 Props
@@ -38,7 +38,6 @@ export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement
   checked: boolean
   onChange: (checked: boolean) => void
   disabled?: boolean
-  color?: 'violet' | 'emerald' | 'cyan' | 'orange' | 'fuchsia'
   className?: string
 }
 
@@ -47,6 +46,7 @@ export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement
  * 统一的输入框样式
  */
 export default function Input({
+  id,
   label,
   placeholder,
   value,
@@ -57,15 +57,25 @@ export default function Input({
   hint,
   icon,
   className = '',
+  'aria-describedby': ariaDescribedBy,
+  'aria-errormessage': ariaErrorMessage,
+  'aria-invalid': ariaInvalid,
   ...props
 }: InputProps) {
+  const generatedId = useId().replace(/:/g, '')
+  const inputId = id ?? `input-${generatedId}`
+  const errorId = `${inputId}-error`
+  const hintId = `${inputId}-hint`
+  const describedBy = [ariaDescribedBy, error ? errorId : hint ? hintId : undefined]
+    .filter(Boolean)
+    .join(' ') || undefined
   const baseStyles = 'app-input control-surface'
   const errorStyles = 'form-error-surface'
   
   return (
     <div className={className}>
       {label && (
-        <label className="block text-sm font-medium text-secondary mb-2">
+        <label htmlFor={inputId} className="mb-2 block text-sm font-medium text-secondary">
           {label}
         </label>
       )}
@@ -78,25 +88,28 @@ export default function Input({
         )}
         
         <input
+          id={inputId}
           type={type}
           value={value}
           onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
           placeholder={placeholder}
           disabled={disabled}
-          aria-invalid={error ? true : undefined}
+          aria-invalid={error ? true : ariaInvalid}
+          aria-describedby={describedBy}
+          aria-errormessage={error ? (ariaErrorMessage ?? errorId) : ariaErrorMessage}
           className={`${baseStyles} ${error ? errorStyles : ''} ${icon ? 'pl-10' : ''}`}
           {...props}
         />
       </div>
       
       {error && (
-        <p className="text-xs form-error-text mt-2">
+        <p id={errorId} className="form-error-text mt-2 text-xs" role="alert">
           {error}
         </p>
       )}
       
       {hint && !error && (
-        <p className="text-xs text-tertiary mt-2">
+        <p id={hintId} className="mt-2 text-xs text-tertiary">
           {hint}
         </p>
       )}
@@ -108,6 +121,7 @@ export default function Input({
  * 选择框组件
  */
 export function Select({
+  id,
   label,
   value,
   onChange,
@@ -116,24 +130,37 @@ export function Select({
   error,
   hint,
   className = '',
+  'aria-describedby': ariaDescribedBy,
+  'aria-errormessage': ariaErrorMessage,
+  'aria-invalid': ariaInvalid,
   ...props
 }: SelectProps) {
+  const generatedId = useId().replace(/:/g, '')
+  const selectId = id ?? `select-${generatedId}`
+  const errorId = `${selectId}-error`
+  const hintId = `${selectId}-hint`
+  const describedBy = [ariaDescribedBy, error ? errorId : hint ? hintId : undefined]
+    .filter(Boolean)
+    .join(' ') || undefined
   const baseStyles = 'app-input control-surface'
   const errorStyles = 'form-error-surface'
   
   return (
     <div className={className}>
       {label && (
-        <label className="block text-sm font-medium text-secondary mb-2">
+        <label htmlFor={selectId} className="mb-2 block text-sm font-medium text-secondary">
           {label}
         </label>
       )}
       
       <select
+        id={selectId}
         value={value}
         onChange={(e: ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)}
         disabled={disabled}
-        aria-invalid={error ? true : undefined}
+        aria-invalid={error ? true : ariaInvalid}
+        aria-describedby={describedBy}
+        aria-errormessage={error ? (ariaErrorMessage ?? errorId) : ariaErrorMessage}
         className={`${baseStyles} ${error ? errorStyles : ''}`}
         {...props}
       >
@@ -145,13 +172,13 @@ export function Select({
       </select>
       
       {error && (
-        <p className="text-xs form-error-text mt-2">
+        <p id={errorId} className="form-error-text mt-2 text-xs" role="alert">
           {error}
         </p>
       )}
       
       {hint && !error && (
-        <p className="text-xs text-tertiary mt-2">
+        <p id={hintId} className="mt-2 text-xs text-tertiary">
           {hint}
         </p>
       )}
@@ -167,18 +194,9 @@ export function Checkbox({
   checked,
   onChange,
   disabled = false,
-  color = 'violet',
   className = '',
   ...props
 }: CheckboxProps) {
-  const colorStyles: Record<string, string> = {
-    violet: 'custom-checkbox-violet',
-    emerald: 'custom-checkbox-emerald',
-    cyan: 'custom-checkbox-cyan',
-    orange: 'custom-checkbox-orange',
-    fuchsia: 'custom-checkbox-fuchsia',
-  }
-  
   return (
     <label className={`app-checkbox group ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
       <input
@@ -186,7 +204,7 @@ export function Checkbox({
         checked={checked}
         onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.checked)}
         disabled={disabled}
-        className={`${colorStyles[color]} cursor-pointer`}
+        className="custom-checkbox cursor-pointer"
         {...props}
       />
       {label && (

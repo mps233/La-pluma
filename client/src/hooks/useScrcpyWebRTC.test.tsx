@@ -3,7 +3,14 @@
 import { act, useEffect, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { resolveSignalingEndpoints, useScrcpyWebRTC } from './useScrcpyWebRTC'
+import {
+  bindInputChannelReadiness,
+  getRenderedVideoGeometry,
+  isPointInsideRenderedVideo,
+  isTouchMoveBackpressured,
+  resolveSignalingEndpoints,
+  useScrcpyWebRTC,
+} from './useScrcpyWebRTC'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -239,6 +246,63 @@ describe('useScrcpyWebRTC startup', () => {
     expect(hook!.status).toBe('disconnected')
     expect(hook!.error).toBeNull()
   })
+
+  it('ignores stale SDP failures after disconnecting the old connection', async () => {
+    let rejectRemoteDescription: ((reason?: unknown) => void) | undefined
+    class MockMediaStream {
+      private tracks: MediaStreamTrack[] = []
+      getTracks() { return this.tracks }
+      getVideoTracks() { return this.tracks }
+      addTrack(track: MediaStreamTrack) { this.tracks.push(track) }
+    }
+    class MockPeerConnection {
+      localDescription: RTCSessionDescription | null = null
+      iceConnectionState = 'new'
+      connectionState = 'new'
+      signalingState = 'stable'
+      iceGatheringState = 'new'
+      ontrack = null
+      onicecandidate = null
+      ondatachannel = null
+      oniceconnectionstatechange = null
+      onconnectionstatechange = null
+      setRemoteDescription = vi.fn(() => new Promise<void>((_resolve, reject) => {
+        rejectRemoteDescription = reject
+      }))
+      createAnswer = vi.fn()
+      setLocalDescription = vi.fn()
+      addIceCandidate = vi.fn()
+      addEventListener = vi.fn()
+      removeEventListener = vi.fn()
+      close = vi.fn()
+      getStats = vi.fn()
+    }
+    vi.stubGlobal('MediaStream', MockMediaStream)
+    vi.stubGlobal('RTCPeerConnection', MockPeerConnection)
+    vi.stubGlobal('RTCSessionDescription', class {
+      constructor(init: RTCSessionDescriptionInit) { Object.assign(this, init) }
+    })
+
+    act(() => hook!.connect())
+    await flushAsyncWork()
+    act(() => MockWebSocket.instances[0]!.open())
+    act(() => {
+      MockWebSocket.instances[0]!.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({
+          message_type: 'device_msg',
+          payload: { type: 'offer', sdp: 'v=0\r\n' },
+        }),
+      }))
+    })
+    expect(hook!.status).toBe('connecting_webrtc')
+
+    act(() => hook!.disconnect())
+    await act(async () => rejectRemoteDescription?.(new Error('old SDP failed')))
+    await flushAsyncWork()
+
+    expect(hook!.status).toBe('disconnected')
+    expect(hook!.error).toBeNull()
+  })
 })
 
 describe('WebRTC signaling endpoint normalization', () => {
@@ -261,5 +325,46 @@ describe('WebRTC signaling endpoint normalization', () => {
       httpBase: 'http://192.168.1.2:8443',
       websocketBase: 'ws://192.168.1.2:8443'
     })
+  })
+})
+
+describe('WebRTC touch transport safeguards', () => {
+  it('reports input-channel readiness immediately and on channel changes', () => {
+    const channel = {
+      readyState: 'connecting',
+      bufferedAmountLowThreshold: 0,
+      onopen: null,
+      onclose: null,
+      onerror: null,
+    } as unknown as RTCDataChannel
+    const readiness: boolean[] = []
+    const cleanup = bindInputChannelReadiness(channel, ready => readiness.push(ready))
+
+    expect(readiness).toEqual([false])
+    Object.defineProperty(channel, 'readyState', { value: 'open', configurable: true })
+    channel.onopen?.(new Event('open'))
+    expect(readiness).toEqual([false, true])
+
+    Object.defineProperty(channel, 'readyState', { value: 'closed', configurable: true })
+    channel.onclose?.(new Event('close'))
+    expect(readiness).toEqual([false, true, false])
+
+    cleanup()
+    expect(channel.onopen).toBeNull()
+    expect(channel.onclose).toBeNull()
+  })
+
+  it('recognizes letterboxing and excludes pointer-down outside the rendered video', () => {
+    const geometry = getRenderedVideoGeometry(1600, 900, 1080, 1920)
+
+    expect(geometry).toEqual({ actualW: 506.25, actualH: 900, offsetX: 546.875, offsetY: 0 })
+    expect(isPointInsideRenderedVideo(100, 450, { left: 0, top: 0 }, geometry!)).toBe(false)
+    expect(isPointInsideRenderedVideo(800, 450, { left: 0, top: 0 }, geometry!)).toBe(true)
+  })
+
+  it('drops only move packets under backpressure so release packets still get sent', () => {
+    expect(isTouchMoveBackpressured(2, 64 * 1024 + 1)).toBe(true)
+    expect(isTouchMoveBackpressured(1, 64 * 1024 + 1)).toBe(false)
+    expect(isTouchMoveBackpressured(3, 64 * 1024 + 1)).toBe(false)
   })
 })

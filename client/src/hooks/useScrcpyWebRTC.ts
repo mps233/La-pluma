@@ -49,10 +49,66 @@ const SIGNALING_TOKEN_KEY = 'scrcpy_webrtc_auth_token'
 const DEFAULT_SIGNALING_PATH = '/webrtc-signaling'
 const SIGNALING_RETRY_DELAYS_MS = [300, 800]
 const SIGNALING_ATTEMPT_TIMEOUT_MS = 4000
+const INPUT_CHANNEL_BACKPRESSURE_BYTES = 64 * 1024
 
 interface SignalingEndpoints {
   httpBase: string
   websocketBase: string
+}
+
+interface RenderedVideoGeometry {
+  actualW: number
+  actualH: number
+  offsetX: number
+  offsetY: number
+}
+
+export function getRenderedVideoGeometry(
+  containerWidth: number,
+  containerHeight: number,
+  videoWidth: number,
+  videoHeight: number
+): RenderedVideoGeometry | null {
+  if (!containerWidth || !containerHeight || !videoWidth || !videoHeight) return null
+  const videoRatio = videoWidth / videoHeight
+  const clientRatio = containerWidth / containerHeight
+  if (clientRatio > videoRatio) {
+    const actualH = containerHeight
+    const actualW = containerHeight * videoRatio
+    return { actualW, actualH, offsetX: (containerWidth - actualW) / 2, offsetY: 0 }
+  }
+  const actualW = containerWidth
+  const actualH = containerWidth / videoRatio
+  return { actualW, actualH, offsetX: 0, offsetY: (containerHeight - actualH) / 2 }
+}
+
+export function isPointInsideRenderedVideo(
+  clientX: number,
+  clientY: number,
+  rect: Pick<DOMRect, 'left' | 'top'>,
+  geometry: RenderedVideoGeometry
+) {
+  const relativeX = clientX - rect.left - geometry.offsetX
+  const relativeY = clientY - rect.top - geometry.offsetY
+  return relativeX >= 0 && relativeX <= geometry.actualW && relativeY >= 0 && relativeY <= geometry.actualH
+}
+
+export function isTouchMoveBackpressured(action: number, bufferedAmount: number) {
+  return action === 2 && bufferedAmount > INPUT_CHANNEL_BACKPRESSURE_BYTES
+}
+
+export function bindInputChannelReadiness(channel: RTCDataChannel, onChange: (ready: boolean) => void) {
+  channel.bufferedAmountLowThreshold = INPUT_CHANNEL_BACKPRESSURE_BYTES / 2
+  const update = () => onChange(channel.readyState === 'open')
+  channel.onopen = update
+  channel.onclose = update
+  channel.onerror = update
+  update()
+  return () => {
+    channel.onopen = null
+    channel.onclose = null
+    channel.onerror = null
+  }
 }
 
 function endpointBase(url: URL) {
@@ -163,10 +219,13 @@ export function useScrcpyWebRTC({
   const [status, setStatus] = useState<WebRTCStatus>('idle')
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<VideoStats | null>(null)
+  const [inputReady, setInputReady] = useState(false)
+  const [mediaStream, setMediaStream] = useState<MediaStream | null>(null)
   const [deviceSize, setDeviceSize] = useState({ width: 1080, height: 1920 })
   const wsRef = useRef<WebSocket | null>(null)
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const inputChannelRef = useRef<RTCDataChannel | null>(null)
+  const inputChannelCleanupRef = useRef<(() => void) | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const iceServersRef = useRef<RTCIceServer[]>([{ urls: 'stun:stun.l.google.com:19302' }])
   const touchSeqRef = useRef(0)
@@ -174,6 +233,7 @@ export function useScrcpyWebRTC({
   const retryTimerRef = useRef<number | null>(null)
   const attemptTimeoutRef = useRef<number | null>(null)
   const authAbortControllerRef = useRef<AbortController | null>(null)
+  const iceGatheringCleanupRef = useRef<(() => void) | null>(null)
   const prevStatsRef = useRef({ timestamp: 0, bytesReceived: 0, framesDecoded: 0 })
 
   const sendForward = useCallback((payload: unknown) => {
@@ -203,9 +263,12 @@ export function useScrcpyWebRTC({
       iceTransportPolicy: connectionPath === 'relay' ? 'relay' : 'all'
     })
     pcRef.current = pc
-    streamRef.current = new MediaStream()
+    const stream = new MediaStream()
+    streamRef.current = stream
+    setMediaStream(stream)
 
     pc.ontrack = evt => {
+      if (pcRef.current !== pc) return
       if (evt.track.kind !== 'video') return
       const stream = streamRef.current || new MediaStream()
       streamRef.current = stream
@@ -218,6 +281,7 @@ export function useScrcpyWebRTC({
     }
 
     pc.onicecandidate = evt => {
+      if (pcRef.current !== pc) return
       if (!evt.candidate) return
       const candidate = evt.candidate.candidate
       if (!shouldKeepCandidate(candidate, connectionPath, ipPreference)) return
@@ -232,10 +296,20 @@ export function useScrcpyWebRTC({
     }
 
     pc.ondatachannel = evt => {
-      if (evt.channel.label === 'input-channel') inputChannelRef.current = evt.channel
+      if (pcRef.current !== pc) return
+      if (evt.channel.label !== 'input-channel') return
+
+      const channel = evt.channel
+      inputChannelCleanupRef.current?.()
+      inputChannelRef.current = channel
+      inputChannelCleanupRef.current = bindInputChannelReadiness(channel, ready => {
+        if (inputChannelRef.current !== channel) return
+        setInputReady(ready)
+      })
     }
 
     pc.oniceconnectionstatechange = () => {
+      if (pcRef.current !== pc) return
       if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') setStatus('connected')
       if (pc.iceConnectionState === 'failed') {
         setError('ICE connection failed')
@@ -244,6 +318,7 @@ export function useScrcpyWebRTC({
     }
 
     pc.onconnectionstatechange = () => {
+      if (pcRef.current !== pc) return
       if (pc.connectionState === 'connected') setStatus('connected')
       if (pc.connectionState === 'failed') {
         setError('WebRTC connection failed')
@@ -266,7 +341,12 @@ export function useScrcpyWebRTC({
     }
     authAbortControllerRef.current?.abort()
     authAbortControllerRef.current = null
+    iceGatheringCleanupRef.current?.()
+    iceGatheringCleanupRef.current = null
     inputChannelRef.current = null
+    inputChannelCleanupRef.current?.()
+    inputChannelCleanupRef.current = null
+    setInputReady(false)
     const pc = pcRef.current
     pcRef.current = null
     if (pc) {
@@ -279,6 +359,7 @@ export function useScrcpyWebRTC({
     if (ws && ws.readyState < WebSocket.CLOSING) ws.close()
     streamRef.current?.getTracks().forEach(track => track.stop())
     streamRef.current = null
+    setMediaStream(null)
     if (videoRef.current) videoRef.current.srcObject = null
     prevStatsRef.current = { timestamp: 0, bytesReceived: 0, framesDecoded: 0 }
     setStats(null)
@@ -419,35 +500,51 @@ export function useScrcpyWebRTC({
             if (payload.type === 'offer') {
               setStatus('connecting_webrtc')
               const pc = createPeerConnection()
-              void pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: filterSdpCandidates(payload.sdp) }))
-                .then(() => pc.createAnswer())
-                .then(answer => {
+              const isCurrentConnection = () => connectionGenerationRef.current === generation && pcRef.current === pc
+
+              void (async () => {
+                try {
+                  await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: filterSdpCandidates(payload.sdp) }))
+                  if (!isCurrentConnection()) return
+                  const answer = await pc.createAnswer()
+                  if (!isCurrentConnection()) return
                   let sdp = answer.sdp || ''
                   const answerBitrateKbps = Math.max(1000, Math.round((scrcpyOptionsRef.current.max_bitrate || scrcpyOptionsRef.current.bitrate || 8000000) / 1000))
                   sdp = sdp.replace(/m=video (.*)\r\n/g, `m=video $1\r\nb=AS:${answerBitrateKbps}\r\n`)
-                  return pc.setLocalDescription(new RTCSessionDescription({ type: 'answer', sdp }))
-                })
-                .then(() => {
+                  await pc.setLocalDescription(new RTCSessionDescription({ type: 'answer', sdp }))
+                  if (!isCurrentConnection()) return
                   if (pc.iceGatheringState === 'complete') {
                     sendAnswer()
                     return
                   }
+
+                  iceGatheringCleanupRef.current?.()
                   let sent = false
+                  let timeoutId: number | null = null
+                  const handleGatheringChange = () => {
+                    if (pc.iceGatheringState === 'complete') finish()
+                  }
+                  const cleanup = () => {
+                    pc.removeEventListener('icegatheringstatechange', handleGatheringChange)
+                    if (timeoutId !== null) window.clearTimeout(timeoutId)
+                    timeoutId = null
+                    if (iceGatheringCleanupRef.current === cleanup) iceGatheringCleanupRef.current = null
+                  }
                   const finish = () => {
                     if (sent) return
                     sent = true
-                    pc.removeEventListener('icegatheringstatechange', finish)
-                    sendAnswer()
+                    cleanup()
+                    if (isCurrentConnection()) sendAnswer()
                   }
-                  pc.addEventListener('icegatheringstatechange', () => {
-                    if (pc.iceGatheringState === 'complete') finish()
-                  })
-                  window.setTimeout(finish, 2000)
-                })
-                .catch(err => {
-                  setError(`SDP 处理失败: ${err.message}`)
+                  pc.addEventListener('icegatheringstatechange', handleGatheringChange)
+                  timeoutId = window.setTimeout(finish, 2000)
+                  iceGatheringCleanupRef.current = cleanup
+                } catch (err) {
+                  if (!isCurrentConnection()) return
+                  setError(`SDP 处理失败: ${err instanceof Error ? err.message : String(err)}`)
                   setStatus('error')
-                })
+                }
+              })()
             } else if (payload.type === 'ice-candidate' && payload.candidate) {
               const candidate = payload.candidate.candidate
               if (!shouldKeepCandidate(candidate, connectionPath, ipPreference)) return
@@ -483,31 +580,50 @@ export function useScrcpyWebRTC({
   const sendTouch = useCallback((action: number, clientX: number, clientY: number, id = 0, targetVideo?: HTMLVideoElement | null) => {
     const channel = inputChannelRef.current
     const video = targetVideo || videoRef.current
-    if (!channel || channel.readyState !== 'open' || !video || !video.videoWidth || !video.videoHeight) return false
+    if (!channel || channel.readyState !== 'open') return false
+    if (isTouchMoveBackpressured(action, channel.bufferedAmount)) return false
+
+    const isRelease = action === 1 || action === 3
+    const sendTouchPacket = (x: number, y: number, w: number, h: number) => {
+      try {
+        channel.send(JSON.stringify({
+          type: 'touch',
+          id,
+          seq: ++touchSeqRef.current,
+          client_ts_ms: Date.now(),
+          action,
+          x,
+          y,
+          w,
+          h
+        }))
+        return true
+      } catch {
+        return false
+      }
+    }
+    const sendReleaseFallback = () => sendTouchPacket(0, 0, deviceSize.width, deviceSize.height)
+
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      return isRelease ? sendReleaseFallback() : false
+    }
 
     const rect = video.getBoundingClientRect()
-    const videoRatio = video.videoWidth / video.videoHeight
-    const clientRatio = rect.width / rect.height
-    let actualW: number, actualH: number, offsetX: number, offsetY: number
-    if (clientRatio > videoRatio) {
-      actualH = rect.height
-      actualW = rect.height * videoRatio
-      offsetX = (rect.width - actualW) / 2
-      offsetY = 0
-    } else {
-      actualW = rect.width
-      actualH = rect.width / videoRatio
-      offsetX = 0
-      offsetY = (rect.height - actualH) / 2
-    }
+    if (!rect.width || !rect.height) return isRelease ? sendReleaseFallback() : false
+    const geometry = getRenderedVideoGeometry(rect.width, rect.height, video.videoWidth, video.videoHeight)
+    if (!geometry) return isRelease ? sendReleaseFallback() : false
+    const { actualW, actualH, offsetX, offsetY } = geometry
 
     const isLandscape = video.videoWidth > video.videoHeight
     const targetW = isLandscape ? deviceSize.height : deviceSize.width
     const targetH = isLandscape ? deviceSize.width : deviceSize.height
-    const x = Math.max(0, Math.min(targetW, Math.round((clientX - rect.left - offsetX) / actualW * targetW)))
-    const y = Math.max(0, Math.min(targetH, Math.round((clientY - rect.top - offsetY) / actualH * targetH)))
-    channel.send(JSON.stringify({ type: 'touch', id, seq: ++touchSeqRef.current, client_ts_ms: Date.now(), action, x, y, w: targetW, h: targetH }))
-    return true
+    const relativeX = clientX - rect.left - offsetX
+    const relativeY = clientY - rect.top - offsetY
+    if (action === 0 && !isPointInsideRenderedVideo(clientX, clientY, rect, geometry)) return false
+
+    const x = Math.max(0, Math.min(targetW - 1, Math.round(relativeX / actualW * targetW)))
+    const y = Math.max(0, Math.min(targetH - 1, Math.round(relativeY / actualH * targetH)))
+    return sendTouchPacket(x, y, targetW, targetH)
   }, [deviceSize.height, deviceSize.width, videoRef])
 
   const sendCommand = useCallback((command: string) => {
@@ -555,16 +671,16 @@ export function useScrcpyWebRTC({
             iceState: pc.iceConnectionState || 'unknown',
             peerState: pc.connectionState || 'unknown',
             signalingState: pc.signalingState || 'unknown',
-            inputReady: inputChannelRef.current?.readyState === 'open'
+            inputReady
           })
           break
         }
       }
     }, 1000)
     return () => window.clearInterval(timer)
-  }, [videoRef])
+  }, [inputReady, videoRef])
 
   useEffect(() => disconnect, [disconnect])
 
-  return { status, error, stats, connect, disconnect, sendTouch, sendCommand }
+  return { status, error, stats, inputReady, mediaStream, connect, disconnect, sendTouch, sendCommand }
 }

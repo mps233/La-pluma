@@ -25,11 +25,12 @@
 - 多行正文使用 `leading-6` 或 `leading-relaxed`；普通中文文本不要新增 letter spacing，也不要在普通页面新建 `8px` 至 `11px` 微文案。
 - 可点击元素优先使用 `Button`、`IconButton`、`control-surface` 或 `surface-panel-hover`，并保留 `focus-visible`。静态卡片不添加 hover 位移或投影；禁用与 loading 状态必须关闭交互，不能只降低透明度。
 - 普通 hover 只做轻微压暗、弱主题背景或 1px 描边；不要新增高亮渐变、重投影或无意义缩放。新增动效应尊重 reduced motion。
+- 启动、连接或执行中的重点区域可使用 `status-border-beam is-active` 提供短暂的主题色边框反馈；空闲后移除 `is-active`，不要用于普通静态卡片。
 
 ### 反馈、图标与布局
 
 - 字段问题用表单组件的 `error`；控制台初始加载由专用的 `DashboardSkeleton` 维持结构；局部加载用 `Loading`；无数据用 `EmptyState`；不可逆操作用 `ConfirmDialog`。区域错误必须就地展示和重试，不要伪装成空状态。
-- 全局短消息使用 `useStatusStore.setMessage` 和 `FloatingStatusIndicator`，不要新增独立 toast 或自行清除定时器。
+- 全局结果使用 `useStatusStore.setMessage` 和 `FloatingStatusIndicator`。错误持续到用户关闭，其他短消息由 store 自动收起；不要新增独立 toast 或自行清除定时器。
 - 普通功能图标优先用 `lucide-react`，业务身份图标复用 `Icons`。无文字操作用 `IconButton` 并同时提供 `title` 与 `aria-label`；装饰图标加 `aria-hidden`。
 - 应用外层使用 `app-shell` 控制 1600px 最大宽度与响应式 gutter；页面内容使用 `app-page`，区块用 `app-stack-section`，卡片内用 `app-stack-card`。页面内部不要再嵌套 `max-w-7xl` 或重复水平 padding。不要为凑版式嵌套卡片或硬塞多栏；每列保持 `min-w-0`，窄屏优先折叠。
 
@@ -95,6 +96,7 @@ Props：
 - `subtitle` (string) - 副标题
 - `actions` (ReactNode) - 右侧操作区域
 - `animated` (boolean) - 是否启用动画，默认 `true`
+- `mobileLayout` (`stack` | `inline`) - 手机端操作布局；默认 `stack`，仅标题和操作足够紧凑时使用 `inline`
 
 页面标题统一使用全局品牌色，不再按页面传入独立渐变。
 
@@ -129,8 +131,6 @@ Card Props：
 - `className` (string) - 额外类名
 - `animated` (boolean) - 是否启用动画，默认 `true`
 - `delay` (number) - 动画延迟，默认 `0`
-- `hover` (boolean) - 是否启用悬停效果，默认 `false`
-- `theme` - 旧调用兼容参数。所有值当前均使用同一套主题表面，新代码不要用它区分模块配色。
 
 `CardHeader` 支持 `icon`、`title`、`actions`；`CardContent` 和 `InfoCard` 均支持 `className`。
 
@@ -155,9 +155,8 @@ import { Button, IconButton } from '@/components/common'
 - `success`：成功或确认类操作
 - `danger`：危险操作
 - `ghost`：低强调操作
-- `gradient`：保留的主要操作兼容别名，新代码使用 `primary`
 
-`IconButton` 仅支持 `primary`、`secondary`、`danger`、`ghost`；没有 `success`、`outline` 或 `gradient` 变体。
+`IconButton` 仅支持 `primary`、`secondary`、`danger`、`ghost`。
 
 ---
 
@@ -189,7 +188,7 @@ import { Input, Select, Checkbox } from '@/components/common'
 />
 ```
 
-表单错误态使用 `error` prop，不要在页面里单独手写红色边框和错误文字。`Input`、`Select` 均支持 `hint`；`Input` 额外支持前置 `icon`。多行文本使用带 `app-input control-surface` 的原生 `textarea`。`Checkbox.color` 是历史兼容参数，新代码不要按页面传入不同颜色。
+表单错误态使用 `error` prop，不要在页面里单独手写红色边框和错误文字。`Input`、`Select` 均支持 `hint`；`Input` 额外支持前置 `icon`。多行文本使用带 `app-input control-surface` 的原生 `textarea`。
 
 ---
 
@@ -225,7 +224,7 @@ Props：
 
 `ConfirmDialog` 和 `Loading` 从 common 导出。
 
-- `ConfirmDialog`：删除、清空等不可逆操作的确认弹窗，传入明确的标题、说明和关闭行为。
+- `ConfirmDialog`：删除、清空等不可逆操作的确认弹窗。异步 `onConfirm` 返回 `false` 或抛出错误时会保持打开并就地显示失败原因。
 - `Loading`：短时局部等待状态。
 - `DashboardSkeleton`：控制台专用骨架，由 `Dashboard` 直接从 `Loading.tsx` 引入，不属于 common 的公共导出。
 

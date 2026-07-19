@@ -15,6 +15,7 @@ const ENV_KEYS = [
   'LA_PLUMA_WEBRTC_START_POLL_INTERVAL_MS',
   'TEST_WEBRTC_DEVICES_FILE',
   'TEST_WEBRTC_SERVER_COUNT_FILE',
+  'TEST_WEBRTC_SERVER_ARGS_FILE',
   'TEST_WEBRTC_AGENT_COUNT_FILE',
   'TEST_WEBRTC_AGENT_PID_FILE',
   'TEST_WEBRTC_SERVER_PID_FILE'
@@ -56,6 +57,7 @@ describe('WebRTC startup readiness', () => {
   let fixtureDir
   let devicesFile
   let serverCountFile
+  let serverArgsFile
   let agentCountFile
   let agentPidFile
   let serverPidFile
@@ -76,6 +78,7 @@ describe('WebRTC startup readiness', () => {
 
     devicesFile = join(fixtureDir, 'devices.json')
     serverCountFile = join(fixtureDir, 'server-count.log')
+    serverArgsFile = join(fixtureDir, 'server-args.json')
     agentCountFile = join(fixtureDir, 'agent-count.log')
     agentPidFile = join(fixtureDir, 'agent.pid')
     serverPidFile = join(fixtureDir, 'server.pid')
@@ -88,6 +91,7 @@ const fs = require('node:fs')
 const http = require('node:http')
 
 fs.appendFileSync(process.env.TEST_WEBRTC_SERVER_COUNT_FILE, 'spawn\\n')
+fs.writeFileSync(process.env.TEST_WEBRTC_SERVER_ARGS_FILE, JSON.stringify(process.argv.slice(2)))
 fs.writeFileSync(process.env.TEST_WEBRTC_SERVER_PID_FILE, String(process.pid))
 
 const server = http.createServer((request, response) => {
@@ -133,6 +137,10 @@ printf '["%s"]' "$3" > "$TEST_WEBRTC_DEVICES_FILE"
 `)
 
     await writeFile(fakeAdbPath, `#!/bin/bash
+if [ "$1" = "devices" ]; then
+  printf 'List of devices attached\\nfixture-device\\tdevice\\nsecond-address\\tdevice\\nfailure-address\\tdevice\\ntimeout-address\\tdevice\\nqueued-address\\tdevice\\n'
+  exit 0
+fi
 if [[ "$*" == *"pkill -f cloudphone-agent"* ]]; then
   printf '[]' > "$TEST_WEBRTC_DEVICES_FILE"
   exit 0
@@ -156,6 +164,7 @@ fi
       LA_PLUMA_WEBRTC_START_POLL_INTERVAL_MS: '20',
       TEST_WEBRTC_DEVICES_FILE: devicesFile,
       TEST_WEBRTC_SERVER_COUNT_FILE: serverCountFile,
+      TEST_WEBRTC_SERVER_ARGS_FILE: serverArgsFile,
       TEST_WEBRTC_AGENT_COUNT_FILE: agentCountFile,
       TEST_WEBRTC_AGENT_PID_FILE: agentPidFile,
       TEST_WEBRTC_SERVER_PID_FILE: serverPidFile
@@ -199,6 +208,63 @@ fi
     )
   })
 
+  it('waits for the selected ADB target and reports its actual state', async () => {
+    assert.equal(service.parseAdbDeviceState(
+      'List of devices attached\n127.0.0.1:5555\tdevice product:test\n',
+      '127.0.0.1:5555'
+    ), 'device')
+
+    const states = [null, 'offline', 'device']
+    let attempts = 0
+    const ready = await service.waitForAdbDeviceReady('127.0.0.1:5555', fakeAdbPath, {
+      timeoutMs: 1000,
+      pollIntervalMs: 5,
+      getDeviceState: async () => {
+        attempts += 1
+        return states.length ? states.shift() : 'device'
+      }
+    })
+    assert.equal(ready, 'device')
+    assert.equal(attempts, 3)
+
+    await assert.rejects(
+      service.waitForAdbDeviceReady('127.0.0.1:5555', fakeAdbPath, {
+        timeoutMs: 20,
+        pollIntervalMs: 5,
+        getDeviceState: async () => 'unauthorized'
+      }),
+      error => error.code === 'WEBRTC_ADB_DEVICE_UNAUTHORIZED'
+        && error.message.includes('允许调试')
+        && error.retryable === true
+    )
+  })
+
+  it('recognizes a binary release layout and skips the missing source build step', async () => {
+    const legacyAssetsDir = join(fixtureDir, 'assets', 'v1')
+    const releaseIndex = join(fixtureDir, 'assets', 'index.html')
+    const buildScript = join(fixtureDir, 'build.sh')
+    const buildMarker = join(fixtureDir, 'build-ran')
+
+    await rm(legacyAssetsDir, { recursive: true, force: true })
+    await writeFile(releaseIndex, '<!doctype html>')
+    await writeFile(buildScript, `#!/bin/bash\nprintf ran > "${buildMarker}"\nexit 99\n`)
+
+    try {
+      assert.equal(await service.getWebrtcAssetsPath(), join(fixtureDir, 'assets'))
+      const status = await service.installWebrtc()
+      assert.equal(status.installed, true)
+      assert.equal(status.built, true)
+      assert.equal(await service.pathExists(buildMarker), false)
+    } finally {
+      await Promise.all([
+        rm(releaseIndex, { force: true }),
+        rm(buildScript, { force: true }),
+        rm(buildMarker, { force: true }),
+        mkdir(legacyAssetsDir, { recursive: true })
+      ])
+    }
+  })
+
   it('serializes concurrent starts and waits for authenticated device registration', async () => {
     const [first, second] = await Promise.all([
       service.startWebrtc('fixture-device', 'preview-device', fakeAdbPath),
@@ -214,6 +280,12 @@ fi
     assert.deepEqual(await service.getWebrtcDevices({ throwOnError: true }), ['preview-device'])
     assert.equal(await countLines(serverCountFile), 1)
     assert.equal(await countLines(agentCountFile), 1)
+    const serverArgs = JSON.parse(await readFile(serverArgsFile, 'utf8'))
+    assert.equal(serverArgs.includes('-tls=false'), true)
+    assert.deepEqual(serverArgs.slice(serverArgs.indexOf('-assets'), serverArgs.indexOf('-assets') + 2), [
+      '-assets',
+      join(fixtureDir, 'assets', 'v1')
+    ])
 
     await service.startWebrtc('fixture-device', 'preview-device', fakeAdbPath)
     assert.equal(await countLines(serverCountFile), 1)

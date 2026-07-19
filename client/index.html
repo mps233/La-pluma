@@ -13,16 +13,24 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="La Pluma" />
     <script>
-      try {
-        const stored = JSON.parse(localStorage.getItem('ui-storage') || '{}').state
-        const theme = stored?.theme || 'dark'
-        const dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
-        document.documentElement.classList.toggle('dark', dark)
-        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#05090c' : '#f6f8fb')
-        document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.setAttribute('content', dark ? 'black-translucent' : 'default')
-      } catch {
-        document.documentElement.classList.add('dark')
-      }
+      (() => {
+        const applyTheme = (theme) => {
+          const dark = theme === 'dark'
+            || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+          document.documentElement.classList.toggle('dark', dark)
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+          document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#05090c' : '#f6f8fb')
+          document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.setAttribute('content', dark ? 'black-translucent' : 'default')
+        }
+        window.__LA_PLUMA_APPLY_THEME__ = applyTheme
+        try {
+          const stored = JSON.parse(localStorage.getItem('ui-storage') || '{}').state
+          const theme = ['light', 'dark', 'system'].includes(stored?.theme) ? stored.theme : 'dark'
+          applyTheme(theme)
+        } catch {
+          applyTheme('dark')
+        }
+      })()
     </script>
     
     <title>La Pluma - MAA WebUI</title>

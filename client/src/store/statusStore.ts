@@ -3,7 +3,7 @@ import { detectStatusMessageType, type StatusMessageType } from '../utils/status
 
 const AUTO_DISMISS_MS: Record<StatusMessageType, number> = {
   success: 1500,
-  error: 2500,
+  error: 0,
   warning: 3000,
   info: 10000,
   default: 3000,
@@ -34,6 +34,7 @@ export const useStatusStore = create<StatusState>((set, get) => {
   const scheduleDismiss = (type: StatusMessageType, revision: number) => {
     cancelDismissTimer()
     if (get().isActive) return
+    if (AUTO_DISMISS_MS[type] <= 0) return
 
     dismissTimer = setTimeout(() => {
       if (revision !== messageRevision || get().isActive) return

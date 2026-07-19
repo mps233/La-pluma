@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { maaApi, getTodayDrops, getDropStatistics, fetchOperatorMaterials, getTrainingQueue, getItemIconUrl } from '../services/api'
+import { maaApi, getAllOperators, getDropStatistics, getItemIconUrl, getOperBoxData, fetchOperatorMaterials, getTrainingQueue } from '../services/api'
 import { motion } from 'framer-motion'
 import Icons from './Icons'
 import DropRecords from './DropRecords'
@@ -7,7 +7,6 @@ import { PageHeader, InfoCard, Button } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type {
-  DataStatisticsProps,
   DepotDataDetailed,
   OperBoxData,
   OperatorDetailed,
@@ -55,7 +54,7 @@ const taskPanelClass = (isActive: boolean) =>
 const statCardClass = 'rounded-2xl border border-[var(--app-border)] p-3 surface-soft'
 const chipClass = 'brand-chip rounded-full px-2 py-0.5 text-xs whitespace-nowrap'
 
-export default function DataStatistics({}: DataStatisticsProps) {
+export default function DataStatistics() {
   const [isRunning, setIsRunning] = useState(false)
   const [activeTask, setActiveTask] = useState<ActiveTask>(null)
   const { setMessage: setStatusMessage } = useStatusStore()
@@ -108,7 +107,6 @@ export default function DataStatistics({}: DataStatisticsProps) {
   }, [depotData])
 
   // 掉落记录相关状态
-  const [dropData, setDropData] = useState<any>(null)
   const [dropStatistics, setDropStatistics] = useState<any>(null)
   const [dropDays, setDropDays] = useState(7)
 
@@ -150,7 +148,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
       }
 
       // 加载干员数据
-      const operBoxResult = await maaApi.getOperBoxData()
+      const operBoxResult = await getOperBoxData()
       if (operBoxResult.success) {
         setOperBoxData({
           operCount: operBoxResult.data.operCount,
@@ -165,7 +163,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
 
   const loadAllOperators = async () => {
     try {
-      const result = await maaApi.getAllOperators()
+      const result = await getAllOperators()
       if (result.success) {
         setAllOperators(result.data)
       }
@@ -177,12 +175,6 @@ export default function DataStatistics({}: DataStatisticsProps) {
   // 加载掉落数据
   const loadDropData = async () => {
     try {
-      // 加载今日掉落
-      const todayResult = await getTodayDrops()
-      if (todayResult.success) {
-        setDropData(todayResult.data)
-      }
-      
       // 加载统计数据
       const statsResult = await getDropStatistics(dropDays)
       if (statsResult.success) {
@@ -406,32 +398,20 @@ export default function DataStatistics({}: DataStatisticsProps) {
 
             if (queueResult.success && queueResult.data && queueResult.data.length > 0) {
               setStatusMessage(`识别完成！共识别 ${parseResult.data.itemCount} 种物品，已更新养成进度`)
-              await new Promise(resolve => setTimeout(resolve, 2000))
-              setStatusMessage('')
             } else {
               setStatusMessage(`识别完成！共识别 ${parseResult.data.itemCount} 种物品`)
-              await new Promise(resolve => setTimeout(resolve, 2000))
-              setStatusMessage('')
             }
           } catch (error) {
             setStatusMessage(`识别完成！共识别 ${parseResult.data.itemCount} 种物品`)
-            await new Promise(resolve => setTimeout(resolve, 2000))
-            setStatusMessage('')
           }
         } else {
           setStatusMessage(`识别完成，但数据解析失败: ${maaApi.getErrorMessage(parseResult)}`)
-          await new Promise(resolve => setTimeout(resolve, 2000))
-          setStatusMessage('')
         }
       } else {
         setStatusMessage(`识别失败: ${maaApi.getErrorMessage(result)}`)
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        setStatusMessage('')
       }
     } catch (error: any) {
       setStatusMessage(`识别失败: ${error.message}`)
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStatusMessage('')
     } finally {
       setIsRunning(false)
       setActiveTask(null)
@@ -450,20 +430,14 @@ export default function DataStatistics({}: DataStatisticsProps) {
 
       if (result.success) {
         setStatusMessage('干员材料数据获取成功！')
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        setStatusMessage('')
 
         // 重新加载干员列表以显示材料数据
         await loadAllOperators()
       } else {
         setStatusMessage(`获取失败: ${maaApi.getErrorMessage(result)}`)
-        await new Promise(resolve => setTimeout(resolve, 3000))
-        setStatusMessage('')
       }
     } catch (error: any) {
       setStatusMessage(`获取失败: ${error.message}`)
-      await new Promise(resolve => setTimeout(resolve, 3000))
-      setStatusMessage('')
     } finally {
       setIsRunning(false)
     }
@@ -507,22 +481,14 @@ export default function DataStatistics({}: DataStatisticsProps) {
             path: parseResult.data.path,
             timestamp: new Date().toISOString()
           })
-          await new Promise(resolve => setTimeout(resolve, 2000))
-          setStatusMessage('')
         } else {
           setStatusMessage(`识别完成，但数据解析失败: ${maaApi.getErrorMessage(parseResult)}`)
-          await new Promise(resolve => setTimeout(resolve, 2000))
-          setStatusMessage('')
         }
       } else {
         setStatusMessage(`识别失败: ${maaApi.getErrorMessage(result)}`)
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        setStatusMessage('')
       }
     } catch (error: any) {
       setStatusMessage(`识别失败: ${error.message}`)
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      setStatusMessage('')
     } finally {
       setIsRunning(false)
       setActiveTask(null)
@@ -644,7 +610,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                     <Button
                       onClick={executeOperBox}
                       disabled={isRunning}
-                      variant="gradient"
+                      variant="primary"
                       icon={
                         <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
@@ -1084,7 +1050,7 @@ export default function DataStatistics({}: DataStatisticsProps) {
                   <Button
                     onClick={executeDepot}
                     disabled={isRunning}
-                    variant="gradient"
+                    variant="primary"
                     icon={
                       <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
@@ -1217,7 +1183,6 @@ export default function DataStatistics({}: DataStatisticsProps) {
           {/* 掉落记录 */}
           {activeTab === 'drops' && (
             <DropRecords
-              dropData={dropData}
               dropStatistics={dropStatistics}
               dropDays={dropDays}
               setDropDays={setDropDays}

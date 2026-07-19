@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { getOperatorList, getAllOperators, getOperBoxData, getTrainingQueue, addToTrainingQueue, removeFromTrainingQueue, updateTrainingSettings, generateTrainingPlan, applyTrainingPlan, getItemIconUrl } from '../services/api'
+import { getOperatorList, getAllOperators, getOperBoxData, getTrainingQueue, addToTrainingQueue, removeFromTrainingQueue, updateTrainingQueueOrder, updateTrainingSettings, generateTrainingPlan, applyTrainingPlan, getItemIconUrl } from '../services/api'
 import { PageHeader, Button, Checkbox, IconButton } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
@@ -19,6 +19,7 @@ import type {
 
 // 材料层级节点组件
 function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) {
+  const shouldReduceMotion = useReducedMotion();
   const hasChildren = node.children && node.children.length > 0;
   
   const getColorByDepth = (_d: number): string => 'bg-[var(--app-accent)] text-white';
@@ -29,9 +30,9 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
   if (depth === 0) {
     return (
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
+        initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.3 }}
+        transition={{ duration: shouldReduceMotion ? 0 : 0.3 }}
         className="space-y-3 rounded-2xl p-4 surface-soft"
       >
         {/* 顶层材料 */}
@@ -299,15 +300,11 @@ export default function OperatorTraining() {
   const { setMessage: setStatusMessage } = useStatusStore()
 
   // 辅助函数：使用 statusMessage 显示消息
-  const showSuccess = async (msg: string) => {
-    setStatusMessage(msg)
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setStatusMessage('')
+  const showSuccess = (msg: string) => {
+    setStatusMessage(msg, 'success')
   }
-  const showError = async (msg: string) => {
-    setStatusMessage(msg)
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setStatusMessage('')
+  const showError = (msg: string) => {
+    setStatusMessage(msg, 'error')
   }
   const showInfo = (msg: string) => {
     setStatusMessage(msg)
@@ -340,6 +337,16 @@ export default function OperatorTraining() {
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({});
   const [visibleOperatorLimit, setVisibleOperatorLimit] = useState(OPERATOR_RENDER_BATCH_SIZE);
   const [openMenu, setOpenMenu] = useState<TrainingOpenMenu>(null);
+  const [pendingOperatorIds, setPendingOperatorIds] = useState<Set<string>>(new Set());
+  const [recentlyRemoved, setRecentlyRemoved] = useState<{ item: TrainingQueueItem; index: number } | null>(null);
+  const operatorsRequestRef = useRef(0);
+  const statusCountsRequestRef = useRef(0);
+  const settingsRequestRef = useRef(0);
+  const queueRequestRef = useRef(0);
+  const settingsWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const persistedSettingsRef = useRef(settings);
+  const queueMutationInFlightRef = useRef(false);
+  const rarityMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const { containerRef: statusTabsRef, activeRect: activeStatusTabRect, setTabRef: setStatusTabRef } = useFluidTabIndicator(filters.status);
 
   const getOpenStagePlan = (sourcePlan: TrainingPlan): TrainingPlan => ({
@@ -371,15 +378,20 @@ export default function OperatorTraining() {
     }).length;
 
   const loadTrainingStatusCounts = async () => {
+    const requestId = ++statusCountsRequestRef.current;
+    const requestedRarity = filters.rarity;
+    const requestedNeedsElite2 = filters.needsElite2;
     setStatusCountsLoading(true);
     try {
-      const rarity = filters.rarity ? parseInt(filters.rarity) : undefined;
+      const rarity = requestedRarity ? parseInt(requestedRarity) : undefined;
       const [trainableResponse, ownedResponse, allOperatorsResponse, operBoxResponse] = await Promise.all([
-        getOperatorList({ status: 'trainable', rarity, needsElite2: filters.needsElite2 }),
-        getOperatorList({ status: 'owned', rarity, needsElite2: filters.needsElite2 }),
+        getOperatorList({ status: 'trainable', rarity, needsElite2: requestedNeedsElite2 }),
+        getOperatorList({ status: 'owned', rarity, needsElite2: requestedNeedsElite2 }),
         getAllOperators(),
         getOperBoxData()
       ]);
+
+      if (requestId !== statusCountsRequestRef.current) return;
 
       const trainableRows = trainableResponse.success ? extractOperatorRows(trainableResponse.data) : [];
       const ownedRows = ownedResponse.success ? extractOperatorRows(ownedResponse.data) : [];
@@ -389,7 +401,7 @@ export default function OperatorTraining() {
       setTrainingStatusCounts(prev => {
         const ownedCount = ownedRows.length > 0
           ? ownedRows.length
-          : countOperatorsByCurrentMetaFilters(operBoxRows, { rarity, needsElite2: filters.needsElite2 });
+          : countOperatorsByCurrentMetaFilters(operBoxRows, { rarity, needsElite2: requestedNeedsElite2 });
         const allCount = countOperatorsByCurrentMetaFilters(allRows, { rarity });
 
         return {
@@ -401,7 +413,7 @@ export default function OperatorTraining() {
     } catch (error) {
       // 静默失败，保留上一次统计
     } finally {
-      setStatusCountsLoading(false);
+      if (requestId === statusCountsRequestRef.current) setStatusCountsLoading(false);
     }
   };
 
@@ -420,10 +432,10 @@ export default function OperatorTraining() {
 
   // 加载养成队列
   useEffect(() => {
-    loadQueue();
+    void loadQueue(true);
   }, []);
 
-  // 点击外部关闭菜单
+  // 点击外部或按 Escape 关闭菜单
   useEffect(() => {
     if (!openMenu) return;
 
@@ -435,24 +447,43 @@ export default function OperatorTraining() {
       }
     };
 
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setOpenMenu(null);
+      rarityMenuTriggerRef.current?.focus();
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [openMenu]);
 
+  useEffect(() => {
+    if (openMenu !== 'rarity') return;
+    const frame = window.requestAnimationFrame(() => {
+      document.querySelector<HTMLButtonElement>('#training-rarity-menu button')?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [openMenu]);
+
   const loadOperators = async () => {
+    const requestId = ++operatorsRequestRef.current;
+    const requestedFilters = { ...filters };
     try {
       setOperatorsLoading(true);
       const response = await getOperatorList({
-        ...filters,
-        rarity: filters.rarity ? parseInt(filters.rarity) : undefined
+        ...requestedFilters,
+        rarity: requestedFilters.rarity ? parseInt(requestedFilters.rarity) : undefined
       });
+      if (requestId !== operatorsRequestRef.current) return;
       if (response.success) {
         // 适配新的响应格式：data.operators 是数组
         let nextOperators: TrainingOperator[] = response.data.operators || response.data || [];
 
-        if (filters.status === 'all' && nextOperators.length === 0) {
+        if (requestedFilters.status === 'all' && nextOperators.length === 0) {
           const [allOperatorsResponse, operBoxResponse] = await Promise.all([
             getAllOperators(),
             getOperBoxData()
@@ -463,7 +494,8 @@ export default function OperatorTraining() {
             const operBoxPayload = operBoxResponse.success ? operBoxResponse.data : null;
             const ownedOperators: FallbackOperatorRow[] = operBoxPayload?.data || operBoxPayload?.operators || [];
             const ownedMap = new Map(ownedOperators.map(operator => [operator.id, operator]));
-            const rarityFilter = filters.rarity ? parseInt(filters.rarity) : null;
+            if (requestId !== operatorsRequestRef.current) return;
+            const rarityFilter = requestedFilters.rarity ? parseInt(requestedFilters.rarity) : null;
 
             nextOperators = allOperators
               .filter(operator => !rarityFilter || operator.rarity === rarityFilter)
@@ -491,21 +523,27 @@ export default function OperatorTraining() {
           }
         }
 
-        setOperators(nextOperators);
+        if (requestId === operatorsRequestRef.current) setOperators(nextOperators);
       }
     } catch (error) {
       // 静默失败，不影响用户体验
     } finally {
-      setOperatorsLoading(false);
+      if (requestId === operatorsRequestRef.current) setOperatorsLoading(false);
     }
   };
 
-  const loadQueue = async () => {
+  const loadQueue = async (syncSettings = false) => {
+    const requestId = ++queueRequestRef.current;
+    const settingsRevision = settingsRequestRef.current;
     try {
       const response = await getTrainingQueue();
-      if (response.success) {
+      if (requestId !== queueRequestRef.current) return null;
+      if (response.success && response.data?.queue) {
         setQueue(response.data.queue);
-        setSettings(response.data.settings);
+        if (syncSettings && settingsRevision === settingsRequestRef.current && response.data.settings) {
+          persistedSettingsRef.current = response.data.settings;
+          setSettings(response.data.settings);
+        }
         return response.data;
       }
     } catch (error) {
@@ -514,9 +552,25 @@ export default function OperatorTraining() {
     return null;
   };
 
+  const setOperatorPending = (operatorId: string, pending: boolean) => {
+    setPendingOperatorIds(current => {
+      const next = new Set(current);
+      if (pending) next.add(operatorId);
+      else next.delete(operatorId);
+      return next;
+    });
+  };
+
   const handleAddToQueue = async (operator: TrainingOperator) => {
+    if (queueMutationInFlightRef.current) {
+      showInfo('养成队列正在更新，请稍候');
+      return;
+    }
+
+    queueMutationInFlightRef.current = true;
+    setOperatorPending(operator.id, true);
+    setRecentlyRemoved(null);
     try {
-      setLoading(true);
       setStatusMessage('正在添加干员...');
       
       const response = await addToTrainingQueue({
@@ -528,14 +582,30 @@ export default function OperatorTraining() {
       if (response.success) {
         const queueData = await loadQueue();
         setPlan(null);
-        setStatusMessage(`${operator.name} 添加成功！`);
-        await new Promise(resolve => setTimeout(resolve, 800));
+
+        if (!queueData) {
+          const optimisticItem: TrainingQueueItem = {
+            operatorId: operator.id,
+            operator: {
+              name: operator.name,
+              rarity: operator.rarity,
+              profession: operator.profession
+            },
+            currentElite: operator.currentElite ?? 0,
+            targetElite: operator.targetElite ?? 2,
+            materials: [],
+            progress: 0
+          };
+          setQueue(current => current.some(item => item.operatorId === operator.id)
+            ? current
+            : [...current, optimisticItem]);
+          setStatusMessage(`${operator.name} 已添加，但队列刷新失败，请稍后重试`, 'warning');
+          return;
+        }
 
         const addedIsCurrent = queueData?.queue?.[0]?.operatorId === operator.id;
         if (!addedIsCurrent) {
-          setStatusMessage(`${operator.name} 已加入队列，将在当前目标完成后处理`);
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          setStatusMessage('');
+          setStatusMessage(`${operator.name} 已加入队列，将在当前目标完成后处理`, 'success');
           return;
         }
 
@@ -550,9 +620,7 @@ export default function OperatorTraining() {
 
             const todayPlan = getOpenStagePlan(generatedPlan);
             if (!todayPlan.stages || todayPlan.stages.length === 0) {
-              setStatusMessage('今天没有可直接加入流程的开放关卡');
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              setStatusMessage('');
+              setStatusMessage('今天没有可直接加入流程的开放关卡', 'warning');
               return;
             }
 
@@ -562,63 +630,115 @@ export default function OperatorTraining() {
             try {
               const applyResponse = await applyTrainingPlan({
                 plan: todayPlan,
-                settings: queueData?.settings ?? settings
+                settings
               });
               if (applyResponse.success) {
                 window.dispatchEvent(new CustomEvent('training-plan-applied', {
                   detail: { stageCount: applyResponse.data?.stageCount ?? todayPlan.stages.length }
                 }));
-                setStatusMessage('刷取计划已应用到作战任务！');
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                setStatusMessage('');
+                setStatusMessage('刷取计划已应用到作战任务！', 'success');
               } else {
-                setStatusMessage('应用失败');
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                setStatusMessage('');
+                setStatusMessage('应用失败', 'error');
               }
             } catch (applyError) {
-              setStatusMessage('应用失败');
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              setStatusMessage('');
+              setStatusMessage('应用失败', 'error');
             }
           } else {
-            setStatusMessage('生成计划失败');
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            setStatusMessage('');
+            setStatusMessage('生成计划失败', 'error');
           }
         } catch (planError) {
-          setStatusMessage('生成计划失败');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          setStatusMessage('');
+          setStatusMessage('生成计划失败', 'error');
         }
+      } else {
+        setStatusMessage('添加失败', 'error');
       }
     } catch (error: any) {
-      setStatusMessage('添加失败');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setStatusMessage('');
+      setStatusMessage('添加失败', 'error');
     } finally {
-      setLoading(false);
+      queueMutationInFlightRef.current = false;
+      setOperatorPending(operator.id, false);
     }
   };
 
   const handleRemoveFromQueue = async (operatorId: string) => {
+    if (queueMutationInFlightRef.current) {
+      showInfo('养成队列正在更新，请稍候');
+      return;
+    }
+
+    const removedIndex = queue.findIndex(item => item.operatorId === operatorId);
+    const removedItem = removedIndex >= 0 ? queue[removedIndex] ?? null : null;
+    queueMutationInFlightRef.current = true;
+    setOperatorPending(operatorId, true);
     try {
-      setLoading(true);
       setStatusMessage('正在删除...');
       const response = await removeFromTrainingQueue(operatorId);
       if (response.success) {
-        await loadQueue();
+        const queueData = await loadQueue();
         setPlan(null);
-        setStatusMessage('删除成功！');
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        setStatusMessage('');
+        if (removedItem) setRecentlyRemoved({ item: removedItem, index: removedIndex });
+        if (!queueData) {
+          setQueue(current => current.filter(item => item.operatorId !== operatorId));
+          setStatusMessage('已移除，但队列刷新失败，请稍后重试', 'warning');
+        } else {
+          setStatusMessage('已从养成队列移除', 'success');
+        }
+      } else {
+        setStatusMessage('删除失败', 'error');
       }
     } catch (error) {
-      setStatusMessage('删除失败');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setStatusMessage('');
+      setStatusMessage('删除失败', 'error');
     } finally {
-      setLoading(false);
+      queueMutationInFlightRef.current = false;
+      setOperatorPending(operatorId, false);
+    }
+  };
+
+  const handleUndoRemove = async () => {
+    const snapshot = recentlyRemoved;
+    if (!snapshot || queueMutationInFlightRef.current) return;
+
+    queueMutationInFlightRef.current = true;
+    setOperatorPending(snapshot.item.operatorId, true);
+    let itemWasAdded = false;
+    try {
+      const response = await addToTrainingQueue({
+        operatorId: snapshot.item.operatorId,
+        currentElite: snapshot.item.currentElite,
+        targetElite: snapshot.item.targetElite
+      });
+      if (!response.success) throw new Error('恢复失败');
+      itemWasAdded = true;
+
+      const restoredQueue = queue.filter(item => item.operatorId !== snapshot.item.operatorId);
+      restoredQueue.splice(Math.min(snapshot.index, restoredQueue.length), 0, snapshot.item);
+      const orderResponse = await updateTrainingQueueOrder(restoredQueue.map(item => item.operatorId));
+      if (!orderResponse.success) throw new Error('顺序恢复失败');
+
+      const queueData = await loadQueue();
+      setRecentlyRemoved(null);
+      if (!queueData) {
+        setQueue(restoredQueue);
+        setStatusMessage(`${snapshot.item.operator.name} 已恢复，但队列刷新失败`, 'warning');
+      } else {
+        setStatusMessage(`${snapshot.item.operator.name} 已恢复到养成队列`, 'success');
+      }
+    } catch (error) {
+      if (itemWasAdded) {
+        const queueData = await loadQueue();
+        if (!queueData) {
+          setQueue(current => current.some(item => item.operatorId === snapshot.item.operatorId)
+            ? current
+            : [...current, snapshot.item]);
+        }
+        setRecentlyRemoved(null);
+        setStatusMessage('干员已恢复，但原队列顺序恢复失败', 'error');
+      } else {
+        setStatusMessage('撤销失败，请重新添加干员', 'error');
+      }
+    } finally {
+      queueMutationInFlightRef.current = false;
+      setOperatorPending(snapshot.item.operatorId, false);
     }
   };
 
@@ -674,15 +794,28 @@ export default function OperatorTraining() {
     }
   };
 
-  const handleUpdateSettings = async (newSettings: TrainingSettings) => {
-    try {
-      const response = await updateTrainingSettings(newSettings);
-      if (response.success) {
-        setSettings(response.data);
+  const handleUpdateSettings = (newSettings: TrainingSettings) => {
+    const requestId = ++settingsRequestRef.current;
+    setSettings(newSettings);
+
+    settingsWriteQueueRef.current = settingsWriteQueueRef.current.then(async () => {
+      try {
+        const response = await updateTrainingSettings(newSettings);
+        if (response.success) {
+          const savedSettings = response.data ?? newSettings;
+          persistedSettingsRef.current = savedSettings;
+          if (requestId === settingsRequestRef.current) setSettings(savedSettings);
+          return;
+        }
+      } catch (error) {
+        // The latest requested value is restored below when its write fails.
       }
-    } catch (error) {
-      // 静默失败
-    }
+
+      if (requestId === settingsRequestRef.current) {
+        setSettings(persistedSettingsRef.current);
+        showError('设置保存失败，已恢复原设置');
+      }
+    });
   };
 
   // 过滤干员
@@ -707,6 +840,7 @@ export default function OperatorTraining() {
   const upcomingQueue = currentTarget ? queue.slice(1) : queue;
   const previewStages = todayStages.slice(0, 5);
   const hiddenStageCount = Math.max(todayStages.length - previewStages.length, 0);
+  const queueMutationPending = pendingOperatorIds.size > 0;
   const operatorEmptyState: OperatorEmptyStateProps | null = !operatorsLoading && filteredOperators.length === 0
     ? (() => {
         if (normalizedSearchTerm || filters.rarity) {
@@ -770,7 +904,7 @@ export default function OperatorTraining() {
               </div>
             </div>
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="space-y-4"
         >
@@ -846,6 +980,7 @@ export default function OperatorTraining() {
               </div>
               <input
                 type="text"
+                aria-label="搜索干员名称"
                 placeholder="搜索干员名称..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -858,11 +993,15 @@ export default function OperatorTraining() {
               {/* 稀有度 */}
               <div className="relative filter-menu-container">
                 <button
+                  ref={rarityMenuTriggerRef}
                   type="button"
                   onClick={() => setOpenMenu(openMenu === 'rarity' ? null : 'rarity')}
+                  aria-expanded={openMenu === 'rarity'}
+                  aria-controls="training-rarity-menu"
+                  aria-haspopup="true"
                   className={`flex h-10 items-center space-x-1.5 whitespace-nowrap rounded-xl px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] ${
                     filters.rarity
-                      ? 'control-active'
+                      ? 'brand-action-subtle'
                       : 'text-secondary control-surface'
                   }`}
                 >
@@ -874,7 +1013,7 @@ export default function OperatorTraining() {
                   </svg>
                 </button>
                 {openMenu === 'rarity' && (
-                  <div className="absolute left-0 top-full z-50 mt-1 w-32 rounded-xl py-1 surface-panel">
+                  <div id="training-rarity-menu" className="absolute left-0 top-full z-50 mt-1 w-32 rounded-xl py-1 surface-panel">
                     {[
                       { value: '', label: '全部' },
                       { value: '6', label: '6星' },
@@ -887,6 +1026,7 @@ export default function OperatorTraining() {
                         onClick={() => {
                           setFilters({ ...filters, rarity: option.value });
                           setOpenMenu(null);
+                          rarityMenuTriggerRef.current?.focus();
                         }}
                         className={`h-10 w-full px-3 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--app-accent)] ${
                           filters.rarity === option.value
@@ -905,9 +1045,10 @@ export default function OperatorTraining() {
               <button
                 type="button"
                 onClick={() => setFilters({ ...filters, needsElite2: !filters.needsElite2 })}
+                aria-pressed={filters.needsElite2}
                 className={`flex h-10 items-center space-x-1.5 whitespace-nowrap rounded-xl px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] ${
                   filters.needsElite2
-                    ? 'control-active'
+                    ? 'brand-action-subtle'
                     : 'text-secondary control-surface'
                 }`}
               >
@@ -959,9 +1100,9 @@ export default function OperatorTraining() {
                   return (
                     <motion.div
                       key={operator.id}
-                      initial={{ opacity: 0, scale: 0.9 }}
+                      initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: Math.min(idx, 24) * 0.004 }}
+                      transition={shouldReduceMotion ? { duration: 0 } : { delay: Math.min(idx, 24) * 0.004 }}
                       className={`group relative overflow-hidden rounded-2xl border p-3 transition-colors duration-200 ${
                         canAdd
                           ? 'border-transparent surface-soft hover:bg-[var(--app-accent-soft)]'
@@ -1058,8 +1199,10 @@ export default function OperatorTraining() {
                       {/* 添加按钮 */}
                       <Button
                         onClick={() => handleAddToQueue(operator)}
-                        disabled={!canAdd}
-                        variant="gradient"
+                        disabled={!canAdd || (queueMutationPending && !pendingOperatorIds.has(operator.id))}
+                        loading={pendingOperatorIds.has(operator.id)}
+                        loadingText="添加中"
+                        variant="primary"
                         size="sm"
                         fullWidth
                         className="h-10 rounded-lg text-xs"
@@ -1093,7 +1236,7 @@ export default function OperatorTraining() {
 
           <aside className={`space-y-4 xl:sticky xl:top-4 ${currentTarget ? 'order-1 xl:order-2' : 'order-2'}`}>
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="space-y-4"
         >
@@ -1112,9 +1255,9 @@ export default function OperatorTraining() {
                 <div className="h-2.5 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/70 dark:bg-slate-800 dark:ring-white/10">
                   <motion.div
                     className="h-full rounded-full bg-[var(--app-accent)]"
-                    initial={{ width: 0 }}
+                    initial={shouldReduceMotion ? false : { width: 0 }}
                     animate={{ width: `${currentProgress}%` }}
-                    transition={{ duration: 0.6, ease: 'easeOut' }}
+                    transition={{ duration: shouldReduceMotion ? 0 : 0.6, ease: 'easeOut' }}
                   />
                 </div>
                 <div className="text-sm font-bold brand-text">{currentProgress}%</div>
@@ -1155,7 +1298,7 @@ export default function OperatorTraining() {
                 <Button
                   onClick={handleGeneratePlan}
                   disabled={loading}
-                  variant="gradient"
+                  variant="primary"
                   size="sm"
                   className="h-11 rounded-xl"
                   icon={
@@ -1191,6 +1334,23 @@ export default function OperatorTraining() {
           </details>
 
           {/* 队列列表 */}
+          {recentlyRemoved && (
+            <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl px-3 py-2 status-info" role="status">
+              <span className="min-w-0 truncate text-sm">
+                已移除 {recentlyRemoved.item.operator.name}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleUndoRemove}
+                disabled={queueMutationPending}
+                className="shrink-0"
+              >
+                撤销
+              </Button>
+            </div>
+          )}
           {queue.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface-muted)] px-6 py-12 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl icon-well">
@@ -1214,9 +1374,9 @@ export default function OperatorTraining() {
                   {upcomingQueue.map((item, index) => (
                     <motion.div
                       key={item.operatorId}
-                      initial={{ opacity: 0, scale: 0.98 }}
+                      initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.98 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: index * 0.04 }}
+                      transition={shouldReduceMotion ? { duration: 0 } : { delay: index * 0.04 }}
                       className="px-4 py-3 transition-colors hover:bg-[var(--app-surface-muted)]"
                     >
                       <div className="flex items-center gap-3">
@@ -1235,23 +1395,29 @@ export default function OperatorTraining() {
                           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/70 dark:bg-slate-800 dark:ring-white/10">
                             <motion.div
                               className="h-full rounded-full bg-[var(--app-accent)]"
-                              initial={{ width: 0 }}
+                              initial={shouldReduceMotion ? false : { width: 0 }}
                               animate={{ width: `${item.progress}%` }}
-                              transition={{ duration: 0.6, ease: 'easeOut' }}
+                              transition={{ duration: shouldReduceMotion ? 0 : 0.6, ease: 'easeOut' }}
                             />
                           </div>
                         </div>
                         <span className="w-9 text-right text-xs font-semibold brand-text">{item.progress}%</span>
                         <IconButton
                           onClick={() => handleRemoveFromQueue(item.operatorId)}
+                          disabled={queueMutationPending}
                           variant="ghost"
                           size="sm"
-                          title="移除"
+                          title={pendingOperatorIds.has(item.operatorId) ? '正在移除' : '移除'}
+                          aria-label={pendingOperatorIds.has(item.operatorId) ? `正在移除${item.operator.name}` : `移除${item.operator.name}`}
                           className="text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                           icon={
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
+                            pendingOperatorIds.has(item.operatorId) ? (
+                              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" aria-hidden="true" />
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            )
                           }
                         />
                       </div>
@@ -1263,7 +1429,7 @@ export default function OperatorTraining() {
           )}
         </motion.div>
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="space-y-4"
         >
@@ -1282,7 +1448,7 @@ export default function OperatorTraining() {
               <div className="rounded-2xl px-4 py-4 surface-panel">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.16em] brand-text">今日流程</div>
+                    <div className="text-xs font-semibold uppercase brand-text">今日流程</div>
                     <h3 className="mt-1 text-lg font-semibold text-primary">{planFocusName}</h3>
                     <div className="mt-1 text-sm leading-6 text-secondary">
                       可刷 {openStageCount} 个关卡 · 预计 {todayRunCount} 次 · 完整计划约 {plan.totalSanity || 0} 理智
@@ -1403,9 +1569,9 @@ export default function OperatorTraining() {
                         {plan.stages.map((stage, idx) => (
                           <motion.div
                             key={`${stage.stage}-${idx}`}
-                            initial={{ opacity: 0, scale: 0.9 }}
+                            initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: idx * 0.05 }}
+                            transition={shouldReduceMotion ? { duration: 0 } : { delay: idx * 0.05 }}
                             className={`relative overflow-hidden rounded-3xl p-5 ${
                               stage.isOpen !== false
                                 ? 'surface-soft'

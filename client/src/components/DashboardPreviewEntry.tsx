@@ -8,10 +8,14 @@ interface DashboardPreviewEntryProps {
 }
 
 const DashboardPreviewEntry = memo(function DashboardPreviewEntry({ onOpen }: DashboardPreviewEntryProps) {
-  const { videoRef, fallbackSnapshot, showLivePreview, statusText, headerStatusText } = useDashboardPreview()
+  const { videoRef, fallbackSnapshot, showLivePreview, isConnecting, statusText, headerStatusText } = useDashboardPreview()
 
   return (
-    <div data-dashboard-preview-card className="rounded-2xl surface-panel overflow-hidden">
+    <div
+      data-dashboard-preview-card
+      className={`status-border-beam rounded-2xl surface-panel overflow-hidden ${isConnecting ? 'is-active' : ''}`}
+      aria-busy={isConnecting}
+    >
       <div className="dashboard-preview-header flex items-center justify-between gap-3 px-4 py-2.5 border-b border-[var(--app-border)]">
         <div className="flex items-center gap-2">
           <div className={`h-1.5 w-1.5 rounded-full ${showLivePreview ? 'bg-[var(--app-success)]' : 'bg-[var(--app-accent)]'}`} />
@@ -44,6 +48,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry({ onOpen }: Da
         <button
           type="button"
           onClick={onOpen}
+          aria-label={showLivePreview ? '打开模拟器实时预览' : fallbackSnapshot ? '打开模拟器画面快照' : '打开完整模拟器控制台'}
           className={`absolute inset-0 flex items-center justify-center text-left ${showLivePreview || fallbackSnapshot ? 'bg-transparent' : 'dashboard-preview-empty'}`}
         >
           {!showLivePreview && !fallbackSnapshot && (

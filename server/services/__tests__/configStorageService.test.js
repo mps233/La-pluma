@@ -10,7 +10,7 @@ import {
 test('user config storage accepts only its explicit config types', () => {
   assert.equal(validateConfigType('automation-tasks'), 'automation-tasks');
   assert.equal(validateConfigType('notification'), 'notification');
-  assert.throws(() => validateConfigType('skland-account'), /配置类型不合法/);
+  assert.throws(() => validateConfigType('invalid-config'), /配置类型不合法/);
   assert.throws(() => validateConfigType('../../package'), /配置类型不合法/);
 });
 

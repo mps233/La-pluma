@@ -3,7 +3,7 @@
  */
 
 import { randomUUID } from 'crypto';
-import { access, mkdir, open, readFile, rename, unlink } from 'fs/promises';
+import { mkdir, open, readFile, rename, unlink } from 'fs/promises';
 import { basename, dirname, join, resolve } from 'path';
 
 const fileMutationQueues = new Map();
@@ -47,18 +47,6 @@ export async function ensureDir(dirPath) {
     if (error.code !== 'EEXIST') {
       throw error;
     }
-  }
-}
-
-/**
- * 检查文件是否存在
- */
-export async function fileExists(filePath) {
-  try {
-    await access(filePath);
-    return true;
-  } catch {
-    return false;
   }
 }
 

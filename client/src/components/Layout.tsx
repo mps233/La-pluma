@@ -1,47 +1,204 @@
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import ThemeToggle from './ThemeToggle'
 import { useUIStore } from '@/stores'
+import { appTabFromPath, appTabPath, isAppTab, type AppTab } from '@/stores/uiStore'
 
 interface LayoutProps {
   children: (props: { activeTab: string }) => React.ReactNode
 }
 
+const tabs = [
+  { id: 'dashboard', name: '控制台' },
+  { id: 'automation', name: '自动化' },
+  { id: 'combat', name: '作业' },
+  { id: 'roguelike', name: '肉鸽' },
+  { id: 'training', name: '养成' },
+  { id: 'logs', name: '日志' },
+  { id: 'statistics', name: '数据' },
+  { id: 'config', name: '配置' },
+] satisfies Array<{ id: AppTab; name: string }>
+
 export default function Layout({ children }: LayoutProps) {
-  // 使用 UI Store 管理活动标签页
-  const activeTab = useUIStore(state => state.activeTab)
+  const storedActiveTab = useUIStore(state => state.activeTab)
   const setActiveTab = useUIStore(state => state.setActiveTab)
-  
-  // 移动端菜单状态保持本地管理（不需要全局共享）
+  const activeTab: AppTab = isAppTab(storedActiveTab) ? storedActiveTab : 'dashboard'
+  const shouldReduceMotion = useReducedMotion()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const mobileMenuRef = useRef<HTMLDivElement>(null)
+  const mobileMenuTriggerRef = useRef<HTMLButtonElement>(null)
+  const scrollPositions = useRef(new Map<AppTab, number>())
+  const previousTab = useRef<AppTab>(activeTab)
+  const navigationSource = useRef<'initial' | 'store' | 'link' | 'popstate'>('initial')
+  const restoreFrame = useRef<number | null>(null)
+  const scrollRestoreCleanupRef = useRef<(() => void) | null>(null)
 
-  const tabs = [
-    { id: 'dashboard', name: '控制台', color: 'cyan' as const },
-    { id: 'automation', name: '自动化', color: 'cyan' as const },
-    { id: 'combat', name: '作业', color: 'cyan' as const },
-    { id: 'roguelike', name: '肉鸽', color: 'cyan' as const },
-    { id: 'training', name: '养成', color: 'cyan' as const },
-    { id: 'logs', name: '日志', color: 'cyan' as const },
-    { id: 'statistics', name: '数据', color: 'cyan' as const },
-    { id: 'config', name: '配置', color: 'cyan' as const },
-  ]
+  const restoreScroll = useCallback((tab: AppTab) => {
+    scrollRestoreCleanupRef.current?.()
+    const top = scrollPositions.current.get(tab) ?? 0
+    let observer: ResizeObserver | null = null
+    let maxTimer: number | null = null
+    let cancelled = false
 
-  type TabColor = 'violet' | 'emerald' | 'fuchsia' | 'amber' | 'blue' | 'cyan' | 'teal' | 'orange'
+    const applyScroll = () => {
+      if (cancelled) return
+      window.scrollTo({ top, left: 0, behavior: 'auto' })
+    }
+    const scheduleScroll = () => {
+      if (restoreFrame.current !== null) window.cancelAnimationFrame(restoreFrame.current)
+      restoreFrame.current = window.requestAnimationFrame(() => {
+        restoreFrame.current = null
+        applyScroll()
+      })
+    }
+    const cleanup = () => {
+      if (cancelled) return
+      cancelled = true
+      observer?.disconnect()
+      observer = null
+      if (maxTimer !== null) window.clearTimeout(maxTimer)
+      maxTimer = null
+      if (restoreFrame.current !== null) window.cancelAnimationFrame(restoreFrame.current)
+      restoreFrame.current = null
+      window.removeEventListener('wheel', cleanup)
+      window.removeEventListener('touchstart', cleanup)
+      window.removeEventListener('pointerdown', cleanup)
+      window.removeEventListener('keydown', handleUserKeyDown)
+      if (scrollRestoreCleanupRef.current === cleanup) scrollRestoreCleanupRef.current = null
+    }
+    const handleUserKeyDown = (event: KeyboardEvent) => {
+      if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) cleanup()
+    }
 
-  const getTabColors = (_color: TabColor, isActive: boolean) => {
-    void _color
-    return isActive ? 'nav-item-active' : 'nav-item-idle'
+    scrollRestoreCleanupRef.current = cleanup
+    applyScroll()
+    scheduleScroll()
+
+    if (top <= 0) return
+
+    const content = document.querySelector('main')
+    if (content && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(scheduleScroll)
+      observer.observe(content)
+    }
+    window.addEventListener('wheel', cleanup, { passive: true })
+    window.addEventListener('touchstart', cleanup, { passive: true })
+    window.addEventListener('pointerdown', cleanup, { passive: true })
+    window.addEventListener('keydown', handleUserKeyDown)
+    maxTimer = window.setTimeout(cleanup, 10_000)
+  }, [])
+
+  useEffect(() => {
+    const previousScrollRestoration = window.history.scrollRestoration
+    const savedScrollPositions = scrollPositions.current
+    window.history.scrollRestoration = 'manual'
+    const handlePopState = () => {
+      const nextTab = appTabFromPath(window.location.pathname) ?? 'dashboard'
+      if (nextTab !== previousTab.current) {
+        scrollPositions.current.set(previousTab.current, window.scrollY)
+      }
+      navigationSource.current = 'popstate'
+      if (!appTabFromPath(window.location.pathname)) {
+        window.history.replaceState({ ...window.history.state, laPlumaTab: nextTab }, '', appTabPath(nextTab))
+      }
+      if (nextTab === useUIStore.getState().activeTab) {
+        restoreScroll(nextTab)
+        navigationSource.current = 'store'
+      } else {
+        setActiveTab(nextTab)
+      }
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      savedScrollPositions.set(previousTab.current, window.scrollY)
+      window.history.scrollRestoration = previousScrollRestoration
+      window.removeEventListener('popstate', handlePopState)
+      scrollRestoreCleanupRef.current?.()
+      if (restoreFrame.current !== null) window.cancelAnimationFrame(restoreFrame.current)
+    }
+  }, [restoreScroll, setActiveTab])
+
+  useLayoutEffect(() => {
+    if (storedActiveTab !== activeTab) {
+      setActiveTab(activeTab)
+      return
+    }
+
+    const source = navigationSource.current
+    const isInitial = source === 'initial'
+    if (!isInitial && source === 'store' && previousTab.current !== activeTab) {
+      scrollPositions.current.set(previousTab.current, window.scrollY)
+    }
+
+    const targetPath = appTabPath(activeTab)
+    if (window.location.pathname !== targetPath) {
+      const state = { ...window.history.state, laPlumaTab: activeTab }
+      if (isInitial || source === 'popstate') window.history.replaceState(state, '', targetPath)
+      else window.history.pushState(state, '', targetPath)
+    }
+
+    previousTab.current = activeTab
+    navigationSource.current = 'store'
+    restoreScroll(activeTab)
+  }, [activeTab, restoreScroll, setActiveTab, storedActiveTab])
+
+  const closeMobileMenu = useCallback((restoreFocus = false) => {
+    setMobileMenuOpen(false)
+    if (restoreFocus) {
+      window.requestAnimationFrame(() => mobileMenuTriggerRef.current?.focus({ preventScroll: true }))
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return undefined
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      const activeLink = mobileMenuRef.current?.querySelector<HTMLElement>('[aria-current="page"]')
+      const firstLink = mobileMenuRef.current?.querySelector<HTMLElement>('a[href]')
+      ;(activeLink ?? firstLink)?.focus({ preventScroll: true })
+    })
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!mobileMenuRef.current?.contains(event.target as Node)
+        && !mobileMenuTriggerRef.current?.contains(event.target as Node)) {
+        closeMobileMenu()
+      }
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeMobileMenu(true)
+      }
+    }
+    const desktopQuery = window.matchMedia('(min-width: 1024px)')
+    const handleDesktopChange = (event: MediaQueryListEvent) => {
+      if (event.matches) closeMobileMenu()
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    desktopQuery.addEventListener('change', handleDesktopChange)
+    return () => {
+      window.cancelAnimationFrame(focusFrame)
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+      desktopQuery.removeEventListener('change', handleDesktopChange)
+    }
+  }, [closeMobileMenu, mobileMenuOpen])
+
+  const navigateToTab = (event: ReactMouseEvent<HTMLAnchorElement>, tab: AppTab, mobile = false) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    event.preventDefault()
+    if (mobile) closeMobileMenu(true)
+    if (tab !== activeTab) {
+      scrollPositions.current.set(activeTab, window.scrollY)
+      navigationSource.current = 'link'
+      setActiveTab(tab)
+    }
   }
-
 
   return (
     <div className="min-h-screen transition-colors">
       {/* 顶部导航栏 - 包含标题和标签页 */}
-      <motion.nav 
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className="nav-shell sticky top-0 z-50 transition-colors"
-      >
+      <header className="nav-shell sticky top-0 z-50 transition-colors">
         <div className="app-shell">
           <div className="flex justify-between items-center h-14 sm:h-16">
             {/* 左侧：Logo 和标题 */}
@@ -51,7 +208,7 @@ export default function Layout({ children }: LayoutProps) {
                 alt="La Pluma Logo" 
                 className="h-7 w-7 object-contain sm:h-8 sm:w-8"
               />
-              <h1 className="text-primary text-base font-semibold tracking-tight sm:text-lg">
+              <h1 className="text-primary text-base font-semibold sm:text-lg">
                 La Pluma
               </h1>
             </div>
@@ -59,41 +216,77 @@ export default function Layout({ children }: LayoutProps) {
             {/* 右侧：标签页导航 + 系统信息 */}
             <div className="flex items-center gap-3 sm:gap-5">
               {/* 桌面端标签页导航 */}
-              <div className="surface-soft hidden gap-1 rounded-2xl p-1.5 lg:flex">
+              <nav aria-label="主要功能" className="surface-soft hidden gap-1 rounded-2xl p-1.5 lg:flex">
                 {tabs.map((tab) => (
-                  <button
+                  <a
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
+                    href={appTabPath(tab.id)}
+                    aria-current={activeTab === tab.id ? 'page' : undefined}
+                    onClick={(event) => navigateToTab(event, tab.id)}
                     className={`
-                      relative flex items-center px-3.5 py-2 font-medium text-sm rounded-xl transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]
-                      ${getTabColors(tab.color, activeTab === tab.id)}
+                      relative flex items-center px-3.5 py-2 font-medium text-sm rounded-xl transition-colors active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]
+                      ${activeTab === tab.id ? 'nav-item-active' : 'nav-item-idle'}
                     `}
                   >
                     <span>{tab.name}</span>
-                  </button>
+                  </a>
                 ))}
-              </div>
+              </nav>
 
               {/* 主题切换器 */}
-              <ThemeToggle color="cyan" />
+              <ThemeToggle />
 
               {/* 移动端汉堡菜单按钮 */}
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                aria-label={mobileMenuOpen ? '关闭导航菜单' : '打开导航菜单'}
-                aria-expanded={mobileMenuOpen}
-                aria-controls="mobile-navigation"
-                className="text-secondary hover:text-primary lg:hidden rounded-lg p-2 transition-colors hover:bg-white/60 dark:hover:bg-white/10"
-              >
-                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  {mobileMenuOpen ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              <div className="relative lg:hidden">
+                <button
+                  ref={mobileMenuTriggerRef}
+                  type="button"
+                  onClick={() => setMobileMenuOpen((open) => !open)}
+                  aria-label={mobileMenuOpen ? '关闭导航菜单' : '打开导航菜单'}
+                  aria-expanded={mobileMenuOpen}
+                  aria-controls="mobile-navigation"
+                  className="text-secondary hover:text-primary flex min-h-11 min-w-11 items-center justify-center rounded-lg transition-colors active:scale-[0.96] hover:bg-white/60 dark:hover:bg-white/10"
+                >
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    {mobileMenuOpen ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    ) : (
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                    )}
+                  </svg>
+                </button>
+                <AnimatePresence>
+                  {mobileMenuOpen && (
+                    <motion.nav
+                      ref={mobileMenuRef}
+                      id="mobile-navigation"
+                      aria-label="移动端主要功能"
+                      initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }}
+                      transition={{ duration: shouldReduceMotion ? 0.08 : 0.16, ease: 'easeOut' }}
+                      className="surface-panel absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(18rem,calc(100vw-1.75rem))] origin-top-right rounded-xl p-2 shadow-xl"
+                    >
+                      <div className="flex flex-col space-y-1">
+                        {tabs.map((tab) => (
+                          <a
+                            key={tab.id}
+                            href={appTabPath(tab.id)}
+                            aria-current={activeTab === tab.id ? 'page' : undefined}
+                            onClick={(event) => navigateToTab(event, tab.id, true)}
+                            className={`
+                              flex min-h-11 items-center rounded-xl px-4 py-3 text-sm font-medium transition-colors active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]
+                              ${activeTab === tab.id ? 'nav-item-active' : 'nav-item-idle'}
+                            `}
+                          >
+                            <span>{tab.name}</span>
+                          </a>
+                        ))}
+                      </div>
+                    </motion.nav>
                   )}
-                </svg>
-              </button>
+                </AnimatePresence>
+              </div>
 
               {/* GitHub 链接 */}
               <a
@@ -110,49 +303,14 @@ export default function Layout({ children }: LayoutProps) {
             </div>
           </div>
 
-          {/* 移动端菜单 */}
-          <AnimatePresence>
-            {mobileMenuOpen && (
-              <motion.div
-                id="mobile-navigation"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
-                className="lg:hidden py-2 shadow-[inset_0_1px_0_var(--app-border)]"
-              >
-                <div className="flex flex-col space-y-1">
-                  {tabs.map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => {
-                        setActiveTab(tab.id)
-                        setMobileMenuOpen(false)
-                      }}
-                      className={`
-                        flex items-center px-4 py-3 font-medium text-sm rounded-xl transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]
-                        ${getTabColors(tab.color, activeTab === tab.id)}
-                      `}
-                    >
-                      <span>{tab.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
-      </motion.nav>
+      </header>
 
       {/* 主内容区域 */}
       <main className="app-shell py-3 sm:py-8">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
+        <div>
           {children({ activeTab })}
-        </motion.div>
+        </div>
       </main>
     </div>
   )

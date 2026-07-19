@@ -248,11 +248,6 @@ export const maaApi = {
     return this.executeCommand(taskType, args, taskConfig, signal, taskName, taskTypeLabel, waitForCompletion)
   },
 
-  async getActivityRunPreflight(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/activity/preflight`)
-    return parseJsonResponse(response)
-  },
-
   async runCurrentActivity(): Promise<ApiResponse> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/activity/run`, {
       method: 'POST',
@@ -328,15 +323,6 @@ export const maaApi = {
       body: JSON.stringify({ maxSizeMB }),
     })
     return parseJsonResponse(response)
-  },
-
-  // ========== 任务管理 ==========
-  
-  /**
-   * 列出所有任务
-   */
-  async listTasks(): Promise<ApiResponse> {
-    return this.executeCommand('list')
   },
 
   // ========== 配置管理 ==========
@@ -428,15 +414,6 @@ export const maaApi = {
     return parseJsonResponse(response)
   },
 
-  async setPreviewOrientation(orientation: 'portrait' | 'landscape' | 'auto', profileId: string = 'default'): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/preview/orientation`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orientation, profileId })
-    })
-    return parseJsonResponse(response)
-  },
-
   async captureScreen(profileId: string = 'default'): Promise<ApiResponse> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/screen/screenshot`, {
       method: 'POST',
@@ -489,14 +466,6 @@ export const maaApi = {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/schedules/${scheduleId}`, {
       method: 'DELETE',
     })
-    return parseJsonResponse(response)
-  },
-
-  /**
-   * 获取定时任务状态
-   */
-  async getScheduleStatus(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/schedules/status`)
     return parseJsonResponse(response)
   },
 
@@ -572,30 +541,6 @@ export const maaApi = {
     return parseJsonResponse(response)
   },
 
-  /**
-   * 获取自动更新状态
-   */
-  async getAutoUpdateStatus(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/auto-update/status`)
-    return parseJsonResponse(response)
-  },
-
-  /**
-   * 获取 MaaCore 更新日志（最新的 Beta 和正式版）
-   */
-  async getMaaCoreChangelog(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/changelog/core`)
-    return parseJsonResponse(response)
-  },
-
-  /**
-   * 获取 MAA CLI 更新日志（最新的正式版）
-   */
-  async getMaaCliChangelog(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/changelog/cli`)
-    return parseJsonResponse(response)
-  },
-
   // ========== 用户配置存储 ==========
   
   /**
@@ -617,24 +562,6 @@ export const maaApi = {
    */
   async loadUserConfig(configType: string): Promise<ApiResponse> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/config/user/${configType}`)
-    return parseJsonResponse(response)
-  },
-
-  /**
-   * 获取所有用户配置
-   */
-  async getAllUserConfigs(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/config/user`)
-    return parseJsonResponse(response)
-  },
-
-  /**
-   * 删除用户配置
-   */
-  async deleteUserConfig(configType: string): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/config/user/${configType}`, {
-      method: 'DELETE',
-    })
     return parseJsonResponse(response)
   },
 
@@ -665,22 +592,6 @@ export const maaApi = {
    */
   async getDepotData(): Promise<ApiResponse> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/data/depot`)
-    return parseJsonResponse(response)
-  },
-
-  /**
-   * 获取已保存的干员数据
-   */
-  async getOperBoxData(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/data/operbox`)
-    return parseJsonResponse(response)
-  },
-
-  /**
-   * 获取所有干员列表
-   */
-  async getAllOperators(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/data/operators`)
     return parseJsonResponse(response)
   },
 
@@ -726,19 +637,6 @@ export const maaApi = {
     return parseJsonResponse(response)
   },
 
-  // ========== 干员养成相关 API ==========
-  
-  /**
-   * 生成养成计划
-   */
-  async generateTrainingPlan(mode: 'current' | 'all' = 'current'): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/plan`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode })
-    })
-    return parseJsonResponse(response)
-  },
 }
 
 // ========== 干员养成相关 API（独立导出函数）==========
@@ -800,6 +698,18 @@ export async function addToTrainingQueue(data: TrainingQueueData): Promise<ApiRe
 export async function removeFromTrainingQueue(operatorId: string): Promise<ApiResponse> {
   const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/queue/${operatorId}`, {
     method: 'DELETE'
+  })
+  return parseJsonResponse(response)
+}
+
+/**
+ * 更新养成队列顺序
+ */
+export async function updateTrainingQueueOrder(operatorIds: string[]): Promise<ApiResponse> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/queue/order`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ operatorIds })
   })
   return parseJsonResponse(response)
 }
@@ -884,75 +794,6 @@ export async function getTodayDrops(): Promise<ApiResponse> {
 export async function getDropStatistics(days: number = 7): Promise<ApiResponse> {
   const response = await fetchWithAuth(`${API_BASE_URL}/agent/drops/statistics?days=${days}`)
   return parseJsonResponse(response)
-}
-
-// ==================== 森空岛 API ====================
-
-/**
- * 发送森空岛验证码
- */
-export async function sklandSendCode(phone: string): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/agent/skland/send-code`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone })
-  })
-  return parseJsonResponse(response)
-}
-
-/**
- * 森空岛登录（使用验证码或密码）
- */
-export async function sklandLogin(phone: string, codeOrPassword: string, savePassword: boolean = false): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/agent/skland/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone, code: codeOrPassword, savePassword })
-  })
-  return parseJsonResponse(response)
-}
-
-/**
- * 森空岛登出
- */
-export async function sklandLogout(): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/agent/skland/logout`, {
-    method: 'POST'
-  })
-  return parseJsonResponse(response)
-}
-
-/**
- * 获取森空岛登录状态
- */
-export async function getSklandStatus(): Promise<ApiResponse> {
-  const response = await fetchWithAuth(`${API_BASE_URL}/agent/skland/status`)
-  return parseJsonResponse(response)
-}
-
-/**
- * 获取森空岛玩家完整数据
- */
-export async function getSklandPlayerData(useCache: boolean = true): Promise<ApiResponse> {
-  try {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/skland/player?cache=${useCache}`)
-    const data = await parseJsonResponse(response)
-    
-    // 如果响应不是 200，返回错误
-    if (!response.ok) {
-      return {
-        success: false,
-        error: data.error || '获取玩家数据失败'
-      }
-    }
-    
-    return data
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : '网络请求失败'
-    }
-  }
 }
 
 export async function getOpenTodayStages(): Promise<ApiResponse> {
