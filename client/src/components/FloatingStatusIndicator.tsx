@@ -119,10 +119,10 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
 
   const indicatorContent = (
     <div
-      className={`inline-flex max-w-full items-start gap-2 rounded-xl px-3 py-1.5 text-xs font-medium sm:px-4 sm:py-2 sm:text-sm ${config.className} ${className}`}
+      className={`inline-flex max-w-full items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-medium sm:px-4 sm:py-2 sm:text-sm ${config.className} ${className}`}
     >
       <motion.div
-        className="mt-1 h-2 w-2 flex-shrink-0 rounded-full sm:mt-1.5"
+        className="h-2 w-2 flex-shrink-0 rounded-full"
         style={{ backgroundColor: config.dotColor }}
         animate={shouldReduceMotion ? { boxShadow: 'none' } : {
           boxShadow: [

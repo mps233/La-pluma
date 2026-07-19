@@ -94,7 +94,26 @@
   );
   --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.16);
   --la-pluma-tabbar-shadow: 0 1rem 2.25rem rgba(60, 60, 67, 0.18);
+  --la-pluma-tabbar-fade-color: #ffffff;
   --la-pluma-navbar-fade-color: #ffffff;
+  --la-pluma-liquid-surface-lift: rgba(255, 255, 255, 0.04);
+  --la-pluma-liquid-edge-light: rgba(255, 255, 255, 0.48);
+  --la-pluma-liquid-edge-clear: rgba(255, 255, 255, 0);
+  --la-pluma-liquid-edge-high: color-mix(
+    in srgb,
+    var(--la-pluma-liquid-edge-light) 75%,
+    var(--la-pluma-liquid-edge-clear)
+  );
+  --la-pluma-liquid-edge-mid: color-mix(
+    in srgb,
+    var(--la-pluma-liquid-edge-light) 50%,
+    var(--la-pluma-liquid-edge-clear)
+  );
+  --la-pluma-liquid-edge-faint: color-mix(
+    in srgb,
+    var(--la-pluma-liquid-edge-light) 25%,
+    var(--la-pluma-liquid-edge-clear)
+  );
 }
 
 /* Safari's dynamic viewport is intentionally used in a normal browser so
@@ -150,7 +169,10 @@ html.dark,
   --app-info: #5e5ce6;
   --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.3);
   --la-pluma-tabbar-shadow: 0 1rem 2.25rem rgba(0, 0, 0, 0.44);
+  --la-pluma-tabbar-fade-color: #000000;
   --la-pluma-navbar-fade-color: #000000;
+  --la-pluma-liquid-surface-lift: rgba(255, 255, 255, 0.05);
+  --la-pluma-liquid-edge-light: rgba(255, 255, 255, 0.18);
 }
 
 /* Framework7's iOS stylesheet defines a few component variables on `.ios`
@@ -539,7 +561,7 @@ body {
   background: var(--f7-glass-bg-color);
   -webkit-backdrop-filter: blur(28px) saturate(180%);
   backdrop-filter: blur(28px) saturate(180%);
-  box-shadow: var(--la-pluma-tabbar-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.38);
+  box-shadow: var(--la-pluma-tabbar-shadow);
   pointer-events: auto;
 }
 
@@ -570,7 +592,7 @@ body {
 #framework7-root.la-pluma-framework7 .la-pluma-tabbar-search:hover,
 #framework7-root.la-pluma-framework7 .la-pluma-tabbar-search:focus-visible,
 #framework7-root.la-pluma-framework7 .la-pluma-tabbar-search.is-active {
-  background: var(--app-surface-muted);
+  --la-pluma-liquid-surface: var(--app-surface-muted);
   color: var(--app-accent) !important;
 }
 
@@ -847,9 +869,8 @@ button.button.app-icon-button:not(.w-full) {
     backdrop-filter: none;
   }
 
-  /* The scroll host runs behind this pure color fade. It has no opaque stop
-     and no blur, so the three controls remain legible without creating a
-     separate solid header surface. */
+  /* Fade across the full Navbar so scrolling content disappears smoothly at
+     the top edge without introducing blur or a separate solid header. */
   #framework7-root.la-pluma-framework7 .la-pluma-navbar::before {
     display: block;
     position: absolute;
@@ -860,9 +881,7 @@ button.button.app-icon-button:not(.w-full) {
     height: 100%;
     background: linear-gradient(
       to bottom,
-      color-mix(in srgb, var(--la-pluma-navbar-fade-color) 72%, transparent) 0%,
-      color-mix(in srgb, var(--la-pluma-navbar-fade-color) 46%, transparent) 48%,
-      color-mix(in srgb, var(--la-pluma-navbar-fade-color) 16%, transparent) 78%,
+      var(--la-pluma-navbar-fade-color) 0%,
       transparent 100%
     );
     content: '';
@@ -917,7 +936,7 @@ button.button.app-icon-button:not(.w-full) {
     border: 1px solid var(--f7-glass-border-color);
     border-radius: 999px;
     background: var(--f7-glass-bg-color);
-    box-shadow: var(--f7-glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    box-shadow: var(--f7-glass-shadow);
     overflow: hidden;
     pointer-events: auto;
   }
@@ -940,15 +959,117 @@ button.button.app-icon-button:not(.w-full) {
   #framework7-root.la-pluma-framework7 .la-pluma-github-link {
     border: 1px solid var(--f7-glass-border-color);
     background: var(--f7-glass-bg-color);
-    box-shadow: var(--f7-glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    box-shadow: var(--f7-glass-shadow);
     pointer-events: auto;
   }
 
   #framework7-root.la-pluma-framework7 .la-pluma-theme-trigger:hover,
   #framework7-root.la-pluma-framework7 .la-pluma-theme-trigger:focus-visible,
+  #framework7-root.la-pluma-framework7 .la-pluma-theme-trigger[aria-expanded='true'],
   #framework7-root.la-pluma-framework7 .la-pluma-github-link:hover,
   #framework7-root.la-pluma-framework7 .la-pluma-github-link:focus-visible {
-    background: var(--app-surface-muted);
+    --la-pluma-liquid-surface: var(--app-surface-muted);
+  }
+
+  /* Adapt the layered edge-light approach from liquid-glass-react (MIT)
+     without its SVG displacement runtime, which Safari does not render. */
+  #framework7-root.la-pluma-framework7 :is(
+    .la-pluma-brand,
+    .la-pluma-theme-trigger,
+    .la-pluma-github-link,
+    .la-pluma-tabbar-pill,
+    .la-pluma-tabbar-search
+  ) {
+    --la-pluma-liquid-surface: color-mix(
+      in srgb,
+      var(--f7-glass-bg-color) 42%,
+      transparent
+    );
+    position: relative;
+    isolation: isolate;
+    border-color: transparent;
+    background:
+      linear-gradient(
+        var(--la-pluma-liquid-surface-lift),
+        var(--la-pluma-liquid-surface-lift)
+      ),
+      var(--la-pluma-liquid-surface);
+    -webkit-backdrop-filter: blur(6px) saturate(140%);
+    backdrop-filter: blur(6px) saturate(140%);
+  }
+
+  #framework7-root.la-pluma-framework7 :is(
+    .la-pluma-brand,
+    .la-pluma-theme-trigger,
+    .la-pluma-github-link,
+    .la-pluma-tabbar-pill,
+    .la-pluma-tabbar-search
+  )::before {
+    position: absolute;
+    inset: 0;
+    padding: 0.5px;
+    border-radius: inherit;
+    background: conic-gradient(
+      from 0deg,
+      var(--la-pluma-liquid-edge-light) 0deg,
+      var(--la-pluma-liquid-edge-light) 26deg,
+      var(--la-pluma-liquid-edge-high) 32deg,
+      var(--la-pluma-liquid-edge-mid) 38deg,
+      var(--la-pluma-liquid-edge-faint) 44deg,
+      var(--la-pluma-liquid-edge-clear) 50deg,
+      var(--la-pluma-liquid-edge-faint) 56deg,
+      var(--la-pluma-liquid-edge-mid) 62deg,
+      var(--la-pluma-liquid-edge-high) 68deg,
+      var(--la-pluma-liquid-edge-light) 74deg,
+      var(--la-pluma-liquid-edge-light) 206deg,
+      var(--la-pluma-liquid-edge-high) 212deg,
+      var(--la-pluma-liquid-edge-mid) 218deg,
+      var(--la-pluma-liquid-edge-faint) 224deg,
+      var(--la-pluma-liquid-edge-clear) 230deg,
+      var(--la-pluma-liquid-edge-faint) 236deg,
+      var(--la-pluma-liquid-edge-mid) 242deg,
+      var(--la-pluma-liquid-edge-high) 248deg,
+      var(--la-pluma-liquid-edge-light) 254deg,
+      var(--la-pluma-liquid-edge-light) 360deg
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    content: '';
+    pointer-events: none;
+  }
+
+  /* A circle's diagonal angles land near a wide pill's top and bottom
+     centers. Shift the two gaps toward the pill's rounded corners. */
+  #framework7-root.la-pluma-framework7 .la-pluma-tabbar-pill::before {
+    background: conic-gradient(
+      from 0deg,
+      var(--la-pluma-liquid-edge-light) 0deg,
+      var(--la-pluma-liquid-edge-light) 72deg,
+      var(--la-pluma-liquid-edge-high) 73deg,
+      var(--la-pluma-liquid-edge-mid) 75deg,
+      var(--la-pluma-liquid-edge-faint) 77deg,
+      var(--la-pluma-liquid-edge-clear) 79deg,
+      var(--la-pluma-liquid-edge-faint) 82deg,
+      var(--la-pluma-liquid-edge-mid) 84deg,
+      var(--la-pluma-liquid-edge-high) 87deg,
+      var(--la-pluma-liquid-edge-light) 90deg,
+      var(--la-pluma-liquid-edge-light) 252deg,
+      var(--la-pluma-liquid-edge-high) 253deg,
+      var(--la-pluma-liquid-edge-mid) 255deg,
+      var(--la-pluma-liquid-edge-faint) 257deg,
+      var(--la-pluma-liquid-edge-clear) 259deg,
+      var(--la-pluma-liquid-edge-faint) 262deg,
+      var(--la-pluma-liquid-edge-mid) 264deg,
+      var(--la-pluma-liquid-edge-high) 267deg,
+      var(--la-pluma-liquid-edge-light) 270deg,
+      var(--la-pluma-liquid-edge-light) 360deg
+    );
   }
 
   #framework7-root.la-pluma-framework7 .la-pluma-page-body {
@@ -967,6 +1088,35 @@ button.button.app-icon-button:not(.w-full) {
     right: 0;
     bottom: 0;
     left: 0;
+    isolation: isolate;
+  }
+
+  /* Mirror the Navbar edge treatment: content remains visible above the
+     toolbar and fades continuously into the page color at the screen edge. */
+  #framework7-root.la-pluma-framework7 .la-pluma-tabbar::before {
+    display: block;
+    position: absolute;
+    z-index: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    height: auto;
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      color-mix(in srgb, var(--la-pluma-tabbar-fade-color) 20%, transparent) 100%
+    );
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    content: '';
+    transform: none;
+    pointer-events: none;
+  }
+
+  #framework7-root.la-pluma-framework7 .la-pluma-tabbar .toolbar-inner {
+    z-index: 1;
   }
 
   #framework7-root.la-pluma-framework7 .la-pluma-content {
@@ -986,20 +1136,16 @@ button.button.app-icon-button:not(.w-full) {
     -webkit-mask-image: linear-gradient(
       to bottom,
       transparent 0,
-      transparent calc(var(--f7-safe-area-top) + 3.25rem),
-      rgba(0, 0, 0, 0.08) calc(var(--f7-safe-area-top) + 3.75rem),
-      rgba(0, 0, 0, 0.3) calc(var(--f7-safe-area-top) + 4.125rem),
-      rgba(0, 0, 0, 0.7) calc(var(--f7-safe-area-top) + 4.5rem),
-      #000 calc(var(--f7-safe-area-top) + var(--f7-navbar-height))
+      #000 calc(var(--f7-safe-area-top) + var(--f7-navbar-height)),
+      #000 calc(100% - var(--la-pluma-tabbar-reserved-height)),
+      transparent 100%
     );
     mask-image: linear-gradient(
       to bottom,
       transparent 0,
-      transparent calc(var(--f7-safe-area-top) + 3.25rem),
-      rgba(0, 0, 0, 0.08) calc(var(--f7-safe-area-top) + 3.75rem),
-      rgba(0, 0, 0, 0.3) calc(var(--f7-safe-area-top) + 4.125rem),
-      rgba(0, 0, 0, 0.7) calc(var(--f7-safe-area-top) + 4.5rem),
-      #000 calc(var(--f7-safe-area-top) + var(--f7-navbar-height))
+      #000 calc(var(--f7-safe-area-top) + var(--f7-navbar-height)),
+      #000 calc(100% - var(--la-pluma-tabbar-reserved-height)),
+      transparent 100%
     );
   }
 }
@@ -1079,13 +1225,14 @@ button.button.app-icon-button:not(.w-full) {
     min-height: 0;
     margin: 0;
     padding: 0.25rem 0 1rem;
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
     gap: 0.75rem;
   }
 
   #framework7-root.la-pluma-framework7 .dashboard-page .app-page-heading {
     display: flex;
+    flex: 1 1 auto;
     min-width: 0;
     align-items: center;
     gap: 0.75rem;
@@ -1109,17 +1256,22 @@ button.button.app-icon-button:not(.w-full) {
   }
 
   #framework7-root.la-pluma-framework7 .dashboard-page .app-page-actions {
-    width: 100%;
-    min-height: 2.75rem;
-    justify-content: stretch;
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+    flex: 0 1 48%;
+    justify-content: flex-end;
   }
 
   #framework7-root.la-pluma-framework7 .dashboard-page .dashboard-page-actions {
-    width: 100%;
+    width: auto;
+    min-width: 0;
   }
 
   #framework7-root.la-pluma-framework7 .dashboard-page .dashboard-status-slot {
+    flex: 1 1 auto;
     min-width: 0;
+    max-width: 100%;
     overflow: visible;
   }
 
@@ -1130,23 +1282,6 @@ button.button.app-icon-button:not(.w-full) {
   #framework7-root.la-pluma-framework7 .dashboard-page .dashboard-status-indicator {
     max-width: 100%;
     overflow: hidden;
-  }
-
-  #framework7-root.la-pluma-framework7 .dashboard-page .dashboard-mobile-refresh {
-    box-sizing: border-box;
-    width: 2.75rem !important;
-    min-width: 2.75rem !important;
-    height: 2.75rem !important;
-    min-height: 2.75rem !important;
-    border: 1px solid var(--app-border-strong);
-    border-radius: 0.875rem;
-    background: var(--app-surface-muted);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  }
-
-  #framework7-root.la-pluma-framework7 .dashboard-page .dashboard-mobile-refresh:hover,
-  #framework7-root.la-pluma-framework7 .dashboard-page .dashboard-mobile-refresh:focus-visible {
-    background: color-mix(in srgb, var(--app-accent-soft) 46%, var(--app-surface-muted));
   }
 
   #framework7-root.la-pluma-framework7 .dashboard-page .dashboard-flow-layout {
@@ -1275,12 +1410,21 @@ button.button.app-icon-button:not(.w-full) {
   #framework7-root.la-pluma-framework7 .la-pluma-brand,
   #framework7-root.la-pluma-framework7 .la-pluma-theme-trigger,
   #framework7-root.la-pluma-framework7 .la-pluma-github-link,
-  #framework7-root.la-pluma-framework7 .dashboard-mobile-refresh,
   #framework7-root.la-pluma-framework7 .app-card,
   #framework7-root.la-pluma-framework7 .surface-panel {
     background: var(--app-surface-solid);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
+  }
+
+  #framework7-root.la-pluma-framework7 :is(
+    .la-pluma-brand,
+    .la-pluma-theme-trigger,
+    .la-pluma-github-link,
+    .la-pluma-tabbar-pill,
+    .la-pluma-tabbar-search
+  )::before {
+    display: none;
   }
 }
 

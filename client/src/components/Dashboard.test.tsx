@@ -143,7 +143,7 @@ describe('Dashboard connectivity state', () => {
     expect(findButton('打当前活动')?.disabled).toBe(false)
   })
 
-  it('keeps actions available while a background refresh checks the backend', async () => {
+  it('keeps actions available while a contextual refresh checks the backend', async () => {
     await act(async () => root.render(<Dashboard />))
     await flushDashboard()
 
@@ -152,7 +152,7 @@ describe('Dashboard connectivity state', () => {
       resolveBackendCheck = resolve
     }))
 
-    act(() => findButton('刷新数据')?.click())
+    act(() => container.querySelector<HTMLButtonElement>('button[aria-label="刷新执行状态"]')?.click())
 
     expect(useStatusStore.getState().backendStatus).toBe('available')
     expect(container.textContent).not.toContain('正在检查服务')
@@ -163,16 +163,13 @@ describe('Dashboard connectivity state', () => {
     await flushDashboard()
   })
 
-  it('keeps refresh available as a compact mobile action', async () => {
+  it('omits the redundant global refresh while keeping contextual refresh', async () => {
     await act(async () => root.render(<Dashboard />))
     await flushDashboard()
 
-    const refreshButton = container.querySelector<HTMLButtonElement>('.dashboard-mobile-refresh')
-    expect(refreshButton).toBeTruthy()
-
-    const activityCallsBeforeClick = apiMocks.getActivity.mock.calls.length
-    await act(async () => refreshButton?.click())
-    expect(apiMocks.getActivity).toHaveBeenCalledTimes(activityCallsBeforeClick + 1)
+    expect(findButton('刷新数据')).toBeUndefined()
+    expect(container.querySelector('.dashboard-mobile-refresh')).toBeNull()
+    expect(container.querySelector('button[aria-label="刷新执行状态"]')).toBeTruthy()
   })
 
   it('activates the status beam while the daily flow is running', async () => {

@@ -366,33 +366,14 @@ export default function Dashboard() {
     <div className="app-page dashboard-page" data-page="dashboard">
       <div className="app-stack-section">
         <PageHeader
-          icon={<Icons.Dashboard />}
           title="控制台"
           subtitle="当前活动、自动化进度、养成与掉落总览"
-          mobileLayout="stack"
+          mobileLayout="inline"
           actions={
-            <div className="dashboard-page-actions flex w-full items-center gap-2 sm:w-auto sm:gap-3">
+            <div className="dashboard-page-actions flex w-full items-center sm:w-auto">
               <div className="dashboard-status-slot min-w-0 flex-1 sm:flex-none">
                 <FloatingStatusIndicator className="dashboard-status-indicator w-full sm:w-auto sm:max-w-none" textClassName="truncate whitespace-nowrap" />
               </div>
-              <IconButton
-                onClick={() => loadDashboardData()}
-                variant="secondary"
-                size="lg"
-                title="刷新数据"
-                aria-label="刷新数据"
-                className="dashboard-mobile-refresh shrink-0 text-[var(--app-accent-strong)] sm:hidden"
-                icon={<Icons.RefreshCw className="h-4 w-4" />}
-              />
-              <Button
-                onClick={() => loadDashboardData()}
-                variant="primary"
-                size="md"
-                className="hidden shrink-0 sm:inline-flex"
-                icon={<Icons.RefreshCw />}
-              >
-                刷新数据
-              </Button>
             </div>
           }
         />
