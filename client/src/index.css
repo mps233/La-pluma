@@ -2713,18 +2713,18 @@ svg.w-5.h-5 {
     border-radius: calc(var(--app-radius-lg) - 4px);
     background: radial-gradient(
       ellipse 52% 68% at top left,
-      color-mix(in srgb, var(--app-accent) 78%, transparent) 0%,
-      color-mix(in srgb, var(--app-accent) 38%, transparent) 44%,
+      color-mix(in srgb, var(--app-accent) 24%, transparent) 0%,
+      color-mix(in srgb, var(--app-accent) 12%, transparent) 44%,
       transparent 76%
     );
-    filter: blur(16px);
-    opacity: 0.38;
+    filter: blur(12px);
+    opacity: 0.2;
     transform: translate(-4px, -4px);
     pointer-events: none;
   }
 
   .dark .dashboard-flow-glow-shell::before {
-    opacity: 0.62;
+    opacity: 0.26;
   }
 
   .dashboard-flow-card {
@@ -2745,8 +2745,8 @@ svg.w-5.h-5 {
     border-radius: inherit;
     background: radial-gradient(
       ellipse 48% 62% at top left,
-      color-mix(in srgb, var(--app-accent) 68%, var(--app-border)) 0%,
-      color-mix(in srgb, var(--app-accent) 32%, var(--app-border)) 48%,
+      color-mix(in srgb, var(--app-accent) 28%, var(--app-border)) 0%,
+      color-mix(in srgb, var(--app-accent) 14%, var(--app-border)) 48%,
       var(--app-border) 100%
     );
     -webkit-mask:
@@ -3381,7 +3381,7 @@ svg.w-5.h-5 {
     bottom: max(1rem, env(safe-area-inset-bottom));
     left: max(0.75rem, env(safe-area-inset-left));
     max-height: calc(
-      100dvh
+      var(--la-pluma-viewport-height, 100dvh)
       - max(0.75rem, env(safe-area-inset-top))
       - max(1rem, env(safe-area-inset-bottom))
     );
@@ -3397,6 +3397,24 @@ svg.w-5.h-5 {
   .pwa-update-chip {
     right: max(0.75rem, env(safe-area-inset-right));
     bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  @media (max-width: 1023px) {
+    .pwa-install-prompt {
+      bottom: calc(
+        var(--f7-tabbar-icons-height, var(--f7-toolbar-height, 0px))
+        + var(--f7-safe-area-bottom, env(safe-area-inset-bottom, 0px))
+        + 1rem
+      );
+    }
+
+    .pwa-update-chip {
+      bottom: calc(
+        var(--f7-tabbar-icons-height, var(--f7-toolbar-height, 0px))
+        + var(--f7-safe-area-bottom, env(safe-area-inset-bottom, 0px))
+        + 1rem
+      );
+    }
   }
 
   .floating-status-overlay {

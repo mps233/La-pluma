@@ -182,6 +182,7 @@ export default function NotificationSettings() {
             placeholder="Telegram Bot Token"
             disabled={loading || saving || !telegram.enabled}
             autoComplete="off"
+            className="app-native-control"
           />
         </label>
 
@@ -194,15 +195,16 @@ export default function NotificationSettings() {
             placeholder="Telegram Chat ID"
             disabled={loading || saving || !telegram.enabled}
             autoComplete="off"
+            className="app-native-control"
           />
         </label>
 
         <div className="automation-notification-buttons">
-          <button type="button" onClick={testNotification} disabled={loading || saving || testing || !canTest}>
+          <button type="button" onClick={testNotification} disabled={loading || saving || testing || !canTest} className="app-native-button">
             <Send size={14} />
             <span>{loading ? '加载中' : testing ? '发送中' : '测试'}</span>
           </button>
-          <button type="button" onClick={saveConfig} disabled={loading || saving || testing} className="is-primary">
+          <button type="button" onClick={saveConfig} disabled={loading || saving || testing} className="app-native-button app-native-button-primary is-primary">
             <Save size={14} />
             <span>{loading ? '加载中' : saving ? '保存中' : '保存'}</span>
           </button>

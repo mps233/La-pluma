@@ -1,5 +1,10 @@
-import { motion, useReducedMotion } from 'framer-motion'
-import type { ReactNode } from 'react'
+import { Card as FrameworkCard, CardContent as FrameworkCardContent, CardHeader as FrameworkCardHeader } from 'framework7-react'
+import type { CSSProperties, ComponentType, ReactNode } from 'react'
+import { useFramework7Runtime } from '../../framework7Context'
+
+const F7Card = FrameworkCard as unknown as ComponentType<Record<string, unknown>>
+const F7CardHeader = FrameworkCardHeader as unknown as ComponentType<Record<string, unknown>>
+const F7CardContent = FrameworkCardContent as unknown as ComponentType<Record<string, unknown>>
 
 /**
  * 卡片容器组件 Props
@@ -47,21 +52,34 @@ export function Card({
   animated = false,
   delay = 0,
 }: CardProps) {
-  const shouldReduceMotion = useReducedMotion()
-  const Container = animated ? motion.div : 'div'
-  const animationProps = animated ? {
-    initial: shouldReduceMotion ? false : { opacity: 0, y: 12 },
-    animate: { opacity: 1, y: 0 },
-    transition: { delay: shouldReduceMotion ? 0 : delay, duration: shouldReduceMotion ? 0 : 0.22 },
-  } : {}
+  const framework7Runtime = useFramework7Runtime()
+  const cardClassName = `app-card surface-panel ${className}`
+  const animationStyle = animated
+    ? { '--app-card-animation-delay': `${delay}s` } as CSSProperties
+    : undefined
+  if (!framework7Runtime) {
+    return (
+      <div
+        className={cardClassName}
+        data-animated={animated ? 'true' : undefined}
+        data-animation-delay={animated ? delay : undefined}
+        style={animationStyle}
+      >
+        {children}
+      </div>
+    )
+  }
 
   return (
-    <Container 
-      className={`app-card surface-panel ${className}`}
-      {...animationProps}
+    <F7Card
+      className={cardClassName}
+      padding={false}
+      data-animated={animated ? 'true' : undefined}
+      data-animation-delay={animated ? delay : undefined}
+      style={animationStyle}
     >
       {children}
-    </Container>
+    </F7Card>
   )
 }
 
@@ -69,8 +87,21 @@ export function Card({
  * 卡片标题组件
  */
 export function CardHeader({ icon, title, actions }: CardHeaderProps) {
+  const framework7Runtime = useFramework7Runtime()
+  if (!framework7Runtime) {
+    return (
+      <div className="app-card-header">
+        <div className="flex items-center space-x-2">
+          {icon}
+          <h3 className="app-section-title text-primary">{title}</h3>
+        </div>
+        {actions && <div>{actions}</div>}
+      </div>
+    )
+  }
+
   return (
-    <div className="app-card-header">
+    <F7CardHeader className="app-card-header">
       <div className="flex items-center space-x-2">
         {icon}
         <h3 className="app-section-title text-primary">
@@ -78,7 +109,7 @@ export function CardHeader({ icon, title, actions }: CardHeaderProps) {
         </h3>
       </div>
       {actions && <div>{actions}</div>}
-    </div>
+    </F7CardHeader>
   )
 }
 
@@ -86,10 +117,13 @@ export function CardHeader({ icon, title, actions }: CardHeaderProps) {
  * 卡片内容组件
  */
 export function CardContent({ children, className = '' }: CardContentProps) {
+  const framework7Runtime = useFramework7Runtime()
+  if (!framework7Runtime) return <div className={`app-card-content ${className}`}>{children}</div>
+
   return (
-    <div className={`app-card-content ${className}`}>
+    <F7CardContent padding={false} className={`app-card-content ${className}`}>
       {children}
-    </div>
+    </F7CardContent>
   )
 }
 

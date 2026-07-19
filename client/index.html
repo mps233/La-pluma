@@ -9,15 +9,27 @@
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#05090c" />
     <meta name="description" content="MAA CLI 的现代化 Web 界面 - 自动化明日方舟游戏任务" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="La Pluma" />
     <script>
       (() => {
+        const standalone = window.matchMedia?.('(display-mode: standalone)').matches
+          || window.matchMedia?.('(display-mode: fullscreen)').matches
+          || window.navigator.standalone === true
+        if (standalone) {
+          // Framework7 only adds this class for black-translucent status bars.
+          // Keep light-mode status icons readable while still claiming the full
+          // iOS standalone viewport ourselves.
+          document.documentElement.classList.add('la-pluma-standalone', 'device-full-viewport')
+        }
+
         const applyTheme = (theme) => {
           const dark = theme === 'dark'
             || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
           document.documentElement.classList.toggle('dark', dark)
+          document.getElementById('framework7-root')?.classList.toggle('dark', dark)
           document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
           document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#05090c' : '#f6f8fb')
           document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.setAttribute('content', dark ? 'black-translucent' : 'default')

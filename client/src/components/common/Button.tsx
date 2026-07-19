@@ -1,5 +1,8 @@
-import { motion, useReducedMotion } from 'framer-motion'
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import { Button as FrameworkButton } from 'framework7-react'
+import type { ButtonHTMLAttributes, ComponentType, ReactNode } from 'react'
+import { useFramework7Runtime } from '../../framework7Context'
+
+const F7Button = FrameworkButton as unknown as ComponentType<Record<string, unknown>>
 
 /**
  * 按钮组件 Props
@@ -49,9 +52,9 @@ export default function Button({
   type = 'button',
   ...props
 }: ButtonProps) {
-  const shouldReduceMotion = useReducedMotion()
+  const framework7Runtime = useFramework7Runtime()
   const baseStyles = 'app-button'
-  
+
   const variantStyles: Record<string, string> = {
     primary: 'brand-action',
     secondary: 'control-surface text-primary',
@@ -74,44 +77,61 @@ export default function Button({
   }
   
   const widthStyles = fullWidth ? 'w-full' : ''
-  
+
   const isDisabled = disabled || loading
-  const contentKey = statusKey ?? (loading ? 'loading' : 'ready')
-  
+
+  const content = loading
+    ? loadingText
+    : <><span className="button-icon-slot">{icon}</span>{children && <span>{children}</span>}</>
+
+  if (!framework7Runtime) {
+    return (
+      <button
+        type={type}
+        onClick={onClick}
+        disabled={isDisabled}
+        className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${widthStyles} ${isDisabled ? 'cursor-not-allowed opacity-50' : ''} ${className}`}
+        aria-busy={loading || undefined}
+        data-status-key={statusKey ?? undefined}
+        {...props}
+      >
+        <span className={`inline-flex min-h-4 items-center justify-center ${contentGapStyles[size]}`}>
+          {loading ? (
+            <>
+              <span
+                className={`${size === 'sm' ? 'h-4 w-4' : size === 'lg' ? 'h-5 w-5' : 'h-4 w-4'} app-spinner shrink-0 rounded-full border-2 border-current border-r-transparent`}
+                aria-hidden="true"
+              />
+              {loadingText && <span>{loadingText}</span>}
+            </>
+          ) : content}
+        </span>
+      </button>
+    )
+  }
+
   return (
-    <motion.button
+    <F7Button
       type={type}
+      href={false}
       onClick={onClick}
       disabled={isDisabled}
+      preloader={loading}
+      loading={loading}
+      fill={variant === 'primary' || variant === 'danger' || variant === 'success'}
+      tonal={variant === 'secondary' || variant === 'outline'}
+      outline={variant === 'outline'}
+      large={size === 'lg'}
+      small={size === 'sm'}
       className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${widthStyles} ${isDisabled ? 'cursor-not-allowed opacity-50' : ''} ${className}`}
       aria-busy={loading || undefined}
-      whileHover={isDisabled || shouldReduceMotion ? {} : { y: -1 }}
-      whileTap={isDisabled || shouldReduceMotion ? {} : { y: 0, scale: 0.98 }}
+      data-status-key={statusKey ?? undefined}
       {...props}
     >
-      <motion.span
-        key={contentKey}
-        className={`inline-flex min-h-4 items-center justify-center ${contentGapStyles[size]}`}
-        initial={shouldReduceMotion ? false : { opacity: 0, y: -5 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: shouldReduceMotion ? 0 : 0.14, ease: 'easeOut' }}
-      >
-        {loading ? (
-          <>
-            <svg className="app-spinner h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            {loadingText && <span>{loadingText}</span>}
-          </>
-        ) : (
-          <>
-            {icon}
-            {children && <span>{children}</span>}
-          </>
-        )}
-      </motion.span>
-    </motion.button>
+      <span className={`inline-flex min-h-4 items-center justify-center ${contentGapStyles[size]}`}>
+        {content}
+      </span>
+    </F7Button>
   )
 }
 
@@ -129,35 +149,51 @@ export function IconButton({
   title,
   ...props
 }: IconButtonProps) {
-  const shouldReduceMotion = useReducedMotion()
+  const framework7Runtime = useFramework7Runtime()
   const baseStyles = 'app-icon-button'
-  
+
   const variantStyles: Record<string, string> = {
     primary: 'brand-action',
     secondary: 'control-surface text-primary',
     danger: 'status-danger-action',
     ghost: 'app-button-ghost text-secondary',
   }
-  
+
   const sizeStyles: Record<string, string> = {
     sm: 'app-icon-button-size-sm text-xs',
     md: 'app-icon-button-size-md text-sm',
     lg: 'app-icon-button-size-lg text-base',
   }
-  
+
+  if (!framework7Runtime) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        title={title}
+        aria-label={props['aria-label'] ?? title}
+        className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${disabled ? 'cursor-not-allowed opacity-50' : ''} ${className}`}
+        {...props}
+      >
+        {icon}
+      </button>
+    )
+  }
+
   return (
-    <motion.button
+    <F7Button
       type="button"
+      href={false}
       onClick={onClick}
       disabled={disabled}
+      round
       title={title}
       aria-label={props['aria-label'] ?? title}
       className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${disabled ? 'cursor-not-allowed opacity-50' : ''} ${className}`}
-      whileHover={disabled || shouldReduceMotion ? {} : { scale: 1.04 }}
-      whileTap={disabled || shouldReduceMotion ? {} : { scale: 0.96 }}
       {...props}
     >
       {icon}
-    </motion.button>
+    </F7Button>
   )
 }

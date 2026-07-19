@@ -1,9 +1,13 @@
 import React, { lazy, Suspense, useEffect } from 'react'
 import { MotionConfig } from 'framer-motion'
+import { App as Framework7App } from 'framework7-react'
+import './framework7'
+import { Framework7RuntimeProvider } from './framework7Context'
 import Layout from './components/Layout'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
 import { PageSkeleton } from './components/common'
 import { useBackendStatusMonitor } from './hooks/useBackendStatusMonitor'
+import { useUIStore } from './stores'
 
 const pageLoaders = {
   dashboard: () => import('./components/Dashboard'),
@@ -62,6 +66,13 @@ class PageErrorBoundary extends React.Component<{ activeKey: string; children: R
 
 function App() {
   useBackendStatusMonitor()
+  const theme = useUIStore(state => state.theme)
+  const isDark = theme === 'dark'
+    || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)
+
+  useEffect(() => {
+    document.getElementById('framework7-root')?.classList.toggle('dark', isDark)
+  }, [isDark])
 
   useEffect(() => {
     const preloadPages = () => {
@@ -96,18 +107,48 @@ function App() {
   }
 
   return (
-    <MotionConfig reducedMotion="user">
-      <Layout>
-        {({ activeTab }) => (
-          <PageErrorBoundary activeKey={activeTab}>
-            <Suspense fallback={<PageSkeleton variant={activeTab} />}>
-              {renderActivePage(activeTab)}
-            </Suspense>
-          </PageErrorBoundary>
-        )}
-      </Layout>
-      <PWAInstallPrompt />
-    </MotionConfig>
+    <Framework7App
+      name="La Pluma"
+      theme="ios"
+      // Framework7 9.1.1 registers Sheet swipe listeners against a
+      // `sheetDestroy` event, while Modal.destroy emits `beforeDestroy`.
+      // Bridge the two events so StrictMode/HMR teardown cannot leave a stale
+      // touch listener that later reads from a destroyed instance.
+      sheet={{
+        on: {
+          // The internal listener is registered for `sheetDestroy`, which is
+          // missing from Framework7's public event types.
+          beforeDestroy: (sheet) => {
+            const emitInternal = sheet.emit as unknown as (event: string) => void
+            emitInternal.call(sheet, 'sheetDestroy')
+          },
+        },
+      }}
+      // Theme state is applied by uiStore to both document roots. Leaving this
+      // undefined lets Framework7 snapshot that state without installing its
+      // own MediaQueryList listeners (which are not available in older iOS
+      // WebViews and are already managed by the store).
+      darkMode={undefined}
+      iosTranslucentBars
+      iosTranslucentModals
+      colors={{ primary: '#007AFF' }}
+      className="la-pluma-framework7"
+    >
+      <Framework7RuntimeProvider>
+        <MotionConfig reducedMotion="user">
+          <Layout>
+            {({ activeTab }) => (
+              <PageErrorBoundary activeKey={activeTab}>
+                <Suspense fallback={<PageSkeleton variant={activeTab} />}>
+                  {renderActivePage(activeTab)}
+                </Suspense>
+              </PageErrorBoundary>
+            )}
+          </Layout>
+          <PWAInstallPrompt />
+        </MotionConfig>
+      </Framework7RuntimeProvider>
+    </Framework7App>
   )
 }
 

@@ -21,6 +21,20 @@
 
 ---
 
+## Framework7 壳层与 iOS 风格
+
+应用根节点由 `Framework7App` 提供，统一使用 Framework7 9 的 `theme="ios"`。Navbar、Page、Toolbar/tabbar、Sheet 等页面 chrome 和交互优先使用 `framework7-react`；`framework7-overrides.css` 只做 La Pluma 的语义 token、密度和品牌适配，不要在页面中另起一套导航或 modal 基础样式。
+
+- 桌面端（`lg` 及以上）显示左侧工作台导航；移动端使用底部 tabbar，“更多”承载次要页面。两端必须复用 `Layout` 的 URL 路由和 active 状态，不要按 viewport 建立第二份导航状态。
+- 主题由 `useUIStore` 的 `light`、`dark`、`system` 管理，并同步到文档根节点和 Framework7 根节点。组件或页面不要直接操作 `.dark`，也不要创建局部主题开关。
+- `client/index.html` 使用 `viewport-fit=cover`。Framework7 navbar、toolbar/tabbar 自己拥有安全区高度；自定义 fixed/sticky 层只有在不属于这些 chrome 时才使用 `env(safe-area-inset-*)`，内容区不要重复叠加顶部或底部 inset。
+- `Button`、`Card`、`Loading` 等 common 组件在 `Framework7RuntimeProvider` 内渲染 Framework7 版本；provider 外的原生版本用于 jsdom 测试、SSR 和嵌入式场景。不要通过检查 DOM 是否已经存在 `#framework7-root` 来决定首屏组件类型。
+- Framework7 的全局 form reset 可能影响原有按钮宽度、卡片外边距和 preloader 尺寸；这类兼容规则集中放在 `framework7-overrides.css` 或 common 组件中，调用处不要用局部覆盖扩散规则。
+
+桌面和移动端都要检查 light/dark、loading、disabled、empty、error 以及长标题/长操作文案；安全区设备还应确认 chrome 与页面内容没有双重留白。
+
+---
+
 ## 设计规范
 
 ### 色彩

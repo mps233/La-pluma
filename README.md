@@ -23,7 +23,7 @@
 - 📱 **Telegram 通知** - 任务完成后发送通知，包含截图和详细总结
 - 🤖 **Bot 远程控制** - 通过 Telegram Bot 远程执行任务
 - 🤖 **Agent API** - 通过 `/api/agent` 暴露 manifest/status/actions，方便 AI 或脚本调用
-- 🎨 **现代化 UI** - Tailwind CSS + Framer Motion，支持深色模式
+- 🎨 **现代化 UI** - Framework7 9 iOS 风格壳层 + Tailwind CSS + Framer Motion，支持深色模式
 - 📲 **PWA 支持** - 在 HTTPS 或 localhost 下可安装，离线可打开已缓存界面
 - 🔄 **实时更新** - WebSocket 实时推送任务状态和日志
 
@@ -55,6 +55,17 @@ La Pluma 是一个面向《明日方舟》自动化的本地 Web 控制台。前
 - `/api/operator-quotes` - 干员语音/台词相关接口。
 
 历史拆分路由已清理；新增功能应优先接入 `/api/agent`。
+
+### 前端 UI 与响应式壳层
+
+前端使用 React 19、Framework7 9（`theme="ios"`）、Tailwind CSS 和 Framer Motion。Framework7 负责页面 chrome、导航栏、工具栏/tabbar、模态交互和 iOS 风格的基础行为；项目语义 token 与 `framework7-overrides.css` 负责与 La Pluma 的品牌色、信息密度和现有组件保持一致。
+
+- 桌面端使用左侧工作台导航；移动端使用底部 tabbar，并通过“更多”入口承载次要页面。两端共享同一套 URL 路由和页面状态。
+- 主题由 `useUIStore` 管理，`light`、`dark`、`system` 会同步到文档根节点和 Framework7 根节点。页面组件不要自行切换 `.dark` 或另建主题状态。
+- 页面启用 `viewport-fit=cover`。Framework7 navbar、toolbar/tabbar 已包含对应安全区处理；自定义固定层只在自身不属于 Framework7 chrome 时补充 `env(safe-area-inset-*)`，避免重复留白。
+- 通用组件在 `Framework7RuntimeProvider` 内使用 Framework7 实现；测试、SSR 或嵌入式渲染脱离该 provider 时保留原生 fallback，这是有意的兼容行为。
+
+新增页面应复用现有 Layout、common 组件和语义 token；不要重复创建桌面侧栏、移动 tabbar 或页面级安全区计算。
 
 ## 🤖 Agent API
 
@@ -342,7 +353,7 @@ docker-compose up -d --build
 
 ```
 la-pluma/
-├── client/                    # 前端 (React + TypeScript + Vite + Tailwind CSS)
+├── client/                    # 前端 (React + TypeScript + Vite + Framework7 9 + Tailwind CSS)
 │   ├── src/
 │   │   ├── components/        # UI 组件
 │   │   │   ├── Dashboard.tsx          # 控制台总览
@@ -462,7 +473,7 @@ la-pluma/
 ## 🛠️ 技术栈
 
 - **前端框架**: React 19 + TypeScript + Vite
-- **UI 框架**: Tailwind CSS + Framer Motion
+- **UI 框架**: Framework7 9（iOS theme）+ Tailwind CSS + Framer Motion
 - **图标**: Lucide React
 - **状态管理**: Zustand
 - **后端**: Node.js + Express
@@ -478,7 +489,7 @@ la-pluma/
 
 ### 主要技术点
 
-- **前端**: React Hooks + Tailwind CSS 实现响应式 UI，Zustand 管理跨页面状态
+- **前端**: React Hooks + Framework7 9 实现页面壳层和响应式 chrome，Tailwind CSS/语义 token 负责业务布局，Zustand 管理跨页面状态
 - **API**: 前端通过 `client/src/services/api.ts` 访问 `/api/agent/*`
 - **后端**: `server/server.js` 挂载 Agent API，并用 Socket.IO 推送运行状态
 - **MAA 集成**: 通过 Node.js 子进程调用 `maa` CLI 命令

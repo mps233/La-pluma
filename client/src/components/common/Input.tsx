@@ -69,7 +69,7 @@ export default function Input({
   const describedBy = [ariaDescribedBy, error ? errorId : hint ? hintId : undefined]
     .filter(Boolean)
     .join(' ') || undefined
-  const baseStyles = 'app-input control-surface'
+  const baseStyles = 'input app-input control-surface'
   const errorStyles = 'form-error-surface'
   
   return (
@@ -142,7 +142,7 @@ export function Select({
   const describedBy = [ariaDescribedBy, error ? errorId : hint ? hintId : undefined]
     .filter(Boolean)
     .join(' ') || undefined
-  const baseStyles = 'app-input control-surface'
+  const baseStyles = 'input app-input control-surface'
   const errorStyles = 'form-error-surface'
   
   return (

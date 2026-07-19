@@ -70,6 +70,7 @@ export function applyThemePreference(theme: ThemeMode) {
     || (theme === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)
   const root = document.documentElement
   root.classList.toggle('dark', isDark)
+  document.getElementById('framework7-root')?.classList.toggle('dark', isDark)
   root.style.colorScheme = isDark ? 'dark' : 'light'
   document.querySelector('meta[name="theme-color"]')
     ?.setAttribute('content', isDark ? '#05090c' : '#f6f8fb')
@@ -130,7 +131,14 @@ export const useUIStore = create<UIState>()(
 if (typeof window !== 'undefined') {
   applyThemePreference(useUIStore.getState().theme)
   const systemTheme = window.matchMedia?.('(prefers-color-scheme: dark)')
-  systemTheme?.addEventListener('change', () => {
+  const handleSystemThemeChange = () => {
     if (useUIStore.getState().theme === 'system') applyThemePreference('system')
-  })
+  }
+
+  // Safari/WebViews before the modern MediaQueryList API expose addListener only.
+  if (systemTheme && typeof systemTheme.addEventListener === 'function') {
+    systemTheme.addEventListener('change', handleSystemThemeChange)
+  } else {
+    systemTheme?.addListener?.(handleSystemThemeChange)
+  }
 }
