@@ -69,7 +69,9 @@ export default function Input({
   const describedBy = [ariaDescribedBy, error ? errorId : hint ? hintId : undefined]
     .filter(Boolean)
     .join(' ') || undefined
-  const baseStyles = 'input app-input control-surface'
+  // Keep the native fallback API while opting shared controls into the same
+  // 44px touch target and focus treatment as Framework7's iOS inputs.
+  const baseStyles = 'input app-input app-native-control control-surface'
   const errorStyles = 'form-error-surface'
   
   return (
@@ -142,7 +144,7 @@ export function Select({
   const describedBy = [ariaDescribedBy, error ? errorId : hint ? hintId : undefined]
     .filter(Boolean)
     .join(' ') || undefined
-  const baseStyles = 'input app-input control-surface'
+  const baseStyles = 'input app-input app-native-control control-surface'
   const errorStyles = 'form-error-surface'
   
   return (

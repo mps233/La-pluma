@@ -60,7 +60,7 @@ La Pluma 是一个面向《明日方舟》自动化的本地 Web 控制台。前
 
 前端使用 React 19、Framework7 9（`theme="ios"`）、Tailwind CSS 和 Framer Motion。Framework7 负责页面 chrome、导航栏、工具栏/tabbar、模态交互和 iOS 风格的基础行为；项目语义 token 与 `framework7-overrides.css` 负责与 La Pluma 的品牌色、信息密度和现有组件保持一致。
 
-- 桌面端使用左侧工作台导航；移动端使用底部 tabbar，并通过“更多”入口承载次要页面。两端共享同一套 URL 路由和页面状态。
+- 桌面端使用左侧工作台导航；移动端使用悬浮的 iOS 风格底部胶囊导航，右侧搜索/更多入口承载次要页面。两端共享同一套 URL 路由和页面状态。
 - 主题由 `useUIStore` 管理，`light`、`dark`、`system` 会同步到文档根节点和 Framework7 根节点。页面组件不要自行切换 `.dark` 或另建主题状态。
 - 页面启用 `viewport-fit=cover`。Framework7 navbar、toolbar/tabbar 已包含对应安全区处理；自定义固定层只在自身不属于 Framework7 chrome 时补充 `env(safe-area-inset-*)`，避免重复留白。
 - 通用组件在 `Framework7RuntimeProvider` 内使用 Framework7 实现；测试、SSR 或嵌入式渲染脱离该 provider 时保留原生 fallback，这是有意的兼容行为。

@@ -41,7 +41,7 @@ export default function DropRecords({ dropStatistics, dropDays, setDropDays, onR
         className="app-grid-card grid-cols-2 md:grid-cols-4"
       >
         {metricCards.map((metric) => (
-          <div key={metric.label} className="surface-soft rounded-2xl border border-[var(--app-border)] p-4">
+          <div key={metric.label} className="surface-soft app-info-card">
             <div className="mb-2 flex items-center justify-between text-secondary">
               <p className="text-xs">{metric.label}</p>
               <span className="brand-text">{metric.icon}</span>
@@ -56,19 +56,21 @@ export default function DropRecords({ dropStatistics, dropDays, setDropDays, onR
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="flex items-center justify-between"
+        className="flex flex-wrap items-center justify-between gap-3"
       >
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm text-secondary">统计周期:</span>
-          <div className="flex items-center space-x-1">
+          <div className="flex flex-wrap items-center gap-1">
             {[3, 7, 14, 30].map((days) => (
               <button
                 key={days}
+                type="button"
                 onClick={() => setDropDays(days)}
-                className={`rounded-lg px-3 py-1 text-sm font-medium transition-all ${
+                aria-pressed={dropDays === days}
+                className={`app-native-button px-3 text-sm font-medium ${
                   dropDays === days
-                    ? 'brand-action'
-                    : 'control-surface text-secondary'
+                    ? 'app-native-button-primary'
+                    : ''
                 }`}
               >
                 {days}天
@@ -104,7 +106,7 @@ export default function DropRecords({ dropStatistics, dropDays, setDropDays, onR
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: idx * 0.02 }}
-              className="group flex items-center gap-3 rounded-2xl border border-[var(--app-border)] p-3 transition-colors surface-soft hover:border-[color-mix(in_srgb,var(--app-accent)_42%,var(--app-border))] hover:bg-[var(--app-accent-soft)]"
+              className="group surface-soft app-info-card flex items-center gap-3 p-3 transition-colors hover:border-[color-mix(in_srgb,var(--app-accent)_42%,var(--app-border))] hover:bg-[var(--app-accent-soft)]"
             >
               {/* 物品图标 */}
               {itemData.iconId && (
@@ -164,7 +166,7 @@ export default function DropRecords({ dropStatistics, dropDays, setDropDays, onR
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: idx * 0.05 }}
-              className="rounded-2xl border border-[var(--app-border)] p-4 surface-soft"
+              className="surface-soft app-info-card"
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-3">
@@ -185,7 +187,7 @@ export default function DropRecords({ dropStatistics, dropDays, setDropDays, onR
                 {Object.entries(stageData.items).map(([itemName, count]) => (
                   <span
                     key={itemName}
-                    className="rounded-lg border border-[var(--app-border)] px-2 py-1 text-xs text-secondary control-surface"
+                    className="control-surface rounded-[var(--app-radius-sm)] px-2 py-1 text-xs text-secondary"
                   >
                     {itemName} ×{count}
                   </span>

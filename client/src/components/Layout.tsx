@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentType, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
-import { BarChart3, Bot, Dices, FileText, Gamepad2, GitBranch, GraduationCap, LayoutDashboard, MoreHorizontal, Settings2, Swords, X } from 'lucide-react'
+import { BarChart3, Bot, Dices, FileText, Gamepad2, GitBranch, GraduationCap, LayoutDashboard, Search, Settings2, Swords, X } from 'lucide-react'
 import { Link, NavLeft, NavRight, NavTitle, Navbar, Page as F7Page, Sheet, Toolbar, View } from 'framework7-react'
 import '../framework7'
 import ThemeToggle from './ThemeToggle'
@@ -24,7 +24,9 @@ const tabs = [
   { id: 'config', name: '配置', icon: Settings2 },
 ] satisfies Array<{ id: AppTab; name: string; icon: typeof LayoutDashboard }>
 
-const mobileTabs = tabs.filter(tab => ['dashboard', 'automation', 'combat', 'training', 'config'].includes(tab.id))
+// Keep the compact mobile rail focused on the four destinations used most often.
+// The remaining workspaces stay available from the adjacent search/more control.
+const mobileTabs = tabs.filter(tab => ['dashboard', 'automation', 'combat', 'config'].includes(tab.id))
 const overflowTabs = tabs.filter(tab => !mobileTabs.some(primary => primary.id === tab.id))
 
 function getScrollHost() {
@@ -78,13 +80,12 @@ function TabLink({
       tabLink={mobile || undefined}
       tabLinkActive={mobile ? active : undefined}
       tabbarLabel={mobile || undefined}
-      text={mobile ? tab.name : undefined}
       aria-current={active ? 'page' : undefined}
       onClick={(event) => onNavigate(event as ReactMouseEvent<HTMLAnchorElement>, tab.id, mobile)}
       className={`la-pluma-tab-link ${active ? 'is-active' : ''} ${mobile ? 'is-mobile-tab' : 'is-desktop-tab'}`}
     >
       <TabIcon tab={tab} size={mobile ? 'h-5 w-5' : 'h-[1.125rem] w-[1.125rem]'} />
-      {!mobile && <span>{tab.name}</span>}
+      <span className={mobile ? 'tabbar-label' : undefined}>{tab.name}</span>
     </Link>
   )
 }
@@ -334,9 +335,11 @@ export default function Layout({ children }: LayoutProps) {
         </div>
 
         <Toolbar tabbar icons bottom className="la-pluma-tabbar">
-          {mobileTabs.map(tab => (
-            <TabLink key={tab.id} tab={tab} active={activeTab === tab.id} onNavigate={navigateToTab} mobile />
-          ))}
+          <nav className="la-pluma-tabbar-pill" aria-label="主要功能">
+            {mobileTabs.map(tab => (
+              <TabLink key={tab.id} tab={tab} active={activeTab === tab.id} onNavigate={navigateToTab} mobile />
+            ))}
+          </nav>
           <Link
             tabLink
             tabLinkActive={isOverflowActive || moreOpen}
@@ -345,15 +348,15 @@ export default function Layout({ children }: LayoutProps) {
             aria-haspopup="dialog"
             aria-expanded={moreOpen}
             aria-controls="la-pluma-more-sheet"
+            tooltip="搜索与更多页面"
             onClick={(event) => {
               event?.preventDefault()
               setMoreOpen(true)
             }}
-            className={`la-pluma-tab-link is-mobile-tab ${isOverflowActive ? 'is-active' : ''}`}
+            className={`la-pluma-tabbar-search ${isOverflowActive || moreOpen ? 'is-active' : ''}`}
             aria-label="更多页面"
           >
-            <MoreHorizontal className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" />
-            <span>更多</span>
+            <Search className="la-pluma-tabbar-search-icon" strokeWidth={2.1} aria-hidden="true" />
           </Link>
         </Toolbar>
 

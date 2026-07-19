@@ -8,7 +8,7 @@
 
 应用由 Framework7 9 `theme="ios"` 提供页面 chrome。`Button`、`Card`、`Loading` 等组件在 `Framework7RuntimeProvider` 内会使用对应的 Framework7 实现；脱离 provider 时使用原生 fallback，用于 jsdom 测试、SSR 和嵌入式渲染。不要在组件 render 阶段检查 `#framework7-root`，也不要让页面各自维护一套 F7/native 判断。
 
-主题由 `useUIStore` 统一管理并同步到两个根节点。Navbar 和 toolbar/tabbar 已由 Framework7 处理安全区；只有自定义固定浮层才补充 `env(safe-area-inset-*)`，避免重复 padding。桌面侧栏和移动底部 tabbar 由 `Layout` 统一提供，页面只负责渲染内容。
+主题由 `useUIStore` 统一管理并同步到两个根节点。Navbar 和 toolbar/tabbar 已由 Framework7 处理安全区；只有自定义固定浮层才补充 `env(safe-area-inset-*)`，避免重复 padding。桌面侧栏和移动悬浮胶囊导航由 `Layout` 统一提供，页面只负责渲染内容。
 
 ## 设计系统速记
 

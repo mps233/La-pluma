@@ -38,13 +38,17 @@ export default function Loading({
   
   return (
     <div
-      className="flex flex-col items-center justify-center space-y-3"
+      className="app-loading flex flex-col items-center justify-center space-y-3"
       role="status"
       aria-live="polite"
       aria-busy="true"
     >
       {framework7Runtime ? (
-        <Preloader size={sizeStyles[size]} color="blue" aria-hidden="true" />
+        <Preloader
+          size={sizeStyles[size]}
+          className="app-preloader"
+          aria-hidden="true"
+        />
       ) : (
         <span
           className={`${size === 'sm' ? 'h-4 w-4' : size === 'lg' ? 'h-12 w-12' : 'h-8 w-8'} brand-text app-spinner rounded-full border-2 border-current border-r-transparent`}

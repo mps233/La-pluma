@@ -453,14 +453,13 @@ export default function ConfigManager() {
         <Card animated delay={0.1}>
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">配置目录</h2>
-              <p className="break-all font-mono text-sm text-gray-600 dark:text-gray-400">{configDir || '加载中...'}</p>
+              <h2 className="mb-2 text-lg font-bold text-primary">配置目录</h2>
+              <p className="break-all font-mono text-sm text-secondary">{configDir || '加载中...'}</p>
             </div>
             <Button
               onClick={handleOpenConfigDir}
               variant="outline"
               size="sm"
-              className="brand-chip"
             >
               打开目录
             </Button>
@@ -471,20 +470,21 @@ export default function ConfigManager() {
           <CardHeader title="更新管理" />
           <CardContent>
             {/* 自动更新设置 */}
-            <div className="mb-6 rounded-2xl p-5 border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-800/40">
+            <div className="surface-soft app-info-card mb-6 p-5">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">自动更新</h3>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">每天定时自动更新 MAA 组件</p>
+                  <h3 className="mb-1 text-base font-semibold text-primary">自动更新</h3>
+                  <p className="text-xs text-secondary">每天定时自动更新 MAA 组件</p>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
+                <label className="relative inline-flex min-h-11 shrink-0 cursor-pointer items-center">
                   <input
                     type="checkbox"
                     checked={autoUpdate.enabled}
                     onChange={(e) => handleAutoUpdateChange('enabled', e.target.checked)}
+                    aria-label="启用自动更新"
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[var(--app-accent-soft)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--app-accent)]"></div>
+                  <div className="relative h-7 w-12 rounded-[var(--app-radius-pill)] border border-[var(--app-border-strong)] bg-[var(--app-surface-muted)] transition-colors after:absolute after:left-[3px] after:top-[3px] after:h-5 after:w-5 after:rounded-[var(--app-radius-pill)] after:border after:border-[var(--app-border)] after:bg-[var(--app-surface-solid)] after:shadow-sm after:transition-transform peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--app-accent)] peer-checked:border-[var(--app-accent)] peer-checked:bg-[var(--app-accent)] peer-checked:after:translate-x-5"></div>
                 </label>
               </div>
               
@@ -525,10 +525,10 @@ export default function ConfigManager() {
                     {/* 右侧：资源热更新 */}
                     <div className="space-y-3">
                       <div>
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
+                        <h4 className="mb-1 text-sm font-semibold text-primary">
                           资源热更新
                         </h4>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">同步 MaaResource 仓库的最新资源文件（活动地图、公招数据等）</p>
+                        <p className="text-xs text-secondary">同步 MaaResource 仓库的最新资源文件（活动地图、公招数据等）</p>
                       </div>
                       <Button
                         onClick={handleHotUpdate}
@@ -557,11 +557,11 @@ export default function ConfigManager() {
             {/* 手动更新按钮 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* 更新 MaaCore */}
-              <div className="rounded-2xl p-5 border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-800/40">
+              <div className="surface-soft app-info-card p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                      <h3 className="text-base font-semibold text-primary">
                         MaaCore
                       </h3>
                       {versionInfo && (
@@ -570,35 +570,35 @@ export default function ConfigManager() {
                         </span>
                       )}
                       {versionInfo && versionInfo.core.includes('beta') && (
-                        <span className="px-2 py-0.5 text-xs status-warning rounded">
+                        <span className="status-warning rounded-[var(--app-radius-sm)] px-2 py-0.5 text-xs">
                           Beta
                         </span>
                       )}
                       {versionInfo && !versionInfo.core.includes('beta') && (
-                        <span className="px-2 py-0.5 text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded">
+                        <span className="status-success rounded-[var(--app-radius-sm)] px-2 py-0.5 text-xs">
                           正式版
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">更新 MAA 核心组件和资源文件</p>
+                    <p className="text-xs text-secondary">更新 MAA 核心组件和资源文件</p>
                     {versionInfo?.resource && (
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                        <span className="text-gray-500 dark:text-gray-400">
+                        <span className="text-xs text-tertiary">
                           资源更新：{versionInfo.resource.lastUpdated
                             ? new Date(versionInfo.resource.lastUpdated.replace(' ', 'T')).toLocaleString('zh-CN', { hour12: false })
                             : '未知'}
                         </span>
-                        <span className={`rounded px-1.5 py-0.5 font-medium ${
+                        <span className={`rounded-[var(--app-radius-sm)] px-1.5 py-0.5 font-medium ${
                           versionInfo.resource.status === 'current'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                            ? 'status-success'
+                            : 'status-warning'
                         }`}>
                           {versionInfo.resource.status === 'current' ? '资源正常' : '需要同步'}
                         </span>
                       </div>
                     )}
                     {versionInfo?.resource && versionInfo.resource.status !== 'current' && (
-                      <p className="mt-1.5 text-xs leading-5 text-amber-600 dark:text-amber-400">
+                      <p className="mt-1.5 text-xs leading-5 text-[var(--app-warning)]">
                         {versionInfo.resource.message}
                       </p>
                     )}
@@ -620,9 +620,10 @@ export default function ConfigManager() {
                     {updating.core ? '同步中...' : '更新 MaaCore'}
                   </Button>
                   <button
+                    type="button"
                     onClick={handleToggleCoreVersion}
                     disabled={updating.core || hotUpdating}
-                    className="px-4 py-2 text-sm rounded-xl transition-colors bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="app-native-button app-native-button-primary w-full px-3 text-sm sm:w-auto"
                   >
                     {versionInfo?.core.includes('beta') || versionInfo?.core.includes('alpha') ? '切换到正式版' : '切换到 Beta'}
                   </button>
@@ -643,10 +644,10 @@ export default function ConfigManager() {
                 </div>
 
                 {updateFeedback && (
-                  <div className={`mt-3 border-t border-gray-200 pt-3 text-xs leading-5 dark:border-white/10 ${
+                  <div className={`mt-3 border-t border-[var(--app-border)] pt-3 text-xs leading-5 ${
                     updateFeedback.type === 'success'
-                      ? 'text-green-600 dark:text-green-400'
-                      : 'text-amber-600 dark:text-amber-400'
+                      ? 'text-[var(--app-success)]'
+                      : 'text-[var(--app-warning)]'
                   }`}>
                     <p>{updateFeedback.message}</p>
                     {updateFeedback.resourceRetry && (
@@ -654,7 +655,7 @@ export default function ConfigManager() {
                         type="button"
                         onClick={handleHotUpdate}
                         disabled={hotUpdating || updating.core}
-                        className="mt-1 font-semibold underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="app-native-button mt-1 !min-h-0 !border-0 !bg-transparent !px-0 !py-0 font-semibold underline underline-offset-2 shadow-none disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         重试资源同步
                       </button>
@@ -665,11 +666,11 @@ export default function ConfigManager() {
               </div>
 
               {/* 更新 MAA CLI */}
-              <div className="rounded-2xl p-5 border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-800/40">
+              <div className="surface-soft app-info-card p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                      <h3 className="text-base font-semibold text-primary">
                         MAA CLI
                       </h3>
                       {versionInfo && (
@@ -677,11 +678,11 @@ export default function ConfigManager() {
                           {versionInfo.cli}
                         </span>
                       )}
-                      <span className="px-2 py-0.5 text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded">
+                      <span className="status-success rounded-[var(--app-radius-sm)] px-2 py-0.5 text-xs">
                         正式版
                       </span>
                     </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">通过 Homebrew 更新 MAA 命令行工具</p>
+                    <p className="text-xs text-secondary">通过 Homebrew 更新 MAA 命令行工具</p>
                   </div>
                 </div>
                 <Button
@@ -708,13 +709,13 @@ export default function ConfigManager() {
           {/* 配置类型选择 */}
           <div>
             <motion.div 
-              className="overflow-hidden rounded-2xl surface-panel"
+              className="overflow-hidden rounded-[var(--app-radius-lg)] surface-panel"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <div className="px-5 py-4 border-b border-gray-200 dark:border-white/10">
-                <h3 className="font-bold text-gray-900 dark:text-white">配置类型</h3>
+              <div className="border-b border-[var(--app-border)] px-5 py-4">
+                <h3 className="font-bold text-primary">配置类型</h3>
               </div>
               <div className="p-3">
                 {configSections.map((section, index) => (
@@ -826,7 +827,7 @@ export default function ConfigManager() {
                       )}
 
                       {discoveredDevices.length > 0 && (
-                        <div className="mt-3 divide-y divide-[var(--app-border)] overflow-hidden rounded-lg border border-[var(--app-border)]">
+                        <div className="mt-3 divide-y divide-[var(--app-border)] overflow-hidden rounded-[var(--app-radius-md)] border border-[var(--app-border)]">
                           {discoveredDevices.map(device => {
                             const selectable = device.state === 'device' || device.state === 'candidate'
                             const stateLabel = device.state === 'device'
@@ -844,7 +845,7 @@ export default function ConfigManager() {
                                 type="button"
                                 disabled={!selectable || testingConnection}
                                 onClick={() => void handleUseDiscoveredDevice(device)}
-                                className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--app-accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50"
+                                className="app-native-button !flex !min-h-0 !w-full !justify-between !rounded-none !border-0 !bg-transparent !px-3 !py-2.5 !text-left !font-normal !shadow-none transition-colors hover:!bg-[var(--app-accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50"
                               >
                                 <span className="min-w-0">
                                   <span className="block truncate text-sm font-medium text-primary">{device.address}</span>
@@ -878,11 +879,11 @@ export default function ConfigManager() {
                       ]}
                       hint="平台相关配置"
                     />
-                    <div className="rounded-xl border border-gray-200/80 bg-gray-50/80 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+                    <div className="surface-soft app-info-card px-4 py-3">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">自动重连</div>
-                          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">maa-cli 0.7.3+ 支持。开启后游戏服务断开时自动重连；关闭则保持断开，适合手动排障。</div>
+                          <div className="text-sm font-medium text-primary">自动重连</div>
+                          <div className="mt-1 text-xs text-tertiary">maa-cli 0.7.3+ 支持。开启后游戏服务断开时自动重连；关闭则保持断开，适合手动排障。</div>
                         </div>
                         <Checkbox
                           label="启用"
