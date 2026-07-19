@@ -156,8 +156,8 @@ html.la-pluma-standalone #root,
 html.la-pluma-standalone #framework7-root,
 html.la-pluma-standalone #framework7-root .view,
 html.la-pluma-standalone #framework7-root .page {
-  height: 100%;
-  min-height: 100%;
+  height: var(--la-pluma-viewport-height);
+  min-height: var(--la-pluma-viewport-height);
 }
 
 /* Framework7 owns the safe-area insets on its bars and tabbar. The legacy
@@ -609,6 +609,16 @@ button.button.app-icon-button:not(.w-full) {
     padding-bottom: calc(
       var(--la-pluma-tabbar-content-height) + var(--la-pluma-tabbar-safe-bottom) + var(--app-space-page)
     );
+  }
+}
+
+/* In an installed app the page is the full physical viewport. Keeping the
+   tabbar page-relative avoids WebKit anchoring `position: fixed` to the
+   smaller dynamic layout viewport reported during PWA startup. */
+@media (max-width: 1023px) {
+  html.la-pluma-standalone #framework7-root.la-pluma-framework7 .la-pluma-tabbar {
+    position: absolute;
+    bottom: 0;
   }
 }
 
