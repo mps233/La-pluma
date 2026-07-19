@@ -73,7 +73,7 @@ export default function ThemeToggle() {
 
   return (
     <>
-      <div className="surface-soft hidden items-center gap-1 rounded-xl p-1 sm:flex" role="group" aria-label="界面主题">
+      <div className="la-pluma-theme-desktop surface-soft items-center gap-1 rounded-xl p-1" role="group" aria-label="界面主题">
         {themeOptions.map(option => {
           const ThemeIcon = option.icon
           return (
@@ -98,12 +98,12 @@ export default function ThemeToggle() {
         })}
       </div>
 
-      <div className="relative sm:hidden">
+      <div className="la-pluma-theme-mobile relative flex-none">
         <motion.button
           ref={mobileTriggerRef}
           type="button"
           onClick={() => setMobileMenuOpen(open => !open)}
-          className="group flex h-11 w-11 items-center justify-center rounded-lg text-secondary transition-colors hover:text-primary focus-visible:outline-none"
+          className={`la-pluma-theme-trigger group text-secondary transition-colors hover:bg-[var(--app-surface-muted)] hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] ${mobileMenuOpen ? 'bg-[var(--app-surface-muted)]' : ''}`}
           whileTap={shouldReduceMotion ? {} : { scale: 0.96 }}
           title={`主题：${currentTheme.label}`}
           aria-label={`切换界面主题，当前${currentTheme.label}`}
@@ -111,9 +111,7 @@ export default function ThemeToggle() {
           aria-expanded={mobileMenuOpen}
           aria-controls={mobileMenuId}
         >
-          <span className="control-surface flex h-8 w-8 items-center justify-center rounded-lg group-focus-visible:ring-2 group-focus-visible:ring-[var(--app-accent)]" aria-hidden="true">
-            <CurrentThemeIcon className="h-4 w-4" />
-          </span>
+          <CurrentThemeIcon className="h-5 w-5" aria-hidden="true" />
         </motion.button>
 
         <AnimatePresence>

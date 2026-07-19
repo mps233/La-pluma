@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentType, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { BarChart3, Bot, Dices, FileText, Gamepad2, GitBranch, GraduationCap, LayoutDashboard, Search, Settings2, Swords, X } from 'lucide-react'
-import { Link, NavLeft, NavRight, NavTitle, Navbar, Page as F7Page, Sheet, Toolbar, View } from 'framework7-react'
+import { Link, Navbar, Page as F7Page, Sheet, Toolbar, View } from 'framework7-react'
 import '../framework7'
 import ThemeToggle from './ThemeToggle'
 import { useUIStore } from '@/stores'
@@ -290,14 +290,14 @@ export default function Layout({ children }: LayoutProps) {
     <View main router={false} className="la-pluma-view">
       <F7Page name="la-pluma" pageContent={false} noSwipeback className="la-pluma-page">
         <Navbar className="la-pluma-navbar">
-          <NavLeft slot="left">
+          <div slot="left" className="la-pluma-navbar-left">
             <Link href={appTabPath('dashboard')} className="la-pluma-brand" aria-label="La Pluma 控制台" onClick={(event) => navigateToTab(event as ReactMouseEvent<HTMLAnchorElement>, 'dashboard')}>
               <img src={`${import.meta.env.BASE_URL}logo-graphite.svg?v=1`} alt="" className="la-pluma-brand-mark" />
               <span>La Pluma</span>
             </Link>
-          </NavLeft>
-          <NavTitle slot="title" className="la-pluma-navbar-title">{tabs.find(tab => tab.id === activeTab)?.name}</NavTitle>
-          <NavRight slot="right">
+          </div>
+          <div slot="title" className="la-pluma-navbar-title">{tabs.find(tab => tab.id === activeTab)?.name}</div>
+          <div slot="right" className="la-pluma-navbar-actions">
             <ThemeToggle />
             <ExternalLink
               href="https://github.com/mps233/La-pluma"
@@ -310,7 +310,7 @@ export default function Layout({ children }: LayoutProps) {
             >
               <GitBranch className="h-[1.125rem] w-[1.125rem]" aria-hidden="true" />
             </ExternalLink>
-          </NavRight>
+          </div>
         </Navbar>
 
         <div className="la-pluma-page-body">

@@ -314,13 +314,68 @@ body {
   font-weight: 700 !important;
 }
 
-.la-pluma-github-link {
-  display: inline-flex !important;
-  width: 2.75rem;
-  height: 2.75rem;
+.la-pluma-navbar-left,
+.la-pluma-navbar-actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.la-pluma-navbar-actions {
+  gap: 0;
+}
+
+.la-pluma-theme-desktop {
+  display: none;
+}
+
+/* Keep the mobile theme control a real 44px hit target. Framework7's iOS
+   navbar is a flex container and can otherwise shrink this button beside a
+   second icon link. */
+.la-pluma-theme-mobile {
+  display: flex;
+  flex: 0 0 2.75rem;
   align-items: center;
   justify-content: center;
+}
+
+.la-pluma-theme-trigger {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex: 0 0 2.75rem;
+  width: 2.75rem !important;
+  min-width: 2.75rem !important;
+  height: 2.75rem !important;
+  min-height: 2.75rem !important;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+}
+
+.la-pluma-github-link {
+  display: inline-flex !important;
+  flex: 0 0 2.75rem;
+  width: 2.75rem !important;
+  min-width: 2.75rem !important;
+  height: 2.75rem !important;
+  min-height: 2.75rem !important;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
   border-radius: 999px;
+}
+
+@media (min-width: 1024px) {
+  .la-pluma-theme-desktop {
+    display: flex;
+  }
+
+  .la-pluma-theme-mobile {
+    display: none;
+  }
 }
 
 .la-pluma-github-link:hover,
