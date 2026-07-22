@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Download, RefreshCw, Share2, SquarePlus } from 'lucide-react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useStatusStore } from '@/store/statusStore'
-import { Button } from '@/components/common'
+import { Button, IconButton } from '@/components/common'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -30,6 +30,9 @@ const isIosDevice = () => {
 const canOfferInstallation = () =>
   window.isSecureContext
   || ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)
+
+const isCompactInstallViewport = () =>
+  window.matchMedia('(max-width: 639px)').matches
 
 const shouldRemindAboutInstall = () => {
   try {
@@ -66,6 +69,7 @@ export default function PWAInstallPrompt() {
     && canOfferInstallation()
     && isIosDevice()
     && shouldRemindAboutInstall())
+  const [isInstallExpanded, setIsInstallExpanded] = useState(() => !isCompactInstallViewport())
   const [isUpdateCollapsed, setIsUpdateCollapsed] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const shouldReduceMotion = useReducedMotion()
@@ -95,13 +99,17 @@ export default function PWAInstallPrompt() {
       e.preventDefault()
       const promptEvent = e as BeforeInstallPromptEvent
       setDeferredPrompt(promptEvent)
-      if (shouldRemindAboutInstall()) setShowInstallPrompt(true)
+      if (shouldRemindAboutInstall()) {
+        setIsInstallExpanded(!isCompactInstallViewport())
+        setShowInstallPrompt(true)
+      }
     }
 
     const handleAppInstalled = () => {
       clearInstallDismissal()
       setDeferredPrompt(null)
       setShowInstallPrompt(false)
+      setIsInstallExpanded(false)
       setStatusMessage('La Pluma 已安装', 'success')
     }
 
@@ -124,6 +132,7 @@ export default function PWAInstallPrompt() {
       else clearInstallDismissal()
       setDeferredPrompt(null)
       setShowInstallPrompt(false)
+      setIsInstallExpanded(false)
     } catch {
       setStatusMessage('未能打开安装窗口，请稍后重试', 'error')
     }
@@ -132,6 +141,7 @@ export default function PWAInstallPrompt() {
   const handleInstallDismiss = () => {
     rememberInstallDismissal()
     setShowInstallPrompt(false)
+    setIsInstallExpanded(false)
   }
 
   const handleUpdate = async () => {
@@ -146,10 +156,11 @@ export default function PWAInstallPrompt() {
   }
 
   const showUpdateCard = needRefresh && !isUpdateCollapsed
-  const showInstallCard = !needRefresh && showInstallPrompt
+  const showInstallCard = !needRefresh && showInstallPrompt && isInstallExpanded
+  const showInstallEntry = !needRefresh && showInstallPrompt && !isInstallExpanded
   const announcement = showUpdateCard
     ? '发现新版本，可以立即更新'
-    : showInstallCard
+    : showInstallPrompt
       ? (isIos ? '可以将 La Pluma 添加到主屏幕' : '可以安装 La Pluma')
       : ''
   const logoUrl = `${import.meta.env.BASE_URL}logo-graphite.svg?v=1`
@@ -236,6 +247,26 @@ export default function PWAInstallPrompt() {
           </motion.section>
         )}
       </AnimatePresence>
+
+      {showInstallEntry && (
+        <motion.div
+          initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: shouldReduceMotion ? 0.08 : 0.18, ease: 'easeOut' }}
+          className="pwa-install-entry fixed z-50"
+        >
+          <IconButton
+            variant="secondary"
+            size="md"
+            icon={<SquarePlus className="h-5 w-5" aria-hidden="true" />}
+            onClick={() => setIsInstallExpanded(true)}
+            className="pwa-install-entry-button"
+            title="安装 La Pluma"
+            aria-label="安装 La Pluma"
+            aria-expanded="false"
+          />
+        </motion.div>
+      )}
 
       <AnimatePresence>
         {needRefresh && isUpdateCollapsed && (

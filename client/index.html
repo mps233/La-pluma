@@ -19,9 +19,8 @@
           || window.matchMedia?.('(display-mode: fullscreen)').matches
           || window.navigator.standalone === true
         if (standalone) {
-          // Framework7 only adds this class for black-translucent status bars.
-          // Keep light-mode status icons readable while still claiming the full
-          // iOS standalone viewport ourselves.
+          // Claim the full iOS standalone viewport while keeping status icons
+          // readable in both color schemes.
           document.documentElement.classList.add('la-pluma-standalone', 'device-full-viewport')
         }
 
@@ -29,7 +28,7 @@
           const dark = theme === 'dark'
             || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
           document.documentElement.classList.toggle('dark', dark)
-          document.getElementById('framework7-root')?.classList.toggle('dark', dark)
+          document.getElementById('app-root')?.classList.toggle('dark', dark)
           document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
           document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#05090c' : '#f6f8fb')
           document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.setAttribute('content', dark ? 'black-translucent' : 'default')

@@ -164,6 +164,81 @@ describe('OperatorTraining async interactions', () => {
     vi.restoreAllMocks()
   })
 
+  it('uses the dashboard workspace layout and smooth primary surfaces', async () => {
+    mocks.getTrainingQueue.mockResolvedValue({
+      success: true,
+      data: { queue: [queueItem('char_current', '阿米娅')], settings },
+    })
+
+    await renderComponent()
+
+    expect(container.querySelector('.ios-workspace-page[data-page="training"]')).not.toBeNull()
+    expect(container.querySelector('.app-page-header.is-mobile-inline')).not.toBeNull()
+    expect(container.querySelector('.training-current-card[data-smooth-corners="true"]')).not.toBeNull()
+    expect(container.querySelector('.training-settings-panel[data-smooth-corners="true"]')).not.toBeNull()
+  })
+
+  it('shows retryable errors instead of empty states when initial reads fail', async () => {
+    mocks.getOperatorList.mockRejectedValueOnce(new Error('干员服务暂不可用'))
+    mocks.getTrainingQueue
+      .mockRejectedValueOnce(new Error('队列服务暂不可用'))
+      .mockResolvedValueOnce({ success: true, data: { queue: [], settings } })
+
+    await renderComponent()
+
+    expect(document.body.textContent).toContain('干员列表加载失败')
+    expect(document.body.textContent).toContain('干员服务暂不可用')
+    expect(document.body.textContent).toContain('养成队列加载失败')
+    expect(document.body.textContent).toContain('队列服务暂不可用')
+    expect(document.body.textContent).not.toContain('没有可养成干员')
+    expect(document.body.textContent).not.toContain('养成队列还是空的')
+
+    const queueAlert = Array.from(container.querySelectorAll<HTMLElement>('[role="alert"]'))
+      .find(alert => alert.textContent?.includes('队列服务暂不可用'))
+    const queueRetry = queueAlert?.querySelector<HTMLButtonElement>('button')
+    expect(queueRetry).not.toBeNull()
+    await click(queueRetry!)
+
+    expect(mocks.getTrainingQueue).toHaveBeenCalledTimes(2)
+    expect(document.body.textContent).not.toContain('队列服务暂不可用')
+    expect(document.body.textContent).toContain('养成队列还是空的')
+  })
+
+  it('keeps the rarity menu keyboard-operable and labels the plan selector', async () => {
+    mocks.getTrainingQueue.mockResolvedValue({
+      success: true,
+      data: { queue: [queueItem('char_current', '阿米娅')], settings },
+    })
+
+    await renderComponent()
+    const trigger = container.querySelector<HTMLButtonElement>('[aria-controls="training-rarity-menu"]')!
+    expect(trigger.className).toContain('min-h-11')
+    await click(trigger)
+    await act(async () => {
+      await new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()))
+    })
+
+    const menu = container.querySelector<HTMLElement>('#training-rarity-menu')!
+    const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
+    expect(menu.getAttribute('role')).toBe('menu')
+    expect(items).toHaveLength(4)
+    expect(items.every(item => item.className.includes('min-h-11'))).toBe(true)
+    expect(document.activeElement).toBe(items[0])
+
+    await act(async () => {
+      items[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+    })
+    expect(document.activeElement).toBe(items[1])
+
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(container.querySelector('#training-rarity-menu')).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+    expect(container.querySelector('select[aria-label="计划范围"]')).not.toBeNull()
+    expect(container.querySelector('.training-settings-panel summary')?.className).toContain('min-h-11')
+  })
+
   it('serializes settings writes so an older response cannot overwrite the latest value on disk', async () => {
     const firstRequest = deferred<{ success: boolean; data: TrainingSettings }>()
     mocks.updateTrainingSettings

@@ -560,8 +560,8 @@ export const maaApi = {
   /**
    * 从服务器读取用户配置
    */
-  async loadUserConfig(configType: string): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/config/user/${configType}`)
+  async loadUserConfig(configType: string, signal?: AbortSignal): Promise<ApiResponse> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/config/user/${configType}`, { signal })
     return parseJsonResponse(response)
   },
 

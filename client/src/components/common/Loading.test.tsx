@@ -2,7 +2,7 @@
 
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PageSkeleton } from './Loading'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -16,6 +16,21 @@ const renderSkeleton = async (variant: string) => {
 
 describe('PageSkeleton', () => {
   beforeEach(() => {
+    window.matchMedia = vi.fn((query: string): MediaQueryList => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+    vi.stubGlobal('ResizeObserver', class ResizeObserverMock {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
@@ -24,16 +39,28 @@ describe('PageSkeleton', () => {
   afterEach(async () => {
     await act(async () => root.unmount())
     container.remove()
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
   })
 
-  it('mirrors the automation overview and builder regions', async () => {
+  it('mirrors the automation workspace and support rail', async () => {
     await renderSkeleton('automation')
 
     expect(container.querySelector('[aria-label="页面内容加载中"]')).not.toBeNull()
-    expect(container.querySelector('.automation-overview-grid')).not.toBeNull()
-    expect(container.querySelector('.automation-builder-grid')).not.toBeNull()
+    expect(container.querySelector('.automation-workspace-grid')).not.toBeNull()
+    expect(container.querySelector('.automation-support-column')).not.toBeNull()
     expect(container.querySelector('.automation-monitor-panel .aspect-video')).not.toBeNull()
+    expect(container.querySelectorAll('.automation-monitor-skeleton-toolbar .rounded-full')).toHaveLength(5)
     expect(container.querySelectorAll('.surface-panel')).toHaveLength(4)
+  })
+
+  it('keeps dashboard material styling while data is loading', async () => {
+    await renderSkeleton('dashboard')
+
+    const page = container.querySelector('[aria-label="控制台加载中"]')
+    expect(page?.classList.contains('dashboard-page')).toBe(true)
+    expect(page?.querySelector('.dashboard-flow-card')).not.toBeNull()
+    expect(page?.querySelectorAll('.dashboard-summary-card')).toHaveLength(4)
   })
 
   it('keeps the device preview aspect ratio for execution pages', async () => {

@@ -1,0 +1,2240 @@
+/* La Pluma's iOS 26-inspired material and application chrome. */
+
+:root {
+  --app-chrome-page-bg: #f2f2f7;
+  --app-chrome-bg: rgba(255, 255, 255, 0.72);
+  --app-glass-bg: rgba(255, 255, 255, 0.68);
+  --app-glass-border: rgba(60, 60, 67, 0.18);
+  --app-glass-shadow: 0 12px 32px rgba(60, 60, 67, 0.12);
+  --app-bg: #f2f2f7;
+  --app-bg-soft: #e5e5ea;
+  --app-surface: rgba(255, 255, 255, 0.72);
+  --app-surface-solid: #ffffff;
+  --app-surface-muted: rgba(118, 118, 128, 0.12);
+  --app-border: rgba(60, 60, 67, 0.18);
+  --app-border-strong: rgba(60, 60, 67, 0.28);
+  --app-text: #1c1c1e;
+  --app-text-muted: #636366;
+  --app-text-soft: #8e8e93;
+  --app-accent: #007aff;
+  --app-accent-strong: #005ecb;
+  --app-accent-action: #0066cc;
+  --app-accent-action-pressed: #0055b3;
+  --app-accent-soft: rgba(0, 122, 255, 0.12);
+  --app-success: #34c759;
+  --app-success-text: #1f7a36;
+  --app-success-action: #248a3d;
+  --app-warning: #ff9500;
+  --app-danger: #ff3b30;
+  --app-danger-action: #d70015;
+  --app-info: #5856d6;
+  --app-radius-xs: 0.375rem;
+  --app-radius-sm: 0.625rem;
+  --app-radius-md: 0.8125rem;
+  --app-radius-lg: 1rem;
+  --app-continuous-radius: 1.25rem;
+  --app-continuous-radius-compact: 1rem;
+  --app-space-card: 0.875rem;
+  --app-space-section: 1.125rem;
+  --app-space-page: 1.25rem;
+  --app-space-panel: 1rem;
+  --app-space-control-x: 1rem;
+  --app-control-height-sm: 2.25rem;
+  --app-control-height-md: 2.75rem;
+  --app-control-height-lg: 3rem;
+  --app-control-height-touch: 2.75rem;
+  --app-material-bg: var(--app-chrome-page-bg);
+  --app-material-surface: var(--app-glass-bg);
+  --app-material-fill-secondary: var(--app-surface-muted);
+  --app-material-separator: var(--app-border);
+  --app-material-shadow: var(--app-glass-shadow);
+  --app-focus-ring: 0 0 0 3px var(--app-accent-soft);
+  --app-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF UI Text", system-ui, sans-serif;
+  --app-navbar-height: 4.75rem;
+  --app-toolbar-height: 4rem;
+  --app-tabbar-icons-height: 5rem;
+  --app-safe-area-top: env(safe-area-inset-top, 0px);
+  --app-safe-area-right: env(safe-area-inset-right, 0px);
+  --app-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --app-safe-area-left: env(safe-area-inset-left, 0px);
+  --app-page-gutter: 1.25rem;
+  --la-pluma-viewport-height: 100dvh;
+  --la-pluma-tabbar-content-height: var(--app-tabbar-icons-height, var(--app-toolbar-height));
+  --la-pluma-tabbar-safe-bottom: max(var(--app-safe-area-bottom, 0px), env(safe-area-inset-bottom, 0px));
+  --la-pluma-tabbar-floating-height: 4rem;
+  --la-pluma-tabbar-floating-offset: 0.5rem;
+  --la-pluma-tabbar-bottom-clearance: max(
+    var(--la-pluma-tabbar-safe-bottom),
+    var(--la-pluma-tabbar-floating-offset)
+  );
+  --la-pluma-tabbar-reserved-height: calc(
+    var(--la-pluma-tabbar-floating-height) + var(--la-pluma-tabbar-bottom-clearance)
+  );
+  --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.16);
+  --la-pluma-tabbar-shadow: 0 1rem 2.25rem rgba(60, 60, 67, 0.18);
+  --la-pluma-tabbar-fade-color: #ffffff;
+  --la-pluma-navbar-fade-color: #ffffff;
+  --la-pluma-sidebar-width: 17rem;
+  --la-pluma-sidebar-bg: #efeff4;
+  --la-pluma-sidebar-search-bg: rgba(118, 118, 128, 0.12);
+  --la-pluma-sidebar-selection: #007aff;
+  --la-pluma-liquid-surface-lift: rgba(255, 255, 255, 0.04);
+  --la-pluma-liquid-edge-light: rgba(255, 255, 255, 0.48);
+  --la-pluma-liquid-edge-clear: rgba(255, 255, 255, 0);
+  --la-pluma-liquid-edge-high: color-mix(
+    in srgb,
+    var(--la-pluma-liquid-edge-light) 75%,
+    var(--la-pluma-liquid-edge-clear)
+  );
+  --la-pluma-liquid-edge-mid: color-mix(
+    in srgb,
+    var(--la-pluma-liquid-edge-light) 50%,
+    var(--la-pluma-liquid-edge-clear)
+  );
+  --la-pluma-liquid-edge-faint: color-mix(
+    in srgb,
+    var(--la-pluma-liquid-edge-light) 25%,
+    var(--la-pluma-liquid-edge-clear)
+  );
+}
+
+/* Safari's dynamic viewport is intentionally used in a normal browser so
+   the app follows the address bar. An installed app has no browser chrome;
+   use the largest viewport so fixed bars reach the physical screen edge. */
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  :root {
+    --la-pluma-viewport-height: 100lvh;
+  }
+}
+
+html.la-pluma-standalone {
+  --la-pluma-viewport-height: 100lvh;
+}
+
+@supports not (height: 100lvh) {
+  @media (display-mode: standalone), (display-mode: fullscreen) {
+    :root {
+      --la-pluma-viewport-height: 100vh;
+    }
+  }
+
+  html.la-pluma-standalone {
+    --la-pluma-viewport-height: 100vh;
+  }
+}
+
+html.dark,
+#app-root.dark {
+  --app-chrome-page-bg: #000000;
+  --app-chrome-bg: rgba(28, 28, 30, 0.74);
+  --app-glass-bg: rgba(28, 28, 30, 0.72);
+  --app-glass-border: rgba(235, 235, 245, 0.18);
+  --app-glass-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
+  --app-bg: #000000;
+  --app-bg-soft: #1c1c1e;
+  --app-surface: rgba(28, 28, 30, 0.72);
+  --app-surface-solid: #1c1c1e;
+  --app-surface-muted: rgba(118, 118, 128, 0.24);
+  --app-border: rgba(235, 235, 245, 0.18);
+  --app-border-strong: rgba(235, 235, 245, 0.28);
+  --app-text: #f2f2f7;
+  --app-text-muted: #aeaeb2;
+  --app-text-soft: #8e8e93;
+  --app-accent: #0a84ff;
+  --app-accent-strong: #64b5ff;
+  --app-accent-action: #0066cc;
+  --app-accent-action-pressed: #0055b3;
+  --app-accent-soft: rgba(10, 132, 255, 0.2);
+  --app-success: #30d158;
+  --app-success-text: #30d158;
+  --app-success-action: #1f7a36;
+  --app-warning: #ff9f0a;
+  --app-danger: #ff453a;
+  --app-danger-action: #ff453a;
+  --app-info: #5e5ce6;
+  --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.3);
+  --la-pluma-tabbar-shadow: 0 1rem 2.25rem rgba(0, 0, 0, 0.44);
+  --la-pluma-tabbar-fade-color: #000000;
+  --la-pluma-navbar-fade-color: #000000;
+  --la-pluma-sidebar-bg: #1c1c1e;
+  --la-pluma-sidebar-search-bg: rgba(118, 118, 128, 0.2);
+  --la-pluma-sidebar-selection: #0a84ff;
+  --la-pluma-liquid-surface-lift: rgba(255, 255, 255, 0.05);
+  --la-pluma-liquid-edge-light: rgba(255, 255, 255, 0.18);
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --app-border: rgba(60, 60, 67, 0.32);
+    --app-border-strong: rgba(60, 60, 67, 0.46);
+    --app-text-muted: #48484a;
+    --app-text-soft: #48484a;
+  }
+
+  html.dark,
+  #app-root.dark {
+    --app-border: rgba(235, 235, 245, 0.3);
+    --app-border-strong: rgba(235, 235, 245, 0.46);
+    --app-text-muted: #d1d1d6;
+    --app-text-soft: #d1d1d6;
+  }
+}
+
+html,
+body,
+#root,
+#app-root {
+  min-height: 100%;
+}
+
+html,
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--app-font-family);
+}
+
+html,
+body {
+  background: var(--app-chrome-page-bg) !important;
+}
+
+body {
+  overflow-x: hidden;
+  background-image: none !important;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body::before {
+  display: none !important;
+}
+
+.la-pluma-app,
+.la-pluma-app .view,
+.la-pluma-app .page {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--la-pluma-viewport-height);
+  height: auto;
+  overflow: visible;
+  background: transparent;
+}
+
+/* A standalone iOS document can report a dynamic layout height while its
+   screen is still the full largest viewport. Link every root in the height
+   chain so fixed tabbars are positioned against the physical viewport. */
+html.la-pluma-standalone,
+html.la-pluma-standalone body,
+html.la-pluma-standalone #root,
+html.la-pluma-standalone #app-root,
+html.la-pluma-standalone #app-root .view,
+html.la-pluma-standalone #app-root .page {
+  height: var(--la-pluma-viewport-height);
+  min-height: var(--la-pluma-viewport-height);
+}
+
+/* The app chrome owns its safe-area insets; the document must not add a
+   second bottom strip in standalone mode. */
+body {
+  padding-bottom: 0 !important;
+}
+
+/* The page body is a fixed app shell; only the content host scrolls. */
+html,
+body {
+  overflow: hidden !important;
+}
+
+.la-pluma-app .la-pluma-page {
+  isolation: isolate;
+  color: var(--app-text);
+}
+
+.la-pluma-app .navbar {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: calc(var(--app-navbar-height) + var(--app-safe-area-top));
+  padding-top: var(--app-safe-area-top);
+}
+
+.la-pluma-app .navbar-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.la-pluma-app .navbar-inner {
+  position: relative;
+  display: grid;
+  box-sizing: border-box;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.la-pluma-app .navbar-inner > :is(.left, .title, .right) {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.la-pluma-app .navbar-inner > .left {
+  justify-self: start;
+}
+
+.la-pluma-app .navbar-inner > .title {
+  justify-self: center;
+  text-align: center;
+}
+
+.la-pluma-app .navbar-inner > .right {
+  justify-self: end;
+}
+
+.la-pluma-app :is(.link, .tab-link) {
+  color: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.la-pluma-sidebar-frame {
+  display: none;
+}
+
+.la-pluma-app .la-pluma-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  color: var(--app-text);
+  background: var(--app-chrome-bg);
+  border: 0;
+  box-shadow: 0 1px 0 var(--app-border);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+}
+
+.la-pluma-app .la-pluma-navbar::after {
+  display: none;
+}
+
+.la-pluma-app .la-pluma-navbar .navbar-inner {
+  min-height: var(--app-navbar-height);
+  padding-right: calc(0.875rem + var(--app-safe-area-right, 0px));
+  padding-left: calc(0.875rem + var(--app-safe-area-left, 0px));
+}
+
+.la-pluma-brand {
+  color: var(--app-text) !important;
+}
+
+.la-pluma-github-link {
+  color: var(--app-text-muted) !important;
+}
+
+.la-pluma-brand {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 2.75rem;
+  padding: 0 0.25rem !important;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.la-pluma-brand-mark {
+  width: 1.875rem;
+  height: 1.875rem;
+  object-fit: contain;
+}
+
+.la-pluma-navbar-title {
+  color: var(--app-text) !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+}
+
+.la-pluma-navbar-left,
+.la-pluma-navbar-actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.la-pluma-navbar-actions {
+  gap: 0;
+}
+
+.la-pluma-theme-desktop {
+  display: none;
+}
+
+/* Keep the mobile theme control a real 44px hit target beside the repository
+   link, including on the narrowest supported viewport. */
+.la-pluma-theme-mobile {
+  display: flex;
+  flex: 0 0 2.75rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.la-pluma-theme-trigger {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex: 0 0 2.75rem;
+  width: 2.75rem !important;
+  min-width: 2.75rem !important;
+  height: 2.75rem !important;
+  min-height: 2.75rem !important;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+}
+
+.la-pluma-github-link {
+  display: inline-flex !important;
+  flex: 0 0 2.75rem;
+  width: 2.75rem !important;
+  min-width: 2.75rem !important;
+  height: 2.75rem !important;
+  min-height: 2.75rem !important;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+  border-radius: 999px;
+}
+
+.la-pluma-github-link svg {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+@media (min-width: 1024px) {
+  .la-pluma-app .la-pluma-sidebar-frame {
+    display: block;
+    position: fixed;
+    z-index: 0;
+    top: 0.75rem;
+    bottom: 0.75rem;
+    left: 0.75rem;
+    width: calc(var(--la-pluma-sidebar-width) - 1.5rem);
+    border: 1px solid var(--app-border-strong);
+    border-radius: 1.625rem;
+    background: var(--la-pluma-sidebar-bg);
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    pointer-events: none;
+  }
+
+  .la-pluma-app .la-pluma-sidebar {
+    top: 0.75rem;
+    height: calc(var(--la-pluma-viewport-height) - 1.5rem);
+  }
+
+  .la-pluma-app .la-pluma-navbar {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    width: 100%;
+    background: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .la-pluma-app .la-pluma-navbar .navbar-bg {
+    display: none;
+    background: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .la-pluma-app .la-pluma-navbar :is(.left, .right) {
+    background: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .la-pluma-app .la-pluma-navbar::before {
+    display: block;
+    position: absolute;
+    z-index: 0;
+    top: 0;
+    right: 0;
+    left: calc(var(--la-pluma-sidebar-width) - 0.75rem);
+    height: 100%;
+    background: linear-gradient(
+      to bottom,
+      var(--la-pluma-navbar-fade-color) 0%,
+      transparent 100%
+    );
+    content: '';
+    pointer-events: none;
+  }
+
+  .la-pluma-app .la-pluma-navbar .navbar-inner {
+    z-index: 1;
+    padding-left: calc(var(--la-pluma-sidebar-width) + 2rem);
+  }
+
+  .la-pluma-app .la-pluma-page-body {
+    height: var(--la-pluma-viewport-height);
+    min-height: var(--la-pluma-viewport-height);
+  }
+
+  .la-pluma-app .la-pluma-scroll-host {
+    height: var(--la-pluma-viewport-height);
+    min-height: var(--la-pluma-viewport-height);
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 calc(var(--app-safe-area-top) + var(--app-navbar-height)),
+      #000 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 calc(var(--app-safe-area-top) + var(--app-navbar-height)),
+      #000 100%
+    );
+  }
+
+  .la-pluma-app .la-pluma-content {
+    padding-top: calc(
+      var(--app-navbar-height) + var(--app-safe-area-top) + var(--app-space-page)
+    );
+  }
+
+  .la-pluma-app .la-pluma-navbar-actions {
+    gap: 0.625rem;
+  }
+
+  .la-pluma-app .la-pluma-theme-desktop,
+  .la-pluma-app .la-pluma-github-link {
+    --la-pluma-liquid-surface: color-mix(
+      in srgb,
+      var(--app-glass-bg) 58%,
+      transparent
+    );
+    box-sizing: border-box;
+    position: relative;
+    isolation: isolate;
+    border: 0;
+    background:
+      linear-gradient(
+        var(--la-pluma-liquid-surface-lift),
+        var(--la-pluma-liquid-surface-lift)
+      ),
+      var(--la-pluma-liquid-surface);
+    box-shadow:
+      inset 0 0 0 0.5px color-mix(in srgb, var(--app-border-strong) 58%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--la-pluma-liquid-edge-light) 36%, transparent),
+      inset 1px 0 0 color-mix(in srgb, var(--la-pluma-liquid-edge-light) 10%, transparent),
+      inset 0 -1px 0 color-mix(in srgb, var(--la-pluma-liquid-edge-light) 18%, transparent),
+      0 5px 18px color-mix(in srgb, black 12%, transparent);
+    -webkit-backdrop-filter: blur(8px) saturate(145%);
+    backdrop-filter: blur(8px) saturate(145%);
+  }
+
+  .la-pluma-app .la-pluma-theme-desktop {
+    display: flex;
+    height: 2.5rem;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border: 0;
+    border-radius: 999px;
+  }
+
+  .la-pluma-app .la-pluma-theme-desktop::before,
+  .la-pluma-app .la-pluma-github-link::before {
+    display: none;
+  }
+
+  .la-pluma-app .la-pluma-theme-desktop::after {
+    position: absolute;
+    z-index: 0;
+    top: 0.25rem;
+    left: 0.25rem;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--app-accent) 82%, white) 0%,
+      var(--app-accent) 58%,
+      color-mix(in srgb, var(--app-accent) 90%, black) 100%
+    );
+    box-shadow:
+      inset 0 0.5px 0 rgba(255, 255, 255, 0.48),
+      inset 0 -0.5px 0 rgba(0, 0, 0, 0.16),
+      0 2px 6px color-mix(in srgb, var(--app-accent) 24%, transparent);
+    content: '';
+    transform: translateX(0);
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+  }
+
+  .la-pluma-app .la-pluma-theme-desktop[data-theme='dark']::after {
+    transform: translateX(2.25rem);
+  }
+
+  .la-pluma-app .la-pluma-theme-desktop[data-theme='system']::after {
+    transform: translateX(4.5rem);
+  }
+
+  .la-pluma-app .theme-toggle-btn {
+    position: relative;
+    z-index: 1;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0.75rem;
+    background: transparent;
+    color: var(--app-text-soft);
+    transition:
+      color 160ms ease,
+      background-color 160ms ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .la-pluma-app .theme-toggle-btn svg {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+
+  .la-pluma-app .theme-toggle-btn:hover:not(.is-active) {
+    background: color-mix(in srgb, var(--app-surface-solid) 38%, transparent);
+    color: var(--app-text);
+  }
+
+  .la-pluma-app .theme-toggle-btn.is-active {
+    color: white;
+  }
+
+  .la-pluma-app .theme-toggle-btn:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--app-accent) 72%, white);
+    outline-offset: -2px;
+  }
+
+  .la-pluma-app .la-pluma-github-link {
+    flex-basis: 2.5rem;
+    width: 2.5rem !important;
+    min-width: 2.5rem !important;
+    height: 2.5rem !important;
+    min-height: 2.5rem !important;
+    border-radius: 50%;
+    color: var(--app-text-muted) !important;
+  }
+
+  .la-pluma-app .la-pluma-github-link svg {
+    position: relative;
+    z-index: 1;
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .la-pluma-app .la-pluma-github-link:hover {
+    --la-pluma-liquid-surface: color-mix(
+      in srgb,
+      var(--app-surface-muted) 82%,
+      transparent
+    );
+    color: var(--app-text) !important;
+  }
+
+  .la-pluma-app .la-pluma-github-link:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--app-accent) 72%, transparent);
+    outline-offset: 2px;
+  }
+
+  .la-pluma-theme-mobile {
+    display: none;
+  }
+}
+
+.la-pluma-github-link:hover,
+.la-pluma-github-link:focus-visible {
+  background: var(--app-surface-muted);
+  color: var(--app-text) !important;
+}
+
+.la-pluma-app .la-pluma-github-link:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--app-accent) 72%, transparent);
+  outline-offset: 2px;
+}
+
+.la-pluma-page-body {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: var(--la-pluma-sidebar-width) minmax(0, 1fr);
+  min-height: calc(var(--la-pluma-viewport-height) - var(--app-navbar-height) - var(--app-safe-area-top));
+}
+
+.la-pluma-sidebar {
+  position: sticky;
+  top: calc(var(--app-navbar-height) + var(--app-safe-area-top));
+  display: flex;
+  min-width: 0;
+  height: calc(var(--la-pluma-viewport-height) - var(--app-navbar-height) - var(--app-safe-area-top) - 0.75rem);
+  flex-direction: column;
+  gap: 0.875rem;
+  padding: 1.125rem 1.5rem 1rem max(1.5rem, env(safe-area-inset-left));
+  overflow-y: auto;
+  border: 0;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  scrollbar-width: none;
+}
+
+.la-pluma-eyebrow {
+  color: var(--app-text-soft);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.la-pluma-sidebar-nav,
+.la-pluma-sheet-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.la-pluma-sidebar::-webkit-scrollbar {
+  display: none;
+}
+
+.la-pluma-sidebar-search {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.625rem;
+  border-radius: 1.25rem;
+  background: var(--la-pluma-sidebar-search-bg);
+  color: var(--app-text-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-border) 60%, transparent);
+  transition: background 160ms ease, box-shadow 160ms ease;
+}
+
+.la-pluma-sidebar-search:focus-within {
+  background: color-mix(in srgb, var(--la-pluma-sidebar-search-bg) 72%, var(--app-surface-solid));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 62%, transparent),
+    0 0 0 3px var(--app-accent-soft);
+}
+
+.la-pluma-sidebar-search > svg {
+  flex: none;
+}
+
+.la-pluma-sidebar-search input {
+  width: 100%;
+  min-width: 0;
+  height: 2.5rem;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--app-text);
+  font: inherit;
+  font-size: 0.875rem;
+  letter-spacing: 0;
+}
+
+.la-pluma-sidebar-search input::placeholder {
+  color: var(--app-text-soft);
+}
+
+.la-pluma-sidebar-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.la-pluma-sidebar-search-clear {
+  display: inline-flex;
+  width: 1.75rem;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--app-text-soft) 20%, transparent);
+  color: var(--app-text-muted);
+}
+
+.la-pluma-sidebar-search-clear:hover,
+.la-pluma-sidebar-search-clear:focus-visible {
+  background: color-mix(in srgb, var(--app-text-soft) 30%, transparent);
+  color: var(--app-text);
+}
+
+.la-pluma-sidebar-search-clear:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 1px;
+}
+
+.la-pluma-sidebar-identity {
+  display: flex;
+  min-width: 0;
+  min-height: 3.75rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 0.625rem;
+}
+
+.la-pluma-sidebar-avatar {
+  display: inline-flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 2.5rem;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--app-surface-muted);
+  box-shadow:
+    inset 0 0 0 1px var(--app-border),
+    0 1px 3px rgba(0, 0, 0, 0.14);
+}
+
+.la-pluma-sidebar-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.la-pluma-sidebar-identity-copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.125rem;
+}
+
+.la-pluma-sidebar-identity-copy strong,
+.la-pluma-sidebar-identity-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.la-pluma-sidebar-identity-copy strong {
+  color: var(--app-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.la-pluma-sidebar-identity-copy small {
+  color: var(--app-text-soft);
+  font-size: 0.75rem;
+}
+
+.la-pluma-sidebar-nav {
+  gap: 0.75rem;
+}
+
+.la-pluma-sidebar-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1875rem;
+}
+
+.la-pluma-tab-link {
+  color: var(--app-text-muted) !important;
+  text-decoration: none;
+  transition: color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.la-pluma-tab-link:active {
+  transform: scale(0.98);
+}
+
+.la-pluma-tab-link.is-desktop-tab {
+  display: flex !important;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.625rem;
+  border-radius: 0.75rem;
+  padding: 0 0.625rem !important;
+  color: var(--app-text) !important;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.la-pluma-tab-link.is-desktop-tab:hover,
+.la-pluma-tab-link.is-desktop-tab:focus-visible {
+  background: var(--app-surface-muted);
+  color: var(--app-text) !important;
+}
+
+.la-pluma-tab-link.is-desktop-tab.is-active {
+  color: #fff !important;
+  background: var(--la-pluma-sidebar-selection);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.la-pluma-tab-link.is-desktop-tab:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 1px;
+}
+
+.la-pluma-tab-link.is-desktop-tab.is-active:focus-visible {
+  outline-color: color-mix(in srgb, white 80%, var(--app-accent));
+}
+
+.la-pluma-sidebar-icon {
+  display: inline-flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: 0 0 1.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--app-text-soft) 14%, transparent);
+  color: var(--app-text-muted);
+  box-shadow:
+    inset 0 0 0 0.5px color-mix(in srgb, var(--app-text-soft) 28%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 32%, transparent);
+}
+
+.la-pluma-tab-link.is-desktop-tab.is-active .la-pluma-sidebar-icon {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.16);
+}
+
+.la-pluma-sidebar-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.la-pluma-sidebar-empty {
+  margin: 0;
+  padding: 1.25rem 0.75rem;
+  color: var(--app-text-soft);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.la-pluma-scroll-host {
+  min-width: 0;
+  height: calc(var(--la-pluma-viewport-height) - var(--app-navbar-height) - var(--app-safe-area-top));
+  min-height: calc(var(--la-pluma-viewport-height) - var(--app-navbar-height) - var(--app-safe-area-top));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-bottom: calc(
+    var(--la-pluma-tabbar-reserved-height) + var(--app-space-page)
+  );
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.la-pluma-scroll-host::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.la-pluma-content {
+  min-width: 0;
+  padding-top: var(--app-space-page);
+  padding-bottom: var(--app-space-page);
+}
+
+.la-pluma-tabbar {
+  display: none;
+  z-index: 70;
+  box-sizing: border-box;
+  height: var(--la-pluma-tabbar-reserved-height);
+  overflow: visible;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 0;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.la-pluma-app .la-pluma-tabbar::before,
+.la-pluma-app .la-pluma-tabbar::after {
+  display: none;
+}
+
+.la-pluma-app .la-pluma-tabbar .toolbar-inner {
+  position: absolute !important;
+  top: auto !important;
+  right: 0;
+  bottom: var(--la-pluma-tabbar-bottom-clearance);
+  left: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  height: var(--la-pluma-tabbar-floating-height);
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 0 max(1.25rem, env(safe-area-inset-right, 0px)) 0
+    max(1.25rem, env(safe-area-inset-left, 0px)) !important;
+  pointer-events: none;
+}
+
+.la-pluma-app .la-pluma-tabbar-pill,
+.la-pluma-app .la-pluma-tabbar-search {
+  box-sizing: border-box;
+  border: 1px solid var(--app-glass-border);
+  background: var(--app-glass-bg);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+  box-shadow: var(--la-pluma-tabbar-shadow);
+  pointer-events: auto;
+}
+
+.la-pluma-app .la-pluma-tabbar-pill {
+  display: flex;
+  flex: 1 1 auto;
+  width: min(100%, 31rem);
+  min-width: 0;
+  height: 100%;
+  gap: 0.125rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+}
+
+.la-pluma-app .la-pluma-tabbar-search {
+  display: inline-flex !important;
+  flex: 0 0 var(--la-pluma-tabbar-floating-height);
+  width: var(--la-pluma-tabbar-floating-height);
+  height: var(--la-pluma-tabbar-floating-height);
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--app-text) !important;
+  text-decoration: none;
+  transition: transform 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.la-pluma-app .la-pluma-tabbar-search:hover,
+.la-pluma-app .la-pluma-tabbar-search:focus-visible,
+.la-pluma-app .la-pluma-tabbar-search.is-active {
+  --la-pluma-liquid-surface: var(--app-surface-muted);
+  color: var(--app-accent) !important;
+}
+
+.la-pluma-app .la-pluma-tabbar-search:active {
+  transform: scale(0.94);
+}
+
+.la-pluma-tabbar-search-icon {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab {
+  display: inline-flex !important;
+  min-width: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1875rem;
+  min-height: 0;
+  border-radius: 999px;
+  padding: 0.25rem 0.3rem !important;
+  color: var(--app-text-muted) !important;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  text-decoration: none;
+  transition: transform 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab .tabbar-label {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: inherit;
+  line-height: inherit;
+  white-space: nowrap;
+}
+
+.la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+}
+
+.la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab.is-active,
+.la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab.tab-link-active {
+  background: var(--la-pluma-tabbar-active-bg) !important;
+  color: var(--app-accent-strong) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab:hover {
+  color: var(--app-text) !important;
+}
+
+.la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab:active {
+  transform: scale(0.95);
+}
+
+.la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab:focus-visible,
+.la-pluma-app .la-pluma-tabbar-search:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: -3px;
+}
+
+.la-pluma-more-sheet {
+  position: fixed;
+  z-index: 1110;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  max-height: min(28rem, 78dvh);
+  margin: 0;
+  padding: 0.75rem max(1rem, env(safe-area-inset-right)) max(1.25rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--app-glass-border) 72%, transparent);
+  border-bottom: 0;
+  border-radius: 1.25rem 1.25rem 0 0;
+  outline: none;
+  background: var(--app-glass-bg);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+  box-shadow: 0 -1.25rem 3rem rgba(0, 0, 0, 0.16);
+  will-change: transform, opacity;
+}
+
+.la-pluma-app .sheet-backdrop {
+  position: fixed;
+  z-index: 1100;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.32);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.la-pluma-app .sheet-modal-inner {
+  max-height: inherit;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.la-pluma-app .sheet-modal-inner::-webkit-scrollbar {
+  display: none;
+}
+
+.la-pluma-sheet-grabber {
+  width: 2.25rem;
+  height: 0.3125rem;
+  margin: 0 auto 1.125rem;
+  border-radius: 999px;
+  background: var(--app-text-soft);
+  opacity: 0.48;
+}
+
+.la-pluma-sheet-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 1rem;
+}
+
+.la-pluma-sheet-heading h2 {
+  margin: 0.25rem 0 0;
+  color: var(--app-text);
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.la-pluma-sheet-close {
+  display: inline-flex !important;
+  width: 2.75rem !important;
+  min-width: 2.75rem !important;
+  height: 2.75rem !important;
+  min-height: 2.75rem !important;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--app-text-muted) !important;
+}
+
+.la-pluma-sheet-close:hover,
+.la-pluma-sheet-close:focus-visible {
+  color: var(--app-text) !important;
+  background: var(--app-surface-muted);
+}
+
+.la-pluma-sheet-nav .la-pluma-tab-link {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 0.75rem !important;
+  min-height: 3rem !important;
+  padding: 0 0.875rem !important;
+  font-size: 0.9375rem !important;
+}
+
+.la-pluma-app .app-page {
+  padding-top: 0;
+}
+
+.la-pluma-app .app-page-header {
+  min-height: 4rem;
+  margin-bottom: 0.875rem;
+}
+
+.la-pluma-app .app-page-title {
+  color: var(--app-text);
+  font-size: 1.875rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.15;
+}
+
+.la-pluma-app .app-page-subtitle {
+  color: var(--app-text-muted);
+}
+
+.la-pluma-app .app-page-header-icon {
+  border-radius: 0.875rem;
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 18%, transparent);
+}
+
+.la-pluma-app .app-card,
+.la-pluma-app .surface-panel {
+  margin: 0;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-surface);
+  box-shadow: 0 8px 28px rgba(60, 60, 67, 0.07);
+  -webkit-backdrop-filter: blur(20px) saturate(145%);
+  backdrop-filter: blur(20px) saturate(145%);
+}
+
+.la-pluma-app .app-card {
+  width: auto;
+  overflow: hidden;
+}
+
+/* Lisse clips the visible surface while the card root remains the
+   layout and shadow shell. This preserves grid/flex semantics and keeps the
+   soft outer shadow outside the clipped region. */
+.la-pluma-app .app-card[data-smooth-corners='true'] {
+  display: flex;
+  border: 0;
+  border-radius: var(--app-continuous-radius);
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  overflow: visible;
+}
+
+.la-pluma-app .app-card-smooth-surface {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  flex: 1 1 auto;
+  align-self: stretch;
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: inherit;
+  background: var(--app-surface);
+  -webkit-backdrop-filter: blur(20px) saturate(145%);
+  backdrop-filter: blur(20px) saturate(145%);
+}
+
+.la-pluma-app .smooth-panel-shell.surface-panel {
+  display: flex;
+  min-width: 0;
+  border: 0;
+  border-radius: var(--app-continuous-radius);
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  overflow: visible;
+}
+
+.la-pluma-app .smooth-panel-shell.smooth-panel-compact {
+  border-radius: var(--app-continuous-radius-compact);
+}
+
+.la-pluma-app .smooth-panel-surface {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-self: stretch;
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: inherit;
+  background: var(--app-surface);
+  -webkit-backdrop-filter: blur(20px) saturate(145%);
+  backdrop-filter: blur(20px) saturate(145%);
+}
+
+/* WebKit tiles very tall clipped backdrop layers while scrolling. Keep the
+   tall Roguelike workspace opaque on phones so tile edges cannot flash. The
+   Automation workspace uses scoped solid content surfaces at every width. */
+@media (max-width: 899px) {
+  .la-pluma-app .roguelike-page .roguelike-workspace > .app-card-smooth-surface {
+    background: color-mix(in srgb, var(--app-surface-solid) 72%, var(--app-bg));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+.la-pluma-app .smooth-panel-surface.status-warning {
+  background: color-mix(in srgb, var(--app-warning) 10%, transparent);
+}
+
+.la-pluma-app .smooth-panel-surface.status-danger {
+  background: color-mix(in srgb, var(--app-danger) 10%, transparent);
+}
+
+.app-card[data-animated="true"] {
+  animation: la-pluma-card-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: var(--app-card-animation-delay, 0s);
+}
+
+@keyframes la-pluma-card-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 0.75rem, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.la-pluma-app .app-card-header {
+  min-height: 3.25rem;
+  border-bottom: 1px solid var(--app-border);
+  box-shadow: none;
+}
+
+.la-pluma-app .app-card-content {
+  min-width: 0;
+}
+
+.la-pluma-app .app-info-card {
+  border: 1px solid var(--app-border);
+  border-radius: 0.875rem;
+}
+
+.la-pluma-app .app-modal-backdrop {
+  background: rgba(0, 0, 0, 0.42);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+@media (max-width: 1023px) {
+  /* On phones the chrome floats as separate controls over the page material,
+     so each action owns one clear circular hit target. */
+  .la-pluma-app .la-pluma-navbar {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    isolation: isolate;
+    width: 100%;
+    background: transparent !important;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    pointer-events: none;
+  }
+
+  .la-pluma-app .la-pluma-navbar .navbar-bg {
+    background: transparent !important;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  /* Fade across the full Navbar so scrolling content disappears smoothly at
+     the top edge without introducing blur or a separate solid header. */
+  .la-pluma-app .la-pluma-navbar::before {
+    display: block;
+    position: absolute;
+    z-index: 0;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 100%;
+    background: linear-gradient(
+      to bottom,
+      var(--la-pluma-navbar-fade-color) 0%,
+      transparent 100%
+    );
+    content: '';
+    pointer-events: none;
+  }
+
+  .la-pluma-app .la-pluma-navbar .navbar-bg {
+    display: none;
+  }
+
+  /* The page body owns the workspace title on phones. */
+  .la-pluma-app .la-pluma-navbar-title {
+    display: none;
+  }
+
+  .la-pluma-app .la-pluma-navbar .left,
+  .la-pluma-app .la-pluma-navbar .right {
+    min-width: 0;
+    margin-left: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .la-pluma-app .la-pluma-navbar .navbar-inner {
+    z-index: 1;
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-left: max(1rem, env(safe-area-inset-left));
+    pointer-events: none;
+  }
+
+  .la-pluma-app .la-pluma-theme-mobile {
+    pointer-events: auto;
+  }
+
+  .la-pluma-app .la-pluma-navbar-left {
+    width: 2.75rem;
+    height: 2.75rem;
+    flex: 0 0 2.75rem;
+  }
+
+  .la-pluma-app .la-pluma-brand {
+    box-sizing: border-box;
+    width: 2.75rem;
+    height: 2.75rem;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem !important;
+    border: 1px solid var(--app-glass-border);
+    border-radius: 999px;
+    background: var(--app-glass-bg);
+    box-shadow: var(--app-glass-shadow);
+    overflow: hidden;
+    pointer-events: auto;
+  }
+
+  .la-pluma-app .la-pluma-brand span {
+    display: none;
+  }
+
+  .la-pluma-app .la-pluma-brand-mark {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+  }
+
+  .la-pluma-app .la-pluma-navbar-actions {
+    gap: 0.75rem;
+  }
+
+  .la-pluma-app .la-pluma-theme-trigger,
+  .la-pluma-app .la-pluma-github-link {
+    border: 1px solid var(--app-glass-border);
+    background: var(--app-glass-bg);
+    box-shadow: var(--app-glass-shadow);
+    pointer-events: auto;
+  }
+
+  .la-pluma-app .la-pluma-theme-trigger:hover,
+  .la-pluma-app .la-pluma-theme-trigger:focus-visible,
+  .la-pluma-app .la-pluma-theme-trigger[aria-expanded='true'],
+  .la-pluma-app .la-pluma-github-link:hover,
+  .la-pluma-app .la-pluma-github-link:focus-visible {
+    --la-pluma-liquid-surface: var(--app-surface-muted);
+  }
+
+  /* Adapt the layered edge-light approach from liquid-glass-react (MIT)
+     without its SVG displacement runtime, which Safari does not render. */
+  .la-pluma-app :is(
+    .la-pluma-brand,
+    .la-pluma-theme-trigger,
+    .la-pluma-github-link,
+    .automation-preview-glass-button,
+    .pwa-install-entry-button,
+    .la-pluma-tabbar-pill,
+    .la-pluma-tabbar-search
+  ) {
+    --la-pluma-liquid-surface: color-mix(
+      in srgb,
+      var(--app-glass-bg) 42%,
+      transparent
+    );
+    position: relative;
+    isolation: isolate;
+    border-color: transparent;
+    background:
+      linear-gradient(
+        var(--la-pluma-liquid-surface-lift),
+        var(--la-pluma-liquid-surface-lift)
+      ),
+      var(--la-pluma-liquid-surface);
+    -webkit-backdrop-filter: blur(6px) saturate(140%);
+    backdrop-filter: blur(6px) saturate(140%);
+  }
+
+  .la-pluma-app :is(
+    .la-pluma-brand,
+    .la-pluma-theme-trigger,
+    .la-pluma-github-link,
+    .automation-preview-glass-button,
+    .pwa-install-entry-button,
+    .la-pluma-tabbar-pill,
+    .la-pluma-tabbar-search
+  )::before {
+    position: absolute;
+    inset: 0;
+    padding: 0.5px;
+    border-radius: inherit;
+    background: conic-gradient(
+      from 0deg,
+      var(--la-pluma-liquid-edge-light) 0deg,
+      var(--la-pluma-liquid-edge-light) 26deg,
+      var(--la-pluma-liquid-edge-high) 32deg,
+      var(--la-pluma-liquid-edge-mid) 38deg,
+      var(--la-pluma-liquid-edge-faint) 44deg,
+      var(--la-pluma-liquid-edge-clear) 50deg,
+      var(--la-pluma-liquid-edge-faint) 56deg,
+      var(--la-pluma-liquid-edge-mid) 62deg,
+      var(--la-pluma-liquid-edge-high) 68deg,
+      var(--la-pluma-liquid-edge-light) 74deg,
+      var(--la-pluma-liquid-edge-light) 206deg,
+      var(--la-pluma-liquid-edge-high) 212deg,
+      var(--la-pluma-liquid-edge-mid) 218deg,
+      var(--la-pluma-liquid-edge-faint) 224deg,
+      var(--la-pluma-liquid-edge-clear) 230deg,
+      var(--la-pluma-liquid-edge-faint) 236deg,
+      var(--la-pluma-liquid-edge-mid) 242deg,
+      var(--la-pluma-liquid-edge-high) 248deg,
+      var(--la-pluma-liquid-edge-light) 254deg,
+      var(--la-pluma-liquid-edge-light) 360deg
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    content: '';
+    pointer-events: none;
+  }
+
+  /* A circle's diagonal angles land near a wide pill's top and bottom
+     centers. Shift the two gaps toward the pill's rounded corners. */
+  .la-pluma-app .la-pluma-tabbar-pill::before {
+    background: conic-gradient(
+      from 0deg,
+      var(--la-pluma-liquid-edge-light) 0deg,
+      var(--la-pluma-liquid-edge-light) 72deg,
+      var(--la-pluma-liquid-edge-high) 73deg,
+      var(--la-pluma-liquid-edge-mid) 75deg,
+      var(--la-pluma-liquid-edge-faint) 77deg,
+      var(--la-pluma-liquid-edge-clear) 79deg,
+      var(--la-pluma-liquid-edge-faint) 82deg,
+      var(--la-pluma-liquid-edge-mid) 84deg,
+      var(--la-pluma-liquid-edge-high) 87deg,
+      var(--la-pluma-liquid-edge-light) 90deg,
+      var(--la-pluma-liquid-edge-light) 252deg,
+      var(--la-pluma-liquid-edge-high) 253deg,
+      var(--la-pluma-liquid-edge-mid) 255deg,
+      var(--la-pluma-liquid-edge-faint) 257deg,
+      var(--la-pluma-liquid-edge-clear) 259deg,
+      var(--la-pluma-liquid-edge-faint) 262deg,
+      var(--la-pluma-liquid-edge-mid) 264deg,
+      var(--la-pluma-liquid-edge-high) 267deg,
+      var(--la-pluma-liquid-edge-light) 270deg,
+      var(--la-pluma-liquid-edge-light) 360deg
+    );
+  }
+
+  .la-pluma-app .la-pluma-page-body {
+    display: block;
+    height: var(--la-pluma-viewport-height);
+    min-height: var(--la-pluma-viewport-height);
+  }
+
+  .la-pluma-app .la-pluma-sidebar {
+    display: none;
+  }
+
+  .la-pluma-app .la-pluma-tabbar {
+    display: flex;
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    isolation: isolate;
+  }
+
+  /* Mirror the Navbar edge treatment: content remains visible above the
+     toolbar and fades continuously into the page color at the screen edge. */
+  .la-pluma-app .la-pluma-tabbar::before {
+    display: block;
+    position: absolute;
+    z-index: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    height: auto;
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      color-mix(in srgb, var(--la-pluma-tabbar-fade-color) 20%, transparent) 100%
+    );
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    content: '';
+    transform: none;
+    pointer-events: none;
+  }
+
+  .la-pluma-app .la-pluma-tabbar .toolbar-inner {
+    z-index: 1;
+  }
+
+  .la-pluma-app .la-pluma-content {
+    padding-top: calc(
+      var(--app-navbar-height) + var(--app-safe-area-top) + var(--app-space-page)
+    );
+    padding-right: max(var(--app-page-gutter), env(safe-area-inset-right));
+    padding-left: max(var(--app-page-gutter), env(safe-area-inset-left));
+    padding-bottom: calc(
+      var(--la-pluma-tabbar-reserved-height) + var(--app-space-page)
+    );
+  }
+
+  .la-pluma-app .la-pluma-scroll-host {
+    height: var(--la-pluma-viewport-height);
+    min-height: var(--la-pluma-viewport-height);
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 calc(var(--app-safe-area-top) + var(--app-navbar-height)),
+      #000 calc(100% - var(--la-pluma-tabbar-reserved-height)),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 calc(var(--app-safe-area-top) + var(--app-navbar-height)),
+      #000 calc(100% - var(--la-pluma-tabbar-reserved-height)),
+      transparent 100%
+    );
+  }
+}
+
+/* In an installed app the page is the full physical viewport. Keeping the
+   tabbar page-relative avoids WebKit anchoring `position: fixed` to the
+   smaller dynamic layout viewport reported during PWA startup. */
+@media (max-width: 1023px) {
+  html.la-pluma-standalone .la-pluma-app .la-pluma-tabbar {
+    position: absolute;
+    bottom: 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .la-pluma-app .la-pluma-navbar-title {
+    display: none;
+  }
+
+  .la-pluma-app .la-pluma-content {
+    max-width: 112rem;
+    padding-right: 2rem;
+    padding-left: 2rem;
+  }
+}
+
+@media (max-width: 639px) {
+  :root {
+    --app-page-gutter: 0.875rem;
+    --app-space-page: 0.875rem;
+  }
+
+  .la-pluma-app .la-pluma-navbar .navbar-inner {
+    padding-right: max(1.25rem, env(safe-area-inset-right));
+    padding-left: max(1.25rem, env(safe-area-inset-left));
+  }
+
+  .la-pluma-app .la-pluma-brand span {
+    display: none;
+  }
+
+  .la-pluma-app .app-page-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.625rem;
+  }
+
+  .la-pluma-app .app-page-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .la-pluma-app .app-page-header.is-mobile-inline {
+    align-items: center;
+    flex-direction: row;
+    gap: 0.75rem;
+  }
+
+  .la-pluma-app .app-page-header.is-mobile-inline .app-page-heading {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .la-pluma-app .app-page-header.is-mobile-inline .app-page-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .la-pluma-app .app-page-header.is-mobile-inline .app-page-actions {
+    width: auto;
+    min-width: 0;
+    max-width: 7.75rem;
+    flex: 0 1 7.75rem;
+    justify-content: flex-end;
+  }
+
+  .la-pluma-app .app-page-header.is-mobile-inline .floating-status-anchor,
+  .la-pluma-app .app-page-header.is-mobile-inline .floating-status-indicator {
+    width: fit-content;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .la-pluma-app .app-page-header.is-mobile-inline .floating-status-anchor {
+    margin-left: 0 !important;
+  }
+
+  .la-pluma-app .app-page-header.is-mobile-inline .floating-status-indicator {
+    overflow: hidden;
+  }
+
+  .la-pluma-app .app-page-header.is-mobile-inline .floating-status-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .la-pluma-app .app-page-header.is-mobile-inline .floating-status-dismiss {
+    position: relative;
+    width: 1.75rem !important;
+    min-width: 1.75rem !important;
+    height: 1.75rem !important;
+    min-height: 1.75rem !important;
+  }
+
+  .la-pluma-app .app-page-header.is-mobile-inline .floating-status-dismiss::before {
+    content: '';
+    position: absolute;
+    inset: -0.5rem;
+  }
+
+  .la-pluma-app .app-page-title {
+    font-size: 1.375rem;
+  }
+
+  .la-pluma-app .ios-workspace-page {
+    padding-top: 0;
+    margin-right: 0.125rem;
+    margin-left: 0.125rem;
+  }
+
+  .la-pluma-app .ios-workspace-page > .app-stack-section,
+  .la-pluma-app .ios-workspace-page.app-stack-section {
+    gap: 1rem;
+  }
+
+  .la-pluma-app .ios-workspace-page .app-page-header.is-mobile-inline {
+    box-sizing: border-box;
+    min-height: 0;
+    margin: 0;
+    padding: 0.25rem 0 1rem;
+  }
+
+  .la-pluma-app .ios-workspace-page .app-page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  /* Keep workspace titles at the full iOS scale on narrow phones. The status
+     chip yields its text space first and retains the compact dismiss target. */
+  .la-pluma-app :is(.dashboard-page, .ios-workspace-page) .app-page-header.is-mobile-inline .app-page-heading {
+    max-width: calc(100% - 3.25rem);
+    flex: 0 0 auto;
+  }
+
+  .la-pluma-app :is(.dashboard-page, .ios-workspace-page) .app-page-header.is-mobile-inline .app-page-actions {
+    max-width: 7.75rem;
+    flex: 1 1 auto;
+  }
+
+  .la-pluma-app .ios-workspace-page .app-page-header.is-mobile-inline .app-page-actions > :not(.sr-only):not(.floating-status-overlay) {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    justify-content: flex-end;
+  }
+
+  .la-pluma-app .ios-workspace-page .app-card[data-smooth-corners='true'],
+  .la-pluma-app .ios-workspace-page .smooth-panel-shell[data-smooth-corners='true'] {
+    border: 0 !important;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
+  }
+
+  .la-pluma-app .ios-workspace-page .app-card-smooth-surface,
+  .la-pluma-app .ios-workspace-page .smooth-panel-surface {
+    border: 0;
+  }
+
+  .dark .la-pluma-app .ios-workspace-page .app-card[data-smooth-corners='true'],
+  .dark .la-pluma-app .ios-workspace-page .smooth-panel-shell[data-smooth-corners='true'] {
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+  }
+}
+
+/* Dashboard cards use one continuous, softly lifted material at every width.
+   Remove only the outer strokes; internal row and control separators remain. */
+.la-pluma-app .dashboard-flow-glow-shell::before,
+.la-pluma-app .dashboard-flow-glow-shell.status-border-beam::after,
+.la-pluma-app .dashboard-flow-card::before,
+.la-pluma-app .dashboard-flow-card > .app-card-smooth-surface::before {
+  display: none;
+}
+
+.la-pluma-app .dashboard-page .app-card,
+.la-pluma-app .dashboard-page .surface-panel,
+.la-pluma-app .dashboard-page .app-info-card {
+  border: 0 !important;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
+}
+
+.la-pluma-app .dashboard-page .app-card-smooth-surface,
+.la-pluma-app .dashboard-page .smooth-panel-surface {
+  border: 0;
+}
+
+/* Device and summary cards are grouped content, so give them the solid iOS
+   grouped surface. Their former translucent gray nearly matched the page and
+   made the top of summary cards disappear after the outer stroke was removed. */
+.la-pluma-app .dashboard-page .dashboard-device-card,
+.la-pluma-app .dashboard-page .dashboard-summary-card > .app-card-smooth-surface {
+  background: var(--app-surface-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.la-pluma-app .dashboard-page .dashboard-summary-header {
+  background: transparent;
+}
+
+.la-pluma-app .dashboard-page .app-info-card.status-warning {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--app-warning) 30%, transparent),
+    0 12px 30px rgba(15, 23, 42, 0.1);
+}
+
+.la-pluma-app .dashboard-page .app-info-card.status-danger {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--app-danger) 34%, transparent),
+    0 12px 30px rgba(15, 23, 42, 0.1);
+}
+
+.la-pluma-app .dashboard-page .status-border-beam::after {
+  display: none;
+}
+
+.la-pluma-app .dashboard-page .surface-panel-hover:hover:not(:disabled) {
+  transform: none;
+}
+
+.dark .la-pluma-app .dashboard-page .app-card,
+.dark .la-pluma-app .dashboard-page .surface-panel,
+.dark .la-pluma-app .dashboard-page .app-info-card {
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+}
+
+.dark .la-pluma-app .dashboard-page .app-info-card.status-warning {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--app-warning) 38%, transparent),
+    0 16px 36px rgba(0, 0, 0, 0.28);
+}
+
+.dark .la-pluma-app .dashboard-page .app-info-card.status-danger {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--app-danger) 40%, transparent),
+    0 16px 36px rgba(0, 0, 0, 0.28);
+}
+
+/* Primary workspaces share the large title above. The rules below remain
+   dashboard-specific because its status slot and card flow are unique. */
+@media (max-width: 639px) {
+  .la-pluma-app .dashboard-page {
+    --dashboard-card-gap: 1rem;
+    padding-top: 0;
+    margin-right: 0.125rem;
+    margin-left: 0.125rem;
+  }
+
+  .la-pluma-app .dashboard-page > .app-stack-section {
+    gap: var(--dashboard-card-gap);
+  }
+
+  /* Keep the dashboard title in the normal content flow. The translucent
+     gradient belongs to the top three-button Navbar, not this section. */
+  .la-pluma-app .dashboard-page .app-page-header {
+    box-sizing: border-box;
+    min-height: 0;
+    margin: 0;
+    padding: 0.25rem 0 1rem;
+    align-items: center;
+    flex-direction: row;
+    gap: 0.75rem;
+  }
+
+  .la-pluma-app .dashboard-page .app-page-heading {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .la-pluma-app .dashboard-page .app-page-header-icon {
+    display: flex;
+    width: 2.75rem;
+    height: 2.75rem;
+    flex: 0 0 2.75rem;
+  }
+
+  .la-pluma-app .dashboard-page .app-page-subtitle {
+    display: none;
+  }
+
+  .la-pluma-app .dashboard-page .app-page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .la-pluma-app .dashboard-page .app-page-actions {
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+    justify-content: flex-end;
+  }
+
+  .la-pluma-app .dashboard-page .dashboard-page-actions {
+    width: auto;
+    min-width: 0;
+  }
+
+  .la-pluma-app .dashboard-page .dashboard-status-slot {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+  }
+
+  .la-pluma-app .dashboard-page .dashboard-status-slot > * {
+    max-width: 100%;
+  }
+
+  .la-pluma-app .dashboard-page .dashboard-status-indicator {
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .la-pluma-app .dashboard-page .dashboard-flow-layout {
+    margin-top: 0;
+    margin-bottom: 0;
+    gap: var(--dashboard-card-gap);
+  }
+
+  .la-pluma-app .dashboard-page .dashboard-device-section,
+  .la-pluma-app .dashboard-page .dashboard-summary-grid {
+    margin-bottom: 0;
+  }
+
+  .la-pluma-app .dashboard-page .dashboard-device-grid,
+  .la-pluma-app .dashboard-page .dashboard-summary-grid {
+    gap: var(--dashboard-card-gap);
+  }
+
+  .la-pluma-app .dashboard-flow-header {
+    box-sizing: border-box;
+    height: 3.5rem;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid var(--app-border);
+  }
+
+  .la-pluma-app .dashboard-flow-title {
+    margin-top: 0;
+    font-size: 1.125rem;
+    line-height: 1.2;
+  }
+
+  .la-pluma-app .dashboard-flow-mark {
+    border-radius: 0.5rem;
+    background: var(--app-accent-soft);
+    color: var(--app-accent-strong);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 24%, transparent);
+  }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .la-pluma-app *,
+  .la-pluma-app *::before,
+  .la-pluma-app *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+
+  .la-pluma-app .app-card[data-animated="true"] {
+    animation-delay: 0s !important;
+  }
+
+  .la-pluma-app .app-activity-indicator .preloader-inner,
+  .la-pluma-app .app-activity-indicator-fallback {
+    animation: none !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .la-pluma-app .la-pluma-sidebar-frame,
+  .la-pluma-app .la-pluma-tabbar,
+  .la-pluma-app .la-pluma-tabbar-pill,
+  .la-pluma-app .la-pluma-tabbar-search,
+  .la-pluma-app .la-pluma-more-sheet,
+  .la-pluma-app .la-pluma-brand,
+  .la-pluma-app .la-pluma-theme-desktop,
+  .la-pluma-app .la-pluma-theme-trigger,
+  .la-pluma-app .la-pluma-github-link,
+  .la-pluma-app .app-card,
+  .la-pluma-app .app-card-smooth-surface,
+  .la-pluma-app .smooth-panel-surface,
+  .la-pluma-app .surface-panel {
+    background: var(--app-surface-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .la-pluma-app .la-pluma-sidebar {
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .la-pluma-app .app-card[data-smooth-corners='true'],
+  .la-pluma-app .smooth-panel-shell.surface-panel {
+    background: transparent;
+  }
+
+  .la-pluma-app :is(
+    .la-pluma-brand,
+    .la-pluma-theme-desktop,
+    .la-pluma-theme-trigger,
+    .la-pluma-github-link,
+    .automation-preview-glass-button,
+    .la-pluma-tabbar-pill,
+    .la-pluma-tabbar-search
+  )::before {
+    display: none;
+  }
+}
+
+/* Native business controls use the same iOS touch target and glass surface as
+   the shared controls. Opt-in semantics keep compact, specialized controls
+   (time pickers, sliders, and task editors) unchanged. */
+.la-pluma-app .la-pluma-content .app-native-control {
+  box-sizing: border-box;
+  min-height: var(--app-control-height-md);
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius-md);
+  background: color-mix(in srgb, var(--app-surface-solid) 82%, transparent);
+  color: var(--app-text);
+  box-shadow: none;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+  accent-color: var(--app-accent);
+}
+
+.la-pluma-app .la-pluma-content .app-native-control:not(textarea) {
+  padding: 0 var(--app-space-control-x);
+}
+
+.la-pluma-app .la-pluma-content select.app-native-control {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: var(--app-select-chevron);
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1rem 1rem;
+  padding-right: 2.5rem;
+}
+
+.la-pluma-app .la-pluma-content .app-native-control:focus-visible {
+  outline: none;
+  border-color: var(--app-accent);
+  box-shadow: 0 0 0 3px var(--app-accent-soft);
+}
+
+.la-pluma-app .la-pluma-content .app-native-control:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.la-pluma-app .la-pluma-content .app-native-control::placeholder {
+  color: var(--app-text-soft);
+  opacity: 1;
+}
+
+.la-pluma-app .la-pluma-content .app-native-button {
+  display: inline-flex;
+  min-height: var(--app-control-height-md);
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  background: var(--app-surface-muted);
+  color: var(--app-text);
+  box-shadow: none;
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 120ms ease;
+}
+
+.la-pluma-app .la-pluma-content .app-native-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--app-accent) 28%, var(--app-border));
+  background: color-mix(in srgb, var(--app-accent-soft) 34%, var(--app-surface-muted));
+  color: var(--app-accent);
+}
+
+.la-pluma-app .la-pluma-content .app-native-button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.la-pluma-app .la-pluma-content .app-native-button:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
+}
+
+.la-pluma-app .la-pluma-content .app-native-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.la-pluma-app .la-pluma-content .app-native-button-primary {
+  border-color: var(--app-accent-action);
+  background: var(--app-accent-action);
+  color: #fff;
+}
+
+.la-pluma-app .la-pluma-content .app-native-button-primary:hover:not(:disabled) {
+  border-color: var(--app-accent-action-pressed);
+  background: var(--app-accent-action-pressed);
+  color: #fff;
+}
+
+html.dark .la-pluma-app .la-pluma-content .app-native-control,
+.la-pluma-app.dark .la-pluma-content .app-native-control {
+  background: color-mix(in srgb, var(--app-surface-muted) 92%, transparent);
+}
+
+@media (max-width: 768px) {
+  /* Opt-in controls retain the iOS 44px touch target on phones. */
+  .la-pluma-app .la-pluma-content .app-native-control {
+    height: var(--app-control-height-md);
+    min-height: var(--app-control-height-md) !important;
+  }
+}
+
+/* Apple Liquid Glass keeps ordinary Automation content solid. The preview
+   controls and task picker remain the only translucent layers in this view. */
+.la-pluma-app [data-automation-tasks] .smooth-panel-shell[data-smooth-corners='true'] {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.05),
+    0 14px 40px rgba(0, 0, 0, 0.05);
+}
+
+.la-pluma-app [data-automation-tasks] .smooth-panel-surface {
+  border: 0;
+  background: var(--app-surface-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+html.dark .la-pluma-app [data-automation-tasks] .smooth-panel-shell[data-smooth-corners='true'],
+.la-pluma-app.dark [data-automation-tasks] .smooth-panel-shell[data-smooth-corners='true'] {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.24),
+    0 14px 40px rgba(0, 0, 0, 0.3);
+}
+
+@media (prefers-contrast: more) {
+  .la-pluma-app [data-automation-tasks] .smooth-panel-surface {
+    border: 1px solid var(--app-border-strong);
+  }
+}

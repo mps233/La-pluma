@@ -82,6 +82,29 @@ describe('ThemeToggle mobile menu', () => {
     expect(document.activeElement).toBe(trigger)
   })
 
+  it('keeps the desktop segmented control and store selection in sync', async () => {
+    await act(async () => root.render(<ThemeToggle />))
+
+    const group = container.querySelector<HTMLElement>('.la-pluma-theme-desktop[role="group"][aria-label="界面主题"]')!
+    const buttons = Array.from(group.querySelectorAll<HTMLButtonElement>('button'))
+
+    expect(buttons.map(button => button.getAttribute('aria-label'))).toEqual([
+      '亮色模式',
+      '暗色模式',
+      '跟随系统',
+    ])
+    expect(buttons.every(button => button.type === 'button')).toBe(true)
+    expect(group.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(3)
+    expect(buttons.filter(button => button.getAttribute('aria-pressed') === 'true')).toEqual([buttons[2]])
+    expect(group.dataset.theme).toBe('system')
+
+    await act(async () => buttons[0]?.click())
+
+    expect(useUIStore.getState().theme).toBe('light')
+    expect(group.dataset.theme).toBe('light')
+    expect(buttons.filter(button => button.getAttribute('aria-pressed') === 'true')).toEqual([buttons[0]])
+  })
+
   it('closes with Escape and restores focus to the trigger', async () => {
     await act(async () => root.render(<ThemeToggle />))
     const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!
@@ -89,6 +112,36 @@ describe('ThemeToggle mobile menu', () => {
 
     await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
 
+    expect(container.querySelector('[role="menu"]')).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('moves through options with arrow keys and closes when tabbing away', async () => {
+    await act(async () => root.render(
+      <div className="la-pluma-navbar-actions">
+        <ThemeToggle />
+        <a href="https://github.com/mps233/La-pluma" className="la-pluma-github-link">GitHub</a>
+      </div>,
+    ))
+    const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!
+    const githubLink = container.querySelector<HTMLAnchorElement>('.la-pluma-github-link')!
+    await act(async () => trigger.click())
+
+    const options = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
+    expect(document.activeElement).toBe(options[2])
+
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })))
+    expect(document.activeElement).toBe(options[0])
+
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true })))
+    expect(document.activeElement).toBe(options[2])
+
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })))
+    expect(container.querySelector('[role="menu"]')).toBeNull()
+    expect(document.activeElement).toBe(githubLink)
+
+    await act(async () => trigger.click())
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true })))
     expect(container.querySelector('[role="menu"]')).toBeNull()
     expect(document.activeElement).toBe(trigger)
   })

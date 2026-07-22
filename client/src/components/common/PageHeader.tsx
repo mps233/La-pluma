@@ -45,9 +45,9 @@ export default function PageHeader({
           </div>
         )}
         <div className="min-w-0">
-          <h2 className="app-page-title text-primary">
+          <h1 className="app-page-title text-primary">
             {title}
-          </h2>
+          </h1>
           {subtitle && (
             <p className="app-page-subtitle text-secondary">
               {subtitle}

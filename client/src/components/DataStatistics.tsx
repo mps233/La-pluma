@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { maaApi, getAllOperators, getDropStatistics, getItemIconUrl, getOperBoxData, fetchOperatorMaterials, getTrainingQueue } from '../services/api'
 import { motion } from 'framer-motion'
+import { Package as PackageIcon } from 'lucide-react'
 import Icons from './Icons'
 import DropRecords from './DropRecords'
-import { PageHeader, InfoCard, Button } from './common'
+import { PageHeader, Button, Card, EmptyState, Loading } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type {
@@ -18,41 +20,373 @@ import type {
   SortBy,
   ActiveTask,
   ActiveTab,
-  OpenMenu
+  OpenMenu,
+  DropRecordsProps,
 } from '@/types/components'
 
+type FilterMenuKey = Exclude<OpenMenu, null>
+
+interface FilterMenuOption {
+  value: string
+  label: string
+}
+
+interface FilterMenuProps {
+  menuKey: FilterMenuKey
+  label: string
+  value: string
+  options: readonly FilterMenuOption[]
+  isActive: boolean
+  isOpen: boolean
+  mobileAlign?: 'start' | 'end'
+  menuWidth?: number
+  onOpenChange: (menu: OpenMenu) => void
+  onSelect: (value: string) => void
+}
+
+interface InlineDataErrorProps {
+  title: string
+  description: string
+  isRetrying: boolean
+  onRetry: () => void
+}
+
+interface FilterMenuPosition {
+  top: number
+  left: number
+  width: number
+  maxHeight: number
+  placement: 'top' | 'bottom'
+}
+
 const tabButtonClass = (isActive: boolean) =>
-  `relative flex items-center space-x-2 px-4 py-3 text-sm font-medium transition-all ${
-    isActive
-      ? 'brand-text'
-      : 'text-secondary hover:text-primary'
-  }`
+  `data-statistics-tab min-h-11${isActive ? ' is-active' : ''}`
 
 const filterButtonClass = (isActive: boolean) =>
-  `w-full sm:w-auto flex items-center justify-center space-x-1 sm:space-x-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+  `flex min-h-11 w-full items-center justify-center space-x-1 rounded-lg px-2 text-xs font-medium transition-all sm:w-auto sm:space-x-1.5 sm:px-3 ${
     isActive
       ? 'brand-action'
       : 'control-surface text-secondary'
   }`
 
-const menuSurfaceClass = 'absolute top-full left-0 mt-1 rounded-lg surface-panel py-1 z-50'
+const menuSurfaceClass = 'fixed z-[2000] overflow-y-auto overscroll-contain rounded-lg py-1 surface-panel'
 
 const menuOptionClass = (isActive: boolean) =>
-  `w-full text-left px-3 py-1.5 text-xs transition-colors ${
+  `min-h-11 w-full px-3 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--app-accent)] ${
     isActive
       ? 'brand-chip font-medium'
       : 'text-secondary hover:bg-[var(--app-surface-muted)] hover:text-primary'
   }`
 
 const taskPanelClass = (isActive: boolean) =>
-  `app-card transition-all ${
-    isActive
-      ? 'status-info ring-1 ring-[color-mix(in_srgb,var(--app-info)_24%,transparent)]'
-      : 'surface-panel surface-panel-hover'
-  }`
+  `data-statistics-task-card !p-0${isActive ? ' is-active' : ''}`
 
-const statCardClass = 'rounded-2xl border border-[var(--app-border)] p-3 surface-soft'
+const statCardClass = 'data-statistics-kpi'
 const chipClass = 'brand-chip rounded-full px-2 py-0.5 text-xs whitespace-nowrap'
+const ownershipOptions: readonly FilterMenuOption[] = [
+  { value: 'all', label: '全部' },
+  { value: 'owned', label: '已拥有' },
+  { value: 'unowned', label: '未拥有' },
+]
+const rarityOptions: readonly FilterMenuOption[] = [
+  { value: 'all', label: '全部' },
+  { value: '6', label: '6星' },
+  { value: '5', label: '5星' },
+  { value: '4', label: '4星' },
+  { value: '3', label: '3星' },
+  { value: '2', label: '2星' },
+  { value: '1', label: '1星' },
+]
+const professionOptions: readonly FilterMenuOption[] = [
+  { value: 'all', label: '全部' },
+  { value: 'PIONEER', label: '先锋' },
+  { value: 'WARRIOR', label: '近卫' },
+  { value: 'TANK', label: '重装' },
+  { value: 'SNIPER', label: '狙击' },
+  { value: 'CASTER', label: '术师' },
+  { value: 'MEDIC', label: '医疗' },
+  { value: 'SUPPORT', label: '辅助' },
+  { value: 'SPECIAL', label: '特种' },
+]
+const eliteOptions: readonly FilterMenuOption[] = [
+  { value: 'all', label: '全部' },
+  { value: '2', label: '精英2' },
+  { value: '1', label: '精英1' },
+  { value: '0', label: '精英0' },
+]
+const potentialOptions: readonly FilterMenuOption[] = [
+  { value: 'all', label: '全部' },
+  { value: '6', label: '潜能6' },
+  { value: '5', label: '潜能5' },
+  { value: '4', label: '潜能4' },
+  { value: '3', label: '潜能3' },
+  { value: '2', label: '潜能2' },
+  { value: '1', label: '潜能1' },
+]
+const sortOptions: readonly FilterMenuOption[] = [
+  { value: 'default', label: '默认顺序' },
+  { value: 'rarity', label: '星级降序' },
+  { value: 'level', label: '等级降序' },
+  { value: 'potential', label: '潜能降序' },
+]
+const ownershipLabels: Record<FilterOwnership, string> = {
+  all: '拥有状态',
+  owned: '已拥有',
+  unowned: '未拥有',
+}
+const professionLabels: Record<FilterProfession, string> = {
+  all: '职业',
+  PIONEER: '先锋',
+  WARRIOR: '近卫',
+  TANK: '重装',
+  SNIPER: '狙击',
+  CASTER: '术师',
+  MEDIC: '医疗',
+  SUPPORT: '辅助',
+  SPECIAL: '特种',
+}
+const sortLabels: Record<SortBy, string> = {
+  default: '排序',
+  rarity: '星级降序',
+  level: '等级降序',
+  potential: '潜能降序',
+}
+const depotTypeLabelMap: Record<string, string> = {
+  MATERIAL: '材料',
+  CARD_EXP: '经验书',
+  ACTIVITY_ITEM: '活动道具',
+  CONSUME: '消耗品',
+  CHARM: '养成凭证',
+  DIAMOND: '源石/至纯源石',
+  EXP_ITEM: '经验材料',
+  FURN: '家具',
+  FURN_PART: '家具零件',
+  HGG_SHD: '黄票/凭证',
+  LGG_SHD: '绿票/凭证',
+  RECRUIT_TAG: '公招相关',
+  TKT: '票券',
+}
+
+function getDepotTypeLabel(classifyType?: string) {
+  if (!classifyType) return '未分类'
+  return depotTypeLabelMap[classifyType] || '其他'
+}
+
+function FilterMenu({
+  menuKey,
+  label,
+  value,
+  options,
+  isActive,
+  isOpen,
+  mobileAlign = 'start',
+  menuWidth = 128,
+  onOpenChange,
+  onSelect,
+}: FilterMenuProps) {
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [menuPosition, setMenuPosition] = useState<FilterMenuPosition | null>(null)
+  const menuId = `data-filter-${menuKey}-${useId().replace(/:/g, '')}`
+
+  const updateMenuPosition = useCallback(() => {
+    const trigger = triggerRef.current
+    if (!trigger) return
+
+    const rect = trigger.getBoundingClientRect()
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
+    const margin = Math.min(16, viewportWidth / 2)
+    const gap = 6
+    const width = Math.min(menuWidth, Math.max(0, viewportWidth - margin * 2))
+    const alignEnd = mobileAlign === 'end' && viewportWidth < 640
+    const preferredLeft = alignEnd ? rect.right - width : rect.left
+    const left = Math.min(
+      Math.max(preferredLeft, margin),
+      Math.max(margin, viewportWidth - margin - width),
+    )
+    const naturalHeight = Math.min(options.length * 44 + 8, 320)
+    const spaceBelow = Math.max(0, viewportHeight - rect.bottom - gap - margin)
+    const spaceAbove = Math.max(0, rect.top - gap - margin)
+    const placement = spaceBelow < Math.min(naturalHeight, 176) && spaceAbove > spaceBelow
+      ? 'top'
+      : 'bottom'
+    const availableHeight = placement === 'top' ? spaceAbove : spaceBelow
+
+    setMenuPosition({
+      top: placement === 'top' ? rect.top - gap : rect.bottom + gap,
+      left,
+      width,
+      maxHeight: Math.min(naturalHeight, availableHeight),
+      placement,
+    })
+  }, [menuWidth, mobileAlign, options.length])
+
+  const restoreTriggerFocus = useCallback(() => {
+    window.requestAnimationFrame(() => triggerRef.current?.focus({ preventScroll: true }))
+  }, [])
+
+  const closeMenu = useCallback((restoreFocus = false) => {
+    onOpenChange(null)
+    if (restoreFocus) restoreTriggerFocus()
+  }, [onOpenChange, restoreTriggerFocus])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      const selectedOption = menuRef.current
+        ?.querySelector<HTMLButtonElement>('[role="menuitemradio"][aria-checked="true"]')
+      const firstOption = menuRef.current
+        ?.querySelector<HTMLButtonElement>('[role="menuitemradio"]')
+      ;(selectedOption ?? firstOption)?.focus({ preventScroll: true })
+    })
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (!containerRef.current?.contains(target) && !menuRef.current?.contains(target)) closeMenu()
+    }
+    const handleFocusIn = (event: FocusEvent) => {
+      const target = event.target as Node
+      if (!containerRef.current?.contains(target) && !menuRef.current?.contains(target)) closeMenu()
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      closeMenu(true)
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('focusin', handleFocusIn)
+    document.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('resize', updateMenuPosition)
+    window.addEventListener('scroll', updateMenuPosition, true)
+    return () => {
+      window.cancelAnimationFrame(focusFrame)
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('focusin', handleFocusIn)
+      document.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('resize', updateMenuPosition)
+      window.removeEventListener('scroll', updateMenuPosition, true)
+    }
+  }, [closeMenu, isOpen, updateMenuPosition])
+
+  const handleMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+    const menuItems = Array.from(
+      menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? [],
+    )
+    if (menuItems.length === 0) return
+
+    event.preventDefault()
+    const activeIndex = menuItems.indexOf(document.activeElement as HTMLButtonElement)
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? menuItems.length - 1
+        : event.key === 'ArrowUp'
+          ? (activeIndex <= 0 ? menuItems.length - 1 : activeIndex - 1)
+          : (activeIndex + 1) % menuItems.length
+    menuItems[nextIndex]?.focus({ preventScroll: true })
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="filter-menu-container relative w-[calc(33.333%_-_0.5rem)] sm:w-auto"
+    >
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => {
+          if (isOpen) {
+            closeMenu()
+          } else {
+            updateMenuPosition()
+            onOpenChange(menuKey)
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+          event.preventDefault()
+          updateMenuPosition()
+          onOpenChange(menuKey)
+        }}
+        className={filterButtonClass(isActive)}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        aria-controls={menuId}
+      >
+        <span className="truncate">{label}</span>
+        <svg className="h-3 w-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {isOpen && menuPosition && createPortal(
+        <div
+          ref={menuRef}
+          id={menuId}
+          role="menu"
+          aria-label={`${label}筛选`}
+          data-placement={menuPosition.placement}
+          className={menuSurfaceClass}
+          style={{
+            top: menuPosition.top,
+            left: menuPosition.left,
+            width: menuPosition.width,
+            maxHeight: menuPosition.maxHeight,
+            transform: menuPosition.placement === 'top' ? 'translateY(-100%)' : undefined,
+            transformOrigin: menuPosition.placement === 'top' ? 'bottom' : 'top',
+          }}
+          onKeyDown={handleMenuKeyDown}
+        >
+          {options.map(option => (
+            <button
+              key={option.value}
+              type="button"
+              role="menuitemradio"
+              aria-checked={value === option.value}
+              onClick={() => {
+                onSelect(option.value)
+                closeMenu(true)
+              }}
+              className={menuOptionClass(value === option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
+    </div>
+  )
+}
+
+function InlineDataError({ title, description, isRetrying, onRetry }: InlineDataErrorProps) {
+  return (
+    <div
+      className="form-error-surface flex flex-col items-start gap-3 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between"
+      role="alert"
+    >
+      <div className="min-w-0">
+        <p className="font-semibold text-primary">{title}</p>
+        <p className="mt-1 break-words text-sm leading-6 [overflow-wrap:anywhere] form-error-text">{description}</p>
+      </div>
+      <Button
+        variant="secondary"
+        size="sm"
+        loading={isRetrying}
+        loadingText="正在重试..."
+        onClick={onRetry}
+        className="w-full sm:w-auto"
+        icon={<Icons.RefreshCw className="h-4 w-4" />}
+      >
+        重新加载
+      </Button>
+    </div>
+  )
+}
 
 export default function DataStatistics() {
   const [isRunning, setIsRunning] = useState(false)
@@ -61,6 +395,16 @@ export default function DataStatistics() {
   const [depotData, setDepotData] = useState<DepotDataDetailed | null>(null)
   const [operBoxData, setOperBoxData] = useState<OperBoxData | null>(null)
   const [allOperators, setAllOperators] = useState<OperatorDetailed[]>([])
+  const [depotDataLoading, setDepotDataLoading] = useState(true)
+  const [operBoxDataLoading, setOperBoxDataLoading] = useState(true)
+  const [operatorCatalogLoading, setOperatorCatalogLoading] = useState(true)
+  const [depotDataError, setDepotDataError] = useState<string | null>(null)
+  const [operBoxDataError, setOperBoxDataError] = useState<string | null>(null)
+  const [operatorCatalogError, setOperatorCatalogError] = useState<string | null>(null)
+  const depotRequestIdRef = useRef(0)
+  const operBoxRequestIdRef = useRef(0)
+  const operatorCatalogRequestIdRef = useRef(0)
+  const [failedDepotImages, setFailedDepotImages] = useState<Record<string, boolean>>({})
   
   // 筛选和排序状态
   const [filterRarity, setFilterRarity] = useState<FilterRarity>('all')
@@ -73,27 +417,6 @@ export default function DataStatistics() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('operbox')
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({})
   
-  const depotTypeLabelMap: Record<string, string> = {
-    MATERIAL: '材料',
-    CARD_EXP: '经验书',
-    ACTIVITY_ITEM: '活动道具',
-    CONSUME: '消耗品',
-    CHARM: '养成凭证',
-    DIAMOND: '源石/至纯源石',
-    EXP_ITEM: '经验材料',
-    FURN: '家具',
-    FURN_PART: '家具零件',
-    HGG_SHD: '黄票/凭证',
-    LGG_SHD: '绿票/凭证',
-    RECRUIT_TAG: '公招相关',
-    TKT: '票券',
-  }
-
-  const getDepotTypeLabel = (classifyType?: string) => {
-    if (!classifyType) return '未分类'
-    return depotTypeLabelMap[classifyType] || classifyType.replace(/_/g, ' ')
-  }
-
   const depotTypeSummary = useMemo(() => {
     const grouped = new Map<string, { count: number; kinds: number }>()
     for (const item of depotData?.items || []) {
@@ -107,90 +430,138 @@ export default function DataStatistics() {
   }, [depotData])
 
   // 掉落记录相关状态
-  const [dropStatistics, setDropStatistics] = useState<any>(null)
+  const [dropStatistics, setDropStatistics] = useState<DropRecordsProps['dropStatistics']>(null)
   const [dropDays, setDropDays] = useState(7)
+  const [dropDataLoading, setDropDataLoading] = useState(true)
+  const [dropDataError, setDropDataError] = useState<string | null>(null)
+  const dropRequestIdRef = useRef(0)
 
-  // 加载已保存的数据
-  useEffect(() => {
-    loadSavedData()
-    loadAllOperators()
-    loadDropData()
-  }, [])
-
-  // 点击外部关闭菜单
-  useEffect(() => {
-    if (!openMenu) return
-
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      const isInsideMenu = target.closest('.relative')
-      if (!isInsideMenu) {
-        setOpenMenu(null)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [openMenu])
-
-  const loadSavedData = async () => {
+  const loadDepotData = useCallback(async () => {
+    const requestId = ++depotRequestIdRef.current
+    setDepotDataLoading(true)
+    setDepotDataError(null)
     try {
-      // 加载仓库数据
       const depotResult = await maaApi.getDepotData()
-      if (depotResult.success) {
+      if (requestId !== depotRequestIdRef.current) return
+      if (!depotResult.success) {
+        setDepotDataError('暂时无法读取仓库数据，请检查服务连接后重试。')
+        return
+      }
+
+      if (depotResult.data) {
         setDepotData({
           itemCount: depotResult.data.itemCount,
           items: depotResult.data.items || [],
           timestamp: depotResult.data.timestamp
         })
+      } else {
+        setDepotData(null)
+      }
+    } catch {
+      if (requestId !== depotRequestIdRef.current) return
+      setDepotDataError('暂时无法读取仓库数据，请检查服务连接后重试。')
+    } finally {
+      if (requestId === depotRequestIdRef.current) setDepotDataLoading(false)
+    }
+  }, [])
+
+  const loadOperBoxData = useCallback(async () => {
+    const requestId = ++operBoxRequestIdRef.current
+    setOperBoxDataLoading(true)
+    setOperBoxDataError(null)
+    try {
+      const operBoxResult = await getOperBoxData()
+      if (requestId !== operBoxRequestIdRef.current) return
+      if (!operBoxResult.success) {
+        setOperBoxDataError('暂时无法读取干员识别结果，请检查服务连接后重试。')
+        return
       }
 
-      // 加载干员数据
-      const operBoxResult = await getOperBoxData()
-      if (operBoxResult.success) {
+      if (operBoxResult.data) {
         setOperBoxData({
           operCount: operBoxResult.data.operCount,
           data: operBoxResult.data.data || [],
           timestamp: operBoxResult.data.timestamp
         })
+      } else {
+        setOperBoxData(null)
       }
-    } catch (error) {
-      // 静默失败，不影响用户体验
+    } catch {
+      if (requestId !== operBoxRequestIdRef.current) return
+      setOperBoxDataError('暂时无法读取干员识别结果，请检查服务连接后重试。')
+    } finally {
+      if (requestId === operBoxRequestIdRef.current) setOperBoxDataLoading(false)
     }
-  }
+  }, [])
 
-  const loadAllOperators = async () => {
+  const loadAllOperators = useCallback(async () => {
+    const requestId = ++operatorCatalogRequestIdRef.current
+    setOperatorCatalogLoading(true)
+    setOperatorCatalogError(null)
     try {
       const result = await getAllOperators()
-      if (result.success) {
-        setAllOperators(result.data)
+      if (requestId !== operatorCatalogRequestIdRef.current) return
+      if (!result.success) {
+        setOperatorCatalogError('暂时无法读取干员资料，请检查资源状态后重试。')
+        return
       }
-    } catch (error) {
-      // 静默失败，不影响用户体验
+
+      setAllOperators(Array.isArray(result.data) ? result.data : [])
+    } catch {
+      if (requestId !== operatorCatalogRequestIdRef.current) return
+      setOperatorCatalogError('暂时无法读取干员资料，请检查资源状态后重试。')
+    } finally {
+      if (requestId === operatorCatalogRequestIdRef.current) setOperatorCatalogLoading(false)
     }
-  }
+  }, [])
+
+  const loadOperatorData = useCallback(async () => {
+    await Promise.all([loadOperBoxData(), loadAllOperators()])
+  }, [loadAllOperators, loadOperBoxData])
 
   // 加载掉落数据
-  const loadDropData = async () => {
+  const loadDropData = useCallback(async () => {
+    const requestId = ++dropRequestIdRef.current
+    setDropDataLoading(true)
+    setDropDataError(null)
     try {
-      // 加载统计数据
       const statsResult = await getDropStatistics(dropDays)
-      if (statsResult.success) {
-        setDropStatistics(statsResult.data)
+      if (requestId !== dropRequestIdRef.current) return
+      if (!statsResult.success) {
+        setDropDataError('暂时无法读取掉落记录，请检查服务连接后重试。')
+        return
       }
-    } catch (error) {
-      // 静默失败，不影响用户体验
+
+      setDropStatistics(statsResult.data || null)
+    } catch {
+      if (requestId !== dropRequestIdRef.current) return
+      setDropDataError('暂时无法读取掉落记录，请检查服务连接后重试。')
+    } finally {
+      if (requestId === dropRequestIdRef.current) setDropDataLoading(false)
     }
-  }
+  }, [dropDays])
+
+  // 首次读取各区域数据；每个区域独立反馈，不让单个接口拖住整页。
+  useEffect(() => {
+    void loadDepotData()
+    void loadOperatorData()
+    return () => {
+      depotRequestIdRef.current += 1
+      operBoxRequestIdRef.current += 1
+      operatorCatalogRequestIdRef.current += 1
+    }
+  }, [loadDepotData, loadOperatorData])
   
   // 当统计天数变化时重新加载
   useEffect(() => {
-    if (activeTab === 'drops') {
-      loadDropData()
+    void loadDropData()
+    return () => {
+      dropRequestIdRef.current += 1
     }
-  }, [dropDays, activeTab])
+  }, [loadDropData])
+
+  const operatorDataLoading = operBoxDataLoading || operatorCatalogLoading
+  const operatorDataError = operBoxDataError || operatorCatalogError
 
   // 筛选和排序干员数据
   const getFilteredAndSortedOperators = useMemo(() => {
@@ -361,7 +732,7 @@ export default function DataStatistics() {
     setIsRunning(true)
     setActiveTask('depot')
     setStatusMessage('正在识别仓库物品...')
-    setDepotData(null)
+    setDepotDataError(null)
 
     try {
       // 使用动态任务配置
@@ -385,6 +756,7 @@ export default function DataStatistics() {
         const parseResult = await maaApi.parseDepotData()
         
         if (parseResult.success) {
+          setDepotDataError(null)
           setDepotData({
             itemCount: parseResult.data.itemCount,
             items: parseResult.data.items || [],
@@ -450,7 +822,7 @@ export default function DataStatistics() {
     setIsRunning(true)
     setActiveTask('operbox')
     setStatusMessage('正在识别干员数据...')
-    setOperBoxData(null)
+    setOperBoxDataError(null)
 
     try {
       // 使用动态任务配置
@@ -474,6 +846,7 @@ export default function DataStatistics() {
         const parseResult = await maaApi.parseOperBoxData()
 
         if (parseResult.success) {
+          setOperBoxDataError(null)
           setStatusMessage(`识别完成！共识别 ${parseResult.data.operCount} 名干员`)
           setOperBoxData({
             operCount: parseResult.data.operCount,
@@ -495,71 +868,78 @@ export default function DataStatistics() {
     }
   }
 
+  const hasActiveOperatorFilters = filterRarity !== 'all'
+    || filterElite !== 'all'
+    || filterPotential !== 'all'
+    || filterOwnership !== 'all'
+    || filterProfession !== 'all'
+    || sortBy !== 'default'
+
+  const resetOperatorFilters = () => {
+    setFilterRarity('all')
+    setFilterElite('all')
+    setFilterPotential('all')
+    setFilterOwnership('all')
+    setFilterProfession('all')
+    setSortBy('default')
+  }
+
   return (
-    <div className="app-page">
+    <div className="app-page ios-workspace-page data-statistics-page">
       <div className="app-stack-section">
         {/* 页面标题 */}
         <PageHeader
-          icon={<Icons.Info className="w-6 h-6" />}
           title="数据统计"
           subtitle="识别并查看仓库、干员与掉落数据"
-          actions={<FloatingStatusIndicator />}
+          mobileLayout="inline"
+          actions={(
+            <div className="data-statistics-status min-w-0 max-w-full">
+              <FloatingStatusIndicator
+                className="max-w-full"
+                textClassName="truncate whitespace-nowrap"
+              />
+            </div>
+          )}
         />
 
         {/* 标签页切换 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-2 border-b border-[var(--app-border)]"
+          className="data-statistics-tabs"
+          role="group"
+          aria-label="数据统计视图"
         >
           <button
+            type="button"
             onClick={() => setActiveTab('operbox')}
             className={tabButtonClass(activeTab === 'operbox')}
+            aria-pressed={activeTab === 'operbox'}
           >
             <Icons.Users />
             <span>干员识别</span>
-            {activeTab === 'operbox' && (
-              <motion.div
-                layoutId="activeTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--app-accent)]"
-                initial={false}
-                transition={{ type: "spring", stiffness: 500, damping: 30 }}
-              />
-            )}
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('depot')}
             className={tabButtonClass(activeTab === 'depot')}
+            aria-pressed={activeTab === 'depot'}
           >
             <Icons.Package />
             <span>仓库识别</span>
-            {activeTab === 'depot' && (
-              <motion.div
-                layoutId="activeTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--app-accent)]"
-                initial={false}
-                transition={{ type: "spring", stiffness: 500, damping: 30 }}
-              />
-            )}
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('drops')}
             className={tabButtonClass(activeTab === 'drops')}
+            aria-pressed={activeTab === 'drops'}
           >
             <Icons.TrendingUp />
             <span>掉落记录</span>
-            {activeTab === 'drops' && (
-              <motion.div
-                layoutId="activeTab"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--app-accent)]"
-                initial={false}
-                transition={{ type: "spring", stiffness: 500, damping: 30 }}
-              />
-            )}
           </button>
         </motion.div>
 
-        <div className="data-statistics-layout">
+        <div>
           {/* 功能卡片 */}
           <div className="min-w-0 app-stack-section">
           {/* 干员识别 */}
@@ -567,15 +947,20 @@ export default function DataStatistics() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className={taskPanelClass(activeTask === 'operbox' && isRunning)}
+            className="min-w-0"
           >
+            <Card
+              smoothCorners
+              className={taskPanelClass(activeTask === 'operbox' && isRunning)}
+            >
+              <div className="data-statistics-task-content">
             {/* 顶部行：图标 + 标题 + 执行按钮 */}
-            <div className="flex items-start gap-3 mb-4">
+            <div className="data-statistics-task-header flex items-start gap-3 mb-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-2 flex-wrap mb-2">
                   <span className="text-xl"><Icons.Users /></span>
                   <span className="font-bold text-primary text-base">干员识别</span>
-                  <span className="brand-chip rounded-full px-2 py-0.5 text-xs">operbox</span>
+                  <span className="brand-chip rounded-full px-2 py-0.5 text-xs">干员清单</span>
                 </div>
                 <p className="text-sm text-secondary leading-relaxed">
                   识别所有干员信息
@@ -583,48 +968,67 @@ export default function DataStatistics() {
               </div>
               
               {/* 执行按钮 */}
-              <div className="flex-shrink-0 flex items-center gap-2">
-                {activeTask === 'operbox' && isRunning ? (
-                  <div className="w-7 h-7 flex items-center justify-center">
-                    <svg className="w-5 h-5 animate-spin brand-text" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              <div className="data-statistics-task-actions flex-shrink-0 flex items-center gap-2">
+                <Button
+                  onClick={handleFetchMaterials}
+                  disabled={isRunning}
+                  loading={isRunning && activeTask === null}
+                  loadingText="正在获取..."
+                  variant="outline"
+                  size="sm"
+                  icon={
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                  </div>
-                ) : (
-                  <>
-                    <Button
-                      onClick={handleFetchMaterials}
-                      disabled={isRunning}
-                      variant="outline"
-                      size="sm"
-                      className="min-h-10"
-                      icon={
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                      }
-                    >
-                      获取材料数据
-                    </Button>
-                    <Button
-                      onClick={executeOperBox}
-                      disabled={isRunning}
-                      variant="primary"
-                      icon={
-                        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                        </svg>
-                      }
-                    >
-                      立即执行
-                    </Button>
-                  </>
-                )}
+                  }
+                >
+                  获取材料数据
+                </Button>
+                <Button
+                  onClick={executeOperBox}
+                  disabled={isRunning}
+                  loading={activeTask === 'operbox' && isRunning}
+                  loadingText="正在执行..."
+                  variant="primary"
+                  icon={
+                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                    </svg>
+                  }
+                >
+                  立即执行
+                </Button>
               </div>
             </div>
 
             {/* 识别结果展示 */}
+            {operatorDataLoading && !operatorDataError && !operBoxData && (
+              <div className="py-10">
+                <Loading text="正在读取干员数据..." />
+              </div>
+            )}
+            {activeTask === 'operbox' && isRunning && !operBoxData && (
+              <div className="py-10">
+                <Loading text="正在识别干员数据..." />
+              </div>
+            )}
+            {operatorDataError && (
+              <InlineDataError
+                title="干员数据读取失败"
+                description={operatorDataError}
+                isRetrying={operatorDataLoading}
+                onRetry={() => { void loadOperatorData() }}
+              />
+            )}
+            {!operatorDataLoading && !operatorDataError && !isRunning && (!operBoxData?.data || operBoxData.data.length === 0) && (
+              <EmptyState
+                compact
+                className="py-10"
+                icon={<Icons.Users />}
+                title="还没有干员识别结果"
+                description="完成一次干员识别后，清单会显示在这里。"
+              />
+            )}
             {operBoxData && operBoxData.data && operBoxData.data.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -636,255 +1040,88 @@ export default function DataStatistics() {
                   {/* 筛选和排序按钮组 */}
                   <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
                     {/* 拥有状态 */}
-                    <div className="relative w-[calc(33.333%-0.5rem)] sm:w-auto">
-                      <button
-                        onClick={() => setOpenMenu(openMenu === 'ownership' ? null : 'ownership')}
-                        className={filterButtonClass(filterOwnership !== 'all')}
-                      >
-                        <span className="truncate">
-                          {filterOwnership === 'all' ? '拥有状态' : 
-                           filterOwnership === 'owned' ? '已拥有' : '未拥有'}
-                        </span>
-                        <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      {openMenu === 'ownership' && (
-                        <div className={`${menuSurfaceClass} w-32`}>
-                          {[
-                            { value: 'all', label: '全部' },
-                            { value: 'owned', label: '已拥有' },
-                            { value: 'unowned', label: '未拥有' }
-                          ].map((option) => (
-                            <button
-                              key={option.value}
-                              onClick={() => {
-                                setFilterOwnership(option.value as FilterOwnership)
-                                setOpenMenu(null)
-                              }}
-                              className={menuOptionClass(filterOwnership === option.value)}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <FilterMenu
+                      menuKey="ownership"
+                      label={ownershipLabels[filterOwnership]}
+                      value={filterOwnership}
+                      options={ownershipOptions}
+                      isActive={filterOwnership !== 'all'}
+                      isOpen={openMenu === 'ownership'}
+                      onOpenChange={setOpenMenu}
+                      onSelect={value => setFilterOwnership(value as FilterOwnership)}
+                    />
 
                     {/* 星级 */}
-                    <div className="relative w-[calc(33.333%-0.5rem)] sm:w-auto">
-                      <button
-                        onClick={() => setOpenMenu(openMenu === 'rarity' ? null : 'rarity')}
-                        className={filterButtonClass(filterRarity !== 'all')}
-                      >
-                        <span className="truncate">
-                          {filterRarity === 'all' ? '星级' : `${filterRarity}星`}
-                        </span>
-                        <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      {openMenu === 'rarity' && (
-                        <div className={`${menuSurfaceClass} w-28`}>
-                          {[
-                            { value: 'all', label: '全部' },
-                            { value: '6', label: '6星' },
-                            { value: '5', label: '5星' },
-                            { value: '4', label: '4星' },
-                            { value: '3', label: '3星' },
-                            { value: '2', label: '2星' },
-                            { value: '1', label: '1星' }
-                          ].map((option) => (
-                            <button
-                              key={option.value}
-                              onClick={() => {
-                                setFilterRarity(option.value as FilterRarity)
-                                setOpenMenu(null)
-                              }}
-                              className={menuOptionClass(filterRarity === option.value)}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <FilterMenu
+                      menuKey="rarity"
+                      label={filterRarity === 'all' ? '星级' : `${filterRarity}星`}
+                      value={filterRarity}
+                      options={rarityOptions}
+                      isActive={filterRarity !== 'all'}
+                      isOpen={openMenu === 'rarity'}
+                      menuWidth={112}
+                      onOpenChange={setOpenMenu}
+                      onSelect={value => setFilterRarity(value as FilterRarity)}
+                    />
 
                     {/* 职业 */}
-                    <div className="relative w-[calc(33.333%-0.5rem)] sm:w-auto">
-                      <button
-                        onClick={() => setOpenMenu(openMenu === 'profession' ? null : 'profession')}
-                        className={filterButtonClass(filterProfession !== 'all')}
-                      >
-                        <span className="truncate">
-                          {filterProfession === 'all' ? '职业' :
-                           filterProfession === 'PIONEER' ? '先锋' :
-                           filterProfession === 'WARRIOR' ? '近卫' :
-                           filterProfession === 'TANK' ? '重装' :
-                           filterProfession === 'SNIPER' ? '狙击' :
-                           filterProfession === 'CASTER' ? '术师' :
-                           filterProfession === 'MEDIC' ? '医疗' :
-                           filterProfession === 'SUPPORT' ? '辅助' :
-                           filterProfession === 'SPECIAL' ? '特种' : '职业'}
-                        </span>
-                        <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      {openMenu === 'profession' && (
-                        <div className={`${menuSurfaceClass} w-32`}>
-                          {[
-                            { value: 'all', label: '全部' },
-                            { value: 'PIONEER', label: '先锋' },
-                            { value: 'WARRIOR', label: '近卫' },
-                            { value: 'TANK', label: '重装' },
-                            { value: 'SNIPER', label: '狙击' },
-                            { value: 'CASTER', label: '术师' },
-                            { value: 'MEDIC', label: '医疗' },
-                            { value: 'SUPPORT', label: '辅助' },
-                            { value: 'SPECIAL', label: '特种' }
-                          ].map((option) => (
-                            <button
-                              key={option.value}
-                              onClick={() => {
-                                setFilterProfession(option.value as FilterProfession)
-                                setOpenMenu(null)
-                              }}
-                              className={menuOptionClass(filterProfession === option.value)}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <FilterMenu
+                      menuKey="profession"
+                      label={professionLabels[filterProfession]}
+                      value={filterProfession}
+                      options={professionOptions}
+                      isActive={filterProfession !== 'all'}
+                      isOpen={openMenu === 'profession'}
+                      mobileAlign="end"
+                      onOpenChange={setOpenMenu}
+                      onSelect={value => setFilterProfession(value as FilterProfession)}
+                    />
 
                     {/* 精英化 */}
-                    <div className="relative w-[calc(33.333%-0.5rem)] sm:w-auto">
-                      <button
-                        onClick={() => setOpenMenu(openMenu === 'elite' ? null : 'elite')}
-                        className={filterButtonClass(filterElite !== 'all')}
-                      >
-                        <span className="truncate">
-                          {filterElite === 'all' ? '精英化' : `精英${filterElite}`}
-                        </span>
-                        <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      {openMenu === 'elite' && (
-                        <div className={`${menuSurfaceClass} w-28`}>
-                          {[
-                            { value: 'all', label: '全部' },
-                            { value: '2', label: '精英2' },
-                            { value: '1', label: '精英1' },
-                            { value: '0', label: '精英0' }
-                          ].map((option) => (
-                            <button
-                              key={option.value}
-                              onClick={() => {
-                                setFilterElite(option.value as FilterElite)
-                                setOpenMenu(null)
-                              }}
-                              className={menuOptionClass(filterElite === option.value)}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <FilterMenu
+                      menuKey="elite"
+                      label={filterElite === 'all' ? '精英化' : `精英${filterElite}`}
+                      value={filterElite}
+                      options={eliteOptions}
+                      isActive={filterElite !== 'all'}
+                      isOpen={openMenu === 'elite'}
+                      menuWidth={112}
+                      onOpenChange={setOpenMenu}
+                      onSelect={value => setFilterElite(value as FilterElite)}
+                    />
 
                     {/* 潜能 */}
-                    <div className="relative w-[calc(33.333%-0.5rem)] sm:w-auto">
-                      <button
-                        onClick={() => setOpenMenu(openMenu === 'potential' ? null : 'potential')}
-                        className={filterButtonClass(filterPotential !== 'all')}
-                      >
-                        <span className="truncate">
-                          {filterPotential === 'all' ? '潜能' : `潜能${filterPotential}`}
-                        </span>
-                        <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      {openMenu === 'potential' && (
-                        <div className={`${menuSurfaceClass} w-28`}>
-                          {[
-                            { value: 'all', label: '全部' },
-                            { value: '6', label: '潜能6' },
-                            { value: '5', label: '潜能5' },
-                            { value: '4', label: '潜能4' },
-                            { value: '3', label: '潜能3' },
-                            { value: '2', label: '潜能2' },
-                            { value: '1', label: '潜能1' }
-                          ].map((option) => (
-                            <button
-                              key={option.value}
-                              onClick={() => {
-                                setFilterPotential(option.value as FilterPotential)
-                                setOpenMenu(null)
-                              }}
-                              className={menuOptionClass(filterPotential === option.value)}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <FilterMenu
+                      menuKey="potential"
+                      label={filterPotential === 'all' ? '潜能' : `潜能${filterPotential}`}
+                      value={filterPotential}
+                      options={potentialOptions}
+                      isActive={filterPotential !== 'all'}
+                      isOpen={openMenu === 'potential'}
+                      menuWidth={112}
+                      onOpenChange={setOpenMenu}
+                      onSelect={value => setFilterPotential(value as FilterPotential)}
+                    />
 
                     {/* 排序 */}
-                    <div className="relative w-[calc(33.333%-0.5rem)] sm:w-auto">
-                      <button
-                        onClick={() => setOpenMenu(openMenu === 'sort' ? null : 'sort')}
-                        className={filterButtonClass(sortBy !== 'default')}
-                      >
-                        <span className="truncate">
-                          {sortBy === 'default' ? '排序' :
-                           sortBy === 'rarity' ? '星级降序' :
-                           sortBy === 'level' ? '等级降序' :
-                           sortBy === 'potential' ? '潜能降序' : '排序'}
-                        </span>
-                        <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      {openMenu === 'sort' && (
-                        <div className={`${menuSurfaceClass} w-32`}>
-                          {[
-                            { value: 'default', label: '默认顺序' },
-                            { value: 'rarity', label: '星级降序' },
-                            { value: 'level', label: '等级降序' },
-                            { value: 'potential', label: '潜能降序' }
-                          ].map((option) => (
-                            <button
-                              key={option.value}
-                              onClick={() => {
-                                setSortBy(option.value as SortBy)
-                                setOpenMenu(null)
-                              }}
-                              className={menuOptionClass(sortBy === option.value)}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <FilterMenu
+                      menuKey="sort"
+                      label={sortLabels[sortBy]}
+                      value={sortBy}
+                      options={sortOptions}
+                      isActive={sortBy !== 'default'}
+                      isOpen={openMenu === 'sort'}
+                      mobileAlign="end"
+                      onOpenChange={setOpenMenu}
+                      onSelect={value => setSortBy(value as SortBy)}
+                    />
 
                     {/* 重置按钮 */}
-                    {(filterRarity !== 'all' || filterElite !== 'all' || filterPotential !== 'all' || filterOwnership !== 'all' || filterProfession !== 'all' || sortBy !== 'default') && (
+                    {hasActiveOperatorFilters && (
                       <button
-                        onClick={() => {
-                          setFilterRarity('all')
-                          setFilterElite('all')
-                          setFilterPotential('all')
-                          setFilterOwnership('all')
-                          setFilterProfession('all')
-                          setSortBy('default')
-                        }}
-                        className="w-[calc(33.333%-0.5rem)] sm:w-auto px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium text-secondary hover:text-primary hover:bg-[var(--app-surface-muted)] transition-all"
+                        type="button"
+                        onClick={resetOperatorFilters}
+                        className="min-h-11 w-[calc(33.333%_-_0.5rem)] rounded-lg px-2 text-xs font-medium text-secondary transition-all hover:bg-[var(--app-surface-muted)] hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] sm:w-auto sm:px-3"
                       >
                         重置
                       </button>
@@ -902,6 +1139,20 @@ export default function DataStatistics() {
                 </div>
 
                 {/* 干员卡片网格 */}
+                {getFilteredAndSortedOperators.length === 0 ? (
+                  <EmptyState
+                    compact
+                    className="py-10"
+                    icon={<Icons.Users />}
+                    title="没有符合条件的干员"
+                    description="调整筛选条件后再查看。"
+                    action={hasActiveOperatorFilters ? (
+                      <Button variant="secondary" size="sm" onClick={resetOperatorFilters}>
+                        清除筛选
+                      </Button>
+                    ) : undefined}
+                  />
+                ) : (
                 <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                   {getFilteredAndSortedOperators.map((oper, idx) => {
                     // 判断是否拥有该干员
@@ -919,7 +1170,7 @@ export default function DataStatistics() {
                     
                     return (
                       <motion.div
-                        key={idx}
+                        key={oper.id}
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: idx * 0.01 }}
@@ -1012,8 +1263,11 @@ export default function DataStatistics() {
                     );
                   })}
                 </div>
+                )}
                   </motion.div>
                 )}
+              </div>
+            </Card>
           </motion.div>
           )}
 
@@ -1022,15 +1276,20 @@ export default function DataStatistics() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className={taskPanelClass(activeTask === 'depot' && isRunning)}
+            className="min-w-0"
           >
+            <Card
+              smoothCorners
+              className={taskPanelClass(activeTask === 'depot' && isRunning)}
+            >
+              <div className="data-statistics-task-content">
             {/* 顶部行：图标 + 标题 + 执行按钮 */}
-            <div className="flex items-start gap-3 mb-4">
+            <div className="data-statistics-task-header flex items-start gap-3 mb-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-2 flex-wrap mb-2">
                   <span className="text-xl"><Icons.Package /></span>
                   <span className="font-bold text-primary text-base">仓库识别</span>
-                  <span className="brand-chip rounded-full px-2 py-0.5 text-xs">depot</span>
+                  <span className="brand-chip rounded-full px-2 py-0.5 text-xs">仓库清单</span>
                 </div>
                 <p className="text-sm text-secondary leading-relaxed">
                   识别仓库中的所有物品
@@ -1038,36 +1297,56 @@ export default function DataStatistics() {
               </div>
               
               {/* 执行按钮 */}
-              <div className="flex-shrink-0">
-                {activeTask === 'depot' && isRunning ? (
-                  <div className="w-7 h-7 flex items-center justify-center">
-                    <svg className="w-5 h-5 animate-spin brand-text" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              <div className="data-statistics-task-actions flex-shrink-0">
+                <Button
+                  onClick={executeDepot}
+                  disabled={isRunning}
+                  loading={activeTask === 'depot' && isRunning}
+                  loadingText="正在执行..."
+                  variant="primary"
+                  icon={
+                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                     </svg>
-                  </div>
-                ) : (
-                  <Button
-                    onClick={executeDepot}
-                    disabled={isRunning}
-                    variant="primary"
-                    icon={
-                      <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                      </svg>
-                    }
-                  >
-                    立即执行
-                  </Button>
-                )}
+                  }
+                >
+                  立即执行
+                </Button>
               </div>
             </div>
 
             {/* 识别结果展示 */}
+            {depotDataLoading && !depotDataError && !depotData && (
+              <div className="py-10">
+                <Loading text="正在读取仓库数据..." />
+              </div>
+            )}
+            {activeTask === 'depot' && isRunning && !depotData && (
+              <div className="py-10">
+                <Loading text="正在识别仓库数据..." />
+              </div>
+            )}
+            {depotDataError && (
+              <InlineDataError
+                title="仓库数据读取失败"
+                description={depotDataError}
+                isRetrying={depotDataLoading}
+                onRetry={() => { void loadDepotData() }}
+              />
+            )}
+            {!depotDataLoading && !depotDataError && !isRunning && !depotData && (
+              <EmptyState
+                compact
+                className="py-10"
+                icon={<Icons.Package />}
+                title="还没有仓库识别结果"
+                description="完成一次仓库识别后，物品清单会显示在这里。"
+              />
+            )}
             {depotData && (
               <div className="space-y-3">
                 {/* 统计信息 */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="data-statistics-kpi-grid grid grid-cols-2 md:grid-cols-4">
                   <div className={statCardClass}>
                     <p className="text-xs text-secondary mb-1">总物品数</p>
                     <p className="text-lg font-bold text-primary">
@@ -1101,7 +1380,7 @@ export default function DataStatistics() {
                     </p>
                   </div>
                   {depotData.timestamp && (
-                    <div className={`col-span-2 md:col-span-4 ${statCardClass}`}>
+                    <div className={`col-span-1 md:col-span-3 ${statCardClass}`}>
                       <p className="text-xs text-secondary">
                         识别时间: {new Date(depotData.timestamp).toLocaleString('zh-CN')}
                       </p>
@@ -1130,53 +1409,61 @@ export default function DataStatistics() {
                 {/* 物品卡片网格 */}
                 {depotData.items && depotData.items.length > 0 && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {depotData.items.map((item, idx) => (
-                      <motion.div
-                        key={idx}
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: idx * 0.01 }}
-                        className="group flex items-center gap-3 rounded-2xl border border-[var(--app-border)] p-3 transition-colors surface-soft hover:border-[color-mix(in_srgb,var(--app-accent)_42%,var(--app-border))] hover:bg-[var(--app-accent-soft)]"
-                      >
-                        {/* 物品图标 */}
-                        <div className="flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden surface-panel flex items-center justify-center">
-                          <img
-                            src={getItemIconUrl(item.iconId)}
-                            alt={item.name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.style.display = 'none'
-                              const parent = target.parentElement
-                              if (parent) {
-                                parent.innerHTML = '<svg class="w-6 h-6 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>'
-                              }
-                            }}
-                          />
-                        </div>
-                        
-                        {/* 物品信息 */}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-bold text-primary truncate" title={item.name}>
-                            {item.name}
-                          </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            {item.classifyType && (
-                              <span className={chipClass}>
-                                {getDepotTypeLabel(item.classifyType)}
+                    {depotData.items.map((item, idx) => {
+                      const itemKey = item.id || item.iconId
+                      const imageKey = `${itemKey}:${item.iconId}`
+
+                      return (
+                        <motion.div
+                          key={itemKey}
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: idx * 0.01 }}
+                          className="group flex items-center gap-3 rounded-2xl border border-[var(--app-border)] p-3 transition-colors surface-soft hover:border-[color-mix(in_srgb,var(--app-accent)_42%,var(--app-border))] hover:bg-[var(--app-accent-soft)]"
+                        >
+                          {/* 物品图标 */}
+                          <div className="flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden surface-panel flex items-center justify-center">
+                            {failedDepotImages[imageKey] ? (
+                              <span role="img" aria-label={`${item.name}图标不可用`}>
+                                <PackageIcon className="h-6 w-6 brand-text" aria-hidden="true" />
                               </span>
+                            ) : (
+                              <img
+                                src={getItemIconUrl(item.iconId)}
+                                alt={item.name}
+                                className="w-full h-full object-cover"
+                                onError={() => {
+                                  setFailedDepotImages(previous => ({ ...previous, [imageKey]: true }))
+                                }}
+                              />
                             )}
-                            <span className={`${chipClass} font-semibold`}>
-                              ×{item.count.toLocaleString()}
-                            </span>
                           </div>
-                        </div>
-                      </motion.div>
-                    ))}
+
+                          {/* 物品信息 */}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-bold text-primary truncate" title={item.name}>
+                              {item.name}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              {item.classifyType && (
+                                <span className={chipClass}>
+                                  {getDepotTypeLabel(item.classifyType)}
+                                </span>
+                              )}
+                              <span className={`${chipClass} font-semibold`}>
+                                ×{item.count.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
             )}
+              </div>
+            </Card>
           </motion.div>
           )}
           
@@ -1187,27 +1474,12 @@ export default function DataStatistics() {
               dropDays={dropDays}
               setDropDays={setDropDays}
               onRefresh={loadDropData}
+              isLoading={dropDataLoading}
+              error={dropDataError}
             />
           )}
           </div>
 
-          {/* 说明信息 */}
-          <InfoCard type="info" className="data-statistics-help">
-            <div className="flex items-start space-x-3">
-              <Icons.Info className="w-5 h-5 brand-text mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-secondary">
-                <p className="font-semibold text-primary mb-2">使用说明</p>
-                <ul className="space-y-1.5 list-disc list-inside text-xs leading-5">
-                  <li>识别前请确保游戏已启动并进入主界面</li>
-                  <li>仓库识别需要打开仓库界面</li>
-                  <li>干员识别需要打开干员界面</li>
-                  <li>识别完成后可展开查看完整清单</li>
-                  <li>数据按游戏内顺序保存名称和数量</li>
-                  <li>结果目录：<code className="px-1 py-0.5 brand-chip rounded text-xs">server/data/</code></li>
-                </ul>
-              </div>
-            </div>
-          </InfoCard>
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
 import { Button } from './common'
@@ -85,12 +85,15 @@ export default function ScrcpyDeviceView({
   const pendingPointerMovesRef = useRef(new Map<number, TrackedPointer>())
   const pointerMoveFrameRef = useRef<number | null>(null)
   const autoConnectStartedRef = useRef(false)
+  const connectRequestGenerationRef = useRef(0)
   const [quality, setQuality] = useState<QualitySelection>('smooth')
   const [customFps, setCustomFps] = useState<number>(qualityPresets.smooth.fps)
   const [customMaxSize, setCustomMaxSize] = useState<number>(qualityPresets.smooth.maxSize)
   const [customBitrateMbps, setCustomBitrateMbps] = useState<number>(qualityPresets.smooth.bitrateMbps)
   const [settingsDirty, setSettingsDirty] = useState(false)
   const [immersiveMode, setImmersiveMode] = useState(false)
+  const [compactControlsOpen, setCompactControlsOpen] = useState(false)
+  const compactControlsId = `scrcpy-controls-${useId().replace(/:/g, '')}`
   const bitrateProgress = ((customBitrateMbps - 2) / (32 - 2)) * 100
   const selectedPreset = quality === 'custom' ? null : qualityPresets[quality]
   const scrcpyOptions = useMemo(() => ({
@@ -111,6 +114,7 @@ export default function ScrcpyDeviceView({
     ipPreference: 'ipv4',
     scrcpyOptions
   })
+  const connectWebrtc = webrtc.connect
   const sendTouchRef = useRef(webrtc.sendTouch)
   useEffect(() => {
     sendTouchRef.current = webrtc.sendTouch
@@ -144,16 +148,18 @@ export default function ScrcpyDeviceView({
 
   const connect = useCallback(async () => {
     if (!automationAvailable) return false
+    const requestGeneration = ++connectRequestGenerationRef.current
     try {
       const freshSignalingUrl = await onStartInfrastructure?.()
+      if (requestGeneration !== connectRequestGenerationRef.current) return false
       if (onStartInfrastructure && !freshSignalingUrl) return false
-      webrtc.connect(freshSignalingUrl)
+      connectWebrtc(freshSignalingUrl)
       return true
     } catch {
       // 基础设施错误由 ScreenMonitor 显示，连接流程到此停止。
       return false
     }
-  }, [automationAvailable, onStartInfrastructure, webrtc])
+  }, [automationAvailable, connectWebrtc, onStartInfrastructure])
 
   const connectFromControl = async () => {
     if (await connect()) setSettingsDirty(false)
@@ -183,7 +189,12 @@ export default function ScrcpyDeviceView({
     }
     if (!enabled || !automationAvailable || autoConnectStartedRef.current) return
     autoConnectStartedRef.current = true
-    void connect()
+    void connect().then(started => {
+      if (!started) autoConnectStartedRef.current = false
+    })
+    return () => {
+      autoConnectStartedRef.current = false
+    }
   }, [autoConnect, automationAvailable, connect, enabled])
 
   const flushPointerMoves = useCallback(() => {
@@ -250,6 +261,7 @@ export default function ScrcpyDeviceView({
   }
 
   useEffect(() => () => {
+    connectRequestGenerationRef.current += 1
     if (pointerMoveFrameRef.current !== null) window.cancelAnimationFrame(pointerMoveFrameRef.current)
     pointerMoveFrameRef.current = null
     pendingPointerMovesRef.current.clear()
@@ -389,10 +401,10 @@ export default function ScrcpyDeviceView({
       <div className="space-y-3 min-w-0">
         <div className={`scrcpy-view-header flex items-start justify-between gap-3 flex-wrap ${isCompact ? 'is-compact' : ''}`}>
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className={`h-2 w-2 rounded-full ${statusDotClass}`} />
-              <span className="text-sm font-semibold text-gray-900 dark:text-white">{isCompact ? '模拟器画面' : '模拟器实时预览'}</span>
-              <span className="text-xs text-gray-500 dark:text-gray-400" role="status" aria-live="polite">
+            <div className="scrcpy-view-title-row flex items-center gap-2">
+              <span className={`scrcpy-view-status-dot h-2 w-2 rounded-full ${statusDotClass}`} />
+              <span className="scrcpy-view-title text-sm font-semibold text-gray-900 dark:text-white">{isCompact ? '模拟器画面' : '模拟器实时预览'}</span>
+              <span className="scrcpy-view-status text-xs text-gray-500 dark:text-gray-400" role="status" aria-live="polite">
                 {statusLabel[webrtc.status] || webrtc.status}
               </span>
             </div>
@@ -404,7 +416,7 @@ export default function ScrcpyDeviceView({
               onClick={webrtc.disconnect}
               title="断开预览"
               aria-label="断开预览"
-              className="scrcpy-compact-disconnect control-surface flex h-7 w-7 items-center justify-center rounded-md text-secondary transition-colors hover:text-primary"
+              className="scrcpy-compact-disconnect control-surface flex h-7 min-h-11 w-7 min-w-11 items-center justify-center rounded-md text-secondary transition-colors hover:text-primary"
             >
               <Unplug className="h-4 w-4" strokeWidth={1.8} />
             </button>
@@ -473,25 +485,25 @@ export default function ScrcpyDeviceView({
               role={visibleError ? 'alert' : 'status'}
               aria-live="polite"
             >
-              <div className="w-full max-w-sm">
+              <div className="scrcpy-empty-content w-full max-w-sm">
                 <div className="device-preview-empty-icon mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-lg">
                   <Smartphone className="h-5 w-5" strokeWidth={1.6} aria-hidden="true" />
                 </div>
-                <div className="mb-1 text-sm font-semibold text-primary">
+                <div className="scrcpy-empty-title mb-1 text-sm font-semibold text-primary">
                   {visibleError ? '预览启动失败' : '等待实时画面'}
                 </div>
-                <div className="mx-auto max-w-md text-xs leading-5 text-secondary">
+                <div className="scrcpy-empty-description mx-auto max-w-md text-xs leading-5 text-secondary">
                   {visibleError || (!automationAvailable
                     ? automationUnavailableMessage
                     : isCompact
-                    ? '点击按钮连接模拟器。'
+                    ? '预览服务尚未连接。'
                     : '点击“启动实时预览”后，La-pluma 会自动启动服务、连接 MuMu 并显示实时画面。')}
                 </div>
-                <div className="mt-4 flex justify-center">
+                <div className="scrcpy-empty-actions mt-4 flex justify-center">
                   <Button
                     size="sm"
                     variant="primary"
-                    className="min-w-32 px-4"
+                    className="scrcpy-empty-action min-w-32 px-4"
                     icon={needsInstall
                       ? <Package className="h-3.5 w-3.5" strokeWidth={1.8} />
                       : <Plug className="h-3.5 w-3.5" strokeWidth={1.8} />}
@@ -513,7 +525,7 @@ export default function ScrcpyDeviceView({
             </div>
           )}
         </div>
-        <div className="scrcpy-preview-toolbar flex items-center justify-center gap-2 bg-transparent px-2 py-1">
+        <div className="scrcpy-preview-toolbar flex items-center justify-center gap-2 bg-transparent px-2 py-1" role="toolbar" aria-label="模拟器导航">
           {[
             {
               label: '返回',
@@ -544,7 +556,7 @@ export default function ScrcpyDeviceView({
               disabled={action.disabled || (action.requiresAutomation && !automationAvailable)}
               title={action.requiresAutomation && !automationAvailable ? automationUnavailableMessage : action.label}
               aria-label={action.label}
-              className={`control-surface flex items-center justify-center rounded-full text-secondary transition-colors hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35 ${isCompact ? 'h-10 w-10' : 'h-8 w-8'}`}
+              className={`control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-secondary transition-colors hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35 ${isCompact ? 'automation-preview-glass-button' : ''}`}
             >
               {action.icon}
             </button>
@@ -555,15 +567,28 @@ export default function ScrcpyDeviceView({
             disabled={webrtc.status !== 'connected'}
             title="全屏"
             aria-label="全屏"
-            className={`control-surface flex items-center justify-center rounded-full text-secondary transition-colors hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35 ${isCompact ? 'h-10 w-10' : 'h-8 w-8'}`}
+            className={`control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-secondary transition-colors hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35 ${isCompact ? 'automation-preview-glass-button' : ''}`}
           >
             <Maximize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
           </button>
+          {isCompact && (
+            <button
+              type="button"
+              onClick={() => setCompactControlsOpen(open => !open)}
+              title={compactControlsOpen ? '收起预览设置' : '预览设置'}
+              aria-label={compactControlsOpen ? '收起预览设置' : '打开预览设置'}
+              aria-expanded={compactControlsOpen}
+              aria-controls={compactControlsId}
+              className={`automation-preview-glass-button control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-secondary${compactControlsOpen ? ' is-active' : ''}`}
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.8} />
+            </button>
+          )}
         </div>
 
       </div>
 
-      {!isCompact && <aside className="scrcpy-control-rail surface-soft">
+      {(!isCompact || compactControlsOpen) && <aside id={compactControlsId} className={`scrcpy-control-rail surface-soft${isCompact ? ' is-compact' : ''}`}>
         <section className="scrcpy-control-section">
           <div className="scrcpy-control-header">
             <div className="scrcpy-control-title">
@@ -605,7 +630,7 @@ export default function ScrcpyDeviceView({
                   onClick={() => runInfrastructureAction(action.onClick, action.allowWhenUnavailable)}
                   disabled={action.disabled}
                   title={action.disabled && !automationAvailable ? automationUnavailableMessage : action.label}
-                  className="scrcpy-service-action control-surface"
+                  className="scrcpy-service-action control-surface min-h-11"
                 >
                   <Icon className="h-3.5 w-3.5" strokeWidth={1.7} />
                   <span>{action.loading ? '处理中' : action.label}</span>
@@ -619,7 +644,7 @@ export default function ScrcpyDeviceView({
               type="button"
               onClick={webrtc.disconnect}
               disabled={webrtc.status === 'idle' || webrtc.status === 'disconnected'}
-              className="scrcpy-utility-action"
+              className="scrcpy-utility-action min-h-11"
             >
               <Unplug className="h-3.5 w-3.5" strokeWidth={1.8} />
               <span>断开</span>
@@ -629,7 +654,7 @@ export default function ScrcpyDeviceView({
               onClick={() => runInfrastructureAction(onInstall)}
               disabled={!automationAvailable || infrastructureBusy || !infrastructureKnown}
               title={!automationAvailable ? automationUnavailableMessage : undefined}
-              className="scrcpy-utility-action"
+              className="scrcpy-utility-action min-h-11"
             >
               <Package className="h-3.5 w-3.5" strokeWidth={1.8} />
               <span>{infrastructureLoading === 'install' ? '安装中' : infrastructureStatus?.built ? '重装组件' : '安装组件'}</span>
@@ -650,7 +675,7 @@ export default function ScrcpyDeviceView({
             <div className="scrcpy-quality-body">
               <div className="scrcpy-setting-group">
                 <div className="scrcpy-setting-label">画质预设</div>
-                <div className="scrcpy-preset-grid">
+                <div className="scrcpy-preset-grid" role="group" aria-label="画质预设">
                   {Object.entries(qualityPresets).map(([key, preset]) => (
                     <button
                       key={key}
@@ -669,7 +694,7 @@ export default function ScrcpyDeviceView({
 
               <div className="scrcpy-setting-group">
                 <div className="scrcpy-setting-label">帧率</div>
-                <div className="scrcpy-fps-segment">
+                <div className="scrcpy-fps-segment" role="group" aria-label="视频帧率">
                   {fpsOptions.map(fps => (
                     <button
                       key={fps}
@@ -680,7 +705,8 @@ export default function ScrcpyDeviceView({
                         setSettingsDirty(true)
                       }}
                       aria-pressed={customFps === fps}
-                      className={customFps === fps ? 'is-active' : ''}
+                      aria-label={`${fps} FPS`}
+                      className={`${customFps === fps ? 'is-active ' : ''}!min-h-11`}
                     >
                       {fps}
                     </button>
@@ -699,7 +725,7 @@ export default function ScrcpyDeviceView({
                   </output>
                 </div>
                 <div
-                  className="scrcpy-bitrate-slider"
+                  className="scrcpy-bitrate-slider min-h-11"
                   style={{ '--scrcpy-range-progress': `${bitrateProgress}%` } as CSSProperties}
                 >
                   <div className="scrcpy-bitrate-track" aria-hidden="true">
@@ -767,7 +793,7 @@ export default function ScrcpyDeviceView({
             </div>
           )}
         </div>
-        <div className="flex shrink-0 items-center justify-center gap-2 landscape:flex-col">
+        <div className="flex shrink-0 items-center justify-center gap-2 landscape:flex-col" role="toolbar" aria-label="沉浸预览控制">
           {[
             {
               label: '返回',

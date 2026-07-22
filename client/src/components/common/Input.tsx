@@ -69,8 +69,7 @@ export default function Input({
   const describedBy = [ariaDescribedBy, error ? errorId : hint ? hintId : undefined]
     .filter(Boolean)
     .join(' ') || undefined
-  // Keep the native fallback API while opting shared controls into the same
-  // 44px touch target and focus treatment as Framework7's iOS inputs.
+  // Keep shared native controls on the 44px iOS touch target and focus treatment.
   const baseStyles = 'input app-input app-native-control control-surface'
   const errorStyles = 'form-error-surface'
   

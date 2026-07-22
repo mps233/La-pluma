@@ -55,7 +55,7 @@ const renderPrompt = async () => {
 
 const clickButton = async (label: string) => {
   const button = Array.from(container.querySelectorAll('button'))
-    .find(candidate => candidate.textContent?.includes(label))
+    .find(candidate => candidate.textContent?.includes(label) || candidate.getAttribute('aria-label') === label)
   expect(button).toBeDefined()
   await act(async () => {
     button!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -106,9 +106,32 @@ describe('PWAInstallPrompt', () => {
 
   it('shows iOS Add to Home Screen guidance', async () => {
     setNavigator('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1', 5)
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(max-width: 639px)' || query === '(prefers-reduced-motion: reduce)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
 
     await renderPrompt()
 
+    const installEntry = container.querySelector<HTMLButtonElement>('[aria-label="安装 La Pluma"]')
+    expect(installEntry).not.toBeNull()
+    expect(installEntry?.classList.contains('pwa-install-entry-button')).toBe(true)
+    expect(installEntry?.classList.contains('app-icon-button-size-md')).toBe(true)
+    expect(installEntry?.getAttribute('aria-expanded')).toBe('false')
+    expect(container.querySelector('.pwa-install-entry')?.classList.contains('fixed')).toBe(true)
+    expect(container.querySelector('.pwa-install-prompt')).toBeNull()
+    expect(container.textContent).not.toContain('在 Safari 工具栏中点击“分享”')
+
+    await clickButton('安装 La Pluma')
+
+    expect(container.querySelector('.pwa-install-entry')).toBeNull()
+    expect(container.querySelector('.pwa-install-prompt')).not.toBeNull()
     expect(container.textContent).toContain('在 Safari 工具栏中点击“分享”')
     expect(container.textContent).toContain('选择“添加到主屏幕”')
   })

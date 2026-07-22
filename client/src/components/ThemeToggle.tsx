@@ -49,9 +49,47 @@ export default function ThemeToggle() {
       }
     }
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      closeMobileMenu(true)
+      const items = Array.from(
+        mobileMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? [],
+      )
+      const currentIndex = Math.max(0, items.indexOf(document.activeElement as HTMLButtonElement))
+
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeMobileMenu(true)
+        return
+      }
+
+      if (event.key === 'Tab') {
+        event.preventDefault()
+        const nextTarget = event.shiftKey
+          ? mobileTriggerRef.current
+          : mobileTriggerRef.current
+            ?.closest('.la-pluma-navbar-actions')
+            ?.querySelector<HTMLElement>('.la-pluma-github-link') ?? mobileTriggerRef.current
+        setMobileMenuOpen(false)
+        window.requestAnimationFrame(() => nextTarget?.focus({ preventScroll: true }))
+        return
+      }
+
+      if (items.length === 0) return
+
+      let nextIndex: number | null = null
+      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+        nextIndex = (currentIndex + 1) % items.length
+      } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+        nextIndex = (currentIndex - 1 + items.length) % items.length
+      } else if (event.key === 'Home') {
+        nextIndex = 0
+      } else if (event.key === 'End') {
+        nextIndex = items.length - 1
+      }
+
+      const nextItem = nextIndex === null ? undefined : items[nextIndex]
+      if (nextItem) {
+        event.preventDefault()
+        nextItem.focus({ preventScroll: true })
+      }
     }
 
     document.addEventListener('pointerdown', handlePointerDown)
@@ -73,26 +111,27 @@ export default function ThemeToggle() {
 
   return (
     <>
-      <div className="la-pluma-theme-desktop surface-soft items-center gap-1 rounded-xl p-1" role="group" aria-label="界面主题">
+      <div
+        className="la-pluma-theme-desktop"
+        role="group"
+        aria-label="界面主题"
+        data-theme={theme}
+      >
         {themeOptions.map(option => {
           const ThemeIcon = option.icon
+          const selected = theme === option.value
           return (
             <motion.button
               key={option.value}
               type="button"
               onClick={() => handleThemeChange(option.value)}
-              className={`theme-toggle-btn rounded-lg transition-colors ${
-                theme === option.value
-                  ? 'brand-action text-white'
-                  : 'text-tertiary hover:bg-white/70 hover:text-primary dark:hover:bg-white/10'
-              }`}
-              whileHover={shouldReduceMotion ? {} : { y: -1 }}
-              whileTap={shouldReduceMotion ? {} : { y: 0, scale: 0.96 }}
+              className={`theme-toggle-btn ${selected ? 'is-active' : ''}`}
+              whileTap={shouldReduceMotion ? {} : { scale: 0.94 }}
               title={option.label}
               aria-label={option.label}
-              aria-pressed={theme === option.value}
+              aria-pressed={selected}
             >
-              <ThemeIcon className="h-4 w-4" aria-hidden="true" />
+              <ThemeIcon strokeWidth={1.8} aria-hidden="true" />
             </motion.button>
           )
         })}
@@ -111,7 +150,7 @@ export default function ThemeToggle() {
           aria-expanded={mobileMenuOpen}
           aria-controls={mobileMenuId}
         >
-          <CurrentThemeIcon className="h-5 w-5" aria-hidden="true" />
+          <CurrentThemeIcon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
         </motion.button>
 
         <AnimatePresence>
@@ -141,7 +180,7 @@ export default function ThemeToggle() {
                       selected ? 'brand-action-subtle' : 'text-secondary hover:bg-[var(--app-surface-muted)] hover:text-primary'
                     }`}
                   >
-                    <ThemeIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <ThemeIcon className="h-4 w-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
                     <span className="flex-1 text-left">{option.label}</span>
                     {selected && <Check className="h-4 w-4 shrink-0 text-[var(--app-accent)]" aria-hidden="true" />}
                   </button>

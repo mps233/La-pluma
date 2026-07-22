@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Activity, Bot, CalendarDays, CheckCircle2, ChevronRight, Cpu, HardDrive, Database, PackageOpen, Play, ServerOff, Target, Thermometer, WifiOff } from 'lucide-react'
 import { getOpenTodayStages, getTodayDrops, getTrainingQueue, maaApi } from '../services/api'
 import Icons from './Icons'
-import { PageHeader, Card, Button, IconButton } from './common'
+import { PageHeader, Card, Button, IconButton, SmoothPanel } from './common'
 import { DashboardSkeleton } from './common/Loading'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useUIStore } from '@/stores'
@@ -11,52 +11,15 @@ import DashboardPreviewEntry from './DashboardPreviewEntry'
 import { formatExecutionSummary, getExecutionLastTask } from '../utils/executionSummary'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { useStatusStore } from '../store/statusStore'
+import { useDashboardStore, type DashboardSnapshot } from '../store/dashboardStore'
 import { probeBackendAvailability } from '../hooks/useBackendStatusMonitor'
-
-interface ActivitySummary {
-  available: boolean
-  code?: string
-  name?: string
-  tip?: string
-  completion?: {
-    known?: boolean
-    complete?: boolean
-    completedStages?: string[]
-    totalStages?: number
-  }
-}
-
-interface ScheduleSummary {
-  isRunning: boolean
-  currentTask?: string
-  message?: string
-  lastTask?: string
-  lastResult?: string
-}
-
-interface TrainingSummary {
-  count: number
-  topNames: string[]
-}
-
-interface DropSummary {
-  count: number
-  recent: Array<{
-    stage: string
-    items: string
-  }>
-}
-
-interface OpenStageSummary {
-  open: Array<{ stage: string; name: string }>
-  closed: Array<{ stage: string; name: string }>
-}
 
 const sectionTitleClass = 'text-base font-bold text-primary'
 const labelClass = 'text-secondary'
 const progressTrackClass = 'h-1.5 rounded-full bg-[var(--app-surface-muted)] overflow-hidden'
 const dashboardChipClass = 'brand-chip rounded-lg px-2.5 py-1 text-xs font-medium'
 const mutedChipClass = 'rounded-lg px-2.5 py-1 surface-soft text-secondary text-xs'
+export const DASHBOARD_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 
 const getUsageBarClass = (pct?: number) => {
   if (pct == null) return 'bg-[var(--app-accent)]'
@@ -115,63 +78,25 @@ const TemperatureSparkline = ({ values }: { values: number[] }) => {
   )
 }
 
-export default function Dashboard() {
-  const setActiveTab = useUIStore(state => state.setActiveTab)
-  const { backendStatus, backendMessage } = useStatusStore()
-  const isOnline = useOnlineStatus()
-  const openAutomation = useCallback(() => setActiveTab('automation'), [setActiveTab])
-  const [loading, setLoading] = useState(true)
-  const initialLoadCompleteRef = useRef(false)
-  const wasOnlineRef = useRef(isOnline)
-  const { flowGridRef, flowCardRef, flowPreviewRef, flowGridStyle } = useDashboardFlowLayout(!loading)
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
-  const [activitySummary, setActivitySummary] = useState<ActivitySummary>({ available: false })
-  const [scheduleSummary, setScheduleSummary] = useState<ScheduleSummary>({ isRunning: false })
-  const [trainingSummary, setTrainingSummary] = useState<TrainingSummary>({ count: 0, topNames: [] })
-  const [dropSummary, setDropSummary] = useState<DropSummary>({ count: 0, recent: [] })
-  const [openStageSummary, setOpenStageSummary] = useState<OpenStageSummary>({ open: [], closed: [] })
-  const [quickStartLoading, setQuickStartLoading] = useState(false)
-  const [activityPreflightLoading, setActivityPreflightLoading] = useState(false)
-  const [quickStartMessage, setQuickStartMessage] = useState('')
-  const [deviceStats, setDeviceStats] = useState<{
-    cpuPct?: number; load1m?: number;
-    memPct?: number; memUsed?: string; memTotal?: string;
-    diskPct?: number; diskUsed?: string; diskTotal?: string;
-    temp?: number;
-  } | null>(null)
-  const [temperatureHistory, setTemperatureHistory] = useState<number[]>([])
+let dashboardRefreshPromise: Promise<void> | null = null
 
-  const serviceStatus = isOnline ? backendStatus : 'offline'
-  const automationAvailable = serviceStatus === 'available'
-  // 设备状态轮询（CPU/内存）
-  useEffect(() => {
-    const fetch = () => {
-      maaApi.getDeviceStats().then(r => {
-        if (!r.success) return
-        setDeviceStats(r.data)
-        if (Number.isFinite(r.data?.temp)) {
-          setTemperatureHistory(history => [...history, Number(r.data.temp)].slice(-36))
-        }
-      }).catch(() => {})
-    }
-    fetch()
-    const timer = setInterval(fetch, 5000)
-    return () => clearInterval(timer)
-  }, [])
+function refreshDashboardData(force = false): Promise<void> {
+  if (dashboardRefreshPromise) {
+    return force
+      ? dashboardRefreshPromise.then(() => refreshDashboardData())
+      : dashboardRefreshPromise
+  }
 
-  const loadDashboardData = useCallback(async () => {
-    // 后续刷新保留现有内容，只在首次进入时显示整页骨架屏。
-    if (!initialLoadCompleteRef.current) {
-      setLoading(true)
-    }
+  const attemptedAt = Date.now()
+  const dashboardStore = useDashboardStore.getState()
+  dashboardStore.startRefresh()
 
-    if (!navigator.onLine) {
-      initialLoadCompleteRef.current = true
-      setLoading(false)
-      return
-    }
+  const request = (async () => {
+    let backendAvailable = false
 
     try {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return
+
       const [backendResult, activityResult, scheduleResult, trainingResult, dropResult, openTodayResult] = await Promise.allSettled([
         probeBackendAvailability({ showChecking: useStatusStore.getState().backendStatus !== 'available' }),
         maaApi.getActivity('Official'),
@@ -180,41 +105,47 @@ export default function Dashboard() {
         getTodayDrops(),
         getOpenTodayStages(),
       ])
+      const snapshot: Partial<DashboardSnapshot> = {}
 
-      const backendAvailable = backendResult.status === 'fulfilled' && backendResult.value
+      backendAvailable = backendResult.status === 'fulfilled' && backendResult.value
 
       if (activityResult.status === 'fulfilled' && activityResult.value.success) {
         const activity = activityResult.value.data
-        setActivitySummary({
+        snapshot.activitySummary = {
           available: Boolean(activity?.isActive || activity?.available || activity?.code || activity?.name),
           code: activity?.code || activity?.id || undefined,
           name: activity?.name || activity?.displayName || activity?.stageName || undefined,
           tip: activity?.tip || activity?.description || undefined,
           completion: activity?.completion,
-        })
+        }
       }
 
       if (scheduleResult.status === 'fulfilled' && scheduleResult.value.success) {
         const execution = scheduleResult.value.data || {}
         const rawLastResult = execution?.lastResult || execution?.result || execution?.lastMessage
-        setScheduleSummary({
+        snapshot.scheduleSummary = {
           isRunning: Boolean(execution?.isRunning || execution?.running || execution?.executing),
           currentTask: execution?.taskName || execution?.currentTask || execution?.task?.name || undefined,
           message: execution?.message || execution?.status || undefined,
           lastTask: execution?.lastTaskName || execution?.lastTask || execution?.completedTask || getExecutionLastTask(rawLastResult),
           lastResult: formatExecutionSummary(rawLastResult),
-        })
+        }
       }
 
       if (trainingResult.status === 'fulfilled' && trainingResult.value.success) {
-        const queue = Array.isArray(trainingResult.value.data) ? trainingResult.value.data : []
-        setTrainingSummary({
+        const payload = trainingResult.value.data
+        const queue = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.queue)
+            ? payload.queue
+            : []
+        snapshot.trainingSummary = {
           count: queue.length,
           topNames: queue
-            .map((item: any) => item?.operatorName || item?.name || item?.nickname)
+            .map((item: any) => item?.operatorName || item?.operator?.name || item?.name || item?.nickname)
             .filter(Boolean)
             .slice(0, 3),
-        })
+        }
       }
 
       if (dropResult.status === 'fulfilled' && dropResult.value.success) {
@@ -224,7 +155,7 @@ export default function Dashboard() {
           : Array.isArray(payload?.records)
             ? payload.records
             : []
-        setDropSummary({
+        snapshot.dropSummary = {
           count: drops.length,
           recent: [...drops].reverse().slice(0, 3).map((record: any) => ({
             stage: record?.stageName || record?.stageCode || record?.stage || '未知关卡',
@@ -240,39 +171,117 @@ export default function Dashboard() {
                     .join('、')
                 : record?.itemName || '已记录作战，暂无材料明细',
           })),
-        })
+        }
       }
 
       if (openTodayResult.status === 'fulfilled' && openTodayResult.value.success && openTodayResult.value.data) {
-        setOpenStageSummary({
+        snapshot.openStageSummary = {
           open: Array.isArray(openTodayResult.value.data.open) ? openTodayResult.value.data.open : [],
           closed: Array.isArray(openTodayResult.value.data.closed) ? openTodayResult.value.data.closed : [],
-        })
+        }
       }
 
-      if (backendAvailable) {
-        setLastUpdate(new Date())
-      }
+      dashboardStore.updateSnapshot(snapshot)
     } catch (error) {
       console.error('加载 Dashboard 数据失败:', error)
     } finally {
-      initialLoadCompleteRef.current = true
-      setLoading(false)
+      dashboardStore.finishRefresh(attemptedAt, backendAvailable)
+    }
+  })()
+  const refreshPromise = request.finally(() => {
+    dashboardRefreshPromise = null
+  })
+
+  dashboardRefreshPromise = refreshPromise
+  return refreshPromise
+}
+
+export default function Dashboard() {
+  const setActiveTab = useUIStore(state => state.setActiveTab)
+  const { backendStatus, backendMessage } = useStatusStore()
+  const isOnline = useOnlineStatus()
+  const openAutomation = useCallback(() => setActiveTab('automation'), [setActiveTab])
+  const hasLoaded = useDashboardStore(state => state.hasLoaded)
+  const lastUpdate = useDashboardStore(state => state.lastUpdate)
+  const activitySummary = useDashboardStore(state => state.activitySummary)
+  const scheduleSummary = useDashboardStore(state => state.scheduleSummary)
+  const trainingSummary = useDashboardStore(state => state.trainingSummary)
+  const dropSummary = useDashboardStore(state => state.dropSummary)
+  const openStageSummary = useDashboardStore(state => state.openStageSummary)
+  const deviceStats = useDashboardStore(state => state.deviceStats)
+  const temperatureHistory = useDashboardStore(state => state.temperatureHistory)
+  const shouldAnimateCardsRef = useRef(!hasLoaded)
+  const wasOnlineRef = useRef(isOnline)
+  const { flowGridRef, flowCardRef, flowPreviewRef, flowGridStyle } = useDashboardFlowLayout(hasLoaded)
+  const [quickStartLoading, setQuickStartLoading] = useState(false)
+  const [activityPreflightLoading, setActivityPreflightLoading] = useState(false)
+  const [quickStartMessage, setQuickStartMessage] = useState('')
+
+  const serviceStatus = isOnline ? backendStatus : 'offline'
+  const automationAvailable = serviceStatus === 'available'
+
+  useEffect(() => {
+    let disposed = false
+    let requestInFlight = false
+    const fetch = async () => {
+      if (requestInFlight) return
+      requestInFlight = true
+      try {
+        const result = await maaApi.getDeviceStats()
+        if (!disposed && result.success) {
+          useDashboardStore.getState().updateDeviceStats(result.data)
+        }
+      } catch {
+        // Keep the most recent sample while the device endpoint is unavailable.
+      } finally {
+        requestInFlight = false
+      }
+    }
+    void fetch()
+    const timer = window.setInterval(() => void fetch(), 5000)
+    return () => {
+      disposed = true
+      window.clearInterval(timer)
+    }
+  }, [])
+
+  const loadDashboardData = useCallback(() => refreshDashboardData(true), [])
+
+  useEffect(() => {
+    let disposed = false
+    let timer: number | null = null
+
+    const scheduleNextRefresh = () => {
+      if (disposed) return
+      const lastAttempt = useDashboardStore.getState().lastRefreshAttemptAt
+      const elapsed = lastAttempt === null ? DASHBOARD_REFRESH_INTERVAL_MS : Date.now() - lastAttempt
+      const delay = Math.max(1000, DASHBOARD_REFRESH_INTERVAL_MS - elapsed)
+      timer = window.setTimeout(() => {
+        void refreshDashboardData().finally(scheduleNextRefresh)
+      }, delay)
+    }
+    const refreshThenSchedule = () => {
+      void refreshDashboardData().finally(scheduleNextRefresh)
+    }
+    const cache = useDashboardStore.getState()
+    const cacheIsStale = cache.lastRefreshAttemptAt === null
+      || Date.now() - cache.lastRefreshAttemptAt >= DASHBOARD_REFRESH_INTERVAL_MS
+
+    if (!cache.hasLoaded || cacheIsStale) refreshThenSchedule()
+    else scheduleNextRefresh()
+
+    return () => {
+      disposed = true
+      if (timer !== null) window.clearTimeout(timer)
     }
   }, [])
 
   useEffect(() => {
-    void loadDashboardData()
-    const interval = setInterval(loadDashboardData, 5 * 60 * 1000)
-    return () => clearInterval(interval)
-  }, [loadDashboardData])
-
-  useEffect(() => {
     if (isOnline && !wasOnlineRef.current) {
-      void loadDashboardData()
+      void refreshDashboardData(true)
     }
     wasOnlineRef.current = isOnline
-  }, [isOnline, loadDashboardData])
+  }, [isOnline])
 
   const runTodayFlow = async () => {
     if (!automationAvailable) {
@@ -328,10 +337,11 @@ export default function Dashboard() {
     }
   }
 
-  if (loading) {
+  if (!hasLoaded) {
     return <DashboardSkeleton />
   }
 
+  const lastUpdateDate = lastUpdate ? new Date(lastUpdate) : null
   const flowIsRunning = scheduleSummary.isRunning
   const connectionTitle = serviceStatus === 'offline'
     ? '当前网络离线'
@@ -379,8 +389,10 @@ export default function Dashboard() {
         />
 
         {(serviceStatus === 'offline' || serviceStatus === 'unavailable') && (
-          <div
-            className={`app-info-card flex min-w-0 flex-wrap items-center gap-3 ${serviceStatus === 'offline' ? 'status-warning' : 'status-danger'}`}
+          <SmoothPanel
+            cornerSize="compact"
+            className="dashboard-connection-alert"
+            surfaceClassName={`app-info-card flex min-w-0 flex-wrap items-center gap-3 ${serviceStatus === 'offline' ? 'status-warning' : 'status-danger'}`}
             role="alert"
           >
             {serviceStatus === 'offline'
@@ -400,7 +412,7 @@ export default function Dashboard() {
                 重试连接
               </Button>
             )}
-          </div>
+          </SmoothPanel>
         )}
 
         <div
@@ -413,7 +425,7 @@ export default function Dashboard() {
               className={`dashboard-flow-glow-shell status-border-beam ${quickStartLoading || flowIsRunning ? 'is-active' : ''}`}
               aria-busy={quickStartLoading || flowIsRunning}
             >
-              <Card animated delay={0.18} className="dashboard-flow-card !p-0">
+              <Card animated={shouldAnimateCardsRef.current} delay={0.18} smoothCorners className="dashboard-flow-card !p-0">
               <div className="dashboard-flow-header">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="dashboard-flow-mark" aria-hidden="true">
@@ -424,13 +436,13 @@ export default function Dashboard() {
                     <div className="dashboard-flow-title mt-0.5 text-base font-bold text-primary">今日流程</div>
                   </div>
                 </div>
-                <div className="dashboard-flow-meta flex shrink-0 flex-col items-end gap-1.5">
+                <div className="dashboard-flow-meta flex shrink-0 items-center gap-2">
                   <div className={`dashboard-flow-status ${automationAvailable && flowIsRunning ? 'is-running' : ''} ${serviceStatus === 'offline' ? 'status-warning' : serviceStatus === 'unavailable' ? 'status-danger' : ''}`}>
                     <span className="dashboard-flow-status-dot" />
                     {flowStatusLabel}
                   </div>
-                  <span className={`text-[11px] ${labelClass}`}>
-                    {lastUpdate ? lastUpdate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '--:--'} 更新
+                  <span className={`whitespace-nowrap text-[11px] ${labelClass}`}>
+                    {lastUpdateDate ? lastUpdateDate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '--:--'} 更新
                   </span>
                 </div>
               </div>
@@ -590,7 +602,12 @@ export default function Dashboard() {
                 { label: '温度', pct: undefined, sub: '', Icon: Thermometer, value: deviceStats.temp != null ? `${deviceStats.temp}°C` : '--' },
               ] as const).map(({ label, pct, sub, Icon, value }) => {
                 return (
-                  <div key={label} className="dashboard-device-card group surface-panel surface-panel-hover transition-colors">
+                  <SmoothPanel
+                    key={label}
+                    cornerSize="compact"
+                    className="dashboard-device-card-shell group surface-panel-hover transition-colors"
+                    surfaceClassName="dashboard-device-card"
+                  >
                     <div className="flex items-center gap-2.5 mb-3">
                       <div className="shrink-0 h-8 w-8 rounded-lg surface-soft flex items-center justify-center">
                         <Icon className={`h-4 w-4 ${labelClass}`} strokeWidth={1.5} />
@@ -616,7 +633,7 @@ export default function Dashboard() {
                         </div>
                       </div>
                     )}
-                  </div>
+                  </SmoothPanel>
                 )
               })}
             </div>
@@ -624,7 +641,7 @@ export default function Dashboard() {
         )}
 
         <div className="dashboard-summary-grid">
-          <Card animated delay={0.23} className="dashboard-summary-card is-status !p-0">
+          <Card animated={shouldAnimateCardsRef.current} delay={0.23} smoothCorners className="dashboard-summary-card is-status !p-0">
             <div className="dashboard-summary-header">
               <div className="dashboard-summary-heading">
                 <span className="dashboard-summary-icon" aria-hidden="true">
@@ -635,15 +652,6 @@ export default function Dashboard() {
                   <div className={`mt-0.5 text-xs ${labelClass}`}>当前进度与最近一次结果</div>
                 </div>
               </div>
-              <IconButton
-                onClick={() => loadDashboardData()}
-                icon={<Icons.RefreshCw />}
-                variant="ghost"
-                size="sm"
-                title="刷新执行状态"
-                aria-label="刷新执行状态"
-                className="dashboard-summary-action"
-              />
             </div>
             <div className="dashboard-status-grid">
               <div className="dashboard-status-block">
@@ -665,7 +673,7 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          <Card animated delay={0.24} className="dashboard-summary-card is-stages !p-0">
+          <Card animated={shouldAnimateCardsRef.current} delay={0.24} smoothCorners className="dashboard-summary-card is-stages !p-0">
             <div className="dashboard-summary-header">
               <div className="dashboard-summary-heading">
                 <span className="dashboard-summary-icon" aria-hidden="true">
@@ -712,7 +720,7 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          <Card animated delay={0.24} className="dashboard-summary-card is-training !p-0">
+          <Card animated={shouldAnimateCardsRef.current} delay={0.24} smoothCorners className="dashboard-summary-card is-training !p-0">
             <div className="dashboard-summary-header">
               <div className="dashboard-summary-heading">
                 <span className="dashboard-summary-icon" aria-hidden="true">
@@ -746,7 +754,7 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-              <div className="dashboard-summary-footer">
+              <div className={`dashboard-summary-footer${trainingSummary.topNames.length === 0 ? ' is-action' : ''}`}>
                 {trainingSummary.topNames.length > 0 ? (
                   <div className="dashboard-stage-list">
                     {trainingSummary.topNames.map(name => (
@@ -754,7 +762,7 @@ export default function Dashboard() {
                     ))}
                   </div>
                 ) : (
-                  <button type="button" onClick={() => setActiveTab('training')} className="dashboard-summary-link">
+                  <button type="button" onClick={() => setActiveTab('training')} className="dashboard-summary-link min-h-11">
                     添加首个培养目标
                     <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
@@ -763,7 +771,7 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          <Card animated delay={0.26} className="dashboard-summary-card is-drops !p-0">
+          <Card animated={shouldAnimateCardsRef.current} delay={0.26} smoothCorners className="dashboard-summary-card is-drops !p-0">
             <div className="dashboard-summary-header">
               <div className="dashboard-summary-heading">
                 <span className="dashboard-summary-icon" aria-hidden="true">
@@ -797,7 +805,7 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-              <div className="dashboard-summary-footer">
+              <div className={`dashboard-summary-footer${dropSummary.count === 0 ? ' is-action' : ''}`}>
                 {dropSummary.count > 0 ? (
                   <div className="dashboard-drop-list">
                     {dropSummary.recent.map((record, index) => (
@@ -808,7 +816,7 @@ export default function Dashboard() {
                     ))}
                   </div>
                 ) : (
-                  <button type="button" onClick={() => setActiveTab('statistics')} className="dashboard-summary-link">
+                  <button type="button" onClick={() => setActiveTab('statistics')} className="dashboard-summary-link min-h-11">
                     查看掉落数据
                     <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
@@ -819,9 +827,9 @@ export default function Dashboard() {
         </div>
 
         {/* 最后更新时间 */}
-        {lastUpdate && (
+        {lastUpdateDate && (
           <div className={`text-center text-sm ${labelClass}`}>
-            最后更新: {lastUpdate.toLocaleString('zh-CN')}
+            最后更新: {lastUpdateDate.toLocaleString('zh-CN')}
           </div>
         )}
       </div>

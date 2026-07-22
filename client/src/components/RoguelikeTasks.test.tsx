@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, type ReactNode } from 'react'
+import { Activity, act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RoguelikeTasks from './RoguelikeTasks'
@@ -119,6 +119,177 @@ describe('RoguelikeTasks execution recovery', () => {
     container.remove()
     vi.useRealTimers()
     vi.restoreAllMocks()
+  })
+
+  it('uses the shared iOS workspace surfaces without clipping the compact monitor', async () => {
+    await act(async () => root.render(<RoguelikeTasks />))
+    await flush()
+
+    const page = container.querySelector('.roguelike-page')
+    expect(page?.classList.contains('ios-workspace-page')).toBe(true)
+    expect(page?.querySelector('.app-page-header')?.classList.contains('is-mobile-inline')).toBe(true)
+    expect(page?.querySelector('.app-page-header-icon')).toBeNull()
+
+    const modeShell = page?.querySelector('.roguelike-mode-shell')
+    expect(modeShell?.getAttribute('data-slot')).toBe('smooth-corners')
+
+    const workspace = page?.querySelector('.roguelike-workspace')
+    expect(workspace?.getAttribute('data-smooth-corners')).toBe('true')
+    expect(workspace?.querySelector(':scope > .app-card-smooth-surface')).not.toBeNull()
+
+    const monitor = page?.querySelector('.task-monitor-panel.is-compact')
+    expect(monitor?.classList.contains('surface-panel')).toBe(true)
+    expect(monitor?.getAttribute('data-smooth-corners')).toBeNull()
+    expect(monitor?.closest('.smooth-panel-surface')).toBeNull()
+  })
+
+  it('keeps an unsynced local draft across remounts and retries the save', async () => {
+    vi.useFakeTimers()
+    mocks.saveUserConfig.mockRejectedValueOnce(new Error('网络连接中断'))
+    await act(async () => root.render(<RoguelikeTasks />))
+    await flush()
+
+    const themeInput = container.querySelector<HTMLInputElement>('input[name="maa-roguelike-theme"]')
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      valueSetter?.call(themeInput, 'Phantom')
+      themeInput?.dispatchEvent(new Event('input', { bubbles: true }))
+      await vi.advanceTimersByTimeAsync(300)
+    })
+    await flush()
+
+    expect(localStorage.getItem('roguelikeConfigSyncPending')).not.toBeNull()
+    expect(JSON.parse(localStorage.getItem('roguelikeTaskInputs') || '{}')).toMatchObject({ roguelike: 'Phantom' })
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('网络连接中断')
+
+    await act(async () => root.unmount())
+    root = createRoot(container)
+    mocks.loadUserConfig.mockClear()
+    await act(async () => root.render(<RoguelikeTasks />))
+    await flush()
+
+    expect(mocks.loadUserConfig).not.toHaveBeenCalled()
+    expect(container.querySelector<HTMLInputElement>('input[name="maa-roguelike-theme"]')?.value).toBe('Phantom')
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('尚未同步到服务器')
+
+    await click(buttonByText('重新同步')!)
+    await flush()
+
+    expect(mocks.saveUserConfig).toHaveBeenCalledTimes(2)
+    expect(localStorage.getItem('roguelikeConfigSyncPending')).toBeNull()
+    expect(container.querySelector('[role="alert"]')).toBeNull()
+    expect(mocks.setMessage).toHaveBeenCalledWith('肉鸽配置已同步', 'success')
+  })
+
+  it('serializes saves so the latest draft reaches the server last', async () => {
+    vi.useFakeTimers()
+    const olderSave = deferred<{ success: boolean }>()
+    const newerSave = deferred<{ success: boolean }>()
+    mocks.saveUserConfig
+      .mockReturnValueOnce(olderSave.promise)
+      .mockReturnValueOnce(newerSave.promise)
+    await act(async () => root.render(<RoguelikeTasks />))
+    await flush()
+
+    const themeInput = container.querySelector<HTMLInputElement>('input[name="maa-roguelike-theme"]')!
+    const setTheme = async (value: string) => {
+      await act(async () => {
+        const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+        valueSetter?.call(themeInput, value)
+        themeInput.dispatchEvent(new Event('input', { bubbles: true }))
+        await vi.advanceTimersByTimeAsync(300)
+      })
+    }
+    await setTheme('Phantom')
+    await setTheme('Sami')
+
+    expect(mocks.saveUserConfig).toHaveBeenCalledOnce()
+    await act(async () => olderSave.resolve({ success: true }))
+    await flush()
+    expect(mocks.saveUserConfig).toHaveBeenCalledTimes(2)
+    expect(mocks.saveUserConfig.mock.calls[1]?.[1]).toMatchObject({
+      taskInputs: { roguelike: 'Sami' },
+    })
+
+    await act(async () => newerSave.resolve({ success: true }))
+    await flush()
+    expect(localStorage.getItem('roguelikeConfigSyncPending')).toBeNull()
+  })
+
+  it('keeps the hydrated draft and skips config reload after Activity restore', async () => {
+    vi.useFakeTimers()
+    mocks.loadUserConfig.mockResolvedValueOnce({
+      success: true,
+      data: { taskInputs: { roguelike: 'Phantom' }, advancedParams: {} },
+    })
+    const renderMode = async (mode: 'visible' | 'hidden') => {
+      await act(async () => {
+        root.render(
+          <Activity mode={mode}>
+            <RoguelikeTasks />
+          </Activity>,
+        )
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+    }
+
+    await renderMode('visible')
+    const themeInput = container.querySelector<HTMLInputElement>('input[name="maa-roguelike-theme"]')!
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      valueSetter?.call(themeInput, 'Sami')
+      themeInput.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await renderMode('hidden')
+    await renderMode('visible')
+    await act(async () => vi.advanceTimersByTimeAsync(300))
+    await flush()
+
+    expect(mocks.loadUserConfig).toHaveBeenCalledOnce()
+    expect(container.querySelector<HTMLInputElement>('input[name="maa-roguelike-theme"]')?.value).toBe('Sami')
+    expect(mocks.saveUserConfig).toHaveBeenCalledOnce()
+
+    await renderMode('hidden')
+    await renderMode('visible')
+    await act(async () => vi.advanceTimersByTimeAsync(300))
+    await flush()
+    expect(mocks.saveUserConfig).toHaveBeenCalledOnce()
+  })
+
+  it('keeps global activity true while a combat task is running', async () => {
+    mocks.getTaskStatus.mockResolvedValueOnce({
+      success: true,
+      data: { isRunning: true, taskType: 'combat', taskName: '自动战斗', startTime: Date.now() },
+    })
+    await act(async () => root.render(<RoguelikeTasks />))
+    await flush()
+
+    expect(mocks.setActive).toHaveBeenCalledWith(true)
+    expect(mocks.setActive).not.toHaveBeenCalledWith(false)
+    expect(buttonByText('立即执行')).toBeDefined()
+  })
+
+  it('associates form controls with labels and exposes 44px touch targets', async () => {
+    await act(async () => root.render(<RoguelikeTasks />))
+    await flush()
+
+    const controls = Array.from(container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input, select'))
+    expect(controls.length).toBeGreaterThan(0)
+    controls.forEach(control => {
+      expect(control.id).not.toBe('')
+      const label = Array.from(container.querySelectorAll<HTMLLabelElement>('label'))
+        .find(candidate => candidate.htmlFor === control.id || candidate.contains(control))
+      expect(label).toBeDefined()
+      if (control instanceof HTMLInputElement && control.type === 'checkbox') {
+        expect(label?.classList.contains('min-h-11')).toBe(true)
+      } else {
+        expect(control.classList.contains('app-native-control')).toBe(true)
+      }
+    })
+    container.querySelectorAll('.roguelike-mode-button, .roguelike-theme-option').forEach(control => {
+      expect(control.classList.contains('min-h-11')).toBe(true)
+    })
   })
 
   it('continues polling after temporary failures and observes eventual completion', async () => {

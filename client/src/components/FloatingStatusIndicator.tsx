@@ -32,6 +32,33 @@ const fallbackReadyQuotes: OperatorQuote[] = [
 const getFallbackReadyQuote = () =>
   fallbackReadyQuotes[Math.floor(Math.random() * fallbackReadyQuotes.length)] ?? defaultReadyQuote
 
+const sessionFallbackQuote = getFallbackReadyQuote()
+let cachedReadyQuote: OperatorQuote | null = null
+let readyQuoteRequest: Promise<OperatorQuote> | null = null
+
+const loadReadyQuote = () => {
+  if (cachedReadyQuote) return Promise.resolve(cachedReadyQuote)
+  if (readyQuoteRequest) return readyQuoteRequest
+
+  readyQuoteRequest = fetchWithAuth(`${API_BASE_URL}/operator-quotes/random`)
+    .then(async response => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const data = await parseJsonResponse<OperatorQuote>(response)
+      if (!data?.operator || !data?.quote) throw new Error('Invalid quote payload')
+      return { operator: String(data.operator), quote: String(data.quote) }
+    })
+    .catch(() => sessionFallbackQuote)
+    .then(quote => {
+      cachedReadyQuote = quote
+      return quote
+    })
+    .finally(() => {
+      readyQuoteRequest = null
+    })
+
+  return readyQuoteRequest
+}
+
 /**
  * 全局悬浮状态指示器
  * "就绪"状态始终显示在原位置
@@ -42,29 +69,17 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
   const isOnline = useOnlineStatus()
   const shouldReduceMotion = useReducedMotion()
   const [shouldFloat, setShouldFloat] = useState(false)
-  const [dailyQuote, setDailyQuote] = useState<OperatorQuote>(() => getFallbackReadyQuote())
+  const [dailyQuote, setDailyQuote] = useState<OperatorQuote>(() => cachedReadyQuote ?? sessionFallbackQuote)
   const sentinelRef = useRef<HTMLDivElement>(null)
 
-  // 从 API 获取随机台词
   useEffect(() => {
-    const fetchRandomQuote = async () => {
-      try {
-        const response = await fetchWithAuth(`${API_BASE_URL}/operator-quotes/random`)
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
-
-        const data = await parseJsonResponse<OperatorQuote>(response)
-        if (!data?.operator || !data?.quote) throw new Error('Invalid quote payload')
-
-        setDailyQuote({
-          operator: String(data.operator),
-          quote: String(data.quote)
-        })
-      } catch (error) {
-        // 如果获取失败，使用本地兜底台词，避免固定停留在同一句文案。
-        setDailyQuote(getFallbackReadyQuote())
-      }
+    let subscribed = true
+    void loadReadyQuote().then(quote => {
+      if (subscribed) setDailyQuote(quote)
+    })
+    return () => {
+      subscribed = false
     }
-    fetchRandomQuote()
   }, [])
 
   // 显示文本：有消息显示消息，运行中显示运行态，否则显示干员台词
@@ -90,8 +105,9 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
     // 如果没有尺寸（页面被隐藏），不更新状态
     if (!hasSize) return
 
-    // 检查是否滚出视口上方
-    const isAboveViewport = rect.bottom < 0
+    const scrollHost = sentinel.closest<HTMLElement>('.la-pluma-scroll-host')
+    const viewportTop = scrollHost?.getBoundingClientRect().top ?? 0
+    const isAboveViewport = rect.bottom < viewportTop
     setShouldFloat(isAboveViewport)
   }, [])
 
@@ -99,11 +115,14 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
   useEffect(() => {
     checkPosition()
 
-    window.addEventListener('scroll', checkPosition, { passive: true })
+    const scrollHost = sentinelRef.current?.closest<HTMLElement>('.la-pluma-scroll-host')
+    const scrollTarget: HTMLElement | Window = scrollHost ?? window
+
+    scrollTarget.addEventListener('scroll', checkPosition, { passive: true })
     window.addEventListener('resize', checkPosition, { passive: true })
 
     return () => {
-      window.removeEventListener('scroll', checkPosition)
+      scrollTarget.removeEventListener('scroll', checkPosition)
       window.removeEventListener('resize', checkPosition)
     }
   }, [checkPosition])
@@ -119,7 +138,7 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
 
   const indicatorContent = (
     <div
-      className={`inline-flex max-w-full items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-medium sm:px-4 sm:py-2 sm:text-sm ${config.className} ${className}`}
+      className={`floating-status-indicator inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium sm:px-4 sm:py-2 sm:text-sm ${config.className} ${className}`}
     >
       <motion.div
         className="h-2 w-2 flex-shrink-0 rounded-full"
@@ -134,7 +153,7 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
         transition={shouldReduceMotion ? { duration: 0 } : { duration: 2, repeat: Infinity, ease: "easeOut" }}
       />
       <div
-        className={`min-w-0 flex-1 break-words whitespace-normal leading-5 ${textClassName}`}
+        className={`floating-status-text min-w-0 flex-1 break-words whitespace-normal leading-5 ${textClassName}`}
       >
         {isReady ? (
           <>
@@ -149,7 +168,7 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
         <button
           type="button"
           onClick={() => clearMessage()}
-          className="floating-status-dismiss -mr-1 inline-flex shrink-0 items-center justify-center rounded-lg opacity-70 transition-colors hover:bg-black/5 hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 dark:hover:bg-white/10"
+          className="floating-status-dismiss -mr-1 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg opacity-70 transition-colors hover:bg-black/5 hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 dark:hover:bg-white/10"
           title="关闭状态提示"
           aria-label="关闭状态提示"
         >
@@ -166,7 +185,7 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
       </span>
 
       {/* 哨兵元素 - 始终存在用于检测位置 */}
-      <div ref={sentinelRef} className="inline-block min-w-[1px] min-h-[1px]">
+      <div ref={sentinelRef} className="floating-status-anchor inline-block min-w-[1px] min-h-[1px]">
         {/* "就绪"状态始终显示，其他状态只在不需要悬浮时显示 */}
         {(isReady || !shouldFloat) && indicatorContent}
       </div>

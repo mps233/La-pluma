@@ -3,8 +3,9 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useDashboardStore } from '../store/dashboardStore'
 import { useStatusStore } from '../store/statusStore'
-import Dashboard from './Dashboard'
+import Dashboard, { DASHBOARD_REFRESH_INTERVAL_MS } from './Dashboard'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -19,6 +20,9 @@ const apiMocks = vi.hoisted(() => ({
   getTrainingQueue: vi.fn(),
   getTodayDrops: vi.fn(),
   getOpenTodayStages: vi.fn(),
+}))
+const renderSpies = vi.hoisted(() => ({
+  dashboardSkeleton: vi.fn(),
 }))
 
 vi.mock('../services/api', () => ({
@@ -56,10 +60,26 @@ vi.mock('./Icons', () => {
   const Icon = () => null
   return { default: new Proxy({}, { get: () => Icon }) }
 })
-vi.mock('./common/Loading', () => ({ DashboardSkeleton: () => <div>loading</div> }))
+vi.mock('./common/Loading', () => ({
+  DashboardSkeleton: () => {
+    renderSpies.dashboardSkeleton()
+    return <div>loading</div>
+  },
+}))
 vi.mock('./common', () => ({
   PageHeader: ({ title, actions }: { title: string; actions?: React.ReactNode }) => <header><h1>{title}</h1>{actions}</header>,
-  Card: ({ children }: { children: React.ReactNode }) => <section>{children}</section>,
+  Card: ({ children, animated }: { children: React.ReactNode; animated?: boolean }) => <section data-animated={animated ? 'true' : undefined}>{children}</section>,
+  SmoothPanel: ({
+    children,
+    className = '',
+    cornerSize: _cornerSize,
+    surfaceClassName = '',
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & { cornerSize?: string; surfaceClassName?: string }) => (
+    <div className={`smooth-panel-shell ${className}`} {...props}>
+      <div className={`smooth-panel-surface ${surfaceClassName}`}>{children}</div>
+    </div>
+  ),
   Button: ({ children, icon: _icon, loading, loadingText, statusKey: _statusKey, variant: _variant, size: _size, className: _className, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { loading?: boolean; loadingText?: React.ReactNode; statusKey?: string; variant?: string; size?: string; icon?: React.ReactNode }) => (
     <button {...props}>{loading ? loadingText : children}</button>
   ),
@@ -92,9 +112,10 @@ describe('Dashboard connectivity state', () => {
     apiMocks.getDeviceStats.mockResolvedValue({ success: false })
     apiMocks.getActivity.mockResolvedValue({ success: true, data: { available: true, name: '测试活动' } })
     apiMocks.getScheduleExecutionStatus.mockResolvedValue({ success: true, data: { isRunning: false } })
-    apiMocks.getTrainingQueue.mockResolvedValue({ success: true, data: [] })
+    apiMocks.getTrainingQueue.mockResolvedValue({ success: true, data: { queue: [] } })
     apiMocks.getTodayDrops.mockResolvedValue({ success: true, data: [] })
     apiMocks.getOpenTodayStages.mockResolvedValue({ success: true, data: { open: [], closed: [] } })
+    useDashboardStore.getState().reset()
     useStatusStore.getState().setBackendStatus('unknown')
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -104,8 +125,77 @@ describe('Dashboard connectivity state', () => {
   afterEach(async () => {
     await act(async () => root.unmount())
     container.remove()
+    useDashboardStore.getState().reset()
     useStatusStore.getState().setBackendStatus('unknown')
     vi.clearAllMocks()
+  })
+
+  it('uses the full dashboard skeleton only for the first uncached load', async () => {
+    let resolveActivity: ((value: { success: boolean; data: { available: boolean; name: string } }) => void) | undefined
+    apiMocks.getActivity.mockReturnValueOnce(new Promise(resolve => {
+      resolveActivity = resolve
+    }))
+
+    await act(async () => root.render(<Dashboard />))
+
+    expect(container.textContent).toContain('loading')
+    expect(renderSpies.dashboardSkeleton).toHaveBeenCalled()
+
+    await act(async () => resolveActivity?.({ success: true, data: { available: true, name: '首次活动' } }))
+    await flushDashboard()
+
+    expect(container.textContent).not.toContain('loading')
+    expect(container.textContent).toContain('首次活动')
+  })
+
+  it('restores a fresh dashboard cache immediately without replaying its entrance animation', async () => {
+    apiMocks.getActivity.mockResolvedValueOnce({ success: true, data: { available: true, name: '缓存活动' } })
+
+    await act(async () => root.render(<Dashboard />))
+    await flushDashboard()
+
+    expect(container.textContent).toContain('缓存活动')
+    expect(container.querySelector('section[data-animated="true"]')).toBeTruthy()
+    const skeletonRenders = renderSpies.dashboardSkeleton.mock.calls.length
+
+    await act(async () => root.render(<div>其他页面</div>))
+    apiMocks.getActivity.mockClear()
+    await act(async () => root.render(<Dashboard />))
+
+    expect(container.textContent).toContain('缓存活动')
+    expect(container.textContent).not.toContain('loading')
+    expect(renderSpies.dashboardSkeleton).toHaveBeenCalledTimes(skeletonRenders)
+    expect(apiMocks.getActivity).not.toHaveBeenCalled()
+    expect(container.querySelector('section[data-animated="true"]')).toBeNull()
+  })
+
+  it('keeps stale content visible while refreshing it in the background', async () => {
+    apiMocks.getActivity.mockResolvedValueOnce({ success: true, data: { available: true, name: '缓存活动' } })
+
+    await act(async () => root.render(<Dashboard />))
+    await flushDashboard()
+    useDashboardStore.setState({
+      lastRefreshAttemptAt: Date.now() - DASHBOARD_REFRESH_INTERVAL_MS,
+    })
+
+    let resolveActivity: ((value: { success: boolean; data: { available: boolean; name: string } }) => void) | undefined
+    apiMocks.getActivity.mockReturnValueOnce(new Promise(resolve => {
+      resolveActivity = resolve
+    }))
+    const skeletonRenders = renderSpies.dashboardSkeleton.mock.calls.length
+
+    await act(async () => root.render(<div>其他页面</div>))
+    await act(async () => root.render(<Dashboard />))
+
+    expect(container.textContent).toContain('缓存活动')
+    expect(container.textContent).not.toContain('loading')
+    expect(renderSpies.dashboardSkeleton).toHaveBeenCalledTimes(skeletonRenders)
+    expect(apiMocks.getActivity).toHaveBeenCalledTimes(2)
+
+    await act(async () => resolveActivity?.({ success: true, data: { available: true, name: '更新活动' } }))
+    await flushDashboard()
+
+    expect(container.textContent).toContain('更新活动')
   })
 
   it('disables execution actions as soon as the browser goes offline', async () => {
@@ -143,33 +233,25 @@ describe('Dashboard connectivity state', () => {
     expect(findButton('打当前活动')?.disabled).toBe(false)
   })
 
-  it('keeps actions available while a contextual refresh checks the backend', async () => {
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
-
-    let resolveBackendCheck: ((value: { success: boolean; data: { isRunning: boolean } }) => void) | undefined
-    apiMocks.getTaskStatus.mockReturnValueOnce(new Promise(resolve => {
-      resolveBackendCheck = resolve
-    }))
-
-    act(() => container.querySelector<HTMLButtonElement>('button[aria-label="刷新执行状态"]')?.click())
-
-    expect(useStatusStore.getState().backendStatus).toBe('available')
-    expect(container.textContent).not.toContain('正在检查服务')
-    expect(findButton('开始今日流程')?.disabled).toBe(false)
-    expect(findButton('打当前活动')?.disabled).toBe(false)
-
-    await act(async () => resolveBackendCheck?.({ success: true, data: { isRunning: false } }))
-    await flushDashboard()
-  })
-
-  it('omits the redundant global refresh while keeping contextual refresh', async () => {
+  it('omits redundant manual refresh controls', async () => {
     await act(async () => root.render(<Dashboard />))
     await flushDashboard()
 
     expect(findButton('刷新数据')).toBeUndefined()
     expect(container.querySelector('.dashboard-mobile-refresh')).toBeNull()
-    expect(container.querySelector('button[aria-label="刷新执行状态"]')).toBeTruthy()
+    expect(container.querySelector('button[aria-label="刷新执行状态"]')).toBeNull()
+  })
+
+  it('keeps empty summary actions at the iOS touch target size', async () => {
+    await act(async () => root.render(<Dashboard />))
+    await flushDashboard()
+
+    const emptyActions = [findButton('添加首个培养目标'), findButton('查看掉落数据')]
+    emptyActions.forEach(action => {
+      expect(action?.classList.contains('dashboard-summary-link')).toBe(true)
+      expect(action?.classList.contains('min-h-11')).toBe(true)
+      expect(action?.closest('.dashboard-summary-footer')?.classList.contains('is-action')).toBe(true)
+    })
   })
 
   it('activates the status beam while the daily flow is running', async () => {

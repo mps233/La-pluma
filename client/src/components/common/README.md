@@ -4,11 +4,11 @@
 
 项目级设计规范见根目录 `COMPONENT_LIBRARY_GUIDE.md`。本文件保留日常开发最常用的规则和组件用法。
 
-## Framework7 运行时约定
+## 原生运行时约定
 
-应用由 Framework7 9 `theme="ios"` 提供页面 chrome。`Button`、`Card`、`Loading` 等组件在 `Framework7RuntimeProvider` 内会使用对应的 Framework7 实现；脱离 provider 时使用原生 fallback，用于 jsdom 测试、SSR 和嵌入式渲染。不要在组件 render 阶段检查 `#framework7-root`，也不要让页面各自维护一套 F7/native 判断。
+应用由 `Layout` 和 common 组件使用原生语义元素提供页面 chrome。`Button`、`Card`、`Loading`、`ActivityIndicator`、`Switch` 等组件在浏览器、jsdom、SSR 和嵌入式渲染中使用同一套 DOM 与行为；不要按运行环境维护第二套实现。
 
-主题由 `useUIStore` 统一管理并同步到两个根节点。Navbar 和 toolbar/tabbar 已由 Framework7 处理安全区；只有自定义固定浮层才补充 `env(safe-area-inset-*)`，避免重复 padding。桌面侧栏和移动悬浮胶囊导航由 `Layout` 统一提供，页面只负责渲染内容。
+主题由 `useUIStore` 统一管理并同步到文档根节点与 `.la-pluma-app`。Navbar 和移动 tabbar 的安全区由 `Layout` 及统一 token 管理；只有不属于应用 chrome 的自定义固定浮层才补充 `env(safe-area-inset-*)`，避免重复 padding。桌面侧栏和移动悬浮胶囊导航由 `Layout` 统一提供，页面只负责渲染内容。
 
 ## 设计系统速记
 
@@ -35,10 +35,10 @@
 
 ### 反馈、图标与布局
 
-- 字段问题用表单组件的 `error`；控制台初始加载由专用的 `DashboardSkeleton` 维持结构；局部加载用 `Loading`；无数据用 `EmptyState`；不可逆操作用 `ConfirmDialog`。区域错误必须就地展示和重试，不要伪装成空状态。
+- 字段问题用表单组件的 `error`；控制台仅在首次且没有会话缓存时由 `DashboardSkeleton` 维持结构，返回页面应保留旧内容并后台刷新；局部加载用 `Loading`；无数据用 `EmptyState`；不可逆操作用 `ConfirmDialog`。区域错误必须就地展示和重试，不要伪装成空状态。
 - 全局结果使用 `useStatusStore.setMessage` 和 `FloatingStatusIndicator`。错误持续到用户关闭，其他短消息由 store 自动收起；不要新增独立 toast 或自行清除定时器。
 - 普通功能图标优先用 `lucide-react`，业务身份图标复用 `Icons`。无文字操作用 `IconButton` 并同时提供 `title` 与 `aria-label`；装饰图标加 `aria-hidden`。
-- 应用外层使用 `app-shell` 控制 1600px 最大宽度与响应式 gutter；页面内容使用 `app-page`，区块用 `app-stack-section`，卡片内用 `app-stack-card`。页面内部不要再嵌套 `max-w-7xl` 或重复水平 padding。不要为凑版式嵌套卡片或硬塞多栏；每列保持 `min-w-0`，窄屏优先折叠。
+- 应用外层使用 `app-shell` 控制 1600px 最大宽度与响应式 gutter；页面内容使用 `app-page`，复用控制台手机材质的功能页在同层增加 `ios-workspace-page`，区块用 `app-stack-section`，卡片内用 `app-stack-card`。页面内部不要再嵌套 `max-w-7xl` 或重复水平 padding。不要为凑版式嵌套卡片或硬塞多栏；每列保持 `min-w-0`，窄屏优先折叠。
 
 ### 圆角与间距
 
@@ -48,7 +48,7 @@
 - `gap-3` / `gap-4` 和 `space-y-4` 映射到 `--app-space-card`。
 - `gap-5` / `gap-6` 和 `space-y-5` / `space-y-6` 映射到 `--app-space-section`。
 
-通用间距遵循 4px 基线：`--app-space-1` 至 `--app-space-6` 依次为 4、8、12、16、20、24px。页面、卡片、输入控件和按钮分别使用 `--app-space-page`、`--app-space-panel`、`--app-space-control-x` 与 `app-button-size-*`。按钮高度固定为 36/40/44px，输入与选择框固定为 40px；不要在调用处覆盖标准控件的 `h-*`、`px-*`、`py-*`。
+通用间距遵循 4px 基线：`--app-space-1` 至 `--app-space-6` 依次为 4、8、12、16、20、24px。页面、卡片、输入控件和按钮分别使用 `--app-space-page`、`--app-space-panel`、`--app-space-control-x` 与 `app-button-size-*`。iOS 风格按钮档位为 36/44/48px，输入与选择框为 44px；手机和粗指针设备的标准交互区均不得小于 44px。不要在调用处覆盖标准控件的 `h-*`、`px-*`、`py-*` 来缩小点击区。
 
 页面布局优先使用：
 
@@ -70,7 +70,7 @@
 
 - 卡片：`Card`、`CardHeader`、`CardContent`、`InfoCard`，或 `app-card surface-panel`。
 - 按钮：`Button`、`IconButton`，或 `app-button` / `app-icon-button`。
-- 输入：`Input`、`Select`、`Checkbox`，或 `app-input control-surface`；多行文本使用同一语义类的原生 `textarea`。
+- 输入：`Input`、`Select`、`Checkbox`、`Switch`，或 `app-input control-surface`；多行文本使用同一语义类的原生 `textarea`。
 
 移动端间距由 token 自动收缩，不要再用全局 `.p-4`、`.p-6` 覆盖来修页面。
 
@@ -80,17 +80,16 @@
 
 ### PageHeader - 页面标题组件
 
-统一的页面标题样式，包含图标、标题、副标题和操作区域。
+统一的页面标题样式，包含标题、副标题和操作区域；`icon` 仅用于确有身份识别需要的独立页面。
 
 ```tsx
 import { PageHeader } from '@/components/common'
 import FloatingStatusIndicator from '@/components/FloatingStatusIndicator'
-import Icons from '../Icons'
 
 <PageHeader
-  icon={<Icons.TargetIcon />}
   title="自动战斗"
   subtitle="配置自动刷关卡任务"
+  mobileLayout="inline"
   actions={<FloatingStatusIndicator />}
 />
 ```
@@ -137,8 +136,13 @@ Card Props：
 - `className` (string) - 额外类名
 - `animated` (boolean) - 是否启用动画，默认 `true`
 - `delay` (number) - 动画延迟，默认 `0`
+- `smoothCorners` (boolean) - 使用 Lisse 连续曲率；仅在内容允许增加内部表面层时显式开启，外层继续承担布局、动画和阴影
 
 `CardHeader` 支持 `icon`、`title`、`actions`；`CardContent` 和 `InfoCard` 均支持 `className`。
+
+需要让非 `Card` 面板使用同一连续曲率时，优先使用 `SmoothPanel`。它由未裁切的阴影外壳和 Lisse 内表面组成；常规面板为 `20px / 80%`，短小信息卡传入 `cornerSize="compact"` 使用 `16px / 80%`。只有本身没有外阴影的圆角矩形才直接使用 `SmoothSurface`，因为它的 `clip-path` 会裁掉外阴影。
+
+`ios-workspace-page` 只提升显式开启连续圆角的一级 `Card` / `SmoothPanel`；卡内 `surface-soft`、菜单、输入和高密度列表项保持普通圆角。一级工作区标题与控制台一致，不添加装饰图标，并显式使用 `mobileLayout="inline"`；长状态由 `FloatingStatusIndicator` 在右侧截断。
 
 ---
 
@@ -164,14 +168,16 @@ import { Button, IconButton } from '@/components/common'
 
 `IconButton` 仅支持 `primary`、`secondary`、`danger`、`ghost`。
 
+`Button` 的 loading 状态会显示紧凑的 iOS 活动指示器并保留 `loadingText`。页面不要再给同一操作叠加第二个旋转图标。
+
 ---
 
-### Input / Select / Checkbox - 表单组件
+### Input / Select / Checkbox / Switch - 表单组件
 
 统一输入、选择、错误和提示样式。
 
 ```tsx
-import { Input, Select, Checkbox } from '@/components/common'
+import { Input, Select, Checkbox, Switch } from '@/components/common'
 
 <Input
   label="ADB 路径"
@@ -192,9 +198,15 @@ import { Input, Select, Checkbox } from '@/components/common'
   checked={continueOnFailure}
   onChange={setContinueOnFailure}
 />
+
+<Switch
+  label="启用定时执行"
+  checked={scheduleEnabled}
+  onChange={setScheduleEnabled}
+/>
 ```
 
-表单错误态使用 `error` prop，不要在页面里单独手写红色边框和错误文字。`Input`、`Select` 均支持 `hint`；`Input` 额外支持前置 `icon`。多行文本使用带 `app-input control-surface` 的原生 `textarea`。
+表单错误态使用 `error` prop，不要在页面里单独手写红色边框和错误文字。`Input`、`Select` 均支持 `hint`；`Input` 额外支持前置 `icon`。二元设置使用 `Switch`，多选或参数组合使用 `Checkbox`；多行文本使用带 `app-input control-surface` 的原生 `textarea`。
 
 ---
 
@@ -226,12 +238,13 @@ Props：
 
 ---
 
-### ConfirmDialog / Loading - 反馈组件
+### ConfirmDialog / Loading / ActivityIndicator - 反馈组件
 
-`ConfirmDialog` 和 `Loading` 从 common 导出。
+`ConfirmDialog`、`Loading` 和 `ActivityIndicator` 从 common 导出。
 
 - `ConfirmDialog`：删除、清空等不可逆操作的确认弹窗。异步 `onConfirm` 返回 `false` 或抛出错误时会保持打开并就地显示失败原因。
 - `Loading`：短时局部等待状态。
+- `ActivityIndicator`：按钮或紧凑状态行中的 iOS 活动指示器，支持 `xs`、`sm`、`md`、`lg` 四档；同一区域只保留一个动态指示器。
 - `DashboardSkeleton`：控制台专用骨架，由 `Dashboard` 直接从 `Loading.tsx` 引入，不属于 common 的公共导出。
 
 ## 重构建议

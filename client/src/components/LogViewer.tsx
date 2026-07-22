@@ -8,7 +8,6 @@ import {
   Search,
   Trash2,
 } from 'lucide-react'
-import Icons from './Icons'
 import { maaApi } from '../services/api'
 import {
   PageHeader,
@@ -21,6 +20,7 @@ import {
   Input,
   Loading,
   ConfirmDialog,
+  SmoothPanel,
 } from './common'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type { LogEntry, LogFile } from '@/types/components'
@@ -495,31 +495,41 @@ export default function LogViewer() {
   const isFilteredEmpty = readableLogs.length > 0 && visibleLogs.length === 0
 
   return (
-    <div className="app-page app-stack-section log-viewer">
-      <div className="log-page-header">
+    <div className="app-page log-viewer ios-workspace-page">
+      <div className="app-stack-section">
         <PageHeader
-          icon={<Icons.DocumentTextIcon />}
           title="日志查看器"
           subtitle="实时查看任务执行与历史记录"
+          mobileLayout="inline"
           actions={<FloatingStatusIndicator />}
         />
-      </div>
 
-      {notice && (
-        <div className={`log-notice ${notice.type === 'error' ? 'is-error' : 'is-success'}`} role="status">
-          <AlertCircle className="h-4 w-4" aria-hidden="true" />
-          <span>{notice.text}</span>
-          <button type="button" onClick={() => setNotice(null)} aria-label="关闭提示">关闭</button>
-        </div>
-      )}
+        {notice && (
+          <SmoothPanel
+            cornerSize="compact"
+            surfaceClassName={`log-notice ${notice.type === 'error' ? 'is-error' : 'is-success'}`}
+            role="status"
+          >
+            <AlertCircle className="h-4 w-4" aria-hidden="true" />
+            <span>{notice.text}</span>
+            <button
+              type="button"
+              onClick={() => setNotice(null)}
+              aria-label="关闭提示"
+              className="min-h-11 min-w-11 rounded-lg px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]"
+            >
+              关闭
+            </button>
+          </SmoothPanel>
+        )}
 
-      <Card className="log-card log-toolbar-card" animated delay={0.1}>
+      <Card className="log-card log-toolbar-card !p-0" animated delay={0.1} smoothCorners>
         <CardContent className="log-toolbar">
           <div className="log-toolbar-controls">
             <div className="log-mode-switch" role="group" aria-label="日志内容模式">
               <button
                 type="button"
-                className={contentMode === 'summary' ? 'is-active' : ''}
+                className={`${contentMode === 'summary' ? 'is-active ' : ''}!min-h-11`}
                 onClick={() => setContentMode('summary')}
                 aria-pressed={contentMode === 'summary'}
               >
@@ -527,7 +537,7 @@ export default function LogViewer() {
               </button>
               <button
                 type="button"
-                className={contentMode === 'raw' ? 'is-active' : ''}
+                className={`${contentMode === 'raw' ? 'is-active ' : ''}!min-h-11`}
                 onClick={() => setContentMode('raw')}
                 aria-pressed={contentMode === 'raw'}
               >
@@ -592,7 +602,7 @@ export default function LogViewer() {
         </CardContent>
       </Card>
 
-      <Card className="log-card" animated delay={0.16}>
+      <Card className="log-card !p-0" animated delay={0.16} smoothCorners>
         <CardHeader
           title={viewingHistory ? selectedFile?.name || '历史日志' : '实时日志'}
           actions={
@@ -617,9 +627,20 @@ export default function LogViewer() {
           ) : (
             <div ref={logContainerRef} className="log-console" role="log" aria-label="日志内容">
               {activeError && (
-                <div className="log-console-state is-error" role="alert">
+                <div className="log-console-state is-error flex-wrap" role="alert">
                   <AlertCircle className="h-5 w-5" aria-hidden="true" />
                   <span>{activeError}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (viewingHistory && selectedFile) void viewHistoryFile(selectedFile)
+                      else void loadRealtimeLogs()
+                    }}
+                  >
+                    重新加载
+                  </Button>
                 </div>
               )}
               {!activeError && logs.length === 0 && (
@@ -657,7 +678,7 @@ export default function LogViewer() {
         </CardContent>
       </Card>
 
-      <Card className="log-card" animated delay={0.22}>
+      <Card className="log-card !p-0" animated delay={0.22} smoothCorners>
         <CardHeader
           title="历史日志文件"
           actions={
@@ -674,9 +695,12 @@ export default function LogViewer() {
         />
         <CardContent className="log-history-content">
           {historyError && !viewingHistory && (
-            <div className="log-history-state is-error" role="alert">
+            <div className="log-history-state is-error flex-wrap px-4 py-6" role="alert">
               <AlertCircle className="h-5 w-5" aria-hidden="true" />
               <span>{historyError}</span>
+              <Button type="button" variant="outline" size="sm" onClick={() => void loadHistoryFiles()}>
+                重新加载
+              </Button>
             </div>
           )}
           {!historyError && historyFiles.length === 0 && (
@@ -721,6 +745,7 @@ export default function LogViewer() {
         confirmText={confirmAction === 'clear' ? '确认清空' : '确认清理'}
         variant="danger"
       />
+      </div>
     </div>
   )
 }

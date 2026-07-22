@@ -21,15 +21,16 @@
 
 ---
 
-## Framework7 壳层与 iOS 风格
+## 原生响应式壳层与 iOS 风格
 
-应用根节点由 `Framework7App` 提供，统一使用 Framework7 9 的 `theme="ios"`。Navbar、Page、Toolbar/tabbar、Sheet 等页面 chrome 和交互优先使用 `framework7-react`；`framework7-overrides.css` 只做 La Pluma 的语义 token、密度和品牌适配，不要在页面中另起一套导航或 modal 基础样式。
+应用使用原生 `.la-pluma-app` 根节点。Navbar、页面区域、移动 tabbar 和 Sheet 等 chrome 与交互统一由 `Layout` 及 common 组件提供；`ios-theme.css` 负责 iOS 26 材质、应用 chrome、安全区和品牌适配，不要在页面中另起一套导航或 modal 基础样式。
 
 - 桌面端（`lg` 及以上）显示左侧工作台导航；移动端使用悬浮的 iOS 风格底部胶囊导航，右侧搜索/更多入口承载次要页面。两端必须复用 `Layout` 的 URL 路由和 active 状态，不要按 viewport 建立第二份导航状态。
-- 主题由 `useUIStore` 的 `light`、`dark`、`system` 管理，并同步到文档根节点和 Framework7 根节点。组件或页面不要直接操作 `.dark`，也不要创建局部主题开关。
-- `client/index.html` 使用 `viewport-fit=cover`。Framework7 navbar、toolbar/tabbar 自己拥有安全区高度；自定义 fixed/sticky 层只有在不属于这些 chrome 时才使用 `env(safe-area-inset-*)`，内容区不要重复叠加顶部或底部 inset。
-- `Button`、`Card`、`Loading` 等 common 组件在 `Framework7RuntimeProvider` 内渲染 Framework7 版本；provider 外的原生版本用于 jsdom 测试、SSR 和嵌入式场景。不要通过检查 DOM 是否已经存在 `#framework7-root` 来决定首屏组件类型。
-- Framework7 的全局 form reset 可能影响原有按钮宽度、卡片外边距和 preloader 尺寸；这类兼容规则集中放在 `framework7-overrides.css` 或 common 组件中，调用处不要用局部覆盖扩散规则。
+- 桌面工作台使用 macOS 结构侧栏：一条跨越顶栏与导航区的连续圆角材质边界、可用的工作区搜索、分组导航和 28px 语义色图标底座。品牌入口属于侧栏右侧的工作区顶栏，不能进入或遮挡侧栏圆角区。当前项使用整行系统强调色与白色文字；这些桌面样式不得扩散到移动底栏和“更多”Sheet。
+- 主题由 `useUIStore` 的 `light`、`dark`、`system` 管理，并同步到文档根节点和 `.la-pluma-app`。组件或页面不要直接操作 `.dark`，也不要创建局部主题开关。
+- `client/index.html` 使用 `viewport-fit=cover`。`Layout` 通过统一 token 管理 navbar、移动 tabbar 和对应安全区高度；自定义 fixed/sticky 层只有在不属于这些 chrome 时才使用 `env(safe-area-inset-*)`，内容区不要重复叠加顶部或底部 inset。
+- `Button`、`Card`、`Loading`、`Switch` 等 common 组件使用原生语义元素，在浏览器、jsdom、SSR 和嵌入式场景中渲染一致。不要按运行环境维护第二套组件 DOM。
+- 浏览器默认样式与第三方样式可能影响按钮宽度、卡片外边距和活动指示器尺寸；这类基础规则集中放在 `ios-theme.css`、`index.css` 或 common 组件中，调用处不要用局部覆盖扩散规则。
 
 桌面和移动端都要检查 light/dark、loading、disabled、empty、error 以及长标题/长操作文案；安全区设备还应确认 chrome 与页面内容没有双重留白。
 
@@ -97,6 +98,7 @@ Tailwind 中 `rounded-xl`、`rounded-2xl`、`rounded-3xl` 已统一映射到 `--
 常用间距以语义类为主：
 
 - `app-page`：页面外层 padding。
+- `ios-workspace-page`：需要复用控制台移动材质与紧凑标题的功能页，和 `app-page` 同层使用。
 - `app-stack-card`：卡片内部或紧密内容的纵向间距。
 - `app-stack-section`：页面区块之间的纵向间距。
 - `app-grid-card`：卡片网格的紧密间距。
@@ -123,14 +125,14 @@ Tailwind 中 `rounded-xl`、`rounded-2xl`、`rounded-3xl` 已统一映射到 `--
 
 ### 表单与按钮
 
-新增表单优先使用 `Input`、`Select`、`Checkbox`。多行文本和其他必须手写的原生控件使用：
+新增表单优先使用 `Input`、`Select`、`Checkbox`、`Switch`。二元启停设置使用 `Switch`，多选或参数组合使用 `Checkbox`。多行文本和其他必须手写的原生控件使用：
 
 - 输入控件：`app-input control-surface`
 - 复选项外层：`app-checkbox`
 - 普通按钮：`app-button`
 - 图标按钮：`app-icon-button`
 
-三档 `Button` 的高度固定为 36、40、44px，由 `app-button-size-sm`、`app-button-size-md`、`app-button-size-lg` 统一管理；`Input` 和 `Select` 固定为 40px。不要在调用处再叠加 `h-*`、`px-*`、`py-*` 改变标准控件密度。图标专用工具条可明确使用更紧凑的尺寸，但不能承载文字。
+iOS 风格三档 `Button` 高度由 `app-button-size-sm`、`app-button-size-md`、`app-button-size-lg` 统一管理，桌面分别为 36、44、48px；`Input` 和 `Select` 为 44px。手机断点和粗指针设备会把所有标准按钮、图标按钮与表单点击区提升到至少 44px。不要在调用处再叠加 `h-*`、`px-*`、`py-*` 缩小标准控件；图标专用工具条只有在桌面高密度场景才可明确使用更紧凑的尺寸，且不能承载文字。
 
 ### 交互状态与动效
 
@@ -148,7 +150,7 @@ Tailwind 中 `rounded-xl`、`rounded-2xl`、`rounded-3xl` 已统一映射到 `--
 | 情况 | 使用方式 |
 | --- | --- |
 | 字段校验失败 | `Input`、`Select` 的 `error` prop；`hint` 只在没有错误时显示 |
-| 控制台结构正在加载 | 控制台内部的 `DashboardSkeleton`，不要在其他页面复制其布局 |
+| 控制台首次且没有会话缓存 | 控制台内部的 `DashboardSkeleton`；返回页面时先显示缓存并后台刷新，不要重播整页骨架 |
 | 局部内容正在读取 | `Loading` |
 | 列表、流程或卡片无数据 | `EmptyState`，按容器选择 `compact` |
 | 区域读取失败 | 在原区域显示可恢复的错误与重试操作；不要改成空状态 |
@@ -161,10 +163,10 @@ Tailwind 中 `rounded-xl`、`rounded-2xl`、`rounded-3xl` 已统一映射到 `--
 
 ### 图标
 
-- 普通功能图标优先使用已引入的 `lucide-react`；业务身份、页面标题和概览图标优先复用 `Icons.tsx`。不要在普通页面重复手写 SVG。
+- 普通功能图标优先使用已引入的 `lucide-react`；业务身份和概览图标优先复用 `Icons.tsx`。一级工作区标题与控制台一致，不添加装饰图标；不要在普通页面重复手写 SVG。
 - 行内或文字旁图标使用 16px，常规操作和字段图标使用 20px，页面标题或大操作使用 24px。`icon-well` 只用于页面、概览和卡片的内容身份图标，不能包裹普通按钮图标。
 - 无文字操作使用 `IconButton`，调用时必须提供 `title` 和 `aria-label`；有文字的操作使用 `Button icon`，不要在调用处额外覆盖图标与文字间距或按钮尺寸。
-- `IconButton` 的 `sm`、`md`、`lg` 已固定为 36、40、44px。不要页面自行缩小点击面积；32px 仅保留给明确的高密度图标工具条，不得承载文字。
+- `IconButton` 的 `sm`、`md`、`lg` 与相同档位的 `Button` 共用尺寸，并在手机和粗指针设备保持至少 44px。不要页面自行缩小点击面积；32px 仅保留给明确的桌面高密度图标工具条，不得承载文字。
 - 装饰图标加 `aria-hidden="true"`；状态和结果必须同时提供可读文字或 `aria-label`，不能只依赖颜色和图标。
 
 按钮颜色按语义选择 `brand-action`、`status-success-action`、`status-danger-action`，不要按页面重新定义按钮渐变。
@@ -211,15 +213,15 @@ import { PageHeader } from '@/components/common'
 import FloatingStatusIndicator from '@/components/FloatingStatusIndicator'
 
 <PageHeader
-  icon={<Icons.TargetIcon />}
   title="自动战斗"
   subtitle="配置自动刷关卡任务"
+  mobileLayout="inline"
   actions={<FloatingStatusIndicator />}
 />
 ```
 
-页面标题统一使用全局品牌色和 `icon-well`，不再支持页面单独传入渐变色。
-手机端默认使用 `stack` 保护长标题和多操作；只有控制台这类标题与操作都能稳定收缩的紧凑标题栏才使用 `mobileLayout="inline"`。
+页面标题统一使用全局品牌色，不再支持页面单独传入渐变色。一级工作区标题不使用 `icon-well`，只有确有身份识别需要的独立页面才传入 `icon`。
+手机端默认使用 `stack` 保护长标题和多操作；控制台及同级 `ios-workspace-page` 使用 `mobileLayout="inline"`，由右侧状态浮条主动收缩。
 
 ### Card - 卡片组件系列
 
@@ -245,7 +247,9 @@ import { Card, CardHeader, CardContent, InfoCard } from '@/components/common'
 </InfoCard>
 ```
 
-`Card` 支持 `animated`、`delay` 和 `className`。`CardHeader` 可传入 `actions`，`CardContent` 与 `InfoCard` 均支持 `className`。
+`Card` 支持 `animated`、`delay`、`className` 和显式的 `smoothCorners`。`smoothCorners` 使用 Lisse 的 `20px / 80%` 连续曲率，外层仍负责布局、动画和阴影，内部表面负责裁切与材质；只在已经验证内部包裹不会破坏直接子元素布局语义的卡片上启用。非 `Card` 面板使用 `SmoothPanel`，大面板为 `20px / 80%`，紧凑信息卡通过 `cornerSize="compact"` 使用 `16px / 80%`。不要直接给带外阴影的根元素调用 `useSmoothCorners`，也不要对需要保留原生结构的交互控件使用 `SmoothCorners asChild`。`CardHeader` 可传入 `actions`，`CardContent` 与 `InfoCard` 均支持 `className`。
+
+控制台同类功能页在根节点添加 `ios-workspace-page`，并显式给 `PageHeader` 传 `mobileLayout="inline"`。手机端只有 `Card smoothCorners` 和 `SmoothPanel` 会获得无外描边的柔和阴影；不要给卡内 `surface-soft`、菜单、输入或列表项添加该页面级材质。
 
 ### Button / IconButton
 

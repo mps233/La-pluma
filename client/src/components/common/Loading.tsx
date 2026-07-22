@@ -1,7 +1,8 @@
 import type { CSSProperties } from 'react'
-import { Preloader } from 'framework7-react'
 import { useDashboardFlowLayout } from '../../hooks/useDashboardFlowLayout'
-import { useFramework7Runtime } from '../../framework7Context'
+import { Card } from './Card'
+import SmoothPanel from './SmoothPanel'
+import ActivityIndicator from './ActivityIndicator'
 
 /**
  * 加载动画组件 Props
@@ -27,15 +28,6 @@ export default function Loading({
   size = 'md',
   text,
 }: LoadingProps) {
-  const framework7Runtime = useFramework7Runtime()
-  const sizeStyles: Record<string, string> = {
-    // Framework7's Preloader appends px to string sizes unless they already
-    // carry a px suffix; rem values would otherwise become invalid `rempx`.
-    sm: '16px',
-    md: '32px',
-    lg: '48px',
-  }
-  
   return (
     <div
       className="app-loading flex flex-col items-center justify-center space-y-3"
@@ -43,18 +35,7 @@ export default function Loading({
       aria-live="polite"
       aria-busy="true"
     >
-      {framework7Runtime ? (
-        <Preloader
-          size={sizeStyles[size]}
-          className="app-preloader"
-          aria-hidden="true"
-        />
-      ) : (
-        <span
-          className={`${size === 'sm' ? 'h-4 w-4' : size === 'lg' ? 'h-12 w-12' : 'h-8 w-8'} brand-text app-spinner rounded-full border-2 border-current border-r-transparent`}
-          aria-hidden="true"
-        />
-      )}
+      <ActivityIndicator size={size} className="app-preloader" />
       
       {text && (
         <p className="text-sm text-secondary">
@@ -181,42 +162,48 @@ export function PageSkeleton({ variant }: { variant: string }) {
   if (variant === 'dashboard') return <DashboardSkeleton />
 
   return (
-    <div className="app-page" aria-busy="true" aria-label="页面内容加载中">
+    <div
+      className={`app-page${variant === 'automation' ? ' ios-workspace-page' : ''}`}
+      data-automation-tasks={variant === 'automation' ? true : undefined}
+      aria-busy="true"
+      aria-label="页面内容加载中"
+    >
       <div className="app-stack-section">
         <PageHeaderSkeleton />
 
         {variant === 'automation' && (
-          <>
-            <div className="automation-overview-grid">
+          <div className="automation-workspace-grid">
+            <div className="automation-sequence-column">
+              <PanelSkeleton className="automation-sequence-panel" rows={5} />
+            </div>
+            <div className="automation-editor-column">
+              <PanelSkeleton className="automation-editor-panel" rows={4} />
+            </div>
+            <div className="automation-support-column">
               <div className="automation-monitor-column">
-                <div className="automation-monitor-panel surface-panel p-[var(--app-space-panel)]" aria-hidden="true">
-                  <div className="flex items-center justify-between gap-3">
-                    <Skeleton variant="text" className="h-4 w-32" />
-                    <div className="flex gap-2">
-                      <Skeleton variant="rect" className="h-6 w-16 rounded-lg" />
-                      <Skeleton variant="rect" className="h-6 w-16 rounded-lg" />
-                    </div>
+                <SmoothPanel
+                  className="automation-monitor-panel automation-monitor-skeleton"
+                  surfaceClassName="automation-monitor-skeleton-surface"
+                  aria-hidden="true"
+                >
+                  <div className="automation-monitor-skeleton-header">
+                    <Skeleton variant="circle" className="h-1.5 w-1.5" />
+                    <Skeleton variant="text" className="h-4 w-24" />
+                    <Skeleton variant="text" className="ml-auto h-3 w-12" />
                   </div>
-                  <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-8">
-                    {Array.from({ length: 8 }, (_, index) => (
-                      <Skeleton key={index} variant="rect" className="h-12 rounded-lg" />
-                    ))}
+                  <div className="automation-monitor-skeleton-frame aspect-video">
+                    <Skeleton variant="rect" className="h-full w-full rounded-[inherit]" />
                   </div>
-                  <Skeleton variant="rect" className="mt-3 aspect-video w-full rounded-lg" />
-                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {[1, 2, 3, 4].map(item => <Skeleton key={item} variant="rect" className="h-9 rounded-lg" />)}
+                  <div className="automation-monitor-skeleton-toolbar">
+                    {[1, 2, 3, 4, 5].map(item => <Skeleton key={item} variant="circle" className="h-11 w-11" />)}
                   </div>
-                </div>
+                </SmoothPanel>
               </div>
               <div className="automation-schedule-column">
                 <PanelSkeleton className="automation-schedule-panel" rows={3} />
               </div>
             </div>
-            <div className="automation-builder-grid">
-              <div className="automation-sequence-column"><PanelSkeleton className="automation-sequence-panel" rows={5} /></div>
-              <div className="automation-editor-column"><PanelSkeleton className="automation-editor-panel" rows={4} /></div>
-            </div>
-          </>
+          </div>
         )}
 
         {(variant === 'combat' || variant === 'roguelike') && <WorkbenchSkeleton variant={variant} />}
@@ -271,7 +258,7 @@ export function PageSkeleton({ variant }: { variant: string }) {
 
 function DashboardSummarySkeleton({ variant }: { variant: 'status' | 'stages' | 'metric' }) {
   return (
-    <div className={`app-card surface-panel dashboard-summary-card dashboard-summary-skeleton is-${variant} !p-0`} aria-hidden="true">
+    <Card smoothCorners className={`dashboard-summary-card dashboard-summary-skeleton is-${variant} !p-0`}>
       <div className="dashboard-summary-header">
         <div className="dashboard-summary-heading">
           <Skeleton variant="rect" className="h-8 w-8 rounded-lg" />
@@ -327,7 +314,7 @@ function DashboardSummarySkeleton({ variant }: { variant: 'status' | 'stages' | 
           </div>
         </div>
       )}
-    </div>
+    </Card>
   )
 }
 
@@ -338,7 +325,7 @@ export function DashboardSkeleton() {
   const { flowGridRef, flowCardRef, flowPreviewRef, flowGridStyle } = useDashboardFlowLayout()
 
   return (
-    <div className="app-page" aria-busy="true" aria-label="控制台加载中">
+    <div className="app-page dashboard-page" aria-busy="true" aria-label="控制台加载中">
       <div className="app-stack-section">
         <div className="flex items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
@@ -357,7 +344,7 @@ export function DashboardSkeleton() {
         <div ref={flowGridRef} className="dashboard-flow-layout" style={flowGridStyle}>
           <div ref={flowCardRef} className="min-w-0">
             <div className="dashboard-flow-glow-shell">
-              <div className="app-card surface-panel dashboard-flow-card dashboard-flow-skeleton !p-0" aria-hidden="true">
+              <Card smoothCorners className="dashboard-flow-card dashboard-flow-skeleton !p-0">
                 <div className="dashboard-flow-header">
                   <div className="flex items-center gap-3">
                     <Skeleton variant="rect" className="h-8 w-8 rounded-lg" />
@@ -414,12 +401,12 @@ export function DashboardSkeleton() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </Card>
             </div>
           </div>
 
           <div ref={flowPreviewRef} className="min-w-0">
-            <div data-dashboard-preview-card className="overflow-hidden rounded-2xl surface-panel" aria-hidden="true">
+            <SmoothPanel data-dashboard-preview-card aria-hidden="true">
               <div className="dashboard-preview-header flex items-center justify-between gap-3 border-b border-[var(--app-border)] px-4 py-2.5">
                 <div className="flex items-center gap-2">
                   <Skeleton variant="circle" className="h-1.5 w-1.5" />
@@ -430,7 +417,7 @@ export function DashboardSkeleton() {
               <div data-dashboard-preview-frame className="relative aspect-video overflow-hidden bg-black">
                 <Skeleton variant="rect" className="absolute inset-[12%] h-auto w-auto rounded-xl opacity-60" />
               </div>
-            </div>
+            </SmoothPanel>
           </div>
         </div>
 
@@ -442,7 +429,12 @@ export function DashboardSkeleton() {
           </div>
           <div className="dashboard-device-grid">
             {[1, 2, 3, 4].map(item => (
-              <div key={item} className="dashboard-device-card dashboard-device-skeleton surface-panel space-y-3">
+              <SmoothPanel
+                key={item}
+                cornerSize="compact"
+                className="dashboard-device-card-shell"
+                surfaceClassName="dashboard-device-card dashboard-device-skeleton space-y-3"
+              >
                 <div className="flex items-center gap-2.5">
                   <Skeleton variant="rect" className="h-8 w-8 rounded-lg" />
                   <div className="flex-1 space-y-1.5">
@@ -457,7 +449,7 @@ export function DashboardSkeleton() {
                   </div>
                   <Skeleton variant="rect" className="h-1.5 w-full rounded-full" />
                 </div>
-              </div>
+              </SmoothPanel>
             ))}
           </div>
         </div>
@@ -469,20 +461,6 @@ export function DashboardSkeleton() {
           <DashboardSummarySkeleton variant="metric" />
         </div>
 
-        <div className="app-card surface-panel" aria-hidden="true">
-          <div className="flex items-center gap-3 border-b border-[var(--app-border)] pb-4">
-            <Skeleton variant="rect" className="h-8 w-8 rounded-lg" />
-            <div className="space-y-1.5">
-              <Skeleton variant="title" className="h-4 w-24" />
-              <Skeleton variant="text" className="h-2.5 w-40" />
-            </div>
-          </div>
-          <div className="grid gap-4 pt-4 sm:grid-cols-3">
-            <Skeleton variant="rect" className="h-16 rounded-xl" />
-            <Skeleton variant="rect" className="h-16 rounded-xl" />
-            <Skeleton variant="rect" className="h-16 rounded-xl" />
-          </div>
-        </div>
       </div>
     </div>
   )

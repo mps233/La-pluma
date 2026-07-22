@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { maaApi } from '../services/api'
 import { motion } from 'framer-motion'
 import Icons from './Icons'
-import { PageHeader, Card, CardHeader, CardContent, Button, Input, Select, Checkbox } from './common'
+import { PageHeader, Card, CardHeader, CardContent, Button, Input, Select, Checkbox, SmoothPanel } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type {
@@ -51,6 +51,36 @@ interface ConnectionFeedback {
   message: string
 }
 
+interface SettingsFeedback {
+  type: 'success' | 'error' | 'warning'
+  message: string
+}
+
+const DEFAULT_AUTO_UPDATE_CONFIG: AutoUpdateConfig = {
+  enabled: false,
+  time: '04:00',
+  updateCore: true,
+  updateCli: true
+}
+
+const normalizeAutoUpdateConfig = (value: unknown): AutoUpdateConfig | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+
+  const config = value as Partial<AutoUpdateConfig>
+  return {
+    enabled: typeof config.enabled === 'boolean' ? config.enabled : DEFAULT_AUTO_UPDATE_CONFIG.enabled,
+    time: typeof config.time === 'string' ? config.time : DEFAULT_AUTO_UPDATE_CONFIG.time,
+    updateCore: typeof config.updateCore === 'boolean' ? config.updateCore : DEFAULT_AUTO_UPDATE_CONFIG.updateCore,
+    updateCli: typeof config.updateCli === 'boolean' ? config.updateCli : DEFAULT_AUTO_UPDATE_CONFIG.updateCli,
+  }
+}
+
+const isValidUpdateTime = (value: string) => {
+  const match = /^(\d{2}):(\d{2})$/.exec(value)
+  if (!match) return false
+  return Number(match[1]) <= 23 && Number(match[2]) <= 59
+}
+
 export default function ConfigManager() {
   const { setMessage: setStatusMessage } = useStatusStore()
   const [configType, setConfigType] = useState<'connection' | 'resource' | 'instance'>(() => {
@@ -66,15 +96,16 @@ export default function ConfigManager() {
     auto_reconnect: true,
   })
   const [configDir, setConfigDir] = useState<string>('')
+  const [configDirStatus, setConfigDirStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [configDirError, setConfigDirError] = useState<string | null>(null)
   const [loading, setLoading] = useState<boolean>(false)
   const [updating, setUpdating] = useState<UpdateStatus>({ core: false, cli: false })
   const [hotUpdating, setHotUpdating] = useState<boolean>(false)
-  const [autoUpdate, setAutoUpdate] = useState<AutoUpdateConfig>({
-    enabled: false,
-    time: '04:00',
-    updateCore: true,
-    updateCli: true
-  })
+  const [autoUpdate, setAutoUpdate] = useState<AutoUpdateConfig>(DEFAULT_AUTO_UPDATE_CONFIG)
+  const [autoUpdateDirty, setAutoUpdateDirty] = useState(false)
+  const [autoUpdateSaving, setAutoUpdateSaving] = useState(false)
+  const [autoUpdateFeedback, setAutoUpdateFeedback] = useState<SettingsFeedback | null>(null)
+  const [configFeedback, setConfigFeedback] = useState<SettingsFeedback | null>(null)
   const [versionInfo, setVersionInfo] = useState<MaaVersionInfo | null>(null)
   const [updateFeedback, setUpdateFeedback] = useState<UpdateFeedback | null>(null)
   const [discoveredDevices, setDiscoveredDevices] = useState<DiscoveredDevice[]>([])
@@ -84,19 +115,12 @@ export default function ConfigManager() {
   const [testingConnection, setTestingConnection] = useState(false)
   const [connectionFeedback, setConnectionFeedback] = useState<ConnectionFeedback | null>(null)
   const didInitializeRef = useRef(false)
-
-  useEffect(() => {
-    if (didInitializeRef.current) return
-    didInitializeRef.current = true
-
-    void Promise.allSettled([
-      loadConfigDir(),
-      loadConfig(),
-      loadAutoUpdateConfig(),
-      loadVersion(),
-    ])
-  }, [])
-
+  const autoUpdateTouchedRef = useRef(false)
+  const autoUpdateRevisionRef = useRef(0)
+  const autoUpdateSaveInFlightRef = useRef(false)
+  const connectionRevisionRef = useRef(0)
+  const connectionSaveInFlightRef = useRef(false)
+  const updateInFlightRef = useRef(false)
 
   useEffect(() => {
     const handleSectionChange = (event: Event) => {
@@ -110,7 +134,7 @@ export default function ConfigManager() {
     return () => window.removeEventListener('la-pluma-config-section', handleSectionChange)
   }, [])
 
-  const loadVersion = async () => {
+  const loadVersion = useCallback(async () => {
     try {
       const result = await maaApi.getVersion()
       if (result.success && result.data) {
@@ -119,71 +143,133 @@ export default function ConfigManager() {
     } catch (error) {
       // 静默失败
     }
-  }
+  }, [])
 
-  const loadAutoUpdateConfig = async () => {
+  const loadAutoUpdateConfig = useCallback(async () => {
+    let serverError: string | null = null
+
     try {
-      // 优先从服务器加载配置
       const serverConfig = await maaApi.loadUserConfig('auto-update')
-      if (serverConfig.success && serverConfig.data) {
-        setAutoUpdate(serverConfig.data)
-        localStorage.setItem('autoUpdateConfig', JSON.stringify(serverConfig.data))
-        
-        // 同步到后端调度器
-        if (serverConfig.data.enabled) {
-          await maaApi.setupAutoUpdate(serverConfig.data)
+      const normalizedConfig = normalizeAutoUpdateConfig(serverConfig.data)
+      if (serverConfig.success && normalizedConfig) {
+        if (!autoUpdateTouchedRef.current) {
+          setAutoUpdate(normalizedConfig)
+          setAutoUpdateDirty(false)
+          localStorage.setItem('autoUpdateConfig', JSON.stringify(normalizedConfig))
         }
         return
       }
+
+      if (!serverConfig.success) {
+        serverError = `自动更新设置读取失败: ${maaApi.getErrorMessage(serverConfig)}`
+      }
     } catch (error) {
-      // 静默失败，从 localStorage 加载
+      serverError = `自动更新设置读取失败: ${(error as Error).message}`
     }
-    
-    // 服务器加载失败，从 localStorage 加载配置
+
     try {
       const saved = localStorage.getItem('autoUpdateConfig')
       if (saved) {
-        const config: AutoUpdateConfig = JSON.parse(saved)
-        setAutoUpdate(config)
-        
-        // 同步到后端
-        if (config.enabled) {
-          await maaApi.setupAutoUpdate(config)
+        const config = normalizeAutoUpdateConfig(JSON.parse(saved))
+        if (config && !autoUpdateTouchedRef.current) {
+          setAutoUpdate(config)
+          setAutoUpdateDirty(true)
+        }
+
+        if (config) {
+          const message = serverError
+            ? `${serverError}，已显示此设备上次保存的设置，请保存后重试`
+            : '已载入此设备上次保存的自动更新设置，请保存后应用'
+          setAutoUpdateFeedback({ type: 'warning', message })
+          setStatusMessage(message, 'warning')
+          return
         }
       }
     } catch (error) {
-      // 静默失败，不影响用户体验
+      const message = `自动更新设置读取失败: ${(error as Error).message}`
+      setAutoUpdateFeedback({ type: 'error', message })
+      setStatusMessage(message, 'error')
+      return
     }
-  }
+
+    if (serverError) {
+      setAutoUpdateFeedback({ type: 'error', message: serverError })
+      setStatusMessage(serverError, 'error')
+    }
+  }, [setStatusMessage])
 
   const saveAutoUpdateConfig = async (config: AutoUpdateConfig) => {
-    try {
-      // 保存到 localStorage
-      localStorage.setItem('autoUpdateConfig', JSON.stringify(config))
-      
-      // 保存到服务器
-      await maaApi.saveUserConfig('auto-update', config)
-      
-      // 同步到后端调度器
-      const result = await maaApi.setupAutoUpdate(config)
+    if (autoUpdateSaveInFlightRef.current) return
+    if (config.enabled && !isValidUpdateTime(config.time)) {
+      const message = '更新时间格式无效，请输入 00:00 到 23:59 之间的时间'
+      setAutoUpdateFeedback({ type: 'error', message })
+      setStatusMessage(message, 'error')
+      return
+    }
 
-      if (result.success) {
-        setStatusMessage(config.enabled ? `自动更新已启用，每天 ${config.time} 执行` : '自动更新已禁用')
+    const savedRevision = autoUpdateRevisionRef.current
+    autoUpdateSaveInFlightRef.current = true
+    setAutoUpdateSaving(true)
+    setAutoUpdateFeedback(null)
+    setStatusMessage('正在保存自动更新设置...', 'info')
+
+    try {
+      const saveResult = await maaApi.saveUserConfig('auto-update', config)
+      if (!saveResult.success) {
+        const message = `自动更新设置保存失败: ${maaApi.getErrorMessage(saveResult)}`
+        setAutoUpdateFeedback({ type: 'error', message })
+        setStatusMessage(message, 'error')
+        return
+      }
+
+      const result = await maaApi.setupAutoUpdate(config)
+      const schedulerResult = result.data && typeof result.data === 'object' && !Array.isArray(result.data)
+        ? result.data as { success?: boolean; message?: string }
+        : null
+      const schedulerSucceeded = result.success && (!config.enabled || schedulerResult?.success !== false)
+
+      if (schedulerSucceeded) {
+        if (savedRevision === autoUpdateRevisionRef.current) {
+          const message = config.enabled ? `自动更新已启用，每天 ${config.time} 执行` : '自动更新已禁用'
+          localStorage.setItem('autoUpdateConfig', JSON.stringify(config))
+          setAutoUpdateDirty(false)
+          setAutoUpdateFeedback({ type: 'success', message })
+          setStatusMessage(message, 'success')
+        } else {
+          const message = '此前设置已保存，当前更改尚未保存'
+          setAutoUpdateFeedback({ type: 'warning', message })
+          setStatusMessage(message, 'warning')
+        }
       } else {
-        setStatusMessage(`设置失败: ${result.message}`)
+        const message = `自动更新设置应用失败: ${schedulerResult?.message || maaApi.getErrorMessage(result)}`
+        setAutoUpdateFeedback({ type: 'error', message })
+        setStatusMessage(message, 'error')
       }
     } catch (error) {
-      setStatusMessage(`设置失败: ${(error as Error).message}`)
+      const message = `自动更新设置保存失败: ${(error as Error).message}`
+      setAutoUpdateFeedback({ type: 'error', message })
+      setStatusMessage(message, 'error')
+    } finally {
+      autoUpdateSaveInFlightRef.current = false
+      setAutoUpdateSaving(false)
     }
   }
 
   const handleAutoUpdateChange = (field: keyof AutoUpdateConfig, value: boolean | string) => {
-    const newConfig = { ...autoUpdate, [field]: value }
-    setAutoUpdate(newConfig)
-    saveAutoUpdateConfig(newConfig)
+    autoUpdateTouchedRef.current = true
+    autoUpdateRevisionRef.current += 1
+    setAutoUpdate(current => {
+      const next = { ...current, [field]: value }
+      localStorage.setItem('autoUpdateConfig', JSON.stringify(next))
+      return next
+    })
+    setAutoUpdateDirty(true)
+    setAutoUpdateFeedback(null)
   }
 
-  const loadConfigDir = async () => {
+  const loadConfigDir = useCallback(async () => {
+    setConfigDirStatus('loading')
+    setConfigDirError(null)
     try {
       const result = await maaApi.getConfigDir()
       if (result.success) {
@@ -192,50 +278,100 @@ export default function ConfigManager() {
           : (result.data && typeof result.data === 'object' && 'path' in result.data && typeof (result.data as { path?: unknown }).path === 'string'
               ? (result.data as { path: string }).path
               : '')
+        if (!nextConfigDir) throw new Error('服务器未返回配置目录')
         setConfigDir(nextConfigDir)
+        setConfigDirStatus('ready')
+        return
       }
-    } catch (error) {
-      // 静默失败，不影响用户体验
-    }
-  }
 
-  const loadConfig = async () => {
+      throw new Error(maaApi.getErrorMessage(result))
+    } catch (error) {
+      const detail = error instanceof Error && error.message ? error.message : '暂时无法读取配置目录'
+      setConfigDir('')
+      setConfigDirStatus('error')
+      setConfigDirError(`配置目录读取失败: ${detail}`)
+    }
+  }, [])
+
+  const loadConfig = useCallback(async () => {
     try {
       const result = await maaApi.getConfig()
-      if (result.success && result.data) {
+      if (result.success && result.data && connectionRevisionRef.current === 0) {
         setConfigData(result.data)
+      } else if (!result.success) {
+        const message = `连接配置读取失败: ${maaApi.getErrorMessage(result)}`
+        setConfigFeedback({ type: 'error', message })
+        setStatusMessage(message, 'error')
       }
     } catch (error) {
-      // 静默失败，不影响用户体验
+      const message = `连接配置读取失败: ${(error as Error).message}`
+      setConfigFeedback({ type: 'error', message })
+      setStatusMessage(message, 'error')
     }
+  }, [setStatusMessage])
+
+  useEffect(() => {
+    if (didInitializeRef.current) return
+    didInitializeRef.current = true
+
+    void Promise.allSettled([
+      loadConfigDir(),
+      loadConfig(),
+      loadAutoUpdateConfig(),
+      loadVersion(),
+    ])
+  }, [loadAutoUpdateConfig, loadConfig, loadConfigDir, loadVersion])
+
+  const updateConnectionConfig = (update: (current: MaaConnectionConfig) => MaaConnectionConfig) => {
+    connectionRevisionRef.current += 1
+    setConfigData(update)
+    setConfigFeedback(null)
   }
 
   const handleSave = async () => {
+    if (connectionSaveInFlightRef.current) return
+    const savedRevision = connectionRevisionRef.current
+    const configSnapshot = { ...configData }
+    connectionSaveInFlightRef.current = true
     setLoading(true)
-    setStatusMessage('正在保存配置...')
+    setConfigFeedback(null)
+    setStatusMessage('正在保存配置...', 'info')
     
     try {
-      const result = await maaApi.saveConfig('default', { connection: configData })
+      const result = await maaApi.saveConfig('default', { connection: configSnapshot })
 
       if (result.success) {
-        setStatusMessage('配置保存成功')
+        if (savedRevision === connectionRevisionRef.current) {
+          const message = '连接配置保存成功'
+          setConfigFeedback({ type: 'success', message })
+          setStatusMessage(message, 'success')
+        } else {
+          const message = '此前连接配置已保存，当前更改尚未保存'
+          setConfigFeedback({ type: 'warning', message })
+          setStatusMessage(message, 'warning')
+        }
       } else {
-        setStatusMessage(`保存失败: ${maaApi.getErrorMessage(result)}`)
+        const message = `连接配置保存失败: ${maaApi.getErrorMessage(result)}`
+        setConfigFeedback({ type: 'error', message })
+        setStatusMessage(message, 'error')
       }
     } catch (error) {
-      setStatusMessage(`网络错误: ${(error as Error).message}`)
+      const message = `连接配置保存失败: ${(error as Error).message}`
+      setConfigFeedback({ type: 'error', message })
+      setStatusMessage(message, 'error')
     } finally {
+      connectionSaveInFlightRef.current = false
       setLoading(false)
     }
   }
 
   const handleReset = () => {
-    setConfigData({
+    updateConnectionConfig(() => ({
       adb_path: '/opt/homebrew/bin/adb',
       address: '127.0.0.1:16384',
       config: 'CompatMac',
       auto_reconnect: true,
-    })
+    }))
     setStatusMessage('已重置为默认值')
   }
 
@@ -279,7 +415,7 @@ export default function ConfigManager() {
 
   const handleUseDiscoveredDevice = async (device: DiscoveredDevice) => {
     const adbPath = device.adbPath || configData.adb_path
-    setConfigData(current => ({ ...current, adb_path: adbPath, address: device.address }))
+    updateConnectionConfig(current => ({ ...current, adb_path: adbPath, address: device.address }))
     setTestingConnection(true)
     setConnectionFeedback(null)
 
@@ -312,6 +448,8 @@ export default function ConfigManager() {
   }
 
   const handleUpdateCore = async () => {
+    if (updateInFlightRef.current) return
+    updateInFlightRef.current = true
     setUpdating(current => ({ ...current, core: true }))
     setUpdateFeedback(null)
     setStatusMessage('正在更新 MaaCore 并同步最新资源...')
@@ -343,11 +481,14 @@ export default function ConfigManager() {
       setStatusMessage(message, 'error')
     } finally {
       setUpdating(current => ({ ...current, core: false }))
+      updateInFlightRef.current = false
     }
   }
 
   const handleUpdateCli = async () => {
-    setUpdating({ ...updating, cli: true })
+    if (updateInFlightRef.current) return
+    updateInFlightRef.current = true
+    setUpdating(current => ({ ...current, cli: true }))
     setStatusMessage('正在更新 MAA CLI...')
 
     try {
@@ -363,11 +504,14 @@ export default function ConfigManager() {
     } catch (error) {
       setStatusMessage(`网络错误: ${(error as Error).message}`)
     } finally {
-      setUpdating({ ...updating, cli: false })
+      setUpdating(current => ({ ...current, cli: false }))
+      updateInFlightRef.current = false
     }
   }
 
   const handleToggleCoreVersion = async () => {
+    if (updateInFlightRef.current) return
+    updateInFlightRef.current = true
     // 根据当前安装的版本判断目标渠道
     const currentIsBeta = versionInfo?.core.includes('beta') || versionInfo?.core.includes('alpha')
     const targetIsBeta = !currentIsBeta
@@ -404,10 +548,13 @@ export default function ConfigManager() {
       setStatusMessage(message, 'error')
     } finally {
       setUpdating(current => ({ ...current, core: false }))
+      updateInFlightRef.current = false
     }
   }
 
   const handleHotUpdate = async () => {
+    if (updateInFlightRef.current) return
+    updateInFlightRef.current = true
     setHotUpdating(true)
     setUpdateFeedback(null)
     setStatusMessage('正在热更新资源文件...')
@@ -431,8 +578,11 @@ export default function ConfigManager() {
       setStatusMessage(message, 'error')
     } finally {
       setHotUpdating(false)
+      updateInFlightRef.current = false
     }
   }
+
+  const updateBusy = updating.core || updating.cli || hotUpdating
 
   const configSections = [
     { id: 'connection', name: '连接配置', icon: <Icons.Monitor /> },
@@ -442,35 +592,63 @@ export default function ConfigManager() {
 
   return (
     <>
-      <div className="app-page app-stack-section">
+      <div className="app-page app-stack-section ios-workspace-page">
         <PageHeader
-          icon={<Icons.CogIcon />}
           title="配置管理"
           subtitle="管理游戏连接、运行设置与资源更新"
-          actions={<FloatingStatusIndicator />}
+          mobileLayout="inline"
+          actions={(
+            <FloatingStatusIndicator
+              className="w-full overflow-hidden sm:w-auto sm:max-w-none"
+              textClassName="truncate whitespace-nowrap"
+            />
+          )}
         />
 
-        <Card animated delay={0.1}>
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="mb-2 text-lg font-bold text-primary">配置目录</h2>
-              <p className="break-all font-mono text-sm text-secondary">{configDir || '加载中...'}</p>
+        <Card animated delay={0.1} smoothCorners className="!p-0">
+          <CardContent>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="mb-2 text-lg font-bold text-primary">配置目录</h2>
+                {configDirStatus === 'error' ? (
+                  <p className="break-words text-sm text-danger [overflow-wrap:anywhere]" role="alert">
+                    {configDirError}
+                  </p>
+                ) : (
+                  <p className="break-words font-mono text-sm text-secondary [overflow-wrap:anywhere]" aria-live="polite">
+                    {configDirStatus === 'loading' ? '正在读取目录...' : configDir}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {configDirStatus === 'error' && (
+                  <Button
+                    onClick={() => void loadConfigDir()}
+                    variant="outline"
+                    size="sm"
+                    icon={<Icons.RefreshCw className="h-4 w-4" />}
+                  >
+                    重试
+                  </Button>
+                )}
+                <Button
+                  onClick={handleOpenConfigDir}
+                  variant="outline"
+                  size="sm"
+                  disabled={configDirStatus !== 'ready' || !configDir}
+                >
+                  打开目录
+                </Button>
+              </div>
             </div>
-            <Button
-              onClick={handleOpenConfigDir}
-              variant="outline"
-              size="sm"
-            >
-              打开目录
-            </Button>
-          </div>
+          </CardContent>
         </Card>
 
-        <Card animated delay={0.15}>
+        <Card animated delay={0.15} smoothCorners className="!p-0">
           <CardHeader title="更新管理" />
           <CardContent>
             {/* 自动更新设置 */}
-            <div className="surface-soft app-info-card mb-6 p-5">
+            <section className="mb-6 border-b border-[var(--app-border)] pb-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="mb-1 text-base font-semibold text-primary">自动更新</h3>
@@ -484,7 +662,7 @@ export default function ConfigManager() {
                     aria-label="启用自动更新"
                     className="sr-only peer"
                   />
-                  <div className="relative h-7 w-12 rounded-[var(--app-radius-pill)] border border-[var(--app-border-strong)] bg-[var(--app-surface-muted)] transition-colors after:absolute after:left-[3px] after:top-[3px] after:h-5 after:w-5 after:rounded-[var(--app-radius-pill)] after:border after:border-[var(--app-border)] after:bg-[var(--app-surface-solid)] after:shadow-sm after:transition-transform peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--app-accent)] peer-checked:border-[var(--app-accent)] peer-checked:bg-[var(--app-accent)] peer-checked:after:translate-x-5"></div>
+                  <div className="relative h-7 w-12 rounded-[var(--app-radius-pill)] border border-[var(--app-border-strong)] bg-[var(--app-surface-muted)] transition-colors after:absolute after:left-[3px] after:top-[3px] after:h-5 after:w-5 after:rounded-[var(--app-radius-pill)] after:border after:border-[var(--app-border)] after:bg-white after:shadow-sm after:transition-transform peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--app-accent)] peer-checked:border-[var(--app-accent)] peer-checked:bg-[var(--app-accent)] peer-checked:after:translate-x-5"></div>
                 </label>
               </div>
               
@@ -532,7 +710,7 @@ export default function ConfigManager() {
                       </div>
                       <Button
                         onClick={handleHotUpdate}
-                        disabled={hotUpdating || updating.core}
+                        disabled={updateBusy}
                         variant="primary"
                         fullWidth
                         icon={hotUpdating ? (
@@ -552,12 +730,44 @@ export default function ConfigManager() {
                   </div>
                 </motion.div>
               )}
-            </div>
+
+              {autoUpdateFeedback && (
+                <div
+                  className={`mt-4 rounded-[var(--app-radius-md)] px-3 py-2.5 text-xs leading-5 ${
+                    autoUpdateFeedback.type === 'success'
+                      ? 'status-success'
+                      : autoUpdateFeedback.type === 'warning'
+                        ? 'status-warning'
+                        : 'status-danger'
+                  }`}
+                  role={autoUpdateFeedback.type === 'error' ? 'alert' : 'status'}
+                >
+                  {autoUpdateFeedback.message}
+                </div>
+              )}
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--app-border)] pt-4">
+                <p className="text-xs text-tertiary">
+                  {autoUpdateDirty ? '有尚未保存的更改' : '设置会在保存后生效'}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  loading={autoUpdateSaving}
+                  loadingText="保存中..."
+                  disabled={!autoUpdateDirty || autoUpdateSaving}
+                  onClick={() => void saveAutoUpdateConfig(autoUpdate)}
+                >
+                  保存自动更新设置
+                </Button>
+              </div>
+            </section>
             
             {/* 手动更新按钮 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2">
               {/* 更新 MaaCore */}
-              <div className="surface-soft app-info-card p-5">
+              <section className="min-w-0 border-b border-[var(--app-border)] pb-5 md:border-b-0 md:border-r md:pb-0 md:pr-5">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -607,7 +817,7 @@ export default function ConfigManager() {
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <Button
                     onClick={handleUpdateCore}
-                    disabled={updating.core || hotUpdating}
+                    disabled={updateBusy}
                     variant="primary"
                     className="w-full"
                     icon={updating.core ? (
@@ -622,14 +832,14 @@ export default function ConfigManager() {
                   <button
                     type="button"
                     onClick={handleToggleCoreVersion}
-                    disabled={updating.core || hotUpdating}
+                    disabled={updateBusy}
                     className="app-native-button app-native-button-primary w-full px-3 text-sm sm:w-auto"
                   >
                     {versionInfo?.core.includes('beta') || versionInfo?.core.includes('alpha') ? '切换到正式版' : '切换到 Beta'}
                   </button>
                   <Button
                     onClick={handleHotUpdate}
-                    disabled={hotUpdating || updating.core}
+                    disabled={updateBusy}
                     variant="outline"
                     className="w-full sm:col-span-2"
                     icon={hotUpdating ? (
@@ -654,8 +864,8 @@ export default function ConfigManager() {
                       <button
                         type="button"
                         onClick={handleHotUpdate}
-                        disabled={hotUpdating || updating.core}
-                        className="app-native-button mt-1 !min-h-0 !border-0 !bg-transparent !px-0 !py-0 font-semibold underline underline-offset-2 shadow-none disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={updateBusy}
+                        className="app-native-button mt-1 !min-h-11 !border-0 !bg-transparent !px-0 !py-0 font-semibold underline underline-offset-2 shadow-none disabled:cursor-not-allowed disabled:opacity-50 lg:!min-h-0"
                       >
                         重试资源同步
                       </button>
@@ -663,10 +873,10 @@ export default function ConfigManager() {
                   </div>
                 )}
                 
-              </div>
+              </section>
 
               {/* 更新 MAA CLI */}
-              <div className="surface-soft app-info-card p-5">
+              <section className="min-w-0 pt-5 md:pl-5 md:pt-0">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -687,7 +897,7 @@ export default function ConfigManager() {
                 </div>
                 <Button
                   onClick={handleUpdateCli}
-                  disabled={updating.cli}
+                  disabled={updateBusy}
                   variant="primary"
                   fullWidth
                   icon={updating.cli ? (
@@ -700,7 +910,7 @@ export default function ConfigManager() {
                   {updating.cli ? '更新中...' : '更新 MAA CLI'}
                 </Button>
                 
-              </div>
+              </section>
             </div>
           </CardContent>
         </Card>
@@ -708,86 +918,114 @@ export default function ConfigManager() {
         <div className="grid grid-cols-1 gap-[var(--app-space-section)] lg:grid-cols-[17rem_minmax(0,1fr)]">
           {/* 配置类型选择 */}
           <div>
-            <motion.div 
-              className="overflow-hidden rounded-[var(--app-radius-lg)] surface-panel"
+            <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <div className="border-b border-[var(--app-border)] px-5 py-4">
-                <h3 className="font-bold text-primary">配置类型</h3>
-              </div>
-              <div className="p-3">
-                {configSections.map((section, index) => (
-                  <motion.button
-                    key={section.id}
-                    onClick={() => handleConfigTypeChange(section.id)}
-                    className={`
-                      mb-2 flex min-h-12 w-full items-center space-x-3 rounded-xl px-4 py-2.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]
-                      ${configType === section.id
-                        ? 'brand-action-subtle'
-                        : 'border border-transparent text-secondary hover:border-[var(--app-border)] hover:bg-[var(--app-surface-muted)] hover:text-primary'
-                      }
-                    `}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.3 + index * 0.1 }}
-                  >
-                    <span className="flex h-8 w-8 items-center justify-center [&>*]:!h-8 [&>*]:!w-8">{section.icon}</span>
-                    <span className="text-sm font-medium">{section.name}</span>
-                  </motion.button>
-                ))}
-              </div>
+              <SmoothPanel surfaceClassName="overflow-hidden">
+                <div className="border-b border-[var(--app-border)] px-5 py-4">
+                  <h3 className="font-bold text-primary">配置类型</h3>
+                </div>
+                <div className="p-3">
+                  {configSections.map((section, index) => (
+                    <motion.button
+                      key={section.id}
+                      onClick={() => handleConfigTypeChange(section.id)}
+                      className={`
+                        mb-2 flex min-h-12 w-full items-center space-x-3 rounded-xl px-4 py-2.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]
+                        ${configType === section.id
+                          ? 'brand-action-subtle'
+                          : 'border border-transparent text-secondary hover:border-[var(--app-border)] hover:bg-[var(--app-surface-muted)] hover:text-primary'
+                        }
+                      `}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.3 + index * 0.1 }}
+                    >
+                      <span className="flex h-8 w-8 items-center justify-center [&>*]:!h-8 [&>*]:!w-8">{section.icon}</span>
+                      <span className="text-sm font-medium">{section.name}</span>
+                    </motion.button>
+                  ))}
+                </div>
+              </SmoothPanel>
             </motion.div>
           </div>
 
           {/* 配置编辑器 */}
           <div className="min-w-0">
-            <Card animated delay={0.2}>
+            <Card animated delay={0.2} smoothCorners className="!p-0">
               <CardHeader 
                 title={configSections.find(s => s.id === configType)?.name || '配置'}
                 actions={
-                  <div className="flex items-center space-x-2">
+                  configType === 'connection' ? (
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        onClick={handleReset}
+                        disabled={loading}
+                        variant="outline"
+                        size="sm"
+                        className="min-h-10"
+                      >
+                        重置
+                      </Button>
+                      <Button
+                        onClick={handleSave}
+                        disabled={loading}
+                        variant="outline"
+                        size="sm"
+                        className="min-h-10 brand-chip"
+                        icon={
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 16v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-7a2 2 0 012-2h2m3-4H5a2 2 0 00-2 2v7a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-1m-4 0V3m0 0L9 6m1.5-3L12 6" />
+                          </svg>
+                        }
+                      >
+                        {loading ? '保存中...' : '保存'}
+                      </Button>
+                    </div>
+                  ) : (
                     <Button
-                      onClick={handleReset}
-                      disabled={loading}
+                      type="button"
+                      onClick={handleOpenConfigDir}
                       variant="outline"
                       size="sm"
-                      className="min-h-10"
                     >
-                      重置
+                      打开配置目录
                     </Button>
-                    <Button
-                      onClick={handleSave}
-                      disabled={loading}
-                      variant="outline"
-                      size="sm"
-                      className="min-h-10 brand-chip"
-                      icon={
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M17 16v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-7a2 2 0 012-2h2m3-4H5a2 2 0 00-2 2v7a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-1m-4 0V3m0 0L9 6m1.5-3L12 6" />
-                        </svg>
-                      }
-                    >
-                      {loading ? '保存中...' : '保存'}
-                    </Button>
-                  </div>
+                  )
                 }
               />
               <CardContent>
                 {configType === 'connection' && (
                   <div className="space-y-5">
+                    {configFeedback && (
+                      <div
+                        className={`rounded-[var(--app-radius-md)] px-3 py-2.5 text-xs leading-5 ${
+                          configFeedback.type === 'success'
+                            ? 'status-success'
+                            : configFeedback.type === 'warning'
+                              ? 'status-warning'
+                              : 'status-danger'
+                        }`}
+                        role={configFeedback.type === 'error' ? 'alert' : 'status'}
+                      >
+                        {configFeedback.message}
+                      </div>
+                    )}
                     <Input
                       label="ADB 路径"
                       value={configData.adb_path}
-                      onChange={(value: string) => setConfigData({ ...configData, adb_path: value })}
+                      onChange={(value: string) => {
+                        updateConnectionConfig(current => ({ ...current, adb_path: value }))
+                      }}
                       hint="ADB 可执行文件的路径"
                     />
                     <Input
                       label="连接地址"
                       value={configData.address}
                       onChange={(value: string) => {
-                        setConfigData({ ...configData, address: value })
+                        updateConnectionConfig(current => ({ ...current, address: value }))
                         setConnectionFeedback(null)
                       }}
                       hint="模拟器连接地址，格式: IP:端口"
@@ -863,7 +1101,7 @@ export default function ConfigManager() {
                       )}
 
                       {connectionFeedback && (
-                        <div className={`mt-3 app-info-card text-xs ${connectionFeedback.success ? 'status-success' : 'status-danger'}`} role={connectionFeedback.success ? 'status' : 'alert'}>
+                        <div className={`mt-3 rounded-[var(--app-radius-md)] px-3 py-2.5 text-xs ${connectionFeedback.success ? 'status-success' : 'status-danger'}`} role={connectionFeedback.success ? 'status' : 'alert'}>
                           {connectionFeedback.message}
                         </div>
                       )}
@@ -871,7 +1109,9 @@ export default function ConfigManager() {
                     <Select
                       label="平台配置"
                       value={configData.config}
-                      onChange={(value: string) => setConfigData({ ...configData, config: value })}
+                      onChange={(value: string) => {
+                        updateConnectionConfig(current => ({ ...current, config: value }))
+                      }}
                       options={[
                         { value: 'CompatMac', label: 'CompatMac (macOS)' },
                         { value: 'CompatPOSIXShell', label: 'CompatPOSIXShell (Linux)' },
@@ -879,7 +1119,7 @@ export default function ConfigManager() {
                       ]}
                       hint="平台相关配置"
                     />
-                    <div className="surface-soft app-info-card px-4 py-3">
+                    <section className="border-t border-[var(--app-border)] pt-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-sm font-medium text-primary">自动重连</div>
@@ -888,62 +1128,29 @@ export default function ConfigManager() {
                         <Checkbox
                           label="启用"
                           checked={configData.auto_reconnect !== false}
-                          onChange={(checked: boolean) => setConfigData({ ...configData, auto_reconnect: checked })}
+                          onChange={(checked: boolean) => {
+                            updateConnectionConfig(current => ({ ...current, auto_reconnect: checked }))
+                          }}
                         />
                       </div>
-                    </div>
+                    </section>
                   </div>
                 )}
                 {configType === 'resource' && (
-                  <div className="space-y-5">
-                    <Select
-                      label="全局资源"
-                      value=""
-                      onChange={() => {}}
-                      options={[
-                        { value: '', label: '简体中文 (默认)' },
-                        { value: 'YoStarEN', label: 'YoStarEN (国际服)' },
-                        { value: 'YoStarJP', label: 'YoStarJP (日服)' },
-                        { value: 'YoStarKR', label: 'YoStarKR (韩服)' }
-                      ]}
-                    />
-                    <Checkbox 
-                      label="启用用户自定义资源" 
-                      checked={false}
-                      onChange={() => {}}
-                    />
-                  </div>
+                  <section className="py-1" aria-labelledby="resource-config-readonly-title">
+                    <h3 id="resource-config-readonly-title" className="text-sm font-semibold text-primary">当前为只读</h3>
+                    <p className="mt-2 text-sm leading-6 text-secondary">
+                      资源来源沿用当前 MAA 配置。如需更改，请打开配置目录。
+                    </p>
+                  </section>
                 )}
                 {configType === 'instance' && (
-                  <div className="space-y-5">
-                    <Select
-                      label="触摸模式"
-                      value="ADB"
-                      onChange={() => {}}
-                      options={[
-                        { value: 'ADB', label: 'ADB' },
-                        { value: 'MiniTouch', label: 'MiniTouch' },
-                        { value: 'MaaTouch', label: 'MaaTouch' }
-                      ]}
-                    />
-                    <div className="space-y-3">
-                      <Checkbox 
-                        label="部署时暂停" 
-                        checked={false}
-                        onChange={() => {}}
-                      />
-                      <Checkbox 
-                        label="启用 ADB Lite 模式" 
-                        checked={false}
-                        onChange={() => {}}
-                      />
-                      <Checkbox 
-                        label="退出时关闭 ADB" 
-                        checked={false}
-                        onChange={() => {}}
-                      />
-                    </div>
-                  </div>
+                  <section className="py-1" aria-labelledby="instance-config-readonly-title">
+                    <h3 id="instance-config-readonly-title" className="text-sm font-semibold text-primary">当前为只读</h3>
+                    <p className="mt-2 text-sm leading-6 text-secondary">
+                      触摸模式等实例选项沿用当前 MAA 配置。如需更改，请打开配置目录。
+                    </p>
+                  </section>
                 )}
               </CardContent>
             </Card>

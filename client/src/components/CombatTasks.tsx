@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { maaApi, searchCopilot, searchParadoxCopilot } from '../services/api'
 import { motion, useReducedMotion } from 'framer-motion'
 import Icons from './Icons'
-import { PageHeader, Button, ConfirmDialog } from './common'
+import { PageHeader, Button, Card, ConfirmDialog, SmoothSurface } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import ScreenMonitor from './ScreenMonitor'
@@ -25,6 +25,24 @@ import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
 type CopilotSetExecutionMode = 'app' | 'manual' | 'cli'
 type CopilotSetSelections = Record<string, number[]>
 type CombatMode = 'copilot' | 'ssscopilot' | 'paradoxcopilot'
+type CombatUserConfig = {
+  taskInputs: CombatTaskInputs
+  advancedParams: CombatAdvancedParams
+  autoFormation: AutoFormationConfig
+  copilotSetExecutionMode: CopilotSetExecutionMode
+  copilotSetSelections: CopilotSetSelections
+}
+
+const COMBAT_CONFIG_SYNC_PENDING_KEY = 'combatConfigSyncPending'
+let combatConfigSyncSequence = 0
+let combatConfigSyncQueue: Promise<void> = Promise.resolve()
+
+const createCombatConfigSyncToken = () => `${Date.now()}-${++combatConfigSyncSequence}`
+const enqueueCombatConfigSync = <T,>(operation: () => Promise<T>) => {
+  const result = combatConfigSyncQueue.then(operation, operation)
+  combatConfigSyncQueue = result.then(() => undefined, () => undefined)
+  return result
+}
 
 export default function CombatTasks() {
   const shouldReduceMotion = useReducedMotion()
@@ -49,6 +67,15 @@ export default function CombatTasks() {
   const [autoFormation, setAutoFormation] = useState<AutoFormationConfig>({ copilot: 'auto' })
   const [copilotSetExecutionMode, setCopilotSetExecutionMode] = useState<CopilotSetExecutionMode>('cli')
   const [configLoaded, setConfigLoaded] = useState(false)
+  const [configSyncError, setConfigSyncError] = useState<string | null>(null)
+  const [isRetryingConfigSave, setIsRetryingConfigSave] = useState(false)
+  const configRevisionRef = useRef(0)
+  const skippedInitialConfigSaveRef = useRef(false)
+  const lastQueuedConfigFingerprintRef = useRef<string | null>(null)
+  const configHydratedRef = useRef(false)
+  const previewRequestRef = useRef(0)
+  const copilotSearchRequestRef = useRef(0)
+  const paradoxSearchRequestRef = useRef(0)
 
   // 作业类型选择：'auto' 自动检测，'single' 单个作业，'set' 作业集
   const [copilotType, setCopilotType] = useState<'auto' | 'single' | 'set'>('auto')
@@ -67,16 +94,6 @@ export default function CombatTasks() {
   const [paradoxSearchResult, setParadoxSearchResult] = useState<ParadoxSearchResult | null>(null)
   const [isSearchingParadox, setIsSearchingParadox] = useState(false)
 
-  // 同步 isRunning 状态到 store
-  useEffect(() => {
-    setIsActiveStatus(isRunning)
-  }, [isRunning, setIsActiveStatus])
-
-  useEffect(() => () => {
-    executionGenerationRef.current += 1
-    stopWaitControllerRef.current?.abort()
-  }, [])
-
   const beginExecution = () => {
     stopWaitControllerRef.current?.abort()
     stopWaitControllerRef.current = null
@@ -84,6 +101,7 @@ export default function CombatTasks() {
     stopRequestInFlightRef.current = false
     setIsStopping(false)
     setIsRunning(true)
+    setIsActiveStatus(true)
     executionGenerationRef.current += 1
     return executionGenerationRef.current
   }
@@ -99,6 +117,22 @@ export default function CombatTasks() {
   const [activeCombatMode, setActiveCombatMode] = useState<CombatMode>('copilot')
   const { containerRef: combatModeTabsRef, activeRect: activeCombatModeRect, setTabRef: setCombatModeTabRef } = useFluidTabIndicator(activeCombatMode)
 
+  useEffect(() => {
+    // Activity retains state while hidden, so clear loading left behind by
+    // requests invalidated during the previous cleanup when effects resume.
+    setIsLoadingSet(false)
+    setIsSearchingCopilot(false)
+    setIsSearchingParadox(false)
+
+    return () => {
+      executionGenerationRef.current += 1
+      previewRequestRef.current += 1
+      copilotSearchRequestRef.current += 1
+      paradoxSearchRequestRef.current += 1
+      stopWaitControllerRef.current?.abort()
+    }
+  }, [])
+
   const normalizeFormationMode = (value: AutoFormationConfig[string] | undefined): FormationMode => {
     if (value === true) return 'on'
     if (value === false) return 'off'
@@ -108,19 +142,54 @@ export default function CombatTasks() {
 
   const getFormationMode = (taskId: string): FormationMode => normalizeFormationMode(autoFormation[taskId])
 
-  const normalizeRaidValue = (value: unknown): 'normal' | 'raid' | 'both' => {
+  const normalizeRaidValue = useCallback((value: unknown): 'normal' | 'raid' | 'both' => {
     if (value === '1' || value === 'raid') return 'raid'
     if (value === '2' || value === 'both') return 'both'
     return 'normal'
-  }
+  }, [])
 
-  const normalizeAdvancedConfig = (advanced: CombatAdvancedParams): CombatAdvancedParams => ({
+  const normalizeAdvancedConfig = useCallback((advanced: CombatAdvancedParams): CombatAdvancedParams => ({
     ...advanced,
     copilot: {
       ...advanced.copilot,
       raid: normalizeRaidValue(advanced.copilot?.raid)
     }
-  })
+  }), [normalizeRaidValue])
+
+  const syncConfig = useCallback((
+    config: CombatUserConfig,
+    revision: number,
+    syncToken: string,
+    announceSuccess = false,
+  ) => enqueueCombatConfigSync(async () => {
+    if (
+      revision !== configRevisionRef.current
+      || localStorage.getItem(COMBAT_CONFIG_SYNC_PENDING_KEY) !== syncToken
+    ) return false
+
+    try {
+      const result = await maaApi.saveUserConfig('combat-tasks', config)
+      if (!result.success) throw new Error(maaApi.getErrorMessage(result))
+      if (
+        revision !== configRevisionRef.current
+        || localStorage.getItem(COMBAT_CONFIG_SYNC_PENDING_KEY) !== syncToken
+      ) return false
+
+      localStorage.removeItem(COMBAT_CONFIG_SYNC_PENDING_KEY)
+      setConfigSyncError(null)
+      if (announceSuccess) setStatusMessage('自动战斗配置已同步', 'success')
+      return true
+    } catch (error) {
+      if (
+        revision !== configRevisionRef.current
+        || localStorage.getItem(COMBAT_CONFIG_SYNC_PENDING_KEY) !== syncToken
+      ) return false
+
+      const detail = error instanceof Error && error.message ? error.message : '暂时无法连接服务器'
+      setConfigSyncError(`配置已保存在此设备，但尚未同步到服务器：${detail}`)
+      return false
+    }
+  }), [setStatusMessage])
 
   const shouldAppendFormation = (taskId: string, forceForSplitSet = false): boolean => {
     if (taskId !== 'copilot') return false
@@ -212,7 +281,15 @@ export default function CombatTasks() {
         const result = await maaApi.getTaskStatus(controller.signal)
         if (cancelled) return
         const taskStatus = result.data
-        if (result.success && taskStatus?.isRunning) {
+        if (result.success) {
+          const backendRunning = Boolean(taskStatus?.isRunning)
+          setIsActiveStatus(backendRunning)
+
+          if (!backendRunning || taskStatus?.taskType !== 'combat') {
+            setIsRunning(false)
+            return
+          }
+
           // 后端确实有任务在运行
           const { taskName, startTime, taskType } = taskStatus
 
@@ -233,6 +310,9 @@ export default function CombatTasks() {
               try {
                 const statusResult = await maaApi.getTaskStatus(controller.signal)
                 if (cancelled) return
+                if (statusResult.success) {
+                  setIsActiveStatus(Boolean(statusResult.data?.isRunning))
+                }
                 if (statusResult.success && statusResult.data?.isRunning === false) {
                   // 任务已完成
                   setIsRunning(false)
@@ -259,6 +339,53 @@ export default function CombatTasks() {
     }
 
     void checkBackendStatus()
+
+    const cleanup = () => {
+      cancelled = true
+      controller.abort()
+      stopStatusPolling()
+    }
+
+    if (configHydratedRef.current) return cleanup
+
+    const loadLocalConfig = () => {
+      let restored = false
+      const restoreJson = <T,>(key: string, apply: (value: T) => void) => {
+        const stored = localStorage.getItem(key)
+        if (!stored) return
+        try {
+          apply(JSON.parse(stored) as T)
+          restored = true
+        } catch {
+          localStorage.removeItem(key)
+        }
+      }
+
+      restoreJson<CombatTaskInputs>('combatTaskInputs', setTaskInputs)
+      restoreJson<CombatAdvancedParams>('combatAdvancedParams', value => setAdvancedParams(normalizeAdvancedConfig(value)))
+      restoreJson<AutoFormationConfig>('combatAutoFormation', setAutoFormation)
+      restoreJson<CopilotSetSelections>('combatCopilotSetSelections', setCopilotSetSelections)
+
+      const savedSetMode = localStorage.getItem('combatCopilotSetExecutionMode')
+      if (savedSetMode === 'app' || savedSetMode === 'manual' || savedSetMode === 'cli') {
+        setCopilotSetExecutionMode(savedSetMode === 'app' ? 'cli' : savedSetMode)
+        restored = true
+      }
+      return restored
+    }
+
+    // A failed or interrupted save leaves a durable local draft. Never replace it
+    // with an older server copy on the next mount.
+    const hasPendingLocalDraft = localStorage.getItem(COMBAT_CONFIG_SYNC_PENDING_KEY) !== null
+    if (hasPendingLocalDraft) {
+      if (loadLocalConfig()) {
+        configHydratedRef.current = true
+        setConfigSyncError('上次更改已保存在此设备，但尚未同步到服务器。')
+        setConfigLoaded(true)
+        return cleanup
+      }
+      localStorage.removeItem(COMBAT_CONFIG_SYNC_PENDING_KEY)
+    }
 
     // 加载保存的配置 - 优先从服务器加载
     const loadConfig = async () => {
@@ -305,66 +432,79 @@ export default function CombatTasks() {
       if (cancelled) return
 
       // 服务器加载失败，从 localStorage 加载
-      const savedInputs = localStorage.getItem('combatTaskInputs')
-      const savedAdvanced = localStorage.getItem('combatAdvancedParams')
-      const savedFormation = localStorage.getItem('combatAutoFormation')
-      const savedSetMode = localStorage.getItem('combatCopilotSetExecutionMode')
-      const savedSelections = localStorage.getItem('combatCopilotSetSelections')
-
-      if (savedInputs) {
-        setTaskInputs(JSON.parse(savedInputs))
-      }
-      if (savedAdvanced) {
-        setAdvancedParams(normalizeAdvancedConfig(JSON.parse(savedAdvanced)))
-      }
-      if (savedFormation) {
-        setAutoFormation(JSON.parse(savedFormation))
-      }
-      if (savedSetMode === 'app' || savedSetMode === 'manual' || savedSetMode === 'cli') {
-        setCopilotSetExecutionMode(savedSetMode === 'app' ? 'cli' : savedSetMode)
-      }
-      if (savedSelections) {
-        setCopilotSetSelections(JSON.parse(savedSelections))
-      }
+      loadLocalConfig()
     }
 
     void loadConfig()
       .catch(() => undefined)
       .finally(() => {
-        if (!cancelled) setConfigLoaded(true)
+        if (!cancelled) {
+          configHydratedRef.current = true
+          setConfigLoaded(true)
+        }
       })
 
-    return () => {
-      cancelled = true
-      controller.abort()
-      stopStatusPolling()
-    }
-    // Hydration and status recovery are intentionally scoped to this mount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    return cleanup
+  }, [normalizeAdvancedConfig, setIsActiveStatus, setStatusMessage])
 
   // 自动保存配置
   useEffect(() => {
     if (!configLoaded) return
+
+    const config: CombatUserConfig = {
+      taskInputs,
+      advancedParams,
+      autoFormation,
+      copilotSetExecutionMode,
+      copilotSetSelections,
+    }
+    const fingerprint = JSON.stringify(config)
+
+    if (!skippedInitialConfigSaveRef.current) {
+      skippedInitialConfigSaveRef.current = true
+      lastQueuedConfigFingerprintRef.current = fingerprint
+      return
+    }
+
+    if (lastQueuedConfigFingerprintRef.current === fingerprint) return
+
+    const revision = configRevisionRef.current + 1
+    configRevisionRef.current = revision
+    const syncToken = createCombatConfigSyncToken()
 
     localStorage.setItem('combatTaskInputs', JSON.stringify(taskInputs))
     localStorage.setItem('combatAdvancedParams', JSON.stringify(advancedParams))
     localStorage.setItem('combatAutoFormation', JSON.stringify(autoFormation))
     localStorage.setItem('combatCopilotSetExecutionMode', copilotSetExecutionMode)
     localStorage.setItem('combatCopilotSetSelections', JSON.stringify(copilotSetSelections))
+    localStorage.setItem(COMBAT_CONFIG_SYNC_PENDING_KEY, syncToken)
 
     const saveTimer = window.setTimeout(() => {
-      maaApi.saveUserConfig('combat-tasks', {
+      lastQueuedConfigFingerprintRef.current = fingerprint
+      void syncConfig(config, revision, syncToken)
+    }, 300)
+
+    return () => window.clearTimeout(saveTimer)
+  }, [advancedParams, autoFormation, configLoaded, copilotSetExecutionMode, copilotSetSelections, syncConfig, taskInputs])
+
+  const handleRetryConfigSave = async () => {
+    if (isRetryingConfigSave) return
+    const revision = configRevisionRef.current
+    const syncToken = localStorage.getItem(COMBAT_CONFIG_SYNC_PENDING_KEY) ?? createCombatConfigSyncToken()
+    localStorage.setItem(COMBAT_CONFIG_SYNC_PENDING_KEY, syncToken)
+    setIsRetryingConfigSave(true)
+    try {
+      await syncConfig({
         taskInputs,
         advancedParams,
         autoFormation,
         copilotSetExecutionMode,
-        copilotSetSelections
-      }).catch(() => {})
-    }, 300)
-
-    return () => window.clearTimeout(saveTimer)
-  }, [advancedParams, autoFormation, configLoaded, copilotSetExecutionMode, copilotSetSelections, taskInputs])
+        copilotSetSelections,
+      }, revision, syncToken, true)
+    } finally {
+      setIsRetryingConfigSave(false)
+    }
+  }
 
   const tasks: CombatTask[] = [
     {
@@ -702,6 +842,7 @@ export default function CombatTasks() {
         setStatusMessage(`作业 ${firstSelectedIndex + 1}/${copilotSetInfo.copilots.length} 完成，等待开始下一关`)
         setWaitingForNextCopilot(true)
         setIsRunning(false)
+        setIsActiveStatus(false)
       } else {
         const selectedCount = selectedCopilotIndexes.size
         setStatusMessage(`作业集执行完成 (${selectedCount} 个作业)`)
@@ -716,6 +857,7 @@ export default function CombatTasks() {
         setStatusMessage(`作业 ${firstSelectedIndex + 1} 执行失败: ${errorMessage}，等待开始下一关`)
         setWaitingForNextCopilot(true)
         setIsRunning(false)
+        setIsActiveStatus(false)
       } else {
         setStatusMessage(`作业执行失败: ${errorMessage}`)
         finishCopilotSet(generation)
@@ -778,6 +920,7 @@ export default function CombatTasks() {
         setStatusMessage(`作业 ${nextIndex + 1}/${copilotSetInfo.copilots.length} 完成，等待开始下一关`)
         setWaitingForNextCopilot(true)
         setIsRunning(false)
+        setIsActiveStatus(false)
       } else {
         const selectedCount = selectedCopilotIndexes.size
         setStatusMessage(`作业集全部执行完成 (${selectedCount} 个作业)`)
@@ -792,6 +935,7 @@ export default function CombatTasks() {
         setStatusMessage(`作业 ${nextIndex + 1} 执行失败: ${nextErrorMessage}，等待开始下一关`)
         setWaitingForNextCopilot(true)
         setIsRunning(false)
+        setIsActiveStatus(false)
       } else {
         setStatusMessage(`作业 ${nextIndex + 1} 执行失败: ${nextErrorMessage}`)
         finishCopilotSet(generation)
@@ -804,6 +948,7 @@ export default function CombatTasks() {
     if (generation !== undefined && executionGenerationRef.current !== generation) return
     stopRequestedRef.current = false
     setIsRunning(false)
+    setIsActiveStatus(false)
     setWaitingForNextCopilot(false)
     setCurrentCopilotTask(null)
     setCopilotSetInfo(prev => prev ? { ...prev, currentIndex: 0 } : null)
@@ -857,6 +1002,7 @@ export default function CombatTasks() {
 
       stopRequestedRef.current = false
       setIsRunning(false)
+      setIsActiveStatus(false)
       setWaitingForNextCopilot(false)
       setCurrentCopilotTask(null)
       setStatusMessage('自动战斗已终止', 'warning')
@@ -933,6 +1079,7 @@ export default function CombatTasks() {
         if (isCurrentExecution(generation)) {
           stopRequestedRef.current = false
           setIsRunning(false)
+          setIsActiveStatus(false)
           stopRequestInFlightRef.current = false
           setIsStopping(false)
         }
@@ -941,8 +1088,10 @@ export default function CombatTasks() {
   }
 
   const handleInputChange = (taskId: string, value: string) => {
-    setTaskInputs({ ...taskInputs, [taskId]: value })
+    setTaskInputs(current => ({ ...current, [taskId]: value }))
     if (taskId === 'copilot') {
+      previewRequestRef.current += 1
+      setIsLoadingSet(false)
       setCopilotSetInfo(null)
       if (value.trim() !== selectedSearchCopilotUri) {
         setSelectedSearchCopilotUri('')
@@ -1053,6 +1202,8 @@ export default function CombatTasks() {
   }
 
   const handlePreviewCopilotSetWithInput = async (rawValue?: string) => {
+    const requestId = ++previewRequestRef.current
+    const isCurrentRequest = () => previewRequestRef.current === requestId
     const rawInput = rawValue ?? (taskInputs['copilot'] || '')
     const normalizedInput = normalizeCopilotInput(rawInput).trim()
     const firstToken = normalizedInput.split(/\s+/)[0] || ''
@@ -1073,6 +1224,7 @@ export default function CombatTasks() {
       if (copilotType === 'single') {
         // 强制单个作业模式
         const copilotData = await maaApi.getCopilotInfo(copilotId)
+        if (!isCurrentRequest()) return
         const content = getCopilotContent(copilotData)
         if (content) {
           setCopilotSetInfo({
@@ -1089,6 +1241,7 @@ export default function CombatTasks() {
       } else if (copilotType === 'set') {
         // 强制作业集模式
         const copilots = await fetchCopilotSetDetails(copilotId)
+        if (!isCurrentRequest()) return
         if (copilots.length > 0) {
           setCopilotSetInfo({
             type: 'set',
@@ -1110,6 +1263,7 @@ export default function CombatTasks() {
           maaApi.getCopilotInfo(copilotId),
           maaApi.getCopilotSet(copilotId)
         ])
+        if (!isCurrentRequest()) return
 
         let foundSingle = false
         let foundSet = false
@@ -1139,6 +1293,7 @@ export default function CombatTasks() {
           // 两个都存在，优先使用作业集（因为作业集更少见，用户可能更想要）
           const copilotIds: number[] = setData
           const copilots = await Promise.all(copilotIds.map(id => fetchCopilotDetail(id)))
+          if (!isCurrentRequest()) return
           const validCopilots = copilots.filter((item): item is CopilotSetItem => item !== null)
           setCopilotSetInfo({
             type: 'set',
@@ -1155,6 +1310,7 @@ export default function CombatTasks() {
           // 只有作业集
           const copilotIds: number[] = setData
           const copilots = await Promise.all(copilotIds.map(id => fetchCopilotDetail(id)))
+          if (!isCurrentRequest()) return
           const validCopilots = copilots.filter((item): item is CopilotSetItem => item !== null)
           setCopilotSetInfo({
             type: 'set',
@@ -1202,25 +1358,29 @@ export default function CombatTasks() {
       }
 
     } catch (error) {
-      setStatusMessage(`网络错误: ${(error as Error).message}`)
+      if (isCurrentRequest()) setStatusMessage(`网络错误: ${(error as Error).message}`)
     } finally {
-      setIsLoadingSet(false)
+      if (isCurrentRequest()) setIsLoadingSet(false)
     }
   }
 
   // 搜索悖论模拟作业
   const handleSearchParadox = async () => {
+    if (isSearchingParadox) return
     if (!paradoxSearchName.trim()) {
       setStatusMessage('请输入干员名字')
       return
     }
 
+    const requestId = ++paradoxSearchRequestRef.current
+    const query = paradoxSearchName.trim()
     setIsSearchingParadox(true)
     setStatusMessage('正在搜索作业...')
     setParadoxSearchResult(null)
 
     try {
-      const result = await searchParadoxCopilot(paradoxSearchName.trim())
+      const result = await searchParadoxCopilot(query)
+      if (paradoxSearchRequestRef.current !== requestId) return
 
       // 适配新的响应格式：数据在 result.data 中
       const data = result.data || result
@@ -1231,33 +1391,38 @@ export default function CombatTasks() {
 
         // 自动填充推荐作业
         if (data.recommended) {
-          setTaskInputs({ ...taskInputs, paradoxcopilot: data.recommended.uri })
+          setTaskInputs(current => ({ ...current, paradoxcopilot: data.recommended.uri }))
         }
       } else {
         setStatusMessage(result.message || data.error || '未找到作业')
         setParadoxSearchResult(null)
       }
     } catch (error) {
+      if (paradoxSearchRequestRef.current !== requestId) return
       setStatusMessage(`搜索失败: ${(error as Error).message}`)
       setParadoxSearchResult(null)
     } finally {
-      setIsSearchingParadox(false)
+      if (paradoxSearchRequestRef.current === requestId) setIsSearchingParadox(false)
     }
   }
 
   // 搜索普通关卡作业
   const handleSearchCopilot = async () => {
+    if (isSearchingCopilot) return
     if (!copilotSearchStage.trim()) {
       setStatusMessage('请输入关卡名称')
       return
     }
 
+    const requestId = ++copilotSearchRequestRef.current
+    const query = copilotSearchStage.trim()
     setIsSearchingCopilot(true)
     setStatusMessage('正在搜索作业...')
     setCopilotSearchResult(null)
 
     try {
-      const result = await searchCopilot(copilotSearchStage.trim())
+      const result = await searchCopilot(query)
+      if (copilotSearchRequestRef.current !== requestId) return
 
       // 适配新的响应格式：数据在 result.data 中
       const data = result.data || result
@@ -1276,11 +1441,30 @@ export default function CombatTasks() {
         setCopilotSearchResult(null)
       }
     } catch (error) {
+      if (copilotSearchRequestRef.current !== requestId) return
       setStatusMessage(`搜索失败: ${(error as Error).message}`)
       setCopilotSearchResult(null)
     } finally {
-      setIsSearchingCopilot(false)
+      if (copilotSearchRequestRef.current === requestId) setIsSearchingCopilot(false)
     }
+  }
+
+  const handleCopilotSearchStageChange = (value: string) => {
+    copilotSearchRequestRef.current += 1
+    setIsSearchingCopilot(false)
+    setCopilotSearchStage(value)
+  }
+
+  const handleParadoxSearchNameChange = (value: string) => {
+    paradoxSearchRequestRef.current += 1
+    setIsSearchingParadox(false)
+    setParadoxSearchName(value)
+  }
+
+  const handleCopilotTypeChange = (type: 'auto' | 'single' | 'set') => {
+    previewRequestRef.current += 1
+    setIsLoadingSet(false)
+    setCopilotType(type)
   }
 
 
@@ -1297,11 +1481,14 @@ export default function CombatTasks() {
         animate={{ opacity: 1, height: "auto" }}
         transition={{ duration: 0.3 }}
       >
-        {options.map(option => (
+        {options.map(option => {
+          const controlId = `combat-${task.id}-${option.key}`
+          return (
           <div key={option.key} className="min-w-0">
             {option.type === 'checkbox' ? (
-              <label className="group flex min-w-0 cursor-pointer items-center gap-2 text-sm text-secondary">
+              <label htmlFor={controlId} className="group flex min-h-11 w-full min-w-0 cursor-pointer items-center gap-2 py-2 text-sm text-secondary">
                 <input
+                  id={controlId}
                   type="checkbox"
                   checked={advanced[option.key] as boolean || false}
                   onChange={(e) => handleAdvancedChange(task.id, option.key, e.target.checked)}
@@ -1311,11 +1498,13 @@ export default function CombatTasks() {
               </label>
             ) : option.type === 'select' && option.options ? (
               <div className="grid min-w-0 gap-1.5 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center">
-                <label className="text-sm text-secondary">{option.label}</label>
+                <label htmlFor={controlId} className="text-sm text-secondary">{option.label}</label>
                 <select
+                  id={controlId}
+                  name={`maa-${task.id}-${option.key}`}
                   value={(advanced[option.key] as string) || (option.options[0]?.value || '')}
                   onChange={(e) => handleAdvancedChange(task.id, option.key, e.target.value)}
-                  className="min-w-0 rounded-lg border border-[var(--app-border)] py-2 pl-3 pr-9 text-sm text-primary control-surface focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
+                  className="min-h-11 min-w-0 rounded-lg border border-[var(--app-border)] py-2 pl-3 pr-9 text-sm text-primary control-surface focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
                 >
                   {option.options.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -1324,8 +1513,9 @@ export default function CombatTasks() {
               </div>
             ) : (
               <div className="grid min-w-0 gap-1.5 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center">
-                <label className="text-sm text-secondary">{option.label}</label>
+                <label htmlFor={controlId} className="text-sm text-secondary">{option.label}</label>
                 <input
+                  id={controlId}
                   type={option.type}
                   name={`maa-${task.id}-${option.key}`}
                   autoComplete="off"
@@ -1335,12 +1525,13 @@ export default function CombatTasks() {
                   value={advanced[option.key] as string || ''}
                   onChange={(e) => handleAdvancedChange(task.id, option.key, e.target.value)}
                   placeholder={option.placeholder}
-                  className="min-w-0 rounded-lg border border-[var(--app-border)] px-3 py-2 text-sm text-primary control-surface focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
+                  className="min-h-11 min-w-0 rounded-lg border border-[var(--app-border)] px-3 py-2 text-sm text-primary control-surface focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
                 />
               </div>
             )}
           </div>
-        ))}
+          )
+        })}
       </motion.div>
     )
   }
@@ -1354,18 +1545,38 @@ export default function CombatTasks() {
 
   return (
     <>
-      <div className="app-page app-stack-section combat-page">
+      <div className="app-page app-stack-section combat-page ios-workspace-page">
         <PageHeader
-          icon={<Icons.TargetIcon />}
           title="自动战斗"
           subtitle="支持单作业、作业集、保全派驻、悖论模拟与链接识别"
+          mobileLayout="inline"
           actions={<FloatingStatusIndicator />}
         />
 
+        {configSyncError && (
+          <div
+            role="alert"
+            className="status-warning flex min-h-11 flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm leading-5"
+          >
+            <span className="min-w-0 flex-1">{configSyncError}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              loading={isRetryingConfigSave}
+              loadingText="同步中"
+              onClick={() => void handleRetryConfigSave()}
+              className="min-h-11 shrink-0"
+            >
+              重新同步
+            </Button>
+          </div>
+        )}
+
         <div className="task-monitor-layout">
           <div className="task-monitor-main">
-        <div className="combat-mode-shell">
-          <div ref={combatModeTabsRef} className="relative grid grid-cols-1 gap-1 sm:grid-cols-3">
+        <SmoothSurface className="combat-mode-shell">
+          <div ref={combatModeTabsRef} className="relative grid grid-cols-3 gap-1">
             {activeCombatModeOption && activeCombatModeRect.width > 0 && (
               <motion.div
                 data-testid="combat-mode-highlight"
@@ -1400,7 +1611,7 @@ export default function CombatTasks() {
                 type="button"
                 onClick={() => setActiveCombatMode(id)}
                 aria-pressed={activeCombatMode === id}
-                className={`combat-mode-button ${activeCombatMode === id ? 'is-selected' : ''}`}
+                className={`combat-mode-button min-h-11 ${activeCombatMode === id ? 'is-selected' : ''}`}
               >
                 <span className="combat-mode-icon">
                   {icon}
@@ -1412,16 +1623,17 @@ export default function CombatTasks() {
               </button>
             ))}
           </div>
-        </div>
+        </SmoothSurface>
 
         {/* 任务列表 */}
         <div className="app-stack-section">
           {/* 自动抄作业 - 单独一行 */}
           {activeCombatMode === 'copilot' && tasks.filter(task => task.id === 'copilot').map((task) => {
             return (
-              <div
+              <Card
                 key={task.id}
-                className="combat-task-card rounded-xl surface-panel"
+                smoothCorners
+                className="combat-task-card !p-0"
               >
                 <div className="combat-task-heading flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div className="flex min-w-0 items-center gap-3">
@@ -1446,7 +1658,7 @@ export default function CombatTasks() {
                       variant="danger"
                       size="md"
                       icon={<span className="h-3 w-3 rounded-[2px] bg-current" aria-hidden="true" />}
-                      className="combat-task-run-button min-h-10 px-4 text-sm sm:px-6"
+                      className="combat-task-run-button min-h-11 px-4 text-sm sm:px-6"
                     >
                       终止执行
                     </Button>
@@ -1462,7 +1674,7 @@ export default function CombatTasks() {
                           <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                         </svg>
                       }
-                      className="combat-task-run-button min-h-10 px-4 text-sm sm:px-6"
+                      className="combat-task-run-button min-h-11 px-4 text-sm sm:px-6"
                     >
                       立即执行
                     </Button>
@@ -1485,11 +1697,13 @@ export default function CombatTasks() {
                       {/* 自动编队 */}
                       <div className="mb-3 space-y-1.5">
                         <div className="flex items-center space-x-2">
-                          <label className="w-12 shrink-0 text-xs text-secondary">编队</label>
+                          <label htmlFor="combat-copilot-formation" className="w-12 shrink-0 text-xs text-secondary">编队</label>
                           <select
+                            id="combat-copilot-formation"
+                            name="maa-copilot-formation"
                             value={getFormationMode(task.id)}
                             onChange={(e) => setAutoFormation({ ...autoFormation, [task.id]: e.target.value as FormationMode })}
-                            className="min-w-0 flex-1 rounded-lg border border-[var(--app-border)] py-1.5 pl-2 pr-8 text-xs text-primary control-surface focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
+                            className="min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--app-border)] py-1.5 pl-2 pr-8 text-xs text-primary control-surface focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
                           >
                             <option value="auto">自动决定</option>
                             <option value="on">自动编队</option>
@@ -1503,11 +1717,13 @@ export default function CombatTasks() {
 
                       {/* 突袭模式 */}
                       <div className="mb-3 flex items-center space-x-2">
-                        <label className="w-12 shrink-0 text-xs text-secondary">模式</label>
+                        <label htmlFor="combat-copilot-raid" className="w-12 shrink-0 text-xs text-secondary">模式</label>
                         <select
+                          id="combat-copilot-raid"
+                          name="maa-copilot-raid"
                           value={normalizeRaidValue(advancedParams[task.id]?.raid)}
                           onChange={(e) => handleAdvancedChange(task.id, 'raid', e.target.value)}
-                          className="min-w-0 flex-1 rounded-lg border border-[var(--app-border)] py-1.5 pl-2 pr-8 text-xs text-primary control-surface focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
+                          className="min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--app-border)] py-1.5 pl-2 pr-8 text-xs text-primary control-surface focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
                         >
                           <option value="normal">普通模式</option>
                           <option value="raid">突袭模式</option>
@@ -1518,11 +1734,13 @@ export default function CombatTasks() {
                       {/* 作业集执行方式 */}
                       <div className="space-y-1.5">
                         <div className="flex items-center space-x-2">
-                          <label className="w-12 shrink-0 text-xs text-secondary">作业集</label>
+                          <label htmlFor="combat-copilot-set-mode" className="w-12 shrink-0 text-xs text-secondary">作业集</label>
                           <select
+                            id="combat-copilot-set-mode"
+                            name="maa-copilot-set-mode"
                             value={copilotSetExecutionMode}
                             onChange={(e) => setCopilotSetExecutionMode(e.target.value as CopilotSetExecutionMode)}
-                            className="min-w-0 flex-1 rounded-lg border border-[var(--app-border)] py-1.5 pl-2 pr-8 text-xs text-primary control-surface focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
+                            className="min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--app-border)] py-1.5 pl-2 pr-8 text-xs text-primary control-surface focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
                           >
                             <option value="app">顺序执行</option>
                             <option value="manual">手动逐关</option>
@@ -1537,7 +1755,7 @@ export default function CombatTasks() {
                       {/* 高级选项 */}
                       {task.hasAdvanced && (
                         <details className="mt-4 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] px-3 py-2">
-                          <summary className="cursor-pointer list-none text-sm font-medium text-secondary">
+                          <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-medium text-secondary">
                             高级设置
                           </summary>
                           {renderAdvancedOptions(task)}
@@ -1550,7 +1768,9 @@ export default function CombatTasks() {
                   <div className="flex min-w-0 flex-col space-y-3">
                     <div className="rounded-lg border border-[var(--app-border)] p-4 surface-soft">
                       <div className="flex gap-2">
+                        <label htmlFor="combat-copilot-uri" className="sr-only">作业链接或本地路径</label>
                         <input
+                          id="combat-copilot-uri"
                           type="text"
                           name="maa-copilot-uri"
                           autoComplete="off"
@@ -1561,7 +1781,7 @@ export default function CombatTasks() {
                           placeholder="maa://1234、maa://1234s、作业站链接或本地路径"
                           value={taskInputs[task.id] || ''}
                           onChange={(e) => handleInputChange(task.id, e.target.value)}
-                          className="min-w-0 flex-1 rounded-lg border border-transparent px-3 py-2 font-mono text-sm text-primary control-surface focus:border-[var(--app-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
+                          className="min-h-11 min-w-0 flex-1 rounded-lg border border-transparent px-3 py-2 font-mono text-sm text-primary control-surface focus:border-[var(--app-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
                         />
                         <Button
                           onClick={() => handlePreviewCopilotSetWithInput()}
@@ -1585,8 +1805,8 @@ export default function CombatTasks() {
                       <div className="mt-2 flex items-center justify-between gap-3 text-xs text-tertiary">
                         <p className="truncate">支持作业链接、导入文件和本地作业。</p>
                         <details className="group relative shrink-0">
-                          <summary className="cursor-pointer list-none brand-text hover:underline">说明</summary>
-                          <div className="absolute right-0 z-20 mt-2 hidden w-72 space-y-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-solid)] p-3 text-left shadow-lg group-open:block">
+                          <summary className="inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center brand-text hover:underline">说明</summary>
+                          <div className="absolute right-0 z-20 mt-2 hidden w-[min(18rem,calc(100vw_-_3rem))] space-y-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-solid)] p-3 text-left shadow-lg group-open:block">
                             <p>• 在 <a href="https://zoot.plus/" target="_blank" rel="noopener noreferrer" className="brand-text hover:underline">zoot.plus</a> 获取作业链接</p>
                             <p>• 单作业：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">maa://1234</code>；作业集：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">maa://1234s</code></p>
                             <p>• 作业站链接会自动识别，也可导入远程或本地作业文件</p>
@@ -1600,8 +1820,8 @@ export default function CombatTasks() {
                       <span className="shrink-0 font-medium text-secondary">识别方式</span>
                       <div className="flex min-w-0 max-w-full overflow-hidden rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] p-0.5">
                         <button
-                          onClick={() => setCopilotType('auto')}
-                          className={`rounded-md px-3 py-1 transition-colors ${
+                          onClick={() => handleCopilotTypeChange('auto')}
+                          className={`min-h-11 rounded-md px-3 py-1 transition-colors ${
                             copilotType === 'auto'
                               ? 'combat-segment-active'
                               : 'text-secondary hover:bg-white/70 hover:text-primary dark:hover:bg-white/10'
@@ -1610,8 +1830,8 @@ export default function CombatTasks() {
                           自动
                         </button>
                         <button
-                          onClick={() => setCopilotType('single')}
-                          className={`rounded-md px-3 py-1 transition-colors ${
+                          onClick={() => handleCopilotTypeChange('single')}
+                          className={`min-h-11 rounded-md px-3 py-1 transition-colors ${
                             copilotType === 'single'
                               ? 'combat-segment-active'
                               : 'text-secondary hover:bg-white/70 hover:text-primary dark:hover:bg-white/10'
@@ -1620,8 +1840,8 @@ export default function CombatTasks() {
                           单个作业
                         </button>
                         <button
-                          onClick={() => setCopilotType('set')}
-                          className={`rounded-md px-3 py-1 transition-colors ${
+                          onClick={() => handleCopilotTypeChange('set')}
+                          className={`min-h-11 rounded-md px-3 py-1 transition-colors ${
                             copilotType === 'set'
                               ? 'combat-segment-active'
                               : 'text-secondary hover:bg-white/70 hover:text-primary dark:hover:bg-white/10'
@@ -1646,7 +1866,7 @@ export default function CombatTasks() {
                             <button
                               onClick={() => setResetProgressDialogOpen(true)}
                               disabled={isResettingProgress}
-                              className="text-xs text-gray-500 transition-colors hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-400"
+                              className="min-h-11 px-1 text-xs text-gray-500 transition-colors hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-400"
                             >
                               {isResettingProgress ? '重置中...' : '重置进度'}
                             </button>
@@ -1659,7 +1879,7 @@ export default function CombatTasks() {
                                   applySelectedCopilotIndexes(new Set(copilotSetInfo.copilots!.map((_, idx) => idx)), copilotSetInfo.id)
                                 }
                               }}
-                              className="text-xs brand-text hover:underline transition-colors"
+                              className="min-h-11 px-1 text-xs brand-text transition-colors hover:underline"
                             >
                               {selectedCopilotIndexes.size === copilotSetInfo.copilots.length ? '清空待执行' : '全选待执行'}
                             </button>
@@ -1884,13 +2104,20 @@ export default function CombatTasks() {
                         <span>快速搜索</span>
                       </h5>
                       <div className="flex space-x-2">
+                        <label htmlFor="combat-stage-search" className="sr-only">搜索关卡作业</label>
                         <input
+                          id="combat-stage-search"
                           type="text"
+                          name="maa-copilot-stage-search"
                           placeholder="关卡名称，如：1-7、CE-6"
                           value={copilotSearchStage}
-                          onChange={(e) => setCopilotSearchStage(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleSearchCopilot()}
-                          className="min-w-0 flex-1 rounded-lg border border-[var(--app-border)] px-3 py-2 text-sm text-primary control-surface focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
+                          onChange={(e) => handleCopilotSearchStageChange(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key !== 'Enter' || isSearchingCopilot || !copilotSearchStage.trim()) return
+                            e.preventDefault()
+                            void handleSearchCopilot()
+                          }}
+                          className="min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--app-border)] px-3 py-2 text-sm text-primary control-surface focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
                         />
                         <Button
                           onClick={handleSearchCopilot}
@@ -1912,7 +2139,7 @@ export default function CombatTasks() {
                             <button
                               key={copilot.id}
                               onClick={() => void applyCopilotUri(copilot.uri)}
-                              className={`flex w-full items-center justify-between rounded-lg border px-3 py-1.5 text-left text-xs transition-all ${
+                              className={`flex min-h-11 w-full items-center justify-between rounded-lg border px-3 py-1.5 text-left text-xs transition-all ${
                                 selectedSearchCopilotUri === copilot.uri
                                   ? 'brand-action-subtle border-[var(--app-accent)]'
                                   : 'border-[var(--app-border)] bg-[var(--app-surface)] hover:border-[var(--app-accent)]'
@@ -2043,7 +2270,7 @@ export default function CombatTasks() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Card>
             )
           })}
 
@@ -2056,9 +2283,10 @@ export default function CombatTasks() {
               const recommendedParadox = paradoxSearchResult?.copilots?.[0]
 
               return (
-                <div
+                <Card
                   key={task.id}
-                  className="combat-task-card rounded-xl surface-panel"
+                  smoothCorners
+                  className="combat-task-card !p-0"
                 >
                   <div className="combat-task-heading flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div className="flex min-w-0 items-center gap-3">
@@ -2083,7 +2311,7 @@ export default function CombatTasks() {
                         variant="danger"
                         size="md"
                         icon={<span className="h-3 w-3 rounded-[2px] bg-current" aria-hidden="true" />}
-                        className="combat-task-run-button min-h-10 px-4 text-sm sm:px-5"
+                        className="combat-task-run-button min-h-11 px-4 text-sm sm:px-5"
                       >
                         终止执行
                       </Button>
@@ -2099,7 +2327,7 @@ export default function CombatTasks() {
                             <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                           </svg>
                         }
-                        className="combat-task-run-button min-h-10 px-4 text-sm sm:px-5"
+                        className="combat-task-run-button min-h-11 px-4 text-sm sm:px-5"
                       >
                         立即执行
                       </Button>
@@ -2120,7 +2348,11 @@ export default function CombatTasks() {
                             {isSss ? `${taskUris.length}/1 URI` : `${taskUris.length} 个 URI`}
                           </span>
                         </div>
+                        <label htmlFor={`combat-${task.id}-uris`} className="sr-only">
+                          {task.name}作业链接或本地路径
+                        </label>
                         <textarea
+                          id={`combat-${task.id}-uris`}
                           name={`maa-${task.id}-uris`}
                           autoComplete="off"
                           autoCorrect="off"
@@ -2161,7 +2393,9 @@ export default function CombatTasks() {
                             <span>干员搜索</span>
                           </h5>
                           <div className="flex space-x-2">
+                            <label htmlFor="combat-paradox-operator" className="sr-only">搜索悖论模拟干员</label>
                             <input
+                              id="combat-paradox-operator"
                               type="text"
                               name="maa-paradox-operator"
                               autoComplete="off"
@@ -2170,9 +2404,13 @@ export default function CombatTasks() {
                               spellCheck={false}
                               placeholder="古米、能天使"
                               value={paradoxSearchName}
-                              onChange={(e) => setParadoxSearchName(e.target.value)}
-                              onKeyDown={(e) => e.key === 'Enter' && handleSearchParadox()}
-                              className="min-w-0 flex-1 rounded-lg border border-[var(--app-border)] px-3 py-2 text-sm text-primary control-surface focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
+                              onChange={(e) => handleParadoxSearchNameChange(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key !== 'Enter' || isSearchingParadox || !paradoxSearchName.trim()) return
+                                e.preventDefault()
+                                void handleSearchParadox()
+                              }}
+                              className="min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--app-border)] px-3 py-2 text-sm text-primary control-surface focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
                             />
                             <Button
                               onClick={handleSearchParadox}
@@ -2202,7 +2440,7 @@ export default function CombatTasks() {
                                       onClick={() => {
                                         setTaskInputs({ ...taskInputs, paradoxcopilot: copilot.uri })
                                       }}
-                                      className="w-full rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2 text-left text-xs transition-all hover:border-[var(--app-accent)]"
+                                      className="min-h-11 w-full rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2 text-left text-xs transition-all hover:border-[var(--app-accent)]"
                                     >
                                       <div className="flex min-w-0 items-center justify-between gap-2">
                                         <span className="truncate font-mono brand-text">{copilot.uri}</span>
@@ -2273,7 +2511,7 @@ export default function CombatTasks() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </Card>
               )
             })}
           </div>

@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { Monitor } from 'lucide-react'
-import { Button } from './common'
+import { Button, SmoothPanel } from './common'
 import { useDashboardPreview } from '../hooks/useDashboardPreview'
 
 interface DashboardPreviewEntryProps {
@@ -11,9 +11,9 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry({ onOpen }: Da
   const { videoRef, fallbackSnapshot, showLivePreview, isConnecting, statusText, headerStatusText } = useDashboardPreview()
 
   return (
-    <div
+    <SmoothPanel
       data-dashboard-preview-card
-      className={`status-border-beam rounded-2xl surface-panel overflow-hidden ${isConnecting ? 'is-active' : ''}`}
+      className={`status-border-beam ${isConnecting ? 'is-active' : ''}`}
       aria-busy={isConnecting}
     >
       <div className="dashboard-preview-header flex items-center justify-between gap-3 px-4 py-2.5 border-b border-[var(--app-border)]">
@@ -23,7 +23,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry({ onOpen }: Da
         </div>
         <div className="flex items-center gap-2">
           <span className="hidden sm:inline text-[10px] text-secondary">{headerStatusText}</span>
-          <Button onClick={onOpen} variant="ghost" size="sm">打开</Button>
+          <Button onClick={onOpen} variant="ghost" size="sm" className="min-h-11 sm:min-h-9">打开</Button>
         </div>
       </div>
       <div
@@ -35,6 +35,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry({ onOpen }: Da
           autoPlay
           muted
           playsInline
+          aria-hidden="true"
           className={`relative h-full w-full bg-black object-contain ${showLivePreview ? 'opacity-100' : 'opacity-0'}`}
         />
         {!showLivePreview && fallbackSnapshot && (
@@ -65,7 +66,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry({ onOpen }: Da
           {statusText}
         </div>
       </div>
-    </div>
+    </SmoothPanel>
   )
 })
 

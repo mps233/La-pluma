@@ -37,26 +37,34 @@ export function useDashboardPreview() {
       snapshot_interval: 10
     }
   })
+  const connectPreview = preview.connect
 
   useEffect(() => {
+    let cancelled = false
     const fetch = () => {
       maaApi.getWebrtcStatus()
         .then(response => {
-          if (response.success) setWebrtcStatus(response.data)
+          if (!cancelled && response.success) setWebrtcStatus(response.data)
         })
         .catch(() => {})
     }
 
     fetch()
     const timer = setInterval(fetch, STATUS_POLL_INTERVAL_MS)
-    return () => clearInterval(timer)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
   }, [])
 
   useEffect(() => {
     if (!webrtcStatus?.serverRunning || !webrtcStatus?.agentRunning || autoConnectRef.current) return
     autoConnectRef.current = true
-    preview.connect()
-  }, [preview, webrtcStatus?.agentRunning, webrtcStatus?.serverRunning])
+    connectPreview()
+    return () => {
+      autoConnectRef.current = false
+    }
+  }, [connectPreview, webrtcStatus?.agentRunning, webrtcStatus?.serverRunning])
 
   useEffect(() => {
     const canvas = document.createElement('canvas')

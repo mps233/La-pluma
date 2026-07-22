@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { maaApi } from '../services/api'
 import Icons from './Icons'
-import { PageHeader, Card, Input, Select, Checkbox, Button } from './common'
+import { PageHeader, Card, Input, Select, Checkbox, Button, SmoothSurface } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import ScreenMonitor from './ScreenMonitor'
@@ -17,6 +17,21 @@ import type {
 import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
 
 type RoguelikeMode = 'roguelike' | 'reclamation'
+type RoguelikeUserConfig = {
+  taskInputs: RoguelikeTaskInputs
+  advancedParams: RoguelikeAdvancedParams
+}
+
+const ROGUELIKE_CONFIG_SYNC_PENDING_KEY = 'roguelikeConfigSyncPending'
+let roguelikeConfigSyncSequence = 0
+let roguelikeConfigSyncQueue: Promise<void> = Promise.resolve()
+
+const createRoguelikeConfigSyncToken = () => `${Date.now()}-${++roguelikeConfigSyncSequence}`
+const enqueueRoguelikeConfigSync = <T,>(operation: () => Promise<T>) => {
+  const result = roguelikeConfigSyncQueue.then(operation, operation)
+  roguelikeConfigSyncQueue = result.then(() => undefined, () => undefined)
+  return result
+}
 
 const THEME_PRESETS: Record<RoguelikeMode, Array<{ value: string; label: string }>> = {
   roguelike: [
@@ -44,12 +59,14 @@ export default function RoguelikeTasks() {
   const [taskInputs, setTaskInputs] = useState<RoguelikeTaskInputs>({})
   const [advancedParams, setAdvancedParams] = useState<RoguelikeAdvancedParams>({})
   const [configLoaded, setConfigLoaded] = useState(false)
+  const [configSyncError, setConfigSyncError] = useState<string | null>(null)
+  const [isRetryingConfigSave, setIsRetryingConfigSave] = useState(false)
+  const configRevisionRef = useRef(0)
+  const skippedInitialConfigSaveRef = useRef(false)
+  const lastQueuedConfigFingerprintRef = useRef<string | null>(null)
+  const configHydratedRef = useRef(false)
   const [activeMode, setActiveMode] = useState<RoguelikeMode>('roguelike')
   const { containerRef: modeTabsRef, activeRect: activeModeRect, setTabRef: setModeTabRef } = useFluidTabIndicator(activeMode)
-
-  useEffect(() => {
-    setIsActiveStatus(isRunning)
-  }, [isRunning, setIsActiveStatus])
 
   useEffect(() => () => {
     executionGenerationRef.current += 1
@@ -63,12 +80,48 @@ export default function RoguelikeTasks() {
     stopRequestInFlightRef.current = false
     setIsStopping(false)
     setIsRunning(true)
+    setIsActiveStatus(true)
     executionGenerationRef.current += 1
     return executionGenerationRef.current
   }
 
   const isCurrentExecution = (generation: number) =>
     executionGenerationRef.current === generation && !stopRequestedRef.current
+
+  const syncConfig = useCallback((
+    config: RoguelikeUserConfig,
+    revision: number,
+    syncToken: string,
+    announceSuccess = false,
+  ) => enqueueRoguelikeConfigSync(async () => {
+    if (
+      revision !== configRevisionRef.current
+      || localStorage.getItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY) !== syncToken
+    ) return false
+
+    try {
+      const result = await maaApi.saveUserConfig('roguelike-tasks', config)
+      if (!result.success) throw new Error(maaApi.getErrorMessage(result))
+      if (
+        revision !== configRevisionRef.current
+        || localStorage.getItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY) !== syncToken
+      ) return false
+
+      localStorage.removeItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY)
+      setConfigSyncError(null)
+      if (announceSuccess) setStatusMessage('肉鸽配置已同步', 'success')
+      return true
+    } catch (error) {
+      if (
+        revision !== configRevisionRef.current
+        || localStorage.getItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY) !== syncToken
+      ) return false
+
+      const detail = error instanceof Error && error.message ? error.message : '暂时无法连接服务器'
+      setConfigSyncError(`配置已保存在此设备，但尚未同步到服务器：${detail}`)
+      return false
+    }
+  }), [setStatusMessage])
 
   // 页面加载时从服务器或 localStorage 加载配置和恢复执行状态
   useEffect(() => {
@@ -90,7 +143,15 @@ export default function RoguelikeTasks() {
         const result = await maaApi.getTaskStatus(controller.signal)
         if (cancelled) return
         const taskStatus = result.data
-        if (result.success && taskStatus?.isRunning) {
+        if (result.success) {
+          const backendRunning = Boolean(taskStatus?.isRunning)
+          setIsActiveStatus(backendRunning)
+
+          if (!backendRunning || taskStatus?.taskType !== 'roguelike') {
+            setIsRunning(false)
+            return
+          }
+
           // 后端确实有任务在运行
           const { taskName, startTime, taskType } = taskStatus
           
@@ -111,6 +172,9 @@ export default function RoguelikeTasks() {
               try {
                 const statusResult = await maaApi.getTaskStatus(controller.signal)
                 if (cancelled) return
+                if (statusResult.success) {
+                  setIsActiveStatus(Boolean(statusResult.data?.isRunning))
+                }
                 if (statusResult.success && !statusResult.data.isRunning) {
                   // 任务已完成
                   setIsRunning(false)
@@ -136,12 +200,51 @@ export default function RoguelikeTasks() {
       }
     }
     
-    checkBackendStatus()
+    void checkBackendStatus()
+
+    const cleanup = () => {
+      cancelled = true
+      controller.abort()
+      stopStatusPolling()
+    }
+
+    if (configHydratedRef.current) return cleanup
     
+    const loadLocalConfig = () => {
+      let restored = false
+      const restoreJson = <T,>(key: string, apply: (value: T) => void) => {
+        const stored = localStorage.getItem(key)
+        if (!stored) return
+        try {
+          apply(JSON.parse(stored) as T)
+          restored = true
+        } catch {
+          localStorage.removeItem(key)
+        }
+      }
+
+      restoreJson<RoguelikeTaskInputs>('roguelikeTaskInputs', setTaskInputs)
+      restoreJson<RoguelikeAdvancedParams>('roguelikeAdvancedParams', setAdvancedParams)
+      return restored
+    }
+
+    // A pending local draft is newer than the server copy by definition.
+    const hasPendingLocalDraft = localStorage.getItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY) !== null
+    if (hasPendingLocalDraft) {
+      if (loadLocalConfig()) {
+        configHydratedRef.current = true
+        setConfigSyncError('上次更改已保存在此设备，但尚未同步到服务器。')
+        setConfigLoaded(true)
+        return cleanup
+      }
+      localStorage.removeItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY)
+    }
+
     // 加载保存的配置 - 优先从服务器加载
     const loadConfig = async () => {
       try {
         const serverConfig = await maaApi.loadUserConfig('roguelike-tasks')
+        if (cancelled) return
         if (serverConfig.success && serverConfig.data) {
           const { taskInputs: inputs, advancedParams: advanced } = serverConfig.data
           if (inputs) {
@@ -155,46 +258,65 @@ export default function RoguelikeTasks() {
           return
         }
       } catch (error) {
+        if (cancelled) return
         // 静默失败，从 localStorage 加载
       }
-      
-      // 服务器加载失败，从 localStorage 加载
-      const savedInputs = localStorage.getItem('roguelikeTaskInputs')
-      const savedAdvanced = localStorage.getItem('roguelikeAdvancedParams')
-      
-      if (savedInputs) {
-        setTaskInputs(JSON.parse(savedInputs))
-      }
-      if (savedAdvanced) {
-        setAdvancedParams(JSON.parse(savedAdvanced))
-      }
+
+      if (!cancelled) loadLocalConfig()
     }
     
     void loadConfig().finally(() => {
-      if (!cancelled) setConfigLoaded(true)
+      if (!cancelled) {
+        configHydratedRef.current = true
+        setConfigLoaded(true)
+      }
     })
 
-    return () => {
-      cancelled = true
-      controller.abort()
-      stopStatusPolling()
-    }
-  }, [setStatusMessage])
+    return cleanup
+  }, [setIsActiveStatus, setStatusMessage])
 
   // 自动保存配置
   useEffect(() => {
     if (!configLoaded) return
 
+    const config: RoguelikeUserConfig = { taskInputs, advancedParams }
+    const fingerprint = JSON.stringify(config)
+
+    if (!skippedInitialConfigSaveRef.current) {
+      skippedInitialConfigSaveRef.current = true
+      lastQueuedConfigFingerprintRef.current = fingerprint
+      return
+    }
+
+    if (lastQueuedConfigFingerprintRef.current === fingerprint) return
+
+    const revision = configRevisionRef.current + 1
+    configRevisionRef.current = revision
+    const syncToken = createRoguelikeConfigSyncToken()
+
     localStorage.setItem('roguelikeTaskInputs', JSON.stringify(taskInputs))
     localStorage.setItem('roguelikeAdvancedParams', JSON.stringify(advancedParams))
+    localStorage.setItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY, syncToken)
     const saveTimer = window.setTimeout(() => {
-      maaApi.saveUserConfig('roguelike-tasks', { taskInputs, advancedParams }).catch(() => {
-        // 静默失败，不影响用户体验
-      })
+      lastQueuedConfigFingerprintRef.current = fingerprint
+      void syncConfig(config, revision, syncToken)
     }, 300)
 
     return () => window.clearTimeout(saveTimer)
-  }, [advancedParams, configLoaded, taskInputs])
+  }, [advancedParams, configLoaded, syncConfig, taskInputs])
+
+  const handleRetryConfigSave = async () => {
+    if (isRetryingConfigSave) return
+    const revision = configRevisionRef.current
+    const syncToken = localStorage.getItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY) ?? createRoguelikeConfigSyncToken()
+    localStorage.setItem(ROGUELIKE_CONFIG_SYNC_PENDING_KEY, syncToken)
+    setIsRetryingConfigSave(true)
+    try {
+      await syncConfig({ taskInputs, advancedParams }, revision, syncToken, true)
+    } finally {
+      setIsRetryingConfigSave(false)
+    }
+  }
 
   const tasks: RoguelikeTask[] = [
     { 
@@ -298,6 +420,7 @@ export default function RoguelikeTasks() {
       if (isCurrentExecution(generation)) {
         stopRequestedRef.current = false
         setIsRunning(false)
+        setIsActiveStatus(false)
         stopRequestInFlightRef.current = false
         setIsStopping(false)
       }
@@ -336,6 +459,7 @@ export default function RoguelikeTasks() {
 
       stopRequestedRef.current = false
       setIsRunning(false)
+      setIsActiveStatus(false)
       setStatusMessage('肉鸽任务已终止', 'warning')
     } catch (error) {
       if (waitController?.signal.aborted || executionGenerationRef.current !== operationGeneration) return
@@ -380,6 +504,8 @@ export default function RoguelikeTasks() {
             <div key={option.key}>
               {option.type === 'select' && option.options ? (
                 <Select
+                  id={`roguelike-${task.id}-${option.key}`}
+                  name={`maa-${task.id}-${option.key}`}
                   label={option.label}
                   value={String(advanced[option.key] ?? option.options[0]?.value ?? '')}
                   onChange={(value: string) => handleAdvancedChange(task.id, option.key, value)}
@@ -387,6 +513,8 @@ export default function RoguelikeTasks() {
                 />
               ) : (
                 <Input
+                  id={`roguelike-${task.id}-${option.key}`}
+                  name={`maa-${task.id}-${option.key}`}
                   type={option.type === 'number' ? 'number' : 'text'}
                   label={option.label}
                   value={advanced[option.key] as string | number ?? ''}
@@ -402,9 +530,12 @@ export default function RoguelikeTasks() {
             {toggleOptions.map(option => (
               <div key={option.key} className="roguelike-toggle-row">
                 <Checkbox
+                  id={`roguelike-${task.id}-${option.key}`}
+                  name={`maa-${task.id}-${option.key}`}
                   checked={advanced[option.key] as boolean || false}
                   onChange={(checked: boolean) => handleAdvancedChange(task.id, option.key, checked)}
                   label={option.label}
+                  className="min-h-11"
                 />
               </div>
             ))}
@@ -420,17 +551,42 @@ export default function RoguelikeTasks() {
   const activeTheme = taskInputs[activeTask.id] || ''
 
   return (
-    <div className="app-page app-stack-section roguelike-page">
+    <div className="app-page app-stack-section ios-workspace-page roguelike-page">
       <PageHeader
-        icon={<Icons.DiceIcon />}
         title="肉鸽模式"
         subtitle="集成战略与生息演算配置"
-        actions={<FloatingStatusIndicator />}
+        mobileLayout="inline"
+        actions={(
+          <FloatingStatusIndicator
+            className="w-full overflow-hidden sm:w-auto sm:max-w-none"
+            textClassName="truncate whitespace-nowrap"
+          />
+        )}
       />
+
+      {configSyncError && (
+        <div
+          role="alert"
+          className="status-warning flex min-h-11 flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm leading-5"
+        >
+          <span className="min-w-0 flex-1">{configSyncError}</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            loading={isRetryingConfigSave}
+            loadingText="同步中"
+            onClick={() => void handleRetryConfigSave()}
+            className="min-h-11 shrink-0"
+          >
+            重新同步
+          </Button>
+        </div>
+      )}
 
       <div className="task-monitor-layout">
         <div className="task-monitor-main">
-      <div className="roguelike-mode-shell">
+      <SmoothSurface className="roguelike-mode-shell">
         <div ref={modeTabsRef} className="roguelike-mode-tabs">
           {activeModeRect.width > 0 && (
             <motion.div
@@ -467,7 +623,7 @@ export default function RoguelikeTasks() {
                 type="button"
                 onClick={() => setActiveMode(task.id as RoguelikeMode)}
                 aria-pressed={selected}
-                className={`roguelike-mode-button ${selected ? 'is-selected' : ''}`}
+                className={`roguelike-mode-button min-h-11 ${selected ? 'is-selected' : ''}`}
               >
                 {IconComponent && <span className="roguelike-mode-icon"><IconComponent /></span>}
                 <span className="min-w-0">
@@ -478,9 +634,9 @@ export default function RoguelikeTasks() {
             )
           })}
         </div>
-      </div>
+      </SmoothSurface>
 
-      <Card className="roguelike-workspace" animated>
+      <Card className="roguelike-workspace !p-0" animated smoothCorners>
         <div className="roguelike-workspace-header">
           <div className="roguelike-workspace-heading">
             {ActiveIcon && <span className="roguelike-workspace-icon"><ActiveIcon /></span>}
@@ -537,7 +693,7 @@ export default function RoguelikeTasks() {
                   type="button"
                   onClick={() => handleInputChange(activeTask.id, theme.value)}
                   aria-pressed={activeTheme === theme.value}
-                  className={`roguelike-theme-option ${activeTheme === theme.value ? 'is-active' : ''}`}
+                  className={`roguelike-theme-option min-h-11 ${activeTheme === theme.value ? 'is-active' : ''}`}
                 >
                   <span>{theme.label}</span>
                   <small>{theme.value}</small>
@@ -545,6 +701,8 @@ export default function RoguelikeTasks() {
               ))}
             </div>
             <Input
+              id={`roguelike-${activeTask.id}-theme`}
+              name={`maa-${activeTask.id}-theme`}
               type="text"
               label="自定义主题代号"
               placeholder={activeTask.placeholder}

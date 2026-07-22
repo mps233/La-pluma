@@ -1,13 +1,18 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentType, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
-import { BarChart3, Bot, Dices, FileText, Gamepad2, GitBranch, GraduationCap, LayoutDashboard, Search, Settings2, Swords, X } from 'lucide-react'
-import { Link, Navbar, Page as F7Page, Sheet, Toolbar, View } from 'framework7-react'
-import '../framework7'
+import { AnimatePresence, motion, useReducedMotion, type PanInfo } from 'framer-motion'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutDashboard, Search, Settings2, Swords, X } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
 import { useUIStore } from '@/stores'
 import { appTabFromPath, appTabPath, isAppTab, type AppTab } from '@/stores/uiStore'
 
-const AccessibleSheet = Sheet as unknown as ComponentType<Record<string, unknown>>
-const ExternalLink = Link as unknown as ComponentType<Record<string, unknown>>
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not(:disabled)',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
+const SHEET_DISMISS_OFFSET = 96
+const SHEET_DISMISS_VELOCITY = 650
+const SHEET_EASE = [0.32, 0.72, 0, 1] as const
 
 interface LayoutProps {
   children: (props: { activeTab: string }) => ReactNode
@@ -24,8 +29,21 @@ const tabs = [
   { id: 'config', name: '配置', icon: Settings2 },
 ] satisfies Array<{ id: AppTab; name: string; icon: typeof LayoutDashboard }>
 
+const desktopTabGroups = [
+  {
+    id: 'tasks',
+    label: '任务与执行',
+    tabs: tabs.filter(tab => ['dashboard', 'automation', 'combat', 'roguelike', 'training'].includes(tab.id)),
+  },
+  {
+    id: 'library',
+    label: '记录与设置',
+    tabs: tabs.filter(tab => ['logs', 'statistics', 'config'].includes(tab.id)),
+  },
+]
+
 // Keep the compact mobile rail focused on the four destinations used most often.
-// The remaining workspaces stay available from the adjacent search/more control.
+// The remaining workspaces stay available from the adjacent more control.
 const mobileTabs = tabs.filter(tab => ['dashboard', 'automation', 'combat', 'config'].includes(tab.id))
 const overflowTabs = tabs.filter(tab => !mobileTabs.some(primary => primary.id === tab.id))
 
@@ -46,21 +64,17 @@ function setScrollTop(top: number) {
   window.scrollTo({ top, left: 0, behavior: 'auto' })
 }
 
-function restoreMoreSheetFocus() {
-  window.requestAnimationFrame(() => {
-    const isDesktop = window.matchMedia?.('(min-width: 1024px)').matches ?? false
-    const selector = isDesktop
-      ? '.la-pluma-sidebar a[aria-current="page"]'
-      : '.la-pluma-tabbar [aria-label="更多页面"]'
-    const target = document.querySelector<HTMLElement>(selector)
-      ?? document.querySelector<HTMLElement>('.la-pluma-navbar a')
-    target?.focus({ preventScroll: true })
-  })
-}
-
 function TabIcon({ tab, size = 'h-4 w-4' }: { tab: typeof tabs[number]; size?: string }) {
   const Icon = tab.icon
   return <Icon className={size} strokeWidth={1.9} aria-hidden="true" />
+}
+
+function GitHubMark() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" focusable="false" aria-hidden="true">
+      <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.335-1.756-1.335-1.756-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.418-1.305.762-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23a11.5 11.5 0 0 1 3.003-.404c1.02.005 2.045.138 3.003.404 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+    </svg>
+  )
 }
 
 function TabLink({
@@ -74,19 +88,26 @@ function TabLink({
   onNavigate: (event: ReactMouseEvent<HTMLAnchorElement>, tab: AppTab, mobile?: boolean) => void
   mobile?: boolean
 }) {
+  const frameworkClasses = mobile
+    ? `tab-link${active ? ' tab-link-active' : ''}`
+    : 'link'
+
   return (
-    <Link
+    <a
       href={appTabPath(tab.id)}
-      tabLink={mobile || undefined}
-      tabLinkActive={mobile ? active : undefined}
-      tabbarLabel={mobile || undefined}
       aria-current={active ? 'page' : undefined}
-      onClick={(event) => onNavigate(event as ReactMouseEvent<HTMLAnchorElement>, tab.id, mobile)}
-      className={`la-pluma-tab-link ${active ? 'is-active' : ''} ${mobile ? 'is-mobile-tab' : 'is-desktop-tab'}`}
+      onClick={(event) => onNavigate(event, tab.id, mobile)}
+      className={`la-pluma-tab-link ${frameworkClasses} ${active ? 'is-active' : ''} ${mobile ? 'is-mobile-tab' : 'is-desktop-tab'}`}
     >
-      <TabIcon tab={tab} size={mobile ? 'h-5 w-5' : 'h-[1.125rem] w-[1.125rem]'} />
-      <span className={mobile ? 'tabbar-label' : undefined}>{tab.name}</span>
-    </Link>
+      {mobile ? (
+        <TabIcon tab={tab} size="h-5 w-5" />
+      ) : (
+        <span className="la-pluma-sidebar-icon">
+          <TabIcon tab={tab} size="h-4 w-4" />
+        </span>
+      )}
+      <span className={mobile ? 'tabbar-label' : 'la-pluma-sidebar-label'}>{tab.name}</span>
+    </a>
   )
 }
 
@@ -95,37 +116,54 @@ export default function Layout({ children }: LayoutProps) {
   const setActiveTab = useUIStore(state => state.setActiveTab)
   const activeTab: AppTab = isAppTab(storedActiveTab) ? storedActiveTab : 'dashboard'
   const [moreOpen, setMoreOpen] = useState(false)
+  const [sidebarQuery, setSidebarQuery] = useState('')
+  const shouldReduceMotion = useReducedMotion()
+  const moreTriggerRef = useRef<HTMLAnchorElement>(null)
   const scrollPositions = useRef(new Map<AppTab, number>())
   const previousTab = useRef<AppTab>(activeTab)
   const navigationSource = useRef<'initial' | 'store' | 'link' | 'popstate'>('initial')
   const restoreFrame = useRef<number | null>(null)
   const scrollRestoreCleanupRef = useRef<(() => void) | null>(null)
+
+  const closeMoreSheet = useCallback(() => setMoreOpen(false), [])
+
   useEffect(() => {
     if (!moreOpen) return undefined
+
+    const scrollHost = getScrollHost()
+    const focusReturnTarget = moreTriggerRef.current
+    const previousBodyOverflow = document.body.style.overflow
+    const previousScrollHostOverflow = scrollHost?.style.overflow ?? ''
+    document.body.style.overflow = 'hidden'
+    if (scrollHost) scrollHost.style.overflow = 'hidden'
 
     const focusFrame = window.requestAnimationFrame(() => {
       const sheet = document.getElementById('la-pluma-more-sheet')
       const activeLink = sheet?.querySelector<HTMLElement>('[aria-current="page"]')
-      const firstFocusable = sheet?.querySelector<HTMLElement>('a[href], button:not(:disabled), [tabindex]:not([tabindex="-1"])')
+      const firstFocusable = sheet?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
       ;(activeLink ?? firstFocusable)?.focus({ preventScroll: true })
     })
 
     const handleSheetKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
-        setMoreOpen(false)
+        closeMoreSheet()
         return
       }
       if (event.key !== 'Tab') return
 
       const sheet = document.getElementById('la-pluma-more-sheet')
       if (!sheet) return
-      const focusable = [...sheet.querySelectorAll<HTMLElement>('a[href], button:not(:disabled), [tabindex]:not([tabindex="-1"])')]
-        .filter(element => element.getClientRects().length > 0)
+      const focusable = [...sheet.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)]
       if (focusable.length === 0) return
 
       const first = focusable[0]!
       const last = focusable[focusable.length - 1]!
+      if (!sheet.contains(document.activeElement)) {
+        event.preventDefault()
+        ;(event.shiftKey ? last : first).focus({ preventScroll: true })
+        return
+      }
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault()
         last.focus({ preventScroll: true })
@@ -135,12 +173,23 @@ export default function Layout({ children }: LayoutProps) {
       }
     }
 
-    document.addEventListener('keydown', handleSheetKeyDown)
+    document.addEventListener('keydown', handleSheetKeyDown, true)
     return () => {
       window.cancelAnimationFrame(focusFrame)
-      document.removeEventListener('keydown', handleSheetKeyDown)
+      document.removeEventListener('keydown', handleSheetKeyDown, true)
+      document.body.style.overflow = previousBodyOverflow
+      if (scrollHost) scrollHost.style.overflow = previousScrollHostOverflow
+      window.requestAnimationFrame(() => {
+        if (focusReturnTarget?.isConnected) focusReturnTarget.focus({ preventScroll: true })
+      })
     }
-  }, [moreOpen])
+  }, [closeMoreSheet, moreOpen])
+
+  const handleMoreSheetDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    if (info.offset.y >= SHEET_DISMISS_OFFSET || info.velocity.y >= SHEET_DISMISS_VELOCITY) {
+      closeMoreSheet()
+    }
+  }
 
   useEffect(() => {
     const desktopQuery = window.matchMedia('(min-width: 1024px)')
@@ -285,46 +334,112 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   const isOverflowActive = overflowTabs.some(tab => tab.id === activeTab)
+  const normalizedSidebarQuery = sidebarQuery.trim().toLocaleLowerCase()
+  const visibleDesktopGroups = desktopTabGroups
+    .map(group => ({
+      ...group,
+      tabs: group.tabs.filter(tab => (
+        !normalizedSidebarQuery
+        || `${tab.name} ${tab.id}`.toLocaleLowerCase().includes(normalizedSidebarQuery)
+      )),
+    }))
+    .filter(group => group.tabs.length > 0)
+  const visibleDesktopTabCount = visibleDesktopGroups.reduce((count, group) => count + group.tabs.length, 0)
 
   return (
-    <View main router={false} className="la-pluma-view">
-      <F7Page name="la-pluma" pageContent={false} noSwipeback className="la-pluma-page">
-        <Navbar className="la-pluma-navbar">
-          <div slot="left" className="la-pluma-navbar-left">
-            <Link href={appTabPath('dashboard')} className="la-pluma-brand" aria-label="La Pluma 控制台" onClick={(event) => navigateToTab(event as ReactMouseEvent<HTMLAnchorElement>, 'dashboard')}>
-              <img src={`${import.meta.env.BASE_URL}logo-graphite.svg?v=1`} alt="" className="la-pluma-brand-mark" />
-              <span>La Pluma</span>
-            </Link>
+    <div className="view view-main la-pluma-view">
+      <div className="page no-swipeback la-pluma-page" data-name="la-pluma">
+        <div className="la-pluma-sidebar-frame" aria-hidden="true" />
+        <header className="navbar la-pluma-navbar">
+          <div className="navbar-bg" aria-hidden="true" />
+          <div className="navbar-inner">
+            <div className="left">
+              <div className="la-pluma-navbar-left">
+                <a href={appTabPath('dashboard')} className="link la-pluma-brand" aria-label="La Pluma 控制台" onClick={(event) => navigateToTab(event, 'dashboard')}>
+                  <img src={`${import.meta.env.BASE_URL}logo-graphite.svg?v=1`} alt="" className="la-pluma-brand-mark" />
+                  <span>La Pluma</span>
+                </a>
+              </div>
+            </div>
+            <div className="title">
+              <div className="la-pluma-navbar-title">{tabs.find(tab => tab.id === activeTab)?.name}</div>
+            </div>
+            <div className="right">
+              <div className="la-pluma-navbar-actions">
+                <ThemeToggle />
+                <a
+                  href="https://github.com/mps233/La-pluma"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="link la-pluma-github-link"
+                  aria-label="打开 GitHub 仓库"
+                >
+                  <GitHubMark />
+                </a>
+              </div>
+            </div>
           </div>
-          <div slot="title" className="la-pluma-navbar-title">{tabs.find(tab => tab.id === activeTab)?.name}</div>
-          <div slot="right" className="la-pluma-navbar-actions">
-            <ThemeToggle />
-            <ExternalLink
-              href="https://github.com/mps233/La-pluma"
-              target="_blank"
-              rel="noopener noreferrer"
-              external
-              className="la-pluma-github-link"
-              tooltip="打开 GitHub 仓库"
-              aria-label="打开 GitHub 仓库"
-            >
-              <GitBranch className="h-[1.125rem] w-[1.125rem]" aria-hidden="true" />
-            </ExternalLink>
-          </div>
-        </Navbar>
+        </header>
 
         <div className="la-pluma-page-body">
           <aside className="la-pluma-sidebar" aria-label="主要功能">
-            <div className="la-pluma-sidebar-caption">工作台</div>
-            <nav className="la-pluma-sidebar-nav">
-              {tabs.map(tab => (
-                <TabLink key={tab.id} tab={tab} active={activeTab === tab.id} onNavigate={navigateToTab} />
-              ))}
-            </nav>
-            <div className="la-pluma-sidebar-footnote">
-              <Gamepad2 className="h-4 w-4" aria-hidden="true" />
-              <span>MAA 本地控制台</span>
+            <div className="la-pluma-sidebar-search" role="search">
+              <Search size={17} strokeWidth={2} aria-hidden="true" />
+              <input
+                type="search"
+                value={sidebarQuery}
+                onChange={(event) => setSidebarQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape' && sidebarQuery) {
+                    event.preventDefault()
+                    setSidebarQuery('')
+                  }
+                }}
+                placeholder="搜索工作区"
+                aria-label="搜索工作区"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {sidebarQuery && (
+                <button
+                  type="button"
+                  className="la-pluma-sidebar-search-clear"
+                  onClick={() => setSidebarQuery('')}
+                  title="清除搜索"
+                  aria-label="清除搜索"
+                >
+                  <X size={13} strokeWidth={2.2} aria-hidden="true" />
+                </button>
+              )}
             </div>
+
+            <div className="la-pluma-sidebar-identity">
+              <span className="la-pluma-sidebar-avatar" aria-hidden="true">
+                <img src={`${import.meta.env.BASE_URL}logo-graphite.svg?v=1`} alt="" />
+              </span>
+              <span className="la-pluma-sidebar-identity-copy">
+                <strong>La Pluma</strong>
+                <small>MAA 本地控制台</small>
+              </span>
+            </div>
+
+            <nav className="la-pluma-sidebar-nav" aria-label="工作台">
+              {visibleDesktopGroups.map(group => (
+                <div
+                  key={group.id}
+                  className="la-pluma-sidebar-nav-group"
+                  role="group"
+                  aria-label={group.label}
+                >
+                  {group.tabs.map(tab => (
+                    <TabLink key={tab.id} tab={tab} active={activeTab === tab.id} onNavigate={navigateToTab} />
+                  ))}
+                </div>
+              ))}
+              {visibleDesktopTabCount === 0 && (
+                <p className="la-pluma-sidebar-empty" role="status">没有匹配的工作区</p>
+              )}
+            </nav>
           </aside>
 
           <main className="la-pluma-scroll-host">
@@ -334,70 +449,100 @@ export default function Layout({ children }: LayoutProps) {
           </main>
         </div>
 
-        <Toolbar tabbar icons bottom className="la-pluma-tabbar">
-          <nav className="la-pluma-tabbar-pill" aria-label="主要功能">
-            {mobileTabs.map(tab => (
-              <TabLink key={tab.id} tab={tab} active={activeTab === tab.id} onNavigate={navigateToTab} mobile />
-            ))}
-          </nav>
-          <Link
-            tabLink
-            tabLinkActive={isOverflowActive || moreOpen}
-            href="#la-pluma-more-sheet"
-            sheetOpen={moreOpen ? '#la-pluma-more-sheet' : undefined}
-            aria-haspopup="dialog"
-            aria-expanded={moreOpen}
-            aria-controls="la-pluma-more-sheet"
-            tooltip="搜索与更多页面"
-            onClick={(event) => {
-              event?.preventDefault()
-              setMoreOpen(true)
-            }}
-            className={`la-pluma-tabbar-search ${isOverflowActive || moreOpen ? 'is-active' : ''}`}
-            aria-label="更多页面"
-          >
-            <Search className="la-pluma-tabbar-search-icon" strokeWidth={2.1} aria-hidden="true" />
-          </Link>
-        </Toolbar>
-
-        <AccessibleSheet
-          id="la-pluma-more-sheet"
-          className="la-pluma-more-sheet"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="la-pluma-more-sheet-title"
-          opened={moreOpen}
-          bottom
-          backdrop
-          closeByBackdropClick
-          closeOnEscape
-          swipeToClose
-          onSheetClosed={() => {
-            setMoreOpen(false)
-            restoreMoreSheetFocus()
-          }}
-        >
-          <div className="la-pluma-sheet-grabber" aria-hidden="true" />
-          <div className="la-pluma-sheet-heading">
-            <div>
-              <span className="la-pluma-eyebrow">LA PLUMA</span>
-              <h2 id="la-pluma-more-sheet-title">更多工作区</h2>
-            </div>
-            <Link
-              sheetClose="#la-pluma-more-sheet"
-              iconOnly
-              aria-label="关闭更多工作区"
+        <footer className="toolbar toolbar-bottom tabbar tabbar-icons la-pluma-tabbar">
+          <div className="toolbar-inner">
+            <nav className="la-pluma-tabbar-pill" aria-label="主要功能">
+              {mobileTabs.map(tab => (
+                <TabLink key={tab.id} tab={tab} active={activeTab === tab.id} onNavigate={navigateToTab} mobile />
+              ))}
+            </nav>
+            <a
+              ref={moreTriggerRef}
+              href="#la-pluma-more-sheet"
+              aria-haspopup="dialog"
+              aria-expanded={moreOpen}
+              aria-controls="la-pluma-more-sheet"
+              onClick={(event) => {
+                event.preventDefault()
+                setMoreOpen(true)
+              }}
+              className={`tab-link la-pluma-tabbar-search ${isOverflowActive || moreOpen ? 'is-active tab-link-active' : ''}`}
+              aria-label="更多页面"
             >
-              <X className="h-5 w-5" aria-hidden="true" />
-            </Link>
+              <Ellipsis className="la-pluma-tabbar-search-icon" strokeWidth={2.1} aria-hidden="true" />
+            </a>
           </div>
-          <nav aria-label="更多功能" className="la-pluma-sheet-nav">
-            {overflowTabs.map(tab => (
-              <TabLink key={tab.id} tab={tab} active={activeTab === tab.id} onNavigate={navigateToTab} mobile />
-            ))}
-          </nav>
-        </AccessibleSheet>
-      </F7Page>
-    </View>
+        </footer>
+
+        <AnimatePresence>
+          {moreOpen && (
+            <>
+              <motion.div
+                key="more-sheet-backdrop"
+                className="sheet-backdrop backdrop-in"
+                aria-hidden="true"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: shouldReduceMotion ? 0.12 : 0.16, ease: SHEET_EASE }}
+                style={{ transition: 'none' }}
+                onClick={closeMoreSheet}
+              />
+              <motion.section
+                key="more-sheet"
+                id="la-pluma-more-sheet"
+                className="sheet-modal sheet-modal-bottom modal-in la-pluma-more-sheet"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="la-pluma-more-sheet-title"
+                tabIndex={-1}
+                initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: '100%' }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: '100%' }}
+                transition={shouldReduceMotion
+                  ? { duration: 0.12, ease: SHEET_EASE }
+                  : {
+                      y: { duration: 0.28, ease: SHEET_EASE },
+                      opacity: { duration: 0.16, ease: SHEET_EASE },
+                    }}
+                drag={shouldReduceMotion ? false : 'y'}
+                dragConstraints={{ top: 0, bottom: 0 }}
+                dragElastic={{ top: 0.06, bottom: 0.72 }}
+                dragMomentum={false}
+                dragDirectionLock
+                onDragEnd={handleMoreSheetDragEnd}
+                style={{
+                  touchAction: shouldReduceMotion ? undefined : 'pan-x',
+                  transition: 'none',
+                }}
+              >
+                <div className="sheet-modal-inner">
+                  <div className="la-pluma-sheet-grabber" aria-hidden="true" />
+                  <div className="la-pluma-sheet-heading">
+                    <div>
+                      <span className="la-pluma-eyebrow">LA PLUMA</span>
+                      <h2 id="la-pluma-more-sheet-title">更多工作区</h2>
+                    </div>
+                    <button
+                      type="button"
+                      className="link icon-only sheet-close la-pluma-sheet-close"
+                      aria-label="关闭更多工作区"
+                      onClick={closeMoreSheet}
+                    >
+                      <X className="h-5 w-5" aria-hidden="true" />
+                    </button>
+                  </div>
+                  <nav aria-label="更多功能" className="la-pluma-sheet-nav">
+                    {overflowTabs.map(tab => (
+                      <TabLink key={tab.id} tab={tab} active={activeTab === tab.id} onNavigate={navigateToTab} mobile />
+                    ))}
+                  </nav>
+                </div>
+              </motion.section>
+            </>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
   )
 }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
+import { Activity, act } from 'react'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -118,6 +118,35 @@ describe('ScrcpyDeviceView automation availability', () => {
     expect(webrtcMock.sendTouch).not.toHaveBeenCalled()
   })
 
+  it('restarts auto-connect after an Activity workspace is restored', async () => {
+    const onStartInfrastructure = vi.fn().mockResolvedValue('/webrtc-signaling')
+    const renderMode = async (mode: 'visible' | 'hidden') => {
+      await act(async () => {
+        root.render(
+          <Activity mode={mode}>
+            <ScrcpyDeviceView
+              enabled
+              autoConnect
+              infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
+              onStartInfrastructure={onStartInfrastructure}
+            />
+          </Activity>,
+        )
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+    }
+
+    await renderMode('visible')
+    expect(webrtcMock.connect).toHaveBeenCalledOnce()
+
+    await renderMode('hidden')
+    await renderMode('visible')
+
+    expect(onStartInfrastructure).toHaveBeenCalledTimes(2)
+    expect(webrtcMock.connect).toHaveBeenCalledTimes(2)
+  })
+
   it('shows the status beam only while the preview is connecting', async () => {
     webrtcMock.status = 'connecting'
     await act(async () => root.render(
@@ -142,6 +171,37 @@ describe('ScrcpyDeviceView automation availability', () => {
 
     expect(frame?.classList.contains('is-active')).toBe(false)
     expect(frame?.getAttribute('aria-busy')).toBe('false')
+  })
+
+  it('keeps compact preview controls outside the video and expands settings below them', async () => {
+    await act(async () => root.render(
+      <ScrcpyDeviceView
+        variant="compact"
+        enabled={false}
+        infrastructureStatus={{ installed: true, built: true, serverRunning: false, agentRunning: false }}
+      />
+    ))
+
+    const frame = container.querySelector('.scrcpy-video-frame')
+    const toolbar = container.querySelector('.scrcpy-preview-toolbar')
+    const openSettings = findButton('打开预览设置')
+
+    expect(frame?.nextElementSibling).toBe(toolbar)
+    expect(toolbar?.contains(frame)).toBe(false)
+    expect(container.querySelector('.scrcpy-control-rail')).toBeNull()
+    expect(openSettings?.getAttribute('aria-expanded')).toBe('false')
+    expect(toolbar?.getAttribute('role')).toBe('toolbar')
+    expect(Array.from(toolbar?.querySelectorAll('button') || []).every(button => (
+      button.className.includes('h-11') && button.className.includes('w-11')
+    ))).toBe(true)
+
+    await act(async () => openSettings?.click())
+
+    const rail = container.querySelector('.scrcpy-control-rail.is-compact')
+    expect(rail).not.toBeNull()
+    expect(toolbar?.parentElement?.nextElementSibling).toBe(rail)
+    expect(findButton('收起预览设置')?.getAttribute('aria-expanded')).toBe('true')
+    expect(findButton('收起预览设置')?.getAttribute('aria-controls')).toBe(rail?.id)
   })
 
   it('keeps recovery controls available while blocking new device actions', async () => {
@@ -244,6 +304,13 @@ describe('ScrcpyDeviceView automation availability', () => {
 
     await act(async () => findButton('60')?.click())
     expect(container.textContent).toContain('自定义 · 1280p · 60 FPS')
+    expect(container.querySelector('[role="group"][aria-label="视频帧率"]')).not.toBeNull()
+    expect(findButton('60')?.getAttribute('aria-label')).toBe('60 FPS')
+    expect(findButton('60')?.className).toContain('min-h-11')
+    expect(Array.from(container.querySelectorAll('.scrcpy-service-action, .scrcpy-utility-action')).every(button => (
+      button.className.includes('min-h-11')
+    ))).toBe(true)
+    expect(container.querySelector('.scrcpy-bitrate-slider')?.className).toContain('min-h-11')
   })
 
   it('tracks pointers independently, coalesces moves per frame, and releases every pointer', async () => {

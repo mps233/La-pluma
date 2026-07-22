@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, createElement, useEffect, useRef, type ReactNode } from 'react'
+import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUIStore } from '@/stores'
@@ -8,102 +8,33 @@ import Layout from './Layout'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-/*
- * Layout owns navigation state and history. Framework7 owns the DOM details of
- * its chrome, so keep those details out of this unit test and expose the
- * semantic elements that Layout's behavior actually controls.
- */
-vi.mock('../framework7', () => ({ default: {} }))
-vi.mock('framework7-react', () => {
-  const frameworkProps = new Set([
-    'bottom',
-    'closeByBackdropClick',
-    'closeOnEscape',
-    'external',
-    'icons',
-    'iconOnly',
-    'main',
-    'noSwipeback',
-    'opened',
-    'onSheetClosed',
-    'pageContent',
-    'router',
-    'sheetClose',
-    'sheetOpen',
-    'slot',
-    'swipeToClose',
-    'tabLink',
-    'tabLinkActive',
-    'tabbarLabel',
-    'text',
-    'tooltip',
-  ])
-
-  type MockProps = Record<string, unknown> & { children?: ReactNode }
-
-  const domProps = (props: MockProps) => Object.fromEntries(
-    Object.entries(props).filter(([key]) => key !== 'children' && !frameworkProps.has(key)),
+vi.mock('framer-motion', async () => {
+  const React = await import('react')
+  type MotionTestProps = Record<string, unknown> & { children?: ReactNode }
+  const motionComponent = (tag: 'div' | 'section') => React.forwardRef<HTMLElement, MotionTestProps>(
+    ({
+      children,
+      initial: _initial,
+      animate: _animate,
+      exit: _exit,
+      transition: _transition,
+      drag: _drag,
+      dragConstraints: _dragConstraints,
+      dragElastic: _dragElastic,
+      dragMomentum: _dragMomentum,
+      dragDirectionLock: _dragDirectionLock,
+      onDragEnd: _onDragEnd,
+      ...props
+    }, ref) => React.createElement(tag, { ...props, ref }, children as ReactNode),
   )
-
-  const MockContainer = ({ as = 'div', children, ...props }: MockProps & { as?: string }) => (
-    createElement(as, domProps(props), children)
-  )
-
-  const MockLink = ({ children, text, ...props }: MockProps & { text?: string }) => (
-    createElement('a', domProps(props), children, text ? createElement('span', {}, text) : null)
-  )
-
-  const MockSheet = ({ children, opened = false, onSheetClosed, id, ...props }: MockProps & {
-    opened?: boolean
-    onSheetClosed?: () => void
-    id?: string
-  }) => {
-    const wasOpened = useRef(Boolean(opened))
-
-    useEffect(() => {
-      if (wasOpened.current && !opened) onSheetClosed?.()
-      wasOpened.current = Boolean(opened)
-    }, [onSheetClosed, opened])
-
-    useEffect(() => {
-      if (!opened) return undefined
-
-      const close = (event: KeyboardEvent | PointerEvent) => {
-        if (event instanceof KeyboardEvent && event.key !== 'Escape') return
-        if (event instanceof PointerEvent && id && document.getElementById(id)?.contains(event.target as Node)) return
-        onSheetClosed?.()
-      }
-      document.addEventListener('keydown', close)
-      document.addEventListener('pointerdown', close)
-      return () => {
-        document.removeEventListener('keydown', close)
-        document.removeEventListener('pointerdown', close)
-      }
-    }, [id, onSheetClosed, opened])
-
-    if (!opened) return null
-    return createElement('section', {
-      ...domProps({ ...props, id }),
-      id,
-      role: 'dialog',
-    }, children)
-  }
 
   return {
-    App: ({ children, ...props }: MockProps) => createElement('div', { ...domProps(props), 'data-framework7-app': 'true' }, children),
-    Link: MockLink,
-    NavLeft: MockContainer,
-    NavRight: MockContainer,
-    NavTitle: MockContainer,
-    Navbar: ({ children, ...props }: MockProps) => createElement('header', domProps(props), children),
-    Page: MockContainer,
-    Sheet: MockSheet,
-    Toolbar: ({ children, ...props }: MockProps) => createElement('nav', domProps(props), children),
-    View: MockContainer,
-    Button: MockContainer,
-    Card: MockContainer,
-    CardHeader: MockContainer,
-    CardContent: MockContainer,
+    AnimatePresence: ({ children }: { children: ReactNode }) => children,
+    motion: {
+      div: motionComponent('div'),
+      section: motionComponent('section'),
+    },
+    useReducedMotion: () => false,
   }
 })
 
@@ -268,30 +199,100 @@ describe('top-level application navigation', () => {
     unsubscribe()
   })
 
-  it('opens the mobile overflow sheet, navigates from it, and restores trigger focus', async () => {
+  it('groups and filters desktop workspaces without changing the mobile destinations', async () => {
+    await renderLayout()
+
+    const sidebar = container.querySelector<HTMLElement>('.la-pluma-sidebar')!
+    const groups = [...sidebar.querySelectorAll<HTMLElement>('[role="group"]')]
+    expect(groups.map(group => group.getAttribute('aria-label'))).toEqual([
+      '任务与执行',
+      '记录与设置',
+    ])
+    expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav a')).toHaveLength(8)
+    expect(sidebar.querySelectorAll('.la-pluma-sidebar-icon > svg[aria-hidden="true"]')).toHaveLength(8)
+
+    const mobileDestinations = [...container.querySelectorAll<HTMLAnchorElement>('.la-pluma-tabbar-pill a')]
+      .map(link => link.getAttribute('href'))
+    expect(mobileDestinations).toEqual([
+      '/app/dashboard',
+      '/app/automation',
+      '/app/combat',
+      '/app/config',
+    ])
+
+    const search = sidebar.querySelector<HTMLInputElement>('input[aria-label="搜索工作区"]')!
+    const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+    await act(async () => {
+      setInputValue?.call(search, '数据')
+      search.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+
+    const filteredLinks = [...sidebar.querySelectorAll<HTMLAnchorElement>('.la-pluma-sidebar-nav a')]
+    expect(filteredLinks.map(link => link.getAttribute('href'))).toEqual(['/app/statistics'])
+    expect(mobileDestinations).toHaveLength(4)
+
+    await act(async () => filteredLinks[0]?.click())
+    expect(sidebar.querySelectorAll('[aria-current="page"]')).toHaveLength(1)
+    expect(sidebar.querySelector('[aria-current="page"]')?.getAttribute('href')).toBe('/app/statistics')
+
+    await act(async () => {
+      sidebar.querySelector<HTMLButtonElement>('button[aria-label="清除搜索"]')?.click()
+    })
+    expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav a')).toHaveLength(8)
+  })
+
+  it('exposes the GitHub repository as a secure external action', async () => {
+    await renderLayout()
+
+    const githubLink = container.querySelector<HTMLAnchorElement>('.la-pluma-github-link')!
+    expect(githubLink.getAttribute('aria-label')).toBe('打开 GitHub 仓库')
+    expect(githubLink.getAttribute('href')).toBe('https://github.com/mps233/La-pluma')
+    expect(githubLink.getAttribute('target')).toBe('_blank')
+    expect(githubLink.getAttribute('rel')?.split(/\s+/).sort()).toEqual(['noopener', 'noreferrer'])
+    expect(githubLink.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(1)
+  })
+
+  it('opens and dismisses the mobile overflow sheet without losing trigger focus', async () => {
     await renderLayout()
     const trigger = mobileMoreTrigger()
     trigger.focus()
 
     await act(async () => trigger.click())
 
-    const sheet = container.querySelector<HTMLElement>('#la-pluma-more-sheet')
+    let sheet = container.querySelector<HTMLElement>('#la-pluma-more-sheet')
     expect(sheet?.getAttribute('role')).toBe('dialog')
+    expect(sheet?.getAttribute('aria-modal')).toBe('true')
+    expect(sheet?.querySelector('[aria-label="关闭更多工作区"]')?.classList.contains('la-pluma-sheet-close')).toBe(true)
+    expect(document.body.style.overflow).toBe('hidden')
+    expect(getScrollHost().style.overflow).toBe('hidden')
+
+    await act(async () => {
+      sheet?.querySelector<HTMLButtonElement>('[aria-label="关闭更多工作区"]')?.click()
+    })
+    expect(container.querySelector('#la-pluma-more-sheet')).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+    expect(document.body.style.overflow).toBe('')
+    expect(getScrollHost().style.overflow).toBe('')
+
+    await act(async () => trigger.click())
+    await act(async () => container.querySelector<HTMLElement>('.sheet-backdrop')?.click())
+    expect(container.querySelector('#la-pluma-more-sheet')).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+
+    await act(async () => trigger.click())
+    expect(container.querySelector('#la-pluma-more-sheet')).toBeTruthy()
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    expect(container.querySelector('#la-pluma-more-sheet')).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+
+    await act(async () => trigger.click())
+    sheet = container.querySelector<HTMLElement>('#la-pluma-more-sheet')
     const overflowLink = sheet?.querySelector<HTMLAnchorElement>('a[href="/app/roguelike"]')
     expect(overflowLink).toBeTruthy()
 
     await act(async () => overflowLink?.click())
 
     expect(container.querySelector('[data-testid="active-tab"]')?.textContent).toBe('roguelike')
-    expect(container.querySelector('#la-pluma-more-sheet')).toBeNull()
-    expect(document.activeElement).toBe(trigger)
-
-    await act(async () => {
-      trigger.focus()
-      trigger.click()
-    })
-    expect(container.querySelector('#la-pluma-more-sheet')).toBeTruthy()
-    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
     expect(container.querySelector('#la-pluma-more-sheet')).toBeNull()
     expect(document.activeElement).toBe(trigger)
   })

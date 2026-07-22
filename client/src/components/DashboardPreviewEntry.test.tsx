@@ -26,6 +26,16 @@ vi.mock('../hooks/useDashboardPreview', () => ({
 
 vi.mock('./common', () => ({
   Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props}>{children}</button>,
+  SmoothPanel: ({
+    children,
+    className = '',
+    surfaceClassName = '',
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & { surfaceClassName?: string }) => (
+    <div className={`smooth-panel-shell ${className}`} {...props}>
+      <div className={`smooth-panel-surface ${surfaceClassName}`}>{children}</div>
+    </div>
+  ),
 }))
 
 let container: HTMLDivElement
@@ -54,6 +64,8 @@ describe('DashboardPreviewEntry', () => {
     expect(frameButton).not.toBeNull()
     await act(async () => frameButton?.click())
     expect(onOpen).toHaveBeenCalledOnce()
+    expect(container.querySelector('video')?.getAttribute('aria-hidden')).toBe('true')
+    expect(Array.from(container.querySelectorAll('button')).find(button => button.textContent === '打开')?.classList.contains('min-h-11')).toBe(true)
   })
 
   it('uses a live-preview name while video is available', async () => {

@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useEffectEvent, useRef } from 'react'
 import { generateTrainingPlan, maaApi } from '../services/api'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { AlertTriangle, Cable, Check, CheckCircle2, ChevronDown, CircleMinus, GripVertical, ListPlus, LoaderCircle, Plus, SlidersHorizontal, Square, Trash2 } from 'lucide-react'
+import { AlertTriangle, Cable, Check, CheckCircle2, ChevronDown, CircleMinus, CirclePlus, ClipboardList, Clock3, GripVertical, Info, ListPlus, Minus, Play, Plus, SlidersHorizontal, Square, Trash2 } from 'lucide-react'
 import Icons from './Icons'
 import ScreenMonitor from './ScreenMonitor'
 import NotificationSettings from './NotificationSettings'
-import { EmptyState, PageHeader, Button } from './common'
+import { EmptyState, PageHeader, Button, SmoothPanel, Switch } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type {
@@ -21,6 +21,10 @@ const scheduleTimePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/
 const RECOVERY_STATUS_POLL_MS = 1000
 const RECOVERY_STATUS_TIMEOUT_MS = 30 * 60 * 1000
 const POINTER_SORT_ACTIVATION_PX = 10
+const AUTOMATION_CONFIG_SYNC_PENDING_KEY = 'automationConfigSyncPending'
+let automationConfigSyncSequence = 0
+
+const createAutomationConfigSyncToken = () => `${Date.now()}-${++automationConfigSyncSequence}`
 
 type RecoveryWaitResult = 'completed' | 'timeout' | 'cancelled'
 
@@ -277,6 +281,9 @@ export default function AutomationTasks() {
   const [executionDetailsOpen, setExecutionDetailsOpen] = useState(false)
   const autoSaveQueueRef = useRef<Promise<void>>(Promise.resolve())
   const autoSaveRevisionRef = useRef(0)
+  const taskFlowHydratedRef = useRef(false)
+  const taskFlowLoadRequestRef = useRef(0)
+  const taskFlowLoadAbortRef = useRef<AbortController | null>(null)
   const scheduleWasRunningRef = useRef(false)
   const stopRequestInFlightRef = useRef(false)
   const connectionTestInFlightRef = useRef(false)
@@ -285,9 +292,50 @@ export default function AutomationTasks() {
   const lastExecutionFingerprintRef = useRef('')
   const pointerSortRef = useRef<PointerSortSession | null>(null)
   const sequenceItemRefs = useRef(new Map<string, HTMLDivElement>())
+  const editorColumnRef = useRef<HTMLDivElement>(null)
+  const taskPickerRegionRef = useRef<HTMLDivElement>(null)
+  const taskPickerButtonRef = useRef<HTMLButtonElement>(null)
   const activeTaskId = selectedTaskId && taskFlow.some(task => task.id === selectedTaskId)
     ? selectedTaskId
     : taskFlow[0]?.id ?? null
+
+  const selectTaskForEditing = (taskId: string) => {
+    setSelectedTaskId(taskId)
+    if (!window.matchMedia?.('(max-width: 899px)').matches) return
+
+    window.requestAnimationFrame(() => {
+      editorColumnRef.current?.scrollIntoView({
+        behavior: shouldReduceMotion ? 'auto' : 'smooth',
+        block: 'start',
+      })
+    })
+  }
+
+  useEffect(() => {
+    if (!taskPickerOpen) return
+
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!taskPickerRegionRef.current?.contains(event.target as Node)) {
+        setTaskPickerOpen(false)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setTaskPickerOpen(false)
+      taskPickerButtonRef.current?.focus()
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsidePress)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePress)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [taskPickerOpen])
+
+  useEffect(() => {
+    if (isRunning) setTaskPickerOpen(false)
+  }, [isRunning])
 
   useEffect(() => {
     taskFlowRef.current = taskFlow
@@ -304,9 +352,18 @@ export default function AutomationTasks() {
 
   useEffect(() => {
     connectionTestMountedRef.current = true
+    setTestingConnectionTaskId(null)
     return () => {
       connectionTestMountedRef.current = false
-      connectionTestAbortRef.current?.abort()
+      const connectionController = connectionTestAbortRef.current
+      connectionController?.abort()
+      if (connectionTestAbortRef.current === connectionController) {
+        connectionTestAbortRef.current = null
+        connectionTestInFlightRef.current = false
+      }
+      taskFlowLoadRequestRef.current += 1
+      taskFlowLoadAbortRef.current?.abort()
+      taskFlowLoadAbortRef.current = null
     }
   }, [])
 
@@ -379,7 +436,7 @@ export default function AutomationTasks() {
       isSubscribed = false
       if (intervalId) clearInterval(intervalId)
     }
-  }, [taskFlow]) // 只依赖 taskFlow
+  }, [setIsActiveStatus, setStatusMessage, taskFlow])
 
   // 可用的任务列表
   const availableTasks: AutomationAvailableTask[] = [
@@ -881,16 +938,22 @@ export default function AutomationTasks() {
     })
     const normalizedTimes = normalizeScheduleTimes(times)
     const revision = ++autoSaveRevisionRef.current
+    const syncToken = createAutomationConfigSyncToken()
+    const isCurrentSave = () => (
+      revision === autoSaveRevisionRef.current
+      && localStorage.getItem(AUTOMATION_CONFIG_SYNC_PENDING_KEY) === syncToken
+    )
 
     // 保存到 localStorage（快速访问）
     localStorage.setItem('maa-task-flow', JSON.stringify(taskFlowToSave))
     localStorage.setItem('maa-schedule', JSON.stringify({ enabled, times: normalizedTimes }))
+    localStorage.setItem(AUTOMATION_CONFIG_SYNC_PENDING_KEY, syncToken)
 
     autoSaveQueueRef.current = autoSaveQueueRef.current
       .catch(() => undefined)
       .then(async () => {
         // 连续编辑时只提交队列中最新的一版，避免旧请求覆盖新配置。
-        if (revision !== autoSaveRevisionRef.current) return
+        if (!isCurrentSave()) return
 
         const saveResult = await maaApi.saveUserConfig('automation-tasks', {
           taskFlow: taskFlowToSave,
@@ -900,7 +963,7 @@ export default function AutomationTasks() {
           throw new Error(maaApi.getErrorMessage(saveResult))
         }
 
-        if (revision !== autoSaveRevisionRef.current) return
+        if (!isCurrentSave()) return
 
         const scheduleResult = enabled && normalizedTimes.length > 0
           ? await maaApi.setupSchedule('default', normalizedTimes, taskFlowToSave)
@@ -909,27 +972,13 @@ export default function AutomationTasks() {
         if (!scheduleResult.success) {
           throw new Error(maaApi.getErrorMessage(scheduleResult))
         }
+        if (isCurrentSave()) localStorage.removeItem(AUTOMATION_CONFIG_SYNC_PENDING_KEY)
       })
       .catch((error: unknown) => {
-        if (revision !== autoSaveRevisionRef.current) return
+        if (!isCurrentSave()) return
         const message = error instanceof Error ? error.message : '未知错误'
         void showError(`配置同步失败: ${message}`)
       })
-  }
-
-  const syncLoadedSchedule = async (times: string[], flow: any[]) => {
-    const normalizedTimes = normalizeScheduleTimes(times)
-    if (normalizedTimes.length === 0) return
-
-    try {
-      const result = await maaApi.setupSchedule('default', normalizedTimes, flow)
-      if (!result.success) {
-        throw new Error(maaApi.getErrorMessage(result))
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '未知错误'
-      void showError(`定时任务恢复失败: ${message}`)
-    }
   }
 
   const updateScheduleTime = (index: number, nextTime: string) => {
@@ -942,12 +991,6 @@ export default function AutomationTasks() {
     newTimes[index] = nextTime
     setScheduleTimes(newTimes)
     autoSave(taskFlow, scheduleEnabled, newTimes)
-  }
-
-  const restoreSchedule = async (enabled: boolean, times: string[], flow: any[]) => {
-    if (enabled && times.length > 0) {
-      await syncLoadedSchedule(times, flow)
-    }
   }
 
   const buildCommand = (task: TaskFlowItem) => {
@@ -1158,80 +1201,99 @@ export default function AutomationTasks() {
     setIsStopping(false)
   }, [isRunning])
 
-  const loadTaskFlow = async () => {
+  const loadTaskFlow = useEffectEvent(async (force = false) => {
+    if (taskFlowHydratedRef.current && !force) return
+
+    const applyLoadedConfig = (savedTasks: any[] | null | undefined, schedule: any) => {
+      const loadedTasks = savedTasks
+        ? placeClosedownLast(synchronizeConnectionParams(savedTasks.map(migrateTaskParams)))
+        : savedTasks
+
+      if (loadedTasks) {
+        const restoredTasks = loadedTasks.map((task: any) => {
+          const originalTask = availableTasks.find(t => t.id === task.commandId || t.id === task.id.split('-')[0])
+          return {
+            ...task,
+            icon: originalTask?.icon,
+            paramFields: originalTask?.paramFields
+          }
+        })
+        taskFlowRef.current = restoredTasks
+        setTaskFlow(restoredTasks)
+      }
+
+      if (schedule) {
+        const { enabled, times } = schedule
+        const normalizedTimes = normalizeScheduleTimes(Array.isArray(times) ? times : [])
+        setScheduleEnabled(Boolean(enabled))
+        if (normalizedTimes.length > 0) setScheduleTimes(normalizedTimes)
+      }
+
+      return loadedTasks
+    }
+
+    const loadLocalConfig = () => {
+      try {
+        const savedTasks = localStorage.getItem('maa-task-flow')
+        const savedSchedule = localStorage.getItem('maa-schedule')
+        applyLoadedConfig(
+          savedTasks ? JSON.parse(savedTasks) : null,
+          savedSchedule ? JSON.parse(savedSchedule) : null,
+        )
+      } catch {
+        localStorage.removeItem('maa-task-flow')
+        localStorage.removeItem('maa-schedule')
+      }
+    }
+
+    if (localStorage.getItem(AUTOMATION_CONFIG_SYNC_PENDING_KEY)) {
+      loadLocalConfig()
+      taskFlowHydratedRef.current = true
+      return
+    }
+
+    taskFlowLoadAbortRef.current?.abort()
+    const controller = new AbortController()
+    const requestId = ++taskFlowLoadRequestRef.current
+    const startingRevision = autoSaveRevisionRef.current
+    taskFlowLoadAbortRef.current = controller
+    const isCurrentLoad = () => (
+      taskFlowLoadRequestRef.current === requestId
+      && !controller.signal.aborted
+      && autoSaveRevisionRef.current === startingRevision
+      && !localStorage.getItem(AUTOMATION_CONFIG_SYNC_PENDING_KEY)
+    )
+
     try {
       // 优先从服务器加载配置
-      const serverConfig = await maaApi.loadUserConfig('automation-tasks')
+      const serverConfig = await maaApi.loadUserConfig('automation-tasks', controller.signal)
+      if (!isCurrentLoad()) return
 
       if (serverConfig.success && serverConfig.data) {
         // 服务器有配置，使用服务器配置
         const { taskFlow: savedTasks, schedule } = serverConfig.data
-        const loadedTasks = savedTasks
-          ? placeClosedownLast(synchronizeConnectionParams(savedTasks.map(migrateTaskParams)))
-          : savedTasks
-
-        if (loadedTasks) {
-          const restoredTasks = loadedTasks.map((task: any) => {
-            const originalTask = availableTasks.find(t => t.id === task.commandId || t.id === task.id.split('-')[0])
-            return {
-              ...task,
-              icon: originalTask?.icon,
-              paramFields: originalTask?.paramFields
-            }
-          })
-          setTaskFlow(restoredTasks)
-
-          // 同步到 localStorage
-          localStorage.setItem('maa-task-flow', JSON.stringify(loadedTasks))
-        }
-
+        const loadedTasks = applyLoadedConfig(savedTasks, schedule)
+        if (loadedTasks) localStorage.setItem('maa-task-flow', JSON.stringify(loadedTasks))
         if (schedule) {
-          const { enabled, times } = schedule
-          const normalizedTimes = normalizeScheduleTimes(Array.isArray(times) ? times : [])
-          setScheduleEnabled(enabled)
-          if (normalizedTimes.length > 0) {
-            setScheduleTimes(normalizedTimes)
-          }
-
-          // 同步到 localStorage
+          const normalizedTimes = normalizeScheduleTimes(Array.isArray(schedule.times) ? schedule.times : [])
           localStorage.setItem('maa-schedule', JSON.stringify({ ...schedule, times: normalizedTimes }))
-
-          await restoreSchedule(enabled, normalizedTimes, loadedTasks || [])
         }
 
+        taskFlowHydratedRef.current = true
         return
       }
     } catch (error) {
+      if (controller.signal.aborted) return
       // 静默失败，尝试从 localStorage 加载
+    } finally {
+      if (taskFlowLoadAbortRef.current === controller) taskFlowLoadAbortRef.current = null
     }
 
+    if (!isCurrentLoad()) return
     // 服务器加载失败，从 localStorage 加载
-    const saved = localStorage.getItem('maa-task-flow')
-    const schedule = localStorage.getItem('maa-schedule')
-    if (saved) {
-      const loadedTasks = placeClosedownLast(synchronizeConnectionParams(JSON.parse(saved).map(migrateTaskParams)))
-      const restoredTasks = loadedTasks.map((task: any) => {
-        const originalTask = availableTasks.find(t => t.id === task.commandId || t.id === task.id.split('-')[0])
-        return {
-          ...task,
-          icon: originalTask?.icon,
-          paramFields: originalTask?.paramFields
-        }
-      })
-      setTaskFlow(restoredTasks)
-
-      if (schedule) {
-        const { enabled, times } = JSON.parse(schedule)
-        const normalizedTimes = normalizeScheduleTimes(Array.isArray(times) ? times : [])
-        setScheduleEnabled(enabled)
-        if (normalizedTimes.length > 0) {
-          setScheduleTimes(normalizedTimes)
-        }
-
-        await restoreSchedule(enabled, normalizedTimes, loadedTasks)
-      }
-    }
-  }
+    loadLocalConfig()
+    taskFlowHydratedRef.current = true
+  })
 
   // updateScheduleTime 函数已被内联处理替代，已移除
 
@@ -1544,8 +1606,8 @@ export default function AutomationTasks() {
   // 监听养成计划应用事件，自动刷新任务流程
   useEffect(() => {
     const handleTrainingPlanApplied = async (event: any) => {
-      await loadTaskFlow()
-      showSuccess(`智能养成计划已更新：${event.detail?.stageCount || 0} 个关卡`)
+      await loadTaskFlow(true)
+      setStatusMessage(`智能养成计划已更新：${event.detail?.stageCount || 0} 个关卡`, 'success')
     }
 
     window.addEventListener('training-plan-applied', handleTrainingPlanApplied)
@@ -1553,7 +1615,7 @@ export default function AutomationTasks() {
     return () => {
       window.removeEventListener('training-plan-applied', handleTrainingPlanApplied)
     }
-  }, [])
+  }, [setStatusMessage])
 
   // 监听页面可见性变化，切换回来时自动刷新
   useEffect(() => {
@@ -1571,49 +1633,22 @@ export default function AutomationTasks() {
     }
   }, [])
 
-  // 使用 IntersectionObserver 监听组件可见性
-  useEffect(() => {
-    const containerRef = document.querySelector('[data-automation-tasks]')
-    if (!containerRef) return
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            // 组件变为可见时，重新加载任务流程
-            loadTaskFlow()
-          }
-        })
-      },
-      { threshold: 0.1 } // 当至少 10% 可见时触发
-    )
-
-    observer.observe(containerRef)
-
-    return () => {
-      observer.disconnect()
-    }
-  }, [])
-
   const schedulePanel = (
     <div className="automation-schedule-column">
-      <div className="automation-schedule-panel surface-panel">
+      <SmoothPanel className="automation-schedule-panel">
         <div className="automation-schedule-heading">
           <div>
-            <h3><Icons.Clock /><span>定时与通知</span></h3>
+            <h3><Clock3 size={16} strokeWidth={1.8} aria-hidden="true" /><span>定时与通知</span></h3>
             <p>自动运行与结果推送</p>
           </div>
           <div className="automation-schedule-actions">
-            <label className="automation-schedule-enabled">
-              <input
-                type="checkbox"
-                checked={scheduleEnabled}
-                onChange={(e) => handleScheduleEnabledChange(e.target.checked)}
-                disabled={isRunning}
-                className="custom-checkbox cursor-pointer"
-              />
-              <span>{scheduleEnabled ? '已启用' : '未启用'}</span>
-            </label>
+            <Switch
+              checked={scheduleEnabled}
+              onChange={handleScheduleEnabledChange}
+              disabled={isRunning}
+              label="定时执行"
+              className="automation-section-switch"
+            />
           </div>
         </div>
 
@@ -1643,6 +1678,7 @@ export default function AutomationTasks() {
                         }}
                         disabled={isRunning}
                         aria-label={`第 ${index + 1} 个执行时间的小时`}
+                        className="min-h-11"
                       >
                         {Array.from({ length: 24 }, (_, i) => {
                           const value = i.toString().padStart(2, '0')
@@ -1657,6 +1693,7 @@ export default function AutomationTasks() {
                         }}
                         disabled={isRunning}
                         aria-label={`第 ${index + 1} 个执行时间的分钟`}
+                        className="min-h-11"
                       >
                         {Array.from({ length: 60 }, (_, i) => {
                           const value = i.toString().padStart(2, '0')
@@ -1669,10 +1706,11 @@ export default function AutomationTasks() {
                         type="button"
                         onClick={() => removeScheduleTime(index)}
                         disabled={isRunning}
-                        className="automation-schedule-remove"
+                        className="automation-schedule-remove min-h-11 min-w-11"
                         title="删除时间点"
+                        aria-label={`删除第 ${index + 1} 个时间点`}
                       >
-                        <Trash2 size={14} strokeWidth={1.9} />
+                        <CircleMinus size={19} strokeWidth={1.8} aria-hidden="true" />
                       </button>
                     ) : <span className="automation-schedule-remove-placeholder" />}
                   </div>
@@ -1686,93 +1724,56 @@ export default function AutomationTasks() {
                 disabled={isRunning}
                 className="automation-schedule-add"
               >
-                <Plus size={15} strokeWidth={2} />
+                <CirclePlus size={18} strokeWidth={1.8} aria-hidden="true" />
                 <span>添加时间点</span>
               </button>
             )}
           </motion.div>
         ) : (
           <div className="automation-schedule-empty">
-            <span><Icons.Clock /></span>
-            <strong>尚未启用</strong>
-            <p>启用后设置自动执行时间</p>
+            <strong>定时运行已关闭</strong>
+            <p>打开右上角开关后设置执行时间</p>
           </div>
         )}
 
         <NotificationSettings />
-      </div>
+      </SmoothPanel>
     </div>
   )
 
   return (
     <>
-      <div className="app-page" data-automation-tasks>
+      <div className="app-page ios-workspace-page" data-automation-tasks>
         <div className="app-stack-section">
         {/* 页面标题 */}
         <PageHeader
-          icon={<Icons.Robot />}
           title="自动化任务"
           subtitle="编排日常任务流程，一键执行或定时运行"
-          actions={
-            <div className="flex items-center space-x-4">
-              <FloatingStatusIndicator />
-              {/* 活动状态 */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className={`hidden sm:flex px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-medium border items-center space-x-1.5 sm:space-x-2 ${
-                  currentActivity
-                    ? 'brand-action-subtle border-transparent'
-                    : 'bg-gray-50 dark:bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-500/30'
-                }`}
-              >
-                {currentActivity ? (
-                  <>
-                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    <span className="hidden sm:inline">当前活动: {activityName || currentActivity}</span>
-                    <span className="sm:hidden">{currentActivity}</span>
-                    {activityName && (
-                      <span className="text-xs opacity-75 hidden sm:inline">({currentActivity})</span>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <svg className="hidden sm:block w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                    </svg>
-                    <span className="hidden sm:inline">长草中～</span>
-                  </>
-                )}
-              </motion.div>
-            </div>
-          }
+          mobileLayout="inline"
+          actions={<FloatingStatusIndicator />}
         />
 
-        {/* 实时预览 + 定时与通知 */}
-        <div className="automation-overview-grid">
-          <div className="automation-monitor-column">
-            <div className="automation-monitor-panel p-[var(--app-space-panel)] surface-panel transition-colors">
-              <ScreenMonitor />
-            </div>
-          </div>
-
-          {schedulePanel}
-        </div>
-
-        {/* 下半部分：任务流程 + 当前配置 */}
-        <div className="automation-builder-grid">
+        <div className="automation-workspace-grid">
           {/* 紧凑流程顺序 */}
           <div className="automation-sequence-column">
-            <div className="automation-sequence-panel surface-panel">
+            <SmoothPanel
+              className="automation-sequence-panel"
+              surfaceClassName="automation-sequence-surface"
+            >
               <div className="automation-flow-header">
                 <div className="min-w-0">
                   <h3>
-                    <Icons.Clipboard />
+                    <ClipboardList size={16} strokeWidth={1.8} aria-hidden="true" />
                     <span>任务流程</span>
                   </h3>
-                  <p>按顺序执行，可拖拽调整</p>
+                  <p className="automation-flow-meta">
+                    <span>按顺序执行，可拖拽调整</span>
+                    {currentActivity && (
+                      <span className="automation-flow-activity">
+                        当前活动 · {activityName || currentActivity}
+                      </span>
+                    )}
+                  </p>
                 </div>
                 <span className="automation-flow-summary">
                   {taskFlow.filter(t => t.enabled).length}/{taskFlow.length}
@@ -1822,7 +1823,9 @@ export default function AutomationTasks() {
                       <button
                         type="button"
                         className="automation-sequence-select"
-                        onClick={() => setSelectedTaskId(task.id)}
+                        onClick={() => selectTaskForEditing(task.id)}
+                        aria-controls="automation-task-editor"
+                        aria-pressed={activeTaskId === task.id}
                       >
                         <span className="automation-sequence-node" aria-hidden="true">
                           <AnimatePresence initial={false} mode="wait">
@@ -1839,31 +1842,25 @@ export default function AutomationTasks() {
                             </motion.span>
                           </AnimatePresence>
                         </span>
-                        <span className="automation-sequence-icon">{task.icon}</span>
                         <span className="automation-sequence-copy">
                           <strong>{task.name}</strong>
                           <small>{isCurrentStep ? '正在执行' : isCompletedStep ? '已完成' : task.description}</small>
                         </span>
                       </button>
-                      <label className="automation-sequence-enabled flex min-h-11 min-w-11 items-center justify-center" title={task.enabled ? '停用任务' : '启用任务'}>
-                        <input
-                          type="checkbox"
+                      <span className="automation-sequence-enabled">
+                        <Switch
+                          compact
                           checked={task.enabled}
                           onChange={() => toggleTaskEnabled(index)}
                           disabled={isRunning}
-                          className="custom-checkbox cursor-pointer"
+                          label={`${task.name}启用状态`}
                         />
-                        <span className="sr-only">{task.enabled ? '已启用' : '已停用'}</span>
-                      </label>
-                      {isCurrentStep ? (
-                        <span className="automation-current-spinner">
-                          <LoaderCircle className="animate-spin" strokeWidth={2.2} />
+                      </span>
+                      {isCompletedStep ? (
+                        <span className="automation-completed-mark" role="img" aria-label="已完成" title="已完成">
+                          <Check size={13} strokeWidth={2.6} aria-hidden="true" />
                         </span>
-                      ) : isCompletedStep ? (
-                        <span className="automation-completed-mark" title="已完成">
-                          <Check size={14} strokeWidth={2.4} />
-                        </span>
-                      ) : (
+                      ) : !isCurrentStep ? (
                         <button
                           type="button"
                           onClick={() => removeTaskFromFlow(index)}
@@ -1874,7 +1871,7 @@ export default function AutomationTasks() {
                         >
                           <Trash2 size={14} strokeWidth={1.9} />
                         </button>
-                      )}
+                      ) : null}
                       </motion.div>
                     )
                   })}
@@ -1895,39 +1892,54 @@ export default function AutomationTasks() {
                 </div>
               )}
 
-              <div className="automation-sequence-footer">
+              <div ref={taskPickerRegionRef} className="automation-sequence-footer">
                   <button
+                    ref={taskPickerButtonRef}
                     type="button"
                     className={`automation-task-picker-toggle${taskPickerOpen ? ' is-open' : ''}`}
                     onClick={() => setTaskPickerOpen(open => !open)}
                     disabled={isRunning}
                     aria-expanded={taskPickerOpen}
+                    aria-haspopup="menu"
+                    aria-controls="automation-task-picker"
                   >
                     <Plus size={16} strokeWidth={2.1} />
                     <span>添加任务</span>
                     <small>{availableTasks.length}</small>
                   </button>
-                  {taskPickerOpen && (
-                    <div className="automation-task-picker">
-                      {availableTasks.map(task => {
-                        const addedCount = taskFlow.filter(flowTask => flowTask.commandId === task.id).length
+                  <AnimatePresence initial={false}>
+                    {taskPickerOpen && (
+                      <motion.div
+                        id="automation-task-picker"
+                        role="menu"
+                        aria-label="可添加任务"
+                        className="automation-task-picker"
+                        initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.98 }}
+                        transition={{ duration: shouldReduceMotion ? 0.12 : 0.32, ease: [0.32, 0.72, 0, 1] }}
+                      >
+                        {availableTasks.map(task => {
+                          const addedCount = taskFlow.filter(flowTask => flowTask.commandId === task.id).length
 
-                        return (
-                          <button
-                            key={task.id}
-                            type="button"
-                            onClick={() => addTaskToFlow(task)}
-                            className="automation-task-picker-option"
-                          >
-                            <span>{task.icon}</span>
-                            <strong>{task.name}</strong>
-                            {addedCount > 0 && <small>{addedCount}</small>}
-                            <Plus size={14} strokeWidth={2} />
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
+                          return (
+                            <button
+                              key={task.id}
+                              type="button"
+                              role="menuitem"
+                              onClick={() => addTaskToFlow(task)}
+                              className="automation-task-picker-option"
+                            >
+                              <span>{task.icon}</span>
+                              <strong>{task.name}</strong>
+                              {addedCount > 0 && <small>{addedCount}</small>}
+                              <Plus size={14} strokeWidth={2} />
+                            </button>
+                          )
+                        })}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                   <Button
                     onClick={executeTaskFlow}
                     disabled={!automationAvailable || isRunning || taskFlow.filter(t => t.enabled).length === 0}
@@ -1937,11 +1949,7 @@ export default function AutomationTasks() {
                     statusKey={isRunning ? 'running' : 'ready'}
                     variant="primary"
                     className={`automation-run-button w-full justify-center whitespace-nowrap${isRunning ? ' is-running' : ''}`}
-                    icon={
-                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                      </svg>
-                    }
+                    icon={<Play size={16} fill="currentColor" aria-hidden="true" />}
                   >
                     立即执行
                   </Button>
@@ -1993,7 +2001,7 @@ export default function AutomationTasks() {
                       aria-expanded={executionDetailsOpen}
                       aria-label={executionDetailsOpen ? '收起执行详情' : '展开执行详情'}
                       title={executionDetailsOpen ? '收起详情' : '展开详情'}
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                      className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-200"
                     >
                       <ChevronDown
                         size={15}
@@ -2087,15 +2095,15 @@ export default function AutomationTasks() {
                   )}
                 </section>
               )}
-            </div>
+            </SmoothPanel>
           </div>
 
           {/* 当前任务配置 */}
-          <div className="automation-editor-column">
-            <div className="automation-editor-panel surface-panel">
+          <div ref={editorColumnRef} id="automation-task-editor" className="automation-editor-column" tabIndex={-1}>
+            <SmoothPanel className="automation-editor-panel">
               <div className="automation-editor-heading">
                 <div>
-                  <h3><Icons.Settings /><span>任务配置</span></h3>
+                  <h3><SlidersHorizontal size={16} strokeWidth={1.8} aria-hidden="true" /><span>任务配置</span></h3>
                   <p>选择流程步骤后调整参数</p>
                 </div>
                 {activeTaskId && (
@@ -2103,17 +2111,23 @@ export default function AutomationTasks() {
                 )}
               </div>
               {!activeTaskId ? (
-                <div className="automation-editor-empty">
-                  <SlidersHorizontal size={22} strokeWidth={1.7} />
-                  <strong>暂无可配置任务</strong>
-                  <span>先从左侧任务库添加任务</span>
-                </div>
+                <EmptyState
+                  className="automation-editor-empty"
+                  compact
+                  icon={<SlidersHorizontal size={22} strokeWidth={1.7} />}
+                  title="暂无可配置任务"
+                  description="先从任务流程中添加一个任务"
+                />
               ) : (
                 <div className="automation-editor-content">
                   {taskFlow.filter(task => task.id === activeTaskId).map((task) => {
                     const index = taskFlow.findIndex(item => item.id === task.id)
                     const connectionFeedback = connectionStatus[task.id]
                     const isTestingConnection = testingConnectionTaskId === task.id
+                    const parameterFields = task.paramFields ?? []
+                    const usesGroupedParameterRows = parameterFields.length > 0 && parameterFields.every(field => (
+                      field.type === 'select' || field.type === 'text' || field.type === 'number'
+                    ))
 
                     return (
                     <div
@@ -2130,27 +2144,20 @@ export default function AutomationTasks() {
                           </span>
                         </div>
                         <div className="automation-flow-card-controls">
-                          <label className="automation-enabled-control">
-                            <input
-                              type="checkbox"
-                              checked={task.enabled}
-                              onChange={() => toggleTaskEnabled(index)}
-                              disabled={isRunning}
-                              className="custom-checkbox cursor-pointer"
-                            />
-                            <span>{task.enabled ? '已启用' : '已停用'}</span>
-                          </label>
-                          {currentStep === index ? (
-                            <span className="automation-current-spinner">
-                              <LoaderCircle className="animate-spin" strokeWidth={2.2} />
-                            </span>
-                          ) : (
+                          <Switch
+                            checked={task.enabled}
+                            onChange={() => toggleTaskEnabled(index)}
+                            disabled={isRunning}
+                            label={`${task.name}启用状态`}
+                          />
+                          {currentStep !== index && (
                             <button
                               type="button"
                               onClick={() => removeTaskFromFlow(index)}
                               disabled={isRunning}
-                              className="automation-delete-task"
+                              className="automation-delete-task min-h-11 min-w-11"
                               title="删除任务"
+                              aria-label={`删除${task.name}`}
                             >
                               <Trash2 size={16} strokeWidth={1.9} />
                             </button>
@@ -2160,7 +2167,7 @@ export default function AutomationTasks() {
 
                       {/* 参数配置区域 */}
                       {task.paramFields && task.paramFields.length > 0 && (
-                        <div className="space-y-3">
+                        <div className={`automation-param-fields${usesGroupedParameterRows ? ' is-grouped' : ''}`}>
                           {task.paramFields.map((field) => {
                             if (field.visibleWhen && String(task.params[field.visibleWhen.key] ?? '') !== String(field.visibleWhen.value)) {
                               return null
@@ -2168,11 +2175,13 @@ export default function AutomationTasks() {
                             if (field.hiddenWhen && String(task.params[field.hiddenWhen.key] ?? '') === String(field.hiddenWhen.value)) {
                               return null
                             }
+                            const fieldId = `automation-${task.id}-${field.key}`
                             return (
-                            <div key={field.key}>
+                            <div key={field.key} className={`automation-param-field is-${field.type}`}>
                               {field.type === 'checkbox' ? (
-                                <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer group">
+                                <label htmlFor={fieldId} className="group flex min-h-11 cursor-pointer items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
                                   <input
+                                    id={fieldId}
                                     type="checkbox"
                                     checked={task.params[field.key] || false}
                                     onChange={(e) => updateTaskParam(index, field.key, e.target.checked)}
@@ -2185,15 +2194,15 @@ export default function AutomationTasks() {
                                 <div className="space-y-2">
                                   {(task.params.stages || [{ stage: '', times: '' }]).map((stageItem, stageIndex) => (
                                     <div key={stageIndex}>
-                                      <div className="flex items-center space-x-2">
+                                      <div className="flex min-w-0 flex-col items-stretch gap-1.5 sm:flex-row sm:items-center sm:gap-2">
                                         {stageIndex === 0 && (
-                                          <label className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap" style={{ width: '80px', flexShrink: 0 }}>{field.label}:</label>
+                                          <label htmlFor={`${fieldId}-${stageIndex}`} className="automation-field-label w-full shrink-0 whitespace-nowrap sm:w-20">{field.label}</label>
                                         )}
                                         {stageIndex > 0 && (
-                                          <div style={{ width: '80px', flexShrink: 0 }}></div>
+                                          <div className="hidden w-20 shrink-0 sm:block" aria-hidden="true" />
                                         )}
-                                        <div className="flex items-center space-x-2 flex-1">
-                                        <div className={`automation-composite-control automation-stage-control relative inline-flex items-center overflow-hidden ${
+                                        <div className="flex min-w-0 flex-1 items-center gap-2">
+                                        <div className={`automation-composite-control automation-stage-control relative inline-flex min-w-0 flex-1 items-center overflow-hidden ${
                                           typeof stageItem === 'object' && stageItem.pinned
                                             ? 'is-accented'
                                             : typeof stageItem === 'object' && stageItem.smart
@@ -2215,7 +2224,7 @@ export default function AutomationTasks() {
                                             updateTaskParam(index, 'stages', newStages);
                                           }}
                                           disabled={isRunning || !task.enabled || (typeof stageItem === 'object' && stageItem.smart)}
-                                          className={`absolute left-1 top-1/2 -translate-y-1/2 p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-10 ${
+                                          className={`absolute left-0 top-1/2 z-10 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                                             (typeof stageItem === 'object' && stageItem.smart)
                                               ? 'brand-text'
                                               : (typeof stageItem === 'object' && stageItem.pinned)
@@ -2229,6 +2238,13 @@ export default function AutomationTasks() {
                                                 ? '取消置顶'
                                                 : '置顶'
                                           }
+                                          aria-label={`${
+                                            typeof stageItem === 'object' && stageItem.smart
+                                              ? '智能养成关卡'
+                                              : typeof stageItem === 'object' && stageItem.pinned
+                                                ? '取消置顶'
+                                                : '置顶'
+                                          }：${field.label} ${stageIndex + 1}`}
                                         >
                                           {(typeof stageItem === 'object' && stageItem.smart) ? (
                                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -2241,8 +2257,10 @@ export default function AutomationTasks() {
                                           )}
                                         </button>
                                         <input
+                                          id={`${fieldId}-${stageIndex}`}
                                           type="text"
-                                          list="stage-suggestions"
+                                          list={`${fieldId}-suggestions`}
+                                          aria-label={stageIndex === 0 ? undefined : `${field.label} ${stageIndex + 1}`}
                                           value={typeof stageItem === 'string' ? stageItem : stageItem.stage}
                                           onChange={(e) => {
                                             const newStages = [...(task.params.stages || [{ stage: '', times: '' }])];
@@ -2255,9 +2273,9 @@ export default function AutomationTasks() {
                                           }}
                                           placeholder={field.placeholder}
                                           disabled={isRunning || !task.enabled || (typeof stageItem === 'object' && stageItem.smart)}
-                                          className="w-28 pl-7 pr-3 py-2 bg-transparent text-sm text-gray-900 dark:text-gray-200 focus:outline-none"
+                                          className="min-w-0 flex-1 py-2 pl-11 pr-3 text-sm text-gray-900 focus:outline-none dark:text-gray-200"
                                         />
-                                        <datalist id="stage-suggestions">
+                                        <datalist id={`${fieldId}-suggestions`}>
                                           <option value="1-7">1-7 (固源岩)</option>
                                           <option value="4-6">4-6 (酮凝集)</option>
                                           <option value="S4-1">S4-1 (聚酸酯)</option>
@@ -2285,7 +2303,9 @@ export default function AutomationTasks() {
                                         </datalist>
                                         <div className="w-px h-6 bg-white/20"></div>
                                         <input
+                                          id={`${fieldId}-${stageIndex}-times`}
                                           type="number"
+                                          aria-label={`${field.label} ${stageIndex + 1} 执行次数`}
                                           value={typeof stageItem === 'string' ? '' : (stageItem.times || '')}
                                           onChange={(e) => {
                                             const newStages = [...(task.params.stages || [{ stage: '', times: '' }])];
@@ -2299,10 +2319,10 @@ export default function AutomationTasks() {
                                           }}
                                           placeholder=""
                                           disabled={isRunning || !task.enabled || (typeof stageItem === 'object' && stageItem.smart)}
-                                          className="w-10 px-1 py-2 bg-transparent text-sm text-gray-900 dark:text-gray-200 text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                          className="w-10 shrink-0 bg-transparent px-1 py-2 text-center text-sm text-gray-900 focus:outline-none [appearance:textfield] dark:text-gray-200 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                           min="0"
                                         />
-                                        <div className="flex flex-col border-l border-white/10 self-stretch overflow-hidden">
+                                        <div className="hidden flex-col self-stretch overflow-hidden border-l border-white/10 min-[900px]:flex">
                                           <button
                                             type="button"
                                             onClick={() => {
@@ -2319,6 +2339,7 @@ export default function AutomationTasks() {
                                             }}
                                             disabled={isRunning || !task.enabled || (typeof stageItem === 'object' && stageItem.smart)}
                                             className="flex-1 px-1.5 bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                                            aria-label={`增加${field.label} ${stageIndex + 1} 的执行次数`}
                                           >
                                             <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                               <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
@@ -2343,6 +2364,7 @@ export default function AutomationTasks() {
                                             }}
                                             disabled={isRunning || !task.enabled || (typeof stageItem === 'object' && stageItem.smart)}
                                             className="flex-1 px-1.5 bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                                            aria-label={`减少${field.label} ${stageIndex + 1} 的执行次数`}
                                           >
                                             <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -2358,8 +2380,9 @@ export default function AutomationTasks() {
                                             updateTaskParam(index, 'stages', newStages.length > 0 ? newStages : [{ stage: '', times: '' }]);
                                           }}
                                           disabled={isRunning || !task.enabled}
-                                          className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                                          className="flex min-h-11 min-w-11 flex-shrink-0 items-center justify-center rounded-lg text-red-500 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                                           title="删除此关卡"
+                                          aria-label={`删除${field.label} ${stageIndex + 1}`}
                                         >
                                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -2410,7 +2433,7 @@ export default function AutomationTasks() {
                                           updateTaskParam(index, 'stages', [...currentStages, { stage: '', times: '' }]);
                                         }}
                                         disabled={isRunning || !task.enabled}
-                                        className="flex items-center justify-center space-x-1 border border-dashed border-gray-300 dark:border-gray-600 hover:border-[var(--app-accent)] rounded-xl py-1.5 px-3 text-sm text-gray-500 dark:text-gray-400 hover:text-[var(--app-accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed control-surface"
+                                        className="control-surface flex min-h-11 items-center justify-center space-x-1 rounded-xl border border-dashed border-gray-300 px-3 text-sm text-gray-500 transition-colors hover:border-[var(--app-accent)] hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-400"
                                       >
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -2497,7 +2520,7 @@ export default function AutomationTasks() {
                                           }
                                         }}
                                         disabled={isRunning || !task.enabled}
-                                        className={`flex items-center justify-center space-x-1 border border-dashed rounded-xl py-1.5 px-3 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                                        className={`flex min-h-11 items-center justify-center space-x-1 rounded-xl border border-dashed px-3 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                                           (task.params.stages || []).some(s => typeof s === 'object' && s.smart)
                                             ? 'border-[var(--app-accent)] brand-action-subtle'
                                             : 'border-[var(--app-border)] brand-chip hover:border-[var(--app-accent)]'
@@ -2519,9 +2542,10 @@ export default function AutomationTasks() {
                                 </div>
                               ) : field.type === 'stage-with-times' ? (
                                 <div className="flex items-center space-x-2">
-                                  <label className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap w-20">{field.label}:</label>
+                                  <label htmlFor={fieldId} className="automation-field-label w-20 whitespace-nowrap">{field.label}</label>
                                   <div className="automation-composite-control flex items-center flex-1 max-w-[280px]">
                                     <input
+                                      id={fieldId}
                                       type="text"
                                       value={task.params[field.key] || ''}
                                       onChange={(e) => updateTaskParam(index, field.key, e.target.value)}
@@ -2531,7 +2555,9 @@ export default function AutomationTasks() {
                                     />
                                     <div className="w-px h-6 bg-white/20"></div>
                                     <input
+                                      id={`${fieldId}-times`}
                                       type="number"
+                                      aria-label={`${field.label}执行次数`}
                                       value={task.params.times || ''}
                                       onChange={(e) => updateTaskParam(index, 'times', e.target.value)}
                                       placeholder=""
@@ -2539,7 +2565,7 @@ export default function AutomationTasks() {
                                       className="w-16 px-2 py-2 bg-transparent text-sm text-gray-900 dark:text-gray-200 text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                       min="0"
                                     />
-                                    <div className="flex flex-col border-l border-white/10 self-stretch overflow-hidden">
+                                    <div className="hidden flex-col self-stretch overflow-hidden border-l border-white/10 min-[900px]:flex">
                                       <button
                                         type="button"
                                         onClick={() => {
@@ -2548,6 +2574,7 @@ export default function AutomationTasks() {
                                         }}
                                         disabled={isRunning || !task.enabled}
                                         className="flex-1 px-1.5 bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center rounded-tr-xl"
+                                        aria-label={`增加${field.label}执行次数`}
                                       >
                                         <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
@@ -2564,6 +2591,7 @@ export default function AutomationTasks() {
                                         }}
                                         disabled={isRunning || !task.enabled}
                                         className="flex-1 px-1.5 bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center rounded-br-xl"
+                                        aria-label={`减少${field.label}执行次数`}
                                       >
                                         <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -2573,15 +2601,17 @@ export default function AutomationTasks() {
                                   </div>
                                 </div>
                               ) : field.type === 'star-select' ? (
-                                <div>
-                                  <label className="text-sm text-gray-600 dark:text-gray-400 block mb-2">{field.label}:</label>
+                                <fieldset>
+                                  <legend className="automation-field-label mb-2 block">{field.label}</legend>
                                   <div className="flex items-center space-x-2 flex-wrap">
                                     {[3, 4, 5, 6].map(star => {
                                       const currentValue = Array.isArray(task.params[field.key]) ? task.params[field.key] : [];
                                       const isChecked = currentValue.includes(star);
+                                      const optionId = `${fieldId}-${star}`
                                       return (
-                                        <label key={star} className="flex items-center space-x-1 text-sm text-gray-700 dark:text-gray-300 cursor-pointer group">
+                                        <label key={star} htmlFor={optionId} className="group flex min-h-11 cursor-pointer items-center space-x-1 text-sm text-gray-700 dark:text-gray-300">
                                           <input
+                                            id={optionId}
                                             type="checkbox"
                                             checked={isChecked}
                                             onChange={(e) => {
@@ -2608,10 +2638,10 @@ export default function AutomationTasks() {
                                       已开启 6 星自动公招：遇到高级资深干员等高价值标签时，会优先保留并自动选择。
                                     </div>
                                   )}
-                                </div>
+                                </fieldset>
                               ) : field.type === 'facility-select' ? (
-                                <div>
-                                  <label className="text-sm text-gray-600 dark:text-gray-400 block mb-2">{field.label}:</label>
+                                <fieldset>
+                                  <legend className="automation-field-label mb-2 block">{field.label}</legend>
                                   <div className="grid grid-cols-2 gap-2">
                                     {[
                                       { value: 'Mfg', label: '制造站' },
@@ -2626,9 +2656,11 @@ export default function AutomationTasks() {
                                     ].map(facility => {
                                       const currentValue = Array.isArray(task.params[field.key]) ? task.params[field.key] : [];
                                       const isChecked = currentValue.includes(facility.value);
+                                      const optionId = `${fieldId}-${facility.value}`
                                       return (
-                                        <label key={facility.value} className="flex items-center space-x-1 text-sm text-gray-700 dark:text-gray-300 cursor-pointer group">
+                                        <label key={facility.value} htmlFor={optionId} className="group flex min-h-11 cursor-pointer items-center space-x-1 text-sm text-gray-700 dark:text-gray-300">
                                           <input
+                                            id={optionId}
                                             type="checkbox"
                                             checked={isChecked}
                                             onChange={(e) => {
@@ -2645,12 +2677,13 @@ export default function AutomationTasks() {
                                       );
                                     })}
                                   </div>
-                                </div>
+                                </fieldset>
                               ) : field.type === 'select' ? (
-                                <div className="flex items-center space-x-2">
-                                  <label className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap w-20">{field.label}:</label>
+                                <div className="automation-field-row">
+                                  <label htmlFor={fieldId} className="automation-field-label">{field.label}</label>
                                   <div className="automation-select-control">
                                     <select
+                                      id={fieldId}
                                       value={task.params[field.key] || (Array.isArray(field.options) && field.options.length > 0 ? (typeof field.options[0] === 'object' ? field.options[0].value : field.options[0]) : '')}
                                       onChange={(e) => updateTaskParam(index, field.key, e.target.value)}
                                       disabled={isRunning || !task.enabled}
@@ -2665,11 +2698,12 @@ export default function AutomationTasks() {
                                   </div>
                                 </div>
                               ) : (
-                                <div className="flex items-center space-x-2">
-                                  <label className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap w-20">{field.label}:</label>
+                                <div className="automation-field-row">
+                                  <label htmlFor={fieldId} className="automation-field-label">{field.label}</label>
                                   {field.type === 'number' ? (
                                     <div className="number-input-wrapper flex-1">
                                       <input
+                                        id={fieldId}
                                         type="number"
                                         value={task.params[field.key] || ''}
                                         onChange={(e) => updateTaskParam(index, field.key, e.target.value)}
@@ -2680,22 +2714,7 @@ export default function AutomationTasks() {
                                         disabled={isRunning || !task.enabled}
                                         className="automation-number-control"
                                       />
-                                      <div className="number-input-controls">
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const currentValue = Number(task.params[field.key]) || 0;
-                                            const step = Number(field.step) || 1;
-                                            const max = field.max !== undefined ? Number(field.max) : Infinity;
-                                            const newValue = Math.min(currentValue + step, max);
-                                            updateTaskParam(index, field.key, newValue.toString());
-                                          }}
-                                          disabled={isRunning || !task.enabled}
-                                        >
-                                          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-                                          </svg>
-                                        </button>
+                                      <div className="number-input-controls hidden min-[900px]:flex">
                                         <button
                                           type="button"
                                           onClick={() => {
@@ -2706,15 +2725,29 @@ export default function AutomationTasks() {
                                             updateTaskParam(index, field.key, newValue.toString());
                                           }}
                                           disabled={isRunning || !task.enabled}
+                                          aria-label={`减少${field.label}`}
                                         >
-                                          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                                          </svg>
+                                          <Minus size={14} strokeWidth={2.2} aria-hidden="true" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const currentValue = Number(task.params[field.key]) || 0;
+                                            const step = Number(field.step) || 1;
+                                            const max = field.max !== undefined ? Number(field.max) : Infinity;
+                                            const newValue = Math.min(currentValue + step, max);
+                                            updateTaskParam(index, field.key, newValue.toString());
+                                          }}
+                                          disabled={isRunning || !task.enabled}
+                                          aria-label={`增加${field.label}`}
+                                        >
+                                          <Plus size={14} strokeWidth={2.2} aria-hidden="true" />
                                         </button>
                                       </div>
                                     </div>
                                   ) : (
                                     <input
+                                      id={fieldId}
                                       type={field.type}
                                       value={task.params[field.key] || ''}
                                       onChange={(e) => updateTaskParam(index, field.key, e.target.value)}
@@ -2729,10 +2762,8 @@ export default function AutomationTasks() {
                                 </div>
                               )}
                               {field.helper && (
-                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 flex items-start gap-1.5">
-                                  <svg className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                                  </svg>
+                                <p className="automation-field-helper">
+                                  <Info size={13} strokeWidth={1.8} aria-hidden="true" />
                                   <span>{field.helper}</span>
                                 </p>
                               )}
@@ -2744,7 +2775,7 @@ export default function AutomationTasks() {
 
                       {task.commandId === 'fight' && (
                         <details className="group mt-3 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] px-3 py-2">
-                          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
+                          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
                             <span className="flex items-center gap-2">
                               <SlidersHorizontal size={15} strokeWidth={1.9} />
                               高级设置
@@ -2754,9 +2785,10 @@ export default function AutomationTasks() {
 
                           <div className="mt-3 space-y-3 border-t border-[var(--app-border)] pt-3">
                             <div className="flex items-center gap-2">
-                              <label className="w-24 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">闪退重启:</label>
+                              <label htmlFor={`${task.id}-fight-client-type`} className="w-24 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">闪退重启:</label>
                               <div className="automation-select-control min-w-0 flex-1">
                                 <select
+                                  id={`${task.id}-fight-client-type`}
                                   value={task.params.clientType || ''}
                                   onChange={(e) => updateTaskParam(index, 'clientType', e.target.value)}
                                   disabled={isRunning || !task.enabled}
@@ -2774,7 +2806,7 @@ export default function AutomationTasks() {
                             </div>
                             <p className="text-xs text-gray-400 dark:text-gray-500">选择客户端后，游戏闪退时会自动重新启动。</p>
 
-                            <label className="flex cursor-pointer items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                            <label className="flex min-h-11 cursor-pointer items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
                               <input
                                 type="checkbox"
                                 checked={Boolean(task.params.DrGrandet)}
@@ -2789,7 +2821,7 @@ export default function AutomationTasks() {
                             </label>
 
                             <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
-                              <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                              <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                                 <input
                                   type="checkbox"
                                   checked={Boolean(task.params.report_to_penguin)}
@@ -2801,8 +2833,9 @@ export default function AutomationTasks() {
                               </label>
                               {task.params.report_to_penguin && (
                                 <div className="flex items-center gap-2 pl-6">
-                                  <label className="w-20 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">用户 ID:</label>
+                                  <label htmlFor={`${task.id}-penguin-id`} className="w-20 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">用户 ID:</label>
                                   <input
+                                    id={`${task.id}-penguin-id`}
                                     type="text"
                                     value={task.params.penguin_id || ''}
                                     onChange={(e) => updateTaskParam(index, 'penguin_id', e.target.value)}
@@ -2815,7 +2848,7 @@ export default function AutomationTasks() {
                             </section>
 
                             <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
-                              <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                              <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                                 <input
                                   type="checkbox"
                                   checked={Boolean(task.params.report_to_yituliu)}
@@ -2827,8 +2860,9 @@ export default function AutomationTasks() {
                               </label>
                               {task.params.report_to_yituliu && (
                                 <div className="flex items-center gap-2 pl-6">
-                                  <label className="w-20 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">用户 ID:</label>
+                                  <label htmlFor={`${task.id}-yituliu-id`} className="w-20 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">用户 ID:</label>
                                   <input
+                                    id={`${task.id}-yituliu-id`}
                                     type="text"
                                     value={task.params.yituliu_id || ''}
                                     onChange={(e) => updateTaskParam(index, 'yituliu_id', e.target.value)}
@@ -2845,7 +2879,7 @@ export default function AutomationTasks() {
 
                       {task.commandId === 'infrast' && (
                         <details className="group mt-3 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] px-3 py-2">
-                          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
+                          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
                             <span className="flex items-center gap-2">
                               <SlidersHorizontal size={15} strokeWidth={1.9} />
                               高级设置
@@ -2857,7 +2891,7 @@ export default function AutomationTasks() {
                             {Array.isArray(task.params.facility) && task.params.facility.includes('Dorm') && (
                               <section className="space-y-2">
                                 <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">宿舍</h4>
-                                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                                   <input
                                     type="checkbox"
                                     checked={Boolean(task.params.dorm_notstationed_enabled)}
@@ -2867,7 +2901,7 @@ export default function AutomationTasks() {
                                   />
                                   使用“未进驻”筛选
                                 </label>
-                                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                                   <input
                                     type="checkbox"
                                     checked={Boolean(task.params.dorm_trust_enabled)}
@@ -2883,7 +2917,7 @@ export default function AutomationTasks() {
                             {Array.isArray(task.params.facility) && task.params.facility.includes('Reception') && (
                               <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
                                 <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">会客室</h4>
-                                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                                   <input
                                     type="checkbox"
                                     checked={Boolean(task.params.reception_message_board)}
@@ -2893,7 +2927,7 @@ export default function AutomationTasks() {
                                   />
                                   领取信息板信用
                                 </label>
-                                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                                   <input
                                     type="checkbox"
                                     checked={Boolean(task.params.reception_clue_exchange)}
@@ -2903,7 +2937,7 @@ export default function AutomationTasks() {
                                   />
                                   发起线索交流
                                 </label>
-                                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                                   <input
                                     type="checkbox"
                                     checked={Boolean(task.params.reception_send_clue)}
@@ -2919,7 +2953,7 @@ export default function AutomationTasks() {
                             {Array.isArray(task.params.facility) && task.params.facility.includes('Training') && (
                               <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
                                 <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">训练室</h4>
-                                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                                   <input
                                     type="checkbox"
                                     checked={Boolean(task.params.continue_training)}
@@ -2937,7 +2971,7 @@ export default function AutomationTasks() {
 
                       {task.commandId === 'recruit' && (
                         <details className="group mt-3 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] px-3 py-2">
-                          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
+                          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
                             <span className="flex items-center gap-2">
                               <SlidersHorizontal size={15} strokeWidth={1.9} />
                               高级设置
@@ -2947,9 +2981,10 @@ export default function AutomationTasks() {
 
                           <div className="mt-3 space-y-3 border-t border-[var(--app-border)] pt-3">
                             <div className="flex items-center gap-2">
-                              <label className="w-20 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">额外标签:</label>
+                              <label htmlFor={`${task.id}-extra-tags-mode`} className="w-20 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">额外标签:</label>
                               <div className="automation-select-control min-w-0 flex-1">
                                 <select
+                                  id={`${task.id}-extra-tags-mode`}
                                   value={String(task.params.extra_tags_mode ?? 0)}
                                   onChange={(e) => updateTaskParam(index, 'extra_tags_mode', Number(e.target.value))}
                                   disabled={isRunning || !task.enabled}
@@ -2963,8 +2998,9 @@ export default function AutomationTasks() {
                             </div>
 
                             <div className="flex items-center gap-2">
-                              <label className="w-20 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">三星首选:</label>
+                              <label htmlFor={`${task.id}-first-tags`} className="w-20 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">三星首选:</label>
                               <input
+                                id={`${task.id}-first-tags`}
                                 type="text"
                                 value={Array.isArray(task.params.first_tags) ? task.params.first_tags.join(',') : (task.params.first_tags || '')}
                                 onChange={(e) => updateTaskParam(index, 'first_tags', e.target.value)}
@@ -2975,16 +3011,18 @@ export default function AutomationTasks() {
                             </div>
                             <p className="text-xs text-gray-400 dark:text-gray-500">仅在三星组合中优先选择，多个标签用逗号分隔。</p>
 
-                            <div>
-                              <label className="mb-2 block text-sm text-gray-600 dark:text-gray-400">招募时长:</label>
-                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <fieldset>
+                              <legend className="mb-2 block text-sm text-gray-600 dark:text-gray-400">招募时长:</legend>
+                              <div className="automation-recruitment-time-list">
                                 {[3, 4].map(star => {
                                   const key = String(star)
+                                  const recruitmentTimeId = `${task.id}-recruitment-time-${star}`
                                   const recruitmentTime = task.params.recruitment_time || { '3': 540, '4': 540 }
                                   return (
-                                    <label key={star} className="flex min-w-0 items-center gap-2 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] px-2.5 py-2">
+                                    <label key={star} htmlFor={recruitmentTimeId} className="automation-recruitment-time-row">
                                       <span className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-200">{star} 星</span>
                                       <input
+                                        id={recruitmentTimeId}
                                         type="number"
                                         value={recruitmentTime[key] ?? 540}
                                         onChange={(e) => updateTaskParam(index, 'recruitment_time', { ...recruitmentTime, [key]: e.target.value })}
@@ -3007,7 +3045,7 @@ export default function AutomationTasks() {
                                 })}
                               </div>
                               <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">可设置 60 至 540 分钟，按 10 分钟调整；五星和六星固定为 540 分钟。</p>
-                            </div>
+                            </fieldset>
                           </div>
                         </details>
                       )}
@@ -3063,7 +3101,22 @@ export default function AutomationTasks() {
                   })}
                 </div>
               )}
+            </SmoothPanel>
+          </div>
+
+          <div className="automation-support-column">
+            <div className="automation-monitor-column">
+              <SmoothPanel
+                className="automation-monitor-panel"
+                surfaceClassName="automation-monitor-surface"
+              >
+                <div className="task-monitor-panel is-compact">
+                  <ScreenMonitor variant="compact" />
+                </div>
+              </SmoothPanel>
             </div>
+
+            {schedulePanel}
           </div>
         </div>
         </div>

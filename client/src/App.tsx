@@ -1,8 +1,5 @@
-import React, { lazy, Suspense, useEffect } from 'react'
+import React, { Activity, lazy, Suspense, useEffect } from 'react'
 import { MotionConfig } from 'framer-motion'
-import { App as Framework7App } from 'framework7-react'
-import './framework7'
-import { Framework7RuntimeProvider } from './framework7Context'
 import Layout from './components/Layout'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
 import { PageSkeleton } from './components/common'
@@ -29,8 +26,25 @@ const LogViewer = lazy(pageLoaders.logs)
 const DataStatistics = lazy(pageLoaders.statistics)
 const ConfigManager = lazy(pageLoaders.config)
 
-class PageErrorBoundary extends React.Component<{ activeKey: string; children: React.ReactNode }, { hasError: boolean; errorMessage: string }> {
-  constructor(props: { activeKey: string; children: React.ReactNode }) {
+const appPages = [
+  { id: 'dashboard', Component: Dashboard },
+  { id: 'automation', Component: AutomationTasks },
+  { id: 'combat', Component: CombatTasks },
+  { id: 'roguelike', Component: RoguelikeTasks },
+  { id: 'training', Component: OperatorTraining },
+  { id: 'logs', Component: LogViewer },
+  { id: 'statistics', Component: DataStatistics },
+  { id: 'config', Component: ConfigManager },
+] as const
+
+interface PageErrorBoundaryProps {
+  activeKey: string
+  pageKey: string
+  children: React.ReactNode
+}
+
+class PageErrorBoundary extends React.Component<PageErrorBoundaryProps, { hasError: boolean; errorMessage: string }> {
+  constructor(props: PageErrorBoundaryProps) {
     super(props)
     this.state = { hasError: false, errorMessage: '' }
   }
@@ -43,24 +57,29 @@ class PageErrorBoundary extends React.Component<{ activeKey: string; children: R
     console.error('Page render error:', error)
   }
 
-  componentDidUpdate(prevProps: { activeKey: string }) {
+  componentDidUpdate(prevProps: PageErrorBoundaryProps) {
     if (prevProps.activeKey !== this.props.activeKey && this.state.hasError) {
       this.setState({ hasError: false, errorMessage: '' })
     }
   }
 
   render() {
-    if (this.state.hasError) {
-      return (
+    const content = this.state.hasError ? (
         <div className="p-6">
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-300">
             页面渲染失败：{this.state.errorMessage}
           </div>
         </div>
-      )
-    }
+    ) : this.props.children
 
-    return this.props.children
+    return (
+      <Activity
+        name={`${this.props.pageKey}-workspace`}
+        mode={this.props.activeKey === this.props.pageKey ? 'visible' : 'hidden'}
+      >
+        {content}
+      </Activity>
+    )
   }
 }
 
@@ -71,7 +90,7 @@ function App() {
     || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)
 
   useEffect(() => {
-    document.getElementById('framework7-root')?.classList.toggle('dark', isDark)
+    document.getElementById('app-root')?.classList.toggle('dark', isDark)
   }, [isDark])
 
   useEffect(() => {
@@ -92,63 +111,21 @@ function App() {
     return () => window.clearTimeout(timer)
   }, [])
 
-  const renderActivePage = (activeTab: string) => {
-    switch (activeTab) {
-      case 'automation': return <AutomationTasks />
-      case 'combat': return <CombatTasks />
-      case 'roguelike': return <RoguelikeTasks />
-      case 'training': return <OperatorTraining />
-      case 'logs': return <LogViewer />
-      case 'statistics': return <DataStatistics />
-      case 'config': return <ConfigManager />
-      case 'dashboard':
-      default: return <Dashboard />
-    }
-  }
-
   return (
-    <Framework7App
-      name="La Pluma"
-      theme="ios"
-      // Framework7 9.1.1 registers Sheet swipe listeners against a
-      // `sheetDestroy` event, while Modal.destroy emits `beforeDestroy`.
-      // Bridge the two events so StrictMode/HMR teardown cannot leave a stale
-      // touch listener that later reads from a destroyed instance.
-      sheet={{
-        on: {
-          // The internal listener is registered for `sheetDestroy`, which is
-          // missing from Framework7's public event types.
-          beforeDestroy: (sheet) => {
-            const emitInternal = sheet.emit as unknown as (event: string) => void
-            emitInternal.call(sheet, 'sheetDestroy')
-          },
-        },
-      }}
-      // Theme state is applied by uiStore to both document roots. Leaving this
-      // undefined lets Framework7 snapshot that state without installing its
-      // own MediaQueryList listeners (which are not available in older iOS
-      // WebViews and are already managed by the store).
-      darkMode={undefined}
-      iosTranslucentBars
-      iosTranslucentModals
-      colors={{ primary: '#007AFF' }}
-      className="la-pluma-framework7"
-    >
-      <Framework7RuntimeProvider>
-        <MotionConfig reducedMotion="user">
-          <Layout>
-            {({ activeTab }) => (
-              <PageErrorBoundary activeKey={activeTab}>
-                <Suspense fallback={<PageSkeleton variant={activeTab} />}>
-                  {renderActivePage(activeTab)}
+    <div id="app-root" className="la-pluma-app">
+      <MotionConfig reducedMotion="user">
+        <Layout>
+          {({ activeTab }) => appPages.map(({ id, Component }) => (
+            <PageErrorBoundary key={id} activeKey={activeTab} pageKey={id}>
+                <Suspense fallback={<PageSkeleton variant={id} />}>
+                  <Component />
                 </Suspense>
-              </PageErrorBoundary>
-            )}
-          </Layout>
-          <PWAInstallPrompt />
-        </MotionConfig>
-      </Framework7RuntimeProvider>
-    </Framework7App>
+            </PageErrorBoundary>
+          ))}
+        </Layout>
+        <PWAInstallPrompt />
+      </MotionConfig>
+    </div>
   )
 }
 

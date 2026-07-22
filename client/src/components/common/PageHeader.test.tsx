@@ -32,6 +32,7 @@ describe('PageHeader mobile layout', () => {
       <PageHeader title="控制台" actions={<button type="button">刷新</button>} mobileLayout="inline" />,
     ))
     expect(container.querySelector('.app-page-header')?.classList.contains('is-mobile-inline')).toBe(true)
+    expect(container.querySelector('h1')?.textContent).toBe('控制台')
 
     await act(async () => root.render(<PageHeader title="配置" actions={<button type="button">保存</button>} />))
     expect(container.querySelector('.app-page-header')?.classList.contains('is-mobile-inline')).toBe(false)
