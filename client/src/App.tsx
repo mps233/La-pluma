@@ -1,5 +1,6 @@
 import React, { Activity, lazy, Suspense, useEffect } from 'react'
 import { MotionConfig } from 'framer-motion'
+import Dashboard from './components/Dashboard'
 import Layout from './components/Layout'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
 import { PageSkeleton } from './components/common'
@@ -7,7 +8,6 @@ import { useBackendStatusMonitor } from './hooks/useBackendStatusMonitor'
 import { useUIStore } from './stores'
 
 const pageLoaders = {
-  dashboard: () => import('./components/Dashboard'),
   automation: () => import('./components/AutomationTasks'),
   combat: () => import('./components/CombatTasks'),
   roguelike: () => import('./components/RoguelikeTasks'),
@@ -17,7 +17,6 @@ const pageLoaders = {
   config: () => import('./components/ConfigManager'),
 }
 
-const Dashboard = lazy(pageLoaders.dashboard)
 const AutomationTasks = lazy(pageLoaders.automation)
 const CombatTasks = lazy(pageLoaders.combat)
 const RoguelikeTasks = lazy(pageLoaders.roguelike)

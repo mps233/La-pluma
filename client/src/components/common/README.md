@@ -35,7 +35,7 @@
 
 ### 反馈、图标与布局
 
-- 字段问题用表单组件的 `error`；控制台仅在首次且没有会话缓存时由 `DashboardSkeleton` 维持结构，返回页面应保留旧内容并后台刷新；局部加载用 `Loading`；无数据用 `EmptyState`；不可逆操作用 `ConfirmDialog`。区域错误必须就地展示和重试，不要伪装成空状态。
+- 字段问题用表单组件的 `error`；控制台仅在首次且没有本地缓存时由 `DashboardSkeleton` 维持结构，恢复或返回页面应先显示最后一次成功快照并后台刷新；局部加载用 `Loading`；无数据用 `EmptyState`；不可逆操作用 `ConfirmDialog`。区域错误必须就地展示和重试，不要伪装成空状态。
 - 全局结果使用 `useStatusStore.setMessage` 和 `FloatingStatusIndicator`。错误持续到用户关闭，其他短消息由 store 自动收起；不要新增独立 toast 或自行清除定时器。
 - 普通功能图标优先用 `lucide-react`，业务身份图标复用 `Icons`。无文字操作用 `IconButton` 并同时提供 `title` 与 `aria-label`；装饰图标加 `aria-hidden`。
 - 应用外层使用 `app-shell` 控制 1600px 最大宽度与响应式 gutter；页面内容使用 `app-page`，复用控制台手机材质的功能页在同层增加 `ios-workspace-page`，区块用 `app-stack-section`，卡片内用 `app-stack-card`。页面内部不要再嵌套 `max-w-7xl` 或重复水平 padding。不要为凑版式嵌套卡片或硬塞多栏；每列保持 `min-w-0`，窄屏优先折叠。

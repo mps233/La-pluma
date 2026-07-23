@@ -1,9 +1,21 @@
-import { useState, useEffect, useRef, useCallback, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
+import {
+  AlertCircle,
+  Check,
+  ClipboardList,
+  Filter,
+  Package,
+  Search,
+  Sparkles,
+  Trash2,
+  UserRoundSearch,
+} from 'lucide-react'
 import { getOperatorList, getAllOperators, getOperBoxData, getTrainingQueue, addToTrainingQueue, removeFromTrainingQueue, updateTrainingQueueOrder, updateTrainingSettings, generateTrainingPlan, applyTrainingPlan, getItemIconUrl } from '../services/api'
-import { PageHeader, Card, SmoothPanel, Button, Checkbox, IconButton, Loading } from './common'
+import { PageHeader, Card, SmoothPanel, Button, EmptyState, IconButton, Input, Loading, Select, Switch } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
+import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
 import type {
   MaterialHierarchyNodeProps,
   TrainingOperator,
@@ -13,8 +25,17 @@ import type {
   MaterialNode,
   TrainingFilters,
   TrainingPlanMode,
-  TrainingOpenMenu
 } from '@/types/components'
+
+const TRAINING_STATUS_OPTIONS: Array<{
+  value: TrainingFilters['status']
+  label: string
+  desc: string
+}> = [
+  { value: 'trainable', label: '可养成', desc: '可加入队列' },
+  { value: 'owned', label: '已拥有', desc: '已识别干员' },
+  { value: 'all', label: '全部', desc: '含未拥有' },
+]
 
 // 材料层级节点组件
 function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) {
@@ -29,16 +50,16 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
   if (depth === 0) {
     return (
       <motion.div
-        initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: shouldReduceMotion ? 0 : 0.3 }}
-        className="space-y-3 rounded-2xl p-4 surface-soft"
+        initial={shouldReduceMotion ? false : { opacity: 0, y: 5 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: shouldReduceMotion ? 0 : 0.18 }}
+        className="space-y-3 rounded-xl p-3 surface-soft"
       >
         {/* 顶层材料 */}
-        <div className="rounded-xl p-3">
+        <div className="rounded-xl p-1">
           <div className="flex items-center gap-3">
             {/* 材料图标 */}
-            <div className="flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center">
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl surface-panel">
               {node.iconId ? (
                 <img
                   src={getItemIconUrl(node.iconId)}
@@ -115,7 +136,7 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
         
         {/* 子材料 */}
         {hasChildren && node.children && (
-          <div className="space-y-2 border-l-2 border-[var(--app-border)] pl-4">
+          <div className="space-y-2 border-l border-[var(--app-border)] pl-3">
             {node.children.map((child, index) => (
               <MaterialHierarchyNode key={`${child.id}-${index}`} node={child} depth={depth + 1} />
             ))}
@@ -130,7 +151,7 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
     <div className={`rounded-lg p-2.5 ${getBgColorByDepth()}`}>
       <div className="flex items-center gap-2">
         {/* 材料图标 */}
-        <div className="flex-shrink-0 w-9 h-9 rounded-lg overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center">
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg surface-panel">
           {node.iconId ? (
             <img
               src={getItemIconUrl(node.iconId)}
@@ -219,7 +240,7 @@ function MaterialGapList({
 
   if (visibleMaterials.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface-muted)] px-4 py-5 text-sm text-tertiary">
+      <div className="rounded-xl px-4 py-4 text-sm text-tertiary surface-soft">
         {emptyText}
       </div>
     );
@@ -232,14 +253,12 @@ function MaterialGapList({
           key={material.id}
           className="flex min-h-[60px] items-center gap-3 rounded-xl px-3 py-2 surface-soft"
         >
-          <div className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-slate-100 to-slate-50 text-slate-400 ring-1 ring-slate-200/70 dark:from-slate-800 dark:to-slate-900 dark:text-slate-500 dark:ring-white/10">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
+          <div className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl surface-panel text-tertiary">
+            <Package size={16} strokeWidth={1.8} aria-hidden="true" />
             {material.iconId && (
               <img
                 src={getItemIconUrl(material.iconId)}
-                alt={material.name}
+                alt=""
                 className="absolute inset-0 h-full w-full object-cover"
                 onError={(event) => {
                   event.currentTarget.style.display = 'none';
@@ -272,15 +291,11 @@ interface OperatorEmptyStateProps {
 
 function OperatorEmptyState({ title, description }: OperatorEmptyStateProps) {
   return (
-    <div className="rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface-muted)] px-6 py-12 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl icon-well">
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2m-9 4h10M5 7h14a1 1 0 011 1v11a2 2 0 01-2 2H6a2 2 0 01-2-2V8a1 1 0 011-1z" />
-        </svg>
-      </div>
-      <h3 className="mt-4 text-base font-semibold text-primary">{title}</h3>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-secondary">{description}</p>
-    </div>
+    <EmptyState
+      icon={<UserRoundSearch size={21} strokeWidth={1.8} />}
+      title={title}
+      description={description}
+    />
   );
 }
 
@@ -294,8 +309,9 @@ function TrainingLoadError({
   onRetry: () => void
 }) {
   return (
-    <div className="flex min-h-36 flex-col items-center justify-center gap-3 rounded-2xl px-6 py-8 text-center status-danger" role="alert">
-      <div>
+    <div className="flex min-h-40 flex-col items-center justify-center gap-4 rounded-xl px-6 py-8 text-center status-danger" role="alert">
+      <AlertCircle size={22} strokeWidth={1.9} aria-hidden="true" />
+      <div className="max-w-md">
         <h3 className="text-base font-semibold">{title}</h3>
         <p className="mt-1 text-sm leading-6">{description}</p>
       </div>
@@ -376,11 +392,16 @@ export default function OperatorTraining() {
     status: 'trainable',
     needsElite2: true
   });
+  const {
+    containerRef: statusTabsRef,
+    activeRect: activeStatusRect,
+    setTabRef: setStatusTabRef,
+    handleTabKeyDown: handleStatusKeyDown,
+  } = useFluidTabIndicator(filters.status);
   const [searchTerm, setSearchTerm] = useState('');
   const [planMode, setPlanMode] = useState<TrainingPlanMode>('current');
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({});
   const [visibleOperatorLimit, setVisibleOperatorLimit] = useState(OPERATOR_RENDER_BATCH_SIZE);
-  const [openMenu, setOpenMenu] = useState<TrainingOpenMenu>(null);
   const [pendingOperatorIds, setPendingOperatorIds] = useState<Set<string>>(new Set());
   const [recentlyRemoved, setRecentlyRemoved] = useState<{ item: TrainingQueueItem; index: number } | null>(null);
   const operatorsRequestRef = useRef(0);
@@ -390,8 +411,14 @@ export default function OperatorTraining() {
   const settingsWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
   const persistedSettingsRef = useRef(settings);
   const queueMutationInFlightRef = useRef(false);
-  const rarityMenuTriggerRef = useRef<HTMLButtonElement>(null);
-  const rarityMenuRef = useRef<HTMLDivElement>(null);
+
+  const handleTrainingStatusChange = (status: TrainingFilters['status']) => {
+    setFilters(current => ({
+      ...current,
+      status,
+      needsElite2: status === 'all' ? false : current.needsElite2,
+    }));
+  };
 
   const getOpenStagePlan = (sourcePlan: TrainingPlan): TrainingPlan => ({
     ...sourcePlan,
@@ -451,57 +478,6 @@ export default function OperatorTraining() {
   useEffect(() => {
     void loadQueue(true);
   }, []);
-
-  // 点击外部或按 Escape 关闭菜单
-  useEffect(() => {
-    if (!openMenu) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      const isInsideMenu = target.closest('.filter-menu-container');
-      if (!isInsideMenu) {
-        setOpenMenu(null);
-      }
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setOpenMenu(null);
-      rarityMenuTriggerRef.current?.focus();
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [openMenu]);
-
-  useEffect(() => {
-    if (openMenu !== 'rarity') return;
-    const frame = window.requestAnimationFrame(() => {
-      rarityMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitemradio"]')?.focus();
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [openMenu]);
-
-  const handleRarityMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
-    const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'));
-    if (items.length === 0) return;
-
-    event.preventDefault();
-    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? items.length - 1
-        : event.key === 'ArrowUp'
-          ? (currentIndex <= 0 ? items.length - 1 : currentIndex - 1)
-          : (currentIndex + 1) % items.length;
-    items[nextIndex]?.focus();
-  };
 
   const loadOperators = useCallback(async () => {
     const requestId = ++operatorsRequestRef.current;
@@ -937,24 +913,19 @@ export default function OperatorTraining() {
         };
       })()
     : null;
-  const trainingStatusOptions: Array<{ value: TrainingFilters['status']; label: string; desc: string }> = [
-    { value: 'trainable', label: '可养成', desc: '可加入队列' },
-    { value: 'owned', label: '已拥有', desc: '已识别干员' },
-    { value: 'all', label: '全部', desc: '含未拥有' }
-  ];
   return (
     <div className="app-page ios-workspace-page" data-page="training">
       <div className="app-stack-section">
         {/* 页面标题 */}
         <PageHeader
-          title="智能养成系统"
-          subtitle="自动识别未精二干员，计算材料需求，生成刷取计划"
+          title="养成"
+          subtitle="整理干员目标、材料缺口与今日刷取流程"
           mobileLayout="inline"
           actions={<FloatingStatusIndicator />}
         />
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_430px] gap-[var(--app-space-section)] items-start">
-          <section className={`space-y-4 ${currentTarget ? 'order-2 xl:order-1' : 'order-1'}`}>
+        <div className="grid grid-cols-1 items-start gap-[var(--app-space-section)] xl:grid-cols-[minmax(0,1fr)_minmax(22rem,27rem)]">
+          <section className={`training-operator-column min-w-0 space-y-4 ${currentTarget ? 'order-2 xl:order-1' : 'order-1'}`}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-primary">添加干员</h2>
@@ -971,143 +942,106 @@ export default function OperatorTraining() {
         >
           {/* 搜索和过滤 */}
           <div className="flex flex-col gap-3">
-            <div className="training-status-tabs" role="group" aria-label="干员范围">
-              {trainingStatusOptions.map((option) => {
-                const selected = filters.status === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setFilters({
-                      ...filters,
-                      status: option.value,
-                      needsElite2: option.value === 'all' ? false : filters.needsElite2
-                    })}
-                    aria-pressed={selected}
-                    className={`training-status-tab${selected ? ' is-active' : ''}`}
-                  >
-                    <span className="training-status-copy">
-                      <span className="training-status-label">{option.label}</span>
-                      <span className="training-status-description">{option.desc}</span>
-                    </span>
-                    <span className="training-status-count">
-                      {statusCountsLoading && trainingStatusCounts[option.value] === 0 ? '-' : trainingStatusCounts[option.value]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-          <div className="flex flex-col sm:flex-row gap-3">
-            {/* 搜索框 */}
-            <div className="flex-1 relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                aria-label="搜索干员名称"
-                placeholder="搜索干员名称..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="app-input control-surface !h-11 !min-h-11 pl-10 pr-4 placeholder:text-tertiary"
-              />
-            </div>
-            
-            {/* 过滤按钮组 */}
-            <div className="flex gap-2">
-              {/* 稀有度 */}
+            <div className="app-workspace-segments app-liquid-tab-pill training-status-shell">
               <div
-                className="relative filter-menu-container"
-                onBlur={(event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpenMenu(null);
-                }}
+                ref={statusTabsRef}
+                className="app-workspace-segment-list grid-cols-3"
+                role="toolbar"
+                aria-label="干员范围"
               >
-                <button
-                  ref={rarityMenuTriggerRef}
-                  type="button"
-                  onClick={() => setOpenMenu(openMenu === 'rarity' ? null : 'rarity')}
-                  aria-expanded={openMenu === 'rarity'}
-                  aria-controls="training-rarity-menu"
-                  aria-haspopup="menu"
-                  className={`flex h-10 min-h-11 items-center space-x-1.5 whitespace-nowrap rounded-xl px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] ${
-                    filters.rarity
-                      ? 'brand-action-subtle'
-                      : 'text-secondary control-surface'
-                  }`}
-                >
-                  <span>
-                    {filters.rarity ? `${filters.rarity}星` : '全部稀有度'}
-                  </span>
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {openMenu === 'rarity' && (
-                  <div
-                    ref={rarityMenuRef}
-                    id="training-rarity-menu"
-                    role="menu"
-                    aria-label="稀有度"
-                    onKeyDown={handleRarityMenuKeyDown}
-                    className="absolute left-0 top-full z-50 mt-1 w-32 rounded-xl py-1 surface-panel"
-                  >
-                    {[
-                      { value: '', label: '全部' },
-                      { value: '6', label: '6星' },
-                      { value: '5', label: '5星' },
-                      { value: '4', label: '4星' }
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={filters.rarity === option.value}
-                        onClick={() => {
-                          setFilters({ ...filters, rarity: option.value });
-                          setOpenMenu(null);
-                          rarityMenuTriggerRef.current?.focus();
-                        }}
-                        className={`h-10 min-h-11 w-full px-3 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--app-accent)] ${
-                          filters.rarity === option.value
-                            ? 'brand-action-subtle font-medium'
-                            : 'text-secondary hover:bg-[var(--app-surface-muted)] hover:text-primary'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
+                {activeStatusRect.width > 0 && (
+                  <motion.div
+                    data-testid="training-status-highlight"
+                    aria-hidden="true"
+                    className="app-workspace-segment-indicator training-status-highlight"
+                    initial={false}
+                    animate={{
+                      x: activeStatusRect.x,
+                      y: activeStatusRect.y,
+                      width: activeStatusRect.width,
+                      height: activeStatusRect.height,
+                    }}
+                    transition={shouldReduceMotion
+                      ? { duration: 0 }
+                      : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
+                  />
                 )}
+                {TRAINING_STATUS_OPTIONS.map((option) => {
+                  const selected = filters.status === option.value;
+                  const count = statusCountsLoading && trainingStatusCounts[option.value] === 0
+                    ? '-'
+                    : trainingStatusCounts[option.value];
+                  return (
+                    <button
+                      key={option.value}
+                      ref={setStatusTabRef(option.value)}
+                      type="button"
+                      onClick={() => handleTrainingStatusChange(option.value)}
+                      onKeyDown={(event) => handleStatusKeyDown(
+                        event,
+                        TRAINING_STATUS_OPTIONS.map(({ value }) => value),
+                        handleTrainingStatusChange,
+                      )}
+                      aria-pressed={selected}
+                      tabIndex={selected ? 0 : -1}
+                      className={`app-workspace-segment training-status-segment min-h-11 ${selected ? 'is-selected' : ''}`}
+                    >
+                      <span
+                        className="app-workspace-segment-icon training-status-count"
+                        aria-label={`${count} 名`}
+                      >
+                        {count}
+                      </span>
+                      <span className="app-workspace-segment-copy">
+                        <span>{option.label}</span>
+                        <small>{option.desc}</small>
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-
-              {/* 仅未精二 */}
-              <button
-                type="button"
-                onClick={() => setFilters({ ...filters, needsElite2: !filters.needsElite2 })}
-                aria-pressed={filters.needsElite2}
-                className={`flex h-10 min-h-11 items-center space-x-1.5 whitespace-nowrap rounded-xl px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] ${
-                  filters.needsElite2
-                    ? 'brand-action-subtle'
-                    : 'text-secondary control-surface'
-                }`}
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                </svg>
-                <span>仅未精二</span>
-              </button>
             </div>
+
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">
+            <Input
+              type="text"
+              aria-label="搜索干员名称"
+              placeholder="搜索干员"
+              value={searchTerm}
+              onChange={setSearchTerm}
+              icon={<Search size={17} strokeWidth={1.9} aria-hidden="true" />}
+              className="col-span-2 min-w-0 sm:col-span-1"
+            />
+            <Select
+              aria-label="稀有度"
+              value={filters.rarity}
+              onChange={(rarity) => setFilters({ ...filters, rarity })}
+              options={[
+                { value: '', label: '全部稀有度' },
+                { value: '6', label: '6 星' },
+                { value: '5', label: '5 星' },
+                { value: '4', label: '4 星' },
+              ]}
+              className="min-w-0"
+            />
+            <Button
+              type="button"
+              variant={filters.needsElite2 ? 'primary' : 'secondary'}
+              size="md"
+              onClick={() => setFilters({ ...filters, needsElite2: !filters.needsElite2 })}
+              aria-pressed={filters.needsElite2}
+              icon={<Filter size={15} strokeWidth={1.9} aria-hidden="true" />}
+              className="whitespace-nowrap"
+            >
+              未精二
+            </Button>
           </div>
           </div>
 
           {/* 干员卡片列表 */}
           {operatorsLoading ? (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--app-accent)]"></div>
-              <p className="mt-2 text-secondary">加载中...</p>
+            <div className="flex min-h-[260px] items-center justify-center">
+              <Loading text="正在读取干员..." />
             </div>
           ) : operatorsError ? (
             <TrainingLoadError
@@ -1119,22 +1053,13 @@ export default function OperatorTraining() {
             <OperatorEmptyState {...operatorEmptyState} />
           ) : (
             <div className="min-h-[260px]">
-              <div className="grid grid-cols-3 gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
+              <div className="training-operator-grid grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-4 2xl:grid-cols-6">
                 {visibleOperators.map((operator, idx) => {
                   const isInQueue = queue.some(q => q.operatorId === operator.id);
                   const imageLoaded = loadedImages[operator.id] || false;
                   const isOwned = operator.owned !== false;
                   const isAlreadyElite2 = operator.disabledReason === 'already_elite2';
                   const canAdd = Boolean(operator.canTrain) && !isInQueue;
-                  const statusLabel = isInQueue
-                    ? '已添加'
-                    : !isOwned
-                      ? '未拥有'
-                      : !operator.hasMaterialData
-                        ? '暂无数据'
-                        : isAlreadyElite2
-                          ? '已精二'
-                          : '可养成';
                   const actionLabel = isInQueue
                     ? '已添加'
                     : !isOwned
@@ -1148,45 +1073,27 @@ export default function OperatorTraining() {
                   return (
                     <motion.div
                       key={operator.id}
-                      initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
+                      initial={shouldReduceMotion ? false : { opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
                       transition={shouldReduceMotion ? { duration: 0 } : { delay: Math.min(idx, 24) * 0.004 }}
-                      className={`group relative overflow-hidden rounded-2xl border p-3 transition-colors duration-200 ${
-                        canAdd
-                          ? 'border-transparent surface-soft hover:bg-[var(--app-accent-soft)]'
-                          : isOwned
-                            ? 'border-transparent surface-soft'
-                            : 'border-transparent opacity-75 surface-soft'
-                      }`}
+                      className={`relative overflow-hidden rounded-xl p-2.5 surface-soft ${!isOwned ? 'opacity-75' : ''}`}
                     >
-                    <div className={`absolute top-2 left-2 z-10 rounded-md px-2 py-0.5 text-xs font-bold text-white shadow-sm backdrop-blur-sm ${
-                      canAdd
-                        ? 'bg-[var(--app-accent)]'
-                        : isInQueue
-                          ? 'bg-emerald-500/95'
-                          : isOwned
-                            ? 'bg-slate-500/95'
-                            : 'bg-slate-400/95'
-                    }`}>
-                      {statusLabel}
-                    </div>
-                    
                     {/* 干员头像 */}
-                    <div className="relative mb-3 aspect-square w-full overflow-hidden rounded-xl bg-gradient-to-br from-slate-100 via-white to-slate-100 ring-1 ring-slate-200/60 dark:from-slate-800 dark:via-slate-900 dark:to-slate-950 dark:ring-white/10">
+                    <div className="relative mb-2.5 aspect-square w-full overflow-hidden rounded-xl surface-panel">
                       {operator.id ? (
                         <>
                           {/* 骨架屏 */}
                           {!imageLoaded && (
-                            <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-slate-100 via-white to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-slate-950"></div>
+                            <div className="app-skeleton absolute inset-0 surface-soft" />
                           )}
                           <img
                             src={`https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/avatar/${operator.id}.png`}
                             alt={operator.name}
                             loading={idx < 12 ? 'eager' : 'lazy'}
                             decoding="async"
-                            className={`w-full h-full object-cover transition-opacity duration-500 ${
+                            className={`h-full w-full object-cover transition-opacity duration-200 ${
                               imageLoaded ? 'opacity-100' : 'opacity-0'
-                            } ${canAdd && imageLoaded ? 'transition-transform duration-200 group-hover:scale-[1.03]' : ''}`}
+                            }`}
                             onLoad={() => setLoadedImages(prev => prev[operator.id] ? prev : ({ ...prev, [operator.id]: true }))}
                             onError={(e) => {
                               // 如果加载失败，尝试带 _2 后缀的版本（用于异格干员）
@@ -1206,7 +1113,7 @@ export default function OperatorTraining() {
                           />
                           {/* 不可添加时的半透明蒙版 */}
                           {!canAdd && imageLoaded && (
-                            <div className={`absolute inset-0 ${isOwned ? 'bg-white/35 dark:bg-black/20' : 'bg-white/55 dark:bg-black/30'}`}></div>
+                            <div className={`absolute inset-0 ${isOwned ? 'bg-[var(--app-surface)]/25' : 'bg-[var(--app-surface)]/50'}`} />
                           )}
                         </>
                       ) : (
@@ -1216,30 +1123,20 @@ export default function OperatorTraining() {
                       )}
                       {/* 稀有度标识 */}
                       {operator.rarity !== undefined && operator.rarity > 0 && (
-                        <div className="absolute right-2 top-2 rounded-md bg-[var(--app-accent)] px-1.5 py-0.5 text-xs font-bold text-white shadow-sm backdrop-blur-sm">
+                        <div className="absolute right-2 top-2 rounded-full px-2 py-0.5 text-xs font-semibold surface-panel brand-text">
                           {operator.rarity}★
                         </div>
                       )}
                     </div>
                     
-                    <div className="text-center space-y-2">
+                    <div className="space-y-2 text-center">
                       <div className="truncate text-sm font-semibold text-primary" title={operator.name}>
                         {operator.name || '未知干员'}
                       </div>
-                      <div className="flex flex-wrap items-center justify-center gap-1 text-xs">
+                      <div className="flex min-h-5 flex-wrap items-center justify-center gap-1 text-xs">
                         {isOwned && operator.currentElite !== undefined && (
-                          <span className="rounded-full px-2 py-0.5 brand-chip whitespace-nowrap">
-                            精{operator.currentElite}
-                          </span>
-                        )}
-                        {isOwned && operator.currentLevel !== undefined && operator.currentLevel > 0 && (
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600 ring-1 ring-slate-200/70 dark:bg-white/10 dark:text-slate-300 dark:ring-white/10 whitespace-nowrap">
-                            Lv.{operator.currentLevel}
-                          </span>
-                        )}
-                        {!isOwned && (
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500 ring-1 ring-slate-200/70 dark:bg-white/10 dark:text-slate-400 dark:ring-white/10 whitespace-nowrap">
-                            未拥有
+                          <span className="whitespace-nowrap rounded-full px-2 py-0.5 surface-panel text-secondary">
+                            精{operator.currentElite}{operator.currentLevel ? ` · ${operator.currentLevel} 级` : ''}
                           </span>
                         )}
                       </div>
@@ -1250,10 +1147,9 @@ export default function OperatorTraining() {
                         disabled={!canAdd || (queueMutationPending && !pendingOperatorIds.has(operator.id))}
                         loading={pendingOperatorIds.has(operator.id)}
                         loadingText="添加中"
-                        variant="primary"
+                        variant={canAdd ? 'primary' : 'secondary'}
                         size="sm"
                         fullWidth
-                        className="h-10 rounded-lg text-xs"
                       >
                         {actionLabel}
                       </Button>
@@ -1268,7 +1164,7 @@ export default function OperatorTraining() {
                     onClick={() => setVisibleOperatorLimit(limit => limit + OPERATOR_RENDER_BATCH_SIZE)}
                     variant="secondary"
                     size="md"
-                    className="h-10 min-w-36"
+                    className="min-w-36"
                   >
                     继续显示 {Math.min(OPERATOR_RENDER_BATCH_SIZE, hiddenOperatorCount)} 个
                   </Button>
@@ -1282,7 +1178,7 @@ export default function OperatorTraining() {
         </motion.div>
           </section>
 
-          <aside className={`space-y-4 xl:sticky xl:top-4 ${currentTarget ? 'order-1 xl:order-2' : 'order-2'}`}>
+          <aside className={`training-support-column min-w-0 space-y-4 xl:sticky xl:top-4 ${currentTarget ? 'order-1 xl:order-2' : 'order-2'}`}>
         <motion.div
           initial={shouldReduceMotion ? false : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1290,18 +1186,17 @@ export default function OperatorTraining() {
         >
           {currentTarget && (
             <Card smoothCorners className="training-current-card !p-0">
-              <div className="relative px-4 py-4">
-                <div className="absolute inset-x-0 top-0 h-px bg-[var(--app-accent)]/45" />
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <span className="rounded-md px-2 py-1 text-xs font-semibold brand-chip">当前养成</span>
+              <div className="px-4 py-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full px-2.5 py-1 text-xs font-semibold brand-chip">当前目标</span>
                   <h3 className="min-w-0 flex-1 truncate text-xl font-semibold text-primary">{currentTarget.operator.name}</h3>
-                  <span className="rounded-md px-2 py-0.5 text-xs font-bold brand-chip">
+                  <span className="rounded-full px-2 py-0.5 text-xs font-semibold surface-soft brand-text">
                     {currentTarget.operator.rarity}★
                   </span>
                 </div>
 
                 <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                  <div className="h-2.5 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/70 dark:bg-slate-800 dark:ring-white/10">
+                  <div className="h-2 overflow-hidden rounded-full surface-soft">
                     <motion.div
                       className="h-full rounded-full bg-[var(--app-accent)]"
                       initial={shouldReduceMotion ? false : { width: 0 }}
@@ -1336,28 +1231,26 @@ export default function OperatorTraining() {
                 </div>
 
                 <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <select
+                  <Select
                     aria-label="计划范围"
                     value={planMode}
-                    onChange={(e) => setPlanMode(e.target.value as TrainingPlanMode)}
-                    className="app-input control-surface !h-11 !min-h-11"
-                  >
-                    <option value="current">仅当前</option>
-                    <option value="all">全部队列</option>
-                  </select>
+                    onChange={(mode) => setPlanMode(mode as TrainingPlanMode)}
+                    options={[
+                      { value: 'current', label: '仅当前目标' },
+                      { value: 'all', label: '全部队列' },
+                    ]}
+                    className="min-w-0"
+                  />
                   <Button
                     onClick={handleGeneratePlan}
                     disabled={loading}
+                    loading={loading}
+                    loadingText="生成中"
                     variant="primary"
-                    size="sm"
-                    className="h-11 rounded-xl"
-                    icon={
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                    }
+                    size="md"
+                    icon={<Sparkles size={15} strokeWidth={1.9} aria-hidden="true" />}
                   >
-                    {loading ? '生成中...' : '生成计划'}
+                    生成计划
                   </Button>
                 </div>
               </div>
@@ -1366,24 +1259,40 @@ export default function OperatorTraining() {
 
           {/* 设置 */}
           <SmoothPanel cornerSize="compact" className="training-settings-panel">
-            <details className="w-full px-4 py-3">
-              <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-primary marker:text-tertiary">自动化设置</summary>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <Checkbox
-                  checked={settings.autoSwitch}
-                  onChange={(checked: boolean) => handleUpdateSettings({ ...settings, autoSwitch: checked })}
-                  label="自动切换"
-                  className="rounded-lg px-2 py-1.5"
-                />
-
-                <Checkbox
-                  checked={settings.notifyOnComplete}
-                  onChange={(checked: boolean) => handleUpdateSettings({ ...settings, notifyOnComplete: checked })}
-                  label="完成通知"
-                  className="rounded-lg px-2 py-1.5"
-                />
+            <section className="w-full px-4 py-3" aria-labelledby="training-automation-settings-title">
+              <h3
+                id="training-automation-settings-title"
+                className="flex min-h-11 items-center text-sm font-semibold text-primary"
+              >
+                自动化设置
+              </h3>
+              <div className="mt-2 divide-y divide-[var(--app-border)]">
+                <div className="flex min-h-14 items-center justify-between gap-4 py-2.5">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-primary">自动切换</div>
+                    <p className="mt-0.5 text-xs text-tertiary">当前目标完成后继续下一个</p>
+                  </div>
+                  <Switch
+                    compact
+                    checked={settings.autoSwitch}
+                    onChange={(checked: boolean) => handleUpdateSettings({ ...settings, autoSwitch: checked })}
+                    label="自动切换"
+                  />
+                </div>
+                <div className="flex min-h-14 items-center justify-between gap-4 py-2.5">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-primary">完成通知</div>
+                    <p className="mt-0.5 text-xs text-tertiary">养成目标完成后发送通知</p>
+                  </div>
+                  <Switch
+                    compact
+                    checked={settings.notifyOnComplete}
+                    onChange={(checked: boolean) => handleUpdateSettings({ ...settings, notifyOnComplete: checked })}
+                    label="完成通知"
+                  />
+                </div>
               </div>
-            </details>
+            </section>
           </SmoothPanel>
 
           {/* 队列列表 */}
@@ -1415,14 +1324,13 @@ export default function OperatorTraining() {
               onRetry={() => void loadQueue(true)}
             />
           ) : queue.length === 0 ? (
-            <SmoothPanel className="training-queue-empty" surfaceClassName="px-6 py-12 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl icon-well">
-                <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                </svg>
-              </div>
-              <h3 className="mt-4 text-lg font-semibold text-primary">养成队列还是空的</h3>
-              <p className="mt-2 text-sm text-secondary">在左侧添加要养成的干员，系统会自动接上计划和今日流程。</p>
+            <SmoothPanel className="training-queue-empty" surfaceClassName="px-4 py-6">
+              <EmptyState
+                compact
+                icon={<ClipboardList size={20} strokeWidth={1.8} />}
+                title="养成队列还是空的"
+                description="从干员列表添加目标后，这里会显示后续顺序"
+              />
             </SmoothPanel>
           ) : (
             <Card smoothCorners className="training-queue-card !p-0">
@@ -1443,7 +1351,7 @@ export default function OperatorTraining() {
                       className="px-4 py-3 transition-colors hover:bg-[var(--app-surface-muted)]"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-xs font-semibold surface-soft text-secondary">
                           #{index + 2}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -1455,7 +1363,7 @@ export default function OperatorTraining() {
                               {item.operator.rarity}★
                             </span>
                           </div>
-                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/70 dark:bg-slate-800 dark:ring-white/10">
+                          <div className="mt-2 h-1.5 overflow-hidden rounded-full surface-soft">
                             <motion.div
                               className="h-full rounded-full bg-[var(--app-accent)]"
                               initial={shouldReduceMotion ? false : { width: 0 }}
@@ -1472,14 +1380,12 @@ export default function OperatorTraining() {
                           size="sm"
                           title={pendingOperatorIds.has(item.operatorId) ? '正在移除' : '移除'}
                           aria-label={pendingOperatorIds.has(item.operatorId) ? `正在移除${item.operator.name}` : `移除${item.operator.name}`}
-                          className="text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                          className="text-[var(--app-danger)]"
                           icon={
                             pendingOperatorIds.has(item.operatorId) ? (
                               <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" aria-hidden="true" />
                             ) : (
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
+                              <Trash2 size={16} strokeWidth={1.9} aria-hidden="true" />
                             )
                           }
                         />
@@ -1497,14 +1403,13 @@ export default function OperatorTraining() {
           className="space-y-4"
         >
           {!plan ? (
-            <SmoothPanel className="training-plan-empty" surfaceClassName="px-6 py-12 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl icon-well">
-                <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                </svg>
-              </div>
-              <h3 className="mt-4 text-lg font-semibold text-primary">还没有刷取计划</h3>
-              <p className="mt-2 text-sm text-secondary">先在“养成队列”里添加干员并生成计划，系统会在这里展示推荐关卡、材料层级和总理智消耗。</p>
+            <SmoothPanel className="training-plan-empty" surfaceClassName="px-4 py-6">
+              <EmptyState
+                compact
+                icon={<Sparkles size={20} strokeWidth={1.8} />}
+                title="还没有刷取计划"
+                description="添加养成目标后生成计划，即可查看今日推荐关卡"
+              />
             </SmoothPanel>
           ) : (
             <>
@@ -1522,16 +1427,13 @@ export default function OperatorTraining() {
                       <Button
                         onClick={handleApplyPlan}
                         disabled={loading || openStageCount === 0}
+                        loading={loading}
+                        loadingText="应用中"
                         variant="success"
-                        size="sm"
-                        className="h-11 rounded-xl"
-                        icon={
-                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        }
+                        size="md"
+                        icon={<Check size={15} strokeWidth={2.2} aria-hidden="true" />}
                       >
-                        {loading ? '应用中...' : '加入今日流程'}
+                        加入今日流程
                       </Button>
                     </div>
                   </div>
@@ -1550,7 +1452,7 @@ export default function OperatorTraining() {
                     {previewStages.map((stage, idx) => (
                       <div key={`${stage.stage}-${idx}`} className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-[var(--app-surface-muted)]">
                         <div className="flex min-w-0 items-center gap-3">
-                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-500 ring-1 ring-slate-200/70 dark:bg-white/10 dark:text-slate-300 dark:ring-white/10">
+                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-xs font-semibold surface-soft text-secondary">
                             {idx + 1}
                           </div>
                           <div className="min-w-0">
@@ -1594,7 +1496,7 @@ export default function OperatorTraining() {
                       <h3 className="text-sm font-bold text-primary">今日未开放</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {plan.closedStages.map((stage, idx) => (
-                          <div key={`${stage.stage}-${idx}`} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 dark:border-red-500/20 dark:bg-red-500/5">
+                          <div key={`${stage.stage}-${idx}`} className="rounded-xl px-3 py-2.5 surface-soft">
                             <div className="flex items-center justify-between gap-3">
                               <div>
                                 <div className="text-sm font-bold text-primary">{stage.stage}</div>
@@ -1602,7 +1504,7 @@ export default function OperatorTraining() {
                                   {stage.materials?.slice(0, 2).map((mat: any) => `${mat.name}×${mat.count}`).join('、') || '等待开放后再推进'}
                                 </div>
                               </div>
-                              <div className="text-xs font-semibold text-red-700 dark:text-red-300">未开放</div>
+                              <div className="text-xs font-semibold text-[var(--app-danger)]">未开放</div>
                             </div>
                           </div>
                         ))}
@@ -1638,30 +1540,26 @@ export default function OperatorTraining() {
                             initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={shouldReduceMotion ? { duration: 0 } : { delay: idx * 0.05 }}
-                            className={`relative overflow-hidden rounded-3xl p-5 ${
-                              stage.isOpen !== false
-                                ? 'surface-soft'
-                                : 'status-danger'
-                            }`}
+                            className="relative overflow-hidden rounded-xl p-4 surface-soft"
                           >
                             <div className="relative">
                               <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-3">
-                                  <div className={`px-3 py-1.5 rounded-xl font-bold text-sm ${
+                                  <div className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
                                     stage.isOpen !== false
                                       ? 'brand-chip'
-                                      : 'bg-[var(--app-danger)] text-white'
+                                      : 'status-danger'
                                   }`}>
                                     {stage.stage}
                                   </div>
-                                  {stage.isOpen === false && <div className="text-xs text-red-600 dark:text-red-400 font-medium">未开放</div>}
+                                  {stage.isOpen === false && <div className="text-xs font-medium text-[var(--app-danger)]">未开放</div>}
                                 </div>
-                                <div className="px-3 py-1.5 rounded-xl text-sm font-bold brand-chip">×{stage.totalTimes || 0}</div>
+                                <div className="rounded-full px-3 py-1.5 text-sm font-semibold brand-chip">×{stage.totalTimes || 0}</div>
                               </div>
                               {stage.materials && stage.materials.length > 0 && (
                                 <div className="flex flex-wrap gap-2">
                                   {stage.materials.map((mat, matIdx) => (
-                                    <div key={matIdx} className="px-3 py-1.5 rounded-xl text-xs font-medium brand-chip">
+                                    <div key={matIdx} className="rounded-full px-3 py-1.5 text-xs font-medium surface-panel text-secondary">
                                       {mat.name} ×{mat.count}
                                     </div>
                                   ))}

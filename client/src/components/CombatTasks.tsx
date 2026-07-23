@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { maaApi, searchCopilot, searchParadoxCopilot } from '../services/api'
 import { motion, useReducedMotion } from 'framer-motion'
+import { FileText, Info, Play, Square } from 'lucide-react'
 import Icons from './Icons'
-import { PageHeader, Button, Card, ConfirmDialog, SmoothSurface } from './common'
+import { PageHeader, Button, Card, ConfirmDialog, EmptyState, SmoothPanel } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import ScreenMonitor from './ScreenMonitor'
@@ -115,7 +116,12 @@ export default function CombatTasks() {
   const [selectedSearchCopilotUri, setSelectedSearchCopilotUri] = useState<string>('')
   const [isSearchingCopilot, setIsSearchingCopilot] = useState(false)
   const [activeCombatMode, setActiveCombatMode] = useState<CombatMode>('copilot')
-  const { containerRef: combatModeTabsRef, activeRect: activeCombatModeRect, setTabRef: setCombatModeTabRef } = useFluidTabIndicator(activeCombatMode)
+  const {
+    containerRef: combatModeTabsRef,
+    activeRect: activeCombatModeRect,
+    setTabRef: setCombatModeTabRef,
+    handleTabKeyDown: handleCombatModeKeyDown,
+  } = useFluidTabIndicator(activeCombatMode)
 
   useEffect(() => {
     // Activity retains state while hidden, so clear loading left behind by
@@ -1504,7 +1510,7 @@ export default function CombatTasks() {
                   name={`maa-${task.id}-${option.key}`}
                   value={(advanced[option.key] as string) || (option.options[0]?.value || '')}
                   onChange={(e) => handleAdvancedChange(task.id, option.key, e.target.value)}
-                  className="min-h-11 min-w-0 rounded-lg border border-[var(--app-border)] py-2 pl-3 pr-9 text-sm text-primary control-surface focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
+                  className="app-input app-native-control min-h-11 min-w-0 control-surface"
                 >
                   {option.options.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -1525,7 +1531,7 @@ export default function CombatTasks() {
                   value={advanced[option.key] as string || ''}
                   onChange={(e) => handleAdvancedChange(task.id, option.key, e.target.value)}
                   placeholder={option.placeholder}
-                  className="min-h-11 min-w-0 rounded-lg border border-[var(--app-border)] px-3 py-2 text-sm text-primary control-surface focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
+                  className="app-input app-native-control min-h-11 min-w-0 control-surface"
                 />
               </div>
             )}
@@ -1538,14 +1544,14 @@ export default function CombatTasks() {
 
   const combatModeOptions = [
     { id: 'copilot' as const, title: '普通作业', desc: '单作业 / 作业集 / 链接识别', icon: <Icons.Document /> },
-    { id: 'ssscopilot' as const, title: '保全派驻', desc: 'SSS 作业独立入口', icon: <Icons.Shield /> },
+    { id: 'ssscopilot' as const, title: '保全派驻', desc: '保全派驻自动执行', icon: <Icons.Shield /> },
     { id: 'paradoxcopilot' as const, title: '悖论模拟', desc: '按干员搜索作业', icon: <Icons.Puzzle /> },
   ]
-  const activeCombatModeOption = combatModeOptions.find(option => option.id === activeCombatMode)
 
   return (
     <>
-      <div className="app-page app-stack-section combat-page ios-workspace-page">
+      <div className="app-page combat-page ios-workspace-page" data-workbench-tasks>
+        <div className="app-stack-section">
         <PageHeader
           title="自动战斗"
           subtitle="支持单作业、作业集、保全派驻、悖论模拟与链接识别"
@@ -1575,13 +1581,18 @@ export default function CombatTasks() {
 
         <div className="task-monitor-layout">
           <div className="task-monitor-main">
-        <SmoothSurface className="combat-mode-shell">
-          <div ref={combatModeTabsRef} className="relative grid grid-cols-3 gap-1">
-            {activeCombatModeOption && activeCombatModeRect.width > 0 && (
+        <div className="app-workspace-segments app-liquid-tab-pill combat-mode-shell">
+          <div
+            ref={combatModeTabsRef}
+            className="app-workspace-segment-list"
+            role="toolbar"
+            aria-label="作业类型"
+          >
+            {activeCombatModeRect.width > 0 && (
               <motion.div
                 data-testid="combat-mode-highlight"
                 aria-hidden="true"
-                className="combat-mode-highlight"
+                className="app-workspace-segment-indicator combat-mode-highlight"
                 initial={false}
                 animate={{
                   x: activeCombatModeRect.x,
@@ -1592,15 +1603,7 @@ export default function CombatTasks() {
                 transition={shouldReduceMotion
                   ? { duration: 0 }
                   : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
-              >
-                <span className="combat-mode-active-icon">
-                  {activeCombatModeOption.icon}
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold">{activeCombatModeOption.title}</span>
-                  <span className="combat-mode-active-description">{activeCombatModeOption.desc}</span>
-                </span>
-              </motion.div>
+              />
             )}
             {combatModeOptions.map(({ id, title, desc, icon }) => (
               <button
@@ -1610,20 +1613,26 @@ export default function CombatTasks() {
                 }}
                 type="button"
                 onClick={() => setActiveCombatMode(id)}
+                onKeyDown={(event) => handleCombatModeKeyDown(
+                  event,
+                  combatModeOptions.map(option => option.id),
+                  setActiveCombatMode,
+                )}
                 aria-pressed={activeCombatMode === id}
-                className={`combat-mode-button min-h-11 ${activeCombatMode === id ? 'is-selected' : ''}`}
+                tabIndex={activeCombatMode === id ? 0 : -1}
+                className={`app-workspace-segment combat-mode-button min-h-11 ${activeCombatMode === id ? 'is-selected' : ''}`}
               >
-                <span className="combat-mode-icon">
+                <span className="app-workspace-segment-icon combat-mode-icon">
                   {icon}
                 </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold">{title}</span>
-                  <span className="mt-0.5 block truncate text-xs text-tertiary">{desc}</span>
+                <span className="app-workspace-segment-copy">
+                  <span>{title}</span>
+                  <small>{desc}</small>
                 </span>
               </button>
             ))}
           </div>
-        </SmoothSurface>
+        </div>
 
         {/* 任务列表 */}
         <div className="app-stack-section">
@@ -1641,10 +1650,7 @@ export default function CombatTasks() {
                       {task.icon}
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h4 className="truncate text-xl font-semibold text-primary">{task.name}</h4>
-                        <span className="shrink-0 rounded-md border border-[var(--app-border)] px-2 py-0.5 font-mono text-[11px] text-tertiary">{task.command}</span>
-                      </div>
+                      <h4 className="truncate text-lg font-semibold text-primary">{task.name}</h4>
                       <p className="mt-1 text-sm leading-relaxed text-secondary">{task.description}</p>
                     </div>
                   </div>
@@ -1657,7 +1663,7 @@ export default function CombatTasks() {
                       loadingText="正在终止"
                       variant="danger"
                       size="md"
-                      icon={<span className="h-3 w-3 rounded-[2px] bg-current" aria-hidden="true" />}
+                      icon={!isStopping ? <Square size={14} fill="currentColor" aria-hidden="true" /> : undefined}
                       className="combat-task-run-button min-h-11 px-4 text-sm sm:px-6"
                     >
                       终止执行
@@ -1669,11 +1675,7 @@ export default function CombatTasks() {
                       title={!automationAvailable ? unavailableMessage : waitingForNextCopilot ? '请先继续或取消当前作业集' : undefined}
                       variant="primary"
                       size="md"
-                      icon={
-                        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                        </svg>
-                      }
+                      icon={<Play size={15} fill="currentColor" aria-hidden="true" />}
                       className="combat-task-run-button min-h-11 px-4 text-sm sm:px-6"
                     >
                       立即执行
@@ -1685,7 +1687,7 @@ export default function CombatTasks() {
                 <div className="combat-copilot-layout">
                   {/* 左栏：设置项 */}
                   <div className="space-y-3 xl:sticky xl:top-24">
-                    <div className="rounded-lg border border-[var(--app-border)] p-4 surface-soft">
+                    <div className="combat-workspace-section">
                       <h5 className="mb-3 flex items-center space-x-2 text-sm font-semibold text-primary">
                         <svg className="w-4 h-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -1703,7 +1705,7 @@ export default function CombatTasks() {
                             name="maa-copilot-formation"
                             value={getFormationMode(task.id)}
                             onChange={(e) => setAutoFormation({ ...autoFormation, [task.id]: e.target.value as FormationMode })}
-                            className="min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--app-border)] py-1.5 pl-2 pr-8 text-xs text-primary control-surface focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
+                            className="app-input app-native-control min-h-11 min-w-0 flex-1 control-surface"
                           >
                             <option value="auto">自动决定</option>
                             <option value="on">自动编队</option>
@@ -1723,7 +1725,7 @@ export default function CombatTasks() {
                           name="maa-copilot-raid"
                           value={normalizeRaidValue(advancedParams[task.id]?.raid)}
                           onChange={(e) => handleAdvancedChange(task.id, 'raid', e.target.value)}
-                          className="min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--app-border)] py-1.5 pl-2 pr-8 text-xs text-primary control-surface focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
+                          className="app-input app-native-control min-h-11 min-w-0 flex-1 control-surface"
                         >
                           <option value="normal">普通模式</option>
                           <option value="raid">突袭模式</option>
@@ -1740,7 +1742,7 @@ export default function CombatTasks() {
                             name="maa-copilot-set-mode"
                             value={copilotSetExecutionMode}
                             onChange={(e) => setCopilotSetExecutionMode(e.target.value as CopilotSetExecutionMode)}
-                            className="min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--app-border)] py-1.5 pl-2 pr-8 text-xs text-primary control-surface focus:outline-none focus:ring-1 focus:ring-[var(--app-accent)]"
+                            className="app-input app-native-control min-h-11 min-w-0 flex-1 control-surface"
                           >
                             <option value="app">顺序执行</option>
                             <option value="manual">手动逐关</option>
@@ -1754,8 +1756,8 @@ export default function CombatTasks() {
 
                       {/* 高级选项 */}
                       {task.hasAdvanced && (
-                        <details className="mt-4 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] px-3 py-2">
-                          <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-medium text-secondary">
+                        <details className="combat-advanced-disclosure mt-4">
+                          <summary className="flex min-h-11 cursor-pointer list-none items-center px-3 text-sm font-medium text-secondary">
                             高级设置
                           </summary>
                           {renderAdvancedOptions(task)}
@@ -1766,7 +1768,7 @@ export default function CombatTasks() {
 
                   {/* 中栏：输入框 + 作业列表 */}
                   <div className="flex min-w-0 flex-col space-y-3">
-                    <div className="rounded-lg border border-[var(--app-border)] p-4 surface-soft">
+                    <div className="combat-workspace-section">
                       <div className="flex gap-2">
                         <label htmlFor="combat-copilot-uri" className="sr-only">作业链接或本地路径</label>
                         <input
@@ -1781,7 +1783,7 @@ export default function CombatTasks() {
                           placeholder="maa://1234、maa://1234s、作业站链接或本地路径"
                           value={taskInputs[task.id] || ''}
                           onChange={(e) => handleInputChange(task.id, e.target.value)}
-                          className="min-h-11 min-w-0 flex-1 rounded-lg border border-transparent px-3 py-2 font-mono text-sm text-primary control-surface focus:border-[var(--app-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
+                          className="app-input app-native-control min-h-11 min-w-0 flex-1 font-mono control-surface"
                         />
                         <Button
                           onClick={() => handlePreviewCopilotSetWithInput()}
@@ -1853,7 +1855,7 @@ export default function CombatTasks() {
                     </div>
 
                     {/* 作业列表 - 占据剩余空间 */}
-                    <div className="flex min-h-[380px] flex-1 flex-col rounded-lg border border-[var(--app-border)] p-4 surface-soft">
+                    <div className="combat-workspace-section combat-job-list-section flex flex-1 flex-col">
                       <div className="flex items-center justify-between mb-3">
                         <h5 className="flex items-center space-x-2 text-sm font-semibold text-primary">
                           <svg className="w-4 h-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2082,13 +2084,13 @@ export default function CombatTasks() {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex flex-1 flex-col items-center justify-center rounded-lg border border-dashed border-[var(--app-border)] py-10 text-center text-xs text-tertiary">
-                          <svg className="w-12 h-12 mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          <p>输入 maa:// 作业可预览</p>
-                          <p className="mt-1">作业站链接会自动提取 ID，本地路径可直接执行</p>
-                        </div>
+                        <EmptyState
+                          compact
+                          className="combat-job-empty flex-1"
+                          icon={<FileText size={24} strokeWidth={1.7} />}
+                          title="等待作业"
+                          description="输入作业链接即可预览，本地作业可直接执行。"
+                        />
                       )}
                     </div>
                   </div>
@@ -2096,7 +2098,7 @@ export default function CombatTasks() {
                   {/* 右栏：搜索框 + 作业介绍 */}
                   <div className="space-y-3 xl:sticky xl:top-24">
                     {/* 搜索框 */}
-                    <div className="rounded-lg border border-[var(--app-border)] p-4 surface-soft">
+                    <div className="combat-workspace-section">
                       <h5 className="mb-3 flex items-center space-x-2 text-sm font-semibold text-primary">
                         <svg className="w-4 h-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -2117,7 +2119,7 @@ export default function CombatTasks() {
                             e.preventDefault()
                             void handleSearchCopilot()
                           }}
-                          className="min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--app-border)] px-3 py-2 text-sm text-primary control-surface focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
+                          className="app-input app-native-control min-h-11 min-w-0 flex-1 control-surface"
                         />
                         <Button
                           onClick={handleSearchCopilot}
@@ -2164,7 +2166,7 @@ export default function CombatTasks() {
                     </div>
 
                     {/* 作业介绍 */}
-                    <div className="rounded-lg border border-[var(--app-border)] p-4 surface-soft">
+                    <div className="combat-workspace-section">
                       <h5 className="mb-3 flex items-center space-x-2 text-sm font-semibold text-primary">
                         <svg className="w-4 h-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -2260,12 +2262,12 @@ export default function CombatTasks() {
                           </Button>
                         </div>
                       ) : (
-                        <div className="rounded-lg border border-dashed border-[var(--app-border)] py-6 text-center text-xs text-tertiary">
-                          <svg className="w-8 h-8 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <p>预览作业后显示详情</p>
-                        </div>
+                        <EmptyState
+                          compact
+                          icon={<Info size={22} strokeWidth={1.7} />}
+                          title="等待预览"
+                          description="预览作业后会在这里显示详情。"
+                        />
                       )}
                     </div>
                   </div>
@@ -2294,10 +2296,7 @@ export default function CombatTasks() {
                         {task.icon}
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="truncate text-xl font-semibold text-primary">{task.name}</h4>
-                          <span className="shrink-0 rounded-md border border-[var(--app-border)] px-2 py-0.5 font-mono text-[11px] text-tertiary">{task.command}</span>
-                        </div>
+                        <h4 className="truncate text-lg font-semibold text-primary">{task.name}</h4>
                         <p className="mt-1 text-sm leading-relaxed text-secondary">{task.description}</p>
                       </div>
                     </div>
@@ -2310,7 +2309,7 @@ export default function CombatTasks() {
                         loadingText="正在终止"
                         variant="danger"
                         size="md"
-                        icon={<span className="h-3 w-3 rounded-[2px] bg-current" aria-hidden="true" />}
+                        icon={!isStopping ? <Square size={14} fill="currentColor" aria-hidden="true" /> : undefined}
                         className="combat-task-run-button min-h-11 px-4 text-sm sm:px-5"
                       >
                         终止执行
@@ -2322,11 +2321,7 @@ export default function CombatTasks() {
                         title={!automationAvailable ? unavailableMessage : waitingForNextCopilot ? '请先继续或取消当前作业集' : undefined}
                         variant="primary"
                         size="md"
-                        icon={
-                          <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                          </svg>
-                        }
+                        icon={<Play size={15} fill="currentColor" aria-hidden="true" />}
                         className="combat-task-run-button min-h-11 px-4 text-sm sm:px-5"
                       >
                         立即执行
@@ -2336,7 +2331,7 @@ export default function CombatTasks() {
 
                   <div className="combat-special-layout">
                     <div className="min-w-0 space-y-4">
-                      <div className="rounded-lg border border-[var(--app-border)] p-4 surface-soft">
+                      <div className="combat-workspace-section">
                         <div className="mb-3 flex items-center justify-between gap-3">
                           <h5 className="flex items-center gap-2 text-sm font-semibold text-primary">
                             <svg className="h-4 w-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2366,7 +2361,7 @@ export default function CombatTasks() {
                           value={taskInputs[task.id] || ''}
                           onChange={(e) => handleInputChange(task.id, e.target.value)}
                           rows={isSss ? 4 : 5}
-                          className="w-full resize-none rounded-lg border border-[var(--app-border)] px-4 py-3 font-mono text-sm font-medium text-primary control-surface focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
+                          className="app-native-control w-full resize-none rounded-lg px-4 py-3 font-mono text-sm font-medium text-primary control-surface focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
                         />
                         {isSss && taskUris.length > 1 && (
                           <div className="mt-2 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-500 dark:text-rose-300">
@@ -2376,7 +2371,7 @@ export default function CombatTasks() {
                       </div>
 
                       {task.hasAdvanced && (
-                        <div className="rounded-lg border border-[var(--app-border)] p-4 surface-soft">
+                        <div className="combat-workspace-section">
                           <h5 className="mb-2 text-sm font-semibold text-primary">高级设置</h5>
                           {renderAdvancedOptions(task)}
                         </div>
@@ -2385,7 +2380,7 @@ export default function CombatTasks() {
 
                     <div className="space-y-3 xl:sticky xl:top-24">
                       {isParadox ? (
-                        <div className="rounded-lg border border-[var(--app-border)] p-4 surface-soft">
+                        <div className="combat-workspace-section">
                           <h5 className="mb-3 flex items-center space-x-2 text-sm font-semibold text-primary">
                             <svg className="h-4 w-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -2410,7 +2405,7 @@ export default function CombatTasks() {
                                 e.preventDefault()
                                 void handleSearchParadox()
                               }}
-                              className="min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--app-border)] px-3 py-2 text-sm text-primary control-surface focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
+                              className="app-input app-native-control min-h-11 min-w-0 flex-1 control-surface"
                             />
                             <Button
                               onClick={handleSearchParadox}
@@ -2467,7 +2462,7 @@ export default function CombatTasks() {
                           )}
                         </div>
                       ) : (
-                        <div className="rounded-lg border border-[var(--app-border)] p-4 surface-soft">
+                        <div className="combat-workspace-section">
                           <h5 className="mb-3 text-sm font-semibold text-primary">执行概览</h5>
                           <div className="space-y-2 text-xs">
                             <div className="flex items-center justify-between rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2">
@@ -2482,7 +2477,7 @@ export default function CombatTasks() {
                         </div>
                       )}
 
-                      <div className="rounded-lg border border-[var(--app-border)] p-4 surface-soft">
+                      <div className="combat-workspace-section">
                         <h5 className="mb-3 text-sm font-semibold text-primary">参数概览</h5>
                         <div className="space-y-2 text-xs">
                           <div className="flex items-center justify-between gap-3">
@@ -2519,11 +2514,17 @@ export default function CombatTasks() {
           </div>
 
           <aside className="task-monitor-column" aria-label="模拟器实时预览">
-            <div className="task-monitor-panel is-compact surface-panel">
-              <ScreenMonitor variant="compact" />
-            </div>
+            <SmoothPanel
+              className="combat-monitor-panel"
+              surfaceClassName="automation-monitor-surface combat-monitor-surface"
+            >
+              <div className="task-monitor-panel is-compact">
+                <ScreenMonitor variant="compact" />
+              </div>
+            </SmoothPanel>
           </aside>
         </div>
+      </div>
       </div>
       <ConfirmDialog
         isOpen={resetProgressDialogOpen}

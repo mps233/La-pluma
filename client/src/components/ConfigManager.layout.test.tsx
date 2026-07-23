@@ -31,6 +31,7 @@ vi.mock('framer-motion', async () => {
   )
 
   return {
+    AnimatePresence: ({ children }: { children?: ReactNode }) => children,
     motion: {
       button: motionComponent('button'),
       div: motionComponent('div'),
@@ -120,7 +121,7 @@ describe('ConfigManager layout surfaces', () => {
     vi.restoreAllMocks()
   })
 
-  it('uses continuous corners for the three primary cards and configuration navigation', async () => {
+  it('uses the shared liquid segments and continuous corners for the configuration workspace', async () => {
     await act(async () => root.render(<ConfigManager />))
     await flush()
 
@@ -135,19 +136,32 @@ describe('ConfigManager layout surfaces', () => {
       expect(card.classList.contains('!p-0')).toBe(true)
       expect(card.querySelector(':scope > .app-card-smooth-surface')).not.toBeNull()
     })
+    const workspace = page?.querySelector(':scope > .config-workspace-grid')
+    const primaryColumn = workspace?.querySelector(':scope > .config-workspace-primary')
+    const secondaryColumn = workspace?.querySelector(':scope > .config-workspace-secondary')
+    expect(workspace).not.toBeNull()
+    expect(workspace?.children).toHaveLength(2)
+    expect(primaryColumn?.classList.contains('min-w-0')).toBe(true)
+    expect(secondaryColumn?.classList.contains('min-w-0')).toBe(true)
+    expect(Array.from(primaryColumn?.querySelectorAll(':scope > .app-card') ?? [])).toEqual([cards[0], cards[1]])
+    expect(Array.from(secondaryColumn?.querySelectorAll(':scope > .app-card') ?? [])).toEqual([cards[2]])
+    expect(cards[0]?.classList.contains('config-editor-card')).toBe(true)
+    expect(cards[1]?.classList.contains('config-directory-card')).toBe(true)
+    expect(cards[2]?.classList.contains('config-update-card')).toBe(true)
+    expect(page?.querySelectorAll(':scope > .app-card')).toHaveLength(0)
     expect(cards[0]?.querySelector(':scope > .app-card-smooth-surface > .app-card-content')).not.toBeNull()
 
-    const navigation = page?.querySelector('.smooth-panel-shell')
-    expect(navigation?.getAttribute('data-smooth-corners')).toBe('true')
-    expect(navigation?.querySelector(':scope > .smooth-panel-surface')).not.toBeNull()
-    expect(navigation?.textContent).toContain('配置类型')
-    expect(page?.querySelectorAll('.smooth-panel-shell')).toHaveLength(1)
+    const navigation = page?.querySelector('[data-config-sections]')
+    expect(navigation?.classList.contains('app-liquid-tab-pill')).toBe(true)
+    expect(navigation?.querySelectorAll('.app-workspace-segment')).toHaveLength(3)
+    expect(navigation?.querySelector('.app-workspace-segment.is-selected')?.textContent).toContain('连接')
+    expect(page?.querySelector('.smooth-panel-shell')).toBeNull()
     expect(page?.querySelector('.app-card .app-info-card')).toBeNull()
 
     const autoUpdateToggle = page?.querySelector<HTMLInputElement>('input[aria-label="启用自动更新"]')
     const autoUpdateTrack = autoUpdateToggle?.nextElementSibling
-    expect(autoUpdateTrack?.classList.contains('after:bg-white')).toBe(true)
-    expect(autoUpdateTrack?.classList.contains('after:bg-[var(--app-surface-solid)]')).toBe(false)
+    expect(autoUpdateToggle?.getAttribute('role')).toBe('switch')
+    expect(autoUpdateTrack?.classList.contains('app-switch-track')).toBe(true)
 
     const configPath = Array.from(page?.querySelectorAll('p') ?? []).find(element => element.textContent === '/tmp/la-pluma')
     expect(configPath?.classList.contains('break-all')).toBe(false)
@@ -203,7 +217,7 @@ describe('ConfigManager layout surfaces', () => {
     expect(container.textContent).toContain('有尚未保存的更改')
 
     const saveButton = Array.from(container.querySelectorAll('button')).find(button =>
-      button.textContent?.includes('保存自动更新设置')
+      button.textContent?.includes('保存自动更新')
     )
     expect(saveButton?.disabled).toBe(false)
 
@@ -256,7 +270,7 @@ describe('ConfigManager layout surfaces', () => {
     })
 
     const saveButton = Array.from(container.querySelectorAll('button')).find(button =>
-      button.textContent?.includes('保存自动更新设置')
+      button.textContent?.includes('保存自动更新')
     )
     await act(async () => {
       saveButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -292,7 +306,7 @@ describe('ConfigManager layout surfaces', () => {
     }
     await setTime('05:30')
     const saveButton = Array.from(container.querySelectorAll('button')).find(button =>
-      button.textContent?.includes('保存自动更新设置')
+      button.textContent?.includes('保存自动更新')
     )!
     await act(async () => saveButton.click())
     await setTime('06:45')
@@ -399,7 +413,7 @@ describe('ConfigManager layout surfaces', () => {
     })
 
     const saveButton = Array.from(container.querySelectorAll('button')).find(button =>
-      button.textContent?.includes('保存自动更新设置')
+      button.textContent?.includes('保存自动更新')
     )
     await act(async () => {
       saveButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -418,18 +432,17 @@ describe('ConfigManager layout surfaces', () => {
     await act(async () => root.render(<ConfigManager />))
     await flush()
 
-    const cards = container.querySelectorAll('.app-card')
-    const editor = cards[cards.length - 1]
-    expect(editor?.textContent).toContain('资源来源沿用当前 MAA 配置')
+    const editor = container.querySelector('.config-editor-card')
+    expect(editor?.textContent).toContain('当前资源来源保持不变')
     expect(editor?.querySelector('select')).toBeNull()
     expect(Array.from(editor?.querySelectorAll('button') ?? []).some(button => button.textContent?.trim() === '保存')).toBe(false)
 
-    const instanceButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('实例选项'))
+    const instanceButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('实例'))
     await act(async () => {
       instanceButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    expect(editor?.textContent).toContain('触摸模式等实例选项沿用当前 MAA 配置')
+    expect(editor?.textContent).toContain('触摸模式等实例选项保持当前设置')
     expect(editor?.querySelector('select')).toBeNull()
   })
 })

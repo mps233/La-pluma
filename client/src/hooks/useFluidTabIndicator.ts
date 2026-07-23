@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 export interface FluidTabRect {
   x: number
@@ -8,6 +8,30 @@ export interface FluidTabRect {
 }
 
 const emptyRect: FluidTabRect = { x: 0, y: 0, width: 0, height: 0 }
+
+export function measureFluidTabRect(
+  container: HTMLDivElement,
+  activeElement: HTMLButtonElement,
+): FluidTabRect {
+  const transform = window.getComputedStyle(activeElement).transform
+  if (!transform || transform === 'none') {
+    const containerRect = container.getBoundingClientRect()
+    const tabRect = activeElement.getBoundingClientRect()
+    return {
+      x: tabRect.left - containerRect.left,
+      y: tabRect.top - containerRect.top,
+      width: tabRect.width,
+      height: tabRect.height,
+    }
+  }
+
+  return {
+    x: activeElement.offsetLeft,
+    y: activeElement.offsetTop,
+    width: activeElement.offsetWidth,
+    height: activeElement.offsetHeight,
+  }
+}
 
 /** Keeps an animated tab highlight aligned with its active button. */
 export function useFluidTabIndicator<T extends string>(activeTab: T) {
@@ -24,14 +48,7 @@ export function useFluidTabIndicator<T extends string>(activeTab: T) {
         return
       }
 
-      const containerRect = container.getBoundingClientRect()
-      const tabRect = activeElement.getBoundingClientRect()
-      setActiveRect({
-        x: tabRect.left - containerRect.left,
-        y: tabRect.top - containerRect.top,
-        width: tabRect.width,
-        height: tabRect.height,
-      })
+      setActiveRect(measureFluidTabRect(container, activeElement))
     }
 
     syncActiveRect()
@@ -51,5 +68,33 @@ export function useFluidTabIndicator<T extends string>(activeTab: T) {
     tabRefs.current[tab] = element
   }
 
-  return { containerRef, activeRect, setTabRef }
+  const handleTabKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    tabs: readonly T[],
+    onTabChange: (tab: T) => void,
+  ) => {
+    if (tabs.length === 0) return
+
+    const currentIndex = Math.max(0, tabs.indexOf(activeTab))
+    let nextIndex: number | null = null
+
+    if (event.key === 'ArrowRight') {
+      nextIndex = (currentIndex + 1) % tabs.length
+    } else if (event.key === 'ArrowLeft') {
+      nextIndex = (currentIndex - 1 + tabs.length) % tabs.length
+    } else if (event.key === 'Home') {
+      nextIndex = 0
+    } else if (event.key === 'End') {
+      nextIndex = tabs.length - 1
+    }
+
+    const nextTab = nextIndex === null ? undefined : tabs[nextIndex]
+    if (!nextTab) return
+
+    event.preventDefault()
+    onTabChange(nextTab)
+    tabRefs.current[nextTab]?.focus({ preventScroll: true })
+  }
+
+  return { containerRef, activeRect, setTabRef, handleTabKeyDown }
 }

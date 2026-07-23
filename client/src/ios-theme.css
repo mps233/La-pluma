@@ -63,14 +63,16 @@
   --la-pluma-tabbar-safe-bottom: max(var(--app-safe-area-bottom, 0px), env(safe-area-inset-bottom, 0px));
   --la-pluma-tabbar-floating-height: 4rem;
   --la-pluma-tabbar-floating-offset: 0.5rem;
-  --la-pluma-tabbar-bottom-clearance: max(
+  --la-pluma-tabbar-bottom-clearance: clamp(
+    var(--la-pluma-tabbar-floating-offset),
     var(--la-pluma-tabbar-safe-bottom),
-    var(--la-pluma-tabbar-floating-offset)
+    1.25rem
   );
   --la-pluma-tabbar-reserved-height: calc(
     var(--la-pluma-tabbar-floating-height) + var(--la-pluma-tabbar-bottom-clearance)
   );
   --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.16);
+  --la-pluma-tabbar-active-edge: inset 0 0 0 0.5px var(--app-glass-border);
   --la-pluma-tabbar-shadow: 0 1rem 2.25rem rgba(60, 60, 67, 0.18);
   --la-pluma-tabbar-fade-color: #ffffff;
   --la-pluma-navbar-fade-color: #ffffff;
@@ -839,11 +841,13 @@ body {
   color: var(--app-text);
   font-size: 0.9375rem;
   font-weight: 600;
+  line-height: 1.3;
 }
 
 .la-pluma-sidebar-identity-copy small {
   color: var(--app-text-soft);
   font-size: 0.75rem;
+  line-height: 1.35;
 }
 
 .la-pluma-sidebar-nav {
@@ -1003,7 +1007,7 @@ body {
   pointer-events: none;
 }
 
-.la-pluma-app .la-pluma-tabbar-pill,
+.la-pluma-app .app-liquid-tab-pill,
 .la-pluma-app .la-pluma-tabbar-search {
   box-sizing: border-box;
   border: 1px solid var(--app-glass-border);
@@ -1012,6 +1016,73 @@ body {
   backdrop-filter: blur(28px) saturate(180%);
   box-shadow: var(--la-pluma-tabbar-shadow);
   pointer-events: auto;
+}
+
+/* Shared with the mobile tab bar so in-page mode pickers use the exact same
+   liquid material without inheriting the tab bar's navigation geometry. */
+.la-pluma-app .app-liquid-tab-pill {
+  --la-pluma-liquid-surface: color-mix(
+    in srgb,
+    var(--app-glass-bg) 42%,
+    transparent
+  );
+  position: relative;
+  isolation: isolate;
+  border-color: transparent;
+  background:
+    linear-gradient(
+      var(--la-pluma-liquid-surface-lift),
+      var(--la-pluma-liquid-surface-lift)
+    ),
+    var(--la-pluma-liquid-surface);
+  -webkit-backdrop-filter: blur(6px) saturate(140%);
+  backdrop-filter: blur(6px) saturate(140%);
+}
+
+.la-pluma-app .app-liquid-tab-pill::before {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  padding: 0.5px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg,
+    var(--la-pluma-liquid-edge-light) 0deg,
+    var(--la-pluma-liquid-edge-light) 72deg,
+    var(--la-pluma-liquid-edge-high) 73deg,
+    var(--la-pluma-liquid-edge-mid) 75deg,
+    var(--la-pluma-liquid-edge-faint) 77deg,
+    var(--la-pluma-liquid-edge-clear) 79deg,
+    var(--la-pluma-liquid-edge-faint) 82deg,
+    var(--la-pluma-liquid-edge-mid) 84deg,
+    var(--la-pluma-liquid-edge-high) 87deg,
+    var(--la-pluma-liquid-edge-light) 90deg,
+    var(--la-pluma-liquid-edge-light) 252deg,
+    var(--la-pluma-liquid-edge-high) 253deg,
+    var(--la-pluma-liquid-edge-mid) 255deg,
+    var(--la-pluma-liquid-edge-faint) 257deg,
+    var(--la-pluma-liquid-edge-clear) 259deg,
+    var(--la-pluma-liquid-edge-faint) 262deg,
+    var(--la-pluma-liquid-edge-mid) 264deg,
+    var(--la-pluma-liquid-edge-high) 267deg,
+    var(--la-pluma-liquid-edge-light) 270deg,
+    var(--la-pluma-liquid-edge-light) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  content: '';
+  pointer-events: none;
+}
+
+.la-pluma-app .app-liquid-tab-pill > * {
+  position: relative;
+  z-index: 1;
 }
 
 .la-pluma-app .la-pluma-tabbar-pill {
@@ -1093,7 +1164,7 @@ body {
 .la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab.tab-link-active {
   background: var(--la-pluma-tabbar-active-bg) !important;
   color: var(--app-accent-strong) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  box-shadow: var(--la-pluma-tabbar-active-edge);
 }
 
 .la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab:hover {
@@ -1503,7 +1574,6 @@ body {
     .la-pluma-github-link,
     .automation-preview-glass-button,
     .pwa-install-entry-button,
-    .la-pluma-tabbar-pill,
     .la-pluma-tabbar-search
   ) {
     --la-pluma-liquid-surface: color-mix(
@@ -1530,7 +1600,6 @@ body {
     .la-pluma-github-link,
     .automation-preview-glass-button,
     .pwa-install-entry-button,
-    .la-pluma-tabbar-pill,
     .la-pluma-tabbar-search
   )::before {
     position: absolute;
@@ -1570,34 +1639,6 @@ body {
     mask-composite: exclude;
     content: '';
     pointer-events: none;
-  }
-
-  /* A circle's diagonal angles land near a wide pill's top and bottom
-     centers. Shift the two gaps toward the pill's rounded corners. */
-  .la-pluma-app .la-pluma-tabbar-pill::before {
-    background: conic-gradient(
-      from 0deg,
-      var(--la-pluma-liquid-edge-light) 0deg,
-      var(--la-pluma-liquid-edge-light) 72deg,
-      var(--la-pluma-liquid-edge-high) 73deg,
-      var(--la-pluma-liquid-edge-mid) 75deg,
-      var(--la-pluma-liquid-edge-faint) 77deg,
-      var(--la-pluma-liquid-edge-clear) 79deg,
-      var(--la-pluma-liquid-edge-faint) 82deg,
-      var(--la-pluma-liquid-edge-mid) 84deg,
-      var(--la-pluma-liquid-edge-high) 87deg,
-      var(--la-pluma-liquid-edge-light) 90deg,
-      var(--la-pluma-liquid-edge-light) 252deg,
-      var(--la-pluma-liquid-edge-high) 253deg,
-      var(--la-pluma-liquid-edge-mid) 255deg,
-      var(--la-pluma-liquid-edge-faint) 257deg,
-      var(--la-pluma-liquid-edge-clear) 259deg,
-      var(--la-pluma-liquid-edge-faint) 262deg,
-      var(--la-pluma-liquid-edge-mid) 264deg,
-      var(--la-pluma-liquid-edge-high) 267deg,
-      var(--la-pluma-liquid-edge-light) 270deg,
-      var(--la-pluma-liquid-edge-light) 360deg
-    );
   }
 
   .la-pluma-app .la-pluma-page-body {
@@ -1770,20 +1811,6 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .la-pluma-app .app-page-header.is-mobile-inline .floating-status-dismiss {
-    position: relative;
-    width: 1.75rem !important;
-    min-width: 1.75rem !important;
-    height: 1.75rem !important;
-    min-height: 1.75rem !important;
-  }
-
-  .la-pluma-app .app-page-header.is-mobile-inline .floating-status-dismiss::before {
-    content: '';
-    position: absolute;
-    inset: -0.5rem;
   }
 
   .la-pluma-app .app-page-title {
@@ -2062,7 +2089,7 @@ body {
 @media (prefers-reduced-transparency: reduce) {
   .la-pluma-app .la-pluma-sidebar-frame,
   .la-pluma-app .la-pluma-tabbar,
-  .la-pluma-app .la-pluma-tabbar-pill,
+  .la-pluma-app .app-liquid-tab-pill,
   .la-pluma-app .la-pluma-tabbar-search,
   .la-pluma-app .la-pluma-more-sheet,
   .la-pluma-app .la-pluma-brand,
@@ -2095,9 +2122,20 @@ body {
     .la-pluma-theme-trigger,
     .la-pluma-github-link,
     .automation-preview-glass-button,
-    .la-pluma-tabbar-pill,
+    .app-liquid-tab-pill,
     .la-pluma-tabbar-search
   )::before {
+    display: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .la-pluma-app .app-liquid-tab-pill {
+    border-color: var(--app-border-strong);
+    background: var(--app-surface-solid);
+  }
+
+  .la-pluma-app .app-liquid-tab-pill::before {
     display: none;
   }
 }
@@ -2120,6 +2158,10 @@ body {
 
 .la-pluma-app .la-pluma-content .app-native-control:not(textarea) {
   padding: 0 var(--app-space-control-x);
+}
+
+.la-pluma-app .la-pluma-content input.app-native-control.app-input-has-icon {
+  padding-left: 2.5rem;
 }
 
 .la-pluma-app .la-pluma-content select.app-native-control {
@@ -2213,28 +2255,36 @@ html.dark .la-pluma-app .la-pluma-content .app-native-control,
 
 /* Apple Liquid Glass keeps ordinary Automation content solid. The preview
    controls and task picker remain the only translucent layers in this view. */
-.la-pluma-app [data-automation-tasks] .smooth-panel-shell[data-smooth-corners='true'] {
+.la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .smooth-panel-shell[data-smooth-corners='true'] {
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.05),
     0 14px 40px rgba(0, 0, 0, 0.05);
 }
 
-.la-pluma-app [data-automation-tasks] .smooth-panel-surface {
+.la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .smooth-panel-surface {
   border: 0;
   background: var(--app-surface-solid);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
 
-html.dark .la-pluma-app [data-automation-tasks] .smooth-panel-shell[data-smooth-corners='true'],
-.la-pluma-app.dark [data-automation-tasks] .smooth-panel-shell[data-smooth-corners='true'] {
+.la-pluma-app [data-workbench-tasks] .app-card-smooth-surface {
+  border: 0;
+  background: var(--app-surface-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+html.dark .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .smooth-panel-shell[data-smooth-corners='true'],
+.la-pluma-app.dark :is([data-automation-tasks], [data-workbench-tasks]) .smooth-panel-shell[data-smooth-corners='true'] {
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.24),
     0 14px 40px rgba(0, 0, 0, 0.3);
 }
 
 @media (prefers-contrast: more) {
-  .la-pluma-app [data-automation-tasks] .smooth-panel-surface {
+  .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .smooth-panel-surface,
+  .la-pluma-app [data-workbench-tasks] .app-card-smooth-surface {
     border: 1px solid var(--app-border-strong);
   }
 }

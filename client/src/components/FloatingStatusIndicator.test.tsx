@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, forwardRef, type HTMLAttributes, type ReactNode } from 'react'
+import { act, forwardRef, type HTMLAttributes } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
@@ -10,11 +10,9 @@ import FloatingStatusIndicator from './FloatingStatusIndicator'
 const mocks = vi.hoisted(() => ({
   fetchWithAuth: vi.fn(),
   parseJsonResponse: vi.fn(),
-  clearMessage: vi.fn(),
 }))
 
 vi.mock('framer-motion', () => ({
-  AnimatePresence: ({ children }: { children: ReactNode }) => children,
   useReducedMotion: () => true,
   motion: {
     div: forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> & {
@@ -41,7 +39,6 @@ vi.mock('../store/statusStore', () => ({
     isActive: false,
     backendStatus: 'available',
     backendMessage: '',
-    clearMessage: mocks.clearMessage,
   }),
 }))
 
@@ -78,7 +75,7 @@ describe('FloatingStatusIndicator', () => {
     vi.restoreAllMocks()
   })
 
-  it('floats after its anchor leaves the actual page scroll container', async () => {
+  it('reuses the anchored status pill without creating a dismissible overlay', async () => {
     await act(async () => root.render(
       <>
         <FloatingStatusIndicator />
@@ -88,23 +85,21 @@ describe('FloatingStatusIndicator', () => {
     await act(async () => { await Promise.resolve() })
     expect(mocks.fetchWithAuth).toHaveBeenCalledTimes(1)
 
-    const anchor = container.querySelector<HTMLElement>('.floating-status-anchor')!
-    let anchorBottom = 120
-    anchor.getBoundingClientRect = () => ({
-      x: 0, y: anchorBottom - 20, top: anchorBottom - 20, right: 100,
-      bottom: anchorBottom, left: 0, width: 100, height: 20,
-      toJSON: () => ({}),
-    })
-    host.getBoundingClientRect = () => ({
-      x: 0, y: 50, top: 50, right: 390, bottom: 844,
-      left: 0, width: 390, height: 794, toJSON: () => ({}),
-    })
-
-    await act(async () => host.dispatchEvent(new Event('scroll')))
+    const indicator = container.querySelector<HTMLElement>('.floating-status-indicator')
+    const visibleText = container.querySelector<HTMLElement>('.floating-status-text')
+    const liveText = container.querySelector<HTMLElement>('[role="status"]')
+    expect(indicator?.classList.contains('sm:max-w-sm')).toBe(true)
+    expect(indicator?.classList.contains('gap-2')).toBe(true)
+    expect(indicator?.classList.contains('py-1.5')).toBe(true)
+    expect(indicator?.classList.contains('sm:py-2')).toBe(true)
+    expect(indicator?.classList.contains('sm:text-sm')).toBe(true)
+    expect(visibleText?.classList.contains('truncate')).toBe(true)
+    expect(visibleText?.classList.contains('break-words')).toBe(false)
+    expect(visibleText?.classList.contains('whitespace-normal')).toBe(false)
+    expect(visibleText?.title).toBe('保存失败，请重试')
+    expect(liveText?.textContent).toBe('保存失败，请重试')
+    expect(container.querySelector('.floating-status-dismiss')).toBeNull()
+    expect(container.querySelector('.floating-status-anchor .floating-status-indicator')).not.toBeNull()
     expect(container.querySelector('.floating-status-overlay')).toBeNull()
-
-    anchorBottom = 20
-    await act(async () => host.dispatchEvent(new Event('scroll')))
-    expect(container.querySelector('.floating-status-overlay')).not.toBeNull()
   })
 })

@@ -124,11 +124,8 @@ const renderComponent = async () => {
   await flush()
 }
 
-const checkboxByLabel = (label: string) => {
-  const labelElement = Array.from(document.querySelectorAll('label'))
-    .find(candidate => candidate.textContent?.includes(label))
-  return labelElement?.querySelector<HTMLInputElement>('input[type="checkbox"]')
-}
+const switchByLabel = (label: string) =>
+  container.querySelector<HTMLInputElement>(`input[role="switch"][aria-label="${label}"]`)
 
 describe('OperatorTraining async interactions', () => {
   beforeEach(() => {
@@ -174,6 +171,8 @@ describe('OperatorTraining async interactions', () => {
 
     expect(container.querySelector('.ios-workspace-page[data-page="training"]')).not.toBeNull()
     expect(container.querySelector('.app-page-header.is-mobile-inline')).not.toBeNull()
+    expect(container.querySelector('.training-operator-column')).not.toBeNull()
+    expect(container.querySelector('.training-support-column')).not.toBeNull()
     expect(container.querySelector('.training-current-card[data-smooth-corners="true"]')).not.toBeNull()
     expect(container.querySelector('.training-settings-panel[data-smooth-corners="true"]')).not.toBeNull()
   })
@@ -204,39 +203,59 @@ describe('OperatorTraining async interactions', () => {
     expect(document.body.textContent).toContain('养成队列还是空的')
   })
 
-  it('keeps the rarity menu keyboard-operable and labels the plan selector', async () => {
+  it('uses the shared iOS form controls for filters, plans, and settings', async () => {
     mocks.getTrainingQueue.mockResolvedValue({
       success: true,
       data: { queue: [queueItem('char_current', '阿米娅')], settings },
     })
 
     await renderComponent()
-    const trigger = container.querySelector<HTMLButtonElement>('[aria-controls="training-rarity-menu"]')!
-    expect(trigger.className).toContain('min-h-11')
-    await click(trigger)
-    await act(async () => {
-      await new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()))
-    })
+    const search = container.querySelector<HTMLInputElement>('input[aria-label="搜索干员名称"]')
+    const rarity = container.querySelector<HTMLSelectElement>('select[aria-label="稀有度"]')
+    const planModeSelect = container.querySelector<HTMLSelectElement>('select[aria-label="计划范围"]')
+    expect(search?.className).toContain('app-native-control')
+    expect(rarity?.className).toContain('app-native-control')
+    expect(rarity?.querySelectorAll('option')).toHaveLength(4)
+    expect(planModeSelect?.className).toContain('app-native-control')
+    expect(planModeSelect?.querySelectorAll('option')).toHaveLength(2)
+    expect(switchByLabel('自动切换')).not.toBeNull()
+    expect(switchByLabel('完成通知')).not.toBeNull()
+    const settingsPanel = container.querySelector('.training-settings-panel')
+    const settingsHeading = settingsPanel?.querySelector('#training-automation-settings-title')
+    expect(settingsPanel?.querySelector('details')).toBeNull()
+    expect(settingsPanel?.querySelector('summary')).toBeNull()
+    expect(settingsHeading?.tagName).toBe('H3')
+    expect(settingsHeading?.className).toContain('min-h-11')
+  })
 
-    const menu = container.querySelector<HTMLElement>('#training-rarity-menu')!
-    const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
-    expect(menu.getAttribute('role')).toBe('menu')
-    expect(items).toHaveLength(4)
-    expect(items.every(item => item.className.includes('min-h-11'))).toBe(true)
-    expect(document.activeElement).toBe(items[0])
+  it('uses the shared liquid segment control for operator scope', async () => {
+    await renderComponent()
+
+    const toolbar = container.querySelector<HTMLElement>('[role="toolbar"][aria-label="干员范围"]')
+    expect(toolbar).not.toBeNull()
+    expect(toolbar?.parentElement?.className).toContain('app-liquid-tab-pill')
+
+    const buttons = Array.from(toolbar?.querySelectorAll<HTMLButtonElement>('button') ?? [])
+    expect(buttons).toHaveLength(3)
+    expect(buttons[0]?.className).toContain('app-workspace-segment')
+    expect(buttons[0]?.className).toContain('is-selected')
+    expect(buttons[0]?.getAttribute('aria-pressed')).toBe('true')
+
+    const allButton = buttons.find(button => button.textContent?.includes('全部'))
+    expect(allButton).toBeDefined()
+    await click(allButton!)
+
+    expect(allButton?.className).toContain('is-selected')
+    expect(allButton?.getAttribute('aria-pressed')).toBe('true')
+    expect(buttons[0]?.getAttribute('aria-pressed')).toBe('false')
 
     await act(async () => {
-      items[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+      allButton?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
     })
-    expect(document.activeElement).toBe(items[1])
+    await flush()
 
-    await act(async () => {
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-    })
-    expect(container.querySelector('#training-rarity-menu')).toBeNull()
-    expect(document.activeElement).toBe(trigger)
-    expect(container.querySelector('select[aria-label="计划范围"]')).not.toBeNull()
-    expect(container.querySelector('.training-settings-panel summary')?.className).toContain('min-h-11')
+    expect(buttons[0]?.getAttribute('aria-pressed')).toBe('true')
+    expect(document.activeElement).toBe(buttons[0])
   })
 
   it('serializes settings writes so an older response cannot overwrite the latest value on disk', async () => {
@@ -246,7 +265,7 @@ describe('OperatorTraining async interactions', () => {
       .mockResolvedValueOnce({ success: true, data: settings })
 
     await renderComponent()
-    const autoSwitch = checkboxByLabel('自动切换')
+    const autoSwitch = switchByLabel('自动切换')
     expect(autoSwitch?.checked).toBe(true)
 
     await click(autoSwitch!)
@@ -372,7 +391,7 @@ describe('OperatorTraining async interactions', () => {
     await flush()
 
     expect(document.querySelector('button[aria-label="移除能天使"]')).not.toBeNull()
-    expect(checkboxByLabel('自动切换')?.checked).toBe(true)
+    expect(switchByLabel('自动切换')?.checked).toBe(true)
   })
 
   it('keeps the local queue truthful and warns when a successful add cannot be refreshed', async () => {

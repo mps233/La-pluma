@@ -31,6 +31,61 @@ export const createNavigateFallbackDenylist = (basePath) => {
   return denylist
 }
 
+export const createDevServiceWorkerCleanupScript = () => `
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting())
+})
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    const cacheNames = await caches.keys()
+    const appCacheNames = cacheNames.filter((cacheName) =>
+      cacheName.startsWith('workbox-') || cacheName === 'google-fonts-cache')
+    await Promise.all(appCacheNames.map((cacheName) => caches.delete(cacheName)))
+
+    await self.clients.claim()
+    const windowClients = await self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true,
+    })
+    await self.registration.unregister()
+    await Promise.all(windowClients.map(async (client) => {
+      try {
+        await client.navigate(client.url)
+      } catch {
+        // A closed client does not need to be refreshed.
+      }
+    }))
+  })())
+})
+`.trimStart()
+
+export const createDevServiceWorkerCleanupPlugin = (basePath) => {
+  const serviceWorkerPath = `${basePath}sw.js`
+  const cleanupScript = createDevServiceWorkerCleanupScript()
+
+  return {
+    name: 'la-pluma-dev-service-worker-cleanup',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        const requestUrl = new URL(request.url || '/', 'http://localhost')
+        if (requestUrl.pathname !== serviceWorkerPath) {
+          next()
+          return
+        }
+
+        response.statusCode = 200
+        response.setHeader('Content-Type', 'application/javascript; charset=utf-8')
+        response.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
+        response.setHeader('Service-Worker-Allowed', basePath)
+        response.setHeader('X-La-Pluma-Dev-Service-Worker', 'cleanup')
+        response.end(request.method === 'HEAD' ? undefined : cleanupScript)
+      })
+    }
+  }
+}
+
 // https://vite.dev/config/
 export const createViteConfig = (basePath) => ({
   base: basePath,
@@ -46,9 +101,10 @@ export const createViteConfig = (basePath) => ({
     }
   },
   plugins: [
+    createDevServiceWorkerCleanupPlugin(basePath),
     react(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       devOptions: {
         enabled: false // 开发模式下禁用 Service Worker
       },

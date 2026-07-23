@@ -1,9 +1,8 @@
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
-import { X } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
 import { API_BASE_URL, fetchWithAuth, parseJsonResponse } from '../services/api'
 import { useStatusStore } from '../store/statusStore'
 import { detectStatusMessageType, getStatusVisualConfig } from '../utils/statusMessage'
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 
 interface OperatorQuote {
@@ -65,12 +64,10 @@ const loadReadyQuote = () => {
  * 其他状态在原位置可见时显示在原位置，不可见时悬浮到右上角
  */
 export default function FloatingStatusIndicator({ className = '', textClassName = '' }: FloatingStatusIndicatorProps) {
-  const { message, messageType, isActive, backendStatus, backendMessage, clearMessage } = useStatusStore()
+  const { message, messageType, isActive, backendStatus, backendMessage } = useStatusStore()
   const isOnline = useOnlineStatus()
   const shouldReduceMotion = useReducedMotion()
-  const [shouldFloat, setShouldFloat] = useState(false)
   const [dailyQuote, setDailyQuote] = useState<OperatorQuote>(() => cachedReadyQuote ?? sessionFallbackQuote)
-  const sentinelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let subscribed = true
@@ -94,39 +91,6 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
   const displayText = connectionMessage || message || (isActive ? '任务执行中' : `${dailyQuote.operator}：${dailyQuote.quote}`)
   const isReady = !connectionMessage && !message && !isActive
 
-  // 检测哨兵位置
-  const checkPosition = useCallback(() => {
-    const sentinel = sentinelRef.current
-    if (!sentinel) return
-
-    const rect = sentinel.getBoundingClientRect()
-    const hasSize = rect.width > 0 && rect.height > 0
-
-    // 如果没有尺寸（页面被隐藏），不更新状态
-    if (!hasSize) return
-
-    const scrollHost = sentinel.closest<HTMLElement>('.la-pluma-scroll-host')
-    const viewportTop = scrollHost?.getBoundingClientRect().top ?? 0
-    const isAboveViewport = rect.bottom < viewportTop
-    setShouldFloat(isAboveViewport)
-  }, [])
-
-  // 监听滚动
-  useEffect(() => {
-    checkPosition()
-
-    const scrollHost = sentinelRef.current?.closest<HTMLElement>('.la-pluma-scroll-host')
-    const scrollTarget: HTMLElement | Window = scrollHost ?? window
-
-    scrollTarget.addEventListener('scroll', checkPosition, { passive: true })
-    window.addEventListener('resize', checkPosition, { passive: true })
-
-    return () => {
-      scrollTarget.removeEventListener('scroll', checkPosition)
-      window.removeEventListener('resize', checkPosition)
-    }
-  }, [checkPosition])
-
   const detectedType = isBackendChecking
     ? 'info'
     : connectionMessage
@@ -134,11 +98,9 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
       : messageType ?? (message ? detectStatusMessageType(message) : (isActive ? 'info' : 'default'))
   const config = getStatusVisualConfig(detectedType)
 
-  const canDismiss = Boolean(message) && !connectionMessage
-
   const indicatorContent = (
     <div
-      className={`floating-status-indicator inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium sm:px-4 sm:py-2 sm:text-sm ${config.className} ${className}`}
+      className={`floating-status-indicator inline-flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium sm:max-w-sm sm:px-4 sm:py-2 sm:text-sm ${config.className} ${className}`}
     >
       <motion.div
         className="h-2 w-2 flex-shrink-0 rounded-full"
@@ -153,7 +115,8 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
         transition={shouldReduceMotion ? { duration: 0 } : { duration: 2, repeat: Infinity, ease: "easeOut" }}
       />
       <div
-        className={`floating-status-text min-w-0 flex-1 break-words whitespace-normal leading-5 ${textClassName}`}
+        className={`floating-status-text min-w-0 flex-1 truncate leading-5 ${textClassName}`}
+        title={displayText}
       >
         {isReady ? (
           <>
@@ -164,17 +127,6 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
           displayText
         )}
       </div>
-      {canDismiss && (
-        <button
-          type="button"
-          onClick={() => clearMessage()}
-          className="floating-status-dismiss -mr-1 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg opacity-70 transition-colors hover:bg-black/5 hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 dark:hover:bg-white/10"
-          title="关闭状态提示"
-          aria-label="关闭状态提示"
-        >
-          <X className="h-3.5 w-3.5" aria-hidden="true" />
-        </button>
-      )}
     </div>
   )
 
@@ -184,26 +136,9 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
         {displayText}
       </span>
 
-      {/* 哨兵元素 - 始终存在用于检测位置 */}
-      <div ref={sentinelRef} className="floating-status-anchor inline-block min-w-[1px] min-h-[1px]">
-        {/* "就绪"状态始终显示，其他状态只在不需要悬浮时显示 */}
-        {(isReady || !shouldFloat) && indicatorContent}
+      <div className="floating-status-anchor inline-block min-h-[1px] min-w-[1px]">
+        {indicatorContent}
       </div>
-
-      {/* 当有消息且原位置滚出视口时，悬浮显示在右上角 */}
-      <AnimatePresence>
-        {!isReady && shouldFloat && (
-          <motion.div
-            initial={shouldReduceMotion ? false : { opacity: 0, y: -20, x: 20 }}
-            animate={{ opacity: 1, y: 0, x: 0 }}
-            exit={{ opacity: 0, y: -20, x: 20 }}
-            transition={{ duration: shouldReduceMotion ? 0 : 0.2 }}
-            className="floating-status-overlay fixed z-40 max-w-[calc(100vw-2rem)]"
-          >
-            {indicatorContent}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </>
   )
 }

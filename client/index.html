@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="%BASE_URL%favicon-graphite.png?v=1" />
@@ -13,6 +13,331 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="La Pluma" />
+    <style id="la-pluma-boot-style">
+      :root {
+        --boot-bg: #f2f2f7;
+        --boot-chrome: rgba(255, 255, 255, 0.82);
+        --boot-sidebar: #efeff4;
+        --boot-surface: #ffffff;
+        --boot-fill: rgba(118, 118, 128, 0.14);
+        --boot-line: rgba(60, 60, 67, 0.11);
+        --boot-accent: #007aff;
+        --boot-viewport-height: 100dvh;
+        --boot-bottom-clearance: clamp(
+          0.5rem,
+          env(safe-area-inset-bottom, 0px),
+          1.25rem
+        );
+      }
+
+      html.dark {
+        --boot-bg: #000000;
+        --boot-chrome: rgba(28, 28, 30, 0.86);
+        --boot-sidebar: #1c1c1e;
+        --boot-surface: #1c1c1e;
+        --boot-fill: rgba(118, 118, 128, 0.26);
+        --boot-line: rgba(235, 235, 245, 0.13);
+        --boot-accent: #0a84ff;
+      }
+
+      @media (display-mode: standalone), (display-mode: fullscreen) {
+        :root {
+          --boot-viewport-height: 100lvh;
+        }
+      }
+
+      html.la-pluma-standalone {
+        --boot-viewport-height: 100lvh;
+      }
+
+      @supports not (height: 100lvh) {
+        @media (display-mode: standalone), (display-mode: fullscreen) {
+          :root {
+            --boot-viewport-height: 100vh;
+          }
+        }
+
+        html.la-pluma-standalone {
+          --boot-viewport-height: 100vh;
+        }
+      }
+
+      html,
+      body,
+      #root {
+        min-height: 100%;
+        background-color: var(--boot-bg);
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+      }
+
+      .la-pluma-boot,
+      .la-pluma-boot * {
+        box-sizing: border-box;
+      }
+
+      .la-pluma-boot {
+        position: fixed;
+        inset: 0;
+        height: 100vh;
+        height: var(--boot-viewport-height);
+        min-height: 100vh;
+        min-height: var(--boot-viewport-height);
+        overflow: hidden;
+        background: var(--boot-bg);
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      }
+
+      .la-pluma-boot-header {
+        display: flex;
+        min-height: calc(4.75rem + env(safe-area-inset-top, 0px));
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding:
+          env(safe-area-inset-top, 0px)
+          max(1rem, env(safe-area-inset-right, 0px))
+          0
+          max(1rem, env(safe-area-inset-left, 0px));
+        background: linear-gradient(180deg, var(--boot-chrome), transparent);
+      }
+
+      .la-pluma-boot-line,
+      .la-pluma-boot-dot,
+      .la-pluma-boot-pill,
+      .la-pluma-boot-row {
+        display: block;
+        border-radius: 999px;
+        background: var(--boot-fill);
+      }
+
+      .la-pluma-boot-line {
+        width: 5rem;
+        height: 0.625rem;
+      }
+
+      .la-pluma-boot-dot {
+        width: 2.75rem;
+        height: 2.75rem;
+      }
+
+      .la-pluma-boot-header-dots {
+        display: flex;
+        gap: 0.5rem;
+      }
+
+      .la-pluma-boot-shell {
+        display: flex;
+        height: calc(100% - 4.75rem - env(safe-area-inset-top, 0px));
+      }
+
+      .la-pluma-boot-sidebar {
+        display: none;
+      }
+
+      .la-pluma-boot-main {
+        min-width: 0;
+        flex: 1;
+        padding:
+          0.5rem
+          max(0.875rem, env(safe-area-inset-right, 0px))
+          calc(4.875rem + var(--boot-bottom-clearance))
+          max(0.875rem, env(safe-area-inset-left, 0px));
+      }
+
+      .la-pluma-boot-title {
+        display: flex;
+        min-height: 3.25rem;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.875rem;
+      }
+
+      .la-pluma-boot-title .la-pluma-boot-line {
+        width: 6rem;
+        height: 1.25rem;
+      }
+
+      .la-pluma-boot-pill {
+        width: 5.5rem;
+        height: 2.25rem;
+      }
+
+      .la-pluma-boot-grid,
+      .la-pluma-boot-cards {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.875rem;
+      }
+
+      .la-pluma-boot-panel,
+      .la-pluma-boot-card {
+        overflow: hidden;
+        border-radius: 1.25rem;
+        background: var(--boot-surface);
+        box-shadow: 0 0.75rem 2rem rgba(60, 60, 67, 0.08);
+      }
+
+      .la-pluma-boot-primary {
+        min-height: 15rem;
+        padding: 1rem;
+      }
+
+      .la-pluma-boot-panel-head {
+        display: flex;
+        min-height: 3rem;
+        align-items: flex-start;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--boot-line);
+      }
+
+      .la-pluma-boot-panel-head .la-pluma-boot-line:last-child {
+        width: 3rem;
+      }
+
+      .la-pluma-boot-feature {
+        height: 5.5rem;
+        margin: 0.875rem 0;
+        border-radius: 0.875rem;
+        background: var(--boot-fill);
+      }
+
+      .la-pluma-boot-metrics {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.5rem;
+      }
+
+      .la-pluma-boot-metrics span {
+        height: 3.75rem;
+        border-radius: 0.875rem;
+        background: var(--boot-fill);
+      }
+
+      .la-pluma-boot-preview {
+        min-height: 10rem;
+      }
+
+      .la-pluma-boot-preview::before {
+        display: block;
+        height: 3.25rem;
+        border-bottom: 1px solid var(--boot-line);
+        content: '';
+      }
+
+      .la-pluma-boot-preview::after {
+        display: block;
+        height: 6.75rem;
+        background: color-mix(in srgb, var(--boot-bg) 90%, var(--boot-surface));
+        content: '';
+      }
+
+      .la-pluma-boot-cards {
+        margin-top: 1rem;
+      }
+
+      .la-pluma-boot-card {
+        height: 4.5rem;
+      }
+
+      .la-pluma-boot-tabbar {
+        position: fixed;
+        right: max(0.875rem, env(safe-area-inset-right, 0px));
+        bottom: var(--boot-bottom-clearance);
+        left: max(0.875rem, env(safe-area-inset-left, 0px));
+        display: grid;
+        height: 4rem;
+        grid-template-columns: minmax(0, 1fr) 4rem;
+        gap: 0.625rem;
+      }
+
+      .la-pluma-boot-tabs,
+      .la-pluma-boot-search {
+        border: 1px solid var(--boot-line);
+        border-radius: 999px;
+        background: var(--boot-chrome);
+        box-shadow: 0 1rem 2.25rem rgba(60, 60, 67, 0.16);
+      }
+
+      .la-pluma-boot-tabs {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        align-items: center;
+        padding: 0 1.25rem;
+      }
+
+      .la-pluma-boot-tabs span {
+        width: 1.25rem;
+        height: 1.25rem;
+        margin: auto;
+        border-radius: 999px;
+        background: var(--boot-fill);
+      }
+
+      .la-pluma-boot-tabs span:first-child {
+        background: var(--boot-accent);
+      }
+
+      @media (min-width: 640px) {
+        .la-pluma-boot-cards {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (min-width: 1024px) {
+        .la-pluma-boot-sidebar {
+          display: grid;
+          width: 17rem;
+          flex: none;
+          align-content: start;
+          gap: 0.5rem;
+          padding: 0.5rem 0.875rem;
+          background: var(--boot-sidebar);
+        }
+
+        .la-pluma-boot-sidebar .la-pluma-boot-row:first-child {
+          height: 2.5rem;
+          margin-bottom: 0.75rem;
+        }
+
+        .la-pluma-boot-sidebar .la-pluma-boot-row:not(:first-child) {
+          height: 2.75rem;
+        }
+
+        .la-pluma-boot-sidebar .la-pluma-boot-row:nth-child(2) {
+          background: color-mix(in srgb, var(--boot-accent) 72%, var(--boot-surface));
+        }
+
+        .la-pluma-boot-main {
+          max-width: 100rem;
+          margin: 0 auto;
+          padding: 0.75rem 2rem 2rem;
+        }
+
+        .la-pluma-boot-grid {
+          grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.65fr);
+        }
+
+        .la-pluma-boot-cards {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .la-pluma-boot-tabbar {
+          display: none;
+        }
+      }
+
+      @media (prefers-reduced-transparency: reduce) {
+        .la-pluma-boot-header,
+        .la-pluma-boot-tabs,
+        .la-pluma-boot-search {
+          background: var(--boot-surface);
+        }
+      }
+    </style>
     <script>
       (() => {
         const standalone = window.matchMedia?.('(display-mode: standalone)').matches
@@ -25,11 +350,12 @@
         }
 
         const applyTheme = (theme) => {
-          const dark = theme === 'dark'
-            || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+          const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches === true
+          const dark = theme === 'dark' || (theme === 'system' && prefersDark)
           document.documentElement.classList.toggle('dark', dark)
           document.getElementById('app-root')?.classList.toggle('dark', dark)
           document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+          document.documentElement.style.backgroundColor = dark ? '#000000' : '#f2f2f7'
           document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#05090c' : '#f6f8fb')
           document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.setAttribute('content', dark ? 'black-translucent' : 'default')
         }
@@ -47,7 +373,55 @@
     <title>La Pluma - MAA WebUI</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="la-pluma-boot" role="status" aria-label="正在打开 La Pluma" aria-busy="true">
+        <header class="la-pluma-boot-header" aria-hidden="true">
+          <span class="la-pluma-boot-line"></span>
+          <span class="la-pluma-boot-line"></span>
+          <span class="la-pluma-boot-header-dots">
+            <span class="la-pluma-boot-dot"></span>
+            <span class="la-pluma-boot-dot"></span>
+          </span>
+        </header>
+        <div class="la-pluma-boot-shell" aria-hidden="true">
+          <aside class="la-pluma-boot-sidebar">
+            <span class="la-pluma-boot-row"></span>
+            <span class="la-pluma-boot-row"></span>
+            <span class="la-pluma-boot-row"></span>
+            <span class="la-pluma-boot-row"></span>
+            <span class="la-pluma-boot-row"></span>
+            <span class="la-pluma-boot-row"></span>
+          </aside>
+          <main class="la-pluma-boot-main">
+            <div class="la-pluma-boot-title">
+              <span class="la-pluma-boot-line"></span>
+              <span class="la-pluma-boot-pill"></span>
+            </div>
+            <div class="la-pluma-boot-grid">
+              <section class="la-pluma-boot-panel la-pluma-boot-primary">
+                <div class="la-pluma-boot-panel-head">
+                  <span class="la-pluma-boot-line"></span>
+                  <span class="la-pluma-boot-line"></span>
+                </div>
+                <div class="la-pluma-boot-feature"></div>
+                <div class="la-pluma-boot-metrics"><span></span><span></span><span></span></div>
+              </section>
+              <section class="la-pluma-boot-panel la-pluma-boot-preview"></section>
+            </div>
+            <div class="la-pluma-boot-cards">
+              <span class="la-pluma-boot-card"></span>
+              <span class="la-pluma-boot-card"></span>
+              <span class="la-pluma-boot-card"></span>
+              <span class="la-pluma-boot-card"></span>
+            </div>
+          </main>
+        </div>
+        <footer class="la-pluma-boot-tabbar" aria-hidden="true">
+          <div class="la-pluma-boot-tabs"><span></span><span></span><span></span><span></span></div>
+          <span class="la-pluma-boot-search"></span>
+        </footer>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

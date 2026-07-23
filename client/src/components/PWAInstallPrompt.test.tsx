@@ -3,20 +3,25 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { hasDocumentBuildChanged } from '@/utils/pwaUpdate'
 import PWAInstallPrompt from './PWAInstallPrompt'
 
 const swMock = vi.hoisted(() => ({
   needRefresh: false,
   setNeedRefresh: vi.fn(),
   updateServiceWorker: vi.fn().mockResolvedValue(undefined),
+  registerOptions: undefined as Record<string, unknown> | undefined,
 }))
 
 vi.mock('virtual:pwa-register/react', () => ({
-  useRegisterSW: () => ({
-    needRefresh: [swMock.needRefresh, swMock.setNeedRefresh],
-    offlineReady: [false, vi.fn()],
-    updateServiceWorker: swMock.updateServiceWorker,
-  }),
+  useRegisterSW: (options: Record<string, unknown>) => {
+    swMock.registerOptions = options
+    return {
+      needRefresh: [swMock.needRefresh, swMock.setNeedRefresh],
+      offlineReady: [false, vi.fn()],
+      updateServiceWorker: swMock.updateServiceWorker,
+    }
+  },
 }))
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -67,6 +72,7 @@ describe('PWAInstallPrompt', () => {
     swMock.needRefresh = false
     swMock.setNeedRefresh.mockReset()
     swMock.updateServiceWorker.mockReset().mockResolvedValue(undefined)
+    swMock.registerOptions = undefined
     window.localStorage.clear()
     Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true })
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
@@ -174,5 +180,91 @@ describe('PWAInstallPrompt', () => {
     expect(container.textContent).toContain('发现新版本')
     await clickButton('立即更新')
     expect(swMock.updateServiceWorker).toHaveBeenCalledWith(true)
+  })
+
+  it('checks for an update when the app returns to the foreground', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-23T00:00:00Z'))
+    const update = vi.fn().mockResolvedValue(undefined)
+    await renderPrompt()
+
+    const onRegisteredSW = swMock.registerOptions?.onRegisteredSW as
+      | ((url: string, registration: ServiceWorkerRegistration) => void)
+      | undefined
+    expect(onRegisteredSW).toBeTypeOf('function')
+    onRegisteredSW?.('/sw.js', { update } as unknown as ServiceWorkerRegistration)
+
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+      await Promise.resolve()
+    })
+    expect(update).toHaveBeenCalledOnce()
+
+    await act(async () => {
+      window.dispatchEvent(new Event('pageshow'))
+      await Promise.resolve()
+    })
+    expect(update).toHaveBeenCalledOnce()
+
+    vi.advanceTimersByTime(60 * 1000)
+    await act(async () => {
+      window.dispatchEvent(new Event('pageshow'))
+      await Promise.resolve()
+    })
+    expect(update).toHaveBeenCalledTimes(2)
+  })
+
+  it('detects a changed document bundle without relying on a service worker', async () => {
+    const currentDocument = document.implementation.createHTMLDocument()
+    currentDocument.head.innerHTML = `
+      <script type="module" src="/assets/index-old.js"></script>
+      <link rel="stylesheet" href="/assets/index-old.css">
+    `
+    const fetchDocument = vi.fn().mockResolvedValue({
+      ok: true,
+      url: 'http://console.test/',
+      text: vi.fn().mockResolvedValue(`
+        <script type="module" src="/assets/index-new.js"></script>
+        <link rel="stylesheet" href="/assets/index-new.css">
+      `),
+    } as unknown as Response)
+
+    await expect(hasDocumentBuildChanged({
+      appUrl: new URL('http://console.test/'),
+      currentDocument,
+      fetchDocument,
+    })).resolves.toBe(true)
+
+    expect(fetchDocument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        href: expect.stringContaining('la-pluma-update-check='),
+      }),
+      expect.objectContaining({
+        cache: 'no-store',
+        credentials: 'same-origin',
+      }),
+    )
+  })
+
+  it('keeps the current document when its bundle is already up to date', async () => {
+    const currentDocument = document.implementation.createHTMLDocument()
+    currentDocument.head.innerHTML = `
+      <script type="module" src="/assets/index-current.js"></script>
+      <link rel="stylesheet" href="/assets/index-current.css">
+    `
+    const fetchDocument = vi.fn().mockResolvedValue({
+      ok: true,
+      url: 'http://console.test/',
+      text: vi.fn().mockResolvedValue(`
+        <script type="module" src="/assets/index-current.js"></script>
+        <link rel="stylesheet" href="/assets/index-current.css">
+      `),
+    } as unknown as Response)
+
+    await expect(hasDocumentBuildChanged({
+      appUrl: new URL('http://console.test/'),
+      currentDocument,
+      fetchDocument,
+    })).resolves.toBe(false)
   })
 })

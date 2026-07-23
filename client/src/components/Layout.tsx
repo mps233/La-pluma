@@ -4,6 +4,11 @@ import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutDashboa
 import ThemeToggle from './ThemeToggle'
 import { useUIStore } from '@/stores'
 import { appTabFromPath, appTabPath, isAppTab, type AppTab } from '@/stores/uiStore'
+import {
+  DEFAULT_OPERATOR_QUOTE,
+  getOperatorAvatarUrl,
+  loadDailyOperatorQuote,
+} from '@/services/operatorQuotes'
 
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -117,6 +122,7 @@ export default function Layout({ children }: LayoutProps) {
   const activeTab: AppTab = isAppTab(storedActiveTab) ? storedActiveTab : 'dashboard'
   const [moreOpen, setMoreOpen] = useState(false)
   const [sidebarQuery, setSidebarQuery] = useState('')
+  const [sidebarIdentity, setSidebarIdentity] = useState(DEFAULT_OPERATOR_QUOTE)
   const shouldReduceMotion = useReducedMotion()
   const moreTriggerRef = useRef<HTMLAnchorElement>(null)
   const scrollPositions = useRef(new Map<AppTab, number>())
@@ -126,6 +132,18 @@ export default function Layout({ children }: LayoutProps) {
   const scrollRestoreCleanupRef = useRef<(() => void) | null>(null)
 
   const closeMoreSheet = useCallback(() => setMoreOpen(false), [])
+
+  useEffect(() => {
+    let subscribed = true
+
+    void loadDailyOperatorQuote().then((quote) => {
+      if (subscribed) setSidebarIdentity(quote)
+    }).catch(() => undefined)
+
+    return () => {
+      subscribed = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!moreOpen) return undefined
@@ -413,13 +431,27 @@ export default function Layout({ children }: LayoutProps) {
               )}
             </div>
 
-            <div className="la-pluma-sidebar-identity">
+            <div
+              className="la-pluma-sidebar-identity"
+              aria-label={`${sidebarIdentity.operator}：${sidebarIdentity.quote}`}
+            >
               <span className="la-pluma-sidebar-avatar" aria-hidden="true">
-                <img src={`${import.meta.env.BASE_URL}logo-graphite.svg?v=1`} alt="" />
+                <img
+                  key={sidebarIdentity.operatorId}
+                  src={getOperatorAvatarUrl(sidebarIdentity.operatorId)}
+                  alt=""
+                  decoding="async"
+                  onError={(event) => {
+                    const target = event.currentTarget
+                    if (target.dataset.fallbackApplied === 'true') return
+                    target.dataset.fallbackApplied = 'true'
+                    target.src = `${import.meta.env.BASE_URL}logo-graphite.svg?v=1`
+                  }}
+                />
               </span>
               <span className="la-pluma-sidebar-identity-copy">
-                <strong>La Pluma</strong>
-                <small>MAA 本地控制台</small>
+                <strong title={sidebarIdentity.operator}>{sidebarIdentity.operator}</strong>
+                <small title={sidebarIdentity.quote}>{sidebarIdentity.quote}</small>
               </span>
             </div>
 
@@ -451,7 +483,7 @@ export default function Layout({ children }: LayoutProps) {
 
         <footer className="toolbar toolbar-bottom tabbar tabbar-icons la-pluma-tabbar">
           <div className="toolbar-inner">
-            <nav className="la-pluma-tabbar-pill" aria-label="主要功能">
+            <nav className="la-pluma-tabbar-pill app-liquid-tab-pill" aria-label="主要功能">
               {mobileTabs.map(tab => (
                 <TabLink key={tab.id} tab={tab} active={activeTab === tab.id} onNavigate={navigateToTab} mobile />
               ))}

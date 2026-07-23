@@ -1,10 +1,24 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { maaApi } from '../services/api'
-import { motion } from 'framer-motion'
-import Icons from './Icons'
-import { PageHeader, Card, CardHeader, CardContent, Button, Input, Select, Checkbox, SmoothPanel } from './common'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import {
+  Cable,
+  Clock3,
+  Download,
+  FolderOpen,
+  LockKeyhole,
+  MonitorSmartphone,
+  PackageOpen,
+  RefreshCw,
+  RotateCcw,
+  Save,
+  Search,
+  SlidersHorizontal,
+} from 'lucide-react'
+import { PageHeader, Card, CardHeader, CardContent, Button, Input, Select, Checkbox, Switch } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
+import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
 import type {
   MaaConnectionConfig,
   AutoUpdateConfig,
@@ -63,6 +77,9 @@ const DEFAULT_AUTO_UPDATE_CONFIG: AutoUpdateConfig = {
   updateCli: true
 }
 
+const CONFIG_SECTION_IDS = ['connection', 'resource', 'instance'] as const
+type ConfigSectionId = typeof CONFIG_SECTION_IDS[number]
+
 const normalizeAutoUpdateConfig = (value: unknown): AutoUpdateConfig | null => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
 
@@ -83,12 +100,19 @@ const isValidUpdateTime = (value: string) => {
 
 export default function ConfigManager() {
   const { setMessage: setStatusMessage } = useStatusStore()
-  const [configType, setConfigType] = useState<'connection' | 'resource' | 'instance'>(() => {
+  const shouldReduceMotion = useReducedMotion()
+  const [configType, setConfigType] = useState<ConfigSectionId>(() => {
     const saved = localStorage.getItem('laPlumaConfigSection')
-    return ['connection', 'resource', 'instance'].includes(saved || '')
-      ? saved as 'connection' | 'resource' | 'instance'
+    return CONFIG_SECTION_IDS.includes(saved as ConfigSectionId)
+      ? saved as ConfigSectionId
       : 'connection'
   })
+  const {
+    containerRef: configTabsRef,
+    activeRect: activeConfigRect,
+    setTabRef: setConfigTabRef,
+    handleTabKeyDown: handleConfigTabKeyDown,
+  } = useFluidTabIndicator(configType)
   const [configData, setConfigData] = useState<MaaConnectionConfig>({
     adb_path: '/opt/homebrew/bin/adb',
     address: '127.0.0.1:16384',
@@ -126,7 +150,7 @@ export default function ConfigManager() {
     const handleSectionChange = (event: Event) => {
       const section = (event as CustomEvent).detail
       if (['connection', 'resource', 'instance'].includes(section)) {
-        handleConfigTypeChange(section as 'connection' | 'resource' | 'instance')
+        handleConfigTypeChange(section as ConfigSectionId)
       }
     }
 
@@ -433,7 +457,7 @@ export default function ConfigManager() {
     }
   }
 
-  const handleConfigTypeChange = (section: 'connection' | 'resource' | 'instance') => {
+  const handleConfigTypeChange = (section: ConfigSectionId) => {
     localStorage.setItem('laPlumaConfigSection', section)
     setConfigType(section)
   }
@@ -585,578 +609,556 @@ export default function ConfigManager() {
   const updateBusy = updating.core || updating.cli || hotUpdating
 
   const configSections = [
-    { id: 'connection', name: '连接配置', icon: <Icons.Monitor /> },
-    { id: 'resource', name: '资源配置', icon: <Icons.Package /> },
-    { id: 'instance', name: '实例选项', icon: <Icons.Lightning /> },
-  ] satisfies ConfigSection[]
+    {
+      id: 'connection',
+      name: '连接',
+      description: 'ADB 与模拟器',
+      icon: <MonitorSmartphone aria-hidden="true" />,
+    },
+    {
+      id: 'resource',
+      name: '资源',
+      description: '资源来源与目录',
+      icon: <PackageOpen aria-hidden="true" />,
+    },
+    {
+      id: 'instance',
+      name: '实例',
+      description: '运行与触控选项',
+      icon: <SlidersHorizontal aria-hidden="true" />,
+    },
+  ] satisfies Array<ConfigSection & { description: string }>
 
   return (
-    <>
-      <div className="app-page app-stack-section ios-workspace-page">
-        <PageHeader
-          title="配置管理"
-          subtitle="管理游戏连接、运行设置与资源更新"
-          mobileLayout="inline"
-          actions={(
-            <FloatingStatusIndicator
-              className="w-full overflow-hidden sm:w-auto sm:max-w-none"
-              textClassName="truncate whitespace-nowrap"
+    <div className="app-page app-stack-section ios-workspace-page" data-page="config">
+      <PageHeader
+        title="配置"
+        subtitle="连接设备、管理运行选项与组件更新"
+        mobileLayout="inline"
+        actions={(
+          <FloatingStatusIndicator
+            className="w-full overflow-hidden sm:w-auto"
+            textClassName="truncate whitespace-nowrap"
+          />
+        )}
+      />
+
+      <div className="app-workspace-segments app-liquid-tab-pill w-full" data-config-sections>
+        <div
+          ref={configTabsRef}
+          className="app-workspace-segment-list grid-cols-3"
+          role="toolbar"
+          aria-label="配置类型"
+        >
+          {activeConfigRect.width > 0 && (
+            <motion.div
+              data-testid="config-section-highlight"
+              aria-hidden="true"
+              className="app-workspace-segment-indicator"
+              initial={false}
+              animate={{
+                x: activeConfigRect.x,
+                y: activeConfigRect.y,
+                width: activeConfigRect.width,
+                height: activeConfigRect.height,
+              }}
+              transition={shouldReduceMotion
+                ? { duration: 0 }
+                : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
             />
           )}
-        />
+          {configSections.map(section => {
+            const selected = configType === section.id
+            return (
+              <button
+                key={section.id}
+                ref={element => setConfigTabRef(section.id)(element)}
+                type="button"
+                onClick={() => handleConfigTypeChange(section.id)}
+                onKeyDown={event => handleConfigTabKeyDown(
+                  event,
+                  CONFIG_SECTION_IDS,
+                  handleConfigTypeChange,
+                )}
+                aria-pressed={selected}
+                tabIndex={selected ? 0 : -1}
+                className={`app-workspace-segment min-h-11 ${selected ? 'is-selected' : ''}`}
+              >
+                <span className="app-workspace-segment-icon">{section.icon}</span>
+                <span className="app-workspace-segment-copy">
+                  <span>{section.name}</span>
+                  <small>{section.description}</small>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
 
-        <Card animated delay={0.1} smoothCorners className="!p-0">
-          <CardContent>
-            <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="config-workspace-grid grid min-w-0 gap-[var(--app-space-section)] xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)] xl:items-start">
+        <div className="config-workspace-primary app-stack-section min-w-0">
+      <Card animated delay={0.08} smoothCorners className="config-editor-card !p-0">
+        <CardHeader
+          title={configSections.find(section => section.id === configType)?.name || '配置'}
+          actions={configType === 'connection' ? (
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleReset}
+                disabled={loading}
+                variant="outline"
+                size="sm"
+                icon={<RotateCcw size={16} aria-hidden="true" />}
+              >
+                重置
+              </Button>
+              <Button
+                onClick={handleSave}
+                loading={loading}
+                loadingText="保存中"
+                variant="primary"
+                size="sm"
+                icon={<Save size={16} aria-hidden="true" />}
+              >
+                保存
+              </Button>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              onClick={handleOpenConfigDir}
+              variant="outline"
+              size="sm"
+              disabled={configDirStatus !== 'ready' || !configDir}
+              icon={<FolderOpen size={16} aria-hidden="true" />}
+            >
+              打开目录
+            </Button>
+          )}
+        />
+        <CardContent>
+          {configType === 'connection' && (
+            <div className="app-stack-card">
+              {configFeedback && (
+                <div
+                  className={`rounded-[var(--app-radius-md)] px-3 py-2.5 text-xs leading-5 ${
+                    configFeedback.type === 'success'
+                      ? 'status-success'
+                      : configFeedback.type === 'warning'
+                        ? 'status-warning'
+                        : 'status-danger'
+                  }`}
+                  role={configFeedback.type === 'error' ? 'alert' : 'status'}
+                >
+                  {configFeedback.message}
+                </div>
+              )}
+
+              <div className="grid min-w-0 gap-[var(--app-space-card)] md:grid-cols-2">
+                <Input
+                  label="ADB 路径"
+                  value={configData.adb_path}
+                  onChange={(value: string) => {
+                    updateConnectionConfig(current => ({ ...current, adb_path: value }))
+                  }}
+                  hint="ADB 可执行文件的完整路径"
+                />
+                <Input
+                  label="连接地址"
+                  value={configData.address}
+                  onChange={(value: string) => {
+                    updateConnectionConfig(current => ({ ...current, address: value }))
+                    setConnectionFeedback(null)
+                  }}
+                  hint="模拟器地址，例如 127.0.0.1:16384"
+                />
+              </div>
+
+              <section className="surface-soft rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]" aria-label="模拟器查找与连接测试">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="icon-well flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] brand-text">
+                      <Cable size={18} aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold text-primary">模拟器连接</h3>
+                      <p className="mt-1 text-xs leading-5 text-tertiary">查找本机模拟器，或测试当前连接地址。</p>
+                    </div>
+                  </div>
+                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      loading={discoveringDevices}
+                      loadingText="查找中"
+                      onClick={() => void handleDiscoverDevices()}
+                      className="flex-1 sm:flex-none"
+                      icon={<Search size={16} aria-hidden="true" />}
+                    >
+                      查找模拟器
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      loading={testingConnection}
+                      loadingText="测试中"
+                      onClick={() => void handleTestConnection()}
+                      className="flex-1 sm:flex-none"
+                      icon={<Cable size={16} aria-hidden="true" />}
+                    >
+                      测试连接
+                    </Button>
+                  </div>
+                </div>
+
+                {discoveryMessage && (
+                  <p className="mt-3 text-xs text-secondary" role="status">{discoveryMessage}</p>
+                )}
+
+                {discoveredDevices.length > 0 && (
+                  <div className="mt-3 divide-y divide-[var(--app-border)] overflow-hidden rounded-[var(--app-radius-md)] bg-[var(--app-surface)] shadow-[inset_0_0_0_1px_var(--app-border)]">
+                    {discoveredDevices.map(device => {
+                      const selectable = device.state === 'device' || device.state === 'candidate'
+                      const stateLabel = device.state === 'device'
+                        ? '已连接'
+                        : device.state === 'candidate'
+                          ? '可尝试连接'
+                          : device.state === 'offline'
+                            ? '设备离线'
+                            : device.state === 'unauthorized'
+                              ? '等待授权'
+                              : '状态未知'
+                      return (
+                        <button
+                          key={`${device.source}-${device.address}`}
+                          type="button"
+                          disabled={!selectable || testingConnection}
+                          onClick={() => void handleUseDiscoveredDevice(device)}
+                          className="flex min-h-12 w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--app-accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-medium text-primary">{device.address}</span>
+                            <span className="mt-0.5 block truncate text-xs text-tertiary">{device.details || (device.source === 'adb' ? 'ADB 已识别设备' : device.source === 'emulator-adb' ? '模拟器内置 ADB' : '本机端口')}</span>
+                          </span>
+                          <span className="shrink-0 rounded-[var(--app-radius-pill)] bg-[var(--app-surface-muted)] px-2 py-1 text-xs text-secondary">{stateLabel}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {hasSearchedDevices && !discoveredDevices.length && (
+                  <p className="mt-3 text-xs leading-5 text-tertiary">未找到已连接设备。启动模拟器后重新查找，或手动填写连接地址。</p>
+                )}
+
+                {connectionFeedback && (
+                  <div className={`mt-3 rounded-[var(--app-radius-md)] px-3 py-2.5 text-xs ${connectionFeedback.success ? 'status-success' : 'status-danger'}`} role={connectionFeedback.success ? 'status' : 'alert'}>
+                    {connectionFeedback.message}
+                  </div>
+                )}
+              </section>
+
+              <div className="grid min-w-0 gap-[var(--app-space-card)] md:grid-cols-2 md:items-end">
+                <Select
+                  label="平台配置"
+                  value={configData.config}
+                  onChange={(value: string) => {
+                    updateConnectionConfig(current => ({ ...current, config: value }))
+                  }}
+                  options={[
+                    { value: 'CompatMac', label: 'CompatMac (macOS)' },
+                    { value: 'CompatPOSIXShell', label: 'CompatPOSIXShell (Linux)' },
+                    { value: 'General', label: 'General (Windows)' },
+                  ]}
+                  hint="选择与服务器系统匹配的平台预设"
+                />
+                <div className="surface-soft flex min-h-20 items-center justify-between gap-3 rounded-[var(--app-radius-lg)] px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-primary">自动重连</div>
+                    <div className="mt-1 text-xs leading-5 text-tertiary">连接中断后自动尝试恢复</div>
+                  </div>
+                  <Switch
+                    label="启用自动重连"
+                    checked={configData.auto_reconnect !== false}
+                    onChange={(checked: boolean) => {
+                      updateConnectionConfig(current => ({ ...current, auto_reconnect: checked }))
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {configType === 'resource' && (
+            <section className="surface-soft flex items-start gap-3 rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]" aria-labelledby="resource-config-readonly-title">
+              <span className="icon-well flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] brand-text">
+                <LockKeyhole size={18} aria-hidden="true" />
+              </span>
               <div className="min-w-0">
-                <h2 className="mb-2 text-lg font-bold text-primary">配置目录</h2>
+                <h3 id="resource-config-readonly-title" className="text-sm font-semibold text-primary">资源配置由 MAA 管理</h3>
+                <p className="mt-1 text-sm leading-6 text-secondary">当前资源来源保持不变。需要调整时，可打开配置目录编辑对应文件。</p>
+              </div>
+            </section>
+          )}
+
+          {configType === 'instance' && (
+            <section className="surface-soft flex items-start gap-3 rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]" aria-labelledby="instance-config-readonly-title">
+              <span className="icon-well flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] brand-text">
+                <LockKeyhole size={18} aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <h3 id="instance-config-readonly-title" className="text-sm font-semibold text-primary">实例选项由 MAA 管理</h3>
+                <p className="mt-1 text-sm leading-6 text-secondary">触摸模式等实例选项保持当前设置。需要调整时，可打开配置目录编辑对应文件。</p>
+              </div>
+            </section>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card animated delay={0.12} smoothCorners className="config-directory-card !p-0">
+        <CardContent>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="icon-well flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] brand-text">
+                <FolderOpen size={20} aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold text-primary">配置目录</h2>
                 {configDirStatus === 'error' ? (
-                  <p className="break-words text-sm text-danger [overflow-wrap:anywhere]" role="alert">
-                    {configDirError}
-                  </p>
+                  <p className="mt-1 break-words text-sm text-danger [overflow-wrap:anywhere]" role="alert">{configDirError}</p>
                 ) : (
-                  <p className="break-words font-mono text-sm text-secondary [overflow-wrap:anywhere]" aria-live="polite">
+                  <p className="mt-1 break-words font-mono text-xs leading-5 text-secondary [overflow-wrap:anywhere]" aria-live="polite">
                     {configDirStatus === 'loading' ? '正在读取目录...' : configDir}
                   </p>
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {configDirStatus === 'error' && (
-                  <Button
-                    onClick={() => void loadConfigDir()}
-                    variant="outline"
-                    size="sm"
-                    icon={<Icons.RefreshCw className="h-4 w-4" />}
-                  >
-                    重试
-                  </Button>
-                )}
+            </div>
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+              {configDirStatus === 'error' && (
                 <Button
-                  onClick={handleOpenConfigDir}
+                  onClick={() => void loadConfigDir()}
                   variant="outline"
                   size="sm"
-                  disabled={configDirStatus !== 'ready' || !configDir}
+                  className="flex-1 sm:flex-none"
+                  icon={<RefreshCw size={16} aria-hidden="true" />}
                 >
-                  打开目录
+                  重试
                 </Button>
-              </div>
+              )}
+              <Button
+                onClick={handleOpenConfigDir}
+                variant="outline"
+                size="sm"
+                className="flex-1 sm:flex-none"
+                disabled={configDirStatus !== 'ready' || !configDir}
+                icon={<FolderOpen size={16} aria-hidden="true" />}
+              >
+                打开目录
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
+        </div>
 
-        <Card animated delay={0.15} smoothCorners className="!p-0">
-          <CardHeader title="更新管理" />
-          <CardContent>
-            {/* 自动更新设置 */}
-            <section className="mb-6 border-b border-[var(--app-border)] pb-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="mb-1 text-base font-semibold text-primary">自动更新</h3>
-                  <p className="text-xs text-secondary">每天定时自动更新 MAA 组件</p>
+        <div className="config-workspace-secondary app-stack-section min-w-0">
+      <Card animated delay={0.16} smoothCorners className="config-update-card !p-0">
+        <CardHeader title="组件更新" />
+        <CardContent className="app-stack-card">
+          <section className="surface-soft rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="icon-well flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] brand-text">
+                  <Clock3 size={18} aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-primary">自动更新</h3>
+                  <p className="mt-1 text-xs leading-5 text-tertiary">每天按设定时间更新所选组件</p>
                 </div>
-                <label className="relative inline-flex min-h-11 shrink-0 cursor-pointer items-center">
-                  <input
-                    type="checkbox"
-                    checked={autoUpdate.enabled}
-                    onChange={(e) => handleAutoUpdateChange('enabled', e.target.checked)}
-                    aria-label="启用自动更新"
-                    className="sr-only peer"
-                  />
-                  <div className="relative h-7 w-12 rounded-[var(--app-radius-pill)] border border-[var(--app-border-strong)] bg-[var(--app-surface-muted)] transition-colors after:absolute after:left-[3px] after:top-[3px] after:h-5 after:w-5 after:rounded-[var(--app-radius-pill)] after:border after:border-[var(--app-border)] after:bg-white after:shadow-sm after:transition-transform peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--app-accent)] peer-checked:border-[var(--app-accent)] peer-checked:bg-[var(--app-accent)] peer-checked:after:translate-x-5"></div>
-                </label>
               </div>
-              
+              <Switch
+                checked={autoUpdate.enabled}
+                onChange={checked => handleAutoUpdateChange('enabled', checked)}
+                label="启用自动更新"
+              />
+            </div>
+
+            <AnimatePresence initial={false}>
               {autoUpdate.enabled && (
                 <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="space-y-4"
+                  initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+                  transition={{ duration: shouldReduceMotion ? 0.12 : 0.2 }}
+                  className="mt-4 grid gap-4 border-t border-[var(--app-border)] pt-4 md:grid-cols-[12rem_minmax(0,1fr)] md:items-end xl:grid-cols-1 xl:items-stretch"
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* 左侧：定时更新设置 */}
-                    <div className="space-y-4">
-                      <div className="w-48">
-                        <Input
-                          type="text"
-                          label="更新时间"
-                          value={autoUpdate.time}
-                          onChange={(value: string) => handleAutoUpdateChange('time', value)}
-                          placeholder="HH:MM"
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Checkbox
-                          checked={autoUpdate.updateCore}
-                          onChange={(checked: boolean) => handleAutoUpdateChange('updateCore', checked)}
-                          label="更新 MaaCore"
-                        />
-                        <Checkbox
-                          checked={autoUpdate.updateCli}
-                          onChange={(checked: boolean) => handleAutoUpdateChange('updateCli', checked)}
-                          label="更新 MAA CLI"
-                        />
-                      </div>
-                    </div>
-                    
-                    {/* 右侧：资源热更新 */}
-                    <div className="space-y-3">
-                      <div>
-                        <h4 className="mb-1 text-sm font-semibold text-primary">
-                          资源热更新
-                        </h4>
-                        <p className="text-xs text-secondary">同步 MaaResource 仓库的最新资源文件（活动地图、公招数据等）</p>
-                      </div>
-                      <Button
-                        onClick={handleHotUpdate}
-                        disabled={updateBusy}
-                        variant="primary"
-                        fullWidth
-                        icon={hotUpdating ? (
-                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                        ) : (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                          </svg>
-                        )}
-                      >
-                        {hotUpdating ? '更新中...' : '热更新资源'}
-                      </Button>
-                    </div>
+                  <Input
+                    type="text"
+                    label="更新时间"
+                    value={autoUpdate.time}
+                    onChange={(value: string) => handleAutoUpdateChange('time', value)}
+                    placeholder="HH:MM"
+                    className="max-w-48"
+                  />
+                  <div className="flex min-h-11 flex-wrap items-center gap-x-5 gap-y-2">
+                    <Checkbox
+                      checked={autoUpdate.updateCore}
+                      onChange={(checked: boolean) => handleAutoUpdateChange('updateCore', checked)}
+                      label="更新 MaaCore"
+                    />
+                    <Checkbox
+                      checked={autoUpdate.updateCli}
+                      onChange={(checked: boolean) => handleAutoUpdateChange('updateCli', checked)}
+                      label="更新 MAA CLI"
+                    />
                   </div>
                 </motion.div>
               )}
+            </AnimatePresence>
 
-              {autoUpdateFeedback && (
-                <div
-                  className={`mt-4 rounded-[var(--app-radius-md)] px-3 py-2.5 text-xs leading-5 ${
-                    autoUpdateFeedback.type === 'success'
-                      ? 'status-success'
-                      : autoUpdateFeedback.type === 'warning'
-                        ? 'status-warning'
-                        : 'status-danger'
-                  }`}
-                  role={autoUpdateFeedback.type === 'error' ? 'alert' : 'status'}
-                >
-                  {autoUpdateFeedback.message}
+            {autoUpdateFeedback && (
+              <div
+                className={`mt-4 rounded-[var(--app-radius-md)] px-3 py-2.5 text-xs leading-5 ${
+                  autoUpdateFeedback.type === 'success'
+                    ? 'status-success'
+                    : autoUpdateFeedback.type === 'warning'
+                      ? 'status-warning'
+                      : 'status-danger'
+                }`}
+                role={autoUpdateFeedback.type === 'error' ? 'alert' : 'status'}
+              >
+                {autoUpdateFeedback.message}
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--app-border)] pt-4">
+              <p className="text-xs text-tertiary">{autoUpdateDirty ? '有尚未保存的更改' : '设置会在保存后生效'}</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                loading={autoUpdateSaving}
+                loadingText="保存中"
+                disabled={!autoUpdateDirty || autoUpdateSaving}
+                onClick={() => void saveAutoUpdateConfig(autoUpdate)}
+                icon={<Save size={16} aria-hidden="true" />}
+              >
+                保存自动更新
+              </Button>
+            </div>
+          </section>
+
+          <div className="grid gap-[var(--app-space-card)] md:grid-cols-2 xl:grid-cols-1">
+            <section className="surface-soft flex min-w-0 flex-col rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-base font-semibold text-primary">MaaCore</h3>
+                {versionInfo && <span className="text-sm brand-text">{versionInfo.core}</span>}
+                {versionInfo && (
+                  <span className={`rounded-[var(--app-radius-pill)] px-2 py-1 text-xs ${versionInfo.core.includes('beta') || versionInfo.core.includes('alpha') ? 'status-warning' : 'status-success'}`}>
+                    {versionInfo.core.includes('beta') || versionInfo.core.includes('alpha') ? '测试版' : '正式版'}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs leading-5 text-secondary">核心组件与游戏资源</p>
+              {versionInfo?.resource && (
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-tertiary">
+                    资源更新：{versionInfo.resource.lastUpdated
+                      ? new Date(versionInfo.resource.lastUpdated.replace(' ', 'T')).toLocaleString('zh-CN', { hour12: false })
+                      : '未知'}
+                  </span>
+                  <span className={`rounded-[var(--app-radius-pill)] px-2 py-1 font-medium ${versionInfo.resource.status === 'current' ? 'status-success' : 'status-warning'}`}>
+                    {versionInfo.resource.status === 'current' ? '资源正常' : '需要同步'}
+                  </span>
                 </div>
               )}
-
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--app-border)] pt-4">
-                <p className="text-xs text-tertiary">
-                  {autoUpdateDirty ? '有尚未保存的更改' : '设置会在保存后生效'}
-                </p>
+              {versionInfo?.resource && versionInfo.resource.status !== 'current' && (
+                <p className="mt-2 text-xs leading-5 text-[var(--app-warning)]">{versionInfo.resource.message}</p>
+              )}
+              <div className="mt-auto grid gap-2 pt-4 sm:grid-cols-2">
+                <Button
+                  onClick={handleUpdateCore}
+                  disabled={updateBusy}
+                  loading={updating.core}
+                  loadingText="更新中"
+                  variant="primary"
+                  className="w-full"
+                  icon={<Download size={16} aria-hidden="true" />}
+                >
+                  更新 MaaCore
+                </Button>
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  loading={autoUpdateSaving}
-                  loadingText="保存中..."
-                  disabled={!autoUpdateDirty || autoUpdateSaving}
-                  onClick={() => void saveAutoUpdateConfig(autoUpdate)}
+                  onClick={handleToggleCoreVersion}
+                  disabled={updateBusy}
+                  variant="secondary"
+                  className="w-full"
+                  icon={<RefreshCw size={16} aria-hidden="true" />}
                 >
-                  保存自动更新设置
+                  {versionInfo?.core.includes('beta') || versionInfo?.core.includes('alpha') ? '切换正式版' : '切换测试版'}
+                </Button>
+                <Button
+                  onClick={handleHotUpdate}
+                  disabled={updateBusy}
+                  loading={hotUpdating}
+                  loadingText="同步中"
+                  variant="outline"
+                  className="w-full sm:col-span-2"
+                  icon={<RefreshCw size={16} aria-hidden="true" />}
+                >
+                  仅同步游戏资源
                 </Button>
               </div>
             </section>
-            
-            {/* 手动更新按钮 */}
-            <div className="grid grid-cols-1 md:grid-cols-2">
-              {/* 更新 MaaCore */}
-              <section className="min-w-0 border-b border-[var(--app-border)] pb-5 md:border-b-0 md:border-r md:pb-0 md:pr-5">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-base font-semibold text-primary">
-                        MaaCore
-                      </h3>
-                      {versionInfo && (
-                        <span className="text-sm font-normal brand-text">
-                          {versionInfo.core}
-                        </span>
-                      )}
-                      {versionInfo && versionInfo.core.includes('beta') && (
-                        <span className="status-warning rounded-[var(--app-radius-sm)] px-2 py-0.5 text-xs">
-                          Beta
-                        </span>
-                      )}
-                      {versionInfo && !versionInfo.core.includes('beta') && (
-                        <span className="status-success rounded-[var(--app-radius-sm)] px-2 py-0.5 text-xs">
-                          正式版
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-secondary">更新 MAA 核心组件和资源文件</p>
-                    {versionInfo?.resource && (
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                        <span className="text-xs text-tertiary">
-                          资源更新：{versionInfo.resource.lastUpdated
-                            ? new Date(versionInfo.resource.lastUpdated.replace(' ', 'T')).toLocaleString('zh-CN', { hour12: false })
-                            : '未知'}
-                        </span>
-                        <span className={`rounded-[var(--app-radius-sm)] px-1.5 py-0.5 font-medium ${
-                          versionInfo.resource.status === 'current'
-                            ? 'status-success'
-                            : 'status-warning'
-                        }`}>
-                          {versionInfo.resource.status === 'current' ? '资源正常' : '需要同步'}
-                        </span>
-                      </div>
-                    )}
-                    {versionInfo?.resource && versionInfo.resource.status !== 'current' && (
-                      <p className="mt-1.5 text-xs leading-5 text-[var(--app-warning)]">
-                        {versionInfo.resource.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <Button
-                    onClick={handleUpdateCore}
-                    disabled={updateBusy}
-                    variant="primary"
-                    className="w-full"
-                    icon={updating.core ? (
-                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                    ) : <Icons.Download />}
-                  >
-                    {updating.core ? '同步中...' : '更新 MaaCore'}
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={handleToggleCoreVersion}
-                    disabled={updateBusy}
-                    className="app-native-button app-native-button-primary w-full px-3 text-sm sm:w-auto"
-                  >
-                    {versionInfo?.core.includes('beta') || versionInfo?.core.includes('alpha') ? '切换到正式版' : '切换到 Beta'}
-                  </button>
-                  <Button
-                    onClick={handleHotUpdate}
-                    disabled={updateBusy}
-                    variant="outline"
-                    className="w-full sm:col-span-2"
-                    icon={hotUpdating ? (
-                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                    ) : <Icons.RefreshCw />}
-                  >
-                    {hotUpdating ? '正在同步资源...' : '仅同步最新资源'}
-                  </Button>
-                </div>
 
-                {updateFeedback && (
-                  <div className={`mt-3 border-t border-[var(--app-border)] pt-3 text-xs leading-5 ${
-                    updateFeedback.type === 'success'
-                      ? 'text-[var(--app-success)]'
-                      : 'text-[var(--app-warning)]'
-                  }`}>
-                    <p>{updateFeedback.message}</p>
-                    {updateFeedback.resourceRetry && (
-                      <button
-                        type="button"
-                        onClick={handleHotUpdate}
-                        disabled={updateBusy}
-                        className="app-native-button mt-1 !min-h-11 !border-0 !bg-transparent !px-0 !py-0 font-semibold underline underline-offset-2 shadow-none disabled:cursor-not-allowed disabled:opacity-50 lg:!min-h-0"
-                      >
-                        重试资源同步
-                      </button>
-                    )}
-                  </div>
-                )}
-                
-              </section>
-
-              {/* 更新 MAA CLI */}
-              <section className="min-w-0 pt-5 md:pl-5 md:pt-0">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-base font-semibold text-primary">
-                        MAA CLI
-                      </h3>
-                      {versionInfo && (
-                        <span className="text-sm font-normal brand-text">
-                          {versionInfo.cli}
-                        </span>
-                      )}
-                      <span className="status-success rounded-[var(--app-radius-sm)] px-2 py-0.5 text-xs">
-                        正式版
-                      </span>
-                    </div>
-                    <p className="text-xs text-secondary">通过 Homebrew 更新 MAA 命令行工具</p>
-                  </div>
-                </div>
+            <section className="surface-soft flex min-w-0 flex-col rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-base font-semibold text-primary">MAA CLI</h3>
+                {versionInfo && <span className="text-sm brand-text">{versionInfo.cli}</span>}
+                <span className="status-success rounded-[var(--app-radius-pill)] px-2 py-1 text-xs">正式版</span>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-secondary">命令行工具与任务运行入口</p>
+              <div className="mt-auto pt-4">
                 <Button
                   onClick={handleUpdateCli}
                   disabled={updateBusy}
+                  loading={updating.cli}
+                  loadingText="更新中"
                   variant="primary"
                   fullWidth
-                  icon={updating.cli ? (
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  ) : <Icons.Download />}
+                  icon={<Download size={16} aria-hidden="true" />}
                 >
-                  {updating.cli ? '更新中...' : '更新 MAA CLI'}
+                  更新 MAA CLI
                 </Button>
-                
-              </section>
+              </div>
+            </section>
+          </div>
+
+          {updateFeedback && (
+            <div className={`rounded-[var(--app-radius-md)] px-3 py-2.5 text-xs leading-5 ${updateFeedback.type === 'success' ? 'status-success' : 'status-warning'}`} role={updateFeedback.type === 'error' ? 'alert' : 'status'}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p>{updateFeedback.message}</p>
+                {updateFeedback.resourceRetry && (
+                  <Button
+                    type="button"
+                    onClick={handleHotUpdate}
+                    disabled={updateBusy}
+                    variant="ghost"
+                    size="sm"
+                    className="!min-h-11 lg:!min-h-0"
+                    icon={<RefreshCw size={16} aria-hidden="true" />}
+                  >
+                    重试资源同步
+                  </Button>
+                )}
+              </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid grid-cols-1 gap-[var(--app-space-section)] lg:grid-cols-[17rem_minmax(0,1fr)]">
-          {/* 配置类型选择 */}
-          <div>
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <SmoothPanel surfaceClassName="overflow-hidden">
-                <div className="border-b border-[var(--app-border)] px-5 py-4">
-                  <h3 className="font-bold text-primary">配置类型</h3>
-                </div>
-                <div className="p-3">
-                  {configSections.map((section, index) => (
-                    <motion.button
-                      key={section.id}
-                      onClick={() => handleConfigTypeChange(section.id)}
-                      className={`
-                        mb-2 flex min-h-12 w-full items-center space-x-3 rounded-xl px-4 py-2.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]
-                        ${configType === section.id
-                          ? 'brand-action-subtle'
-                          : 'border border-transparent text-secondary hover:border-[var(--app-border)] hover:bg-[var(--app-surface-muted)] hover:text-primary'
-                        }
-                      `}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.3 + index * 0.1 }}
-                    >
-                      <span className="flex h-8 w-8 items-center justify-center [&>*]:!h-8 [&>*]:!w-8">{section.icon}</span>
-                      <span className="text-sm font-medium">{section.name}</span>
-                    </motion.button>
-                  ))}
-                </div>
-              </SmoothPanel>
-            </motion.div>
-          </div>
-
-          {/* 配置编辑器 */}
-          <div className="min-w-0">
-            <Card animated delay={0.2} smoothCorners className="!p-0">
-              <CardHeader 
-                title={configSections.find(s => s.id === configType)?.name || '配置'}
-                actions={
-                  configType === 'connection' ? (
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        onClick={handleReset}
-                        disabled={loading}
-                        variant="outline"
-                        size="sm"
-                        className="min-h-10"
-                      >
-                        重置
-                      </Button>
-                      <Button
-                        onClick={handleSave}
-                        disabled={loading}
-                        variant="outline"
-                        size="sm"
-                        className="min-h-10 brand-chip"
-                        icon={
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 16v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-7a2 2 0 012-2h2m3-4H5a2 2 0 00-2 2v7a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-1m-4 0V3m0 0L9 6m1.5-3L12 6" />
-                          </svg>
-                        }
-                      >
-                        {loading ? '保存中...' : '保存'}
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      type="button"
-                      onClick={handleOpenConfigDir}
-                      variant="outline"
-                      size="sm"
-                    >
-                      打开配置目录
-                    </Button>
-                  )
-                }
-              />
-              <CardContent>
-                {configType === 'connection' && (
-                  <div className="space-y-5">
-                    {configFeedback && (
-                      <div
-                        className={`rounded-[var(--app-radius-md)] px-3 py-2.5 text-xs leading-5 ${
-                          configFeedback.type === 'success'
-                            ? 'status-success'
-                            : configFeedback.type === 'warning'
-                              ? 'status-warning'
-                              : 'status-danger'
-                        }`}
-                        role={configFeedback.type === 'error' ? 'alert' : 'status'}
-                      >
-                        {configFeedback.message}
-                      </div>
-                    )}
-                    <Input
-                      label="ADB 路径"
-                      value={configData.adb_path}
-                      onChange={(value: string) => {
-                        updateConnectionConfig(current => ({ ...current, adb_path: value }))
-                      }}
-                      hint="ADB 可执行文件的路径"
-                    />
-                    <Input
-                      label="连接地址"
-                      value={configData.address}
-                      onChange={(value: string) => {
-                        updateConnectionConfig(current => ({ ...current, address: value }))
-                        setConnectionFeedback(null)
-                      }}
-                      hint="模拟器连接地址，格式: IP:端口"
-                    />
-                    <section className="border-t border-[var(--app-border)] pt-4" aria-label="模拟器查找与连接测试">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <h3 className="text-sm font-semibold text-primary">模拟器查找</h3>
-                          <p className="mt-1 text-xs text-tertiary">查找已连接设备和常见本机模拟器端口，选用后会填入连接地址。</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            loading={discoveringDevices}
-                            loadingText="查找中..."
-                            onClick={() => void handleDiscoverDevices()}
-                          >
-                            查找模拟器
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            loading={testingConnection}
-                            loadingText="测试中..."
-                            onClick={() => void handleTestConnection()}
-                          >
-                            测试连接
-                          </Button>
-                        </div>
-                      </div>
-
-                      {discoveryMessage && (
-                        <p className="mt-3 text-xs text-secondary" role="status">{discoveryMessage}</p>
-                      )}
-
-                      {discoveredDevices.length > 0 && (
-                        <div className="mt-3 divide-y divide-[var(--app-border)] overflow-hidden rounded-[var(--app-radius-md)] border border-[var(--app-border)]">
-                          {discoveredDevices.map(device => {
-                            const selectable = device.state === 'device' || device.state === 'candidate'
-                            const stateLabel = device.state === 'device'
-                              ? '已连接'
-                              : device.state === 'candidate'
-                                ? '可尝试连接'
-                                : device.state === 'offline'
-                                  ? '设备离线'
-                                  : device.state === 'unauthorized'
-                                    ? '等待授权'
-                                    : '状态未知'
-                            return (
-                              <button
-                                key={`${device.source}-${device.address}`}
-                                type="button"
-                                disabled={!selectable || testingConnection}
-                                onClick={() => void handleUseDiscoveredDevice(device)}
-                                className="app-native-button !flex !min-h-0 !w-full !justify-between !rounded-none !border-0 !bg-transparent !px-3 !py-2.5 !text-left !font-normal !shadow-none transition-colors hover:!bg-[var(--app-accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                <span className="min-w-0">
-                                  <span className="block truncate text-sm font-medium text-primary">{device.address}</span>
-                                  <span className="mt-0.5 block truncate text-xs text-tertiary">{device.details || (device.source === 'adb' ? 'ADB 已识别设备' : device.source === 'emulator-adb' ? '模拟器内置 ADB' : '本机端口')}</span>
-                                </span>
-                                <span className="shrink-0 text-xs text-secondary">{stateLabel}</span>
-                              </button>
-                            )
-                          })}
-                        </div>
-                      )}
-
-                      {hasSearchedDevices && !discoveredDevices.length && (
-                        <p className="mt-3 text-xs text-tertiary">未找到已连接的设备。启动模拟器后重新查找，或手动填写连接地址。</p>
-                      )}
-
-                      {connectionFeedback && (
-                        <div className={`mt-3 rounded-[var(--app-radius-md)] px-3 py-2.5 text-xs ${connectionFeedback.success ? 'status-success' : 'status-danger'}`} role={connectionFeedback.success ? 'status' : 'alert'}>
-                          {connectionFeedback.message}
-                        </div>
-                      )}
-                    </section>
-                    <Select
-                      label="平台配置"
-                      value={configData.config}
-                      onChange={(value: string) => {
-                        updateConnectionConfig(current => ({ ...current, config: value }))
-                      }}
-                      options={[
-                        { value: 'CompatMac', label: 'CompatMac (macOS)' },
-                        { value: 'CompatPOSIXShell', label: 'CompatPOSIXShell (Linux)' },
-                        { value: 'General', label: 'General (Windows)' }
-                      ]}
-                      hint="平台相关配置"
-                    />
-                    <section className="border-t border-[var(--app-border)] pt-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-medium text-primary">自动重连</div>
-                          <div className="mt-1 text-xs text-tertiary">maa-cli 0.7.3+ 支持。开启后游戏服务断开时自动重连；关闭则保持断开，适合手动排障。</div>
-                        </div>
-                        <Checkbox
-                          label="启用"
-                          checked={configData.auto_reconnect !== false}
-                          onChange={(checked: boolean) => {
-                            updateConnectionConfig(current => ({ ...current, auto_reconnect: checked }))
-                          }}
-                        />
-                      </div>
-                    </section>
-                  </div>
-                )}
-                {configType === 'resource' && (
-                  <section className="py-1" aria-labelledby="resource-config-readonly-title">
-                    <h3 id="resource-config-readonly-title" className="text-sm font-semibold text-primary">当前为只读</h3>
-                    <p className="mt-2 text-sm leading-6 text-secondary">
-                      资源来源沿用当前 MAA 配置。如需更改，请打开配置目录。
-                    </p>
-                  </section>
-                )}
-                {configType === 'instance' && (
-                  <section className="py-1" aria-labelledby="instance-config-readonly-title">
-                    <h3 id="instance-config-readonly-title" className="text-sm font-semibold text-primary">当前为只读</h3>
-                    <p className="mt-2 text-sm leading-6 text-secondary">
-                      触摸模式等实例选项沿用当前 MAA 配置。如需更改，请打开配置目录。
-                    </p>
-                  </section>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          )}
+        </CardContent>
+      </Card>
         </div>
       </div>
-    </>
+    </div>
   )
 }

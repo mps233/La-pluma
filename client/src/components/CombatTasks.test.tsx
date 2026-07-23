@@ -98,6 +98,14 @@ const click = async (element: HTMLElement) => {
   })
 }
 
+const keyDown = async (element: HTMLElement, key: string) => {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+  await act(async () => {
+    element.dispatchEvent(event)
+  })
+  return event
+}
+
 const renderComponent = async () => {
   await act(async () => {
     root.render(<CombatTasks />)
@@ -163,6 +171,30 @@ describe('CombatTasks execution recovery', () => {
     expect(page?.classList.contains('ios-workspace-page')).toBe(true)
     expect(page?.querySelector('.app-page-header')?.classList.contains('is-mobile-inline')).toBe(true)
 
+    const modeShell = page?.querySelector('.combat-mode-shell')
+    expect(modeShell?.classList.contains('app-liquid-tab-pill')).toBe(true)
+    const modeButtons = page?.querySelectorAll('.combat-mode-button') ?? []
+    expect(modeButtons).toHaveLength(3)
+    modeButtons.forEach(button => expect(button.classList.contains('min-h-11')).toBe(true))
+    expect(modeShell?.querySelector('[role="toolbar"]')).not.toBeNull()
+    expect(page?.querySelectorAll('.combat-mode-button[aria-pressed="true"]')).toHaveLength(1)
+    expect(Array.from(modeButtons).map(button => button.getAttribute('tabindex'))).toEqual(['0', '-1', '-1'])
+
+    const firstModeButton = modeButtons[0] as HTMLButtonElement
+    const secondModeButton = modeButtons[1] as HTMLButtonElement
+    firstModeButton.focus()
+    await keyDown(firstModeButton, 'ArrowRight')
+    expect(secondModeButton.getAttribute('aria-pressed')).toBe('true')
+    expect(document.activeElement).toBe(secondModeButton)
+
+    await keyDown(secondModeButton, 'Home')
+    expect(firstModeButton.getAttribute('aria-pressed')).toBe('true')
+    expect(document.activeElement).toBe(firstModeButton)
+
+    const arrowDownEvent = await keyDown(firstModeButton, 'ArrowDown')
+    expect(arrowDownEvent.defaultPrevented).toBe(false)
+    expect(firstModeButton.getAttribute('aria-pressed')).toBe('true')
+
     const copilotCard = page?.querySelector('.combat-task-card')
     expect(copilotCard?.getAttribute('data-smooth-corners')).toBe('true')
     expect(copilotCard?.querySelector(':scope > .app-card-smooth-surface')).not.toBeNull()
@@ -183,6 +215,10 @@ describe('CombatTasks execution recovery', () => {
     const sssCard = page?.querySelector('.combat-task-card')
     expect(sssCard?.getAttribute('data-smooth-corners')).toBe('true')
     expect(sssCard?.querySelector(':scope > .app-card-smooth-surface')).not.toBeNull()
+
+    const monitor = page?.querySelector('.combat-monitor-panel')
+    expect(monitor?.getAttribute('data-smooth-corners')).toBe('true')
+    expect(monitor?.querySelector('.task-monitor-panel.is-compact')).not.toBeNull()
   })
 
   it('keeps an unsynced local draft across remounts and retries the save', async () => {

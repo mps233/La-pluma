@@ -1,11 +1,11 @@
 import { useState, useEffect, useEffectEvent, useRef } from 'react'
 import { generateTrainingPlan, maaApi } from '../services/api'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { AlertTriangle, Cable, Check, CheckCircle2, ChevronDown, CircleMinus, CirclePlus, ClipboardList, Clock3, GripVertical, Info, ListPlus, Minus, Play, Plus, SlidersHorizontal, Square, Trash2 } from 'lucide-react'
+import { AlertTriangle, Cable, Check, CheckCircle2, ChevronDown, CircleMinus, CirclePlus, ClipboardList, Clock3, GraduationCap, GripVertical, Info, ListPlus, Minus, Pin, Play, Plus, SlidersHorizontal, Square, Trash2 } from 'lucide-react'
 import Icons from './Icons'
 import ScreenMonitor from './ScreenMonitor'
 import NotificationSettings from './NotificationSettings'
-import { EmptyState, PageHeader, Button, SmoothPanel, Switch } from './common'
+import { EmptyState, PageHeader, Button, IconButton, SmoothPanel, Switch } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type {
@@ -245,6 +245,346 @@ const synchronizeConnectionParams = (tasks: any[]) => {
   })
 }
 
+const stageSuggestions = [
+  ['1-7', '固源岩'],
+  ['4-6', '酮凝集'],
+  ['S4-1', '聚酸酯'],
+  ['S5-9', '异铁'],
+  ['CE-6', '龙门币'],
+  ['LS-6', '作战记录'],
+  ['AP-5', '采购凭证'],
+  ['CA-5', '技巧概要'],
+  ['SK-5', '碳'],
+  ['PR-A-2', '重装/医疗芯片组'],
+  ['PR-B-2', '狙击/术师芯片组'],
+  ['PR-C-2', '先锋/辅助芯片组'],
+  ['PR-D-2', '近卫/特种芯片组'],
+  ['Annihilation', '剿灭'],
+  ...Array.from({ length: 10 }, (_, index) => [`HD-${index + 1}`, '活动']),
+] as const
+
+interface AutomationStageEditorProps {
+  field: TaskFlowItem['paramFields'][number]
+  fieldId: string
+  task: TaskFlowItem
+  taskIndex: number
+  isRunning: boolean
+  onUpdate: (taskIndex: number, key: string, value: Array<string | StageConfig>) => void
+  onSuccess: (message: string) => void
+  onError: (message: string) => void
+}
+
+function AutomationStageEditor({
+  field,
+  fieldId,
+  task,
+  taskIndex,
+  isRunning,
+  onUpdate,
+  onSuccess,
+  onError,
+}: AutomationStageEditorProps) {
+  const [isSmartStageLoading, setIsSmartStageLoading] = useState(false)
+  const stages = task.params.stages || [{ stage: '', times: '' }]
+  const controlsDisabled = isRunning || !task.enabled
+  const stageControlsDisabled = controlsDisabled || isSmartStageLoading
+  const smartStages = stages.filter((stage): stage is StageConfig => (
+    typeof stage === 'object' && stage.smart === true
+  ))
+  const hasSmartStages = smartStages.length > 0
+  const validStageCount = stages.filter(stage => (
+    typeof stage === 'string' ? stage.trim() : stage.stage?.trim()
+  )).length
+  const trainingOperators = [...smartStages]
+    .reverse()
+    .find(stage => stage.trainingOperators && stage.trainingOperators.length > 0)
+    ?.trainingOperators || []
+  const smartStageDescription = hasSmartStages
+    ? trainingOperators.length > 0
+      ? `正在养成：${trainingOperators.join('、')}`
+      : `已加入 ${smartStages.length} 个关卡`
+    : '根据养成队列自动生成刷取关卡'
+
+  const updateStages = (nextStages: Array<string | StageConfig>) => {
+    onUpdate(taskIndex, 'stages', nextStages)
+  }
+
+  const togglePinned = (stageIndex: number) => {
+    const currentStage = stages[stageIndex]
+    if (!currentStage || (typeof currentStage === 'object' && currentStage.smart)) return
+
+    const nextStages = [...stages]
+    nextStages[stageIndex] = typeof currentStage === 'string'
+      ? { stage: currentStage, times: '', pinned: true }
+      : { ...currentStage, pinned: !currentStage.pinned }
+    updateStages(nextStages)
+  }
+
+  const updateStageName = (stageIndex: number, stage: string) => {
+    const nextStages = [...stages]
+    const currentStage = nextStages[stageIndex]
+    if (typeof currentStage === 'string') {
+      nextStages[stageIndex] = { stage, times: '' }
+    } else if (currentStage) {
+      nextStages[stageIndex] = { ...currentStage, stage }
+    }
+    updateStages(nextStages)
+  }
+
+  const updateStageTimes = (stageIndex: number, times: string) => {
+    const nextStages = [...stages]
+    const currentStage = nextStages[stageIndex]
+    if (typeof currentStage === 'string') {
+      nextStages[stageIndex] = { stage: currentStage, times }
+    } else if (currentStage) {
+      nextStages[stageIndex] = { ...currentStage, times }
+    }
+    updateStages(nextStages)
+  }
+
+  const adjustStageTimes = (stageIndex: number, delta: number) => {
+    const currentStage = stages[stageIndex]
+    if (!currentStage || (typeof currentStage === 'object' && currentStage.smart)) return
+
+    const currentValue = typeof currentStage === 'string' ? 0 : (Number(currentStage.times) || 0)
+    const nextValue = Math.max(0, currentValue + delta)
+    updateStageTimes(stageIndex, nextValue.toString())
+  }
+
+  const deleteStage = (stageIndex: number) => {
+    const nextStages = stages.filter((_, index) => index !== stageIndex)
+    updateStages(nextStages.length > 0 ? nextStages : [{ stage: '', times: '' }])
+  }
+
+  const toggleSmartStages = async () => {
+    if (isSmartStageLoading) return
+    setIsSmartStageLoading(true)
+
+    try {
+      if (hasSmartStages) {
+        const pinnedStages = stages.filter((stage): stage is StageConfig => (
+          typeof stage === 'object'
+          && stage.pinned === true
+          && Boolean(stage.stage?.trim())
+        ))
+        const normalStages = stages.filter(stage => (
+          (typeof stage === 'string' && Boolean(stage.trim()))
+          || (
+            typeof stage === 'object'
+            && !stage.pinned
+            && !stage.smart
+            && Boolean(stage.stage?.trim())
+          )
+        ))
+        const nextStages = [...pinnedStages, ...normalStages]
+        updateStages(nextStages.length > 0 ? nextStages : [{ stage: '', times: '' }])
+        onSuccess('已移除智能养成关卡')
+        return
+      }
+
+      const queueResult = await maaApi.loadUserConfig('training-queue')
+      if (!queueResult.success || !queueResult.data?.queue?.length) {
+        onError('智能养成队列为空，请先添加干员')
+        return
+      }
+
+      const planResult = await generateTrainingPlan({ mode: 'current' })
+      if (!planResult.success || !planResult.data) {
+        onError('生成刷取计划失败')
+        return
+      }
+
+      const plan = planResult.data
+      if (!plan.stages?.length) {
+        onSuccess('当前干员材料已集齐！')
+        return
+      }
+
+      const operatorNames = plan.operators?.map((operator: { name: string }) => operator.name) || []
+      const generatedStages: StageConfig[] = plan.stages.map((stage: { stage: string; totalTimes: number }) => ({
+        stage: stage.stage,
+        times: stage.totalTimes.toString(),
+        smart: true,
+        trainingOperators: operatorNames,
+      }))
+      const pinnedStages = stages.filter((stage): stage is StageConfig => (
+        typeof stage === 'object'
+        && stage.pinned === true
+        && Boolean(stage.stage?.trim())
+      ))
+      const normalStages = stages.filter(stage => (
+        (typeof stage === 'string' && Boolean(stage.trim()))
+        || (
+          typeof stage === 'object'
+          && !stage.pinned
+          && !stage.smart
+          && Boolean(stage.stage?.trim())
+        )
+      ))
+
+      updateStages([...pinnedStages, ...generatedStages, ...normalStages])
+      onSuccess(`已添加智能养成计划：${generatedStages.length} 个关卡`)
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : '未知错误'
+      onError(`操作失败: ${errorMessage}`)
+    } finally {
+      setIsSmartStageLoading(false)
+    }
+  }
+
+  return (
+    <fieldset className="automation-stage-editor">
+      <legend className="sr-only">{field.label}计划</legend>
+      <div className="automation-stage-editor-header">
+        <div className="automation-stage-editor-title">
+          <label htmlFor={`${fieldId}-0`}>{field.label}计划</label>
+          <span>{validStageCount > 0 ? `${validStageCount} 个关卡` : '尚未配置'}</span>
+        </div>
+      </div>
+
+      <div className="automation-stage-list">
+        {stages.map((stageItem, stageIndex) => {
+          const isSmartStage = typeof stageItem === 'object' && stageItem.smart === true
+          const isPinnedStage = typeof stageItem === 'object' && stageItem.pinned === true
+          const stageName = typeof stageItem === 'string' ? stageItem : stageItem.stage
+          const stageTimes = typeof stageItem === 'string' ? '' : (stageItem.times || '')
+          const canDeleteStage = stages.length > 1 && !isSmartStage
+          const suggestionsId = `${fieldId}-${stageIndex}-suggestions`
+
+          return (
+            <div
+              key={stageIndex}
+              className={`automation-stage-item${isSmartStage ? ' is-smart' : ''}${isPinnedStage ? ' is-pinned' : ''}`}
+            >
+              <div className="automation-stage-row">
+                {isSmartStage ? (
+                  <span className="automation-stage-kind" title="智能养成关卡" aria-label={`智能养成关卡：${field.label} ${stageIndex + 1}`}>
+                    <GraduationCap size={17} strokeWidth={1.9} aria-hidden="true" />
+                  </span>
+                ) : (
+                  <IconButton
+                    icon={<Pin size={16} strokeWidth={1.9} aria-hidden="true" />}
+                    variant="ghost"
+                    size="md"
+                    onClick={() => togglePinned(stageIndex)}
+                    disabled={stageControlsDisabled}
+                    className={`automation-stage-pin min-h-11 min-w-11${isPinnedStage ? ' is-active' : ''}`}
+                    title={isPinnedStage ? '取消置顶' : '置顶'}
+                    aria-label={`${isPinnedStage ? '取消置顶' : '置顶'}：${field.label} ${stageIndex + 1}`}
+                  />
+                )}
+
+                <input
+                  id={`${fieldId}-${stageIndex}`}
+                  type="text"
+                  list={suggestionsId}
+                  aria-label={stageIndex === 0 ? undefined : `${field.label} ${stageIndex + 1}`}
+                  value={stageName}
+                  onChange={event => updateStageName(stageIndex, event.target.value)}
+                  placeholder={field.placeholder}
+                  disabled={stageControlsDisabled || isSmartStage}
+                  className="automation-stage-name-input"
+                />
+                <datalist id={suggestionsId}>
+                  {stageSuggestions.map(([value, description]) => (
+                    <option key={value} value={value}>{`${value} (${description})`}</option>
+                  ))}
+                </datalist>
+
+                <div className="automation-stage-times">
+                  <input
+                    id={`${fieldId}-${stageIndex}-times`}
+                    type="number"
+                    aria-label={`${field.label} ${stageIndex + 1} 执行次数`}
+                    value={stageTimes}
+                    onChange={event => updateStageTimes(stageIndex, event.target.value)}
+                    placeholder="0"
+                    disabled={stageControlsDisabled || isSmartStage}
+                    min="0"
+                  />
+                  <span aria-hidden="true">次</span>
+                </div>
+
+                {!isSmartStage && (
+                  <div className="automation-stage-stepper hidden min-[900px]:flex">
+                    <button
+                      type="button"
+                      onClick={() => adjustStageTimes(stageIndex, -1)}
+                      disabled={stageControlsDisabled || Number(stageTimes) <= 0}
+                      aria-label={`减少${field.label} ${stageIndex + 1} 的执行次数`}
+                    >
+                      <Minus size={14} strokeWidth={2.1} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => adjustStageTimes(stageIndex, 1)}
+                      disabled={stageControlsDisabled}
+                      aria-label={`增加${field.label} ${stageIndex + 1} 的执行次数`}
+                    >
+                      <Plus size={14} strokeWidth={2.1} aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
+
+                {canDeleteStage && (
+                  <IconButton
+                    icon={<Trash2 size={16} strokeWidth={1.9} aria-hidden="true" />}
+                    variant="ghost"
+                    size="md"
+                    onClick={() => deleteStage(stageIndex)}
+                    disabled={stageControlsDisabled}
+                    className="automation-stage-delete min-h-11 min-w-11"
+                    title="删除此关卡"
+                    aria-label={`删除${field.label} ${stageIndex + 1}`}
+                  />
+                )}
+              </div>
+            </div>
+          )
+        })}
+
+        <Button
+          variant="ghost"
+          size="md"
+          fullWidth
+          icon={<ListPlus size={17} strokeWidth={1.9} aria-hidden="true" />}
+          onClick={() => updateStages([...stages, { stage: '', times: '' }])}
+          disabled={stageControlsDisabled}
+          className="automation-stage-add"
+        >
+          添加关卡
+        </Button>
+      </div>
+
+      <div className={`automation-smart-stage-entry${hasSmartStages ? ' is-active' : ''}`}>
+        <span className="automation-smart-stage-icon" aria-hidden="true">
+          <GraduationCap size={19} strokeWidth={1.8} />
+        </span>
+        <div className="automation-smart-stage-copy">
+          <strong>智能养成关卡</strong>
+          <span title={smartStageDescription}>{smartStageDescription}</span>
+        </div>
+        <Button
+          variant={hasSmartStages ? 'ghost' : 'secondary'}
+          size="md"
+          icon={hasSmartStages
+            ? <CircleMinus size={16} strokeWidth={1.9} aria-hidden="true" />
+            : <CirclePlus size={16} strokeWidth={1.9} aria-hidden="true" />}
+          onClick={() => void toggleSmartStages()}
+          disabled={controlsDisabled}
+          loading={isSmartStageLoading}
+          loadingText={hasSmartStages ? '移除中' : '同步中'}
+          aria-pressed={hasSmartStages}
+          aria-label={hasSmartStages ? '移除智能养成关卡' : '加入智能养成关卡'}
+          className="automation-smart-stage-action"
+        >
+          {hasSmartStages ? '移除' : '加入'}
+        </Button>
+      </div>
+    </fieldset>
+  )
+}
+
 export default function AutomationTasks() {
   const shouldReduceMotion = useReducedMotion()
   const { setMessage: setStatusMessage, setActive: setIsActiveStatus } = useStatusStore()
@@ -482,7 +822,7 @@ export default function AutomationTasks() {
         yituliu_id: ''
       },
       paramFields: [
-        { key: 'stages', label: '关卡', type: 'multi-stages', placeholder: '1-7 或 HD-7', timesPlaceholder: '次数', helper: '使用 HD-数字 代表当前活动关卡，点击 + 添加更多关卡' },
+        { key: 'stages', label: '关卡', type: 'multi-stages', placeholder: '1-7 或 HD-7', timesPlaceholder: '次数', helper: '使用 HD-数字代表当前活动关卡；置顶关卡会优先执行' },
         { key: 'drops', label: '掉落目标', type: 'text', placeholder: '30011=10,30062=5', helper: '任一物品达到目标数量后停止；格式为物品 ID=数量，多个目标用逗号分隔' },
         { key: 'medicine', label: '理智药', type: 'number', placeholder: '0', helper: '使用理智药数量' },
         { key: 'expiringMedicine', label: '临期药数量', type: 'number', placeholder: '0', helper: '按瓶数设置可使用的临期理智药' },
@@ -2191,355 +2531,16 @@ export default function AutomationTasks() {
                                   <span className="group-hover:text-[var(--app-accent)] transition-colors">{field.label}</span>
                                 </label>
                               ) : field.type === 'multi-stages' ? (
-                                <div className="space-y-2">
-                                  {(task.params.stages || [{ stage: '', times: '' }]).map((stageItem, stageIndex) => (
-                                    <div key={stageIndex}>
-                                      <div className="flex min-w-0 flex-col items-stretch gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-                                        {stageIndex === 0 && (
-                                          <label htmlFor={`${fieldId}-${stageIndex}`} className="automation-field-label w-full shrink-0 whitespace-nowrap sm:w-20">{field.label}</label>
-                                        )}
-                                        {stageIndex > 0 && (
-                                          <div className="hidden w-20 shrink-0 sm:block" aria-hidden="true" />
-                                        )}
-                                        <div className="flex min-w-0 flex-1 items-center gap-2">
-                                        <div className={`automation-composite-control automation-stage-control relative inline-flex min-w-0 flex-1 items-center overflow-hidden ${
-                                          typeof stageItem === 'object' && stageItem.pinned
-                                            ? 'is-accented'
-                                            : typeof stageItem === 'object' && stageItem.smart
-                                              ? 'is-accented'
-                                              : ''
-                                        }`}>
-                                        {/* 置顶/智能标识按钮 - 绝对定位在输入框内部左侧 */}
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const newStages = [...(task.params.stages || [{ stage: '', times: '' }])];
-                                            const currentItem = newStages[stageIndex];
-                                            // 切换置顶状态
-                                            if (typeof currentItem === 'string') {
-                                              newStages[stageIndex] = { stage: currentItem, times: '', pinned: true };
-                                            } else if (currentItem) {
-                                              newStages[stageIndex] = { ...currentItem, pinned: !currentItem.pinned };
-                                            }
-                                            updateTaskParam(index, 'stages', newStages);
-                                          }}
-                                          disabled={isRunning || !task.enabled || (typeof stageItem === 'object' && stageItem.smart)}
-                                          className={`absolute left-0 top-1/2 z-10 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                                            (typeof stageItem === 'object' && stageItem.smart)
-                                              ? 'brand-text'
-                                              : (typeof stageItem === 'object' && stageItem.pinned)
-                                                ? 'brand-text hover:bg-[var(--app-accent-soft)]'
-                                                : 'text-gray-300/50 dark:text-gray-600/50 hover:bg-gray-500/10'
-                                          }`}
-                                          title={
-                                            typeof stageItem === 'object' && stageItem.smart
-                                              ? '智能养成关卡'
-                                              : typeof stageItem === 'object' && stageItem.pinned
-                                                ? '取消置顶'
-                                                : '置顶'
-                                          }
-                                          aria-label={`${
-                                            typeof stageItem === 'object' && stageItem.smart
-                                              ? '智能养成关卡'
-                                              : typeof stageItem === 'object' && stageItem.pinned
-                                                ? '取消置顶'
-                                                : '置顶'
-                                          }：${field.label} ${stageIndex + 1}`}
-                                        >
-                                          {(typeof stageItem === 'object' && stageItem.smart) ? (
-                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                              <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                                            </svg>
-                                          ) : (
-                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                                            </svg>
-                                          )}
-                                        </button>
-                                        <input
-                                          id={`${fieldId}-${stageIndex}`}
-                                          type="text"
-                                          list={`${fieldId}-suggestions`}
-                                          aria-label={stageIndex === 0 ? undefined : `${field.label} ${stageIndex + 1}`}
-                                          value={typeof stageItem === 'string' ? stageItem : stageItem.stage}
-                                          onChange={(e) => {
-                                            const newStages = [...(task.params.stages || [{ stage: '', times: '' }])];
-                                            if (typeof newStages[stageIndex] === 'string') {
-                                              newStages[stageIndex] = { stage: e.target.value, times: '' };
-                                            } else {
-                                              newStages[stageIndex] = { ...newStages[stageIndex], stage: e.target.value };
-                                            }
-                                            updateTaskParam(index, 'stages', newStages);
-                                          }}
-                                          placeholder={field.placeholder}
-                                          disabled={isRunning || !task.enabled || (typeof stageItem === 'object' && stageItem.smart)}
-                                          className="min-w-0 flex-1 py-2 pl-11 pr-3 text-sm text-gray-900 focus:outline-none dark:text-gray-200"
-                                        />
-                                        <datalist id={`${fieldId}-suggestions`}>
-                                          <option value="1-7">1-7 (固源岩)</option>
-                                          <option value="4-6">4-6 (酮凝集)</option>
-                                          <option value="S4-1">S4-1 (聚酸酯)</option>
-                                          <option value="S5-9">S5-9 (异铁)</option>
-                                          <option value="CE-6">CE-6 (龙门币)</option>
-                                          <option value="LS-6">LS-6 (作战记录)</option>
-                                          <option value="AP-5">AP-5 (采购凭证)</option>
-                                          <option value="CA-5">CA-5 (技巧概要)</option>
-                                          <option value="SK-5">SK-5 (碳)</option>
-                                          <option value="PR-A-2">PR-A-2 (重装/医疗芯片组)</option>
-                                          <option value="PR-B-2">PR-B-2 (狙击/术师芯片组)</option>
-                                          <option value="PR-C-2">PR-C-2 (先锋/辅助芯片组)</option>
-                                          <option value="PR-D-2">PR-D-2 (近卫/特种芯片组)</option>
-                                          <option value="Annihilation">Annihilation (剿灭)</option>
-                                          <option value="HD-1">HD-1 (活动)</option>
-                                          <option value="HD-2">HD-2 (活动)</option>
-                                          <option value="HD-3">HD-3 (活动)</option>
-                                          <option value="HD-4">HD-4 (活动)</option>
-                                          <option value="HD-5">HD-5 (活动)</option>
-                                          <option value="HD-6">HD-6 (活动)</option>
-                                          <option value="HD-7">HD-7 (活动)</option>
-                                          <option value="HD-8">HD-8 (活动)</option>
-                                          <option value="HD-9">HD-9 (活动)</option>
-                                          <option value="HD-10">HD-10 (活动)</option>
-                                        </datalist>
-                                        <div className="w-px h-6 bg-white/20"></div>
-                                        <input
-                                          id={`${fieldId}-${stageIndex}-times`}
-                                          type="number"
-                                          aria-label={`${field.label} ${stageIndex + 1} 执行次数`}
-                                          value={typeof stageItem === 'string' ? '' : (stageItem.times || '')}
-                                          onChange={(e) => {
-                                            const newStages = [...(task.params.stages || [{ stage: '', times: '' }])];
-                                            const currentStage = newStages[stageIndex];
-                                            if (typeof currentStage === 'string') {
-                                              newStages[stageIndex] = { stage: currentStage, times: e.target.value };
-                                            } else if (currentStage) {
-                                              newStages[stageIndex] = { ...currentStage, times: e.target.value };
-                                            }
-                                            updateTaskParam(index, 'stages', newStages);
-                                          }}
-                                          placeholder=""
-                                          disabled={isRunning || !task.enabled || (typeof stageItem === 'object' && stageItem.smart)}
-                                          className="w-10 shrink-0 bg-transparent px-1 py-2 text-center text-sm text-gray-900 focus:outline-none [appearance:textfield] dark:text-gray-200 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                          min="0"
-                                        />
-                                        <div className="hidden flex-col self-stretch overflow-hidden border-l border-white/10 min-[900px]:flex">
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const newStages = [...(task.params.stages || [{ stage: '', times: '' }])];
-                                              const currentItem = newStages[stageIndex];
-                                              if (!currentItem) return;
-                                              const currentValue = typeof currentItem === 'string' ? 0 : (Number(currentItem.times) || 0);
-                                              if (typeof currentItem === 'string') {
-                                                newStages[stageIndex] = { stage: currentItem, times: (currentValue + 1).toString() };
-                                              } else {
-                                                newStages[stageIndex] = { ...currentItem, times: (currentValue + 1).toString() };
-                                              }
-                                              updateTaskParam(index, 'stages', newStages);
-                                            }}
-                                            disabled={isRunning || !task.enabled || (typeof stageItem === 'object' && stageItem.smart)}
-                                            className="flex-1 px-1.5 bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                                            aria-label={`增加${field.label} ${stageIndex + 1} 的执行次数`}
-                                          >
-                                            <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-                                            </svg>
-                                          </button>
-                                          <div className="w-full h-px bg-white/10"></div>
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const newStages = [...(task.params.stages || [{ stage: '', times: '' }])];
-                                              const currentItem = newStages[stageIndex];
-                                              if (!currentItem) return;
-                                              const currentValue = typeof currentItem === 'string' ? 0 : (Number(currentItem.times) || 0);
-                                              if (currentValue > 0) {
-                                                if (typeof currentItem === 'string') {
-                                                  newStages[stageIndex] = { stage: currentItem, times: (currentValue - 1).toString() };
-                                                } else {
-                                                  newStages[stageIndex] = { ...currentItem, times: (currentValue - 1).toString() };
-                                                }
-                                                updateTaskParam(index, 'stages', newStages);
-                                              }
-                                            }}
-                                            disabled={isRunning || !task.enabled || (typeof stageItem === 'object' && stageItem.smart)}
-                                            className="flex-1 px-1.5 bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                                            aria-label={`减少${field.label} ${stageIndex + 1} 的执行次数`}
-                                          >
-                                            <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                                            </svg>
-                                          </button>
-                                        </div>
-                                      </div>
-                                      {(task.params.stages || [{ stage: '', times: '' }]).length > 1 && !(typeof stageItem === 'object' && stageItem.smart) && (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const newStages = (task.params.stages || [{ stage: '', times: '' }]).filter((_, i) => i !== stageIndex);
-                                            updateTaskParam(index, 'stages', newStages.length > 0 ? newStages : [{ stage: '', times: '' }]);
-                                          }}
-                                          disabled={isRunning || !task.enabled}
-                                          className="flex min-h-11 min-w-11 flex-shrink-0 items-center justify-center rounded-lg text-red-500 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
-                                          title="删除此关卡"
-                                          aria-label={`删除${field.label} ${stageIndex + 1}`}
-                                        >
-                                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                          </svg>
-                                        </button>
-                                      )}
-                                        </div>
-                                      </div>
-                                      {/* 智能养成干员提示 - 只在最后一个智能养成关卡下显示 */}
-                                      {(() => {
-                                        // 找到所有智能养成关卡的索引
-                                        const smartStageIndices = (task.params.stages || [])
-                                          .map((s: any, idx: number) => ({ stage: s, index: idx }))
-                                          .filter((item: any) => typeof item.stage === 'object' && item.stage.smart)
-                                          .map((item: any) => item.index);
-
-                                        // 检查当前是否是最后一个智能养成关卡
-                                        const isLastSmartStage = smartStageIndices.length > 0 &&
-                                          stageIndex === smartStageIndices[smartStageIndices.length - 1];
-
-                                        // 只在最后一个智能养成关卡下显示
-                                        return isLastSmartStage &&
-                                          typeof stageItem === 'object' &&
-                                          stageItem.smart &&
-                                          stageItem.trainingOperators &&
-                                          stageItem.trainingOperators.length > 0 && (
-                                          <div className="flex items-center space-x-2 -mb-1 mt-1">
-                                            <div style={{ width: '80px', flexShrink: 0 }}></div>
-                                            <div className="text-xs brand-chip px-3 py-1.5 rounded-lg flex items-center space-x-1.5">
-                                              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                              </svg>
-                                              <span className="font-medium">正在养成:</span>
-                                              <span>{stageItem.trainingOperators.join('、')}</span>
-                                            </div>
-                                          </div>
-                                        );
-                                      })()}
-                                    </div>
-                                  ))}
-                                  <div className="flex items-center space-x-2">
-                                    <div style={{ width: '80px', flexShrink: 0 }}></div>
-                                    <div className="inline-flex space-x-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const currentStages = task.params.stages || [{ stage: '', times: '' }];
-                                          updateTaskParam(index, 'stages', [...currentStages, { stage: '', times: '' }]);
-                                        }}
-                                        disabled={isRunning || !task.enabled}
-                                        className="control-surface flex min-h-11 items-center justify-center space-x-1 rounded-xl border border-dashed border-gray-300 px-3 text-sm text-gray-500 transition-colors hover:border-[var(--app-accent)] hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-400"
-                                      >
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                                        </svg>
-                                        <span className="pointer-events-none">添加关卡</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={async () => {
-                                          try {
-                                            // 获取当前关卡列表
-                                            const currentStages = task.params.stages || [{ stage: '', times: '' }];
-
-                                            // 检查是否已有智能关卡
-                                            const hasSmartStages = currentStages.some(s => typeof s === 'object' && s.smart);
-
-                                            if (hasSmartStages) {
-                                              // 如果已有智能关卡，则移除所有智能关卡
-                                              const pinnedStages = currentStages.filter(s =>
-                                                typeof s === 'object' && s.pinned && s.stage && s.stage.trim()
-                                              );
-                                              const normalStages = currentStages.filter(s =>
-                                                (typeof s === 'string' && s.trim()) ||
-                                                (typeof s === 'object' && !s.pinned && !s.smart && s.stage && s.stage.trim())
-                                              );
-
-                                              const allStages = [...pinnedStages, ...normalStages];
-                                              updateTaskParam(index, 'stages', allStages.length > 0 ? allStages : [{ stage: '', times: '' }]);
-                                              showSuccess('已移除智能养成关卡');
-                                              return;
-                                            }
-
-                                            // 如果没有智能关卡，则添加
-                                            // 从智能养成加载刷取计划
-                                            const result = await maaApi.loadUserConfig('training-queue');
-                                            if (!result.success || !result.data || !result.data.queue || result.data.queue.length === 0) {
-                                              showError('智能养成队列为空，请先添加干员');
-                                              return;
-                                            }
-
-                                            // 生成刷取计划
-                                            const planResult = await generateTrainingPlan({ mode: 'current' });
-                                            if (!planResult.success || !planResult.data) {
-                                              showError('生成刷取计划失败');
-                                              return;
-                                            }
-
-                                            const plan = planResult.data;
-                                            if (!plan.stages || plan.stages.length === 0) {
-                                              showSuccess('当前干员材料已集齐！');
-                                              return;
-                                            }
-
-                                            // 获取正在养成的干员名称
-                                            const trainingOperatorNames = plan.operators && plan.operators.length > 0
-                                              ? plan.operators.map((op: any) => op.name)
-                                              : [];
-
-                                            // 将刷取计划转换为关卡列表，标记为智能养成
-                                            const newStages = plan.stages.map((stage: any) => ({
-                                              stage: stage.stage,
-                                              times: stage.totalTimes.toString(),
-                                              smart: true, // 标记为智能养成关卡
-                                              trainingOperators: trainingOperatorNames // 添加干员信息
-                                            }));
-
-                                            // 分类：置顶关卡、普通关卡
-                                            const pinnedStages = currentStages.filter((s): s is StageConfig =>
-                                              typeof s === 'object' && s.pinned === true && !!s.stage && s.stage.trim() !== ''
-                                            );
-                                            const normalStages = currentStages.filter((s): s is string | StageConfig =>
-                                              (typeof s === 'string' && s.trim() !== '') ||
-                                              (typeof s === 'object' && !s.pinned && !s.smart && !!s.stage && s.stage.trim() !== '')
-                                            );
-
-                                            // 重新组合：置顶 -> 智能养成 -> 普通
-                                            const allStages = [...pinnedStages, ...newStages, ...normalStages];
-
-                                            updateTaskParam(index, 'stages', allStages);
-                                            showSuccess(`已添加智能养成计划：${newStages.length} 个关卡`);
-                                          } catch (error: unknown) {
-                                            const errorMessage = error instanceof Error ? error.message : '未知错误'
-                                            showError('操作失败: ' + errorMessage);
-                                          }
-                                        }}
-                                        disabled={isRunning || !task.enabled}
-                                        className={`flex min-h-11 items-center justify-center space-x-1 rounded-xl border border-dashed px-3 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                                          (task.params.stages || []).some(s => typeof s === 'object' && s.smart)
-                                            ? 'border-[var(--app-accent)] brand-action-subtle'
-                                            : 'border-[var(--app-border)] brand-chip hover:border-[var(--app-accent)]'
-                                        }`}
-                                      >
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                          {(task.params.stages || []).some(s => typeof s === 'object' && s.smart) ? (
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                          ) : (
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5z M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-                                          )}
-                                        </svg>
-                                        <span>
-                                          {(task.params.stages || []).some(s => typeof s === 'object' && s.smart) ? '关闭养成' : '智能养成'}
-                                        </span>
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
+                                <AutomationStageEditor
+                                  field={field}
+                                  fieldId={fieldId}
+                                  task={task}
+                                  taskIndex={index}
+                                  isRunning={isRunning}
+                                  onUpdate={updateTaskParam}
+                                  onSuccess={showSuccess}
+                                  onError={showError}
+                                />
                               ) : field.type === 'stage-with-times' ? (
                                 <div className="flex items-center space-x-2">
                                   <label htmlFor={fieldId} className="automation-field-label w-20 whitespace-nowrap">{field.label}</label>

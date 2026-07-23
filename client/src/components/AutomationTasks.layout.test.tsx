@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   getActivity: vi.fn(),
   getScheduleExecutionStatus: vi.fn(),
   getTaskStatus: vi.fn(),
+  generateTrainingPlan: vi.fn(),
   loadUserConfig: vi.fn(),
   saveUserConfig: vi.fn(),
   setActive: vi.fn(),
@@ -40,7 +41,7 @@ vi.mock('framer-motion', async () => {
 })
 
 vi.mock('../services/api', () => ({
-  generateTrainingPlan: vi.fn(),
+  generateTrainingPlan: mocks.generateTrainingPlan,
   maaApi: {
     getActivity: mocks.getActivity,
     getErrorMessage: () => '未知错误',
@@ -173,6 +174,7 @@ describe('AutomationTasks layout surfaces', () => {
     mocks.getActivity.mockReset().mockResolvedValue({ success: false })
     mocks.getScheduleExecutionStatus.mockReset().mockResolvedValue({ success: true, data: { isRunning: false } })
     mocks.getTaskStatus.mockReset().mockResolvedValue({ success: true, data: { isRunning: false } })
+    mocks.generateTrainingPlan.mockReset().mockResolvedValue({ success: false })
     mocks.loadUserConfig.mockReset().mockResolvedValue({ success: true, data: { taskFlow: [] } })
     mocks.saveUserConfig.mockReset().mockResolvedValue({ success: true })
     mocks.setupSchedule.mockReset().mockResolvedValue({ success: true })
@@ -436,16 +438,15 @@ describe('AutomationTasks layout surfaces', () => {
     expect(container.querySelector('[aria-label="关卡 2 执行次数"]')).not.toBeNull()
 
     const stageLabel = container.querySelector<HTMLLabelElement>('label[for="automation-fight-1-stages-0"]')!
-    const stageRow = stageLabel.parentElement
+    const stageEditor = stageLabel.closest('.automation-stage-editor')
     const secondStageInput = container.querySelector<HTMLInputElement>('[aria-label="关卡 2"]')!
-    const secondStageControl = secondStageInput.closest('.automation-stage-control')
-    expect(stageRow?.className).toContain('flex-col')
-    expect(stageRow?.className).toContain('sm:flex-row')
-    expect(stageRow?.className).toContain('min-w-0')
-    expect(secondStageControl?.classList.contains('min-w-0')).toBe(true)
-    expect(secondStageControl?.classList.contains('flex-1')).toBe(true)
-    expect(secondStageInput.classList.contains('min-w-0')).toBe(true)
-    expect(secondStageInput.classList.contains('flex-1')).toBe(true)
+    const secondStageRow = secondStageInput.closest('.automation-stage-row')
+    expect(stageEditor).not.toBeNull()
+    expect(stageEditor?.querySelector('.automation-stage-list')).not.toBeNull()
+    expect(stageEditor?.querySelector('.automation-stage-add')?.textContent).toContain('添加关卡')
+    expect(stageEditor?.querySelector('.automation-smart-stage-entry')?.textContent).toContain('智能养成关卡')
+    expect(secondStageRow).not.toBeNull()
+    expect(secondStageInput.classList.contains('automation-stage-name-input')).toBe(true)
 
     const pinButton = container.querySelector<HTMLButtonElement>('[aria-label="置顶：关卡 1"]')
     const deleteStageButton = container.querySelector<HTMLButtonElement>('[aria-label="删除关卡 2"]')
@@ -463,6 +464,74 @@ describe('AutomationTasks layout surfaces', () => {
     expect(refreshLabel?.classList.contains('min-h-11')).toBe(true)
     expect(container.querySelector('#automation-recruit-1-refresh')).not.toBeNull()
     expect(container.querySelector('fieldset legend')?.textContent).toContain('招募星级')
+  })
+
+  it('keeps stage creation and deletion inside one grouped list', async () => {
+    mocks.loadUserConfig.mockResolvedValue({ success: true, data: { taskFlow: taskFlowFixture } })
+
+    await act(async () => root.render(<AutomationTasks />))
+    await flush()
+    await clickSequenceTask('理智作战')
+
+    const stageEditor = container.querySelector('.automation-stage-editor')!
+    expect(stageEditor.querySelectorAll('.automation-stage-item')).toHaveLength(2)
+
+    await act(async () => {
+      stageEditor.querySelector<HTMLButtonElement>('.automation-stage-add')?.click()
+    })
+    await flush()
+
+    expect(stageEditor.querySelectorAll('.automation-stage-item')).toHaveLength(3)
+    expect(stageEditor.querySelector('[aria-label="关卡 3"]')).not.toBeNull()
+
+    await act(async () => {
+      stageEditor.querySelector<HTMLButtonElement>('[aria-label="删除关卡 3"]')?.click()
+    })
+    await flush()
+
+    expect(stageEditor.querySelectorAll('.automation-stage-item')).toHaveLength(2)
+    expect(stageEditor.querySelector('[aria-label="关卡 3"]')).toBeNull()
+  })
+
+  it('adds and removes the generated smart training stages from the dedicated entry', async () => {
+    mocks.loadUserConfig
+      .mockResolvedValueOnce({ success: true, data: { taskFlow: taskFlowFixture } })
+      .mockResolvedValueOnce({
+        success: true,
+        data: { queue: [{ name: '阿米娅' }] },
+      })
+    mocks.generateTrainingPlan.mockResolvedValue({
+      success: true,
+      data: {
+        operators: [{ name: '阿米娅' }],
+        stages: [{ stage: 'AP-5', totalTimes: 3 }],
+      },
+    })
+
+    await act(async () => root.render(<AutomationTasks />))
+    await flush()
+    await clickSequenceTask('理智作战')
+
+    const addSmartStages = container.querySelector<HTMLButtonElement>('[aria-label="加入智能养成关卡"]')!
+    await act(async () => {
+      addSmartStages.click()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    await flush()
+
+    const stageEditor = container.querySelector('.automation-stage-editor')!
+    expect(stageEditor.querySelectorAll('.automation-stage-item.is-smart')).toHaveLength(1)
+    expect(stageEditor.textContent).toContain('正在养成：阿米娅')
+    expect(stageEditor.querySelector<HTMLInputElement>('.automation-stage-item.is-smart .automation-stage-name-input')?.value).toBe('AP-5')
+    expect(mocks.generateTrainingPlan).toHaveBeenCalledWith({ mode: 'current' })
+
+    const removeSmartStages = stageEditor.querySelector<HTMLButtonElement>('[aria-label="移除智能养成关卡"]')!
+    await act(async () => removeSmartStages.click())
+    await flush()
+
+    expect(stageEditor.querySelectorAll('.automation-stage-item.is-smart')).toHaveLength(0)
+    expect(stageEditor.querySelector('[aria-label="加入智能养成关卡"]')).not.toBeNull()
   })
 
   it('exposes the add-task picker as a labelled menu', async () => {

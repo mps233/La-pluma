@@ -84,6 +84,14 @@ const click = async (element: HTMLElement) => {
   })
 }
 
+const keyDown = async (element: HTMLElement, key: string) => {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+  await act(async () => {
+    element.dispatchEvent(event)
+  })
+  return event
+}
+
 const runningStatus = () => ({
   success: true,
   data: { isRunning: true, taskType: 'roguelike', taskName: '集成战略', startTime: Date.now() },
@@ -121,7 +129,7 @@ describe('RoguelikeTasks execution recovery', () => {
     vi.restoreAllMocks()
   })
 
-  it('uses the shared iOS workspace surfaces without clipping the compact monitor', async () => {
+  it('uses the shared iOS workspace surfaces for configuration and preview', async () => {
     await act(async () => root.render(<RoguelikeTasks />))
     await flush()
 
@@ -131,16 +139,58 @@ describe('RoguelikeTasks execution recovery', () => {
     expect(page?.querySelector('.app-page-header-icon')).toBeNull()
 
     const modeShell = page?.querySelector('.roguelike-mode-shell')
-    expect(modeShell?.getAttribute('data-slot')).toBe('smooth-corners')
+    expect(modeShell?.classList.contains('app-liquid-tab-pill')).toBe(true)
 
-    const workspace = page?.querySelector('.roguelike-workspace')
-    expect(workspace?.getAttribute('data-smooth-corners')).toBe('true')
-    expect(workspace?.querySelector(':scope > .app-card-smooth-surface')).not.toBeNull()
+    const panels = page?.querySelectorAll('.roguelike-theme-panel, .roguelike-settings-panel, .roguelike-monitor-panel')
+    expect(panels).toHaveLength(3)
+    panels?.forEach(panel => {
+      expect(panel.getAttribute('data-smooth-corners')).toBe('true')
+      expect(panel.querySelector(':scope > .smooth-panel-surface')).not.toBeNull()
+    })
 
     const monitor = page?.querySelector('.task-monitor-panel.is-compact')
-    expect(monitor?.classList.contains('surface-panel')).toBe(true)
-    expect(monitor?.getAttribute('data-smooth-corners')).toBeNull()
-    expect(monitor?.closest('.smooth-panel-surface')).toBeNull()
+    expect(monitor?.closest('.roguelike-monitor-surface')).not.toBeNull()
+    expect(monitor?.closest('.roguelike-monitor-panel')).not.toBeNull()
+
+    expect(modeShell?.querySelector('[role="toolbar"]')).not.toBeNull()
+    const selectedModes = page?.querySelectorAll('.roguelike-mode-button[aria-pressed="true"]')
+    expect(selectedModes).toHaveLength(1)
+
+    const toggleTextLabel = page?.querySelector<HTMLLabelElement>('.roguelike-toggle-label')
+    expect(toggleTextLabel?.htmlFor).toBeTruthy()
+    expect(page?.querySelector(`#${toggleTextLabel?.htmlFor}`)?.getAttribute('role')).toBe('switch')
+    const switches = page?.querySelectorAll('.roguelike-toggle-row .app-switch') ?? []
+    expect(switches).toHaveLength(2)
+    switches.forEach(switchControl => {
+      expect(switchControl.classList.contains('min-h-11')).toBe(false)
+    })
+
+    const modeButtons = Array.from(page?.querySelectorAll<HTMLButtonElement>('.roguelike-mode-button') ?? [])
+    expect(modeButtons.map(button => button.tabIndex)).toEqual([0, -1])
+    modeButtons[0]?.focus()
+    await keyDown(modeButtons[0]!, 'End')
+    expect(modeButtons[1]?.getAttribute('aria-pressed')).toBe('true')
+    expect(document.activeElement).toBe(modeButtons[1])
+
+    const arrowDownEvent = await keyDown(modeButtons[1]!, 'ArrowDown')
+    expect(arrowDownEvent.defaultPrevented).toBe(false)
+    expect(modeButtons[1]?.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('keeps mode selection and its configuration panel in sync', async () => {
+    await act(async () => root.render(<RoguelikeTasks />))
+    await flush()
+
+    const reclamationMode = Array.from(container.querySelectorAll<HTMLButtonElement>('.roguelike-mode-button'))
+      .find(button => button.textContent?.includes('生息演算'))
+    expect(reclamationMode).toBeDefined()
+    await click(reclamationMode!)
+
+    expect(reclamationMode?.getAttribute('aria-pressed')).toBe('true')
+    expect(container.querySelectorAll('.roguelike-mode-button[aria-pressed="true"]')).toHaveLength(1)
+    expect(container.querySelector('input[name="maa-reclamation-theme"]')).not.toBeNull()
+    expect(Array.from(container.querySelectorAll('.roguelike-theme-option'))
+      .some(option => option.textContent?.includes('沙洲遗闻'))).toBe(true)
   })
 
   it('keeps an unsynced local draft across remounts and retries the save', async () => {

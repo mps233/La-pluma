@@ -83,7 +83,7 @@ export default function Input({
       
       <div className="relative">
         {icon && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-tertiary">
+          <div className="app-input-leading-icon pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary">
             {icon}
           </div>
         )}
@@ -98,7 +98,7 @@ export default function Input({
           aria-invalid={error ? true : ariaInvalid}
           aria-describedby={describedBy}
           aria-errormessage={error ? (ariaErrorMessage ?? errorId) : ariaErrorMessage}
-          className={`${baseStyles} ${error ? errorStyles : ''} ${icon ? 'pl-10' : ''}`}
+          className={`${baseStyles} ${error ? errorStyles : ''} ${icon ? 'app-input-has-icon' : ''}`}
           {...props}
         />
       </div>

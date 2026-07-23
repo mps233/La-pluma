@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Download, RefreshCw, Share2, SquarePlus } from 'lucide-react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useStatusStore } from '@/store/statusStore'
 import { Button, IconButton } from '@/components/common'
+import { hasDocumentBuildChanged } from '@/utils/pwaUpdate'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -16,6 +17,7 @@ interface NavigatorWithStandalone extends Navigator {
 
 const INSTALL_DISMISS_KEY = 'pwa-install-dismissed-at'
 const INSTALL_REMINDER_DELAY_MS = 7 * 24 * 60 * 60 * 1000
+const UPDATE_CHECK_INTERVAL_MS = 60 * 1000
 
 const isStandalone = () =>
   window.matchMedia('(display-mode: standalone)').matches
@@ -72,6 +74,8 @@ export default function PWAInstallPrompt() {
   const [isInstallExpanded, setIsInstallExpanded] = useState(() => !isCompactInstallViewport())
   const [isUpdateCollapsed, setIsUpdateCollapsed] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
+  const serviceWorkerRegistrationRef = useRef<ServiceWorkerRegistration | null>(null)
+  const lastUpdateCheckRef = useRef(0)
   const shouldReduceMotion = useReducedMotion()
   const setStatusMessage = useStatusStore(state => state.setMessage)
 
@@ -83,14 +87,57 @@ export default function PWAInstallPrompt() {
     setStatusMessage('应用安装服务启动失败，请刷新页面重试', 'error')
   }, [setStatusMessage])
 
+  const handleRegisteredSW = useCallback((
+    _swScriptUrl: string,
+    registration: ServiceWorkerRegistration | undefined,
+  ) => {
+    serviceWorkerRegistrationRef.current = registration ?? null
+  }, [])
+
+  const checkForApplicationUpdate = useCallback(() => {
+    if (!window.navigator.onLine) return
+
+    const now = Date.now()
+    if (now - lastUpdateCheckRef.current < UPDATE_CHECK_INTERVAL_MS) return
+    lastUpdateCheckRef.current = now
+
+    const registration = serviceWorkerRegistrationRef.current
+    if (registration) {
+      void registration.update().catch(() => {
+        // A transient update check failure must not interrupt the current UI.
+      })
+      return
+    }
+
+    void hasDocumentBuildChanged().then((hasChanged) => {
+      if (hasChanged) window.location.reload()
+    }).catch(() => {
+      // A transient update check failure must not interrupt the current UI.
+    })
+  }, [])
+
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     immediate: true,
     onOfflineReady: handleOfflineReady,
+    onRegisteredSW: handleRegisteredSW,
     onRegisterError: handleRegisterError,
   })
+
+  useEffect(() => {
+    const checkWhenVisible = () => {
+      if (document.visibilityState === 'visible') checkForApplicationUpdate()
+    }
+
+    window.addEventListener('pageshow', checkWhenVisible)
+    document.addEventListener('visibilitychange', checkWhenVisible)
+    return () => {
+      window.removeEventListener('pageshow', checkWhenVisible)
+      document.removeEventListener('visibilitychange', checkWhenVisible)
+    }
+  }, [checkForApplicationUpdate])
 
   useEffect(() => {
     if (isStandalone() || !canOfferInstallation()) return

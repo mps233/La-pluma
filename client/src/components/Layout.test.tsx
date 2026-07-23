@@ -8,6 +8,10 @@ import Layout from './Layout'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
+const mocks = vi.hoisted(() => ({
+  loadDailyOperatorQuote: vi.fn(),
+}))
+
 vi.mock('framer-motion', async () => {
   const React = await import('react')
   type MotionTestProps = Record<string, unknown> & { children?: ReactNode }
@@ -39,6 +43,16 @@ vi.mock('framer-motion', async () => {
 })
 
 vi.mock('./ThemeToggle', () => ({ default: () => <button type="button">主题</button> }))
+vi.mock('@/services/operatorQuotes', () => ({
+  DEFAULT_OPERATOR_QUOTE: {
+    operatorId: 'char_002_amiya',
+    operator: '阿米娅',
+    quote: '今天也请多指教',
+  },
+  getOperatorAvatarUrl: (operatorId: string) =>
+    `https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/avatar/${operatorId}.png`,
+  loadDailyOperatorQuote: mocks.loadDailyOperatorQuote,
+}))
 
 let container: HTMLDivElement
 let root: Root
@@ -110,6 +124,12 @@ describe('top-level application navigation', () => {
       return 1
     })
     window.cancelAnimationFrame = vi.fn()
+    mocks.loadDailyOperatorQuote.mockReset()
+    mocks.loadDailyOperatorQuote.mockResolvedValue({
+      operatorId: 'char_172_svrash',
+      operator: '银灰',
+      quote: '战术安排已就绪',
+    })
     useUIStore.setState({ activeTab: 'dashboard' })
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -213,6 +233,7 @@ describe('top-level application navigation', () => {
 
     const mobileDestinations = [...container.querySelectorAll<HTMLAnchorElement>('.la-pluma-tabbar-pill a')]
       .map(link => link.getAttribute('href'))
+    expect(container.querySelector('.la-pluma-tabbar-pill')?.classList.contains('app-liquid-tab-pill')).toBe(true)
     expect(mobileDestinations).toEqual([
       '/app/dashboard',
       '/app/automation',
@@ -239,6 +260,36 @@ describe('top-level application navigation', () => {
       sidebar.querySelector<HTMLButtonElement>('button[aria-label="清除搜索"]')?.click()
     })
     expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav a')).toHaveLength(8)
+  })
+
+  it('shows the daily operator portrait, name, and quote in the desktop identity area', async () => {
+    await renderLayout()
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    const identity = container.querySelector<HTMLElement>('.la-pluma-sidebar-identity')!
+    const avatar = identity.querySelector<HTMLImageElement>('.la-pluma-sidebar-avatar img')!
+    expect(mocks.loadDailyOperatorQuote).toHaveBeenCalledTimes(1)
+    expect(identity.getAttribute('aria-label')).toBe('银灰：战术安排已就绪')
+    expect(identity.querySelector('strong')?.textContent).toBe('银灰')
+    expect(identity.querySelector('small')?.textContent).toBe('战术安排已就绪')
+    expect(avatar.getAttribute('src')).toContain('/avatar/char_172_svrash.png')
+    expect(avatar.getAttribute('decoding')).toBe('async')
+  })
+
+  it('keeps the fallback operator identity when the daily quote cannot load', async () => {
+    mocks.loadDailyOperatorQuote.mockRejectedValueOnce(new Error('offline'))
+    await renderLayout()
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    const identity = container.querySelector<HTMLElement>('.la-pluma-sidebar-identity')!
+    expect(identity.getAttribute('aria-label')).toBe('阿米娅：今天也请多指教')
+    expect(identity.querySelector('strong')?.textContent).toBe('阿米娅')
+    expect(identity.querySelector('small')?.textContent).toBe('今天也请多指教')
+    expect(identity.querySelector('img')?.getAttribute('src')).toContain('/avatar/char_002_amiya.png')
   })
 
   it('exposes the GitHub repository as a secure external action', async () => {

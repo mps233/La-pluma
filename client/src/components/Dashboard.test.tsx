@@ -198,6 +198,54 @@ describe('Dashboard connectivity state', () => {
     expect(container.textContent).toContain('更新活动')
   })
 
+  it('keeps the last complete snapshot when one background request fails', async () => {
+    apiMocks.getActivity.mockResolvedValueOnce({ success: true, data: { available: true, name: '已确认活动' } })
+
+    await act(async () => root.render(<Dashboard />))
+    await flushDashboard()
+    const lastSuccessfulUpdate = useDashboardStore.getState().lastUpdate
+    const persistedSnapshot = window.localStorage.getItem('la-pluma-dashboard-cache')
+    useDashboardStore.setState({
+      lastRefreshAttemptAt: Date.now() - DASHBOARD_REFRESH_INTERVAL_MS,
+    })
+
+    apiMocks.getActivity.mockResolvedValueOnce({ success: true, data: { available: true, name: '未确认活动' } })
+    apiMocks.getTodayDrops.mockResolvedValueOnce({ success: false, message: '暂时不可用' })
+
+    await act(async () => root.render(<div>其他页面</div>))
+    await act(async () => root.render(<Dashboard />))
+    await flushDashboard()
+
+    expect(container.textContent).toContain('已确认活动')
+    expect(container.textContent).not.toContain('未确认活动')
+    expect(useDashboardStore.getState().lastUpdate).toBe(lastSuccessfulUpdate)
+    expect(window.localStorage.getItem('la-pluma-dashboard-cache')).toBe(persistedSnapshot)
+  })
+
+  it('keeps the last complete snapshot when a successful response has malformed data', async () => {
+    apiMocks.getActivity.mockResolvedValueOnce({ success: true, data: { available: true, name: '稳定活动' } })
+
+    await act(async () => root.render(<Dashboard />))
+    await flushDashboard()
+    const lastSuccessfulUpdate = useDashboardStore.getState().lastUpdate
+    const persistedSnapshot = window.localStorage.getItem('la-pluma-dashboard-cache')
+    useDashboardStore.setState({
+      lastRefreshAttemptAt: Date.now() - DASHBOARD_REFRESH_INTERVAL_MS,
+    })
+
+    apiMocks.getActivity.mockResolvedValueOnce({ success: true, data: { available: true, name: '异常活动' } })
+    apiMocks.getOpenTodayStages.mockResolvedValueOnce({ success: true, data: undefined })
+
+    await act(async () => root.render(<div>其他页面</div>))
+    await act(async () => root.render(<Dashboard />))
+    await flushDashboard()
+
+    expect(container.textContent).toContain('稳定活动')
+    expect(container.textContent).not.toContain('异常活动')
+    expect(useDashboardStore.getState().lastUpdate).toBe(lastSuccessfulUpdate)
+    expect(window.localStorage.getItem('la-pluma-dashboard-cache')).toBe(persistedSnapshot)
+  })
+
   it('disables execution actions as soon as the browser goes offline', async () => {
     await act(async () => root.render(<Dashboard />))
     await flushDashboard()
@@ -221,6 +269,8 @@ describe('Dashboard connectivity state', () => {
     await flushDashboard()
 
     expect(container.textContent).toContain('后端服务不可用')
+    expect(container.textContent).toContain('测试活动')
+    expect(useDashboardStore.getState().lastUpdate).not.toBeNull()
     expect(findButton('重试连接')).toBeDefined()
     expect(findButton('开始今日流程')?.disabled).toBe(true)
     expect(findButton('打当前活动')?.disabled).toBe(true)

@@ -15,38 +15,65 @@ const DATA_FILE = path.join(__dirname, '../data/operatorQuotes.json')
 
 // 默认状态文案（当数据文件不存在、为空或损坏时使用）
 // 这些是项目内置兜底文案，不作为官方语音记录。
+const OPERATOR_IDS = {
+  阿米娅: 'char_002_amiya',
+  凯尔希: 'char_003_kalts',
+  陈: 'char_010_chen',
+  煌: 'char_017_huang',
+  德克萨斯: 'char_102_texas',
+  能天使: 'char_103_angel',
+  推进之王: 'char_112_siege',
+  W: 'char_113_cqbw',
+  星熊: 'char_136_hsguma',
+  拉普兰德: 'char_140_whitew',
+  银灰: 'char_172_svrash',
+  艾雅法拉: 'char_180_amgoat',
+  塞雷娅: 'char_202_demkni',
+  令: 'char_2023_ling',
+  棘刺: 'char_293_thorns',
+  史尔特尔: 'char_350_surtr',
+  澄闪: 'char_377_gdglow'
+}
+
 const DEFAULT_QUOTES = [
-  { operator: '博士', quote: '准备就绪' },
-  { operator: '阿米娅', quote: '今天也请多指教' },
-  { operator: '凯尔希', quote: '作战记录已归档' },
-  { operator: '陈', quote: '任务简报已经确认' },
-  { operator: '煌', quote: '队伍状态不错' },
-  { operator: '能天使', quote: '补给检查完成' },
-  { operator: '银灰', quote: '战术安排已就绪' },
-  { operator: '艾雅法拉', quote: '数据采集稳定' },
-  { operator: '塞雷娅', quote: '防护流程正常' },
-  { operator: '星熊', quote: '防线已经架好' },
-  { operator: '推进之王', quote: '行动前先确认队形' },
-  { operator: '德克萨斯', quote: '通讯频道保持畅通' },
-  { operator: '拉普兰德', quote: '这次行动会很有趣' },
-  { operator: '令', quote: '今日也宜从容落子' },
-  { operator: '棘刺', quote: '药剂和装备都已备齐' },
-  { operator: '史尔特尔', quote: '别让目标等太久' },
-  { operator: 'W', quote: '装置都在正确位置' },
-  { operator: '澄闪', quote: '信号稳定，可以开始' }
+  { operatorId: OPERATOR_IDS.阿米娅, operator: '阿米娅', quote: '今天也请多指教' },
+  { operatorId: OPERATOR_IDS.凯尔希, operator: '凯尔希', quote: '作战记录已归档' },
+  { operatorId: OPERATOR_IDS.陈, operator: '陈', quote: '任务简报已经确认' },
+  { operatorId: OPERATOR_IDS.煌, operator: '煌', quote: '队伍状态不错' },
+  { operatorId: OPERATOR_IDS.能天使, operator: '能天使', quote: '补给检查完成' },
+  { operatorId: OPERATOR_IDS.银灰, operator: '银灰', quote: '战术安排已就绪' },
+  { operatorId: OPERATOR_IDS.艾雅法拉, operator: '艾雅法拉', quote: '数据采集稳定' },
+  { operatorId: OPERATOR_IDS.塞雷娅, operator: '塞雷娅', quote: '防护流程正常' },
+  { operatorId: OPERATOR_IDS.星熊, operator: '星熊', quote: '防线已经架好' },
+  { operatorId: OPERATOR_IDS.推进之王, operator: '推进之王', quote: '行动前先确认队形' },
+  { operatorId: OPERATOR_IDS.德克萨斯, operator: '德克萨斯', quote: '通讯频道保持畅通' },
+  { operatorId: OPERATOR_IDS.拉普兰德, operator: '拉普兰德', quote: '这次行动会很有趣' },
+  { operatorId: OPERATOR_IDS.令, operator: '令', quote: '今日也宜从容落子' },
+  { operatorId: OPERATOR_IDS.棘刺, operator: '棘刺', quote: '药剂和装备都已备齐' },
+  { operatorId: OPERATOR_IDS.史尔特尔, operator: '史尔特尔', quote: '别让目标等太久' },
+  { operatorId: OPERATOR_IDS.W, operator: 'W', quote: '装置都在正确位置' },
+  { operatorId: OPERATOR_IDS.澄闪, operator: '澄闪', quote: '信号稳定，可以开始' }
 ]
 
-function normalizeQuotes(quotes) {
+export function normalizeQuotes(quotes) {
   if (!Array.isArray(quotes)) return []
 
   return quotes
     .filter((item) => item && typeof item === 'object')
-    .map((item) => ({
-      operator: String(item.operator || '').trim(),
-      quote: String(item.quote || '').trim()
-    }))
+    .map((item) => {
+      const operator = String(item.operator || '').trim()
+      const operatorId = String(item.operatorId || OPERATOR_IDS[operator] || '').trim()
+
+      return {
+        operatorId,
+        operator,
+        quote: String(item.quote || '').trim()
+      }
+    })
     .filter((item) => item.operator && item.quote)
 }
+
+export { DEFAULT_QUOTES }
 
 const OperatorQuotes = {
   /**

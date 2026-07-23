@@ -132,32 +132,61 @@ describe('DataStatistics layout surfaces', () => {
     vi.unstubAllGlobals()
   })
 
-  it('uses the shared header, neutral tabs, smooth task panels, and a single KPI surface grid', async () => {
+  it('uses the shared header, liquid segmented tabs, smooth task panels, and grouped KPI surfaces', async () => {
+    mocks.getAllOperators.mockResolvedValue({
+      success: true,
+      data: [{ id: 'char_001', name: '测试干员', rarity: 6, profession: 'SNIPER' }],
+    })
+    mocks.getOperBoxData.mockResolvedValue({
+      success: true,
+      data: {
+        operCount: 1,
+        data: [{ id: 'char_001', name: '测试干员', rarity: 6, level: 80, elite: 2, potential: 1 }],
+        timestamp: '2026-07-20T08:00:00.000Z',
+      },
+    })
+
     await act(async () => root.render(<DataStatistics />))
     await flush()
 
     const page = container.querySelector('.data-statistics-page')
     expect(page?.classList.contains('ios-workspace-page')).toBe(true)
     expect(page?.querySelector('.app-page-header')?.classList.contains('is-mobile-inline')).toBe(true)
+    expect(page?.querySelector('.app-page-title')?.textContent).toBe('数据')
 
     const status = page?.querySelector('[data-testid="floating-status"]')
     expect(status?.getAttribute('data-text-class-name')).toContain('truncate')
     expect(status?.getAttribute('data-text-class-name')).toContain('whitespace-nowrap')
 
-    expect(page?.querySelector('.data-statistics-tabs')?.getAttribute('role')).toBe('group')
-    const tabs = Array.from(page?.querySelectorAll<HTMLButtonElement>('.data-statistics-tabs > button') ?? [])
+    const tabShell = page?.querySelector('.data-statistics-view-switcher')
+    expect(tabShell?.classList.contains('app-liquid-tab-pill')).toBe(true)
+    expect(tabShell?.classList.contains('app-workspace-segments')).toBe(true)
+    expect(tabShell?.classList.contains('data-statistics-mode-shell')).toBe(true)
+    const tabList = tabShell?.querySelector('[role="tablist"]')
+    expect(tabList?.classList.contains('data-statistics-mode-tabs')).toBe(true)
+    const tabs = Array.from(tabList?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])
     expect(tabs).toHaveLength(3)
     expect(tabs.every(tab => tab.classList.contains('min-h-11'))).toBe(true)
-    expect(tabs[0]?.classList.contains('is-active')).toBe(true)
-    expect(tabs[0]?.getAttribute('aria-pressed')).toBe('true')
+    expect(tabs.every(tab => tab.classList.contains('data-statistics-mode-button'))).toBe(true)
+    expect(tabs[0]?.classList.contains('is-selected')).toBe(true)
+    expect(tabs[0]?.getAttribute('aria-selected')).toBe('true')
+    expect(tabs[0]?.tabIndex).toBe(0)
+    expect(tabs[1]?.tabIndex).toBe(-1)
 
     const operatorCard = page?.querySelector('.data-statistics-task-card')
     expect(operatorCard?.getAttribute('data-smooth-corners')).toBe('true')
     expect(operatorCard?.querySelector(':scope > .app-card-smooth-surface')).not.toBeNull()
+    expect(operatorCard?.querySelectorAll('.data-statistics-kpi')).toHaveLength(4)
+    const operatorItem = operatorCard?.querySelector('.data-statistics-operator-item')
+    expect(operatorItem?.classList.contains('surface-soft')).toBe(true)
+    expect(operatorItem?.classList.contains('border')).toBe(false)
 
     const depotTab = tabs.find(tab => tab.textContent?.includes('仓库识别'))
     expect(depotTab).toBeDefined()
-    await click(depotTab!)
+    await act(async () => tabs[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })))
+    await flush()
+    expect(depotTab?.getAttribute('aria-selected')).toBe('true')
+    expect(document.activeElement).toBe(depotTab)
 
     const depotCard = page?.querySelector('.data-statistics-task-card')
     expect(depotCard?.getAttribute('data-smooth-corners')).toBe('true')
@@ -168,6 +197,9 @@ describe('DataStatistics layout surfaces', () => {
     expect(kpis).toHaveLength(6)
     expect(kpis.every(kpi => !kpi.classList.contains('surface-soft'))).toBe(true)
     expect(kpis.every(kpi => !kpi.classList.contains('border'))).toBe(true)
+    const depotItem = page?.querySelector('.data-statistics-depot-item')
+    expect(depotItem?.classList.contains('surface-soft')).toBe(true)
+    expect(depotItem?.classList.contains('border')).toBe(false)
   })
 
   it('shows local loading and recovers from an operator data error with retry', async () => {
@@ -257,7 +289,7 @@ describe('DataStatistics layout surfaces', () => {
     const resetButton = findButton('重置')
     expect(resetButton?.type).toBe('button')
     expect(resetButton?.classList.contains('min-h-11')).toBe(true)
-    expect(resetButton?.className).toContain('focus-visible:ring-2')
+    expect(resetButton?.classList.contains('app-button')).toBe(true)
 
     await click(trigger)
     expect(document.body.querySelector('[role="menu"]')).not.toBeNull()
@@ -364,7 +396,7 @@ describe('DataStatistics layout surfaces', () => {
     await click(findButton('重新加载')!)
     expect(mocks.getDepotData).toHaveBeenCalledTimes(2)
     expect(container.querySelector('[role="alert"]')).toBeNull()
-    expect(container.textContent).toContain('总物品数')
+    expect(container.textContent).toContain('物品种类')
   })
 
   it('ignores stale data loaders across an Activity hide and restore cycle', async () => {

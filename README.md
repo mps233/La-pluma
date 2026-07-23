@@ -261,6 +261,8 @@ docker run -d \
 
 PWA 的 Service Worker 只会在 HTTPS 或浏览器认可的本机 `localhost` 安全上下文中启用。生产构建在电脑本机通过 `http://localhost:*` 打开时可以安装；手机通过 `http://192.168.x.x:*` 访问时不能安装，也不会获得离线界面缓存。Vite 开发模式默认不注册 Service Worker。
 
+不要把 `5173` 的 Vite 开发服务器作为手机主屏幕或公网长期入口。开发服务器的 HMR 连接在 iOS 后台挂起后可能触发整页重载；手机入口应使用 `npm run build --prefix client` 生成的正式资源，并由下方的生产服务或可信 HTTPS 反向代理提供。
+
 La Pluma 可以直接使用可信证书启动 HTTPS：
 
 ```bash

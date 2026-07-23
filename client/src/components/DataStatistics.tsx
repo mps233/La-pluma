@@ -1,13 +1,20 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { maaApi, getAllOperators, getDropStatistics, getItemIconUrl, getOperBoxData, fetchOperatorMaterials, getTrainingQueue } from '../services/api'
-import { motion } from 'framer-motion'
-import { Package as PackageIcon } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
+import {
+  ChevronDown,
+  Download,
+  Package as PackageIcon,
+  Play,
+  RotateCcw,
+} from 'lucide-react'
 import Icons from './Icons'
 import DropRecords from './DropRecords'
 import { PageHeader, Button, Card, EmptyState, Loading } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
+import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
 import type {
   DepotDataDetailed,
   OperBoxData,
@@ -59,17 +66,14 @@ interface FilterMenuPosition {
   placement: 'top' | 'bottom'
 }
 
-const tabButtonClass = (isActive: boolean) =>
-  `data-statistics-tab min-h-11${isActive ? ' is-active' : ''}`
-
 const filterButtonClass = (isActive: boolean) =>
-  `flex min-h-11 w-full items-center justify-center space-x-1 rounded-lg px-2 text-xs font-medium transition-all sm:w-auto sm:space-x-1.5 sm:px-3 ${
+  `flex min-h-11 w-full items-center justify-center gap-1 rounded-full px-2 text-xs font-medium transition-[background,color,box-shadow,transform] duration-200 active:scale-[0.97] sm:w-auto sm:gap-1.5 sm:px-3 ${
     isActive
-      ? 'brand-action'
+      ? 'brand-action-subtle'
       : 'control-surface text-secondary'
   }`
 
-const menuSurfaceClass = 'fixed z-[2000] overflow-y-auto overscroll-contain rounded-lg py-1 surface-panel'
+const menuSurfaceClass = 'fixed z-[2000] overflow-y-auto overscroll-contain rounded-xl py-1 surface-panel'
 
 const menuOptionClass = (isActive: boolean) =>
   `min-h-11 w-full px-3 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--app-accent)] ${
@@ -82,7 +86,32 @@ const taskPanelClass = (isActive: boolean) =>
   `data-statistics-task-card !p-0${isActive ? ' is-active' : ''}`
 
 const statCardClass = 'data-statistics-kpi'
-const chipClass = 'brand-chip rounded-full px-2 py-0.5 text-xs whitespace-nowrap'
+const chipClass = 'control-surface rounded-full px-2 py-0.5 text-xs whitespace-nowrap'
+const statisticsTabs = [
+  {
+    id: 'operbox',
+    title: '干员识别',
+    description: '档案与养成进度',
+    icon: 'Users',
+  },
+  {
+    id: 'depot',
+    title: '仓库识别',
+    description: '库存与材料分类',
+    icon: 'Package',
+  },
+  {
+    id: 'drops',
+    title: '掉落记录',
+    description: '作战收益统计',
+    icon: 'TrendingUp',
+  },
+] as const satisfies ReadonlyArray<{
+  id: ActiveTab
+  title: string
+  description: string
+  icon: 'Users' | 'Package' | 'TrendingUp'
+}>
 const ownershipOptions: readonly FilterMenuOption[] = [
   { value: 'all', label: '全部' },
   { value: 'owned', label: '已拥有' },
@@ -319,9 +348,10 @@ function FilterMenu({
         aria-controls={menuId}
       >
         <span className="truncate">{label}</span>
-        <svg className="h-3 w-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <ChevronDown
+          className={`h-3.5 w-3.5 flex-none transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          aria-hidden="true"
+        />
       </button>
       {isOpen && menuPosition && createPortal(
         <div
@@ -416,6 +446,13 @@ export default function DataStatistics() {
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null)
   const [activeTab, setActiveTab] = useState<ActiveTab>('operbox')
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({})
+  const shouldReduceMotion = useReducedMotion()
+  const {
+    containerRef: tabListRef,
+    activeRect: activeTabRect,
+    setTabRef,
+    handleTabKeyDown,
+  } = useFluidTabIndicator(activeTab)
   
   const depotTypeSummary = useMemo(() => {
     const grouped = new Map<string, { count: number; kinds: number }>()
@@ -704,6 +741,15 @@ export default function DataStatistics() {
     return filtered
   }, [filterOwnership, filterRarity, filterProfession, filterElite, filterPotential, sortBy, allOperators, operBoxData])
 
+  const ownedOperatorCount = useMemo(
+    () => new Set((operBoxData?.data || []).map(operator => operator.id)).size,
+    [operBoxData],
+  )
+  const operatorCatalogCount = allOperators.length || ownedOperatorCount
+  const operatorCoverage = operatorCatalogCount > 0
+    ? Math.round((ownedOperatorCount / operatorCatalogCount) * 100)
+    : 0
+
   // 当筛选条件变化时，清理不再显示的干员图片加载状态
   useEffect(() => {
     const currentOperIds = new Set(getFilteredAndSortedOperators.map(op => op.id))
@@ -889,7 +935,7 @@ export default function DataStatistics() {
       <div className="app-stack-section">
         {/* 页面标题 */}
         <PageHeader
-          title="数据统计"
+          title="数据"
           subtitle="识别并查看仓库、干员与掉落数据"
           mobileLayout="inline"
           actions={(
@@ -902,42 +948,64 @@ export default function DataStatistics() {
           )}
         />
 
-        {/* 标签页切换 */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="data-statistics-tabs"
-          role="group"
-          aria-label="数据统计视图"
-        >
-          <button
-            type="button"
-            onClick={() => setActiveTab('operbox')}
-            className={tabButtonClass(activeTab === 'operbox')}
-            aria-pressed={activeTab === 'operbox'}
+        <div className="app-workspace-segments app-liquid-tab-pill data-statistics-view-switcher data-statistics-mode-shell">
+          <div
+            ref={tabListRef}
+            className="app-workspace-segment-list data-statistics-mode-tabs"
+            role="tablist"
+            aria-label="数据统计视图"
           >
-            <Icons.Users />
-            <span>干员识别</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('depot')}
-            className={tabButtonClass(activeTab === 'depot')}
-            aria-pressed={activeTab === 'depot'}
-          >
-            <Icons.Package />
-            <span>仓库识别</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('drops')}
-            className={tabButtonClass(activeTab === 'drops')}
-            aria-pressed={activeTab === 'drops'}
-          >
-            <Icons.TrendingUp />
-            <span>掉落记录</span>
-          </button>
-        </motion.div>
+            {activeTabRect.width > 0 && (
+              <motion.div
+                data-testid="data-statistics-tab-highlight"
+                aria-hidden="true"
+                className="app-workspace-segment-indicator data-statistics-mode-highlight"
+                initial={false}
+                animate={{
+                  x: activeTabRect.x,
+                  y: activeTabRect.y,
+                  width: activeTabRect.width,
+                  height: activeTabRect.height,
+                }}
+                transition={shouldReduceMotion
+                  ? { duration: 0 }
+                  : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
+              />
+            )}
+            {statisticsTabs.map(tab => {
+              const TabIcon = Icons[tab.icon]
+              const selected = activeTab === tab.id
+
+              return (
+                <button
+                  key={tab.id}
+                  ref={setTabRef(tab.id)}
+                  id={`data-statistics-tab-${tab.id}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  aria-controls={`data-statistics-panel-${tab.id}`}
+                  tabIndex={selected ? 0 : -1}
+                  onClick={() => setActiveTab(tab.id)}
+                  onKeyDown={event => handleTabKeyDown(
+                    event,
+                    statisticsTabs.map(option => option.id),
+                    setActiveTab,
+                  )}
+                  className={`app-workspace-segment data-statistics-mode-button min-h-11 ${selected ? 'is-selected' : ''}`}
+                >
+                  <span className="app-workspace-segment-icon data-statistics-mode-icon" aria-hidden="true">
+                    <TabIcon />
+                  </span>
+                  <span className="app-workspace-segment-copy">
+                    <span>{tab.title}</span>
+                    <small>{tab.description}</small>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
         <div>
           {/* 功能卡片 */}
@@ -945,42 +1013,41 @@ export default function DataStatistics() {
           {/* 干员识别 */}
           {activeTab === 'operbox' && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            id="data-statistics-panel-operbox"
+            role="tabpanel"
+            aria-labelledby="data-statistics-tab-operbox"
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
+            transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
             className="min-w-0"
           >
             <Card
               smoothCorners
               className={taskPanelClass(activeTask === 'operbox' && isRunning)}
             >
-              <div className="data-statistics-task-content">
-            {/* 顶部行：图标 + 标题 + 执行按钮 */}
-            <div className="data-statistics-task-header flex items-start gap-3 mb-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center space-x-2 flex-wrap mb-2">
-                  <span className="text-xl"><Icons.Users /></span>
-                  <span className="font-bold text-primary text-base">干员识别</span>
-                  <span className="brand-chip rounded-full px-2 py-0.5 text-xs">干员清单</span>
+              <div className="data-statistics-task-content app-stack-card">
+            <div className="data-statistics-task-header flex items-start gap-3 sm:items-center">
+              <div className="flex w-full min-w-0 flex-1 items-center gap-3 sm:w-auto">
+                <div className="flex h-10 w-10 flex-none items-center justify-center" aria-hidden="true">
+                  <Icons.Users />
                 </div>
-                <p className="text-sm text-secondary leading-relaxed">
-                  识别所有干员信息
-                </p>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-semibold text-primary">干员识别</h2>
+                  <p className="mt-1 text-sm leading-relaxed text-secondary">
+                    读取档案、等级、精英化与潜能数据
+                  </p>
+                </div>
               </div>
-              
-              {/* 执行按钮 */}
-              <div className="data-statistics-task-actions flex-shrink-0 flex items-center gap-2">
+
+              <div className="data-statistics-task-actions flex flex-shrink-0 items-center gap-2">
                 <Button
                   onClick={handleFetchMaterials}
                   disabled={isRunning}
                   loading={isRunning && activeTask === null}
-                  loadingText="正在获取..."
+                  loadingText="正在获取"
                   variant="outline"
-                  size="sm"
-                  icon={
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                  }
+                  size="md"
+                  icon={<Download size={16} aria-hidden="true" />}
                 >
                   获取材料数据
                 </Button>
@@ -988,13 +1055,10 @@ export default function DataStatistics() {
                   onClick={executeOperBox}
                   disabled={isRunning}
                   loading={activeTask === 'operbox' && isRunning}
-                  loadingText="正在执行..."
+                  loadingText="正在执行"
                   variant="primary"
-                  icon={
-                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                    </svg>
-                  }
+                  size="md"
+                  icon={<Play size={15} fill="currentColor" aria-hidden="true" />}
                 >
                   立即执行
                 </Button>
@@ -1002,14 +1066,9 @@ export default function DataStatistics() {
             </div>
 
             {/* 识别结果展示 */}
-            {operatorDataLoading && !operatorDataError && !operBoxData && (
-              <div className="py-10">
-                <Loading text="正在读取干员数据..." />
-              </div>
-            )}
-            {activeTask === 'operbox' && isRunning && !operBoxData && (
-              <div className="py-10">
-                <Loading text="正在识别干员数据..." />
+            {!operatorDataError && !operBoxData && (operatorDataLoading || (activeTask === 'operbox' && isRunning)) && (
+              <div className="rounded-xl py-12 surface-soft" aria-live="polite">
+                <Loading text={activeTask === 'operbox' && isRunning ? '正在识别干员数据' : '正在读取干员数据'} />
               </div>
             )}
             {operatorDataError && (
@@ -1031,14 +1090,49 @@ export default function DataStatistics() {
             )}
             {operBoxData && operBoxData.data && operBoxData.data.length > 0 && (
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="space-y-3"
+                transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
+                className="app-stack-card"
               >
-                {/* 筛选和排序按钮 */}
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  {/* 筛选和排序按钮组 */}
-                  <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+                <div
+                  className="data-statistics-kpi-grid grid grid-cols-2 lg:grid-cols-4"
+                  aria-label="干员数据概览"
+                >
+                  <div className={statCardClass}>
+                    <p className="text-xs text-secondary">已识别</p>
+                    <p className="mt-1 text-2xl font-semibold text-primary">{ownedOperatorCount}</p>
+                  </div>
+                  <div className={statCardClass}>
+                    <p className="text-xs text-secondary">干员资料</p>
+                    <p className="mt-1 text-2xl font-semibold text-primary">{operatorCatalogCount}</p>
+                  </div>
+                  <div className={statCardClass}>
+                    <p className="text-xs text-secondary">当前显示</p>
+                    <p className="mt-1 text-2xl font-semibold text-primary">{getFilteredAndSortedOperators.length}</p>
+                  </div>
+                  <div className={statCardClass}>
+                    <p className="text-xs text-secondary">档案覆盖</p>
+                    <p className="mt-1 text-2xl font-semibold text-primary">{operatorCoverage}%</p>
+                  </div>
+                </div>
+
+                <section className="rounded-xl surface-soft p-3" aria-labelledby="operator-filter-title">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 id="operator-filter-title" className="text-sm font-semibold text-primary">筛选与排序</h3>
+                      {operBoxData.timestamp && (
+                        <p className="mt-1 truncate text-xs text-tertiary">
+                          更新于 {new Date(operBoxData.timestamp).toLocaleString('zh-CN')}
+                        </p>
+                      )}
+                    </div>
+                    <p className="shrink-0 text-xs text-secondary" aria-live="polite">
+                      显示 <span className="font-semibold brand-text">{getFilteredAndSortedOperators.length}</span> 项
+                    </p>
+                  </div>
+
+                  <div className="flex w-full flex-wrap items-center gap-2">
                     {/* 拥有状态 */}
                     <FilterMenu
                       menuKey="ownership"
@@ -1118,25 +1212,18 @@ export default function DataStatistics() {
 
                     {/* 重置按钮 */}
                     {hasActiveOperatorFilters && (
-                      <button
-                        type="button"
+                      <Button
                         onClick={resetOperatorFilters}
-                        className="min-h-11 w-[calc(33.333%_-_0.5rem)] rounded-lg px-2 text-xs font-medium text-secondary transition-all hover:bg-[var(--app-surface-muted)] hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] sm:w-auto sm:px-3"
+                        variant="ghost"
+                        size="sm"
+                        icon={<RotateCcw size={14} aria-hidden="true" />}
+                        className="min-h-11 w-[calc(33.333%_-_0.5rem)] sm:w-auto"
                       >
                         重置
-                      </button>
+                      </Button>
                     )}
                   </div>
-
-                  {/* 统计信息 */}
-                  <div className="text-xs text-secondary w-full sm:w-auto text-right sm:text-left mt-2 sm:mt-0">
-                    <span className="font-semibold brand-text">{getFilteredAndSortedOperators.length}</span> / {
-                      filterOwnership === 'all' ? allOperators.length : 
-                      filterOwnership === 'unowned' ? allOperators.length : 
-                      (operBoxData?.data?.length || 0)
-                    }
-                  </div>
-                </div>
+                </section>
 
                 {/* 干员卡片网格 */}
                 {getFilteredAndSortedOperators.length === 0 ? (
@@ -1153,7 +1240,7 @@ export default function DataStatistics() {
                     ) : undefined}
                   />
                 ) : (
-                <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                   {getFilteredAndSortedOperators.map((oper, idx) => {
                     // 判断是否拥有该干员
                     const ownedIds = new Set((operBoxData?.data || []).map(op => op.id))
@@ -1171,24 +1258,26 @@ export default function DataStatistics() {
                     return (
                       <motion.div
                         key={oper.id}
-                        initial={{ opacity: 0, scale: 0.9 }}
+                        initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.98 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: idx * 0.01 }}
-                        className={`group relative p-3 rounded-2xl border transition-all overflow-hidden ${
+                        transition={shouldReduceMotion
+                          ? { duration: 0 }
+                          : { duration: 0.2, delay: Math.min(idx, 10) * 0.01 }}
+                        className={`data-statistics-operator-item relative overflow-hidden rounded-xl p-3 surface-soft ${
                           isOwned
-                            ? 'surface-soft border-[var(--app-border)] hover:border-[color-mix(in_srgb,var(--app-accent)_42%,var(--app-border))] hover:bg-[var(--app-accent-soft)]'
-                            : 'surface-soft border-[var(--app-border)] opacity-75 grayscale-[0.15]'
+                            ? ''
+                            : 'opacity-70 grayscale-[0.15]'
                         }`}
                       >
                         {/* 未拥有标识 */}
                         {!isOwned && (
-                          <div className="absolute top-2 left-2 z-10 px-2 py-0.5 surface-panel text-secondary text-xs font-bold rounded-md border border-[var(--app-border)] backdrop-blur-sm">
+                          <div className="control-surface absolute left-2 top-2 z-10 rounded-full px-2 py-0.5 text-xs font-semibold text-secondary">
                             未拥有
                           </div>
                         )}
                         
                         {/* 干员头像 */}
-                        <div className="relative w-full aspect-square mb-2 rounded-xl overflow-hidden surface-soft">
+                        <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-xl bg-[var(--app-surface-muted)]">
                           {oper.id ? (
                             <>
                               {/* 骨架屏 */}
@@ -1198,9 +1287,9 @@ export default function DataStatistics() {
                               <img
                                 src={`https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/avatar/${oper.id}.png`}
                                 alt={oper.name}
-                                className={`w-full h-full object-cover transition-opacity duration-500 ${
+                                className={`h-full w-full object-cover transition-opacity duration-300 ${
                                   imageLoaded ? 'opacity-100' : 'opacity-0'
-                                } ${isOwned && imageLoaded ? 'group-hover:scale-110 transition-transform duration-300' : ''}`}
+                                }`}
                                 onLoad={() => setLoadedImages(prev => ({ ...prev, [oper.id]: true }))}
                                 onError={(e) => {
                                   const target = e.target as HTMLImageElement
@@ -1227,7 +1316,7 @@ export default function DataStatistics() {
                           )}
                           {/* 稀有度标识 */}
                           {oper.rarity !== undefined && oper.rarity > 0 && (
-                            <div className="absolute top-1 right-1 px-1.5 py-0.5 brand-action text-xs font-bold rounded-md backdrop-blur-sm">
+                            <div className="brand-chip absolute right-1.5 top-1.5 rounded-full px-2 py-0.5 text-xs font-semibold">
                               {Math.min(oper.rarity, 6)}★
                             </div>
                           )}
@@ -1274,41 +1363,41 @@ export default function DataStatistics() {
           {/* 仓库识别 */}
           {activeTab === 'depot' && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            id="data-statistics-panel-depot"
+            role="tabpanel"
+            aria-labelledby="data-statistics-tab-depot"
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
+            transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
             className="min-w-0"
           >
             <Card
               smoothCorners
               className={taskPanelClass(activeTask === 'depot' && isRunning)}
             >
-              <div className="data-statistics-task-content">
-            {/* 顶部行：图标 + 标题 + 执行按钮 */}
-            <div className="data-statistics-task-header flex items-start gap-3 mb-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center space-x-2 flex-wrap mb-2">
-                  <span className="text-xl"><Icons.Package /></span>
-                  <span className="font-bold text-primary text-base">仓库识别</span>
-                  <span className="brand-chip rounded-full px-2 py-0.5 text-xs">仓库清单</span>
+              <div className="data-statistics-task-content app-stack-card">
+            <div className="data-statistics-task-header flex items-start gap-3 sm:items-center">
+              <div className="flex w-full min-w-0 flex-1 items-center gap-3 sm:w-auto">
+                <div className="flex h-10 w-10 flex-none items-center justify-center" aria-hidden="true">
+                  <Icons.Package />
                 </div>
-                <p className="text-sm text-secondary leading-relaxed">
-                  识别仓库中的所有物品
-                </p>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-semibold text-primary">仓库识别</h2>
+                  <p className="mt-1 text-sm leading-relaxed text-secondary">
+                    汇总物品库存、材料分类与数量
+                  </p>
+                </div>
               </div>
-              
-              {/* 执行按钮 */}
+
               <div className="data-statistics-task-actions flex-shrink-0">
                 <Button
                   onClick={executeDepot}
                   disabled={isRunning}
                   loading={activeTask === 'depot' && isRunning}
-                  loadingText="正在执行..."
+                  loadingText="正在执行"
                   variant="primary"
-                  icon={
-                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                    </svg>
-                  }
+                  size="md"
+                  icon={<Play size={15} fill="currentColor" aria-hidden="true" />}
                 >
                   立即执行
                 </Button>
@@ -1316,14 +1405,9 @@ export default function DataStatistics() {
             </div>
 
             {/* 识别结果展示 */}
-            {depotDataLoading && !depotDataError && !depotData && (
-              <div className="py-10">
-                <Loading text="正在读取仓库数据..." />
-              </div>
-            )}
-            {activeTask === 'depot' && isRunning && !depotData && (
-              <div className="py-10">
-                <Loading text="正在识别仓库数据..." />
+            {!depotDataError && !depotData && (depotDataLoading || (activeTask === 'depot' && isRunning)) && (
+              <div className="rounded-xl py-12 surface-soft" aria-live="polite">
+                <Loading text={activeTask === 'depot' && isRunning ? '正在识别仓库数据' : '正在读取仓库数据'} />
               </div>
             )}
             {depotDataError && (
@@ -1344,57 +1428,59 @@ export default function DataStatistics() {
               />
             )}
             {depotData && (
-              <div className="space-y-3">
-                {/* 统计信息 */}
-                <div className="data-statistics-kpi-grid grid grid-cols-2 md:grid-cols-4">
+              <div className="app-stack-card">
+                <div
+                  className="data-statistics-kpi-grid grid grid-cols-2 md:grid-cols-3"
+                  aria-label="仓库数据概览"
+                >
                   <div className={statCardClass}>
-                    <p className="text-xs text-secondary mb-1">总物品数</p>
-                    <p className="text-lg font-bold text-primary">
+                    <p className="text-xs text-secondary">物品种类</p>
+                    <p className="mt-1 text-2xl font-semibold text-primary">
                       {depotData.itemCount}
                     </p>
                   </div>
                   <div className={statCardClass}>
-                    <p className="text-xs text-secondary mb-1">材料类</p>
-                    <p className="text-lg font-bold text-primary">
+                    <p className="text-xs text-secondary">材料种类</p>
+                    <p className="mt-1 text-2xl font-semibold text-primary">
                       {depotData.items.filter(i => i.classifyType === 'MATERIAL').length}
                     </p>
                   </div>
                   <div className={statCardClass}>
-                    <p className="text-xs text-secondary mb-1">识别分类</p>
-                    <p className="text-lg font-bold text-primary">
+                    <p className="text-xs text-secondary">识别分类</p>
+                    <p className="mt-1 text-2xl font-semibold text-primary">
                       {depotTypeSummary.length}
                     </p>
                   </div>
                   <div className={statCardClass}>
-                    <p className="text-xs text-secondary mb-1">总数量</p>
-                    <p className="text-lg font-bold text-primary">
+                    <p className="text-xs text-secondary">库存总量</p>
+                    <p className="mt-1 text-2xl font-semibold text-primary">
                       {depotData.items.reduce((sum, i) => sum + i.count, 0).toLocaleString()}
                     </p>
                   </div>
                   <div className={statCardClass}>
-                    <p className="text-xs text-secondary mb-1">最多物品</p>
-                    <p className="text-sm font-bold text-primary truncate">
+                    <p className="text-xs text-secondary">库存最多</p>
+                    <p className="mt-1 truncate text-sm font-semibold text-primary">
                       {depotData.items.length > 0 && depotData.items[0]
                         ? depotData.items.reduce((max, i) => i.count > max.count ? i : max, depotData.items[0]).name 
                         : '-'}
                     </p>
                   </div>
                   {depotData.timestamp && (
-                    <div className={`col-span-1 md:col-span-3 ${statCardClass}`}>
-                      <p className="text-xs text-secondary">
-                        识别时间: {new Date(depotData.timestamp).toLocaleString('zh-CN')}
+                    <div className={statCardClass}>
+                      <p className="text-xs text-secondary">最近识别</p>
+                      <p className="mt-1 truncate text-sm font-semibold text-primary">
+                        {new Date(depotData.timestamp).toLocaleString('zh-CN')}
                       </p>
                     </div>
                   )}
                 </div>
 
-                {/* 分类汇总 */}
                 {depotTypeSummary.length > 0 && (
-                  <div className="rounded-2xl border border-[var(--app-border)] surface-soft p-3">
-                    <div className="text-sm font-semibold text-primary mb-2">分类汇总</div>
+                  <section className="rounded-xl surface-soft p-3" aria-labelledby="depot-category-title">
+                    <h3 id="depot-category-title" className="mb-2 text-sm font-semibold text-primary">分类汇总</h3>
                     <div className="flex flex-wrap gap-2">
                       {depotTypeSummary.map((group) => (
-                        <div key={group.type} className="rounded-full border border-[var(--app-border)] surface-panel px-3 py-1 text-xs text-secondary">
+                        <div key={group.type} className="control-surface rounded-full px-3 py-1.5 text-xs text-secondary">
                           <span className="font-medium">{group.label}</span>
                           <span className="mx-1 brand-text">·</span>
                           <span>{group.kinds} 种</span>
@@ -1403,12 +1489,12 @@ export default function DataStatistics() {
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </section>
                 )}
 
                 {/* 物品卡片网格 */}
                 {depotData.items && depotData.items.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
                     {depotData.items.map((item, idx) => {
                       const itemKey = item.id || item.iconId
                       const imageKey = `${itemKey}:${item.iconId}`
@@ -1416,13 +1502,15 @@ export default function DataStatistics() {
                       return (
                         <motion.div
                           key={itemKey}
-                          initial={{ opacity: 0, scale: 0.9 }}
+                          initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.98 }}
                           animate={{ opacity: 1, scale: 1 }}
-                          transition={{ delay: idx * 0.01 }}
-                          className="group flex items-center gap-3 rounded-2xl border border-[var(--app-border)] p-3 transition-colors surface-soft hover:border-[color-mix(in_srgb,var(--app-accent)_42%,var(--app-border))] hover:bg-[var(--app-accent-soft)]"
+                          transition={shouldReduceMotion
+                            ? { duration: 0 }
+                            : { duration: 0.2, delay: Math.min(idx, 10) * 0.01 }}
+                          className="data-statistics-depot-item flex min-w-0 items-center gap-3 rounded-xl p-3 surface-soft"
                         >
                           {/* 物品图标 */}
-                          <div className="flex-shrink-0 w-12 h-12 rounded-xl overflow-hidden surface-panel flex items-center justify-center">
+                          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--app-surface-muted)]">
                             {failedDepotImages[imageKey] ? (
                               <span role="img" aria-label={`${item.name}图标不可用`}>
                                 <PackageIcon className="h-6 w-6 brand-text" aria-hidden="true" />
@@ -1469,14 +1557,24 @@ export default function DataStatistics() {
           
           {/* 掉落记录 */}
           {activeTab === 'drops' && (
-            <DropRecords
-              dropStatistics={dropStatistics}
-              dropDays={dropDays}
-              setDropDays={setDropDays}
-              onRefresh={loadDropData}
-              isLoading={dropDataLoading}
-              error={dropDataError}
-            />
+            <motion.div
+              id="data-statistics-panel-drops"
+              role="tabpanel"
+              aria-labelledby="data-statistics-tab-drops"
+              initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
+              className="min-w-0"
+            >
+              <DropRecords
+                dropStatistics={dropStatistics}
+                dropDays={dropDays}
+                setDropDays={setDropDays}
+                onRefresh={loadDropData}
+                isLoading={dropDataLoading}
+                error={dropDataError}
+              />
+            </motion.div>
           )}
           </div>
 
