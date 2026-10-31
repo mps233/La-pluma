@@ -305,10 +305,6 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-body::before {
-  display: none !important;
-}
-
 .la-pluma-app,
 .la-pluma-app .view,
 .la-pluma-app .page {

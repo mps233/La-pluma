@@ -133,25 +133,6 @@
     color: var(--app-text);
   }
 
-  body {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
-
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: -1;
-    background-image: linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px);
-    background-size: 40px 40px;
-    mask-image: linear-gradient(to bottom, rgba(0,0,0,0.65), transparent 70%);
-  }
-
-  .dark body::before {
-    background-image: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  }
-
   button:focus-visible,
   a:focus-visible,
   summary:focus-visible {
@@ -546,36 +527,6 @@
   }
 }
 
-.automation-flow-card {
-  min-width: 0;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-lg);
-  padding: 1rem;
-  background: var(--app-surface-muted);
-  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, opacity 160ms ease, transform 160ms ease;
-}
-
-.automation-flow-card:hover {
-  border-color: color-mix(in srgb, var(--app-accent) 42%, var(--app-border));
-  box-shadow: 0 8px 22px color-mix(in srgb, var(--app-accent) 9%, transparent);
-}
-
-.automation-flow-card.is-current {
-  border-color: var(--app-accent);
-  background: var(--app-accent-soft);
-  box-shadow: none;
-}
-
-.automation-flow-card.is-disabled {
-  background: color-mix(in srgb, var(--app-surface-muted) 56%, transparent);
-  opacity: 0.58;
-}
-
-.automation-flow-card.is-dragging {
-  transform: scale(0.99);
-  opacity: 0.5;
-}
-
 .automation-flow-card-header {
   display: flex;
   align-items: center;
@@ -676,10 +627,6 @@
     min-height: 0;
     align-items: stretch;
     flex-direction: column;
-    padding: 0.875rem;
-  }
-
-  .automation-flow-card {
     padding: 0.875rem;
   }
 
@@ -1147,7 +1094,7 @@ html.dark .la-pluma-app [data-automation-tasks] .automation-monitor-surface .aut
   inset: 0.125rem 0;
   border-radius: var(--app-continuous-radius-compact);
   background: color-mix(in srgb, var(--app-accent) 7%, transparent);
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--app-accent) 8%, transparent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .automation-sequence-item.is-completed {
@@ -4605,16 +4552,6 @@ svg.w-5.h-5 {
     gap: var(--app-space-section);
   }
 
-  .app-grid-card {
-    display: grid;
-    gap: var(--app-space-card);
-  }
-
-  .app-grid-section {
-    display: grid;
-    gap: var(--app-space-section);
-  }
-
   .data-statistics-status {
     width: 100%;
     overflow: hidden;
@@ -5065,17 +5002,6 @@ svg.w-5.h-5 {
     background: color-mix(in srgb, var(--app-accent-soft) 28%, transparent);
   }
 
-  .control-active {
-    background: var(--app-text);
-    color: var(--app-bg);
-    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
-  }
-
-  .dark .control-active {
-    background: var(--app-text);
-    color: #071014;
-  }
-
   .icon-well {
     background: color-mix(in srgb, var(--app-surface-solid) 70%, transparent);
     color: var(--app-accent);
@@ -5110,14 +5036,14 @@ svg.w-5.h-5 {
     color: white;
     box-shadow:
       inset 0 0 0 1px color-mix(in srgb, white 12%, transparent),
-      0 5px 14px color-mix(in srgb, var(--app-success-action) 18%, transparent);
+      0 5px 14px rgba(0, 0, 0, 0.16);
   }
 
   .status-success-action:hover:not(:disabled) {
     background: color-mix(in srgb, var(--app-success-action) 82%, black);
     box-shadow:
       inset 0 0 0 1px color-mix(in srgb, white 14%, transparent),
-      0 7px 18px color-mix(in srgb, var(--app-success-action) 22%, transparent);
+      0 7px 18px rgba(0, 0, 0, 0.2);
   }
 
   .status-warning {
@@ -5137,14 +5063,14 @@ svg.w-5.h-5 {
     color: white;
     box-shadow:
       inset 0 0 0 1px color-mix(in srgb, white 12%, transparent),
-      0 5px 14px color-mix(in srgb, var(--app-danger-action) 18%, transparent);
+      0 5px 14px rgba(0, 0, 0, 0.16);
   }
 
   .status-danger-action:hover:not(:disabled) {
     background: color-mix(in srgb, var(--app-danger-action) 82%, black);
     box-shadow:
       inset 0 0 0 1px color-mix(in srgb, white 14%, transparent),
-      0 7px 18px color-mix(in srgb, var(--app-danger-action) 22%, transparent);
+      0 7px 18px rgba(0, 0, 0, 0.2);
   }
 
   .status-info {
