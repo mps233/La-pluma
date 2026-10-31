@@ -136,6 +136,24 @@ describe('executeAgentTask', () => {
     );
   });
 
+  it('rejects dynamic task types not supported by maa-cli 0.7.7', async () => {
+    const { dependencies } = createExecutors();
+
+    await assert.rejects(
+      executeAgentTask({
+        command: 'run',
+        taskConfig: { name: '更换主题', type: 'SwitchTheme' }
+      }, dependencies),
+      error => {
+        assert.equal(error.code, 'AGENT_VALIDATION_TASK_TYPE_NOT_SUPPORTED');
+        assert.equal(error.statusCode, 400);
+        assert.equal(error.details.type, 'SwitchTheme');
+        assert.ok(error.details.allowed.includes('Custom'));
+        return true;
+      }
+    );
+  });
+
   it('rejects malformed and non-object task configs', async () => {
     const { dependencies } = createExecutors();
 

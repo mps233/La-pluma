@@ -392,6 +392,21 @@ async function getOperatorList(filters = {}) {
   return filteredOperators;
 }
 
+// Current Arknights game data no longer carries the LMD entry in evolveCost.
+// These are the standard promotion LMD costs by rarity.
+const ELITE_LMD_COSTS = {
+  3: { elite1: 15000, elite2: 0 },
+  4: { elite1: 30000, elite2: 180000 },
+  5: { elite1: 40000, elite2: 200000 },
+  6: { elite1: 50000, elite2: 210000 }
+};
+
+export function getEliteLmdCost(operator, phase) {
+  const explicit = Number(operator?.materials?.[phase]?.lmd);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  return ELITE_LMD_COSTS[Number(operator?.rarity)]?.[phase] || 0;
+}
+
 /**
  * 计算单个干员的材料需求
  */
@@ -408,14 +423,14 @@ function calculateOperatorMaterials(operator, depot = {}) {
   const allMaterials = {};
   
   if (needElite1 && operator.materials.elite1) {
-    totalLMD.needed += operator.materials.elite1.lmd || 0;
+    totalLMD.needed += getEliteLmdCost(operator, 'elite1');
     operator.materials.elite1.materials?.forEach(mat => {
       allMaterials[mat.id] = (allMaterials[mat.id] || 0) + mat.count;
     });
   }
   
   if (needElite2 && operator.materials.elite2) {
-    totalLMD.needed += operator.materials.elite2.lmd || 0;
+    totalLMD.needed += getEliteLmdCost(operator, 'elite2');
     operator.materials.elite2.materials?.forEach(mat => {
       allMaterials[mat.id] = (allMaterials[mat.id] || 0) + mat.count;
     });
@@ -487,20 +502,34 @@ async function getTrainingQueue() {
   const queueData = await loadTrainingQueue();
   const depot = await loadDepot();
   const operatorMaterialsData = await loadOperatorMaterials();
-  
+  const operBoxData = await loadOperBox();
+  const ownedOperators = new Map(
+    getOperBoxOperators(operBoxData).map(operator => [operator.id, operator])
+  );
+  let queueChanged = false;
+
   // 为队列中的每个干员计算材料需求和进度
   const enrichedQueue = [];
-  
+
   for (const queueItem of queueData.queue) {
     const opData = operatorMaterialsData.operators[queueItem.operatorId];
     if (!opData) continue;
-    
+
+    const ownedOperator = ownedOperators.get(queueItem.operatorId);
+    const currentElite = ownedOperator
+      ? Math.max(0, Number(ownedOperator.elite) || 0)
+      : Math.max(0, Number(queueItem.currentElite) || 0);
+    if (currentElite !== queueItem.currentElite) {
+      queueItem.currentElite = currentElite;
+      queueChanged = true;
+    }
+
     const operator = {
       id: queueItem.operatorId,
       name: opData.name,
       rarity: opData.rarity,
       profession: opData.profession,
-      currentElite: queueItem.currentElite ?? 0,
+      currentElite,
       targetElite: queueItem.targetElite ?? 2,
       materials: {
         elite1: opData.elite1,
@@ -525,6 +554,10 @@ async function getTrainingQueue() {
     });
   }
   
+  if (queueChanged) {
+    await saveTrainingQueue(queueData);
+  }
+
   return {
     queue: enrichedQueue,
     settings: queueData.settings,

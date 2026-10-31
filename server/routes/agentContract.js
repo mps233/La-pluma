@@ -518,6 +518,95 @@ export const AGENT_OPERATIONS = Object.freeze([
     }
   }),
   operation({
+    id: 'update_core',
+    method: 'POST',
+    path: '/api/agent/actions/update-core',
+    description: 'Update MaaCore and its resources, optionally switching the stable/beta channel.',
+    advertised: false,
+    tags: ['Maintenance'],
+    safety: lowRiskWrite(['update_maa_core'], { mutatesDevice: false }),
+    execution: execution({
+      dryRun: true,
+      producesRun: true,
+      pollAction: 'get_current_run',
+      stopAction: 'stop_task',
+      idempotency: idempotencyPolicy()
+    }),
+    body_schema: {
+      type: 'object',
+      properties: {
+        version: { type: 'string', enum: ['stable', 'beta'] },
+        dryRun: { type: 'boolean', default: false }
+      }
+    }
+  }),
+  operation({
+    id: 'hot_update_resources',
+    method: 'POST',
+    path: '/api/agent/actions/hot-update-resources',
+    description: 'Run maa hot-update to refresh the configured resource source and hot-fix cache.',
+    advertised: false,
+    tags: ['Maintenance'],
+    safety: lowRiskWrite(['update_maa_resources'], { mutatesDevice: false }),
+    execution: execution({
+      dryRun: true,
+      producesRun: true,
+      pollAction: 'get_current_run',
+      stopAction: 'stop_task',
+      idempotency: idempotencyPolicy()
+    }),
+    body_schema: {
+      type: 'object',
+      properties: {
+        dryRun: { type: 'boolean', default: false }
+      }
+    }
+  }),
+  operation({
+    id: 'depot_recognition',
+    method: 'POST',
+    path: '/api/agent/actions/depot-recognition',
+    description: 'Parse the latest DepotInfo callback from the MAA log and update the local depot cache.',
+    advertised: false,
+    tags: ['Data'],
+    safety: lowRiskWrite(['parse_maa_logs', 'update_local_depot_cache'], { mutatesDevice: false }),
+    execution: execution({
+      dryRun: true,
+      producesRun: true,
+      pollAction: 'get_current_run',
+      stopAction: 'stop_task',
+      idempotency: idempotencyPolicy()
+    }),
+    body_schema: {
+      type: 'object',
+      properties: {
+        dryRun: { type: 'boolean', default: false }
+      }
+    }
+  }),
+  operation({
+    id: 'operbox_recognition',
+    method: 'POST',
+    path: '/api/agent/actions/operbox-recognition',
+    description: 'Parse the latest OperBoxInfo callback from the MAA log and update the local operator cache.',
+    advertised: false,
+    tags: ['Data'],
+    safety: lowRiskWrite(['parse_maa_logs', 'update_local_operbox_cache'], { mutatesDevice: false }),
+    execution: execution({
+      dryRun: true,
+      producesRun: true,
+      pollAction: 'get_current_run',
+      stopAction: 'stop_task',
+      idempotency: idempotencyPolicy()
+    }),
+    body_schema: {
+      type: 'object',
+      properties: {
+        dryRun: { type: 'boolean', default: false }
+      }
+    }
+  }),
+  operation({
     id: 'get_current_activity',
     method: 'GET',
     path: '/api/agent/activity',

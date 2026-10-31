@@ -44,7 +44,7 @@ function getOpenApiOperation(spec, item) {
 
 describe('Agent API contract registry', () => {
   it('keeps operation ids and method/path pairs unique', () => {
-    assert.equal(AGENT_OPERATIONS.length, 23);
+    assert.equal(AGENT_OPERATIONS.length, 27);
     assert.equal(new Set(AGENT_OPERATIONS.map(item => item.id)).size, AGENT_OPERATIONS.length);
     assert.equal(
       new Set(AGENT_OPERATIONS.map(item => `${item.method} ${item.path}`)).size,

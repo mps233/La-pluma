@@ -20,7 +20,28 @@ export const AGENT_TASK_COMMANDS = Object.freeze([
   'list'
 ]);
 
+export const MAA_TASK_TYPES = Object.freeze([
+  'StartUp',
+  'CloseDown',
+  'Fight',
+  'Recruit',
+  'Infrast',
+  'Mall',
+  'Award',
+  'Roguelike',
+  'Copilot',
+  'SSSCopilot',
+  'ParadoxCopilot',
+  'Depot',
+  'OperBox',
+  'Reclamation',
+  'Custom',
+  'SingleStep',
+  'VideoRecognition'
+]);
+
 const AGENT_TASK_COMMAND_SET = new Set(AGENT_TASK_COMMANDS);
+const MAA_TASK_TYPE_SET = new Set(MAA_TASK_TYPES);
 const AGENT_QUERY_COMMANDS = new Set(['activity', 'list']);
 const SAFE_TASK_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
@@ -30,6 +51,10 @@ function invalidRequest(code, message, details) {
     details,
     retryable: false
   });
+}
+
+export function validateTaskConfig(taskConfig) {
+  return normalizeTaskConfig(taskConfig);
 }
 
 function normalizeTaskConfig(taskConfig) {
@@ -67,6 +92,15 @@ function normalizeTaskConfig(taskConfig) {
     );
   }
 
+  const normalizedType = normalized.type.trim();
+  if (!MAA_TASK_TYPE_SET.has(normalizedType)) {
+    throw invalidRequest(
+      'AGENT_VALIDATION_TASK_TYPE_NOT_SUPPORTED',
+      `不支持的 MaaCore 任务类型: ${normalizedType}`,
+      { type: normalizedType, allowed: [...MAA_TASK_TYPES] }
+    );
+  }
+
   if (normalized.params !== undefined
     && (!normalized.params || typeof normalized.params !== 'object' || Array.isArray(normalized.params))) {
     throw invalidRequest(
@@ -79,7 +113,7 @@ function normalizeTaskConfig(taskConfig) {
   return {
     ...normalized,
     name: normalized.name.trim(),
-    type: normalized.type.trim(),
+    type: normalizedType,
     params: normalized.params || {}
   };
 }

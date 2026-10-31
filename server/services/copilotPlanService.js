@@ -108,7 +108,9 @@ export async function buildCopilotPlan(setId, raid = 'normal') {
       id: Number(id),
       stageId: content.stage_name || '',
       stage: stageCodes.get(content.stage_name)?.code || getNavigationStage(content) || `prts://${id}`,
-      apCost: stageCodes.get(content.stage_name)?.apCost || 0,
+      apCost: stageCodes.get(content.stage_name)?.apCost > 0
+        ? stageCodes.get(content.stage_name).apCost
+        : null,
       presetFormation: isPresetFormationCopilot(content),
       supportsRaid: !isPresetFormationCopilot(content),
       operators: content.opers || [],
@@ -240,10 +242,13 @@ export function buildCopilotRepeatFiles(entry, loopTimes, planDir) {
 
 async function recordCompletedCopilotEntries(entries, loopTimes) {
   for (const entry of entries) {
+    const apCost = entry.apCost === null || entry.apCost === undefined
+      ? null
+      : Number(entry.apCost);
     await recordDrops({
       stage: entry.displayStage,
       times: loopTimes,
-      sanity: entry.apCost * loopTimes,
+      sanity: Number.isFinite(apCost) ? apCost * loopTimes : 0,
       medicine: 0,
       stone: 0,
       items: [],

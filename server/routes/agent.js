@@ -27,6 +27,7 @@ import { loadUserConfig, saveUserConfig, getAllUserConfigs, deleteUserConfig } f
 import { getNotificationConfig, sendNotification, sendToChannel, testNotificationChannel, setNotificationConfig, getTodayOpenStages } from '../services/notificationService.js';
 import operatorTrainingService from '../services/operatorTrainingService.js';
 import { getMaaResourceInfo, updateMaaResources } from '../services/resourceUpdateService.js';
+import { getMaaCoreChannel, setMaaCoreChannel } from '../services/maaCliConfigService.js';
 import { parseDepotData, parseOperBoxData, getDepotData, getOperBoxData, getAllOperators } from '../services/dataParserService.js';
 import { getTodayDrops, getRecentDrops, getDropStatistics } from '../services/dropRecordService.js';
 import { loadParadoxOperators, resolveStageSearchKeyword } from '../services/copilotService.js';
@@ -35,7 +36,7 @@ import { getActivityRunPreflight } from '../services/activityNavigationService.j
 import { findActivityCopilotCandidates } from '../services/activityCopilotDiscoveryService.js';
 import { getActivityCompletion, runCurrentActivityCopilots } from '../services/activityCopilotRunService.js';
 import { withMaaExecutionLease } from '../services/executionCoordinatorService.js';
-import { createDailyFlowExecutionError, executeAgentTask, normalizeDailyFlowRequest } from '../services/agentActionService.js';
+import { createDailyFlowExecutionError, executeAgentTask, normalizeDailyFlowRequest, validateTaskConfig } from '../services/agentActionService.js';
 import {
   beginAgentRun,
   startAgentRun,
@@ -878,21 +879,29 @@ router.post('/actions/depot-recognition', asyncHandler(async (req, res) => {
     return sendDryRun(res, req, plan);
   }
 
-  const result = await parseDepotData();
-  if (!result?.success) {
-    const failure = result?.error || {};
-    return sendError(res, req, agentError(
-      failure.code || 'AGENT_DEPOT_RECOGNITION_FAILED',
-      result?.message || '仓库识别失败',
-      {
-        statusCode: failure.statusCode || 500,
-        details: failure.details || {},
-        retryable: failure.retryable ?? true
+  return executeTrackedAgentAction(req, res, {
+    operationId: 'depot_recognition',
+    input: { action: 'depot-recognition' },
+    waitForCompletion: true,
+    metadata: { taskName: '仓库识别', taskType: 'statistics' },
+    execute: async () => {
+      const result = await parseDepotData();
+      if (!result?.success) {
+        const failure = result?.error || {};
+        throw agentError(
+          failure.code || 'AGENT_DEPOT_RECOGNITION_FAILED',
+          result?.message || '仓库识别失败',
+          {
+            statusCode: failure.statusCode || 500,
+            details: failure.details || {},
+            retryable: failure.retryable ?? true
+          }
+        );
       }
-    ), result?.message || '仓库识别失败');
-  }
-
-  return sendSuccess(res, req, result.data, '仓库识别完成');
+      return result.data;
+    },
+    successMessage: '仓库识别完成'
+  });
 }));
 
 router.get('/data/operbox', asyncHandler(async (req, res) => {
@@ -908,21 +917,29 @@ router.post('/actions/operbox-recognition', asyncHandler(async (req, res) => {
     return sendDryRun(res, req, plan);
   }
 
-  const result = await parseOperBoxData();
-  if (!result?.success) {
-    const failure = result?.error || {};
-    return sendError(res, req, agentError(
-      failure.code || 'AGENT_OPERBOX_RECOGNITION_FAILED',
-      result?.message || '干员识别失败',
-      {
-        statusCode: failure.statusCode || 500,
-        details: failure.details || {},
-        retryable: failure.retryable ?? true
+  return executeTrackedAgentAction(req, res, {
+    operationId: 'operbox_recognition',
+    input: { action: 'operbox-recognition' },
+    waitForCompletion: true,
+    metadata: { taskName: '干员识别', taskType: 'statistics' },
+    execute: async () => {
+      const result = await parseOperBoxData();
+      if (!result?.success) {
+        const failure = result?.error || {};
+        throw agentError(
+          failure.code || 'AGENT_OPERBOX_RECOGNITION_FAILED',
+          result?.message || '干员识别失败',
+          {
+            statusCode: failure.statusCode || 500,
+            details: failure.details || {},
+            retryable: failure.retryable ?? true
+          }
+        );
       }
-    ), result?.message || '干员识别失败');
-  }
-
-  return sendSuccess(res, req, result.data, '干员识别完成');
+      return result.data;
+    },
+    successMessage: '干员识别完成'
+  });
 }));
 
 router.get('/data/operators', asyncHandler(async (req, res) => {
@@ -1466,52 +1483,76 @@ router.post('/actions/update-core', asyncHandler(async (req, res) => {
 
   if (dryRun) return sendDryRun(res, req, plan);
 
-  return withMaaExecutionLease({ source: 'core-update', taskName: '更新 MaaCore 与资源', command: 'update' }, async () => {
-    let coreResult;
-    try {
-      coreResult = version === 'beta'
-        ? await execMaaCommand('install', ['beta', '--force'])
-        : version === 'stable'
-          ? await execMaaCommand('install', ['stable', '--force'])
-          : await execMaaCommand('update', []);
-    } catch (error) {
-      logger.error('更新 MaaCore 失败', { error: error.message, version });
-      return sendError(res, req, agentError('AGENT_MAA_UPDATE_CORE_FAILED', `MaaCore 更新失败: ${error.message}`, {
-        statusCode: 500,
-        retryable: true,
-        details: { version, failedStep: 'core', coreUpdated: false }
-      }));
-    }
+  return executeTrackedAgentAction(req, res, {
+    operationId: 'update_core',
+    input: { version: version || 'current' },
+    waitForCompletion: true,
+    metadata: { taskName: '更新 MaaCore 与资源', taskType: 'maintenance' },
+    execute: async () => withMaaExecutionLease({
+      source: 'core-update',
+      taskName: '更新 MaaCore 与资源',
+      command: 'update'
+    }, async () => {
+      let coreResult;
+      try {
+        coreResult = version === 'beta'
+          ? await execMaaCommand('install', ['beta', '--force'])
+          : version === 'stable'
+            ? await execMaaCommand('install', ['stable', '--force'])
+            : await execMaaCommand('update', []);
+      } catch (error) {
+        logger.error('更新 MaaCore 失败', { error: error.message, version });
+        throw agentError('AGENT_MAA_UPDATE_CORE_FAILED', `MaaCore 更新失败: ${error.message}`, {
+          statusCode: 500,
+          retryable: true,
+          details: { version, failedStep: 'core', coreUpdated: false }
+        });
+      }
 
-    try {
-      // `maa update` / `maa install` already refresh the base resource,
-      // MaaResource/hot-fix source, and the hot-update cache. Read the
-      // resulting version instead of running a second custom resource sync.
-      const resource = await getMaaResourceInfo();
-      const runtime = await getMaaVersion(true);
-      return sendSuccess(res, req, {
-        plan,
-        steps: {
-          core: { success: true, output: coreResult.stdout || coreResult.stderr || '' },
-          resources: { success: true, resource }
-        },
-        runtime: { ...runtime, resource }
-      }, version ? `已切换到 ${version} 渠道并同步最新资源` : 'MaaCore 和资源已更新');
-    } catch (error) {
-      const runtime = await getMaaVersion(true).catch(() => null);
-      const resource = await getMaaResourceInfo().catch(() => null);
-      logger.error('MaaCore 已更新，但资源同步失败', { error: error.message, version });
-      return sendError(res, req, agentError('AGENT_MAA_UPDATE_RESOURCE_FAILED', `MaaCore 已更新，但资源同步失败: ${error.message}`, {
-        statusCode: 500,
-        retryable: true,
-        details: {
-          version,
-          failedStep: 'resources',
-          coreUpdated: true,
-          runtime: runtime ? { ...runtime, resource } : null
+      try {
+        let coreChannel = null;
+        let channelPersisted = false;
+        try {
+          coreChannel = version === 'beta' || version === 'stable'
+            ? await setMaaCoreChannel(version)
+            : await getMaaCoreChannel();
+          channelPersisted = true;
+        } catch (channelError) {
+          logger.warn('持久化 MaaCore 更新渠道失败', { error: channelError.message, version });
         }
-      }));
-    }
+
+        // `maa update` / `maa install` already refresh the base resource,
+        // MaaResource/hot-fix source, and the hot-update cache. Read the
+        // resulting version instead of running a second custom resource sync.
+        const resource = await getMaaResourceInfo();
+        const runtime = await getMaaVersion(true);
+        return {
+          plan,
+          channel: coreChannel,
+          channelPersisted,
+          steps: {
+            core: { success: true, output: coreResult.stdout || coreResult.stderr || '' },
+            resources: { success: true, resource }
+          },
+          runtime: { ...runtime, resource }
+        };
+      } catch (error) {
+        const runtime = await getMaaVersion(true).catch(() => null);
+        const resource = await getMaaResourceInfo().catch(() => null);
+        logger.error('MaaCore 已更新，但资源同步失败', { error: error.message, version });
+        throw agentError('AGENT_MAA_UPDATE_RESOURCE_FAILED', `MaaCore 已更新，但资源同步失败: ${error.message}`, {
+          statusCode: 500,
+          retryable: true,
+          details: {
+            version,
+            failedStep: 'resources',
+            coreUpdated: true,
+            runtime: runtime ? { ...runtime, resource } : null
+          }
+        });
+      }
+    }),
+    successMessage: version ? `已切换到 ${version} 渠道并同步最新资源` : 'MaaCore 和资源已更新'
   });
 }));
 
@@ -1553,16 +1594,26 @@ router.post('/actions/update-cli', asyncHandler(async (req, res) => {
 router.post('/actions/hot-update-resources', asyncHandler(async (req, res) => {
   const plan = { action: 'hot-update-resources', command: 'hot-update' };
   if (req.body?.dryRun) return sendDryRun(res, req, plan);
-  try {
-    const result = await updateMaaResources();
-    return sendSuccess(res, req, { ...result, plan }, '资源文件更新成功');
-  } catch (error) {
-    return sendError(res, req, agentError('AGENT_MAA_RESOURCE_UPDATE_FAILED', `资源同步失败: ${error.message}`, {
-      statusCode: 500,
-      retryable: true,
-      details: { failedStep: 'resources' }
-    }));
-  }
+
+  return executeTrackedAgentAction(req, res, {
+    operationId: 'hot_update_resources',
+    input: { action: 'hot-update' },
+    waitForCompletion: true,
+    metadata: { taskName: '同步 MAA 资源', taskType: 'maintenance' },
+    execute: async () => {
+      try {
+        const result = await updateMaaResources();
+        return { ...result, plan };
+      } catch (error) {
+        throw agentError('AGENT_MAA_RESOURCE_UPDATE_FAILED', `资源同步失败: ${error.message}`, {
+          statusCode: 500,
+          retryable: true,
+          details: { failedStep: 'resources' }
+        });
+      }
+    },
+    successMessage: '资源文件更新成功'
+  });
 }));
 
 router.post('/actions/test-connection', asyncHandler(async (req, res) => {
@@ -1732,6 +1783,13 @@ router.post('/actions/fight', asyncHandler(async (req, res) => {
 
 router.post('/actions/run-task', asyncHandler(async (req, res) => {
   const input = req.body || {};
+  if (input.taskConfig !== undefined && input.taskConfig !== null) {
+    try {
+      validateTaskConfig(input.taskConfig);
+    } catch (error) {
+      return sendError(res, req, error);
+    }
+  }
   const requestedWait = parseWaitForCompletion(input.waitForCompletion);
   const waitForCompletion = input.command === 'activity' || input.command === 'list'
     ? true
