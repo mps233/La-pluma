@@ -34,7 +34,7 @@ Read these before broad work:
 
 ## Frontend And Design
 
-`DESIGN.md` is the authoritative visual and component spec, and `client/src/components/common/README.md` documents component props. Both are committed. When a rule changes, edit those files instead of restating the rule here, so there is exactly one copy of each rule.
+`DESIGN.md` is the authoritative visual and component spec, and `client/src/components/common/README.md` documents component props. Both are committed. When a rule changes, edit those files instead of restating the rule here, so there is exactly one copy of each rule. Tooling that generates its own `DESIGN.md` (design linters, prompt packs, `/impeccable document`) must merge into this file or write elsewhere; never let it overwrite the committed spec.
 
 Non-negotiables:
 
