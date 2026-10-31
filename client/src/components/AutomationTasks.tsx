@@ -2680,10 +2680,10 @@ export default function AutomationTasks() {
 
                   <div className="mt-2 flex min-w-0 items-center gap-2">
                     {executionSummaryHasFailure(lastExecutionSummary)
-                      ? <AlertTriangle size={14} className="shrink-0 text-red-500" strokeWidth={2} />
+                      ? <AlertTriangle size={14} className="shrink-0 text-[var(--app-danger)]" strokeWidth={2} />
                       : lastExecutionSummary.skippedCount > 0 && lastExecutionSummary.successCount === 0
                         ? <CircleMinus size={14} className="shrink-0 text-gray-400" strokeWidth={2} />
-                        : <CheckCircle2 size={14} className="shrink-0 text-emerald-500" strokeWidth={2} />}
+                        : <CheckCircle2 size={14} className="shrink-0 text-[var(--app-success)]" strokeWidth={2} />}
                     <span className="min-w-0 flex-1 text-xs leading-5 text-gray-600 dark:text-gray-300">
                       {formatExecutionActionSummary(lastExecutionSummary.actions)
                         || (lastExecutionSummary.failedCount > 0
@@ -2739,7 +2739,7 @@ export default function AutomationTasks() {
                           {lastExecutionSummary.reports.map((report, reportIndex) => (
                             <div
                               key={`${report.provider}-${report.stage || reportIndex}-${reportIndex}`}
-                              className={`flex min-w-0 items-start gap-2 text-xs ${report.status === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}
+                              className={`flex min-w-0 items-start gap-2 text-xs ${report.status === 'success' ? 'text-[var(--app-success-text)]' : 'text-[var(--app-warning-text)]'}`}
                             >
                               {report.status === 'success'
                                 ? <CheckCircle2 size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
@@ -2757,7 +2757,7 @@ export default function AutomationTasks() {
                           {lastExecutionSummary.actions.map((action, actionIndex) => (
                             <div
                               key={`${action.action}-${action.task}-${actionIndex}`}
-                              className={`flex min-w-0 items-start gap-2 text-xs ${action.status === 'success' ? 'text-emerald-600 dark:text-emerald-400' : action.status === 'skipped' ? 'text-gray-500 dark:text-gray-400' : 'text-red-600 dark:text-red-400'}`}
+                              className={`flex min-w-0 items-start gap-2 text-xs ${action.status === 'success' ? 'text-[var(--app-success-text)]' : action.status === 'skipped' ? 'text-secondary' : 'text-[var(--app-danger-text)]'}`}
                             >
                               {action.status === 'success'
                                 ? <CheckCircle2 size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
@@ -2776,14 +2776,14 @@ export default function AutomationTasks() {
                           return !lastExecutionSummary.actions?.some(action => action.status === 'failed' && action.task === taskName)
                         })
                         .map((error, errorIndex) => (
-                          <p key={`${typeof error === 'string' ? error : error.task}-${errorIndex}`} className="mt-2 flex items-start gap-2 text-xs leading-5 text-red-600 dark:text-red-400">
+                          <p key={`${typeof error === 'string' ? error : error.task}-${errorIndex}`} className="mt-2 flex items-start gap-2 text-xs leading-5 text-[var(--app-danger-text)]">
                             <AlertTriangle size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
                             <span>{typeof error === 'string' ? error : `${error.task}：${error.error}`}</span>
                           </p>
                         ))}
 
                       {lastExecutionSummary.warnings.map((warning, warningIndex) => (
-                        <p key={`${warning}-${warningIndex}`} className="mt-2 flex items-start gap-2 text-xs leading-5 text-amber-600 dark:text-amber-400">
+                        <p key={`${warning}-${warningIndex}`} className="mt-2 flex items-start gap-2 text-xs leading-5 text-[var(--app-warning-text)]">
                           <AlertTriangle size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
                           <span>{warning}</span>
                         </p>

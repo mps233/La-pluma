@@ -22,10 +22,12 @@
   --app-accent-action-pressed: #0055b3;
   --app-accent-soft: rgba(0, 122, 255, 0.12);
   --app-success: #34c759;
-  --app-success-text: #1f7a36;
+  --app-success-text: #1c7331;
   --app-success-action: #248a3d;
   --app-warning: #ff9500;
+  --app-warning-text: #92400e;
   --app-danger: #ff3b30;
+  --app-danger-text: #b42318;
   --app-danger-action: #d70015;
   --app-info: #5856d6;
   --app-radius-xs: 0.375rem;
@@ -192,7 +194,9 @@ html.dark,
   --app-success-text: #30d158;
   --app-success-action: #1f7a36;
   --app-warning: #ff9f0a;
+  --app-warning-text: #ff9f0a;
   --app-danger: #ff453a;
+  --app-danger-text: #ff6961;
   --app-danger-action: #ff453a;
   --app-info: #5e5ce6;
   --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.3);

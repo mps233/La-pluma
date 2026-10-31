@@ -168,11 +168,11 @@ export default function ScrcpyDeviceView({
   const needsInstall = infrastructureKnown && (!infrastructureStatus.installed || !infrastructureStatus.built)
   const visibleError = webrtc.error || infrastructureError
   const statusDotClass = visibleError
-    ? 'bg-red-400'
+    ? 'bg-[var(--app-danger)]'
     : webrtc.status === 'connected'
-    ? 'bg-emerald-400'
+    ? 'bg-[var(--app-success)]'
     : isConnecting
-        ? 'bg-amber-400'
+        ? 'bg-[var(--app-warning)]'
         : 'bg-gray-400'
 
   const applyPreset = (preset: QualityPreset) => {
@@ -470,7 +470,7 @@ export default function ScrcpyDeviceView({
               Agent：{agentStatusLabel}
             </span>
             {visibleError && (
-              <span className="px-2 py-1 rounded-full bg-red-100 dark:bg-red-500/10 dark:text-red-300 text-red-600">{visibleError}</span>
+              <span className="px-2 py-1 rounded-full status-danger">{visibleError}</span>
             )}
           </div>}
         </div>

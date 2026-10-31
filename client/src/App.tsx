@@ -70,7 +70,7 @@ class PageErrorBoundary extends React.Component<PageErrorBoundaryProps, { hasErr
   render() {
     const content = this.state.hasError ? (
         <div className="p-6">
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-300">
+          <div className="rounded-2xl border border-transparent p-4 text-sm status-danger">
             页面渲染失败：{this.state.errorMessage}
           </div>
         </div>

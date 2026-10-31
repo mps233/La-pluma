@@ -1916,7 +1916,7 @@ export default function CombatTasks() {
                                   <div className="flex shrink-0 items-center gap-1.5">
                                     <span className="rounded-md px-2 py-1 text-[11px] brand-chip">待 {pendingCount}</span>
                                     <span className="rounded-md border border-[var(--app-border)] px-2 py-1 text-[11px] text-secondary">完成 {completedCount}</span>
-                                    <span className={`rounded-md border px-2 py-1 text-[11px] ${failedCount > 0 ? 'border-rose-400/30 bg-rose-500/10 text-rose-500 dark:text-rose-300' : 'border-[var(--app-border)] text-secondary'}`}>失败 {failedCount}</span>
+                                    <span className={`rounded-md border px-2 py-1 text-[11px] ${failedCount > 0 ? 'status-danger border-transparent' : 'border-[var(--app-border)] text-secondary'}`}>失败 {failedCount}</span>
                                   </div>
                                 </div>
                                 <div className="mt-3">
@@ -2008,7 +2008,7 @@ export default function CombatTasks() {
                               return (
                                 <div key={`${copilot.id}-${idx}`} className={`flex items-center justify-between gap-3 px-2.5 py-2 text-xs transition-colors ${
                                   isCurrent ? 'bg-[var(--app-accent-soft)]' :
-                                  isCompleted ? (isSuccess ? 'bg-emerald-500/10' : 'bg-rose-500/10') :
+                                  isCompleted ? (isSuccess ? 'bg-[color-mix(in_srgb,var(--app-success)_10%,transparent)]' : 'bg-[color-mix(in_srgb,var(--app-danger)_10%,transparent)]') :
                                   isPersistedDone ? 'bg-black/[0.025] opacity-70 dark:bg-white/[0.035]' :
                                   'hover:bg-[var(--app-surface-muted)]'
                                 }`}>
@@ -2049,7 +2049,7 @@ export default function CombatTasks() {
                                           <span className="shrink-0 rounded px-1.5 py-0.5 text-[11px] brand-chip">预设编队 · 仅普通</span>
                                         )}
                                         {copilot.completedModes?.map(mode => (
-                                          <span key={mode} className="shrink-0 rounded px-1.5 py-0.5 text-[11px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+                                          <span key={mode} className="shrink-0 rounded px-1.5 py-0.5 text-[11px] status-success">
                                             {mode === 'raid' ? '突袭已完成' : '普通已完成'}
                                           </span>
                                         ))}
@@ -2060,7 +2060,7 @@ export default function CombatTasks() {
                                   <div className="flex shrink-0 items-center gap-2">
                                     <span className={`min-w-[64px] rounded-md px-2 py-0.5 text-center text-[11px] ${
                                       isCurrent ? 'brand-action text-white' :
-                                      isCompleted && !isSuccess ? 'bg-rose-500/10 text-rose-500 dark:text-rose-300' :
+                                      isCompleted && !isSuccess ? 'status-danger' :
                                       isSelected ? 'brand-chip' :
                                       'bg-black/5 text-secondary dark:bg-white/10'
                                     }`}>
@@ -2341,7 +2341,7 @@ export default function CombatTasks() {
                             </svg>
                             <span>作业输入</span>
                           </h5>
-                          <span className={`shrink-0 rounded-md px-2 py-1 text-[11px] ${isSss && taskUris.length > 1 ? 'bg-rose-500/10 text-rose-500 dark:text-rose-300' : 'brand-chip'}`}>
+                          <span className={`shrink-0 rounded-md px-2 py-1 text-[11px] ${isSss && taskUris.length > 1 ? 'status-danger' : 'brand-chip'}`}>
                             {isSss ? `${taskUris.length}/1 URI` : `${taskUris.length} 个 URI`}
                           </span>
                         </div>
@@ -2366,7 +2366,7 @@ export default function CombatTasks() {
                           className="app-native-control w-full resize-none rounded-lg px-4 py-3 font-mono text-sm font-medium text-primary control-surface focus:outline-none focus:ring-2 focus:ring-[var(--app-accent-soft)]"
                         />
                         {isSss && taskUris.length > 1 && (
-                          <div className="mt-2 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-500 dark:text-rose-300">
+                          <div className="mt-2 rounded-lg border border-transparent px-3 py-2 text-xs status-danger">
                             保全派驻当前只会执行一个 SSS 作业 URI。
                           </div>
                         )}
@@ -2469,7 +2469,7 @@ export default function CombatTasks() {
                           <div className="divide-y divide-[var(--app-border)] overflow-hidden rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-solid)] text-xs">
                             <div className="flex items-center justify-between px-3 py-2">
                               <span className="text-tertiary">作业数量</span>
-                              <span className={taskUris.length > 1 ? 'text-rose-500 dark:text-rose-300' : 'text-primary'}>{taskUris.length || 0}</span>
+                              <span className={taskUris.length > 1 ? 'text-[var(--app-danger-text)]' : 'text-primary'}>{taskUris.length || 0}</span>
                             </div>
                             <div className="flex items-center justify-between px-3 py-2">
                               <span className="text-tertiary">循环次数</span>
