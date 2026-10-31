@@ -117,6 +117,8 @@ export default function ConfigManager() {
     adb_path: '/opt/homebrew/bin/adb',
     address: '127.0.0.1:16384',
     config: 'CompatMac',
+    preset: '',
+    touch_mode: '',
     auto_reconnect: true,
   })
   const [configDir, setConfigDir] = useState<string>('')
@@ -356,6 +358,8 @@ export default function ConfigManager() {
     if (connectionSaveInFlightRef.current) return
     const savedRevision = connectionRevisionRef.current
     const configSnapshot = { ...configData }
+    if (!configSnapshot.preset) delete configSnapshot.preset
+    if (!configSnapshot.touch_mode) delete configSnapshot.touch_mode
     connectionSaveInFlightRef.current = true
     setLoading(true)
     setConfigFeedback(null)
@@ -394,6 +398,8 @@ export default function ConfigManager() {
       adb_path: '/opt/homebrew/bin/adb',
       address: '127.0.0.1:16384',
       config: 'CompatMac',
+      preset: '',
+      touch_mode: '',
       auto_reconnect: true,
     }))
     setStatusMessage('已重置为默认值')
@@ -872,6 +878,41 @@ export default function ConfigManager() {
                     { value: 'General', label: 'General (Windows)' },
                   ]}
                   hint="选择与服务器系统匹配的平台预设"
+                />
+                <Select
+                  label="连接预设"
+                  value={configData.preset || ''}
+                  onChange={(value: string) => {
+                    updateConnectionConfig(current => ({ ...current, preset: value }))
+                  }}
+                  options={[
+                    { value: '', label: '自动（不指定）' },
+                    { value: 'Adb', label: 'ADB' },
+                    { value: 'MuMuPro', label: 'MuMu Pro' },
+                    { value: 'PlayCover', label: 'PlayCover (macOS)' },
+                    { value: 'Waydroid', label: 'Waydroid (Linux)' },
+                    { value: 'Androws', label: 'Androws (Windows)' },
+                  ]}
+                  hint="对应 maa-cli 的 connection.preset；自动时不写入"
+                />
+              </div>
+
+              <div className="grid min-w-0 gap-[var(--app-space-card)] md:grid-cols-2 md:items-end">
+                <Select
+                  label="触控模式"
+                  value={configData.touch_mode || ''}
+                  onChange={(value: string) => {
+                    updateConnectionConfig(current => ({ ...current, touch_mode: value }))
+                  }}
+                  options={[
+                    { value: '', label: '跟随默认' },
+                    { value: 'ADB', label: 'ADB' },
+                    { value: 'MiniTouch', label: 'MiniTouch' },
+                    { value: 'MaaTouch', label: 'MaaTouch' },
+                    { value: 'MacPlayTools', label: 'MacPlayTools' },
+                    { value: 'MaaFwAdb', label: 'MaaFwAdb' },
+                  ]}
+                  hint="对应 instance_options.touch_mode；自动时不写入"
                 />
                 <div className="config-reconnect-row flex min-h-[3.5rem] items-center justify-between gap-3 py-1">
                   <div className="min-w-0">

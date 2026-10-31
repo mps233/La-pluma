@@ -49,9 +49,11 @@ describe('dynamic task lifecycle', () => {
     const runId = 'award_temp_nonce_1'
     assert.equal(executeEvent[2][0], '--batch')
     assert.equal(executeEvent[2][1], `_lapluma/${runId}`)
-    assert.ok(writeEvent[1].endsWith(`/tasks/_lapluma/${runId}.toml`))
-    assert.match(writeEvent[2], /client_type = "Official"/)
-    assert.match(writeEvent[2], /type = "Award"/)
+    assert.ok(writeEvent[1].endsWith(`/tasks/_lapluma/${runId}.json`))
+    const writtenConfig = JSON.parse(writeEvent[2])
+    assert.equal(writtenConfig.client_type, 'Official')
+    assert.equal(writtenConfig.tasks[0].type, 'Award')
+    assert.equal(writtenConfig.tasks[0].name, '领取奖励')
     assert.deepEqual(events.slice(-2).map(event => event[0]), ['unlink', 'release'])
   })
 
@@ -97,7 +99,7 @@ describe('dynamic task lifecycle', () => {
     )
 
     const writeEvent = events.find(event => event[0] === 'write')
-    assert.match(writeEvent[2], /client_type = "Bilibili"/)
+    assert.equal(JSON.parse(writeEvent[2]).client_type, 'Bilibili')
   })
 
   it('rejects an unsupported client type before writing the task file', async () => {
@@ -128,8 +130,8 @@ describe('dynamic task lifecycle', () => {
     const dynamicDir = join(tasksDir, '_lapluma')
     await mkdir(dynamicDir, { recursive: true })
 
-    const staleDynamic = join(dynamicDir, 'stale.toml')
-    const freshDynamic = join(dynamicDir, 'fresh.toml')
+    const staleDynamic = join(dynamicDir, 'stale.json')
+    const freshDynamic = join(dynamicDir, 'fresh.json')
     const staleLegacy = join(tasksDir, 'award_temp_old.toml')
     const userTask = join(tasksDir, 'user-task.toml')
     await Promise.all([

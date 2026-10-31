@@ -12,6 +12,7 @@ import {
   discoverAdbDevices,
   captureScreen,
   getMaaConfigDir,
+  canUseMaaSelfUpdate,
   getConfig,
   saveConfig,
   getCurrentActivity,
@@ -1520,9 +1521,28 @@ router.post('/actions/update-cli', asyncHandler(async (req, res) => {
   const os = await import('os');
   const execAsync = promisify(exec);
   const MAA_CLI_PATH = DEFAULT_MAA_CLI_PATH;
+  const platform = os.platform();
   const isDocker = process.env.NODE_ENV === 'production' && await execAsync('test -f /.dockerenv').then(() => true).catch(() => false);
-  const command = isDocker ? `${MAA_CLI_PATH} self update` : (os.platform() === 'darwin' ? 'brew upgrade maa-cli' : `${MAA_CLI_PATH} self update`);
-  const plan = { action: 'update-cli', command };
+  const selfUpdateAvailable = await canUseMaaSelfUpdate();
+  const command = platform === 'darwin' && !isDocker
+    ? 'brew upgrade maa-cli'
+    : selfUpdateAvailable
+      ? `${MAA_CLI_PATH} self update`
+      : null;
+  const plan = { action: 'update-cli', command, platform, selfUpdateAvailable };
+
+  if (!command) {
+    return sendError(res, req, agentError(
+      'AGENT_MAA_CLI_UPDATE_UNSUPPORTED',
+      '当前 maa-cli 构建没有 self 子命令，无法自动更新；请使用安装方式对应的包管理器升级',
+      {
+        statusCode: 409,
+        details: { platform, cliPath: MAA_CLI_PATH, selfUpdateAvailable },
+        retryable: false
+      }
+    ));
+  }
+
   if (req.body?.dryRun) return sendDryRun(res, req, plan);
   return withMaaExecutionLease({ source: 'cli-update', taskName: '更新 MAA CLI', command: 'update-cli' }, async () => {
     const { stdout, stderr } = await execAsync(command);

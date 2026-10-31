@@ -288,6 +288,8 @@ export interface MaaConnectionConfig {
   adb_path: string
   address: string
   config: string
+  preset?: string
+  touch_mode?: string
   auto_reconnect?: boolean
 }
 

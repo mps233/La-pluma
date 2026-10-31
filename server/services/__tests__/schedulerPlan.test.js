@@ -38,6 +38,25 @@ describe('scheduled task flow planning', () => {
     })
   })
 
+  it('passes maa-cli condition and variants into dynamic task configs', () => {
+    const result = buildScheduledTaskFlowPlan([{
+      id: 'award-1',
+      commandId: 'award',
+      name: '领取奖励',
+      enabled: true,
+      taskType: 'Award',
+      condition: { type: 'Weekday', weekdays: [3] },
+      variants: [{ condition: { type: 'Time', start: '18:00:00' }, params: { mail: true } }],
+      params: { award: true }
+    }]);
+
+    assert.deepEqual(result.steps[0].taskConfig.condition, { type: 'Weekday', weekdays: [3] });
+    assert.deepEqual(result.steps[0].taskConfig.variants, [{
+      condition: { type: 'Time', start: '18:00:00' },
+      params: { mail: true }
+    }]);
+  });
+
   it('includes every advanced fight argument in the confirmation plan', () => {
     const result = buildScheduledTaskFlowPlan([{
       id: 'fight-1',

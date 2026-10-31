@@ -559,6 +559,20 @@ export async function getMaaVersion(silent = false) {
 /**
  * 获取 MAA 配置目录
  */
+/**
+ * Some maa-cli builds (for example the Homebrew formula) are compiled without
+ * the `cli_installer` feature, so `maa self` does not exist. Probe it before
+ * using `maa self update` instead of assuming the subcommand is available.
+ */
+export async function canUseMaaSelfUpdate({ execute = execMaaCommand } = {}) {
+  try {
+    await execute('self', ['--help'], null, null, true, true);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function getMaaConfigDir() {
   const result = await execMaaCommand('dir', ['config']);
   return result.stdout;
@@ -609,12 +623,43 @@ export function mergeMaaProfileConnection(profileDocument = {}, config = {}) {
   const normalizedUpdates = Object.fromEntries(
     Object.entries(connectionUpdates).filter(([, value]) => value !== undefined)
   );
+  const {
+    auto_reconnect: autoReconnect,
+    touch_mode: touchMode,
+    ...connectionOnlyUpdates
+  } = normalizedUpdates;
+  const {
+    auto_reconnect: _legacyAutoReconnect,
+    touch_mode: _legacyTouchMode,
+    ...existingConnectionOnly
+  } = existingConnection || {};
+  const existingBehavior = profileDocument.behavior;
+  const behavior = autoReconnect === undefined
+    ? existingBehavior
+    : {
+        ...(existingBehavior && typeof existingBehavior === 'object' && !Array.isArray(existingBehavior)
+          ? existingBehavior
+          : {}),
+        auto_reconnect: autoReconnect
+      };
+  const existingInstanceOptions = profileDocument.instance_options;
+  const instanceOptions = touchMode === undefined
+    ? existingInstanceOptions
+    : {
+        ...(existingInstanceOptions && typeof existingInstanceOptions === 'object' && !Array.isArray(existingInstanceOptions)
+          ? existingInstanceOptions
+          : {}),
+        touch_mode: touchMode
+      };
+
   return {
     ...profileDocument,
     connection: {
-      ...(existingConnection || {}),
-      ...normalizedUpdates
-    }
+      ...existingConnectionOnly,
+      ...connectionOnlyUpdates
+    },
+    ...(behavior ? { behavior } : {}),
+    ...(instanceOptions ? { instance_options: instanceOptions } : {})
   };
 }
 
@@ -627,7 +672,16 @@ export async function getConfig(profileName = 'default') {
     const configPath = await getConfigPath(normalizedProfileName);
     const content = await readFile(configPath, 'utf-8');
     const profile = parseMaaProfile(content);
-    return profile.connection || profile;
+    const connection = profile.connection || profile;
+    const result = { ...connection };
+    const behaviorAutoReconnect = profile.behavior?.auto_reconnect;
+    if (behaviorAutoReconnect !== undefined && result.auto_reconnect === undefined) {
+      result.auto_reconnect = behaviorAutoReconnect;
+    }
+    if (profile.instance_options?.touch_mode) {
+      result.touch_mode = profile.instance_options.touch_mode;
+    }
+    return result;
   } catch {
     logger.debug('配置文件不存在，返回环境默认配置');
     return {
@@ -713,7 +767,7 @@ export async function execDynamicTask(taskId, taskConfig, taskName = null, taskT
       .replace(/[^A-Za-z0-9_-]/g, '_')
       .slice(0, 64) || 'dynamic-task';
     const taskFileId = `${taskPrefix}_temp_${createNonce()}`;
-    tempTaskFile = join(dynamicTasksDir, `${taskFileId}.toml`);
+    tempTaskFile = join(dynamicTasksDir, `${taskFileId}.json`);
 
     // 将 taskConfig 转换为对象（如果是字符串则解析，如果已经是对象则直接使用）
     const configObj = typeof taskConfig === 'string' ? JSON.parse(taskConfig) : taskConfig;
@@ -721,13 +775,13 @@ export async function execDynamicTask(taskId, taskConfig, taskName = null, taskT
       runtime.clientType || configObj.client_type || configObj.clientType
     );
 
-    // 将配置对象转换为 TOML 格式
-    const tomlContent = generateTaskToml({ ...configObj, client_type: clientType });
+    // 将配置对象转换为 maa-cli 支持的 JSON 任务文件
+    const taskContent = generateTaskConfig({ ...configObj, client_type: clientType });
 
     // 写入临时文件
-    await writeTaskFile(tempTaskFile, tomlContent, 'utf-8');
+    await writeTaskFile(tempTaskFile, taskContent, 'utf-8');
     addLog('INFO', `临时任务文件已创建: ${tempTaskFile}`);
-    addLog('DEBUG', `任务内容:\n${tomlContent}`);
+    addLog('DEBUG', `任务内容:\n${taskContent}`);
 
     // 执行任务；任务文件位于 tasks/_lapluma，用相对路径交给 maa run。
     const runArgs = ['--batch'];
@@ -777,74 +831,52 @@ export async function execDynamicTask(taskId, taskConfig, taskName = null, taskT
   }
 }
 
-/**
- * 生成任务 TOML 内容
- */
-function formatTomlValue(value) {
-  if (typeof value === 'boolean') {
-    return String(value);
-  }
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) {
-      throw new TypeError(`TOML 数值必须是有限数字: ${value}`);
+function normalizeTaskParams(params = {}) {
+  const normalized = {};
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue;
+
+    // Preserve the old API convenience: a JSON-array string becomes an array.
+    if (typeof value === 'string' && value.trim().startsWith('[') && value.trim().endsWith(']')) {
+      try {
+        const parsed = JSON.parse(value.trim());
+        if (Array.isArray(parsed)) {
+          normalized[key] = parsed;
+          continue;
+        }
+      } catch {
+        // Leave malformed array-like strings as strings.
+      }
     }
-    return String(value);
+
+    normalized[key] = value;
   }
-  if (typeof value === 'string') {
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map(formatTomlValue).join(', ')}]`;
-  }
-  if (value && typeof value === 'object') {
-    const entries = Object.entries(value)
-      .filter(([, nestedValue]) => nestedValue !== undefined && nestedValue !== null && nestedValue !== '')
-      .map(([nestedKey, nestedValue]) => `${JSON.stringify(nestedKey)} = ${formatTomlValue(nestedValue)}`);
-    return `{ ${entries.join(', ')} }`;
-  }
-  throw new TypeError(`不支持的 TOML 参数类型: ${typeof value}`);
+
+  return normalized;
 }
 
-function generateTaskToml(taskConfig) {
+/**
+ * Generate the JSON task file consumed by `maa run`.
+ */
+function generateTaskConfig(taskConfig) {
   const clientType = taskConfig.client_type || taskConfig.clientType;
-  let toml = clientType
-    ? `client_type = ${formatTomlValue(normalizeClientType(clientType))}\n`
-    : '';
-  toml += '[[tasks]]\n';
-  toml += `name = ${formatTomlValue(taskConfig.name)}\n`;
-  toml += `type = ${formatTomlValue(taskConfig.type)}\n`;
-  
-  if (taskConfig.params && Object.keys(taskConfig.params).length > 0) {
-    toml += '\n[tasks.params]\n';
-    
-    for (const [key, value] of Object.entries(taskConfig.params)) {
-      if (value === undefined || value === null || value === '') continue;
-      
-      addLog('DEBUG', `处理参数 ${key}: ${typeof value} ${value}`);
-      
-      // 处理字符串形式的数组，如 "[4,5,6]"
-      if (typeof value === 'string' && value.trim().startsWith('[') && value.trim().endsWith(']')) {
-        try {
-          // 移除空格并解析
-          const cleanValue = value.trim();
-          const arrayValue = JSON.parse(cleanValue);
-          if (Array.isArray(arrayValue)) {
-            addLog('DEBUG', `  -> 解析为数组: ${JSON.stringify(arrayValue)}`);
-            toml += `${key} = ${formatTomlValue(arrayValue)}\n`;
-            continue;
-          }
-        } catch (e) {
-          addLog('ERROR', `解析数组失败 ${key}: ${value} - ${e.message}`);
-          // 如果解析失败，继续按普通字符串处理
-        }
-      }
-      
-      toml += `${key} = ${formatTomlValue(value)}\n`;
-    }
-  }
-  
-  addLog('DEBUG', `生成的 TOML:\n${toml}`);
-  return toml;
+  const task = {
+    name: taskConfig.name,
+    type: taskConfig.type,
+    params: normalizeTaskParams(taskConfig.params)
+  };
+  if (taskConfig.strategy) task.strategy = taskConfig.strategy;
+  if (taskConfig.condition) task.condition = taskConfig.condition;
+  if (taskConfig.variants) task.variants = taskConfig.variants;
+
+  const config = {
+    ...(clientType ? { client_type: normalizeClientType(clientType) } : {}),
+    tasks: [task]
+  };
+  const content = JSON.stringify(config, null, 2);
+  addLog('DEBUG', `生成的任务配置:\n${content}`);
+  return content;
 }
 
 /**

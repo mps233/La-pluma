@@ -49,11 +49,28 @@ test('connection updates preserve unknown profile sections and existing values',
   assert.equal(roundTrip.profile_name, 'daily');
   assert.equal(roundTrip.connection.adb_path, 'adb');
   assert.equal(roundTrip.connection.address, '192.168.1.10:5555');
-  assert.equal(roundTrip.connection.auto_reconnect, false);
+  // maa-cli 0.7.3+ reads this from [behavior], not [connection].
+  assert.equal(roundTrip.connection.auto_reconnect, undefined);
+  assert.equal(roundTrip.behavior.auto_reconnect, false);
   assert.equal(roundTrip.connection.retry_count, 3);
   assert.deepEqual(roundTrip.connection.ports, [5555, 16384]);
   assert.deepEqual(roundTrip.resource, { channel: 'beta', auto_update: false });
   assert.deepEqual(roundTrip.instance_options, { touch_mode: 'maatouch' });
+});
+
+test('keeps preset in connection and moves touch_mode into instance_options', () => {
+  const parsed = parseMaaProfile(existingProfile);
+  const merged = mergeMaaProfileConnection(parsed, {
+    connection: {
+      preset: 'MuMuPro',
+      touch_mode: 'maafwadb'
+    }
+  });
+  const roundTrip = parseMaaProfile(TOML.stringify(merged));
+
+  assert.equal(roundTrip.connection.preset, 'MuMuPro');
+  assert.equal(roundTrip.connection.touch_mode, undefined);
+  assert.deepEqual(roundTrip.instance_options, { touch_mode: 'maafwadb' });
 });
 
 test('MAA profile names reject traversal before invoking maa-cli', async () => {

@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { execMaaCommand, execDynamicTask, replaceActivityCode, captureScreen, getGameClientState, getMaaExecutionDiagnostics, testAdbConnection, createMaaLogCheckpoint, readMaaLogSince } from './maaService.js';
+import { execMaaCommand, execDynamicTask, replaceActivityCode, captureScreen, getGameClientState, getMaaExecutionDiagnostics, testAdbConnection, createMaaLogCheckpoint, readMaaLogSince, canUseMaaSelfUpdate } from './maaService.js';
 import { resolveConnection } from './connectionService.js';
 import { sendTaskCompletionNotification, isStageOpenToday, shouldCaptureNotificationScreenshot } from './notificationService.js';
 import { getEnabledAwardItems, parseAwardExecutionActions } from './awardResultService.js';
@@ -229,6 +229,8 @@ function buildScheduledTaskCommand(task, connectionDefaults = {}) {
       name: task.name,
       type: task.taskType,
       client_type: clientType,
+      ...(task.condition ? { condition: task.condition } : {}),
+      ...(Array.isArray(task.variants) ? { variants: task.variants } : {}),
       params: {}
     };
     
@@ -1730,28 +1732,30 @@ export function setupAutoUpdate(config) {
 
             if (isDocker) {
               // Docker 环境：支持更新，更新会持久化
-              try {
-                await execAsync(`${MAA_CLI_PATH} self update`);
-                logger.success('MAA CLI 更新完成', { environment: 'Docker', persistent: true });
-              } catch (error) {
-                logger.error('MAA CLI 更新失败', { error: error.message });
+              if (await canUseMaaSelfUpdate()) {
+                try {
+                  await execAsync(`${MAA_CLI_PATH} self update`);
+                  logger.success('MAA CLI 更新完成', { environment: 'Docker', persistent: true });
+                } catch (error) {
+                  logger.error('MAA CLI 更新失败', { error: error.message });
+                }
+              } else {
+                logger.warn('当前 maa-cli 构建没有 self 子命令，跳过 CLI 更新');
               }
             } else {
               // 根据操作系统选择更新方式
               const os = await import('os');
               const platform = os.platform();
-              let command;
 
               if (platform === 'darwin') {
-                command = 'brew upgrade maa-cli';
-              } else if (platform === 'linux' || platform === 'win32') {
-                command = `${MAA_CLI_PATH} self update`;
+                await execAsync('brew upgrade maa-cli');
+                logger.success('MAA CLI 更新完成', { platform });
+              } else if ((platform === 'linux' || platform === 'win32') && await canUseMaaSelfUpdate()) {
+                await execAsync(`${MAA_CLI_PATH} self update`);
+                logger.success('MAA CLI 更新完成', { platform });
               } else {
-                throw new Error(`不支持的操作系统: ${platform}`);
+                logger.warn('当前 maa-cli 构建没有 self 子命令，跳过 CLI 更新', { platform });
               }
-
-              await execAsync(command);
-              logger.success('MAA CLI 更新完成', { platform });
             }
           }
 

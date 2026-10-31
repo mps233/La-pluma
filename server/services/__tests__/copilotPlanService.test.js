@@ -5,6 +5,8 @@ import {
   buildCurrentMapStageTasks,
   buildCopilotRepeatFiles,
   buildCopilotTaskParams,
+  buildNativeCopilotCommand,
+  canUseNativeCopilotSet,
   extractLoadedCopilotFiles,
   getNavigationStage,
   isPresetFormationCopilot,
@@ -79,6 +81,37 @@ test('preset resource merge preserves existing user BattleStart settings', () =>
   assert.equal(merged.BattleStart.custom, true);
   assert.deepEqual(merged.ExistingTask, { action: 'DoNothing' });
   assert.ok(merged.BattleStart.next.includes('LaPlumaPresetBattleConfirm'));
+});
+
+test('delegates only full, non-preset, non-resumed copilot sets', () => {
+  const entries = [{ key: '0:1:normal', presetFormation: false }, { key: '1:2:normal', presetFormation: false }];
+
+  assert.equal(canUseNativeCopilotSet({ entries }), true);
+  assert.equal(canUseNativeCopilotSet({ entries, raid: 'both' }), true);
+  assert.equal(canUseNativeCopilotSet({ entries: [entries[0]] }), true);
+  assert.equal(canUseNativeCopilotSet({ entries: [entries[0]], raid: 'raid' }), false);
+  assert.equal(canUseNativeCopilotSet({
+    entries: [{ ...entries[0], presetFormation: true }]
+  }), false);
+  assert.equal(canUseNativeCopilotSet({ entries, selectedIndexes: [0] }), false);
+  assert.equal(canUseNativeCopilotSet({ entries, selectedIndexes: [0, 1], totalEntries: 2 }), true);
+  assert.equal(canUseNativeCopilotSet({ entries, loopTimes: 2 }), false);
+  assert.equal(canUseNativeCopilotSet({ entries, completedKeys: ['0:1:normal'] }), false);
+  assert.equal(canUseNativeCopilotSet({ entries: [] }), false);
+});
+
+test('builds the native maa copilot command', () => {
+  assert.deepEqual(buildNativeCopilotCommand(48990, 'normal'), [
+    'prts://s48990', '--batch'
+  ]);
+  assert.deepEqual(buildNativeCopilotCommand(48990, 'both', {
+    profile: 'daily',
+    address: '127.0.0.1:16384',
+    userResource: true
+  }), [
+    'prts://s48990', '--batch', '--raid', 'both', '--user-resource',
+    '-p', 'daily', '-a', '127.0.0.1:16384'
+  ]);
 });
 
 test('both mode skips raid for preset formation stages', async () => {

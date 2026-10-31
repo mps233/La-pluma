@@ -599,11 +599,20 @@
 
 ### Phase 3：执行路径换原生
 
-- [ ] 3.5 抄作业原生委托。
-- [ ] 3.6 每日流程任务文件。
-- [ ] 3.7 动态任务文件 JSON/子目录/`--batch`。
-- [ ] 3.8 调度条件 `condition`/`variants`。
-- [ ] P1 配置/连接/更新流程。
+- [x] 3.5 抄作业原生委托。
+- [ ] 3.6 每日流程任务文件（需要重做逐任务结果归属，暂缓）。
+- [x] 3.7 动态任务文件 JSON/子目录/`--batch`。
+- [x] 3.8 调度条件 `condition`/`variants`（已支持透传；硬编码开放日判断的替换仍待做）。
+- [x] P1 配置/连接/更新流程（`auto_reconnect` → `[behavior]`、连接预设/触控模式 UI、`maa self` 探测已完成；全局 clientType 表单仍属 P1-17）。
+
+> **Phase 3 实施记录（2026-10-31）**
+>
+> - 3.5：`copilotPlanService` 新增 `canUseNativeCopilotSet()` / `buildNativeCopilotCommand()`；完整、非预设编队、无部分选择、无已完成进度、`loopTimes=1` 的作业集走 `maa copilot prts://s<id>`；单关突袭、预设编队、断点续跑仍走自定义计划。`maa copilot prts://s48990 --batch --dry-run` 实机预检通过。
+> - 3.7：动态任务文件从 TOML 改为 JSON（`tasks/_lapluma/*.json`），保留顶层 `client_type`；实机 Depot 通过 JSON 任务文件执行，`maa run --batch _lapluma/...` 退出码 0，完成后文件清理。
+> - 3.8：`buildScheduledTaskCommand()` 把任务的 `condition` / `variants` 透传到动态任务 JSON；测试覆盖 Weekday + Time variants。
+> - P1：`mergeMaaProfileConnection()` 把 `auto_reconnect` 写入 `[behavior]`、`touch_mode` 写入 `[instance_options]`；`getConfig()` 回读到连接视图。ConfigManager 新增“连接预设”和“触控模式”选择；`canUseMaaSelfUpdate()` 在更新前探测 `maa self --help`，Homebrew 构建会正确回退到 brew。
+> - 页面验证（生产模式 `:3100` + 隔离 headless Chrome）：作业集 55238 预览 2/2，执行时服务端命令为 `maa copilot prts://s55238 --batch`，终止后未写入进度；数据页“仓库识别”通过 JSON 动态任务执行，日志为 `tasks/_lapluma/...json` + `maa run --batch`，识别 83 项；配置页关闭自动重连并保存后，profile 出现 `[behavior] auto_reconnect = false`；选择 `preset=Adb` + `touch_mode=MaaTouch` 保存后，profile 分别写入 `[connection]` 和 `[instance_options]`，测试后已恢复。`update-cli` dry-run 在本机返回 `selfUpdateAvailable: false`、`command: brew upgrade maa-cli`。
+> - 验证：server 42 个测试文件、client 42 个测试文件全部通过。
 
 ### Phase 4：新增功能
 

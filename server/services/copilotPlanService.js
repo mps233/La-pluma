@@ -245,6 +245,40 @@ async function recordCompletedCopilotEntries(entries, loopTimes) {
   }
 }
 
+/**
+ * A full copilot set can be delegated to `maa copilot prts://s<id>` when the
+ * project does not need per-stage custom behavior (preset formation, partial
+ * selection, loop expansion, or resume progress).
+ */
+export function canUseNativeCopilotSet({
+  entries = [],
+  totalEntries = entries.length,
+  raid = 'normal',
+  loopTimes = 1,
+  selectedIndexes = [],
+  completedKeys = []
+} = {}) {
+  if (entries.length === 0) return false;
+  if (selectedIndexes.length > 0 && selectedIndexes.length < totalEntries) return false;
+  if (loopTimes !== 1) return false;
+  if (completedKeys.length > 0) return false;
+  if (entries.some(entry => entry.presetFormation)) return false;
+  // `maa copilot --raid raid` only keeps is_raid in the copilot_list branch,
+  // which is used for multi-stage sets. A single-stage set would lose it.
+  if (raid === 'raid' && entries.length < 2) return false;
+  return raid === 'normal' || raid === 'raid' || raid === 'both';
+}
+
+export function buildNativeCopilotCommand(setId, raid = 'normal', options = {}) {
+  const args = [`prts://s${setId}`, '--batch'];
+  if (raid === 'raid' || raid === 'both') args.push('--raid', raid);
+  if (options.userResource) args.push('--user-resource');
+  const profile = options.profile || options.profileId;
+  if (profile) args.push('-p', String(profile));
+  if (options.address) args.push('-a', String(options.address));
+  return args;
+}
+
 function groupEntries(entries) {
   const groups = [];
   for (const entry of entries) {
@@ -312,6 +346,29 @@ export async function executeCopilotPlan({ setId, raid = 'normal', selectedIndex
   const pending = selectedEntries.filter(entry => !completed.has(entry.key));
   const results = [];
   const loopTimes = normalizeCopilotLoopTimes(options.loopTimes);
+
+  if (options.nativeDelegation !== false && canUseNativeCopilotSet({
+    entries: selectedEntries,
+    totalEntries: plan.entries.length,
+    raid,
+    loopTimes,
+    selectedIndexes,
+    completedKeys: [...completed]
+  })) {
+    const args = buildNativeCopilotCommand(setId, raid, options);
+    const result = await execMaaCommand('copilot', args, plan.name, 'copilot', true, false, lifecycle);
+    await recordCompletedCopilotEntries(selectedEntries, loopTimes);
+    progress[String(setId)] = [...new Set([...completed, ...selectedEntries.map(entry => entry.key)])];
+    await saveProgress(progress);
+    return {
+      success: true,
+      source: 'native',
+      command: `maa copilot ${args.join(' ')}`,
+      results: selectedEntries.map(entry => ({ ...entry, success: true })),
+      loopTimes,
+      output: result.stdout || result.stderr || ''
+    };
+  }
 
   await withMaaExecutionLease({ source: 'copilot-set', taskName: plan.name, command: 'copilot-plan' }, async () => {
     lifecycle.onStarted?.();
