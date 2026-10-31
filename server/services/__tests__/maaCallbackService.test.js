@@ -108,7 +108,8 @@ describe('Maa callback parsing', () => {
       stageInfoErrors: 1,
       unsupportedLevels: ['XX-99'],
       recruitSpecialTags: ['高级资深干员'],
-      recruitSelectedTags: [['高级资深干员', '远程位']]
+      recruitSelectedTags: [['高级资深干员', '远程位']],
+      connectionEvents: []
     });
   });
 

@@ -6,15 +6,15 @@
 
 ## 总览
 
-> 注：矩阵为审计时状态；审计后已修复 P0 三项，以及 P1 的 Recruit 上报字段、`/actions/fight` 新字段、Copilot 原生委托参数和 8 个公开回调的解析/API。
+> 注：矩阵为审计时状态；审计后已修复 P0、P1 和 P2 的 StartUp、Recruit、Roguelike 准备局、Agent/调度器动态 Fight 活动关卡，以及 Copilot `user_additional`；连接/性能回调已进入回调摘要 API。
 
 | 审计域 | 总项 | 已对齐 | 部分对齐 | 缺失 | 不适用 | CLI 不支持 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| basic task parameters (StartUp, CloseDown, Fight, Recruit, Infrast, Mall, Award) | 73 | 67 | 5 | 0 | 1 | 0 |
-| advanced task parameters (Roguelike / Reclamation / Custom / Copilot / SSSCopilot / ParadoxCopilot) | 76 | 65 | 2 | 2 | 7 | 0 |
-| MAA 6.20 callback events | 85 | 23 | 28 | 26 | 8 | 0 |
+| basic task parameters (StartUp, CloseDown, Fight, Recruit, Infrast, Mall, Award) | 73 | 71 | 1 | 0 | 1 | 0 |
+| advanced task parameters (Roguelike / Reclamation / Custom / Copilot / SSSCopilot / ParadoxCopilot) | 76 | 67 | 2 | 0 | 7 | 0 |
+| MAA 6.20 callback events | 85 | 23 | 37 | 17 | 8 | 0 |
 | Agent API / task-type / CLI coverage | 25 | 5 | 18 | 0 | 1 | 1 |
-| **合计** | **259** | **160** | **53** | **28** | **17** | **1** |
+| **合计** | **259** | **166** | **58** | **17** | **17** | **1** |
 
 ## 关键项目侧差距（按优先级）
 
@@ -41,7 +41,7 @@
 - **Fight `/actions/fight`**：已补 `medicineExpireDays`、`server`、`drops`、上报参数、`DrGrandet`、`clientType`，并在需要时走动态 Fight。
 - **StartUp**：`start_game_enabled` 无控件；`account_name` 只在自动化表单，未进入 `/actions/start-game` 契约。
 - **Roguelike**：缺少 `collectible_mode_core_char_list`（模式 30003 准备局开局干员，未提供时回退主列表）；`find_playTime_target` 见 P0。
-- **Copilot**：原生委托已补 `--use-sanity-potion`、`--formation`、`--formation-index`、`--add-trust`、`--ignore-requirements`、`--support-unit-usage`、`--support-unit-name`，并对 CLI 无法表达的组合回退动态计划；`user_additional` 仍缺 UI。
+- **Copilot**：原生委托已补 `--use-sanity-potion`、`--formation`、`--formation-index`、`--add-trust`、`--ignore-requirements`、`--support-unit-usage`、`--support-unit-name`，并对 CLI 无法表达的组合回退动态计划；`user_additional` 已补文本输入、解析和原生委托回退。
 - **ParadoxCopilot**：多作业没有对象 `{id, filename}` 的 `list` 入口，也没有按作业跟踪加载结果。
 - **Custom**：白名单只覆盖 5 个工具；通用 `run-task` 可传任意 Custom params，但 UI 没有 SecretFront 等入口。保持白名单策略即可，除非要暴露 SecretFront。
 
@@ -69,15 +69,15 @@
 | --- | --- | --- | --- |
 | StartUp/CloseDown/Fight/Recruit/Infrast/Mall/Award.params.enable | 已对齐 | AutomationTasks.tsx:1103-1109 sets enabled:true when a task is added; :1153-1161 toggles it. schedulerService.js:485 (plan) and :549,:558 (execution) filter to enabled tasks; :458-473 applies enabled !== false validation. No enable param is sent; a disabled task is omitted, which is equivalent to MAA enable=false. | No change. |
 | StartUp.params.client_type | 已对齐 | AutomationTasks.tsx:864,868-875 exposes all six client types; schedulerService.js:358-359 passes it positionally to maa startup; agent.js:1684-1704 accepts a clientType override via connectionService.js:36; AutomationTasks.tsx:1593-1594 uses it on the restore path. | No change. |
-| StartUp.params.start_game_enabled | 部分对齐 | No key, default, or control in AutomationTasks.tsx:863-877 or client/src/types/components.ts:46-52. Every startup path supplies a client type (schedulerService.js:358-359; AutomationTasks.tsx:1593-1595; agent.js:1692-1694), and maa-cli 0.7.7's startup preset sets start_game_enabled=true whenever a client type is suppl… | Add an auto-launch control; when false, run a dynamic StartUp task with start_game_enabled:false while preserving client_type/account_name, or omit the client type on the CLI path. |
-| StartUp.params.account_name | 部分对齐 | UI field AutomationTasks.tsx:865,876; schedulerService.js:365-366 appends --account-name; restore builder AutomationTasks.tsx:1594-1595. The dedicated /actions/start-game contract (agentContract.js:239-247) and route (agent.js:1684-1704) expose only clientType/address; account_name is reachable only through run-task a… | Add accountName to /actions/start-game and pass --account-name, or document the run-task fallback. |
+| StartUp.params.start_game_enabled | 已对齐 | 自动化表单新增「启动游戏客户端」开关；关闭时客户端/调度器/Agent start-game 都改走动态 `StartUp` 任务并发送 `start_game_enabled:false`。 | 无；审计后已补。 |
+| StartUp.params.account_name | 已对齐 | 自动化表单、调度器 CLI 以及 `/actions/start-game` 都支持账号切换；动态 StartUp 也会携带 `account_name`。 | 无；审计后已补 Agent API。 |
 | CloseDown.params.client_type | 已对齐 | UI AutomationTasks.tsx:1086,1090-1097 (deliberately no empty option); live bidirectional sync with StartUp at :1305-1321, load sync at :306-321, add-time sync at :1111-1116; schedulerService.js:358-359 passes it to maa closedown. | No change. |
-| Fight.params.stage | 部分对齐 | UI AutomationTasks.tsx:886,902. Normal scheduler builds stage1:times1,... (schedulerService.js:368-396), splits per stage (:1073-1090), replaces HD-n (:1135,:1284; maaService.js:1498-1520) and runs one maa fight per stage. Gaps: dynamic Fight configs send stage raw (schedulerService.js:61-122; AutomationTasks.tsx:1529… | Route restored flows through the scheduler plan or emit separate stages; apply replaceActivityCode in dynamic and semantic fight builds. |
+| Fight.params.stage | 部分对齐 | 调度器 CLI/动态路径和 Agent 动态路径都会调用 `replaceActivityCode`；恢复流程直接提交 `run-task` 动态配置，仍未在服务端入口统一替换 HD-X。 | 继续在 `/actions/run-task` 的动态 Fight 分支统一做活动关卡替换。 |
 | Fight.params.medicine | 已对齐 | UI AutomationTasks.tsx:887,904; schedulerService.js:398-400 (-m); dynamic config :86-88; restore builder AutomationTasks.tsx:1606-1608; /actions/fight agent.js:602-603. | No change. |
 | Fight.params.medicine_expire_days | 已对齐 | 自动化表单和调度器已支持；`/actions/fight` 新增 `medicineExpireDays`，在需要时自动走 `buildDynamicFightPlan` 动态任务。 | 无；审计后已补 Agent API。 |
 | Fight.params.expiring_medicine | 已对齐 | UI AutomationTasks.tsx:888,905; schedulerService.js:401-403; dynamic :89-91; restore builder AutomationTasks.tsx:1609-1611; /actions/fight agent.js:603 (expiringMedicine). MAA 6.20 marks it deprecated in favor of medicine_expire_days. | Optionally demote or hide it in the UI; coverage itself is correct. |
 | Fight.params.stone | 已对齐 | UI AutomationTasks.tsx:891,914; schedulerService.js:404-406; dynamic :93-95; restore builder AutomationTasks.tsx:1612-1614; /actions/fight agent.js:604. | No change. |
-| Fight.params.times | 部分对齐 | UI AutomationTasks.tsx:886,902; schedulerService.js:1146-1148 and :1298-1300 use --times; dynamic :113; /actions/fight agent.js:613 uses --times. The restore builder embeds ':times' into the stage token (AutomationTasks.tsx:1604); run-task/execMaaCommand does not split it (agent.js:1819-1851). | Emit --times in buildCommand or route restored flows through the scheduler plan//actions/fight. |
+| Fight.params.times | 已对齐 | 调度器、`/actions/fight` 和恢复流程均支持 `times`；多关卡恢复流程已改为动态多任务，不再把 `:times` 拼进 stage token。 | 无；审计后已补。 |
 | Fight.params.series | 已对齐 | UI AutomationTasks.tsx:892,915-928 (-1..10); schedulerService.js:407-409; dynamic :96-98 with >6 routed by :68; restore builder AutomationTasks.tsx:1615-1617; /actions/fight agent.js:605. Dynamic avoids the CLI -1..6 help cap. | No change. |
 | Fight.params.drops | 已对齐 | 自动化表单和调度器已支持；`/actions/fight` 新增对象/字符串 `drops` 并映射为动态 Fight 的 `drops` 对象。 | 无；审计后已补 Agent API。 |
 | Fight.params.report_to_penguin | 已对齐 | 自动化表单、调度器和动态 Fight 已支持；`/actions/fight` 新增 `reportToPenguin`。 | 无；审计后已补 Agent API。 |
@@ -89,7 +89,7 @@
 | Fight.params.DrGrandet | 已对齐 | 自动化表单、调度器和动态 Fight 已支持；`/actions/fight` 新增 `DrGrandet`。 | 无；审计后已补 Agent API。 |
 | Recruit.params.refresh | 已对齐 | UI AutomationTasks.tsx:992,1007; schedulerService.js:314-335 forwards booleans; execution :872-889. force_refresh is also sent (AutomationTasks.tsx:993,1008) but is not a MAA 6.20 Recruit field (absent from /tmp/maa-integration-fields.json) and is ignored by Core. | Remove or relabel force_refresh; refresh itself is covered. |
 | Recruit.params.select | 已对齐 | UI AutomationTasks.tsx:994,1009 (star-select allows deselecting all); schedulerService.js:320-323 forwards non-empty arrays; execution :872-889. An empty selection is silently dropped, leaving the required MAA field absent. | Validate that at least one star is selected before execution. |
-| Recruit.params.confirm | 部分对齐 | UI AutomationTasks.tsx:995,1010; schedulerService.js:320-323 (and client builder AutomationTasks.tsx:1495-1499) drops empty arrays, so the documented calculation-only mode (confirm: []) cannot be expressed from the UI/scheduler; only a raw run-task taskConfig preserves [] (maaService.js:834-857). | Preserve an explicit empty confirm array (distinguish unset from empty) when calculation-only mode is intended. |
+| Recruit.params.confirm | 已对齐 | 新增「仅计算公招」开关；开启后客户端与调度器写入 `times:0`、`confirm:[]`、`set_time:false`，显式保留空数组。 | 无；审计后已补。 |
 | Recruit.params.level3_recruitment_permit_reserve | 已对齐 | UI AutomationTasks.tsx:1003,1016 with default 0 and min 0; schedulerService.js:330-331 numeric conversion; executed at :872-889. | No change. |
 | Recruit.params.first_tags | 已对齐 | Advanced UI AutomationTasks.tsx:996,3287-3298; comma split via AutomationTasks.tsx:169,1503-1504 and schedulerService.js:24,326-327; forwarded at :314-335. | No change. |
 | Recruit.params.extra_tags_mode | 已对齐 | Advanced UI AutomationTasks.tsx:997,3274-3282 exposes 0/1/2; schedulerService.js:314-335 forwards it. | No change. |
@@ -183,7 +183,7 @@
 | Roguelike.params.blackflow_start_animals | 已对齐 | `RoguelikeTasks.tsx` 的 `listFields` 在非空时写入数组；审计后 mode 30003 分支始终写入 `splitCommaList(...)`，空输入发送 `[]`，并校验 0–2 项、羽蛇最多 1 项。 | 无；已补 mode 30003 空数组测试。 |
 | Roguelike.params.blackflow_start_rewards | 已对齐 | `/Users/miaopasi/La-pluma/client/src/components/RoguelikeTasks.tsx:452` 与 `:773-801` 用 12 个复选框生成位掩码，`:560-561` 始终写入数字 params.blackflow_start_rewards（0–4095）。 | 保持；建议解析 SubTaskExtraInfo 的 BlackFlowStartRun 回调，把 preparing/target_run/reward_missed 等状态展示给用户。 |
 | Roguelike.params.collectible_mode_roles | 已对齐 | `/Users/miaopasi/La-pluma/client/src/components/RoguelikeTasks.tsx:428` 提供烧水职业组输入，`:493` 写入 params.collectible_mode_roles。 | 保持。 |
-| Roguelike.params.collectible_mode_core_char_list | 缺失 | 全仓库没有 collectible_mode_core_char_list 引用：`/Users/miaopasi/La-pluma/client/src/components/RoguelikeTasks.tsx:487-567` 只映射 collectible_mode_roles 和主 core_char_list，UI `:402-454` 没有准备局开局干员控件。MAA 文档 `/tmp/maa-integration-620.md:1113-1116` 说明该字段用于 30003 准备局，未提供时回退 core_char_list。 | 在 mode 30003 下增加准备局开局干员三顺位（可复用 core-char-list），未填写时不发送以沿用回退语义。 |
+| Roguelike.params.collectible_mode_core_char_list | 已对齐 | 模式 30003 新增「准备局开局干员」三顺位控件，映射为 `collectible_mode_core_char_list`；留空则不发送，沿用主列表回退。 | 无；审计后已补。 |
 | Roguelike.params.blackflow_start_utopia | 已对齐 | `/Users/miaopasi/La-pluma/client/src/components/RoguelikeTasks.tsx:453` 暴露开关，`:534` 写入 params.blackflow_start_utopia；`:575-578` 在开启时校验奖励优先级非空。 | 保持。 |
 | Roguelike.params.blackflow_start_reward_priority | 已对齐 | `/Users/miaopasi/La-pluma/client/src/components/RoguelikeTasks.tsx:454` 提供逗号分隔输入，`:546,548-551` 写入 params.blackflow_start_reward_priority；`:575-578` 在凹实托邦时要求非空。 | 保持；本地校验重复值和未知值，避免 MaaCore 拒绝整条任务。 |
 | Roguelike.params.find_playTime_target | 已对齐 | `RoguelikeTasks.tsx` 的 `numberFields` 与模式 20001 校验已统一使用 MAA 的 `find_playTime_target`；未选择时默认节点 1。 | 无；已补 mode 20001 payload 测试。 |
@@ -201,7 +201,7 @@
 | Copilot.params.use_sanity_potion | 已对齐 | 动态计划已支持；原生委托 `buildNativeCopilotCommand` 现追加 `--use-sanity-potion`。 | 无；审计后已补原生委托。 |
 | Copilot.params.formation | 已对齐 | 原生委托现按 `formationMode=on` 追加 `--formation`；auto/off 在 CLI 无法表达的组合由 `canUseNativeCopilotSet` 拒绝委托，回退动态计划。 | 无；审计后已补原生委托门控。 |
 | Copilot.params.formation_index | 已对齐 | 原生委托现追加 `--formation-index`（>0 时）；动态计划原有映射保留。 | 无；审计后已补原生委托。 |
-| Copilot.params.user_additional | 缺失 | 全仓库没有 user_additional/userAdditional：`/Users/miaopasi/La-pluma/server/services/copilotPlanService.js:204-215` 不生成该键，`/Users/miaopasi/La-pluma/client/src/components/CombatTasks.tsx:547-570` 没有对应控件，`activityCopilotRunService.js:65-77` 也没有该偏好。MAA 文档 `/tmp/maa-integration-620.md:1246-1258` 仅在 formation=true 时应用 [{name,ski… | 在自动编队区域增加可增删的干员/技能行，服务端动态计划透传 user_additional，并仅在 formation=true 时发送；maa-cli 无该参数，填写时应禁用原生委托。 |
+| Copilot.params.user_additional | 已对齐 | Copilot 表单新增「追加干员」文本输入；服务端 `normalizeUserAdditional` 解析为 `user_additional: [{name, skill}]`，仅在自动编队时发送；有值时禁用原生委托并回退动态计划。 | 无；审计后已补。 |
 | Copilot.params.add_trust | 已对齐 | 原生委托现追加 `--add-trust`；动态计划原有映射保留。 | 无；审计后已补原生委托。 |
 | Copilot.params.ignore_requirements | 已对齐 | 原生委托在 `ignoreRequirements=true` 时追加 `--ignore-requirements`；动态计划原有映射保留。 | 无；审计后已补原生委托。 |
 | Copilot.params.support_unit_usage | 已对齐 | 原生委托现追加 `--support-unit-usage`（>0 时）；动态计划原有映射保留。 | 无；审计后已补原生委托。 |

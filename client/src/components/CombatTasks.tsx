@@ -567,6 +567,7 @@ export default function CombatTasks() {
           { value: '3', label: '使用随机助战' },
         ]},
         { key: 'supportName', label: '助战干员名称', type: 'text', param: '--support-unit-name', placeholder: '干员名称' },
+        { key: 'userAdditional', label: '追加干员', type: 'text', param: '', placeholder: '干员名:技能，多个用逗号分隔', helper: '仅自动编队生效；技能填 1-3，留空使用默认' },
       ],
       ssscopilot: [
         { key: 'loopTimes', label: '循环次数', type: 'number', param: '--loop-times', placeholder: '1' },
@@ -791,6 +792,7 @@ export default function CombatTasks() {
               formationIndex: advancedParams.copilot?.formationIndex,
               supportUsage: advancedParams.copilot?.supportUsage,
               supportName: advancedParams.copilot?.supportName,
+              userAdditional: advancedParams.copilot?.userAdditional,
               formationMode: getFormationMode(task.id)
             }
           })

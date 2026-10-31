@@ -939,9 +939,11 @@ export default function AutomationTasks() {
       description: '启动游戏并进入主界面',
       defaultParams: {
         clientType: 'Official',
-        accountName: ''
+        accountName: '',
+        startGameEnabled: true
       },
       paramFields: [
+        { key: 'startGameEnabled', label: '启动游戏客户端', type: 'checkbox', helper: '关闭后只建立 MAA 连接，不拉起游戏客户端' },
         { key: 'clientType', label: '客户端类型', type: 'select', options: [
           { value: 'Official', label: '官服' },
           { value: 'Bilibili', label: 'B服' },
@@ -1076,6 +1078,7 @@ export default function AutomationTasks() {
         set_time: true,
         expedite: false,
         expedite_times: 0,
+        calculationOnly: false,
         preserve_tags: '支援机械',
         level3_recruitment_permit_reserve: 0,
         report_to_penguin: false,
@@ -1091,6 +1094,7 @@ export default function AutomationTasks() {
         { key: 'select', label: '招募星级', type: 'star-select', helper: '支持 6 星自动公招；勾选 6 星后会保留高价值标签并自动选择对应组合' },
         { key: 'confirm', label: '确认星级', type: 'star-select', helper: '建议至少保留 5/6 星确认，避免高价值标签被跳过' },
         { key: 'times', label: '招募次数', type: 'number', placeholder: '4' },
+        { key: 'calculationOnly', label: '仅计算公招（不招募）', type: 'checkbox', helper: '发送 times=0、confirm=[]，只计算标签组合' },
         { key: 'set_time', label: '设置时间', type: 'checkbox' },
         { key: 'expedite', label: '使用加急', type: 'checkbox' },
         { key: 'expedite_times', label: '加急次数', type: 'number', placeholder: '0', visibleWhen: { key: 'expedite', value: true } },
@@ -1581,6 +1585,15 @@ export default function AutomationTasks() {
         const value = params[key]
         if (value === undefined || value === '' || value === null) return
 
+        if (key === 'calculationOnly') {
+          if (value === true && task.taskType === 'Recruit') {
+            taskConfig.params.times = 0
+            taskConfig.params.confirm = []
+            taskConfig.params.set_time = false
+          }
+          return
+        }
+
         if (typeof value === 'boolean') {
           taskConfig.params[key] = value
         }
@@ -1613,10 +1626,27 @@ export default function AutomationTasks() {
       }
     }
 
+    const commandId = task.commandId || task.id.split('-')[0]
+    if (commandId === 'startup' && task.params?.startGameEnabled === false) {
+      const taskConfig: Record<string, unknown> = {
+        name: task.name,
+        type: 'StartUp',
+        params: { start_game_enabled: false }
+      }
+      const clientType = String(task.params?.clientType || '').trim()
+      if (clientType) taskConfig.client_type = clientType
+      if (task.params?.accountName?.trim()) {
+        (taskConfig.params as Record<string, unknown>).account_name = task.params.accountName.trim()
+      }
+      return {
+        command: 'run',
+        params: 'startup',
+        taskConfig: JSON.stringify(taskConfig)
+      }
+    }
+
     const dynamicFightCommand = buildDynamicFightCommand(task)
     if (dynamicFightCommand) return dynamicFightCommand
-
-    const commandId = task.commandId || task.id.split('-')[0]
     let params = ''
     const extraArgs: string[] = []
 

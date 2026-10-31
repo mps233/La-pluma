@@ -49,6 +49,7 @@ interface TaskParams {
   adbPath?: string
   address?: string
   accountName?: string
+  startGameEnabled?: boolean
   recognizeDepotBeforeClose?: boolean
   
   // 理智作战
@@ -99,6 +100,7 @@ interface TaskParams {
   set_time?: boolean
   expedite?: boolean
   expedite_times?: number
+  calculationOnly?: boolean
   preserve_tags?: string | string[]
   level3_recruitment_permit_reserve?: number | string
   recruitment_time?: Record<string, number | string>

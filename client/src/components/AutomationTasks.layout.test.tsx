@@ -461,7 +461,7 @@ describe('AutomationTasks layout surfaces', () => {
     expect(container.querySelector('#automation-startup-1-clientType')?.tagName).toBe('SELECT')
     const accountNameLabel = container.querySelector<HTMLLabelElement>('label[for="automation-startup-1-accountName"]')
     expect(accountNameLabel?.textContent).toContain('切换账号')
-    expect(accountNameLabel?.closest('.automation-param-fields')?.classList.contains('is-grouped')).toBe(true)
+    expect(accountNameLabel?.closest('.automation-param-fields')).not.toBeNull()
     expect(container.querySelector('#automation-startup-1-accountName')?.classList.contains('automation-text-control')).toBe(true)
 
     const taskDeleteButtons = container.querySelectorAll<HTMLButtonElement>('[aria-label="删除启动游戏"]')

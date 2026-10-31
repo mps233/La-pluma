@@ -649,7 +649,7 @@
 >   - BlackFlow 模式 30003 生成 `type: Roguelike`，包含 `blackflow_start_animals`、`blackflow_start_rewards: 5`、`core_char_list`（含助战标记）。
 >   - Reclamation 生成 `type: Reclamation`，参数 `theme: RelaunchAnchor, mode: 48`。
 > - 390px 移动端无横向溢出；未执行真实肉鸽/生息演算/理智作战任务，避免改变账号与游戏状态。
-> - 测试：server 46 个测试文件通过，client 42 个测试文件 / 270 个测试通过，type-check 通过。
+> - 测试：server 46 个测试文件通过，client 42 个测试文件 / 271 个测试通过，type-check 通过。
 
 > **Phase 4C 实施记录（2026-10-31）**
 >
@@ -667,6 +667,16 @@
 > - Copilot 原生委托补 `--use-sanity-potion`、`--formation`、`--formation-index`、`--add-trust`、`--ignore-requirements`、`--support-unit-*`；CLI 无法表达的 formation 组合回退动态计划。
 > - 新增 `summarizeAuxiliaryCallbacks` 与 `GET /api/agent/logs/maa-callbacks`，解析 `BlackFlowStartRun`、`BlackFlowScrapTradeAborted`、`CopilotPrecheckFile`、`StageInfo` / `StageInfoError`、`UnsupportedLevel`、`RecruitSpecialTag`、`RecruitTagsSelected`。
 > - 覆盖矩阵更新：`docs/MAA_6.20_COVERAGE_MATRIX.md`；`npm run verify` 通过（client 42 个测试文件 / 270 个测试，server 46 个测试文件）。
+
+> **P2 覆盖补齐（2026-10-31）**
+>
+> - StartUp 新增 `start_game_enabled` 开关；客户端/调度器/Agent start-game 在关闭时走动态 `StartUp` 任务；`/actions/start-game` 新增 `accountName`、`startGameEnabled`。
+> - Recruit 新增「仅计算公招」开关，显式写入 `times:0`、`confirm:[]`、`set_time:false`，保留空数组语义。
+> - Roguelike 模式 30003 新增准备局开局干员三顺位，映射 `collectible_mode_core_char_list`；留空沿用主列表。
+> - Agent 动态 Fight 在构建多任务前调用 `replaceActivityCode`，HD-X 活动关卡不再原样下发。
+> - Copilot 新增 `user_additional` 文本输入、解析和原生委托回退；连接/性能回调进入 `GET /api/agent/logs/maa-callbacks` 的 `connectionEvents`。
+> - 覆盖矩阵更新：基础任务 71/73 对齐，高级任务 67/76 对齐，回调 23 已对齐 / 37 部分对齐；仍缺 ParadoxCopilot 对象 `list`、Custom 任意 `task_names` 入口，连接/性能回调尚未进入 `/status` 或 UI。
+> - `npm run verify` 通过（client 42 个测试文件 / 271 个测试，server 46 个测试文件）。
 
 ### Phase 5：清理与文档
 

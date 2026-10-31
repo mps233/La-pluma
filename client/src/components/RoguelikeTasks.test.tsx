@@ -463,6 +463,41 @@ describe('RoguelikeTasks execution recovery', () => {
     )
   })
 
+  it('maps a separate preparation-run operator list for mode 30003', async () => {
+    mocks.executeCommand.mockResolvedValueOnce({ success: true })
+    mocks.loadUserConfig.mockResolvedValueOnce({
+      success: true,
+      data: {
+        taskInputs: { roguelike: 'BlackFlow' },
+        advancedParams: {
+          roguelike: {
+            mode: '30003',
+            coreCharList: [{ name: '维什戴尔', use_support: false }],
+            collectibleModeCoreCharList: [{ name: '斑点', use_support: true }],
+          },
+        },
+      },
+    })
+    await act(async () => root.render(<RoguelikeTasks />))
+    await flush()
+    await click(buttonByText('立即执行')!)
+
+    expect(mocks.executeCommand).toHaveBeenCalledWith(
+      'run',
+      ['roguelike'],
+      expect.objectContaining({
+        params: expect.objectContaining({
+          core_char_list: [{ name: '维什戴尔', use_support: false }],
+          collectible_mode_core_char_list: [{ name: '斑点', use_support: true }],
+        }),
+      }),
+      null,
+      '集成战略',
+      'roguelike',
+      true,
+    )
+  })
+
   it('sends an empty blackflow_start_animals array for mode 30003', async () => {
     mocks.executeCommand.mockResolvedValueOnce({ success: true })
     mocks.loadUserConfig.mockResolvedValueOnce({

@@ -61,6 +61,23 @@ test('native copilot plans keep all advanced execution options', () => {
   });
 });
 
+test('maps user_additional only when auto formation is enabled', () => {
+  const params = buildCopilotTaskParams([{ filename: '/tmp/a.json' }], false, {
+    formationMode: 'auto',
+    userAdditional: '逻各斯:3，维什戴尔:9, , 斑点'
+  });
+  assert.deepEqual(params.user_additional, [
+    { name: '逻各斯', skill: 3 },
+    { name: '维什戴尔', skill: 0 },
+    { name: '斑点', skill: 0 }
+  ]);
+  const off = buildCopilotTaskParams([{ filename: '/tmp/a.json' }], false, {
+    formationMode: 'off',
+    userAdditional: '逻各斯:3'
+  });
+  assert.equal(off.user_additional, undefined);
+});
+
 test('multi-copilot loop count expands into repeated native entries', () => {
   const files = buildCopilotRepeatFiles({ itemIndex: 2, copilotId: 99, mode: 'raid' }, 3, '/tmp/plan');
   assert.equal(files.length, 3);

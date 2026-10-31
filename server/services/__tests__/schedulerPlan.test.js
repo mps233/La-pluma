@@ -57,6 +57,46 @@ describe('scheduled task flow planning', () => {
     }]);
   });
 
+  it('emits calculation-only Recruit params from the explicit switch', () => {
+    const result = buildScheduledTaskFlowPlan([{
+      id: 'recruit-1',
+      commandId: 'recruit',
+      name: '自动公招',
+      enabled: true,
+      taskType: 'Recruit',
+      params: { refresh: true, times: '4', confirm: [3, 4], calculationOnly: true }
+    }])
+
+    assert.equal(result.success, true)
+    assert.deepEqual(result.steps[0].taskConfig.params, {
+      refresh: true,
+      times: 0,
+      confirm: [],
+      set_time: false
+    })
+  })
+
+  it('uses a dynamic StartUp task when client launch is disabled', () => {
+    const result = buildScheduledTaskFlowPlan([{
+      id: 'startup-1',
+      commandId: 'startup',
+      name: '启动游戏',
+      enabled: true,
+      params: { clientType: 'Bilibili', accountName: '4567', startGameEnabled: false }
+    }])
+
+    assert.equal(result.success, true)
+    assert.equal(result.steps[0].command, 'run')
+    assert.deepEqual(result.steps[0].args, ['startup'])
+    assert.equal(result.steps[0].dynamicTask, true)
+    assert.equal(result.steps[0].taskConfig.type, 'StartUp')
+    assert.equal(result.steps[0].taskConfig.client_type, 'Bilibili')
+    assert.deepEqual(result.steps[0].taskConfig.params, {
+      start_game_enabled: false,
+      account_name: '4567'
+    })
+  })
+
   it('switches fight to a multi-task dynamic config for new Core-only fields', () => {
     const result = buildScheduledTaskFlowPlan([{
       id: 'fight-1',

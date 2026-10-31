@@ -314,6 +314,15 @@ function buildScheduledTaskCommand(task, connectionDefaults = {}) {
     Object.keys(params).forEach(key => {
       const value = params[key];
       if (value === undefined || value === '' || value === null) return;
+
+      if (key === 'calculationOnly') {
+        if (value === true && task.taskType === 'Recruit') {
+          taskConfig.params.times = 0;
+          taskConfig.params.confirm = [];
+          taskConfig.params.set_time = false;
+        }
+        return;
+      }
       
       if (typeof value === 'boolean') {
         taskConfig.params[key] = value;
@@ -338,6 +347,23 @@ function buildScheduledTaskCommand(task, connectionDefaults = {}) {
       command: 'run', 
       params: task.commandId || task.id,
       taskConfig: JSON.stringify(taskConfig)
+    };
+  }
+
+  const startupCommandId = task.commandId || String(task.id || '').split('-')[0];
+  if (startupCommandId === 'startup' && task.params?.startGameEnabled === false) {
+    const clientType = task.params?.clientType || connectionDefaults.clientType || DEFAULT_CLIENT_TYPE;
+    const params = { start_game_enabled: false };
+    if (task.params?.accountName?.trim()) params.account_name = task.params.accountName.trim();
+    return {
+      command: 'run',
+      params: 'startup',
+      taskConfig: JSON.stringify({
+        name: task.name || '启动游戏',
+        type: 'StartUp',
+        client_type: clientType,
+        params
+      })
     };
   }
 
@@ -1052,8 +1078,23 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
       if (taskConfig) {
         const taskId = params;
         const fightLogCheckpoint = commandId === 'fight' ? await createMaaLogCheckpoint() : null;
+        let effectiveTaskConfig = taskConfig;
+        if (commandId === 'fight') {
+          const parsed = JSON.parse(taskConfig);
+          if (Array.isArray(parsed.tasks)) {
+            const clientType = task.params?.clientType || adbConfig?.clientType || DEFAULT_CLIENT_TYPE;
+            parsed.tasks = await Promise.all(parsed.tasks.map(async item => ({
+              ...item,
+              params: {
+                ...item.params,
+                stage: await replaceActivityCode(item.params?.stage, clientType)
+              }
+            })));
+            effectiveTaskConfig = JSON.stringify(parsed);
+          }
+        }
         // 定时任务需要等待命令完成才能获取输出
-        const result = await execDynamicTask(taskId, taskConfig, task.name, null, true);
+        const result = await execDynamicTask(taskId, effectiveTaskConfig, task.name, null, true);
 
         // 尝试从输出中提取任务总结
         if (result.stdout) {

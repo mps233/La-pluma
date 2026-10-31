@@ -400,6 +400,7 @@ export default function RoguelikeTasks() {
         { key: 'squad', label: '起始分队', type: 'text', placeholder: '指挥分队' },
         { key: 'roles', label: '职业组', type: 'text', placeholder: '取长补短' },
         { key: 'coreCharList', label: '开局干员（最多 3 位）', type: 'core-char-list', helper: '按顺位招募；三个位置职业不能相同，助战可逐位开启' },
+        { key: 'collectibleModeCoreCharList', label: '准备局开局干员（模式 30003）', type: 'core-char-list', helper: '不填则沿用主开局干员列表' },
         { key: 'coreChar', label: '开局干员（兼容字段）', type: 'text', placeholder: '留空自动选择', helper: '仅在未填写上方干员列表时使用' },
         { key: 'useSupport', label: '兼容字段使用助战', type: 'checkbox', helper: '仅作用于上方兼容字段' },
         { key: 'useNonfriendSupport', label: '允许非好友助战', type: 'checkbox' },
@@ -575,6 +576,12 @@ export default function RoguelikeTasks() {
         .map(entry => ({ name: entry.name.trim(), use_support: Boolean(entry.use_support) }))
       if (coreCharList.length > 0) params.core_char_list = coreCharList
 
+      const prepCoreCharList = (Array.isArray(advanced.collectibleModeCoreCharList) ? advanced.collectibleModeCoreCharList : [])
+        .filter(entry => entry && typeof entry.name === 'string' && entry.name.trim())
+        .slice(0, 3)
+        .map(entry => ({ name: entry.name.trim(), use_support: Boolean(entry.use_support) }))
+      if (prepCoreCharList.length > 0) params.collectible_mode_core_char_list = prepCoreCharList
+
       if ([30001, 30003].includes(Number(params.mode)) && theme !== 'BlackFlow') {
         throw new Error('该模式仅适用于黑流树海主题')
       }
@@ -730,8 +737,8 @@ export default function RoguelikeTasks() {
     if (options.length === 0) return null
 
     const advanced = advancedParams[task.id] || {}
-    const coreCharRows = Array.from({ length: 3 }, (_, index) => {
-      const entry = Array.isArray(advanced.coreCharList) ? advanced.coreCharList[index] : undefined
+    const getCoreCharRows = (value: unknown) => Array.from({ length: 3 }, (_, index) => {
+      const entry = Array.isArray(value) ? value[index] : undefined
       return {
         name: entry?.name || '',
         use_support: Boolean(entry?.use_support),
@@ -739,45 +746,49 @@ export default function RoguelikeTasks() {
     })
     const rewardMask = Number(advanced.blackflowStartRewards ?? 0)
 
-    const updateCoreChar = (index: number, patch: Partial<RoguelikeCoreChar>) => {
-      const next = coreCharRows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row)
-      handleAdvancedChange(task.id, 'coreCharList', next)
+    const updateCoreChar = (key: string, index: number, patch: Partial<RoguelikeCoreChar>) => {
+      const next = getCoreCharRows(advanced[key]).map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row)
+      handleAdvancedChange(task.id, key, next)
     }
 
-    const renderCoreCharList = (option: RoguelikeAdvancedOption) => (
-      <fieldset>
-        <legend className="roguelike-field-label mb-1 block">{option.label}</legend>
-        <p className="mb-2 text-xs leading-5 text-gray-500 dark:text-gray-400">{option.helper}</p>
-        <div className="space-y-2">
-          {coreCharRows.map((row, index) => (
-            <div key={index} className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
-              <Input
-                id={`roguelike-${task.id}-core-char-${index}`}
-                name={`maa-${task.id}-core-char-${index}`}
-                type="text"
-                label={`第 ${index + 1} 顺位`}
-                value={row.name}
-                onChange={(value: string) => updateCoreChar(index, { name: value })}
-                placeholder="留空则自动选择"
-              />
-              <label
-                htmlFor={`roguelike-${task.id}-core-char-${index}-support`}
-                className="flex min-h-11 items-center gap-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-300"
-              >
-                <input
-                  id={`roguelike-${task.id}-core-char-${index}-support`}
-                  type="checkbox"
-                  checked={row.use_support}
-                  onChange={(event) => updateCoreChar(index, { use_support: event.target.checked })}
-                  className="custom-checkbox cursor-pointer"
+    const renderCoreCharList = (option: RoguelikeAdvancedOption) => {
+      const fieldSlug = option.key === 'coreCharList' ? 'core-char' : option.key
+      const rows = getCoreCharRows(advanced[option.key])
+      return (
+        <fieldset>
+          <legend className="roguelike-field-label mb-1 block">{option.label}</legend>
+          <p className="mb-2 text-xs leading-5 text-gray-500 dark:text-gray-400">{option.helper}</p>
+          <div className="space-y-2">
+            {rows.map((row, index) => (
+              <div key={index} className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+                <Input
+                  id={`roguelike-${task.id}-${fieldSlug}-${index}`}
+                  name={`maa-${task.id}-${fieldSlug}-${index}`}
+                  type="text"
+                  label={`第 ${index + 1} 顺位`}
+                  value={row.name}
+                  onChange={(value: string) => updateCoreChar(option.key, index, { name: value })}
+                  placeholder="留空则自动选择"
                 />
-                助战
-              </label>
-            </div>
-          ))}
-        </div>
-      </fieldset>
-    )
+                <label
+                  htmlFor={`roguelike-${task.id}-${fieldSlug}-${index}-support`}
+                  className="flex min-h-11 items-center gap-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-300"
+                >
+                  <input
+                    id={`roguelike-${task.id}-${fieldSlug}-${index}-support`}
+                    type="checkbox"
+                    checked={row.use_support}
+                    onChange={(event) => updateCoreChar(option.key, index, { use_support: event.target.checked })}
+                    className="custom-checkbox cursor-pointer"
+                  />
+                  助战
+                </label>
+              </div>
+            ))}
+          </div>
+        </fieldset>
+      )
+    }
 
     const renderBlackflowRewards = (option: RoguelikeAdvancedOption) => (
       <fieldset>

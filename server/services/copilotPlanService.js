@@ -201,10 +201,32 @@ async function ensurePresetFormationResource(configDir) {
   await writeFile(userTasksPath, JSON.stringify(mergePresetFormationTasks(installedTasks, userTasks), null, 2));
 }
 
+function normalizeUserAdditional(value) {
+  if (Array.isArray(value)) {
+    return value.map(item => ({
+      name: String(item?.name || '').trim(),
+      skill: Number(item?.skill) >= 1 && Number(item?.skill) <= 3 ? Number(item.skill) : 0
+    })).filter(item => item.name);
+  }
+  if (typeof value !== 'string' || !value.trim()) return [];
+  return value.split(/[,，\n]/).map(entry => {
+    const [name, skill] = entry.split(/[:：]/).map(part => part.trim());
+    if (!name) return null;
+    const numericSkill = Number(skill);
+    return {
+      name,
+      skill: Number.isInteger(numericSkill) && numericSkill >= 1 && numericSkill <= 3 ? numericSkill : 0
+    };
+  }).filter(Boolean);
+}
+
 export function buildCopilotTaskParams(list, presetFormation, options = {}) {
+  const formation = presetFormation ? false : options.formationMode !== 'off';
+  const userAdditional = formation ? normalizeUserAdditional(options.userAdditional) : [];
   return {
     copilot_list: list,
-    formation: presetFormation ? false : options.formationMode !== 'off',
+    formation,
+    ...(userAdditional.length > 0 ? { user_additional: userAdditional } : {}),
     ignore_requirements: options.ignoreRequirements !== false,
     use_sanity_potion: options.useSanityPotion === true,
     add_trust: options.addTrust === true,
@@ -278,7 +300,12 @@ export function canUseNativeCopilotSet({
   if (loopTimes !== 1) return false;
   if (completedKeys.length > 0) return false;
   if (entries.some(entry => entry.presetFormation)) return false;
-  if (userAdditional && (Array.isArray(userAdditional) ? userAdditional.length > 0 : Object.keys(userAdditional).length > 0)) return false;
+  const hasUserAdditional = typeof userAdditional === 'string'
+    ? userAdditional.trim().length > 0
+    : Array.isArray(userAdditional)
+      ? userAdditional.length > 0
+      : Boolean(userAdditional && Object.keys(userAdditional).length > 0);
+  if (hasUserAdditional) return false;
   // maa-cli forces formation=true for multi-stage sets and defaults to false
   // for a single stage; auto/off cannot be expressed for those combinations.
   if (formationMode === 'auto' && entries.length < 2) return false;

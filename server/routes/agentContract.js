@@ -242,6 +242,8 @@ export const AGENT_OPERATIONS = Object.freeze([
         profileId: profileIdProperty,
         clientType: { type: 'string', ...runtimeDefault('clientType') },
         address: { type: 'string', ...runtimeDefault('adbAddress') },
+        accountName: { type: 'string', description: 'Optional account name fragment to switch to after launch.' },
+        startGameEnabled: { type: 'boolean', default: true, description: 'Set false to initialize MAA without launching the game client.' },
         waitForCompletion: { type: 'boolean', default: true }
       }
     }

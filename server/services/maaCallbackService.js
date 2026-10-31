@@ -66,7 +66,8 @@ export function summarizeAuxiliaryCallbacks(logOutput) {
     stageInfoErrors: 0,
     unsupportedLevels: [],
     recruitSpecialTags: [],
-    recruitSelectedTags: []
+    recruitSelectedTags: [],
+    connectionEvents: []
   };
 
   for (const payload of parseMaaCallbackPayloads(logOutput)) {
@@ -107,6 +108,19 @@ export function summarizeAuxiliaryCallbacks(logOutput) {
         break;
       case 'RecruitTagsSelected':
         pushCapped(result.recruitSelectedTags, Array.isArray(details.tags) ? details.tags.map(String) : []);
+        break;
+      case 'ConnectFailed':
+      case 'Connected':
+      case 'Reconnecting':
+      case 'Reconnected':
+      case 'Disconnect':
+      case 'ScreencapFailed':
+      case 'TouchModeNotAvailable':
+      case 'MuMuExtrasInputStatus':
+      case 'ResolutionChanged':
+      case 'ScreencapCost':
+      case 'EmulatorFPS':
+        pushCapped(result.connectionEvents, { what: payload.what, details });
         break;
       default:
         break;

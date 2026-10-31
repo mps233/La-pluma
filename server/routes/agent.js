@@ -5,6 +5,7 @@ import {
   execMaaCommand,
   execDynamicTask,
   getMaaVersion,
+  replaceActivityCode,
   getRealtimeLogs,
   getTaskStatus,
   stopCurrentTask,
@@ -659,8 +660,8 @@ export function needsDynamicFight(input = {}) {
     || (Number.isFinite(series) && series > 6);
 }
 
-export function buildDynamicFightPlan(input = {}) {
-  const stages = normalizeFightStages(input);
+export function buildDynamicFightPlan(input = {}, resolvedStages = null) {
+  const stages = Array.isArray(resolvedStages) ? resolvedStages : normalizeFightStages(input);
   if (stages.length === 0) return null;
   const common = {};
   if (input.medicine !== undefined && input.medicine !== '' && input.medicine !== null) {
@@ -1791,21 +1792,41 @@ router.get('/config-directory', asyncHandler(async (req, res) => {
 
 router.post('/actions/start-game', asyncHandler(async (req, res) => {
   const waitForCompletion = parseWaitForCompletion(req.body?.waitForCompletion);
+  const accountName = typeof req.body?.accountName === 'string' ? req.body.accountName.trim() : '';
+  const startGameEnabled = req.body?.startGameEnabled !== false;
   const { clientType, address } = await resolveRequestConnection(req, { allowOverrides: true })
   return executeTrackedAgentAction(req, res, {
     operationId: 'start_game',
-    input: { clientType, address, waitForCompletion },
+    input: { clientType, address, accountName, startGameEnabled, waitForCompletion },
     waitForCompletion,
     metadata: { taskName: '启动游戏', taskType: 'agent' },
-    execute: lifecycle => execMaaCommand(
-      'startup',
-      [clientType, '-a', address],
-      '启动游戏',
-      'agent',
-      waitForCompletion,
-      false,
-      lifecycle
-    ),
+    execute: lifecycle => startGameEnabled
+      ? execMaaCommand(
+          'startup',
+          [clientType, '-a', address, ...(accountName ? ['--account-name', accountName] : [])],
+          '启动游戏',
+          'agent',
+          waitForCompletion,
+          false,
+          lifecycle
+        )
+      : execDynamicTask(
+          'startup',
+          {
+            name: '启动游戏',
+            type: 'StartUp',
+            client_type: clientType,
+            params: {
+              start_game_enabled: false,
+              ...(accountName ? { account_name: accountName } : {})
+            }
+          },
+          '启动游戏',
+          'agent',
+          waitForCompletion,
+          false,
+          { lifecycle, clientType }
+        ),
     successMessage: '游戏启动命令执行完成',
     acceptedMessage: '游戏启动命令已接受'
   });
@@ -1859,9 +1880,16 @@ router.post('/actions/fight', asyncHandler(async (req, res) => {
   delete fightOptions.waitForCompletion;
 
   let dynamicFightPlan = null;
+  let dynamicConnection = null;
   try {
     if (needsDynamicFight(fightOptions)) {
-      dynamicFightPlan = buildDynamicFightPlan(fightOptions);
+      dynamicConnection = await resolveRequestConnection(req, { allowOverrides: true });
+      const clientType = fightOptions.clientType || dynamicConnection.clientType;
+      const resolvedStages = await Promise.all(normalizeFightStages(fightOptions).map(async stage => ({
+        ...stage,
+        stage: await replaceActivityCode(stage.stage, clientType)
+      })));
+      dynamicFightPlan = buildDynamicFightPlan(fightOptions, resolvedStages);
     }
   } catch (error) {
     return sendError(res, req, agentError('AGENT_VALIDATION_DROPS_INVALID', error.message, {
@@ -1898,7 +1926,6 @@ router.post('/actions/fight', asyncHandler(async (req, res) => {
       waitForCompletion,
       metadata: { taskName: 'Agent: 理智作战', taskType: 'agent', plan },
       execute: async lifecycle => {
-        const connection = await resolveRequestConnection(req, { allowOverrides: true });
         const result = await execDynamicTask(
           'fight',
           dynamicFightPlan,
@@ -1906,7 +1933,7 @@ router.post('/actions/fight', asyncHandler(async (req, res) => {
           'agent',
           waitForCompletion,
           false,
-          { lifecycle, clientType: fightOptions.clientType || connection.clientType }
+          { lifecycle, clientType: fightOptions.clientType || dynamicConnection?.clientType }
         );
         return { ...result, plan };
       },
