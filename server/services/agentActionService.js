@@ -12,6 +12,7 @@ export const AGENT_TASK_COMMANDS = Object.freeze([
   'ssscopilot',
   'paradoxcopilot',
   'roguelike',
+  'reclamation',
   'depot',
   'operbox',
   'activity',

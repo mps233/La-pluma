@@ -58,11 +58,45 @@ export function parseInfrastExecutionAction(taskName, params = {}, logOutput = '
 
   const startEvents = events.filter(event => event.callback === 'SubTaskStart');
   const taskNames = startEvents.map(event => event.details?.task).filter(Boolean);
-  const observedFacilities = unique(startEvents.flatMap(event => {
-    const className = String(event.class || '');
-    const matchedClass = Object.keys(FACILITY_CLASSES).find(name => className.includes(name));
-    return matchedClass ? [FACILITY_CLASSES[matchedClass]] : [];
-  }));
+  const structuredFacilities = events
+    .filter(event => event.what === 'EnterFacility')
+    .map(event => String(event.details?.facility || '').trim())
+    .filter(Boolean);
+  const observedFacilities = unique([
+    ...startEvents.flatMap(event => {
+      const className = String(event.class || '');
+      const matchedClass = Object.keys(FACILITY_CLASSES).find(name => className.includes(name));
+      return matchedClass ? [FACILITY_CLASSES[matchedClass]] : [];
+    }),
+    ...structuredFacilities
+  ]);
+  const products = events
+    .filter(event => event.what === 'ProductOfFacility')
+    .map(event => ({
+      facility: event.details?.facility || null,
+      index: Number(event.details?.index) || null,
+      product: event.details?.product || null
+    }))
+    .filter(product => product.product);
+  const keptUnchanged = events
+    .filter(event => [
+      'CustomInfrastRoomKeptUnchanged',
+      'CustomInfrastRoomsNotConfigured',
+      'CustomInfrastTraineeNotFound',
+      'CustomInfrastAssistantNotFound',
+      'CustomInfrastRoomGroupsMatchFailed'
+    ].includes(event.what))
+    .map(event => ({
+      facility: event.details?.facility || null,
+      index: Number(event.details?.index) || null,
+      reason: event.details?.reason || event.what
+    }));
+  const notEnoughStaff = events
+    .filter(event => event.what === 'NotEnoughStaff')
+    .map(event => ({
+      facility: event.details?.facility || null,
+      index: Number(event.details?.index) || null
+    }));
   const failed = events.some(event => event.callback === 'TaskChainError');
   const entered = taskNames.includes('InfrastEnteredFlag')
     || taskNames.includes('InfrastNotification')
@@ -101,7 +135,10 @@ export function parseInfrastExecutionAction(taskName, params = {}, logOutput = '
     clueExchange,
     trainingContinued,
     trainingCompleted,
-    trainingProcessing
+    trainingProcessing,
+    products,
+    keptUnchanged,
+    notEnoughStaff
   };
 
   if (failed) {
@@ -122,6 +159,9 @@ export function parseInfrastExecutionAction(taskName, params = {}, logOutput = '
   if (trainingContinued) details.push('已继续专精训练');
   else if (trainingCompleted) details.push('专精训练已完成');
   else if (trainingProcessing) details.push('专精训练进行中');
+  if (products.length > 0) details.push(`已识别 ${products.length} 个设施产物`);
+  if (keptUnchanged.length > 0) details.push(`${keptUnchanged.length} 个房间保持原样`);
+  if (notEnoughStaff.length > 0) details.push(`${notEnoughStaff.length} 个设施可用干员不足`);
   if (observedFacilities.length > 0) {
     details.push(`已处理：${observedFacilities.map(facility => FACILITY_LABELS[facility] || facility).join('、')}`);
   }

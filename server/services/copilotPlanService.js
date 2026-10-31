@@ -66,7 +66,7 @@ async function loadStageCodeMap(stageIds) {
     }));
     try {
       const stages = JSON.parse(await readFile(join(resourceDir, 'stages.json'), 'utf8'));
-      for (const stage of stages) {
+      for (const stage of Object.values(stages)) {
         if (!stage?.stageId || !stage?.code) continue;
         const existing = result.get(stage.stageId);
         result.set(stage.stageId, {
@@ -295,7 +295,7 @@ export async function executeSelectedCopilotEntries({ planId, name, entries, opt
         params: buildCopilotTaskParams(list, group.presetFormation, options)
       };
       if (group.presetFormation) await ensurePresetFormationResource(configDir);
-      await execDynamicTask(taskId, taskConfig, name, 'copilot', true, group.presetFormation || options.userResource === true);
+      await execDynamicTask(taskId, taskConfig, name, 'copilot', true, group.presetFormation || options.userResource === true, { clientType: options.clientType });
       results.push(...group.entries.map(entry => ({ ...entry, success: true })));
     }
   });
@@ -347,7 +347,7 @@ export async function executeCopilotPlan({ setId, raid = 'normal', selectedIndex
       const checkpoint = await createMaaLogCheckpoint();
       try {
         if (group.presetFormation) await ensurePresetFormationResource(configDir);
-        await execDynamicTask(taskId, taskConfig, `作业集 ${plan.name}`, 'copilot', true, group.presetFormation || options.userResource === true);
+        await execDynamicTask(taskId, taskConfig, `作业集 ${plan.name}`, 'copilot', true, group.presetFormation || options.userResource === true, { clientType: options.clientType });
         for (const entry of group.entries) {
           completed.add(entry.key);
           results.push({ ...entry, success: true });

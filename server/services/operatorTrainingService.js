@@ -10,6 +10,7 @@ import { readJsonFile, writeJsonFile } from '../utils/fileHelper.js';
 import { createLogger } from '../utils/logger.js';
 import { getTodayOpenStages, isStageOpenToday } from './notificationService.js';
 import { getAllOperators } from './dataParserService.js';
+import { getMaaMaterialDatabase } from './maaResourceDataService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -194,28 +195,33 @@ async function loadOperatorMaterials() {
   }
 }
 
+let materialNameCache = new Map();
+
 /**
- * 加载材料数据库（包含 recipes）
+ * 加载材料数据库（包含 recipes），数据统一来自 MaaResource。
  */
 async function loadMaterialsDatabase() {
   try {
-    const MATERIALS_DB_PATH = path.join(__dirname, '../data/materials.json');
-    return await readJsonFile(MATERIALS_DB_PATH, { materials: {}, recipes: {}, stageSchedule: {} });
+    const { materials, recipes } = await getMaaMaterialDatabase();
+    materialNameCache = new Map(
+      Object.values(materials).map(material => [String(material.id), material.name])
+    );
+    return { materials, recipes, stageSchedule: {} };
   } catch (error) {
-    logger.error('加载材料数据库失败', { error: error.message });
+    logger.error('加载 MaaResource 材料数据库失败', { error: error.message });
     return { materials: {}, recipes: {}, stageSchedule: {} };
   }
 }
 
 /**
- * 加载材料合成配方数据库
+ * 加载材料合成配方数据库。
  */
 async function loadMaterialFormulas() {
   try {
-    const FORMULAS_PATH = path.join(__dirname, '../data/material-formulas.json');
-    return await readJsonFile(FORMULAS_PATH, {});
+    const { recipes } = await getMaaMaterialDatabase();
+    return recipes;
   } catch (error) {
-    logger.error('加载材料合成配方失败', { error: error.message });
+    logger.error('加载 MaaResource 合成配方失败', { error: error.message });
     return {};
   }
 }
@@ -467,7 +473,10 @@ function getMaterialName(id, operatorMaterials) {
     const mat = operatorMaterials.elite2.chips.find(m => m.id === id);
     if (mat) return mat.name;
   }
-  
+
+  // 最后使用 MaaResource 的物品名
+  if (materialNameCache.has(String(id))) return materialNameCache.get(String(id));
+
   return `材料_${id}`;
 }
 

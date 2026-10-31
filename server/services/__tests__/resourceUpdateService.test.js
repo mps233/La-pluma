@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildResourceInfo } from '../resourceUpdateService.js';
+import { buildResourceInfo, updateMaaResources } from '../resourceUpdateService.js';
 
 const now = new Date('2026-07-10T12:00:00.000Z');
 
@@ -35,5 +35,45 @@ describe('buildResourceInfo', () => {
     assert.equal(result.status, 'unknown');
     assert.equal(result.ageDays, null);
     assert.match(result.message, /无法读取资源版本/);
+  });
+});
+
+describe('updateMaaResources', () => {
+  it('runs maa hot-update and returns the refreshed resource info', async () => {
+    const calls = [];
+    const result = await updateMaaResources({
+      execute: async (...args) => {
+        calls.push(args);
+        return { stdout: 'hot update completed' };
+      },
+      getResourceInfo: async () => ({ lastUpdated: '2026-10-31 12:00:00.000', status: 'current' })
+    });
+
+    assert.deepEqual(calls, [['hot-update', [], null, null, true]]);
+    assert.equal(result.output, 'hot update completed');
+    assert.equal(result.resource.status, 'current');
+  });
+
+  it('shares one in-flight update between concurrent callers', async () => {
+    let releases = 0;
+    let executions = 0;
+    const execute = async () => {
+      executions += 1;
+      await new Promise(resolve => setTimeout(resolve, 20));
+      return { stdout: 'done' };
+    };
+    const getResourceInfo = async () => {
+      releases += 1;
+      return { status: 'current' };
+    };
+
+    const [first, second] = await Promise.all([
+      updateMaaResources({ execute, getResourceInfo }),
+      updateMaaResources({ execute, getResourceInfo })
+    ]);
+
+    assert.equal(executions, 1);
+    assert.equal(releases, 1);
+    assert.equal(first, second);
   });
 });

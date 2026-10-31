@@ -7,10 +7,10 @@ import { parseRecruitExecutionAction } from './recruitResultService.js';
 import { parseInfrastExecutionAction } from './infrastResultService.js';
 import { parseMallExecutionAction } from './mallResultService.js';
 import { createFightExecutionAction, isFightSanityDepleted } from './fightResultService.js';
+import { summarizeFightCallbacks } from './maaCallbackService.js';
 import { loadUserConfig, saveUserConfig } from './configStorageService.js';
 import operatorTrainingService from './operatorTrainingService.js';
 import { recordDrops } from './dropRecordService.js';
-import { updateMaaResources } from './resourceUpdateService.js';
 import { createLogger } from '../utils/logger.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -87,22 +87,43 @@ function getFightReportResults(task, stage, result) {
 }
 
 async function recordFightDrops(summary, scheduleId) {
-  if (!summary?.stage || !Array.isArray(summary.dropItems) || summary.dropItems.length === 0) return;
+  if (!summary?.stage) return;
 
   try {
     const times = Math.max(1, Number(summary.times) || 1);
     await recordDrops({
       stage: summary.stage,
       times,
-      items: summary.dropItems,
-      sanity: times * 20,
+      items: Array.isArray(summary.dropItems) ? summary.dropItems : [],
+      sanity: Math.max(0, Number(summary.sanity) || 0),
       medicine: Math.max(0, Number(summary.medicine) || 0),
       stone: Math.max(0, Number(summary.stone) || 0)
     });
-    logger.debug('掉落记录已保存', { scheduleId, stage: summary.stage });
+    logger.debug('掉落记录已保存', { scheduleId, stage: summary.stage, drops: summary.dropItems?.length || 0 });
   } catch (error) {
     logger.error('掉落记录保存失败', { scheduleId, error: error.message });
   }
+}
+
+async function attachFightCallbacks(summary, checkpoint, taskName) {
+  if (!checkpoint) return summary;
+
+  let callbackSummary;
+  try {
+    callbackSummary = summarizeFightCallbacks(await readMaaLogSince(checkpoint));
+  } catch (error) {
+    logger.warn('读取战斗回调失败', { taskName, error: error.message });
+    return summary;
+  }
+
+  const merged = summary || { task: taskName };
+  if (callbackSummary.stage) merged.stage = merged.stage || callbackSummary.stage;
+  if (callbackSummary.items.length > 0) {
+    merged.dropItems = callbackSummary.items;
+    merged.drops = callbackSummary.items.map(item => `${item.name} × ${item.count}`).join(', ');
+  }
+  if (callbackSummary.sanityUsed > 0) merged.sanity = callbackSummary.sanityUsed;
+  return merged;
 }
 
 // 定时任务执行状态
@@ -183,6 +204,10 @@ function buildScheduledTaskCommand(task, connectionDefaults = {}) {
   if (task.taskType) {
     // MaaCore 内置任务类型
     const params = { ...(task.params || {}) };
+    const clientType = params.clientType || params.client_type
+      || connectionDefaults.clientType || DEFAULT_CLIENT_TYPE;
+    delete params.clientType;
+    delete params.client_type;
     if (task.taskType === 'Recruit') {
       if (params.preserve_tags === undefined && params.skip_robot === true) {
         params.preserve_tags = ['支援机械'];
@@ -203,6 +228,7 @@ function buildScheduledTaskCommand(task, connectionDefaults = {}) {
     const taskConfig = {
       name: task.name,
       type: task.taskType,
+      client_type: clientType,
       params: {}
     };
     
@@ -468,7 +494,8 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
   const sharedConnection = await resolveConnection();
   const adbConfig = {
     adbPath: sharedConnection.adbPath,
-    address: sharedConnection.address
+    address: sharedConnection.address,
+    clientType: sharedConnection.clientType
   };
   
   for (let i = 0; i < enabledTasks.length; i++) {
@@ -596,7 +623,9 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         // execDynamicTask 需要 JSON 字符串
         // execDynamicTask 成功时不抛出异常，失败时抛出异常
         try {
-          await execDynamicTask('Depot_temp', JSON.stringify(depotTaskConfig), '仓库识别', 'depot', true);
+          await execDynamicTask('Depot_temp', JSON.stringify(depotTaskConfig), '仓库识别', 'depot', true, false, {
+            clientType: adbConfig.clientType
+          });
           logger.success('仓库识别命令执行完成', { scheduleId });
           
           // 解析并保存仓库数据
@@ -604,15 +633,16 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
           const { parseDepotData } = await import('./dataParserService.js');
           const parseResult = await parseDepotData();
           if (parseResult && parseResult.success) {
-            logger.success('仓库数据已保存', { 
-              scheduleId, 
-              itemCount: parseResult.itemCount 
+            const itemCount = parseResult.data?.itemCount || 0;
+            logger.success('仓库数据已保存', {
+              scheduleId,
+              itemCount
             });
             actionResults.push({
               task: task.name,
               action: 'depot',
               status: 'success',
-              message: `关闭前仓库识别完成，共 ${parseResult.itemCount || 0} 项`
+              message: `关闭前仓库识别完成，共 ${itemCount} 项`
             });
           } else {
             logger.warn('仓库数据解析失败', { scheduleId });
@@ -1040,6 +1070,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
               
               // 执行命令
               try {
+                const fightLogCheckpoint = await createMaaLogCheckpoint();
                 const result = await execMaaCommand(command, currentArgs, `${task.name} (${stage})`, null, true);
                 if (scheduleExecutionStatus.shouldStop || activeScheduleAbortController.signal.aborted) break;
                 const reportSummary = getFightReportResults(task, stage, result);
@@ -1065,10 +1096,11 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
                   logger.debug('未检测到理智耗尽', { scheduleId, stage });
                 }
                 
-                // 提取任务总结
-                const summary = result.stdout
+                // 提取任务总结，并用结构化回调补齐掉落与理智
+                let summary = result.stdout
                   ? parseTaskSummary(`${task.name} (${stage})`, result.stdout)
                   : null;
+                summary = await attachFightCallbacks(summary, fightLogCheckpoint, `${task.name} (${stage})`);
                 if (summary) {
                   taskSummaries.push(summary);
                   await recordFightDrops(summary, scheduleId);
@@ -1183,6 +1215,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         }
         
         // 定时任务需要等待命令完成才能获取输出
+        const fightLogCheckpoint = command === 'fight' ? await createMaaLogCheckpoint() : null;
         const result = await execMaaCommand(command, args, task.name, null, true);
         if (command === 'closedown') {
           actionResults.push({
@@ -1200,14 +1233,17 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
           reportSummary.diagnostics.forEach(diagnostic => executionWarnings.add(diagnostic.message));
         }
         
-        // 尝试从输出中提取任务总结
+        // 尝试从输出中提取任务总结，并用结构化回调补齐掉落与理智
         let parsedTaskSummary = null;
         if (result.stdout) {
           parsedTaskSummary = parseTaskSummary(task.name, result.stdout);
-          if (parsedTaskSummary) {
-            taskSummaries.push(parsedTaskSummary);
-            if (command === 'fight') await recordFightDrops(parsedTaskSummary, scheduleId);
-          }
+        }
+        if (command === 'fight') {
+          parsedTaskSummary = await attachFightCallbacks(parsedTaskSummary, fightLogCheckpoint, task.name);
+        }
+        if (parsedTaskSummary) {
+          taskSummaries.push(parsedTaskSummary);
+          if (command === 'fight') await recordFightDrops(parsedTaskSummary, scheduleId);
         }
 
         if (command === 'fight') {
@@ -1429,7 +1465,7 @@ export async function executeScheduledTaskFromCron(taskFlow, scheduleId) {
 /**
  * 解析 MAA 任务总结信息
  */
-function parseTaskSummary(taskName, output) {
+export function parseTaskSummary(taskName, output) {
   const summary = { task: taskName };
   
   // 调试：打印原始输出
@@ -1470,13 +1506,15 @@ function parseTaskSummary(taskName, output) {
     }
   }
   
-  // 提取理智药和源石使用（如果有的话）
-  const medicineMatch = output.match(/medicine[:\s]+(\d+)/i);
+  // 提取理智药和源石使用（maa-cli 0.7.x 的 Summary 格式）
+  const medicineMatch = output.match(/used\s+(\d+)\s+medicine/i)
+    || output.match(/medicine[:\s]+(\d+)/i);
   if (medicineMatch) {
     summary.medicine = medicineMatch[1];
   }
-  
-  const stoneMatch = output.match(/stone[:\s]+(\d+)/i);
+
+  const stoneMatch = output.match(/used\s+(\d+)\s+stone/i)
+    || output.match(/stone[:\s]+(\d+)/i);
   if (stoneMatch) {
     summary.stone = stoneMatch[1];
   }
@@ -1487,8 +1525,27 @@ function parseTaskSummary(taskName, output) {
     summary.duration = timeMatch[3];
   }
   
-  // 解析公招总结
-  if (output.includes('Recruit')) {
+  // 解析公招总结（Detected tags 格式）
+  if (output.includes('Detected tags')) {
+    const recruits = [];
+    const recruitLinePattern = /^\s*\d+\.\s*(★+)\s*(.*?)(?:,\s*(Recruited|Refreshed))?\s*$/gm;
+    for (const match of output.matchAll(recruitLinePattern)) {
+      const tags = match[2].split(',').map(tag => tag.trim()).filter(Boolean);
+      recruits.push({
+        stars: match[1].length,
+        tags,
+        state: match[3] || null
+      });
+    }
+    if (recruits.length > 0) {
+      summary.recruits = recruits;
+    }
+
+    const recruitedMatch = output.match(/Recruited\s+(\d+)\s+times/i);
+    if (recruitedMatch) summary.recruitCount = Number(recruitedMatch[1]);
+    const refreshedMatch = output.match(/Refreshed\s+(\d+)\s+times/i);
+    if (refreshedMatch) summary.refreshCount = Number(refreshedMatch[1]);
+  } else if (output.includes('Recruit')) {
     const recruitMatches = output.matchAll(/Recruit[:\s]+\[([^\]]+)\]\s*->\s*(\d+)\*/gi);
     const recruits = [];
     for (const match of recruitMatches) {
@@ -1501,9 +1558,14 @@ function parseTaskSummary(taskName, output) {
       summary.recruits = recruits;
     }
   }
-  
-  // 解析基建总结
-  if (output.includes('Infrast')) {
+
+  // 解析基建总结（maa-cli 0.7.x 的设施明细格式）
+  const infrastLines = output.split('\n')
+    .map(line => line.trim())
+    .filter(line => /^(Control|Mfg|Trade|Power|Office|Reception|Dorm|Processing|Training|Unknown)\b/.test(line));
+  if (infrastLines.length > 0) {
+    summary.infrast = infrastLines.join('\n');
+  } else if (output.includes('Infrast')) {
     const infrastMatch = output.match(/Infrast[:\s]+([^\n]+)/i);
     if (infrastMatch) {
       summary.infrast = infrastMatch[1].trim();
@@ -1652,14 +1714,11 @@ export function setupAutoUpdate(config) {
       try {
         await withMaaExecutionLease({ source: 'auto-update', taskName: '自动更新 MAA', command: 'update' }, async () => {
           if (updateCore) {
-            logger.info('开始更新 MaaCore');
+            logger.info('开始更新 MaaCore 与资源');
+            // `maa update` already refreshes MaaCore, base resources, the
+            // configured resource source, and hot-update files.
             await execMaaCommand('update', []);
-            logger.success('MaaCore 更新完成');
-            logger.info('开始同步最新 MaaResource');
-            const resourceResult = await updateMaaResources();
-            logger.success('MaaResource 同步完成', {
-              lastUpdated: resourceResult.resource.lastUpdated
-            });
+            logger.success('MaaCore 与资源更新完成');
           }
 
           if (updateCli) {

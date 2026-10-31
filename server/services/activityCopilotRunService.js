@@ -167,9 +167,11 @@ export async function runCurrentActivityCopilots(clientType = DEFAULT_CLIENT_TYP
       plan.entries.map(entry => entry.displayStage)
     );
   }
-  const executionOptions = candidates.navigationMode === 'current-map-fallback'
-    ? { ...preferences, userResource: true }
-    : preferences;
+  const executionOptions = {
+    ...preferences,
+    clientType,
+    ...(candidates.navigationMode === 'current-map-fallback' ? { userResource: true } : {})
+  };
 
   if (candidates.matchingSet) {
     const setPlan = await buildCopilotPlan(candidates.matchingSet.id, preferences.raid);

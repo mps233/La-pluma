@@ -14,6 +14,7 @@ import {
   initializeAgentRunStore
 } from './services/agentRunService.js';
 import { initializeRuntimeState } from './services/runtimeInitializationService.js';
+import { cleanupStaleDynamicTaskFiles } from './services/maaService.js';
 import {
   createWebrtcSignalingGateway,
   WEBRTC_SIGNALING_PATH
@@ -203,6 +204,15 @@ export async function startLaPlumaServer({
   logger.log(`  - 网络: ${transport.protocol}://${localIp}:${listeningPort}`);
   logger.log('');
   printPathConfig();
+
+  try {
+    const removedTaskFiles = await cleanupStaleDynamicTaskFiles();
+    if (removedTaskFiles > 0) {
+      logger.log(`[MAA] 已清理 ${removedTaskFiles} 个残留动态任务文件`);
+    }
+  } catch (error) {
+    logger.error('[MAA] 清理残留动态任务文件失败:', error.message);
+  }
 
   try {
     await initializeRuntime();

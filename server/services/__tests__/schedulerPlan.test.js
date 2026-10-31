@@ -28,6 +28,7 @@ describe('scheduled task flow planning', () => {
       taskConfig: {
         name: '自动公招',
         type: 'Recruit',
+        client_type: 'Official',
         params: {
           refresh: true,
           times: 4,

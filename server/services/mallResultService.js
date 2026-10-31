@@ -40,17 +40,30 @@ export function parseMallExecutionAction(taskName, params = {}, logOutput = '') 
 
   const startEvents = events.filter(event => event.callback === 'SubTaskStart');
   const taskNames = startEvents.map(event => event.details?.task).filter(Boolean);
-  const visitedCount = taskNames.filter(task => task === 'VisitNext' || task === 'VisitNextOcr').length;
-  const creditCollected = taskNames.includes('CollectCredit');
-  const purchasedCount = startEvents.filter(event => (
+  const eventTaskNames = events.flatMap(event => [
+    event.details?.task,
+    ...(Array.isArray(event.details?.to_be_recognized) ? event.details.to_be_recognized : [])
+  ]).filter(Boolean);
+  const visitedNext = taskNames.filter(task => task === 'VisitNext').length;
+  const visitedOcr = taskNames.filter(task => task === 'VisitNextOcr').length;
+  // A single friend visit may emit both VisitNext and VisitNextOcr; do not sum
+  // them or the report doubles the number of visited friends.
+  const visitedCount = Math.max(visitedNext, visitedOcr);
+  const creditCollected = eventTaskNames.includes('CollectCredit');
+  const boughtEvents = startEvents.filter(event => (
     event.details?.task === 'CreditShop-Bought'
       && (event.details.exec_times === undefined || Number(event.details.exec_times) === 1)
   )).length;
-  const noMoney = taskNames.includes('CreditShop-NoMoney');
-  const visitLimited = taskNames.includes('VisitLimited');
-  const noFriends = taskNames.includes('NoFriends');
+  const buyItEvents = startEvents.filter(event => (
+    event.details?.task === 'CreditShop-BuyIt' && event.details?.action === 'ClickSelf'
+  )).length;
+  const purchasedCount = buyItEvents > 0 ? buyItEvents : boughtEvents;
+  const noMoney = eventTaskNames.includes('CreditShop-NoMoney');
+  const visitLimited = eventTaskNames.includes('VisitLimited');
+  const noFriends = eventTaskNames.includes('NoFriends');
   const failed = events.some(event => event.callback === 'TaskChainError');
-  const entered = taskNames.some(task => [
+  const entered = eventTaskNames.some(task => [
+    'MallBegin',
     'FriendsList',
     'StartToVisit',
     'Mall',

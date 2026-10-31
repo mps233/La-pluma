@@ -27,11 +27,15 @@ export function parseRecruitExecutionAction(taskName, params = {}, logOutput = '
   const detectedEvents = events.filter(event => event.what === 'RecruitTagsDetected');
   const resultEvents = events.filter(event => event.what === 'RecruitResult');
   const preservedEvents = events.filter(event => event.what === 'RecruitPreservedTag');
+  const permitReservedEvents = events.filter(event => event.what === 'RecruitPermitReserved');
+  const permitRecognitionFailedEvents = events.filter(event => event.what === 'RecruitPermitCountRecognitionFailed');
+  const recruitErrorEvents = events.filter(event => event.what === 'RecruitError');
   const refreshCount = events.filter(event => event.what === 'RecruitTagsRefreshed').length;
   const startedCount = taskNames.filter(task => task === 'RecruitConfirm').length;
   const collectedCount = taskNames.filter(task => task === 'RecruitFinish').length;
   const expeditedCount = taskNames.filter(task => task === 'RecruitNowConfirm').length;
-  const noPermit = taskNames.includes('RecruitNoPermit');
+  const noPermit = events.some(event => event.what === 'RecruitNoPermit')
+    || taskNames.includes('RecruitNoPermit');
   const noRefresh = taskNames.includes('RecruitNoRefresh');
   const failed = events.some(event => event.callback === 'TaskChainError');
   const completed = events.some(event => event.callback === 'TaskChainCompleted');
@@ -47,10 +51,17 @@ export function parseRecruitExecutionAction(taskName, params = {}, logOutput = '
   );
   const configuredPreserveTags = normalizePreserveTags(params.preserve_tags);
   const preservedDetectedTags = uniqueStrings(
-    preservedEvents.flatMap(event => Array.isArray(event.details?.tags) ? event.details.tags : [])
+    preservedEvents.flatMap(event => {
+      if (typeof event.details?.tag === 'string') return [event.details.tag];
+      if (Array.isArray(event.details?.tags)) return event.details.tags;
+      return [];
+    })
   );
   const preservedTags = configuredPreserveTags.filter(tag => preservedDetectedTags.includes(tag));
   const effectivePreservedTags = preservedTags.length > 0 ? preservedTags : preservedDetectedTags;
+  const refreshLimit = recruitErrorEvents
+    .map(event => Number(event.details?.refresh_limit))
+    .find(Number.isFinite) || null;
 
   const baseAction = {
     task: taskName,
@@ -63,6 +74,10 @@ export function parseRecruitExecutionAction(taskName, params = {}, logOutput = '
     detectedTags,
     finalTags,
     preservedTags: effectivePreservedTags,
+    permitReserved: permitReservedEvents.length > 0,
+    permitReservedCount: permitReservedEvents[0]?.details?.current ?? null,
+    permitCountRecognitionFailed: permitRecognitionFailedEvents.length > 0,
+    refreshLimit,
     noRefresh
   };
 
@@ -73,6 +88,30 @@ export function parseRecruitExecutionAction(taskName, params = {}, logOutput = '
       message: detectedEvents.length > 0
         ? '自动公招在标签处理过程中失败'
         : '自动公招未能进入或识别公招界面'
+    };
+  }
+
+  if (baseAction.permitReserved) {
+    return {
+      ...baseAction,
+      status: 'skipped',
+      message: `招聘许可已保留（当前 ${baseAction.permitReservedCount ?? '未知'}），未开始新的公招`
+    };
+  }
+
+  if (baseAction.permitCountRecognitionFailed) {
+    return {
+      ...baseAction,
+      status: 'skipped',
+      message: '招聘许可数量识别失败，已跳过 3 星招募'
+    };
+  }
+
+  if (baseAction.refreshLimit !== null) {
+    return {
+      ...baseAction,
+      status: 'skipped',
+      message: `公招槽位刷新次数已达上限（${baseAction.refreshLimit} 次）`
     };
   }
 

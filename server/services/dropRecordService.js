@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { readJsonFile, ensureDir, updateJsonFile } from '../utils/fileHelper.js';
 import { successResponse, errorResponse } from '../utils/apiHelper.js';
 import { createLogger } from '../utils/logger.js';
+import { getMaaMaterialDatabase } from './maaResourceDataService.js';
 
 const logger = createLogger('DropRecord');
 
@@ -15,7 +16,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DROP_RECORDS_DIR = path.join(__dirname, '../data/drop-records');
-const MATERIALS_PATH = path.join(__dirname, '../data/materials.json');
 
 // 业务日期统一使用服务器配置时区，避免北京时间凌晨落到前一天。
 export function getLocalDateString(date = new Date(), timeZone = process.env.TZ || 'Asia/Shanghai') {
@@ -217,21 +217,16 @@ export async function getDropStatistics(days = 7) {
   }
 }
 
-// 加载材料数据映射
+// 加载材料数据映射（MaaResource item_index + item_table）
 async function loadMaterialsMap() {
   try {
-    const materials = await readJsonFile(MATERIALS_PATH, []);
-    // 确保 materials 是数组
-    if (!Array.isArray(materials)) {
-      logger.warn('材料数据格式错误，应为数组', { type: typeof materials });
-      return {};
-    }
-    return materials.reduce((map, item) => {
+    const { materials } = await getMaaMaterialDatabase();
+    return Object.values(materials).reduce((map, item) => {
       map[item.name] = item;
       return map;
     }, {});
   } catch (error) {
-    logger.warn('无法加载材料数据', { error: error.message });
+    logger.warn('无法加载 MaaResource 材料数据', { error: error.message });
     return {};
   }
 }

@@ -50,6 +50,7 @@ export function createFightExecutionAction(taskName, requestedStage, options = {
     drops: summary?.drops || '',
     medicine: Math.max(0, Number(summary?.medicine) || 0),
     stone: Math.max(0, Number(summary?.stone) || 0),
+    sanity: Math.max(0, Number(summary?.sanity) || 0),
     duration: summary?.duration || '',
     sanityDepleted
   };

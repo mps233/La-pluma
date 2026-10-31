@@ -583,22 +583,34 @@ async function setAndroidOrientation(options = {}) {
   };
 }
 
-function buildFightArgs({ stages, stage, times, medicine = 0, expiringMedicine = 0, stone = 0, series = 0 } = {}) {
+function normalizeFightStages({ stages, stage, times } = {}) {
   const rawStages = Array.isArray(stages) ? stages : [{ stage: stage || '', times: times || '' }];
-  const stageList = rawStages
+  return rawStages
     .map(item => typeof item === 'string' ? { stage: item, times: '' } : item)
     .filter(item => item?.stage && String(item.stage).trim())
-    .map(item => `${String(item.stage).trim()}${item.times !== undefined && item.times !== '' && item.times !== null ? `:${item.times}` : ''}`)
-    .join(',');
+    .map(item => ({
+      stage: String(item.stage).trim(),
+      times: item.times !== undefined && item.times !== null ? String(item.times) : ''
+    }));
+}
 
-  if (!stageList) return [];
-
-  const args = [stageList];
+function buildFightCommonArgs({ medicine = 0, expiringMedicine = 0, stone = 0, series = 0 } = {}) {
+  const args = [];
   if (medicine !== undefined && medicine !== '' && medicine !== null) args.push('-m', String(medicine));
   if (expiringMedicine !== undefined && expiringMedicine !== '' && expiringMedicine !== null) args.push('--expiring-medicine', String(expiringMedicine));
   if (stone !== undefined && stone !== '' && stone !== null) args.push('--stone', String(stone));
   if (series !== undefined && series !== '' && series !== null && String(series) !== '1') args.push('--series', String(series));
   return args;
+}
+
+export function buildFightPlans(input = {}) {
+  const commonArgs = buildFightCommonArgs(input);
+  return normalizeFightStages(input).map(({ stage, times }) => {
+    const args = [stage];
+    if (times !== '') args.push('--times', times);
+    args.push(...commonArgs);
+    return { stage, times, args };
+  });
 }
 
 async function loadAutomationTaskFlow(overrideTaskFlow = null) {
@@ -864,7 +876,22 @@ router.post('/actions/depot-recognition', asyncHandler(async (req, res) => {
   if (req.body?.dryRun) {
     return sendDryRun(res, req, plan);
   }
-  return sendSuccess(res, req, await parseDepotData(), '仓库识别完成');
+
+  const result = await parseDepotData();
+  if (!result?.success) {
+    const failure = result?.error || {};
+    return sendError(res, req, agentError(
+      failure.code || 'AGENT_DEPOT_RECOGNITION_FAILED',
+      result?.message || '仓库识别失败',
+      {
+        statusCode: failure.statusCode || 500,
+        details: failure.details || {},
+        retryable: failure.retryable ?? true
+      }
+    ), result?.message || '仓库识别失败');
+  }
+
+  return sendSuccess(res, req, result.data, '仓库识别完成');
 }));
 
 router.get('/data/operbox', asyncHandler(async (req, res) => {
@@ -879,7 +906,22 @@ router.post('/actions/operbox-recognition', asyncHandler(async (req, res) => {
   if (req.body?.dryRun) {
     return sendDryRun(res, req, plan);
   }
-  return sendSuccess(res, req, await parseOperBoxData(), '干员识别完成');
+
+  const result = await parseOperBoxData();
+  if (!result?.success) {
+    const failure = result?.error || {};
+    return sendError(res, req, agentError(
+      failure.code || 'AGENT_OPERBOX_RECOGNITION_FAILED',
+      result?.message || '干员识别失败',
+      {
+        statusCode: failure.statusCode || 500,
+        details: failure.details || {},
+        retryable: failure.retryable ?? true
+      }
+    ), result?.message || '干员识别失败');
+  }
+
+  return sendSuccess(res, req, result.data, '干员识别完成');
 }));
 
 router.get('/data/operators', asyncHandler(async (req, res) => {
@@ -998,11 +1040,12 @@ router.get('/copilot-sets/:id/plan', asyncHandler(async (req, res) => {
 
 router.post('/copilot-sets/:id/execute', asyncHandler(async (req, res) => {
   const { raid = 'normal', selectedIndexes = [], options = {} } = req.body || {};
+  const { clientType } = await resolveRequestConnection(req, { allowOverrides: true });
   const result = await executeCopilotPlan({
     setId: req.params.id,
     raid,
     selectedIndexes: Array.isArray(selectedIndexes) ? selectedIndexes : [],
-    options
+    options: { ...options, clientType }
   });
   return sendSuccess(res, req, result);
 }));
@@ -1416,7 +1459,8 @@ router.post('/actions/update-core', asyncHandler(async (req, res) => {
       : { action: 'update-core', targetChannel: 'current', command: 'update', args: [] };
   const plan = {
     action: 'update-core-and-resources',
-    steps: [corePlan, { action: 'hot-update-resources', script: 'server/scripts/update-maa-resources.js' }]
+    steps: [corePlan],
+    resourcesIncluded: true
   };
 
   if (dryRun) return sendDryRun(res, req, plan);
@@ -1439,15 +1483,18 @@ router.post('/actions/update-core', asyncHandler(async (req, res) => {
     }
 
     try {
-      const resourceResult = await updateMaaResources();
+      // `maa update` / `maa install` already refresh the base resource,
+      // MaaResource/hot-fix source, and the hot-update cache. Read the
+      // resulting version instead of running a second custom resource sync.
+      const resource = await getMaaResourceInfo();
       const runtime = await getMaaVersion(true);
       return sendSuccess(res, req, {
         plan,
         steps: {
           core: { success: true, output: coreResult.stdout || coreResult.stderr || '' },
-          resources: { success: true, output: resourceResult.output }
+          resources: { success: true, resource }
         },
-        runtime: { ...runtime, resource: resourceResult.resource }
+        runtime: { ...runtime, resource }
       }, version ? `已切换到 ${version} 渠道并同步最新资源` : 'MaaCore 和资源已更新');
     } catch (error) {
       const runtime = await getMaaVersion(true).catch(() => null);
@@ -1484,7 +1531,7 @@ router.post('/actions/update-cli', asyncHandler(async (req, res) => {
 }));
 
 router.post('/actions/hot-update-resources', asyncHandler(async (req, res) => {
-  const plan = { action: 'hot-update-resources', script: 'server/scripts/update-maa-resources.js' };
+  const plan = { action: 'hot-update-resources', command: 'hot-update' };
   if (req.body?.dryRun) return sendDryRun(res, req, plan);
   try {
     const result = await updateMaaResources();
@@ -1596,19 +1643,21 @@ router.post('/actions/fight', asyncHandler(async (req, res) => {
   const waitForCompletion = parseWaitForCompletion(requestOptions.waitForCompletion);
   const fightOptions = { ...requestOptions };
   delete fightOptions.waitForCompletion;
-  const args = buildFightArgs(fightOptions);
-  if (!args.length) {
+  const fightPlans = buildFightPlans(fightOptions);
+  if (!fightPlans.length) {
     return sendError(res, req, agentError('AGENT_VALIDATION_MISSING_STAGES', '至少需要一个有效关卡', {
       statusCode: 400,
       details: { fightOptions },
       retryable: false
     }));
   }
+  const effectiveWait = fightPlans.length > 1 ? true : waitForCompletion;
   const plan = {
     command: 'fight',
-    args,
+    args: fightPlans[0].args,
+    commands: fightPlans.map(item => item.args),
     semantic: {
-      stages: Array.isArray(fightOptions.stages) ? fightOptions.stages : [{ stage: fightOptions.stage || '', times: fightOptions.times || '' }],
+      stages: fightPlans.map(item => ({ stage: item.stage, times: item.times })),
       medicine: fightOptions.medicine ?? 0,
       expiringMedicine: fightOptions.expiringMedicine ?? 0,
       stone: fightOptions.stone ?? 0,
@@ -1622,21 +1671,40 @@ router.post('/actions/fight', asyncHandler(async (req, res) => {
 
   return executeTrackedAgentAction(req, res, {
     operationId: 'fight',
-    input: { ...plan.semantic, waitForCompletion },
-    waitForCompletion,
+    input: { ...plan.semantic, waitForCompletion: effectiveWait },
+    waitForCompletion: effectiveWait,
     metadata: { taskName: 'Agent: 理智作战', taskType: 'agent', plan },
-    execute: async lifecycle => ({
-      ...(await execMaaCommand(
-        'fight',
-        args,
-        'Agent: 理智作战',
-        'agent',
-        waitForCompletion,
-        false,
-        lifecycle
-      )),
-      plan
-    }),
+    execute: async lifecycle => {
+      if (fightPlans.length === 1) {
+        return {
+          ...(await execMaaCommand(
+            'fight',
+            fightPlans[0].args,
+            'Agent: 理智作战',
+            'agent',
+            waitForCompletion,
+            false,
+            lifecycle
+          )),
+          plan
+        };
+      }
+
+      const stageResults = [];
+      for (const item of fightPlans) {
+        const result = await execMaaCommand(
+          'fight',
+          item.args,
+          `Agent: 理智作战 (${item.stage})`,
+          'agent',
+          true,
+          false,
+          lifecycle
+        );
+        stageResults.push({ stage: item.stage, times: item.times, result });
+      }
+      return { ...plan, stages: stageResults, results: stageResults };
+    },
     successMessage: '理智作战执行完成',
     acceptedMessage: '理智作战已接受'
   });
@@ -1653,15 +1721,18 @@ router.post('/actions/run-task', asyncHandler(async (req, res) => {
     input: { ...input, waitForCompletion },
     waitForCompletion,
     metadata: { taskName: input.taskName || `Agent: ${input.command || 'task'}`, taskType: input.taskType || 'agent' },
-    execute: lifecycle => executeAgentTask(
-      { ...input, waitForCompletion },
-      {
-        execMaaCommand: (command, args, taskName, taskType, shouldWait, silent = false) =>
-          execMaaCommand(command, args, taskName, taskType, shouldWait, silent, lifecycle),
-        execDynamicTask: (taskId, taskConfig, taskName, taskType, shouldWait, userResource) =>
-          execDynamicTask(taskId, taskConfig, taskName, taskType, shouldWait, userResource, { lifecycle })
-      }
-    ),
+    execute: async lifecycle => {
+      const { clientType } = await resolveRequestConnection(req, { allowOverrides: true });
+      return executeAgentTask(
+        { ...input, waitForCompletion },
+        {
+          execMaaCommand: (command, args, taskName, taskType, shouldWait, silent = false) =>
+            execMaaCommand(command, args, taskName, taskType, shouldWait, silent, lifecycle),
+          execDynamicTask: (taskId, taskConfig, taskName, taskType, shouldWait, userResource) =>
+            execDynamicTask(taskId, taskConfig, taskName, taskType, shouldWait, userResource, { lifecycle, clientType })
+        }
+      );
+    },
     successMessage: '任务执行完成',
     acceptedMessage: '任务已接受'
   });

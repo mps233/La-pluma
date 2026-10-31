@@ -35,6 +35,21 @@ describe('award execution results', () => {
     assert.match(actions[1].message, /已跳过/);
   });
 
+  it('reports the signinevent switch and detects SignInEvent', () => {
+    assert.equal(getEnabledAwardItems({ signinevent: true }).length, 1);
+
+    const claimed = parseAwardExecutionActions('领取奖励', { signinevent: true }, [
+      'SubTaskStart {"details":{"task":"SignInEvent"},"first":["SignInEvent"]}',
+      'SubTaskStart {"details":{"task":"SignInEventAllClaimed"},"first":["SignInEvent"]}'
+    ].join('\n'));
+    assert.equal(claimed[0].status, 'success');
+    assert.match(claimed[0].message, /限时签到奖励已领取/);
+
+    const missing = parseAwardExecutionActions('领取奖励', { signinevent: true }, '');
+    assert.equal(missing[0].status, 'skipped');
+    assert.match(missing[0].message, /未检测到/);
+  });
+
   it('falls back to a completed check when incremental MaaCore logs are unavailable', () => {
     const actions = parseAwardExecutionActions('领取奖励', { award: true, mail: true }, '');
     assert.equal(actions.length, 1);

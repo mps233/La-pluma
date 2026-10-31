@@ -34,22 +34,36 @@ const AWARD_ITEMS = [
     label: '特别登录奖励',
     beginTask: 'SpecialAccessActivitiesBegin',
     claimedTasks: ['SpecialAccessActivitiesConfirm']
+  },
+  {
+    key: 'signinevent',
+    label: '限时签到奖励',
+    beginTask: 'SignInEvent',
+    claimedTasks: ['SignInEventAllClaimed']
   }
 ];
 
 function hasTaskEvent(logSegment, taskName) {
   const escapedTaskName = taskName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`"task":"${escapedTaskName}"`).test(logSegment);
+  return new RegExp(`"(?:task|what)":"${escapedTaskName}"`).test(logSegment);
 }
 
 function getTaskSegment(logOutput, item, nextItem) {
   const startMarker = `"first":["${item.beginTask}"]`;
-  const start = logOutput.indexOf(startMarker);
+  let start = logOutput.indexOf(startMarker);
+  let startLength = startMarker.length;
+  if (start === -1) {
+    // Newer interface tasks (for example SignInEvent) do not always appear as
+    // the `first` task of the Award chain. Fall back to the task name itself.
+    start = logOutput.indexOf(item.beginTask);
+    startLength = item.beginTask.length;
+  }
   if (start === -1) return null;
 
   if (!nextItem) return logOutput.slice(start);
   const nextMarker = `"first":["${nextItem.beginTask}"]`;
-  const end = logOutput.indexOf(nextMarker, start + startMarker.length);
+  let end = logOutput.indexOf(nextMarker, start + startLength);
+  if (end === -1) end = logOutput.indexOf(nextItem.beginTask, start + startLength);
   return end === -1 ? logOutput.slice(start) : logOutput.slice(start, end);
 }
 
@@ -74,8 +88,34 @@ export function parseAwardExecutionActions(taskName, params = {}, logOutput = ''
   enabledItems.forEach(item => {
     const itemIndex = AWARD_ITEMS.findIndex(candidate => candidate.key === item.key);
     const segment = getTaskSegment(logOutput, item, AWARD_ITEMS[itemIndex + 1]);
-    if (!segment) return;
+    if (!segment) {
+      if (item.key === 'signinevent') {
+        actions.push({
+          task: taskName,
+          action: 'award',
+          status: 'skipped',
+          message: '未检测到可领取的限时签到活动，已跳过'
+        });
+      }
+      return;
+    }
     parsedItemCount++;
+
+    if (item.key === 'signinevent') {
+      const allClaimed = hasTaskEvent(segment, 'SignInEventAllClaimed');
+      const processed = hasTaskEvent(segment, 'SignInEvent');
+      actions.push({
+        task: taskName,
+        action: 'award',
+        status: allClaimed || processed ? 'success' : 'skipped',
+        message: allClaimed
+          ? '限时签到奖励已领取'
+          : processed
+            ? '已处理限时签到活动'
+            : '未检测到可领取的限时签到奖励，已跳过'
+      });
+      return;
+    }
 
     const claimed = item.claimedTasks.some(claimedTask => hasTaskEvent(segment, claimedTask));
     actions.push({
@@ -88,7 +128,7 @@ export function parseAwardExecutionActions(taskName, params = {}, logOutput = ''
     });
   });
 
-  if (parsedItemCount === 0) {
+  if (parsedItemCount === 0 && actions.length === 0) {
     return [{
       task: taskName,
       action: 'award',

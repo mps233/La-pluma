@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, it } from 'node:test'
-import router, { buildWebrtcBrowserProtocol, executeTrackedAgentAction } from '../agent.js'
+import router, { buildFightPlans, buildWebrtcBrowserProtocol, executeTrackedAgentAction } from '../agent.js'
 import { API_VERSION } from '../agentContract.js'
 import { getTaskStatus, setTaskStatus } from '../../services/maaService.js'
 import { loggerManager } from '../../utils/logger.js'
@@ -46,6 +46,31 @@ function createResponse() {
     }
   }
 }
+
+describe('Agent fight planning', () => {
+  it('builds one valid maa fight command per stage instead of a comma-separated stage list', () => {
+    const plans = buildFightPlans({
+      stages: [{ stage: '1-7', times: 3 }, { stage: 'CE-6', times: 1 }],
+      medicine: 2,
+      stone: 1,
+      series: 2
+    })
+
+    assert.deepEqual(plans, [
+      { stage: '1-7', times: '3', args: ['1-7', '--times', '3', '-m', '2', '--expiring-medicine', '0', '--stone', '1', '--series', '2'] },
+      { stage: 'CE-6', times: '1', args: ['CE-6', '--times', '1', '-m', '2', '--expiring-medicine', '0', '--stone', '1', '--series', '2'] }
+    ])
+  })
+
+  it('keeps single-stage requests unchanged and ignores empty stage entries', () => {
+    assert.deepEqual(buildFightPlans({ stage: '1-7', times: 3 }), [
+      { stage: '1-7', times: '3', args: ['1-7', '--times', '3', '-m', '0', '--expiring-medicine', '0', '--stone', '0', '--series', '0'] }
+    ])
+    assert.deepEqual(buildFightPlans({ stages: [{ stage: '  ' }, { stage: 'CE-6' }] }), [
+      { stage: 'CE-6', times: '', args: ['CE-6', '-m', '0', '--expiring-medicine', '0', '--stone', '0', '--series', '0'] }
+    ])
+  })
+})
 
 describe('Agent discovery routes', () => {
   it('documents the same-origin browser signaling endpoint', () => {

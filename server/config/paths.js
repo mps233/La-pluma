@@ -1,82 +1,83 @@
 import { homedir, platform } from 'os';
 import { join } from 'path';
 
+function readDirEnv(env, key) {
+  const value = env?.[key];
+  return typeof value === 'string' && value.trim() !== '' ? value : null;
+}
+
+function xdgDir(env, key, fallback) {
+  const value = readDirEnv(env, key);
+  return value ? join(value, 'maa') : fallback;
+}
+
+/**
+ * Resolve the MAA directories using the same rules as maa-dirs.
+ *
+ * maa-dirs checks `MAA_*_DIR` first, then `XDG_*_HOME` (with a `maa` suffix),
+ * then the platform project directories. Empty environment values are treated
+ * as unset.
+ */
+export function resolveMaaDirs({ os = platform(), home = homedir(), env = process.env } = {}) {
+  let data;
+  let state;
+  let config;
+  let cache;
+
+  if (os === 'darwin') {
+    const support = join(home, 'Library', 'Application Support', 'com.loong.maa');
+    data = support;
+    state = support;
+    config = join(support, 'config');
+    cache = join(home, 'Library', 'Caches', 'com.loong.maa');
+  } else if (os === 'win32') {
+    const roaming = readDirEnv(env, 'APPDATA') || join(home, 'AppData', 'Roaming');
+    const local = readDirEnv(env, 'LOCALAPPDATA') || join(home, 'AppData', 'Local');
+    data = join(roaming, 'loong', 'maa', 'data');
+    state = data;
+    config = join(roaming, 'loong', 'maa', 'config');
+    cache = join(local, 'loong', 'maa', 'cache');
+  } else {
+    data = xdgDir(env, 'XDG_DATA_HOME', join(home, '.local', 'share', 'maa'));
+    state = xdgDir(env, 'XDG_STATE_HOME', join(home, '.local', 'state', 'maa'));
+    config = xdgDir(env, 'XDG_CONFIG_HOME', join(home, '.config', 'maa'));
+    cache = xdgDir(env, 'XDG_CACHE_HOME', join(home, '.cache', 'maa'));
+  }
+
+  return {
+    data: readDirEnv(env, 'MAA_DATA_DIR') || data,
+    state: readDirEnv(env, 'MAA_STATE_DIR') || state,
+    config: readDirEnv(env, 'MAA_CONFIG_DIR') || config,
+    cache: readDirEnv(env, 'MAA_CACHE_DIR') || cache
+  };
+}
+
 /**
  * 获取 MAA 配置目录路径（跨平台）
  */
-function getMaaConfigDir() {
-  const home = homedir();
-  const os = platform();
-  
-  switch (os) {
-    case 'darwin': // macOS
-      return join(home, 'Library', 'Application Support', 'com.loong.maa');
-    
-    case 'linux':
-      // Linux 使用 XDG 标准
-      const xdgConfigHome = process.env.XDG_CONFIG_HOME || join(home, '.config');
-      return join(xdgConfigHome, 'maa');
-    
-    case 'win32': // Windows
-      const appData = process.env.APPDATA || join(home, 'AppData', 'Roaming');
-      return join(appData, 'maa');
-    
-    default:
-      // 默认使用 Linux 风格
-      return join(home, '.config', 'maa');
-  }
+export function getMaaConfigDir() {
+  return resolveMaaDirs().config;
 }
 
 /**
  * 获取 MAA 数据目录路径（存放 MaaCore、资源文件等）
  */
-function getMaaDataDir() {
-  const home = homedir();
-  const os = platform();
-  
-  switch (os) {
-    case 'darwin': // macOS
-      return join(home, 'Library', 'Application Support', 'com.loong.maa');
-    
-    case 'linux':
-      // Linux 使用 XDG 标准
-      const xdgDataHome = process.env.XDG_DATA_HOME || join(home, '.local', 'share');
-      return join(xdgDataHome, 'maa');
-    
-    case 'win32': // Windows
-      const localAppData = process.env.LOCALAPPDATA || join(home, 'AppData', 'Local');
-      return join(localAppData, 'maa');
-    
-    default:
-      // 默认使用 Linux 风格
-      return join(home, '.local', 'share', 'maa');
-  }
+export function getMaaDataDir() {
+  return resolveMaaDirs().data;
 }
 
 /**
- * 获取 MAA state 目录路径（存放日志、缓存等运行时数据）
+ * 获取 MAA state 目录路径（存放日志等运行时数据）
  */
-function getMaaStateDir() {
-  const home = homedir();
-  const os = platform();
-  
-  switch (os) {
-    case 'darwin': // macOS
-      return join(home, 'Library', 'Application Support', 'com.loong.maa');
-    
-    case 'linux':
-      // Linux 使用 XDG 标准
-      const xdgStateHome = process.env.XDG_STATE_HOME || join(home, '.local', 'state');
-      return join(xdgStateHome, 'maa');
-    
-    case 'win32': // Windows
-      const localAppData = process.env.LOCALAPPDATA || join(home, 'AppData', 'Local');
-      return join(localAppData, 'maa');
-    
-    default:
-      // 默认使用 Linux 风格
-      return join(home, '.local', 'state', 'maa');
-  }
+export function getMaaStateDir() {
+  return resolveMaaDirs().state;
+}
+
+/**
+ * 获取 MAA cache 目录路径（存放活动数据和热更新覆盖层）
+ */
+export function getMaaCacheDir() {
+  return resolveMaaDirs().cache;
 }
 
 /**
@@ -91,6 +92,20 @@ export function getMaaLogPath() {
  */
 export function getMaaResourceDir() {
   return join(getMaaDataDir(), 'resource');
+}
+
+/**
+ * 获取 MAA 活动数据文件路径
+ */
+export function getMaaActivityPath() {
+  return join(getMaaCacheDir(), 'StageActivityV2.json');
+}
+
+/**
+ * 获取 MAA 热更新任务覆盖层路径
+ */
+export function getMaaHotUpdateResourceDir() {
+  return join(getMaaCacheDir(), 'resource');
 }
 
 /**
@@ -140,6 +155,7 @@ export function printPathConfig() {
   console.log('配置目录:', getMaaConfigDir());
   console.log('数据目录:', getMaaDataDir());
   console.log('State目录:', getMaaStateDir());
+  console.log('Cache目录:', getMaaCacheDir());
   console.log('资源目录:', getMaaResourceDir());
   console.log('日志文件:', getMaaLogPath());
   console.log('==================');

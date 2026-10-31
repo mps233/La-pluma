@@ -22,11 +22,23 @@ describe('mall execution results', () => {
 
     const action = parseMallExecutionAction('信用收支', {}, log);
     assert.equal(action.status, 'success');
-    assert.equal(action.visitedCount, 2);
+    // VisitNext and VisitNextOcr describe the same friend visit.
+    assert.equal(action.visitedCount, 1);
     assert.equal(action.creditCollected, true);
     assert.equal(action.purchasedCount, 1);
-    assert.match(action.message, /访问 2 位好友/);
+    assert.match(action.message, /访问 1 位好友/);
     assert.match(action.message, /购买 1 件商品/);
+  });
+
+  it('counts CreditShop-BuyIt clicks when CreditShop-Bought is not emitted', () => {
+    const log = [
+      callback('SubTaskStart', { details: { task: 'CreditShop-BuyIt', action: 'ClickSelf', exec_times: 1 } }),
+      callback('SubTaskStart', { details: { task: 'CreditShop-BuyIt', action: 'ClickSelf', exec_times: 1 } }),
+      callback('TaskChainCompleted', { details: {} })
+    ].join('\n');
+
+    const action = parseMallExecutionAction('信用收支', {}, log);
+    assert.equal(action.purchasedCount, 2);
   });
 
   it('treats insufficient credit as a completed outcome', () => {

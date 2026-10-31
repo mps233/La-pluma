@@ -1,13 +1,9 @@
-import { spawn } from 'child_process';
 import { readFile, stat } from 'fs/promises';
-import { dirname, join, resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 import { execMaaCommand } from './maaService.js';
 import { withMaaExecutionLease } from './executionCoordinatorService.js';
+import { clearMaaResourceCache } from './maaResourceDataService.js';
 
-const serviceDir = dirname(fileURLToPath(import.meta.url));
-const serverDir = resolve(serviceDir, '..');
-const updateScriptPath = join(serverDir, 'scripts', 'update-maa-resources.js');
 const STALE_RESOURCE_DAYS = 14;
 let activeResourceUpdate = null;
 
@@ -45,41 +41,31 @@ export async function getMaaResourceInfo() {
   return buildResourceInfo(JSON.parse(content), fileStat.mtime);
 }
 
-async function performResourceUpdate() {
-  const output = await new Promise((resolvePromise, reject) => {
-    const child = spawn('node', [updateScriptPath], {
-      cwd: serverDir,
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout.on('data', data => { stdout += data.toString(); });
-    child.stderr.on('data', data => { stderr += data.toString(); });
-    child.on('close', code => {
-      if (code === 0) {
-        resolvePromise(stdout);
-      } else {
-        reject(new Error(stderr || stdout || `资源更新进程退出码 ${code}`));
-      }
-    });
-    child.on('error', reject);
-  });
-
-  return {
-    output,
-    resource: await getMaaResourceInfo()
-  };
-}
-
-export async function updateMaaResources() {
+/**
+ * Update hot-fixable resources through maa-cli.
+ *
+ * `maa hot-update` updates the configured resource source (Git or MirrorChyan)
+ * and the hot-update files under the CLI cache. The base resource installed
+ * with MaaCore is updated by `maa update` / `maa install`, not by this command.
+ */
+export async function updateMaaResources({
+  execute = execMaaCommand,
+  getResourceInfo = getMaaResourceInfo
+} = {}) {
   if (activeResourceUpdate) return activeResourceUpdate;
 
   activeResourceUpdate = withMaaExecutionLease({
     source: 'resource-update',
     taskName: '同步 MAA 资源',
     command: 'hot-update'
-  }, performResourceUpdate);
+  }, async () => {
+    const result = await execute('hot-update', [], null, null, true);
+    clearMaaResourceCache();
+    return {
+      output: result.stdout || result.stderr || '',
+      resource: await getResourceInfo()
+    };
+  });
   try {
     return await activeResourceUpdate;
   } finally {

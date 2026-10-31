@@ -49,7 +49,8 @@ export function errorResponse(error, message, meta = {}) {
     error: {
       code: normalized?.code || 'AGENT_INTERNAL_ERROR',
       details: normalized?.details || {},
-      retryable: normalized?.retryable ?? false
+      retryable: normalized?.retryable ?? false,
+      ...(normalized?.statusCode ? { statusCode: normalized.statusCode } : {})
     },
     meta: responseMeta(null, meta)
   };
@@ -79,7 +80,8 @@ export function sendError(res, req, error, fallbackMessage, meta = {}) {
     error: {
       code: normalized?.code || 'AGENT_INTERNAL_ERROR',
       details: normalized?.details || {},
-      retryable: normalized?.retryable ?? false
+      retryable: normalized?.retryable ?? false,
+      ...(normalized?.statusCode ? { statusCode: normalized.statusCode } : {})
     },
     meta: responseMeta(req, meta)
   });

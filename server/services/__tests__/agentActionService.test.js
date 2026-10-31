@@ -92,6 +92,18 @@ describe('executeAgentTask', () => {
     });
   });
 
+  it('allows the reclamation command', async () => {
+    const { calls, dependencies } = createExecutors();
+
+    await executeAgentTask({ command: 'reclamation', args: ['Tales'] }, dependencies);
+
+    assert.ok(AGENT_TASK_COMMANDS.includes('reclamation'));
+    assert.deepEqual(calls[0], {
+      executor: 'command',
+      args: ['reclamation', ['Tales'], 'Agent: reclamation', 'agent', true]
+    });
+  });
+
   it('runs read-only activity queries without overwriting tracked task state', async () => {
     const { calls, dependencies } = createExecutors();
 

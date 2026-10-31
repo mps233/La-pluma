@@ -7,6 +7,7 @@ import { randomBytes } from 'crypto';
 import TOML from '@iarna/toml';
 import { createLogger } from '../utils/logger.js';
 import { getFallbackActivity } from './activityFallbackService.js';
+import { getStageActivityInfo } from './activityDataService.js';
 import { acquireMaaExecutionLease } from './executionCoordinatorService.js';
 import { loadUserConfig, saveUserConfig } from './configStorageService.js';
 import { DEFAULT_ADB_ADDRESS, DEFAULT_ADB_PATH, DEFAULT_CLIENT_TYPE, DEFAULT_MAA_CLI_PATH } from '../config/connectionDefaults.js';
@@ -19,6 +20,8 @@ const logger = createLogger('MaaService');
 // MAA CLI 路径
 const MAA_CLI_PATH = DEFAULT_MAA_CLI_PATH;
 const MAX_REALTIME_LOGS = Number(process.env.LA_PLUMA_MAX_REALTIME_LOGS || 5000);
+const DYNAMIC_TASK_DIR = '_lapluma';
+const STALE_DYNAMIC_TASK_MS = 24 * 60 * 60 * 1000;
 const LOCAL_EMULATOR_ADDRESSES = [
   '127.0.0.1:16384',
   '127.0.0.1:5555',
@@ -41,6 +44,34 @@ const GAME_PACKAGES = {
   YoStarKR: 'com.YoStarKR.Arknights',
   Txwy: 'tw.txwy.and.arknights'
 };
+const CLIENT_TYPE_NAMES = {
+  official: 'Official',
+  bilibili: 'Bilibili',
+  txwy: 'txwy',
+  yostaren: 'YostarEN',
+  yostarjp: 'YostarJP',
+  yostarkr: 'YostarKR'
+};
+
+/**
+ * Normalize a client type to the value maa-cli expects in a task file.
+ * maa-cli accepts the values case-insensitively, but the task file should use
+ * its canonical spelling so the generated config stays readable.
+ */
+export function normalizeClientType(value) {
+  const key = String(value || '').trim().toLowerCase();
+  if (!key) return DEFAULT_CLIENT_TYPE;
+
+  const normalized = CLIENT_TYPE_NAMES[key];
+  if (!normalized) {
+    const error = new Error(`不支持的客户端类型: ${value}`);
+    error.code = 'MAA_CLIENT_TYPE_INVALID';
+    error.statusCode = 400;
+    error.retryable = false;
+    throw error;
+  }
+  return normalized;
+}
 
 // 全局任务状态追踪
 const taskStatus = {
@@ -673,30 +704,35 @@ export async function execDynamicTask(taskId, taskConfig, taskName = null, taskT
   try {
     const configDir = await resolveConfigDir();
     const tasksDir = join(configDir.trim(), 'tasks');
-    
-    // 确保 tasks 目录存在
-    await makeDirectory(tasksDir, { recursive: true });
-    
+    const dynamicTasksDir = join(tasksDir, DYNAMIC_TASK_DIR);
+
+    // 确保动态任务目录存在。子目录不会出现在 `maa list` 中，避免临时任务污染任务列表。
+    await makeDirectory(dynamicTasksDir, { recursive: true });
+
     const taskPrefix = String(taskId || 'dynamic-task')
       .replace(/[^A-Za-z0-9_-]/g, '_')
       .slice(0, 64) || 'dynamic-task';
     const taskFileId = `${taskPrefix}_temp_${createNonce()}`;
-    tempTaskFile = join(tasksDir, `${taskFileId}.toml`);
-    
+    tempTaskFile = join(dynamicTasksDir, `${taskFileId}.toml`);
+
     // 将 taskConfig 转换为对象（如果是字符串则解析，如果已经是对象则直接使用）
     const configObj = typeof taskConfig === 'string' ? JSON.parse(taskConfig) : taskConfig;
-    
+    const clientType = normalizeClientType(
+      runtime.clientType || configObj.client_type || configObj.clientType
+    );
+
     // 将配置对象转换为 TOML 格式
-    const tomlContent = generateTaskToml(configObj);
-    
+    const tomlContent = generateTaskToml({ ...configObj, client_type: clientType });
+
     // 写入临时文件
     await writeTaskFile(tempTaskFile, tomlContent, 'utf-8');
     addLog('INFO', `临时任务文件已创建: ${tempTaskFile}`);
     addLog('DEBUG', `任务内容:\n${tomlContent}`);
-    
-    // 执行任务
-    const runArgs = [taskFileId];
+
+    // 执行任务；任务文件位于 tasks/_lapluma，用相对路径交给 maa run。
+    const runArgs = ['--batch'];
     if (userResource) runArgs.push('--user-resource');
+    runArgs.push(join(DYNAMIC_TASK_DIR, taskFileId));
     if (taskName && !waitForCompletion) {
       const { onSettled: lifecycleOnSettled, ...processLifecycle } = lifecycle;
       const result = await executeCommand(
@@ -770,7 +806,11 @@ function formatTomlValue(value) {
 }
 
 function generateTaskToml(taskConfig) {
-  let toml = '[[tasks]]\n';
+  const clientType = taskConfig.client_type || taskConfig.clientType;
+  let toml = clientType
+    ? `client_type = ${formatTomlValue(normalizeClientType(clientType))}\n`
+    : '';
+  toml += '[[tasks]]\n';
   toml += `name = ${formatTomlValue(taskConfig.name)}\n`;
   toml += `type = ${formatTomlValue(taskConfig.type)}\n`;
   
@@ -805,6 +845,52 @@ function generateTaskToml(taskConfig) {
   
   addLog('DEBUG', `生成的 TOML:\n${toml}`);
   return toml;
+}
+
+/**
+ * Remove dynamic task files left behind by a crashed or interrupted process.
+ * Only files created by La Pluma are considered: everything under
+ * `tasks/_lapluma` and legacy `*_temp*` files in the tasks root.
+ */
+export async function cleanupStaleDynamicTaskFiles({
+  configDir = null,
+  now = Date.now(),
+  maxAgeMs = STALE_DYNAMIC_TASK_MS
+} = {}) {
+  const resolvedConfigDir = configDir || (await getMaaConfigDir()).trim();
+  const tasksDir = join(resolvedConfigDir, 'tasks');
+  const targets = [
+    { dir: join(tasksDir, DYNAMIC_TASK_DIR), matches: () => true },
+    { dir: tasksDir, matches: name => /_temp(?:_|\.)/.test(name) }
+  ];
+  let removed = 0;
+
+  for (const target of targets) {
+    let entries;
+    try {
+      entries = await readdir(target.dir, { withFileTypes: true });
+    } catch (error) {
+      if (error.code === 'ENOENT') continue;
+      throw error;
+    }
+
+    for (const entry of entries) {
+      if (!entry.isFile() || !target.matches(entry.name)) continue;
+      const filePath = join(target.dir, entry.name);
+      const fileStat = await stat(filePath).catch(error => {
+        if (error.code === 'ENOENT') return null;
+        throw error;
+      });
+      if (!fileStat || now - fileStat.mtimeMs <= maxAgeMs) continue;
+
+      await unlink(filePath).catch(error => {
+        if (error.code !== 'ENOENT') throw error;
+      });
+      removed += 1;
+    }
+  }
+
+  return removed;
 }
 
 function validateAdbPath(adbPath) {
@@ -1282,6 +1368,21 @@ export async function getCurrentActivity(clientType = DEFAULT_CLIENT_TYPE) {
     activityCache.set(clientType, { ...persisted, timestamp: persistedResult.data[clientType].timestamp, ttl: persistedResult.data[clientType].ttl || ACTIVITY_CACHE_TTL });
     logger.debug('使用持久化活动缓存', { clientType, code: persisted.code, name: persisted.name, source: persisted.source });
     return persisted;
+  }
+
+  try {
+    const stageActivity = await getStageActivityInfo(clientType, now);
+    if (stageActivity?.code) {
+      logger.debug('从 StageActivityV2 获取活动信息', {
+        clientType,
+        code: stageActivity.code,
+        name: stageActivity.name,
+        stages: stageActivity.stages.length
+      });
+      return cacheActivity(clientType, stageActivity);
+    }
+  } catch (error) {
+    logger.warn('读取 StageActivityV2 失败，尝试 maa activity', { error: error.message });
   }
 
   try {

@@ -27,6 +27,30 @@ describe('infrast execution results', () => {
     assert.match(action.message, /已收取产物/);
   });
 
+  it('uses structured EnterFacility, ProductOfFacility and custom-room events', () => {
+    const log = [
+      callback('SubTaskExtraInfo', { what: 'EnterFacility', details: { facility: 'Recycle', index: 1 } }),
+      callback('SubTaskExtraInfo', {
+        what: 'ProductOfFacility',
+        details: { facility: 'Mfg', index: 2, product: 'Battle Record' }
+      }),
+      callback('SubTaskExtraInfo', {
+        what: 'CustomInfrastRoomKeptUnchanged',
+        details: { facility: 'Training', index: 1, reason: 'candidates_low_mood' }
+      }),
+      callback('SubTaskExtraInfo', { what: 'NotEnoughStaff', details: { facility: 'Trade', index: 1 } }),
+      callback('TaskChainCompleted', { details: {} })
+    ].join('\n');
+
+    const action = parseInfrastExecutionAction('基建换班', { facility: ['Recycle', 'Mfg'] }, log);
+    assert.deepEqual(action.observedFacilities, ['Recycle']);
+    assert.deepEqual(action.products, [{ facility: 'Mfg', index: 2, product: 'Battle Record' }]);
+    assert.equal(action.keptUnchanged.length, 1);
+    assert.equal(action.keptUnchanged[0].reason, 'candidates_low_mood');
+    assert.equal(action.notEnoughStaff.length, 1);
+    assert.match(action.message, /保持原样/);
+  });
+
   it('does not invent facility details when only completion is observable', () => {
     const log = callback('TaskChainCompleted', { details: {} });
     const action = parseInfrastExecutionAction('基建换班', { facility: ['Mfg', 'Trade'] }, log);

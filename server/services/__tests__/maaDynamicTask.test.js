@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { execDynamicTask } from '../maaService.js'
+import { mkdtemp, mkdir, writeFile, utimes, rm, stat } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { cleanupStaleDynamicTaskFiles, execDynamicTask } from '../maaService.js'
 import { MaaExecutionBusyError } from '../executionCoordinatorService.js'
 
 function createRuntime({ background = false } = {}) {
@@ -43,9 +46,11 @@ describe('dynamic task lifecycle', () => {
     assert.equal(events[0][0], 'acquire')
     const writeEvent = events.find(event => event[0] === 'write')
     const executeEvent = events.find(event => event[0] === 'execute')
-    const runId = executeEvent[2][0]
-    assert.equal(runId, 'award_temp_nonce_1')
-    assert.ok(writeEvent[1].endsWith(`/tasks/${runId}.toml`))
+    const runId = 'award_temp_nonce_1'
+    assert.equal(executeEvent[2][0], '--batch')
+    assert.equal(executeEvent[2][1], `_lapluma/${runId}`)
+    assert.ok(writeEvent[1].endsWith(`/tasks/_lapluma/${runId}.toml`))
+    assert.match(writeEvent[2], /client_type = "Official"/)
     assert.match(writeEvent[2], /type = "Award"/)
     assert.deepEqual(events.slice(-2).map(event => event[0]), ['unlink', 'release'])
   })
@@ -78,6 +83,34 @@ describe('dynamic task lifecycle', () => {
     assert.deepEqual(events.at(-1)[1], { ok: true, result: { stdout: 'done' } })
   })
 
+  it('writes the resolved client type into the task file', async () => {
+    const { events, runtime } = createRuntime()
+    runtime.clientType = 'Bilibili'
+    await execDynamicTask(
+      'award',
+      { name: '领取奖励', type: 'Award', params: { award: true } },
+      '领取奖励',
+      'agent',
+      true,
+      false,
+      runtime
+    )
+
+    const writeEvent = events.find(event => event[0] === 'write')
+    assert.match(writeEvent[2], /client_type = "Bilibili"/)
+  })
+
+  it('rejects an unsupported client type before writing the task file', async () => {
+    const { events, runtime } = createRuntime()
+    runtime.clientType = 'InvalidServer'
+
+    await assert.rejects(
+      execDynamicTask('award', { name: '领取奖励', type: 'Award', params: {} }, '领取奖励', 'agent', true, false, runtime),
+      error => error.code === 'MAA_CLIENT_TYPE_INVALID' && error.statusCode === 400
+    )
+    assert.equal(events.some(event => event[0] === 'write'), false)
+  })
+
   it('does not collapse concurrent requests onto the same task file', async () => {
     const { events, runtime } = createRuntime()
     await Promise.all([
@@ -85,8 +118,45 @@ describe('dynamic task lifecycle', () => {
       execDynamicTask('award', { name: '奖励 B', type: 'Award', params: {} }, '奖励 B', 'agent', true, false, runtime)
     ])
 
-    const runIds = events.filter(event => event[0] === 'execute').map(event => event[2][0])
+    const runIds = events.filter(event => event[0] === 'execute').map(event => event[2][1])
     assert.equal(new Set(runIds).size, 2)
+  })
+
+  it('removes only stale la-pluma task files during startup cleanup', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'la-pluma-task-cleanup-'))
+    const tasksDir = join(root, 'tasks')
+    const dynamicDir = join(tasksDir, '_lapluma')
+    await mkdir(dynamicDir, { recursive: true })
+
+    const staleDynamic = join(dynamicDir, 'stale.toml')
+    const freshDynamic = join(dynamicDir, 'fresh.toml')
+    const staleLegacy = join(tasksDir, 'award_temp_old.toml')
+    const userTask = join(tasksDir, 'user-task.toml')
+    await Promise.all([
+      writeFile(staleDynamic, ''),
+      writeFile(freshDynamic, ''),
+      writeFile(staleLegacy, ''),
+      writeFile(userTask, '')
+    ])
+
+    const now = Date.now()
+    await Promise.all([
+      utimes(staleDynamic, new Date(now - 60_000), new Date(now - 60_000)),
+      utimes(staleLegacy, new Date(now - 60_000), new Date(now - 60_000)),
+      utimes(freshDynamic, new Date(now), new Date(now)),
+      utimes(userTask, new Date(now - 60_000), new Date(now - 60_000))
+    ])
+
+    try {
+      const removed = await cleanupStaleDynamicTaskFiles({ configDir: root, now, maxAgeMs: 30_000 })
+      assert.equal(removed, 2)
+      await assert.rejects(stat(staleDynamic), error => error.code === 'ENOENT')
+      await assert.rejects(stat(staleLegacy), error => error.code === 'ENOENT')
+      assert.equal((await stat(freshDynamic)).isFile(), true)
+      assert.equal((await stat(userTask)).isFile(), true)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('preserves a busy execution error before any task file is written', async () => {
