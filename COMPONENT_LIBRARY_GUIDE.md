@@ -47,7 +47,7 @@
 - `control-surface`：输入框、选择框、筛选项、未选中的分段控件。
 - `control-active`：选中的分段控件或当前项。
 - `brand-action` / `brand-text`：主要操作和品牌强调。
-- `status-success` / `status-warning` / `status-danger` / `status-info`：语义状态提示。
+- `status-neutral` / `status-success` / `status-warning` / `status-danger` / `status-info`：语义状态提示。中性状态用于待机、默认或与状态无关的提示浮层；它自带 1px 内描边，不受 `ios-borderless-cards` 影响，因此浮层在各类页面外观一致。
 - `status-success-action` / `status-danger-action`：成功、危险类操作按钮。
 - `form-error-surface` / `form-error-text`：表单错误态。
 

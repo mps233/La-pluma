@@ -5093,6 +5093,12 @@ svg.w-5.h-5 {
       0 0 0 1px var(--app-border);
   }
 
+  .status-neutral {
+    color: var(--app-text-muted);
+    background: var(--app-surface-muted);
+    box-shadow: inset 0 0 0 1px var(--app-border);
+  }
+
   .status-success {
     color: var(--app-success-text);
     background: color-mix(in srgb, var(--app-success) 10%, transparent);

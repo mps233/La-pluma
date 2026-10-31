@@ -28,7 +28,7 @@ const STATUS_VISUAL_CONFIG: Record<StatusMessageType, StatusVisualConfig> = {
     pulseRgb: '37, 99, 235',
   },
   default: {
-    className: 'surface-soft text-secondary',
+    className: 'status-neutral',
     dotColor: 'var(--app-text-soft)',
     pulseRgb: '148, 163, 184',
   },
