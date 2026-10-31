@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   extractCallbackPayloads,
   parseDepotData,
@@ -104,6 +107,36 @@ test('parseDepotData reports malformed payload data as a parse failure', async (
   assert.equal(result.success, false);
   assert.equal(result.error.code, 'AGENT_DEPOT_PARSE_FAILED');
   assert.equal(result.error.statusCode, 500);
+});
+
+test('parseOperBoxData persists all_opers for owned and unowned display', async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), 'la-pluma-operbox-'));
+  const allOpers = [
+    { id: 'char_002_amiya', name: '阿米娅', rarity: 5, own: true },
+    { id: 'char_1001_amiya2', name: '阿米娅', rarity: 5, own: false },
+    { id: 'char_1037_amiya3', name: '阿米娅', rarity: 5, own: false }
+  ];
+  const ownOpers = [
+    { id: 'char_002_amiya', name: '阿米娅', own: true, elite: 2, level: 80, potential: 5, rarity: 5 }
+  ];
+  const logContent = callbackLine({
+    what: 'OperBoxInfo',
+    details: { done: true, all_opers: allOpers, own_opers: ownOpers }
+  });
+
+  try {
+    const result = await parseOperBoxData({ logContent, dataDir });
+    assert.equal(result.success, true);
+    assert.equal(result.data.operCount, 1);
+    assert.equal(result.data.totalOperCount, 3);
+    assert.deepEqual(result.data.allOpers, allOpers);
+
+    const saved = JSON.parse(await readFile(join(dataDir, 'operbox.json'), 'utf8'));
+    assert.equal(saved.totalOperCount, 3);
+    assert.equal(saved.allOpers.filter(oper => oper.own === false).length, 2);
+  } finally {
+    await rm(dataDir, { recursive: true, force: true });
+  }
 });
 
 test('parseOperBoxData does not report an incomplete recognition as success', async () => {

@@ -166,7 +166,7 @@ export const placeClosedownLast = <T extends { id: string; commandId?: string },
 ]
 
 
-const commaSeparatedArrayKeys = new Set(['buy_first', 'blacklist', 'first_tags', 'preserve_tags'])
+const commaSeparatedArrayKeys = new Set(['buy_first', 'blacklist', 'first_tags', 'preserve_tags', 'fiammetta_targets'])
 
 const parseDropTargetEntries = (value: unknown): string[] | null => {
   if (value === undefined || value === null || value === '') return []
@@ -886,6 +886,8 @@ export default function AutomationTasks() {
         stages: [{ stage: '1-7', times: '' }],
         medicine: 0,
         expiringMedicine: 0,
+        medicineExpireDays: 0,
+        server: '',
         stone: 0,
         series: '1',
         drops: '',
@@ -900,7 +902,15 @@ export default function AutomationTasks() {
         { key: 'stages', label: '关卡', type: 'multi-stages', placeholder: '1-7 或 HD-7', timesPlaceholder: '次数', helper: '使用 HD-数字代表当前活动关卡；置顶关卡会优先执行' },
         { key: 'drops', label: '掉落目标', type: 'text', placeholder: '30011=10,30062=5', helper: '任一物品达到目标数量后停止；格式为物品 ID=数量，多个目标用逗号分隔' },
         { key: 'medicine', label: '理智药', type: 'number', placeholder: '0', helper: '使用理智药数量' },
-        { key: 'expiringMedicine', label: '临期药数量', type: 'number', placeholder: '0', helper: '按瓶数设置可使用的临期理智药' },
+        { key: 'expiringMedicine', label: '临期药数量', type: 'number', placeholder: '0', helper: '按瓶数设置可使用的临期理智药；建议改用临期药天数' },
+        { key: 'medicineExpireDays', label: '临期药天数', type: 'number', placeholder: '0', min: '0', helper: '使用指定天数内过期的理智药；设置后自动改用动态任务' },
+        { key: 'server', label: '掉落服务器', type: 'select', options: [
+          { value: '', label: '自动' },
+          { value: 'CN', label: '国服' },
+          { value: 'US', label: '美服' },
+          { value: 'JP', label: '日服' },
+          { value: 'KR', label: '韩服' }
+        ], helper: '外服资源可能只接受 -1~6 倍代理' },
         { key: 'stone', label: '源石', type: 'number', placeholder: '0', helper: '使用源石数量' },
         { key: 'series', label: '连战', type: 'select', options: [
           { value: '-1', label: '禁用' },
@@ -910,8 +920,12 @@ export default function AutomationTasks() {
           { value: '3', label: '3次' },
           { value: '4', label: '4次' },
           { value: '5', label: '5次' },
-          { value: '6', label: '6次' }
-        ], helper: '单次代理作战重复次数（需要游戏支持）' },
+          { value: '6', label: '6次' },
+          { value: '7', label: '7次' },
+          { value: '8', label: '8次' },
+          { value: '9', label: '9次' },
+          { value: '10', label: '10次' }
+        ], helper: '单次代理作战重复次数；7–10 需要新资源，外服可能被拒绝' },
       ]
     },
     {
@@ -928,6 +942,12 @@ export default function AutomationTasks() {
         filename: '',
         plan_index: 0,
         continue_training: false,
+        fiammetta_recovery_enabled: false,
+        fiammetta_targets: '',
+        use_pinus_sylvestris: false,
+        use_perception_information: false,
+        use_worldly_plight: false,
+        use_abyssal_hunter: false,
         dorm_notstationed_enabled: false,
         dorm_trust_enabled: false,
         reception_message_board: true,
@@ -952,6 +972,12 @@ export default function AutomationTasks() {
         ], hiddenWhen: { key: 'mode', value: '10000' } },
         { key: 'threshold', label: '心情阈值', type: 'number', placeholder: '0.3', step: '0.1', min: '0', max: '1' },
         { key: 'replenish', label: '自动补货', type: 'checkbox' },
+        { key: 'fiammetta_recovery_enabled', label: '菲亚梅塔恢复', type: 'checkbox', helper: '第一轮宿舍优先配对菲亚梅塔；默认关闭' },
+        { key: 'fiammetta_targets', label: '恢复目标', type: 'text', placeholder: '清流,可露希尔,但书', helper: '多个干员用逗号分隔；留空使用默认名单', visibleWhen: { key: 'fiammetta_recovery_enabled', value: true } },
+        { key: 'use_pinus_sylvestris', label: '红松骑士团组合', type: 'checkbox', helper: '允许跨设施组合红松骑士团技能' },
+        { key: 'use_perception_information', label: '感知信息组合', type: 'checkbox', helper: '优先感知信息；会覆盖人间烟火组合' },
+        { key: 'use_worldly_plight', label: '人间烟火组合', type: 'checkbox', helper: '允许跨设施组合人间烟火技能' },
+        { key: 'use_abyssal_hunter', label: '深海猎人组合', type: 'checkbox', helper: '允许跨设施组合深海猎人技能' },
         { key: 'filename', label: '排班文件', type: 'text', placeholder: 'schedules/base.json', helper: '自定义换班使用的排班配置文件路径', visibleWhen: { key: 'mode', value: '10000' } },
         { key: 'plan_index', label: '方案序号', type: 'number', placeholder: '0', min: '0', helper: '配置文件中的方案序号，从 0 开始', visibleWhen: { key: 'mode', value: '10000' } },
       ],
@@ -974,6 +1000,7 @@ export default function AutomationTasks() {
         expedite: false,
         expedite_times: 0,
         preserve_tags: '支援机械',
+        level3_recruitment_permit_reserve: 0,
         recruitment_time: { '3': 540, '4': 540 }
       },
       paramFields: [
@@ -986,6 +1013,7 @@ export default function AutomationTasks() {
         { key: 'expedite', label: '使用加急', type: 'checkbox' },
         { key: 'expedite_times', label: '加急次数', type: 'number', placeholder: '0', visibleWhen: { key: 'expedite', value: true } },
         { key: 'preserve_tags', label: '保留标签', type: 'text', placeholder: '支援机械,高级资深干员', helper: '识别到任一标签时保留该公招槽位，多个标签用逗号分隔' },
+        { key: 'level3_recruitment_permit_reserve', label: '3 星许可保留数', type: 'number', placeholder: '0', min: '0', helper: '剩余招聘许可不超过该值时跳过 3 星招募；0 表示禁用' },
       ],
       taskType: 'Recruit'
     },
@@ -1035,7 +1063,8 @@ export default function AutomationTasks() {
         recruit: false,
         orundum: false,
         mining: false,
-        specialaccess: false
+        specialaccess: false,
+        signinevent: false
       },
       paramFields: [
         { key: 'award', label: '每日奖励', type: 'checkbox' },
@@ -1044,6 +1073,7 @@ export default function AutomationTasks() {
         { key: 'orundum', label: '合成玉奖励', type: 'checkbox' },
         { key: 'mining', label: '采矿奖励', type: 'checkbox' },
         { key: 'specialaccess', label: '特别通行证', type: 'checkbox' },
+        { key: 'signinevent', label: '限时签到奖励', type: 'checkbox', helper: '仅支持常见横向版式活动' },
       ],
       taskType: 'Award'
     },
@@ -1492,6 +1522,70 @@ export default function AutomationTasks() {
     }
 
     const commandId = task.commandId || task.id.split('-')[0]
+    const medicineExpireDays = Number(task.params?.medicineExpireDays ?? 0)
+    const server = String(task.params?.server || '').trim()
+    const series = Number(task.params?.series ?? 1)
+
+    if (commandId === 'fight' && (medicineExpireDays > 0 || server || (Number.isFinite(series) && series > 6))) {
+      const stages = (task.params?.stages || [{ stage: task.params?.stage || '', times: task.params?.times || '' }])
+        .map(stageConfig => typeof stageConfig === 'string'
+          ? { stage: stageConfig, times: '' }
+          : stageConfig)
+        .filter(stageConfig => stageConfig.stage?.trim())
+        .map(stageConfig => ({
+          stage: stageConfig.stage.trim(),
+          times: stageConfig.times === undefined || stageConfig.times === '' ? '' : String(stageConfig.times).trim()
+        }))
+      if (stages.length === 0) throw new Error('请至少选择一个关卡')
+
+      const dropTargets = parseDropTargetEntries(task.params?.drops)
+      if (dropTargets === null) throw new Error('掉落目标格式应为物品 ID=数量，多个目标用逗号分隔')
+      const drops = dropTargets.length > 0
+        ? Object.fromEntries(dropTargets.map(entry => {
+          const [itemId, count] = entry.split('=')
+          return [itemId, Number(count)]
+        }))
+        : null
+
+      const commonParams: Record<string, unknown> = {}
+      if (task.params?.medicine !== undefined && task.params.medicine !== '' && task.params.medicine !== null) {
+        commonParams.medicine = Number(task.params.medicine)
+      }
+      if (medicineExpireDays > 0) {
+        commonParams.medicine_expire_days = medicineExpireDays
+      } else if (task.params?.expiringMedicine !== undefined && task.params.expiringMedicine !== '' && task.params.expiringMedicine !== null) {
+        commonParams.expiring_medicine = Number(task.params.expiringMedicine)
+      }
+      if (task.params?.stone !== undefined && task.params.stone !== '' && task.params.stone !== null) {
+        commonParams.stone = Number(task.params.stone)
+      }
+      if (task.params?.series !== undefined && task.params.series !== '' && task.params.series !== null) {
+        commonParams.series = Number(task.params.series)
+      }
+      if (drops) commonParams.drops = drops
+      if (server) commonParams.server = server
+      if (typeof task.params?.DrGrandet === 'boolean') commonParams.DrGrandet = task.params.DrGrandet
+      if (typeof task.params?.report_to_penguin === 'boolean') commonParams.report_to_penguin = task.params.report_to_penguin
+      if (typeof task.params?.penguin_id === 'string' && task.params.penguin_id.trim()) commonParams.penguin_id = task.params.penguin_id.trim()
+      if (typeof task.params?.report_to_yituliu === 'boolean') commonParams.report_to_yituliu = task.params.report_to_yituliu
+      if (typeof task.params?.yituliu_id === 'string' && task.params.yituliu_id.trim()) commonParams.yituliu_id = task.params.yituliu_id.trim()
+
+      const tasks = stages.map(({ stage, times }) => ({
+        name: `${task.name} (${stage})`,
+        type: 'Fight',
+        params: {
+          ...commonParams,
+          stage,
+          ...(times ? { times: Number(times) } : {})
+        }
+      }))
+
+      return {
+        command: 'run',
+        params: commandId,
+        taskConfig: JSON.stringify({ name: task.name, type: 'Fight', tasks })
+      }
+    }
     let params = ''
     const extraArgs: string[] = []
 
@@ -2843,7 +2937,9 @@ export default function AutomationTasks() {
                                       { value: 'Office', label: '办公室' },
                                       { value: 'Dorm', label: '宿舍' },
                                       { value: 'Processing', label: '加工站' },
-                                      { value: 'Training', label: '训练室' }
+                                      { value: 'Training', label: '训练室' },
+                                      { value: 'Recycle', label: '回收站' },
+                                      { value: 'AssistantChange', label: '副手换人' }
                                     ].map(facility => {
                                       const currentValue = Array.isArray(task.params[field.key]) ? task.params[field.key] : [];
                                       const isChecked = currentValue.includes(facility.value);

@@ -52,6 +52,39 @@ describe('executeAgentTask', () => {
     }]);
   });
 
+  it('normalizes a multi-task config used for multi-stage fight runs', async () => {
+    const { calls, dependencies } = createExecutors();
+
+    await executeAgentTask({
+      command: 'run',
+      args: ['fight'],
+      taskConfig: {
+        name: '理智作战',
+        type: 'Fight',
+        tasks: [
+          { name: '理智作战 (1-7)', type: 'Fight', params: { stage: '1-7', times: 2 } },
+          { name: '理智作战 (CE-6)', type: 'Fight', params: { stage: 'CE-6' } }
+        ]
+      }
+    }, dependencies);
+
+    assert.equal(calls[0].executor, 'dynamic');
+    assert.deepEqual(calls[0].args[1].tasks.map(task => task.params.stage), ['1-7', 'CE-6']);
+    assert.equal(calls[0].args[1].tasks[0].params.times, 2);
+  });
+
+  it('rejects an empty multi-task list', async () => {
+    const { dependencies } = createExecutors();
+
+    await assert.rejects(
+      executeAgentTask({
+        command: 'run',
+        taskConfig: { name: '理智作战', type: 'Fight', tasks: [] }
+      }, dependencies),
+      error => error.code === 'AGENT_VALIDATION_TASK_CONFIG_INVALID'
+    );
+  });
+
   it('falls back to the command for a dynamic depot task without args', async () => {
     const { calls, dependencies } = createExecutors();
 

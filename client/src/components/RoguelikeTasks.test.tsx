@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   loadUserConfig: vi.fn(),
   saveUserConfig: vi.fn(),
   stopTask: vi.fn(),
-  executePredefinedTask: vi.fn(),
+  executeCommand: vi.fn(),
   setMessage: vi.fn(),
   setActive: vi.fn(),
 }))
@@ -41,7 +41,7 @@ vi.mock('../services/api', () => ({
     loadUserConfig: mocks.loadUserConfig,
     saveUserConfig: mocks.saveUserConfig,
     stopTask: mocks.stopTask,
-    executePredefinedTask: mocks.executePredefinedTask,
+    executeCommand: mocks.executeCommand,
     getErrorMessage: (result: { message?: string; error?: string }) => result.message || result.error || '未知错误',
   },
 }))
@@ -114,7 +114,7 @@ describe('RoguelikeTasks execution recovery', () => {
     mocks.loadUserConfig.mockReset().mockResolvedValue({ success: false })
     mocks.saveUserConfig.mockReset().mockResolvedValue({ success: true })
     mocks.stopTask.mockReset().mockResolvedValue({ success: true, data: { task: { success: true } } })
-    mocks.executePredefinedTask.mockReset()
+    mocks.executeCommand.mockReset()
     mocks.setMessage.mockReset()
     mocks.setActive.mockReset()
     container = document.createElement('div')
@@ -160,7 +160,7 @@ describe('RoguelikeTasks execution recovery', () => {
     expect(toggleTextLabel?.htmlFor).toBeTruthy()
     expect(page?.querySelector(`#${toggleTextLabel?.htmlFor}`)?.getAttribute('role')).toBe('switch')
     const switches = page?.querySelectorAll('.roguelike-toggle-row .app-switch') ?? []
-    expect(switches).toHaveLength(2)
+    expect(switches.length).toBeGreaterThan(2)
     switches.forEach(switchControl => {
       expect(switchControl.classList.contains('min-h-11')).toBe(false)
     })
@@ -399,9 +399,85 @@ describe('RoguelikeTasks execution recovery', () => {
     expect(mocks.setMessage).toHaveBeenCalledWith('肉鸽任务已终止', 'warning')
   })
 
+  it('builds a BlackFlow mode 30003 dynamic task with core operators and start rewards', async () => {
+    mocks.executeCommand.mockResolvedValueOnce({ success: true })
+    mocks.loadUserConfig.mockResolvedValueOnce({
+      success: true,
+      data: {
+        taskInputs: { roguelike: 'BlackFlow' },
+        advancedParams: {
+          roguelike: {
+            mode: '30003',
+            blackflowStartAnimals: 'swaddled_cat,swaddled_dog',
+            blackflowStartRewards: 5,
+            blackflowStartUtopia: false,
+            coreCharList: [{ name: '维什戴尔', use_support: true }],
+          },
+        },
+      },
+    })
+    await act(async () => root.render(<RoguelikeTasks />))
+    await flush()
+    await click(buttonByText('立即执行')!)
+
+    expect(mocks.executeCommand).toHaveBeenCalledWith(
+      'run',
+      ['roguelike'],
+      expect.objectContaining({
+        type: 'Roguelike',
+        params: expect.objectContaining({
+          theme: 'BlackFlow',
+          mode: 30003,
+          blackflow_start_animals: ['swaddled_cat', 'swaddled_dog'],
+          blackflow_start_rewards: 5,
+          core_char_list: [{ name: '维什戴尔', use_support: true }],
+        }),
+      }),
+      null,
+      '集成战略',
+      'roguelike',
+      true,
+    )
+  })
+
+  it('builds a RelaunchAnchor reclamation dynamic task', async () => {
+    mocks.executeCommand.mockResolvedValueOnce({ success: true })
+    mocks.loadUserConfig.mockResolvedValueOnce({
+      success: true,
+      data: {
+        taskInputs: { reclamation: 'RelaunchAnchor' },
+        advancedParams: { reclamation: { mode: '48' } },
+      },
+    })
+    await act(async () => root.render(<RoguelikeTasks />))
+    await flush()
+
+    const reclamationMode = Array.from(container.querySelectorAll<HTMLButtonElement>('.roguelike-mode-button'))
+      .find(button => button.textContent?.includes('生息演算'))
+    await click(reclamationMode!)
+    await click(buttonByText('立即执行')!)
+
+    expect(mocks.executeCommand).toHaveBeenCalledWith(
+      'run',
+      ['reclamation'],
+      expect.objectContaining({
+        type: 'Reclamation',
+        params: expect.objectContaining({
+          theme: 'RelaunchAnchor',
+          mode: 48,
+          increment_mode: 0,
+        }),
+      }),
+      null,
+      '生息演算',
+      'roguelike',
+      true,
+    )
+  })
+
   it('keeps the task running until a wait-for-completion request settles', async () => {
     const execution = deferred<{ success: boolean }>()
-    mocks.executePredefinedTask.mockReturnValueOnce(execution.promise)
+    mocks.executeCommand.mockReturnValueOnce(execution.promise)
     await act(async () => root.render(<RoguelikeTasks />))
     await flush()
 
@@ -413,10 +489,14 @@ describe('RoguelikeTasks execution recovery', () => {
     })
     await click(buttonByText('立即执行')!)
 
-    expect(mocks.executePredefinedTask).toHaveBeenCalledWith(
-      'roguelike',
-      expect.any(String),
-      null,
+    expect(mocks.executeCommand).toHaveBeenCalledWith(
+      'run',
+      ['roguelike'],
+      expect.objectContaining({
+        name: '集成战略',
+        type: 'Roguelike',
+        params: expect.objectContaining({ theme: 'Phantom', mode: 0 }),
+      }),
       null,
       '集成战略',
       'roguelike',

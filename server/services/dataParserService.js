@@ -186,13 +186,15 @@ export async function parseDepotData(runtime = {}) {
     const sortedData = Object.values(enrichedData).sort((a, b) => a.sortId - b.sortId);
 
     // 保存到文件
-    await ensureDir(DATA_DIR);
-    const outputPath = join(DATA_DIR, 'depot.json');
+    const dataDir = runtime.dataDir || DATA_DIR;
+    await ensureDir(dataDir);
+    const outputPath = join(dataDir, 'depot.json');
 
     const output = {
       timestamp: new Date().toISOString(),
       itemCount: Object.keys(depotData).length,
-      items: sortedData
+      items: sortedData,
+      complete: selected.complete
     };
 
     await writeJsonFile(outputPath, output);
@@ -303,16 +305,34 @@ export async function parseOperBoxData(runtime = {}) {
     }
 
     const opers = selected.payload.details.own_opers;
-    logger.success(`解析成功，干员数量: ${opers.length}`);
+    const allOpers = Array.isArray(selected.payload.details.all_opers)
+      ? selected.payload.details.all_opers
+        .filter(oper => oper && typeof oper.id === 'string' && oper.id)
+        .map(oper => ({
+          id: oper.id,
+          name: oper.name || oper.id,
+          rarity: Number(oper.rarity) || 0,
+          own: oper.own === true
+        }))
+      : opers.map(oper => ({
+        id: oper.id,
+        name: oper.name || oper.id,
+        rarity: Number(oper.rarity) || 0,
+        own: true
+      }));
+    logger.success(`解析成功，已拥有干员: ${opers.length}/${allOpers.length}`);
 
     // 保存到文件
-    await ensureDir(DATA_DIR);
-    const outputPath = join(DATA_DIR, 'operbox.json');
+    const dataDir = runtime.dataDir || DATA_DIR;
+    await ensureDir(dataDir);
+    const outputPath = join(dataDir, 'operbox.json');
 
     const output = {
       timestamp: new Date().toISOString(),
       operCount: opers.length,
-      data: opers
+      totalOperCount: allOpers.length,
+      data: opers,
+      allOpers
     };
 
     await writeJsonFile(outputPath, output);
@@ -321,7 +341,9 @@ export async function parseOperBoxData(runtime = {}) {
     return successResponse({
       path: outputPath,
       operCount: opers.length,
-      data: opers
+      totalOperCount: allOpers.length,
+      data: opers,
+      allOpers
     });
   } catch (error) {
     logger.error('解析干员数据失败', { error: error.message, stack: error.stack });

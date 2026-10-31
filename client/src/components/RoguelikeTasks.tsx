@@ -13,7 +13,8 @@ import type {
   RoguelikeTask,
   RoguelikeAdvancedOption,
   RoguelikeTaskInputs,
-  RoguelikeAdvancedParams
+  RoguelikeAdvancedParams,
+  RoguelikeCoreChar
 } from '@/types/components'
 import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
 
@@ -41,11 +42,34 @@ const THEME_PRESETS: Record<RoguelikeMode, Array<{ value: string; label: string 
     { value: 'Sami', label: '萨米' },
     { value: 'Sarkaz', label: '萨卡兹' },
     { value: 'JieGarden', label: '界园' },
+    { value: 'BlackFlow', label: '黑流树海' },
   ],
   reclamation: [
     { value: 'Tales', label: '沙洲遗闻' },
+    { value: 'RelaunchAnchor', label: '重启锚点' },
   ],
 }
+
+const BLACKFLOW_REWARDS = [
+  { value: 1, label: '未编号物' },
+  { value: 2, label: '调查预付款' },
+  { value: 4, label: '空间租赁' },
+  { value: 8, label: '退行补偿' },
+  { value: 16, label: '林间代步' },
+  { value: 32, label: '巢寄生' },
+  { value: 64, label: '襁褓天马' },
+  { value: 128, label: '襁褓骏鹰' },
+  { value: 256, label: '襁褓巨龙' },
+  { value: 512, label: '襁褓九头蛇' },
+  { value: 1024, label: '襁褓白泽' },
+  { value: 2048, label: '襁褓金乌' },
+]
+
+const splitCommaList = (value: unknown): string[] => (
+  typeof value === 'string'
+    ? value.split(',').map(item => item.trim()).filter(Boolean)
+    : []
+)
 
 export default function RoguelikeTasks() {
   const shouldReduceMotion = useReducedMotion()
@@ -348,47 +372,213 @@ export default function RoguelikeTasks() {
   const getAdvancedOptions = (taskId: string): RoguelikeAdvancedOption[] => {
     const options: Record<string, RoguelikeAdvancedOption[]> = {
       roguelike: [
-        { key: 'mode', label: '模式', type: 'select', param: '--mode', options: [
-          { value: '0', label: '刷分模式' },
+        { key: 'mode', label: '模式', type: 'select', options: [
+          { value: '0', label: '刷分 / 奖励点数' },
           { value: '1', label: '刷源石锭' },
-          { value: '4', label: '3层后退出' },
-        ]},
-        { key: 'squad', label: '起始分队', type: 'text', param: '--squad', placeholder: '指挥分队' },
-        { key: 'coreChar', label: '核心干员', type: 'text', param: '--core-char', placeholder: '维什戴尔' },
-        { key: 'startCount', label: '运行次数', type: 'number', param: '--starts-count', placeholder: '无限' },
-        { key: 'useSupport', label: '使用助战', type: 'checkbox', param: '--use-support' },
-        { key: 'stopAtBoss', label: '最终Boss前停止', type: 'checkbox', param: '--stop-at-final-boss' },
+          { value: '4', label: '凹开局' },
+          { value: '5', label: '刷坍缩范式（萨米）' },
+          { value: '6', label: '月度小队' },
+          { value: '7', label: '深入调查' },
+          { value: '10001', label: '快速第一层（萨卡兹）' },
+          { value: '20001', label: '常乐节点（界园）' },
+          { value: '30001', label: '刷襁褓动物（黑流树海）' },
+          { value: '30003', label: '刷开局（黑流树海）' },
+        ], helper: '主题限制由 MaaCore 校验' },
+        { key: 'difficulty', label: '难度', type: 'number', placeholder: '-1', helper: '-1 表示不指定；黑流树海实托邦需要 6 以上' },
+        { key: 'squad', label: '起始分队', type: 'text', placeholder: '指挥分队' },
+        { key: 'roles', label: '职业组', type: 'text', placeholder: '取长补短' },
+        { key: 'coreCharList', label: '开局干员（最多 3 位）', type: 'core-char-list', helper: '按顺位招募；三个位置职业不能相同，助战可逐位开启' },
+        { key: 'coreChar', label: '开局干员（兼容字段）', type: 'text', placeholder: '留空自动选择', helper: '仅在未填写上方干员列表时使用' },
+        { key: 'useSupport', label: '兼容字段使用助战', type: 'checkbox', helper: '仅作用于上方兼容字段' },
+        { key: 'useNonfriendSupport', label: '允许非好友助战', type: 'checkbox' },
+        { key: 'startCount', label: '运行次数', type: 'number', placeholder: '无限' },
+        { key: 'stopAtBoss', label: '最终 Boss 前停止', type: 'checkbox' },
+        { key: 'stopAtMaxLevel', label: '肉鸽等级满后停止', type: 'checkbox' },
+        { key: 'investmentEnabled', label: '投资源石锭', type: 'checkbox' },
+        { key: 'investmentsCount', label: '投资次数', type: 'number', placeholder: '无限' },
+        { key: 'stopWhenInvestmentFull', label: '投资满后停止', type: 'checkbox' },
+        { key: 'investmentWithMoreScore', label: '投资后购物', type: 'checkbox', helper: '仅模式 1' },
+        { key: 'startWithEliteTwo', label: '凹精二直升', type: 'checkbox', helper: '仅模式 4' },
+        { key: 'onlyStartWithEliteTwo', label: '只凹精二直升', type: 'checkbox', helper: '仅模式 4 且开启精二直升' },
+        { key: 'refreshTraderWithDice', label: '骰子刷新商店', type: 'checkbox', helper: '仅水月主题' },
+        { key: 'firstFloorFoldartal', label: '第一层目标密文版', type: 'text', placeholder: '如：惊讶' },
+        { key: 'startFoldartalList', label: '开局目标密文板', type: 'text', placeholder: '多个用逗号分隔', helper: '仅萨米模式 4，需生活至上分队' },
+        { key: 'expectedCollapsalParadigms', label: '目标坍缩范式', type: 'text', placeholder: '目空一些,睁眼瞎', helper: '仅萨米模式 5，多个用逗号分隔' },
+        { key: 'useFoldartal', label: '使用密文板', type: 'checkbox', helper: '仅萨米主题' },
+        { key: 'checkCollapsalParadigms', label: '检测坍缩范式', type: 'checkbox', helper: '仅萨米主题' },
+        { key: 'doubleCheckCollapsalParadigms', label: '坍缩范式防漏检测', type: 'checkbox' },
+        { key: 'monthlySquadAutoIterate', label: '月度小队自动切换', type: 'checkbox' },
+        { key: 'monthlySquadCheckComms', label: '参考月度小队通信', type: 'checkbox' },
+        { key: 'deepExplorationAutoIterate', label: '深入调查自动切换', type: 'checkbox' },
+        { key: 'collectibleModeShopping', label: '烧水时购物', type: 'checkbox' },
+        { key: 'collectibleModeSquad', label: '烧水分队', type: 'text', placeholder: '默认与起始分队同步' },
+        { key: 'collectibleModeRoles', label: '烧水职业组', type: 'text', placeholder: '默认与职业组同步' },
+        { key: 'startWithSeed', label: '固定种子', type: 'text', placeholder: '留空不启用', helper: '仅萨卡兹投资模式' },
+        { key: 'findPlayTimeTarget', label: '常乐节点目标', type: 'select', options: [
+          { value: '1', label: '令（掷地有声）' },
+          { value: '2', label: '黍（种因得果）' },
+          { value: '3', label: '年（三缺一）' },
+        ], helper: '仅界园模式 20001，必填' },
+        { key: 'blackflowStrategy', label: '黑流树海策略', type: 'select', options: [
+          { value: '', label: '按模式自动推断' },
+          { value: 'baby_animal', label: '培育襁褓动物' },
+          { value: 'investment', label: '投资路线' },
+          { value: 'burn_with_investment', label: '投资后速通三层' },
+          { value: 'burn', label: '速通三层' },
+          { value: 'ending1', label: '第一结局' },
+          { value: 'ending2', label: '第二结局' },
+          { value: 'ending3', label: '第三结局' },
+        ], helper: '仅刷等级模式 0；模式 30003 不读取' },
+        { key: 'blackflowCultivationTarget', label: '培育目标', type: 'select', options: [
+          { value: 'swaddled_cat', label: '襁褓猫' },
+          { value: 'swaddled_feathered_serpent', label: '襁褓羽蛇' },
+          { value: 'swaddled_dog', label: '襁褓狗' },
+          { value: 'swaddled_cerberus', label: '襁褓三头犬' },
+        ], helper: '仅策略为培育襁褓动物时使用' },
+        { key: 'blackflowStartAnimals', label: '模式 30003 襁褓动物', type: 'text', placeholder: 'swaddled_cat,swaddled_dog', helper: '0–2 项，羽蛇最多一项' },
+        { key: 'blackflowStartRewards', label: '模式 30003 开局奖励', type: 'blackflow-rewards', helper: '命中任意一项即完成目标局' },
+        { key: 'blackflowStartUtopia', label: '凹第一层实托邦', type: 'checkbox', helper: '难度 6 以上才会出现' },
+        { key: 'blackflowStartRewardPriority', label: '实托邦奖励优先级', type: 'text', placeholder: 'space_lease,unnumbered_item', helper: '凹实托邦时必填，多个用逗号分隔' },
       ],
       reclamation: [
-        { key: 'mode', label: '模式', type: 'select', param: '-m', options: [
-          { value: '0', label: '刷繁荣度（无存档）' },
-          { value: '1', label: '制作工具刷繁荣度' },
-        ]},
-        { key: 'toolsToCraft', label: '制作工具名称', type: 'text', param: '-C', placeholder: '荧光棒' },
-        { key: 'numBatches', label: '批次数', type: 'number', param: '--num-craft-batches', placeholder: '16' },
+        { key: 'mode', label: '模式', type: 'select', options: [
+          { value: '0', label: '沙洲遗闻：刷繁荣度（无存档）' },
+          { value: '1', label: '沙洲遗闻：制作工具刷繁荣度' },
+          { value: '16', label: '重启锚点：RA-1 精耕细作' },
+          { value: '32', label: '重启锚点：RA-15 圣聆初雪 60 杀' },
+          { value: '48', label: '重启锚点：RA-4 维什戴尔 Boss' },
+        ], helper: '模式需与上方主题匹配' },
+        { key: 'toolsToCraft', label: '制作工具名称', type: 'text', placeholder: '荧光棒,发电机', helper: '仅沙洲遗闻模式 1，多个用逗号分隔' },
+        { key: 'clearStore', label: '完成后清空商店', type: 'checkbox', helper: '仅沙洲遗闻模式 0' },
+        { key: 'incrementMode', label: '点击方式', type: 'select', options: [
+          { value: '0', label: '连点' },
+          { value: '1', label: '长按' },
+        ], helper: '仅沙洲遗闻' },
+        { key: 'numCraftBatches', label: '制造轮数', type: 'number', placeholder: '16', helper: '仅沙洲遗闻' },
       ],
     }
     return options[taskId] || []
   }
 
-  const buildCommandParams = (task: RoguelikeTask): string => {
-    let params = taskInputs[task.id] || ''
-    
+  const buildTaskConfig = (task: RoguelikeTask) => {
     const advanced = advancedParams[task.id] || {}
-    const options = getAdvancedOptions(task.id)
-    
-    options.forEach(option => {
-      const value = advanced[option.key]
-      if (value !== undefined && value !== '' && value !== false) {
-        if (option.type === 'checkbox' && value === true) {
-          params += ` ${option.param}`
-        } else if (option.type !== 'checkbox') {
-          params += ` ${option.param} ${value}`
-        }
+    const theme = (taskInputs[task.id] || '').trim()
+    if (!theme) throw new Error('请选择主题')
+
+    const params: Record<string, unknown> = { theme }
+    const mode = Number(advanced.mode ?? 0)
+
+    if (task.id === 'roguelike') {
+      params.mode = Number.isFinite(mode) ? mode : 0
+
+      const stringFields: Record<string, string> = {
+        squad: 'squad',
+        roles: 'roles',
+        coreChar: 'core_char',
+        firstFloorFoldartal: 'first_floor_foldartal',
+        collectibleModeSquad: 'collectible_mode_squad',
+        collectibleModeRoles: 'collectible_mode_roles',
+        startWithSeed: 'start_with_seed',
+        blackflowStrategy: 'blackflow_strategy',
+        blackflowCultivationTarget: 'blackflow_cultivation_target',
       }
-    })
-    
-    return params
+      Object.entries(stringFields).forEach(([key, param]) => {
+        const value = advanced[key]
+        if (typeof value === 'string' && value.trim()) params[param] = value.trim()
+      })
+
+      const numberFields: Record<string, string> = {
+        difficulty: 'difficulty',
+        startCount: 'starts_count',
+        investmentsCount: 'investments_count',
+        findPlayTimeTarget: 'find_play_time_target',
+      }
+      Object.entries(numberFields).forEach(([key, param]) => {
+        const value = advanced[key]
+        if (value !== undefined && value !== '') {
+          const numeric = Number(value)
+          if (Number.isFinite(numeric)) params[param] = numeric
+        }
+      })
+
+      const booleanFields: Record<string, string> = {
+        useSupport: 'use_support',
+        useNonfriendSupport: 'use_nonfriend_support',
+        stopAtBoss: 'stop_at_final_boss',
+        stopAtMaxLevel: 'stop_at_max_level',
+        stopWhenInvestmentFull: 'stop_when_investment_full',
+        investmentWithMoreScore: 'investment_with_more_score',
+        startWithEliteTwo: 'start_with_elite_two',
+        onlyStartWithEliteTwo: 'only_start_with_elite_two',
+        refreshTraderWithDice: 'refresh_trader_with_dice',
+        useFoldartal: 'use_foldartal',
+        checkCollapsalParadigms: 'check_collapsal_paradigms',
+        doubleCheckCollapsalParadigms: 'double_check_collapsal_paradigms',
+        monthlySquadAutoIterate: 'monthly_squad_auto_iterate',
+        monthlySquadCheckComms: 'monthly_squad_check_comms',
+        deepExplorationAutoIterate: 'deep_exploration_auto_iterate',
+        collectibleModeShopping: 'collectible_mode_shopping',
+        blackflowStartUtopia: 'blackflow_start_utopia',
+      }
+      Object.entries(booleanFields).forEach(([key, param]) => {
+        const value = advanced[key]
+        if (typeof value === 'boolean') params[param] = value
+      })
+      params.investment_enabled = advanced.investmentEnabled !== false
+
+      const listFields: Record<string, string> = {
+        startFoldartalList: 'start_foldartal_list',
+        expectedCollapsalParadigms: 'expected_collapsal_paradigms',
+        blackflowStartAnimals: 'blackflow_start_animals',
+        blackflowStartRewardPriority: 'blackflow_start_reward_priority',
+      }
+      Object.entries(listFields).forEach(([key, param]) => {
+        const list = splitCommaList(advanced[key])
+        if (list.length > 0) params[param] = list
+      })
+
+      const rewards = Number(advanced.blackflowStartRewards ?? 0)
+      if (Number.isFinite(rewards) && rewards >= 0) params.blackflow_start_rewards = rewards
+
+      const coreCharList = (Array.isArray(advanced.coreCharList) ? advanced.coreCharList : [])
+        .filter(entry => entry && typeof entry.name === 'string' && entry.name.trim())
+        .slice(0, 3)
+        .map(entry => ({ name: entry.name.trim(), use_support: Boolean(entry.use_support) }))
+      if (coreCharList.length > 0) params.core_char_list = coreCharList
+
+      if ([30001, 30003].includes(Number(params.mode)) && theme !== 'BlackFlow') {
+        throw new Error('该模式仅适用于黑流树海主题')
+      }
+      if (Number(params.mode) === 20001 && params.find_play_time_target === undefined) {
+        throw new Error('常乐节点模式需要选择目标节点')
+      }
+      if (Number(params.mode) === 30003 && params.blackflow_start_utopia === true
+        && !Array.isArray(params.blackflow_start_reward_priority)) {
+        throw new Error('凹第一层实托邦需要填写奖励优先级')
+      }
+    } else {
+      params.mode = Number.isFinite(mode) ? mode : 0
+      const tools = splitCommaList(advanced.toolsToCraft)
+      if (tools.length > 0) params.tools_to_craft = tools
+      if (typeof advanced.clearStore === 'boolean') params.clear_store = advanced.clearStore
+      const incrementMode = Number(advanced.incrementMode ?? 0)
+      if (Number.isFinite(incrementMode)) params.increment_mode = incrementMode
+      const numBatches = Number(advanced.numCraftBatches ?? 0)
+      if (Number.isFinite(numBatches) && numBatches > 0) params.num_craft_batches = numBatches
+
+      if ([16, 32, 48].includes(Number(params.mode)) && theme !== 'RelaunchAnchor') {
+        throw new Error('RA-1 / RA-15 / RA-4 模式需要选择「重启锚点」主题')
+      }
+      if ([0, 1].includes(Number(params.mode)) && theme === 'RelaunchAnchor') {
+        throw new Error('「重启锚点」主题请选择 RA-1 / RA-15 / RA-4 模式')
+      }
+    }
+
+    return {
+      name: task.name,
+      type: task.id === 'roguelike' ? 'Roguelike' : 'Reclamation',
+      params,
+    }
   }
 
   const handleExecute = async (task: RoguelikeTask) => {
@@ -410,8 +600,16 @@ export default function RoguelikeTasks() {
     setStatusMessage('正在执行命令...')
 
     try {
-      const params = buildCommandParams(task)
-      const result = await maaApi.executePredefinedTask(task.command, params, null, null, task.name, 'roguelike', true)
+      const taskConfig = buildTaskConfig(task)
+      const result = await maaApi.executeCommand(
+        'run',
+        [task.command],
+        taskConfig as any,
+        null,
+        task.name,
+        'roguelike',
+        true
+      )
 
       if (!isCurrentExecution(generation)) return
       if (result.success) {
@@ -484,7 +682,11 @@ export default function RoguelikeTasks() {
     setTaskInputs({ ...taskInputs, [taskId]: value })
   }
 
-  const handleAdvancedChange = (taskId: string, key: string, value: string | number | boolean) => {
+  const handleAdvancedChange = (
+    taskId: string,
+    key: string,
+    value: string | number | boolean | RoguelikeCoreChar[]
+  ) => {
     setAdvancedParams({
       ...advancedParams,
       [taskId]: {
@@ -497,39 +699,131 @@ export default function RoguelikeTasks() {
   const renderAdvancedOptions = (task: RoguelikeTask) => {
     const options = getAdvancedOptions(task.id)
     if (options.length === 0) return null
-    
+
     const advanced = advancedParams[task.id] || {}
-    
+    const coreCharRows = Array.from({ length: 3 }, (_, index) => {
+      const entry = Array.isArray(advanced.coreCharList) ? advanced.coreCharList[index] : undefined
+      return {
+        name: entry?.name || '',
+        use_support: Boolean(entry?.use_support),
+      }
+    })
+    const rewardMask = Number(advanced.blackflowStartRewards ?? 0)
+
+    const updateCoreChar = (index: number, patch: Partial<RoguelikeCoreChar>) => {
+      const next = coreCharRows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row)
+      handleAdvancedChange(task.id, 'coreCharList', next)
+    }
+
+    const renderCoreCharList = (option: RoguelikeAdvancedOption) => (
+      <fieldset>
+        <legend className="roguelike-field-label mb-1 block">{option.label}</legend>
+        <p className="mb-2 text-xs leading-5 text-gray-500 dark:text-gray-400">{option.helper}</p>
+        <div className="space-y-2">
+          {coreCharRows.map((row, index) => (
+            <div key={index} className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+              <Input
+                id={`roguelike-${task.id}-core-char-${index}`}
+                name={`maa-${task.id}-core-char-${index}`}
+                type="text"
+                label={`第 ${index + 1} 顺位`}
+                value={row.name}
+                onChange={(value: string) => updateCoreChar(index, { name: value })}
+                placeholder="留空则自动选择"
+              />
+              <label
+                htmlFor={`roguelike-${task.id}-core-char-${index}-support`}
+                className="flex min-h-11 items-center gap-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-300"
+              >
+                <input
+                  id={`roguelike-${task.id}-core-char-${index}-support`}
+                  type="checkbox"
+                  checked={row.use_support}
+                  onChange={(event) => updateCoreChar(index, { use_support: event.target.checked })}
+                  className="custom-checkbox cursor-pointer"
+                />
+                助战
+              </label>
+            </div>
+          ))}
+        </div>
+      </fieldset>
+    )
+
+    const renderBlackflowRewards = (option: RoguelikeAdvancedOption) => (
+      <fieldset>
+        <legend className="roguelike-field-label mb-1 block">{option.label}</legend>
+        <p className="mb-2 text-xs leading-5 text-gray-500 dark:text-gray-400">{option.helper}</p>
+        <div className="grid grid-cols-2 gap-2">
+          {BLACKFLOW_REWARDS.map(reward => (
+            <label
+              key={reward.value}
+              htmlFor={`roguelike-${task.id}-blackflow-reward-${reward.value}`}
+              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-[var(--app-border)] px-2 py-1.5 text-xs text-gray-700 dark:text-gray-300"
+            >
+              <input
+                id={`roguelike-${task.id}-blackflow-reward-${reward.value}`}
+                type="checkbox"
+                checked={(rewardMask & reward.value) === reward.value}
+                onChange={(event) => {
+                  const next = event.target.checked
+                    ? rewardMask | reward.value
+                    : rewardMask & ~reward.value
+                  handleAdvancedChange(task.id, 'blackflowStartRewards', next)
+                }}
+                className="custom-checkbox cursor-pointer"
+              />
+              {reward.label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+    )
+
     const fieldOptions = options.filter(option => option.type !== 'checkbox')
     const toggleOptions = options.filter(option => option.type === 'checkbox')
 
     return (
       <>
         <div className="roguelike-field-grid">
-          {fieldOptions.map(option => (
-            <div key={option.key}>
-              {option.type === 'select' && option.options ? (
-                <Select
-                  id={`roguelike-${task.id}-${option.key}`}
-                  name={`maa-${task.id}-${option.key}`}
-                  label={option.label}
-                  value={String(advanced[option.key] ?? option.options[0]?.value ?? '')}
-                  onChange={(value: string) => handleAdvancedChange(task.id, option.key, value)}
-                  options={option.options}
-                />
-              ) : (
-                <Input
-                  id={`roguelike-${task.id}-${option.key}`}
-                  name={`maa-${task.id}-${option.key}`}
-                  type={option.type === 'number' ? 'number' : 'text'}
-                  label={option.label}
-                  value={advanced[option.key] as string | number ?? ''}
-                  onChange={(value: string) => handleAdvancedChange(task.id, option.key, value)}
-                  placeholder={option.placeholder}
-                />
-              )}
-            </div>
-          ))}
+          {fieldOptions.map(option => {
+            const isCustom = option.type === 'core-char-list' || option.type === 'blackflow-rewards'
+            return (
+              <div
+                key={option.key}
+                className={isCustom ? 'roguelike-custom-field' : undefined}
+                style={isCustom ? { gridColumn: '1 / -1' } : undefined}
+              >
+                {option.type === 'select' && option.options ? (
+                  <Select
+                    id={`roguelike-${task.id}-${option.key}`}
+                    name={`maa-${task.id}-${option.key}`}
+                    label={option.label}
+                    value={String(advanced[option.key] ?? option.options[0]?.value ?? '')}
+                    onChange={(value: string) => handleAdvancedChange(task.id, option.key, value)}
+                    options={option.options}
+                  />
+                ) : option.type === 'core-char-list' ? (
+                  renderCoreCharList(option)
+                ) : option.type === 'blackflow-rewards' ? (
+                  renderBlackflowRewards(option)
+                ) : (
+                  <Input
+                    id={`roguelike-${task.id}-${option.key}`}
+                    name={`maa-${task.id}-${option.key}`}
+                    type={option.type === 'number' ? 'number' : 'text'}
+                    label={option.label}
+                    value={advanced[option.key] as string | number ?? ''}
+                    onChange={(value: string) => handleAdvancedChange(task.id, option.key, value)}
+                    placeholder={option.placeholder}
+                  />
+                )}
+                {!isCustom && option.helper && (
+                  <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{option.helper}</p>
+                )}
+              </div>
+            )
+          })}
         </div>
         {toggleOptions.length > 0 && (
           <div className="roguelike-toggle-list">
@@ -544,7 +838,9 @@ export default function RoguelikeTasks() {
                 <Switch
                   id={`roguelike-${task.id}-${option.key}`}
                   name={`maa-${task.id}-${option.key}`}
-                  checked={advanced[option.key] as boolean || false}
+                  checked={option.key === 'investmentEnabled'
+                    ? advanced[option.key] !== false
+                    : Boolean(advanced[option.key])}
                   onChange={(checked: boolean) => handleAdvancedChange(task.id, option.key, checked)}
                   label={option.label}
                 />

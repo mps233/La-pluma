@@ -537,7 +537,7 @@ export async function getMaaVersion(silent = false) {
   const output = result.stdout;
   
   // 解析版本信息
-  // 输出格式: "maa-cli v0.7.0\nMaaCore v6.2.3\n"
+  // 输出格式: "maa-cli <version>\nMaaCore <version>\n"
   const lines = output.trim().split('\n');
   const versions = {
     raw: output,
@@ -861,18 +861,22 @@ function normalizeTaskParams(params = {}) {
  */
 function generateTaskConfig(taskConfig) {
   const clientType = taskConfig.client_type || taskConfig.clientType;
-  const task = {
-    name: taskConfig.name,
-    type: taskConfig.type,
-    params: normalizeTaskParams(taskConfig.params)
-  };
-  if (taskConfig.strategy) task.strategy = taskConfig.strategy;
-  if (taskConfig.condition) task.condition = taskConfig.condition;
-  if (taskConfig.variants) task.variants = taskConfig.variants;
+  const sourceTasks = Array.isArray(taskConfig.tasks) ? taskConfig.tasks : [taskConfig];
+  const tasks = sourceTasks.map(sourceTask => {
+    const task = {
+      name: sourceTask.name,
+      type: sourceTask.type,
+      params: normalizeTaskParams(sourceTask.params)
+    };
+    if (sourceTask.strategy) task.strategy = sourceTask.strategy;
+    if (sourceTask.condition) task.condition = sourceTask.condition;
+    if (sourceTask.variants) task.variants = sourceTask.variants;
+    return task;
+  });
 
   const config = {
     ...(clientType ? { client_type: normalizeClientType(clientType) } : {}),
-    tasks: [task]
+    tasks
   };
   const content = JSON.stringify(config, null, 2);
   addLog('DEBUG', `生成的任务配置:\n${content}`);

@@ -90,7 +90,7 @@ describe('Agent discovery routes', () => {
     assert.equal(res.body.success, true)
     assert.equal(res.body.meta.requestId, 'manifest-test')
     assert.equal(res.body.data.version, API_VERSION)
-    assert.equal(res.body.data.actions.length, 21)
+    assert.equal(res.body.data.actions.length, 23)
     assert.ok(res.body.data.actions.every(action => action.safety && action.execution))
   })
 

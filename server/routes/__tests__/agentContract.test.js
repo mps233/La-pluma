@@ -35,7 +35,9 @@ const expectedAdvertisedIds = [
   'webrtc_start',
   'webrtc_stop',
   'preview_orientation',
-  'get_current_activity'
+  'get_current_activity',
+  'list_custom_tools',
+  'run_custom_tool'
 ];
 
 function getOpenApiOperation(spec, item) {
@@ -44,7 +46,7 @@ function getOpenApiOperation(spec, item) {
 
 describe('Agent API contract registry', () => {
   it('keeps operation ids and method/path pairs unique', () => {
-    assert.equal(AGENT_OPERATIONS.length, 27);
+    assert.equal(AGENT_OPERATIONS.length, 29);
     assert.equal(new Set(AGENT_OPERATIONS.map(item => item.id)).size, AGENT_OPERATIONS.length);
     assert.equal(
       new Set(AGENT_OPERATIONS.map(item => `${item.method} ${item.path}`)).size,
@@ -58,7 +60,7 @@ describe('Agent API contract registry', () => {
     assert.equal(manifest.version, API_VERSION);
     assert.deepEqual(manifest.defaults, defaults);
     assert.deepEqual(manifest.actions.map(item => item.id), expectedAdvertisedIds);
-    assert.equal(manifest.actions.length, 21);
+    assert.equal(manifest.actions.length, 23);
     assert.ok(!manifest.actions.some(item => item.id === 'get_manifest'));
     assert.ok(!manifest.actions.some(item => item.id === 'get_openapi'));
   });
@@ -145,7 +147,8 @@ describe('Agent API contract registry', () => {
       'start_game',
       'fight',
       'run_task',
-      'run_daily_flow'
+      'run_daily_flow',
+      'run_custom_tool'
     ]);
     for (const action of runActions) {
       assert.equal(action.execution.runLookupAction, 'get_run');

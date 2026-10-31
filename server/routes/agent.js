@@ -28,6 +28,7 @@ import { getNotificationConfig, sendNotification, sendToChannel, testNotificatio
 import operatorTrainingService from '../services/operatorTrainingService.js';
 import { getMaaResourceInfo, updateMaaResources } from '../services/resourceUpdateService.js';
 import { getMaaCoreChannel, setMaaCoreChannel } from '../services/maaCliConfigService.js';
+import { buildCustomToolTaskConfig, listCustomTools } from '../services/customTaskService.js';
 import { parseDepotData, parseOperBoxData, getDepotData, getOperBoxData, getAllOperators } from '../services/dataParserService.js';
 import { getTodayDrops, getRecentDrops, getDropStatistics } from '../services/dropRecordService.js';
 import { loadParadoxOperators, resolveStageSearchKeyword } from '../services/copilotService.js';
@@ -1613,6 +1614,40 @@ router.post('/actions/hot-update-resources', asyncHandler(async (req, res) => {
       }
     },
     successMessage: '资源文件更新成功'
+  });
+}));
+
+router.get('/custom-tools', asyncHandler(async (req, res) => {
+  return sendSuccess(res, req, { tools: listCustomTools() });
+}));
+
+router.post('/actions/run-custom-tool', asyncHandler(async (req, res) => {
+  const { toolId, params = {}, dryRun = false, waitForCompletion = true } = req.body || {};
+  const taskConfig = buildCustomToolTaskConfig(toolId, params);
+  const plan = { action: 'run-custom-tool', toolId, taskConfig };
+
+  if (dryRun) return sendDryRun(res, req, plan);
+
+  const shouldWait = parseWaitForCompletion(waitForCompletion);
+  return executeTrackedAgentAction(req, res, {
+    operationId: 'run_custom_tool',
+    input: { toolId, params, waitForCompletion: shouldWait },
+    waitForCompletion: shouldWait,
+    metadata: { taskName: taskConfig.name, taskType: 'custom' },
+    execute: async lifecycle => {
+      const { clientType } = await resolveRequestConnection(req, { allowOverrides: true });
+      return execDynamicTask(
+        `custom_${toolId}`,
+        taskConfig,
+        taskConfig.name,
+        'custom',
+        shouldWait,
+        false,
+        { lifecycle, clientType }
+      );
+    },
+    successMessage: `${taskConfig.name}执行完成`,
+    acceptedMessage: `${taskConfig.name}已接受`
   });
 }));
 

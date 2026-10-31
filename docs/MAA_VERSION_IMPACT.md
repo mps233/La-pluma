@@ -620,20 +620,62 @@
 
 ### Phase 4：新增功能
 
-- [ ] Custom / 小工具。
-- [ ] 肉鸽完整参数面。
-- [ ] Fight/Infrast/Recruit/Award 参数。
-- [ ] 生息演算。
-- [ ] 连接预设/触控模式。
-- [ ] 仓库/干员数据展示。
-- [ ] UI 暴露与文案。
+- [x] Custom / 小工具。
+- [x] 肉鸽完整参数面。
+- [x] Fight/Infrast/Recruit/Award 参数。
+- [x] 生息演算。
+- [x] 连接预设/触控模式。
+- [x] 仓库/干员数据展示。
+- [x] UI 暴露与文案。
+
+> **Phase 4A 实施记录（2026-10-31）**
+>
+> - 新增 `server/services/customTaskService.js`：5 个白名单工具（像素画填色、自动提升潜能、缺口材料合成、刷傀影维多利亚皇冠、活动商店兑换），负责参数校验和 `type=Custom` 任务配置生成。
+> - 新增 Agent API：`GET /api/agent/custom-tools`、`POST /api/agent/actions/run-custom-tool`（tracked Run、dry-run、幂等）；契约中登记为公开操作。
+> - 新增前端「小工具」页：工具选择、24×24 点阵与 0–39 色板、自动提升潜能开关、活动商店黑名单；使用 `PageHeader`、`Card`、`Button`、`Input`、`Switch` 等通用组件。
+> - 页面验证：工具列表加载正常；像素画点阵可填色，dry-run 返回 `MiniGame@PixelPaint@Begin` + groups；自动提升潜能返回 `MiniGame@AutoRaisePotential@Begin`；活动商店返回 `SS@Store@Begin` + blacklist；移动端详情标题不再被按钮挤断。
+> - 修复：前端最初把参数包成 `pixel_paint.groups` / `event_shop.blacklist`，与后端 API 约定的工具参数不一致，已改为直接传 `groups` / `blacklist`。
+> - 没有执行真实 Custom 任务（会改变游戏/账号状态），只做 dry-run。
+
+> **Phase 4B 实施记录（2026-10-31）**
+>
+> - Award 新增 `signinevent` 复选框；Recruit 新增 `level3_recruitment_permit_reserve` 字段。
+> - Infrast 设施新增「回收站」「副手换人」，并补齐 `fiammetta_recovery_enabled` / `fiammetta_targets`、`use_pinus_sylvestris` / `use_perception_information` / `use_worldly_plight` / `use_abyssal_hunter` 开关。
+> - Roguelike 改为动态任务：新增 `BlackFlow` 主题、模式 5/6/7/10001/20001/30001/30003、`core_char_list` 三顺位（逐位助战）、难度/投资/密文板/坍缩范式/月度小队/深入调查/黑流树海策略与开局奖励位掩码等字段。
+> - Reclamation 改为动态任务：新增 `RelaunchAnchor` 主题与 16/32/48 模式，补齐 `tools_to_craft`、`clear_store`、`increment_mode`、`num_craft_batches`。
+> - Fight 新增 `medicineExpireDays`、`server`，`series` 扩展到 10；当使用临期药天数、外服服务器或 7–10 倍代理时，单任务执行与调度器都改为 `maa run` 的多任务配置，多关卡各生成一个 `Fight` 任务。
+> - 后端 `normalizeTaskConfig` / `generateTaskConfig` 支持 `tasks` 数组；Agent API 仍要求顶层 `name/type`，每个子任务单独校验。
+> - 页面验证：肉鸽页出现黑流树海主题、3 行开局干员、12 个开局奖励复选框；生息演算页出现重启锚点主题和 RA-1/RA-15/RA-4 模式；理智作战页出现临期药天数、掉落服务器和 7–10 倍代理。用页面拦截 `run-task` 请求验证：
+>   - BlackFlow 模式 30003 生成 `type: Roguelike`，包含 `blackflow_start_animals`、`blackflow_start_rewards: 5`、`core_char_list`（含助战标记）。
+>   - Reclamation 生成 `type: Reclamation`，参数 `theme: RelaunchAnchor, mode: 48`。
+> - 390px 移动端无横向溢出；未执行真实肉鸽/生息演算/理智作战任务，避免改变账号与游戏状态。
+> - 测试：server 46 个测试文件通过，client 42 个测试文件 / 264 个测试通过，type-check 通过。
+
+> **Phase 4C 实施记录（2026-10-31）**
+>
+> - OperBox 解析保存 `all_opers` 和 `totalOperCount`，不再只保留 `own_opers`；前端用 `all_opers` 的 `own` 标记合并拥有状态，未拥有筛选不再依赖 `battle_data.json`。
+> - 页面 KPI 改为「已拥有 / 全干员 / 当前显示 / 收集率」；真实数据验证为已拥有 409、全干员 463、未拥有筛选 54。
+> - 仓库保存并展示 `complete`；识别未完整结束时显示「清单可能缺少部分内容」提示。
+> - 仓库分类文案补齐实际 `classifyType`：`NORMAL → 基础资源`、`NONE → 资源/凭证`、`MEMENTO → 活动纪念品`、`CONSUME → 消耗品`。
+> - 页面验证：`/app/statistics` 干员页显示 463 名全干员、54 名未拥有；仓库页显示「基础资源·5 种」「材料·78 种」，无溢出。
+> - 测试：`parseOperBoxData` 新增全干员持久化测试；`npm run verify` 通过。
 
 ### Phase 5：清理与文档
 
-- [ ] 删除死代码/旧脚本/旧注释。
-- [ ] 更新 README / COMPONENT_LIBRARY_GUIDE（如涉及 UI）。
-- [ ] 更新 `server/routes/agentContract.js` 与契约测试。
-- [ ] 更新本文档的“已完成/未完成”状态。
+- [x] 删除死代码/旧脚本/旧注释。
+- [x] 更新 README / COMPONENT_LIBRARY_GUIDE（如涉及 UI）。
+- [x] 更新 `server/routes/agentContract.js` 与契约测试。
+- [x] 更新本文档的“已完成/未完成”状态。
+
+> **Phase 5 实施记录（2026-10-31）**
+>
+> - 清理 `RoguelikeAdvancedOption` 中动态任务迁移后不再使用的 `param` 字段；`maaService` 的版本解析注释改为不绑定具体版本号。
+> - 确认旧 `server/scripts/update-maa-resources.js` 已删除，资源更新统一走 `maa hot-update`；保留仍被 npm scripts 引用的数据生成脚本。
+> - README 补充小工具、新版肉鸽/生息演算、全干员/未拥有筛选、仓库分类与完整度说明；项目结构补充 `CustomTools.tsx`、`agentContract.js`、`customTaskService.js`。
+> - README Agent API 增加多任务 `taskConfig.tasks` 示例，说明多关卡 Fight 的临期药天数/外服掉落/7–10 倍代理用法。
+> - COMPONENT_LIBRARY_GUIDE 无需改动：本轮 UI 全部复用现有 `PageHeader`、`Card`、`Button`、`Input`、`Select`、`Switch`、`EmptyState`、`Loading` 和语义 token。
+> - 契约测试随 `npm run verify` 通过；Phase 4 检查项已全部完成。
+> - 仍有意保留：3.6 每日流程任务文件（需要重做逐任务结果归属）；GUI-only、6.21 beta/0.8 nightly 和需要真实账号副作用的研究项不纳入当前实现。
 
 ---
 

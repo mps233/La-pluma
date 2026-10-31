@@ -57,6 +57,42 @@ export function validateTaskConfig(taskConfig) {
   return normalizeTaskConfig(taskConfig);
 }
 
+function normalizeSingleTaskConfig(taskConfig, label = 'taskConfig') {
+  if (typeof taskConfig.name !== 'string' || !taskConfig.name.trim()
+    || typeof taskConfig.type !== 'string' || !taskConfig.type.trim()) {
+    throw invalidRequest(
+      'AGENT_VALIDATION_TASK_CONFIG_INVALID',
+      `${label}.name 和 ${label}.type 必须是非空字符串`,
+      { reason: 'name_and_type_required' }
+    );
+  }
+
+  const normalizedType = taskConfig.type.trim();
+  if (!MAA_TASK_TYPE_SET.has(normalizedType)) {
+    throw invalidRequest(
+      'AGENT_VALIDATION_TASK_TYPE_NOT_SUPPORTED',
+      `不支持的 MaaCore 任务类型: ${normalizedType}`,
+      { type: normalizedType, allowed: [...MAA_TASK_TYPES] }
+    );
+  }
+
+  if (taskConfig.params !== undefined
+    && (!taskConfig.params || typeof taskConfig.params !== 'object' || Array.isArray(taskConfig.params))) {
+    throw invalidRequest(
+      'AGENT_VALIDATION_TASK_CONFIG_INVALID',
+      `${label}.params 必须是对象`,
+      { reason: 'params_object_required' }
+    );
+  }
+
+  return {
+    ...taskConfig,
+    name: taskConfig.name.trim(),
+    type: normalizedType,
+    params: taskConfig.params || {}
+  };
+}
+
 function normalizeTaskConfig(taskConfig) {
   let normalized = taskConfig;
 
@@ -83,38 +119,30 @@ function normalizeTaskConfig(taskConfig) {
     );
   }
 
-  if (typeof normalized.name !== 'string' || !normalized.name.trim()
-    || typeof normalized.type !== 'string' || !normalized.type.trim()) {
+  const normalizedTopLevel = normalizeSingleTaskConfig(normalized, 'taskConfig');
+
+  if (normalized.tasks === undefined) return normalizedTopLevel;
+
+  if (!Array.isArray(normalized.tasks) || normalized.tasks.length === 0) {
     throw invalidRequest(
       'AGENT_VALIDATION_TASK_CONFIG_INVALID',
-      'taskConfig.name 和 taskConfig.type 必须是非空字符串',
-      { reason: 'name_and_type_required' }
-    );
-  }
-
-  const normalizedType = normalized.type.trim();
-  if (!MAA_TASK_TYPE_SET.has(normalizedType)) {
-    throw invalidRequest(
-      'AGENT_VALIDATION_TASK_TYPE_NOT_SUPPORTED',
-      `不支持的 MaaCore 任务类型: ${normalizedType}`,
-      { type: normalizedType, allowed: [...MAA_TASK_TYPES] }
-    );
-  }
-
-  if (normalized.params !== undefined
-    && (!normalized.params || typeof normalized.params !== 'object' || Array.isArray(normalized.params))) {
-    throw invalidRequest(
-      'AGENT_VALIDATION_TASK_CONFIG_INVALID',
-      'taskConfig.params 必须是对象',
-      { reason: 'params_object_required' }
+      'taskConfig.tasks 必须是非空数组',
+      { reason: 'tasks_array_required' }
     );
   }
 
   return {
-    ...normalized,
-    name: normalized.name.trim(),
-    type: normalizedType,
-    params: normalized.params || {}
+    ...normalizedTopLevel,
+    tasks: normalized.tasks.map((task, index) => {
+      if (!task || typeof task !== 'object' || Array.isArray(task)) {
+        throw invalidRequest(
+          'AGENT_VALIDATION_TASK_CONFIG_INVALID',
+          `taskConfig.tasks[${index}] 必须是对象`,
+          { reason: 'task_object_required', index }
+        );
+      }
+      return normalizeSingleTaskConfig(task, `taskConfig.tasks[${index}]`);
+    })
   };
 }
 

@@ -57,6 +57,56 @@ describe('scheduled task flow planning', () => {
     }]);
   });
 
+  it('switches fight to a multi-task dynamic config for new Core-only fields', () => {
+    const result = buildScheduledTaskFlowPlan([{
+      id: 'fight-1',
+      commandId: 'fight',
+      name: '理智作战',
+      enabled: true,
+      params: {
+        stages: [{ stage: '1-7', times: 3 }, { stage: 'CE-6', times: '' }],
+        medicine: 2,
+        medicineExpireDays: 2,
+        server: 'JP',
+        stone: 1,
+        series: 7,
+        drops: '30011=10,30062=5'
+      }
+    }])
+
+    assert.equal(result.success, true)
+    assert.equal(result.steps[0].command, 'run')
+    assert.deepEqual(result.steps[0].args, ['fight'])
+    assert.equal(result.steps[0].dynamicTask, true)
+    assert.equal(result.steps[0].taskConfig.type, 'Fight')
+    assert.equal(result.steps[0].taskConfig.tasks.length, 2)
+    assert.deepEqual(result.steps[0].taskConfig.tasks[0].params, {
+      medicine: 2,
+      medicine_expire_days: 2,
+      stone: 1,
+      series: 7,
+      drops: { 30011: 10, 30062: 5 },
+      server: 'JP',
+      stage: '1-7',
+      times: 3
+    })
+    assert.equal(result.steps[0].taskConfig.tasks[1].params.stage, 'CE-6')
+  })
+
+  it('switches series above the CLI limit to a dynamic fight task', () => {
+    const result = buildScheduledTaskFlowPlan([{
+      id: 'fight-1',
+      commandId: 'fight',
+      name: '理智作战',
+      enabled: true,
+      params: { stages: [{ stage: '1-7', times: 2 }], series: 8 }
+    }])
+
+    assert.equal(result.success, true)
+    assert.equal(result.steps[0].dynamicTask, true)
+    assert.equal(result.steps[0].taskConfig.tasks[0].params.series, 8)
+  })
+
   it('includes every advanced fight argument in the confirmation plan', () => {
     const result = buildScheduledTaskFlowPlan([{
       id: 'fight-1',

@@ -181,6 +181,9 @@ const sortLabels: Record<SortBy, string> = {
   potential: '潜能降序',
 }
 const depotTypeLabelMap: Record<string, string> = {
+  NONE: '资源/凭证',
+  NORMAL: '基础资源',
+  MEMENTO: '活动纪念品',
   MATERIAL: '材料',
   CARD_EXP: '经验书',
   ACTIVITY_ITEM: '活动道具',
@@ -489,7 +492,8 @@ export default function DataStatistics() {
         setDepotData({
           itemCount: depotResult.data.itemCount,
           items: depotResult.data.items || [],
-          timestamp: depotResult.data.timestamp
+          timestamp: depotResult.data.timestamp,
+          complete: depotResult.data.complete
         })
       } else {
         setDepotData(null)
@@ -517,7 +521,9 @@ export default function DataStatistics() {
       if (operBoxResult.data) {
         setOperBoxData({
           operCount: operBoxResult.data.operCount,
+          totalOperCount: operBoxResult.data.totalOperCount,
           data: operBoxResult.data.data || [],
+          allOpers: operBoxResult.data.allOpers || [],
           timestamp: operBoxResult.data.timestamp
         })
       } else {
@@ -598,7 +604,8 @@ export default function DataStatistics() {
   }, [loadDropData])
 
   const operatorDataLoading = operBoxDataLoading || operatorCatalogLoading
-  const operatorDataError = operBoxDataError || operatorCatalogError
+  const operatorDataError = operBoxDataError
+    || (operBoxData?.allOpers?.length ? null : operatorCatalogError)
 
   // 筛选和排序干员数据
   const getFilteredAndSortedOperators = useMemo(() => {
@@ -606,6 +613,24 @@ export default function DataStatistics() {
     
     const allOperatorsMap = new Map((allOperators || []).map(op => [op.id, op]))
     const ownedIds = new Set((operBoxData?.data || []).map(op => op.id))
+    for (const oper of operBoxData?.allOpers || []) {
+      if (oper.own) ownedIds.add(oper.id)
+    }
+    const catalogOperators: OperatorDetailed[] = operBoxData?.allOpers?.length
+      ? operBoxData.allOpers.map(op => {
+        const fullInfo = allOperatorsMap.get(op.id)
+        return {
+          id: op.id,
+          name: op.name,
+          rarity: op.rarity,
+          profession: fullInfo?.profession || '',
+          position: fullInfo?.position,
+          level: 0,
+          elite: 0,
+          potential: 0,
+        }
+      })
+      : allOperators
     
     // 特殊处理：阿米娅的三个形态
     const amiyaIds = ['char_002_amiya', 'char_1001_amiya2', 'char_1037_amiya3']
@@ -615,11 +640,11 @@ export default function DataStatistics() {
     }
     
     if (filterOwnership === 'unowned') {
-      if (!allOperators || allOperators.length === 0) {
+      if (!catalogOperators || catalogOperators.length === 0) {
         return []
       }
       
-      dataSource = allOperators
+      dataSource = catalogOperators
         .filter(op => !ownedIds.has(op.id))
         .map(op => ({
           ...op,
@@ -660,7 +685,7 @@ export default function DataStatistics() {
       
       dataSource = ownedOperators
     } else {
-      if (!allOperators || allOperators.length === 0) return []
+      if (!catalogOperators || catalogOperators.length === 0) return []
       
       const ownedMap = new Map((operBoxData?.data || []).map(op => [op.id, op]))
       
@@ -669,7 +694,7 @@ export default function DataStatistics() {
         ownedAmiyaData = amiyaIds.map(id => ownedMap.get(id)).find(data => data)
       }
       
-      dataSource = allOperators.map(op => {
+      dataSource = catalogOperators.map(op => {
         const owned = ownedMap.get(op.id)
         if (owned) {
           return {
@@ -741,11 +766,19 @@ export default function DataStatistics() {
     return filtered
   }, [filterOwnership, filterRarity, filterProfession, filterElite, filterPotential, sortBy, allOperators, operBoxData])
 
-  const ownedOperatorCount = useMemo(
-    () => new Set((operBoxData?.data || []).map(operator => operator.id)).size,
-    [operBoxData],
+  const ownedOperatorCount = useMemo(() => {
+    const ids = new Set((operBoxData?.data || []).map(operator => operator.id))
+    for (const oper of operBoxData?.allOpers || []) {
+      if (oper.own) ids.add(oper.id)
+    }
+    return ids.size
+  }, [operBoxData])
+  const operatorCatalogCount = Math.max(
+    allOperators.length,
+    operBoxData?.totalOperCount || 0,
+    operBoxData?.allOpers?.length || 0,
+    ownedOperatorCount,
   )
-  const operatorCatalogCount = allOperators.length || ownedOperatorCount
   const operatorCoverage = operatorCatalogCount > 0
     ? Math.round((ownedOperatorCount / operatorCatalogCount) * 100)
     : 0
@@ -804,7 +837,8 @@ export default function DataStatistics() {
             itemCount: parseResult.data.itemCount,
             items: parseResult.data.items || [],
             path: parseResult.data.path,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            complete: parseResult.data.complete
           })
           
           try {
@@ -887,10 +921,15 @@ export default function DataStatistics() {
 
         if (parseResult.success) {
           setOperBoxDataError(null)
-          setStatusMessage(`识别完成！共识别 ${parseResult.data.operCount} 名干员`)
+          const totalOperCount = parseResult.data.totalOperCount || parseResult.data.allOpers?.length
+          setStatusMessage(totalOperCount
+            ? `识别完成！已拥有 ${parseResult.data.operCount} / ${totalOperCount} 名干员`
+            : `识别完成！共识别 ${parseResult.data.operCount} 名干员`)
           setOperBoxData({
             operCount: parseResult.data.operCount,
+            totalOperCount,
             data: parseResult.data.data || [],
+            allOpers: parseResult.data.allOpers || [],
             path: parseResult.data.path,
             timestamp: new Date().toISOString()
           })
@@ -1089,11 +1128,11 @@ export default function DataStatistics() {
                   aria-label="干员数据概览"
                 >
                   <div className={statCardClass}>
-                    <p className="text-xs text-secondary">已识别</p>
+                    <p className="text-xs text-secondary">已拥有</p>
                     <p className="mt-1 text-2xl font-semibold text-primary">{ownedOperatorCount}</p>
                   </div>
                   <div className={statCardClass}>
-                    <p className="text-xs text-secondary">干员资料</p>
+                    <p className="text-xs text-secondary">全干员</p>
                     <p className="mt-1 text-2xl font-semibold text-primary">{operatorCatalogCount}</p>
                   </div>
                   <div className={statCardClass}>
@@ -1101,7 +1140,7 @@ export default function DataStatistics() {
                     <p className="mt-1 text-2xl font-semibold text-primary">{getFilteredAndSortedOperators.length}</p>
                   </div>
                   <div className={statCardClass}>
-                    <p className="text-xs text-secondary">档案覆盖</p>
+                    <p className="text-xs text-secondary">收集率</p>
                     <p className="mt-1 text-2xl font-semibold text-primary">{operatorCoverage}%</p>
                   </div>
                 </div>
@@ -1233,6 +1272,9 @@ export default function DataStatistics() {
                   {getFilteredAndSortedOperators.map((oper) => {
                     // 判断是否拥有该干员
                     const ownedIds = new Set((operBoxData?.data || []).map(op => op.id))
+                    for (const catalogOper of operBoxData?.allOpers || []) {
+                      if (catalogOper.own) ownedIds.add(catalogOper.id)
+                    }
                     
                     // 特殊处理：阿米娅的三个形态
                     const amiyaIds = ['char_002_amiya', 'char_1001_amiya2', 'char_1037_amiya3']
@@ -1413,6 +1455,14 @@ export default function DataStatistics() {
             )}
             {depotData && (
               <div className="app-stack-card">
+                {depotData.complete === false && (
+                  <div
+                    role="status"
+                    className="status-warning flex min-h-11 items-center rounded-lg px-3 py-2 text-sm leading-6"
+                  >
+                    最近一次仓库识别没有完整结束，物品清单可能缺少部分内容。
+                  </div>
+                )}
                 <div
                   className="data-statistics-kpi-grid grid grid-cols-2 md:grid-cols-3"
                   aria-label="仓库数据概览"

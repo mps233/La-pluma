@@ -11,6 +11,7 @@ const APP_TABS = [
   'combat',
   'roguelike',
   'training',
+  'tools',
   'logs',
   'statistics',
   'config',

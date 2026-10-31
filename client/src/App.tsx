@@ -12,6 +12,7 @@ const pageLoaders = {
   combat: () => import('./components/CombatTasks'),
   roguelike: () => import('./components/RoguelikeTasks'),
   training: () => import('./components/OperatorTraining'),
+  tools: () => import('./components/CustomTools'),
   logs: () => import('./components/LogViewer'),
   statistics: () => import('./components/DataStatistics'),
   config: () => import('./components/ConfigManager'),
@@ -21,6 +22,7 @@ const AutomationTasks = lazy(pageLoaders.automation)
 const CombatTasks = lazy(pageLoaders.combat)
 const RoguelikeTasks = lazy(pageLoaders.roguelike)
 const OperatorTraining = lazy(pageLoaders.training)
+const CustomTools = lazy(pageLoaders.tools)
 const LogViewer = lazy(pageLoaders.logs)
 const DataStatistics = lazy(pageLoaders.statistics)
 const ConfigManager = lazy(pageLoaders.config)
@@ -31,6 +33,7 @@ const appPages = [
   { id: 'combat', Component: CombatTasks },
   { id: 'roguelike', Component: RoguelikeTasks },
   { id: 'training', Component: OperatorTraining },
+  { id: 'tools', Component: CustomTools },
   { id: 'logs', Component: LogViewer },
   { id: 'statistics', Component: DataStatistics },
   { id: 'config', Component: ConfigManager },

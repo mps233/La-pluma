@@ -56,6 +56,8 @@ interface TaskParams {
   stages?: Array<string | StageConfig>
   medicine?: number | string
   expiringMedicine?: number | string
+  medicineExpireDays?: number | string
+  server?: string
   stone?: number | string
   series?: number | string
   times?: string
@@ -75,6 +77,12 @@ interface TaskParams {
   filename?: string
   plan_index?: number | string
   continue_training?: boolean
+  fiammetta_recovery_enabled?: boolean
+  fiammetta_targets?: string | string[]
+  use_pinus_sylvestris?: boolean
+  use_perception_information?: boolean
+  use_worldly_plight?: boolean
+  use_abyssal_hunter?: boolean
   dorm_notstationed_enabled?: boolean
   dorm_trust_enabled?: boolean
   reception_message_board?: boolean
@@ -92,6 +100,7 @@ interface TaskParams {
   expedite?: boolean
   expedite_times?: number
   preserve_tags?: string | string[]
+  level3_recruitment_permit_reserve?: number | string
   recruitment_time?: Record<string, number | string>
   /** @deprecated Migrated to preserve_tags when loading saved tasks. */
   skip_robot?: boolean
@@ -114,6 +123,7 @@ interface TaskParams {
   orundum?: boolean
   mining?: boolean
   specialaccess?: boolean
+  signinevent?: boolean
   
   // 其他
   [key: string]: any
@@ -164,12 +174,17 @@ export interface RoguelikeTask {
   description: string
 }
 
+export interface RoguelikeCoreChar {
+  name: string
+  use_support: boolean
+}
+
 export interface RoguelikeAdvancedOption {
   key: string
   label: string
-  type: 'text' | 'number' | 'select' | 'checkbox'
-  param: string
+  type: 'text' | 'number' | 'select' | 'checkbox' | 'core-char-list' | 'blackflow-rewards'
   placeholder?: string
+  helper?: string
   options?: Array<{ value: string; label: string }>
 }
 
@@ -179,7 +194,7 @@ export interface RoguelikeTaskInputs {
 
 export interface RoguelikeAdvancedParams {
   [taskId: string]: {
-    [key: string]: string | number | boolean
+    [key: string]: string | number | boolean | RoguelikeCoreChar[]
   }
 }
 
@@ -388,6 +403,14 @@ export interface DepotDataDetailed {
   items: DepotItem[];
   path?: string;
   timestamp: string;
+  complete?: boolean;
+}
+
+export interface OperatorCatalogEntry {
+  id: string;
+  name: string;
+  rarity: number;
+  own: boolean;
 }
 
 // 干员数据 (组件专用,包含详细信息)
@@ -406,7 +429,9 @@ export interface OperatorDetailed {
 
 export interface OperBoxData {
   operCount: number;
+  totalOperCount?: number;
   data: OperatorDetailed[];
+  allOpers?: OperatorCatalogEntry[];
   path?: string;
   timestamp: string;
 }

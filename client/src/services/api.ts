@@ -616,6 +616,28 @@ export const maaApi = {
     return parseJsonResponse(response)
   },
 
+  async listCustomTools(): Promise<ApiResponse> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/custom-tools`)
+    return parseJsonResponse(response)
+  },
+
+  async runCustomTool(toolId: string, params: Record<string, unknown> = {}, options: {
+    dryRun?: boolean
+    waitForCompletion?: boolean
+  } = {}): Promise<ApiResponse> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/run-custom-tool`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        toolId,
+        params,
+        dryRun: options.dryRun === true,
+        waitForCompletion: options.waitForCompletion !== false
+      })
+    })
+    return parseJsonResponse(response)
+  },
+
   async executeCopilotSetPlan(copilotId: string, payload: {
     raid: 'normal' | 'raid' | 'both'
     selectedIndexes: number[]

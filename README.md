@@ -20,6 +20,8 @@
 - ⏰ **定时任务** - 支持多个定时任务，实时显示执行状态和进度
 - 🖥️ **模拟器预览** - 集成 ScrcpyOverWebRTC，支持网页内查看和基础设备控制
 - 📊 **数据与养成** - 识别仓库和干员 Box，统计掉落，生成干员养成材料计划
+- 🧰 **小工具** - 像素画填色、自动提升潜能、材料合成、肉鸽刷取和活动商店兑换
+- 🎲 **新版肉鸽/生息演算** - 支持黑流树海、界园、萨卡兹等主题与重启锚点模式
 - 📱 **Telegram 通知** - 任务完成后发送通知，包含截图和详细总结
 - 🤖 **Bot 远程控制** - 通过 Telegram Bot 远程执行任务
 - 🤖 **Agent API** - 通过 `/api/agent` 暴露 manifest/status/actions，方便 AI 或脚本调用
@@ -155,6 +157,11 @@ curl -X POST http://localhost:3000/api/agent/actions/run-task \
 curl -X POST http://localhost:3000/api/agent/actions/run-task \
   -H 'Content-Type: application/json' \
   -d '{"command":"run","args":["agent-award"],"taskConfig":{"name":"领取奖励","type":"Award","params":{"award":true}},"waitForCompletion":true}'
+
+# 多关卡动态任务：每个子任务单独校验，适用于临期药天数、外服掉落或 7–10 倍代理
+curl -X POST http://localhost:3000/api/agent/actions/run-task \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"run","args":["fight"],"taskConfig":{"name":"理智作战","type":"Fight","tasks":[{"name":"1-7","type":"Fight","params":{"stage":"1-7","times":2,"medicine_expire_days":2,"server":"JP"}},{"name":"CE-6","type":"Fight","params":{"stage":"CE-6"}}]},"waitForCompletion":true}'
 ```
 
 如果设置了 `LA_PLUMA_TOKEN`，Agent API、其它 `/api/*` 以及 WebRTC 同源网关的票据入口都需要 `Authorization: Bearer <token>` 或 `X-La-Pluma-Token`。未设置时认证关闭。
@@ -363,6 +370,7 @@ la-pluma/
 │   │   │   ├── CombatTasks.tsx        # 作业、SSS、悖论模拟
 │   │   │   ├── RoguelikeTasks.tsx     # 肉鸽模式
 │   │   │   ├── OperatorTraining.tsx   # 干员养成计划
+│   │   │   ├── CustomTools.tsx        # 小工具（像素画、材料合成等）
 │   │   │   ├── DataStatistics.tsx     # 仓库、干员和掉落数据
 │   │   │   ├── LogViewer.tsx          # 日志查看
 │   │   │   ├── ConfigManager.tsx      # 配置管理
@@ -378,10 +386,12 @@ la-pluma/
 ├── server/                    # 后端 (Node.js + Express)
 │   ├── routes/                # API 路由
 │   │   ├── agent.js           # 主 Agent API
+│   │   ├── agentContract.js   # Agent 能力清单 / OpenAPI 注册表
 │   │   └── operatorQuotes.js  # 干员台词接口
 │   ├── services/              # 业务逻辑
 │   │   ├── maaService.js      # MAA CLI、ADB、截图、实时日志
 │   │   ├── schedulerService.js # 定时任务调度
+│   │   ├── customTaskService.js # Custom 小工具参数校验与任务配置
 │   │   ├── notificationService.js # 通知服务
 │   │   ├── operatorTrainingService.js # 养成计划和材料计算
 │   │   ├── webrtcService.js   # ScrcpyOverWebRTC 管理
@@ -425,11 +435,20 @@ la-pluma/
 
 - 支持普通作业、作业集、SSS 作业和悖论模拟
 - 支持从链接或关卡名搜索作业
-- 支持集成战略、生息演算等长流程任务
+- 集成战略支持傀影、水月、萨米、萨卡兹、界园和黑流树海主题；新模式覆盖月度小队、深入调查、常乐节点、襁褓动物和刷开局
+- 肉鸽支持三顺位开局干员 `core_char_list` 和逐位助战
+- 生息演算支持沙洲遗闻与重启锚点，包含 RA-1 / RA-15 / RA-4 模式
+
+### 小工具
+
+- 像素画填色：24×24 点阵与 0–39 色板，支持参数检查和真实执行
+- 自动提升潜能、缺口材料合成、刷傀影皇冠、活动商店兑换
+- 所有工具先校验参数；真实执行前会明确提示会改变游戏或账号状态
 
 ### 数据与养成
 
-- 从 MAA 识别结果解析仓库和干员 Box
+- 从 MAA 识别结果解析仓库和干员 Box；干员识别保存全干员列表，支持未拥有筛选和收集率
+- 仓库识别保留完整度，并展示基础资源、材料、消耗品和活动纪念品分类
 - 读取材料数据库和关卡开放日，计算干员精二/技能所需材料
 - 维护养成队列，并可将养成计划应用回自动化任务流程
 - 记录并统计掉落数据

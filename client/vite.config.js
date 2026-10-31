@@ -166,6 +166,8 @@ export const createDevPwaSupportPlugin = (basePath) => {
 }
 
 // https://vite.dev/config/
+const apiTarget = globalThis.process?.env?.VITE_API_TARGET || 'http://localhost:3000'
+
 export const createViteConfig = (basePath) => ({
   base: basePath,
   resolve: {
@@ -199,15 +201,16 @@ export const createViteConfig = (basePath) => ({
   },
   server: {
     host: '0.0.0.0', // 监听所有网络接口，允许局域网访问
+    allowedHosts: ['mps.sgponte'],
     port: 5173,
     strictPort: false, // 如果端口被占用，自动尝试下一个可用端口
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: apiTarget,
         changeOrigin: true,
       },
       '/webrtc-signaling': {
-        target: 'http://localhost:3000',
+        target: apiTarget,
         changeOrigin: true,
         ws: true,
       }

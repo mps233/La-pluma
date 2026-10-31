@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion, type PanInfo } from 'framer-motion'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, Search, Settings2, Swords, X } from 'lucide-react'
+import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, Search, Settings2, Swords, Wrench, X } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
 import { useUIStore } from '@/stores'
 import { appTabFromPath, appTabPath, isAppTab, type AppTab } from '@/stores/uiStore'
@@ -29,6 +29,7 @@ const tabs = [
   { id: 'combat', name: '作业', icon: Swords },
   { id: 'roguelike', name: '肉鸽', icon: Dices },
   { id: 'training', name: '养成', icon: GraduationCap },
+  { id: 'tools', name: '小工具', icon: Wrench },
   { id: 'logs', name: '日志', icon: FileText },
   { id: 'statistics', name: '数据', icon: BarChart3 },
   { id: 'config', name: '配置', icon: Settings2 },
@@ -38,7 +39,7 @@ const desktopTabGroups = [
   {
     id: 'tasks',
     label: '任务与执行',
-    tabs: tabs.filter(tab => ['dashboard', 'automation', 'combat', 'roguelike', 'training'].includes(tab.id)),
+    tabs: tabs.filter(tab => ['dashboard', 'automation', 'combat', 'roguelike', 'training', 'tools'].includes(tab.id)),
   },
   {
     id: 'library',

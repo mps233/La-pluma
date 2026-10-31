@@ -619,6 +619,51 @@ export const AGENT_OPERATIONS = Object.freeze([
         clientType: { type: 'string', ...runtimeDefault('clientType') }
       }
     }
+  }),
+  operation({
+    id: 'list_custom_tools',
+    method: 'GET',
+    path: '/api/agent/custom-tools',
+    description: 'List whitelisted Custom tools and their parameter requirements.',
+    tags: ['Tools']
+  }),
+  operation({
+    id: 'run_custom_tool',
+    method: 'POST',
+    path: '/api/agent/actions/run-custom-tool',
+    description: 'Run a whitelisted MaaCore Custom tool, such as pixel paint or material synthesis.',
+    tags: ['Tools'],
+    safety: consequential(['run_maa_command']),
+    execution: execution({
+      mode: 'sync-or-background',
+      dryRun: true,
+      waitForCompletion: true,
+      pollAction: 'get_current_run',
+      stopAction: 'stop_task',
+      conflictsWith: ['maa-execution'],
+      producesRun: true,
+      idempotency: idempotencyPolicy()
+    }),
+    body_schema: {
+      type: 'object',
+      required: ['toolId'],
+      properties: {
+        toolId: {
+          type: 'string',
+          enum: [
+            'pixel-paint',
+            'auto-raise-potential',
+            'material-synthesis',
+            'cursed-relic',
+            'event-shop-blacklist'
+          ]
+        },
+        params: { type: 'object', additionalProperties: true, default: {} },
+        dryRun: { type: 'boolean', default: false },
+        waitForCompletion: { type: 'boolean', default: true },
+        profileId: profileIdProperty
+      }
+    }
   })
 ]);
 

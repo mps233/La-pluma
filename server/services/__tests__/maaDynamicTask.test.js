@@ -57,6 +57,32 @@ describe('dynamic task lifecycle', () => {
     assert.deepEqual(events.slice(-2).map(event => event[0]), ['unlink', 'release'])
   })
 
+  it('writes multiple tasks into one dynamic task file', async () => {
+    const { events, runtime } = createRuntime()
+
+    await execDynamicTask(
+      'fight',
+      {
+        name: '理智作战',
+        type: 'Fight',
+        tasks: [
+          { name: '理智作战 (1-7)', type: 'Fight', params: { stage: '1-7', times: 2 } },
+          { name: '理智作战 (CE-6)', type: 'Fight', params: { stage: 'CE-6' } }
+        ]
+      },
+      '理智作战',
+      'agent',
+      true,
+      false,
+      runtime
+    )
+
+    const writtenConfig = JSON.parse(events.find(event => event[0] === 'write')[2])
+    assert.deepEqual(writtenConfig.tasks.map(task => task.params.stage), ['1-7', 'CE-6'])
+    assert.equal(writtenConfig.tasks[0].params.times, 2)
+    assert.equal(writtenConfig.tasks[0].type, 'Fight')
+  })
+
   it('keeps the task file and lease until a background process settles', async () => {
     const { events, runtime, getSettled } = createRuntime({ background: true })
     let releaseLifecycle

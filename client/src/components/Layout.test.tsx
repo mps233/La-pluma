@@ -251,8 +251,8 @@ describe('top-level application navigation', () => {
       '任务与执行',
       '记录与设置',
     ])
-    expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(8)
-    expect(sidebar.querySelectorAll('.la-pluma-sidebar-icon > svg[aria-hidden="true"]')).toHaveLength(8)
+    expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(9)
+    expect(sidebar.querySelectorAll('.la-pluma-sidebar-icon > svg[aria-hidden="true"]')).toHaveLength(9)
 
     const mobileDestinations = [...container.querySelectorAll<HTMLButtonElement>('.la-pluma-tabbar-pill button[data-app-tab]')]
       .map(button => button.dataset.appTab)
@@ -285,7 +285,7 @@ describe('top-level application navigation', () => {
     await act(async () => {
       sidebar.querySelector<HTMLButtonElement>('button[aria-label="清除搜索"]')?.click()
     })
-    expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(8)
+    expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(9)
   })
 
   it('shows the daily operator portrait, name, and quote in the desktop identity area', async () => {

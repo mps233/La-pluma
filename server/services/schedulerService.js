@@ -21,7 +21,7 @@ const execAsync = promisify(exec);
 
 // 创建日志记录器
 const logger = createLogger('Scheduler');
-const commaSeparatedArrayKeys = new Set(['buy_first', 'blacklist', 'first_tags', 'preserve_tags']);
+const commaSeparatedArrayKeys = new Set(['buy_first', 'blacklist', 'first_tags', 'preserve_tags', 'fiammetta_targets']);
 
 // MAA CLI 路径
 const MAA_CLI_PATH = DEFAULT_MAA_CLI_PATH;
@@ -43,6 +43,83 @@ function parseDropTargetEntries(value) {
     normalizedEntries.push(`${match[1]}=${Number(match[2])}`);
   }
   return normalizedEntries;
+}
+
+function normalizeFightStageEntries(task) {
+  const stages = task.params?.stages || [{ stage: task.params?.stage || '', times: task.params?.times || '' }];
+  return stages
+    .map(stageConfig => typeof stageConfig === 'string'
+      ? { stage: stageConfig, times: '' }
+      : stageConfig)
+    .filter(stageConfig => stageConfig.stage?.trim())
+    .map(stageConfig => ({
+      stage: stageConfig.stage.trim(),
+      times: stageConfig.times === undefined || stageConfig.times === '' ? '' : String(stageConfig.times).trim()
+    }));
+}
+
+function buildDynamicFightTaskConfig(task, connectionDefaults = {}) {
+  const commandId = task.commandId || String(task.id || '').split('-')[0];
+  if (commandId !== 'fight' || task.taskType) return null;
+  const params = task.params || {};
+  const medicineExpireDays = Number(params.medicineExpireDays ?? params.medicine_expire_days ?? 0);
+  const server = String(params.server || '').trim();
+  const series = Number(params.series ?? 1);
+  if (!(medicineExpireDays > 0) && !server && !(Number.isFinite(series) && series > 6)) return null;
+
+  const stages = normalizeFightStageEntries(task);
+  if (stages.length === 0) return null;
+
+  const dropEntries = parseDropTargetEntries(params.drops);
+  if (dropEntries === null) {
+    throw new Error('掉落目标格式应为物品 ID=数量，多个目标用逗号分隔');
+  }
+  const drops = dropEntries.length > 0
+    ? Object.fromEntries(dropEntries.map(entry => {
+      const [itemId, count] = entry.split('=');
+      return [itemId, Number(count)];
+    }))
+    : null;
+
+  const clientType = params.clientType || params.client_type || connectionDefaults.clientType || DEFAULT_CLIENT_TYPE;
+  const commonParams = {};
+  if (params.medicine !== undefined && params.medicine !== '' && params.medicine !== null) {
+    commonParams.medicine = Number(params.medicine);
+  }
+  if (params.expiringMedicine !== undefined && params.expiringMedicine !== '' && params.expiringMedicine !== null && !(medicineExpireDays > 0)) {
+    commonParams.expiring_medicine = Number(params.expiringMedicine);
+  }
+  if (medicineExpireDays > 0) commonParams.medicine_expire_days = medicineExpireDays;
+  if (params.stone !== undefined && params.stone !== '' && params.stone !== null) {
+    commonParams.stone = Number(params.stone);
+  }
+  if (params.series !== undefined && params.series !== '' && params.series !== null) {
+    commonParams.series = Number(params.series);
+  }
+  if (drops) commonParams.drops = drops;
+  if (server) commonParams.server = server;
+  if (typeof params.DrGrandet === 'boolean') commonParams.DrGrandet = params.DrGrandet;
+  if (typeof params.report_to_penguin === 'boolean') commonParams.report_to_penguin = params.report_to_penguin;
+  if (typeof params.penguin_id === 'string' && params.penguin_id.trim()) commonParams.penguin_id = params.penguin_id.trim();
+  if (typeof params.report_to_yituliu === 'boolean') commonParams.report_to_yituliu = params.report_to_yituliu;
+  if (typeof params.yituliu_id === 'string' && params.yituliu_id.trim()) commonParams.yituliu_id = params.yituliu_id.trim();
+
+  const tasks = stages.map(({ stage, times }) => ({
+    name: `${task.name || '理智作战'} (${stage})`,
+    type: 'Fight',
+    params: {
+      ...commonParams,
+      stage,
+      ...(times ? { times: Number(times) } : {})
+    }
+  }));
+
+  return JSON.stringify({
+    name: task.name || '理智作战',
+    type: 'Fight',
+    client_type: clientType,
+    tasks
+  });
 }
 
 function getFightReportResults(task, stage, result) {
@@ -261,6 +338,15 @@ function buildScheduledTaskCommand(task, connectionDefaults = {}) {
       command: 'run', 
       params: task.commandId || task.id,
       taskConfig: JSON.stringify(taskConfig)
+    };
+  }
+
+  const dynamicFightConfig = buildDynamicFightTaskConfig(task, connectionDefaults);
+  if (dynamicFightConfig) {
+    return {
+      command: 'run',
+      params: task.commandId || task.id,
+      taskConfig: dynamicFightConfig
     };
   }
 
@@ -965,13 +1051,18 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
       
       if (taskConfig) {
         const taskId = params;
+        const fightLogCheckpoint = commandId === 'fight' ? await createMaaLogCheckpoint() : null;
         // 定时任务需要等待命令完成才能获取输出
         const result = await execDynamicTask(taskId, taskConfig, task.name, null, true);
-        
+
         // 尝试从输出中提取任务总结
         if (result.stdout) {
-          const summary = parseTaskSummary(task.name, result.stdout);
+          let summary = parseTaskSummary(task.name, result.stdout);
           if (summary) {
+            if (commandId === 'fight' && fightLogCheckpoint) {
+              summary = await attachFightCallbacks(summary, fightLogCheckpoint, task.name);
+              await recordFightDrops(summary, scheduleId);
+            }
             taskSummaries.push(summary);
           }
         }
