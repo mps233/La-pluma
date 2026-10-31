@@ -48,6 +48,74 @@ function addDropItem(items, item) {
  * `SanityBeforeStage` is used as a fallback for sanity when FightTimes is not
  * present in the checkpoint window.
  */
+function pushCapped(list, value, limit = 20) {
+  list.push(value);
+  if (list.length > limit) list.splice(0, list.length - limit);
+}
+
+/**
+ * Summarize callback events that the project exposes to Agent/UI surfaces but
+ * that are not part of the Fight drop summarizer.
+ */
+export function summarizeAuxiliaryCallbacks(logOutput) {
+  const result = {
+    blackflowStartRun: [],
+    blackflowScrapTradeAborted: [],
+    copilotPrecheckFile: [],
+    stageInfo: [],
+    stageInfoErrors: 0,
+    unsupportedLevels: [],
+    recruitSpecialTags: [],
+    recruitSelectedTags: []
+  };
+
+  for (const payload of parseMaaCallbackPayloads(logOutput)) {
+    const details = payload.details || {};
+    switch (payload.what) {
+      case 'BlackFlowStartRun':
+        pushCapped(result.blackflowStartRun, {
+          status: String(details.status || ''),
+          rewards: Array.isArray(details.rewards) ? details.rewards.map(String) : []
+        });
+        break;
+      case 'BlackFlowScrapTradeAborted':
+        pushCapped(result.blackflowScrapTradeAborted, {
+          reason: String(details.reason || ''),
+          item: String(details.item || '')
+        });
+        break;
+      case 'CopilotPrecheckFile':
+        pushCapped(result.copilotPrecheckFile, {
+          navName: String(details.nav_name || details.navName || ''),
+          filename: String(details.filename || '')
+        });
+        break;
+      case 'StageInfo':
+        pushCapped(result.stageInfo, {
+          name: String(details.name || details.stage || ''),
+          stage: String(details.stage || '')
+        });
+        break;
+      case 'StageInfoError':
+        result.stageInfoErrors += 1;
+        break;
+      case 'UnsupportedLevel':
+        pushCapped(result.unsupportedLevels, String(details.level || ''));
+        break;
+      case 'RecruitSpecialTag':
+        pushCapped(result.recruitSpecialTags, String(details.tag || ''));
+        break;
+      case 'RecruitTagsSelected':
+        pushCapped(result.recruitSelectedTags, Array.isArray(details.tags) ? details.tags.map(String) : []);
+        break;
+      default:
+        break;
+    }
+  }
+
+  return result;
+}
+
 export function summarizeFightCallbacks(logOutput) {
   const payloads = parseMaaCallbackPayloads(logOutput);
   const items = [];

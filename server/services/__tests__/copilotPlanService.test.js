@@ -96,7 +96,11 @@ test('delegates only full, non-preset, non-resumed copilot sets', () => {
 
   assert.equal(canUseNativeCopilotSet({ entries }), true);
   assert.equal(canUseNativeCopilotSet({ entries, raid: 'both' }), true);
-  assert.equal(canUseNativeCopilotSet({ entries: [entries[0]] }), true);
+  assert.equal(canUseNativeCopilotSet({ entries: [entries[0]] }), false);
+  assert.equal(canUseNativeCopilotSet({ entries: [entries[0]], formationMode: 'off' }), true);
+  assert.equal(canUseNativeCopilotSet({ entries, formationMode: 'off' }), false);
+  assert.equal(canUseNativeCopilotSet({ entries, formationMode: 'on' }), true);
+  assert.equal(canUseNativeCopilotSet({ entries, userAdditional: [{ name: '史都华德' }] }), false);
   assert.equal(canUseNativeCopilotSet({ entries: [entries[0]], raid: 'raid' }), false);
   assert.equal(canUseNativeCopilotSet({
     entries: [{ ...entries[0], presetFormation: true }]
@@ -119,6 +123,19 @@ test('builds the native maa copilot command', () => {
   }), [
     'prts://s48990', '--batch', '--raid', 'both', '--user-resource',
     '-p', 'daily', '-a', '127.0.0.1:16384'
+  ]);
+  assert.deepEqual(buildNativeCopilotCommand(48990, 'normal', {
+    formationMode: 'on',
+    formationIndex: 3,
+    addTrust: true,
+    ignoreRequirements: true,
+    useSanityPotion: true,
+    supportUsage: 2,
+    supportName: '史都华德'
+  }), [
+    'prts://s48990', '--batch', '--formation', '--formation-index', '3',
+    '--add-trust', '--ignore-requirements', '--use-sanity-potion',
+    '--support-unit-usage', '2', '--support-unit-name', '史都华德'
   ]);
 });
 

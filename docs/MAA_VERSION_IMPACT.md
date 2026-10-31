@@ -641,7 +641,7 @@
 >
 > - Award 新增 `signinevent` 复选框；Recruit 新增 `level3_recruitment_permit_reserve` 字段。
 > - Infrast 设施新增「回收站」「副手换人」，并补齐 `fiammetta_recovery_enabled` / `fiammetta_targets`、`use_pinus_sylvestris` / `use_perception_information` / `use_worldly_plight` / `use_abyssal_hunter` 开关。
-> - Roguelike 改为动态任务：新增 `BlackFlow` 主题、模式 5/6/7/10001/20001/30001/30003、`core_char_list` 三顺位（逐位助战）、难度/投资/密文板/坍缩范式/月度小队/深入调查/黑流树海策略与开局奖励位掩码等字段。
+> - Roguelike 改为动态任务：新增 `BlackFlow` 主题、模式 5/6/7/10001/20001/30001/30003、`core_char_list` 三顺位（逐位助战）、难度/投资/密文板/坍缩范式/月度小队/深入调查/黑流树海策略、开局奖励位掩码和模式 4 的 `collectible_mode_start_list` 等字段。
 > - Reclamation 改为动态任务：新增 `RelaunchAnchor` 主题与 16/32/48 模式，补齐 `tools_to_craft`、`clear_store`、`increment_mode`、`num_craft_batches`。
 > - Fight 新增 `medicineExpireDays`、`server`，`series` 扩展到 10；当使用临期药天数、外服服务器或 7–10 倍代理时，单任务执行与调度器都改为 `maa run` 的多任务配置，多关卡各生成一个 `Fight` 任务。
 > - 后端 `normalizeTaskConfig` / `generateTaskConfig` 支持 `tasks` 数组；Agent API 仍要求顶层 `name/type`，每个子任务单独校验。
@@ -649,7 +649,7 @@
 >   - BlackFlow 模式 30003 生成 `type: Roguelike`，包含 `blackflow_start_animals`、`blackflow_start_rewards: 5`、`core_char_list`（含助战标记）。
 >   - Reclamation 生成 `type: Reclamation`，参数 `theme: RelaunchAnchor, mode: 48`。
 > - 390px 移动端无横向溢出；未执行真实肉鸽/生息演算/理智作战任务，避免改变账号与游戏状态。
-> - 测试：server 46 个测试文件通过，client 42 个测试文件 / 264 个测试通过，type-check 通过。
+> - 测试：server 46 个测试文件通过，client 42 个测试文件 / 270 个测试通过，type-check 通过。
 
 > **Phase 4C 实施记录（2026-10-31）**
 >
@@ -659,6 +659,14 @@
 > - 仓库分类文案补齐实际 `classifyType`：`NORMAL → 基础资源`、`NONE → 资源/凭证`、`MEMENTO → 活动纪念品`、`CONSUME → 消耗品`。
 > - 页面验证：`/app/statistics` 干员页显示 463 名全干员、54 名未拥有；仓库页显示「基础资源·5 种」「材料·78 种」，无溢出。
 > - 测试：`parseOperBoxData` 新增全干员持久化测试；`npm run verify` 通过。
+
+> **P1 覆盖补齐（2026-10-31）**
+>
+> - Recruit 补 `report_to_penguin` / `penguin_id` / `report_to_yituliu` / `yituliu_id` / `server` UI 与调度器透传。
+> - `/actions/fight` 补 `medicineExpireDays`、`server`、`drops`、上报参数、`DrGrandet`、`clientType`；需要 Core-only 字段时自动走动态多任务 Fight。
+> - Copilot 原生委托补 `--use-sanity-potion`、`--formation`、`--formation-index`、`--add-trust`、`--ignore-requirements`、`--support-unit-*`；CLI 无法表达的 formation 组合回退动态计划。
+> - 新增 `summarizeAuxiliaryCallbacks` 与 `GET /api/agent/logs/maa-callbacks`，解析 `BlackFlowStartRun`、`BlackFlowScrapTradeAborted`、`CopilotPrecheckFile`、`StageInfo` / `StageInfoError`、`UnsupportedLevel`、`RecruitSpecialTag`、`RecruitTagsSelected`。
+> - 覆盖矩阵更新：`docs/MAA_6.20_COVERAGE_MATRIX.md`；`npm run verify` 通过（client 42 个测试文件 / 270 个测试，server 46 个测试文件）。
 
 ### Phase 5：清理与文档
 
@@ -675,6 +683,16 @@
 > - README Agent API 增加多任务 `taskConfig.tasks` 示例，说明多关卡 Fight 的临期药天数/外服掉落/7–10 倍代理用法。
 > - COMPONENT_LIBRARY_GUIDE 无需改动：本轮 UI 全部复用现有 `PageHeader`、`Card`、`Button`、`Input`、`Select`、`Switch`、`EmptyState`、`Loading` 和语义 token。
 > - 契约测试随 `npm run verify` 通过；Phase 4 检查项已全部完成。
+> - MaaCore dry-run 验收（2026-10-31）：BlackFlow 模式 30003（含 `core_char_list`、襁褓动物、开局奖励）、RelaunchAnchor 模式 48、多关卡 Fight（`medicine_expire_days=2`、`server=JP`、`series=8`）均以 `maa run --dry-run --batch` 退出码 0 加载，任务状态为 `Unstarted`，无参数错误；未连接设备、未执行游戏操作，临时任务文件已清理。
+
+> **真机实测记录（2026-10-31，用户明确授权）**
+>
+> - Fight：多关卡任务成功完成，CE-6 实际消耗 36 理智、掉落龙门币 ×10000；1-7 因当前理智 46 < 八倍代理所需 48，被 MaaCore 标记 0 次完成，未自动使用理智药。`series=8` 参数被接受，但低理智下不会预支理智药，需先保证理智或先手动用药。
+> - Custom 工具：自动提升潜能成功加载但当前无待提升提示（0 秒）；缺口材料合成返回 `navigation_failed`（需要缺材料弹窗）；像素画返回 `params not found for pixel paint`（需要先在像素画页面）；活动商店滑动 10 次未匹配商品，未购买；刷傀影皇冠失败，主页找不到 `MiniGame@CursedRelic@Run`。结论：Custom 任务依赖具体游戏页面，当前 UI 从主页直接执行会空跑或失败。
+> - Roguelike：首次执行 5 分 31 秒后在 `EnterAfterRecruit` 失败，原因是首次进入黑流树海的主题介绍页未关闭；关闭介绍并清理旧探索后重跑 14 分钟，推进到第二层培育商店，最终在 `CultivateBuyAction → CultivateRefresh` 连续 20 次识别失败。参数和招募流程可用，当前 MaaCore 6.20.1 对培育商店界面仍有识别缺口。
+> - Reclamation：从主页和生息演算主题页分别重试，均在 `RelaunchAnchor@RA@RA4-Entry` 15 秒内失败；手动进入 RA-1 建设并关闭教学后仍无法识别 RA4 入口。需要完成首次生息演算教学、确认 RA-4 已解锁，并可能等待 MaaCore 资源更新。
+> - 资源安全：源石 87、合成玉 31545 全程未变；未进行活动商店购买、材料合成、潜能提升或像素画执行。理智从 46 降至 19（含自然恢复），CE-6 实际消耗 36 理智。
+> - 结论：以上页面依赖、首次教学和识别失败与 MAA 原生任务行为一致，不作为项目缺陷处理；项目目标是参数、任务类型和回调对齐，不复制 MAA 的页面限制。Fight 八倍代理的理智前置条件也属于 MaaCore 行为。
 > - 仍有意保留：3.6 每日流程任务文件（需要重做逐任务结果归属）；GUI-only、6.21 beta/0.8 nightly 和需要真实账号副作用的研究项不纳入当前实现。
 
 ---

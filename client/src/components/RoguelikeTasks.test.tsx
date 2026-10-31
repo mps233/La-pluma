@@ -399,6 +399,93 @@ describe('RoguelikeTasks execution recovery', () => {
     expect(mocks.setMessage).toHaveBeenCalledWith('肉鸽任务已终止', 'warning')
   })
 
+  it('maps collectible_mode_start_list for roguelike mode 4', async () => {
+    mocks.executeCommand.mockResolvedValueOnce({ success: true })
+    mocks.loadUserConfig.mockResolvedValueOnce({
+      success: true,
+      data: {
+        taskInputs: { roguelike: 'Sami' },
+        advancedParams: {
+          roguelike: {
+            mode: '4',
+            collectibleModeStartList: { hot_water: true, hope: true },
+          },
+        },
+      },
+    })
+    await act(async () => root.render(<RoguelikeTasks />))
+    await flush()
+    await click(buttonByText('立即执行')!)
+
+    expect(mocks.executeCommand).toHaveBeenCalledWith(
+      'run',
+      ['roguelike'],
+      expect.objectContaining({
+        type: 'Roguelike',
+        params: expect.objectContaining({
+          theme: 'Sami',
+          mode: 4,
+          collectible_mode_start_list: expect.objectContaining({
+            hot_water: true,
+            hope: true,
+            shield: false,
+            ticket: false,
+          }),
+        }),
+      }),
+      null,
+      '集成战略',
+      'roguelike',
+      true,
+    )
+  })
+
+  it('defaults find_playTime_target for JieGarden mode 20001', async () => {
+    mocks.executeCommand.mockResolvedValueOnce({ success: true })
+    mocks.loadUserConfig.mockResolvedValueOnce({
+      success: true,
+      data: { taskInputs: { roguelike: 'JieGarden' }, advancedParams: { roguelike: { mode: '20001' } } },
+    })
+    await act(async () => root.render(<RoguelikeTasks />))
+    await flush()
+    await click(buttonByText('立即执行')!)
+
+    expect(mocks.executeCommand).toHaveBeenCalledWith(
+      'run',
+      ['roguelike'],
+      expect.objectContaining({
+        params: expect.objectContaining({ mode: 20001, find_playTime_target: 1 }),
+      }),
+      null,
+      '集成战略',
+      'roguelike',
+      true,
+    )
+  })
+
+  it('sends an empty blackflow_start_animals array for mode 30003', async () => {
+    mocks.executeCommand.mockResolvedValueOnce({ success: true })
+    mocks.loadUserConfig.mockResolvedValueOnce({
+      success: true,
+      data: { taskInputs: { roguelike: 'BlackFlow' }, advancedParams: { roguelike: { mode: '30003' } } },
+    })
+    await act(async () => root.render(<RoguelikeTasks />))
+    await flush()
+    await click(buttonByText('立即执行')!)
+
+    expect(mocks.executeCommand).toHaveBeenCalledWith(
+      'run',
+      ['roguelike'],
+      expect.objectContaining({
+        params: expect.objectContaining({ mode: 30003, blackflow_start_animals: [] }),
+      }),
+      null,
+      '集成战略',
+      'roguelike',
+      true,
+    )
+  })
+
   it('builds a BlackFlow mode 30003 dynamic task with core operators and start rewards', async () => {
     mocks.executeCommand.mockResolvedValueOnce({ success: true })
     mocks.loadUserConfig.mockResolvedValueOnce({

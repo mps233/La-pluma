@@ -184,6 +184,83 @@ const parseDropTargetEntries = (value: unknown): string[] | null => {
   return normalizedEntries
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
+export const buildDynamicFightCommand = (task: TaskFlowItem) => {
+  const commandId = task.commandId || task.id.split('-')[0]
+  if (commandId !== 'fight') return null
+
+  const medicineExpireDays = Number(task.params?.medicineExpireDays ?? 0)
+  const server = String(task.params?.server || '').trim()
+  const series = Number(task.params?.series ?? 1)
+  const rawStages = Array.isArray(task.params?.stages)
+    ? task.params.stages
+    : [{ stage: task.params?.stage || '', times: task.params?.times || '' }]
+  const stages = rawStages
+    .map(stageConfig => typeof stageConfig === 'string'
+      ? { stage: stageConfig, times: '' }
+      : stageConfig)
+    .filter(stageConfig => stageConfig.stage?.trim())
+    .map(stageConfig => ({
+      stage: stageConfig.stage.trim(),
+      times: stageConfig.times === undefined || stageConfig.times === '' ? '' : String(stageConfig.times).trim()
+    }))
+
+  const needsDynamic = stages.length > 1
+    || medicineExpireDays > 0
+    || Boolean(server)
+    || (Number.isFinite(series) && series > 6)
+  if (!needsDynamic) return null
+  if (stages.length === 0) throw new Error('请至少选择一个关卡')
+
+  const dropTargets = parseDropTargetEntries(task.params?.drops)
+  if (dropTargets === null) throw new Error('掉落目标格式应为物品 ID=数量，多个目标用逗号分隔')
+  const drops = dropTargets.length > 0
+    ? Object.fromEntries(dropTargets.map(entry => {
+      const [itemId, count] = entry.split('=')
+      return [itemId, Number(count)]
+    }))
+    : null
+
+  const commonParams: Record<string, unknown> = {}
+  if (task.params?.medicine !== undefined && task.params.medicine !== '' && task.params.medicine !== null) {
+    commonParams.medicine = Number(task.params.medicine)
+  }
+  if (medicineExpireDays > 0) {
+    commonParams.medicine_expire_days = medicineExpireDays
+  } else if (task.params?.expiringMedicine !== undefined && task.params.expiringMedicine !== '' && task.params.expiringMedicine !== null) {
+    commonParams.expiring_medicine = Number(task.params.expiringMedicine)
+  }
+  if (task.params?.stone !== undefined && task.params.stone !== '' && task.params.stone !== null) {
+    commonParams.stone = Number(task.params.stone)
+  }
+  if (task.params?.series !== undefined && task.params.series !== '' && task.params.series !== null) {
+    commonParams.series = Number(task.params.series)
+  }
+  if (drops) commonParams.drops = drops
+  if (server) commonParams.server = server
+  if (typeof task.params?.DrGrandet === 'boolean') commonParams.DrGrandet = task.params.DrGrandet
+  if (typeof task.params?.report_to_penguin === 'boolean') commonParams.report_to_penguin = task.params.report_to_penguin
+  if (typeof task.params?.penguin_id === 'string' && task.params.penguin_id.trim()) commonParams.penguin_id = task.params.penguin_id.trim()
+  if (typeof task.params?.report_to_yituliu === 'boolean') commonParams.report_to_yituliu = task.params.report_to_yituliu
+  if (typeof task.params?.yituliu_id === 'string' && task.params.yituliu_id.trim()) commonParams.yituliu_id = task.params.yituliu_id.trim()
+
+  const tasks = stages.map(({ stage, times }) => ({
+    name: `${task.name} (${stage})`,
+    type: 'Fight',
+    params: {
+      ...commonParams,
+      stage,
+      ...(times ? { times: Number(times) } : {})
+    }
+  }))
+
+  return {
+    command: 'run',
+    params: commandId,
+    taskConfig: JSON.stringify({ name: task.name, type: 'Fight', tasks })
+  }
+}
+
 interface AutomationExecutionSummary {
   successCount: number
   failedCount: number
@@ -899,7 +976,7 @@ export default function AutomationTasks() {
         yituliu_id: ''
       },
       paramFields: [
-        { key: 'stages', label: '关卡', type: 'multi-stages', placeholder: '1-7 或 HD-7', timesPlaceholder: '次数', helper: '使用 HD-数字代表当前活动关卡；置顶关卡会优先执行' },
+        { key: 'stages', label: '关卡', type: 'multi-stages', placeholder: '1-7 或 HD-7', timesPlaceholder: '次数', helper: '使用 HD-数字代表当前活动关卡；置顶关卡会优先执行。主线可在末尾加 -NORMAL/-HARD：10-14 章为标准/磨难，15 章后为常规/险地' },
         { key: 'drops', label: '掉落目标', type: 'text', placeholder: '30011=10,30062=5', helper: '任一物品达到目标数量后停止；格式为物品 ID=数量，多个目标用逗号分隔' },
         { key: 'medicine', label: '理智药', type: 'number', placeholder: '0', helper: '使用理智药数量' },
         { key: 'expiringMedicine', label: '临期药数量', type: 'number', placeholder: '0', helper: '按瓶数设置可使用的临期理智药；建议改用临期药天数' },
@@ -1001,6 +1078,11 @@ export default function AutomationTasks() {
         expedite_times: 0,
         preserve_tags: '支援机械',
         level3_recruitment_permit_reserve: 0,
+        report_to_penguin: false,
+        penguin_id: '',
+        report_to_yituliu: false,
+        yituliu_id: '',
+        server: 'CN',
         recruitment_time: { '3': 540, '4': 540 }
       },
       paramFields: [
@@ -1014,6 +1096,16 @@ export default function AutomationTasks() {
         { key: 'expedite_times', label: '加急次数', type: 'number', placeholder: '0', visibleWhen: { key: 'expedite', value: true } },
         { key: 'preserve_tags', label: '保留标签', type: 'text', placeholder: '支援机械,高级资深干员', helper: '识别到任一标签时保留该公招槽位，多个标签用逗号分隔' },
         { key: 'level3_recruitment_permit_reserve', label: '3 星许可保留数', type: 'number', placeholder: '0', min: '0', helper: '剩余招聘许可不超过该值时跳过 3 星招募；0 表示禁用' },
+        { key: 'report_to_penguin', label: '上报企鹅数据', type: 'checkbox' },
+        { key: 'penguin_id', label: '企鹅 ID', type: 'text', placeholder: '留空匿名上报', visibleWhen: { key: 'report_to_penguin', value: true } },
+        { key: 'report_to_yituliu', label: '上报一图流', type: 'checkbox' },
+        { key: 'yituliu_id', label: '一图流 ID', type: 'text', placeholder: '留空匿名上报', visibleWhen: { key: 'report_to_yituliu', value: true } },
+        { key: 'server', label: '公招服务器', type: 'select', options: [
+          { value: 'CN', label: '国服' },
+          { value: 'US', label: '美服' },
+          { value: 'JP', label: '日服' },
+          { value: 'KR', label: '韩服' }
+        ], helper: '影响公招数据上报的服务器判定' },
       ],
       taskType: 'Recruit'
     },
@@ -1521,71 +1613,10 @@ export default function AutomationTasks() {
       }
     }
 
+    const dynamicFightCommand = buildDynamicFightCommand(task)
+    if (dynamicFightCommand) return dynamicFightCommand
+
     const commandId = task.commandId || task.id.split('-')[0]
-    const medicineExpireDays = Number(task.params?.medicineExpireDays ?? 0)
-    const server = String(task.params?.server || '').trim()
-    const series = Number(task.params?.series ?? 1)
-
-    if (commandId === 'fight' && (medicineExpireDays > 0 || server || (Number.isFinite(series) && series > 6))) {
-      const stages = (task.params?.stages || [{ stage: task.params?.stage || '', times: task.params?.times || '' }])
-        .map(stageConfig => typeof stageConfig === 'string'
-          ? { stage: stageConfig, times: '' }
-          : stageConfig)
-        .filter(stageConfig => stageConfig.stage?.trim())
-        .map(stageConfig => ({
-          stage: stageConfig.stage.trim(),
-          times: stageConfig.times === undefined || stageConfig.times === '' ? '' : String(stageConfig.times).trim()
-        }))
-      if (stages.length === 0) throw new Error('请至少选择一个关卡')
-
-      const dropTargets = parseDropTargetEntries(task.params?.drops)
-      if (dropTargets === null) throw new Error('掉落目标格式应为物品 ID=数量，多个目标用逗号分隔')
-      const drops = dropTargets.length > 0
-        ? Object.fromEntries(dropTargets.map(entry => {
-          const [itemId, count] = entry.split('=')
-          return [itemId, Number(count)]
-        }))
-        : null
-
-      const commonParams: Record<string, unknown> = {}
-      if (task.params?.medicine !== undefined && task.params.medicine !== '' && task.params.medicine !== null) {
-        commonParams.medicine = Number(task.params.medicine)
-      }
-      if (medicineExpireDays > 0) {
-        commonParams.medicine_expire_days = medicineExpireDays
-      } else if (task.params?.expiringMedicine !== undefined && task.params.expiringMedicine !== '' && task.params.expiringMedicine !== null) {
-        commonParams.expiring_medicine = Number(task.params.expiringMedicine)
-      }
-      if (task.params?.stone !== undefined && task.params.stone !== '' && task.params.stone !== null) {
-        commonParams.stone = Number(task.params.stone)
-      }
-      if (task.params?.series !== undefined && task.params.series !== '' && task.params.series !== null) {
-        commonParams.series = Number(task.params.series)
-      }
-      if (drops) commonParams.drops = drops
-      if (server) commonParams.server = server
-      if (typeof task.params?.DrGrandet === 'boolean') commonParams.DrGrandet = task.params.DrGrandet
-      if (typeof task.params?.report_to_penguin === 'boolean') commonParams.report_to_penguin = task.params.report_to_penguin
-      if (typeof task.params?.penguin_id === 'string' && task.params.penguin_id.trim()) commonParams.penguin_id = task.params.penguin_id.trim()
-      if (typeof task.params?.report_to_yituliu === 'boolean') commonParams.report_to_yituliu = task.params.report_to_yituliu
-      if (typeof task.params?.yituliu_id === 'string' && task.params.yituliu_id.trim()) commonParams.yituliu_id = task.params.yituliu_id.trim()
-
-      const tasks = stages.map(({ stage, times }) => ({
-        name: `${task.name} (${stage})`,
-        type: 'Fight',
-        params: {
-          ...commonParams,
-          stage,
-          ...(times ? { times: Number(times) } : {})
-        }
-      }))
-
-      return {
-        command: 'run',
-        params: commandId,
-        taskConfig: JSON.stringify({ name: task.name, type: 'Fight', tasks })
-      }
-    }
     let params = ''
     const extraArgs: string[] = []
 

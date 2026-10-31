@@ -269,13 +269,20 @@ export function canUseNativeCopilotSet({
   raid = 'normal',
   loopTimes = 1,
   selectedIndexes = [],
-  completedKeys = []
+  completedKeys = [],
+  formationMode = 'auto',
+  userAdditional = null
 } = {}) {
   if (entries.length === 0) return false;
   if (selectedIndexes.length > 0 && selectedIndexes.length < totalEntries) return false;
   if (loopTimes !== 1) return false;
   if (completedKeys.length > 0) return false;
   if (entries.some(entry => entry.presetFormation)) return false;
+  if (userAdditional && (Array.isArray(userAdditional) ? userAdditional.length > 0 : Object.keys(userAdditional).length > 0)) return false;
+  // maa-cli forces formation=true for multi-stage sets and defaults to false
+  // for a single stage; auto/off cannot be expressed for those combinations.
+  if (formationMode === 'auto' && entries.length < 2) return false;
+  if (formationMode === 'off' && entries.length >= 2) return false;
   // `maa copilot --raid raid` only keeps is_raid in the copilot_list branch,
   // which is used for multi-stage sets. A single-stage set would lose it.
   if (raid === 'raid' && entries.length < 2) return false;
@@ -285,6 +292,17 @@ export function canUseNativeCopilotSet({
 export function buildNativeCopilotCommand(setId, raid = 'normal', options = {}) {
   const args = [`prts://s${setId}`, '--batch'];
   if (raid === 'raid' || raid === 'both') args.push('--raid', raid);
+  if (options.formationMode === 'on') args.push('--formation');
+  const formationIndex = Number(options.formationIndex || 0);
+  if (Number.isFinite(formationIndex) && formationIndex > 0) args.push('--formation-index', String(formationIndex));
+  if (options.addTrust === true) args.push('--add-trust');
+  if (options.ignoreRequirements === true) args.push('--ignore-requirements');
+  if (options.useSanityPotion === true) args.push('--use-sanity-potion');
+  const supportUsage = Number(options.supportUsage || 0);
+  if (Number.isFinite(supportUsage) && supportUsage > 0) args.push('--support-unit-usage', String(supportUsage));
+  if (typeof options.supportName === 'string' && options.supportName.trim()) {
+    args.push('--support-unit-name', options.supportName.trim());
+  }
   if (options.userResource) args.push('--user-resource');
   const profile = options.profile || options.profileId;
   if (profile) args.push('-p', String(profile));
@@ -369,7 +387,9 @@ export async function executeCopilotPlan({ setId, raid = 'normal', selectedIndex
     raid,
     loopTimes,
     selectedIndexes,
-    completedKeys: [...completed]
+    completedKeys: [...completed],
+    formationMode: options.formationMode || 'auto',
+    userAdditional: options.userAdditional || null
   })) {
     const args = buildNativeCopilotCommand(setId, raid, options);
     const result = await execMaaCommand('copilot', args, plan.name, 'copilot', true, false, lifecycle);

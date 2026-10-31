@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, it } from 'node:test'
-import router, { buildFightPlans, buildWebrtcBrowserProtocol, executeTrackedAgentAction } from '../agent.js'
+import router, { buildDynamicFightPlan, buildFightPlans, buildWebrtcBrowserProtocol, executeTrackedAgentAction, needsDynamicFight } from '../agent.js'
 import { API_VERSION } from '../agentContract.js'
 import { getTaskStatus, setTaskStatus } from '../../services/maaService.js'
 import { loggerManager } from '../../utils/logger.js'
@@ -62,6 +62,39 @@ describe('Agent fight planning', () => {
     ])
   })
 
+  it('builds a dynamic multi-task plan for Core-only Fight fields', () => {
+    const input = {
+      stages: [{ stage: '1-7', times: 2 }, { stage: 'CE-6', times: '' }],
+      medicine: 1,
+      medicineExpireDays: 2,
+      server: 'JP',
+      series: 8,
+      drops: '30011=10,30062=5',
+      reportToPenguin: true,
+      penguinId: 'doctor',
+      clientType: 'Bilibili'
+    }
+
+    assert.equal(needsDynamicFight(input), true)
+    const plan = buildDynamicFightPlan(input)
+    assert.equal(plan.type, 'Fight')
+    assert.equal(plan.client_type, 'Bilibili')
+    assert.equal(plan.tasks.length, 2)
+    assert.deepEqual(plan.tasks[0].params, {
+      medicine: 1,
+      medicine_expire_days: 2,
+      series: 8,
+      drops: { 30011: 10, 30062: 5 },
+      server: 'JP',
+      report_to_penguin: true,
+      penguin_id: 'doctor',
+      stage: '1-7',
+      times: 2
+    })
+    assert.equal(plan.tasks[1].params.stage, 'CE-6')
+    assert.equal(plan.tasks[1].params.times, undefined)
+  })
+
   it('keeps single-stage requests unchanged and ignores empty stage entries', () => {
     assert.deepEqual(buildFightPlans({ stage: '1-7', times: 3 }), [
       { stage: '1-7', times: '3', args: ['1-7', '--times', '3', '-m', '0', '--expiring-medicine', '0', '--stone', '0', '--series', '0'] }
@@ -90,7 +123,7 @@ describe('Agent discovery routes', () => {
     assert.equal(res.body.success, true)
     assert.equal(res.body.meta.requestId, 'manifest-test')
     assert.equal(res.body.data.version, API_VERSION)
-    assert.equal(res.body.data.actions.length, 23)
+    assert.equal(res.body.data.actions.length, 24)
     assert.ok(res.body.data.actions.every(action => action.safety && action.execution))
   })
 

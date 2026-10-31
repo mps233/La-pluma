@@ -30,6 +30,7 @@ const expectedAdvertisedIds = [
   'get_screenshot',
   'run_daily_flow',
   'recent_logs',
+  'maa_callback_summary',
   'webrtc_status',
   'webrtc_devices',
   'webrtc_start',
@@ -46,7 +47,7 @@ function getOpenApiOperation(spec, item) {
 
 describe('Agent API contract registry', () => {
   it('keeps operation ids and method/path pairs unique', () => {
-    assert.equal(AGENT_OPERATIONS.length, 29);
+    assert.equal(AGENT_OPERATIONS.length, 30);
     assert.equal(new Set(AGENT_OPERATIONS.map(item => item.id)).size, AGENT_OPERATIONS.length);
     assert.equal(
       new Set(AGENT_OPERATIONS.map(item => `${item.method} ${item.path}`)).size,
@@ -60,7 +61,7 @@ describe('Agent API contract registry', () => {
     assert.equal(manifest.version, API_VERSION);
     assert.deepEqual(manifest.defaults, defaults);
     assert.deepEqual(manifest.actions.map(item => item.id), expectedAdvertisedIds);
-    assert.equal(manifest.actions.length, 23);
+    assert.equal(manifest.actions.length, 24);
     assert.ok(!manifest.actions.some(item => item.id === 'get_manifest'));
     assert.ok(!manifest.actions.some(item => item.id === 'get_openapi'));
   });
@@ -357,6 +358,7 @@ describe('Agent OpenAPI generation', () => {
     const byId = new Map(manifest.actions.map(item => [item.id, item]));
 
     assert.equal(byId.get('recent_logs').safety.readOnly, true);
+    assert.equal(byId.get('maa_callback_summary').safety.readOnly, true);
     assert.equal(byId.get('get_status').safety.readOnly, false);
     assert.deepEqual(byId.get('get_status').safety.sideEffects, ['adb_connect']);
     assert.equal(byId.get('get_screenshot').safety.readOnly, false);

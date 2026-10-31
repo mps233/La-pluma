@@ -50,6 +50,18 @@ const THEME_PRESETS: Record<RoguelikeMode, Array<{ value: string; label: string 
   ],
 }
 
+const COLLECTIBLE_START_REWARDS = [
+  { key: 'hot_water', label: '热水壶' },
+  { key: 'shield', label: '护盾' },
+  { key: 'ingot', label: '源石锭' },
+  { key: 'hope', label: '希望' },
+  { key: 'random', label: '随机奖励' },
+  { key: 'key', label: '钥匙（水月）' },
+  { key: 'dice', label: '骰子（水月）' },
+  { key: 'ideas', label: '2 构想（萨卡兹）' },
+  { key: 'ticket', label: '票券（界园）' },
+]
+
 const BLACKFLOW_REWARDS = [
   { value: 1, label: '未编号物' },
   { value: 2, label: '调查预付款' },
@@ -398,6 +410,7 @@ export default function RoguelikeTasks() {
         { key: 'investmentsCount', label: '投资次数', type: 'number', placeholder: '无限' },
         { key: 'stopWhenInvestmentFull', label: '投资满后停止', type: 'checkbox' },
         { key: 'investmentWithMoreScore', label: '投资后购物', type: 'checkbox', helper: '仅模式 1' },
+        { key: 'collectibleModeStartList', label: '凹开局奖励（模式 4）', type: 'collectible-start-list', helper: '仅模式 4；勾选希望凹到的开局奖励' },
         { key: 'startWithEliteTwo', label: '凹精二直升', type: 'checkbox', helper: '仅模式 4' },
         { key: 'onlyStartWithEliteTwo', label: '只凹精二直升', type: 'checkbox', helper: '仅模式 4 且开启精二直升' },
         { key: 'refreshTraderWithDice', label: '骰子刷新商店', type: 'checkbox', helper: '仅水月主题' },
@@ -491,7 +504,7 @@ export default function RoguelikeTasks() {
         difficulty: 'difficulty',
         startCount: 'starts_count',
         investmentsCount: 'investments_count',
-        findPlayTimeTarget: 'find_play_time_target',
+        findPlayTimeTarget: 'find_playTime_target',
       }
       Object.entries(numberFields).forEach(([key, param]) => {
         const value = advanced[key]
@@ -537,6 +550,22 @@ export default function RoguelikeTasks() {
         if (list.length > 0) params[param] = list
       })
 
+      if (Number(params.mode) === 30003) {
+        const animals = splitCommaList(advanced.blackflowStartAnimals)
+        if (animals.length > 2) throw new Error('黑流树海襁褓动物最多选择 2 项')
+        if (animals.filter(animal => animal === 'swaddled_feathered_serpent').length > 1) {
+          throw new Error('襁褓羽蛇最多选择 1 项')
+        }
+        params.blackflow_start_animals = animals
+      }
+
+      const startList = advanced.collectibleModeStartList
+      if (startList && typeof startList === 'object' && !Array.isArray(startList)) {
+        params.collectible_mode_start_list = Object.fromEntries(
+          COLLECTIBLE_START_REWARDS.map(reward => [reward.key, Boolean((startList as Record<string, boolean>)[reward.key])])
+        )
+      }
+
       const rewards = Number(advanced.blackflowStartRewards ?? 0)
       if (Number.isFinite(rewards) && rewards >= 0) params.blackflow_start_rewards = rewards
 
@@ -549,8 +578,8 @@ export default function RoguelikeTasks() {
       if ([30001, 30003].includes(Number(params.mode)) && theme !== 'BlackFlow') {
         throw new Error('该模式仅适用于黑流树海主题')
       }
-      if (Number(params.mode) === 20001 && params.find_play_time_target === undefined) {
-        throw new Error('常乐节点模式需要选择目标节点')
+      if (Number(params.mode) === 20001 && params.find_playTime_target === undefined) {
+        params.find_playTime_target = 1
       }
       if (Number(params.mode) === 30003 && params.blackflow_start_utopia === true
         && !Array.isArray(params.blackflow_start_reward_priority)) {
@@ -685,7 +714,7 @@ export default function RoguelikeTasks() {
   const handleAdvancedChange = (
     taskId: string,
     key: string,
-    value: string | number | boolean | RoguelikeCoreChar[]
+    value: string | number | boolean | RoguelikeCoreChar[] | Record<string, boolean>
   ) => {
     setAdvancedParams({
       ...advancedParams,
@@ -780,6 +809,40 @@ export default function RoguelikeTasks() {
       </fieldset>
     )
 
+    const renderCollectibleStartList = (option: RoguelikeAdvancedOption) => {
+      const selected = advanced.collectibleModeStartList
+      const selectedMap = selected && typeof selected === 'object' && !Array.isArray(selected)
+        ? selected as Record<string, boolean>
+        : {}
+      return (
+        <fieldset>
+          <legend className="roguelike-field-label mb-1 block">{option.label}</legend>
+          <p className="mb-2 text-xs leading-5 text-gray-500 dark:text-gray-400">{option.helper}</p>
+          <div className="grid grid-cols-2 gap-2">
+            {COLLECTIBLE_START_REWARDS.map(reward => (
+              <label
+                key={reward.key}
+                htmlFor={`roguelike-${task.id}-collectible-${reward.key}`}
+                className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-[var(--app-border)] px-2 py-1.5 text-xs text-gray-700 dark:text-gray-300"
+              >
+                <input
+                  id={`roguelike-${task.id}-collectible-${reward.key}`}
+                  type="checkbox"
+                  checked={Boolean(selectedMap[reward.key])}
+                  onChange={(event) => handleAdvancedChange(task.id, 'collectibleModeStartList', {
+                    ...selectedMap,
+                    [reward.key]: event.target.checked,
+                  })}
+                  className="custom-checkbox cursor-pointer"
+                />
+                {reward.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )
+    }
+
     const fieldOptions = options.filter(option => option.type !== 'checkbox')
     const toggleOptions = options.filter(option => option.type === 'checkbox')
 
@@ -787,7 +850,7 @@ export default function RoguelikeTasks() {
       <>
         <div className="roguelike-field-grid">
           {fieldOptions.map(option => {
-            const isCustom = option.type === 'core-char-list' || option.type === 'blackflow-rewards'
+            const isCustom = option.type === 'core-char-list' || option.type === 'blackflow-rewards' || option.type === 'collectible-start-list'
             return (
               <div
                 key={option.key}
@@ -807,6 +870,8 @@ export default function RoguelikeTasks() {
                   renderCoreCharList(option)
                 ) : option.type === 'blackflow-rewards' ? (
                   renderBlackflowRewards(option)
+                ) : option.type === 'collectible-start-list' ? (
+                  renderCollectibleStartList(option)
                 ) : (
                   <Input
                     id={`roguelike-${task.id}-${option.key}`}

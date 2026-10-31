@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseMaaCallbackEvents, summarizeFightCallbacks } from '../maaCallbackService.js';
+import { parseMaaCallbackEvents, summarizeAuxiliaryCallbacks, summarizeFightCallbacks } from '../maaCallbackService.js';
 
 describe('Maa callback parsing', () => {
   it('parses matching callbacks from structured payloads regardless of JSON spacing', () => {
@@ -82,6 +82,34 @@ describe('Maa callback parsing', () => {
 
     const summary = summarizeFightCallbacks(log);
     assert.equal(summary.sanityUsed, 6);
+  });
+
+  it('summarizes BlackFlow, copilot precheck and public recruit callbacks', () => {
+    const callback = (what, details) => '[INF] Assistant::append_callback | SubTaskExtraInfo ' + JSON.stringify({ what, details, taskchain: 'Custom' });
+    const log = [
+      callback('BlackFlowStartRun', { status: 'preparing' }),
+      callback('BlackFlowStartRun', { status: 'completed', rewards: ['空间租赁'] }),
+      callback('BlackFlowScrapTradeAborted', { reason: 'not_enough_currency', item: '源石锭' }),
+      callback('CopilotPrecheckFile', { nav_name: 'CE-6', filename: '/tmp/ce6.json' }),
+      callback('StageInfoError', {}),
+      callback('UnsupportedLevel', { level: 'XX-99' }),
+      callback('RecruitSpecialTag', { tag: '高级资深干员' }),
+      callback('RecruitTagsSelected', { tags: ['高级资深干员', '远程位'] })
+    ].join('\n');
+
+    assert.deepEqual(summarizeAuxiliaryCallbacks(log), {
+      blackflowStartRun: [
+        { status: 'preparing', rewards: [] },
+        { status: 'completed', rewards: ['空间租赁'] }
+      ],
+      blackflowScrapTradeAborted: [{ reason: 'not_enough_currency', item: '源石锭' }],
+      copilotPrecheckFile: [{ navName: 'CE-6', filename: '/tmp/ce6.json' }],
+      stageInfo: [],
+      stageInfoErrors: 1,
+      unsupportedLevels: ['XX-99'],
+      recruitSpecialTags: ['高级资深干员'],
+      recruitSelectedTags: [['高级资深干员', '远程位']]
+    });
   });
 
   it('skips incomplete and malformed callback lines from incremental logs', () => {

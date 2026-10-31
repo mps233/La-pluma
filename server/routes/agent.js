@@ -30,6 +30,8 @@ import { getMaaResourceInfo, updateMaaResources } from '../services/resourceUpda
 import { getMaaCoreChannel, setMaaCoreChannel } from '../services/maaCliConfigService.js';
 import { buildCustomToolTaskConfig, listCustomTools } from '../services/customTaskService.js';
 import { parseDepotData, parseOperBoxData, getDepotData, getOperBoxData, getAllOperators } from '../services/dataParserService.js';
+import { summarizeAuxiliaryCallbacks } from '../services/maaCallbackService.js';
+import { getMaaLogPath } from '../config/paths.js';
 import { getTodayDrops, getRecentDrops, getDropStatistics } from '../services/dropRecordService.js';
 import { loadParadoxOperators, resolveStageSearchKeyword } from '../services/copilotService.js';
 import { buildCopilotPlan, executeCopilotPlan, resetCopilotPlanProgress } from '../services/copilotPlanService.js';
@@ -616,6 +618,92 @@ export function buildFightPlans(input = {}) {
   });
 }
 
+function normalizeFightDropMap(drops) {
+  if (drops === undefined || drops === null || drops === '') return null;
+  if (typeof drops === 'object' && !Array.isArray(drops)) {
+    const entries = Object.entries(drops);
+    if (entries.length === 0) return null;
+    const normalized = {};
+    for (const [itemId, count] of entries) {
+      const numeric = Number(count);
+      if (!/^[A-Za-z0-9_-]+$/.test(itemId) || !Number.isFinite(numeric) || numeric <= 0) {
+        throw new Error('掉落目标格式应为物品 ID=数量，多个目标用逗号分隔');
+      }
+      normalized[itemId] = numeric;
+    }
+    return normalized;
+  }
+  const normalized = {};
+  for (const entry of String(drops).split(',').map(value => value.trim()).filter(Boolean)) {
+    const match = entry.match(/^([A-Za-z0-9_-]+)\s*=\s*(\d+)$/);
+    if (!match || Number(match[2]) <= 0) {
+      throw new Error('掉落目标格式应为物品 ID=数量，多个目标用逗号分隔');
+    }
+    normalized[match[1]] = Number(match[2]);
+  }
+  return Object.keys(normalized).length > 0 ? normalized : null;
+}
+
+export function needsDynamicFight(input = {}) {
+  const medicineExpireDays = Number(input.medicineExpireDays ?? 0);
+  const series = Number(input.series ?? 1);
+  const drops = input.drops;
+  return (Number.isFinite(medicineExpireDays) && medicineExpireDays > 0)
+    || Boolean(String(input.server || '').trim())
+    || (drops !== undefined && drops !== null && drops !== ''
+      && (typeof drops !== 'object' || Object.keys(drops).length > 0))
+    || input.reportToPenguin === true
+    || input.reportToYituliu === true
+    || input.DrGrandet === true
+    || Boolean(String(input.clientType || '').trim())
+    || (Number.isFinite(series) && series > 6);
+}
+
+export function buildDynamicFightPlan(input = {}) {
+  const stages = normalizeFightStages(input);
+  if (stages.length === 0) return null;
+  const common = {};
+  if (input.medicine !== undefined && input.medicine !== '' && input.medicine !== null) {
+    common.medicine = Number(input.medicine);
+  }
+  if (input.medicineExpireDays !== undefined && input.medicineExpireDays !== '' && input.medicineExpireDays !== null) {
+    common.medicine_expire_days = Number(input.medicineExpireDays);
+  }
+  if (input.expiringMedicine !== undefined && input.expiringMedicine !== '' && input.expiringMedicine !== null) {
+    common.expiring_medicine = Number(input.expiringMedicine);
+  }
+  if (input.stone !== undefined && input.stone !== '' && input.stone !== null) {
+    common.stone = Number(input.stone);
+  }
+  if (input.series !== undefined && input.series !== '' && input.series !== null) {
+    common.series = Number(input.series);
+  }
+  const drops = normalizeFightDropMap(input.drops);
+  if (drops) common.drops = drops;
+  if (String(input.server || '').trim()) common.server = String(input.server).trim();
+  if (typeof input.DrGrandet === 'boolean') common.DrGrandet = input.DrGrandet;
+  if (typeof input.reportToPenguin === 'boolean') common.report_to_penguin = input.reportToPenguin;
+  if (typeof input.penguinId === 'string' && input.penguinId.trim()) common.penguin_id = input.penguinId.trim();
+  if (typeof input.reportToYituliu === 'boolean') common.report_to_yituliu = input.reportToYituliu;
+  if (typeof input.yituliuId === 'string' && input.yituliuId.trim()) common.yituliu_id = input.yituliuId.trim();
+
+  const tasks = stages.map(({ stage, times }) => ({
+    name: `Agent: 理智作战 (${stage})`,
+    type: 'Fight',
+    params: {
+      ...common,
+      stage,
+      ...(times !== '' ? { times: Number(times) } : {})
+    }
+  }));
+  return {
+    name: 'Agent: 理智作战',
+    type: 'Fight',
+    ...(input.clientType ? { client_type: String(input.clientType) } : {}),
+    tasks
+  };
+}
+
 async function loadAutomationTaskFlow(overrideTaskFlow = null) {
   if (Array.isArray(overrideTaskFlow)) return overrideTaskFlow;
   const saved = await loadUserConfig('automation-tasks');
@@ -726,6 +814,26 @@ router.post('/screen/screenshot', asyncHandler(async (req, res) => {
     address,
     profileId
   });
+}));
+
+router.get('/logs/maa-callbacks', asyncHandler(async (req, res) => {
+  const lines = Math.min(Math.max(Number(req.query.lines || 2000), 1), 5000);
+  const logPath = getMaaLogPath();
+  try {
+    const result = await readLogFile(logPath, lines);
+    return sendSuccess(res, req, {
+      ...summarizeAuxiliaryCallbacks(result.content),
+      logPath,
+      totalLines: result.totalLines,
+      returnedLines: result.returnedLines
+    });
+  } catch (error) {
+    return sendError(res, req, agentError('AGENT_MAA_LOG_UNAVAILABLE', `无法读取 MAA 日志: ${error.message}`, {
+      statusCode: 500,
+      details: { logPath },
+      retryable: true
+    }));
+  }
 }));
 
 router.get('/logs/recent', asyncHandler(async (req, res) => {
@@ -1749,6 +1857,64 @@ router.post('/actions/fight', asyncHandler(async (req, res) => {
   const waitForCompletion = parseWaitForCompletion(requestOptions.waitForCompletion);
   const fightOptions = { ...requestOptions };
   delete fightOptions.waitForCompletion;
+
+  let dynamicFightPlan = null;
+  try {
+    if (needsDynamicFight(fightOptions)) {
+      dynamicFightPlan = buildDynamicFightPlan(fightOptions);
+    }
+  } catch (error) {
+    return sendError(res, req, agentError('AGENT_VALIDATION_DROPS_INVALID', error.message, {
+      statusCode: 400,
+      retryable: false
+    }));
+  }
+
+  if (dynamicFightPlan) {
+    const plan = {
+      command: 'run',
+      taskConfig: dynamicFightPlan,
+      semantic: {
+        stages: dynamicFightPlan.tasks.map(task => ({
+          stage: task.params.stage,
+          times: task.params.times !== undefined ? String(task.params.times) : ''
+        })),
+        medicine: fightOptions.medicine ?? 0,
+        medicineExpireDays: fightOptions.medicineExpireDays ?? 0,
+        expiringMedicine: fightOptions.expiringMedicine ?? 0,
+        stone: fightOptions.stone ?? 0,
+        series: fightOptions.series ?? 0,
+        server: fightOptions.server || null,
+        drops: fightOptions.drops ?? null,
+        clientType: fightOptions.clientType || null
+      }
+    };
+
+    if (dryRun) return sendDryRun(res, req, plan);
+
+    return executeTrackedAgentAction(req, res, {
+      operationId: 'fight',
+      input: { ...plan.semantic, waitForCompletion },
+      waitForCompletion,
+      metadata: { taskName: 'Agent: 理智作战', taskType: 'agent', plan },
+      execute: async lifecycle => {
+        const connection = await resolveRequestConnection(req, { allowOverrides: true });
+        const result = await execDynamicTask(
+          'fight',
+          dynamicFightPlan,
+          'Agent: 理智作战',
+          'agent',
+          waitForCompletion,
+          false,
+          { lifecycle, clientType: fightOptions.clientType || connection.clientType }
+        );
+        return { ...result, plan };
+      },
+      successMessage: '理智作战执行完成',
+      acceptedMessage: '理智作战已接受'
+    });
+  }
+
   const fightPlans = buildFightPlans(fightOptions);
   if (!fightPlans.length) {
     return sendError(res, req, agentError('AGENT_VALIDATION_MISSING_STAGES', '至少需要一个有效关卡', {

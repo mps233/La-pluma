@@ -182,7 +182,7 @@ export interface RoguelikeCoreChar {
 export interface RoguelikeAdvancedOption {
   key: string
   label: string
-  type: 'text' | 'number' | 'select' | 'checkbox' | 'core-char-list' | 'blackflow-rewards'
+  type: 'text' | 'number' | 'select' | 'checkbox' | 'core-char-list' | 'blackflow-rewards' | 'collectible-start-list'
   placeholder?: string
   helper?: string
   options?: Array<{ value: string; label: string }>
@@ -194,7 +194,7 @@ export interface RoguelikeTaskInputs {
 
 export interface RoguelikeAdvancedParams {
   [taskId: string]: {
-    [key: string]: string | number | boolean | RoguelikeCoreChar[]
+    [key: string]: string | number | boolean | RoguelikeCoreChar[] | Record<string, boolean>
   }
 }
 

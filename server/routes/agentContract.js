@@ -286,9 +286,24 @@ export const AGENT_OPERATIONS = Object.freeze([
           examples: [['HD-7', 'CE-6', 'AP-5']]
         },
         medicine: { type: ['integer', 'string'], default: 0, description: 'Normal sanity medicine count for -m.' },
-        expiringMedicine: { type: ['integer', 'string'], default: 0, description: 'Expiring sanity medicine count.' },
+        medicineExpireDays: { type: ['integer', 'string'], default: 0, description: 'Use sanity medicine expiring within N days; requires a dynamic Fight task.' },
+        expiringMedicine: { type: ['integer', 'string'], default: 0, description: 'Expiring sanity medicine count (deprecated by MAA in favor of medicineExpireDays).' },
         stone: { type: ['integer', 'string'], default: 0, description: 'Originium stone count.' },
-        series: { type: ['integer', 'string'], default: 0, description: 'MAA --series value; omit or set 1 to use maa-cli default.' },
+        series: { type: ['integer', 'string'], default: 0, description: 'MAA series value; 7–10 require a dynamic Fight task.' },
+        server: { type: 'string', enum: ['CN', 'US', 'JP', 'KR'], description: 'Drop recognition/upload server; requires a dynamic Fight task.' },
+        drops: {
+          oneOf: [
+            { type: 'object', additionalProperties: { type: ['integer', 'string'] }, examples: [{ 30011: 10, 30062: 5 }] },
+            { type: 'string', examples: ['30011=10,30062=5'] }
+          ],
+          description: 'Stop when any drop target is reached; requires a dynamic Fight task.'
+        },
+        reportToPenguin: { type: 'boolean', default: false },
+        penguinId: { type: 'string' },
+        reportToYituliu: { type: 'boolean', default: false },
+        yituliuId: { type: 'string' },
+        DrGrandet: { type: 'boolean', default: false },
+        clientType: { type: 'string', ...runtimeDefault('clientType') },
         dryRun: { type: 'boolean', default: false },
         waitForCompletion: { type: 'boolean', default: true }
       }
@@ -438,6 +453,19 @@ export const AGENT_OPERATIONS = Object.freeze([
       type: 'object',
       properties: {
         lines: { type: 'integer', minimum: 1, maximum: 500, default: 80, description: 'Maximum number of log lines to return.' }
+      }
+    }
+  }),
+  operation({
+    id: 'maa_callback_summary',
+    method: 'GET',
+    path: '/api/agent/logs/maa-callbacks',
+    description: 'Summarize BlackFlow, copilot precheck, stage navigation and public recruit callbacks from recent MAA logs.',
+    tags: ['Logs'],
+    query_schema: {
+      type: 'object',
+      properties: {
+        lines: { type: 'integer', minimum: 1, maximum: 5000, default: 2000, description: 'Number of trailing MAA log lines to scan.' }
       }
     }
   }),
