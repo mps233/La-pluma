@@ -2,17 +2,15 @@
 
 本目录包含项目中可复用的通用 UI 组件，用于统一代码风格和减少重复代码。组件通过 `index.ts` 统一导出，页面中优先从 `@/components/common` 或相邻路径的 `./common` 引入。
 
-项目级设计规范见根目录 `COMPONENT_LIBRARY_GUIDE.md`。本文件保留日常开发最常用的规则和组件用法。
+项目级设计规范见根目录 `DESIGN.md`。本文件保留日常开发最常用的规则和组件用法。
 
 ## 原生运行时约定
 
-应用由 `Layout` 和 common 组件使用原生语义元素提供页面 chrome。`Button`、`Card`、`Loading`、`ActivityIndicator`、`Switch` 等组件在浏览器、jsdom、SSR 和嵌入式渲染中使用同一套 DOM 与行为；不要按运行环境维护第二套实现。
-
-主题由 `useUIStore` 统一管理并同步到文档根节点与 `.la-pluma-app`。Navbar 和移动 tabbar 的安全区由 `Layout` 及统一 token 管理；只有不属于应用 chrome 的自定义固定浮层才补充 `env(safe-area-inset-*)`，避免重复 padding。桌面侧栏和移动悬浮胶囊导航由 `Layout` 统一提供，页面只负责渲染内容。
+`Button`、`Card`、`Loading`、`ActivityIndicator`、`Switch` 等组件在浏览器、jsdom、SSR 和嵌入式渲染中使用同一套原生语义 DOM 与行为；不要按运行环境维护第二套实现。壳层、安全区和主题归属见 `DESIGN.md`。
 
 ## 设计规范
 
-色彩、文字层级、圆角、间距、边框、阴影、交互状态、响应式断点等视觉规范统一由根目录 `COMPONENT_LIBRARY_GUIDE.md` 维护。本文件只记录组件 API 和本目录的运行时约定；需要修改规范时改指南，不要在这里另写一份。
+色彩、文字层级、圆角、间距、边框、阴影、交互状态、响应式断点等视觉规范统一由根目录 `DESIGN.md` 维护。本文件只记录组件 API 和本目录的运行时约定；需要修改规范时改指南，不要在这里另写一份。
 
 组件本身不携带主题分支，颜色和尺寸一律通过 `app-*` 语义类与 `--app-*` token 取得，因此同一份 DOM 在浅色、深色和嵌入式渲染下表现一致。
 
@@ -51,13 +49,13 @@ Props：
 统一的卡片容器样式，支持连续圆角和自定义样式。静态卡片直接渲染，不使用整卡进场动画。
 
 ```tsx
-import { Card, CardHeader, CardContent } from '@/components/common'
+import { Card, CardHeader, CardContent, Button } from '@/components/common'
 
 <Card smoothCorners>
   <CardHeader
     icon={<Icons.Package />}
     title="材料掉落统计"
-    actions={<button>刷新</button>}
+    actions={<Button variant="ghost" size="sm">刷新</Button>}
   />
   <CardContent>
     <p>卡片内容区域</p>
@@ -184,7 +182,7 @@ Props：
 
 ## 新增页面顺序
 
-页面结构、组件选型和重构顺序见 `COMPONENT_LIBRARY_GUIDE.md` 的「重构建议」，本文件不再重复该清单。
+页面结构、组件选型和重构顺序见 `DESIGN.md` 的「重构建议」，本文件不再重复该清单。
 
 ---
 

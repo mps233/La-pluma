@@ -12,21 +12,12 @@
 
 ---
 
-## 设计目标
-
-1. **减少重复代码**：重复 UI 模式优先沉淀到组件或语义类。
-2. **统一视觉风格**：页面不再各自定义主色、圆角、间距。
-3. **提升开发效率**：新页面优先复用现成组件和布局类。
-4. **易于维护**：修改 token 或通用组件即可影响全局。
-
----
-
 ## 原生响应式壳层与 iOS 风格
 
 应用使用原生 `.la-pluma-app` 根节点。Navbar、页面区域、移动 tabbar 和 Sheet 等 chrome 与交互统一由 `Layout` 及 common 组件提供；`ios-theme.css` 负责 iOS 26 材质、应用 chrome、安全区和品牌适配，不要在页面中另起一套导航或 modal 基础样式。
 
-- 桌面端（`lg` 及以上）显示左侧工作台导航；移动端使用悬浮的 iOS 风格底部胶囊导航，右侧搜索/更多入口承载次要页面。两端必须复用 `Layout` 的 URL 路由和 active 状态，不要按 viewport 建立第二份导航状态。
-- 桌面工作台使用 macOS 结构侧栏：一条跨越顶栏与导航区的连续圆角材质边界、可用的工作区搜索、分组导航和 28px 语义色图标底座。品牌入口属于侧栏右侧的工作区顶栏，不能进入或遮挡侧栏圆角区。当前项使用整行系统强调色与白色文字；这些桌面样式不得扩散到移动底栏和“更多”Sheet。
+- 桌面端（`lg` 及以上）显示左侧工作台导航；移动端使用悬浮的 iOS 风格底部胶囊导航，右侧「更多」按钮打开次要页面的 Sheet。两端必须复用 `Layout` 的 URL 路由和 active 状态，不要按 viewport 建立第二份导航状态。
+- 桌面工作台使用 macOS 结构侧栏：一条跨越顶栏与导航区的连续圆角材质边界、可用的工作区搜索、分组导航和 24px 图标底座。品牌入口属于侧栏右侧的工作区顶栏，不能进入或遮挡侧栏圆角区。当前项使用整行系统强调色与白色文字；这些桌面样式不得扩散到移动底栏和“更多”Sheet。
 - 主题由 `useUIStore` 的 `light`、`dark`、`system` 管理，并同步到文档根节点和 `.la-pluma-app`。组件或页面不要直接操作 `.dark`，也不要创建局部主题开关。
 - `client/index.html` 使用 `viewport-fit=cover`。`Layout` 通过统一 token 管理 navbar、移动 tabbar 和对应安全区高度；自定义 fixed/sticky 层只有在不属于这些 chrome 时才使用 `env(safe-area-inset-*)`，内容区不要重复叠加顶部或底部 inset。
 - `Button`、`Card`、`Loading`、`Switch` 等 common 组件使用原生语义元素，在浏览器、jsdom、SSR 和嵌入式场景中渲染一致。不要按运行环境维护第二套组件 DOM。
@@ -45,7 +36,6 @@
 - `surface-panel`：主要卡片和大面板。
 - `surface-soft`：弱背景、状态条、次级容器。
 - `control-surface`：输入框、选择框、筛选项、未选中的分段控件。
-- `control-active`：选中的分段控件或当前项。
 - `brand-action` / `brand-text`：主要操作和品牌强调。
 - `status-neutral` / `status-success` / `status-warning` / `status-danger` / `status-info`：语义状态提示。中性状态用于待机、默认或与状态无关的提示浮层；它自带 1px 内描边，不受 `ios-borderless-cards` 影响，因此浮层在各类页面外观一致。
 - `status-success-action` / `status-danger-action`：成功、危险类操作按钮。
@@ -59,7 +49,7 @@
 
 | 层级 | 推荐样式 | 用途 |
 | --- | --- | --- |
-| 页面标题 | `text-xl sm:text-2xl font-semibold text-primary` | 仅 `PageHeader` 的页面主标题 |
+| 页面标题 | 由 `PageHeader` 的 `.app-page-title` 决定 | 仅页面主标题；不要在页面里重写字号和字重 |
 | 常规卡片标题 | `text-lg font-semibold text-primary` | `CardHeader`、主要内容区标题 |
 | 紧凑区块标题 | `text-base font-bold text-primary` | 总览卡片内的次级区块 |
 | 列表标题、字段名 | `text-sm font-semibold` | 列表项、配置字段、主要操作文案 |
@@ -77,19 +67,21 @@
 
 ### 页面宽度
 
-高密度工具页面使用统一的 `app-shell`：内容最大宽度为 `1600px`，桌面左右留白通常为 `32px`，超宽屏为 `40px`，移动端为 `14px`。页面内部不要再次嵌套 `max-w-7xl` 或重复水平 padding；阅读型长文本应在自己的内容区单独限制行宽。
+高密度工具页面使用统一的 `app-shell`：内容宽度、左右留白和安全区由 `--app-content-max`、`--app-page-gutter` 等 token 控制，`Layout` 已经把 `la-pluma-content app-shell` 渲染在页面外层。不要在页面里重复这些数值，也不要再次嵌套 `max-w-7xl` 或重复水平 padding；阅读型长文本应在自己的内容区单独限制行宽。
 
 ### 圆角
 
 圆角以 CSS 变量为准：
 
-| token | 当前值 | 用途 |
-| --- | --- | --- |
-| `--app-radius-xs` | `0.25rem` | 细小元素、默认边界 |
-| `--app-radius-sm` | `0.375rem` | checkbox、小控件 |
-| `--app-radius-md` | `0.5rem` | 紧凑控件与局部容器 |
-| `--app-radius-lg` | `0.625rem` | 卡片、面板、分段控件、通用按钮和输入 |
-| `--app-radius-pill` | `9999px` | 胶囊、头像、圆形状态点 |
+| token | 用途 |
+| --- | --- |
+| `--app-radius-xs` | 细小元素、默认边界 |
+| `--app-radius-sm` | checkbox、小控件 |
+| `--app-radius-md` | 紧凑控件与局部容器 |
+| `--app-radius-lg` | 卡片、面板、分段控件、通用按钮和输入 |
+| `--app-radius-pill` | 胶囊、头像、圆形状态点 |
+
+具体数值由 `client/src/index.css` 定义、`client/src/ios-theme.css` 覆盖（iOS 外壳下的圆角明显大于基础主题）。不要把数值抄进文档或页面代码，需要精确值时读 token 或浏览器计算结果。
 
 Tailwind 中 `rounded-xl`、`rounded-2xl`、`rounded-3xl` 已统一映射到 `--app-radius-lg`。不要为了局部效果继续加更大的圆角；如果某处确实需要特殊造型，先确认是否应当成为新的语义 token。
 
@@ -117,21 +109,19 @@ Tailwind 中 `rounded-xl`、`rounded-2xl`、`rounded-3xl` 已统一映射到 `--
 - `ios-workspace-page`：需要复用控制台移动材质与紧凑标题的功能页，和 `app-page` 同层使用。
 - `app-stack-card`：卡片内部或紧密内容的纵向间距。
 - `app-stack-section`：页面区块之间的纵向间距。
-- `app-grid-card`：卡片网格的紧密间距。
-- `app-grid-section`：大区块网格间距。
 
-当前 token：
+| token | 用途 |
+| --- | --- |
+| `--app-space-card` | 卡片内部、紧密列表 |
+| `--app-space-section` | 页面区块、主网格 |
 
-| token | 桌面 | 移动端 | 用途 |
-| --- | --- | --- | --- |
-| `--app-space-card` | `1rem` | `0.75rem` | 卡片内部、紧密列表 |
-| `--app-space-section` | `1.25rem` | `0.875rem` | 页面区块、主网格 |
+数值同样由 `index.css` 定义、`ios-theme.css` 覆盖，移动端还会再收缩一档；不要在文档或页面里写死具体像素。
 
 基础尺度遵循 4px 基线：`--app-space-1` 至 `--app-space-6` 分别为 4、8、12、16、20、24px。新增全局或通用组件间距时优先用这些 token；页面外层使用 `--app-space-page`，通用卡片内边距使用 `--app-space-panel`，表单控件使用 `--app-space-control-x`。移动端会自动收缩页面、卡片和区块尺度。
 
 Tailwind 已把常用档位映射到这些 token：`gap-3` / `gap-4` / `space-y-4` 对应 `--app-space-card`，`gap-5` / `gap-6` / `space-y-5` / `space-y-6` 对应 `--app-space-section`。写版式时优先复用这些档位，不要为同一间距再引入新的任意值。
 
-不要在页面里继续散写大量 `space-y-6`、`gap-6`、`p-6` 来做版式基准。需要页面级布局时优先使用 `app-page`、`app-stack-section`、`app-grid-section`。
+不要在页面里继续散写大量 `space-y-6`、`gap-6`、`p-6` 来做版式基准。需要页面级布局时优先使用 `app-page`、`app-stack-section`。
 
 ### 卡片与容器
 
@@ -200,7 +190,7 @@ iOS 风格三档 `Button` 高度由 `app-button-size-sm`、`app-button-size-md`�
 ### 布局密度
 
 - 常规内容宽度为 `max-w-7xl`。`Layout` 已负责主内容居中与外层 padding；页面内部避免再套一层同用途的宽度和 padding 容器。
-- 区块间使用 `app-stack-section` / `app-grid-section`，卡片内使用 `app-stack-card` / `app-grid-card`。只有内容可独立扫描、操作或滚动时才使用卡片；内部分区优先用 `CardHeader`、`CardContent`、分隔线、网格或 `surface-soft`。
+- 区块间使用 `app-stack-section`，卡片内使用 `app-stack-card`。只有内容可独立扫描、操作或滚动时才使用卡片；内部分区优先用 `CardHeader`、`CardContent`、分隔线、网格或 `surface-soft`。
 - 常规信息卡片使用 `repeat(2, minmax(0, 1fr))`；主次栏建议保持约 `1.1–1.75 : 0.9–1`，工具/筛选窄栏最小约 `16rem`，主内容必须保持弹性。每一列都应有 `minmax(0, ...)` 或 `min-w-0`，避免长文本造成横向溢出。
 - 不要为了填满右侧留白而硬塞第二张卡，也不要把普通页面区块做成卡片嵌套卡片。独立工作区、弹窗、空状态和设备预览属于合理例外。
 - 自动化编排器、肉鸽工作区是高密度专用布局：前者按三栏/两栏/单栏专用断点折叠，后者在窄屏转单栏。它们不是新页面的默认模板。
@@ -209,152 +199,20 @@ iOS 风格三档 `Button` 高度由 `app-button-size-sm`、`app-button-size-md`�
 
 ## 组件列表
 
-### PageHeader - 页面标题组件
+### 组件选型
 
-**文件位置**：`client/src/components/common/PageHeader.tsx`
+组件细节（props、导入方式、示例）统一维护在 `client/src/components/common/README.md`，本节只说明什么时候用哪个。
 
-**适用场景**：所有页面的顶部标题区域。
-
-```typescript
-{
-  icon?: ReactNode
-  title: string
-  subtitle?: string
-  actions?: ReactNode
-  mobileLayout?: 'stack' | 'inline'
-}
-```
-
-```tsx
-import { PageHeader } from '@/components/common'
-import FloatingStatusIndicator from '@/components/FloatingStatusIndicator'
-
-<PageHeader
-  title="自动战斗"
-  subtitle="配置自动刷关卡任务"
-  mobileLayout="inline"
-  actions={<FloatingStatusIndicator />}
-/>
-```
-
-页面标题统一使用全局品牌色，不再支持页面单独传入渐变色。一级工作区标题不使用 `icon-well`，只有确有身份识别需要的独立页面才传入 `icon`。
-手机端默认使用 `stack` 保护长标题和多操作；控制台及同级 `ios-workspace-page` 使用 `mobileLayout="inline"`，由右侧状态浮条主动收缩。
-
-### Card - 卡片组件系列
-
-**文件位置**：`client/src/components/common/Card.tsx`
-
-**适用场景**：主要面板、信息卡片、带标题的内容区域。
-
-```tsx
-import { Card, CardHeader, CardContent } from '@/components/common'
-
-<Card smoothCorners>
-  <CardHeader
-    icon={<Icons.Package />}
-    title="材料掉落统计"
-  />
-  <CardContent>
-    <p>卡片内容区域</p>
-  </CardContent>
-</Card>
-
-<div className="app-info-card status-warning">
-  <p>需要用户注意的信息。</p>
-</div>
-```
-
-`Card` 支持 `className` 和显式的 `smoothCorners`。静态内容直接渲染，不提供整卡进场动画。`smoothCorners` 使用 Lisse 的 `20px / 80%` 连续曲率，外层仍负责布局和阴影，内部表面负责裁切与材质；只在已经验证内部包裹不会破坏直接子元素布局语义的卡片上启用。非 `Card` 面板使用 `SmoothPanel`，大面板为 `20px / 80%`，紧凑信息卡通过 `cornerSize="compact"` 使用 `16px / 80%`。不要直接给带外阴影的根元素调用 `useSmoothCorners`，也不要对需要保留原生结构的交互控件使用 `SmoothCorners asChild`。`CardHeader` 可传入 `actions`，`CardContent` 支持 `className`；紧凑提示容器使用语义类 `app-info-card` 配合对应状态类。
-
-控制台同类功能页在根节点添加 `ios-workspace-page`，并显式给 `PageHeader` 传 `mobileLayout="inline"`。手机端只有 `Card smoothCorners` 和 `SmoothPanel` 会获得无外描边的柔和阴影；不要给卡内 `surface-soft`、菜单、输入或列表项添加该页面级材质。
-
-### Button / IconButton
-
-**文件位置**：`client/src/components/common/Button.tsx`
-
-**适用场景**：文本按钮、主要操作、危险操作、图标按钮。
-
-```tsx
-import { Button, IconButton } from '@/components/common'
-import { RefreshCw } from 'lucide-react'
-
-<Button variant="primary" size="md">保存</Button>
-<Button variant="danger" loading={deleting}>删除</Button>
-<IconButton icon={<RefreshCw />} title="刷新" />
-```
-
-`Button` 支持 `primary`、`secondary`、`outline`、`success`、`danger`、`ghost`。`IconButton` 仅支持 `primary`、`secondary`、`danger`、`ghost`。新增按钮优先走 `variant`，不要在页面里手写一套按钮颜色、阴影和圆角。
-
-### Input / Select / Checkbox
-
-**文件位置**：`client/src/components/common/Input.tsx`
-
-**适用场景**：表单输入、选择、错误提示、说明文字。
-
-```tsx
-import { Input, Select, Checkbox } from '@/components/common'
-
-<Input
-  label="ADB 路径"
-  value={adbPath}
-  onChange={setAdbPath}
-  error={adbPathError}
-/>
-
-<Select
-  label="队列策略"
-  value={strategy}
-  onChange={setStrategy}
-  options={strategyOptions}
-/>
-
-<Checkbox
-  label="失败后继续下一个"
-  checked={continueOnFailure}
-  onChange={setContinueOnFailure}
-/>
-```
-
-`Input`、`Select` 均支持 `error` 和 `hint`，`Input` 额外支持前置 `icon`。多行文本使用带 `app-input control-surface` 的原生 `textarea`。
-
-### EmptyState
-
-**文件位置**：`client/src/components/common/EmptyState.tsx`
-
-**适用场景**：流程、列表、统计区或数据面板暂时没有内容。通过 `index.ts` 导入，不要在页面中各自拼装“暂无数据”的图标、文案和间距。
-
-```tsx
-import { EmptyState, Button } from '@/components/common'
-
-<EmptyState
-  compact
-  icon={<Icons.TrendingUp />}
-  title="暂无掉落记录"
-  description="执行作战并完成材料识别后，会在这里汇总掉落。"
-  action={<Button variant="secondary">刷新</Button>}
-/>
-```
-
-`title` 为必填；`icon`、`description`、`action` 均可选。卡片内部使用 `compact`，页面级空状态保留默认尺寸。已有自动化流程和掉落记录页使用该组件。
-
-### ConfirmDialog / Loading
-
-**文件位置**：`client/src/components/common/Modal.tsx`、`client/src/components/common/Loading.tsx`
-
-**适用场景**：需要确认的破坏性操作使用 `ConfirmDialog`；短时局部等待使用 `Loading`。两者都由 common 的 `index.ts` 导出。控制台专用的 `DashboardSkeleton` 由 `Dashboard` 直接从 `Loading.tsx` 引入，不属于公共组件导出。
-
-```tsx
-import { ConfirmDialog, Loading } from '@/components/common'
-
-{loading ? <Loading text="正在读取日志..." /> : content}
-<ConfirmDialog
-  isOpen={confirmOpen}
-  onClose={() => setConfirmOpen(false)}
-  onConfirm={handleDelete}
-  title="确认删除"
-  message="此操作不可撤销。"
-/>
-```
+| 场景 | 组件 |
+| --- | --- |
+| 页面标题与操作区 | `PageHeader` |
+| 卡片与分区 | `Card` / `CardHeader` / `CardContent`；需要连续曲率时用 `SmoothPanel` |
+| 操作 | `Button`（有文字）、`IconButton`（仅图标，必须带 `title` 与 `aria-label`） |
+| 表单 | `Input`、`Select`、`Checkbox`、`Switch`；多行文本用带 `app-input control-surface` 的原生 `textarea` |
+| 空状态 | `EmptyState`，只用于确实没有数据 |
+| 不可逆操作确认 | `ConfirmDialog` |
+| 局部加载 | `Loading`；控制台骨架用 `DashboardSkeleton` |
+| 动态分段标签 | `useFluidTabIndicator` |
 
 ### useFluidTabIndicator
 
@@ -387,17 +245,12 @@ const { containerRef, activeRect, setTabRef } = useFluidTabIndicator(activeTab)
 
 ## 重构建议
 
-新增页面或改老页面时，按下面顺序处理：
+新增页面或改老页面时按这个顺序：
 
-1. 页面外层使用 `app-page`，主内容使用 `app-stack-section`。
-2. 页面标题使用 `PageHeader`。
-3. 大面板使用 `Card` 或 `app-card surface-panel`。
-4. 表单使用 `Input`、`Select`、`Checkbox`；多行文本复用 `app-input control-surface`。
-5. 没有内容时使用 `EmptyState`，不要重复手写空状态。
-6. 动态分段标签优先使用 `useFluidTabIndicator`，不要复制测量逻辑。
-7. 页面全局执行状态使用 `FloatingStatusIndicator`；局部状态使用既有 `status-*` 语义类并紧邻相关操作。
-8. 操作用 `Button`、`IconButton`。
-9. 如果出现新的颜色、圆角、间距需求，优先抽成 token 或语义类。
+1. 页面外层 `app-page` + `app-stack-section`，标题使用 `PageHeader`。
+2. 大面板使用 `Card` 或 `SmoothPanel`，内部分区用分隔线、网格或透明分组。
+3. 表单、按钮、空状态、加载按「组件选型」表选择，不要手写等价实现。
+4. 新的颜色、圆角、间距需求先抽成 token 或语义类，再落到页面。
 
 ### Tailwind 动态类名
 
@@ -415,23 +268,9 @@ className={`from-${tone}`}
 
 ## 维护清单
 
-- [x] 页面级色彩收敛到品牌色与状态语义色。
-- [x] 圆角和常用间距接入 Tailwind token。
-- [x] 卡片、按钮、输入控件接入 `app-*` 语义类。
-- [x] 移动端页面 padding 改由 `app-page` 和 spacing token 控制。
-- [x] 投影统一为中性阴影，移除品牌色和状态色光晕。
-- [x] 功能性文字下限统一到 `11px`（`--app-font-meta`）。
 - [ ] 持续把零散手写卡片迁移到 `Card` 或 `app-card`。
 - [ ] 为核心通用组件补充单元测试或视觉回归检查。
 - [ ] 每次改颜色或字号，在浅色和深色两套主题的真实渲染页面上各核对一次对比度。
-
----
-
-## 参考资料
-
-- [Tailwind CSS 文档](https://tailwindcss.com/docs)
-- [Framer Motion 文档](https://www.framer.com/motion/)
-- [React 组件设计模式](https://reactpatterns.com/)
 
 ---
 

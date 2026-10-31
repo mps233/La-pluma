@@ -17,9 +17,9 @@ La Pluma is a local web console for Arknights automation. The frontend configure
 Read these before broad work:
 
 - `README.md` for architecture, setup, Agent API behavior, and deployment.
-- `COMPONENT_LIBRARY_GUIDE.md` for the authoritative visual and component rules.
+- `DESIGN.md` for the authoritative visual and component rules.
 - `client/src/components/common/README.md` for component props and usage examples only; the visual rules live in the guide.
-- `server/utils/README.md` for response, file, and logging helpers.
+- `server/README.md` for the server-side helpers and data scripts.
 
 ## Working Rules
 
@@ -34,12 +34,12 @@ Read these before broad work:
 
 ## Frontend And Design
 
-`COMPONENT_LIBRARY_GUIDE.md` is the authoritative visual and component spec, and `client/src/components/common/README.md` documents component props. Both are committed. When a rule changes, edit those files instead of restating the rule here, so there is exactly one copy of each rule.
+`DESIGN.md` is the authoritative visual and component spec, and `client/src/components/common/README.md` documents component props. Both are committed. When a rule changes, edit those files instead of restating the rule here, so there is exactly one copy of each rule.
 
 Non-negotiables:
 
 - Prefer the components exported from `@/components/common` and the existing semantic `app-*` classes over new parallel implementations. Do not reference or import components and packages the repository does not contain; verify the export exists before citing it.
-- Continuous-corner and glass surfaces use the existing `SmoothPanel` / `Card smoothCorners` primitives (with `SmoothSurface` underneath). Keep clipping, corners, and motion inside those components instead of hand-building a second material layer.
+- Continuous-corner surfaces use the existing `SmoothPanel` / `Card smoothCorners` primitives (with `SmoothSurface` underneath). Keep clipping, corners, and motion inside those components instead of hand-building a second material layer.
 - Brand color plus semantic status colors only. No page-specific palettes, bright gradients, colored glow shadows, or decorative color noise.
 - Read control sizes, radii, and spacing from the tokens in `client/src/index.css` and `client/src/ios-theme.css`; the iOS shell overrides several base values. Cite the token rather than a number, and never shrink standard controls at call sites.
 - Do not nest cards for ordinary page sections. Use headers, dividers, grids, or transparent internal groups.

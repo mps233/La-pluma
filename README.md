@@ -27,7 +27,7 @@
 - 🤖 **Agent API** - 通过 `/api/agent` 暴露 manifest/status/actions，方便 AI 或脚本调用
 - 🎨 **现代化 UI** - React 原生 iOS 26 风格壳层 + Tailwind CSS + Framer Motion，支持深色模式
 - 📲 **PWA 支持** - 在 HTTPS 或 localhost 下可安装，离线可打开已缓存界面
-- 🔄 **实时更新** - WebSocket 实时推送任务状态和日志
+- 🔄 **实时更新** - 轮询 Agent API 刷新任务状态与日志（约 1–5 秒）
 
 ## 📸 界面预览
 
@@ -60,14 +60,7 @@ La Pluma 是一个面向《明日方舟》自动化的本地 Web 控制台。前
 
 ### 前端 UI 与响应式壳层
 
-前端使用 React 19、Tailwind CSS 和 Framer Motion。`Layout` 与 common 组件使用原生语义元素实现页面 chrome、导航栏、移动 tabbar 和模态交互；项目语义 token 与 `ios-theme.css` 统一 iOS 26 风格、La Pluma 品牌色和信息密度。
-
-- 桌面端使用左侧工作台导航；移动端使用悬浮的 iOS 风格底部胶囊导航，右侧搜索/更多入口承载次要页面。两端共享同一套 URL 路由和页面状态。
-- 主题由 `useUIStore` 管理，`light`、`dark`、`system` 会同步到文档根节点和 `.la-pluma-app`。页面组件不要自行切换 `.dark` 或另建主题状态。
-- 页面启用 `viewport-fit=cover`。`Layout` 通过统一的安全区 token 管理 navbar、移动 tabbar 和页面内容；自定义固定层只有在不属于应用 chrome 时才补充 `env(safe-area-inset-*)`，避免重复留白。
-- `Button`、`Card`、`Loading`、`Switch` 等通用组件使用原生语义元素，在浏览器、测试、SSR 和嵌入式渲染中保持同一套 DOM 与行为。
-
-新增页面应复用现有 Layout、common 组件和语义 token；不要重复创建桌面侧栏、移动 tabbar 或页面级安全区计算。
+前端使用 React 19、Tailwind CSS 和 Framer Motion。页面 chrome、导航栏、移动 tabbar、主题切换和安全区由 `Layout` 与 common 组件统一提供；壳层结构、导航规则和主题约定见 `DESIGN.md`，这里不再重复。
 
 ## 🤖 Agent API
 
@@ -350,7 +343,7 @@ docker-compose up -d --build
 
 **配置说明**：
 - 宿主机端口：`3055`，容器内端口：`3000`
-- 数据持久化：`./docker-data/` 和 `./server/data/`
+- 数据持久化：`docker-compose.yml` 挂载三个目录——`server/data`（配置与运行数据）、`/root/.config/maa`（MAA 配置）、`/root/.local/share/maa`（MaaCore 与资源）；宿主机路径按部署环境调整
 - ADB 连接：在 WebUI 中配置设备地址（如 `127.0.0.1:5555`）
 - 首次启动会自动下载 MaaCore（约 5-10 分钟）
 
@@ -463,7 +456,7 @@ la-pluma/
 
 ### ADB 连接配置
 
-在"自动化任务"页面配置 ADB 连接：
+在"配置 → 连接配置"中设置 ADB 路径和设备地址：
 
 - **ADB 路径**：默认 `/opt/homebrew/bin/adb`
 - **设备地址**：
@@ -472,21 +465,24 @@ la-pluma/
 
 ### Telegram 通知配置
 
-在"通知设置"页面配置：
+在"自动化任务"页面的"定时与通知"区域配置：
 
 1. 创建 Telegram Bot（通过 @BotFather）
 2. 获取 Bot Token
 3. 获取 Chat ID（通过 @userinfobot）
 4. 填入配置并测试
 
-**Bot 远程控制**：配置完成后，Bot 会自动启动，支持以下命令：
+**Bot 远程控制**：保存配置并重启服务后，Bot 会随服务启动，支持以下命令：
 
 ```
 /help - 显示帮助信息
 /status - 查看当前任务状态
+/start /stop - 开始或停止当前任务
 /fight <关卡> - 执行理智作战（例如：/fight 1-7）
 /roguelike [主题] - 执行肉鸽任务（例如：/roguelike Sami）
-/stop - 停止当前任务
+/copilot - 执行抄作业
+/startup /closedown - 启动或关闭游戏客户端
+/screenshot - 获取当前截图
 ```
 
 **注意**：Bot 只响应配置的 Chat ID，其他用户无法控制。
@@ -498,15 +494,15 @@ la-pluma/
 - **图标**: Lucide React
 - **状态管理**: Zustand
 - **后端**: Node.js + Express
-- **实时通信**: Socket.io
+- **状态刷新**: 前端轮询 `/api/agent`
+- **API 访问**: 前端统一通过 `client/src/services/api.ts` 调用 `/api/agent/*`
 - **MAA 集成**: 通过子进程调用 `maa` CLI 命令
 - **模拟器连接**: ADB + ScrcpyOverWebRTC
+- **定时任务**: node-cron
 - **数据来源**: MAA 识别结果和本地游戏数据 JSON
 - **通知服务**: Telegram Bot API 和任务完成通知
 
 ## 📝 开发指南
-
-项目使用 React + TypeScript + Node.js 技术栈，代码结构围绕“前端页面、Agent API、后端服务”展开。
 
 ### 文档地图
 
@@ -514,31 +510,16 @@ la-pluma/
 | --- | --- |
 | `README.md` | 产品能力、架构、安装部署、Agent API 概览 |
 | `AGENTS.md` | 编码 agent 的工作规则、验证命令与交付标准 |
-| `COMPONENT_LIBRARY_GUIDE.md` | 视觉规范与组件选型的唯一事实源 |
+| `DESIGN.md` | 视觉规范与组件选型的唯一事实源 |
 | `client/src/components/common/README.md` | 通用组件的 props 与用法示例 |
-| `server/utils/README.md` | 响应、文件与日志工具 |
-| `docs/` | MAA 版本影响分析与任务覆盖矩阵 |
+| `server/README.md` | 服务端工具类与数据脚本 |
+| `docs/maa.md` | MAA 集成现状、未完成项与 CLI 事实 |
 
 规范类内容只在对应文件中维护一次，其他文档引用而不复制；修改规范时同步更新该文件本身。
 
-### 主要技术点
-
-- **前端**: React Hooks 与原生语义组件实现页面壳层和响应式 chrome，Tailwind CSS/语义 token 负责业务布局，Framer Motion 负责物理动效，Zustand 管理跨页面状态
-- **API**: 前端通过 `client/src/services/api.ts` 访问 `/api/agent/*`
-- **后端**: `server/server.js` 挂载 Agent API，并用 Socket.IO 推送运行状态
-- **MAA 集成**: 通过 Node.js 子进程调用 `maa` CLI 命令
-- **定时任务**: 使用 node-cron 实现任务调度
-- **通知服务**: Telegram Bot API + 任务完成通知
-
 ### 常用检查
 
-```bash
-# 前端类型检查和构建
-cd client && npm run build
-
-# 后端语法检查
-cd server && npm run check
-```
+验证命令与交付标准统一维护在 `AGENTS.md` 的 Commands 与 Definition Of Done 两节，这里不再重复。
 
 ## 🤝 贡献
 
