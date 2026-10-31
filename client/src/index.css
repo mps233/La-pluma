@@ -4473,11 +4473,7 @@ svg.w-5.h-5 {
     }
 
     .pwa-install-entry {
-      bottom: calc(
-        var(--app-tabbar-icons-height, var(--app-toolbar-height, 0px))
-        + var(--app-safe-area-bottom, env(safe-area-inset-bottom, 0px))
-        + 1rem
-      );
+      display: none;
     }
 
     .pwa-update-chip {

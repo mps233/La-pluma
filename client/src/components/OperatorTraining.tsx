@@ -33,8 +33,8 @@ const TRAINING_STATUS_OPTIONS: Array<{
   desc: string
 }> = [
   { value: 'trainable', label: '可养成', desc: '可加入队列' },
-  { value: 'owned', label: '已拥有', desc: '已识别干员' },
-  { value: 'all', label: '全部', desc: '含未拥有' },
+  { value: 'owned', label: '已拥有', desc: '全部已拥有' },
+  { value: 'all', label: '全部', desc: '全部干员' },
 ]
 
 // 材料层级节点组件
@@ -435,8 +435,8 @@ export default function OperatorTraining() {
       const rarity = requestedRarity ? parseInt(requestedRarity) : undefined;
       const [trainableResponse, ownedResponse, allOperatorsResponse, operBoxResponse] = await Promise.all([
         getOperatorList({ status: 'trainable', rarity, needsElite2: requestedNeedsElite2 }),
-        getOperatorList({ status: 'owned', rarity, needsElite2: requestedNeedsElite2 }),
-        getAllOperators(),
+        getOperatorList({ status: 'owned', rarity }),
+        getOperatorList({ status: 'all', rarity }),
         getOperBoxData()
       ]);
 

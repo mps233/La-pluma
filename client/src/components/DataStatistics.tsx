@@ -1313,6 +1313,8 @@ export default function DataStatistics() {
                               <img
                                 src={`https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/avatar/${oper.id}.png`}
                                 alt={oper.name}
+                                loading="lazy"
+                                decoding="async"
                                 className={`h-full w-full object-cover transition-opacity duration-300 ${
                                   imageLoaded ? 'opacity-100' : 'opacity-0'
                                 }`}

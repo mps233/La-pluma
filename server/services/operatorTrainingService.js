@@ -314,6 +314,9 @@ async function getOperatorList(filters = {}) {
 
   const ownedOperators = getOperBoxOperators(operBoxData);
   const ownedMap = new Map(ownedOperators.map(operator => [operator.id, operator]));
+  const catalogOwnIds = new Set((operBoxData?.allOpers || [])
+    .filter(operator => operator?.own === true)
+    .map(operator => operator.id));
   let allOperators = [];
 
   try {
@@ -328,21 +331,37 @@ async function getOperatorList(filters = {}) {
     }));
   }
 
+  // Keep the training catalog consistent with OperBox/DataStatistics: add
+  // operators that exist in `all_opers` but not in battle_data.
+  const knownOperatorIds = new Set(allOperators.map(operator => operator.id));
+  for (const catalogOperator of operBoxData?.allOpers || []) {
+    const id = String(catalogOperator?.id || '');
+    if (!id || knownOperatorIds.has(id)) continue;
+    allOperators.push({
+      id,
+      name: catalogOperator.name || id,
+      rarity: Number(catalogOperator.rarity) || 0,
+      profession: operatorMaterialsData.operators?.[id]?.profession || '未知',
+      position: undefined
+    });
+    knownOperatorIds.add(id);
+  }
+
   const operators = allOperators.map(baseOperator => {
     const ownedOperator = ownedMap.get(baseOperator.id);
     const opData = operatorMaterialsData.operators?.[baseOperator.id];
-    const owned = Boolean(ownedOperator);
+    const owned = Boolean(ownedOperator) || catalogOwnIds.has(baseOperator.id);
     const operator = {
       id: baseOperator.id,
       name: ownedOperator?.name || baseOperator.name,
       rarity: ownedOperator?.rarity ?? baseOperator.rarity,
       profession: opData?.profession || baseOperator.profession || ownedOperator?.profession || '未知',
       position: baseOperator.position,
-      currentElite: owned ? (ownedOperator.elite || 0) : 0,
-      currentLevel: owned ? (ownedOperator.level || 1) : 0,
+      currentElite: owned ? (ownedOperator?.elite || 0) : 0,
+      currentLevel: owned ? (ownedOperator?.level || 1) : 0,
       targetElite: 2,
       owned,
-      potential: owned ? (ownedOperator.potential || 1) : 0,
+      potential: owned ? (ownedOperator?.potential || 1) : 0,
       hasMaterialData: !!opData,
       materials: opData ? {
         elite1: opData.elite1,

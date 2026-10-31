@@ -338,10 +338,15 @@ const migrateTaskParams = (task: any) => {
     delete params.adbPath
     delete params.address
   }
+  if (commandId === 'startup') {
+    params.startGameEnabled ??= true
+  }
   if (commandId === 'fight') {
     params.drops ??= ''
     params.clientType ??= ''
     params.DrGrandet ??= false
+    params.medicineExpireDays ??= 0
+    params.server ??= ''
     params.report_to_penguin ??= false
     params.penguin_id ??= ''
     params.report_to_yituliu ??= false
@@ -356,6 +361,13 @@ const migrateTaskParams = (task: any) => {
     params.first_tags ??= ''
     params.extra_tags_mode ??= 0
     params.recruitment_time ??= { '3': 540, '4': 540 }
+    params.level3_recruitment_permit_reserve ??= 0
+    params.report_to_penguin ??= false
+    params.penguin_id ??= ''
+    params.report_to_yituliu ??= false
+    params.yituliu_id ??= ''
+    params.server ??= 'CN'
+    params.calculationOnly ??= false
     delete params.skip_robot
   } else if (commandId === 'infrast') {
     params.filename ??= ''

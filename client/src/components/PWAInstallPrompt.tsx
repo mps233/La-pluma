@@ -33,8 +33,8 @@ const canOfferInstallation = () =>
   window.isSecureContext
   || ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)
 
-const isCompactInstallViewport = () =>
-  window.matchMedia('(max-width: 639px)').matches
+const isDesktopInstallViewport = () =>
+  window.matchMedia('(min-width: 1024px)').matches
 
 const shouldRemindAboutInstall = () => {
   try {
@@ -71,7 +71,7 @@ export default function PWAInstallPrompt() {
     && canOfferInstallation()
     && isIosDevice()
     && shouldRemindAboutInstall())
-  const [isInstallExpanded, setIsInstallExpanded] = useState(() => !isCompactInstallViewport())
+  const [isInstallExpanded, setIsInstallExpanded] = useState(() => !isDesktopInstallViewport())
   const [isUpdateCollapsed, setIsUpdateCollapsed] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const serviceWorkerRegistrationRef = useRef<ServiceWorkerRegistration | null>(null)
@@ -147,7 +147,7 @@ export default function PWAInstallPrompt() {
       const promptEvent = e as BeforeInstallPromptEvent
       setDeferredPrompt(promptEvent)
       if (shouldRemindAboutInstall()) {
-        setIsInstallExpanded(!isCompactInstallViewport())
+        setIsInstallExpanded(!isDesktopInstallViewport())
         setShowInstallPrompt(true)
       }
     }
