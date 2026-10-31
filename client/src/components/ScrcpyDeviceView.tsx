@@ -173,7 +173,7 @@ export default function ScrcpyDeviceView({
     ? 'bg-[var(--app-success)]'
     : isConnecting
         ? 'bg-[var(--app-warning)]'
-        : 'bg-gray-400'
+        : 'bg-[var(--app-text-soft)]'
 
   const applyPreset = (preset: QualityPreset) => {
     const next = qualityPresets[preset]
@@ -441,8 +441,8 @@ export default function ScrcpyDeviceView({
           <div className="min-w-0">
             <div className="scrcpy-view-title-row flex items-center gap-2">
               <span className={`scrcpy-view-status-dot h-2 w-2 rounded-full ${statusDotClass}`} />
-              <span className="scrcpy-view-title text-sm font-semibold text-gray-900 dark:text-white">{isCompact ? '模拟器画面' : '模拟器实时预览'}</span>
-              <span className="scrcpy-view-status text-xs text-gray-500 dark:text-gray-400" role="status" aria-live="polite">
+              <span className="scrcpy-view-title text-sm font-semibold text-primary">{isCompact ? '模拟器画面' : '模拟器实时预览'}</span>
+              <span className="scrcpy-view-status text-xs text-secondary" role="status" aria-live="polite">
                 {statusLabel[webrtc.status] || webrtc.status}
               </span>
             </div>

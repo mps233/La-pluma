@@ -757,7 +757,7 @@ export default function RoguelikeTasks() {
       return (
         <fieldset>
           <legend className="roguelike-field-label mb-1 block">{option.label}</legend>
-          <p className="mb-2 text-xs leading-5 text-gray-500 dark:text-gray-400">{option.helper}</p>
+          <p className="mb-2 text-xs leading-5 text-secondary">{option.helper}</p>
           <div className="space-y-2">
             {rows.map((row, index) => (
               <div key={index} className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
@@ -772,7 +772,7 @@ export default function RoguelikeTasks() {
                 />
                 <label
                   htmlFor={`roguelike-${task.id}-${fieldSlug}-${index}-support`}
-                  className="flex min-h-11 items-center gap-2 whitespace-nowrap text-xs text-gray-600 dark:text-gray-300"
+                  className="flex min-h-11 items-center gap-2 whitespace-nowrap text-xs text-secondary"
                 >
                   <input
                     id={`roguelike-${task.id}-${fieldSlug}-${index}-support`}
@@ -793,13 +793,13 @@ export default function RoguelikeTasks() {
     const renderBlackflowRewards = (option: RoguelikeAdvancedOption) => (
       <fieldset>
         <legend className="roguelike-field-label mb-1 block">{option.label}</legend>
-        <p className="mb-2 text-xs leading-5 text-gray-500 dark:text-gray-400">{option.helper}</p>
+        <p className="mb-2 text-xs leading-5 text-secondary">{option.helper}</p>
         <div className="grid grid-cols-2 gap-2">
           {BLACKFLOW_REWARDS.map(reward => (
             <label
               key={reward.value}
               htmlFor={`roguelike-${task.id}-blackflow-reward-${reward.value}`}
-              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-[var(--app-border)] px-2 py-1.5 text-xs text-gray-700 dark:text-gray-300"
+              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-[var(--app-border)] px-2 py-1.5 text-xs text-secondary"
             >
               <input
                 id={`roguelike-${task.id}-blackflow-reward-${reward.value}`}
@@ -828,13 +828,13 @@ export default function RoguelikeTasks() {
       return (
         <fieldset>
           <legend className="roguelike-field-label mb-1 block">{option.label}</legend>
-          <p className="mb-2 text-xs leading-5 text-gray-500 dark:text-gray-400">{option.helper}</p>
+          <p className="mb-2 text-xs leading-5 text-secondary">{option.helper}</p>
           <div className="grid grid-cols-2 gap-2">
             {COLLECTIBLE_START_REWARDS.map(reward => (
               <label
                 key={reward.key}
                 htmlFor={`roguelike-${task.id}-collectible-${reward.key}`}
-                className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-[var(--app-border)] px-2 py-1.5 text-xs text-gray-700 dark:text-gray-300"
+                className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-[var(--app-border)] px-2 py-1.5 text-xs text-secondary"
               >
                 <input
                   id={`roguelike-${task.id}-collectible-${reward.key}`}
@@ -895,7 +895,7 @@ export default function RoguelikeTasks() {
                   />
                 )}
                 {!isCustom && option.helper && (
-                  <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{option.helper}</p>
+                  <p className="mt-1 text-xs leading-5 text-secondary">{option.helper}</p>
                 )}
               </div>
             )

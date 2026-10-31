@@ -2669,8 +2669,8 @@ export default function AutomationTasks() {
               {lastExecutionSummary && (
                 <section className="border-t border-[var(--app-border)] px-3.5 py-3 sm:px-4" aria-label="最近执行结果">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-200">最近执行</h4>
-                    <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                    <h4 className="text-xs font-semibold text-primary">最近执行</h4>
+                    <span className="text-[11px] text-tertiary">
                       成功 {lastExecutionSummary.successCount}
                       {lastExecutionSummary.failedCount > 0 && ` · 失败 ${lastExecutionSummary.failedCount}`}
                       {lastExecutionSummary.skippedCount > 0 && ` · 跳过 ${lastExecutionSummary.skippedCount}`}
@@ -2682,9 +2682,9 @@ export default function AutomationTasks() {
                     {executionSummaryHasFailure(lastExecutionSummary)
                       ? <AlertTriangle size={14} className="shrink-0 text-[var(--app-danger)]" strokeWidth={2} />
                       : lastExecutionSummary.skippedCount > 0 && lastExecutionSummary.successCount === 0
-                        ? <CircleMinus size={14} className="shrink-0 text-gray-400" strokeWidth={2} />
+                        ? <CircleMinus size={14} className="shrink-0 text-tertiary" strokeWidth={2} />
                         : <CheckCircle2 size={14} className="shrink-0 text-[var(--app-success)]" strokeWidth={2} />}
-                    <span className="min-w-0 flex-1 text-xs leading-5 text-gray-600 dark:text-gray-300">
+                    <span className="min-w-0 flex-1 text-xs leading-5 text-secondary">
                       {formatExecutionActionSummary(lastExecutionSummary.actions)
                         || (lastExecutionSummary.failedCount > 0
                           ? `${lastExecutionSummary.failedCount} 项任务执行失败`
@@ -2698,7 +2698,7 @@ export default function AutomationTasks() {
                       aria-expanded={executionDetailsOpen}
                       aria-label={executionDetailsOpen ? '收起执行详情' : '展开执行详情'}
                       title={executionDetailsOpen ? '收起详情' : '展开详情'}
-                      className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                      className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-tertiary transition-colors hover:bg-black/5 hover:text-primary dark:hover:bg-white/5"
                     >
                       <ChevronDown
                         size={15}
@@ -2721,13 +2721,13 @@ export default function AutomationTasks() {
                             .filter(summary => summary.stage || summary.drops)
                             .map((summary, summaryIndex) => (
                               <div key={`${summary.task}-${summary.stage || summaryIndex}`} className="min-w-0 text-xs">
-                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-gray-700 dark:text-gray-200">
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-primary">
                                   <span className="font-semibold">{summary.stage || summary.task}</span>
-                                  {summary.times && <span className="text-gray-400">{summary.times} 次</span>}
-                                  {summary.duration && <span className="text-gray-400">{summary.duration}</span>}
+                                  {summary.times && <span className="text-tertiary">{summary.times} 次</span>}
+                                  {summary.duration && <span className="text-tertiary">{summary.duration}</span>}
                                 </div>
                                 {summary.drops && (
-                                  <p className="mt-1 break-words leading-5 text-gray-500 dark:text-gray-400">{summary.drops}</p>
+                                  <p className="mt-1 break-words leading-5 text-secondary">{summary.drops}</p>
                                 )}
                               </div>
                             ))}
@@ -2876,7 +2876,7 @@ export default function AutomationTasks() {
                             return (
                             <div key={field.key} className={`automation-param-field is-${field.type}`}>
                               {field.type === 'checkbox' ? (
-                                <label htmlFor={fieldId} className="group flex min-h-11 cursor-pointer items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
+                                <label htmlFor={fieldId} className="group flex min-h-11 cursor-pointer items-center space-x-2 text-sm text-secondary">
                                   <input
                                     id={fieldId}
                                     type="checkbox"
@@ -2909,7 +2909,7 @@ export default function AutomationTasks() {
                                       onChange={(e) => updateTaskParam(index, field.key, e.target.value)}
                                       placeholder={field.placeholder}
                                       disabled={isRunning || !task.enabled}
-                                      className="flex-1 px-3 py-2 bg-transparent text-sm text-gray-900 dark:text-gray-200 focus:outline-none min-w-0"
+                                      className="flex-1 px-3 py-2 bg-transparent text-sm text-primary focus:outline-none min-w-0"
                                     />
                                     <div className="w-px h-6 bg-white/20"></div>
                                     <input
@@ -2920,7 +2920,7 @@ export default function AutomationTasks() {
                                       onChange={(e) => updateTaskParam(index, 'times', e.target.value)}
                                       placeholder=""
                                       disabled={isRunning || !task.enabled}
-                                      className="w-16 px-2 py-2 bg-transparent text-sm text-gray-900 dark:text-gray-200 text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                      className="w-16 px-2 py-2 bg-transparent text-sm text-primary text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                       min="0"
                                     />
                                     <div className="hidden flex-col self-stretch overflow-hidden border-l border-white/10 min-[900px]:flex">
@@ -2934,7 +2934,7 @@ export default function AutomationTasks() {
                                         className="flex-1 px-1.5 bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center rounded-tr-xl"
                                         aria-label={`增加${field.label}执行次数`}
                                       >
-                                        <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                        <svg className="w-3 h-3 text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
                                         </svg>
                                       </button>
@@ -2951,7 +2951,7 @@ export default function AutomationTasks() {
                                         className="flex-1 px-1.5 bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center rounded-br-xl"
                                         aria-label={`减少${field.label}执行次数`}
                                       >
-                                        <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                        <svg className="w-3 h-3 text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                                         </svg>
                                       </button>
@@ -2967,7 +2967,7 @@ export default function AutomationTasks() {
                                       const isChecked = currentValue.includes(star);
                                       const optionId = `${fieldId}-${star}`
                                       return (
-                                        <label key={star} htmlFor={optionId} className="group flex min-h-11 cursor-pointer items-center space-x-1 text-sm text-gray-700 dark:text-gray-300">
+                                        <label key={star} htmlFor={optionId} className="group flex min-h-11 cursor-pointer items-center space-x-1 text-sm text-secondary">
                                           <input
                                             id={optionId}
                                             type="checkbox"
@@ -3018,7 +3018,7 @@ export default function AutomationTasks() {
                                       const isChecked = currentValue.includes(facility.value);
                                       const optionId = `${fieldId}-${facility.value}`
                                       return (
-                                        <label key={facility.value} htmlFor={optionId} className="group flex min-h-11 cursor-pointer items-center space-x-1 text-sm text-gray-700 dark:text-gray-300">
+                                        <label key={facility.value} htmlFor={optionId} className="group flex min-h-11 cursor-pointer items-center space-x-1 text-sm text-secondary">
                                           <input
                                             id={optionId}
                                             type="checkbox"
@@ -3135,7 +3135,7 @@ export default function AutomationTasks() {
 
                       {task.commandId === 'fight' && (
                         <details className="group mt-3 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] px-3 py-2">
-                          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
+                          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-primary marker:hidden [&::-webkit-details-marker]:hidden">
                             <span className="flex items-center gap-2">
                               <SlidersHorizontal size={15} strokeWidth={1.9} />
                               高级设置
@@ -3145,7 +3145,7 @@ export default function AutomationTasks() {
 
                           <div className="mt-3 space-y-3 border-t border-[var(--app-border)] pt-3">
                             <div className="flex items-center gap-2">
-                              <label htmlFor={`${task.id}-fight-client-type`} className="w-24 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">闪退重启:</label>
+                              <label htmlFor={`${task.id}-fight-client-type`} className="w-24 shrink-0 whitespace-nowrap text-sm text-secondary">闪退重启:</label>
                               <div className="automation-select-control min-w-0 flex-1">
                                 <select
                                   id={`${task.id}-fight-client-type`}
@@ -3164,9 +3164,9 @@ export default function AutomationTasks() {
                                 <ChevronDown size={15} strokeWidth={2} aria-hidden="true" />
                               </div>
                             </div>
-                            <p className="text-xs text-gray-400 dark:text-gray-500">选择客户端后，游戏闪退时会自动重新启动。</p>
+                            <p className="text-xs text-tertiary">选择客户端后，游戏闪退时会自动重新启动。</p>
 
-                            <label className="flex min-h-11 cursor-pointer items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                            <label className="flex min-h-11 cursor-pointer items-start gap-2 text-sm text-secondary">
                               <input
                                 type="checkbox"
                                 checked={Boolean(task.params.DrGrandet)}
@@ -3176,12 +3176,12 @@ export default function AutomationTasks() {
                               />
                               <span>
                                 <span className="block">葛朗台碎石模式</span>
-                                <span className="mt-0.5 block text-xs text-gray-400 dark:text-gray-500">使用源石前等待自然恢复 1 点理智，尽量减少碎石浪费。</span>
+                                <span className="mt-0.5 block text-xs text-tertiary">使用源石前等待自然恢复 1 点理智，尽量减少碎石浪费。</span>
                               </span>
                             </label>
 
                             <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
-                              <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                              <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
                                 <input
                                   type="checkbox"
                                   checked={Boolean(task.params.report_to_penguin)}
@@ -3193,7 +3193,7 @@ export default function AutomationTasks() {
                               </label>
                               {task.params.report_to_penguin && (
                                 <div className="flex items-center gap-2 pl-6">
-                                  <label htmlFor={`${task.id}-penguin-id`} className="w-20 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">用户 ID:</label>
+                                  <label htmlFor={`${task.id}-penguin-id`} className="w-20 shrink-0 whitespace-nowrap text-sm text-secondary">用户 ID:</label>
                                   <input
                                     id={`${task.id}-penguin-id`}
                                     type="text"
@@ -3208,7 +3208,7 @@ export default function AutomationTasks() {
                             </section>
 
                             <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
-                              <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                              <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
                                 <input
                                   type="checkbox"
                                   checked={Boolean(task.params.report_to_yituliu)}
@@ -3220,7 +3220,7 @@ export default function AutomationTasks() {
                               </label>
                               {task.params.report_to_yituliu && (
                                 <div className="flex items-center gap-2 pl-6">
-                                  <label htmlFor={`${task.id}-yituliu-id`} className="w-20 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">用户 ID:</label>
+                                  <label htmlFor={`${task.id}-yituliu-id`} className="w-20 shrink-0 whitespace-nowrap text-sm text-secondary">用户 ID:</label>
                                   <input
                                     id={`${task.id}-yituliu-id`}
                                     type="text"
@@ -3239,7 +3239,7 @@ export default function AutomationTasks() {
 
                       {task.commandId === 'infrast' && (
                         <details className="group mt-3 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] px-3 py-2">
-                          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
+                          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-primary marker:hidden [&::-webkit-details-marker]:hidden">
                             <span className="flex items-center gap-2">
                               <SlidersHorizontal size={15} strokeWidth={1.9} />
                               高级设置
@@ -3250,8 +3250,8 @@ export default function AutomationTasks() {
                           <div className="mt-3 space-y-3 border-t border-[var(--app-border)] pt-3">
                             {Array.isArray(task.params.facility) && task.params.facility.includes('Dorm') && (
                               <section className="space-y-2">
-                                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">宿舍</h4>
-                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <h4 className="text-xs font-semibold text-secondary">宿舍</h4>
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
                                   <input
                                     type="checkbox"
                                     checked={Boolean(task.params.dorm_notstationed_enabled)}
@@ -3261,7 +3261,7 @@ export default function AutomationTasks() {
                                   />
                                   使用“未进驻”筛选
                                 </label>
-                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
                                   <input
                                     type="checkbox"
                                     checked={Boolean(task.params.dorm_trust_enabled)}
@@ -3276,8 +3276,8 @@ export default function AutomationTasks() {
 
                             {Array.isArray(task.params.facility) && task.params.facility.includes('Reception') && (
                               <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
-                                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">会客室</h4>
-                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <h4 className="text-xs font-semibold text-secondary">会客室</h4>
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
                                   <input
                                     type="checkbox"
                                     checked={Boolean(task.params.reception_message_board)}
@@ -3287,7 +3287,7 @@ export default function AutomationTasks() {
                                   />
                                   领取信息板信用
                                 </label>
-                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
                                   <input
                                     type="checkbox"
                                     checked={Boolean(task.params.reception_clue_exchange)}
@@ -3297,7 +3297,7 @@ export default function AutomationTasks() {
                                   />
                                   发起线索交流
                                 </label>
-                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
                                   <input
                                     type="checkbox"
                                     checked={Boolean(task.params.reception_send_clue)}
@@ -3312,8 +3312,8 @@ export default function AutomationTasks() {
 
                             {Array.isArray(task.params.facility) && task.params.facility.includes('Training') && (
                               <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
-                                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">训练室</h4>
-                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <h4 className="text-xs font-semibold text-secondary">训练室</h4>
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
                                   <input
                                     type="checkbox"
                                     checked={Boolean(task.params.continue_training)}
@@ -3331,7 +3331,7 @@ export default function AutomationTasks() {
 
                       {task.commandId === 'recruit' && (
                         <details className="group mt-3 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] px-3 py-2">
-                          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
+                          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-primary marker:hidden [&::-webkit-details-marker]:hidden">
                             <span className="flex items-center gap-2">
                               <SlidersHorizontal size={15} strokeWidth={1.9} />
                               高级设置
@@ -3341,7 +3341,7 @@ export default function AutomationTasks() {
 
                           <div className="mt-3 space-y-3 border-t border-[var(--app-border)] pt-3">
                             <div className="flex items-center gap-2">
-                              <label htmlFor={`${task.id}-extra-tags-mode`} className="w-20 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">额外标签:</label>
+                              <label htmlFor={`${task.id}-extra-tags-mode`} className="w-20 shrink-0 whitespace-nowrap text-sm text-secondary">额外标签:</label>
                               <div className="automation-select-control min-w-0 flex-1">
                                 <select
                                   id={`${task.id}-extra-tags-mode`}
@@ -3358,7 +3358,7 @@ export default function AutomationTasks() {
                             </div>
 
                             <div className="flex items-center gap-2">
-                              <label htmlFor={`${task.id}-first-tags`} className="w-20 shrink-0 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">三星首选:</label>
+                              <label htmlFor={`${task.id}-first-tags`} className="w-20 shrink-0 whitespace-nowrap text-sm text-secondary">三星首选:</label>
                               <input
                                 id={`${task.id}-first-tags`}
                                 type="text"
@@ -3369,10 +3369,10 @@ export default function AutomationTasks() {
                                 className="automation-text-control min-w-0 flex-1"
                               />
                             </div>
-                            <p className="text-xs text-gray-400 dark:text-gray-500">仅在三星组合中优先选择，多个标签用逗号分隔。</p>
+                            <p className="text-xs text-tertiary">仅在三星组合中优先选择，多个标签用逗号分隔。</p>
 
                             <fieldset>
-                              <legend className="mb-2 block text-sm text-gray-600 dark:text-gray-400">招募时长:</legend>
+                              <legend className="mb-2 block text-sm text-secondary">招募时长:</legend>
                               <div className="automation-recruitment-time-list">
                                 {[3, 4].map(star => {
                                   const key = String(star)
@@ -3380,7 +3380,7 @@ export default function AutomationTasks() {
                                   const recruitmentTime = task.params.recruitment_time || { '3': 540, '4': 540 }
                                   return (
                                     <label key={star} htmlFor={recruitmentTimeId} className="automation-recruitment-time-row">
-                                      <span className="shrink-0 text-sm font-medium text-gray-700 dark:text-gray-200">{star} 星</span>
+                                      <span className="shrink-0 text-sm font-medium text-primary">{star} 星</span>
                                       <input
                                         id={recruitmentTimeId}
                                         type="number"
@@ -3397,14 +3397,14 @@ export default function AutomationTasks() {
                                         max="540"
                                         step="10"
                                         disabled={isRunning || !task.enabled}
-                                        className="min-w-0 flex-1 bg-transparent text-right text-sm text-gray-900 outline-none dark:text-gray-100"
+                                        className="min-w-0 flex-1 bg-transparent text-right text-sm text-primary outline-none"
                                       />
-                                      <span className="shrink-0 text-xs text-gray-400">分钟</span>
+                                      <span className="shrink-0 text-xs text-tertiary">分钟</span>
                                     </label>
                                   )
                                 })}
                               </div>
-                              <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">可设置 60 至 540 分钟，按 10 分钟调整；五星和六星固定为 540 分钟。</p>
+                              <p className="mt-1.5 text-xs text-tertiary">可设置 60 至 540 分钟，按 10 分钟调整；五星和六星固定为 540 分钟。</p>
                             </fieldset>
                           </div>
                         </details>
@@ -3412,7 +3412,7 @@ export default function AutomationTasks() {
 
                       {/* 启动游戏任务的测试连接按钮 */}
                       {task.commandId === 'startup' && (
-                        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-white/10">
+                        <div className="mt-4 pt-4 border-t border-[var(--app-border)]">
                           <Button
                             type="button"
                             fullWidth
