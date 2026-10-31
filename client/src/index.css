@@ -3609,7 +3609,7 @@ svg.w-5.h-5 {
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
     margin-top: 0.125rem;
-    color: var(--app-text-tertiary);
+    color: var(--app-text-soft);
     font-size: var(--app-font-meta);
     line-height: 1.2;
   }
@@ -3622,7 +3622,7 @@ svg.w-5.h-5 {
     display: flex;
     height: 2.25rem;
     align-items: center;
-    color: var(--app-text-tertiary);
+    color: var(--app-text-soft);
     font-size: var(--app-font-meta);
   }
 
