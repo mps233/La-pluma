@@ -2034,7 +2034,7 @@ export default function CombatTasks() {
                                         )}
                                       </span>
                                     </button>
-                                    <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${
+                                    <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[11px] ${
                                       isCurrent ? 'bg-[var(--app-accent)] text-white animate-pulse' :
                                       isCompleted ? (isSuccess ? 'bg-[var(--app-success)] text-white' : 'bg-[var(--app-danger)] text-white') :
                                       isPersistedDone ? 'bg-black/10 text-tertiary dark:bg-white/10' :
@@ -2046,10 +2046,10 @@ export default function CombatTasks() {
                                       <div className="flex min-w-0 items-center gap-1.5">
                                         <span className="truncate text-primary">{copilot.name || `作业 #${copilot.id}`}</span>
                                         {copilot.presetFormation && (
-                                          <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] brand-chip">预设编队 · 仅普通</span>
+                                          <span className="shrink-0 rounded px-1.5 py-0.5 text-[11px] brand-chip">预设编队 · 仅普通</span>
                                         )}
                                         {copilot.completedModes?.map(mode => (
-                                          <span key={mode} className="shrink-0 rounded px-1.5 py-0.5 text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+                                          <span key={mode} className="shrink-0 rounded px-1.5 py-0.5 text-[11px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
                                             {mode === 'raid' ? '突袭已完成' : '普通已完成'}
                                           </span>
                                         ))}
