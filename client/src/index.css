@@ -3459,14 +3459,14 @@ svg.w-5.h-5 {
     color: white;
     box-shadow:
       inset 0 0 0 1px color-mix(in srgb, white 12%, transparent),
-      0 5px 14px color-mix(in srgb, var(--app-accent) 18%, transparent);
+      0 5px 14px rgba(0, 0, 0, 0.16);
   }
 
   .brand-action:hover:not(:disabled) {
     background: color-mix(in srgb, var(--app-accent) 78%, black);
     box-shadow:
       inset 0 0 0 1px color-mix(in srgb, white 14%, transparent),
-      0 7px 18px color-mix(in srgb, var(--app-accent) 22%, transparent);
+      0 7px 18px rgba(0, 0, 0, 0.2);
   }
 
   .brand-action-subtle {
@@ -3606,8 +3606,8 @@ svg.w-5.h-5 {
     align-items: center;
     margin-top: 0.125rem;
     color: var(--app-text-tertiary);
-    font-size: 0.5625rem;
-    line-height: 1;
+    font-size: var(--app-font-meta);
+    line-height: 1.2;
   }
 
   .dashboard-temperature-range span:last-child {
@@ -3619,7 +3619,7 @@ svg.w-5.h-5 {
     height: 2.25rem;
     align-items: center;
     color: var(--app-text-tertiary);
-    font-size: 0.625rem;
+    font-size: var(--app-font-meta);
   }
 
   .dashboard-preview-header {
@@ -3777,7 +3777,7 @@ svg.w-5.h-5 {
     background: var(--app-surface-muted);
     color: var(--app-text-muted);
     box-shadow: none;
-    font-size: 0.625rem;
+    font-size: var(--app-font-meta);
     font-weight: 700;
   }
 
@@ -3817,7 +3817,6 @@ svg.w-5.h-5 {
     gap: 1rem;
     min-height: 6.25rem;
     padding: 1rem;
-    background: color-mix(in srgb, var(--app-surface-muted) 72%, transparent);
     box-shadow: inset 0 -1px 0 var(--app-border);
   }
 
@@ -3831,12 +3830,12 @@ svg.w-5.h-5 {
     border-radius: var(--app-radius-lg);
     background: var(--app-accent);
     color: white;
-    box-shadow: 0 10px 24px color-mix(in srgb, var(--app-accent) 28%, transparent);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
   }
 
   .dashboard-flow-command-icon.is-running {
     background: var(--app-success);
-    box-shadow: 0 10px 24px color-mix(in srgb, var(--app-success) 22%, transparent);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
   }
 
   .dashboard-flow-primary-action {
@@ -3855,12 +3854,12 @@ svg.w-5.h-5 {
     min-width: 0;
     border: 0;
     background: color-mix(in srgb, var(--app-accent-soft) 72%, var(--app-surface));
-    box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent), 0 6px 16px color-mix(in srgb, var(--app-accent) 12%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent), 0 6px 16px rgba(0, 0, 0, 0.14);
   }
 
   .dashboard-flow-activity-action:not(:disabled):hover {
     background: color-mix(in srgb, var(--app-accent-soft) 88%, var(--app-surface));
-    box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent), 0 8px 18px color-mix(in srgb, var(--app-accent) 16%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent), 0 8px 18px rgba(0, 0, 0, 0.18);
   }
 
   .dashboard-flow-activity-action:active:not(:disabled) {
@@ -3893,7 +3892,7 @@ svg.w-5.h-5 {
     overflow: hidden;
     box-shadow:
       inset 0 0 0 1px color-mix(in srgb, white 12%, transparent),
-      0 8px 20px color-mix(in srgb, var(--app-accent) 20%, transparent);
+      0 8px 20px rgba(0, 0, 0, 0.18);
   }
 
   .dashboard-flow-shining-action::before {
@@ -3918,8 +3917,7 @@ svg.w-5.h-5 {
   .dashboard-flow-shining-action:not(:disabled):hover {
     box-shadow:
       inset 0 0 0 1px color-mix(in srgb, white 14%, transparent),
-      0 0 0 2px color-mix(in srgb, var(--app-accent) 9%, transparent),
-      0 9px 22px color-mix(in srgb, var(--app-accent) 22%, transparent);
+      0 9px 22px rgba(0, 0, 0, 0.22);
   }
 
   .dashboard-flow-shining-action:not(:disabled):hover::before {
@@ -4269,7 +4267,7 @@ svg.w-5.h-5 {
 
   .dashboard-stage-chip.is-open {
     background: color-mix(in srgb, var(--app-accent) 11%, var(--app-surface-solid));
-    color: var(--app-accent);
+    color: var(--app-accent-strong);
     box-shadow: none;
   }
 

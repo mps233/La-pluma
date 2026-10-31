@@ -76,7 +76,7 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
       >
         {isReady ? (
           <>
-            <span className="opacity-70">{readyQuote.operator}：</span>
+            <span>{readyQuote.operator}：</span>
             <span>{readyQuote.quote}</span>
           </>
         ) : (

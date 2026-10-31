@@ -22,7 +22,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry({ onOpen }: Da
           <span className="text-xs font-medium text-secondary">模拟器实时预览</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="hidden sm:inline text-[10px] text-secondary">{headerStatusText}</span>
+          <span className="hidden sm:inline text-[11px] text-secondary">{headerStatusText}</span>
           <Button onClick={onOpen} variant="ghost" size="sm" className="min-h-11 sm:min-h-9">打开</Button>
         </div>
       </div>
@@ -62,7 +62,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry({ onOpen }: Da
             </div>
           )}
         </button>
-        <div className="pointer-events-none absolute left-2 top-2 rounded-lg border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-bg)_55%,transparent)] px-2 py-1 text-[10px] text-primary">
+        <div className="pointer-events-none absolute left-2 top-2 rounded-lg border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-bg)_55%,transparent)] px-2 py-1 text-[11px] text-primary">
           {statusText}
         </div>
       </div>
