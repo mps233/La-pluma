@@ -117,6 +117,7 @@ export default function ConfigManager() {
     adb_path: '/opt/homebrew/bin/adb',
     address: '127.0.0.1:16384',
     config: 'CompatMac',
+    client_type: 'Official',
     preset: '',
     touch_mode: '',
     auto_reconnect: true,
@@ -398,6 +399,7 @@ export default function ConfigManager() {
       adb_path: '/opt/homebrew/bin/adb',
       address: '127.0.0.1:16384',
       config: 'CompatMac',
+      client_type: 'Official',
       preset: '',
       touch_mode: '',
       auto_reconnect: true,
@@ -880,6 +882,25 @@ export default function ConfigManager() {
                   hint="选择与服务器系统匹配的平台预设"
                 />
                 <Select
+                  label="客户端类型"
+                  value={configData.client_type || 'Official'}
+                  onChange={(value: string) => {
+                    updateConnectionConfig(current => ({ ...current, client_type: value }))
+                  }}
+                  options={[
+                    { value: 'Official', label: '官服' },
+                    { value: 'Bilibili', label: 'B 服' },
+                    { value: 'Txwy', label: '繁中服' },
+                    { value: 'YostarEN', label: '美服' },
+                    { value: 'YostarJP', label: '日服' },
+                    { value: 'YostarKR', label: '韩服' },
+                  ]}
+                  hint="用于动态任务、作业集和活动识别"
+                />
+              </div>
+
+              <div className="grid min-w-0 gap-[var(--app-space-card)] md:grid-cols-2 md:items-end">
+                <Select
                   label="连接预设"
                   value={configData.preset || ''}
                   onChange={(value: string) => {
@@ -895,9 +916,6 @@ export default function ConfigManager() {
                   ]}
                   hint="对应 maa-cli 的 connection.preset；自动时不写入"
                 />
-              </div>
-
-              <div className="grid min-w-0 gap-[var(--app-space-card)] md:grid-cols-2 md:items-end">
                 <Select
                   label="触控模式"
                   value={configData.touch_mode || ''}
@@ -914,7 +932,7 @@ export default function ConfigManager() {
                   ]}
                   hint="对应 instance_options.touch_mode；自动时不写入"
                 />
-                <div className="config-reconnect-row flex min-h-[3.5rem] items-center justify-between gap-3 py-1">
+                <div className="config-reconnect-row flex min-h-[3.5rem] items-center justify-between gap-3 py-1 md:col-span-2">
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-primary">自动重连</div>
                     <div className="mt-1 text-xs leading-5 text-tertiary">连接中断后自动尝试恢复</div>

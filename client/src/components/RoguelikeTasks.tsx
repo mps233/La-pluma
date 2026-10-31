@@ -355,7 +355,7 @@ export default function RoguelikeTasks() {
         ]},
         { key: 'squad', label: '起始分队', type: 'text', param: '--squad', placeholder: '指挥分队' },
         { key: 'coreChar', label: '核心干员', type: 'text', param: '--core-char', placeholder: '维什戴尔' },
-        { key: 'startCount', label: '运行次数', type: 'number', param: '--start-count', placeholder: '无限' },
+        { key: 'startCount', label: '运行次数', type: 'number', param: '--starts-count', placeholder: '无限' },
         { key: 'useSupport', label: '使用助战', type: 'checkbox', param: '--use-support' },
         { key: 'stopAtBoss', label: '最终Boss前停止', type: 'checkbox', param: '--stop-at-final-boss' },
       ],

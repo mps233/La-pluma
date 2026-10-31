@@ -1,4 +1,5 @@
 import { getActivityRunPreflight } from './activityNavigationService.js';
+import { getMaaStageByCode } from './maaResourceDataService.js';
 import { DEFAULT_CLIENT_TYPE } from '../config/connectionDefaults.js';
 
 const PRTS_QUERY_URL = 'https://prts.maa.plus/copilot/query';
@@ -109,7 +110,7 @@ export function rankActivityCopilots(items, stage) {
       const content = parseContent(item);
       return {
         id: Number(item.id),
-        uri: `maa://${item.id}`,
+        uri: `prts://${item.id}`,
         stage,
         title: String(content.doc?.title || item.doc?.title || '').trim(),
         stageName: String(content.stage_name || '').trim(),
@@ -134,20 +135,47 @@ export function rankActivityCopilots(items, stage) {
 }
 
 async function queryStageCandidates(stage) {
-  const url = `${PRTS_QUERY_URL}?level_keyword=${encodeURIComponent(stage)}&page=1&limit=50&order_by=hot`;
-  const response = await fetch(url, { signal: AbortSignal.timeout(12000) });
-  if (!response.ok) throw new Error(`作业站请求失败: HTTP ${response.status}`);
-  const payload = await response.json();
-  const items = payload?.status_code === 200 && Array.isArray(payload?.data?.data)
-    ? payload.data.data
-    : [];
-  const reliableItems = items.filter(item =>
-    item?.available !== false && item?.status === 'PUBLIC' && item?.not_enough_rating !== true
-  );
+  const stageInfo = await getMaaStageByCode(stage).catch(() => null);
+  const keywords = [...new Set([stageInfo?.stageId, stage].filter(Boolean))];
+  let lastQuery = null;
+  let lastError = null;
+  let succeeded = false;
+
+  for (const keyword of keywords) {
+    const url = `${PRTS_QUERY_URL}?level_keyword=${encodeURIComponent(keyword)}&page=1&limit=50&order_by=hot`;
+    lastQuery = url;
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(12000) });
+      if (!response.ok) throw new Error(`作业站请求失败: HTTP ${response.status}`);
+      const payload = await response.json();
+      succeeded = true;
+      const items = payload?.status_code === 200 && Array.isArray(payload?.data?.data)
+        ? payload.data.data
+        : [];
+      const reliableItems = items.filter(item =>
+        item?.available !== false && item?.status === 'PUBLIC' && item?.not_enough_rating !== true
+      );
+      const candidates = rankActivityCopilots(reliableItems, stage);
+      if (candidates.length > 0) {
+        return {
+          stage,
+          stageId: stageInfo?.stageId || null,
+          query: url,
+          candidates
+        };
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (!succeeded && lastError) throw lastError;
+
   return {
     stage,
-    query: url,
-    candidates: rankActivityCopilots(reliableItems, stage)
+    stageId: stageInfo?.stageId || null,
+    query: lastQuery,
+    candidates: []
   };
 }
 

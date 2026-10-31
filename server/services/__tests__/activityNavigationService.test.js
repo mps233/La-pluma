@@ -18,6 +18,18 @@ test('activity preflight is ready only with a complete home navigation chain', (
   assert.equal(result.navigation.entryTask, 'BD-OpenOpt');
 });
 
+test('activity preflight accepts implicit @OpenOpt stage references', () => {
+  const result = assessActivityNavigation(activity, {
+    'BD-OpenOpt': { next: ['BD-OpenOcr', 'BD-Open'] },
+    'BD-OpenOcr': { next: ['BDChapterToBD'] },
+    'BD-Open': { next: ['BDChapterToBD'] },
+    'BD-4': { sub: ['BD-4@BD-OpenOpt'], next: ['BD-4@SideStoryStage'] }
+  });
+
+  assert.equal(result.state, 'ready');
+  assert.equal(result.navigation.entryTask, 'BD-OpenOpt');
+});
+
 test('activity preflight blocks when fallback activity data lacks MAA navigation', () => {
   const result = assessActivityNavigation(
     { code: 'BD', name: '丛林症结', source: 'penguin', stages: ['BD-4'] },

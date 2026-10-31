@@ -7,6 +7,16 @@ function toArray(value) {
   return Array.isArray(value) ? value : value ? [value] : [];
 }
 
+/**
+ * MaaCore stage resources reference the shared open-option task as either
+ * `CODE-OpenOpt` or an implicit variant such as `CODE-6@CODE-OpenOpt`.
+ */
+function referencesTask(values, taskName) {
+  return toArray(values).some(value => (
+    value === taskName || String(value).endsWith(`@${taskName}`)
+  ));
+}
+
 function blocked(activity, reasonCode, reason) {
   return {
     state: 'blocked',
@@ -49,10 +59,10 @@ export function assessActivityNavigation(activity, tasks) {
     new RegExp(`^${code}-(?:\\d+|EX-\\d+|S-\\d+|MO-\\d+|TR-\\d+)$`, 'i').test(key) && task && typeof task === 'object'
   );
   const hasOpenSequence = Boolean(openOption && openKey &&
-    toArray(openOption.next).some(next => openKeys.includes(next)) &&
+    toArray(openOption.next).some(next => openKeys.some(key => referencesTask([next], key))) &&
     toArray(tasks[openKey].next).length > 0);
   const hasStageEntry = stageEntries.some(([, task]) =>
-    toArray(task.sub).includes(openOptionKey) && toArray(task.next).length > 0
+    referencesTask(task.sub, openOptionKey) && toArray(task.next).length > 0
   );
 
   if (!hasOpenSequence || !hasStageEntry) {

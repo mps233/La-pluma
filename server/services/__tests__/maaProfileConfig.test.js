@@ -63,12 +63,14 @@ test('keeps preset in connection and moves touch_mode into instance_options', ()
   const merged = mergeMaaProfileConnection(parsed, {
     connection: {
       preset: 'MuMuPro',
+      client_type: 'Bilibili',
       touch_mode: 'maafwadb'
     }
   });
   const roundTrip = parseMaaProfile(TOML.stringify(merged));
 
   assert.equal(roundTrip.connection.preset, 'MuMuPro');
+  assert.equal(roundTrip.connection.client_type, 'Bilibili');
   assert.equal(roundTrip.connection.touch_mode, undefined);
   assert.deepEqual(roundTrip.instance_options, { touch_mode: 'maafwadb' });
 });

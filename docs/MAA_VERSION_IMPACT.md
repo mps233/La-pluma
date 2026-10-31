@@ -612,7 +612,10 @@
 > - 3.8：`buildScheduledTaskCommand()` 把任务的 `condition` / `variants` 透传到动态任务 JSON；测试覆盖 Weekday + Time variants。
 > - P1：`mergeMaaProfileConnection()` 把 `auto_reconnect` 写入 `[behavior]`、`touch_mode` 写入 `[instance_options]`；`getConfig()` 回读到连接视图。ConfigManager 新增“连接预设”和“触控模式”选择；`canUseMaaSelfUpdate()` 在更新前探测 `maa self --help`，Homebrew 构建会正确回退到 brew。
 > - 页面验证（生产模式 `:3100` + 隔离 headless Chrome）：作业集 55238 预览 2/2，执行时服务端命令为 `maa copilot prts://s55238 --batch`，终止后未写入进度；数据页“仓库识别”通过 JSON 动态任务执行，日志为 `tasks/_lapluma/...json` + `maa run --batch`，识别 83 项；配置页关闭自动重连并保存后，profile 出现 `[behavior] auto_reconnect = false`；选择 `preset=Adb` + `touch_mode=MaaTouch` 保存后，profile 分别写入 `[connection]` 和 `[instance_options]`，测试后已恢复。`update-cli` dry-run 在本机返回 `selfUpdateAvailable: false`、`command: brew upgrade maa-cli`。
-> - 验证：server 42 个测试文件、client 42 个测试文件全部通过。
+> - **P1 正确性批次**：输出 URI 统一为 `prts://`（输入继续兼容 `maa://`）；活动导航接受隐式 `CODE-6@CODE-OpenOpt`；PRTS 候选查询优先使用 `stages.json` 的内部 `stageId`，活动关卡缺失时回退展示代号；`copilot_list` 双写 `nav_name_override`；作业集 ID 做路径白名单校验；Roguelike 改 `--starts-count`；`ignore_requirements` 文案改为“忽略等级/技能要求”；数据页去掉识别后的固定 2 秒等待；连接配置新增全局客户端类型并写入 `[connection].client_type`。
+> - P1 页面验证：配置页客户端类型选择 `Bilibili` 并保存后，profile 出现 `[connection] client_type = "Bilibili"`；作业页输入占位符已显示 `prts://1234`。
+> - 仍未完成：P1-15 AP 未知展示、P1-19 更新渠道持久化、P1-20 update/识别 tracked Run、P1-21 LMD/currentElite 快照。
+> - 验证：server 43 个测试文件、client 42 个测试文件全部通过。
 
 ### Phase 4：新增功能
 

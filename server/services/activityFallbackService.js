@@ -1,5 +1,8 @@
 import fetch from 'node-fetch';
 import { DEFAULT_CLIENT_TYPE } from '../config/connectionDefaults.js';
+import { createLogger } from '../utils/logger.js';
+
+const logger = createLogger('ActivityFallback');
 
 const PENGUIN_API_BASE = 'https://penguin-stats.io/PenguinStats/api/v2';
 const CACHE_TTL = 30 * 60 * 1000;
@@ -81,7 +84,10 @@ async function fetchJson(url) {
 
 export async function getFallbackActivity(clientType = DEFAULT_CLIENT_TYPE) {
   const server = CLIENT_SERVERS[clientType];
-  if (!server) return null;
+  if (!server) {
+    logger.debug('Penguin 没有该客户端的数据源', { clientType });
+    return null;
+  }
 
   const cached = cache.get(server);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) return cached.value;

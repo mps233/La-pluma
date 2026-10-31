@@ -11,8 +11,8 @@ const candidatePlan = {
   state: 'candidates-ready',
   preflight: { activity: { code: 'BD', name: '丛林症结' } },
   stages: [
-    { stage: 'BD-1', candidates: [{ id: 10, uri: 'maa://10', title: 'BD-1', presetFormation: false }] },
-    { stage: 'BD-2', candidates: [{ id: 11, uri: 'maa://11', title: 'BD-2', presetFormation: false }] }
+    { stage: 'BD-1', candidates: [{ id: 10, uri: 'prts://10', title: 'BD-1', presetFormation: false }] },
+    { stage: 'BD-2', candidates: [{ id: 11, uri: 'prts://11', title: 'BD-2', presetFormation: false }] }
   ]
 };
 

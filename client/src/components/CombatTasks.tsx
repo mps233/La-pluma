@@ -517,7 +517,7 @@ export default function CombatTasks() {
       id: 'copilot',
       name: '自动战斗作业',
       command: 'copilot',
-      placeholder: 'maa://1234、作业站链接或本地文件路径',
+      placeholder: 'prts://1234、作业站链接或本地文件路径',
       icon: <Icons.Document />,
       hasAdvanced: true,
       description: '支持单作业、作业集、作业站链接、循环次数与失败处理策略'
@@ -526,7 +526,7 @@ export default function CombatTasks() {
       id: 'ssscopilot',
       name: '保全派驻',
       command: 'ssscopilot',
-      placeholder: 'maa://1234 或本地文件路径',
+      placeholder: 'prts://1234 或本地文件路径',
       icon: <Icons.Shield />,
       hasAdvanced: true,
       description: '保全派驻作业入口，一次只能执行一份作业'
@@ -535,7 +535,7 @@ export default function CombatTasks() {
       id: 'paradoxcopilot',
       name: '悖论模拟',
       command: 'paradoxcopilot',
-      placeholder: 'maa://1234 或本地文件路径',
+      placeholder: 'prts://1234 或本地文件路径',
       icon: <Icons.Puzzle />,
       hasAdvanced: true,
       description: '悖论模拟独立作业入口，可按干员搜索推荐作业并单独诊断'
@@ -545,7 +545,7 @@ export default function CombatTasks() {
   const getAdvancedOptions = (taskId: string): CombatAdvancedOption[] => {
     const options: Record<string, CombatAdvancedOption[]> = {
       copilot: [
-        { key: 'ignoreRequirements', label: '忽略干员要求', type: 'checkbox', param: '--ignore-requirements' },
+        { key: 'ignoreRequirements', label: '忽略等级/技能要求', type: 'checkbox', param: '--ignore-requirements', helper: '精英化要求仍会校验' },
         { key: 'loopTimes', label: '循环次数', type: 'number', param: '--loop-times', placeholder: '1' },
         { key: 'executionStrategy', label: '队列策略', type: 'select', param: '', options: [
           { value: 'continue', label: '失败继续下一个' },
@@ -587,9 +587,9 @@ export default function CombatTasks() {
       .map(line => line.trim())
       .filter(Boolean)
       .map(item => {
-        const maaMatch = item.match(/^maa:\/\/(\d+)(s?)$/i)
-        if (maaMatch) {
-          return `maa://${maaMatch[1]}${maaMatch[2] || ''}`
+        const uriMatch = item.match(/^(maa|prts):\/\/(\d+)(s?)$/i)
+        if (uriMatch) {
+          return `${uriMatch[1]!.toLowerCase()}://${uriMatch[2]!}${uriMatch[3] || ''}`
         }
         if (!/^https?:\/\//i.test(item)) return item
 
@@ -599,7 +599,7 @@ export default function CombatTasks() {
           const looksLikeSet = /set|collection|合集|作业集/i.test(url.pathname + url.search)
           if (idMatch) {
             const suffix = looksLikeSet || idMatch[2] === 's' ? 's' : ''
-            return `maa://${idMatch[1]}${suffix}`
+            return `prts://${idMatch[1]}${suffix}`
           }
         } catch {
           // URL 解析失败时保留原始输入，交给 maa-cli 报错
@@ -650,7 +650,7 @@ export default function CombatTasks() {
 
     if (task.id === 'copilot' && copilotSetInfo?.type === 'set' && copilotSetInfo?.autoAddS) {
       for (let i = 0; i < args.length; i++) {
-        args[i] = (args[i] || '').replace(/^maa:\/\/(\d+)(?!s)$/i, 'maa://$1s')
+        args[i] = (args[i] || '').replace(/^(maa|prts):\/\/(\d+)(?!s)$/i, '$1://$2s')
       }
     }
 
@@ -664,7 +664,7 @@ export default function CombatTasks() {
       const selectedArgs = selectedIndexes
         .map(index => copilotSetInfo.copilots?.[index])
         .filter((copilot): copilot is CopilotSetItem => !!copilot)
-        .map(copilot => `maa://${copilot.id}`)
+        .map(copilot => `prts://${copilot.id}`)
       return appendCommandOptions(selectedArgs, task)
     }
 
@@ -680,7 +680,7 @@ export default function CombatTasks() {
 
   // 构建作业参数
   const buildCopilotArgs = (copilotId: number, task: CombatTask): string[] => {
-    const args = [`maa://${copilotId}`]
+    const args = [`prts://${copilotId}`]
     return appendCommandOptions(args, task, true)
   }
 
@@ -697,7 +697,7 @@ export default function CombatTasks() {
 
     // 更新当前执行索引
     setCopilotSetInfo(prev => prev ? { ...prev, currentIndex: index } : null)
-    setStatusMessage(`正在执行作业 ${index + 1}/${copilotSetInfo.copilots.length}: ${copilot.name || `maa://${copilot.id}`}`)
+    setStatusMessage(`正在执行作业 ${index + 1}/${copilotSetInfo.copilots.length}: ${copilot.name || `prts://${copilot.id}`}`)
 
     const args = buildCopilotArgs(copilot.id, task)
 
@@ -1156,13 +1156,13 @@ export default function CombatTasks() {
           name: content.doc?.title || '未命名作业',
           stage: content.stage_name,
           operators: extractOperators(content),
-          uri: `maa://${copilotId}`
+          uri: `prts://${copilotId}`
         }
       }
     } catch {
       // 忽略单个作业获取失败
     }
-    return { id: copilotId, uri: `maa://${copilotId}` }
+    return { id: copilotId, uri: `prts://${copilotId}` }
   }
 
   // 获取作业集详情（包含所有作业列表）
@@ -1183,7 +1183,7 @@ export default function CombatTasks() {
                 .filter((entry: any) => entry.itemIndex === itemIndex && entry.completed)
                 .map((entry: any) => entry.mode as 'normal' | 'raid')
             : [],
-          uri: `maa://${item.id}`
+          uri: `prts://${item.id}`
         }))
       }
       const data = await maaApi.getCopilotSet(setId)
@@ -1216,7 +1216,7 @@ export default function CombatTasks() {
     const match = firstToken.match(/^maa:\/\/(\d+)(s?)$/)
 
     if (!match) {
-      setStatusMessage('请输入有效的作业 URI / 作业站链接（如: maa://26766）')
+      setStatusMessage('请输入有效的作业 URI / 作业站链接（如: prts://26766）')
       return
     }
 
@@ -1356,7 +1356,7 @@ export default function CombatTasks() {
               currentIndex: 0
             })
             applySelectedCopilotIndexes(new Set(), copilotId)
-            setStatusMessage(`已按作业集处理：maa://${copilotId}${!hasS ? '（执行时自动补 s）' : ''}`)
+            setStatusMessage(`已按作业集处理：prts://${copilotId}${!hasS ? '（执行时自动补 s）' : ''}`)
           } else {
             setStatusMessage('未找到作业或作业集')
           }
@@ -1780,7 +1780,7 @@ export default function CombatTasks() {
                           autoCapitalize="none"
                           spellCheck={false}
                           inputMode="url"
-                          placeholder="maa://1234、maa://1234s、作业站链接或本地路径"
+                          placeholder="prts://1234、prts://1234s、作业站链接或本地路径"
                           value={taskInputs[task.id] || ''}
                           onChange={(e) => handleInputChange(task.id, e.target.value)}
                           className="app-input app-native-control min-h-11 min-w-0 flex-1 font-mono control-surface"
@@ -1810,7 +1810,7 @@ export default function CombatTasks() {
                           <summary className="inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center brand-text hover:underline">说明</summary>
                           <div className="absolute right-0 z-20 mt-2 hidden w-[min(18rem,calc(100vw_-_3rem))] space-y-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-solid)] p-3 text-left shadow-lg group-open:block">
                             <p>• 在 <a href="https://zoot.plus/" target="_blank" rel="noopener noreferrer" className="brand-text hover:underline">zoot.plus</a> 获取作业链接</p>
-                            <p>• 单作业：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">maa://1234</code>；作业集：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">maa://1234s</code></p>
+                            <p>• 单作业：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">prts://1234</code>；作业集：<code className="px-1 bg-gray-100 dark:bg-gray-800 rounded">prts://1234s</code></p>
                             <p>• 作业站链接会自动识别，也可导入远程或本地作业文件</p>
                           </div>
                         </details>
@@ -1927,7 +1927,7 @@ export default function CombatTasks() {
                                   {nextCopilot ? (
                                     <div className="mt-2 flex min-w-0 items-center gap-2 border-t border-[var(--app-border)] pt-2 text-xs">
                                       <span className="shrink-0 text-tertiary">续跑目标</span>
-                                      <span className="font-mono brand-text">maa://{nextCopilot.id}</span>
+                                      <span className="font-mono brand-text">prts://{nextCopilot.id}</span>
                                       <span className="min-w-0 truncate text-secondary">{nextCopilot.stage || nextCopilot.name || `第 ${nextIndex + 1} 关`}</span>
                                     </div>
                                   ) : (
@@ -1952,7 +1952,7 @@ export default function CombatTasks() {
                                     <span className="px-2 py-0.5 brand-action text-xs font-medium rounded">下一关</span>
                                     <span className="text-xs brand-text">第 {(copilotSetInfo.currentIndex ?? 0) + 1} / {copilotSetInfo.copilots.length} 关</span>
                                   </div>
-                                  <span className="font-mono text-xs brand-text">maa://{currentCopilot.id}</span>
+                                  <span className="font-mono text-xs brand-text">prts://{currentCopilot.id}</span>
                                 </div>
                                 <p className="text-sm font-medium text-primary">{currentCopilot.name || `作业 #${currentCopilot.id}`}</p>
                                 {currentCopilot.stage && <p className="text-xs text-secondary">{currentCopilot.stage}</p>}
@@ -2064,7 +2064,7 @@ export default function CombatTasks() {
                                     }`}>
                                       {statusLabel}
                                     </span>
-                                    <span className="hidden font-mono text-tertiary 2xl:inline">maa://{copilot.id}</span>
+                                    <span className="hidden font-mono text-tertiary 2xl:inline">prts://{copilot.id}</span>
                                   </div>
                                 </div>
                               )
@@ -2208,7 +2208,7 @@ export default function CombatTasks() {
                                           {isRunning ? '当前作业' : '下一作业'}
                                         </span>
                                         <span className="font-mono text-xs brand-text">
-                                          maa://{currentCopilot.id}
+                                          prts://{currentCopilot.id}
                                         </span>
                                       </div>
                                       <p className="text-sm font-medium text-primary">

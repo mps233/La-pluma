@@ -107,7 +107,7 @@ export async function buildCopilotPlan(setId, raid = 'normal') {
     return {
       id: Number(id),
       stageId: content.stage_name || '',
-      stage: stageCodes.get(content.stage_name)?.code || getNavigationStage(content) || `maa://${id}`,
+      stage: stageCodes.get(content.stage_name)?.code || getNavigationStage(content) || `prts://${id}`,
       apCost: stageCodes.get(content.stage_name)?.apCost || 0,
       presetFormation: isPresetFormationCopilot(content),
       supportsRaid: !isPresetFormationCopilot(content),
@@ -216,6 +216,14 @@ function normalizeCopilotLoopTimes(value) {
   return Math.max(1, Math.min(99, Number.parseInt(String(value || 1), 10) || 1));
 }
 
+export function sanitizeCopilotPlanId(value) {
+  const id = String(value || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(id)) {
+    throw new Error('作业集 ID 不合法');
+  }
+  return id;
+}
+
 export function extractLoadedCopilotFiles(logText = '') {
   // MAA writes `file_name` inside `details` before the trailing `what`
   // discriminator for a successfully loaded copilot entry.
@@ -294,6 +302,7 @@ function groupEntries(entries) {
  * Copilot task used by copilot sets. Callers must decide selection separately.
  */
 export async function executeSelectedCopilotEntries({ planId, name, entries, options = {}, lifecycle = {} }) {
+  planId = sanitizeCopilotPlanId(planId);
   const normalizedEntries = entries.filter(entry => Number.isInteger(Number(entry.copilotId)) && entry.displayStage);
   if (!normalizedEntries.length) throw new Error('没有可执行的作业条目');
 
@@ -316,6 +325,7 @@ export async function executeSelectedCopilotEntries({ planId, name, entries, opt
             id: list.length,
             filename,
             stage_name: entry.displayStage,
+            nav_name_override: entry.displayStage,
             is_raid: entry.mode === 'raid'
           });
         }
@@ -338,6 +348,7 @@ export async function executeSelectedCopilotEntries({ planId, name, entries, opt
 }
 
 export async function executeCopilotPlan({ setId, raid = 'normal', selectedIndexes = [], options = {}, lifecycle = {} }) {
+  setId = sanitizeCopilotPlanId(setId);
   const plan = await buildCopilotPlan(setId, raid);
   const selected = new Set(selectedIndexes.map(Number));
   const selectedEntries = plan.entries.filter(entry => selected.size === 0 || selected.has(entry.itemIndex));
@@ -388,6 +399,7 @@ export async function executeCopilotPlan({ setId, raid = 'normal', selectedIndex
             id: executionItems.length,
             filename,
             stage_name: entry.displayStage,
+            nav_name_override: entry.displayStage,
             is_raid: entry.mode === 'raid'
           });
           executionItems.push({ entry, filename, repeat });

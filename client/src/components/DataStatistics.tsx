@@ -795,9 +795,6 @@ export default function DataStatistics() {
       if (result.success) {
         setStatusMessage('识别完成，正在解析数据...')
         
-        // 等待一下让 MAA 写入日志
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        
         // 解析并保存数据
         const parseResult = await maaApi.parseDepotData()
         
@@ -884,9 +881,6 @@ export default function DataStatistics() {
 
       if (result.success) {
         setStatusMessage('识别完成，正在解析数据...')
-        
-        // 等待一下让 MAA 写入日志
-        await new Promise(resolve => setTimeout(resolve, 2000))
 
         // 解析并保存数据
         const parseResult = await maaApi.parseOperBoxData()

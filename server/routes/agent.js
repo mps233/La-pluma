@@ -1081,7 +1081,7 @@ router.get('/paradox/search', asyncHandler(async (req, res) => {
     } catch {}
     return {
       id: item.id,
-      uri: `maa://${item.id}`,
+      uri: `prts://${item.id}`,
       views: item.views,
       hotScore: item.hot_score,
       uploader: item.uploader_id,
@@ -1132,7 +1132,7 @@ router.get('/copilot/search', asyncHandler(async (req, res) => {
       if (normalizedStageName === normalizedStage || normalizedStageName === normalizedSearchKeyword || titleStageCode === normalizedStage) {
         allCopilots.push({
           id: item.id,
-          uri: `maa://${item.id}`,
+          uri: `prts://${item.id}`,
           views: item.views,
           hotScore: item.hot_score,
           uploader: item.uploader_id,

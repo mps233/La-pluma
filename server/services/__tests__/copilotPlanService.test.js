@@ -7,6 +7,7 @@ import {
   buildCopilotTaskParams,
   buildNativeCopilotCommand,
   canUseNativeCopilotSet,
+  sanitizeCopilotPlanId,
   extractLoadedCopilotFiles,
   getNavigationStage,
   isPresetFormationCopilot,
@@ -81,6 +82,13 @@ test('preset resource merge preserves existing user BattleStart settings', () =>
   assert.equal(merged.BattleStart.custom, true);
   assert.deepEqual(merged.ExistingTask, { action: 'DoNothing' });
   assert.ok(merged.BattleStart.next.includes('LaPlumaPresetBattleConfirm'));
+});
+
+test('rejects copilot set ids that could escape the plan directory', () => {
+  assert.equal(sanitizeCopilotPlanId('48990'), '48990');
+  assert.equal(sanitizeCopilotPlanId('set-1_A'), 'set-1_A');
+  assert.throws(() => sanitizeCopilotPlanId('../outside'), /不合法/);
+  assert.throws(() => sanitizeCopilotPlanId(''), /不合法/);
 });
 
 test('delegates only full, non-preset, non-resumed copilot sets', () => {
