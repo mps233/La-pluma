@@ -508,6 +508,19 @@ la-pluma/
 
 项目使用 React + TypeScript + Node.js 技术栈，代码结构围绕“前端页面、Agent API、后端服务”展开。
 
+### 文档地图
+
+| 文档 | 负责的内容 |
+| --- | --- |
+| `README.md` | 产品能力、架构、安装部署、Agent API 概览 |
+| `AGENTS.md` | 编码 agent 的工作规则、验证命令与交付标准 |
+| `COMPONENT_LIBRARY_GUIDE.md` | 视觉规范与组件选型的唯一事实源 |
+| `client/src/components/common/README.md` | 通用组件的 props 与用法示例 |
+| `server/utils/README.md` | 响应、文件与日志工具 |
+| `docs/` | MAA 版本影响分析与任务覆盖矩阵 |
+
+规范类内容只在对应文件中维护一次，其他文档引用而不复制；修改规范时同步更新该文件本身。
+
 ### 主要技术点
 
 - **前端**: React Hooks 与原生语义组件实现页面壳层和响应式 chrome，Tailwind CSS/语义 token 负责业务布局，Framer Motion 负责物理动效，Zustand 管理跨页面状态

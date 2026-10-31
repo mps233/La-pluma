@@ -10,71 +10,11 @@
 
 主题由 `useUIStore` 统一管理并同步到文档根节点与 `.la-pluma-app`。Navbar 和移动 tabbar 的安全区由 `Layout` 及统一 token 管理；只有不属于应用 chrome 的自定义固定浮层才补充 `env(safe-area-inset-*)`，避免重复 padding。桌面侧栏和移动悬浮胶囊导航由 `Layout` 统一提供，页面只负责渲染内容。
 
-## 设计系统速记
+## 设计规范
 
-### 色彩
+色彩、文字层级、圆角、间距、边框、阴影、交互状态、响应式断点等视觉规范统一由根目录 `COMPONENT_LIBRARY_GUIDE.md` 维护。本文件只记录组件 API 和本目录的运行时约定；需要修改规范时改指南，不要在这里另写一份。
 
-页面不要再按模块自定义主色。新增 UI 优先使用语义类：
-
-- `surface-panel` / `surface-soft`：卡片、面板、弱背景。
-- `control-surface` / `control-active`：输入、筛选、分段按钮。
-- `brand-action` / `brand-text`：主要操作和品牌强调。
-- `status-success` / `status-warning` / `status-danger` / `status-info`：语义状态提示。
-- `status-success-action` / `status-danger-action`：成功、危险操作按钮。
-- `form-error-surface` / `form-error-text`：表单错误态。
-
-不要新增页面级 `from-violet-*`、`bg-orange-*`、`text-cyan-*` 这类独立主题色。需要新语义时，先在 `client/src/index.css` 增加 token 或语义类。
-
-### 文字与交互
-
-- 页面标题使用 `PageHeader`；常规卡片标题使用 `text-lg font-semibold`；字段标题和正文使用 `text-sm`；说明、标签和元数据使用 `text-xs text-tertiary`。
-- 多行正文使用 `leading-6` 或 `leading-relaxed`；普通中文文本不要新增 letter spacing，也不要在普通页面新建 `8px` 至 `11px` 微文案。
-- 可点击元素优先使用 `Button`、`IconButton`、`control-surface` 或 `surface-panel-hover`，并保留 `focus-visible`。静态卡片不添加 hover 位移或投影；禁用与 loading 状态必须关闭交互，不能只降低透明度。
-- 普通 hover 只做轻微压暗、弱主题背景或 1px 描边；不要新增高亮渐变、重投影或无意义缩放。新增动效应尊重 reduced motion。
-- 启动、连接或执行中的重点区域可使用 `status-border-beam is-active` 提供短暂的主题色边框反馈；空闲后移除 `is-active`，不要用于普通静态卡片。
-
-### 反馈、图标与布局
-
-- 字段问题用表单组件的 `error`；控制台仅在首次且没有本地缓存时由 `DashboardSkeleton` 维持结构，恢复或返回页面应先显示最后一次成功快照并后台刷新；局部加载用 `Loading`；无数据用 `EmptyState`；不可逆操作用 `ConfirmDialog`。区域错误必须就地展示和重试，不要伪装成空状态。
-- 全局结果使用 `useStatusStore.setMessage` 和 `FloatingStatusIndicator`。错误持续到用户关闭，其他短消息由 store 自动收起；不要新增独立 toast 或自行清除定时器。
-- 普通功能图标优先用 `lucide-react`，业务身份图标复用 `Icons`。无文字操作用 `IconButton` 并同时提供 `title` 与 `aria-label`；装饰图标加 `aria-hidden`。
-- 应用外层使用 `app-shell` 控制 1600px 最大宽度与响应式 gutter；页面内容使用 `app-page`，复用控制台手机材质的功能页在同层增加 `ios-workspace-page`，区块用 `app-stack-section`，卡片内用 `app-stack-card`。页面内部不要再嵌套 `max-w-7xl` 或重复水平 padding。不要为凑版式嵌套卡片或硬塞多栏；每列保持 `min-w-0`，窄屏优先折叠。
-
-### 圆角与间距
-
-圆角和常用间距已经接入 `client/tailwind.config.js`：
-
-- `rounded-xl` / `rounded-2xl` / `rounded-3xl` 统一映射到 `--app-radius-lg`。
-- `gap-3` / `gap-4` 和 `space-y-4` 映射到 `--app-space-card`。
-- `gap-5` / `gap-6` 和 `space-y-5` / `space-y-6` 映射到 `--app-space-section`。
-
-通用间距遵循 4px 基线：`--app-space-1` 至 `--app-space-6` 依次为 4、8、12、16、20、24px。页面、卡片、输入控件和按钮分别使用 `--app-space-page`、`--app-space-panel`、`--app-space-control-x` 与 `app-button-size-*`。iOS 风格按钮档位为 36/44/48px，输入与选择框为 44px；手机和粗指针设备的标准交互区均不得小于 44px。不要在调用处覆盖标准控件的 `h-*`、`px-*`、`py-*` 来缩小点击区。
-
-页面布局优先使用：
-
-- `app-page`：页面外层 padding。
-- `app-stack-section`：页面区块纵向间距。
-- `app-stack-card`：卡片内部或紧密内容纵向间距。
-- `app-grid-section`：主区块网格间距。
-- `app-grid-card`：卡片网格间距。
-
-### 边框
-
-卡片、输入、分段控件和普通信息容器统一使用 `1px` 可见边框，颜色使用 `--app-border`；需要增强分隔时使用 `--app-border-strong`。不要在页面里把普通容器改成 `border-2` 或重新定义描边颜色。
-
-`2px` 仅保留给复选框、层级引导线、加载圈等非容器或小尺寸结构；焦点环、阴影不属于边框规范。
-
-### 卡片与表单
-
-能用组件时优先用组件；特殊结构再使用语义类。
-
-- 卡片：`Card`、`CardHeader`、`CardContent`，或 `app-card surface-panel`。
-- 按钮：`Button`、`IconButton`，或 `app-button` / `app-icon-button`。
-- 输入：`Input`、`Select`、`Checkbox`、`Switch`，或 `app-input control-surface`；多行文本使用同一语义类的原生 `textarea`。
-
-移动端间距由 token 自动收缩，不要再用全局 `.p-4`、`.p-6` 覆盖来修页面。
-
-页面按 mobile-first 编写：`sm` (640px) 恢复次级信息或横向工具栏，`md` (768px) 适配中宽布局，`lg` (1024px) 与 `xl` (1280px) 再扩展为多栏。窄屏优先折叠列、让操作全宽或换行，不裁剪有效内容；不要为新页面增加非标准断点。
+组件本身不携带主题分支，颜色和尺寸一律通过 `app-*` 语义类与 `--app-*` token 取得，因此同一份 DOM 在浅色、深色和嵌入式渲染下表现一致。
 
 ## 组件列表
 
@@ -242,29 +182,12 @@ Props：
 - `ActivityIndicator`：供 `Button` 和 `Loading` 内部复用的 iOS 活动指示器；页面不要直接调用或叠加第二个动态指示器。
 - `DashboardSkeleton`：控制台专用骨架，由 `Dashboard` 直接从 `Loading.tsx` 引入，不属于 common 的公共导出。
 
-## 重构建议
+## 新增页面顺序
 
-新增或整理页面时按这个顺序做：
-
-1. 页面外层使用 `app-page`，主内容使用 `app-stack-section`。
-2. 页面标题使用 `PageHeader`。
-3. 大面板使用 `Card` 或 `app-card surface-panel`。
-4. 表单使用 `Input`、`Select`、`Checkbox`；多行文本复用 `app-input control-surface`。
-5. 没有内容时使用 `EmptyState`，不要新增孤立的空态样式。
-6. 页面全局执行状态使用 `FloatingStatusIndicator`；局部状态使用既有 `status-*` 语义类并紧邻相关操作。
-7. 操作用 `Button`、`IconButton`。
-8. 新颜色、新圆角、新间距优先抽为 token 或语义类。
-
-## 下一步计划
-
-1. ✅ 创建通用组件。
-2. ✅ 接入统一色彩、圆角、间距 token。
-3. ✅ Button、Input、ConfirmDialog、Loading 等组件纳入 common。
-4. ⏳ 持续把零散手写卡片迁移到 `Card` 或 `app-card`。
-5. ⏳ 为核心通用组件补充单元测试或视觉回归检查。
+页面结构、组件选型和重构顺序见 `COMPONENT_LIBRARY_GUIDE.md` 的「重构建议」，本文件不再重复该清单。
 
 ---
 
 **创建时间**：2026-02-09
-**最后更新**：2026-07-11
+**最后更新**：2026-11-01
 **维护者**：@mps233
