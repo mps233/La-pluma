@@ -268,6 +268,19 @@ export function stopScheduleExecution() {
   return false;
 }
 
+function isScheduleStopRequested(error = null) {
+  const stopRequested = scheduleExecutionStatus.shouldStop
+    || Boolean(activeScheduleAbortController?.signal.aborted)
+    || Boolean(error?.stopRequested);
+  if (stopRequested && !scheduleExecutionStatus.shouldStop) {
+    updateScheduleStatus({
+      shouldStop: true,
+      message: '正在终止任务流程'
+    });
+  }
+  return stopRequested;
+}
+
 /**
  * 更新定时任务执行状态
  */
@@ -614,7 +627,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
   
   for (let i = 0; i < enabledTasks.length; i++) {
     // 检查是否需要停止
-    if (scheduleExecutionStatus.shouldStop) {
+    if (isScheduleStopRequested()) {
       logger.warn('检测到停止信号，终止任务流程', { scheduleId });
       updateScheduleStatus({
         message: '任务流程已被用户终止'
@@ -653,11 +666,14 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         }
 
         const logCheckpoint = await createMaaLogCheckpoint();
+        if (isScheduleStopRequested()) break;
         let result;
-        
+
         if (taskConfig) {
           const taskId = params;
-          result = await execDynamicTask(taskId, taskConfig, task.name, null, true);
+          result = await execDynamicTask(taskId, taskConfig, task.name, null, true, false, {
+            shouldAbort: isScheduleStopRequested
+          });
         } else {
           let args = params ? params.split(' ').filter(arg => arg) : [];
           result = await execMaaCommand(command, args, task.name, null, true);
@@ -694,6 +710,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         if (!delayCompleted) break;
         continue;
       } catch (error) {
+        if (isScheduleStopRequested(error)) break;
         failedCount++;
         errors.push({ task: task.name, error: error.message });
         actionResults.push({
@@ -719,8 +736,9 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         
         // 等待3秒确保游戏回到主界面
         logger.debug('等待游戏回到主界面', { scheduleId, waitSeconds: 3 });
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
+        if (!await waitForScheduleDelay(3000)) break;
+
+        if (isScheduleStopRequested()) break;
         updateScheduleStatus({
           message: '正在识别仓库...'
         });
@@ -737,8 +755,10 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         // execDynamicTask 需要 JSON 字符串
         // execDynamicTask 成功时不抛出异常，失败时抛出异常
         try {
+          if (isScheduleStopRequested()) break;
           await execDynamicTask('Depot_temp', JSON.stringify(depotTaskConfig), '仓库识别', 'depot', true, false, {
-            clientType: adbConfig.clientType
+            clientType: adbConfig.clientType,
+            shouldAbort: isScheduleStopRequested
           });
           logger.success('仓库识别命令执行完成', { scheduleId });
           
@@ -768,9 +788,10 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
             });
           }
         } catch (depotError) {
-          logger.error('仓库识别失败', { 
-            scheduleId, 
-            error: depotError.message 
+          if (isScheduleStopRequested(depotError)) break;
+          logger.error('仓库识别失败', {
+            scheduleId,
+            error: depotError.message
           });
           actionResults.push({
             task: task.name,
@@ -783,7 +804,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         
         // 等待2秒
         logger.debug('等待后继续', { scheduleId, waitSeconds: 2 });
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        if (!await waitForScheduleDelay(2000)) break;
       } catch (error) {
         logger.error('仓库识别异常', { 
           scheduleId, 
@@ -801,7 +822,12 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
     
     // 如果是启动游戏任务，添加重试机制
     if (commandId === 'startup') {
-      const connectionCheck = await testAdbConnection(adbConfig.adbPath, adbConfig.address);
+      if (isScheduleStopRequested()) break;
+
+      const connectionCheck = await testAdbConnection(adbConfig.adbPath, adbConfig.address, {
+        shouldStop: isScheduleStopRequested
+      });
+      if (isScheduleStopRequested()) break;
       if (!connectionCheck.success) {
         const errorMessage = connectionCheck.message || '模拟器连接失败';
         failedCount++;
@@ -819,24 +845,29 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
       const maxRetries = 2;
       let retryCount = 0;
       let startupSuccess = false;
-      
+
       while (retryCount <= maxRetries && !startupSuccess) {
+        if (isScheduleStopRequested()) break;
+
         try {
           if (retryCount > 0) {
-            logger.info('启动游戏重试', { 
-              scheduleId, 
-              retryCount, 
-              maxRetries 
+            logger.info('启动游戏重试', {
+              scheduleId,
+              retryCount,
+              maxRetries
             });
-            await new Promise(resolve => setTimeout(resolve, 3000)); // 重试前等待3秒
+            // 重试前等待3秒，停止时立即打断
+            if (!await waitForScheduleDelay(3000)) break;
           }
-          
+
           const { command, params } = buildScheduledTaskCommand(task, adbConfig);
           let args = params ? params.split(' ').filter(arg => arg) : [];
+          if (isScheduleStopRequested()) break;
           await execMaaCommand(command, args, task.name, null, true);
-          
+          if (isScheduleStopRequested()) break;
+
           logger.info('启动游戏命令执行完成', { scheduleId });
-          
+
           // 同时检查前台包名和截图，避免游戏闪退到模拟器桌面后被误判为成功。
           try {
             logger.debug('检测游戏是否运行中', { scheduleId });
@@ -848,7 +879,9 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
             if (!gameState.running) {
               throw new Error(`游戏未在前台，当前应用：${gameState.foregroundPackage || '未知'}`);
             }
+            if (isScheduleStopRequested()) break;
             await captureScreen(adbConfig.adbPath, adbConfig.address);
+            if (isScheduleStopRequested()) break;
             logger.success('游戏运行正常', { scheduleId });
             startupSuccess = true;
             successCount++;
@@ -861,9 +894,10 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
                 : '游戏已启动并进入前台'
             });
           } catch (error) {
-            logger.error('游戏可能已闪退', { 
-              scheduleId, 
-              error: error.message 
+            if (isScheduleStopRequested(error)) break;
+            logger.error('游戏可能已闪退', {
+              scheduleId,
+              error: error.message
             });
             retryCount++;
             if (retryCount > maxRetries) {
@@ -871,6 +905,10 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
             }
           }
         } catch (error) {
+          if (isScheduleStopRequested(error)) {
+            logger.warn('启动游戏已终止，不再重试', { scheduleId });
+            break;
+          }
           if (retryCount >= maxRetries) {
             failedCount++;
             errors.push({ task: task.name, error: error.message });
@@ -880,17 +918,18 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
               status: 'failed',
               message: error.message
             });
-            logger.error('任务执行失败', { 
-              scheduleId, 
-              taskName: task.name, 
-              error: error.message 
+            logger.error('任务执行失败', {
+              scheduleId,
+              taskName: task.name,
+              error: error.message
             });
             break;
           }
           retryCount++;
         }
       }
-      
+
+      if (isScheduleStopRequested()) break;
       // 启动游戏任务已处理完成，继续下一个任务
       continue;
     }
@@ -899,10 +938,13 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
       try {
         const { command, params, taskConfig } = buildScheduledTaskCommand(task, adbConfig);
         const logCheckpoint = await createMaaLogCheckpoint();
+        if (isScheduleStopRequested()) break;
         let result;
 
         if (taskConfig) {
-          result = await execDynamicTask(params, taskConfig, task.name, null, true);
+          result = await execDynamicTask(params, taskConfig, task.name, null, true, false, {
+            shouldAbort: isScheduleStopRequested
+          });
         } else {
           const args = params ? params.split(' ').filter(arg => arg) : [];
           result = await execMaaCommand(command, args, task.name, null, true);
@@ -934,7 +976,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         if (!delayCompleted) break;
         continue;
       } catch (error) {
-        if (scheduleExecutionStatus.shouldStop) break;
+        if (isScheduleStopRequested(error)) break;
         failedCount++;
         errors.push({ task: task.name, error: error.message });
         actionResults.push({
@@ -960,10 +1002,13 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
 
         const { command, params, taskConfig } = buildScheduledTaskCommand(task, adbConfig);
         const logCheckpoint = await createMaaLogCheckpoint();
+        if (isScheduleStopRequested()) break;
         let result;
 
         if (taskConfig) {
-          result = await execDynamicTask(params, taskConfig, task.name, null, true);
+          result = await execDynamicTask(params, taskConfig, task.name, null, true, false, {
+            shouldAbort: isScheduleStopRequested
+          });
         } else {
           const args = params ? params.split(' ').filter(arg => arg) : [];
           result = await execMaaCommand(command, args, task.name, null, true);
@@ -995,7 +1040,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         if (!delayCompleted) break;
         continue;
       } catch (error) {
-        if (scheduleExecutionStatus.shouldStop) break;
+        if (isScheduleStopRequested(error)) break;
         failedCount++;
         errors.push({ task: task.name, error: error.message });
         actionResults.push({
@@ -1023,10 +1068,13 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
 
         const { command, params, taskConfig } = buildScheduledTaskCommand(task, adbConfig);
         const logCheckpoint = await createMaaLogCheckpoint();
+        if (isScheduleStopRequested()) break;
         let result;
 
         if (taskConfig) {
-          result = await execDynamicTask(params, taskConfig, task.name, null, true);
+          result = await execDynamicTask(params, taskConfig, task.name, null, true, false, {
+            shouldAbort: isScheduleStopRequested
+          });
         } else {
           const args = params ? params.split(' ').filter(arg => arg) : [];
           result = await execMaaCommand(command, args, task.name, null, true);
@@ -1058,7 +1106,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         if (!delayCompleted) break;
         continue;
       } catch (error) {
-        if (scheduleExecutionStatus.shouldStop) break;
+        if (isScheduleStopRequested(error)) break;
         failedCount++;
         errors.push({ task: task.name, error: error.message });
         actionResults.push({
@@ -1094,7 +1142,10 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
           }
         }
         // 定时任务需要等待命令完成才能获取输出
-        const result = await execDynamicTask(taskId, effectiveTaskConfig, task.name, null, true);
+        if (isScheduleStopRequested()) break;
+        const result = await execDynamicTask(taskId, effectiveTaskConfig, task.name, null, true, false, {
+          shouldAbort: isScheduleStopRequested
+        });
 
         // 尝试从输出中提取任务总结
         if (result.stdout) {
@@ -1135,7 +1186,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
             const fightActionStartIndex = actionResults.length;
             
             for (let i = 0; i < stageEntries.length; i++) {
-              if (scheduleExecutionStatus.shouldStop || activeScheduleAbortController.signal.aborted) {
+              if (isScheduleStopRequested()) {
                 logger.warn('多关卡任务收到停止信号，不再进入下一关', { scheduleId });
                 break;
               }
@@ -1205,8 +1256,9 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
               // 执行命令
               try {
                 const fightLogCheckpoint = await createMaaLogCheckpoint();
+                if (isScheduleStopRequested()) break;
                 const result = await execMaaCommand(command, currentArgs, `${task.name} (${stage})`, null, true);
-                if (scheduleExecutionStatus.shouldStop || activeScheduleAbortController.signal.aborted) break;
+                if (isScheduleStopRequested()) break;
                 const reportSummary = getFightReportResults(task, stage, result);
                 reportResults.push(...reportSummary.reportResults);
                 reportSummary.diagnostics.forEach(diagnostic => executionWarnings.add(diagnostic.message));
@@ -1244,7 +1296,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
                   output
                 }));
               } catch (error) {
-                if (scheduleExecutionStatus.shouldStop || activeScheduleAbortController.signal.aborted) {
+                if (isScheduleStopRequested(error)) {
                   logger.warn('当前关卡已被终止，不再执行后续关卡', { scheduleId, stage });
                   break;
                 }
@@ -1312,12 +1364,12 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
               countFightTaskResult([fightAction]);
               
               // 跳过后的延迟
-              logger.debug('任务已跳过，等待后继续', { 
-                scheduleId, 
-                taskName: task.name, 
-                waitSeconds: 2 
+              logger.debug('任务已跳过，等待后继续', {
+                scheduleId,
+                taskName: task.name,
+                waitSeconds: 2
               });
-              await new Promise(resolve => setTimeout(resolve, 2000));
+              if (!await waitForScheduleDelay(2000)) break;
               continue; // 跳过这个任务
             }
             
@@ -1350,6 +1402,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         
         // 定时任务需要等待命令完成才能获取输出
         const fightLogCheckpoint = command === 'fight' ? await createMaaLogCheckpoint() : null;
+        if (isScheduleStopRequested()) break;
         const result = await execMaaCommand(command, args, task.name, null, true);
         if (command === 'closedown') {
           actionResults.push({
@@ -1413,7 +1466,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         break;
       }
     } catch (error) {
-      if (scheduleExecutionStatus.shouldStop) {
+      if (isScheduleStopRequested(error)) {
         logger.warn('当前任务已被用户终止', { scheduleId, taskName: task.name });
         break;
       }

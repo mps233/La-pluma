@@ -224,9 +224,8 @@ function clearTaskStatusForProcess(childProcess) {
 }
 
 function createCommandOutcome({ code = null, signal = null, stdout = '', stderr = '', command, error = null, childProcess }) {
-  const stopped = Boolean(
-    signal || childProcess?.killed || (taskStatus.process === childProcess && taskStatus.stopRequested)
-  );
+  const stopRequested = Boolean(taskStatus.process === childProcess && taskStatus.stopRequested);
+  const stopped = Boolean(signal || childProcess?.killed || stopRequested);
   const result = {
     stdout: stdout.trim(),
     stderr: stderr.trim(),
@@ -237,6 +236,7 @@ function createCommandOutcome({ code = null, signal = null, stdout = '', stderr 
   return {
     ok: !error && code === 0 && !stopped,
     stopped,
+    stopRequested,
     result,
     error: error || (code !== 0 && !stopped
       ? Object.assign(new Error(`命令执行失败，退出码: ${code}`), {
@@ -408,13 +408,16 @@ async function execMaaCommandUnlocked(command, args = [], taskName = null, taskT
         if (!outcome.ok) {
           addLog('ERROR', `命令执行失败: ${fullCommand}`);
           const diagnostic = getMaaExecutionDiagnostics(stderr)[0];
-          const commandError = outcome.error || new Error(diagnostic?.message || '任务已终止');
+          const commandError = outcome.error || new Error(
+            diagnostic?.message || (outcome.stopRequested ? '任务已终止' : `任务异常退出${signal ? `（${signal}）` : ''}`)
+          );
           if (diagnostic && !outcome.stopped) commandError.message = diagnostic.message;
           commandError.stdout = stdout.trim();
           commandError.stderr = stderr.trim();
           commandError.exitCode = code;
           commandError.signal = signal || null;
           commandError.stopped = outcome.stopped;
+          commandError.stopRequested = outcome.stopRequested;
           reject(commandError);
         } else {
           resolve({
@@ -729,6 +732,14 @@ export async function execDynamicTask(taskId, taskConfig, taskName = null, taskT
   const executeCommand = runtime.executeCommand || execMaaCommandUnlocked;
   const createNonce = runtime.createNonce || (() => `${process.pid}_${Date.now()}_${randomBytes(6).toString('hex')}`);
   const lifecycle = runtime.lifecycle || {};
+  const shouldAbort = typeof runtime.shouldAbort === 'function' ? runtime.shouldAbort : null;
+  const throwIfAborted = () => {
+    if (!shouldAbort?.()) return;
+    const error = new Error('任务已被用户终止');
+    error.stopped = true;
+    error.stopRequested = true;
+    throw error;
+  };
 
   const lease = await acquireExecutionLease({
     source: taskType || 'dynamic-task',
@@ -756,7 +767,9 @@ export async function execDynamicTask(taskId, taskConfig, taskName = null, taskT
   };
 
   try {
+    throwIfAborted();
     const configDir = await resolveConfigDir();
+    throwIfAborted();
     const tasksDir = join(configDir.trim(), 'tasks');
     const dynamicTasksDir = join(tasksDir, DYNAMIC_TASK_DIR);
 
@@ -780,6 +793,7 @@ export async function execDynamicTask(taskId, taskConfig, taskName = null, taskT
 
     // 写入临时文件
     await writeTaskFile(tempTaskFile, taskContent, 'utf-8');
+    throwIfAborted();
     addLog('INFO', `临时任务文件已创建: ${tempTaskFile}`);
     addLog('DEBUG', `任务内容:\n${taskContent}`);
 
@@ -1202,7 +1216,10 @@ export async function getGameClientState(
   validateAdbAddress(address);
 
   const expectedPackage = GAME_PACKAGES[clientType] || GAME_PACKAGES.Official;
-  const { stdout } = await adbExec(adbPath, ['-s', address, 'shell', 'dumpsys', 'window']);
+  const { stdout } = await adbExec(adbPath, ['-s', address, 'shell', 'dumpsys', 'window'], {
+    timeout: 10000,
+    windowsHide: true
+  });
   const foregroundPackage = parseForegroundPackage(stdout);
 
   return {
@@ -1224,7 +1241,14 @@ export function parseForegroundPackage(output = '') {
 /**
  * 测试 ADB 连接
  */
-export async function testAdbConnection(adbPath = DEFAULT_ADB_PATH, address = DEFAULT_ADB_ADDRESS) {
+export async function testAdbConnection(adbPath = DEFAULT_ADB_PATH, address = DEFAULT_ADB_ADDRESS, options = {}) {
+  const shouldStop = typeof options.shouldStop === 'function' ? options.shouldStop : null;
+  const stoppedResult = () => ({
+    success: false,
+    stopped: true,
+    message: '连接检查已终止'
+  });
+
   try {
     // 检查 ADB 是否可用
     try {
@@ -1236,12 +1260,15 @@ export async function testAdbConnection(adbPath = DEFAULT_ADB_PATH, address = DE
         error: error.message
       };
     }
-    
+
+    if (shouldStop?.()) return stoppedResult();
+
     // 检查设备列表
     validateAdbAddress(address);
     const { stdout: devicesOutput } = await adbExec(adbPath, ['devices'], { timeout: 6000, windowsHide: true });
+    if (shouldStop?.()) return stoppedResult();
     const deviceState = getAdbDeviceState(devicesOutput, address);
-    
+
     if (deviceState === 'device') {
       return {
         success: true,
@@ -1267,14 +1294,17 @@ export async function testAdbConnection(adbPath = DEFAULT_ADB_PATH, address = DE
     }
     
     // 尝试连接
+    if (shouldStop?.()) return stoppedResult();
     logger.debug('尝试连接设备', { address });
     const { stdout: connectOutput } = await adbExec(adbPath, ['connect', address], { timeout: 8000, windowsHide: true });
-    
+    if (shouldStop?.()) return stoppedResult();
+
     // 等待连接稳定
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     // 再次检查连接状态
     const { stdout: devicesOutput2 } = await adbExec(adbPath, ['devices'], { timeout: 6000, windowsHide: true });
+    if (shouldStop?.()) return stoppedResult();
     const currentDeviceState = getAdbDeviceState(devicesOutput2, address);
     
     if (currentDeviceState === 'device') {
@@ -1314,12 +1344,18 @@ export async function captureScreen(adbPath = DEFAULT_ADB_PATH, address = DEFAUL
     validateAdbAddress(address);
 
     // 先检查设备是否已连接
-    const { stdout: devicesOutput } = await adbExec(adbPath, ['devices']);
+    const { stdout: devicesOutput } = await adbExec(adbPath, ['devices'], {
+      timeout: 5000,
+      windowsHide: true
+    });
     const isConnected = devicesOutput.includes(address);
-    
+
     if (!isConnected) {
       logger.debug('设备未连接，尝试连接', { address });
-      const { stdout: connectOutput, stderr: connectError } = await adbExec(adbPath, ['connect', address]);
+      const { stdout: connectOutput, stderr: connectError } = await adbExec(adbPath, ['connect', address], {
+        timeout: 8000,
+        windowsHide: true
+      });
       logger.debug('连接结果', { output: connectOutput });
       
       if (connectError) {
@@ -1331,6 +1367,8 @@ export async function captureScreen(adbPath = DEFAULT_ADB_PATH, address = DEFAUL
     
     logger.debug('执行截图命令', { adbPath, address });
     const { stdout, stderr } = await adbExec(adbPath, ['-s', address, 'exec-out', 'screencap', '-p'], {
+      timeout: 15000,
+      windowsHide: true,
       encoding: 'buffer'
     });
     
