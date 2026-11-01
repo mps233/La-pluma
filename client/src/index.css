@@ -185,7 +185,7 @@
   }
   
   .dark select option {
-    background-color: #0a0a0a;
+    background-color: var(--app-surface-solid);
     color: rgb(229 231 235);
   }
   

@@ -20,7 +20,7 @@ function installThemeDocument() {
   document.documentElement.className = 'dark'
   document.documentElement.removeAttribute('style')
   document.head.innerHTML = `
-    <meta name="theme-color" content="#05090c" />
+    <meta name="theme-color" content="#101318" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   `
   document.body.innerHTML = '<div id="root"></div>'
@@ -94,8 +94,8 @@ describe('PWA document boot shell', () => {
 
   it.each([
     { storedTheme: 'light', systemDark: false, dark: false, background: 'rgb(242, 242, 247)', themeColor: '#f6f8fb' },
-    { storedTheme: 'dark', systemDark: false, dark: true, background: 'rgb(0, 0, 0)', themeColor: '#05090c' },
-    { storedTheme: 'system', systemDark: true, dark: true, background: 'rgb(0, 0, 0)', themeColor: '#05090c' },
+    { storedTheme: 'dark', systemDark: false, dark: true, background: 'rgb(16, 19, 24)', themeColor: '#101318' },
+    { storedTheme: 'system', systemDark: true, dark: true, background: 'rgb(16, 19, 24)', themeColor: '#101318' },
     { storedTheme: 'system', systemDark: false, dark: false, background: 'rgb(242, 242, 247)', themeColor: '#f6f8fb' },
   ])('applies $storedTheme before external assets load', ({ storedTheme, systemDark, dark, background, themeColor }) => {
     window.localStorage.setItem('ui-storage', JSON.stringify({ state: { theme: storedTheme } }))
@@ -114,6 +114,6 @@ describe('PWA document boot shell', () => {
     runBootScript()
 
     expect(document.documentElement.classList.contains('dark')).toBe(true)
-    expect(document.documentElement.style.backgroundColor).toBe('rgb(0, 0, 0)')
+    expect(document.documentElement.style.backgroundColor).toBe('rgb(16, 19, 24)')
   })
 })

@@ -46,7 +46,7 @@ describe('UI navigation and theme state', () => {
     applyThemePreference('system')
     expect(document.documentElement.classList.contains('dark')).toBe(true)
     expect(document.documentElement.style.colorScheme).toBe('dark')
-    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#05090c')
+    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#101318')
 
     systemDark = false
     useUIStore.getState().setTheme('system')

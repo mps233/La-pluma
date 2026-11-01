@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     
     <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#05090c" />
+    <meta name="theme-color" content="#101318" />
     <meta name="description" content="MAA CLI 的现代化 Web 界面 - 自动化明日方舟游戏任务" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -31,7 +31,7 @@
       }
 
       html.dark {
-        --boot-bg: #000000;
+        --boot-bg: #101318;
         --boot-chrome: rgba(28, 28, 30, 0.86);
         --boot-sidebar: #1c1c1e;
         --boot-surface: #1c1c1e;
@@ -355,8 +355,8 @@
           document.documentElement.classList.toggle('dark', dark)
           document.getElementById('app-root')?.classList.toggle('dark', dark)
           document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
-          document.documentElement.style.backgroundColor = dark ? '#000000' : '#f2f2f7'
-          document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#05090c' : '#f6f8fb')
+          document.documentElement.style.backgroundColor = dark ? '#101318' : '#f2f2f7'
+          document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#101318' : '#f6f8fb')
           document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.setAttribute('content', dark ? 'black-translucent' : 'default')
         }
         window.__LA_PLUMA_APPLY_THEME__ = applyTheme

@@ -81,7 +81,7 @@ export function applyThemePreference(theme: ThemeMode) {
   document.getElementById('app-root')?.classList.toggle('dark', isDark)
   root.style.colorScheme = isDark ? 'dark' : 'light'
   document.querySelector('meta[name="theme-color"]')
-    ?.setAttribute('content', isDark ? '#05090c' : '#f6f8fb')
+    ?.setAttribute('content', isDark ? '#101318' : '#f6f8fb')
   document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
     ?.setAttribute('content', isDark ? 'black-translucent' : 'default')
 }

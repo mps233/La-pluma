@@ -170,12 +170,14 @@ html.la-pluma-standalone {
 
 html.dark,
 #app-root.dark {
-  --app-chrome-page-bg: #000000;
+  /* Keep this canvas color in sync with --boot-bg in client/index.html and the
+     dark theme-color writers in index.html, uiStore.ts, and vite.config.js. */
+  --app-chrome-page-bg: #101318;
   --app-chrome-bg: rgba(28, 28, 30, 0.74);
   --app-glass-bg: rgba(28, 28, 30, 0.72);
   --app-glass-border: rgba(235, 235, 245, 0.18);
   --app-glass-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
-  --app-bg: #000000;
+  --app-bg: #101318;
   --app-bg-soft: #1c1c1e;
   --app-surface: rgba(28, 28, 30, 0.72);
   --app-surface-solid: #1c1c1e;
@@ -201,8 +203,8 @@ html.dark,
   --app-info: #5e5ce6;
   --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.3);
   --la-pluma-tabbar-shadow: 0 1rem 2.25rem rgba(0, 0, 0, 0.44);
-  --la-pluma-tabbar-fade-color: #000000;
-  --la-pluma-navbar-fade-color: #000000;
+  --la-pluma-tabbar-fade-color: #101318;
+  --la-pluma-navbar-fade-color: #101318;
   --la-pluma-sidebar-frame-fill: rgba(28, 28, 30, 0.78);
   --la-pluma-sidebar-frame-inner-edge: rgba(255, 255, 255, 0.14);
   --la-pluma-sidebar-frame-sheen: linear-gradient(
