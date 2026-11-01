@@ -23,7 +23,35 @@ import type {
 } from '@/types/components'
 import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
 
-type CopilotSetExecutionMode = 'app' | 'manual' | 'cli'
+type CopilotSetExecutionMode = 'manual' | 'cli'
+
+const normalizeCopilotSetExecutionMode = (value: unknown): CopilotSetExecutionMode | null => {
+  if (value === 'manual' || value === 'cli') return value
+  // 旧版本保存的 app（顺序执行）已移除，统一迁移到连续执行。
+  if (value === 'app') return 'cli'
+  return null
+}
+
+type CopilotUriInfo = { id: string; isSet: boolean }
+
+// 当前规范作业集写法是 prts://s<id>；maa://<id>s、prts://<id>s 等旧写法仅做输入兼容。
+const parseCopilotUri = (value: string): CopilotUriInfo | null => {
+  const trimmed = value.trim()
+  const canonicalSet = trimmed.match(/^prts:\/\/s(\d+)$/i)
+  if (canonicalSet) return { id: canonicalSet[1]!, isSet: true }
+  const canonicalSingle = trimmed.match(/^prts:\/\/(\d+)$/i)
+  if (canonicalSingle) return { id: canonicalSingle[1]!, isSet: false }
+  const legacySuffix = trimmed.match(/^(?:prts|maa):\/\/(\d+)s$/i)
+  if (legacySuffix) return { id: legacySuffix[1]!, isSet: true }
+  const legacyMaaPrefix = trimmed.match(/^maa:\/\/s(\d+)$/i)
+  if (legacyMaaPrefix) return { id: legacyMaaPrefix[1]!, isSet: true }
+  const legacySingle = trimmed.match(/^maa:\/\/(\d+)$/i)
+  if (legacySingle) return { id: legacySingle[1]!, isSet: false }
+  return null
+}
+
+const formatCopilotUri = ({ id, isSet }: CopilotUriInfo): string =>
+  isSet ? `prts://s${id}` : `prts://${id}`
 type CopilotSetSelections = Record<string, number[]>
 type CombatMode = 'copilot' | 'ssscopilot' | 'paradoxcopilot'
 type CombatUserConfig = {
@@ -372,9 +400,10 @@ export default function CombatTasks() {
       restoreJson<AutoFormationConfig>('combatAutoFormation', setAutoFormation)
       restoreJson<CopilotSetSelections>('combatCopilotSetSelections', setCopilotSetSelections)
 
-      const savedSetMode = localStorage.getItem('combatCopilotSetExecutionMode')
-      if (savedSetMode === 'app' || savedSetMode === 'manual' || savedSetMode === 'cli') {
-        setCopilotSetExecutionMode(savedSetMode === 'app' ? 'cli' : savedSetMode)
+      const migratedSetMode = normalizeCopilotSetExecutionMode(localStorage.getItem('combatCopilotSetExecutionMode'))
+      if (migratedSetMode) {
+        setCopilotSetExecutionMode(migratedSetMode)
+        localStorage.setItem('combatCopilotSetExecutionMode', migratedSetMode)
         restored = true
       }
       return restored
@@ -419,8 +448,8 @@ export default function CombatTasks() {
             setAutoFormation(formation)
             localStorage.setItem('combatAutoFormation', JSON.stringify(formation))
           }
-          if (savedSetMode === 'app' || savedSetMode === 'manual' || savedSetMode === 'cli') {
-            const migratedSetMode = savedSetMode === 'app' ? 'cli' : savedSetMode
+          const migratedSetMode = normalizeCopilotSetExecutionMode(savedSetMode)
+          if (migratedSetMode) {
             setCopilotSetExecutionMode(migratedSetMode)
             localStorage.setItem('combatCopilotSetExecutionMode', migratedSetMode)
           }
@@ -588,10 +617,8 @@ export default function CombatTasks() {
       .map(line => line.trim())
       .filter(Boolean)
       .map(item => {
-        const uriMatch = item.match(/^(maa|prts):\/\/(\d+)(s?)$/i)
-        if (uriMatch) {
-          return `${uriMatch[1]!.toLowerCase()}://${uriMatch[2]!}${uriMatch[3] || ''}`
-        }
+        const parsedUri = parseCopilotUri(item)
+        if (parsedUri) return formatCopilotUri(parsedUri)
         if (!/^https?:\/\//i.test(item)) return item
 
         try {
@@ -599,8 +626,10 @@ export default function CombatTasks() {
           const idMatch = `${url.pathname} ${url.search}`.match(/(\d+)(s?)(?!.*\d)/)
           const looksLikeSet = /set|collection|合集|作业集/i.test(url.pathname + url.search)
           if (idMatch) {
-            const suffix = looksLikeSet || idMatch[2] === 's' ? 's' : ''
-            return `prts://${idMatch[1]}${suffix}`
+            return formatCopilotUri({
+              id: idMatch[1]!,
+              isSet: looksLikeSet || idMatch[2] === 's'
+            })
           }
         } catch {
           // URL 解析失败时保留原始输入，交给 maa-cli 报错
@@ -617,6 +646,10 @@ export default function CombatTasks() {
       ? (normalized.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [])
           .map(arg => arg.replace(/^("|')|("|')$/g, ''))
           .filter(Boolean)
+          .map(arg => {
+            const parsedUri = parseCopilotUri(arg)
+            return parsedUri ? formatCopilotUri(parsedUri) : arg
+          })
       : []
   }
 
@@ -651,7 +684,10 @@ export default function CombatTasks() {
 
     if (task.id === 'copilot' && copilotSetInfo?.type === 'set' && copilotSetInfo?.autoAddS) {
       for (let i = 0; i < args.length; i++) {
-        args[i] = (args[i] || '').replace(/^(maa|prts):\/\/(\d+)(?!s)$/i, '$1://$2s')
+        const parsedUri = parseCopilotUri(args[i] || '')
+        if (parsedUri && !parsedUri.isSet) {
+          args[i] = formatCopilotUri({ ...parsedUri, isSet: true })
+        }
       }
     }
 
@@ -708,60 +744,6 @@ export default function CombatTasks() {
     } catch (error) {
       return { success: false, error: (error as Error).message }
     }
-  }
-
-  // 应用内连续执行作业集，可确定按前端策略跳过失败作业
-  const startCopilotSetSequentially = async (task: CombatTask, generation: number) => {
-    if (!copilotSetInfo?.copilots || copilotSetInfo.copilots.length === 0) {
-      setStatusMessage('作业集为空')
-      return
-    }
-
-    const selectedIndexes = getSelectedCopilotIndexes()
-    if (!selectedIndexes.length) {
-      setStatusMessage('请至少选择一个作业')
-      return
-    }
-
-    setIsRunning(true)
-    setWaitingForNextCopilot(false)
-    setCopilotSetResults([])
-    setCurrentCopilotTask(task)
-
-    const strategy = advancedParams.copilot?.executionStrategy || 'continue'
-    const results: { index: number; success: boolean; error?: string }[] = []
-    const remainingIndexes = new Set(selectedIndexes)
-    const setId = copilotSetInfo.id
-
-    for (const [order, index] of selectedIndexes.entries()) {
-      if (!isCurrentExecution(generation)) return
-      const result = await executeCopilotAtIndex(task, index)
-      if (!isCurrentExecution(generation)) return
-      const errorMessage = result.error || maaApi.getErrorMessage({ message: result.error }) || '未知错误'
-      results.push({ index, success: result.success, error: errorMessage })
-      setCopilotSetResults([...results])
-
-      const isLast = order === selectedIndexes.length - 1
-      if (result.success) {
-        remainingIndexes.delete(index)
-        applySelectedCopilotIndexes(remainingIndexes, setId)
-      }
-      if (!result.success) {
-        if (strategy === 'stop') {
-          setStatusMessage(`作业 ${index + 1} 执行失败: ${errorMessage}，已按策略停止`)
-          finishCopilotSet(generation)
-          return
-        }
-        if (!isLast) {
-          setStatusMessage(`作业 ${index + 1} 执行失败: ${errorMessage}，已跳过并继续下一关`)
-        }
-      }
-    }
-
-    const successCount = results.filter(result => result.success).length
-    if (!isCurrentExecution(generation)) return
-    setStatusMessage(`作业集执行完成 (${successCount}/${selectedIndexes.length} 成功)`)
-    finishCopilotSet(generation)
   }
 
   // 交给 maa-cli 原生作业集/多 URI 流程执行
@@ -874,15 +856,11 @@ export default function CombatTasks() {
   }
 
   const startCopilotSet = async (task: CombatTask, generation: number) => {
-    if (copilotSetExecutionMode === 'cli') {
-      await startCopilotSetWithCli(task, generation)
-      return
-    }
     if (copilotSetExecutionMode === 'manual') {
       await startCopilotSetManually(task, generation)
       return
     }
-    await startCopilotSetSequentially(task, generation)
+    await startCopilotSetWithCli(task, generation)
   }
 
   // 执行下一个作业
@@ -1053,7 +1031,7 @@ export default function CombatTasks() {
 
     if (task.id === 'copilot' && !copilotSetInfo) {
       const firstArg = splitCopilotInputToArgs(inputValue)[0] || ''
-      if (/^maa:\/\/\d+s$/i.test(firstArg)) {
+      if (parseCopilotUri(firstArg)?.isSet) {
         await handlePreviewCopilotSetWithInput(inputValue)
         setStatusMessage('已恢复作业集进度，请确认待执行关卡后再次执行')
         return
@@ -1213,17 +1191,16 @@ export default function CombatTasks() {
     const requestId = ++previewRequestRef.current
     const isCurrentRequest = () => previewRequestRef.current === requestId
     const rawInput = rawValue ?? (taskInputs['copilot'] || '')
-    const normalizedInput = normalizeCopilotInput(rawInput).trim()
-    const firstToken = normalizedInput.split(/\s+/)[0] || ''
-    const match = firstToken.match(/^maa:\/\/(\d+)(s?)$/)
+    const firstToken = splitCopilotInputToArgs(rawInput)[0] || ''
+    const parsedUri = parseCopilotUri(firstToken)
 
-    if (!match) {
-      setStatusMessage('请输入有效的作业 URI / 作业站链接（如: prts://26766）')
+    if (!parsedUri) {
+      setStatusMessage('请输入有效的作业 URI / 作业站链接（如: prts://26766 或 prts://s56593）')
       return
     }
 
-    const copilotId = match[1] || ''
-    const hasS = match[2] === 's'
+    const copilotId = parsedUri.id
+    const hasS = parsedUri.isSet
     setIsLoadingSet(true)
     setStatusMessage('正在获取作业信息...')
 
@@ -1358,7 +1335,7 @@ export default function CombatTasks() {
               currentIndex: 0
             })
             applySelectedCopilotIndexes(new Set(), copilotId)
-            setStatusMessage(`已按作业集处理：prts://${copilotId}${!hasS ? '（执行时自动补 s）' : ''}`)
+            setStatusMessage(`已按作业集处理：prts://s${copilotId}${!hasS ? '（执行时自动补 s）' : ''}`)
           } else {
             setStatusMessage('未找到作业或作业集')
           }
@@ -1746,13 +1723,14 @@ export default function CombatTasks() {
                             onChange={(e) => setCopilotSetExecutionMode(e.target.value as CopilotSetExecutionMode)}
                             className="app-input app-native-control min-h-11 min-w-0 flex-1 control-surface"
                           >
-                            <option value="app">顺序执行</option>
-                            <option value="manual">手动逐关</option>
                             <option value="cli">连续执行</option>
+                            <option value="manual">手动逐关</option>
                           </select>
                         </div>
                         <p className="pl-14 text-xs leading-relaxed text-tertiary">
-                          顺序执行会保存进度：成功项自动移出待执行，失败项保留待重试。
+                          {copilotSetExecutionMode === 'manual'
+                            ? '每关完成后暂停，请先在游戏中进入下一关界面，再点击“开始下一关”。'
+                            : '自动完成整个作业集；中途需要逐关确认时，请切换到手动逐关。'}
                         </p>
                       </div>
 
@@ -1782,7 +1760,7 @@ export default function CombatTasks() {
                           autoCapitalize="none"
                           spellCheck={false}
                           inputMode="url"
-                          placeholder="prts://1234、prts://1234s、作业站链接或本地路径"
+                          placeholder="prts://1234、prts://s1234、作业站链接或本地路径"
                           value={taskInputs[task.id] || ''}
                           onChange={(e) => handleInputChange(task.id, e.target.value)}
                           className="app-input app-native-control min-h-11 min-w-0 flex-1 font-mono control-surface"
@@ -1812,7 +1790,7 @@ export default function CombatTasks() {
                           <summary className="inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center brand-text hover:underline">说明</summary>
                           <div className="absolute right-0 z-20 mt-2 hidden w-[min(18rem,calc(100vw_-_3rem))] space-y-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-solid)] p-3 text-left shadow-lg group-open:block">
                             <p>• 在 <a href="https://zoot.plus/" target="_blank" rel="noopener noreferrer" className="brand-text hover:underline">zoot.plus</a> 获取作业链接</p>
-                            <p>• 单作业：<code className="px-1 bg-[var(--app-surface-muted)] rounded">prts://1234</code>；作业集：<code className="px-1 bg-[var(--app-surface-muted)] rounded">prts://1234s</code></p>
+                            <p>• 单作业：<code className="px-1 bg-[var(--app-surface-muted)] rounded">prts://1234</code>；作业集：<code className="px-1 bg-[var(--app-surface-muted)] rounded">prts://s1234</code></p>
                             <p>• 作业站链接会自动识别，也可导入远程或本地作业文件</p>
                           </div>
                         </details>

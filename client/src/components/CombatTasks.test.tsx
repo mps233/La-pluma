@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   saveUserConfig: vi.fn(),
   stopTask: vi.fn(),
   executePredefinedTaskArgs: vi.fn(),
+  executeCopilotSetPlan: vi.fn(),
   getCopilotInfo: vi.fn(),
   getCopilotSet: vi.fn(),
   getCopilotSetPlan: vi.fn(),
@@ -48,6 +49,7 @@ vi.mock('../services/api', () => ({
     saveUserConfig: mocks.saveUserConfig,
     stopTask: mocks.stopTask,
     executePredefinedTaskArgs: mocks.executePredefinedTaskArgs,
+    executeCopilotSetPlan: mocks.executeCopilotSetPlan,
     getCopilotInfo: mocks.getCopilotInfo,
     getCopilotSet: mocks.getCopilotSet,
     getCopilotSetPlan: mocks.getCopilotSetPlan,
@@ -143,6 +145,7 @@ describe('CombatTasks execution recovery', () => {
     mocks.saveUserConfig.mockReset().mockResolvedValue({ success: true })
     mocks.stopTask.mockReset().mockResolvedValue({ success: true, data: { task: { success: true } } })
     mocks.executePredefinedTaskArgs.mockReset().mockResolvedValue({ success: true })
+    mocks.executeCopilotSetPlan.mockReset().mockResolvedValue({ success: true, data: { pending: [] } })
     mocks.getCopilotInfo.mockReset()
     mocks.getCopilotSet.mockReset()
     mocks.getCopilotSetPlan.mockReset()
@@ -481,6 +484,105 @@ describe('CombatTasks execution recovery', () => {
     expect(container.textContent).not.toContain('旧预览')
   })
 
+  it('previews a prts:// URI without requiring the legacy prefix', async () => {
+    mocks.getCopilotInfo.mockResolvedValue({
+      success: true,
+      data: {
+        status_code: 200,
+        data: { content: JSON.stringify({ doc: { title: 'PRTS 预览' }, stage_name: 'TEST-1', opers: [] }) },
+      },
+    })
+
+    await renderComponent()
+    await click(buttonsByText('单个作业')[0]!)
+    const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')!
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      valueSetter?.call(input, 'prts://1234')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(buttonsByText('预览')[0]!)
+    await flush()
+
+    expect(mocks.getCopilotInfo).toHaveBeenCalledWith('1234')
+    expect(container.textContent).toContain('PRTS 预览')
+  })
+
+  it('previews the canonical prts://s<id> set form', async () => {
+    mocks.getCopilotSetPlan.mockResolvedValue({
+      success: true,
+      data: {
+        items: [{ id: 101, stage: 'TEST-1', stageId: 'test_1', supportsRaid: true }],
+        entries: [],
+      },
+    })
+
+    await renderComponent()
+    await click(buttonsByText('作业集')[0]!)
+    const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')!
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      valueSetter?.call(input, 'prts://s56593')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(buttonsByText('预览')[0]!)
+    await flush()
+
+    expect(mocks.getCopilotSetPlan).toHaveBeenCalledWith('56593', 'normal')
+    expect(container.textContent).toContain('作业集')
+  })
+
+  it('normalizes the legacy prts://<id>s set form before preview', async () => {
+    mocks.getCopilotSetPlan.mockResolvedValue({
+      success: true,
+      data: {
+        items: [{ id: 101, stage: 'TEST-1', stageId: 'test_1', supportsRaid: true }],
+        entries: [],
+      },
+    })
+
+    await renderComponent()
+    await click(buttonsByText('作业集')[0]!)
+    const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')!
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      valueSetter?.call(input, 'prts://56593s')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(buttonsByText('预览')[0]!)
+    await flush()
+
+    expect(mocks.getCopilotSetPlan).toHaveBeenCalledWith('56593', 'normal')
+    expect(container.textContent).toContain('作业集')
+  })
+
+  it('writes the canonical set URI when auto-detecting a set without details', async () => {
+    mocks.getCopilotInfo.mockResolvedValueOnce({ success: true, data: { status_code: 404 } })
+    mocks.getCopilotSet.mockResolvedValueOnce({ success: true, data: { status_code: 400 } })
+
+    await renderComponent()
+    const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')!
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      valueSetter?.call(input, 'prts://56593')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(buttonsByText('预览')[0]!)
+    await flush()
+    await click(buttonsByText('立即执行')[0]!)
+    await flush()
+
+    expect(mocks.executePredefinedTaskArgs).toHaveBeenCalledWith(
+      'copilot',
+      expect.arrayContaining(['prts://s56593']),
+      null,
+      null,
+      '自动战斗作业',
+      'combat',
+      true,
+    )
+  })
+
   it('associates visible form controls with labels and keeps touch targets at least 44px', async () => {
     await renderComponent()
 
@@ -572,7 +674,7 @@ describe('CombatTasks execution recovery', () => {
 
     expect(mocks.executePredefinedTaskArgs).toHaveBeenCalledWith(
       'copilot',
-      expect.any(Array),
+      expect.arrayContaining(['prts://1234']),
       null,
       null,
       '自动战斗作业',
@@ -585,8 +687,35 @@ describe('CombatTasks execution recovery', () => {
     expect(buttonsByText('立即执行').length).toBeGreaterThan(0)
   })
 
-  it('does not continue a sequential copilot set after stop is confirmed', async () => {
-    const firstCopilot = deferred<{ success: boolean }>()
+  it('keeps only continuous and manual set modes and migrates the legacy sequential choice', async () => {
+    localStorage.setItem('combatCopilotSetExecutionMode', 'app')
+
+    await renderComponent()
+
+    const modeSelect = Array.from(document.querySelectorAll<HTMLSelectElement>('select'))
+      .find(select => Array.from(select.options).some(option => option.value === 'cli'))
+    expect(modeSelect).toBeDefined()
+    expect(Array.from(modeSelect!.options).map(option => option.value)).toEqual(['cli', 'manual'])
+    expect(modeSelect!.value).toBe('cli')
+    expect(localStorage.getItem('combatCopilotSetExecutionMode')).toBe('cli')
+  })
+
+  it('migrates a legacy sequential mode from the server config', async () => {
+    mocks.loadUserConfig.mockResolvedValueOnce({
+      success: true,
+      data: { copilotSetExecutionMode: 'app' },
+    })
+
+    await renderComponent()
+
+    const modeSelect = Array.from(document.querySelectorAll<HTMLSelectElement>('select'))
+      .find(select => Array.from(select.options).some(option => option.value === 'cli'))
+    expect(modeSelect).toBeDefined()
+    expect(modeSelect!.value).toBe('cli')
+    expect(localStorage.getItem('combatCopilotSetExecutionMode')).toBe('cli')
+  })
+
+  it('runs a copilot set through the server plan in continuous mode', async () => {
     mocks.getCopilotSetPlan.mockResolvedValue({
       success: true,
       data: {
@@ -597,38 +726,25 @@ describe('CombatTasks execution recovery', () => {
         entries: [],
       },
     })
-    mocks.executePredefinedTaskArgs.mockReturnValueOnce(firstCopilot.promise)
 
     await renderComponent()
     await click(buttonsByText('作业集')[0]!)
     const input = document.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')
     await act(async () => {
       const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      valueSetter?.call(input, 'maa://48990s')
+      valueSetter?.call(input, 'prts://s48990')
       input?.dispatchEvent(new Event('input', { bubbles: true }))
     })
     await click(buttonsByText('预览')[0]!)
     await flush()
 
-    const executionMode = Array.from(document.querySelectorAll('select'))
-      .find(select => Array.from(select.options).some(option => option.value === 'app'))
-    await act(async () => {
-      if (!executionMode) return
-      const valueSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set
-      valueSetter?.call(executionMode, 'app')
-      executionMode.dispatchEvent(new Event('change', { bubbles: true }))
-    })
     await click(buttonsByText('立即执行')[0]!)
-    expect(mocks.executePredefinedTaskArgs).toHaveBeenCalledTimes(1)
-
-    await click(buttonsByText('终止执行')[0]!)
     await flush()
-    expect(mocks.setMessage).toHaveBeenCalledWith('自动战斗已终止', 'warning')
 
-    await act(async () => firstCopilot.resolve({ success: true }))
-    await flush()
-    expect(mocks.executePredefinedTaskArgs).toHaveBeenCalledTimes(1)
-    expect(mocks.setMessage).not.toHaveBeenCalledWith(expect.stringContaining('作业集执行完成'))
+    expect(mocks.executeCopilotSetPlan).toHaveBeenCalledWith('48990', expect.objectContaining({
+      selectedIndexes: [0, 1],
+    }))
+    expect(mocks.setMessage).toHaveBeenCalledWith('作业集执行完成')
   })
 
   it('allows the stop request to be retried when idle confirmation times out', async () => {

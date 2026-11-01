@@ -61,7 +61,7 @@
 - `maa cleanup` 默认清 `cli-cache core-cache debug`，不清 `tasks/`。
 - `maa run --dry-run` 会加载 Core/资源并 append_task，不是纯语法检查。
 - `maa list` 只列 `tasks/` 顶层文件，不递归子目录。
-- `maa://` 在 0.7.7 仍可用，但首次使用会打印弃用警告；输出优先 `prts://`。
+- 作业集 URI 为 `prts://s<id>`；`maa://`、`maa://<id>s`、`prts://<id>s` 仅保留输入兼容，Web 控制台执行前统一归一化为该形式。
 - `maa fight --series` 帮助文本写 -1~6，实际可透传 -1~10；外服旧资源可能拒绝 >6。
 - `maa roguelike` 0.7.7 只接受 Phantom/Mizuki/Sami/Sarkaz/JieGarden 和 mode 0–5。
 - `maa reclamation` 0.7.7 发送 `increase_mode`，Core 文档键为 `increment_mode`，该参数实际不生效。

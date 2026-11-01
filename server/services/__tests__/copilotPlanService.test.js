@@ -123,10 +123,84 @@ test('delegates only full, non-preset, non-resumed copilot sets', () => {
     entries: [{ ...entries[0], presetFormation: true }]
   }), false);
   assert.equal(canUseNativeCopilotSet({ entries, selectedIndexes: [0] }), false);
-  assert.equal(canUseNativeCopilotSet({ entries, selectedIndexes: [0, 1], totalEntries: 2 }), true);
+  assert.equal(canUseNativeCopilotSet({ entries, selectedIndexes: [0, 1], totalItems: 2 }), true);
+  assert.equal(canUseNativeCopilotSet({ entries, selectedIndexes: [0, 0], totalItems: 2 }), false);
+  assert.equal(canUseNativeCopilotSet({ entries, selectedIndexes: [0, 2], totalItems: 2 }), false);
   assert.equal(canUseNativeCopilotSet({ entries, loopTimes: 2 }), false);
   assert.equal(canUseNativeCopilotSet({ entries, completedKeys: ['0:1:normal'] }), false);
   assert.equal(canUseNativeCopilotSet({ entries: [] }), false);
+});
+
+test('single-item raid=both keeps formation semantics from the set size', () => {
+  const entries = [
+    { key: '0:1:normal', itemIndex: 0, presetFormation: false },
+    { key: '0:1:raid', itemIndex: 0, presetFormation: false }
+  ];
+
+  assert.equal(canUseNativeCopilotSet({
+    entries,
+    totalItems: 1,
+    selectedIndexes: [0],
+    raid: 'both',
+    formationMode: 'auto'
+  }), false);
+  assert.equal(canUseNativeCopilotSet({
+    entries,
+    totalItems: 1,
+    selectedIndexes: [0],
+    raid: 'both',
+    formationMode: 'off'
+  }), true);
+  assert.equal(canUseNativeCopilotSet({
+    entries,
+    totalItems: 1,
+    selectedIndexes: [0],
+    raid: 'both',
+    formationMode: 'on'
+  }), true);
+});
+
+test('raid both does not turn a full selection into a partial one', () => {
+  const expanded = [
+    { key: '0:1:normal', itemIndex: 0, presetFormation: false },
+    { key: '0:1:raid', itemIndex: 0, presetFormation: false },
+    { key: '1:2:normal', itemIndex: 1, presetFormation: false },
+    { key: '1:2:raid', itemIndex: 1, presetFormation: false }
+  ];
+
+  assert.equal(canUseNativeCopilotSet({
+    entries: expanded,
+    totalItems: 2,
+    selectedIndexes: [0, 1],
+    raid: 'both'
+  }), true);
+  assert.equal(canUseNativeCopilotSet({
+    entries: expanded,
+    totalItems: 2,
+    selectedIndexes: [0],
+    raid: 'both'
+  }), false);
+  assert.equal(canUseNativeCopilotSet({
+    entries: expanded,
+    totalItems: 2,
+    selectedIndexes: [0, 1, 2],
+    raid: 'both'
+  }), false);
+});
+
+test('preset formation blocks native delegation even when raid filters its entry', () => {
+  // 第三个作业是预设编队，raid 过滤后不会出现在 entries 里，只能靠 hasPresetFormation 拦截。
+  const entries = [
+    { key: '0:1:raid', itemIndex: 0, presetFormation: false },
+    { key: '1:2:raid', itemIndex: 1, presetFormation: false }
+  ];
+  assert.equal(canUseNativeCopilotSet({
+    entries,
+    totalItems: 3,
+    selectedIndexes: [0, 1, 2],
+    hasPresetFormation: true,
+    raid: 'raid'
+  }), false);
 });
 
 test('builds the native maa copilot command', () => {

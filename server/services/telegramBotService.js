@@ -19,6 +19,13 @@ function stripCopilotScheme(value) {
   return String(value || '').trim().replace(/^(?:maa|prts):\/\//i, '');
 }
 
+function extractCopilotCode(value) {
+  const raw = stripCopilotScheme(value);
+  // 兼容规范作业集 prts://s<id> 和旧的 <id>s 后缀写法。
+  const match = raw.match(/^s(\d+)$/i) || raw.match(/^(\d+)s$/i) || raw.match(/^(\d+)$/);
+  return match?.[1] || raw;
+}
+
 let botConfig = {
   enabled: false,
   botToken: '',
@@ -599,7 +606,7 @@ const STAGE_NAME_MAP = {
 async function getStageInfoFromCopilot(uri) {
   try {
     if (isCopilotUri(uri)) {
-      const code = stripCopilotScheme(uri).replace(/s$/, '');
+      const code = extractCopilotCode(uri);
       const apiUrl = `https://prts.maa.plus/copilot/get/${code}`;
       
       const response = await fetch(apiUrl);

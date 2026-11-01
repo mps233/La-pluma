@@ -287,7 +287,8 @@ async function recordCompletedCopilotEntries(entries, loopTimes) {
  */
 export function canUseNativeCopilotSet({
   entries = [],
-  totalEntries = entries.length,
+  totalItems = entries.length,
+  hasPresetFormation = entries.some(entry => entry.presetFormation),
   raid = 'normal',
   loopTimes = 1,
   selectedIndexes = [],
@@ -296,23 +297,29 @@ export function canUseNativeCopilotSet({
   userAdditional = null
 } = {}) {
   if (entries.length === 0) return false;
-  if (selectedIndexes.length > 0 && selectedIndexes.length < totalEntries) return false;
+  // selectedIndexes 是作业条目索引，entries 会按 raid=both 展开成多份。
+  // 必须和作业条目总数比较，不能和展开后的 entries 数比较。
+  // 同时拒绝重复或越界索引，避免原生委托执行未选中的关卡。
+  if (selectedIndexes.length > 0) {
+    const normalizedIndexes = selectedIndexes.map(Number);
+    if (normalizedIndexes.some(index => !Number.isInteger(index) || index < 0 || index >= totalItems)) return false;
+    if (new Set(normalizedIndexes).size !== totalItems) return false;
+  }
   if (loopTimes !== 1) return false;
   if (completedKeys.length > 0) return false;
-  if (entries.some(entry => entry.presetFormation)) return false;
+  if (hasPresetFormation || entries.some(entry => entry.presetFormation)) return false;
   const hasUserAdditional = typeof userAdditional === 'string'
     ? userAdditional.trim().length > 0
     : Array.isArray(userAdditional)
       ? userAdditional.length > 0
       : Boolean(userAdditional && Object.keys(userAdditional).length > 0);
   if (hasUserAdditional) return false;
-  // maa-cli forces formation=true for multi-stage sets and defaults to false
-  // for a single stage; auto/off cannot be expressed for those combinations.
-  if (formationMode === 'auto' && entries.length < 2) return false;
-  if (formationMode === 'off' && entries.length >= 2) return false;
-  // `maa copilot --raid raid` only keeps is_raid in the copilot_list branch,
-  // which is used for multi-stage sets. A single-stage set would lose it.
-  if (raid === 'raid' && entries.length < 2) return false;
+  // maa-cli 按作业 JSON 文件数量决定 formation：多作业集强制 true，单作业默认 false。
+  // raid=both 会把 entries 展开成两份，但不会改变作业 JSON 文件数量，所以这里用 totalItems。
+  if (formationMode === 'auto' && totalItems < 2) return false;
+  if (formationMode === 'off' && totalItems >= 2) return false;
+  // 单文件模式会丢失 is_raid；只有 copilot_list 分支保留突袭标记。
+  if (raid === 'raid' && totalItems < 2) return false;
   return raid === 'normal' || raid === 'raid' || raid === 'both';
 }
 
@@ -410,7 +417,8 @@ export async function executeCopilotPlan({ setId, raid = 'normal', selectedIndex
 
   if (options.nativeDelegation !== false && canUseNativeCopilotSet({
     entries: selectedEntries,
-    totalEntries: plan.entries.length,
+    totalItems: plan.items.length,
+    hasPresetFormation: plan.items.some(item => item.presetFormation),
     raid,
     loopTimes,
     selectedIndexes,
