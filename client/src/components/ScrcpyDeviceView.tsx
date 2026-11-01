@@ -19,6 +19,13 @@ interface ScrcpyDeviceViewProps {
     built?: boolean
     serverRunning?: boolean
     agentRunning?: boolean
+    serverVersion?: string | null
+    agentVersion?: string | null
+    agentOnline?: boolean
+    agentVersionStatus?: 'ok' | 'outdated' | 'unknown'
+    minimumAgentVersion?: string
+    screenState?: string | null
+    usingDefaultPassword?: boolean
   } | null
   infrastructureStatusState?: 'loading' | 'ready' | 'error'
   infrastructureLoading?: string | null
@@ -26,6 +33,7 @@ interface ScrcpyDeviceViewProps {
   onInstall?: () => Promise<void> | void
   onToggleServer?: () => Promise<void> | void
   onToggleAgent?: () => Promise<void> | void
+  onRedeployAgent?: () => Promise<void> | void
 }
 
 const statusLabel: Record<string, string> = {
@@ -101,7 +109,7 @@ export default function ScrcpyDeviceView({
   automationUnavailableMessage = '后端服务暂不可用，请稍后重试',
   variant = 'full',
   deviceId = 'mumu-la-pluma',
-  signalingUrl = 'ws://127.0.0.1:8443',
+  signalingUrl = '/webrtc-signaling',
   onStartInfrastructure,
   autoConnect = false,
   onStatusChange,
@@ -111,7 +119,8 @@ export default function ScrcpyDeviceView({
   infrastructureError,
   onInstall,
   onToggleServer,
-  onToggleAgent
+  onToggleAgent,
+  onRedeployAgent
 }: ScrcpyDeviceViewProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const immersiveVideoRef = useRef<HTMLVideoElement | null>(null)
@@ -129,6 +138,8 @@ export default function ScrcpyDeviceView({
   const [customMaxSize, setCustomMaxSize] = useState<number>(qualityPresets.smooth.maxSize)
   const [customBitrateMbps, setCustomBitrateMbps] = useState<number>(qualityPresets.smooth.bitrateMbps)
   const [settingsDirty, setSettingsDirty] = useState(false)
+  const [commandError, setCommandError] = useState<string | null>(null)
+  const commandErrorTimerRef = useRef<number | null>(null)
   const [immersiveMode, setImmersiveMode] = useState(false)
   const [compactControlsOpen, setCompactControlsOpen] = useState(false)
   const compactControlsId = `scrcpy-controls-${useId().replace(/:/g, '')}`
@@ -142,7 +153,8 @@ export default function ScrcpyDeviceView({
     max_bitrate: Math.max(customBitrateMbps, selectedPreset?.maxBitrateMbps ?? customBitrateMbps) * 1000000,
     bwe: true,
     audio: false,
-    snapshot_interval: 10
+    snapshot_interval: 10,
+    stay_awake: true
   }), [customBitrateMbps, customFps, customMaxSize, selectedPreset?.maxBitrateMbps])
   const webrtc = useScrcpyWebRTC({
     deviceId,
@@ -167,6 +179,8 @@ export default function ScrcpyDeviceView({
   const infrastructureBusy = infrastructureLoading !== null && infrastructureLoading !== undefined
   const needsInstall = infrastructureKnown && (!infrastructureStatus.installed || !infrastructureStatus.built)
   const visibleError = webrtc.error || infrastructureError
+  const minimumAgentVersion = infrastructureStatus?.minimumAgentVersion || '0.4.3'
+  const agentVersionOutdated = infrastructureStatus?.agentVersionStatus === 'outdated'
   const statusDotClass = visibleError
     ? 'bg-[var(--app-danger)]'
     : webrtc.status === 'connected'
@@ -213,7 +227,21 @@ export default function ScrcpyDeviceView({
 
   const sendDeviceCommand = (command: string) => {
     if (!automationAvailable) return
-    webrtc.sendCommand(command)
+    void webrtc.sendCommand(command).then(result => {
+      if (commandErrorTimerRef.current !== null) {
+        window.clearTimeout(commandErrorTimerRef.current)
+        commandErrorTimerRef.current = null
+      }
+      if (result.success) {
+        setCommandError(null)
+        return
+      }
+      setCommandError(result.error || '命令执行失败')
+      commandErrorTimerRef.current = window.setTimeout(() => {
+        commandErrorTimerRef.current = null
+        setCommandError(null)
+      }, 4000)
+    })
   }
 
   useEffect(() => {
@@ -302,6 +330,10 @@ export default function ScrcpyDeviceView({
     connectRequestGenerationRef.current += 1
     if (pointerMoveFrameRef.current !== null) window.cancelAnimationFrame(pointerMoveFrameRef.current)
     pointerMoveFrameRef.current = null
+    if (commandErrorTimerRef.current !== null) {
+      window.clearTimeout(commandErrorTimerRef.current)
+      commandErrorTimerRef.current = null
+    }
     pendingPointerMovesRef.current.clear()
     trackedPointersRef.current.forEach((pointer, pointerId) => {
       sendTouchRef.current(3, pointer.clientX, pointer.clientY, pointerId, pointer.target)
@@ -464,16 +496,52 @@ export default function ScrcpyDeviceView({
               组件：{componentStatusLabel}
             </span>
             <span className="surface-soft rounded-full px-2 py-1 text-secondary">
-              服务：{serverStatusLabel}
+              服务：{serverStatusLabel}{infrastructureStatus?.serverVersion ? ` · ${infrastructureStatus.serverVersion}` : ''}
             </span>
             <span className="surface-soft rounded-full px-2 py-1 text-secondary">
-              Agent：{agentStatusLabel}
+              Agent：{agentStatusLabel}{infrastructureStatus?.agentVersion ? ` · ${infrastructureStatus.agentVersion}` : ''}
             </span>
+            {infrastructureStatus?.screenState === 'off' && (
+              <span className="status-warning rounded-full px-2 py-1">设备息屏</span>
+            )}
+            {infrastructureStatus?.usingDefaultPassword && (
+              <span
+                className="status-warning rounded-full px-2 py-1"
+                title="建议修改 ScrcpyOverWebRTC 管理员密码并设置 LA_PLUMA_WEBRTC_PASSWORD"
+              >
+                默认密码
+              </span>
+            )}
             {visibleError && (
               <span className="px-2 py-1 rounded-full status-danger">{visibleError}</span>
             )}
           </div>}
         </div>
+
+        {agentVersionOutdated && (
+          <div
+            className="status-warning flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs leading-5"
+            role="alert"
+          >
+            <span>
+              设备端 Agent {infrastructureStatus?.agentVersion || '版本未知'} 低于 v{minimumAgentVersion}，旧版可能因到期限制无法启动。
+              {onRedeployAgent ? '重新部署即可更新设备端 Agent。' : '请先停止 Agent，再重新连接以部署新版。'}
+            </span>
+            {onRedeployAgent && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => void onRedeployAgent()}
+                disabled={!automationAvailable || infrastructureBusy}
+                loading={infrastructureLoading === 'agent'}
+                loadingText="部署中"
+                title={!automationAvailable ? automationUnavailableMessage : undefined}
+              >
+                重新部署 Agent
+              </Button>
+            )}
+          </div>
+        )}
 
         {!isCompact && <div className="scrcpy-status-grid">
           {statusCards.map(([label, value]) => (
@@ -595,6 +663,12 @@ export default function ScrcpyDeviceView({
             </button>
           )}
         </div>
+
+        {commandError && (
+          <p className="text-center text-xs text-[var(--app-danger)]" role="alert" aria-live="polite">
+            {commandError}
+          </p>
+        )}
 
       </div>
 

@@ -70,7 +70,8 @@ import { DEFAULT_ADB_ADDRESS, DEFAULT_ADB_PATH, DEFAULT_CLIENT_TYPE, DEFAULT_MAA
 import { API_VERSION, buildAgentManifest, buildOpenApiSpec } from './agentContract.js';
 import {
   getWebrtcStatus,
-  installWebrtc,
+  startWebrtcInstall,
+  getWebrtcInstallState,
   startWebrtcServer,
   stopWebrtcServer,
   startWebrtcAgent,
@@ -79,6 +80,11 @@ import {
   stopWebrtc,
   isWebrtcServerReachable,
   getWebrtcDevices,
+  getWebrtcDeviceRecords,
+  getWebrtcSnapshot,
+  getWebrtcServerVersion,
+  getWebrtcAgentVersionStatus,
+  MINIMUM_WEBRTC_AGENT_VERSION,
   WEBRTC_PORT,
   DEFAULT_DEVICE_ADDRESS,
   DEFAULT_DEVICE_ID
@@ -98,6 +104,19 @@ export function buildWebrtcBrowserProtocol(deviceId) {
     requestOfferPayload: { type: 'request-offer', ip_preference: 'ipv4' },
     candidatePolicy: 'relay preferred / ipv4'
   };
+}
+
+export function buildWebrtcDeviceStatus(records = [], deviceId = DEFAULT_DEVICE_ID) {
+  const device = records.find(record => record.id === deviceId) || null
+  return {
+    deviceId,
+    devices: records.filter(record => record.online).map(record => record.id),
+    agentVersion: device?.agentVersion || null,
+    agentOnline: Boolean(device?.online),
+    agentVersionStatus: getWebrtcAgentVersionStatus(device?.agentVersion),
+    minimumAgentVersion: MINIMUM_WEBRTC_AGENT_VERSION,
+    screenState: device?.screenState || null
+  }
 }
 
 function getIdempotencyKey(req) {
@@ -463,9 +482,9 @@ async function getAdbSummary(adbPath = DEFAULT_ADB_PATH, address = DEFAULT_ADB_A
   };
 }
 
-async function getWebrtcSummary(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
+async function getWebrtcSummary(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH, { agentRunning = null } = {}) {
   const [status, reachable] = await Promise.all([
-    getWebrtcStatus(address, adbPath).catch(() => null),
+    getWebrtcStatus(address, adbPath, { agentRunning }).catch(() => null),
     isWebrtcServerReachable()
   ])
   return {
@@ -1357,23 +1376,58 @@ router.post('/actions/fetch-training-materials', asyncHandler(async (req, res) =
 
 router.get('/webrtc/status', asyncHandler(async (req, res) => {
   const { address, adbPath, profileId } = await resolveRequestConnection(req, { allowOverrides: true })
-  const summary = await getWebrtcSummary(address, adbPath);
-  return sendSuccess(res, req, { ...summary, profileId, devices: await getWebrtcDevices() });
+  const deviceId = typeof req.query?.deviceId === 'string' && req.query.deviceId.trim()
+    ? req.query.deviceId.trim()
+    : DEFAULT_DEVICE_ID
+  const [records, serverVersion] = await Promise.all([
+    getWebrtcDeviceRecords(),
+    getWebrtcServerVersion().catch(() => null)
+  ])
+  const device = records.find(record => record.id === deviceId) || null
+  const summary = await getWebrtcSummary(address, adbPath, {
+    agentRunning: device ? device.online : null
+  })
+  return sendSuccess(res, req, {
+    ...summary,
+    ...buildWebrtcDeviceStatus(records, deviceId),
+    profileId,
+    serverVersion
+  })
 }));
 
 router.get('/webrtc/devices', asyncHandler(async (req, res) => {
   return sendSuccess(res, req, { devices: await getWebrtcDevices() });
 }));
 
+router.get('/webrtc/snapshot', asyncHandler(async (req, res) => {
+  const deviceId = typeof req.query?.deviceId === 'string' && req.query.deviceId.trim()
+    ? req.query.deviceId.trim()
+    : DEFAULT_DEVICE_ID
+  const snapshot = await getWebrtcSnapshot(deviceId)
+  if (!snapshot) {
+    return sendError(res, req, agentError(
+      'WEBRTC_SNAPSHOT_UNAVAILABLE',
+      '无法读取设备快照，请确认 WebRTC 服务正在运行',
+      { statusCode: 404, retryable: true, details: { deviceId } }
+    ))
+  }
+  return sendSuccess(res, req, snapshot)
+}));
+
 router.post('/webrtc/start', asyncHandler(async (req, res) => {
   const { address, adbPath, profileId } = await resolveRequestConnection(req, { allowOverrides: true })
   const deviceId = req.body?.deviceId || DEFAULT_DEVICE_ID;
   const status = await startWebrtc(address, deviceId, adbPath);
-  const summary = await getWebrtcSummary(address, adbPath);
+  const [summary, records, serverVersion] = await Promise.all([
+    getWebrtcSummary(address, adbPath),
+    getWebrtcDeviceRecords(),
+    getWebrtcServerVersion().catch(() => null)
+  ])
   return sendSuccess(res, req, {
     ...summary,
     ...status,
-    devices: await getWebrtcDevices(),
+    ...buildWebrtcDeviceStatus(records, deviceId),
+    serverVersion,
     deviceId,
     address,
     profileId,
@@ -1399,8 +1453,14 @@ router.post('/preview/orientation', asyncHandler(async (req, res) => {
 }));
 
 router.post('/webrtc/install', asyncHandler(async (req, res) => {
-  const result = await installWebrtc();
-  return sendSuccess(res, req, result, 'WebRTC 组件已安装');
+  const state = startWebrtcInstall()
+  const running = state.status === 'running'
+  res.status(running ? 202 : 200)
+  return sendSuccess(res, req, state, running ? 'WebRTC 组件安装已开始' : 'WebRTC 组件安装状态')
+}));
+
+router.get('/webrtc/install/status', asyncHandler(async (req, res) => {
+  return sendSuccess(res, req, getWebrtcInstallState())
 }));
 
 router.post('/webrtc/start-server', asyncHandler(async (req, res) => {

@@ -16,6 +16,7 @@ const apiMocks = vi.hoisted(() => ({
   getWebrtcStatus: vi.fn(),
   startWebrtc: vi.fn(),
   installWebrtc: vi.fn(),
+  getWebrtcInstallStatus: vi.fn(),
   startWebrtcServer: vi.fn(),
   stopWebrtcServer: vi.fn(),
   startWebrtcAgent: vi.fn(),
@@ -40,6 +41,7 @@ interface MockDeviceViewProps {
   onInstall?: () => Promise<void> | void
   onToggleServer?: () => Promise<void> | void
   onToggleAgent?: () => Promise<void> | void
+  onRedeployAgent?: () => Promise<void> | void
   infrastructureStatus?: { serverRunning?: boolean } | null
   infrastructureStatusState?: string
   infrastructureLoading?: string | null
@@ -61,6 +63,7 @@ vi.mock('./ScrcpyDeviceView', () => ({
       <button type="button" onClick={() => void props.onInstall?.()}>install</button>
       <button type="button" onClick={() => void props.onToggleServer?.()}>server</button>
       <button type="button" onClick={() => void props.onToggleAgent?.()}>agent</button>
+      {props.onRedeployAgent && <button type="button" onClick={() => void props.onRedeployAgent?.()}>redeploy</button>}
     </div>
   ),
 }))
@@ -91,6 +94,7 @@ describe('ScreenMonitor automation availability guard', () => {
     })
     apiMocks.startWebrtc.mockResolvedValue({ success: true, data: { signalingUrl: '/webrtc-signaling' } })
     apiMocks.installWebrtc.mockResolvedValue({ success: true })
+    apiMocks.getWebrtcInstallStatus.mockResolvedValue({ success: true, data: { status: 'succeeded' } })
     apiMocks.startWebrtcServer.mockResolvedValue({ success: true })
     apiMocks.stopWebrtcServer.mockResolvedValue({ success: true })
     apiMocks.startWebrtcAgent.mockResolvedValue({ success: true })
@@ -158,6 +162,33 @@ describe('ScreenMonitor automation availability guard', () => {
     expect(view?.getAttribute('data-status-state')).toBe('error')
     expect(view?.getAttribute('data-has-status')).toBe('false')
     expect(view?.getAttribute('data-error')).toBe('状态读取失败')
+  })
+
+  it('redeploys the agent by stopping a running agent before starting it again', async () => {
+    availabilityMock.isAvailable = true
+    apiMocks.getWebrtcStatus.mockResolvedValue({
+      success: true,
+      data: {
+        installed: true,
+        built: true,
+        serverRunning: true,
+        agentRunning: true,
+        agentVersion: 'v0.2.7-abcdef',
+        agentVersionStatus: 'outdated',
+        minimumAgentVersion: '0.4.3',
+      },
+    })
+    await act(async () => root.render(<ScreenMonitor />))
+    await flush()
+
+    await click('redeploy')
+    await flush()
+
+    expect(apiMocks.stopWebrtcAgent).toHaveBeenCalledOnce()
+    expect(apiMocks.startWebrtcAgent).toHaveBeenCalledOnce()
+    const stopOrder = apiMocks.stopWebrtcAgent.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER
+    const startOrder = apiMocks.startWebrtcAgent.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER
+    expect(stopOrder).toBeLessThan(startOrder)
   })
 
   it('serializes service operations so a second action cannot overtake the first', async () => {

@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { maaApi } from '../services/api'
 import { useScrcpyWebRTC } from './useScrcpyWebRTC'
 
-const DEFAULT_SIGNALING_URL = 'ws://127.0.0.1:8443'
+const DEFAULT_SIGNALING_URL = '/webrtc-signaling'
 const DEFAULT_DEVICE_ID = 'mumu-la-pluma'
 const FRAME_SAMPLE_SIZE = 8
 const BLACK_FRAME_THRESHOLD = 18
 const LIVE_STALE_MS = 1500
 const FRAME_SAMPLE_INTERVAL_MS = 500
-const STATUS_POLL_INTERVAL_MS = 5000
+const STATUS_POLL_INTERVAL_MS = 10000
 const FALLBACK_SNAPSHOT_INTERVAL_MS = 10000
 const CONNECTING_STATUSES = new Set(['connecting', 'signaling', 'waiting_offer', 'connecting_webrtc'])
 
@@ -19,6 +19,8 @@ export function useDashboardPreview() {
   const [webrtcStatus, setWebrtcStatus] = useState<any>(null)
   const [fallbackSnapshot, setFallbackSnapshot] = useState<string | null>(null)
   const [showLivePreview, setShowLivePreview] = useState(false)
+  const [statusSettled, setStatusSettled] = useState(false)
+  const serverRunning = Boolean(webrtcStatus?.serverRunning)
 
   const preview = useScrcpyWebRTC({
     videoRef,
@@ -34,23 +36,27 @@ export function useDashboardPreview() {
       max_bitrate: 5000000,
       bwe: true,
       audio: false,
-      snapshot_interval: 10
+      snapshot_interval: 10,
+      stay_awake: true
     }
   })
   const connectPreview = preview.connect
 
   useEffect(() => {
     let cancelled = false
-    const fetch = () => {
+    const fetchStatus = () => {
       maaApi.getWebrtcStatus()
         .then(response => {
           if (!cancelled && response.success) setWebrtcStatus(response.data)
         })
         .catch(() => {})
+        .finally(() => {
+          if (!cancelled) setStatusSettled(true)
+        })
     }
 
-    fetch()
-    const timer = setInterval(fetch, STATUS_POLL_INTERVAL_MS)
+    fetchStatus()
+    const timer = setInterval(fetchStatus, STATUS_POLL_INTERVAL_MS)
     return () => {
       cancelled = true
       clearInterval(timer)
@@ -106,10 +112,25 @@ export function useDashboardPreview() {
   }, [])
 
   useEffect(() => {
-    if (showLivePreview) return
+    if (!statusSettled || showLivePreview) return
 
     let cancelled = false
     const fetchSnapshot = async () => {
+      if (serverRunning) {
+        try {
+          const snapshot = await maaApi.getWebrtcSnapshot(DEFAULT_DEVICE_ID)
+          const snapshotData = snapshot?.data
+          const image = snapshotData?.image
+          if (!cancelled && image && snapshotData) {
+            const mediaType = snapshotData.mediaType || 'image/jpeg'
+            setFallbackSnapshot(`data:${mediaType};base64,${image}`)
+            return
+          }
+        } catch {
+          // Fall back to an ADB screenshot when the preview service has no snapshot.
+        }
+      }
+
       try {
         const result = await maaApi.captureScreen()
         const image = result?.data?.image
@@ -127,14 +148,26 @@ export function useDashboardPreview() {
       cancelled = true
       clearInterval(timer)
     }
-  }, [showLivePreview])
+  }, [serverRunning, showLivePreview, statusSettled])
 
   return {
     videoRef,
     fallbackSnapshot,
     showLivePreview,
     isConnecting: CONNECTING_STATUSES.has(preview.status),
-    statusText: showLivePreview ? 'Live' : fallbackSnapshot ? '画面快照 · 10s' : preview.error || preview.status,
-    headerStatusText: showLivePreview ? `${preview.stats?.width || 0}×${preview.stats?.height || 0}` : fallbackSnapshot ? '画面快照' : '自动连接中'
+    statusText: showLivePreview
+      ? 'Live'
+      : webrtcStatus?.screenState === 'off'
+        ? '设备息屏'
+        : fallbackSnapshot
+          ? '画面快照 · 10s'
+          : preview.error || preview.status,
+    headerStatusText: showLivePreview
+      ? `${preview.stats?.width || 0}×${preview.stats?.height || 0}`
+      : webrtcStatus?.screenState === 'off'
+        ? '设备息屏'
+        : fallbackSnapshot
+          ? '画面快照'
+          : '自动连接中'
   }
 }

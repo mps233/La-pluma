@@ -475,14 +475,19 @@ export const AGENT_OPERATIONS = Object.freeze([
     id: 'webrtc_status',
     method: 'GET',
     path: '/api/agent/webrtc/status',
-    description: 'Return lightweight WebRTC endpoint hints, including the same-origin browser signaling path.',
+    description: 'Return WebRTC endpoint hints, the installed server version, and device-agent version status. Agents older than v0.4.3 are reported as outdated.',
     tags: ['Preview'],
     query_schema: {
       type: 'object',
       properties: {
         profileId: profileIdProperty,
         adbPath: { type: 'string', ...runtimeDefault('adbPath') },
-        address: { type: 'string', ...runtimeDefault('adbAddress') }
+        address: { type: 'string', ...runtimeDefault('adbAddress') },
+        deviceId: {
+          type: 'string',
+          default: 'mumu-la-pluma',
+          description: 'ScrcpyOverWebRTC device id whose agent version should be inspected.'
+        }
       }
     }
   }),
@@ -490,8 +495,25 @@ export const AGENT_OPERATIONS = Object.freeze([
     id: 'webrtc_devices',
     method: 'GET',
     path: '/api/agent/webrtc/devices',
-    description: 'Return online ScrcpyOverWebRTC device ids in an AI-readable shape.',
+    description: 'Return online ScrcpyOverWebRTC device ids in an AI-readable shape. Retained offline records are excluded.',
     tags: ['Preview']
+  }),
+  operation({
+    id: 'webrtc_snapshot',
+    method: 'GET',
+    path: '/api/agent/webrtc/snapshot',
+    description: 'Return the latest ScrcpyOverWebRTC device snapshot as a base64 JPEG for dashboard fallback previews.',
+    tags: ['Preview'],
+    query_schema: {
+      type: 'object',
+      properties: {
+        deviceId: {
+          type: 'string',
+          default: 'mumu-la-pluma',
+          description: 'ScrcpyOverWebRTC device id whose latest snapshot should be returned.'
+        }
+      }
+    }
   }),
   operation({
     id: 'webrtc_start',

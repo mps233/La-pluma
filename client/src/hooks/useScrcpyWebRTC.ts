@@ -18,6 +18,7 @@ interface ScrcpyOptions {
   debug?: boolean
   snapshot_interval?: number
   power_off?: boolean
+  stay_awake?: boolean
 }
 
 interface UseScrcpyWebRTCOptions {
@@ -45,11 +46,38 @@ interface VideoStats {
   inputReady: boolean
 }
 
-const SIGNALING_TOKEN_KEY = 'scrcpy_webrtc_auth_token'
 const DEFAULT_SIGNALING_PATH = '/webrtc-signaling'
 const SIGNALING_RETRY_DELAYS_MS = [300, 800]
 const SIGNALING_ATTEMPT_TIMEOUT_MS = 4000
 const INPUT_CHANNEL_BACKPRESSURE_BYTES = 64 * 1024
+const HEARTBEAT_INTERVAL_MS = 20_000
+const OFFER_TIMEOUT_MS = 15_000
+const RECONNECT_DELAY_MS = 800
+const COMMAND_TIMEOUT_MS = 12_000
+
+export interface ScrcpyCommandResult {
+  requestId: string
+  success: boolean
+  output?: string
+  error?: string
+  raw?: unknown
+}
+
+function normalizeCommandResult(payload: any, requestId: string): ScrcpyCommandResult {
+  const error = typeof payload?.error === 'string' ? payload.error : ''
+  const output = typeof payload?.output === 'string'
+    ? payload.output
+    : typeof payload?.result === 'string'
+      ? payload.result
+      : undefined
+  return {
+    requestId,
+    success: payload?.success !== false && !error,
+    output,
+    error: error || undefined,
+    raw: payload
+  }
+}
 
 interface SignalingEndpoints {
   httpBase: string
@@ -91,6 +119,22 @@ export function isPointInsideRenderedVideo(
   const relativeX = clientX - rect.left - geometry.offsetX
   const relativeY = clientY - rect.top - geometry.offsetY
   return relativeX >= 0 && relativeX <= geometry.actualW && relativeY >= 0 && relativeY <= geometry.actualH
+}
+
+export function resolveTouchTargetSize(
+  deviceWidth: number,
+  deviceHeight: number,
+  videoWidth: number,
+  videoHeight: number
+) {
+  if (!deviceWidth || !deviceHeight || !videoWidth || !videoHeight) {
+    return { width: deviceWidth, height: deviceHeight }
+  }
+  const defaultLandscape = deviceWidth > deviceHeight
+  const videoLandscape = videoWidth > videoHeight
+  return videoLandscape !== defaultLandscape
+    ? { width: deviceHeight, height: deviceWidth }
+    : { width: deviceWidth, height: deviceHeight }
 }
 
 export function isTouchMoveBackpressured(action: number, bufferedAmount: number) {
@@ -152,33 +196,20 @@ export function resolveSignalingEndpoints(
 }
 
 async function getSignalingToken(httpBase: string, signal: AbortSignal) {
-  // The signaling server can restart between previews, invalidating its old token.
-  window.localStorage.removeItem(SIGNALING_TOKEN_KEY)
   const loginUrl = `${httpBase}/api/login`
-  const gatewayLoginUrl = new URL(`${DEFAULT_SIGNALING_PATH}/api/login`, window.location.href).toString()
-  const usesSameOriginGateway = new URL(loginUrl).toString() === gatewayLoginUrl
   let response: Response
   try {
-    response = usesSameOriginGateway
-      ? await fetchWithAuth(loginUrl, {
-          method: 'POST',
-          cache: 'no-store',
-          signal
-        })
-      : await fetch(loginUrl, {
-          method: 'POST',
-          cache: 'no-store',
-          signal,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: 'admin', password: 'admin123' })
-        })
+    response = await fetchWithAuth(loginUrl, {
+      method: 'POST',
+      cache: 'no-store',
+      signal
+    })
   } catch {
     throw new Error('暂时无法连接信令服务')
   }
   if (!response.ok) throw new Error(`信令服务登录失败 (HTTP ${response.status})`)
   const data = await response.json().catch(() => null)
   if (typeof data?.token !== 'string' || !data.token.trim()) throw new Error('信令服务返回了无效凭证')
-  window.localStorage.setItem(SIGNALING_TOKEN_KEY, data.token)
   return data.token as string
 }
 
@@ -233,7 +264,14 @@ export function useScrcpyWebRTC({
   const retryTimerRef = useRef<number | null>(null)
   const attemptTimeoutRef = useRef<number | null>(null)
   const authAbortControllerRef = useRef<AbortController | null>(null)
-  const iceGatheringCleanupRef = useRef<(() => void) | null>(null)
+  const heartbeatTimerRef = useRef<number | null>(null)
+  const offerTimeoutRef = useRef<number | null>(null)
+  const reconnectTimerRef = useRef<number | null>(null)
+  const pendingCommandsRef = useRef(new Map<string, {
+    requestId: string
+    resolve: (result: ScrcpyCommandResult) => void
+    timer: number
+  }>())
   const prevStatsRef = useRef({ timestamp: 0, bytesReceived: 0, framesDecoded: 0 })
 
   const sendForward = useCallback((payload: unknown) => {
@@ -242,6 +280,41 @@ export function useScrcpyWebRTC({
       ws.send(JSON.stringify({ message_type: 'forward', device_id: deviceId, payload }))
     }
   }, [deviceId])
+
+  const stopHeartbeat = useCallback(() => {
+    if (heartbeatTimerRef.current !== null) {
+      window.clearInterval(heartbeatTimerRef.current)
+      heartbeatTimerRef.current = null
+    }
+  }, [])
+
+  const startHeartbeat = useCallback((ws: WebSocket) => {
+    stopHeartbeat()
+    heartbeatTimerRef.current = window.setInterval(() => {
+      if (ws.readyState !== WebSocket.OPEN) return
+      try {
+        ws.send(JSON.stringify({ type: 'ping' }))
+      } catch {
+        // The close handler will surface a failed signaling connection.
+      }
+    }, HEARTBEAT_INTERVAL_MS)
+  }, [stopHeartbeat])
+
+  const clearOfferTimeout = useCallback(() => {
+    if (offerTimeoutRef.current !== null) {
+      window.clearTimeout(offerTimeoutRef.current)
+      offerTimeoutRef.current = null
+    }
+  }, [])
+
+  const resolvePendingCommands = useCallback((error: string) => {
+    const pending = pendingCommandsRef.current
+    pendingCommandsRef.current = new Map()
+    pending.forEach(entry => {
+      window.clearTimeout(entry.timer)
+      entry.resolve({ requestId: entry.requestId, success: false, error })
+    })
+  }, [])
 
   const filterSdpCandidates = useCallback((sdp: string) => {
     return sdp.split('\r\n').filter(line => {
@@ -331,6 +404,13 @@ export function useScrcpyWebRTC({
   }, [connectionPath, ipPreference, sendForward, videoRef])
 
   const teardownConnection = useCallback(() => {
+    stopHeartbeat()
+    clearOfferTimeout()
+    if (reconnectTimerRef.current !== null) {
+      window.clearTimeout(reconnectTimerRef.current)
+      reconnectTimerRef.current = null
+    }
+    resolvePendingCommands('连接已断开')
     if (retryTimerRef.current !== null) {
       window.clearTimeout(retryTimerRef.current)
       retryTimerRef.current = null
@@ -341,8 +421,6 @@ export function useScrcpyWebRTC({
     }
     authAbortControllerRef.current?.abort()
     authAbortControllerRef.current = null
-    iceGatheringCleanupRef.current?.()
-    iceGatheringCleanupRef.current = null
     inputChannelRef.current = null
     inputChannelCleanupRef.current?.()
     inputChannelCleanupRef.current = null
@@ -363,7 +441,7 @@ export function useScrcpyWebRTC({
     if (videoRef.current) videoRef.current.srcObject = null
     prevStatsRef.current = { timestamp: 0, bytesReceived: 0, framesDecoded: 0 }
     setStats(null)
-  }, [videoRef])
+  }, [clearOfferTimeout, resolvePendingCommands, stopHeartbeat, videoRef])
 
   const disconnect = useCallback(() => {
     connectionGenerationRef.current += 1
@@ -375,11 +453,32 @@ export function useScrcpyWebRTC({
   const connect = useCallback((signalingUrlOverride?: string) => {
     connectionGenerationRef.current += 1
     const generation = connectionGenerationRef.current
+    const hadActiveConnection = Boolean(wsRef.current || pcRef.current)
     teardownConnection()
     const targetSignalingUrl = signalingUrlOverride || signalingUrl
-    const signalingEndpoints = resolveSignalingEndpoints(targetSignalingUrl)
+    const requestedEndpoints = resolveSignalingEndpoints(targetSignalingUrl)
+    const gatewayEndpoints = resolveSignalingEndpoints(DEFAULT_SIGNALING_PATH)
+    let signalingEndpoints = requestedEndpoints
+    try {
+      if (new URL(requestedEndpoints.httpBase).origin !== window.location.origin) {
+        signalingEndpoints = gatewayEndpoints
+      }
+    } catch {
+      signalingEndpoints = gatewayEndpoints
+    }
     setStatus('connecting')
     setError(null)
+
+    const armProtocolTimeout = (message: string) => {
+      clearOfferTimeout()
+      offerTimeoutRef.current = window.setTimeout(() => {
+        offerTimeoutRef.current = null
+        if (connectionGenerationRef.current !== generation) return
+        setError(message)
+        setStatus('error')
+        resolvePendingCommands(message)
+      }, OFFER_TIMEOUT_MS)
+    }
 
     const attemptConnection = (attemptIndex: number) => {
       if (connectionGenerationRef.current !== generation) return
@@ -403,6 +502,9 @@ export function useScrcpyWebRTC({
         if (attemptFinished || connectionGenerationRef.current !== generation) return
         attemptFinished = true
         clearAttemptResources()
+        stopHeartbeat()
+        clearOfferTimeout()
+        resolvePendingCommands('信令连接未建立')
         if (socket) {
           socket.onopen = null
           socket.onmessage = null
@@ -411,7 +513,6 @@ export function useScrcpyWebRTC({
           if (wsRef.current === socket) wsRef.current = null
           if (socket.readyState < WebSocket.CLOSING) socket.close()
         }
-        window.localStorage.removeItem(SIGNALING_TOKEN_KEY)
 
         const retryDelay = SIGNALING_RETRY_DELAYS_MS[attemptIndex]
         if (retryDelay !== undefined) {
@@ -451,7 +552,9 @@ export function useScrcpyWebRTC({
             clearAttemptResources()
             setError(null)
             setStatus('signaling')
+            startHeartbeat(ws)
             ws.send(JSON.stringify({ message_type: 'connect', device_id: deviceId }))
+            armProtocolTimeout('等待信令配置超时，请重新连接预览')
           }
 
           ws.onmessage = event => {
@@ -465,6 +568,7 @@ export function useScrcpyWebRTC({
               return
             }
             const type = msg.message_type || msg.type
+            if (type === 'pong') return
             if (type === 'config') {
               if (Array.isArray(msg.ice_servers) && msg.ice_servers.length > 0) iceServersRef.current = msg.ice_servers
               setStatus('waiting_offer')
@@ -483,6 +587,8 @@ export function useScrcpyWebRTC({
                   ...scrcpyOptionsRef.current
                 }
               })
+              clearOfferTimeout()
+              armProtocolTimeout('等待设备画面超时，请重新连接预览')
               return
             }
             if (type === 'device_info' && msg.device_info?.displays?.[0]) {
@@ -491,13 +597,55 @@ export function useScrcpyWebRTC({
               return
             }
             if (type === 'error') {
-              setError(msg.error || '信令服务返回错误')
+              clearOfferTimeout()
+              const message = msg.error || '信令服务返回错误'
+              setError(message)
               setStatus('error')
+              resolvePendingCommands(message)
               return
             }
             if (type !== 'device_msg' || !msg.payload?.type) return
             const payload = msg.payload
+            if (payload.type === 'command_result') {
+              const requestId = typeof payload.request_id === 'string' ? payload.request_id : ''
+              const pending = pendingCommandsRef.current.get(requestId)
+              if (pending) {
+                window.clearTimeout(pending.timer)
+                pendingCommandsRef.current.delete(requestId)
+                pending.resolve(normalizeCommandResult(payload, requestId))
+              }
+              return
+            }
+            if (payload.type === 'scrcpy_error') {
+              clearOfferTimeout()
+              const message = typeof payload.message === 'string' && payload.message
+                ? payload.message
+                : '设备端视频服务启动失败'
+              setError(message)
+              setStatus('error')
+              resolvePendingCommands(message)
+              const pc = pcRef.current
+              pcRef.current = null
+              if (pc) {
+                pc.oniceconnectionstatechange = null
+                pc.onconnectionstatechange = null
+                pc.close()
+              }
+              inputChannelRef.current = null
+              inputChannelCleanupRef.current?.()
+              inputChannelCleanupRef.current = null
+              setInputReady(false)
+              streamRef.current?.getTracks().forEach(track => track.stop())
+              streamRef.current = null
+              setMediaStream(null)
+              if (videoRef.current) videoRef.current.srcObject = null
+              prevStatsRef.current = { timestamp: 0, bytesReceived: 0, framesDecoded: 0 }
+              setStats(null)
+              return
+            }
             if (payload.type === 'offer') {
+              clearOfferTimeout()
+              setError(null)
               setStatus('connecting_webrtc')
               const pc = createPeerConnection()
               const isCurrentConnection = () => connectionGenerationRef.current === generation && pcRef.current === pc
@@ -509,36 +657,24 @@ export function useScrcpyWebRTC({
                   const answer = await pc.createAnswer()
                   if (!isCurrentConnection()) return
                   let sdp = answer.sdp || ''
-                  const answerBitrateKbps = Math.max(1000, Math.round((scrcpyOptionsRef.current.max_bitrate || scrcpyOptionsRef.current.bitrate || 8000000) / 1000))
-                  sdp = sdp.replace(/m=video (.*)\r\n/g, `m=video $1\r\nb=AS:${answerBitrateKbps}\r\n`)
-                  await pc.setLocalDescription(new RTCSessionDescription({ type: 'answer', sdp }))
-                  if (!isCurrentConnection()) return
-                  if (pc.iceGatheringState === 'complete') {
-                    sendAnswer()
+                  if (/m=video 0/i.test(sdp)) {
+                    setError('浏览器未接受视频流，请尝试其他浏览器或重新连接预览')
+                    setStatus('error')
                     return
                   }
-
-                  iceGatheringCleanupRef.current?.()
-                  let sent = false
-                  let timeoutId: number | null = null
-                  const handleGatheringChange = () => {
-                    if (pc.iceGatheringState === 'complete') finish()
-                  }
-                  const cleanup = () => {
-                    pc.removeEventListener('icegatheringstatechange', handleGatheringChange)
-                    if (timeoutId !== null) window.clearTimeout(timeoutId)
-                    timeoutId = null
-                    if (iceGatheringCleanupRef.current === cleanup) iceGatheringCleanupRef.current = null
-                  }
-                  const finish = () => {
-                    if (sent) return
-                    sent = true
-                    cleanup()
-                    if (isCurrentConnection()) sendAnswer()
-                  }
-                  pc.addEventListener('icegatheringstatechange', handleGatheringChange)
-                  timeoutId = window.setTimeout(finish, 2000)
-                  iceGatheringCleanupRef.current = cleanup
+                  const answerBitrateBps = Math.max(
+                    1_000_000,
+                    scrcpyOptionsRef.current.max_bitrate || scrcpyOptionsRef.current.bitrate || 8_000_000
+                  )
+                  const answerBitrateKbps = Math.round(answerBitrateBps / 1000)
+                  sdp = sdp.replace(/m=video ([1-9]\d* .*)\r\n/g, `m=video $1\r\nb=AS:${answerBitrateKbps}\r\n`)
+                  sdp = sdp.replace(
+                    /a=fmtp:(\d+) (.*)\r\n/g,
+                    `a=fmtp:$1 $2;x-google-start-bitrate=${answerBitrateBps};x-google-max-bitrate=${answerBitrateBps}\r\n`
+                  )
+                  await pc.setLocalDescription(new RTCSessionDescription({ type: 'answer', sdp }))
+                  if (!isCurrentConnection()) return
+                  sendAnswer()
                 } catch (err) {
                   if (!isCurrentConnection()) return
                   setError(`SDP 处理失败: ${err instanceof Error ? err.message : String(err)}`)
@@ -557,6 +693,9 @@ export function useScrcpyWebRTC({
           }
           ws.onclose = event => {
             if (connectionGenerationRef.current !== generation) return
+            stopHeartbeat()
+            clearOfferTimeout()
+            resolvePendingCommands('信令连接已中断')
             if (!opened) {
               finishStartupFailure(new Error(event.code === 1008 ? '信令认证失败，请稍后重试' : '信令连接暂时不可用，请稍后重试'))
               return
@@ -574,8 +713,20 @@ export function useScrcpyWebRTC({
         .catch(finishStartupFailure)
     }
 
-    attemptConnection(0)
-  }, [connectionPath, createPeerConnection, deviceId, filterSdpCandidates, ipPreference, sendAnswer, sendForward, signalingUrl, teardownConnection])
+    const beginConnection = () => {
+      if (connectionGenerationRef.current !== generation) return
+      attemptConnection(0)
+    }
+
+    if (hadActiveConnection) {
+      reconnectTimerRef.current = window.setTimeout(() => {
+        reconnectTimerRef.current = null
+        beginConnection()
+      }, RECONNECT_DELAY_MS)
+    } else {
+      beginConnection()
+    }
+  }, [clearOfferTimeout, connectionPath, createPeerConnection, deviceId, filterSdpCandidates, ipPreference, resolvePendingCommands, sendAnswer, sendForward, signalingUrl, startHeartbeat, stopHeartbeat, teardownConnection, videoRef])
 
   const sendTouch = useCallback((action: number, clientX: number, clientY: number, id = 0, targetVideo?: HTMLVideoElement | null) => {
     const channel = inputChannelRef.current
@@ -614,9 +765,12 @@ export function useScrcpyWebRTC({
     if (!geometry) return isRelease ? sendReleaseFallback() : false
     const { actualW, actualH, offsetX, offsetY } = geometry
 
-    const isLandscape = video.videoWidth > video.videoHeight
-    const targetW = isLandscape ? deviceSize.height : deviceSize.width
-    const targetH = isLandscape ? deviceSize.width : deviceSize.height
+    const { width: targetW, height: targetH } = resolveTouchTargetSize(
+      deviceSize.width,
+      deviceSize.height,
+      video.videoWidth,
+      video.videoHeight
+    )
     const relativeX = clientX - rect.left - offsetX
     const relativeY = clientY - rect.top - offsetY
     if (action === 0 && !isPointInsideRenderedVideo(clientX, clientY, rect, geometry)) return false
@@ -626,11 +780,37 @@ export function useScrcpyWebRTC({
     return sendTouchPacket(x, y, targetW, targetH)
   }, [deviceSize.height, deviceSize.width, videoRef])
 
-  const sendCommand = useCallback((command: string) => {
+  const sendCommand = useCallback((command: string): Promise<ScrcpyCommandResult> => {
     const ws = wsRef.current
-    if (ws?.readyState !== WebSocket.OPEN) return false
-    ws.send(JSON.stringify({ message_type: 'command', device_id: deviceId, request_id: Math.random().toString(36).slice(2), command }))
-    return true
+    if (ws?.readyState !== WebSocket.OPEN) {
+      return Promise.resolve({
+        requestId: '',
+        success: false,
+        error: '信令连接未就绪'
+      })
+    }
+
+    const requestId = Math.random().toString(36).slice(2)
+    return new Promise<ScrcpyCommandResult>(resolve => {
+      const timer = window.setTimeout(() => {
+        pendingCommandsRef.current.delete(requestId)
+        resolve({ requestId, success: false, error: '命令执行超时' })
+      }, COMMAND_TIMEOUT_MS)
+      pendingCommandsRef.current.set(requestId, { requestId, resolve, timer })
+
+      try {
+        ws.send(JSON.stringify({
+          message_type: 'command',
+          device_id: deviceId,
+          request_id: requestId,
+          command
+        }))
+      } catch {
+        window.clearTimeout(timer)
+        pendingCommandsRef.current.delete(requestId)
+        resolve({ requestId, success: false, error: '命令发送失败' })
+      }
+    })
   }, [deviceId])
 
   useEffect(() => {

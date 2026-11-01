@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, it } from 'node:test'
-import router, { buildDynamicFightPlan, buildFightPlans, buildWebrtcBrowserProtocol, executeTrackedAgentAction, needsDynamicFight } from '../agent.js'
+import router, { buildDynamicFightPlan, buildFightPlans, buildWebrtcBrowserProtocol, buildWebrtcDeviceStatus, executeTrackedAgentAction, needsDynamicFight } from '../agent.js'
 import { API_VERSION } from '../agentContract.js'
 import { getTaskStatus, setTaskStatus } from '../../services/maaService.js'
 import { loggerManager } from '../../utils/logger.js'
@@ -115,6 +115,30 @@ describe('Agent discovery routes', () => {
     })
   })
 
+  it('summarizes online devices and flags an outdated agent', () => {
+    const result = buildWebrtcDeviceStatus([
+      { id: 'preview-device', online: true, agentVersion: 'v0.4.2-abcdef' },
+      { id: 'offline-device', online: false, agentVersion: 'v0.4.3-1b7d786' }
+    ], 'preview-device')
+
+    assert.deepEqual(result.devices, ['preview-device'])
+    assert.equal(result.deviceId, 'preview-device')
+    assert.equal(result.agentVersion, 'v0.4.2-abcdef')
+    assert.equal(result.agentOnline, true)
+    assert.equal(result.agentVersionStatus, 'outdated')
+    assert.equal(result.minimumAgentVersion, '0.4.3')
+  })
+
+  it('reports an unknown agent version instead of guessing', () => {
+    const result = buildWebrtcDeviceStatus([
+      { id: 'preview-device', online: false, agentVersion: null }
+    ], 'preview-device')
+
+    assert.deepEqual(result.devices, [])
+    assert.equal(result.agentVersion, null)
+    assert.equal(result.agentVersionStatus, 'unknown')
+  })
+
   it('serves the generated manifest through the public route', async () => {
     const res = createResponse()
     await findHandler('get', '/manifest')({ headers: { 'x-request-id': 'manifest-test' } }, res)
@@ -123,7 +147,7 @@ describe('Agent discovery routes', () => {
     assert.equal(res.body.success, true)
     assert.equal(res.body.meta.requestId, 'manifest-test')
     assert.equal(res.body.data.version, API_VERSION)
-    assert.equal(res.body.data.actions.length, 24)
+    assert.equal(res.body.data.actions.length, 25)
     assert.ok(res.body.data.actions.every(action => action.safety && action.execution))
   })
 

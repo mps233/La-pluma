@@ -9,6 +9,7 @@ import { useDashboardPreview } from './useDashboardPreview'
 
 const mocks = vi.hoisted(() => ({
   getWebrtcStatus: vi.fn(),
+  getWebrtcSnapshot: vi.fn(),
   captureScreen: vi.fn(),
   connect: vi.fn(),
   disconnect: vi.fn(),
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../services/api', () => ({
   maaApi: {
     getWebrtcStatus: mocks.getWebrtcStatus,
+    getWebrtcSnapshot: mocks.getWebrtcSnapshot,
     captureScreen: mocks.captureScreen,
   },
 }))
@@ -49,6 +51,7 @@ describe('useDashboardPreview Activity lifecycle', () => {
       success: true,
       data: { serverRunning: true, agentRunning: true, signalingUrl: '/webrtc-signaling' },
     })
+    mocks.getWebrtcSnapshot.mockReset().mockResolvedValue({ success: false })
     mocks.captureScreen.mockReset().mockResolvedValue({ success: false })
     mocks.connect.mockReset()
     mocks.disconnect.mockReset()
@@ -75,6 +78,27 @@ describe('useDashboardPreview Activity lifecycle', () => {
       await Promise.resolve()
     })
   }
+
+  it('prefers the preview service snapshot over an ADB screenshot', async () => {
+    mocks.getWebrtcSnapshot.mockResolvedValue({
+      success: true,
+      data: {
+        deviceId: 'mumu-la-pluma',
+        image: 'snapshot-base64',
+        mediaType: 'image/jpeg',
+      },
+    })
+
+    await renderMode('visible')
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(mocks.getWebrtcSnapshot).toHaveBeenCalled()
+    expect(mocks.captureScreen).not.toHaveBeenCalled()
+  })
 
   it('auto-connects again when the dashboard workspace becomes visible again', async () => {
     await renderMode('visible')

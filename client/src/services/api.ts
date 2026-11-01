@@ -106,7 +106,35 @@ export interface WebrtcStatusData {
   directSignalingUrl?: string
   deviceId?: string
   devices?: string[]
+  serverVersion?: string | null
+  agentVersion?: string | null
+  agentOnline?: boolean
+  agentVersionStatus?: 'ok' | 'outdated' | 'unknown'
+  minimumAgentVersion?: string
+  screenState?: string | null
+  usingDefaultPassword?: boolean
   [key: string]: any
+}
+
+export interface WebrtcSnapshotData {
+  deviceId: string
+  image: string
+  mediaType: string
+  size?: number
+  capturedAt?: string
+}
+
+export interface WebrtcInstallState {
+  status: 'idle' | 'running' | 'succeeded' | 'failed'
+  startedAt?: string | null
+  finishedAt?: string | null
+  result?: any
+  error?: {
+    code: string
+    message: string
+    retryable: boolean
+    details?: any
+  } | null
 }
 
 /**
@@ -376,6 +404,13 @@ export const maaApi = {
     return parseJsonResponse(response)
   },
 
+  async getWebrtcSnapshot(deviceId: string = 'mumu-la-pluma'): Promise<ApiResponse<WebrtcSnapshotData>> {
+    const response = await fetchWithAuth(
+      `${API_BASE_URL}/agent/webrtc/snapshot?deviceId=${encodeURIComponent(deviceId)}`
+    )
+    return parseJsonResponse(response)
+  },
+
   async startWebrtc(profileId: string = 'default', deviceId: string = 'mumu-la-pluma'): Promise<ApiResponse<WebrtcStatusData>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/start`, {
       method: 'POST',
@@ -385,8 +420,13 @@ export const maaApi = {
     return parseJsonResponse(response)
   },
 
-  async installWebrtc(): Promise<ApiResponse> {
+  async installWebrtc(): Promise<ApiResponse<WebrtcInstallState>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/install`, { method: 'POST' })
+    return parseJsonResponse(response)
+  },
+
+  async getWebrtcInstallStatus(): Promise<ApiResponse<WebrtcInstallState>> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/install/status`)
     return parseJsonResponse(response)
   },
 

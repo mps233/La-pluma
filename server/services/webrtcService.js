@@ -1,9 +1,14 @@
 import { execFile, spawn } from 'child_process'
-import { closeSync, openSync } from 'fs'
+import { createHash, randomUUID } from 'crypto'
+import { closeSync, createWriteStream, openSync } from 'fs'
+import { chmod, cp, mkdtemp, readFile, readdir, rename, rm } from 'fs/promises'
+import { Readable, Transform } from 'stream'
+import { pipeline } from 'stream/promises'
 import { promisify } from 'util'
 import path from 'path'
 import { setTimeout as delay } from 'timers/promises'
 import { DEFAULT_ADB_ADDRESS, DEFAULT_ADB_PATH } from '../config/connectionDefaults.js'
+import { ensureDir, readJsonFile, writeJsonFile } from '../utils/fileHelper.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -14,24 +19,158 @@ export const WEBRTC_PORT = Number(process.env.LA_PLUMA_WEBRTC_PORT || 8443)
 const WEBRTC_TURN_PORT = Number(process.env.LA_PLUMA_WEBRTC_TURN_PORT || 3478)
 export const DEFAULT_DEVICE_ADDRESS = DEFAULT_ADB_ADDRESS
 export const DEFAULT_DEVICE_ID = 'mumu-la-pluma'
+export const MINIMUM_WEBRTC_AGENT_VERSION = '0.4.3'
+
+const WEBRTC_VERSION_PATTERN = /^v?(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/i
+const WEBRTC_RELEASE_REPO = 'hqw700/ScrcpyOverWebRTC'
+const WEBRTC_RELEASE_API = `https://api.github.com/repos/${WEBRTC_RELEASE_REPO}/releases`
+const WEBRTC_RELEASE_ASSET_PATTERN = /^cloudphone-v?(\d+\.\d+\.\d+)\.zip$/i
+
+const WEBRTC_ERROR_STATUS = {
+  WEBRTC_INSTALL_SERVER_RUNNING: 409,
+  WEBRTC_RELEASE_FETCH_FAILED: 502,
+  WEBRTC_RELEASE_DOWNLOAD_FAILED: 502,
+  WEBRTC_RELEASE_SIZE_MISMATCH: 502,
+  WEBRTC_RELEASE_CHECKSUM_MISMATCH: 502,
+  WEBRTC_RELEASE_ASSET_MISSING: 502,
+  WEBRTC_RELEASE_DIGEST_MISSING: 502,
+  WEBRTC_RELEASE_EXTRACT_FAILED: 500,
+  WEBRTC_RELEASE_LAYOUT_INVALID: 422,
+  WEBRTC_PLATFORM_UNSUPPORTED: 500,
+  WEBRTC_DEVICE_SECRET_INVALID: 500,
+  WEBRTC_AGENT_DEPLOYMENT_SCRIPT_UNSUPPORTED: 500
+}
 
 const WEBRTC_REQUEST_TIMEOUT_MS = readPositiveInteger(process.env.LA_PLUMA_WEBRTC_REQUEST_TIMEOUT_MS, 1500)
 const WEBRTC_SERVER_START_TIMEOUT_MS = readPositiveInteger(process.env.LA_PLUMA_WEBRTC_SERVER_START_TIMEOUT_MS, 15000)
 const WEBRTC_AGENT_START_TIMEOUT_MS = readPositiveInteger(process.env.LA_PLUMA_WEBRTC_AGENT_START_TIMEOUT_MS, 20000)
 const WEBRTC_START_POLL_INTERVAL_MS = readPositiveInteger(process.env.LA_PLUMA_WEBRTC_START_POLL_INTERVAL_MS, 250)
+const WEBRTC_RELEASE_REQUEST_TIMEOUT_MS = readPositiveInteger(process.env.LA_PLUMA_WEBRTC_RELEASE_REQUEST_TIMEOUT_MS, 15_000)
+const WEBRTC_RELEASE_DOWNLOAD_TIMEOUT_MS = readPositiveInteger(process.env.LA_PLUMA_WEBRTC_RELEASE_DOWNLOAD_TIMEOUT_MS, 10 * 60_000)
+const WEBRTC_RELEASE_EXTRACT_TIMEOUT_MS = readPositiveInteger(process.env.LA_PLUMA_WEBRTC_RELEASE_EXTRACT_TIMEOUT_MS, 2 * 60_000)
+const WEBRTC_AUTH_TOKEN_TTL_MS = readPositiveInteger(process.env.LA_PLUMA_WEBRTC_TOKEN_TTL_MS, 5 * 60_000)
+const DEFAULT_WEBRTC_PASSWORD = 'admin123'
+const WEBRTC_DEVICE_SECRET = process.env.LA_PLUMA_WEBRTC_DEVICE_SECRET || ''
+const WEBRTC_DEVICE_SECRET_PATTERN = /^[A-Za-z0-9._~-]{1,128}$/
 const WEBRTC_USERNAME = process.env.LA_PLUMA_WEBRTC_USERNAME || 'admin'
-const WEBRTC_PASSWORD = process.env.LA_PLUMA_WEBRTC_PASSWORD || 'admin123'
+const WEBRTC_PASSWORD = process.env.LA_PLUMA_WEBRTC_PASSWORD || DEFAULT_WEBRTC_PASSWORD
+const WEBRTC_TURN_USERNAME = process.env.LA_PLUMA_WEBRTC_TURN_USERNAME || 'cloudphone_user'
+const WEBRTC_TURN_PASSWORD = process.env.LA_PLUMA_WEBRTC_TURN_PASSWORD || 'cloudphone_secure_password@'
 
 let webrtcServerProcess = null
 let webrtcAgentProcess = null
 let webrtcTurnProcess = null
 let webrtcLifecycleQueue = Promise.resolve()
 let registeredAgentOwner = null
+let webrtcAuthTokenCache = { token: '', expiresAt: 0 }
+let webrtcInstallState = {
+  status: 'idle',
+  startedAt: null,
+  finishedAt: null,
+  result: null,
+  error: null
+}
 const processStartupErrors = new WeakMap()
 
 function readPositiveInteger(value, fallback) {
   const parsed = Number(value)
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
+export function parseWebrtcVersion(value) {
+  const match = String(value || '').trim().match(WEBRTC_VERSION_PATTERN)
+  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null
+}
+
+export function compareWebrtcVersions(left, right) {
+  const leftParts = Array.isArray(left) ? left : parseWebrtcVersion(left)
+  const rightParts = Array.isArray(right) ? right : parseWebrtcVersion(right)
+  if (!leftParts || !rightParts) return null
+
+  for (let index = 0; index < 3; index += 1) {
+    if (leftParts[index] !== rightParts[index]) {
+      return leftParts[index] < rightParts[index] ? -1 : 1
+    }
+  }
+  return 0
+}
+
+export function getWebrtcAgentVersionStatus(agentVersion, minimumVersion = MINIMUM_WEBRTC_AGENT_VERSION) {
+  const comparison = compareWebrtcVersions(agentVersion, minimumVersion)
+  if (comparison === null) return 'unknown'
+  return comparison < 0 ? 'outdated' : 'ok'
+}
+
+function createWebrtcError(code, message, { retryable = false, details, statusCode } = {}) {
+  const error = new Error(message)
+  error.code = code
+  error.retryable = retryable
+  if (details) error.details = details
+  const resolvedStatus = statusCode || WEBRTC_ERROR_STATUS[code]
+  if (resolvedStatus) error.statusCode = resolvedStatus
+  return error
+}
+
+function getWebrtcDeviceSecretOrThrow() {
+  if (!WEBRTC_DEVICE_SECRET) return ''
+  if (!WEBRTC_DEVICE_SECRET_PATTERN.test(WEBRTC_DEVICE_SECRET)) {
+    throw createWebrtcError(
+      'WEBRTC_DEVICE_SECRET_INVALID',
+      'LA_PLUMA_WEBRTC_DEVICE_SECRET 只能包含字母、数字、点、下划线、波浪线和短横线',
+      { retryable: false, statusCode: 500 }
+    )
+  }
+  return WEBRTC_DEVICE_SECRET
+}
+
+export function patchAgentDeploymentScript(script, secret = WEBRTC_DEVICE_SECRET) {
+  if (!secret) return script
+  if (!WEBRTC_DEVICE_SECRET_PATTERN.test(secret)) {
+    throw createWebrtcError(
+      'WEBRTC_DEVICE_SECRET_INVALID',
+      'Agent 设备密钥格式无效',
+      { retryable: false, statusCode: 500 }
+    )
+  }
+
+  const exportLine = `export DEVICE_SECRET='${secret}'; `
+  if (script.includes('ENV_EXPORTS=""')) {
+    return script.replace('ENV_EXPORTS=""', `ENV_EXPORTS="${exportLine}"`)
+  }
+  if (script.includes('env GODEBUG=asyncpreemptoff=1')) {
+    return script.replace('env GODEBUG=asyncpreemptoff=1', `env GODEBUG=asyncpreemptoff=1 DEVICE_SECRET='${secret}'`)
+  }
+  throw createWebrtcError(
+    'WEBRTC_AGENT_DEPLOYMENT_SCRIPT_UNSUPPORTED',
+    'Agent 部署脚本不支持注入设备密钥，请升级 ScrcpyOverWebRTC 或使用 Magisk/App 部署',
+    { retryable: false, statusCode: 500 }
+  )
+}
+
+export function getWebrtcPlatformDir(platform = process.platform, arch = process.arch) {
+  const platformName = platform === 'win32'
+    ? 'windows'
+    : platform === 'darwin' || platform === 'linux'
+      ? platform
+      : null
+  const archName = arch === 'arm64'
+    ? 'arm64'
+    : arch === 'x64'
+      ? 'amd64'
+      : null
+
+  if (!platformName || !archName) {
+    throw createWebrtcError(
+      'WEBRTC_PLATFORM_UNSUPPORTED',
+      `不支持的 WebRTC 平台：${platform}/${arch}`,
+      { retryable: false }
+    )
+  }
+  return `${platformName}_${archName}`
+}
+
+function getWebrtcBinaryName(platform = process.platform) {
+  return platform === 'win32' ? 'webrtc-signaling.exe' : 'webrtc-signaling'
 }
 
 function enqueueLifecycle(operation) {
@@ -224,8 +363,7 @@ export async function pathExists(filePath) {
 }
 
 async function getWebrtcBinaryPath() {
-  const arch = process.arch === 'arm64' ? 'darwin_arm64' : 'darwin_amd64'
-  return path.join(WEBRTC_DIR, 'bin', arch, 'webrtc-signaling')
+  return path.join(WEBRTC_DIR, 'bin', getWebrtcPlatformDir(), getWebrtcBinaryName())
 }
 
 export async function getWebrtcAssetsPath() {
@@ -236,6 +374,324 @@ export async function getWebrtcAssetsPath() {
   if (await pathExists(path.join(releaseAssetsPath, 'index.html'))) return releaseAssetsPath
 
   return null
+}
+
+export async function getWebrtcServerVersion() {
+  for (const fileName of ['.la-pluma-release.json', 'la-pluma-runtime.json']) {
+    const metadata = await readJsonFile(path.join(WEBRTC_DIR, fileName), null).catch(() => null)
+    const version = typeof metadata?.version === 'string' ? metadata.version.trim() : ''
+    if (version) return version
+  }
+  return null
+}
+
+export function parseSha256Digest(digest) {
+  const match = String(digest || '').trim().match(/^sha256:([a-f0-9]{64})$/i)
+  return match ? match[1].toLowerCase() : null
+}
+
+export function selectWebrtcReleaseAsset(assets = []) {
+  const candidates = []
+  for (const asset of Array.isArray(assets) ? assets : []) {
+    const match = String(asset?.name || '').match(WEBRTC_RELEASE_ASSET_PATTERN)
+    if (match) candidates.push({ asset, version: `v${match[1]}` })
+  }
+  candidates.sort((left, right) => compareWebrtcVersions(right.version, left.version) || 0)
+  return candidates[0]?.asset || null
+}
+
+export async function resolveWebrtcRelease({
+  version = process.env.LA_PLUMA_WEBRTC_VERSION || 'latest',
+  fetchImpl = fetch
+} = {}) {
+  const requestedVersion = String(version || 'latest').trim() || 'latest'
+  const endpoint = requestedVersion === 'latest'
+    ? `${WEBRTC_RELEASE_API}/latest`
+    : `${WEBRTC_RELEASE_API}/tags/${encodeURIComponent(requestedVersion.startsWith('v') ? requestedVersion : `v${requestedVersion}`)}`
+
+  let response
+  try {
+    response = await fetchImpl(endpoint, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'la-pluma-webrtc-installer'
+      },
+      signal: AbortSignal.timeout(WEBRTC_RELEASE_REQUEST_TIMEOUT_MS)
+    })
+  } catch (error) {
+    throw createWebrtcError(
+      'WEBRTC_RELEASE_FETCH_FAILED',
+      `无法获取 ScrcpyOverWebRTC 发布信息：${error.message}`,
+      { retryable: true }
+    )
+  }
+
+  if (!response.ok) {
+    throw createWebrtcError(
+      'WEBRTC_RELEASE_FETCH_FAILED',
+      `无法获取 ScrcpyOverWebRTC 发布信息（HTTP ${response.status}）`,
+      { retryable: response.status >= 500 || response.status === 429 }
+    )
+  }
+
+  const release = await response.json().catch(() => null)
+  const asset = selectWebrtcReleaseAsset(release?.assets)
+  if (!asset) {
+    throw createWebrtcError(
+      'WEBRTC_RELEASE_ASSET_MISSING',
+      'ScrcpyOverWebRTC 发布包中未找到 cloudphone-vX.Y.Z.zip',
+      { retryable: false }
+    )
+  }
+  if (typeof asset.browser_download_url !== 'string' || !asset.browser_download_url) {
+    throw createWebrtcError('WEBRTC_RELEASE_ASSET_MISSING', 'WebRTC 发布包缺少下载地址', { retryable: false })
+  }
+
+  const sha256 = parseSha256Digest(asset.digest)
+  if (!sha256) {
+    throw createWebrtcError(
+      'WEBRTC_RELEASE_DIGEST_MISSING',
+      'WebRTC 发布包缺少 SHA256 摘要，已拒绝未校验的安装',
+      { retryable: false, details: { assetName: asset.name } }
+    )
+  }
+
+  return {
+    version: typeof release?.tag_name === 'string' && release.tag_name ? release.tag_name : asset.name,
+    assetName: asset.name,
+    url: asset.browser_download_url,
+    size: Number(asset.size) || null,
+    sha256
+  }
+}
+
+export async function downloadWebrtcRelease(release, destination, { fetchImpl = fetch } = {}) {
+  if (!release?.url) {
+    throw createWebrtcError('WEBRTC_RELEASE_ASSET_MISSING', 'WebRTC 发布包缺少下载地址', { retryable: false })
+  }
+  await ensureDir(path.dirname(destination))
+
+  let response
+  try {
+    response = await fetchImpl(release.url, {
+      headers: {
+        Accept: 'application/octet-stream',
+        'User-Agent': 'la-pluma-webrtc-installer'
+      },
+      signal: AbortSignal.timeout(WEBRTC_RELEASE_DOWNLOAD_TIMEOUT_MS)
+    })
+  } catch (error) {
+    throw createWebrtcError(
+      'WEBRTC_RELEASE_DOWNLOAD_FAILED',
+      `下载 WebRTC 发布包失败：${error.message}`,
+      { retryable: true }
+    )
+  }
+
+  if (!response.ok || !response.body) {
+    throw createWebrtcError(
+      'WEBRTC_RELEASE_DOWNLOAD_FAILED',
+      `下载 WebRTC 发布包失败（HTTP ${response.status}）`,
+      { retryable: response.status >= 500 || response.status === 429 }
+    )
+  }
+
+  const hash = createHash('sha256')
+  let size = 0
+  const meter = new Transform({
+    transform(chunk, encoding, callback) {
+      hash.update(chunk)
+      size += chunk.length
+      callback(null, chunk)
+    }
+  })
+
+  try {
+    await pipeline(Readable.fromWeb(response.body), meter, createWriteStream(destination, { mode: 0o600 }))
+  } catch (error) {
+    throw createWebrtcError(
+      'WEBRTC_RELEASE_DOWNLOAD_FAILED',
+      `下载 WebRTC 发布包失败：${error.message}`,
+      { retryable: true }
+    )
+  }
+
+  const actualSha256 = hash.digest('hex')
+  if (release.size && Number(release.size) !== size) {
+    throw createWebrtcError(
+      'WEBRTC_RELEASE_SIZE_MISMATCH',
+      `WebRTC 发布包大小不匹配（期望 ${release.size}，实际 ${size}）`,
+      { retryable: true }
+    )
+  }
+  if (release.sha256 && actualSha256 !== String(release.sha256).toLowerCase()) {
+    throw createWebrtcError(
+      'WEBRTC_RELEASE_CHECKSUM_MISMATCH',
+      'WebRTC 发布包 SHA256 校验失败',
+      { retryable: true, details: { expected: release.sha256, actual: actualSha256 } }
+    )
+  }
+
+  return { size, sha256: actualSha256 }
+}
+
+function quotePowerShellLiteral(value) {
+  return `'${String(value).replace(/'/g, "''")}'`
+}
+
+export async function extractWebrtcArchive(archivePath, destination) {
+  await ensureDir(destination)
+  try {
+    if (process.platform === 'win32') {
+      const script = `Expand-Archive -LiteralPath ${quotePowerShellLiteral(archivePath)} -DestinationPath ${quotePowerShellLiteral(destination)} -Force`
+      await execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
+        timeout: WEBRTC_RELEASE_EXTRACT_TIMEOUT_MS,
+        maxBuffer: 1024 * 1024
+      })
+    } else {
+      await execFileAsync('unzip', ['-q', '-o', archivePath, '-d', destination], {
+        timeout: WEBRTC_RELEASE_EXTRACT_TIMEOUT_MS,
+        maxBuffer: 1024 * 1024
+      })
+    }
+  } catch (error) {
+    throw createWebrtcError(
+      'WEBRTC_RELEASE_EXTRACT_FAILED',
+      `解压 WebRTC 发布包失败：${error.message}`,
+      { retryable: error?.code !== 'ENOENT', details: { archivePath } }
+    )
+  }
+}
+
+export async function findWebrtcReleaseRoot(rootDir) {
+  const hasLayout = async dir => (
+    await pathExists(path.join(dir, 'bin')) &&
+    await pathExists(path.join(dir, 'assets')) &&
+    await pathExists(path.join(dir, 'agentd'))
+  )
+
+  if (await hasLayout(rootDir)) return rootDir
+
+  let entries
+  try {
+    entries = await readdir(rootDir, { withFileTypes: true })
+  } catch {
+    return null
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const candidate = path.join(rootDir, entry.name)
+    if (await hasLayout(candidate)) return candidate
+  }
+  return null
+}
+
+export async function validateWebrtcReleaseLayout(releaseRoot, {
+  platform = process.platform,
+  arch = process.arch
+} = {}) {
+  const platformDir = getWebrtcPlatformDir(platform, arch)
+  const binaryPath = path.join(releaseRoot, 'bin', platformDir, getWebrtcBinaryName(platform))
+  const assetsIndex = path.join(releaseRoot, 'assets', 'index.html')
+  const agentRunScript = path.join(releaseRoot, 'agentd', 'run.sh')
+  const missing = []
+
+  if (!await pathExists(binaryPath)) missing.push(path.relative(releaseRoot, binaryPath))
+  if (!await pathExists(assetsIndex)) missing.push(path.relative(releaseRoot, assetsIndex))
+  if (!await pathExists(agentRunScript)) missing.push(path.relative(releaseRoot, agentRunScript))
+
+  if (missing.length > 0) {
+    throw createWebrtcError(
+      'WEBRTC_RELEASE_LAYOUT_INVALID',
+      `WebRTC 发布包缺少当前平台所需文件：${missing.join(', ')}`,
+      { retryable: false, details: { missing, platformDir } }
+    )
+  }
+
+  return { binaryPath, assetsIndex, agentRunScript, platformDir }
+}
+
+async function copyWebrtcReleaseContents(sourceDir, destinationDir) {
+  const entries = await readdir(sourceDir, { withFileTypes: true })
+  await Promise.all(entries.map(entry => cp(
+    path.join(sourceDir, entry.name),
+    path.join(destinationDir, entry.name),
+    { recursive: true, force: true }
+  )))
+}
+
+export async function installWebrtcReleaseDirectory(releaseRoot, release = {}, {
+  platform = process.platform,
+  arch = process.arch,
+  getStatus = getWebrtcStatus
+} = {}) {
+  const { platformDir } = await validateWebrtcReleaseLayout(releaseRoot, { platform, arch })
+
+  if (await isWebrtcServerReachable()) {
+    throw createWebrtcError(
+      'WEBRTC_INSTALL_SERVER_RUNNING',
+      'WebRTC 服务正在运行，请先停止服务后再安装或升级组件',
+      { retryable: true }
+    )
+  }
+
+  const parentDir = path.dirname(WEBRTC_DIR) || process.cwd()
+  await ensureDir(parentDir)
+  const currentVersion = await getWebrtcServerVersion().catch(() => null)
+  const safeVersion = String(currentVersion || 'unknown').replace(/[^A-Za-z0-9._-]+/g, '-')
+  const backupDir = `${WEBRTC_DIR}.backup-${safeVersion}-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`
+  const hadExisting = await pathExists(WEBRTC_DIR)
+  let movedExisting = false
+
+  try {
+    if (hadExisting) {
+      await rename(WEBRTC_DIR, backupDir)
+      movedExisting = true
+    }
+
+    await ensureDir(WEBRTC_DIR)
+    await copyWebrtcReleaseContents(releaseRoot, WEBRTC_DIR)
+
+    if (movedExisting) {
+      for (const name of ['data', 'certs']) {
+        const preservedPath = path.join(backupDir, name)
+        if (!await pathExists(preservedPath)) continue
+        await rm(path.join(WEBRTC_DIR, name), { recursive: true, force: true })
+        await cp(preservedPath, path.join(WEBRTC_DIR, name), { recursive: true, force: true })
+      }
+    }
+
+    await chmod(path.join(WEBRTC_DIR, 'bin', platformDir, getWebrtcBinaryName(platform)), 0o755).catch(() => {})
+    await chmod(path.join(WEBRTC_DIR, 'agentd', 'run.sh'), 0o755).catch(() => {})
+
+    const installedAt = new Date().toISOString()
+    const metadata = {
+      version: typeof release.version === 'string' && release.version ? release.version : (currentVersion || 'unknown'),
+      assetName: release.assetName || null,
+      source: release.url || null,
+      size: release.size || null,
+      sha256: release.sha256 || null,
+      installedAt,
+      backupDir: movedExisting ? backupDir : null
+    }
+    await writeJsonFile(path.join(WEBRTC_DIR, '.la-pluma-release.json'), metadata)
+    await writeJsonFile(path.join(WEBRTC_DIR, 'la-pluma-runtime.json'), {
+      version: metadata.version,
+      installedAt
+    })
+    clearWebrtcAuthTokenCache()
+  } catch (error) {
+    if (movedExisting) {
+      await rm(WEBRTC_DIR, { recursive: true, force: true }).catch(() => {})
+      await rename(backupDir, WEBRTC_DIR).catch(() => {})
+    } else if (!hadExisting) {
+      await rm(WEBRTC_DIR, { recursive: true, force: true }).catch(() => {})
+    }
+    throw error
+  }
+
+  return getStatus()
 }
 
 async function getMacLanIp() {
@@ -271,7 +727,12 @@ export async function isWebrtcServerReachable() {
   }
 }
 
-async function requestWebrtcAuthToken() {
+async function requestWebrtcAuthToken({ force = false } = {}) {
+  const now = Date.now()
+  if (!force && webrtcAuthTokenCache.token && now < webrtcAuthTokenCache.expiresAt) {
+    return webrtcAuthTokenCache.token
+  }
+
   const response = await fetch(`http://127.0.0.1:${WEBRTC_PORT}/api/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -283,7 +744,15 @@ async function requestWebrtcAuthToken() {
   }
   const data = await response.json()
   if (!data?.token) throw new Error('WebRTC 登录响应缺少 token')
+  webrtcAuthTokenCache = {
+    token: data.token,
+    expiresAt: Date.now() + WEBRTC_AUTH_TOKEN_TTL_MS
+  }
   return data.token
+}
+
+export function clearWebrtcAuthTokenCache() {
+  webrtcAuthTokenCache = { token: '', expiresAt: 0 }
 }
 
 export async function getWebrtcAuthToken({ throwOnError = false } = {}) {
@@ -295,28 +764,111 @@ export async function getWebrtcAuthToken({ throwOnError = false } = {}) {
   }
 }
 
-function normalizeDeviceIds(data) {
-  if (!Array.isArray(data)) throw new Error('WebRTC /devices 响应格式无效')
-  return data
-    .map(item => typeof item === 'string' ? item : (item?.device_id || item?.id))
-    .filter(Boolean)
+async function fetchWebrtcAuthorized(pathname) {
+  const request = token => fetch(`http://127.0.0.1:${WEBRTC_PORT}${pathname}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(WEBRTC_REQUEST_TIMEOUT_MS)
+  })
+
+  let token = await requestWebrtcAuthToken()
+  let response = await request(token)
+  if (response.status === 401) {
+    clearWebrtcAuthTokenCache()
+    token = await requestWebrtcAuthToken({ force: true })
+    response = await request(token)
+  }
+  return response
 }
 
-export async function getWebrtcDevices({ throwOnError = false } = {}) {
+async function fetchWebrtcSnapshotResponse(deviceId) {
+  const request = token => fetch(
+    `http://127.0.0.1:${WEBRTC_PORT}/snapshots/${encodeURIComponent(deviceId)}.jpg?token=${encodeURIComponent(token)}`,
+    { signal: AbortSignal.timeout(WEBRTC_REQUEST_TIMEOUT_MS) }
+  )
+
+  let token = await requestWebrtcAuthToken()
+  let response = await request(token)
+  if (response.status === 401) {
+    clearWebrtcAuthTokenCache()
+    token = await requestWebrtcAuthToken({ force: true })
+    response = await request(token)
+  }
+  return response
+}
+
+function normalizeDeviceRecord(item) {
+  if (typeof item === 'string') {
+    return {
+      id: item,
+      online: true,
+      agentVersion: null,
+      snapshotHash: null,
+      screenState: null
+    }
+  }
+
+  const id = item?.device_id || item?.id
+  if (typeof id !== 'string' || !id.trim()) return null
+
+  const deviceInfo = item?.device_info && typeof item.device_info === 'object' ? item.device_info : {}
+  const rawAgentVersion = typeof deviceInfo.agent_version === 'string'
+    ? deviceInfo.agent_version
+    : typeof deviceInfo.app_version === 'string'
+      ? deviceInfo.app_version
+      : ''
+
+  return {
+    id: id.trim(),
+    online: item?.online !== false,
+    agentVersion: rawAgentVersion.trim() || null,
+    snapshotHash: typeof item?.snapshot_hash === 'string' ? item.snapshot_hash : null,
+    screenState: typeof item?.screen_state === 'string' ? item.screen_state : null
+  }
+}
+
+export async function getWebrtcDeviceRecords({ throwOnError = false } = {}) {
   try {
-    const token = await requestWebrtcAuthToken()
-    const response = await fetch(`http://127.0.0.1:${WEBRTC_PORT}/devices`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(WEBRTC_REQUEST_TIMEOUT_MS)
-    })
+    const response = await fetchWebrtcAuthorized('/devices')
     if (!response.ok) {
       throw new Error(`WebRTC 设备列表请求失败（HTTP ${response.status}）`)
     }
-    return normalizeDeviceIds(await response.json())
+    const data = await response.json()
+    if (!Array.isArray(data)) throw new Error('WebRTC /devices 响应格式无效')
+    return data.map(normalizeDeviceRecord).filter(Boolean)
   } catch (error) {
     if (throwOnError) throw error
     return []
   }
+}
+
+export async function getWebrtcSnapshot(deviceId = DEFAULT_DEVICE_ID, { throwOnError = false } = {}) {
+  try {
+    const response = await fetchWebrtcSnapshotResponse(deviceId)
+    if (!response.ok) {
+      throw new Error(`WebRTC 快照请求失败（HTTP ${response.status}）`)
+    }
+    const mediaType = String(response.headers.get('content-type') || 'image/jpeg').split(';')[0].trim()
+    if (!mediaType.startsWith('image/')) {
+      throw new Error(`WebRTC 快照响应类型无效：${mediaType || 'unknown'}`)
+    }
+    const buffer = Buffer.from(await response.arrayBuffer())
+    if (buffer.length === 0) throw new Error('WebRTC 快照为空')
+    return {
+      deviceId,
+      image: buffer.toString('base64'),
+      mediaType,
+      size: buffer.length,
+      capturedAt: new Date().toISOString()
+    }
+  } catch (error) {
+    if (throwOnError) throw error
+    return null
+  }
+}
+
+export async function getWebrtcDevices({ throwOnError = false } = {}) {
+  const records = await getWebrtcDeviceRecords({ throwOnError })
+  return records.filter(record => record.online).map(record => record.id)
 }
 
 export async function waitForWebrtcServerReady({
@@ -407,7 +959,7 @@ async function isDeviceAgentRunning(address = DEFAULT_DEVICE_ADDRESS, adbPath = 
 
 async function getIceServersConfig() {
   const lanIp = await getMacLanIp()
-  return `turn:cloudphone_user:cloudphone_secure_password@${lanIp}:${WEBRTC_TURN_PORT}?transport=udp,stun:${lanIp}:${WEBRTC_TURN_PORT}`
+  return `turn:${WEBRTC_TURN_USERNAME}:${WEBRTC_TURN_PASSWORD}@${lanIp}:${WEBRTC_TURN_PORT}?transport=udp,stun:${lanIp}:${WEBRTC_TURN_PORT}`
 }
 
 function isSameAgentOwner(owner, address, deviceId) {
@@ -433,7 +985,7 @@ async function startLocalTurnServerUnlocked() {
     '-L', '0.0.0.0',
     '-p', String(WEBRTC_TURN_PORT),
     '-a',
-    '-u', 'cloudphone_user:cloudphone_secure_password',
+    '-u', `${WEBRTC_TURN_USERNAME}:${WEBRTC_TURN_PASSWORD}`,
     '-r', 'cloudphone'
   ], turnLog, {
     cwd: WEBRTC_DIR,
@@ -460,13 +1012,17 @@ async function killLocalWebrtcInfrastructureUnlocked(address, adbPath) {
   await stopRemoteWebrtcAgent(address, adbPath)
 }
 
-export async function getWebrtcStatus(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH) {
+export async function getWebrtcStatus(address = DEFAULT_DEVICE_ADDRESS, adbPath = DEFAULT_ADB_PATH, {
+  agentRunning = null
+} = {}) {
   const binaryPath = await getWebrtcBinaryPath()
   const assetsPath = await getWebrtcAssetsPath()
   const lanIp = await getMacLanIp()
   const logPaths = await getWebrtcLogPaths()
   const serverReachable = await isWebrtcServerReachable()
-  const deviceAgentRunning = await isDeviceAgentRunning(address, adbPath)
+  const deviceAgentRunning = agentRunning === null
+    ? await isDeviceAgentRunning(address, adbPath)
+    : agentRunning
   return {
     installed: await pathExists(WEBRTC_DIR),
     built: await pathExists(binaryPath) && assetsPath !== null,
@@ -477,75 +1033,125 @@ export async function getWebrtcStatus(address = DEFAULT_DEVICE_ADDRESS, adbPath 
     signalingUrl: '/webrtc-signaling',
     directSignalingUrl: `ws://${lanIp}:${WEBRTC_PORT}`,
     turnRunning: !!webrtcTurnProcess && !webrtcTurnProcess.killed,
-    iceServers: await getIceServersConfig(),
     serverRunning: (!!webrtcServerProcess && !webrtcServerProcess.killed) || serverReachable,
     agentRunning: (!!webrtcAgentProcess && !webrtcAgentProcess.killed) || deviceAgentRunning,
+    usingDefaultPassword: WEBRTC_PASSWORD === DEFAULT_WEBRTC_PASSWORD,
     deviceAddress: address,
     ...logPaths
   }
 }
 
-export async function installWebrtc() {
-  const fs = await import('fs/promises')
-  const parentDir = path.dirname(WEBRTC_DIR) || (process.env.HOME || process.cwd())
+export async function installWebrtc(options = {}) {
+  const {
+    resolveRelease = resolveWebrtcRelease,
+    downloadRelease = downloadWebrtcRelease,
+    extractRelease = extractWebrtcArchive,
+    installRelease = installWebrtcReleaseDirectory,
+    force = false
+  } = options
 
-  if (!await pathExists(WEBRTC_DIR)) {
-    await new Promise((resolve, reject) => {
-      const child = spawn('git', ['clone', 'https://github.com/hqw700/ScrcpyOverWebRTC.git', WEBRTC_DIR], {
-        cwd: parentDir,
-        stdio: 'ignore'
-      })
-      child.on('close', code => code === 0 ? resolve() : reject(new Error(`git clone 失败: ${code}`)))
-      child.on('error', reject)
-    })
+  const release = await resolveRelease(options)
+  const currentVersion = await getWebrtcServerVersion().catch(() => null)
+  const sameVersion = release?.version && currentVersion
+    ? compareWebrtcVersions(currentVersion, release.version) === 0
+    : false
+  const status = sameVersion ? await getWebrtcStatus().catch(() => null) : null
+  const hasAgentRuntime = await pathExists(path.join(WEBRTC_DIR, 'agentd', 'run.sh'))
+
+  if (!force && sameVersion && status?.built && hasAgentRuntime) {
+    return status
   }
 
-  const binaryPath = await getWebrtcBinaryPath()
-  const assetsPath = await getWebrtcAssetsPath()
-  if (await pathExists(binaryPath) && assetsPath) {
-    return getWebrtcStatus()
+  if (await isWebrtcServerReachable()) {
+    throw createWebrtcError(
+      'WEBRTC_INSTALL_SERVER_RUNNING',
+      'WebRTC 服务正在运行，请先停止服务后再安装或升级组件',
+      { retryable: true }
+    )
   }
 
-  const buildScript = path.join(WEBRTC_DIR, 'build.sh')
-  if (!await pathExists(buildScript)) {
-    const error = new Error('WebRTC 组件目录不完整，且缺少 build.sh；请重新安装二进制发布包')
-    error.code = 'WEBRTC_BUILD_SCRIPT_MISSING'
-    error.retryable = false
-    throw error
-  }
+  const parentDir = path.dirname(WEBRTC_DIR) || process.cwd()
+  await ensureDir(parentDir)
+  const tempDir = await mkdtemp(path.join(parentDir, '.la-pluma-webrtc-install-'))
+  const archivePath = path.join(tempDir, release.assetName || 'cloudphone.zip')
+  const extractDir = path.join(tempDir, 'extracted')
 
-  await fs.chmod(buildScript, 0o755)
-  await new Promise((resolve, reject) => {
-    const child = spawn('bash', [buildScript], { cwd: WEBRTC_DIR, stdio: ['ignore', 'pipe', 'pipe'] })
-    let output = ''
-    const appendOutput = chunk => {
-      output = `${output}${chunk}`.slice(-4000)
+  try {
+    await downloadRelease(release, archivePath)
+    await extractRelease(archivePath, extractDir)
+    const releaseRoot = await findWebrtcReleaseRoot(extractDir)
+    if (!releaseRoot) {
+      throw createWebrtcError(
+        'WEBRTC_RELEASE_LAYOUT_INVALID',
+        'WebRTC 发布包解压后未找到 bin/assets/agentd 目录',
+        { retryable: false }
+      )
     }
-    child.stdout?.on('data', appendOutput)
-    child.stderr?.on('data', appendOutput)
-    child.on('close', code => {
-      if (code === 0) {
-        resolve()
-        return
-      }
-      const detail = output.trim()
-      const error = new Error(`build.sh 失败（退出码 ${code}）${detail ? `：${detail}` : ''}`)
-      error.code = 'WEBRTC_BUILD_FAILED'
-      error.exitCode = code
-      error.retryable = false
-      reject(error)
-    })
-    child.on('error', reject)
-  })
-
-  const status = await getWebrtcStatus()
-  if (!status.built) {
-    const error = new Error('build.sh 已完成，但未找到 WebRTC 可执行文件或静态资源')
-    error.code = 'WEBRTC_BUILD_OUTPUT_MISSING'
-    error.retryable = false
-    throw error
+    return await installRelease(releaseRoot, release)
+  } finally {
+    await rm(tempDir, { recursive: true, force: true }).catch(() => {})
   }
-  return status
+}
+
+export function getWebrtcInstallState() {
+  return {
+    ...webrtcInstallState,
+    result: webrtcInstallState.result ? { ...webrtcInstallState.result } : null,
+    error: webrtcInstallState.error ? { ...webrtcInstallState.error } : null
+  }
+}
+
+export function resetWebrtcInstallStateForTests() {
+  webrtcInstallState = {
+    status: 'idle',
+    startedAt: null,
+    finishedAt: null,
+    result: null,
+    error: null
+  }
+}
+
+export function startWebrtcInstall({ install = installWebrtc, ...options } = {}) {
+  if (webrtcInstallState.status === 'running') {
+    return getWebrtcInstallState()
+  }
+
+  const startedAt = new Date().toISOString()
+  webrtcInstallState = {
+    status: 'running',
+    startedAt,
+    finishedAt: null,
+    result: null,
+    error: null
+  }
+
+  void Promise.resolve()
+    .then(() => install(options))
+    .then(result => {
+      webrtcInstallState = {
+        status: 'succeeded',
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        result,
+        error: null
+      }
+    })
+    .catch(error => {
+      webrtcInstallState = {
+        status: 'failed',
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        result: null,
+        error: {
+          code: error?.code || 'WEBRTC_INSTALL_FAILED',
+          message: error?.message || 'WebRTC 组件安装失败',
+          retryable: error?.retryable ?? false,
+          details: error?.details || {}
+        }
+      }
+    })
+
+  return getWebrtcInstallState()
 }
 
 async function startWebrtcServerUnlocked(address, adbPath) {
@@ -565,7 +1171,16 @@ async function startWebrtcServerUnlocked(address, adbPath) {
     await startLocalTurnServerUnlocked()
     const { serverLog } = await getWebrtcLogPaths()
     const iceServers = await getIceServersConfig()
-    child = spawnWithLog(binaryPath, ['-host', '0.0.0.0', '-port', String(WEBRTC_PORT), '-assets', assetsPath, '-ice_servers', iceServers, '-tls=false'], serverLog, {
+    const deviceSecret = getWebrtcDeviceSecretOrThrow()
+    const serverArgs = [
+      '-host', '0.0.0.0',
+      '-port', String(WEBRTC_PORT),
+      '-assets', assetsPath,
+      '-ice_servers', iceServers,
+      '-tls=false',
+      ...(deviceSecret ? ['-device-secret', deviceSecret] : [])
+    ]
+    child = spawnWithLog(binaryPath, serverArgs, serverLog, {
       cwd: WEBRTC_DIR,
       detached: false,
       env: { ...process.env, PORT: String(WEBRTC_PORT), PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH || ''}` }
@@ -627,7 +1242,28 @@ async function startWebrtcAgentUnlocked(address, deviceId, adbPath) {
   const { agentLog } = await getWebrtcLogPaths()
   const lanIp = await getMacLanIp()
   const iceServers = await getIceServersConfig()
-  const child = spawnWithLog('bash', [runScript, address, '-id', deviceId, '-signaling', `ws://${lanIp}:${WEBRTC_PORT}`, '-ice-servers', iceServers, '-webrtc-port', '50000'], agentLog, {
+  const deviceSecret = getWebrtcDeviceSecretOrThrow()
+  let deployCommand = 'bash'
+  let deployArgs = [
+    runScript,
+    address,
+    '-id', deviceId,
+    '-signaling', `ws://${lanIp}:${WEBRTC_PORT}`,
+    '-ice-servers', iceServers,
+    '-webrtc-port', '50000'
+  ]
+
+  if (deviceSecret) {
+    const runScriptContent = await readFile(runScript, 'utf8')
+    deployArgs = [
+      '-c',
+      patchAgentDeploymentScript(runScriptContent, deviceSecret),
+      'la-pluma-agentd',
+      ...deployArgs.slice(1)
+    ]
+  }
+
+  const child = spawnWithLog(deployCommand, deployArgs, agentLog, {
     cwd: path.join(WEBRTC_DIR, 'agentd'),
     detached: true,
     env: { ...process.env, ADB_PATH: adbPath, PATH: `/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${process.env.PATH || ''}` }

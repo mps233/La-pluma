@@ -9,7 +9,9 @@ import {
   isPointInsideRenderedVideo,
   isTouchMoveBackpressured,
   resolveSignalingEndpoints,
+  resolveTouchTargetSize,
   useScrcpyWebRTC,
+  type ScrcpyCommandResult,
 } from './useScrcpyWebRTC'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -74,6 +76,14 @@ async function flushAsyncWork() {
   })
 }
 
+async function connectAndOpenSocket() {
+  act(() => hook!.connect())
+  await flushAsyncWork()
+  const socket = MockWebSocket.instances[MockWebSocket.instances.length - 1]!
+  act(() => socket.open())
+  return socket
+}
+
 describe('useScrcpyWebRTC startup', () => {
   beforeEach(async () => {
     vi.useFakeTimers()
@@ -99,22 +109,21 @@ describe('useScrcpyWebRTC startup', () => {
     vi.useRealTimers()
   })
 
-  it('uses the same-click URL override and refreshes a stale cached token', async () => {
-    window.localStorage.setItem('scrcpy_webrtc_auth_token', 'stale-token')
-
+  it('routes a direct signaling URL override through the same-origin gateway without persisting the ticket', async () => {
     act(() => hook!.connect('ws://fresh-host:8443'))
     await flushAsyncWork()
 
-    expect(fetch).toHaveBeenCalledWith('http://fresh-host:8443/api/login', expect.objectContaining({
+    expect(fetch).toHaveBeenCalledWith('http://localhost:3000/webrtc-signaling/api/login', expect.objectContaining({
       method: 'POST',
       cache: 'no-store',
-      body: JSON.stringify({ username: 'admin', password: 'admin123' })
     }))
-    const directHeaders = new Headers(vi.mocked(fetch).mock.calls[0]?.[1]?.headers)
-    expect(directHeaders.has('Authorization')).toBe(false)
+    const requestInit = vi.mocked(fetch).mock.calls[0]?.[1]
+    expect(requestInit?.body).toBeUndefined()
+    const gatewayHeaders = new Headers(requestInit?.headers)
+    expect(gatewayHeaders.has('Authorization')).toBe(false)
     expect(MockWebSocket.instances).toHaveLength(1)
-    expect(MockWebSocket.instances[0]!.url).toBe('ws://fresh-host:8443/connect_client?token=fresh-token')
-    expect(window.localStorage.getItem('scrcpy_webrtc_auth_token')).toBe('fresh-token')
+    expect(MockWebSocket.instances[0]!.url).toBe('ws://localhost:3000/webrtc-signaling/connect_client?token=fresh-token')
+    expect(window.localStorage.getItem('scrcpy_webrtc_auth_token')).toBeNull()
   })
 
   it('uses an authenticated same-origin ticket request when API auth is configured', async () => {
@@ -179,6 +188,141 @@ describe('useScrcpyWebRTC startup', () => {
     expect(MockWebSocket.instances).toHaveLength(1)
     expect(hook!.status).toBe('signaling')
     expect(hook!.error).toBeNull()
+  })
+
+  it('keeps the signaling socket alive with a 20s heartbeat', async () => {
+    const socket = await connectAndOpenSocket()
+    socket.send.mockClear()
+
+    await act(async () => vi.advanceTimersByTimeAsync(20_000))
+    expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ type: 'ping' }))
+
+    act(() => hook!.disconnect())
+    socket.send.mockClear()
+    await act(async () => vi.advanceTimersByTimeAsync(20_000))
+    expect(socket.send).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a scrcpy_error instead of waiting forever', async () => {
+    const socket = await connectAndOpenSocket()
+
+    act(() => {
+      socket.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({
+          message_type: 'device_msg',
+          payload: { type: 'scrcpy_error', message: 'MediaCodec failed' },
+        }),
+      }))
+    })
+
+    expect(hook!.status).toBe('error')
+    expect(hook!.error).toBe('MediaCodec failed')
+  })
+
+  it('times out when the signaling config never arrives', async () => {
+    await connectAndOpenSocket()
+
+    await act(async () => vi.advanceTimersByTimeAsync(15_000))
+
+    expect(hook!.status).toBe('error')
+    expect(hook!.error).toContain('等待信令配置超时')
+  })
+
+  it('times out when no offer arrives after config', async () => {
+    const socket = await connectAndOpenSocket()
+
+    act(() => {
+      socket.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({ message_type: 'config', ice_servers: [] }),
+      }))
+    })
+    expect(hook!.status).toBe('waiting_offer')
+
+    await act(async () => vi.advanceTimersByTimeAsync(15_000))
+
+    expect(hook!.status).toBe('error')
+    expect(hook!.error).toContain('等待设备画面超时')
+  })
+
+  it('resolves command results and reports command failures', async () => {
+    const socket = await connectAndOpenSocket()
+    let successPromise: Promise<ScrcpyCommandResult>
+    let failurePromise: Promise<ScrcpyCommandResult>
+
+    act(() => {
+      successPromise = hook!.sendCommand('input keyevent 4')
+    })
+    const successCommand = JSON.parse(socket.send.mock.calls[socket.send.mock.calls.length - 1]![0] as string)
+    expect(successCommand.message_type).toBe('command')
+
+    act(() => {
+      socket.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({
+          message_type: 'device_msg',
+          payload: {
+            type: 'command_result',
+            request_id: successCommand.request_id,
+            success: true,
+            output: 'ok',
+          },
+        }),
+      }))
+    })
+    await expect(successPromise!).resolves.toMatchObject({ success: true, output: 'ok' })
+
+    act(() => {
+      failurePromise = hook!.sendCommand('bad command')
+    })
+    const failureCommand = JSON.parse(socket.send.mock.calls[socket.send.mock.calls.length - 1]![0] as string)
+
+    act(() => {
+      socket.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({
+          message_type: 'device_msg',
+          payload: {
+            type: 'command_result',
+            request_id: failureCommand.request_id,
+            success: false,
+            error: 'boom',
+          },
+        }),
+      }))
+    })
+    await expect(failurePromise!).resolves.toMatchObject({ success: false, error: 'boom' })
+  })
+
+  it('times out a command that never receives a result', async () => {
+    await connectAndOpenSocket()
+    let commandPromise: Promise<ScrcpyCommandResult>
+
+    act(() => {
+      commandPromise = hook!.sendCommand('input keyevent 3')
+    })
+    await act(async () => vi.advanceTimersByTimeAsync(15_000))
+
+    await expect(commandPromise!).resolves.toMatchObject({
+      success: false,
+      error: '命令执行超时',
+    })
+  })
+
+  it('waits for the previous session to release before reconnecting', async () => {
+    await connectAndOpenSocket()
+    expect(MockWebSocket.instances).toHaveLength(1)
+
+    act(() => hook!.connect())
+    await flushAsyncWork()
+    expect(hook!.status).toBe('connecting')
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(MockWebSocket.instances).toHaveLength(1)
+
+    await act(async () => vi.advanceTimersByTimeAsync(799))
+    expect(fetch).toHaveBeenCalledTimes(1)
+
+    await act(async () => vi.advanceTimersByTimeAsync(1))
+    await flushAsyncWork()
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(MockWebSocket.instances).toHaveLength(2)
   })
 
   it('aborts a pending token request when an attempt times out', async () => {
@@ -352,6 +496,12 @@ describe('WebRTC touch transport safeguards', () => {
     cleanup()
     expect(channel.onopen).toBeNull()
     expect(channel.onclose).toBeNull()
+  })
+
+  it('maps touch coordinates against the device default orientation', () => {
+    expect(resolveTouchTargetSize(1080, 1920, 1920, 1080)).toEqual({ width: 1920, height: 1080 })
+    expect(resolveTouchTargetSize(1920, 1080, 1920, 1080)).toEqual({ width: 1920, height: 1080 })
+    expect(resolveTouchTargetSize(1920, 1080, 1080, 1920)).toEqual({ width: 1080, height: 1920 })
   })
 
   it('recognizes letterboxing and excludes pointer-down outside the rendered video', () => {

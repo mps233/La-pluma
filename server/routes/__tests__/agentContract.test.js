@@ -33,6 +33,7 @@ const expectedAdvertisedIds = [
   'maa_callback_summary',
   'webrtc_status',
   'webrtc_devices',
+  'webrtc_snapshot',
   'webrtc_start',
   'webrtc_stop',
   'preview_orientation',
@@ -47,7 +48,7 @@ function getOpenApiOperation(spec, item) {
 
 describe('Agent API contract registry', () => {
   it('keeps operation ids and method/path pairs unique', () => {
-    assert.equal(AGENT_OPERATIONS.length, 30);
+    assert.equal(AGENT_OPERATIONS.length, 31);
     assert.equal(new Set(AGENT_OPERATIONS.map(item => item.id)).size, AGENT_OPERATIONS.length);
     assert.equal(
       new Set(AGENT_OPERATIONS.map(item => `${item.method} ${item.path}`)).size,
@@ -61,7 +62,7 @@ describe('Agent API contract registry', () => {
     assert.equal(manifest.version, API_VERSION);
     assert.deepEqual(manifest.defaults, defaults);
     assert.deepEqual(manifest.actions.map(item => item.id), expectedAdvertisedIds);
-    assert.equal(manifest.actions.length, 24);
+    assert.equal(manifest.actions.length, 25);
     assert.ok(!manifest.actions.some(item => item.id === 'get_manifest'));
     assert.ok(!manifest.actions.some(item => item.id === 'get_openapi'));
   });

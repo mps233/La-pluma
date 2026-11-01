@@ -66,6 +66,7 @@ describe('ScrcpyDeviceView automation availability', () => {
     webrtcMock.inputReady = false
     webrtcMock.mediaStream = null
     webrtcMock.sendTouch.mockReturnValue(true)
+    webrtcMock.sendCommand.mockResolvedValue({ requestId: 'test-command', success: true })
     vi.clearAllMocks()
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -171,6 +172,81 @@ describe('ScrcpyDeviceView automation availability', () => {
 
     expect(frame?.classList.contains('is-active')).toBe(false)
     expect(frame?.getAttribute('aria-busy')).toBe('false')
+  })
+
+  it('warns and offers a redeploy when the device agent is outdated', async () => {
+    const onRedeployAgent = vi.fn()
+    await act(async () => root.render(
+      <ScrcpyDeviceView
+        enabled
+        infrastructureStatus={{
+          installed: true,
+          built: true,
+          serverRunning: true,
+          agentRunning: true,
+          serverVersion: 'v0.4.3',
+          agentVersion: 'v0.2.7-abcdef',
+          agentVersionStatus: 'outdated',
+          minimumAgentVersion: '0.4.3',
+          screenState: 'off',
+          usingDefaultPassword: true
+        }}
+        onRedeployAgent={onRedeployAgent}
+      />
+    ))
+
+    expect(container.textContent).toContain('设备端 Agent v0.2.7-abcdef 低于 v0.4.3')
+    expect(container.textContent).toContain('服务：运行中 · v0.4.3')
+    expect(container.textContent).toContain('Agent：运行中 · v0.2.7-abcdef')
+    expect(container.textContent).toContain('设备息屏')
+    expect(container.textContent).toContain('默认密码')
+
+    await act(async () => findButton('重新部署 Agent')?.click())
+    expect(onRedeployAgent).toHaveBeenCalledOnce()
+  })
+
+  it('does not warn about an agent that meets the minimum version', async () => {
+    await act(async () => root.render(
+      <ScrcpyDeviceView
+        enabled
+        infrastructureStatus={{
+          installed: true,
+          built: true,
+          serverRunning: true,
+          agentRunning: true,
+          serverVersion: 'v0.4.3',
+          agentVersion: 'v0.4.3-1b7d786',
+          agentVersionStatus: 'ok',
+          minimumAgentVersion: '0.4.3'
+        }}
+      />
+    ))
+
+    expect(container.textContent).not.toContain('低于 v0.4.3')
+  })
+
+  it('shows a command failure returned by the preview channel', async () => {
+    webrtcMock.status = 'connected'
+    webrtcMock.sendCommand.mockResolvedValueOnce({
+      requestId: 'failed-command',
+      success: false,
+      error: '命令执行失败'
+    })
+
+    await act(async () => root.render(
+      <ScrcpyDeviceView
+        enabled
+        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
+      />
+    ))
+
+    await act(async () => {
+      findButton('返回')?.click()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(container.textContent).toContain('命令执行失败')
   })
 
   it('keeps compact preview controls outside the video and expands settings below them', async () => {

@@ -254,10 +254,25 @@ docker run -d \
 | `LA_PLUMA_MAX_REALTIME_LOGS` | 实时日志内存缓存最大行数 | `5000` |
 | `LA_PLUMA_WEBRTC_DIR` | ScrcpyOverWebRTC 工作目录 | `$HOME/ScrcpyOverWebRTC` |
 | `LA_PLUMA_WEBRTC_PORT` | ScrcpyOverWebRTC 本地端口 | `8443` |
+| `LA_PLUMA_WEBRTC_VERSION` | 安装/升级时使用的 ScrcpyOverWebRTC Release 版本；`latest` 使用最新稳定版 | `latest` |
+| `LA_PLUMA_WEBRTC_USERNAME` | ScrcpyOverWebRTC 管理账号 | `admin` |
+| `LA_PLUMA_WEBRTC_PASSWORD` | ScrcpyOverWebRTC 管理密码；建议修改上游默认值后同步设置 | 上游默认值 |
+| `LA_PLUMA_WEBRTC_TOKEN_TTL_MS` | 信令 token 缓存时间 | `300000` |
+| `LA_PLUMA_WEBRTC_DEVICE_SECRET` | 可选的设备注册密钥；服务端与 Agent 必须一致，需要 ScrcpyOverWebRTC v0.4.3+ | 空，不启用 |
+| `LA_PLUMA_WEBRTC_TURN_USERNAME` | 本地 TURN 用户名 | `cloudphone_user` |
+| `LA_PLUMA_WEBRTC_TURN_PASSWORD` | 本地 TURN 密码；建议修改 | 本地默认值 |
 | `LA_PLUMA_HTTPS_CERT_PATH` | 可选 HTTPS 证书链路径，必须与私钥同时配置 | 空，使用 HTTP |
 | `LA_PLUMA_HTTPS_KEY_PATH` | 可选 HTTPS 私钥路径，必须与证书同时配置 | 空，使用 HTTP |
 
 #### PWA、HTTPS 与实时预览
+
+实时预览会读取 ScrcpyOverWebRTC 的 `/devices`，只把在线设备视为可用，并展示服务端与设备端 Agent 版本。设备端 Agent 低于 `v0.4.3` 时，预览界面会提示重新部署；`v0.4.3` 移除了旧版 Agent 的内置到期限制，升级服务端后应同时重新部署设备端 Agent。
+
+浏览器预览统一通过同源 `/webrtc-signaling` 网关连接，上游管理凭据只保存在 La Pluma 后端；即使传入直连地址，也会改为通过同源网关。仪表盘快照优先使用 ScrcpyOverWebRTC 的 `/snapshots`，失败时再回退到 ADB 截图。
+
+设置 `LA_PLUMA_WEBRTC_DEVICE_SECRET` 后，La Pluma 会把它同时传给服务端和 ADB 部署的 Agent。已有 Magisk/App 部署的 Agent 也需要配置相同的 `DEVICE_SECRET`，否则无法注册；未设置时保持原有开放注册行为。
+
+“安装组件/重装组件”会从 GitHub Release 下载 `cloudphone-vX.Y.Z.zip`，使用 Release 提供的 SHA256 摘要校验后解压安装；升级时保留现有 `data/` 与 `certs/`，并把旧目录备份为 `ScrcpyOverWebRTC.backup-*`。安装或升级前需要先停止 WebRTC 服务。安装会在后台执行，界面通过 `/api/agent/webrtc/install/status` 轮询结果；可用 `LA_PLUMA_WEBRTC_VERSION` 固定版本，默认跟随最新稳定版。
 
 PWA 的 Service Worker 只会在 HTTPS 或浏览器认可的本机 `localhost` 安全上下文中启用。生产构建在电脑本机通过 `http://localhost:*` 打开时可以安装；手机通过 `http://192.168.x.x:*` 访问时不能安装，也不会获得离线界面缓存。Vite 开发模式默认不注册 Service Worker。
 
