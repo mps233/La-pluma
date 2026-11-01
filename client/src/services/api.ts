@@ -472,8 +472,8 @@ export const maaApi = {
   /**
    * 获取定时任务执行状态
    */
-  async getScheduleExecutionStatus(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/schedules/execution`)
+  async getScheduleExecutionStatus(signal?: AbortSignal): Promise<ApiResponse> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/schedules/execution`, { signal })
     return parseJsonResponse(response)
   },
 

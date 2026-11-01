@@ -8,6 +8,7 @@ import AutomationTasks from './AutomationTasks'
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const mocks = vi.hoisted(() => ({
+  executeScheduleNow: vi.fn(),
   getActivity: vi.fn(),
   getScheduleExecutionStatus: vi.fn(),
   getTaskStatus: vi.fn(),
@@ -18,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   setMessage: vi.fn(),
   setupSchedule: vi.fn(),
   stopSchedule: vi.fn(),
+  stopTask: vi.fn(),
   testConnection: vi.fn(),
   scrollIntoView: vi.fn(),
 }))
@@ -43,6 +45,7 @@ vi.mock('framer-motion', async () => {
 vi.mock('../services/api', () => ({
   generateTrainingPlan: mocks.generateTrainingPlan,
   maaApi: {
+    executeScheduleNow: mocks.executeScheduleNow,
     getActivity: mocks.getActivity,
     getErrorMessage: () => '未知错误',
     getScheduleExecutionStatus: mocks.getScheduleExecutionStatus,
@@ -51,6 +54,7 @@ vi.mock('../services/api', () => ({
     saveUserConfig: mocks.saveUserConfig,
     setupSchedule: mocks.setupSchedule,
     stopSchedule: mocks.stopSchedule,
+    stopTask: mocks.stopTask,
     testConnection: mocks.testConnection,
   },
 }))
@@ -146,6 +150,30 @@ const deferred = <T,>() => {
   return { promise, resolve }
 }
 
+const buttonsByText = (text: string) => Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+  .filter(button => button.textContent?.includes(text))
+
+const pointerEvent = (
+  type: string,
+  { pointerId, clientX = 0, clientY = 0, pointerType = 'mouse' }: {
+    pointerId: number
+    clientX?: number
+    clientY?: number
+    pointerType?: string
+  },
+) => {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    button: 0,
+    clientX,
+    clientY,
+  })
+  Object.defineProperty(event, 'pointerId', { value: pointerId })
+  Object.defineProperty(event, 'pointerType', { value: pointerType })
+  return event
+}
+
 const clickSequenceTask = async (taskName: string) => {
   const button = Array.from(container.querySelectorAll<HTMLButtonElement>('.automation-sequence-select'))
     .find(candidate => candidate.textContent?.includes(taskName))
@@ -171,9 +199,11 @@ describe('AutomationTasks layout surfaces', () => {
       value: mocks.scrollIntoView,
     })
     localStorage.clear()
+    mocks.executeScheduleNow.mockReset().mockResolvedValue({ success: true })
     mocks.getActivity.mockReset().mockResolvedValue({ success: false })
     mocks.getScheduleExecutionStatus.mockReset().mockResolvedValue({ success: true, data: { isRunning: false } })
     mocks.getTaskStatus.mockReset().mockResolvedValue({ success: true, data: { isRunning: false } })
+    mocks.stopTask.mockReset().mockResolvedValue({ success: true, data: { task: { success: true }, scheduleStopped: true } })
     mocks.generateTrainingPlan.mockReset().mockResolvedValue({ success: false })
     mocks.loadUserConfig.mockReset().mockResolvedValue({ success: true, data: { taskFlow: [] } })
     mocks.saveUserConfig.mockReset().mockResolvedValue({ success: true })
@@ -672,5 +702,249 @@ describe('AutomationTasks layout surfaces', () => {
 
     expect(container.querySelector('[role="menu"]')).toBeNull()
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('moves a task with a floating ghost while dragging its handle', async () => {
+    mocks.loadUserConfig.mockResolvedValue({ success: true, data: { taskFlow: taskFlowFixture } })
+
+    await act(async () => root.render(<AutomationTasks />))
+    await flush()
+
+    const rowHeight = 88
+    const items = Array.from(container.querySelectorAll<HTMLElement>('.automation-sequence-item'))
+    items.forEach((item, index) => {
+      item.getBoundingClientRect = () => ({
+        top: index * rowHeight,
+        left: 0,
+        right: 400,
+        bottom: (index + 1) * rowHeight,
+        width: 400,
+        height: rowHeight,
+        x: 0,
+        y: index * rowHeight,
+        toJSON: () => ({}),
+      })
+    })
+
+    const fightItem = items.find(item => item.textContent?.includes('理智作战'))
+    const handle = fightItem?.querySelector<HTMLButtonElement>('.automation-sequence-drag')
+    expect(handle).toBeDefined()
+
+    await act(async () => {
+      handle?.dispatchEvent(pointerEvent('pointerdown', { pointerId: 7, clientX: 20, clientY: 132 }))
+    })
+    await flush()
+
+    await act(async () => {
+      window.dispatchEvent(pointerEvent('pointermove', { pointerId: 7, clientX: 20, clientY: 300 }))
+      await Promise.resolve()
+    })
+    await flush()
+
+    const ghost = document.body.querySelector<HTMLElement>('.automation-drag-ghost')
+    expect(ghost).not.toBeNull()
+    expect(ghost?.textContent).toContain('理智作战')
+    expect(ghost?.style.transform).toContain('translate3d')
+    expect(document.body.classList.contains('automation-sorting')).toBe(true)
+
+    await act(async () => {
+      window.dispatchEvent(pointerEvent('pointerup', { pointerId: 7, clientX: 20, clientY: 300 }))
+    })
+    await flush()
+
+    expect(document.body.querySelector('.automation-drag-ghost')).toBeNull()
+    expect(document.body.classList.contains('automation-sorting')).toBe(false)
+    expect(Array.from(container.querySelectorAll('.automation-sequence-copy strong')).map(node => node.textContent))
+      .toEqual(['启动游戏', '自动公招', '理智作战'])
+  })
+
+  it('shows only the stopping state while a stop is awaiting confirmation', async () => {
+    mocks.loadUserConfig.mockResolvedValue({ success: true, data: { taskFlow: taskFlowFixture } })
+    mocks.getScheduleExecutionStatus.mockResolvedValue({
+      success: true,
+      data: {
+        isRunning: true,
+        currentTaskId: 'startup-1',
+        currentTask: '启动游戏',
+        message: '正在执行: 启动游戏',
+        shouldStop: false,
+      },
+    })
+
+    await act(async () => root.render(<AutomationTasks />))
+    await flush()
+    await flush()
+
+    expect(buttonsByText('执行中')).toHaveLength(1)
+    expect(buttonsByText('终止执行')).toHaveLength(1)
+
+    const stopConfirmation = deferred<{ success: boolean; data: { isRunning: boolean } }>()
+    mocks.stopTask.mockImplementation(async () => {
+      mocks.getScheduleExecutionStatus.mockReturnValue(stopConfirmation.promise)
+      return { success: true, data: { task: { success: true }, scheduleStopped: true } }
+    })
+
+    const stopButton = buttonsByText('终止执行')[0]
+    expect(stopButton).toBeDefined()
+    await act(async () => stopButton?.click())
+    await flush()
+
+    const stoppingButton = buttonsByText('正在终止')[0]
+    expect(stoppingButton).toBeDefined()
+    expect(stoppingButton?.disabled).toBe(true)
+    expect(buttonsByText('执行中')).toHaveLength(0)
+
+    await act(async () => stopConfirmation.resolve({
+      success: true,
+      data: { isRunning: false },
+    }))
+    await flush()
+    await flush()
+
+    expect(buttonsByText('正在终止')).toHaveLength(0)
+    expect(buttonsByText('立即执行')[0]?.disabled).toBe(false)
+  })
+
+  it('does not let a stale stop confirmation outlive the stopped run', async () => {
+    vi.useFakeTimers()
+    try {
+      mocks.loadUserConfig.mockResolvedValue({ success: true, data: { taskFlow: taskFlowFixture } })
+      mocks.stopTask.mockResolvedValue({
+        success: true,
+        data: { task: { success: true }, scheduleStopped: true },
+      })
+      mocks.executeScheduleNow.mockReturnValue(new Promise(() => undefined))
+
+      let phase: 'running' | 'idle' = 'running'
+      let stopClicked = false
+      let firstStatusPromise: Promise<unknown> | null = null
+      let resolveFirstStatus: ((value: unknown) => void) | null = null
+
+      mocks.getScheduleExecutionStatus.mockImplementation((signal?: AbortSignal) => {
+        if (stopClicked && firstStatusPromise === null) {
+          firstStatusPromise = new Promise((resolve, reject) => {
+            resolveFirstStatus = resolve
+            signal?.addEventListener('abort', () => {
+              const error = new Error('aborted')
+              error.name = 'AbortError'
+              reject(error)
+            }, { once: true })
+          })
+          return firstStatusPromise
+        }
+        return Promise.resolve({
+          success: true,
+          data: {
+            isRunning: phase === 'running',
+            message: phase === 'running' ? '正在执行: 启动游戏' : '',
+          },
+        })
+      })
+
+      await act(async () => root.render(<AutomationTasks />))
+      await flush()
+      await flush()
+
+      const stopButton = buttonsByText('终止执行')[0]
+      expect(stopButton).toBeDefined()
+      stopClicked = true
+      await act(async () => stopButton?.click())
+      await flush()
+      expect(buttonsByText('正在终止')).toHaveLength(1)
+
+      phase = 'idle'
+      await act(async () => vi.advanceTimersByTimeAsync(1_000))
+      await flush()
+      await flush()
+      expect(buttonsByText('正在终止')).toHaveLength(0)
+
+      phase = 'running'
+      const runButton = buttonsByText('立即执行')[0]
+      expect(runButton?.disabled).toBe(false)
+      await act(async () => runButton?.click())
+      await flush()
+
+      // Simulate the pre-fix status endpoint resolving the stale wait with the new run.
+      await act(async () => {
+        resolveFirstStatus?.({ success: true, data: { isRunning: true, message: '正在执行: 启动游戏' } })
+        await Promise.resolve()
+      })
+      await act(async () => vi.advanceTimersByTimeAsync(15_000))
+      await flush()
+
+      expect(mocks.executeScheduleNow).toHaveBeenCalledTimes(1)
+      expect(mocks.setMessage).not.toHaveBeenCalledWith(
+        '终止失败: 终止请求已发送，但尚未确认任务停止',
+        'error',
+      )
+
+      const nextStopButton = buttonsByText('终止执行')[0]
+      expect(nextStopButton?.disabled).toBe(false)
+      await act(async () => nextStopButton?.click())
+      await flush()
+      expect(mocks.stopTask).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('allows the stop request to be retried when idle confirmation times out', async () => {
+    vi.useFakeTimers()
+    try {
+      mocks.loadUserConfig.mockResolvedValue({ success: true, data: { taskFlow: taskFlowFixture } })
+      mocks.getScheduleExecutionStatus.mockResolvedValue({
+        success: true,
+        data: {
+          isRunning: true,
+          currentTaskId: 'startup-1',
+          currentTask: '启动游戏',
+          message: '正在执行: 启动游戏',
+          shouldStop: false,
+        },
+      })
+
+      await act(async () => root.render(<AutomationTasks />))
+      await flush()
+      await flush()
+
+      mocks.getScheduleExecutionStatus.mockResolvedValue({
+        success: true,
+        data: {
+          isRunning: true,
+          currentTaskId: 'startup-1',
+          currentTask: '启动游戏',
+          message: '正在终止任务流程',
+          shouldStop: true,
+        },
+      })
+
+      const stopButton = buttonsByText('终止执行')[0]
+      expect(stopButton).toBeDefined()
+      await act(async () => stopButton?.click())
+      await flush()
+      expect(buttonsByText('正在终止')).toHaveLength(1)
+
+      await act(async () => vi.advanceTimersByTimeAsync(15_000))
+      await flush()
+
+      expect(mocks.stopTask).toHaveBeenCalledTimes(2)
+      expect(buttonsByText('正在终止')).toHaveLength(1)
+      expect(buttonsByText('终止执行')).toHaveLength(0)
+
+      await act(async () => vi.advanceTimersByTimeAsync(15_000))
+      await flush()
+
+      expect(mocks.setMessage).toHaveBeenCalledWith(
+        '终止失败: 终止请求已发送，但尚未确认任务停止',
+        'error',
+      )
+      expect(buttonsByText('终止执行')[0]?.disabled).toBe(false)
+
+      await act(async () => buttonsByText('终止执行')[0]?.click())
+      await flush()
+      expect(mocks.stopTask).toHaveBeenCalledTimes(3)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

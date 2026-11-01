@@ -1110,8 +1110,19 @@ html.dark .la-pluma-app [data-automation-tasks] .automation-monitor-surface .aut
 }
 
 .automation-sequence-item.is-dragging {
-  transform: scale(0.98);
-  opacity: 0.42;
+  opacity: 1;
+}
+
+.automation-sequence-item.is-dragging > * {
+  opacity: 0.18;
+}
+
+.automation-sequence-item.is-dragging::before {
+  inset: 0.125rem 0;
+  border: 1px dashed var(--app-border-strong);
+  border-radius: var(--app-continuous-radius-compact);
+  background: color-mix(in srgb, var(--app-surface-solid) 36%, transparent);
+  box-shadow: none;
 }
 
 .automation-sequence-drag,
@@ -1127,6 +1138,85 @@ html.dark .la-pluma-app [data-automation-tasks] .automation-monitor-surface .aut
   width: 1.375rem;
   height: 2rem;
   cursor: grab;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body.automation-sorting {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.automation-drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1200;
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 0.75rem;
+  overflow: hidden;
+  padding: 0 0.75rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-surface-solid);
+  box-shadow: var(--app-glass-shadow);
+  color: var(--app-text);
+  pointer-events: none;
+  transform: translate3d(-9999px, -9999px, 0);
+  will-change: transform;
+}
+
+.automation-drag-ghost-grip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  color: var(--app-text-soft);
+}
+
+.automation-drag-ghost-index {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: var(--app-accent-soft);
+  color: var(--app-accent-strong);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.automation-drag-ghost-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.automation-drag-ghost-copy strong {
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-drag-ghost-copy small {
+  overflow: hidden;
+  color: var(--app-text-muted);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .automation-sequence-drag:active {
