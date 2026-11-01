@@ -1,12 +1,20 @@
-import { readFile } from 'fs/promises';
+import { readFile, readdir } from 'fs/promises';
 import { join } from 'path';
 import { getMaaResourceDir, getItemTablePath } from '../config/paths.js';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const TILE_POS_DIR = 'Arknights-Tile-Pos';
+const TILE_POS_BATCH_SIZE = 32;
 
 let cache = null;
 let cacheAt = 0;
 let pending = null;
+let stageCatalog = null;
+let stageCatalogPending = null;
+let paradoxOperators = null;
+let paradoxOperatorsPending = null;
+let itemAssetMap = null;
+let itemAssetMapMaterials = null;
 
 async function readJson(path, fallback = null) {
   try {
@@ -65,6 +73,170 @@ export function buildMaaStageIndex(stages = []) {
   return { byCode, byStageId };
 }
 
+/**
+ * Build a searchable stage catalog from Arknights-Tile-Pos entries.
+ *
+ * Tile-Pos is the only MaaResource file that carries both the display name and
+ * the internal stage id for every supported stage. The catalog keeps the first
+ * entry for duplicate codes/names (for example, ISW-NO or #f# variants).
+ */
+export function buildMaaStageCatalog(entries = []) {
+  const byCode = new Map();
+  const byName = new Map();
+  const byStageId = new Map();
+
+  for (const raw of Array.isArray(entries) ? entries : []) {
+    const stageId = String(raw?.stageId || '').trim();
+    if (!stageId) continue;
+
+    const entry = {
+      code: String(raw?.code || '').trim(),
+      name: String(raw?.name || '').trim(),
+      stageId,
+      levelId: raw?.levelId ? String(raw.levelId) : null
+    };
+
+    if (!byStageId.has(stageId)) byStageId.set(stageId, entry);
+    if (entry.code && !byCode.has(entry.code.toUpperCase())) {
+      byCode.set(entry.code.toUpperCase(), entry);
+    }
+    if (entry.name && !byName.has(entry.name)) byName.set(entry.name, entry);
+  }
+
+  return {
+    entries: [...byStageId.values()],
+    byCode,
+    byName,
+    byStageId
+  };
+}
+
+export function buildMaaParadoxOperators(battleData = {}, catalog = null) {
+  const chars = battleData?.chars && typeof battleData.chars === 'object' ? battleData.chars : {};
+  const byStageId = catalog instanceof Map ? catalog : catalog?.byStageId;
+  if (!(byStageId instanceof Map)) return [];
+
+  const operators = [];
+  for (const [id, char] of Object.entries(chars)) {
+    if (!id.startsWith('char_')) continue;
+
+    const parts = id.split('_');
+    const suffix = parts.length > 2 ? parts.slice(2).join('_') : '';
+    if (!suffix) continue;
+
+    const stageId = `mem_${suffix}_1`;
+    const stage = byStageId.get(stageId);
+    if (!stage) continue;
+
+    operators.push({
+      id,
+      name: String(char?.name || stage.name || id),
+      stage_id: stageId,
+      stage_name: String(stage.name || '')
+    });
+  }
+
+  return operators.sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
+}
+
+export function buildMaaItemAssetMap(materials = {}) {
+  const byIconId = new Map();
+
+  for (const [id, item] of Object.entries(materials || {})) {
+    const iconId = item?.iconId ? String(item.iconId) : '';
+    if (iconId && !byIconId.has(iconId)) byIconId.set(iconId, String(id));
+  }
+
+  return byIconId;
+}
+
+async function loadMaaStageCatalogUncached({
+  resourceDir = getMaaResourceDir(),
+  readdirFn = readdir,
+  readFileFn = readFile
+} = {}) {
+  const tileDir = join(resourceDir, TILE_POS_DIR);
+  let filenames;
+
+  try {
+    filenames = (await readdirFn(tileDir)).filter(name => name.endsWith('.json'));
+  } catch (error) {
+    if (error.code === 'ENOENT') return buildMaaStageCatalog([]);
+    throw error;
+  }
+
+  const entries = [];
+  for (let index = 0; index < filenames.length; index += TILE_POS_BATCH_SIZE) {
+    const batch = filenames.slice(index, index + TILE_POS_BATCH_SIZE);
+    const parsed = await Promise.all(batch.map(async name => {
+      try {
+        const value = JSON.parse(await readFileFn(join(tileDir, name), 'utf-8'));
+        return value && typeof value === 'object' ? value : null;
+      } catch {
+        return null;
+      }
+    }));
+    entries.push(...parsed.filter(Boolean));
+  }
+
+  return buildMaaStageCatalog(entries);
+}
+
+export async function loadMaaStageCatalog(options = {}) {
+  if (stageCatalog) return stageCatalog;
+  if (stageCatalogPending) return stageCatalogPending;
+
+  stageCatalogPending = loadMaaStageCatalogUncached(options)
+    .then(catalog => {
+      stageCatalog = catalog;
+      return catalog;
+    })
+    .finally(() => {
+      stageCatalogPending = null;
+    });
+
+  return stageCatalogPending;
+}
+
+export async function findMaaStage(input, options = {}) {
+  const value = String(input || '').trim();
+  if (!value) return null;
+
+  const catalog = await loadMaaStageCatalog(options);
+  return catalog.byStageId.get(value)
+    || catalog.byCode.get(value.toUpperCase())
+    || catalog.byName.get(value)
+    || null;
+}
+
+export async function getMaaParadoxOperators(options = {}) {
+  if (paradoxOperators) return paradoxOperators;
+  if (paradoxOperatorsPending) return paradoxOperatorsPending;
+
+  paradoxOperatorsPending = Promise.all([
+    loadMaaResourceData(options),
+    loadMaaStageCatalog(options)
+  ])
+    .then(([data, catalog]) => {
+      paradoxOperators = buildMaaParadoxOperators(data.battleData, catalog);
+      return paradoxOperators;
+    })
+    .finally(() => {
+      paradoxOperatorsPending = null;
+    });
+
+  return paradoxOperatorsPending;
+}
+
+export async function getMaaItemAssetMap(options = {}) {
+  const { materials } = await getMaaMaterialDatabase(options);
+  if (itemAssetMap && itemAssetMapMaterials === materials) return itemAssetMap;
+
+  itemAssetMap = buildMaaItemAssetMap(materials);
+  itemAssetMapMaterials = materials;
+  return itemAssetMap;
+}
+
 async function loadMaaResourceDataUncached({
   resourceDir = getMaaResourceDir(),
   itemTablePath = getItemTablePath()
@@ -108,6 +280,12 @@ export function clearMaaResourceCache() {
   cache = null;
   cacheAt = 0;
   pending = null;
+  stageCatalog = null;
+  stageCatalogPending = null;
+  paradoxOperators = null;
+  paradoxOperatorsPending = null;
+  itemAssetMap = null;
+  itemAssetMapMaterials = null;
 }
 
 export async function getMaaMaterialDatabase(options = {}) {

@@ -50,7 +50,7 @@ vi.mock('@/services/operatorQuotes', () => ({
     quote: '今天也请多指教',
   },
   getOperatorAvatarUrl: (operatorId: string) =>
-    `https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/avatar/${operatorId}.png`,
+    `/api/maa-assets/avatar/${operatorId}`,
   loadDailyOperatorQuote: mocks.loadDailyOperatorQuote,
 }))
 
@@ -300,7 +300,7 @@ describe('top-level application navigation', () => {
     expect(identity.getAttribute('aria-label')).toBe('银灰：战术安排已就绪')
     expect(identity.querySelector('strong')?.textContent).toBe('银灰')
     expect(identity.querySelector('small')?.textContent).toBe('战术安排已就绪')
-    expect(avatar.getAttribute('src')).toContain('/avatar/char_172_svrash.png')
+    expect(avatar.getAttribute('src')).toContain('/avatar/char_172_svrash')
     expect(avatar.getAttribute('decoding')).toBe('async')
   })
 
@@ -315,7 +315,7 @@ describe('top-level application navigation', () => {
     expect(identity.getAttribute('aria-label')).toBe('阿米娅：今天也请多指教')
     expect(identity.querySelector('strong')?.textContent).toBe('阿米娅')
     expect(identity.querySelector('small')?.textContent).toBe('今天也请多指教')
-    expect(identity.querySelector('img')?.getAttribute('src')).toContain('/avatar/char_002_amiya.png')
+    expect(identity.querySelector('img')?.getAttribute('src')).toContain('/avatar/char_002_amiya')
   })
 
   it('exposes the GitHub repository as a secure external action', async () => {

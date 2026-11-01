@@ -13,7 +13,7 @@
 
 ## 当前状态
 
-资源同步、活动识别、战斗结果、材料字典四条数据管线已改为 MAA 原生来源；`client_type`、识别响应信封、Depot 日志解析、Agent 多关卡 Fight 等 P0 兼容问题已修复；原生委托（copilot / 动态任务 / 调度条件）已接入。
+资源同步、活动识别、战斗结果、材料字典四条数据管线已改为 MAA 原生来源；悖论干员映射、关卡名索引、物品图标和干员头像改为从 MaaResource 本地派生或读取；`client_type`、识别响应信封、Depot 日志解析、Agent 多关卡 Fight 等 P0 兼容问题已修复；原生委托（copilot / 动态任务 / 调度条件）已接入。
 
 ## 未完成项
 
@@ -47,10 +47,17 @@
 | MaaResource Git 检出 | `maa dir hot-update`（实际是 `data/MaaResource`） |
 | 热更新覆盖层 | `$(maa dir cache)/resource/**/tasks/tasks.json` |
 | 活动数据 | `$(maa dir cache)/StageActivityV2.json` |
+| 关卡名 / 内部 stageId 索引 | `$(maa dir resource)/Arknights-Tile-Pos/*.json`（`code`、`name`、`stageId`；悖论映射由 `char_*_<suffix>` → `mem_<suffix>_1` 派生） |
+| 物品图标 | `$(maa dir resource)/template/items/*.png`（经 `/api/maa-assets/item/:key` 提供，先按物品 ID、再按 `iconId` 反查） |
+| 干员头像 | `$(maa dir resource)/template/avatar/char_*.png`（经 `/api/maa-assets/avatar/:id` 提供；只在基资源中，MaaResource 上游不含该目录） |
 | MirrorChyan 快照 | `$(maa dir data)/mirrorchyan/MaaResource/current.json` 指向的目录 |
 | 配置/任务 | `maa dir config`（`profiles/`、`tasks/`） |
 | 日志/截图 | `maa dir log`（`asst.log`、`asst.bak.log`、`debug/`） |
 | 项目 Agent Run 存储 | `server/data/agent-runs.json`（可用 `LA_PLUMA_AGENT_RUN_STORE` 覆盖） |
+
+`server/data/paradox-operators.json` 和 `server/data/stages.json` 已不再参与运行时；悖论干员与关卡名都从 MaaResource 推导，两个旧文件仅保留为历史数据。
+
+`/api/maa-assets/{item,avatar}/:key` 是只读的 MaaResource 图片路由，挂在 `LA_PLUMA_TOKEN` 鉴权之前（`<img>` 无法附带 bearer 头）；它只接受受限文件名，并且只暴露 `template/items` 与 `template/avatar`。
 
 ## 关键 CLI 事实
 

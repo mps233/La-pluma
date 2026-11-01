@@ -321,6 +321,11 @@
   color: var(--app-accent-strong) !important;
 }
 
+/* MaaResource item icons use a black matte; the artwork itself is circular. */
+.maa-item-icon {
+  clip-path: circle(50%);
+}
+
 .app-skeleton-shimmer {
   background: linear-gradient(
     90deg,

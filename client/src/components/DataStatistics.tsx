@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { maaApi, getAllOperators, getDropStatistics, getItemIconUrl, getOperBoxData, fetchOperatorMaterials, getTrainingQueue } from '../services/api'
+import { getOperatorAvatarUrl } from '../services/operatorQuotes'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
   ChevronDown,
@@ -1344,7 +1345,7 @@ export default function DataStatistics() {
                                 <div className="absolute inset-0 animate-pulse bg-[var(--app-surface-muted)]"></div>
                               )}
                               <img
-                                src={`https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/avatar/${oper.id}.png`}
+                                src={getOperatorAvatarUrl(oper.id)}
                                 alt={oper.name}
                                 loading="lazy"
                                 decoding="async"
@@ -1354,15 +1355,8 @@ export default function DataStatistics() {
                                 onLoad={() => setLoadedImages(prev => ({ ...prev, [oper.id]: true }))}
                                 onError={(e) => {
                                   const target = e.target as HTMLImageElement
-                                  const currentSrc = target.src
-                                  if (!currentSrc.includes('_2.png') && !currentSrc.includes('_1.png')) {
-                                    target.src = `https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/avatar/${oper.id}_2.png`
-                                  } else if (currentSrc.includes('_2.png')) {
-                                    target.src = `https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/avatar/${oper.id}_1.png`
-                                  } else {
-                                    target.style.display = 'none'
-                                    setLoadedImages(prev => ({ ...prev, [oper.id]: true }))
-                                  }
+                                  target.style.display = 'none'
+                                  setLoadedImages(prev => ({ ...prev, [oper.id]: true }))
                                 }}
                               />
                               {/* 未拥有白色半透明蒙版 */}
@@ -1562,7 +1556,7 @@ export default function DataStatistics() {
                               <img
                                 src={getItemIconUrl(item.iconId)}
                                 alt={item.name}
-                                className="w-full h-full object-cover"
+                                className="maa-item-icon w-full h-full object-cover"
                                 onError={() => {
                                   setFailedDepotImages(previous => ({ ...previous, [imageKey]: true }))
                                 }}

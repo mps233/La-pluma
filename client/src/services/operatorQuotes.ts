@@ -50,7 +50,7 @@ const asOperatorQuote = (value: unknown, allowMissingOperatorId = false): Operat
 }
 
 export const getOperatorAvatarUrl = (operatorId: string) =>
-  `https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/avatar/${encodeURIComponent(operatorId)}.png`
+  `${API_BASE_URL}/maa-assets/avatar/${encodeURIComponent(operatorId)}`
 
 function loadQuote(
   path: 'daily' | 'random',

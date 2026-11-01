@@ -41,6 +41,7 @@ vi.mock('framer-motion', async () => {
 })
 
 vi.mock('../services/api', () => ({
+  API_BASE_URL: '/api',
   getOperatorList: mocks.getOperatorList,
   getAllOperators: mocks.getAllOperators,
   getOperBoxData: mocks.getOperBoxData,

@@ -218,7 +218,7 @@ export default function DropRecords({
                     <img
                       src={getItemIconUrl(itemData.iconId)}
                       alt={itemName}
-                      className="h-full w-full object-cover"
+                      className="maa-item-icon h-full w-full object-cover"
                       onError={() => setFailedItemImages(previous => ({ ...previous, [itemName]: true }))}
                     />
                   )}

@@ -72,7 +72,7 @@ describe('operator quote service', () => {
   it('builds an encoded operator avatar URL', async () => {
     const { getOperatorAvatarUrl } = await import('./operatorQuotes')
     expect(getOperatorAvatarUrl('char_002 amiya')).toBe(
-      'https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/avatar/char_002%20amiya.png',
+      '/api/maa-assets/avatar/char_002%20amiya',
     )
   })
 })

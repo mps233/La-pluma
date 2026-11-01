@@ -8,6 +8,7 @@ import cors from 'cors';
 import express from 'express';
 import { printPathConfig } from './config/paths.js';
 import operatorQuotesRoutes from './routes/operatorQuotes.js';
+import maaAssetsRoutes from './routes/maaAssets.js';
 import agentRoutes from './routes/agent.js';
 import {
   getAgentRunStoreStatus,
@@ -106,6 +107,9 @@ export function createLaPlumaApp({
     else app.get(`${staticMountPath}/*`, sendAppShell);
   }
 
+  // Read-only MaaResource images are loaded by <img> tags, which cannot attach
+  // the bearer token. Mount the allowlisted asset router before API auth.
+  app.use('/api/maa-assets', maaAssetsRoutes);
   app.use('/api', optionalApiAuth);
   app.use('/api/agent', agentRoutes);
   app.use('/api/operator-quotes', operatorQuotesRoutes);

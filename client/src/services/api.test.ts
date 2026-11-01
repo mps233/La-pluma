@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { API_BASE_URL, fetchWithAuth, maaApi } from './api'
+import { API_BASE_URL, fetchWithAuth, getItemIconUrl, maaApi } from './api'
 
 describe('maaApi WebRTC preview', () => {
   beforeEach(() => {
@@ -29,6 +29,13 @@ describe('maaApi WebRTC preview', () => {
       body: JSON.stringify({ profileId: 'default', deviceId: 'mumu-la-pluma' })
     }))
     expect(result.data?.signalingUrl).toBe('ws://192.168.1.2:8443')
+  })
+})
+
+describe('local MaaResource assets', () => {
+  it('routes item icons through the local asset endpoint', () => {
+    expect(getItemIconUrl('MTL_SL_G2')).toBe(`${API_BASE_URL}/maa-assets/item/MTL_SL_G2`)
+    expect(getItemIconUrl(30012)).toBe(`${API_BASE_URL}/maa-assets/item/30012`)
   })
 })
 

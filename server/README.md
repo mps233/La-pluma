@@ -101,4 +101,6 @@ loggerManager.clearAll();
 
 数据来自 [Kengxxiao/ArknightsGameData](https://github.com/Kengxxiao/ArknightsGameData)。游戏版本更新后运行对应脚本刷新 `server/data/`；这些脚本会联网并改写仓库内的数据文件，运行后应把生成结果当作数据变更单独审阅，不要夹带在无关改动里。
 
+运行时的物品、配方、关卡、干员目录、悖论映射和活动数据已改为读取 MaaResource；其中 `operator-materials.json` 仍是干员精英化需求的来源。`stages.json` 和 `paradox-operators.json` 已不再参与运行时，保留为历史数据。`material-formulas.json`、`materials.json`、`characters.json`、`skills.json`、`items.json` 目前没有运行时消费者。
+
 `data/operator-materials.json` 以干员 ID 为键，`elite1` / `elite2` 分别记录龙门币、材料与芯片需求。干员总数以文件里的 `metadata.totalOperators` 为准，不要在文档或代码里写死。

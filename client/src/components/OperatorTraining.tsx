@@ -12,6 +12,7 @@ import {
   UserRoundSearch,
 } from 'lucide-react'
 import { getOperatorList, getAllOperators, getOperBoxData, getTrainingQueue, addToTrainingQueue, removeFromTrainingQueue, updateTrainingQueueOrder, updateTrainingSettings, generateTrainingPlan, applyTrainingPlan, getItemIconUrl } from '../services/api'
+import { getOperatorAvatarUrl } from '../services/operatorQuotes'
 import { PageHeader, Card, SmoothPanel, Button, EmptyState, IconButton, Input, Loading, Select, Switch } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
@@ -58,7 +59,7 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
                 <img
                   src={getItemIconUrl(node.iconId)}
                   alt={node.name}
-                  className="w-full h-full object-cover"
+                  className="maa-item-icon w-full h-full object-cover"
                   onError={(e) => {
                     // 图标加载失败时，隐藏图片并显示默认图标
                     const target = e.target as HTMLImageElement;
@@ -150,7 +151,7 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
             <img
               src={getItemIconUrl(node.iconId)}
               alt={node.name}
-              className="w-full h-full object-cover"
+              className="maa-item-icon w-full h-full object-cover"
               onError={(e) => {
                 // 图标加载失败，显示默认图标
                 const target = e.target as HTMLImageElement;
@@ -253,7 +254,7 @@ function MaterialGapList({
               <img
                 src={getItemIconUrl(material.iconId)}
                 alt=""
-                className="absolute inset-0 h-full w-full object-cover"
+                className="maa-item-icon absolute inset-0 h-full w-full object-cover"
                 onError={(event) => {
                   event.currentTarget.style.display = 'none';
                 }}
@@ -1076,7 +1077,7 @@ export default function OperatorTraining() {
                             <div className="app-skeleton absolute inset-0 surface-soft" />
                           )}
                           <img
-                            src={`https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/avatar/${operator.id}.png`}
+                            src={getOperatorAvatarUrl(operator.id)}
                             alt={operator.name}
                             loading={idx < 12 ? 'eager' : 'lazy'}
                             decoding="async"
@@ -1085,19 +1086,9 @@ export default function OperatorTraining() {
                             }`}
                             onLoad={() => setLoadedImages(prev => prev[operator.id] ? prev : ({ ...prev, [operator.id]: true }))}
                             onError={(e) => {
-                              // 如果加载失败，尝试带 _2 后缀的版本（用于异格干员）
                               const target = e.target as HTMLImageElement;
-                              const currentSrc = target.src;
-                              if (!currentSrc.includes('_2.png') && !currentSrc.includes('_1.png')) {
-                                target.src = `https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/avatar/${operator.id}_2.png`;
-                              } else if (currentSrc.includes('_2.png')) {
-                                // 如果 _2 也失败，尝试 _1
-                                target.src = `https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/main/avatar/${operator.id}_1.png`;
-                              } else {
-                                // 都失败了，隐藏图片并标记为已加载
-                                target.style.display = 'none';
-                                setLoadedImages(prev => prev[operator.id] ? prev : ({ ...prev, [operator.id]: true }));
-                              }
+                              target.style.display = 'none';
+                              setLoadedImages(prev => prev[operator.id] ? prev : ({ ...prev, [operator.id]: true }));
                             }}
                           />
                           {/* 不可添加时的半透明蒙版 */}

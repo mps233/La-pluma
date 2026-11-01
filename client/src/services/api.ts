@@ -21,7 +21,7 @@ const getApiBaseUrl = (): string => {
 export const API_BASE_URL = getApiBaseUrl()
 
 export const getItemIconUrl = (iconId: string | number): string =>
-  `https://raw.githubusercontent.com/yuanyan3060/ArknightsGameResource/refs/heads/main/item/${encodeURIComponent(String(iconId))}.png`
+  `${API_BASE_URL}/maa-assets/item/${encodeURIComponent(String(iconId))}`
 
 const getStoredToken = (): string => {
   const rawToken = localStorage.getItem('laPlumaToken') || ''
