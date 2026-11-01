@@ -1544,28 +1544,15 @@ html.la-pluma-standalone #app-root .page {
   box-shadow: none;
 }
 
-/* Dense sibling data belongs to one grouped surface. The one-pixel grid gap
-   becomes the hairline, while each child stays on a solid content material. */
-.la-pluma-app :is(
-  .data-statistics-item-grid,
-  .training-operator-grid,
-  .drop-records-metric-panel,
-  .drop-records-item-grid,
-  .drop-records-stage-list
-) {
+/* Dense training data keeps the grouped surface; the statistics and drop
+   workspaces use separate soft tiles instead of hairline grids. */
+.la-pluma-app .training-operator-grid {
   gap: 1px;
   background: var(--app-border);
   box-shadow: inset 0 0 0 1px var(--app-border);
 }
 
-.la-pluma-app :is(
-  .data-statistics-operator-item,
-  .data-statistics-depot-item,
-  .training-operator-item,
-  .drop-records-metric-row,
-  .drop-records-item-row,
-  .drop-records-stage-row
-) {
+.la-pluma-app .training-operator-item {
   background: var(--app-surface-solid);
 }
 
@@ -2095,10 +2082,6 @@ html.la-pluma-standalone #app-root .page {
   .config-device-list
 ) {
   box-shadow: none;
-}
-
-.la-pluma-app .ios-borderless-cards .data-statistics-kpi-grid {
-  padding: 0;
 }
 
 .dark .la-pluma-app .ios-borderless-cards :is(

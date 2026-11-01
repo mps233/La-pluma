@@ -41,7 +41,7 @@ describe('DropRecords layout surfaces', () => {
     container.remove()
   })
 
-  it('uses smooth corners only for the two outer record panels', async () => {
+  it('uses smooth corners for the summary and the two record panels', async () => {
     await act(async () => root.render(
       <DropRecords
         dropStatistics={{
@@ -62,7 +62,13 @@ describe('DropRecords layout surfaces', () => {
       expect(panel.getAttribute('data-smooth-corners')).toBe('true')
       expect(panel.querySelector(':scope > .app-card-smooth-surface')).not.toBeNull()
     })
-    expect(container.querySelectorAll('[data-smooth-corners="true"]')).toHaveLength(2)
+    expect(container.querySelectorAll('[data-smooth-corners="true"]')).toHaveLength(3)
+
+    const summary = container.querySelector('.data-readout')
+    expect(summary?.classList.contains('surface-soft')).toBe(false)
+    expect(summary?.querySelectorAll('.data-readout-stat')).toHaveLength(3)
+    expect(container.textContent).toContain('统计最近 7 天')
+    expect(container.textContent).toContain('2026-07-14 至 2026-07-20')
   })
 
   it('keeps the empty state on the same continuous outer surface', async () => {

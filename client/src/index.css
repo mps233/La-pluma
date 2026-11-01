@@ -4571,18 +4571,288 @@ svg.w-5.h-5 {
     padding: var(--app-space-panel);
   }
 
-  .data-statistics-kpi-grid {
-    gap: 1px;
-    overflow: hidden;
-    border-radius: var(--app-radius-lg);
-    padding: 1px;
-    background: var(--app-border);
+  .data-readout {
+    min-width: 0;
+    padding-block: var(--app-space-2);
   }
 
-  .data-statistics-kpi {
+  .data-readout-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: var(--app-space-card);
+  }
+
+  .data-readout-primary,
+  .data-readout-stat {
     min-width: 0;
-    padding: 0.75rem;
-    background: color-mix(in srgb, var(--app-surface-muted) 78%, var(--app-surface));
+    border-radius: var(--app-radius-lg);
+    padding: var(--app-space-card);
+    background: color-mix(in srgb, var(--app-surface-muted) 56%, transparent);
+  }
+
+  .data-readout-label {
+    margin: 0;
+    color: var(--app-text-soft);
+    font-size: var(--app-font-caption);
+    font-weight: 500;
+    line-height: 1.2;
+  }
+
+  .data-readout-value {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--app-space-1);
+    margin: 0;
+    color: var(--app-text);
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+
+  .data-readout-value.is-primary {
+    margin-top: var(--app-space-2);
+    font-size: 1.875rem;
+    line-height: 1;
+  }
+
+  .data-readout-number {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .data-readout-unit {
+    color: var(--app-text-soft);
+    font-size: var(--app-font-caption);
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .data-readout-value.is-primary .data-readout-unit {
+    font-size: var(--app-font-section-title);
+    font-weight: 600;
+  }
+
+  .data-readout-meter {
+    width: min(100%, 18rem);
+    height: var(--app-space-1);
+    margin-top: var(--app-space-3);
+    overflow: hidden;
+    border-radius: var(--app-radius-pill);
+    background: var(--app-surface-muted);
+  }
+
+  .data-readout-meter > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--app-accent);
+  }
+
+  .data-readout-detail {
+    margin: var(--app-space-2) 0 0;
+    color: var(--app-text-soft);
+    font-size: var(--app-font-caption);
+    line-height: 1.45;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .data-readout-stats {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--app-space-card);
+    margin: 0;
+  }
+
+  .data-readout-stats[data-count='3'] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .data-readout-stat .data-readout-value {
+    margin-top: var(--app-space-2);
+  }
+
+  .data-readout-stat.is-muted .data-readout-value {
+    color: var(--app-text-soft);
+    font-weight: 500;
+  }
+
+  .data-readout-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--app-space-2) var(--app-space-4);
+    margin-top: var(--app-space-3);
+    color: var(--app-text-soft);
+    font-size: var(--app-font-caption);
+    line-height: 1.45;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .data-readout-meta > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .data-readout-meta-label {
+    font-weight: 500;
+  }
+
+  .data-readout-meta > span:last-child {
+    white-space: nowrap;
+  }
+
+  @media (min-width: 768px) {
+    .data-readout-grid {
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    }
+  }
+
+  .data-statistics-filter-section,
+  .data-statistics-category-section {
+    min-width: 0;
+  }
+
+  /* Filter triggers read as a quiet toolbar rather than six outlined boxes. */
+  .data-statistics-filter-trigger {
+    background: transparent;
+    color: var(--app-text-muted);
+    transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .data-statistics-filter-trigger:hover {
+    background: var(--app-surface-muted);
+    color: var(--app-text);
+  }
+
+  .data-statistics-filter-trigger.is-open {
+    background: var(--app-surface-muted);
+    color: var(--app-text);
+  }
+
+  .data-statistics-filter-trigger.is-active {
+    background: var(--app-accent-soft);
+    color: var(--app-accent-strong);
+  }
+
+  .data-statistics-filter-trigger:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--app-accent);
+  }
+
+  /* The inner scroll area keeps its thin scrollbar clipped by the rounded
+     surface instead of letting the thumb poke through the corners. */
+  .data-statistics-menu-scroll {
+    display: flex;
+    min-height: 0;
+    max-height: 100%;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: var(--app-space-1);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .data-statistics-menu-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Record rows are soft tiles, not cells in a ruled table. */
+  .data-statistics-depot-item,
+  .drop-records-item-row,
+  .drop-records-stage-row {
+    border-radius: var(--app-radius-lg);
+    background: color-mix(in srgb, var(--app-surface-muted) 56%, transparent);
+  }
+
+  .drop-records-summary-content {
+    padding: var(--app-space-panel);
+  }
+
+  .drop-records-summary-header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-space-card);
+    margin-bottom: var(--app-space-card);
+  }
+
+  .drop-records-summary-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--app-space-2);
+  }
+
+  .drop-records-period {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--app-radius-pill);
+    background: var(--app-surface-muted);
+    box-shadow: inset 0 0 0 1px var(--app-border);
+  }
+
+  .drop-records-period-button {
+    display: inline-flex;
+    min-width: 0;
+    min-height: var(--app-control-height-sm);
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: var(--app-radius-pill);
+    padding: 0 var(--app-space-3);
+    background: transparent;
+    color: var(--app-text-muted);
+    font: inherit;
+    font-size: var(--app-font-caption);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .drop-records-period-button:hover {
+    color: var(--app-text);
+  }
+
+  .drop-records-period-button.is-selected {
+    background: var(--app-surface-solid);
+    color: var(--app-text);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+  }
+
+  .dark .drop-records-period-button.is-selected {
+    background: color-mix(in srgb, var(--app-surface-muted) 58%, var(--app-text) 10%);
+  }
+
+  .drop-records-period-button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--app-accent);
+  }
+
+  @media (min-width: 640px) {
+    .drop-records-summary-header {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--app-space-section);
+    }
+
+    .drop-records-period {
+      width: auto;
+    }
+  }
+
+  @media (pointer: coarse), (max-width: 639px) {
+    .drop-records-period-button {
+      min-height: 2.75rem;
+    }
   }
 
   @media (max-width: 639px) {

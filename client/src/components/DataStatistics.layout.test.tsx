@@ -132,7 +132,7 @@ describe('DataStatistics layout surfaces', () => {
     vi.unstubAllGlobals()
   })
 
-  it('uses the shared header, liquid segmented tabs, smooth task panels, and grouped KPI surfaces', async () => {
+  it('uses the shared header, liquid segmented tabs, smooth task panels, and soft KPI tiles', async () => {
     mocks.getAllOperators.mockResolvedValue({
       success: true,
       data: [{ id: 'char_001', name: '测试干员', rarity: 6, profession: 'SNIPER' }],
@@ -177,9 +177,14 @@ describe('DataStatistics layout surfaces', () => {
     const operatorCard = page?.querySelector('.data-statistics-task-card')
     expect(operatorCard?.getAttribute('data-smooth-corners')).toBe('true')
     expect(operatorCard?.querySelector(':scope > .app-card-smooth-surface')).not.toBeNull()
-    expect(operatorCard?.querySelectorAll('.data-statistics-kpi')).toHaveLength(4)
+    const operatorSummary = operatorCard?.querySelector('.data-readout')
+    expect(operatorSummary?.querySelectorAll('.data-readout-stat')).toHaveLength(2)
+    expect(operatorSummary?.querySelector('[role="progressbar"]')).not.toBeNull()
+    expect(operatorSummary?.classList.contains('surface-soft')).toBe(false)
+    expect(operatorCard?.querySelector('.data-statistics-filter-section')?.classList.contains('surface-soft')).toBe(false)
     const operatorGrid = operatorCard?.querySelector('.data-statistics-item-grid')
-    expect(operatorGrid?.classList.contains('surface-soft')).toBe(true)
+    expect(operatorGrid?.classList.contains('surface-soft')).toBe(false)
+    expect(operatorGrid?.classList.contains('gap-3')).toBe(true)
     const operatorItem = operatorCard?.querySelector('.data-statistics-operator-item')
     expect(operatorItem?.classList.contains('surface-soft')).toBe(false)
     expect(operatorItem?.classList.contains('border')).toBe(false)
@@ -195,13 +200,18 @@ describe('DataStatistics layout surfaces', () => {
     expect(depotCard?.getAttribute('data-smooth-corners')).toBe('true')
     expect(depotCard?.textContent).toContain('仓库识别')
 
-    const kpiGrid = page?.querySelector('.data-statistics-kpi-grid')
-    const kpis = Array.from(kpiGrid?.querySelectorAll('.data-statistics-kpi') ?? [])
-    expect(kpis).toHaveLength(6)
+    const depotSummary = page?.querySelector('.data-readout')
+    const kpis = Array.from(depotSummary?.querySelectorAll('.data-readout-stat') ?? [])
+    expect(kpis).toHaveLength(2)
+    expect(depotSummary?.querySelectorAll('.data-readout-meta > span')).toHaveLength(2)
     expect(kpis.every(kpi => !kpi.classList.contains('surface-soft'))).toBe(true)
     expect(kpis.every(kpi => !kpi.classList.contains('border'))).toBe(true)
+    expect(depotSummary?.classList.contains('surface-soft')).toBe(false)
+    expect(depotCard?.querySelector('#depot-category-title')?.textContent).toContain('1 类')
+    expect(depotCard?.querySelector('.data-statistics-category-section')?.classList.contains('surface-soft')).toBe(false)
     const depotGrid = page?.querySelector('.data-statistics-item-grid')
-    expect(depotGrid?.classList.contains('surface-soft')).toBe(true)
+    expect(depotGrid?.classList.contains('surface-soft')).toBe(false)
+    expect(depotGrid?.classList.contains('gap-3')).toBe(true)
     const depotItem = page?.querySelector('.data-statistics-depot-item')
     expect(depotItem?.classList.contains('surface-soft')).toBe(false)
     expect(depotItem?.classList.contains('border')).toBe(false)
@@ -271,7 +281,7 @@ describe('DataStatistics layout surfaces', () => {
     let options = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
     expect(trigger.classList.contains('min-h-11')).toBe(true)
     expect(menu.classList.contains('fixed')).toBe(true)
-    expect(menu.style.width).toBe('128px')
+    expect(menu.style.width).toBe('88px')
     expect(menu.style.left).toBe('16px')
     expect(options.every(option => option.classList.contains('min-h-11'))).toBe(true)
     expect(trigger.getAttribute('aria-expanded')).toBe('true')
@@ -319,6 +329,7 @@ describe('DataStatistics layout surfaces', () => {
     await flush()
 
     for (const label of ['职业', '排序']) {
+      const expectedWidth = label === '职业' ? 72 : 100
       const trigger = findButton(label)!
       vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({
         x: 220,
@@ -339,9 +350,9 @@ describe('DataStatistics layout surfaces', () => {
       const menu = document.body.querySelector<HTMLElement>('[role="menu"]')!
       const options = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
       expect(menu.classList.contains('fixed')).toBe(true)
-      expect(menu.style.left).toBe('172px')
-      expect(menu.style.width).toBe('128px')
-      expect(Number.parseFloat(menu.style.maxHeight)).toBeLessThanOrEqual(320)
+      expect(menu.style.left).toBe(`${300 - expectedWidth}px`)
+      expect(menu.style.width).toBe(`${expectedWidth}px`)
+      expect(Number.parseFloat(menu.style.maxHeight)).toBeLessThanOrEqual(360)
       expect(options.every(option => option.classList.contains('min-h-11'))).toBe(true)
       expect(document.activeElement).toBe(options[0])
 

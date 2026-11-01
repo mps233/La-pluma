@@ -8,9 +8,11 @@ import {
   Package as PackageIcon,
   Play,
   RotateCcw,
+  Users,
 } from 'lucide-react'
 import Icons from './Icons'
 import DropRecords from './DropRecords'
+import StatisticsSummary from './StatisticsSummary'
 import { PageHeader, Button, Card, EmptyState, Loading } from './common'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
@@ -66,27 +68,36 @@ interface FilterMenuPosition {
   placement: 'top' | 'bottom'
 }
 
-const filterButtonClass = (isActive: boolean) =>
-  `flex min-h-11 w-full items-center justify-center gap-1 rounded-full px-2 text-xs font-medium transition-[background,color,box-shadow,transform] duration-200 active:scale-[0.97] sm:w-auto sm:gap-1.5 sm:px-3 ${
-    isActive
-      ? 'brand-action-subtle'
-      : 'control-surface text-secondary'
-  }`
+const filterButtonClass = (isActive: boolean, isOpen: boolean) =>
+  `data-statistics-filter-trigger flex min-h-11 w-full items-center justify-center gap-1 rounded-[var(--app-radius-md)] px-2 text-xs font-medium sm:w-auto sm:gap-1.5 sm:px-3${
+    isActive ? ' is-active' : ''
+  }${isOpen ? ' is-open' : ''}`
 
-const menuSurfaceClass = 'data-statistics-menu-surface fixed z-[2000] overflow-y-auto overscroll-contain rounded-xl py-1 surface-panel'
+const menuSurfaceClass = 'data-statistics-menu-surface fixed z-[2000] flex flex-col overflow-hidden rounded-xl p-1 surface-panel'
 
 const menuOptionClass = (isActive: boolean) =>
-  `min-h-11 w-full px-3 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--app-accent)] ${
+  `flex min-h-11 w-full items-center justify-center rounded-[var(--app-radius-md)] px-3 text-center text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--app-accent)] ${
     isActive
-      ? 'brand-chip font-medium'
+      ? 'bg-[var(--app-accent-soft)] font-medium text-primary'
       : 'text-secondary hover:bg-[var(--app-surface-muted)] hover:text-primary'
   }`
 
 const taskPanelClass = (isActive: boolean) =>
   `data-statistics-task-card !p-0${isActive ? ' is-active' : ''}`
 
-const statCardClass = 'data-statistics-kpi'
-const chipClass = 'control-surface rounded-full px-2 py-0.5 text-xs whitespace-nowrap'
+const chipClass = 'rounded-full bg-[var(--app-surface-muted)] px-2 py-0.5 text-xs whitespace-nowrap text-secondary'
+const timestampFormatter = new Intl.DateTimeFormat('zh-CN', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+})
+const formatTimestamp = (value: string) => {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : timestampFormatter.format(date)
+}
 const statisticsTabs = [
   {
     id: 'operbox',
@@ -238,7 +249,10 @@ function FilterMenu({
       Math.max(preferredLeft, margin),
       Math.max(margin, viewportWidth - margin - width),
     )
-    const naturalHeight = Math.min(options.length * 44 + 8, 320)
+    const naturalHeight = Math.min(
+      options.length * 44 + Math.max(0, options.length - 1) * 4 + 8,
+      360,
+    )
     const spaceBelow = Math.max(0, viewportHeight - rect.bottom - gap - margin)
     const spaceAbove = Math.max(0, rect.top - gap - margin)
     const placement = spaceBelow < Math.min(naturalHeight, 176) && spaceAbove > spaceBelow
@@ -345,7 +359,7 @@ function FilterMenu({
           updateMenuPosition()
           onOpenChange(menuKey)
         }}
-        className={filterButtonClass(isActive)}
+        className={filterButtonClass(isActive, isOpen)}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls={menuId}
@@ -374,21 +388,23 @@ function FilterMenu({
           }}
           onKeyDown={handleMenuKeyDown}
         >
-          {options.map(option => (
-            <button
-              key={option.value}
-              type="button"
-              role="menuitemradio"
-              aria-checked={value === option.value}
-              onClick={() => {
-                onSelect(option.value)
-                closeMenu(true)
-              }}
-              className={menuOptionClass(value === option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
+          <div className="data-statistics-menu-scroll">
+            {options.map(option => (
+              <button
+                key={option.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={value === option.value}
+                onClick={() => {
+                  onSelect(option.value)
+                  closeMenu(true)
+                }}
+                className={menuOptionClass(value === option.value)}
+              >
+                <span className="min-w-0 truncate">{option.label}</span>
+              </button>
+            ))}
+          </div>
         </div>,
         document.body,
       )}
@@ -467,6 +483,24 @@ export default function DataStatistics() {
     return Array.from(grouped.entries())
       .map(([type, value]) => ({ type, ...value, label: getDepotTypeLabel(type) }))
       .sort((a, b) => b.count - a.count)
+  }, [depotData])
+
+  const depotOverview = useMemo(() => {
+    let materialKinds = 0
+    let totalCount = 0
+    let topItem: DepotDataDetailed['items'][number] | null = null
+
+    for (const item of depotData?.items || []) {
+      if (item.classifyType === 'MATERIAL') materialKinds += 1
+      totalCount += item.count
+      if (!topItem || item.count > topItem.count) topItem = item
+    }
+
+    return {
+      materialKinds,
+      totalCount,
+      topItemName: topItem?.name || '-',
+    }
   }, [depotData])
 
   // 掉落记录相关状态
@@ -782,6 +816,7 @@ export default function DataStatistics() {
   const operatorCoverage = operatorCatalogCount > 0
     ? Math.round((ownedOperatorCount / operatorCatalogCount) * 100)
     : 0
+  const hasOperatorCatalog = operatorCatalogCount > 0
 
   // 当筛选条件变化时，清理不再显示的干员图片加载状态
   useEffect(() => {
@@ -1061,8 +1096,8 @@ export default function DataStatistics() {
               <div className="data-statistics-task-content app-stack-card">
             <div className="data-statistics-task-header flex items-start gap-3 sm:items-center">
               <div className="flex w-full min-w-0 flex-1 items-center gap-3 sm:w-auto">
-                <div className="flex h-10 w-10 flex-none items-center justify-center" aria-hidden="true">
-                  <Icons.Users />
+                <div className="flex h-10 w-10 flex-none items-center justify-center rounded-[var(--app-radius-md)] surface-soft text-secondary" aria-hidden="true">
+                  <Users size={20} strokeWidth={1.9} />
                 </div>
                 <div className="min-w-0">
                   <h2 className="text-lg font-semibold text-primary">干员识别</h2>
@@ -1100,7 +1135,7 @@ export default function DataStatistics() {
 
             {/* 识别结果展示 */}
             {!operatorDataError && !operBoxData && (operatorDataLoading || (activeTask === 'operbox' && isRunning)) && (
-              <div className="rounded-xl py-12 surface-soft" aria-live="polite">
+              <div className="py-12" aria-live="polite">
                 <Loading text={activeTask === 'operbox' && isRunning ? '正在识别干员数据' : '正在读取干员数据'} />
               </div>
             )}
@@ -1116,47 +1151,42 @@ export default function DataStatistics() {
               <EmptyState
                 compact
                 className="py-10"
-                icon={<Icons.Users />}
+                icon={<Users className="h-7 w-7" strokeWidth={1.6} aria-hidden="true" />}
                 title="还没有干员识别结果"
                 description="完成一次干员识别后，清单会显示在这里。"
               />
             )}
             {operBoxData && operBoxData.data && operBoxData.data.length > 0 && (
               <div className="app-stack-card">
-                <div
-                  className="data-statistics-kpi-grid grid grid-cols-2 lg:grid-cols-4"
-                  aria-label="干员数据概览"
-                >
-                  <div className={statCardClass}>
-                    <p className="text-xs text-secondary">已拥有</p>
-                    <p className="mt-1 text-2xl font-semibold text-primary">{ownedOperatorCount}</p>
-                  </div>
-                  <div className={statCardClass}>
-                    <p className="text-xs text-secondary">全干员</p>
-                    <p className="mt-1 text-2xl font-semibold text-primary">{operatorCatalogCount}</p>
-                  </div>
-                  <div className={statCardClass}>
-                    <p className="text-xs text-secondary">当前显示</p>
-                    <p className="mt-1 text-2xl font-semibold text-primary">{getFilteredAndSortedOperators.length}</p>
-                  </div>
-                  <div className={statCardClass}>
-                    <p className="text-xs text-secondary">收集率</p>
-                    <p className="mt-1 text-2xl font-semibold text-primary">{operatorCoverage}%</p>
-                  </div>
-                </div>
+                <StatisticsSummary
+                  ariaLabel="干员数据概览"
+                  primary={{
+                    label: '收集率',
+                    value: hasOperatorCatalog ? operatorCoverage : '—',
+                    unit: hasOperatorCatalog ? '%' : undefined,
+                    detail: hasOperatorCatalog
+                      ? `${ownedOperatorCount} / ${operatorCatalogCount} 已收录`
+                      : '档案总数暂不可用',
+                    meter: hasOperatorCatalog ? operatorCoverage : undefined,
+                    meterLabel: '干员收集率',
+                    meterText: hasOperatorCatalog
+                      ? `${operatorCoverage}%，已拥有 ${ownedOperatorCount} 位，共 ${operatorCatalogCount} 位`
+                      : undefined,
+                  }}
+                  stats={[
+                    { label: '已拥有', value: ownedOperatorCount, unit: '位' },
+                    { label: '全干员', value: operatorCatalogCount, unit: '位' },
+                  ]}
+                  meta={operBoxData.timestamp
+                    ? [{ label: '更新于', value: formatTimestamp(operBoxData.timestamp) }]
+                    : undefined}
+                />
 
-                <section className="rounded-xl surface-soft p-3" aria-labelledby="operator-filter-title">
+                <section className="data-statistics-filter-section" aria-labelledby="operator-filter-title">
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 id="operator-filter-title" className="text-sm font-semibold text-primary">筛选与排序</h3>
-                      {operBoxData.timestamp && (
-                        <p className="mt-1 truncate text-xs text-tertiary">
-                          更新于 {new Date(operBoxData.timestamp).toLocaleString('zh-CN')}
-                        </p>
-                      )}
-                    </div>
+                    <h3 id="operator-filter-title" className="min-w-0 text-sm font-semibold text-primary">筛选与排序</h3>
                     <p className="shrink-0 text-xs text-secondary" aria-live="polite">
-                      显示 <span className="font-semibold brand-text">{getFilteredAndSortedOperators.length}</span> 项
+                      显示 <span className="font-semibold text-primary">{getFilteredAndSortedOperators.length}</span> 项
                     </p>
                   </div>
 
@@ -1169,6 +1199,7 @@ export default function DataStatistics() {
                       options={ownershipOptions}
                       isActive={filterOwnership !== 'all'}
                       isOpen={openMenu === 'ownership'}
+                      menuWidth={88}
                       onOpenChange={setOpenMenu}
                       onSelect={value => setFilterOwnership(value as FilterOwnership)}
                     />
@@ -1181,7 +1212,7 @@ export default function DataStatistics() {
                       options={rarityOptions}
                       isActive={filterRarity !== 'all'}
                       isOpen={openMenu === 'rarity'}
-                      menuWidth={112}
+                      menuWidth={72}
                       onOpenChange={setOpenMenu}
                       onSelect={value => setFilterRarity(value as FilterRarity)}
                     />
@@ -1194,6 +1225,7 @@ export default function DataStatistics() {
                       options={professionOptions}
                       isActive={filterProfession !== 'all'}
                       isOpen={openMenu === 'profession'}
+                      menuWidth={72}
                       mobileAlign="end"
                       onOpenChange={setOpenMenu}
                       onSelect={value => setFilterProfession(value as FilterProfession)}
@@ -1207,7 +1239,7 @@ export default function DataStatistics() {
                       options={eliteOptions}
                       isActive={filterElite !== 'all'}
                       isOpen={openMenu === 'elite'}
-                      menuWidth={112}
+                      menuWidth={88}
                       onOpenChange={setOpenMenu}
                       onSelect={value => setFilterElite(value as FilterElite)}
                     />
@@ -1220,7 +1252,7 @@ export default function DataStatistics() {
                       options={potentialOptions}
                       isActive={filterPotential !== 'all'}
                       isOpen={openMenu === 'potential'}
-                      menuWidth={112}
+                      menuWidth={88}
                       onOpenChange={setOpenMenu}
                       onSelect={value => setFilterPotential(value as FilterPotential)}
                     />
@@ -1233,6 +1265,7 @@ export default function DataStatistics() {
                       options={sortOptions}
                       isActive={sortBy !== 'default'}
                       isOpen={openMenu === 'sort'}
+                      menuWidth={100}
                       mobileAlign="end"
                       onOpenChange={setOpenMenu}
                       onSelect={value => setSortBy(value as SortBy)}
@@ -1258,7 +1291,7 @@ export default function DataStatistics() {
                   <EmptyState
                     compact
                     className="py-10"
-                    icon={<Icons.Users />}
+                    icon={<Users className="h-7 w-7" strokeWidth={1.6} aria-hidden="true" />}
                     title="没有符合条件的干员"
                     description="调整筛选条件后再查看。"
                     action={hasActiveOperatorFilters ? (
@@ -1268,7 +1301,7 @@ export default function DataStatistics() {
                     ) : undefined}
                   />
                 ) : (
-                <div className="data-statistics-item-grid grid grid-cols-2 overflow-hidden rounded-xl surface-soft sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                <div className="data-statistics-item-grid grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                   {getFilteredAndSortedOperators.map((oper) => {
                     // 判断是否拥有该干员
                     const ownedIds = new Set((operBoxData?.data || []).map(op => op.id))
@@ -1289,7 +1322,7 @@ export default function DataStatistics() {
                     return (
                       <div
                         key={oper.id}
-                        className={`data-statistics-operator-item relative overflow-hidden p-3 ${
+                        className={`data-statistics-operator-item relative min-w-0 ${
                           isOwned
                             ? ''
                             : 'opacity-70 grayscale-[0.15]'
@@ -1297,7 +1330,7 @@ export default function DataStatistics() {
                       >
                         {/* 未拥有标识 */}
                         {!isOwned && (
-                          <div className="control-surface absolute left-2 top-2 z-10 rounded-full px-2 py-0.5 text-xs font-semibold text-secondary">
+                          <div className="absolute left-2 top-2 z-10 rounded-full bg-[var(--app-surface-solid)] px-2 py-0.5 text-xs font-semibold text-secondary">
                             未拥有
                           </div>
                         )}
@@ -1406,8 +1439,8 @@ export default function DataStatistics() {
               <div className="data-statistics-task-content app-stack-card">
             <div className="data-statistics-task-header flex items-start gap-3 sm:items-center">
               <div className="flex w-full min-w-0 flex-1 items-center gap-3 sm:w-auto">
-                <div className="flex h-10 w-10 flex-none items-center justify-center" aria-hidden="true">
-                  <Icons.Package />
+                <div className="flex h-10 w-10 flex-none items-center justify-center rounded-[var(--app-radius-md)] surface-soft text-secondary" aria-hidden="true">
+                  <PackageIcon size={20} strokeWidth={1.9} />
                 </div>
                 <div className="min-w-0">
                   <h2 className="text-lg font-semibold text-primary">仓库识别</h2>
@@ -1434,7 +1467,7 @@ export default function DataStatistics() {
 
             {/* 识别结果展示 */}
             {!depotDataError && !depotData && (depotDataLoading || (activeTask === 'depot' && isRunning)) && (
-              <div className="rounded-xl py-12 surface-soft" aria-live="polite">
+              <div className="py-12" aria-live="polite">
                 <Loading text={activeTask === 'depot' && isRunning ? '正在识别仓库数据' : '正在读取仓库数据'} />
               </div>
             )}
@@ -1450,7 +1483,7 @@ export default function DataStatistics() {
               <EmptyState
                 compact
                 className="py-10"
-                icon={<Icons.Package />}
+                icon={<PackageIcon className="h-7 w-7" strokeWidth={1.6} aria-hidden="true" />}
                 title="还没有仓库识别结果"
                 description="完成一次仓库识别后，物品清单会显示在这里。"
               />
@@ -1465,63 +1498,42 @@ export default function DataStatistics() {
                     最近一次仓库识别没有完整结束，物品清单可能缺少部分内容。
                   </div>
                 )}
-                <div
-                  className="data-statistics-kpi-grid grid grid-cols-2 md:grid-cols-3"
-                  aria-label="仓库数据概览"
-                >
-                  <div className={statCardClass}>
-                    <p className="text-xs text-secondary">物品种类</p>
-                    <p className="mt-1 text-2xl font-semibold text-primary">
-                      {depotData.itemCount}
-                    </p>
-                  </div>
-                  <div className={statCardClass}>
-                    <p className="text-xs text-secondary">材料种类</p>
-                    <p className="mt-1 text-2xl font-semibold text-primary">
-                      {depotData.items.filter(i => i.classifyType === 'MATERIAL').length}
-                    </p>
-                  </div>
-                  <div className={statCardClass}>
-                    <p className="text-xs text-secondary">识别分类</p>
-                    <p className="mt-1 text-2xl font-semibold text-primary">
-                      {depotTypeSummary.length}
-                    </p>
-                  </div>
-                  <div className={statCardClass}>
-                    <p className="text-xs text-secondary">库存总量</p>
-                    <p className="mt-1 text-2xl font-semibold text-primary">
-                      {depotData.items.reduce((sum, i) => sum + i.count, 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className={statCardClass}>
-                    <p className="text-xs text-secondary">库存最多</p>
-                    <p className="mt-1 truncate text-sm font-semibold text-primary">
-                      {depotData.items.length > 0 && depotData.items[0]
-                        ? depotData.items.reduce((max, i) => i.count > max.count ? i : max, depotData.items[0]).name 
-                        : '-'}
-                    </p>
-                  </div>
-                  {depotData.timestamp && (
-                    <div className={statCardClass}>
-                      <p className="text-xs text-secondary">最近识别</p>
-                      <p className="mt-1 truncate text-sm font-semibold text-primary">
-                        {new Date(depotData.timestamp).toLocaleString('zh-CN')}
-                      </p>
-                    </div>
-                  )}
-                </div>
+                <StatisticsSummary
+                  ariaLabel="仓库数据概览"
+                  primary={{
+                    label: '库存总量',
+                    value: depotOverview.totalCount.toLocaleString(),
+                    unit: '件',
+                    detail: '含货币与经验道具',
+                  }}
+                  stats={[
+                    { label: '物品种类', value: depotData.itemCount, unit: '种' },
+                    { label: '材料种类', value: depotOverview.materialKinds, unit: '种' },
+                  ]}
+                  meta={[
+                    { label: '库存最多', value: depotOverview.topItemName },
+                    ...(depotData.timestamp
+                      ? [{ label: '最近识别', value: formatTimestamp(depotData.timestamp) }]
+                      : []),
+                  ]}
+                />
 
                 {depotTypeSummary.length > 0 && (
-                  <section className="rounded-xl surface-soft p-3" aria-labelledby="depot-category-title">
-                    <h3 id="depot-category-title" className="mb-2 text-sm font-semibold text-primary">分类汇总</h3>
+                  <section className="data-statistics-category-section" aria-labelledby="depot-category-title">
+                    <h3 id="depot-category-title" className="mb-2 flex min-w-0 flex-wrap items-baseline gap-2 text-sm font-semibold text-primary">
+                      <span>分类汇总</span>
+                      <span className="text-xs font-normal text-tertiary">{depotTypeSummary.length} 类</span>
+                    </h3>
                     <div className="flex flex-wrap gap-2">
                       {depotTypeSummary.map((group) => (
-                        <div key={group.type} className="control-surface rounded-full px-3 py-1.5 text-xs text-secondary">
-                          <span className="font-medium">{group.label}</span>
-                          <span className="mx-1 brand-text">·</span>
-                          <span>{group.kinds} 种</span>
-                          <span className="mx-1 brand-text">/</span>
-                          <span>{group.count.toLocaleString()} 件</span>
+                        <div
+                          key={group.type}
+                          className="flex min-w-0 items-baseline gap-2 rounded-full bg-[var(--app-surface-muted)] px-3 py-1.5 text-xs text-secondary"
+                        >
+                          <span className="font-medium text-primary">{group.label}</span>
+                          <span className="tabular-nums">{group.kinds} 种</span>
+                          <span className="text-tertiary" aria-hidden="true">·</span>
+                          <span className="tabular-nums">{group.count.toLocaleString()} 件</span>
                         </div>
                       ))}
                     </div>
@@ -1530,7 +1542,7 @@ export default function DataStatistics() {
 
                 {/* 物品卡片网格 */}
                 {depotData.items && depotData.items.length > 0 && (
-                  <div className="data-statistics-item-grid grid grid-cols-1 overflow-hidden rounded-xl surface-soft sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                  <div className="data-statistics-item-grid grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
                     {depotData.items.map((item) => {
                       const itemKey = item.id || item.iconId
                       const imageKey = `${itemKey}:${item.iconId}`
@@ -1560,16 +1572,16 @@ export default function DataStatistics() {
 
                           {/* 物品信息 */}
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-bold text-primary truncate" title={item.name}>
+                            <div className="text-sm font-semibold text-primary truncate" title={item.name}>
                               {item.name}
                             </div>
-                            <div className="flex items-center gap-2 mt-1">
+                            <div className="mt-1 flex min-w-0 items-baseline gap-2">
                               {item.classifyType && (
-                                <span className={chipClass}>
+                                <span className="min-w-0 truncate text-xs text-tertiary">
                                   {getDepotTypeLabel(item.classifyType)}
                                 </span>
                               )}
-                              <span className={`${chipClass} font-semibold`}>
+                              <span className="ml-auto shrink-0 text-xs font-medium tabular-nums text-secondary">
                                 ×{item.count.toLocaleString()}
                               </span>
                             </div>
