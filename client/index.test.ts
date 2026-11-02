@@ -7,7 +7,7 @@ import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const indexSource = readFileSync(resolve(cwd(), 'index.html'), 'utf8')
 const sourceDocument = new DOMParser().parseFromString(indexSource, 'text/html')
@@ -30,12 +30,20 @@ function installThemeDocument() {
   })
 }
 
-function runBootScript({ systemDark = false } = {}) {
+function runBootScript({ systemDark = false }: { systemDark?: boolean } = {}) {
   window.matchMedia = vi.fn().mockImplementation(query => ({
     matches: query === '(prefers-color-scheme: dark)' && systemDark,
     media: query,
   }))
   window.eval(bootScript)
+}
+
+interface ThemeCase {
+  storedTheme: string
+  systemDark: boolean
+  dark: boolean
+  background: string
+  themeColor: string
 }
 
 describe('PWA document boot shell', () => {
@@ -78,7 +86,7 @@ describe('PWA document boot shell', () => {
   it('is replaced by the first React commit', async () => {
     const sourceRoot = sourceDocument.querySelector('#root')
     document.body.innerHTML = sourceRoot?.outerHTML ?? '<div id="root"></div>'
-    const rootElement = document.getElementById('root')
+    const rootElement = document.getElementById('root') as HTMLElement
     expect(rootElement?.querySelector('.la-pluma-boot')).toBeTruthy()
 
     const reactRoot = createRoot(rootElement)
@@ -97,7 +105,7 @@ describe('PWA document boot shell', () => {
     { storedTheme: 'dark', systemDark: false, dark: true, background: 'rgb(16, 19, 24)', themeColor: '#101318' },
     { storedTheme: 'system', systemDark: true, dark: true, background: 'rgb(16, 19, 24)', themeColor: '#101318' },
     { storedTheme: 'system', systemDark: false, dark: false, background: 'rgb(242, 242, 247)', themeColor: '#f6f8fb' },
-  ])('applies $storedTheme before external assets load', ({ storedTheme, systemDark, dark, background, themeColor }) => {
+  ])('applies $storedTheme before external assets load', ({ storedTheme, systemDark, dark, background, themeColor }: ThemeCase) => {
     window.localStorage.setItem('ui-storage', JSON.stringify({ state: { theme: storedTheme } }))
 
     runBootScript({ systemDark })

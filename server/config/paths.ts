@@ -1,12 +1,12 @@
 import { homedir, platform } from 'os';
 import { join } from 'path';
 
-function readDirEnv(env, key) {
+function readDirEnv(env: NodeJS.ProcessEnv | undefined, key: string): string | null {
   const value = env?.[key];
   return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
-function xdgDir(env, key, fallback) {
+function xdgDir(env: NodeJS.ProcessEnv | undefined, key: string, fallback: string): string {
   const value = readDirEnv(env, key);
   return value ? join(value, 'maa') : fallback;
 }
@@ -18,11 +18,22 @@ function xdgDir(env, key, fallback) {
  * then the platform project directories. Empty environment values are treated
  * as unset.
  */
-export function resolveMaaDirs({ os = platform(), home = homedir(), env = process.env } = {}) {
-  let data;
-  let state;
-  let config;
-  let cache;
+export interface MaaDirs {
+  data: string;
+  state: string;
+  config: string;
+  cache: string;
+}
+
+export function resolveMaaDirs({
+  os = platform(),
+  home = homedir(),
+  env = process.env
+}: { os?: string; home?: string; env?: NodeJS.ProcessEnv } = {}): MaaDirs {
+  let data: string;
+  let state: string;
+  let config: string;
+  let cache: string;
 
   if (os === 'darwin') {
     const support = join(home, 'Library', 'Application Support', 'com.loong.maa');

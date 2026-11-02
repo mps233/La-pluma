@@ -3,20 +3,22 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node server.js",
-    "start": "node server.js",
-    "check": "node scripts/check-syntax.js",
-    "build": "npm run check",
-    "test": "node scripts/run-tests.js",
-    "test:coverage": "node --test --test-concurrency=1 --experimental-test-coverage",
-    "verify": "npm run check && npm run test",
-    "fetch-materials": "node scripts/fetch-operator-materials.js",
-    "fetch-formulas": "node scripts/fetch-material-formulas.js && node scripts/merge-formulas.js",
-    "fetch-all-materials": "node scripts/fetch-all-materials.js",
-    "fetch-stages": "node scripts/fetch-stage-data.js",
-    "fetch-assets": "node scripts/fetch-game-assets.js",
-    "fetch-paradox": "node scripts/fetch-paradox-operators.js",
-    "fetch-game-data": "npm run fetch-stages && npm run fetch-paradox"
+    "dev": "node --experimental-strip-types server.ts",
+    "start": "node --experimental-strip-types server.ts",
+    "check": "node --experimental-strip-types scripts/check-syntax.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "npm run check && npm run typecheck",
+    "test": "node --experimental-strip-types scripts/run-tests.ts",
+    "test:coverage": "node --experimental-strip-types scripts/coverage.ts",
+    "verify": "npm run check && npm run check:repo && npm run typecheck && npm run test",
+    "fetch-materials": "node --experimental-strip-types scripts/fetch-operator-materials.ts",
+    "fetch-formulas": "node --experimental-strip-types scripts/fetch-material-formulas.ts && node --experimental-strip-types scripts/merge-formulas.ts",
+    "fetch-all-materials": "node --experimental-strip-types scripts/fetch-all-materials.ts",
+    "fetch-stages": "node --experimental-strip-types scripts/fetch-stage-data.ts",
+    "fetch-assets": "node --experimental-strip-types scripts/fetch-game-assets.ts",
+    "fetch-paradox": "node --experimental-strip-types scripts/fetch-paradox-operators.ts",
+    "fetch-game-data": "npm run fetch-stages && npm run fetch-paradox",
+    "check:repo": "node --experimental-strip-types scripts/repo-check.ts"
   },
   "dependencies": {
     "@iarna/toml": "^2.2.5",
@@ -25,5 +27,11 @@
     "form-data": "^4.0.0",
     "node-cron": "^4.2.1",
     "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/cors": "2.8.19",
+    "@types/express": "4.17.25",
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3"
   }
 }

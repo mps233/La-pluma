@@ -171,7 +171,7 @@ html.la-pluma-standalone {
 html.dark,
 #app-root.dark {
   /* Keep this canvas color in sync with --boot-bg in client/index.html and the
-     dark theme-color writers in index.html, uiStore.ts, and vite.config.js. */
+     dark theme-color writers in index.html, uiStore.ts, and vite.config.ts. */
   --app-chrome-page-bg: #101318;
   --app-chrome-bg: rgba(28, 28, 30, 0.74);
   --app-glass-bg: rgba(28, 28, 30, 0.72);

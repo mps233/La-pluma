@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { join } from 'path';
-import { resolveMaaDirs } from '../paths.js';
+import { resolveMaaDirs } from '../paths.ts';
 
 test('resolves macOS directories like maa-dirs', () => {
   const dirs = resolveMaaDirs({ os: 'darwin', home: '/Users/test', env: {} });

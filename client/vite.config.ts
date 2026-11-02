@@ -1,4 +1,8 @@
 import { defineConfig, loadEnv } from 'vite'
+import type { ConfigEnv, Plugin, UserConfig } from 'vite'
+import type { ManifestOptions, Options } from 'vite-plugin-pwa'
+import tailwindcss from 'tailwindcss'
+import autoprefixer from 'autoprefixer'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
@@ -8,7 +12,7 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-export const normalizeBasePath = (value = '/') => {
+export const normalizeBasePath = (value: string = '/'): string => {
   const trimmed = value.trim()
   if (!trimmed || trimmed === '/') return '/'
 
@@ -16,7 +20,7 @@ export const normalizeBasePath = (value = '/') => {
   return `${withLeadingSlash.replace(/\/+$/, '')}/`
 }
 
-export const createNavigateFallbackDenylist = (basePath) => {
+export const createNavigateFallbackDenylist = (basePath: string): RegExp[] => {
   const denylist = [
     /^\/api(?:[/?]|$)/,
     /^\/health(?:[/?]|$)/,
@@ -31,7 +35,7 @@ export const createNavigateFallbackDenylist = (basePath) => {
   return denylist
 }
 
-export const createWorkboxConfig = (basePath) => {
+export const createWorkboxConfig = (basePath: string): Options['workbox'] => {
   const escapedBasePath = basePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
   return {
@@ -62,7 +66,7 @@ export const createWorkboxConfig = (basePath) => {
   }
 }
 
-export const createDevServiceWorkerCleanupScript = () => `
+export const createDevServiceWorkerCleanupScript = (): string => `
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting())
 })
@@ -93,7 +97,7 @@ self.addEventListener('activate', (event) => {
 })
 `.trimStart()
 
-export const createWebManifest = (basePath) => ({
+export const createWebManifest = (basePath: string): Partial<ManifestOptions> => ({
   name: 'La Pluma - MAA WebUI',
   short_name: 'La Pluma',
   description: 'MAA CLI 的现代化 Web 界面',
@@ -123,7 +127,7 @@ export const createWebManifest = (basePath) => ({
   ]
 })
 
-export const createDevPwaSupportPlugin = (basePath) => {
+export const createDevPwaSupportPlugin = (basePath: string): Plugin => {
   const serviceWorkerPath = `${basePath}sw.js`
   const manifestPath = `${basePath}manifest.webmanifest`
   const cleanupScript = createDevServiceWorkerCleanupScript()
@@ -168,7 +172,7 @@ export const createDevPwaSupportPlugin = (basePath) => {
 // https://vite.dev/config/
 const apiTarget = globalThis.process?.env?.VITE_API_TARGET || 'http://localhost:3000'
 
-export const createViteConfig = (basePath) => ({
+export const createViteConfig = (basePath: string): UserConfig => ({
   base: basePath,
   resolve: {
     alias: {
@@ -188,10 +192,15 @@ export const createViteConfig = (basePath) => ({
       workbox: createWorkboxConfig(basePath)
     })
   ],
+  css: {
+    postcss: {
+      plugins: [tailwindcss(), autoprefixer()]
+    }
+  },
   build: {
     rollupOptions: {
       output: {
-        manualChunks(id) {
+        manualChunks(id: string) {
           if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react-vendor'
           if (/node_modules\/(framer-motion|motion-dom|motion-utils)\//.test(id)) return 'motion-vendor'
           return undefined
@@ -218,7 +227,7 @@ export const createViteConfig = (basePath) => ({
   }
 })
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode }: ConfigEnv) => {
   const env = loadEnv(mode, __dirname)
   return createViteConfig(normalizeBasePath(env.VITE_BASE_PATH))
 })

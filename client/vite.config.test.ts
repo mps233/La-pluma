@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import vm from 'node:vm'
+import type { Plugin, ViteDevServer } from 'vite'
 import {
   createDevPwaSupportPlugin,
   createDevServiceWorkerCleanupScript,
@@ -7,10 +8,63 @@ import {
   createWebManifest,
   createWorkboxConfig,
   normalizeBasePath,
-} from './vite.config.js'
+} from './vite.config.ts'
+
+interface DevMiddlewareRequest {
+  method: string
+  url: string
+}
+
+interface DevMiddlewareResponse {
+  statusCode: number
+  setHeader: (name: string, value: string) => void
+  end: (body?: string) => void
+}
+
+type DevMiddleware = (
+  request: DevMiddlewareRequest,
+  response: DevMiddlewareResponse,
+  next: () => void,
+) => void
+
+interface WorkerEvent {
+  waitUntil: (work: Promise<unknown>) => void
+}
+
+type WorkerListener = (event: WorkerEvent) => void
+
+const captureDevMiddleware = (plugin: Plugin): DevMiddleware => {
+  let middleware: DevMiddleware | undefined
+  const server = {
+    middlewares: {
+      use: (handler: DevMiddleware) => {
+        middleware = handler
+      },
+    },
+  } as unknown as ViteDevServer
+  const configureServer = plugin.configureServer
+  if (typeof configureServer === 'function') {
+    configureServer(server)
+  } else {
+    configureServer?.handler(server)
+  }
+  if (!middleware) throw new Error('Dev PWA plugin did not register middleware')
+  return middleware
+}
+
+const createMockResponse = () => {
+  const headers = new Map<string, string>()
+  const end = vi.fn()
+  const response: DevMiddlewareResponse = {
+    statusCode: 0,
+    setHeader: (name, value) => headers.set(name, value),
+    end,
+  }
+  return { headers, response, end }
+}
 
 describe('PWA base path configuration', () => {
-  const matchesWorkboxRegExpRoute = (pattern, input, origin = 'https://la-pluma.test') => {
+  const matchesWorkboxRegExpRoute = (pattern: RegExp, input: string, origin = 'https://la-pluma.test') => {
     const url = new URL(input, origin)
     const result = pattern.exec(url.href)
     return Boolean(result && (url.origin === origin || result.index === 0))
@@ -24,7 +78,7 @@ describe('PWA base path configuration', () => {
 
   it('keeps API and signaling routes out of the navigation fallback', () => {
     const denylist = createNavigateFallbackDenylist('/la-pluma/')
-    const isDenied = (url) => denylist.some(pattern => pattern.test(url))
+    const isDenied = (url: string) => denylist.some(pattern => pattern.test(url))
 
     expect(isDenied('/api/agent/manifest')).toBe(true)
     expect(isDenied('/api?format=json')).toBe(true)
@@ -40,48 +94,42 @@ describe('PWA base path configuration', () => {
 
   it('precaches only the app shell and caches page chunks after use', () => {
     const workbox = createWorkboxConfig('/la-pluma/')
-    const pageChunkCache = workbox.runtimeCaching[0]
+    const runtimeCaching = workbox.runtimeCaching
+    expect(runtimeCaching).toBeDefined()
+    const pageChunkCache = runtimeCaching?.[0]
+    expect(pageChunkCache).toBeDefined()
+    if (!pageChunkCache) throw new Error('Expected a runtime caching route')
+    const urlPattern = pageChunkCache.urlPattern
+    expect(urlPattern).toBeInstanceOf(RegExp)
+    if (!(urlPattern instanceof RegExp)) throw new Error('Expected a RegExp url pattern')
 
     expect(workbox.cleanupOutdatedCaches).toBe(true)
     expect(workbox.globPatterns).toContain('assets/{index,react-vendor,motion-vendor,workbox-window.prod.es5}-*.js')
     expect(workbox.globPatterns).not.toContain('**/*.{js,css,html,ico,png,svg,woff,woff2}')
     expect(matchesWorkboxRegExpRoute(
-      pageChunkCache.urlPattern,
+      urlPattern,
       'https://la-pluma.test/la-pluma/assets/AutomationTasks-abc123.js',
     )).toBe(true)
     expect(matchesWorkboxRegExpRoute(
-      pageChunkCache.urlPattern,
+      urlPattern,
       'https://la-pluma.test/la-pluma/assets/AutomationTasks-abc123.js?reload=1',
     )).toBe(true)
     expect(matchesWorkboxRegExpRoute(
-      pageChunkCache.urlPattern,
+      urlPattern,
       'https://la-pluma.test/assets/AutomationTasks-abc123.js',
     )).toBe(false)
     expect(matchesWorkboxRegExpRoute(
-      pageChunkCache.urlPattern,
+      urlPattern,
       'https://cdn.example.com/la-pluma/assets/AutomationTasks-abc123.js',
     )).toBe(false)
     expect(pageChunkCache.handler).toBe('CacheFirst')
-    expect(pageChunkCache.options.cacheName).toBe('la-pluma-page-chunks')
+    expect(pageChunkCache.options?.cacheName).toBe('la-pluma-page-chunks')
   })
 
   it('serves a no-store cleanup worker before the development SPA fallback', () => {
-    let middleware
-    const plugin = createDevPwaSupportPlugin('/la-pluma/')
-    plugin.configureServer({
-      middlewares: {
-        use: (handler) => {
-          middleware = handler
-        },
-      },
-    })
+    const middleware = captureDevMiddleware(createDevPwaSupportPlugin('/la-pluma/'))
 
-    const headers = new Map()
-    const response = {
-      statusCode: 0,
-      setHeader: (name, value) => headers.set(name, value),
-      end: vi.fn(),
-    }
+    const { headers, response, end } = createMockResponse()
     const next = vi.fn()
     middleware(
       { method: 'GET', url: '/la-pluma/sw.js?update=1' },
@@ -95,53 +143,36 @@ describe('PWA base path configuration', () => {
     expect(headers.get('Cache-Control')).toContain('no-store')
     expect(headers.get('Service-Worker-Allowed')).toBe('/la-pluma/')
     expect(headers.get('X-La-Pluma-Dev-Service-Worker')).toBe('cleanup')
-    expect(response.end).toHaveBeenCalledWith(createDevServiceWorkerCleanupScript())
+    expect(end).toHaveBeenCalledWith(createDevServiceWorkerCleanupScript())
   })
 
   it('lets unrelated development requests continue through Vite', () => {
-    let middleware
-    const plugin = createDevPwaSupportPlugin('/')
-    plugin.configureServer({
-      middlewares: {
-        use: (handler) => {
-          middleware = handler
-        },
-      },
-    })
+    const middleware = captureDevMiddleware(createDevPwaSupportPlugin('/'))
 
     const next = vi.fn()
+    const { response } = createMockResponse()
     middleware(
       { method: 'GET', url: '/src/main.tsx' },
-      { setHeader: vi.fn(), end: vi.fn() },
+      response,
       next,
     )
 
     expect(next).toHaveBeenCalledOnce()
   })
 
-  it('exposes the install manifest in development without enabling a caching worker', () => {
-    let middleware
+  it('exposes the install manifest in development without enabling a caching worker', async () => {
     const plugin = createDevPwaSupportPlugin('/la-pluma/')
-    plugin.configureServer({
-      middlewares: {
-        use: (handler) => {
-          middleware = handler
-        },
-      },
-    })
+    const middleware = captureDevMiddleware(plugin)
 
-    expect(plugin.transformIndexHtml()).toEqual([{
+    const transformIndexHtml = plugin.transformIndexHtml
+    if (typeof transformIndexHtml !== 'function') throw new Error('Expected a transformIndexHtml hook')
+    expect(await transformIndexHtml('', { path: '/', filename: '/index.html' })).toEqual([{
       tag: 'link',
       attrs: { rel: 'manifest', href: '/la-pluma/manifest.webmanifest' },
       injectTo: 'head',
     }])
 
-    const headers = new Map()
-    const response = {
-      statusCode: 0,
-      setHeader: (name, value) => headers.set(name, value),
-      end: vi.fn(),
-    }
+    const { headers, response, end } = createMockResponse()
     const next = vi.fn()
     middleware(
       { method: 'GET', url: '/la-pluma/manifest.webmanifest?install=1' },
@@ -153,7 +184,7 @@ describe('PWA base path configuration', () => {
     expect(response.statusCode).toBe(200)
     expect(headers.get('Content-Type')).toBe('application/manifest+json; charset=utf-8')
     expect(headers.get('Cache-Control')).toContain('no-store')
-    expect(JSON.parse(response.end.mock.calls[0][0])).toEqual(createWebManifest('/la-pluma/'))
+    expect(JSON.parse(String(end.mock.calls[0]?.[0]))).toEqual(createWebManifest('/la-pluma/'))
   })
 
   it('builds a worker that clears app caches, unregisters, and refreshes clients', () => {
@@ -169,14 +200,14 @@ describe('PWA base path configuration', () => {
   })
 
   it('executes the complete cleanup worker lifecycle', async () => {
-    const listeners = new Map()
+    const listeners = new Map<string, WorkerListener>()
     const skipWaiting = vi.fn().mockResolvedValue(undefined)
     const claim = vi.fn().mockResolvedValue(undefined)
     const unregister = vi.fn().mockResolvedValue(true)
     const navigate = vi.fn().mockResolvedValue(undefined)
-    const deleteCache = vi.fn().mockResolvedValue(true)
+    const deleteCache = vi.fn<(cacheName: string) => Promise<boolean>>().mockResolvedValue(true)
     const workerScope = {
-      addEventListener: (type, listener) => listeners.set(type, listener),
+      addEventListener: (type: string, listener: WorkerListener) => listeners.set(type, listener),
       skipWaiting,
       clients: {
         claim,
@@ -201,17 +232,17 @@ describe('PWA base path configuration', () => {
       caches: cacheStorage,
     })
 
-    let installWork
-    listeners.get('install')({
-      waitUntil: (work) => {
+    let installWork: Promise<unknown> | undefined
+    listeners.get('install')?.({
+      waitUntil: (work: Promise<unknown>) => {
         installWork = work
       },
     })
     await installWork
 
-    let activateWork
-    listeners.get('activate')({
-      waitUntil: (work) => {
+    let activateWork: Promise<unknown> | undefined
+    listeners.get('activate')?.({
+      waitUntil: (work: Promise<unknown>) => {
         activateWork = work
       },
     })
