@@ -10,11 +10,12 @@ const MAX_RECENT_DROPS = 50
 const MAX_OPEN_STAGE_ITEMS = 100
 const MAX_TEMPERATURE_SAMPLES = 36
 
-interface ActivitySummary {
+export interface ActivitySummary {
   available: boolean
   code?: string
   name?: string
   tip?: string
+  endTime?: number
   completion?: {
     known?: boolean
     complete?: boolean
@@ -125,6 +126,7 @@ const isStringArray = (value: unknown, maxLength: number): value is string[] => 
 function isActivitySummary(value: unknown): value is ActivitySummary {
   if (!isRecord(value) || typeof value.available !== 'boolean') return false
   if (!isOptionalString(value.code) || !isOptionalString(value.name) || !isOptionalString(value.tip)) return false
+  if (value.endTime !== undefined && (!isTimestamp(value.endTime) || value.endTime <= 0)) return false
   if (value.completion === undefined) return true
   if (!isRecord(value.completion)) return false
 

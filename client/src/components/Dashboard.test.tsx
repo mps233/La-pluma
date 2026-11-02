@@ -93,6 +93,9 @@ let root: Root
 const findButton = (text: string) => Array.from(container.querySelectorAll('button'))
   .find(button => button.textContent?.includes(text))
 
+const findActivityMetric = () => Array.from(container.querySelectorAll('.dashboard-flow-metric'))
+  .find(metric => metric.textContent?.includes('当前活动'))
+
 async function flushDashboard() {
   await act(async () => {
     await Promise.resolve()
@@ -246,6 +249,65 @@ describe('Dashboard connectivity state', () => {
     expect(container.textContent).not.toContain('异常活动')
     expect(useDashboardStore.getState().lastUpdate).toBe(lastSuccessfulUpdate)
     expect(window.localStorage.getItem('la-pluma-dashboard-cache')).toBe(persistedSnapshot)
+  })
+
+  it('shows the remaining activity time instead of waiting', async () => {
+    apiMocks.getActivity.mockResolvedValueOnce({
+      success: true,
+      data: {
+        available: true,
+        code: 'TL',
+        name: '时间啊，向前！',
+        endTime: Date.now() + 3 * 24 * 60 * 60 * 1000,
+      },
+    })
+
+    await act(async () => root.render(<Dashboard />))
+    await flushDashboard()
+
+    const activityMetric = findActivityMetric()
+    expect(activityMetric?.textContent).toContain('时间啊，向前！')
+    expect(activityMetric?.textContent).toContain('剩余 3 天')
+    expect(activityMetric?.textContent).not.toContain('等待活动数据')
+  })
+
+  it('does not show waiting when an activity is available without a known window', async () => {
+    apiMocks.getActivity.mockResolvedValueOnce({
+      success: true,
+      data: { available: true, code: 'TL', name: '时间啊，向前！' },
+    })
+
+    await act(async () => root.render(<Dashboard />))
+    await flushDashboard()
+
+    const activityMetric = findActivityMetric()
+    expect(activityMetric?.textContent).toContain('时间啊，向前！')
+    expect(activityMetric?.textContent).toContain('活动进行中')
+    expect(activityMetric?.textContent).not.toContain('等待活动数据')
+  })
+
+  it('shows completion progress when the activity window is unknown', async () => {
+    apiMocks.getActivity.mockResolvedValueOnce({
+      success: true,
+      data: {
+        available: true,
+        code: 'TL',
+        name: '时间啊，向前！',
+        completion: {
+          known: true,
+          complete: false,
+          completedStages: ['TL-9'],
+          totalStages: 3,
+        },
+      },
+    })
+
+    await act(async () => root.render(<Dashboard />))
+    await flushDashboard()
+
+    const activityMetric = findActivityMetric()
+    expect(activityMetric?.textContent).toContain('已通关 1/3 关')
+    expect(activityMetric?.textContent).not.toContain('等待活动数据')
   })
 
   it('disables execution actions as soon as the browser goes offline', async () => {

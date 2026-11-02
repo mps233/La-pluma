@@ -9,6 +9,7 @@ const snapshotFixture = {
     available: true,
     code: 'SSS',
     name: '测试活动',
+    endTime: 1795291199000,
     completion: {
       known: true,
       complete: false,
@@ -94,6 +95,25 @@ describe('dashboardStore persistence', () => {
       lastUpdate: savedAt,
       lastRefreshAttemptAt: savedAt,
     })
+  })
+
+  it('restores a legacy snapshot that has no activity end time', async () => {
+    await persistFixture(Date.now())
+    const persisted = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
+    delete persisted.snapshot.activitySummary.endTime
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted))
+
+    vi.resetModules()
+    const { useDashboardStore } = await import('./dashboardStore')
+    const restored = useDashboardStore.getState()
+
+    expect(restored.hasLoaded).toBe(true)
+    expect(restored.activitySummary).toMatchObject({
+      available: true,
+      code: 'SSS',
+      name: '测试活动',
+    })
+    expect(restored.activitySummary.endTime).toBeUndefined()
   })
 
   it('restores a stale snapshot so the dashboard can refresh it in the background', async () => {
@@ -266,6 +286,26 @@ describe('dashboardStore persistence', () => {
               ...validPayload.snapshot.activitySummary.completion,
               totalStages: 1.5,
             },
+          },
+        },
+      },
+      {
+        ...validPayload,
+        snapshot: {
+          ...validPayload.snapshot,
+          activitySummary: {
+            ...validPayload.snapshot.activitySummary,
+            endTime: -1,
+          },
+        },
+      },
+      {
+        ...validPayload,
+        snapshot: {
+          ...validPayload.snapshot,
+          activitySummary: {
+            ...validPayload.snapshot.activitySummary,
+            endTime: null,
           },
         },
       },

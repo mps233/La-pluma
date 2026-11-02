@@ -1,3 +1,4 @@
+import { getErrorMessage } from '@/utils/errorMessage'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Activity, Bot, CalendarDays, CheckCircle2, ChevronRight, Cpu, HardDrive, Database, PackageOpen, Play, ServerOff, Target, Thermometer, WifiOff } from 'lucide-react'
 import { getOpenTodayStages, getTodayDrops, getTrainingQueue, maaApi } from '../services/api'
@@ -8,6 +9,7 @@ import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useUIStore } from '@/stores'
 import { useDashboardFlowLayout } from '../hooks/useDashboardFlowLayout'
 import DashboardPreviewEntry from './DashboardPreviewEntry'
+import { formatActivitySubtitle } from '../utils/activitySummary'
 import { formatExecutionSummary, getExecutionLastTask } from '../utils/executionSummary'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { useStatusStore } from '../store/statusStore'
@@ -28,6 +30,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> => (
 
 const firstString = (...values: unknown[]) => values.find(
   (value): value is string => typeof value === 'string' && value.trim().length > 0
+)
+
+const toOptionalTimestamp = (value: unknown): number | undefined => (
+  typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined
 )
 
 const asRecordArray = (value: unknown): Array<Record<string, unknown>> | null => (
@@ -200,6 +206,7 @@ function refreshDashboardData(force = false): Promise<void> {
           code: activityCode,
           name: activityName,
           tip: firstString(activity.tip, activity.description),
+          endTime: toOptionalTimestamp(activity.endTime),
           completion: normalizeActivityCompletion(activity.completion),
         }
         const rawLastResult = execution.lastResult || execution.result || execution.lastMessage
@@ -234,12 +241,18 @@ function refreshDashboardData(force = false): Promise<void> {
             items: Array.isArray(record.drops) && record.drops.length > 0
               ? record.drops
                   .slice(0, 3)
-                  .map((drop: any) => `${drop?.name || drop?.itemName || '材料'}×${drop?.count || 1}`)
+                  .map((drop: unknown) => {
+                    const entry = isRecord(drop) ? drop : {}
+                    return `${entry.name || entry.itemName || '材料'}×${entry.count || 1}`
+                  })
                   .join('、')
               : Array.isArray(record.items) && record.items.length > 0
                 ? record.items
                     .slice(0, 3)
-                    .map((item: any) => `${item?.name || item?.itemName || '材料'}×${item?.count || 1}`)
+                    .map((item: unknown) => {
+                      const entry = isRecord(item) ? item : {}
+                      return `${entry.name || entry.itemName || '材料'}×${entry.count || 1}`
+                    })
                     .join('、')
                 : firstString(record.itemName) || '已记录作战，暂无材料明细',
           })),
@@ -372,7 +385,7 @@ export default function Dashboard() {
     setQuickStartMessage('')
     setQuickStartMessageType('info')
     try {
-      const configResult = await maaApi.loadUserConfig('automation-tasks')
+      const configResult = await maaApi.loadUserConfig<{ taskFlow?: unknown[] }>('automation-tasks')
       const savedFlow = Array.isArray(configResult?.data?.taskFlow) ? configResult.data.taskFlow : []
       if (!configResult.success || savedFlow.length === 0) {
         setQuickStartMessage('还没有配置今日流程，先去自动化页保存任务流。')
@@ -390,8 +403,8 @@ export default function Dashboard() {
         setQuickStartMessage(result.message || '今日流程启动失败')
         setQuickStartMessageType('error')
       }
-    } catch (error: any) {
-      setQuickStartMessage(error?.message || '今日流程启动失败')
+    } catch (error) {
+      setQuickStartMessage(getErrorMessage(error) || '今日流程启动失败')
       setQuickStartMessageType('error')
     } finally {
       setQuickStartLoading(false)
@@ -430,8 +443,8 @@ export default function Dashboard() {
         setQuickStartMessageType('warning')
         setStatusMessage(blockedMessage, 'warning')
       }
-    } catch (error: any) {
-      const errorMessage = error?.message || '当前活动检查失败'
+    } catch (error) {
+      const errorMessage = getErrorMessage(error) || '当前活动检查失败'
       setQuickStartMessage(errorMessage)
       setQuickStartMessageType('error')
       setStatusMessage(errorMessage, 'error')
@@ -596,7 +609,7 @@ export default function Dashboard() {
                       loadingText="检查中"
                       statusKey={activityPreflightLoading ? 'running' : 'ready'}
                       className={`dashboard-flow-activity-action justify-center whitespace-nowrap ${activityCompleted ? 'is-completed' : ''}`}
-                      title={activityCompleted ? '重新执行当前活动' : '检查活动导航并执行已保存偏好的活动作业'}
+                      title={activityCompleted ? '重新执行当前活动（会重启游戏）' : '重启游戏并执行已保存偏好的活动作业'}
                       aria-label={activityCompleted ? '重新执行当前活动' : '打当前活动'}
                       icon={activityCompleted
                         ? <CheckCircle2 className="h-4 w-4" strokeWidth={2} />
@@ -640,7 +653,7 @@ export default function Dashboard() {
                   {
                     label: '当前活动',
                     value: activitySummary.available ? (activitySummary.name || activitySummary.code || '进行中') : '暂无活动',
-                    sub: activitySummary.tip || '等待活动数据',
+                    sub: formatActivitySubtitle(activitySummary),
                     Icon: CalendarDays,
                   },
                   {
