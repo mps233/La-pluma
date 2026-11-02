@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { maaApi, type WebrtcStatusData } from '../services/api'
+import type { ApiResponse } from '../types/api'
 import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
 import ScrcpyDeviceView from './ScrcpyDeviceView'
 
@@ -48,7 +49,7 @@ export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) 
     }
   }, [refreshWebrtcStatus])
 
-  const runWebrtcAction = async (action: string, fn: () => Promise<any>, allowWhenUnavailable = false) => {
+  const runWebrtcAction = async (action: string, fn: () => Promise<ApiResponse<unknown> | void>, allowWhenUnavailable = false) => {
     if (operationInFlightRef.current) return
     if (!automationAvailable && !allowWhenUnavailable) {
       setWebrtcActionError(unavailableMessage)
@@ -63,7 +64,7 @@ export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) 
       if (result?.success === false) throw new Error(maaApi.getErrorMessage(result))
       if (!mountedRef.current) return
       if (result?.data) {
-        setWebrtcStatus(result.data)
+        setWebrtcStatus(result.data as WebrtcStatusData)
         setWebrtcStatusState('ready')
       }
       await refreshWebrtcStatus()

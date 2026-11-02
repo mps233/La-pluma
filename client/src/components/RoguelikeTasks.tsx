@@ -199,7 +199,7 @@ export default function RoguelikeTasks() {
           
           // 只恢复属于肉鸽模式的任务
           if (taskType === 'roguelike') {
-            const elapsedMinutes = (Date.now() - startTime) / 1000 / 60
+            const elapsedMinutes = (Date.now() - (startTime ?? 0)) / 1000 / 60
             setIsRunning(true)
             if (elapsedMinutes > 5) {
               setStatusMessage(`${taskName} 可能已完成（已运行 ${Math.floor(elapsedMinutes)} 分钟）`)
@@ -217,7 +217,7 @@ export default function RoguelikeTasks() {
                 if (statusResult.success) {
                   setIsActiveStatus(Boolean(statusResult.data?.isRunning))
                 }
-                if (statusResult.success && !statusResult.data.isRunning) {
+                if (statusResult.success && statusResult.data?.isRunning === false) {
                   // 任务已完成
                   setIsRunning(false)
                   setStatusMessage('任务已完成')
@@ -285,7 +285,10 @@ export default function RoguelikeTasks() {
     // 加载保存的配置 - 优先从服务器加载
     const loadConfig = async () => {
       try {
-        const serverConfig = await maaApi.loadUserConfig('roguelike-tasks')
+        const serverConfig = await maaApi.loadUserConfig<{
+          taskInputs?: RoguelikeTaskInputs
+          advancedParams?: RoguelikeAdvancedParams
+        }>('roguelike-tasks')
         if (cancelled) return
         if (serverConfig.success && serverConfig.data) {
           const { taskInputs: inputs, advancedParams: advanced } = serverConfig.data
@@ -640,7 +643,7 @@ export default function RoguelikeTasks() {
       const result = await maaApi.executeCommand(
         'run',
         [task.command],
-        taskConfig as any,
+        taskConfig,
         null,
         task.name,
         'roguelike',

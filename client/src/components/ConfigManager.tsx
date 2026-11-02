@@ -26,6 +26,16 @@ import type {
   UpdateStatus
 } from '@/types/components'
 
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+)
+
+const getErrorDetails = (result: { error?: string; errorInfo?: { details?: unknown } }): Record<string, unknown> => {
+  const legacyError: unknown = result.error
+  if (isRecord(legacyError) && isRecord(legacyError.details)) return legacyError.details
+  return isRecord(result.errorInfo?.details) ? result.errorInfo.details : {}
+}
+
 interface MaaVersionInfo {
   cli: string
   core: string
@@ -498,7 +508,7 @@ export default function ConfigManager() {
         // 更新成功后重新加载版本信息
         await loadVersion()
       } else {
-        const details = (result as any).error?.details || result.errorInfo?.details || {}
+        const details = getErrorDetails(result)
         const message = maaApi.getErrorMessage(result)
         setUpdateFeedback({
           type: 'error',
@@ -565,7 +575,7 @@ export default function ConfigManager() {
         // 更新成功后重新加载版本信息
         await loadVersion()
       } else {
-        const details = (result as any).error?.details || result.errorInfo?.details || {}
+        const details = getErrorDetails(result)
         const message = maaApi.getErrorMessage(result)
         setUpdateFeedback({
           type: 'error',

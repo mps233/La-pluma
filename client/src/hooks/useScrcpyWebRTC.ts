@@ -30,7 +30,7 @@ interface UseScrcpyWebRTCOptions {
   scrcpyOptions?: ScrcpyOptions
 }
 
-interface VideoStats {
+export interface VideoStats {
   fps: string | number
   bitrate: string | number
   rtt: string | number
@@ -63,16 +63,39 @@ export interface ScrcpyCommandResult {
   raw?: unknown
 }
 
-function normalizeCommandResult(payload: any, requestId: string): ScrcpyCommandResult {
-  const error = typeof payload?.error === 'string' ? payload.error : ''
-  const output = typeof payload?.output === 'string'
+interface SignalingPayload {
+  type: string
+  success?: boolean
+  output?: string
+  result?: string
+  error?: string
+  request_id?: string
+  message?: string
+  sdp: string
+  candidate: RTCIceCandidateInit
+}
+
+interface SignalingMessage {
+  message_type?: string
+  type?: string
+  ice_servers?: RTCIceServer[]
+  device_info?: {
+    displays?: Array<{ x_res?: number; y_res?: number }>
+  }
+  error?: string
+  payload?: SignalingPayload
+}
+
+function normalizeCommandResult(payload: SignalingPayload, requestId: string): ScrcpyCommandResult {
+  const error = typeof payload.error === 'string' ? payload.error : ''
+  const output = typeof payload.output === 'string'
     ? payload.output
-    : typeof payload?.result === 'string'
+    : typeof payload.result === 'string'
       ? payload.result
       : undefined
   return {
     requestId,
-    success: payload?.success !== false && !error,
+    success: payload.success !== false && !error,
     output,
     error: error || undefined,
     raw: payload
@@ -559,7 +582,7 @@ export function useScrcpyWebRTC({
 
           ws.onmessage = event => {
             if (connectionGenerationRef.current !== generation) return
-            let msg: any
+            let msg: SignalingMessage
             try {
               msg = JSON.parse(event.data)
             } catch {
@@ -591,8 +614,8 @@ export function useScrcpyWebRTC({
               armProtocolTimeout('等待设备画面超时，请重新连接预览')
               return
             }
-            if (type === 'device_info' && msg.device_info?.displays?.[0]) {
-              const display = msg.device_info.displays[0]
+            const display = msg.device_info?.displays?.[0]
+            if (type === 'device_info' && display) {
               setDeviceSize({ width: display.x_res || 1080, height: display.y_res || 1920 })
               return
             }
@@ -682,7 +705,7 @@ export function useScrcpyWebRTC({
                 }
               })()
             } else if (payload.type === 'ice-candidate' && payload.candidate) {
-              const candidate = payload.candidate.candidate
+              const candidate = payload.candidate.candidate ?? ''
               if (!shouldKeepCandidate(candidate, connectionPath, ipPreference)) return
               void pcRef.current?.addIceCandidate(new RTCIceCandidate(payload.candidate)).catch(() => {})
             }

@@ -4,7 +4,19 @@
  */
 
 import type { ApiResponse } from '@/types/api'
-import type { TrainingPlan, TrainingSettings } from '@/types/components'
+import type {
+  CopilotSearchResult,
+  DepotDataDetailed,
+  DropStatistics,
+  MaaConnectionConfig,
+  OperBoxData,
+  OperatorDetailed,
+  ParadoxSearchResult,
+  TrainingOperator,
+  TrainingPlan,
+  TrainingQueueItem,
+  TrainingSettings,
+} from '@/types/components'
 import { parseJsonResponse } from '@/utils/apiResponse'
 
 export { parseJsonResponse } from '@/utils/apiResponse'
@@ -57,9 +69,14 @@ export const fetchWithAuth = async (input: RequestInfo | URL, init: RequestInit 
 /**
  * 任务配置接口
  */
-interface TaskConfig {
-  [key: string]: any
+export interface TaskConfig {
+  name: string
+  type: string
+  params: Record<string, unknown>
+  [key: string]: unknown
 }
+
+export type TaskConfigInput = TaskConfig | string
 
 /**
  * 自动更新配置接口
@@ -113,7 +130,7 @@ export interface WebrtcStatusData {
   minimumAgentVersion?: string
   screenState?: string | null
   usingDefaultPassword?: boolean
-  [key: string]: any
+  [key: string]: unknown
 }
 
 export interface WebrtcSnapshotData {
@@ -128,13 +145,114 @@ export interface WebrtcInstallState {
   status: 'idle' | 'running' | 'succeeded' | 'failed'
   startedAt?: string | null
   finishedAt?: string | null
-  result?: any
+  result?: unknown
   error?: {
     code: string
     message: string
     retryable: boolean
-    details?: any
+    details?: unknown
   } | null
+}
+
+export interface MaaVersionData {
+  cli: string
+  core: string
+  raw: string
+  resource?: {
+    lastUpdated: string | null
+    modifiedAt: string | null
+    ageDays: number | null
+    status: 'current' | 'stale' | 'unknown'
+    message: string
+    activity?: unknown
+    gacha?: unknown
+  }
+}
+
+export interface TaskStatusData {
+  isRunning: boolean
+  taskName: string | null
+  startTime: number | null
+  taskType: string | null
+  stopRequested: boolean
+  logs: unknown[]
+}
+
+export interface ScheduleExecutionStatusData {
+  isRunning: boolean
+  scheduleId: string | null
+  currentStep: number
+  totalSteps: number
+  currentTask: string | null
+  currentTaskId?: string | null
+  message: string
+  startTime: number | null
+  shouldStop: boolean
+  lastResult: unknown
+}
+
+export interface ActivityData {
+  code: string | null
+  name: string | null
+  [key: string]: unknown
+}
+
+export interface StopTaskData {
+  task?: {
+    success?: boolean
+    message?: string
+  }
+  scheduleStopped?: boolean
+  stopRequested?: boolean
+  run?: unknown
+  stopped?: boolean
+  alreadyTerminal?: boolean
+}
+
+export interface ScheduleExecutionResultData {
+  success?: boolean
+  message?: string
+  stopped?: boolean
+  busy?: boolean
+  owner?: unknown
+  summary?: unknown
+  runId?: string
+  results?: unknown[]
+  pending?: Array<{ itemIndex: number; [key: string]: unknown }>
+}
+
+export interface TrainingQueueResponse {
+  queue: TrainingQueueItem[]
+  settings: TrainingSettings
+  lastUpdated?: string
+}
+
+export interface OperatorListData {
+  operators: TrainingOperator[]
+  count?: number
+}
+
+export interface ApplyTrainingPlanResult {
+  success?: boolean
+  stageCount: number
+  totalStages?: number
+  hasFallback?: boolean
+}
+
+export interface ScreenCaptureData {
+  image: string
+  mediaType?: string
+  width?: number
+  height?: number
+  adbPath?: string
+  address?: string
+  profileId?: string
+}
+
+export interface LogFileContentData {
+  content: string
+  totalLines?: number
+  returnedLines?: number
 }
 
 /**
@@ -172,7 +290,7 @@ export const maaApi = {
   /**
    * 获取版本信息
    */
-  async getVersion(): Promise<ApiResponse> {
+  async getVersion(): Promise<ApiResponse<MaaVersionData>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/version`)
     return parseJsonResponse(response)
   },
@@ -201,13 +319,13 @@ export const maaApi = {
   async executeCommand(
     command: string,
     args: string[] = [],
-    taskConfig: TaskConfig | null = null,
+    taskConfig: TaskConfigInput | null = null,
     signal: AbortSignal | null = null,
     taskName: string | null = null,
     taskType: string | null = null,
     waitForCompletion: boolean = false
   ): Promise<ApiResponse> {
-    const body: Record<string, any> = { command, args }
+    const body: Record<string, unknown> = { command, args }
     
     if (taskConfig) {
       body.taskConfig = taskConfig
@@ -246,7 +364,7 @@ export const maaApi = {
   async executePredefinedTaskArgs(
     taskType: string,
     args: string[] = [],
-    taskConfig: TaskConfig | null = null,
+    taskConfig: TaskConfigInput | null = null,
     signal: AbortSignal | null = null,
     taskName: string | null = null,
     taskTypeLabel: string | null = null,
@@ -261,7 +379,7 @@ export const maaApi = {
   async executePredefinedTask(
     taskType: string,
     params: string,
-    taskConfig: TaskConfig | null = null,
+    taskConfig: TaskConfigInput | null = null,
     signal: AbortSignal | null = null,
     taskName: string | null = null,
     taskTypeLabel: string | null = null,
@@ -287,7 +405,7 @@ export const maaApi = {
   /**
    * 获取任务执行状态
    */
-  async getTaskStatus(signal?: AbortSignal): Promise<ApiResponse> {
+  async getTaskStatus(signal?: AbortSignal): Promise<ApiResponse<TaskStatusData>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/tasks/status`, { signal })
     return parseJsonResponse(response)
   },
@@ -295,7 +413,7 @@ export const maaApi = {
   /**
    * 终止当前任务
    */
-  async stopTask(): Promise<ApiResponse> {
+  async stopTask(): Promise<ApiResponse<StopTaskData>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/stop`, {
       method: 'POST',
     })
@@ -333,7 +451,7 @@ export const maaApi = {
   /**
    * 读取日志文件内容
    */
-  async readLogFile(filePath: string, lines: number = 1000): Promise<ApiResponse> {
+  async readLogFile(filePath: string, lines: number = 1000): Promise<ApiResponse<LogFileContentData>> {
     const encodedPath = encodeURIComponent(filePath)
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/logs/files/${encodedPath}?lines=${lines}`)
     return parseJsonResponse(response)
@@ -358,7 +476,7 @@ export const maaApi = {
   /**
    * 获取配置
    */
-  async getConfig(profileName: string = 'default'): Promise<ApiResponse> {
+  async getConfig(profileName: string = 'default'): Promise<ApiResponse<MaaConnectionConfig>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/config/maa/${profileName}`)
     return parseJsonResponse(response)
   },
@@ -366,7 +484,7 @@ export const maaApi = {
   /**
    * 保存配置
    */
-  async saveConfig(profileName: string = 'default', config: any): Promise<ApiResponse> {
+  async saveConfig(profileName: string = 'default', config: Record<string, unknown>): Promise<ApiResponse> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/config/maa/${profileName}`, {
       method: 'POST',
       headers: {
@@ -454,7 +572,7 @@ export const maaApi = {
     return parseJsonResponse(response)
   },
 
-  async captureScreen(profileId: string = 'default'): Promise<ApiResponse> {
+  async captureScreen(profileId: string = 'default'): Promise<ApiResponse<ScreenCaptureData>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/screen/screenshot`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -474,7 +592,7 @@ export const maaApi = {
   /**
    * 获取当前活动信息
    */
-  async getActivity(clientType: string = 'Official'): Promise<ApiResponse> {
+  async getActivity(clientType: string = 'Official'): Promise<ApiResponse<ActivityData>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/activity?clientType=${clientType}`)
     return parseJsonResponse(response)
   },
@@ -487,7 +605,7 @@ export const maaApi = {
   async setupSchedule(
     scheduleId: string = 'default',
     times: string[],
-    taskFlow: any[]
+    taskFlow: unknown[]
   ): Promise<ApiResponse> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/schedules`, {
       method: 'POST',
@@ -512,7 +630,7 @@ export const maaApi = {
   /**
    * 获取定时任务执行状态
    */
-  async getScheduleExecutionStatus(signal?: AbortSignal): Promise<ApiResponse> {
+  async getScheduleExecutionStatus(signal?: AbortSignal): Promise<ApiResponse<ScheduleExecutionStatusData>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/schedules/execution`, { signal })
     return parseJsonResponse(response)
   },
@@ -520,7 +638,7 @@ export const maaApi = {
   /**
    * 立即执行定时任务
    */
-  async executeScheduleNow(scheduleId: string = 'default', taskFlow: any[]): Promise<ApiResponse> {
+  async executeScheduleNow(scheduleId: string = 'default', taskFlow: unknown[]): Promise<ApiResponse<ScheduleExecutionResultData>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/schedules/${scheduleId}/execute`, {
       method: 'POST',
       headers: {
@@ -586,7 +704,7 @@ export const maaApi = {
   /**
    * 保存用户配置到服务器
    */
-  async saveUserConfig(configType: string, data: any): Promise<ApiResponse> {
+  async saveUserConfig(configType: string, data: unknown): Promise<ApiResponse> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/config/user/${configType}`, {
       method: 'POST',
       headers: {
@@ -600,7 +718,7 @@ export const maaApi = {
   /**
    * 从服务器读取用户配置
    */
-  async loadUserConfig(configType: string, signal?: AbortSignal): Promise<ApiResponse> {
+  async loadUserConfig<T = unknown>(configType: string, signal?: AbortSignal): Promise<ApiResponse<T>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/config/user/${configType}`, { signal })
     return parseJsonResponse(response)
   },
@@ -610,7 +728,7 @@ export const maaApi = {
   /**
    * 解析并保存仓库数据
    */
-  async parseDepotData(): Promise<ApiResponse> {
+  async parseDepotData(): Promise<ApiResponse<DepotDataDetailed>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/depot-recognition`, {
       method: 'POST',
     })
@@ -620,7 +738,7 @@ export const maaApi = {
   /**
    * 解析并保存干员数据
    */
-  async parseOperBoxData(): Promise<ApiResponse> {
+  async parseOperBoxData(): Promise<ApiResponse<OperBoxData>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/operbox-recognition`, {
       method: 'POST',
     })
@@ -630,7 +748,7 @@ export const maaApi = {
   /**
    * 获取已保存的仓库数据
    */
-  async getDepotData(): Promise<ApiResponse> {
+  async getDepotData(): Promise<ApiResponse<DepotDataDetailed>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/data/depot`)
     return parseJsonResponse(response)
   },
@@ -656,7 +774,7 @@ export const maaApi = {
     return parseJsonResponse(response)
   },
 
-  async listCustomTools(): Promise<ApiResponse> {
+  async listCustomTools(): Promise<ApiResponse<{ tools?: unknown }>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/custom-tools`)
     return parseJsonResponse(response)
   },
@@ -682,7 +800,7 @@ export const maaApi = {
     raid: 'normal' | 'raid' | 'both'
     selectedIndexes: number[]
     options?: Record<string, unknown>
-  }): Promise<ApiResponse> {
+  }): Promise<ApiResponse<ScheduleExecutionResultData>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/copilot-sets/${encodeURIComponent(copilotId)}/execute`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -706,7 +824,7 @@ export const maaApi = {
 /**
  * 获取干员列表
  */
-export async function getOperatorList(filters: OperatorFilters = {}): Promise<ApiResponse> {
+export async function getOperatorList(filters: OperatorFilters = {}): Promise<ApiResponse<OperatorListData | TrainingOperator[]>> {
   const params = new URLSearchParams()
   if (filters.rarity) params.append('rarity', filters.rarity.toString())
   if (filters.profession) params.append('profession', filters.profession)
@@ -721,7 +839,7 @@ export async function getOperatorList(filters: OperatorFilters = {}): Promise<Ap
 /**
  * 获取全量干员列表
  */
-export async function getAllOperators(): Promise<ApiResponse> {
+export async function getAllOperators(): Promise<ApiResponse<OperatorDetailed[]>> {
   const response = await fetchWithAuth(`${API_BASE_URL}/agent/data/operators`)
   return parseJsonResponse(response)
 }
@@ -729,7 +847,7 @@ export async function getAllOperators(): Promise<ApiResponse> {
 /**
  * 获取已识别的持有干员数据
  */
-export async function getOperBoxData(): Promise<ApiResponse> {
+export async function getOperBoxData(): Promise<ApiResponse<OperBoxData>> {
   const response = await fetchWithAuth(`${API_BASE_URL}/agent/data/operbox`)
   return parseJsonResponse(response)
 }
@@ -737,7 +855,7 @@ export async function getOperBoxData(): Promise<ApiResponse> {
 /**
  * 获取养成队列
  */
-export async function getTrainingQueue(): Promise<ApiResponse> {
+export async function getTrainingQueue(): Promise<ApiResponse<TrainingQueueResponse>> {
   const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/queue`)
   return parseJsonResponse(response)
 }
@@ -779,7 +897,7 @@ export async function updateTrainingQueueOrder(operatorIds: string[]): Promise<A
 /**
  * 更新养成设置
  */
-export async function updateTrainingSettings(settings: TrainingSettings): Promise<ApiResponse> {
+export async function updateTrainingSettings(settings: TrainingSettings): Promise<ApiResponse<TrainingSettings>> {
   const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/settings`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -791,7 +909,7 @@ export async function updateTrainingSettings(settings: TrainingSettings): Promis
 /**
  * 生成养成计划
  */
-export async function generateTrainingPlan(options: TrainingPlanOptions): Promise<ApiResponse> {
+export async function generateTrainingPlan(options: TrainingPlanOptions): Promise<ApiResponse<TrainingPlan>> {
   const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/plan`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -803,7 +921,7 @@ export async function generateTrainingPlan(options: TrainingPlanOptions): Promis
 /**
  * 应用养成计划到任务流程
  */
-export async function applyTrainingPlan(data: ApplyTrainingPlanData): Promise<ApiResponse> {
+export async function applyTrainingPlan(data: ApplyTrainingPlanData): Promise<ApiResponse<ApplyTrainingPlanResult>> {
   const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/apply-training-plan`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -827,7 +945,7 @@ export async function fetchOperatorMaterials(): Promise<ApiResponse> {
 /**
  * 搜索悖论模拟作业
  */
-export async function searchParadoxCopilot(operatorName: string): Promise<ApiResponse> {
+export async function searchParadoxCopilot(operatorName: string): Promise<ApiResponse<ParadoxSearchResult>> {
   const response = await fetchWithAuth(`${API_BASE_URL}/agent/paradox/search?name=${encodeURIComponent(operatorName)}`)
   return parseJsonResponse(response)
 }
@@ -835,7 +953,7 @@ export async function searchParadoxCopilot(operatorName: string): Promise<ApiRes
 /**
  * 搜索普通关卡作业
  */
-export async function searchCopilot(stageName: string): Promise<ApiResponse> {
+export async function searchCopilot(stageName: string): Promise<ApiResponse<CopilotSearchResult>> {
   const response = await fetchWithAuth(`${API_BASE_URL}/agent/copilot/search?stage=${encodeURIComponent(stageName)}`)
   return parseJsonResponse(response)
 }
@@ -853,7 +971,7 @@ export async function getTodayDrops(): Promise<ApiResponse> {
 /**
  * 获取掉落统计数据
  */
-export async function getDropStatistics(days: number = 7): Promise<ApiResponse> {
+export async function getDropStatistics(days: number = 7): Promise<ApiResponse<DropStatistics>> {
   const response = await fetchWithAuth(`${API_BASE_URL}/agent/drops/statistics?days=${days}`)
   return parseJsonResponse(response)
 }

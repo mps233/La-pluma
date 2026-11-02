@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal } from 'react-dom'
 import { ArrowLeft, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
 import { Button } from './common'
-import { useScrcpyWebRTC } from '../hooks/useScrcpyWebRTC'
+import { useScrcpyWebRTC, type VideoStats } from '../hooks/useScrcpyWebRTC'
 
 interface ScrcpyDeviceViewProps {
   enabled: boolean
@@ -13,7 +13,7 @@ interface ScrcpyDeviceViewProps {
   signalingUrl?: string
   onStartInfrastructure?: () => Promise<string | undefined> | string | undefined
   autoConnect?: boolean
-  onStatusChange?: (status: string, stats: any, error: string | null) => void
+  onStatusChange?: (status: string, stats: VideoStats | null, error: string | null) => void
   infrastructureStatus?: {
     installed?: boolean
     built?: boolean

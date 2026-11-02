@@ -74,6 +74,21 @@ vi.mock('./ScreenMonitor', () => ({ default: () => <div data-testid="screen-moni
 let container: HTMLDivElement
 let root: Root
 
+interface CopilotSearchResponse {
+  success: boolean
+  data: {
+    copilots: Array<{ id: number; uri: string; title: string }>
+  }
+}
+
+interface CopilotPreviewResponse {
+  success: boolean
+  data: {
+    status_code: number
+    data: { content: string }
+  }
+}
+
 const deferred = <T,>() => {
   let resolve!: (value: T) => void
   let reject!: (reason?: unknown) => void
@@ -336,9 +351,9 @@ describe('CombatTasks execution recovery', () => {
   })
 
   it('clears retained request loading when Activity restores the combat workspace', async () => {
-    mocks.getCopilotInfo.mockReturnValueOnce(deferred<any>().promise)
-    mocks.searchCopilot.mockReturnValueOnce(deferred<any>().promise)
-    mocks.searchParadoxCopilot.mockReturnValueOnce(deferred<any>().promise)
+    mocks.getCopilotInfo.mockReturnValueOnce(deferred<CopilotPreviewResponse>().promise)
+    mocks.searchCopilot.mockReturnValueOnce(deferred<CopilotSearchResponse>().promise)
+    mocks.searchParadoxCopilot.mockReturnValueOnce(deferred<CopilotSearchResponse>().promise)
 
     await renderActivityMode('visible')
     await click(buttonsByText('单个作业')[0]!)
@@ -409,8 +424,8 @@ describe('CombatTasks execution recovery', () => {
   })
 
   it('ignores an older search response after the query changes', async () => {
-    const olderSearch = deferred<any>()
-    const newerSearch = deferred<any>()
+    const olderSearch = deferred<CopilotSearchResponse>()
+    const newerSearch = deferred<CopilotSearchResponse>()
     mocks.searchCopilot
       .mockReturnValueOnce(olderSearch.promise)
       .mockReturnValueOnce(newerSearch.promise)
@@ -446,8 +461,8 @@ describe('CombatTasks execution recovery', () => {
   })
 
   it('ignores an older copilot preview after the URI changes', async () => {
-    const olderPreview = deferred<any>()
-    const newerPreview = deferred<any>()
+    const olderPreview = deferred<CopilotPreviewResponse>()
+    const newerPreview = deferred<CopilotPreviewResponse>()
     mocks.getCopilotInfo
       .mockReturnValueOnce(olderPreview.promise)
       .mockReturnValueOnce(newerPreview.promise)

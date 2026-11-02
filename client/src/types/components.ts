@@ -43,6 +43,19 @@ export interface StageConfig {
   trainingOperators?: string[]
 }
 
+export type TaskParamValue =
+  | string
+  | number
+  | boolean
+  | string[]
+  | number[]
+  | StageConfig
+  | StageConfig[]
+  | Array<string | StageConfig>
+  | Record<string, number | string>
+  | null
+  | undefined
+
 interface TaskParams {
   // 启动游戏
   clientType?: string
@@ -128,7 +141,7 @@ interface TaskParams {
   signinevent?: boolean
   
   // 其他
-  [key: string]: any
+  [key: string]: TaskParamValue
 }
 
 export interface AutomationAvailableTask {
@@ -357,7 +370,16 @@ export interface DropRecordsProps {
   onRefresh: () => void
 }
 
-interface DropStatistics {
+export interface DropDailyTrend {
+  date: string
+  sanity: number
+  medicine: number
+  stone: number
+  battles: number
+  items: Record<string, number>
+}
+
+export interface DropStatistics {
   total: {
     sanity: number
     battles: number
@@ -379,10 +401,10 @@ interface DropStatistics {
       }
     }
   }
-  dailyTrend?: any[]
+  dailyTrend?: DropDailyTrend[]
   dateRange: {
-    start: string
-    end: string
+    start: string | null
+    end: string | null
     days: number
   }
 }

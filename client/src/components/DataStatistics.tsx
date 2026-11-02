@@ -1,3 +1,4 @@
+import { getErrorMessage } from '@/utils/errorMessage'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { maaApi, getAllOperators, getDropStatistics, getItemIconUrl, getOperBoxData, fetchOperatorMaterials, getTrainingQueue } from '../services/api'
@@ -868,26 +869,27 @@ export default function DataStatistics() {
         const parseResult = await maaApi.parseDepotData()
         
         if (parseResult.success) {
+          const parsedDepotData = parseResult.data!
           setDepotDataError(null)
           setDepotData({
-            itemCount: parseResult.data.itemCount,
-            items: parseResult.data.items || [],
-            path: parseResult.data.path,
+            itemCount: parsedDepotData.itemCount,
+            items: parsedDepotData.items || [],
+            path: parsedDepotData.path,
             timestamp: new Date().toISOString(),
-            complete: parseResult.data.complete
+            complete: parsedDepotData.complete
           })
-          
+
           try {
             setStatusMessage('正在更新智能养成系统...')
             const queueResult = await getTrainingQueue()
 
-            if (queueResult.success && queueResult.data && queueResult.data.length > 0) {
-              setStatusMessage(`识别完成！共识别 ${parseResult.data.itemCount} 种物品，已更新养成进度`)
+            if (queueResult.success && Array.isArray(queueResult.data) && queueResult.data.length > 0) {
+              setStatusMessage(`识别完成！共识别 ${parsedDepotData.itemCount} 种物品，已更新养成进度`)
             } else {
-              setStatusMessage(`识别完成！共识别 ${parseResult.data.itemCount} 种物品`)
+              setStatusMessage(`识别完成！共识别 ${parsedDepotData.itemCount} 种物品`)
             }
           } catch (error) {
-            setStatusMessage(`识别完成！共识别 ${parseResult.data.itemCount} 种物品`)
+            setStatusMessage(`识别完成！共识别 ${parsedDepotData.itemCount} 种物品`)
           }
         } else {
           setStatusMessage(`识别完成，但数据解析失败: ${maaApi.getErrorMessage(parseResult)}`)
@@ -895,8 +897,8 @@ export default function DataStatistics() {
       } else {
         setStatusMessage(`识别失败: ${maaApi.getErrorMessage(result)}`)
       }
-    } catch (error: any) {
-      setStatusMessage(`识别失败: ${error.message}`)
+    } catch (error) {
+      setStatusMessage(`识别失败: ${getErrorMessage(error)}`)
     } finally {
       setIsRunning(false)
       setActiveTask(null)
@@ -921,8 +923,8 @@ export default function DataStatistics() {
       } else {
         setStatusMessage(`获取失败: ${maaApi.getErrorMessage(result)}`)
       }
-    } catch (error: any) {
-      setStatusMessage(`获取失败: ${error.message}`)
+    } catch (error) {
+      setStatusMessage(`获取失败: ${getErrorMessage(error)}`)
     } finally {
       setIsRunning(false)
     }
@@ -956,17 +958,18 @@ export default function DataStatistics() {
         const parseResult = await maaApi.parseOperBoxData()
 
         if (parseResult.success) {
+          const parsedOperBoxData = parseResult.data!
           setOperBoxDataError(null)
-          const totalOperCount = parseResult.data.totalOperCount || parseResult.data.allOpers?.length
+          const totalOperCount = parsedOperBoxData.totalOperCount || parsedOperBoxData.allOpers?.length
           setStatusMessage(totalOperCount
-            ? `识别完成！已拥有 ${parseResult.data.operCount} / ${totalOperCount} 名干员`
-            : `识别完成！共识别 ${parseResult.data.operCount} 名干员`)
+            ? `识别完成！已拥有 ${parsedOperBoxData.operCount} / ${totalOperCount} 名干员`
+            : `识别完成！共识别 ${parsedOperBoxData.operCount} 名干员`)
           setOperBoxData({
-            operCount: parseResult.data.operCount,
+            operCount: parsedOperBoxData.operCount,
             totalOperCount,
-            data: parseResult.data.data || [],
-            allOpers: parseResult.data.allOpers || [],
-            path: parseResult.data.path,
+            data: parsedOperBoxData.data || [],
+            allOpers: parsedOperBoxData.allOpers || [],
+            path: parsedOperBoxData.path,
             timestamp: new Date().toISOString()
           })
         } else {
@@ -975,8 +978,8 @@ export default function DataStatistics() {
       } else {
         setStatusMessage(`识别失败: ${maaApi.getErrorMessage(result)}`)
       }
-    } catch (error: any) {
-      setStatusMessage(`识别失败: ${error.message}`)
+    } catch (error) {
+      setStatusMessage(`识别失败: ${getErrorMessage(error)}`)
     } finally {
       setIsRunning(false)
       setActiveTask(null)

@@ -5,11 +5,11 @@
 export interface ApiErrorPayload {
   code?: string
   message?: string
-  details?: any
+  details?: unknown
   retryable?: boolean
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean
   data?: T
   error?: string
@@ -17,7 +17,7 @@ export interface ApiResponse<T = any> {
   meta?: {
     requestId?: string | null
     dryRun?: boolean
-    [key: string]: any
+    [key: string]: unknown
   }
   errorInfo?: ApiErrorPayload
 }

@@ -1,3 +1,4 @@
+import { getResponseErrorMessage } from '@/utils/errorMessage'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
@@ -492,7 +493,10 @@ export default function OperatorTraining() {
       }
       if (response.success) {
         // 适配新的响应格式：data.operators 是数组
-        let nextOperators: TrainingOperator[] = response.data.operators || response.data || [];
+        const operatorPayload = response.data;
+        let nextOperators: TrainingOperator[] = Array.isArray(operatorPayload)
+          ? operatorPayload
+          : operatorPayload?.operators ?? [];
 
         if (requestedFilters.status === 'all' && nextOperators.length === 0) {
           const [allOperatorsResponse, operBoxResponse] = await Promise.all([
@@ -501,9 +505,9 @@ export default function OperatorTraining() {
           ]);
 
           if (allOperatorsResponse.success) {
-            const allOperators: FallbackOperatorRow[] = allOperatorsResponse.data.operators || allOperatorsResponse.data || [];
+            const allOperators: FallbackOperatorRow[] = extractOperatorRows(allOperatorsResponse.data);
             const operBoxPayload = operBoxResponse.success ? operBoxResponse.data : null;
-            const ownedOperators: FallbackOperatorRow[] = operBoxPayload?.data || operBoxPayload?.operators || [];
+            const ownedOperators: FallbackOperatorRow[] = extractOperatorRows(operBoxPayload);
             const ownedMap = new Map(ownedOperators.map(operator => [operator.id, operator]));
             if (requestId !== operatorsRequestRef.current) return;
             const rarityFilter = requestedFilters.rarity ? parseInt(requestedFilters.rarity) : null;
@@ -692,7 +696,7 @@ export default function OperatorTraining() {
       } else {
         setStatusMessage('添加失败', 'error');
       }
-    } catch (error: any) {
+    } catch {
       setStatusMessage('添加失败', 'error');
     } finally {
       queueMutationInFlightRef.current = false;
@@ -792,12 +796,12 @@ export default function OperatorTraining() {
       setLoading(true);
       showInfo('生成中...');
       const response = await generateTrainingPlan({ mode: planMode });
-      if (response.success) {
+      if (response.success && response.data) {
         setPlan(response.data);
         showSuccess('刷取计划生成成功！');
       }
-    } catch (error: any) {
-      showError(error.response?.data?.error || '生成计划失败');
+    } catch (error) {
+      showError(getResponseErrorMessage(error) || '生成计划失败');
     } finally {
       setLoading(false);
     }
@@ -827,8 +831,8 @@ export default function OperatorTraining() {
           detail: { stageCount: response.data?.stageCount ?? todayPlan.stages.length }
         }));
       }
-    } catch (error: any) {
-      showError(error.response?.data?.error || '应用失败');
+    } catch (error) {
+      showError(getResponseErrorMessage(error) || '应用失败');
     } finally {
       setLoading(false);
     }
@@ -1427,7 +1431,7 @@ export default function OperatorTraining() {
                           <div className="min-w-0">
                             <div className="font-semibold text-primary">{stage.stage}</div>
                             <div className="mt-1 truncate text-sm text-secondary">
-                              {stage.materials?.slice(0, 2).map((mat: any) => `${mat.name}×${mat.count}`).join('、') || '今日可直接推进'}
+                              {stage.materials?.slice(0, 2).map(mat => `${mat.name}×${mat.count}`).join('、') || '今日可直接推进'}
                             </div>
                           </div>
                         </div>
@@ -1470,7 +1474,7 @@ export default function OperatorTraining() {
                               <div>
                                 <div className="text-sm font-bold text-primary">{stage.stage}</div>
                                 <div className="mt-1 text-xs text-tertiary">
-                                  {stage.materials?.slice(0, 2).map((mat: any) => `${mat.name}×${mat.count}`).join('、') || '等待开放后再推进'}
+                                  {stage.materials?.slice(0, 2).map(mat => `${mat.name}×${mat.count}`).join('、') || '等待开放后再推进'}
                                 </div>
                               </div>
                               <div className="text-xs font-semibold text-[var(--app-danger)]">未开放</div>

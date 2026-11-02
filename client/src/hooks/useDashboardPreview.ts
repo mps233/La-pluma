@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { maaApi } from '../services/api'
+import { maaApi, type WebrtcStatusData } from '../services/api'
 import { useScrcpyWebRTC } from './useScrcpyWebRTC'
 
 const DEFAULT_SIGNALING_URL = '/webrtc-signaling'
@@ -16,7 +16,7 @@ export function useDashboardPreview() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const autoConnectRef = useRef(false)
   const lastVisibleLiveFrameAtRef = useRef(0)
-  const [webrtcStatus, setWebrtcStatus] = useState<any>(null)
+  const [webrtcStatus, setWebrtcStatus] = useState<WebrtcStatusData | null>(null)
   const [fallbackSnapshot, setFallbackSnapshot] = useState<string | null>(null)
   const [showLivePreview, setShowLivePreview] = useState(false)
   const [statusSettled, setStatusSettled] = useState(false)
@@ -47,7 +47,7 @@ export function useDashboardPreview() {
     const fetchStatus = () => {
       maaApi.getWebrtcStatus()
         .then(response => {
-          if (!cancelled && response.success) setWebrtcStatus(response.data)
+          if (!cancelled && response.success) setWebrtcStatus(response.data ?? null)
         })
         .catch(() => {})
         .finally(() => {

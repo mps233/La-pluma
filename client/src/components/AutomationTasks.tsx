@@ -1,6 +1,7 @@
+import { getErrorMessage } from '@/utils/errorMessage'
 import { forwardRef, useImperativeHandle, useLayoutEffect, useState, useEffect, useEffectEvent, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { generateTrainingPlan, maaApi } from '../services/api'
+import { generateTrainingPlan, maaApi, type TaskConfig } from '../services/api'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { AlertTriangle, Cable, Check, CheckCircle2, ChevronDown, ChevronUp, CircleMinus, CirclePlus, ClipboardList, Clock3, GraduationCap, GripVertical, Info, ListPlus, LoaderCircle, Minus, Pin, Play, Plus, SlidersHorizontal, Square, Trash2 } from 'lucide-react'
 import Icons from './Icons'
@@ -12,6 +13,7 @@ import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type {
   AutomationAvailableTask,
   TaskFlowItem,
+  TaskParamValue,
   ConnectionTestStatus,
   StageConfig
 } from '@/types/components'
@@ -22,6 +24,19 @@ import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
 const scheduleTimePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/
 const normalizeScheduleTimes = (times: string[]) => (
   [...new Set(times.filter(time => scheduleTimePattern.test(time)))]
+)
+
+const toTextInputValue = (value: TaskParamValue): string | number => {
+  const displayValue = typeof value === 'string' || typeof value === 'number' ? value : ''
+  return displayValue || ''
+}
+
+const toNumberArray = (value: TaskParamValue): number[] => (
+  Array.isArray(value) ? value.filter((entry): entry is number => typeof entry === 'number') : []
+)
+
+const toStringArray = (value: TaskParamValue): string[] => (
+  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []
 )
 
 interface ScheduleTimeEntry {
@@ -380,7 +395,20 @@ const executionSummaryHasFailure = (summary: AutomationExecutionSummary) => Bool
   || summary.reports?.some(report => report.status === 'failed')
 )
 
-const migrateTaskParams = (task: any) => {
+type SavedTaskFlowItem = Omit<TaskFlowItem, 'icon' | 'paramFields'>
+
+interface SavedAutomationSchedule {
+  enabled?: boolean
+  times?: unknown
+  entries?: unknown
+}
+
+interface SavedAutomationConfig {
+  taskFlow?: SavedTaskFlowItem[]
+  schedule?: SavedAutomationSchedule
+}
+
+const migrateTaskParams = (task: SavedTaskFlowItem): SavedTaskFlowItem => {
   const commandId = task.commandId || String(task.id || '').split('-')[0]
   if (!task.params) return task
 
@@ -443,7 +471,7 @@ const migrateTaskParams = (task: any) => {
   return { ...task, params }
 }
 
-const synchronizeConnectionParams = (tasks: any[]) => {
+const synchronizeConnectionParams = (tasks: SavedTaskFlowItem[]): SavedTaskFlowItem[] => {
   const startupTask = tasks.find(task => (task.commandId || String(task.id || '').split('-')[0]) === 'startup')
   if (!startupTask?.params) return tasks
 
@@ -597,7 +625,7 @@ function AutomationStageEditor({
         return
       }
 
-      const queueResult = await maaApi.loadUserConfig('training-queue')
+      const queueResult = await maaApi.loadUserConfig<{ queue?: unknown[] }>('training-queue')
       if (!queueResult.success || !queueResult.data?.queue?.length) {
         onError('智能养成队列为空，请先添加干员')
         return
@@ -616,9 +644,9 @@ function AutomationStageEditor({
       }
 
       const operatorNames = plan.operators?.map((operator: { name: string }) => operator.name) || []
-      const generatedStages: StageConfig[] = plan.stages.map((stage: { stage: string; totalTimes: number }) => ({
+      const generatedStages: StageConfig[] = plan.stages.map(stage => ({
         stage: stage.stage,
-        times: stage.totalTimes.toString(),
+        times: String(stage.totalTimes ?? ''),
         smart: true,
         trainingOperators: operatorNames,
       }))
@@ -837,7 +865,7 @@ export default function AutomationTasks() {
   const suppressSelectClickRef = useRef(false)
   const [lastDeletedTask, setLastDeletedTask] = useState<DeletedTaskSnapshot | null>(null)
   const [sortAnnouncement, setSortAnnouncement] = useState('')
-  const [currentActivity, setCurrentActivity] = useState<any>(null)
+  const [currentActivity, setCurrentActivity] = useState<string | null>(null)
   const [activityName, setActivityName] = useState<string | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<Record<string, ConnectionTestStatus>>({})
   const [testingConnectionTaskId, setTestingConnectionTaskId] = useState<string | null>(null)
@@ -1498,7 +1526,7 @@ export default function AutomationTasks() {
     document.body.classList.remove('automation-sorting')
   }, [])
 
-  const updateTaskParam = (index: number, key: string, value: any) => {
+  const updateTaskParam = (index: number, key: string, value: TaskParamValue) => {
     const newFlow = [...taskFlow]
     const currentTask = newFlow[index]
     if (!currentTask) return
@@ -1506,22 +1534,25 @@ export default function AutomationTasks() {
     // 如果修改的是 stages 参数，需要对关卡进行排序，但保留空白行用于继续输入。
     // 之前这里会把 { stage: '', times: '' } 过滤掉，导致“添加关卡”点击后看起来没反应。
     if (key === 'stages' && Array.isArray(value)) {
+      const stageValues = value.filter((s): s is string | StageConfig => (
+        typeof s === 'string' || (typeof s === 'object' && s !== null && 'stage' in s)
+      ))
       const hasStageText = (s: string | StageConfig) =>
         typeof s === 'string' ? s.trim() !== '' : !!s.stage && s.stage.trim() !== '';
 
-      const pinnedStages = value.filter((s): s is StageConfig =>
+      const pinnedStages = stageValues.filter((s): s is StageConfig =>
         typeof s === 'object' && s.pinned === true && hasStageText(s)
       );
-      const smartStages = value.filter((s): s is StageConfig =>
+      const smartStages = stageValues.filter((s): s is StageConfig =>
         typeof s === 'object' && s.smart === true && hasStageText(s)
       );
-      const normalStages = value.filter((s): s is string | StageConfig =>
+      const normalStages = stageValues.filter((s): s is string | StageConfig =>
         hasStageText(s) && (
           typeof s === 'string' ||
           (typeof s === 'object' && !s.pinned && !s.smart)
         )
       );
-      const blankStages = value.filter((s): s is string | StageConfig => !hasStageText(s));
+      const blankStages = stageValues.filter((s): s is string | StageConfig => !hasStageText(s));
 
       // 重新组合：置顶 -> 智能养成 -> 普通 -> 空白输入行
       currentTask.params[key] = [...pinnedStages, ...smartStages, ...normalStages, ...blankStages];
@@ -1533,7 +1564,7 @@ export default function AutomationTasks() {
     const connectionKeys = new Set(['clientType'])
     if (currentTask.commandId === 'startup' && connectionKeys.has(key)) {
       newFlow.forEach((task, i) => {
-        if (task.commandId === 'closedown' && newFlow[i]) {
+        if (task.commandId === 'closedown' && newFlow[i] && typeof value === 'string') {
           newFlow[i]!.params.clientType = value
         }
       })
@@ -1541,7 +1572,7 @@ export default function AutomationTasks() {
     // 如果修改的是关闭游戏的客户端类型，同步到启动游戏
     else if (currentTask.commandId === 'closedown' && connectionKeys.has(key)) {
       newFlow.forEach((task, i) => {
-        if (task.commandId === 'startup' && newFlow[i]) {
+        if (task.commandId === 'startup' && newFlow[i] && typeof value === 'string') {
           newFlow[i]!.params.clientType = value
         }
       })
@@ -1706,7 +1737,7 @@ export default function AutomationTasks() {
   const buildCommand = (task: TaskFlowItem) => {
     if (task.taskType) {
       const params = task.params || {}
-      const taskConfig: any = {
+      const taskConfig: TaskConfig = {
         name: task.name,
         type: task.taskType,
         params: {}
@@ -1898,9 +1929,9 @@ export default function AutomationTasks() {
       } else {
         showError(`任务流程执行失败: ${result.message || '未知错误'}`)
       }
-    } catch (error: any) {
+    } catch (error) {
       if (runGenerationRef.current !== runGeneration) return
-      showError(`执行失败: ${error.message}`)
+      showError(`执行失败: ${getErrorMessage(error)}`)
     } finally {
       if (runGenerationRef.current === runGeneration) {
         stopRequestInFlightRef.current = false
@@ -1991,18 +2022,18 @@ export default function AutomationTasks() {
   const loadTaskFlow = useEffectEvent(async (force = false) => {
     if (taskFlowHydratedRef.current && !force) return
 
-    const applyLoadedConfig = (savedTasks: any[] | null | undefined, schedule: any) => {
+    const applyLoadedConfig = (savedTasks: SavedTaskFlowItem[] | null | undefined, schedule: SavedAutomationSchedule | null | undefined) => {
       const loadedTasks = savedTasks
         ? placeClosedownLast(synchronizeConnectionParams(savedTasks.map(migrateTaskParams)))
         : savedTasks
 
       if (loadedTasks) {
-        const restoredTasks = loadedTasks.map((task: any) => {
+        const restoredTasks: TaskFlowItem[] = loadedTasks.map(task => {
           const originalTask = availableTasks.find(t => t.id === task.commandId || t.id === task.id.split('-')[0])
           return {
             ...task,
-            icon: originalTask?.icon,
-            paramFields: originalTask?.paramFields
+            icon: originalTask?.icon ?? null,
+            paramFields: originalTask?.paramFields ?? []
           }
         })
         taskFlowRef.current = restoredTasks
@@ -2053,7 +2084,7 @@ export default function AutomationTasks() {
 
     try {
       // 优先从服务器加载配置
-      const serverConfig = await maaApi.loadUserConfig('automation-tasks', controller.signal)
+      const serverConfig = await maaApi.loadUserConfig<SavedAutomationConfig>('automation-tasks', controller.signal)
       if (!isCurrentLoad()) return
 
       if (serverConfig.success && serverConfig.data) {
@@ -2245,13 +2276,13 @@ export default function AutomationTasks() {
                 const currentTaskInfo = restoredTasks[restoredCurrentIndex]
                 if (currentTaskInfo) {
                   // 找到当前任务在 taskFlow 中的索引
-                  const currentTask = loadedTasks.find((t: any) => {
+                  const currentTask = loadedTasks.find(t => {
                     const tCommandId = t.commandId || t.id.split('-')[0]
                     return tCommandId === currentTaskInfo.commandId
                   })
 
                   if (currentTask) {
-                    const actualIndex = loadedTasks.findIndex((t: any) => t.id === currentTask.id)
+                    const actualIndex = loadedTasks.findIndex(t => t.id === currentTask.id)
                     setCurrentStep(actualIndex)
                   }
                 }
@@ -2276,7 +2307,7 @@ export default function AutomationTasks() {
                   if (cancelled || !taskInfo) return
 
                   // 使用 commandId 匹配任务
-                  const task = loadedTasks.find((t: any) => {
+                  const task = loadedTasks.find(t => {
                     const tCommandId = t.commandId || t.id.split('-')[0]
                     return tCommandId === taskInfo.commandId && t.enabled
                   })
@@ -2285,7 +2316,7 @@ export default function AutomationTasks() {
                     continue
                   }
 
-                  const actualIndex = loadedTasks.findIndex((t: any) => t.id === task.id)
+                  const actualIndex = loadedTasks.findIndex(t => t.id === task.id)
                   setCurrentStep(actualIndex)
                   showInfo(`正在执行: ${task.name}`)
 
@@ -2301,7 +2332,7 @@ export default function AutomationTasks() {
                     const result = await maaApi.executePredefinedTask(
                       command,
                       params,
-                      taskConfig as any,
+                      taskConfig,
                       controller.signal,
                       task.name,
                       'automation',
@@ -2359,7 +2390,7 @@ export default function AutomationTasks() {
           const { taskName, startTime, taskType } = currentRun
 
           if (taskType === 'automation') {
-            const elapsedMinutes = (Date.now() - startTime) / 1000 / 60
+            const elapsedMinutes = (Date.now() - (startTime ?? 0)) / 1000 / 60
             setIsRunning(true)
             setCurrentStep(0)
             if (elapsedMinutes > 5) {
@@ -2392,9 +2423,10 @@ export default function AutomationTasks() {
 
   // 监听养成计划应用事件，自动刷新任务流程
   useEffect(() => {
-    const handleTrainingPlanApplied = async (event: any) => {
+    const handleTrainingPlanApplied = async (event: Event) => {
       await loadTaskFlow(true)
-      setStatusMessage(`智能养成计划已更新：${event.detail?.stageCount || 0} 个关卡`, 'success')
+      const detail = (event as CustomEvent<{ stageCount?: number }>).detail
+      setStatusMessage(`智能养成计划已更新：${detail?.stageCount || 0} 个关卡`, 'success')
     }
 
     window.addEventListener('training-plan-applied', handleTrainingPlanApplied)
@@ -3065,7 +3097,7 @@ export default function AutomationTasks() {
                                   <input
                                     id={fieldId}
                                     type="checkbox"
-                                    checked={task.params[field.key] || false}
+                                    checked={Boolean(task.params[field.key])}
                                     onChange={(e) => updateTaskParam(index, field.key, e.target.checked)}
                                     disabled={isRunning || !task.enabled}
                                     className="custom-checkbox cursor-pointer"
@@ -3090,7 +3122,7 @@ export default function AutomationTasks() {
                                     <input
                                       id={fieldId}
                                       type="text"
-                                      value={task.params[field.key] || ''}
+                                      value={toTextInputValue(task.params[field.key])}
                                       onChange={(e) => updateTaskParam(index, field.key, e.target.value)}
                                       placeholder={field.placeholder}
                                       disabled={isRunning || !task.enabled}
@@ -3148,7 +3180,7 @@ export default function AutomationTasks() {
                                   <legend className="automation-field-label mb-2 block">{field.label}</legend>
                                   <div className="flex items-center space-x-2 flex-wrap">
                                     {[3, 4, 5, 6].map(star => {
-                                      const currentValue = Array.isArray(task.params[field.key]) ? task.params[field.key] : [];
+                                      const currentValue = toNumberArray(task.params[field.key]);
                                       const isChecked = currentValue.includes(star);
                                       const optionId = `${fieldId}-${star}`
                                       return (
@@ -3199,7 +3231,7 @@ export default function AutomationTasks() {
                                       { value: 'Recycle', label: '回收站' },
                                       { value: 'AssistantChange', label: '副手换人' }
                                     ].map(facility => {
-                                      const currentValue = Array.isArray(task.params[field.key]) ? task.params[field.key] : [];
+                                      const currentValue = toStringArray(task.params[field.key]);
                                       const isChecked = currentValue.includes(facility.value);
                                       const optionId = `${fieldId}-${facility.value}`
                                       return (
@@ -3229,7 +3261,7 @@ export default function AutomationTasks() {
                                   <div className="automation-select-control">
                                     <select
                                       id={fieldId}
-                                      value={task.params[field.key] || (Array.isArray(field.options) && field.options.length > 0 ? (typeof field.options[0] === 'object' ? field.options[0].value : field.options[0]) : '')}
+                                      value={toTextInputValue(task.params[field.key]) || (Array.isArray(field.options) && field.options.length > 0 ? (typeof field.options[0] === 'object' ? field.options[0].value : field.options[0]) : '')}
                                       onChange={(e) => updateTaskParam(index, field.key, e.target.value)}
                                       disabled={isRunning || !task.enabled}
                                     >
@@ -3250,7 +3282,7 @@ export default function AutomationTasks() {
                                       <input
                                         id={fieldId}
                                         type="number"
-                                        value={task.params[field.key] || ''}
+                                        value={toTextInputValue(task.params[field.key])}
                                         onChange={(e) => updateTaskParam(index, field.key, e.target.value)}
                                         placeholder={field.placeholder}
                                         step={field.step}
@@ -3294,7 +3326,7 @@ export default function AutomationTasks() {
                                     <input
                                       id={fieldId}
                                       type={field.type}
-                                      value={task.params[field.key] || ''}
+                                      value={toTextInputValue(task.params[field.key])}
                                       onChange={(e) => updateTaskParam(index, field.key, e.target.value)}
                                       placeholder={field.placeholder}
                                       step={field.step}
