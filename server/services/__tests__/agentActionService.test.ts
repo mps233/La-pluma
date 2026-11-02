@@ -1,3 +1,4 @@
+import { asErrorWithCode, getErrorCode, getErrorDetails, getErrorStatus } from '../../utils/errors.ts';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
@@ -5,23 +6,42 @@ import {
   createDailyFlowExecutionError,
   executeAgentTask,
   normalizeDailyFlowRequest
-} from '../agentActionService.js';
+} from '../agentActionService.ts';
+import { isRecord } from '../../utils/errors.ts';
+
+type AgentTaskDependencies = NonNullable<Parameters<typeof executeAgentTask>[1]>;
+
+interface ExecutorCall {
+  executor: 'command' | 'dynamic';
+  args: unknown[];
+}
+
+interface TaskConfigFixture {
+  name?: unknown;
+  type?: unknown;
+  params?: Record<string, unknown>;
+  tasks?: TaskConfigFixture[];
+  [key: string]: unknown;
+}
+
+function taskConfig(value: unknown): TaskConfigFixture {
+  assert.ok(isRecord(value));
+  return value as TaskConfigFixture;
+}
 
 function createExecutors() {
-  const calls = [];
-  return {
-    calls,
-    dependencies: {
-      execMaaCommand: async (...args) => {
-        calls.push({ executor: 'command', args });
-        return { success: true, executor: 'command' };
-      },
-      execDynamicTask: async (...args) => {
-        calls.push({ executor: 'dynamic', args });
-        return { success: true, executor: 'dynamic' };
-      }
+  const calls: ExecutorCall[] = [];
+  const dependencies: AgentTaskDependencies = {
+    execMaaCommand: async (...args) => {
+      calls.push({ executor: 'command', args });
+      return { success: true, executor: 'command' };
+    },
+    execDynamicTask: async (...args) => {
+      calls.push({ executor: 'dynamic', args });
+      return { success: true, executor: 'dynamic' };
     }
   };
+  return { calls, dependencies };
 }
 
 describe('executeAgentTask', () => {
@@ -68,9 +88,10 @@ describe('executeAgentTask', () => {
       }
     }, dependencies);
 
+    const config = taskConfig(calls[0].args[1]);
     assert.equal(calls[0].executor, 'dynamic');
-    assert.deepEqual(calls[0].args[1].tasks.map(task => task.params.stage), ['1-7', 'CE-6']);
-    assert.equal(calls[0].args[1].tasks[0].params.times, 2);
+    assert.deepEqual(config.tasks?.map(task => task.params?.stage), ['1-7', 'CE-6']);
+    assert.equal(config.tasks?.[0].params?.times, 2);
   });
 
   it('rejects an empty multi-task list', async () => {
@@ -81,7 +102,7 @@ describe('executeAgentTask', () => {
         command: 'run',
         taskConfig: { name: '理智作战', type: 'Fight', tasks: [] }
       }, dependencies),
-      error => error.code === 'AGENT_VALIDATION_TASK_CONFIG_INVALID'
+      (error: unknown) => getErrorCode(error) === 'AGENT_VALIDATION_TASK_CONFIG_INVALID'
     );
   });
 
@@ -158,12 +179,13 @@ describe('executeAgentTask', () => {
 
     await assert.rejects(
       executeAgentTask({ command: 'install' }, dependencies),
-      error => {
-        assert.equal(error.code, 'AGENT_VALIDATION_COMMAND_NOT_ALLOWED');
-        assert.equal(error.statusCode, 400);
-        assert.equal(error.retryable, false);
-        assert.equal(error.details.command, 'install');
-        assert.deepEqual(error.details.allowed, [...AGENT_TASK_COMMANDS]);
+      (error: unknown) => {
+        assert.equal(getErrorCode(error), 'AGENT_VALIDATION_COMMAND_NOT_ALLOWED');
+        assert.equal(getErrorStatus(error), 400);
+        assert.equal(asErrorWithCode(error).retryable, false);
+        const details = getErrorDetails(error);
+        assert.equal(details.command, 'install');
+        assert.deepEqual(details.allowed, [...AGENT_TASK_COMMANDS]);
         return true;
       }
     );
@@ -177,11 +199,12 @@ describe('executeAgentTask', () => {
         command: 'run',
         taskConfig: { name: '更换主题', type: 'SwitchTheme' }
       }, dependencies),
-      error => {
-        assert.equal(error.code, 'AGENT_VALIDATION_TASK_TYPE_NOT_SUPPORTED');
-        assert.equal(error.statusCode, 400);
-        assert.equal(error.details.type, 'SwitchTheme');
-        assert.ok(error.details.allowed.includes('Custom'));
+      (error: unknown) => {
+        assert.equal(getErrorCode(error), 'AGENT_VALIDATION_TASK_TYPE_NOT_SUPPORTED');
+        assert.equal(getErrorStatus(error), 400);
+        const details = getErrorDetails(error);
+        assert.equal(details.type, 'SwitchTheme');
+        assert.ok(Array.isArray(details.allowed) && details.allowed.includes('Custom'));
         return true;
       }
     );
@@ -193,7 +216,7 @@ describe('executeAgentTask', () => {
     for (const taskConfig of ['{bad json', '[]', 'null', 42, {}, { name: '任务', type: 'Fight', params: [] }]) {
       await assert.rejects(
         executeAgentTask({ command: 'run', taskConfig }, dependencies),
-        error => error.code === 'AGENT_VALIDATION_TASK_CONFIG_INVALID' && error.statusCode === 400
+        (error: unknown) => getErrorCode(error) === 'AGENT_VALIDATION_TASK_CONFIG_INVALID' && getErrorStatus(error) === 400
       );
     }
   });
@@ -207,10 +230,10 @@ describe('executeAgentTask', () => {
         args: ['../outside'],
         taskConfig: { name: '理智作战', type: 'Fight' }
       }, dependencies),
-      error => {
-        assert.equal(error.code, 'AGENT_VALIDATION_TASK_ID_INVALID');
-        assert.equal(error.statusCode, 400);
-        assert.equal(error.details.taskId, '../outside');
+      (error: unknown) => {
+        assert.equal(getErrorCode(error), 'AGENT_VALIDATION_TASK_ID_INVALID');
+        assert.equal(getErrorStatus(error), 400);
+        assert.equal(getErrorDetails(error).taskId, '../outside');
         return true;
       }
     );
@@ -221,10 +244,10 @@ describe('executeAgentTask', () => {
 
     await assert.rejects(
       executeAgentTask({ command: 'fight', args: '1-7' }, dependencies),
-      error => {
-        assert.equal(error.code, 'AGENT_VALIDATION_ARGS_INVALID');
-        assert.equal(error.statusCode, 400);
-        assert.deepEqual(error.details, { receivedType: 'string' });
+      (error: unknown) => {
+        assert.equal(getErrorCode(error), 'AGENT_VALIDATION_ARGS_INVALID');
+        assert.equal(getErrorStatus(error), 400);
+        assert.deepEqual(getErrorDetails(error), { receivedType: 'string' });
         return true;
       }
     );
@@ -235,15 +258,15 @@ describe('executeAgentTask', () => {
 
     await assert.rejects(
       executeAgentTask({ command: 'award', taskName: { text: '领取奖励' } }, dependencies),
-      error => error.code === 'AGENT_VALIDATION_TASK_NAME_INVALID'
+      (error: unknown) => getErrorCode(error) === 'AGENT_VALIDATION_TASK_NAME_INVALID'
     );
     await assert.rejects(
       executeAgentTask({ command: 'award', waitForCompletion: 'false' }, dependencies),
-      error => error.code === 'AGENT_VALIDATION_WAIT_FOR_COMPLETION_INVALID'
+      (error: unknown) => getErrorCode(error) === 'AGENT_VALIDATION_WAIT_FOR_COMPLETION_INVALID'
     );
     await assert.rejects(
       executeAgentTask({ command: 'run', taskConfig: {}, userResource: 1 }, dependencies),
-      error => error.code === 'AGENT_VALIDATION_USER_RESOURCE_INVALID'
+      (error: unknown) => getErrorCode(error) === 'AGENT_VALIDATION_USER_RESOURCE_INVALID'
     );
   });
 });
@@ -260,15 +283,15 @@ describe('normalizeDailyFlowRequest', () => {
   it('rejects ambiguous daily flow input types', () => {
     assert.throws(
       () => normalizeDailyFlowRequest({ dryRun: 'false' }),
-      error => error.code === 'AGENT_VALIDATION_DRY_RUN_INVALID'
+      (error: unknown) => getErrorCode(error) === 'AGENT_VALIDATION_DRY_RUN_INVALID'
     );
     assert.throws(
       () => normalizeDailyFlowRequest({ taskFlow: {} }),
-      error => error.code === 'AGENT_VALIDATION_TASK_FLOW_INVALID'
+      (error: unknown) => getErrorCode(error) === 'AGENT_VALIDATION_TASK_FLOW_INVALID'
     );
     assert.throws(
       () => normalizeDailyFlowRequest({ scheduleId: { id: 'morning' } }),
-      error => error.code === 'AGENT_VALIDATION_SCHEDULE_ID_INVALID'
+      (error: unknown) => getErrorCode(error) === 'AGENT_VALIDATION_SCHEDULE_ID_INVALID'
     );
   });
 });
@@ -283,10 +306,10 @@ describe('createDailyFlowExecutionError', () => {
       owner
     });
 
-    assert.equal(error.code, 'AGENT_EXECUTION_BUSY');
-    assert.equal(error.statusCode, 409);
-    assert.equal(error.retryable, true);
-    assert.deepEqual(error.details, { owner });
+    assert.equal(getErrorCode(error), 'AGENT_EXECUTION_BUSY');
+    assert.equal(getErrorStatus(error), 409);
+    assert.equal(asErrorWithCode(error).retryable, true);
+    assert.deepEqual(getErrorDetails(error), { owner });
   });
 
   it('recognizes the scheduler already-running message as busy', () => {
@@ -295,19 +318,19 @@ describe('createDailyFlowExecutionError', () => {
       message: '已有任务流程正在执行'
     });
 
-    assert.equal(error.code, 'AGENT_EXECUTION_BUSY');
-    assert.equal(error.statusCode, 409);
-    assert.deepEqual(error.details, { owner: null });
+    assert.equal(getErrorCode(error), 'AGENT_EXECUTION_BUSY');
+    assert.equal(getErrorStatus(error), 409);
+    assert.deepEqual(getErrorDetails(error), { owner: null });
   });
 
   it('returns a non-retryable validation error for other rejections', () => {
     const result = { success: false, message: '自定义换班需要填写排班文件路径' };
     const error = createDailyFlowExecutionError(result);
 
-    assert.equal(error.code, 'AGENT_DAILY_FLOW_REJECTED');
-    assert.equal(error.statusCode, 400);
-    assert.equal(error.retryable, false);
-    assert.deepEqual(error.details, { result });
+    assert.equal(getErrorCode(error), 'AGENT_DAILY_FLOW_REJECTED');
+    assert.equal(getErrorStatus(error), 400);
+    assert.equal(asErrorWithCode(error).retryable, false);
+    assert.deepEqual(getErrorDetails(error), { result });
   });
 
   it('returns null for successful or absent results', () => {

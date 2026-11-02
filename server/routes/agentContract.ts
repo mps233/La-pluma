@@ -1,10 +1,108 @@
-import { AGENT_TASK_COMMANDS } from '../services/agentActionService.js';
+import { AGENT_TASK_COMMANDS } from '../services/agentActionService.ts';
+import { isRecord } from '../utils/errors.ts';
 
 export const API_VERSION = '2026-07-12';
 
-const runtimeDefault = (key) => ({ 'x-la-pluma-runtime-default': key });
+type JsonRecord = Record<string, unknown>;
 
-const profileIdProperty = {
+interface SafetyOptions {
+  readOnly?: boolean;
+  idempotent?: boolean;
+  mutatesDevice?: boolean;
+  destructive?: boolean;
+  confirmationRequired?: boolean;
+  confirmationRecommended?: boolean;
+  sideEffects?: string[];
+}
+
+interface SafetyDefinition extends SafetyOptions {
+  level: string;
+  riskLevel: string;
+  readOnly: boolean;
+  idempotent: boolean;
+  mutatesDevice: boolean;
+  destructive: boolean;
+  confirmationRequired: boolean;
+  confirmationRecommended: boolean;
+  sideEffects: string[];
+}
+
+interface ExecutionOptions {
+  mode?: string;
+  dryRun?: boolean;
+  waitForCompletion?: boolean;
+  pollAction?: string | null;
+  stopAction?: string | null;
+  preflightAction?: string | null;
+  conflictsWith?: string[];
+  producesRun?: boolean;
+  idempotency?: JsonRecord | null;
+}
+
+interface ExecutionDefinition {
+  mode: string;
+  supportsDryRun: boolean;
+  dryRun: { supported: boolean; parameter?: string };
+  supportsWaitForCompletion: boolean;
+  waitForCompletion: { supported: boolean; parameter?: string; default?: boolean };
+  pollAction?: string;
+  stopAction?: string;
+  preflightAction?: string;
+  conflictsWith?: string[];
+  producesRun?: boolean;
+  runLookupAction?: string;
+  idempotency?: JsonRecord & { supported?: boolean };
+}
+
+interface SchemaObject {
+  type?: string | string[];
+  properties?: Record<string, SchemaObject>;
+  required?: string[];
+  description?: string;
+  [key: string]: unknown;
+}
+
+interface AgentOperationInput {
+  id: string;
+  method: string;
+  path: string;
+  description: string;
+  advertised?: boolean;
+  tags?: string[];
+  safety?: SafetyDefinition;
+  execution?: ExecutionDefinition;
+  responseKind?: string;
+  body_schema?: SchemaObject;
+  query_schema?: SchemaObject;
+  path_schema?: SchemaObject;
+  discovery?: boolean;
+  [key: string]: unknown;
+}
+
+interface MaterializedOperation extends AgentOperationInput {
+  advertised: boolean;
+  tags: string[];
+  safety: SafetyDefinition;
+  execution: ExecutionDefinition;
+}
+
+interface ManifestAction {
+  id: string;
+  method: string;
+  path: string;
+  description: string;
+  body_schema?: SchemaObject;
+  query_schema?: SchemaObject;
+  path_schema?: SchemaObject;
+  header_schema?: JsonRecord;
+  safety?: SafetyDefinition;
+  execution?: ExecutionDefinition;
+  [key: string]: unknown;
+}
+
+const runtimeDefault = (key: string) => ({ 'x-la-pluma-runtime-default': key });
+
+const profileIdProperty: SchemaObject = {
   type: 'string',
   minLength: 1,
   maxLength: 64,
@@ -13,13 +111,13 @@ const profileIdProperty = {
   description: 'Saved connection profile id. Explicit connection fields override values loaded from this profile.'
 };
 
-const runIdProperty = {
+const runIdProperty: SchemaObject = {
   type: 'string',
   format: 'uuid',
   description: 'Server-generated id for one Agent API execution.'
 };
 
-const idempotencyKeyProperty = {
+const idempotencyKeyProperty: SchemaObject = {
   type: 'string',
   minLength: 1,
   maxLength: 128,
@@ -27,7 +125,7 @@ const idempotencyKeyProperty = {
   description: 'Client-generated key that identifies one logical execution request.'
 };
 
-const idempotencyPolicy = (appliesWhen = null) => ({
+const idempotencyPolicy = (appliesWhen: JsonRecord | null = null) => ({
   supported: true,
   required: false,
   header: 'Idempotency-Key',
@@ -41,7 +139,7 @@ const idempotencyPolicy = (appliesWhen = null) => ({
   ...(appliesWhen ? { appliesWhen } : {})
 });
 
-const safety = (level, options = {}) => ({
+const safety = (level: string, options: SafetyOptions = {}): SafetyDefinition => ({
   level,
   riskLevel: level,
   readOnly: options.readOnly ?? level === 'read-only',
@@ -63,7 +161,7 @@ const execution = ({
   conflictsWith = [],
   producesRun = false,
   idempotency = null
-} = {}) => ({
+}: ExecutionOptions = {}): ExecutionDefinition => ({
   mode,
   supportsDryRun: dryRun,
   dryRun: {
@@ -84,8 +182,8 @@ const execution = ({
 });
 
 const readOnly = safety('read-only');
-const lowRiskWrite = (sideEffects = [], options = {}) => safety('low-risk-write', { sideEffects, ...options });
-const consequential = (sideEffects = [], options = {}) => safety('consequential', {
+const lowRiskWrite = (sideEffects: string[] = [], options: SafetyOptions = {}) => safety('low-risk-write', { sideEffects, ...options });
+const consequential = (sideEffects: string[] = [], options: SafetyOptions = {}) => safety('consequential', {
   confirmationRequired: true,
   confirmationRecommended: true,
   mutatesDevice: true,
@@ -93,13 +191,13 @@ const consequential = (sideEffects = [], options = {}) => safety('consequential'
   ...options
 });
 
-const operation = (definition) => ({
+const operation = (definition: AgentOperationInput): MaterializedOperation => ({
   advertised: true,
   tags: ['Agent'],
   safety: readOnly,
   execution: execution(),
   ...definition
-});
+}) as MaterializedOperation;
 
 export const AGENT_OPERATIONS = Object.freeze([
   operation({
@@ -200,9 +298,9 @@ export const AGENT_OPERATIONS = Object.freeze([
     id: 'run_current_activity_copilots',
     method: 'POST',
     path: '/api/agent/activity/run',
-    description: 'Run the server-built current-activity copilot plan. It blocks when navigation or a reliable candidate is unavailable.',
+    description: 'Run the server-built current-activity copilot plan. It restarts the game, navigates to the activity stage, and blocks when navigation or a reliable candidate is unavailable.',
     tags: ['Activity'],
-    safety: consequential(['start_game_automation', 'consume_in_game_resources']),
+    safety: consequential(['start_game_automation', 'close_game_automation', 'consume_in_game_resources']),
     execution: execution({
       mode: 'long-running',
       pollAction: 'get_current_run',
@@ -402,6 +500,28 @@ export const AGENT_OPERATIONS = Object.freeze([
       type: 'object',
       required: ['runId'],
       properties: { runId: runIdProperty }
+    }
+  }),
+  operation({
+    id: 'stop_run',
+    method: 'POST',
+    path: '/api/agent/runs/{runId}/stop',
+    description: 'Stop one retained Agent run by id. Accepted runs are canceled without touching the device; running runs are stopped only when they are current.',
+    tags: ['Execution'],
+    safety: safety('low-risk-write', {
+      idempotent: true,
+      mutatesDevice: true,
+      destructive: true,
+      sideEffects: ['interrupt_running_automation']
+    }),
+    path_schema: {
+      type: 'object',
+      required: ['runId'],
+      properties: { runId: runIdProperty }
+    },
+    body_schema: {
+      type: 'object',
+      properties: {}
     }
   }),
   operation({
@@ -719,44 +839,51 @@ export const AGENT_OPERATIONS = Object.freeze([
   })
 ]);
 
-function clone(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+function clone<T>(value: T): T {
+  return value === undefined ? value : JSON.parse(JSON.stringify(value)) as T;
 }
 
-function normalizeDefaults(defaults = {}) {
-  const values = {
+interface RuntimeDefaults {
+  adbPath?: string;
+  address?: string;
+  adbAddress?: string;
+  clientType?: string;
+}
+
+function normalizeDefaults(defaults: RuntimeDefaults = {}): Record<string, string> {
+  const values: Record<string, string | undefined> = {
     adbPath: defaults.adbPath,
     adbAddress: defaults.adbAddress ?? defaults.address,
     clientType: defaults.clientType
   };
-  return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined));
+  return Object.fromEntries(Object.entries(values).filter((entry): entry is [string, string] => entry[1] !== undefined));
 }
 
-function materializeRuntimeDefaults(value, defaults) {
+function materializeRuntimeDefaults(value: unknown, defaults: Record<string, string>): unknown {
   if (Array.isArray(value)) {
     return value.map(item => materializeRuntimeDefaults(item, defaults));
   }
-  if (!value || typeof value !== 'object') return value;
+  if (!isRecord(value)) return value;
 
-  const result = {};
+  const result: JsonRecord = {};
   const defaultKey = value['x-la-pluma-runtime-default'];
   for (const [key, child] of Object.entries(value)) {
     if (key === 'x-la-pluma-runtime-default') continue;
     result[key] = materializeRuntimeDefaults(child, defaults);
   }
-  if (defaultKey && defaults[defaultKey] !== undefined) {
+  if (typeof defaultKey === 'string' && defaults[defaultKey] !== undefined) {
     result.default = defaults[defaultKey];
   }
   return result;
 }
 
-function materializeOperation(definition, defaults = {}) {
-  return materializeRuntimeDefaults(clone(definition), normalizeDefaults(defaults));
+function materializeOperation(definition: AgentOperationInput, defaults: RuntimeDefaults = {}): MaterializedOperation {
+  return materializeRuntimeDefaults(clone(definition), normalizeDefaults(defaults)) as MaterializedOperation;
 }
 
-function manifestAction(definition, defaults) {
+function manifestAction(definition: AgentOperationInput, defaults: RuntimeDefaults): ManifestAction {
   const item = materializeOperation(definition, defaults);
-  const action = {
+  const action: ManifestAction = {
     id: item.id,
     method: item.method,
     path: item.path,
@@ -778,7 +905,7 @@ function manifestAction(definition, defaults) {
   return action;
 }
 
-export function buildAgentManifest(defaults = {}) {
+export function buildAgentManifest(defaults: RuntimeDefaults = {}) {
   const resolvedDefaults = normalizeDefaults(defaults);
   return {
     name: 'La Pluma Agent API',
@@ -800,6 +927,7 @@ export function buildAgentManifest(defaults = {}) {
       openapi: '/api/agent/openapi.json',
       currentRun: '/api/agent/runs/current',
       run: '/api/agent/runs/{runId}',
+      stopRun: '/api/agent/runs/{runId}/stop',
       screenshot: '/api/agent/screen/screenshot',
       recentLogs: '/api/agent/logs/recent?lines=80'
     },
@@ -809,7 +937,7 @@ export function buildAgentManifest(defaults = {}) {
   };
 }
 
-function queryParameters(schema = {}) {
+function queryParameters(schema: SchemaObject = {}) {
   const required = new Set(schema.required || []);
   return Object.entries(schema.properties || {}).map(([name, property]) => ({
     name,
@@ -820,7 +948,7 @@ function queryParameters(schema = {}) {
   }));
 }
 
-function pathParameters(schema = {}) {
+function pathParameters(schema: SchemaObject = {}) {
   return Object.entries(schema.properties || {}).map(([name, property]) => ({
     name,
     in: 'path',
@@ -830,7 +958,7 @@ function pathParameters(schema = {}) {
   }));
 }
 
-const standardErrorResponses = {
+const standardErrorResponses: Record<number, unknown> = {
   400: { $ref: '#/components/responses/BadRequest' },
   401: { $ref: '#/components/responses/Unauthorized' },
   404: { $ref: '#/components/responses/NotFound' },
@@ -840,7 +968,7 @@ const standardErrorResponses = {
   503: { $ref: '#/components/responses/ServiceUnavailable' }
 };
 
-function openApiOperation(definition, defaults) {
+function openApiOperation(definition: AgentOperationInput, defaults: RuntimeDefaults): JsonRecord {
   const item = materializeOperation(definition, defaults);
   const successSchema = item.responseKind === 'openapi'
     ? { $ref: '#/components/schemas/OpenApiDocument' }
@@ -859,7 +987,7 @@ function openApiOperation(definition, defaults) {
         }
       }
     : null;
-  const result = {
+  const result: JsonRecord = {
     operationId: item.id,
     tags: item.tags,
     summary: item.description,
@@ -883,7 +1011,7 @@ function openApiOperation(definition, defaults) {
     }
   };
 
-  const parameters = [
+  const parameters: unknown[] = [
     ...(item.path_schema ? pathParameters(item.path_schema) : []),
     ...(item.query_schema ? queryParameters(item.query_schema) : []),
     ...(item.execution.idempotency?.supported
@@ -891,8 +1019,9 @@ function openApiOperation(definition, defaults) {
       : [])
   ];
   if (parameters.length) result.parameters = parameters;
+  const responses = result.responses as Record<number, unknown>;
   if (item.execution.producesRun) {
-    result.responses[202] = {
+    responses[202] = {
       description: 'The execution was accepted and can be polled by run id.',
       headers: {
         Location: {
@@ -919,7 +1048,7 @@ function openApiOperation(definition, defaults) {
   return result;
 }
 
-function reusableErrorResponse(description) {
+function reusableErrorResponse(description: string) {
   return {
     description,
     content: {
@@ -930,8 +1059,8 @@ function reusableErrorResponse(description) {
   };
 }
 
-export function buildOpenApiSpec(defaults = {}) {
-  const paths = {};
+export function buildOpenApiSpec(defaults: RuntimeDefaults = {}) {
+  const paths: Record<string, Record<string, unknown>> = {};
   for (const definition of AGENT_OPERATIONS) {
     const method = definition.method.toLowerCase();
     paths[definition.path] = {
@@ -1033,7 +1162,8 @@ export function buildOpenApiSpec(defaults = {}) {
           required: ['self'],
           properties: {
             self: { type: 'string', format: 'uri-reference' },
-            stop: { type: 'string', format: 'uri-reference' }
+            stop: { type: 'string', format: 'uri-reference' },
+            targetedStop: { type: 'string', format: 'uri-reference' }
           },
           additionalProperties: false
         },
@@ -1063,7 +1193,9 @@ export function buildOpenApiSpec(defaults = {}) {
             startedAt: { type: ['string', 'null'], format: 'date-time' },
             finishedAt: { type: ['string', 'null'], format: 'date-time' },
             durationMs: { type: ['integer', 'null'], minimum: 0 },
+            trigger: { type: ['object', 'null'], additionalProperties: true },
             progress: { $ref: '#/components/schemas/RunProgress' },
+            taskResults: { type: 'array', items: { type: 'object', additionalProperties: true } },
             result: {},
             error: { $ref: '#/components/schemas/RunError' },
             links: { $ref: '#/components/schemas/RunLinks' }

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
+import { isRecord } from '../../utils/errors.ts';
 
 const isWindows = process.platform === 'win32';
 const envKeys = [
@@ -58,15 +59,30 @@ const adbScript = [
   ''
 ].join('\n');
 
-let testDir;
-let logPath;
-let adbLogPath;
-let configDir;
-let scheduler;
-let maaService;
-const previousEnv = {};
+type SchedulerModule = typeof import('../schedulerService.ts');
+type MaaModule = typeof import('../maaService.ts');
+type ScheduleResult = Awaited<ReturnType<SchedulerModule['executeScheduleNow']>>;
 
-async function readLines(filePath) {
+interface ExecutionSummary {
+  failedCount?: number;
+  skippedCount?: number;
+  successCount?: number;
+}
+
+function getExecutionSummary(result: ScheduleResult): ExecutionSummary {
+  assert.ok(isRecord(result.summary));
+  return result.summary as ExecutionSummary;
+}
+
+let testDir = '';
+let logPath = '';
+let adbLogPath = '';
+let configDir = '';
+let scheduler: SchedulerModule | null = null;
+let maaService: MaaModule | null = null;
+const previousEnv: Record<string, string | undefined> = {};
+
+async function readLines(filePath: string) {
   const content = await readFile(filePath, 'utf8').catch(() => '');
   return content.split('\n').filter(Boolean);
 }
@@ -75,7 +91,7 @@ async function readStartupCommands() {
   return (await readLines(logPath)).filter(line => line.startsWith('startup'));
 }
 
-async function waitFor(predicate, timeoutMs = 5000) {
+async function waitFor(predicate: () => unknown, timeoutMs = 5000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await predicate()) return true;
@@ -84,12 +100,14 @@ async function waitFor(predicate, timeoutMs = 5000) {
   return false;
 }
 
-function withTimeout(promise, timeoutMs, message) {
-  let timer;
-  const timeout = new Promise((_, reject) => {
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(message)), timeoutMs);
   });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
 }
 
 function stopEverything() {
@@ -133,8 +151,8 @@ before(async () => {
   process.env.LA_PLUMA_MAA_LOCK_FILE = join(testDir, 'maa.lock');
   delete process.env.ADB_DEVICES_DELAY;
 
-  scheduler = await import('../schedulerService.js');
-  maaService = await import('../maaService.js');
+  scheduler = await import('../schedulerService.ts');
+  maaService = await import('../maaService.ts');
 });
 
 after(async () => {
@@ -149,7 +167,7 @@ after(async () => {
   await rm(testDir, { recursive: true, force: true });
 });
 
-test('stopping during StartUp does not relaunch MAA', { skip: isWindows }, async () => {
+test('stopping during StartUp does not relaunch MAA', { skip: isWindows }, async (): Promise<void> => {
   await writeFile(logPath, '');
   await writeFile(adbLogPath, '');
   delete process.env.ADB_DEVICES_DELAY;
@@ -162,23 +180,24 @@ test('stopping during StartUp does not relaunch MAA', { skip: isWindows }, async
     params: { clientType: 'Official' }
   }];
 
-  let result;
+  let result: ScheduleResult | undefined;
   try {
-    const runPromise = scheduler.executeScheduleNow('stop-startup', taskFlow);
+    const runPromise = scheduler!.executeScheduleNow('stop-startup', taskFlow);
     runPromise.catch(() => undefined);
 
     const startupStarted = await waitFor(async () => (await readStartupCommands()).length >= 1);
     assert.equal(startupStarted, true, 'maa startup should have started');
 
-    const taskStop = maaService.stopCurrentTask();
+    const taskStop = maaService!.stopCurrentTask();
     assert.equal(taskStop.success, true, taskStop.message);
-    assert.equal(scheduler.stopScheduleExecution(), true);
+    assert.equal(scheduler!.stopScheduleExecution(), true);
 
     result = await withTimeout(runPromise, 10000, 'schedule flow did not stop after StartUp was terminated');
   } finally {
     stopEverything();
   }
 
+  assert.ok(result);
   assert.equal(result.success, true);
   assert.equal(result.stopped, true);
   const startupCommands = await readStartupCommands();
@@ -186,7 +205,7 @@ test('stopping during StartUp does not relaunch MAA', { skip: isWindows }, async
   assert.match(startupCommands[0], /^startup\b/);
 });
 
-test('an out-of-band MAA stop also ends the scheduled flow', { skip: isWindows }, async () => {
+test('an out-of-band MAA stop also ends the scheduled flow', { skip: isWindows }, async (): Promise<void> => {
   await writeFile(logPath, '');
   await writeFile(adbLogPath, '');
   delete process.env.ADB_DEVICES_DELAY;
@@ -199,15 +218,15 @@ test('an out-of-band MAA stop also ends the scheduled flow', { skip: isWindows }
     params: { clientType: 'Official' }
   }];
 
-  let result;
+  let result: ScheduleResult | undefined;
   try {
-    const runPromise = scheduler.executeScheduleNow('stop-out-of-band', taskFlow);
+    const runPromise = scheduler!.executeScheduleNow('stop-out-of-band', taskFlow);
     runPromise.catch(() => undefined);
 
     const startupStarted = await waitFor(async () => (await readStartupCommands()).length >= 1);
     assert.equal(startupStarted, true, 'maa startup should have started');
 
-    const taskStop = maaService.stopCurrentTask();
+    const taskStop = maaService!.stopCurrentTask();
     assert.equal(taskStop.success, true, taskStop.message);
     // Intentionally do not call stopScheduleExecution: only stopCurrentTask is allowed here.
 
@@ -216,15 +235,16 @@ test('an out-of-band MAA stop also ends the scheduled flow', { skip: isWindows }
     stopEverything();
   }
 
+  assert.ok(result);
   assert.equal(result.success, true);
   assert.equal(result.stopped, true);
-  assert.equal(result.summary?.failedCount ?? 0, 0);
+  assert.equal(getExecutionSummary(result).failedCount ?? 0, 0);
   const startupCommands = await readStartupCommands();
   assert.equal(startupCommands.length, 1);
   assert.match(startupCommands[0], /^startup\b/);
 });
 
-test('a crashed task is counted as a failure instead of stopping the flow', { skip: isWindows }, async () => {
+test('a crashed task is counted as a failure instead of stopping the flow', { skip: isWindows }, async (): Promise<void> => {
   await writeFile(logPath, '');
   await writeFile(adbLogPath, '');
   delete process.env.ADB_DEVICES_DELAY;
@@ -247,17 +267,17 @@ test('a crashed task is counted as a failure instead of stopping the flow', { sk
     }
   ];
 
-  let result;
+  let result: ScheduleResult | undefined;
   try {
-    const runPromise = scheduler.executeScheduleNow('crash-continue', taskFlow);
+    const runPromise = scheduler!.executeScheduleNow('crash-continue', taskFlow);
     runPromise.catch(() => undefined);
 
     const startupStarted = await waitFor(async () => (await readStartupCommands()).length >= 1);
     assert.equal(startupStarted, true, 'flow should continue to StartUp after the fight crash');
 
-    const taskStop = maaService.stopCurrentTask();
+    const taskStop = maaService!.stopCurrentTask();
     assert.equal(taskStop.success, true, taskStop.message);
-    assert.equal(scheduler.stopScheduleExecution(), true);
+    assert.equal(scheduler!.stopScheduleExecution(), true);
 
     result = await withTimeout(runPromise, 10000, 'schedule flow did not stop after the later StartUp stop');
   } finally {
@@ -265,13 +285,15 @@ test('a crashed task is counted as a failure instead of stopping the flow', { sk
     stopEverything();
   }
 
+  assert.ok(result);
   assert.equal(result.success, true);
   assert.equal(result.stopped, true);
-  assert.equal(result.summary?.failedCount + result.summary?.skippedCount, 1);
-  assert.equal(result.summary?.successCount, 0);
+  const summary = getExecutionSummary(result);
+  assert.equal((summary.failedCount ?? 0) + (summary.skippedCount ?? 0), 1);
+  assert.equal(summary.successCount, 0);
 });
 
-test('stopping during the StartUp preflight does not start MAA', { skip: isWindows }, async () => {
+test('stopping during the StartUp preflight does not start MAA', { skip: isWindows }, async (): Promise<void> => {
   await writeFile(logPath, '');
   await writeFile(adbLogPath, '');
   process.env.ADB_DEVICES_DELAY = '1';
@@ -284,16 +306,16 @@ test('stopping during the StartUp preflight does not start MAA', { skip: isWindo
     params: { clientType: 'Official' }
   }];
 
-  let result;
+  let result: ScheduleResult | undefined;
   try {
-    const runPromise = scheduler.executeScheduleNow('stop-preflight', taskFlow);
+    const runPromise = scheduler!.executeScheduleNow('stop-preflight', taskFlow);
     runPromise.catch(() => undefined);
 
     const preflightStarted = await waitFor(async () => (await readLines(adbLogPath)).includes('devices'));
     assert.equal(preflightStarted, true, 'ADB preflight should have started');
 
-    assert.equal(scheduler.getScheduleExecutionStatus().isRunning, true);
-    assert.equal(scheduler.stopScheduleExecution(), true);
+    assert.equal(scheduler!.getScheduleExecutionStatus().isRunning, true);
+    assert.equal(scheduler!.stopScheduleExecution(), true);
 
     result = await withTimeout(runPromise, 10000, 'schedule flow did not stop during the StartUp preflight');
   } finally {
@@ -301,6 +323,7 @@ test('stopping during the StartUp preflight does not start MAA', { skip: isWindo
     stopEverything();
   }
 
+  assert.ok(result);
   assert.equal(result.success, true);
   assert.equal(result.stopped, true);
   assert.deepEqual(await readStartupCommands(), []);

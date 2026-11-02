@@ -1,9 +1,12 @@
+import { isRecord } from '../../utils/errors.ts'
+import type { ErrorWithCode } from '../../utils/errors.ts'
+import type { ChildProcess } from 'node:child_process'
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, it } from 'node:test'
-import router, { buildDynamicFightPlan, buildFightPlans, buildWebrtcBrowserProtocol, buildWebrtcDeviceStatus, executeTrackedAgentAction, needsDynamicFight } from '../agent.js'
-import { API_VERSION } from '../agentContract.js'
-import { getTaskStatus, setTaskStatus } from '../../services/maaService.js'
-import { loggerManager } from '../../utils/logger.js'
+import router, { buildDynamicFightPlan, buildFightPlans, buildWebrtcBrowserProtocol, buildWebrtcDeviceStatus, executeTrackedAgentAction, needsDynamicFight } from '../agent.ts'
+import { API_VERSION, buildAgentManifest } from '../agentContract.ts'
+import { getTaskStatus, setTaskStatus } from '../../services/maaService.ts'
+import { loggerManager } from '../../utils/logger.ts'
 import {
   beginAgentRun,
   completeAgentRun,
@@ -14,24 +17,152 @@ import {
   resetAgentRunsForTests,
   shutdownAgentRunStoreForTests,
   startAgentRun
-} from '../../services/agentRunService.js'
+} from '../../services/agentRunService.ts'
+import type { AgentRunDto, AgentRunStoreOverrides } from '../../services/agentRunService.ts'
 
-const quietLogger = {
-  info() {},
-  error() {}
+type TrackedAgentActionOptions = Parameters<typeof executeTrackedAgentAction>[2]
+type AgentRunLifecycle = Parameters<TrackedAgentActionOptions['execute']>[0]
+type FightPlanningInput = NonNullable<Parameters<typeof buildDynamicFightPlan>[0]>
+
+type RouteHandler = (req: unknown, res: unknown, next?: () => void) => unknown
+
+interface ApiMeta {
+  requestId: string | null
+  dryRun: boolean
 }
 
-function findHandler(method, path) {
-  const layer = router.stack.find(item => item.route?.path === path && item.route.methods?.[method])
-  assert.ok(layer, `missing ${method.toUpperCase()} ${path}`)
-  return layer.route.stack.at(-1).handle
+interface AgentErrorDetails {
+  runId?: string
+  run?: AgentRunDto | null
+  requestedRunId?: string
+  currentRunId?: string
+  state?: string
+  result?: { details?: { index?: number } }
+  [key: string]: unknown
 }
 
-function createResponse() {
+interface AgentErrorBody {
+  success: false
+  message: string
+  error: {
+    code: string
+    details: AgentErrorDetails
+    retryable: boolean
+  }
+  meta: ApiMeta
+  data?: undefined
+}
+
+interface AgentSuccessBody<TData> {
+  success: true
+  message: string
+  data: TData
+  meta: ApiMeta
+}
+
+type AgentManifestBody = AgentSuccessBody<ReturnType<typeof buildAgentManifest>>
+
+interface OpenApiOperationFixture {
+  requestBody?: unknown
+  parameters: Array<{ name: string; in: string }>
+}
+
+interface OpenApiBody {
+  openapi: string
+  paths: Record<string, { get: OpenApiOperationFixture }>
+  components: {
+    responses: {
+      Conflict: {
+        content: {
+          'application/json': {
+            schema: { $ref: string }
+          }
+        }
+      }
+    }
+  }
+}
+
+type RunData = AgentRunDto & {
+  message?: string
+  plan?: unknown
+  stdout?: string
+  signal?: string
+  run?: AgentRunDto
+}
+
+interface StopData {
+  stopped: boolean
+  acceptedRunCanceled?: boolean
+  run: AgentRunDto | null
+}
+
+interface CurrentRunData {
+  isRunning: boolean
+  schedule: unknown
+  recentLogs: unknown[]
+  run: AgentRunDto | null
+  lastRun: AgentRunDto | null
+}
+
+interface DailyFlowStep {
+  index: number
+  id: string
+  name: string
+  command: string
+  args: string[]
+  dynamicTask: boolean
+  taskConfig?: { type?: string }
+}
+
+interface DailyFlowData {
+  dryRun: boolean
+  scheduleId: string | null
+  totalSteps: number
+  plan: DailyFlowStep[]
+}
+
+type RunResponseBody = AgentSuccessBody<RunData>
+type StopResponseBody = AgentSuccessBody<StopData>
+type CurrentRunResponseBody = AgentSuccessBody<CurrentRunData>
+type DailyFlowResponseBody = AgentSuccessBody<DailyFlowData>
+
+interface TestResponse<TBody = unknown> {
+  statusCode: number
+  readonly body: TBody
+  readonly headers: Record<string, string>
+  status(code: number): TestResponse<TBody>
+  set(name: string, value: string): TestResponse<TBody>
+  json(body: TBody): TestResponse<TBody>
+}
+
+const quietLogger = loggerManager.getLogger('AgentRoutesTest', { enableConsole: false })
+
+function isRouteHandler(value: unknown): value is RouteHandler {
+  return typeof value === 'function'
+}
+
+function findHandler(method: string, path: string): RouteHandler {
+  for (const layer of router.stack) {
+    if (!isRecord(layer.route)) continue
+    const methods = layer.route.methods
+    if (!isRecord(methods) || !methods[method]) continue
+    if (layer.route.path !== path) continue
+    const handler = layer.route.stack.at(-1)?.handle
+    if (isRouteHandler(handler)) return handler
+  }
+  assert.fail(`missing ${method.toUpperCase()} ${path}`)
+}
+
+function createResponse<TBody = unknown>(): TestResponse<TBody> {
+  let body: TBody | undefined
   return {
     statusCode: 200,
-    body: null,
     headers: {},
+    get body(): TBody {
+      if (body === undefined) throw new Error('response body was not written')
+      return body
+    },
     status(code) {
       this.statusCode = code
       return this
@@ -40,8 +171,8 @@ function createResponse() {
       this.headers[name] = value
       return this
     },
-    json(body) {
-      this.body = body
+    json(value) {
+      body = value
       return this
     }
   }
@@ -63,7 +194,7 @@ describe('Agent fight planning', () => {
   })
 
   it('builds a dynamic multi-task plan for Core-only Fight fields', () => {
-    const input = {
+    const input: FightPlanningInput = {
       stages: [{ stage: '1-7', times: 2 }, { stage: 'CE-6', times: '' }],
       medicine: 1,
       medicineExpireDays: 2,
@@ -76,7 +207,7 @@ describe('Agent fight planning', () => {
     }
 
     assert.equal(needsDynamicFight(input), true)
-    const plan = buildDynamicFightPlan(input)
+    const plan = buildDynamicFightPlan(input)!
     assert.equal(plan.type, 'Fight')
     assert.equal(plan.client_type, 'Bilibili')
     assert.equal(plan.tasks.length, 2)
@@ -140,19 +271,19 @@ describe('Agent discovery routes', () => {
   })
 
   it('serves the generated manifest through the public route', async () => {
-    const res = createResponse()
+    const res = createResponse<AgentManifestBody>()
     await findHandler('get', '/manifest')({ headers: { 'x-request-id': 'manifest-test' } }, res)
 
     assert.equal(res.statusCode, 200)
     assert.equal(res.body.success, true)
     assert.equal(res.body.meta.requestId, 'manifest-test')
     assert.equal(res.body.data.version, API_VERSION)
-    assert.equal(res.body.data.actions.length, 25)
+    assert.equal(res.body.data.actions.length, 26)
     assert.ok(res.body.data.actions.every(action => action.safety && action.execution))
   })
 
   it('serves OpenAPI with real query parameters and structured errors', async () => {
-    const res = createResponse()
+    const res = createResponse<OpenApiBody>()
     await findHandler('get', '/openapi.json')({ headers: {} }, res)
 
     const discover = res.body.paths['/api/agent/actions/discover-devices'].get
@@ -177,7 +308,7 @@ describe('Agent run routes', () => {
     const run = beginAgentRun({ operationId: 'fight', input: { stage: '1-7' } }).run
     startAgentRun(run.runId)
     completeAgentRun(run.runId, { success: true, summary: 'done' })
-    const res = createResponse()
+    const res = createResponse<RunResponseBody>()
 
     await findHandler('get', '/runs/:runId')({
       headers: { 'x-request-id': 'run-lookup' },
@@ -191,8 +322,22 @@ describe('Agent run routes', () => {
     assert.deepEqual(res.body.data.result, { success: true, summary: 'done' })
   })
 
+  it('cancels an accepted run through the targeted stop endpoint', async () => {
+    const run = beginAgentRun({ operationId: 'fight', input: { stage: '1-7' } }).run
+    const res = createResponse<StopResponseBody>()
+
+    await findHandler('post', '/runs/:runId/stop')({
+      headers: {},
+      params: { runId: run.runId }
+    }, res, () => {})
+
+    assert.equal(res.statusCode, 200)
+    assert.equal(res.body.data.acceptedRunCanceled, true)
+    assert.equal(getAgentRun(run.runId)!.state, 'stopped')
+  })
+
   it('returns a structured 404 for an unknown run id', async () => {
-    const res = createResponse()
+    const res = createResponse<AgentErrorBody>()
 
     await findHandler('get', '/runs/:runId')({
       headers: {},
@@ -208,17 +353,17 @@ describe('Agent run routes', () => {
     completeAgentRun(terminal.runId, { ok: true })
     const run = beginAgentRun({ operationId: 'run_task' }).run
     startAgentRun(run.runId)
-    const res = createResponse()
+    const res = createResponse<CurrentRunResponseBody>()
 
     await findHandler('get', '/runs/current')({ headers: {}, query: { lines: 1 } }, res, () => {})
 
     assert.equal(typeof res.body.data.isRunning, 'boolean')
     assert.ok(res.body.data.schedule)
     assert.ok(Array.isArray(res.body.data.recentLogs))
-    assert.equal(res.body.data.run.runId, run.runId)
-    assert.equal(res.body.data.run.state, 'running')
-    assert.equal(res.body.data.lastRun.runId, terminal.runId)
-    assert.equal(res.body.data.lastRun.state, 'succeeded')
+    assert.equal(res.body.data.run!.runId, run.runId)
+    assert.equal(res.body.data.run!.state, 'running')
+    assert.equal(res.body.data.lastRun!.runId, terminal.runId)
+    assert.equal(res.body.data.lastRun!.state, 'succeeded')
   })
 
   it('selects lastRun by completion time rather than creation order', async () => {
@@ -233,12 +378,12 @@ describe('Agent run routes', () => {
       completeAgentRun(newer.runId, { order: 1 })
       now += 1
       completeAgentRun(older.runId, { order: 2 })
-      const res = createResponse()
+      const res = createResponse<CurrentRunResponseBody>()
 
       await findHandler('get', '/runs/current')({ headers: {}, query: {} }, res, () => {})
 
-      assert.equal(res.body.data.lastRun.runId, older.runId)
-      assert.deepEqual(res.body.data.lastRun.result, { order: 2 })
+      assert.equal(res.body.data.lastRun!.runId, older.runId)
+      assert.deepEqual(res.body.data.lastRun!.result, { order: 2 })
     } finally {
       Date.now = originalNow
     }
@@ -246,16 +391,16 @@ describe('Agent run routes', () => {
 
   it('replays one background intent without executing it twice and retains its final result', async () => {
     const req = { headers: { 'idempotency-key': 'background:test:1' } }
-    const first = createResponse()
+    const first = createResponse<RunResponseBody>()
     let executions = 0
-    let settle = null
-    const options = {
+    let settle: NonNullable<AgentRunLifecycle['onSettled']> | null = null
+    const options: TrackedAgentActionOptions = {
       operationId: 'test_background_action',
       input: { command: 'award', waitForCompletion: false },
       waitForCompletion: false,
-      execute: async lifecycle => {
+      execute: async (lifecycle) => {
         executions += 1
-        settle = lifecycle.onSettled
+        settle = lifecycle.onSettled!
         return { message: 'started', plan: { command: 'award' } }
       }
     }
@@ -267,7 +412,7 @@ describe('Agent run routes', () => {
     assert.equal(executions, 1)
     const runId = first.body.data.runId
 
-    const activeReplay = createResponse()
+    const activeReplay = createResponse<RunResponseBody>()
     await executeTrackedAgentAction(req, activeReplay, options)
     assert.equal(activeReplay.statusCode, 202)
     assert.equal(activeReplay.body.data.message, first.body.data.message)
@@ -275,8 +420,8 @@ describe('Agent run routes', () => {
     assert.equal(activeReplay.body.data.runId, runId)
     assert.equal(executions, 1)
 
-    await settle({ ok: true, result: { stdout: 'finished', exitCode: 0 } })
-    const terminal = getAgentRun(runId)
+    await settle!({ ok: true, result: { stdout: 'finished', exitCode: 0 } })
+    const terminal = getAgentRun(runId)!
     assert.equal(terminal.state, 'succeeded')
     assert.deepEqual(terminal.result, {
       message: 'started',
@@ -285,21 +430,21 @@ describe('Agent run routes', () => {
       exitCode: 0
     })
 
-    const replay = createResponse()
+    const replay = createResponse<RunResponseBody>()
     await executeTrackedAgentAction(req, replay, options)
 
     assert.equal(replay.statusCode, 200)
     assert.equal(replay.headers['Idempotency-Replayed'], 'true')
     assert.equal(replay.body.data.runId, runId)
-    assert.equal(replay.body.data.run.state, 'succeeded')
+    assert.equal(replay.body.data.run!.state, 'succeeded')
     assert.equal(executions, 1)
   })
 
   it('returns an early background failure instead of a successful accepted response', async () => {
-    const error = new Error('background process failed before admission returned')
+    const error: ErrorWithCode = new Error('background process failed before admission returned')
     error.code = 'EARLY_BACKGROUND_FAILURE'
     error.statusCode = 422
-    const res = createResponse()
+    const res = createResponse<AgentErrorBody>()
 
     await executeTrackedAgentAction(
       { headers: { 'idempotency-key': 'background:early-failure' } },
@@ -308,9 +453,9 @@ describe('Agent run routes', () => {
         operationId: 'test_early_background_failure',
         input: { command: 'award' },
         waitForCompletion: false,
-        execute: async lifecycle => {
-          lifecycle.onStarted()
-          await lifecycle.onSettled({ ok: false, error })
+        execute: async (lifecycle) => {
+          lifecycle.onStarted!()
+          await lifecycle.onSettled!({ ok: false, error })
           return { message: 'started' }
         }
       }
@@ -319,11 +464,11 @@ describe('Agent run routes', () => {
     assert.equal(res.statusCode, 422)
     assert.equal(res.body.success, false)
     assert.equal(res.body.error.code, 'EARLY_BACKGROUND_FAILURE')
-    assert.equal(res.body.error.details.run.state, 'failed')
+    assert.equal(res.body.error.details.run!.state, 'failed')
   })
 
   it('returns a stopped result when a background process exits during admission', async () => {
-    const res = createResponse()
+    const res = createResponse<RunResponseBody>()
 
     await executeTrackedAgentAction(
       { headers: { 'idempotency-key': 'background:early-stop' } },
@@ -332,9 +477,9 @@ describe('Agent run routes', () => {
         operationId: 'test_early_background_stop',
         input: { command: 'fight' },
         waitForCompletion: false,
-        execute: async lifecycle => {
-          lifecycle.onStarted()
-          await lifecycle.onSettled({
+        execute: async (lifecycle) => {
+          lifecycle.onStarted!()
+          await lifecycle.onSettled!({
             ok: false,
             stopped: true,
             result: { signal: 'SIGTERM' }
@@ -347,7 +492,7 @@ describe('Agent run routes', () => {
     assert.equal(res.statusCode, 200)
     assert.equal(res.body.success, true)
     assert.equal(res.body.message, '任务已终止')
-    assert.equal(res.body.data.run.state, 'stopped')
+    assert.equal(res.body.data.run!.state, 'stopped')
     assert.equal(res.body.data.signal, 'SIGTERM')
   })
 
@@ -355,7 +500,7 @@ describe('Agent run routes', () => {
     let failWrites = false
     let executions = 0
     const req = { headers: { 'idempotency-key': 'persistence:retry:1' } }
-    const options = {
+    const options: TrackedAgentActionOptions = {
       operationId: 'test_persistence_failure',
       input: { command: 'award' },
       execute: async () => {
@@ -378,7 +523,7 @@ describe('Agent run routes', () => {
       })
 
       failWrites = true
-      const rejected = createResponse()
+      const rejected = createResponse<AgentErrorBody>()
       await executeTrackedAgentAction(req, rejected, options)
 
       assert.equal(rejected.statusCode, 503)
@@ -387,7 +532,7 @@ describe('Agent run routes', () => {
       const rejectedRunId = rejected.body.error.details.runId
 
       failWrites = false
-      const retry = createResponse()
+      const retry = createResponse<RunResponseBody>()
       await executeTrackedAgentAction(req, retry, options)
 
       assert.equal(retry.statusCode, 200)
@@ -404,10 +549,10 @@ describe('Agent run routes', () => {
   })
 
   it('replays a run interrupted by restart without executing it again', async () => {
-    let snapshot = null
+    let snapshot: unknown = null
     let executions = 0
     const req = { headers: { 'idempotency-key': 'restart:interrupted:1' } }
-    const options = {
+    const options: TrackedAgentActionOptions = {
       operationId: 'test_restart_interruption',
       input: { command: 'fight' },
       execute: async () => {
@@ -415,7 +560,7 @@ describe('Agent run routes', () => {
         return { success: true }
       }
     }
-    const store = {
+    const store: AgentRunStoreOverrides = {
       filePath: '/virtual/agent-route-restart-runs.json',
       runtimeLogger: quietLogger,
       writeStore: async (_filePath, value) => {
@@ -435,7 +580,7 @@ describe('Agent run routes', () => {
       await shutdownAgentRunStoreForTests()
       await initializeAgentRunStore({ ...store, readStore: async () => snapshot })
 
-      const replay = createResponse()
+      const replay = createResponse<AgentErrorBody>()
       await executeTrackedAgentAction(req, replay, options)
 
       assert.equal(replay.statusCode, 503)
@@ -451,12 +596,12 @@ describe('Agent run routes', () => {
 
   it('waits for the accepted snapshot before acknowledging a concurrent replay', async () => {
     let blockWrites = false
-    let releaseBlockedWrite
-    let signalWriteStarted
-    const writeStarted = new Promise(resolve => { signalWriteStarted = resolve })
+    let releaseBlockedWrite!: (() => void) | null
+    let signalWriteStarted: (() => void) | null = null
+    const writeStarted = new Promise<void>((resolve) => { signalWriteStarted = () => resolve() })
     let executions = 0
     const req = { headers: { 'idempotency-key': 'persistence:concurrent:1' } }
-    const options = {
+    const options: TrackedAgentActionOptions = {
       operationId: 'test_persistence_concurrency',
       input: { command: 'award' },
       execute: async () => {
@@ -470,32 +615,32 @@ describe('Agent run routes', () => {
       readStore: async (_filePath, fallback) => fallback,
       writeStore: async () => {
         if (!blockWrites) return
-        signalWriteStarted()
-        await new Promise(resolve => { releaseBlockedWrite = resolve })
+        signalWriteStarted!()
+        await new Promise<void>((resolve) => { releaseBlockedWrite = () => resolve() })
       },
       runtimeLogger: quietLogger
     })
 
     try {
       blockWrites = true
-      const first = createResponse()
+      const first = createResponse<RunResponseBody>()
       let firstFinished = false
       const firstRequest = executeTrackedAgentAction(req, first, options)
         .then(() => { firstFinished = true })
       await writeStarted
 
-      const replay = createResponse()
+      const replay = createResponse<RunResponseBody>()
       let replayFinished = false
       const replayRequest = executeTrackedAgentAction(req, replay, options)
         .then(() => { replayFinished = true })
-      await new Promise(resolve => setImmediate(resolve))
+      await new Promise<void>((resolve) => setImmediate(resolve))
 
       assert.equal(firstFinished, false)
       assert.equal(replayFinished, false)
       assert.equal(executions, 0)
 
       blockWrites = false
-      releaseBlockedWrite()
+      releaseBlockedWrite!()
       await Promise.all([firstRequest, replayRequest])
 
       assert.equal(first.statusCode, 200)
@@ -512,12 +657,12 @@ describe('Agent run routes', () => {
 
   it('refreshes a replay that becomes terminal while its state is being persisted', async () => {
     let blockWrites = false
-    let releaseBlockedWrite
-    let signalWriteStarted
-    const writeStarted = new Promise(resolve => { signalWriteStarted = resolve })
+    let releaseBlockedWrite!: (() => void) | null
+    let signalWriteStarted: (() => void) | null = null
+    const writeStarted = new Promise<void>((resolve) => { signalWriteStarted = () => resolve() })
     let executions = 0
     const req = { headers: { 'idempotency-key': 'persistence:refresh-replay' } }
-    const options = {
+    const options: TrackedAgentActionOptions = {
       operationId: 'test_replay_refresh',
       input: { command: 'award' },
       waitForCompletion: false,
@@ -532,8 +677,8 @@ describe('Agent run routes', () => {
       readStore: async (_filePath, fallback) => fallback,
       writeStore: async () => {
         if (!blockWrites) return
-        signalWriteStarted()
-        await new Promise(resolve => { releaseBlockedWrite = resolve })
+        signalWriteStarted!()
+        await new Promise<void>((resolve) => { releaseBlockedWrite = () => resolve() })
       },
       runtimeLogger: quietLogger
     })
@@ -548,17 +693,17 @@ describe('Agent run routes', () => {
 
       blockWrites = true
       startAgentRun(run.runId)
-      const replay = createResponse()
+      const replay = createResponse<RunResponseBody>()
       const replayRequest = executeTrackedAgentAction(req, replay, options)
       await writeStarted
       completeAgentRun(run.runId, { stdout: 'finished during replay' })
       blockWrites = false
-      releaseBlockedWrite()
+      releaseBlockedWrite!()
       await replayRequest
 
       assert.equal(replay.statusCode, 200)
       assert.equal(replay.headers['Idempotency-Replayed'], 'true')
-      assert.equal(replay.body.data.run.state, 'succeeded')
+      assert.equal(replay.body.data.run!.state, 'succeeded')
       assert.equal(replay.body.data.stdout, 'finished during replay')
       assert.equal(executions, 0)
     } finally {
@@ -579,11 +724,11 @@ describe('Agent run routes', () => {
     startAgentRun(run.runId)
 
     let executions = 0
-    let stateAtSerialization = null
-    const res = createResponse()
+    let stateAtSerialization: string | null = null
+    const res = createResponse<RunResponseBody>()
     const serialize = res.json
     res.json = function json(body) {
-      stateAtSerialization = getAgentRun(run.runId).state
+      stateAtSerialization = getAgentRun(run.runId)!.state
       return serialize.call(this, body)
     }
 
@@ -599,17 +744,17 @@ describe('Agent run routes', () => {
     queueMicrotask(() => completeAgentRun(run.runId, { stdout: 'completed in microtask' }))
     await replay
 
-    assert.equal(res.body.data.run.state, stateAtSerialization)
-    assert.equal(getAgentRun(run.runId).state, 'succeeded')
+    assert.equal(res.body.data.run!.state, stateAtSerialization)
+    assert.equal(getAgentRun(run.runId)!.state, 'succeeded')
     assert.equal(executions, 0)
   })
 
   it('returns a background failure that settles during the response flush', async () => {
-    let releaseBlockedWrite
-    let signalWriteStarted
-    const writeStarted = new Promise(resolve => { signalWriteStarted = resolve })
-    let settle
-    const error = new Error('background failed during response persistence')
+    let releaseBlockedWrite!: (() => void) | null
+    let signalWriteStarted: (() => void) | null = null
+    const writeStarted = new Promise<void>((resolve) => { signalWriteStarted = () => resolve() })
+    let settle: NonNullable<AgentRunLifecycle['onSettled']> | null = null
+    const error: ErrorWithCode = new Error('background failed during response persistence')
     error.code = 'BACKGROUND_SETTLED_DURING_FLUSH'
     error.statusCode = 422
 
@@ -617,17 +762,21 @@ describe('Agent run routes', () => {
       filePath: '/virtual/agent-route-response-runs.json',
       readStore: async (_filePath, fallback) => fallback,
       writeStore: async (_filePath, snapshot) => {
-        const run = snapshot.runs[0]?.run
-        if (run?.status === 'running' && run?.result?.message === 'started') {
-          signalWriteStarted()
-          await new Promise(resolve => { releaseBlockedWrite = resolve })
+        if (!isRecord(snapshot) || !Array.isArray(snapshot.runs)) return
+        const first = snapshot.runs[0]
+        if (!isRecord(first) || !isRecord(first.run)) return
+        const run = first.run
+        const result = isRecord(run.result) ? run.result : null
+        if (run.status === 'running' && result?.message === 'started') {
+          signalWriteStarted!()
+          await new Promise<void>((resolve) => { releaseBlockedWrite = () => resolve() })
         }
       },
       runtimeLogger: quietLogger
     })
 
     try {
-      const res = createResponse()
+      const res = createResponse<AgentErrorBody>()
       const request = executeTrackedAgentAction(
         { headers: { 'idempotency-key': 'background:settle-during-flush' } },
         res,
@@ -635,23 +784,23 @@ describe('Agent run routes', () => {
           operationId: 'test_settle_during_response_flush',
           input: { command: 'award' },
           waitForCompletion: false,
-          execute: async lifecycle => {
-            lifecycle.onStarted()
-            settle = lifecycle.onSettled
+          execute: async (lifecycle) => {
+            lifecycle.onStarted!()
+            settle = lifecycle.onSettled!
             return { message: 'started' }
           }
         }
       )
 
       await writeStarted
-      const settlement = settle({ ok: false, error })
-      releaseBlockedWrite()
+      const settlement = settle!({ ok: false, error })
+      releaseBlockedWrite!()
       await Promise.all([request, settlement])
 
       assert.equal(res.statusCode, 422)
       assert.equal(res.body.success, false)
       assert.equal(res.body.error.code, 'BACKGROUND_SETTLED_DURING_FLUSH')
-      assert.equal(res.body.error.details.run.state, 'failed')
+      assert.equal(res.body.error.details.run!.state, 'failed')
     } finally {
       releaseBlockedWrite?.()
       await shutdownAgentRunStoreForTests()
@@ -660,41 +809,41 @@ describe('Agent run routes', () => {
 
   it('keeps a concurrently replayed run queryable when admission later fails', async () => {
     const req = { headers: { 'idempotency-key': 'busy:retry:1' } }
-    let rejectAdmission
+    let rejectAdmission: ((reason?: unknown) => void) | null = null
     let executions = 0
-    const options = {
+    const options: TrackedAgentActionOptions = {
       operationId: 'test_busy_action',
       input: { command: 'fight', waitForCompletion: false },
       waitForCompletion: false,
       execute: async () => {
         executions += 1
         if (executions === 1) {
-          await new Promise((_, reject) => { rejectAdmission = reject })
+          await new Promise<unknown>((_resolve, reject) => { rejectAdmission = reject })
         }
         return { message: 'started' }
       }
     }
 
-    const first = createResponse()
+    const first = createResponse<AgentErrorBody>()
     const firstRequest = executeTrackedAgentAction(req, first, options)
     await Promise.resolve()
-    const replay = createResponse()
+    const replay = createResponse<RunResponseBody>()
     await executeTrackedAgentAction(req, replay, options)
     const replayedRunId = replay.body.data.runId
-    const busy = new Error('MAA 正在被其他任务使用')
+    const busy: ErrorWithCode = new Error('MAA 正在被其他任务使用')
     busy.code = 'MAA_EXECUTION_BUSY'
     busy.statusCode = 409
     busy.retryable = true
-    rejectAdmission(busy)
+    rejectAdmission!(busy)
     await firstRequest
 
     assert.equal(replay.statusCode, 202)
     assert.equal(first.statusCode, 409)
     assert.equal(first.body.data, undefined)
     assert.equal(first.body.error.details.runId, replayedRunId)
-    assert.equal(getAgentRun(replayedRunId).state, 'failed')
+    assert.equal(getAgentRun(replayedRunId)!.state, 'failed')
 
-    const retry = createResponse()
+    const retry = createResponse<RunResponseBody>()
     await executeTrackedAgentAction(req, retry, options)
     assert.equal(retry.statusCode, 202)
     assert.notEqual(retry.body.data.runId, replayedRunId)
@@ -704,28 +853,28 @@ describe('Agent run routes', () => {
   it('does not let a pending admission hide the run that owns the executor', async () => {
     const owner = beginAgentRun({ operationId: 'fight' }).run
     startAgentRun(owner.runId)
-    let rejectAdmission
-    const res = createResponse()
+    let rejectAdmission: ((reason?: unknown) => void) | null = null
+    const res = createResponse<AgentErrorBody>()
     const request = executeTrackedAgentAction(
       { headers: { 'idempotency-key': 'pending:behind-owner' } },
       res,
       {
         operationId: 'run_task',
         input: { command: 'award' },
-        execute: async () => new Promise((_, reject) => { rejectAdmission = reject })
+        execute: async () => new Promise<unknown>((_resolve, reject) => { rejectAdmission = reject })
       }
     )
-    await new Promise(resolve => setImmediate(resolve))
+    await new Promise<void>((resolve) => setImmediate(resolve))
 
-    assert.equal(getCurrentAgentRun().runId, owner.runId)
-    const busy = new Error('MAA 正在被其他任务使用')
+    assert.equal(getCurrentAgentRun()!.runId, owner.runId)
+    const busy: ErrorWithCode = new Error('MAA 正在被其他任务使用')
     busy.code = 'MAA_EXECUTION_BUSY'
     busy.statusCode = 409
-    rejectAdmission(busy)
+    rejectAdmission!(busy)
     await request
 
     assert.equal(res.statusCode, 409)
-    assert.equal(getCurrentAgentRun().runId, owner.runId)
+    assert.equal(getCurrentAgentRun()!.runId, owner.runId)
   })
 
   it('rejects guarded stop when the requested run is not current', async () => {
@@ -733,7 +882,7 @@ describe('Agent run routes', () => {
     startAgentRun(older.runId)
     const current = beginAgentRun({ operationId: 'run_task' }).run
     startAgentRun(current.runId)
-    const res = createResponse()
+    const res = createResponse<AgentErrorBody>()
 
     await findHandler('post', '/actions/stop')({
       headers: {},
@@ -747,28 +896,31 @@ describe('Agent run routes', () => {
   })
 
   it('does not let an accepted run stop an untracked legacy process', async () => {
-    const signals = []
+    const signals: Array<NodeJS.Signals | number | undefined> = []
     setTaskStatus(true, '旧版任务', 'legacy', {
       pid: null,
       exitCode: null,
-      kill: signal => signals.push(signal)
-    })
-    let rejectAdmission
-    const startResponse = createResponse()
+      kill: (signal?: NodeJS.Signals | number) => {
+        signals.push(signal)
+        return true
+      }
+    } as unknown as ChildProcess)
+    let rejectAdmission: ((reason?: unknown) => void) | null = null
+    const startResponse = createResponse<RunResponseBody>()
     const startRequest = executeTrackedAgentAction(
       { headers: { 'idempotency-key': 'guard:legacy-process' } },
       startResponse,
       {
         operationId: 'run_task',
         input: { command: 'award' },
-        execute: async () => new Promise((_, reject) => { rejectAdmission = reject })
+        execute: async () => new Promise<unknown>((_resolve, reject) => { rejectAdmission = reject })
       }
     )
     await Promise.resolve()
-    const acceptedRun = getCurrentAgentRun()
+    const acceptedRun = getCurrentAgentRun()!
     assert.equal(acceptedRun.state, 'accepted')
 
-    const stopResponse = createResponse()
+    const stopResponse = createResponse<AgentErrorBody>()
     await findHandler('post', '/actions/stop')({
       headers: {},
       body: { runId: acceptedRun.runId }
@@ -778,17 +930,17 @@ describe('Agent run routes', () => {
     assert.equal(stopResponse.body.error.code, 'AGENT_RUN_NOT_STARTED')
     assert.deepEqual(signals, [])
 
-    const busy = new Error('MAA 正在被其他任务使用')
+    const busy: ErrorWithCode = new Error('MAA 正在被其他任务使用')
     busy.code = 'MAA_EXECUTION_BUSY'
     busy.statusCode = 409
-    rejectAdmission(busy)
+    rejectAdmission!(busy)
     await startRequest
   })
 })
 
 describe('Agent daily flow route', () => {
   it('returns an inspectable dry-run plan with the standard dry-run metadata', async () => {
-    const res = createResponse()
+    const res = createResponse<DailyFlowResponseBody>()
     const req = {
       headers: { 'x-request-id': 'dry-run-test' },
       body: {
@@ -821,7 +973,7 @@ describe('Agent daily flow route', () => {
   })
 
   it('uses scheduler-native dynamic configs and advanced fight arguments in dry-run output', async () => {
-    const res = createResponse()
+    const res = createResponse<DailyFlowResponseBody>()
     const req = {
       headers: {},
       query: {},
@@ -845,14 +997,14 @@ describe('Agent daily flow route', () => {
     assert.equal(res.body.meta.dryRun, true)
     assert.equal(res.body.data.plan[0].command, 'run')
     assert.equal(res.body.data.plan[0].dynamicTask, true)
-    assert.equal(res.body.data.plan[0].taskConfig.type, 'Recruit')
+    assert.equal(res.body.data.plan[0].taskConfig!.type, 'Recruit')
     assert.deepEqual(res.body.data.plan[1].args, [
       '1-7', '-m', '1', '-D30011=10', '--report-to-penguin', '--penguin-id', 'doctor'
     ])
   })
 
   it('rejects invalid scheduler configuration during dry-run', async () => {
-    const res = createResponse()
+    const res = createResponse<AgentErrorBody>()
     const req = {
       headers: {},
       query: {},
@@ -874,13 +1026,13 @@ describe('Agent daily flow route', () => {
   })
 
   it('returns a validation error for malformed task entries', async () => {
-    const res = createResponse()
+    const res = createResponse<AgentErrorBody>()
     const req = { headers: {}, query: {}, body: { dryRun: true, taskFlow: [null] } }
 
     await findHandler('post', '/actions/run-daily-flow')(req, res, () => {})
 
     assert.equal(res.statusCode, 400)
     assert.equal(res.body.error.code, 'AGENT_DAILY_FLOW_REJECTED')
-    assert.equal(res.body.error.details.result.details.index, 0)
+    assert.equal(res.body.error.details.result!.details!.index, 0)
   })
 })

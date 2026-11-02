@@ -1,3 +1,4 @@
+import { getErrorMessage } from './utils/errors.ts';
 import { readFileSync } from 'node:fs';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
@@ -6,44 +7,48 @@ import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
-import { printPathConfig } from './config/paths.js';
-import operatorQuotesRoutes from './routes/operatorQuotes.js';
-import maaAssetsRoutes from './routes/maaAssets.js';
-import agentRoutes from './routes/agent.js';
+import type { Express, NextFunction, Request, Response } from 'express';
+import { printPathConfig } from './config/paths.ts';
+import operatorQuotesRoutes from './routes/operatorQuotes.ts';
+import maaAssetsRoutes from './routes/maaAssets.ts';
+import agentRoutes from './routes/agent.ts';
 import {
   getAgentRunStoreStatus,
   initializeAgentRunStore
-} from './services/agentRunService.js';
-import { initializeRuntimeState } from './services/runtimeInitializationService.js';
-import { cleanupStaleDynamicTaskFiles } from './services/maaService.js';
+} from './services/agentRunService.ts';
+import { initializeRuntimeState } from './services/runtimeInitializationService.ts';
+import { cleanupStaleDynamicTaskFiles } from './services/maaService.ts';
 import {
   createWebrtcSignalingGateway,
   WEBRTC_SIGNALING_PATH
-} from './services/webrtcSignalingGateway.js';
-import { agentError, sendError } from './utils/apiHelper.js';
+} from './services/webrtcSignalingGateway.ts';
+import { agentError, sendError } from './utils/apiHelper.ts';
+import { closeMaaExecutionLeaseAdmission } from './services/executionCoordinatorService.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-function getLocalIpAddress() {
+function getLocalIpAddress(): string {
   const nets = networkInterfaces();
   for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
+    const entries = nets[name];
+    if (!entries) continue;
+    for (const net of entries) {
       if (net.family === 'IPv4' && !net.internal) return net.address;
     }
   }
   return 'localhost';
 }
 
-export function normalizeBasePath(value = '/') {
+export function normalizeBasePath(value: unknown = '/'): string {
   const trimmed = String(value || '').trim();
   if (!trimmed || trimmed === '/') return '/';
   const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
   return `${withLeadingSlash.replace(/\/+$/, '')}/`;
 }
 
-function createOptionalApiAuth(apiToken = '') {
-  return function optionalApiAuth(req, res, next) {
+function createOptionalApiAuth(apiToken = ''): express.RequestHandler {
+  return function optionalApiAuth(req: Request, res: Response, next: NextFunction) {
     if (!apiToken) return next();
 
     const authHeader = req.headers.authorization || '';
@@ -61,11 +66,17 @@ function createOptionalApiAuth(apiToken = '') {
   };
 }
 
+interface CreateAppOptions {
+  env?: NodeJS.ProcessEnv;
+  signalingGateway?: ReturnType<typeof createWebrtcSignalingGateway>;
+  clientDistPath?: string;
+}
+
 export function createLaPlumaApp({
   env = process.env,
   signalingGateway = createWebrtcSignalingGateway(),
   clientDistPath = join(__dirname, '..', 'client', 'dist')
-} = {}) {
+}: CreateAppOptions = {}): Express {
   const app = express();
   const optionalApiAuth = createOptionalApiAuth(env.LA_PLUMA_TOKEN || '');
   const signalingPath = signalingGateway.proxyPath || WEBRTC_SIGNALING_PATH;
@@ -74,8 +85,8 @@ export function createLaPlumaApp({
   // Only ticket issuance is exposed over HTTP. The signaling admin UI and
   // device endpoints remain inaccessible through the public application port.
   app.post(`${signalingPath}/api/login`, optionalApiAuth, signalingGateway.handleLogin);
-  app.all(signalingPath, (_req, res) => res.status(404).json({ error: 'Not Found' }));
-  app.all(`${signalingPath}/*`, (_req, res) => res.status(404).json({ error: 'Not Found' }));
+  app.all(signalingPath, (_req: Request, res: Response) => res.status(404).json({ error: 'Not Found' }));
+  app.all(`${signalingPath}/*`, (_req: Request, res: Response) => res.status(404).json({ error: 'Not Found' }));
 
   app.use(cors({
     origin: '*',
@@ -84,14 +95,14 @@ export function createLaPlumaApp({
   }));
   app.use(express.json());
 
-  app.get('/health', (_req, res) => {
+  app.get('/health', (_req: Request, res: Response) => {
     res.json({ success: true, status: 'ok' });
   });
 
   if (env.NODE_ENV === 'production') {
     const staticMountPath = basePath === '/' ? '/' : basePath.slice(0, -1);
-    const reservedPaths = ['/api', '/health', signalingPath];
-    const sendAppShell = (req, res, next) => {
+    const reservedPaths: string[] = ['/api', '/health', signalingPath];
+    const sendAppShell = (req: Request, res: Response, next: NextFunction) => {
       const appPath = staticMountPath === '/'
         ? req.path
         : req.path.slice(staticMountPath.length) || '/';
@@ -116,7 +127,10 @@ export function createLaPlumaApp({
   return app;
 }
 
-export function loadHttpsOptions(env = process.env, readFile = readFileSync) {
+export function loadHttpsOptions(
+  env: NodeJS.ProcessEnv = process.env,
+  readFile: (path: string) => Buffer | string = readFileSync
+) {
   const certPath = env.LA_PLUMA_HTTPS_CERT_PATH?.trim();
   const keyPath = env.LA_PLUMA_HTTPS_KEY_PATH?.trim();
   if (!certPath && !keyPath) return null;
@@ -129,12 +143,19 @@ export function loadHttpsOptions(env = process.env, readFile = readFileSync) {
   };
 }
 
+interface TransportOptions {
+  app: Express;
+  signalingGateway: ReturnType<typeof createWebrtcSignalingGateway>;
+  env?: NodeJS.ProcessEnv;
+  readFile?: (path: string) => Buffer | string;
+}
+
 function createLaPlumaTransportServer({
   app,
   signalingGateway,
   env = process.env,
   readFile = readFileSync
-}) {
+}: TransportOptions) {
   const httpsOptions = loadHttpsOptions(env, readFile);
   const server = httpsOptions
     ? createHttpsServer(httpsOptions, app)
@@ -146,7 +167,7 @@ function createLaPlumaTransportServer({
     if (!server.listening) return;
     server.closeIdleConnections?.();
     server.closeAllConnections?.();
-    await new Promise((resolveClose, rejectClose) => {
+    await new Promise<void>((resolveClose, rejectClose) => {
       server.close(error => error ? rejectClose(error) : resolveClose());
     });
   };
@@ -158,6 +179,16 @@ function createLaPlumaTransportServer({
   };
 }
 
+interface StartServerOptions {
+  env?: NodeJS.ProcessEnv;
+  host?: string;
+  port?: number;
+  signalingGateway?: ReturnType<typeof createWebrtcSignalingGateway>;
+  initializeRunStore?: typeof initializeAgentRunStore;
+  initializeRuntime?: typeof initializeRuntimeState;
+  logger?: Pick<Console, 'log' | 'error'>;
+}
+
 export async function startLaPlumaServer({
   env = process.env,
   host = '0.0.0.0',
@@ -166,7 +197,7 @@ export async function startLaPlumaServer({
   initializeRunStore = initializeAgentRunStore,
   initializeRuntime = initializeRuntimeState,
   logger = console
-} = {}) {
+}: StartServerOptions = {}) {
   const app = createLaPlumaApp({ env, signalingGateway });
   const transport = createLaPlumaTransportServer({ app, signalingGateway, env });
 
@@ -182,13 +213,13 @@ export async function startLaPlumaServer({
     const status = getAgentRunStoreStatus();
     logger.error('[AgentRun] 存储初始化失败，执行接口已关闭:', {
       filePath: status.filePath,
-      error: status.error || error.message
+      error: status.error || getErrorMessage(error)
     });
   }
 
   try {
-    await new Promise((resolveListen, rejectListen) => {
-      const onError = error => rejectListen(error);
+    await new Promise<void>((resolveListen, rejectListen) => {
+      const onError = (error: Error) => rejectListen(error);
       transport.server.once('error', onError);
       transport.server.listen(port, host, () => {
         transport.server.off('error', onError);
@@ -215,13 +246,13 @@ export async function startLaPlumaServer({
       logger.log(`[MAA] 已清理 ${removedTaskFiles} 个残留动态任务文件`);
     }
   } catch (error) {
-    logger.error('[MAA] 清理残留动态任务文件失败:', error.message);
+    logger.error('[MAA] 清理残留动态任务文件失败:', getErrorMessage(error));
   }
 
   try {
     await initializeRuntime();
   } catch (error) {
-    logger.error('[Runtime] 初始化失败:', error.message);
+    logger.error('[Runtime] 初始化失败:', getErrorMessage(error));
   }
 
   return { app, ...transport, port: listeningPort };
@@ -235,13 +266,14 @@ if (isMainModule) {
     const shutdown = async () => {
       if (closing) return;
       closing = true;
-      await runtime.close().catch(error => console.error('[Server] 关闭失败:', error.message));
+      closeMaaExecutionLeaseAdmission('server_shutdown');
+      await runtime.close().catch((error: unknown) => console.error('[Server] 关闭失败:', getErrorMessage(error)));
       process.exit(0);
     };
     process.once('SIGINT', shutdown);
     process.once('SIGTERM', shutdown);
   } catch (error) {
-    console.error('[Server] 启动失败:', error.message);
+    console.error('[Server] 启动失败:', getErrorMessage(error));
     process.exitCode = 1;
   }
 }

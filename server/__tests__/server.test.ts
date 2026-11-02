@@ -1,38 +1,58 @@
+import { getErrorCode } from '../utils/errors.ts';
+import type { ApiErrorResponse } from '../utils/apiHelper.ts';
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
+import type { Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, it } from 'node:test'
+import type { Express } from 'express'
 import {
   createLaPlumaApp,
   loadHttpsOptions,
   normalizeBasePath,
   startLaPlumaServer
-} from '../server.js'
-import { WEBRTC_SIGNALING_PATH } from '../services/webrtcSignalingGateway.js'
+} from '../server.ts'
+import { WEBRTC_SIGNALING_PATH, type createWebrtcSignalingGateway } from '../services/webrtcSignalingGateway.ts'
 
-const servers = []
-const tempDirs = []
+const servers: Server[] = []
+const tempDirs: string[] = []
 
-async function listen(app) {
+type SignalingGateway = ReturnType<typeof createWebrtcSignalingGateway>
+
+function createSignalingGatewayStub(token: string): SignalingGateway {
+  return {
+    proxyPath: WEBRTC_SIGNALING_PATH,
+    async handleLogin(_request, response) {
+      return response.json({ token })
+    },
+    handleUpgrade() {},
+    attach() {},
+    close() {}
+  }
+}
+
+async function listen(app: Express) {
   const server = createServer(app)
   servers.push(server)
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     server.once('error', reject)
     server.listen(0, '127.0.0.1', resolve)
   })
-  return server.address().port
+  const address = server.address()
+  assert.ok(address && typeof address !== 'string', 'expected the test server to listen on a TCP port')
+  return address.port
 }
 
 afterEach(async () => {
   while (servers.length) {
-    const server = servers.pop()
+    const server = servers.pop()!
     server.closeIdleConnections?.()
     server.closeAllConnections?.()
-    await new Promise(resolve => server.close(resolve))
+    await new Promise<void>((resolve) => server.close(() => resolve()))
   }
-  while (tempDirs.length) await rm(tempDirs.pop(), { recursive: true, force: true })
+  while (tempDirs.length) await rm(tempDirs.pop()!, { recursive: true, force: true })
 })
 
 describe('La Pluma transport configuration', () => {
@@ -49,26 +69,21 @@ describe('La Pluma transport configuration', () => {
       /必须同时配置/
     )
 
-    const reads = []
+    const reads: string[] = []
     const options = loadHttpsOptions({
       LA_PLUMA_HTTPS_CERT_PATH: '/cert.pem',
       LA_PLUMA_HTTPS_KEY_PATH: '/key.pem'
-    }, path => {
+    }, (path) => {
       reads.push(path)
       return Buffer.from(path)
     })
     assert.deepEqual(reads, ['/cert.pem', '/key.pem'])
-    assert.equal(options.cert.toString(), '/cert.pem')
-    assert.equal(options.key.toString(), '/key.pem')
+    assert.equal(options!.cert.toString(), '/cert.pem')
+    assert.equal(options!.key.toString(), '/key.pem')
   })
 
   it('protects ticket issuance with LA_PLUMA_TOKEN and hides all other HTTP paths', async () => {
-    const signalingGateway = {
-      proxyPath: WEBRTC_SIGNALING_PATH,
-      handleLogin(_req, res) {
-        return res.json({ token: 'one-use-ticket' })
-      }
-    }
+    const signalingGateway = createSignalingGatewayStub('one-use-ticket')
     const app = createLaPlumaApp({
       env: { LA_PLUMA_TOKEN: 'api-secret' },
       signalingGateway
@@ -78,7 +93,7 @@ describe('La Pluma transport configuration', () => {
 
     const unauthorized = await fetch(`${baseUrl}/api/login`, { method: 'POST' })
     assert.equal(unauthorized.status, 401)
-    assert.equal((await unauthorized.json()).error.code, 'AGENT_AUTH_REQUIRED')
+    assert.equal((await unauthorized.json() as ApiErrorResponse).error.code, 'AGENT_AUTH_REQUIRED')
 
     const authorized = await fetch(`${baseUrl}/api/login`, {
       method: 'POST',
@@ -99,12 +114,7 @@ describe('La Pluma transport configuration', () => {
     await writeFile(join(clientDistPath, 'index.html'), '<!doctype html><title>La Pluma fixture</title>')
     await writeFile(join(clientDistPath, 'assets', 'app.js'), 'globalThis.fixtureLoaded = true')
 
-    const signalingGateway = {
-      proxyPath: WEBRTC_SIGNALING_PATH,
-      handleLogin(_req, res) {
-        return res.json({ token: 'fixture-ticket' })
-      }
-    }
+    const signalingGateway = createSignalingGatewayStub('fixture-ticket')
     const app = createLaPlumaApp({
       env: { NODE_ENV: 'production', LA_PLUMA_BASE_PATH: '/la-pluma/' },
       signalingGateway,
@@ -119,7 +129,7 @@ describe('La Pluma transport configuration', () => {
 
     const asset = await fetch(`${origin}/la-pluma/assets/app.js`)
     assert.equal(asset.status, 200)
-    assert.match(asset.headers.get('content-type'), /javascript/)
+    assert.match(asset.headers.get('content-type') || '', /javascript/)
     assert.match(await asset.text(), /fixtureLoaded/)
 
     const missingAsset = await fetch(`${origin}/la-pluma/assets/missing.js`)
@@ -146,7 +156,12 @@ describe('La Pluma transport configuration', () => {
         interruptedRuns: 0,
         prunedRuns: 0
       }),
-      initializeRuntime: async () => {},
+      initializeRuntime: async () => ({
+        notification: { restored: false },
+        schedule: { restored: false },
+        autoUpdate: { restored: false },
+        telegram: { initialized: false }
+      }),
       logger: { log() {}, error() {} }
     })
 

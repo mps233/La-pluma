@@ -1,8 +1,11 @@
+import { asErrorWithCode, getErrorDetails, getErrorStatus } from '../utils/errors.ts';
+import type { ErrorWithCode } from '../utils/errors.ts';
+import { getErrorCode, getErrorMessage } from '../utils/errors.ts';
 import { createHash, randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
-import { agentError } from '../utils/apiHelper.js';
-import { readJsonFile, writeJsonFile } from '../utils/fileHelper.js';
-import { createLogger } from '../utils/logger.js';
+import { agentError } from '../utils/apiHelper.ts';
+import { readJsonFile, writeJsonFile } from '../utils/fileHelper.ts';
+import { createLogger } from '../utils/logger.ts';
 
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._~:-]{0,127}$/;
 const TERMINAL_RETENTION_MS = 24 * 60 * 60 * 1000;
@@ -14,11 +17,92 @@ const AGENT_RUN_STORE_VERSION = 1;
 const DEFAULT_AGENT_RUN_STORE_PATH = fileURLToPath(new URL('../data/agent-runs.json', import.meta.url));
 const logger = createLogger('AgentRunService');
 
-const runs = new Map();
-const idempotencyIndex = new Map();
+export interface AgentRunFailure {
+  code: string;
+  message: string;
+  statusCode: number;
+  details: Record<string, unknown>;
+  retryable: boolean;
+}
+
+export interface AgentRun {
+  runId: string;
+  operationId: string;
+  idempotencyKey: string | null;
+  inputFingerprint: string;
+  input: unknown;
+  metadata: unknown;
+  trigger: unknown;
+  progress: unknown;
+  taskResults: unknown[];
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  durationMs: number | null;
+  result: unknown;
+  error: AgentRunFailure | null;
+}
+
+export interface AgentRunRecord {
+  run: AgentRun;
+  sequence: number;
+  createdAtMs: number;
+  startedAtMs: number | null;
+  finishedAtMs: number | null;
+  terminalSequence: number | null;
+}
+
+export interface AgentRunDto {
+  runId: string;
+  operationId: string;
+  state: string;
+  acceptedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  durationMs?: number;
+  trigger: unknown;
+  progress?: unknown;
+  taskResults: unknown[];
+  result: unknown;
+  error?: AgentRunFailure;
+  links: { self: string; stop: string; targetedStop: string };
+}
+
+export interface AgentRunPersistence {
+  enabled: boolean;
+  required: boolean;
+  filePath: string;
+  readStore: (filePath: string, fallback: unknown) => Promise<unknown>;
+  writeStore: (filePath: string, data: unknown) => Promise<unknown>;
+  runtimeLogger: ReturnType<typeof createLogger>;
+}
+
+export interface AgentRunStoreOverrides {
+  filePath?: string;
+  readStore?: AgentRunPersistence['readStore'];
+  writeStore?: AgentRunPersistence['writeStore'];
+  runtimeLogger?: AgentRunPersistence['runtimeLogger'];
+  required?: boolean;
+}
+
+export interface BeginAgentRunInput {
+  operationId: string;
+  idempotencyKey?: string | null;
+  input?: unknown;
+  metadata?: unknown;
+  trigger?: unknown;
+  progress?: unknown;
+  taskResults?: unknown[];
+}
+
+
+const runs = new Map<string, AgentRunRecord>();
+const idempotencyIndex = new Map<string, { runId: string; inputFingerprint: string }>();
 let sequence = 0;
 let terminalSequence = 0;
-let persistence = {
+let persistence: AgentRunPersistence = {
   enabled: false,
   required: false,
   filePath: DEFAULT_AGENT_RUN_STORE_PATH,
@@ -27,13 +111,13 @@ let persistence = {
   runtimeLogger: logger
 };
 let persistenceDirty = false;
-let persistencePromise = null;
-let persistenceError = null;
+let persistencePromise: Promise<void> | null = null;
+let persistenceError: unknown = null;
 let persistenceStartQueued = false;
 let persistenceGeneration = 0;
 
-function agentRunPersistenceError(error) {
-  return agentError('AGENT_RUN_PERSISTENCE_FAILED', `Agent run 持久化失败: ${error?.message || error}`, {
+function agentRunPersistenceError(error: unknown) {
+  return agentError('AGENT_RUN_PERSISTENCE_FAILED', `Agent run 持久化失败: ${getErrorMessage(error) || error}`, {
     statusCode: 503,
     details: { filePath: persistence.filePath },
     retryable: true
@@ -68,7 +152,7 @@ function startPersistenceWriter() {
 
   const generation = persistenceGeneration;
   const activePersistence = persistence;
-  const writer = (async () => {
+  const writer = (async (): Promise<void> => {
     while (generation === persistenceGeneration && persistenceDirty) {
       persistenceDirty = false;
       try {
@@ -81,7 +165,7 @@ function startPersistenceWriter() {
         persistenceError = error;
         activePersistence.runtimeLogger.error('Agent run 持久化失败', {
           filePath: activePersistence.filePath,
-          error: error.message
+          error: getErrorMessage(error)
         });
         break;
       }
@@ -132,7 +216,7 @@ export async function flushAgentRunStore() {
   }
 }
 
-export async function withFlushedAgentRunSnapshot(runId, consume) {
+export async function withFlushedAgentRunSnapshot<T>(runId: string, consume: (run: AgentRunDto | null) => T): Promise<T> {
   while (true) {
     await flushAgentRunStore();
     const run = getAgentRun(runId);
@@ -147,11 +231,11 @@ export function getAgentRunStoreStatus() {
     ready: persistence.enabled && !persistenceError,
     dirty: persistenceDirty,
     filePath: persistence.filePath,
-    error: persistenceError?.message || null
+    error: persistenceError ? getErrorMessage(persistenceError) : null
   };
 }
 
-function validationError(code, message, details = {}) {
+function validationError(code: string, message: string, details: Record<string, unknown> = {}) {
   return agentError(code, message, {
     statusCode: 400,
     details,
@@ -159,45 +243,45 @@ function validationError(code, message, details = {}) {
   });
 }
 
-function normalizeJson(value, fieldName) {
+function normalizeJson<T>(value: T, fieldName: string): T {
   try {
     const serialized = JSON.stringify(value);
     if (serialized === undefined) {
       throw new TypeError(`${fieldName} 不是可序列化的 JSON 值`);
     }
-    return JSON.parse(serialized);
+    return JSON.parse(serialized) as T;
   } catch (error) {
     throw validationError(
       'AGENT_RUN_JSON_INVALID',
       `${fieldName} 必须是可序列化的 JSON`,
-      { field: fieldName, reason: error.message }
+      { field: fieldName, reason: getErrorMessage(error) }
     );
   }
 }
 
-function stableJson(value) {
+function stableJson(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
-
-  return `{${Object.keys(value)
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
     .sort()
-    .map(key => `${JSON.stringify(key)}:${stableJson(value[key])}`)
+    .map(key => `${JSON.stringify(key)}:${stableJson(record[key])}`)
     .join(',')}}`;
 }
 
-export function fingerprintAgentRunInput(input = {}) {
+export function fingerprintAgentRunInput(input: unknown = {}) {
   const normalized = normalizeJson(input, 'input');
   return createHash('sha256').update(stableJson(normalized)).digest('hex');
 }
 
-function cloneJson(value) {
-  return JSON.parse(JSON.stringify(value));
+function cloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function toAgentRunDto(run) {
+function toAgentRunDto(run: AgentRun | undefined | null): AgentRunDto | null {
   if (!run) return null;
 
-  const dto = {
+  const dto: AgentRunDto = {
     runId: run.runId,
     operationId: run.operationId,
     state: run.status,
@@ -205,9 +289,12 @@ function toAgentRunDto(run) {
     startedAt: run.startedAt,
     finishedAt: run.finishedAt,
     result: cloneJson(run.result),
+    trigger: run.trigger === undefined ? null : cloneJson(run.trigger),
+    taskResults: cloneJson(run.taskResults || []),
     links: {
       self: `/api/agent/runs/${run.runId}`,
-      stop: '/api/agent/actions/stop'
+      stop: '/api/agent/actions/stop',
+      targetedStop: `/api/agent/runs/${run.runId}/stop`
     }
   };
   if (run.durationMs !== null) dto.durationMs = run.durationMs;
@@ -224,11 +311,11 @@ function toAgentRunDto(run) {
   return cloneJson(dto);
 }
 
-function idempotencyIndexKey(operationId, idempotencyKey) {
+function idempotencyIndexKey(operationId: string, idempotencyKey: string) {
   return JSON.stringify([operationId, idempotencyKey]);
 }
 
-function removeRecord(runId) {
+function removeRecord(runId: string): boolean {
   const record = runs.get(runId);
   if (!record) return false;
 
@@ -240,14 +327,14 @@ function removeRecord(runId) {
   return true;
 }
 
-function pruneTerminalRuns(now = Date.now()) {
+function pruneTerminalRuns(now: number = Date.now()): number {
   const cutoff = now - TERMINAL_RETENTION_MS;
-  const retained = [];
+  const retained: AgentRunRecord[] = [];
   let removed = 0;
 
   for (const [runId, record] of runs) {
     if (!TERMINAL_STATUSES.has(record.run.status)) continue;
-    if (record.finishedAtMs <= cutoff) {
+    if ((record.finishedAtMs ?? 0) <= cutoff) {
       if (removeRecord(runId)) removed += 1;
       continue;
     }
@@ -256,7 +343,7 @@ function pruneTerminalRuns(now = Date.now()) {
 
   if (retained.length <= MAX_TERMINAL_RUNS) return removed;
   retained.sort((left, right) =>
-    left.finishedAtMs - right.finishedAtMs || left.terminalSequence - right.terminalSequence
+    (left.finishedAtMs ?? 0) - (right.finishedAtMs ?? 0) || (left.terminalSequence ?? 0) - (right.terminalSequence ?? 0)
   );
   for (const record of retained.slice(0, retained.length - MAX_TERMINAL_RUNS)) {
     if (removeRecord(record.run.runId)) removed += 1;
@@ -264,7 +351,7 @@ function pruneTerminalRuns(now = Date.now()) {
   return removed;
 }
 
-function normalizeOperationId(operationId) {
+function normalizeOperationId(operationId: unknown): string {
   if (typeof operationId !== 'string' || !operationId.trim()) {
     throw validationError(
       'AGENT_RUN_OPERATION_REQUIRED',
@@ -275,7 +362,7 @@ function normalizeOperationId(operationId) {
   return operationId.trim();
 }
 
-function normalizeIdempotencyKey(idempotencyKey) {
+function normalizeIdempotencyKey(idempotencyKey: unknown): string | null {
   if (idempotencyKey === undefined || idempotencyKey === null) return null;
   if (typeof idempotencyKey !== 'string' || !IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
     throw validationError(
@@ -287,7 +374,7 @@ function normalizeIdempotencyKey(idempotencyKey) {
   return idempotencyKey;
 }
 
-function requireRecord(runId) {
+function requireRecord(runId: string): AgentRunRecord {
   if (pruneTerminalRuns() > 0) scheduleAgentRunPersistence();
   const record = runs.get(runId);
   if (!record) {
@@ -300,7 +387,7 @@ function requireRecord(runId) {
   return record;
 }
 
-function transitionError(record, targetStatus, allowedStatuses) {
+function transitionError(record: AgentRunRecord, targetStatus: string, allowedStatuses: string[]) {
   return agentError('AGENT_RUN_STATE_CONFLICT', `无法将 run 从 ${record.run.status} 更新为 ${targetStatus}`, {
     statusCode: 409,
     details: {
@@ -313,9 +400,9 @@ function transitionError(record, targetStatus, allowedStatuses) {
   });
 }
 
-function transition(runId, targetStatus, allowedStatuses, updates = {}) {
+function transition(runId: string, targetStatus: string, allowedStatuses: string[], updates: Partial<AgentRun> = {}) {
   const record = requireRecord(runId);
-  if (record.run.status === targetStatus) return toAgentRunDto(record.run);
+  if (record.run.status === targetStatus) return toAgentRunDto(record.run) as AgentRunDto;
   if (!allowedStatuses.includes(record.run.status)) {
     throw transitionError(record, targetStatus, allowedStatuses);
   }
@@ -340,40 +427,44 @@ function transition(runId, targetStatus, allowedStatuses, updates = {}) {
   }
 
   scheduleAgentRunPersistence();
-  return toAgentRunDto(record.run);
+  return toAgentRunDto(record.run) as AgentRunDto;
 }
 
-function normalizeFailure(error) {
+function normalizeFailure(error: unknown): AgentRunFailure {
   if (error instanceof Error) {
+    const failure = error as ErrorWithCode;
     return normalizeJson({
-      code: error.code || 'AGENT_RUN_FAILED',
-      message: error.message,
-      statusCode: normalizeFailureStatusCode(error.statusCode || error.status),
-      details: error.details || {},
-      retryable: error.retryable ?? false
-    }, 'error');
+      code: failure.code || 'AGENT_RUN_FAILED',
+      message: failure.message,
+      statusCode: normalizeFailureStatusCode(failure.statusCode || failure.status),
+      details: failure.details || {},
+      retryable: failure.retryable ?? false
+    }, 'error') as AgentRunFailure;
   }
-  const normalized = normalizeJson(error ?? { message: 'Agent run 执行失败' }, 'error');
+  const normalized: unknown = normalizeJson(error ?? { message: 'Agent run 执行失败' }, 'error');
   if (typeof normalized === 'string') {
-    return { code: 'AGENT_RUN_FAILED', message: normalized, statusCode: 500, details: {}, retryable: false };
+    return { code: 'AGENT_RUN_FAILED', message: normalized, statusCode: 500, details: {} as Record<string, unknown>, retryable: false };
   }
+  const failure = normalized && typeof normalized === 'object' && !Array.isArray(normalized)
+    ? normalized as Record<string, unknown>
+    : {};
   return {
-    code: normalized.code || 'AGENT_RUN_FAILED',
-    message: normalized.message || 'Agent run 执行失败',
-    statusCode: normalizeFailureStatusCode(normalized.statusCode || normalized.status),
-    details: normalized.details && typeof normalized.details === 'object' && !Array.isArray(normalized.details)
-      ? normalized.details
+    code: typeof failure.code === 'string' ? failure.code : 'AGENT_RUN_FAILED',
+    message: typeof failure.message === 'string' ? failure.message : 'Agent run 执行失败',
+    statusCode: normalizeFailureStatusCode(failure.statusCode ?? failure.status),
+    details: failure.details && typeof failure.details === 'object' && !Array.isArray(failure.details)
+      ? failure.details as Record<string, unknown>
       : {},
-    retryable: normalized.retryable ?? false
+    retryable: failure.retryable === true
   };
 }
 
-function normalizeFailureStatusCode(statusCode) {
+function normalizeFailureStatusCode(statusCode: unknown): number {
   const normalized = Number(statusCode);
   return Number.isInteger(normalized) && normalized >= 400 && normalized <= 599 ? normalized : 500;
 }
 
-function storeValidationError(message, details = {}) {
+function storeValidationError(message: string, details: Record<string, unknown> = {}) {
   return agentError('AGENT_RUN_STORE_INVALID', message, {
     statusCode: 503,
     details: { filePath: persistence.filePath, ...details },
@@ -381,7 +472,7 @@ function storeValidationError(message, details = {}) {
   });
 }
 
-function finiteTimestamp(value, fallback, field, index) {
+function finiteTimestamp(value: unknown, fallback: number | undefined, field: string, index: number): number {
   const normalized = Number(value ?? fallback);
   if (!Number.isFinite(normalized) || normalized < 0) {
     throw storeValidationError(`Agent run 存储中的 ${field} 无效`, { index, field });
@@ -389,12 +480,16 @@ function finiteTimestamp(value, fallback, field, index) {
   return normalized;
 }
 
-function restoreRecord(item, index) {
-  if (!item || typeof item !== 'object' || Array.isArray(item) || !item.run || typeof item.run !== 'object') {
+function restoreRecord(item: unknown, index: number): AgentRunRecord {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    throw storeValidationError('Agent run 存储记录格式无效', { index });
+  }
+  const itemRecord = item as Record<string, unknown>;
+  if (!itemRecord.run || typeof itemRecord.run !== 'object') {
     throw storeValidationError('Agent run 存储记录格式无效', { index });
   }
 
-  const run = normalizeJson(item.run, `runs[${index}].run`);
+  const run = normalizeJson<AgentRun>(itemRecord.run as AgentRun, `runs[${index}].run`);
   if (typeof run.runId !== 'string' || !run.runId
     || typeof run.operationId !== 'string' || !run.operationId
     || !ALL_STATUSES.has(run.status)
@@ -439,24 +534,24 @@ function restoreRecord(item, index) {
   run.result = run.result ?? null;
   run.error = run.error ?? null;
 
-  const createdAtMs = finiteTimestamp(item.createdAtMs, Date.parse(run.createdAt), 'createdAtMs', index);
+  const createdAtMs = finiteTimestamp(itemRecord.createdAtMs, Date.parse(run.createdAt), 'createdAtMs', index);
   const startedAtMs = run.startedAt
-    ? finiteTimestamp(item.startedAtMs, Date.parse(run.startedAt), 'startedAtMs', index)
+    ? finiteTimestamp(itemRecord.startedAtMs, Date.parse(run.startedAt), 'startedAtMs', index)
     : null;
-  if (terminal && (item.finishedAtMs === null || item.finishedAtMs === undefined)) {
+  if (terminal && (itemRecord.finishedAtMs === null || itemRecord.finishedAtMs === undefined)) {
     throw storeValidationError('Agent run 终态记录缺少 finishedAtMs', { index, runId: run.runId });
   }
   const finishedAtMs = terminal
-    ? finiteTimestamp(item.finishedAtMs, undefined, 'finishedAtMs', index)
+    ? finiteTimestamp(itemRecord.finishedAtMs, undefined, 'finishedAtMs', index)
     : null;
-  const storedSequence = Number(item.sequence);
+  const storedSequence = Number(itemRecord.sequence);
   if (!Number.isInteger(storedSequence) || storedSequence <= 0) {
     throw storeValidationError('Agent run 存储中的 sequence 无效', { index, runId: run.runId });
   }
-  const storedTerminalSequence = item.terminalSequence === null || item.terminalSequence === undefined
+  const storedTerminalSequence = itemRecord.terminalSequence === null || itemRecord.terminalSequence === undefined
     ? null
-    : Number(item.terminalSequence);
-  if (terminal && (!Number.isInteger(storedTerminalSequence) || storedTerminalSequence <= 0)) {
+    : Number(itemRecord.terminalSequence);
+  if (terminal && (!Number.isInteger(storedTerminalSequence) || (storedTerminalSequence as number) <= 0)) {
     throw storeValidationError('Agent run 终态记录缺少有效的 terminalSequence', { index, runId: run.runId });
   }
   if (active && storedTerminalSequence !== null) {
@@ -479,17 +574,22 @@ function restoreRecord(item, index) {
   };
 }
 
-function restoreStoreSnapshot(snapshot, nowMs = Date.now()) {
-  const normalized = snapshot;
-  if (!normalized || typeof normalized !== 'object' || Array.isArray(normalized)
-    || normalized.version !== AGENT_RUN_STORE_VERSION || !Array.isArray(normalized.runs)) {
+function restoreStoreSnapshot(snapshot: unknown, nowMs: number = Date.now()) {
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
     throw storeValidationError('Agent run 存储版本或顶层格式无效', {
       expectedVersion: AGENT_RUN_STORE_VERSION,
-      actualVersion: normalized?.version ?? null
+      actualVersion: null
+    });
+  }
+  const normalized = snapshot as Record<string, unknown>;
+  if (normalized.version !== AGENT_RUN_STORE_VERSION || !Array.isArray(normalized.runs)) {
+    throw storeValidationError('Agent run 存储版本或顶层格式无效', {
+      expectedVersion: AGENT_RUN_STORE_VERSION,
+      actualVersion: normalized.version ?? null
     });
   }
 
-  const restoredRecords = normalized.runs.map(restoreRecord);
+  const restoredRecords = normalized.runs.map((item, index) => restoreRecord(item, index));
   const runIds = new Set();
   const sequences = new Set();
   const terminalSequences = new Set();
@@ -559,7 +659,7 @@ function restoreStoreSnapshot(snapshot, nowMs = Date.now()) {
   };
 }
 
-export async function initializeAgentRunStore(overrides = {}) {
+export async function initializeAgentRunStore(overrides: AgentRunStoreOverrides = {}) {
   if (persistencePromise) await persistencePromise;
 
   persistenceGeneration += 1;
@@ -575,7 +675,7 @@ export async function initializeAgentRunStore(overrides = {}) {
   persistenceError = null;
   persistenceStartQueued = false;
 
-  let restored;
+  let restored: ReturnType<typeof restoreStoreSnapshot>;
   try {
     const snapshot = await persistence.readStore(persistence.filePath, {
       version: AGENT_RUN_STORE_VERSION,
@@ -586,9 +686,9 @@ export async function initializeAgentRunStore(overrides = {}) {
     persistenceError = error;
     persistence.runtimeLogger.error('Agent run 存储恢复失败，执行接口将保持关闭', {
       filePath: persistence.filePath,
-      error: error.message
+      error: getErrorMessage(error)
     });
-    throw error?.code === 'AGENT_RUN_STORE_INVALID' ? error : agentRunPersistenceError(error);
+    throw getErrorCode(error) === 'AGENT_RUN_STORE_INVALID' ? error : agentRunPersistenceError(error);
   }
 
   runs.clear();
@@ -623,8 +723,8 @@ export async function initializeAgentRunStore(overrides = {}) {
   };
 }
 
-export async function shutdownAgentRunStoreForTests({ clearMemory = true } = {}) {
-  let flushError = null;
+export async function shutdownAgentRunStoreForTests({ clearMemory = true }: { clearMemory?: boolean } = {}) {
+  let flushError: unknown = null;
   try {
     if (persistence.enabled) await flushAgentRunStore();
   } catch (error) {
@@ -639,8 +739,11 @@ export function beginAgentRun({
   operationId,
   idempotencyKey = null,
   input = {},
-  metadata = {}
-} = {}) {
+  metadata = {},
+  trigger = null,
+  progress = null,
+  taskResults = []
+}: BeginAgentRunInput) {
   if (persistence.required && !persistence.enabled) {
     throw agentRunPersistenceError(persistenceError || new Error('Agent run 存储尚未就绪'));
   }
@@ -650,6 +753,12 @@ export function beginAgentRun({
   const normalizedIdempotencyKey = normalizeIdempotencyKey(idempotencyKey);
   const normalizedInput = normalizeJson(input, 'input');
   const normalizedMetadata = normalizeJson(metadata, 'metadata');
+  const normalizedTrigger = trigger === null ? null : normalizeJson(trigger, 'trigger');
+  const normalizedProgress = progress === null ? null : normalizeJson(progress, 'progress');
+  const normalizedTaskResults = normalizeJson(taskResults, 'taskResults');
+  if (!Array.isArray(normalizedTaskResults)) {
+    throw validationError('AGENT_RUN_TASK_RESULTS_INVALID', 'taskResults 必须是数组', { taskResults });
+  }
   const inputFingerprint = createHash('sha256').update(stableJson(normalizedInput)).digest('hex');
 
   if (normalizedIdempotencyKey) {
@@ -658,7 +767,7 @@ export function beginAgentRun({
     if (existing) {
       const record = runs.get(existing.runId);
       if (record && existing.inputFingerprint === inputFingerprint) {
-        return { run: toAgentRunDto(record.run), replayed: true };
+        return { run: toAgentRunDto(record.run) as AgentRunDto, replayed: true };
       }
       if (record) {
         throw agentError('AGENT_IDEMPOTENCY_KEY_REUSED', '同一 operation 的幂等键不能用于不同输入', {
@@ -679,13 +788,16 @@ export function beginAgentRun({
 
   const nowMs = Date.now();
   const now = new Date(nowMs).toISOString();
-  const run = {
+  const run: AgentRun = {
     runId: randomUUID(),
     operationId: normalizedOperationId,
     idempotencyKey: normalizedIdempotencyKey,
     inputFingerprint,
     input: normalizedInput,
     metadata: normalizedMetadata,
+    trigger: normalizedTrigger,
+    progress: normalizedProgress,
+    taskResults: normalizedTaskResults,
     status: 'accepted',
     createdAt: now,
     updatedAt: now,
@@ -695,7 +807,7 @@ export function beginAgentRun({
     result: null,
     error: null
   };
-  const record = {
+  const record: AgentRunRecord = {
     run,
     sequence: ++sequence,
     createdAtMs: nowMs,
@@ -713,80 +825,96 @@ export function beginAgentRun({
   }
 
   scheduleAgentRunPersistence();
-  return { run: toAgentRunDto(run), replayed: false };
+  return { run: toAgentRunDto(run) as AgentRunDto, replayed: false };
 }
 
-export function startAgentRun(runId) {
+export function startAgentRun(runId: string) {
   return transition(runId, 'running', ['accepted']);
 }
 
-export function markAgentRunStopping(runId) {
+export function markAgentRunStopping(runId: string) {
   return transition(runId, 'stopping', ['accepted', 'running']);
 }
 
-export function setAgentRunAcceptedResult(runId, result = null) {
+export function setAgentRunAcceptedResult(runId: string, result: unknown = null): AgentRunDto {
   const record = requireRecord(runId);
-  if (TERMINAL_STATUSES.has(record.run.status)) return toAgentRunDto(record.run);
+  if (TERMINAL_STATUSES.has(record.run.status)) return toAgentRunDto(record.run) as AgentRunDto;
   if (!['accepted', 'running', 'stopping'].includes(record.run.status)) {
     throw transitionError(record, 'accepted-result', ['accepted', 'running', 'stopping']);
   }
   record.run.result = normalizeJson(result, 'result');
   record.run.updatedAt = new Date().toISOString();
   scheduleAgentRunPersistence();
-  return toAgentRunDto(record.run);
+  return toAgentRunDto(record.run) as AgentRunDto;
 }
 
-export function completeAgentRun(runId, result = null) {
+export function completeAgentRun(runId: string, result: unknown = null) {
   return transition(runId, 'succeeded', ['accepted', 'running'], {
     result: normalizeJson(result, 'result'),
     error: null
   });
 }
 
-export function failAgentRun(runId, error = null) {
+export function failAgentRun(runId: string, error: unknown = null) {
   return transition(runId, 'failed', ['accepted', 'running', 'stopping'], {
     result: null,
     error: normalizeFailure(error)
   });
 }
 
-export function stopAgentRun(runId, result = null) {
+export function stopAgentRun(runId: string, result: unknown = null) {
   return transition(runId, 'stopped', ['accepted', 'running', 'stopping'], {
     result: normalizeJson(result, 'result'),
     error: null
   });
 }
 
-export function releaseAgentRunIdempotency(runId) {
+export function updateAgentRunProgress(runId: string, progress: unknown, taskResults: unknown[] | null = null): AgentRunDto {
   const record = requireRecord(runId);
-  if (!record.run.idempotencyKey) return toAgentRunDto(record.run);
+  if (TERMINAL_STATUSES.has(record.run.status)) return toAgentRunDto(record.run) as AgentRunDto;
+  record.run.progress = progress === null ? null : normalizeJson(progress, 'progress');
+  if (taskResults !== null) {
+    const normalized = normalizeJson(taskResults, 'taskResults');
+    if (!Array.isArray(normalized)) {
+      throw validationError('AGENT_RUN_TASK_RESULTS_INVALID', 'taskResults 必须是数组', { taskResults });
+    }
+    record.run.taskResults = normalized;
+  }
+  record.run.updatedAt = new Date().toISOString();
+  scheduleAgentRunPersistence();
+  return toAgentRunDto(record.run) as AgentRunDto;
+}
+
+export function releaseAgentRunIdempotency(runId: string) {
+  const record = requireRecord(runId);
+  if (!record.run.idempotencyKey) return toAgentRunDto(record.run) as AgentRunDto;
   const indexKey = idempotencyIndexKey(record.run.operationId, record.run.idempotencyKey);
   if (idempotencyIndex.get(indexKey)?.runId === runId) idempotencyIndex.delete(indexKey);
   record.run.idempotencyKey = null;
   scheduleAgentRunPersistence();
-  return toAgentRunDto(record.run);
+  return toAgentRunDto(record.run) as AgentRunDto;
 }
 
-export function discardAgentRun(runId) {
+export function discardAgentRun(runId: string) {
   const record = requireRecord(runId);
-  const allowedStatuses = ['accepted', 'running'];
+  const allowedStatuses: string[] = ['accepted', 'running'];
   if (!allowedStatuses.includes(record.run.status)) {
     throw transitionError(record, 'discarded', allowedStatuses);
   }
 
-  const discarded = toAgentRunDto(record.run);
+  const discarded = toAgentRunDto(record.run) as AgentRunDto;
   removeRecord(runId);
   scheduleAgentRunPersistence();
   return discarded;
 }
 
-export function getAgentRun(runId) {
+export function getAgentRun(runId: string): AgentRunDto | null {
   assertAgentRunStoreReadable();
   if (pruneTerminalRuns() > 0) scheduleAgentRunPersistence();
   return toAgentRunDto(runs.get(runId)?.run);
 }
 
-export function listAgentRuns({ operationId = null, state = null, status = null, limit = 500 } = {}) {
+export function listAgentRuns({ operationId = null, state = null, status = null, limit = 500 }: { operationId?: string | null; state?: string | null; status?: string | null; limit?: number } = {}) {
   assertAgentRunStoreReadable();
   if (pruneTerminalRuns() > 0) scheduleAgentRunPersistence();
   const normalizedLimit = Math.min(Math.max(Number(limit) || 0, 0), 500);
@@ -804,7 +932,7 @@ export function listAgentRuns({ operationId = null, state = null, status = null,
 export function getCurrentAgentRun() {
   assertAgentRunStoreReadable();
   if (pruneTerminalRuns() > 0) scheduleAgentRunPersistence();
-  const priority = { stopping: 3, running: 2, accepted: 1 };
+  const priority: Record<string, number> = { stopping: 3, running: 2, accepted: 1 };
   const current = [...runs.values()]
     .filter(record => priority[record.run.status])
     .sort((left, right) =>
@@ -813,7 +941,7 @@ export function getCurrentAgentRun() {
   return toAgentRunDto(current?.run);
 }
 
-function resetAgentRunState({ clearMemory = true } = {}) {
+function resetAgentRunState({ clearMemory = true }: { clearMemory?: boolean } = {}) {
   persistenceGeneration += 1;
   persistence = {
     enabled: false,

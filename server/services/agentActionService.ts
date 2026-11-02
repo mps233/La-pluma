@@ -1,4 +1,5 @@
-import { agentError } from '../utils/apiHelper.js';
+import { getErrorMessage, isRecord } from '../utils/errors.ts';
+import { agentError } from '../utils/apiHelper.ts';
 
 export const AGENT_TASK_COMMANDS = Object.freeze([
   'startup',
@@ -45,7 +46,39 @@ const MAA_TASK_TYPE_SET = new Set(MAA_TASK_TYPES);
 const AGENT_QUERY_COMMANDS = new Set(['activity', 'list']);
 const SAFE_TASK_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
-function invalidRequest(code, message, details) {
+interface AgentTaskConfig {
+  name: string;
+  type: string;
+  params: Record<string, unknown>;
+  tasks?: AgentTaskConfig[];
+  [key: string]: unknown;
+}
+
+interface AgentTaskDependencies {
+  execDynamicTask?: (
+    taskId: string,
+    taskConfig: AgentTaskConfig,
+    taskName: string,
+    taskType: string,
+    waitForCompletion: boolean,
+    userResource: boolean
+  ) => unknown;
+  execMaaCommand?: (
+    command: string,
+    args: string[],
+    taskName: string | null,
+    taskType: string | null,
+    waitForCompletion: boolean
+  ) => unknown;
+}
+
+interface DailyFlowRequest {
+  dryRun: boolean;
+  scheduleId: string;
+  taskFlow: unknown[] | null;
+}
+
+function invalidRequest(code: string, message: string, details: unknown) {
   return agentError(code, message, {
     statusCode: 400,
     details,
@@ -53,12 +86,13 @@ function invalidRequest(code, message, details) {
   });
 }
 
-export function validateTaskConfig(taskConfig) {
+export function validateTaskConfig(taskConfig: unknown): AgentTaskConfig {
   return normalizeTaskConfig(taskConfig);
 }
 
-function normalizeSingleTaskConfig(taskConfig, label = 'taskConfig') {
-  if (typeof taskConfig.name !== 'string' || !taskConfig.name.trim()
+function normalizeSingleTaskConfig(taskConfig: unknown, label = 'taskConfig'): AgentTaskConfig {
+  if (!isRecord(taskConfig)
+    || typeof taskConfig.name !== 'string' || !taskConfig.name.trim()
     || typeof taskConfig.type !== 'string' || !taskConfig.type.trim()) {
     throw invalidRequest(
       'AGENT_VALIDATION_TASK_CONFIG_INVALID',
@@ -89,26 +123,26 @@ function normalizeSingleTaskConfig(taskConfig, label = 'taskConfig') {
     ...taskConfig,
     name: taskConfig.name.trim(),
     type: normalizedType,
-    params: taskConfig.params || {}
+    params: isRecord(taskConfig.params) ? taskConfig.params : {}
   };
 }
 
-function normalizeTaskConfig(taskConfig) {
-  let normalized = taskConfig;
+function normalizeTaskConfig(taskConfig: unknown): AgentTaskConfig {
+  let normalized: unknown = taskConfig;
 
   if (typeof taskConfig === 'string') {
     try {
-      normalized = JSON.parse(taskConfig);
+      normalized = JSON.parse(taskConfig) as unknown;
     } catch (error) {
       throw invalidRequest(
         'AGENT_VALIDATION_TASK_CONFIG_INVALID',
         'taskConfig 必须是有效的 JSON 对象',
-        { reason: 'invalid_json', parseError: error.message }
+        { reason: 'invalid_json', parseError: getErrorMessage(error) }
       );
     }
   }
 
-  if (!normalized || typeof normalized !== 'object' || Array.isArray(normalized)) {
+  if (!isRecord(normalized)) {
     throw invalidRequest(
       'AGENT_VALIDATION_TASK_CONFIG_INVALID',
       'taskConfig 必须是非数组对象',
@@ -134,7 +168,7 @@ function normalizeTaskConfig(taskConfig) {
   return {
     ...normalizedTopLevel,
     tasks: normalized.tasks.map((task, index) => {
-      if (!task || typeof task !== 'object' || Array.isArray(task)) {
+      if (!isRecord(task)) {
         throw invalidRequest(
           'AGENT_VALIDATION_TASK_CONFIG_INVALID',
           `taskConfig.tasks[${index}] 必须是对象`,
@@ -146,7 +180,7 @@ function normalizeTaskConfig(taskConfig) {
   };
 }
 
-function normalizeOptionalLabel(value, field, fallback, maxLength) {
+function normalizeOptionalLabel(value: unknown, field: string, fallback: string, maxLength: number): string {
   const errorField = field.replace(/[A-Z]/g, character => `_${character}`).toUpperCase();
   if (value === undefined || value === null) return fallback;
   if (typeof value !== 'string') {
@@ -168,8 +202,8 @@ function normalizeOptionalLabel(value, field, fallback, maxLength) {
   return normalized || fallback;
 }
 
-export function normalizeDailyFlowRequest(input = {}) {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+export function normalizeDailyFlowRequest(input: unknown = {}): DailyFlowRequest {
+  if (!isRecord(input)) {
     throw invalidRequest('AGENT_VALIDATION_DAILY_FLOW_INPUT_INVALID', '请求体必须是对象', {
       receivedType: Array.isArray(input) ? 'array' : input === null ? 'null' : typeof input
     });
@@ -197,7 +231,11 @@ export function normalizeDailyFlowRequest(input = {}) {
  * Execute a command exposed through the Agent API after validating its
  * filesystem-sensitive dynamic-task inputs.
  */
-export async function executeAgentTask(input = {}, dependencies = {}) {
+export async function executeAgentTask(
+  input: unknown = {},
+  dependencies: AgentTaskDependencies = {}
+): Promise<Record<string, unknown>> {
+  const record = isRecord(input) ? input : {};
   const {
     command,
     args = [],
@@ -206,9 +244,9 @@ export async function executeAgentTask(input = {}, dependencies = {}) {
     taskType,
     waitForCompletion = true,
     userResource = false
-  } = input || {};
+  } = record;
 
-  if (!AGENT_TASK_COMMAND_SET.has(command)) {
+  if (typeof command !== 'string' || !AGENT_TASK_COMMAND_SET.has(command)) {
     throw invalidRequest(
       'AGENT_VALIDATION_COMMAND_NOT_ALLOWED',
       `不允许的 command: ${command}`,
@@ -269,7 +307,7 @@ export async function executeAgentTask(input = {}, dependencies = {}) {
       normalizedTaskType,
       waitForCompletion,
       userResource
-    );
+    ) as Record<string, unknown>;
   }
 
   if (typeof dependencies.execMaaCommand !== 'function') {
@@ -277,7 +315,7 @@ export async function executeAgentTask(input = {}, dependencies = {}) {
   }
 
   if (AGENT_QUERY_COMMANDS.has(command)) {
-    return dependencies.execMaaCommand(command, normalizedArgs, null, null, true);
+    return dependencies.execMaaCommand(command, normalizedArgs, null, null, true) as Record<string, unknown>;
   }
 
   return dependencies.execMaaCommand(
@@ -286,13 +324,13 @@ export async function executeAgentTask(input = {}, dependencies = {}) {
     normalizedTaskName,
     normalizedTaskType,
     waitForCompletion
-  );
+  ) as Record<string, unknown>;
 }
 
-export function createDailyFlowExecutionError(result) {
-  if (result?.success !== false) return null;
+export function createDailyFlowExecutionError(result: unknown) {
+  if (!isRecord(result) || result.success !== false) return null;
 
-  const message = result.message || '今日流程未能开始执行';
+  const message = typeof result.message === 'string' && result.message ? result.message : '今日流程未能开始执行';
   const isBusy = result.busy === true || message.includes('已有任务');
 
   if (isBusy) {

@@ -1,21 +1,31 @@
+import { asErrorWithCode, getErrorCode, getErrorMessage, isRecord } from '../utils/errors.ts';
 import cron from 'node-cron';
-import { execMaaCommand, execDynamicTask, replaceActivityCode, captureScreen, getGameClientState, getMaaExecutionDiagnostics, testAdbConnection, createMaaLogCheckpoint, readMaaLogSince, canUseMaaSelfUpdate } from './maaService.js';
-import { resolveConnection } from './connectionService.js';
-import { sendTaskCompletionNotification, isStageOpenToday, shouldCaptureNotificationScreenshot } from './notificationService.js';
-import { getEnabledAwardItems, parseAwardExecutionActions } from './awardResultService.js';
-import { parseRecruitExecutionAction } from './recruitResultService.js';
-import { parseInfrastExecutionAction } from './infrastResultService.js';
-import { parseMallExecutionAction } from './mallResultService.js';
-import { createFightExecutionAction, isFightSanityDepleted } from './fightResultService.js';
-import { summarizeFightCallbacks } from './maaCallbackService.js';
-import { loadUserConfig, saveUserConfig } from './configStorageService.js';
-import operatorTrainingService from './operatorTrainingService.js';
-import { recordDrops } from './dropRecordService.js';
-import { createLogger } from '../utils/logger.js';
+import { execMaaCommand, execDynamicTask, replaceActivityCode, captureScreen, getGameClientState, getMaaExecutionDiagnostics, testAdbConnection, createMaaLogCheckpoint, readMaaLogSince, canUseMaaSelfUpdate } from './maaService.ts';
+import { resolveConnection } from './connectionService.ts';
+import { sendTaskCompletionNotification, isStageOpenToday, shouldCaptureNotificationScreenshot } from './notificationService.ts';
+import { getEnabledAwardItems, parseAwardExecutionActions } from './awardResultService.ts';
+import { parseRecruitExecutionAction } from './recruitResultService.ts';
+import { parseInfrastExecutionAction } from './infrastResultService.ts';
+import { parseMallExecutionAction } from './mallResultService.ts';
+import { createFightExecutionAction, isFightSanityDepleted } from './fightResultService.ts';
+import { summarizeFightCallbacks } from './maaCallbackService.ts';
+import { loadUserConfig, saveUserConfig } from './configStorageService.ts';
+import operatorTrainingService from './operatorTrainingService.ts';
+import { recordDrops } from './dropRecordService.ts';
+import { createLogger } from '../utils/logger.ts';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { withMaaExecutionLease } from './executionCoordinatorService.js';
-import { DEFAULT_CLIENT_TYPE, DEFAULT_MAA_CLI_PATH } from '../config/connectionDefaults.js';
+import { withMaaExecutionLease } from './executionCoordinatorService.ts';
+import {
+  beginAgentRun,
+  startAgentRun,
+  completeAgentRun,
+  failAgentRun,
+  updateAgentRunProgress,
+  flushAgentRunStore
+} from './agentRunService.ts';
+import { agentError } from '../utils/apiHelper.ts';
+import { DEFAULT_CLIENT_TYPE, DEFAULT_MAA_CLI_PATH } from '../config/connectionDefaults.ts';
 
 const execAsync = promisify(exec);
 
@@ -26,17 +36,207 @@ const commaSeparatedArrayKeys = new Set(['buy_first', 'blacklist', 'first_tags',
 // MAA CLI 路径
 const MAA_CLI_PATH = DEFAULT_MAA_CLI_PATH;
 
-// 存储所有定时任务
-const scheduledJobs = new Map();
+type MaaCommandResult = {
+  stdout?: string;
+  stderr?: string;
+};
 
-function parseDropTargetEntries(value) {
+type MaaLogCheckpoint = Awaited<ReturnType<typeof createMaaLogCheckpoint>>;
+
+interface FightDropItem {
+  name: string;
+  count: number;
+}
+
+interface FightCallbackSummary {
+  stage: string | null;
+  items: FightDropItem[];
+  sanityUsed: number;
+}
+
+type RecruitSummary = {
+  stars: number | string;
+  tags: string[] | string;
+  state?: string | null;
+};
+
+type TaskSummary = {
+  task?: string;
+  stage?: string;
+  times?: string;
+  drops?: string;
+  dropItems?: FightDropItem[];
+  medicine?: string;
+  stone?: string;
+  duration?: string;
+  recruits?: RecruitSummary[];
+  recruitCount?: number;
+  refreshCount?: number;
+  infrast?: string;
+  sanity?: number;
+};
+
+type TaskActionResultStatus = 'success' | 'failed' | 'skipped';
+
+type TaskActionResult = {
+  task?: string;
+  action: string;
+  status: TaskActionResultStatus;
+  message: string;
+};
+
+type FightReportResult = {
+  provider: string;
+  stage: string;
+  status: 'failed' | 'success';
+  message: string;
+};
+
+interface TaskErrorEntry {
+  task?: string;
+  error: unknown;
+}
+
+interface TaskSkipEntry {
+  task?: string;
+  reason: string;
+}
+
+interface ScheduleTaskResult {
+  id: string;
+  name?: string;
+  state: string;
+  startedAt: string;
+  finishedAt?: string;
+}
+
+interface TaskCounts {
+  success: number;
+  failed: number;
+  skipped: number;
+}
+
+interface ScheduleExecutionSummary {
+  successCount: number;
+  failedCount: number;
+  skippedCount: number;
+  durationMs: number;
+  summaries: TaskSummary[];
+  reports: FightReportResult[];
+  actions: TaskActionResult[];
+  taskResults: ScheduleTaskResult[];
+  errors: TaskErrorEntry[];
+  warnings: string[];
+}
+
+interface FightStageConfig {
+  stage?: unknown;
+  times?: unknown;
+}
+
+interface NormalizedFightStage {
+  stage: string;
+  times: string;
+}
+
+interface MaaTaskConfig {
+  name?: string;
+  type?: string;
+  client_type: string;
+  condition?: unknown;
+  variants?: unknown;
+  params: Record<string, unknown>;
+}
+
+interface DynamicFightTaskItem {
+  params?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+interface DynamicFightTaskDocument {
+  tasks?: DynamicFightTaskItem[];
+  [key: string]: unknown;
+}
+
+interface ScheduledCommandSpec {
+  command: string;
+  params: string;
+  taskConfig?: string;
+}
+
+interface SchedulePlanStep {
+  index: number;
+  id: string;
+  name: string;
+  command: string;
+  args: string[];
+  dynamicTask: boolean;
+  taskConfig?: unknown;
+  preActions?: Array<{ action: string }>;
+}
+
+interface ScheduledJobEntry {
+  time: string;
+  job: ReturnType<typeof cron.schedule>;
+}
+
+interface SmartTrainingPlanStage {
+  stage?: unknown;
+  isOpen?: unknown;
+  totalTimes?: unknown;
+  times?: unknown;
+}
+
+interface SmartTrainingOperator {
+  name?: unknown;
+}
+
+interface TrainingPlan {
+  stages?: SmartTrainingPlanStage[];
+  openStages?: SmartTrainingPlanStage[];
+  operators?: SmartTrainingOperator[];
+}
+
+interface SmartTrainingStage {
+  stage: string;
+  times: string;
+  smart: boolean;
+  trainingOperators: string[];
+}
+
+interface TrainingQueueOperator {
+  name?: string;
+  operatorId?: string;
+}
+
+interface ScheduleStateEntry {
+  scheduleId: string;
+  times: string[];
+  count: number;
+}
+
+// 存储所有定时任务
+const scheduledJobs = new Map<string, ScheduledJobEntry[]>();
+
+function isFightStageConfig(value: unknown): value is FightStageConfig {
+  return isRecord(value);
+}
+
+function firstNonEmptyString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value) return value;
+  }
+  return undefined;
+}
+
+function parseDropTargetEntries(value: unknown): string[] | null {
   if (value === undefined || value === null || value === '') return [];
 
-  const rawEntries = typeof value === 'object' && !Array.isArray(value)
-    ? Object.entries(value).map(([itemId, count]) => `${itemId}=${count}`)
+  const rawEntries = isRecord(value)
+    ? Object.entries(value).map(([itemId, count]) => `${itemId}=${String(count)}`)
     : String(value).split(',').map(entry => entry.trim()).filter(Boolean);
 
-  const normalizedEntries = [];
+  const normalizedEntries: string[] = [];
   for (const entry of rawEntries) {
     const match = entry.match(/^([A-Za-z0-9_-]+)\s*=\s*(\d+)$/);
     if (!match || Number(match[2]) <= 0) return null;
@@ -45,20 +245,24 @@ function parseDropTargetEntries(value) {
   return normalizedEntries;
 }
 
-function normalizeFightStageEntries(task) {
-  const stages = task.params?.stages || [{ stage: task.params?.stage || '', times: task.params?.times || '' }];
+function normalizeFightStageEntries(task: ScheduledTask): NormalizedFightStage[] {
+  const configuredStages = task.params.stages;
+  const stages: unknown[] = Array.isArray(configuredStages)
+    ? configuredStages
+    : [{ stage: task.params.stage || '', times: task.params.times || '' }];
   return stages
-    .map(stageConfig => typeof stageConfig === 'string'
+    .map((stageConfig): FightStageConfig => typeof stageConfig === 'string'
       ? { stage: stageConfig, times: '' }
-      : stageConfig)
-    .filter(stageConfig => stageConfig.stage?.trim())
+      : isFightStageConfig(stageConfig) ? stageConfig : {})
+    .filter((stageConfig): stageConfig is FightStageConfig & { stage: string } =>
+      typeof stageConfig.stage === 'string' && Boolean(stageConfig.stage.trim()))
     .map(stageConfig => ({
       stage: stageConfig.stage.trim(),
       times: stageConfig.times === undefined || stageConfig.times === '' ? '' : String(stageConfig.times).trim()
     }));
 }
 
-function buildDynamicFightTaskConfig(task, connectionDefaults = {}) {
+function buildDynamicFightTaskConfig(task: ScheduledTask, connectionDefaults: ConnectionDefaults = {}): string | null {
   const commandId = task.commandId || String(task.id || '').split('-')[0];
   if (commandId !== 'fight' || task.taskType) return null;
   const params = task.params || {};
@@ -82,7 +286,7 @@ function buildDynamicFightTaskConfig(task, connectionDefaults = {}) {
     : null;
 
   const clientType = params.clientType || params.client_type || connectionDefaults.clientType || DEFAULT_CLIENT_TYPE;
-  const commonParams = {};
+  const commonParams: Record<string, unknown> = {};
   if (params.medicine !== undefined && params.medicine !== '' && params.medicine !== null) {
     commonParams.medicine = Number(params.medicine);
   }
@@ -122,7 +326,7 @@ function buildDynamicFightTaskConfig(task, connectionDefaults = {}) {
   });
 }
 
-function getFightReportResults(task, stage, result) {
+function getFightReportResults(task: ScheduledTask, stage: string, result: MaaCommandResult) {
   const stderr = String(result?.stderr || '');
   const diagnostics = getMaaExecutionDiagnostics(stderr);
   const completedFight = /Fight\s+\S+\s+[1-9]\d*\s+times?/i.test(String(result?.stdout || ''));
@@ -130,9 +334,9 @@ function getFightReportResults(task, stage, result) {
     return { reportResults: [], diagnostics };
   }
   const hasUnknownDrops = diagnostics.some(diagnostic => diagnostic.code === 'UNKNOWN_DROPS');
-  const reportResults = [];
+  const reportResults: FightReportResult[] = [];
 
-  const addReport = (provider, enabled, failurePattern, successMessage, failureMessage) => {
+  const addReport = (provider: string, enabled: unknown, failurePattern: RegExp, successMessage: string, failureMessage: string) => {
     if (!enabled) return;
     const failed = hasUnknownDrops || failurePattern.test(stderr);
     reportResults.push({
@@ -163,7 +367,7 @@ function getFightReportResults(task, stage, result) {
   return { reportResults, diagnostics };
 }
 
-async function recordFightDrops(summary, scheduleId) {
+async function recordFightDrops(summary: TaskSummary | null | undefined, scheduleId: string) {
   if (!summary?.stage) return;
 
   try {
@@ -178,18 +382,20 @@ async function recordFightDrops(summary, scheduleId) {
     });
     logger.debug('掉落记录已保存', { scheduleId, stage: summary.stage, drops: summary.dropItems?.length || 0 });
   } catch (error) {
-    logger.error('掉落记录保存失败', { scheduleId, error: error.message });
+    logger.error('掉落记录保存失败', { scheduleId, error: getErrorMessage(error) });
   }
 }
 
-async function attachFightCallbacks(summary, checkpoint, taskName) {
+function attachFightCallbacks(summary: TaskSummary, checkpoint: MaaLogCheckpoint | null, taskName: string): Promise<TaskSummary>;
+function attachFightCallbacks(summary: TaskSummary | null, checkpoint: MaaLogCheckpoint | null, taskName: string): Promise<TaskSummary | null>;
+async function attachFightCallbacks(summary: TaskSummary | null, checkpoint: MaaLogCheckpoint | null, taskName: string): Promise<TaskSummary | null> {
   if (!checkpoint) return summary;
 
-  let callbackSummary;
+  let callbackSummary: FightCallbackSummary;
   try {
     callbackSummary = summarizeFightCallbacks(await readMaaLogSince(checkpoint));
   } catch (error) {
-    logger.warn('读取战斗回调失败', { taskName, error: error.message });
+    logger.warn('读取战斗回调失败', { taskName, error: getErrorMessage(error) });
     return summary;
   }
 
@@ -204,7 +410,82 @@ async function attachFightCallbacks(summary, checkpoint, taskName) {
 }
 
 // 定时任务执行状态
-const scheduleExecutionStatus = {
+
+interface ScheduleExecutionStatus {
+  isRunning: boolean;
+  scheduleId: string | null;
+  currentStep: number;
+  totalSteps: number;
+  currentTask: string | null;
+  currentTaskId?: string | null;
+  message: string;
+  startTime: number | null;
+  shouldStop: boolean;
+  lastResult: unknown;
+}
+
+interface ScheduledTask {
+  id: string;
+  commandId?: string;
+  name?: string;
+  enabled?: boolean;
+  taskType?: string;
+  condition?: unknown;
+  variants?: unknown;
+  params: Record<string, unknown>;
+}
+
+type ScheduledTaskFlow = ScheduledTask[];
+
+interface ConnectionDefaults {
+  adbPath?: string;
+  address?: string;
+  clientType?: string;
+}
+
+interface ResolvedConnection {
+  adbPath: string;
+  address: string;
+  clientType: string;
+}
+
+interface ScheduleLifecycle {
+  runId?: string;
+  onStarted?: () => unknown;
+  onProgress?: (progress: Record<string, unknown>, taskResults?: unknown[] | null) => unknown;
+}
+
+interface ScheduleValidationFailure {
+  success: false;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+interface ScheduleValidationSuccess {
+  success: true;
+}
+
+type ScheduleValidationResult = ScheduleValidationFailure | ScheduleValidationSuccess;
+
+interface SchedulePlanResult {
+  success: boolean;
+  message?: string;
+  totalSteps?: number;
+  steps?: SchedulePlanStep[];
+  details?: Record<string, unknown>;
+}
+
+interface ScheduleExecutionResult {
+  success: boolean;
+  message: string;
+  stopped?: boolean;
+  busy?: boolean;
+  owner?: unknown;
+  summary?: unknown;
+  runId?: string;
+}
+
+const scheduleExecutionStatus: ScheduleExecutionStatus = {
   isRunning: false,
   scheduleId: null,
   currentStep: -1,
@@ -216,17 +497,17 @@ const scheduleExecutionStatus = {
   lastResult: null
 };
 
-let cancelActiveScheduleDelay = null;
-let activeScheduleAbortController = null;
-let activeScheduleRunId = null;
+let cancelActiveScheduleDelay: (() => void) | null = null;
+let activeScheduleAbortController: AbortController | null = null;
+let activeScheduleRunId: symbol | null = null;
 
-function waitForScheduleDelay(delayMs) {
-  return new Promise((resolve) => {
+function waitForScheduleDelay(delayMs: number): Promise<boolean> {
+  return new Promise(resolve => {
     let settled = false;
-    let timeoutId = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const signal = activeScheduleAbortController?.signal;
 
-    const finish = (completed) => {
+    const finish = (completed: boolean) => {
       if (settled) return;
       settled = true;
       if (timeoutId) clearTimeout(timeoutId);
@@ -268,10 +549,10 @@ export function stopScheduleExecution() {
   return false;
 }
 
-function isScheduleStopRequested(error = null) {
+function isScheduleStopRequested(error: unknown = null): boolean {
   const stopRequested = scheduleExecutionStatus.shouldStop
     || Boolean(activeScheduleAbortController?.signal.aborted)
-    || Boolean(error?.stopRequested);
+    || Boolean(asErrorWithCode(error).stopRequested);
   if (stopRequested && !scheduleExecutionStatus.shouldStop) {
     updateScheduleStatus({
       shouldStop: true,
@@ -284,18 +565,18 @@ function isScheduleStopRequested(error = null) {
 /**
  * 更新定时任务执行状态
  */
-function updateScheduleStatus(updates) {
+function updateScheduleStatus(updates: Partial<ScheduleExecutionStatus>) {
   Object.assign(scheduleExecutionStatus, updates);
   logger.debug('定时任务状态更新', scheduleExecutionStatus);
 }
 
 // 构建 MAA 命令
-function buildScheduledTaskCommand(task, connectionDefaults = {}) {
+function buildScheduledTaskCommand(task: ScheduledTask, connectionDefaults: ConnectionDefaults = {}): ScheduledCommandSpec {
   if (task.taskType) {
     // MaaCore 内置任务类型
-    const params = { ...(task.params || {}) };
-    const clientType = params.clientType || params.client_type
-      || connectionDefaults.clientType || DEFAULT_CLIENT_TYPE;
+    const params: Record<string, unknown> = { ...(task.params || {}) };
+    const clientType = firstNonEmptyString(params.clientType, params.client_type, connectionDefaults.clientType)
+      || DEFAULT_CLIENT_TYPE;
     delete params.clientType;
     delete params.client_type;
     if (task.taskType === 'Recruit') {
@@ -315,7 +596,7 @@ function buildScheduledTaskCommand(task, connectionDefaults = {}) {
     if (task.taskType === 'Infrast' && Number(params.mode) === 10000 && params.plan_index === undefined) {
       params.plan_index = 0;
     }
-    const taskConfig = {
+    const taskConfig: MaaTaskConfig = {
       name: task.name,
       type: task.taskType,
       client_type: clientType,
@@ -323,7 +604,7 @@ function buildScheduledTaskCommand(task, connectionDefaults = {}) {
       ...(Array.isArray(task.variants) ? { variants: task.variants } : {}),
       params: {}
     };
-    
+
     Object.keys(params).forEach(key => {
       const value = params[key];
       if (value === undefined || value === '' || value === null) return;
@@ -336,7 +617,7 @@ function buildScheduledTaskCommand(task, connectionDefaults = {}) {
         }
         return;
       }
-      
+
       if (typeof value === 'boolean') {
         taskConfig.params[key] = value;
       } else if (Array.isArray(value)) {
@@ -355,9 +636,9 @@ function buildScheduledTaskCommand(task, connectionDefaults = {}) {
         taskConfig.params[key] = value;
       }
     });
-    
-    return { 
-      command: 'run', 
+
+    return {
+      command: 'run',
       params: task.commandId || task.id,
       taskConfig: JSON.stringify(taskConfig)
     };
@@ -365,9 +646,11 @@ function buildScheduledTaskCommand(task, connectionDefaults = {}) {
 
   const startupCommandId = task.commandId || String(task.id || '').split('-')[0];
   if (startupCommandId === 'startup' && task.params?.startGameEnabled === false) {
-    const clientType = task.params?.clientType || connectionDefaults.clientType || DEFAULT_CLIENT_TYPE;
-    const params = { start_game_enabled: false };
-    if (task.params?.accountName?.trim()) params.account_name = task.params.accountName.trim();
+    const clientType = firstNonEmptyString(task.params?.clientType, connectionDefaults.clientType)
+      || DEFAULT_CLIENT_TYPE;
+    const params: Record<string, unknown> = { start_game_enabled: false };
+    const accountName = typeof task.params?.accountName === 'string' ? task.params.accountName.trim() : '';
+    if (accountName) params.account_name = accountName;
     return {
       command: 'run',
       params: 'startup',
@@ -392,10 +675,10 @@ function buildScheduledTaskCommand(task, connectionDefaults = {}) {
   // 预定义命令
   const commandId = task.commandId || task.id.split('-')[0];
   let params = '';
-  let extraArgs = [];
-  
+  const extraArgs: string[] = [];
+
   if (commandId === 'startup' || commandId === 'closedown') {
-    params = task.params.clientType || DEFAULT_CLIENT_TYPE;
+    params = firstNonEmptyString(task.params.clientType) || DEFAULT_CLIENT_TYPE;
     const address = connectionDefaults.address;
     if (address) {
       extraArgs.push(`-a ${address}`);
@@ -406,34 +689,38 @@ function buildScheduledTaskCommand(task, connectionDefaults = {}) {
     }
   } else if (commandId === 'fight') {
     // 支持多个关卡（stages 数组，每个元素是 {stage, times}）或单个关卡（stage 字符串）
-    let stages = task.params.stages || [{ stage: task.params.stage || '', times: task.params.times || '' }];
-    
+    const configuredStages = task.params.stages;
+    const stages: unknown[] = Array.isArray(configuredStages)
+      ? configuredStages
+      : [{ stage: task.params.stage || '', times: task.params.times || '' }];
+
     // 标准化格式：将所有元素转换为 {stage, times} 对象
-    stages = stages.map(s => {
-      if (typeof s === 'string') {
+    const normalizedStages = stages.map((stageConfig): FightStageConfig => {
+      if (typeof stageConfig === 'string') {
         // 字符串格式，转换为对象
-        return { stage: s, times: '' };
-      } else if (typeof s === 'object' && s.stage) {
+        return { stage: stageConfig, times: '' };
+      } else if (isRecord(stageConfig) && stageConfig.stage) {
         // 已经是对象格式
-        return s;
+        return stageConfig;
       } else {
         // 无效格式，返回空对象
         return { stage: '', times: '' };
       }
     });
-    
+
     // 构建关卡列表，格式：stage1:times1,stage2:times2
-    const stageList = stages
-      .filter(s => s.stage && s.stage.trim())
-      .map(s => {
-        const stage = s.stage.trim();
-        const times = s.times ? `:${s.times}` : '';
+    const stageList = normalizedStages
+      .filter((stageConfig): stageConfig is FightStageConfig & { stage: string } =>
+        typeof stageConfig.stage === 'string' && Boolean(stageConfig.stage.trim()))
+      .map(stageConfig => {
+        const stage = stageConfig.stage.trim();
+        const times = stageConfig.times ? `:${stageConfig.times}` : '';
         return `${stage}${times}`;
       })
       .join(',');
-    
+
     params = stageList;
-    
+
     if (task.params.medicine !== undefined && task.params.medicine !== '' && task.params.medicine !== null) {
       params += ` -m ${task.params.medicine}`;
     }
@@ -472,20 +759,21 @@ function buildScheduledTaskCommand(task, connectionDefaults = {}) {
       }
     }
   }
-  
+
   if (extraArgs.length > 0) {
     params = `${extraArgs.join(' ')} ${params}`;
   }
-  
+
   return { command: commandId, params };
 }
 
-export function validateScheduledTaskFlow(taskFlow) {
+export function validateScheduledTaskFlow(taskFlow: unknown): ScheduleValidationResult {
   if (!Array.isArray(taskFlow)) {
     return { success: false, message: '任务流程格式无效' };
   }
 
-  const invalidTaskIndex = taskFlow.findIndex(task => !task || typeof task !== 'object' || Array.isArray(task));
+  const tasks = taskFlow as ScheduledTaskFlow;
+  const invalidTaskIndex = tasks.findIndex(task => !task || typeof task !== 'object' || Array.isArray(task));
   if (invalidTaskIndex >= 0) {
     return {
       success: false,
@@ -494,7 +782,7 @@ export function validateScheduledTaskFlow(taskFlow) {
     };
   }
 
-  const invalidCustomInfrast = taskFlow.find(task =>
+  const invalidCustomInfrast = tasks.find(task =>
     task.enabled !== false &&
     task.taskType === 'Infrast' &&
     Number(task.params?.mode) === 10000 &&
@@ -504,7 +792,7 @@ export function validateScheduledTaskFlow(taskFlow) {
     return { success: false, message: '自定义换班需要填写排班文件路径' };
   }
 
-  const invalidFightDrops = taskFlow.find(task => {
+  const invalidFightDrops = tasks.find(task => {
     const commandId = task.commandId || String(task.id || '').split('-')[0];
     return task.enabled !== false && commandId === 'fight' && parseDropTargetEntries(task.params?.drops) === null;
   });
@@ -515,14 +803,14 @@ export function validateScheduledTaskFlow(taskFlow) {
   return { success: true };
 }
 
-export function buildScheduledTaskFlowPlan(taskFlow, connectionDefaults = {}) {
+export function buildScheduledTaskFlowPlan(taskFlow: unknown, connectionDefaults: ConnectionDefaults = {}): SchedulePlanResult {
   const validation = validateScheduledTaskFlow(taskFlow);
   if (!validation.success) return validation;
 
   try {
-    const steps = taskFlow
+    const steps = (taskFlow as ScheduledTaskFlow)
       .filter(task => task.enabled)
-      .map((task, index) => {
+      .map((task, index): SchedulePlanStep => {
         const { command, params, taskConfig } = buildScheduledTaskCommand(task, connectionDefaults);
         const args = params ? params.split(' ').filter(Boolean) : [];
         return {
@@ -532,7 +820,7 @@ export function buildScheduledTaskFlowPlan(taskFlow, connectionDefaults = {}) {
           command,
           args,
           dynamicTask: Boolean(taskConfig),
-          ...(taskConfig ? { taskConfig: JSON.parse(taskConfig) } : {}),
+          ...(taskConfig ? { taskConfig: JSON.parse(taskConfig) as unknown } : {}),
           ...(command === 'closedown' && task.params?.recognizeDepotBeforeClose === true
             ? { preActions: [{ action: 'depot-recognition' }] }
             : {})
@@ -541,15 +829,15 @@ export function buildScheduledTaskFlowPlan(taskFlow, connectionDefaults = {}) {
 
     return { success: true, totalSteps: steps.length, steps };
   } catch (error) {
-    return { success: false, message: error.message };
+    return { success: false, message: getErrorMessage(error) };
   }
 }
 
-export async function getScheduledTaskFlowPlan(taskFlow) {
+export async function getScheduledTaskFlowPlan(taskFlow: unknown): Promise<SchedulePlanResult> {
   const validation = validateScheduledTaskFlow(taskFlow);
   if (!validation.success) return validation;
 
-  const needsConnection = Array.isArray(taskFlow) && taskFlow.some(task => {
+  const needsConnection = Array.isArray(taskFlow) && (taskFlow as ScheduledTaskFlow).some(task => {
     if (!task.enabled) return false;
     const commandId = task.commandId || String(task.id || '').split('-')[0];
     return commandId === 'startup' || commandId === 'closedown';
@@ -559,7 +847,7 @@ export async function getScheduledTaskFlowPlan(taskFlow) {
 }
 
 // 执行任务流程
-async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = {}) {
+async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: string, runId: symbol, lifecycle: ScheduleLifecycle = {}): Promise<ScheduleExecutionResult> {
   if (!Array.isArray(taskFlow)) {
     return { success: false, message: '任务流程格式无效' };
   }
@@ -579,7 +867,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
   logger.info('开始执行任务流程', { scheduleId });
   activeScheduleRunId = runId;
   activeScheduleAbortController = new AbortController();
-  
+
   // 更新状态：开始执行
   updateScheduleStatus({
     isRunning: true,
@@ -592,19 +880,19 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
     shouldStop: false,  // 重置停止标志
     lastResult: null
   });
-  
+
   const startTime = Date.now();
   const enabledTasks = taskFlow.filter(t => t.enabled);
   let successCount = 0;
   let failedCount = 0;
   let skippedCount = 0;
-  const errors = [];
-  const skipped = [];
-  const taskSummaries = []; // 收集任务总结信息
-  const reportResults = [];
-  const executionWarnings = new Set();
-  const actionResults = [];
-  const addFightAction = (action) => {
+  const errors: TaskErrorEntry[] = [];
+  const skipped: TaskSkipEntry[] = [];
+  const taskSummaries: TaskSummary[] = []; // 收集任务总结信息
+  const reportResults: FightReportResult[] = [];
+  const executionWarnings = new Set<string>();
+  const actionResults: TaskActionResult[] = [];
+  const addFightAction = (action: TaskActionResult) => {
     actionResults.push(action);
     if (action.status === 'failed') {
       errors.push({ task: action.task, error: action.message });
@@ -612,19 +900,37 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
       skipped.push({ task: action.task, reason: action.message });
     }
   };
-  const countFightTaskResult = (actions) => {
+  const countFightTaskResult = (actions: TaskActionResult[]) => {
     if (actions.some(action => action.status === 'failed')) failedCount++;
     else if (actions.some(action => action.status === 'success')) successCount++;
     else skippedCount++;
   };
-  let screenshot = null;
+  let screenshot: string | null = null;
   const sharedConnection = await resolveConnection();
-  const adbConfig = {
+  const adbConfig: ResolvedConnection = {
     adbPath: sharedConnection.adbPath,
     address: sharedConnection.address,
     clientType: sharedConnection.clientType
   };
-  
+
+  const taskResults: ScheduleTaskResult[] = [];
+  let activeTaskResult: ScheduleTaskResult | null = null;
+  let lastTaskCounts: TaskCounts = { success: 0, failed: 0, skipped: 0 };
+  const finalizeActiveTask = (forcedState: string | null = null) => {
+    if (!activeTaskResult) return;
+    const successDelta = successCount - lastTaskCounts.success;
+    const failedDelta = failedCount - lastTaskCounts.failed;
+    const skippedDelta = skippedCount - lastTaskCounts.skipped;
+    activeTaskResult.state = forcedState || (failedDelta > 0
+      ? 'failed'
+      : successDelta > 0
+        ? 'success'
+        : 'skipped');
+    activeTaskResult.finishedAt = new Date().toISOString();
+    lastTaskCounts = { success: successCount, failed: failedCount, skipped: skippedCount };
+    activeTaskResult = null;
+  };
+
   for (let i = 0; i < enabledTasks.length; i++) {
     // 检查是否需要停止
     if (isScheduleStopRequested()) {
@@ -634,17 +940,19 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
       });
       break;
     }
-    
+
+    finalizeActiveTask();
     const task = enabledTasks[i];
+    const taskName = task.name || task.id;
     const commandId = task.commandId || task.id.split('-')[0];
-    
-    logger.info('执行任务', { 
+
+    logger.info('执行任务', {
       scheduleId,
       taskIndex: i + 1,
       totalTasks: enabledTasks.length,
       taskName: task.name
     });
-    
+
     // 更新状态：执行中
     updateScheduleStatus({
       currentStep: i,
@@ -652,7 +960,22 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
       currentTaskId: task.id, // 添加任务 ID
       message: `正在执行: ${task.name} (${i + 1}/${enabledTasks.length})`
     });
-    
+    activeTaskResult = {
+      id: task.id,
+      name: task.name,
+      state: 'running',
+      startedAt: new Date().toISOString()
+    };
+    taskResults.push(activeTaskResult);
+    lifecycle.onProgress?.({
+      currentStep: i + 1,
+      totalSteps: enabledTasks.length,
+      currentTask: task.name,
+      currentTaskId: task.id,
+      message: `正在执行: ${task.name} (${i + 1}/${enabledTasks.length})`,
+      updatedAt: new Date().toISOString()
+    }, taskResults);
+
     if (commandId === 'award') {
       try {
         const { command, params, taskConfig } = buildScheduledTaskCommand(task, adbConfig);
@@ -661,13 +984,13 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         if (enabledAwardItems.length === 0) {
           skippedCount++;
           skipped.push({ task: task.name, reason: '未启用任何领取项目' });
-          actionResults.push(...parseAwardExecutionActions(task.name, task.params));
+          actionResults.push(...parseAwardExecutionActions(taskName, task.params));
           continue;
         }
 
         const logCheckpoint = await createMaaLogCheckpoint();
         if (isScheduleStopRequested()) break;
-        let result;
+        let result: MaaCommandResult;
 
         if (taskConfig) {
           const taskId = params;
@@ -675,17 +998,17 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
             shouldAbort: isScheduleStopRequested
           });
         } else {
-          let args = params ? params.split(' ').filter(arg => arg) : [];
+          const args = params ? params.split(' ').filter(arg => arg) : [];
           result = await execMaaCommand(command, args, task.name, null, true);
         }
 
         if (result?.stdout) {
-          const summary = parseTaskSummary(task.name, result.stdout);
+          const summary = parseTaskSummary(taskName, result.stdout);
           if (summary) taskSummaries.push(summary);
         }
 
-        const awardActions = parseAwardExecutionActions(
-          task.name,
+        const awardActions: TaskActionResult[] = parseAwardExecutionActions(
+          taskName,
           task.params,
           await readMaaLogSince(logCheckpoint)
         );
@@ -702,7 +1025,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
             screenshot = screenshotResult.image;
             logger.success('通知截图成功', { scheduleId });
           } catch (error) {
-            logger.error('通知截图失败', { scheduleId, error: error.message });
+            logger.error('通知截图失败', { scheduleId, error: getErrorMessage(error) });
           }
         }
 
@@ -712,28 +1035,28 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
       } catch (error) {
         if (isScheduleStopRequested(error)) break;
         failedCount++;
-        errors.push({ task: task.name, error: error.message });
+        errors.push({ task: task.name, error: getErrorMessage(error) });
         actionResults.push({
           task: task.name,
           action: 'award',
           status: 'failed',
-          message: `领取奖励失败：${error.message}`
+          message: `领取奖励失败：${getErrorMessage(error)}`
         });
-        logger.error('任务执行失败', { 
-          scheduleId, 
-          taskName: task.name, 
-          error: error.message 
+        logger.error('任务执行失败', {
+          scheduleId,
+          taskName: task.name,
+          error: getErrorMessage(error)
         });
         continue;
       }
     }
-    
+
     // 关闭前仓库识别是可选步骤，不再作为隐藏的强制行为。
     if (commandId === 'closedown' && task.params?.recognizeDepotBeforeClose === true) {
       // 识别仓库
       try {
         logger.info('关闭游戏前先识别仓库', { scheduleId });
-        
+
         // 等待3秒确保游戏回到主界面
         logger.debug('等待游戏回到主界面', { scheduleId, waitSeconds: 3 });
         if (!await waitForScheduleDelay(3000)) break;
@@ -742,7 +1065,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         updateScheduleStatus({
           message: '正在识别仓库...'
         });
-        
+
         // 构建 Depot 任务配置
         const depotTaskConfig = {
           name: '仓库识别',
@@ -751,7 +1074,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
             enable: true
           }
         };
-        
+
         // execDynamicTask 需要 JSON 字符串
         // execDynamicTask 成功时不抛出异常，失败时抛出异常
         try {
@@ -761,13 +1084,13 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
             shouldAbort: isScheduleStopRequested
           });
           logger.success('仓库识别命令执行完成', { scheduleId });
-          
+
           // 解析并保存仓库数据
           logger.debug('开始解析仓库数据', { scheduleId });
-          const { parseDepotData } = await import('./dataParserService.js');
+          const { parseDepotData } = await import('./dataParserService.ts');
           const parseResult = await parseDepotData();
           if (parseResult && parseResult.success) {
-            const itemCount = parseResult.data?.itemCount || 0;
+            const itemCount = isRecord(parseResult.data) ? (parseResult.data.itemCount || 0) : 0;
             logger.success('仓库数据已保存', {
               scheduleId,
               itemCount
@@ -791,35 +1114,35 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
           if (isScheduleStopRequested(depotError)) break;
           logger.error('仓库识别失败', {
             scheduleId,
-            error: depotError.message
+            error: getErrorMessage(depotError)
           });
           actionResults.push({
             task: task.name,
             action: 'depot',
             status: 'failed',
-            message: `关闭前仓库识别失败：${depotError.message}`
+            message: `关闭前仓库识别失败：${getErrorMessage(depotError)}`
           });
           // 即使识别失败也继续执行后续任务
         }
-        
+
         // 等待2秒
         logger.debug('等待后继续', { scheduleId, waitSeconds: 2 });
         if (!await waitForScheduleDelay(2000)) break;
       } catch (error) {
-        logger.error('仓库识别异常', { 
-          scheduleId, 
-          error: error.message 
+        logger.error('仓库识别异常', {
+          scheduleId,
+          error: getErrorMessage(error)
         });
         actionResults.push({
           task: task.name,
           action: 'depot',
           status: 'failed',
-          message: `关闭前仓库识别异常：${error.message}`
+          message: `关闭前仓库识别异常：${getErrorMessage(error)}`
         });
         // 即使识别失败也继续
       }
     }
-    
+
     // 如果是启动游戏任务，添加重试机制
     if (commandId === 'startup') {
       if (isScheduleStopRequested()) break;
@@ -861,7 +1184,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
           }
 
           const { command, params } = buildScheduledTaskCommand(task, adbConfig);
-          let args = params ? params.split(' ').filter(arg => arg) : [];
+          const args = params ? params.split(' ').filter(arg => arg) : [];
           if (isScheduleStopRequested()) break;
           await execMaaCommand(command, args, task.name, null, true);
           if (isScheduleStopRequested()) break;
@@ -874,7 +1197,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
             const gameState = await getGameClientState(
               adbConfig.adbPath,
               adbConfig.address,
-              task.params.clientType || DEFAULT_CLIENT_TYPE
+              firstNonEmptyString(task.params.clientType) || DEFAULT_CLIENT_TYPE
             );
             if (!gameState.running) {
               throw new Error(`游戏未在前台，当前应用：${gameState.foregroundPackage || '未知'}`);
@@ -897,7 +1220,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
             if (isScheduleStopRequested(error)) break;
             logger.error('游戏可能已闪退', {
               scheduleId,
-              error: error.message
+              error: getErrorMessage(error)
             });
             retryCount++;
             if (retryCount > maxRetries) {
@@ -911,17 +1234,17 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
           }
           if (retryCount >= maxRetries) {
             failedCount++;
-            errors.push({ task: task.name, error: error.message });
+            errors.push({ task: task.name, error: getErrorMessage(error) });
             actionResults.push({
               task: task.name,
               action: 'startup',
               status: 'failed',
-              message: error.message
+              message: getErrorMessage(error)
             });
             logger.error('任务执行失败', {
               scheduleId,
               taskName: task.name,
-              error: error.message
+              error: getErrorMessage(error)
             });
             break;
           }
@@ -939,7 +1262,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         const { command, params, taskConfig } = buildScheduledTaskCommand(task, adbConfig);
         const logCheckpoint = await createMaaLogCheckpoint();
         if (isScheduleStopRequested()) break;
-        let result;
+        let result: MaaCommandResult;
 
         if (taskConfig) {
           result = await execDynamicTask(params, taskConfig, task.name, null, true, false, {
@@ -951,12 +1274,12 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         }
 
         if (result?.stdout) {
-          const summary = parseTaskSummary(task.name, result.stdout);
+          const summary = parseTaskSummary(taskName, result.stdout);
           if (summary) taskSummaries.push(summary);
         }
 
-        const recruitAction = parseRecruitExecutionAction(
-          task.name,
+        const recruitAction: TaskActionResult = parseRecruitExecutionAction(
+          taskName,
           task.params,
           await readMaaLogSince(logCheckpoint)
         );
@@ -978,22 +1301,22 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
       } catch (error) {
         if (isScheduleStopRequested(error)) break;
         failedCount++;
-        errors.push({ task: task.name, error: error.message });
+        errors.push({ task: task.name, error: getErrorMessage(error) });
         actionResults.push({
           task: task.name,
           action: 'recruit',
           status: 'failed',
-          message: `自动公招失败：${error.message}`
+          message: `自动公招失败：${getErrorMessage(error)}`
         });
-        logger.error('自动公招执行失败', { scheduleId, taskName: task.name, error: error.message });
+        logger.error('自动公招执行失败', { scheduleId, taskName: task.name, error: getErrorMessage(error) });
         continue;
       }
     }
 
     if (commandId === 'infrast') {
       try {
-        if (!Array.isArray(task.params?.facility) || task.params.facility.length === 0) {
-          const infrastAction = parseInfrastExecutionAction(task.name, task.params);
+        if (!Array.isArray(task.params.facility) || task.params.facility.length === 0) {
+          const infrastAction: TaskActionResult = parseInfrastExecutionAction(taskName, task.params);
           skippedCount++;
           skipped.push({ task: task.name, reason: infrastAction.message });
           actionResults.push(infrastAction);
@@ -1003,7 +1326,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         const { command, params, taskConfig } = buildScheduledTaskCommand(task, adbConfig);
         const logCheckpoint = await createMaaLogCheckpoint();
         if (isScheduleStopRequested()) break;
-        let result;
+        let result: MaaCommandResult;
 
         if (taskConfig) {
           result = await execDynamicTask(params, taskConfig, task.name, null, true, false, {
@@ -1015,12 +1338,12 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         }
 
         if (result?.stdout) {
-          const summary = parseTaskSummary(task.name, result.stdout);
+          const summary = parseTaskSummary(taskName, result.stdout);
           if (summary) taskSummaries.push(summary);
         }
 
-        const infrastAction = parseInfrastExecutionAction(
-          task.name,
+        const infrastAction: TaskActionResult = parseInfrastExecutionAction(
+          taskName,
           task.params,
           await readMaaLogSince(logCheckpoint)
         );
@@ -1042,14 +1365,14 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
       } catch (error) {
         if (isScheduleStopRequested(error)) break;
         failedCount++;
-        errors.push({ task: task.name, error: error.message });
+        errors.push({ task: task.name, error: getErrorMessage(error) });
         actionResults.push({
           task: task.name,
           action: 'infrast',
           status: 'failed',
-          message: `基建任务失败：${error.message}`
+          message: `基建任务失败：${getErrorMessage(error)}`
         });
-        logger.error('基建任务执行失败', { scheduleId, taskName: task.name, error: error.message });
+        logger.error('基建任务执行失败', { scheduleId, taskName: task.name, error: getErrorMessage(error) });
         continue;
       }
     }
@@ -1059,7 +1382,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         if (task.params?.visit_friends === false
           && task.params?.shopping === false
           && task.params?.credit_fight === false) {
-          const mallAction = parseMallExecutionAction(task.name, task.params);
+          const mallAction: TaskActionResult = parseMallExecutionAction(taskName, task.params);
           skippedCount++;
           skipped.push({ task: task.name, reason: mallAction.message });
           actionResults.push(mallAction);
@@ -1069,7 +1392,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         const { command, params, taskConfig } = buildScheduledTaskCommand(task, adbConfig);
         const logCheckpoint = await createMaaLogCheckpoint();
         if (isScheduleStopRequested()) break;
-        let result;
+        let result: MaaCommandResult;
 
         if (taskConfig) {
           result = await execDynamicTask(params, taskConfig, task.name, null, true, false, {
@@ -1081,12 +1404,12 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
         }
 
         if (result?.stdout) {
-          const summary = parseTaskSummary(task.name, result.stdout);
+          const summary = parseTaskSummary(taskName, result.stdout);
           if (summary) taskSummaries.push(summary);
         }
 
-        const mallAction = parseMallExecutionAction(
-          task.name,
+        const mallAction: TaskActionResult = parseMallExecutionAction(
+          taskName,
           task.params,
           await readMaaLogSince(logCheckpoint)
         );
@@ -1108,36 +1431,42 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
       } catch (error) {
         if (isScheduleStopRequested(error)) break;
         failedCount++;
-        errors.push({ task: task.name, error: error.message });
+        errors.push({ task: task.name, error: getErrorMessage(error) });
         actionResults.push({
           task: task.name,
           action: 'mall',
           status: 'failed',
-          message: `信用收支失败：${error.message}`
+          message: `信用收支失败：${getErrorMessage(error)}`
         });
-        logger.error('信用收支执行失败', { scheduleId, taskName: task.name, error: error.message });
+        logger.error('信用收支执行失败', { scheduleId, taskName: task.name, error: getErrorMessage(error) });
         continue;
       }
     }
-    
+
     try {
       const { command, params, taskConfig } = buildScheduledTaskCommand(task, adbConfig);
-      
+
       if (taskConfig) {
         const taskId = params;
         const fightLogCheckpoint = commandId === 'fight' ? await createMaaLogCheckpoint() : null;
         let effectiveTaskConfig = taskConfig;
         if (commandId === 'fight') {
-          const parsed = JSON.parse(taskConfig);
+          const parsed = JSON.parse(taskConfig) as DynamicFightTaskDocument;
           if (Array.isArray(parsed.tasks)) {
-            const clientType = task.params?.clientType || adbConfig?.clientType || DEFAULT_CLIENT_TYPE;
-            parsed.tasks = await Promise.all(parsed.tasks.map(async item => ({
-              ...item,
-              params: {
-                ...item.params,
-                stage: await replaceActivityCode(item.params?.stage, clientType)
-              }
-            })));
+            const clientType = firstNonEmptyString(task.params?.clientType, adbConfig.clientType)
+              || DEFAULT_CLIENT_TYPE;
+            parsed.tasks = await Promise.all(parsed.tasks.map(async item => {
+              const itemStage = item.params?.stage;
+              return {
+                ...item,
+                params: {
+                  ...item.params,
+                  stage: typeof itemStage === 'string'
+                    ? await replaceActivityCode(itemStage, clientType)
+                    : itemStage
+                }
+              };
+            }));
             effectiveTaskConfig = JSON.stringify(parsed);
           }
         }
@@ -1149,49 +1478,49 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
 
         // 尝试从输出中提取任务总结
         if (result.stdout) {
-          let summary = parseTaskSummary(task.name, result.stdout);
+          let summary = parseTaskSummary(taskName, result.stdout);
           if (summary) {
             if (commandId === 'fight' && fightLogCheckpoint) {
-              summary = await attachFightCallbacks(summary, fightLogCheckpoint, task.name);
+              summary = await attachFightCallbacks(summary, fightLogCheckpoint, taskName);
               await recordFightDrops(summary, scheduleId);
             }
             taskSummaries.push(summary);
           }
         }
       } else {
-        let args = params ? params.split(' ').filter(arg => arg) : [];
-        
+        const args = params ? params.split(' ').filter(arg => arg) : [];
+
         // 如果是 fight 命令，处理多个关卡
         if (command === 'fight' && args.length > 0) {
           const stageInput = args[0];
-          const clientType = task.params.clientType || DEFAULT_CLIENT_TYPE;
-          
+          const clientType = firstNonEmptyString(task.params.clientType) || DEFAULT_CLIENT_TYPE;
+
           // 解析关卡列表，格式：stage1:times1,stage2:times2 或 stage1,stage2
-          const stageEntries = stageInput.split(',').map(s => {
-            const parts = s.trim().split(':');
+          const stageEntries = stageInput.split(',').map((entry): NormalizedFightStage => {
+            const parts = entry.trim().split(':');
             return {
               stage: parts[0],
               times: parts[1] || ''
             };
-          }).filter(s => s.stage);
-          
+          }).filter(entry => entry.stage);
+
           if (stageEntries.length > 1) {
             // 多个关卡，依次执行
-            logger.info('检测到多个关卡', { 
-              scheduleId, 
-              stages: stageEntries.map(e => `${e.stage}${e.times ? `:${e.times}` : ''}`).join(', ')
+            logger.info('检测到多个关卡', {
+              scheduleId,
+              stages: stageEntries.map(entry => `${entry.stage}${entry.times ? `:${entry.times}` : ''}`).join(', ')
             });
-            
+
             let sanityDepleted = false;
             const fightActionStartIndex = actionResults.length;
-            
+
             for (let i = 0; i < stageEntries.length; i++) {
               if (isScheduleStopRequested()) {
                 logger.warn('多关卡任务收到停止信号，不再进入下一关', { scheduleId });
                 break;
               }
               const { stage, times } = stageEntries[i];
-              
+
               // 如果理智已耗尽，跳过剩余关卡
               if (sanityDepleted) {
                 logger.info('理智已耗尽，跳过关卡', { scheduleId, stage });
@@ -1200,48 +1529,48 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
                 }));
                 continue;
               }
-              
+
               // 检查关卡是否开放
               const openCheck = isStageOpenToday(stage);
               if (!openCheck.isOpen) {
-                logger.info('关卡今日未开放，跳过', { 
-                  scheduleId, 
-                  stage, 
-                  reason: openCheck.reason 
+                logger.info('关卡今日未开放，跳过', {
+                  scheduleId,
+                  stage,
+                  reason: openCheck.reason
                 });
                 addFightAction(createFightExecutionAction(`${task.name} (${stage})`, stage, {
                   skipReason: openCheck.reason
                 }));
                 continue; // 跳过这个关卡
               }
-              
-              logger.info('执行关卡', { 
-                scheduleId, 
-                stageIndex: i + 1, 
-                totalStages: stageEntries.length, 
-                stage, 
-                times 
+
+              logger.info('执行关卡', {
+                scheduleId,
+                stageIndex: i + 1,
+                totalStages: stageEntries.length,
+                stage,
+                times
               });
-              
+
               // 替换活动代号
               const realStage = await replaceActivityCode(stage, clientType);
               if (realStage !== stage) {
-                logger.debug('关卡代号已替换', { 
-                  scheduleId, 
-                  originalStage: stage, 
-                  realStage 
+                logger.debug('关卡代号已替换', {
+                  scheduleId,
+                  originalStage: stage,
+                  realStage
                 });
               }
-              
+
               // 构建当前关卡的参数（移除第一个参数，添加当前关卡和次数）
-              const currentArgs = [realStage];
+              const currentArgs: string[] = [realStage];
               if (times) {
                 currentArgs.push('--times', times);
               }
-              
+
               // 添加其他参数（理智药、源石等）
               // 如果填了次数，排除 --series 参数；否则保留所有参数
-              let otherArgs;
+              let otherArgs: string[];
               if (times) {
                 // 填了次数，过滤掉 --series
                 otherArgs = args.slice(1).filter((arg, index, arr) => {
@@ -1252,7 +1581,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
                 otherArgs = args.slice(1);
               }
               currentArgs.push(...otherArgs);
-              
+
               // 执行命令
               try {
                 const fightLogCheckpoint = await createMaaLogCheckpoint();
@@ -1262,26 +1591,26 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
                 const reportSummary = getFightReportResults(task, stage, result);
                 reportResults.push(...reportSummary.reportResults);
                 reportSummary.diagnostics.forEach(diagnostic => executionWarnings.add(diagnostic.message));
-                
+
                 // 检查理智状态（传入关卡名称用于排除剿灭）
                 const output = (result.stdout || '') + (result.stderr || '');
-                logger.debug('检查理智状态', { 
-                  scheduleId, 
-                  stage, 
-                  outputLength: output.length 
+                logger.debug('检查理智状态', {
+                  scheduleId,
+                  stage,
+                  outputLength: output.length
                 });
-                logger.debug('输出内容预览', { 
-                  scheduleId, 
-                  preview: output.substring(0, 200) 
+                logger.debug('输出内容预览', {
+                  scheduleId,
+                  preview: output.substring(0, 200)
                 });
-                
+
                 if (isFightSanityDepleted(output, stage)) {
                   logger.info('检测到理智已耗尽', { scheduleId, stage });
                   sanityDepleted = true;
                 } else {
                   logger.debug('未检测到理智耗尽', { scheduleId, stage });
                 }
-                
+
                 // 提取任务总结，并用结构化回调补齐掉落与理智
                 let summary = result.stdout
                   ? parseTaskSummary(`${task.name} (${stage})`, result.stdout)
@@ -1300,15 +1629,15 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
                   logger.warn('当前关卡已被终止，不再执行后续关卡', { scheduleId, stage });
                   break;
                 }
-                const errorMsg = error.message || '';
-                const errorOutput = (error.stdout || '') + (error.stderr || '');
-                
-                logger.debug('任务执行出错，检查是否理智不足', { 
-                  scheduleId, 
-                  stage, 
-                  errorMsg 
+                const errorMsg = getErrorMessage(error) || '';
+                const errorOutput = String(asErrorWithCode(error).stdout || '') + String(asErrorWithCode(error).stderr || '');
+
+                logger.debug('任务执行出错，检查是否理智不足', {
+                  scheduleId,
+                  stage,
+                  errorMsg
                 });
-                
+
                 const fightAction = createFightExecutionAction(`${task.name} (${stage})`, stage, {
                   output: errorOutput,
                   error
@@ -1323,7 +1652,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
                 }
                 addFightAction(fightAction);
               }
-              
+
               // 关卡之间等待2秒
               if (i < stageEntries.length - 1) {
                 logger.debug('等待后继续下一个关卡', { scheduleId, waitSeconds: 2 });
@@ -1333,36 +1662,36 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
             }
 
             countFightTaskResult(actionResults.slice(fightActionStartIndex));
-            
+
             // 所有关卡完成后的延迟
             let delayTime = 2000;
-            logger.debug('任务完成，等待后继续', { 
-              scheduleId, 
-              taskName: task.name, 
-              delaySeconds: delayTime / 1000 
+            logger.debug('任务完成，等待后继续', {
+              scheduleId,
+              taskName: task.name,
+              delaySeconds: delayTime / 1000
             });
             const delayCompleted = await waitForScheduleDelay(delayTime);
             if (!delayCompleted) break;
-            
+
             continue; // 跳过后面的单关卡处理
           } else {
             // 单个关卡，检查是否开放
             const { stage, times } = stageEntries[0];
-            
+
             // 检查关卡是否开放
             const openCheck = isStageOpenToday(stage);
             if (!openCheck.isOpen) {
-              logger.info('关卡今日未开放，跳过', { 
-                scheduleId, 
-                stage, 
-                reason: openCheck.reason 
+              logger.info('关卡今日未开放，跳过', {
+                scheduleId,
+                stage,
+                reason: openCheck.reason
               });
               const fightAction = createFightExecutionAction(`${task.name} (${stage})`, stage, {
                 skipReason: openCheck.reason
               });
               addFightAction(fightAction);
               countFightTaskResult([fightAction]);
-              
+
               // 跳过后的延迟
               logger.debug('任务已跳过，等待后继续', {
                 scheduleId,
@@ -1372,25 +1701,25 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
               if (!await waitForScheduleDelay(2000)) break;
               continue; // 跳过这个任务
             }
-            
+
             // 替换活动代号
             const realStage = await replaceActivityCode(stage, clientType);
             if (realStage !== stage) {
               args[0] = realStage; // 只保留关卡名，不要拼接次数
-              logger.debug('关卡代号已替换', { 
-                scheduleId, 
-                originalStage: stage, 
-                realStage 
+              logger.debug('关卡代号已替换', {
+                scheduleId,
+                originalStage: stage,
+                realStage
               });
             } else if (times) {
               // 如果没有替换但有次数，也要更新 args[0] 为纯关卡名
               args[0] = stage;
             }
-            
+
             // 如果有次数，添加 --times 参数，并移除 --series 参数
             if (times && !args.includes('--times')) {
               args.splice(1, 0, '--times', times);
-              
+
               // 移除 --series 参数（填了次数的关卡不使用连战）
               const seriesIndex = args.indexOf('--series');
               if (seriesIndex !== -1) {
@@ -1399,7 +1728,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
             }
           }
         }
-        
+
         // 定时任务需要等待命令完成才能获取输出
         const fightLogCheckpoint = command === 'fight' ? await createMaaLogCheckpoint() : null;
         if (isScheduleStopRequested()) break;
@@ -1412,21 +1741,23 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
             message: '游戏客户端已关闭'
           });
         }
-        const fightStage = command === 'fight' ? (args[0] || task.params?.stage || '') : '';
+        const fightStage = command === 'fight'
+          ? (args[0] || (typeof task.params?.stage === 'string' ? task.params.stage : '') || '')
+          : '';
         if (command === 'fight') {
           const stage = fightStage;
           const reportSummary = getFightReportResults(task, stage, result);
           reportResults.push(...reportSummary.reportResults);
           reportSummary.diagnostics.forEach(diagnostic => executionWarnings.add(diagnostic.message));
         }
-        
+
         // 尝试从输出中提取任务总结，并用结构化回调补齐掉落与理智
-        let parsedTaskSummary = null;
+        let parsedTaskSummary: TaskSummary | null = null;
         if (result.stdout) {
-          parsedTaskSummary = parseTaskSummary(task.name, result.stdout);
+          parsedTaskSummary = parseTaskSummary(taskName, result.stdout);
         }
         if (command === 'fight') {
-          parsedTaskSummary = await attachFightCallbacks(parsedTaskSummary, fightLogCheckpoint, task.name);
+          parsedTaskSummary = await attachFightCallbacks(parsedTaskSummary, fightLogCheckpoint, taskName);
         }
         if (parsedTaskSummary) {
           taskSummaries.push(parsedTaskSummary);
@@ -1435,7 +1766,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
 
         if (command === 'fight') {
           const output = (result.stdout || '') + (result.stderr || '');
-          const fightAction = createFightExecutionAction(task.name, fightStage, {
+          const fightAction = createFightExecutionAction(taskName, fightStage, {
             summary: parsedTaskSummary,
             output
           });
@@ -1443,9 +1774,9 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
           countFightTaskResult([fightAction]);
         }
       }
-      
+
       if (commandId !== 'fight') successCount++;
-      
+
       // 任务完成后的延迟时间
       // 启动游戏需要更长的等待时间，确保游戏完全启动
       let delayTime = 2000;
@@ -1454,11 +1785,11 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
       } else if (commandId === 'closedown') {
         delayTime = 3000; // 关闭游戏等待3秒
       }
-      
-      logger.debug('任务完成，等待后继续', { 
-        scheduleId, 
-        taskName: task.name, 
-        delaySeconds: delayTime / 1000 
+
+      logger.debug('任务完成，等待后继续', {
+        scheduleId,
+        taskName: task.name,
+        delaySeconds: delayTime / 1000
       });
       const delayCompleted = await waitForScheduleDelay(delayTime);
       if (!delayCompleted) {
@@ -1472,10 +1803,15 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
       }
 
       failedCount++;
-      errors.push({ task: task.name, error: error.message });
+      errors.push({ task: task.name, error: getErrorMessage(error) });
       if (commandId === 'fight') {
-        const configuredStage = task.params?.stages?.[0]?.stage || task.params?.stage || '';
-        const action = createFightExecutionAction(task.name, configuredStage, { error });
+        const firstStage = Array.isArray(task.params?.stages) && isRecord(task.params.stages[0])
+          ? task.params.stages[0].stage
+          : undefined;
+        const configuredStage = (typeof firstStage === 'string' && firstStage)
+          ? firstStage
+          : (typeof task.params?.stage === 'string' ? task.params.stage : '');
+        const action = createFightExecutionAction(taskName, configuredStage, { error });
         actionResults.push(action);
         if (action.status === 'skipped') {
           failedCount--;
@@ -1489,20 +1825,21 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
           task: task.name,
           action: 'closedown',
           status: 'failed',
-          message: `关闭游戏失败：${error.message}`
+          message: `关闭游戏失败：${getErrorMessage(error)}`
         });
       }
-      logger.error('任务执行失败', { 
-        scheduleId, 
-        taskName: task.name, 
-        error: error.message 
+      logger.error('任务执行失败', {
+        scheduleId,
+        taskName: task.name,
+        error: getErrorMessage(error)
       });
       // 继续执行下一个任务
     }
   }
-  
-  const duration = Date.now() - startTime;
+
   const wasStopped = scheduleExecutionStatus.shouldStop;
+  finalizeActiveTask(wasStopped ? 'stopped' : null);
+  const duration = Date.now() - startTime;
   const reportFailureCount = reportResults.filter(report => report.status === 'failed').length;
   const completionMessage = wasStopped
     ? '任务流程已被用户终止'
@@ -1511,7 +1848,7 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
       : failedCount > 0
         ? `任务流程执行完成，${failedCount} 项任务失败`
         : '任务流程执行完成';
-  const executionSummary = {
+  const executionSummary: ScheduleExecutionSummary = {
     successCount,
     failedCount,
     skippedCount,
@@ -1519,17 +1856,26 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
     summaries: taskSummaries,
     reports: reportResults,
     actions: actionResults,
+    taskResults,
     errors,
     warnings: [...executionWarnings]
   };
   logger.info(completionMessage, {
-    scheduleId, 
-    successCount, 
-    failedCount, 
-    skippedCount, 
-    durationSeconds: Math.floor(duration / 1000) 
+    scheduleId,
+    successCount,
+    failedCount,
+    skippedCount,
+    durationSeconds: Math.floor(duration / 1000)
   });
-  
+
+  lifecycle.onProgress?.({
+    currentStep: wasStopped ? scheduleExecutionStatus.currentStep : enabledTasks.length,
+    totalSteps: enabledTasks.length,
+    currentTask: null,
+    message: completionMessage,
+    updatedAt: new Date().toISOString()
+  }, taskResults);
+
   // 更新状态：完成
   updateScheduleStatus({
     isRunning: false,
@@ -1547,17 +1893,17 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
   if (wasStopped) {
     return { success: true, stopped: true, message: completionMessage, summary: executionSummary };
   }
-  
+
   // 动态更新智能养成关卡
   try {
     await updateSmartTrainingStages(scheduleId);
   } catch (error) {
-    logger.error('动态更新智能养成关卡失败', { 
-      scheduleId, 
-      error: error.message 
+    logger.error('动态更新智能养成关卡失败', {
+      scheduleId,
+      error: getErrorMessage(error)
     });
   }
-  
+
   // 发送完成通知
   try {
     await sendTaskCompletionNotification({
@@ -1569,39 +1915,45 @@ async function executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle = 
       duration,
       errors,
       skipped,
-      summaries: taskSummaries,
+      summaries: taskSummaries as Parameters<typeof sendTaskCompletionNotification>[0]['summaries'],
       actions: actionResults,
       reports: reportResults,
       warnings: [...executionWarnings],
       screenshot,
     });
   } catch (error) {
-    logger.error('发送通知失败', { 
-      scheduleId, 
-      error: error.message 
+    logger.error('发送通知失败', {
+      scheduleId,
+      error: getErrorMessage(error)
     });
   }
 
   return { success: true, stopped: false, message: completionMessage, summary: executionSummary };
 }
 
-async function executeTaskFlow(taskFlow, scheduleId, lifecycle = {}) {
+function getThrownMessage(error: unknown): string {
+  if (!isRecord(error)) return '';
+  return error.message ? String(error.message) : '';
+}
+
+async function executeTaskFlow(taskFlow: unknown, scheduleId: string, lifecycle: ScheduleLifecycle = {}): Promise<ScheduleExecutionResult> {
   const runId = Symbol(scheduleId);
-  let unexpectedError = null;
+  let unexpectedError: unknown = null;
   try {
     return await withMaaExecutionLease({
       source: 'schedule',
       taskName: `任务流程 ${scheduleId}`,
-      command: 'schedule'
-    }, () => executeTaskFlowUnlocked(taskFlow, scheduleId, runId, lifecycle));
+      command: 'schedule',
+      runId: lifecycle.runId || null
+    }, () => executeTaskFlowUnlocked(taskFlow as ScheduledTaskFlow, scheduleId, runId, lifecycle));
   } catch (error) {
-    if (error?.code === 'MAA_EXECUTION_BUSY') {
-      logger.warn('设备正被其他 MAA 任务占用，跳过任务流程', { scheduleId, owner: error.owner });
+    if (getErrorCode(error) === 'MAA_EXECUTION_BUSY') {
+      logger.warn('设备正被其他 MAA 任务占用，跳过任务流程', { scheduleId, owner: asErrorWithCode(error).owner });
       return {
         success: false,
-        message: error.message,
+        message: getErrorMessage(error),
         busy: true,
-        owner: error.owner
+        owner: asErrorWithCode(error).owner
       };
     }
     unexpectedError = error;
@@ -1610,14 +1962,15 @@ async function executeTaskFlow(taskFlow, scheduleId, lifecycle = {}) {
     const ownsActiveExecution = activeScheduleRunId === runId;
     if (ownsActiveExecution && scheduleExecutionStatus.isRunning) {
       const wasStopped = scheduleExecutionStatus.shouldStop;
+      const unexpectedMessage = getThrownMessage(unexpectedError);
       const message = wasStopped
         ? '任务流程已被用户终止'
-        : `任务流程异常终止${unexpectedError?.message ? `: ${unexpectedError.message}` : ''}`;
+        : `任务流程异常终止${unexpectedMessage ? `: ${unexpectedMessage}` : ''}`;
 
       logger.error('任务流程未正常收尾，已复位执行状态', {
         scheduleId,
         stopped: wasStopped,
-        error: unexpectedError?.message || null
+        error: unexpectedMessage || null
       });
       updateScheduleStatus({
         isRunning: false,
@@ -1640,38 +1993,80 @@ async function executeTaskFlow(taskFlow, scheduleId, lifecycle = {}) {
   }
 }
 
-export async function executeScheduledTaskFromCron(taskFlow, scheduleId) {
+export async function executeScheduledTaskFromCron(taskFlow: unknown, scheduleId: string): Promise<ScheduleExecutionResult & { runId: string }> {
+  const reservation = beginAgentRun({
+    operationId: 'run_daily_flow',
+    input: { scheduleId, taskFlow },
+    trigger: { type: 'cron', scheduleId, source: 'cron' },
+    metadata: { taskName: `定时任务 ${scheduleId}`, taskType: 'schedule' }
+  });
+  const runId = reservation.run.runId;
+  const lifecycle: ScheduleLifecycle = {
+    runId,
+    onProgress: (progress, taskResults = null) => updateAgentRunProgress(runId, progress, taskResults)
+  };
+
   try {
-    return await executeTaskFlow(taskFlow, scheduleId);
+    await flushAgentRunStore();
   } catch (error) {
-    logger.error('定时任务回调执行失败', { scheduleId, error: error.message });
-    return { success: false, message: error.message };
+    failAgentRun(runId, error);
+    await flushAgentRunStore().catch((_error: unknown) => undefined);
+    logger.error('定时任务 Run 接受状态持久化失败，已跳过执行', { scheduleId, runId, error: getErrorMessage(error) });
+    return { success: false, message: getErrorMessage(error), runId };
+  }
+
+  startAgentRun(runId);
+  try {
+    const result = await executeTaskFlow(taskFlow, scheduleId, lifecycle);
+    if (result.success) {
+      completeAgentRun(runId, result);
+    } else {
+      const failure = result.busy
+        ? agentError('MAA_EXECUTION_BUSY', result.message || '设备正被其他任务占用', {
+            statusCode: 409,
+            details: { owner: result.owner || null },
+            retryable: true
+          })
+        : new Error(result.message || '定时任务执行失败');
+      failAgentRun(runId, failure);
+    }
+    await flushAgentRunStore().catch((error: unknown) => {
+      logger.error('定时任务 Run 终态持久化失败', { scheduleId, runId, error: getErrorMessage(error) });
+    });
+    return { ...result, runId };
+  } catch (error) {
+    failAgentRun(runId, error);
+    await flushAgentRunStore().catch((flushError: unknown) => {
+      logger.error('定时任务 Run 失败状态持久化失败', { scheduleId, runId, error: getErrorMessage(flushError) });
+    });
+    logger.error('定时任务回调执行失败', { scheduleId, runId, error: getErrorMessage(error) });
+    return { success: false, message: getErrorMessage(error), runId };
   }
 }
 
 /**
  * 解析 MAA 任务总结信息
  */
-export function parseTaskSummary(taskName, output) {
-  const summary = { task: taskName };
-  
+export function parseTaskSummary(taskName: string, output: string): TaskSummary | null {
+  const summary: TaskSummary = { task: taskName };
+
   // 调试：打印原始输出
-  logger.debug('解析任务总结', { 
-    taskName, 
-    outputLength: output.length 
+  logger.debug('解析任务总结', {
+    taskName,
+    outputLength: output.length
   });
   logger.debug('任务总结完整输出', { output });
-  
+
   // 解析 MAA 的实际输出格式
   // 格式示例: Fight OR-7 1 times, drops:
-  
+
   // 提取关卡和次数
   const fightMatch = output.match(/Fight\s+([A-Z0-9-]+)\s+(\d+)\s+times?/i);
   if (fightMatch) {
     summary.stage = fightMatch[1];
     summary.times = fightMatch[2];
   }
-  
+
   // 提取掉落信息
   // 格式: total drops: "生香" × 21, 全新装置 × 1, 龙门币 × 252
   const totalDropsMatch = output.match(/total drops:\s*(.+?)(?:\n|$)/i);
@@ -1679,8 +2074,8 @@ export function parseTaskSummary(taskName, output) {
     const dropsText = totalDropsMatch[1].trim();
     // 解析每个物品
     const itemMatches = dropsText.matchAll(/(?:"([^"]+)"|([^\s,×]+))\s*×\s*(\d+)/g);
-    const drops = [];
-    const dropItems = []; // 用于记录的结构化数据
+    const drops: string[] = [];
+    const dropItems: FightDropItem[] = []; // 用于记录的结构化数据
     for (const match of itemMatches) {
       const itemName = match[1] || match[2];
       const count = parseInt(match[3]);
@@ -1692,7 +2087,7 @@ export function parseTaskSummary(taskName, output) {
       summary.dropItems = dropItems; // 保存结构化数据
     }
   }
-  
+
   // 提取理智药和源石使用（maa-cli 0.7.x 的 Summary 格式）
   const medicineMatch = output.match(/used\s+(\d+)\s+medicine/i)
     || output.match(/medicine[:\s]+(\d+)/i);
@@ -1705,16 +2100,16 @@ export function parseTaskSummary(taskName, output) {
   if (stoneMatch) {
     summary.stone = stoneMatch[1];
   }
-  
+
   // 提取执行时间
   const timeMatch = output.match(/\[Fight\]\s+([\d:]+)\s+-\s+([\d:]+)\s+\(([^)]+)\)/);
   if (timeMatch) {
     summary.duration = timeMatch[3];
   }
-  
+
   // 解析公招总结（Detected tags 格式）
   if (output.includes('Detected tags')) {
-    const recruits = [];
+    const recruits: RecruitSummary[] = [];
     const recruitLinePattern = /^\s*\d+\.\s*(★+)\s*(.*?)(?:,\s*(Recruited|Refreshed))?\s*$/gm;
     for (const match of output.matchAll(recruitLinePattern)) {
       const tags = match[2].split(',').map(tag => tag.trim()).filter(Boolean);
@@ -1734,7 +2129,7 @@ export function parseTaskSummary(taskName, output) {
     if (refreshedMatch) summary.refreshCount = Number(refreshedMatch[1]);
   } else if (output.includes('Recruit')) {
     const recruitMatches = output.matchAll(/Recruit[:\s]+\[([^\]]+)\]\s*->\s*(\d+)\*/gi);
-    const recruits = [];
+    const recruits: RecruitSummary[] = [];
     for (const match of recruitMatches) {
       recruits.push({
         tags: match[1],
@@ -1758,20 +2153,21 @@ export function parseTaskSummary(taskName, output) {
       summary.infrast = infrastMatch[1].trim();
     }
   }
-  
+
   logger.debug('任务总结解析结果', { summary });
-  
+
   return Object.keys(summary).length > 1 ? summary : null;
 }
 
 // 创建或更新定时任务
-export function setupSchedule(scheduleId, times, taskFlow) {
+export function setupSchedule(scheduleId: string, times: unknown, taskFlow: unknown) {
   if (!Array.isArray(taskFlow)) {
     return { success: false, message: '任务流程格式无效' };
   }
 
-  const normalizedTimes = Array.isArray(times)
-    ? [...new Set(times.filter(time => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)))]
+  const normalizedTimes: string[] = Array.isArray(times)
+    ? [...new Set(times.filter((time): time is string =>
+      typeof time === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)))]
     : [];
 
   if (normalizedTimes.length === 0) {
@@ -1784,67 +2180,68 @@ export function setupSchedule(scheduleId, times, taskFlow) {
     existingJobs.forEach(({ job }) => job.stop());
     scheduledJobs.delete(scheduleId);
   }
-  
-  const jobs = [];
-  const failedTimes = [];
-  
+
+  const jobs: ScheduledJobEntry[] = [];
+  const failedTimes: string[] = [];
+
   normalizedTimes.forEach((time, index) => {
     if (!time) return;
-    
+
     // 解析时间 (HH:MM)
     const [hour, minute] = time.split(':');
     if (!hour || !minute) return;
-    
+
     // 创建 cron 表达式: 分 时 * * *
     const cronExpression = `${minute} ${hour} * * *`;
-    
+    const cronOptions = {
+      scheduled: true,
+      timezone: "Asia/Shanghai"
+    };
+
     try {
       const job = cron.schedule(cronExpression, () => {
         logger.info('定时任务触发执行', { scheduleId: `${scheduleId}-${index}`, time });
         void executeScheduledTaskFromCron(taskFlow, `${scheduleId}-${index}`);
-      }, {
-        scheduled: true,
-        timezone: "Asia/Shanghai"
-      });
-      
+      }, cronOptions);
+
       jobs.push({ time, job });
     } catch (error) {
       failedTimes.push(time);
-      logger.error('定时任务设置失败', { 
-        scheduleId: `${scheduleId}-${index}`, 
+      logger.error('定时任务设置失败', {
+        scheduleId: `${scheduleId}-${index}`,
         time,
-        error: error.message 
+        error: getErrorMessage(error)
       });
     }
   });
-  
+
   if (jobs.length > 0) {
     scheduledJobs.set(scheduleId, jobs);
-    logger.info('定时任务已设置', { 
-      scheduleId, 
+    logger.info('定时任务已设置', {
+      scheduleId,
       count: jobs.length,
-      times: jobs.map(j => j.time).join(', ')
+      times: jobs.map(job => job.time).join(', ')
     });
-    return { 
-      success: true, 
+    return {
+      success: true,
       message: `已设置 ${jobs.length} 个定时任务`,
-      times: jobs.map(j => j.time)
+      times: jobs.map(job => job.time)
     };
   }
-  
+
   return { success: false, message: '没有成功设置任何定时任务' };
 }
 
 // 停止定时任务
-export function stopSchedule(scheduleId) {
+export function stopSchedule(scheduleId: string) {
   const jobs = scheduledJobs.get(scheduleId);
   if (jobs) {
     jobs.forEach(({ job }) => job.stop());
     scheduledJobs.delete(scheduleId);
-    logger.debug('定时任务已停止', { 
-      scheduleId, 
+    logger.debug('定时任务已停止', {
+      scheduleId,
       count: jobs.length,
-      times: jobs.map(j => j.time).join(', ')
+      times: jobs.map(job => job.time).join(', ')
     });
     return { success: true, message: '定时任务已停止' };
   }
@@ -1853,11 +2250,11 @@ export function stopSchedule(scheduleId) {
 
 // 获取所有定时任务状态
 export function getScheduleStatus() {
-  const status = [];
+  const status: ScheduleStateEntry[] = [];
   scheduledJobs.forEach((jobs, scheduleId) => {
     status.push({
       scheduleId,
-      times: jobs.map(j => j.time),
+      times: jobs.map(job => job.time),
       count: jobs.length
     });
   });
@@ -1865,39 +2262,47 @@ export function getScheduleStatus() {
 }
 
 // 立即执行一次定时任务（用于测试）
-export async function executeScheduleNow(scheduleId, taskFlow, lifecycle = {}) {
+export async function executeScheduleNow(scheduleId: string, taskFlow: unknown, lifecycle: ScheduleLifecycle = {}) {
   logger.info('手动触发执行', { scheduleId });
   return await executeTaskFlow(taskFlow, scheduleId, lifecycle);
 }
 
 // 自动更新任务
-export function setupAutoUpdate(config) {
-  const { enabled, time, updateCore, updateCli } = config;
-  
+export function setupAutoUpdate(config: unknown) {
+  const configRecord = isRecord(config) ? config : {};
+  const enabled = Boolean(configRecord.enabled);
+  const time = typeof configRecord.time === 'string' ? configRecord.time : '';
+  const updateCore = Boolean(configRecord.updateCore);
+  const updateCli = Boolean(configRecord.updateCli);
+
   // 先停止已存在的自动更新任务（静默停止）
   const existingJobs = scheduledJobs.get('auto-update');
   if (existingJobs) {
     existingJobs.forEach(({ job }) => job.stop());
     scheduledJobs.delete('auto-update');
   }
-  
+
   if (!enabled || !time) {
     return { success: false, message: '自动更新未启用' };
   }
-  
+
   // 解析时间 (HH:MM)
   const [hour, minute] = time.split(':');
   if (!hour || !minute) {
     return { success: false, message: '时间格式错误' };
   }
-  
+
   // 创建 cron 表达式: 分 时 * * *
   const cronExpression = `${minute} ${hour} * * *`;
-  
+  const cronOptions = {
+    scheduled: true,
+    timezone: "Asia/Shanghai"
+  };
+
   try {
     const job = cron.schedule(cronExpression, async () => {
       logger.info('自动更新触发执行', { time });
-      
+
       try {
         await withMaaExecutionLease({ source: 'auto-update', taskName: '自动更新 MAA', command: 'update' }, async () => {
           if (updateCore) {
@@ -1922,7 +2327,7 @@ export function setupAutoUpdate(config) {
                   await execAsync(`${MAA_CLI_PATH} self update`);
                   logger.success('MAA CLI 更新完成', { environment: 'Docker', persistent: true });
                 } catch (error) {
-                  logger.error('MAA CLI 更新失败', { error: error.message });
+                  logger.error('MAA CLI 更新失败', { error: getErrorMessage(error) });
                 }
               } else {
                 logger.warn('当前 maa-cli 构建没有 self 子命令，跳过 CLI 更新');
@@ -1947,24 +2352,21 @@ export function setupAutoUpdate(config) {
           logger.success('所有自动更新任务完成');
         });
       } catch (error) {
-        logger.error('自动更新失败', { error: error.message });
+        logger.error('自动更新失败', { error: getErrorMessage(error) });
       }
-    }, {
-      scheduled: true,
-      timezone: "Asia/Shanghai"
-    });
-    
+    }, cronOptions);
+
     scheduledJobs.set('auto-update', [{ time, job }]);
     logger.info('自动更新已设置', { time });
-    
-    return { 
-      success: true, 
+
+    return {
+      success: true,
       message: `自动更新已设置，每天 ${time} 执行`,
       config
     };
   } catch (error) {
-    logger.error('自动更新设置失败', { error: error.message });
-    return { success: false, message: `设置失败: ${error.message}` };
+    logger.error('自动更新设置失败', { error: getErrorMessage(error) });
+    return { success: false, message: `设置失败: ${getErrorMessage(error)}` };
   }
 }
 
@@ -1987,68 +2389,83 @@ export function getAutoUpdateStatus() {
  * 动态更新智能养成关卡
  * 在任务执行完成后，重新生成刷取计划并更新任务流程
  */
-function getPlanOpenStages(plan = {}) {
-  const stages = Array.isArray(plan.openStages) && plan.openStages.length > 0
-    ? plan.openStages
-    : Array.isArray(plan.stages)
-      ? plan.stages.filter(stage => stage?.isOpen !== false)
+function getPlanOpenStages(plan: unknown = {}): SmartTrainingPlanStage[] {
+  const planRecord = isRecord(plan) ? plan : {};
+  const stages: unknown[] = Array.isArray(planRecord.openStages) && planRecord.openStages.length > 0
+    ? planRecord.openStages
+    : Array.isArray(planRecord.stages)
+      ? planRecord.stages.filter(stage => !isRecord(stage) || stage.isOpen !== false)
       : [];
 
-  return stages.filter(stage => stage?.stage && Number(stage.totalTimes ?? stage.times ?? 0) > 0);
+  return stages.filter((stage): stage is SmartTrainingPlanStage =>
+    isRecord(stage) &&
+    typeof stage.stage === 'string' &&
+    Boolean(stage.stage) &&
+    Number(stage.totalTimes ?? stage.times ?? 0) > 0
+  );
 }
 
-function buildSmartTrainingStages(plan = {}) {
-  const trainingOperatorNames = Array.isArray(plan.operators)
-    ? plan.operators.map(op => op.name).filter(Boolean)
+function buildSmartTrainingStages(plan: unknown = {}): SmartTrainingStage[] {
+  const planRecord = isRecord(plan) ? plan : {};
+  const trainingOperatorNames = Array.isArray(planRecord.operators)
+    ? planRecord.operators
+      .map(operator => isRecord(operator) ? operator.name : undefined)
+      .filter((name): name is string => typeof name === 'string' && Boolean(name))
     : [];
 
   return getPlanOpenStages(plan).map(stage => ({
-    stage: stage.stage,
+    stage: String(stage.stage),
     times: String(stage.totalTimes ?? stage.times ?? 0),
     smart: true,
     trainingOperators: trainingOperatorNames
   }));
 }
 
-function replaceSmartTrainingStages(task, smartStages = []) {
-  const currentStages = task.params.stages || [];
-  const pinnedStages = currentStages.filter(s => typeof s === 'object' && s.pinned && s.stage && s.stage.trim());
-  const normalStages = currentStages.filter(s =>
-    (typeof s === 'string' && s.trim()) ||
-    (typeof s === 'object' && !s.pinned && !s.smart && s.stage && s.stage.trim())
+function replaceSmartTrainingStages(task: ScheduledTask, smartStages: SmartTrainingStage[] = []) {
+  const currentStages = task.params.stages;
+  const stageList: unknown[] = Array.isArray(currentStages) ? currentStages : [];
+  const pinnedStages = stageList.filter(stage =>
+    isRecord(stage) && Boolean(stage.pinned) && typeof stage.stage === 'string' && Boolean(stage.stage.trim()));
+  const normalStages = stageList.filter(stage =>
+    (typeof stage === 'string' && Boolean(stage.trim())) ||
+    (isRecord(stage) && !stage.pinned && !stage.smart && typeof stage.stage === 'string' && Boolean(stage.stage.trim()))
   );
 
   task.params.stages = [...pinnedStages, ...smartStages, ...normalStages];
 }
 
-function clearSmartTrainingStagesFromTask(task) {
-  const currentStages = task.params.stages || [];
-  const newStages = currentStages.filter(s => !(typeof s === 'object' && s.smart));
+function clearSmartTrainingStagesFromTask(task: ScheduledTask) {
+  const currentStages = task.params.stages;
+  const stageList: unknown[] = Array.isArray(currentStages) ? currentStages : [];
+  const newStages = stageList.filter(stage => !(isRecord(stage) && stage.smart));
   task.params.stages = newStages.length > 0 ? newStages : [{ stage: '', times: '' }];
 }
 
-async function updateSmartTrainingStages(scheduleId) {
+async function updateSmartTrainingStages(scheduleId: string) {
   logger.info('智能养成开始动态更新关卡', { scheduleId });
-  
+
   try {
     // 1. 加载当前的任务流程配置
     const configResult = await loadUserConfig('automation-tasks');
-    if (!configResult.success || !configResult.data || !configResult.data.taskFlow) {
+    const configData = configResult.success && isRecord(configResult.data) ? configResult.data : null;
+    if (!configData || !configData.taskFlow) {
       logger.info('智能养成未找到任务流程配置，跳过更新', { scheduleId });
       return;
     }
-    
-    const { taskFlow } = configResult.data;
-    
+
+    const taskFlow = configData.taskFlow as ScheduledTaskFlow;
+
     // 2. 查找包含智能养成关卡的任务
     let hasSmartStages = false;
     let fightTaskIndex = -1;
-    
+
     for (let i = 0; i < taskFlow.length; i++) {
       const task = taskFlow[i];
       if (task.commandId === 'fight' && task.params && task.params.stages) {
         const stages = task.params.stages;
-        const smartStages = stages.filter(s => typeof s === 'object' && s.smart);
+        const smartStages = Array.isArray(stages)
+          ? stages.filter(stage => isRecord(stage) && Boolean(stage.smart))
+          : [];
         if (smartStages.length > 0) {
           hasSmartStages = true;
           fightTaskIndex = i;
@@ -2056,78 +2473,80 @@ async function updateSmartTrainingStages(scheduleId) {
         }
       }
     }
-    
+
     if (!hasSmartStages) {
       logger.info('智能养成未找到智能养成关卡，跳过更新', { scheduleId });
       return;
     }
-    
+
     logger.info('智能养成找到智能养成关卡，开始重新生成刷取计划', { scheduleId });
-    
+
     // 3. 加载养成队列
     const queueResult = await loadUserConfig('training-queue');
-    if (!queueResult.success || !queueResult.data || !queueResult.data.queue || queueResult.data.queue.length === 0) {
+    const queueData = queueResult.success && isRecord(queueResult.data) ? queueResult.data : null;
+    const queueValue = queueData?.queue;
+    if (!queueData || !Array.isArray(queueValue) || queueValue.length === 0) {
       logger.info('智能养成队列为空，移除所有智能养成关卡', { scheduleId });
-      
+
       const task = taskFlow[fightTaskIndex];
       clearSmartTrainingStagesFromTask(task);
-      
-      await saveUserConfig('automation-tasks', { taskFlow, schedule: configResult.data.schedule });
+
+      await saveUserConfig('automation-tasks', { taskFlow, schedule: configData.schedule });
       logger.success('智能养成已移除所有智能养成关卡', { scheduleId });
       return;
     }
 
-    const trainingSettings = queueResult.data.settings || {};
-    const shouldAutoSwitch = trainingSettings.autoSwitch !== false;
-    
+    const queue = queueValue as TrainingQueueOperator[];
+    const trainingSettings = queueData.settings || {};
+    const shouldAutoSwitch = !isRecord(trainingSettings) || trainingSettings.autoSwitch !== false;
+
     // 4. 重新生成刷取计划（仅当前干员）
-    const plan = await operatorTrainingService.generateTrainingPlan('current');
-    if (!plan || !plan.stages) {
+    const plan = await operatorTrainingService.generateTrainingPlan('current') as TrainingPlan | null;
+    if (!plan || !Array.isArray(plan.stages)) {
       logger.warn('智能养成生成刷取计划失败', { scheduleId });
       return;
     }
 
     const openSmartStages = buildSmartTrainingStages(plan);
-    
+
     // 5. 检查是否还有需要刷的关卡
     if (plan.stages.length === 0) {
       logger.info('智能养成当前干员材料已集齐，检查是否需要切换到下一个干员', { scheduleId });
-      
+
       // 6. 自动切换到下一个干员
-      const queue = queueResult.data.queue;
       if (shouldAutoSwitch && queue.length > 1) {
         // 移除第一个干员（已完成）
-        const completedOperator = queue.shift();
+        const completedOperator = queue.shift()!;
         await saveUserConfig('training-queue', {
-          ...queueResult.data,
+          ...queueData,
           queue,
           settings: trainingSettings,
           lastUpdated: new Date().toISOString()
         });
-        logger.success('智能养成已切换到下一个干员', { 
-          scheduleId, 
+        logger.success('智能养成已切换到下一个干员', {
+          scheduleId,
           completedOperator: completedOperator.name || completedOperator.operatorId,
           nextOperator: queue[0].name || queue[0].operatorId
         });
-        
+
         // 重新生成刷取计划
-        const newPlan = await operatorTrainingService.generateTrainingPlan('current');
+        const newPlan = await operatorTrainingService.generateTrainingPlan('current') as TrainingPlan | null;
         const newSmartStages = buildSmartTrainingStages(newPlan || {});
-        if (newPlan && newPlan.stages && newPlan.stages.length > 0 && newSmartStages.length > 0) {
+        if (newPlan && Array.isArray(newPlan.stages) && newPlan.stages.length > 0 && newSmartStages.length > 0) {
           const task = taskFlow[fightTaskIndex];
           replaceSmartTrainingStages(task, newSmartStages);
-          
-          await saveUserConfig('automation-tasks', { taskFlow, schedule: configResult.data.schedule });
-          logger.success('智能养成已更新智能养成关卡', { 
+
+          await saveUserConfig('automation-tasks', { taskFlow, schedule: configData.schedule });
+          logger.success('智能养成已更新智能养成关卡', {
             scheduleId,
             operators: newSmartStages[0]?.trainingOperators || [],
-            stageCount: newSmartStages.length 
+            stageCount: newSmartStages.length
           });
         } else {
           const task = taskFlow[fightTaskIndex];
           clearSmartTrainingStagesFromTask(task);
-          
-          await saveUserConfig('automation-tasks', { taskFlow, schedule: configResult.data.schedule });
+
+          await saveUserConfig('automation-tasks', { taskFlow, schedule: configData.schedule });
           logger.info('智能养成新目标今天没有可刷关卡，已移除所有智能养成关卡', { scheduleId });
         }
       } else {
@@ -2136,11 +2555,11 @@ async function updateSmartTrainingStages(scheduleId) {
           autoSwitch: shouldAutoSwitch,
           queueLength: queue.length
         });
-        
+
         const task = taskFlow[fightTaskIndex];
         clearSmartTrainingStagesFromTask(task);
-        
-        await saveUserConfig('automation-tasks', { taskFlow, schedule: configResult.data.schedule });
+
+        await saveUserConfig('automation-tasks', { taskFlow, schedule: configData.schedule });
         logger.success('智能养成已移除所有智能养成关卡', { scheduleId });
       }
     } else if (openSmartStages.length === 0) {
@@ -2152,26 +2571,26 @@ async function updateSmartTrainingStages(scheduleId) {
       const task = taskFlow[fightTaskIndex];
       clearSmartTrainingStagesFromTask(task);
 
-      await saveUserConfig('automation-tasks', { taskFlow, schedule: configResult.data.schedule });
+      await saveUserConfig('automation-tasks', { taskFlow, schedule: configData.schedule });
     } else {
       // 7. 还有关卡需要刷，更新关卡和次数
-      logger.info('智能养成更新剩余关卡', { 
-        scheduleId, 
+      logger.info('智能养成更新剩余关卡', {
+        scheduleId,
         stageCount: openSmartStages.length
       });
-      
+
       const task = taskFlow[fightTaskIndex];
       replaceSmartTrainingStages(task, openSmartStages);
-      
-      await saveUserConfig('automation-tasks', { taskFlow, schedule: configResult.data.schedule });
-      logger.success('智能养成已更新智能养成关卡', { 
+
+      await saveUserConfig('automation-tasks', { taskFlow, schedule: configData.schedule });
+      logger.success('智能养成已更新智能养成关卡', {
         scheduleId,
-        stages: openSmartStages.map(s => `${s.stage}×${s.times}`)
+        stages: openSmartStages.map(stage => `${stage.stage}×${stage.times}`)
       });
     }
-    
+
   } catch (error) {
-    logger.error('智能养成动态更新失败', { scheduleId, error: error.message });
+    logger.error('智能养成动态更新失败', { scheduleId, error: getErrorMessage(error) });
     throw error;
   }
 }

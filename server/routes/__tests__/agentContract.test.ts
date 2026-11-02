@@ -6,7 +6,101 @@ import {
   AGENT_OPERATIONS,
   buildAgentManifest,
   buildOpenApiSpec
-} from '../agentContract.js';
+} from '../agentContract.ts';
+
+interface TestSchema {
+  type?: string | string[];
+  default?: unknown;
+  minimum?: number;
+  maximum?: number;
+  maxLength?: number;
+  pattern?: string;
+  format?: string;
+  enum?: string[];
+  required?: string[];
+  const?: unknown;
+  additionalProperties?: unknown;
+  $ref?: string;
+  oneOf?: TestSchema[];
+  allOf?: TestSchema[];
+  properties: Record<string, TestSchema>;
+  [key: string]: unknown;
+}
+
+interface TestSafety {
+  readOnly?: boolean;
+  idempotent?: boolean;
+  destructive?: boolean;
+  mutatesDevice?: boolean;
+  sideEffects?: string[];
+}
+
+interface TestExecution {
+  producesRun?: boolean;
+  runLookupAction?: string;
+  dryRun: { supported?: boolean };
+  supportsDryRun?: boolean;
+  pollAction?: string;
+  conflictsWith?: string[];
+  idempotency: TestSchema & { appliesWhen?: unknown };
+}
+
+interface TestAction {
+  id: string;
+  method: string;
+  path: string;
+  description: string;
+  body_schema: TestSchema;
+  query_schema: TestSchema;
+  path_schema: TestSchema;
+  header_schema: TestSchema;
+  safety: TestSafety;
+  execution: TestExecution;
+}
+
+interface TestManifest {
+  version: string;
+  defaults: unknown;
+  links: { run: string };
+  actions: TestAction[];
+}
+
+interface TestParameter {
+  name?: string;
+  description: string;
+  in?: string;
+  required?: boolean;
+  $ref?: string;
+  schema: TestSchema;
+}
+
+interface TestResponse {
+  $ref?: string;
+  content: { 'application/json': { schema: TestSchema } };
+  headers: Record<string, { schema: TestSchema }>;
+}
+
+interface TestOperation {
+  operationId: string;
+  tags: unknown;
+  requestBody: { required?: boolean; content: { 'application/json': { schema: TestSchema } } };
+  parameters: TestParameter[];
+  responses: Record<string, TestResponse>;
+  'x-la-pluma-safety': unknown;
+  'x-la-pluma-execution': unknown;
+}
+
+interface TestSpec {
+  openapi: string;
+  paths: Record<string, Record<string, TestOperation>>;
+  components: {
+    schemas: Record<string, TestSchema>;
+    securitySchemes: Record<string, Record<string, unknown>>;
+    parameters: Record<string, TestParameter>;
+    responses: Record<string, TestResponse>;
+  };
+  security: Array<Record<string, unknown>>;
+}
 
 const defaults = {
   adbPath: '/custom/platform-tools/adb',
@@ -14,7 +108,7 @@ const defaults = {
   clientType: 'Bilibili'
 };
 
-const expectedAdvertisedIds = [
+const expectedAdvertisedIds: string[] = [
   'get_status',
   'test_connection',
   'discover_devices',
@@ -27,6 +121,7 @@ const expectedAdvertisedIds = [
   'stop_task',
   'get_current_run',
   'get_run',
+  'stop_run',
   'get_screenshot',
   'run_daily_flow',
   'recent_logs',
@@ -42,13 +137,33 @@ const expectedAdvertisedIds = [
   'run_custom_tool'
 ];
 
-function getOpenApiOperation(spec, item) {
-  return spec.paths[item.path]?.[item.method.toLowerCase()];
+function testManifest(): TestManifest {
+  return buildAgentManifest(defaults) as unknown as TestManifest;
+}
+
+function testSpec(): TestSpec {
+  return buildOpenApiSpec(defaults) as unknown as TestSpec;
+}
+
+function actionById(manifest: TestManifest, id: string): TestAction {
+  const action = manifest.actions.find(item => item.id === id);
+  assert.ok(action, `missing action ${id}`);
+  return action;
+}
+
+function operationAt(spec: TestSpec, path: string, method: string): TestOperation {
+  const operation = spec.paths[path]?.[method];
+  assert.ok(operation, `missing operation ${method} ${path}`);
+  return operation;
+}
+
+function getOpenApiOperation(spec: TestSpec, item: { path: string; method: string }): TestOperation {
+  return operationAt(spec, item.path, item.method.toLowerCase());
 }
 
 describe('Agent API contract registry', () => {
   it('keeps operation ids and method/path pairs unique', () => {
-    assert.equal(AGENT_OPERATIONS.length, 31);
+    assert.equal(AGENT_OPERATIONS.length, 32);
     assert.equal(new Set(AGENT_OPERATIONS.map(item => item.id)).size, AGENT_OPERATIONS.length);
     assert.equal(
       new Set(AGENT_OPERATIONS.map(item => `${item.method} ${item.path}`)).size,
@@ -57,20 +172,20 @@ describe('Agent API contract registry', () => {
   });
 
   it('advertises the existing actions plus retained run lookup', () => {
-    const manifest = buildAgentManifest(defaults);
+    const manifest = testManifest();
 
     assert.equal(manifest.version, API_VERSION);
     assert.deepEqual(manifest.defaults, defaults);
     assert.deepEqual(manifest.actions.map(item => item.id), expectedAdvertisedIds);
-    assert.equal(manifest.actions.length, 25);
+    assert.equal(manifest.actions.length, 26);
     assert.ok(!manifest.actions.some(item => item.id === 'get_manifest'));
     assert.ok(!manifest.actions.some(item => item.id === 'get_openapi'));
   });
 
   it('materializes runtime connection defaults without reading the environment', () => {
-    const manifest = buildAgentManifest(defaults);
-    const testConnection = manifest.actions.find(item => item.id === 'test_connection');
-    const startGame = manifest.actions.find(item => item.id === 'start_game');
+    const manifest = testManifest();
+    const testConnection = actionById(manifest, 'test_connection');
+    const startGame = actionById(manifest, 'start_game');
 
     assert.equal(testConnection.body_schema.properties.adbPath.default, defaults.adbPath);
     assert.equal(testConnection.body_schema.properties.address.default, defaults.adbAddress);
@@ -80,32 +195,32 @@ describe('Agent API contract registry', () => {
   });
 
   it('documents profile selection alongside the compatible direct connection fields', () => {
-    const manifest = buildAgentManifest(defaults);
-    const byId = new Map(manifest.actions.map(item => [item.id, item]));
+    const manifest = testManifest();
 
     assert.deepEqual(
-      Object.keys(byId.get('test_connection').body_schema.properties),
+      Object.keys(actionById(manifest, 'test_connection').body_schema.properties),
       ['profileId', 'adbPath', 'address']
     );
-    assert.equal(byId.get('test_connection').body_schema.properties.profileId.maxLength, 64);
+    assert.equal(actionById(manifest, 'test_connection').body_schema.properties.profileId.maxLength, 64);
     assert.equal(
-      byId.get('test_connection').body_schema.properties.profileId.pattern,
+      actionById(manifest, 'test_connection').body_schema.properties.profileId.pattern,
       '^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$'
     );
     assert.deepEqual(
-      Object.keys(byId.get('discover_devices').query_schema.properties),
+      Object.keys(actionById(manifest, 'discover_devices').query_schema.properties),
       ['profileId', 'adbPath']
     );
     assert.deepEqual(
-      Object.keys(byId.get('get_screenshot').body_schema.properties),
+      Object.keys(actionById(manifest, 'get_screenshot').body_schema.properties),
       ['profileId', 'adbPath', 'address']
     );
-    assert.ok(byId.get('webrtc_start').body_schema.properties.profileId);
-    assert.ok(byId.get('preview_orientation').body_schema.properties.profileId);
+    assert.ok(actionById(manifest, 'webrtc_start').body_schema.properties.profileId);
+    assert.ok(actionById(manifest, 'preview_orientation').body_schema.properties.profileId);
   });
 
   it('publishes recent log options as query schema instead of embedding them in the path', () => {
-    const action = buildAgentManifest(defaults).actions.find(item => item.id === 'recent_logs');
+    const manifest = testManifest();
+    const action = actionById(manifest, 'recent_logs');
 
     assert.equal(action.path, '/api/agent/logs/recent');
     assert.equal(action.query_schema.properties.lines.type, 'integer');
@@ -115,33 +230,33 @@ describe('Agent API contract registry', () => {
   });
 
   it('documents the runtime-compatible task command and dynamic task fields', () => {
-    const action = buildAgentManifest(defaults).actions.find(item => item.id === 'run_task');
+    const action = actionById(testManifest(), 'run_task');
     const properties = action.body_schema.properties;
 
-    assert.ok(properties.command.enum.includes('run'));
-    assert.ok(properties.command.enum.includes('list'));
-    assert.ok(properties.taskConfig.oneOf);
-    assert.deepEqual(properties.taskConfig.oneOf[0].required, ['name', 'type']);
-    assert.equal(properties.taskConfig.oneOf[0].properties.params.type, 'object');
+    assert.ok(properties.command.enum?.includes('run'));
+    assert.ok(properties.command.enum?.includes('list'));
+    const taskConfigOneOf = properties.taskConfig.oneOf;
+    assert.ok(taskConfigOneOf?.[0]);
+    assert.deepEqual(taskConfigOneOf[0].required, ['name', 'type']);
+    assert.equal(taskConfigOneOf[0].properties.params.type, 'object');
     assert.equal(properties.taskName.type, 'string');
     assert.equal(properties.taskType.type, 'string');
     assert.equal(properties.userResource.type, 'boolean');
   });
 
   it('documents retained run lookup and guarded stopping', () => {
-    const manifest = buildAgentManifest(defaults);
-    const byId = new Map(manifest.actions.map(item => [item.id, item]));
-    const getRun = byId.get('get_run');
+    const manifest = testManifest();
+        const getRun = actionById(manifest, 'get_run');
 
     assert.equal(manifest.links.run, '/api/agent/runs/{runId}');
     assert.equal(getRun.path, '/api/agent/runs/{runId}');
     assert.deepEqual(getRun.path_schema.required, ['runId']);
     assert.equal(getRun.path_schema.properties.runId.format, 'uuid');
-    assert.equal(byId.get('stop_task').body_schema.properties.runId.format, 'uuid');
+    assert.equal(actionById(manifest, 'stop_task').body_schema.properties.runId.format, 'uuid');
   });
 
   it('advertises restart-safe local idempotency for exactly five execution actions', () => {
-    const manifest = buildAgentManifest(defaults);
+    const manifest = testManifest();
     const runActions = manifest.actions.filter(item => item.execution.producesRun);
 
     assert.deepEqual(runActions.map(item => item.id), [
@@ -166,18 +281,18 @@ describe('Agent API contract registry', () => {
       assert.equal(action.header_schema.properties['Idempotency-Key'].maxLength, 128);
     }
     assert.deepEqual(
-      runActions.find(item => item.id === 'fight').execution.idempotency.appliesWhen,
+      runActions.find(item => item.id === 'fight')!.execution.idempotency.appliesWhen,
       { dryRun: false }
     );
     assert.deepEqual(
-      runActions.find(item => item.id === 'run_daily_flow').execution.idempotency.appliesWhen,
+      runActions.find(item => item.id === 'run_daily_flow')!.execution.idempotency.appliesWhen,
       { dryRun: false }
     );
   });
 
   it('only advertises operations that exist on the mounted Agent router', async () => {
-    const source = await readFile(new URL('../agent.js', import.meta.url), 'utf8');
-    const manifest = buildAgentManifest(defaults);
+    const source = await readFile(new URL('../agent.ts', import.meta.url), 'utf8');
+    const manifest = testManifest();
 
     for (const action of manifest.actions) {
       const relativePath = action.path
@@ -191,7 +306,7 @@ describe('Agent API contract registry', () => {
 
 describe('Agent OpenAPI generation', () => {
   it('generates every registered operation from the shared registry', () => {
-    const spec = buildOpenApiSpec(defaults);
+    const spec = testSpec();
 
     assert.equal(spec.openapi, '3.1.0');
     for (const item of AGENT_OPERATIONS) {
@@ -205,8 +320,8 @@ describe('Agent OpenAPI generation', () => {
   });
 
   it('keeps manifest actions and OpenAPI operations in sync', () => {
-    const manifest = buildAgentManifest(defaults);
-    const spec = buildOpenApiSpec(defaults);
+    const manifest = testManifest();
+    const spec = testSpec();
 
     for (const action of manifest.actions) {
       const generated = spec.paths[action.path]?.[action.method.toLowerCase()];
@@ -218,28 +333,28 @@ describe('Agent OpenAPI generation', () => {
   });
 
   it('turns GET schemas into query parameters and never emits a GET request body', () => {
-    const spec = buildOpenApiSpec(defaults);
+    const spec = testSpec();
 
     for (const item of AGENT_OPERATIONS.filter(item => item.method === 'GET')) {
       assert.equal(getOpenApiOperation(spec, item).requestBody, undefined, `${item.id} has a request body`);
     }
 
-    const discover = spec.paths['/api/agent/actions/discover-devices'].get;
+    const discover = operationAt(spec, '/api/agent/actions/discover-devices', 'get');
     const discoverParameters = Object.fromEntries(discover.parameters.map(item => [item.name, item]));
     assert.equal(discoverParameters.profileId.in, 'query');
     assert.equal(discoverParameters.adbPath.schema.default, defaults.adbPath);
 
-    const logs = spec.paths['/api/agent/logs/recent'].get;
-    const lines = logs.parameters.find(item => item.name === 'lines');
+    const logs = operationAt(spec, '/api/agent/logs/recent', 'get');
+    const lines = logs.parameters.find(item => item.name === 'lines')!;
     assert.equal(lines.in, 'query');
     assert.equal(lines.schema.default, 80);
     assert.equal(lines.schema.maximum, 500);
   });
 
   it('turns the run id schema into a required OpenAPI path parameter', () => {
-    const spec = buildOpenApiSpec(defaults);
-    const operation = spec.paths['/api/agent/runs/{runId}'].get;
-    const runId = operation.parameters.find(item => item.name === 'runId');
+    const spec = testSpec();
+    const operation = operationAt(spec, '/api/agent/runs/{runId}', 'get');
+    const runId = operation.parameters.find(item => item.name === 'runId')!;
 
     assert.equal(operation.operationId, 'get_run');
     assert.equal(runId.in, 'path');
@@ -252,8 +367,8 @@ describe('Agent OpenAPI generation', () => {
   });
 
   it('turns body schemas into JSON request bodies for mutating operations', () => {
-    const spec = buildOpenApiSpec(defaults);
-    const fight = spec.paths['/api/agent/actions/fight'].post;
+    const spec = testSpec();
+    const fight = operationAt(spec, '/api/agent/actions/fight', 'post');
     const schema = fight.requestBody.content['application/json'].schema;
 
     assert.equal(fight.requestBody.required, true);
@@ -262,7 +377,7 @@ describe('Agent OpenAPI generation', () => {
   });
 
   it('describes success, error, and response metadata envelopes', () => {
-    const spec = buildOpenApiSpec(defaults);
+    const spec = testSpec();
     const schemas = spec.components.schemas;
 
     assert.deepEqual(schemas.SuccessResponse.required, ['success', 'message', 'data', 'meta']);
@@ -280,7 +395,7 @@ describe('Agent OpenAPI generation', () => {
       }
       if (item.responseKind !== 'openapi' && item.responseKind !== 'run') {
         assert.equal(
-          generated.responses['200'].content['application/json'].schema.$ref,
+          generated.responses['200']?.content?.['application/json']?.schema.$ref,
           '#/components/schemas/SuccessResponse'
         );
       }
@@ -288,7 +403,7 @@ describe('Agent OpenAPI generation', () => {
   });
 
   it('supports both optional token authentication forms', () => {
-    const spec = buildOpenApiSpec(defaults);
+    const spec = testSpec();
     const schemes = spec.components.securitySchemes;
 
     assert.equal(schemes.bearerAuth.type, 'http');
@@ -300,7 +415,7 @@ describe('Agent OpenAPI generation', () => {
   });
 
   it('declares idempotency headers and accepted-run responses on execution actions', () => {
-    const spec = buildOpenApiSpec(defaults);
+    const spec = testSpec();
     const runOperations = AGENT_OPERATIONS.filter(item => item.execution.producesRun);
     const header = spec.components.parameters.IdempotencyKey;
 
@@ -336,7 +451,7 @@ describe('Agent OpenAPI generation', () => {
   });
 
   it('describes retained run state and progress DTOs', () => {
-    const schemas = buildOpenApiSpec(defaults).components.schemas;
+    const schemas = testSpec().components.schemas;
 
     assert.deepEqual(schemas.Run.required, ['runId', 'operationId', 'state', 'acceptedAt', 'links']);
     assert.equal(schemas.Run.properties.runId.format, 'uuid');
@@ -351,29 +466,28 @@ describe('Agent OpenAPI generation', () => {
       ['code', 'message', 'details', 'retryable', 'statusCode']
     );
     assert.equal(schemas.RunError.additionalProperties, false);
-    assert.equal(schemas.RunResponse.allOf[1].properties.data.$ref, '#/components/schemas/Run');
+    assert.equal(schemas.RunResponse.allOf?.[1]?.properties.data.$ref, '#/components/schemas/Run');
   });
 
   it('marks read-only operations and actual dry-run support explicitly', () => {
-    const manifest = buildAgentManifest(defaults);
-    const byId = new Map(manifest.actions.map(item => [item.id, item]));
+    const manifest = testManifest();
 
-    assert.equal(byId.get('recent_logs').safety.readOnly, true);
-    assert.equal(byId.get('maa_callback_summary').safety.readOnly, true);
-    assert.equal(byId.get('get_status').safety.readOnly, false);
-    assert.deepEqual(byId.get('get_status').safety.sideEffects, ['adb_connect']);
-    assert.equal(byId.get('get_screenshot').safety.readOnly, false);
-    assert.equal(byId.get('fight').safety.readOnly, false);
-    assert.equal(byId.get('fight').execution.dryRun.supported, true);
-    assert.equal(byId.get('run_daily_flow').execution.supportsDryRun, true);
-    assert.equal(byId.get('preview_orientation').execution.dryRun.supported, true);
-    assert.equal(byId.get('run_task').execution.dryRun.supported, false);
-    assert.equal(byId.get('run_task').execution.pollAction, 'get_current_run');
-    assert.deepEqual(byId.get('run_task').execution.conflictsWith, ['maa-execution']);
-    assert.equal(byId.get('stop_task').safety.idempotent, true);
-    assert.equal(byId.get('stop_task').safety.destructive, true);
-    assert.equal(byId.get('webrtc_start').safety.mutatesDevice, true);
-    assert.equal(byId.get('webrtc_stop').safety.mutatesDevice, true);
-    assert.equal(byId.get('preview_orientation').safety.mutatesDevice, true);
+    assert.equal(actionById(manifest, 'recent_logs').safety.readOnly, true);
+    assert.equal(actionById(manifest, 'maa_callback_summary').safety.readOnly, true);
+    assert.equal(actionById(manifest, 'get_status').safety.readOnly, false);
+    assert.deepEqual(actionById(manifest, 'get_status').safety.sideEffects, ['adb_connect']);
+    assert.equal(actionById(manifest, 'get_screenshot').safety.readOnly, false);
+    assert.equal(actionById(manifest, 'fight').safety.readOnly, false);
+    assert.equal(actionById(manifest, 'fight').execution.dryRun.supported, true);
+    assert.equal(actionById(manifest, 'run_daily_flow').execution.supportsDryRun, true);
+    assert.equal(actionById(manifest, 'preview_orientation').execution.dryRun.supported, true);
+    assert.equal(actionById(manifest, 'run_task').execution.dryRun.supported, false);
+    assert.equal(actionById(manifest, 'run_task').execution.pollAction, 'get_current_run');
+    assert.deepEqual(actionById(manifest, 'run_task').execution.conflictsWith, ['maa-execution']);
+    assert.equal(actionById(manifest, 'stop_task').safety.idempotent, true);
+    assert.equal(actionById(manifest, 'stop_task').safety.destructive, true);
+    assert.equal(actionById(manifest, 'webrtc_start').safety.mutatesDevice, true);
+    assert.equal(actionById(manifest, 'webrtc_stop').safety.mutatesDevice, true);
+    assert.equal(actionById(manifest, 'preview_orientation').safety.mutatesDevice, true);
   });
 });

@@ -7,9 +7,9 @@ import {
   executeScheduledTaskFromCron,
   executeScheduleNow,
   getScheduleExecutionStatus
-} from '../schedulerService.js';
+} from '../schedulerService.ts';
 
-let testDir;
+let testDir = '';
 
 before(async () => {
   testDir = await mkdtemp(join(tmpdir(), 'la-pluma-scheduler-'));
@@ -29,7 +29,7 @@ test('unexpected execution errors always reset scheduler state', async () => {
     executeScheduleNow('unexpected-error', malformedTaskFlow, {
       onStarted: () => { started += 1; }
     }),
-    error => error instanceof TypeError
+    (error: unknown) => error instanceof TypeError
   );
 
   assert.equal(started, 1);
@@ -47,6 +47,6 @@ test('cron execution catches rejected task flows and leaves the scheduler reusab
   const result = await executeScheduledTaskFromCron(malformedTaskFlow, 'cron-error');
 
   assert.equal(result.success, false);
-  assert.match(result.message, /split/);
+  assert.match(result.message || '', /split/);
   assert.equal(getScheduleExecutionStatus().isRunning, false);
 });
