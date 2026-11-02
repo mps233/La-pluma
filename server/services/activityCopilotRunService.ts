@@ -8,6 +8,7 @@ import { getMaaConfigDir, execDynamicTask, createMaaLogCheckpoint, readMaaLogSin
 import { withMaaExecutionLease } from './executionCoordinatorService.ts';
 import { updateMaaResources } from './resourceUpdateService.ts';
 import { DEFAULT_CLIENT_TYPE } from '../config/connectionDefaults.ts';
+import { getMaaResourceDir } from '../config/paths.ts';
 import { averageRatingLevel } from './activityCopilotSelectionService.ts';
 
 export { getCombatCopilotPreferences } from './activityCopilotPreferences.ts';
@@ -247,8 +248,40 @@ export function hasCompletedActivityNavigation(logText: string, expectedTaskId: 
   });
 }
 
+function activityStageNumber(stage: string): number | null {
+  const match = stage.match(/-(\d+)$/);
+  return match ? Number(match[1]) : null;
+}
+
+async function resolvePreparationStage(requestedStage: string, activityCode: string): Promise<string> {
+  const code = String(activityCode || '').trim().toUpperCase();
+  const requested = String(requestedStage || '').trim().toUpperCase();
+  if (!code) return '';
+  let installed: Record<string, unknown> = {};
+  try {
+    const raw: unknown = JSON.parse(await readFile(join(getMaaResourceDir(), 'tasks', 'Stages', `${code}.json`), 'utf8'));
+    if (isRecord(raw)) installed = raw;
+  } catch {
+    // No installed stage task file: fall back to the generic activity entry task.
+  }
+  const available = Object.keys(installed)
+    .map(stage => stage.toUpperCase())
+    .filter(stage => new RegExp(`^${code}-\\d+$`).test(stage));
+  if (!available.length) return '';
+  if (available.includes(requested)) return requested;
+  const requestedNumber = activityStageNumber(requested);
+  if (requestedNumber === null) return available.sort((left, right) => (activityStageNumber(left) ?? 0) - (activityStageNumber(right) ?? 0))[0] || '';
+  // Prepare the activity map through a stage task MaaResource actually ships,
+  // then let Copilot navigate to the requested first stage.
+  return available
+    .sort((left, right) => Math.abs((activityStageNumber(left) ?? 0) - requestedNumber) - Math.abs((activityStageNumber(right) ?? 0) - requestedNumber))[0]
+    || '';
+}
+
 async function runActivityPreparation(candidates: unknown, clientType: string, navigationStage: string): Promise<true | null> {
-  const tasks = buildActivityPreparationTasks(candidates, clientType, navigationStage);
+  const activityCode = String(asRecord(asRecord(asRecord(candidates).preflight).activity).code || '');
+  const preparationStage = await resolvePreparationStage(navigationStage, activityCode);
+  const tasks = buildActivityPreparationTasks(candidates, clientType, preparationStage);
   if (!tasks.length) return null;
 
   const checkpoint = await createMaaLogCheckpoint();
@@ -305,10 +338,9 @@ export async function runCurrentActivityCopilots(clientType: string = DEFAULT_CL
   const stageRatingScore = plan.state === 'ready' ? averageRatingLevel(plan.entries) : 0;
   const matchingSet = candidates.matchingSet;
   const setRatingScore = Number(matchingSet?.ratingScore) || 0;
-  // 有合格套装时，只有套装评分不低于单关候选评分才使用套装；否则回退到
-  // 每个关卡评价最高的单关作业，避免“最新但低评价”的套装覆盖高评价作业。
-  const useMatchingSet = Boolean(matchingSet)
-    && (plan.state !== 'ready' || setRatingScore >= stageRatingScore);
+  // 用户选择的策略是“作业集优先”：只要找到覆盖完整活动关卡的公开
+  // 作业集，就执行该套装；没有可用套装时才回退到逐关最高分作业。
+  const useMatchingSet = Boolean(matchingSet);
   const selectionSummary = { mode: useMatchingSet ? 'matching-set' : 'per-stage', setRatingScore, stageRatingScore };
 
   if (!useMatchingSet && plan.state !== 'ready') {
@@ -350,14 +382,13 @@ export async function runCurrentActivityCopilots(clientType: string = DEFAULT_CL
   if (useMatchingSet) {
     const set = matchingSet!;
     const setPlan = await buildCopilotPlan(set.id, preferences.raid);
-    const activityStagePattern = new RegExp(
-      `^${String(activity.code).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-(?:\\d+|EX-\\d+|S-\\d+|MO-\\d+|TR-\\d+)$`,
-      'i'
-    );
-    const selectedIndexes: number[] = [...new Set(setPlan.entries
-      .filter(entry => activityStagePattern.test(entry.displayStage))
-      .map(entry => entry.itemIndex))];
     const activityStages = new Set(asArray(activity.stages).map(stage => String(stage).toUpperCase()));
+    const selectedIndexes: number[] = [...new Set(setPlan.entries
+      .filter(entry => activityStages.has(String(entry.displayStage || '').toUpperCase()))
+      .map(entry => entry.itemIndex))];
+    if (!selectedIndexes.length) {
+      throw new Error('匹配作业集不包含当前活动关卡');
+    }
     const navigationStage = setPlan.entries
       .filter(entry => selectedIndexes.includes(entry.itemIndex))
       .map(entry => entry.displayStage)
@@ -365,7 +396,7 @@ export async function runCurrentActivityCopilots(clientType: string = DEFAULT_CL
     const completionEntries = plan.state === 'ready'
       ? plan.entries
       : (set.members || [])
-          .filter(member => member.stage)
+          .filter(member => member.stage && activityStages.has(String(member.stage).toUpperCase()))
           .map(member => ({ displayStage: member.stage || '', success: true }));
     try {
       const execution = await runWithPreparation(navigationStage, () => executeCopilotPlan({

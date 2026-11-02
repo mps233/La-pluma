@@ -10,6 +10,7 @@ import {
   buildMaaStageCatalog,
   buildMaaStageIndex,
   clearMaaResourceCache,
+  collectMaaActivityStageCodes,
   findMaaStage,
   getMaaItemInfo,
   getMaaMaterialDatabase,
@@ -52,6 +53,17 @@ test('builds a material dictionary and recipes from MaaResource data', () => {
   assert.equal(database.materials['30012'].rarity, 1);
   assert.deepEqual(database.recipes['30012'], { materials: { 30011: 3 } });
   assert.equal(database.recipes['4001'], undefined);
+});
+
+test('collects the complete numeric activity stage sequence in natural order', () => {
+  assert.deepEqual(collectMaaActivityStageCodes([
+    { code: 'TL-10', stageId: 'act55side_10' },
+    { code: 'TL-2', stageId: 'act55side_02' },
+    { code: 'TL-1', stageId: 'act55side_01' },
+    { code: 'TL-1', stageId: 'act55side_01#f#' },
+    { code: 'TL-EX-1', stageId: 'act55side_ex01' },
+    { code: 'CV-1', stageId: 'act54side_01' }
+  ], 'tl'), ['TL-1', 'TL-2', 'TL-10']);
 });
 
 test('builds a stage index by code and internal stage id', () => {

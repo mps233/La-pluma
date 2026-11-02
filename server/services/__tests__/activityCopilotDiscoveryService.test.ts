@@ -71,6 +71,13 @@ test('activity set may include optional same-event stages while covering all mai
   ], 'BD', mainStages), true);
 
   assert.equal(coversActivityStages([
+    { doc: { title: '时间啊，向前！ - TL-1 - 庸俗的实践' } },
+    { doc: { title: '时间啊，向前！ - TL-2 - 孑遗的道路' } },
+    { doc: { title: '时间啊，向前！ - TL-3 - 苦难的历程' } },
+    { doc: { title: '【时间啊，向前！】TL-S-1 - 突袭' } }
+  ], 'TL', ['TL-1', 'TL-2', 'TL-3']), true);
+
+  assert.equal(coversActivityStages([
     { doc: { title: 'BD-1' } },
     { doc: { title: 'BD-2' } },
     { doc: { title: 'BD-3' } },

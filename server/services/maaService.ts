@@ -13,6 +13,7 @@ import { createLogger } from '../utils/logger.ts';
 import type { LogEntry, LogLevel } from '../utils/logger.ts';
 import { getFallbackActivity } from './activityFallbackService.ts';
 import { getStageActivityInfo } from './activityDataService.ts';
+import { listMaaActivityStageCodes } from './maaResourceDataService.ts';
 import { acquireMaaExecutionLease } from './executionCoordinatorService.ts';
 import { loadUserConfig, saveUserConfig } from './configStorageService.ts';
 import { DEFAULT_ADB_ADDRESS, DEFAULT_ADB_PATH, DEFAULT_CLIENT_TYPE, DEFAULT_MAA_CLI_PATH } from '../config/connectionDefaults.ts';
@@ -1547,6 +1548,16 @@ function cacheActivity(clientType: string, activity: ActivityInfo): ActivityInfo
   return { ...activity };
 }
 
+async function withFullActivityStages(activity: ActivityInfo): Promise<ActivityInfo> {
+  if (!activity.code) return activity;
+  try {
+    const stages = await listMaaActivityStageCodes(activity.code);
+    return stages.length ? { ...activity, stages } : activity;
+  } catch {
+    return activity;
+  }
+}
+
 function getValidCachedActivity(clientType: string, cachedActivity: ActivityInfo | undefined, now: number = Date.now()): ActivityInfo | null {
   if (!cachedActivity?.code || !cachedActivity.timestamp) return null;
   const ttlExpiresAt = cachedActivity.timestamp + (cachedActivity.ttl || ACTIVITY_CACHE_TTL);
@@ -1578,7 +1589,7 @@ export async function getCurrentActivity(clientType: string = DEFAULT_CLIENT_TYP
       logger.debug('使用缓存的活动信息', {
         clientType, code: cached.code, name: cached.name, source: cached.source
       });
-    return cached;
+    return withFullActivityStages(cached);
   }
   if (cachedActivity) {
     activityCache.delete(clientType);
@@ -1600,7 +1611,7 @@ export async function getCurrentActivity(clientType: string = DEFAULT_CLIENT_TYP
     const ttl = typeof persistedEntry?.ttl === 'number' && persistedEntry.ttl ? persistedEntry.ttl : ACTIVITY_CACHE_TTL;
     activityCache.set(clientType, { ...persisted, timestamp, ttl });
     logger.debug('使用持久化活动缓存', { clientType, code: persisted.code, name: persisted.name, source: persisted.source });
-    return persisted;
+    return withFullActivityStages(persisted);
   }
 
   try {
@@ -1612,7 +1623,7 @@ export async function getCurrentActivity(clientType: string = DEFAULT_CLIENT_TYP
         name: stageActivity.name,
         stages: stageActivity.stages.length
       });
-      return cacheActivity(clientType, stageActivity);
+      return withFullActivityStages(cacheActivity(clientType, stageActivity));
     }
   } catch (error) {
     logger.warn('读取 StageActivityV2 失败，尝试 maa activity', { error: getErrorMessage(error) });
@@ -1661,14 +1672,14 @@ export async function getCurrentActivity(clientType: string = DEFAULT_CLIENT_TYP
     if (match && match[1]) {
       activityCode = match[1].toUpperCase();
       logger.debug('获取到活动信息', { code: activityCode, name: activityName });
-      return cacheActivity(clientType, {
+      return withFullActivityStages(cacheActivity(clientType, {
         code: activityCode,
         name: activityName,
         source: 'maa',
         startTime: null,
         endTime: null,
         stages: []
-      });
+      }));
     }
 
     logger.debug('MAA 活动表未返回当前活动，尝试备用数据源');
@@ -1680,7 +1691,7 @@ export async function getCurrentActivity(clientType: string = DEFAULT_CLIENT_TYP
     const fallbackActivity = await getFallbackActivity(clientType);
     if (fallbackActivity?.code) {
       logger.info('从备用数据源获取到活动信息', fallbackActivity);
-      return cacheActivity(clientType, fallbackActivity);
+      return withFullActivityStages(cacheActivity(clientType, fallbackActivity));
     }
   } catch (error) {
     logger.warn('备用活动数据源不可用', { error: getErrorMessage(error) });

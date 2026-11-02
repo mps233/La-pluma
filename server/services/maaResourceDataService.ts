@@ -365,6 +365,37 @@ export function clearMaaResourceCache() {
   itemAssetMapMaterials = null;
 }
 
+
+/**
+ * Collect the main numeric stages for an activity from MaaResource's stage
+ * table. StageActivityV2 only lists drop/efficiency highlights (for example
+ * TL-9, TL-8, TL-7, TL-4), not every playable stage. The full stage table is
+ * needed when the activity runner falls back to the complete stage sequence.
+ */
+export function collectMaaActivityStageCodes(stages: unknown, activityCode: string): string[] {
+  const prefix = `${String(activityCode || '').trim().toUpperCase()}-`;
+  if (!prefix || prefix === '-') return [];
+  const byCode = new Map<string, number>();
+  for (const raw of Array.isArray(stages) ? stages : []) {
+    if (!isRecord(raw) || typeof raw.code !== 'string') continue;
+    const code = raw.code.trim().toUpperCase();
+    if (!code.startsWith(prefix)) continue;
+    const suffix = code.slice(prefix.length);
+    if (!/^\d+$/.test(suffix)) continue;
+    const number = Number(suffix);
+    if (!Number.isSafeInteger(number) || number < 0) continue;
+    if (!byCode.has(code)) byCode.set(code, number);
+  }
+  return [...byCode.entries()]
+    .sort((left, right) => left[1] - right[1] || left[0].localeCompare(right[0]))
+    .map(([code]) => code);
+}
+
+export async function listMaaActivityStageCodes(activityCode: string): Promise<string[]> {
+  const data = await loadMaaResourceData();
+  return collectMaaActivityStageCodes(data.stages, activityCode);
+}
+
 export async function getMaaMaterialDatabase(options: MaaResourceOptions = {}): Promise<MaaMaterialDatabase> {
   const data = await loadMaaResourceData(options);
   return data.materialDatabase;

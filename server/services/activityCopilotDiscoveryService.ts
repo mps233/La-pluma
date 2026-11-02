@@ -110,6 +110,16 @@ function escapeRegExp(value: unknown): string {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function compareActivityStageCodes(left: string, right: string): number {
+  const leftMatch = left.match(/-(\d+)$/);
+  const rightMatch = right.match(/-(\d+)$/);
+  if (leftMatch && rightMatch) {
+    const numberDelta = Number(leftMatch[1]) - Number(rightMatch[1]);
+    if (numberDelta !== 0) return numberDelta;
+  }
+  return left.localeCompare(right);
+}
+
 function parseContent(item: unknown): CopilotContent {
   try {
     const content = asRecord(item).content;
@@ -126,7 +136,7 @@ function isPresetFormation(content: CopilotContent = {}): boolean {
 }
 
 function stageTitleMatches(title: unknown, stage: unknown): boolean {
-  return new RegExp(`^\\s*${escapeRegExp(stage)}(?:\\s|$|[-_:：,【（(])`, 'i').test(String(title || ''));
+  return new RegExp(`(?:^|[\\s\\-_【（(】])${escapeRegExp(stage)}(?:\\s|$|[-_:：,【（(])`, 'i').test(String(title || ''));
 }
 
 function findKnownStage(title: unknown, stages: string[]): string | null {
@@ -134,7 +144,7 @@ function findKnownStage(title: unknown, stages: string[]): string | null {
 }
 
 function activityStageTitleMatches(title: unknown, code: unknown): boolean {
-  return new RegExp(`^\\s*${escapeRegExp(code)}-(?:\\d+|EX-\\d+|S-\\d+|MO-\\d+|TR-\\d+)(?:\\s|$|[-_:：,【（(])`, 'i')
+  return new RegExp(`(?:^|[\\s\\-_【（(】])${escapeRegExp(code)}-(?:\\d+|EX-\\d+|S-\\d+|MO-\\d+|TR-\\d+)(?:\\s|$|[-_:：,【（(])`, 'i')
     .test(String(title || ''));
 }
 
@@ -386,6 +396,7 @@ export async function findActivityCopilotCandidates(clientType: string = DEFAULT
   const stages: string[] = [...new Set(((preflight.activity.stages || []) as unknown[])
     .map(stage => String(stage || '').trim().toUpperCase())
     .filter(stage => new RegExp(`^${escapeRegExp(preflight.activity.code)}-(?:\\d+|EX-\\d+|S-\\d+|MO-\\d+|TR-\\d+)$`, 'i').test(stage)))]
+    .sort(compareActivityStageCodes)
     .slice(0, MAX_STAGES);
   if (!stages.length) {
     return {
