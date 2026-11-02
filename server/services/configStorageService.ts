@@ -1,9 +1,10 @@
+import { getErrorMessage } from '../utils/errors.ts';
 import { readdir } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { deleteJsonFile, readJsonFile, writeJsonFile, ensureDir } from '../utils/fileHelper.js';
-import { agentError, successResponse, errorResponse } from '../utils/apiHelper.js';
-import { createLogger } from '../utils/logger.js';
+import { deleteJsonFile, readJsonFile, updateJsonFile, writeJsonFile, ensureDir } from '../utils/fileHelper.ts';
+import { agentError, successResponse, errorResponse } from '../utils/apiHelper.ts';
+import { createLogger } from '../utils/logger.ts';
 
 const logger = createLogger('ConfigStorage');
 
@@ -22,7 +23,7 @@ const ALLOWED_CONFIG_TYPES = new Set([
   'training-queue'
 ]);
 
-export function validateConfigType(configType) {
+export function validateConfigType(configType: unknown): string {
   if (typeof configType !== 'string' || !ALLOWED_CONFIG_TYPES.has(configType)) {
     throw agentError('AGENT_CONFIG_TYPE_INVALID', '配置类型不合法', {
       statusCode: 400,
@@ -33,7 +34,7 @@ export function validateConfigType(configType) {
 }
 
 // 获取配置文件路径
-function getConfigPath(configType) {
+function getConfigPath(configType: unknown): string {
   const normalizedType = validateConfigType(configType);
   const configPath = path.resolve(CONFIG_STORAGE_DIR, `${normalizedType}.json`);
   if (path.dirname(configPath) !== path.resolve(CONFIG_STORAGE_DIR)) {
@@ -43,7 +44,7 @@ function getConfigPath(configType) {
 }
 
 // 保存用户配置
-export async function saveUserConfig(configType, data) {
+export async function saveUserConfig(configType: unknown, data: unknown) {
   try {
     await ensureDir(CONFIG_STORAGE_DIR);
     const configPath = getConfigPath(configType);
@@ -51,19 +52,35 @@ export async function saveUserConfig(configType, data) {
     // 移除 DEBUG 日志，保存配置太频繁
     return successResponse(null, '配置保存成功');
   } catch (error) {
-    logger.error('保存配置失败', { configType, error: error.message });
+    logger.error('保存配置失败', { configType, error: getErrorMessage(error) });
     return errorResponse(error, '保存配置失败');
   }
 }
 
+// 原子读改写用户配置：读取、更新、写回在同一路径队列内完成。
+export async function updateUserConfig<T>(
+  configType: unknown,
+  updateFn: (data: T) => T | Promise<T>,
+  defaultValue: T
+) {
+  try {
+    const configPath = getConfigPath(configType);
+    const updated = await updateJsonFile(configPath, updateFn, defaultValue);
+    return successResponse(updated, '配置更新成功');
+  } catch (error) {
+    logger.error('更新配置失败', { configType, error: getErrorMessage(error) });
+    return errorResponse(error, '更新配置失败');
+  }
+}
+
 // 读取用户配置
-export async function loadUserConfig(configType) {
+export async function loadUserConfig(configType: unknown) {
   try {
     const configPath = getConfigPath(configType);
     const data = await readJsonFile(configPath, null);
     return successResponse(data);
   } catch (error) {
-    logger.error('读取配置失败', { configType, error: error.message });
+    logger.error('读取配置失败', { configType, error: getErrorMessage(error) });
     return errorResponse(error, '读取配置失败');
   }
 }
@@ -73,8 +90,8 @@ export async function getAllUserConfigs() {
   try {
     await ensureDir(CONFIG_STORAGE_DIR);
     const files = await readdir(CONFIG_STORAGE_DIR);
-    const configs = {};
-    
+    const configs: Record<string, unknown> = {};
+
     for (const file of files) {
       if (file.endsWith('.json')) {
         const configType = file.replace('.json', '');
@@ -85,16 +102,16 @@ export async function getAllUserConfigs() {
         }
       }
     }
-    
+
     return successResponse(configs);
   } catch (error) {
-    logger.error('获取所有配置失败', { error: error.message });
+    logger.error('获取所有配置失败', { error: getErrorMessage(error) });
     return errorResponse(error, '获取所有配置失败');
   }
 }
 
 // 删除配置
-export async function deleteUserConfig(configType) {
+export async function deleteUserConfig(configType: unknown) {
   try {
     const configPath = getConfigPath(configType);
     const deleted = await deleteJsonFile(configPath);
@@ -106,7 +123,7 @@ export async function deleteUserConfig(configType) {
     logger.info('配置删除成功', { configType });
     return successResponse(null, '配置删除成功');
   } catch (error) {
-    logger.error('删除配置失败', { configType, error: error.message });
+    logger.error('删除配置失败', { configType, error: getErrorMessage(error) });
     return errorResponse(error, '删除配置失败');
   }
 }

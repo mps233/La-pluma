@@ -5,7 +5,7 @@ import {
   loadUserConfig,
   saveUserConfig,
   validateConfigType
-} from '../configStorageService.js';
+} from '../configStorageService.ts';
 
 test('user config storage accepts only its explicit config types', () => {
   assert.equal(validateConfigType('automation-tasks'), 'automation-tasks');
@@ -21,7 +21,7 @@ test('path traversal values cannot read, write, or delete outside user configs',
   const deleteResult = await deleteUserConfig(traversal);
 
   assert.equal(readResult.success, false);
-  assert.equal(readResult.data, undefined);
+  assert.equal('data' in readResult ? readResult.data : undefined, undefined);
   assert.equal(writeResult.success, false);
   assert.equal(deleteResult.success, false);
 });
