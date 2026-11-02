@@ -8,8 +8,8 @@ La Pluma is a local web console for Arknights automation. The frontend configure
 
 - `client/`: React, TypeScript, Vite, Tailwind CSS, Framer Motion, and Zustand.
 - `server/`: Node.js ESM, Express routes, service modules, schedulers, and external-process integration.
-- `server/routes/agent.js`: primary `/api/agent` route surface.
-- `server/routes/agentContract.js`: shared Agent API manifest/OpenAPI registry.
+- `server/routes/agent.ts`: primary `/api/agent` route surface.
+- `server/routes/agentContract.ts`: shared Agent API manifest/OpenAPI registry.
 - `client/src/services/api.ts`: frontend API access layer.
 - `client/src/components/common/`: shared UI primitives.
 - `client/src/index.css`: semantic design tokens and utility classes.
@@ -52,9 +52,9 @@ Non-negotiables:
 
 - Add new backend capabilities to `/api/agent` unless there is a clear ownership reason not to.
 - Keep route handlers thin. Put reusable business and integration logic in `server/services`.
-- Use `server/utils/apiHelper.js` so responses preserve the standard `success`, `message`, `data` or structured `error`, and `meta` envelope.
+- Use `server/utils/apiHelper.ts` so responses preserve the standard `success`, `message`, `data` or structured `error`, and `meta` envelope.
 - Agent errors need stable codes, useful details, an accurate HTTP status, and a truthful `retryable` value.
-- Public Agent API changes must update `server/routes/agentContract.js` and the corresponding contract, route, and service tests. Manifest and OpenAPI must continue to derive from the same registry.
+- Public Agent API changes must update `server/routes/agentContract.ts` and the corresponding contract, route, and service tests. Manifest and OpenAPI must continue to derive from the same registry.
 - Long-running or consequential Agent actions must use the tracked Run lifecycle. Preserve `runId`, polling and stop links, idempotency, the shared MAA execution lease, and stable terminal outcomes.
 - An accepted Run and its idempotency record must be durably persisted before the external side effect starts. Persistence failure must fail closed instead of starting MAA.
 - Restored active Runs become non-retryable `interrupted`; they are not silently resumed. Preserve the current single-process storage limitation unless the storage design is intentionally replaced.
@@ -108,6 +108,8 @@ npm run test --prefix client
 npm run build --prefix client
 
 npm run check --prefix server
+npm run check:repo --prefix server
+npm run typecheck --prefix server
 npm run test --prefix server
 ```
 
@@ -121,7 +123,7 @@ For a focused server test, run Node's test runner from `server/`, for example:
 
 ```bash
 cd server
-node --test services/__tests__/webrtcService.test.js
+node --experimental-strip-types --test services/__tests__/webrtcService.test.ts
 ```
 
 ## Definition Of Done

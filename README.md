@@ -128,6 +128,9 @@ curl 'http://localhost:3000/api/agent/runs/00000000-0000-4000-8000-000000000000'
 curl -X POST http://localhost:3000/api/agent/actions/stop \
   -H 'Content-Type: application/json' \
   -d '{"runId":"00000000-0000-4000-8000-000000000000"}'
+
+# 按 runId 定向取消/停止：accepted run 直接取消，不发送设备命令
+curl -X POST http://localhost:3000/api/agent/runs/00000000-0000-4000-8000-000000000000/stop
 ```
 
 所有标准响应都包含 `success`、`message` 和 `meta`。真实执行响应还包含稳定的 `runId`、`run`、`pollUrl` 和 `stopUrl`；后台接受执行时返回 HTTP `202`。Dry-run 响应会设置 `meta.dryRun: true`；失败响应的 `error` 包含稳定的 `code`、`details` 与 `retryable`，执行器忙碌时返回 HTTP `409`。
@@ -393,20 +396,20 @@ la-pluma/
 │   └── public/                # 静态资源（Logo、图标）
 ├── server/                    # 后端 (Node.js + Express)
 │   ├── routes/                # API 路由
-│   │   ├── agent.js           # 主 Agent API
-│   │   ├── agentContract.js   # Agent 能力清单 / OpenAPI 注册表
-│   │   └── operatorQuotes.js  # 干员台词接口
+│   │   ├── agent.ts           # 主 Agent API
+│   │   ├── agentContract.ts   # Agent 能力清单 / OpenAPI 注册表
+│   │   └── operatorQuotes.ts  # 干员台词接口
 │   ├── services/              # 业务逻辑
-│   │   ├── maaService.js      # MAA CLI、ADB、截图、实时日志
-│   │   ├── schedulerService.js # 定时任务调度
-│   │   ├── customTaskService.js # Custom 小工具参数校验与任务配置
-│   │   ├── notificationService.js # 通知服务
-│   │   ├── operatorTrainingService.js # 养成计划和材料计算
-│   │   ├── webrtcService.js   # ScrcpyOverWebRTC 管理
-│   │   └── configStorageService.js # 配置存储
+│   │   ├── maaService.ts      # MAA CLI、ADB、截图、实时日志
+│   │   ├── schedulerService.ts # 定时任务调度
+│   │   ├── customTaskService.ts # Custom 小工具参数校验与任务配置
+│   │   ├── notificationService.ts # 通知服务
+│   │   ├── operatorTrainingService.ts # 养成计划和材料计算
+│   │   ├── webrtcService.ts   # ScrcpyOverWebRTC 管理
+│   │   └── configStorageService.ts # 配置存储
 │   ├── data/                  # 用户配置数据
 │   │   └── user-configs/      # 任务配置 JSON 文件
-│   └── server.js              # 服务器入口
+│   └── server.ts              # 服务器入口
 ├── package.json               # 根目录脚本
 └── README.md                  # 项目文档
 ```
@@ -415,7 +418,7 @@ la-pluma/
 
 ### 控制台总览
 
-- ✅ **今日活动** - 查看当前活动、开放日常本和推荐操作
+- ✅ **今日活动** - 查看当前活动、开放日常本和推荐操作；执行活动作业前会自动重启游戏并导航到活动关卡
 - ✅ **实时预览** - 通过 ScrcpyOverWebRTC 查看模拟器画面
 - ✅ **状态汇总** - 聚合当前任务、调度、掉落和养成数据
 
@@ -444,6 +447,7 @@ la-pluma/
 - 支持普通作业、作业集、SSS 作业和悖论模拟
 - 作业集使用 `prts://s<id>`；支持连续执行与手动逐关，旧 URI 写法仅保留输入兼容
 - 支持从链接或关卡名搜索作业
+- 活动作业优先选择评分高的候选；套装评分低于单关候选时回退单关，并可按本地干员 Box 跳过缺 2 名及以上干员的作业；缺 1 名干员时可在执行设置中启用助战补位
 - 集成战略支持傀影、水月、萨米、萨卡兹、界园和黑流树海主题；新模式覆盖月度小队、深入调查、常乐节点、襁褓动物和刷开局
 - 肉鸽支持三顺位开局干员 `core_char_list` 和逐位助战
 - 生息演算支持沙洲遗闻与重启锚点，包含 RA-1 / RA-15 / RA-4 模式

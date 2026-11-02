@@ -7,7 +7,7 @@
 设计系统的代码来源：
 
 - `client/src/index.css`：颜色、圆角、间距、表面、控件、状态等 CSS 变量和语义类。
-- `client/tailwind.config.js`：把常用 `rounded-*`、`gap-*`、`space-*` 映射到统一 token。
+- `client/tailwind.config.ts`：把常用 `rounded-*`、`gap-*`、`space-*` 映射到统一 token。
 - `client/src/components/common`：页面标题、卡片、按钮、输入、弹窗、加载等通用组件。
 
 ---

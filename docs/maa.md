@@ -19,7 +19,7 @@
 
 | 项 | 现状 |
 | --- | --- |
-| 每日流程任务文件 | 仍走 `executeTaskFlowUnlocked`，逐任务结果归属未重做（`server/services/schedulerService.js`） |
+| 每日流程任务文件 | 仍走 `executeTaskFlowUnlocked`，逐任务结果归属未重做（`server/services/schedulerService.ts`） |
 | 开放日判断 | `condition` / `variants` 已支持透传，但硬编码的 `isStageOpenToday` 尚未替换（同文件） |
 | 真实 CLI fixture | 尚未用真实回调固化 Depot / OperBox / Recruit / Infrast / Mall / Award / Fight 的回归样本 |
 
