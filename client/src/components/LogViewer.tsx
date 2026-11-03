@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
   AlertCircle,
+  ArrowDown,
   ArrowLeft,
   CheckCircle2,
   ChevronRight,
@@ -38,6 +39,7 @@ type Notice = { type: 'success' | 'error'; text: string }
 type VisibleLog = LogEntry & { count: number }
 
 const LOG_LEVELS: LogEntry['level'][] = ['ERROR', 'WARN', 'INFO', 'DEBUG']
+const LOG_SCROLL_EDGE_THRESHOLD = 16
 const CONTENT_MODE_OPTIONS: ReadonlyArray<{ id: LogContentMode; label: string; description: string }> = [
   { id: 'summary', label: '摘要', description: '关键事件' },
   { id: 'raw', label: '原始', description: '完整内容' },
@@ -271,6 +273,8 @@ export default function LogViewer() {
   const shouldReduceMotion = useReducedMotion()
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [autoScroll, setAutoScroll] = useState(true)
+  const [atLogTop, setAtLogTop] = useState(true)
+  const [atLogBottom, setAtLogBottom] = useState(true)
   const [contentMode, setContentMode] = useState<LogContentMode>('summary')
   const [filter, setFilter] = useState<LogFilter>('all')
   const [search, setSearch] = useState('')
@@ -297,6 +301,28 @@ export default function LogViewer() {
   const realtimeRequestIdRef = useRef(0)
   const realtimePausedRef = useRef(false)
   const historyRequestIdRef = useRef(0)
+
+  const updateLogScrollState = useCallback(() => {
+    const container = logContainerRef.current
+    if (!container) return
+    const nextAtTop = container.scrollTop <= LOG_SCROLL_EDGE_THRESHOLD
+    const nextAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= LOG_SCROLL_EDGE_THRESHOLD
+    setAtLogTop(current => current === nextAtTop ? current : nextAtTop)
+    setAtLogBottom(current => current === nextAtBottom ? current : nextAtBottom)
+    if (!nextAtBottom && !viewingHistoryRef.current) {
+      setAutoScroll(current => current ? false : current)
+    }
+  }, [])
+
+  const scrollToLatest = useCallback(() => {
+    const container = logContainerRef.current
+    if (!container) return
+    container.scrollTop = container.scrollHeight
+    setAutoScroll(true)
+    setAtLogBottom(true)
+    setAtLogTop(container.scrollHeight <= container.clientHeight)
+    container.focus({ preventScroll: true })
+  }, [])
 
   const loadRealtimeLogs = useCallback(async () => {
     if (viewingHistoryRef.current || realtimePausedRef.current || document.hidden || realtimeAbortRef.current) return
@@ -417,9 +443,11 @@ export default function LogViewer() {
   }, [loadHistoryFiles, loadRealtimeLogs, stopRealtimeRequest])
 
   useEffect(() => {
-    if (autoScroll && !viewingHistory && logContainerRef.current) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight
-    }
+    const container = logContainerRef.current
+    if (!container || !autoScroll || viewingHistory) return
+    container.scrollTop = container.scrollHeight
+    setAtLogBottom(true)
+    setAtLogTop(container.scrollHeight <= container.clientHeight)
   }, [logs, autoScroll, viewingHistory])
 
   const readableLogs = useMemo(() => {
@@ -450,6 +478,10 @@ export default function LogViewer() {
       return entries
     }, [])
   }, [collapseRepeats, filteredLogs])
+
+  useEffect(() => {
+    updateLogScrollState()
+  }, [visibleLogs, collapseRepeats, filter, search, viewingHistory, updateLogScrollState])
 
   const clearLogs = async () => {
     if (viewingHistoryRef.current) return false
@@ -711,15 +743,18 @@ export default function LogViewer() {
                 </div>
               </div>
             ) : (
-              <div
-                id="log-console-panel"
-                ref={logContainerRef}
-                className="log-console"
-                role="log"
-                aria-label="日志内容"
-                aria-live="polite"
-                aria-relevant="additions text"
-              >
+              <div className="log-console-frame">
+                <div
+                  id="log-console-panel"
+                  ref={logContainerRef}
+                  className="log-console focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] focus-visible:ring-inset"
+                  role="log"
+                  aria-label="日志内容"
+                  aria-live="polite"
+                  aria-relevant="additions text"
+                  tabIndex={0}
+                  onScroll={updateLogScrollState}
+                >
                 {activeError && (
                   <div
                     className={`log-console-state is-error flex-wrap ${logs.length > 0 ? 'status-danger m-3 !min-h-0 !justify-start !p-3 text-left font-sans text-sm' : ''}`}
@@ -767,6 +802,22 @@ export default function LogViewer() {
                     </div>
                   </div>
                 ))}
+                </div>
+                <div className={`log-console-fade is-top${atLogTop ? '' : ' is-visible'}`} aria-hidden="true" />
+                <div className={`log-console-fade is-bottom${atLogBottom ? '' : ' is-visible'}`} aria-hidden="true" />
+                {!atLogBottom && (
+                  <div className="log-console-jump">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      icon={<ArrowDown className="h-4 w-4" aria-hidden="true" />}
+                      onClick={scrollToLatest}
+                    >
+                      {viewingHistory ? '回到底部' : '回到最新'}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

@@ -134,6 +134,38 @@ describe('LogViewer recovery and controls', () => {
     expect(toggleControls.every(control => !control.classList.contains('surface-soft'))).toBe(true)
   })
 
+  it('pauses following when the user scrolls up and offers a jump to latest', async () => {
+    mocks.getRealtimeLogs.mockResolvedValue({
+      success: true,
+      data: [{ time: '2026-07-22T10:11:12.000Z', level: 'INFO', message: '滚动测试日志' }],
+    })
+
+    await renderComponent()
+
+    const consoleElement = container.querySelector<HTMLElement>('.log-console')
+    expect(consoleElement).not.toBeNull()
+    Object.defineProperty(consoleElement, 'scrollHeight', { configurable: true, value: 1000 })
+    Object.defineProperty(consoleElement, 'clientHeight', { configurable: true, value: 400 })
+    consoleElement!.scrollTop = 200
+
+    await act(async () => {
+      consoleElement!.dispatchEvent(new Event('scroll'))
+    })
+    await flush()
+
+    const jump = container.querySelector<HTMLButtonElement>('.log-console-jump button')
+    const autoScrollSwitch = container.querySelector<HTMLInputElement>('[role="switch"][aria-label="自动滚动"]')
+    expect(jump?.textContent).toContain('回到最新')
+    expect(container.querySelector('.log-console-fade.is-bottom')?.classList.contains('is-visible')).toBe(true)
+    expect(autoScrollSwitch?.checked).toBe(false)
+
+    await click(jump!)
+
+    expect(consoleElement!.scrollTop).toBe(1000)
+    expect(container.querySelector('.log-console-jump')).toBeNull()
+    expect(autoScrollSwitch?.checked).toBe(true)
+  })
+
   it('keeps existing realtime rows visible when a background refresh fails', async () => {
     mocks.getRealtimeLogs
       .mockResolvedValueOnce({
