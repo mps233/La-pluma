@@ -273,7 +273,6 @@ export interface CopilotSetInfo {
   stage?: string
   operators?: string
   note?: string
-  autoAddS?: boolean
   // 作业集包含的作业列表
   copilots?: CopilotSetItem[]
   // 当前执行到的作业索引（用于顺序执行）

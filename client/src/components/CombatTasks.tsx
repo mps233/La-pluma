@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { maaApi, searchCopilot, searchParadoxCopilot, type ScheduleExecutionResultData } from '../services/api'
 import { motion, useReducedMotion } from 'framer-motion'
-import { FileText, Info, Play, Square } from 'lucide-react'
+import { ChevronRight, FileText, Info, Play, Search, Square } from 'lucide-react'
 import Icons from './Icons'
-import { PageHeader, Button, Card, ConfirmDialog, EmptyState, SmoothPanel } from './common'
+import { PageHeader, Button, Card, ConfirmDialog, EmptyState, SmoothPanel, StatusMark } from './common'
 import { useStatusStore } from '../store/statusStore'
+import { useRunStore } from '../store/runStore'
+import type { RunTaskResult } from '../types/run'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import ScreenMonitor from './ScreenMonitor'
 import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
@@ -22,6 +24,7 @@ import type {
   CopilotSetItem
 } from '@/types/components'
 import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
+import { useUIStore, type CombatCopilotPrefill } from '@/stores'
 
 type CopilotSetExecutionMode = 'manual' | 'cli'
 
@@ -94,6 +97,52 @@ const enqueueCombatConfigSync = <T,>(operation: () => Promise<T>) => {
   return result
 }
 
+function SingleCopilotSummary({
+  info,
+  compact = false,
+}: {
+  info: Pick<CopilotSetInfo, 'id' | 'name' | 'stage' | 'operators'>
+  compact?: boolean
+}) {
+  const operators = (info.operators || '')
+    .split('、')
+    .map(operator => operator.trim())
+    .filter(Boolean)
+
+  return (
+    <div className={compact ? 'space-y-2' : 'space-y-3'}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-border)] bg-[var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-secondary">
+          <span className="h-1.5 w-1.5 rounded-full bg-[var(--app-accent)]" aria-hidden="true" />
+          单个作业
+        </span>
+        <span className="font-mono text-[11px] text-tertiary">prts://{info.id}</span>
+      </div>
+      <p className={`${compact ? 'text-sm' : 'text-base'} break-words font-semibold leading-6 text-primary`}>{info.name}</p>
+      <div className={`grid gap-2 text-xs ${compact ? '' : 'border-t border-[var(--app-border)] pt-3'}`}>
+        {info.stage && (
+          <div className="flex items-start gap-2">
+            <span className="w-8 shrink-0 text-tertiary">关卡</span>
+            <span className="min-w-0 break-words font-medium text-secondary">{info.stage}</span>
+          </div>
+        )}
+        {operators.length > 0 && (
+          <div className="flex items-start gap-2">
+            <span className="w-8 shrink-0 text-tertiary">干员</span>
+            <div className="flex min-w-0 flex-wrap gap-1.5">
+              {operators.map((operator, index) => (
+                <span key={`${operator}-${index}`} className="rounded-md bg-[var(--app-surface-muted)] px-1.5 py-0.5 text-[11px] text-secondary">
+                  {operator}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function CombatTasks() {
   const shouldReduceMotion = useReducedMotion()
   const [isRunning, setIsRunning] = useState(false)
@@ -104,10 +153,11 @@ export default function CombatTasks() {
   const stopRequestedRef = useRef(false)
   const executionGenerationRef = useRef(0)
   const stopWaitControllerRef = useRef<AbortController | null>(null)
-  const { setMessage: setStatusMessage, setActive: setIsActiveStatus } = useStatusStore()
+  const { setMessage: setStatusMessage, clearMessage: clearStatusMessage, setActive: setIsActiveStatus } = useStatusStore()
   const { isAvailable: automationAvailable, unavailableMessage } = useAutomationAvailability()
   const [taskInputs, setTaskInputs] = useState<CombatTaskInputs>({})
   const [copilotSetInfo, setCopilotSetInfo] = useState<CopilotSetInfo | null>(null)
+  const currentRun = useRunStore(state => state.run)
   const [isLoadingSet, setIsLoadingSet] = useState(false)
   const [advancedParams, setAdvancedParams] = useState<CombatAdvancedParams>({
     copilot: { ignoreRequirements: true, loopTimes: '1', executionStrategy: 'continue', raid: 'normal', allowOneMissingOperator: true },
@@ -127,9 +177,6 @@ export default function CombatTasks() {
   const copilotSearchRequestRef = useRef(0)
   const paradoxSearchRequestRef = useRef(0)
 
-  // 作业类型选择：'auto' 自动检测，'single' 单个作业，'set' 作业集
-  const [copilotType, setCopilotType] = useState<'auto' | 'single' | 'set'>('auto')
-
   // 作业集执行控制
   const [waitingForNextCopilot, setWaitingForNextCopilot] = useState(false)
   const [currentCopilotTask, setCurrentCopilotTask] = useState<CombatTask | null>(null)
@@ -138,6 +185,39 @@ export default function CombatTasks() {
   // 作业集任务选择状态（记录选中的索引）
   const [selectedCopilotIndexes, setSelectedCopilotIndexes] = useState<Set<number>>(new Set())
   const [copilotSetSelections, setCopilotSetSelections] = useState<CopilotSetSelections>({})
+  const [activityPrefillSetId, setActivityPrefillSetId] = useState<string | null>(null)
+  const [activityFallback, setActivityFallback] = useState(false)
+  const runTaskResults = currentRun?.taskResults ?? currentRun?.progress?.taskResults ?? []
+  const runSetId = currentRun?.progress?.setId ?? null
+  const runBelongsToSet = Boolean(currentRun && copilotSetInfo && (
+    runSetId === copilotSetInfo.id
+    || (!runSetId
+      && currentRun.operationId === 'run_current_activity_copilots'
+      && activityPrefillSetId === copilotSetInfo.id)
+  ))
+  const runResultByItem = new Map<number, RunTaskResult>()
+  if (runBelongsToSet) {
+    for (const result of runTaskResults) {
+      if (typeof result.itemIndex === 'number') runResultByItem.set(result.itemIndex, result)
+    }
+  }
+  const runCurrentItemIndex = runBelongsToSet
+    ? (runTaskResults.find(result => result.status === 'running')?.itemIndex ?? null)
+    : null
+  const effectiveCurrentIndex = runCurrentItemIndex ?? copilotSetInfo?.currentIndex ?? 0
+  const runBattle = runBelongsToSet ? currentRun?.progress?.battle ?? null : null
+  const validRunBattle = runBattle
+    && Number.isFinite(runBattle.kills)
+    && Number.isFinite(runBattle.total)
+    && runBattle.total > 0
+    && runBattle.kills >= 0
+    && runBattle.kills <= runBattle.total
+    ? runBattle
+    : null
+  const handledCombatPrefillRef = useRef<CombatCopilotPrefill | null>(null)
+  const combatCopilotPrefill = useUIStore(state => state.combatCopilotPrefill)
+  const setCombatCopilotPrefill = useUIStore(state => state.setCombatCopilotPrefill)
+  const activeTab = useUIStore(state => state.activeTab)
 
   // 悖论模拟搜索相关状态
   const [paradoxSearchName, setParadoxSearchName] = useState('')
@@ -160,10 +240,9 @@ export default function CombatTasks() {
     executionGenerationRef.current === generation && !stopRequestedRef.current
 
   // 普通关卡搜索相关状态
-  const [copilotSearchStage, setCopilotSearchStage] = useState('')
   const [copilotSearchResult, setCopilotSearchResult] = useState<CopilotSearchResult | null>(null)
-  const [selectedSearchCopilotUri, setSelectedSearchCopilotUri] = useState<string>('')
   const [isSearchingCopilot, setIsSearchingCopilot] = useState(false)
+  const copilotSearchInputRef = useRef<HTMLInputElement | null>(null)
   const [activeCombatMode, setActiveCombatMode] = useState<CombatMode>('copilot')
   const {
     containerRef: combatModeTabsRef,
@@ -677,6 +756,12 @@ export default function CombatTasks() {
   }
 
 
+  const isCopilotLinkInput = (value: string): boolean => {
+    const firstToken = splitCopilotInputToArgs(value)[0] || ''
+    if (parseCopilotUri(firstToken)) return true
+    return /^https?:\/\//i.test(firstToken) || /^(?:\/|~\/|[A-Za-z]:[\\/])/.test(firstToken)
+  }
+
   const appendCommandOptions = (args: string[], task: CombatTask, forceFormationForSplitSet = false): string[] => {
     const nextArgs = [...args]
     if (shouldAppendFormation(task.id, forceFormationForSplitSet)) {
@@ -704,15 +789,6 @@ export default function CombatTasks() {
 
   const buildCommandArgs = (task: CombatTask): string[] => {
     const args = splitCopilotInputToArgs(taskInputs[task.id] || '')
-
-    if (task.id === 'copilot' && copilotSetInfo?.type === 'set' && copilotSetInfo?.autoAddS) {
-      for (let i = 0; i < args.length; i++) {
-        const parsedUri = parseCopilotUri(args[i] || '')
-        if (parsedUri && !parsedUri.isSet) {
-          args[i] = formatCopilotUri({ ...parsedUri, isSet: true })
-        }
-      }
-    }
 
     return appendCommandOptions(args, task)
   }
@@ -781,26 +857,64 @@ export default function CombatTasks() {
     setWaitingForNextCopilot(false)
     setCopilotSetResults([])
     setCurrentCopilotTask(task)
+    setCopilotSetInfo(prev => prev ? { ...prev, currentIndex: selectedIndexes[0] ?? 0 } : prev)
     setStatusMessage('正在连续执行作业集')
+    let stageTimer: number | null = null
+    const pollStage = async () => {
+      try {
+        const status = await maaApi.getTaskStatus()
+        if (!isCurrentExecution(generation)) return
+        const stage = status.data?.currentStage
+        if (!stage) return
+        const normalizedStage = stage.trim()
+        const stageIndex = copilotSetInfo?.copilots?.findIndex(copilot => (
+          copilot.stage?.trim() === normalizedStage
+          || copilot.name?.trim() === normalizedStage
+        )) ?? -1
+        if (stageIndex !== -1) {
+          setCopilotSetInfo(prev => (
+            prev && prev.currentIndex !== stageIndex
+              ? { ...prev, currentIndex: stageIndex }
+              : prev
+          ))
+        }
+        const step = status.data?.currentStep
+        const total = status.data?.totalSteps
+        const stageLabel = `${stage}${typeof step === 'number' && typeof total === 'number' ? `（${step}/${total}）` : ''}`
+        setStatusMessage(`正在执行 ${stageLabel}`)
+      } catch {
+        // Keep the previous status while the task query is temporarily unavailable.
+      }
+    }
+    stageTimer = window.setInterval(() => void pollStage(), 2000)
 
     try {
       const raid = normalizeRaidValue(advancedParams.copilot?.raid)
+      const isActivityPrefill = Boolean(activityPrefillSetId && copilotSetInfo?.id === activityPrefillSetId)
+      const executionOptions = {
+        ignoreRequirements: advancedParams.copilot?.ignoreRequirements,
+        loopTimes: advancedParams.copilot?.loopTimes,
+        useSanityPotion: isActivityPrefill ? true : advancedParams.copilot?.useSanityPotion,
+        ...(isActivityPrefill ? { nativeDelegation: false } : {}),
+        addTrust: advancedParams.copilot?.addTrust,
+        formationIndex: advancedParams.copilot?.formationIndex,
+        supportUsage: advancedParams.copilot?.supportUsage,
+        supportName: advancedParams.copilot?.supportName,
+        userAdditional: advancedParams.copilot?.userAdditional,
+        formationMode: getFormationMode(task.id)
+      }
       const result = copilotSetInfo?.type === 'set'
-        ? await maaApi.executeCopilotSetPlan(copilotSetInfo.id, {
-            raid,
-            selectedIndexes,
-            options: {
-              ignoreRequirements: advancedParams.copilot?.ignoreRequirements,
-              loopTimes: advancedParams.copilot?.loopTimes,
-              useSanityPotion: advancedParams.copilot?.useSanityPotion,
-              addTrust: advancedParams.copilot?.addTrust,
-              formationIndex: advancedParams.copilot?.formationIndex,
-              supportUsage: advancedParams.copilot?.supportUsage,
-              supportName: advancedParams.copilot?.supportName,
-              userAdditional: advancedParams.copilot?.userAdditional,
-              formationMode: getFormationMode(task.id)
-            }
-          })
+        ? isActivityPrefill
+          ? await maaApi.runActivitySet(copilotSetInfo.id, {
+              raid,
+              selectedIndexes,
+              options: executionOptions
+            })
+          : await maaApi.executeCopilotSetPlan(copilotSetInfo.id, {
+              raid,
+              selectedIndexes,
+              options: executionOptions
+            })
         : await maaApi.executePredefinedTaskArgs(task.command, buildCopilotSetCliArgs(task), null, null, task.name, 'combat', true)
 
       if (!isCurrentExecution(generation)) return
@@ -816,6 +930,7 @@ export default function CombatTasks() {
       if (!isCurrentExecution(generation)) return
       setStatusMessage(`网络错误: ${(error as Error).message}`)
     } finally {
+      if (stageTimer !== null) window.clearInterval(stageTimer)
       finishCopilotSet(generation)
     }
   }
@@ -1029,9 +1144,56 @@ export default function CombatTasks() {
     }
   }
 
+  const startActivityFallback = async (task: CombatTask, generation: number) => {
+    setIsRunning(true)
+    setWaitingForNextCopilot(false)
+    setCopilotSetResults([])
+    setCurrentCopilotTask(task)
+    setStatusMessage('正在执行当前活动逐关作业')
+    let stageTimer: number | null = null
+    const pollStage = async () => {
+      try {
+        const status = await maaApi.getTaskStatus()
+        if (!isCurrentExecution(generation)) return
+        const stage = status.data?.currentStage
+        if (!stage) return
+        const step = status.data?.currentStep
+        const total = status.data?.totalSteps
+        const stageLabel = `${stage}${typeof step === 'number' && typeof total === 'number' ? `（${step}/${total}）` : ''}`
+        setStatusMessage(`正在执行 ${stageLabel}`)
+      } catch {
+        // Keep the previous status while the task query is temporarily unavailable.
+      }
+    }
+    stageTimer = window.setInterval(() => void pollStage(), 2000)
+    try {
+      const result = await maaApi.runActivityFallback({
+        options: { useSanityPotion: true }
+      })
+      if (!isCurrentExecution(generation)) return
+      if (result.success) {
+        setStatusMessage('当前活动逐关作业执行完成')
+      } else {
+        setStatusMessage(`当前活动逐关作业执行失败: ${maaApi.getErrorMessage(result)}`)
+      }
+    } catch (error) {
+      if (!isCurrentExecution(generation)) return
+      setStatusMessage(`网络错误: ${(error as Error).message}`)
+    } finally {
+      if (stageTimer !== null) window.clearInterval(stageTimer)
+      finishCopilotSet(generation)
+    }
+  }
+
   const handleExecute = async (task: CombatTask) => {
     if (!automationAvailable) {
       setStatusMessage(unavailableMessage, 'error')
+      return
+    }
+
+    if (task.id === 'copilot' && activityFallback) {
+      const generation = beginExecution()
+      await startActivityFallback(task, generation)
       return
     }
 
@@ -1100,11 +1262,16 @@ export default function CombatTasks() {
   const handleInputChange = (taskId: string, value: string) => {
     setTaskInputs(current => ({ ...current, [taskId]: value }))
     if (taskId === 'copilot') {
+      setActivityPrefillSetId(null)
+      setActivityFallback(false)
+      setCopilotSearchResult(null)
       previewRequestRef.current += 1
+      copilotSearchRequestRef.current += 1
       setIsLoadingSet(false)
+      setIsSearchingCopilot(false)
       setCopilotSetInfo(null)
-      if (value.trim() !== selectedSearchCopilotUri) {
-        setSelectedSearchCopilotUri('')
+      if (!isRunning) {
+        clearStatusMessage()
       }
     }
   }
@@ -1117,6 +1284,13 @@ export default function CombatTasks() {
         [key]: value
       }
     })
+  }
+
+  const extractStageDisplay = (title: unknown, stageName: unknown): string | undefined => {
+    const titleValue = typeof title === 'string' ? title : ''
+    const match = titleValue.match(/(?:[A-Z]{1,4}-[A-Z]{1,3}-\d+|[A-Z]{1,4}-\d+|\d+-\d+)/i)
+    if (match?.[0]) return match[0].toUpperCase()
+    return typeof stageName === 'string' && stageName ? stageName : undefined
   }
 
   // 从作业内容中提取干员列表（包含固定干员和干员组）
@@ -1209,17 +1383,20 @@ export default function CombatTasks() {
     return []
   }
 
-  const applyCopilotUri = async (uri: string) => {
+  const applyCopilotUri = async (uri: string, options: { ignorePreviewGuard?: boolean } = {}) => {
     const normalizedUri = normalizeCopilotInput(uri).trim()
     setTaskInputs(prev => ({ ...prev, copilot: normalizedUri }))
-    setSelectedSearchCopilotUri(normalizedUri)
+    setCopilotSearchResult(null)
     setCopilotSetInfo(null)
-    await handlePreviewCopilotSetWithInput(normalizedUri)
+    await handlePreviewCopilotSetWithInput(normalizedUri, options)
   }
 
-  const handlePreviewCopilotSetWithInput = async (rawValue?: string) => {
+  const handlePreviewCopilotSetWithInput = async (
+    rawValue?: string,
+    options: { ignorePreviewGuard?: boolean } = {}
+  ) => {
     const requestId = ++previewRequestRef.current
-    const isCurrentRequest = () => previewRequestRef.current === requestId
+    const isCurrentRequest = () => options.ignorePreviewGuard === true || previewRequestRef.current === requestId
     const rawInput = rawValue ?? (taskInputs['copilot'] || '')
     const firstToken = splitCopilotInputToArgs(rawInput)[0] || ''
     const parsedUri = parseCopilotUri(firstToken)
@@ -1235,26 +1412,7 @@ export default function CombatTasks() {
     setStatusMessage('正在获取作业信息...')
 
     try {
-      // 根据用户选择或自动检测模式
-      if (copilotType === 'single') {
-        // 强制单个作业模式
-        const copilotData = await maaApi.getCopilotInfo(copilotId)
-        if (!isCurrentRequest()) return
-        const content = getCopilotContent(copilotData)
-        if (content) {
-          setCopilotSetInfo({
-            type: 'single',
-            id: copilotId,
-            name: content.doc?.title || '未命名作业',
-            stage: content.stage_name,
-            operators: extractOperators(content)
-          })
-          setStatusMessage(`已加载作业：${content.doc?.title || content.stage_name}`)
-        } else {
-          setStatusMessage('作业不存在')
-        }
-      } else if (copilotType === 'set') {
-        // 强制作业集模式
+      if (hasS) {
         const copilots = await fetchCopilotSetDetails(copilotId)
         if (!isCurrentRequest()) return
         if (copilots.length > 0) {
@@ -1263,7 +1421,6 @@ export default function CombatTasks() {
             id: copilotId,
             name: `作业集 (${copilots.length} 个作业)`,
             note: '包含多个关卡，将按顺序执行',
-            autoAddS: !hasS,
             copilots,
             currentIndex: 0
           })
@@ -1273,102 +1430,20 @@ export default function CombatTasks() {
           setStatusMessage('作业集不存在或为空')
         }
       } else {
-        // 自动检测模式：同时请求两个接口，哪个成功就用哪个
-        const [copilotResult, setResult] = await Promise.allSettled([
-          maaApi.getCopilotInfo(copilotId),
-          maaApi.getCopilotSet(copilotId)
-        ])
+        const copilotData = await maaApi.getCopilotInfo(copilotId)
         if (!isCurrentRequest()) return
-
-        let foundSingle = false
-        let foundSet = false
-        let singleData: CopilotContent | null = null
-        let setData: number[] = []
-
-        // 检查单个作业
-        if (copilotResult.status === 'fulfilled') {
-          const content = getCopilotContent(copilotResult.value)
-          if (content) {
-            foundSingle = true
-            singleData = content
-          }
-        }
-
-        // 检查作业集
-        if (setResult.status === 'fulfilled') {
-          const copilotIds = getCopilotSetIds(setResult.value)
-          if (copilotIds.length > 0) {
-            foundSet = true
-            setData = copilotIds
-          }
-        }
-
-        // 根据结果决定使用哪个
-        if (foundSingle && foundSet) {
-          // 两个都存在，优先使用作业集（因为作业集更少见，用户可能更想要）
-          const copilotIds: number[] = setData
-          const copilots = await Promise.all(copilotIds.map(id => fetchCopilotDetail(id)))
-          if (!isCurrentRequest()) return
-          const validCopilots = copilots.filter((item): item is CopilotSetItem => item !== null)
-          setCopilotSetInfo({
-            type: 'set',
-            id: copilotId,
-            name: `作业集 (${validCopilots.length} 个作业)`,
-            note: '包含多个关卡，将按顺序执行',
-            autoAddS: !hasS,
-            copilots: validCopilots,
-            currentIndex: 0
-          })
-          restoreSelectedCopilots(copilotId, validCopilots)
-          setStatusMessage(`已识别作业集：${validCopilots.length} 个作业`)
-        } else if (foundSet) {
-          // 只有作业集
-          const copilotIds: number[] = setData
-          const copilots = await Promise.all(copilotIds.map(id => fetchCopilotDetail(id)))
-          if (!isCurrentRequest()) return
-          const validCopilots = copilots.filter((item): item is CopilotSetItem => item !== null)
-          setCopilotSetInfo({
-            type: 'set',
-            id: copilotId,
-            name: `作业集 (${validCopilots.length} 个作业)`,
-            note: '包含多个关卡，将按顺序执行',
-            autoAddS: !hasS,
-            copilots: validCopilots,
-            currentIndex: 0
-          })
-          restoreSelectedCopilots(copilotId, validCopilots)
-          setStatusMessage(`已加载作业集：${validCopilots.length} 个作业`)
-        } else if (foundSingle) {
-          // 只有单个作业
-          const content = singleData!
+        const content = getCopilotContent(copilotData)
+        if (content) {
           setCopilotSetInfo({
             type: 'single',
             id: copilotId,
             name: content.doc?.title || '未命名作业',
-            stage: content.stage_name,
+            stage: extractStageDisplay(content.doc?.title, content.stage_name),
             operators: extractOperators(content)
           })
           setStatusMessage(`已加载作业：${content.doc?.title || content.stage_name}`)
         } else {
-          const singlePayload = copilotResult.status === 'fulfilled' ? unwrapApiPayload(copilotResult.value) : null
-          const setPayload = setResult.status === 'fulfilled' ? unwrapApiPayload(setResult.value) : null
-          const looksLikeSetFallback = singlePayload?.status_code === 404 && setPayload?.status_code === 400
-
-          if (looksLikeSetFallback) {
-            setCopilotSetInfo({
-              type: 'set',
-              id: copilotId,
-              name: '作业集',
-              note: `当前接口未返回 ${copilotId} 的明细，执行时将按作业集处理${!hasS ? '（自动补 s）' : ''}`,
-              autoAddS: !hasS,
-              copilots: [],
-              currentIndex: 0
-            })
-            applySelectedCopilotIndexes(new Set(), copilotId)
-            setStatusMessage(`已按作业集处理：prts://s${copilotId}${!hasS ? '（执行时自动补 s）' : ''}`)
-          } else {
-            setStatusMessage('未找到作业或作业集')
-          }
+          setStatusMessage('作业不存在')
         }
       }
 
@@ -1380,6 +1455,24 @@ export default function CombatTasks() {
   }
 
   // 搜索悖论模拟作业
+  useEffect(() => {
+    if (activeTab !== 'combat' || !configLoaded || !combatCopilotPrefill) return
+    if (handledCombatPrefillRef.current === combatCopilotPrefill) return
+    handledCombatPrefillRef.current = combatCopilotPrefill
+    setCombatCopilotPrefill(null)
+    if (combatCopilotPrefill.fallback) {
+      setActivityFallback(true)
+      setActivityPrefillSetId(null)
+      setCopilotSetInfo(null)
+      setTaskInputs(current => ({ ...current, copilot: '' }))
+      setStatusMessage('当前活动没有可用作业集，已准备逐关作业，请点击立即执行。', 'warning')
+      return
+    }
+    setActivityFallback(false)
+    setActivityPrefillSetId(combatCopilotPrefill.setId)
+    void applyCopilotUri(`prts://s${combatCopilotPrefill.setId}`, { ignorePreviewGuard: true })
+  }, [activeTab, applyCopilotUri, combatCopilotPrefill, configLoaded, setCombatCopilotPrefill])
+
   const handleSearchParadox = async () => {
     if (isSearchingParadox) return
     if (!paradoxSearchName.trim()) {
@@ -1424,15 +1517,15 @@ export default function CombatTasks() {
   }
 
   // 搜索普通关卡作业
-  const handleSearchCopilot = async () => {
+  const handleSearchCopilot = async (queryOverride?: string) => {
     if (isSearchingCopilot) return
-    if (!copilotSearchStage.trim()) {
+    const query = (queryOverride ?? '').trim()
+    if (!query) {
       setStatusMessage('请输入关卡名称')
       return
     }
 
     const requestId = ++copilotSearchRequestRef.current
-    const query = copilotSearchStage.trim()
     setIsSearchingCopilot(true)
     setStatusMessage('正在搜索作业...')
     setCopilotSearchResult(null)
@@ -1446,13 +1539,7 @@ export default function CombatTasks() {
 
       if (result.success && isCopilotSearchResult(data) && data.copilots.length > 0) {
         setCopilotSearchResult(data)
-
-        // 自动填充并预览推荐作业
-        if (data.recommended?.uri) {
-          await applyCopilotUri(data.recommended.uri)
-        } else {
-          setStatusMessage(`找到 ${data.copilots.length} 个作业`)
-        }
+        setStatusMessage(`找到 ${data.copilots.length} 个作业，请选择要使用的作业`)
       } else {
         const errorMessage = isRecord(data) && typeof data.error === 'string' ? data.error : ''
         setStatusMessage(result.message || errorMessage || '未找到作业')
@@ -1467,24 +1554,21 @@ export default function CombatTasks() {
     }
   }
 
-  const handleCopilotSearchStageChange = (value: string) => {
-    copilotSearchRequestRef.current += 1
-    setIsSearchingCopilot(false)
-    setCopilotSearchStage(value)
-  }
-
   const handleParadoxSearchNameChange = (value: string) => {
     paradoxSearchRequestRef.current += 1
     setIsSearchingParadox(false)
     setParadoxSearchName(value)
   }
 
-  const handleCopilotTypeChange = (type: 'auto' | 'single' | 'set') => {
-    previewRequestRef.current += 1
-    setIsLoadingSet(false)
-    setCopilotType(type)
+  const handleCopilotSubmit = () => {
+    const value = taskInputs.copilot || ''
+    if (!value.trim() || isLoadingSet || isSearchingCopilot) return
+    if (isCopilotLinkInput(value)) {
+      void handlePreviewCopilotSetWithInput(value)
+    } else {
+      void handleSearchCopilot(value)
+    }
   }
-
 
   const renderAdvancedOptions = (task: CombatTask) => {
     const options = getAdvancedOptions(task.id)
@@ -1784,10 +1868,16 @@ export default function CombatTasks() {
 
                   {/* 中栏：输入框 + 作业列表 */}
                   <div className="flex min-w-0 flex-col space-y-3">
+                    {activityFallback && (
+                      <div role="status" className="status-warning flex min-h-11 items-center rounded-lg px-3 py-2 text-sm leading-5">
+                        当前活动没有匹配的作业集，点击“立即执行”将按活动关卡逐关运行。
+                      </div>
+                    )}
                     <div className="combat-workspace-section">
                       <div className="flex gap-2">
-                        <label htmlFor="combat-copilot-uri" className="sr-only">作业链接或本地路径</label>
+                        <label htmlFor="combat-copilot-uri" className="sr-only">作业链接、本地路径或关卡名</label>
                         <input
+                          ref={copilotSearchInputRef}
                           id="combat-copilot-uri"
                           type="text"
                           name="maa-copilot-uri"
@@ -1795,90 +1885,106 @@ export default function CombatTasks() {
                           autoCorrect="off"
                           autoCapitalize="none"
                           spellCheck={false}
-                          inputMode="url"
-                          placeholder="prts://1234、prts://s1234、作业站链接或本地路径"
+                          inputMode="text"
+                          placeholder="输入作业链接，或输入关卡名搜索"
                           value={taskInputs[task.id] || ''}
                           onChange={(e) => handleInputChange(task.id, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key !== 'Enter') return
+                            e.preventDefault()
+                            handleCopilotSubmit()
+                          }}
                           className="app-input app-native-control min-h-11 min-w-0 flex-1 font-mono control-surface"
                         />
                         <Button
-                          onClick={() => handlePreviewCopilotSetWithInput()}
-                          disabled={isLoadingSet || !taskInputs[task.id]?.trim()}
-                          loading={isLoadingSet}
+                          onClick={handleCopilotSubmit}
+                          disabled={isLoadingSet || isSearchingCopilot || !taskInputs[task.id]?.trim()}
+                          loading={isCopilotLinkInput(taskInputs[task.id] || '') ? isLoadingSet : isSearchingCopilot}
+                          loadingText={isCopilotLinkInput(taskInputs[task.id] || '') ? '预览中' : '搜索中'}
                           variant="secondary"
                           size="md"
                           className="shrink-0 px-3"
+                          aria-label={isCopilotLinkInput(taskInputs[task.id] || '') ? '预览作业' : '搜索关卡作业'}
                           icon={
-                            !isLoadingSet && (
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
+                            !isLoadingSet && !isSearchingCopilot && (
+                              isCopilotLinkInput(taskInputs[task.id] || '') ? (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                              ) : (
+                                <Search className="h-4 w-4" strokeWidth={2} />
+                              )
                             )
                           }
                         >
-                          {!isLoadingSet && '预览'}
+                          {!isLoadingSet && !isSearchingCopilot && (isCopilotLinkInput(taskInputs[task.id] || '') ? '预览' : '搜索')}
                         </Button>
                       </div>
-                      <div className="mt-2 flex items-center justify-between gap-3 text-xs text-tertiary">
-                        <p className="truncate">支持作业链接、导入文件和本地作业。</p>
-                        <details className="group relative shrink-0">
-                          <summary className="inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center brand-text hover:underline">说明</summary>
-                          <div className="absolute right-0 z-20 mt-2 hidden w-[min(18rem,calc(100vw_-_3rem))] space-y-1.5 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-solid)] p-3 text-left shadow-lg group-open:block">
-                            <p>• 在 <a href="https://zoot.plus/" target="_blank" rel="noopener noreferrer" className="brand-text hover:underline">zoot.plus</a> 获取作业链接</p>
-                            <p>• 单作业：<code className="px-1 bg-[var(--app-surface-muted)] rounded">prts://1234</code>；作业集：<code className="px-1 bg-[var(--app-surface-muted)] rounded">prts://s1234</code></p>
-                            <p>• 作业站链接会自动识别，也可导入远程或本地作业文件</p>
+                      {copilotSearchResult && copilotSearchResult.copilots && (
+                        <div className="mt-3 border-t border-[var(--app-border)] pt-3">
+                          <div className="mb-2 flex items-center justify-between gap-3 px-1">
+                            <h5 id="combat-copilot-search-heading" className="text-xs font-semibold text-secondary">搜索结果</h5>
+                            <span id="combat-copilot-search-count" className="shrink-0 whitespace-nowrap text-xs tabular-nums text-tertiary">
+                              {copilotSearchResult.copilots.length} 个作业 · 点击预览
+                            </span>
                           </div>
-                        </details>
-                      </div>
-                    </div>
-
-                    {/* 作业类型选择 */}
-                    <div className="flex items-center justify-between gap-3 px-4 text-xs">
-                      <span className="shrink-0 font-medium text-secondary">识别方式</span>
-                      <div className="flex min-w-0 max-w-full overflow-hidden rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] p-0.5">
-                        <button
-                          onClick={() => handleCopilotTypeChange('auto')}
-                          className={`min-h-11 rounded-md px-3 py-1 transition-colors ${
-                            copilotType === 'auto'
-                              ? 'combat-segment-active'
-                              : 'text-secondary hover:bg-white/70 hover:text-primary dark:hover:bg-white/10'
-                          }`}
-                        >
-                          自动
-                        </button>
-                        <button
-                          onClick={() => handleCopilotTypeChange('single')}
-                          className={`min-h-11 rounded-md px-3 py-1 transition-colors ${
-                            copilotType === 'single'
-                              ? 'combat-segment-active'
-                              : 'text-secondary hover:bg-white/70 hover:text-primary dark:hover:bg-white/10'
-                          }`}
-                        >
-                          单个作业
-                        </button>
-                        <button
-                          onClick={() => handleCopilotTypeChange('set')}
-                          className={`min-h-11 rounded-md px-3 py-1 transition-colors ${
-                            copilotType === 'set'
-                              ? 'combat-segment-active'
-                              : 'text-secondary hover:bg-white/70 hover:text-primary dark:hover:bg-white/10'
-                          }`}
-                        >
-                          作业集
-                        </button>
-                      </div>
+                          <p id="combat-copilot-search-hint" className="sr-only">选择结果后将预览作业</p>
+                          <div className="combat-search-results-shell">
+                            <div
+                              className="combat-search-results-scroll"
+                              role="group"
+                              aria-labelledby="combat-copilot-search-heading"
+                              aria-describedby="combat-copilot-search-count combat-copilot-search-hint"
+                            >
+                              {copilotSearchResult.copilots.map((copilot, idx) => {
+                                const resultTitle = copilot.title?.trim() || copilot.uri
+                                const isRecommended = copilotSearchResult.recommended
+                                  ? copilot.uri === copilotSearchResult.recommended.uri
+                                  : idx === 0
+                                return (
+                                  <button
+                                    key={copilot.id}
+                                    type="button"
+                                    onClick={(event) => {
+                                      const keyboardActivated = event.detail === 0
+                                      setCopilotSearchResult(null)
+                                      void applyCopilotUri(copilot.uri)
+                                      if (keyboardActivated) {
+                                        copilotSearchInputRef.current?.focus({ preventScroll: true })
+                                      }
+                                    }}
+                                    className="group flex w-full shrink-0 items-start gap-2.5 rounded-[var(--app-radius-md)] px-3 py-2 text-left transition-colors hover:bg-[var(--app-surface-muted)] active:bg-[var(--app-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--app-accent)] motion-reduce:transition-none"
+                                  >
+                                    <span className="flex min-w-0 flex-1 flex-col">
+                                      <span className="break-words text-sm font-semibold leading-5 text-primary">{resultTitle}</span>
+                                      <span className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                                        <span className="break-all font-mono text-[11px] leading-4 text-tertiary">{copilot.uri}</span>
+                                        {isRecommended && (
+                                          <span className="whitespace-nowrap rounded-full px-2 text-[11px] font-semibold leading-4 brand-chip">推荐</span>
+                                        )}
+                                      </span>
+                                    </span>
+                                    <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-tertiary transition-colors group-hover:text-secondary motion-reduce:transition-none" aria-hidden="true" />
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* 作业列表 - 占据剩余空间 */}
                     <div className="combat-workspace-section combat-job-list-section flex flex-1 flex-col">
-                      <div className="flex items-center justify-between mb-3">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                         <h5 className="flex items-center space-x-2 text-sm font-semibold text-primary">
                           <svg className="w-4 h-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                           </svg>
                           <span>作业列表</span>
                         </h5>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
                         {copilotSetInfo?.type === 'set' && copilotSetInfo.copilots && !isRunning && (
                           <div className="flex items-center gap-2">
                             <button
@@ -1903,6 +2009,7 @@ export default function CombatTasks() {
                             </button>
                           </div>
                         )}
+                        </div>
                       </div>
 
                       {/* 作业集预览 */}
@@ -1958,15 +2065,13 @@ export default function CombatTasks() {
 
                           {/* 当前作业卡片 */}
                           {(() => {
-                            const currentCopilot = copilotSetInfo.currentIndex !== undefined
-                              ? copilotSetInfo.copilots[copilotSetInfo.currentIndex]
-                              : null
+                            const currentCopilot = copilotSetInfo.copilots[effectiveCurrentIndex] ?? null
                             return waitingForNextCopilot && currentCopilot && (
                               <div className="mb-3 rounded-lg border border-[var(--app-accent)] bg-[var(--app-accent-soft)] p-3">
                                 <div className="flex items-center justify-between mb-2">
                                   <div className="flex items-center space-x-2">
                                     <span className="px-2 py-0.5 brand-action text-xs font-medium rounded">下一关</span>
-                                    <span className="text-xs brand-text">第 {(copilotSetInfo.currentIndex ?? 0) + 1} / {copilotSetInfo.copilots.length} 关</span>
+                                    <span className="text-xs brand-text">第 {effectiveCurrentIndex + 1} / {copilotSetInfo.copilots.length} 关</span>
                                   </div>
                                   <span className="font-mono text-xs brand-text">prts://{currentCopilot.id}</span>
                                 </div>
@@ -1996,18 +2101,97 @@ export default function CombatTasks() {
                           {/* 作业列表 */}
                           <div className="flex-1 divide-y divide-[var(--app-border)] overflow-hidden overflow-y-auto rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-solid)]">
                             {copilotSetInfo.copilots.map((copilot, idx) => {
-                              const isCompleted = copilotSetResults.some(r => r.index === idx)
-                              const isSuccess = copilotSetResults.find(r => r.index === idx)?.success
-                              const isCurrent = copilotSetInfo.currentIndex === idx && isRunning
+                              const runEntry = runResultByItem.get(idx)
+                              const runEntryStatus = runEntry?.status
+                              const hasRunEntry = Boolean(runEntry)
+                              const isRunCurrent = runEntryStatus === 'running'
+                              const isRunSuccess = runEntryStatus === 'success'
+                              const isRunFailed = runEntryStatus === 'failed'
+                              const isRunStopped = runEntryStatus === 'stopped'
+                              const isRunSkipped = runEntryStatus === 'skipped'
+                              const localCompleted = copilotSetResults.some(r => r.index === idx)
+                              const localSuccess = copilotSetResults.find(r => r.index === idx)?.success
+                              const isCompleted = hasRunEntry
+                                ? (isRunSuccess || isRunFailed || isRunStopped || isRunSkipped)
+                                : localCompleted
+                              const isSuccess = hasRunEntry ? isRunSuccess : localSuccess
+                              const isCurrent = hasRunEntry
+                                ? isRunCurrent
+                                : (effectiveCurrentIndex === idx && isRunning)
                               const isSelected = selectedCopilotIndexes.has(idx)
                               const isPersistedDone = !isSelected && !isCompleted
-                              const statusLabel = isCurrent
-                                ? '执行中'
-                                : isCompleted
-                                  ? (isSuccess ? '已完成' : '待重试')
-                                  : isPersistedDone
-                                    ? '已完成/跳过'
-                                    : '待执行'
+                              const isPastCurrent = !hasRunEntry
+                                && isRunning
+                                && copilotSetExecutionMode !== 'manual'
+                                && isSelected
+                                && effectiveCurrentIndex > idx
+                              const isRunQuiet = isRunSkipped || isRunStopped
+                              const battle = isRunCurrent ? validRunBattle : null
+                              const statusLabel = hasRunEntry
+                                ? (isRunCurrent
+                                  ? '执行中'
+                                  : isRunSuccess
+                                    ? '已完成'
+                                    : isRunFailed
+                                      ? '待重试'
+                                      : isRunStopped
+                                        ? '已终止'
+                                        : isRunSkipped
+                                          ? '已完成/跳过'
+                                          : '待执行')
+                                : isCurrent
+                                  ? '执行中'
+                                  : isCompleted
+                                    ? (isSuccess ? '已完成' : '待重试')
+                                    : isPastCurrent
+                                      ? '已完成'
+                                      : isPersistedDone
+                                        ? '已完成/跳过'
+                                        : '待执行'
+                              const statusMarkStatus = hasRunEntry
+                                ? (isRunCurrent
+                                  ? 'running'
+                                  : isRunSuccess
+                                    ? 'done'
+                                    : isRunFailed
+                                      ? 'failed'
+                                      : isRunStopped
+                                        ? 'cancelled'
+                                        : isRunSkipped
+                                          ? 'done'
+                                          : 'pending')
+                                : isCurrent
+                                  ? 'running'
+                                  : isCompleted
+                                    ? (isSuccess ? 'done' : 'failed')
+                                    : isPastCurrent
+                                      ? 'done'
+                                      : isPersistedDone
+                                        ? 'done'
+                                        : 'pending'
+                              const statusMarkColor = hasRunEntry
+                                ? (isRunCurrent
+                                  ? 'var(--app-accent)'
+                                  : isRunFailed
+                                    ? 'var(--app-danger)'
+                                    : isRunStopped
+                                      ? 'var(--app-warning-text)'
+                                      : isRunSuccess || isRunSkipped
+                                        ? 'var(--app-text-soft)'
+                                        : isSelected
+                                          ? 'var(--app-accent)'
+                                          : 'var(--app-text-secondary)')
+                                : isCurrent
+                                  ? 'var(--app-accent)'
+                                  : isCompleted && !isSuccess
+                                    ? 'var(--app-danger)'
+                                    : isPastCurrent
+                                      ? 'var(--app-text-soft)'
+                                      : isSelected
+                                        ? 'var(--app-accent)'
+                                        : isPersistedDone
+                                          ? 'var(--app-text-soft)'
+                                          : 'var(--app-text-secondary)'
 
                               const handleToggleSelect = () => {
                                 const newSet = new Set(selectedCopilotIndexes)
@@ -2020,10 +2204,10 @@ export default function CombatTasks() {
                               }
 
                               return (
-                                <div key={`${copilot.id}-${idx}`} className={`flex items-center justify-between gap-3 px-2.5 py-2 text-xs transition-colors ${
+                                <div key={`${copilot.id}-${idx}`} data-copilot-index={idx} className={`flex items-center justify-between gap-3 px-2.5 py-2 text-xs transition-colors ${
                                   isCurrent ? 'bg-[var(--app-accent-soft)]' :
-                                  isCompleted ? (isSuccess ? 'bg-[color-mix(in_srgb,var(--app-success)_10%,transparent)]' : 'bg-[color-mix(in_srgb,var(--app-danger)_10%,transparent)]') :
-                                  isPersistedDone ? 'bg-black/[0.025] opacity-70 dark:bg-white/[0.035]' :
+                                  isCompleted && !isRunQuiet ? (isSuccess ? 'bg-[color-mix(in_srgb,var(--app-success)_10%,transparent)]' : 'bg-[color-mix(in_srgb,var(--app-danger)_10%,transparent)]') :
+                                  isPersistedDone || isRunQuiet ? 'bg-black/[0.025] opacity-70 dark:bg-white/[0.035]' :
                                   'hover:bg-[var(--app-surface-muted)]'
                                 }`}>
                                   <div className="flex min-w-0 items-center space-x-2">
@@ -2048,14 +2232,6 @@ export default function CombatTasks() {
                                         )}
                                       </span>
                                     </button>
-                                    <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[11px] ${
-                                      isCurrent ? 'bg-[var(--app-accent)] text-white animate-pulse' :
-                                      isCompleted ? (isSuccess ? 'bg-[var(--app-success)] text-white' : 'bg-[var(--app-danger)] text-white') :
-                                      isPersistedDone ? 'bg-black/10 text-tertiary dark:bg-white/10' :
-                                      'bg-black/5 text-secondary dark:bg-white/10'
-                                    }`}>
-                                      {isCompleted ? (isSuccess ? '✓' : '✗') : isPersistedDone ? '✓' : idx + 1}
-                                    </span>
                                     <div className="min-w-0">
                                       <div className="flex min-w-0 items-center gap-1.5">
                                         <span className="truncate text-primary">{copilot.name || `作业 #${copilot.id}`}</span>
@@ -2072,14 +2248,20 @@ export default function CombatTasks() {
                                     </div>
                                   </div>
                                   <div className="flex shrink-0 items-center gap-2">
-                                    <span className={`min-w-[64px] rounded-md px-2 py-0.5 text-center text-[11px] ${
-                                      isCurrent ? 'brand-action text-white' :
-                                      isCompleted && !isSuccess ? 'status-danger' :
-                                      isSelected ? 'brand-chip' :
-                                      'bg-black/5 text-secondary dark:bg-white/10'
-                                    }`}>
-                                      {statusLabel}
-                                    </span>
+                                    <StatusMark
+                                      status={statusMarkStatus}
+                                      label={battle ? `执行中 · ${battle.kills}/${battle.total}` : statusLabel}
+                                      progress={battle ? battle.kills / battle.total : undefined}
+                                      size={16}
+                                      fontSize={11}
+                                      strokeWidth={2}
+                                      color={statusMarkColor}
+                                      doneColor={isRunSkipped || isRunStopped || (isPersistedDone && !hasRunEntry)
+                                        ? 'var(--app-text-soft)'
+                                        : 'var(--app-success)'}
+                                      errorColor="var(--app-danger)"
+                                      className="shrink-0"
+                                    />
                                     <span className="hidden font-mono text-tertiary 2xl:inline">prts://{copilot.id}</span>
                                   </div>
                                 </div>
@@ -2088,16 +2270,8 @@ export default function CombatTasks() {
                           </div>
                         </>
                       ) : copilotSetInfo?.type === 'single' ? (
-                        <div className="flex-1 border-y border-[var(--app-border)] py-3">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <span className="rounded-md px-2 py-0.5 text-xs font-medium brand-chip">单个作业</span>
-                            <span className="text-xs text-tertiary">ID: {copilotSetInfo.id}</span>
-                          </div>
-                          <p className="font-medium text-primary">{copilotSetInfo.name}</p>
-                          <div className="mt-1 space-x-2 text-xs text-secondary">
-                            {copilotSetInfo.stage && <span>关卡: {copilotSetInfo.stage}</span>}
-                            {copilotSetInfo.operators && <span>干员: {copilotSetInfo.operators}</span>}
-                          </div>
+                        <div className="flex-1 py-3">
+                          <SingleCopilotSummary info={copilotSetInfo} />
                         </div>
                       ) : (
                         <EmptyState
@@ -2111,182 +2285,6 @@ export default function CombatTasks() {
                     </div>
                   </div>
 
-                  {/* 右栏：搜索框 + 作业介绍 */}
-                  <div className="space-y-3 xl:sticky xl:top-24">
-                    {/* 搜索框 */}
-                    <div className="combat-workspace-section">
-                      <h5 className="mb-3 flex items-center space-x-2 text-sm font-semibold text-primary">
-                        <svg className="w-4 h-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                        <span>快速搜索</span>
-                      </h5>
-                      <div className="flex space-x-2">
-                        <label htmlFor="combat-stage-search" className="sr-only">搜索关卡作业</label>
-                        <input
-                          id="combat-stage-search"
-                          type="text"
-                          name="maa-copilot-stage-search"
-                          placeholder="关卡名称，如：1-7、CE-6"
-                          value={copilotSearchStage}
-                          onChange={(e) => handleCopilotSearchStageChange(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key !== 'Enter' || isSearchingCopilot || !copilotSearchStage.trim()) return
-                            e.preventDefault()
-                            void handleSearchCopilot()
-                          }}
-                          className="app-input app-native-control min-h-11 min-w-0 flex-1 control-surface"
-                        />
-                        <Button
-                          onClick={handleSearchCopilot}
-                          disabled={isSearchingCopilot || !copilotSearchStage.trim()}
-                          loading={isSearchingCopilot}
-                          variant="secondary"
-                          size="md"
-                          className="px-3"
-                        >
-                          {!isSearchingCopilot && '搜索'}
-                        </Button>
-                      </div>
-                      <p className="mt-2 text-xs text-tertiary">支持关卡代号或关卡名，例如 1-7、CE-6。</p>
-
-                      {/* 搜索结果 */}
-                      {copilotSearchResult && copilotSearchResult.copilots && (
-                        <div className="mt-3 max-h-32 space-y-1 overflow-y-auto">
-                          {copilotSearchResult.copilots.slice(0, 5).map((copilot, idx) => (
-                            <button
-                              key={copilot.id}
-                              onClick={() => void applyCopilotUri(copilot.uri)}
-                              className={`flex min-h-11 w-full items-center justify-between rounded-lg border px-3 py-1.5 text-left text-xs transition-all ${
-                                selectedSearchCopilotUri === copilot.uri
-                                  ? 'brand-action-subtle border-[var(--app-accent)]'
-                                  : 'border-[var(--app-border)] bg-[var(--app-surface)] hover:border-[var(--app-accent)]'
-                              }`}
-                            >
-                              <div className="flex items-center space-x-2">
-                                <span className="font-mono brand-text">{copilot.uri}</span>
-                                <span className="max-w-[80px] truncate text-secondary">{copilot.title}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                {selectedSearchCopilotUri === copilot.uri && (
-                                  <span className="whitespace-nowrap rounded-md px-1.5 py-0.5 text-xs brand-chip">已选中</span>
-                                )}
-                                {idx === 0 && (
-                                  <span className="whitespace-nowrap rounded-md px-1.5 py-0.5 text-xs brand-chip">推荐</span>
-                                )}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 作业介绍 */}
-                    <div className="combat-workspace-section">
-                      <h5 className="mb-3 flex items-center space-x-2 text-sm font-semibold text-primary">
-                        <svg className="w-4 h-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span>作业信息</span>
-                      </h5>
-
-                      {copilotSetInfo ? (
-                        <div className="space-y-2">
-                          {copilotSetInfo.type === 'set' && copilotSetInfo.copilots ? (
-                            (() => {
-                              // 作业集模式：显示当前作业或第一个作业的详细信息
-                              const currentIndex = copilotSetInfo.currentIndex ?? 0
-                              const currentCopilot = copilotSetInfo.copilots[currentIndex] || copilotSetInfo.copilots[0]
-                              const total = copilotSetInfo.copilots.length
-                              const selectedCount = selectedCopilotIndexes.size
-                              const completed = copilotSetResults.filter(r => r.success && selectedCopilotIndexes.has(r.index)).length
-
-                              return (
-                                <>
-                                  <div className="flex items-center space-x-2">
-                                    <span className="rounded-md px-2 py-0.5 text-xs font-medium brand-chip">作业集</span>
-                                    <span className="text-xs text-tertiary">已选 {selectedCount}/{total} 个</span>
-                                  </div>
-
-                                  {/* 当前进度 */}
-                                  <div className="flex items-center space-x-2 text-xs">
-                                    <span className="text-tertiary">进度</span>
-                                    <span className="font-medium brand-text">
-                                      {isRunning ? `第 ${currentIndex + 1} 关` : `${completed}/${selectedCount} 完成`}
-                                    </span>
-                                  </div>
-
-                                  {/* 当前作业详情 */}
-                                  {currentCopilot && (
-                                    <div className="border-t border-[var(--app-border)] pt-2">
-                                      <div className="flex items-center justify-between mb-1">
-                                        <span className="text-xs text-tertiary">
-                                          {isRunning ? '当前作业' : '下一作业'}
-                                        </span>
-                                        <span className="font-mono text-xs brand-text">
-                                          prts://{currentCopilot.id}
-                                        </span>
-                                      </div>
-                                      <p className="text-sm font-medium text-primary">
-                                        {currentCopilot.name || `作业 #${currentCopilot.id}`}
-                                      </p>
-                                      {currentCopilot.stage && (
-                                        <div className="mt-1 text-xs text-secondary">
-                                          <span className="font-medium">关卡:</span> {currentCopilot.stage}
-                                        </div>
-                                      )}
-                                      {currentCopilot.operators && (
-                                        <div className="text-xs text-secondary">
-                                          <span className="font-medium">干员:</span> {currentCopilot.operators}
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-
-                                  {copilotSetInfo.note && (
-                                    <p className="text-xs text-tertiary">{copilotSetInfo.note}</p>
-                                  )}
-                                </>
-                              )
-                            })()
-                          ) : (
-                            <>
-                              <div className="flex items-center space-x-2">
-                                <span className="rounded-md px-2 py-0.5 text-xs font-medium brand-chip">单个作业</span>
-                                <span className="text-xs text-tertiary">ID: {copilotSetInfo.id}</span>
-                              </div>
-                              <p className="text-sm font-medium text-primary">{copilotSetInfo.name}</p>
-                              {copilotSetInfo.stage && (
-                                <div className="text-xs text-secondary">
-                                  <span className="font-medium">关卡:</span> {copilotSetInfo.stage}
-                                </div>
-                              )}
-                              {copilotSetInfo.operators && (
-                                <div className="text-xs text-secondary">
-                                  <span className="font-medium">干员:</span> {copilotSetInfo.operators}
-                                </div>
-                              )}
-                            </>
-                          )}
-                          <Button
-                            onClick={() => setCopilotSetInfo(null)}
-                            variant="ghost"
-                            size="sm"
-                            className="mt-2 text-xs"
-                          >
-                            清除预览
-                          </Button>
-                        </div>
-                      ) : (
-                        <EmptyState
-                          compact
-                          icon={<Info size={22} strokeWidth={1.7} />}
-                          title="等待预览"
-                          description="预览作业后会在这里显示详情。"
-                        />
-                      )}
-                    </div>
-                  </div>
                 </div>
               </Card>
             )
@@ -2538,6 +2536,96 @@ export default function CombatTasks() {
                 <ScreenMonitor variant="compact" />
               </div>
             </SmoothPanel>
+
+            {/* 作业介绍 */}
+            <div className="combat-workspace-section mt-[var(--app-space-section)]">
+              <h5 className="mb-3 flex items-center space-x-2 text-sm font-semibold text-primary">
+                <svg className="w-4 h-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>作业信息</span>
+              </h5>
+
+              {copilotSetInfo ? (
+                <div className="space-y-2">
+                  {copilotSetInfo.type === 'set' && copilotSetInfo.copilots ? (
+                    (() => {
+                      // 作业集模式：显示当前作业或第一个作业的详细信息
+                      const currentIndex = effectiveCurrentIndex
+                      const currentCopilot = copilotSetInfo.copilots[currentIndex] || copilotSetInfo.copilots[0]
+                      const total = copilotSetInfo.copilots.length
+                      const selectedCount = selectedCopilotIndexes.size
+                      const completed = copilotSetResults.filter(r => r.success && selectedCopilotIndexes.has(r.index)).length
+
+                      return (
+                        <>
+                          <div className="flex items-center space-x-2">
+                            <span className="rounded-md px-2 py-0.5 text-xs font-medium brand-chip">作业集</span>
+                            <span className="text-xs text-tertiary">已选 {selectedCount}/{total} 个</span>
+                          </div>
+
+                          {/* 当前进度 */}
+                          <div className="flex items-center space-x-2 text-xs">
+                            <span className="text-tertiary">进度</span>
+                            <span className="font-medium brand-text">
+                              {isRunning ? `第 ${currentIndex + 1} 关` : `${completed}/${selectedCount} 完成`}
+                            </span>
+                          </div>
+
+                          {/* 当前作业详情 */}
+                          {currentCopilot && (
+                            <div className="border-t border-[var(--app-border)] pt-2">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs text-tertiary">
+                                  {isRunning ? '当前作业' : '下一作业'}
+                                </span>
+                                <span className="font-mono text-xs brand-text">
+                                  prts://{currentCopilot.id}
+                                </span>
+                              </div>
+                              <p className="text-sm font-medium text-primary">
+                                {currentCopilot.name || `作业 #${currentCopilot.id}`}
+                              </p>
+                              {currentCopilot.stage && (
+                                <div className="mt-1 text-xs text-secondary">
+                                  <span className="font-medium">关卡:</span> {currentCopilot.stage}
+                                </div>
+                              )}
+                              {currentCopilot.operators && (
+                                <div className="text-xs text-secondary">
+                                  <span className="font-medium">干员:</span> {currentCopilot.operators}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {copilotSetInfo.note && (
+                            <p className="text-xs text-tertiary">{copilotSetInfo.note}</p>
+                          )}
+                        </>
+                      )
+                    })()
+                  ) : (
+                    <SingleCopilotSummary info={copilotSetInfo} compact />
+                  )}
+                  <Button
+                    onClick={() => setCopilotSetInfo(null)}
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 text-xs"
+                  >
+                    清除预览
+                  </Button>
+                </div>
+              ) : (
+                <EmptyState
+                  compact
+                  icon={<Info size={22} strokeWidth={1.7} />}
+                  title="等待预览"
+                  description="预览作业后会在这里显示详情。"
+                />
+              )}
+            </div>
           </aside>
         </div>
       </div>

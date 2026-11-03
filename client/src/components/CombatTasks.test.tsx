@@ -4,6 +4,8 @@ import { Activity, act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CombatTasks from './CombatTasks'
+import { useRunStore } from '../store/runStore'
+import { useUIStore } from '../stores/uiStore'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -14,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   stopTask: vi.fn(),
   executePredefinedTaskArgs: vi.fn(),
   executeCopilotSetPlan: vi.fn(),
+  runActivitySet: vi.fn(),
+  runActivityFallback: vi.fn(),
   getCopilotInfo: vi.fn(),
   getCopilotSet: vi.fn(),
   getCopilotSetPlan: vi.fn(),
@@ -21,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   searchCopilot: vi.fn(),
   searchParadoxCopilot: vi.fn(),
   setMessage: vi.fn(),
+  clearMessage: vi.fn(),
   setActive: vi.fn(),
 }))
 
@@ -31,6 +36,14 @@ vi.mock('framer-motion', async () => {
     ({ children, initial: _initial, animate: _animate, exit: _exit, transition: _transition, whileHover: _whileHover, whileTap: _whileTap, ...props }, ref) =>
       React.createElement(tag, { ...props, ref }, children as ReactNode),
   )
+  const motionValue = (initial: number) => ({
+    get: () => initial,
+    set: () => undefined,
+    jump: () => undefined,
+    on: () => () => undefined,
+    stop: () => undefined,
+  })
+
   return {
     AnimatePresence: ({ children }: { children: ReactNode }) => children,
     motion: {
@@ -38,6 +51,13 @@ vi.mock('framer-motion', async () => {
       div: motionComponent('div'),
       span: motionComponent('span'),
     },
+    useMotionValue: (initial: number) => motionValue(initial),
+    animate: () => ({
+      then: (callback: () => void) => {
+        callback()
+        return Promise.resolve()
+      },
+    }),
     useReducedMotion: () => true,
   }
 })
@@ -50,6 +70,8 @@ vi.mock('../services/api', () => ({
     stopTask: mocks.stopTask,
     executePredefinedTaskArgs: mocks.executePredefinedTaskArgs,
     executeCopilotSetPlan: mocks.executeCopilotSetPlan,
+    runActivitySet: mocks.runActivitySet,
+    runActivityFallback: mocks.runActivityFallback,
     getCopilotInfo: mocks.getCopilotInfo,
     getCopilotSet: mocks.getCopilotSet,
     getCopilotSetPlan: mocks.getCopilotSetPlan,
@@ -61,7 +83,7 @@ vi.mock('../services/api', () => ({
 }))
 
 vi.mock('../store/statusStore', () => ({
-  useStatusStore: () => ({ setMessage: mocks.setMessage, setActive: mocks.setActive }),
+  useStatusStore: () => ({ setMessage: mocks.setMessage, clearMessage: mocks.clearMessage, setActive: mocks.setActive }),
 }))
 
 vi.mock('../hooks/useBackendStatusMonitor', () => ({
@@ -161,6 +183,8 @@ describe('CombatTasks execution recovery', () => {
     mocks.stopTask.mockReset().mockResolvedValue({ success: true, data: { task: { success: true } } })
     mocks.executePredefinedTaskArgs.mockReset().mockResolvedValue({ success: true })
     mocks.executeCopilotSetPlan.mockReset().mockResolvedValue({ success: true, data: { pending: [] } })
+    mocks.runActivitySet.mockReset().mockResolvedValue({ success: true, data: { pending: [] } })
+    mocks.runActivityFallback.mockReset().mockResolvedValue({ success: true, data: { executed: true, pending: [] } })
     mocks.getCopilotInfo.mockReset()
     mocks.getCopilotSet.mockReset()
     mocks.getCopilotSetPlan.mockReset()
@@ -169,6 +193,8 @@ describe('CombatTasks execution recovery', () => {
     mocks.searchParadoxCopilot.mockReset()
     mocks.setMessage.mockReset()
     mocks.setActive.mockReset()
+    useRunStore.getState().applyRun(null)
+    useUIStore.getState().setCombatCopilotPrefill(null)
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
@@ -217,13 +243,8 @@ describe('CombatTasks execution recovery', () => {
     expect(copilotCard?.getAttribute('data-smooth-corners')).toBe('true')
     expect(copilotCard?.querySelector(':scope > .app-card-smooth-surface')).not.toBeNull()
 
-    const explanationDetails = Array.from(copilotCard?.querySelectorAll('details') ?? [])
-      .find(details => details.querySelector('summary')?.textContent?.trim() === '说明')
-    const explanationTrigger = explanationDetails?.querySelector('summary')
-    const explanation = explanationDetails?.querySelector(':scope > div')
-    expect(explanationTrigger?.classList.contains('min-h-11')).toBe(true)
-    expect(explanationTrigger?.classList.contains('min-w-11')).toBe(true)
-    expect(explanation?.className).toContain('w-[min(18rem,calc(100vw_-_3rem))]')
+    expect(Array.from(copilotCard?.querySelectorAll('summary') ?? [])
+      .some(summary => summary.textContent?.trim() === '说明')).toBe(false)
 
     const sssModeButton = Array.from(container.querySelectorAll<HTMLButtonElement>('.combat-mode-button'))
       .find(button => button.textContent?.includes('保全派驻'))
@@ -356,7 +377,6 @@ describe('CombatTasks execution recovery', () => {
     mocks.searchParadoxCopilot.mockReturnValueOnce(deferred<CopilotSearchResponse>().promise)
 
     await renderActivityMode('visible')
-    await click(buttonsByText('单个作业')[0]!)
 
     const previewInput = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')!
     await act(async () => {
@@ -374,13 +394,12 @@ describe('CombatTasks execution recovery', () => {
     expect(previewButton?.disabled).toBe(false)
     expect(previewButton?.textContent).toContain('预览')
 
-    const stageInput = container.querySelector<HTMLInputElement>('input[name="maa-copilot-stage-search"]')!
     await act(async () => {
       const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      valueSetter?.call(stageInput, '1-7')
-      stageInput.dispatchEvent(new Event('input', { bubbles: true }))
+      valueSetter?.call(previewInput, '1-7')
+      previewInput.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    const stageSearchButton = stageInput.parentElement?.querySelector<HTMLButtonElement>('button')
+    const stageSearchButton = previewInput.parentElement?.querySelector<HTMLButtonElement>('button')
     await click(stageSearchButton!)
     expect(stageSearchButton?.disabled).toBe(true)
     expect(mocks.searchCopilot).toHaveBeenCalledOnce()
@@ -423,6 +442,99 @@ describe('CombatTasks execution recovery', () => {
     expect(buttonsByText('立即执行').length).toBeGreaterThan(0)
   })
 
+  it('shows search results without auto-selecting the recommended job', async () => {
+    mocks.searchCopilot.mockResolvedValueOnce({
+      success: true,
+      data: {
+        stage: 'TL-1',
+        copilots: [{ id: '108821', uri: 'prts://108821', title: '推荐作业', views: 1, hotScore: 1 }],
+        recommended: { uri: 'prts://108821' },
+      },
+    })
+    await renderComponent()
+    const searchInput = container.querySelector<HTMLInputElement>('#combat-copilot-uri')!
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      valueSetter?.call(searchInput, 'TL-1')
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(buttonsByText('搜索')[0]!)
+    await flush()
+
+    expect(container.textContent).toContain('推荐作业')
+    expect(mocks.getCopilotInfo).not.toHaveBeenCalled()
+    expect(container.querySelector<HTMLInputElement>('#combat-copilot-uri')?.value).toBe('TL-1')
+    expect(container.querySelector('#combat-copilot-search-heading')?.textContent).toContain('搜索结果')
+    expect(container.querySelector('#combat-copilot-search-count')?.textContent).toContain('1 个作业')
+    expect(container.querySelector('.combat-search-results-scroll')?.getAttribute('aria-labelledby')).toBe('combat-copilot-search-heading')
+
+    const resultButton = Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
+      .find(button => button.textContent?.includes('推荐作业'))
+    expect(resultButton).toBeDefined()
+    await click(resultButton!)
+    await flush()
+    expect(mocks.getCopilotInfo).toHaveBeenCalledWith('108821')
+    expect(document.activeElement).toBe(searchInput)
+  })
+
+  it('marks the recommended result and does not expose internal stage names', async () => {
+    mocks.searchCopilot.mockResolvedValueOnce({
+      success: true,
+      data: {
+        stage: 'TL-1',
+        copilots: [
+          { id: '1', uri: 'prts://1', title: '', stageName: 'act50side_01', views: 1, hotScore: 1 },
+          { id: '2', uri: 'prts://2', title: '推荐作业', stageName: 'act50side_02', views: 1, hotScore: 1 },
+        ],
+        recommended: { uri: 'prts://2' },
+      },
+    })
+    await renderComponent()
+    const searchInput = container.querySelector<HTMLInputElement>('#combat-copilot-uri')!
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      valueSetter?.call(searchInput, 'TL-1')
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(container.querySelector<HTMLButtonElement>('button[aria-label="搜索关卡作业"]')!)
+    await flush()
+
+    const resultButtons = Array.from(container.querySelectorAll<HTMLButtonElement>('.combat-search-results-scroll button'))
+    expect(resultButtons).toHaveLength(2)
+    expect(resultButtons[0]?.textContent).toContain('prts://1')
+    expect(resultButtons[0]?.textContent).not.toContain('act50side_01')
+    expect(resultButtons[0]?.textContent).not.toContain('推荐')
+    expect(resultButtons[1]?.textContent).toContain('推荐作业')
+    expect(resultButtons[1]?.textContent).toContain('推荐')
+  })
+
+  it('clears search results and status when the input changes', async () => {
+    mocks.searchCopilot.mockResolvedValueOnce({
+      success: true,
+      data: {
+        stage: 'TL-1',
+        copilots: [{ id: '108821', uri: 'prts://108821', title: '推荐作业', views: 1, hotScore: 1 }],
+      },
+    })
+    await renderComponent()
+    const searchInput = container.querySelector<HTMLInputElement>('#combat-copilot-uri')!
+    const setInput = async (value: string) => {
+      await act(async () => {
+        const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+        valueSetter?.call(searchInput, value)
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+    }
+    await setInput('TL-1')
+    await click(container.querySelector<HTMLButtonElement>('button[aria-label="搜索关卡作业"]')!)
+    await flush()
+    expect(container.textContent).toContain('推荐作业')
+
+    await setInput('prts://108821')
+    expect(container.textContent).not.toContain('推荐作业')
+    expect(container.querySelector<HTMLButtonElement>('button[aria-label="预览作业"]')).not.toBeNull()
+  })
+
   it('ignores an older search response after the query changes', async () => {
     const olderSearch = deferred<CopilotSearchResponse>()
     const newerSearch = deferred<CopilotSearchResponse>()
@@ -431,7 +543,7 @@ describe('CombatTasks execution recovery', () => {
       .mockReturnValueOnce(newerSearch.promise)
     await renderComponent()
 
-    const searchInput = container.querySelector<HTMLInputElement>('input[name="maa-copilot-stage-search"]')!
+    const searchInput = container.querySelector<HTMLInputElement>('#combat-copilot-uri')!
     const setQuery = async (value: string) => {
       await act(async () => {
         const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
@@ -440,9 +552,9 @@ describe('CombatTasks execution recovery', () => {
       })
     }
     await setQuery('旧关卡')
-    await click(buttonsByText('搜索')[0]!)
+    await click(container.querySelector<HTMLButtonElement>('button[aria-label="搜索关卡作业"]')!)
     await setQuery('新关卡')
-    await click(buttonsByText('搜索')[0]!)
+    await click(container.querySelector<HTMLButtonElement>('button[aria-label="搜索关卡作业"]')!)
 
     await act(async () => newerSearch.resolve({
       success: true,
@@ -467,7 +579,6 @@ describe('CombatTasks execution recovery', () => {
       .mockReturnValueOnce(olderPreview.promise)
       .mockReturnValueOnce(newerPreview.promise)
     await renderComponent()
-    await click(buttonsByText('单个作业')[0]!)
 
     const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')!
     const setUri = async (value: string) => {
@@ -509,7 +620,6 @@ describe('CombatTasks execution recovery', () => {
     })
 
     await renderComponent()
-    await click(buttonsByText('单个作业')[0]!)
     const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')!
     await act(async () => {
       const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
@@ -523,6 +633,35 @@ describe('CombatTasks execution recovery', () => {
     expect(container.textContent).toContain('PRTS 预览')
   })
 
+  it('shows the public stage code instead of the internal stage id for a single job', async () => {
+    mocks.getCopilotInfo.mockResolvedValue({
+      success: true,
+      data: {
+        status_code: 200,
+        data: {
+          content: JSON.stringify({
+            doc: { title: '时间啊，向前！ - TL-10 - 活着的重量' },
+            stage_name: 'act55side_10',
+            opers: [{ name: '乌尔比安' }],
+          }),
+        },
+      },
+    })
+
+    await renderComponent()
+    const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')!
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      valueSetter?.call(input, 'prts://108821')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(buttonsByText('预览')[0]!)
+    await flush()
+
+    expect(container.textContent).toContain('TL-10')
+    expect(container.textContent).not.toContain('act55side_10')
+  })
+
   it('previews the canonical prts://s<id> set form', async () => {
     mocks.getCopilotSetPlan.mockResolvedValue({
       success: true,
@@ -533,7 +672,6 @@ describe('CombatTasks execution recovery', () => {
     })
 
     await renderComponent()
-    await click(buttonsByText('作业集')[0]!)
     const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')!
     await act(async () => {
       const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
@@ -557,7 +695,6 @@ describe('CombatTasks execution recovery', () => {
     })
 
     await renderComponent()
-    await click(buttonsByText('作业集')[0]!)
     const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')!
     await act(async () => {
       const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
@@ -569,33 +706,6 @@ describe('CombatTasks execution recovery', () => {
 
     expect(mocks.getCopilotSetPlan).toHaveBeenCalledWith('56593', 'normal')
     expect(container.textContent).toContain('作业集')
-  })
-
-  it('writes the canonical set URI when auto-detecting a set without details', async () => {
-    mocks.getCopilotInfo.mockResolvedValueOnce({ success: true, data: { status_code: 404 } })
-    mocks.getCopilotSet.mockResolvedValueOnce({ success: true, data: { status_code: 400 } })
-
-    await renderComponent()
-    const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')!
-    await act(async () => {
-      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      valueSetter?.call(input, 'prts://56593')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-    })
-    await click(buttonsByText('预览')[0]!)
-    await flush()
-    await click(buttonsByText('立即执行')[0]!)
-    await flush()
-
-    expect(mocks.executePredefinedTaskArgs).toHaveBeenCalledWith(
-      'copilot',
-      expect.arrayContaining(['prts://s56593']),
-      null,
-      null,
-      '自动战斗作业',
-      'combat',
-      true,
-    )
   })
 
   it('associates visible form controls with labels and keeps touch targets at least 44px', async () => {
@@ -651,7 +761,6 @@ describe('CombatTasks execution recovery', () => {
     mocks.resetCopilotSetProgress.mockResolvedValue({ success: false, message: '进度存储不可用' })
 
     await renderComponent()
-    await click(buttonsByText('作业集')[0]!)
 
     const input = document.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')
     expect(input).not.toBeNull()
@@ -743,7 +852,6 @@ describe('CombatTasks execution recovery', () => {
     })
 
     await renderComponent()
-    await click(buttonsByText('作业集')[0]!)
     const input = document.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')
     await act(async () => {
       const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
@@ -760,6 +868,170 @@ describe('CombatTasks execution recovery', () => {
       selectedIndexes: [0, 1],
     }))
     expect(mocks.setMessage).toHaveBeenCalledWith('作业集执行完成')
+  })
+
+  it('moves the running status to the stage reported by the native set', async () => {
+    vi.useFakeTimers()
+    const setExecution = deferred<{ success: boolean; data: { pending: never[] } }>()
+    mocks.getCopilotSetPlan.mockResolvedValue({
+      success: true,
+      data: {
+        items: [
+          { id: 101, stage: 'TEST-1', stageId: 'test_1', supportsRaid: true },
+          { id: 102, stage: 'TEST-2', stageId: 'test_2', supportsRaid: true },
+        ],
+        entries: [],
+      },
+    })
+    mocks.executeCopilotSetPlan.mockReturnValueOnce(setExecution.promise)
+    mocks.getTaskStatus.mockResolvedValue({
+      success: true,
+      data: { isRunning: true, currentStage: 'TEST-2' },
+    })
+
+    await renderComponent()
+    const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      valueSetter?.call(input, 'prts://s48990')
+      input?.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(buttonsByText('预览')[0]!)
+    await flush()
+
+    await click(buttonsByText('立即执行')[0]!)
+    await flush()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2100)
+    })
+    await flush()
+
+    const firstRow = container.querySelector('[data-copilot-index="0"]')
+    const secondRow = container.querySelector('[data-copilot-index="1"]')
+    expect(firstRow?.querySelector('[data-status="done"]')).not.toBeNull()
+    expect(secondRow?.querySelector('[data-status="running"]')).not.toBeNull()
+    expect(firstRow?.textContent).toContain('已完成')
+    expect(secondRow?.textContent).toContain('执行中')
+
+    await act(async () => setExecution.resolve({ success: true, data: { pending: [] } }))
+    await flush()
+  })
+
+  it('renders row status from the active Run taskResults', async () => {
+    mocks.getCopilotSetPlan.mockResolvedValue({
+      success: true,
+      data: {
+        items: [
+          { id: 101, stage: 'TEST-1', stageId: 'test_1', supportsRaid: true },
+          { id: 102, stage: 'TEST-2', stageId: 'test_2', supportsRaid: true },
+        ],
+        entries: [],
+      },
+    })
+
+    await renderComponent()
+    const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      valueSetter?.call(input, 'prts://s48990')
+      input?.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(buttonsByText('预览')[0]!)
+    await flush()
+
+    await act(async () => {
+      useRunStore.getState().applyRun({
+        runId: 'run-1',
+        operationId: 'run_copilot_set',
+        state: 'running',
+        progress: {
+          setId: '48990',
+          phase: 'running',
+          battle: { kills: 17, total: 41 },
+        },
+        taskResults: [
+          { itemIndex: 0, status: 'success' },
+          { itemIndex: 1, status: 'running' },
+        ],
+      })
+    })
+    await flush()
+
+    const firstRow = container.querySelector('[data-copilot-index="0"]')
+    const secondRow = container.querySelector('[data-copilot-index="1"]')
+    expect(firstRow?.querySelector('[data-status="done"]')).not.toBeNull()
+    expect(secondRow?.querySelector('[data-status="running"]')).not.toBeNull()
+    expect(firstRow?.textContent).toContain('已完成')
+    expect(secondRow?.textContent).toContain('执行中')
+    expect(secondRow?.textContent).toContain('17/41')
+
+    await act(async () => useRunStore.getState().applyRun(null))
+  })
+
+  it('loads a dashboard activity set without executing and enables sanity potions on execute', async () => {
+    mocks.getCopilotSetPlan.mockResolvedValue({
+      success: true,
+      data: {
+        items: [
+          { id: 101, stage: 'TL-1', stageId: 'act55side_01', supportsRaid: true },
+          { id: 102, stage: 'TL-2', stageId: 'act55side_02', supportsRaid: true },
+        ],
+        entries: [],
+      },
+    })
+    useUIStore.getState().setActiveTab('combat')
+    useUIStore.getState().setCombatCopilotPrefill({
+      setId: '56877',
+      name: '时间啊，向前！全关卡作业',
+      activityName: '时间啊，向前！',
+    })
+
+    await renderComponent()
+    await flush()
+
+    const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')
+    expect(input?.value).toBe('prts://s56877')
+    expect(container.textContent).toContain('共 2 个作业')
+    expect(mocks.runActivitySet).not.toHaveBeenCalled()
+    expect(mocks.executeCopilotSetPlan).not.toHaveBeenCalled()
+
+    await click(buttonsByText('立即执行')[0]!)
+    await flush()
+
+    expect(mocks.runActivitySet).toHaveBeenCalledWith('56877', expect.objectContaining({
+      options: expect.objectContaining({
+        useSanityPotion: true,
+        nativeDelegation: false,
+      }),
+    }))
+    useUIStore.getState().setCombatCopilotPrefill(null)
+    useUIStore.getState().setActiveTab('dashboard')
+  })
+
+  it('runs the activity fallback from the manual execute button when no set exists', async () => {
+    useUIStore.getState().setActiveTab('combat')
+    useUIStore.getState().setCombatCopilotPrefill({
+      setId: '',
+      name: null,
+      activityName: '时间啊，向前！',
+      fallback: true,
+    })
+
+    await renderComponent()
+    await flush()
+
+    expect(container.textContent).toContain('当前活动没有匹配的作业集')
+    expect(container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')?.value).toBe('')
+
+    await click(buttonsByText('立即执行')[0]!)
+    await flush()
+
+    expect(mocks.runActivityFallback).toHaveBeenCalledTimes(1)
+    expect(mocks.runActivitySet).not.toHaveBeenCalled()
+    expect(mocks.executeCopilotSetPlan).not.toHaveBeenCalled()
+
+    useUIStore.getState().setCombatCopilotPrefill(null)
+    useUIStore.getState().setActiveTab('dashboard')
   })
 
   it('allows the stop request to be retried when idle confirmation times out', async () => {
