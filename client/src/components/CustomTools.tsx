@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { maaApi } from '../services/api'
 import { useStatusStore } from '../store/statusStore'
-import { Button, Card, CardContent, EmptyState, Input, Loading, PageHeader, Switch } from './common'
+import { Button, Card, CardContent, ConfirmDialog, EmptyState, Input, Loading, PageHeader, Switch } from './common'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 
 interface CustomTool {
@@ -60,6 +60,7 @@ export default function CustomTools() {
 
   const [color, setColor] = useState(0)
   const [cells, setCells] = useState<Record<string, number>>({})
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false)
   const [swipe, setSwipe] = useState(true)
   const [gridDelay, setGridDelay] = useState(0)
   const [useNormalToken, setUseNormalToken] = useState(false)
@@ -286,7 +287,8 @@ export default function CustomTools() {
                       variant="secondary"
                       size="sm"
                       icon={<Eraser size={15} aria-hidden="true" />}
-                      onClick={() => setCells({})}
+                      onClick={() => setConfirmClearOpen(true)}
+                      disabled={Object.keys(cells).length === 0}
                     >
                       清空点阵
                     </Button>
@@ -352,6 +354,16 @@ export default function CustomTools() {
           </CardContent>
         </Card>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmClearOpen}
+        onClose={() => setConfirmClearOpen(false)}
+        onConfirm={() => setCells({})}
+        title="清空点阵？"
+        message={`将清除当前已填的 ${Object.keys(cells).length} 格点阵，此操作无法撤销。`}
+        confirmText="清空"
+        variant="danger"
+      />
     </div>
   )
 }
