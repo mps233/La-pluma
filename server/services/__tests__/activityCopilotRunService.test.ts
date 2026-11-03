@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildActivityCopilotRunPlan,
+  buildActivityExecutionOptions,
+  selectActivitySetEntries,
   buildActivityPreparationTasks,
   getCombatCopilotPreferences,
   hasCompletedActivityNavigation,
@@ -43,6 +45,29 @@ test('saved combat preferences map to the dynamic copilot options', () => {
     addTrust: false, formationIndex: undefined, supportUsage: undefined, supportName: undefined,
     allowOneMissingOperator: true, formationMode: 'off'
   });
+});
+
+test('activity set execution filters by activity stages and selected indexes', () => {
+  const entries = [
+    { itemIndex: 0, displayStage: 'TL-1' },
+    { itemIndex: 1, displayStage: 'TL-2' },
+    { itemIndex: 2, displayStage: 'TL-S-1' },
+    { itemIndex: 3, displayStage: 'CV-1' }
+  ];
+  assert.deepEqual(
+    selectActivitySetEntries(entries, ['TL-1', 'TL-2'], [1, 2]).map(entry => entry.itemIndex),
+    [1]
+  );
+  assert.deepEqual(
+    selectActivitySetEntries(entries, ['TL-1', 'TL-2']).map(entry => entry.itemIndex),
+    [0, 1]
+  );
+});
+
+test('activity execution always enables sanity potions when sanity is insufficient', () => {
+  const options = buildActivityExecutionOptions({ useSanityPotion: false }, 'Official');
+  assert.equal(options.useSanityPotion, true);
+  assert.equal(options.nativeDelegation, false);
 });
 
 test('activity completion requires every known main stage', () => {

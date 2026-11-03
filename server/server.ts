@@ -17,6 +17,7 @@ import {
   initializeAgentRunStore
 } from './services/agentRunService.ts';
 import { initializeRuntimeState } from './services/runtimeInitializationService.ts';
+import { shutdownBattleOcr } from './services/battleOcrService.ts';
 import { cleanupStaleDynamicTaskFiles } from './services/maaService.ts';
 import {
   createWebrtcSignalingGateway,
@@ -268,6 +269,7 @@ if (isMainModule) {
       closing = true;
       closeMaaExecutionLeaseAdmission('server_shutdown');
       await runtime.close().catch((error: unknown) => console.error('[Server] 关闭失败:', getErrorMessage(error)));
+      await shutdownBattleOcr().catch((error: unknown) => console.error('[BattleOcr] 关闭失败:', getErrorMessage(error)));
       process.exit(0);
     };
     process.once('SIGINT', shutdown);

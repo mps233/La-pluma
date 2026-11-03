@@ -8,13 +8,46 @@ import {
   buildCopilotTaskParams,
   buildNativeCopilotCommand,
   canUseNativeCopilotSet,
+  createCopilotSetProgressTracker,
   sanitizeCopilotPlanId,
   extractLoadedCopilotFiles,
+  findCopilotStageProgress,
   getNavigationStage,
+  parseCopilotBattleTotal,
   isPresetFormationCopilot,
   mergePresetFormationTasks,
   orderEntriesForNavigation
 } from '../copilotPlanService.ts';
+
+test('maps the latest loaded copilot file to the current activity stage', () => {
+  const items = [
+    { filename: '/tmp/1-101-normal-1.json', displayStage: 'TL-1' },
+    { filename: '/tmp/2-102-normal-1.json', displayStage: 'TL-2' }
+  ];
+  const log = [
+    '{"details":{"file_name":"/tmp/1-101-normal-1.json"},"what":"CopilotListLoadTaskFileSuccess"}',
+    '{"details":{"file_name":"/tmp/2-102-normal-1.json"},"what":"CopilotListLoadTaskFileSuccess"}'
+  ].join('\n');
+  assert.deepEqual(findCopilotStageProgress(items, log), { index: 1, displayStage: 'TL-2' });
+  assert.equal(findCopilotStageProgress(items, 'no stage events'), null);
+});
+
+test('reads the battle total after the latest copilot stage load', () => {
+  const stageLoad = '{"details":{"file_name":"/tmp/2-102-normal-1.json"},"what":"CopilotListLoadTaskFileSuccess"}';
+  const log = [
+    'Kills: 0 / 22',
+    '{"details":{"file_name":"/tmp/1-101-normal-1.json"},"what":"CopilotListLoadTaskFileSuccess"}',
+    'Kills: 11 / 35',
+    'Kills: 0 / 41',
+    stageLoad,
+    'Kills: 0 / 52'
+  ].join('\n');
+
+  assert.equal(parseCopilotBattleTotal(log), 52);
+  assert.equal(parseCopilotBattleTotal('Kills: 0 / 41'), 41);
+  assert.equal(parseCopilotBattleTotal('Kills: 0 / 0'), null);
+  assert.equal(parseCopilotBattleTotal('no battle lines'), null);
+});
 
 test('preparation tasks run before the copilot task in one MAA task file', () => {
   const config = buildCopilotDynamicTaskConfig(
@@ -265,6 +298,30 @@ test('builds the native maa copilot command', () => {
     'prts://s48990', '--batch', '--formation', '--formation-index', '3',
     '--add-trust', '--ignore-requirements', '--use-sanity-potion',
     '--support-unit-usage', '2', '--support-unit-name', '史都华德'
+  ]);
+});
+
+test('projects per-entry progress as the set advances', () => {
+  const entries = [
+    { key: '0:101:normal', itemIndex: 0, copilotId: 101, displayStage: 'TL-1', mode: 'normal' },
+    { key: '1:102:normal', itemIndex: 1, copilotId: 102, displayStage: 'TL-2', mode: 'normal' },
+    { key: '2:103:normal', itemIndex: 2, copilotId: 103, displayStage: 'TL-3', mode: 'normal' }
+  ];
+  const tracker = createCopilotSetProgressTracker(entries);
+  assert.deepEqual(tracker.snapshot().map(item => item.status), ['pending', 'pending', 'pending']);
+
+  tracker.markRunning(entries[1]);
+  assert.deepEqual(tracker.snapshot().map(item => item.status), ['success', 'running', 'pending']);
+
+  tracker.markGroupSuccess([entries[1]]);
+  assert.deepEqual(tracker.snapshot().map(item => item.status), ['success', 'success', 'pending']);
+
+  tracker.markRunning(entries[2]);
+  tracker.settleRunning('failed', '测试失败');
+  assert.deepEqual(tracker.snapshot().map(item => [item.stage, item.status, item.error]), [
+    ['TL-1', 'success', undefined],
+    ['TL-2', 'success', undefined],
+    ['TL-3', 'failed', '测试失败']
   ]);
 });
 

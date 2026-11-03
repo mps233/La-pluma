@@ -1153,7 +1153,16 @@ export function buildOpenApiSpec(defaults: RuntimeDefaults = {}) {
             currentStep: { type: ['integer', 'null'], minimum: -1 },
             totalSteps: { type: ['integer', 'null'], minimum: 0 },
             currentTask: {},
-            message: { type: ['string', 'null'] }
+            message: { type: ['string', 'null'] },
+            battle: {
+              type: 'object',
+              required: ['kills', 'total'],
+              properties: {
+                kills: { type: 'integer', minimum: 0 },
+                total: { type: 'integer', minimum: 1 }
+              },
+              additionalProperties: false
+            }
           },
           additionalProperties: true
         },

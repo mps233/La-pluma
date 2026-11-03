@@ -3,9 +3,12 @@ import { getErrorCode, getErrorDetails, getErrorMessage, getErrorStatus } from '
 import { mkdir, readFile, readdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
-import { execMaaCommand, execDynamicTask, getMaaConfigDir, createMaaLogCheckpoint, readMaaLogSince } from './maaService.ts';
+import { execMaaCommand, execDynamicTask, getMaaConfigDir, createMaaLogCheckpoint, readMaaLogSince, setMaaTaskProgress } from './maaService.ts';
 import { withMaaExecutionLease } from './executionCoordinatorService.ts';
 import { recordDrops } from './dropRecordService.ts';
+import { resolveConnection } from './connectionService.ts';
+import { getBattleOcrIntervalMs, isBattleOcrEnabled, readBattleProgress } from './battleOcrService.ts';
+import type { ResolvedConnection } from './connectionService.ts';
 
 const dataDir = fileURLToPath(new URL('../data/', import.meta.url));
 const progressPath = join(dataDir, 'copilot-progress.json');
@@ -85,6 +88,7 @@ interface CopilotExecutionOptions extends CopilotOptions {
 interface CopilotLifecycle {
   runId?: string
   onStarted?: (context?: unknown) => unknown
+  onProgress?: (progress: unknown, taskResults?: unknown[] | null) => unknown
   onSettled?: (outcome: unknown) => unknown
 }
 
@@ -160,6 +164,79 @@ interface CopilotExecutionItem {
   entry: ExecutableCopilotEntry
   filename: string
   repeat: number
+}
+
+type CopilotProgressStatus = 'pending' | 'running' | 'success' | 'failed' | 'stopped' | 'skipped'
+
+interface CopilotProgressEntryResult {
+  key: string
+  itemIndex: number
+  copilotId: number
+  stage: string
+  mode: string
+  status: CopilotProgressStatus
+  error?: string
+}
+
+interface CopilotSetProgressTracker {
+  snapshot(): CopilotProgressEntryResult[]
+  markRunning(entry: ExecutableCopilotEntry): void
+  markSettled(entry: ExecutableCopilotEntry, status: CopilotProgressStatus, error?: string): void
+  markGroupSuccess(entries: ExecutableCopilotEntry[]): void
+  settleRunning(status: CopilotProgressStatus, error?: string): void
+}
+
+function copilotEntryKey(entry: ExecutableCopilotEntry): string {
+  if (typeof entry.key === 'string' && entry.key) return entry.key
+  return `${String(entry.itemIndex ?? '')}:${entry.copilotId}:${String(entry.mode ?? '')}`
+}
+
+export function createCopilotSetProgressTracker(entries: ExecutableCopilotEntry[]): CopilotSetProgressTracker {
+  const order = entries.map(copilotEntryKey)
+  const results = new Map<string, CopilotProgressEntryResult>()
+  for (const entry of entries) {
+    results.set(copilotEntryKey(entry), {
+      key: copilotEntryKey(entry),
+      itemIndex: typeof entry.itemIndex === 'number' ? entry.itemIndex : -1,
+      copilotId: entry.copilotId,
+      stage: entry.displayStage,
+      mode: typeof entry.mode === 'string' ? entry.mode : '',
+      status: 'pending'
+    })
+  }
+
+  const settle = (entry: ExecutableCopilotEntry, status: CopilotProgressStatus, error?: string) => {
+    const item = results.get(copilotEntryKey(entry))
+    if (!item) return
+    item.status = status
+    if (error) item.error = error
+    else delete item.error
+  }
+
+  return {
+    snapshot: () => [...results.values()].map(item => ({ ...item })),
+    markRunning: (entry) => {
+      const index = order.indexOf(copilotEntryKey(entry))
+      if (index > 0) {
+        for (let i = 0; i < index; i += 1) {
+          const item = results.get(order[i])
+          if (item && (item.status === 'pending' || item.status === 'running')) item.status = 'success'
+        }
+      }
+      settle(entry, 'running')
+    },
+    markSettled: settle,
+    markGroupSuccess: (groupEntries) => {
+      for (const entry of groupEntries) settle(entry, 'success')
+    },
+    settleRunning: (status, error) => {
+      for (const item of results.values()) {
+        if (item.status !== 'running') continue
+        item.status = status
+        if (error) item.error = error
+      }
+    }
+  }
 }
 
 interface CopilotExecutionResult {
@@ -694,6 +771,151 @@ function isExecutableCopilotEntry(entry: CopilotEntryInput): entry is Executable
  * Runs an already-selected list of copilot ids through the same dynamic MAA
  * Copilot task used by copilot sets. Callers must decide selection separately.
  */
+export interface CopilotStageProgressItem {
+  filename: string
+  displayStage: string
+  entry?: ExecutableCopilotEntry
+}
+
+/**
+ * Read the enemy total MAA logs at battle start. The value is only trusted
+ * when it follows the latest copilot stage load, so a previous stage's line
+ * cannot become the expected total for the next stage.
+ */
+export function parseCopilotBattleTotal(logText: string): number | null {
+  const text = String(logText ?? '');
+  const loads = [...text.matchAll(/"what"\s*:\s*"CopilotListLoadTaskFileSuccess"/g)];
+  const segment = loads.length > 0
+    ? text.slice(loads[loads.length - 1].index ?? 0)
+    : text;
+  const lines = [...segment.matchAll(/Kills:\s*\d+\s*\/\s*(\d+)/g)];
+  if (!lines.length) return null;
+  const total = Number(lines[lines.length - 1][1]);
+  return Number.isInteger(total) && total > 0 && total <= 500 ? total : null;
+}
+
+export function findCopilotStageProgress(
+  items: CopilotStageProgressItem[],
+  logText: string
+): { index: number; displayStage: string } | null {
+  const currentFile = extractLoadedCopilotFiles(logText).at(-1);
+  if (!currentFile) return null;
+  const index = items.findIndex(item => currentFile === item.filename || currentFile.endsWith(item.filename));
+  return index >= 0 ? { index, displayStage: items[index].displayStage } : null;
+}
+
+function startCopilotStageProgress(
+  checkpoint: Parameters<typeof readMaaLogSince>[0],
+  items: CopilotStageProgressItem[],
+  lifecycle: CopilotLifecycle,
+  tracker?: CopilotSetProgressTracker | null,
+  baseProgress: Record<string, unknown> = {}
+): () => void {
+  let lastStage = '';
+  let latestProgress: Record<string, unknown> | null = null;
+  let battleTimer: ReturnType<typeof setInterval> | null = null;
+  let battleInFlight = false;
+  let battleFailures = 0;
+  let expectedBattleTotal: number | null = null;
+  let pendingBattleTotal: number | null = null;
+  let pendingBattleTotalHits = 0;
+  let lastBattleKills = 0;
+  let battleConnection: ResolvedConnection | null = null;
+  const MAX_UNCONFIRMED_BATTLE_TOTAL = 200;
+
+  const stopBattleSampler = () => {
+    if (battleTimer !== null) clearInterval(battleTimer);
+    battleTimer = null;
+  };
+
+  const sampleBattle = async () => {
+    if (battleInFlight || !latestProgress || !isBattleOcrEnabled()) return;
+    battleInFlight = true;
+    try {
+      battleConnection ??= await resolveConnection();
+      const battle = await readBattleProgress(battleConnection, expectedBattleTotal);
+      if (!battle) return;
+      if (expectedBattleTotal === null) {
+        // MAA's log supplies the total once the battle starts. Until then,
+        // require two matching frames and a plausible enemy count so the
+        // result screen's sanity counter cannot become the battle total.
+        if (battle.total > MAX_UNCONFIRMED_BATTLE_TOTAL) return;
+        if (battle.total !== pendingBattleTotal) {
+          pendingBattleTotal = battle.total;
+          pendingBattleTotalHits = 1;
+          return;
+        }
+        pendingBattleTotalHits += 1;
+        if (pendingBattleTotalHits < 2) return;
+        expectedBattleTotal = battle.total;
+      }
+      // The battle total is stable within a stage; a different total is a
+      // result/cutscene frame and must not overwrite the real counter.
+      if (battle.total !== expectedBattleTotal || battle.kills < lastBattleKills) return;
+      lastBattleKills = battle.kills;
+      battleFailures = 0;
+      void lifecycle.onProgress?.({ ...latestProgress, battle }, tracker?.snapshot() ?? null);
+    } catch {
+      battleFailures += 1;
+      if (battleFailures >= 5) stopBattleSampler();
+    } finally {
+      battleInFlight = false;
+    }
+  };
+
+  const startBattleSampler = () => {
+    if (battleTimer !== null || !lifecycle.runId || !isBattleOcrEnabled()) return;
+    battleTimer = setInterval(() => void sampleBattle(), getBattleOcrIntervalMs());
+    void sampleBattle();
+  };
+
+  const timer = setInterval(() => {
+    void readMaaLogSince(checkpoint, 256 * 1024)
+      .then(logText => {
+        const logBattleTotal = parseCopilotBattleTotal(logText);
+        const progress = findCopilotStageProgress(items, logText);
+        if (!progress || progress.displayStage === lastStage) {
+          if (logBattleTotal !== null && logBattleTotal !== expectedBattleTotal) {
+            expectedBattleTotal = logBattleTotal;
+            pendingBattleTotal = null;
+            pendingBattleTotalHits = 0;
+            lastBattleKills = 0;
+          }
+          return;
+        }
+        expectedBattleTotal = logBattleTotal;
+        pendingBattleTotal = null;
+        pendingBattleTotalHits = 0;
+        lastBattleKills = 0;
+        battleFailures = 0;
+        lastStage = progress.displayStage;
+        const item = items[progress.index];
+        if (tracker && item?.entry) tracker.markRunning(item.entry);
+        const totalSteps = tracker?.snapshot().length ?? items.length;
+        setMaaTaskProgress({
+          currentStage: progress.displayStage,
+          currentStep: progress.index + 1,
+          totalSteps
+        });
+        latestProgress = {
+          ...baseProgress,
+          currentStage: progress.displayStage,
+          currentTask: `正在执行 ${progress.displayStage}`,
+          currentStep: progress.index + 1,
+          totalSteps,
+          message: `正在执行 ${progress.displayStage}`
+        };
+        void lifecycle.onProgress?.(latestProgress, tracker?.snapshot() ?? null);
+        startBattleSampler();
+      })
+      .catch(() => undefined);
+  }, 1500);
+  return () => {
+    clearInterval(timer);
+    stopBattleSampler();
+  };
+}
+
 export async function executeSelectedCopilotEntries({
   planId,
   name,
@@ -708,6 +930,17 @@ export async function executeSelectedCopilotEntries({
   const results: CopilotExecutionResult[] = [];
   const loopTimes = normalizeCopilotLoopTimes(options.loopTimes);
   const clientType = typeof options.clientType === 'string' ? options.clientType : undefined;
+  const tracker = lifecycle.runId ? createCopilotSetProgressTracker(normalizedEntries) : null;
+  if (tracker) {
+    void lifecycle.onProgress?.({
+      setId: planId,
+      name,
+      phase: 'starting',
+      message: '准备执行',
+      currentStep: 0,
+      totalSteps: normalizedEntries.length
+    }, tracker.snapshot());
+  }
   await withMaaExecutionLease({ source: 'activity-copilot', taskName: name, command: 'copilot-plan' }, async () => {
     lifecycle.onStarted?.();
     const configDir = (await getMaaConfigDir()).trim();
@@ -716,6 +949,7 @@ export async function executeSelectedCopilotEntries({
 
     for (const [groupIndex, group] of groupEntries(orderEntriesForNavigation(normalizedEntries, options.navigationStage)).entries()) {
       const list: CopilotListEntry[] = [];
+      const progressItems: CopilotStageProgressItem[] = [];
       for (const entry of group.entries) {
         const data = await fetchJson(`https://prts.maa.plus/copilot/get/${entry.copilotId}`);
         const content = parseCopilotContent(data);
@@ -728,6 +962,7 @@ export async function executeSelectedCopilotEntries({
             nav_name_override: entry.displayStage,
             is_raid: entry.mode === 'raid'
           });
+          progressItems.push({ filename, displayStage: entry.displayStage, entry });
         }
       }
       if (!list.length) continue;
@@ -741,17 +976,51 @@ export async function executeSelectedCopilotEntries({
           params: buildCopilotTaskParams(list, Boolean(group.presetFormation), options)
         }
       );
-      if (group.presetFormation) await ensurePresetFormationResource(configDir);
-      await execDynamicTask(
-        taskId,
-        taskConfig,
-        name,
-        'copilot',
-        true,
-        Boolean(group.presetFormation) || options.userResource === true,
-        { clientType }
+      const checkpoint = await createMaaLogCheckpoint();
+      const stopStageProgress = startCopilotStageProgress(
+        checkpoint,
+        progressItems,
+        lifecycle,
+        tracker,
+        { setId: planId, name, phase: 'running' }
       );
-      results.push(...group.entries.map(entry => ({ ...entry, success: true })));
+      try {
+        if (group.presetFormation) await ensurePresetFormationResource(configDir);
+        await execDynamicTask(
+          taskId,
+          taskConfig,
+          name,
+          'copilot',
+          true,
+          Boolean(group.presetFormation) || options.userResource === true,
+          { clientType }
+        );
+        results.push(...group.entries.map(entry => ({ ...entry, success: true })));
+        tracker?.markGroupSuccess(group.entries);
+        if (tracker) {
+          void lifecycle.onProgress?.({
+            setId: planId,
+            name,
+            phase: 'running',
+            message: '正在执行作业集'
+          }, tracker.snapshot());
+        }
+      } catch (error) {
+        if (tracker) {
+          const stopped = Boolean((error as { stopped?: boolean })?.stopped);
+          const message = getErrorMessage(error) || '作业集执行失败';
+          tracker.settleRunning(stopped ? 'stopped' : 'failed', message);
+          void lifecycle.onProgress?.({
+            setId: planId,
+            name,
+            phase: stopped ? 'stopping' : 'failed',
+            message
+          }, tracker.snapshot());
+        }
+        throw error;
+      } finally {
+        stopStageProgress();
+      }
     }
   });
 
@@ -775,10 +1044,22 @@ export async function executeCopilotPlan({
   const results: CopilotExecutionResult[] = [];
   const loopTimes = normalizeCopilotLoopTimes(options.loopTimes);
   const clientType = typeof options.clientType === 'string' ? options.clientType : undefined;
+  const tracker = lifecycle.runId ? createCopilotSetProgressTracker(pending) : null;
+  if (tracker) {
+    void lifecycle.onProgress?.({
+      setId: planId,
+      name: plan.name,
+      phase: 'starting',
+      message: '准备执行',
+      currentStep: 0,
+      totalSteps: pending.length
+    }, tracker.snapshot());
+  }
 
   // 原生命令只会执行 Copilot；带活动导航前置任务时必须走动态任务文件。
+  // 有 Run 身份时也走动态任务，才能按条目投影 taskResults。
   const hasPreTasks = Array.isArray(options.preTasks) && options.preTasks.length > 0;
-  if (!hasPreTasks && options.nativeDelegation !== false && canUseNativeCopilotSet({
+  if (!tracker && !hasPreTasks && options.nativeDelegation !== false && canUseNativeCopilotSet({
     entries: selectedEntries,
     totalItems: plan.items.length,
     hasPresetFormation: plan.items.some(item => item.presetFormation),
@@ -842,6 +1123,17 @@ export async function executeCopilotPlan({
         }
       );
       const checkpoint = await createMaaLogCheckpoint();
+      const stopStageProgress = startCopilotStageProgress(
+        checkpoint,
+        executionItems.map(item => ({
+          filename: item.filename,
+          displayStage: item.entry.displayStage,
+          entry: item.entry
+        })),
+        lifecycle,
+        tracker,
+        { setId: planId, name: plan.name, phase: 'running' }
+      );
       try {
         if (group.presetFormation) await ensurePresetFormationResource(configDir);
         await execDynamicTask(
@@ -857,6 +1149,15 @@ export async function executeCopilotPlan({
           completed.add(entry.key);
           results.push({ ...entry, success: true });
         }
+        tracker?.markGroupSuccess(group.entries);
+        if (tracker) {
+          void lifecycle.onProgress?.({
+            setId: planId,
+            name: plan.name,
+            phase: 'running',
+            message: '正在执行作业集'
+          }, tracker.snapshot());
+        }
         await recordCompletedCopilotEntries(group.entries, loopTimes);
         progress[planId] = [...completed];
         await saveProgress(progress);
@@ -866,6 +1167,7 @@ export async function executeCopilotPlan({
         const loadedFiles = extractLoadedCopilotFiles(logText);
         const currentFile = loadedFiles.at(-1) || '';
         const currentIndex = executionItems.findIndex(item => currentFile === item.filename || currentFile.endsWith(item.filename));
+        const stopped = Boolean((error as { stopped?: boolean })?.stopped);
         const successfulEntries: ExecutableCopilotEntry[] = [];
         group.entries.forEach(entry => {
           const entryIndexes = executionItems
@@ -876,8 +1178,22 @@ export async function executeCopilotPlan({
             completed.add(entry.key);
             successfulEntries.push(entry);
           }
+          if (tracker) {
+            const started = currentIndex >= 0 && entryIndexes.some(index => index <= currentIndex);
+            const status = success ? 'success' : (started ? (stopped ? 'stopped' : 'failed') : 'pending');
+            tracker.markSettled(entry, status, status === 'failed' ? message : undefined);
+          }
           results.push({ ...entry, success, error: success ? undefined : message });
         });
+        if (tracker) {
+          if (stopped) tracker.settleRunning('stopped', message);
+          void lifecycle.onProgress?.({
+            setId: planId,
+            name: plan.name,
+            phase: stopped ? 'stopping' : 'failed',
+            message
+          }, tracker.snapshot());
+        }
         await recordCompletedCopilotEntries(successfulEntries, loopTimes);
         progress[planId] = [...completed];
         await saveProgress(progress);
@@ -887,6 +1203,8 @@ export async function executeCopilotPlan({
         copilotError.details = { ...getErrorDetails(error), plan, results, completed: [...completed] };
         copilotError.retryable = true;
         throw Object.assign(copilotError, { copilotPlan: { plan, results, completed: [...completed] } });
+      } finally {
+        stopStageProgress();
       }
     }
   });

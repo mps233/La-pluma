@@ -4,6 +4,7 @@ import { getErrorMessage } from '../utils/errors.ts';
 import { findActivityCopilotCandidates } from './activityCopilotDiscoveryService.ts';
 import { loadActivitySelectionContext } from './activityCopilotPreferences.ts';
 import { buildCopilotPlan, ensureCurrentMapActivityResource, executeCopilotPlan, executeSelectedCopilotEntries } from './copilotPlanService.ts';
+import { getActivityRunPreflight } from './activityNavigationService.ts';
 import { getMaaConfigDir, execDynamicTask, createMaaLogCheckpoint, readMaaLogSince } from './maaService.ts';
 import { withMaaExecutionLease } from './executionCoordinatorService.ts';
 import { updateMaaResources } from './resourceUpdateService.ts';
@@ -75,7 +76,7 @@ interface ActivityCandidatesPlan {
 
 interface ActivityLifecycle {
   runId?: string
-  onProgress?: (progress: Record<string, unknown>, taskResults?: unknown[] | null) => unknown
+  onProgress?: (progress: unknown, taskResults?: unknown[] | null) => unknown
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -128,6 +129,107 @@ export function buildActivityPreparationTasks(
     { name: '等待终端加载 2', type: 'Custom', params: { task_names: ['SleepThenStop'] } },
     { name: stageTask ? `选择活动关卡 ${stageTask}` : '打开活动页', type: 'Custom', params: { task_names: [navigationTask] } }
   ];
+}
+
+
+export function selectActivitySetEntries<T extends { displayStage?: unknown; itemIndex: number }>(
+  entries: T[],
+  activityStages: unknown,
+  selectedIndexes: number[] = []
+): T[] {
+  const stages = new Set(asArray(activityStages).map(stage => String(stage || '').toUpperCase()).filter(Boolean));
+  const requested = new Set((selectedIndexes || []).map(Number).filter(Number.isInteger));
+  return (Array.isArray(entries) ? entries : []).filter(entry => (
+    stages.has(String(entry?.displayStage || '').toUpperCase()) &&
+    (!requested.size || requested.has(entry.itemIndex))
+  ));
+}
+
+export interface ActivitySetExecutionOptions {
+  setId: string;
+  selectedIndexes?: number[];
+  raid?: 'normal' | 'raid' | 'both';
+  options?: Record<string, unknown>;
+  clientType?: string;
+}
+
+/**
+ * Execute one explicitly selected activity copilot set after performing the
+ * same activity navigation preparation used by the automatic activity runner.
+ * This keeps the manual "fill set, then execute" flow functionally aligned with
+ * the old dashboard action.
+ */
+export async function runCurrentActivitySet(
+  input: ActivitySetExecutionOptions,
+  lifecycle: ActivityLifecycle = {}
+): Promise<Record<string, unknown>> {
+  const setId = String(input.setId || '').trim();
+  if (!setId) throw new Error('缺少活动作业集 ID');
+  const clientType = input.clientType || DEFAULT_CLIENT_TYPE;
+  const raid = input.raid || 'normal';
+
+  let preflight = await getActivityRunPreflight(clientType);
+  if (preflight.state !== 'ready' && preflight.reasonCode === 'navigation-resource-unavailable') {
+    try {
+      await updateMaaResources();
+      preflight = await getActivityRunPreflight(clientType);
+    } catch {
+      // Keep the original preflight error below so the caller gets a stable failure.
+    }
+  }
+  if (preflight.state !== 'ready') {
+    throw new Error(preflight.reason || '活动导航资源未就绪');
+  }
+
+  const activity = asRecord(preflight.activity);
+  const activityStageSet = new Set(asArray(activity.stages).map(stage => String(stage || '').toUpperCase()).filter(Boolean));
+  if (!activityStageSet.size) throw new Error('当前活动没有可执行关卡');
+
+  const setPlan = await buildCopilotPlan(setId, raid);
+  const selectedEntries = selectActivitySetEntries(setPlan.entries, [...activityStageSet], input.selectedIndexes || []);
+  if (!selectedEntries.length) throw new Error('作业集不包含当前活动关卡');
+  const selectedIndexes = [...new Set(selectedEntries.map(entry => entry.itemIndex))];
+  const navigationStage = selectedEntries[0]?.displayStage || '';
+  const options = buildActivityExecutionOptions(input.options || {}, clientType, 'home-navigation');
+
+  try {
+    const execution = await withMaaExecutionLease(
+      { source: 'activity-copilot', taskName: '当前活动作业', command: 'activity-copilot' },
+      async () => {
+        await runActivityPreparation({ preflight, navigationMode: 'home-navigation' }, clientType, navigationStage);
+        return executeCopilotPlan({
+          setId,
+          raid,
+          selectedIndexes,
+          options: { ...options, navigationStage },
+          lifecycle
+        });
+      }
+    );
+    await recordActivityCompletion(
+      activity,
+      (execution.results || [])
+        .filter(entry => entry.success !== false)
+        .map(entry => ({ displayStage: String(entry.displayStage || ''), success: true }))
+    );
+    return {
+      ...execution,
+      executed: true,
+      source: 'matching-set',
+      activity,
+      plan: { ...execution.plan, activity }
+    };
+  } catch (error) {
+    const partialResults = asArray(asErrorWithCode(error).copilotPlan?.results);
+    await recordActivityCompletion(
+      activity,
+      partialResults
+        .filter(isRecord)
+        .filter(entry => entry.success !== false && typeof entry.displayStage === 'string')
+        .map(entry => ({ displayStage: entry.displayStage as string, success: true }))
+    ).catch(() => undefined);
+    throw error;
+  }
 }
 
 async function loadActivityProgress(): Promise<ActivityProgress> {
@@ -278,6 +380,24 @@ async function resolvePreparationStage(requestedStage: string, activityCode: str
     || '';
 }
 
+export function buildActivityExecutionOptions(
+  preferences: unknown,
+  clientType: string,
+  navigationMode: string | null | undefined = null
+): Record<string, unknown> {
+  return {
+    ...asRecord(preferences),
+    clientType,
+    // 活动作业按用户要求默认在理智不足时使用理智药；手动作业仍遵循自己的
+    // 保存偏好，不在这里统一提高为 true。
+    useSanityPotion: true,
+    // 活动作业的 Copilot 列表已按导航关卡排序；不使用原生 maa copilot，
+    // 否则会丢失首关顺序，从已经打开的错误关卡开始找关。
+    nativeDelegation: false,
+    ...(navigationMode === 'current-map-fallback' ? { userResource: true } : {})
+  };
+}
+
 async function runActivityPreparation(candidates: unknown, clientType: string, navigationStage: string): Promise<true | null> {
   const activityCode = String(asRecord(asRecord(asRecord(candidates).preflight).activity).code || '');
   const preparationStage = await resolvePreparationStage(navigationStage, activityCode);
@@ -357,14 +477,11 @@ export async function runCurrentActivityCopilots(clientType: string = DEFAULT_CL
       (plan.entries.length ? plan.entries : matchingSet?.members || []).map(entry => ('displayStage' in entry ? entry.displayStage : entry.stage))
     );
   }
-  const baseExecutionOptions: Record<string, unknown> = {
-    ...preferences,
+  const baseExecutionOptions = buildActivityExecutionOptions(
+    preferences,
     clientType,
-    // 活动作业的 Copilot 列表已按导航关卡排序；不使用原生 maa copilot，
-    // 否则会丢失首关顺序，从已经打开的错误关卡开始找关。
-    nativeDelegation: false,
-    ...(candidates.navigationMode === 'current-map-fallback' ? { userResource: true } : {})
-  };
+    candidates.navigationMode
+  );
   const buildExecutionOptions = (navigationStage = '') => ({
     ...baseExecutionOptions,
     ...(navigationStage ? { navigationStage } : {})

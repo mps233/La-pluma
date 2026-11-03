@@ -40,7 +40,7 @@ import { loadParadoxOperators, resolveStageSearchKeyword } from '../services/cop
 import { buildCopilotPlan, executeCopilotPlan, resetCopilotPlanProgress } from '../services/copilotPlanService.ts';
 import { getActivityRunPreflight } from '../services/activityNavigationService.ts';
 import { findActivityCopilotCandidates } from '../services/activityCopilotDiscoveryService.ts';
-import { getActivityCompletion, runCurrentActivityCopilots } from '../services/activityCopilotRunService.ts';
+import { getActivityCompletion, runCurrentActivityCopilots, runCurrentActivitySet } from '../services/activityCopilotRunService.ts';
 import { withMaaExecutionLease, getMaaExecutionLeaseSnapshot } from '../services/executionCoordinatorService.ts';
 import { createDailyFlowExecutionError, executeAgentTask, normalizeDailyFlowRequest, validateTaskConfig } from '../services/agentActionService.ts';
 import {
@@ -365,13 +365,22 @@ function enrichAgentRun(run: AgentRunDto | null): AgentRunDto | null {
       }
     };
   }
+  const progress = isRecord(run.progress) ? run.progress : {};
   return {
     ...run,
     progress: {
-      currentStep: null,
-      totalSteps: null,
-      currentTask: task.taskName,
-      message: task.stopRequested ? '正在终止任务' : task.isRunning ? '任务执行中' : '等待任务启动'
+      ...progress,
+      currentStep: typeof progress.currentStep === 'number' ? progress.currentStep : null,
+      totalSteps: typeof progress.totalSteps === 'number' ? progress.totalSteps : null,
+      currentTask: typeof progress.currentTask === 'string' && progress.currentTask
+        ? progress.currentTask
+        : task.taskName,
+      currentStage: typeof progress.currentStage === 'string' ? progress.currentStage : null,
+      message: task.stopRequested
+        ? '正在终止任务'
+        : task.isRunning
+          ? (typeof progress.message === 'string' && progress.message ? progress.message : '任务执行中')
+          : '等待任务启动'
     }
   };
 }
@@ -1278,11 +1287,38 @@ router.get('/activity/copilot-candidates', asyncHandler(async (req: AgentRequest
 
 router.post('/activity/run', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
   const { clientType } = await resolveRequestConnection(req, { allowOverrides: true });
+  const setId = typeof req.body?.setId === 'string' ? req.body.setId.trim() : '';
+  const selectedIndexes = Array.isArray(req.body?.selectedIndexes)
+    ? req.body.selectedIndexes.map(Number).filter(Number.isInteger)
+    : [];
+  const raidValue = req.body?.raid;
+  const raid: 'normal' | 'raid' | 'both' = raidValue === 'raid' || raidValue === 'both' ? raidValue : 'normal';
+  const options = isRecord(req.body?.options) ? req.body.options : {};
+  const waitForCompletion = parseWaitForCompletion(req.body?.waitForCompletion);
   return executeTrackedAgentAction(req, res, {
     operationId: 'run_current_activity_copilots',
-    input: { clientType },
+    input: { clientType, setId: setId || null, selectedIndexes, raid, options, waitForCompletion },
+    waitForCompletion,
     metadata: { taskName: '当前活动作业', taskType: 'activity' },
-    execute: (lifecycle: AgentRunLifecycle) => runCurrentActivityCopilots(clientType, lifecycle),
+    execute: async (lifecycle: AgentRunLifecycle) => {
+      const run = () => setId
+        ? runCurrentActivitySet({ setId, selectedIndexes, raid, options, clientType }, lifecycle)
+        : runCurrentActivityCopilots(clientType, lifecycle);
+
+      if (waitForCompletion) return run();
+
+      // 后台模式不能把 execute 的返回当成终态：先返回 accepted，等实际执行结束
+      // 再通过 onSettled 把最终结果或错误写回同一个 Run。
+      void (async () => {
+        try {
+          const result = await run();
+          await lifecycle.onSettled?.({ ok: true, result });
+        } catch (error) {
+          await lifecycle.onSettled?.({ ok: false, error });
+        }
+      })();
+      return { message: '当前活动作业已在后台启动', background: true };
+    },
     successMessage: '当前活动作业执行完成'
   });
 }));
@@ -1491,13 +1527,30 @@ router.post('/copilot-sets/:id/execute', asyncHandler(async (req: AgentRequest, 
   const raid = typeof req.body?.raid === 'string' ? req.body.raid : 'normal';
   const { clientType } = await resolveRequestConnection(req, { allowOverrides: true });
   const options = isRecord(rawOptions) ? rawOptions : {};
-  const result = await executeCopilotPlan({
-    setId: req.params!.id,
-    raid,
-    selectedIndexes: Array.isArray(selectedIndexes) ? selectedIndexes : [],
-    options: { ...options, clientType }
+  return executeTrackedAgentAction(req, res, {
+    operationId: 'run_copilot_set',
+    input: {
+      clientType,
+      setId: req.params!.id,
+      selectedIndexes: Array.isArray(selectedIndexes) ? selectedIndexes : [],
+      raid,
+      options
+    },
+    waitForCompletion: true,
+    metadata: { taskName: '作业集执行', taskType: 'copilot' },
+    execute: (lifecycle: AgentRunLifecycle) => executeCopilotPlan({
+      setId: req.params!.id,
+      raid,
+      selectedIndexes: Array.isArray(selectedIndexes) ? selectedIndexes : [],
+      options: { ...options, clientType },
+      lifecycle: {
+        runId: lifecycle.runId,
+        onStarted: lifecycle.onStarted,
+        onProgress: lifecycle.onProgress
+      }
+    }),
+    successMessage: '作业集执行完成'
   });
-  return sendSuccess(res, req, result);
 }));
 
 router.post('/copilot-sets/:id/reset-progress', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {

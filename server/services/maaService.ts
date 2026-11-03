@@ -28,6 +28,9 @@ interface TaskStatus {
   taskName: string | null;
   startTime: number | null;
   taskType: string | null;
+  currentStage: string | null;
+  currentStep: number | null;
+  totalSteps: number | null;
   process: ChildProcess | null;
   stopRequested: boolean;
   forceKillTimer: NodeJS.Timeout | null;
@@ -214,6 +217,9 @@ const taskStatus: TaskStatus = {
   taskName: null,
   startTime: null,
   taskType: null, // 'automation', 'combat', 'roguelike'
+  currentStage: null,
+  currentStep: null,
+  totalSteps: null,
   process: null, // 保存子进程引用
   stopRequested: false,
   forceKillTimer: null,
@@ -337,12 +343,26 @@ export function setTaskStatus(isRunning: boolean, taskName: string | null = null
   taskStatus.isRunning = isRunning;
   taskStatus.taskName = taskName;
   taskStatus.taskType = taskType;
+  taskStatus.currentStage = null;
+  taskStatus.currentStep = null;
+  taskStatus.totalSteps = null;
   taskStatus.startTime = isRunning ? Date.now() : null;
   taskStatus.process = process;
   taskStatus.stopRequested = false;
   taskStatus.forceKillTimer = null;
 
   addLog('INFO', `任务状态更新: ${JSON.stringify({ isRunning, taskName, taskType, hasProcess: !!process })}`);
+}
+
+export function setMaaTaskProgress(progress: {
+  currentStage?: string | null;
+  currentStep?: number | null;
+  totalSteps?: number | null;
+}): void {
+  if (!taskStatus.isRunning) return;
+  if ('currentStage' in progress) taskStatus.currentStage = progress.currentStage ?? null;
+  if ('currentStep' in progress) taskStatus.currentStep = progress.currentStep ?? null;
+  if ('totalSteps' in progress) taskStatus.totalSteps = progress.totalSteps ?? null;
 }
 
 function clearTaskStatusForProcess(childProcess: ChildProcess | null): boolean {
