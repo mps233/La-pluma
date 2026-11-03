@@ -99,9 +99,65 @@ import { RefreshCw, Save } from 'lucide-react'
 - `danger`：危险操作
 - `ghost`：低强调操作
 
-`IconButton` 仅支持 `primary`、`secondary`、`danger`、`ghost`。
+`IconButton` 仅支持 `primary`、`secondary`、`danger`、`ghost`。默认使用原生 `title` 作为悬停提示；需要统一的自定义提示样式时传入 `tooltip`（可选 `tooltipSide="top" | "bottom"`）。`tooltip` 只负责视觉提示，`title` 或 `aria-label` 仍必须提供，组件会用它们生成无障碍名称。
 
 `Button` 的 loading 状态会显示紧凑的 iOS 活动指示器并保留 `loadingText`。页面不要再给同一操作叠加第二个旋转图标。
+
+---
+
+### Tooltip - 轻量提示
+
+用于图标工具条等没有可见文字的控件。触发元素必须自带 `aria-label`；Tooltip 只是视觉补充，不是唯一的无障碍名称来源。不要给拖拽手柄或破坏性操作加长按提示。
+
+```tsx
+import { Tooltip } from '@/components/common'
+
+<Tooltip content="全屏">
+  <button type="button" aria-label="全屏">...</button>
+</Tooltip>
+```
+
+Props：
+
+- `content` (ReactNode, required) - 提示内容。
+- `children` (ReactElement, required) - 触发元素，建议是原生 `button` 或 `IconButton`。
+- `side` (`top` | `bottom`) - 首选方向；空间不足时自动翻转。
+- `delay` (number) - 首次悬停延迟，默认 `400`ms。
+- `warmWindow` (number) - 关闭后继续暖显示的窗口，默认 `400`ms。
+- `longPress` (number) - 触摸长按打开时间，默认 `450`ms。
+- `disabled` (boolean) - 关闭提示。
+- `className` (string) - 追加到提示气泡的类名。
+
+鼠标悬停、键盘焦点和触摸长按都可以打开；Escape、外部点击、滚动或窗口缩放会关闭。提供 `tooltip` 时不要再保留同一个元素的 `title`，避免原生提示和自定义提示叠加。
+
+---
+
+### StatusMark - 环形任务状态
+
+用于作业、任务行等需要表达「待执行 / 执行中 / 已完成 / 待重试 / 已跳过」的场景。组件来源于 ReactBits 的 `StatusMark`，仅将动画导入改为项目已有的 `framer-motion`，状态文案改为中文；视觉和状态机保持原样。
+
+```tsx
+import { StatusMark } from '@/components/common'
+
+<StatusMark
+  status="running"
+  label="执行中"
+  size={16}
+  fontSize={11}
+  color="var(--app-accent)"
+  doneColor="var(--app-success)"
+  errorColor="var(--app-danger)"
+/>
+```
+
+- `status`：`pending` / `running` / `done` / `failed` / `cancelled`。
+- `progress`：仅 `running` 时使用，传入 0–1 的确定进度；不传则为不确定进度弧。
+- `label`：环右侧的可读状态文字；不要只靠环的颜色或形状表达状态。
+- `size` / `fontSize` / `strokeWidth`：按所在行密度调整；列表行建议 16px 环配 11px 文字。
+- `color` / `doneColor` / `errorColor`：优先传语义 token，如 `var(--app-accent)`、`var(--app-success)`、`var(--app-danger)`。
+- `strike`：完成态是否给 `label` 加删除线，默认 `true`；状态文字本身不适合删除线时可传 `false`。
+
+StatusMark 是纯展示组件，不能替代可交互的勾选框；选择状态仍使用原生按钮/复选框。
 
 ---
 

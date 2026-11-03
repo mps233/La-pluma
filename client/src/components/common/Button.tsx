@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import ActivityIndicator from './ActivityIndicator'
+import Tooltip from './Tooltip'
 
 /**
  * 按钮组件 Props
@@ -27,6 +28,8 @@ interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
   size?: 'sm' | 'md' | 'lg'
   disabled?: boolean
   title?: string
+  tooltip?: ReactNode
+  tooltipSide?: 'top' | 'bottom'
   onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void
 }
 
@@ -122,6 +125,8 @@ export function IconButton({
   onClick,
   className = '',
   title,
+  tooltip,
+  tooltipSide,
   ...props
 }: IconButtonProps) {
   const baseStyles = 'app-icon-button'
@@ -139,12 +144,12 @@ export function IconButton({
     lg: 'app-icon-button-size-lg text-base',
   }
 
-  return (
+  const button = (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      title={title}
+      title={tooltip ? undefined : title}
       aria-label={props['aria-label'] ?? title}
       className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${disabled ? 'cursor-not-allowed opacity-50' : ''} ${className}`}
       {...props}
@@ -152,4 +157,8 @@ export function IconButton({
       {icon}
     </button>
   )
+
+  return tooltip
+    ? <Tooltip content={tooltip} side={tooltipSide}>{button}</Tooltip>
+    : button
 }

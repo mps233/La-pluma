@@ -173,7 +173,7 @@ iOS 风格三档 `Button` 高度由 `app-button-size-sm`、`app-button-size-md`�
 
 - 普通功能图标优先使用已引入的 `lucide-react`；业务身份和概览图标优先复用 `Icons.tsx`。一级工作区标题与控制台一致，不添加装饰图标；不要在普通页面重复手写 SVG。
 - 行内或文字旁图标使用 16px，常规操作和字段图标使用 20px，页面标题或大操作使用 24px。`icon-well` 只用于页面、概览和卡片的内容身份图标，不能包裹普通按钮图标。
-- 无文字操作使用 `IconButton`，调用时必须提供 `title` 和 `aria-label`；有文字的操作使用 `Button icon`，不要在调用处额外覆盖图标与文字间距或按钮尺寸。
+- 无文字操作使用 `IconButton`，调用时必须提供 `aria-label`，并提供 `title` 或 `tooltip` 作为提示；只传 `tooltip` 时不能省略 `aria-label`。有文字的操作使用 `Button icon`，不要在调用处额外覆盖图标与文字间距或按钮尺寸。
 - `IconButton` 的 `sm`、`md`、`lg` 与相同档位的 `Button` 共用尺寸，并在手机和粗指针设备保持至少 44px。不要页面自行缩小点击面积；32px 仅保留给明确的桌面高密度图标工具条，不得承载文字。
 - 装饰图标加 `aria-hidden="true"`；状态和结果必须同时提供可读文字或 `aria-label`，不能只依赖颜色和图标。
 
@@ -207,7 +207,8 @@ iOS 风格三档 `Button` 高度由 `app-button-size-sm`、`app-button-size-md`�
 | --- | --- |
 | 页面标题与操作区 | `PageHeader` |
 | 卡片与分区 | `Card` / `CardHeader` / `CardContent`；需要连续曲率时用 `SmoothPanel` |
-| 操作 | `Button`（有文字）、`IconButton`（仅图标，必须带 `title` 与 `aria-label`） |
+| 操作 | `Button`（有文字）、`IconButton`（仅图标，必须带 `aria-label`，并提供 `title` 或 `tooltip`） |
+| 图标控件提示 | `Tooltip`；触发元素仍需自带 `aria-label`，不要和原生 `title` 同时使用 |
 | 表单 | `Input`、`Select`、`Checkbox`、`Switch`；多行文本用带 `app-input control-surface` 的原生 `textarea` |
 | 空状态 | `EmptyState`，只用于确实没有数据 |
 | 不可逆操作确认 | `ConfirmDialog` |

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
-import { Button } from './common'
+import { Button, Tooltip } from './common'
 import { useScrcpyWebRTC, type VideoStats } from '../hooks/useScrcpyWebRTC'
 
 interface ScrcpyDeviceViewProps {
@@ -80,21 +80,30 @@ function DeviceNavigationButtons({
   compact?: boolean
   onCommand: (command: string) => void
 }) {
-  return deviceNavigationActions.map(({ label, command, Icon }) => (
-    <button
-      key={label}
-      type="button"
-      onClick={() => onCommand(command)}
-      disabled={!connected || !automationAvailable}
-      title={!automationAvailable ? automationUnavailableMessage : label}
-      aria-label={label}
-      className={immersive
-        ? 'group flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-35'
-        : `control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-secondary transition-colors hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35 ${compact ? 'automation-preview-glass-button' : ''}`}
-    >
-      <Icon className="h-3.5 w-3.5" strokeWidth={1.8} />
-    </button>
-  ))
+  return deviceNavigationActions.map(({ label, command, Icon }) => {
+    const trigger = (
+      <button
+        key={label}
+        type="button"
+        onClick={() => onCommand(command)}
+        disabled={!connected || !automationAvailable}
+        aria-label={label}
+        className={immersive
+          ? 'group flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-35'
+          : `control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-secondary transition-colors hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35 ${compact ? 'automation-preview-glass-button' : ''}`}
+      >
+        <Icon className="h-3.5 w-3.5" strokeWidth={1.8} />
+      </button>
+    )
+
+    return immersive
+      ? trigger
+      : (
+          <Tooltip key={label} content={!automationAvailable ? automationUnavailableMessage : label}>
+            {trigger}
+          </Tooltip>
+        )
+  })
 }
 
 interface TrackedPointer {
@@ -639,28 +648,30 @@ export default function ScrcpyDeviceView({
             compact={isCompact}
             onCommand={sendDeviceCommand}
           />
-          <button
-            type="button"
-            onClick={fullscreen}
-            disabled={webrtc.status !== 'connected'}
-            title="全屏"
-            aria-label="全屏"
-            className={`control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-secondary transition-colors hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35 ${isCompact ? 'automation-preview-glass-button' : ''}`}
-          >
-            <Maximize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
-          </button>
-          {isCompact && (
+          <Tooltip content="全屏">
             <button
               type="button"
-              onClick={() => setCompactControlsOpen(open => !open)}
-              title={compactControlsOpen ? '收起预览设置' : '预览设置'}
-              aria-label={compactControlsOpen ? '收起预览设置' : '打开预览设置'}
-              aria-expanded={compactControlsOpen}
-              aria-controls={compactControlsId}
-              className={`automation-preview-glass-button control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-secondary${compactControlsOpen ? ' is-active' : ''}`}
+              onClick={fullscreen}
+              disabled={webrtc.status !== 'connected'}
+              aria-label="全屏"
+              className={`control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-secondary transition-colors hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35 ${isCompact ? 'automation-preview-glass-button' : ''}`}
             >
-              <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.8} />
+              <Maximize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
             </button>
+          </Tooltip>
+          {isCompact && (
+            <Tooltip content={compactControlsOpen ? '收起预览设置' : '打开预览设置'}>
+              <button
+                type="button"
+                onClick={() => setCompactControlsOpen(open => !open)}
+                aria-label={compactControlsOpen ? '收起预览设置' : '打开预览设置'}
+                aria-expanded={compactControlsOpen}
+                aria-controls={compactControlsId}
+                className={`automation-preview-glass-button control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-secondary${compactControlsOpen ? ' is-active' : ''}`}
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.8} />
+              </button>
+            </Tooltip>
           )}
         </div>
 

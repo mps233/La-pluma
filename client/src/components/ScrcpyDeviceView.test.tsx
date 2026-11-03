@@ -35,6 +35,7 @@ interface MockButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 vi.mock('./common', () => ({
+  Tooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
   Button: ({
     children,
     icon: _icon,

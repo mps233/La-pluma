@@ -317,6 +317,7 @@ export default function PWAInstallPrompt() {
             onClick={() => setIsInstallExpanded(true)}
             className="pwa-install-entry-button"
             title="安装 La Pluma"
+            tooltip="安装 La Pluma"
             aria-label="安装 La Pluma"
             aria-expanded="false"
           />

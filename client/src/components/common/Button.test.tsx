@@ -3,7 +3,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import Button from './Button'
+import Button, { IconButton } from './Button'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -55,5 +55,21 @@ describe('Button loading state', () => {
     expect(button?.getAttribute('aria-busy')).toBe('true')
     expect(button?.textContent).toContain('正在检查')
     expect(button?.textContent).not.toContain('检查更新')
+  })
+
+  it('uses a custom tooltip without duplicating the native title', async () => {
+    await act(async () => root.render(
+      <IconButton
+        icon={<span aria-hidden="true">+</span>}
+        title="安装 La Pluma"
+        tooltip="安装 La Pluma"
+      />,
+    ))
+
+    const button = container.querySelector<HTMLButtonElement>('button')
+
+    expect(button?.getAttribute('title')).toBeNull()
+    expect(button?.getAttribute('aria-label')).toBe('安装 La Pluma')
+    expect(container.querySelector('span.inline-flex')).not.toBeNull()
   })
 })
