@@ -283,11 +283,22 @@ function refreshDashboardData(force = false): Promise<void> {
   return refreshPromise
 }
 
+interface DashboardFlowMetric {
+  label: string
+  value: string
+  sub: string
+  Icon: typeof CalendarDays
+  progress?: { completed: number; total: number }
+  showProgressValue?: boolean
+}
+
 export default function Dashboard() {
   const setActiveTab = useUIStore(state => state.setActiveTab)
+  const setCombatCopilotPrefill = useUIStore(state => state.setCombatCopilotPrefill)
   const {
     backendStatus,
     backendMessage,
+    runStatus,
     setMessage: setStatusMessage,
     setActive: setStatusActive,
   } = useStatusStore()
@@ -306,6 +317,7 @@ export default function Dashboard() {
   const { flowGridRef, flowCardRef, flowPreviewRef, flowGridStyle } = useDashboardFlowLayout(hasLoaded)
   const [quickStartLoading, setQuickStartLoading] = useState(false)
   const [activityPreflightLoading, setActivityPreflightLoading] = useState(false)
+  const [activityRunStatus, setActivityRunStatus] = useState('')
   const [quickStartMessage, setQuickStartMessage] = useState('')
   const [quickStartMessageType, setQuickStartMessageType] = useState<StatusMessageType>('default')
 
@@ -411,7 +423,7 @@ export default function Dashboard() {
     }
   }
 
-  const runCurrentActivity = async () => {
+  const prepareCurrentActivity = async () => {
     if (!automationAvailable) {
       const unavailableMessage = serviceStatus === 'offline'
         ? '当前网络已断开，恢复连接后再试。'
@@ -421,34 +433,58 @@ export default function Dashboard() {
       setStatusMessage(unavailableMessage, 'warning')
       return
     }
-    const checkingMessage = '正在检查当前活动是否可以执行…'
+    const preparingMessage = '正在获取当前活动作业集…'
     setActivityPreflightLoading(true)
-    setQuickStartMessage(checkingMessage)
+    setActivityRunStatus('正在获取当前活动作业集')
+    setQuickStartMessage(preparingMessage)
     setQuickStartMessageType('info')
     setStatusActive(true)
-    setStatusMessage(checkingMessage, 'info')
+    setStatusMessage(preparingMessage, 'info')
     try {
-      const runResult = await maaApi.runCurrentActivity()
-      const runData = runResult.data as { executed?: boolean; plan?: { reason?: string }; execution?: { results?: unknown[] } } | undefined
-      if (runResult.success && runData?.executed) {
-        const completedCount = Array.isArray(runData.execution?.results) ? runData.execution.results.length : 0
-        const completedMessage = completedCount > 0 ? `当前活动作业已完成 ${completedCount} 项。` : '当前活动作业已完成。'
-        await loadDashboardData()
-        setQuickStartMessage(completedMessage)
-        setQuickStartMessageType('success')
-        setStatusMessage(completedMessage, 'success')
-      } else {
-        const blockedMessage = runData?.plan?.reason || maaApi.getErrorMessage(runResult) || '当前活动暂未准备就绪。'
+      const result = await maaApi.getActivityCopilotCandidates()
+      const data = result.data as {
+        state?: string
+        reason?: string
+        matchingSet?: { id?: unknown; name?: unknown } | null
+        matchingSets?: Array<{ id?: unknown; name?: unknown }>
+        stages?: Array<{ candidates?: unknown[] }>
+      } | undefined
+      const matchingSet = data?.matchingSet || data?.matchingSets?.[0]
+      const setId = matchingSet?.id === undefined || matchingSet?.id === null
+        ? ''
+        : String(matchingSet.id).trim()
+      const hasStageCandidates = Array.isArray(data?.stages)
+        && data.stages.some(stage => Array.isArray(stage?.candidates) && stage.candidates.length > 0)
+      if (!result.success || (!setId && !hasStageCandidates)) {
+        const blockedMessage = data?.reason || maaApi.getErrorMessage(result) || '当前活动没有可用的作业集。'
         setQuickStartMessage(blockedMessage)
         setQuickStartMessageType('warning')
         setStatusMessage(blockedMessage, 'warning')
+        return
       }
+      const setName = typeof matchingSet?.name === 'string' && matchingSet.name ? matchingSet.name : null
+      setCombatCopilotPrefill({
+        setId,
+        name: setName,
+        activityName: activitySummary.name || null,
+        fallback: !setId
+      })
+      setActiveTab('combat')
+      const handoffMessage = setId
+        ? (setName
+            ? `已将「${setName}」填入自动战斗，请点击立即执行。`
+            : '已将当前活动作业集填入自动战斗，请点击立即执行。')
+        : '当前活动没有可用作业集，已准备逐关作业，请点击立即执行。'
+      setQuickStartMessage(handoffMessage)
+      setQuickStartMessageType('success')
+      setStatusMessage(handoffMessage, 'success')
     } catch (error) {
-      const errorMessage = getErrorMessage(error) || '当前活动检查失败'
+      const errorMessage = getErrorMessage(error) || '获取当前活动作业集失败'
       setQuickStartMessage(errorMessage)
       setQuickStartMessageType('error')
       setStatusMessage(errorMessage, 'error')
     } finally {
+      setActivityRunStatus('')
       setActivityPreflightLoading(false)
       setStatusActive(false)
     }
@@ -459,7 +495,7 @@ export default function Dashboard() {
   }
 
   const lastUpdateDate = lastUpdate ? new Date(lastUpdate) : null
-  const flowIsRunning = scheduleSummary.isRunning
+  const flowIsRunning = scheduleSummary.isRunning || runStatus.isRunning
   const connectionTitle = serviceStatus === 'offline'
     ? '当前网络离线'
     : serviceStatus === 'unavailable'
@@ -473,7 +509,7 @@ export default function Dashboard() {
   const flowCommandTitle = !automationAvailable
     ? connectionTitle
     : activityPreflightLoading
-      ? '正在检查当前活动'
+      ? (activityRunStatus || '正在准备当前活动')
       : quickStartLoading
         ? '正在启动今日流程'
         : flowIsRunning
@@ -482,7 +518,7 @@ export default function Dashboard() {
   const flowCommandDescription = !automationAvailable
     ? connectionDescription
     : activityPreflightLoading
-      ? '正在确认当前活动与可用作业'
+      ? '正在获取当前活动作业集，随后跳到自动战斗页'
       : quickStartLoading
         ? '正在读取任务配置并提交执行'
         : flowIsRunning
@@ -495,11 +531,56 @@ export default function Dashboard() {
       : serviceStatus === 'checking' || serviceStatus === 'unknown'
         ? '检查中'
         : activityPreflightLoading
-          ? '检查中'
+          ? '准备中'
           : quickStartLoading
             ? '启动中'
             : flowIsRunning ? '执行中' : '待命'
   const activityCompleted = activitySummary.completion?.complete === true
+  const activityCompletion = activitySummary.completion
+  const activityProgress = activityCompletion?.known === true
+    && typeof activityCompletion.totalStages === 'number'
+    && Number.isSafeInteger(activityCompletion.totalStages)
+    && activityCompletion.totalStages > 0
+    ? {
+        completed: Math.min(
+          Math.max(
+            activityCompletion.complete === true
+              ? activityCompletion.totalStages
+              : (activityCompletion.completedStages?.length ?? 0),
+            0,
+          ),
+          activityCompletion.totalStages,
+        ),
+        total: activityCompletion.totalStages,
+      }
+    : null
+  const showActivityProgressValue = activityProgress !== null
+    && activityProgress.completed < activityProgress.total
+    && typeof activitySummary.endTime === 'number'
+    && Number.isFinite(activitySummary.endTime)
+
+  const dashboardFlowMetrics: DashboardFlowMetric[] = [
+    {
+      label: '当前活动',
+      value: activitySummary.available ? (activitySummary.name || activitySummary.code || '进行中') : '暂无活动',
+      sub: formatActivitySubtitle(activitySummary),
+      Icon: CalendarDays,
+      progress: activityProgress ?? undefined,
+      showProgressValue: showActivityProgressValue,
+    },
+    {
+      label: '养成目标',
+      value: `${trainingSummary.count} 项`,
+      sub: trainingSummary.topNames.length > 0 ? trainingSummary.topNames.join('、') : '尚未添加目标',
+      Icon: Target,
+    },
+    {
+      label: '今日掉落',
+      value: `${dropSummary.count} 条`,
+      sub: dropSummary.recent[0]?.items || '作战后自动汇总',
+      Icon: PackageOpen,
+    },
+  ]
 
   return (
     <div className="app-page dashboard-page" data-page="dashboard">
@@ -602,14 +683,14 @@ export default function Dashboard() {
                 <div className="dashboard-flow-actions">
                   {activitySummary.available && (
                     <Button
-                      onClick={runCurrentActivity}
+                      onClick={prepareCurrentActivity}
                       variant="secondary"
                       disabled={quickStartLoading || activityPreflightLoading || flowIsRunning || !automationAvailable}
                       loading={activityPreflightLoading}
-                      loadingText="检查中"
+                      loadingText="准备中"
                       statusKey={activityPreflightLoading ? 'running' : 'ready'}
                       className={`dashboard-flow-activity-action justify-center whitespace-nowrap ${activityCompleted ? 'is-completed' : ''}`}
-                      title={activityCompleted ? '重新执行当前活动（会重启游戏）' : '重启游戏并执行已保存偏好的活动作业'}
+                      title={activityCompleted ? '重新准备当前活动作业（不会立即开战）' : '获取当前活动作业集并填入自动战斗页'}
                       aria-label={activityCompleted ? '重新执行当前活动' : '打当前活动'}
                       icon={activityCompleted
                         ? <CheckCircle2 className="h-4 w-4" strokeWidth={2} />
@@ -649,26 +730,7 @@ export default function Dashboard() {
               )}
 
               <div className="dashboard-flow-metrics">
-                {[
-                  {
-                    label: '当前活动',
-                    value: activitySummary.available ? (activitySummary.name || activitySummary.code || '进行中') : '暂无活动',
-                    sub: formatActivitySubtitle(activitySummary),
-                    Icon: CalendarDays,
-                  },
-                  {
-                    label: '养成目标',
-                    value: `${trainingSummary.count} 项`,
-                    sub: trainingSummary.topNames.length > 0 ? trainingSummary.topNames.join('、') : '尚未添加目标',
-                    Icon: Target,
-                  },
-                  {
-                    label: '今日掉落',
-                    value: `${dropSummary.count} 条`,
-                    sub: dropSummary.recent[0]?.items || '作战后自动汇总',
-                    Icon: PackageOpen,
-                  },
-                ].map(({ Icon, ...item }) => (
+                {dashboardFlowMetrics.map(({ Icon, progress, showProgressValue, ...item }) => (
                   <div key={item.label} className="dashboard-flow-metric">
                     <div className="flex items-center gap-2">
                       <Icon className="h-3.5 w-3.5 text-[var(--app-accent-strong)]" strokeWidth={1.8} />
@@ -676,6 +738,26 @@ export default function Dashboard() {
                     </div>
                     <div className="mt-2 truncate text-sm font-bold text-primary">{item.value}</div>
                     <div className={`mt-0.5 truncate text-xs ${labelClass}`}>{item.sub}</div>
+                    {progress && (
+                      <div className="dashboard-flow-metric-progress">
+                        {showProgressValue && (
+                          <span className="dashboard-flow-metric-progress-value">
+                            {progress.completed}/{progress.total}
+                          </span>
+                        )}
+                        <div
+                          className="dashboard-flow-metric-progress-track"
+                          role="progressbar"
+                          aria-label="当前活动通关进度"
+                          aria-valuemin={0}
+                          aria-valuemax={progress.total}
+                          aria-valuenow={progress.completed}
+                          aria-valuetext={`已通关 ${progress.completed}/${progress.total} 关`}
+                        >
+                          <span style={{ width: `${(progress.completed / progress.total) * 100}%` }} />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -798,11 +880,23 @@ export default function Dashboard() {
             <div className="dashboard-status-grid">
               <div className="dashboard-status-block">
                 <div className="dashboard-summary-label">
-                  <span className={`dashboard-summary-dot ${scheduleSummary.isRunning ? 'is-active' : ''}`} />
+                  <span className={`dashboard-summary-dot ${scheduleSummary.isRunning || runStatus.isRunning ? 'is-active' : ''}`} />
                   当前执行
                 </div>
-                <div className="dashboard-summary-value">{automationAvailable ? (scheduleSummary.isRunning ? '执行中' : '空闲中') : '状态不可用'}</div>
-                <div className="dashboard-summary-detail">{automationAvailable ? (scheduleSummary.currentTask || scheduleSummary.message || '暂无进行中的流程') : connectionDescription}</div>
+                <div className="dashboard-summary-value">{
+                  automationAvailable
+                    ? runStatus.phase === 'unknown'
+                      ? '状态未知'
+                      : (runStatus.isRunning || scheduleSummary.isRunning ? '执行中' : '空闲中')
+                    : '状态不可用'
+                }</div>
+                <div className="dashboard-summary-detail">{
+                  automationAvailable
+                    ? runStatus.isRunning
+                      ? (runStatus.label || runStatus.detail || '任务执行中')
+                      : (scheduleSummary.currentTask || scheduleSummary.message || '暂无进行中的流程')
+                    : connectionDescription
+                }</div>
               </div>
               <div className="dashboard-status-block">
                 <div className="dashboard-summary-label">

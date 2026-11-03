@@ -20,7 +20,7 @@ interface FloatingStatusIndicatorProps {
  * 其他状态在原位置可见时显示在原位置，不可见时悬浮到右上角
  */
 export default function FloatingStatusIndicator({ className = '', textClassName = '' }: FloatingStatusIndicatorProps) {
-  const { message, messageType, isActive, backendStatus, backendMessage } = useStatusStore()
+  const { message, messageType, isActive, runStatus, backendStatus, backendMessage } = useStatusStore()
   const isOnline = useOnlineStatus()
   const shouldReduceMotion = useReducedMotion()
   const [readyQuote, setReadyQuote] = useState<OperatorQuote>(DEFAULT_RANDOM_OPERATOR_QUOTE)
@@ -44,14 +44,24 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
       : backendStatus === 'unavailable'
         ? (backendMessage || '无法连接后端服务，请确认服务已启动')
         : ''
-  const displayText = connectionMessage || message || (isActive ? '任务执行中' : `${readyQuote.operator}：${readyQuote.quote}`)
-  const isReady = !connectionMessage && !message && !isActive
+  const hasRunStatus = runStatus.phase !== 'idle'
+  const runStatusType = runStatus.phase === 'running'
+    ? 'info'
+    : runStatus.phase === 'stopping' || runStatus.phase === 'unknown'
+      ? 'warning'
+      : 'default'
+  const displayText = connectionMessage || message || (hasRunStatus
+    ? (runStatus.label || '任务执行中')
+    : isActive
+      ? '任务执行中'
+      : `${readyQuote.operator}：${readyQuote.quote}`)
+  const isReady = !connectionMessage && !message && !hasRunStatus && !isActive
 
   const detectedType = isBackendChecking
     ? 'info'
     : connectionMessage
       ? (isOnline ? 'error' : 'warning')
-      : messageType ?? (message ? detectStatusMessageType(message) : (isActive ? 'info' : 'default'))
+      : messageType ?? (message ? detectStatusMessageType(message) : (hasRunStatus ? runStatusType : (isActive ? 'info' : 'default')))
   const config = getStatusVisualConfig(detectedType)
 
   const indicatorContent = (

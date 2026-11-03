@@ -5,6 +5,7 @@ import Layout from './components/Layout'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
 import { PageSkeleton } from './components/common'
 import { useBackendStatusMonitor } from './hooks/useBackendStatusMonitor'
+import { useRunStatusMonitor } from './hooks/useRunStatusMonitor'
 import { useUIStore } from './stores'
 
 const pageLoaders = {
@@ -105,6 +106,7 @@ function VisitedWorkspaces({ activeTab }: { activeTab: string }) {
 
 function App() {
   useBackendStatusMonitor()
+  useRunStatusMonitor()
   const theme = useUIStore(state => state.theme)
   const isDark = theme === 'dark'
     || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)

@@ -4,6 +4,7 @@
  */
 
 import type { ApiResponse } from '@/types/api'
+import type { CurrentRunSnapshot } from '@/types/run'
 import type {
   CopilotSearchResult,
   DepotDataDetailed,
@@ -174,6 +175,9 @@ export interface TaskStatusData {
   taskName: string | null
   startTime: number | null
   taskType: string | null
+  currentStage?: string | null
+  currentStep?: number | null
+  totalSteps?: number | null
   stopRequested: boolean
   logs: unknown[]
 }
@@ -394,12 +398,18 @@ export const maaApi = {
     return this.executeCommand(taskType, args, taskConfig, signal, taskName, taskTypeLabel, waitForCompletion)
   },
 
-  async runCurrentActivity(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/activity/run`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    })
+  async getActivityCopilotCandidates(signal?: AbortSignal): Promise<ApiResponse> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/activity/copilot-candidates`, { signal })
     return parseJsonResponse(response)
+  },
+
+  /**
+   * 获取当前 Agent Run 快照。
+   * lines=1 只取一条日志，避免全局状态轮询把整段日志反复拉回。
+   */
+  async getCurrentRun(signal?: AbortSignal): Promise<ApiResponse<CurrentRunSnapshot>> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/runs/current?lines=1`, { signal })
+    return parseJsonResponse<ApiResponse<CurrentRunSnapshot>>(response)
   },
 
   /**
@@ -791,6 +801,40 @@ export const maaApi = {
         params,
         dryRun: options.dryRun === true,
         waitForCompletion: options.waitForCompletion !== false
+      })
+    })
+    return parseJsonResponse(response)
+  },
+
+  async runActivitySet(setId: string, payload: {
+    raid: 'normal' | 'raid' | 'both'
+    selectedIndexes: number[]
+    options?: Record<string, unknown>
+  }): Promise<ApiResponse<ScheduleExecutionResultData>> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/activity/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        setId,
+        raid: payload.raid,
+        selectedIndexes: payload.selectedIndexes,
+        options: payload.options || {},
+        waitForCompletion: true
+      })
+    })
+    return parseJsonResponse(response)
+  },
+
+  async runActivityFallback(payload: {
+    options?: Record<string, unknown>
+  } = {}): Promise<ApiResponse<ScheduleExecutionResultData>> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/activity/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        selectedIndexes: [],
+        options: payload.options || {},
+        waitForCompletion: true
       })
     })
     return parseJsonResponse(response)

@@ -3,3 +3,4 @@
  */
 
 export { useUIStore } from './uiStore'
+export type { CombatCopilotPrefill } from './uiStore'

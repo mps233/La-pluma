@@ -1,4 +1,10 @@
 import { create } from 'zustand'
+import {
+  IDLE_RUN_STATUS,
+  isRunStatusBusy,
+  isSameGlobalRunStatus,
+  type GlobalRunStatus,
+} from '../types/run'
 import { detectStatusMessageType, type StatusMessageType } from '../utils/statusMessage'
 
 const AUTO_DISMISS_MS: Record<StatusMessageType, number> = {
@@ -22,22 +28,28 @@ interface StatusState {
   message: string
   messageType: StatusMessageType | null
   isActive: boolean
+  /**
+   * 全局运行状态，由 useRunStatusMonitor 从 /api/agent/runs/current 投影写入。
+   * 页面不直接改写这个字段；它是跨页面显示运行中任务的唯一来源。
+   */
+  runStatus: GlobalRunStatus
   backendStatus: 'unknown' | 'checking' | 'available' | 'unavailable'
   backendMessage: string
   setMessage: (message: string, type?: StatusMessageType) => number
   clearMessage: (expectedRevision?: number) => void
   setActive: (active: boolean) => void
+  applyRunStatus: (runStatus: GlobalRunStatus) => void
   setBackendStatus: (status: StatusState['backendStatus'], message?: string) => void
 }
 
 export const useStatusStore = create<StatusState>((set, get) => {
   const scheduleDismiss = (type: StatusMessageType, revision: number) => {
     cancelDismissTimer()
-    if (get().isActive) return
+    if (get().isActive || isRunStatusBusy(get().runStatus)) return
     if (AUTO_DISMISS_MS[type] <= 0) return
 
     dismissTimer = setTimeout(() => {
-      if (revision !== messageRevision || get().isActive) return
+      if (revision !== messageRevision || get().isActive || isRunStatusBusy(get().runStatus)) return
       dismissTimer = null
       set({ message: '', messageType: null })
     }, AUTO_DISMISS_MS[type])
@@ -47,6 +59,7 @@ export const useStatusStore = create<StatusState>((set, get) => {
     message: '',
     messageType: null,
     isActive: false,
+    runStatus: IDLE_RUN_STATUS,
     backendStatus: 'unknown',
     backendMessage: '',
     setMessage: (message, type) => {
@@ -76,6 +89,22 @@ export const useStatusStore = create<StatusState>((set, get) => {
         return
       }
 
+      const { message, messageType } = get()
+      if (message && messageType) scheduleDismiss(messageType, messageRevision)
+    },
+    applyRunStatus: (runStatus) => {
+      const previous = get().runStatus
+      if (isSameGlobalRunStatus(previous, runStatus)) return
+
+      const wasBusy = isRunStatusBusy(previous)
+      set({ runStatus })
+      if (isRunStatusBusy(runStatus)) {
+        cancelDismissTimer()
+        return
+      }
+
+      // 只在从忙到闲的转变时重新计时，重复上报空闲不能推迟已有提示的消失。
+      if (!wasBusy) return
       const { message, messageType } = get()
       if (message && messageType) scheduleDismiss(messageType, messageRevision)
     },

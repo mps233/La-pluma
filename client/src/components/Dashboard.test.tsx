@@ -16,10 +16,14 @@ const apiMocks = vi.hoisted(() => ({
   getScheduleExecutionStatus: vi.fn(),
   loadUserConfig: vi.fn(),
   executeScheduleNow: vi.fn(),
-  runCurrentActivity: vi.fn(),
+  getActivityCopilotCandidates: vi.fn(),
   getTrainingQueue: vi.fn(),
   getTodayDrops: vi.fn(),
   getOpenTodayStages: vi.fn(),
+}))
+const uiMocks = vi.hoisted(() => ({
+  setActiveTab: vi.fn(),
+  setCombatCopilotPrefill: vi.fn(),
 }))
 const renderSpies = vi.hoisted(() => ({
   dashboardSkeleton: vi.fn(),
@@ -33,7 +37,7 @@ vi.mock('../services/api', () => ({
     getScheduleExecutionStatus: apiMocks.getScheduleExecutionStatus,
     loadUserConfig: apiMocks.loadUserConfig,
     executeScheduleNow: apiMocks.executeScheduleNow,
-    runCurrentActivity: apiMocks.runCurrentActivity,
+    getActivityCopilotCandidates: apiMocks.getActivityCopilotCandidates,
     getErrorMessage: (result?: { message?: string; error?: string }) => result?.message || result?.error || '未知错误',
   },
   getTrainingQueue: apiMocks.getTrainingQueue,
@@ -42,7 +46,13 @@ vi.mock('../services/api', () => ({
 }))
 
 vi.mock('@/stores', () => ({
-  useUIStore: (selector: (state: { setActiveTab: () => void }) => unknown) => selector({ setActiveTab: vi.fn() }),
+  useUIStore: (selector: (state: {
+    setActiveTab: () => void
+    setCombatCopilotPrefill: () => void
+  }) => unknown) => selector({
+    setActiveTab: uiMocks.setActiveTab,
+    setCombatCopilotPrefill: uiMocks.setCombatCopilotPrefill,
+  }),
 }))
 
 vi.mock('../hooks/useDashboardFlowLayout', () => ({
@@ -118,6 +128,9 @@ describe('Dashboard connectivity state', () => {
     apiMocks.getTrainingQueue.mockResolvedValue({ success: true, data: { queue: [] } })
     apiMocks.getTodayDrops.mockResolvedValue({ success: true, data: [] })
     apiMocks.getOpenTodayStages.mockResolvedValue({ success: true, data: { open: [], closed: [] } })
+    apiMocks.getActivityCopilotCandidates.mockResolvedValue({ success: true, data: { matchingSet: null, matchingSets: [], reason: '没有可用作业集' } })
+    uiMocks.setActiveTab.mockReset()
+    uiMocks.setCombatCopilotPrefill.mockReset()
     useDashboardStore.getState().reset()
     useStatusStore.getState().clearMessage()
     useStatusStore.getState().setActive(false)
@@ -271,6 +284,35 @@ describe('Dashboard connectivity state', () => {
     expect(activityMetric?.textContent).not.toContain('等待活动数据')
   })
 
+  it('shows activity completion progress when the activity window is known', async () => {
+    apiMocks.getActivity.mockResolvedValueOnce({
+      success: true,
+      data: {
+        available: true,
+        code: 'TL',
+        name: '时间啊，向前！',
+        endTime: Date.now() + 3 * 24 * 60 * 60 * 1000,
+        completion: {
+          known: true,
+          complete: false,
+          completedStages: ['TL-1', 'TL-2'],
+          totalStages: 8,
+        },
+      },
+    })
+
+    await act(async () => root.render(<Dashboard />))
+    await flushDashboard()
+
+    const activityMetric = findActivityMetric()
+    expect(activityMetric?.textContent).toContain('剩余 3 天')
+    expect(activityMetric?.textContent).toContain('2/8')
+    const progressbar = activityMetric?.querySelector('[role="progressbar"]')
+    expect(progressbar?.getAttribute('aria-valuenow')).toBe('2')
+    expect(progressbar?.getAttribute('aria-valuemax')).toBe('8')
+    expect(progressbar?.getAttribute('aria-valuetext')).toBe('已通关 2/8 关')
+  })
+
   it('does not show waiting when an activity is available without a known window', async () => {
     apiMocks.getActivity.mockResolvedValueOnce({
       success: true,
@@ -383,13 +425,13 @@ describe('Dashboard connectivity state', () => {
     expect(flow?.getAttribute('aria-busy')).toBe('true')
   })
 
-  it('shows immediate preflight feedback while checking the current activity', async () => {
-    let resolveRun: ((value: {
+  it('hands the current activity set to the combat workspace without executing it', async () => {
+    let resolveCandidates: ((value: {
       success: boolean
-      data: { executed: boolean; plan: { reason: string } }
+      data: { matchingSet: { id: string; name: string }; matchingSets: unknown[] }
     }) => void) | undefined
-    apiMocks.runCurrentActivity.mockReturnValueOnce(new Promise(resolve => {
-      resolveRun = resolve
+    apiMocks.getActivityCopilotCandidates.mockReturnValueOnce(new Promise(resolve => {
+      resolveCandidates = resolve
     }))
 
     await act(async () => root.render(<Dashboard />))
@@ -403,32 +445,67 @@ describe('Dashboard connectivity state', () => {
 
     const flow = container.querySelector('.dashboard-flow-glow-shell')
     const status = useStatusStore.getState()
-    expect(apiMocks.runCurrentActivity).toHaveBeenCalledTimes(1)
+    expect(apiMocks.getActivityCopilotCandidates).toHaveBeenCalledTimes(1)
     expect(activityButton?.disabled).toBe(true)
-    expect(activityButton?.textContent).toContain('检查中')
+    expect(activityButton?.textContent).toContain('准备中')
     expect(flow?.classList.contains('is-active')).toBe(true)
     expect(flow?.getAttribute('aria-busy')).toBe('true')
     expect(status.isActive).toBe(true)
     expect(status.message).toContain('当前活动')
     expect(status.messageType).toBe('info')
 
-    await act(async () => resolveRun?.({
+    await act(async () => resolveCandidates?.({
       success: true,
       data: {
-        executed: false,
-        plan: { reason: '测试结束' },
+        matchingSet: { id: '56877', name: '时间啊，向前！全关卡作业' },
+        matchingSets: [],
       },
     }))
     await flushDashboard()
+
+    expect(uiMocks.setCombatCopilotPrefill).toHaveBeenCalledWith(expect.objectContaining({
+      setId: '56877',
+      name: '时间啊，向前！全关卡作业',
+    }))
+    expect(uiMocks.setActiveTab).toHaveBeenCalledWith('combat')
+    expect(useStatusStore.getState().message).toContain('立即执行')
+  })
+
+  it('hands off per-stage activity candidates when no set is available', async () => {
+    apiMocks.getActivityCopilotCandidates.mockResolvedValueOnce({
+      success: true,
+      data: {
+        state: 'candidates-ready',
+        matchingSet: null,
+        matchingSets: [],
+        stages: [{ stage: 'TL-1', candidates: [{ id: 101 }] }],
+        reason: '已按当前活动的明确关卡代号找到候选作业',
+      },
+    })
+
+    await act(async () => root.render(<Dashboard />))
+    await flushDashboard()
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="打当前活动"]')?.click()
+    })
+    await flushDashboard()
+
+    expect(uiMocks.setCombatCopilotPrefill).toHaveBeenCalledWith(expect.objectContaining({
+      fallback: true,
+      activityName: expect.any(String),
+    }))
+    expect(uiMocks.setActiveTab).toHaveBeenCalledWith('combat')
+    expect(useStatusStore.getState().message).toContain('逐关')
   })
 
   it('surfaces the exact activity preflight blocker as a warning and leaves the active state', async () => {
     const blocker = 'AD「红丝绒」的资源未包含从主页进入活动关卡的完整导航链。'
-    apiMocks.runCurrentActivity.mockResolvedValueOnce({
+    apiMocks.getActivityCopilotCandidates.mockResolvedValueOnce({
       success: true,
       data: {
-        executed: false,
-        plan: { reason: blocker },
+        matchingSet: null,
+        matchingSets: [],
+        reason: blocker,
       },
     })
 

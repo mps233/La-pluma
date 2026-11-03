@@ -10,6 +10,20 @@ import FloatingStatusIndicator from './FloatingStatusIndicator'
 const mocks = vi.hoisted(() => ({
   fetchWithAuth: vi.fn(),
   parseJsonResponse: vi.fn(),
+  status: {
+    message: '保存失败，请重试',
+    messageType: 'error' as string | null,
+    isActive: false,
+    runStatus: {
+      phase: 'idle' as 'idle' | 'running' | 'stopping' | 'unknown',
+      isRunning: false,
+      runId: null as string | null,
+      label: null as string | null,
+      detail: null as string | null,
+    },
+    backendStatus: 'available' as const,
+    backendMessage: '',
+  },
 }))
 
 vi.mock('framer-motion', () => ({
@@ -33,13 +47,7 @@ vi.mock('../services/api', () => ({
 }))
 
 vi.mock('../store/statusStore', () => ({
-  useStatusStore: () => ({
-    message: '保存失败，请重试',
-    messageType: 'error',
-    isActive: false,
-    backendStatus: 'available',
-    backendMessage: '',
-  }),
+  useStatusStore: () => mocks.status,
 }))
 
 vi.mock('../hooks/useOnlineStatus', () => ({ useOnlineStatus: () => true }))
@@ -61,6 +69,12 @@ describe('FloatingStatusIndicator', () => {
     mocks.parseJsonResponse.mockClear()
     mocks.fetchWithAuth.mockResolvedValue({ ok: true })
     mocks.parseJsonResponse.mockResolvedValue({ operator: '阿米娅', quote: '准备完成' })
+    mocks.status.message = '保存失败，请重试'
+    mocks.status.messageType = 'error'
+    mocks.status.isActive = false
+    mocks.status.runStatus = { phase: 'idle', isRunning: false, runId: null, label: null, detail: null }
+    mocks.status.backendStatus = 'available'
+    mocks.status.backendMessage = ''
     host = document.createElement('div')
     host.className = 'la-pluma-scroll-host'
     container = document.createElement('div')
@@ -101,5 +115,23 @@ describe('FloatingStatusIndicator', () => {
     expect(container.querySelector('.floating-status-dismiss')).toBeNull()
     expect(container.querySelector('.floating-status-anchor .floating-status-indicator')).not.toBeNull()
     expect(container.querySelector('.floating-status-overlay')).toBeNull()
+  })
+
+  it('shows the global run status when there is no transient message', async () => {
+    mocks.status.message = ''
+    mocks.status.messageType = null
+    mocks.status.runStatus = {
+      phase: 'running',
+      isRunning: true,
+      runId: 'run-1',
+      label: '正在执行: 理智作战',
+      detail: '正在执行: 理智作战',
+    }
+
+    await act(async () => root.render(<FloatingStatusIndicator />))
+    await act(async () => { await Promise.resolve() })
+
+    expect(container.querySelector<HTMLElement>('.floating-status-text')?.textContent).toBe('正在执行: 理智作战')
+    expect(container.querySelector<HTMLElement>('[role="status"]')?.textContent).toBe('正在执行: 理智作战')
   })
 })

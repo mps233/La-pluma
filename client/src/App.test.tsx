@@ -36,6 +36,7 @@ vi.mock('./components/Layout', () => ({
 }))
 vi.mock('./components/PWAInstallPrompt', () => ({ default: () => null }))
 vi.mock('./hooks/useBackendStatusMonitor', () => ({ useBackendStatusMonitor: () => undefined }))
+vi.mock('./hooks/useRunStatusMonitor', () => ({ useRunStatusMonitor: () => undefined }))
 vi.mock('./components/common', () => ({ PageSkeleton: ({ variant }: { variant: string }) => <div>{variant} skeleton</div> }))
 vi.mock('./components/Dashboard', () => ({
   default: function MockDashboard() {

@@ -21,11 +21,20 @@ export type AppTab = typeof APP_TABS[number]
 
 type ThemeMode = 'light' | 'dark' | 'system'
 
+export interface CombatCopilotPrefill {
+  setId: string
+  name: string | null
+  activityName: string | null
+  fallback?: boolean
+}
+
 interface UIState {
   theme: ThemeMode
   activeTab: AppTab
+  combatCopilotPrefill: CombatCopilotPrefill | null
   setTheme: (theme: ThemeMode) => void
   setActiveTab: (tab: AppTab) => void
+  setCombatCopilotPrefill: (prefill: CombatCopilotPrefill | null) => void
 }
 
 type ThemeRuntimeWindow = Window & {
@@ -92,6 +101,7 @@ export const useUIStore = create<UIState>()(
       (set) => ({
         theme: 'dark',
         activeTab: initialAppTab(),
+        combatCopilotPrefill: null,
 
         setTheme: (theme) => {
           set({ theme })
@@ -99,6 +109,8 @@ export const useUIStore = create<UIState>()(
         },
 
         setActiveTab: (tab) => set({ activeTab: tab }),
+
+        setCombatCopilotPrefill: (prefill) => set({ combatCopilotPrefill: prefill }),
       }),
       {
         name: 'ui-storage',
