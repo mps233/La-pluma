@@ -57,6 +57,27 @@ const formatScheduleTime = (hour: number, minute: number) => (
   `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
 )
 
+const formatElapsedTime = (elapsedMs: number): string => {
+  const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000))
+  const seconds = totalSeconds % 60
+  const totalMinutes = Math.floor(totalSeconds / 60)
+  const minutes = totalMinutes % 60
+  const hours = Math.floor(totalMinutes / 60)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`
+}
+
+function RunElapsed({ startedAt }: { startedAt: number }) {
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [startedAt])
+
+  return <>{formatElapsedTime(now - startedAt)}</>
+}
+
 const parseScheduleTime = (time: string) => {
   const [hourText = '0', minuteText = '0'] = time.split(':')
   const hour = Number(hourText)
@@ -528,6 +549,11 @@ function AutomationStageEditor({
   onError,
 }: AutomationStageEditorProps) {
   const [isSmartStageLoading, setIsSmartStageLoading] = useState(false)
+  const [lastDeletedStage, setLastDeletedStage] = useState<{
+    taskId: string
+    stage: string | StageConfig
+    index: number
+  } | null>(null)
   const stages = task.params.stages || [{ stage: '', times: '' }]
   const controlsDisabled = isRunning || !task.enabled
   const stageControlsDisabled = controlsDisabled || isSmartStageLoading
@@ -595,9 +621,32 @@ function AutomationStageEditor({
   }
 
   const deleteStage = (stageIndex: number) => {
+    const removed = stages[stageIndex]
+    if (removed === undefined) return
+    setLastDeletedStage({ taskId: task.id, stage: removed, index: stageIndex })
     const nextStages = stages.filter((_, index) => index !== stageIndex)
     updateStages(nextStages.length > 0 ? nextStages : [{ stage: '', times: '' }])
   }
+
+  const restoreDeletedStage = () => {
+    if (!lastDeletedStage || lastDeletedStage.taskId !== task.id) return
+    const isPlaceholder = stages.length === 1
+      && typeof stages[0] === 'object'
+      && !stages[0].stage
+      && !stages[0].times
+      && !stages[0].smart
+    const nextStages = isPlaceholder ? [lastDeletedStage.stage] : [...stages]
+    if (!isPlaceholder) {
+      const index = Math.min(Math.max(lastDeletedStage.index, 0), nextStages.length)
+      nextStages.splice(index, 0, lastDeletedStage.stage)
+    }
+    updateStages(nextStages)
+    setLastDeletedStage(null)
+  }
+
+  const deletedStageName = lastDeletedStage?.taskId === task.id
+    ? (typeof lastDeletedStage.stage === 'string' ? lastDeletedStage.stage : lastDeletedStage.stage.stage)
+    : ''
 
   const toggleSmartStages = async () => {
     if (isSmartStageLoading) return
@@ -797,6 +846,22 @@ function AutomationStageEditor({
         >
           添加关卡
         </Button>
+
+        {lastDeletedStage?.taskId === task.id && (
+          <div className="flex min-h-11 items-center justify-between gap-3 border-t border-[var(--app-border)] px-1 text-xs text-secondary" role="status">
+            <span className="min-w-0 truncate">
+              已删除关卡{deletedStageName ? `「${deletedStageName}」` : ''}
+            </span>
+            <button
+              type="button"
+              onClick={restoreDeletedStage}
+              disabled={stageControlsDisabled}
+              className="min-h-11 shrink-0 rounded-[var(--app-radius-sm)] px-2 font-medium text-[var(--app-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              撤销
+            </button>
+          </div>
+        )}
       </div>
 
       <div className={`automation-smart-stage-entry${hasSmartStages ? ' is-active' : ''}`}>
@@ -853,6 +918,8 @@ export default function AutomationTasks() {
   const [scheduleEnabled, setScheduleEnabled] = useState(false)
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleTimeEntry[]>(DEFAULT_SCHEDULE_ENTRIES)
   const [currentStep, setCurrentStep] = useState(-1)
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
+  const [runProgress, setRunProgress] = useState<{ current: number; total: number } | null>(null)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragGhost, setDragGhost] = useState<{
     taskId: string
@@ -986,6 +1053,22 @@ export default function AutomationTasks() {
             scheduleWasRunningRef.current = true
             setIsRunning(true)
             setIsActiveStatus(true)
+            setRunStartedAt(
+              typeof status.startTime === 'number' && Number.isFinite(status.startTime) && status.startTime > 0
+                ? status.startTime
+                : null
+            )
+            const serverStep = typeof status.currentStep === 'number' ? status.currentStep + 1 : 0
+            const serverTotal = typeof status.totalSteps === 'number' && status.totalSteps > 0
+              ? status.totalSteps
+              : 0
+            setRunProgress(current => {
+              if (serverStep <= 0 || serverTotal <= 0) return current === null ? current : null
+              const next = { current: Math.min(serverStep, serverTotal), total: serverTotal }
+              return current && current.current === next.current && current.total === next.total
+                ? current
+                : next
+            })
 
             // 根据任务 ID 找到在 taskFlow 中的实际索引
             if (status.currentTaskId) {
@@ -993,8 +1076,14 @@ export default function AutomationTasks() {
                 const actualIndex = taskFlow.findIndex(t => t.id === status.currentTaskId)
                 return actualIndex !== -1 ? actualIndex : prev
               })
-            } else {
-              setCurrentStep(status.currentStep)
+            } else if (typeof status.currentStep === 'number') {
+              // 服务端 currentStep 是启用任务的 0 基索引，不能直接当 taskFlow 索引。
+              const enabledTasks = taskFlow.filter(t => t.enabled)
+              const targetTask = enabledTasks[status.currentStep]
+              const actualIndex = targetTask
+                ? taskFlow.findIndex(t => t.id === targetTask.id)
+                : -1
+              setCurrentStep(actualIndex !== -1 ? actualIndex : status.currentStep)
             }
 
             if (!stopConfirmationFailedRef.current) {
@@ -1005,6 +1094,8 @@ export default function AutomationTasks() {
             scheduleWasRunningRef.current = false
             stopConfirmationFailedRef.current = false
             setIsRunning(false)
+            setRunStartedAt(null)
+            setRunProgress(null)
             if (status.lastResult) {
               applyExecutionSummary(status.lastResult as AutomationExecutionSummary)
             }
@@ -2670,10 +2761,25 @@ export default function AutomationTasks() {
                         当前活动 · {activityName || currentActivity}
                       </span>
                     )}
+                    {isRunning && (
+                      <span className={`automation-flow-progress${isStopping ? ' is-stopping' : ''}`}>
+                        <span className="sr-only">
+                          {runProgress ? `第 ${runProgress.current} 步，共 ${runProgress.total} 步` : '任务执行中'}
+                          {isStopping ? '，正在终止' : ''}
+                        </span>
+                        <span aria-hidden="true">
+                          {isStopping ? '正在终止' : '执行中'}
+                          {runProgress ? ` · 第 ${runProgress.current}/${runProgress.total} 步` : ''}
+                          {runStartedAt !== null && <> · 已用时 <RunElapsed key={runStartedAt} startedAt={runStartedAt} /></>}
+                        </span>
+                      </span>
+                    )}
                   </p>
                 </div>
                 <span className="automation-flow-summary">
-                  {taskFlow.filter(t => t.enabled).length}/{taskFlow.length}
+                  {isRunning && runProgress
+                    ? `${runProgress.current}/${runProgress.total}`
+                    : `${taskFlow.filter(t => t.enabled).length}/${taskFlow.length}`}
                 </span>
                 <span className="sr-only" aria-live="polite">{sortAnnouncement}</span>
               </div>

@@ -473,6 +473,61 @@ describe('AutomationTasks layout surfaces', () => {
     expect(runningItem?.textContent).toContain('正在执行')
   })
 
+  it('shows server step progress and elapsed time while the flow is running', async () => {
+    mocks.loadUserConfig.mockResolvedValue({ success: true, data: { taskFlow: taskFlowFixture } })
+    mocks.getScheduleExecutionStatus.mockResolvedValue({
+      success: true,
+      data: {
+        isRunning: true,
+        currentTaskId: 'fight-1',
+        currentTask: '理智作战',
+        currentStep: 1,
+        totalSteps: 4,
+        startTime: Date.now() - 65_000,
+        message: '正在执行: 理智作战 (2/4)',
+      },
+    })
+
+    await act(async () => root.render(<AutomationTasks />))
+    await flush()
+    await flush()
+
+    const progress = container.querySelector('.automation-flow-progress')
+    expect(progress?.textContent).toContain('执行中')
+    expect(progress?.textContent).toContain('第 2/4 步')
+    expect(progress?.textContent).toMatch(/已用时 \d{2}:\d{2}/)
+    expect(container.querySelector('.automation-flow-summary')?.textContent).toBe('2/4')
+  })
+
+  it('maps the server enabled-task step onto the visible task flow', async () => {
+    const flowWithDisabledTask = taskFlowFixture.map(task => (
+      task.id === 'fight-1' ? { ...task, enabled: false } : task
+    ))
+    mocks.loadUserConfig.mockResolvedValue({ success: true, data: { taskFlow: flowWithDisabledTask } })
+    mocks.getScheduleExecutionStatus.mockResolvedValue({
+      success: true,
+      data: {
+        isRunning: true,
+        currentStep: 1,
+        totalSteps: 2,
+        currentTask: '自动公招',
+        message: '正在执行: 自动公招 (2/2)',
+      },
+    })
+
+    await act(async () => root.render(<AutomationTasks />))
+    await flush()
+    await flush()
+
+    const runningButton = Array.from(container.querySelectorAll<HTMLButtonElement>('.automation-sequence-select'))
+      .find(button => button.textContent?.includes('自动公招'))
+    const disabledButton = Array.from(container.querySelectorAll<HTMLButtonElement>('.automation-sequence-select'))
+      .find(button => button.textContent?.includes('理智作战'))
+
+    expect(runningButton?.getAttribute('aria-current')).toBe('step')
+    expect(disabledButton?.hasAttribute('aria-current')).toBe(false)
+  })
+
   it('associates dynamic labels and names compact destructive controls', async () => {
     mocks.loadUserConfig.mockResolvedValue({
       success: true,
@@ -608,6 +663,18 @@ describe('AutomationTasks layout surfaces', () => {
 
     expect(stageEditor.querySelectorAll('.automation-stage-item')).toHaveLength(2)
     expect(stageEditor.querySelector('[aria-label="关卡 3"]')).toBeNull()
+
+    const undoRow = stageEditor.querySelector('[role="status"]')
+    expect(undoRow?.textContent).toContain('已删除关卡')
+    const undoButton = Array.from(stageEditor.querySelectorAll<HTMLButtonElement>('button'))
+      .find(button => button.textContent === '撤销')
+    expect(undoButton).not.toBeNull()
+
+    await act(async () => undoButton?.click())
+    await flush()
+
+    expect(stageEditor.querySelectorAll('.automation-stage-item')).toHaveLength(3)
+    expect(stageEditor.querySelector('[aria-label="关卡 3"]')).not.toBeNull()
   })
 
   it('adds and removes the generated smart training stages from the dedicated entry', async () => {
