@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Package as PackageIcon, RefreshCw, Target, TrendingUp } from 'lucide-react'
 import { getItemIconUrl } from '../services/api'
+import { useItemIconCacheVersion } from '../hooks/useItemIconCacheVersion'
 import type { DropRecordsProps } from '@/types/components'
 import { Button, Card, EmptyState, Loading } from './common'
 import StatisticsSummary from './StatisticsSummary'
@@ -47,6 +48,7 @@ export default function DropRecords({
   isLoading = false,
   error = null,
 }: DropRecordsViewProps) {
+  useItemIconCacheVersion()
   const [failedItemImages, setFailedItemImages] = useState<Record<string, boolean>>({})
 
   if (isLoading && !dropStatistics && !error) {

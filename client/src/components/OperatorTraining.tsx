@@ -1,5 +1,6 @@
 import { getResponseErrorMessage } from '@/utils/errorMessage'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
   AlertCircle,
@@ -18,6 +19,7 @@ import { PageHeader, Card, SmoothPanel, Button, EmptyState, IconButton, Input, L
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
+import { useItemIconCacheVersion } from '../hooks/useItemIconCacheVersion'
 import type {
   MaterialHierarchyNodeProps,
   TrainingOperator,
@@ -351,6 +353,7 @@ const countOperatorsByCurrentMetaFilters = (
 }).length;
 
 export default function OperatorTraining() {
+  useItemIconCacheVersion()
   const shouldReduceMotion = useReducedMotion();
   const { setMessage: setStatusMessage } = useStatusStore()
 
@@ -402,6 +405,12 @@ export default function OperatorTraining() {
   const [visibleOperatorLimit, setVisibleOperatorLimit] = useState(OPERATOR_RENDER_BATCH_SIZE);
   const [pendingOperatorIds, setPendingOperatorIds] = useState<Set<string>>(new Set());
   const [recentlyRemoved, setRecentlyRemoved] = useState<{ item: TrainingQueueItem; index: number } | null>(null);
+
+  useEffect(() => {
+    if (!recentlyRemoved) return undefined
+    const timer = window.setTimeout(() => setRecentlyRemoved(null), 8_000)
+    return () => window.clearTimeout(timer)
+  }, [recentlyRemoved])
   const operatorsRequestRef = useRef(0);
   const statusCountsRequestRef = useRef(0);
   const settingsRequestRef = useRef(0);
@@ -1276,23 +1285,6 @@ export default function OperatorTraining() {
           </SmoothPanel>
 
           {/* 队列列表 */}
-          {recentlyRemoved && (
-            <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl px-3 py-2 status-info" role="status">
-              <span className="min-w-0 truncate text-sm">
-                已移除 {recentlyRemoved.item.operator.name}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleUndoRemove}
-                disabled={queueMutationPending}
-                className="shrink-0"
-              >
-                撤销
-              </Button>
-            </div>
-          )}
           {queueLoading ? (
             <SmoothPanel className="training-queue-loading" surfaceClassName="px-6 py-12">
               <Loading text="正在读取养成队列..." />
@@ -1550,6 +1542,29 @@ export default function OperatorTraining() {
           </aside>
         </div>
       </div>
+      {recentlyRemoved && createPortal(
+        <div
+          className="fixed bottom-24 left-1/2 z-[90] flex min-h-11 w-[min(92vw,28rem)] -translate-x-1/2 items-center justify-between gap-3 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-solid)] px-4 py-3 text-sm shadow-lg"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="min-w-0 truncate text-primary">
+            已移除 {recentlyRemoved.item.operator.name}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleUndoRemove}
+            disabled={queueMutationPending}
+            className="shrink-0"
+          >
+            撤销
+          </Button>
+        </div>,
+        document.body
+      )}
+
     </div>
   );
 }
