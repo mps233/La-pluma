@@ -1,10 +1,10 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 
-const FLOW_GRID_COLUMNS_FALLBACK = 'minmax(0, 0.78fr) minmax(0, 1.22fr)'
+const FLOW_GRID_COLUMNS_FALLBACK = 'minmax(0, 1.7fr) minmax(0, 1fr)'
 const PREVIEW_ASPECT_RATIO = 16 / 9
 const GRID_MIN_LEFT_WIDTH = 360
-const GRID_MIN_PREVIEW_WIDTH = 520
+const GRID_MIN_PREVIEW_WIDTH = 360
 
 export function useDashboardFlowLayout(enabled = true) {
   const flowGridRef = useRef<HTMLDivElement | null>(null)
@@ -69,7 +69,7 @@ export function useDashboardFlowLayout(enabled = true) {
         const targetFrameHeight = Math.max(180, stableFlowHeight - previewChromeHeight)
         const desiredPreviewWidth = targetFrameHeight * PREVIEW_ASPECT_RATIO + previewChromeWidth
         const minLeftWidth = Math.min(420, Math.max(GRID_MIN_LEFT_WIDTH, gridRect.width * 0.32))
-        const minPreviewWidth = Math.min(560, Math.max(GRID_MIN_PREVIEW_WIDTH, gridRect.width * 0.42))
+        const minPreviewWidth = GRID_MIN_PREVIEW_WIDTH
         const maxPreviewWidth = Math.max(minPreviewWidth, gridRect.width - columnGap - minLeftWidth)
         const nextPreviewWidth = Math.round(Math.min(Math.max(desiredPreviewWidth, minPreviewWidth), maxPreviewWidth))
         const nextLeftWidth = Math.max(0, Math.round(gridRect.width - columnGap - nextPreviewWidth))

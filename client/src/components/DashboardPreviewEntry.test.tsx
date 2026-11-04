@@ -28,7 +28,7 @@ vi.mock('../hooks/useDashboardPreview', () => ({
 
 vi.mock('./PreviewModeControls', () => ({
   default: () => <div>预览模式</div>,
-  PreviewAutoStartSetting: () => <div>自动恢复</div>,
+  PreviewAutoStartToggle: () => <div>自动恢复</div>,
 }))
 
 vi.mock('./common', () => ({
@@ -84,15 +84,17 @@ describe('DashboardPreviewEntry', () => {
     await act(async () => root.render(<DashboardPreviewEntry key="connecting" />))
 
     const card = container.querySelector('[data-dashboard-preview-card]')
-    expect(card?.classList.contains('status-border-beam')).toBe(true)
-    expect(card?.classList.contains('is-active')).toBe(true)
+    const frame = container.querySelector('[data-dashboard-preview-frame]')
     expect(card?.getAttribute('aria-busy')).toBe('true')
+    expect(frame?.classList.contains('status-border-beam')).toBe(true)
+    expect(frame?.classList.contains('is-active')).toBe(true)
 
     preview.isConnecting = false
     await act(async () => root.render(<DashboardPreviewEntry key="idle" />))
 
     const updatedCard = container.querySelector('[data-dashboard-preview-card]')
-    expect(updatedCard?.classList.contains('is-active')).toBe(false)
+    const updatedFrame = container.querySelector('[data-dashboard-preview-frame]')
     expect(updatedCard?.getAttribute('aria-busy')).toBe('false')
+    expect(updatedFrame?.classList.contains('is-active')).toBe(false)
   })
 })

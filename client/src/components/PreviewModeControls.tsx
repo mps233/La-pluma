@@ -18,6 +18,7 @@ const PREVIEW_MODES: ReadonlyArray<{
 
 interface PreviewModeControlsProps {
   compact?: boolean
+  fluid?: boolean
   className?: string
 }
 
@@ -27,6 +28,7 @@ interface PreviewModeControlsProps {
  */
 export function PreviewModeControls({
   compact = false,
+  fluid = false,
   className = '',
 }: PreviewModeControlsProps) {
   const shouldReduceMotion = useReducedMotion()
@@ -61,7 +63,7 @@ export function PreviewModeControls({
   }
 
   return (
-    <div className={`app-workspace-segments app-liquid-tab-pill preview-mode-shell${compact ? ' is-compact' : ''} ${className}`.trim()}>
+    <div className={`app-workspace-segments app-liquid-tab-pill preview-mode-shell${compact ? ' is-compact' : ''}${fluid ? ' is-fluid' : ''} ${className}`.trim()}>
       <div
         ref={containerRef}
         className="app-workspace-segment-list preview-mode-list"
@@ -99,7 +101,7 @@ export function PreviewModeControls({
               tabIndex={selected ? 0 : -1}
               title={option.description}
               onClick={() => setMode(option.value)}
-              className={`app-workspace-segment preview-mode-option min-h-11 ${selected ? 'is-selected' : ''}`}
+              className={`app-workspace-segment preview-mode-option ${selected ? 'is-selected' : ''}`}
             >
               <span className="app-workspace-segment-icon" aria-hidden="true">
                 <Icon strokeWidth={1.8} />
@@ -116,22 +118,19 @@ export function PreviewModeControls({
   )
 }
 
-/** 重新打开应用后是否恢复上次模式；默认关闭。 */
-export function PreviewAutoStartSetting({ compact = false }: { compact?: boolean }) {
+/** 头部紧凑开关：重新打开应用后是否恢复上次模式；默认关闭。 */
+export function PreviewAutoStartToggle() {
   const autoStart = usePreviewStore(state => state.autoStart)
   const setAutoStart = usePreviewStore(state => state.setAutoStart)
   const inputId = `preview-auto-start-${useId().replace(/:/g, '')}`
 
   return (
-    <div className={`flex items-center justify-between gap-4${compact ? ' text-xs' : ''}`}>
-      <label htmlFor={inputId} className="min-w-0 cursor-pointer">
-        <span className="block font-medium text-primary">重新打开时恢复预览</span>
-        <span className="mt-0.5 block leading-5 text-secondary">默认关闭；仅在重新打开应用后生效</span>
-      </label>
+    <div className="dashboard-preview-auto-toggle" title="重新打开应用时恢复上次预览模式">
+      <label htmlFor={inputId} className="dashboard-preview-auto-label">自动恢复</label>
       <Switch
         id={inputId}
         compact
-        label="重新打开时恢复预览"
+        label="重新打开应用时恢复上次预览模式"
         checked={autoStart}
         onChange={setAutoStart}
       />

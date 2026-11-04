@@ -938,20 +938,42 @@ export function DashboardSkeleton() {
           </div>
 
           <div ref={flowPreviewRef} className="min-w-0">
-            <SmoothPanel data-dashboard-preview-card className="status-border-beam" aria-hidden="true">
-              <div className="dashboard-preview-header flex items-center justify-between gap-3 border-b border-[var(--app-border)] px-4 py-2.5">
-                <div className="flex items-center gap-2">
-                  <Skeleton variant="circle" className="h-1.5 w-1.5" />
-                  <Skeleton variant="text" className="h-3 w-28" />
+            <SmoothPanel
+              data-dashboard-preview-card
+              className="status-border-beam"
+              surfaceClassName="automation-monitor-surface dashboard-preview-surface"
+              aria-hidden="true"
+            >
+              <div className="task-monitor-panel is-compact">
+                <div className="scrcpy-device-layout is-compact">
+                  <div className="space-y-3 min-w-0">
+                    <div className="scrcpy-view-header is-compact flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <Skeleton variant="text" className="mb-1 h-2.5 w-16" />
+                        <div className="scrcpy-view-title-row flex min-w-0 items-center gap-2">
+                          <Skeleton variant="circle" className="h-1.5 w-1.5" />
+                          <Skeleton variant="text" className="h-3 w-24" />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Skeleton variant="rect" className="h-6 w-14 rounded-full" />
+                        <Skeleton variant="rect" className="h-6 w-10 rounded-full" />
+                      </div>
+                    </div>
+                    <div
+                      data-dashboard-preview-frame
+                      className="scrcpy-video-frame is-empty relative aspect-video w-full overflow-hidden"
+                    >
+                      <Skeleton variant="rect" className="absolute inset-[12%] h-auto w-auto rounded-xl opacity-60" />
+                    </div>
+                    <div className="dashboard-preview-settings">
+                      <div className="dashboard-preview-setting-row">
+                        <Skeleton variant="text" className="h-3 w-12" />
+                        <Skeleton variant="rect" className="h-8 w-full rounded-full" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Skeleton variant="text" className="hidden h-2.5 w-14 sm:block" />
-                  <Skeleton variant="rect" className="h-11 w-14 rounded-xl sm:h-9" />
-                </div>
-              </div>
-              <div data-dashboard-preview-frame className="dashboard-preview-frame relative aspect-video w-full overflow-hidden bg-black">
-                <Skeleton variant="rect" className="absolute inset-[12%] h-auto w-auto rounded-xl opacity-60" />
-                <Skeleton variant="rect" className="absolute left-2 top-2 h-6 w-16 rounded-lg" />
               </div>
             </SmoothPanel>
           </div>
