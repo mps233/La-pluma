@@ -1,6 +1,8 @@
 import type { HTMLAttributes } from 'react'
 import SmoothSurface from './SmoothSurface'
 
+// Keep in sync with --app-continuous-radius (20px) and
+// --app-continuous-radius-compact (16px) in ios-theme.css.
 const PANEL_RADII = {
   panel: 20,
   compact: 16,

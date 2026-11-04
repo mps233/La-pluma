@@ -40,7 +40,7 @@ Props：
 - `actions` (ReactNode) - 右侧操作区域
 - `mobileLayout` (`stack` | `inline`) - 手机端操作布局；默认 `stack`，仅标题和操作足够紧凑时使用 `inline`
 
-页面标题统一使用全局品牌色，不再按页面传入独立渐变。
+页面标题使用 `--app-text`（`text-primary`），不要在页面里传入渐变色或品牌色。
 
 ---
 
@@ -51,7 +51,7 @@ Props：
 ```tsx
 import { Card, CardHeader, CardContent, Button } from '@/components/common'
 
-<Card smoothCorners>
+<Card smoothCorners className="!p-0">
   <CardHeader
     icon={<Icons.Package />}
     title="材料掉落统计"
@@ -72,7 +72,7 @@ Card Props：
 
 `CardHeader` 支持 `icon`、`title`、`actions`；`CardContent` 支持 `className`。
 
-需要让非 `Card` 面板使用同一连续曲率时，优先使用 `SmoothPanel`。它由未裁切的阴影外壳和 Lisse 内表面组成；常规面板为 `20px / 80%`，短小信息卡传入 `cornerSize="compact"` 使用 `16px / 80%`。只有本身没有外阴影的圆角矩形才直接使用 `SmoothSurface`，因为它的 `clip-path` 会裁掉外阴影。
+需要让非 `Card` 面板使用同一连续曲率时，优先使用 `SmoothPanel`。它由未裁切的阴影外壳和 Lisse 内表面组成；常规面板为 `20px / 80%`，短小信息卡传入 `cornerSize="compact"` 使用 `16px / 80%`。只有本身没有外阴影的圆角矩形才直接使用 `SmoothSurface`（从 `@/components/common/SmoothSurface` 直接导入；它不是 barrel 导出），因为它的 `clip-path` 会裁掉外阴影。
 
 `ios-workspace-page` 只提升显式开启连续圆角的一级 `Card` / `SmoothPanel`；卡内 `surface-soft`、菜单、输入和高密度列表项保持普通圆角。一级工作区标题与控制台一致，不添加装饰图标，并显式使用 `mobileLayout="inline"`；长状态由 `FloatingStatusIndicator` 在右侧截断。
 
@@ -188,14 +188,21 @@ import { Input, Select, Checkbox, Switch } from '@/components/common'
   onChange={setContinueOnFailure}
 />
 
-<Switch
-  label="启用定时执行"
-  checked={scheduleEnabled}
-  onChange={setScheduleEnabled}
-/>
+<div className="flex items-center justify-between gap-4">
+  <div>
+    <label htmlFor="schedule-enabled" className="text-sm font-medium text-primary">启用定时执行</label>
+    <p className="text-xs text-tertiary">每天按设定时间执行</p>
+  </div>
+  <Switch
+    id="schedule-enabled"
+    label="启用定时执行"
+    checked={scheduleEnabled}
+    onChange={setScheduleEnabled}
+  />
+</div>
 ```
 
-表单错误态使用 `error` prop，不要在页面里单独手写红色边框和错误文字。`Input`、`Select` 均支持 `hint`；`Input` 额外支持前置 `icon`。二元设置使用 `Switch`，多选或参数组合使用 `Checkbox`；多行文本使用带 `app-input control-surface` 的原生 `textarea`。
+表单错误态使用 `error` prop，不要在页面里单独手写红色边框和错误文字。`Input`、`Select` 均支持 `hint`；`Input` 额外支持前置 `icon`。二元设置使用 `Switch`，多选或参数组合使用 `Checkbox`；多行文本使用带 `app-input control-surface !h-auto !min-h-28 resize-y px-3 py-2` 的原生 `textarea`（`app-input` 在手机端会被 44px 的 `!important` 高度规则覆盖）。
 
 ---
 

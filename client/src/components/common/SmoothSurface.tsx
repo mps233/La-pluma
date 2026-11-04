@@ -1,6 +1,7 @@
 import { useSmoothCorners } from '@lisse/react'
 import { useMemo, useRef, type HTMLAttributes } from 'react'
 
+// Keep in sync with --app-continuous-radius (1.25rem) in ios-theme.css.
 const IOS_CONTINUOUS_RADIUS = 20
 const IOS_CONTINUOUS_SMOOTHING = 0.8
 

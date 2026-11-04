@@ -34,16 +34,15 @@ Read these before broad work:
 
 ## Frontend And Design
 
-`DESIGN.md` is the authoritative visual and component spec, and `client/src/components/common/README.md` documents component props. Both are committed. When a rule changes, edit those files instead of restating the rule here, so there is exactly one copy of each rule. Tooling that generates its own `DESIGN.md` (design linters, prompt packs, `/impeccable document`) must merge into this file or write elsewhere; never let it overwrite the committed spec.
+`DESIGN.md` is the authoritative visual and component spec, and `client/src/components/common/README.md` documents component props. Both are committed. When a rule changes, edit those files; the list below is only a short pointer for agents that have not read the spec yet, not a second copy of the rules. Tooling that generates its own `DESIGN.md` (design linters, prompt packs, `/impeccable document`) must merge into this file or write elsewhere; never let it overwrite the committed spec.
 
-Non-negotiables:
+Non-negotiables (these are pointers; `DESIGN.md` is authoritative if the summary and the spec differ):
 
-- Prefer the components exported from `@/components/common` and the existing semantic `app-*` classes over new parallel implementations. Do not reference or import components and packages the repository does not contain; verify the export exists before citing it.
-- Continuous-corner surfaces use the existing `SmoothPanel` / `Card smoothCorners` primitives (with `SmoothSurface` underneath). Keep clipping, corners, and motion inside those components instead of hand-building a second material layer.
-- Brand color plus semantic status colors only. No page-specific palettes, bright gradients, colored glow shadows, or decorative color noise.
-- Read control sizes, radii, and spacing from the tokens in `client/src/index.css` and `client/src/ios-theme.css`; the iOS shell overrides several base values. Cite the token rather than a number, and never shrink standard controls at call sites.
+- Read `DESIGN.md` and `client/src/components/common/README.md` before UI work; use the components exported from `@/components/common` and the existing semantic `app-*` classes. Do not build parallel implementations or import things the repository does not export.
+- Brand color plus semantic status colors only; game-resource rarity colors are the documented exception. No page-specific palettes, bright gradients, colored glow shadows, or decorative color noise.
+- Read control sizes, radii, and spacing from the tokens in `client/src/index.css` and `client/src/ios-theme.css`; cite the token rather than a number, and never shrink standard controls at call sites.
 - Do not nest cards for ordinary page sections. Use headers, dividers, grids, or transparent internal groups.
-- Static cards must not gain hover translation, flashing shadow, or transient blur.
+- Static cards must not gain hover translation, flashing shadow, or transient blur; only genuinely clickable cards use the documented hover treatment.
 - Every interactive control needs `focus-visible`, disabled, and loading behavior. Motion must respect reduced-motion preferences.
 - Verify changed UI at desktop and mobile widths in both light and dark themes, across initial, loading, empty, error, disabled, and long-content states. Check contrast from the rendered page in each theme; a single-theme check misses failures.
 - User-facing Chinese copy should describe purpose, state, or outcome. Do not expose internal implementation details, fallback mechanisms, or developer terminology as subtitles.
