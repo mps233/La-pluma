@@ -89,8 +89,10 @@ loggerManager.clearAll();
 - `npm run typecheck` 使用固定的 TypeScript 5.9.3；`check:repo` 要求仓库内全部 TypeScript（含测试与构建配置）显式 `any` 为 0，并禁止 catch 变量显式 any。`npm run check:repo` 会拒绝任何 tracked `.js/.jsx/.mjs/.cjs`，并要求每个 `.ts/.tsx` 被 server/client 的 tsconfig 覆盖。
 - Run 记录包含 `trigger`、`progress` 和 `taskResults`；`POST /api/agent/runs/{runId}/stop` 可按 id 取消 `accepted` run，或在它是当前执行时停止设备任务。
 - 作业集执行（`/api/agent/copilot-sets/:id/execute`）会创建 `run_copilot_set` Run；活动期间的 `progress.setId` 标识作业集，`taskResults` 按条目记录 `pending` / `running` / `success` / `failed` / `stopped`，页面不再自行推断当前关卡。
+- 手动作业集通过 `POST /api/agent/copilot-sets/{id}/manual/start` 启动；条目完成后 Run 进入 `waiting` 且不持有设备租约，`POST /api/agent/actions/continue-copilot-set` 携带 `runId` 继续下一关，`POST /api/agent/runs/{runId}/stop` 可在等待或执行中停止。
 - 作业集战斗期间每 5 秒截取一次设备画面并识别顶部敌人计数，写入 Run `progress.battle`（`kills` / `total`）。OCR 仅用于展示，失败不会阻止或重试 MAA；识别的敌人总数优先采用 MAA 日志中当前关卡的 `Kills` 记录。默认开启，`LA_PLUMA_BATTLE_OCR=0` 可关闭，`LA_PLUMA_BATTLE_OCR_INTERVAL_MS` 可调整采样间隔（2000–60000 毫秒）。首次使用需要在临时目录缓存 `eng.traineddata`。
 - `/api/agent/activity/run` 在 `waitForCompletion:false` 时先返回 accepted，活动导航和作业执行在后台继续；完成或失败后通过同一 Run 的 `onSettled` 写入终态，调用方应轮询 `runId` 而不是把 HTTP 202 当成完成。
+- MAA Core 安装、更新与热更新的同步命令使用维护超时，默认 15 分钟，`LA_PLUMA_MAA_MAINTENANCE_TIMEOUT_MS` 可调整（上限 1 小时）；其他配置查询命令仍使用 15 秒硬超时，超时会终止 CLI 子进程而不是无限等待。
 - MAA 执行租约用同目录临时文件 + fsync + link 原子发布，记录 token/host/runId；无法解析的锁按 unknown fail-closed，不自动回收。确认没有 MAA 进程后，可手动删除 `LA_PLUMA_MAA_LOCK_FILE`（默认 `server/data/maa-execution.lock`）恢复。
 - `fileHelper` 的 JSON 写入使用临时文件 + fsync + rename；读取损坏文件抛 `JsonFileParseError`，写入失败抛带 `committed` 的 `FileWriteError`。
 
