@@ -2114,16 +2114,8 @@ html.la-pluma-standalone #app-root .page {
   border: 0;
 }
 
-/* Device and summary cards are grouped content, so give them the solid iOS
-   grouped surface. Their former translucent gray nearly matched the page and
-   made the top of summary cards disappear after the outer stroke was removed. */
-.la-pluma-app .dashboard-page .dashboard-device-card,
-.la-pluma-app .dashboard-page .dashboard-summary-card > .app-card-smooth-surface {
-  background: var(--app-surface-solid);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
+/* Device and summary cards share the workspace glass material; their former
+   solid fill is intentionally not restored here. */
 .la-pluma-app .dashboard-page .dashboard-summary-header {
   background: transparent;
 }
@@ -2344,6 +2336,8 @@ html.la-pluma-standalone #app-root .page {
   )::before {
     display: none;
   }
+
+
 }
 
 @media (prefers-contrast: more) {
@@ -2365,6 +2359,7 @@ html.la-pluma-standalone #app-root .page {
   .la-pluma-app .app-liquid-tab-pill::before {
     display: none;
   }
+
 }
 
 /* Native business controls use the same iOS touch target and glass surface as
@@ -2625,8 +2620,7 @@ html.dark .la-pluma-app .la-pluma-content .app-native-control,
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 16%, transparent);
 }
 
-/* Apple Liquid Glass keeps ordinary Automation content solid. The preview
-   controls and task picker remain the only translucent layers in this view. */
+/* Automation and workbench panels share the workspace glass material. */
 .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .smooth-panel-shell[data-smooth-corners='true'] {
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.05),
@@ -2635,16 +2629,44 @@ html.dark .la-pluma-app .la-pluma-content .app-native-control,
 
 .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .smooth-panel-surface {
   border: 0;
-  background: var(--app-surface-solid);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
 }
 
-.la-pluma-app [data-workbench-tasks] .app-card-smooth-surface {
-  border: 0;
+/* Liquid Glass workspace surfaces: cards stay readable while the ambient
+   background remains faintly visible behind them. */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .la-pluma-content .smooth-panel-surface,
+  .la-pluma-content .app-card-smooth-surface {
+    --app-glass-card-fill: color-mix(in srgb, var(--app-glass-bg) 88%, transparent);
+    --app-glass-card-background:
+      linear-gradient(180deg, var(--la-pluma-liquid-surface-lift), transparent 34%),
+      var(--app-glass-card-fill);
+    --app-glass-card-filter: blur(20px) saturate(160%);
+    background: var(--app-glass-card-background);
+    -webkit-backdrop-filter: var(--app-glass-card-filter);
+    backdrop-filter: var(--app-glass-card-filter);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--app-glass-border) 68%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--la-pluma-liquid-edge-light) 55%, transparent),
+      inset 0 -1px 0 color-mix(in srgb, var(--app-glass-border) 42%, transparent);
+  }
+
+  html.dark .la-pluma-content .smooth-panel-surface,
+  html.dark .la-pluma-content .app-card-smooth-surface,
+  .la-pluma-app.dark .la-pluma-content .smooth-panel-surface,
+  .la-pluma-app.dark .la-pluma-content .app-card-smooth-surface {
+    --app-glass-card-fill: color-mix(in srgb, var(--app-glass-bg) 80%, var(--app-surface-solid));
+  }
+
+  .la-pluma-content .data-statistics-task-card.is-active > .app-card-smooth-surface {
+    background:
+      linear-gradient(180deg, var(--la-pluma-liquid-surface-lift), transparent 34%),
+      color-mix(in srgb, var(--app-info) 8%, var(--app-glass-card-fill));
+  }
+}
+
+/* Dense text surfaces remain opaque inside the glass cards. */
+.la-pluma-content .log-console {
   background: var(--app-surface-solid);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
 }
 
 html.dark .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .smooth-panel-shell[data-smooth-corners='true'],

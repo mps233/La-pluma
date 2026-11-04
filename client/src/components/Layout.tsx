@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useReducedMotion, type PanInfo } from 'framer-
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, Search, Settings2, Swords, Wrench, X } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
+import AeroBackdrop from './backgrounds/AeroBackdrop'
 import { useUIStore } from '@/stores'
 import { appTabFromPath, appTabPath, isAppTab, type AppTab } from '@/stores/uiStore'
 import {
@@ -392,6 +393,7 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className="view view-main la-pluma-view">
       <div className="page no-swipeback la-pluma-page" data-name="la-pluma">
+        <AeroBackdrop />
         <div className="la-pluma-sidebar-frame" aria-hidden="true" />
         <header className="navbar la-pluma-navbar">
           <div className="navbar-bg" aria-hidden="true" />
