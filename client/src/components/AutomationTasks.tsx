@@ -9,6 +9,8 @@ import ScreenMonitor from './ScreenMonitor'
 import NotificationSettings from './NotificationSettings'
 import { EmptyState, PageHeader, Button, IconButton, SmoothPanel, Switch } from './common'
 import { useStatusStore } from '../store/statusStore'
+import { useRunStore } from '../store/runStore'
+import type { RunTaskResult } from '../types/run'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import type {
   AutomationAvailableTask,
@@ -894,6 +896,17 @@ function AutomationStageEditor({
 }
 
 export default function AutomationTasks() {
+  const currentRun = useRunStore(state => state.run)
+  const runTaskResults = currentRun?.taskResults ?? currentRun?.progress?.taskResults ?? []
+  const runResultById = new Map<string, RunTaskResult>()
+  for (const result of runTaskResults) {
+    const id = typeof result.id === 'string'
+      ? result.id
+      : typeof result.name === 'string'
+        ? result.name
+        : null
+    if (id) runResultById.set(id, result)
+  }
   const shouldReduceMotion = useReducedMotion()
   const { setMessage: setStatusMessage, setActive: setIsActiveStatus } = useStatusStore()
   const { isAvailable: automationAvailable, unavailableMessage } = useAutomationAvailability()
@@ -1927,7 +1940,7 @@ export default function AutomationTasks() {
         params += ` --stone ${task.params.stone}`
       }
       if (task.params?.series !== undefined && task.params.series !== '' && String(task.params.series) !== '1') {
-        params += ` --series ${task.params.series}`
+        params += ` --series=${task.params.series}`
       }
       const dropTargets = parseDropTargetEntries(task.params?.drops)
       if (dropTargets === null) {
@@ -2048,7 +2061,7 @@ export default function AutomationTasks() {
     // 调用后端 API 终止任务，并等待任务流程真正退出；未确认时自动重发停止请求
     try {
       for (let attempt = 1; attempt <= STOP_CONFIRMATION_MAX_ATTEMPTS; attempt += 1) {
-        const result = await maaApi.stopTask()
+        const result = await maaApi.stopTask(currentRun?.runId ?? null)
         if (stopController.signal.aborted || runGenerationRef.current !== stopGeneration) return
 
         const taskStopped = Boolean(result.data?.task?.success)
@@ -2320,7 +2333,7 @@ export default function AutomationTasks() {
 
       // 2. 获取当前活动信息
       try {
-        const activityResult = await maaApi.getActivity('Official')
+        const activityResult = await maaApi.getActivity()
         if (cancelled) return
         if (activityResult.success && activityResult.data?.code) {
           setCurrentActivity(activityResult.data.code)
@@ -2796,7 +2809,32 @@ export default function AutomationTasks() {
                 <div className="automation-sequence-list">
                   {taskFlow.map((task, index) => {
                     const isCurrentStep = isRunning && currentStep === index
-                    const isCompletedStep = isRunning && task.enabled && currentStep > index
+                    const runResult = runResultById.get(task.id)
+                    const rawResultState = typeof runResult?.state === 'string'
+                      ? runResult.state
+                      : typeof runResult?.status === 'string'
+                        ? runResult.status
+                        : null
+                    const runSettledState = rawResultState === 'success'
+                      || rawResultState === 'failed'
+                      || rawResultState === 'skipped'
+                      || rawResultState === 'stopped'
+                      ? rawResultState
+                      : null
+                    const executionState = runSettledState
+                      || (isCurrentStep ? 'running' : isRunning && task.enabled && currentStep > index ? 'completed' : 'idle')
+                    const isCompletedStep = executionState !== 'idle' && executionState !== 'running'
+                    const executionLabel = executionState === 'failed'
+                      ? '失败'
+                      : executionState === 'skipped'
+                        ? '已跳过'
+                        : executionState === 'stopped'
+                          ? '已终止'
+                          : executionState === 'running'
+                            ? '正在执行'
+                            : executionState === 'completed'
+                              ? '已完成'
+                              : task.description
                     const isSelectedTask = activeTaskId === task.id
 
                     return (
@@ -2845,23 +2883,27 @@ export default function AutomationTasks() {
                         <span className="automation-sequence-node" aria-hidden="true">
                           <AnimatePresence initial={false} mode="wait">
                             <motion.span
-                              key={isCompletedStep ? 'completed' : isCurrentStep ? 'current' : 'pending'}
+                              key={executionState}
                               initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7 }}
                               animate={{ opacity: 1, scale: 1 }}
                               exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.7 }}
                               transition={{ duration: shouldReduceMotion ? 0 : 0.16 }}
                             >
-                              {isCompletedStep
-                                ? <Check size={11} strokeWidth={2.8} />
-                                : isCurrentStep
-                                  ? <LoaderCircle className="automation-sequence-progress" size={13} strokeWidth={2.3} />
-                                : String(index + 1).padStart(2, '0')}
+                              {executionState === 'failed'
+                                ? <AlertTriangle size={11} strokeWidth={2.8} />
+                                : executionState === 'skipped' || executionState === 'stopped'
+                                  ? <Minus size={11} strokeWidth={2.8} />
+                                  : isCompletedStep
+                                    ? <Check size={11} strokeWidth={2.8} />
+                                    : isCurrentStep
+                                      ? <LoaderCircle className="automation-sequence-progress" size={13} strokeWidth={2.3} />
+                                      : String(index + 1).padStart(2, '0')}
                             </motion.span>
                           </AnimatePresence>
                         </span>
                         <span className="automation-sequence-copy">
                           <strong>{task.name}</strong>
-                          <small>{isCurrentStep ? '正在执行' : isCompletedStep ? '已完成' : task.description}</small>
+                          <small>{executionLabel}</small>
                         </span>
                       </button>
                       <span className="automation-sequence-enabled" data-drag-ignore>
@@ -2873,7 +2915,15 @@ export default function AutomationTasks() {
                           label={`${task.name}启用状态`}
                         />
                       </span>
-                      {isCompletedStep ? (
+                      {executionState === 'failed' ? (
+                        <span className="automation-completed-mark" role="img" aria-label="失败" title="失败">
+                          <AlertTriangle size={13} strokeWidth={2.6} aria-hidden="true" />
+                        </span>
+                      ) : executionState === 'skipped' || executionState === 'stopped' ? (
+                        <span className="automation-completed-mark" role="img" aria-label={executionLabel} title={executionLabel}>
+                          <Minus size={13} strokeWidth={2.6} aria-hidden="true" />
+                        </span>
+                      ) : isCompletedStep ? (
                         <span className="automation-completed-mark" role="img" aria-label="已完成" title="已完成">
                           <Check size={13} strokeWidth={2.6} aria-hidden="true" />
                         </span>
