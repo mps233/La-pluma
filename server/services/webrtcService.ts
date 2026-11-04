@@ -15,8 +15,10 @@ import path from 'path'
 import { setTimeout as delay } from 'timers/promises'
 import { DEFAULT_ADB_ADDRESS, DEFAULT_ADB_PATH } from '../config/connectionDefaults.ts'
 import { ensureDir, readJsonFile, writeJsonFile } from '../utils/fileHelper.ts'
+import { createLogger } from '../utils/logger.ts'
 
 const execFileAsync = promisify(execFile)
+const logger = createLogger('Webrtc')
 
 export { DEFAULT_ADB_PATH }
 
@@ -112,6 +114,7 @@ interface WebrtcStatus extends WebrtcLogPaths {
   agentRunning: boolean
   usingDefaultPassword: boolean
   deviceAddress: string
+  runtimeVersion: string | null
 }
 
 interface WebrtcReleaseInfo {
@@ -878,11 +881,21 @@ export async function installWebrtcReleaseDirectory(
   const { platformDir } = await validateWebrtcReleaseLayout(releaseRoot, { platform, arch })
 
   if (await isWebrtcServerReachable()) {
-    throw createWebrtcError(
-      'WEBRTC_INSTALL_SERVER_RUNNING',
-      'WebRTC 服务正在运行，请先停止服务后再安装或升级组件',
-      { retryable: true }
-    )
+    if (!hasManagedWebrtcResources()) {
+      throw createWebrtcError(
+        'WEBRTC_INSTALL_SERVER_RUNNING',
+        'WebRTC 服务正在运行且不是由本实例启动，请先停止外部服务后再安装或升级组件',
+        { retryable: true }
+      )
+    }
+    await stopWebrtc()
+    if (await isWebrtcServerReachable()) {
+      throw createWebrtcError(
+        'WEBRTC_INSTALL_SERVER_RUNNING',
+        'WebRTC 服务仍在运行，请先停止服务后再安装或升级组件',
+        { retryable: true }
+      )
+    }
   }
 
   const parentDir = path.dirname(WEBRTC_DIR) || process.cwd()
@@ -1136,6 +1149,65 @@ export async function getWebrtcDevices({ throwOnError = false }: { throwOnError?
   return records.filter(record => record.online).map(record => record.id)
 }
 
+async function getUpstreamViewerCount(): Promise<number> {
+  try {
+    const response = await fetchWebrtcAuthorized('/devices')
+    if (!response.ok) return 0
+    const data: unknown = await response.json()
+    if (!Array.isArray(data)) return 0
+    let count = 0
+    for (const item of data) {
+      if (!isRecord(item)) continue
+      if (typeof item.client_count === 'number' && Number.isFinite(item.client_count)) {
+        count += Math.max(0, Math.trunc(item.client_count))
+      } else if (Array.isArray(item.clients)) {
+        count += item.clients.length
+      }
+    }
+    return count
+  } catch {
+    return 0
+  }
+}
+
+let gatewayViewerCount = 0
+let viewerIdleTimer: NodeJS.Timeout | null = null
+
+/**
+ * 网关最后一个 viewer 离开后，仅在确认没有上游观看者且 Agent 由本实例启动时
+ * 释放设备端 Agent；信令与 TURN 保持运行，新的 view。 会重新触发启动。
+ */
+export function handleWebrtcViewerCountChange(count: number): void {
+  gatewayViewerCount = Math.max(0, count)
+  if (gatewayViewerCount > 0) {
+    if (viewerIdleTimer) clearTimeout(viewerIdleTimer)
+    viewerIdleTimer = null
+    return
+  }
+  if (!registeredAgentOwner) return
+  if (viewerIdleTimer) clearTimeout(viewerIdleTimer)
+  viewerIdleTimer = setTimeout(() => {
+    viewerIdleTimer = null
+    void (async () => {
+      if (gatewayViewerCount > 0) return
+      const upstreamViewers = await getUpstreamViewerCount()
+      if (upstreamViewers > 0) return
+      const owner = registeredAgentOwner
+      if (!owner) return
+      try {
+        await stopWebrtcAgent(owner.address, owner.adbPath)
+        logger.info('预览无观看者，已释放设备端 Agent', { deviceId: owner.deviceId })
+      } catch (error) {
+        logger.warn('预览空闲释放设备端 Agent 失败', {
+          deviceId: owner.deviceId,
+          error: getErrorMessage(error)
+        })
+      }
+    })()
+  }, 3_000)
+  viewerIdleTimer.unref?.()
+}
+
 export async function waitForWebrtcServerReady({
   timeoutMs = WEBRTC_SERVER_START_TIMEOUT_MS,
   pollIntervalMs = WEBRTC_START_POLL_INTERVAL_MS,
@@ -1245,12 +1317,12 @@ async function startLocalTurnServerUnlocked(): Promise<void> {
   const turnserver = '/opt/homebrew/bin/turnserver'
   if (!await pathExists(turnserver)) return
   const { turnLog } = await getWebrtcLogPaths()
+  const lanIp = await getMacLanIp()
   const child = spawnWithLog(turnserver, [
     '-n',
-    '--no-cli',
     '--no-tls',
-    '--no-dtls',
     '-L', '0.0.0.0',
+    '--external-ip', lanIp,
     '-p', String(WEBRTC_TURN_PORT),
     '-a',
     '-u', `${WEBRTC_TURN_USERNAME}:${WEBRTC_TURN_PASSWORD}`,
@@ -1264,6 +1336,8 @@ async function startLocalTurnServerUnlocked(): Promise<void> {
 
 async function killLocalWebrtcInfrastructureUnlocked(address: string, adbPath: string): Promise<void> {
   const owner = registeredAgentOwner
+  const ownedServer = Boolean(webrtcServerProcess)
+  const ownedTurn = Boolean(webrtcTurnProcess)
   terminateAgentDeployment(webrtcAgentProcess)
   if (webrtcServerProcess && !webrtcServerProcess.killed) webrtcServerProcess.kill('SIGTERM')
   if (webrtcTurnProcess && !webrtcTurnProcess.killed) webrtcTurnProcess.kill('SIGTERM')
@@ -1272,12 +1346,10 @@ async function killLocalWebrtcInfrastructureUnlocked(address: string, adbPath: s
   webrtcTurnProcess = null
   registeredAgentOwner = null
 
-  await killListeningPidsOnTcpPort(WEBRTC_PORT)
-  await killListeningPidsOnTcpPort(WEBRTC_TURN_PORT)
-  if (owner && owner.address !== address) {
-    await stopRemoteWebrtcAgent(owner.address, owner.adbPath)
-  }
-  await stopRemoteWebrtcAgent(address, adbPath)
+  // 只回收本实例启动的服务/TURN；port 上若仍是外部资源，不在这里杀掉。
+  if (ownedServer) await killListeningPidsOnTcpPort(WEBRTC_PORT)
+  if (ownedTurn) await killListeningPidsOnTcpPort(WEBRTC_TURN_PORT)
+  if (owner) await stopRemoteWebrtcAgent(owner.address, owner.adbPath)
 }
 
 export async function getWebrtcStatus(
@@ -1302,13 +1374,19 @@ export async function getWebrtcStatus(
     lanUrl: `http://${lanIp}:${WEBRTC_PORT}`,
     signalingUrl: '/webrtc-signaling',
     directSignalingUrl: `ws://${lanIp}:${WEBRTC_PORT}`,
-    turnRunning: !!webrtcTurnProcess && !webrtcTurnProcess.killed,
+    turnRunning: !!webrtcTurnProcess && !webrtcTurnProcess.killed
+      || await isProcessListeningOnTcpPort(WEBRTC_TURN_PORT),
     serverRunning: (!!webrtcServerProcess && !webrtcServerProcess.killed) || serverReachable,
     agentRunning: (!!webrtcAgentProcess && !webrtcAgentProcess.killed) || deviceAgentRunning,
     usingDefaultPassword: WEBRTC_PASSWORD === DEFAULT_WEBRTC_PASSWORD,
     deviceAddress: address,
+    runtimeVersion: await getWebrtcServerVersion().catch(() => null),
     ...logPaths
   }
+}
+
+export function hasManagedWebrtcResources(): boolean {
+  return Boolean(webrtcServerProcess || webrtcTurnProcess || registeredAgentOwner)
 }
 
 export async function installWebrtc(options: InstallWebrtcOptions = {}): Promise<WebrtcStatus> {
@@ -1431,6 +1509,8 @@ export function startWebrtcInstall({ install = installWebrtc, ...options }: Star
 
 async function startWebrtcServerUnlocked(address: string, adbPath: string): Promise<WebrtcStatus> {
   if (await isWebrtcServerReachable()) {
+    // 信令可能由上一个实例或外部启动；TURN 仍可能缺失，不能直接返回。
+    await startLocalTurnServerUnlocked()
     return getWebrtcStatus(address, adbPath)
   }
 

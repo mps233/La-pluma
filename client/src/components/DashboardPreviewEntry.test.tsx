@@ -8,6 +8,7 @@ import DashboardPreviewEntry from './DashboardPreviewEntry'
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const preview = vi.hoisted(() => ({
+  mode: 'snapshot' as 'off' | 'snapshot' | 'live',
   fallbackSnapshot: 'data:image/png;base64,c25hcHNob3Q=',
   showLivePreview: false,
   isConnecting: false,
@@ -15,6 +16,7 @@ const preview = vi.hoisted(() => ({
 
 vi.mock('../hooks/useDashboardPreview', () => ({
   useDashboardPreview: () => ({
+    mode: preview.mode,
     videoRef: { current: null },
     fallbackSnapshot: preview.fallbackSnapshot,
     showLivePreview: preview.showLivePreview,
@@ -22,6 +24,11 @@ vi.mock('../hooks/useDashboardPreview', () => ({
     statusText: '快照可用',
     headerStatusText: '已连接',
   }),
+}))
+
+vi.mock('./PreviewModeControls', () => ({
+  default: () => <div>预览模式</div>,
+  PreviewAutoStartSetting: () => <div>自动恢复</div>,
 }))
 
 vi.mock('./common', () => ({
@@ -43,6 +50,7 @@ let root: Root
 
 describe('DashboardPreviewEntry', () => {
   beforeEach(() => {
+    preview.mode = 'snapshot'
     preview.fallbackSnapshot = 'data:image/png;base64,c25hcHNob3Q='
     preview.showLivePreview = false
     preview.isConnecting = false
@@ -56,28 +64,24 @@ describe('DashboardPreviewEntry', () => {
     container.remove()
   })
 
-  it('names the full-frame snapshot action and opens the preview', async () => {
-    const onOpen = vi.fn()
-    await act(async () => root.render(<DashboardPreviewEntry onOpen={onOpen} />))
+  it('renders the snapshot without navigating away from the overview', async () => {
+    await act(async () => root.render(<DashboardPreviewEntry />))
 
-    const frameButton = container.querySelector<HTMLButtonElement>('button[aria-label="打开模拟器画面快照"]')
-    expect(frameButton).not.toBeNull()
-    await act(async () => frameButton?.click())
-    expect(onOpen).toHaveBeenCalledOnce()
+    expect(container.querySelector('img[alt="模拟器画面快照"]')).not.toBeNull()
+    expect(container.querySelector('button[aria-label="打开模拟器画面快照"]')).toBeNull()
     expect(container.querySelector('video')?.getAttribute('aria-hidden')).toBe('true')
-    expect(Array.from(container.querySelectorAll('button')).find(button => button.textContent === '打开')?.classList.contains('min-h-11')).toBe(true)
   })
 
-  it('uses a live-preview name while video is available', async () => {
+  it('renders a live video frame when available', async () => {
     preview.showLivePreview = true
-    await act(async () => root.render(<DashboardPreviewEntry onOpen={vi.fn()} />))
+    await act(async () => root.render(<DashboardPreviewEntry />))
 
-    expect(container.querySelector('button[aria-label="打开模拟器实时预览"]')).not.toBeNull()
+    expect(container.querySelector('video')?.className).toContain('opacity-100')
   })
 
   it('activates the border beam only during WebRTC connection', async () => {
     preview.isConnecting = true
-    await act(async () => root.render(<DashboardPreviewEntry onOpen={vi.fn()} />))
+    await act(async () => root.render(<DashboardPreviewEntry key="connecting" />))
 
     const card = container.querySelector('[data-dashboard-preview-card]')
     expect(card?.classList.contains('status-border-beam')).toBe(true)
@@ -85,9 +89,10 @@ describe('DashboardPreviewEntry', () => {
     expect(card?.getAttribute('aria-busy')).toBe('true')
 
     preview.isConnecting = false
-    await act(async () => root.render(<DashboardPreviewEntry onOpen={vi.fn()} />))
+    await act(async () => root.render(<DashboardPreviewEntry key="idle" />))
 
-    expect(card?.classList.contains('is-active')).toBe(false)
-    expect(card?.getAttribute('aria-busy')).toBe('false')
+    const updatedCard = container.querySelector('[data-dashboard-preview-card]')
+    expect(updatedCard?.classList.contains('is-active')).toBe(false)
+    expect(updatedCard?.getAttribute('aria-busy')).toBe('false')
   })
 })

@@ -2,7 +2,9 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal } from 'react-dom'
 import { ArrowLeft, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
 import { Button, Tooltip } from './common'
-import { useScrcpyWebRTC, type VideoStats } from '../hooks/useScrcpyWebRTC'
+import { previewQualityPresets, usePreviewStore, type PreviewQuality } from '../stores'
+import type { VideoStats } from '../hooks/useScrcpyWebRTC'
+import { usePreviewConnection } from '../contexts/previewSession'
 
 interface ScrcpyDeviceViewProps {
   enabled: boolean
@@ -12,6 +14,7 @@ interface ScrcpyDeviceViewProps {
   deviceId?: string
   signalingUrl?: string
   onStartInfrastructure?: () => Promise<string | undefined> | string | undefined
+  onCancelInfrastructure?: () => void
   autoConnect?: boolean
   onStatusChange?: (status: string, stats: VideoStats | null, error: string | null) => void
   infrastructureStatus?: {
@@ -47,17 +50,12 @@ const statusLabel: Record<string, string> = {
   error: '连接失败'
 }
 
-const qualityPresets = {
-  smooth: { label: '流畅', fps: 30, maxSize: 960, bitrateMbps: 4, maxBitrateMbps: 8 },
-  balanced: { label: '均衡', fps: 45, maxSize: 1280, bitrateMbps: 8, maxBitrateMbps: 16 },
-  crisp: { label: '清晰', fps: 60, maxSize: 1600, bitrateMbps: 14, maxBitrateMbps: 24 },
-  ultra: { label: '超清', fps: 60, maxSize: 1920, bitrateMbps: 20, maxBitrateMbps: 32 }
-} as const
+const qualityPresets = previewQualityPresets
 
 const fpsOptions = [30, 60, 90, 120] as const
 
 type QualityPreset = keyof typeof qualityPresets
-type QualitySelection = QualityPreset | 'custom'
+type QualitySelection = PreviewQuality
 
 const deviceNavigationActions = [
   { label: '返回', command: 'input keyevent 4', Icon: ArrowLeft },
@@ -120,6 +118,7 @@ export default function ScrcpyDeviceView({
   deviceId = 'mumu-la-pluma',
   signalingUrl = '/webrtc-signaling',
   onStartInfrastructure,
+  onCancelInfrastructure,
   autoConnect = false,
   onStatusChange,
   infrastructureStatus,
@@ -140,12 +139,17 @@ export default function ScrcpyDeviceView({
   const trackedPointersRef = useRef(new Map<number, TrackedPointer>())
   const pendingPointerMovesRef = useRef(new Map<number, TrackedPointer>())
   const pointerMoveFrameRef = useRef<number | null>(null)
+  const lastPreviewGeometryRef = useRef({ width: 0, height: 0, status: 'idle' })
   const autoConnectStartedRef = useRef(false)
   const connectRequestGenerationRef = useRef(0)
-  const [quality, setQuality] = useState<QualitySelection>('smooth')
-  const [customFps, setCustomFps] = useState<number>(qualityPresets.smooth.fps)
-  const [customMaxSize, setCustomMaxSize] = useState<number>(qualityPresets.smooth.maxSize)
-  const [customBitrateMbps, setCustomBitrateMbps] = useState<number>(qualityPresets.smooth.bitrateMbps)
+  const quality = usePreviewStore(state => state.quality) as QualitySelection
+  const customFps = usePreviewStore(state => state.fps)
+  const customMaxSize = usePreviewStore(state => state.maxSize)
+  const customBitrateMbps = usePreviewStore(state => state.bitrateMbps)
+  const setQuality = usePreviewStore(state => state.setQuality)
+  const setCustomFps = usePreviewStore(state => state.setCustomFps)
+  const setCustomMaxSize = usePreviewStore(state => state.setCustomMaxSize)
+  const setCustomBitrateMbps = usePreviewStore(state => state.setCustomBitrateMbps)
   const [settingsDirty, setSettingsDirty] = useState(false)
   const [commandError, setCommandError] = useState<string | null>(null)
   const commandErrorTimerRef = useRef<number | null>(null)
@@ -165,10 +169,9 @@ export default function ScrcpyDeviceView({
     snapshot_interval: 10,
     stay_awake: true
   }), [customBitrateMbps, customFps, customMaxSize, selectedPreset?.maxBitrateMbps])
-  const webrtc = useScrcpyWebRTC({
+  const webrtc = usePreviewConnection(videoRef, {
     deviceId,
     signalingUrl,
-    videoRef,
     connectionPath: 'auto',
     ipPreference: 'ipv4',
     scrcpyOptions
@@ -178,6 +181,28 @@ export default function ScrcpyDeviceView({
   useEffect(() => {
     sendTouchRef.current = webrtc.sendTouch
   }, [webrtc.sendTouch])
+
+  useEffect(() => {
+    const width = webrtc.stats?.width ?? 0
+    const height = webrtc.stats?.height ?? 0
+    const previous = lastPreviewGeometryRef.current
+    const geometryChanged = previous.width > 0 && previous.height > 0
+      && width > 0 && height > 0
+      && (previous.width !== width || previous.height !== height)
+    const connectionEnded = previous.status === 'connected' && webrtc.status !== 'connected'
+    lastPreviewGeometryRef.current = { width, height, status: webrtc.status }
+    if (!geometryChanged && !connectionEnded) return
+    // 旋转、重连或画面尺寸变化后，旧手势的坐标不再对应新画面，先发送取消。
+    if (pointerMoveFrameRef.current !== null) {
+      window.cancelAnimationFrame(pointerMoveFrameRef.current)
+      pointerMoveFrameRef.current = null
+    }
+    pendingPointerMovesRef.current.clear()
+    trackedPointersRef.current.forEach((pointer, pointerId) => {
+      sendTouchRef.current(3, pointer.clientX, pointer.clientY, pointerId, pointer.target)
+    })
+    trackedPointersRef.current.clear()
+  }, [webrtc.stats?.height, webrtc.stats?.width, webrtc.status])
   const isCompact = variant === 'compact'
   const connectingStatuses = ['connecting', 'signaling', 'waiting_offer', 'connecting_webrtc']
   const isConnecting = connectingStatuses.includes(webrtc.status)
@@ -635,6 +660,19 @@ export default function ScrcpyDeviceView({
                         ? '重试预览'
                         : '启动预览'}
                   </Button>
+                  {previewBusy && onCancelInfrastructure && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="scrcpy-empty-action min-w-24 px-3"
+                      onClick={() => {
+                        webrtc.disconnect()
+                        onCancelInfrastructure()
+                      }}
+                    >
+                      取消启动
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>

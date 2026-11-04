@@ -20,6 +20,7 @@ export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) 
   const [webrtcLoading, setWebrtcLoading] = useState<string | null>(null)
   const [webrtcActionError, setWebrtcActionError] = useState<string | null>(null)
   const operationInFlightRef = useRef<string | null>(null)
+  const startAbortRef = useRef<AbortController | null>(null)
   const statusRequestRevisionRef = useRef(0)
   const mountedRef = useRef(true)
 
@@ -43,9 +44,18 @@ export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) 
   useEffect(() => {
     mountedRef.current = true
     void refreshWebrtcStatus()
+    const timer = window.setInterval(() => {
+      if (!document.hidden) void refreshWebrtcStatus()
+    }, 15_000)
+    const handleVisibility = () => {
+      if (!document.hidden) void refreshWebrtcStatus()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
     return () => {
       mountedRef.current = false
       statusRequestRevisionRef.current += 1
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [refreshWebrtcStatus])
 
@@ -87,8 +97,10 @@ export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) 
     statusRequestRevisionRef.current += 1
     setWebrtcLoading('preview')
     setWebrtcActionError(null)
+    const controller = new AbortController()
+    startAbortRef.current = controller
     try {
-      const result = await maaApi.startWebrtc()
+      const result = await maaApi.startWebrtc('default', 'mumu-la-pluma', controller.signal)
       if (!result.success) throw new Error(maaApi.getErrorMessage(result))
       if (!result.data?.signalingUrl) throw new Error('预览服务未返回信令地址')
       if (!mountedRef.current) return undefined
@@ -96,11 +108,13 @@ export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) 
       setWebrtcStatusState('ready')
       return result.data.signalingUrl
     } catch (error) {
+      if (controller.signal.aborted) return undefined
       if (!mountedRef.current) return undefined
       setWebrtcStatusState('error')
       setWebrtcActionError(error instanceof Error ? error.message : '无法启动实时预览')
       throw error
     } finally {
+      if (startAbortRef.current === controller) startAbortRef.current = null
       operationInFlightRef.current = null
       if (mountedRef.current) setWebrtcLoading(null)
     }
@@ -134,6 +148,15 @@ export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) 
     }
   }
 
+  const cancelWebrtcStart = () => {
+    startAbortRef.current?.abort()
+    startAbortRef.current = null
+    operationInFlightRef.current = null
+    setWebrtcLoading(null)
+    setWebrtcActionError('已取消启动')
+    void refreshWebrtcStatus()
+  }
+
   return (
     <div className="scrcpy-device-container">
       <ScrcpyDeviceView
@@ -144,6 +167,7 @@ export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) 
         deviceId="mumu-la-pluma"
         signalingUrl={webrtcStatus?.signalingUrl || '/webrtc-signaling'}
         onStartInfrastructure={startWebrtcInfrastructure}
+        onCancelInfrastructure={cancelWebrtcStart}
         infrastructureStatus={webrtcStatus}
         infrastructureStatusState={webrtcStatusState}
         infrastructureLoading={webrtcLoading}

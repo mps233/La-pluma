@@ -25,6 +25,23 @@ vi.mock('framer-motion', () => ({
 
 vi.mock('./stores', () => ({
   useUIStore: (selector: (state: { theme: 'dark' }) => unknown) => selector({ theme: 'dark' }),
+  usePreviewStore: (selector: (state: { quality: 'power'; fps: number; maxSize: number; bitrateMbps: number }) => unknown) =>
+    selector({ quality: 'power', fps: 15, maxSize: 640, bitrateMbps: 1.5 }),
+  buildPreviewScrcpyOptions: () => ({ max_fps: 15, max_size: 640 }),
+}))
+
+vi.mock('./hooks/useScrcpyWebRTC', () => ({
+  useScrcpyWebRTC: () => ({
+    status: 'idle',
+    error: null,
+    stats: null,
+    inputReady: false,
+    mediaStream: null,
+    connect: () => undefined,
+    disconnect: () => undefined,
+    sendTouch: () => false,
+    sendCommand: () => Promise.resolve({ success: false }),
+  }),
 }))
 
 vi.mock('./components/Layout', () => ({

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, useEffect, useRef } from 'react'
+import { Activity, act, useEffect, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -10,6 +10,8 @@ import {
   isTouchMoveBackpressured,
   resolveSignalingEndpoints,
   resolveTouchTargetSize,
+  normalizeIceServers,
+  shouldKeepCandidate,
   useScrcpyWebRTC,
   type ScrcpyCommandResult,
 } from './useScrcpyWebRTC'
@@ -122,7 +124,7 @@ describe('useScrcpyWebRTC startup', () => {
     const gatewayHeaders = new Headers(requestInit?.headers)
     expect(gatewayHeaders.has('Authorization')).toBe(false)
     expect(MockWebSocket.instances).toHaveLength(1)
-    expect(MockWebSocket.instances[0]!.url).toBe('ws://localhost:3000/webrtc-signaling/connect_client?token=fresh-token')
+    expect(MockWebSocket.instances[0]!.url).toBe('ws://localhost:3000/webrtc-signaling/connect_client?token=fresh-token&deviceId=mumu-la-pluma')
     expect(window.localStorage.getItem('scrcpy_webrtc_auth_token')).toBeNull()
   })
 
@@ -136,7 +138,7 @@ describe('useScrcpyWebRTC startup', () => {
     const headers = new Headers(init?.headers)
     expect(url).toBe('http://localhost:3000/webrtc-signaling/api/login')
     expect(headers.get('Authorization')).toBe('Bearer la-pluma-secret')
-    expect(MockWebSocket.instances[0]!.url).toBe('ws://localhost:3000/webrtc-signaling/connect_client?token=fresh-token')
+    expect(MockWebSocket.instances[0]!.url).toBe('ws://localhost:3000/webrtc-signaling/connect_client?token=fresh-token&deviceId=mumu-la-pluma')
   })
 
   it('retries one transient startup failure without creating duplicate sockets', async () => {
@@ -449,6 +451,8 @@ describe('useScrcpyWebRTC startup', () => {
   })
 })
 
+
+
 describe('WebRTC signaling endpoint normalization', () => {
   it('derives HTTPS and WSS endpoints from the same-origin proxy path', () => {
     expect(resolveSignalingEndpoints('/webrtc-signaling', 'https://console.example/settings')).toEqual({
@@ -517,4 +521,98 @@ describe('WebRTC touch transport safeguards', () => {
     expect(isTouchMoveBackpressured(1, 64 * 1024 + 1)).toBe(false)
     expect(isTouchMoveBackpressured(3, 64 * 1024 + 1)).toBe(false)
   })
+
 })
+
+
+describe('useScrcpyWebRTC preview grace', () => {
+  beforeEach(async () => {
+    vi.useFakeTimers()
+    MockWebSocket.instances = []
+    vi.stubGlobal('WebSocket', MockWebSocket)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({ token: 'fresh-token' })
+    }))
+    window.localStorage.clear()
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    await act(async () => root.render(<Harness />))
+  })
+
+  afterEach(async () => {
+    await act(async () => root.unmount())
+    container.remove()
+    hook = null
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
+
+  it('keeps a live connection through a short Activity hide and reconnects after the hidden grace', async () => {
+    const socket = await connectAndOpenSocket()
+    const renderMode = async (mode: 'visible' | 'hidden') => {
+      await act(async () => {
+        root.render(<Activity mode={mode}><Harness /></Activity>)
+      })
+      await flushAsyncWork()
+    }
+
+    await renderMode('hidden')
+    await act(async () => {
+      vi.advanceTimersByTime(60_000)
+    })
+    expect(socket.readyState).toBe(MockWebSocket.OPEN)
+
+    await renderMode('visible')
+    await renderMode('hidden')
+    await act(async () => {
+      vi.advanceTimersByTime(180_000)
+    })
+    expect(socket.readyState).toBe(MockWebSocket.CLOSED)
+
+    await renderMode('visible')
+    await flushAsyncWork()
+    expect(MockWebSocket.instances.length).toBeGreaterThan(1)
+  })
+})
+
+
+describe('WebRTC candidate filtering', () => {
+  const ipv4Line = 'a=candidate:1 1 UDP 2122260223 192.168.50.14 54321 typ host'
+  const relayLine = 'a=candidate:2 1 UDP 16777215 192.168.50.14 49152 typ relay raddr 10.0.2.15 rport 50000'
+  const ipv6Line = 'a=candidate:3 1 UDP 2122260223 2001:db8::1 54321 typ host'
+
+  it('keeps IPv4 candidates in SDP lines with the a= prefix', () => {
+    expect(shouldKeepCandidate(ipv4Line, 'auto', 'ipv4')).toBe(true)
+    expect(shouldKeepCandidate(relayLine, 'auto', 'ipv4')).toBe(true)
+    expect(shouldKeepCandidate(ipv6Line, 'auto', 'ipv4')).toBe(false)
+  })
+
+  it('keeps IPv6 candidates when requested and filters relay/direct policy', () => {
+    expect(shouldKeepCandidate(ipv6Line, 'auto', 'ipv6')).toBe(true)
+    expect(shouldKeepCandidate(ipv4Line, 'auto', 'ipv6')).toBe(false)
+    expect(shouldKeepCandidate(ipv4Line, 'relay', 'ipv4')).toBe(false)
+    expect(shouldKeepCandidate(relayLine, 'relay', 'ipv4')).toBe(true)
+  })
+})
+
+
+describe('WebRTC ICE server normalization', () => {
+  it('removes the empty userinfo marker emitted by the signaling server', () => {
+    assertDeepEqual(normalizeIceServers([
+      { urls: ['turn:@192.168.50.14:3478?transport=udp'], username: 'user', credential: 'pass' },
+      { urls: 'stun:192.168.50.14:3478' }
+    ]), [
+      { urls: 'turn:192.168.50.14:3478?transport=udp', username: 'user', credential: 'pass' },
+      { urls: 'stun:192.168.50.14:3478' }
+    ])
+  })
+})
+
+function assertDeepEqual(actual: unknown, expected: unknown) {
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(`Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`)
+  }
+}

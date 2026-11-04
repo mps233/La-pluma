@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { maaApi, type WebrtcStatusData } from '../services/api'
-import { useScrcpyWebRTC } from './useScrcpyWebRTC'
+import { buildPreviewScrcpyOptions, usePreviewStore } from '../stores'
+import { usePreviewConnection } from '../contexts/previewSession'
 
 const DEFAULT_SIGNALING_URL = '/webrtc-signaling'
 const DEFAULT_DEVICE_ID = 'mumu-la-pluma'
@@ -15,32 +16,53 @@ const CONNECTING_STATUSES = new Set(['connecting', 'signaling', 'waiting_offer',
 export function useDashboardPreview() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const autoConnectRef = useRef(false)
+  const infrastructureStartingRef = useRef(false)
   const lastVisibleLiveFrameAtRef = useRef(0)
+  const mode = usePreviewStore(state => state.mode)
+  const quality = usePreviewStore(state => state.quality)
+  const fps = usePreviewStore(state => state.fps)
+  const maxSize = usePreviewStore(state => state.maxSize)
+  const bitrateMbps = usePreviewStore(state => state.bitrateMbps)
   const [webrtcStatus, setWebrtcStatus] = useState<WebrtcStatusData | null>(null)
   const [fallbackSnapshot, setFallbackSnapshot] = useState<string | null>(null)
   const [showLivePreview, setShowLivePreview] = useState(false)
   const [statusSettled, setStatusSettled] = useState(false)
+  const [previewStartError, setPreviewStartError] = useState<string | null>(null)
   const serverRunning = Boolean(webrtcStatus?.serverRunning)
+  const agentRunning = Boolean(webrtcStatus?.agentRunning)
+  const scrcpyOptions = useMemo(
+    () => buildPreviewScrcpyOptions({ quality, fps, maxSize, bitrateMbps }),
+    [bitrateMbps, fps, maxSize, quality]
+  )
 
-  const preview = useScrcpyWebRTC({
-    videoRef,
+  const preview = usePreviewConnection(videoRef, {
     deviceId: DEFAULT_DEVICE_ID,
     signalingUrl: webrtcStatus?.signalingUrl || DEFAULT_SIGNALING_URL,
     connectionPath: 'auto',
     ipPreference: 'ipv4',
-    scrcpyOptions: {
-      max_fps: 30,
-      max_size: 960,
-      bitrate: 2500000,
-      min_bitrate: 1000000,
-      max_bitrate: 5000000,
-      bwe: true,
-      audio: false,
-      snapshot_interval: 10,
-      stay_awake: true
-    }
+    scrcpyOptions
   })
   const connectPreview = preview.connect
+  const disconnectPreview = preview.disconnect
+
+  const reconnectPreview = () => {
+    autoConnectRef.current = false
+    disconnectPreview()
+    if (!serverRunning || !agentRunning) {
+      void maaApi.startWebrtc()
+        .then(result => {
+          if (!result.success) throw new Error(maaApi.getErrorMessage(result))
+          setPreviewStartError(null)
+          if (result.data) setWebrtcStatus(result.data)
+        })
+        .catch((error: unknown) => {
+          setPreviewStartError(error instanceof Error ? error.message : '无法启动实时预览')
+        })
+      return
+    }
+    autoConnectRef.current = true
+    connectPreview()
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -64,13 +86,32 @@ export function useDashboardPreview() {
   }, [])
 
   useEffect(() => {
-    if (!webrtcStatus?.serverRunning || !webrtcStatus?.agentRunning || autoConnectRef.current) return
+    if (mode !== 'live') {
+      autoConnectRef.current = false
+      disconnectPreview()
+      return
+    }
+    if (!serverRunning || !agentRunning || autoConnectRef.current) return
     autoConnectRef.current = true
     connectPreview()
-    return () => {
-      autoConnectRef.current = false
-    }
-  }, [connectPreview, webrtcStatus?.agentRunning, webrtcStatus?.serverRunning])
+  }, [agentRunning, connectPreview, disconnectPreview, mode, serverRunning])
+
+  useEffect(() => {
+    if (mode !== 'live' || !statusSettled || (serverRunning && agentRunning) || infrastructureStartingRef.current) return
+    infrastructureStartingRef.current = true
+    void maaApi.startWebrtc()
+      .then(result => {
+        if (!result.success) throw new Error(maaApi.getErrorMessage(result))
+        setPreviewStartError(null)
+        if (result.data) setWebrtcStatus(result.data)
+      })
+      .catch((error: unknown) => {
+        setPreviewStartError(error instanceof Error ? error.message : '无法启动实时预览')
+      })
+      .finally(() => {
+        infrastructureStartingRef.current = false
+      })
+  }, [agentRunning, mode, serverRunning, statusSettled])
 
   useEffect(() => {
     const canvas = document.createElement('canvas')
@@ -97,6 +138,10 @@ export function useDashboardPreview() {
     }
 
     const timer = setInterval(() => {
+      if (mode !== 'live') {
+        setShowLivePreview(false)
+        return
+      }
       if (hasVisibleFrame()) {
         lastVisibleLiveFrameAtRef.current = Date.now()
         setShowLivePreview(true)
@@ -109,13 +154,15 @@ export function useDashboardPreview() {
     }, FRAME_SAMPLE_INTERVAL_MS)
 
     return () => clearInterval(timer)
-  }, [])
+  }, [mode])
 
+  const shouldShowSnapshot = mode === 'snapshot' || (mode === 'live' && !showLivePreview)
   useEffect(() => {
-    if (!statusSettled || showLivePreview) return
+    if (!statusSettled || !shouldShowSnapshot) return
 
     let cancelled = false
     const fetchSnapshot = async () => {
+      if (document.hidden) return
       if (serverRunning) {
         try {
           const snapshot = await maaApi.getWebrtcSnapshot(DEFAULT_DEVICE_ID)
@@ -148,26 +195,42 @@ export function useDashboardPreview() {
       cancelled = true
       clearInterval(timer)
     }
-  }, [serverRunning, showLivePreview, statusSettled])
+  }, [serverRunning, shouldShowSnapshot, statusSettled])
 
+  const previewError = previewStartError || preview.error
+  const visibleFallback = shouldShowSnapshot ? fallbackSnapshot : null
   return {
+    mode,
     videoRef,
-    fallbackSnapshot,
-    showLivePreview,
-    isConnecting: CONNECTING_STATUSES.has(preview.status),
-    statusText: showLivePreview
-      ? 'Live'
-      : webrtcStatus?.screenState === 'off'
-        ? '设备息屏'
-        : fallbackSnapshot
-          ? '画面快照 · 10s'
-          : preview.error || preview.status,
-    headerStatusText: showLivePreview
-      ? `${preview.stats?.width || 0}×${preview.stats?.height || 0}`
-      : webrtcStatus?.screenState === 'off'
-        ? '设备息屏'
-        : fallbackSnapshot
-          ? '画面快照'
-          : '自动连接中'
+    fallbackSnapshot: visibleFallback,
+    showLivePreview: mode === 'live' ? showLivePreview : false,
+    isConnecting: mode === 'live' && CONNECTING_STATUSES.has(preview.status),
+    connectionStatus: preview.status,
+    connectionError: preview.error,
+    reconnectPreview,
+    statusText: mode === 'off'
+      ? '预览已关闭'
+      : mode === 'snapshot'
+        ? visibleFallback ? '画面快照 · 10s' : '等待画面快照'
+        : showLivePreview
+          ? 'Live'
+          : webrtcStatus?.screenState === 'off'
+            ? '设备息屏'
+            : previewError
+              ? `实时连接失败 · 快照占位`
+              : visibleFallback
+                ? '正在连接实时画面 · 快照占位'
+                : preview.status,
+    headerStatusText: mode === 'off'
+      ? '已关闭'
+      : mode === 'snapshot'
+        ? visibleFallback ? '画面快照' : '等待快照'
+        : showLivePreview
+          ? `${preview.stats?.width || 0}×${preview.stats?.height || 0}`
+          : webrtcStatus?.screenState === 'off'
+            ? '设备息屏'
+            : visibleFallback
+              ? '快照占位 · 实时连接中'
+              : '连接中'
   }
 }

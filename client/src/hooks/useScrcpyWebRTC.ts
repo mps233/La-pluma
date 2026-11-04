@@ -28,6 +28,8 @@ interface UseScrcpyWebRTCOptions {
   connectionPath?: 'auto' | 'relay' | 'direct'
   ipPreference?: 'auto' | 'ipv4' | 'ipv6'
   scrcpyOptions?: ScrcpyOptions
+  /** 由 App 级共享会话接管时禁用本实例的连接与定时器。 */
+  passive?: boolean
 }
 
 export interface VideoStats {
@@ -54,6 +56,9 @@ const HEARTBEAT_INTERVAL_MS = 20_000
 const OFFER_TIMEOUT_MS = 15_000
 const RECONNECT_DELAY_MS = 800
 const COMMAND_TIMEOUT_MS = 12_000
+
+/** 离开工作区或页面隐藏后保留媒体连接的时间，与预览服务的 3 秒回收宽限区分。 */
+const PREVIEW_HIDDEN_DISCONNECT_MS = 180_000;
 
 export interface ScrcpyCommandResult {
   requestId: string
@@ -236,19 +241,52 @@ async function getSignalingToken(httpBase: string, signal: AbortSignal) {
   return data.token as string
 }
 
-function normalizeSignalingUrl(websocketBase: string, token: string) {
-  return `${websocketBase}/connect_client?token=${encodeURIComponent(token)}`
+function normalizeSignalingUrl(websocketBase: string, token: string, deviceId?: string) {
+  const deviceQuery = deviceId ? `&deviceId=${encodeURIComponent(deviceId)}` : ''
+  return `${websocketBase}/connect_client?token=${encodeURIComponent(token)}${deviceQuery}`
+}
+
+function normalizeIceServerUrls(value: unknown): string[] {
+  const urls = Array.isArray(value) ? value : [value]
+  return urls
+    .filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
+    .map(url => url.trim().replace(/^(turns?):@/i, '$1:'))
+}
+
+function normalizeIceServers(value: unknown): RTCIceServer[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap(item => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return []
+    const record = item as Record<string, unknown>
+    const urls = normalizeIceServerUrls(record.urls)
+    if (!urls.length) return []
+    const server: RTCIceServer = { urls: urls.length === 1 ? urls[0]! : urls }
+    if (typeof record.username === 'string' && record.username) server.username = record.username
+    if (typeof record.credential === 'string' && record.credential) server.credential = record.credential
+    return [server]
+  })
+}
+
+export { normalizeIceServers }
+
+function candidateAddress(candidate: string): string {
+  // SDP uses `a=candidate:...` while trickle messages use `candidate:...`.
+  // The address is the fifth token (foundation, component, protocol, priority,
+  // address, port, typ, ...).
+  const tokens = String(candidate || '').trim().replace(/^a=/, '').split(/\s+/)
+  return tokens[4] || ''
 }
 
 function candidateHasIpv6(candidate: string) {
-  return candidate.split(/\s+/).some(part => !part.startsWith('candidate:') && part.includes(':') && part.split(':').length >= 3)
+  const address = candidateAddress(candidate)
+  return address.includes(':') && !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(address)
 }
 
 function candidateHasIpv4(candidate: string) {
-  return candidate.split(/\s+/).some(part => part.split('.').length === 4)
+  return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(candidateAddress(candidate))
 }
 
-function shouldKeepCandidate(candidate: string, connectionPath: 'auto' | 'relay' | 'direct', ipPreference: 'auto' | 'ipv4' | 'ipv6') {
+export function shouldKeepCandidate(candidate: string, connectionPath: 'auto' | 'relay' | 'direct', ipPreference: 'auto' | 'ipv4' | 'ipv6') {
   if (!candidate) return false
   const isRelay = candidate.includes(' typ relay')
   if (connectionPath === 'relay' && !isRelay) return false
@@ -264,7 +302,8 @@ export function useScrcpyWebRTC({
   videoRef,
   connectionPath = 'relay',
   ipPreference = 'ipv4',
-  scrcpyOptions = {}
+  scrcpyOptions = {},
+  passive = false
 }: UseScrcpyWebRTCOptions) {
   const scrcpyOptionsRef = useRef(scrcpyOptions)
   useEffect(() => {
@@ -290,6 +329,8 @@ export function useScrcpyWebRTC({
   const heartbeatTimerRef = useRef<number | null>(null)
   const offerTimeoutRef = useRef<number | null>(null)
   const reconnectTimerRef = useRef<number | null>(null)
+  const hiddenDisconnectTimerRef = useRef<number | null>(null)
+  const disconnectedByHiddenRef = useRef(false)
   const pendingCommandsRef = useRef(new Map<string, {
     requestId: string
     resolve: (result: ScrcpyCommandResult) => void
@@ -354,10 +395,17 @@ export function useScrcpyWebRTC({
 
   const createPeerConnection = useCallback(() => {
     if (pcRef.current) return pcRef.current
-    const pc = new RTCPeerConnection({
-      iceServers: iceServersRef.current,
-      iceTransportPolicy: connectionPath === 'relay' ? 'relay' : 'all'
-    })
+    let pc: RTCPeerConnection
+    try {
+      pc = new RTCPeerConnection({
+        iceServers: iceServersRef.current,
+        iceTransportPolicy: connectionPath === 'relay' ? 'relay' : 'all'
+      })
+    } catch (error) {
+      setError(`实时连接初始化失败: ${error instanceof Error ? error.message : String(error)}`)
+      setStatus('error')
+      throw error
+    }
     pcRef.current = pc
     const stream = new MediaStream()
     streamRef.current = stream
@@ -467,13 +515,15 @@ export function useScrcpyWebRTC({
   }, [clearOfferTimeout, resolvePendingCommands, stopHeartbeat, videoRef])
 
   const disconnect = useCallback(() => {
+    if (passive) return
     connectionGenerationRef.current += 1
     teardownConnection()
     setError(null)
     setStatus('disconnected')
-  }, [teardownConnection])
+  }, [passive, teardownConnection])
 
   const connect = useCallback((signalingUrlOverride?: string) => {
+    if (passive) return
     connectionGenerationRef.current += 1
     const generation = connectionGenerationRef.current
     const hadActiveConnection = Boolean(wsRef.current || pcRef.current)
@@ -560,7 +610,7 @@ export function useScrcpyWebRTC({
       void getSignalingToken(signalingEndpoints.httpBase, authAbortController.signal)
         .then(token => {
           if (attemptFinished || connectionGenerationRef.current !== generation) return
-          const ws = new WebSocket(normalizeSignalingUrl(signalingEndpoints.websocketBase, token))
+          const ws = new WebSocket(normalizeSignalingUrl(signalingEndpoints.websocketBase, token, deviceId))
           socket = ws
           wsRef.current = ws
           let opened = false
@@ -593,7 +643,7 @@ export function useScrcpyWebRTC({
             const type = msg.message_type || msg.type
             if (type === 'pong') return
             if (type === 'config') {
-              if (Array.isArray(msg.ice_servers) && msg.ice_servers.length > 0) iceServersRef.current = msg.ice_servers
+              if (Array.isArray(msg.ice_servers) && msg.ice_servers.length > 0) iceServersRef.current = normalizeIceServers(msg.ice_servers)
               setStatus('waiting_offer')
               sendForward({
                 type: 'request-offer',
@@ -672,7 +722,6 @@ export function useScrcpyWebRTC({
               setStatus('connecting_webrtc')
               const pc = createPeerConnection()
               const isCurrentConnection = () => connectionGenerationRef.current === generation && pcRef.current === pc
-
               void (async () => {
                 try {
                   await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: filterSdpCandidates(payload.sdp) }))
@@ -749,7 +798,7 @@ export function useScrcpyWebRTC({
     } else {
       beginConnection()
     }
-  }, [clearOfferTimeout, connectionPath, createPeerConnection, deviceId, filterSdpCandidates, ipPreference, resolvePendingCommands, sendAnswer, sendForward, signalingUrl, startHeartbeat, stopHeartbeat, teardownConnection, videoRef])
+  }, [clearOfferTimeout, connectionPath, createPeerConnection, deviceId, filterSdpCandidates, ipPreference, passive, resolvePendingCommands, sendAnswer, sendForward, signalingUrl, startHeartbeat, stopHeartbeat, teardownConnection, videoRef])
 
   const sendTouch = useCallback((action: number, clientX: number, clientY: number, id = 0, targetVideo?: HTMLVideoElement | null) => {
     const channel = inputChannelRef.current
@@ -883,7 +932,50 @@ export function useScrcpyWebRTC({
     return () => window.clearInterval(timer)
   }, [inputReady, videoRef])
 
-  useEffect(() => disconnect, [disconnect])
+  const scheduleHiddenDisconnect = useCallback(() => {
+    if (hiddenDisconnectTimerRef.current !== null) return
+    hiddenDisconnectTimerRef.current = window.setTimeout(() => {
+      hiddenDisconnectTimerRef.current = null
+      disconnectedByHiddenRef.current = true
+      disconnect()
+    }, PREVIEW_HIDDEN_DISCONNECT_MS)
+  }, [disconnect])
+
+  const cancelHiddenDisconnect = useCallback(() => {
+    if (hiddenDisconnectTimerRef.current !== null) {
+      window.clearTimeout(hiddenDisconnectTimerRef.current)
+      hiddenDisconnectTimerRef.current = null
+    }
+  }, [])
+
+  // 工作区被 Activity 隐藏或浏览器切到后台时不要立刻断开：保留媒体
+  // 连接三分钟，返回时取消回收；超过宽限才释放，避免频繁重启设备 Agent。
+  useEffect(() => {
+    if (passive) return undefined
+    cancelHiddenDisconnect()
+    if (disconnectedByHiddenRef.current) {
+      disconnectedByHiddenRef.current = false
+      queueMicrotask(() => connect())
+    }
+    return () => scheduleHiddenDisconnect()
+  }, [cancelHiddenDisconnect, connect, passive, scheduleHiddenDisconnect])
+
+  useEffect(() => {
+    if (passive) return undefined
+    const handleVisibility = () => {
+      if (document.hidden) {
+        scheduleHiddenDisconnect()
+        return
+      }
+      cancelHiddenDisconnect()
+      if (disconnectedByHiddenRef.current) {
+        disconnectedByHiddenRef.current = false
+        connect()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [cancelHiddenDisconnect, connect, passive, scheduleHiddenDisconnect])
 
   return { status, error, stats, inputReady, mediaStream, connect, disconnect, sendTouch, sendCommand }
 }

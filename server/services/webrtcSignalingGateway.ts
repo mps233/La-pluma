@@ -29,6 +29,7 @@ interface WebrtcSignalingUpgradeServer {
 
 interface ParsedClientUpgrade {
   ticket: string
+  deviceId: string | null
 }
 
 interface WebrtcSignalingGatewayOptions {
@@ -42,6 +43,7 @@ interface WebrtcSignalingGatewayOptions {
   createTicket?: () => string
   getUpstreamToken?: () => Promise<string>
   connect?: typeof connectTcp
+  onViewerCountChange?: (count: number) => void
 }
 
 interface WebrtcSignalingGateway {
@@ -99,7 +101,9 @@ function parseClientUpgrade(request: IncomingMessage, proxyPath: string): Parsed
 
   if (url.pathname !== `${proxyPath}/connect_client`) return null
   const ticket = url.searchParams.get('token')?.trim()
-  return ticket ? { ticket } : null
+  const deviceId = url.searchParams.get('deviceId')?.trim() || null
+  if (deviceId && deviceId.length > 256) return null
+  return ticket ? { ticket, deviceId } : null
 }
 
 export function createWebrtcSignalingGateway({
@@ -112,12 +116,14 @@ export function createWebrtcSignalingGateway({
   now = () => Date.now(),
   createTicket = () => randomUUID(),
   getUpstreamToken = () => getWebrtcAuthToken({ throwOnError: true }),
-  connect = connectTcp
+  connect = connectTcp,
+  onViewerCountChange
 }: WebrtcSignalingGatewayOptions = {}): WebrtcSignalingGateway {
   const tickets = new Map<string, SignalingTicket>()
   const activeSockets = new Set<Duplex>()
   const ticketLimit = Number.isInteger(maxTickets) && maxTickets > 0 ? maxTickets : DEFAULT_MAX_TICKETS
   let attachedServer: WebrtcSignalingUpgradeServer | null = null
+  let viewerCount = 0
 
   function pruneTickets(): void {
     const currentTime = now()
@@ -175,14 +181,27 @@ export function createWebrtcSignalingGateway({
     }
 
     const targetAuthority = `${targetHost}:${targetPort}`
-    const upstreamPath = `/connect_client?token=${encodeURIComponent(upstreamToken)}`
+    const deviceQuery = parsed.deviceId ? `&deviceId=${encodeURIComponent(parsed.deviceId)}` : ''
+    const upstreamPath = `/connect_client?token=${encodeURIComponent(upstreamToken)}${deviceQuery}`
     const upstreamSocket: Socket = connect({ host: targetHost, port: targetPort })
     let connected = false
     let failedBeforeConnect = false
 
     activeSockets.add(clientSocket)
     activeSockets.add(upstreamSocket)
-    const forgetClient = () => activeSockets.delete(clientSocket)
+    viewerCount += 1
+    onViewerCountChange?.(viewerCount)
+    let viewerReleased = false
+    const releaseViewer = () => {
+      if (viewerReleased) return
+      viewerReleased = true
+      viewerCount = Math.max(0, viewerCount - 1)
+      onViewerCountChange?.(viewerCount)
+    }
+    const forgetClient = () => {
+      activeSockets.delete(clientSocket)
+      releaseViewer()
+    }
     const forgetUpstream = () => activeSockets.delete(upstreamSocket)
     clientSocket.once('close', forgetClient)
     upstreamSocket.once('close', forgetUpstream)
@@ -234,6 +253,8 @@ export function createWebrtcSignalingGateway({
     tickets.clear()
     for (const socket of activeSockets) socket.destroy()
     activeSockets.clear()
+    viewerCount = 0
+    onViewerCountChange?.(0)
   }
 
   return {

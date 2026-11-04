@@ -25,6 +25,7 @@ import {
 } from './services/webrtcSignalingGateway.ts';
 import { agentError, sendError } from './utils/apiHelper.ts';
 import { closeMaaExecutionLeaseAdmission } from './services/executionCoordinatorService.ts';
+import { handleWebrtcViewerCountChange } from './services/webrtcService.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -73,9 +74,13 @@ interface CreateAppOptions {
   clientDistPath?: string;
 }
 
+function createManagedSignalingGateway() {
+  return createWebrtcSignalingGateway({ onViewerCountChange: handleWebrtcViewerCountChange });
+}
+
 export function createLaPlumaApp({
   env = process.env,
-  signalingGateway = createWebrtcSignalingGateway(),
+  signalingGateway = createManagedSignalingGateway(),
   clientDistPath = join(__dirname, '..', 'client', 'dist')
 }: CreateAppOptions = {}): Express {
   const app = express();
@@ -194,7 +199,7 @@ export async function startLaPlumaServer({
   env = process.env,
   host = '0.0.0.0',
   port = Number(env.PORT || 3000),
-  signalingGateway = createWebrtcSignalingGateway(),
+  signalingGateway = createManagedSignalingGateway(),
   initializeRunStore = initializeAgentRunStore,
   initializeRuntime = initializeRuntimeState,
   logger = console

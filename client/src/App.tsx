@@ -7,6 +7,7 @@ import { PageSkeleton } from './components/common'
 import { useBackendStatusMonitor } from './hooks/useBackendStatusMonitor'
 import { useRunStatusMonitor } from './hooks/useRunStatusMonitor'
 import { useUIStore } from './stores'
+import { PreviewSessionProvider } from './contexts/PreviewSessionContext'
 
 const pageLoaders = {
   automation: () => import('./components/AutomationTasks'),
@@ -165,9 +166,11 @@ function App() {
   return (
     <div id="app-root" className="la-pluma-app">
       <MotionConfig reducedMotion="user">
-        <Layout>
-          {({ activeTab }) => <VisitedWorkspaces activeTab={activeTab} />}
-        </Layout>
+        <PreviewSessionProvider>
+          <Layout>
+            {({ activeTab }) => <VisitedWorkspaces activeTab={activeTab} />}
+          </Layout>
+        </PreviewSessionProvider>
         <PWAInstallPrompt />
       </MotionConfig>
     </div>

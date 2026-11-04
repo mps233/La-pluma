@@ -4,6 +4,7 @@ import { Activity, act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useDashboardPreview } from './useDashboardPreview'
+import { usePreviewStore } from '../stores'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -47,6 +48,7 @@ describe('useDashboardPreview Activity lifecycle', () => {
   let root: Root
 
   beforeEach(() => {
+    usePreviewStore.setState({ mode: 'snapshot' })
     mocks.getWebrtcStatus.mockReset().mockResolvedValue({
       success: true,
       data: { serverRunning: true, agentRunning: true, signalingUrl: '/webrtc-signaling' },
@@ -63,6 +65,7 @@ describe('useDashboardPreview Activity lifecycle', () => {
 
   afterEach(async () => {
     await act(async () => root.unmount())
+    usePreviewStore.setState({ mode: 'off' })
     container.remove()
     vi.restoreAllMocks()
   })
@@ -100,13 +103,14 @@ describe('useDashboardPreview Activity lifecycle', () => {
     expect(mocks.captureScreen).not.toHaveBeenCalled()
   })
 
-  it('auto-connects again when the dashboard workspace becomes visible again', async () => {
+  it('keeps the live connection across an Activity hide when the preview mode stays live', async () => {
+    usePreviewStore.setState({ mode: 'live' })
     await renderMode('visible')
     expect(mocks.connect).toHaveBeenCalledOnce()
 
     await renderMode('hidden')
     await renderMode('visible')
 
-    expect(mocks.connect).toHaveBeenCalledTimes(2)
+    expect(mocks.connect).toHaveBeenCalledOnce()
   })
 })
