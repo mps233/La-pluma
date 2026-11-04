@@ -102,10 +102,10 @@
 @media (max-width: 640px) {
     :root {
       --app-space-card: 0.75rem;
-      --app-space-section: 0.875rem;
-      --app-space-page: var(--app-space-3);
+      --app-space-section: 1rem;
+      --app-space-page: 1.125rem;
       --app-space-panel: 0.875rem;
-      --app-page-gutter: 0.875rem;
+      --app-page-gutter: 1.125rem;
       --app-font-page-title: 1.25rem;
     }
   }
@@ -6140,7 +6140,7 @@ svg.w-5.h-5 {
   .app-workspace-segment-copy > span {
     color: inherit;
     font-size: var(--app-font-body);
-    font-weight: 650;
+    font-weight: 600;
     line-height: 1.15rem;
   }
 
@@ -6238,7 +6238,7 @@ svg.w-5.h-5 {
     gap: var(--app-space-2);
     color: var(--app-text);
     font-size: 0.8125rem;
-    font-weight: 650;
+    font-weight: 600;
     line-height: 1.25rem;
   }
 
@@ -6408,7 +6408,7 @@ svg.w-5.h-5 {
 
   .scrcpy-preset-option span {
     font-size: 0.6875rem;
-    font-weight: 650;
+    font-weight: 600;
   }
 
   .scrcpy-preset-option small {
@@ -6435,7 +6435,7 @@ svg.w-5.h-5 {
     border-radius: calc(var(--app-radius-md) - 0.125rem);
     color: var(--app-text-muted);
     font-size: 0.6875rem;
-    font-weight: 650;
+    font-weight: 600;
     transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
   }
 
@@ -6962,7 +6962,7 @@ svg.w-5.h-5 {
   .roguelike-panel-heading h3 {
     color: var(--app-text);
     font-size: var(--app-font-card-title);
-    font-weight: 650;
+    font-weight: 600;
   }
 
   .roguelike-panel-heading p {
@@ -7055,7 +7055,7 @@ svg.w-5.h-5 {
   .roguelike-theme-copy strong {
     color: inherit;
     font-size: var(--app-font-body);
-    font-weight: 650;
+    font-weight: 600;
   }
 
   .roguelike-theme-copy small {

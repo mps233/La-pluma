@@ -1917,8 +1917,11 @@ html.la-pluma-standalone #app-root .page {
 
 @media (max-width: 639px) {
   :root {
-    --app-page-gutter: 0.875rem;
-    --app-space-page: 0.875rem;
+    --app-page-gutter: 1.125rem;
+    --app-space-card: 0.75rem;
+    --app-space-panel: 0.875rem;
+    --app-space-section: 1rem;
+    --app-space-page: 1.125rem;
   }
 
   .la-pluma-app .la-pluma-navbar .navbar-inner {
