@@ -456,7 +456,7 @@ describe('Agent OpenAPI generation', () => {
     assert.deepEqual(schemas.Run.required, ['runId', 'operationId', 'state', 'acceptedAt', 'links']);
     assert.equal(schemas.Run.properties.runId.format, 'uuid');
     assert.deepEqual(schemas.Run.properties.state.enum, [
-      'accepted', 'running', 'succeeded', 'failed', 'stopping', 'stopped', 'interrupted'
+      'accepted', 'waiting', 'running', 'succeeded', 'failed', 'stopping', 'stopped', 'interrupted'
     ]);
     assert.equal(schemas.Run.properties.progress.$ref, '#/components/schemas/RunProgress');
     assert.equal(schemas.Run.properties.durationMs.minimum, 0);

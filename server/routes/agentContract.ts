@@ -1196,7 +1196,7 @@ export function buildOpenApiSpec(defaults: RuntimeDefaults = {}) {
             operationId: { type: 'string' },
             state: {
               type: 'string',
-              enum: ['accepted', 'running', 'succeeded', 'failed', 'stopping', 'stopped', 'interrupted']
+              enum: ['accepted', 'waiting', 'running', 'succeeded', 'failed', 'stopping', 'stopped', 'interrupted']
             },
             acceptedAt: { type: 'string', format: 'date-time' },
             startedAt: { type: ['string', 'null'], format: 'date-time' },

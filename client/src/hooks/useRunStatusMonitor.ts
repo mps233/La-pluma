@@ -34,9 +34,11 @@ export function runToGlobalStatus(run: AgentRun | null): GlobalRunStatus {
   const labelText = specificMessage || task
   const label = run.state === 'stopping'
     ? '正在停止'
-    : run.state === 'accepted'
-      ? (labelText || '等待执行')
-      : labelText
+    : run.state === 'waiting'
+      ? (labelText || '等待继续下一关')
+      : run.state === 'accepted'
+        ? (labelText || '等待执行')
+        : labelText
         ? (labelText.startsWith('正在') ? labelText : `正在执行: ${labelText}`)
         : '任务执行中'
 

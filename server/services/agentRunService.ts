@@ -11,7 +11,7 @@ const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._~:-]{0,127}$/;
 const TERMINAL_RETENTION_MS = 24 * 60 * 60 * 1000;
 const MAX_TERMINAL_RUNS = 500;
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'stopped', 'interrupted']);
-const ACTIVE_STATUSES = new Set(['accepted', 'running', 'stopping']);
+const ACTIVE_STATUSES = new Set(['accepted', 'waiting', 'running', 'stopping']);
 const ALL_STATUSES = new Set([...TERMINAL_STATUSES, ...ACTIVE_STATUSES]);
 const AGENT_RUN_STORE_VERSION = 1;
 const DEFAULT_AGENT_RUN_STORE_PATH = fileURLToPath(new URL('../data/agent-runs.json', import.meta.url));
@@ -832,14 +832,29 @@ export function startAgentRun(runId: string) {
   return transition(runId, 'running', ['accepted']);
 }
 
+/** 手动作业集在条目之间进入等待；等待状态不持有设备租约。 */
+export function markAgentRunWaiting(runId: string) {
+  return transition(runId, 'waiting', ['running']);
+}
+
+/** 续跑时从 waiting 重新获得执行权；同时兼容首次启动。 */
+export function startAgentRunForExecution(runId: string) {
+  const run = getAgentRun(runId);
+  if (!run) throw transitionError({ run: { runId, status: 'missing' } } as AgentRunRecord, 'running', ['accepted', 'waiting']);
+  if (run.state === 'waiting') return transition(runId, 'running', ['waiting']);
+  if (run.state === 'accepted') return transition(runId, 'running', ['accepted']);
+  if (run.state === 'running') return run;
+  throw transitionError({ run: { runId, status: run.state } } as AgentRunRecord, 'running', ['accepted', 'waiting', 'running']);
+}
+
 export function markAgentRunStopping(runId: string) {
-  return transition(runId, 'stopping', ['accepted', 'running']);
+  return transition(runId, 'stopping', ['accepted', 'waiting', 'running']);
 }
 
 export function setAgentRunAcceptedResult(runId: string, result: unknown = null): AgentRunDto {
   const record = requireRecord(runId);
   if (TERMINAL_STATUSES.has(record.run.status)) return toAgentRunDto(record.run) as AgentRunDto;
-  if (!['accepted', 'running', 'stopping'].includes(record.run.status)) {
+  if (!['accepted', 'waiting', 'running', 'stopping'].includes(record.run.status)) {
     throw transitionError(record, 'accepted-result', ['accepted', 'running', 'stopping']);
   }
   record.run.result = normalizeJson(result, 'result');
@@ -849,21 +864,21 @@ export function setAgentRunAcceptedResult(runId: string, result: unknown = null)
 }
 
 export function completeAgentRun(runId: string, result: unknown = null) {
-  return transition(runId, 'succeeded', ['accepted', 'running'], {
+  return transition(runId, 'succeeded', ['accepted', 'waiting', 'running'], {
     result: normalizeJson(result, 'result'),
     error: null
   });
 }
 
 export function failAgentRun(runId: string, error: unknown = null) {
-  return transition(runId, 'failed', ['accepted', 'running', 'stopping'], {
+  return transition(runId, 'failed', ['accepted', 'waiting', 'running', 'stopping'], {
     result: null,
     error: normalizeFailure(error)
   });
 }
 
 export function stopAgentRun(runId: string, result: unknown = null) {
-  return transition(runId, 'stopped', ['accepted', 'running', 'stopping'], {
+  return transition(runId, 'stopped', ['accepted', 'waiting', 'running', 'stopping'], {
     result: normalizeJson(result, 'result'),
     error: null
   });
@@ -897,7 +912,7 @@ export function releaseAgentRunIdempotency(runId: string) {
 
 export function discardAgentRun(runId: string) {
   const record = requireRecord(runId);
-  const allowedStatuses: string[] = ['accepted', 'running'];
+  const allowedStatuses: string[] = ['accepted', 'waiting', 'running'];
   if (!allowedStatuses.includes(record.run.status)) {
     throw transitionError(record, 'discarded', allowedStatuses);
   }
@@ -932,7 +947,7 @@ export function listAgentRuns({ operationId = null, state = null, status = null,
 export function getCurrentAgentRun() {
   assertAgentRunStoreReadable();
   if (pruneTerminalRuns() > 0) scheduleAgentRunPersistence();
-  const priority: Record<string, number> = { stopping: 3, running: 2, accepted: 1 };
+  const priority: Record<string, number> = { stopping: 4, running: 3, accepted: 2, waiting: 1 };
   const current = [...runs.values()]
     .filter(record => priority[record.run.status])
     .sort((left, right) =>

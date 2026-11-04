@@ -40,6 +40,8 @@ import { loadParadoxOperators, resolveStageSearchKeyword } from '../services/cop
 import { buildCopilotPlan, executeCopilotPlan, resetCopilotPlanProgress } from '../services/copilotPlanService.ts';
 import { getActivityRunPreflight } from '../services/activityNavigationService.ts';
 import { findActivityCopilotCandidates } from '../services/activityCopilotDiscoveryService.ts';
+import { continueManualCopilotSet, getManualCopilotSetSession, startManualCopilotSet, stopManualCopilotSetRun } from '../services/copilotManualRunService.ts';
+import { isResourceCollectionOpenNow } from '../services/activityDataService.ts';
 import { getActivityCompletion, runCurrentActivityCopilots, runCurrentActivitySet } from '../services/activityCopilotRunService.ts';
 import { withMaaExecutionLease, getMaaExecutionLeaseSnapshot } from '../services/executionCoordinatorService.ts';
 import { createDailyFlowExecutionError, executeAgentTask, normalizeDailyFlowRequest, validateTaskConfig } from '../services/agentActionService.ts';
@@ -304,7 +306,7 @@ interface TrackedAgentActionOptions {
 
 const logger = createLogger('AgentRoutes');
 
-const ACTIVE_RUN_STATES = new Set(['accepted', 'running', 'stopping']);
+const ACTIVE_RUN_STATES = new Set(['accepted', 'waiting', 'running', 'stopping']);
 const TERMINAL_RUN_STATES = new Set(['succeeded', 'failed', 'stopped', 'interrupted']);
 
 export function buildWebrtcBrowserProtocol(deviceId: string) {
@@ -1102,6 +1104,15 @@ router.post('/runs/:runId/stop', asyncHandler(async (req: AgentRequest, res: Age
   if (TERMINAL_RUN_STATES.has(run.state)) {
     return sendSuccess(res, req, { stopped: false, alreadyTerminal: true, run: enrichAgentRun(run) }, '任务已经结束');
   }
+  const manualStopped = run.state === 'waiting' ? stopManualCopilotSetRun(runId) : null;
+  if (manualStopped) {
+    return respondWithPersistedAgentRun(res, req, runId, '停止手动作业集时持久化失败', (persistedRun: AgentRunDto | null) =>
+      sendSuccess(res, req, {
+        stopped: true,
+        run: enrichAgentRun(persistedRun || manualStopped)
+      }, '手动作业集已停止')
+    );
+  }
   if (run.state === 'accepted') {
     const stopped = stopAgentRun(runId, { canceled: true });
     releaseAgentRunIdempotency(runId);
@@ -1269,6 +1280,10 @@ router.get('/activity', asyncHandler(async (req: AgentRequest, res: AgentRespons
     stages: activityInfo.stages || [],
     completion,
     available: !!activityInfo.code,
+    status: activityInfo.status ?? (activityInfo.code ? 'active' : 'none'),
+    failure: activityInfo.failure ?? null,
+    dataUpdatedAt: activityInfo.dataUpdatedAt ?? null,
+    lastSuccessAt: activityInfo.lastSuccessAt ?? null,
     message: activityInfo.code ? `当前活动: ${activityInfo.name || activityInfo.code}` : '当前没有活动或无法获取活动信息'
   });
 }));
@@ -1323,8 +1338,10 @@ router.post('/activity/run', asyncHandler(async (req: AgentRequest, res: AgentRe
   });
 }));
 
-router.get('/stages/open-today', asyncHandler(async (_req: AgentRequest, res: AgentResponse) => {
-  return sendSuccess(res, _req, getTodayOpenStages(), '已获取今日开放日常关卡');
+router.get('/stages/open-today', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
+  const { clientType } = await resolveRequestConnection(req, { allowOverrides: true });
+  const resourceCollectionOpen = await isResourceCollectionOpenNow(clientType).catch(() => false);
+  return sendSuccess(res, req, getTodayOpenStages({ clientType, resourceCollectionOpen }), '已获取今日开放日常关卡');
 }));
 
 router.get('/drops/today', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
@@ -1553,6 +1570,49 @@ router.post('/copilot-sets/:id/execute', asyncHandler(async (req: AgentRequest, 
   });
 }));
 
+router.post('/copilot-sets/:id/manual/start', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
+  const { selectedIndexes = [], options: rawOptions = {}, raid: rawRaid, idempotencyKey } = req.body || {};
+  const raid = rawRaid === 'raid' || rawRaid === 'both' ? rawRaid : 'normal';
+  const options = isRecord(rawOptions) ? rawOptions : {};
+  const { clientType } = await resolveRequestConnection(req, { allowOverrides: true });
+  const result = await startManualCopilotSet({
+    setId: req.params!.id,
+    raid,
+    selectedIndexes,
+    options,
+    clientType,
+    idempotencyKey: typeof idempotencyKey === 'string' ? idempotencyKey : null
+  });
+  return sendSuccess(res, req, result, result.message);
+}));
+
+router.post('/actions/continue-copilot-set', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
+  const runId = typeof req.body?.runId === 'string' ? req.body.runId.trim() : '';
+  if (!runId) {
+    return sendError(res, req, agentError('AGENT_RUN_ID_REQUIRED', '继续手动作业集需要 runId', {
+      statusCode: 400,
+      retryable: false
+    }));
+  }
+  const options = isRecord(req.body?.options) ? req.body.options : undefined;
+  const result = await continueManualCopilotSet({ runId, options });
+  return sendSuccess(res, req, result, result.message);
+}));
+
+router.get('/copilot-sets/:id/manual/:runId', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
+  const session = getManualCopilotSetSession(req.params!.runId);
+  if (!session || session.setId !== String(req.params!.id)) {
+    return sendError(res, req, agentError('COPILOT_MANUAL_SESSION_NOT_FOUND', '手动作业集会话不存在或已结束', {
+      statusCode: 404,
+      retryable: false
+    }));
+  }
+  return sendSuccess(res, req, {
+    ...session,
+    run: getAgentRun(req.params!.runId)
+  });
+}));
+
 router.post('/copilot-sets/:id/reset-progress', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
   return sendSuccess(res, req, await resetCopilotPlanProgress(req.params!.id));
 }));
@@ -1730,7 +1790,8 @@ router.put('/training/settings', asyncHandler(async (req: AgentRequest, res: Age
 router.post('/training/plan', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
   const modeValue = req.body?.mode;
   const mode = typeof modeValue === 'string' && modeValue ? modeValue : 'current';
-  const plan = await operatorTrainingService.generateTrainingPlan(mode);
+  const { clientType } = await resolveRequestConnection(req, { allowOverrides: true });
+  const plan = await operatorTrainingService.generateTrainingPlan(mode, clientType);
   return sendSuccess(res, req, plan);
 }));
 
@@ -1995,7 +2056,8 @@ router.get('/schedules/execution', asyncHandler(async (req: AgentRequest, res: A
 router.post('/schedules', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
   const { scheduleId: scheduleIdValue, times, taskFlow } = req.body || {};
   const scheduleId = typeof scheduleIdValue === 'string' ? scheduleIdValue : 'default';
-  const result = setupSchedule(scheduleId, times, taskFlow);
+  const { clientType } = await resolveRequestConnection(req, { allowOverrides: true });
+  const result = setupSchedule(scheduleId, times, taskFlow, clientType);
   if (!result.success) {
     return sendError(res, req, agentError('AGENT_SCHEDULE_SETUP_FAILED', result.message, { statusCode: 400 }));
   }
@@ -2039,7 +2101,8 @@ router.post('/schedules/:scheduleId/execute', asyncHandler(async (req: AgentRequ
 }));
 
 router.post('/actions/configure-auto-update', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
-  return sendSuccess(res, req, setupAutoUpdate(req.body || {}));
+  const { clientType } = await resolveRequestConnection(req, { allowOverrides: true });
+  return sendSuccess(res, req, setupAutoUpdate(req.body || {}, clientType));
 }));
 
 router.get('/auto-update/status', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
@@ -2561,6 +2624,15 @@ router.post('/actions/stop', asyncHandler(async (req: AgentRequest, res: AgentRe
     }
     if (TERMINAL_RUN_STATES.has(requestedRun.state)) {
       return sendSuccess(res, req, { stopped: false, alreadyTerminal: true, run: requestedRun }, '任务已经结束');
+    }
+    const manualStopped = requestedRun.state === 'waiting' ? stopManualCopilotSetRun(requestedRunId) : null;
+    if (manualStopped) {
+      return respondWithPersistedAgentRun(res, req, requestedRunId, '停止手动作业集时持久化失败', (persistedRun: AgentRunDto | null) =>
+        sendSuccess(res, req, {
+          stopped: true,
+          run: enrichAgentRun(persistedRun || manualStopped)
+        }, '手动作业集已停止')
+      );
     }
     if (requestedRun.state === 'accepted') {
       return sendError(res, req, agentError('AGENT_RUN_NOT_STARTED', '目标 run 尚未获得执行权，未发送终止命令', {

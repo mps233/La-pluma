@@ -12,10 +12,12 @@ import {
   listAgentRuns,
   type AgentRunDto,
   markAgentRunStopping,
+  markAgentRunWaiting,
   releaseAgentRunIdempotency,
   resetAgentRunsForTests,
   setAgentRunAcceptedResult,
   startAgentRun,
+  startAgentRunForExecution,
   stopAgentRun,
   updateAgentRunProgress
 } from '../agentRunService.ts';
@@ -342,5 +344,28 @@ describe('agent run registry', () => {
       () => startAgentRun('missing'),
       (error: unknown) => getErrorCode(error) === 'AGENT_RUN_NOT_FOUND' && getErrorStatus(error) === 404
     );
+  });
+});
+
+describe('manual copilot-set waiting lifecycle', () => {
+  beforeEach(() => resetAgentRunsForTests());
+  afterEach(() => resetAgentRunsForTests());
+
+  it('enters waiting between entries and resumes or stops from waiting', () => {
+    const { run } = beginAgentRun({ operationId: 'run_copilot_set_manual' });
+    assert.equal(startAgentRun(run.runId).state, 'running');
+    assert.equal(markAgentRunWaiting(run.runId).state, 'waiting');
+    assert.equal(getCurrentAgentRun()?.runId, run.runId);
+
+    assert.equal(startAgentRunForExecution(run.runId).state, 'running');
+    assert.equal(markAgentRunWaiting(run.runId).state, 'waiting');
+    assert.equal(stopAgentRun(run.runId, { canceled: true }).state, 'stopped');
+  });
+
+  it('completes from waiting without a new execution transition', () => {
+    const { run } = beginAgentRun({ operationId: 'run_copilot_set_manual' });
+    startAgentRun(run.runId);
+    markAgentRunWaiting(run.runId);
+    assert.equal(completeAgentRun(run.runId, { finished: true }).state, 'succeeded');
   });
 });
