@@ -19,6 +19,7 @@ import type {
   TrainingSettings,
 } from '@/types/components'
 import { parseJsonResponse } from '@/utils/apiResponse'
+import { bumpItemIconCacheVersion, getItemIconCacheVersion } from './itemIconCache'
 
 export { parseJsonResponse } from '@/utils/apiResponse'
 
@@ -33,8 +34,13 @@ const getApiBaseUrl = (): string => {
 
 export const API_BASE_URL = getApiBaseUrl()
 
-export const getItemIconUrl = (iconId: string | number): string =>
-  `${API_BASE_URL}/maa-assets/item/${encodeURIComponent(String(iconId))}`
+export { bumpItemIconCacheVersion, getItemIconCacheVersion } from './itemIconCache'
+
+export const getItemIconUrl = (iconId: string | number): string => {
+  const path = `${API_BASE_URL}/maa-assets/item/${encodeURIComponent(String(iconId))}`
+  const version = getItemIconCacheVersion()
+  return version > 0 ? `${path}?v=${version}` : path
+}
 
 const getStoredToken = (): string => {
   const rawToken = localStorage.getItem('laPlumaToken') || ''
@@ -131,6 +137,7 @@ export interface WebrtcStatusData {
   minimumAgentVersion?: string
   screenState?: string | null
   usingDefaultPassword?: boolean
+  runtimeVersion?: string | null
   [key: string]: unknown
 }
 
@@ -198,6 +205,11 @@ export interface ScheduleExecutionStatusData {
 export interface ActivityData {
   code: string | null
   name: string | null
+  available?: boolean
+  status?: 'active' | 'none' | 'unavailable' | 'stale'
+  failure?: { source?: string; message?: string } | null
+  dataUpdatedAt?: number | null
+  lastSuccessAt?: number | null
   [key: string]: unknown
 }
 
@@ -223,6 +235,19 @@ export interface ScheduleExecutionResultData {
   runId?: string
   results?: unknown[]
   pending?: Array<{ itemIndex: number; [key: string]: unknown }>
+}
+
+export interface ManualCopilotSetResult {
+  runId: string
+  state: string
+  setId: string
+  name: string
+  waitingForNext: boolean
+  finished: boolean
+  stopped: boolean
+  nextItemIndex: number | null
+  taskResults: unknown[]
+  message: string
 }
 
 export interface TrainingQueueResponse {
@@ -423,9 +448,11 @@ export const maaApi = {
   /**
    * 终止当前任务
    */
-  async stopTask(): Promise<ApiResponse<StopTaskData>> {
+  async stopTask(runId?: string | null): Promise<ApiResponse<StopTaskData>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/stop`, {
       method: 'POST',
+      headers: runId ? { 'Content-Type': 'application/json' } : undefined,
+      body: runId ? JSON.stringify({ runId }) : undefined
     })
     return parseJsonResponse(response)
   },
@@ -539,11 +566,16 @@ export const maaApi = {
     return parseJsonResponse(response)
   },
 
-  async startWebrtc(profileId: string = 'default', deviceId: string = 'mumu-la-pluma'): Promise<ApiResponse<WebrtcStatusData>> {
+  async startWebrtc(
+    profileId: string = 'default',
+    deviceId: string = 'mumu-la-pluma',
+    signal?: AbortSignal
+  ): Promise<ApiResponse<WebrtcStatusData>> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profileId, deviceId })
+      body: JSON.stringify({ profileId, deviceId }),
+      signal
     })
     return parseJsonResponse(response)
   },
@@ -602,8 +634,9 @@ export const maaApi = {
   /**
    * 获取当前活动信息
    */
-  async getActivity(clientType: string = 'Official'): Promise<ApiResponse<ActivityData>> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/activity?clientType=${clientType}`)
+  async getActivity(clientType?: string): Promise<ApiResponse<ActivityData>> {
+    const query = clientType ? `?clientType=${encodeURIComponent(clientType)}` : ''
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/activity${query}`)
     return parseJsonResponse(response)
   },
 
@@ -672,7 +705,9 @@ export const maaApi = {
       } : undefined,
       body: version ? JSON.stringify({ version }) : undefined,
     })
-    return parseJsonResponse(response)
+    const result = await parseJsonResponse(response)
+    if (result.success) bumpItemIconCacheVersion()
+    return result
   },
 
   /**
@@ -682,7 +717,9 @@ export const maaApi = {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/update-cli`, {
       method: 'POST',
     })
-    return parseJsonResponse(response)
+    const result = await parseJsonResponse(response)
+    if (result.success) bumpItemIconCacheVersion()
+    return result
   },
 
   /**
@@ -692,7 +729,9 @@ export const maaApi = {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/hot-update-resources`, {
       method: 'POST',
     })
-    return parseJsonResponse(response)
+    const result = await parseJsonResponse(response)
+    if (result.success) bumpItemIconCacheVersion()
+    return result
   },
 
   /**
@@ -838,6 +877,28 @@ export const maaApi = {
       })
     })
     return parseJsonResponse(response)
+  },
+
+  async startManualCopilotSet(copilotId: string, payload: {
+    raid: 'normal' | 'raid' | 'both'
+    selectedIndexes: number[]
+    options?: Record<string, unknown>
+  }): Promise<ApiResponse<ManualCopilotSetResult>> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/copilot-sets/${encodeURIComponent(copilotId)}/manual/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    return parseJsonResponse<ApiResponse<ManualCopilotSetResult>>(response)
+  },
+
+  async continueManualCopilotSet(runId: string, options?: Record<string, unknown>): Promise<ApiResponse<ManualCopilotSetResult>> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/actions/continue-copilot-set`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ runId, ...(options ? { options } : {}) })
+    })
+    return parseJsonResponse<ApiResponse<ManualCopilotSetResult>>(response)
   },
 
   async executeCopilotSetPlan(copilotId: string, payload: {

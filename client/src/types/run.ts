@@ -5,6 +5,7 @@
 
 export type AgentRunState =
   | 'accepted'
+  | 'waiting'
   | 'running'
   | 'stopping'
   | 'succeeded'
@@ -92,7 +93,7 @@ export const IDLE_RUN_STATUS: GlobalRunStatus = Object.freeze({
   detail: null,
 })
 
-const ACTIVE_RUN_STATES = new Set<AgentRunState>(['accepted', 'running', 'stopping'])
+const ACTIVE_RUN_STATES = new Set<AgentRunState>(['accepted', 'waiting', 'running', 'stopping'])
 
 export const isActiveRunState = (state: AgentRunState): boolean => ACTIVE_RUN_STATES.has(state)
 
