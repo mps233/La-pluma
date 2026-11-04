@@ -201,6 +201,18 @@ export interface RoguelikeAdvancedOption {
   placeholder?: string
   helper?: string
   options?: Array<{ value: string; label: string }>
+  /** 仅在这些主题下显示并下发。 */
+  themes?: string[]
+  /** 仅在这些模式（字符串形式）下显示并下发。 */
+  modes?: string[]
+  /** 空值时的显示/命令默认值。 */
+  defaultValue?: string
+  /** 依赖另一个字段的取值。 */
+  requires?: {
+    key: string
+    equals?: string | number | boolean
+    oneOf?: Array<string | number | boolean>
+  }
 }
 
 export interface RoguelikeTaskInputs {
@@ -349,6 +361,11 @@ export interface LogEntry {
   time: string
   level: 'ERROR' | 'WARN' | 'INFO' | 'DEBUG'
   message: string
+  /** 语义摘要对应的原始日志文本，用于逐条查看与导出取证。 */
+  rawMessage?: string
+  sequence?: number
+  runId?: string | null
+  operationId?: string | null
 }
 
 export interface LogFile {

@@ -5,6 +5,7 @@ import { maaApi } from '../services/api'
 import Icons from './Icons'
 import { PageHeader, Input, Select, Button, SmoothPanel, Switch } from './common'
 import { useStatusStore } from '../store/statusStore'
+import { useRunStore } from '../store/runStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import ScreenMonitor from './ScreenMonitor'
 import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
@@ -17,6 +18,12 @@ import type {
   RoguelikeCoreChar
 } from '@/types/components'
 import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
+import {
+  getRoguelikeModeChoices,
+  getRoguelikeRoleChoices,
+  getRoguelikeSquadChoices,
+  isRoguelikeOptionVisible,
+} from '../utils/roguelikeStrategy'
 
 type RoguelikeMode = 'roguelike' | 'reclamation'
 type RoguelikeUserConfig = {
@@ -84,6 +91,7 @@ const splitCommaList = (value: unknown): string[] => (
 )
 
 export default function RoguelikeTasks() {
+  const currentRun = useRunStore(state => state.run)
   const shouldReduceMotion = useReducedMotion()
   const [isRunning, setIsRunning] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
@@ -400,43 +408,43 @@ export default function RoguelikeTasks() {
           { value: '30003', label: '刷开局（黑流树海）' },
         ], helper: '主题限制由 MaaCore 校验' },
         { key: 'difficulty', label: '难度', type: 'number', placeholder: '-1', helper: '-1 表示不指定；黑流树海实托邦需要 6 以上' },
-        { key: 'squad', label: '起始分队', type: 'text', placeholder: '指挥分队' },
-        { key: 'roles', label: '职业组', type: 'text', placeholder: '取长补短' },
+        { key: 'squad', label: '起始分队', type: 'select', options: [] },
+        { key: 'roles', label: '职业组', type: 'select', options: [], defaultValue: '稳扎稳打' },
         { key: 'coreCharList', label: '开局干员（最多 3 位）', type: 'core-char-list', helper: '按顺位招募；三个位置职业不能相同，助战可逐位开启' },
-        { key: 'collectibleModeCoreCharList', label: '准备局开局干员（模式 30003）', type: 'core-char-list', helper: '不填则沿用主开局干员列表' },
+        { key: 'collectibleModeCoreCharList', label: '准备局开局干员（模式 30003）', type: 'core-char-list', helper: '不填则沿用主开局干员列表', modes: ['30003'] },
         { key: 'coreChar', label: '开局干员（兼容字段）', type: 'text', placeholder: '留空自动选择', helper: '仅在未填写上方干员列表时使用' },
         { key: 'useSupport', label: '兼容字段使用助战', type: 'checkbox', helper: '仅作用于上方兼容字段' },
         { key: 'useNonfriendSupport', label: '允许非好友助战', type: 'checkbox' },
         { key: 'startCount', label: '运行次数', type: 'number', placeholder: '无限' },
-        { key: 'stopAtBoss', label: '最终 Boss 前停止', type: 'checkbox' },
+        { key: 'stopAtBoss', label: '最终 Boss 前停止', type: 'checkbox', modes: ['0'] },
         { key: 'stopAtMaxLevel', label: '肉鸽等级满后停止', type: 'checkbox' },
         { key: 'investmentEnabled', label: '投资源石锭', type: 'checkbox' },
         { key: 'investmentsCount', label: '投资次数', type: 'number', placeholder: '无限' },
         { key: 'stopWhenInvestmentFull', label: '投资满后停止', type: 'checkbox' },
-        { key: 'investmentWithMoreScore', label: '投资后购物', type: 'checkbox', helper: '仅模式 1' },
+        { key: 'investmentWithMoreScore', label: '投资后购物', type: 'checkbox', helper: '仅模式 1', modes: ['1'] },
         { key: 'collectibleModeStartList', label: '凹开局奖励（模式 4）', type: 'collectible-start-list', helper: '仅模式 4；勾选希望凹到的开局奖励' },
-        { key: 'startWithEliteTwo', label: '凹精二直升', type: 'checkbox', helper: '仅模式 4' },
-        { key: 'onlyStartWithEliteTwo', label: '只凹精二直升', type: 'checkbox', helper: '仅模式 4 且开启精二直升' },
-        { key: 'refreshTraderWithDice', label: '骰子刷新商店', type: 'checkbox', helper: '仅水月主题' },
-        { key: 'firstFloorFoldartal', label: '第一层目标密文版', type: 'text', placeholder: '如：惊讶' },
-        { key: 'startFoldartalList', label: '开局目标密文板', type: 'text', placeholder: '多个用逗号分隔', helper: '仅萨米模式 4，需生活至上分队' },
-        { key: 'expectedCollapsalParadigms', label: '目标坍缩范式', type: 'text', placeholder: '目空一些,睁眼瞎', helper: '仅萨米模式 5，多个用逗号分隔' },
-        { key: 'useFoldartal', label: '使用密文板', type: 'checkbox', helper: '仅萨米主题' },
-        { key: 'checkCollapsalParadigms', label: '检测坍缩范式', type: 'checkbox', helper: '仅萨米主题' },
-        { key: 'doubleCheckCollapsalParadigms', label: '坍缩范式防漏检测', type: 'checkbox' },
-        { key: 'monthlySquadAutoIterate', label: '月度小队自动切换', type: 'checkbox' },
-        { key: 'monthlySquadCheckComms', label: '参考月度小队通信', type: 'checkbox' },
-        { key: 'deepExplorationAutoIterate', label: '深入调查自动切换', type: 'checkbox' },
-        { key: 'collectibleModeShopping', label: '烧水时购物', type: 'checkbox' },
-        { key: 'collectibleModeSquad', label: '烧水分队', type: 'text', placeholder: '默认与起始分队同步' },
-        { key: 'collectibleModeRoles', label: '烧水职业组', type: 'text', placeholder: '默认与职业组同步' },
-        { key: 'startWithSeed', label: '固定种子', type: 'text', placeholder: '留空不启用', helper: '仅萨卡兹投资模式' },
-        { key: 'findPlayTimeTarget', label: '常乐节点目标', type: 'select', options: [
+        { key: 'startWithEliteTwo', label: '凹精二直升', type: 'checkbox', helper: '仅模式 4', modes: ['4'] },
+        { key: 'onlyStartWithEliteTwo', label: '只凹精二直升', type: 'checkbox', helper: '仅模式 4 且开启精二直升', modes: ['4'], requires: { key: 'startWithEliteTwo' } },
+        { key: 'refreshTraderWithDice', label: '骰子刷新商店', type: 'checkbox', helper: '仅水月主题', themes: ['Mizuki'] },
+        { key: 'firstFloorFoldartal', label: '第一层目标密文版', type: 'text', placeholder: '如：惊讶', themes: ['Sami'] },
+        { key: 'startFoldartalList', label: '开局目标密文板', type: 'text', placeholder: '多个用逗号分隔', helper: '仅萨米模式 4，需生活至上分队', themes: ['Sami'], modes: ['4'] },
+        { key: 'expectedCollapsalParadigms', label: '目标坍缩范式', type: 'text', placeholder: '目空一些,睁眼瞎', helper: '仅萨米模式 5，多个用逗号分隔', themes: ['Sami'], modes: ['5'] },
+        { key: 'useFoldartal', label: '使用密文板', type: 'checkbox', helper: '仅萨米主题', themes: ['Sami'] },
+        { key: 'checkCollapsalParadigms', label: '检测坍缩范式', type: 'checkbox', helper: '仅萨米主题', themes: ['Sami'] },
+        { key: 'doubleCheckCollapsalParadigms', label: '坍缩范式防漏检测', type: 'checkbox', themes: ['Sami'], requires: { key: 'checkCollapsalParadigms' } },
+        { key: 'monthlySquadAutoIterate', label: '月度小队自动切换', type: 'checkbox', modes: ['6'] },
+        { key: 'monthlySquadCheckComms', label: '参考月度小队通信', type: 'checkbox', modes: ['6'] },
+        { key: 'deepExplorationAutoIterate', label: '深入调查自动切换', type: 'checkbox', modes: ['7'] },
+        { key: 'collectibleModeShopping', label: '烧水时购物', type: 'checkbox', modes: ['4', '30003'] },
+        { key: 'collectibleModeSquad', label: '烧水分队', type: 'text', placeholder: '默认与起始分队同步', modes: ['4', '30003'] },
+        { key: 'collectibleModeRoles', label: '烧水职业组', type: 'text', placeholder: '默认与职业组同步', modes: ['4', '30003'] },
+        { key: 'startWithSeed', label: '固定种子', type: 'text', placeholder: '留空不启用', helper: '仅萨卡兹投资模式', themes: ['Sarkaz'], modes: ['1'] },
+        { key: 'findPlayTimeTarget', label: '常乐节点目标', type: 'select', themes: ['JieGarden'], modes: ['20001'], options: [
           { value: '1', label: '令（掷地有声）' },
           { value: '2', label: '黍（种因得果）' },
           { value: '3', label: '年（三缺一）' },
         ], helper: '仅界园模式 20001，必填' },
-        { key: 'blackflowStrategy', label: '黑流树海策略', type: 'select', options: [
+        { key: 'blackflowStrategy', label: '黑流树海策略', type: 'select', themes: ['BlackFlow'], options: [
           { value: '', label: '按模式自动推断' },
           { value: 'baby_animal', label: '培育襁褓动物' },
           { value: 'investment', label: '投资路线' },
@@ -446,35 +454,53 @@ export default function RoguelikeTasks() {
           { value: 'ending2', label: '第二结局' },
           { value: 'ending3', label: '第三结局' },
         ], helper: '仅刷等级模式 0；模式 30003 不读取' },
-        { key: 'blackflowCultivationTarget', label: '培育目标', type: 'select', options: [
+        { key: 'blackflowCultivationTarget', label: '培育目标', type: 'select', themes: ['BlackFlow'], modes: ['0'], options: [
           { value: 'swaddled_cat', label: '襁褓猫' },
           { value: 'swaddled_feathered_serpent', label: '襁褓羽蛇' },
           { value: 'swaddled_dog', label: '襁褓狗' },
           { value: 'swaddled_cerberus', label: '襁褓三头犬' },
         ], helper: '仅策略为培育襁褓动物时使用' },
-        { key: 'blackflowStartAnimals', label: '模式 30003 襁褓动物', type: 'text', placeholder: 'swaddled_cat,swaddled_dog', helper: '0–2 项，羽蛇最多一项' },
-        { key: 'blackflowStartRewards', label: '模式 30003 开局奖励', type: 'blackflow-rewards', helper: '命中任意一项即完成目标局' },
-        { key: 'blackflowStartUtopia', label: '凹第一层实托邦', type: 'checkbox', helper: '难度 6 以上才会出现' },
-        { key: 'blackflowStartRewardPriority', label: '实托邦奖励优先级', type: 'text', placeholder: 'space_lease,unnumbered_item', helper: '凹实托邦时必填，多个用逗号分隔' },
+        { key: 'blackflowStartAnimals', label: '模式 30003 襁褓动物', type: 'text', placeholder: 'swaddled_cat,swaddled_dog', helper: '0–2 项，羽蛇最多一项', modes: ['30003'] },
+        { key: 'blackflowStartRewards', label: '模式 30003 开局奖励', type: 'blackflow-rewards', helper: '命中任意一项即完成目标局', modes: ['30003'] },
+        { key: 'blackflowStartUtopia', label: '凹第一层实托邦', type: 'checkbox', helper: '难度 6 以上才会出现', modes: ['30003'] },
+        { key: 'blackflowStartRewardPriority', label: '实托邦奖励优先级', type: 'text', placeholder: 'space_lease,unnumbered_item', helper: '凹实托邦时必填，多个用逗号分隔', modes: ['30003'] },
       ],
       reclamation: [
-        { key: 'mode', label: '模式', type: 'select', options: [
+        { key: 'mode', label: '模式', type: 'select', defaultValue: '1', options: [
           { value: '0', label: '沙洲遗闻：刷繁荣度（无存档）' },
           { value: '1', label: '沙洲遗闻：制作工具刷繁荣度' },
           { value: '16', label: '重启锚点：RA-1 精耕细作' },
           { value: '32', label: '重启锚点：RA-15 圣聆初雪 60 杀' },
           { value: '48', label: '重启锚点：RA-4 维什戴尔 Boss' },
         ], helper: '模式需与上方主题匹配' },
-        { key: 'toolsToCraft', label: '制作工具名称', type: 'text', placeholder: '荧光棒,发电机', helper: '仅沙洲遗闻模式 1，多个用逗号分隔' },
-        { key: 'clearStore', label: '完成后清空商店', type: 'checkbox', helper: '仅沙洲遗闻模式 0' },
+        { key: 'toolsToCraft', label: '制作工具名称', type: 'text', placeholder: '荧光棒,发电机', helper: '仅沙洲遗闻模式 1，多个用逗号分隔', modes: ['1'] },
+        { key: 'clearStore', label: '完成后清空商店', type: 'checkbox', helper: '仅沙洲遗闻模式 0', modes: ['0'] },
         { key: 'incrementMode', label: '点击方式', type: 'select', options: [
           { value: '0', label: '连点' },
           { value: '1', label: '长按' },
         ], helper: '仅沙洲遗闻' },
-        { key: 'numCraftBatches', label: '制造轮数', type: 'number', placeholder: '16', helper: '仅沙洲遗闻' },
+        { key: 'numCraftBatches', label: '制造轮数', type: 'number', placeholder: '16', helper: '仅沙洲遗闻', modes: ['1'] },
       ],
     }
-    return options[taskId] || []
+    const selected = options[taskId] || []
+    if (taskId === 'roguelike') {
+      const theme = (taskInputs[taskId] || '').trim()
+      const modeOption = selected.find(option => option.key === 'mode')
+      if (modeOption) modeOption.options = getRoguelikeModeChoices(theme)
+      const squadOption = selected.find(option => option.key === 'squad')
+      if (squadOption) squadOption.options = getRoguelikeSquadChoices(theme)
+      const rolesOption = selected.find(option => option.key === 'roles')
+      if (rolesOption) rolesOption.options = getRoguelikeRoleChoices(theme)
+    }
+    return selected
+  }
+
+  const getVisibleAdvancedOptions = (taskId: string) => {
+    const theme = (taskInputs[taskId] || '').trim()
+    const advanced = advancedParams[taskId] || {}
+    const mode = String(advanced.mode ?? (taskId === 'reclamation' ? 1 : 0))
+    return getAdvancedOptions(taskId)
+      .filter(option => isRoguelikeOptionVisible(option, theme, mode, advanced))
   }
 
   const buildTaskConfig = (task: RoguelikeTask) => {
@@ -483,9 +509,19 @@ export default function RoguelikeTasks() {
     if (!theme) throw new Error('请选择主题')
 
     const params: Record<string, unknown> = { theme }
-    const mode = Number(advanced.mode ?? 0)
+    const modeDefault = task.id === 'reclamation' ? 1 : 0
+    const mode = Number(advanced.mode ?? modeDefault)
+    const optionMap = new Map(getAdvancedOptions(task.id).map(option => [option.key, option]))
+    const modeKey = String(advanced.mode ?? modeDefault)
+    const isVisible = (key: string) => isRoguelikeOptionVisible(optionMap.get(key), theme, modeKey, advanced)
 
     if (task.id === 'roguelike') {
+      if (advanced.mode !== undefined && advanced.mode !== '') {
+        const modeChoices = getRoguelikeModeChoices(theme)
+        if (!modeChoices.some(choice => choice.value === String(advanced.mode))) {
+          throw new Error('当前主题不支持所选模式，请重新选择')
+        }
+      }
       params.mode = Number.isFinite(mode) ? mode : 0
 
       const stringFields: Record<string, string> = {
@@ -500,9 +536,11 @@ export default function RoguelikeTasks() {
         blackflowCultivationTarget: 'blackflow_cultivation_target',
       }
       Object.entries(stringFields).forEach(([key, param]) => {
+        if (!isVisible(key)) return
         const value = advanced[key]
         if (typeof value === 'string' && value.trim()) params[param] = value.trim()
       })
+      if (isVisible('roles') && !params.roles) params.roles = '稳扎稳打'
 
       const numberFields: Record<string, string> = {
         difficulty: 'difficulty',
@@ -511,6 +549,7 @@ export default function RoguelikeTasks() {
         findPlayTimeTarget: 'find_playTime_target',
       }
       Object.entries(numberFields).forEach(([key, param]) => {
+        if (!isVisible(key)) return
         const value = advanced[key]
         if (value !== undefined && value !== '') {
           const numeric = Number(value)
@@ -538,6 +577,7 @@ export default function RoguelikeTasks() {
         blackflowStartUtopia: 'blackflow_start_utopia',
       }
       Object.entries(booleanFields).forEach(([key, param]) => {
+        if (!isVisible(key)) return
         const value = advanced[key]
         if (typeof value === 'boolean') params[param] = value
       })
@@ -550,11 +590,12 @@ export default function RoguelikeTasks() {
         blackflowStartRewardPriority: 'blackflow_start_reward_priority',
       }
       Object.entries(listFields).forEach(([key, param]) => {
+        if (!isVisible(key)) return
         const list = splitCommaList(advanced[key])
         if (list.length > 0) params[param] = list
       })
 
-      if (Number(params.mode) === 30003) {
+      if (isVisible('blackflowStartAnimals') && Number(params.mode) === 30003) {
         const animals = splitCommaList(advanced.blackflowStartAnimals)
         if (animals.length > 2) throw new Error('黑流树海襁褓动物最多选择 2 项')
         if (animals.filter(animal => animal === 'swaddled_feathered_serpent').length > 1) {
@@ -564,25 +605,31 @@ export default function RoguelikeTasks() {
       }
 
       const startList = advanced.collectibleModeStartList
-      if (startList && typeof startList === 'object' && !Array.isArray(startList)) {
+      if (isVisible('collectibleModeStartList') && startList && typeof startList === 'object' && !Array.isArray(startList)) {
         params.collectible_mode_start_list = Object.fromEntries(
           COLLECTIBLE_START_REWARDS.map(reward => [reward.key, Boolean((startList as Record<string, boolean>)[reward.key])])
         )
       }
 
       const rewards = Number(advanced.blackflowStartRewards ?? 0)
-      if (Number.isFinite(rewards) && rewards >= 0) params.blackflow_start_rewards = rewards
+      if (isVisible('blackflowStartRewards') && Number.isFinite(rewards) && rewards >= 0) {
+        params.blackflow_start_rewards = rewards
+      }
 
-      const coreCharList = (Array.isArray(advanced.coreCharList) ? advanced.coreCharList : [])
+      const coreCharList = isVisible('coreCharList')
+        ? (Array.isArray(advanced.coreCharList) ? advanced.coreCharList : [])
         .filter(entry => entry && typeof entry.name === 'string' && entry.name.trim())
         .slice(0, 3)
-        .map(entry => ({ name: entry.name.trim(), use_support: Boolean(entry.use_support) }))
+          .map(entry => ({ name: entry.name.trim(), use_support: Boolean(entry.use_support) }))
+        : []
       if (coreCharList.length > 0) params.core_char_list = coreCharList
 
-      const prepCoreCharList = (Array.isArray(advanced.collectibleModeCoreCharList) ? advanced.collectibleModeCoreCharList : [])
+      const prepCoreCharList = isVisible('collectibleModeCoreCharList')
+        ? (Array.isArray(advanced.collectibleModeCoreCharList) ? advanced.collectibleModeCoreCharList : [])
         .filter(entry => entry && typeof entry.name === 'string' && entry.name.trim())
         .slice(0, 3)
-        .map(entry => ({ name: entry.name.trim(), use_support: Boolean(entry.use_support) }))
+          .map(entry => ({ name: entry.name.trim(), use_support: Boolean(entry.use_support) }))
+        : []
       if (prepCoreCharList.length > 0) params.collectible_mode_core_char_list = prepCoreCharList
 
       if ([30001, 30003].includes(Number(params.mode)) && theme !== 'BlackFlow') {
@@ -598,12 +645,12 @@ export default function RoguelikeTasks() {
     } else {
       params.mode = Number.isFinite(mode) ? mode : 0
       const tools = splitCommaList(advanced.toolsToCraft)
-      if (tools.length > 0) params.tools_to_craft = tools
-      if (typeof advanced.clearStore === 'boolean') params.clear_store = advanced.clearStore
+      if (isVisible('toolsToCraft') && tools.length > 0) params.tools_to_craft = tools
+      if (isVisible('clearStore') && typeof advanced.clearStore === 'boolean') params.clear_store = advanced.clearStore
       const incrementMode = Number(advanced.incrementMode ?? 0)
-      if (Number.isFinite(incrementMode)) params.increment_mode = incrementMode
+      if (isVisible('incrementMode') && Number.isFinite(incrementMode)) params.increment_mode = incrementMode
       const numBatches = Number(advanced.numCraftBatches ?? 0)
-      if (Number.isFinite(numBatches) && numBatches > 0) params.num_craft_batches = numBatches
+      if (isVisible('numCraftBatches') && Number.isFinite(numBatches) && numBatches > 0) params.num_craft_batches = numBatches
 
       if ([16, 32, 48].includes(Number(params.mode)) && theme !== 'RelaunchAnchor') {
         throw new Error('RA-1 / RA-15 / RA-4 模式需要选择「重启锚点」主题')
@@ -682,7 +729,7 @@ export default function RoguelikeTasks() {
     setStatusMessage('正在终止肉鸽任务...', 'warning')
 
     try {
-      const result = await maaApi.stopTask()
+      const result = await maaApi.stopTask(currentRun?.runId ?? null)
       if (executionGenerationRef.current !== activeGeneration) return
       const taskStopped = Boolean(result.data?.task?.success)
       if (!result.success || !taskStopped) {
@@ -736,7 +783,7 @@ export default function RoguelikeTasks() {
   }
 
   const renderAdvancedOptions = (task: RoguelikeTask) => {
-    const options = getAdvancedOptions(task.id)
+    const options = getVisibleAdvancedOptions(task.id)
     if (options.length === 0) return null
 
     const advanced = advancedParams[task.id] || {}
@@ -871,16 +918,23 @@ export default function RoguelikeTasks() {
                 className={isCustom ? 'roguelike-custom-field' : undefined}
                 style={isCustom ? { gridColumn: '1 / -1' } : undefined}
               >
-                {option.type === 'select' && option.options ? (
-                  <Select
-                    id={`roguelike-${task.id}-${option.key}`}
-                    name={`maa-${task.id}-${option.key}`}
-                    label={option.label}
-                    value={String(advanced[option.key] ?? option.options[0]?.value ?? '')}
-                    onChange={(value: string) => handleAdvancedChange(task.id, option.key, value)}
-                    options={option.options}
-                  />
-                ) : option.type === 'core-char-list' ? (
+                {option.type === 'select' && option.options ? (() => {
+                  const choices = option.options ?? []
+                  const value = String(advanced[option.key] ?? option.defaultValue ?? choices[0]?.value ?? '')
+                  const withCurrent = value && !choices.some(choice => choice.value === value)
+                    ? [...choices, { value, label: value }]
+                    : choices
+                  return (
+                    <Select
+                      id={`roguelike-${task.id}-${option.key}`}
+                      name={`maa-${task.id}-${option.key}`}
+                      label={option.label}
+                      value={value}
+                      onChange={(next: string) => handleAdvancedChange(task.id, option.key, next)}
+                      options={withCurrent}
+                    />
+                  )
+                })() : option.type === 'core-char-list' ? (
                   renderCoreCharList(option)
                 ) : option.type === 'blackflow-rewards' ? (
                   renderBlackflowRewards(option)
@@ -1080,7 +1134,7 @@ export default function RoguelikeTasks() {
                 <h3>策略设置</h3>
                 <p>{activeTask.name}</p>
               </div>
-              <span>{getAdvancedOptions(activeTask.id).length} 项</span>
+              <span>{getVisibleAdvancedOptions(activeTask.id).length} 项</span>
             </div>
             <div className="roguelike-panel-body roguelike-settings-body">
               {renderAdvancedOptions(activeTask)}
