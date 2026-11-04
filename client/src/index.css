@@ -7102,3 +7102,46 @@ svg.w-5.h-5 {
     }
   }
 }
+
+/* 预览模式：复用工作区液体分段控件 */
+.preview-mode-shell {
+  width: min(100%, 21rem);
+}
+
+.preview-mode-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.preview-mode-list .app-workspace-segment {
+  height: 3.25rem;
+  min-height: 3.25rem;
+  padding: 0.5rem 0.55rem;
+  gap: 0.5rem;
+}
+
+.preview-mode-list .app-workspace-segment-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-basis: 1.5rem;
+}
+
+.preview-mode-list .app-workspace-segment-icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.preview-mode-list .app-workspace-segment-copy > span {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.preview-mode-list .app-workspace-segment-copy > small {
+  font-size: 0.6875rem;
+}
+
+@media (pointer: coarse) {
+  .preview-mode-list .app-workspace-segment {
+    height: 44px;
+    min-height: 44px;
+  }
+}
