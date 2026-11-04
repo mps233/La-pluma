@@ -11,6 +11,9 @@ export interface LogEntry {
   message: unknown;
   service?: string;
   data?: unknown;
+  sequence?: number;
+  runId?: string | null;
+  operationId?: string | null;
 }
 
 export interface LoggerOptions {

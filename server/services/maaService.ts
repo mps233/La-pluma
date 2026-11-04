@@ -15,6 +15,7 @@ import { getFallbackActivity } from './activityFallbackService.ts';
 import { getStageActivityInfo } from './activityDataService.ts';
 import { listMaaActivityStageCodes } from './maaResourceDataService.ts';
 import { acquireMaaExecutionLease } from './executionCoordinatorService.ts';
+import { getCurrentAgentRun } from './agentRunService.ts';
 import { loadUserConfig, saveUserConfig } from './configStorageService.ts';
 import { DEFAULT_ADB_ADDRESS, DEFAULT_ADB_PATH, DEFAULT_CLIENT_TYPE, DEFAULT_MAA_CLI_PATH } from '../config/connectionDefaults.ts';
 
@@ -22,6 +23,24 @@ const execFilePromise = promisify(execFile);
 
 // 创建日志记录器
 const logger = createLogger('MaaService');
+
+/** 配置查询等短命令的硬超时，避免 CLI 卡死拖住 HTTP 请求。 */
+export const MAA_CLI_EXEC_TIMEOUT_MS = 15_000;
+/** Core 安装/更新的默认长超时：真实慢下载应在 15 分钟量级内完成。 */
+export const DEFAULT_MAA_MAINTENANCE_TIMEOUT_MS = 900_000;
+/** 维护命令超时上限，防止环境配置无限等待。 */
+export const MAX_MAA_MAINTENANCE_TIMEOUT_MS = 3_600_000;
+
+/** 解析并收敛 LA_PLUMA_MAA_MAINTENANCE_TIMEOUT_MS；非法值回退默认。 */
+export function resolveMaaMaintenanceTimeoutMs(raw: string | undefined): number {
+  const parsed = Number(String(raw ?? '').trim());
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_MAA_MAINTENANCE_TIMEOUT_MS;
+  return Math.min(Math.trunc(parsed), MAX_MAA_MAINTENANCE_TIMEOUT_MS);
+}
+
+const MAA_MAINTENANCE_TIMEOUT_MS = resolveMaaMaintenanceTimeoutMs(
+  process.env.LA_PLUMA_MAA_MAINTENANCE_TIMEOUT_MS
+);
 
 interface TaskStatus {
   isRunning: boolean;
@@ -134,6 +153,10 @@ interface ActivityInfo {
   stages?: string[]
   timestamp?: number
   ttl?: number
+  status?: 'active' | 'none' | 'unavailable' | 'stale'
+  dataUpdatedAt?: number | null
+  lastSuccessAt?: number | null
+  failure?: { source: 'maa' | 'penguin'; message: string } | null
 }
 
 interface MaaLogFile {
@@ -158,6 +181,9 @@ interface MaaVersionInfo {
 // MAA CLI 路径
 const MAA_CLI_PATH = DEFAULT_MAA_CLI_PATH;
 const MAX_REALTIME_LOGS = Number(process.env.LA_PLUMA_MAX_REALTIME_LOGS || 5000);
+let realtimeLogSequence = 0;
+const MAX_CAPTURED_STDOUT_CHARS = 5 * 1024 * 1024;
+const MAX_CAPTURED_STDERR_CHARS = 1024 * 1024;
 const DYNAMIC_TASK_DIR = '_lapluma';
 const STALE_DYNAMIC_TASK_MS = 24 * 60 * 60 * 1000;
 const LOCAL_EMULATOR_ADDRESSES: string[] = [
@@ -250,6 +276,12 @@ export function clearRealtimeLogs() {
   taskStatus.logs = [];
 }
 
+function appendCapturedOutput(current: string, chunk: string, maxChars: number): string {
+  const next = current + chunk;
+  // 字符数上限足以控制内存；截断只影响诊断输出，不影响进程退出码或终态。
+  return next.length > maxChars ? next.slice(-maxChars) : next;
+}
+
 function trimRealtimeLogs() {
   if (taskStatus.logs.length > MAX_REALTIME_LOGS) {
     taskStatus.logs.splice(0, taskStatus.logs.length - MAX_REALTIME_LOGS);
@@ -257,10 +289,14 @@ function trimRealtimeLogs() {
 }
 
 function appendRealtimeLog(level: LogLevel, message: unknown) {
+  const run = getCurrentAgentRun();
   taskStatus.logs.push({
     time: new Date().toISOString(),
     level,
-    message
+    message,
+    sequence: ++realtimeLogSequence,
+    runId: run?.runId ?? null,
+    operationId: run?.operationId ?? null
   });
   trimRealtimeLogs();
 }
@@ -426,7 +462,7 @@ async function execMaaCommandUnlocked(command: string, args: string[] = [], task
       // 实时捕获输出
       childProcess.stdout.on('data', (data: Buffer) => {
         const text = data.toString();
-        stdout += text;
+        stdout = appendCapturedOutput(stdout, text, MAX_CAPTURED_STDOUT_CHARS);
 
         // 将输出按行分割并添加到日志
         const lines = text.split('\n').filter((line: string) => line.trim());
@@ -437,7 +473,7 @@ async function execMaaCommandUnlocked(command: string, args: string[] = [], task
 
       childProcess.stderr.on('data', (data: Buffer) => {
         const text = data.toString();
-        stderr += text;
+        stderr = appendCapturedOutput(stderr, text, MAX_CAPTURED_STDERR_CHARS);
 
         // 将错误输出按行分割并添加到日志
         const lines = text.split('\n').filter((line: string) => line.trim());
@@ -508,7 +544,7 @@ async function execMaaCommandUnlocked(command: string, args: string[] = [], task
       // 实时捕获输出
       childProcess.stdout.on('data', (data: Buffer) => {
         const text = data.toString();
-        stdout += text;
+        stdout = appendCapturedOutput(stdout, text, MAX_CAPTURED_STDOUT_CHARS);
 
         const lines = text.split('\n').filter((line: string) => line.trim());
         lines.forEach((line: string) => {
@@ -518,7 +554,7 @@ async function execMaaCommandUnlocked(command: string, args: string[] = [], task
 
       childProcess.stderr.on('data', (data: Buffer) => {
         const text = data.toString();
-        stderr += text;
+        stderr = appendCapturedOutput(stderr, text, MAX_CAPTURED_STDERR_CHARS);
 
         const lines = text.split('\n').filter((line: string) => line.trim());
         lines.forEach((line: string) => {
@@ -587,8 +623,11 @@ async function execMaaCommandUnlocked(command: string, args: string[] = [], task
   // 没有任务名称，使用同步执行（用于配置查询等操作）
   else {
     try {
+      const maintenance = command === 'install' || command === 'update' || command === 'hot-update';
       const { stdout, stderr } = await execFilePromise(MAA_CLI_PATH, [command, ...finalArgs], {
-        maxBuffer: 10 * 1024 * 1024
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: maintenance ? MAA_MAINTENANCE_TIMEOUT_MS : MAA_CLI_EXEC_TIMEOUT_MS,
+        killSignal: 'SIGKILL'
       });
 
       return {
@@ -725,9 +764,18 @@ export async function canUseMaaSelfUpdate({ execute = execMaaCommand }: { execut
   }
 }
 
+let maaConfigDirCache: { value: string; cachedAt: number } | null = null;
+const MAA_CONFIG_DIR_CACHE_MS = 5 * 60 * 1000;
+
 export async function getMaaConfigDir() {
+  const now = Date.now();
+  if (maaConfigDirCache && now - maaConfigDirCache.cachedAt < MAA_CONFIG_DIR_CACHE_MS) {
+    return maaConfigDirCache.value;
+  }
   const result = await execMaaCommand('dir', ['config']);
-  return result.stdout;
+  const value = result.stdout;
+  maaConfigDirCache = { value, cachedAt: now };
+  return value;
 }
 
 /**
@@ -1604,12 +1652,19 @@ function getValidCachedActivity(clientType: string, cachedActivity: ActivityInfo
 export async function getCurrentActivity(clientType: string = DEFAULT_CLIENT_TYPE): Promise<ActivityInfo> {
   const now = Date.now();
   const cachedActivity = activityCache.get(clientType);
+  let staleCandidate: ActivityInfo | null = cachedActivity?.code ? cachedActivity : null;
   const cached = getValidCachedActivity(clientType, cachedActivity, now);
   if (cached) {
       logger.debug('使用缓存的活动信息', {
         clientType, code: cached.code, name: cached.name, source: cached.source
       });
-    return withFullActivityStages(cached);
+    return withFullActivityStages({
+      ...cached,
+      status: 'active',
+      dataUpdatedAt: cached.timestamp ?? now,
+      lastSuccessAt: cached.timestamp ?? now,
+      failure: null
+    });
   }
   if (cachedActivity) {
     activityCache.delete(clientType);
@@ -1631,9 +1686,19 @@ export async function getCurrentActivity(clientType: string = DEFAULT_CLIENT_TYP
     const ttl = typeof persistedEntry?.ttl === 'number' && persistedEntry.ttl ? persistedEntry.ttl : ACTIVITY_CACHE_TTL;
     activityCache.set(clientType, { ...persisted, timestamp, ttl });
     logger.debug('使用持久化活动缓存', { clientType, code: persisted.code, name: persisted.name, source: persisted.source });
-    return withFullActivityStages(persisted);
+    return withFullActivityStages({
+      ...persisted,
+      status: 'active',
+      dataUpdatedAt: timestamp || now,
+      lastSuccessAt: timestamp || now,
+      failure: null
+    });
+  }
+  if (persistedEntry && typeof persistedEntry.code === 'string' && persistedEntry.code) {
+    staleCandidate = staleCandidate || (persistedEntry as unknown as ActivityInfo);
   }
 
+  let failureMessage: string | null = null;
   try {
     const stageActivity = await getStageActivityInfo(clientType, now);
     if (stageActivity?.code) {
@@ -1643,10 +1708,17 @@ export async function getCurrentActivity(clientType: string = DEFAULT_CLIENT_TYP
         name: stageActivity.name,
         stages: stageActivity.stages.length
       });
-      return withFullActivityStages(cacheActivity(clientType, stageActivity));
+      return withFullActivityStages({
+        ...cacheActivity(clientType, stageActivity),
+        status: 'active',
+        dataUpdatedAt: now,
+        lastSuccessAt: now,
+        failure: null
+      });
     }
   } catch (error) {
-    logger.warn('读取 StageActivityV2 失败，尝试 maa activity', { error: getErrorMessage(error) });
+    failureMessage = getErrorMessage(error);
+    logger.warn('读取 StageActivityV2 失败，尝试 maa activity', { error: failureMessage });
   }
 
   try {
@@ -1692,32 +1764,67 @@ export async function getCurrentActivity(clientType: string = DEFAULT_CLIENT_TYP
     if (match && match[1]) {
       activityCode = match[1].toUpperCase();
       logger.debug('获取到活动信息', { code: activityCode, name: activityName });
-      return withFullActivityStages(cacheActivity(clientType, {
-        code: activityCode,
-        name: activityName,
-        source: 'maa',
-        startTime: null,
-        endTime: null,
-        stages: []
-      }));
+      return withFullActivityStages({
+        ...cacheActivity(clientType, {
+          code: activityCode,
+          name: activityName,
+          source: 'maa',
+          startTime: null,
+          endTime: null,
+          stages: []
+        }),
+        status: 'active',
+        dataUpdatedAt: now,
+        lastSuccessAt: now,
+        failure: null
+      });
     }
 
     logger.debug('MAA 活动表未返回当前活动，尝试备用数据源');
   } catch (error) {
-    logger.warn('获取 MAA 活动信息失败，尝试备用数据源', { error: getErrorMessage(error) });
+    failureMessage = getErrorMessage(error);
+    logger.warn('获取 MAA 活动信息失败，尝试备用数据源', { error: failureMessage });
   }
 
   try {
     const fallbackActivity = await getFallbackActivity(clientType);
     if (fallbackActivity?.code) {
       logger.info('从备用数据源获取到活动信息', fallbackActivity);
-      return withFullActivityStages(cacheActivity(clientType, fallbackActivity));
+      return withFullActivityStages({
+        ...cacheActivity(clientType, fallbackActivity),
+        status: 'active',
+        dataUpdatedAt: now,
+        lastSuccessAt: now,
+        failure: null
+      });
     }
   } catch (error) {
-    logger.warn('备用活动数据源不可用', { error: getErrorMessage(error) });
+    failureMessage = getErrorMessage(error);
+    logger.warn('备用活动数据源不可用', { error: failureMessage });
   }
 
-  return { code: null, name: null, source: null, startTime: null, endTime: null, stages: [] };
+  if (staleCandidate?.code) {
+    return withFullActivityStages({
+      ...staleCandidate,
+      status: 'stale',
+      dataUpdatedAt: staleCandidate.timestamp ?? null,
+      lastSuccessAt: staleCandidate.timestamp ?? null,
+      failure: failureMessage ? { source: 'maa', message: failureMessage } : null
+    });
+  }
+
+  return {
+    code: null,
+    name: null,
+    source: null,
+    startTime: null,
+    endTime: null,
+    stages: [],
+    status: failureMessage ? 'unavailable' : 'none',
+    dataUpdatedAt: null,
+    lastSuccessAt: null,
+    failure: failureMessage ? { source: 'maa', message: failureMessage } : null
+  };
 }
 
 /**
@@ -1953,8 +2060,27 @@ export async function readLogFile(filePath: string, lines = 1000): Promise<{ con
     if (!relativePath || isOutsideLogDir || extname(requestedPath).toLowerCase() !== '.log') {
       throw new Error('只能读取 MAA 日志目录内的文件');
     }
-    const content = await readFile(requestedPath, 'utf-8');
-    const allLines = content.split('\n');
+    // 只读取文件尾部：历史日志可能很大，整文件读取会让打开日志页出现
+    // 明显的内存与延迟尖峰。2 MiB 足够覆盖默认的最后 1000 行。
+    const fileStats = await stat(requestedPath);
+    const maxTailBytes = 2 * 1024 * 1024;
+    const tailBytes = Math.min(fileStats.size, maxTailBytes);
+    const startByte = Math.max(0, fileStats.size - tailBytes);
+    const handle = await open(requestedPath, 'r');
+    let tail = '';
+    try {
+      const buffer = Buffer.alloc(tailBytes);
+      const { bytesRead } = await handle.read(buffer, 0, tailBytes, startByte);
+      tail = buffer.subarray(0, bytesRead).toString('utf8');
+    } finally {
+      await handle.close();
+    }
+    // 从中间开始时第一行可能被截断，丢弃它；从文件开头读取时保留首行。
+    if (startByte > 0) {
+      const firstNewline = tail.indexOf('\n');
+      tail = firstNewline >= 0 ? tail.slice(firstNewline + 1) : '';
+    }
+    const allLines = tail.split('\n');
 
     // 只返回最后 N 行
     const startIndex = Math.max(0, allLines.length - lines);

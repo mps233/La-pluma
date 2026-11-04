@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getTaskStatus, requiresMaaExecutionLease, setMaaTaskProgress, setTaskStatus } from '../maaService.ts';
+import {
+  DEFAULT_MAA_MAINTENANCE_TIMEOUT_MS,
+  MAX_MAA_MAINTENANCE_TIMEOUT_MS,
+  getTaskStatus,
+  requiresMaaExecutionLease,
+  resolveMaaMaintenanceTimeoutMs,
+  setMaaTaskProgress,
+  setTaskStatus
+} from '../maaService.ts';
 
 test('device tasks and update commands share the global execution lease', () => {
   for (const command of ['fight', 'copilot', 'run', 'install', 'update', 'hot-update']) {
@@ -26,4 +34,13 @@ test('task status exposes the current copilot stage and clears it on completion'
   assert.equal(getTaskStatus().currentStage, null);
   assert.equal(getTaskStatus().currentStep, null);
   assert.equal(getTaskStatus().totalSteps, null);
+});
+
+test('maintenance commands use a configurable long timeout with a hard cap', () => {
+  assert.equal(resolveMaaMaintenanceTimeoutMs(undefined), DEFAULT_MAA_MAINTENANCE_TIMEOUT_MS);
+  assert.equal(resolveMaaMaintenanceTimeoutMs(''), DEFAULT_MAA_MAINTENANCE_TIMEOUT_MS);
+  assert.equal(resolveMaaMaintenanceTimeoutMs('-1'), DEFAULT_MAA_MAINTENANCE_TIMEOUT_MS);
+  assert.equal(resolveMaaMaintenanceTimeoutMs('nope'), DEFAULT_MAA_MAINTENANCE_TIMEOUT_MS);
+  assert.equal(resolveMaaMaintenanceTimeoutMs('120000'), 120_000);
+  assert.equal(resolveMaaMaintenanceTimeoutMs('99999999'), MAX_MAA_MAINTENANCE_TIMEOUT_MS);
 });
