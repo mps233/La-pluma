@@ -167,7 +167,7 @@ describe('NotificationSettings Activity lifecycle', () => {
     expect(buttonByText('保存')?.disabled).toBe(false)
   })
 
-  it('aborts a pending save before an Activity cleanup can receive its response', async () => {
+  it('keeps a pending save alive through Activity cleanup', async () => {
     const saveRequest = deferred<{ success: boolean; message: string }>()
     mocks.fetchWithAuth.mockImplementation((_url: string, init?: RequestInit) => (
       init?.method === 'POST' ? saveRequest.promise : Promise.resolve({ success: true, data: loadedConfig })
@@ -180,7 +180,7 @@ describe('NotificationSettings Activity lifecycle', () => {
     expect(saveInit?.signal?.aborted).toBe(false)
 
     await renderMode('hidden')
-    expect(saveInit?.signal?.aborted).toBe(true)
+    expect(saveInit?.signal?.aborted).toBe(false)
 
     await act(async () => saveRequest.resolve({ success: true, message: '已保存' }))
     await flush()

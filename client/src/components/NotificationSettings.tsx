@@ -107,7 +107,7 @@ export default function NotificationSettings() {
     return () => {
       if (activationRevisionRef.current === activationRevision) activationRevisionRef.current += 1
       mountedRef.current = false
-      saveAbortRef.current?.abort()
+      // 保存请求不绑定页面生命周期：离开页面不应取消已经提交的配置。
       testAbortRef.current?.abort()
     }
   }, [])
@@ -173,18 +173,18 @@ export default function NotificationSettings() {
         signal: controller.signal,
       })
       const data = await parseJsonResponse<NotificationResponse>(response)
-      if (controller.signal.aborted || !mountedRef.current || saveAbortRef.current !== controller) return
+      if (controller.signal.aborted || saveAbortRef.current !== controller) return
 
       if (data.success) {
         updateNotificationConfigCache(configSnapshot)
         committedRevisionRef.current = revisionSnapshot
-        setNotice({ type: 'success', text: data.message || '通知配置已保存' })
-      } else {
+        if (mountedRef.current) setNotice({ type: 'success', text: data.message || '通知配置已保存' })
+      } else if (mountedRef.current) {
         setNotice({ type: 'error', text: getResponseMessage(data, '通知配置保存失败') })
       }
     } catch (error) {
-      if (controller.signal.aborted || !mountedRef.current || saveAbortRef.current !== controller) return
-      setNotice({ type: 'error', text: getErrorMessage(error, '通知配置保存失败') })
+      if (controller.signal.aborted || saveAbortRef.current !== controller) return
+      if (mountedRef.current) setNotice({ type: 'error', text: getErrorMessage(error, '通知配置保存失败') })
     } finally {
       if (saveAbortRef.current === controller) {
         saveAbortRef.current = null
