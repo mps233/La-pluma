@@ -1,4 +1,5 @@
 import { getErrorMessage, isRecord } from '../utils/errors.ts';
+import { getGameDay } from './gameCalendar.ts';
 /**
  * 通知服务 - 支持多种通知渠道
  * 当前支持：Telegram
@@ -148,8 +149,10 @@ const RESOURCE_STAGES: Record<string, ResourceStage> = {
   'SK-5': { name: '碳', days: [0, 1, 3, 5] },     // 周日、周一、周三、周五
 };
 
-export function getTodayOpenStages() {
-  const today = new Date().getDay();
+export function getTodayOpenStages(options: { now?: Date; clientType?: string; resourceCollectionOpen?: boolean } = {}) {
+  const gameDay = getGameDay(options.now ?? new Date(), options.clientType);
+  const today = gameDay.weekday;
+  const allResourceStagesOpen = options.resourceCollectionOpen === true;
   const open: Array<{ stage: string; name: string; isOpen: boolean }> = [];
   const closed: Array<{ stage: string; name: string; isOpen: boolean }> = [];
 
@@ -159,7 +162,7 @@ export function getTodayOpenStages() {
     const item: { stage: string; name: string; isOpen: boolean } = {
       stage,
       name: info.name,
-      isOpen: info.days.includes(today)
+      isOpen: allResourceStagesOpen || info.days.includes(today)
     };
 
     if (item.isOpen) {
@@ -171,6 +174,8 @@ export function getTodayOpenStages() {
 
   return {
     weekday: today,
+    date: gameDay.date,
+    clientType: options.clientType ?? 'Official',
     open,
     closed
   };
@@ -179,15 +184,18 @@ export function getTodayOpenStages() {
 /**
  * 检查关卡是否在今天开放
  */
-export function isStageOpenToday(stage: string): { isOpen: boolean; reason: string | null; stageName?: string } {
+export function isStageOpenToday(
+  stage: string,
+  options: { now?: Date; clientType?: string; resourceCollectionOpen?: boolean } = {}
+): { isOpen: boolean; reason: string | null; stageName?: string } {
   const stageKey = stage.toUpperCase();
   if (!RESOURCE_STAGES[stageKey]) {
     return { isOpen: true, reason: null }; // 非资源本，默认开放
   }
 
-  const today = new Date().getDay(); // 0=周日, 1=周一, ..., 6=周六
+  const today = getGameDay(options.now ?? new Date(), options.clientType).weekday;
   const stageInfo = RESOURCE_STAGES[stageKey];
-  const isOpen = stageInfo.days.includes(today);
+  const isOpen = options.resourceCollectionOpen === true || stageInfo.days.includes(today);
 
   return {
     isOpen,

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   getStageActivityInfo,
+  isResourceCollectionOpen,
   normalizeActivityClientType,
   parseStageActivityTime,
   selectCurrentStageActivity
@@ -91,4 +92,21 @@ test('reads StageActivityV2 through the injected reader', async () => {
   }))!;
 
   assert.equal(selected.code, 'AC');
+});
+
+test('detects the resource-collection all-open window without changing weekly rules', () => {
+  const data = {
+    Official: {
+      resourceCollection: {
+        Tip: '资源收集',
+        UtcStartTime: '2026/10/01 16:00:00',
+        UtcExpireTime: '2026/10/20 03:59:59',
+        TimeZone: 8,
+        IsResourceCollection: true
+      }
+    }
+  };
+  assert.equal(isResourceCollectionOpen(data, 'Official', Date.UTC(2026, 9, 5)), true);
+  assert.equal(isResourceCollectionOpen(data, 'Official', Date.UTC(2026, 9, 21)), false);
+  assert.equal(isResourceCollectionOpen({}, 'Official', Date.UTC(2026, 9, 5)), false);
 });

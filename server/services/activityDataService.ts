@@ -121,3 +121,54 @@ export async function getStageActivityInfo(
   const data = JSON.parse(content) as unknown;
   return selectCurrentStageActivity(data, clientType, now);
 }
+
+interface ResourceCollectionCacheEntry {
+  value: boolean;
+  cachedAt: number;
+}
+
+const resourceCollectionCache = new Map<string, ResourceCollectionCacheEntry>();
+const RESOURCE_COLLECTION_CACHE_MS = 60_000;
+
+/** 判断 StageActivityV2 的资源收集全开放窗口是否覆盖 now。 */
+export function isResourceCollectionOpen(
+  data: unknown,
+  clientType: unknown = 'Official',
+  now: Date | number = Date.now()
+): boolean {
+  const root = isRecord(data) ? data : {};
+  const clientKey = normalizeActivityClientType(clientType);
+  const rawClientData = root[clientKey] || root.Official;
+  const clientData = isRecord(rawClientData) ? rawClientData : {};
+  const resource = clientData.resourceCollection;
+  if (!isRecord(resource) || resource.IsResourceCollection !== true) return false;
+  const { startTime, endTime } = getActivityWindow(resource);
+  if (startTime === null) return false;
+  const nowMs = now instanceof Date ? now.getTime() : Number(now);
+  return startTime <= nowMs && (endTime === null || endTime > nowMs);
+}
+
+/** 读取并缓存当前服务区的资源收集全开放状态；读取失败按未开放处理。 */
+export async function isResourceCollectionOpenNow(
+  clientType: unknown = 'Official',
+  now: Date | number = Date.now(),
+  { path = getMaaActivityPath(), readFileFn = readFile }: {
+    path?: string;
+    readFileFn?: (path: string, encoding: 'utf-8') => Promise<string>;
+  } = {}
+): Promise<boolean> {
+  const key = normalizeActivityClientType(clientType);
+  const nowMs = now instanceof Date ? now.getTime() : Number(now);
+  const cached = resourceCollectionCache.get(key);
+  if (cached && Math.abs(nowMs - cached.cachedAt) < RESOURCE_COLLECTION_CACHE_MS) {
+    return cached.value;
+  }
+  try {
+    const data = JSON.parse(await readFileFn(path, 'utf-8')) as unknown;
+    const value = isResourceCollectionOpen(data, key, nowMs);
+    resourceCollectionCache.set(key, { value, cachedAt: nowMs });
+    return value;
+  } catch {
+    return false;
+  }
+}

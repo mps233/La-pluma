@@ -196,7 +196,7 @@ describe('scheduled task flow planning', () => {
     }]))
 
     assert.deepEqual(step.args, [
-      '1-7:3,CE-6', '-m', '2', '--expiring-medicine', '1', '--stone', '0', '--series', '2',
+      '1-7:3,CE-6', '-m', '2', '--expiring-medicine', '1', '--stone', '0', '--series=2',
       '-D30011=10', '-D30062=5', '--client-type', 'Bilibili', '--dr-grandet',
       '--report-to-penguin', '--penguin-id', 'penguin-user',
       '--report-to-yituliu', '--yituliu-id', 'yituliu-user'

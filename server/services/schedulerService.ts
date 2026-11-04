@@ -2,6 +2,8 @@ import { asErrorWithCode, getErrorCode, getErrorMessage, isRecord } from '../uti
 import cron from 'node-cron';
 import { execMaaCommand, execDynamicTask, replaceActivityCode, captureScreen, getGameClientState, getMaaExecutionDiagnostics, testAdbConnection, createMaaLogCheckpoint, readMaaLogSince, canUseMaaSelfUpdate } from './maaService.ts';
 import { resolveConnection } from './connectionService.ts';
+import { gameTimeZoneForClientType } from './gameCalendar.ts';
+import { isResourceCollectionOpenNow } from './activityDataService.ts';
 import { sendTaskCompletionNotification, isStageOpenToday, shouldCaptureNotificationScreenshot } from './notificationService.ts';
 import { getEnabledAwardItems, parseAwardExecutionActions } from './awardResultService.ts';
 import { parseRecruitExecutionAction } from './recruitResultService.ts';
@@ -731,7 +733,7 @@ function buildScheduledTaskCommand(task: ScheduledTask, connectionDefaults: Conn
       params += ` --stone ${task.params.stone}`;
     }
     if (task.params.series !== undefined && task.params.series !== '' && task.params.series !== '1') {
-      params += ` --series ${task.params.series}`;
+      params += ` --series=${task.params.series}`;
     }
     const dropTargets = parseDropTargetEntries(task.params.drops);
     if (dropTargets === null) {
@@ -912,6 +914,7 @@ async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: 
     address: sharedConnection.address,
     clientType: sharedConnection.clientType
   };
+  const resourceCollectionOpen = await isResourceCollectionOpenNow(sharedConnection.clientType).catch(() => false);
 
   const taskResults: ScheduleTaskResult[] = [];
   let activeTaskResult: ScheduleTaskResult | null = null;
@@ -1531,7 +1534,7 @@ async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: 
               }
 
               // 检查关卡是否开放
-              const openCheck = isStageOpenToday(stage);
+              const openCheck = isStageOpenToday(stage, { clientType: sharedConnection.clientType, resourceCollectionOpen });
               if (!openCheck.isOpen) {
                 logger.info('关卡今日未开放，跳过', {
                   scheduleId,
@@ -1574,7 +1577,9 @@ async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: 
               if (times) {
                 // 填了次数，过滤掉 --series
                 otherArgs = args.slice(1).filter((arg, index, arr) => {
-                  return arg !== '--series' && (index === 0 || arr[index - 1] !== '--series');
+                  if (arg.startsWith('--series=')) return false;
+                  const previous = index > 0 ? arr[index - 1] : '';
+                  return arg !== '--series' && previous !== '--series';
                 });
               } else {
                 // 没填次数，保留所有参数（包括 --series）
@@ -1679,7 +1684,7 @@ async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: 
             const { stage, times } = stageEntries[0];
 
             // 检查关卡是否开放
-            const openCheck = isStageOpenToday(stage);
+            const openCheck = isStageOpenToday(stage, { clientType: sharedConnection.clientType, resourceCollectionOpen });
             if (!openCheck.isOpen) {
               logger.info('关卡今日未开放，跳过', {
                 scheduleId,
@@ -1721,9 +1726,12 @@ async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: 
               args.splice(1, 0, '--times', times);
 
               // 移除 --series 参数（填了次数的关卡不使用连战）
-              const seriesIndex = args.indexOf('--series');
-              if (seriesIndex !== -1) {
-                args.splice(seriesIndex, 2); // 移除 --series 和它的值
+              const combinedSeriesIndex = args.findIndex(arg => arg.startsWith('--series='));
+              if (combinedSeriesIndex !== -1) {
+                args.splice(combinedSeriesIndex, 1);
+              } else {
+                const seriesIndex = args.indexOf('--series');
+                if (seriesIndex !== -1) args.splice(seriesIndex, 2);
               }
             }
           }
@@ -1894,19 +1902,16 @@ async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: 
     return { success: true, stopped: true, message: completionMessage, summary: executionSummary };
   }
 
-  // 动态更新智能养成关卡
-  try {
-    await updateSmartTrainingStages(scheduleId);
-  } catch (error) {
+  // 收尾副作用在 Run 释放后异步执行，不阻塞流程完成与设备租约释放。
+  void updateSmartTrainingStages(scheduleId).catch((error: unknown) => {
     logger.error('动态更新智能养成关卡失败', {
       scheduleId,
       error: getErrorMessage(error)
     });
-  }
+  });
 
   // 发送完成通知
-  try {
-    await sendTaskCompletionNotification({
+  void sendTaskCompletionNotification({
       taskName: `定时任务 ${scheduleId}`,
       totalTasks: enabledTasks.length,
       successTasks: successCount,
@@ -1920,13 +1925,12 @@ async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: 
       reports: reportResults,
       warnings: [...executionWarnings],
       screenshot,
-    });
-  } catch (error) {
+  }).catch((error: unknown) => {
     logger.error('发送通知失败', {
       scheduleId,
       error: getErrorMessage(error)
     });
-  }
+  });
 
   return { success: true, stopped: false, message: completionMessage, summary: executionSummary };
 }
@@ -2160,7 +2164,12 @@ export function parseTaskSummary(taskName: string, output: string): TaskSummary 
 }
 
 // 创建或更新定时任务
-export function setupSchedule(scheduleId: string, times: unknown, taskFlow: unknown) {
+export function setupSchedule(
+  scheduleId: string,
+  times: unknown,
+  taskFlow: unknown,
+  clientType?: string
+) {
   if (!Array.isArray(taskFlow)) {
     return { success: false, message: '任务流程格式无效' };
   }
@@ -2195,7 +2204,7 @@ export function setupSchedule(scheduleId: string, times: unknown, taskFlow: unkn
     const cronExpression = `${minute} ${hour} * * *`;
     const cronOptions = {
       scheduled: true,
-      timezone: "Asia/Shanghai"
+      timezone: gameTimeZoneForClientType(clientType)
     };
 
     try {
@@ -2268,7 +2277,7 @@ export async function executeScheduleNow(scheduleId: string, taskFlow: unknown, 
 }
 
 // 自动更新任务
-export function setupAutoUpdate(config: unknown) {
+export function setupAutoUpdate(config: unknown, clientType?: string) {
   const configRecord = isRecord(config) ? config : {};
   const enabled = Boolean(configRecord.enabled);
   const time = typeof configRecord.time === 'string' ? configRecord.time : '';
@@ -2296,7 +2305,7 @@ export function setupAutoUpdate(config: unknown) {
   const cronExpression = `${minute} ${hour} * * *`;
   const cronOptions = {
     scheduled: true,
-    timezone: "Asia/Shanghai"
+    timezone: gameTimeZoneForClientType(clientType)
   };
 
   try {

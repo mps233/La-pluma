@@ -12,6 +12,7 @@ import { dirname } from 'path';
 import { readJsonFile, writeJsonFile } from '../utils/fileHelper.ts';
 import { createLogger } from '../utils/logger.ts';
 import { getTodayOpenStages, isStageOpenToday } from './notificationService.ts';
+import { isResourceCollectionOpenNow } from './activityDataService.ts';
 import { getAllOperators } from './dataParserService.ts';
 import { getMaaMaterialDatabase } from './maaResourceDataService.ts';
 import { agentError } from '../utils/apiHelper.ts';
@@ -1391,9 +1392,10 @@ interface TrainingPlan {
 /**
  * 生成养成计划（刷取计划）
  */
-async function generateTrainingPlan(mode: string = 'current'): Promise<TrainingPlan> {
+async function generateTrainingPlan(mode: string = 'current', clientType?: string): Promise<TrainingPlan> {
   const queueData = await loadTrainingQueue();
   const depot = await loadDepot();
+  const resourceCollectionOpen = await isResourceCollectionOpenNow(clientType).catch(() => false);
   const operatorMaterialsData = await loadOperatorMaterials();
   const materialsDb = await loadMaterialsDatabase();
 
@@ -1560,9 +1562,9 @@ async function generateTrainingPlan(mode: string = 'current'): Promise<TrainingP
 
   const stages: TrainingStage[] = Array.from(stagesMap.values()).map((stageData) => ({
     ...stageData,
-    isOpen: isStageOpenToday(stageData.stage)
+    isOpen: isStageOpenToday(stageData.stage, { clientType, resourceCollectionOpen })
   }));
-  const todayOpen = getTodayOpenStages();
+  const todayOpen = getTodayOpenStages({ clientType, resourceCollectionOpen });
   const openStages = stages.filter((stage) => stage.isOpen !== false);
   const closedStages = stages.filter((stage) => stage.isOpen === false);
   const focusOperator = operators[0] || null;
