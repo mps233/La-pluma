@@ -17,8 +17,10 @@ import DropRecords from './DropRecords'
 import StatisticsSummary from './StatisticsSummary'
 import { PageHeader, Button, Card, EmptyState, Loading } from './common'
 import { useStatusStore } from '../store/statusStore'
+import { useUIStore } from '../stores'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
+import { useItemIconCacheVersion } from '../hooks/useItemIconCacheVersion'
 import type {
   DepotDataDetailed,
   OperBoxData,
@@ -439,7 +441,25 @@ function InlineDataError({ title, description, isRetrying, onRetry }: InlineData
   )
 }
 
+const STATISTICS_TABS: readonly ActiveTab[] = ['operbox', 'depot', 'drops']
+const STATISTICS_TAB_PARAM = 'tab'
+
+function readStatisticsTabFromUrl(): ActiveTab {
+  if (typeof window === 'undefined') return 'operbox'
+  const value = new URLSearchParams(window.location.search).get(STATISTICS_TAB_PARAM)
+  return STATISTICS_TABS.find(tab => tab === value) ?? 'operbox'
+}
+
+function writeStatisticsTabToUrl(tab: ActiveTab): void {
+  if (typeof window === 'undefined') return
+  const url = new URL(window.location.href)
+  if (tab === 'operbox') url.searchParams.delete(STATISTICS_TAB_PARAM)
+  else url.searchParams.set(STATISTICS_TAB_PARAM, tab)
+  window.history.replaceState(window.history.state, '', url)
+}
+
 export default function DataStatistics() {
+  useItemIconCacheVersion()
   const [isRunning, setIsRunning] = useState(false)
   const [activeTask, setActiveTask] = useState<ActiveTask>(null)
   const { setMessage: setStatusMessage } = useStatusStore()
@@ -465,7 +485,9 @@ export default function DataStatistics() {
   const [filterProfession, setFilterProfession] = useState<FilterProfession>('all')
   const [sortBy, setSortBy] = useState<SortBy>('default')
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null)
-  const [activeTab, setActiveTab] = useState<ActiveTab>('operbox')
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => readStatisticsTabFromUrl())
+  const requestedStatisticsTab = useUIStore(state => state.statisticsTab)
+  const setRequestedStatisticsTab = useUIStore(state => state.setStatisticsTab)
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({})
   const shouldReduceMotion = useReducedMotion()
   const {
@@ -475,6 +497,17 @@ export default function DataStatistics() {
     handleTabKeyDown,
   } = useFluidTabIndicator(activeTab)
   
+  const selectStatisticsTab = useCallback((tab: ActiveTab) => {
+    setActiveTab(tab)
+    writeStatisticsTabToUrl(tab)
+  }, [])
+
+  useEffect(() => {
+    if (!requestedStatisticsTab) return
+    selectStatisticsTab(requestedStatisticsTab)
+    setRequestedStatisticsTab(null)
+  }, [requestedStatisticsTab, selectStatisticsTab, setRequestedStatisticsTab])
+
   const depotTypeSummary = useMemo(() => {
     const grouped = new Map<string, { count: number; kinds: number }>()
     for (const item of depotData?.items || []) {
@@ -1058,11 +1091,11 @@ export default function DataStatistics() {
                   aria-selected={selected}
                   aria-controls={`data-statistics-panel-${tab.id}`}
                   tabIndex={selected ? 0 : -1}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => selectStatisticsTab(tab.id)}
                   onKeyDown={event => handleTabKeyDown(
                     event,
                     statisticsTabs.map(option => option.id),
-                    setActiveTab,
+                    selectStatisticsTab,
                   )}
                   className={`app-workspace-segment data-statistics-mode-button min-h-11 ${selected ? 'is-selected' : ''}`}
                 >

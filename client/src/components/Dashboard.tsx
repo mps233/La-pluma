@@ -138,6 +138,7 @@ const TemperatureSparkline = ({ values }: { values: number[] }) => {
 let dashboardRefreshPromise: Promise<void> | null = null
 
 function refreshDashboardData(force = false): Promise<void> {
+  if (typeof document !== 'undefined' && document.hidden && !force) return Promise.resolve()
   if (dashboardRefreshPromise) {
     return force
       ? dashboardRefreshPromise.then(() => refreshDashboardData())
@@ -156,7 +157,7 @@ function refreshDashboardData(force = false): Promise<void> {
 
       const [, activityResult, scheduleResult, trainingResult, dropResult, openTodayResult] = await Promise.allSettled([
         probeBackendAvailability({ showChecking: useStatusStore.getState().backendStatus !== 'available' }),
-        maaApi.getActivity('Official'),
+        maaApi.getActivity(),
         maaApi.getScheduleExecutionStatus(),
         getTrainingQueue(),
         getTodayDrops(),
@@ -203,6 +204,9 @@ function refreshDashboardData(force = false): Promise<void> {
         const activityName = firstString(activity.name, activity.displayName, activity.stageName)
         const activitySummary = {
           available: activity.isActive === true || activity.available === true || Boolean(activityCode || activityName),
+          status: typeof activity.status === 'string' ? activity.status : undefined,
+          failure: isRecord(activity.failure) ? firstString(activity.failure.message) : undefined,
+          dataUpdatedAt: toOptionalTimestamp(activity.dataUpdatedAt),
           code: activityCode,
           name: activityName,
           tip: firstString(activity.tip, activity.description),
@@ -294,6 +298,7 @@ interface DashboardFlowMetric {
 
 export default function Dashboard() {
   const setActiveTab = useUIStore(state => state.setActiveTab)
+  const setStatisticsTab = useUIStore(state => state.setStatisticsTab)
   const setCombatCopilotPrefill = useUIStore(state => state.setCombatCopilotPrefill)
   const {
     backendStatus,
@@ -303,7 +308,10 @@ export default function Dashboard() {
     setActive: setStatusActive,
   } = useStatusStore()
   const isOnline = useOnlineStatus()
-  const openAutomation = useCallback(() => setActiveTab('automation'), [setActiveTab])
+  const openDropStatistics = useCallback(() => {
+    setStatisticsTab('drops')
+    setActiveTab('statistics')
+  }, [setActiveTab, setStatisticsTab])
   const hasLoaded = useDashboardStore(state => state.hasLoaded)
   const lastUpdate = useDashboardStore(state => state.lastUpdate)
   const activitySummary = useDashboardStore(state => state.activitySummary)
@@ -328,7 +336,7 @@ export default function Dashboard() {
     let disposed = false
     let requestInFlight = false
     const fetch = async () => {
-      if (requestInFlight) return
+      if (requestInFlight || document.hidden) return
       requestInFlight = true
       try {
         const result = await maaApi.getDeviceStats()
@@ -343,9 +351,14 @@ export default function Dashboard() {
     }
     void fetch()
     const timer = window.setInterval(() => void fetch(), 5000)
+    const handleVisibility = () => {
+      if (!document.hidden) void fetch()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
     return () => {
       disposed = true
       window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [])
 
@@ -371,11 +384,19 @@ export default function Dashboard() {
     const cacheIsStale = cache.lastRefreshAttemptAt === null
       || Date.now() - cache.lastRefreshAttemptAt >= DASHBOARD_REFRESH_INTERVAL_MS
 
+    const handleVisibility = () => {
+      if (document.hidden) return
+      if (timer !== null) window.clearTimeout(timer)
+      timer = null
+      refreshThenSchedule()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
     if (!cache.hasLoaded || cacheIsStale) refreshThenSchedule()
     else scheduleNextRefresh()
 
     return () => {
       disposed = true
+      document.removeEventListener('visibilitychange', handleVisibility)
       if (timer !== null) window.clearTimeout(timer)
     }
   }, [])
@@ -625,6 +646,27 @@ export default function Dashboard() {
           </SmoothPanel>
         )}
 
+        {(activitySummary.status === 'unavailable' || activitySummary.status === 'stale') && (
+          <div
+            className={`flex flex-wrap items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm ${activitySummary.status === 'stale' ? 'status-warning' : 'status-danger'}`}
+            role="status"
+          >
+            <span>
+              {activitySummary.status === 'stale'
+                ? '活动信息可能已过期，正在使用上次成功读取的数据。'
+                : activitySummary.failure || '活动信息暂时不可用，请检查 MAA 活动数据或网络。'}
+            </span>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => void loadDashboardData()}
+            >
+              重试
+            </Button>
+          </div>
+        )}
+
         <div
           ref={flowGridRef}
           className="dashboard-flow-layout"
@@ -807,7 +849,7 @@ export default function Dashboard() {
           </div>
 
           <div ref={flowPreviewRef} className="min-w-0">
-            <DashboardPreviewEntry onOpen={openAutomation} />
+            <DashboardPreviewEntry />
           </div>
         </div>
 
@@ -1019,12 +1061,12 @@ export default function Dashboard() {
                 </div>
               </div>
               <IconButton
-                onClick={() => setActiveTab('statistics')}
+                onClick={openDropStatistics}
                 icon={<ChevronRight className="h-4 w-4" />}
                 variant="ghost"
                 size="sm"
-                title="打开数据"
-                aria-label="打开数据"
+                title="打开掉落记录"
+                aria-label="打开掉落记录"
                 className="dashboard-summary-action"
               />
             </div>
@@ -1052,7 +1094,7 @@ export default function Dashboard() {
                     ))}
                   </div>
                 ) : (
-                  <button type="button" onClick={() => setActiveTab('statistics')} className="dashboard-summary-link min-h-11">
+                  <button type="button" onClick={openDropStatistics} className="dashboard-summary-link min-h-11">
                     查看掉落数据
                     <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>

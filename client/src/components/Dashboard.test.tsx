@@ -23,6 +23,7 @@ const apiMocks = vi.hoisted(() => ({
 }))
 const uiMocks = vi.hoisted(() => ({
   setActiveTab: vi.fn(),
+  setStatisticsTab: vi.fn(),
   setCombatCopilotPrefill: vi.fn(),
 }))
 const renderSpies = vi.hoisted(() => ({
@@ -48,9 +49,11 @@ vi.mock('../services/api', () => ({
 vi.mock('@/stores', () => ({
   useUIStore: (selector: (state: {
     setActiveTab: () => void
+    setStatisticsTab: () => void
     setCombatCopilotPrefill: () => void
   }) => unknown) => selector({
     setActiveTab: uiMocks.setActiveTab,
+    setStatisticsTab: uiMocks.setStatisticsTab,
     setCombatCopilotPrefill: uiMocks.setCombatCopilotPrefill,
   }),
 }))
@@ -130,6 +133,7 @@ describe('Dashboard connectivity state', () => {
     apiMocks.getOpenTodayStages.mockResolvedValue({ success: true, data: { open: [], closed: [] } })
     apiMocks.getActivityCopilotCandidates.mockResolvedValue({ success: true, data: { matchingSet: null, matchingSets: [], reason: '没有可用作业集' } })
     uiMocks.setActiveTab.mockReset()
+    uiMocks.setStatisticsTab.mockReset()
     uiMocks.setCombatCopilotPrefill.mockReset()
     useDashboardStore.getState().reset()
     useStatusStore.getState().clearMessage()
@@ -525,5 +529,45 @@ describe('Dashboard connectivity state', () => {
     expect(status.isActive).toBe(false)
     expect(flow?.classList.contains('is-active')).toBe(false)
     expect(flow?.getAttribute('aria-busy')).toBe('false')
+  })
+})
+
+
+describe('Dashboard drop summary navigation', () => {
+  beforeEach(async () => {
+    online = true
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => online })
+    apiMocks.getTaskStatus.mockResolvedValue({ success: true, data: { isRunning: false } })
+    apiMocks.getDeviceStats.mockResolvedValue({ success: false })
+    apiMocks.getActivity.mockResolvedValue({ success: true, data: { available: false } })
+    apiMocks.getScheduleExecutionStatus.mockResolvedValue({ success: true, data: { isRunning: false } })
+    apiMocks.getTrainingQueue.mockResolvedValue({ success: true, data: { queue: [] } })
+    apiMocks.getTodayDrops.mockResolvedValue({ success: true, data: [] })
+    apiMocks.getOpenTodayStages.mockResolvedValue({ success: true, data: { open: [], closed: [] } })
+    apiMocks.getActivityCopilotCandidates.mockResolvedValue({ success: true, data: { matchingSets: [] } })
+    uiMocks.setActiveTab.mockReset()
+    uiMocks.setStatisticsTab.mockReset()
+    useDashboardStore.getState().reset()
+    useStatusStore.getState().clearMessage()
+    useStatusStore.getState().setActive(false)
+    useStatusStore.getState().setBackendStatus('unknown')
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    act(() => root.render(<Dashboard />))
+    await flushDashboard()
+  })
+
+  afterEach(() => {
+    act(() => root.unmount())
+    container.remove()
+  })
+
+  it('opens the drops tab instead of the default statistics tab', () => {
+    const open = container.querySelector<HTMLButtonElement>('button[aria-label="打开掉落记录"]')
+    expect(open).not.toBeNull()
+    act(() => open?.click())
+    expect(uiMocks.setStatisticsTab).toHaveBeenCalledWith('drops')
+    expect(uiMocks.setActiveTab).toHaveBeenCalledWith('statistics')
   })
 })

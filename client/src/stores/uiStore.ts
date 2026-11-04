@@ -20,6 +20,7 @@ const APP_TABS = [
 export type AppTab = typeof APP_TABS[number]
 
 type ThemeMode = 'light' | 'dark' | 'system'
+export type StatisticsTab = 'operbox' | 'depot' | 'drops'
 
 export interface CombatCopilotPrefill {
   setId: string
@@ -31,9 +32,11 @@ export interface CombatCopilotPrefill {
 interface UIState {
   theme: ThemeMode
   activeTab: AppTab
+  statisticsTab: StatisticsTab | null
   combatCopilotPrefill: CombatCopilotPrefill | null
   setTheme: (theme: ThemeMode) => void
   setActiveTab: (tab: AppTab) => void
+  setStatisticsTab: (tab: StatisticsTab | null) => void
   setCombatCopilotPrefill: (prefill: CombatCopilotPrefill | null) => void
 }
 
@@ -101,6 +104,7 @@ export const useUIStore = create<UIState>()(
       (set) => ({
         theme: 'dark',
         activeTab: initialAppTab(),
+        statisticsTab: null,
         combatCopilotPrefill: null,
 
         setTheme: (theme) => {
@@ -109,6 +113,8 @@ export const useUIStore = create<UIState>()(
         },
 
         setActiveTab: (tab) => set({ activeTab: tab }),
+
+        setStatisticsTab: (tab) => set({ statisticsTab: tab }),
 
         setCombatCopilotPrefill: (prefill) => set({ combatCopilotPrefill: prefill }),
       }),

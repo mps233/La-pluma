@@ -12,6 +12,9 @@ const MAX_TEMPERATURE_SAMPLES = 36
 
 export interface ActivitySummary {
   available: boolean
+  status?: 'active' | 'none' | 'unavailable' | 'stale'
+  failure?: string
+  dataUpdatedAt?: number
   code?: string
   name?: string
   tip?: string

@@ -105,6 +105,7 @@ const deferred = <T,>() => {
 
 describe('DataStatistics layout surfaces', () => {
   beforeEach(() => {
+    window.history.replaceState(null, '', '/')
     window.requestAnimationFrame = vi.fn(callback => {
       callback(0)
       return 1
