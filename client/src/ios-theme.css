@@ -14,8 +14,8 @@
   --app-border: rgba(60, 60, 67, 0.18);
   --app-border-strong: rgba(60, 60, 67, 0.28);
   --app-text: #1c1c1e;
-  --app-text-muted: #636366;
-  --app-text-soft: #69696e;
+  --app-text-muted: #5e5e63;
+  --app-text-soft: #636368;
   --app-accent: #007aff;
   --app-accent-strong: #005ecb;
   --app-accent-action: #0066cc;
@@ -23,13 +23,14 @@
   --app-accent-soft: rgba(0, 122, 255, 0.12);
   --app-success: #34c759;
   --app-success-text: #1c7331;
-  --app-success-action: #248a3d;
+  --app-success-action: #1f7a36;
   --app-warning: #ff9500;
   --app-warning-text: #92400e;
   --app-danger: #ff3b30;
   --app-danger-text: #b42318;
   --app-danger-action: #d70015;
   --app-info: #5856d6;
+  --app-info-text: #3f3dc4;
   --app-radius-xs: 0.375rem;
   --app-radius-sm: 0.625rem;
   --app-radius-md: 0.8125rem;
@@ -186,7 +187,7 @@ html.dark,
   --app-border-strong: rgba(235, 235, 245, 0.28);
   --app-text: #f2f2f7;
   --app-text-muted: #aeaeb2;
-  --app-text-soft: #8e8e93;
+  --app-text-soft: #a1a1a6;
   --app-accent: #0a84ff;
   --app-accent-strong: #64b5ff;
   --app-accent-action: #0066cc;
@@ -199,8 +200,9 @@ html.dark,
   --app-warning-text: #ff9f0a;
   --app-danger: #ff453a;
   --app-danger-text: #ff6961;
-  --app-danger-action: #ff453a;
+  --app-danger-action: #d70015;
   --app-info: #5e5ce6;
+  --app-info-text: #a5a3ff;
   --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.3);
   --la-pluma-tabbar-shadow: 0 1rem 2.25rem rgba(0, 0, 0, 0.44);
   --la-pluma-tabbar-fade-color: #101318;

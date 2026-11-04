@@ -3053,10 +3053,10 @@ export default function AutomationTasks() {
 
                   <div className="mt-2 flex min-w-0 items-center gap-2">
                     {executionSummaryHasFailure(lastExecutionSummary)
-                      ? <AlertTriangle size={14} className="shrink-0 text-[var(--app-danger)]" strokeWidth={2} />
+                      ? <AlertTriangle size={14} className="shrink-0 text-[var(--app-danger-text)]" strokeWidth={2} />
                       : lastExecutionSummary.skippedCount > 0 && lastExecutionSummary.successCount === 0
                         ? <CircleMinus size={14} className="shrink-0 text-tertiary" strokeWidth={2} />
-                        : <CheckCircle2 size={14} className="shrink-0 text-[var(--app-success)]" strokeWidth={2} />}
+                        : <CheckCircle2 size={14} className="shrink-0 text-[var(--app-success-text)]" strokeWidth={2} />}
                     <span className="min-w-0 flex-1 text-xs leading-5 text-secondary">
                       {formatExecutionActionSummary(lastExecutionSummary.actions)
                         || (lastExecutionSummary.failedCount > 0

@@ -706,7 +706,7 @@ export default function ScrcpyDeviceView({
         </div>
 
         {commandError && (
-          <p className="text-center text-xs text-[var(--app-danger)]" role="alert" aria-live="polite">
+          <p className="text-center text-xs text-[var(--app-danger-text)]" role="alert" aria-live="polite">
             {commandError}
           </p>
         )}

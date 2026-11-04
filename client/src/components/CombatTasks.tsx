@@ -2210,7 +2210,7 @@ export default function CombatTasks() {
                                         ? 'var(--app-text-soft)'
                                         : isSelected
                                           ? 'var(--app-accent)'
-                                          : 'var(--app-text-secondary)')
+                                          : 'var(--app-text-muted)')
                                 : isCurrent
                                   ? 'var(--app-accent)'
                                   : isCompleted && !isSuccess
@@ -2221,7 +2221,7 @@ export default function CombatTasks() {
                                         ? 'var(--app-accent)'
                                         : isPersistedDone
                                           ? 'var(--app-text-soft)'
-                                          : 'var(--app-text-secondary)'
+                                          : 'var(--app-text-muted)'
 
                               const handleToggleSelect = () => {
                                 const newSet = new Set(selectedCopilotIndexes)

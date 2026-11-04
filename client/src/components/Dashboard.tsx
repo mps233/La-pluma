@@ -87,8 +87,8 @@ const getUsageBarClass = (pct?: number | null) => {
 
 const getUsageValueClass = (pct?: number | null) => {
   if (pct == null) return 'text-primary'
-  if (pct >= 90) return 'text-[var(--app-danger)]'
-  if (pct >= 75) return 'text-[var(--app-warning)]'
+  if (pct >= 90) return 'text-[var(--app-danger-text)]'
+  if (pct >= 75) return 'text-[var(--app-warning-text)]'
   return 'text-primary'
 }
 

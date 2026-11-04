@@ -1143,7 +1143,7 @@ export default function ConfigManager() {
                 </div>
               )}
               {versionInfo?.resource && versionInfo.resource.status !== 'current' && (
-                <p className="mt-2 text-xs leading-5 text-[var(--app-warning)]">{versionInfo.resource.message}</p>
+                <p className="mt-2 text-xs leading-5 text-[var(--app-warning-text)]">{versionInfo.resource.message}</p>
               )}
               <div className="mt-auto grid gap-2 pt-4 sm:grid-cols-2">
                 <Button

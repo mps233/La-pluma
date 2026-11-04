@@ -109,7 +109,7 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
                 <div className="flex items-center gap-3 text-xs">
                   <div>
                     <span className="text-tertiary">拥有 </span>
-                    <span className="font-bold text-[var(--app-success)]">{node.have}</span>
+                    <span className="font-bold text-[var(--app-success-text)]">{node.have}</span>
                   </div>
                   <span className="text-tertiary">/</span>
                   <div>
@@ -201,7 +201,7 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
           
           <div className="flex items-center gap-2 text-xs">
             <span className="text-tertiary">
-              <span className="font-semibold text-[var(--app-success)]">{node.have}</span> / {node.needed}
+              <span className="font-semibold text-[var(--app-success-text)]">{node.have}</span> / {node.needed}
             </span>
           </div>
         </div>
@@ -1349,7 +1349,7 @@ export default function OperatorTraining() {
                           size="sm"
                           title={pendingOperatorIds.has(item.operatorId) ? '正在移除' : '移除'}
                           aria-label={pendingOperatorIds.has(item.operatorId) ? `正在移除${item.operator.name}` : `移除${item.operator.name}`}
-                          className="text-[var(--app-danger)]"
+                          className="text-[var(--app-danger-text)]"
                           icon={
                             pendingOperatorIds.has(item.operatorId) ? (
                               <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" aria-hidden="true" />
@@ -1469,7 +1469,7 @@ export default function OperatorTraining() {
                                   {stage.materials?.slice(0, 2).map(mat => `${mat.name}×${mat.count}`).join('、') || '等待开放后再推进'}
                                 </div>
                               </div>
-                              <div className="text-xs font-semibold text-[var(--app-danger)]">未开放</div>
+                              <div className="text-xs font-semibold text-[var(--app-danger-text)]">未开放</div>
                             </div>
                           </div>
                         ))}
@@ -1514,7 +1514,7 @@ export default function OperatorTraining() {
                                   }`}>
                                     {stage.stage}
                                   </div>
-                                  {stage.isOpen === false && <div className="text-xs font-medium text-[var(--app-danger)]">未开放</div>}
+                                  {stage.isOpen === false && <div className="text-xs font-medium text-[var(--app-danger-text)]">未开放</div>}
                                 </div>
                                 <div className="rounded-full px-3 py-1.5 text-sm font-semibold brand-chip">×{stage.totalTimes || 0}</div>
                               </div>
