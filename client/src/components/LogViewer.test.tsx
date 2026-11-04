@@ -127,10 +127,10 @@ describe('LogViewer recovery and controls', () => {
     expect(document.activeElement).toBe(modeTabs[0])
 
     const switches = Array.from(container.querySelectorAll<HTMLInputElement>('[role="switch"]'))
-    expect(switches.map(input => input.getAttribute('aria-label'))).toEqual(['自动滚动', '折叠重复日志'])
-    expect(switches.every(input => input.checked)).toBe(true)
+    expect(switches.map(input => input.getAttribute('aria-label'))).toEqual(['自动滚动', '仅显示本次运行日志', '折叠重复日志'])
+    expect(switches.map(input => input.checked)).toEqual([true, false, true])
     const toggleControls = Array.from(container.querySelectorAll('.log-toggle-control'))
-    expect(toggleControls).toHaveLength(2)
+    expect(toggleControls).toHaveLength(3)
     expect(toggleControls.every(control => !control.classList.contains('surface-soft'))).toBe(true)
   })
 

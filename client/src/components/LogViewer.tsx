@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react'
 import { maaApi } from '../services/api'
+import { useRunStore } from '../store/runStore'
 import {
   PageHeader,
   Card,
@@ -30,6 +31,7 @@ import {
 } from './common'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
+import { summarizeMaaCliMessage, summarizeMaaCliSummaryBlock } from '../utils/maaLogSummary'
 import type { LogEntry, LogFile } from '@/types/components'
 
 type LogFilter = 'all' | LogEntry['level']
@@ -83,6 +85,11 @@ function parseRealtimeLog(value: unknown): LogEntry {
     time: formatLogTime(log.time),
     level: normalizeLevel(log.level),
     message,
+    ...(typeof log.sequence === 'number' ? { sequence: log.sequence } : {}),
+    ...(typeof log.runId === 'string' || log.runId === null ? { runId: log.runId as string | null } : {}),
+    ...(typeof log.operationId === 'string' || log.operationId === null
+      ? { operationId: log.operationId as string | null }
+      : {}),
   }
 }
 
@@ -131,7 +138,81 @@ function getTaskName(value: unknown): string {
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+}
+
+function readText(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key]
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed ? trimmed : null
+}
+
+function readNumber(record: Record<string, unknown>, key: string): number | null {
+  const value = record[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function summarizeStageClear(marker: unknown): string | null {
+  switch (marker) {
+    case 'StageDrops-Stars-3':
+      return '三星通关'
+    case 'StageDrops-Adverse':
+    case 'StageDrops-Stars-Adverse':
+      return '险情通关'
+    default:
+      return null
+  }
+}
+
+function summarizeCopilotFileLoad(details: Record<string, unknown>): string {
+  const stage = readText(details, 'stage_name')
+  const file = readText(details, 'file_name')
+  if (stage && file) return `开始作业：${stage}（${file}）`
+  if (stage) return `开始作业：${stage}`
+  if (file) return `开始作业：${file}`
+  return '开始加载作业文件'
+}
+
+function summarizeCopilotAction(details: Record<string, unknown>): string {
+  const target = readText(details, 'target')
+  const elapsed = readNumber(details, 'elapsed_time')
+  if (target && elapsed !== null) return `战斗进行中：${target} · 已用 ${elapsed}ms`
+  if (target) return `战斗进行中：${target}`
+  if (elapsed !== null) return `战斗进行中 · 已用 ${elapsed}ms`
+  return '战斗进行中'
+}
+
+function summarizeStageDrops(details: Record<string, unknown>): string | null {
+  const drops = Array.isArray(details.drops) ? details.drops : []
+  const parts: string[] = []
+  for (const item of drops) {
+    const record = asRecord(item)
+    const name = readText(record, 'itemName') || readText(record, 'item_name')
+    if (!name) continue
+    const quantity = readNumber(record, 'quantity') ?? readNumber(record, 'count')
+    parts.push(quantity !== null ? `${name} ×${quantity}` : name)
+  }
+  return parts.length ? `掉落：${parts.join('、')}` : null
+}
+
+function summarizeRoguelikeSettlement(details: Record<string, unknown>): string {
+  const floor = readNumber(details, 'floor')
+  const step = readNumber(details, 'step')
+  const recruit = readNumber(details, 'recruit')
+  const score = readNumber(details, 'score')
+  const progress = [
+    floor !== null ? `${floor}层` : null,
+    step !== null ? `${step}步` : null,
+  ].filter(Boolean).join(' ')
+  const parts = [
+    progress || null,
+    recruit !== null ? `招募 ${recruit}` : null,
+    score !== null ? `得分 ${score}` : null,
+  ].filter(Boolean)
+  return parts.length ? `肉鸽结算：${parts.join(' · ')}` : '肉鸽结算完成'
 }
 
 function summarizeCallback(log: LogEntry): LogEntry | null {
@@ -159,13 +240,47 @@ function summarizeCallback(log: LogEntry): LogEntry | null {
     case 'SubTaskError':
       return { ...log, level: 'ERROR', message: `执行步骤失败：${taskName}` }
     case 'AllTasksCompleted':
-    case 'SubTaskStart':
     case 'SubTaskCompleted':
       return null
-    case 'SubTaskExtraInfo':
-      return payload.what === 'DepotInfo'
-        ? { ...log, message: '仓库识别数据已生成' }
-        : null
+    case 'SubTaskStart': {
+      const stageClear = summarizeStageClear(details.task)
+      if (stageClear) return { ...log, message: stageClear }
+      if (typeof details.task === 'string' && details.task.endsWith('FightMissionFailed')) {
+        return { ...log, level: 'ERROR', message: '作战失败' }
+      }
+      return null
+    }
+    case 'SubTaskExtraInfo': {
+      const stageClear = summarizeStageClear(payload.what)
+      if (stageClear) return { ...log, message: stageClear }
+      switch (payload.what) {
+        case 'DepotInfo':
+          return { ...log, message: '仓库识别数据已生成' }
+        case 'CopilotListLoadTaskFileSuccess':
+          return { ...log, message: summarizeCopilotFileLoad(details) }
+        case 'CopilotAction':
+          return { ...log, message: summarizeCopilotAction(details) }
+        case 'StageDrops': {
+          const drops = summarizeStageDrops(details)
+          return drops ? { ...log, message: drops } : null
+        }
+        case 'RoguelikeSettlement':
+          return { ...log, message: summarizeRoguelikeSettlement(details) }
+        case 'RoguelikeInvestment': {
+          const count = readNumber(details, 'count')
+          const deposit = readNumber(details, 'deposit')
+          const depositText = deposit !== null && deposit >= 0 ? `（存款 ${deposit}）` : ''
+          if (count !== null && count >= 0) return { ...log, message: `投资：${count}${depositText}` }
+          return { ...log, message: depositText ? `投资完成${depositText}` : '投资完成' }
+        }
+        case 'RoguelikeEvent': {
+          const eventName = readText(details, 'name')
+          return eventName ? { ...log, message: `事件：${eventName}` } : null
+        }
+        default:
+          return null
+      }
+    }
     case 'AsyncCallInfo':
       if (payload.what !== 'Connect') return null
       return {
@@ -196,7 +311,7 @@ function summarizeCallback(log: LogEntry): LogEntry | null {
   }
 }
 
-function summarizeLog(log: LogEntry): LogEntry | null {
+function summarizeLogInner(log: LogEntry): LogEntry | null {
   if (log.level === 'DEBUG' || !log.time) return null
 
   const callback = summarizeCallback(log)
@@ -217,6 +332,19 @@ function summarizeLog(log: LogEntry): LogEntry | null {
     } catch {
       return null
     }
+  }
+
+  const rawOutput = message.startsWith('stdout:') ? message.slice(7).trim() : null
+  const cliSummary = rawOutput !== null
+    ? summarizeMaaCliSummaryBlock(rawOutput)
+    : summarizeMaaCliSummaryBlock(message)
+  if (cliSummary) {
+    return { ...log, message: cliSummary.message, level: cliSummary.level || log.level }
+  }
+
+  const cliMessage = summarizeMaaCliMessage(message)
+  if (cliMessage) {
+    return { ...log, message: cliMessage.message, level: cliMessage.level || log.level }
   }
 
   const commandStart = message.match(/^执行命令:\s+maa\s+(\w+)(?:\s+.*?)?,\s*等待完成:\s*(?:true|false)$/)
@@ -269,16 +397,28 @@ function summarizeLog(log: LogEntry): LogEntry | null {
   return { ...log, message }
 }
 
+function summarizeLog(log: LogEntry): LogEntry | null {
+  const summarized = summarizeLogInner(log)
+  return summarized
+    ? { ...summarized, rawMessage: log.rawMessage ?? log.message }
+    : null
+}
+
 export default function LogViewer() {
   const shouldReduceMotion = useReducedMotion()
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [autoScroll, setAutoScroll] = useState(true)
   const [atLogTop, setAtLogTop] = useState(true)
   const [atLogBottom, setAtLogBottom] = useState(true)
+  const [newLogCount, setNewLogCount] = useState(0)
+  const priorLogsLengthRef = useRef(0)
+  const clearedThroughSequenceRef = useRef(0)
   const [contentMode, setContentMode] = useState<LogContentMode>('summary')
   const [filter, setFilter] = useState<LogFilter>('all')
   const [search, setSearch] = useState('')
   const [collapseRepeats, setCollapseRepeats] = useState(true)
+  const [runOnly, setRunOnly] = useState(false)
+  const currentRunId = useRunStore(state => state.run?.runId ?? null)
   const [historyFiles, setHistoryFiles] = useState<LogFile[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<LogFile | null>(null)
@@ -311,6 +451,9 @@ export default function LogViewer() {
     setAtLogBottom(current => current === nextAtBottom ? current : nextAtBottom)
     if (!nextAtBottom && !viewingHistoryRef.current) {
       setAutoScroll(current => current ? false : current)
+    } else if (nextAtBottom && !viewingHistoryRef.current) {
+      setAutoScroll(true)
+      setNewLogCount(0)
     }
   }, [])
 
@@ -319,6 +462,7 @@ export default function LogViewer() {
     if (!container) return
     container.scrollTop = container.scrollHeight
     setAutoScroll(true)
+    setNewLogCount(0)
     setAtLogBottom(true)
     setAtLogTop(container.scrollHeight <= container.clientHeight)
     container.focus({ preventScroll: true })
@@ -342,7 +486,9 @@ export default function LogViewer() {
         && !document.hidden
       ) {
         const values = Array.isArray(result.data) ? result.data : []
-        setLogs(values.map(parseRealtimeLog))
+        setLogs(values
+          .map(parseRealtimeLog)
+          .filter(log => typeof log.sequence !== 'number' || log.sequence > clearedThroughSequenceRef.current))
         setRealtimeError(null)
       }
     } catch (error) {
@@ -460,16 +606,18 @@ export default function LogViewer() {
     return readableLogs.filter(log => {
       const matchesLevel = filter === 'all' || log.level === filter
       const matchesSearch = !query || `${log.time} ${log.level} ${log.message}`.toLocaleLowerCase('zh-CN').includes(query)
-      return matchesLevel && matchesSearch
+      const matchesRun = !runOnly || !currentRunId || log.runId === currentRunId
+      return matchesLevel && matchesSearch && matchesRun
     })
-  }, [filter, readableLogs, search])
+  }, [currentRunId, filter, readableLogs, runOnly, search])
 
   const visibleLogs = useMemo<VisibleLog[]>(() => {
     if (!collapseRepeats) return filteredLogs.map(log => ({ ...log, count: 1 }))
 
     return filteredLogs.reduce<VisibleLog[]>((entries, log) => {
       const previous = entries[entries.length - 1]
-      if (previous && previous.level === log.level && previous.message === log.message) {
+      if (previous && previous.level === log.level && previous.message === log.message
+        && previous.runId === log.runId && previous.operationId === log.operationId) {
         previous.count += 1
         previous.time = log.time || previous.time
       } else {
@@ -483,26 +631,25 @@ export default function LogViewer() {
     updateLogScrollState()
   }, [visibleLogs, collapseRepeats, filter, search, viewingHistory, updateLogScrollState])
 
+  useEffect(() => {
+    const previous = priorLogsLengthRef.current
+    priorLogsLengthRef.current = logs.length
+    if (autoScroll || viewingHistory || logs.length <= previous) return
+    setNewLogCount(count => count + logs.length - previous)
+  }, [autoScroll, logs.length, viewingHistory])
+
   const clearLogs = async () => {
     if (viewingHistoryRef.current) return false
-    realtimePausedRef.current = true
-    stopRealtimeRequest()
-    setActionBusy(true)
-    setNotice(null)
-    try {
-      const result = await maaApi.clearRealtimeLogs()
-      if (!result.success) throw new Error(result.message || '清空实时日志失败')
-      setLogs([])
-      setRealtimeError(null)
-      setNotice({ type: 'success', text: result.message || '实时日志已清空' })
-    } catch (error) {
-      const message = getErrorMessage(error, '清空实时日志失败')
-      setNotice({ type: 'error', text: message })
-      throw new Error(message)
-    } finally {
-      realtimePausedRef.current = false
-      setActionBusy(false)
-    }
+    // 只清空当前观察窗口，不删除服务端共享日志；其他标签页/API 仍可读取。
+    const maxSequence = logs.reduce((max, log) => (
+      typeof log.sequence === 'number' ? Math.max(max, log.sequence) : max
+    ), 0)
+    clearedThroughSequenceRef.current = Math.max(clearedThroughSequenceRef.current, maxSequence)
+    setLogs([])
+    setNewLogCount(0)
+    setRealtimeError(null)
+    setNotice({ type: 'success', text: '当前视图已清空，服务端日志保留' })
+    return true
   }
 
   const cleanupHistoryLogs = async () => {
@@ -649,6 +796,16 @@ export default function LogViewer() {
                   disabled={viewingHistory}
                 />
               </div>
+              <div className={`log-toggle-control flex min-h-11 min-w-0 items-center justify-between gap-3 ${currentRunId ? '' : 'opacity-50'}`}>
+                <span className="truncate text-xs font-medium text-secondary">仅本次运行</span>
+                <Switch
+                  compact
+                  checked={runOnly && Boolean(currentRunId)}
+                  onChange={setRunOnly}
+                  label="仅显示本次运行日志"
+                  disabled={!currentRunId}
+                />
+              </div>
               <div className="log-toggle-control flex min-h-11 min-w-0 items-center justify-between gap-3">
                 <span className="truncate text-xs font-medium text-secondary">折叠重复</span>
                 <Switch
@@ -750,7 +907,7 @@ export default function LogViewer() {
                   className="log-console focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] focus-visible:ring-inset"
                   role="log"
                   aria-label="日志内容"
-                  aria-live="polite"
+                  aria-live={autoScroll && !viewingHistory ? 'polite' : 'off'}
                   aria-relevant="additions text"
                   tabIndex={0}
                   onScroll={updateLogScrollState}
@@ -799,6 +956,12 @@ export default function LogViewer() {
                     <div className="log-message">
                       <span>{log.message}</span>
                       {collapseRepeats && log.count > 1 && <span className="log-repeat">x{log.count}</span>}
+                      {log.rawMessage && log.rawMessage !== log.message && (
+                        <details className="log-row-details">
+                          <summary>原文</summary>
+                          <pre>{log.rawMessage}</pre>
+                        </details>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -814,7 +977,7 @@ export default function LogViewer() {
                       icon={<ArrowDown className="h-4 w-4" aria-hidden="true" />}
                       onClick={scrollToLatest}
                     >
-                      {viewingHistory ? '回到底部' : '回到最新'}
+                      {viewingHistory ? '回到底部' : newLogCount > 0 ? `回到最新 · ${newLogCount} 条` : '回到最新'}
                     </Button>
                   </div>
                 )}
@@ -887,11 +1050,11 @@ export default function LogViewer() {
           isOpen={confirmAction !== null}
           onClose={() => setConfirmAction(null)}
           onConfirm={handleConfirm}
-          title={confirmAction === 'clear' ? '清空实时日志？' : '清理旧日志文件？'}
+          title={confirmAction === 'clear' ? '清空当前日志视图？' : '清理旧日志文件？'}
           message={confirmAction === 'clear'
-            ? '这会清空当前会话中的实时日志缓存，历史日志文件不会受到影响。'
+            ? '只隐藏当前页面已经显示的日志，不删除服务端共享日志；新日志仍会继续显示。'
             : '系统会删除较旧的日志文件，只保留最新的 10 MB。此操作无法撤销。'}
-          confirmText={confirmAction === 'clear' ? '确认清空' : '确认清理'}
+          confirmText={confirmAction === 'clear' ? '清空视图' : '确认清理'}
           variant="danger"
         />
       </div>
