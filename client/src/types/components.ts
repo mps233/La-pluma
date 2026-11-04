@@ -184,7 +184,6 @@ export interface RoguelikeTask {
   name: string
   command: string
   placeholder: string
-  icon: string
   hasAdvanced: boolean
   description: string
 }

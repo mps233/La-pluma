@@ -32,7 +32,6 @@ export interface MaaExecutionLeaseRequest {
 export interface MaaExecutionLease {
   owner: MaaExecutionLeaseOwner;
   lockPath: string;
-  reentrant: boolean;
   release(): Promise<void>;
 }
 
@@ -234,7 +233,6 @@ export async function acquireMaaExecutionLease(
     active.depth += 1;
     return {
       ...active.lease,
-      reentrant: true,
       release: async () => {
         active.depth = Math.max(1, active.depth - 1);
       }
@@ -268,7 +266,6 @@ export async function acquireMaaExecutionLease(
       return {
         owner: metadata,
         lockPath,
-        reentrant: false,
         release: async () => {
           if (released) return;
           released = true;

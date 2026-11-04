@@ -75,7 +75,6 @@ interface AgentOperationInput {
   body_schema?: SchemaObject;
   query_schema?: SchemaObject;
   path_schema?: SchemaObject;
-  discovery?: boolean;
   [key: string]: unknown;
 }
 
@@ -206,7 +205,6 @@ export const AGENT_OPERATIONS = Object.freeze([
     path: '/api/agent/manifest',
     description: 'Discover AI-readable capabilities and action contracts.',
     advertised: false,
-    discovery: true,
     tags: ['Discovery']
   }),
   operation({
@@ -215,7 +213,6 @@ export const AGENT_OPERATIONS = Object.freeze([
     path: '/api/agent/openapi.json',
     description: 'Return the OpenAPI 3.1 contract for the Agent API.',
     advertised: false,
-    discovery: true,
     responseKind: 'openapi',
     tags: ['Discovery']
   }),

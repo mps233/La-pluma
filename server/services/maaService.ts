@@ -1626,7 +1626,7 @@ async function withFullActivityStages(activity: ActivityInfo): Promise<ActivityI
   }
 }
 
-function getValidCachedActivity(clientType: string, cachedActivity: ActivityInfo | undefined, now: number = Date.now()): ActivityInfo | null {
+function getValidCachedActivity(cachedActivity: ActivityInfo | undefined, now: number = Date.now()): ActivityInfo | null {
   if (!cachedActivity?.code || !cachedActivity.timestamp) return null;
   const ttlExpiresAt = cachedActivity.timestamp + (cachedActivity.ttl || ACTIVITY_CACHE_TTL);
   const endTimeMs = typeof cachedActivity.endTime === 'number'
@@ -1653,7 +1653,7 @@ export async function getCurrentActivity(clientType: string = DEFAULT_CLIENT_TYP
   const now = Date.now();
   const cachedActivity = activityCache.get(clientType);
   let staleCandidate: ActivityInfo | null = cachedActivity?.code ? cachedActivity : null;
-  const cached = getValidCachedActivity(clientType, cachedActivity, now);
+  const cached = getValidCachedActivity(cachedActivity, now);
   if (cached) {
       logger.debug('使用缓存的活动信息', {
         clientType, code: cached.code, name: cached.name, source: cached.source
@@ -1677,7 +1677,6 @@ export async function getCurrentActivity(clientType: string = DEFAULT_CLIENT_TYP
   const rawPersistedEntry = persistedData[clientType];
   const persistedEntry = isRecord(rawPersistedEntry) ? rawPersistedEntry : null;
   const persisted = getValidCachedActivity(
-    clientType,
     persistedEntry ? persistedEntry as unknown as ActivityInfo : undefined,
     now
   );

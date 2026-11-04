@@ -37,14 +37,6 @@ const CUSTOM_TOOLS = Object.freeze([
   }
 ]);
 
-interface CustomTool {
-  id: string;
-  name: string;
-  description: string;
-  taskNames: string[];
-  paramsKey?: string;
-}
-
 interface PixelPaintParams {
   groups: Array<{ color: number; points: Array<[number, number]> }>;
   swipe?: boolean;

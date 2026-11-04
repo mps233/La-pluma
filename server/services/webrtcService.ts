@@ -20,8 +20,6 @@ import { createLogger } from '../utils/logger.ts'
 const execFileAsync = promisify(execFile)
 const logger = createLogger('Webrtc')
 
-export { DEFAULT_ADB_PATH }
-
 const WEBRTC_DIR = process.env.LA_PLUMA_WEBRTC_DIR || `${process.env.HOME || ''}/ScrcpyOverWebRTC`
 export const WEBRTC_PORT = Number(process.env.LA_PLUMA_WEBRTC_PORT || 8443)
 const WEBRTC_TURN_PORT = Number(process.env.LA_PLUMA_WEBRTC_TURN_PORT || 3478)
@@ -39,7 +37,6 @@ interface WebrtcAgentOwner {
   address: string
   deviceId: string
   adbPath: string
-  generation?: number
 }
 
 interface WebrtcAuthTokenCache {
@@ -1334,7 +1331,7 @@ async function startLocalTurnServerUnlocked(): Promise<void> {
   webrtcTurnProcess = trackManagedProcess(child, 'turn')
 }
 
-async function killLocalWebrtcInfrastructureUnlocked(address: string, adbPath: string): Promise<void> {
+async function killLocalWebrtcInfrastructureUnlocked(): Promise<void> {
   const owner = registeredAgentOwner
   const ownedServer = Boolean(webrtcServerProcess)
   const ownedTurn = Boolean(webrtcTurnProcess)
@@ -1559,7 +1556,7 @@ export async function startWebrtcServer(address: string = DEFAULT_DEVICE_ADDRESS
 }
 
 async function stopWebrtcServerUnlocked(address: string, adbPath: string): Promise<WebrtcStatus> {
-  await killLocalWebrtcInfrastructureUnlocked(address, adbPath)
+  await killLocalWebrtcInfrastructureUnlocked()
   return getWebrtcStatus(address, adbPath)
 }
 

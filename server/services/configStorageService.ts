@@ -2,7 +2,7 @@ import { getErrorMessage } from '../utils/errors.ts';
 import { readdir } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { deleteJsonFile, readJsonFile, updateJsonFile, writeJsonFile, ensureDir } from '../utils/fileHelper.ts';
+import { deleteJsonFile, readJsonFile, writeJsonFile, ensureDir } from '../utils/fileHelper.ts';
 import { agentError, successResponse, errorResponse } from '../utils/apiHelper.ts';
 import { createLogger } from '../utils/logger.ts';
 
@@ -54,22 +54,6 @@ export async function saveUserConfig(configType: unknown, data: unknown) {
   } catch (error) {
     logger.error('保存配置失败', { configType, error: getErrorMessage(error) });
     return errorResponse(error, '保存配置失败');
-  }
-}
-
-// 原子读改写用户配置：读取、更新、写回在同一路径队列内完成。
-export async function updateUserConfig<T>(
-  configType: unknown,
-  updateFn: (data: T) => T | Promise<T>,
-  defaultValue: T
-) {
-  try {
-    const configPath = getConfigPath(configType);
-    const updated = await updateJsonFile(configPath, updateFn, defaultValue);
-    return successResponse(updated, '配置更新成功');
-  } catch (error) {
-    logger.error('更新配置失败', { configType, error: getErrorMessage(error) });
-    return errorResponse(error, '更新配置失败');
   }
 }
 

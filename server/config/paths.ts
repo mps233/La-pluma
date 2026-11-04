@@ -113,20 +113,6 @@ export function getMaaActivityPath() {
 }
 
 /**
- * 获取 MAA 热更新任务覆盖层路径
- */
-export function getMaaHotUpdateResourceDir() {
-  return join(getMaaCacheDir(), 'resource');
-}
-
-/**
- * 获取 MAA 物品索引文件路径
- */
-export function getItemIndexPath() {
-  return join(getMaaResourceDir(), 'item_index.json');
-}
-
-/**
  * 获取游戏物品表文件路径
  */
 export function getItemTablePath() {

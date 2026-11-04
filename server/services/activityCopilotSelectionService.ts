@@ -66,9 +66,3 @@ export function averageRatingLevel(items: unknown[]) {
   if (!list.length) return 0;
   return list.reduce<number>((total, item) => total + (Number(isRecord(item) ? item.ratingLevel : 0) || 0), 0) / list.length;
 }
-
-export function averageRatingRatio(items: unknown[]) {
-  const list = Array.isArray(items) ? items : [];
-  if (!list.length) return 0;
-  return list.reduce<number>((total, item) => total + (Number(isRecord(item) ? item.ratingRatio : 0) || 0), 0) / list.length;
-}

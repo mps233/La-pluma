@@ -57,7 +57,6 @@ async function persistFixture(savedAt: number) {
     deviceStats: snapshotFixture.deviceStats,
     temperatureHistory: snapshotFixture.temperatureHistory,
   })
-  store.startRefresh()
   store.finishRefresh(savedAt, businessSnapshotFixture)
   return dashboardModule
 }
@@ -81,7 +80,6 @@ describe('dashboardStore persistence', () => {
     expect(Object.keys(persisted).sort()).toEqual(['savedAt', 'snapshot', 'version'])
     expect(persisted.snapshot).not.toHaveProperty('lastUpdate')
     expect(persisted).not.toHaveProperty('hasLoaded')
-    expect(persisted).not.toHaveProperty('isRefreshing')
     expect(persisted).not.toHaveProperty('finishRefresh')
 
     vi.resetModules()
@@ -91,7 +89,6 @@ describe('dashboardStore persistence', () => {
     expect(restored).toMatchObject({
       ...snapshotFixture,
       hasLoaded: true,
-      isRefreshing: false,
       lastUpdate: savedAt,
       lastRefreshAttemptAt: savedAt,
     })
@@ -164,7 +161,6 @@ describe('dashboardStore persistence', () => {
   it('merges the latest device sample when a business refresh commits', async () => {
     const dashboardModule = await import('./dashboardStore')
     const store = dashboardModule.useDashboardStore.getState()
-    store.startRefresh()
     store.updateDeviceStats({ cpuPct: 44, temp: 39 })
     store.finishRefresh(Date.now(), businessSnapshotFixture)
 
@@ -197,7 +193,6 @@ describe('dashboardStore persistence', () => {
     const restored = useDashboardStore.getState()
 
     expect(restored.hasLoaded).toBe(false)
-    expect(restored.isRefreshing).toBe(false)
     expect(restored.lastUpdate).toBeNull()
     expect(restored.lastRefreshAttemptAt).toBeNull()
   })
@@ -222,7 +217,6 @@ describe('dashboardStore persistence', () => {
     const successfulCache = window.localStorage.getItem(STORAGE_KEY)
     const store = dashboardModule.useDashboardStore.getState()
 
-    store.startRefresh()
     store.finishRefresh(Date.now())
 
     expect(window.localStorage.getItem(STORAGE_KEY)).toBe(successfulCache)

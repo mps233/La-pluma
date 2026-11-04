@@ -42,7 +42,6 @@ interface BotConfig {
   allowedUserIds: Array<string | number>;
   adbPath: string;
   adbAddress: string;
-  allowedCommands: string[];
 }
 
 interface CopilotResponse {
@@ -82,8 +81,7 @@ let botConfig: BotConfig = {
   chatId: '',
   allowedUserIds: [], // 新增：允许的用户 ID 列表
   adbPath: DEFAULT_ADB_PATH,
-  adbAddress: DEFAULT_ADB_ADDRESS,
-  allowedCommands: ['start', 'stop', 'status', 'fight', 'roguelike', 'copilot', 'startup', 'closedown', 'screenshot', 'help']
+  adbAddress: DEFAULT_ADB_ADDRESS
 };
 
 let isPolling = false;

@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import { ArrowLeft, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
 import { Button, Tooltip } from './common'
 import { previewQualityPresets, usePreviewStore, type PreviewQuality } from '../stores'
-import type { VideoStats } from '../hooks/useScrcpyWebRTC'
 import { usePreviewConnection } from '../contexts/previewSession'
 
 interface ScrcpyDeviceViewProps {
@@ -16,7 +15,6 @@ interface ScrcpyDeviceViewProps {
   onStartInfrastructure?: () => Promise<string | undefined> | string | undefined
   onCancelInfrastructure?: () => void
   autoConnect?: boolean
-  onStatusChange?: (status: string, stats: VideoStats | null, error: string | null) => void
   infrastructureStatus?: {
     installed?: boolean
     built?: boolean
@@ -24,7 +22,6 @@ interface ScrcpyDeviceViewProps {
     agentRunning?: boolean
     serverVersion?: string | null
     agentVersion?: string | null
-    agentOnline?: boolean
     agentVersionStatus?: 'ok' | 'outdated' | 'unknown'
     minimumAgentVersion?: string
     screenState?: string | null
@@ -120,7 +117,6 @@ export default function ScrcpyDeviceView({
   onStartInfrastructure,
   onCancelInfrastructure,
   autoConnect = false,
-  onStatusChange,
   infrastructureStatus,
   infrastructureStatusState,
   infrastructureLoading,
@@ -277,10 +273,6 @@ export default function ScrcpyDeviceView({
       }, 4000)
     })
   }
-
-  useEffect(() => {
-    onStatusChange?.(webrtc.status, webrtc.stats, webrtc.error)
-  }, [onStatusChange, webrtc.error, webrtc.stats, webrtc.status])
 
   useEffect(() => {
     if (!autoConnect) {

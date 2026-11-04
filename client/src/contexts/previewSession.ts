@@ -51,7 +51,3 @@ export function usePreviewConnection(
 
   return sharedSession ?? localSession
 }
-
-export function usePreviewSessionContext(): PreviewSessionContextValue | null {
-  return useContext(PreviewSessionContext)
-}

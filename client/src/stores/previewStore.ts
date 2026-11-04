@@ -21,8 +21,6 @@ export const previewQualityPresets = {
 export type PreviewQualityPreset = keyof typeof previewQualityPresets
 export type PreviewQuality = PreviewQualityPreset | 'custom'
 
-export const previewFpsOptions = [10, 15, 30, 45, 60, 90, 120] as const
-
 interface PreviewPreferences {
   mode: PreviewMode
   autoStart: boolean

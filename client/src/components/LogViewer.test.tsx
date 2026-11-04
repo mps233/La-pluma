@@ -11,7 +11,6 @@ const mocks = vi.hoisted(() => ({
   getRealtimeLogs: vi.fn(),
   getLogFiles: vi.fn(),
   readLogFile: vi.fn(),
-  clearRealtimeLogs: vi.fn(),
   cleanupLogs: vi.fn(),
 }))
 
@@ -71,7 +70,6 @@ describe('LogViewer recovery and controls', () => {
     mocks.getRealtimeLogs.mockReset().mockResolvedValue({ success: true, data: [] })
     mocks.getLogFiles.mockReset().mockResolvedValue({ success: true, data: [] })
     mocks.readLogFile.mockReset()
-    mocks.clearRealtimeLogs.mockReset()
     mocks.cleanupLogs.mockReset()
     container = document.createElement('div')
     document.body.appendChild(container)

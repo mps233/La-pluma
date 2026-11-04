@@ -1,4 +1,3 @@
-import { getErrorCode } from '../utils/errors.ts';
 import type { ApiErrorResponse } from '../utils/apiHelper.ts';
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'

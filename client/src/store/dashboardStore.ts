@@ -14,7 +14,6 @@ export interface ActivitySummary {
   available: boolean
   status?: 'active' | 'none' | 'unavailable' | 'stale'
   failure?: string
-  dataUpdatedAt?: number
   code?: string
   name?: string
   tip?: string
@@ -84,9 +83,7 @@ export type DashboardBusinessSnapshot = Pick<
 
 interface DashboardCacheState extends DashboardSnapshot {
   hasLoaded: boolean
-  isRefreshing: boolean
   lastRefreshAttemptAt: number | null
-  startRefresh: () => void
   finishRefresh: (attemptedAt: number, snapshot?: DashboardBusinessSnapshot) => void
   updateDeviceStats: (stats: DeviceStats) => void
   reset: () => void
@@ -274,7 +271,6 @@ function restoreDashboardCache() {
       ...payload.snapshot,
       lastUpdate: restoredAt,
       hasLoaded: true,
-      isRefreshing: false,
       lastRefreshAttemptAt: restoredAt,
     }
   } catch {
@@ -306,7 +302,6 @@ const initialSnapshot = (): DashboardSnapshot => ({
 const emptyCacheState = () => ({
   ...initialSnapshot(),
   hasLoaded: false,
-  isRefreshing: false,
   lastRefreshAttemptAt: null,
 })
 
@@ -314,7 +309,6 @@ const initialCacheState = () => restoreDashboardCache() ?? emptyCacheState()
 
 export const useDashboardStore = create<DashboardCacheState>((set, get) => ({
   ...initialCacheState(),
-  startRefresh: () => set({ isRefreshing: true }),
   finishRefresh: (attemptedAt, snapshot) => {
     const validSnapshot = snapshot && isDashboardBusinessSnapshot(snapshot) ? snapshot : undefined
     set(state => validSnapshot
@@ -323,13 +317,11 @@ export const useDashboardStore = create<DashboardCacheState>((set, get) => ({
           deviceStats: state.deviceStats,
           temperatureHistory: state.temperatureHistory,
           hasLoaded: true,
-          isRefreshing: false,
           lastRefreshAttemptAt: attemptedAt,
           lastUpdate: attemptedAt,
         }
       : {
           hasLoaded: true,
-          isRefreshing: false,
           lastRefreshAttemptAt: attemptedAt,
           lastUpdate: state.lastUpdate,
         })

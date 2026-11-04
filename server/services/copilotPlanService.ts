@@ -1,5 +1,5 @@
 import { asErrorWithCode, isRecord } from '../utils/errors.ts';
-import { getErrorCode, getErrorDetails, getErrorMessage, getErrorStatus } from '../utils/errors.ts';
+import { getErrorDetails, getErrorMessage } from '../utils/errors.ts';
 import { mkdir, readFile, readdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { fileURLToPath } from 'url';

@@ -22,7 +22,6 @@
     "vite.config.test.ts",
     "tailwind.config.ts",
     "eslint.config.ts",
-    "index.test.ts",
-    "scripts/**/*.ts"
+    "index.test.ts"
   ]
 }

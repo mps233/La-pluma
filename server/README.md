@@ -58,7 +58,7 @@ await ensureDir('./data/logs');
 ### logger.ts — 日志
 
 ```typescript
-import { createLogger, loggerManager } from '../utils/logger.ts';
+import { createLogger } from '../utils/logger.ts';
 
 const logger = createLogger('MyService');
 logger.info('服务启动');
@@ -66,13 +66,6 @@ logger.debug('调试信息', { userId: 123 });
 logger.warn('警告信息');
 logger.error('错误信息', { error: err.message });
 logger.success('操作成功');
-
-const recentLogs = logger.getRecentLogs(50);
-const errors = logger.filterByLevel('ERROR');
-logger.clear();
-
-loggerManager.getAllLogs();
-loggerManager.clearAll();
 ```
 
 ### 约定

@@ -1,4 +1,4 @@
-import { asErrorWithCode, getErrorCode, getErrorDetails, getErrorMessage, getErrorStatus } from '../../utils/errors.ts';
+import { asErrorWithCode, getErrorCode, getErrorDetails, getErrorStatus } from '../../utils/errors.ts';
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import {

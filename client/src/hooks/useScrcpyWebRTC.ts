@@ -36,16 +36,10 @@ export interface VideoStats {
   fps: string | number
   bitrate: string | number
   rtt: string | number
-  connectionType: string
-  lostCount: number
   width: number
   height: number
-  videoReadyState: number
   videoLive: boolean
   iceState: RTCIceConnectionState | 'unknown'
-  peerState: RTCPeerConnectionState | 'unknown'
-  signalingState: RTCSignalingState | 'unknown'
-  inputReady: boolean
 }
 
 const DEFAULT_SIGNALING_PATH = '/webrtc-signaling'
@@ -892,12 +886,9 @@ export function useScrcpyWebRTC({
       const reports = await pc.getStats().catch(() => null)
       if (!reports) return
       let rtt = 0
-      let connectionType = 'UDP p2p'
       for (const report of reports.values()) {
         if (report.type === 'candidate-pair' && (report.state === 'succeeded' || report.selected || report.nominated)) {
           rtt = (report.currentRoundTripTime || 0) * 1000
-          const local = reports.get(report.localCandidateId)
-          if (local?.candidateType === 'relay') connectionType = `${(local.protocol || 'udp').toUpperCase()} relay`
           break
         }
       }
@@ -914,16 +905,10 @@ export function useScrcpyWebRTC({
             fps,
             bitrate,
             rtt: rtt.toFixed(0),
-            connectionType,
-            lostCount: report.packetsLost || 0,
             width: video?.videoWidth || 0,
             height: video?.videoHeight || 0,
-            videoReadyState: video?.readyState || 0,
             videoLive: track?.readyState === 'live' && !track.muted,
-            iceState: pc.iceConnectionState || 'unknown',
-            peerState: pc.connectionState || 'unknown',
-            signalingState: pc.signalingState || 'unknown',
-            inputReady
+            iceState: pc.iceConnectionState || 'unknown'
           })
           break
         }

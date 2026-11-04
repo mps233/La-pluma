@@ -142,7 +142,6 @@
   /* 深色主题的表单元素 */
   input[type="text"],
   input[type="number"],
-  input[type="time"],
   select {
     background-color: var(--app-surface-solid);
     border-color: var(--app-border-strong);
@@ -152,7 +151,6 @@
   
   .dark input[type="text"],
   .dark input[type="number"],
-  .dark input[type="time"],
   .dark select {
     background-color: var(--app-surface-muted);
     color: var(--app-text);
@@ -1394,7 +1392,7 @@ body.automation-sorting {
   border-top: 1px solid var(--app-border);
 }
 
-[data-automation-tasks] .automation-run-button.is-running:is(:disabled, .disabled) {
+[data-automation-tasks] .automation-run-button.is-running:disabled {
   cursor: progress;
   opacity: 1 !important;
   background: color-mix(in srgb, var(--app-accent) 11%, var(--app-surface-solid)) !important;
@@ -1402,7 +1400,7 @@ body.automation-sorting {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 24%, var(--app-border)) !important;
 }
 
-[data-automation-tasks] .automation-stop-button.is-stopping:is(:disabled, .disabled) {
+[data-automation-tasks] .automation-stop-button.is-stopping:disabled {
   cursor: progress;
   opacity: 1 !important;
   background: var(--app-accent-soft) !important;
@@ -1410,7 +1408,7 @@ body.automation-sorting {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 28%, var(--app-border)) !important;
 }
 
-[data-automation-tasks] .automation-test-connection.is-testing:is(:disabled, .disabled) {
+[data-automation-tasks] .automation-test-connection.is-testing:disabled {
   cursor: progress;
   opacity: 1 !important;
   background: var(--app-accent-soft) !important;
@@ -3681,15 +3679,6 @@ svg.w-5.h-5 {
     font-size: var(--app-font-meta);
   }
 
-  .dashboard-preview-header {
-    min-height: 49px;
-  }
-
-  .dashboard-preview-frame.is-empty,
-  .dashboard-preview-empty {
-    background: var(--app-preview-empty-bg);
-  }
-
   .dashboard-flow-skeleton .dashboard-flow-header {
     height: 68.5px;
   }
@@ -5091,7 +5080,7 @@ svg.w-5.h-5 {
     to { transform: rotate(360deg); }
   }
 
-  .app-button.is-loading:is(:disabled, .disabled) {
+  .app-button.is-loading:disabled {
     cursor: progress !important;
     opacity: 1 !important;
   }

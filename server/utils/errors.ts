@@ -63,10 +63,6 @@ export function getErrorDetails(error: unknown): Record<string, unknown> {
   return {};
 }
 
-export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && typeof (error as ErrorWithCode).code === 'string';
-}
-
 export function asErrorWithCode(error: unknown): ErrorWithCode {
   if (error instanceof Error) return error as ErrorWithCode;
   return new Error(getErrorMessage(error)) as ErrorWithCode;

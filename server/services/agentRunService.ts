@@ -1,4 +1,3 @@
-import { asErrorWithCode, getErrorDetails, getErrorStatus } from '../utils/errors.ts';
 import type { ErrorWithCode } from '../utils/errors.ts';
 import { getErrorCode, getErrorMessage } from '../utils/errors.ts';
 import { createHash, randomUUID } from 'crypto';
@@ -84,7 +83,6 @@ export interface AgentRunStoreOverrides {
   readStore?: AgentRunPersistence['readStore'];
   writeStore?: AgentRunPersistence['writeStore'];
   runtimeLogger?: AgentRunPersistence['runtimeLogger'];
-  required?: boolean;
 }
 
 export interface BeginAgentRunInput {

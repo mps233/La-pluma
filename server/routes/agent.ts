@@ -273,7 +273,6 @@ interface WebrtcDeviceRecord {
   id: string;
   online?: boolean;
   agentVersion?: string | null;
-  snapshotHash?: unknown;
   screenState?: string | null;
 }
 
@@ -286,7 +285,6 @@ function toWebrtcDeviceRecords(value: unknown): WebrtcDeviceRecord[] {
       id: item.id,
       online: item.online !== false,
       agentVersion: typeof item.agentVersion === 'string' ? item.agentVersion : null,
-      snapshotHash: item.snapshotHash ?? null,
       screenState: typeof item.screenState === 'string' ? item.screenState : null
     });
   }
@@ -498,7 +496,7 @@ function sendRunPersistenceFailure(res: AgentResponse, req: AgentRequest, runId:
     getErrorCode(error) || 'AGENT_RUN_PERSISTENCE_FAILED',
     getErrorMessage(error) || 'Agent run 持久化失败',
     {
-      statusCode: getErrorStatus(error) || getErrorStatus(error) || 503,
+      statusCode: getErrorStatus(error) || 503,
       details: {
         ...(getErrorDetails(error) || {}),
         runId,
@@ -1046,7 +1044,7 @@ router.get('/manifest', (req: AgentRequest, res: AgentResponse) => {
   }));
 });
 
-router.get('/openapi.json', (req: AgentRequest, res: AgentResponse) => {
+router.get('/openapi.json', (_req: AgentRequest, res: AgentResponse) => {
   res.json(buildOpenApiSpec({
     adbPath: DEFAULT_ADB_PATH,
     adbAddress: DEFAULT_ADB_ADDRESS,

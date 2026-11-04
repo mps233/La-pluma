@@ -13,7 +13,6 @@ import { createLogger } from '../utils/logger.ts';
 // 创建日志记录器
 const logger = createLogger('Notification');
 
-type TelegramLevel = 'info' | 'success' | 'warning' | 'error'
 type FetchInitWithTimeout = RequestInit & { timeout?: number }
 
 interface TelegramApiResponse {
@@ -213,23 +212,6 @@ let notificationConfig: NotificationConfig = {
       botToken: '',
       chatId: '',
     },
-    // 预留其他通知渠道
-    wechat: {
-      enabled: false,
-      // 微信企业号配置
-    },
-    dingtalk: {
-      enabled: false,
-      // 钉钉机器人配置
-    },
-    email: {
-      enabled: false,
-      // 邮件配置
-    },
-    bark: {
-      enabled: false,
-      // Bark 配置
-    }
   }
 };
 
@@ -421,11 +403,6 @@ class NotificationManager {
     // 注册 Telegram 渠道
     this.registerChannel('telegram', TelegramChannel);
 
-    // 未来可以在这里注册更多渠道
-    // this.registerChannel('wechat', WeChatChannel);
-    // this.registerChannel('dingtalk', DingTalkChannel);
-    // this.registerChannel('email', EmailChannel);
-    // this.registerChannel('bark', BarkChannel);
   }
 
   registerChannel(name: string, ChannelClass: new (config: ChannelConfig) => NotificationChannel): void {

@@ -24,12 +24,9 @@ interface CopilotRecord {
   ratingLevel: number
   ratingRatio: number
   notEnoughRating: boolean
-  hotScore: number
-  views: number
-  uploadTime: string | null
 }
 
-interface CopilotSetMember extends Omit<CopilotRecord, 'content' | 'hotScore' | 'views' | 'uploadTime'> {
+interface CopilotSetMember extends Omit<CopilotRecord, 'content'> {
   stage: string | null
   missingOperators: string[]
   missingOperatorCount: number
@@ -90,10 +87,6 @@ interface CopilotCandidate {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {}
-}
-
-function asArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : []
 }
 
 function asString(value: unknown): string {
@@ -171,10 +164,7 @@ async function fetchCopilotRecord(id: number): Promise<CopilotRecord> {
         content: parseContent(data),
         ratingLevel: asNumber(data.rating_level),
         ratingRatio: asNumber(data.rating_ratio),
-        notEnoughRating: data.not_enough_rating === true,
-        hotScore: asNumber(data.hot_score),
-        views: asNumber(data.views),
-        uploadTime: typeof data.upload_time === 'string' ? data.upload_time : null
+        notEnoughRating: data.not_enough_rating === true
       };
     } catch (error) {
       lastError = error;

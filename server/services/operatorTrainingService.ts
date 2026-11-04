@@ -1790,6 +1790,5 @@ export default {
   updateSettings,
   generateTrainingPlan,
   applyPlanToTasks,
-  fetchOperatorMaterials,
-  calculateOperatorMaterials
+  fetchOperatorMaterials
 };

@@ -923,7 +923,6 @@ async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: 
     if (!activeTaskResult) return;
     const successDelta = successCount - lastTaskCounts.success;
     const failedDelta = failedCount - lastTaskCounts.failed;
-    const skippedDelta = skippedCount - lastTaskCounts.skipped;
     activeTaskResult.state = forcedState || (failedDelta > 0
       ? 'failed'
       : successDelta > 0

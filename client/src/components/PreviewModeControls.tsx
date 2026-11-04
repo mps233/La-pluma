@@ -18,7 +18,6 @@ const PREVIEW_MODES: ReadonlyArray<{
 
 interface PreviewModeControlsProps {
   compact?: boolean
-  unavailable?: boolean
   className?: string
 }
 
@@ -28,7 +27,6 @@ interface PreviewModeControlsProps {
  */
 export function PreviewModeControls({
   compact = false,
-  unavailable = false,
   className = '',
 }: PreviewModeControlsProps) {
   const shouldReduceMotion = useReducedMotion()
@@ -54,7 +52,7 @@ export function PreviewModeControls({
       nextIndex = values.length - 1
     }
     const nextMode = nextIndex === null ? undefined : values[nextIndex]
-    if (!nextMode || (unavailable && nextMode !== 'off')) return
+    if (!nextMode) return
     event.preventDefault()
     setMode(nextMode)
     containerRef.current
@@ -89,7 +87,6 @@ export function PreviewModeControls({
         )}
         {PREVIEW_MODES.map(option => {
           const selected = mode === option.value
-          const disabled = unavailable && option.value !== 'off' && !selected
           const Icon = option.Icon
           return (
             <button
@@ -100,8 +97,7 @@ export function PreviewModeControls({
               aria-checked={selected}
               aria-pressed={selected}
               tabIndex={selected ? 0 : -1}
-              disabled={disabled}
-              title={disabled ? '自动化服务暂不可用' : option.description}
+              title={option.description}
               onClick={() => setMode(option.value)}
               className={`app-workspace-segment preview-mode-option min-h-11 ${selected ? 'is-selected' : ''}`}
             >

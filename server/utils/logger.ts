@@ -17,20 +17,15 @@ export interface LogEntry {
 }
 
 export interface LoggerOptions {
-  maxLogs?: number;
   enableConsole?: boolean;
 }
 
 class Logger {
   name: string;
-  logs: LogEntry[];
-  maxLogs: number;
   enableConsole: boolean;
 
   constructor(name: string, options: LoggerOptions = {}) {
     this.name = name;
-    this.logs = [];
-    this.maxLogs = options.maxLogs || 1000; // 最多保留的日志条数
     this.enableConsole = options.enableConsole !== false; // 默认输出到控制台
   }
 
@@ -45,14 +40,6 @@ class Logger {
       service: this.name,
       ...(data ? { data } : {})
     };
-
-    // 添加到内存日志
-    this.logs.push(entry);
-
-    // 限制日志数量
-    if (this.logs.length > this.maxLogs) {
-      this.logs.shift();
-    }
 
     // 输出到控制台
     if (this.enableConsole) {
@@ -100,44 +87,6 @@ class Logger {
     return this.log('SUCCESS', message, data);
   }
 
-  /**
-   * 获取最近的日志
-   */
-  getRecentLogs(count = 100): LogEntry[] {
-    const startIndex = Math.max(0, this.logs.length - count);
-    return this.logs.slice(startIndex);
-  }
-
-  /**
-   * 获取所有日志
-   */
-  getAllLogs(): LogEntry[] {
-    return [...this.logs];
-  }
-
-  /**
-   * 清空日志
-   */
-  clear(): void {
-    this.logs = [];
-  }
-
-  /**
-   * 按级别过滤日志
-   */
-  filterByLevel(level: LogLevel): LogEntry[] {
-    return this.logs.filter(log => log.level === level);
-  }
-
-  /**
-   * 按时间范围过滤日志
-   */
-  filterByTimeRange(startTime: Date, endTime: Date): LogEntry[] {
-    return this.logs.filter(log => {
-      const logTime = new Date(log.time);
-      return logTime >= startTime && logTime <= endTime;
-    });
-  }
 }
 
 /**
@@ -160,26 +109,6 @@ class LoggerManager {
     return this.loggers.get(name) as Logger;
   }
 
-  /**
-   * 获取所有日志（合并所有 Logger）
-   */
-  getAllLogs(): LogEntry[] {
-    const allLogs: LogEntry[] = [];
-    for (const logger of this.loggers.values()) {
-      allLogs.push(...logger.getAllLogs());
-    }
-    // 按时间排序
-    return allLogs.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
-  }
-
-  /**
-   * 清空所有日志
-   */
-  clearAll(): void {
-    for (const logger of this.loggers.values()) {
-      logger.clear();
-    }
-  }
 }
 
 // 导出全局实例

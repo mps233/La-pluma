@@ -68,10 +68,6 @@ export function agentError(
   return error;
 }
 
-export function isAgentError(value: unknown): value is AgentError {
-  return value instanceof Error && typeof (value as { code?: unknown }).code === 'string';
-}
-
 /**
  * 成功响应
  */

@@ -439,7 +439,6 @@ export default function LogViewer() {
   const mountedRef = useRef(true)
   const realtimeAbortRef = useRef<AbortController | null>(null)
   const realtimeRequestIdRef = useRef(0)
-  const realtimePausedRef = useRef(false)
   const historyRequestIdRef = useRef(0)
 
   const updateLogScrollState = useCallback(() => {
@@ -469,7 +468,7 @@ export default function LogViewer() {
   }, [])
 
   const loadRealtimeLogs = useCallback(async () => {
-    if (viewingHistoryRef.current || realtimePausedRef.current || document.hidden || realtimeAbortRef.current) return
+    if (viewingHistoryRef.current || document.hidden || realtimeAbortRef.current) return
 
     const controller = new AbortController()
     const requestId = ++realtimeRequestIdRef.current

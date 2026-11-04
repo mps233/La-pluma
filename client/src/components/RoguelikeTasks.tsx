@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Check, Play, Square } from 'lucide-react'
 import { maaApi } from '../services/api'
-import Icons from './Icons'
 import { PageHeader, Input, Select, Button, SmoothPanel, Switch } from './common'
 import { useStatusStore } from '../store/statusStore'
 import { useRunStore } from '../store/runStore'
@@ -377,7 +376,6 @@ export default function RoguelikeTasks() {
       name: '集成战略', 
       command: 'roguelike', 
       placeholder: '输入主题代号',
-      icon: 'Map', 
       hasAdvanced: true,
       description: '自动刷集成战略（肉鸽），支持多个主题'
     },
@@ -386,7 +384,6 @@ export default function RoguelikeTasks() {
       name: '生息演算', 
       command: 'reclamation', 
       placeholder: '输入主题代号',
-      icon: 'Plant', 
       hasAdvanced: true,
       description: '自动生息演算模式'
     },
@@ -1051,7 +1048,6 @@ export default function RoguelikeTasks() {
                   />
                 )}
                 {tasks.map(task => {
-                  const IconComponent = Icons[task.icon as keyof typeof Icons]
                   const selected = activeMode === task.id
                   return (
                     <button
@@ -1070,11 +1066,6 @@ export default function RoguelikeTasks() {
                       tabIndex={selected ? 0 : -1}
                       className={`app-workspace-segment roguelike-mode-button min-h-11 ${selected ? 'is-selected' : ''}`}
                     >
-                      {IconComponent && (
-                        <span className="app-workspace-segment-icon roguelike-mode-icon">
-                          <IconComponent />
-                        </span>
-                      )}
                       <span className="app-workspace-segment-copy">
                         <span>{task.name}</span>
                         <small>{task.description}</small>

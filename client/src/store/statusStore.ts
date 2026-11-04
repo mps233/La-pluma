@@ -36,7 +36,7 @@ interface StatusState {
   backendStatus: 'unknown' | 'checking' | 'available' | 'unavailable'
   backendMessage: string
   setMessage: (message: string, type?: StatusMessageType) => number
-  clearMessage: (expectedRevision?: number) => void
+  clearMessage: () => void
   setActive: (active: boolean) => void
   applyRunStatus: (runStatus: GlobalRunStatus) => void
   setBackendStatus: (status: StatusState['backendStatus'], message?: string) => void
@@ -74,8 +74,7 @@ export const useStatusStore = create<StatusState>((set, get) => {
       scheduleDismiss(messageType, revision)
       return revision
     },
-    clearMessage: (expectedRevision) => {
-      if (expectedRevision !== undefined && expectedRevision !== messageRevision) return
+    clearMessage: () => {
       messageRevision += 1
       cancelDismissTimer()
       set({ message: '', messageType: null })

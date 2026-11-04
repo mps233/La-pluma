@@ -55,9 +55,6 @@ vi.mock('../utils/statusMessage', () => ({
   detectStatusMessageType: () => 'error',
   getStatusVisualConfig: () => ({ className: 'status-danger', dotColor: '#f00', pulseRgb: '255, 0, 0' }),
 }))
-vi.mock('./common', () => ({
-  SmoothSurface: ({ children, ...props }: HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
-}))
 
 let host: HTMLDivElement
 let container: HTMLDivElement

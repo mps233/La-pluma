@@ -3,15 +3,13 @@
  */
 
 export { useUIStore } from './uiStore'
-export type { CombatCopilotPrefill, StatisticsTab } from './uiStore'
+export type { CombatCopilotPrefill } from './uiStore'
 export {
   usePreviewStore,
   previewQualityPresets,
-  previewFpsOptions,
   buildPreviewScrcpyOptions,
 } from './previewStore'
 export type {
   PreviewMode,
   PreviewQuality,
-  PreviewQualityPreset,
 } from './previewStore'

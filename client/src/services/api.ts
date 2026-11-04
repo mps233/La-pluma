@@ -34,8 +34,6 @@ const getApiBaseUrl = (): string => {
 
 export const API_BASE_URL = getApiBaseUrl()
 
-export { bumpItemIconCacheVersion, getItemIconCacheVersion } from './itemIconCache'
-
 export const getItemIconUrl = (iconId: string | number): string => {
   const path = `${API_BASE_URL}/maa-assets/item/${encodeURIComponent(String(iconId))}`
   const version = getItemIconCacheVersion()
@@ -109,7 +107,6 @@ interface TrainingQueueData {
   operatorId: string
   currentElite?: number
   targetElite?: number
-  priority?: number
 }
 
 /**
@@ -118,7 +115,6 @@ interface TrainingQueueData {
 interface ApplyTrainingPlanData {
   plan: TrainingPlan
   settings?: TrainingSettings
-  taskType?: 'combat'
 }
 
 export interface WebrtcStatusData {
@@ -464,16 +460,6 @@ export const maaApi = {
    */
   async getRealtimeLogs(lines: number = 100, signal?: AbortSignal): Promise<ApiResponse> {
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/logs/recent?lines=${lines}`, { signal })
-    return parseJsonResponse(response)
-  },
-
-  /**
-   * 清空实时日志
-   */
-  async clearRealtimeLogs(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/logs/recent/clear`, {
-      method: 'POST',
-    })
     return parseJsonResponse(response)
   },
 

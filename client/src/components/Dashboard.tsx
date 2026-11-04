@@ -147,7 +147,6 @@ function refreshDashboardData(force = false): Promise<void> {
 
   const attemptedAt = Date.now()
   const dashboardStore = useDashboardStore.getState()
-  dashboardStore.startRefresh()
 
   const request = (async () => {
     let completedSnapshot: DashboardBusinessSnapshot | undefined
@@ -206,7 +205,6 @@ function refreshDashboardData(force = false): Promise<void> {
           available: activity.isActive === true || activity.available === true || Boolean(activityCode || activityName),
           status: typeof activity.status === 'string' ? activity.status : undefined,
           failure: isRecord(activity.failure) ? firstString(activity.failure.message) : undefined,
-          dataUpdatedAt: toOptionalTimestamp(activity.dataUpdatedAt),
           code: activityCode,
           name: activityName,
           tip: firstString(activity.tip, activity.description),
