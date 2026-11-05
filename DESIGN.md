@@ -36,7 +36,6 @@ token 权威表：
 | 语义间距 card / section / page / panel / control-x | `ios-theme.css` | 移动端在 ≤639px 覆盖全部语义间距，见「间距」 |
 | 控件高度 | `ios-theme.css` | 桌面 36 / 44 / 48px；`index.css` 的 36 / 40 / 44px 是回退 |
 | 内容宽度、桌面留白 | `ios-theme.css` | `.la-pluma-content` 的 112rem 与 1.25 / 2rem |
-| 材质 | `ios-theme.css` | `--app-material-regular-*` 已用于桌面侧栏；`clear` / `tinted` 是目标 |
 | 阴影 | 通用卡片/菜单/弹层没有 elevation token；chrome 有专用 token | 按「表面与高度」表使用现有类 |
 
 ### token 分层（目标架构）
@@ -70,11 +69,11 @@ iOS / macOS 27 的 Liquid Glass 是 iOS 26 材质的精修，不是换一套语�
 
 材质只用在这三类层：
 
-| 材质 | 用法 | token | 回退 |
+| 材质 | 用法 | 目标 token | 回退 |
 | --- | --- | --- | --- |
-| regular | 默认 chrome、导航、工具条 | `--app-material-regular-bg` / `-edge` / `-highlight`（已落地） | 实色 `--app-surface-solid` |
-| clear | 大图、hero、低密度浮层 | `--app-material-clear-*`（目标） | 同 regular |
-| tinted | 日志、表单、高密度面板 | `--app-material-tinted-*`（目标） | 同 regular |
+| regular | 默认 chrome、导航、工具条 | `--app-glass-bg` + `--app-glass-border` | 实色 `--app-surface-solid` |
+| clear | 大图、hero、低密度浮层 | 更低透明度的 glass | 同 regular |
+| tinted | 日志、表单、高密度面板 | glass + 更高的 surface 混合 | 同 regular |
 
 规则：
 
@@ -82,7 +81,7 @@ iOS / macOS 27 的 Liquid Glass 是 iOS 26 材质的精修，不是换一套语�
 - 边缘用 1px darkened edge + inset specular highlight 表达材质；禁止用彩色 glow 模拟玻璃。
 - 任何透明度下正文都必须可读；文字对比度不能依赖 blur。玻璃层上的文字按实际合成背景测 WCAG AA。
 - `prefers-reduced-transparency: reduce` 时改为实色表面；`prefers-contrast: more` 时加强边框和文字，不保留半透明装饰。
-- `regular` 材质已落到 `--app-material-regular-*`，并用于桌面侧栏；`clear` / `tinted` 和其余 chrome 的迁移仍按「当前实现备注」推进。
+- 新的材质 token 和 `regular / clear / tinted` 语义尚未在代码中落地；当前 `ios-theme.css` 的 glass token 是固定值，按「当前实现备注」逐步替换。
 
 ---
 
@@ -109,7 +108,7 @@ macOS 27（Golden Gate）把侧栏贴到窗口边缘，让内容在下面滚动�
 - 侧栏选中态保留图标颜色，用 subtle fill + accent indicator，不要整行 accent + 白字。
 - 窗口/侧栏圆角审计 16 / 20 / 26px 三档，按 macOS 27 的统一窗口语言收敛；保留大圆角时，把它写成 La Pluma 的品牌例外。
 
-桌面侧栏已改为 edge-to-edge：frame 贴住窗口左上并贯穿全高，右侧用 1px material edge；侧栏选中态改为 subtle fill + accent indicator，并保留图标颜色。Uniform toolbar、窗口圆角收敛和 `clear` / `tinted` 材质仍在「当前实现备注」中。移动端保留悬浮胶囊 tabbar 和「更多」Sheet，这是 La Pluma 的移动端选择，不套用 macOS 27 的桌面侧栏。
+当前实现仍是浮动圆角侧栏（`ios-theme.css` 的 `sidebar-frame` 内缩 0.75rem），与上述目标有差距，已记入「当前实现备注」。移动端保留悬浮胶囊 tabbar 和「更多」Sheet，这是 La Pluma 的移动端选择，不套用 macOS 27 的桌面侧栏。
 
 ---
 
@@ -762,8 +761,8 @@ className={`from-${tone}`}
 
 下面这些是当前实现与规范的已知差异/备注。新增代码按规范写。
 
-- **Liquid Glass 27 材质**：`regular` 材质（`--app-material-regular-*`）和 edge-to-edge 侧栏已落地；`clear` / `tinted`、navbar / tabbar / sheet 的材质迁移仍待做。
-- **macOS 27 桌面壳层**：edge-to-edge 侧栏、图标保留颜色的选中态已落地；统一 toolbar、窗口圆角收敛仍待做。
+- **Liquid Glass 27 材质**：当前 `ios-theme.css` 仍是固定 glass token + 自定义边缘；`regular / clear / tinted` 和 `--app-material-*` 尚未落地。
+- **macOS 27 桌面壳层**：当前侧栏是 0.75rem 内缩的浮动圆角 frame；edge-to-edge 侧栏、统一 toolbar、侧栏图标彩色选中态尚未落地。
 - **品牌内容层**：当前只有系统蓝；`--app-ink-wash`、品牌触点、`--game-rarity-*` 尚未落地。
 - **token 三层架构**：当前仍是 `index.css` / `ios-theme.css` 双文件字面值；primitive/semantic/component 分层是目标。
 - **连续圆角**：`SmoothPanel` / `SmoothSurface` 的 20/16 是 TS 常量，不是 token；组件源码已注明与 `--app-continuous-radius` / `-compact` 同步。
