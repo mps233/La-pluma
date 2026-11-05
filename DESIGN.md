@@ -9,7 +9,7 @@
 3. **一屏一个主角。** 每个视口只有一个 Display 元素、一个主操作和一个 L2 级动态状态；其他元素主动退后。
 4. **注意力是预算。** 动效、光效、状态色按 ambient / live / attention / interruptive 分层，不允许靠叠加制造“高级感”。
 5. **可访问性是底线。** 对比度、键盘、读屏、触控目标、reduced motion、reduced transparency 不是可选项。
-6. **平台一致，但保留 La Pluma 的个性。** 遵循 iOS / macOS 27 的材质与布局语言，同时用小面积、可识别的品牌记号建立身份。
+6. **平台一致，但保留 La Pluma 的个性。** 遵循 iOS / macOS 27 的材质与布局语言，同时用小面积、可识别的品牌记号建立身份；桌面浮动侧栏是明确的品牌例外。
 
 ---
 
@@ -97,18 +97,14 @@ iOS / macOS 27 的 Liquid Glass 是 iOS 26 材质的精修，不是换一套语�
 - `Button`、`Card`、`Loading`、`Switch` 等 common 组件使用原生语义元素，在浏览器、jsdom、SSR 和嵌入式场景中渲染一致。不要按运行环境维护第二套组件 DOM。
 - 浏览器默认样式与第三方样式可能影响按钮宽度、卡片外边距和活动指示器尺寸；这类基础规则集中放在 `ios-theme.css`、`index.css` 或 common 组件中，调用处不要用局部覆盖扩散规则。
 
-### 桌面壳层：macOS 27 方向
+### 桌面壳层：浮动侧栏是 La Pluma 的选择
 
-macOS 27（Golden Gate）把侧栏贴到窗口边缘，让内容在下面滚动时产生折射；toolbar 更统一；侧栏图标恢复彩色；有整理还提到窗口/侧栏圆角更统一。([WWDC26](https://developer.apple.com/videos/play/meet-with-apple/277/))
+macOS 27（Golden Gate）的方向是 edge-to-edge 侧栏、滚动折射和更统一的 toolbar；La Pluma **不采用** 这套桌面壳层方向。浮动圆角侧栏是产品的有意选择，不是待修的差距。
 
-本规范采用 **edge-to-edge 侧栏** 作为桌面目标：
-
-- 侧栏贴窗口边缘，不再用 0.75rem 内缩的浮动 frame；内容滚动到侧栏下方时用折射/边缘高光表达层级。
-- Toolbar 统一分组：主操作 + 运行状态常驻，次级操作在窄宽度收进 overflow；不要把所有操作平铺。
-- 侧栏选中态保留图标颜色，用 subtle fill + accent indicator，不要整行 accent + 白字。
-- 窗口/侧栏圆角审计 16 / 20 / 26px 三档，按 macOS 27 的统一窗口语言收敛；保留大圆角时，把它写成 La Pluma 的品牌例外。
-
-当前实现仍是浮动圆角侧栏（`ios-theme.css` 的 `sidebar-frame` 内缩 0.75rem），与上述目标有差距，已记入「当前实现备注」。移动端保留悬浮胶囊 tabbar 和「更多」Sheet，这是 La Pluma 的移动端选择，不套用 macOS 27 的桌面侧栏。
+- 保留 0.75rem 内缩的浮动圆角 frame、连续圆角材质边界和现有 toolbar 结构；不要为了对齐 macOS 27 把侧栏贴边、改折射或重做 toolbar。
+- 侧栏选中态保留现有的 accent 填充 + 白字/白图标；不要改成 subtle fill + 彩色图标，也不要新增左侧指示条。
+- macOS 27 的 uniform toolbar、窗口圆角收敛只作为未来可选探索，不是当前规范要求；改壳层前先出视觉对比并确认。
+- 移动端保留悬浮胶囊 tabbar 和「更多」Sheet，不要按桌面侧栏规则改移动端。
 
 ---
 
@@ -762,7 +758,6 @@ className={`from-${tone}`}
 下面这些是当前实现与规范的已知差异/备注。新增代码按规范写。
 
 - **Liquid Glass 27 材质**：当前 `ios-theme.css` 仍是固定 glass token + 自定义边缘；`regular / clear / tinted` 和 `--app-material-*` 尚未落地。
-- **macOS 27 桌面壳层**：当前侧栏是 0.75rem 内缩的浮动圆角 frame；edge-to-edge 侧栏、统一 toolbar、侧栏图标彩色选中态尚未落地。
 - **品牌内容层**：当前只有系统蓝；`--app-ink-wash`、品牌触点、`--game-rarity-*` 尚未落地。
 - **token 三层架构**：当前仍是 `index.css` / `ios-theme.css` 双文件字面值；primitive/semantic/component 分层是目标。
 - **连续圆角**：`SmoothPanel` / `SmoothSurface` 的 20/16 是 TS 常量，不是 token；组件源码已注明与 `--app-continuous-radius` / `-compact` 同步。
