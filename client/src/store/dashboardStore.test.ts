@@ -73,7 +73,7 @@ describe('dashboardStore persistence', () => {
 
     const persisted = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}')
     expect(persisted).toMatchObject({
-      version: 1,
+      version: 2,
       savedAt,
       snapshot: snapshotFixture,
     })

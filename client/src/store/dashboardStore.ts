@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 const DASHBOARD_CACHE_STORAGE_KEY = 'la-pluma-dashboard-cache'
-const DASHBOARD_CACHE_VERSION = 1
+const DASHBOARD_CACHE_VERSION = 2
 export const DASHBOARD_CACHE_MAX_FUTURE_SKEW_MS = 60_000
 
 const MAX_COMPLETED_STAGES = 500
@@ -17,6 +17,7 @@ export interface ActivitySummary {
   code?: string
   name?: string
   tip?: string
+  startTime?: number
   endTime?: number
   completion?: {
     known?: boolean
@@ -126,6 +127,7 @@ const isStringArray = (value: unknown, maxLength: number): value is string[] => 
 function isActivitySummary(value: unknown): value is ActivitySummary {
   if (!isRecord(value) || typeof value.available !== 'boolean') return false
   if (!isOptionalString(value.code) || !isOptionalString(value.name) || !isOptionalString(value.tip)) return false
+  if (value.startTime !== undefined && (!isTimestamp(value.startTime) || value.startTime <= 0)) return false
   if (value.endTime !== undefined && (!isTimestamp(value.endTime) || value.endTime <= 0)) return false
   if (value.completion === undefined) return true
   if (!isRecord(value.completion)) return false

@@ -208,6 +208,7 @@ function refreshDashboardData(force = false): Promise<void> {
           code: activityCode,
           name: activityName,
           tip: firstString(activity.tip, activity.description),
+          startTime: toOptionalTimestamp(activity.startTime),
           endTime: toOptionalTimestamp(activity.endTime),
           completion: normalizeActivityCompletion(activity.completion),
         }
@@ -290,8 +291,12 @@ interface DashboardFlowMetric {
   value: string
   sub: string
   Icon: typeof CalendarDays
-  progress?: { completed: number; total: number }
-  showProgressValue?: boolean
+  progress?: {
+    label: string
+    valueText: string
+    percent: number
+    value?: string
+  }
 }
 
 export default function Dashboard() {
@@ -556,7 +561,7 @@ export default function Dashboard() {
             : flowIsRunning ? '执行中' : '待命'
   const activityCompleted = activitySummary.completion?.complete === true
   const activityCompletion = activitySummary.completion
-  const activityProgress = activityCompletion?.known === true
+  const activityStageProgress = activityCompletion?.known === true
     && typeof activityCompletion.totalStages === 'number'
     && Number.isSafeInteger(activityCompletion.totalStages)
     && activityCompletion.totalStages > 0
@@ -573,10 +578,34 @@ export default function Dashboard() {
         total: activityCompletion.totalStages,
       }
     : null
-  const showActivityProgressValue = activityProgress !== null
-    && activityProgress.completed < activityProgress.total
-    && typeof activitySummary.endTime === 'number'
-    && Number.isFinite(activitySummary.endTime)
+  const activityTimeProgress = (() => {
+    const { startTime, endTime } = activitySummary
+    if (!activitySummary.available) return null
+    if (typeof startTime !== 'number' || !Number.isFinite(startTime)
+      || typeof endTime !== 'number' || !Number.isFinite(endTime)
+      || endTime <= startTime) return null
+    const remaining = Math.max(0, endTime - Date.now())
+    return {
+      percent: Math.max(0, Math.min(100, (remaining / (endTime - startTime)) * 100)),
+      valueText: formatActivitySubtitle(activitySummary),
+    }
+  })()
+  const activityProgress = activityTimeProgress
+    ? {
+        label: '当前活动剩余时间',
+        valueText: activityTimeProgress.valueText,
+        percent: activityTimeProgress.percent,
+      }
+    : activityStageProgress
+      ? {
+          label: '当前活动通关进度',
+          valueText: `已通关 ${activityStageProgress.completed}/${activityStageProgress.total} 关`,
+          percent: (activityStageProgress.completed / activityStageProgress.total) * 100,
+          value: activityStageProgress.completed < activityStageProgress.total
+            ? `${activityStageProgress.completed}/${activityStageProgress.total}`
+            : undefined,
+        }
+      : undefined
 
   const dashboardFlowMetrics: DashboardFlowMetric[] = [
     {
@@ -584,8 +613,7 @@ export default function Dashboard() {
       value: activitySummary.available ? (activitySummary.name || activitySummary.code || '进行中') : '暂无活动',
       sub: formatActivitySubtitle(activitySummary),
       Icon: CalendarDays,
-      progress: activityProgress ?? undefined,
-      showProgressValue: showActivityProgressValue,
+      progress: activityProgress,
     },
     {
       label: '养成目标',
@@ -770,7 +798,7 @@ export default function Dashboard() {
               )}
 
               <div className="dashboard-flow-metrics">
-                {dashboardFlowMetrics.map(({ Icon, progress, showProgressValue, ...item }) => (
+                {dashboardFlowMetrics.map(({ Icon, progress, ...item }) => (
                   <div key={item.label} className="dashboard-flow-metric">
                     <div className="flex items-center gap-2">
                       <Icon className="h-3.5 w-3.5 text-[var(--app-accent-strong)]" strokeWidth={1.8} />
@@ -780,21 +808,21 @@ export default function Dashboard() {
                     <div className={`mt-0.5 truncate text-xs ${labelClass}`}>{item.sub}</div>
                     {progress && (
                       <div className="dashboard-flow-metric-progress">
-                        {showProgressValue && (
+                        {progress.value && (
                           <span className="dashboard-flow-metric-progress-value">
-                            {progress.completed}/{progress.total}
+                            {progress.value}
                           </span>
                         )}
                         <div
                           className="dashboard-flow-metric-progress-track"
                           role="progressbar"
-                          aria-label="当前活动通关进度"
+                          aria-label={progress.label}
                           aria-valuemin={0}
-                          aria-valuemax={progress.total}
-                          aria-valuenow={progress.completed}
-                          aria-valuetext={`已通关 ${progress.completed}/${progress.total} 关`}
+                          aria-valuemax={100}
+                          aria-valuenow={Math.round(progress.percent)}
+                          aria-valuetext={progress.valueText}
                         >
-                          <span style={{ width: `${(progress.completed / progress.total) * 100}%` }} />
+                          <span style={{ width: `${progress.percent}%` }} />
                         </div>
                       </div>
                     )}

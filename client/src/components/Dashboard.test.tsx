@@ -288,14 +288,16 @@ describe('Dashboard connectivity state', () => {
     expect(activityMetric?.textContent).not.toContain('等待活动数据')
   })
 
-  it('shows activity completion progress when the activity window is known', async () => {
+  it('shows activity time progress when the activity window is known', async () => {
+    const now = Date.now()
     apiMocks.getActivity.mockResolvedValueOnce({
       success: true,
       data: {
         available: true,
         code: 'TL',
         name: '时间啊，向前！',
-        endTime: Date.now() + 3 * 24 * 60 * 60 * 1000,
+        startTime: now - 2 * 24 * 60 * 60 * 1000,
+        endTime: now + 3 * 24 * 60 * 60 * 1000,
         completion: {
           known: true,
           complete: false,
@@ -310,11 +312,13 @@ describe('Dashboard connectivity state', () => {
 
     const activityMetric = findActivityMetric()
     expect(activityMetric?.textContent).toContain('剩余 3 天')
-    expect(activityMetric?.textContent).toContain('2/8')
+    expect(activityMetric?.textContent).not.toContain('2/8')
     const progressbar = activityMetric?.querySelector('[role="progressbar"]')
-    expect(progressbar?.getAttribute('aria-valuenow')).toBe('2')
-    expect(progressbar?.getAttribute('aria-valuemax')).toBe('8')
-    expect(progressbar?.getAttribute('aria-valuetext')).toBe('已通关 2/8 关')
+    expect(progressbar?.getAttribute('aria-label')).toBe('当前活动剩余时间')
+    const remainingPercent = Number(progressbar?.getAttribute('aria-valuenow'))
+    expect(remainingPercent).toBeGreaterThan(55)
+    expect(remainingPercent).toBeLessThan(65)
+    expect(progressbar?.getAttribute('aria-valuetext')).toContain('剩余 3 天')
   })
 
   it('does not show waiting when an activity is available without a known window', async () => {
@@ -354,6 +358,9 @@ describe('Dashboard connectivity state', () => {
     const activityMetric = findActivityMetric()
     expect(activityMetric?.textContent).toContain('已通关 1/3 关')
     expect(activityMetric?.textContent).not.toContain('等待活动数据')
+    const progressbar = activityMetric?.querySelector('[role="progressbar"]')
+    expect(progressbar?.getAttribute('aria-label')).toBe('当前活动通关进度')
+    expect(progressbar?.getAttribute('aria-valuenow')).toBe('33')
   })
 
   it('disables execution actions as soon as the browser goes offline', async () => {

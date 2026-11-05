@@ -29,7 +29,7 @@ The project is named after La Pluma, the five-star Guard in Arknights.
 
 ### Console
 
-- **Today at a glance** — current event with remaining time and stage progress, today's open and closed resource and chip stages, the current run and last result, training queue, today's drops, and ADB device health (CPU, memory, `/data` disk, battery temperature).
+- **Today at a glance** — current event with a remaining-time progress bar, today's open and closed resource and chip stages, the current run and last result, training queue, today's drops, and ADB device health (CPU, memory, `/data` disk, battery temperature).
 - **One-click routine** — run the saved daily flow from the dashboard, or prepare a matching copilot plan for the current event without starting combat.
 - **Optional preview** — keep the preview off, refresh a snapshot every 10 seconds, or open a live WebRTC view. Snapshot mode falls back to ADB screenshots, and the console keeps its last successful data when a refresh fails. Touch control is available in the device preview on the task workspaces.
 - **Responsive shell** — desktop sidebar with workspace search, mobile bottom bar with a secondary sheet, light/dark/system themes, and an iOS-style material shell. The PWA can be installed and updated from the UI.

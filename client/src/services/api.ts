@@ -204,6 +204,8 @@ export interface ActivityData {
   available?: boolean
   status?: 'active' | 'none' | 'unavailable' | 'stale'
   failure?: { source?: string; message?: string } | null
+  startTime?: number | null
+  endTime?: number | null
   dataUpdatedAt?: number | null
   lastSuccessAt?: number | null
   [key: string]: unknown
