@@ -283,7 +283,7 @@ function ModalLayer({
   )
 }
 
-function Modal({ isOpen, ...props }: ModalProps) {
+export function Modal({ isOpen, ...props }: ModalProps) {
   const generatedId = useId().replace(/:/g, '')
   if (typeof document === 'undefined') return null
 

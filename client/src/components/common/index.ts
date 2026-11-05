@@ -14,7 +14,7 @@ export { default as Input, Select, Checkbox } from './Input.tsx'
 export { default as Switch } from './Switch.tsx'
 
 // 反馈组件
-export { ConfirmDialog } from './Modal.tsx'
+export { Modal, ConfirmDialog } from './Modal.tsx'
 export { default as Loading, PageSkeleton } from './Loading.tsx'
 export { default as EmptyState } from './EmptyState.tsx'
 export { default as Tooltip } from './Tooltip.tsx'

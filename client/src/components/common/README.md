@@ -234,11 +234,16 @@ Props：
 
 ---
 
-### ConfirmDialog / Loading - 反馈组件
+### Modal / ConfirmDialog - 覆盖层
 
-`ConfirmDialog` 和 `Loading` 从 common 导出。
+`Modal` 和 `ConfirmDialog` 从 common 导出。`Modal` 用于 ≤6 字段的短表单：`size` 为 `sm` / `md` / `lg` / `xl`（max-width 28 / 32 / 42 / 56rem），内置焦点陷阱、关闭归还、滚动锁和背景 inert。`Sheet` 是 `Layout` 的移动导航内部组件，不是公共导出。
 
 - `ConfirmDialog`：删除、清空等不可逆操作的确认弹窗。异步 `onConfirm` 返回 `false` 或抛出错误时会保持打开并就地显示失败原因。
+
+### Loading - 反馈组件
+
+`Loading` 从 common 导出。
+
 - `Loading`：短时局部等待状态。
 - `ActivityIndicator`：供 `Button` 和 `Loading` 内部复用的 iOS 活动指示器；页面不要直接调用或叠加第二个动态指示器。
 - `DashboardSkeleton`：控制台专用骨架，由 `Dashboard` 直接从 `Loading.tsx` 引入，不属于 common 的公共导出。

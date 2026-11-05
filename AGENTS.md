@@ -39,6 +39,8 @@ Read these before broad work:
 Non-negotiables (these are pointers; `DESIGN.md` is authoritative if the summary and the spec differ):
 
 - Read `DESIGN.md` and `client/src/components/common/README.md` before UI work; use the components exported from `@/components/common` and the existing semantic `app-*` classes. Do not build parallel implementations or import things the repository does not export.
+- Declare the page archetype before layout and follow its reference implementation; do not force log/device/settings pages into the default Card skeleton.
+- Cover the component state matrix and the content-design templates; do not invent per-page labels, errors, empty states, or number formats.
 - Brand color plus semantic status colors only; game-resource rarity colors are the documented exception. No page-specific palettes, bright gradients, colored glow shadows, or decorative color noise.
 - Read control sizes, radii, and spacing from the tokens in `client/src/index.css` and `client/src/ios-theme.css`; cite the token rather than a number, and never shrink standard controls at call sites.
 - Do not nest cards for ordinary page sections. Use headers, dividers, grids, or transparent internal groups.
