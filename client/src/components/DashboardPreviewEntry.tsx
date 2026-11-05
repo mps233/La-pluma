@@ -135,7 +135,6 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
                 >
                   {headerStatusText}
                 </span>
-                <PreviewAutoStartToggle />
                 {showReconnect && (
                   <button
                     type="button"
@@ -147,6 +146,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
                     <RotateCw className="h-3.5 w-3.5" strokeWidth={1.8} />
                   </button>
                 )}
+                <PreviewAutoStartToggle />
               </div>
             </div>
 

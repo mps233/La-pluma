@@ -79,6 +79,16 @@ describe('DashboardPreviewEntry', () => {
     expect(container.querySelector('video')?.className).toContain('opacity-100')
   })
 
+  it('keeps the auto-start toggle anchored after the reconnect control', async () => {
+    preview.mode = 'live'
+    preview.showLivePreview = false
+    await act(async () => root.render(<DashboardPreviewEntry />))
+
+    const group = container.querySelector('.scrcpy-view-header > div:last-child')
+    expect(group?.querySelector('button[aria-label="重连预览"]')).not.toBeNull()
+    expect(group?.lastElementChild?.textContent).toBe('自动恢复')
+  })
+
   it('activates the border beam only during WebRTC connection', async () => {
     preview.isConnecting = true
     await act(async () => root.render(<DashboardPreviewEntry key="connecting" />))
