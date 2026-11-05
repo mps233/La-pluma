@@ -217,9 +217,9 @@ export function useDashboardPreview() {
           : webrtcStatus?.screenState === 'off'
             ? '设备息屏'
             : previewError
-              ? `实时连接失败 · 快照占位`
+              ? '实时连接失败'
               : visibleFallback
-                ? '正在连接实时画面 · 快照占位'
+                ? '正在连接实时画面'
                 : preview.status,
     headerStatusText: mode === 'off'
       ? '已关闭'
@@ -230,7 +230,7 @@ export function useDashboardPreview() {
           : webrtcStatus?.screenState === 'off'
             ? '设备息屏'
             : visibleFallback
-              ? '快照占位 · 实时连接中'
+              ? '实时连接中'
               : '连接中'
   }
 }
