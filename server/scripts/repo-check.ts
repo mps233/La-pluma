@@ -69,8 +69,13 @@ function collectTsconfigFiles(configPath: string): string[] {
   return parsed.fileNames.map((fileName: string) => path.resolve(fileName));
 }
 
+// The Glasswork rim lens is vendored from lumno-extension as JavaScript and
+// ships its own lens.d.ts declaration. Keep the exception exact so new JS
+// source still fails the gate.
+const ALLOWED_VENDORED_JS = new Set<string>(['client/src/glasswork/lens.js']);
+
 function checkNoJavaScript(files: string[]): string[] {
-  return files.filter((file: string) => JS_SOURCE_PATTERN.test(file));
+  return files.filter((file: string) => JS_SOURCE_PATTERN.test(file) && !ALLOWED_VENDORED_JS.has(file));
 }
 
 function checkTsconfigCoverage(files: string[]): string[] {
