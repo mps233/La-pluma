@@ -2,12 +2,20 @@
 
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import PreviewModeControls from './PreviewModeControls'
 import { usePreviewStore } from '../stores'
 
 let root: Root | null = null
 let container: HTMLDivElement | null = null
+
+beforeEach(() => {
+  vi.stubGlobal('ResizeObserver', class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  })
+})
 
 function render() {
   container = document.createElement('div')
@@ -23,6 +31,7 @@ afterEach(() => {
   root = null
   container = null
   usePreviewStore.setState({ mode: 'off' })
+  vi.unstubAllGlobals()
 })
 
 describe('PreviewModeControls', () => {
@@ -38,14 +47,21 @@ describe('PreviewModeControls', () => {
     expect(usePreviewStore.getState().mode).toBe('live')
   })
 
-  it('moves selection with arrow keys and exposes radio semantics', () => {
+  it('renders the compact control with theme binding', () => {
     const node = render()
-    const group = node.querySelector('[role="radiogroup"]')
+    const track = node.querySelector('.lg-track')
+    expect(track?.classList.contains('lg-track--sm')).toBe(true)
+    expect(node.querySelector('.preview-mode-shell')?.getAttribute('data-theme')).toBe('dark')
+  })
+
+  it('moves selection with arrow keys and exposes tab semantics', () => {
+    const node = render()
+    const group = node.querySelector('[role="tablist"]')
     expect(group?.getAttribute('aria-label')).toBe('预览模式')
     act(() => {
       group?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
     })
     expect(usePreviewStore.getState().mode).toBe('snapshot')
-    expect(node.querySelector('[role="radio"][aria-checked="true"]')?.textContent).toContain('快照')
+    expect(node.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain('快照')
   })
 })

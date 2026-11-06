@@ -200,7 +200,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
             <div className="dashboard-preview-settings">
               <div className="dashboard-preview-setting-row">
                 <span className="dashboard-preview-setting-label">预览模式</span>
-                <PreviewModeControls compact fluid />
+                <PreviewModeControls />
               </div>
             </div>
           </div>

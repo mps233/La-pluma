@@ -58,6 +58,7 @@ let container: HTMLDivElement
 let root: Root
 let currentScrollY = 0
 let availableScroll = Number.POSITIVE_INFINITY
+let frameClock = 0
 let scrollToMock: ReturnType<typeof vi.fn>
 
 function mediaQueryList(query: string, matches = false): MediaQueryList {
@@ -102,11 +103,17 @@ function desktopLink(tab: string) {
 }
 
 function mobileMoreTrigger() {
-  return container.querySelector<HTMLButtonElement>('.la-pluma-tabbar button[aria-label="更多页面"]')!
+  return container.querySelector<HTMLButtonElement>('.la-pluma-tabbar-more-anchor .lg-button')!
 }
 
 describe('top-level application navigation', () => {
   beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+    frameClock = 0
     currentScrollY = 0
     availableScroll = Number.POSITIVE_INFINITY
     window.history.replaceState({}, '', '/app/dashboard')
@@ -120,8 +127,9 @@ describe('top-level application navigation', () => {
     })
     window.scrollTo = scrollToMock as typeof window.scrollTo
     window.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
-      callback(0)
-      return 1
+      frameClock += 16
+      callback(frameClock)
+      return frameClock
     })
     window.cancelAnimationFrame = vi.fn()
     mocks.loadDailyOperatorQuote.mockReset()
@@ -254,17 +262,24 @@ describe('top-level application navigation', () => {
     expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(9)
     expect(sidebar.querySelectorAll('.la-pluma-sidebar-icon > svg[aria-hidden="true"]')).toHaveLength(9)
 
-    const mobileDestinations = [...container.querySelectorAll<HTMLButtonElement>('.la-pluma-tabbar-pill button[data-app-tab]')]
-      .map(button => button.dataset.appTab)
-    const dashboardIcon = container.querySelector('.la-pluma-tabbar-pill button[data-app-tab="dashboard"] svg')
-    expect(container.querySelector('.la-pluma-tabbar-pill')?.classList.contains('app-liquid-tab-pill')).toBe(true)
+    const mobileNav = container.querySelector<HTMLElement>('.la-pluma-tabbar-nav')!
+    const mobileTrack = mobileNav.querySelector<HTMLElement>('.lg-track:not([data-lg-copy])')!
+    const mobileDestinations = [...mobileTrack.querySelectorAll<HTMLButtonElement>(':scope > [data-lg-item]')]
+      .map(button => button.getAttribute('aria-label'))
+    const dashboardIcon = mobileTrack.querySelector('[data-lg-item="0"] svg')
+    expect(mobileTrack.getAttribute('role')).toBe('tablist')
+    expect(mobileTrack.getAttribute('aria-label')).toBe('主要功能')
     expect(dashboardIcon?.classList.contains('lucide-layout-grid')).toBe(true)
     expect(mobileDestinations).toEqual([
-      'dashboard',
-      'automation',
-      'combat',
-      'config',
+      '控制台',
+      '自动化',
+      '作业',
+      '配置',
     ])
+    expect(mobileTrack.querySelector('[data-lg-item="0"]')?.getAttribute('aria-selected')).toBe('true')
+    const moreTrigger = mobileMoreTrigger()
+    expect(moreTrigger.getAttribute('aria-label')).toBe('更多工作区')
+    expect(moreTrigger.getAttribute('aria-haspopup')).toBe('menu')
     expect(container.querySelectorAll('a[href^="/app/"]')).toHaveLength(0)
 
     const search = sidebar.querySelector<HTMLInputElement>('input[aria-label="搜索工作区"]')!
@@ -281,6 +296,8 @@ describe('top-level application navigation', () => {
     await act(async () => filteredLinks[0]?.click())
     expect(sidebar.querySelectorAll('[aria-current="page"]')).toHaveLength(1)
     expect(sidebar.querySelector<HTMLElement>('[aria-current="page"]')?.dataset.appTab).toBe('statistics')
+    expect(container.querySelector('.la-pluma-tabbar-more-anchor')?.classList.contains('is-active')).toBe(true)
+    expect(container.querySelector('.la-pluma-tabbar-nav .lg-track:not([data-lg-copy]) > [data-lg-item][aria-selected="true"]')).toBeNull()
 
     await act(async () => {
       sidebar.querySelector<HTMLButtonElement>('button[aria-label="清除搜索"]')?.click()
@@ -329,48 +346,40 @@ describe('top-level application navigation', () => {
     expect(githubLink.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(1)
   })
 
-  it('opens and dismisses the mobile overflow sheet without losing trigger focus', async () => {
+  it('opens the overflow menu, navigates, and restores trigger focus on Escape', async () => {
     await renderLayout()
     const trigger = mobileMoreTrigger()
     trigger.focus()
 
     await act(async () => trigger.click())
 
-    let sheet = container.querySelector<HTMLElement>('#la-pluma-more-sheet')
-    expect(sheet?.getAttribute('role')).toBe('dialog')
-    expect(sheet?.getAttribute('aria-modal')).toBe('true')
-    expect(sheet?.querySelector('[aria-label="关闭更多工作区"]')?.classList.contains('la-pluma-sheet-close')).toBe(true)
-    expect(document.body.style.overflow).toBe('hidden')
-    expect(getScrollHost().style.overflow).toBe('hidden')
+    const anchor = container.querySelector<HTMLElement>('.la-pluma-tabbar-more-anchor')!
+    const menu = anchor.querySelector<HTMLElement>('[role="menu"]')
+    expect(menu?.getAttribute('aria-label')).toBe('更多工作区')
+    const items = [...(menu?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? [])]
+    expect(items.map(item => item.textContent)).toEqual([
+      expect.stringContaining('肉鸽'),
+      expect.stringContaining('养成'),
+      expect.stringContaining('小工具'),
+      expect.stringContaining('日志'),
+      expect.stringContaining('数据'),
+    ])
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+    expect(document.activeElement).toBe(items[0])
+    expect(anchor.classList.contains('is-active')).toBe(false)
 
+    await act(async () => items[0]?.click())
     await act(async () => {
-      sheet?.querySelector<HTMLButtonElement>('[aria-label="关闭更多工作区"]')?.click()
+      await Promise.resolve()
     })
-    expect(container.querySelector('#la-pluma-more-sheet')).toBeNull()
-    expect(document.activeElement).toBe(trigger)
-    expect(document.body.style.overflow).toBe('')
-    expect(getScrollHost().style.overflow).toBe('')
-
-    await act(async () => trigger.click())
-    await act(async () => container.querySelector<HTMLElement>('.sheet-backdrop')?.click())
-    expect(container.querySelector('#la-pluma-more-sheet')).toBeNull()
-    expect(document.activeElement).toBe(trigger)
-
-    await act(async () => trigger.click())
-    expect(container.querySelector('#la-pluma-more-sheet')).toBeTruthy()
-    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
-    expect(container.querySelector('#la-pluma-more-sheet')).toBeNull()
-    expect(document.activeElement).toBe(trigger)
-
-    await act(async () => trigger.click())
-    sheet = container.querySelector<HTMLElement>('#la-pluma-more-sheet')
-    const overflowLink = sheet?.querySelector<HTMLButtonElement>('button[data-app-tab="roguelike"]')
-    expect(overflowLink).toBeTruthy()
-
-    await act(async () => overflowLink?.click())
 
     expect(container.querySelector('[data-testid="active-tab"]')?.textContent).toBe('roguelike')
-    expect(container.querySelector('#la-pluma-more-sheet')).toBeNull()
+    expect(anchor.classList.contains('is-active')).toBe(true)
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+
+    await act(async () => trigger.click())
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
     expect(document.activeElement).toBe(trigger)
   })
 })

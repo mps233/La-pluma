@@ -1,7 +1,9 @@
 import { getResponseErrorMessage } from '@/utils/errorMessage'
+import '../styles/pages/training.css'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, useReducedMotion } from 'framer-motion'
+import { GlassSegmented } from '@zakisheriff/liquid-glass'
 import {
   AlertCircle,
   Check,
@@ -13,13 +15,12 @@ import {
   Trash2,
   UserRoundSearch,
 } from 'lucide-react'
-import { getOperatorList, getAllOperators, getOperBoxData, getTrainingQueue, addToTrainingQueue, removeFromTrainingQueue, updateTrainingQueueOrder, updateTrainingSettings, generateTrainingPlan, applyTrainingPlan, getItemIconUrl } from '../services/api'
+import { getOperatorList, getOperatorCounts, getAllOperators, getOperBoxData, getTrainingQueue, addToTrainingQueue, removeFromTrainingQueue, updateTrainingQueueOrder, updateTrainingSettings, generateTrainingPlan, applyTrainingPlan, getItemIconUrl } from '../services/api'
 import { getOperatorAvatarUrl } from '../services/operatorQuotes'
 import { PageHeader, Card, SmoothPanel, Button, EmptyState, IconButton, Input, Loading, Select, Switch, CjkText, TruncatedText } from './common'
 import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
-import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
 import { useItemIconCacheVersion } from '../hooks/useItemIconCacheVersion'
 import type {
   MaterialHierarchyNodeProps,
@@ -341,18 +342,6 @@ const extractOperatorRows = (payload: unknown): FallbackOperatorRow[] => {
   return [];
 };
 
-const countOperatorsByCurrentMetaFilters = (
-  rows: FallbackOperatorRow[],
-  options: { rarity?: number; needsElite2?: boolean } = {}
-) => rows.filter(operator => {
-  if (options.rarity && operator.rarity !== options.rarity) return false;
-  if (options.needsElite2) {
-    const elite = operator.currentElite ?? operator.elite ?? 0;
-    if (elite >= 2) return false;
-  }
-  return true;
-}).length;
-
 export default function OperatorTraining() {
   useItemIconCacheVersion()
   const shouldReduceMotion = useReducedMotion();
@@ -394,12 +383,6 @@ export default function OperatorTraining() {
     status: 'trainable',
     needsElite2: true
   });
-  const {
-    containerRef: statusTabsRef,
-    activeRect: activeStatusRect,
-    setTabRef: setStatusTabRef,
-    handleTabKeyDown: handleStatusKeyDown,
-  } = useFluidTabIndicator(filters.status);
   const [searchTerm, setSearchTerm] = useState('');
   const [planMode, setPlanMode] = useState<TrainingPlanMode>('current');
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({});
@@ -414,6 +397,9 @@ export default function OperatorTraining() {
   }, [recentlyRemoved])
   const operatorsRequestRef = useRef(0);
   const statusCountsRequestRef = useRef(0);
+  const operatorsAbortRef = useRef<AbortController | null>(null);
+  const statusCountsAbortRef = useRef<AbortController | null>(null);
+  const trainingStatusShellRef = useRef<HTMLDivElement>(null);
   const settingsRequestRef = useRef(0);
   const queueRequestRef = useRef(0);
   const settingsWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -440,47 +426,51 @@ export default function OperatorTraining() {
 
   const loadTrainingStatusCounts = useCallback(async () => {
     const requestId = ++statusCountsRequestRef.current;
-    const requestedRarity = filters.rarity;
-    const requestedNeedsElite2 = filters.needsElite2;
+    const controller = new AbortController()
+    statusCountsAbortRef.current?.abort()
+    statusCountsAbortRef.current = controller
     setStatusCountsLoading(true);
     try {
-      const rarity = requestedRarity ? parseInt(requestedRarity) : undefined;
-      const [trainableResponse, ownedResponse, allOperatorsResponse, operBoxResponse] = await Promise.all([
-        getOperatorList({ status: 'trainable', rarity, needsElite2: requestedNeedsElite2 }),
-        getOperatorList({ status: 'owned', rarity }),
-        getOperatorList({ status: 'all', rarity }),
-        getOperBoxData()
-      ]);
-
+      const rarity = filters.rarity ? parseInt(filters.rarity) : undefined;
+      const response = await getOperatorCounts({ rarity }, controller.signal);
       if (requestId !== statusCountsRequestRef.current) return;
+      if (!response.success || !response.data) {
+        throw new Error(response.message || '养成状态计数加载失败');
+      }
 
-      const trainableRows = trainableResponse.success ? extractOperatorRows(trainableResponse.data) : [];
-      const ownedRows = ownedResponse.success ? extractOperatorRows(ownedResponse.data) : [];
-      const allRows = allOperatorsResponse.success ? extractOperatorRows(allOperatorsResponse.data) : [];
-      const operBoxRows = operBoxResponse.success ? extractOperatorRows(operBoxResponse.data) : [];
-
-      setTrainingStatusCounts(prev => {
-        const ownedCount = ownedRows.length > 0
-          ? ownedRows.length
-          : countOperatorsByCurrentMetaFilters(operBoxRows, { rarity, needsElite2: requestedNeedsElite2 });
-        const allCount = countOperatorsByCurrentMetaFilters(allRows, { rarity });
-
-        return {
-          trainable: trainableRows.length,
-          owned: ownedCount,
-          all: allCount > 0 ? allCount : prev.all
-        };
-      });
+      const counts = response.data;
+      setTrainingStatusCounts(prev => ({
+        trainable: counts.trainable,
+        owned: counts.owned,
+        all: counts.all > 0 ? counts.all : prev.all
+      }));
     } catch (error) {
+      if (controller.signal.aborted) return;
       // 静默失败，保留上一次统计
     } finally {
+      if (statusCountsAbortRef.current === controller) statusCountsAbortRef.current = null;
       if (requestId === statusCountsRequestRef.current) setStatusCountsLoading(false);
     }
-  }, [filters.rarity, filters.needsElite2]);
+  }, [filters.rarity]);
 
   useEffect(() => {
     setVisibleOperatorLimit(OPERATOR_RENDER_BATCH_SIZE);
   }, [filters.status, filters.rarity, filters.needsElite2, searchTerm]);
+
+  // GlassSegmented 会用自己的 aria-label 覆盖按钮内容，数量需要手动补进可访问名称。
+  useEffect(() => {
+    const items = trainingStatusShellRef.current?.querySelectorAll<HTMLButtonElement>(
+      '.lg-track:not([data-lg-copy]) > .lg-track__item',
+    )
+    items?.forEach((item, index) => {
+      const option = TRAINING_STATUS_OPTIONS[index]
+      if (!option) return
+      const count = statusCountsLoading && trainingStatusCounts[option.value] === 0
+        ? '数量读取中'
+        : `${trainingStatusCounts[option.value]} 名`
+      item.setAttribute('aria-label', `${option.label}，${count}`)
+    })
+  }, [statusCountsLoading, trainingStatusCounts]);
 
   // 加载养成队列
   useEffect(() => {
@@ -490,14 +480,17 @@ export default function OperatorTraining() {
   const loadOperators = useCallback(async () => {
     const requestId = ++operatorsRequestRef.current;
     const requestedFilters = { ...filters };
+    const controller = new AbortController();
+    operatorsAbortRef.current?.abort();
+    operatorsAbortRef.current = controller;
     try {
       setOperatorsLoading(true);
       setOperatorsError(null);
       const response = await getOperatorList({
         ...requestedFilters,
         rarity: requestedFilters.rarity ? parseInt(requestedFilters.rarity) : undefined
-      });
-      if (requestId !== operatorsRequestRef.current) return;
+      }, controller.signal);
+      if (requestId !== operatorsRequestRef.current || controller.signal.aborted) return;
       if (!response.success) {
         throw new Error(response.message || response.errorInfo?.message || response.error || '干员列表加载失败');
       }
@@ -553,11 +546,13 @@ export default function OperatorTraining() {
         if (requestId === operatorsRequestRef.current) setOperators(nextOperators);
       }
     } catch (error) {
+      if (controller.signal.aborted) return;
       if (requestId === operatorsRequestRef.current) {
         setOperators([]);
         setOperatorsError(error instanceof Error && error.message ? error.message : '干员列表加载失败，请稍后重试');
       }
     } finally {
+      if (operatorsAbortRef.current === controller) operatorsAbortRef.current = null;
       if (requestId === operatorsRequestRef.current) setOperatorsLoading(false);
     }
   }, [filters]);
@@ -570,6 +565,11 @@ export default function OperatorTraining() {
   useEffect(() => {
     void loadTrainingStatusCounts();
   }, [loadTrainingStatusCounts]);
+
+  useEffect(() => () => {
+    operatorsAbortRef.current?.abort();
+    statusCountsAbortRef.current?.abort();
+  }, []);
 
   const loadQueue = async (syncSettings = false) => {
     const requestId = ++queueRequestRef.current;
@@ -949,64 +949,25 @@ export default function OperatorTraining() {
         <div className="space-y-4">
           {/* 搜索和过滤 */}
           <div className="flex flex-col gap-3">
-            <div className="app-workspace-segments app-liquid-tab-pill glass training-status-shell">
-              <div
-                ref={statusTabsRef}
-                className="app-workspace-segment-list grid-cols-3"
-                role="toolbar"
-                aria-label="干员范围"
-              >
-                {activeStatusRect.width > 0 && (
-                  <motion.div
-                    data-testid="training-status-highlight"
-                    aria-hidden="true"
-                    className="app-workspace-segment-indicator training-status-highlight"
-                    initial={false}
-                    animate={{
-                      x: activeStatusRect.x,
-                      y: activeStatusRect.y,
-                      width: activeStatusRect.width,
-                      height: activeStatusRect.height,
-                    }}
-                    transition={shouldReduceMotion
-                      ? { duration: 0 }
-                      : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
-                  />
-                )}
-                {TRAINING_STATUS_OPTIONS.map((option) => {
-                  const selected = filters.status === option.value;
+            <div className="training-status-shell" ref={trainingStatusShellRef}>
+              <GlassSegmented
+                options={TRAINING_STATUS_OPTIONS.map((option) => {
                   const count = statusCountsLoading && trainingStatusCounts[option.value] === 0
                     ? '-'
                     : trainingStatusCounts[option.value];
-                  return (
-                    <button
-                      key={option.value}
-                      ref={setStatusTabRef(option.value)}
-                      type="button"
-                      onClick={() => handleTrainingStatusChange(option.value)}
-                      onKeyDown={(event) => handleStatusKeyDown(
-                        event,
-                        TRAINING_STATUS_OPTIONS.map(({ value }) => value),
-                        handleTrainingStatusChange,
-                      )}
-                      aria-pressed={selected}
-                      tabIndex={selected ? 0 : -1}
-                      className={`app-workspace-segment training-status-segment min-h-11 ${selected ? 'is-selected' : ''}`}
-                    >
-                      <span
-                        className="app-workspace-segment-icon training-status-count"
-                        aria-label={`${count} 名`}
-                      >
-                        {count}
-                      </span>
-                      <span className="app-workspace-segment-copy">
-                        <span>{option.label}</span>
-                        <small>{option.desc}</small>
-                      </span>
-                    </button>
-                  );
+                  return {
+                    label: option.label,
+                    icon: <span className="training-status-count" aria-hidden="true">{count}</span>,
+                  };
                 })}
-              </div>
+                value={Math.max(0, TRAINING_STATUS_OPTIONS.findIndex(option => option.value === filters.status))}
+                onChange={(index) => {
+                  const option = TRAINING_STATUS_OPTIONS[index];
+                  if (option) handleTrainingStatusChange(option.value);
+                }}
+                aria-label="干员范围"
+                className="training-status-segmented"
+              />
             </div>
 
           <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">

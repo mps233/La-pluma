@@ -1,0 +1,166 @@
+/* Split from index.css / ios-theme.css; imported by the lazy logs route. */
+
+
+
+
+.log-count {
+    display: inline-flex;
+    min-height: 1.75rem;
+    align-items: center;
+    border-radius: var(--app-radius-pill);
+    padding: 0.25rem 0.625rem;
+    background: var(--app-accent-soft);
+    color: var(--app-accent-strong);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+
+
+
+.log-console-frame {
+    position: relative;
+    min-width: 0;
+  }
+
+
+
+
+.log-console-fade {
+    position: absolute;
+    right: 0;
+    left: 0;
+    z-index: 1;
+    height: 2.5rem;
+    border-radius: var(--app-radius-md);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 160ms ease;
+  }
+
+
+
+
+.log-console-jump {
+    position: absolute;
+    bottom: 0.75rem;
+    left: 50%;
+    z-index: 2;
+    transform: translateX(-50%);
+  }
+
+
+
+
+@media (prefers-reduced-motion: reduce) {
+    .log-console-fade {
+      transition: none;
+    }
+  }
+
+
+
+
+.log-level {
+    display: inline-flex;
+    min-height: 1.25rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    padding: 0.125rem 0.35rem;
+    background: var(--app-surface-muted);
+    color: var(--app-text-muted);
+    box-shadow: inset 0 0 0 1px var(--app-border);
+    font-size: var(--app-font-meta);
+    font-weight: 700;
+    line-height: 1;
+  }
+
+
+
+
+.log-message {
+    min-width: 0;
+    color: var(--app-text-muted);
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
+
+
+
+.log-repeat {
+    display: inline-flex;
+    margin-left: 0.5rem;
+    border-radius: var(--app-radius-pill);
+    padding: 0.05rem 0.375rem;
+    background: var(--app-accent-soft);
+    color: var(--app-accent-strong);
+    font-size: var(--app-font-meta);
+    font-weight: 700;
+  }
+
+
+
+
+.log-console-state,
+  .log-history-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    color: var(--app-text-soft);
+    font-family: inherit;
+    font-size: 0.75rem;
+    text-align: center;
+  }
+
+
+
+
+.log-console-state {
+    min-height: 100%;
+    padding: 2rem;
+  }
+
+
+
+
+.log-history-state {
+    min-height: 7rem;
+    padding: 1.5rem;
+  }
+
+
+
+
+.log-history-state p {
+    color: var(--app-text-muted);
+    font-weight: 600;
+  }
+
+
+
+
+.log-history-state span {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.6875rem;
+  }
+
+
+
+
+@media (max-width: 639px) {
+
+    .log-console-heading-actions {
+      gap: 0.375rem;
+    }
+
+    .log-message {
+      padding-left: 0;
+      color: var(--app-text);
+    }
+  }
+

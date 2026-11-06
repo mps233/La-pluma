@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
+import '../styles/pages/logs.css'
+import { GlassSegmented } from '@zakisheriff/liquid-glass'
 import {
   AlertCircle,
   ArrowDown,
@@ -30,7 +31,6 @@ import {
   Switch,
 } from './common'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
-import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
 import { summarizeMaaCliMessage, summarizeMaaCliSummaryBlock } from '../utils/maaLogSummary'
 import { keepNumberWithUnit } from '../utils/typography'
 import type { LogEntry, LogFile } from '@/types/components'
@@ -43,6 +43,9 @@ type VisibleLog = LogEntry & { count: number }
 
 const LOG_LEVELS: LogEntry['level'][] = ['ERROR', 'WARN', 'INFO', 'DEBUG']
 const LOG_SCROLL_EDGE_THRESHOLD = 16
+const REALTIME_LOG_WINDOW = 500
+const REALTIME_LOG_POLL_MS = 2_000
+const FULL_RESYNC_AFTER_EMPTY_POLLS = 20
 const CONTENT_MODE_OPTIONS: ReadonlyArray<{ id: LogContentMode; label: string; description: string }> = [
   { id: 'summary', label: '摘要', description: '关键事件' },
   { id: 'raw', label: '原始', description: '完整内容' },
@@ -80,17 +83,20 @@ function parseRealtimeLog(value: unknown): LogEntry {
   const log = value && typeof value === 'object' ? value as Record<string, unknown> : {}
   const message = String(log.message ?? '')
   const parsedOutput = parseHistoryLine(message)
-  if (parsedOutput.time) return parsedOutput
-
-  return {
-    time: formatLogTime(log.time),
-    level: normalizeLevel(log.level),
-    message,
+  const metadata = {
     ...(typeof log.sequence === 'number' ? { sequence: log.sequence } : {}),
     ...(typeof log.runId === 'string' || log.runId === null ? { runId: log.runId as string | null } : {}),
     ...(typeof log.operationId === 'string' || log.operationId === null
       ? { operationId: log.operationId as string | null }
       : {}),
+  }
+  if (parsedOutput.time) return { ...parsedOutput, ...metadata }
+
+  return {
+    time: formatLogTime(log.time),
+    level: normalizeLevel(log.level),
+    message,
+    ...metadata,
   }
 }
 
@@ -406,7 +412,6 @@ function summarizeLog(log: LogEntry): LogEntry | null {
 }
 
 export default function LogViewer() {
-  const shouldReduceMotion = useReducedMotion()
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [autoScroll, setAutoScroll] = useState(true)
   const [atLogTop, setAtLogTop] = useState(true)
@@ -429,17 +434,14 @@ export default function LogViewer() {
   const [notice, setNotice] = useState<Notice | null>(null)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
   const [actionBusy, setActionBusy] = useState(false)
-  const {
-    containerRef: contentModeTabsRef,
-    activeRect: activeContentModeRect,
-    setTabRef: setContentModeTabRef,
-    handleTabKeyDown: handleContentModeKeyDown,
-  } = useFluidTabIndicator(contentMode)
   const logContainerRef = useRef<HTMLDivElement>(null)
+  const logModeRef = useRef<HTMLDivElement>(null)
   const viewingHistoryRef = useRef(false)
   const mountedRef = useRef(true)
   const realtimeAbortRef = useRef<AbortController | null>(null)
   const realtimeRequestIdRef = useRef(0)
+  const latestSequenceRef = useRef(0)
+  const emptyIncrementalPollsRef = useRef(0)
   const historyRequestIdRef = useRef(0)
 
   const updateLogScrollState = useCallback(() => {
@@ -473,10 +475,11 @@ export default function LogViewer() {
 
     const controller = new AbortController()
     const requestId = ++realtimeRequestIdRef.current
+    const afterSequence = latestSequenceRef.current
     realtimeAbortRef.current = controller
 
     try {
-      const result = await maaApi.getRealtimeLogs(200, controller.signal)
+      const result = await maaApi.getRealtimeLogs(200, controller.signal, afterSequence)
       if (!result.success) throw new Error(result.message || '实时日志请求失败')
 
       if (
@@ -486,9 +489,53 @@ export default function LogViewer() {
         && !document.hidden
       ) {
         const values = Array.isArray(result.data) ? result.data : []
-        setLogs(values
+        const parsed = values
           .map(parseRealtimeLog)
-          .filter(log => typeof log.sequence !== 'number' || log.sequence > clearedThroughSequenceRef.current))
+          .filter(log => typeof log.sequence !== 'number' || log.sequence > clearedThroughSequenceRef.current)
+
+        if (afterSequence > 0) {
+          if (parsed.length === 0) {
+            // No new entries: skip the state replacement, list diff and scroll
+            // write entirely. Periodically fall back to a full window so a
+            // server restart (sequence reset) can resynchronize.
+            emptyIncrementalPollsRef.current += 1
+            if (emptyIncrementalPollsRef.current >= FULL_RESYNC_AFTER_EMPTY_POLLS) {
+              emptyIncrementalPollsRef.current = 0
+              latestSequenceRef.current = 0
+            }
+            setRealtimeError(null)
+            return
+          }
+          emptyIncrementalPollsRef.current = 0
+          setLogs(previous => {
+            const seen = new Set<number>()
+            for (const entry of previous) {
+              if (typeof entry.sequence === 'number') seen.add(entry.sequence)
+            }
+            const fresh = parsed.filter(entry => {
+              if (typeof entry.sequence !== 'number') return true
+              if (seen.has(entry.sequence)) return false
+              seen.add(entry.sequence)
+              return true
+            })
+            if (fresh.length === 0) return previous
+
+            const merged = previous.concat(fresh)
+            return merged.length > REALTIME_LOG_WINDOW
+              ? merged.slice(merged.length - REALTIME_LOG_WINDOW)
+              : merged
+          })
+        } else {
+          emptyIncrementalPollsRef.current = 0
+          setLogs(parsed)
+        }
+
+        const newestSequence = parsed.reduce((max, log) => (
+          typeof log.sequence === 'number' ? Math.max(max, log.sequence) : max
+        ), 0)
+        if (newestSequence > 0) {
+          latestSequenceRef.current = Math.max(latestSequenceRef.current, newestSequence)
+        }
         setRealtimeError(null)
       }
     } catch (error) {
@@ -562,6 +609,8 @@ export default function LogViewer() {
     setHistoryError(null)
     setLoading(false)
     setLogs([])
+    latestSequenceRef.current = 0
+    emptyIncrementalPollsRef.current = 0
     void loadRealtimeLogs()
   }
 
@@ -570,7 +619,7 @@ export default function LogViewer() {
     void loadHistoryFiles()
     void loadRealtimeLogs()
 
-    const intervalId = window.setInterval(() => void loadRealtimeLogs(), 1250)
+    const intervalId = window.setInterval(() => void loadRealtimeLogs(), REALTIME_LOG_POLL_MS)
     const handleVisibilityChange = () => {
       if (document.hidden) {
         stopRealtimeRequest()
@@ -595,6 +644,13 @@ export default function LogViewer() {
     setAtLogBottom(true)
     setAtLogTop(container.scrollHeight <= container.clientHeight)
   }, [logs, autoScroll, viewingHistory])
+
+  useEffect(() => {
+    const buttons = logModeRef.current?.querySelectorAll<HTMLButtonElement>(
+      '.lg-track:not([data-lg-copy]) > [data-lg-item]',
+    )
+    buttons?.forEach(button => button.setAttribute('aria-controls', 'log-console-panel'))
+  }, [])
 
   const readableLogs = useMemo(() => {
     if (contentMode === 'raw') return logs
@@ -645,6 +701,8 @@ export default function LogViewer() {
       typeof log.sequence === 'number' ? Math.max(max, log.sequence) : max
     ), 0)
     clearedThroughSequenceRef.current = Math.max(clearedThroughSequenceRef.current, maxSequence)
+    latestSequenceRef.current = Math.max(latestSequenceRef.current, maxSequence)
+    emptyIncrementalPollsRef.current = 0
     setLogs([])
     setNewLogCount(0)
     setRealtimeError(null)
@@ -726,61 +784,23 @@ export default function LogViewer() {
           </SmoothPanel>
         )}
 
-        <div className="app-workspace-segments app-liquid-tab-pill glass log-mode-shell">
-          <div
-            ref={contentModeTabsRef}
-            className="app-workspace-segment-list log-mode-tabs"
-            role="tablist"
-            aria-label="日志内容模式"
-          >
-            {activeContentModeRect.width > 0 && (
-              <motion.div
-                data-testid="log-mode-highlight"
-                aria-hidden="true"
-                className="app-workspace-segment-indicator log-mode-highlight"
-                initial={false}
-                animate={{
-                  x: activeContentModeRect.x,
-                  y: activeContentModeRect.y,
-                  width: activeContentModeRect.width,
-                  height: activeContentModeRect.height,
-                }}
-                transition={shouldReduceMotion
-                  ? { duration: 0 }
-                  : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
-              />
-            )}
-            {CONTENT_MODE_OPTIONS.map(option => {
-              const selected = contentMode === option.id
+        <div className="log-mode-shell" ref={logModeRef}>
+          <GlassSegmented
+            options={CONTENT_MODE_OPTIONS.map(option => {
               const ModeIcon = option.id === 'summary' ? List : FileText
-              return (
-                <button
-                  key={option.id}
-                  ref={setContentModeTabRef(option.id)}
-                  type="button"
-                  role="tab"
-                  onClick={() => setContentMode(option.id)}
-                  onKeyDown={event => handleContentModeKeyDown(
-                    event,
-                    CONTENT_MODE_OPTIONS.map(({ id }) => id),
-                    setContentMode,
-                  )}
-                  aria-selected={selected}
-                  aria-controls="log-console-panel"
-                  tabIndex={selected ? 0 : -1}
-                  className={`app-workspace-segment log-mode-button min-h-11 ${selected ? 'is-selected' : ''}`}
-                >
-                  <span className="app-workspace-segment-icon log-mode-icon" aria-hidden="true">
-                    <ModeIcon />
-                  </span>
-                  <span className="app-workspace-segment-copy">
-                    <span>{option.label}</span>
-                    <small>{option.description}</small>
-                  </span>
-                </button>
-              )
+              return {
+                label: option.label,
+                icon: <ModeIcon className="h-4 w-4" aria-hidden="true" />,
+              }
             })}
-          </div>
+            value={Math.max(0, CONTENT_MODE_OPTIONS.findIndex(option => option.id === contentMode))}
+            onChange={(index) => {
+              const option = CONTENT_MODE_OPTIONS[index]
+              if (option) setContentMode(option.id)
+            }}
+            aria-label="日志内容模式"
+            className="log-mode-segmented"
+          />
         </div>
 
         <Card className="log-card log-toolbar-card !p-0" smoothCorners>
@@ -948,7 +968,9 @@ export default function LogViewer() {
                   </div>
                 )}
                 {visibleLogs.map((log, index) => (
-                  <div className="log-row" key={`${log.time}-${log.level}-${log.message}-${index}`}>
+                  <div className="log-row" key={typeof log.sequence === 'number'
+                  ? `seq-${log.sequence}`
+                  : `${log.time}-${log.level}-${log.message}-${index}`}>
                     <div className="log-row-meta">
                       {log.time && <time>{log.time}</time>}
                       <span className={`log-level is-${log.level.toLowerCase()}`}>{log.level}</span>

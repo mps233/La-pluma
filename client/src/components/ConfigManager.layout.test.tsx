@@ -153,16 +153,21 @@ describe('ConfigManager layout surfaces', () => {
     expect(cards[0]?.querySelector(':scope > .app-card-smooth-surface > .app-card-content')).not.toBeNull()
 
     const navigation = page?.querySelector('[data-config-sections]')
-    expect(navigation?.classList.contains('app-liquid-tab-pill')).toBe(true)
-    expect(navigation?.querySelectorAll('.app-workspace-segment')).toHaveLength(3)
-    expect(navigation?.querySelector('.app-workspace-segment.is-selected')?.textContent).toContain('连接')
+    const navigationTrack = navigation?.querySelector('.lg-track[role="tablist"]')
+    expect(navigationTrack?.getAttribute('aria-label')).toBe('配置类型')
+    const navigationItems = Array.from(
+      navigationTrack?.querySelectorAll<HTMLButtonElement>(':scope > .lg-track__item') ?? [],
+    )
+    expect(navigationItems).toHaveLength(3)
+    expect(navigationItems[0]?.getAttribute('aria-selected')).toBe('true')
+    expect(navigationItems[0]?.textContent).toContain('连接')
     expect(page?.querySelector('.smooth-panel-shell')).toBeNull()
     expect(page?.querySelector('.app-card .app-info-card')).toBeNull()
 
-    const autoUpdateToggle = page?.querySelector<HTMLInputElement>('input[aria-label="启用自动更新"]')
-    const autoUpdateTrack = autoUpdateToggle?.nextElementSibling
+    const autoUpdateToggle = page?.querySelector<HTMLButtonElement>('[aria-label="启用自动更新"]')
     expect(autoUpdateToggle?.getAttribute('role')).toBe('switch')
-    expect(autoUpdateTrack?.classList.contains('app-switch-track')).toBe(true)
+    expect(autoUpdateToggle?.classList.contains('lg-switch')).toBe(true)
+    expect(autoUpdateToggle?.querySelector('.lg-switch__track')).not.toBeNull()
     const reconnectRow = page?.querySelector('.config-reconnect-row')
     expect(reconnectRow).not.toBeNull()
     expect(reconnectRow?.classList.contains('surface-soft')).toBe(false)

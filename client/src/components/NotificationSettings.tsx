@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bell, Save, Send } from 'lucide-react'
 import { API_BASE_URL, fetchWithAuth, parseJsonResponse } from '@/services/api'
-import { CjkText, Switch } from './common'
+import { CjkText, Button, Switch } from './common'
 
 interface TelegramConfig {
   enabled: boolean
@@ -303,14 +303,26 @@ export default function NotificationSettings() {
         )}
 
         <div className="automation-notification-buttons">
-          <button type="button" onClick={testNotification} disabled={loading || saving || testing || Boolean(loadError) || !canTest} className="app-native-button">
-            <Send size={14} />
-            <span>{loading ? '加载中' : testing ? '发送中' : '测试'}</span>
-          </button>
-          <button type="button" onClick={saveConfig} disabled={loading || saving || testing || Boolean(loadError)} className="app-native-button app-native-button-primary is-primary">
-            <Save size={14} />
-            <span>{loading ? '加载中' : saving ? '保存中' : '保存'}</span>
-          </button>
+          <Button
+            variant="secondary"
+            icon={<Send size={14} aria-hidden="true" />}
+            onClick={testNotification}
+            disabled={loading || saving || testing || Boolean(loadError) || !canTest}
+            loading={loading || testing}
+            loadingText={loading ? '加载中' : '发送中'}
+          >
+            测试
+          </Button>
+          <Button
+            variant="primary"
+            icon={<Save size={14} aria-hidden="true" />}
+            onClick={saveConfig}
+            disabled={loading || saving || testing || Boolean(loadError)}
+            loading={loading || saving}
+            loadingText={loading ? '加载中' : '保存中'}
+          >
+            保存
+          </Button>
         </div>
       </div>
     </section>

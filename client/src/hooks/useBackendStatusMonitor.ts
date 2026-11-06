@@ -59,7 +59,7 @@ export function useBackendStatusMonitor() {
       timer = null
     }
     const scheduleNextProbe = () => {
-      if (disposed || !navigator.onLine) return
+      if (disposed || !navigator.onLine || document.hidden) return
       clearTimer()
       const delay = useStatusStore.getState().isActive
         ? ACTIVE_TASK_PROBE_INTERVAL_MS
@@ -85,16 +85,23 @@ export function useBackendStatusMonitor() {
       invalidateBackendStatusProbe()
     }
     const handleFocus = () => {
-      if (navigator.onLine) void runProbe(false)
+      if (navigator.onLine && !document.hidden) void runProbe(false)
+    }
+    const handleVisibilityChange = () => {
+      clearTimer()
+      controller?.abort()
+      controller = null
+      if (!document.hidden && navigator.onLine) void runProbe(false)
     }
     const unsubscribeStatus = useStatusStore.subscribe((state, previousState) => {
       if (state.isActive !== previousState.isActive) scheduleNextProbe()
     })
 
-    if (navigator.onLine) void runProbe(true)
+    if (navigator.onLine && !document.hidden) void runProbe(true)
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
     window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
       disposed = true
@@ -103,6 +110,7 @@ export function useBackendStatusMonitor() {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
       window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
       controller?.abort()
       invalidateBackendStatusProbe()
     }

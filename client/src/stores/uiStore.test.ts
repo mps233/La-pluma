@@ -28,6 +28,7 @@ describe('UI navigation and theme state', () => {
     ].join('')
     document.documentElement.classList.remove('dark')
     document.documentElement.style.colorScheme = ''
+    delete document.documentElement.dataset.theme
   })
 
   it('maps supported application URLs without persisting navigation state', () => {
@@ -45,12 +46,14 @@ describe('UI navigation and theme state', () => {
     systemDark = true
     applyThemePreference('system')
     expect(document.documentElement.classList.contains('dark')).toBe(true)
+    expect(document.documentElement.dataset.theme).toBe('dark')
     expect(document.documentElement.style.colorScheme).toBe('dark')
     expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#101318')
 
     systemDark = false
     useUIStore.getState().setTheme('system')
     expect(document.documentElement.classList.contains('dark')).toBe(false)
+    expect(document.documentElement.dataset.theme).toBe('light')
     expect(document.documentElement.style.colorScheme).toBe('light')
     expect(document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.getAttribute('content')).toBe('default')
   })

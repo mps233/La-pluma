@@ -41,7 +41,11 @@ export const createWorkboxConfig = (basePath: string): Options['workbox'] => {
   return {
     cleanupOutdatedCaches: true,
     globPatterns: [
-      '**/*.{css,html,ico,png,svg,woff,woff2}',
+      // Only the entry stylesheet is part of the shell. Route CSS is emitted
+      // next to its lazy chunk and cached on first visit instead of being
+      // downloaded at install time.
+      'assets/index-*.css',
+      '**/*.{html,ico,svg,woff,woff2}',
       'assets/{index,react-vendor,motion-vendor,workbox-window.prod.es5}-*.js',
     ],
     navigateFallbackDenylist: createNavigateFallbackDenylist(basePath),
@@ -55,6 +59,37 @@ export const createWorkboxConfig = (basePath: string): Options['workbox'] => {
           cacheName: 'la-pluma-page-chunks',
           expiration: {
             maxEntries: 40,
+            maxAgeSeconds: 60 * 60 * 24 * 30,
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
+        },
+      },
+      {
+        urlPattern: new RegExp(`${escapedBasePath}assets/.*\\.css(?:\\?.*)?$`),
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'la-pluma-page-styles',
+          expiration: {
+            maxEntries: 30,
+            maxAgeSeconds: 60 * 60 * 24 * 30,
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
+        },
+      },
+      {
+        // MaaResource avatars and item icons are immutable for a resource
+        // version. Caching them removes the repeat download cost of the
+        // 400+ card statistics grid on every visit.
+        urlPattern: new RegExp(`${escapedBasePath}api/maa-assets/.*`),
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'la-pluma-maa-assets',
+          expiration: {
+            maxEntries: 1200,
             maxAgeSeconds: 60 * 60 * 24 * 30,
           },
           cacheableResponse: {
@@ -235,5 +270,10 @@ export const createViteConfig = (basePath: string): UserConfig => ({
 
 export default defineConfig(({ mode }: ConfigEnv) => {
   const env = loadEnv(mode, __dirname)
-  return createViteConfig(normalizeBasePath(env.VITE_BASE_PATH))
+  return {
+    ...createViteConfig(normalizeBasePath(env.VITE_BASE_PATH)),
+    test: {
+      setupFiles: ['./src/test/setup.ts'],
+    },
+  } as UserConfig & { test: { setupFiles: string[] } }
 })

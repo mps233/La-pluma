@@ -77,6 +77,7 @@ vi.mock('./ScreenMonitor', () => ({
 
 class IntersectionObserverMock {
   observe() {}
+  unobserve() {}
   disconnect() {}
 }
 
@@ -282,7 +283,7 @@ describe('AutomationTasks layout surfaces', () => {
     await act(async () => root.render(<AutomationTasks />))
     await flush()
 
-    expect(container.querySelector<HTMLInputElement>('[aria-label="定时执行"]')?.checked).toBe(true)
+    expect(container.querySelector('[aria-label="定时执行"]')?.getAttribute('aria-checked')).toBe('true')
     expect(mocks.setupSchedule).not.toHaveBeenCalled()
     expect(mocks.stopSchedule).not.toHaveBeenCalled()
   })

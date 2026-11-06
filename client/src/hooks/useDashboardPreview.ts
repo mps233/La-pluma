@@ -23,6 +23,7 @@ export function useDashboardPreview() {
   const fps = usePreviewStore(state => state.fps)
   const maxSize = usePreviewStore(state => state.maxSize)
   const bitrateMbps = usePreviewStore(state => state.bitrateMbps)
+  const fallbackSnapshotUrlRef = useRef<string | null>(null)
   const [webrtcStatus, setWebrtcStatus] = useState<WebrtcStatusData | null>(null)
   const [fallbackSnapshot, setFallbackSnapshot] = useState<string | null>(null)
   const [showLivePreview, setShowLivePreview] = useState(false)
@@ -65,25 +66,35 @@ export function useDashboardPreview() {
   }
 
   useEffect(() => {
+    if (mode === 'off') return undefined
     let cancelled = false
+    let inFlight = false
     const fetchStatus = () => {
+      if (cancelled || inFlight || document.hidden) return
+      inFlight = true
       maaApi.getWebrtcStatus()
         .then(response => {
           if (!cancelled && response.success) setWebrtcStatus(response.data ?? null)
         })
         .catch(() => {})
         .finally(() => {
+          inFlight = false
           if (!cancelled) setStatusSettled(true)
         })
     }
 
     fetchStatus()
     const timer = setInterval(fetchStatus, STATUS_POLL_INTERVAL_MS)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) fetchStatus()
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
       cancelled = true
       clearInterval(timer)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [])
+  }, [mode])
 
   useEffect(() => {
     if (mode !== 'live') {
@@ -161,31 +172,44 @@ export function useDashboardPreview() {
     if (!statusSettled || !shouldShowSnapshot) return
 
     let cancelled = false
-    const fetchSnapshot = async () => {
-      if (document.hidden) return
-      if (serverRunning) {
-        try {
-          const snapshot = await maaApi.getWebrtcSnapshot(DEFAULT_DEVICE_ID)
-          const snapshotData = snapshot?.data
-          const image = snapshotData?.image
-          if (!cancelled && image && snapshotData) {
-            const mediaType = snapshotData.mediaType || 'image/jpeg'
-            setFallbackSnapshot(`data:${mediaType};base64,${image}`)
-            return
-          }
-        } catch {
-          // Fall back to an ADB screenshot when the preview service has no snapshot.
-        }
-      }
+    let inFlight = false
+    const controller = new AbortController()
 
+    const updateFallback = (next: string) => {
+      const previous = fallbackSnapshotUrlRef.current
+      if (previous && previous !== next) URL.revokeObjectURL(previous)
+      fallbackSnapshotUrlRef.current = next.startsWith('blob:') ? next : null
+      setFallbackSnapshot(next)
+    }
+
+    const fetchSnapshot = async () => {
+      if (document.hidden || inFlight) return
+      inFlight = true
       try {
-        const result = await maaApi.captureScreen()
-        const image = result?.data?.image
-        if (!cancelled && image) {
-          setFallbackSnapshot(`data:image/png;base64,${image}`)
+        if (serverRunning) {
+          try {
+            const snapshot = await maaApi.getWebrtcSnapshot(DEFAULT_DEVICE_ID)
+            const snapshotData = snapshot?.data
+            const image = snapshotData?.image
+            if (!cancelled && image && snapshotData) {
+              const mediaType = snapshotData.mediaType || 'image/jpeg'
+              updateFallback(`data:${mediaType};base64,${image}`)
+              return
+            }
+          } catch {
+            // Fall back to an ADB screenshot when the preview service has no snapshot.
+          }
         }
-      } catch {
-        // Keep the last usable frame.
+
+        try {
+          // Binary WebP frame: avoids base64-in-JSON and full-resolution PNGs.
+          const blob = await maaApi.captureScreenFrame('default', controller.signal)
+          if (!cancelled) updateFallback(URL.createObjectURL(blob))
+        } catch {
+          // Keep the last usable frame.
+        }
+      } finally {
+        inFlight = false
       }
     }
 
@@ -193,9 +217,17 @@ export function useDashboardPreview() {
     const timer = setInterval(fetchSnapshot, FALLBACK_SNAPSHOT_INTERVAL_MS)
     return () => {
       cancelled = true
+      controller.abort()
       clearInterval(timer)
     }
   }, [serverRunning, shouldShowSnapshot, statusSettled])
+
+  useEffect(() => () => {
+    if (fallbackSnapshotUrlRef.current) {
+      URL.revokeObjectURL(fallbackSnapshotUrlRef.current)
+      fallbackSnapshotUrlRef.current = null
+    }
+  }, [])
 
   const previewError = previewStartError || preview.error
   const visibleFallback = shouldShowSnapshot ? fallbackSnapshot : null

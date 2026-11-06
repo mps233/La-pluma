@@ -68,7 +68,7 @@
   --app-page-gutter: 1.25rem;
   --la-pluma-viewport-height: 100dvh;
   --la-pluma-tabbar-safe-bottom: max(var(--app-safe-area-bottom, 0px), env(safe-area-inset-bottom, 0px));
-  --la-pluma-tabbar-floating-height: 4rem;
+  --la-pluma-tabbar-floating-height: 4.25rem;
   --la-pluma-tabbar-floating-offset: 0.5rem;
   --la-pluma-tabbar-bottom-clearance: clamp(
     var(--la-pluma-tabbar-floating-offset),
@@ -79,9 +79,6 @@
     var(--la-pluma-tabbar-floating-height) + var(--la-pluma-tabbar-bottom-clearance)
   );
   --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.16);
-  --la-pluma-tabbar-active-edge: inset 0 0 0 0.5px var(--app-glass-border);
-  --la-pluma-tabbar-shadow: 0 1rem 2.25rem rgba(60, 60, 67, 0.18);
-  --la-pluma-tabbar-fade-color: #ffffff;
   --la-pluma-navbar-fade-color: #ffffff;
   --la-pluma-sidebar-width: 17rem;
   --la-pluma-sidebar-search-bg: rgba(118, 118, 128, 0.12);
@@ -119,6 +116,7 @@
 /* Safari's dynamic viewport is intentionally used in a normal browser so
    the app follows the address bar. An installed app has no browser chrome;
    use the largest viewport so fixed bars reach the physical screen edge. */
+
 @media (display-mode: standalone), (display-mode: fullscreen) {
   :root {
     --la-pluma-viewport-height: 100lvh;
@@ -180,8 +178,6 @@ html.dark,
   --app-info: #5e5ce6;
   --app-info-text: #a5a3ff;
   --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.3);
-  --la-pluma-tabbar-shadow: 0 1rem 2.25rem rgba(0, 0, 0, 0.44);
-  --la-pluma-tabbar-fade-color: #101318;
   --la-pluma-navbar-fade-color: #101318;
   --la-pluma-sidebar-search-bg: rgba(118, 118, 128, 0.2);
   --la-pluma-sidebar-selection: var(--app-accent-action);
@@ -260,6 +256,7 @@ body {
 /* A standalone iOS document can report a dynamic layout height while its
    screen is still the full largest viewport. Link every root in the height
    chain so fixed tabbars are positioned against the physical viewport. */
+
 html.la-pluma-standalone,
 html.la-pluma-standalone body,
 html.la-pluma-standalone #root,
@@ -316,13 +313,13 @@ html.la-pluma-standalone #app-root .page {
   justify-self: end;
 }
 
-.la-pluma-app :is(.link, .tab-link) {
+.la-pluma-app :is(.link) {
   color: inherit;
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
 }
 
-.la-pluma-app button:is(.la-pluma-brand, .la-pluma-tab-link, .la-pluma-tabbar-search) {
+.la-pluma-app button:is(.la-pluma-brand, .la-pluma-tab-link) {
   appearance: none;
   margin: 0;
   border: 0;
@@ -335,8 +332,8 @@ html.la-pluma-standalone #app-root .page {
 /* The reset above would blank a glass button's material background. Keep the
    reset weight below the selected/nav rules and restore the material only on
    the glass controls that need it. */
-.la-pluma-app .la-pluma-brand.glass,
-.la-pluma-app .glass.la-pluma-tabbar-search {
+
+.la-pluma-app .la-pluma-brand.glass {
   background: color-mix(in srgb, var(--m-tint) calc(var(--tint-a) * 100%), transparent);
 }
 
@@ -407,6 +404,7 @@ html.la-pluma-standalone #app-root .page {
 
 /* Keep the mobile theme control a real 44px hit target beside the repository
    link, including on the narrowest supported viewport. */
+
 .la-pluma-theme-mobile {
   display: flex;
   flex: 0 0 2.75rem;
@@ -758,8 +756,7 @@ html.la-pluma-standalone #app-root .page {
   text-transform: uppercase;
 }
 
-.la-pluma-sidebar-nav,
-.la-pluma-sheet-nav {
+.la-pluma-sidebar-nav {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -948,6 +945,7 @@ html.la-pluma-standalone #app-root .page {
 
 /* Resting nav items are invisible glass: no fill, no edge. Hover/focus turns
    on only the material's backdrop filter and rim lens. */
+
 .la-pluma-app .la-pluma-tab-link.is-desktop-tab.glass:not(.is-active) {
   background: transparent;
   box-shadow: none;
@@ -1001,6 +999,7 @@ html.la-pluma-standalone #app-root .page {
 
 /* The selected sidebar item keeps its accent fill and white copy, as a
    blue-tinted glass with a soft sheen instead of a hard rim. */
+
 .la-pluma-app .la-pluma-tab-link.is-desktop-tab.is-active.glass {
   --l-tint: #004b99;
   --d-tint: #0059b3;
@@ -1109,59 +1108,74 @@ html.la-pluma-standalone #app-root .page {
 .la-pluma-tabbar {
   display: none;
   z-index: 70;
-  box-sizing: border-box;
-  height: var(--la-pluma-tabbar-reserved-height);
-  overflow: visible;
-  background: transparent !important;
-  background-color: transparent !important;
-  border: 0;
-  box-shadow: none;
   pointer-events: none;
 }
 
-.la-pluma-app .la-pluma-tabbar::before,
-.la-pluma-app .la-pluma-tabbar::after {
-  display: none;
-}
-
-.la-pluma-app .la-pluma-tabbar .toolbar-inner {
-  position: absolute !important;
-  top: auto !important;
-  right: 0;
-  bottom: var(--la-pluma-tabbar-bottom-clearance);
-  left: 0;
+.la-pluma-tabbar-inner {
   display: flex;
-  align-items: stretch;
-  justify-content: center;
+  align-items: center;
   gap: 0.5rem;
-  width: 100%;
-  height: var(--la-pluma-tabbar-floating-height);
-  min-height: 0;
-  box-sizing: border-box;
-  padding: 0 max(1.25rem, env(safe-area-inset-right, 0px)) 0
-    max(1.25rem, env(safe-area-inset-left, 0px)) !important;
-  pointer-events: none;
+  width: min(100%, 31rem);
+  margin: 0 auto;
+  pointer-events: auto;
 }
 
-.la-pluma-app .app-liquid-tab-pill:not(.glass),
-.la-pluma-app .la-pluma-tabbar-search:not(.glass) {
+.la-pluma-tabbar-nav {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.la-pluma-tabbar-glass.lg-track {
+  width: 100%;
+  grid-auto-columns: minmax(0, 1fr);
+  --lg-track-active: var(--app-accent-strong);
+}
+
+.la-pluma-tabbar-more-anchor {
+  flex: 0 0 auto;
+}
+
+.la-pluma-tabbar-more-anchor .lg-button[data-icon-only] {
+  --lg-h: var(--la-pluma-tabbar-floating-height);
+}
+
+.la-pluma-tabbar-more-anchor.is-active .lg-button {
+  color: var(--app-accent-strong);
+}
+
+/* The menu lives at the bottom-right of the viewport, so it grows upward and
+   leftward instead of dropping below the screen. */
+
+.la-pluma-tabbar-more-anchor .lg-menu-surface {
+  top: auto;
+  bottom: 0;
+}
+
+.la-pluma-tabbar-more-anchor .lg-menu.lg-glass,
+.la-pluma-tabbar-more-anchor .lg-menu__content {
+  transform-origin: bottom right;
+}
+
+.la-pluma-app .app-liquid-tab-pill:not(.glass) {
   box-sizing: border-box;
   border: 1px solid var(--app-glass-border);
   background: var(--app-glass-bg);
   -webkit-backdrop-filter: blur(28px) saturate(180%);
   backdrop-filter: blur(28px) saturate(180%);
-  box-shadow: var(--la-pluma-tabbar-shadow);
+  box-shadow: var(--app-glass-shadow);
   pointer-events: auto;
 }
 
 /* La Pluma applies theme changes with an instant class toggle. Do not fade
    the material separately, or the text switches before the plate and the
    pair sits below AA mid-transition. */
+
 .la-pluma-app .glass {
   transition: none;
 }
 
 /* Glasswork draws the material for opted-in in-page pickers. */
+
 .la-pluma-app .app-liquid-tab-pill.glass {
   box-sizing: border-box;
   border-radius: 999px;
@@ -1170,6 +1184,7 @@ html.la-pluma-standalone #app-root .page {
 }
 
 /* The selected in-page segment and glass cards share one neutral recipe. */
+
 .la-pluma-app .app-workspace-segment-indicator {
   background: color-mix(
     in srgb,
@@ -1187,17 +1202,6 @@ html.la-pluma-standalone #app-root .page {
   box-shadow: none;
 }
 
-/* The floating tab bar sits over arbitrary content, so it keeps the denser
-   sidebar tint instead of the clear wallpaper default. */
-.la-pluma-app .la-pluma-tabbar-pill.glass,
-.la-pluma-app .la-pluma-tabbar-search.glass {
-  --density: 0.75;
-}
-
-html:not(.dark) .la-pluma-app .la-pluma-tabbar-search.glass {
-  --floor: 0.45;
-}
-
 .la-pluma-app .la-pluma-theme-trigger.glass,
 .la-pluma-app .la-pluma-github-link.glass {
   border-radius: 999px;
@@ -1206,33 +1210,21 @@ html:not(.dark) .la-pluma-app .la-pluma-tabbar-search.glass {
 
 /* The glass button keeps its material when the theme menu is open; the
    accent icon is the state cue instead of a replacing background. */
+
 .la-pluma-app .la-pluma-theme-trigger.glass[aria-expanded='true'] {
   color: var(--app-accent-strong);
 }
 
-.la-pluma-app .glass.la-pluma-tabbar-search {
-  border-radius: 50%;
-  corner-shape: round;
-  pointer-events: auto;
-  /* Keep the press/hover feedback; the material switches instantly with the
-     theme like the rest of the chrome. */
-  transition: transform 180ms ease, color 180ms ease;
-}
-
 /* Over the light canvas the clear glass needs a whiter tint for the small
    mode labels, and a lighter active fill keeps the selected copy at AA. */
+
 html:not(.dark) .la-pluma-app .app-liquid-tab-pill.glass {
   --floor: 0.45;
 }
 
-/* The compact preview switcher sits on the preview card's darker footer, so
-   its glass takes a denser white tint to keep the labels at AA. */
-html:not(.dark) .la-pluma-app .preview-mode-shell.glass {
-  --floor: 0.8;
-}
+/* In-page pickers that have not opted into .glass keep the previous
+   material. */
 
-/* The mobile tab bar and any picker that has not opted into .glass keep the
-   previous material. */
 .la-pluma-app .app-liquid-tab-pill:not(.glass) {
   --la-pluma-liquid-surface: color-mix(
     in srgb,
@@ -1298,208 +1290,6 @@ html:not(.dark) .la-pluma-app .preview-mode-shell.glass {
   z-index: 1;
 }
 
-.la-pluma-app .la-pluma-tabbar-pill {
-  display: flex;
-  flex: 1 1 auto;
-  width: min(100%, 31rem);
-  min-width: 0;
-  height: 100%;
-  gap: 0.125rem;
-  padding: 0.25rem;
-  border-radius: 999px;
-}
-
-.la-pluma-app .la-pluma-tabbar-search {
-  display: inline-flex !important;
-  flex: 0 0 var(--la-pluma-tabbar-floating-height);
-  width: var(--la-pluma-tabbar-floating-height);
-  height: var(--la-pluma-tabbar-floating-height);
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  color: var(--app-text) !important;
-  text-decoration: none;
-  transition: transform 180ms ease, background 180ms ease, color 180ms ease;
-}
-
-.la-pluma-app .la-pluma-tabbar-search:hover,
-.la-pluma-app .la-pluma-tabbar-search:focus-visible,
-.la-pluma-app .la-pluma-tabbar-search.is-active {
-  --la-pluma-liquid-surface: var(--app-surface-muted);
-  color: var(--app-accent) !important;
-}
-
-.la-pluma-app .la-pluma-tabbar-search:active {
-  transform: scale(0.94);
-}
-
-.la-pluma-tabbar-search-icon {
-  width: 1.75rem;
-  height: 1.75rem;
-}
-
-.la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab {
-  display: inline-flex !important;
-  min-width: 0;
-  flex: 1 1 0;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.1875rem;
-  min-height: 0;
-  border-radius: 999px;
-  padding: 0.25rem 0.3rem !important;
-  color: var(--app-text-muted) !important;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  line-height: 1;
-  text-align: center;
-  text-decoration: none;
-  transition: transform 180ms ease, background 180ms ease, color 180ms ease;
-}
-
-.la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab .tabbar-label {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  font-size: inherit;
-  line-height: inherit;
-  white-space: nowrap;
-}
-
-.la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab svg {
-  width: 1.5rem;
-  height: 1.5rem;
-  flex: 0 0 auto;
-}
-
-/* Match iOS tab symbols: the dashboard grid is outlined at rest and becomes
-   the filled variant only while its destination is selected. */
-.la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab[data-app-tab='dashboard'].is-active svg {
-  fill: currentColor;
-  stroke: none;
-}
-
-.la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab.is-active,
-.la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab.tab-link-active {
-  background: var(--la-pluma-tabbar-active-bg) !important;
-  color: var(--app-accent-strong) !important;
-  box-shadow: var(--la-pluma-tabbar-active-edge);
-}
-
-.la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab:hover {
-  color: var(--app-text) !important;
-}
-
-.la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab:active {
-  transform: scale(0.95);
-}
-
-.la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab:focus-visible,
-.la-pluma-app .la-pluma-tabbar-search:focus-visible {
-  outline: 2px solid var(--app-accent);
-  outline-offset: -3px;
-}
-
-.la-pluma-more-sheet {
-  position: fixed;
-  z-index: 1110;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  box-sizing: border-box;
-  width: 100%;
-  height: auto;
-  max-height: min(28rem, 78dvh);
-  margin: 0;
-  padding: 0.75rem max(1rem, env(safe-area-inset-right)) max(1.25rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--app-glass-border) 72%, transparent);
-  border-bottom: 0;
-  border-radius: 1.25rem 1.25rem 0 0;
-  outline: none;
-  background: var(--app-glass-bg);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  backdrop-filter: blur(28px) saturate(180%);
-  box-shadow: 0 -1.25rem 3rem rgba(0, 0, 0, 0.16);
-  will-change: transform, opacity;
-}
-
-.la-pluma-app .sheet-backdrop {
-  position: fixed;
-  z-index: 1100;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.32);
-  -webkit-tap-highlight-color: transparent;
-}
-
-.la-pluma-app .sheet-modal-inner {
-  max-height: inherit;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.la-pluma-app .sheet-modal-inner::-webkit-scrollbar {
-  display: none;
-}
-
-.la-pluma-sheet-grabber {
-  width: 2.25rem;
-  height: 0.3125rem;
-  margin: 0 auto 1.125rem;
-  border-radius: 999px;
-  background: var(--app-text-soft);
-  opacity: 0.48;
-}
-
-.la-pluma-sheet-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin: 0 0 1rem;
-}
-
-.la-pluma-sheet-heading h2 {
-  margin: 0.25rem 0 0;
-  color: var(--app-text);
-  font-size: 1.375rem;
-  font-weight: 700;
-  letter-spacing: 0;
-}
-
-.la-pluma-sheet-close {
-  display: inline-flex !important;
-  width: 2.75rem !important;
-  min-width: 2.75rem !important;
-  height: 2.75rem !important;
-  min-height: 2.75rem !important;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  color: var(--app-text-muted) !important;
-}
-
-.la-pluma-sheet-close:hover,
-.la-pluma-sheet-close:focus-visible {
-  color: var(--app-text) !important;
-  background: var(--app-surface-muted);
-}
-
-.la-pluma-sheet-nav .la-pluma-tab-link {
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  gap: 0.75rem !important;
-  min-height: 3rem !important;
-  padding: 0 0.875rem !important;
-  font-size: 0.9375rem !important;
-}
-
 .la-pluma-app .app-page {
   padding-top: 0;
 }
@@ -1549,6 +1339,7 @@ html:not(.dark) .la-pluma-app .preview-mode-shell.glass {
 /* Lisse clips the visible surface while the card root remains the
    layout and shadow shell. This preserves grid/flex semantics and keeps the
    soft outer shadow outside the clipped region. */
+
 .la-pluma-app .app-card[data-smooth-corners='true'] {
   display: flex;
   border: 0;
@@ -1577,6 +1368,7 @@ html:not(.dark) .la-pluma-app .preview-mode-shell.glass {
 
 /* The combat task card reuses the same neutral glass recipe, with a
    card-scale tint opacity and no rim. */
+
 .la-pluma-app .combat-task-card {
   box-shadow: none;
 }
@@ -1671,6 +1463,7 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
 
 /* Dense training data keeps the grouped surface; the statistics and drop
    workspaces use separate soft tiles instead of hairline grids. */
+
 .la-pluma-app .training-operator-grid {
   gap: 1px;
   background: var(--app-border);
@@ -1735,6 +1528,7 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
 
 /* Only summoned, overlapping layers receive Liquid Glass. Ordinary cards and
    grouped content remain opaque so the material hierarchy stays legible. */
+
 .la-pluma-app :is(
   .app-modal-layer .surface-panel,
   .theme-menu-popover,
@@ -1883,8 +1677,7 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
     .la-pluma-theme-trigger,
     .la-pluma-github-link,
     .automation-preview-glass-button,
-    .pwa-install-entry-button,
-    .la-pluma-tabbar-search
+    .pwa-install-entry-button
   ):not(.glass) {
     --la-pluma-liquid-surface: color-mix(
       in srgb,
@@ -1909,8 +1702,7 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
     .la-pluma-theme-trigger,
     .la-pluma-github-link,
     .automation-preview-glass-button,
-    .pwa-install-entry-button,
-    .la-pluma-tabbar-search
+    .pwa-install-entry-button
   ):not(.glass)::before {
     position: absolute;
     inset: 0;
@@ -1962,40 +1754,16 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
   }
 
   .la-pluma-app .la-pluma-tabbar {
-    display: flex;
+    display: block;
     position: fixed;
     right: 0;
     bottom: 0;
     left: 0;
+    box-sizing: border-box;
+    padding: 0 max(1.25rem, env(safe-area-inset-right, 0px))
+      var(--la-pluma-tabbar-bottom-clearance)
+      max(1.25rem, env(safe-area-inset-left, 0px));
     isolation: isolate;
-  }
-
-  /* Mirror the Navbar edge treatment: content remains visible above the
-     toolbar and fades continuously into the page color at the screen edge. */
-  .la-pluma-app .la-pluma-tabbar::before {
-    display: block;
-    position: absolute;
-    z-index: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    width: auto;
-    height: auto;
-    background: linear-gradient(
-      to bottom,
-      transparent 0%,
-      color-mix(in srgb, var(--la-pluma-tabbar-fade-color) 20%, transparent) 100%
-    );
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    content: '';
-    transform: none;
-    pointer-events: none;
-  }
-
-  .la-pluma-app .la-pluma-tabbar .toolbar-inner {
-    z-index: 1;
   }
 
   .la-pluma-app .la-pluma-content {
@@ -2032,6 +1800,7 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
 /* In an installed app the page is the full physical viewport. Keeping the
    tabbar page-relative avoids WebKit anchoring `position: fixed` to the
    smaller dynamic layout viewport reported during PWA startup. */
+
 @media (max-width: 1023px) {
   html.la-pluma-standalone .la-pluma-app .la-pluma-tabbar {
     position: absolute;
@@ -2179,6 +1948,7 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
 
 /* These secondary workspaces use the same borderless grouped-card material as
    the dashboard. Controls, status outlines, and internal dividers stay intact. */
+
 .la-pluma-app .ios-borderless-cards :is(
   .app-card[data-smooth-corners='true'],
   .smooth-panel-shell[data-smooth-corners='true']
@@ -2223,6 +1993,7 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
 
 /* Dashboard cards use one continuous, softly lifted material at every width.
    Remove only the outer strokes; internal row and control separators remain. */
+
 .la-pluma-app .dashboard-flow-glow-shell::before,
 .la-pluma-app .dashboard-flow-glow-shell.status-border-beam::after,
 .la-pluma-app .dashboard-flow-card::before,
@@ -2244,6 +2015,7 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
 
 /* Device and summary cards share the workspace glass material; their former
    solid fill is intentionally not restored here. */
+
 .la-pluma-app .dashboard-page .dashboard-summary-header {
   background: transparent;
 }
@@ -2288,6 +2060,7 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
 
 /* Primary workspaces share the large title above. The rules below remain
    dashboard-specific because its status slot and card flow are unique. */
+
 @media (max-width: 639px) {
   .la-pluma-app .dashboard-page {
     --dashboard-card-gap: 1rem;
@@ -2419,10 +2192,7 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
 
 @media (prefers-reduced-transparency: reduce) {
   .la-pluma-app .la-pluma-sidebar-frame,
-  .la-pluma-app .la-pluma-tabbar,
   .la-pluma-app .app-liquid-tab-pill,
-  .la-pluma-app .la-pluma-tabbar-search,
-  .la-pluma-app .la-pluma-more-sheet,
   .la-pluma-app .la-pluma-brand,
   .la-pluma-app .la-pluma-theme-desktop,
   .la-pluma-app .la-pluma-theme-trigger,
@@ -2481,13 +2251,25 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
     .la-pluma-theme-trigger,
     .la-pluma-github-link,
     .automation-preview-glass-button,
-    .app-liquid-tab-pill,
-    .la-pluma-tabbar-search
+    .app-liquid-tab-pill
   )::before {
     display: none;
   }
 
-
+  .la-pluma-tabbar-nav .lg-glass,
+  .la-pluma-tabbar-more-anchor .lg-button,
+  .la-pluma-tabbar-more-anchor .lg-menu,
+  .la-pluma-app .combat-mode-shell .lg-track__glass,
+  .la-pluma-app .roguelike-mode-shell .lg-track__glass,
+  .la-pluma-app .training-status-shell .lg-track__glass,
+  .la-pluma-app .log-mode-shell .lg-track__glass,
+  .la-pluma-app .data-statistics-view-switcher .lg-track__glass,
+  .la-pluma-app [data-config-sections] .lg-track__glass,
+  .la-pluma-app .preview-mode-shell .lg-track__glass {
+    background: var(--app-surface-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 
 @media (prefers-contrast: more) {
@@ -2505,8 +2287,23 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
   .la-pluma-app .la-pluma-theme-trigger,
   .la-pluma-app .la-pluma-brand,
   .la-pluma-app .la-pluma-github-link,
-  .la-pluma-app .app-liquid-tab-pill.glass,
-  .la-pluma-app .la-pluma-tabbar-search.glass {
+  .la-pluma-app .app-liquid-tab-pill.glass {
+    background: var(--app-surface-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: inset 0 0 0 1px var(--app-border-strong);
+  }
+
+  .la-pluma-tabbar-nav .lg-glass,
+  .la-pluma-tabbar-more-anchor .lg-button,
+  .la-pluma-tabbar-more-anchor .lg-menu,
+  .la-pluma-app .combat-mode-shell .lg-track__glass,
+  .la-pluma-app .roguelike-mode-shell .lg-track__glass,
+  .la-pluma-app .training-status-shell .lg-track__glass,
+  .la-pluma-app .log-mode-shell .lg-track__glass,
+  .la-pluma-app .data-statistics-view-switcher .lg-track__glass,
+  .la-pluma-app [data-config-sections] .lg-track__glass,
+  .la-pluma-app .preview-mode-shell .lg-track__glass {
     background: var(--app-surface-solid);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -2518,8 +2315,7 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
   #app-root.dark .glass.la-pluma-theme-trigger,
   #app-root.dark .glass.la-pluma-brand,
   #app-root.dark .glass.la-pluma-github-link,
-  #app-root.dark .glass.app-liquid-tab-pill,
-  #app-root.dark .glass.la-pluma-tabbar-search {
+  #app-root.dark .glass.app-liquid-tab-pill {
     box-shadow: inset 0 0 0 1px var(--app-border-strong);
   }
 
@@ -2565,6 +2361,7 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
 /* Native business controls use the same iOS touch target and glass surface as
    the shared controls. Opt-in semantics keep compact, specialized controls
    (time pickers, sliders, and task editors) unchanged. */
+
 .la-pluma-app .la-pluma-content .app-native-control {
   box-sizing: border-box;
   min-height: var(--app-control-height-md);
@@ -2637,56 +2434,6 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
   opacity: 1;
 }
 
-.la-pluma-app .la-pluma-content .app-native-button {
-  display: inline-flex;
-  min-height: var(--app-control-height-md);
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-md);
-  background: var(--app-surface-muted);
-  color: var(--app-text);
-  box-shadow: none;
-  font: inherit;
-  font-weight: 600;
-  letter-spacing: 0;
-  -webkit-tap-highlight-color: transparent;
-  transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 120ms ease;
-}
-
-.la-pluma-app .la-pluma-content .app-native-button:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--app-accent) 28%, var(--app-border));
-  background: color-mix(in srgb, var(--app-accent-soft) 34%, var(--app-surface-muted));
-  color: var(--app-accent);
-}
-
-.la-pluma-app .la-pluma-content .app-native-button:active:not(:disabled) {
-  transform: scale(0.97);
-}
-
-.la-pluma-app .la-pluma-content .app-native-button:focus-visible {
-  outline: 2px solid var(--app-accent);
-  outline-offset: 2px;
-}
-
-.la-pluma-app .la-pluma-content .app-native-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.la-pluma-app .la-pluma-content .app-native-button-primary {
-  border-color: var(--app-accent-action);
-  background: var(--app-accent-action);
-  color: #fff;
-}
-
-.la-pluma-app .la-pluma-content .app-native-button-primary:hover:not(:disabled) {
-  border-color: var(--app-accent-action-pressed);
-  background: var(--app-accent-action-pressed);
-  color: #fff;
-}
-
 html.dark .la-pluma-app .la-pluma-content .app-native-control,
 .la-pluma-app.dark .la-pluma-content .app-native-control {
   background: color-mix(in srgb, var(--app-surface-muted) 92%, transparent);
@@ -2702,6 +2449,7 @@ html.dark .la-pluma-app .la-pluma-content .app-native-control,
 
 /* Borderless workspaces distinguish fields with a quiet filled surface. Focus
    remains explicit without bringing back a permanent control outline. */
+
 .la-pluma-app .la-pluma-content :is(
   .ios-borderless-cards,
   [data-automation-tasks],
@@ -2792,6 +2540,7 @@ html.dark .la-pluma-app .la-pluma-content .app-native-control,
 /* Automation owns a few compact field implementations instead of the shared
    Input component. Keep their filled grouping while removing the permanent
    hairlines used by the former desktop control treatment. */
+
 .la-pluma-app [data-automation-tasks] :is(
   .automation-select-control select,
   .automation-task-editor .automation-text-control,
@@ -2821,6 +2570,7 @@ html.dark .la-pluma-app .la-pluma-content .app-native-control,
 }
 
 /* Automation and workbench panels share the workspace glass material. */
+
 .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .smooth-panel-shell[data-smooth-corners='true'] {
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.05),
@@ -2833,6 +2583,7 @@ html.dark .la-pluma-app .la-pluma-content .app-native-control,
 
 /* Liquid Glass workspace surfaces: cards stay readable while the ambient
    background remains faintly visible behind them. */
+
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .la-pluma-content .smooth-panel-surface,
   .la-pluma-content .app-card-smooth-surface {
@@ -2865,6 +2616,7 @@ html.dark .la-pluma-app .la-pluma-content .app-native-control,
 }
 
 /* Dense text surfaces remain opaque inside the glass cards. */
+
 .la-pluma-content .log-console {
   background: var(--app-surface-solid);
 }

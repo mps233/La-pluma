@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   getWebrtcStatus: vi.fn(),
   getWebrtcSnapshot: vi.fn(),
   captureScreen: vi.fn(),
+  captureScreenFrame: vi.fn(),
   connect: vi.fn(),
   disconnect: vi.fn(),
 }))
@@ -21,6 +22,7 @@ vi.mock('../services/api', () => ({
     getWebrtcStatus: mocks.getWebrtcStatus,
     getWebrtcSnapshot: mocks.getWebrtcSnapshot,
     captureScreen: mocks.captureScreen,
+    captureScreenFrame: mocks.captureScreenFrame,
   },
 }))
 
@@ -55,6 +57,7 @@ describe('useDashboardPreview Activity lifecycle', () => {
     })
     mocks.getWebrtcSnapshot.mockReset().mockResolvedValue({ success: false })
     mocks.captureScreen.mockReset().mockResolvedValue({ success: false })
+    mocks.captureScreenFrame.mockReset()
     mocks.connect.mockReset()
     mocks.disconnect.mockReset()
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)

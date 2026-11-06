@@ -22,32 +22,37 @@ describe('Switch', () => {
     container.remove()
   })
 
-  it('keeps native switch semantics and reports the next value', async () => {
+  it('keeps switch semantics and reports the next value', async () => {
     const onChange = vi.fn()
 
     await act(async () => {
       root.render(
-        <Switch
-          compact
-          checked={false}
-          label="启用定时执行"
-          onChange={onChange}
-        />,
+        <div>
+          <label htmlFor="scheduled-switch">启用定时执行</label>
+          <Switch
+            id="scheduled-switch"
+            compact
+            checked={false}
+            label="启用定时执行"
+            onChange={onChange}
+          />
+        </div>,
       )
     })
 
-    const input = container.querySelector<HTMLInputElement>('input[role="switch"]')
-    const wrapper = container.querySelector<HTMLLabelElement>('.app-switch')
-    expect(input?.getAttribute('aria-label')).toBe('启用定时执行')
-    expect(input?.checked).toBe(false)
-    expect(wrapper?.htmlFor).toBe(input?.id)
+    const control = container.querySelector<HTMLButtonElement>('button[role="switch"]')
+    const wrapper = container.querySelector<HTMLElement>('.app-switch')
+    const externalLabel = container.querySelector<HTMLLabelElement>('label')
+    expect(control?.getAttribute('aria-label')).toBe('启用定时执行')
+    expect(control?.getAttribute('aria-checked')).toBe('false')
+    expect(externalLabel?.control).toBe(control)
     expect(wrapper?.classList.contains('app-switch-compact')).toBe(true)
     expect(wrapper?.classList.contains('toggle')).toBe(false)
-    expect(wrapper?.querySelectorAll('.app-switch-track')).toHaveLength(1)
-    expect(wrapper?.querySelectorAll('.app-switch-thumb')).toHaveLength(1)
+    expect(wrapper?.querySelectorAll('.app-switch-control:not([data-lg-copy]) > .lg-switch__track')).toHaveLength(1)
+    expect(wrapper?.querySelectorAll('.app-switch-control:not([data-lg-copy]) > .lg-switch__thumb')).toHaveLength(1)
     expect(wrapper?.querySelector('.toggle-icon')).toBeNull()
 
-    await act(async () => input?.click())
+    await act(async () => externalLabel?.click())
     expect(onChange).toHaveBeenCalledWith(true)
   })
 
@@ -63,7 +68,9 @@ describe('Switch', () => {
       )
     })
 
-    expect(container.querySelector<HTMLInputElement>('input[role="switch"]')?.disabled).toBe(true)
+    const control = container.querySelector<HTMLButtonElement>('button[role="switch"]')
+    expect(control?.disabled).toBe(true)
+    expect(control?.getAttribute('aria-checked')).toBe('true')
     expect(container.querySelector('.app-switch')?.classList.contains('is-disabled')).toBe(true)
   })
 })

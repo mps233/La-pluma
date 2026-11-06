@@ -1,0 +1,54 @@
+/* Split from index.css / ios-theme.css; imported by the lazy roguelike route. */
+
+
+
+
+.roguelike-theme-copy {
+    display: grid;
+    min-width: 0;
+    gap: 0.1rem;
+  }
+
+
+
+
+.roguelike-theme-copy strong,
+  .roguelike-theme-copy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+
+
+
+.roguelike-theme-copy strong {
+    color: inherit;
+    font-size: var(--app-font-body);
+    font-weight: 600;
+  }
+
+
+
+
+.roguelike-theme-copy small {
+    color: var(--app-text-soft);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: var(--app-font-meta);
+  }
+
+
+
+
+.roguelike-toggle-label {
+    display: flex;
+    min-height: 2.75rem;
+    min-width: 0;
+    flex: 1;
+    cursor: pointer;
+    align-items: center;
+    color: var(--app-text-muted);
+    font-size: var(--app-font-body);
+    font-weight: 550;
+  }
+

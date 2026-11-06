@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Check, Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
 import { useUIStore } from '@/stores'
 
@@ -21,7 +20,6 @@ export default function ThemeToggle() {
   // 使用 UI Store 管理主题
   const theme = useUIStore(state => state.theme)
   const setTheme = useUIStore(state => state.setTheme)
-  const shouldReduceMotion = useReducedMotion()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const mobileTriggerRef = useRef<HTMLButtonElement>(null)
   const mobileMenuRef = useRef<HTMLDivElement>(null)
@@ -122,30 +120,28 @@ export default function ThemeToggle() {
           const ThemeIcon = option.icon
           const selected = theme === option.value
           return (
-            <motion.button
+            <button
               key={option.value}
               type="button"
               onClick={() => handleThemeChange(option.value)}
-              className={`theme-toggle-btn ${selected ? 'is-active' : ''}`}
-              whileTap={shouldReduceMotion ? {} : { scale: 0.94 }}
+              className={`theme-toggle-btn motion-safe:active:scale-[0.94] transition-transform ${selected ? 'is-active' : ''}`}
               title={option.label}
               aria-label={option.label}
               aria-pressed={selected}
             >
               <ThemeIcon strokeWidth={1.8} aria-hidden="true" />
-            </motion.button>
+            </button>
           )
         })}
       </div>
 
       <div className="la-pluma-theme-mobile relative flex-none">
-        <motion.button
+        <button
           ref={mobileTriggerRef}
           type="button"
           onClick={() => setMobileMenuOpen(open => !open)}
-          className={`la-pluma-theme-trigger group text-secondary transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] glass ${mobileMenuOpen ? 'text-primary' : ''}`}
+          className={`la-pluma-theme-trigger group text-secondary transition-colors motion-safe:active:scale-[0.96] hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] glass ${mobileMenuOpen ? 'text-primary' : ''}`}
           data-pill
-          whileTap={shouldReduceMotion ? {} : { scale: 0.96 }}
           title={`主题：${currentTheme.label}`}
           aria-label={`切换界面主题，当前${currentTheme.label}`}
           aria-haspopup="menu"
@@ -153,52 +149,38 @@ export default function ThemeToggle() {
           aria-controls={mobileMenuId}
         >
           <CurrentThemeIcon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
-        </motion.button>
+        </button>
 
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.div
-              ref={mobileMenuRef}
-              id={mobileMenuId}
-              role="menu"
-              aria-label="选择界面主题"
-              initial={shouldReduceMotion
-                ? { opacity: 0 }
-                : { opacity: 0, y: -4, scale: 0.98, backdropFilter: 'blur(0px) saturate(100%)' }}
-              animate={shouldReduceMotion
-                ? { opacity: 1 }
-                : { opacity: 1, y: 0, scale: 1, backdropFilter: 'blur(24px) saturate(165%)' }}
-              exit={shouldReduceMotion
-                ? { opacity: 0 }
-                : { opacity: 0, y: -4, scale: 0.98, backdropFilter: 'blur(0px) saturate(100%)' }}
-              transition={shouldReduceMotion
-                ? { duration: 0.08 }
-                : { type: 'spring', stiffness: 440, damping: 38, mass: 0.7 }}
-              className="theme-menu-popover surface-panel absolute right-0 top-[calc(100%+0.5rem)] z-[60] w-40 origin-top-right rounded-xl p-1.5"
-            >
-              {themeOptions.map(option => {
-                const ThemeIcon = option.icon
-                const selected = theme === option.value
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={selected}
-                    onClick={() => handleThemeChange(option.value, true)}
-                    className={`flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] ${
-                      selected ? 'brand-action-subtle' : 'text-secondary hover:bg-[var(--app-surface-muted)] hover:text-primary'
-                    }`}
-                  >
-                    <ThemeIcon className="h-4 w-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
-                    <span className="flex-1 text-left">{option.label}</span>
-                    {selected && <Check className="h-4 w-4 shrink-0 text-[var(--app-accent)]" aria-hidden="true" />}
-                  </button>
-                )
-              })}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {mobileMenuOpen && (
+          <div
+            ref={mobileMenuRef}
+            id={mobileMenuId}
+            role="menu"
+            aria-label="选择界面主题"
+            className="theme-menu-popover surface-panel absolute right-0 top-[calc(100%+0.5rem)] z-[60] w-40 origin-top-right rounded-xl p-1.5"
+          >
+            {themeOptions.map(option => {
+              const ThemeIcon = option.icon
+              const selected = theme === option.value
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={selected}
+                  onClick={() => handleThemeChange(option.value, true)}
+                  className={`flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] ${
+                    selected ? 'brand-action-subtle' : 'text-secondary hover:bg-[var(--app-surface-muted)] hover:text-primary'
+                  }`}
+                >
+                  <ThemeIcon className="h-4 w-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+                  <span className="flex-1 text-left">{option.label}</span>
+                  {selected && <Check className="h-4 w-4 shrink-0 text-[var(--app-accent)]" aria-hidden="true" />}
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
     </>
   )

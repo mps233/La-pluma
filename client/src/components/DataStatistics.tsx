@@ -1,15 +1,18 @@
 import { getErrorMessage } from '@/utils/errorMessage'
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import '../styles/pages/statistics.css'
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { maaApi, getAllOperators, getDropStatistics, getItemIconUrl, getOperBoxData, fetchOperatorMaterials, getTrainingQueue } from '../services/api'
 import { getOperatorAvatarUrl } from '../services/operatorQuotes'
 import { motion, useReducedMotion } from 'framer-motion'
+import { GlassSegmented } from '@zakisheriff/liquid-glass'
 import {
   ChevronDown,
   Download,
   Package as PackageIcon,
   Play,
   RotateCcw,
+  TrendingUp,
   Users,
 } from 'lucide-react'
 import Icons from './Icons'
@@ -20,7 +23,6 @@ import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import { useUIStore } from '../stores'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
-import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
 import { useItemIconCacheVersion } from '../hooks/useItemIconCacheVersion'
 import type {
   DepotDataDetailed,
@@ -442,6 +444,97 @@ function InlineDataError({ title, description, isRetrying, onRetry }: InlineData
   )
 }
 
+const OperatorCard = memo(function OperatorCard({
+  oper,
+  owned,
+}: {
+  oper: OperatorDetailed
+  owned: boolean
+}) {
+  const [imageLoaded, setImageLoaded] = useState(false)
+  const [imageFailed, setImageFailed] = useState(false)
+
+  return (
+    <div
+      className={`data-statistics-operator-item relative min-w-0 ${
+        owned
+          ? ''
+          : 'opacity-70 grayscale-[0.15]'
+      }`}
+    >
+      {!owned && (
+        <div className="absolute left-2 top-2 z-10 rounded-full bg-[var(--app-surface-solid)] px-2 py-0.5 text-xs font-semibold text-secondary">
+          未拥有
+        </div>
+      )}
+
+      <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-xl bg-[var(--app-surface-muted)]">
+        {oper.id ? (
+          <>
+            {!imageLoaded && (
+              <div className="absolute inset-0 animate-pulse bg-[var(--app-surface-muted)]"></div>
+            )}
+            <img
+              src={getOperatorAvatarUrl(oper.id)}
+              alt={oper.name}
+              loading="lazy"
+              decoding="async"
+              className={`h-full w-full object-cover transition-opacity duration-300 ${
+                imageLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
+              style={imageFailed ? { display: 'none' } : undefined}
+              onLoad={() => setImageLoaded(true)}
+              onError={() => {
+                setImageFailed(true)
+                setImageLoaded(true)
+              }}
+            />
+            {!owned && imageLoaded && (
+              <div className="absolute inset-0 bg-[color-mix(in_srgb,var(--app-bg)_62%,transparent)]"></div>
+            )}
+          </>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-secondary">
+            无头像
+          </div>
+        )}
+        {oper.rarity !== undefined && oper.rarity > 0 && (
+          <div className="brand-chip absolute right-1.5 top-1.5 rounded-full px-2 py-0.5 text-xs font-semibold">
+            {Math.min(oper.rarity, 6)}★
+          </div>
+        )}
+      </div>
+
+      <div className="text-center space-y-2">
+        <div className="text-sm font-bold text-primary truncate" title={oper.name}>
+          {oper.name || '未知干员'}
+        </div>
+        {owned && (
+          <>
+            <div className="flex flex-wrap items-center justify-center gap-1 text-xs">
+              {oper.elite !== undefined && (
+                <span className={chipClass}>
+                  精{oper.elite}
+                </span>
+              )}
+              {oper.level !== undefined && (
+                <span className={chipClass}>
+                  Lv.{oper.level}
+                </span>
+              )}
+            </div>
+            {oper.potential !== undefined && (
+              <div className="text-xs text-secondary">
+                潜能 {oper.potential}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+})
+
 const STATISTICS_TABS: readonly ActiveTab[] = ['operbox', 'depot', 'drops']
 const STATISTICS_TAB_PARAM = 'tab'
 
@@ -489,15 +582,9 @@ export default function DataStatistics() {
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => readStatisticsTabFromUrl())
   const requestedStatisticsTab = useUIStore(state => state.statisticsTab)
   const setRequestedStatisticsTab = useUIStore(state => state.setStatisticsTab)
-  const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({})
   const shouldReduceMotion = useReducedMotion()
-  const {
-    containerRef: tabListRef,
-    activeRect: activeTabRect,
-    setTabRef,
-    handleTabKeyDown,
-  } = useFluidTabIndicator(activeTab)
-  
+  const statisticsTabsRef = useRef<HTMLDivElement>(null)
+
   const selectStatisticsTab = useCallback((tab: ActiveTab) => {
     setActiveTab(tab)
     writeStatisticsTabToUrl(tab)
@@ -508,6 +595,18 @@ export default function DataStatistics() {
     selectStatisticsTab(requestedStatisticsTab)
     setRequestedStatisticsTab(null)
   }, [requestedStatisticsTab, selectStatisticsTab, setRequestedStatisticsTab])
+
+  useEffect(() => {
+    const buttons = statisticsTabsRef.current?.querySelectorAll<HTMLButtonElement>(
+      '.lg-track:not([data-lg-copy]) > [data-lg-item]',
+    )
+    buttons?.forEach((button, index) => {
+      const tab = statisticsTabs[index]
+      if (!tab) return
+      button.id = `data-statistics-tab-${tab.id}`
+      button.setAttribute('aria-controls', `data-statistics-panel-${tab.id}`)
+    })
+  }, [])
 
   const depotTypeSummary = useMemo(() => {
     const grouped = new Map<string, { count: number; kinds: number }>()
@@ -836,13 +935,18 @@ export default function DataStatistics() {
     return filtered
   }, [filterOwnership, filterRarity, filterProfession, filterElite, filterPotential, sortBy, allOperators, operBoxData])
 
-  const ownedOperatorCount = useMemo(() => {
+  const ownedOperatorIds = useMemo(() => {
     const ids = new Set((operBoxData?.data || []).map(operator => operator.id))
     for (const oper of operBoxData?.allOpers || []) {
       if (oper.own) ids.add(oper.id)
     }
-    return ids.size
+    const amiyaIds = ['char_002_amiya', 'char_1001_amiya2', 'char_1037_amiya3']
+    if (amiyaIds.some(id => ids.has(id))) {
+      amiyaIds.forEach(id => ids.add(id))
+    }
+    return ids
   }, [operBoxData])
+  const ownedOperatorCount = ownedOperatorIds.size
   const operatorCatalogCount = Math.max(
     allOperators.length,
     operBoxData?.totalOperCount || 0,
@@ -853,27 +957,6 @@ export default function DataStatistics() {
     ? Math.round((ownedOperatorCount / operatorCatalogCount) * 100)
     : 0
   const hasOperatorCatalog = operatorCatalogCount > 0
-
-  // 当筛选条件变化时，清理不再显示的干员图片加载状态
-  useEffect(() => {
-    const currentOperIds = new Set(getFilteredAndSortedOperators.map(op => op.id))
-    
-    setLoadedImages(prev => {
-      const loadedIds = Object.keys(prev)
-      
-      if (loadedIds.length > 500) {
-        const newLoadedImages: Record<string, boolean> = {}
-        loadedIds.forEach(id => {
-          if (currentOperIds.has(id) && prev[id]) {
-            newLoadedImages[id] = prev[id]
-          }
-        })
-        return newLoadedImages
-      }
-      
-      return prev
-    })
-  }, [filterRarity, filterElite, filterPotential, filterOwnership, filterProfession, sortBy, getFilteredAndSortedOperators])
 
   // 执行仓库识别
   const executeDepot = async () => {
@@ -1054,63 +1137,23 @@ export default function DataStatistics() {
           )}
         />
 
-        <div className="app-workspace-segments app-liquid-tab-pill glass data-statistics-view-switcher data-statistics-mode-shell">
-          <div
-            ref={tabListRef}
-            className="app-workspace-segment-list data-statistics-mode-tabs"
-            role="tablist"
-            aria-label="数据统计视图"
-          >
-            {activeTabRect.width > 0 && (
-              <motion.div
-                data-testid="data-statistics-tab-highlight"
-                aria-hidden="true"
-                className="app-workspace-segment-indicator data-statistics-mode-highlight"
-                initial={false}
-                animate={{
-                  x: activeTabRect.x,
-                  y: activeTabRect.y,
-                  width: activeTabRect.width,
-                  height: activeTabRect.height,
-                }}
-                transition={shouldReduceMotion
-                  ? { duration: 0 }
-                  : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
-              />
-            )}
-            {statisticsTabs.map(tab => {
-              const TabIcon = Icons[tab.icon]
-              const selected = activeTab === tab.id
-
-              return (
-                <button
-                  key={tab.id}
-                  ref={setTabRef(tab.id)}
-                  id={`data-statistics-tab-${tab.id}`}
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  aria-controls={`data-statistics-panel-${tab.id}`}
-                  tabIndex={selected ? 0 : -1}
-                  onClick={() => selectStatisticsTab(tab.id)}
-                  onKeyDown={event => handleTabKeyDown(
-                    event,
-                    statisticsTabs.map(option => option.id),
-                    selectStatisticsTab,
-                  )}
-                  className={`app-workspace-segment data-statistics-mode-button min-h-11 ${selected ? 'is-selected' : ''}`}
-                >
-                  <span className="app-workspace-segment-icon data-statistics-mode-icon" aria-hidden="true">
-                    <TabIcon />
-                  </span>
-                  <span className="app-workspace-segment-copy">
-                    <span>{tab.title}</span>
-                    <small>{tab.description}</small>
-                  </span>
-                </button>
-              )
+        <div className="data-statistics-view-switcher data-statistics-mode-shell" ref={statisticsTabsRef}>
+          <GlassSegmented
+            options={statisticsTabs.map(tab => {
+              const TabIcon = tab.id === 'operbox' ? Users : tab.id === 'depot' ? PackageIcon : TrendingUp
+              return {
+                label: tab.title,
+                icon: <TabIcon className="h-4 w-4" aria-hidden="true" />,
+              }
             })}
-          </div>
+            value={Math.max(0, statisticsTabs.findIndex(tab => tab.id === activeTab))}
+            onChange={(index) => {
+              const tab = statisticsTabs[index]
+              if (tab) selectStatisticsTab(tab.id)
+            }}
+            aria-label="数据统计视图"
+            className="data-statistics-segmented"
+          />
         </div>
 
         <div>
@@ -1340,109 +1383,13 @@ export default function DataStatistics() {
                   />
                 ) : (
                 <div className="data-statistics-item-grid grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-                  {getFilteredAndSortedOperators.map((oper) => {
-                    // 判断是否拥有该干员
-                    const ownedIds = new Set((operBoxData?.data || []).map(op => op.id))
-                    for (const catalogOper of operBoxData?.allOpers || []) {
-                      if (catalogOper.own) ownedIds.add(catalogOper.id)
-                    }
-                    
-                    // 特殊处理：阿米娅的三个形态
-                    const amiyaIds = ['char_002_amiya', 'char_1001_amiya2', 'char_1037_amiya3']
-                    const hasAnyAmiya = amiyaIds.some(id => ownedIds.has(id))
-                    if (hasAnyAmiya) {
-                      amiyaIds.forEach(id => ownedIds.add(id))
-                    }
-                    
-                    const isOwned = oper.level > 0 || ownedIds.has(oper.id);
-                    const imageLoaded = loadedImages[oper.id] || false;
-                    
-                    return (
-                      <div
-                        key={oper.id}
-                        className={`data-statistics-operator-item relative min-w-0 ${
-                          isOwned
-                            ? ''
-                            : 'opacity-70 grayscale-[0.15]'
-                        }`}
-                      >
-                        {/* 未拥有标识 */}
-                        {!isOwned && (
-                          <div className="absolute left-2 top-2 z-10 rounded-full bg-[var(--app-surface-solid)] px-2 py-0.5 text-xs font-semibold text-secondary">
-                            未拥有
-                          </div>
-                        )}
-                        
-                        {/* 干员头像 */}
-                        <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-xl bg-[var(--app-surface-muted)]">
-                          {oper.id ? (
-                            <>
-                              {/* 骨架屏 */}
-                              {!imageLoaded && (
-                                <div className="absolute inset-0 animate-pulse bg-[var(--app-surface-muted)]"></div>
-                              )}
-                              <img
-                                src={getOperatorAvatarUrl(oper.id)}
-                                alt={oper.name}
-                                loading="lazy"
-                                decoding="async"
-                                className={`h-full w-full object-cover transition-opacity duration-300 ${
-                                  imageLoaded ? 'opacity-100' : 'opacity-0'
-                                }`}
-                                onLoad={() => setLoadedImages(prev => ({ ...prev, [oper.id]: true }))}
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement
-                                  target.style.display = 'none'
-                                  setLoadedImages(prev => ({ ...prev, [oper.id]: true }))
-                                }}
-                              />
-                              {/* 未拥有白色半透明蒙版 */}
-                              {!isOwned && imageLoaded && (
-                                <div className="absolute inset-0 bg-[color-mix(in_srgb,var(--app-bg)_62%,transparent)]"></div>
-                              )}
-                            </>
-                          ) : (
-                            <div className="absolute inset-0 flex items-center justify-center text-secondary">
-                              无头像
-                            </div>
-                          )}
-                          {/* 稀有度标识 */}
-                          {oper.rarity !== undefined && oper.rarity > 0 && (
-                            <div className="brand-chip absolute right-1.5 top-1.5 rounded-full px-2 py-0.5 text-xs font-semibold">
-                              {Math.min(oper.rarity, 6)}★
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="text-center space-y-2">
-                          <div className="text-sm font-bold text-primary truncate" title={oper.name}>
-                            {oper.name || '未知干员'}
-                          </div>
-                          {isOwned && (
-                            <>
-                              <div className="flex flex-wrap items-center justify-center gap-1 text-xs">
-                                {oper.elite !== undefined && (
-                                  <span className={chipClass}>
-                                    精{oper.elite}
-                                  </span>
-                                )}
-                                {oper.level !== undefined && (
-                                  <span className={chipClass}>
-                                    Lv.{oper.level}
-                                  </span>
-                                )}
-                              </div>
-                              {oper.potential !== undefined && (
-                                <div className="text-xs text-secondary">
-                                  潜能 {oper.potential}
-                                </div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {getFilteredAndSortedOperators.map((oper) => (
+                    <OperatorCard
+                      key={oper.id}
+                      oper={oper}
+                      owned={oper.level > 0 || ownedOperatorIds.has(oper.id)}
+                    />
+                  ))}
                 </div>
                 )}
                   </div>
@@ -1593,6 +1540,8 @@ export default function DataStatistics() {
                               <img
                                 src={getItemIconUrl(item.iconId)}
                                 alt={item.name}
+                                loading="lazy"
+                                decoding="async"
                                 className="maa-item-icon w-full h-full object-cover"
                                 onError={() => {
                                   setFailedDepotImages(previous => ({ ...previous, [imageKey]: true }))

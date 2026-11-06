@@ -126,7 +126,7 @@ const renderComponent = async () => {
 }
 
 const switchByLabel = (label: string) =>
-  container.querySelector<HTMLInputElement>(`input[role="switch"][aria-label="${label}"]`)
+  container.querySelector<HTMLButtonElement>(`button[role="switch"][aria-label="${label}"]`)
 
 describe('OperatorTraining async interactions', () => {
   beforeEach(() => {
@@ -234,30 +234,31 @@ describe('OperatorTraining async interactions', () => {
   it('uses the shared liquid segment control for operator scope', async () => {
     await renderComponent()
 
-    const toolbar = container.querySelector<HTMLElement>('[role="toolbar"][aria-label="干员范围"]')
+    const toolbar = container.querySelector<HTMLElement>('[role="tablist"][aria-label="干员范围"]')
     expect(toolbar).not.toBeNull()
-    expect(toolbar?.parentElement?.className).toContain('app-liquid-tab-pill')
+    expect(toolbar?.parentElement?.className).toContain('training-status-shell')
 
-    const buttons = Array.from(toolbar?.querySelectorAll<HTMLButtonElement>('button') ?? [])
+    const buttons = Array.from(
+      toolbar?.querySelectorAll<HTMLButtonElement>(':scope > .lg-track__item') ?? [],
+    )
     expect(buttons).toHaveLength(3)
-    expect(buttons[0]?.className).toContain('app-workspace-segment')
-    expect(buttons[0]?.className).toContain('is-selected')
-    expect(buttons[0]?.getAttribute('aria-pressed')).toBe('true')
+    expect(buttons.every(button => button.getAttribute('role') === 'tab')).toBe(true)
+    expect(buttons[0]?.getAttribute('aria-label')).toMatch(/^可养成，(数量读取中|\d+ 名)$/)
+    expect(buttons[0]?.getAttribute('aria-selected')).toBe('true')
 
     const allButton = buttons.find(button => button.textContent?.includes('全部'))
     expect(allButton).toBeDefined()
     await click(allButton!)
 
-    expect(allButton?.className).toContain('is-selected')
-    expect(allButton?.getAttribute('aria-pressed')).toBe('true')
-    expect(buttons[0]?.getAttribute('aria-pressed')).toBe('false')
+    expect(allButton?.getAttribute('aria-selected')).toBe('true')
+    expect(buttons[0]?.getAttribute('aria-selected')).toBe('false')
 
     await act(async () => {
       allButton?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
     })
     await flush()
 
-    expect(buttons[0]?.getAttribute('aria-pressed')).toBe('true')
+    expect(buttons[0]?.getAttribute('aria-selected')).toBe('true')
     expect(document.activeElement).toBe(buttons[0])
   })
 
@@ -269,13 +270,13 @@ describe('OperatorTraining async interactions', () => {
 
     await renderComponent()
     const autoSwitch = switchByLabel('自动切换')
-    expect(autoSwitch?.checked).toBe(true)
+    expect(autoSwitch?.getAttribute('aria-checked')).toBe('true')
 
     await click(autoSwitch!)
-    expect(autoSwitch?.checked).toBe(false)
+    expect(autoSwitch?.getAttribute('aria-checked')).toBe('false')
     await click(autoSwitch!)
     expect(mocks.updateTrainingSettings).toHaveBeenCalledOnce()
-    expect(autoSwitch?.checked).toBe(true)
+    expect(autoSwitch?.getAttribute('aria-checked')).toBe('true')
 
     await act(async () => firstRequest.resolve({
       success: true,
@@ -285,7 +286,7 @@ describe('OperatorTraining async interactions', () => {
 
     expect(mocks.updateTrainingSettings).toHaveBeenCalledTimes(2)
     expect(mocks.updateTrainingSettings).toHaveBeenLastCalledWith(settings)
-    expect(autoSwitch?.checked).toBe(true)
+    expect(autoSwitch?.getAttribute('aria-checked')).toBe('true')
   })
 
   it('serializes duplicate queue additions while a request is pending', async () => {
@@ -394,7 +395,7 @@ describe('OperatorTraining async interactions', () => {
     await flush()
 
     expect(document.querySelector('button[aria-label="移除能天使"]')).not.toBeNull()
-    expect(switchByLabel('自动切换')?.checked).toBe(true)
+    expect(switchByLabel('自动切换')?.getAttribute('aria-checked')).toBe('true')
   })
 
   it('keeps the local queue truthful and warns when a successful add cannot be refreshed', async () => {

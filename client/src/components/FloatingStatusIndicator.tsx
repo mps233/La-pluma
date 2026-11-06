@@ -1,4 +1,3 @@
-import { motion, useReducedMotion } from 'framer-motion'
 import {
   DEFAULT_RANDOM_OPERATOR_QUOTE,
   loadRandomOperatorQuote,
@@ -6,7 +5,7 @@ import {
 } from '../services/operatorQuotes'
 import { useStatusStore } from '../store/statusStore'
 import { detectStatusMessageType, getStatusVisualConfig } from '../utils/statusMessage'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 
 interface FloatingStatusIndicatorProps {
@@ -22,7 +21,6 @@ interface FloatingStatusIndicatorProps {
 export default function FloatingStatusIndicator({ className = '', textClassName = '' }: FloatingStatusIndicatorProps) {
   const { message, messageType, isActive, runStatus, backendStatus, backendMessage } = useStatusStore()
   const isOnline = useOnlineStatus()
-  const shouldReduceMotion = useReducedMotion()
   const [readyQuote, setReadyQuote] = useState<OperatorQuote>(DEFAULT_RANDOM_OPERATOR_QUOTE)
 
   useEffect(() => {
@@ -68,17 +66,12 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
     <div
       className={`floating-status-indicator inline-flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium sm:max-w-sm sm:px-4 sm:py-2 sm:text-sm ${config.className} ${className}`}
     >
-      <motion.div
-        className="h-2 w-2 flex-shrink-0 rounded-full"
-        style={{ backgroundColor: config.dotColor }}
-        animate={shouldReduceMotion ? { boxShadow: 'none' } : {
-          boxShadow: [
-            `0 0 0 0 rgba(${config.pulseRgb}, 0.7)`,
-            `0 0 0 4px rgba(${config.pulseRgb}, 0)`,
-            `0 0 0 0 rgba(${config.pulseRgb}, 0)`
-          ]
-        }}
-        transition={shouldReduceMotion ? { duration: 0 } : { duration: 2, repeat: Infinity, ease: "easeOut" }}
+      <div
+        className="floating-status-dot h-2 w-2 flex-shrink-0 rounded-full"
+        style={{
+          backgroundColor: config.dotColor,
+          '--status-pulse-rgb': config.pulseRgb,
+        } as CSSProperties}
       />
       <div
         className={`floating-status-text min-w-0 flex-1 truncate leading-5 ${textClassName}`}

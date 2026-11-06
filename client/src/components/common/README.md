@@ -80,7 +80,7 @@ Card Props：
 
 ### Button / IconButton - 按钮组件
 
-统一按钮样式，支持主要、次要、危险、成功、幽灵等变体。
+统一按钮样式，支持主要、次要、危险、成功、幽灵等变体。`Button` 与 `IconButton` 内部由 `@zakisheriff/liquid-glass` 的 `GlassButton` 承载：primary / danger / success 使用实心玻璃填充（分别取 accent、danger、success 色），secondary / outline 使用玻璃，ghost 使用透明玻璃；loading 时把内置活动指示器放进 icon 并显示 `loadingText`。尺寸映射为 36 / 44 / 48px，粗指针设备下小号自动提升到 44px；明暗主题由 `html[data-theme]` 统一提供，页面不要给按钮单独包裹主题属性。
 
 ```tsx
 import { Button, IconButton } from '@/components/common'
@@ -248,6 +248,8 @@ import { Input, Select, Checkbox, Switch } from '@/components/common'
 
 表单错误态使用 `error` prop，不要在页面里单独手写红色边框和错误文字。`Input`、`Select` 均支持 `hint`；`Input` 额外支持前置 `icon`。二元设置使用 `Switch`，多选或参数组合使用 `Checkbox`；多行文本使用带 `app-input control-surface !h-auto !min-h-28 resize-y px-3 py-2` 的原生 `textarea`（`app-input` 在手机端会被 44px 的 `!important` 高度规则覆盖）。
 
+`Switch` 由 `@zakisheriff/liquid-glass` 的 `GlassSwitch` 承载，保留 `checked` / `onChange` / `label` / `compact` / `disabled` 和 `id` 用法；`label` 只作 `aria-label`，可见标题仍需写在旁边。`id` 落在按钮上，外部 `<label htmlFor>` 可继续关联。
+
 ---
 
 ### EmptyState - 空状态组件
@@ -280,7 +282,7 @@ Props：
 
 ### Modal / ConfirmDialog - 覆盖层
 
-`Modal` 和 `ConfirmDialog` 从 common 导出。`Modal` 用于 ≤6 字段的短表单：`size` 为 `sm` / `md` / `lg` / `xl`（max-width 28 / 32 / 42 / 56rem），内置焦点陷阱、关闭归还、滚动锁和背景 inert。`Sheet` 是 `Layout` 的移动导航内部组件，不是公共导出。
+`Modal` 和 `ConfirmDialog` 从 common 导出。`Modal` 用于 ≤6 字段的短表单：`size` 为 `sm` / `md` / `lg` / `xl`（max-width 28 / 32 / 42 / 56rem），内置焦点陷阱、关闭归还、滚动锁和背景 inert。移动端「更多工作区」由 `Layout` 内的 `GlassMenu` 提供，不是公共导出。
 
 - `ConfirmDialog`：删除、清空等不可逆操作的确认弹窗。异步 `onConfirm` 返回 `false` 或抛出错误时会保持打开并就地显示失败原因。
 

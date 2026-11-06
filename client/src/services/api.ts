@@ -195,7 +195,9 @@ export interface ScheduleExecutionStatusData {
   message: string
   startTime: number | null
   shouldStop: boolean
-  lastResult: unknown
+  lastResult?: unknown
+  hasLastResult?: boolean
+  lastResultRevision?: number
 }
 
 export interface ActivityData {
@@ -460,8 +462,9 @@ export const maaApi = {
   /**
    * 获取实时日志
    */
-  async getRealtimeLogs(lines: number = 100, signal?: AbortSignal): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/logs/recent?lines=${lines}`, { signal })
+  async getRealtimeLogs(lines: number = 100, signal?: AbortSignal, afterSequence = 0): Promise<ApiResponse> {
+    const cursor = afterSequence > 0 ? `&afterSequence=${afterSequence}` : ''
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/logs/recent?lines=${lines}${cursor}`, { signal })
     return parseJsonResponse(response)
   },
 
@@ -611,6 +614,18 @@ export const maaApi = {
     return parseJsonResponse(response)
   },
 
+  /** Binary, downscaled snapshot used by the dashboard preview fallback. */
+  async captureScreenFrame(profileId: string = 'default', signal?: AbortSignal): Promise<Blob> {
+    const response = await fetchWithAuth(
+      `${API_BASE_URL}/agent/screen/frame?profileId=${encodeURIComponent(profileId)}`,
+      { signal }
+    )
+    if (!response.ok) {
+      throw new Error(`截图失败: HTTP ${response.status}`)
+    }
+    return response.blob()
+  },
+
   async getDeviceStats(address?: string): Promise<ApiResponse> {
     const qs = address ? `?address=${encodeURIComponent(address)}` : ''
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/device-stats${qs}`)
@@ -661,8 +676,9 @@ export const maaApi = {
   /**
    * 获取定时任务执行状态
    */
-  async getScheduleExecutionStatus(signal?: AbortSignal): Promise<ApiResponse<ScheduleExecutionStatusData>> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/schedules/execution`, { signal })
+  async getScheduleExecutionStatus(signal?: AbortSignal, includeResult = false): Promise<ApiResponse<ScheduleExecutionStatusData>> {
+    const query = includeResult ? '?includeResult=true' : ''
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/schedules/execution${query}`, { signal })
     return parseJsonResponse(response)
   },
 
@@ -917,15 +933,28 @@ export const maaApi = {
 /**
  * 获取干员列表
  */
-export async function getOperatorList(filters: OperatorFilters = {}): Promise<ApiResponse<OperatorListData | TrainingOperator[]>> {
+export async function getOperatorList(filters: OperatorFilters = {}, signal?: AbortSignal): Promise<ApiResponse<OperatorListData | TrainingOperator[]>> {
   const params = new URLSearchParams()
   if (filters.rarity) params.append('rarity', filters.rarity.toString())
   if (filters.profession) params.append('profession', filters.profession)
   if (filters.owned !== undefined) params.append('owned', filters.owned.toString())
   if (filters.needsElite2) params.append('needsElite2', 'true')
   if (filters.status) params.append('status', filters.status)
-  
-  const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/operators?${params}`)
+
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/operators?${params}`, { signal })
+  return parseJsonResponse(response)
+}
+
+/**
+ * 获取养成状态徽章计数
+ */
+export async function getOperatorCounts(
+  filters: { rarity?: number } = {},
+  signal?: AbortSignal
+): Promise<ApiResponse<{ trainable: number; owned: number; all: number }>> {
+  const params = new URLSearchParams()
+  if (filters.rarity) params.append('rarity', filters.rarity.toString())
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/operator-counts?${params}`, { signal })
   return parseJsonResponse(response)
 }
 

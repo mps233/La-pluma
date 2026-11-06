@@ -1,6 +1,5 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
-import { Parser } from 'budoux/parser'
-import { model as zhHansModel } from 'budoux/model-zh-hans'
+import type { Parser } from 'budoux/parser'
 import { resolveCjkScript, type CjkScript } from '@/utils/cjkScript'
 
 const HAN_RE = /\p{Script=Han}/u
@@ -12,11 +11,19 @@ const OPENING_PUNCTUATION = /[（［｛〈《「『【〔“‘〘〚]$/u
 
 let simplifiedChineseParser: Parser | undefined
 let traditionalChineseParser: Parser | undefined
+let simplifiedChineseParserPromise: Promise<Parser> | null = null
+
+function loadSimplifiedChineseParser(): Promise<Parser> {
+  simplifiedChineseParserPromise ??= Promise.all([
+    import('budoux/parser'),
+    import('budoux/model-zh-hans'),
+  ]).then(([{ Parser }, { model }]) => new Parser(model))
+  return simplifiedChineseParserPromise
+}
 
 function getParser(script: CjkScript) {
   if (script === 'hant') return traditionalChineseParser ?? null
-  simplifiedChineseParser ??= new Parser(zhHansModel)
-  return simplifiedChineseParser
+  return simplifiedChineseParser ?? null
 }
 
 function segmentText(text: string, script: CjkScript) {
@@ -61,19 +68,35 @@ export interface CjkTextProps {
  */
 export default function CjkText({ children, lang, className = '' }: CjkTextProps) {
   const script = resolveCjkScript(lang)
-  const [, setTraditionalReady] = useState(false)
+  const [, setParserReady] = useState(false)
 
   useEffect(() => {
-    if (script !== 'hant' || traditionalChineseParser) return undefined
-
     let cancelled = false
-    void import('@/utils/budouxHant')
-      .then(({ getTraditionalChineseParser }) => {
+
+    if (script === 'hant') {
+      if (traditionalChineseParser) return undefined
+      void import('@/utils/budouxHant')
+        .then(({ getTraditionalChineseParser }) => {
+          if (cancelled) return
+          traditionalChineseParser = getTraditionalChineseParser()
+          setParserReady(ready => !ready)
+        })
+        .catch(() => undefined)
+      return () => {
+        cancelled = true
+      }
+    }
+
+    if (simplifiedChineseParser) return undefined
+    void loadSimplifiedChineseParser()
+      .then(parser => {
         if (cancelled) return
-        traditionalChineseParser = getTraditionalChineseParser()
-        setTraditionalReady(true)
+        simplifiedChineseParser = parser
+        setParserReady(ready => !ready)
       })
-      .catch(() => undefined)
+      .catch(() => {
+        simplifiedChineseParserPromise = null
+      })
 
     return () => {
       cancelled = true

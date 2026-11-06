@@ -1,5 +1,4 @@
-import React, { Activity, lazy, Suspense, useState, useEffect } from 'react'
-import { MotionConfig } from 'framer-motion'
+import React, { Activity, lazy, Suspense, useEffect, useState } from 'react'
 import Dashboard from './components/Dashboard'
 import Layout from './components/Layout'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
@@ -8,17 +7,7 @@ import { useBackendStatusMonitor } from './hooks/useBackendStatusMonitor'
 import { useRunStatusMonitor } from './hooks/useRunStatusMonitor'
 import { useUIStore } from './stores'
 import { PreviewSessionProvider } from './contexts/PreviewSessionContext'
-
-const pageLoaders = {
-  automation: () => import('./components/AutomationTasks'),
-  combat: () => import('./components/CombatTasks'),
-  roguelike: () => import('./components/RoguelikeTasks'),
-  training: () => import('./components/OperatorTraining'),
-  tools: () => import('./components/CustomTools'),
-  logs: () => import('./components/LogViewer'),
-  statistics: () => import('./components/DataStatistics'),
-  config: () => import('./components/ConfigManager'),
-}
+import { pageLoaders } from './utils/pagePreload'
 
 const AutomationTasks = lazy(pageLoaders.automation)
 const CombatTasks = lazy(pageLoaders.combat)
@@ -41,7 +30,8 @@ const appPages = [
   { id: 'config', Component: ConfigManager },
 ] as const
 
-const BACKGROUND_PRELOAD_DELAY = 2000
+/** Keep recently visited workspaces alive without retaining the whole app. */
+const MAX_VISITED_WORKSPACES = 4
 
 interface PageErrorBoundaryProps {
   activeKey: string
@@ -90,12 +80,15 @@ class PageErrorBoundary extends React.Component<PageErrorBoundaryProps, { hasErr
 }
 
 function VisitedWorkspaces({ activeTab }: { activeTab: string }) {
-  const [visitedPages] = useState(() => new Set([activeTab]))
-  // The active tab prop already drives renders; keep history mutable to avoid a second render on navigation.
-  visitedPages.add(activeTab)
+  const [visitedOrder] = useState<string[]>(() => [activeTab])
+  const existingIndex = visitedOrder.indexOf(activeTab)
+  if (existingIndex >= 0) visitedOrder.splice(existingIndex, 1)
+  visitedOrder.push(activeTab)
+  while (visitedOrder.length > MAX_VISITED_WORKSPACES) visitedOrder.shift()
 
+  const visiblePages = new Set(visitedOrder)
   return appPages
-    .filter(({ id }) => id === activeTab || visitedPages.has(id))
+    .filter(({ id }) => visiblePages.has(id))
     .map(({ id, Component }) => (
       <PageErrorBoundary key={id} activeKey={activeTab} pageKey={id}>
         <Suspense fallback={<PageSkeleton variant={id} />}>
@@ -116,63 +109,14 @@ function App() {
     document.getElementById('app-root')?.classList.toggle('dark', isDark)
   }, [isDark])
 
-  useEffect(() => {
-    const connection = (navigator as Navigator & {
-      connection?: { effectiveType?: string; saveData?: boolean }
-    }).connection
-    if (connection?.saveData || connection?.effectiveType?.includes('2g')) return undefined
-
-    const loaders = Object.values(pageLoaders)
-    const idleWindow = window as unknown as {
-      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number
-      cancelIdleCallback?: (handle: number) => void
-    }
-
-    let cancelled = false
-    let nextLoader = 0
-    let idleId: number | undefined
-    let fallbackTimer: number | undefined
-
-    const scheduleNext = () => {
-      if (cancelled || nextLoader >= loaders.length) return
-
-      const preloadNext = () => {
-        idleId = undefined
-        fallbackTimer = undefined
-        if (cancelled) return
-
-        const loadPage = loaders[nextLoader]
-        nextLoader += 1
-        if (!loadPage) return
-        void loadPage().catch(() => undefined).finally(scheduleNext)
-      }
-
-      if (typeof idleWindow.requestIdleCallback === 'function') {
-        idleId = idleWindow.requestIdleCallback(preloadNext, { timeout: 1000 })
-      } else {
-        fallbackTimer = window.setTimeout(preloadNext, 0)
-      }
-    }
-
-    const startTimer = window.setTimeout(scheduleNext, BACKGROUND_PRELOAD_DELAY)
-    return () => {
-      cancelled = true
-      window.clearTimeout(startTimer)
-      if (idleId !== undefined) idleWindow.cancelIdleCallback?.(idleId)
-      if (fallbackTimer !== undefined) window.clearTimeout(fallbackTimer)
-    }
-  }, [])
-
   return (
     <div id="app-root" className="la-pluma-app">
-      <MotionConfig reducedMotion="user">
-        <PreviewSessionProvider>
-          <Layout>
-            {({ activeTab }) => <VisitedWorkspaces activeTab={activeTab} />}
-          </Layout>
-        </PreviewSessionProvider>
-        <PWAInstallPrompt />
-      </MotionConfig>
+      <PreviewSessionProvider>
+        <Layout>
+          {({ activeTab }) => <VisitedWorkspaces activeTab={activeTab} />}
+        </Layout>
+      </PreviewSessionProvider>
+      <PWAInstallPrompt />
     </div>
   )
 }

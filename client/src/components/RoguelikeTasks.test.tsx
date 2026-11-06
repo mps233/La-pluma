@@ -139,7 +139,7 @@ describe('RoguelikeTasks execution recovery', () => {
     expect(page?.querySelector('.app-page-header-icon')).toBeNull()
 
     const modeShell = page?.querySelector('.roguelike-mode-shell')
-    expect(modeShell?.classList.contains('app-liquid-tab-pill')).toBe(true)
+    expect(modeShell?.querySelector('.lg-track[role="tablist"]')?.getAttribute('aria-label')).toBe('肉鸽模式')
 
     const panels = page?.querySelectorAll('.roguelike-theme-panel, .roguelike-settings-panel, .roguelike-monitor-panel')
     expect(panels).toHaveLength(3)
@@ -152,8 +152,8 @@ describe('RoguelikeTasks execution recovery', () => {
     expect(monitor?.closest('.roguelike-monitor-surface')).not.toBeNull()
     expect(monitor?.closest('.roguelike-monitor-panel')).not.toBeNull()
 
-    expect(modeShell?.querySelector('[role="toolbar"]')).not.toBeNull()
-    const selectedModes = page?.querySelectorAll('.roguelike-mode-button[aria-pressed="true"]')
+    expect(modeShell?.querySelector('.lg-track[role="tablist"]')).not.toBeNull()
+    const selectedModes = page?.querySelectorAll('.roguelike-mode-shell > .lg-track > .lg-track__item[aria-selected="true"]')
     expect(selectedModes).toHaveLength(1)
 
     const toggleTextLabel = page?.querySelector<HTMLLabelElement>('.roguelike-toggle-label')
@@ -165,29 +165,32 @@ describe('RoguelikeTasks execution recovery', () => {
       expect(switchControl.classList.contains('min-h-11')).toBe(false)
     })
 
-    const modeButtons = Array.from(page?.querySelectorAll<HTMLButtonElement>('.roguelike-mode-button') ?? [])
+    const modeButtons = Array.from(
+      page?.querySelectorAll<HTMLButtonElement>('.roguelike-mode-shell > .lg-track > .lg-track__item') ?? [],
+    )
     expect(modeButtons.map(button => button.tabIndex)).toEqual([0, -1])
     modeButtons[0]?.focus()
     await keyDown(modeButtons[0]!, 'End')
-    expect(modeButtons[1]?.getAttribute('aria-pressed')).toBe('true')
+    expect(modeButtons[1]?.getAttribute('aria-selected')).toBe('true')
     expect(document.activeElement).toBe(modeButtons[1])
 
     const arrowDownEvent = await keyDown(modeButtons[1]!, 'ArrowDown')
     expect(arrowDownEvent.defaultPrevented).toBe(false)
-    expect(modeButtons[1]?.getAttribute('aria-pressed')).toBe('true')
+    expect(modeButtons[1]?.getAttribute('aria-selected')).toBe('true')
   })
 
   it('keeps mode selection and its configuration panel in sync', async () => {
     await act(async () => root.render(<RoguelikeTasks />))
     await flush()
 
-    const reclamationMode = Array.from(container.querySelectorAll<HTMLButtonElement>('.roguelike-mode-button'))
-      .find(button => button.textContent?.includes('生息演算'))
+    const reclamationMode = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('.roguelike-mode-shell > .lg-track > .lg-track__item'),
+    ).find(button => button.textContent?.includes('生息演算'))
     expect(reclamationMode).toBeDefined()
     await click(reclamationMode!)
 
-    expect(reclamationMode?.getAttribute('aria-pressed')).toBe('true')
-    expect(container.querySelectorAll('.roguelike-mode-button[aria-pressed="true"]')).toHaveLength(1)
+    expect(reclamationMode?.getAttribute('aria-selected')).toBe('true')
+    expect(container.querySelectorAll('.roguelike-mode-shell > .lg-track > .lg-track__item[aria-selected="true"]')).toHaveLength(1)
     expect(container.querySelector('input[name="maa-reclamation-theme"]')).not.toBeNull()
     expect(Array.from(container.querySelectorAll('.roguelike-theme-option'))
       .some(option => option.textContent?.includes('沙洲遗闻'))).toBe(true)
@@ -337,7 +340,7 @@ describe('RoguelikeTasks execution recovery', () => {
         expect(control.classList.contains('app-native-control')).toBe(true)
       }
     })
-    container.querySelectorAll('.roguelike-mode-button, .roguelike-theme-option').forEach(control => {
+    container.querySelectorAll('.roguelike-theme-option').forEach(control => {
       expect(control.classList.contains('min-h-11')).toBe(true)
     })
   })
@@ -574,8 +577,9 @@ describe('RoguelikeTasks execution recovery', () => {
     await act(async () => root.render(<RoguelikeTasks />))
     await flush()
 
-    const reclamationMode = Array.from(container.querySelectorAll<HTMLButtonElement>('.roguelike-mode-button'))
-      .find(button => button.textContent?.includes('生息演算'))
+    const reclamationMode = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('.roguelike-mode-shell > .lg-track > .lg-track__item'),
+    ).find(button => button.textContent?.includes('生息演算'))
     await click(reclamationMode!)
     await click(buttonByText('立即执行')!)
 

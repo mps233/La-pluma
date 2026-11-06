@@ -90,6 +90,7 @@ export function applyThemePreference(theme: ThemeMode) {
     || (theme === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)
   const root = document.documentElement
   root.classList.toggle('dark', isDark)
+  root.dataset.theme = isDark ? 'dark' : 'light'
   document.getElementById('app-root')?.classList.toggle('dark', isDark)
   root.style.colorScheme = isDark ? 'dark' : 'light'
   document.querySelector('meta[name="theme-color"]')

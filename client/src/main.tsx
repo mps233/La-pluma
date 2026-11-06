@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import './ios-theme.css'
 import './glasswork/glass.css'
+import '@zakisheriff/liquid-glass/styles.css'
 import App from './App.tsx'
 
 // Glasswork: Safari on iOS can leave a backdrop filter clipped to a

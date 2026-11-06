@@ -123,12 +123,12 @@ describe('App motion preferences', () => {
     container.remove()
   })
 
-  it('delegates animation reduction to the user preference globally', async () => {
+  it('renders the app shell without a global animation provider', async () => {
     await act(async () => root.render(<App />))
     await act(async () => { await Promise.resolve() })
 
-    expect(container.querySelector('[data-testid="motion-config"]')?.getAttribute('data-reduced-motion')).toBe('user')
     expect(container.querySelector('#app-root')?.className).toContain('la-pluma-app')
+    expect(container.querySelector('[data-testid="motion-config"]')).toBeNull()
   })
 
   it('preserves page state while pausing effects on hidden workspaces', async () => {
@@ -154,6 +154,20 @@ describe('App motion preferences', () => {
     expect(container.querySelector<HTMLInputElement>('[aria-label="控制台草稿"]')?.value).toBe('未保存的连接地址')
     expect(appMocks.dashboardEffectStarts).toBe(2)
     expect(appMocks.automationEffectStops).toBe(1)
+  })
+
+  it('keeps only the most recent workspaces mounted', async () => {
+    await act(async () => root.render(<App />))
+    await act(async () => { await Promise.resolve() })
+
+    for (const tab of ['automation', 'combat', 'roguelike', 'training', 'tools']) {
+      await act(async () => appMocks.navigate?.(tab))
+      await act(async () => { await Promise.resolve() })
+    }
+
+    expect(container.textContent).toContain('tools')
+    expect(container.textContent).not.toContain('automation')
+    expect(container.querySelector('[aria-label="控制台草稿"]')).toBeNull()
   })
 
   it('recovers a failed page after navigating away and back', async () => {

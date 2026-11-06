@@ -1,0 +1,1409 @@
+/* Split from index.css / ios-theme.css; imported by the lazy automation route. */
+
+
+
+.automation-flow-meta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 0.125rem 0.625rem;
+}
+
+.automation-flow-activity {
+  color: var(--app-text-muted);
+  font-weight: 500;
+}
+
+.automation-flow-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--app-space-1);
+  color: var(--app-text-muted);
+  font-size: var(--app-font-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.automation-flow-summary {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.75rem;
+  border-radius: 999px;
+  padding: 0 0.625rem;
+  background: color-mix(in srgb, var(--app-surface-muted) 88%, transparent);
+  color: var(--app-text-muted);
+  box-shadow: none;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.automation-delete-task:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
+}
+
+.automation-flow-task-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.automation-flow-sequence {
+  flex: 0 0 auto;
+  color: var(--app-accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--app-font-meta);
+  font-weight: 700;
+}
+
+.automation-flow-task-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  border-radius: var(--app-radius-md);
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
+}
+
+.automation-flow-task-name {
+  min-width: 0;
+  display: grid;
+  gap: 0.125rem;
+}
+
+.automation-flow-task-name strong {
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: var(--app-font-body);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-flow-task-name small {
+  overflow: hidden;
+  color: var(--app-text-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--app-font-meta);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-delete-task {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 1.875rem;
+  height: 1.875rem;
+  border-radius: var(--app-radius-md);
+  color: var(--app-text-soft);
+  box-shadow: inset 0 0 0 1px var(--app-border);
+  transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.automation-delete-task:hover {
+  background: rgba(239, 68, 68, 0.09);
+  color: rgb(239, 68, 68);
+  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.22);
+}
+
+.automation-delete-task:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.automation-monitor-panel {
+  width: 100%;
+}
+
+.automation-sequence-empty,
+.automation-editor-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  color: var(--app-text-soft);
+  text-align: center;
+}
+
+.automation-sequence-empty {
+  min-height: 12rem;
+  padding: 1.5rem;
+}
+
+.automation-sequence-empty svg,
+.automation-editor-empty svg {
+  margin-bottom: 0.625rem;
+  color: var(--app-accent);
+}
+
+.automation-sequence-empty strong,
+.automation-editor-empty strong {
+  color: var(--app-text);
+  font-size: var(--app-font-body);
+  font-weight: 600;
+}
+
+.automation-sequence-empty span,
+.automation-editor-empty span {
+  margin-top: 0.25rem;
+  font-size: var(--app-font-caption);
+}
+
+.automation-sequence-drag,
+.automation-sequence-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--app-radius-sm);
+  color: var(--app-text-soft);
+}
+
+.automation-sequence-drag {
+  width: 1.375rem;
+  height: 2rem;
+  cursor: grab;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.automation-drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1200;
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 0.75rem;
+  overflow: hidden;
+  padding: 0 0.75rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-surface-solid);
+  box-shadow: var(--app-glass-shadow);
+  color: var(--app-text);
+  pointer-events: none;
+  transform: translate3d(-9999px, -9999px, 0);
+  will-change: transform;
+}
+
+.automation-drag-ghost-grip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  color: var(--app-text-soft);
+}
+
+.automation-drag-ghost-index {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: var(--app-accent-soft);
+  color: var(--app-accent-strong);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.automation-drag-ghost-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.automation-drag-ghost-copy strong {
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-drag-ghost-copy small {
+  overflow: hidden;
+  color: var(--app-text-muted);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-sequence-drag:active {
+  cursor: grabbing;
+}
+
+.automation-sequence-delete {
+  width: 1.75rem;
+  height: 1.75rem;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.automation-sequence-delete:hover {
+  background: rgba(239, 68, 68, 0.09);
+  color: rgb(239, 68, 68);
+}
+
+.automation-sequence-select {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: var(--app-radius-sm);
+  text-align: left;
+}
+
+.automation-sequence-select:focus-visible,
+.automation-sequence-delete:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
+}
+
+.automation-sequence-node {
+  position: relative;
+  z-index: 0;
+  display: inline-flex;
+  width: 1.5rem;
+  height: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--app-surface);
+  color: var(--app-accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--app-font-meta);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 30%, var(--app-border));
+  transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.automation-sequence-node > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.automation-sequence-progress {
+  animation: automation-progress-spin 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .automation-sequence-progress {
+    animation: none;
+  }
+}
+
+.automation-completed-mark {
+  display: inline-flex;
+  width: 1.5rem;
+  height: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--app-success) 11%, var(--app-surface-solid));
+  color: var(--app-success-text);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-success) 22%, var(--app-border));
+}
+
+.automation-sequence-copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
+.automation-sequence-copy strong,
+.automation-sequence-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-sequence-copy strong {
+  color: var(--app-text);
+  font-size: var(--app-font-body);
+  font-weight: 600;
+}
+
+.automation-sequence-copy small {
+  color: var(--app-text-soft);
+  font-size: var(--app-font-caption);
+}
+
+.automation-sequence-enabled {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.automation-task-picker-toggle {
+  display: grid;
+  width: 100%;
+  min-height: 2.75rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: var(--app-radius-md);
+  padding: 0 0.75rem;
+  color: var(--app-text-muted);
+  background: color-mix(in srgb, var(--app-surface-muted) 86%, transparent);
+  box-shadow: none;
+  text-align: left;
+  transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.automation-task-picker-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.automation-task-picker-toggle span {
+  font-size: var(--app-font-caption);
+  font-weight: 700;
+}
+
+.automation-task-picker-toggle small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  border-radius: var(--app-radius-pill);
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
+  font-size: var(--app-font-meta);
+  font-weight: 700;
+}
+
+.automation-task-picker {
+  position: absolute;
+  right: 0.75rem;
+  bottom: calc(100% + 0.5rem);
+  left: 0.75rem;
+  z-index: 20;
+  display: grid;
+  max-height: 14rem;
+  gap: 0.25rem;
+  overflow-y: auto;
+  border-radius: var(--app-radius-md);
+  padding: 0.375rem;
+  background: var(--app-surface-solid);
+  box-shadow: inset 0 0 0 1px var(--app-border), 0 14px 30px rgba(2, 8, 12, 0.28);
+  scrollbar-width: none;
+}
+
+.automation-task-picker::-webkit-scrollbar {
+  display: none;
+}
+
+.automation-task-picker-option {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 1.75rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: var(--app-radius-sm);
+  min-height: 2.75rem;
+  padding: 0.375rem 0.5rem;
+  color: var(--app-text-muted);
+  text-align: left;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.automation-task-picker-option:hover {
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
+}
+
+.automation-task-picker-option > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--app-radius-md);
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
+}
+
+.automation-task-picker-option > span:first-child svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.automation-task-picker-option strong {
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: var(--app-font-caption);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-task-picker-option small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: var(--app-radius-pill);
+  background: var(--app-accent);
+  color: white;
+  font-size: var(--app-font-meta);
+  font-weight: 700;
+}
+
+.automation-schedule-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.automation-section-switch {
+  align-self: center;
+}
+
+.automation-schedule-body {
+  padding: 0.875rem 1rem 1rem;
+}
+
+.automation-schedule-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.625rem;
+  color: var(--app-text-muted);
+  font-size: var(--app-font-caption);
+  font-weight: 700;
+}
+
+.automation-schedule-list-heading-actions {
+  display: inline-flex;
+  min-width: 0;
+  flex: none;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.automation-schedule-list-heading small {
+  display: inline-flex;
+  min-width: 2.5rem;
+  height: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0 0.625rem;
+  background: rgba(118, 118, 128, 0.16);
+  color: var(--app-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.automation-schedule-times {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  border-radius: var(--app-continuous-radius-compact);
+  background: transparent;
+}
+
+.automation-schedule-time-row {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 3.25rem;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.125rem;
+  transition: opacity 160ms ease;
+}
+
+.automation-schedule-time-row + .automation-schedule-time-row::before {
+  position: absolute;
+  top: 0;
+  right: 0.125rem;
+  left: 0.125rem;
+  height: 1px;
+  background: var(--app-border);
+  content: '';
+  opacity: 0.72;
+  transform: scaleY(0.5);
+  transform-origin: top;
+}
+
+.automation-schedule-time-fields {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.automation-schedule-time-unit {
+  flex: none;
+  color: var(--app-text);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.automation-schedule-stepper {
+  display: inline-flex;
+  min-width: 3.75rem;
+  height: 2rem;
+  flex: none;
+  align-items: center;
+  gap: 0.125rem;
+  border-radius: 0.55rem;
+  padding: 0 0.2rem 0 0.55rem;
+  background: color-mix(in srgb, var(--app-surface-muted) 88%, var(--app-text) 12%);
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--app-border) 70%, transparent);
+}
+
+.automation-schedule-stepper input.automation-schedule-stepper-input[type="text"] {
+  width: 1.5rem;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  background-color: transparent;
+  box-shadow: none;
+  color: var(--app-text);
+  font-family: ui-rounded, "SF Pro Rounded", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  outline: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.automation-schedule-stepper input.automation-schedule-stepper-input[type="text"]:focus-visible {
+  outline: none;
+  border: 0;
+  box-shadow: none;
+}
+
+.automation-schedule-stepper:focus-within {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 55%, transparent),
+    0 0 0 3px var(--app-accent-soft);
+}
+
+.automation-schedule-stepper input.automation-schedule-stepper-input[type="text"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  background: transparent;
+  background-color: transparent;
+}
+
+.automation-schedule-stepper-controls {
+  display: inline-flex;
+  height: 100%;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+}
+
+.automation-schedule-stepper-button {
+  display: inline-flex;
+  width: 1.15rem;
+  height: 0.85rem;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0.25rem;
+  padding: 0;
+  background: transparent;
+  color: var(--app-text-muted);
+  cursor: pointer;
+}
+
+.automation-schedule-stepper-button:hover:not(:disabled) {
+  color: var(--app-text);
+  background: color-mix(in srgb, var(--app-surface-solid) 45%, transparent);
+}
+
+.automation-schedule-stepper-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.automation-schedule-time-enable {
+  display: inline-flex;
+  margin-left: auto;
+  flex: none;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.automation-schedule-time-enable-label {
+  color: var(--app-text);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.automation-schedule-time-switch {
+  flex: none;
+}
+
+.automation-schedule-remove,
+.automation-schedule-remove-placeholder {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: none;
+}
+
+.automation-schedule-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--app-danger-text);
+  box-shadow: none;
+  transition: background 120ms ease, color 120ms ease, transform 100ms ease;
+}
+
+.automation-schedule-remove:hover {
+  background: color-mix(in srgb, var(--app-danger) 10%, transparent);
+  color: var(--app-danger-text);
+  box-shadow: none;
+}
+
+.automation-schedule-remove:active:not(:disabled) {
+  transform: scale(0.9);
+}
+
+.automation-schedule-remove:disabled,
+.automation-schedule-add:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+button.automation-schedule-add {
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
+  min-height: 1.75rem;
+  height: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  margin: 0;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 0.625rem;
+  color: var(--app-text-muted);
+  background: rgba(118, 118, 128, 0.16);
+  box-shadow: none;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 160ms ease, color 160ms ease, transform 100ms ease, opacity 160ms ease;
+}
+
+button.automation-schedule-add .automation-schedule-add-plus,
+button.automation-schedule-add .automation-schedule-add-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+button.automation-schedule-add .automation-schedule-add-plus {
+  width: 0.7rem;
+  flex: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.automation-schedule-list-heading-actions > button.automation-schedule-add {
+  position: relative;
+  flex: none;
+}
+
+button.automation-schedule-add:hover:not(:disabled) {
+  color: var(--app-text);
+  background: rgba(118, 118, 128, 0.28);
+}
+
+button.automation-schedule-add:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
+}
+
+button.automation-schedule-add:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+button.automation-schedule-add:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.automation-notification-notice {
+  margin: 0 1rem 0.75rem;
+  border-radius: var(--app-radius-md);
+  padding: 0.5rem 0.625rem;
+  font-size: var(--app-font-caption);
+  font-weight: 600;
+}
+
+.automation-notification-details {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.automation-notification-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.automation-notification-field > span {
+  color: var(--app-text-muted);
+  font-size: var(--app-font-caption);
+  font-weight: 700;
+}
+
+.automation-notification-field input {
+  width: 100%;
+  min-width: 0;
+  height: 2.25rem;
+  border: 0;
+  border-radius: var(--app-radius-md);
+  padding: 0 0.625rem;
+  background: var(--app-surface-muted);
+  color: var(--app-text);
+  box-shadow: inset 0 0 0 1px var(--app-border);
+  font-size: var(--app-font-body);
+  outline: 0;
+  transition: box-shadow 160ms ease, opacity 160ms ease;
+}
+
+.automation-notification-field input:focus {
+  box-shadow: inset 0 0 0 1px var(--app-accent), 0 0 0 2px var(--app-accent-soft);
+}
+
+.automation-notification-field input:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.automation-notification-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.automation-editor-empty {
+  min-height: 22rem;
+  padding: 2rem;
+}
+
+.automation-param-fields {
+  display: grid;
+  min-width: 0;
+  gap: 0.75rem;
+}
+
+.automation-param-field,
+.automation-field-row {
+  min-width: 0;
+}
+
+.automation-field-row {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.automation-field-label {
+  min-width: 0;
+  color: var(--app-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+}
+
+.automation-field-helper {
+  display: grid;
+  grid-template-columns: 0.875rem minmax(0, 1fr);
+  align-items: start;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+  padding-left: 5.75rem;
+  color: var(--app-text-soft);
+  font-size: 0.6875rem;
+  line-height: 1.45;
+}
+
+.automation-field-helper svg {
+  margin-top: 0.0625rem;
+}
+
+.automation-select-control {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.automation-select-control select {
+  width: 100%;
+  min-width: 0;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  border: 0;
+  border-radius: var(--app-radius-md);
+  padding: 0 2.5rem 0 0.875rem;
+  background: var(--app-surface-muted);
+  color: var(--app-text);
+  box-shadow: inset 0 0 0 0.5px var(--automation-hairline);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.25;
+  outline: 0;
+  cursor: pointer;
+  transition: background 160ms ease, box-shadow 160ms ease, color 160ms ease;
+}
+
+.automation-select-control:hover select {
+  background: color-mix(in srgb, var(--app-surface-muted) 86%, var(--app-surface-solid));
+  box-shadow: inset 0 0 0 0.5px var(--app-border-strong);
+}
+
+.automation-select-control:has(select:focus-visible) select {
+  background: var(--app-surface-solid);
+  box-shadow: inset 0 0 0 1px var(--app-accent), 0 0 0 3px var(--app-accent-soft);
+}
+
+.automation-select-control > svg {
+  position: absolute;
+  top: 50%;
+  right: 0.75rem;
+  color: var(--app-text-soft);
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.automation-select-control:hover > svg,
+.automation-select-control:has(select:focus-visible) > svg {
+  color: var(--app-accent);
+}
+
+.automation-select-control select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.automation-composite-control {
+  overflow: hidden;
+}
+
+.automation-composite-control > input[type="text"],
+.automation-composite-control > input[type="number"] {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: 0;
+}
+
+.automation-stage-editor {
+  display: grid;
+  min-width: 0;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  container-type: inline-size;
+}
+
+.automation-stage-editor-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.automation-stage-editor-title {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.automation-stage-editor-title label {
+  color: var(--app-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+}
+
+.automation-stage-editor-title span {
+  overflow: hidden;
+  color: var(--app-text-soft);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-stage-list {
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--app-radius-lg);
+  background: var(--app-surface-muted);
+  box-shadow: inset 0 0 0 1px var(--automation-hairline);
+}
+
+.automation-stage-item {
+  position: relative;
+  min-width: 0;
+}
+
+.automation-stage-item + .automation-stage-item::before,
+.automation-stage-add::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0.75rem;
+  left: 3.25rem;
+  height: 0.5px;
+  background: var(--automation-hairline);
+  pointer-events: none;
+}
+
+.automation-stage-row {
+  display: flex;
+  min-width: 0;
+  min-height: 3.25rem;
+  align-items: center;
+  transition: background 160ms ease;
+}
+
+.automation-stage-row:hover {
+  background: color-mix(in srgb, var(--app-surface-solid) 24%, transparent);
+}
+
+.automation-stage-row:focus-within {
+  background: color-mix(in srgb, var(--app-accent-soft) 32%, transparent);
+}
+
+.automation-stage-kind,
+.automation-stage-pin {
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  flex: 0 0 2.75rem;
+  border-radius: var(--app-radius-md);
+}
+
+.automation-stage-kind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--app-accent);
+}
+
+.automation-stage-pin {
+  color: var(--app-text-soft);
+}
+
+input.automation-stage-name-input {
+  width: 100%;
+  min-width: 0;
+  height: 3.25rem;
+  flex: 1 1 auto;
+  border: 0;
+  border-radius: 0;
+  padding: 0 0.75rem 0 0.25rem;
+  background: transparent;
+  background-color: transparent;
+  color: var(--app-text);
+  box-shadow: none;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.25;
+  outline: 0;
+}
+
+input.automation-stage-name-input::placeholder {
+  color: var(--app-text-soft);
+  font-weight: 400;
+  opacity: 1;
+}
+
+.automation-stage-times {
+  display: flex;
+  width: 4.25rem;
+  min-width: 4.25rem;
+  height: 2rem;
+  flex: 0 0 4.25rem;
+  align-items: center;
+  border-left: 1px solid var(--app-border);
+  color: var(--app-text-soft);
+}
+
+.automation-stage-times input {
+  width: 2.75rem;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  padding: 0 0.1875rem 0 0.375rem;
+  background: transparent;
+  color: var(--app-text);
+  box-shadow: none;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  outline: 0;
+  appearance: textfield;
+}
+
+.automation-stage-times input::-webkit-inner-spin-button,
+.automation-stage-times input::-webkit-outer-spin-button {
+  appearance: none;
+}
+
+.automation-stage-times span {
+  padding-right: 0.5rem;
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+
+input.automation-stage-name-input:focus-visible,
+.automation-stage-times input:focus-visible {
+  color: var(--app-accent-strong);
+}
+
+input.automation-stage-name-input:disabled,
+.automation-stage-times input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.automation-stage-stepper {
+  display: none !important;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  align-items: center;
+  border-left: 1px solid var(--app-border);
+}
+
+.automation-stage-stepper button {
+  display: inline-flex;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--app-text-soft);
+  transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.automation-stage-stepper button + button {
+  border-left: 1px solid var(--app-border);
+}
+
+.automation-stage-stepper button:hover:not(:disabled) {
+  background: var(--app-accent-soft);
+  color: var(--app-accent-strong);
+}
+
+.automation-stage-stepper button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--app-accent);
+  outline-offset: -2px;
+}
+
+.automation-stage-stepper button:disabled {
+  cursor: not-allowed;
+  opacity: 0.32;
+}
+
+.automation-stage-delete {
+  color: var(--app-danger-text);
+}
+
+.automation-stage-delete:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--app-danger) 10%, transparent);
+  color: var(--app-danger-text);
+}
+
+.automation-stage-add {
+  position: relative;
+  justify-content: flex-start;
+  border-radius: 0;
+  padding-right: 0.875rem;
+  padding-left: 1rem;
+  color: var(--app-accent-strong);
+  box-shadow: none;
+}
+
+.automation-stage-add:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--app-accent-soft) 42%, transparent);
+  color: var(--app-accent-strong);
+}
+
+.automation-stage-list :is(
+  .automation-stage-pin,
+  .automation-stage-delete,
+  .automation-stage-add
+):focus-visible {
+  outline-offset: -2px;
+}
+
+.automation-smart-stage-entry {
+  display: flex;
+  min-width: 0;
+  min-height: 4.25rem;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--app-radius-lg);
+  background: var(--app-surface-muted);
+  box-shadow: inset 0 0 0 1px var(--automation-hairline);
+  transition: background 160ms ease, box-shadow 160ms ease;
+}
+
+.automation-smart-stage-icon {
+  display: inline-flex;
+  width: 2.25rem;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--app-radius-md);
+  background: color-mix(in srgb, var(--app-surface-solid) 72%, transparent);
+  color: var(--app-accent-strong);
+  box-shadow: inset 0 0 0 1px var(--app-border);
+}
+
+.automation-smart-stage-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 0.125rem;
+}
+
+.automation-smart-stage-copy strong {
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-smart-stage-copy > span {
+  overflow: hidden;
+  color: var(--app-text-soft);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-smart-stage-action {
+  flex: 0 0 auto;
+  box-shadow: none;
+}
+
+@container (min-width: 30rem) {
+  .automation-stage-stepper {
+    display: flex !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .automation-stage-list,
+  .automation-smart-stage-entry {
+    box-shadow: inset 0 0 0 1px var(--app-border-strong);
+  }
+}
+
+@media (max-width: 639px) {
+
+  button.automation-schedule-add[type="button"] {
+    min-height: 2.75rem;
+    padding: 0 0.875rem;
+    border-radius: var(--app-radius-lg);
+    font-size: 0.75rem;
+  }
+
+  .automation-schedule-add svg,
+  .automation-notification-buttons button svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .automation-notification-buttons {
+    gap: 0.625rem;
+  }
+}
+
+[data-automation-tasks] .automation-schedule-list-heading small {
+  color: var(--app-text-muted);
+}
+
+[data-automation-tasks] .automation-sequence-node {
+  background: var(--app-surface-solid);
+  color: var(--app-text-soft);
+  box-shadow: inset 0 0 0 1px var(--automation-hairline);
+}
+
+[data-automation-tasks] :is(
+  .automation-task-picker-toggle,
+  .automation-run-button,
+  .automation-stop-button,
+  .automation-test-connection,
+  .automation-schedule-add,
+  .automation-notification-buttons button
+) {
+  border-radius: var(--app-radius-pill);
+}
+
+[data-automation-tasks] .automation-schedule-list-heading-actions > button.automation-schedule-add {
+  min-height: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  padding: 0 0.625rem;
+  font-size: 0.8125rem;
+}
+
+[data-automation-tasks] :is(
+  .automation-task-picker-toggle,
+  .automation-task-picker-option,
+  .automation-run-button,
+  .automation-stop-button,
+  .automation-test-connection,
+  .automation-schedule-add
+):active:not(:disabled) {
+  transform: scale(0.98);
+  transition-duration: 100ms;
+}
+
+[data-automation-tasks] :is(
+  .automation-sequence-delete,
+  .automation-delete-task,
+  .automation-schedule-remove
+) {
+  border-radius: 50%;
+}
+
+[data-automation-tasks] .automation-task-picker {
+  gap: 0;
+  border: 1px solid var(--automation-hairline);
+  border-radius: var(--app-continuous-radius-compact);
+  background: color-mix(in srgb, var(--app-surface-solid) 76%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  box-shadow: var(--automation-overlay-shadow);
+  transform-origin: bottom center;
+  will-change: transform, opacity;
+}
+
+[data-automation-tasks] .automation-task-picker-option {
+  border-radius: 0;
+}
+
+[data-automation-tasks] .automation-task-picker-option + .automation-task-picker-option {
+  border-top: 1px solid var(--automation-hairline);
+}
+
+[data-automation-tasks] .automation-task-picker-option > span:first-child {
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface-muted);
+  color: var(--app-text-muted);
+}
+
+[data-automation-tasks] .automation-task-picker-option:hover > span,
+[data-automation-tasks] .automation-task-picker-option:focus-visible > span {
+  color: var(--app-accent);
+}
+
+[data-automation-tasks] .automation-task-picker-option small {
+  background: var(--app-surface-muted);
+  color: var(--app-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.automation-recruitment-time-list {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  border-radius: var(--app-radius-lg);
+  background: var(--app-surface-muted);
+}
+
+.automation-recruitment-time-row {
+  display: flex;
+  min-width: 0;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+}
+
+.automation-recruitment-time-row + .automation-recruitment-time-row {
+  border-top: 1px solid var(--automation-hairline);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-automation-tasks] .automation-task-picker {
+    background: var(--app-surface-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  [data-automation-tasks] .automation-task-picker {
+    border-color: var(--app-border-strong);
+    background: var(--app-surface-solid);
+  }
+}
+

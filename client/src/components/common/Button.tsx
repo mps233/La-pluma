@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import { GlassButton } from '@zakisheriff/liquid-glass'
 import ActivityIndicator from './ActivityIndicator'
 import Tooltip from './Tooltip'
 
@@ -33,9 +34,24 @@ interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
   onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void
 }
 
+type ButtonVariant = NonNullable<ButtonProps['variant']>
+
+const glassVariants: Record<ButtonVariant, {
+  variant: 'filled' | 'glass' | 'clear'
+  tint?: string
+  destructive?: boolean
+}> = {
+  primary: { variant: 'filled', tint: 'var(--app-accent-action)' },
+  secondary: { variant: 'glass' },
+  danger: { variant: 'filled', tint: 'var(--app-danger-action)', destructive: true },
+  success: { variant: 'filled', tint: 'var(--app-success-action)' },
+  ghost: { variant: 'clear', tint: 'var(--app-text-muted)' },
+  outline: { variant: 'glass' },
+}
+
 /**
  * 按钮组件
- * 统一的按钮样式，支持多种变体和状态
+ * 统一的 Liquid Glass 按钮，支持多种变体和状态。
  */
 export default function Button({
   children,
@@ -53,69 +69,38 @@ export default function Button({
   tabIndex,
   ...props
 }: ButtonProps) {
-  const baseStyles = 'app-button'
-
-  const variantStyles: Record<string, string> = {
-    primary: 'brand-action',
-    secondary: 'control-surface text-primary',
-    danger: 'status-danger-action',
-    success: 'status-success-action',
-    ghost: 'app-button-ghost text-secondary',
-    outline: 'control-surface text-primary',
-  }
-  
-  const sizeStyles: Record<string, string> = {
-    sm: 'app-button-size-sm text-xs',
-    md: 'app-button-size-md text-sm',
-    lg: 'app-button-size-lg text-base',
-  }
-
-  const contentGapStyles: Record<string, string> = {
-    sm: 'gap-1.5',
-    md: 'gap-2',
-    lg: 'gap-2',
-  }
-  
-  const widthStyles = fullWidth ? 'w-full' : ''
-
   const isDisabled = disabled || loading
-  const content = loading ? (
-    <>
-      <ActivityIndicator size={size === 'sm' ? 'xs' : 'sm'} />
-      {loadingText && <span>{loadingText}</span>}
-    </>
-  ) : (
-    <>
-      <span className="button-icon-slot">{icon}</span>
-      {children && <span>{children}</span>}
-    </>
-  )
-
-  const disabledStyles = disabled && !loading ? 'cursor-not-allowed opacity-50' : ''
-  const loadingStyles = loading ? 'is-loading cursor-progress' : ''
+  const glassVariant = glassVariants[variant]
+  const content = loading ? loadingText : children
+  const leadingIcon = loading
+    ? <ActivityIndicator size={size === 'sm' ? 'xs' : 'sm'} />
+    : icon
 
   return (
-    <button
+    <GlassButton
+      {...props}
       type={type}
       onClick={isDisabled ? undefined : onClick}
       disabled={isDisabled}
       tabIndex={isDisabled ? -1 : tabIndex}
       aria-disabled={isDisabled || undefined}
-      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${widthStyles} ${disabledStyles} ${loadingStyles} ${className}`}
       aria-busy={loading || undefined}
       data-status-key={statusKey ?? undefined}
-      {...props}
+      icon={leadingIcon}
+      variant={glassVariant.variant}
+      tint={glassVariant.tint}
+      destructive={glassVariant.destructive}
+      size={size}
+      className={`app-glass-button app-glass-button-${size} ${fullWidth ? 'w-full' : ''} ${loading ? 'is-loading' : ''} ${className}`.trim()}
     >
-      <span className={`inline-flex min-h-4 items-center justify-center ${contentGapStyles[size]}`}>
-        {content}
-      </span>
-    </button>
+      {content}
+    </GlassButton>
   )
 }
 
 /**
  * 图标按钮组件
- * 只显示图标的按钮
+ * 只显示图标的 Liquid Glass 按钮。
  */
 export function IconButton({
   icon,
@@ -129,33 +114,23 @@ export function IconButton({
   tooltipSide,
   ...props
 }: IconButtonProps) {
-  const baseStyles = 'app-icon-button'
-
-  const variantStyles: Record<string, string> = {
-    primary: 'brand-action',
-    secondary: 'control-surface text-primary',
-    danger: 'status-danger-action',
-    ghost: 'app-button-ghost text-secondary',
-  }
-
-  const sizeStyles: Record<string, string> = {
-    sm: 'app-icon-button-size-sm text-xs',
-    md: 'app-icon-button-size-md text-sm',
-    lg: 'app-icon-button-size-lg text-base',
-  }
+  const glassVariant = glassVariants[variant]
 
   const button = (
-    <button
+    <GlassButton
+      {...props}
       type="button"
       onClick={onClick}
       disabled={disabled}
       title={tooltip ? undefined : title}
       aria-label={props['aria-label'] ?? title}
-      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${disabled ? 'cursor-not-allowed opacity-50' : ''} ${className}`}
-      {...props}
-    >
-      {icon}
-    </button>
+      icon={icon}
+      variant={glassVariant.variant}
+      tint={glassVariant.tint}
+      destructive={glassVariant.destructive}
+      size={size}
+      className={`app-glass-icon-button app-glass-icon-button-${size} ${className}`.trim()}
+    />
   )
 
   return tooltip

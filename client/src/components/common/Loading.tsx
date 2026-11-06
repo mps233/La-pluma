@@ -248,25 +248,27 @@ function AutomationSkeleton() {
   )
 }
 
-function ModeControlSkeleton({ variant }: { variant: 'combat' | 'roguelike' }) {
-  const modeCount = variant === 'roguelike' ? 2 : 3
+function GlassModeSkeleton({ count, className = '' }: { count: number; className?: string }) {
   return (
-    <div className={`app-workspace-segments app-liquid-tab-pill glass ${variant}-mode-shell`} aria-hidden="true">
-      <div className={`app-workspace-segment-list${variant === 'roguelike' ? ' roguelike-mode-tabs' : ''}`}>
-        <div className={`app-workspace-segment-indicator ${variant}-mode-skeleton-highlight`} />
-        {Array.from({ length: modeCount }, (_, index) => (
-          <div key={index} className={`app-workspace-segment ${variant}-mode-button min-h-11`}>
-            <span className={`app-workspace-segment-icon ${variant}-mode-icon`}>
-              <Skeleton variant="circle" className="h-5 w-5" />
-            </span>
-            <span className="app-workspace-segment-copy min-w-0">
-              <Skeleton variant="text" className="h-3 w-16 max-w-full" />
-              <Skeleton variant="text" className="h-2 w-24 max-w-full" />
-            </span>
+    <div className={`${className} glass-mode-skeleton`.trim()} aria-hidden="true">
+      <div className="glass-mode-skeleton-track">
+        {Array.from({ length: count }, (_, index) => (
+          <div key={index} className={`glass-mode-skeleton-item${index === 0 ? ' is-selected' : ''}`}>
+            <Skeleton variant="circle" className="h-4 w-4" />
+            <Skeleton variant="text" className="h-3 w-16 max-w-full" />
           </div>
         ))}
       </div>
     </div>
+  )
+}
+
+function ModeControlSkeleton({ variant }: { variant: 'combat' | 'roguelike' }) {
+  return (
+    <GlassModeSkeleton
+      count={variant === 'roguelike' ? 2 : 3}
+      className={`${variant}-mode-shell`}
+    />
   )
 }
 
@@ -391,22 +393,7 @@ function TrainingSkeleton() {
           <Skeleton variant="rect" className="h-7 w-44 rounded-full" />
         </div>
         <div className="space-y-4">
-          <div className="app-workspace-segments app-liquid-tab-pill glass training-status-shell">
-            <div className="app-workspace-segment-list grid-cols-3">
-              <div className="app-workspace-segment-indicator training-status-skeleton-highlight" />
-              {[1, 2, 3].map(item => (
-                <div key={item} className="app-workspace-segment training-status-segment">
-                  <span className="app-workspace-segment-icon training-status-count">
-                    <Skeleton variant="text" className="h-3 w-4" />
-                  </span>
-                  <span className="app-workspace-segment-copy space-y-1.5">
-                    <Skeleton variant="text" className="h-3 w-14 max-w-full" />
-                    <Skeleton variant="text" className="h-2 w-16 max-w-full" />
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <GlassModeSkeleton count={3} className="training-status-shell" />
           <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">
             <Skeleton variant="rect" className="col-span-2 h-11 min-w-0 rounded-xl sm:col-span-1" />
             <Skeleton variant="rect" className="h-11 w-full rounded-xl" />
@@ -479,22 +466,7 @@ function TrainingSkeleton() {
 function LogsSkeleton() {
   return (
     <>
-      <div className="app-workspace-segments app-liquid-tab-pill glass log-mode-shell" aria-hidden="true">
-        <div className="app-workspace-segment-list log-mode-tabs">
-          <div className="app-workspace-segment-indicator log-mode-skeleton-highlight" />
-          {[1, 2].map(item => (
-            <div key={item} className="app-workspace-segment log-mode-button min-h-11">
-              <span className="app-workspace-segment-icon log-mode-icon">
-                <Skeleton variant="circle" className="h-5 w-5" />
-              </span>
-              <span className="app-workspace-segment-copy gap-1">
-                <Skeleton variant="text" className="h-3 w-12 max-w-full" />
-                <Skeleton variant="text" className="h-2.5 w-20 max-w-full" />
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+      <GlassModeSkeleton count={2} className="log-mode-shell" />
       <Card smoothCorners className="log-card log-toolbar-card !p-0">
         <div className="app-card-content log-toolbar">
           <div className="log-toolbar-controls">
@@ -553,22 +525,7 @@ function LogsSkeleton() {
 function StatisticsSkeleton() {
   return (
     <>
-      <div className="app-workspace-segments app-liquid-tab-pill glass data-statistics-view-switcher data-statistics-mode-shell" aria-hidden="true">
-        <div className="app-workspace-segment-list data-statistics-mode-tabs">
-          <div className="app-workspace-segment-indicator data-statistics-mode-skeleton-highlight" />
-          {[1, 2, 3].map(item => (
-            <div key={item} className="app-workspace-segment data-statistics-mode-button min-h-11">
-              <span className="app-workspace-segment-icon data-statistics-mode-icon">
-                <Skeleton variant="circle" className="h-5 w-5" />
-              </span>
-              <span className="app-workspace-segment-copy gap-1">
-                <Skeleton variant="text" className="h-3 w-16 max-w-full" />
-                <Skeleton variant="text" className="h-2.5 w-24 max-w-full" />
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+      <GlassModeSkeleton count={3} className="data-statistics-view-switcher data-statistics-mode-shell" />
       <div className="min-w-0 app-stack-section">
         <Card smoothCorners className="data-statistics-task-card !p-0">
           <div className="data-statistics-task-content">
@@ -605,20 +562,8 @@ function StatisticsSkeleton() {
 function ConfigSkeleton() {
   return (
     <>
-      <div className="app-workspace-segments app-liquid-tab-pill glass w-full" data-config-sections aria-hidden="true">
-        <div className="app-workspace-segment-list grid-cols-3">
-          {[1, 2, 3].map(item => (
-            <div key={item} className="app-workspace-segment min-h-11">
-              <span className="app-workspace-segment-icon">
-                <Skeleton variant="circle" className="h-5 w-5" />
-              </span>
-              <span className="app-workspace-segment-copy gap-1">
-                <Skeleton variant="text" className="h-3 w-12 max-w-full" />
-                <Skeleton variant="text" className="h-2.5 w-24 max-w-full" />
-              </span>
-            </div>
-          ))}
-        </div>
+      <div data-config-sections>
+        <GlassModeSkeleton count={3} />
       </div>
       <div className="config-workspace-grid grid min-w-0 gap-[var(--app-space-section)] xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)] xl:items-start">
         <div className="config-workspace-primary app-stack-section min-w-0">

@@ -162,16 +162,15 @@ describe('DataStatistics layout surfaces', () => {
     expect(status?.getAttribute('data-text-class-name')).toContain('whitespace-nowrap')
 
     const tabShell = page?.querySelector('.data-statistics-view-switcher')
-    expect(tabShell?.classList.contains('app-liquid-tab-pill')).toBe(true)
-    expect(tabShell?.classList.contains('app-workspace-segments')).toBe(true)
     expect(tabShell?.classList.contains('data-statistics-mode-shell')).toBe(true)
-    const tabList = tabShell?.querySelector('[role="tablist"]')
-    expect(tabList?.classList.contains('data-statistics-mode-tabs')).toBe(true)
-    const tabs = Array.from(tabList?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])
+    const tabList = tabShell?.querySelector('.lg-track[role="tablist"]')
+    expect(tabList?.getAttribute('aria-label')).toBe('数据统计视图')
+    const tabs = Array.from(
+      tabList?.querySelectorAll<HTMLButtonElement>(':scope > .lg-track__item') ?? [],
+    )
     expect(tabs).toHaveLength(3)
-    expect(tabs.every(tab => tab.classList.contains('min-h-11'))).toBe(true)
-    expect(tabs.every(tab => tab.classList.contains('data-statistics-mode-button'))).toBe(true)
-    expect(tabs[0]?.classList.contains('is-selected')).toBe(true)
+    expect(tabs.every(tab => tab.getAttribute('role') === 'tab')).toBe(true)
+    expect(tabs.every(tab => tab.getAttribute('aria-controls')?.startsWith('data-statistics-panel-'))).toBe(true)
     expect(tabs[0]?.getAttribute('aria-selected')).toBe('true')
     expect(tabs[0]?.tabIndex).toBe(0)
     expect(tabs[1]?.tabIndex).toBe(-1)
@@ -306,7 +305,7 @@ describe('DataStatistics layout surfaces', () => {
     const resetButton = findButton('重置')
     expect(resetButton?.type).toBe('button')
     expect(resetButton?.classList.contains('min-h-11')).toBe(true)
-    expect(resetButton?.classList.contains('app-button')).toBe(true)
+    expect(resetButton?.classList.contains('app-glass-button')).toBe(true)
 
     await click(trigger)
     expect(document.body.querySelector('[role="menu"]')).not.toBeNull()

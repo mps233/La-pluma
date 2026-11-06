@@ -1,119 +1,55 @@
-import { useId, useMemo, type KeyboardEvent } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
+import { useId } from 'react'
 import { Camera, EyeOff, Radio } from 'lucide-react'
-import { usePreviewStore, type PreviewMode } from '../stores'
-import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
+import { GlassSegmented } from '@zakisheriff/liquid-glass'
+import { usePreviewStore, useUIStore, type PreviewMode } from '../stores'
 import { Switch } from './common'
 
 const PREVIEW_MODES: ReadonlyArray<{
   value: PreviewMode
   label: string
-  description: string
   Icon: typeof EyeOff
 }> = [
-  { value: 'off', label: '关闭', description: '不连接', Icon: EyeOff },
-  { value: 'snapshot', label: '快照', description: '10\u00A0秒刷新', Icon: Camera },
-  { value: 'live', label: '实时', description: '低延迟画面', Icon: Radio },
+  { value: 'off', label: '关闭', Icon: EyeOff },
+  { value: 'snapshot', label: '快照', Icon: Camera },
+  { value: 'live', label: '实时', Icon: Radio },
 ]
 
-interface PreviewModeControlsProps {
-  compact?: boolean
-  fluid?: boolean
-  className?: string
-}
-
 /**
- * 预览模式开关，复用工作区液体分段控件的结构与动效。
- * 模式只在当前会话内保留；自动恢复是单独的显式偏好。
+ * 预览模式开关，使用 Liquid Glass 分段控件；模式只在当前会话内保留。
+ * 自动恢复是单独的显式偏好。
  */
-export function PreviewModeControls({
-  compact = false,
-  fluid = false,
-  className = '',
-}: PreviewModeControlsProps) {
-  const shouldReduceMotion = useReducedMotion()
+export function PreviewModeControls() {
+  const theme = useUIStore(state => state.theme)
   const mode = usePreviewStore(state => state.mode)
   const setMode = usePreviewStore(state => state.setMode)
-  const values = useMemo(() => PREVIEW_MODES.map(option => option.value), [])
-  const {
-    containerRef,
-    activeRect,
-    setTabRef,
-  } = useFluidTabIndicator(mode)
-
-  const handleModeKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const currentIndex = Math.max(0, values.indexOf(mode))
-    let nextIndex: number | null = null
-    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
-      nextIndex = (currentIndex + 1) % values.length
-    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
-      nextIndex = (currentIndex - 1 + values.length) % values.length
-    } else if (event.key === 'Home') {
-      nextIndex = 0
-    } else if (event.key === 'End') {
-      nextIndex = values.length - 1
-    }
-    const nextMode = nextIndex === null ? undefined : values[nextIndex]
-    if (!nextMode) return
-    event.preventDefault()
-    setMode(nextMode)
-    containerRef.current
-      ?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[nextIndex!]
-      ?.focus({ preventScroll: true })
-  }
+  const activeIndex = Math.max(0, PREVIEW_MODES.findIndex(option => option.value === mode))
+  const options = PREVIEW_MODES.map(({ label, Icon }) => ({
+    label,
+    icon: (
+      <Icon
+        className="h-3.5 w-3.5"
+        strokeWidth={1.8}
+        aria-hidden="true"
+      />
+    ),
+  }))
 
   return (
-    <div className={`app-workspace-segments app-liquid-tab-pill glass preview-mode-shell${compact ? ' is-compact' : ''}${fluid ? ' is-fluid' : ''} ${className}`.trim()}>
-      <div
-        ref={containerRef}
-        className="app-workspace-segment-list preview-mode-list"
-        role="radiogroup"
+    <div
+      className="preview-mode-shell"
+      data-theme={theme === 'system' ? undefined : theme}
+    >
+      <GlassSegmented
+        size="sm"
+        options={options}
+        value={activeIndex}
+        onChange={(index) => {
+          const nextMode = PREVIEW_MODES[index]?.value
+          if (nextMode) setMode(nextMode)
+        }}
         aria-label="预览模式"
-        onKeyDown={handleModeKeyDown}
-      >
-        {activeRect.width > 0 && (
-          <motion.span
-            aria-hidden="true"
-            className="app-workspace-segment-indicator preview-mode-highlight"
-            initial={false}
-            animate={{
-              x: activeRect.x,
-              y: activeRect.y,
-              width: activeRect.width,
-              height: activeRect.height,
-            }}
-            transition={shouldReduceMotion
-              ? { duration: 0 }
-              : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
-          />
-        )}
-        {PREVIEW_MODES.map(option => {
-          const selected = mode === option.value
-          const Icon = option.Icon
-          return (
-            <button
-              key={option.value}
-              ref={setTabRef(option.value)}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              aria-pressed={selected}
-              tabIndex={selected ? 0 : -1}
-              title={option.description}
-              onClick={() => setMode(option.value)}
-              className={`app-workspace-segment preview-mode-option ${selected ? 'is-selected' : ''}`}
-            >
-              <span className="app-workspace-segment-icon" aria-hidden="true">
-                <Icon strokeWidth={1.8} />
-              </span>
-              <span className="app-workspace-segment-copy">
-                <span>{option.label}</span>
-                <small>{option.description}</small>
-              </span>
-            </button>
-          )
-        })}
-      </div>
+        className="preview-mode-segmented"
+      />
     </div>
   )
 }

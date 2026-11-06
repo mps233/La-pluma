@@ -1,4 +1,5 @@
 import { API_BASE_URL, fetchWithAuth, parseJsonResponse } from './api'
+import { getItemIconCacheVersion } from './itemIconCache'
 
 export interface OperatorQuote {
   operatorId: string
@@ -49,8 +50,11 @@ const asOperatorQuote = (value: unknown, allowMissingOperatorId = false): Operat
   return { operatorId: operatorId || operator, operator, quote }
 }
 
-export const getOperatorAvatarUrl = (operatorId: string) =>
-  `${API_BASE_URL}/maa-assets/avatar/${encodeURIComponent(operatorId)}`
+export const getOperatorAvatarUrl = (operatorId: string) => {
+  const path = `${API_BASE_URL}/maa-assets/avatar/${encodeURIComponent(operatorId)}`
+  const version = getItemIconCacheVersion()
+  return version > 0 ? `${path}?v=${version}` : path
+}
 
 function loadQuote(
   path: 'daily' | 'random',

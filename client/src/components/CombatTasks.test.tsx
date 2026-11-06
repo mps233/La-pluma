@@ -166,6 +166,11 @@ const renderActivityMode = async (mode: 'visible' | 'hidden') => {
 
 describe('CombatTasks execution recovery', () => {
   beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: query === '(prefers-reduced-motion: reduce)',
       media: query,
@@ -206,6 +211,7 @@ describe('CombatTasks execution recovery', () => {
     document.body.style.overflow = ''
     vi.useRealTimers()
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it('keeps each active task in the shared continuous-corner card', async () => {
@@ -216,28 +222,32 @@ describe('CombatTasks execution recovery', () => {
     expect(page?.querySelector('.app-page-header')?.classList.contains('is-mobile-inline')).toBe(true)
 
     const modeShell = page?.querySelector('.combat-mode-shell')
-    expect(modeShell?.classList.contains('app-liquid-tab-pill')).toBe(true)
-    const modeButtons = page?.querySelectorAll('.combat-mode-button') ?? []
+    const modeTrack = modeShell?.querySelector('.lg-track[role="tablist"]')
+    expect(modeTrack?.getAttribute('aria-label')).toBe('作业类型')
+    const modeButtons = modeTrack?.querySelectorAll(':scope > .lg-track__item') ?? []
     expect(modeButtons).toHaveLength(3)
-    modeButtons.forEach(button => expect(button.classList.contains('min-h-11')).toBe(true))
-    expect(modeShell?.querySelector('[role="toolbar"]')).not.toBeNull()
-    expect(page?.querySelectorAll('.combat-mode-button[aria-pressed="true"]')).toHaveLength(1)
+    expect(Array.from(modeButtons).map(button => button.textContent)).toEqual([
+      expect.stringContaining('普通作业'),
+      expect.stringContaining('保全派驻'),
+      expect.stringContaining('悖论模拟'),
+    ])
+    expect(modeTrack?.querySelectorAll(':scope > .lg-track__item[aria-selected="true"]')).toHaveLength(1)
     expect(Array.from(modeButtons).map(button => button.getAttribute('tabindex'))).toEqual(['0', '-1', '-1'])
 
     const firstModeButton = modeButtons[0] as HTMLButtonElement
     const secondModeButton = modeButtons[1] as HTMLButtonElement
     firstModeButton.focus()
     await keyDown(firstModeButton, 'ArrowRight')
-    expect(secondModeButton.getAttribute('aria-pressed')).toBe('true')
+    expect(secondModeButton.getAttribute('aria-selected')).toBe('true')
     expect(document.activeElement).toBe(secondModeButton)
 
     await keyDown(secondModeButton, 'Home')
-    expect(firstModeButton.getAttribute('aria-pressed')).toBe('true')
+    expect(firstModeButton.getAttribute('aria-selected')).toBe('true')
     expect(document.activeElement).toBe(firstModeButton)
 
     const arrowDownEvent = await keyDown(firstModeButton, 'ArrowDown')
     expect(arrowDownEvent.defaultPrevented).toBe(false)
-    expect(firstModeButton.getAttribute('aria-pressed')).toBe('true')
+    expect(firstModeButton.getAttribute('aria-selected')).toBe('true')
 
     const copilotCard = page?.querySelector('.combat-task-card')
     expect(copilotCard?.getAttribute('data-smooth-corners')).toBe('true')
@@ -246,7 +256,7 @@ describe('CombatTasks execution recovery', () => {
     expect(Array.from(copilotCard?.querySelectorAll('summary') ?? [])
       .some(summary => summary.textContent?.trim() === '说明')).toBe(false)
 
-    const sssModeButton = Array.from(container.querySelectorAll<HTMLButtonElement>('.combat-mode-button'))
+    const sssModeButton = Array.from(container.querySelectorAll<HTMLButtonElement>('.lg-track > .lg-track__item'))
       .find(button => button.textContent?.includes('保全派驻'))
     expect(sssModeButton).toBeDefined()
     await click(sssModeButton!)
@@ -409,7 +419,7 @@ describe('CombatTasks execution recovery', () => {
     expect(stageSearchButton?.disabled).toBe(false)
     expect(stageSearchButton?.textContent).toContain('搜索')
 
-    const paradoxModeButton = Array.from(container.querySelectorAll<HTMLButtonElement>('.combat-mode-button'))
+    const paradoxModeButton = Array.from(container.querySelectorAll<HTMLButtonElement>('.lg-track > .lg-track__item'))
       .find(button => button.textContent?.includes('悖论模拟'))
     await click(paradoxModeButton!)
     const paradoxInput = container.querySelector<HTMLInputElement>('input[name="maa-paradox-operator"]')!

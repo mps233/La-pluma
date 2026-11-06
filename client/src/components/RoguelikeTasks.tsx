@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
+import '../styles/pages/roguelike.css'
+import { GlassSegmented } from '@zakisheriff/liquid-glass'
 import { Check, Play, Square } from 'lucide-react'
 import { maaApi } from '../services/api'
 import { PageHeader, Input, Select, Button, SmoothPanel, Switch, CjkText, TruncatedText } from './common'
@@ -8,7 +9,6 @@ import { useStatusStore } from '../store/statusStore'
 import { useRunStore } from '../store/runStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import ScreenMonitor from './ScreenMonitor'
-import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
 import { waitForTaskIdle } from '../utils/taskStatus'
 import type {
   RoguelikeTask,
@@ -92,7 +92,6 @@ const splitCommaList = (value: unknown): string[] => (
 
 export default function RoguelikeTasks() {
   const currentRun = useRunStore(state => state.run)
-  const shouldReduceMotion = useReducedMotion()
   const [isRunning, setIsRunning] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
   const stopRequestInFlightRef = useRef(false)
@@ -111,12 +110,6 @@ export default function RoguelikeTasks() {
   const lastQueuedConfigFingerprintRef = useRef<string | null>(null)
   const configHydratedRef = useRef(false)
   const [activeMode, setActiveMode] = useState<RoguelikeMode>('roguelike')
-  const {
-    containerRef: modeTabsRef,
-    activeRect: activeModeRect,
-    setTabRef: setModeTabRef,
-    handleTabKeyDown: handleModeKeyDown,
-  } = useFluidTabIndicator(activeMode)
 
   useEffect(() => () => {
     executionGenerationRef.current += 1
@@ -217,7 +210,7 @@ export default function RoguelikeTasks() {
             
             // 启动轮询，持续检查任务状态
             pollInterval = setInterval(async () => {
-              if (pollRequestInFlight) return
+              if (pollRequestInFlight || document.hidden) return
               pollRequestInFlight = true
               try {
                 const statusResult = await maaApi.getTaskStatus(controller.signal)
@@ -1024,57 +1017,17 @@ export default function RoguelikeTasks() {
 
         <div className="roguelike-workspace-grid">
           <div className="roguelike-mode-area">
-            <div className="app-workspace-segments app-liquid-tab-pill glass roguelike-mode-shell">
-              <div
-                ref={modeTabsRef}
-                className="app-workspace-segment-list roguelike-mode-tabs"
-                role="toolbar"
+            <div className="roguelike-mode-shell">
+              <GlassSegmented
+                options={tasks.map(task => ({ label: task.name }))}
+                value={Math.max(0, tasks.findIndex(task => task.id === activeMode))}
+                onChange={(index) => {
+                  const task = tasks[index]
+                  if (task) setActiveMode(task.id as RoguelikeMode)
+                }}
                 aria-label="肉鸽模式"
-              >
-                {activeModeRect.width > 0 && (
-                  <motion.div
-                    data-testid="roguelike-mode-highlight"
-                    aria-hidden="true"
-                    className="app-workspace-segment-indicator roguelike-mode-highlight"
-                    initial={false}
-                    animate={{
-                      x: activeModeRect.x,
-                      y: activeModeRect.y,
-                      width: activeModeRect.width,
-                      height: activeModeRect.height,
-                    }}
-                    transition={shouldReduceMotion
-                      ? { duration: 0 }
-                      : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
-                  />
-                )}
-                {tasks.map(task => {
-                  const selected = activeMode === task.id
-                  return (
-                    <button
-                      key={task.id}
-                      ref={(element) => {
-                        setModeTabRef(task.id as RoguelikeMode)(element)
-                      }}
-                      type="button"
-                      onClick={() => setActiveMode(task.id as RoguelikeMode)}
-                      onKeyDown={(event) => handleModeKeyDown(
-                        event,
-                        tasks.map(({ id }) => id as RoguelikeMode),
-                        setActiveMode,
-                      )}
-                      aria-pressed={selected}
-                      tabIndex={selected ? 0 : -1}
-                      className={`app-workspace-segment roguelike-mode-button min-h-11 ${selected ? 'is-selected' : ''}`}
-                    >
-                      <span className="app-workspace-segment-copy">
-                        <span>{task.name}</span>
-                        <small>{task.description}</small>
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
+                className="roguelike-mode-segmented"
+              />
             </div>
           </div>
 

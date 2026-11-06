@@ -21,6 +21,7 @@
 
 - `client/src/ios-theme.css`：**实际生效的主题层**。它在 `main.tsx` 中晚于 `index.css` 加载，且不在 `@layer` 中，因此它的 `:root` 会覆盖调色板、圆角、间距、控件高度和字体族。
 - `client/src/index.css`：基础/回退层，定义 `--app-font-*`、4px 基础间距、语义类和组件样式。
+- `client/src/styles/pages/*.css`：按懒加载路由拆分的页面独占样式，由对应页面组件导入，随路由 chunk 加载。只放单页专用规则；共享组件、骨架屏、`app-*` / `brand-*` / `status-*` 等设计系统类必须留在全局文件，否则未加载该页面时会丢失样式。
 - `client/tailwind.config.ts`：把常用 `rounded-*`、`gap-*`、`space-*` 映射到 token。
 - `client/src/components/common`：页面标题、卡片、按钮、输入、弹窗、加载等通用组件。
 
@@ -85,22 +86,24 @@ iOS / macOS 27 的 Liquid Glass 是 iOS 26 材质的精修，不是换一套语�
 
 ### Glasswork 液态玻璃
 
-悬浮 chrome 与页面内切换控件使用 Glasswork 的液态玻璃：`client/src/glasswork/glass.css` 提供材质变量与规则，`lens.js` 在 Chromium 下绘制边缘折射。当前用于桌面浮动侧栏、顶栏主题/GitHub 控件、移动端顶栏的品牌/主题/GitHub 圆形入口、页面内模式切换胶囊（作业、日志、数据、养成、配置、预览模式）以及移动端底部 tabbar 与“更多”按钮。表面只挂 `.glass`，`html.dark` 自动切换深色材质。
+悬浮 chrome 使用 Glasswork 的液态玻璃：`client/src/glasswork/glass.css` 提供材质变量与规则，`lens.js` 在 Chromium 下绘制边缘折射。当前用于桌面浮动侧栏、顶栏主题/GitHub 控件和移动端顶栏的品牌/主题/GitHub 圆形入口。表面只挂 `.glass`，`html.dark` 自动切换深色材质。
 
-- 表面参数使用材料自带的 `--density`（0 透明，1 实心）、`--floor`（文字所需的最低染色）和 `--keep`（保留的饱和度增益）。侧栏与底部 tabbar 使用 `--density: 0.75` 保证面板在环境/滚动内容上可辨；浅色页面内的切换胶囊与 tabbar 使用 `--floor: 0.45`，预览卡内的紧凑切换使用 `--floor: 0.8`，使小号标签满足 AA。
+- 表面参数使用材料自带的 `--density`（0 透明，1 实心）、`--floor`（文字所需的最低染色）和 `--keep`（保留的饱和度增益）。侧栏使用 `--density: 0.75` 保证面板在环境/滚动内容上可辨。
 - 侧栏选中项保持「accent 填充 + 白字」的语义，但填充改为 accent 染色玻璃：浅色 `#004b99`、深色 `#0059b3`，`--floor: 0.8`（hover 0.88），叠加顶部柔光/底部暗部渐变和软阴影，不使用亮边；白字对比度约 5.6:1 / 9.2:1。
-- 侧栏未选中项的 hover/focus 使用中性灰玻璃（无色相）：浅色由 `--app-text` 与 `--app-surface-solid` 混出灰，深色由 `--app-text` 与 `--app-bg-soft` 混出灰，`--density: 0.7`、16px 模糊、无亮边；静止态完全透明。
-- 页面内分段控件的选中段复用同一中性玻璃配方：同色相混法、`17%` / `31%` 染色、16px 模糊，无描边；与侧栏 hover 保持一致的材质语言。
-- 中性玻璃配方集中在 `--app-neutral-glass-*` 变量，选中段与侧栏 hover 共用同一套 tint / blur / saturate / brightness。
+- 侧栏未选中项的 hover/focus 使用中性灰玻璃（无色相）：浅色由 `--app-text` 与 `--app-surface-solid` 混出灰，深色由 `--app-text` 与 `--app-bg-soft` 混出灰，16px 模糊、无亮边；静止态完全透明。配方集中在 `--app-neutral-glass-*` 变量（tint / blur / saturate / brightness），不额外声明 `--density`。
 - 边缘折射只在 Chromium 生效；其他浏览器保留 CSS 玻璃。Safari / iOS 通过 `[data-engine="webkit"]` 强制圆角，避免 `backdrop-filter` 与超椭圆圆角组合时整块表面不绘制的设备问题。
 - `prefers-reduced-transparency: reduce` 下所有玻璃表面退化为 `--app-surface-solid` 实色表面，并保留 1px 边缘。
-- 移动端顶栏的三个圆形入口（品牌、主题、GitHub）与预览卡内的模式切换按产品要求使用同一材质，允许叠在已有 chrome / 卡片表面之上；这是明确的例外，其他普通卡片仍不得叠加玻璃。
+- 移动端顶栏的三个圆形入口（品牌、主题、GitHub）按产品要求使用同一材质，允许叠在已有 chrome / 卡片表面之上；这是明确的例外，其他普通卡片仍不得叠加玻璃。
+- 页面内分段控件统一使用 `@zakisheriff/liquid-glass` 的 `GlassSegmented`（作业类型、肉鸽模式、预览模式、日志内容、数据视图、养成状态、配置分区），不再使用 `app-liquid-tab-pill` 胶囊或手写高亮层。作业类型与预览卡的 wrapper 通过 `data-theme` 继承明暗主题（`system` 时交给媒体查询）；预览控件使用 `size="sm"`；页面级轨道统一铺满容器，粗指针设备由 CSS 把分段高度提升到 44px。整行作业类型轨道的背景模糊已关闭（背后是均匀的页面底色），否则透镜动画每帧重算模糊会把帧率减半；小号预览控件保留模糊。
+- 移动端底部导航使用同一库的 `GlassNav`（控制台、自动化、作业、配置四个 Tab）+ 独立圆形 `GlassMenu`（更多）；「更多」不是第五个 Tab，点击后从按钮向左上展开工作区菜单，当前溢出页面在菜单中带勾选，溢出页面激活时按钮使用 accent 色。tabbar wrapper 绑定 `data-theme`，保留 `--la-pluma-tabbar-*` 高度与安全区 token，内容区留白和滚动遮罩继续使用这些 token。
+- 全局 `Button` / `IconButton` 也由 `GlassButton` 承载：primary → filled + `--app-accent-action`，danger → filled + `--app-danger-action`，success → filled + `--app-success-action`，secondary / outline → glass，ghost → clear；loading 时用内置活动指示器填入 icon 并保留 `loadingText`。尺寸映射为 36 / 44 / 48px，粗指针下小号提升到 44px。明暗主题通过 `applyThemePreference` 在 `html[data-theme]` 统一解析，按钮不再逐个包裹主题属性。
+- 公共 `Switch` 由同一库的 `GlassSwitch` 承载：保留 `checked` / `onChange` / `label` / `compact` / `disabled` API，`label` 只作 `aria-label`，开启色使用 `--app-accent`；`id` 落在按钮上，外部 `<label htmlFor>` 仍可正常关联。`compact` 通过 0.8 缩放并补偿触摸区域，粗指针下命中高度保持约 44px。
 
 ---
 
 ## 原生响应式壳层与平台语言
 
-应用使用原生 `.la-pluma-app` 根节点。Navbar、页面区域、移动 tabbar 和 Sheet 等 chrome 与交互统一由 `Layout` 及 common 组件提供；`ios-theme.css` 负责 Liquid Glass 材质、应用 chrome、安全区和品牌适配，不要在页面中另起一套导航或 modal 基础样式。
+应用使用原生 `.la-pluma-app` 根节点。Navbar、页面区域、移动 tabbar 和更多菜单等 chrome 与交互统一由 `Layout` 及 common 组件提供；`ios-theme.css` 负责 Liquid Glass 材质、应用 chrome、安全区和品牌适配，不要在页面中另起一套导航或 modal 基础样式。
 
 - `ios-theme.css` 不是可选的「iOS 外壳」。它全局导入，`:root` 无条件覆盖；颜色、圆角、间距、控件高度都以它为准。
 - 平台一致，但保留 La Pluma 的个性：系统负责 chrome 的结构和材质，品牌进入内容层（见「品牌识别」），不要把系统蓝当成品牌本身。
@@ -117,7 +120,7 @@ macOS 27（Golden Gate）的方向是 edge-to-edge 侧栏、滚动折射和更�
 - 保留 0.75rem 内缩的浮动圆角 frame、连续圆角材质边界和现有 toolbar 结构；不要为了对齐 macOS 27 把侧栏贴边、改折射或重做 toolbar。
 - 侧栏选中态保留现有的 accent 填充 + 白字/白图标；不要改成 subtle fill + 彩色图标，也不要新增左侧指示条。
 - macOS 27 的 uniform toolbar、窗口圆角收敛只作为未来可选探索，不是当前规范要求；改壳层前先出视觉对比并确认。
-- 移动端保留悬浮胶囊 tabbar 和「更多」Sheet，不要按桌面侧栏规则改移动端。
+- 移动端保留悬浮胶囊 tabbar 和「更多」菜单，不要按桌面侧栏规则改移动端。
 
 ---
 
@@ -350,7 +353,7 @@ macOS 27（Golden Gate）的方向是 edge-to-edge 侧栏、滚动折射和更�
 | `--app-radius-xs` | 细小元素、默认边界 |
 | `--app-radius-sm` | checkbox、小控件 |
 | `--app-radius-md` | 紧凑控件与局部容器 |
-| `--app-radius-lg` | 卡片、面板、分段控件、通用按钮和输入 |
+| `--app-radius-lg` | 卡片、面板、分段控件和输入 |
 | `--app-radius-pill` | 胶囊、头像、圆形状态点 |
 | `--app-continuous-radius` | SmoothPanel / 一级连续圆角卡片（20px / 80%） |
 | `--app-continuous-radius-compact` | 短小信息卡（16px / 80%） |
@@ -385,10 +388,10 @@ Tailwind 的映射不是按类名直觉对应的，必须按下表使用：
 | 2. 可点击卡片 | 仅整卡可点击时 | `surface-panel-hover`（命名例外） |
 | 3. 菜单 / popover | 下拉、菜单、分组浮层 | 复用组件自身阴影；不要手写 |
 | 4. tooltip | 轻量提示 | `0 5px 14px rgba(0,0,0,.16)` |
-| 5. 弹窗 / Sheet | modal、sheet | 现有 Modal / Sheet 的阴影 |
+| 5. 弹窗 / 菜单 | modal、menu | 沿用组件自身阴影，不要手写 |
 | 6. chrome | navbar、tabbar、侧栏 | `--app-glass-shadow` 或对应 chrome 类 |
 
-- 统一使用中性投影；卡片、菜单和普通浮层保持向下、无水平偏移；底部 Sheet / tabbar 使用向上（负 Y）阴影。需要强调主操作时，用词重、填充色和尺寸，不要靠发光。
+- 统一使用中性投影；卡片、菜单和普通浮层保持向下、无水平偏移；移动 tabbar 使用向上（负 Y）阴影。需要强调主操作时，用词重、填充色和尺寸，不要靠发光。
 - 禁止用品牌色或状态色做模糊投影，也禁止零偏移的彩色光环（`0 0 0 3px` 配彩色）和彩色 `text-shadow`。
 - 普通状态指示点的语义光环限制在扩散 ≤3px、透明度 ≤20%；`status-border-beam`（4px / 46%）和 `FloatingStatusIndicator` 的运行脉冲（4px / 70%，2s）是命名例外。
 - 命名例外：`surface-panel-hover` 的 accent 20% 描边 + 9% 投影、`icon-well` 的 accent 12% 投影、`focus-visible` 焦点环属于现有交互态；不要把它们复制到静态内容或普通容器。
@@ -451,10 +454,12 @@ Tailwind 映射：
 - 输入控件：`app-input control-surface`
 - 多行文本：`app-input control-surface !h-auto !min-h-28 resize-y px-3 py-2`（`app-input` 在手机上会被 `@media (pointer: coarse), (max-width: 768px)` 的 `height/min-height: 2.75rem !important` 覆盖；必须用 `!h-auto !min-h-28`）
 - 复选项外层：`app-checkbox`
-- 普通按钮：`app-button`
-- 图标按钮：`app-icon-button`
+- 普通按钮：使用 `Button`
+- 图标按钮：使用 `IconButton`
 
-iOS 风格三档 `Button` 高度由 `app-button-size-sm`、`app-button-size-md`、`app-button-size-lg` 统一管理，桌面分别为 36、44、48px；`Input` 和 `Select` 为 44px。手机断点和粗指针设备会把所有标准按钮、图标按钮与表单点击区提升到至少 44px。不要在调用处再叠加 `h-*`、`px-*`、`py-*` 缩小标准控件；图标专用工具条只有在桌面高密度场景才可明确使用更紧凑的尺寸，且不能承载文字。
+普通按钮与图标按钮统一由 `@zakisheriff/liquid-glass` 的 `GlassButton` 承载（见“Glasswork 液态玻璃”下的 Button 条目），页面不要再写 `app-button` / `app-icon-button` 之类的按钮外观类。
+
+iOS 风格三档 `Button` 高度由 `Button` 的 `size` 统一管理，经 `app-glass-button-*` 映射为桌面 36、44、48px 的玻璃胶囊；`Input` 和 `Select` 为 44px。手机断点和粗指针设备会把所有标准按钮、图标按钮与表单点击区提升到至少 44px。不要在调用处再叠加 `h-*`、`px-*`、`py-*` 缩小标准控件；图标专用工具条只有在桌面高密度场景才可明确使用更紧凑的尺寸，且不能承载文字。
 
 `Switch` 的 `label` 只作为 `aria-label`，不会渲染可见文字；设置项必须在旁边另写可见标题和说明。`Card` 的标题由 `CardHeader` 渲染；不要再用 `h3` 手写一份同样的字号。
 
@@ -514,11 +519,11 @@ iOS 风格三档 `Button` 高度由 `app-button-size-sm`、`app-button-size-md`�
 | 场景 | 时长 / 参数 |
 | --- | --- |
 | 颜色、背景、阴影、普通变形 | 160–180ms |
-| Switch 轨道 / 滑块 | 220ms ease / 240ms `cubic-bezier(0.22,1,0.36,1)` |
+| Switch 轨道 / 滑块 | 复用 `GlassSwitch` 内置 spring |
 | 菜单、下拉 | 复用现有组件：主题菜单 spring `440/38/0.7`；自动化任务选择器 320ms `cubic-bezier(0.32,0.72,0,1)` |
 | 弹窗 | spring `stiffness: 380, damping: 34, mass: 0.82` |
-| 分段高亮 | spring `stiffness: 420, damping: 38, mass: 0.72` |
-| Sheet | 现有 Sheet 的 `[0.32,0.72,0,1]` |
+| 分段高亮 | 复用 `GlassSegmented` 内置 spring，不要另写 |
+| 更多菜单 | 复用 `GlassMenu` 内置 spring |
 
 - 退出比进入快约 30–40%；浮层从触发点 origin 展开；优先使用可反向中断的过渡。
 - 新增 CSS 或 Framer Motion 动效必须尊重 reduced motion；关闭位移、旋转和弹簧，只保留必要的透明度变化。
@@ -549,7 +554,7 @@ iOS 风格三档 `Button` 高度由 `app-button-size-sm`、`app-button-size-md`�
 - 行内或文字旁图标使用 16px，常规操作和字段图标使用 20px，页面标题或大操作使用 24px。线宽使用 1.8–2.0；11–14px 的小箭头可用 2.1–2.4 补偿。
 - `icon-well` 只用于页面、概览和卡片的内容身份图标，不能包裹普通按钮图标；它是阴影规则的命名例外。
 - 无文字操作使用 `IconButton`，调用时必须提供 `aria-label`，并提供 `title` 或 `tooltip` 作为提示；只传 `tooltip` 时不能省略 `aria-label`。有文字的操作使用 `Button icon`。
-- `IconButton` 的 `sm`、`md`、`lg` 与相同档位的 `Button` 共用尺寸，并在手机和粗指针设备保持至少 44px。不要页面自行缩小点击面积；桌面高密度工具条使用 `IconButton size="sm"`（36px）。
+- `IconButton` 的 `sm`、`md`、`lg` 与相同档位的 `Button` 共用高度，并在手机和粗指针设备保持至少 44px。不要页面自行缩小点击面积；桌面高密度工具条使用 `IconButton size="sm"`（36px）。两者内部都是圆形/胶囊玻璃按钮。
 - 装饰图标加 `aria-hidden="true"`；状态和结果必须同时提供可读文字或 `aria-label`，不能只依赖颜色和图标。
 
 按钮颜色按语义选择 `brand-action`、`status-success-action`、`status-danger-action`，不要按页面重新定义按钮渐变。
@@ -593,7 +598,7 @@ iOS 风格三档 `Button` 高度由 `app-button-size-sm`、`app-button-size-md`�
 | ≤6 字段的短表单 | `Modal`（从 `@/components/common` 导出） | size `sm/md/lg/xl` = 28/32/42/56rem；焦点陷阱、关闭归还、滚动锁由组件处理 |
 | 长表单、多分组 | 独立路由页 | 不要塞进 Modal；保存条固定在页面或 section |
 | 筛选、排序 | 页内筛选菜单（参考 DataStatistics 的 FilterMenu，不是公共组件） | 不遮挡主内容；关闭后焦点回触发按钮 |
-| 页面导航 | `Layout` 的 Sheet | Sheet 是 Layout 内部导航组件，不是 `@/components/common` 的公共导出；页面不要自行复刻 |
+| 页面导航 | `Layout` 的 tabbar / `GlassMenu` | 移动端更多菜单是 Layout 内部组件，不是 `@/components/common` 的公共导出；页面不要自行复刻 |
 | 详情 | 路由 + 返回 | 返回保持列表滚动位置 |
 
 ### 设置页
@@ -633,7 +638,7 @@ iOS 风格三档 `Button` 高度由 `app-button-size-sm`、`app-button-size-md`�
 | --- | --- |
 | Tab / Tablist | roving tabindex，方向键切换，Home/End 首尾 |
 | Menu | 方向键、Enter/Space、Escape 关闭并归还焦点 |
-| Dialog / Sheet | 打开聚焦第一个可操作项，破坏性操作默认聚焦取消；Esc 关闭；关闭归还触发元素 |
+| Dialog | 打开聚焦第一个可操作项，破坏性操作默认聚焦取消；Esc 关闭；关闭归还触发元素 |
 | 路由切换 | 焦点移到 main 或 h1，播报页面名 |
 | 表单错误 | `aria-invalid` + `aria-describedby`；错误摘要可聚焦 |
 | 全局播报 | 只保留一个 polite live region；`role="alert"` 只用于需要用户处理的错误 |
@@ -676,48 +681,52 @@ iOS 风格三档 `Button` 高度由 `app-button-size-sm`、`app-button-size-md`�
 | 不可逆操作确认 | `ConfirmDialog` |
 | 局部加载 | `Loading`；懒加载路由用 `PageSkeleton`；控制台骨架从 `@/components/common/Loading` 直接导入 |
 | 任务状态环 | `StatusMark`（从 `@/components/common` 导出） |
-| 动态分段标签 | `useFluidTabIndicator` |
-| 覆盖层 | 先看「模式库 / 覆盖层」；`Sheet` 不是公共组件 |
+| 动态分段标签 | `GlassSegmented`（来自 `@zakisheriff/liquid-glass`；作业类型、肉鸽模式、预览模式、日志、数据、养成、配置共用） |
+| 覆盖层 | 先看「模式库 / 覆盖层」；移动端更多菜单由 `Layout` 的 `GlassMenu` 提供，不是公共组件 |
 
-### useFluidTabIndicator
+### GlassSegmented
 
-**文件位置**：`client/src/hooks/useFluidTabIndicator.ts`
+**来源**：`@zakisheriff/liquid-glass`；样式表在 `client/src/main.tsx` 全局导入一次。
 
-**适用场景**：带有 Framer Motion 高亮底层的分段标签。它会在切换、容器尺寸变化、标签内容变化和窗口缩放时，把高亮层对齐到当前按钮。不要在每个页面重复维护 `ResizeObserver`、元素 ref 和坐标计算。
+**适用场景**：页面内的互斥视图切换，例如作业类型、肉鸽模式、预览模式、日志内容、数据视图、养成状态和配置分区。选中态是液态玻璃透镜，指针拖动、方向键 / Home / End、`prefers-reduced-motion` 都由组件处理；不要手写 Framer Motion 高亮层、`ResizeObserver`、坐标计算或 `app-liquid-tab-pill` 胶囊。
 
 ```tsx
-const { containerRef, activeRect, setTabRef, handleTabKeyDown } = useFluidTabIndicator(activeTab)
+import { GlassSegmented } from '@zakisheriff/liquid-glass'
+
+const tabs = [
+  { id: 'copilot', label: '普通作业', icon: <FileText className="h-4 w-4" aria-hidden="true" /> },
+  { id: 'ssscopilot', label: '保全派驻', icon: <ShieldCheck className="h-4 w-4" aria-hidden="true" /> },
+  { id: 'paradoxcopilot', label: '悖论模拟', icon: <Puzzle className="h-4 w-4" aria-hidden="true" /> },
+]
+
+const activeIndex = Math.max(0, tabs.findIndex(tab => tab.id === activeTab))
 
 <div
-  ref={containerRef}
-  className="relative"
-  role="tablist"
-  onKeyDown={(event) => handleTabKeyDown(event, tabs.map(tab => tab.id), setActiveTab)}
+  className="combat-mode-shell"
+  data-theme={theme === 'system' ? undefined : theme}
 >
-  <motion.div
-    className="pointer-events-none absolute rounded-[var(--app-radius-md)] bg-[var(--app-accent-soft)]"
-    animate={{
-      x: activeRect.x,
-      y: activeRect.y,
-      width: activeRect.width,
-      height: activeRect.height,
+  <GlassSegmented
+    options={tabs.map(({ label, icon }) => ({ label, icon }))}
+    value={activeIndex}
+    onChange={(index) => {
+      const next = tabs[index]
+      if (next) setActiveTab(next.id)
     }}
+    aria-label="作业类型"
+    className="combat-mode-segmented"
   />
-  {tabs.map((tab) => (
-    <button
-      key={tab.id}
-      ref={setTabRef(tab.id)}
-      role="tab"
-      aria-selected={activeTab === tab.id}
-      tabIndex={activeTab === tab.id ? 0 : -1}
-    >
-      {tab.label}
-    </button>
-  ))}
 </div>
 ```
 
-标签 ID 需是字符串联合类型，且高亮容器需要 `relative` 定位。高亮层必须带自己的背景/圆角，否则复制的示例不可见。
+规则：
+
+- `value` 是索引；`onChange` 必须把索引映射回业务值，找不到时回退到 `0`，不要直接存索引。
+- 必须传 `aria-label`；标签写业务名称，不要写“选项一”。
+- 全宽轨道由 wrapper 的 CSS 控制：`.xxx-shell > .lg-track { width: 100%; grid-auto-columns: minmax(0, 1fr); }`；粗指针设备用 `.xxx-shell > .lg-track.lg-track--segmented { --lg-item-h: 44px; }`。这些声明必须放在 `@layer` 之外：库的 `.lg-track--segmented` 是未分层样式，会压过 `@layer components`；省略 `.lg-track--segmented` 时预览的 `size="sm"` 会退回 28px。参考 `client/src/index.css` 中 `.combat-mode-shell`、`.log-mode-shell` 等规则。
+- 需要局部强制主题时，wrapper 设 `data-theme={theme === 'system' ? undefined : theme}`；其余页面直接继承 `html[data-theme]`。
+- 紧凑场景（预览卡）使用 `size="sm"`。
+- 整行轨道在背后底色均匀时可以关闭背景模糊（参考 `.combat-mode-shell .combat-mode-segmented .lg-track__glass { backdrop-filter: none; }`），否则透镜动画每帧重算模糊会把帧率减半；小号控件和其余分段控件保留模糊。
+- 骨架屏沿用 wrapper 类名和 `glass-mode-skeleton` 结构（见 `Loading.tsx` 的 `GlassModeSkeleton`），让占位高度与真实控件一致。
 
 ---
 
@@ -742,7 +751,7 @@ const { containerRef, activeRect, setTabRef, handleTabKeyDown } = useFluidTabInd
 - [ ] loading / empty / error / disabled / selected / pressed / dirty / 长标题 / 长操作文案都检查。
 - [ ] 375 / 768 / 1280 三个宽度、浅色/深色/增加对比度都看过；没有横向溢出。
 - [ ] 所有交互控件有 `focus-visible`、disabled、loading；触控目标 ≥44px。
-- [ ] 键盘可完成主流程；Modal/Sheet 焦点陷阱和归还正常；错误有 `aria-invalid` / 播报。
+- [ ] 键盘可完成主流程；Modal 焦点陷阱和归还正常；GlassMenu 的 Esc 关闭与焦点归还正常；错误有 `aria-invalid` / 播报。
 - [ ] 没有新增页面级颜色、彩色阴影、彩色光环、未登记的 z-index；游戏语义色面积 ≤10%。
 - [ ] 会变化的数字使用 `tabular-nums`；正文对比度和非文本对比度按「色彩」表核对。
 - [ ] 文案按「内容设计」模板；数字/单位/日期格式统一。

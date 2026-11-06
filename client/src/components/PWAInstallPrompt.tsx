@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Download, RefreshCw, Share2, SquarePlus } from 'lucide-react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useStatusStore } from '@/store/statusStore'
@@ -76,7 +75,6 @@ export default function PWAInstallPrompt() {
   const [isUpdating, setIsUpdating] = useState(false)
   const serviceWorkerRegistrationRef = useRef<ServiceWorkerRegistration | null>(null)
   const lastUpdateCheckRef = useRef(0)
-  const shouldReduceMotion = useReducedMotion()
   const setStatusMessage = useStatusStore(state => state.setMessage)
 
   const handleOfflineReady = useCallback(() => {
@@ -218,27 +216,14 @@ export default function PWAInstallPrompt() {
         {announcement}
       </span>
 
-      <AnimatePresence>
-        {(showUpdateCard || showInstallCard) && (
-          <motion.section
-            key={showUpdateCard ? 'update' : 'install'}
-            role="region"
-            aria-labelledby="pwa-prompt-title"
-            aria-busy={showUpdateCard && isUpdating}
-            initial={shouldReduceMotion
-              ? { opacity: 0 }
-              : { opacity: 0, y: 24, scale: 0.98, backdropFilter: 'blur(0px) saturate(100%)' }}
-            animate={shouldReduceMotion
-              ? { opacity: 1 }
-              : { opacity: 1, y: 0, scale: 1, backdropFilter: 'blur(24px) saturate(165%)' }}
-            exit={shouldReduceMotion
-              ? { opacity: 0 }
-              : { opacity: 0, y: 16, scale: 0.98, backdropFilter: 'blur(0px) saturate(100%)' }}
-            transition={shouldReduceMotion
-              ? { duration: 0.08 }
-              : { type: 'spring', stiffness: 390, damping: 35, mass: 0.8 }}
-            className="pwa-install-prompt surface-panel fixed z-50 rounded-xl p-4 sm:w-96"
-          >
+      {(showUpdateCard || showInstallCard) && (
+        <section
+          key={showUpdateCard ? 'update' : 'install'}
+          role="region"
+          aria-labelledby="pwa-prompt-title"
+          aria-busy={showUpdateCard && isUpdating}
+          className="pwa-install-prompt app-pop-in surface-panel fixed z-50 rounded-xl p-4 sm:w-96"
+        >
             <div className="flex items-start gap-3">
               <img
                 src={logoUrl}
@@ -299,17 +284,11 @@ export default function PWAInstallPrompt() {
                 </div>
               </div>
             </div>
-          </motion.section>
-        )}
-      </AnimatePresence>
+          </section>
+      )}
 
       {showInstallEntry && (
-        <motion.div
-          initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: shouldReduceMotion ? 0.08 : 0.18, ease: 'easeOut' }}
-          className="pwa-install-entry fixed z-50"
-        >
+        <div className="pwa-install-entry app-pop-in fixed z-50">
           <IconButton
             variant="secondary"
             size="md"
@@ -321,28 +300,21 @@ export default function PWAInstallPrompt() {
             aria-label="安装 La Pluma"
             aria-expanded="false"
           />
-        </motion.div>
+        </div>
       )}
 
-      <AnimatePresence>
-        {needRefresh && isUpdateCollapsed && (
-          <motion.div
-            initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="pwa-update-chip fixed z-50"
+      {needRefresh && isUpdateCollapsed && (
+        <div className="pwa-update-chip app-pop-in fixed z-50">
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<RefreshCw className="h-4 w-4 brand-text" aria-hidden="true" />}
+            onClick={() => setIsUpdateCollapsed(false)}
           >
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<RefreshCw className="h-4 w-4 brand-text" aria-hidden="true" />}
-              onClick={() => setIsUpdateCollapsed(false)}
-            >
-              应用更新
-            </Button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            应用更新
+          </Button>
+        </div>
+      )}
     </>
   )
 }

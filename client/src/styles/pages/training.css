@@ -1,0 +1,18 @@
+/* Split from index.css / ios-theme.css; imported by the lazy training route. */
+
+
+
+
+.training-status-count {
+    display: inline-flex;
+    min-width: 1.5rem;
+    height: 1.5rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    color: inherit;
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+  }
+

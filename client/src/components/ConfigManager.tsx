@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { maaApi } from '../services/api'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { GlassSegmented } from '@zakisheriff/liquid-glass'
 import {
   Cable,
   Clock3,
@@ -19,7 +20,6 @@ import { PageHeader, Card, CardHeader, CardContent, Button, Input, Select, Check
 import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
-import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
 import type {
   MaaConnectionConfig,
   AutoUpdateConfig,
@@ -118,12 +118,6 @@ export default function ConfigManager() {
       ? saved as ConfigSectionId
       : 'connection'
   })
-  const {
-    containerRef: configTabsRef,
-    activeRect: activeConfigRect,
-    setTabRef: setConfigTabRef,
-    handleTabKeyDown: handleConfigTabKeyDown,
-  } = useFluidTabIndicator(configType)
   const [configData, setConfigData] = useState<MaaConnectionConfig>({
     adb_path: '/opt/homebrew/bin/adb',
     address: '127.0.0.1:16384',
@@ -632,19 +626,19 @@ export default function ConfigManager() {
       id: 'connection',
       name: '连接',
       description: 'ADB 与模拟器',
-      icon: <MonitorSmartphone aria-hidden="true" />,
+      icon: <MonitorSmartphone className="h-4 w-4" aria-hidden="true" />,
     },
     {
       id: 'resource',
       name: '资源',
       description: '资源来源与目录',
-      icon: <PackageOpen aria-hidden="true" />,
+      icon: <PackageOpen className="h-4 w-4" aria-hidden="true" />,
     },
     {
       id: 'instance',
       name: '实例',
       description: '运行与触控选项',
-      icon: <SlidersHorizontal aria-hidden="true" />,
+      icon: <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />,
     },
   ] satisfies Array<ConfigSection & { description: string }>
 
@@ -662,56 +656,17 @@ export default function ConfigManager() {
         )}
       />
 
-      <div className="app-workspace-segments app-liquid-tab-pill glass w-full" data-config-sections>
-        <div
-          ref={configTabsRef}
-          className="app-workspace-segment-list grid-cols-3"
-          role="toolbar"
+      <div className="w-full" data-config-sections>
+        <GlassSegmented
+          options={configSections.map(section => ({ label: section.name, icon: section.icon }))}
+          value={Math.max(0, CONFIG_SECTION_IDS.indexOf(configType))}
+          onChange={(index) => {
+            const section = configSections[index]
+            if (section) handleConfigTypeChange(section.id)
+          }}
           aria-label="配置类型"
-        >
-          {activeConfigRect.width > 0 && (
-            <motion.div
-              data-testid="config-section-highlight"
-              aria-hidden="true"
-              className="app-workspace-segment-indicator"
-              initial={false}
-              animate={{
-                x: activeConfigRect.x,
-                y: activeConfigRect.y,
-                width: activeConfigRect.width,
-                height: activeConfigRect.height,
-              }}
-              transition={shouldReduceMotion
-                ? { duration: 0 }
-                : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
-            />
-          )}
-          {configSections.map(section => {
-            const selected = configType === section.id
-            return (
-              <button
-                key={section.id}
-                ref={element => setConfigTabRef(section.id)(element)}
-                type="button"
-                onClick={() => handleConfigTypeChange(section.id)}
-                onKeyDown={event => handleConfigTabKeyDown(
-                  event,
-                  CONFIG_SECTION_IDS,
-                  handleConfigTypeChange,
-                )}
-                aria-pressed={selected}
-                tabIndex={selected ? 0 : -1}
-                className={`app-workspace-segment min-h-11 ${selected ? 'is-selected' : ''}`}
-              >
-                <span className="app-workspace-segment-icon">{section.icon}</span>
-                <span className="app-workspace-segment-copy">
-                  <span>{section.name}</span>
-                  <small>{section.description}</small>
-                </span>
-              </button>
-            )
-          })}
-        </div>
+          className="config-sections-segmented"
+        />
       </div>
 
       <div className="config-workspace-grid grid min-w-0 gap-[var(--app-space-section)] xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)] xl:items-start">

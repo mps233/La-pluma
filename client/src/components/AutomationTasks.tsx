@@ -1,4 +1,5 @@
 import { getErrorMessage } from '@/utils/errorMessage'
+import '../styles/pages/automation.css'
 import { forwardRef, useImperativeHandle, useLayoutEffect, useState, useEffect, useEffectEvent, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { generateTrainingPlan, maaApi, type TaskConfig } from '../services/api'
@@ -966,6 +967,7 @@ export default function AutomationTasks() {
   const connectionTestAbortRef = useRef<AbortController | null>(null)
   const connectionTestMountedRef = useRef(true)
   const lastExecutionFingerprintRef = useRef('')
+const appliedExecutionRevisionRef = useRef(-1)
   const pointerSortRef = useRef<PointerSortSession | null>(null)
   const sequenceItemRefs = useRef(new Map<string, HTMLDivElement>())
   const editorColumnRef = useRef<HTMLDivElement>(null)
@@ -1047,12 +1049,19 @@ export default function AutomationTasks() {
 
   // 轮询定时任务执行状态
   useEffect(() => {
-    let intervalId = null
+    let timerId: number | null = null
     let isSubscribed = true // 用于防止组件卸载后的状态更新
     let requestInFlight = false
 
+    const scheduleNextCheck = (delay: number) => {
+      if (!isSubscribed) return
+      if (timerId !== null) window.clearTimeout(timerId)
+      timerId = window.setTimeout(() => void checkScheduleStatus(), delay)
+    }
+
     const checkScheduleStatus = async () => {
       if (!isSubscribed || requestInFlight) return
+      if (document.hidden) return
       requestInFlight = true
 
       try {
@@ -1110,8 +1119,21 @@ export default function AutomationTasks() {
             setIsRunning(false)
             setRunStartedAt(null)
             setRunProgress(null)
-            if (status.lastResult) {
-              applyExecutionSummary(status.lastResult as AutomationExecutionSummary)
+
+            // The poll response deliberately omits the full execution summary.
+            // Fetch it once when a new result revision appears.
+            const resultRevision = status.lastResultRevision ?? 0
+            if (resultRevision !== appliedExecutionRevisionRef.current) {
+              appliedExecutionRevisionRef.current = resultRevision
+              if (status.hasLastResult) {
+                void maaApi.getScheduleExecutionStatus(undefined, true)
+                  .then(fullResult => {
+                    if (fullResult.success && fullResult.data?.lastResult) {
+                      applyExecutionSummary(fullResult.data.lastResult as AutomationExecutionSummary)
+                    }
+                  })
+                  .catch(() => undefined)
+              }
             }
 
             if (justFinished) {
@@ -1126,16 +1148,26 @@ export default function AutomationTasks() {
         // 静默失败，不影响用户体验
       } finally {
         requestInFlight = false
+        if (!document.hidden) scheduleNextCheck(scheduleWasRunningRef.current ? 1_000 : 5_000)
       }
     }
 
-    // 每秒检查一次
-    intervalId = setInterval(checkScheduleStatus, 1000)
-    checkScheduleStatus() // 立即执行一次
+    const handleVisibilityChange = () => {
+      if (document.hidden) return
+      if (timerId !== null) {
+        window.clearTimeout(timerId)
+        timerId = null
+      }
+      void checkScheduleStatus()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    void checkScheduleStatus()
 
     return () => {
       isSubscribed = false
-      if (intervalId) clearInterval(intervalId)
+      if (timerId !== null) window.clearTimeout(timerId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [setIsActiveStatus, setStatusMessage, taskFlow])
 

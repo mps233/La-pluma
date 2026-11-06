@@ -353,6 +353,7 @@
           const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches === true
           const dark = theme === 'dark' || (theme === 'system' && prefersDark)
           document.documentElement.classList.toggle('dark', dark)
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light'
           document.getElementById('app-root')?.classList.toggle('dark', dark)
           document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
           document.documentElement.style.backgroundColor = dark ? '#101318' : '#f2f2f7'

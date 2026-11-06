@@ -354,7 +354,7 @@ export default function Dashboard() {
       }
     }
     void fetch()
-    const timer = window.setInterval(() => void fetch(), 5000)
+    const timer = window.setInterval(() => void fetch(), 15000)
     const handleVisibility = () => {
       if (!document.hidden) void fetch()
     }

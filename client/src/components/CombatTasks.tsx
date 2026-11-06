@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import '../styles/pages/combat.css'
 import { maaApi, searchCopilot, searchParadoxCopilot, type ManualCopilotSetResult, type ScheduleExecutionResultData } from '../services/api'
-import { motion, useReducedMotion } from 'framer-motion'
-import { ChevronRight, FileText, Info, Play, Search, Square } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { GlassSegmented } from '@zakisheriff/liquid-glass'
+import { ChevronRight, FileText, Info, Play, Puzzle, Search, ShieldCheck, Square } from 'lucide-react'
 import Icons from './Icons'
 import { PageHeader, Button, Card, ConfirmDialog, EmptyState, SmoothPanel, StatusMark, TruncatedText } from './common'
 import { keepNumberWithUnit } from '../utils/typography'
@@ -12,7 +14,6 @@ import FloatingStatusIndicator from './FloatingStatusIndicator'
 import ScreenMonitor from './ScreenMonitor'
 import CombatExecutionProgress from './CombatExecutionProgress'
 import { useCopilotItemFollow } from '../hooks/useCopilotItemFollow'
-import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
 import { waitForTaskIdle } from '../utils/taskStatus'
 import type {
   CombatTask,
@@ -148,7 +149,6 @@ function SingleCopilotSummary({
 }
 
 export default function CombatTasks() {
-  const shouldReduceMotion = useReducedMotion()
   const [isRunning, setIsRunning] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
   const [isResettingProgress, setIsResettingProgress] = useState(false)
@@ -272,6 +272,7 @@ export default function CombatTasks() {
   const combatCopilotPrefill = useUIStore(state => state.combatCopilotPrefill)
   const setCombatCopilotPrefill = useUIStore(state => state.setCombatCopilotPrefill)
   const activeTab = useUIStore(state => state.activeTab)
+  const theme = useUIStore(state => state.theme)
 
   // 悖论模拟搜索相关状态
   const [paradoxSearchName, setParadoxSearchName] = useState('')
@@ -298,12 +299,6 @@ export default function CombatTasks() {
   const [isSearchingCopilot, setIsSearchingCopilot] = useState(false)
   const copilotSearchInputRef = useRef<HTMLInputElement | null>(null)
   const [activeCombatMode, setActiveCombatMode] = useState<CombatMode>('copilot')
-  const {
-    containerRef: combatModeTabsRef,
-    activeRect: activeCombatModeRect,
-    setTabRef: setCombatModeTabRef,
-    handleTabKeyDown: handleCombatModeKeyDown,
-  } = useFluidTabIndicator(activeCombatMode)
 
   useEffect(() => {
     // Activity retains state while hidden, so clear loading left behind by
@@ -494,7 +489,7 @@ export default function CombatTasks() {
 
             // 启动轮询，持续检查任务状态
             pollInterval = setInterval(async () => {
-              if (pollRequestInFlight) return
+              if (pollRequestInFlight || document.hidden) return
               pollRequestInFlight = true
               try {
                 const statusResult = await maaApi.getTaskStatus(controller.signal)
@@ -877,6 +872,7 @@ export default function CombatTasks() {
     setStatusMessage('正在连续执行作业集')
     let stageTimer: number | null = null
     const pollStage = async () => {
+      if (document.hidden) return
       try {
         const status = await maaApi.getTaskStatus()
         if (!isCurrentExecution(generation)) return
@@ -1181,6 +1177,7 @@ export default function CombatTasks() {
     setStatusMessage('正在执行当前活动逐关作业')
     let stageTimer: number | null = null
     const pollStage = async () => {
+      if (document.hidden) return
       try {
         const status = await maaApi.getTaskStatus()
         if (!isCurrentExecution(generation)) return
@@ -1671,10 +1668,14 @@ export default function CombatTasks() {
   }
 
   const combatModeOptions = [
-    { id: 'copilot' as const, title: '普通作业', desc: '单作业 / 作业集 / 链接识别', icon: <Icons.Document /> },
-    { id: 'ssscopilot' as const, title: '保全派驻', desc: '保全派驻自动执行', icon: <Icons.Shield /> },
-    { id: 'paradoxcopilot' as const, title: '悖论模拟', desc: '按干员搜索作业', icon: <Icons.Puzzle /> },
+    { id: 'copilot' as const, title: '普通作业', icon: <FileText className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" /> },
+    { id: 'ssscopilot' as const, title: '保全派驻', icon: <ShieldCheck className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" /> },
+    { id: 'paradoxcopilot' as const, title: '悖论模拟', icon: <Puzzle className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" /> },
   ]
+  const activeCombatModeIndex = Math.max(
+    0,
+    combatModeOptions.findIndex(option => option.id === activeCombatMode),
+  )
 
   return (
     <>
@@ -1709,57 +1710,20 @@ export default function CombatTasks() {
 
         <div className="task-monitor-layout">
           <div className="task-monitor-main">
-        <div className="app-workspace-segments app-liquid-tab-pill glass combat-mode-shell">
-          <div
-            ref={combatModeTabsRef}
-            className="app-workspace-segment-list"
-            role="toolbar"
+        <div
+          className="combat-mode-shell"
+          data-theme={theme === 'system' ? undefined : theme}
+        >
+          <GlassSegmented
+            options={combatModeOptions.map(({ title, icon }) => ({ label: title, icon }))}
+            value={activeCombatModeIndex}
+            onChange={(index) => {
+              const nextMode = combatModeOptions[index]?.id
+              if (nextMode) setActiveCombatMode(nextMode)
+            }}
             aria-label="作业类型"
-          >
-            {activeCombatModeRect.width > 0 && (
-              <motion.div
-                data-testid="combat-mode-highlight"
-                aria-hidden="true"
-                className="app-workspace-segment-indicator combat-mode-highlight"
-                initial={false}
-                animate={{
-                  x: activeCombatModeRect.x,
-                  y: activeCombatModeRect.y,
-                  width: activeCombatModeRect.width,
-                  height: activeCombatModeRect.height,
-                }}
-                transition={shouldReduceMotion
-                  ? { duration: 0 }
-                  : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}
-              />
-            )}
-            {combatModeOptions.map(({ id, title, desc, icon }) => (
-              <button
-                key={id}
-                ref={(element) => {
-                  setCombatModeTabRef(id)(element)
-                }}
-                type="button"
-                onClick={() => setActiveCombatMode(id)}
-                onKeyDown={(event) => handleCombatModeKeyDown(
-                  event,
-                  combatModeOptions.map(option => option.id),
-                  setActiveCombatMode,
-                )}
-                aria-pressed={activeCombatMode === id}
-                tabIndex={activeCombatMode === id ? 0 : -1}
-                className={`app-workspace-segment combat-mode-button min-h-11 ${activeCombatMode === id ? 'is-selected' : ''}`}
-              >
-                <span className="app-workspace-segment-icon combat-mode-icon">
-                  {icon}
-                </span>
-                <span className="app-workspace-segment-copy">
-                  <span>{title}</span>
-                  <small>{desc}</small>
-                </span>
-              </button>
-            ))}
-          </div>
+            className="combat-mode-segmented"
+          />
         </div>
 
         {/* 任务列表 */}

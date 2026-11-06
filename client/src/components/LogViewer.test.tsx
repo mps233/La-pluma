@@ -105,15 +105,16 @@ describe('LogViewer recovery and controls', () => {
     expect(mocks.getRealtimeLogs).toHaveBeenCalledTimes(2)
     expect(container.querySelector('.log-console-state.is-error')).toBeNull()
     expect(container.textContent).toContain('TaskChainStart')
-    expect(container.querySelector('.log-mode-shell.app-liquid-tab-pill')).not.toBeNull()
+    const modeShell = container.querySelector('.log-mode-shell')
+    expect(modeShell?.querySelector('.lg-track[role="tablist"]')?.getAttribute('aria-label')).toBe('日志内容模式')
     expect(container.querySelector('.log-toolbar .log-mode-shell')).toBeNull()
-    const modeTabs = Array.from(container.querySelectorAll<HTMLButtonElement>('.log-mode-shell [role="tab"]'))
+    const modeTabs = Array.from(
+      modeShell?.querySelectorAll<HTMLButtonElement>('.lg-track:not([data-lg-copy]) > .lg-track__item') ?? [],
+    )
     expect(modeTabs).toHaveLength(2)
     expect(modeTabs[0]?.getAttribute('aria-selected')).toBe('true')
-    expect(modeTabs.every(button => (
-      button.className.includes('app-workspace-segment')
-      && button.className.includes('min-h-11')
-    ))).toBe(true)
+    expect(modeTabs.every(button => button.getAttribute('role') === 'tab')).toBe(true)
+    expect(modeTabs.every(button => button.getAttribute('aria-controls') === 'log-console-panel')).toBe(true)
     await click(modeTabs[1]!)
     expect(modeTabs[1]?.getAttribute('aria-selected')).toBe('true')
 
@@ -124,9 +125,11 @@ describe('LogViewer recovery and controls', () => {
     expect(modeTabs[0]?.getAttribute('aria-selected')).toBe('true')
     expect(document.activeElement).toBe(modeTabs[0])
 
-    const switches = Array.from(container.querySelectorAll<HTMLInputElement>('[role="switch"]'))
-    expect(switches.map(input => input.getAttribute('aria-label'))).toEqual(['自动滚动', '仅显示本次运行日志', '折叠重复日志'])
-    expect(switches.map(input => input.checked)).toEqual([true, false, true])
+    const switches = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="switch"]:not([data-lg-copy])'),
+    )
+    expect(switches.map(control => control.getAttribute('aria-label'))).toEqual(['自动滚动', '仅显示本次运行日志', '折叠重复日志'])
+    expect(switches.map(control => control.getAttribute('aria-checked'))).toEqual(['true', 'false', 'true'])
     const toggleControls = Array.from(container.querySelectorAll('.log-toggle-control'))
     expect(toggleControls).toHaveLength(3)
     expect(toggleControls.every(control => !control.classList.contains('surface-soft'))).toBe(true)
@@ -152,16 +155,16 @@ describe('LogViewer recovery and controls', () => {
     await flush()
 
     const jump = container.querySelector<HTMLButtonElement>('.log-console-jump button')
-    const autoScrollSwitch = container.querySelector<HTMLInputElement>('[role="switch"][aria-label="自动滚动"]')
+    const autoScrollSwitch = container.querySelector<HTMLButtonElement>('[role="switch"][aria-label="自动滚动"]')
     expect(jump?.textContent).toContain('回到最新')
     expect(container.querySelector('.log-console-fade.is-bottom')?.classList.contains('is-visible')).toBe(true)
-    expect(autoScrollSwitch?.checked).toBe(false)
+    expect(autoScrollSwitch?.getAttribute('aria-checked')).toBe('false')
 
     await click(jump!)
 
     expect(consoleElement!.scrollTop).toBe(1000)
     expect(container.querySelector('.log-console-jump')).toBeNull()
-    expect(autoScrollSwitch?.checked).toBe(true)
+    expect(autoScrollSwitch?.getAttribute('aria-checked')).toBe('true')
   })
 
   it('keeps existing realtime rows visible when a background refresh fails', async () => {
