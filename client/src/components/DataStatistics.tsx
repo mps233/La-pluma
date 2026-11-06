@@ -15,7 +15,8 @@ import {
 import Icons from './Icons'
 import DropRecords from './DropRecords'
 import StatisticsSummary from './StatisticsSummary'
-import { PageHeader, Button, Card, EmptyState, Loading } from './common'
+import { PageHeader, Button, Card, EmptyState, Loading, CjkText } from './common'
+import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import { useUIStore } from '../stores'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
@@ -917,12 +918,12 @@ export default function DataStatistics() {
             const queueResult = await getTrainingQueue()
 
             if (queueResult.success && Array.isArray(queueResult.data) && queueResult.data.length > 0) {
-              setStatusMessage(`识别完成！共识别 ${parsedDepotData.itemCount} 种物品，已更新养成进度`)
+              setStatusMessage(keepNumberWithUnit(`识别完成！共识别 ${parsedDepotData.itemCount} 种物品，已更新养成进度`))
             } else {
-              setStatusMessage(`识别完成！共识别 ${parsedDepotData.itemCount} 种物品`)
+              setStatusMessage(keepNumberWithUnit(`识别完成！共识别 ${parsedDepotData.itemCount} 种物品`))
             }
           } catch (error) {
-            setStatusMessage(`识别完成！共识别 ${parsedDepotData.itemCount} 种物品`)
+            setStatusMessage(keepNumberWithUnit(`识别完成！共识别 ${parsedDepotData.itemCount} 种物品`))
           }
         } else {
           setStatusMessage(`识别完成，但数据解析失败: ${maaApi.getErrorMessage(parseResult)}`)
@@ -995,8 +996,8 @@ export default function DataStatistics() {
           setOperBoxDataError(null)
           const totalOperCount = parsedOperBoxData.totalOperCount || parsedOperBoxData.allOpers?.length
           setStatusMessage(totalOperCount
-            ? `识别完成！已拥有 ${parsedOperBoxData.operCount} / ${totalOperCount} 名干员`
-            : `识别完成！共识别 ${parsedOperBoxData.operCount} 名干员`)
+            ? keepNumberWithUnit(`识别完成！已拥有 ${parsedOperBoxData.operCount} / ${totalOperCount} 名干员`)
+            : keepNumberWithUnit(`识别完成！共识别 ${parsedOperBoxData.operCount} 名干员`))
           setOperBoxData({
             operCount: parsedOperBoxData.operCount,
             totalOperCount,
@@ -1137,7 +1138,7 @@ export default function DataStatistics() {
                   <Users size={20} strokeWidth={1.9} />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-lg font-semibold text-primary">干员识别</h2>
+                  <h2 className="text-lg font-semibold text-primary"><CjkText>干员识别</CjkText></h2>
                   <p className="mt-1 text-sm leading-relaxed text-secondary">
                     读取档案、等级、精英化与潜能数据
                   </p>
@@ -1202,7 +1203,7 @@ export default function DataStatistics() {
                     value: hasOperatorCatalog ? operatorCoverage : '—',
                     unit: hasOperatorCatalog ? '%' : undefined,
                     detail: hasOperatorCatalog
-                      ? `${ownedOperatorCount} / ${operatorCatalogCount} 已收录`
+                      ? keepNumberWithUnit(`${ownedOperatorCount} / ${operatorCatalogCount} 已收录`)
                       : '档案总数暂不可用',
                     meter: hasOperatorCatalog ? operatorCoverage : undefined,
                     meterLabel: '干员收集率',
@@ -1221,9 +1222,9 @@ export default function DataStatistics() {
 
                 <section className="data-statistics-filter-section" aria-labelledby="operator-filter-title">
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <h3 id="operator-filter-title" className="min-w-0 text-sm font-semibold text-primary">筛选与排序</h3>
+                    <h3 id="operator-filter-title" className="min-w-0 text-sm font-semibold text-primary"><CjkText>筛选与排序</CjkText></h3>
                     <p className="shrink-0 text-xs text-secondary" aria-live="polite">
-                      显示 <span className="font-semibold text-primary">{getFilteredAndSortedOperators.length}</span> 项
+                      显示 <span className="font-semibold text-primary">{getFilteredAndSortedOperators.length}</span>{'\u00A0'}项
                     </p>
                   </div>
 
@@ -1473,7 +1474,7 @@ export default function DataStatistics() {
                   <PackageIcon size={20} strokeWidth={1.9} />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-lg font-semibold text-primary">仓库识别</h2>
+                  <h2 className="text-lg font-semibold text-primary"><CjkText>仓库识别</CjkText></h2>
                   <p className="mt-1 text-sm leading-relaxed text-secondary">
                     汇总物品库存、材料分类与数量
                   </p>
@@ -1551,8 +1552,8 @@ export default function DataStatistics() {
                 {depotTypeSummary.length > 0 && (
                   <section className="data-statistics-category-section" aria-labelledby="depot-category-title">
                     <h3 id="depot-category-title" className="mb-2 flex min-w-0 flex-wrap items-baseline gap-2 text-sm font-semibold text-primary">
-                      <span>分类汇总</span>
-                      <span className="text-xs font-normal text-tertiary">{depotTypeSummary.length} 类</span>
+                      <span><CjkText>分类汇总</CjkText></span>
+                      <span className="text-xs font-normal text-tertiary">{keepNumberWithUnit(`${depotTypeSummary.length} 类`)}</span>
                     </h3>
                     <div className="flex flex-wrap gap-2">
                       {depotTypeSummary.map((group) => (
@@ -1561,9 +1562,9 @@ export default function DataStatistics() {
                           className="flex min-w-0 items-baseline gap-2 rounded-full bg-[var(--app-surface-muted)] px-3 py-1.5 text-xs text-secondary"
                         >
                           <span className="font-medium text-primary">{group.label}</span>
-                          <span className="tabular-nums">{group.kinds} 种</span>
+                          <span className="tabular-nums">{keepNumberWithUnit(`${group.kinds} 种`)}</span>
                           <span className="text-tertiary" aria-hidden="true">·</span>
-                          <span className="tabular-nums">{group.count.toLocaleString()} 件</span>
+                          <span className="tabular-nums">{keepNumberWithUnit(`${group.count.toLocaleString()} 件`)}</span>
                         </div>
                       ))}
                     </div>

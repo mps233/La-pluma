@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import CjkText from './CjkText'
 
 /**
  * 页面标题组件 Props
@@ -34,7 +35,7 @@ export default function PageHeader({
         )}
         <div className="min-w-0">
           <h1 className="app-page-title text-primary">
-            {title}
+            <CjkText>{title}</CjkText>
           </h1>
           {subtitle && (
             <p className="app-page-subtitle text-secondary">

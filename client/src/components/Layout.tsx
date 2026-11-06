@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useReducedMotion, type PanInfo } from 'framer-
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, Search, Settings2, Swords, Wrench, X } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
+import { CjkText } from './common'
 import AeroBackdrop from './backgrounds/AeroBackdrop'
 import { useUIStore } from '@/stores'
 import { appTabFromPath, appTabPath, isAppTab, type AppTab } from '@/stores/uiStore'
@@ -577,7 +578,7 @@ export default function Layout({ children }: LayoutProps) {
                   <div className="la-pluma-sheet-heading">
                     <div>
                       <span className="la-pluma-eyebrow">LA PLUMA</span>
-                      <h2 id="la-pluma-more-sheet-title">更多工作区</h2>
+                      <h2 id="la-pluma-more-sheet-title"><CjkText>更多工作区</CjkText></h2>
                     </div>
                     <button
                       type="button"

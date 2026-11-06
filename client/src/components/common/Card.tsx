@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import CjkText from './CjkText'
 import SmoothSurface from './SmoothSurface'
 
 /**
@@ -65,7 +66,7 @@ export function CardHeader({ icon, title, actions }: CardHeaderProps) {
     <div className="app-card-header">
       <div className="flex items-center space-x-2">
         {icon}
-        <h3 className="app-section-title text-primary">{title}</h3>
+        <h3 className="app-section-title text-primary"><CjkText>{title}</CjkText></h3>
       </div>
       {actions && <div>{actions}</div>}
     </div>

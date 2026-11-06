@@ -81,6 +81,8 @@ vi.mock('./common/Loading', () => ({
 }))
 vi.mock('./common', () => ({
   PageHeader: ({ title, actions }: { title: string; actions?: React.ReactNode }) => <header><h1>{title}</h1>{actions}</header>,
+  CjkText: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  TruncatedText: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   Card: ({ children }: { children: React.ReactNode }) => <section>{children}</section>,
   SmoothPanel: ({
     children,
@@ -284,7 +286,7 @@ describe('Dashboard connectivity state', () => {
 
     const activityMetric = findActivityMetric()
     expect(activityMetric?.textContent).toContain('时间啊，向前！')
-    expect(activityMetric?.textContent).toContain('剩余 3 天')
+    expect(activityMetric?.textContent).toContain('剩余 3\u00A0天')
     expect(activityMetric?.textContent).not.toContain('等待活动数据')
   })
 
@@ -311,7 +313,7 @@ describe('Dashboard connectivity state', () => {
     await flushDashboard()
 
     const activityMetric = findActivityMetric()
-    expect(activityMetric?.textContent).toContain('剩余 3 天')
+    expect(activityMetric?.textContent).toContain('剩余 3\u00A0天')
     expect(activityMetric?.textContent).not.toContain('2/8')
     const progressbar = activityMetric?.querySelector('[role="progressbar"]')
     expect(progressbar?.getAttribute('aria-label')).toBe('当前活动剩余时间')
@@ -356,7 +358,7 @@ describe('Dashboard connectivity state', () => {
     await flushDashboard()
 
     const activityMetric = findActivityMetric()
-    expect(activityMetric?.textContent).toContain('已通关 1/3 关')
+    expect(activityMetric?.textContent).toContain('已通关 1/3\u00A0关')
     expect(activityMetric?.textContent).not.toContain('等待活动数据')
     const progressbar = activityMetric?.querySelector('[role="progressbar"]')
     expect(progressbar?.getAttribute('aria-label')).toBe('当前活动通关进度')

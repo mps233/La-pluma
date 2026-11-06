@@ -22,6 +22,8 @@ interface TooltipProps {
   longPress?: number
   disabled?: boolean
   className?: string
+  triggerClassName?: string
+  triggerAs?: 'span' | 'div'
 }
 
 const VIEWPORT_GAP = 8
@@ -47,10 +49,12 @@ export default function Tooltip({
   longPress = DEFAULT_LONG_PRESS,
   disabled = false,
   className = '',
+  triggerClassName = '',
+  triggerAs = 'span',
 }: TooltipProps) {
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
-  const triggerRef = useRef<HTMLSpanElement>(null)
+  const triggerRef = useRef<HTMLElement>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
   const hoverTimerRef = useRef<number | null>(null)
   const longPressTimerRef = useRef<number | null>(null)
@@ -58,6 +62,10 @@ export default function Tooltip({
   const suppressClickRef = useRef(false)
   const lastPointerTypeRef = useRef<string | null>(null)
   const hasContent = content !== null && content !== undefined && content !== ''
+
+  const setTriggerRef = useCallback((node: HTMLElement | null) => {
+    triggerRef.current = node
+  }, [])
 
   const clearHoverTimer = useCallback(() => {
     if (hoverTimerRef.current === null) return
@@ -88,7 +96,7 @@ export default function Tooltip({
     setOpen(true)
   }, [clearHoverTimer, disabled, hasContent])
 
-  const handlePointerEnter = (event: ReactPointerEvent<HTMLSpanElement>) => {
+  const handlePointerEnter = (event: ReactPointerEvent<HTMLElement>) => {
     if (event.pointerType === 'touch' || disabled || !hasContent || open) return
     clearHoverTimer()
     if (Date.now() - lastClosedAt < warmWindow) {
@@ -98,7 +106,7 @@ export default function Tooltip({
     hoverTimerRef.current = window.setTimeout(show, delay)
   }
 
-  const handlePointerLeave = (event: ReactPointerEvent<HTMLSpanElement>) => {
+  const handlePointerLeave = (event: ReactPointerEvent<HTMLElement>) => {
     if (event.pointerType === 'touch') return
     clearHoverTimer()
     if (open) close()
@@ -113,7 +121,7 @@ export default function Tooltip({
     if (open) close()
   }
 
-  const handlePointerDown = (event: ReactPointerEvent<HTMLSpanElement>) => {
+  const handlePointerDown = (event: ReactPointerEvent<HTMLElement>) => {
     lastPointerTypeRef.current = event.pointerType
     if (event.pointerType !== 'touch' || disabled || !hasContent) return
     endPress()
@@ -145,7 +153,7 @@ export default function Tooltip({
     window.addEventListener('pointercancel', handleEnd)
   }
 
-  const handleClickCapture = (event: ReactMouseEvent<HTMLSpanElement>) => {
+  const handleClickCapture = (event: ReactMouseEvent<HTMLElement>) => {
     if (!suppressClickRef.current) return
     suppressClickRef.current = false
     event.preventDefault()
@@ -228,20 +236,25 @@ export default function Tooltip({
       )
     : null
 
+  const Trigger = triggerAs
+  const trigger = (
+    <Trigger
+      ref={setTriggerRef}
+      className={`inline-flex${triggerClassName ? ` ${triggerClassName}` : ''}`}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
+      onPointerDown={handlePointerDown}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onClickCapture={handleClickCapture}
+    >
+      {children}
+    </Trigger>
+  )
+
   return (
     <>
-      <span
-        ref={triggerRef}
-        className="inline-flex"
-        onPointerEnter={handlePointerEnter}
-        onPointerLeave={handlePointerLeave}
-        onPointerDown={handlePointerDown}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onClickCapture={handleClickCapture}
-      >
-        {children}
-      </span>
+      {trigger}
       {portal}
     </>
   )

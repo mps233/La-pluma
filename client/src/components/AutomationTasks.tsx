@@ -7,7 +7,8 @@ import { AlertTriangle, Cable, Check, CheckCircle2, ChevronDown, ChevronUp, Circ
 import Icons from './Icons'
 import ScreenMonitor from './ScreenMonitor'
 import NotificationSettings from './NotificationSettings'
-import { EmptyState, PageHeader, Button, IconButton, SmoothPanel, Switch } from './common'
+import { EmptyState, PageHeader, Button, IconButton, SmoothPanel, Switch, CjkText, TruncatedText } from './common'
+import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import { useRunStore } from '../store/runStore'
 import type { RunTaskResult } from '../types/run'
@@ -1186,7 +1187,7 @@ export default function AutomationTasks() {
         yituliu_id: ''
       },
       paramFields: [
-        { key: 'stages', label: '关卡', type: 'multi-stages', placeholder: '1-7 或 HD-7', timesPlaceholder: '次数', helper: '使用 HD-数字代表当前活动关卡；置顶关卡会优先执行。主线可在末尾加 -NORMAL/-HARD：10-14 章为标准/磨难，15 章后为常规/险地' },
+        { key: 'stages', label: '关卡', type: 'multi-stages', placeholder: '1-7 或 HD-7', timesPlaceholder: '次数', helper: '使用 HD-数字代表当前活动关卡；置顶关卡会优先执行。主线可在末尾加 -NORMAL/-HARD：10-14\u00A0章为标准/磨难，15\u00A0章后为常规/险地' },
         { key: 'drops', label: '掉落目标', type: 'text', placeholder: '30011=10,30062=5', helper: '任一物品达到目标数量后停止；格式为物品 ID=数量，多个目标用逗号分隔' },
         { key: 'medicine', label: '理智药', type: 'number', placeholder: '0', helper: '使用理智药数量' },
         { key: 'expiringMedicine', label: '临期药数量', type: 'number', placeholder: '0', helper: '按瓶数设置可使用的临期理智药；建议改用临期药天数' },
@@ -1197,7 +1198,7 @@ export default function AutomationTasks() {
           { value: 'US', label: '美服' },
           { value: 'JP', label: '日服' },
           { value: 'KR', label: '韩服' }
-        ], helper: '外服资源可能只接受 -1~6 倍代理' },
+        ], helper: '外服资源可能只接受 -1~6\u00A0倍代理' },
         { key: 'stone', label: '源石', type: 'number', placeholder: '0', helper: '使用源石数量' },
         { key: 'series', label: '连战', type: 'select', options: [
           { value: '-1', label: '禁用' },
@@ -1212,7 +1213,7 @@ export default function AutomationTasks() {
           { value: '8', label: '8次' },
           { value: '9', label: '9次' },
           { value: '10', label: '10次' }
-        ], helper: '单次代理作战重复次数；7–10 需要新资源，外服可能被拒绝' },
+        ], helper: '单次代理作战重复次数；7–10\u00A0需要新资源，外服可能被拒绝' },
       ]
     },
     {
@@ -1299,15 +1300,15 @@ export default function AutomationTasks() {
       paramFields: [
         { key: 'refresh', label: '刷新标签', type: 'checkbox' },
         { key: 'force_refresh', label: '无许可时仍刷新', type: 'checkbox', helper: '招聘许可耗尽后，仍会使用可用刷新次数', visibleWhen: { key: 'refresh', value: true } },
-        { key: 'select', label: '招募星级', type: 'star-select', helper: '支持 6 星自动公招；勾选 6 星后会保留高价值标签并自动选择对应组合' },
-        { key: 'confirm', label: '确认星级', type: 'star-select', helper: '建议至少保留 5/6 星确认，避免高价值标签被跳过' },
+        { key: 'select', label: '招募星级', type: 'star-select', helper: '支持 6\u00A0星自动公招；勾选 6\u00A0星后会保留高价值标签并自动选择对应组合' },
+        { key: 'confirm', label: '确认星级', type: 'star-select', helper: '建议至少保留 5/6\u00A0星确认，避免高价值标签被跳过' },
         { key: 'times', label: '招募次数', type: 'number', placeholder: '4' },
         { key: 'calculationOnly', label: '仅计算公招（不招募）', type: 'checkbox', helper: '发送 times=0、confirm=[]，只计算标签组合' },
         { key: 'set_time', label: '设置时间', type: 'checkbox' },
         { key: 'expedite', label: '使用加急', type: 'checkbox' },
         { key: 'expedite_times', label: '加急次数', type: 'number', placeholder: '0', visibleWhen: { key: 'expedite', value: true } },
         { key: 'preserve_tags', label: '保留标签', type: 'text', placeholder: '支援机械,高级资深干员', helper: '识别到任一标签时保留该公招槽位，多个标签用逗号分隔' },
-        { key: 'level3_recruitment_permit_reserve', label: '3 星许可保留数', type: 'number', placeholder: '0', min: '0', helper: '剩余招聘许可不超过该值时跳过 3 星招募；0 表示禁用' },
+        { key: 'level3_recruitment_permit_reserve', label: '3\u00A0星许可保留数', type: 'number', placeholder: '0', min: '0', helper: '剩余招聘许可不超过该值时跳过 3 星招募；0 表示禁用' },
         { key: 'report_to_penguin', label: '上报企鹅数据', type: 'checkbox' },
         { key: 'penguin_id', label: '企鹅 ID', type: 'text', placeholder: '留空匿名上报', visibleWhen: { key: 'report_to_penguin', value: true } },
         { key: 'report_to_yituliu', label: '上报一图流', type: 'checkbox' },
@@ -1343,7 +1344,7 @@ export default function AutomationTasks() {
         { key: 'buy_first', label: '优先购买', type: 'text', placeholder: '招聘许可,龙门币（逗号分隔）', visibleWhen: { key: 'shopping', value: true } },
         { key: 'blacklist', label: '黑名单', type: 'text', placeholder: '家具零件,碳（逗号分隔）', visibleWhen: { key: 'shopping', value: true } },
         { key: 'only_buy_discount', label: '只买折扣商品', type: 'checkbox', helper: '仅影响优先购买之外的普通购物', visibleWhen: { key: 'shopping', value: true } },
-        { key: 'reserve_max_credit', label: '保留 300 信用', type: 'checkbox', helper: '普通购物时信用低于 300 就停止购买', visibleWhen: { key: 'shopping', value: true } },
+        { key: 'reserve_max_credit', label: '保留 300\u00A0信用', type: 'checkbox', helper: '普通购物时信用低于 300 就停止购买', visibleWhen: { key: 'shopping', value: true } },
         { key: 'force_shopping_if_credit_full', label: '信用溢出时无视黑名单', type: 'checkbox', visibleWhen: { key: 'shopping', value: true } },
         { key: 'credit_fight', label: '信用助战', type: 'checkbox', helper: '借助战完成一次 OF-1，以便次日获得更多信用' },
         { key: 'formation_index', label: '助战编队', type: 'select', options: [
@@ -2464,7 +2465,7 @@ export default function AutomationTasks() {
                     const commandId = task.commandId || task.id.split('-')[0]
                     const delayTime = commandId === 'startup' ? 15000 : commandId === 'closedown' ? 3000 : 2000
 
-                    showInfo(`${task.name} 完成，等待 ${delayTime / 1000} 秒后继续...`)
+                    showInfo(`${task.name} 完成，${keepNumberWithUnit(`等待 ${delayTime / 1000} 秒后继续...`)}`)
                     if (!await waitForDelay(delayTime)) return
                   } catch (error) {
                     if (cancelled || (error instanceof Error && error.name === 'AbortError')) return
@@ -2498,7 +2499,7 @@ export default function AutomationTasks() {
             setIsRunning(true)
             setCurrentStep(0)
             if (elapsedMinutes > 5) {
-              showInfo(`${taskName} 可能已完成（已运行 ${Math.floor(elapsedMinutes)} 分钟）`)
+              showInfo(`${taskName} 可能已完成（${keepNumberWithUnit(`已运行 ${Math.floor(elapsedMinutes)} 分钟`)}）`)
             } else {
               showInfo(`正在执行: ${taskName}`)
             }
@@ -2530,7 +2531,7 @@ export default function AutomationTasks() {
     const handleTrainingPlanApplied = async (event: Event) => {
       await loadTaskFlow(true)
       const detail = (event as CustomEvent<{ stageCount?: number }>).detail
-      setStatusMessage(`智能养成计划已更新：${detail?.stageCount || 0} 个关卡`, 'success')
+      setStatusMessage(keepNumberWithUnit(`智能养成计划已更新：${detail?.stageCount || 0} 个关卡`), 'success')
     }
 
     window.addEventListener('training-plan-applied', handleTrainingPlanApplied)
@@ -2561,7 +2562,7 @@ export default function AutomationTasks() {
       <SmoothPanel className="automation-schedule-panel">
         <div className="automation-schedule-heading">
           <div>
-            <h3><Clock3 size={16} strokeWidth={1.8} aria-hidden="true" /><span>定时与通知</span></h3>
+            <h3><Clock3 size={16} strokeWidth={1.8} aria-hidden="true" /><span><CjkText>定时与通知</CjkText></span></h3>
             <p>自动运行与结果推送</p>
           </div>
           <div className="automation-schedule-actions">
@@ -2765,7 +2766,7 @@ export default function AutomationTasks() {
                 <div className="min-w-0">
                   <h3>
                     <ClipboardList size={16} strokeWidth={1.8} aria-hidden="true" />
-                    <span>任务流程</span>
+                    <span><CjkText>任务流程</CjkText></span>
                   </h3>
                   <p className="automation-flow-meta">
                     <span>按顺序执行，拖动左侧手柄调整</span>
@@ -2902,8 +2903,8 @@ export default function AutomationTasks() {
                           </AnimatePresence>
                         </span>
                         <span className="automation-sequence-copy">
-                          <strong>{task.name}</strong>
-                          <small>{executionLabel}</small>
+                          <TruncatedText as="strong" tooltip={task.name}>{task.name}</TruncatedText>
+                          <TruncatedText as="small" tooltip={executionLabel}>{executionLabel}</TruncatedText>
                         </span>
                       </button>
                       <span className="automation-sequence-enabled" data-drag-ignore>
@@ -2999,7 +3000,7 @@ export default function AutomationTasks() {
                               className="automation-task-picker-option"
                             >
                               <span>{task.icon}</span>
-                              <strong>{task.name}</strong>
+                              <TruncatedText as="strong" tooltip={task.name}>{task.name}</TruncatedText>
                               {addedCount > 0 && <small>{addedCount}</small>}
                               <Plus size={14} strokeWidth={2} />
                             </button>
@@ -3042,12 +3043,12 @@ export default function AutomationTasks() {
               {lastExecutionSummary && (
                 <section className="border-t border-[var(--app-border)] px-3.5 py-3 sm:px-4" aria-label="最近执行结果">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h4 className="text-xs font-semibold text-primary">最近执行</h4>
+                    <h4 className="text-xs font-semibold text-primary"><CjkText>最近执行</CjkText></h4>
                     <span className="text-[11px] text-tertiary">
                       成功 {lastExecutionSummary.successCount}
                       {lastExecutionSummary.failedCount > 0 && ` · 失败 ${lastExecutionSummary.failedCount}`}
                       {lastExecutionSummary.skippedCount > 0 && ` · 跳过 ${lastExecutionSummary.skippedCount}`}
-                      {` · ${Math.max(1, Math.round(lastExecutionSummary.durationMs / 1000))} 秒`}
+                      {keepNumberWithUnit(` · ${Math.max(1, Math.round(lastExecutionSummary.durationMs / 1000))} 秒`)}
                     </span>
                   </div>
 
@@ -3058,12 +3059,12 @@ export default function AutomationTasks() {
                         ? <CircleMinus size={14} className="shrink-0 text-tertiary" strokeWidth={2} />
                         : <CheckCircle2 size={14} className="shrink-0 text-[var(--app-success-text)]" strokeWidth={2} />}
                     <span className="min-w-0 flex-1 text-xs leading-5 text-secondary">
-                      {formatExecutionActionSummary(lastExecutionSummary.actions)
+                      {keepNumberWithUnit(formatExecutionActionSummary(lastExecutionSummary.actions)
                         || (lastExecutionSummary.failedCount > 0
                           ? `${lastExecutionSummary.failedCount} 项任务执行失败`
                           : lastExecutionSummary.skippedCount > 0
                             ? `${lastExecutionSummary.skippedCount} 项任务已跳过`
-                            : '任务流程执行完成')}
+                            : '任务流程执行完成'))}
                     </span>
                     <button
                       type="button"
@@ -3096,7 +3097,7 @@ export default function AutomationTasks() {
                               <div key={`${summary.task}-${summary.stage || summaryIndex}`} className="min-w-0 text-xs">
                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-primary">
                                   <span className="font-semibold">{summary.stage || summary.task}</span>
-                                  {summary.times && <span className="text-tertiary">{summary.times} 次</span>}
+                                  {summary.times && <span className="text-tertiary">{keepNumberWithUnit(`${summary.times} 次`)}</span>}
                                   {summary.duration && <span className="text-tertiary">{summary.duration}</span>}
                                 </div>
                                 {summary.drops && (
@@ -3173,7 +3174,7 @@ export default function AutomationTasks() {
             <SmoothPanel className="automation-editor-panel">
               <div className="automation-editor-heading">
                 <div>
-                  <h3><SlidersHorizontal size={16} strokeWidth={1.8} aria-hidden="true" /><span>任务配置</span></h3>
+                  <h3><SlidersHorizontal size={16} strokeWidth={1.8} aria-hidden="true" /><span><CjkText>任务配置</CjkText></span></h3>
                   <p>选择流程步骤后调整参数</p>
                 </div>
                 {activeTaskId && (
@@ -3209,8 +3210,8 @@ export default function AutomationTasks() {
                           <span className="automation-flow-sequence">{String(index + 1).padStart(2, '0')}</span>
                           <span className="automation-flow-task-icon">{task.icon}</span>
                           <span className="automation-flow-task-name">
-                            <strong>{task.name}</strong>
-                            <small>{currentStep === index ? '正在执行' : task.taskType || task.commandId}</small>
+                            <TruncatedText as="strong" tooltip={task.name}>{task.name}</TruncatedText>
+                            <TruncatedText as="small" tooltip={currentStep === index ? '正在执行' : task.taskType || task.commandId}>{currentStep === index ? '正在执行' : task.taskType || task.commandId}</TruncatedText>
                           </span>
                         </div>
                         <div className="automation-flow-card-controls">
@@ -3549,7 +3550,7 @@ export default function AutomationTasks() {
                               />
                               <span>
                                 <span className="block">葛朗台碎石模式</span>
-                                <span className="mt-0.5 block text-xs text-tertiary">使用源石前等待自然恢复 1 点理智，尽量减少碎石浪费。</span>
+                                <span className="mt-0.5 block text-xs text-tertiary">使用源石前等待自然恢复 1\u00A0点理智，尽量减少碎石浪费。</span>
                               </span>
                             </label>
 
@@ -3623,7 +3624,7 @@ export default function AutomationTasks() {
                           <div className="mt-3 space-y-3 border-t border-[var(--app-border)] pt-3">
                             {Array.isArray(task.params.facility) && task.params.facility.includes('Dorm') && (
                               <section className="space-y-2">
-                                <h4 className="text-xs font-semibold text-secondary">宿舍</h4>
+                                <h4 className="text-xs font-semibold text-secondary"><CjkText>宿舍</CjkText></h4>
                                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
                                   <input
                                     type="checkbox"
@@ -3649,7 +3650,7 @@ export default function AutomationTasks() {
 
                             {Array.isArray(task.params.facility) && task.params.facility.includes('Reception') && (
                               <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
-                                <h4 className="text-xs font-semibold text-secondary">会客室</h4>
+                                <h4 className="text-xs font-semibold text-secondary"><CjkText>会客室</CjkText></h4>
                                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
                                   <input
                                     type="checkbox"
@@ -3685,7 +3686,7 @@ export default function AutomationTasks() {
 
                             {Array.isArray(task.params.facility) && task.params.facility.includes('Training') && (
                               <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
-                                <h4 className="text-xs font-semibold text-secondary">训练室</h4>
+                                <h4 className="text-xs font-semibold text-secondary"><CjkText>训练室</CjkText></h4>
                                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
                                   <input
                                     type="checkbox"
@@ -3723,7 +3724,7 @@ export default function AutomationTasks() {
                                   disabled={isRunning || !task.enabled}
                                 >
                                   <option value="0">标准选择</option>
-                                  <option value="1">选满 3 个标签</option>
+                                  <option value="1">选满 3\u00A0个标签</option>
                                   <option value="2">尽量多选高星标签</option>
                                 </select>
                                 <ChevronDown size={15} strokeWidth={2} aria-hidden="true" />
@@ -3753,7 +3754,7 @@ export default function AutomationTasks() {
                                   const recruitmentTime = task.params.recruitment_time || { '3': 540, '4': 540 }
                                   return (
                                     <label key={star} htmlFor={recruitmentTimeId} className="automation-recruitment-time-row">
-                                      <span className="shrink-0 text-sm font-medium text-primary">{star} 星</span>
+                                      <span className="shrink-0 text-sm font-medium text-primary">{star}{'\u00A0'}星</span>
                                       <input
                                         id={recruitmentTimeId}
                                         type="number"
@@ -3777,7 +3778,7 @@ export default function AutomationTasks() {
                                   )
                                 })}
                               </div>
-                              <p className="mt-1.5 text-xs text-tertiary">可设置 60 至 540 分钟，按 10 分钟调整；五星和六星固定为 540 分钟。</p>
+                              <p className="mt-1.5 text-xs text-tertiary">可设置 60\u00A0至 540\u00A0分钟，按 10\u00A0分钟调整；五星和六星固定为 540\u00A0分钟。</p>
                             </fieldset>
                           </div>
                         </details>

@@ -3,7 +3,8 @@ import { maaApi, searchCopilot, searchParadoxCopilot, type ManualCopilotSetResul
 import { motion, useReducedMotion } from 'framer-motion'
 import { ChevronRight, FileText, Info, Play, Search, Square } from 'lucide-react'
 import Icons from './Icons'
-import { PageHeader, Button, Card, ConfirmDialog, EmptyState, SmoothPanel, StatusMark } from './common'
+import { PageHeader, Button, Card, ConfirmDialog, EmptyState, SmoothPanel, StatusMark, TruncatedText } from './common'
+import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import { useRunStore } from '../store/runStore'
 import type { RunTaskResult } from '../types/run'
@@ -486,7 +487,7 @@ export default function CombatTasks() {
             const elapsedMinutes = (Date.now() - (startTime ?? 0)) / 1000 / 60
             setIsRunning(true)
             if (elapsedMinutes > 5) {
-              setStatusMessage(`${taskName} 可能已完成（已运行 ${Math.floor(elapsedMinutes)} 分钟）`)
+              setStatusMessage(`${taskName} 可能已完成（${keepNumberWithUnit(`已运行 ${Math.floor(elapsedMinutes)} 分钟`)}）`)
             } else {
               setStatusMessage(`正在执行: ${taskName}`)
             }
@@ -750,7 +751,7 @@ export default function CombatTasks() {
           { value: '3', label: '使用随机助战' },
         ]},
         { key: 'supportName', label: '助战干员名称', type: 'text', param: '--support-unit-name', placeholder: '干员名称' },
-        { key: 'allowOneMissingOperator', label: '缺 1 名干员时允许助战补位', type: 'checkbox', param: '', helper: '活动作业会跳过缺 2 名及以上干员的候选；缺 1 名时需把上方助战模式设为“缺一个时使用”或指定缺失干员。' },
+        { key: 'allowOneMissingOperator', label: '缺 1\u00A0名干员时允许助战补位', type: 'checkbox', param: '', helper: '活动作业会跳过缺 2\u00A0名及以上干员的候选；缺 1\u00A0名时需把上方助战模式设为“缺一个时使用”或指定缺失干员。' },
         { key: 'userAdditional', label: '追加干员', type: 'text', param: '', placeholder: '干员名:技能，多个用逗号分隔', helper: '仅自动编队生效；技能填 1-3，留空使用默认' },
       ],
       ssscopilot: [
@@ -937,7 +938,7 @@ export default function CombatTasks() {
         const pendingEntries = (result.data as ScheduleExecutionResultData | undefined)?.pending
         const pendingIndexes = new Set<number>((pendingEntries || []).map(entry => entry.itemIndex))
         applySelectedCopilotIndexes(pendingIndexes, copilotSetInfo?.id)
-        setStatusMessage(pendingIndexes.size ? `作业集已完成部分关卡，剩余 ${pendingIndexes.size} 个待执行` : '作业集执行完成')
+        setStatusMessage(pendingIndexes.size ? keepNumberWithUnit(`作业集已完成部分关卡，剩余 ${pendingIndexes.size} 个待执行`) : '作业集执行完成')
       } else {
         setStatusMessage(`作业集执行失败: ${maaApi.getErrorMessage(result)}`)
       }
@@ -1115,7 +1116,7 @@ export default function CombatTasks() {
     if (successCount === 0) {
       setStatusMessage('作业集已取消，所有作业执行失败')
     } else {
-      setStatusMessage(`作业集已取消: ${successCount} 个成功，${failCount} 个失败`)
+      setStatusMessage(keepNumberWithUnit(`作业集已取消: ${successCount} 个成功，${failCount} 个失败`))
     }
 
     executionGenerationRef.current += 1
@@ -1447,13 +1448,13 @@ export default function CombatTasks() {
           setCopilotSetInfo({
             type: 'set',
             id: copilotId,
-            name: `作业集 (${copilots.length} 个作业)`,
+            name: keepNumberWithUnit(`作业集 (${copilots.length} 个作业)`),
             note: '包含多个关卡，将按顺序执行',
             copilots,
             currentIndex: 0
           })
           restoreSelectedCopilots(copilotId, copilots)
-          setStatusMessage(`已加载作业集：${copilots.length} 个作业`)
+          setStatusMessage(keepNumberWithUnit(`已加载作业集：${copilots.length} 个作业`))
         } else {
           setStatusMessage('作业集不存在或为空')
         }
@@ -1777,8 +1778,8 @@ export default function CombatTasks() {
                       {task.icon}
                     </div>
                     <div className="min-w-0">
-                      <h4 className="truncate text-lg font-semibold text-primary">{task.name}</h4>
-                      <p className="mt-1 text-sm leading-relaxed text-secondary">{task.description}</p>
+                      <TruncatedText as="h4" tooltip={task.name} className="text-lg font-semibold text-primary">{task.name}</TruncatedText>
+                      <p className="app-prose-zh mt-1 text-sm leading-relaxed text-secondary">{task.description}</p>
                     </div>
                   </div>
 
@@ -2056,10 +2057,10 @@ export default function CombatTasks() {
                                   <div className="min-w-0">
                                     <div className="text-xs font-medium text-tertiary">续跑进度</div>
                                     <div className="mt-1 text-sm font-semibold text-primary">
-                                      {nextCopilot ? `下次从第 ${nextIndex + 1} 关继续` : '作业集已完成'}
+                                      {nextCopilot ? keepNumberWithUnit(`下次从第 ${nextIndex + 1} 关继续`) : '作业集已完成'}
                                     </div>
                                     <div className="mt-1 truncate text-xs text-tertiary">
-                                      {copilotSetResults.length > 0 ? `本次已执行 ${copilotSetResults.length} 个` : `共 ${total} 个作业`}
+                                      {copilotSetResults.length > 0 ? keepNumberWithUnit(`本次已执行 ${copilotSetResults.length} 个`) : keepNumberWithUnit(`共 ${total} 个作业`)}
                                     </div>
                                   </div>
                                   <div className="flex shrink-0 items-center gap-1.5">
@@ -2079,7 +2080,14 @@ export default function CombatTasks() {
                                     <div className="mt-2 flex min-w-0 items-center gap-2 border-t border-[var(--app-border)] pt-2 text-xs">
                                       <span className="shrink-0 text-tertiary">续跑目标</span>
                                       <span className="font-mono brand-text">prts://{nextCopilot.id}</span>
-                                      <span className="min-w-0 truncate text-secondary">{nextCopilot.stage || nextCopilot.name || `第 ${nextIndex + 1} 关`}</span>
+                                      <TruncatedText
+                                        as="span"
+                                        className="min-w-0 text-secondary"
+                                        triggerClassName="flex-1 min-w-0"
+                                        tooltip={nextCopilot.stage || nextCopilot.name || `第 ${nextIndex + 1} 关`}
+                                      >
+                                        {nextCopilot.stage || nextCopilot.name || `第 ${nextIndex + 1} 关`}
+                                      </TruncatedText>
                                     </div>
                                   ) : (
                                     <div className="mt-2 border-t border-[var(--app-border)] pt-2 text-xs text-tertiary">
@@ -2264,7 +2272,14 @@ export default function CombatTasks() {
                                     </button>
                                     <div className="min-w-0">
                                       <div className="flex min-w-0 items-center gap-1.5">
-                                        <span className="truncate text-primary">{copilot.name || `作业 #${copilot.id}`}</span>
+                                        <TruncatedText
+                                          as="span"
+                                          className="text-primary"
+                                          triggerClassName="flex-1 min-w-0"
+                                          tooltip={copilot.name || `作业 #${copilot.id}`}
+                                        >
+                                          {copilot.name || `作业 #${copilot.id}`}
+                                        </TruncatedText>
                                         {copilot.presetFormation && (
                                           <span className="shrink-0 rounded px-1.5 py-0.5 text-[11px] brand-chip">预设编队 · 仅普通</span>
                                         )}
@@ -2274,7 +2289,7 @@ export default function CombatTasks() {
                                           </span>
                                         ))}
                                       </div>
-                                      {copilot.stage && <div className="mt-0.5 truncate text-xs text-tertiary">{copilot.stage}</div>}
+                                      {copilot.stage && <TruncatedText as="div" tooltip={copilot.stage} className="mt-0.5 text-xs text-tertiary">{copilot.stage}</TruncatedText>}
                                     </div>
                                   </div>
                                   <div className="flex shrink-0 items-center gap-2">
@@ -2340,8 +2355,8 @@ export default function CombatTasks() {
                         {task.icon}
                       </div>
                       <div className="min-w-0">
-                        <h4 className="truncate text-lg font-semibold text-primary">{task.name}</h4>
-                        <p className="mt-1 text-sm leading-relaxed text-secondary">{task.description}</p>
+                        <TruncatedText as="h4" tooltip={task.name} className="text-lg font-semibold text-primary">{task.name}</TruncatedText>
+                        <p className="app-prose-zh mt-1 text-sm leading-relaxed text-secondary">{task.description}</p>
                       </div>
                     </div>
 

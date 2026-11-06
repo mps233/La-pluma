@@ -36,6 +36,7 @@ interface MockButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 vi.mock('./common', () => ({
   Tooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
+  TruncatedText: ({ children }: { children: ReactNode }) => <>{children}</>,
   Button: ({
     children,
     icon: _icon,
@@ -376,11 +377,11 @@ describe('ScrcpyDeviceView automation availability', () => {
     ))
 
     await act(async () => findButton('均衡画质')?.click())
-    expect(container.textContent).toContain('1280p · 45 FPS')
+    expect(container.textContent).toContain('1280p · 45\u00A0FPS')
     expect(container.textContent).toContain('画质已修改，重连预览后生效')
 
     await act(async () => findButton('60')?.click())
-    expect(container.textContent).toContain('自定义 · 1280p · 60 FPS')
+    expect(container.textContent).toContain('自定义 · 1280p · 60\u00A0FPS')
     expect(container.querySelector('[role="group"][aria-label="视频帧率"]')).not.toBeNull()
     expect(findButton('60')?.getAttribute('aria-label')).toBe('60 FPS')
     expect(findButton('60')?.className).toContain('min-h-11')

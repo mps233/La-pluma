@@ -991,7 +991,7 @@ describe('CombatTasks execution recovery', () => {
 
     const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')
     expect(input?.value).toBe('prts://s56877')
-    expect(container.textContent).toContain('共 2 个作业')
+    expect(container.textContent).toContain('共 2\u00A0个作业')
     expect(mocks.runActivitySet).not.toHaveBeenCalled()
     expect(mocks.executeCopilotSetPlan).not.toHaveBeenCalled()
 

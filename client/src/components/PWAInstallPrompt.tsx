@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Download, RefreshCw, Share2, SquarePlus } from 'lucide-react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useStatusStore } from '@/store/statusStore'
-import { Button, IconButton } from '@/components/common'
+import { Button, CjkText, IconButton } from '@/components/common'
 import { hasDocumentBuildChanged } from '@/utils/pwaUpdate'
 
 interface BeforeInstallPromptEvent extends Event {
@@ -248,7 +248,7 @@ export default function PWAInstallPrompt() {
               />
               <div className="min-w-0 flex-1">
                 <h2 id="pwa-prompt-title" className="text-base font-semibold text-primary">
-                  {showUpdateCard ? '发现新版本' : '安装 La Pluma'}
+                  <CjkText>{showUpdateCard ? '发现新版本' : '安装 La Pluma'}</CjkText>
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-secondary">
                   {showUpdateCard

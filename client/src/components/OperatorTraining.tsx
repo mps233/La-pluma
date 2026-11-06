@@ -15,7 +15,8 @@ import {
 } from 'lucide-react'
 import { getOperatorList, getAllOperators, getOperBoxData, getTrainingQueue, addToTrainingQueue, removeFromTrainingQueue, updateTrainingQueueOrder, updateTrainingSettings, generateTrainingPlan, applyTrainingPlan, getItemIconUrl } from '../services/api'
 import { getOperatorAvatarUrl } from '../services/operatorQuotes'
-import { PageHeader, Card, SmoothPanel, Button, EmptyState, IconButton, Input, Loading, Select, Switch } from './common'
+import { PageHeader, Card, SmoothPanel, Button, EmptyState, IconButton, Input, Loading, Select, Switch, CjkText, TruncatedText } from './common'
+import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
@@ -187,9 +188,9 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
         
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
-            <span className="truncate text-xs font-semibold text-primary">
+            <TruncatedText className="text-xs font-semibold text-primary" tooltip={node.name} triggerClassName="flex-1 min-w-0">
               {node.name}
-            </span>
+            </TruncatedText>
             {node.stillNeeded > 0 ? (
               <span className="rounded px-2 py-0.5 text-xs font-bold brand-chip">
                 -{node.stillNeeded}
@@ -265,7 +266,7 @@ function MaterialGapList({
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold text-primary">{material.name}</div>
+            <TruncatedText as="div" className="text-sm font-semibold text-primary" tooltip={material.name}>{material.name}</TruncatedText>
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-tertiary">
               <span>{material.have}/{material.needed}</span>
               <span className="rounded-full px-1.5 py-0.5 font-semibold status-danger">缺 {material.stillNeeded}</span>
@@ -275,7 +276,7 @@ function MaterialGapList({
       ))}
       {hiddenCount > 0 && (
         <div className="flex min-h-[60px] items-center justify-center rounded-xl px-3 py-2 text-sm font-medium text-tertiary surface-soft">
-          还有 {hiddenCount} 种材料
+          {keepNumberWithUnit(`还有 ${hiddenCount} 种材料`)}
         </div>
       )}
     </div>
@@ -312,7 +313,7 @@ function TrainingLoadError({
     <div className="flex min-h-40 flex-col items-center justify-center gap-4 rounded-xl px-6 py-8 text-center status-danger" role="alert">
       <AlertCircle size={22} strokeWidth={1.9} aria-hidden="true" />
       <div className="max-w-md">
-        <h3 className="text-base font-semibold">{title}</h3>
+        <h3 className="text-base font-semibold"><CjkText>{title}</CjkText></h3>
         <p className="mt-1 text-sm leading-6">{description}</p>
       </div>
       <Button type="button" variant="outline" size="sm" onClick={onRetry}>
@@ -938,11 +939,11 @@ export default function OperatorTraining() {
           <section className={`training-operator-column min-w-0 space-y-4 ${currentTarget ? 'order-2 xl:order-1' : 'order-1'}`}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-primary">添加干员</h2>
+                <h2 className="text-lg font-semibold text-primary"><CjkText>添加干员</CjkText></h2>
                 <p className="text-sm text-secondary">筛选并加入养成队列</p>
               </div>
               <div className="rounded-full px-3 py-1 text-xs font-medium text-tertiary surface-soft">
-                队列 {queue.length} · 今日计划 {openStageCount} 个关卡
+                {keepNumberWithUnit(`队列 ${queue.length} · 今日计划 ${openStageCount} 个关卡`)}
               </div>
             </div>
         <div className="space-y-4">
@@ -1129,7 +1130,7 @@ export default function OperatorTraining() {
                       <div className="flex min-h-5 flex-wrap items-center justify-center gap-1 text-xs">
                         {isOwned && operator.currentElite !== undefined && (
                           <span className="whitespace-nowrap rounded-full px-2 py-0.5 surface-panel text-secondary">
-                            精{operator.currentElite}{operator.currentLevel ? ` · ${operator.currentLevel} 级` : ''}
+                            {keepNumberWithUnit(`精${operator.currentElite}${operator.currentLevel ? ` · ${operator.currentLevel} 级` : ''}`)}
                           </span>
                         )}
                       </div>
@@ -1178,7 +1179,7 @@ export default function OperatorTraining() {
               <div className="px-4 py-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full px-2.5 py-1 text-xs font-semibold brand-chip">当前目标</span>
-                  <h3 className="min-w-0 flex-1 truncate text-xl font-semibold text-primary">{currentTarget.operator.name}</h3>
+                  <TruncatedText as="h3" className="min-w-0 flex-1 text-xl font-semibold text-primary" tooltip={currentTarget.operator.name} triggerClassName="flex-1 min-w-0">{currentTarget.operator.name}</TruncatedText>
                   <span className="rounded-full px-2 py-0.5 text-xs font-semibold surface-soft brand-text">
                     {currentTarget.operator.rarity}★
                   </span>
@@ -1203,11 +1204,11 @@ export default function OperatorTraining() {
                   </div>
                   <div className="min-w-0 border-l border-[var(--app-border)] px-2 py-3 text-center">
                     <div className="text-xs font-medium text-tertiary">缺口</div>
-                    <div className="mt-1 text-sm font-semibold text-primary">{currentMissingMaterials.length} 种</div>
+                    <div className="mt-1 text-sm font-semibold text-primary">{keepNumberWithUnit(`${currentMissingMaterials.length} 种`)}</div>
                   </div>
                   <div className="min-w-0 border-l border-[var(--app-border)] px-2 py-3 text-center">
                     <div className="text-xs font-medium text-tertiary">后续</div>
-                    <div className="mt-1 text-sm font-semibold text-primary">{backlogCount} 个</div>
+                    <div className="mt-1 text-sm font-semibold text-primary">{keepNumberWithUnit(`${backlogCount} 个`)}</div>
                   </div>
                 </div>
 
@@ -1253,7 +1254,7 @@ export default function OperatorTraining() {
                 id="training-automation-settings-title"
                 className="flex min-h-11 items-center text-sm font-semibold text-primary"
               >
-                自动化设置
+                <CjkText>自动化设置</CjkText>
               </h3>
               <div className="mt-2 divide-y divide-[var(--app-border)]">
                 <div className="flex min-h-14 items-center justify-between gap-4 py-2.5">
@@ -1307,8 +1308,8 @@ export default function OperatorTraining() {
           ) : (
             <Card smoothCorners className="training-queue-card !p-0">
               <div className="flex items-center justify-between border-b border-[var(--app-border)] px-4 py-3">
-                <h3 className="text-sm font-bold text-primary">后续队列</h3>
-                <span className="text-xs text-tertiary">{upcomingQueue.length} 个待处理</span>
+                <h3 className="text-sm font-bold text-primary"><CjkText>后续队列</CjkText></h3>
+                <span className="text-xs text-tertiary">{keepNumberWithUnit(`${upcomingQueue.length} 个待处理`)}</span>
               </div>
               {upcomingQueue.length === 0 ? (
                 <div className="px-4 py-5 text-sm text-secondary">当前只有一个养成目标。</div>
@@ -1325,9 +1326,9 @@ export default function OperatorTraining() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <h3 className="truncate text-sm font-bold text-primary">
+                            <TruncatedText as="h3" className="text-sm font-bold text-primary" tooltip={item.operator.name} triggerClassName="flex-1 min-w-0">
                               {item.operator.name}
-                            </h3>
+                            </TruncatedText>
                             <span className="rounded-full px-2 py-0.5 text-xs font-bold brand-chip">
                               {item.operator.rarity}★
                             </span>
@@ -1383,9 +1384,9 @@ export default function OperatorTraining() {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-xs font-semibold uppercase brand-text">今日流程</div>
-                      <h3 className="mt-1 text-lg font-semibold text-primary">{planFocusName}</h3>
+                      <h3 className="mt-1 text-lg font-semibold text-primary"><CjkText>{planFocusName}</CjkText></h3>
                       <div className="mt-1 text-sm leading-6 text-secondary">
-                        可刷 {openStageCount} 个关卡 · 预计 {todayRunCount} 次 · 完整计划约 {plan.totalSanity || 0} 理智
+                        {keepNumberWithUnit(`可刷 ${openStageCount} 个关卡 · 预计 ${todayRunCount} 次 · 完整计划约 ${plan.totalSanity || 0} 理智`)}
                       </div>
                     </div>
                     <div className="flex-shrink-0">
@@ -1407,9 +1408,9 @@ export default function OperatorTraining() {
 
               <Card smoothCorners className="training-stage-preview-card !p-0">
                 <div className="flex items-center justify-between border-b border-[var(--app-border)] px-4 py-3">
-                  <h3 className="text-base font-semibold text-primary">今日推荐刷图</h3>
+                  <h3 className="text-base font-semibold text-primary"><CjkText>今日推荐刷图</CjkText></h3>
                   <span className="rounded-full px-2.5 py-1 text-xs font-semibold brand-chip">
-                    {previewStages.length} 个优先
+                    {keepNumberWithUnit(`${previewStages.length} 个优先`)}
                   </span>
                 </div>
                 {previewStages.length > 0 ? (
@@ -1422,9 +1423,13 @@ export default function OperatorTraining() {
                           </div>
                           <div className="min-w-0">
                             <div className="font-semibold text-primary">{stage.stage}</div>
-                            <div className="mt-1 truncate text-sm text-secondary">
+                            <TruncatedText
+                              as="div"
+                              className="mt-1 text-sm text-secondary"
+                              tooltip={stage.materials?.slice(0, 2).map(mat => `${mat.name}×${mat.count}`).join('、') || '今日可直接推进'}
+                            >
                               {stage.materials?.slice(0, 2).map(mat => `${mat.name}×${mat.count}`).join('、') || '今日可直接推进'}
-                            </div>
+                            </TruncatedText>
                           </div>
                         </div>
                         <div className="flex-shrink-0 rounded-full px-2.5 py-1 text-sm font-bold brand-chip">×{stage.totalTimes || 0}</div>
@@ -1432,7 +1437,7 @@ export default function OperatorTraining() {
                     ))}
                     {hiddenStageCount > 0 && (
                       <div className="px-4 py-3 text-sm text-secondary">
-                        还有 {hiddenStageCount} 个关卡，展开详情查看完整列表。
+                        {keepNumberWithUnit(`还有 ${hiddenStageCount} 个关卡，展开详情查看完整列表。`)}
                       </div>
                     )}
                   </div>
@@ -1447,7 +1452,7 @@ export default function OperatorTraining() {
                   <div className="mt-5 space-y-5">
                   {plan.warnings && plan.warnings.length > 0 && (
                     <div className="rounded-2xl p-4 status-warning">
-                      <h4 className="text-sm font-semibold mb-2">注意事项</h4>
+                      <h4 className="text-sm font-semibold mb-2"><CjkText>注意事项</CjkText></h4>
                       <ul className="space-y-1 text-sm">
                         {plan.warnings.map((warning, index) => (
                           <li key={index}>• {warning}</li>
@@ -1458,7 +1463,7 @@ export default function OperatorTraining() {
 
                   {plan.closedStages && plan.closedStages.length > 0 && (
                     <div className="space-y-3">
-                      <h3 className="text-sm font-bold text-primary">今日未开放</h3>
+                      <h3 className="text-sm font-bold text-primary"><CjkText>今日未开放</CjkText></h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {plan.closedStages.map((stage, idx) => (
                           <div key={`${stage.stage}-${idx}`} className="rounded-xl px-3 py-2.5 surface-soft">
@@ -1479,14 +1484,14 @@ export default function OperatorTraining() {
 
                   {plan.materialHierarchy && plan.materialHierarchy.length > 0 && (
                     <div className="space-y-3">
-                      <h3 className="text-sm font-bold text-primary">材料缺口</h3>
+                      <h3 className="text-sm font-bold text-primary"><CjkText>材料缺口</CjkText></h3>
                       <MaterialGapList materials={plan.materialHierarchy} limit={8} emptyText="计划内材料已集齐" />
                     </div>
                   )}
 
                   {plan.materialHierarchy && plan.materialHierarchy.length > 0 && (
                     <div className="space-y-4">
-                      <h3 className="text-lg font-bold text-primary">材料需求</h3>
+                      <h3 className="text-lg font-bold text-primary"><CjkText>材料需求</CjkText></h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {plan.materialHierarchy.map((hierarchy, index) => (
                           <MaterialHierarchyNode key={`${hierarchy.id}-${index}`} node={hierarchy} />
@@ -1497,7 +1502,7 @@ export default function OperatorTraining() {
 
                   {plan.stages && plan.stages.length > 0 && (
                     <div className="space-y-4">
-                      <h3 className="text-lg font-bold text-primary">完整关卡列表</h3>
+                      <h3 className="text-lg font-bold text-primary"><CjkText>完整关卡列表</CjkText></h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {plan.stages.map((stage, idx) => (
                           <div
@@ -1548,9 +1553,13 @@ export default function OperatorTraining() {
           role="status"
           aria-live="polite"
         >
-          <span className="min-w-0 truncate text-primary">
+          <TruncatedText
+            className="min-w-0 text-primary"
+            tooltip={`已移除 ${recentlyRemoved.item.operator.name}`}
+            triggerClassName="flex-1 min-w-0"
+          >
             已移除 {recentlyRemoved.item.operator.name}
-          </span>
+          </TruncatedText>
           <Button
             type="button"
             variant="ghost"

@@ -176,7 +176,13 @@ export const createViteConfig = (basePath: string): UserConfig => ({
   base: basePath,
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src')
+      '@': path.resolve(__dirname, './src'),
+      // BudouX's package entry re-exports the HTML processor, which pulls
+      // linkedom/cssomnom into the entry chunk. These point at the pure parser
+      // and model modules so only the Chinese models are bundled.
+      'budoux/parser': path.resolve(__dirname, './node_modules/budoux/module/parser.js'),
+      'budoux/model-zh-hans': path.resolve(__dirname, './node_modules/budoux/module/data/models/zh-hans.js'),
+      'budoux/model-zh-hant': path.resolve(__dirname, './node_modules/budoux/module/data/models/zh-hant.js')
     }
   },
   plugins: [

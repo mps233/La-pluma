@@ -127,8 +127,52 @@ Props：
 - `longPress` (number) - 触摸长按打开时间，默认 `450`ms。
 - `disabled` (boolean) - 关闭提示。
 - `className` (string) - 追加到提示气泡的类名。
+- `triggerClassName` (string) - 追加到触发元素外层的布局类；截断文本在 flex 行内传 `flex-1 min-w-0`。
+- `triggerAs` (`span` | `div`) - 触发元素外层的标签；块级内容用 `div`，默认 `span`。
 
 鼠标悬停、键盘焦点和触摸长按都可以打开；Escape、外部点击、滚动或窗口缩放会关闭。提供 `tooltip` 时不要再保留同一个元素的 `title`，避免原生提示和自定义提示叠加。
+
+---
+
+### CjkText - 中文标题断行
+
+`CjkText` 用 BudouX 的简体/繁体中文模型在词间插入 `<wbr>`，再由 `.app-cjk-breaks` 应用 `word-break: keep-all` 与 `overflow-wrap: anywhere`。它只处理字符串子节点；短标题若被模型视为一个词，会原样返回纯文本，不会产生额外 DOM，也不会在无断点的情况下使用 `keep-all`。
+
+```tsx
+import { CjkText } from '@/components/common'
+
+<h3 className="app-section-title"><CjkText>{title}</CjkText></h3>
+```
+
+- 只包标题文字，不要替换 `h1`–`h3`、`id`、`aria-labelledby` 或图标兄弟节点。
+- 不要用于正文；正文用默认的 CJK 断行和 `text-wrap: pretty`。
+- 语言取自 `document.documentElement.lang`；`zh-TW` / `zh-HK` / `zh-Hant` 会按需加载繁体模型。
+
+---
+
+### TruncatedText - 条件截断文本
+
+单行文本超过容器宽度时才截断，并且只有真正截断（`scrollWidth > clientWidth`）时才显示完整文本的 Tooltip。外层 Tooltip 触发器始终存在，截断状态切换不会改变布局。
+
+```tsx
+import { TruncatedText } from '@/components/common'
+
+<TruncatedText as="div" className="text-sm font-semibold text-primary" tooltip={task.name}>
+  {task.name}
+</TruncatedText>
+```
+
+Props：
+
+- `as` (`span` | `div` | `strong` | `small` | `p` | `h3` | `h4`) - 渲染标签，默认 `span`。
+- `children` (ReactNode, required) - 可见文本。
+- `tooltip` (ReactNode) - 完整文本；字符串/数字子节点可省略。
+- `side` (`top` | `bottom`) - Tooltip 首选方向。
+- `className` (string) - 追加到文本元素；不要再传 `truncate`，`.app-truncate` 已包含。
+- `triggerClassName` (string) - Tooltip 触发器布局；元素本身是 flex item 时传 `flex-1 min-w-0`。
+- `disabled` (boolean) - 关闭 Tooltip，文本仍截断。
+
+完整字符串始终保留在 DOM 中供屏幕阅读器读取；不要再给同一个元素加 `title`。
 
 ---
 

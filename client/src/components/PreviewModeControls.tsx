@@ -12,7 +12,7 @@ const PREVIEW_MODES: ReadonlyArray<{
   Icon: typeof EyeOff
 }> = [
   { value: 'off', label: '关闭', description: '不连接', Icon: EyeOff },
-  { value: 'snapshot', label: '快照', description: '10 秒刷新', Icon: Camera },
+  { value: 'snapshot', label: '快照', description: '10\u00A0秒刷新', Icon: Camera },
   { value: 'live', label: '实时', description: '低延迟画面', Icon: Radio },
 ]
 

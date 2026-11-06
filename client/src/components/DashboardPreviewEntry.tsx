@@ -49,7 +49,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
     if (mode === 'snapshot') {
       return {
         title: '等待画面快照',
-        description: '快照每 10 秒刷新一次，也可以切换到实时画面。',
+        description: '快照每 10\u00A0秒刷新一次，也可以切换到实时画面。',
         action: (
           <Button
             size="sm"

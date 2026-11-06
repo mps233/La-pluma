@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Check, Play, Square } from 'lucide-react'
 import { maaApi } from '../services/api'
-import { PageHeader, Input, Select, Button, SmoothPanel, Switch } from './common'
+import { PageHeader, Input, Select, Button, SmoothPanel, Switch, CjkText, TruncatedText } from './common'
+import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import { useRunStore } from '../store/runStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
@@ -64,7 +65,7 @@ const COLLECTIBLE_START_REWARDS = [
   { key: 'random', label: '随机奖励' },
   { key: 'key', label: '钥匙（水月）' },
   { key: 'dice', label: '骰子（水月）' },
-  { key: 'ideas', label: '2 构想（萨卡兹）' },
+  { key: 'ideas', label: '2\u00A0构想（萨卡兹）' },
   { key: 'ticket', label: '票券（界园）' },
 ]
 
@@ -209,7 +210,7 @@ export default function RoguelikeTasks() {
             const elapsedMinutes = (Date.now() - (startTime ?? 0)) / 1000 / 60
             setIsRunning(true)
             if (elapsedMinutes > 5) {
-              setStatusMessage(`${taskName} 可能已完成（已运行 ${Math.floor(elapsedMinutes)} 分钟）`)
+              setStatusMessage(`${taskName} 可能已完成（${keepNumberWithUnit(`已运行 ${Math.floor(elapsedMinutes)} 分钟`)}）`)
             } else {
               setStatusMessage(`正在执行: ${taskName}`)
             }
@@ -404,10 +405,10 @@ export default function RoguelikeTasks() {
           { value: '30001', label: '刷襁褓动物（黑流树海）' },
           { value: '30003', label: '刷开局（黑流树海）' },
         ], helper: '主题限制由 MaaCore 校验' },
-        { key: 'difficulty', label: '难度', type: 'number', placeholder: '-1', helper: '-1 表示不指定；黑流树海实托邦需要 6 以上' },
+        { key: 'difficulty', label: '难度', type: 'number', placeholder: '-1', helper: '-1 表示不指定；黑流树海实托邦需要 6\u00A0以上' },
         { key: 'squad', label: '起始分队', type: 'select', options: [] },
         { key: 'roles', label: '职业组', type: 'select', options: [], defaultValue: '稳扎稳打' },
-        { key: 'coreCharList', label: '开局干员（最多 3 位）', type: 'core-char-list', helper: '按顺位招募；三个位置职业不能相同，助战可逐位开启' },
+        { key: 'coreCharList', label: '开局干员（最多 3\u00A0位）', type: 'core-char-list', helper: '按顺位招募；三个位置职业不能相同，助战可逐位开启' },
         { key: 'collectibleModeCoreCharList', label: '准备局开局干员（模式 30003）', type: 'core-char-list', helper: '不填则沿用主开局干员列表', modes: ['30003'] },
         { key: 'coreChar', label: '开局干员（兼容字段）', type: 'text', placeholder: '留空自动选择', helper: '仅在未填写上方干员列表时使用' },
         { key: 'useSupport', label: '兼容字段使用助战', type: 'checkbox', helper: '仅作用于上方兼容字段' },
@@ -457,9 +458,9 @@ export default function RoguelikeTasks() {
           { value: 'swaddled_dog', label: '襁褓狗' },
           { value: 'swaddled_cerberus', label: '襁褓三头犬' },
         ], helper: '仅策略为培育襁褓动物时使用' },
-        { key: 'blackflowStartAnimals', label: '模式 30003 襁褓动物', type: 'text', placeholder: 'swaddled_cat,swaddled_dog', helper: '0–2 项，羽蛇最多一项', modes: ['30003'] },
+        { key: 'blackflowStartAnimals', label: '模式 30003 襁褓动物', type: 'text', placeholder: 'swaddled_cat,swaddled_dog', helper: '0–2\u00A0项，羽蛇最多一项', modes: ['30003'] },
         { key: 'blackflowStartRewards', label: '模式 30003 开局奖励', type: 'blackflow-rewards', helper: '命中任意一项即完成目标局', modes: ['30003'] },
-        { key: 'blackflowStartUtopia', label: '凹第一层实托邦', type: 'checkbox', helper: '难度 6 以上才会出现', modes: ['30003'] },
+        { key: 'blackflowStartUtopia', label: '凹第一层实托邦', type: 'checkbox', helper: '难度 6\u00A0以上才会出现', modes: ['30003'] },
         { key: 'blackflowStartRewardPriority', label: '实托邦奖励优先级', type: 'text', placeholder: 'space_lease,unnumbered_item', helper: '凹实托邦时必填，多个用逗号分隔', modes: ['30003'] },
       ],
       reclamation: [
@@ -467,7 +468,7 @@ export default function RoguelikeTasks() {
           { value: '0', label: '沙洲遗闻：刷繁荣度（无存档）' },
           { value: '1', label: '沙洲遗闻：制作工具刷繁荣度' },
           { value: '16', label: '重启锚点：RA-1 精耕细作' },
-          { value: '32', label: '重启锚点：RA-15 圣聆初雪 60 杀' },
+          { value: '32', label: '重启锚点：RA-15 圣聆初雪 60\u00A0杀' },
           { value: '48', label: '重启锚点：RA-4 维什戴尔 Boss' },
         ], helper: '模式需与上方主题匹配' },
         { key: 'toolsToCraft', label: '制作工具名称', type: 'text', placeholder: '荧光棒,发电机', helper: '仅沙洲遗闻模式 1，多个用逗号分隔', modes: ['1'] },
@@ -1080,10 +1081,10 @@ export default function RoguelikeTasks() {
           <SmoothPanel className="roguelike-panel roguelike-theme-panel">
             <div className="roguelike-panel-heading">
               <div>
-                <h3>主题</h3>
+                <h3><CjkText>主题</CjkText></h3>
                 <p>选择本次运行内容</p>
               </div>
-              <span>{THEME_PRESETS[activeMode].length} 个可用</span>
+              <span>{keepNumberWithUnit(`${THEME_PRESETS[activeMode].length} 个可用`)}</span>
             </div>
             <div className="roguelike-panel-body">
               <div className="roguelike-theme-grid">
@@ -1122,10 +1123,10 @@ export default function RoguelikeTasks() {
           <SmoothPanel className="roguelike-panel roguelike-settings-panel">
             <div className="roguelike-panel-heading">
               <div>
-                <h3>策略设置</h3>
-                <p>{activeTask.name}</p>
+                <h3><CjkText>策略设置</CjkText></h3>
+                <TruncatedText as="p" tooltip={activeTask.name}>{activeTask.name}</TruncatedText>
               </div>
-              <span>{getVisibleAdvancedOptions(activeTask.id).length} 项</span>
+              <span>{keepNumberWithUnit(`${getVisibleAdvancedOptions(activeTask.id).length} 项`)}</span>
             </div>
             <div className="roguelike-panel-body roguelike-settings-body">
               {renderAdvancedOptions(activeTask)}

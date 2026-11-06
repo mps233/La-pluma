@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import Button, { IconButton } from './Button'
+import CjkText from './CjkText'
 
 interface ModalProps {
   isOpen: boolean
@@ -252,7 +253,7 @@ function ModalLayer({
           {(title || showClose) && (
             <div className="flex min-h-14 items-center justify-between gap-4 px-5 py-3 shadow-[inset_0_-1px_0_var(--app-border)] sm:px-6">
               {title
-                ? <h2 id={titleId} className="min-w-0 text-base font-semibold text-primary sm:text-lg">{title}</h2>
+                ? <h2 id={titleId} className="min-w-0 text-base font-semibold text-primary sm:text-lg"><CjkText>{title}</CjkText></h2>
                 : <span />}
               {showClose && (
                 <IconButton

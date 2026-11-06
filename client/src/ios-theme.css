@@ -1955,12 +1955,6 @@ html.la-pluma-standalone #app-root .page {
     min-width: 0;
   }
 
-  .la-pluma-app .app-page-header.is-mobile-inline .app-page-title {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   .la-pluma-app .app-page-header.is-mobile-inline .app-page-actions {
     width: auto;
     min-width: 0;

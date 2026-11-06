@@ -32,6 +32,7 @@ import {
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
 import { summarizeMaaCliMessage, summarizeMaaCliSummaryBlock } from '../utils/maaLogSummary'
+import { keepNumberWithUnit } from '../utils/typography'
 import type { LogEntry, LogFile } from '@/types/components'
 
 type LogFilter = 'all' | LogEntry['level']
@@ -866,7 +867,7 @@ export default function LogViewer() {
             title={viewingHistory ? '历史日志' : '实时日志'}
             actions={
               <div className="log-console-heading-actions">
-                <span className="log-count">{visibleLogs.length} 条</span>
+                <span className="log-count">{keepNumberWithUnit(`${visibleLogs.length} 条`)}</span>
                 {viewingHistory && (
                   <Button
                     onClick={backToRealtime}
@@ -953,7 +954,7 @@ export default function LogViewer() {
                       <span className={`log-level is-${log.level.toLowerCase()}`}>{log.level}</span>
                     </div>
                     <div className="log-message">
-                      <span>{log.message}</span>
+                      <span>{keepNumberWithUnit(log.message)}</span>
                       {collapseRepeats && log.count > 1 && <span className="log-repeat">x{log.count}</span>}
                       {log.rawMessage && log.rawMessage !== log.message && (
                         <details className="log-row-details">
@@ -976,7 +977,7 @@ export default function LogViewer() {
                       icon={<ArrowDown className="h-4 w-4" aria-hidden="true" />}
                       onClick={scrollToLatest}
                     >
-                      {viewingHistory ? '回到底部' : newLogCount > 0 ? `回到最新 · ${newLogCount} 条` : '回到最新'}
+                      {viewingHistory ? '回到底部' : newLogCount > 0 ? keepNumberWithUnit(`回到最新 · ${newLogCount} 条`) : '回到最新'}
                     </Button>
                   </div>
                 )}
@@ -990,7 +991,7 @@ export default function LogViewer() {
             title="历史日志文件"
             actions={
               <div className="log-console-heading-actions">
-                <span className="log-count hidden sm:inline-flex">{historyFiles.length} 个</span>
+                <span className="log-count hidden sm:inline-flex">{keepNumberWithUnit(`${historyFiles.length} 个`)}</span>
                 <Button
                   onClick={() => setConfirmAction('cleanup')}
                   variant="outline"
@@ -1035,7 +1036,7 @@ export default function LogViewer() {
                     <span className="log-history-icon"><FileText className="h-4 w-4" aria-hidden="true" /></span>
                     <span className="log-history-copy">
                       <strong title={file.name}>{file.name}</strong>
-                      <small>{new Date(file.modified).toLocaleString('zh-CN')} · {(file.size / 1024).toFixed(2)} KB</small>
+                      <small>{new Date(file.modified).toLocaleString('zh-CN')} · {keepNumberWithUnit(`${(file.size / 1024).toFixed(2)} KB`)}</small>
                     </span>
                     <ChevronRight className="h-4 w-4" aria-hidden="true" />
                   </button>

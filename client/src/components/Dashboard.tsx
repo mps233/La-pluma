@@ -3,13 +3,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Activity, Bot, CalendarDays, CheckCircle2, ChevronRight, Cpu, HardDrive, Database, PackageOpen, Play, ServerOff, Target, Thermometer, WifiOff } from 'lucide-react'
 import { getOpenTodayStages, getTodayDrops, getTrainingQueue, maaApi } from '../services/api'
 import Icons from './Icons'
-import { PageHeader, Card, Button, IconButton, SmoothPanel } from './common'
+import { PageHeader, Card, Button, IconButton, SmoothPanel, CjkText, TruncatedText } from './common'
 import { DashboardSkeleton } from './common/Loading'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useUIStore } from '@/stores'
 import { useDashboardFlowLayout } from '../hooks/useDashboardFlowLayout'
 import DashboardPreviewEntry from './DashboardPreviewEntry'
 import { formatActivitySubtitle } from '../utils/activitySummary'
+import { keepNumberWithUnit } from '../utils/typography'
 import { formatExecutionSummary, getExecutionLastTask } from '../utils/executionSummary'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { useStatusStore } from '../store/statusStore'
@@ -17,7 +18,7 @@ import { useDashboardStore, type DashboardBusinessSnapshot } from '../store/dash
 import { probeBackendAvailability } from '../hooks/useBackendStatusMonitor'
 import type { StatusMessageType } from '../utils/statusMessage'
 
-const sectionTitleClass = 'text-base font-bold text-primary'
+const sectionTitleClass = 'app-card-title text-base font-bold text-primary'
 const labelClass = 'text-secondary'
 const progressTrackClass = 'h-1.5 rounded-full bg-[var(--app-surface-muted)] overflow-hidden'
 const dashboardChipClass = 'brand-chip rounded-lg px-2.5 py-1 text-xs font-medium'
@@ -128,7 +129,7 @@ const TemperatureSparkline = ({ values }: { values: number[] }) => {
       </svg>
       <div className="dashboard-temperature-range">
         <span>{min.toFixed(0)}°</span>
-        <span>近 {Math.max(5, (values.length - 1) * 5)} 秒</span>
+        <span>{keepNumberWithUnit(`近 ${Math.max(5, (values.length - 1) * 5)} 秒`)}</span>
         <span>{max.toFixed(0)}°</span>
       </div>
     </div>
@@ -539,15 +540,17 @@ export default function Dashboard() {
         : flowIsRunning
           ? (scheduleSummary.currentTask || '流程执行中')
           : '准备就绪'
-  const flowCommandDescription = !automationAvailable
-    ? connectionDescription
-    : activityPreflightLoading
-      ? '正在获取当前活动作业集，随后跳到自动战斗页'
-      : quickStartLoading
-        ? '正在读取任务配置并提交执行'
-        : flowIsRunning
-          ? (scheduleSummary.message || '自动化任务正在按计划推进')
-          : (scheduleSummary.message || '设备待命，可以开始今天的自动化任务')
+  const flowCommandDescription = keepNumberWithUnit(
+    !automationAvailable
+      ? connectionDescription
+      : activityPreflightLoading
+        ? '正在获取当前活动作业集，随后跳到自动战斗页'
+        : quickStartLoading
+          ? '正在读取任务配置并提交执行'
+          : flowIsRunning
+            ? (scheduleSummary.message || '自动化任务正在按计划推进')
+            : (scheduleSummary.message || '设备待命，可以开始今天的自动化任务'),
+  )
   const flowStatusLabel = serviceStatus === 'offline'
     ? '网络离线'
     : serviceStatus === 'unavailable'
@@ -611,23 +614,40 @@ export default function Dashboard() {
     {
       label: '当前活动',
       value: activitySummary.available ? (activitySummary.name || activitySummary.code || '进行中') : '暂无活动',
-      sub: formatActivitySubtitle(activitySummary),
+      sub: keepNumberWithUnit(formatActivitySubtitle(activitySummary)),
       Icon: CalendarDays,
       progress: activityProgress,
     },
     {
       label: '养成目标',
-      value: `${trainingSummary.count} 项`,
+      value: keepNumberWithUnit(`${trainingSummary.count} 项`),
       sub: trainingSummary.topNames.length > 0 ? trainingSummary.topNames.join('、') : '尚未添加目标',
       Icon: Target,
     },
     {
       label: '今日掉落',
-      value: `${dropSummary.count} 条`,
+      value: keepNumberWithUnit(`${dropSummary.count} 条`),
       sub: dropSummary.recent[0]?.items || '作战后自动汇总',
       Icon: PackageOpen,
     },
   ]
+
+  const currentStatusValue = automationAvailable
+    ? runStatus.phase === 'unknown'
+      ? '状态未知'
+      : (runStatus.isRunning || scheduleSummary.isRunning ? '执行中' : '空闲中')
+    : '状态不可用'
+  const currentStatusDetail = keepNumberWithUnit(
+    automationAvailable
+      ? runStatus.isRunning
+        ? (runStatus.label || runStatus.detail || '任务执行中')
+        : (scheduleSummary.currentTask || scheduleSummary.message || '暂无进行中的流程')
+      : connectionDescription,
+  )
+  const lastRunValue = scheduleSummary.lastTask || '暂无记录'
+  const lastRunDetail = keepNumberWithUnit(
+    scheduleSummary.lastResult || '执行一次自动化流程后显示',
+  )
 
   return (
     <div className="app-page dashboard-page" data-page="dashboard">
@@ -711,7 +731,7 @@ export default function Dashboard() {
                   </div>
                   <div className="min-w-0">
                     <div className="dashboard-flow-eyebrow text-[11px] font-semibold uppercase text-[var(--app-accent-strong)]">Daily operations</div>
-                    <div className="dashboard-flow-title mt-0.5 text-base font-bold text-primary">今日流程</div>
+                    <div className="dashboard-flow-title mt-0.5 text-lg font-bold text-primary">今日流程</div>
                   </div>
                 </div>
                 <div className="dashboard-flow-meta flex shrink-0 items-center gap-2">
@@ -719,8 +739,8 @@ export default function Dashboard() {
                     <span className="dashboard-flow-status-dot" />
                     {flowStatusLabel}
                   </div>
-                  <span className={`whitespace-nowrap text-[11px] ${labelClass}`}>
-                    {lastUpdateDate ? lastUpdateDate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '--:--'} 更新
+                  <span className={`whitespace-nowrap text-[11px] tabular-nums ${labelClass}`}>
+                    {lastUpdateDate ? lastUpdateDate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '--:--'}{'\u00A0'}更新
                   </span>
                 </div>
               </div>
@@ -744,8 +764,16 @@ export default function Dashboard() {
                           ? '当前操作'
                           : '运行状态'}
                     </div>
-                    <div className="mt-0.5 truncate text-xl font-bold text-primary">{flowCommandTitle}</div>
-                    <div className={`mt-1 truncate text-xs ${labelClass}`}>{flowCommandDescription}</div>
+                    <div className="app-hero-title mt-0.5 text-2xl font-bold text-primary">
+                      <CjkText>{flowCommandTitle}</CjkText>
+                    </div>
+                    <TruncatedText
+                      as="div"
+                      className={`mt-1 text-xs ${labelClass}`}
+                      tooltip={flowCommandDescription}
+                    >
+                      {flowCommandDescription}
+                    </TruncatedText>
                   </div>
                 </div>
                 <div className="dashboard-flow-actions">
@@ -804,8 +832,20 @@ export default function Dashboard() {
                       <Icon className="h-3.5 w-3.5 text-[var(--app-accent-strong)]" strokeWidth={1.8} />
                       <span className={`text-xs font-medium ${labelClass}`}>{item.label}</span>
                     </div>
-                    <div className="mt-2 truncate text-sm font-bold text-primary">{item.value}</div>
-                    <div className={`mt-0.5 truncate text-xs ${labelClass}`}>{item.sub}</div>
+                    <TruncatedText
+                      as="div"
+                      className="mt-2 text-lg font-bold text-primary"
+                      tooltip={item.value}
+                    >
+                      {item.value}
+                    </TruncatedText>
+                    <TruncatedText
+                      as="div"
+                      className={`mt-0.5 text-xs ${labelClass}`}
+                      tooltip={item.sub}
+                    >
+                      {item.sub}
+                    </TruncatedText>
                     {progress && (
                       <div className="dashboard-flow-metric-progress">
                         {progress.value && (
@@ -836,7 +876,7 @@ export default function Dashboard() {
                     <span className="dashboard-flow-rail-dot" />
                     <span className="text-xs font-semibold text-primary">今日开放关卡</span>
                   </div>
-                  <span className={`text-[11px] ${labelClass}`}>{openStageSummary.open.length} 个日常本</span>
+                  <span className={`text-[11px] ${labelClass}`}>{keepNumberWithUnit(`${openStageSummary.open.length} 个日常本`)}</span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {openStageSummary.open.length > 0 ? (
@@ -906,7 +946,13 @@ export default function Dashboard() {
                       </div>
                       <div className="min-w-0">
                         <div className="text-xs font-medium text-primary">{label}</div>
-                        <div className={`truncate text-xs ${labelClass}`}>{sub || '实时采样'}</div>
+                        <TruncatedText
+                          as="div"
+                          className={`text-xs ${labelClass}`}
+                          tooltip={sub || '实时采样'}
+                        >
+                          {sub || '实时采样'}
+                        </TruncatedText>
                       </div>
                       {value != null && (
                         <div className="ml-auto text-sm font-semibold text-primary">{value}</div>
@@ -951,28 +997,40 @@ export default function Dashboard() {
                   <span className={`dashboard-summary-dot ${scheduleSummary.isRunning || runStatus.isRunning ? 'is-active' : ''}`} />
                   当前执行
                 </div>
-                <div className="dashboard-summary-value">{
-                  automationAvailable
-                    ? runStatus.phase === 'unknown'
-                      ? '状态未知'
-                      : (runStatus.isRunning || scheduleSummary.isRunning ? '执行中' : '空闲中')
-                    : '状态不可用'
-                }</div>
-                <div className="dashboard-summary-detail">{
-                  automationAvailable
-                    ? runStatus.isRunning
-                      ? (runStatus.label || runStatus.detail || '任务执行中')
-                      : (scheduleSummary.currentTask || scheduleSummary.message || '暂无进行中的流程')
-                    : connectionDescription
-                }</div>
+                <TruncatedText
+                  as="div"
+                  className="dashboard-summary-value"
+                  tooltip={currentStatusValue}
+                >
+                  {currentStatusValue}
+                </TruncatedText>
+                <TruncatedText
+                  as="div"
+                  className="dashboard-summary-detail"
+                  tooltip={currentStatusDetail}
+                >
+                  {currentStatusDetail}
+                </TruncatedText>
               </div>
               <div className="dashboard-status-block">
                 <div className="dashboard-summary-label">
                   <span className="dashboard-summary-dot is-muted" />
                   最近结果
                 </div>
-                <div className="dashboard-summary-value">{scheduleSummary.lastTask || '暂无记录'}</div>
-                <div className="dashboard-summary-detail">{scheduleSummary.lastResult || '执行一次自动化流程后显示'}</div>
+                <TruncatedText
+                  as="div"
+                  className="dashboard-summary-value"
+                  tooltip={lastRunValue}
+                >
+                  {lastRunValue}
+                </TruncatedText>
+                <TruncatedText
+                  as="div"
+                  className="dashboard-summary-detail"
+                  tooltip={lastRunDetail}
+                >
+                  {lastRunDetail}
+                </TruncatedText>
               </div>
             </div>
           </Card>
@@ -988,7 +1046,7 @@ export default function Dashboard() {
                   <div className={`mt-0.5 text-xs ${labelClass}`}>资源本与芯片本开放情况</div>
                 </div>
               </div>
-              <span className="dashboard-summary-count">{openStageSummary.open.length} 开放</span>
+              <span className="dashboard-summary-count">{keepNumberWithUnit(`${openStageSummary.open.length} 开放`)}</span>
             </div>
             <div className="dashboard-stage-groups">
               <div className="dashboard-stage-group">
@@ -1115,7 +1173,13 @@ export default function Dashboard() {
                     {dropSummary.recent.map((record, index) => (
                       <div key={`${record.stage}-${index}`} className="dashboard-drop-row">
                         <span className="dashboard-drop-stage">{record.stage}</span>
-                        <span className="dashboard-drop-items">{record.items}</span>
+                        <TruncatedText
+                          as="span"
+                          className="dashboard-drop-items"
+                          tooltip={record.items}
+                        >
+                          {record.items}
+                        </TruncatedText>
                       </div>
                     ))}
                   </div>

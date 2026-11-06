@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
-import { Button, Tooltip } from './common'
+import { Button, Tooltip, TruncatedText } from './common'
+import { keepNumberWithUnit } from '../utils/typography'
 import { previewQualityPresets, usePreviewStore, type PreviewQuality } from '../stores'
 import { usePreviewConnection } from '../contexts/previewSession'
 
@@ -573,7 +574,7 @@ export default function ScrcpyDeviceView({
           {statusCards.map(([label, value]) => (
             <div key={label} className="surface-soft rounded-lg px-2 py-1.5">
               <div className="text-tertiary">{label}</div>
-              <div className="truncate font-medium text-primary">{value}</div>
+              <TruncatedText as="div" tooltip={value} className="font-medium text-primary">{value}</TruncatedText>
             </div>
           ))}
         </div>}
@@ -793,7 +794,7 @@ export default function ScrcpyDeviceView({
               <SlidersHorizontal className="h-4 w-4" strokeWidth={1.8} />
               <span>画质设置</span>
             </div>
-            <span className="scrcpy-quality-current">{quality === 'custom' ? '自定义 · ' : ''}{customMaxSize}p · {customFps} FPS</span>
+            <span className="scrcpy-quality-current">{quality === 'custom' ? '自定义 · ' : ''}{customMaxSize}p · {keepNumberWithUnit(`${customFps} FPS`)}</span>
           </div>
 
           <div className="scrcpy-quality-content">
@@ -811,7 +812,7 @@ export default function ScrcpyDeviceView({
                       className={`scrcpy-preset-option ${quality === key ? 'is-active' : ''}`}
                     >
                       <span>{preset.label}</span>
-                      <small>{preset.maxSize}p · {preset.fps} FPS · {preset.bitrateMbps}M</small>
+                      <small>{preset.maxSize}p · {keepNumberWithUnit(`${preset.fps} FPS`)} · {preset.bitrateMbps}M</small>
                     </button>
                   ))}
                 </div>

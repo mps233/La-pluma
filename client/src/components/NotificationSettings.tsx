@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bell, Save, Send } from 'lucide-react'
 import { API_BASE_URL, fetchWithAuth, parseJsonResponse } from '@/services/api'
-import { Switch } from './common'
+import { CjkText, Switch } from './common'
 
 interface TelegramConfig {
   enabled: boolean
@@ -232,7 +232,7 @@ export default function NotificationSettings() {
     <section className="automation-notification-panel">
       <div className="automation-notification-heading">
         <div>
-          <h4><Bell size={16} strokeWidth={1.8} aria-hidden="true" /><span>通知</span></h4>
+          <h4><Bell size={16} strokeWidth={1.8} aria-hidden="true" /><span><CjkText>通知</CjkText></span></h4>
           <p>任务完成后发送结果</p>
         </div>
         <Switch

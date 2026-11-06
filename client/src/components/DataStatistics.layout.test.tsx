@@ -209,7 +209,7 @@ describe('DataStatistics layout surfaces', () => {
     expect(kpis.every(kpi => !kpi.classList.contains('surface-soft'))).toBe(true)
     expect(kpis.every(kpi => !kpi.classList.contains('border'))).toBe(true)
     expect(depotSummary?.classList.contains('surface-soft')).toBe(false)
-    expect(depotCard?.querySelector('#depot-category-title')?.textContent).toContain('1 类')
+    expect(depotCard?.querySelector('#depot-category-title')?.textContent).toContain('1\u00A0类')
     expect(depotCard?.querySelector('.data-statistics-category-section')?.classList.contains('surface-soft')).toBe(false)
     const depotGrid = page?.querySelector('.data-statistics-item-grid')
     expect(depotGrid?.classList.contains('surface-soft')).toBe(false)

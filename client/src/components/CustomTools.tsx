@@ -11,7 +11,8 @@ import {
 } from 'lucide-react'
 import { maaApi } from '../services/api'
 import { useStatusStore } from '../store/statusStore'
-import { Button, Card, CardContent, ConfirmDialog, EmptyState, Input, Loading, PageHeader, Switch } from './common'
+import { Button, Card, CardContent, ConfirmDialog, EmptyState, Input, Loading, PageHeader, Switch, CjkText } from './common'
+import { keepNumberWithUnit } from '../utils/typography'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 
 interface CustomTool {
@@ -207,7 +208,7 @@ export default function CustomTools() {
               <span className="shrink-0 brand-text">
                 {TOOL_ICONS[selectedTool.id] || <Wrench size={18} aria-hidden="true" />}
               </span>
-              <h3 className="app-section-title min-w-0 break-words text-primary">{selectedTool.name}</h3>
+              <h3 className="app-section-title min-w-0 break-words text-primary"><CjkText>{selectedTool.name}</CjkText></h3>
             </div>
             <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
               <Button
@@ -292,7 +293,7 @@ export default function CustomTools() {
                     >
                       清空点阵
                     </Button>
-                    <span className="text-xs text-tertiary">已填 {Object.keys(cells).length} 格</span>
+                    <span className="text-xs text-tertiary">{keepNumberWithUnit(`已填 ${Object.keys(cells).length} 格`)}</span>
                   </div>
                 </div>
 
@@ -336,7 +337,7 @@ export default function CustomTools() {
                   onChange={event => setBlacklistText(event.target.value)}
                   placeholder="每行一个商品名，例如：固源岩"
                 />
-                <p className="mt-1.5 text-xs leading-5 text-tertiary">识别到的商品名包含任一条目时跳过该商品，最多 100 项。</p>
+                <p className="mt-1.5 text-xs leading-5 text-tertiary">识别到的商品名包含任一条目时跳过该商品，最多 100\u00A0项。</p>
               </div>
             )}
 
@@ -360,7 +361,7 @@ export default function CustomTools() {
         onClose={() => setConfirmClearOpen(false)}
         onConfirm={() => setCells({})}
         title="清空点阵？"
-        message={`将清除当前已填的 ${Object.keys(cells).length} 格点阵，此操作无法撤销。`}
+        message={keepNumberWithUnit(`将清除当前已填的 ${Object.keys(cells).length} 格点阵，此操作无法撤销。`)}
         confirmText="清空"
         variant="danger"
       />

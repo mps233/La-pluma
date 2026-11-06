@@ -3,7 +3,8 @@ import { Package as PackageIcon, RefreshCw, Target, TrendingUp } from 'lucide-re
 import { getItemIconUrl } from '../services/api'
 import { useItemIconCacheVersion } from '../hooks/useItemIconCacheVersion'
 import type { DropRecordsProps } from '@/types/components'
-import { Button, Card, EmptyState, Loading } from './common'
+import { Button, Card, EmptyState, Loading, CjkText } from './common'
+import { keepNumberWithUnit } from '../utils/typography'
 import StatisticsSummary from './StatisticsSummary'
 
 interface DropRecordsViewProps extends DropRecordsProps {
@@ -133,9 +134,9 @@ export default function DropRecords({
         <div className="drop-records-summary-content">
           <div className="drop-records-summary-header">
             <div className="min-w-0">
-              <h2 className="text-lg font-semibold text-primary">掉落记录</h2>
+              <h2 className="text-lg font-semibold text-primary"><CjkText>掉落记录</CjkText></h2>
               <p className="mt-1 text-sm leading-relaxed text-secondary">
-                统计最近 {dropDays} 天
+                {keepNumberWithUnit(`统计最近 ${dropDays} 天`)}
               </p>
             </div>
             <div className="drop-records-summary-actions">
@@ -173,7 +174,7 @@ export default function DropRecords({
               label: '总理智消耗',
               value: total.sanity.toLocaleString(),
               detail: averageSanity !== null
-                ? `平均每场 ${averageSanity.toLocaleString()} 理智`
+                ? keepNumberWithUnit(`平均每场 ${averageSanity.toLocaleString()} 理智`)
                 : '本周期暂无战斗记录',
             }}
             stats={summaryStats}
@@ -190,8 +191,8 @@ export default function DropRecords({
           <div className="drop-records-panel-content">
         <h3 className="mb-4 flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 text-lg font-semibold text-primary">
           <PackageIcon className="h-4 w-4 flex-none self-center text-tertiary" strokeWidth={1.9} aria-hidden="true" />
-          <span className="min-w-0">材料掉落统计</span>
-          <span className="text-sm font-normal text-tertiary">共 {sortedItems.length} 种</span>
+          <span className="min-w-0"><CjkText>材料掉落统计</CjkText></span>
+          <span className="text-sm font-normal text-tertiary">共 {keepNumberWithUnit(`${sortedItems.length} 种`)}</span>
         </h3>
 
         {sortedItems.length === 0 ? (
@@ -243,7 +244,7 @@ export default function DropRecords({
 
         {sortedItems.length > 20 && (
           <p className="mt-3 text-center text-xs text-tertiary">
-            仅显示前 20 种材料
+            仅显示前 20{'\u00A0'}种材料
           </p>
         )}
           </div>
@@ -256,8 +257,8 @@ export default function DropRecords({
           <div className="drop-records-panel-content">
         <h3 className="mb-4 flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 text-lg font-semibold text-primary">
           <Target className="h-4 w-4 flex-none self-center text-tertiary" strokeWidth={1.9} aria-hidden="true" />
-          <span className="min-w-0">关卡统计</span>
-          <span className="text-sm font-normal text-tertiary">共 {sortedStages.length} 个关卡</span>
+          <span className="min-w-0"><CjkText>关卡统计</CjkText></span>
+          <span className="text-sm font-normal text-tertiary">共 {keepNumberWithUnit(`${sortedStages.length} 个关卡`)}</span>
         </h3>
 
         {sortedStages.length === 0 ? (
@@ -280,9 +281,9 @@ export default function DropRecords({
                   {stageName}
                 </span>
                 <span className="flex shrink-0 items-baseline gap-1.5 text-xs text-secondary">
-                  <span className="tabular-nums">{stageData.battles} 次</span>
+                  <span className="tabular-nums">{keepNumberWithUnit(`${stageData.battles} 次`)}</span>
                   <span className="text-tertiary" aria-hidden="true">·</span>
-                  <span className="tabular-nums text-tertiary">{stageData.sanity} 理智</span>
+                  <span className="tabular-nums text-tertiary">{keepNumberWithUnit(`${stageData.sanity} 理智`)}</span>
                 </span>
               </div>
 

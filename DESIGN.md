@@ -272,6 +272,11 @@ macOS 27（Golden Gate）的方向是 edge-to-edge 侧栏、滚动折射和更�
 
 - 页面主标题只使用 `PageHeader` 的 `.app-page-title`，不要在页面里重写字号和字重。
 - 标题使用 `text-wrap: balance`，正文使用 `text-wrap: pretty`；中文正文行宽 32–40em，英文 60–75ch。页面标题的尺寸由 `.app-page-title` 的响应式 token 控制，页面里不要写 clamp 或第二套字号；控件和正文保持固定值。
+- 中文标题统一用 `CjkText` 包裹标题文字：它用 BudouX 在词间插入 `<wbr>`，再由 `.app-cjk-breaks` 应用 `word-break: keep-all` 与 `overflow-wrap: anywhere`。不要手写 `<wbr>`，不要对正文使用 `keep-all`，也不要用 `Intl.Segmenter` 代替 BudouX。
+- 中文界面由全局 `:lang(zh)` 规则获得 `text-autospace: normal` 与 `text-spacing-trim: trim-start`；代码、输入框和等宽技术文本自动退出 autospace。长文正文使用 `.app-prose-zh`（`text-align: justify`，32 个汉字的行宽）；带两字缩进的长文再加 `.is-indented`（改用 `space-first`）。
+- 数字与单位之间需要不可断行时使用 `keepNumberWithUnit`（U+00A0），不要手写普通空格再依赖 `nowrap`。会变化的数值保持 `tabular-nums`；共享 `.data-readout`、表格、`time` 和仪表数值已由全局规则覆盖。
+- 单行截断统一使用 `TruncatedText`：只有 `scrollWidth > clientWidth` 时才显示完整文本的 Tooltip；flex 行内的文本传 `triggerClassName="flex-1 min-w-0"`。不要再用无条件 `title` 或裸 `truncate`。
+- 禁止使用 `line-break: anywhere`；需要兜底断行时用 `overflow-wrap: anywhere`。`word-break: break-all` 只允许用于没有中文标点的技术 URI，不能用于正文或标题。
 - 多行正文使用 `leading-6` 或 `leading-relaxed`；单行标签和数值保持紧凑行高。中文正文不要新增 letter spacing，英文全大写微标签可用 0.06em。
 - `11px` 仅用于序号、时间戳和短元数据；`8px` 至 `10px` 不得承载中文正文、操作名或重要状态。
 - 字重使用 `400`、`500`、`600`、`700`。

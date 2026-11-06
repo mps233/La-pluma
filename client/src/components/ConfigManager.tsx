@@ -15,7 +15,8 @@ import {
   Search,
   SlidersHorizontal,
 } from 'lucide-react'
-import { PageHeader, Card, CardHeader, CardContent, Button, Input, Select, Checkbox, Switch } from './common'
+import { PageHeader, Card, CardHeader, CardContent, Button, Input, Select, Checkbox, Switch, CjkText, TruncatedText } from './common'
+import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useFluidTabIndicator } from '../hooks/useFluidTabIndicator'
@@ -238,7 +239,7 @@ export default function ConfigManager() {
   const saveAutoUpdateConfig = async (config: AutoUpdateConfig) => {
     if (autoUpdateSaveInFlightRef.current) return
     if (config.enabled && !isValidUpdateTime(config.time)) {
-      const message = '更新时间格式无效，请输入 00:00 到 23:59 之间的时间'
+      const message = '更新时间格式无效，请输入 00:00\u00A0到\u00A023:59 之间的时间'
       setAutoUpdateFeedback({ type: 'error', message })
       setStatusMessage(message, 'error')
       return
@@ -267,7 +268,7 @@ export default function ConfigManager() {
 
       if (schedulerSucceeded) {
         if (savedRevision === autoUpdateRevisionRef.current) {
-          const message = config.enabled ? `自动更新已启用，每天 ${config.time} 执行` : '自动更新已禁用'
+          const message = config.enabled ? keepNumberWithUnit(`自动更新已启用，每天 ${config.time} 执行`) : '自动更新已禁用'
           localStorage.setItem('autoUpdateConfig', JSON.stringify(config))
           setAutoUpdateDirty(false)
           setAutoUpdateFeedback({ type: 'success', message })
@@ -798,7 +799,7 @@ export default function ConfigManager() {
                       <Cable size={18} aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
-                      <h3 className="text-sm font-semibold text-primary">模拟器连接</h3>
+                      <h3 className="text-sm font-semibold text-primary"><CjkText>模拟器连接</CjkText></h3>
                       <p className="mt-1 text-xs leading-5 text-tertiary">查找本机模拟器，或测试当前连接地址。</p>
                     </div>
                   </div>
@@ -847,6 +848,7 @@ export default function ConfigManager() {
                             : device.state === 'unauthorized'
                               ? '等待授权'
                               : '状态未知'
+                      const deviceDetails = device.details || (device.source === 'adb' ? 'ADB 已识别设备' : device.source === 'emulator-adb' ? '模拟器内置 ADB' : '本机端口')
                       return (
                         <button
                           key={`${device.source}-${device.address}`}
@@ -856,8 +858,8 @@ export default function ConfigManager() {
                           className="flex min-h-12 w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--app-accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <span className="min-w-0">
-                            <span className="block truncate text-sm font-medium text-primary">{device.address}</span>
-                            <span className="mt-0.5 block truncate text-xs text-tertiary">{device.details || (device.source === 'adb' ? 'ADB 已识别设备' : device.source === 'emulator-adb' ? '模拟器内置 ADB' : '本机端口')}</span>
+                            <TruncatedText as="span" className="block text-sm font-medium text-primary" tooltip={device.address}>{device.address}</TruncatedText>
+                            <TruncatedText as="span" className="mt-0.5 block text-xs text-tertiary" tooltip={deviceDetails}>{deviceDetails}</TruncatedText>
                           </span>
                           <span className="shrink-0 rounded-[var(--app-radius-pill)] bg-[var(--app-surface-muted)] px-2 py-1 text-xs text-secondary">{stateLabel}</span>
                         </button>
@@ -965,7 +967,7 @@ export default function ConfigManager() {
                 <LockKeyhole size={18} aria-hidden="true" />
               </span>
               <div className="min-w-0">
-                <h3 id="resource-config-readonly-title" className="text-sm font-semibold text-primary">资源配置由 MAA 管理</h3>
+                <h3 id="resource-config-readonly-title" className="text-sm font-semibold text-primary"><CjkText>资源配置由 MAA 管理</CjkText></h3>
                 <p className="mt-1 text-sm leading-6 text-secondary">当前资源来源保持不变。需要调整时，可打开配置目录编辑对应文件。</p>
               </div>
             </section>
@@ -977,7 +979,7 @@ export default function ConfigManager() {
                 <LockKeyhole size={18} aria-hidden="true" />
               </span>
               <div className="min-w-0">
-                <h3 id="instance-config-readonly-title" className="text-sm font-semibold text-primary">实例选项由 MAA 管理</h3>
+                <h3 id="instance-config-readonly-title" className="text-sm font-semibold text-primary"><CjkText>实例选项由 MAA 管理</CjkText></h3>
                 <p className="mt-1 text-sm leading-6 text-secondary">触摸模式等实例选项保持当前设置。需要调整时，可打开配置目录编辑对应文件。</p>
               </div>
             </section>
@@ -993,7 +995,7 @@ export default function ConfigManager() {
                 <FolderOpen size={20} aria-hidden="true" />
               </span>
               <div className="min-w-0">
-                <h2 className="text-base font-semibold text-primary">配置目录</h2>
+                <h2 className="text-base font-semibold text-primary"><CjkText>配置目录</CjkText></h2>
                 {configDirStatus === 'error' ? (
                   <p className="mt-1 break-words text-sm text-danger [overflow-wrap:anywhere]" role="alert">{configDirError}</p>
                 ) : (
@@ -1042,7 +1044,7 @@ export default function ConfigManager() {
                   <Clock3 size={18} aria-hidden="true" />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-semibold text-primary">自动更新</h3>
+                  <h3 className="text-sm font-semibold text-primary"><CjkText>自动更新</CjkText></h3>
                   <p className="mt-1 text-xs leading-5 text-tertiary">每天按设定时间更新所选组件</p>
                 </div>
               </div>

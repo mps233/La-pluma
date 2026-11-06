@@ -67,7 +67,7 @@ describe('DropRecords layout surfaces', () => {
     const summary = container.querySelector('.data-readout')
     expect(summary?.classList.contains('surface-soft')).toBe(false)
     expect(summary?.querySelectorAll('.data-readout-stat')).toHaveLength(3)
-    expect(container.textContent).toContain('统计最近 7 天')
+    expect(container.textContent).toContain('统计最近 7\u00A0天')
     expect(container.textContent).toContain('2026-07-14 至 2026-07-20')
   })
 

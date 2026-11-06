@@ -286,6 +286,137 @@
     height: 0.75rem;
   }
 
+  /*
+   * Global typography behavior.
+   *
+   * Only wrapping, inter-script spacing, numeric width and truncation live
+   * here. Palette, font family, font size and weight stay as they are.
+   * These defaults sit in the base layer so Tailwind utilities and component
+   * rules can still override a single element. Every rule is progressive
+   * enhancement: browsers that do not know a property ignore it.
+   */
+
+  /* 1. Headings break into even lines; Chrome balances up to six lines. */
+  :where(
+    h1,
+    h2,
+    h3,
+    .app-page-title,
+    .app-section-title,
+    .app-card-title,
+    .dashboard-flow-title,
+    .app-hero-title,
+    [data-typography~='balance']
+  ) {
+    text-wrap: balance;
+  }
+
+  /* 2. Prose avoids a lone last word. */
+  :where(
+    p,
+    li,
+    dd,
+    figcaption,
+    .app-page-subtitle,
+    .form-error-text,
+    .app-empty-state span,
+    [data-typography~='pretty']
+  ) {
+    text-wrap: pretty;
+  }
+
+  /* 3. Numbers that update in place or sit in a column keep their width. */
+  :where(
+    table,
+    time,
+    output,
+    [role='timer'],
+    .app-numeric,
+    [data-numeric],
+    .data-readout-value,
+    .data-readout-detail,
+    .data-readout-meta,
+    .dashboard-device-card,
+    .dashboard-flow-metric,
+    .dashboard-flow-stages,
+    .dashboard-summary-card,
+    .dashboard-summary-count,
+    .dashboard-stage-count,
+    .dashboard-summary-number,
+    .automation-flow-summary,
+    .automation-flow-progress,
+    .log-count,
+    .log-repeat,
+    .log-history-copy small,
+    .roguelike-panel-heading
+  ) {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 4. Labels in flex rows stay on one line. `.app-button` already owns this
+     for the shared button; these are the remaining label surfaces. */
+  :where(
+    .app-icon-button,
+    .tab-link,
+    .theme-toggle-btn,
+    .drop-records-period-button,
+    .app-workspace-segment-copy > span,
+    .dashboard-flow-shortcut > span
+  ) {
+    white-space: nowrap;
+  }
+
+  /* 7. Chinese text gets a thin gap next to Latin letters and digits.
+     Code, form fields and monospaced technical text opt out. */
+  :lang(zh) {
+    text-autospace: normal;
+  }
+
+  :where(
+    code,
+    kbd,
+    samp,
+    pre,
+    input,
+    textarea,
+    select,
+    [contenteditable='true'],
+    .font-mono
+  ):lang(zh) {
+    text-autospace: no-autospace;
+  }
+
+  /* 8. Chinese UI text without an indent trims the half-width blank before an
+     opening bracket at the start of a line. Long-form indented copy below
+     uses `space-first` instead. Chrome-only for now. */
+  :lang(zh) {
+    text-spacing-trim: trim-start;
+  }
+
+  /* 6. Chinese body copy: justified, measured in whole characters. This is
+     opt-in because narrow cards, captions and list-like copy look worse
+     justified. 32em is 32 Han characters at the paragraph's font size and
+     matches the 32-40em measure in DESIGN.md. */
+  :lang(zh):where(.app-prose-zh) {
+    max-width: min(100%, 32em);
+    text-align: justify;
+  }
+
+  /* Long-form copy with a two-character first-line indent keeps the opening
+     punctuation space. */
+  :lang(zh):where(.app-prose-zh.is-indented) {
+    text-indent: 2em;
+    text-spacing-trim: space-first;
+  }
+
+  /* 9. Chinese headings: BudouX inserts <wbr> at word boundaries. keep-all
+     without those break points would turn the heading into one long word, so
+     this class is only emitted by CjkText when it found break points. */
+  :lang(zh) :where(.app-cjk-breaks) {
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+
 }
 
 @media (min-width: 1600px) {
@@ -1504,7 +1635,7 @@ body.automation-sorting {
   color: var(--app-accent);
 }
 
-.automation-task-picker-option > span {
+.automation-task-picker-option > span:first-child {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1515,7 +1646,7 @@ body.automation-sorting {
   color: var(--app-accent);
 }
 
-.automation-task-picker-option > span svg {
+.automation-task-picker-option > span:first-child svg {
   width: 0.875rem;
   height: 0.875rem;
 }
@@ -3227,7 +3358,7 @@ input.automation-stage-name-input:disabled,
   border-top: 1px solid var(--automation-hairline);
 }
 
-[data-automation-tasks] .automation-task-picker-option > span {
+[data-automation-tasks] .automation-task-picker-option > span:first-child {
   border-radius: var(--app-radius-sm);
   background: var(--app-surface-muted);
   color: var(--app-text-muted);
@@ -4763,10 +4894,6 @@ svg.w-5.h-5 {
 
     .app-page-header.is-mobile-inline .app-page-heading {
       flex: 1 1 auto;
-    }
-
-    .app-page-header.is-mobile-inline .app-page-title {
-      white-space: nowrap;
     }
 
     .app-page-header.is-mobile-inline .app-page-actions {
@@ -7197,6 +7324,25 @@ svg.w-5.h-5 {
     .log-history-row {
       padding: 0.75rem 0.875rem;
     }
+  }
+
+  /* 5. Single-line truncation primitive used by TruncatedText. */
+  .app-truncate {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .app-truncate-trigger {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .app-cjk-breaks {
+    min-width: 0;
   }
 }
 
