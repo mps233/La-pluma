@@ -1024,7 +1024,7 @@ export default function RoguelikeTasks() {
 
         <div className="roguelike-workspace-grid">
           <div className="roguelike-mode-area">
-            <div className="app-workspace-segments app-liquid-tab-pill roguelike-mode-shell">
+            <div className="app-workspace-segments app-liquid-tab-pill glass roguelike-mode-shell">
               <div
                 ref={modeTabsRef}
                 className="app-workspace-segment-list roguelike-mode-tabs"

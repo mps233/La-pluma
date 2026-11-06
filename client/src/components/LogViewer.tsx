@@ -726,7 +726,7 @@ export default function LogViewer() {
           </SmoothPanel>
         )}
 
-        <div className="app-workspace-segments app-liquid-tab-pill log-mode-shell">
+        <div className="app-workspace-segments app-liquid-tab-pill glass log-mode-shell">
           <div
             ref={contentModeTabsRef}
             className="app-workspace-segment-list log-mode-tabs"

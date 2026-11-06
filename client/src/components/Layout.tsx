@@ -4,6 +4,7 @@ import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, S
 import ThemeToggle from './ThemeToggle'
 import { CjkText } from './common'
 import AeroBackdrop from './backgrounds/AeroBackdrop'
+import { liquidGlass, type LiquidGlassHandle } from '@/glasswork/lens.js'
 import { useUIStore } from '@/stores'
 import { appTabFromPath, appTabPath, isAppTab, type AppTab } from '@/stores/uiStore'
 import {
@@ -20,6 +21,9 @@ const FOCUSABLE_SELECTOR = [
 const SHEET_DISMISS_OFFSET = 96
 const SHEET_DISMISS_VELOCITY = 650
 const SHEET_EASE = [0.32, 0.72, 0, 1] as const
+
+// Glasswork's rim lens: only Chromium draws it; elsewhere the CSS glass stays.
+const GLASS_LENS = { rim: 40, edge: 1.1, power: 2.6, dispersion: 0.15 } as const
 
 interface LayoutProps {
   children: (props: { activeTab: string }) => ReactNode
@@ -120,7 +124,7 @@ function TabLink({
       data-app-tab={tab.id}
       aria-current={active ? 'page' : undefined}
       onClick={() => onNavigate(tab.id, mobile)}
-      className={`la-pluma-tab-link ${frameworkClasses} ${active ? 'is-active' : ''} ${mobile ? 'is-mobile-tab' : 'is-desktop-tab'}`}
+      className={`la-pluma-tab-link ${frameworkClasses} ${active ? 'is-active' : ''} ${!mobile ? 'glass' : ''} ${mobile ? 'is-mobile-tab' : 'is-desktop-tab'}`}
     >
       {mobile ? (
         <TabIcon tab={tab} size="h-5 w-5" />
@@ -143,6 +147,7 @@ export default function Layout({ children }: LayoutProps) {
   const [sidebarIdentity, setSidebarIdentity] = useState(DEFAULT_OPERATOR_QUOTE)
   const shouldReduceMotion = useReducedMotion()
   const moreTriggerRef = useRef<HTMLButtonElement>(null)
+  const pageRef = useRef<HTMLDivElement>(null)
   const scrollPositions = useRef(new Map<AppTab, number>())
   const previousTab = useRef<AppTab>(activeTab)
   const navigationSource = useRef<'initial' | 'store' | 'link' | 'popstate'>('initial')
@@ -150,6 +155,50 @@ export default function Layout({ children }: LayoutProps) {
   const scrollRestoreCleanupRef = useRef<(() => void) | null>(null)
 
   const closeMoreSheet = useCallback(() => setMoreOpen(false), [])
+
+  // Every .glass surface gets the rim lens, including ones mounted later with
+  // a page. The lens is a no-op outside Chromium.
+  useEffect(() => {
+    const root = pageRef.current
+    if (!root || typeof ResizeObserver === 'undefined' || typeof MutationObserver === 'undefined') {
+      return undefined
+    }
+
+    const lenses = new Map<Element, LiquidGlassHandle>()
+    let frame = 0
+
+    const sync = () => {
+      frame = 0
+      for (const [element, lens] of lenses) {
+        if (element.isConnected && element.matches('.glass')) continue
+        lens.destroy()
+        lenses.delete(element)
+      }
+      root.querySelectorAll('.glass').forEach((element) => {
+        if (lenses.has(element)) return
+        lenses.set(element, liquidGlass(element, GLASS_LENS))
+      })
+    }
+    const schedule = () => {
+      if (!frame) frame = window.requestAnimationFrame(sync)
+    }
+
+    sync()
+    const observer = new MutationObserver(schedule)
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class'],
+    })
+
+    return () => {
+      observer.disconnect()
+      if (frame) window.cancelAnimationFrame(frame)
+      for (const lens of lenses.values()) lens.destroy()
+      lenses.clear()
+    }
+  }, [])
 
   useEffect(() => {
     let subscribed = true
@@ -393,15 +442,15 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="view view-main la-pluma-view">
-      <div className="page no-swipeback la-pluma-page" data-name="la-pluma">
+      <div ref={pageRef} className="page no-swipeback la-pluma-page" data-name="la-pluma">
         <AeroBackdrop />
-        <div className="la-pluma-sidebar-frame" aria-hidden="true" />
+        <div className="la-pluma-sidebar-frame glass" aria-hidden="true" />
         <header className="navbar la-pluma-navbar">
           <div className="navbar-bg" aria-hidden="true" />
           <div className="navbar-inner">
             <div className="left">
               <div className="la-pluma-navbar-left">
-                <button type="button" className="link la-pluma-brand" aria-label="La Pluma 控制台" onClick={() => navigateToTab('dashboard')}>
+                <button type="button" className="link la-pluma-brand glass" data-pill aria-label="La Pluma 控制台" onClick={() => navigateToTab('dashboard')}>
                   <img src={`${import.meta.env.BASE_URL}logo-graphite.svg?v=1`} alt="" className="la-pluma-brand-mark" />
                   <span>La Pluma</span>
                 </button>
@@ -417,7 +466,8 @@ export default function Layout({ children }: LayoutProps) {
                   href="https://github.com/mps233/La-pluma"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="link la-pluma-github-link"
+                  className="link la-pluma-github-link glass"
+                  data-pill
                   aria-label="打开 GitHub 仓库"
                 >
                   <GitHubMark />
@@ -511,7 +561,7 @@ export default function Layout({ children }: LayoutProps) {
 
         <footer className="toolbar toolbar-bottom tabbar tabbar-icons la-pluma-tabbar">
           <div className="toolbar-inner">
-            <nav className="la-pluma-tabbar-pill app-liquid-tab-pill" aria-label="主要功能">
+            <nav className="la-pluma-tabbar-pill app-liquid-tab-pill glass" aria-label="主要功能">
               {mobileTabs.map(tab => (
                 <TabLink key={tab.id} tab={tab} active={activeTab === tab.id} onNavigate={navigateToTab} mobile />
               ))}
@@ -523,7 +573,8 @@ export default function Layout({ children }: LayoutProps) {
               aria-expanded={moreOpen}
               aria-controls="la-pluma-more-sheet"
               onClick={() => setMoreOpen(true)}
-              className={`tab-link la-pluma-tabbar-search ${isOverflowActive || moreOpen ? 'is-active tab-link-active' : ''}`}
+              className={`tab-link la-pluma-tabbar-search glass ${isOverflowActive || moreOpen ? 'is-active tab-link-active' : ''}`}
+              data-pill
               aria-label="更多页面"
             >
               <Ellipsis className="la-pluma-tabbar-search-icon" strokeWidth={2.1} aria-hidden="true" />

@@ -662,7 +662,7 @@ export default function ConfigManager() {
         )}
       />
 
-      <div className="app-workspace-segments app-liquid-tab-pill w-full" data-config-sections>
+      <div className="app-workspace-segments app-liquid-tab-pill glass w-full" data-config-sections>
         <div
           ref={configTabsRef}
           className="app-workspace-segment-list grid-cols-3"

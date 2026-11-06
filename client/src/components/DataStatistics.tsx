@@ -1054,7 +1054,7 @@ export default function DataStatistics() {
           )}
         />
 
-        <div className="app-workspace-segments app-liquid-tab-pill data-statistics-view-switcher data-statistics-mode-shell">
+        <div className="app-workspace-segments app-liquid-tab-pill glass data-statistics-view-switcher data-statistics-mode-shell">
           <div
             ref={tabListRef}
             className="app-workspace-segment-list data-statistics-mode-tabs"

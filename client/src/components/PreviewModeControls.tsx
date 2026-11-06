@@ -63,7 +63,7 @@ export function PreviewModeControls({
   }
 
   return (
-    <div className={`app-workspace-segments app-liquid-tab-pill preview-mode-shell${compact ? ' is-compact' : ''}${fluid ? ' is-fluid' : ''} ${className}`.trim()}>
+    <div className={`app-workspace-segments app-liquid-tab-pill glass preview-mode-shell${compact ? ' is-compact' : ''}${fluid ? ' is-fluid' : ''} ${className}`.trim()}>
       <div
         ref={containerRef}
         className="app-workspace-segment-list preview-mode-list"

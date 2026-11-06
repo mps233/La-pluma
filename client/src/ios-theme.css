@@ -6,6 +6,18 @@
   --app-glass-bg: rgba(255, 255, 255, 0.68);
   --app-glass-border: rgba(60, 60, 67, 0.18);
   --app-glass-shadow: 0 12px 32px rgba(60, 60, 67, 0.12);
+  /* Shared neutral glass: the in-page selected segment and glass cards. */
+  --app-neutral-glass-tint: color-mix(in srgb, var(--app-text) 30%, var(--app-surface-solid));
+  --app-neutral-glass-alpha: 0.17;
+  --app-neutral-glass-blur: 16;
+  --app-neutral-glass-saturate: 1.8;
+  --app-neutral-glass-brightness: 1.06;
+  /* The simulator viewport's empty surface, shared with content cards. */
+  --app-preview-frame-bg: color-mix(
+    in srgb,
+    var(--app-surface-muted) 86%,
+    var(--app-surface-solid)
+  );
   --app-bg: #f2f2f7;
   --app-bg-soft: #e5e5ea;
   --app-surface: rgba(255, 255, 255, 0.72);
@@ -72,46 +84,6 @@
   --la-pluma-tabbar-fade-color: #ffffff;
   --la-pluma-navbar-fade-color: #ffffff;
   --la-pluma-sidebar-width: 17rem;
-  --la-pluma-sidebar-frame-fill: rgba(244, 245, 248, 0.62);
-  --la-pluma-sidebar-frame-inner-edge: rgba(255, 255, 255, 0.42);
-  --la-pluma-sidebar-frame-sheen: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.86) 0%,
-    rgba(255, 255, 255, 0.36) 38%,
-    rgba(255, 255, 255, 0) 72%
-  );
-  --la-pluma-sidebar-frame-top-refraction: linear-gradient(
-    to bottom,
-    rgba(177, 192, 218, 0.3) 0%,
-    rgba(204, 216, 235, 0.16) 22%,
-    rgba(222, 231, 246, 0) 42%
-  );
-  --la-pluma-sidebar-frame-bottom-refraction: linear-gradient(
-    to top,
-    rgba(255, 255, 255, 0.94) 0%,
-    rgba(255, 255, 255, 0.46) 24%,
-    rgba(255, 255, 255, 0) 54%
-  );
-  --la-pluma-sidebar-frame-shadow: 0 0.875rem 2.625rem rgba(60, 60, 67, 0.17);
-  --la-pluma-sidebar-frame-edge: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.98) 0%,
-    rgba(255, 255, 255, 0.72) 26%,
-    rgba(60, 60, 67, 0.16) 58%,
-    rgba(60, 60, 67, 0.06) 100%
-  );
-  --la-pluma-sidebar-frame-corner-glow: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0) 72%,
-    rgba(255, 255, 255, 0.68) 100%
-  );
-  --la-pluma-sidebar-frame-bottom-edge: linear-gradient(
-    to top,
-    rgba(255, 255, 255, 0.92) 0,
-    rgba(255, 255, 255, 0.92) 1px,
-    rgba(255, 255, 255, 0) 1px
-  );
   --la-pluma-sidebar-search-bg: rgba(118, 118, 128, 0.12);
   --la-pluma-sidebar-selection: var(--app-accent-action);
   --la-pluma-sidebar-selection-fill: linear-gradient(
@@ -178,6 +150,10 @@ html.dark,
   --app-glass-bg: rgba(28, 28, 30, 0.72);
   --app-glass-border: rgba(235, 235, 245, 0.18);
   --app-glass-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
+  --app-neutral-glass-tint: color-mix(in srgb, var(--app-text) 18%, var(--app-bg-soft));
+  --app-neutral-glass-alpha: 0.31;
+  --app-neutral-glass-saturate: 1.6;
+  --app-neutral-glass-brightness: 0.8;
   --app-bg: #101318;
   --app-bg-soft: #1c1c1e;
   --app-surface: rgba(28, 28, 30, 0.72);
@@ -207,46 +183,6 @@ html.dark,
   --la-pluma-tabbar-shadow: 0 1rem 2.25rem rgba(0, 0, 0, 0.44);
   --la-pluma-tabbar-fade-color: #101318;
   --la-pluma-navbar-fade-color: #101318;
-  --la-pluma-sidebar-frame-fill: rgba(28, 28, 30, 0.78);
-  --la-pluma-sidebar-frame-inner-edge: rgba(255, 255, 255, 0.14);
-  --la-pluma-sidebar-frame-sheen: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.06) 0%,
-    rgba(255, 255, 255, 0.018) 38%,
-    rgba(0, 0, 0, 0.05) 100%
-  );
-  --la-pluma-sidebar-frame-top-refraction: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.026) 0%,
-    rgba(255, 255, 255, 0.009) 22%,
-    rgba(255, 255, 255, 0) 42%
-  );
-  --la-pluma-sidebar-frame-bottom-refraction: linear-gradient(
-    to top,
-    rgba(255, 255, 255, 0.026) 0%,
-    rgba(255, 255, 255, 0.009) 22%,
-    rgba(255, 255, 255, 0) 42%
-  );
-  --la-pluma-sidebar-frame-shadow: 0 0.75rem 2.5rem rgba(0, 0, 0, 0.08);
-  --la-pluma-sidebar-frame-edge: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.18) 0%,
-    rgba(255, 255, 255, 0.1) 25%,
-    rgba(235, 235, 245, 0.05) 56%,
-    rgba(235, 235, 245, 0.016) 100%
-  );
-  --la-pluma-sidebar-frame-corner-glow: linear-gradient(
-    135deg,
-    rgba(235, 235, 245, 0) 0%,
-    rgba(235, 235, 245, 0) 72%,
-    rgba(235, 235, 245, 0.1) 100%
-  );
-  --la-pluma-sidebar-frame-bottom-edge: linear-gradient(
-    to top,
-    rgba(235, 235, 245, 0.12) 0,
-    rgba(235, 235, 245, 0.12) 1px,
-    rgba(235, 235, 245, 0) 1px
-  );
   --la-pluma-sidebar-search-bg: rgba(118, 118, 128, 0.2);
   --la-pluma-sidebar-selection: var(--app-accent-action);
   --la-pluma-sidebar-selection-fill: linear-gradient(
@@ -396,6 +332,14 @@ html.la-pluma-standalone #app-root .page {
   cursor: pointer;
 }
 
+/* The reset above would blank a glass button's material background. Keep the
+   reset weight below the selected/nav rules and restore the material only on
+   the glass controls that need it. */
+.la-pluma-app .la-pluma-brand.glass,
+.la-pluma-app .glass.la-pluma-tabbar-search {
+  background: color-mix(in srgb, var(--m-tint) calc(var(--tint-a) * 100%), transparent);
+}
+
 .la-pluma-sidebar-frame {
   display: none;
 }
@@ -510,29 +454,23 @@ html.la-pluma-standalone #app-root .page {
   .la-pluma-app .la-pluma-sidebar-frame {
     display: block;
     position: fixed;
-    /* The frame stays below sidebar content but above the page-level fade. */
+    /* The material is Glasswork's .glass (src/glasswork/glass.css); the
+       lens adds the rim refraction in Chromium. The frame stays below
+       sidebar content but above the page-level fade. */
     z-index: 1;
     top: 0.75rem;
     bottom: 0.75rem;
     left: 0.75rem;
     width: calc(var(--la-pluma-sidebar-width) - 1.5rem);
-    border: 1px solid transparent;
     border-radius: 1.625rem;
-    background:
-      var(--la-pluma-sidebar-frame-bottom-edge) padding-box,
-      var(--la-pluma-sidebar-frame-top-refraction) padding-box,
-      var(--la-pluma-sidebar-frame-bottom-refraction) padding-box,
-      var(--la-pluma-sidebar-frame-sheen) padding-box,
-      linear-gradient(var(--la-pluma-sidebar-frame-fill), var(--la-pluma-sidebar-frame-fill)) padding-box,
-      var(--la-pluma-sidebar-frame-corner-glow) border-box,
-      var(--la-pluma-sidebar-frame-edge) border-box;
-    box-shadow:
-      inset 0 1px 0 var(--la-pluma-sidebar-frame-inner-edge),
-      inset 0 -1px 0 rgba(60, 60, 67, 0.1),
-      var(--la-pluma-sidebar-frame-shadow);
-    -webkit-backdrop-filter: blur(28px) saturate(165%);
-    backdrop-filter: blur(28px) saturate(165%);
     pointer-events: none;
+  }
+
+  /* Glasswork's wallpaper default is clearer than a navigation rail can be.
+     A denser tint keeps the panel defined and the labels readable over the
+     ambient backdrop in both themes. */
+  .la-pluma-app .la-pluma-sidebar-frame.glass {
+    --density: 0.75;
   }
 
   .la-pluma-app .la-pluma-sidebar {
@@ -638,29 +576,24 @@ html.la-pluma-standalone #app-root .page {
 
   .la-pluma-app .la-pluma-theme-desktop,
   .la-pluma-app .la-pluma-github-link {
-    --la-pluma-liquid-surface: color-mix(
-      in srgb,
-      var(--app-glass-bg) 58%,
-      transparent
-    );
+    /* Material comes from Glasswork's .glass; keep the control geometry. */
     box-sizing: border-box;
     position: relative;
-    isolation: isolate;
     border: 0;
-    background:
-      linear-gradient(
-        var(--la-pluma-liquid-surface-lift),
-        var(--la-pluma-liquid-surface-lift)
-      ),
-      var(--la-pluma-liquid-surface);
-    box-shadow:
-      inset 0 0 0 0.5px color-mix(in srgb, var(--app-border-strong) 58%, transparent),
-      inset 0 1px 0 color-mix(in srgb, var(--la-pluma-liquid-edge-light) 36%, transparent),
-      inset 1px 0 0 color-mix(in srgb, var(--la-pluma-liquid-edge-light) 10%, transparent),
-      inset 0 -1px 0 color-mix(in srgb, var(--la-pluma-liquid-edge-light) 18%, transparent),
-      0 5px 18px color-mix(in srgb, black 12%, transparent);
-    -webkit-backdrop-filter: blur(8px) saturate(145%);
-    backdrop-filter: blur(8px) saturate(145%);
+  }
+
+  /* The brand is a glass circle only in the mobile navbar; keep the desktop
+     wordmark on the bare chrome. */
+  .la-pluma-app .la-pluma-brand.glass {
+    background: transparent;
+    border-radius: 0;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  #app-root.dark .la-pluma-brand.glass {
+    box-shadow: none;
   }
 
   .la-pluma-app .la-pluma-theme-desktop {
@@ -763,11 +696,6 @@ html.la-pluma-standalone #app-root .page {
   }
 
   .la-pluma-app .la-pluma-github-link:hover {
-    --la-pluma-liquid-surface: color-mix(
-      in srgb,
-      var(--app-surface-muted) 82%,
-      transparent
-    );
     color: var(--app-text) !important;
   }
 
@@ -781,9 +709,14 @@ html.la-pluma-standalone #app-root .page {
   }
 }
 
-.la-pluma-github-link:hover,
-.la-pluma-github-link:focus-visible {
+.la-pluma-github-link:not(.glass):hover,
+.la-pluma-github-link:not(.glass):focus-visible {
   background: var(--app-surface-muted);
+  color: var(--app-text) !important;
+}
+
+.la-pluma-github-link.glass:hover,
+.la-pluma-github-link.glass:focus-visible {
   color: var(--app-text) !important;
 }
 
@@ -1003,14 +936,50 @@ html.la-pluma-standalone #app-root .page {
     transform 180ms ease;
 }
 
-.la-pluma-tab-link.is-desktop-tab:hover,
-.la-pluma-tab-link.is-desktop-tab:focus-visible {
-  background: var(--app-surface-muted);
+.la-pluma-tab-link.is-desktop-tab:hover:not(.is-active),
+.la-pluma-tab-link.is-desktop-tab:focus-visible:not(.is-active) {
   color: var(--app-text) !important;
+}
+
+.la-pluma-tab-link.is-desktop-tab:hover:not(.is-active):not(.glass),
+.la-pluma-tab-link.is-desktop-tab:focus-visible:not(.is-active):not(.glass) {
+  background: var(--app-surface-muted);
+}
+
+/* Resting nav items are invisible glass: no fill, no edge. Hover/focus turns
+   on only the material's backdrop filter and rim lens. */
+.la-pluma-app .la-pluma-tab-link.is-desktop-tab.glass:not(.is-active) {
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+#app-root.dark .la-pluma-tab-link.is-desktop-tab.glass:not(.is-active) {
+  box-shadow: none;
+}
+
+.la-pluma-app .la-pluma-tab-link.is-desktop-tab.glass:not(.is-active):hover,
+.la-pluma-app .la-pluma-tab-link.is-desktop-tab.glass:not(.is-active):focus-visible {
+  --l-tint: var(--app-neutral-glass-tint);
+  --d-tint: var(--app-neutral-glass-tint);
+  --l-blur: var(--app-neutral-glass-blur);
+  --d-blur: var(--app-neutral-glass-blur);
+  --l-sat: var(--app-neutral-glass-saturate);
+  --d-sat: var(--app-neutral-glass-saturate);
+  --l-bri: var(--app-neutral-glass-brightness);
+  --d-bri: var(--app-neutral-glass-brightness);
+  --floor: var(--app-neutral-glass-alpha);
+  background: color-mix(in srgb, var(--m-tint) calc(var(--tint-a) * 100%), transparent);
+  -webkit-backdrop-filter: var(--filter) var(--glass-lens,);
+  backdrop-filter: var(--filter) var(--glass-lens,);
 }
 
 .la-pluma-tab-link.is-desktop-tab.is-active {
   color: #fff !important;
+}
+
+.la-pluma-tab-link.is-desktop-tab.is-active:not(.glass) {
   background: var(--la-pluma-sidebar-selection-fill);
   box-shadow: var(--la-pluma-sidebar-selection-glow);
 }
@@ -1018,12 +987,53 @@ html.la-pluma-standalone #app-root .page {
 .la-pluma-tab-link.is-desktop-tab.is-active:hover,
 .la-pluma-tab-link.is-desktop-tab.is-active:focus-visible {
   color: #fff !important;
+}
+
+.la-pluma-tab-link.is-desktop-tab.is-active:not(.glass):hover,
+.la-pluma-tab-link.is-desktop-tab.is-active:not(.glass):focus-visible {
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--app-accent-action) 90%, white) 0%,
     color-mix(in srgb, var(--app-accent-action) 97%, white) 58%,
     color-mix(in srgb, var(--app-accent-action) 88%, black) 100%
   );
+}
+
+/* The selected sidebar item keeps its accent fill and white copy, as a
+   blue-tinted glass with a soft sheen instead of a hard rim. */
+.la-pluma-app .la-pluma-tab-link.is-desktop-tab.is-active.glass {
+  --l-tint: #004b99;
+  --d-tint: #0059b3;
+  --floor: 0.8;
+  background-color: color-mix(in srgb, var(--m-tint) calc(var(--tint-a) * 100%), transparent);
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0) 38%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.14),
+    0 0 0 0.5px rgba(0, 0, 0, 0.16),
+    0 3px 10px rgba(0, 0, 0, 0.16);
+  transition:
+    color 180ms ease,
+    transform 180ms ease,
+    background-color 180ms ease;
+}
+
+#app-root.dark .glass.la-pluma-tab-link.is-desktop-tab.is-active {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.14),
+    0 0 0 0.5px rgba(0, 0, 0, 0.24),
+    0 3px 10px rgba(0, 0, 0, 0.2);
+}
+
+.la-pluma-tab-link.is-desktop-tab.is-active.glass:hover,
+.la-pluma-tab-link.is-desktop-tab.is-active.glass:focus-visible {
+  --floor: 0.88;
 }
 
 .la-pluma-tab-link.is-desktop-tab:focus-visible {
@@ -1133,8 +1143,8 @@ html.la-pluma-standalone #app-root .page {
   pointer-events: none;
 }
 
-.la-pluma-app .app-liquid-tab-pill,
-.la-pluma-app .la-pluma-tabbar-search {
+.la-pluma-app .app-liquid-tab-pill:not(.glass),
+.la-pluma-app .la-pluma-tabbar-search:not(.glass) {
   box-sizing: border-box;
   border: 1px solid var(--app-glass-border);
   background: var(--app-glass-bg);
@@ -1144,9 +1154,86 @@ html.la-pluma-standalone #app-root .page {
   pointer-events: auto;
 }
 
-/* Shared with the mobile tab bar so in-page mode pickers use the exact same
-   liquid material without inheriting the tab bar's navigation geometry. */
-.la-pluma-app .app-liquid-tab-pill {
+/* La Pluma applies theme changes with an instant class toggle. Do not fade
+   the material separately, or the text switches before the plate and the
+   pair sits below AA mid-transition. */
+.la-pluma-app .glass {
+  transition: none;
+}
+
+/* Glasswork draws the material for opted-in in-page pickers. */
+.la-pluma-app .app-liquid-tab-pill.glass {
+  box-sizing: border-box;
+  border-radius: 999px;
+  corner-shape: round;
+  pointer-events: auto;
+}
+
+/* The selected in-page segment and glass cards share one neutral recipe. */
+.la-pluma-app .app-workspace-segment-indicator {
+  background: color-mix(
+    in srgb,
+    var(--app-neutral-glass-tint) calc(var(--app-neutral-glass-alpha) * 100%),
+    transparent
+  );
+  -webkit-backdrop-filter:
+    blur(calc(var(--app-neutral-glass-blur) * 1px))
+    saturate(var(--app-neutral-glass-saturate))
+    brightness(var(--app-neutral-glass-brightness));
+  backdrop-filter:
+    blur(calc(var(--app-neutral-glass-blur) * 1px))
+    saturate(var(--app-neutral-glass-saturate))
+    brightness(var(--app-neutral-glass-brightness));
+  box-shadow: none;
+}
+
+/* The floating tab bar sits over arbitrary content, so it keeps the denser
+   sidebar tint instead of the clear wallpaper default. */
+.la-pluma-app .la-pluma-tabbar-pill.glass,
+.la-pluma-app .la-pluma-tabbar-search.glass {
+  --density: 0.75;
+}
+
+html:not(.dark) .la-pluma-app .la-pluma-tabbar-search.glass {
+  --floor: 0.45;
+}
+
+.la-pluma-app .la-pluma-theme-trigger.glass,
+.la-pluma-app .la-pluma-github-link.glass {
+  border-radius: 999px;
+  corner-shape: round;
+}
+
+/* The glass button keeps its material when the theme menu is open; the
+   accent icon is the state cue instead of a replacing background. */
+.la-pluma-app .la-pluma-theme-trigger.glass[aria-expanded='true'] {
+  color: var(--app-accent-strong);
+}
+
+.la-pluma-app .glass.la-pluma-tabbar-search {
+  border-radius: 50%;
+  corner-shape: round;
+  pointer-events: auto;
+  /* Keep the press/hover feedback; the material switches instantly with the
+     theme like the rest of the chrome. */
+  transition: transform 180ms ease, color 180ms ease;
+}
+
+/* Over the light canvas the clear glass needs a whiter tint for the small
+   mode labels, and a lighter active fill keeps the selected copy at AA. */
+html:not(.dark) .la-pluma-app .app-liquid-tab-pill.glass {
+  --floor: 0.45;
+}
+
+/* The compact preview switcher sits on the preview card's darker footer, so
+   its glass takes a denser white tint to keep the labels at AA. */
+html:not(.dark) .la-pluma-app .preview-mode-shell.glass {
+  --floor: 0.8;
+}
+
+/* The mobile tab bar and any picker that has not opted into .glass keep the
+   previous material. */
+.la-pluma-app .app-liquid-tab-pill:not(.glass) {
   --la-pluma-liquid-surface: color-mix(
     in srgb,
     var(--app-glass-bg) 42%,
@@ -1165,7 +1252,7 @@ html.la-pluma-standalone #app-root .page {
   backdrop-filter: blur(6px) saturate(140%);
 }
 
-.la-pluma-app .app-liquid-tab-pill::before {
+.la-pluma-app .app-liquid-tab-pill:not(.glass)::before {
   position: absolute;
   z-index: 2;
   inset: 0;
@@ -1488,6 +1575,40 @@ html.la-pluma-standalone #app-root .page {
   backdrop-filter: none;
 }
 
+/* The combat task card reuses the same neutral glass recipe, with a
+   card-scale tint opacity and no rim. */
+.la-pluma-app .combat-task-card {
+  box-shadow: none;
+}
+
+.la-pluma-app .combat-task-card[data-smooth-corners='true'] {
+  border-radius: var(--app-continuous-radius-compact);
+}
+
+.la-pluma-app .combat-task-card .app-card-smooth-surface {
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--app-border);
+  /* The simulator viewport is a preview fill over the monitor card's glass
+     surface; reuse that whole stack over an opaque base so the page texture
+     behind the card cannot change the result. Every translucent layer is a
+     gradient; the last layer is the opaque background color. */
+  background-color: var(--app-bg-soft);
+  background-image:
+    linear-gradient(var(--app-preview-frame-bg), var(--app-preview-frame-bg)),
+    linear-gradient(180deg, var(--la-pluma-liquid-surface-lift), transparent 34%),
+    linear-gradient(
+      var(--app-glass-card-fill, var(--app-surface-solid)),
+      var(--app-glass-card-fill, var(--app-surface-solid))
+    );
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
+#app-root.dark .la-pluma-app .combat-task-card .app-card-smooth-surface {
+  background-color: var(--app-bg);
+}
+
 .la-pluma-app .smooth-panel-shell.surface-panel {
   display: flex;
   min-width: 0;
@@ -1714,12 +1835,15 @@ html.la-pluma-standalone #app-root .page {
     align-items: center;
     justify-content: center;
     padding: 0.25rem !important;
-    border: 1px solid var(--app-glass-border);
     border-radius: 999px;
-    background: var(--app-glass-bg);
-    box-shadow: var(--app-glass-shadow);
     overflow: hidden;
     pointer-events: auto;
+  }
+
+  .la-pluma-app .la-pluma-brand:not(.glass) {
+    border: 1px solid var(--app-glass-border);
+    background: var(--app-glass-bg);
+    box-shadow: var(--app-glass-shadow);
   }
 
   .la-pluma-app .la-pluma-brand span {
@@ -1736,8 +1860,8 @@ html.la-pluma-standalone #app-root .page {
     gap: 0.75rem;
   }
 
-  .la-pluma-app .la-pluma-theme-trigger,
-  .la-pluma-app .la-pluma-github-link {
+  .la-pluma-app .la-pluma-theme-trigger:not(.glass),
+  .la-pluma-app .la-pluma-github-link:not(.glass) {
     border: 1px solid var(--app-glass-border);
     background: var(--app-glass-bg);
     box-shadow: var(--app-glass-shadow);
@@ -1761,7 +1885,7 @@ html.la-pluma-standalone #app-root .page {
     .automation-preview-glass-button,
     .pwa-install-entry-button,
     .la-pluma-tabbar-search
-  ) {
+  ):not(.glass) {
     --la-pluma-liquid-surface: color-mix(
       in srgb,
       var(--app-glass-bg) 42%,
@@ -1787,7 +1911,7 @@ html.la-pluma-standalone #app-root .page {
     .automation-preview-glass-button,
     .pwa-install-entry-button,
     .la-pluma-tabbar-search
-  )::before {
+  ):not(.glass)::before {
     position: absolute;
     inset: 0;
     padding: 0.5px;
@@ -2045,6 +2169,11 @@ html.la-pluma-standalone #app-root .page {
   .dark .la-pluma-app .ios-workspace-page .app-card[data-smooth-corners='true'],
   .dark .la-pluma-app .ios-workspace-page .smooth-panel-shell[data-smooth-corners='true'] {
     box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+  }
+
+  .la-pluma-app .ios-workspace-page .combat-task-card[data-smooth-corners='true'],
+  .dark .la-pluma-app .ios-workspace-page .combat-task-card[data-smooth-corners='true'] {
+    box-shadow: none;
   }
 }
 
@@ -2319,6 +2448,28 @@ html.la-pluma-standalone #app-root .page {
       0 2px 6px rgba(0, 0, 0, 0.24);
   }
 
+  .la-pluma-app .la-pluma-tab-link.is-desktop-tab.glass:not(.is-active):is(:hover, :focus-visible) {
+    background: var(--app-surface-muted);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .la-pluma-app .app-workspace-segment-indicator,
+  html.dark .la-pluma-app .app-workspace-segment-indicator,
+  #app-root.dark .la-pluma-app .app-workspace-segment-indicator {
+    background: var(--app-surface-muted);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .la-pluma-app .combat-task-card .app-card-smooth-surface,
+  html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
+  #app-root.dark .la-pluma-app .combat-task-card .app-card-smooth-surface {
+    background: var(--app-surface-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
   .la-pluma-app .app-card[data-smooth-corners='true'],
   .la-pluma-app .smooth-panel-shell.surface-panel {
     background: transparent;
@@ -2343,6 +2494,33 @@ html.la-pluma-standalone #app-root .page {
   .la-pluma-app .app-liquid-tab-pill {
     border-color: var(--app-border-strong);
     background: var(--app-surface-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  /* Increased contrast must not depend on translucency; the glass chrome
+     becomes a solid surface with one strong edge. */
+  .la-pluma-app .la-pluma-sidebar-frame,
+  .la-pluma-app .la-pluma-theme-desktop,
+  .la-pluma-app .la-pluma-theme-trigger,
+  .la-pluma-app .la-pluma-brand,
+  .la-pluma-app .la-pluma-github-link,
+  .la-pluma-app .app-liquid-tab-pill.glass,
+  .la-pluma-app .la-pluma-tabbar-search.glass {
+    background: var(--app-surface-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: inset 0 0 0 1px var(--app-border-strong);
+  }
+
+  #app-root.dark .glass.la-pluma-sidebar-frame,
+  #app-root.dark .glass.la-pluma-theme-desktop,
+  #app-root.dark .glass.la-pluma-theme-trigger,
+  #app-root.dark .glass.la-pluma-brand,
+  #app-root.dark .glass.la-pluma-github-link,
+  #app-root.dark .glass.app-liquid-tab-pill,
+  #app-root.dark .glass.la-pluma-tabbar-search {
+    box-shadow: inset 0 0 0 1px var(--app-border-strong);
   }
 
   .la-pluma-app :is(
@@ -2357,6 +2535,29 @@ html.la-pluma-standalone #app-root .page {
 
   .la-pluma-app .app-liquid-tab-pill::before {
     display: none;
+  }
+
+  .la-pluma-app .la-pluma-tab-link.is-desktop-tab.glass:not(.is-active):is(:hover, :focus-visible) {
+    background: var(--app-surface-muted);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .la-pluma-app .app-workspace-segment-indicator,
+  html.dark .la-pluma-app .app-workspace-segment-indicator,
+  #app-root.dark .la-pluma-app .app-workspace-segment-indicator {
+    background: var(--app-surface-muted);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .la-pluma-app .combat-task-card .app-card-smooth-surface,
+  html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
+  #app-root.dark .la-pluma-app .combat-task-card .app-card-smooth-surface {
+    background: var(--app-surface-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: inset 0 0 0 1px var(--app-border-strong);
   }
 
 }

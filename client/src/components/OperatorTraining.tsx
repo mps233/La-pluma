@@ -949,7 +949,7 @@ export default function OperatorTraining() {
         <div className="space-y-4">
           {/* 搜索和过滤 */}
           <div className="flex flex-col gap-3">
-            <div className="app-workspace-segments app-liquid-tab-pill training-status-shell">
+            <div className="app-workspace-segments app-liquid-tab-pill glass training-status-shell">
               <div
                 ref={statusTabsRef}
                 className="app-workspace-segment-list grid-cols-3"

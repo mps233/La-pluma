@@ -1709,7 +1709,7 @@ export default function CombatTasks() {
 
         <div className="task-monitor-layout">
           <div className="task-monitor-main">
-        <div className="app-workspace-segments app-liquid-tab-pill combat-mode-shell">
+        <div className="app-workspace-segments app-liquid-tab-pill glass combat-mode-shell">
           <div
             ref={combatModeTabsRef}
             className="app-workspace-segment-list"
@@ -1770,6 +1770,7 @@ export default function CombatTasks() {
               <Card
                 key={task.id}
                 smoothCorners
+                smoothRadius={16}
                 className="combat-task-card !p-0"
               >
                 <div className="combat-task-heading flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

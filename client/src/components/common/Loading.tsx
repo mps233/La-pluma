@@ -251,7 +251,7 @@ function AutomationSkeleton() {
 function ModeControlSkeleton({ variant }: { variant: 'combat' | 'roguelike' }) {
   const modeCount = variant === 'roguelike' ? 2 : 3
   return (
-    <div className={`app-workspace-segments app-liquid-tab-pill ${variant}-mode-shell`} aria-hidden="true">
+    <div className={`app-workspace-segments app-liquid-tab-pill glass ${variant}-mode-shell`} aria-hidden="true">
       <div className={`app-workspace-segment-list${variant === 'roguelike' ? ' roguelike-mode-tabs' : ''}`}>
         <div className={`app-workspace-segment-indicator ${variant}-mode-skeleton-highlight`} />
         {Array.from({ length: modeCount }, (_, index) => (
@@ -391,7 +391,7 @@ function TrainingSkeleton() {
           <Skeleton variant="rect" className="h-7 w-44 rounded-full" />
         </div>
         <div className="space-y-4">
-          <div className="app-workspace-segments app-liquid-tab-pill training-status-shell">
+          <div className="app-workspace-segments app-liquid-tab-pill glass training-status-shell">
             <div className="app-workspace-segment-list grid-cols-3">
               <div className="app-workspace-segment-indicator training-status-skeleton-highlight" />
               {[1, 2, 3].map(item => (
@@ -479,7 +479,7 @@ function TrainingSkeleton() {
 function LogsSkeleton() {
   return (
     <>
-      <div className="app-workspace-segments app-liquid-tab-pill log-mode-shell" aria-hidden="true">
+      <div className="app-workspace-segments app-liquid-tab-pill glass log-mode-shell" aria-hidden="true">
         <div className="app-workspace-segment-list log-mode-tabs">
           <div className="app-workspace-segment-indicator log-mode-skeleton-highlight" />
           {[1, 2].map(item => (
@@ -553,7 +553,7 @@ function LogsSkeleton() {
 function StatisticsSkeleton() {
   return (
     <>
-      <div className="app-workspace-segments app-liquid-tab-pill data-statistics-view-switcher data-statistics-mode-shell" aria-hidden="true">
+      <div className="app-workspace-segments app-liquid-tab-pill glass data-statistics-view-switcher data-statistics-mode-shell" aria-hidden="true">
         <div className="app-workspace-segment-list data-statistics-mode-tabs">
           <div className="app-workspace-segment-indicator data-statistics-mode-skeleton-highlight" />
           {[1, 2, 3].map(item => (
@@ -605,7 +605,7 @@ function StatisticsSkeleton() {
 function ConfigSkeleton() {
   return (
     <>
-      <div className="app-workspace-segments app-liquid-tab-pill w-full" data-config-sections aria-hidden="true">
+      <div className="app-workspace-segments app-liquid-tab-pill glass w-full" data-config-sections aria-hidden="true">
         <div className="app-workspace-segment-list grid-cols-3">
           {[1, 2, 3].map(item => (
             <div key={item} className="app-workspace-segment min-h-11">

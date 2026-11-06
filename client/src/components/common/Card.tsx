@@ -9,6 +9,7 @@ interface CardProps {
   children: ReactNode
   className?: string
   smoothCorners?: boolean
+  smoothRadius?: number
 }
 
 /**
@@ -28,9 +29,9 @@ interface CardContentProps {
   className?: string
 }
 
-function SmoothCardSurface({ children }: { children: ReactNode }) {
+function SmoothCardSurface({ children, radius }: { children: ReactNode; radius?: number }) {
   return (
-    <SmoothSurface className="app-card-smooth-surface">
+    <SmoothSurface className="app-card-smooth-surface" radius={radius}>
       {children}
     </SmoothSurface>
   )
@@ -44,9 +45,12 @@ export function Card({
   children,
   className = '',
   smoothCorners = false,
+  smoothRadius,
 }: CardProps) {
   const cardClassName = `app-card surface-panel ${className}`
-  const cardContent = smoothCorners ? <SmoothCardSurface>{children}</SmoothCardSurface> : children
+  const cardContent = smoothCorners
+    ? <SmoothCardSurface radius={smoothRadius}>{children}</SmoothCardSurface>
+    : children
 
   return (
     <div

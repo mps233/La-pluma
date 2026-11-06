@@ -112,7 +112,8 @@ export default function ThemeToggle() {
   return (
     <>
       <div
-        className="la-pluma-theme-desktop"
+        className="la-pluma-theme-desktop glass"
+        data-pill
         role="group"
         aria-label="界面主题"
         data-theme={theme}
@@ -142,7 +143,8 @@ export default function ThemeToggle() {
           ref={mobileTriggerRef}
           type="button"
           onClick={() => setMobileMenuOpen(open => !open)}
-          className={`la-pluma-theme-trigger group text-secondary transition-colors hover:bg-[var(--app-surface-muted)] hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] ${mobileMenuOpen ? 'bg-[var(--app-surface-muted)]' : ''}`}
+          className={`la-pluma-theme-trigger group text-secondary transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] glass ${mobileMenuOpen ? 'text-primary' : ''}`}
+          data-pill
           whileTap={shouldReduceMotion ? {} : { scale: 0.96 }}
           title={`主题：${currentTheme.label}`}
           aria-label={`切换界面主题，当前${currentTheme.label}`}

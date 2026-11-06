@@ -908,7 +908,7 @@
 
 .automation-monitor-surface .task-monitor-panel.is-compact .scrcpy-video-frame.is-empty {
   max-height: 17rem;
-  background: color-mix(in srgb, var(--app-surface-muted) 86%, var(--app-surface-solid));
+  background: var(--app-preview-frame-bg);
 }
 
 .automation-monitor-surface .scrcpy-empty-state {
@@ -6182,7 +6182,7 @@ svg.w-5.h-5 {
     inset: 0 auto auto 0;
     pointer-events: none;
     background: var(--la-pluma-tabbar-active-bg);
-    box-shadow: var(--la-pluma-tabbar-active-edge);
+    box-shadow: none;
   }
 
   .app-workspace-segment {
@@ -7420,15 +7420,17 @@ svg.w-5.h-5 {
 }
 
 .preview-mode-shell.is-compact .app-workspace-segment-copy {
-  display: block;
+  display: flex;
+  align-items: center;
   width: auto;
   flex: 0 1 auto;
   gap: 0;
+  line-height: 1.25;
 }
 
 .preview-mode-shell.is-compact .app-workspace-segment-copy > span {
   font-size: 0.75rem;
-  line-height: 1;
+  line-height: 1.25;
 }
 
 .preview-mode-shell.is-compact .app-workspace-segment-copy > small {

@@ -83,6 +83,19 @@ iOS / macOS 27 的 Liquid Glass 是 iOS 26 材质的精修，不是换一套语�
 - `prefers-reduced-transparency: reduce` 时改为实色表面；`prefers-contrast: more` 时加强边框和文字，不保留半透明装饰。
 - 新的材质 token 和 `regular / clear / tinted` 语义尚未在代码中落地；当前 `ios-theme.css` 的 glass token 是固定值，按「当前实现备注」逐步替换。
 
+### Glasswork 液态玻璃
+
+悬浮 chrome 与页面内切换控件使用 Glasswork 的液态玻璃：`client/src/glasswork/glass.css` 提供材质变量与规则，`lens.js` 在 Chromium 下绘制边缘折射。当前用于桌面浮动侧栏、顶栏主题/GitHub 控件、移动端顶栏的品牌/主题/GitHub 圆形入口、页面内模式切换胶囊（作业、日志、数据、养成、配置、预览模式）以及移动端底部 tabbar 与“更多”按钮。表面只挂 `.glass`，`html.dark` 自动切换深色材质。
+
+- 表面参数使用材料自带的 `--density`（0 透明，1 实心）、`--floor`（文字所需的最低染色）和 `--keep`（保留的饱和度增益）。侧栏与底部 tabbar 使用 `--density: 0.75` 保证面板在环境/滚动内容上可辨；浅色页面内的切换胶囊与 tabbar 使用 `--floor: 0.45`，预览卡内的紧凑切换使用 `--floor: 0.8`，使小号标签满足 AA。
+- 侧栏选中项保持「accent 填充 + 白字」的语义，但填充改为 accent 染色玻璃：浅色 `#004b99`、深色 `#0059b3`，`--floor: 0.8`（hover 0.88），叠加顶部柔光/底部暗部渐变和软阴影，不使用亮边；白字对比度约 5.6:1 / 9.2:1。
+- 侧栏未选中项的 hover/focus 使用中性灰玻璃（无色相）：浅色由 `--app-text` 与 `--app-surface-solid` 混出灰，深色由 `--app-text` 与 `--app-bg-soft` 混出灰，`--density: 0.7`、16px 模糊、无亮边；静止态完全透明。
+- 页面内分段控件的选中段复用同一中性玻璃配方：同色相混法、`17%` / `31%` 染色、16px 模糊，无描边；与侧栏 hover 保持一致的材质语言。
+- 中性玻璃配方集中在 `--app-neutral-glass-*` 变量，选中段与侧栏 hover 共用同一套 tint / blur / saturate / brightness。
+- 边缘折射只在 Chromium 生效；其他浏览器保留 CSS 玻璃。Safari / iOS 通过 `[data-engine="webkit"]` 强制圆角，避免 `backdrop-filter` 与超椭圆圆角组合时整块表面不绘制的设备问题。
+- `prefers-reduced-transparency: reduce` 下所有玻璃表面退化为 `--app-surface-solid` 实色表面，并保留 1px 边缘。
+- 移动端顶栏的三个圆形入口（品牌、主题、GitHub）与预览卡内的模式切换按产品要求使用同一材质，允许叠在已有 chrome / 卡片表面之上；这是明确的例外，其他普通卡片仍不得叠加玻璃。
+
 ---
 
 ## 原生响应式壳层与平台语言
