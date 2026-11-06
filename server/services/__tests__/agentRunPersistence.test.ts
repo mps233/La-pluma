@@ -18,6 +18,7 @@ import {
   setAgentRunAcceptedResult,
   shutdownAgentRunStoreForTests,
   startAgentRun,
+  updateAgentRunProgress,
   type AgentRunStoreOverrides
 } from '../agentRunService.ts';
 import { createLogger } from '../../utils/logger.ts';
@@ -279,6 +280,35 @@ describe('agent run persistence', () => {
     assert.equal(persisted.runs.length, 1);
     assert.equal(persisted.runs[0].run.status, 'succeeded');
     assert.deepEqual(persisted.runs[0].run.result, { phase: 'complete' });
+  });
+
+  it('coalesces progress updates and flushes them on demand', async () => {
+    const writes: SnapshotFile[] = [];
+    await initialize({
+      writeStore: async (filePath, snapshot) => {
+        const copy = JSON.parse(JSON.stringify(snapshot)) as SnapshotFile;
+        writes.push(copy);
+        await writeFile(filePath, JSON.stringify(copy), 'utf8');
+      }
+    });
+
+    const run = beginAgentRun({ operationId: 'run_task' }).run;
+    startAgentRun(run.runId);
+    await flushAgentRunStore();
+    writes.length = 0;
+
+    updateAgentRunProgress(run.runId, { kills: 4, total: 10 });
+    await new Promise(resolve => setTimeout(resolve, 25));
+    assert.equal(writes.length, 0);
+
+    await flushAgentRunStore();
+    assert.equal(writes.length, 1);
+    const persisted = await readSnapshot();
+    assert.deepEqual(persisted.runs[0].run.result, null);
+    assert.deepEqual((persisted.runs[0].run as SnapshotRun & { progress?: unknown }).progress, {
+      kills: 4,
+      total: 10
+    });
   });
 
   it('does not strand a dirty mutation in the writer finalization window', async () => {

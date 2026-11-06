@@ -3,6 +3,7 @@ import { asErrorWithCode, getErrorMessage } from '../utils/errors.ts';
 import express from 'express';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import sharp from 'sharp';
 import {
   execMaaCommand,
   execDynamicTask,
@@ -35,7 +36,7 @@ import { buildCustomToolTaskConfig, listCustomTools } from '../services/customTa
 import { parseDepotData, parseOperBoxData, getDepotData, getOperBoxData, getAllOperators } from '../services/dataParserService.ts';
 import { summarizeAuxiliaryCallbacks } from '../services/maaCallbackService.ts';
 import { getMaaLogPath } from '../config/paths.ts';
-import { getTodayDrops, getRecentDrops, getDropStatistics } from '../services/dropRecordService.ts';
+import { getTodayDrops, getRecentDrops, getDropStatistics, normalizeDropDays } from '../services/dropRecordService.ts';
 import { loadParadoxOperators, resolveStageSearchKeyword } from '../services/copilotService.ts';
 import { buildCopilotPlan, executeCopilotPlan, resetCopilotPlanProgress } from '../services/copilotPlanService.ts';
 import { getActivityRunPreflight } from '../services/activityNavigationService.ts';
@@ -55,6 +56,7 @@ import {
   getAgentRun,
   listAgentRuns,
   getCurrentAgentRun,
+  getLatestTerminalRun,
   releaseAgentRunIdempotency,
   setAgentRunAcceptedResult,
   updateAgentRunProgress,
@@ -99,6 +101,98 @@ import {
 
 const router = express.Router();
 const execFileAsync = promisify(execFile);
+
+/**
+ * Query values arrive as strings. `Number('abc')` is NaN, and clamping NaN
+ * with Math.min/Math.max keeps NaN, which later turns `slice(NaN)` into the
+ * entire array. Always fall back to a real integer.
+ */
+function parseBoundedInt(value: unknown, fallback: number, min: number, max: number): number {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(Math.max(Math.trunc(parsed), min), max);
+}
+
+/** Small TTL memo for expensive, external-process status probes. */
+function createTtlMemo<T>(ttlMs: number) {
+  const values = new Map<string, { expiresAt: number; value: T }>();
+  const pending = new Map<string, Promise<T>>();
+  return (key: string, load: () => Promise<T>): Promise<T> => {
+    const cached = values.get(key);
+    if (cached && cached.expiresAt > Date.now()) return Promise.resolve(cached.value);
+    const inFlight = pending.get(key);
+    if (inFlight) return inFlight;
+
+    const promise = load()
+      .then(value => {
+        values.set(key, { expiresAt: Date.now() + ttlMs, value });
+        return value;
+      })
+      .finally(() => {
+        pending.delete(key);
+      });
+    pending.set(key, promise);
+    return promise;
+  };
+}
+
+const memoMaaVersion = createTtlMemo<Awaited<ReturnType<typeof getMaaVersion>>>(60_000);
+const memoAdbSummary = createTtlMemo<Awaited<ReturnType<typeof getAdbSummary>>>(5_000);
+const memoWebrtcSummary = createTtlMemo<WebrtcSummary>(8_000);
+const memoDisplayState = createTtlMemo<AndroidDisplayState>(5_000);
+
+const SCREEN_FRAME_CACHE_TTL_MS = 500;
+const SCREEN_FRAME_MAX_WIDTH = (() => {
+  const value = Number(process.env.LA_PLUMA_SCREEN_FRAME_MAX_WIDTH || 720);
+  return Number.isFinite(value) && value > 0 ? Math.min(1920, Math.trunc(value)) : 720;
+})();
+interface ScreenFrame {
+  buffer: Buffer;
+  mediaType: string;
+}
+const screenFrameCache = new Map<string, { expiresAt: number; value: ScreenFrame }>();
+const screenFrameInFlight = new Map<string, Promise<ScreenFrame>>();
+
+async function getScreenFrame(adbPath: string, address: string): Promise<ScreenFrame> {
+  const key = `${adbPath}\u0000${address}`;
+  const cached = screenFrameCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  const pending = screenFrameInFlight.get(key);
+  if (pending) return pending;
+
+  const promise = (async (): Promise<ScreenFrame> => {
+    const screenshot = await captureScreen(adbPath, address, { skipDeviceProbe: true });
+    const png = Buffer.from(screenshot.image, 'base64');
+    try {
+      const webp = await sharp(png)
+        .resize({ width: SCREEN_FRAME_MAX_WIDTH, withoutEnlargement: true })
+        .webp({ quality: 72, effort: 4 })
+        .toBuffer();
+      return { buffer: webp, mediaType: 'image/webp' };
+    } catch {
+      // Keep the original capture if the image codec cannot process it.
+      return { buffer: png, mediaType: 'image/png' };
+    }
+  })().finally(() => {
+    screenFrameInFlight.delete(key);
+  });
+
+  screenFrameInFlight.set(key, promise);
+  const value = await promise;
+  screenFrameCache.set(key, { expiresAt: Date.now() + SCREEN_FRAME_CACHE_TTL_MS, value });
+  return value;
+}
+
+router.get('/screen/frame', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
+  const { adbPath, address } = await resolveRequestConnection(req, { allowOverrides: true });
+  const frame = await getScreenFrame(adbPath, address);
+  res.status(200);
+  res.setHeader?.('Content-Type', frame.mediaType);
+  res.setHeader?.('Content-Length', String(frame.buffer.length));
+  res.setHeader?.('Cache-Control', 'no-store');
+  (res as unknown as { end(body: Buffer): void }).end(frame.buffer);
+}));
 
 type AgentRequestBody = Record<string, unknown>;
 type AgentQuery = Record<string, unknown>;
@@ -743,11 +837,13 @@ async function getWebrtcSummary(
   adbPath: string = DEFAULT_ADB_PATH,
   { agentRunning = null }: { agentRunning?: boolean | null } = {}
 ): Promise<WebrtcSummary> {
-  const [status, reachable] = await Promise.all([
-    getWebrtcStatus(address, adbPath, { agentRunning }).catch(() => null),
-    isWebrtcServerReachable()
-  ])
+  const status = await getWebrtcStatus(address, adbPath, { agentRunning }).catch(() => null);
   const statusRecord: Record<string, unknown> = isRecord(status) ? status : {};
+  // getWebrtcStatus already probes reachability. Only fall back to a second
+  // probe when the status call itself failed.
+  const reachable = isRecord(status)
+    ? Boolean(statusRecord.reachable || statusRecord.serverRunning)
+    : await isWebrtcServerReachable().catch(() => false);
   return {
     ...statusRecord,
     url: typeof statusRecord.url === 'string' && statusRecord.url
@@ -1001,10 +1097,12 @@ async function buildAgentStatus(req: AgentRequest) {
   const connection = await resolveRequestConnection(req, { allowOverrides: true })
   const { adbPath, address } = connection
   const [version, adb, webrtc, orientation] = await Promise.all([
-    getMaaVersion(true).catch((error: unknown) => ({ error: getErrorMessage(error) })),
-    getAdbSummary(adbPath, address).catch((error: unknown) => ({ connected: false, error: getErrorMessage(error), adbPath, address })),
-    getWebrtcSummary(address, adbPath),
-    getAndroidDisplayState(adbPath, address).catch((error: unknown) => ({ error: getErrorMessage(error), adbPath, address }))
+    memoMaaVersion('default', () => getMaaVersion(true)).catch((error: unknown) => ({ error: getErrorMessage(error) })),
+    memoAdbSummary(`${adbPath}\u0000${address}`, () => getAdbSummary(adbPath, address))
+      .catch((error: unknown) => ({ connected: false, error: getErrorMessage(error), adbPath, address })),
+    memoWebrtcSummary(`${adbPath}\u0000${address}`, () => getWebrtcSummary(address, adbPath)),
+    memoDisplayState(`${adbPath}\u0000${address}`, () => getAndroidDisplayState(adbPath, address))
+      .catch((error: unknown) => ({ error: getErrorMessage(error), adbPath, address }))
   ]);
   const task = getTaskStatus();
   const logs = getRealtimeLogs(25);
@@ -1053,20 +1151,29 @@ router.get('/openapi.json', (_req: AgentRequest, res: AgentResponse) => {
 });
 
 router.get('/status', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
+  const query = req.query || {};
+  if (query.slim === 'true' || query.slim === '1') {
+    const { adbPath, address } = await resolveRequestConnection(req, { allowOverrides: true });
+    const version = await memoMaaVersion('default', () => getMaaVersion(true))
+      .catch((error: unknown) => ({ error: getErrorMessage(error) }));
+    return sendSuccess(res, req, {
+      api: { name: 'la-pluma-agent-api', version: API_VERSION },
+      maa: { version, task: getTaskStatus() },
+      connection: { adbPath, address }
+    });
+  }
   return sendSuccess(res, req, await buildAgentStatus(req));
 }));
 
 router.get('/runs/current', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
   const query = req.query || {};
-  const lines = Math.min(Math.max(Number(query.lines || 80), 1), 500);
+  const lines = parseBoundedInt(query.lines, 80, 1, 500);
   const task = getTaskStatus();
   const schedule = getScheduleExecutionStatus();
   const recentLogs = getRealtimeLogs(lines);
   const currentRun = enrichAgentRun(getCurrentAgentRun());
   const lease = await getMaaExecutionLeaseSnapshot();
-  const lastRun = listAgentRuns({ limit: 500 })
-    .filter((run): run is AgentRunDto => run !== null && TERMINAL_RUN_STATES.has(run.state))
-    .sort((left, right) => String(right.finishedAt).localeCompare(String(left.finishedAt)))[0] || null;
+  const lastRun = getLatestTerminalRun();
   return sendSuccess(res, req, {
     ...task,
     schedule,
@@ -1166,7 +1273,7 @@ router.post('/screen/screenshot', asyncHandler(async (req: AgentRequest, res: Ag
 
 router.get('/logs/maa-callbacks', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
   const query = req.query || {};
-  const lines = Math.min(Math.max(Number(query.lines || 2000), 1), 5000);
+  const lines = parseBoundedInt(query.lines, 2000, 1, 5000);
   const logPath = getMaaLogPath();
   try {
     const result = await readLogFile(logPath, lines);
@@ -1187,8 +1294,9 @@ router.get('/logs/maa-callbacks', asyncHandler(async (req: AgentRequest, res: Ag
 
 router.get('/logs/recent', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
   const query = req.query || {};
-  const lines = Math.min(Math.max(Number(query.lines || 80), 1), 500);
-  return sendSuccess(res, req, getRealtimeLogs(lines));
+  const lines = parseBoundedInt(query.lines, 80, 1, 500);
+  const afterSequence = parseBoundedInt(query.afterSequence, 0, 0, Number.MAX_SAFE_INTEGER);
+  return sendSuccess(res, req, getRealtimeLogs(lines, afterSequence));
 }));
 
 router.post('/logs/recent/clear', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
@@ -1207,7 +1315,7 @@ router.get('/logs/files', asyncHandler(async (req: AgentRequest, res: AgentRespo
 router.get('/logs/files/:filePath(*)', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
   const { filePath } = req.params!;
   const query = req.query || {};
-  const lines = Math.min(Math.max(Number(query.lines || 1000), 1), 5000);
+  const lines = parseBoundedInt(query.lines, 1000, 1, 5000);
   return sendSuccess(res, req, await readLogFile(decodeURIComponent(filePath), lines));
 }));
 
@@ -1349,14 +1457,14 @@ router.get('/drops/today', asyncHandler(async (req: AgentRequest, res: AgentResp
 
 router.get('/drops/recent', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
   const query = req.query || {};
-  const days = Number(query.days || 7);
+  const days = normalizeDropDays(query.days, 7);
   const result = extractServiceResult(await getRecentDrops(days));
   return sendSuccess(res, req, result.data, result.message);
 }));
 
 router.get('/drops/statistics', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
   const query = req.query || {};
-  const days = Number(query.days || 7);
+  const days = normalizeDropDays(query.days, 7);
   const result = extractServiceResult(await getDropStatistics(days));
   return sendSuccess(res, req, result.data, result.message);
 }));
@@ -1752,6 +1860,13 @@ router.get('/training/operators', asyncHandler(async (req: AgentRequest, res: Ag
   return sendSuccess(res, req, { operators, count: operators.length });
 }));
 
+router.get('/training/operator-counts', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
+  const query = req.query || {};
+  const rarityValue = Number(query.rarity);
+  const rarity = Number.isFinite(rarityValue) && rarityValue > 0 ? Math.trunc(rarityValue) : undefined;
+  return sendSuccess(res, req, await operatorTrainingService.getOperatorCounts({ rarity }));
+}));
+
 router.get('/training/queue', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
   return sendSuccess(res, req, await operatorTrainingService.getTrainingQueue());
 }));
@@ -1935,64 +2050,129 @@ router.post('/webrtc/stop-agent', asyncHandler(async (req: AgentRequest, res: Ag
   return sendSuccess(res, req, result, 'MuMu Agent 已停止');
 }));
 
+const DEVICE_STATS_CACHE_TTL_MS = 10_000;
+const DEVICE_STATS_MARKERS = {
+  load: '@@LA_PLUMA_LOAD@@',
+  mem: '@@LA_PLUMA_MEM@@',
+  disk: '@@LA_PLUMA_DISK@@',
+  temp: '@@LA_PLUMA_TEMP@@',
+  top: '@@LA_PLUMA_TOP@@'
+} as const;
+
+function extractDeviceStatsSection(output: string, start: string, end?: string): string {
+  const startIndex = output.indexOf(start);
+  if (startIndex < 0) return '';
+  const contentStart = startIndex + start.length;
+  const endIndex = end ? output.indexOf(end, contentStart) : -1;
+  return output.slice(contentStart, endIndex >= 0 ? endIndex : undefined).trim();
+}
+
+export function parseDeviceStatsOutput(stdout: string) {
+  const loadRaw = extractDeviceStatsSection(stdout, DEVICE_STATS_MARKERS.load, DEVICE_STATS_MARKERS.mem);
+  const memRaw = extractDeviceStatsSection(stdout, DEVICE_STATS_MARKERS.mem, DEVICE_STATS_MARKERS.disk);
+  const diskRaw = extractDeviceStatsSection(stdout, DEVICE_STATS_MARKERS.disk, DEVICE_STATS_MARKERS.temp);
+  const tempRaw = extractDeviceStatsSection(stdout, DEVICE_STATS_MARKERS.temp, DEVICE_STATS_MARKERS.top);
+  const topRaw = extractDeviceStatsSection(stdout, DEVICE_STATS_MARKERS.top);
+
+  // CPU load from /proc/loadavg
+  const loadParts = loadRaw.split(/\s+/)
+  // CPU usage % from top output: "400%cpu  0%user ... 396%idle"
+  const topTotal = topRaw.match(/(\d+)%cpu/i)
+  const topIdle  = topRaw.match(/(\d+)%idle/i)
+  const cpuPct = topTotal && topIdle ? Math.round(((parseInt(topTotal[1]) - parseInt(topIdle[1])) / parseInt(topTotal[1])) * 100) : null
+  // Memory from /proc/meminfo (kB)
+  const memInfo: Record<string, number> = {};
+  for (const line of memRaw.split('\n')) {
+    const m = line.match(/^(\w+):\s+(\d+)/);
+    if (m) memInfo[m[1]] = parseInt(m[2]);
+  }
+  const memTotalKb = memInfo['MemTotal'] || 0;
+  const memFreeKb  = memInfo['MemFree'] || 0;
+  const memAvailKb = memInfo['MemAvailable'] || 0;
+  const memUsedKb  = memTotalKb - (memAvailKb || memFreeKb);
+  const swapTotalKb = memInfo['SwapTotal'] || 0;
+  const swapUsedKb  = swapTotalKb - (memInfo['SwapFree'] || 0);
+  const diskParts = diskRaw.split(/\s+/)
+  const tempMatch = tempRaw.match(/temperature:\s*(\d+)/)
+
+  const fmtMb = (kb: number) => kb >= 1048576 ? `${(kb / 1048576).toFixed(1)}G` : kb >= 1024 ? `${Math.round(kb / 1024)}M` : `${kb}K`
+
+  return {
+    load1m: loadParts[0] ? parseFloat(loadParts[0]) : null,
+    load5m: loadParts[1] ? parseFloat(loadParts[1]) : null,
+    load15m: loadParts[2] ? parseFloat(loadParts[2]) : null,
+    cpuPct,
+    memTotalKb, memUsedKb, memFreeKb: memAvailKb || memFreeKb,
+    memTotal: fmtMb(memTotalKb),
+    memUsed:  fmtMb(memUsedKb),
+    memFree:  fmtMb(memAvailKb || memFreeKb),
+    memPct: memTotalKb ? Math.round((memUsedKb / memTotalKb) * 100) : null,
+    swapTotalKb,
+    swapUsedKb,
+    diskTotal: diskParts[1] || null,
+    diskUsed:  diskParts[2] || null,
+    diskFree:  diskParts[3] || null,
+    diskPct:   diskParts[4] ? parseInt(diskParts[4]) : null,
+    temp: tempMatch ? parseInt(tempMatch[1]) / 10 : null,
+  }
+}
+
 async function getDeviceStats(adbPath: string, address: string) {
   try {
-    const cmd = (c: string) => execFileAsync(adbPath, ['-s', address, 'shell', c], { timeout: 5000, maxBuffer: 256 * 1024 })
-    const [loadRaw, memRaw, diskRaw, tempRaw, topRaw] = await Promise.all([
-      cmd('cat /proc/loadavg'),
-      cmd('cat /proc/meminfo | head -4'),
-      cmd('df -h /data | tail -1'),
-      cmd('dumpsys battery | grep temperature'),
-      cmd('top -b -n 1 -d 0.3 | head -5'),
-    ])
+    // One device shell instead of five adb processes per poll. `top -d 0.3`
+    // stays intentionally short; the result is cached for 10 s below.
+    const script = [
+      `echo ${DEVICE_STATS_MARKERS.load}`,
+      'cat /proc/loadavg',
+      `echo ${DEVICE_STATS_MARKERS.mem}`,
+      'cat /proc/meminfo | head -4',
+      `echo ${DEVICE_STATS_MARKERS.disk}`,
+      'df -h /data | tail -1',
+      `echo ${DEVICE_STATS_MARKERS.temp}`,
+      'dumpsys battery | grep temperature',
+      `echo ${DEVICE_STATS_MARKERS.top}`,
+      'top -b -n 1 -d 0.3 | head -5'
+    ].join('; ');
+    const { stdout } = await execFileAsync(
+      adbPath,
+      ['-s', address, 'shell', script],
+      { timeout: 10_000, maxBuffer: 256 * 1024 }
+    );
+    return parseDeviceStatsOutput(stdout);
+  } catch {
+    return null;
+  }
+}
 
-    // CPU load from /proc/loadavg
-    const loadParts = loadRaw.stdout.trim().split(/\s+/)
-    // CPU usage % from top output: "400%cpu  0%user ... 396%idle"
-    const topTotal = topRaw.stdout.match(/(\d+)%cpu/i)
-    const topIdle  = topRaw.stdout.match(/(\d+)%idle/i)
-    const cpuPct = topTotal && topIdle ? Math.round(((parseInt(topTotal[1]) - parseInt(topIdle[1])) / parseInt(topTotal[1])) * 100) : null
-    // Memory from /proc/meminfo (kB)
-    const memInfo: Record<string, number> = {};
-    for (const line of memRaw.stdout.split('\n')) {
-      const m = line.match(/^(\w+):\s+(\d+)/);
-      if (m) memInfo[m[1]] = parseInt(m[2]);
-    }
-    const memTotalKb = memInfo['MemTotal'] || 0;
-    const memFreeKb  = memInfo['MemFree'] || 0;
-    const memAvailKb = memInfo['MemAvailable'] || 0;
-    const memUsedKb  = memTotalKb - (memAvailKb || memFreeKb);
-    const swapTotalKb = memInfo['SwapTotal'] || 0;
-    const swapUsedKb  = swapTotalKb - (memInfo['SwapFree'] || 0);
-    const diskParts = diskRaw.stdout.trim().split(/\s+/)
-    const tempMatch = tempRaw.stdout.match(/temperature:\s*(\d+)/)
+type DeviceStatsSnapshot = Awaited<ReturnType<typeof getDeviceStats>>;
+let deviceStatsCache: { key: string; fetchedAt: number; value: DeviceStatsSnapshot } | null = null;
+let deviceStatsInFlight: { key: string; promise: Promise<DeviceStatsSnapshot> } | null = null;
 
-    const fmtMb = (kb: number) => kb >= 1048576 ? `${(kb / 1048576).toFixed(1)}G` : kb >= 1024 ? `${Math.round(kb / 1024)}M` : `${kb}K`
+async function getDeviceStatsCached(adbPath: string, address: string): Promise<DeviceStatsSnapshot> {
+  const key = `${adbPath}\u0000${address}`;
+  if (deviceStatsCache && deviceStatsCache.key === key
+    && Date.now() - deviceStatsCache.fetchedAt < DEVICE_STATS_CACHE_TTL_MS) {
+    return deviceStatsCache.value;
+  }
+  if (deviceStatsInFlight && deviceStatsInFlight.key === key) {
+    return deviceStatsInFlight.promise;
+  }
 
-    return {
-      load1m: loadParts[0] ? parseFloat(loadParts[0]) : null,
-      load5m: loadParts[1] ? parseFloat(loadParts[1]) : null,
-      load15m: loadParts[2] ? parseFloat(loadParts[2]) : null,
-      cpuPct,
-      memTotalKb, memUsedKb, memFreeKb: memAvailKb || memFreeKb,
-      memTotal: fmtMb(memTotalKb),
-      memUsed:  fmtMb(memUsedKb),
-      memFree:  fmtMb(memAvailKb || memFreeKb),
-      memPct: memTotalKb ? Math.round((memUsedKb / memTotalKb) * 100) : null,
-      swapTotalKb,
-      swapUsedKb,
-      diskTotal: diskParts[1] || null,
-      diskUsed:  diskParts[2] || null,
-      diskFree:  diskParts[3] || null,
-      diskPct:   diskParts[4] ? parseInt(diskParts[4]) : null,
-      temp: tempMatch ? parseInt(tempMatch[1]) / 10 : null,
-    }
-  } catch { return null }
+  const promise = getDeviceStats(adbPath, address)
+    .then(value => {
+      deviceStatsCache = { key, fetchedAt: Date.now(), value };
+      return value;
+    })
+    .finally(() => {
+      if (deviceStatsInFlight?.key === key) deviceStatsInFlight = null;
+    });
+  deviceStatsInFlight = { key, promise };
+  return promise;
 }
 
 router.get('/device-stats', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
   const { adbPath, address } = await resolveRequestConnection(req, { allowOverrides: true })
-  const stats = await getDeviceStats(adbPath, address);
+  const stats = await getDeviceStatsCached(adbPath, address);
   return sendSuccess(res, req, stats);
 }));
 
@@ -2048,7 +2228,8 @@ router.get('/schedules/status', asyncHandler(async (req: AgentRequest, res: Agen
 }));
 
 router.get('/schedules/execution', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {
-  return sendSuccess(res, req, getScheduleExecutionStatus());
+  const query = req.query || {};
+  return sendSuccess(res, req, getScheduleExecutionStatus(query.includeResult === 'true'));
 }));
 
 router.post('/schedules', asyncHandler(async (req: AgentRequest, res: AgentResponse) => {

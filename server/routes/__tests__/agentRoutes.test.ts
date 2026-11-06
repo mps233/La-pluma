@@ -3,9 +3,9 @@ import type { ErrorWithCode } from '../../utils/errors.ts'
 import type { ChildProcess } from 'node:child_process'
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, it } from 'node:test'
-import router, { buildDynamicFightPlan, buildFightPlans, buildWebrtcBrowserProtocol, buildWebrtcDeviceStatus, executeTrackedAgentAction, needsDynamicFight } from '../agent.ts'
+import router, { buildDynamicFightPlan, buildFightPlans, buildWebrtcBrowserProtocol, buildWebrtcDeviceStatus, executeTrackedAgentAction, needsDynamicFight, parseDeviceStatsOutput } from '../agent.ts'
 import { API_VERSION, buildAgentManifest } from '../agentContract.ts'
-import { getTaskStatus, setTaskStatus } from '../../services/maaService.ts'
+import { clearRealtimeLogs, getRealtimeLogs, getTaskStatus, setTaskStatus } from '../../services/maaService.ts'
 import { loggerManager } from '../../utils/logger.ts'
 import {
   beginAgentRun,
@@ -1034,5 +1034,87 @@ describe('Agent daily flow route', () => {
     assert.equal(res.statusCode, 400)
     assert.equal(res.body.error.code, 'AGENT_DAILY_FLOW_REJECTED')
     assert.equal(res.body.error.details.result!.details!.index, 0)
+  })
+})
+
+describe('Agent status and log projections', () => {
+  afterEach(() => {
+    clearRealtimeLogs()
+    if (getTaskStatus().isRunning) setTaskStatus(false)
+  })
+
+  it('omits the realtime log buffer from task status and current run', async () => {
+    clearRealtimeLogs()
+    setTaskStatus(true, '投影测试', 'automation', null)
+
+    const statusRes = createResponse<AgentSuccessBody<Record<string, unknown>>>()
+    await findHandler('get', '/tasks/status')({ headers: {} }, statusRes, () => {})
+    assert.equal('logs' in statusRes.body.data, false)
+    assert.equal(statusRes.body.data.isRunning, true)
+
+    const runRes = createResponse<CurrentRunResponseBody>()
+    await findHandler('get', '/runs/current')({ headers: {}, query: { lines: 1 } }, runRes, () => {})
+    assert.equal('logs' in (runRes.body.data as unknown as Record<string, unknown>), false)
+    assert.ok(Array.isArray(runRes.body.data.recentLogs))
+    assert.ok(runRes.body.data.recentLogs.length <= 1)
+  })
+
+  it('returns only log entries newer than the requested sequence', async () => {
+    clearRealtimeLogs()
+    setTaskStatus(true, '增量日志测试', 'automation', null)
+    const initial = getRealtimeLogs(10)
+    const cursor = initial.at(-1)?.sequence
+    assert.equal(typeof cursor, 'number')
+
+    setTaskStatus(false)
+
+    const res = createResponse<AgentSuccessBody<Array<{ sequence?: number }>>>()
+    await findHandler('get', '/logs/recent')({
+      headers: {},
+      query: { lines: 10, afterSequence: cursor }
+    }, res, () => {})
+
+    assert.ok(res.body.data.length >= 1)
+    assert.ok(res.body.data.every(entry => (entry.sequence ?? 0) > cursor!))
+  })
+
+  it('falls back to a bounded window when the lines query is not numeric', async () => {
+    clearRealtimeLogs()
+    for (let index = 0; index < 3; index += 1) {
+      setTaskStatus(true, `任务${index}`, 'automation', null)
+    }
+
+    const res = createResponse<AgentSuccessBody<Array<{ sequence?: number }>>>()
+    await findHandler('get', '/logs/recent')({ headers: {}, query: { lines: 'abc' } }, res, () => {})
+
+    assert.ok(Array.isArray(res.body.data))
+    assert.ok(res.body.data.length <= 80)
+  })
+
+  it('parses one combined adb shell probe into device stats', () => {
+    const stats = parseDeviceStatsOutput([
+      '@@LA_PLUMA_LOAD@@',
+      '0.42 0.31 0.20 1/100 1234',
+      '@@LA_PLUMA_MEM@@',
+      'MemTotal: 8000000 kB',
+      'MemFree: 1000000 kB',
+      'MemAvailable: 3000000 kB',
+      'SwapTotal: 1000 kB',
+      '@@LA_PLUMA_DISK@@',
+      '/dev/block/dm-1 100G 40G 60G 40% /data',
+      '@@LA_PLUMA_TEMP@@',
+      'temperature: 321',
+      '@@LA_PLUMA_TOP@@',
+      '400%cpu 20%user 10%sys 370%idle'
+    ].join('\n'))
+
+    assert.equal(stats.load1m, 0.42)
+    assert.equal(stats.load5m, 0.31)
+    assert.equal(stats.memTotalKb, 8000000)
+    assert.equal(stats.memUsedKb, 5000000)
+    assert.equal(stats.memFree, '2.9G')
+    assert.equal(stats.diskPct, 40)
+    assert.equal(stats.temp, 32.1)
+    assert.equal(stats.cpuPct, 8)
   })
 })

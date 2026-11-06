@@ -8,10 +8,19 @@ import { withMaaExecutionLease } from './executionCoordinatorService.ts';
 import { recordDrops } from './dropRecordService.ts';
 import { resolveConnection } from './connectionService.ts';
 import { getBattleOcrIntervalMs, isBattleOcrEnabled, readBattleProgress } from './battleOcrService.ts';
+import { getMaaResourceDir } from '../config/paths.ts';
+import { readJsonFileCached } from '../utils/jsonCache.ts';
 import type { ResolvedConnection } from './connectionService.ts';
 
 const dataDir = fileURLToPath(new URL('../data/', import.meta.url));
 const progressPath = join(dataDir, 'copilot-progress.json');
+const PLAN_CACHE_TTL_MS = Number(process.env.LA_PLUMA_COPILOT_PLAN_TTL_MS || 30 * 60 * 1000);
+const STAGE_MAP_CACHE_TTL_MS = 5 * 60 * 1000;
+
+const planCache = new Map<string, { expiresAt: number; value: CopilotPlan }>();
+const planInFlight = new Map<string, Promise<CopilotPlan>>();
+const stageMapCache = new Map<string, { expiresAt: number; value: Map<string, StageCodeInfo> }>();
+let tileFilenamesCache: { dir: string; expiresAt: number; names: string[] } | null = null;
 
 interface CopilotDocument {
   title?: string
@@ -276,6 +285,8 @@ interface ExecuteCopilotPlanParams {
   selectedIndexes?: unknown[]
   options?: CopilotExecutionOptions
   lifecycle?: CopilotLifecycle
+  /** An already-built plan for this set/raid; skips the remote rebuild. */
+  plan?: CopilotPlan
 }
 
 interface NativeCopilotEntry {
@@ -373,12 +384,25 @@ export function getNavigationStage(copilot: CopilotContent = {}): string {
 }
 
 async function loadStageCodeMap(stageIds: string[]): Promise<Map<string, StageCodeInfo>> {
+  const normalizedStageIds = [...new Set(stageIds.filter(Boolean))].sort();
+  const cacheKey = normalizedStageIds.join('\u0000');
+  const cached = stageMapCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
   try {
-    const resourceDir = (await execMaaCommand('dir', ['resource'], null, null, false, true)).stdout.trim();
+    const resourceDir = getMaaResourceDir();
     const tileDir = join(resourceDir, 'Arknights-Tile-Pos');
-    const filenames = await readdir(tileDir);
+    if (!tileFilenamesCache || tileFilenamesCache.dir !== tileDir
+      || tileFilenamesCache.expiresAt <= Date.now()) {
+      tileFilenamesCache = {
+        dir: tileDir,
+        expiresAt: Date.now() + STAGE_MAP_CACHE_TTL_MS,
+        names: await readdir(tileDir)
+      };
+    }
+    const filenames = tileFilenamesCache.names;
     const result = new Map<string, StageCodeInfo>();
-    await Promise.all([...new Set(stageIds.filter(Boolean))].map(async stageId => {
+    await Promise.all(normalizedStageIds.map(async stageId => {
       const filename = filenames.find(name =>
         name.endsWith('.json') && (name.startsWith(`${stageId}-`) || name.startsWith(`${stageId}#`))
       );
@@ -391,7 +415,7 @@ async function loadStageCodeMap(stageIds: string[]): Promise<Map<string, StageCo
       } catch {}
     }));
     try {
-      const stages: unknown = JSON.parse(await readFile(join(resourceDir, 'stages.json'), 'utf8'));
+      const stages = await readJsonFileCached<unknown>(join(resourceDir, 'stages.json'));
       if (isRecord(stages)) {
         for (const rawStage of Object.values(stages)) {
           if (!isRecord(rawStage) || !rawStage.stageId || !rawStage.code) continue;
@@ -420,13 +444,14 @@ async function loadStageCodeMap(stageIds: string[]): Promise<Map<string, StageCo
         }
       } catch {}
     }
+    stageMapCache.set(cacheKey, { expiresAt: Date.now() + STAGE_MAP_CACHE_TTL_MS, value: result });
     return result;
   } catch {
     return new Map();
   }
 }
 
-export async function buildCopilotPlan(setId: string | number, raid = 'normal'): Promise<CopilotPlan> {
+async function buildCopilotPlanUncached(setId: string | number, raid = 'normal'): Promise<CopilotPlan> {
   const set = await fetchJson(`https://prts.maa.plus/set/get?id=${encodeURIComponent(setId)}`);
   const setRecord = isRecord(set) ? set : {};
   const ids: unknown[] = Array.isArray(setRecord.copilot_ids) ? setRecord.copilot_ids : [];
@@ -469,14 +494,44 @@ export async function buildCopilotPlan(setId: string | number, raid = 'normal'):
       });
     }
   }
-  const progress = await loadProgress();
-  const completed = new Set(progress[String(setId)] || []);
   const name = typeof setRecord.name === 'string' && setRecord.name ? setRecord.name : `作业集 ${setId}`;
   return {
     setId: String(setId),
     name,
     items: copilots,
-    entries: entries.map(entry => ({ ...entry, completed: completed.has(entry.key) }))
+    entries
+  };
+}
+
+async function getCachedCopilotPlan(setId: string | number, raid = 'normal'): Promise<CopilotPlan> {
+  const key = `${setId}\u0000${raid}`;
+  const cached = planCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  const pending = planInFlight.get(key);
+  if (pending) return pending;
+
+  const promise = buildCopilotPlanUncached(setId, raid)
+    .then(value => {
+      planCache.set(key, { expiresAt: Date.now() + PLAN_CACHE_TTL_MS, value });
+      return value;
+    })
+    .finally(() => {
+      planInFlight.delete(key);
+    });
+  planInFlight.set(key, promise);
+  return promise;
+}
+
+export async function buildCopilotPlan(setId: string | number, raid = 'normal'): Promise<CopilotPlan> {
+  const plan = await getCachedCopilotPlan(setId, raid);
+  // Completion changes after every executed entry; keep it out of the cached
+  // plan so a 30 minute TTL cannot replay a finished manual step.
+  const progress = await loadProgress();
+  const completed = new Set(progress[plan.setId] || []);
+  return {
+    ...plan,
+    entries: plan.entries.map(entry => ({ ...entry, completed: completed.has(entry.key) }))
   };
 }
 
@@ -1032,10 +1087,13 @@ export async function executeCopilotPlan({
   raid = 'normal',
   selectedIndexes = [],
   options = {},
-  lifecycle = {}
+  lifecycle = {},
+  plan: prebuiltPlan
 }: ExecuteCopilotPlanParams): Promise<CopilotPlanExecutionSummary> {
   const planId = sanitizeCopilotPlanId(setId);
-  const plan = await buildCopilotPlan(planId, raid);
+  const plan = prebuiltPlan && String(prebuiltPlan.setId) === String(planId)
+    ? prebuiltPlan
+    : await buildCopilotPlan(planId, raid);
   const selected = new Set(selectedIndexes.map(Number));
   const selectedEntries = plan.entries.filter(entry => selected.size === 0 || selected.has(entry.itemIndex));
   const progress = await loadProgress();

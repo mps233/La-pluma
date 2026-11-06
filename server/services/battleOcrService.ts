@@ -13,20 +13,37 @@ export interface BattleProgress {
 
 const CROP = { x: 540, y: 14, width: 86, height: 34 };
 const CROP_REFERENCE = { width: 1280, height: 720 };
-const SCALE = 6;
+const DEFAULT_SCALE = 3;
+const MIN_SCALE = 2;
+const MAX_SCALE = 6;
 const PADDING = 20;
 const THRESHOLD = 120;
 const MAX_TOTAL = 500;
 const DEFAULT_INTERVAL_MS = 5_000;
 const MIN_INTERVAL_MS = 2_000;
 const MAX_INTERVAL_MS = 60_000;
+const DEFAULT_WORKER_IDLE_TIMEOUT_MS = 2 * 60 * 1000;
 const OCR_CACHE_DIR = join(tmpdir(), 'la-pluma-battle-ocr');
 
 let workerPromise: Promise<Worker> | null = null;
+let workerIdleTimer: ReturnType<typeof setTimeout> | null = null;
+let activeRecognitions = 0;
 
 export function isBattleOcrEnabled(): boolean {
   const value = String(process.env.LA_PLUMA_BATTLE_OCR ?? '1').trim().toLowerCase();
   return value !== '0' && value !== 'false' && value !== 'off';
+}
+
+export function getBattleOcrScale(): number {
+  const value = Number(process.env.LA_PLUMA_BATTLE_OCR_SCALE || DEFAULT_SCALE);
+  if (!Number.isFinite(value)) return DEFAULT_SCALE;
+  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.round(value)));
+}
+
+function getWorkerIdleTimeoutMs(): number {
+  const value = Number(process.env.LA_PLUMA_BATTLE_OCR_IDLE_MS || DEFAULT_WORKER_IDLE_TIMEOUT_MS);
+  if (!Number.isFinite(value) || value < 0) return DEFAULT_WORKER_IDLE_TIMEOUT_MS;
+  return Math.trunc(value);
 }
 
 export function getBattleOcrIntervalMs(): number {
@@ -67,16 +84,17 @@ export function preprocessBattleFrame(frame: Buffer): Buffer | null {
   const cropY = Math.max(0, Math.round(CROP.y * scaleY));
   const cropWidth = Math.max(1, Math.round(CROP.width * scaleX));
   const cropHeight = Math.max(1, Math.round(CROP.height * scaleY));
-  const outWidth = cropWidth * SCALE;
-  const outHeight = cropHeight * SCALE;
+  const pixelScale = getBattleOcrScale();
+  const outWidth = cropWidth * pixelScale;
+  const outHeight = cropHeight * pixelScale;
   const out = new PNG({ width: outWidth + PADDING * 2, height: outHeight + PADDING * 2 });
   out.data.fill(255);
 
   for (let y = 0; y < outHeight; y += 1) {
-    const sourceY = cropY + Math.floor(y / SCALE);
+    const sourceY = cropY + Math.floor(y / pixelScale);
     if (sourceY >= source.height) break;
     for (let x = 0; x < outWidth; x += 1) {
-      const sourceX = cropX + Math.floor(x / SCALE);
+      const sourceX = cropX + Math.floor(x / pixelScale);
       if (sourceX >= source.width) break;
       const sourceIndex = (sourceY * source.width + sourceX) * 4;
       const gray = 0.299 * source.data[sourceIndex]
@@ -120,6 +138,20 @@ async function getWorker(): Promise<Worker> {
   return workerPromise;
 }
 
+function scheduleWorkerIdleShutdown() {
+  if (workerIdleTimer) {
+    clearTimeout(workerIdleTimer);
+    workerIdleTimer = null;
+  }
+  const timeout = getWorkerIdleTimeoutMs();
+  if (!workerPromise || timeout <= 0) return;
+  workerIdleTimer = setTimeout(() => {
+    workerIdleTimer = null;
+    if (activeRecognitions === 0) void shutdownBattleOcr();
+  }, timeout);
+  workerIdleTimer.unref?.();
+}
+
 export async function recognizeBattleProgress(
   frame: Buffer,
   expectedTotal: number | null = null
@@ -128,13 +160,19 @@ export async function recognizeBattleProgress(
   if (!processed) return null;
 
   const worker = await getWorker();
-  const { data } = await worker.recognize(processed);
-  if (Number(data.confidence) < 55) return null;
+  activeRecognitions += 1;
+  try {
+    const { data } = await worker.recognize(processed);
+    if (Number(data.confidence) < 55) return null;
 
-  const battle = parseBattleCounter(data.text);
-  if (!battle) return null;
-  if (expectedTotal !== null && battle.total !== expectedTotal) return null;
-  return battle;
+    const battle = parseBattleCounter(data.text);
+    if (!battle) return null;
+    if (expectedTotal !== null && battle.total !== expectedTotal) return null;
+    return battle;
+  } finally {
+    activeRecognitions = Math.max(0, activeRecognitions - 1);
+    if (activeRecognitions === 0) scheduleWorkerIdleShutdown();
+  }
 }
 
 export async function readBattleProgress(
@@ -147,6 +185,10 @@ export async function readBattleProgress(
 }
 
 export async function shutdownBattleOcr(): Promise<void> {
+  if (workerIdleTimer) {
+    clearTimeout(workerIdleTimer);
+    workerIdleTimer = null;
+  }
   if (!workerPromise) return;
   const worker = await workerPromise.catch(() => null);
   workerPromise = null;

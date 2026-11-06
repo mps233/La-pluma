@@ -17,6 +17,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DROP_RECORDS_DIR = path.join(__dirname, '../data/drop-records');
+const DROP_STATS_MAX_DAYS = 365;
+const DROP_STATS_CACHE_TTL_MS = (() => {
+  const value = Number(process.env.LA_PLUMA_DROP_STATS_TTL_MS || 30_000);
+  return Number.isFinite(value) && value >= 0 ? Math.trunc(value) : 30_000;
+})();
+const dropStatsCache = new Map<number, { expiresAt: number; value: unknown }>();
+
+export function normalizeDropDays(value: unknown, fallback = 7): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(DROP_STATS_MAX_DAYS, Math.max(1, Math.trunc(parsed)));
+}
 
 interface DropRecordItem {
   name: string;
@@ -191,6 +203,7 @@ export async function recordDrops(dropData: unknown) {
     );
 
     logger.debug('已记录掉落', { stage: input.stage, times: input.times });
+    dropStatsCache.clear();
     return successResponse({ record: todayRecord });
   } catch (error) {
     logger.error('记录掉落失败', { error: getErrorMessage(error) });
@@ -220,22 +233,20 @@ export async function getRecentDrops(days: number = 7) {
   try {
     await ensureDir(DROP_RECORDS_DIR);
 
-    const records: DropRecordFile[] = [];
+    const normalizedDays = normalizeDropDays(days);
     const today = new Date();
+    const recordPaths: string[] = [];
 
-    for (let i = 0; i < days; i++) {
+    for (let i = 0; i < normalizedDays; i++) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
-      const dateStr = getLocalDateString(date);
-      const recordPath = path.join(DROP_RECORDS_DIR, `${dateStr}.json`);
-
-      const record = await readJsonFile<DropRecordFile | null>(recordPath, null);
-      if (record) {
-        records.push(record);
-      }
+      recordPaths.push(path.join(DROP_RECORDS_DIR, `${getLocalDateString(date)}.json`));
     }
 
-    return successResponse(records);
+    const readRecords = await Promise.all(
+      recordPaths.map(recordPath => readJsonFile<DropRecordFile | null>(recordPath, null))
+    );
+    return successResponse(readRecords.filter((record): record is DropRecordFile => record !== null));
   } catch (error) {
     logger.error('获取历史记录失败', { error: getErrorMessage(error) });
     return errorResponse(error, '获取历史记录失败');
@@ -246,8 +257,14 @@ export async function getRecentDrops(days: number = 7) {
  * 获取掉落统计（按物品汇总）
  */
 export async function getDropStatistics(days: number = 7) {
+  const normalizedDays = normalizeDropDays(days);
+  const cached = dropStatsCache.get(normalizedDays);
+  if (cached && cached.expiresAt > Date.now()) {
+    return successResponse(cached.value);
+  }
+
   try {
-    const recentResult = await getRecentDrops(days);
+    const recentResult = await getRecentDrops(normalizedDays);
     if (!recentResult.success) {
       return recentResult;
     }
@@ -303,6 +320,10 @@ export async function getDropStatistics(days: number = 7) {
     // 反转 dailyTrend，使其按时间正序排列
     statistics.dailyTrend.reverse();
 
+    dropStatsCache.set(normalizedDays, {
+      expiresAt: Date.now() + DROP_STATS_CACHE_TTL_MS,
+      value: statistics
+    });
     return successResponse(statistics);
   } catch (error) {
     logger.error('获取统计数据失败', { error: getErrorMessage(error) });

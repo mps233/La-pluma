@@ -14,7 +14,13 @@ const ACTIVE_STATUSES = new Set(['accepted', 'waiting', 'running', 'stopping']);
 const ALL_STATUSES = new Set([...TERMINAL_STATUSES, ...ACTIVE_STATUSES]);
 const AGENT_RUN_STORE_VERSION = 1;
 const DEFAULT_AGENT_RUN_STORE_PATH = fileURLToPath(new URL('../data/agent-runs.json', import.meta.url));
+const AGENT_RUN_PERSIST_COALESCE_MS = (() => {
+  const value = Number(process.env.LA_PLUMA_AGENT_RUN_PERSIST_COALESCE_MS || 10_000);
+  return Number.isFinite(value) && value >= 0 ? Math.trunc(value) : 10_000;
+})();
 const logger = createLogger('AgentRunService');
+
+const writeAgentRunStore = (filePath: string, data: unknown) => writeJsonFile(filePath, data, false);
 
 export interface AgentRunFailure {
   code: string;
@@ -105,13 +111,14 @@ let persistence: AgentRunPersistence = {
   required: false,
   filePath: DEFAULT_AGENT_RUN_STORE_PATH,
   readStore: readJsonFile,
-  writeStore: writeJsonFile,
+  writeStore: writeAgentRunStore,
   runtimeLogger: logger
 };
 let persistenceDirty = false;
 let persistencePromise: Promise<void> | null = null;
 let persistenceError: unknown = null;
 let persistenceStartQueued = false;
+let persistenceTimer: ReturnType<typeof setTimeout> | null = null;
 let persistenceGeneration = 0;
 
 function agentRunPersistenceError(error: unknown) {
@@ -196,7 +203,33 @@ function scheduleAgentRunPersistence() {
   });
 }
 
+function clearPersistenceTimer() {
+  if (persistenceTimer === null) return;
+  clearTimeout(persistenceTimer);
+  persistenceTimer = null;
+}
+
+/**
+ * Progress updates (battle OCR, stage steps) can arrive every few seconds.
+ * Mark dirty immediately, but coalesce the full-store rewrite so the fsync
+ * cost is paid at most once per window. Terminal/accepted transitions still
+ * use scheduleAgentRunPersistence and explicit flushAgentRunStore calls.
+ */
+function scheduleCoalescedAgentRunPersistence() {
+  if (!persistence.enabled) return;
+  persistenceDirty = true;
+  if (persistencePromise || persistenceStartQueued || persistenceTimer) return;
+  const generation = persistenceGeneration;
+  persistenceTimer = setTimeout(() => {
+    persistenceTimer = null;
+    if (generation !== persistenceGeneration) return;
+    startPersistenceWriter();
+  }, AGENT_RUN_PERSIST_COALESCE_MS);
+  persistenceTimer.unref?.();
+}
+
 export async function flushAgentRunStore() {
+  clearPersistenceTimer();
   if (!persistence.enabled) {
     if (persistence.required) {
       throw agentRunPersistenceError(persistenceError || new Error('Agent run 存储尚未就绪'));
@@ -666,12 +699,13 @@ export async function initializeAgentRunStore(overrides: AgentRunStoreOverrides 
     required: true,
     filePath: overrides.filePath || process.env.LA_PLUMA_AGENT_RUN_STORE || DEFAULT_AGENT_RUN_STORE_PATH,
     readStore: overrides.readStore || readJsonFile,
-    writeStore: overrides.writeStore || writeJsonFile,
+    writeStore: overrides.writeStore || writeAgentRunStore,
     runtimeLogger: overrides.runtimeLogger || logger
   };
   persistenceDirty = false;
   persistenceError = null;
   persistenceStartQueued = false;
+  clearPersistenceTimer();
 
   let restored: ReturnType<typeof restoreStoreSnapshot>;
   try {
@@ -894,7 +928,7 @@ export function updateAgentRunProgress(runId: string, progress: unknown, taskRes
     record.run.taskResults = normalized;
   }
   record.run.updatedAt = new Date().toISOString();
-  scheduleAgentRunPersistence();
+  scheduleCoalescedAgentRunPersistence();
   return toAgentRunDto(record.run) as AgentRunDto;
 }
 
@@ -954,6 +988,55 @@ export function getCurrentAgentRun() {
   return toAgentRunDto(current?.run);
 }
 
+export interface AgentRunIdentity {
+  runId: string;
+  operationId: string | null;
+}
+
+/**
+ * 高频日志写入只需要当前 run 的身份，不需要克隆完整 DTO。
+ * 这里刻意不做终态清理和深拷贝，避免 stdout 每一行都触发一次全量序列化。
+ */
+export function getCurrentAgentRunIdentity(): AgentRunIdentity | null {
+  assertAgentRunStoreReadable();
+  const priority: Record<string, number> = { stopping: 4, running: 3, accepted: 2, waiting: 1 };
+  let current: AgentRunRecord | undefined;
+  for (const record of runs.values()) {
+    const rank = priority[record.run.status];
+    if (!rank) continue;
+    if (!current) {
+      current = record;
+      continue;
+    }
+    const currentRank = priority[current.run.status];
+    if (rank > currentRank || (rank === currentRank && record.sequence > current.sequence)) {
+      current = record;
+    }
+  }
+  return current ? { runId: current.run.runId, operationId: current.run.operationId ?? null } : null;
+}
+
+/** Return only the newest terminal run, without building DTOs for the retention window. */
+export function getLatestTerminalRun(): AgentRunDto | null {
+  assertAgentRunStoreReadable();
+  if (pruneTerminalRuns() > 0) scheduleAgentRunPersistence();
+  let latest: AgentRunRecord | undefined;
+  for (const record of runs.values()) {
+    if (!TERMINAL_STATUSES.has(record.run.status)) continue;
+    if (!latest) {
+      latest = record;
+      continue;
+    }
+    const latestFinished = latest.finishedAtMs ?? 0;
+    const candidateFinished = record.finishedAtMs ?? 0;
+    if (candidateFinished > latestFinished
+      || (candidateFinished === latestFinished && (record.terminalSequence ?? 0) > (latest.terminalSequence ?? 0))) {
+      latest = record;
+    }
+  }
+  return toAgentRunDto(latest?.run);
+}
+
 function resetAgentRunState({ clearMemory = true }: { clearMemory?: boolean } = {}) {
   persistenceGeneration += 1;
   persistence = {
@@ -961,12 +1044,13 @@ function resetAgentRunState({ clearMemory = true }: { clearMemory?: boolean } = 
     required: false,
     filePath: DEFAULT_AGENT_RUN_STORE_PATH,
     readStore: readJsonFile,
-    writeStore: writeJsonFile,
+    writeStore: writeAgentRunStore,
     runtimeLogger: logger
   };
   persistenceDirty = false;
   persistenceError = null;
   persistenceStartQueued = false;
+  clearPersistenceTimer();
   if (clearMemory) {
     runs.clear();
     idempotencyIndex.clear();

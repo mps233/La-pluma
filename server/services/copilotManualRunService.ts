@@ -92,12 +92,17 @@ function makeResult(
   };
 }
 
-async function executeStep(session: CopilotManualSession, itemIndex: number): Promise<void> {
+async function executeStep(
+  session: CopilotManualSession,
+  itemIndex: number,
+  plan: Awaited<ReturnType<typeof buildCopilotPlan>>
+): Promise<void> {
   await stepExecutor({
     setId: session.setId,
     raid: session.raid,
     selectedIndexes: [itemIndex],
     options: session.options,
+    plan,
     lifecycle: {
       runId: session.runId,
       onProgress: (progress, taskResults) => updateAgentRunProgress(session.runId, progress, taskResults ?? null)
@@ -107,16 +112,12 @@ async function executeStep(session: CopilotManualSession, itemIndex: number): Pr
 
 async function advance(
   session: CopilotManualSession,
-  run: AgentRunDto,
-  executing: boolean
+  run: AgentRunDto
 ): Promise<CopilotManualStepResult> {
-  let plan = await planBuilder(session.setId, session.raid);
-  let pending = pendingItemIndexes(plan, session.selectedItemIndexes);
-  if (executing) {
-    // The step was just executed; progress is re-read to derive the next item.
-    plan = await planBuilder(session.setId, session.raid);
-    pending = pendingItemIndexes(plan, session.selectedItemIndexes);
-  }
+  // The underlying plan content is cached; this call refreshes completion
+  // flags from copilot-progress.json without another remote plan build.
+  const plan = await planBuilder(session.setId, session.raid);
+  const pending = pendingItemIndexes(plan, session.selectedItemIndexes);
   const nextItemIndex = pending[0] ?? null;
 
   if (nextItemIndex === null) {
@@ -224,8 +225,8 @@ export async function startManualCopilotSet({
 
   try {
     startAgentRunForExecution(runId);
-    await executeStep(session, pending[0]);
-    return await advance(session, getAgentRun(runId)!, true);
+    await executeStep(session, pending[0], plan);
+    return await advance(session, getAgentRun(runId)!);
   } catch (error) {
     sessions.delete(runId);
     failAgentRun(runId, error);
@@ -276,12 +277,12 @@ export async function continueManualCopilotSet({
   const pending = pendingItemIndexes(plan, session.selectedItemIndexes);
   const nextItemIndex = pending[0];
   if (nextItemIndex === undefined) {
-    return advance(session, getAgentRun(runId)!, false);
+    return advance(session, getAgentRun(runId)!);
   }
   try {
     await flushAgentRunStore();
-    await executeStep(session, nextItemIndex);
-    return await advance(session, getAgentRun(runId)!, true);
+    await executeStep(session, nextItemIndex, plan);
+    return await advance(session, getAgentRun(runId)!);
   } catch (error) {
     sessions.delete(runId);
     failAgentRun(runId, error);

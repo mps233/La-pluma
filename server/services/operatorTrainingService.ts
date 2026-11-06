@@ -10,6 +10,7 @@ import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { readJsonFile, writeJsonFile } from '../utils/fileHelper.ts';
+import { readJsonFileCached, clearJsonFileCache } from '../utils/jsonCache.ts';
 import { createLogger } from '../utils/logger.ts';
 import { getTodayOpenStages, isStageOpenToday } from './notificationService.ts';
 import { isResourceCollectionOpenNow } from './activityDataService.ts';
@@ -333,7 +334,7 @@ function normalizeOperatorMaterialsFile(value: unknown): OperatorMaterialsFile {
  */
 async function loadOperatorMaterials(): Promise<OperatorMaterialsFile> {
   try {
-    const data = await readJsonFile<unknown>(OPERATOR_MATERIALS_PATH, null);
+    const data = await readJsonFileCached<unknown>(OPERATOR_MATERIALS_PATH, null);
     return normalizeOperatorMaterialsFile(data);
   } catch (error) {
     logger.error('加载干员材料数据失败', { error: getErrorMessage(error) });
@@ -529,7 +530,7 @@ function normalizeOperBoxData(value: unknown): OperBoxData {
  */
 async function loadOperBox(): Promise<OperBoxData> {
   try {
-    return normalizeOperBoxData(await readJsonFile<unknown>(OPERBOX_PATH, { operators: [] }));
+    return normalizeOperBoxData(await readJsonFileCached<unknown>(OPERBOX_PATH, { operators: [] }));
   } catch (error) {
     logger.error('加载 OperBox 数据失败', { error: getErrorMessage(error) });
     return { operators: [], allOpers: [] };
@@ -568,7 +569,7 @@ interface DepotData {
  */
 async function loadDepot(): Promise<DepotData> {
   try {
-    const depotData = await readJsonFile<unknown>(DEPOT_PATH, { items: [], timestamp: null });
+    const depotData = await readJsonFileCached<unknown>(DEPOT_PATH, { items: [], timestamp: null });
 
     // 将数组转换为对象 { id: count }
     const itemsMap: Record<string, number> = {};
@@ -629,7 +630,7 @@ async function loadTrainingQueue(): Promise<TrainingQueueData> {
     lastUpdated: new Date().toISOString()
   };
 
-  const queueData = await readJsonFile<unknown>(TRAINING_QUEUE_PATH, defaultQueue);
+  const queueData = await readJsonFileCached<unknown>(TRAINING_QUEUE_PATH, defaultQueue);
   const record = isRecord(queueData) ? queueData : {};
   const queue = Array.isArray(record.queue)
     ? record.queue
@@ -653,6 +654,7 @@ async function saveTrainingQueue(queueData: TrainingQueueData): Promise<boolean>
   try {
     queueData.lastUpdated = new Date().toISOString();
     await writeJsonFile(TRAINING_QUEUE_PATH, queueData);
+    clearJsonFileCache(TRAINING_QUEUE_PATH);
     return true;
   } catch (error) {
     logger.error('保存养成队列失败', { error: getErrorMessage(error) });
@@ -814,6 +816,22 @@ async function getOperatorList(filters: Record<string, unknown> = {}): Promise<T
   });
 
   return filteredOperators;
+}
+
+/**
+ * 状态徽章只需要三个计数；复用一次全量列表，避免客户端为计数下载三份完整列表。
+ */
+async function getOperatorCounts(filters: { rarity?: number } = {}): Promise<{
+  trainable: number;
+  owned: number;
+  all: number;
+}> {
+  const operators = await getOperatorList({ status: 'all', rarity: filters.rarity });
+  return {
+    trainable: operators.filter(operator => operator.canTrain).length,
+    owned: operators.filter(operator => operator.owned).length,
+    all: operators.length
+  };
 }
 
 // Current Arknights game data no longer carries the LMD entry in evolveCost.
@@ -981,10 +999,12 @@ interface TrainingQueueResult {
  * 获取养成队列
  */
 async function getTrainingQueue(): Promise<TrainingQueueResult> {
-  const queueData = await loadTrainingQueue();
-  const depot = await loadDepot();
-  const operatorMaterialsData = await loadOperatorMaterials();
-  const operBoxData = await loadOperBox();
+  const [queueData, depot, operatorMaterialsData, operBoxData] = await Promise.all([
+    loadTrainingQueue(),
+    loadDepot(),
+    loadOperatorMaterials(),
+    loadOperBox()
+  ]);
   const ownedOperators = new Map(
     getOperBoxOperators(operBoxData).map((operator) => [operator.id, operator])
   );
@@ -1783,6 +1803,7 @@ export async function fetchOperatorMaterials(): Promise<{ success: true; scripts
 
 export default {
   getOperatorList,
+  getOperatorCounts,
   getTrainingQueue,
   addToQueue,
   removeFromQueue,

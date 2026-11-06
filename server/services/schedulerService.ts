@@ -424,6 +424,7 @@ interface ScheduleExecutionStatus {
   startTime: number | null;
   shouldStop: boolean;
   lastResult: unknown;
+  lastResultRevision: number;
 }
 
 interface ScheduledTask {
@@ -496,7 +497,8 @@ const scheduleExecutionStatus: ScheduleExecutionStatus = {
   message: '',
   startTime: null,
   shouldStop: false,  // 添加停止标志
-  lastResult: null
+  lastResult: null,
+  lastResultRevision: 0
 };
 
 let cancelActiveScheduleDelay: (() => void) | null = null;
@@ -530,8 +532,14 @@ function waitForScheduleDelay(delayMs: number): Promise<boolean> {
 /**
  * 获取定时任务执行状态
  */
-export function getScheduleExecutionStatus() {
-  return { ...scheduleExecutionStatus };
+export function getScheduleExecutionStatus(includeResult = false) {
+  const { lastResult, ...status } = scheduleExecutionStatus;
+  if (includeResult) return { ...scheduleExecutionStatus };
+  return {
+    ...status,
+    hasLastResult: lastResult !== null,
+    lastResultRevision: scheduleExecutionStatus.lastResultRevision
+  };
 }
 
 /**
@@ -568,6 +576,9 @@ function isScheduleStopRequested(error: unknown = null): boolean {
  * 更新定时任务执行状态
  */
 function updateScheduleStatus(updates: Partial<ScheduleExecutionStatus>) {
+  if ('lastResult' in updates) {
+    scheduleExecutionStatus.lastResultRevision += 1;
+  }
   Object.assign(scheduleExecutionStatus, updates);
   logger.debug('定时任务状态更新', scheduleExecutionStatus);
 }

@@ -1,11 +1,14 @@
 import { getErrorCode, isRecord } from '../utils/errors.ts';
-import { readFile, readdir } from 'fs/promises';
-import { join } from 'path';
+import { mkdir, readFile, readdir, stat, writeFile } from 'fs/promises';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import { getMaaResourceDir, getItemTablePath } from '../config/paths.ts';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const TILE_POS_DIR = 'Arknights-Tile-Pos';
 const TILE_POS_BATCH_SIZE = 32;
+const STAGE_CATALOG_CACHE_VERSION = 1;
+const STAGE_CATALOG_CACHE_PATH = fileURLToPath(new URL('../data/maa-stage-catalog-cache.json', import.meta.url));
 
 export interface MaaMaterialItem {
   id: string;
@@ -227,11 +230,11 @@ export function buildMaaItemAssetMap(materials: unknown = {}): Map<string, strin
   return byIconId;
 }
 
-async function loadMaaStageCatalogUncached({
-  resourceDir = getMaaResourceDir(),
-  readdirFn = readdir,
-  readFileFn = readFile
-}: MaaResourceOptions = {}) {
+async function loadMaaStageCatalogUncached(options: MaaResourceOptions = {}) {
+  const resourceDir = options.resourceDir ?? getMaaResourceDir();
+  const readdirFn = options.readdirFn ?? readdir;
+  const readFileFn = options.readFileFn ?? readFile;
+  const useDiskCache = !options.resourceDir && !options.readdirFn && !options.readFileFn;
   const tileDir = join(resourceDir, TILE_POS_DIR);
   let filenames: string[];
 
@@ -240,6 +243,20 @@ async function loadMaaStageCatalogUncached({
   } catch (error) {
     if (getErrorCode(error) === 'ENOENT') return buildMaaStageCatalog([]);
     throw error;
+  }
+
+  let tileDirMtimeMs: number | null = null;
+  if (useDiskCache && filenames.length > 0) {
+    tileDirMtimeMs = (await stat(tileDir).catch(() => null))?.mtimeMs ?? null;
+    const cached = await readJson<unknown>(STAGE_CATALOG_CACHE_PATH, null).catch(() => null);
+    if (isRecord(cached)
+      && cached.version === STAGE_CATALOG_CACHE_VERSION
+      && cached.resourceDir === resourceDir
+      && cached.fileCount === filenames.length
+      && cached.tileDirMtimeMs === tileDirMtimeMs
+      && Array.isArray(cached.entries)) {
+      return buildMaaStageCatalog(cached.entries);
+    }
   }
 
   const entries: unknown[] = [];
@@ -256,7 +273,22 @@ async function loadMaaStageCatalogUncached({
     entries.push(...parsed.filter(Boolean));
   }
 
-  return buildMaaStageCatalog(entries);
+  const catalog = buildMaaStageCatalog(entries);
+  if (useDiskCache && filenames.length > 0) {
+    try {
+      await mkdir(dirname(STAGE_CATALOG_CACHE_PATH), { recursive: true });
+      await writeFile(STAGE_CATALOG_CACHE_PATH, JSON.stringify({
+        version: STAGE_CATALOG_CACHE_VERSION,
+        resourceDir,
+        fileCount: filenames.length,
+        tileDirMtimeMs,
+        entries: catalog.entries
+      }), 'utf-8');
+    } catch {
+      // A cache write failure must not fail stage lookup.
+    }
+  }
+  return catalog;
 }
 
 export async function loadMaaStageCatalog(options: MaaResourceOptions = {}): Promise<MaaStageCatalog> {
@@ -273,6 +305,11 @@ export async function loadMaaStageCatalog(options: MaaResourceOptions = {}): Pro
     });
 
   return stageCatalogPending;
+}
+
+export async function prewarmMaaStageCatalog(options: MaaResourceOptions = {}): Promise<number> {
+  const catalog = await loadMaaStageCatalog(options);
+  return catalog.entries.length;
 }
 
 export async function findMaaStage(input: unknown, options: MaaResourceOptions = {}): Promise<MaaStageCatalogEntry | null> {

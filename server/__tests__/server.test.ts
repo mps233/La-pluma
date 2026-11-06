@@ -112,6 +112,7 @@ describe('La Pluma transport configuration', () => {
     await mkdir(join(clientDistPath, 'assets'))
     await writeFile(join(clientDistPath, 'index.html'), '<!doctype html><title>La Pluma fixture</title>')
     await writeFile(join(clientDistPath, 'assets', 'app.js'), 'globalThis.fixtureLoaded = true')
+    await writeFile(join(clientDistPath, 'assets', 'big.js'), `globalThis.bigFixture = ${JSON.stringify('x'.repeat(4096))}`)
 
     const signalingGateway = createSignalingGatewayStub('fixture-ticket')
     const app = createLaPlumaApp({
@@ -124,12 +125,20 @@ describe('La Pluma transport configuration', () => {
 
     const shell = await fetch(`${origin}/la-pluma/automation`)
     assert.equal(shell.status, 200)
+    assert.equal(shell.headers.get('cache-control'), 'no-cache')
     assert.match(await shell.text(), /La Pluma fixture/)
 
     const asset = await fetch(`${origin}/la-pluma/assets/app.js`)
     assert.equal(asset.status, 200)
     assert.match(asset.headers.get('content-type') || '', /javascript/)
+    assert.equal(asset.headers.get('cache-control'), 'public, max-age=31536000, immutable')
     assert.match(await asset.text(), /fixtureLoaded/)
+
+    const bigAsset = await fetch(`${origin}/la-pluma/assets/big.js`)
+    assert.equal(bigAsset.status, 200)
+    assert.equal(bigAsset.headers.get('content-encoding'), 'gzip')
+    assert.equal(bigAsset.headers.get('vary'), 'Accept-Encoding')
+    assert.match(await bigAsset.text(), /bigFixture/)
 
     const missingAsset = await fetch(`${origin}/la-pluma/assets/missing.js`)
     assert.equal(missingAsset.status, 404)
@@ -155,6 +164,7 @@ describe('La Pluma transport configuration', () => {
         interruptedRuns: 0,
         prunedRuns: 0
       }),
+      prewarmStageCatalog: false,
       initializeRuntime: async () => ({
         notification: { restored: false },
         schedule: { restored: false },

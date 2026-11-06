@@ -7,15 +7,15 @@ import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
 import express from 'express';
 import type { Express } from 'express';
+import sharp from 'sharp';
 import { createMaaAssetsRouter, normalizeMaaAssetKey, selectMaaItemAssetId } from '../maaAssets.ts';
 
 const servers: Server[] = [];
 const roots: string[] = [];
 
-const PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lJ0nWQAAAABJRU5ErkJggg==',
-  'base64'
-);
+const PNG = await sharp({
+  create: { width: 2, height: 2, channels: 4, background: { r: 32, g: 96, b: 160, alpha: 1 } }
+}).png().toBuffer();
 
 async function listen(app: Express) {
   const server = createServer(app);
@@ -61,14 +61,27 @@ test('serves direct item ids, icon aliases, and avatars', async () => {
   const app = express();
   app.use('/api/maa-assets', createMaaAssetsRouter({
     resourceDir: root,
-    loadItemAssetMap: async () => new Map([['MTL_SL_G2', '30012']])
+    loadItemAssetMap: async () => new Map([['MTL_SL_G2', '30012']]),
+    assetCacheDir: join(root, 'asset-cache')
   }));
   const port = await listen(app);
   const baseUrl = `http://127.0.0.1:${port}/api/maa-assets`;
 
   const direct = await fetch(`${baseUrl}/item/30012`);
   assert.equal(direct.status, 200);
-  assert.equal(direct.headers.get('cache-control'), 'public, max-age=3600');
+  assert.equal(direct.headers.get('cache-control'), 'public, max-age=86400');
+  assert.equal(direct.headers.get('vary'), 'Accept');
+
+  const versioned = await fetch(`${baseUrl}/item/30012?v=7`);
+  assert.equal(versioned.status, 200);
+  assert.equal(versioned.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+
+  const webp = await fetch(`${baseUrl}/avatar/char_002_amiya`, {
+    headers: { Accept: 'image/avif,image/webp,*/*' }
+  });
+  assert.equal(webp.status, 200);
+  assert.equal(webp.headers.get('content-type'), 'image/webp');
+  assert.ok((await webp.arrayBuffer()).byteLength > 0);
 
   const alias = await fetch(`${baseUrl}/item/MTL_SL_G2`);
   assert.equal(alias.status, 200);

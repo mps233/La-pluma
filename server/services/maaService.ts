@@ -15,7 +15,7 @@ import { getFallbackActivity } from './activityFallbackService.ts';
 import { getStageActivityInfo } from './activityDataService.ts';
 import { listMaaActivityStageCodes } from './maaResourceDataService.ts';
 import { acquireMaaExecutionLease } from './executionCoordinatorService.ts';
-import { getCurrentAgentRun } from './agentRunService.ts';
+import { getCurrentAgentRunIdentity } from './agentRunService.ts';
 import { loadUserConfig, saveUserConfig } from './configStorageService.ts';
 import { DEFAULT_ADB_ADDRESS, DEFAULT_ADB_PATH, DEFAULT_CLIENT_TYPE, DEFAULT_MAA_CLI_PATH } from '../config/connectionDefaults.ts';
 
@@ -181,7 +181,13 @@ interface MaaVersionInfo {
 // MAA CLI 路径
 const MAA_CLI_PATH = DEFAULT_MAA_CLI_PATH;
 const MAX_REALTIME_LOGS = Number(process.env.LA_PLUMA_MAX_REALTIME_LOGS || 5000);
+/** 按字符数封顶日志缓冲，避免 5000 条大消息或单条 stdout 把内存/响应撑爆。 */
+const MAX_REALTIME_LOG_CHARS = Number(process.env.LA_PLUMA_MAX_REALTIME_LOG_CHARS || 1_000_000);
+/** 单条日志消息上限；完整 stdout 仍可通过进程结果读取，不重复塞进实时日志。 */
+const MAX_LOG_MESSAGE_CHARS = 4_000;
 let realtimeLogSequence = 0;
+let realtimeLogChars = 0;
+let realtimeLogRunId: string | null = null;
 const MAX_CAPTURED_STDOUT_CHARS = 5 * 1024 * 1024;
 const MAX_CAPTURED_STDERR_CHARS = 1024 * 1024;
 const DYNAMIC_TASK_DIR = '_lapluma';
@@ -253,20 +259,28 @@ const taskStatus: TaskStatus = {
 };
 
 /**
- * 获取当前任务执行状态
+ * 获取当前任务执行状态（不含进程引用和实时日志）。
+ * 状态接口被前端 1-2 秒级轮询，日志必须通过 /logs/recent 游标单独获取。
  */
-export function getTaskStatus(): Omit<TaskStatus, 'process' | 'forceKillTimer'> {
-  const { process, forceKillTimer, ...status } = taskStatus;
+export function getTaskStatus(): Omit<TaskStatus, 'process' | 'forceKillTimer' | 'logs'> {
+  const { process, forceKillTimer, logs, ...status } = taskStatus;
   return status;
 }
 
 /**
- * 获取实时日志
+ * 获取实时日志。传入 afterSequence 时只返回该序列之后的增量，
+ * 便于前端日志页做增量轮询而不是每次重拉整个窗口。
  */
-export function getRealtimeLogs(lines = 100): LogEntry[] {
-  // 返回最后 N 行日志
-  const startIndex = Math.max(0, taskStatus.logs.length - lines);
-  return taskStatus.logs.slice(startIndex);
+export function getRealtimeLogs(lines = 100, afterSequence = 0): LogEntry[] {
+  const normalizedLines = Number.isFinite(lines) && lines > 0 ? Math.trunc(lines) : 100;
+  const normalizedAfter = Number.isFinite(afterSequence) && afterSequence > 0
+    ? Math.trunc(afterSequence)
+    : 0;
+  const source = normalizedAfter > 0
+    ? taskStatus.logs.filter(entry => typeof entry.sequence === 'number' && entry.sequence > normalizedAfter)
+    : taskStatus.logs;
+  const startIndex = Math.max(0, source.length - normalizedLines);
+  return source.slice(startIndex);
 }
 
 /**
@@ -274,6 +288,8 @@ export function getRealtimeLogs(lines = 100): LogEntry[] {
  */
 export function clearRealtimeLogs() {
   taskStatus.logs = [];
+  realtimeLogChars = 0;
+  realtimeLogRunId = null;
 }
 
 function appendCapturedOutput(current: string, chunk: string, maxChars: number): string {
@@ -282,22 +298,59 @@ function appendCapturedOutput(current: string, chunk: string, maxChars: number):
   return next.length > maxChars ? next.slice(-maxChars) : next;
 }
 
+function estimateLogChars(entry: LogEntry): number {
+  return (typeof entry.message === 'string' ? entry.message.length : 128) + 96;
+}
+
 function trimRealtimeLogs() {
-  if (taskStatus.logs.length > MAX_REALTIME_LOGS) {
-    taskStatus.logs.splice(0, taskStatus.logs.length - MAX_REALTIME_LOGS);
+  while (taskStatus.logs.length > MAX_REALTIME_LOGS) {
+    const removed = taskStatus.logs.shift();
+    realtimeLogChars -= removed ? estimateLogChars(removed) : 0;
   }
+  while (realtimeLogChars > MAX_REALTIME_LOG_CHARS && taskStatus.logs.length > 1) {
+    const removed = taskStatus.logs.shift();
+    realtimeLogChars -= removed ? estimateLogChars(removed) : 0;
+  }
+  if (realtimeLogChars < 0) realtimeLogChars = 0;
+}
+
+function formatRealtimeLogMessage(message: unknown): unknown {
+  const text = typeof message === 'string'
+    ? message
+    : message === null || message === undefined
+      ? ''
+      : (() => {
+          try {
+            return typeof message === 'object' ? JSON.stringify(message) : String(message);
+          } catch {
+            return String(message);
+          }
+        })();
+
+  if (text.length <= MAX_LOG_MESSAGE_CHARS) return text;
+  const omitted = text.length - MAX_LOG_MESSAGE_CHARS;
+  return `${text.slice(0, MAX_LOG_MESSAGE_CHARS)}\n…（已截断 ${omitted} 字符）`;
 }
 
 function appendRealtimeLog(level: LogLevel, message: unknown) {
-  const run = getCurrentAgentRun();
-  taskStatus.logs.push({
+  const run = getCurrentAgentRunIdentity();
+  if (run?.runId && realtimeLogRunId && run.runId !== realtimeLogRunId) {
+    taskStatus.logs = [];
+    realtimeLogChars = 0;
+  }
+  if (run?.runId) realtimeLogRunId = run.runId;
+
+  const formattedMessage = formatRealtimeLogMessage(message);
+  const entry: LogEntry = {
     time: new Date().toISOString(),
     level,
-    message,
+    message: formattedMessage,
     sequence: ++realtimeLogSequence,
     runId: run?.runId ?? null,
     operationId: run?.operationId ?? null
-  });
+  };
+  taskStatus.logs.push(entry);
+  realtimeLogChars += estimateLogChars(entry);
   trimRealtimeLogs();
 }
 
@@ -305,9 +358,10 @@ function appendRealtimeLog(level: LogLevel, message: unknown) {
  * 添加日志到缓存
  */
 function addLog(level: LogLevel, message: string) {
-  appendRealtimeLog(level, message);
-  // 使用结构化日志，不再使用 console.log
-  logger.log(level, message);
+  const formattedMessage = formatRealtimeLogMessage(message);
+  appendRealtimeLog(level, formattedMessage);
+  // 使用结构化日志，不再使用 console.log；超长 stdout 不重复写满控制台。
+  logger.log(level, formattedMessage);
 }
 
 export function getMaaExecutionDiagnostics(stderr: unknown = ''): Array<{ code: string; message: string; level: LogLevel }> {
@@ -1552,31 +1606,37 @@ export async function testAdbConnection(adbPath: string = DEFAULT_ADB_PATH, addr
 /**
  * 通过 ADB 截取模拟器屏幕
  */
-export async function captureScreen(adbPath: string = DEFAULT_ADB_PATH, address: string = DEFAULT_ADB_ADDRESS): Promise<{ image: string; timestamp: string }> {
+export async function captureScreen(
+  adbPath: string = DEFAULT_ADB_PATH,
+  address: string = DEFAULT_ADB_ADDRESS,
+  { skipDeviceProbe = false }: { skipDeviceProbe?: boolean } = {}
+): Promise<{ image: string; timestamp: string }> {
   try {
     validateAdbPath(adbPath);
     validateAdbAddress(address);
 
-    // 先检查设备是否已连接
-    const { stdout: devicesOutput } = await adbExec(adbPath, ['devices'], {
-      timeout: 5000,
-      windowsHide: true
-    });
-    const isConnected = devicesOutput.includes(address);
-
-    if (!isConnected) {
-      logger.debug('设备未连接，尝试连接', { address });
-      const { stdout: connectOutput, stderr: connectError } = await adbExec(adbPath, ['connect', address], {
-        timeout: 8000,
+    // 高频预览路径可以跳过 adb devices 探测：screencap 本身会给出明确失败。
+    if (!skipDeviceProbe) {
+      const { stdout: devicesOutput } = await adbExec(adbPath, ['devices'], {
+        timeout: 5000,
         windowsHide: true
       });
-      logger.debug('连接结果', { output: connectOutput });
+      const isConnected = devicesOutput.includes(address);
 
-      if (connectError) {
-        logger.warn('连接警告', { error: connectError });
+      if (!isConnected) {
+        logger.debug('设备未连接，尝试连接', { address });
+        const { stdout: connectOutput, stderr: connectError } = await adbExec(adbPath, ['connect', address], {
+          timeout: 8000,
+          windowsHide: true
+        });
+        logger.debug('连接结果', { output: connectOutput });
+
+        if (connectError) {
+          logger.warn('连接警告', { error: connectError });
+        }
+
+        await new Promise<void>(resolve => setTimeout(resolve, 1000));
       }
-
-      await new Promise<void>(resolve => setTimeout(resolve, 1000));
     }
 
     logger.debug('执行截图命令', { adbPath, address });
@@ -1914,6 +1974,33 @@ export function stopCurrentTask() {
     addLog('WARN', '任务正在启动中，无法立即终止');
     return { success: false, message: '任务正在启动中，暂时无法终止' };
   }
+}
+
+/**
+ * 进程退出前使用：发送终止请求并等待任务真正退出。
+ * 服务器关停时不能只调用 stopCurrentTask 就 process.exit，否则 detached
+ * 的 MAA 进程会继续占用 ADB 与模拟器。
+ */
+export async function stopCurrentTaskAndWait(timeoutMs = 5000): Promise<{
+  success: boolean;
+  message: string;
+  timedOut: boolean;
+}> {
+  const result = stopCurrentTask();
+  if (!result.success) return { ...result, timedOut: false };
+
+  const deadline = Date.now() + Math.max(0, timeoutMs);
+  while (taskStatus.isRunning && Date.now() < deadline) {
+    await new Promise<void>(resolve => {
+      const timer = setTimeout(resolve, 100);
+      timer.unref?.();
+    });
+  }
+  return {
+    success: true,
+    message: taskStatus.isRunning ? '等待 MAA 任务退出超时' : 'MAA 任务已退出',
+    timedOut: taskStatus.isRunning
+  };
 }
 
 /**

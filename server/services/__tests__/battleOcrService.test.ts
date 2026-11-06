@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   getBattleOcrIntervalMs,
+  getBattleOcrScale,
   isBattleOcrEnabled,
   parseBattleCounter,
   preprocessBattleFrame
@@ -61,5 +62,22 @@ test('supports disabling battle OCR with environment flags', () => {
   } finally {
     if (previous === undefined) delete process.env.LA_PLUMA_BATTLE_OCR;
     else process.env.LA_PLUMA_BATTLE_OCR = previous;
+  }
+});
+
+test('uses a smaller default OCR upscale and clamps the environment override', () => {
+  const previous = process.env.LA_PLUMA_BATTLE_OCR_SCALE;
+  try {
+    delete process.env.LA_PLUMA_BATTLE_OCR_SCALE;
+    assert.equal(getBattleOcrScale(), 3);
+    process.env.LA_PLUMA_BATTLE_OCR_SCALE = '1';
+    assert.equal(getBattleOcrScale(), 2);
+    process.env.LA_PLUMA_BATTLE_OCR_SCALE = '9';
+    assert.equal(getBattleOcrScale(), 6);
+    process.env.LA_PLUMA_BATTLE_OCR_SCALE = '4';
+    assert.equal(getBattleOcrScale(), 4);
+  } finally {
+    if (previous === undefined) delete process.env.LA_PLUMA_BATTLE_OCR_SCALE;
+    else process.env.LA_PLUMA_BATTLE_OCR_SCALE = previous;
   }
 });

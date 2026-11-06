@@ -228,7 +228,8 @@ export const AGENT_OPERATIONS = Object.freeze([
       properties: {
         profileId: profileIdProperty,
         adbPath: { type: 'string', ...runtimeDefault('adbPath') },
-        address: { type: 'string', ...runtimeDefault('adbAddress') }
+        address: { type: 'string', ...runtimeDefault('adbAddress') },
+        slim: { type: 'boolean', default: false, description: 'Return only api version, MAA version and current task status; skips ADB/WebRTC/display probes.' }
       }
     }
   }),
@@ -477,12 +478,12 @@ export const AGENT_OPERATIONS = Object.freeze([
     id: 'get_current_run',
     method: 'GET',
     path: '/api/agent/runs/current',
-    description: 'Return current MAA task, schedule execution state, and recent logs for polling.',
+    description: 'Return a compact current MAA task status, schedule execution state, and a short recent log tail for polling.',
     tags: ['Status'],
     query_schema: {
       type: 'object',
       properties: {
-        lines: { type: 'integer', minimum: 1, maximum: 500, default: 80, description: 'Maximum number of recent log lines to include.' }
+        lines: { type: 'integer', minimum: 1, maximum: 500, default: 80, description: 'Maximum number of recent log lines to include in recentLogs.' }
       }
     }
   }),
@@ -566,12 +567,13 @@ export const AGENT_OPERATIONS = Object.freeze([
     id: 'recent_logs',
     method: 'GET',
     path: '/api/agent/logs/recent',
-    description: 'Return recent in-memory MAA logs with optional line count.',
+    description: 'Return recent in-memory MAA logs with optional line count and an incremental sequence cursor.',
     tags: ['Logs'],
     query_schema: {
       type: 'object',
       properties: {
-        lines: { type: 'integer', minimum: 1, maximum: 500, default: 80, description: 'Maximum number of log lines to return.' }
+        lines: { type: 'integer', minimum: 1, maximum: 500, default: 80, description: 'Maximum number of log lines to return.' },
+        afterSequence: { type: 'integer', minimum: 0, default: 0, description: 'Return only entries newer than this sequence number; 0 returns the trailing window.' }
       }
     }
   }),

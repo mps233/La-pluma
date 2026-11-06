@@ -180,6 +180,16 @@ Key environment variables:
 | `LA_PLUMA_WEBRTC_PORT` | ScrcpyOverWebRTC port | `8443` |
 | `LA_PLUMA_WEBRTC_VERSION` | Install or upgrade release; `latest` follows stable | `latest` |
 | `LA_PLUMA_MAX_REALTIME_LOGS` | In-memory log line cap | `5000` |
+| `LA_PLUMA_MAX_REALTIME_LOG_CHARS` | In-memory log character cap; older entries rotate out | `1000000` |
+| `LA_PLUMA_AGENT_RUN_PERSIST_COALESCE_MS` | Progress persistence window; terminal states still flush immediately | `10000` |
+| `LA_PLUMA_COPILOT_PLAN_TTL_MS` | Cache lifetime for immutable PRTS copilot plans | `1800000` |
+| `LA_PLUMA_BATTLE_OCR` | Enable battle counter OCR; set `0`/`false`/`off` to disable | `1` |
+| `LA_PLUMA_BATTLE_OCR_SCALE` | OCR crop upscale factor (2-6) | `3` |
+| `LA_PLUMA_BATTLE_OCR_IDLE_MS` | Release the Tesseract worker after this idle period | `120000` |
+| `LA_PLUMA_ASSET_CACHE_DIR` | Disk cache for WebP MaaResource derivatives | `$TMPDIR/la-pluma-asset-cache` |
+| `LA_PLUMA_ASSET_WEBP_CONCURRENCY` | Concurrent WebP conversions (1-16) | `4` |
+| `LA_PLUMA_DROP_STATS_TTL_MS` | Drop statistics aggregate cache TTL | `30000` |
+| `LA_PLUMA_SCREEN_FRAME_MAX_WIDTH` | Max width for the binary dashboard preview frame (px) | `720` |
 
 <details>
 <summary>HTTPS, subpath hosting and WebRTC notes</summary>

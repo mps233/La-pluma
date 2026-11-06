@@ -2,6 +2,7 @@ import { asErrorWithCode, getErrorMessage, isRecord } from '../utils/errors.ts';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { readJsonFile, writeJsonFile, ensureDir } from '../utils/fileHelper.ts';
+import { readJsonFileCached, clearJsonFileCache } from '../utils/jsonCache.ts';
 import { successResponse, errorResponse, agentError } from '../utils/apiHelper.ts';
 import type { ApiErrorResponse } from '../utils/apiHelper.ts';
 import { createLogger } from '../utils/logger.ts';
@@ -329,6 +330,7 @@ export async function parseDepotData(runtime: unknown = {}): Promise<DepotParseR
     };
 
     await writeJsonFile(outputPath, output);
+    clearJsonFileCache(outputPath);
     logger.success('仓库数据已保存', { path: outputPath });
 
     return successResponse({
@@ -467,6 +469,7 @@ export async function parseOperBoxData(runtime: unknown = {}): Promise<OperBoxPa
     };
 
     await writeJsonFile(outputPath, output);
+    clearJsonFileCache(outputPath);
     logger.success('干员数据已保存', { path: outputPath });
 
     return successResponse({
@@ -504,7 +507,7 @@ function toOperBoxRecord(oper: unknown, own: boolean): OperBoxRecord | null {
  */
 export async function getDepotData(): Promise<unknown> {
   const filePath = join(DATA_DIR, 'depot.json');
-  return await readJsonFile<unknown>(filePath, null);
+  return await readJsonFileCached<unknown>(filePath, null);
 }
 
 /**
@@ -512,8 +515,10 @@ export async function getDepotData(): Promise<unknown> {
  */
 export async function getOperBoxData(): Promise<unknown> {
   const filePath = join(DATA_DIR, 'operbox.json');
-  return await readJsonFile<unknown>(filePath, null);
+  return await readJsonFileCached<unknown>(filePath, null);
 }
+
+const operatorCatalogCache = new WeakMap<object, OperatorSummary[]>();
 
 /**
  * 获取所有干员列表（从 MAA 资源文件）
@@ -521,11 +526,14 @@ export async function getOperBoxData(): Promise<unknown> {
 export async function getAllOperators(): Promise<OperatorSummary[]> {
   try {
     const battleDataPath = getBattleDataPath();
-    const data = await readJsonFile<unknown>(battleDataPath);
+    const data = await readJsonFileCached<unknown>(battleDataPath);
 
     if (!isRecord(data) || !isRecord(data.chars)) {
       throw new Error('无法读取干员数据');
     }
+
+    const cachedCatalog = operatorCatalogCache.get(data);
+    if (cachedCatalog) return [...cachedCatalog];
 
     // 从 chars 对象中提取所有干员
     const operators = Object.entries(data.chars)
@@ -558,8 +566,9 @@ export async function getAllOperators(): Promise<OperatorSummary[]> {
         return a.name.localeCompare(b.name, 'zh-CN');
       });
 
+    operatorCatalogCache.set(data, operators);
     logger.success(`加载所有干员成功，共 ${operators.length} 名干员（已过滤预备干员）`);
-    return operators;
+    return [...operators];
   } catch (error) {
     logger.error('加载所有干员失败', { error: getErrorMessage(error) });
     throw error;
