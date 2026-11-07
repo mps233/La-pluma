@@ -116,6 +116,9 @@ func New(application *app.App, logger *slog.Logger) *Handler {
 	mux.HandleFunc("GET /data/operators", handler.operatorsData)
 	mux.HandleFunc("GET /data/operbox", handler.operboxData)
 	mux.HandleFunc("GET /data/depot", handler.depotData)
+	mux.HandleFunc("POST /preview/orientation", handler.previewOrientation)
+	mux.HandleFunc("GET /changelog/core", handler.changelogCore)
+	mux.HandleFunc("GET /changelog/cli", handler.changelogCLI)
 	mux.HandleFunc("POST /actions/test-connection", handler.testConnection)
 	mux.HandleFunc("GET /actions/discover-devices", handler.discoverDevices)
 	mux.HandleFunc("POST /actions/open-config-directory", handler.openConfigDirectory)
@@ -1822,4 +1825,108 @@ func intField(record map[string]any, key string) int {
 		return value
 	}
 	return 0
+}
+
+func (h *Handler) previewOrientation(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	orientation := strings.ToLower(strings.TrimSpace(stringField(body, "orientation")))
+	if orientation != "portrait" && orientation != "landscape" && orientation != "auto" {
+		httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{Code: "AGENT_VALIDATION_ORIENTATION_INVALID", Message: "orientation 必须是 portrait、landscape 或 auto", Retryable: false})
+		return
+	}
+	adbPath := firstNonEmpty(stringField(body, "adbPath"), defaultADBPath())
+	address := firstNonEmpty(stringField(body, "address"), defaultADBAddress())
+	commands := [][]string{}
+	if orientation == "auto" {
+		commands = append(commands, []string{"settings", "put", "system", "accelerometer_rotation", "1"})
+	} else {
+		rotation := "0"
+		if orientation == "landscape" {
+			rotation = "1"
+		}
+		commands = append(commands,
+			[]string{"settings", "put", "system", "accelerometer_rotation", "0"},
+			[]string{"settings", "put", "system", "user_rotation", rotation},
+			[]string{"cmd", "window", "set-user-rotation", "lock", rotation},
+		)
+	}
+	if dryRun, _ := body["dryRun"].(bool); dryRun {
+		httpx.Success(w, http.StatusOK, map[string]any{"action": "preview-orientation", "orientation": orientation, "adbPath": adbPath, "address": address, "commands": commands}, "Dry run only", nil)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	client := adb.New(adbPath)
+	results := make([]map[string]any, 0, len(commands))
+	for _, command := range commands {
+		output, err := client.Shell(ctx, address, command...)
+		result := map[string]any{"args": command, "ok": err == nil, "stdout": output}
+		if err != nil {
+			result["error"] = err.Error()
+			if !(len(command) >= 2 && command[0] == "cmd" && command[1] == "window") {
+				httpx.Failure(w, http.StatusBadGateway, &httpx.APIError{Code: "AGENT_ORIENTATION_FAILED", Message: "设置屏幕方向失败", Retryable: true, Details: result})
+				return
+			}
+		}
+		results = append(results, result)
+	}
+	httpx.Success(w, http.StatusOK, map[string]any{"action": "preview-orientation", "orientation": orientation, "adbPath": adbPath, "address": address, "commands": commands, "results": results}, "屏幕方向已设置", nil)
+}
+
+func (h *Handler) changelogCore(w http.ResponseWriter, r *http.Request) {
+	h.changelog(w, r, "MaaAssistantArknights/MaaAssistantArknights")
+}
+
+func (h *Handler) changelogCLI(w http.ResponseWriter, r *http.Request) {
+	h.changelog(w, r, "MaaAssistantArknights/maa-cli")
+}
+
+func (h *Handler) changelog(w http.ResponseWriter, r *http.Request, repo string) {
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	request, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/"+repo+"/releases?per_page=30", nil)
+	request.Header.Set("Accept", "application/vnd.github+json")
+	request.Header.Set("User-Agent", "la-pluma-go")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		httpx.Failure(w, http.StatusBadGateway, &httpx.APIError{Code: "AGENT_CHANGELOG_FETCH_FAILED", Message: "获取更新日志失败", Retryable: true})
+		return
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		httpx.Failure(w, http.StatusBadGateway, &httpx.APIError{Code: "AGENT_CHANGELOG_FETCH_FAILED", Message: "获取更新日志失败", Retryable: true, Details: map[string]any{"status": response.StatusCode}})
+		return
+	}
+	var releases []struct {
+		TagName     string `json:"tag_name"`
+		Name        string `json:"name"`
+		Body        string `json:"body"`
+		PublishedAt string `json:"published_at"`
+		HTMLURL     string `json:"html_url"`
+		Prerelease  bool   `json:"prerelease"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&releases); err != nil {
+		httpx.Failure(w, http.StatusBadGateway, &httpx.APIError{Code: "AGENT_CHANGELOG_FETCH_FAILED", Message: "更新日志格式无效", Retryable: true})
+		return
+	}
+	out := make([]map[string]any, 0, 2)
+	var stable, beta *int
+	for index := range releases {
+		if releases[index].Prerelease && beta == nil {
+			value := index
+			beta = &value
+		}
+		if !releases[index].Prerelease && stable == nil {
+			value := index
+			stable = &value
+		}
+	}
+	for _, index := range []*int{beta, stable} {
+		if index == nil {
+			continue
+		}
+		release := releases[*index]
+		out = append(out, map[string]any{"version": release.TagName, "name": release.Name, "body": release.Body, "publishedAt": release.PublishedAt, "htmlUrl": release.HTMLURL, "prerelease": release.Prerelease})
+	}
+	httpx.Success(w, http.StatusOK, out, "", nil)
 }

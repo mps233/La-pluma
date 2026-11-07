@@ -115,8 +115,8 @@ func TestManifestAndOpenAPI(t *testing.T) {
 	}
 	data, _ := body["data"].(map[string]any)
 	actions, _ := data["actions"].([]any)
-	if len(actions) != 26 {
-		t.Fatalf("expected 26 advertised actions, got %d", len(actions))
+	if len(actions) != 40 {
+		t.Fatalf("expected 40 advertised actions, got %d", len(actions))
 	}
 	openapi := doRequest(t, handler, http.MethodGet, "/openapi.json")
 	if openapi.Code != http.StatusOK || !strings.Contains(openapi.Body.String(), `"openapi"`) {

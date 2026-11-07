@@ -36,6 +36,20 @@ var expectedAdvertisedIDs = []string{
 	"get_current_activity",
 	"list_custom_tools",
 	"run_custom_tool",
+	"get_mastery_preflight",
+	"list_mastery_candidates",
+	"get_mastery_operator",
+	"get_mastery_status",
+	"add_mastery_targets",
+	"update_mastery_target",
+	"remove_mastery_target",
+	"reorder_mastery_targets",
+	"update_mastery_settings",
+	"start_mastery_campaign",
+	"pause_mastery_campaign",
+	"resume_mastery_campaign",
+	"stop_mastery_campaign",
+	"retry_mastery_target",
 }
 
 var expectedNonAdvertisedIDs = []string{
@@ -147,8 +161,8 @@ func openAPIOperationAt(t *testing.T, spec map[string]any, path, method string) 
 
 func TestRegistryCountsAndUniqueness(t *testing.T) {
 	operations := Operations()
-	if len(operations) != 32 {
-		t.Fatalf("operation count = %d, want 32", len(operations))
+	if len(operations) != 46 {
+		t.Fatalf("operation count = %d, want 46", len(operations))
 	}
 
 	ids := map[string]bool{}
@@ -174,8 +188,8 @@ func TestRegistryCountsAndUniqueness(t *testing.T) {
 		}
 	}
 
-	if advertised != 26 {
-		t.Fatalf("advertised count = %d, want 26", advertised)
+	if advertised != 40 {
+		t.Fatalf("advertised count = %d, want 40", advertised)
 	}
 	if !reflect.DeepEqual(hidden, expectedNonAdvertisedIDs) {
 		t.Fatalf("hidden ids = %v, want %v", hidden, expectedNonAdvertisedIDs)
@@ -209,8 +223,8 @@ func TestManifestAdvertisesExpectedActions(t *testing.T) {
 	}
 
 	actions := requireSlice(t, manifest["actions"], "manifest.actions")
-	if len(actions) != 26 {
-		t.Fatalf("manifest action count = %d, want 26", len(actions))
+	if len(actions) != 40 {
+		t.Fatalf("manifest action count = %d, want 40", len(actions))
 	}
 	gotIDs := make([]string, 0, len(actions))
 	for _, raw := range actions {
@@ -419,6 +433,139 @@ func TestManifestRetainedRunLookup(t *testing.T) {
 	}
 }
 
+var expectedMasteryOperations = []struct {
+	id     string
+	method string
+	path   string
+}{
+	{"get_mastery_preflight", "GET", "/api/agent/operator-mastery/preflight"},
+	{"list_mastery_candidates", "GET", "/api/agent/operator-mastery/catalog"},
+	{"get_mastery_operator", "GET", "/api/agent/operator-mastery/operators/{operatorId}"},
+	{"get_mastery_status", "GET", "/api/agent/operator-mastery/status"},
+	{"add_mastery_targets", "POST", "/api/agent/operator-mastery/items"},
+	{"update_mastery_target", "PATCH", "/api/agent/operator-mastery/items/{id}"},
+	{"remove_mastery_target", "DELETE", "/api/agent/operator-mastery/items/{id}"},
+	{"reorder_mastery_targets", "PUT", "/api/agent/operator-mastery/items/order"},
+	{"update_mastery_settings", "PUT", "/api/agent/operator-mastery/settings"},
+	{"start_mastery_campaign", "POST", "/api/agent/operator-mastery/start"},
+	{"pause_mastery_campaign", "POST", "/api/agent/operator-mastery/pause"},
+	{"resume_mastery_campaign", "POST", "/api/agent/operator-mastery/resume"},
+	{"stop_mastery_campaign", "POST", "/api/agent/operator-mastery/stop"},
+	{"retry_mastery_target", "POST", "/api/agent/operator-mastery/items/{id}/retry"},
+}
+
+func TestMasteryOperationsInManifestAndOpenAPI(t *testing.T) {
+	spec := OpenAPI()
+	for _, want := range expectedMasteryOperations {
+		item := operationByID(t, want.id)
+		if item.Method != want.method || item.Path != want.path {
+			t.Fatalf("%s = %s %s, want %s %s", want.id, item.Method, item.Path, want.method, want.path)
+		}
+		if !item.Advertised {
+			t.Fatalf("%s is not advertised", want.id)
+		}
+		if !reflect.DeepEqual(item.Tags, []string{"Training"}) {
+			t.Fatalf("%s tags = %v", want.id, item.Tags)
+		}
+
+		action := manifestActionByID(t, want.id)
+		if action["method"] != want.method || action["path"] != want.path {
+			t.Fatalf("%s manifest method/path drifted", want.id)
+		}
+		openAPIOperationAt(t, spec, want.path, want.method)
+	}
+}
+
+func TestMasteryOperationMetadata(t *testing.T) {
+	preflight := manifestActionByID(t, "get_mastery_preflight")
+	preflightQuery := requireMap(t, preflight["query_schema"], "preflight query")
+	preflightProperties := requireMap(t, preflightQuery["properties"], "preflight properties")
+	for _, name := range []string{"profileId", "clientType"} {
+		if _, ok := preflightProperties[name]; !ok {
+			t.Fatalf("get_mastery_preflight is missing %s", name)
+		}
+	}
+
+	catalog := manifestActionByID(t, "list_mastery_candidates")
+	catalogQuery := requireMap(t, catalog["query_schema"], "catalog query")
+	catalogProperties := requireMap(t, catalogQuery["properties"], "catalog properties")
+	status := requireMap(t, catalogProperties["status"], "catalog status")
+	if !reflect.DeepEqual(requireStrings(t, status["enum"], "status.enum"), []string{"eligible", "owned", "all"}) {
+		t.Fatalf("status.enum = %v", status["enum"])
+	}
+	limit := requireMap(t, catalogProperties["limit"], "catalog limit")
+	requireInt(t, limit["minimum"], "limit.minimum", 1)
+	requireInt(t, limit["maximum"], "limit.maximum", 1000)
+	requireInt(t, limit["default"], "limit.default", 500)
+
+	operator := operationByID(t, "get_mastery_operator")
+	if !reflect.DeepEqual(operator.PathSchema["required"], []string{"operatorId"}) {
+		t.Fatalf("get_mastery_operator required = %v", operator.PathSchema["required"])
+	}
+
+	add := manifestActionByID(t, "add_mastery_targets")
+	if requireMap(t, add["safety"], "add safety")["level"] != "low-risk-write" {
+		t.Fatalf("add_mastery_targets safety = %v", add["safety"])
+	}
+	if !reflect.DeepEqual(requireStrings(t, requireMap(t, add["safety"], "add safety")["sideEffects"], "add sideEffects"), []string{"write_mastery_queue"}) {
+		t.Fatalf("add_mastery_targets sideEffects = %v", add["safety"])
+	}
+	addBody := requireMap(t, add["body_schema"], "add body")
+	if !reflect.DeepEqual(requireStrings(t, addBody["required"], "add required"), []string{"items"}) {
+		t.Fatalf("add_mastery_targets body required = %v", addBody["required"])
+	}
+	itemSchema := requireMap(t, requireMap(t, addBody["properties"], "add properties")["items"], "items")
+	itemObject := requireMap(t, itemSchema["items"], "item object")
+	if !reflect.DeepEqual(requireStrings(t, itemObject["required"], "item required"), []string{"operatorId", "skillIndex", "targetLevel"}) {
+		t.Fatalf("mastery item required = %v", itemObject["required"])
+	}
+
+	settings := requireMap(t, manifestActionByID(t, "update_mastery_settings")["body_schema"], "settings body")
+	settingsProperties := requireMap(t, settings["properties"], "settings properties")
+	interval := requireMap(t, settingsProperties["probeIntervalMinutes"], "probeIntervalMinutes")
+	if !reflect.DeepEqual(interval["enum"], []int{60, 120, 360}) {
+		t.Fatalf("probeIntervalMinutes.enum = %v", interval["enum"])
+	}
+
+	start := manifestActionByID(t, "start_mastery_campaign")
+	startSafety := requireMap(t, start["safety"], "start safety")
+	if startSafety["level"] != "consequential" {
+		t.Fatalf("start_mastery_campaign safety = %v", startSafety["level"])
+	}
+	if !reflect.DeepEqual(
+		requireStrings(t, startSafety["sideEffects"], "start sideEffects"),
+		[]string{"start_training_room_training", "consume_mastery_materials"},
+	) {
+		t.Fatalf("start_mastery_campaign sideEffects = %v", startSafety["sideEffects"])
+	}
+	startExecution := requireMap(t, start["execution"], "start execution")
+	if startExecution["mode"] != "sync-or-background" {
+		t.Fatalf("start_mastery_campaign mode = %v", startExecution["mode"])
+	}
+	if startExecution["pollAction"] != "get_mastery_status" {
+		t.Fatalf("start_mastery_campaign pollAction = %v", startExecution["pollAction"])
+	}
+	if startExecution["stopAction"] != "stop_mastery_campaign" {
+		t.Fatalf("start_mastery_campaign stopAction = %v", startExecution["stopAction"])
+	}
+	if !reflect.DeepEqual(requireStrings(t, startExecution["conflictsWith"], "start conflicts"), []string{"maa-execution"}) {
+		t.Fatalf("start_mastery_campaign conflictsWith = %v", startExecution["conflictsWith"])
+	}
+
+	stop := operationByID(t, "stop_mastery_campaign")
+	if stop.Execution.StopAction != nil {
+		t.Fatalf("stop_mastery_campaign stopAction = %v", stop.Execution.StopAction)
+	}
+	if !reflect.DeepEqual(stop.Safety.SideEffects, []string{"stop_mastery_campaign"}) {
+		t.Fatalf("stop_mastery_campaign sideEffects = %v", stop.Safety.SideEffects)
+	}
+
+	retry := operationByID(t, "retry_mastery_target")
+	if !reflect.DeepEqual(retry.PathSchema["required"], []string{"id"}) {
+		t.Fatalf("retry_mastery_target required = %v", retry.PathSchema["required"])
+	}
+}
+
 func TestIdempotencyMetadataForRunActions(t *testing.T) {
 	actions := requireSlice(t, Manifest()["actions"], "manifest.actions")
 	gotIDs := make([]string, 0)
@@ -522,10 +669,15 @@ func TestOpenAPIDerivesFromRegistry(t *testing.T) {
 		}
 	}
 
-	// Every registered operation is unique by path in this registry, so the
-	// OpenAPI path count matches the registry count.
-	if len(paths) != len(operations) {
-		t.Fatalf("OpenAPI path count = %d, want %d", len(paths), len(operations))
+	// update_mastery_target and remove_mastery_target share one path with
+	// different methods, so the OpenAPI path count matches the unique path
+	// count rather than the operation count.
+	uniquePaths := map[string]bool{}
+	for _, item := range operations {
+		uniquePaths[item.Path] = true
+	}
+	if len(paths) != len(uniquePaths) {
+		t.Fatalf("OpenAPI path count = %d, want %d", len(paths), len(uniquePaths))
 	}
 }
 

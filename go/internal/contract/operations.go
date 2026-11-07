@@ -3,7 +3,7 @@ package contract
 var registry = buildRegistry()
 
 func buildRegistry() []Operation {
-	operations := make([]Operation, 0, 32)
+	operations := make([]Operation, 0, 46)
 
 	operations = append(operations,
 		operation(
@@ -557,6 +557,213 @@ func buildRegistry() []Operation {
 				"waitForCompletion": map[string]any{"type": "boolean", "default": true},
 				"profileId":         profileIDProperty(),
 			}, "toolId")),
+
+		operation(
+			"get_mastery_preflight",
+			"GET",
+			"/api/agent/operator-mastery/preflight",
+			"Check mastery data, MAA version, and runtime support for OperProgress. This never starts training.",
+		).withTags("Training").
+			withQuerySchema(objectSchema(map[string]any{
+				"profileId":  profileIDProperty(),
+				"clientType": runtimeDefaultString("clientType"),
+			})),
+
+		operation(
+			"list_mastery_candidates",
+			"GET",
+			"/api/agent/operator-mastery/catalog",
+			"List operators with skill mastery data and their E2 eligibility. This never starts training.",
+		).withTags("Training").
+			withQuerySchema(objectSchema(map[string]any{
+				"search": map[string]any{"type": "string"},
+				"rarity": map[string]any{"type": "number"},
+				"status": map[string]any{
+					"type":    "string",
+					"enum":    stringEnum("eligible", "owned", "all"),
+					"default": "all",
+				},
+				"limit": map[string]any{
+					"type":    "number",
+					"minimum": 1,
+					"maximum": 1000,
+					"default": 500,
+				},
+				"clientType": runtimeDefaultString("clientType"),
+			})),
+
+		operation(
+			"get_mastery_operator",
+			"GET",
+			"/api/agent/operator-mastery/operators/{operatorId}",
+			"Return one operator skill, mastery costs, and the current advisory material gap.",
+		).withTags("Training").
+			withPathSchema(requiredObjectSchema(map[string]any{
+				"operatorId": map[string]any{"type": "string"},
+			}, "operatorId")).
+			withQuerySchema(objectSchema(map[string]any{
+				"declaredLevel": map[string]any{
+					"type":    "number",
+					"minimum": 0,
+					"maximum": 3,
+					"default": 0,
+				},
+				"clientType": runtimeDefaultString("clientType"),
+			})),
+
+		operation(
+			"get_mastery_status",
+			"GET",
+			"/api/agent/operator-mastery/status",
+			"Return the mastery campaign, queue items, counts, and scheduler state.",
+		).withTags("Training"),
+
+		operation(
+			"add_mastery_targets",
+			"POST",
+			"/api/agent/operator-mastery/items",
+			"Add one or more operator-skill mastery targets to the queue. This does not start training.",
+		).withTags("Training").
+			withSafety(lowRiskWriteSafety([]string{"write_mastery_queue"}, safetyOptions{})).
+			withBodySchema(requiredObjectSchema(map[string]any{
+				"items": map[string]any{
+					"type": "array",
+					"items": requiredObjectSchema(map[string]any{
+						"operatorId":    map[string]any{"type": "string"},
+						"skillIndex":    map[string]any{"type": "number", "minimum": 1, "maximum": 3},
+						"targetLevel":   map[string]any{"type": "number", "minimum": 1, "maximum": 3},
+						"declaredLevel": map[string]any{"type": "number", "minimum": 0, "maximum": 2, "default": 0},
+					}, "operatorId", "skillIndex", "targetLevel"),
+				},
+			}, "items")),
+
+		operation(
+			"update_mastery_target",
+			"PATCH",
+			"/api/agent/operator-mastery/items/{id}",
+			"Update a queued mastery target level or enabled state. Execution is locked while a step is in flight.",
+		).withTags("Training").
+			withSafety(lowRiskWriteSafety([]string{"write_mastery_queue"}, safetyOptions{})).
+			withPathSchema(requiredObjectSchema(map[string]any{
+				"id": map[string]any{"type": "string"},
+			}, "id")).
+			withBodySchema(objectSchema(map[string]any{
+				"targetLevel": map[string]any{"type": "number", "minimum": 1, "maximum": 3},
+				"enabled":     map[string]any{"type": "boolean"},
+			})),
+
+		operation(
+			"remove_mastery_target",
+			"DELETE",
+			"/api/agent/operator-mastery/items/{id}",
+			"Remove a mastery target from the queue. An in-game training already started is not canceled.",
+		).withTags("Training").
+			withSafety(lowRiskWriteSafety([]string{"write_mastery_queue"}, safetyOptions{})).
+			withPathSchema(requiredObjectSchema(map[string]any{
+				"id": map[string]any{"type": "string"},
+			}, "id")),
+
+		operation(
+			"reorder_mastery_targets",
+			"PUT",
+			"/api/agent/operator-mastery/items/order",
+			"Reorder the mastery queue. The active item is locked while its step is running.",
+		).withTags("Training").
+			withSafety(lowRiskWriteSafety([]string{"write_mastery_queue"}, safetyOptions{})).
+			withBodySchema(requiredObjectSchema(map[string]any{
+				"order": map[string]any{
+					"type":  "array",
+					"items": map[string]any{"type": "string"},
+				},
+			}, "order")),
+
+		operation(
+			"update_mastery_settings",
+			"PUT",
+			"/api/agent/operator-mastery/settings",
+			"Update the mastery probe interval, blocked-item policy, and notifications.",
+		).withTags("Training").
+			withSafety(lowRiskWriteSafety([]string{"write_mastery_queue"}, safetyOptions{})).
+			withBodySchema(objectSchema(map[string]any{
+				"probeIntervalMinutes": map[string]any{
+					"type": "number",
+					"enum": []int{60, 120, 360},
+				},
+				"onItemBlocked":    map[string]any{"type": "string", "enum": stringEnum("skip", "pause")},
+				"autoStartGame":    map[string]any{"type": "boolean"},
+				"notifyOnComplete": map[string]any{"type": "boolean"},
+				"notifyOnBlocked":  map[string]any{"type": "boolean"},
+			})),
+
+		operation(
+			"start_mastery_campaign",
+			"POST",
+			"/api/agent/operator-mastery/start",
+			"Arm the mastery queue and let the server scheduler start the next OperProgress step. This can consume materials and start a multi-hour training.",
+		).withTags("Training").
+			withSafety(consequentialSafety(
+				[]string{"start_training_room_training", "consume_mastery_materials"},
+				safetyOptions{},
+			)).
+			withExecution(execution(executionOptions{
+				mode:          "sync-or-background",
+				pollAction:    stringPtr("get_mastery_status"),
+				stopAction:    stringPtr("stop_mastery_campaign"),
+				conflictsWith: []string{"maa-execution"},
+			})).
+			withBodySchema(objectSchema(map[string]any{
+				"dryRun":     map[string]any{"type": "boolean", "default": false},
+				"profileId":  profileIDProperty(),
+				"clientType": runtimeDefaultString("clientType"),
+			})),
+
+		operation(
+			"pause_mastery_campaign",
+			"POST",
+			"/api/agent/operator-mastery/pause",
+			"Stop starting new mastery steps. An in-game training already started continues.",
+		).withTags("Training").
+			withSafety(lowRiskWriteSafety([]string{"pause_mastery_campaign"}, safetyOptions{})).
+			withBodySchema(objectSchema(map[string]any{
+				"reason": map[string]any{"type": "string"},
+			})),
+
+		operation(
+			"resume_mastery_campaign",
+			"POST",
+			"/api/agent/operator-mastery/resume",
+			"Resume a paused or interrupted mastery campaign. The next step re-verifies the game state first.",
+		).withTags("Training").
+			withSafety(consequentialSafety([]string{"resume_mastery_training"}, safetyOptions{})).
+			withExecution(execution(executionOptions{
+				mode:          "sync-or-background",
+				pollAction:    stringPtr("get_mastery_status"),
+				stopAction:    stringPtr("stop_mastery_campaign"),
+				conflictsWith: []string{"maa-execution"},
+			})).
+			withBodySchema(objectSchema(map[string]any{})),
+
+		operation(
+			"stop_mastery_campaign",
+			"POST",
+			"/api/agent/operator-mastery/stop",
+			"Stop the scheduler and current step. In-game training continues and materials are not refunded.",
+		).withTags("Training").
+			withSafety(lowRiskWriteSafety([]string{"stop_mastery_campaign"}, safetyOptions{})).
+			withExecution(execution(executionOptions{})).
+			withBodySchema(objectSchema(map[string]any{})),
+
+		operation(
+			"retry_mastery_target",
+			"POST",
+			"/api/agent/operator-mastery/items/{id}/retry",
+			"Move a blocked or failed mastery target back to the queue after the external cause is fixed.",
+		).withTags("Training").
+			withSafety(lowRiskWriteSafety([]string{"write_mastery_queue"}, safetyOptions{})).
+			withPathSchema(requiredObjectSchema(map[string]any{
+				"id": map[string]any{"type": "string"},
+			}, "id")).
+			withBodySchema(objectSchema(map[string]any{})),
 	)
 
 	return operations

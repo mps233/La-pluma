@@ -75,7 +75,7 @@ func materializeSchema(schema map[string]any, defaults map[string]string) map[st
 }
 
 // Manifest returns the AI-readable manifest without runtime connection
-// defaults and with all 26 advertised actions.
+// defaults and with all 40 advertised actions.
 func Manifest() map[string]any {
 	return ManifestWithDefaults(RuntimeDefaults{})
 }
