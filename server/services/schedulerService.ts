@@ -899,6 +899,7 @@ async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: 
   let successCount = 0;
   let failedCount = 0;
   let skippedCount = 0;
+  let startupFailed = false;
   const errors: TaskErrorEntry[] = [];
   const skipped: TaskSkipEntry[] = [];
   const taskSummaries: TaskSummary[] = []; // 收集任务总结信息
@@ -958,6 +959,43 @@ async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: 
     const task = enabledTasks[i];
     const taskName = task.name || task.id;
     const commandId = task.commandId || task.id.split('-')[0];
+
+    // 启动游戏失败后，后续任务没有可操作的游戏界面；直接跳过，只保留关闭游戏做清理。
+    if (startupFailed && commandId !== 'closedown') {
+      const reason = '启动游戏失败，已跳过后续游戏任务';
+      const timestamp = new Date().toISOString();
+      skippedCount++;
+      skipped.push({ task: task.name, reason });
+      actionResults.push({
+        task: task.name,
+        action: commandId || 'task',
+        status: 'skipped',
+        message: reason
+      });
+      taskResults.push({
+        id: task.id,
+        name: task.name,
+        state: 'skipped',
+        startedAt: timestamp,
+        finishedAt: timestamp
+      });
+      updateScheduleStatus({
+        currentStep: i,
+        currentTask: task.name,
+        currentTaskId: task.id,
+        message: `已跳过: ${task.name}（启动游戏失败）`
+      });
+      lifecycle.onProgress?.({
+        currentStep: i + 1,
+        totalSteps: enabledTasks.length,
+        currentTask: task.name,
+        currentTaskId: task.id,
+        message: `已跳过: ${task.name}（启动游戏失败）`,
+        updatedAt: timestamp
+      }, taskResults);
+      logger.warn('启动游戏失败，跳过后续任务', { scheduleId, taskName: task.name });
+      continue;
+    }
 
     logger.info('执行任务', {
       scheduleId,
@@ -1065,7 +1103,7 @@ async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: 
     }
 
     // 关闭前仓库识别是可选步骤，不再作为隐藏的强制行为。
-    if (commandId === 'closedown' && task.params?.recognizeDepotBeforeClose === true) {
+    if (commandId === 'closedown' && !startupFailed && task.params?.recognizeDepotBeforeClose === true) {
       // 识别仓库
       try {
         logger.info('关闭游戏前先识别仓库', { scheduleId });
@@ -1166,6 +1204,7 @@ async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: 
       if (isScheduleStopRequested()) break;
       if (!connectionCheck.success) {
         const errorMessage = connectionCheck.message || '模拟器连接失败';
+        startupFailed = true;
         failedCount++;
         errors.push({ task: task.name, error: errorMessage });
         actionResults.push({
@@ -1178,7 +1217,9 @@ async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: 
         continue;
       }
 
-      const maxRetries = 2;
+      const launchGame = task.params?.startGameEnabled !== false;
+      // 仅连接模式不会拉起游戏，重试没有意义；失败时直接给出明确原因。
+      const maxRetries = launchGame ? 2 : 0;
       let retryCount = 0;
       let startupSuccess = false;
 
@@ -1196,10 +1237,27 @@ async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: 
             if (!await waitForScheduleDelay(3000)) break;
           }
 
-          const { command, params } = buildScheduledTaskCommand(task, adbConfig);
-          const args = params ? params.split(' ').filter(arg => arg) : [];
+          if (!launchGame) {
+            const gameState = await getGameClientState(
+              adbConfig.adbPath,
+              adbConfig.address,
+              firstNonEmptyString(task.params.clientType) || DEFAULT_CLIENT_TYPE
+            );
+            if (!gameState.running) {
+              throw new Error(`启动游戏客户端未勾选，且游戏未在前台运行（当前应用：${gameState.foregroundPackage || '未知'}）`);
+            }
+          }
+
+          const { command, params, taskConfig } = buildScheduledTaskCommand(task, adbConfig);
           if (isScheduleStopRequested()) break;
-          await execMaaCommand(command, args, task.name, null, true);
+          if (taskConfig) {
+            await execDynamicTask(params, taskConfig, task.name, null, true, false, {
+              shouldAbort: isScheduleStopRequested
+            });
+          } else {
+            const args = params ? params.split(' ').filter(arg => arg) : [];
+            await execMaaCommand(command, args, task.name, null, true);
+          }
           if (isScheduleStopRequested()) break;
 
           logger.info('启动游戏命令执行完成', { scheduleId });
@@ -1225,19 +1283,25 @@ async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: 
               task: task.name,
               action: 'startup',
               status: 'success',
-              message: task.params.accountName
-                ? `游戏已启动，账号 ${task.params.accountName} 已匹配`
-                : '游戏已启动并进入前台'
+              message: launchGame
+                ? (task.params.accountName
+                  ? `游戏已启动，账号 ${task.params.accountName} 已匹配`
+                  : '游戏已启动并进入前台')
+                : (task.params.accountName
+                  ? `游戏已在前台，账号 ${task.params.accountName} 已匹配`
+                  : '仅建立 MAA 连接，游戏已在前台运行')
             });
           } catch (error) {
             if (isScheduleStopRequested(error)) break;
-            logger.error('游戏可能已闪退', {
+            logger.error(launchGame ? '游戏可能已闪退' : '游戏已不在前台', {
               scheduleId,
               error: getErrorMessage(error)
             });
             retryCount++;
             if (retryCount > maxRetries) {
-              throw new Error('游戏启动后闪退，已达到最大重试次数');
+              throw new Error(launchGame
+                ? '游戏启动后闪退，已达到最大重试次数'
+                : '游戏未在前台运行，已停止重试');
             }
           }
         } catch (error) {
@@ -1246,6 +1310,7 @@ async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: 
             break;
           }
           if (retryCount >= maxRetries) {
+            startupFailed = true;
             failedCount++;
             errors.push({ task: task.name, error: getErrorMessage(error) });
             actionResults.push({
@@ -1859,13 +1924,16 @@ async function executeTaskFlowUnlocked(taskFlow: ScheduledTaskFlow, scheduleId: 
   finalizeActiveTask(wasStopped ? 'stopped' : null);
   const duration = Date.now() - startTime;
   const reportFailureCount = reportResults.filter(report => report.status === 'failed').length;
+  const skipSuffix = skippedCount > 0 ? `，${skippedCount} 项任务跳过` : '';
   const completionMessage = wasStopped
     ? '任务流程已被用户终止'
     : reportFailureCount > 0
-      ? `任务流程执行完成，${reportFailureCount} 项掉落汇报失败`
+      ? `任务流程执行完成，${reportFailureCount} 项掉落汇报失败${skipSuffix}`
       : failedCount > 0
-        ? `任务流程执行完成，${failedCount} 项任务失败`
-        : '任务流程执行完成';
+        ? `任务流程执行完成，${failedCount} 项任务失败${skipSuffix}`
+        : skippedCount > 0
+          ? `任务流程执行完成${skipSuffix}`
+          : '任务流程执行完成';
   const executionSummary: ScheduleExecutionSummary = {
     successCount,
     failedCount,
