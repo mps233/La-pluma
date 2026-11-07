@@ -76,6 +76,7 @@ func startDesktop() {
 		return
 	}
 	resources, _ := mygo.App.Path(mygo.PathResources)
+	seedDataDir(resources, filepath.Join(userData, "data"))
 	clientDist := os.Getenv("LA_PLUMA_CLIENT_DIST")
 	if clientDist == "" {
 		if candidate := filepath.Join(resources, "client"); directoryExists(candidate) {
@@ -104,16 +105,16 @@ func startDesktop() {
 		}
 	}
 
+	defaultPaths := config.DefaultPaths(".")
+	defaultPaths.DataDir = filepath.Join(userData, "data")
+	defaultPaths.CacheDir = cacheDir
+	defaultPaths.ClientDist = clientDist
 	cfg := config.Config{
 		Host:     "127.0.0.1",
 		Port:     desktopPort,
 		BasePath: "/",
 		Token:    token,
-		Paths: config.Paths{
-			DataDir:    filepath.Join(userData, "data"),
-			CacheDir:   cacheDir,
-			ClientDist: clientDist,
-		},
+		Paths:    defaultPaths,
 	}
 	application, err := app.New(cfg, logger)
 	if err != nil {
@@ -153,6 +154,11 @@ func startDesktop() {
 			logger.Error("desktop server", "error", err)
 		}
 	}()
+
+	// Drop service workers and HTTP caches left by an older build: the
+	// desktop shell serves the app same-origin, and a stale worker would
+	// otherwise keep an old UI alive. Local storage (token, prefs) stays.
+	_ = mygo.DefaultSession().ClearData(mygo.SiteDataServiceWorkers | mygo.SiteDataCaches)
 
 	runtimeState.window = mygo.NewWindow(mygo.WindowOptions{
 		Title:           "La Pluma",
@@ -355,5 +361,32 @@ func (DesktopBridge) AppInfo() map[string]any {
 		"version":  "0.1.0",
 		"platform": runtime.GOOS,
 		"userData": userData,
+	}
+}
+
+// seedDataDir copies static game data shipped under resources/seed into the
+// user data directory. Existing files are never overwritten, and
+// account-specific snapshots are not part of the seed.
+func seedDataDir(resources, dataDir string) {
+	seedDir := filepath.Join(resources, "seed")
+	entries, err := os.ReadDir(seedDir)
+	if err != nil {
+		return
+	}
+	_ = os.MkdirAll(dataDir, 0o700)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		source := filepath.Join(seedDir, entry.Name())
+		target := filepath.Join(dataDir, entry.Name())
+		if _, err := os.Stat(target); err == nil {
+			continue
+		}
+		data, err := os.ReadFile(source)
+		if err != nil {
+			continue
+		}
+		_ = os.WriteFile(target, data, 0o600)
 	}
 }

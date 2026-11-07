@@ -13,14 +13,14 @@ import (
 	domainrun "github.com/mps233/la-pluma/go/internal/domain/agentrun"
 )
 
-type maaExecutor struct{ service *maaapp.Service }
+type maaServiceAdapter struct{ service *maaapp.Service }
 
-func (e maaExecutor) RunTask(ctx context.Context, taskConfig map[string]any, wait bool) (domainrun.DTO, error) {
+func (e maaServiceAdapter) RunTask(ctx context.Context, taskConfig map[string]any, wait bool) (domainrun.DTO, error) {
 	run, _, err := e.service.RunTask(ctx, taskConfig, wait, nil)
 	return run, err
 }
 
-func (e maaExecutor) RunCommand(ctx context.Context, command string, args []string, taskName, taskType string, wait bool) (domainrun.DTO, error) {
+func (e maaServiceAdapter) RunCommand(ctx context.Context, command string, args []string, taskName, taskType string, wait bool) (domainrun.DTO, error) {
 	run, _, err := e.service.Run(ctx, maaapp.RunRequest{
 		OperationID: "run_task",
 		Command:     command,
@@ -34,7 +34,7 @@ func (e maaExecutor) RunCommand(ctx context.Context, command string, args []stri
 	return run, err
 }
 
-func (e maaExecutor) Stop(ctx context.Context) error { return e.service.Stop(ctx) }
+func (e maaServiceAdapter) Stop(ctx context.Context) error { return e.service.Stop(ctx) }
 
 type dropsRecorder struct{ service *drops.Service }
 
@@ -49,18 +49,19 @@ func (c trainingStageChecker) IsStageOpen(stage, clientType string) (bool, strin
 	return c.service.IsStageOpen(stage, clientType)
 }
 
-func newScheduler(cfg config.Config, logger *slog.Logger, executor *maaapp.Service, dropService *drops.Service, trainingService *training.Service, configSource scheduler.ConfigSource) *scheduler.Service {
+func newScheduler(cfg config.Config, logger *slog.Logger, executor *maaapp.Service, dropService *drops.Service, trainingService *training.Service, configSource scheduler.ConfigSource, autoUpdater scheduler.AutoUpdater) *scheduler.Service {
 	defaults := scheduler.ConnectionDefaults{
 		ADBPath:    os.Getenv("ADB_PATH"),
 		Address:    os.Getenv("ADB_ADDRESS"),
 		ClientType: os.Getenv("MAA_CLIENT_TYPE"),
 	}
-	service := scheduler.New(maaExecutor{service: executor}, cfg.Paths, scheduler.Options{
+	service := scheduler.New(maaServiceAdapter{service: executor}, cfg.Paths, scheduler.Options{
 		Logger:             logger,
 		ConfigSource:       configSource,
 		ConnectionDefaults: defaults,
 		DropRecorder:       dropsRecorder{service: dropService},
 		StageOpenChecker:   trainingStageChecker{service: trainingService},
+		AutoUpdater:        autoUpdater,
 	})
 	service.RestoreFromConfig()
 	return service

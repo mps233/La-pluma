@@ -127,6 +127,18 @@ func (t *ProgressTracker) settle(key string, status ProgressStatus, errorMessage
 	}
 }
 
+// statusOf returns the live status for one entry key. Execution failure
+// projection uses it to keep entries that were already running.
+func (t *ProgressTracker) statusOf(key string) ProgressStatus {
+	if t == nil {
+		return ""
+	}
+	if item := t.results[key]; item != nil {
+		return item.Status
+	}
+	return ""
+}
+
 // MarkGroupSuccess records success for a whole formation group.
 func (t *ProgressTracker) MarkGroupSuccess(entries []PlanEntry) {
 	if t == nil {

@@ -12,14 +12,18 @@ import (
 	"github.com/mps233/la-pluma/go/internal/app/agentrun"
 	configapp "github.com/mps233/la-pluma/go/internal/app/config"
 	"github.com/mps233/la-pluma/go/internal/app/copilot"
+	"github.com/mps233/la-pluma/go/internal/app/customtools"
 	"github.com/mps233/la-pluma/go/internal/app/drops"
 	"github.com/mps233/la-pluma/go/internal/app/execution"
 	"github.com/mps233/la-pluma/go/internal/app/logs"
 	maaapp "github.com/mps233/la-pluma/go/internal/app/maa"
+	"github.com/mps233/la-pluma/go/internal/app/mastery"
 	"github.com/mps233/la-pluma/go/internal/app/notifications"
 	"github.com/mps233/la-pluma/go/internal/app/quotes"
+	"github.com/mps233/la-pluma/go/internal/app/recognition"
 	"github.com/mps233/la-pluma/go/internal/app/scheduler"
 	"github.com/mps233/la-pluma/go/internal/app/training"
+	"github.com/mps233/la-pluma/go/internal/app/updates"
 	webrtcapp "github.com/mps233/la-pluma/go/internal/app/webrtc"
 	"github.com/mps233/la-pluma/go/internal/config"
 	"github.com/mps233/la-pluma/go/internal/infra/assets"
@@ -49,6 +53,10 @@ type App struct {
 	Copilot       *copilot.Service
 	Notifications *notifications.Service
 	Quotes        *quotes.Service
+	CustomTools   *customtools.Service
+	Recognition   *recognition.Service
+	Updates       *updates.Service
+	Mastery       *mastery.Service
 	Assets        *assets.Handler
 	WebRTC        *webrtcapp.Service
 
@@ -86,22 +94,39 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	configStore := configapp.NewStorage(cfg.Paths)
 	dropService := drops.New(cfg.Paths)
 	trainingService := training.New(cfg.Paths, logger)
-	copilotService := copilot.New(cfg.Paths)
+	copilotService := copilot.NewWithOptions(copilot.ServiceOptions{
+		Paths:    cfg.Paths,
+		Logger:   logger,
+		Executor: maaServiceAdapter{service: maaActions},
+	})
 	activityService := activity.NewWithOptions(activity.Options{
-		Paths:        cfg.Paths,
-		Logger:       logger,
-		ConfigLoader: configStore,
-		Executor:     maaExecutor{service: maaActions},
+		Paths:              cfg.Paths,
+		Logger:             logger,
+		ConfigLoader:       configStore,
+		Executor:           maaServiceAdapter{service: maaActions},
+		PlanProvider:       activityPlanProvider{service: copilotService},
+		PlanExecutor:       activityPlanExecutor{service: copilotService},
+		CurrentMapPreparer: activityCurrentMapPreparer{},
+		LeaseRunner:        activityLeaseRunner{},
+		NavigationLog:      newActivityNavigationLog(cfg.Paths),
 	})
 	quotesService := quotes.New(cfg.Paths, logger)
+	customToolsService := customtools.New(cfg.Paths, maaServiceAdapter{service: maaActions})
+	recognitionService := recognition.New(recognition.Options{Paths: cfg.Paths, Logger: logger})
 	assetsHandler := assets.New(cfg.Paths, assets.Config{Logger: logger})
-	schedulerService := newScheduler(cfg, logger, maaActions, dropService, trainingService, configStore)
 	notificationService := notifications.New(notifications.Options{Paths: cfg.Paths, Logger: logger})
 	if loaded, err := notificationService.Load(); err == nil {
 		notificationService.SetConfig(loaded)
 	} else {
 		logger.Debug("notification config not loaded", "error", err)
 	}
+	updatesService := updates.NewWithOptions(updates.Options{
+		Paths:  cfg.Paths,
+		Logger: logger,
+		Runner: maaServiceAdapter{service: maaActions},
+	})
+	schedulerService := newScheduler(cfg, logger, maaActions, dropService, trainingService, configStore, updatesAutoUpdater{service: updatesService})
+	masteryService := newMasteryService(cfg, logger, maaServiceAdapter{service: maaActions}, executionManager, notificationService)
 	profiles := configapp.NewProfiles(cfg.Paths.MaaConfigDir)
 	maaActions.SetLineHandler(logService.AppendLine)
 
@@ -122,6 +147,10 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Copilot:       copilotService,
 		Notifications: notificationService,
 		Quotes:        quotesService,
+		CustomTools:   customToolsService,
+		Recognition:   recognitionService,
+		Updates:       updatesService,
+		Mastery:       masteryService,
 		Assets:        assetsHandler,
 		WebRTC:        webrtcapp.New(cfg, logger),
 		startedAt:     time.Now(),
@@ -136,6 +165,9 @@ func (a *App) Close(ctx context.Context) error {
 		a.Execution.CloseAdmission("server_shutdown")
 		if a.Scheduler != nil {
 			a.Scheduler.Close()
+		}
+		if a.Mastery != nil {
+			a.Mastery.StopScheduler()
 		}
 		if err := a.MAAService.Stop(ctx); err != nil {
 			result = err

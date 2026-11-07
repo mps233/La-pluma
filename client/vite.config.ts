@@ -225,6 +225,9 @@ export const createViteConfig = (basePath: string): UserConfig => ({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Windows/PWA use the explicit useRegisterSW hook; the MyGo desktop
+      // webview injects no service worker registration.
+      injectRegister: null,
       devOptions: {
         enabled: false // 开发模式下禁用 Service Worker
       },

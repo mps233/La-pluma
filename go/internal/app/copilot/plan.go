@@ -67,7 +67,9 @@ type planCacheEntry struct {
 	value     *Plan
 }
 
-// ServiceOptions configures the copilot plan, discovery and manual services.
+// ServiceOptions configures the copilot plan, discovery, execution and manual
+// services. Executor and LeaseRunner may be nil until the MAA integration is
+// wired; plan execution then fails closed instead of touching a device.
 type ServiceOptions struct {
 	Paths          config.Paths
 	PRTS           *PRTSClient
@@ -76,6 +78,8 @@ type ServiceOptions struct {
 	Logger         *slog.Logger
 	BattleSampler  BattleProgressSampler
 	ManualExecutor StepExecutor
+	Executor       Executor
+	LeaseRunner    LeaseRunner
 }
 
 // Service owns the PRTS plan cache, progress persistence and stage index.
@@ -89,6 +93,8 @@ type Service struct {
 
 	battleSampler  BattleProgressSampler
 	manualExecutor StepExecutor
+	executor       Executor
+	lease          LeaseRunner
 
 	planMu       sync.Mutex
 	planCache    map[string]planCacheEntry
@@ -132,12 +138,19 @@ func NewWithOptions(options ServiceOptions) *Service {
 		planTTL:       ttl,
 		logger:        logger,
 		battleSampler: options.BattleSampler,
+		executor:      options.Executor,
+		lease:         options.LeaseRunner,
 		planCache:     map[string]planCacheEntry{},
 		planInFlight:  map[string]*planBuildCall{},
 	}
+	manualExecutor := options.ManualExecutor
+	if manualExecutor == nil {
+		manualExecutor = service.ManualStepExecutor()
+	}
+	service.manualExecutor = manualExecutor
 	service.manual = NewManualManagerWithOptions(
 		service.BuildPlan,
-		options.ManualExecutor,
+		manualExecutor,
 		ManualOptions{Now: now},
 	)
 	return service

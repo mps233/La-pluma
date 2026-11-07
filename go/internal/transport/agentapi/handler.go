@@ -17,9 +17,12 @@ import (
 
 	"github.com/mps233/la-pluma/go/internal/app"
 	"github.com/mps233/la-pluma/go/internal/app/activity"
+	"github.com/mps233/la-pluma/go/internal/app/copilot"
+	"github.com/mps233/la-pluma/go/internal/app/mastery"
 	"github.com/mps233/la-pluma/go/internal/app/notifications"
 	"github.com/mps233/la-pluma/go/internal/app/scheduler"
 	"github.com/mps233/la-pluma/go/internal/app/training"
+	"github.com/mps233/la-pluma/go/internal/app/updates"
 	webrtcapp "github.com/mps233/la-pluma/go/internal/app/webrtc"
 	"github.com/mps233/la-pluma/go/internal/contract"
 	"github.com/mps233/la-pluma/go/internal/domain/agentrun"
@@ -76,6 +79,20 @@ func New(application *app.App, logger *slog.Logger) *Handler {
 	mux.HandleFunc("POST /training/plan", handler.trainingPlan)
 	mux.HandleFunc("POST /actions/apply-training-plan", handler.applyTrainingPlan)
 	mux.HandleFunc("POST /actions/fetch-training-materials", handler.fetchTrainingMaterials)
+	mux.HandleFunc("GET /operator-mastery/preflight", handler.masteryPreflight)
+	mux.HandleFunc("GET /operator-mastery/catalog", handler.masteryCatalog)
+	mux.HandleFunc("GET /operator-mastery/operators/{operatorId}", handler.masteryOperator)
+	mux.HandleFunc("GET /operator-mastery/status", handler.masteryStatus)
+	mux.HandleFunc("POST /operator-mastery/items", handler.addMasteryItems)
+	mux.HandleFunc("PATCH /operator-mastery/items/{id}", handler.updateMasteryItem)
+	mux.HandleFunc("DELETE /operator-mastery/items/{id}", handler.removeMasteryItem)
+	mux.HandleFunc("PUT /operator-mastery/items/order", handler.reorderMasteryItems)
+	mux.HandleFunc("PUT /operator-mastery/settings", handler.updateMasterySettings)
+	mux.HandleFunc("POST /operator-mastery/start", handler.startMastery)
+	mux.HandleFunc("POST /operator-mastery/pause", handler.pauseMastery)
+	mux.HandleFunc("POST /operator-mastery/resume", handler.resumeMastery)
+	mux.HandleFunc("POST /operator-mastery/stop", handler.stopMastery)
+	mux.HandleFunc("POST /operator-mastery/items/{id}/retry", handler.retryMasteryItem)
 	mux.HandleFunc("GET /version", handler.version)
 	mux.HandleFunc("GET /activity", handler.activity)
 	mux.HandleFunc("GET /activity/preflight", handler.activityPreflight)
@@ -103,23 +120,24 @@ func New(application *app.App, logger *slog.Logger) *Handler {
 	mux.HandleFunc("GET /actions/discover-devices", handler.discoverDevices)
 	mux.HandleFunc("POST /actions/open-config-directory", handler.openConfigDirectory)
 	mux.HandleFunc("POST /actions/configure-auto-update", handler.configureAutoUpdate)
-	mux.HandleFunc("POST /actions/depot-recognition", handler.recognitionUnsupported)
-	mux.HandleFunc("POST /actions/operbox-recognition", handler.recognitionUnsupported)
-	mux.HandleFunc("POST /activity/run", handler.activityRunUnsupported)
-	mux.HandleFunc("GET /copilot-sets/{id}/manual/{runId}", handler.copilotManualUnsupported)
+	mux.HandleFunc("POST /actions/depot-recognition", handler.depotRecognition)
+	mux.HandleFunc("POST /actions/operbox-recognition", handler.operboxRecognition)
+	mux.HandleFunc("POST /activity/run", handler.activityRun)
+	mux.HandleFunc("GET /copilot-sets/{id}/manual/{runId}", handler.manualCopilotSession)
 	mux.HandleFunc("GET /paradox/search", handler.paradoxSearch)
-	mux.HandleFunc("POST /copilot-sets/{id}/execute", handler.copilotUnsupported)
-	mux.HandleFunc("POST /copilot-sets/{id}/manual/start", handler.copilotUnsupported)
-	mux.HandleFunc("POST /actions/continue-copilot-set", handler.copilotUnsupported)
-	mux.HandleFunc("POST /actions/update-core", handler.updateUnsupported)
-	mux.HandleFunc("POST /actions/update-cli", handler.updateUnsupported)
-	mux.HandleFunc("POST /actions/hot-update-resources", handler.updateUnsupported)
+	mux.HandleFunc("POST /copilot-sets/{id}/execute", handler.executeCopilotSet)
+	mux.HandleFunc("POST /copilot-sets/{id}/manual/start", handler.startManualCopilotSet)
+	mux.HandleFunc("POST /actions/continue-copilot-set", handler.continueManualCopilotSet)
+	mux.HandleFunc("POST /actions/update-core", handler.updateCore)
+	mux.HandleFunc("POST /actions/update-cli", handler.updateCLI)
+	mux.HandleFunc("POST /actions/hot-update-resources", handler.hotUpdateResources)
 	mux.HandleFunc("GET /logs/files", handler.logFiles)
 	mux.HandleFunc("GET /logs/files/{filePath...}", handler.readLogFile)
 	mux.HandleFunc("POST /logs/cleanup", handler.cleanupLogs)
 	mux.HandleFunc("GET /device-stats", handler.deviceStats)
 	mux.HandleFunc("GET /paradox/operators", handler.paradoxOperators)
 	mux.HandleFunc("GET /custom-tools", handler.customTools)
+	mux.HandleFunc("POST /actions/run-custom-tool", handler.runCustomTool)
 	mux.HandleFunc("GET /auto-update/status", handler.autoUpdateStatus)
 	mux.HandleFunc("GET /debug-screenshots", handler.debugScreenshots)
 	mux.HandleFunc("GET /screen/frame", handler.screenFrame)
@@ -1040,10 +1058,14 @@ func (h *Handler) searchCopilots(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) version(w http.ResponseWriter, r *http.Request) {
-	httpx.Success(w, http.StatusOK, map[string]any{
-		"cli":  os.Getenv("MAA_CLI_VERSION"),
-		"core": os.Getenv("MAA_CORE_VERSION"),
-	}, "", nil)
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	info, err := h.app.Updates.GetVersion(ctx)
+	if err != nil {
+		httpx.Failure(w, http.StatusServiceUnavailable, &httpx.APIError{Code: "AGENT_MAA_VERSION_UNAVAILABLE", Message: "无法读取 MAA 版本", Retryable: true})
+		return
+	}
+	httpx.Success(w, http.StatusOK, info, "", nil)
 }
 
 func (h *Handler) deviceStats(w http.ResponseWriter, r *http.Request) {
@@ -1076,24 +1098,52 @@ func (h *Handler) paradoxOperators(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) customTools(w http.ResponseWriter, r *http.Request) {
-	entries, err := os.ReadDir(filepath.Join(h.app.Config().Paths.DataDir, "custom-tools"))
+	tools, err := h.app.CustomTools.ListTools()
 	if err != nil {
-		httpx.Success(w, http.StatusOK, map[string]any{"tools": []any{}}, "", nil)
+		writeError(w, err)
 		return
-	}
-	tools := make([]map[string]any, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
-			continue
-		}
-		tools = append(tools, map[string]any{"name": strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name())), "file": entry.Name()})
 	}
 	httpx.Success(w, http.StatusOK, map[string]any{"tools": tools}, "", nil)
 }
 
+func (h *Handler) runCustomTool(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	toolID, _ := body["toolId"].(string)
+	params := body["params"]
+	dryRun, _ := body["dryRun"].(bool)
+	if strings.TrimSpace(toolID) == "" {
+		httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{Code: "AGENT_VALIDATION_TOOL_ID_REQUIRED", Message: "缺少 toolId", Retryable: false})
+		return
+	}
+	if dryRun {
+		plan, err := h.app.CustomTools.Plan(toolID, params)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		httpx.Success(w, http.StatusOK, plan, "Dry run only", nil)
+		return
+	}
+	wait := true
+	if value, ok := body["waitForCompletion"].(bool); ok {
+		wait = value
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
+	defer cancel()
+	run, err := h.app.CustomTools.Run(ctx, toolID, params, wait)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	sendRunResponse(w, run, false, !wait, nil)
+}
+
 func (h *Handler) autoUpdateStatus(w http.ResponseWriter, r *http.Request) {
 	config, _ := h.app.ConfigStore.Load("auto-update")
-	httpx.Success(w, http.StatusOK, map[string]any{"enabled": false, "config": config, "running": false}, "", nil)
+	enabled, _ := config["enabled"].(bool)
+	clock, _ := config["time"].(string)
+	status := updates.BuildAutoUpdateStatus(enabled, clock)
+	httpx.Success(w, http.StatusOK, map[string]any{"config": config, "status": status}, "", nil)
 }
 
 func (h *Handler) debugScreenshots(w http.ResponseWriter, r *http.Request) {
@@ -1217,11 +1267,50 @@ func (h *Handler) configureAutoUpdate(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, http.StatusOK, result, result.Message, nil)
 }
 
-func (h *Handler) recognitionUnsupported(w http.ResponseWriter, r *http.Request) {
-	httpx.Failure(w, http.StatusNotImplemented, &httpx.APIError{
-		Code: "MAA_RECOGNITION_UNSUPPORTED", Message: "识别任务尚未迁移到 Go 后端",
-		Retryable: false, Details: map[string]any{"todo": "wire dataParserService"},
-	})
+func (h *Handler) depotRecognition(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	if dryRun, _ := body["dryRun"].(bool); dryRun {
+		httpx.Success(w, http.StatusOK, map[string]any{"action": "depot-recognition", "sideEffects": []string{"parse_maa_logs", "update_local_depot_cache"}}, "Dry run only", nil)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
+	defer cancel()
+	run, _, err := h.app.MAAService.RunTask(ctx, map[string]any{
+		"name": "仓库识别", "type": "Depot", "params": map[string]any{},
+	}, true, nil)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	result, err := h.app.Recognition.RecognizeDepot(ctx)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, map[string]any{"run": run, "data": result.Data, "written": result.Written}, "仓库识别完成", nil)
+}
+
+func (h *Handler) operboxRecognition(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	if dryRun, _ := body["dryRun"].(bool); dryRun {
+		httpx.Success(w, http.StatusOK, map[string]any{"action": "operbox-recognition", "sideEffects": []string{"parse_maa_logs", "update_local_operbox_cache"}}, "Dry run only", nil)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
+	defer cancel()
+	run, _, err := h.app.MAAService.RunTask(ctx, map[string]any{
+		"name": "干员识别", "type": "OperBox", "params": map[string]any{},
+	}, true, nil)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	result, err := h.app.Recognition.RecognizeOperBox(ctx)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, map[string]any{"run": run, "data": result.Data, "written": result.Written}, "干员识别完成", nil)
 }
 
 func (h *Handler) copilotUnsupported(w http.ResponseWriter, r *http.Request) {
@@ -1231,11 +1320,44 @@ func (h *Handler) copilotUnsupported(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) updateUnsupported(w http.ResponseWriter, r *http.Request) {
-	httpx.Failure(w, http.StatusNotImplemented, &httpx.APIError{
-		Code: "MAA_UPDATE_UNSUPPORTED", Message: "MAA 更新尚未接入 Go 后端",
-		Retryable: false, Details: map[string]any{"todo": "wire maa update commands"},
-	})
+func (h *Handler) updateCore(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	version := firstNonEmpty(stringField(body, "version"), "stable")
+	dryRun, _ := body["dryRun"].(bool)
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	defer cancel()
+	outcome, err := h.app.Updates.UpdateCoreAction(ctx, version, dryRun)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, outcome.Data, outcome.Message, map[string]any{"dryRun": outcome.DryRun})
+}
+
+func (h *Handler) updateCLI(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	dryRun, _ := body["dryRun"].(bool)
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Minute)
+	defer cancel()
+	outcome, err := h.app.Updates.UpdateCLIAction(ctx, dryRun)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, outcome.Data, outcome.Message, map[string]any{"dryRun": outcome.DryRun})
+}
+
+func (h *Handler) hotUpdateResources(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	dryRun, _ := body["dryRun"].(bool)
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Minute)
+	defer cancel()
+	outcome, err := h.app.Updates.HotUpdateResourcesAction(ctx, dryRun)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, outcome.Data, outcome.Message, map[string]any{"dryRun": outcome.DryRun})
 }
 
 func (h *Handler) logFiles(w http.ResponseWriter, r *http.Request) {
@@ -1316,11 +1438,37 @@ func (h *Handler) activityCandidates(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, http.StatusOK, candidates, "", nil)
 }
 
-func (h *Handler) activityRunUnsupported(w http.ResponseWriter, r *http.Request) {
-	httpx.Failure(w, http.StatusNotImplemented, &httpx.APIError{
-		Code: "ACTIVITY_RUN_UNSUPPORTED", Message: "活动执行尚未接入 Go 后端",
-		Retryable: false, Details: map[string]any{"todo": "wire activity PlanExecutor and LeaseRunner"},
-	})
+func (h *Handler) activityRun(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	clientType := firstNonEmpty(stringField(body, "clientType"), "Official")
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	defer cancel()
+	var result map[string]any
+	var err error
+	setID := stringField(body, "setId")
+	if setID != "" {
+		result, err = h.app.Activity.RunCurrentActivitySet(ctx, activity.SetExecutionOptions{
+			SetID:           setID,
+			SelectedIndexes: intSlice(body["selectedIndexes"]),
+			Raid:            firstNonEmpty(stringField(body, "raid"), "normal"),
+			Options:         mapField(body["options"]),
+			ClientType:      clientType,
+		}, nil)
+	} else {
+		result, err = h.app.Activity.RunCurrentActivityCopilots(ctx, clientType, nil)
+	}
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, result, "活动作业执行完成", nil)
+}
+
+func mapField(value any) map[string]any {
+	if record, ok := value.(map[string]any); ok {
+		return record
+	}
+	return map[string]any{}
 }
 
 func (h *Handler) copilotManualUnsupported(w http.ResponseWriter, r *http.Request) {
@@ -1354,4 +1502,324 @@ func (h *Handler) paradoxSearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	httpx.Success(w, http.StatusOK, matches, "", nil)
+}
+
+func (h *Handler) executeCopilotSet(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	selectedIndexes := intSlice(body["selectedIndexes"])
+	options, _ := body["options"].(map[string]any)
+	if options == nil {
+		options = map[string]any{}
+	}
+	raid := firstNonEmpty(stringField(body, "raid"), "normal")
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	defer cancel()
+	result, err := h.app.Copilot.ExecutePlan(ctx, copilot.PlanExecution{
+		SetID:           r.PathValue("id"),
+		Raid:            raid,
+		SelectedIndexes: selectedIndexes,
+		Options:         options,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	data := map[string]any{"results": result.Results, "taskResults": result.TaskResults}
+	for key, value := range result.Data {
+		data[key] = value
+	}
+	httpx.Success(w, http.StatusOK, data, "作业集执行完成", nil)
+}
+
+func (h *Handler) startManualCopilotSet(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	options, _ := body["options"].(map[string]any)
+	request := copilot.ManualStartRequest{
+		SetID:           r.PathValue("id"),
+		Raid:            firstNonEmpty(stringField(body, "raid"), "normal"),
+		SelectedIndexes: anySlice(body["selectedIndexes"]),
+		Options:         options,
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	defer cancel()
+	result, err := h.app.Copilot.Manual().StartManualSet(ctx, request)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, result, result.Message, nil)
+}
+
+func (h *Handler) continueManualCopilotSet(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	runID := stringField(body, "runId")
+	if strings.TrimSpace(runID) == "" {
+		httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{Code: "AGENT_RUN_ID_REQUIRED", Message: "继续手动作业集需要 runId", Retryable: false})
+		return
+	}
+	options, _ := body["options"].(map[string]any)
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	defer cancel()
+	result, err := h.app.Copilot.Manual().ContinueManualSet(ctx, runID, options)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, result, result.Message, nil)
+}
+
+func (h *Handler) manualCopilotSession(w http.ResponseWriter, r *http.Request) {
+	runID := r.PathValue("runId")
+	session, ok := h.app.Copilot.Manual().ManualSession(runID)
+	if !ok || session.SetID != r.PathValue("id") {
+		httpx.Failure(w, http.StatusNotFound, &httpx.APIError{Code: "COPILOT_MANUAL_SESSION_NOT_FOUND", Message: "手动作业集会话不存在或已结束", Retryable: false})
+		return
+	}
+	data := map[string]any{
+		"runId": session.RunID, "setId": session.SetID, "name": session.Name, "raid": session.Raid,
+		"selectedItemIndexes": session.SelectedItemIndexes, "options": session.Options,
+	}
+	if run, exists := h.app.Runs.Get(runID); exists {
+		data["run"] = run
+	}
+	httpx.Success(w, http.StatusOK, data, "", nil)
+}
+
+func intSlice(value any) []int {
+	array, _ := value.([]any)
+	out := make([]int, 0, len(array))
+	for _, item := range array {
+		switch typed := item.(type) {
+		case float64:
+			out = append(out, int(typed))
+		case int:
+			out = append(out, typed)
+		}
+	}
+	return out
+}
+
+func anySlice(value any) []any {
+	array, _ := value.([]any)
+	return array
+}
+
+func (h *Handler) masteryPreflight(w http.ResponseWriter, r *http.Request) {
+	clientType := firstNonEmpty(r.URL.Query().Get("clientType"), "Official")
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	value, err := h.app.Mastery.Preflight(ctx, clientType)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, value, "", nil)
+}
+
+func (h *Handler) masteryCatalog(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	var rarity *int
+	if raw := query.Get("rarity"); raw != "" {
+		if value, err := strconv.Atoi(raw); err == nil && value > 0 {
+			rarity = &value
+		}
+	}
+	status := query.Get("status")
+	if status != "eligible" && status != "owned" {
+		status = "all"
+	}
+	value, err := h.app.Mastery.Catalog(mastery.CatalogOptions{
+		ClientType: query.Get("clientType"),
+		Search:     query.Get("search"),
+		Rarity:     rarity,
+		Status:     mastery.MasteryCandidateStatus(status),
+		Limit:      parseBoundedInt(query.Get("limit"), 500, 1, 1000),
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, value, "", nil)
+}
+
+func (h *Handler) masteryOperator(w http.ResponseWriter, r *http.Request) {
+	declaredLevel := 0
+	if raw := r.URL.Query().Get("declaredLevel"); raw != "" {
+		declaredLevel, _ = strconv.Atoi(raw)
+	}
+	value, err := h.app.Mastery.OperatorDetail(r.PathValue("operatorId"), mastery.OperatorDetailOptions{
+		ClientType: r.URL.Query().Get("clientType"), DeclaredLevel: declaredLevel,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, value, "", nil)
+}
+
+func (h *Handler) masteryStatus(w http.ResponseWriter, r *http.Request) {
+	value, err := h.app.Mastery.Status()
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, value, "", nil)
+}
+
+func (h *Handler) addMasteryItems(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	array, ok := body["items"].([]any)
+	if !ok {
+		httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{Code: "AGENT_MASTERY_TARGET_INVALID", Message: "items 必须是数组", Retryable: false})
+		return
+	}
+	inputs := make([]mastery.AddItemInput, 0, len(array))
+	for _, item := range array {
+		record, _ := item.(map[string]any)
+		inputs = append(inputs, mastery.AddItemInput{
+			OperatorID:    stringField(record, "operatorId"),
+			SkillIndex:    intField(record, "skillIndex"),
+			TargetLevel:   intField(record, "targetLevel"),
+			DeclaredLevel: intField(record, "declaredLevel"),
+		})
+	}
+	clientType := firstNonEmpty(stringField(body, "clientType"), "Official")
+	profileID := stringField(body, "profileId")
+	context := mastery.CampaignContext{ClientType: &clientType}
+	if profileID != "" {
+		context.ClientProfileID = &profileID
+	}
+	result, err := h.app.Mastery.AddItems(inputs, context)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, result, "已加入专精队列", nil)
+}
+
+func (h *Handler) updateMasteryItem(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	patch := mastery.ItemPatch{}
+	if value, ok := body["targetLevel"].(float64); ok {
+		target := int(value)
+		patch.TargetLevel = &target
+	}
+	if value, ok := body["enabled"].(bool); ok && value {
+		patch.Enabled = &value
+	} else if value, ok := body["enabled"].(bool); ok {
+		patch.Enabled = &value
+	}
+	item, err := h.app.Mastery.UpdateItem(r.PathValue("id"), patch)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, item, "专精目标已更新", nil)
+}
+
+func (h *Handler) removeMasteryItem(w http.ResponseWriter, r *http.Request) {
+	if err := h.app.Mastery.RemoveItem(r.PathValue("id")); err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, nil, "已从专精队列移除", nil)
+}
+
+func (h *Handler) reorderMasteryItems(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	array, _ := body["order"].([]any)
+	order := make([]string, 0, len(array))
+	for _, item := range array {
+		if value, ok := item.(string); ok {
+			order = append(order, value)
+		}
+	}
+	items, err := h.app.Mastery.Reorder(order)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, map[string]any{"items": items}, "队列顺序已更新", nil)
+}
+
+func (h *Handler) updateMasterySettings(w http.ResponseWriter, r *http.Request) {
+	settings, err := h.app.Mastery.UpdateSettings(decodeBody(r))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, settings, "专精设置已更新", nil)
+}
+
+func (h *Handler) startMastery(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	if dryRun, _ := body["dryRun"].(bool); dryRun {
+		httpx.Success(w, http.StatusOK, map[string]any{"action": "start-operator-mastery-campaign", "sideEffects": []string{"consume_mastery_materials", "start_training_room_training"}}, "Dry run only", nil)
+		return
+	}
+	clientType := firstNonEmpty(stringField(body, "clientType"), "Official")
+	profileID := stringField(body, "profileId")
+	context := mastery.CampaignContext{ClientType: &clientType}
+	if profileID != "" {
+		context.ClientProfileID = &profileID
+	}
+	status, err := h.app.Mastery.StartCampaign(r.Context(), context)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, status, "专精队列已开始自动执行", nil)
+}
+
+func (h *Handler) pauseMastery(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	var reason *string
+	if value, ok := body["reason"].(string); ok {
+		reason = &value
+	}
+	status, err := h.app.Mastery.PauseCampaign(reason)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, status, "专精队列已暂停", nil)
+}
+
+func (h *Handler) resumeMastery(w http.ResponseWriter, r *http.Request) {
+	status, err := h.app.Mastery.ResumeCampaign()
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, status, "专精队列已继续", nil)
+}
+
+func (h *Handler) stopMastery(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	status, err := h.app.Mastery.StopCampaign(ctx)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, status, "专精队列已停止", nil)
+}
+
+func (h *Handler) retryMasteryItem(w http.ResponseWriter, r *http.Request) {
+	item, err := h.app.Mastery.RetryItem(r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, item, "已重试专精目标", nil)
+}
+
+func intField(record map[string]any, key string) int {
+	switch value := record[key].(type) {
+	case float64:
+		return int(value)
+	case int:
+		return value
+	}
+	return 0
 }
