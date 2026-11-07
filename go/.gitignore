@@ -5,3 +5,7 @@
 *.out
 coverage.out
 .DS_Store
+/server
+/scrcpy-probe
+/signaling-probe
+/webrtc-probe

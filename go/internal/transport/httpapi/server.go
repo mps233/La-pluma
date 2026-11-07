@@ -20,7 +20,30 @@ type Server struct {
 	handler http.Handler
 }
 
-func New(cfg config.Config, logger *slog.Logger) *Server {
+type Option func(*serverOptions)
+
+type serverOptions struct {
+	agentHandler     http.Handler
+	signalingHandler http.Handler
+}
+
+// WithAgentHandler mounts the /api/agent subtree before the generic API
+// fallback. The handler receives paths with /api/agent stripped.
+func WithAgentHandler(handler http.Handler) Option {
+	return func(options *serverOptions) {
+		options.agentHandler = handler
+	}
+}
+
+// WithSignalingHandler mounts the /webrtc-signaling subtree. The handler
+// receives paths with /webrtc-signaling stripped.
+func WithSignalingHandler(handler http.Handler) Option {
+	return func(options *serverOptions) {
+		options.signalingHandler = handler
+	}
+}
+
+func New(cfg config.Config, logger *slog.Logger, options ...Option) *Server {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -30,18 +53,26 @@ func New(cfg config.Config, logger *slog.Logger) *Server {
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"success": true, "status": "ok"})
 	})
 
-	// Ticket issuance is the only signaling endpoint exposed over the public
-	// port; the media gateway lands here later.
-	mux.HandleFunc("POST /webrtc-signaling/api/login", func(w http.ResponseWriter, r *http.Request) {
-		httpx.Failure(w, http.StatusServiceUnavailable, &httpx.APIError{
-			Code: "WEBRTC_NOT_READY", Message: "WebRTC 信令尚未实现", Retryable: true,
-		})
-	})
+	// Ticket issuance and the WebSocket gateway are mounted below when the
+	// application supplies a signaling handler.
 	mux.HandleFunc("/webrtc-signaling", signalingNotFound)
-	mux.HandleFunc("/webrtc-signaling/", signalingNotFound)
 
 	mux.HandleFunc("/api/maa-assets", assetsPlaceholder)
 	mux.HandleFunc("/api/maa-assets/", assetsPlaceholder)
+
+	opts := serverOptions{}
+	for _, option := range options {
+		option(&opts)
+	}
+	if opts.agentHandler != nil {
+		mux.Handle("/api/agent/", http.StripPrefix("/api/agent", opts.agentHandler))
+	}
+	if opts.signalingHandler != nil {
+		mux.Handle("/webrtc-signaling/", http.StripPrefix("/webrtc-signaling", opts.signalingHandler))
+	} else {
+		mux.HandleFunc("/webrtc-signaling/", signalingNotFound)
+	}
+
 	mux.HandleFunc("/api", apiNotFound)
 	mux.HandleFunc("/api/", apiNotFound)
 

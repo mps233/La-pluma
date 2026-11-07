@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/mps233/la-pluma/go/internal/config"
+	"github.com/mps233/la-pluma/go/internal/transport/httpx"
 )
 
 func newTestConfig(t *testing.T, token, basePath string) config.Config {
@@ -173,14 +174,17 @@ func TestBasePath(t *testing.T) {
 	}
 }
 
-func TestSignalingPlaceholder(t *testing.T) {
-	handler := newTestHandler(t, newTestConfig(t, "", "/"))
+func TestSignalingMount(t *testing.T) {
+	cfg := newTestConfig(t, "", "/")
+	handler := New(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), WithSignalingHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"path": r.URL.Path})
+	}))).Handler()
 	login := request(t, handler, http.MethodPost, "/webrtc-signaling/api/login", nil)
-	if login.Code != http.StatusServiceUnavailable {
-		t.Fatalf("login status = %d", login.Code)
+	if login.Code != http.StatusOK || !strings.Contains(login.Body.String(), `"/api/login"`) {
+		t.Fatalf("login status = %d, body = %s", login.Code, login.Body.String())
 	}
 	admin := request(t, handler, http.MethodGet, "/webrtc-signaling/admin", nil)
-	if admin.Code != http.StatusNotFound {
+	if admin.Code != http.StatusOK {
 		t.Fatalf("admin status = %d", admin.Code)
 	}
 }

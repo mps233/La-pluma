@@ -39,29 +39,32 @@ go/
   - [x] config/env/paths (including MAA dirs)
   - [x] health, auth, CORS, static SPA fallback, cache headers
   - [x] graceful shutdown, TLS
-  - [ ] gzip parity
-  - [ ] tests green
-- [ ] 1. Data + execution core
-  - [ ] atomic JSON store + file locks
-  - [ ] agent run FSM/idempotency/restore/flush
-  - [ ] MAA execution lease actor
-  - [ ] ADB discovery/connection/screenshot
-  - [ ] MAA CLI runner/callbacks/dynamic task files
-- [ ] 2. Agent API parity
-  - [ ] contract registry (32 operations, manifest, OpenAPI)
-  - [ ] 97 Agent routes
+  - [x] gzip parity
+  - [x] tests green
+- [~] 1. Data + execution core
+  - [x] atomic JSON store + file locks
+  - [x] agent run FSM/idempotency/restore/flush
+  - [x] MAA execution lease actor
+  - [x] ADB client (devices/connect/screenshot/input/push/reverse/forward)
+  - [x] MAA CLI runner (spawn/wait/stop/line capture)
+  - [ ] MAA callbacks/dynamic task files/TOML profiles
+  - [ ] ADB emulator discovery orchestration
+- [~] 2. Agent API parity
+  - [x] contract registry (32 operations, manifest, OpenAPI)
+  - [~] Agent routes: status, runs, tasks, WebRTC status/start/stop/devices/snapshot, install
   - [ ] assets/operator-quotes/health/signaling mounts
   - [ ] golden contract tests against Node oracle
 - [ ] 3. Scheduling and task flows
   - [ ] node-cron-equivalent scheduling with timezone/missed-run policy
   - [ ] automation/combat/roguelike/custom task flows
   - [ ] startup restore + stop propagation
-- [ ] 4. Device preview/control replacement
-  - [ ] scrcpy server push/launch/protocol
-  - [ ] H.264 video socket -> Pion WebRTC track
-  - [ ] control socket (touch/key/text/scroll/clipboard)
-  - [ ] React client transport compatibility or new transport
-  - [ ] remove ScrcpyOverWebRTC dependency
+- [~] 4. Device preview/control replacement
+  - [x] scrcpy server push/launch/protocol (scrcpy-server 3.3.4)
+  - [x] H.264 video socket -> Pion WebRTC track
+  - [x] control socket touch/key/text base commands
+  - [x] React client signaling compatibility verified in browser
+  - [ ] clipboard/scroll/multi-touch parity
+  - [ ] remove ScrcpyOverWebRTC from remaining Node paths
 - [ ] 5. Domain modules
   - [ ] training/operator materials
   - [ ] copilot/activity
@@ -75,9 +78,9 @@ go/
   - [ ] tray flyout (native UI)
   - [ ] PWA gating + desktop bridge
   - [ ] signing/notarization/updater
-- [ ] 7. Real MuMu verification
-  - [ ] device connect/screenshot read-only
-  - [ ] live view + touch/key control
+- [~] 7. Real MuMu verification
+  - [x] device connect/screenshot read-only
+  - [x] live view + touch/key control (Pion probe + React client)
   - [ ] MAA task smoke (with explicit approval for side effects)
   - [ ] quit/restart/orphan cleanup
   - [ ] PWA from headless Go server

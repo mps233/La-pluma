@@ -12,8 +12,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mps233/la-pluma/go/internal/app"
 	"github.com/mps233/la-pluma/go/internal/config"
+	scwebrtc "github.com/mps233/la-pluma/go/internal/infra/webrtc"
+	"github.com/mps233/la-pluma/go/internal/transport/agentapi"
 	"github.com/mps233/la-pluma/go/internal/transport/httpapi"
+	"github.com/mps233/la-pluma/go/internal/transport/signaling"
 )
 
 func main() {
@@ -31,7 +35,18 @@ func main() {
 		}
 	}
 
-	server := httpapi.New(cfg, logger)
+	application, err := app.New(cfg, logger)
+	if err != nil {
+		logger.Error("app init", "error", err)
+		os.Exit(1)
+	}
+	signalServer := signaling.New(func() *scwebrtc.Publisher {
+		return application.WebRTC.CurrentPublisher()
+	}, logger)
+	server := httpapi.New(cfg, logger,
+		httpapi.WithAgentHandler(agentapi.New(application, logger)),
+		httpapi.WithSignalingHandler(signalServer.Handler()),
+	)
 	addr := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -70,6 +85,9 @@ func main() {
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	if err := application.Close(shutdownCtx); err != nil {
+		logger.Error("app shutdown", "error", err)
+	}
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		logger.Error("shutdown", "error", err)
 		os.Exit(1)
