@@ -25,6 +25,8 @@ type Option func(*serverOptions)
 type serverOptions struct {
 	agentHandler     http.Handler
 	signalingHandler http.Handler
+	quotesHandler    http.Handler
+	assetsHandler    http.Handler
 }
 
 // WithAgentHandler mounts the /api/agent subtree before the generic API
@@ -43,6 +45,20 @@ func WithSignalingHandler(handler http.Handler) Option {
 	}
 }
 
+// WithQuotesHandler mounts the /api/operator-quotes subtree.
+func WithQuotesHandler(handler http.Handler) Option {
+	return func(options *serverOptions) {
+		options.quotesHandler = handler
+	}
+}
+
+// WithAssetsHandler mounts the public /api/maa-assets subtree.
+func WithAssetsHandler(handler http.Handler) Option {
+	return func(options *serverOptions) {
+		options.assetsHandler = handler
+	}
+}
+
 func New(cfg config.Config, logger *slog.Logger, options ...Option) *Server {
 	if logger == nil {
 		logger = slog.Default()
@@ -57,9 +73,6 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) *Server {
 	// application supplies a signaling handler.
 	mux.HandleFunc("/webrtc-signaling", signalingNotFound)
 
-	mux.HandleFunc("/api/maa-assets", assetsPlaceholder)
-	mux.HandleFunc("/api/maa-assets/", assetsPlaceholder)
-
 	opts := serverOptions{}
 	for _, option := range options {
 		option(&opts)
@@ -71,6 +84,15 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) *Server {
 		mux.Handle("/webrtc-signaling/", http.StripPrefix("/webrtc-signaling", opts.signalingHandler))
 	} else {
 		mux.HandleFunc("/webrtc-signaling/", signalingNotFound)
+	}
+	if opts.assetsHandler != nil {
+		mux.Handle("/api/maa-assets/", http.StripPrefix("/api/maa-assets", opts.assetsHandler))
+	} else {
+		mux.HandleFunc("/api/maa-assets", assetsPlaceholder)
+		mux.HandleFunc("/api/maa-assets/", assetsPlaceholder)
+	}
+	if opts.quotesHandler != nil {
+		mux.Handle("/api/operator-quotes/", http.StripPrefix("/api/operator-quotes", opts.quotesHandler))
 	}
 
 	mux.HandleFunc("/api", apiNotFound)

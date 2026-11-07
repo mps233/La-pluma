@@ -19,6 +19,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/app/scheduler"
 	"github.com/mps233/la-pluma/go/internal/app/training"
 	webrtcapp "github.com/mps233/la-pluma/go/internal/app/webrtc"
+	"github.com/mps233/la-pluma/go/internal/contract"
 	"github.com/mps233/la-pluma/go/internal/domain/agentrun"
 	"github.com/mps233/la-pluma/go/internal/transport/httpx"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
@@ -72,6 +73,14 @@ func New(application *app.App, logger *slog.Logger) *Handler {
 	mux.HandleFunc("POST /training/plan", handler.trainingPlan)
 	mux.HandleFunc("POST /actions/apply-training-plan", handler.applyTrainingPlan)
 	mux.HandleFunc("POST /actions/fetch-training-materials", handler.fetchTrainingMaterials)
+	mux.HandleFunc("GET /version", handler.version)
+	mux.HandleFunc("GET /activity", handler.activity)
+	mux.HandleFunc("GET /activity/preflight", handler.activityPreflight)
+	mux.HandleFunc("GET /copilots/{id}", handler.getCopilot)
+	mux.HandleFunc("GET /copilot-sets/{id}", handler.getCopilotSet)
+	mux.HandleFunc("GET /copilot-sets/{id}/plan", handler.getCopilotSetPlan)
+	mux.HandleFunc("POST /copilot-sets/{id}/reset-progress", handler.resetCopilotProgress)
+	mux.HandleFunc("GET /copilot/search", handler.searchCopilots)
 	mux.HandleFunc("GET /schedules/status", handler.scheduleStatus)
 	mux.HandleFunc("GET /schedules/execution", handler.scheduleExecution)
 	mux.HandleFunc("POST /schedules", handler.setupSchedule)
@@ -83,8 +92,14 @@ func New(application *app.App, logger *slog.Logger) *Handler {
 	mux.HandleFunc("POST /actions/test-notification-channel", handler.testNotificationChannel)
 	mux.HandleFunc("POST /actions/send-notification", handler.sendNotification)
 	mux.HandleFunc("GET /stages/open-today", handler.openStages)
+	mux.HandleFunc("GET /data/operators", handler.operatorsData)
 	mux.HandleFunc("GET /data/operbox", handler.operboxData)
 	mux.HandleFunc("GET /data/depot", handler.depotData)
+	mux.HandleFunc("GET /device-stats", handler.deviceStats)
+	mux.HandleFunc("GET /paradox/operators", handler.paradoxOperators)
+	mux.HandleFunc("GET /custom-tools", handler.customTools)
+	mux.HandleFunc("GET /auto-update/status", handler.autoUpdateStatus)
+	mux.HandleFunc("GET /debug-screenshots", handler.debugScreenshots)
 	mux.HandleFunc("GET /screen/frame", handler.screenFrame)
 	mux.HandleFunc("POST /screen/screenshot", handler.screenScreenshot)
 	mux.HandleFunc("GET /webrtc/status", handler.webrtcStatus)
@@ -218,11 +233,13 @@ func (h *Handler) taskStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) manifest(w http.ResponseWriter, r *http.Request) {
-	httpx.Failure(w, http.StatusServiceUnavailable, &httpx.APIError{Code: "AGENT_CONTRACT_NOT_READY", Message: "Agent contract 尚未迁移", Retryable: true})
+	httpx.Success(w, http.StatusOK, contract.Manifest(), "", nil)
 }
 
 func (h *Handler) openapi(w http.ResponseWriter, r *http.Request) {
-	httpx.Failure(w, http.StatusServiceUnavailable, &httpx.APIError{Code: "AGENT_CONTRACT_NOT_READY", Message: "Agent contract 尚未迁移", Retryable: true})
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(contract.OpenAPI())
 }
 
 func writeError(w http.ResponseWriter, err error) {
@@ -940,4 +957,155 @@ func (h *Handler) runDailyFlow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.Success(w, http.StatusOK, result, result.Message, nil)
+}
+
+func (h *Handler) getCopilot(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	value, err := h.app.Copilot.PRTS().GetCopilot(ctx, r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, value, "", nil)
+}
+
+func (h *Handler) getCopilotSet(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	value, err := h.app.Copilot.PRTS().GetSet(ctx, r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, value, "", nil)
+}
+
+func (h *Handler) getCopilotSetPlan(w http.ResponseWriter, r *http.Request) {
+	raid := firstNonEmpty(r.URL.Query().Get("raid"), "normal")
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	plan, err := h.app.Copilot.BuildPlan(ctx, r.PathValue("id"), raid)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, plan, "", nil)
+}
+
+func (h *Handler) resetCopilotProgress(w http.ResponseWriter, r *http.Request) {
+	if err := h.app.Copilot.ResetProgress(r.PathValue("id")); err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, map[string]any{"reset": true}, "进度已重置", nil)
+}
+
+func (h *Handler) searchCopilots(w http.ResponseWriter, r *http.Request) {
+	stage := strings.TrimSpace(r.URL.Query().Get("stage"))
+	if stage == "" {
+		httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{Code: "AGENT_VALIDATION_STAGE_REQUIRED", Message: "缺少 stage 参数", Retryable: false})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	value, err := h.app.Copilot.PRTS().QueryCopilots(ctx, stage, 1, 20, "hot")
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, value, "", nil)
+}
+
+func (h *Handler) version(w http.ResponseWriter, r *http.Request) {
+	httpx.Success(w, http.StatusOK, map[string]any{
+		"cli":  os.Getenv("MAA_CLI_VERSION"),
+		"core": os.Getenv("MAA_CORE_VERSION"),
+	}, "", nil)
+}
+
+func (h *Handler) deviceStats(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	stats, err := h.app.WebRTC.DeviceStats(ctx)
+	if err != nil {
+		httpx.Success(w, http.StatusOK, nil, "", nil)
+		return
+	}
+	httpx.Success(w, http.StatusOK, stats, "", nil)
+}
+
+func (h *Handler) operatorsData(w http.ResponseWriter, r *http.Request) {
+	operators, err := h.app.Training.AllOperatorsDetailed()
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, operators, "", nil)
+}
+
+func (h *Handler) paradoxOperators(w http.ResponseWriter, r *http.Request) {
+	value, err := jsonstore.Read(filepath.Join(h.app.Config().Paths.DataDir, "paradox-operators.json"), []any{})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, value, "", nil)
+}
+
+func (h *Handler) customTools(w http.ResponseWriter, r *http.Request) {
+	entries, err := os.ReadDir(filepath.Join(h.app.Config().Paths.DataDir, "custom-tools"))
+	if err != nil {
+		httpx.Success(w, http.StatusOK, map[string]any{"tools": []any{}}, "", nil)
+		return
+	}
+	tools := make([]map[string]any, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		tools = append(tools, map[string]any{"name": strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name())), "file": entry.Name()})
+	}
+	httpx.Success(w, http.StatusOK, map[string]any{"tools": tools}, "", nil)
+}
+
+func (h *Handler) autoUpdateStatus(w http.ResponseWriter, r *http.Request) {
+	config, _ := h.app.ConfigStore.Load("auto-update")
+	httpx.Success(w, http.StatusOK, map[string]any{"enabled": false, "config": config, "running": false}, "", nil)
+}
+
+func (h *Handler) debugScreenshots(w http.ResponseWriter, r *http.Request) {
+	dir := filepath.Join(h.app.Config().Paths.DataDir, "debug")
+	entries, _ := os.ReadDir(dir)
+	files := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			files = append(files, entry.Name())
+		}
+	}
+	httpx.Success(w, http.StatusOK, map[string]any{"files": files, "path": dir}, "", nil)
+}
+
+func (h *Handler) activity(w http.ResponseWriter, r *http.Request) {
+	clientType := firstNonEmpty(r.URL.Query().Get("clientType"), "Official")
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	info, err := h.app.Activity.CurrentActivity(ctx, clientType)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, info, "", nil)
+}
+
+func (h *Handler) activityPreflight(w http.ResponseWriter, r *http.Request) {
+	clientType := firstNonEmpty(r.URL.Query().Get("clientType"), "Official")
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	result, err := h.app.Activity.GetActivityRunPreflight(ctx, clientType)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, result, "", nil)
 }

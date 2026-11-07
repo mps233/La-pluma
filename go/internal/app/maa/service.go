@@ -169,7 +169,11 @@ func (s *Service) RunTask(ctx context.Context, input any, wait bool, idempotency
 		return domainrun.DTO{}, false, apperrors.WithStatus("MAA_TASK_FILE_FAILED", "无法写入动态任务文件", 500, false, map[string]any{"error": err.Error()})
 	}
 	cleanup := func() { _ = os.Remove(taskPath) }
-	args := []string{"--batch", filepath.ToSlash(filepath.Join(dynamicTaskDir, taskID))}
+	address := os.Getenv("ADB_ADDRESS")
+	if strings.TrimSpace(address) == "" {
+		address = "127.0.0.1:16384"
+	}
+	args := []string{"--batch", filepath.ToSlash(filepath.Join(dynamicTaskDir, taskID)), "--addr", address}
 	run, replayed, err := s.Run(ctx, RunRequest{
 		OperationID:    "run_task",
 		Command:        "run",

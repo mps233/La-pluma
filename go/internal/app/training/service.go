@@ -717,3 +717,28 @@ func (s *Service) IsStageOpen(stage, clientType string) (bool, string) {
 	}
 	return info.IsOpen, reason
 }
+
+// AllOperatorsDetailed exposes the raw operator catalog for /data/operators.
+func (s *Service) AllOperatorsDetailed() ([]map[string]any, error) {
+	operators, err := s.loadAllOperators()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]map[string]any, 0, len(operators))
+	for _, operator := range operators {
+		entry := map[string]any{
+			"id":         operator.ID,
+			"name":       operator.Name,
+			"rarity":     operator.Rarity,
+			"profession": operator.Profession,
+			"level":      0,
+			"elite":      0,
+			"potential":  0,
+		}
+		if operator.Position != nil {
+			entry["position"] = *operator.Position
+		}
+		out = append(out, entry)
+	}
+	return out, nil
+}

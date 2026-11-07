@@ -8,17 +8,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mps233/la-pluma/go/internal/app/activity"
 	"github.com/mps233/la-pluma/go/internal/app/agentrun"
 	configapp "github.com/mps233/la-pluma/go/internal/app/config"
+	"github.com/mps233/la-pluma/go/internal/app/copilot"
 	"github.com/mps233/la-pluma/go/internal/app/drops"
 	"github.com/mps233/la-pluma/go/internal/app/execution"
 	"github.com/mps233/la-pluma/go/internal/app/logs"
 	maaapp "github.com/mps233/la-pluma/go/internal/app/maa"
 	"github.com/mps233/la-pluma/go/internal/app/notifications"
+	"github.com/mps233/la-pluma/go/internal/app/quotes"
 	"github.com/mps233/la-pluma/go/internal/app/scheduler"
 	"github.com/mps233/la-pluma/go/internal/app/training"
 	webrtcapp "github.com/mps233/la-pluma/go/internal/app/webrtc"
 	"github.com/mps233/la-pluma/go/internal/config"
+	"github.com/mps233/la-pluma/go/internal/infra/assets"
 	"github.com/mps233/la-pluma/go/internal/infra/maa"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
@@ -41,7 +45,11 @@ type App struct {
 	Drops         *drops.Service
 	Scheduler     *scheduler.Service
 	Training      *training.Service
+	Activity      *activity.Service
+	Copilot       *copilot.Service
 	Notifications *notifications.Service
+	Quotes        *quotes.Service
+	Assets        *assets.Handler
 	WebRTC        *webrtcapp.Service
 
 	startedAt time.Time
@@ -78,6 +86,15 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	configStore := configapp.NewStorage(cfg.Paths)
 	dropService := drops.New(cfg.Paths)
 	trainingService := training.New(cfg.Paths, logger)
+	copilotService := copilot.New(cfg.Paths)
+	activityService := activity.NewWithOptions(activity.Options{
+		Paths:        cfg.Paths,
+		Logger:       logger,
+		ConfigLoader: configStore,
+		Executor:     maaExecutor{service: maaActions},
+	})
+	quotesService := quotes.New(cfg.Paths, logger)
+	assetsHandler := assets.New(cfg.Paths, assets.Config{Logger: logger})
 	schedulerService := newScheduler(cfg, logger, maaActions, dropService, trainingService, configStore)
 	notificationService := notifications.New(notifications.Options{Paths: cfg.Paths, Logger: logger})
 	if loaded, err := notificationService.Load(); err == nil {
@@ -101,7 +118,11 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Drops:         dropService,
 		Scheduler:     schedulerService,
 		Training:      trainingService,
+		Activity:      activityService,
+		Copilot:       copilotService,
 		Notifications: notificationService,
+		Quotes:        quotesService,
+		Assets:        assetsHandler,
 		WebRTC:        webrtcapp.New(cfg, logger),
 		startedAt:     time.Now(),
 	}, nil

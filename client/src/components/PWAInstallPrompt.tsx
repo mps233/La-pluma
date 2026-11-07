@@ -5,6 +5,7 @@ import { useStatusStore } from '@/store/statusStore'
 import { GlassCard } from '@zakisheriff/liquid-glass'
 import { Button, CjkText, IconButton } from '@/components/common'
 import { hasDocumentBuildChanged } from '@/utils/pwaUpdate'
+import { isDesktopRuntime } from '@/desktop/desktopMode'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -64,6 +65,11 @@ const clearInstallDismissal = () => {
 }
 
 export default function PWAInstallPrompt() {
+  if (isDesktopRuntime()) return null
+  return <PWAInstallPromptWeb />
+}
+
+function PWAInstallPromptWeb() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isIos] = useState(isIosDevice)
   const [showInstallPrompt, setShowInstallPrompt] = useState(() =>

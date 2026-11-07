@@ -250,6 +250,16 @@ func (s *Service) Devices(ctx context.Context) ([]string, error) {
 	return result, nil
 }
 
+func (s *Service) DeviceStats(ctx context.Context) (*adb.DeviceStats, error) {
+	s.mu.Lock()
+	address := s.address
+	if s.current != nil {
+		address = s.current.address
+	}
+	s.mu.Unlock()
+	return adb.New(s.adbPath).DeviceStats(ctx, address)
+}
+
 func (s *Service) Screenshot(ctx context.Context) ([]byte, error) {
 	s.mu.Lock()
 	address := s.address

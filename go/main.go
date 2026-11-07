@@ -21,6 +21,7 @@ import (
 	"github.com/egoist/mygo"
 
 	"github.com/mps233/la-pluma/go/internal/app"
+	"github.com/mps233/la-pluma/go/internal/app/quotes"
 	"github.com/mps233/la-pluma/go/internal/config"
 	scwebrtc "github.com/mps233/la-pluma/go/internal/infra/webrtc"
 	"github.com/mps233/la-pluma/go/internal/transport/agentapi"
@@ -30,8 +31,11 @@ import (
 
 const desktopPort = 32123
 
+var activeDesktop *desktopRuntime
+
 func main() {
 	mygo.App.SetName("La Pluma")
+	mygo.Bind(DesktopBridge{})
 	if !mygo.App.RequestSingleInstanceLock() {
 		os.Exit(0)
 	}
@@ -118,6 +122,8 @@ func startDesktop() {
 	handler := httpapi.New(cfg, logger,
 		httpapi.WithAgentHandler(agentapi.New(application, logger)),
 		httpapi.WithSignalingHandler(signalServer.Handler()),
+		httpapi.WithQuotesHandler(quotes.NewHandler(application.Quotes)),
+		httpapi.WithAssetsHandler(application.Assets),
 	).Handler()
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", desktopPort))
@@ -160,6 +166,7 @@ func startDesktop() {
 			PreloadScript:        preloadScript(token),
 		},
 	})
+	activeDesktop = runtimeState
 	runtimeState.setupTray(logger)
 	mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) {
 		runtimeState.close(logger)
@@ -280,4 +287,69 @@ func trayIcon() []byte {
 	var buffer bytes.Buffer
 	_ = png.Encode(&buffer, img)
 	return buffer.Bytes()
+}
+
+// DesktopBridge exposes desktop-only capabilities to the trusted loopback
+// page. It is intentionally narrow: no arbitrary command execution.
+type DesktopBridge struct{}
+
+func (DesktopBridge) ChooseExecutable(kind string) (string, error) {
+	title := "选择可执行文件"
+	switch kind {
+	case "adb":
+		title = "选择 ADB 可执行文件"
+	case "maa":
+		title = "选择 MAA CLI 可执行文件"
+	}
+	paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{
+		Title:   title,
+		Filters: []mygo.FileFilter{{Name: "可执行文件", Extensions: []string{"*"}}},
+	})
+	if err != nil || len(paths) == 0 {
+		return "", err
+	}
+	return paths[0], nil
+}
+
+func (DesktopBridge) OpenDataDir() error {
+	path, err := mygo.App.Path(mygo.PathUserData)
+	if err != nil {
+		return err
+	}
+	return mygo.Shell.OpenPath(path)
+}
+
+func (DesktopBridge) OpenLogs() error {
+	path, err := mygo.App.Path(mygo.PathLogs)
+	if err != nil {
+		return err
+	}
+	return mygo.Shell.OpenPath(path)
+}
+
+func (DesktopBridge) Notify(title, body string) error {
+	notification := mygo.NewNotification(mygo.NotificationOptions{
+		ID:    "la-pluma-" + title,
+		Title: title,
+		Body:  body,
+	})
+	return notification.Show()
+}
+
+func (DesktopBridge) GetAutostart() bool {
+	return mygo.App.OpenAtLogin()
+}
+
+func (DesktopBridge) SetAutostart(enabled bool) error {
+	return mygo.App.SetOpenAtLogin(enabled)
+}
+
+func (DesktopBridge) AppInfo() map[string]any {
+	userData, _ := mygo.App.Path(mygo.PathUserData)
+	return map[string]any{
+		"name":     "La Pluma",
+		"version":  "0.1.0",
+		"platform": runtime.GOOS,
+		"userData": userData,
+	}
 }

@@ -103,11 +103,24 @@ func TestStopAcceptedRun(t *testing.T) {
 	}
 }
 
-func TestManifestPlaceholder(t *testing.T) {
+func TestManifestAndOpenAPI(t *testing.T) {
 	_, handler := newTestHandler(t)
 	rec := doRequest(t, handler, http.MethodGet, "/manifest")
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("manifest status = %d", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("manifest status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := body["data"].(map[string]any)
+	actions, _ := data["actions"].([]any)
+	if len(actions) != 26 {
+		t.Fatalf("expected 26 advertised actions, got %d", len(actions))
+	}
+	openapi := doRequest(t, handler, http.MethodGet, "/openapi.json")
+	if openapi.Code != http.StatusOK || !strings.Contains(openapi.Body.String(), `"openapi"`) {
+		t.Fatalf("openapi status = %d", openapi.Code)
 	}
 }
 func appRunInput(operationID, idempotencyKey string) runapp.BeginInput {
