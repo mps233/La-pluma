@@ -9,3 +9,5 @@ coverage.out
 /scrcpy-probe
 /signaling-probe
 /webrtc-probe
+
+/go
