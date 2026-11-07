@@ -56,8 +56,10 @@ go/
   - [ ] golden contract tests against Node oracle
 - [~] 3. Scheduling and task flows
   - [x] Go scheduler core: game timezone, flow validation/plan, sequential execution, startup restore, stop
-  - [~] HTTP schedule routes; tracked Run wrapper around scheduled flows
-  - [~] combat/custom task actions (start-game verified on real MuMu; fight/run-task need device-side smoke)
+  - [x] HTTP schedule routes; startup-only flow verified on MuMu
+  - [~] tracked Run wrapper around scheduled flows
+  - [x] start-game, dynamic run-task (StartUp), and startup-only daily flow verified on real MuMu
+  - [~] fight/copilot execution and recognition actions
 - [~] 4. Device preview/control replacement
   - [x] scrcpy server push/launch/protocol (scrcpy-server 3.3.4)
   - [x] H.264 video socket -> Pion WebRTC track
@@ -70,8 +72,8 @@ go/
   - [x] copilot planning/discovery core (execution/manual session wiring pending)
   - [x] drops/statistics + MAA result parsers
   - [x] notifications/Telegram service and bot
-  - [~] config/profile storage (routes wired)
-  - [ ] quotes/assets/activity
+  - [x] config/profile storage, quotes, MaaResource assets
+  - [x] activity current/preflight/discovery core; run execution wiring pending
   - [ ] battle OCR (tesseract CLI or feature flag)
 - [~] 6. MyGo desktop 2/3
   - [x] desktop shell: window/loopback server/single-instance/basic tray/quit

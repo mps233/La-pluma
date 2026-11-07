@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -94,10 +95,13 @@ func startDesktop() {
 			_ = os.Setenv("LA_PLUMA_SCRCPY_SERVER_PATH", scrcpyServer)
 		}
 	}
-	token, err := randomHex(16)
-	if err != nil {
-		logger.Error("token", "error", err)
-		return
+	token := strings.TrimSpace(os.Getenv("LA_PLUMA_TOKEN"))
+	if token == "" {
+		token, err = randomHex(16)
+		if err != nil {
+			logger.Error("token", "error", err)
+			return
+		}
 	}
 
 	cfg := config.Config{

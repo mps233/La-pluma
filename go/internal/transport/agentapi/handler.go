@@ -10,17 +10,20 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/mps233/la-pluma/go/internal/app"
+	"github.com/mps233/la-pluma/go/internal/app/activity"
 	"github.com/mps233/la-pluma/go/internal/app/notifications"
 	"github.com/mps233/la-pluma/go/internal/app/scheduler"
 	"github.com/mps233/la-pluma/go/internal/app/training"
 	webrtcapp "github.com/mps233/la-pluma/go/internal/app/webrtc"
 	"github.com/mps233/la-pluma/go/internal/contract"
 	"github.com/mps233/la-pluma/go/internal/domain/agentrun"
+	"github.com/mps233/la-pluma/go/internal/infra/adb"
 	"github.com/mps233/la-pluma/go/internal/transport/httpx"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
 	_ "image/png"
@@ -76,6 +79,7 @@ func New(application *app.App, logger *slog.Logger) *Handler {
 	mux.HandleFunc("GET /version", handler.version)
 	mux.HandleFunc("GET /activity", handler.activity)
 	mux.HandleFunc("GET /activity/preflight", handler.activityPreflight)
+	mux.HandleFunc("GET /activity/copilot-candidates", handler.activityCandidates)
 	mux.HandleFunc("GET /copilots/{id}", handler.getCopilot)
 	mux.HandleFunc("GET /copilot-sets/{id}", handler.getCopilotSet)
 	mux.HandleFunc("GET /copilot-sets/{id}/plan", handler.getCopilotSetPlan)
@@ -95,6 +99,24 @@ func New(application *app.App, logger *slog.Logger) *Handler {
 	mux.HandleFunc("GET /data/operators", handler.operatorsData)
 	mux.HandleFunc("GET /data/operbox", handler.operboxData)
 	mux.HandleFunc("GET /data/depot", handler.depotData)
+	mux.HandleFunc("POST /actions/test-connection", handler.testConnection)
+	mux.HandleFunc("GET /actions/discover-devices", handler.discoverDevices)
+	mux.HandleFunc("POST /actions/open-config-directory", handler.openConfigDirectory)
+	mux.HandleFunc("POST /actions/configure-auto-update", handler.configureAutoUpdate)
+	mux.HandleFunc("POST /actions/depot-recognition", handler.recognitionUnsupported)
+	mux.HandleFunc("POST /actions/operbox-recognition", handler.recognitionUnsupported)
+	mux.HandleFunc("POST /activity/run", handler.activityRunUnsupported)
+	mux.HandleFunc("GET /copilot-sets/{id}/manual/{runId}", handler.copilotManualUnsupported)
+	mux.HandleFunc("GET /paradox/search", handler.paradoxSearch)
+	mux.HandleFunc("POST /copilot-sets/{id}/execute", handler.copilotUnsupported)
+	mux.HandleFunc("POST /copilot-sets/{id}/manual/start", handler.copilotUnsupported)
+	mux.HandleFunc("POST /actions/continue-copilot-set", handler.copilotUnsupported)
+	mux.HandleFunc("POST /actions/update-core", handler.updateUnsupported)
+	mux.HandleFunc("POST /actions/update-cli", handler.updateUnsupported)
+	mux.HandleFunc("POST /actions/hot-update-resources", handler.updateUnsupported)
+	mux.HandleFunc("GET /logs/files", handler.logFiles)
+	mux.HandleFunc("GET /logs/files/{filePath...}", handler.readLogFile)
+	mux.HandleFunc("POST /logs/cleanup", handler.cleanupLogs)
 	mux.HandleFunc("GET /device-stats", handler.deviceStats)
 	mux.HandleFunc("GET /paradox/operators", handler.paradoxOperators)
 	mux.HandleFunc("GET /custom-tools", handler.customTools)
@@ -1108,4 +1130,228 @@ func (h *Handler) activityPreflight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.Success(w, http.StatusOK, result, "", nil)
+}
+
+func defaultADBPath() string {
+	if value := os.Getenv("ADB_PATH"); strings.TrimSpace(value) != "" {
+		return strings.TrimSpace(value)
+	}
+	if runtime.GOOS == "darwin" {
+		return "/opt/homebrew/bin/adb"
+	}
+	return "adb"
+}
+
+func defaultADBAddress() string {
+	if value := os.Getenv("ADB_ADDRESS"); strings.TrimSpace(value) != "" {
+		return strings.TrimSpace(value)
+	}
+	return "127.0.0.1:16384"
+}
+
+func (h *Handler) testConnection(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	adbPath := firstNonEmpty(stringField(body, "adbPath"), defaultADBPath())
+	address := firstNonEmpty(stringField(body, "address"), defaultADBAddress())
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	client := adb.New(adbPath)
+	devices, err := client.Devices(ctx)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	connected := false
+	state := "offline"
+	for _, device := range devices {
+		if device.Serial == address {
+			connected = device.State == "device"
+			state = device.State
+			break
+		}
+	}
+	if !connected && strings.Contains(address, ":") {
+		_, _ = client.Connect(ctx, address)
+		devices, _ = client.Devices(ctx)
+		for _, device := range devices {
+			if device.Serial == address {
+				connected = device.State == "device"
+				state = device.State
+				break
+			}
+		}
+	}
+	httpx.Success(w, http.StatusOK, map[string]any{
+		"connected": connected, "state": state, "adbPath": adbPath, "address": address,
+	}, "", nil)
+}
+
+func (h *Handler) discoverDevices(w http.ResponseWriter, r *http.Request) {
+	adbPath := firstNonEmpty(r.URL.Query().Get("adbPath"), defaultADBPath())
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	devices, err := adb.New(adbPath).Devices(ctx)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	out := make([]map[string]any, 0, len(devices))
+	for _, device := range devices {
+		out = append(out, map[string]any{"serial": device.Serial, "state": device.State, "model": device.Model, "raw": device.Raw})
+	}
+	httpx.Success(w, http.StatusOK, map[string]any{"devices": out, "adbPath": adbPath}, "", nil)
+}
+
+func (h *Handler) openConfigDirectory(w http.ResponseWriter, r *http.Request) {
+	httpx.Success(w, http.StatusOK, map[string]any{"path": h.app.Config().Paths.MaaConfigDir}, "配置目录已定位", nil)
+}
+
+func (h *Handler) configureAutoUpdate(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	if err := h.app.ConfigStore.Save("auto-update", body); err != nil {
+		writeError(w, err)
+		return
+	}
+	clientType := firstNonEmpty(stringField(body, "clientType"), "Official")
+	result := h.app.Scheduler.SetupAutoUpdate(body, clientType)
+	httpx.Success(w, http.StatusOK, result, result.Message, nil)
+}
+
+func (h *Handler) recognitionUnsupported(w http.ResponseWriter, r *http.Request) {
+	httpx.Failure(w, http.StatusNotImplemented, &httpx.APIError{
+		Code: "MAA_RECOGNITION_UNSUPPORTED", Message: "识别任务尚未迁移到 Go 后端",
+		Retryable: false, Details: map[string]any{"todo": "wire dataParserService"},
+	})
+}
+
+func (h *Handler) copilotUnsupported(w http.ResponseWriter, r *http.Request) {
+	httpx.Failure(w, http.StatusNotImplemented, &httpx.APIError{
+		Code: "COPILOT_EXECUTION_UNSUPPORTED", Message: "作业执行尚未接入 Go 后端",
+		Retryable: false, Details: map[string]any{"todo": "wire copilot PlanExecutor"},
+	})
+}
+
+func (h *Handler) updateUnsupported(w http.ResponseWriter, r *http.Request) {
+	httpx.Failure(w, http.StatusNotImplemented, &httpx.APIError{
+		Code: "MAA_UPDATE_UNSUPPORTED", Message: "MAA 更新尚未接入 Go 后端",
+		Retryable: false, Details: map[string]any{"todo": "wire maa update commands"},
+	})
+}
+
+func (h *Handler) logFiles(w http.ResponseWriter, r *http.Request) {
+	dir := filepath.Join(h.app.Config().Paths.MaaStateDir, "debug")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		httpx.Success(w, http.StatusOK, map[string]any{"files": []any{}, "path": dir}, "", nil)
+		return
+	}
+	files := make([]map[string]any, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".log") {
+			continue
+		}
+		info, _ := entry.Info()
+		modified := ""
+		size := int64(0)
+		if info != nil {
+			modified = info.ModTime().UTC().Format(time.RFC3339)
+			size = info.Size()
+		}
+		files = append(files, map[string]any{"name": entry.Name(), "path": filepath.Join(dir, entry.Name()), "size": size, "modified": modified})
+	}
+	httpx.Success(w, http.StatusOK, map[string]any{"files": files, "path": dir}, "", nil)
+}
+
+func (h *Handler) readLogFile(w http.ResponseWriter, r *http.Request) {
+	dir := filepath.Join(h.app.Config().Paths.MaaStateDir, "debug")
+	requested := r.PathValue("filePath")
+	path := requested
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(dir, requested)
+	}
+	cleanDir := filepath.Clean(dir) + string(os.PathSeparator)
+	if !strings.HasPrefix(filepath.Clean(path), cleanDir) {
+		httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{Code: "AGENT_LOG_PATH_INVALID", Message: "日志路径不合法", Retryable: false})
+		return
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		httpx.Failure(w, http.StatusNotFound, &httpx.APIError{Code: "AGENT_MAA_LOG_UNAVAILABLE", Message: "日志文件不存在", Retryable: false})
+		return
+	}
+	lines := parseBoundedInt(r.URL.Query().Get("lines"), 1000, 1, 5000)
+	all := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
+	total := len(all)
+	if len(all) > lines {
+		all = all[total-lines:]
+	}
+	httpx.Success(w, http.StatusOK, map[string]any{
+		"path": path, "content": strings.Join(all, "\n"), "totalLines": total, "returnedLines": len(all),
+	}, "", nil)
+}
+
+func (h *Handler) cleanupLogs(w http.ResponseWriter, r *http.Request) {
+	httpx.Success(w, http.StatusOK, map[string]any{"removed": 0}, "日志清理完成", nil)
+}
+
+func stringField(record map[string]any, key string) string {
+	value, _ := record[key].(string)
+	return value
+}
+
+func (h *Handler) activityCandidates(w http.ResponseWriter, r *http.Request) {
+	clientType := firstNonEmpty(r.URL.Query().Get("clientType"), "Official")
+	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
+	defer cancel()
+	preflight, err := h.app.Activity.GetActivityRunPreflight(ctx, clientType)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	candidates, err := h.app.Activity.FindActivityCopilotCandidates(ctx, clientType, activity.DiscoveryOptions{Preflight: &preflight})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, candidates, "", nil)
+}
+
+func (h *Handler) activityRunUnsupported(w http.ResponseWriter, r *http.Request) {
+	httpx.Failure(w, http.StatusNotImplemented, &httpx.APIError{
+		Code: "ACTIVITY_RUN_UNSUPPORTED", Message: "活动执行尚未接入 Go 后端",
+		Retryable: false, Details: map[string]any{"todo": "wire activity PlanExecutor and LeaseRunner"},
+	})
+}
+
+func (h *Handler) copilotManualUnsupported(w http.ResponseWriter, r *http.Request) {
+	httpx.Failure(w, http.StatusNotImplemented, &httpx.APIError{
+		Code: "COPILOT_MANUAL_UNSUPPORTED", Message: "手动作业集尚未接入 Go 后端",
+		Retryable: false,
+	})
+}
+
+func (h *Handler) paradoxSearch(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimSpace(r.URL.Query().Get("name"))
+	if name == "" {
+		httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{Code: "AGENT_VALIDATION_OPERATOR_NAME_REQUIRED", Message: "请提供干员名字", Retryable: false})
+		return
+	}
+	value, err := jsonstore.Read(filepath.Join(h.app.Config().Paths.DataDir, "paradox-operators.json"), []any{})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	list, _ := value.([]any)
+	matches := make([]any, 0)
+	for _, item := range list {
+		record, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		candidate := firstNonEmpty(stringField(record, "name"), stringField(record, "operator"))
+		if strings.Contains(strings.ToLower(candidate), strings.ToLower(name)) {
+			matches = append(matches, item)
+		}
+	}
+	httpx.Success(w, http.StatusOK, matches, "", nil)
 }
