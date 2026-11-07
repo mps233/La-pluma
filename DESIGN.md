@@ -84,16 +84,15 @@ iOS / macOS 27 的 Liquid Glass 是 iOS 26 材质的精修，不是换一套语�
 - `prefers-reduced-transparency: reduce` 时改为实色表面；`prefers-contrast: more` 时加强边框和文字，不保留半透明装饰。
 - 新的材质 token 和 `regular / clear / tinted` 语义尚未在代码中落地；当前 `ios-theme.css` 的 glass token 是固定值，按「当前实现备注」逐步替换。
 
-### Glasswork 液态玻璃
+### Liquid Glass 材质
 
-悬浮 chrome 使用 Glasswork 的液态玻璃：`client/src/glasswork/glass.css` 提供材质变量与规则，`lens.js` 在 Chromium 下绘制边缘折射。当前用于桌面浮动侧栏、顶栏主题/GitHub 控件和移动端顶栏的品牌/主题/GitHub 圆形入口。表面只挂 `.glass`，`html.dark` 自动切换深色材质。
+所有玻璃材质统一使用 `@zakisheriff/liquid-glass`；不再引入或使用 Glasswork / `.glass` 材质类。桌面浮动 chrome 与页面内控件使用同一套包材质：
 
-- 表面参数使用材料自带的 `--density`（0 透明，1 实心）、`--floor`（文字所需的最低染色）和 `--keep`（保留的饱和度增益）。侧栏使用 `--density: 0.75` 保证面板在环境/滚动内容上可辨。
-- 侧栏选中项保持「accent 填充 + 白字」的语义，但填充改为 accent 染色玻璃：浅色 `#004b99`、深色 `#0059b3`，`--floor: 0.8`（hover 0.88），叠加顶部柔光/底部暗部渐变和软阴影，不使用亮边；白字对比度约 5.6:1 / 9.2:1。
-- 侧栏未选中项的 hover/focus 使用中性灰玻璃（无色相）：浅色由 `--app-text` 与 `--app-surface-solid` 混出灰，深色由 `--app-text` 与 `--app-bg-soft` 混出灰，16px 模糊、无亮边；静止态完全透明。配方集中在 `--app-neutral-glass-*` 变量（tint / blur / saturate / brightness），不额外声明 `--density`。
-- 边缘折射只在 Chromium 生效；其他浏览器保留 CSS 玻璃。Safari / iOS 通过 `[data-engine="webkit"]` 强制圆角，避免 `backdrop-filter` 与超椭圆圆角组合时整块表面不绘制的设备问题。
-- `prefers-reduced-transparency: reduce` 下所有玻璃表面退化为 `--app-surface-solid` 实色表面，并保留 1px 边缘。
-- 移动端顶栏的三个圆形入口（品牌、主题、GitHub）按产品要求使用同一材质，允许叠在已有 chrome / 卡片表面之上；这是明确的例外，其他普通卡片仍不得叠加玻璃。
+- 桌面侧栏框架使用 `GlassCard`（`la-pluma-sidebar-surface`），按需设置 `--lg-glass-fill` / `--lg-glass-blur`；侧栏导航项使用 `GlassButton`：选中态 `variant="filled"` + `--app-accent-action`（实色 accent、白字），未选中态 `variant="clear"`（包的轻量玻璃，hover/focus 由包处理）。
+- 顶栏主题胶囊使用 `GlassCard` 作为材质容器，内部保留三按钮和蓝色选中指示；GitHub、品牌、移动端主题触发器使用 `GlassButton`（GitHub 使用 `href`，品牌桌面保持裸链、移动端为 44px 圆钮）。
+- 移动端顶栏的品牌、主题、GitHub 圆形入口使用同一套 `GlassButton` 材质。
+- `prefers-reduced-transparency: reduce` 下包材质退化为实色，并为 `GlassCard` 的 `::before` 同步关闭 backdrop-filter；`prefers-contrast: more` 通过 `--lg-edge` 加强边缘。
+- 页面和组件不要新增手写玻璃或 Glasswork 类；需要新玻璃面时使用 `GlassCard`、`GlassButton`、`GlassSegmented`、`GlassNav`、`GlassMenu`、`GlassSwitch`。
 - 页面内分段控件统一使用 `@zakisheriff/liquid-glass` 的 `GlassSegmented`（作业类型、肉鸽模式、预览模式、日志内容、数据视图、养成状态、配置分区），不再使用 `app-liquid-tab-pill` 胶囊或手写高亮层。作业类型与预览卡的 wrapper 通过 `data-theme` 继承明暗主题（`system` 时交给媒体查询）；预览控件使用 `size="sm"`；页面级轨道统一铺满容器，粗指针设备由 CSS 把分段高度提升到 44px。整行作业类型轨道的背景模糊已关闭（背后是均匀的页面底色），否则透镜动画每帧重算模糊会把帧率减半；小号预览控件保留模糊。
 - 移动端底部导航使用同一库的 `GlassNav`（控制台、自动化、作业、配置四个 Tab）+ 独立圆形 `GlassMenu`（更多）；「更多」不是第五个 Tab，点击后从按钮向左上展开工作区菜单，当前溢出页面在菜单中带勾选，溢出页面激活时按钮使用 accent 色。tabbar wrapper 绑定 `data-theme`，保留 `--la-pluma-tabbar-*` 高度与安全区 token，内容区留白和滚动遮罩继续使用这些 token。
 - 全局 `Button` / `IconButton` 也由 `GlassButton` 承载：primary → filled + `--app-accent-action`，danger → filled + `--app-danger-action`，success → filled + `--app-success-action`，secondary / outline → glass，ghost → clear；loading 时用内置活动指示器填入 icon 并保留 `loadingText`。尺寸映射为 36 / 44 / 48px，粗指针下小号提升到 44px。明暗主题通过 `applyThemePreference` 在 `html[data-theme]` 统一解析，按钮不再逐个包裹主题属性。
@@ -457,7 +456,7 @@ Tailwind 映射：
 - 普通按钮：使用 `Button`
 - 图标按钮：使用 `IconButton`
 
-普通按钮与图标按钮统一由 `@zakisheriff/liquid-glass` 的 `GlassButton` 承载（见“Glasswork 液态玻璃”下的 Button 条目），页面不要再写 `app-button` / `app-icon-button` 之类的按钮外观类。
+普通按钮与图标按钮统一由 `@zakisheriff/liquid-glass` 的 `GlassButton` 承载（见“Liquid Glass 材质”下的 Button 条目），页面不要再写 `app-button` / `app-icon-button` 之类的按钮外观类。
 
 iOS 风格三档 `Button` 高度由 `Button` 的 `size` 统一管理，经 `app-glass-button-*` 映射为桌面 36、44、48px 的玻璃胶囊；`Input` 和 `Select` 为 44px。手机断点和粗指针设备会把所有标准按钮、图标按钮与表单点击区提升到至少 44px。不要在调用处再叠加 `h-*`、`px-*`、`py-*` 缩小标准控件；图标专用工具条只有在桌面高密度场景才可明确使用更紧凑的尺寸，且不能承载文字。
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
-import { Button, Tooltip, TruncatedText } from './common'
+import { Button, IconButton, TruncatedText } from './common'
 import { keepNumberWithUnit } from '../utils/typography'
 import { previewQualityPresets, usePreviewStore, type PreviewQuality } from '../stores'
 import { usePreviewConnection } from '../contexts/previewSession'
@@ -66,40 +66,29 @@ function DeviceNavigationButtons({
   automationAvailable,
   automationUnavailableMessage,
   immersive = false,
-  compact = false,
   onCommand,
 }: {
   connected: boolean
   automationAvailable: boolean
   automationUnavailableMessage: string
   immersive?: boolean
-  compact?: boolean
   onCommand: (command: string) => void
 }) {
-  return deviceNavigationActions.map(({ label, command, Icon }) => {
-    const trigger = (
-      <button
-        key={label}
-        type="button"
-        onClick={() => onCommand(command)}
-        disabled={!connected || !automationAvailable}
-        aria-label={label}
-        className={immersive
-          ? 'group flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-35'
-          : `control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-secondary transition-colors hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35 ${compact ? 'automation-preview-glass-button' : ''}`}
-      >
-        <Icon className="h-3.5 w-3.5" strokeWidth={1.8} />
-      </button>
-    )
-
-    return immersive
-      ? trigger
-      : (
-          <Tooltip key={label} content={!automationAvailable ? automationUnavailableMessage : label}>
-            {trigger}
-          </Tooltip>
-        )
-  })
+  return deviceNavigationActions.map(({ label, command, Icon }) => (
+    <IconButton
+      key={label}
+      icon={<Icon className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />}
+      variant={immersive ? 'ghost' : 'secondary'}
+      size="md"
+      onClick={() => onCommand(command)}
+      disabled={!connected || !automationAvailable}
+      aria-label={label}
+      title={immersive ? label : undefined}
+      tooltip={immersive ? undefined : (!automationAvailable ? automationUnavailableMessage : label)}
+      tooltipSide="top"
+      className={immersive ? 'scrcpy-immersive-control' : 'scrcpy-preview-control'}
+    />
+  ))
 }
 
 interface TrackedPointer {
@@ -676,33 +665,32 @@ export default function ScrcpyDeviceView({
             connected={webrtc.status === 'connected'}
             automationAvailable={automationAvailable}
             automationUnavailableMessage={automationUnavailableMessage}
-            compact={isCompact}
             onCommand={sendDeviceCommand}
           />
-          <Tooltip content="全屏">
-            <button
-              type="button"
-              onClick={fullscreen}
-              disabled={webrtc.status !== 'connected'}
-              aria-label="全屏"
-              className={`control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-secondary transition-colors hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35 ${isCompact ? 'automation-preview-glass-button' : ''}`}
-            >
-              <Maximize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
-            </button>
-          </Tooltip>
+          <IconButton
+            icon={<Maximize2 className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />}
+            variant="secondary"
+            size="md"
+            onClick={fullscreen}
+            disabled={webrtc.status !== 'connected'}
+            aria-label="全屏"
+            tooltip="全屏"
+            tooltipSide="top"
+            className="scrcpy-preview-control"
+          />
           {isCompact && (
-            <Tooltip content={compactControlsOpen ? '收起预览设置' : '打开预览设置'}>
-              <button
-                type="button"
-                onClick={() => setCompactControlsOpen(open => !open)}
-                aria-label={compactControlsOpen ? '收起预览设置' : '打开预览设置'}
-                aria-expanded={compactControlsOpen}
-                aria-controls={compactControlsId}
-                className={`automation-preview-glass-button control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-secondary${compactControlsOpen ? ' is-active' : ''}`}
-              >
-                <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.8} />
-              </button>
-            </Tooltip>
+            <IconButton
+              icon={<SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />}
+              variant="secondary"
+              size="md"
+              onClick={() => setCompactControlsOpen(open => !open)}
+              aria-label={compactControlsOpen ? '收起预览设置' : '打开预览设置'}
+              aria-expanded={compactControlsOpen}
+              aria-controls={compactControlsId}
+              tooltip={compactControlsOpen ? '收起预览设置' : '打开预览设置'}
+              tooltipSide="top"
+              className={`scrcpy-preview-control${compactControlsOpen ? ' is-active' : ''}`}
+            />
           )}
         </div>
 
@@ -927,15 +915,15 @@ export default function ScrcpyDeviceView({
             immersive
             onCommand={sendDeviceCommand}
           />
-          <button
-            type="button"
+          <IconButton
+            icon={<Minimize2 className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />}
+            variant="ghost"
+            size="md"
             onClick={exitImmersive}
             title="退出全屏"
             aria-label="退出全屏"
-            className="group flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-sm transition hover:bg-white/20 disabled:opacity-35 disabled:cursor-not-allowed"
-          >
-            <Minimize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
-          </button>
+            className="scrcpy-immersive-control"
+          />
         </div>
       </div>,
       document.body

@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, Search, Settings2, Swords, Wrench, X } from 'lucide-react'
-import { GlassMenu, GlassNav } from '@zakisheriff/liquid-glass'
+import { GlassButton, GlassCard, GlassMenu, GlassNav } from '@zakisheriff/liquid-glass'
 import ThemeToggle from './ThemeToggle'
 import AeroBackdrop from './backgrounds/AeroBackdrop'
-import { liquidGlass, type LiquidGlassHandle } from '@/glasswork/lens.js'
 import { useUIStore } from '@/stores'
 import { appTabFromPath, appTabPath, isAppTab, type AppTab } from '@/stores/uiStore'
 import { preloadPage } from '@/utils/pagePreload'
@@ -13,8 +12,6 @@ import {
   loadDailyOperatorQuote,
 } from '@/services/operatorQuotes'
 
-// Glasswork's rim lens: only Chromium draws it; elsewhere the CSS glass stays.
-const GLASS_LENS = { rim: 40, edge: 1.1, power: 2.6, dispersion: 0.15 } as const
 
 interface LayoutProps {
   children: (props: { activeTab: string }) => ReactNode
@@ -104,20 +101,21 @@ function TabLink({
   onNavigate: (tab: AppTab) => void
 }) {
   return (
-    <button
+    <GlassButton
       type="button"
       data-app-tab={tab.id}
       aria-current={active ? 'page' : undefined}
       onPointerEnter={() => preloadPage(tab.id)}
       onFocus={() => preloadPage(tab.id)}
       onClick={() => onNavigate(tab.id)}
-      className={`la-pluma-tab-link link is-desktop-tab ${active ? 'is-active' : ''} glass`}
+      icon={<span className="la-pluma-sidebar-icon"><TabIcon tab={tab} size="h-4 w-4" /></span>}
+      variant={active ? 'filled' : 'clear'}
+      tint={active ? 'var(--app-accent-action)' : undefined}
+      size="md"
+      className={`la-pluma-tab-link link is-desktop-tab ${active ? 'is-active' : ''}`}
     >
-      <span className="la-pluma-sidebar-icon">
-        <TabIcon tab={tab} size="h-4 w-4" />
-      </span>
       <span className="la-pluma-sidebar-label">{tab.name}</span>
-    </button>
+    </GlassButton>
   )
 }
 
@@ -134,50 +132,6 @@ export default function Layout({ children }: LayoutProps) {
   const navigationSource = useRef<'initial' | 'store' | 'link' | 'popstate'>('initial')
   const restoreFrame = useRef<number | null>(null)
   const scrollRestoreCleanupRef = useRef<(() => void) | null>(null)
-
-  // Every .glass surface gets the rim lens, including ones mounted later with
-  // a page. The lens is a no-op outside Chromium.
-  useEffect(() => {
-    const root = pageRef.current
-    if (!root || typeof ResizeObserver === 'undefined' || typeof MutationObserver === 'undefined') {
-      return undefined
-    }
-
-    const lenses = new Map<Element, LiquidGlassHandle>()
-    let frame = 0
-
-    const sync = () => {
-      frame = 0
-      for (const [element, lens] of lenses) {
-        if (element.isConnected && element.matches('.glass')) continue
-        lens.destroy()
-        lenses.delete(element)
-      }
-      root.querySelectorAll('.glass').forEach((element) => {
-        if (lenses.has(element)) return
-        lenses.set(element, liquidGlass(element, GLASS_LENS))
-      })
-    }
-    const schedule = () => {
-      if (!frame) frame = window.requestAnimationFrame(sync)
-    }
-
-    sync()
-    const observer = new MutationObserver(schedule)
-    observer.observe(root, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['class'],
-    })
-
-    return () => {
-      observer.disconnect()
-      if (frame) window.cancelAnimationFrame(frame)
-      for (const lens of lenses.values()) lens.destroy()
-      lenses.clear()
-    }
-  }, [])
 
   useEffect(() => {
     let subscribed = true
@@ -356,16 +310,25 @@ export default function Layout({ children }: LayoutProps) {
     <div className="view view-main la-pluma-view">
       <div ref={pageRef} className="page no-swipeback la-pluma-page" data-name="la-pluma">
         <AeroBackdrop />
-        <div className="la-pluma-sidebar-frame glass" aria-hidden="true" />
+        <div className="la-pluma-sidebar-frame" aria-hidden="true">
+          <GlassCard className="la-pluma-sidebar-surface" padding="0" radius="1.625rem" />
+        </div>
         <header className="navbar la-pluma-navbar">
           <div className="navbar-bg" aria-hidden="true" />
           <div className="navbar-inner">
             <div className="left">
               <div className="la-pluma-navbar-left">
-                <button type="button" className="link la-pluma-brand glass" data-pill aria-label="La Pluma 控制台" onClick={() => navigateToTab('dashboard')}>
-                  <img src={`${import.meta.env.BASE_URL}logo-graphite.svg?v=1`} alt="" className="la-pluma-brand-mark" />
+                <GlassButton
+                  type="button"
+                  className="link la-pluma-brand"
+                  icon={<img src={`${import.meta.env.BASE_URL}logo-graphite.svg?v=1`} alt="" className="la-pluma-brand-mark" />}
+                  variant="clear"
+                  size="md"
+                  aria-label="La Pluma 控制台"
+                  onClick={() => navigateToTab('dashboard')}
+                >
                   <span>La Pluma</span>
-                </button>
+                </GlassButton>
               </div>
             </div>
             <div className="title">
@@ -374,16 +337,16 @@ export default function Layout({ children }: LayoutProps) {
             <div className="right">
               <div className="la-pluma-navbar-actions">
                 <ThemeToggle />
-                <a
+                <GlassButton
                   href="https://github.com/mps233/La-pluma"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="link la-pluma-github-link glass"
-                  data-pill
+                  className="link la-pluma-github-link"
+                  icon={<GitHubMark />}
+                  variant="glass"
+                  size="md"
                   aria-label="打开 GitHub 仓库"
-                >
-                  <GitHubMark />
-                </a>
+                />
               </div>
             </div>
           </div>

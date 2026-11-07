@@ -357,7 +357,6 @@
     .app-glass-icon-button,
     .theme-toggle-btn,
     .drop-records-period-button,
-    .app-workspace-segment-copy > span,
     .dashboard-flow-shortcut > span
   ) {
     white-space: nowrap;
@@ -539,8 +538,7 @@
   }
 }
 @media (pointer: coarse), (max-width: 768px) {
-  .app-input,
-  .theme-toggle-btn {
+  .app-input {
     min-height: 2.75rem !important;
     height: 2.75rem !important;
   }
@@ -548,12 +546,6 @@
   .la-pluma-app .app-glass-button-sm,
   .la-pluma-app .app-glass-icon-button-sm {
     --lg-h: 2.75rem;
-  }
-
-  .theme-toggle-btn {
-    width: 2.75rem;
-    min-width: 2.75rem;
-    height: 2.75rem !important;
   }
 
   .app-checkbox {
@@ -864,46 +856,20 @@
     margin: 0;
   }
 }
-.la-pluma-app .task-monitor-panel.is-compact .automation-preview-glass-button {
-  position: relative;
-  width: 2.75rem;
-  min-width: 2.75rem;
-  height: 2.75rem;
-  min-height: 2.75rem;
-  flex: 0 0 2.75rem;
-  overflow: hidden;
-  border: 1px solid transparent;
-  border-color: transparent !important;
-  border-radius: 50%;
-  padding: 0;
-  background: var(--app-glass-bg);
-  -webkit-backdrop-filter: blur(6px) saturate(140%);
-  backdrop-filter: blur(6px) saturate(140%);
-  box-shadow: var(--app-glass-shadow);
-  transition: color 160ms ease, background 160ms ease, transform 120ms ease;
+.scrcpy-preview-control.lg-button {
+  flex: none;
 }
-.la-pluma-app [data-automation-tasks] .automation-monitor-surface .automation-preview-glass-button {
-  background: color-mix(in srgb, var(--app-glass-bg) 84%, transparent);
-  -webkit-backdrop-filter: blur(12px) saturate(150%);
-  backdrop-filter: blur(12px) saturate(150%);
-  box-shadow:
-    inset 0 0 0 0.5px color-mix(in srgb, var(--app-glass-border) 55%, transparent),
-    0 3px 10px rgba(60, 60, 67, 0.08);
+
+.scrcpy-preview-control.is-active {
+  color: var(--app-accent-strong);
 }
-html.dark .la-pluma-app [data-automation-tasks] .automation-monitor-surface .automation-preview-glass-button,
-.la-pluma-app.dark [data-automation-tasks] .automation-monitor-surface .automation-preview-glass-button {
-  box-shadow:
-    inset 0 0 0 0.5px color-mix(in srgb, var(--app-glass-border) 42%, transparent),
-    0 3px 10px rgba(0, 0, 0, 0.2);
+
+.scrcpy-immersive-control.lg-button {
+  --lg-tint: #fff;
+  --lg-glass-fill: rgb(255 255 255 / 0.12);
+  --lg-glass-blur: 4px;
 }
-.la-pluma-app .task-monitor-panel.is-compact .automation-preview-glass-button:active:not(:disabled) {
-  transform: scale(0.94);
-}
-.la-pluma-app .task-monitor-panel.is-compact .automation-preview-glass-button:hover:not(:disabled),
-.la-pluma-app .task-monitor-panel.is-compact .automation-preview-glass-button.is-active {
-  color: var(--app-accent);
-  background: color-mix(in srgb, var(--app-glass-bg) 76%, var(--app-accent-soft));
-}
+
 .automation-workspace-grid .automation-schedule-panel {
   position: static;
   top: auto;
@@ -3015,9 +2981,6 @@ svg.w-5.h-5 {
       - max(1rem, env(safe-area-inset-bottom))
     );
     overflow-y: auto;
-    background: color-mix(in srgb, var(--app-surface-solid) 92%, transparent);
-    backdrop-filter: blur(24px) saturate(150%);
-    -webkit-backdrop-filter: blur(24px) saturate(150%);
   }
 
   .app-pop-in {
@@ -3384,9 +3347,6 @@ svg.w-5.h-5 {
   }
 
   .theme-menu-popover {
-    background: color-mix(in srgb, var(--app-surface-solid) 94%, transparent);
-    backdrop-filter: blur(22px) saturate(135%);
-    -webkit-backdrop-filter: blur(22px) saturate(135%);
     animation: app-popover-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
@@ -4037,115 +3997,6 @@ svg.w-5.h-5 {
     width: 100%;
   }
 
-  .app-workspace-segment-indicator,
-  .app-workspace-segment {
-    min-width: 0;
-    height: 3.25rem;
-    min-height: 3.25rem;
-    border-radius: 999px;
-  }
-
-  .app-workspace-segment-indicator {
-    position: absolute;
-    z-index: 0;
-    inset: 0 auto auto 0;
-    pointer-events: none;
-    background: var(--la-pluma-tabbar-active-bg);
-    box-shadow: none;
-  }
-
-  .app-workspace-segment {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    align-items: center;
-    gap: 0.625rem;
-    padding: 0.5rem 0.75rem;
-    color: var(--app-text-muted);
-    text-align: left;
-    transition: color 180ms ease, opacity 120ms ease;
-  }
-
-  .app-workspace-segment:hover {
-    background: transparent;
-    color: var(--app-text);
-  }
-
-  .app-workspace-segment.is-selected {
-    color: var(--app-accent-strong);
-  }
-
-  .app-workspace-segment:active {
-    opacity: 0.72;
-  }
-
-  .app-workspace-segment:focus-visible {
-    z-index: 2;
-    outline: 2px solid var(--app-accent);
-    outline-offset: -3px;
-  }
-
-  .app-workspace-segment-icon {
-    display: flex;
-    width: 1.5rem;
-    height: 1.5rem;
-    flex: 0 0 1.5rem;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    border-radius: 0;
-    background: transparent;
-    color: inherit;
-    transition: color 180ms ease;
-  }
-
-  .app-workspace-segment.is-selected .app-workspace-segment-icon {
-    background: transparent;
-    color: inherit;
-  }
-
-  .app-workspace-segment-icon > *,
-  .app-workspace-segment-icon > .icon-well {
-    width: 100% !important;
-    height: 100% !important;
-    border-radius: inherit;
-    background: transparent;
-    color: inherit;
-    box-shadow: none;
-  }
-
-  .app-workspace-segment-icon svg {
-    width: 1.5rem;
-    height: 1.5rem;
-  }
-
-  .app-workspace-segment-copy {
-    display: grid;
-    min-width: 0;
-    flex: 1 1 auto;
-    gap: 0.125rem;
-  }
-
-  .app-workspace-segment-copy > span,
-  .app-workspace-segment-copy > small {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .app-workspace-segment-copy > span {
-    color: inherit;
-    font-size: var(--app-font-body);
-    font-weight: 600;
-    line-height: 1.15rem;
-  }
-
-  .app-workspace-segment-copy > small {
-    color: var(--app-text-soft);
-    font-size: var(--app-font-meta);
-    line-height: 0.9rem;
-  }
-
   .combat-mode-shell,
   .roguelike-mode-shell {
     width: 100%;
@@ -4724,14 +4575,6 @@ svg.w-5.h-5 {
     margin-top: 0;
   }
 
-  .task-monitor-panel.is-compact .scrcpy-preview-toolbar button {
-    box-shadow:
-      inset 0 0 0 1px var(--app-border),
-      0 8px 18px rgba(15, 23, 42, 0.12);
-    backdrop-filter: blur(14px) saturate(140%);
-    -webkit-backdrop-filter: blur(14px) saturate(140%);
-  }
-
   @media (min-width: 1280px) {
     .task-monitor-layout {
       grid-template-columns: minmax(0, 1fr) 24rem;
@@ -4760,39 +4603,6 @@ svg.w-5.h-5 {
     padding: var(--app-space-panel);
     border-bottom: 1px solid var(--app-border);
     background: transparent;
-  }
-
-  @media (max-width: 1023px) {
-    .app-workspace-segment-indicator,
-    .app-workspace-segment {
-      height: 3.375rem;
-      min-height: 3.375rem;
-    }
-
-    .app-workspace-segment {
-      flex-direction: column;
-      justify-content: center;
-      gap: 0.1875rem;
-      padding: 0.25rem 0.3rem;
-      text-align: center;
-    }
-
-    .app-workspace-segment-copy {
-      display: block;
-      width: 100%;
-      flex: 0 0 auto;
-    }
-
-    .app-workspace-segment-copy > span {
-      display: block;
-      font-size: 0.6875rem;
-      font-weight: 600;
-      line-height: 1;
-    }
-
-    .app-workspace-segment-copy > small {
-      display: none;
-    }
   }
 
   .combat-task-run-button {

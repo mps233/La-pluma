@@ -1,4 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { GlassCard } from '@zakisheriff/liquid-glass'
 import { AlertCircle, X } from 'lucide-react'
 import {
   useEffect,
@@ -238,46 +239,52 @@ function ModalLayer({
           onKeyDown={handleDialogKeyDown}
           initial={shouldReduceMotion
             ? { opacity: 0 }
-            : { opacity: 0, scale: 0.97, y: 12, backdropFilter: 'blur(0px) saturate(100%)' }}
+            : { opacity: 0, scale: 0.97, y: 12 }}
           animate={shouldReduceMotion
             ? { opacity: 1 }
-            : { opacity: 1, scale: 1, y: 0, backdropFilter: 'blur(24px) saturate(165%)' }}
+            : { opacity: 1, scale: 1, y: 0 }}
           exit={shouldReduceMotion
             ? { opacity: 0 }
-            : { opacity: 0, scale: 0.98, y: 8, backdropFilter: 'blur(0px) saturate(100%)' }}
+            : { opacity: 0, scale: 0.98, y: 8 }}
           transition={shouldReduceMotion
             ? { duration: 0 }
             : { type: 'spring', stiffness: 380, damping: 34, mass: 0.82 }}
-          className={`surface-panel pointer-events-auto flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden rounded-xl ${sizeStyles[size]}`}
+          className={`pointer-events-auto flex max-h-[calc(100dvh-2rem)] w-full flex-col ${sizeStyles[size]}`}
         >
-          {(title || showClose) && (
-            <div className="flex min-h-14 items-center justify-between gap-4 px-5 py-3 shadow-[inset_0_-1px_0_var(--app-border)] sm:px-6">
-              {title
-                ? <h2 id={titleId} className="min-w-0 text-base font-semibold text-primary sm:text-lg"><CjkText>{title}</CjkText></h2>
-                : <span />}
-              {showClose && (
-                <IconButton
-                  icon={<X className="h-4 w-4" aria-hidden="true" />}
-                  size="sm"
-                  variant="ghost"
-                  onClick={onClose}
-                  disabled={!dismissible}
-                  title="关闭对话框"
-                  aria-label="关闭对话框"
-                />
-              )}
-            </div>
-          )}
+          <GlassCard
+            className="app-glass-panel flex min-h-0 w-full flex-1 flex-col overflow-hidden"
+            padding="0"
+            radius="var(--app-radius-lg)"
+          >
+            {(title || showClose) && (
+              <div className="flex min-h-14 items-center justify-between gap-4 px-5 py-3 shadow-[inset_0_-1px_0_var(--app-border)] sm:px-6">
+                {title
+                  ? <h2 id={titleId} className="min-w-0 text-base font-semibold text-primary sm:text-lg"><CjkText>{title}</CjkText></h2>
+                  : <span />}
+                {showClose && (
+                  <IconButton
+                    icon={<X className="h-4 w-4" aria-hidden="true" />}
+                    size="sm"
+                    variant="ghost"
+                    onClick={onClose}
+                    disabled={!dismissible}
+                    title="关闭对话框"
+                    aria-label="关闭对话框"
+                  />
+                )}
+              </div>
+            )}
 
-          <div id={descriptionId} className="min-h-0 overflow-y-auto px-5 py-4 sm:px-6">
-            {children}
-          </div>
-
-          {footer && (
-            <div className="flex flex-wrap items-center justify-end gap-3 px-5 py-4 shadow-[inset_0_1px_0_var(--app-border)] sm:px-6">
-              {footer}
+            <div id={descriptionId} className="min-h-0 overflow-y-auto px-5 py-4 sm:px-6">
+              {children}
             </div>
-          )}
+
+            {footer && (
+              <div className="flex flex-wrap items-center justify-end gap-3 px-5 py-4 shadow-[inset_0_1px_0_var(--app-border)] sm:px-6">
+                {footer}
+              </div>
+            )}
+          </GlassCard>
         </motion.div>
       </div>
     </div>

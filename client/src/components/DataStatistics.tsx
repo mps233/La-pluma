@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { maaApi, getAllOperators, getDropStatistics, getItemIconUrl, getOperBoxData, fetchOperatorMaterials, getTrainingQueue } from '../services/api'
 import { getOperatorAvatarUrl } from '../services/operatorQuotes'
 import { motion, useReducedMotion } from 'framer-motion'
-import { GlassSegmented } from '@zakisheriff/liquid-glass'
+import { GlassCard, GlassSegmented } from '@zakisheriff/liquid-glass'
 import {
   ChevronDown,
   Download,
@@ -80,7 +80,7 @@ const filterButtonClass = (isActive: boolean, isOpen: boolean) =>
     isActive ? ' is-active' : ''
   }${isOpen ? ' is-open' : ''}`
 
-const menuSurfaceClass = 'data-statistics-menu-surface fixed z-[2000] flex flex-col overflow-hidden rounded-xl p-1 surface-panel'
+const menuSurfaceClass = 'data-statistics-menu-surface fixed z-[2000]'
 
 const menuOptionClass = (isActive: boolean) =>
   `flex min-h-11 w-full items-center justify-center rounded-[var(--app-radius-md)] px-3 text-center text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--app-accent)] ${
@@ -395,23 +395,29 @@ function FilterMenu({
           }}
           onKeyDown={handleMenuKeyDown}
         >
-          <div className="data-statistics-menu-scroll">
-            {options.map(option => (
-              <button
-                key={option.value}
-                type="button"
-                role="menuitemradio"
-                aria-checked={value === option.value}
-                onClick={() => {
-                  onSelect(option.value)
-                  closeMenu(true)
-                }}
-                className={menuOptionClass(value === option.value)}
-              >
-                <span className="min-w-0 truncate">{option.label}</span>
-              </button>
-            ))}
-          </div>
+          <GlassCard
+            className="app-glass-panel data-statistics-menu-card flex max-h-full min-h-0 flex-col overflow-hidden"
+            padding="4px"
+            radius="var(--app-radius-lg)"
+          >
+            <div className="data-statistics-menu-scroll">
+              {options.map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={value === option.value}
+                  onClick={() => {
+                    onSelect(option.value)
+                    closeMenu(true)
+                  }}
+                  className={menuOptionClass(value === option.value)}
+                >
+                  <span className="min-w-0 truncate">{option.label}</span>
+                </button>
+              ))}
+            </div>
+          </GlassCard>
         </div>,
         document.body,
       )}

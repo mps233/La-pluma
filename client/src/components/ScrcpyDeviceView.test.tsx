@@ -52,6 +52,20 @@ vi.mock('./common', () => ({
       {loading ? loadingText : children}
     </button>
   ),
+  IconButton: ({
+    icon: _icon,
+    variant: _variant,
+    size,
+    tooltip: _tooltip,
+    tooltipSide: _tooltipSide,
+    className = '',
+    ...props
+  }: Omit<MockButtonProps, 'loading' | 'loadingText' | 'fullWidth' | 'statusKey'> & {
+    tooltip?: ReactNode
+    tooltipSide?: string
+  }) => (
+    <button {...props} data-size={size} className={className} />
+  ),
 }))
 
 let container: HTMLDivElement
@@ -270,7 +284,7 @@ describe('ScrcpyDeviceView automation availability', () => {
     expect(openSettings?.getAttribute('aria-expanded')).toBe('false')
     expect(toolbar?.getAttribute('role')).toBe('toolbar')
     expect(Array.from(toolbar?.querySelectorAll('button') || []).every(button => (
-      button.className.includes('h-11') && button.className.includes('w-11')
+      button.className.includes('scrcpy-preview-control') && button.getAttribute('data-size') === 'md'
     ))).toBe(true)
 
     await act(async () => openSettings?.click())
@@ -494,7 +508,9 @@ describe('ScrcpyDeviceView automation availability', () => {
     expect(container.inert).toBe(true)
     expect(container.getAttribute('aria-hidden')).toBe('true')
     expect(document.body.style.overflow).toBe('hidden')
-    expect(dialog?.querySelector('[aria-label="退出全屏"]')?.className).toContain('h-11')
+    const exitFullscreen = dialog?.querySelector<HTMLElement>('[aria-label="退出全屏"]')
+    expect(exitFullscreen?.className).toContain('scrcpy-immersive-control')
+    expect(exitFullscreen?.getAttribute('data-size')).toBe('md')
 
     await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
     expect(document.body.querySelector('[role="dialog"]')).toBeNull()

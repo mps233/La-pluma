@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Check, Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
+import { GlassButton, GlassCard } from '@zakisheriff/liquid-glass'
 import { useUIStore } from '@/stores'
 
 type ThemeMode = 'light' | 'dark' | 'system'
@@ -109,12 +110,14 @@ export default function ThemeToggle() {
 
   return (
     <>
-      <div
-        className="la-pluma-theme-desktop glass"
+      <GlassCard
+        className="la-pluma-theme-desktop"
         data-pill
         role="group"
         aria-label="界面主题"
         data-theme={theme}
+        padding="0.25rem"
+        radius="999px"
       >
         {themeOptions.map(option => {
           const ThemeIcon = option.icon
@@ -133,23 +136,23 @@ export default function ThemeToggle() {
             </button>
           )
         })}
-      </div>
+      </GlassCard>
 
       <div className="la-pluma-theme-mobile relative flex-none">
-        <button
+        <GlassButton
           ref={mobileTriggerRef}
           type="button"
           onClick={() => setMobileMenuOpen(open => !open)}
-          className={`la-pluma-theme-trigger group text-secondary transition-colors motion-safe:active:scale-[0.96] hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] glass ${mobileMenuOpen ? 'text-primary' : ''}`}
-          data-pill
+          icon={<CurrentThemeIcon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />}
+          variant="glass"
+          size="md"
+          className={`la-pluma-theme-trigger${mobileMenuOpen ? ' text-primary' : ''}`}
           title={`主题：${currentTheme.label}`}
           aria-label={`切换界面主题，当前${currentTheme.label}`}
           aria-haspopup="menu"
           aria-expanded={mobileMenuOpen}
           aria-controls={mobileMenuId}
-        >
-          <CurrentThemeIcon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
-        </button>
+        />
 
         {mobileMenuOpen && (
           <div
@@ -157,28 +160,34 @@ export default function ThemeToggle() {
             id={mobileMenuId}
             role="menu"
             aria-label="选择界面主题"
-            className="theme-menu-popover surface-panel absolute right-0 top-[calc(100%+0.5rem)] z-[60] w-40 origin-top-right rounded-xl p-1.5"
+            className="theme-menu-popover absolute right-0 top-[calc(100%+0.5rem)] z-[60] w-40 origin-top-right"
           >
-            {themeOptions.map(option => {
-              const ThemeIcon = option.icon
-              const selected = theme === option.value
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={selected}
-                  onClick={() => handleThemeChange(option.value, true)}
-                  className={`flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] ${
-                    selected ? 'brand-action-subtle' : 'text-secondary hover:bg-[var(--app-surface-muted)] hover:text-primary'
-                  }`}
-                >
-                  <ThemeIcon className="h-4 w-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
-                  <span className="flex-1 text-left">{option.label}</span>
-                  {selected && <Check className="h-4 w-4 shrink-0 text-[var(--app-accent)]" aria-hidden="true" />}
-                </button>
-              )
-            })}
+            <GlassCard
+              className="app-glass-panel w-full"
+              padding="6px"
+              radius="var(--app-radius-lg)"
+            >
+              {themeOptions.map(option => {
+                const ThemeIcon = option.icon
+                const selected = theme === option.value
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={selected}
+                    onClick={() => handleThemeChange(option.value, true)}
+                    className={`flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] ${
+                      selected ? 'brand-action-subtle' : 'text-secondary hover:bg-[var(--app-surface-muted)] hover:text-primary'
+                    }`}
+                  >
+                    <ThemeIcon className="h-4 w-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+                    <span className="flex-1 text-left">{option.label}</span>
+                    {selected && <Check className="h-4 w-4 shrink-0 text-[var(--app-accent)]" aria-hidden="true" />}
+                  </button>
+                )
+              })}
+            </GlassCard>
           </div>
         )}
       </div>

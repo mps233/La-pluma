@@ -4,6 +4,7 @@ import { forwardRef, useImperativeHandle, useLayoutEffect, useState, useEffect, 
 import { createPortal } from 'react-dom'
 import { generateTrainingPlan, maaApi, type TaskConfig } from '../services/api'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { GlassCard } from '@zakisheriff/liquid-glass'
 import { AlertTriangle, Cable, Check, CheckCircle2, ChevronDown, ChevronUp, CircleMinus, CirclePlus, ClipboardList, Clock3, GraduationCap, GripVertical, Info, ListPlus, LoaderCircle, Minus, Pin, Play, Plus, SlidersHorizontal, Square, Trash2 } from 'lucide-react'
 import Icons from './Icons'
 import ScreenMonitor from './ScreenMonitor'
@@ -3020,24 +3021,30 @@ const appliedExecutionRevisionRef = useRef(-1)
                         exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.98 }}
                         transition={{ duration: shouldReduceMotion ? 0.12 : 0.32, ease: [0.32, 0.72, 0, 1] }}
                       >
-                        {availableTasks.map(task => {
-                          const addedCount = taskFlow.filter(flowTask => flowTask.commandId === task.id).length
+                        <GlassCard
+                          className="app-glass-panel automation-task-picker-surface"
+                          padding="6px"
+                          radius="var(--app-radius-md)"
+                        >
+                          {availableTasks.map(task => {
+                            const addedCount = taskFlow.filter(flowTask => flowTask.commandId === task.id).length
 
-                          return (
-                            <button
-                              key={task.id}
-                              type="button"
-                              role="menuitem"
-                              onClick={() => addTaskToFlow(task)}
-                              className="automation-task-picker-option"
-                            >
-                              <span>{task.icon}</span>
-                              <TruncatedText as="strong" tooltip={task.name}>{task.name}</TruncatedText>
-                              {addedCount > 0 && <small>{addedCount}</small>}
-                              <Plus size={14} strokeWidth={2} />
-                            </button>
-                          )
-                        })}
+                            return (
+                              <button
+                                key={task.id}
+                                type="button"
+                                role="menuitem"
+                                onClick={() => addTaskToFlow(task)}
+                                className="automation-task-picker-option"
+                              >
+                                <span>{task.icon}</span>
+                                <TruncatedText as="strong" tooltip={task.name}>{task.name}</TruncatedText>
+                                {addedCount > 0 && <small>{addedCount}</small>}
+                                <Plus size={14} strokeWidth={2} />
+                              </button>
+                            )
+                          })}
+                        </GlassCard>
                       </motion.div>
                     )}
                   </AnimatePresence>

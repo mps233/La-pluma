@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Download, RefreshCw, Share2, SquarePlus } from 'lucide-react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useStatusStore } from '@/store/statusStore'
+import { GlassCard } from '@zakisheriff/liquid-glass'
 import { Button, CjkText, IconButton } from '@/components/common'
 import { hasDocumentBuildChanged } from '@/utils/pwaUpdate'
 
@@ -222,8 +223,13 @@ export default function PWAInstallPrompt() {
           role="region"
           aria-labelledby="pwa-prompt-title"
           aria-busy={showUpdateCard && isUpdating}
-          className="pwa-install-prompt app-pop-in surface-panel fixed z-50 rounded-xl p-4 sm:w-96"
+          className="pwa-install-prompt app-pop-in fixed z-50 sm:w-96"
         >
+          <GlassCard
+            className="app-glass-panel w-full"
+            padding="16px"
+            radius="var(--app-radius-lg)"
+          >
             <div className="flex items-start gap-3">
               <img
                 src={logoUrl}
@@ -284,7 +290,8 @@ export default function PWAInstallPrompt() {
                 </div>
               </div>
             </div>
-          </section>
+          </GlassCard>
+        </section>
       )}
 
       {showInstallEntry && (

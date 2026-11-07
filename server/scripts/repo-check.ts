@@ -6,7 +6,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
@@ -26,7 +26,10 @@ function repositorySourceFiles(): string[] {
   return output
     .split('\0')
     .filter(Boolean)
-    .filter((file: string) => !/^(?:node_modules|client\/dist|client\/coverage|server\/data|server\/debug)\//.test(file));
+    .filter((file: string) => !/^(?:node_modules|client\/dist|client\/coverage|server\/data|server\/debug)\//.test(file))
+    // An unstaged deletion is still listed by `git ls-files --cached`; it is
+    // no longer source, so do not try to parse it.
+    .filter((file: string) => existsSync(path.join(repoRoot, file)));
 }
 
 interface PackageJsonLike {
@@ -69,13 +72,8 @@ function collectTsconfigFiles(configPath: string): string[] {
   return parsed.fileNames.map((fileName: string) => path.resolve(fileName));
 }
 
-// The Glasswork rim lens is vendored from lumno-extension as JavaScript and
-// ships its own lens.d.ts declaration. Keep the exception exact so new JS
-// source still fails the gate.
-const ALLOWED_VENDORED_JS = new Set<string>(['client/src/glasswork/lens.js']);
-
 function checkNoJavaScript(files: string[]): string[] {
-  return files.filter((file: string) => JS_SOURCE_PATTERN.test(file) && !ALLOWED_VENDORED_JS.has(file));
+  return files.filter((file: string) => JS_SOURCE_PATTERN.test(file));
 }
 
 function checkTsconfigCoverage(files: string[]): string[] {
