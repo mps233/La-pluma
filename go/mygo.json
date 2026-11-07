@@ -1,0 +1,20 @@
+{
+  "name": "La Pluma",
+  "slug": "la-pluma",
+  "identifier": "com.miaopasi.la-pluma",
+  "version": "0.1.0",
+  "main": ".",
+  "out": "build",
+  "buildCommand": "./scripts/build-web.sh",
+  "frontendDist": "web/dist",
+  "resources": [
+    "web/dist"
+  ],
+  "macos": {
+    "infoPlist": {
+      "NSAppTransportSecurity": {
+        "NSAllowsLocalNetworking": true
+      }
+    }
+  }
+}

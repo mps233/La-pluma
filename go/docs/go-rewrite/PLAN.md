@@ -54,10 +54,10 @@ go/
   - [~] Agent routes: status, runs, tasks, WebRTC status/start/stop/devices/snapshot, install
   - [ ] assets/operator-quotes/health/signaling mounts
   - [ ] golden contract tests against Node oracle
-- [ ] 3. Scheduling and task flows
-  - [ ] node-cron-equivalent scheduling with timezone/missed-run policy
-  - [ ] automation/combat/roguelike/custom task flows
-  - [ ] startup restore + stop propagation
+- [~] 3. Scheduling and task flows
+  - [x] Go scheduler core: game timezone, flow validation/plan, sequential execution, startup restore, stop
+  - [~] HTTP schedule routes; tracked Run wrapper around scheduled flows
+  - [~] combat/custom task actions (start-game verified on real MuMu; fight/run-task need device-side smoke)
 - [~] 4. Device preview/control replacement
   - [x] scrcpy server push/launch/protocol (scrcpy-server 3.3.4)
   - [x] H.264 video socket -> Pion WebRTC track
@@ -65,19 +65,21 @@ go/
   - [x] React client signaling compatibility verified in browser
   - [ ] clipboard/scroll/multi-touch parity
   - [ ] remove ScrcpyOverWebRTC from remaining Node paths
-- [ ] 5. Domain modules
-  - [ ] training/operator materials
-  - [ ] copilot/activity
-  - [ ] drops/statistics
-  - [ ] notifications/Telegram
-  - [ ] config/quotes/assets
+- [~] 5. Domain modules
+  - [x] training/operator materials (fetch action returns explicit unsupported)
+  - [x] copilot planning/discovery core (execution/manual session wiring pending)
+  - [x] drops/statistics + MAA result parsers
+  - [x] notifications/Telegram service and bot
+  - [~] config/profile storage (routes wired)
+  - [ ] quotes/assets/activity
   - [ ] battle OCR (tesseract CLI or feature flag)
-- [ ] 6. MyGo desktop 2/3
-  - [ ] desktop shell: window/tray/single-instance/quit
+- [~] 6. MyGo desktop 2/3
+  - [x] desktop shell: window/loopback server/single-instance/basic tray/quit
+  - [x] `mygo build` app bundle (ad-hoc signed, 19 MB)
   - [ ] native bindings: file picker/notify/open/autostart/update
   - [ ] tray flyout (native UI)
   - [ ] PWA gating + desktop bridge
-  - [ ] signing/notarization/updater
+  - [ ] Developer ID signing/notarization/updater
 - [~] 7. Real MuMu verification
   - [x] device connect/screenshot read-only
   - [x] live view + touch/key control (Pion probe + React client)

@@ -6,7 +6,9 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mps233/la-pluma/go/internal/app"
@@ -113,5 +115,40 @@ func appRunInput(operationID, idempotencyKey string) runapp.BeginInput {
 		OperationID:    operationID,
 		IdempotencyKey: &idempotencyKey,
 		Input:          map[string]any{"source": "test"},
+	}
+}
+
+func TestStartGameAction(t *testing.T) {
+	root := t.TempDir()
+	script := filepath.Join(root, "maa")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\necho startup\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MAA_CLI_PATH", script)
+	if err := os.MkdirAll(filepath.Join(root, "maa-config"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Config{Paths: config.Paths{DataDir: filepath.Join(root, "data"), MaaConfigDir: filepath.Join(root, "maa-config")}}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	application, err := app.New(cfg, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = application.Close(t.Context()) })
+	handler := New(application, logger)
+
+	req := httptest.NewRequest(http.MethodPost, "/actions/start-game", strings.NewReader(`{"waitForCompletion":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	data := envelopeData(t, rec)
+	if data["state"] != "succeeded" {
+		t.Fatalf("unexpected data: %#v", data)
+	}
+	if rec.Header().Get("X-La-Pluma-Run-Id") == "" {
+		t.Fatal("missing run header")
 	}
 }

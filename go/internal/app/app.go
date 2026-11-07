@@ -9,7 +9,14 @@ import (
 	"time"
 
 	"github.com/mps233/la-pluma/go/internal/app/agentrun"
+	configapp "github.com/mps233/la-pluma/go/internal/app/config"
+	"github.com/mps233/la-pluma/go/internal/app/drops"
 	"github.com/mps233/la-pluma/go/internal/app/execution"
+	"github.com/mps233/la-pluma/go/internal/app/logs"
+	maaapp "github.com/mps233/la-pluma/go/internal/app/maa"
+	"github.com/mps233/la-pluma/go/internal/app/notifications"
+	"github.com/mps233/la-pluma/go/internal/app/scheduler"
+	"github.com/mps233/la-pluma/go/internal/app/training"
 	webrtcapp "github.com/mps233/la-pluma/go/internal/app/webrtc"
 	"github.com/mps233/la-pluma/go/internal/config"
 	"github.com/mps233/la-pluma/go/internal/infra/maa"
@@ -24,10 +31,18 @@ type App struct {
 	cfg    config.Config
 	logger *slog.Logger
 
-	Runs      *agentrun.Service
-	Execution *execution.Manager
-	MAA       *maa.Runner
-	WebRTC    *webrtcapp.Service
+	Runs          *agentrun.Service
+	Execution     *execution.Manager
+	ConfigStore   *configapp.Storage
+	Profiles      *configapp.Profiles
+	MAA           *maa.Runner
+	MAAService    *maaapp.Service
+	Logs          *logs.Service
+	Drops         *drops.Service
+	Scheduler     *scheduler.Service
+	Training      *training.Service
+	Notifications *notifications.Service
+	WebRTC        *webrtcapp.Service
 
 	startedAt time.Time
 	closeOnce sync.Once
@@ -58,15 +73,37 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		maaPath = "maa"
 	}
 	runner := maa.New(maaPath, logger)
+	maaActions := maaapp.NewService(cfg, logger, runner, executionManager, runs)
+	logService := logs.New(5000)
+	configStore := configapp.NewStorage(cfg.Paths)
+	dropService := drops.New(cfg.Paths)
+	trainingService := training.New(cfg.Paths, logger)
+	schedulerService := newScheduler(cfg, logger, maaActions, dropService, trainingService, configStore)
+	notificationService := notifications.New(notifications.Options{Paths: cfg.Paths, Logger: logger})
+	if loaded, err := notificationService.Load(); err == nil {
+		notificationService.SetConfig(loaded)
+	} else {
+		logger.Debug("notification config not loaded", "error", err)
+	}
+	profiles := configapp.NewProfiles(cfg.Paths.MaaConfigDir)
+	maaActions.SetLineHandler(logService.AppendLine)
 
 	return &App{
-		cfg:       cfg,
-		logger:    logger,
-		Runs:      runs,
-		Execution: executionManager,
-		MAA:       runner,
-		WebRTC:    webrtcapp.New(cfg, logger),
-		startedAt: time.Now(),
+		cfg:           cfg,
+		logger:        logger,
+		Runs:          runs,
+		Execution:     executionManager,
+		ConfigStore:   configStore,
+		Profiles:      profiles,
+		MAA:           runner,
+		MAAService:    maaActions,
+		Logs:          logService,
+		Drops:         dropService,
+		Scheduler:     schedulerService,
+		Training:      trainingService,
+		Notifications: notificationService,
+		WebRTC:        webrtcapp.New(cfg, logger),
+		startedAt:     time.Now(),
 	}, nil
 }
 
@@ -76,7 +113,10 @@ func (a *App) Close(ctx context.Context) error {
 	var result error
 	a.closeOnce.Do(func() {
 		a.Execution.CloseAdmission("server_shutdown")
-		if err := a.MAA.Stop(ctx, 5*time.Second); err != nil {
+		if a.Scheduler != nil {
+			a.Scheduler.Close()
+		}
+		if err := a.MAAService.Stop(ctx); err != nil {
 			result = err
 		}
 		if err := a.WebRTC.Stop(ctx); err != nil && result == nil {
@@ -90,3 +130,6 @@ func (a *App) Close(ctx context.Context) error {
 }
 
 func (a *App) StartedAt() time.Time { return a.startedAt }
+
+// MAAServiceService exposes the MAA action service to transport layers.
+func (a *App) MAAServiceService() *maaapp.Service { return a.MAAService }

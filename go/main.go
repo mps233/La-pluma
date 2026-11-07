@@ -75,8 +75,19 @@ func startDesktop() {
 	if clientDist == "" {
 		if candidate := filepath.Join(resources, "client"); directoryExists(candidate) {
 			clientDist = candidate
+		} else if candidate := filepath.Join(resources, "dist"); directoryExists(candidate) {
+			clientDist = candidate
 		} else if candidate := filepath.Join("..", "client", "dist"); directoryExists(candidate) {
 			clientDist = candidate
+		}
+	}
+	clientDist = resolveClientDist(clientDist)
+	scrcpyServer := os.Getenv("LA_PLUMA_SCRCPY_SERVER_PATH")
+	if scrcpyServer == "" {
+		candidate := filepath.Join(resources, "scrcpy-server")
+		if fileExists(candidate) {
+			scrcpyServer = candidate
+			_ = os.Setenv("LA_PLUMA_SCRCPY_SERVER_PATH", scrcpyServer)
 		}
 	}
 	token, err := randomHex(16)
@@ -228,6 +239,22 @@ func randomHex(size int) (string, error) {
 		out[index*2+1] = hexChars[value&0x0f]
 	}
 	return string(out), nil
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+func resolveClientDist(candidate string) string {
+	if candidate == "" {
+		return candidate
+	}
+	absolute, err := filepath.Abs(candidate)
+	if err == nil {
+		return absolute
+	}
+	return candidate
 }
 
 func directoryExists(path string) bool {

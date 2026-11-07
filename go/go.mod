@@ -12,6 +12,7 @@ require (
 	github.com/ebitengine/purego v0.11.1 // indirect
 	github.com/egoist/mygo v0.8.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
 	github.com/pion/datachannel v1.6.3 // indirect
 	github.com/pion/dtls/v3 v3.1.15 // indirect
 	github.com/pion/ice/v4 v4.4.8 // indirect

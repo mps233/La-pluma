@@ -250,16 +250,18 @@ func (s *Service) Devices(ctx context.Context) ([]string, error) {
 	return result, nil
 }
 
-func (s *Service) Snapshot(ctx context.Context, deviceID string) (map[string]any, error) {
+func (s *Service) Screenshot(ctx context.Context) ([]byte, error) {
 	s.mu.Lock()
 	address := s.address
 	if s.current != nil {
 		address = s.current.address
 	}
 	s.mu.Unlock()
-	_ = deviceID
-	client := adb.New(s.adbPath)
-	image, err := client.Screenshot(ctx, address)
+	return adb.New(s.adbPath).Screenshot(ctx, address)
+}
+
+func (s *Service) Snapshot(ctx context.Context, deviceID string) (map[string]any, error) {
+	image, err := s.Screenshot(ctx)
 	if err != nil {
 		return nil, err
 	}
