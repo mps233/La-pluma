@@ -65,7 +65,7 @@ go/
   - [x] H.264 video socket -> Pion WebRTC track
   - [x] control socket touch/key/text base commands
   - [x] React client signaling compatibility verified in browser
-  - [~] clipboard/scroll/multi-touch parity (clipboard + scroll + ACTION_CANCEL done; multi-touch real-device verification pending)
+  - [~] clipboard/scroll/multi-touch parity (clipboard verified on OnePlus; MuMu clears clipboard by OS policy; scroll/ACTION_CANCEL covered; multi-touch real-device pending)
   - [x] remove ScrcpyOverWebRTC from remaining Node paths (Go runtime is independent; Node stays as oracle)
 - [x] 5. Domain modules
   - [x] training/operator materials (fetch action returns explicit unsupported)
@@ -90,7 +90,7 @@ go/
   - [x] live MAA start-game, dynamic run-task, one fight, daily flow
   - [x] activity copilot one stage, operbox/depot recognition, mastery blocked/training-room path
   - [ ] exhaustive destructive flows and desktop PWA/phone verification
-  - [ ] MAA task smoke (with explicit approval for side effects)
+  - [x] MAA task smoke (minimal: start-game, two TL-9 fights, runId stop; no medicine/stone)
   - [x] quit/restart/second-instance/Dock recovery (active-preview orphan cleanup still manual)
   - [~] PWA from headless Go server (static assets, manifest MIME, SW and token auth verified; phone install pending)
 
