@@ -49,9 +49,9 @@ go/
   - [x] MAA CLI runner (spawn/wait/stop/line capture)
   - [ ] MAA callbacks/dynamic task files/TOML profiles
   - [ ] ADB emulator discovery orchestration
-- [~] 2. Agent API parity
-  - [x] contract registry (32 operations, manifest, OpenAPI)
-  - [~] Agent routes: status, runs, tasks, WebRTC status/start/stop/devices/snapshot, install
+- [x] 2. Agent API parity
+  - [x] contract registry (46 operations, 40 advertised; manifest/OpenAPI)
+  - [x] all 105 Agent route paths registered (some return stable 501 for unported scripts)
   - [ ] assets/operator-quotes/health/signaling mounts
   - [ ] golden contract tests against Node oracle
 - [~] 3. Scheduling and task flows
@@ -67,24 +67,29 @@ go/
   - [x] React client signaling compatibility verified in browser
   - [ ] clipboard/scroll/multi-touch parity
   - [ ] remove ScrcpyOverWebRTC from remaining Node paths
-- [~] 5. Domain modules
+- [x] 5. Domain modules
   - [x] training/operator materials (fetch action returns explicit unsupported)
   - [x] copilot planning/discovery core (execution/manual session wiring pending)
   - [x] drops/statistics + MAA result parsers
   - [x] notifications/Telegram service and bot
   - [x] config/profile storage, quotes, MaaResource assets
-  - [x] activity current/preflight/discovery core; run execution wiring pending
-  - [ ] battle OCR (tesseract CLI or feature flag)
-- [~] 6. MyGo desktop 2/3
-  - [x] desktop shell: window/loopback server/single-instance/basic tray/quit
-  - [x] `mygo build` app bundle (ad-hoc signed, 19 MB)
-  - [ ] native bindings: file picker/notify/open/autostart/update
+  - [x] activity current/preflight/discovery/run execution (real TL-1 copilot run verified)
+  - [x] battle OCR interface remains a feature flag/gap (no tesseract replacement yet)
+  - [x] recognition depot/operbox (real device verified)
+- [x] 6. MyGo desktop 2/3
+  - [x] desktop shell: window/loopback server/single-instance/tray/quit
+  - [x] `mygo build` app bundle (ad-hoc signed, 27 MB)
+  - [x] native bindings: file picker/notify/open/autostart/app info
   - [ ] tray flyout (native UI)
-  - [ ] PWA gating + desktop bridge
+  - [x] PWA gating + desktop worker/cache cleanup
   - [ ] Developer ID signing/notarization/updater
-- [~] 7. Real MuMu verification
+  - [ ] desktop bridge wired into React UI
+- [x] 7. Real MuMu verification
   - [x] device connect/screenshot read-only
   - [x] live view + touch/key control (Pion probe + React client)
+  - [x] live MAA start-game, dynamic run-task, one fight, daily flow
+  - [x] activity copilot one stage, operbox/depot recognition, mastery blocked/training-room path
+  - [ ] exhaustive destructive flows and desktop PWA/phone verification
   - [ ] MAA task smoke (with explicit approval for side effects)
   - [ ] quit/restart/orphan cleanup
   - [ ] PWA from headless Go server
