@@ -93,7 +93,11 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	logService := logs.New(5000)
 	configStore := configapp.NewStorage(cfg.Paths)
 	dropService := drops.New(cfg.Paths)
-	trainingService := training.New(cfg.Paths, logger)
+	trainingService := training.NewWithOptions(training.Options{
+		Paths:   cfg.Paths,
+		Logger:  logger,
+		Fetcher: trainingMaterialFetcher{paths: cfg.Paths},
+	})
 	copilotService := copilot.NewWithOptions(copilot.ServiceOptions{
 		Paths:    cfg.Paths,
 		Logger:   logger,
