@@ -1,0 +1,103 @@
+name: Go Backend Verify
+
+on:
+  push:
+    branches:
+      - main
+      - feat/go-backend
+    paths:
+      - 'go/**'
+      - 'client/**'
+      - '.github/workflows/go-verify.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'go/**'
+      - 'client/**'
+      - '.github/workflows/go-verify.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: go-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go-test:
+    name: Go build, vet and tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - name: Build
+        working-directory: go
+        run: go build ./...
+
+      - name: Vet
+        working-directory: go
+        run: go vet ./...
+
+      - name: Test
+        working-directory: go
+        run: go test ./...
+
+  go-cross-build:
+    name: Go cross build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - name: Cross build
+        working-directory: go
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        run: |
+          go build ./cmd/server
+          go build .
+
+  go-docker:
+    name: Go Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Build image
+        run: docker build -f go/Dockerfile -t la-pluma-go:ci .
