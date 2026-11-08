@@ -1267,6 +1267,14 @@ func (h *Handler) stopActions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if requested.State.Terminal() {
+			if requested.OperationID == "webrtc_start" {
+				if running, _ := h.app.WebRTC.Status()["serverRunning"].(bool); running {
+					if stopErr := h.app.WebRTC.Stop(ctx); stopErr == nil {
+						httpx.Success(w, http.StatusOK, map[string]any{"stopped": true, "webrtcStopped": true, "run": requested}, "实时预览已停止", nil)
+						return
+					}
+				}
+			}
 			httpx.Success(w, http.StatusOK, map[string]any{"stopped": false, "alreadyTerminal": true, "run": requested}, "任务已经结束", nil)
 			return
 		}
