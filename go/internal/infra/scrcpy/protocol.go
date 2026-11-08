@@ -33,6 +33,7 @@ const (
 	CtrlSetClipboard            byte = 9
 	CtrlSetDisplayPower         byte = 10
 	CtrlRotateDevice            byte = 11
+	CtrlResetVideo              byte = 17
 
 	// Device-to-client message types.
 	DeviceMsgClipboard    byte = 0

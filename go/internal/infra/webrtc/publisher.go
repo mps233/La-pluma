@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/webrtc/v4"
@@ -286,6 +287,8 @@ func (p *Publisher) FeedVideo() {
 	var configData []byte
 	var lastPTS uint64
 	packetCount := 0
+	var lastPacket atomic.Int64
+	go p.watchVideo(&lastPacket)
 	for {
 		select {
 		case <-p.stop:
@@ -298,6 +301,7 @@ func (p *Publisher) FeedVideo() {
 			p.notifyEnded()
 			return
 		}
+		lastPacket.Store(time.Now().UnixNano())
 		if header.IsConfig() {
 			configData = append([]byte(nil), data...)
 			profileLevel := spsProfileLevelID(data)
@@ -446,4 +450,44 @@ func candidateSummary(candidate string) string {
 	address := fields[4]
 	loopback := strings.HasPrefix(address, "127.") || address == "::1"
 	return "typ=" + fields[7] + " loopback=" + fmt.Sprintf("%t", loopback) + " protocol=" + fields[2]
+}
+
+// watchVideo recovers a capture/encoder stall: scrcpy normally emits frames
+// continuously, so a multi-second gap means the stream is stuck. RESET_VIDEO
+// asks the server to restart capture and send a fresh keyframe.
+func (p *Publisher) watchVideo(lastPacket *atomic.Int64) {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	resets := 0
+	var lastReset time.Time
+	for {
+		select {
+		case <-p.stop:
+			return
+		case now := <-ticker.C:
+			last := lastPacket.Load()
+			if last == 0 {
+				continue
+			}
+			idle := now.Sub(time.Unix(0, last))
+			if idle < 10*time.Second {
+				if resets > 0 {
+					p.logger.Info("video recovered after capture reset")
+				}
+				resets = 0
+				lastReset = time.Time{}
+				continue
+			}
+			if !lastReset.IsZero() && now.Sub(lastReset) < 30*time.Second {
+				continue
+			}
+			if err := p.session.ResetVideo(); err != nil {
+				p.logger.Warn("video reset failed", "error", err)
+				continue
+			}
+			lastReset = now
+			resets++
+			p.logger.Warn("video stalled; reset capture", "idle", idle.String(), "attempt", resets)
+		}
+	}
 }

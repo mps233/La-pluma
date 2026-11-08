@@ -458,6 +458,18 @@ func (s *Session) SendKeyTap(keycode int) error {
 	return s.SendKey(KeyActionUp, keycode)
 }
 
+// ResetVideo tells scrcpy to reset the video capture after a capture or
+// encoder stall. The server replies with a fresh config packet and keyframe.
+func (s *Session) ResetVideo() error {
+	s.ctrlMu.Lock()
+	defer s.ctrlMu.Unlock()
+	if s.ctrlConn == nil {
+		return fmt.Errorf("scrcpy control is disabled")
+	}
+	_, err := s.ctrlConn.Write([]byte{CtrlResetVideo})
+	return err
+}
+
 func (s *Session) SendText(text string) error {
 	s.ctrlMu.Lock()
 	defer s.ctrlMu.Unlock()

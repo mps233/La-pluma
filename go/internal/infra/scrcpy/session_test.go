@@ -123,3 +123,24 @@ func TestGetClipboardWaitsForDeviceMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestResetVideoWritesControlPacket(t *testing.T) {
+	server, client := net.Pipe()
+	defer server.Close()
+	defer client.Close()
+	session := &Session{ctrlConn: client}
+
+	done := make(chan error, 1)
+	go func() { done <- session.ResetVideo() }()
+
+	buffer := make([]byte, 1)
+	if _, err := io.ReadFull(server, buffer); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if buffer[0] != CtrlResetVideo {
+		t.Fatalf("reset video packet type = %d", buffer[0])
+	}
+}
