@@ -259,10 +259,16 @@ func buildTaskFile(input map[string]any) (map[string]any, error) {
 		if !ok {
 			return nil, apperrors.Validation("AGENT_VALIDATION_TASK_CONFIG_INVALID", "任务配置必须是对象", nil)
 		}
+		params := defaultMap(task["params"])
+		if task["type"] == "StartUp" {
+			if _, exists := params["start_game_enabled"]; !exists {
+				params["start_game_enabled"] = true
+			}
+		}
 		entry := map[string]any{
 			"name":   task["name"],
 			"type":   task["type"],
-			"params": defaultMap(task["params"]),
+			"params": params,
 		}
 		for _, key := range []string{"strategy", "condition", "variants"} {
 			if value, ok := task[key]; ok {

@@ -9,6 +9,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -62,7 +63,15 @@ type desktopRuntime struct {
 }
 
 func startDesktop() {
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	logOutput := io.Writer(os.Stderr)
+	logPath := ""
+	if logsDir, err := mygo.App.Path(mygo.PathLogs); err == nil {
+		logPath = filepath.Join(logsDir, "la-pluma.log")
+		if file, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
+			logOutput = io.MultiWriter(os.Stderr, file)
+		}
+	}
+	logger := slog.New(slog.NewTextHandler(logOutput, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
 	userData, err := mygo.App.Path(mygo.PathUserData)
@@ -196,9 +205,7 @@ func (r *desktopRuntime) setupTray(logger *slog.Logger) {
 	r.tray = tray
 	menu := mygo.NewMenu([]*mygo.MenuItem{
 		{Label: "显示主窗口", Click: func(*mygo.MenuItem, *mygo.Window) {
-			if r.window != nil {
-				r.window.Show()
-			}
+			r.showWindow()
 		}},
 		mygo.Separator(),
 		{Label: "退出 La Pluma", Click: func(*mygo.MenuItem, *mygo.Window) {
@@ -211,9 +218,7 @@ func (r *desktopRuntime) setupTray(logger *slog.Logger) {
 	} else {
 		tray.SetMenu(menu)
 		tray.OnClick(func() {
-			if r.window != nil {
-				r.window.Show()
-			}
+			r.showWindow()
 		})
 	}
 	mygo.App.OnWillQuit(func(*mygo.QuitEvent) { tray.Destroy() })
@@ -389,4 +394,35 @@ func seedDataDir(resources, dataDir string) {
 		}
 		_ = os.WriteFile(target, data, 0o600)
 	}
+}
+
+// showWindow opens the main window, or reopens it after the user closed it.
+// The scheduler and device services stay alive in the tray meanwhile.
+func (r *desktopRuntime) showWindow() {
+	if r.window != nil {
+		r.window.Show()
+		return
+	}
+	window := mygo.NewWindow(mygo.WindowOptions{
+		Title:           "La Pluma",
+		URL:             r.baseURL,
+		Width:           1180,
+		Height:          800,
+		MinWidth:        980,
+		MinHeight:       680,
+		BackgroundColor: "#101318",
+		StateKey:        "main",
+		Page: mygo.PageOptions{
+			TrustedOrigins:       []string{r.baseURL[:len(r.baseURL)-1]},
+			BackgroundThrottling: mygo.ThrottlingOff,
+			Autoplay:             mygo.AutoplayAllow,
+			PreloadScript:        preloadScript(r.token),
+		},
+	})
+	window.OnClosed(func() {
+		if r.window == window {
+			r.window = nil
+		}
+	})
+	r.window = window
 }
