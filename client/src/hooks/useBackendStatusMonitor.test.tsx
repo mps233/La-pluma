@@ -31,7 +31,12 @@ vi.mock('../components/Layout', () => ({
 }))
 
 vi.mock('../components/PWAInstallPrompt', () => ({ default: () => null }))
-vi.mock('../components/common', () => ({ PageSkeleton: () => null }))
+vi.mock('../components/common', () => ({
+  PageSkeleton: () => null,
+  Modal: () => null,
+  Button: () => null,
+  Input: () => null,
+}))
 vi.mock('./useRunStatusMonitor', () => ({ useRunStatusMonitor: () => undefined }))
 vi.mock('../components/AutomationTasks', async () => {
   const { useStatusStore: useMockStatusStore } = await import('../store/statusStore')
