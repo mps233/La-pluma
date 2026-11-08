@@ -614,9 +614,14 @@ describe('SDP loopback filtering', () => {
     expect(filtered).not.toContain('127.0.0.1')
   })
 
-  it('keeps loopback when it is the only candidate', () => {
+  it('keeps loopback when it is the only candidate in an offer', () => {
     const filtered = filterSdpCandidatesForPolicy(loopbackLine, 'auto', 'ipv4')
     expect(filtered).toContain('127.0.0.1')
+  })
+
+  it('drops loopback from a local answer even when it is the only candidate so far', () => {
+    const filtered = filterSdpCandidatesForPolicy(loopbackLine, 'auto', 'ipv4', true)
+    expect(filtered).not.toContain('127.0.0.1')
   })
 })
 

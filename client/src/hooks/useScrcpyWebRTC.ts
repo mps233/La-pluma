@@ -305,14 +305,16 @@ export function shouldKeepCandidate(candidate: string, connectionPath: 'auto' | 
 export function filterSdpCandidatesForPolicy(
   sdp: string,
   connectionPath: 'auto' | 'relay' | 'direct',
-  ipPreference: 'auto' | 'ipv4' | 'ipv6'
+  ipPreference: 'auto' | 'ipv4' | 'ipv6',
+  forceDropLoopback = false
 ) {
   const lines = sdp.split('\r\n')
   const candidates = lines.filter(line => line.startsWith('a=candidate:'))
   const hasNonLoopback = candidates.some(line => !candidateIsLoopback(line))
+  const dropLoopback = forceDropLoopback || hasNonLoopback
   return lines.filter(line => {
     if (!line.startsWith('a=candidate:')) return true
-    if (hasNonLoopback && candidateIsLoopback(line)) return false
+    if (dropLoopback && candidateIsLoopback(line)) return false
     return filterCandidateLine(line, connectionPath, ipPreference)
   }).join('\r\n')
 }
@@ -401,14 +403,14 @@ export function useScrcpyWebRTC({
     })
   }, [])
 
-  const filterSdpCandidates = useCallback((sdp: string) => {
-    return filterSdpCandidatesForPolicy(sdp, connectionPath, ipPreference)
+  const filterSdpCandidates = useCallback((sdp: string, forceDropLoopback = false) => {
+    return filterSdpCandidatesForPolicy(sdp, connectionPath, ipPreference, forceDropLoopback)
   }, [connectionPath, ipPreference])
 
   const sendAnswer = useCallback(() => {
     const pc = pcRef.current
     if (!pc?.localDescription) return
-    sendForward({ type: 'answer', sdp: filterSdpCandidates(pc.localDescription.sdp || '') })
+    sendForward({ type: 'answer', sdp: filterSdpCandidates(pc.localDescription.sdp || '', true) })
   }, [filterSdpCandidates, sendForward])
 
   const createPeerConnection = useCallback(() => {
