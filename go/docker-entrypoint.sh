@@ -13,5 +13,13 @@ else
     maa version
 fi
 
+if [ -d /app/resources/seed ] && [ -d /app/server/data ]; then
+    for file in stages.json paradox-operators.json operator-materials.json operator-mastery.json; do
+        if [ -f "/app/resources/seed/$file" ] && [ ! -f "/app/server/data/$file" ]; then
+            cp "/app/resources/seed/$file" "/app/server/data/$file"
+        fi
+    done
+fi
+
 echo "=== 启动 Go 服务器 ==="
 exec "$@"

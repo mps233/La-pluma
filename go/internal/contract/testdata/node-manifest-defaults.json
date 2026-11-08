@@ -1,0 +1,2362 @@
+{
+  "name": "La Pluma Agent API",
+  "id": "la-pluma-agent-api",
+  "version": "2026-07-12",
+  "description": "AI-readable control surface for MAA / Arknights automation through La Pluma.",
+  "auth": {
+    "type": "optional-bearer-or-x-la-pluma-token",
+    "requiredWhen": "LA_PLUMA_TOKEN is set on the backend",
+    "schemes": [
+      {
+        "type": "http-bearer",
+        "header": "Authorization",
+        "format": "Bearer <LA_PLUMA_TOKEN>"
+      },
+      {
+        "type": "api-key",
+        "header": "X-La-Pluma-Token"
+      }
+    ],
+    "note": "Either token form is accepted. Authentication is disabled when LA_PLUMA_TOKEN is unset."
+  },
+  "defaults": {
+    "adbPath": "/custom/platform-tools/adb",
+    "adbAddress": "127.0.0.1:7555",
+    "clientType": "Bilibili"
+  },
+  "links": {
+    "status": "/api/agent/status",
+    "openapi": "/api/agent/openapi.json",
+    "currentRun": "/api/agent/runs/current",
+    "run": "/api/agent/runs/{runId}",
+    "stopRun": "/api/agent/runs/{runId}/stop",
+    "screenshot": "/api/agent/screen/screenshot",
+    "recentLogs": "/api/agent/logs/recent?lines=80"
+  },
+  "actions": [
+    {
+      "id": "get_status",
+      "method": "GET",
+      "path": "/api/agent/status",
+      "description": "Return a compact, AI-readable summary of La Pluma, MAA, ADB, WebRTC, and recent logs.",
+      "query_schema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "default": "default",
+            "description": "Saved connection profile id. Explicit connection fields override values loaded from this profile."
+          },
+          "adbPath": {
+            "type": "string",
+            "default": "/custom/platform-tools/adb"
+          },
+          "address": {
+            "type": "string",
+            "default": "127.0.0.1:7555"
+          },
+          "slim": {
+            "type": "boolean",
+            "default": false,
+            "description": "Return only api version, MAA version and current task status; skips ADB/WebRTC/display probes."
+          }
+        }
+      },
+      "safety": {
+        "level": "low-risk-write",
+        "riskLevel": "low-risk-write",
+        "readOnly": false,
+        "idempotent": true,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": [
+          "adb_connect"
+        ]
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "test_connection",
+      "method": "POST",
+      "path": "/api/agent/actions/test-connection",
+      "description": "Check ADB availability and emulator connectivity.",
+      "body_schema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "default": "default",
+            "description": "Saved connection profile id. Explicit connection fields override values loaded from this profile."
+          },
+          "adbPath": {
+            "type": "string",
+            "default": "/custom/platform-tools/adb"
+          },
+          "address": {
+            "type": "string",
+            "default": "127.0.0.1:7555"
+          }
+        }
+      },
+      "safety": {
+        "level": "low-risk-write",
+        "riskLevel": "low-risk-write",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": [
+          "adb_connect"
+        ]
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "discover_devices",
+      "method": "GET",
+      "path": "/api/agent/actions/discover-devices",
+      "description": "List ADB-visible devices and reachable common local emulator ports.",
+      "query_schema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "default": "default",
+            "description": "Saved connection profile id. Explicit connection fields override values loaded from this profile."
+          },
+          "adbPath": {
+            "type": "string",
+            "default": "/custom/platform-tools/adb"
+          }
+        }
+      },
+      "safety": {
+        "level": "low-risk-write",
+        "riskLevel": "low-risk-write",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": [
+          "probe_local_adb_ports"
+        ]
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "activity_run_preflight",
+      "method": "GET",
+      "path": "/api/agent/activity/preflight",
+      "description": "Check the current activity and whether MAA has reliable home-screen navigation. This never starts a copilot.",
+      "query_schema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "default": "default",
+            "description": "Saved connection profile id. Explicit connection fields override values loaded from this profile."
+          },
+          "clientType": {
+            "type": "string",
+            "default": "Bilibili"
+          }
+        }
+      },
+      "safety": {
+        "level": "read-only",
+        "riskLevel": "read-only",
+        "readOnly": true,
+        "idempotent": true,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": []
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "activity_copilot_candidates",
+      "method": "GET",
+      "path": "/api/agent/activity/copilot-candidates",
+      "description": "Find manual-selection copilot candidates for the current activity. This never starts a copilot.",
+      "query_schema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "default": "default",
+            "description": "Saved connection profile id. Explicit connection fields override values loaded from this profile."
+          },
+          "clientType": {
+            "type": "string",
+            "default": "Bilibili"
+          }
+        }
+      },
+      "safety": {
+        "level": "read-only",
+        "riskLevel": "read-only",
+        "readOnly": true,
+        "idempotent": true,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": []
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "run_current_activity_copilots",
+      "method": "POST",
+      "path": "/api/agent/activity/run",
+      "description": "Run the server-built current-activity copilot plan. It restarts the game, navigates to the activity stage, and blocks when navigation or a reliable candidate is unavailable.",
+      "body_schema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "default": "default",
+            "description": "Saved connection profile id. Explicit connection fields override values loaded from this profile."
+          },
+          "clientType": {
+            "type": "string",
+            "default": "Bilibili"
+          }
+        }
+      },
+      "header_schema": {
+        "type": "object",
+        "properties": {
+          "Idempotency-Key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._~:-]{0,127}$",
+            "description": "Client-generated key that identifies one logical execution request."
+          }
+        }
+      },
+      "safety": {
+        "level": "consequential",
+        "riskLevel": "consequential",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": true,
+        "destructive": false,
+        "confirmationRequired": true,
+        "confirmationRecommended": true,
+        "sideEffects": [
+          "start_game_automation",
+          "close_game_automation",
+          "consume_in_game_resources"
+        ]
+      },
+      "execution": {
+        "mode": "long-running",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        },
+        "pollAction": "get_current_run",
+        "stopAction": "stop_task",
+        "preflightAction": "activity_run_preflight",
+        "conflictsWith": [
+          "maa-execution"
+        ],
+        "producesRun": true,
+        "runLookupAction": "get_run",
+        "idempotency": {
+          "supported": true,
+          "required": false,
+          "header": "Idempotency-Key",
+          "scope": "local-instance",
+          "namespace": "operationId",
+          "survivesRestart": true,
+          "restartBehavior": "active-runs-become-interrupted",
+          "retentionSeconds": 86400,
+          "retentionMode": "up-to",
+          "maxTerminalRuns": 500
+        }
+      }
+    },
+    {
+      "id": "start_game",
+      "method": "POST",
+      "path": "/api/agent/actions/start-game",
+      "description": "Run maa startup for the selected client. Default is Official.",
+      "body_schema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "default": "default",
+            "description": "Saved connection profile id. Explicit connection fields override values loaded from this profile."
+          },
+          "clientType": {
+            "type": "string",
+            "default": "Bilibili"
+          },
+          "address": {
+            "type": "string",
+            "default": "127.0.0.1:7555"
+          },
+          "accountName": {
+            "type": "string",
+            "description": "Optional account name fragment to switch to after launch."
+          },
+          "startGameEnabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Set false to initialize MAA without launching the game client."
+          },
+          "waitForCompletion": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "header_schema": {
+        "type": "object",
+        "properties": {
+          "Idempotency-Key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._~:-]{0,127}$",
+            "description": "Client-generated key that identifies one logical execution request."
+          }
+        }
+      },
+      "safety": {
+        "level": "consequential",
+        "riskLevel": "consequential",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": true,
+        "destructive": false,
+        "confirmationRequired": true,
+        "confirmationRecommended": true,
+        "sideEffects": [
+          "launch_game"
+        ]
+      },
+      "execution": {
+        "mode": "sync-or-background",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": true,
+        "waitForCompletion": {
+          "supported": true,
+          "parameter": "waitForCompletion",
+          "default": true
+        },
+        "pollAction": "get_current_run",
+        "stopAction": "stop_task",
+        "conflictsWith": [
+          "maa-execution"
+        ],
+        "producesRun": true,
+        "runLookupAction": "get_run",
+        "idempotency": {
+          "supported": true,
+          "required": false,
+          "header": "Idempotency-Key",
+          "scope": "local-instance",
+          "namespace": "operationId",
+          "survivesRestart": true,
+          "restartBehavior": "active-runs-become-interrupted",
+          "retentionSeconds": 86400,
+          "retentionMode": "up-to",
+          "maxTerminalRuns": 500
+        }
+      }
+    },
+    {
+      "id": "fight",
+      "method": "POST",
+      "path": "/api/agent/actions/fight",
+      "description": "Semantic action for 理智作战. Agents can pass stages/medicine/stone/series without knowing maa-cli flags.",
+      "body_schema": {
+        "type": "object",
+        "required": [
+          "stages"
+        ],
+        "properties": {
+          "stages": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "examples": [
+                    "1-7"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "stage"
+                  ],
+                  "properties": {
+                    "stage": {
+                      "type": "string",
+                      "examples": [
+                        "CE-6"
+                      ]
+                    },
+                    "times": {
+                      "type": [
+                        "integer",
+                        "string"
+                      ],
+                      "description": "Optional per-stage run count."
+                    }
+                  }
+                }
+              ]
+            },
+            "examples": [
+              [
+                "HD-7",
+                "CE-6",
+                "AP-5"
+              ]
+            ]
+          },
+          "medicine": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "default": 0,
+            "description": "Normal sanity medicine count for -m."
+          },
+          "medicineExpireDays": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "default": 0,
+            "description": "Use sanity medicine expiring within N days; requires a dynamic Fight task."
+          },
+          "expiringMedicine": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "default": 0,
+            "description": "Expiring sanity medicine count (deprecated by MAA in favor of medicineExpireDays)."
+          },
+          "stone": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "default": 0,
+            "description": "Originium stone count."
+          },
+          "series": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "default": 0,
+            "description": "MAA series value; 7–10 require a dynamic Fight task."
+          },
+          "server": {
+            "type": "string",
+            "enum": [
+              "CN",
+              "US",
+              "JP",
+              "KR"
+            ],
+            "description": "Drop recognition/upload server; requires a dynamic Fight task."
+          },
+          "drops": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "integer",
+                    "string"
+                  ]
+                },
+                "examples": [
+                  {
+                    "30011": 10,
+                    "30062": 5
+                  }
+                ]
+              },
+              {
+                "type": "string",
+                "examples": [
+                  "30011=10,30062=5"
+                ]
+              }
+            ],
+            "description": "Stop when any drop target is reached; requires a dynamic Fight task."
+          },
+          "reportToPenguin": {
+            "type": "boolean",
+            "default": false
+          },
+          "penguinId": {
+            "type": "string"
+          },
+          "reportToYituliu": {
+            "type": "boolean",
+            "default": false
+          },
+          "yituliuId": {
+            "type": "string"
+          },
+          "DrGrandet": {
+            "type": "boolean",
+            "default": false
+          },
+          "clientType": {
+            "type": "string",
+            "default": "Bilibili"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false
+          },
+          "waitForCompletion": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "header_schema": {
+        "type": "object",
+        "properties": {
+          "Idempotency-Key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._~:-]{0,127}$",
+            "description": "Client-generated key that identifies one logical execution request."
+          }
+        }
+      },
+      "safety": {
+        "level": "consequential",
+        "riskLevel": "consequential",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": true,
+        "destructive": false,
+        "confirmationRequired": true,
+        "confirmationRecommended": true,
+        "sideEffects": [
+          "start_game_automation",
+          "consume_sanity",
+          "optionally_consume_medicine_or_originium"
+        ]
+      },
+      "execution": {
+        "mode": "sync-or-background",
+        "supportsDryRun": true,
+        "dryRun": {
+          "supported": true,
+          "parameter": "dryRun"
+        },
+        "supportsWaitForCompletion": true,
+        "waitForCompletion": {
+          "supported": true,
+          "parameter": "waitForCompletion",
+          "default": true
+        },
+        "pollAction": "get_current_run",
+        "stopAction": "stop_task",
+        "conflictsWith": [
+          "maa-execution"
+        ],
+        "producesRun": true,
+        "runLookupAction": "get_run",
+        "idempotency": {
+          "supported": true,
+          "required": false,
+          "header": "Idempotency-Key",
+          "scope": "local-instance",
+          "namespace": "operationId",
+          "survivesRestart": true,
+          "restartBehavior": "active-runs-become-interrupted",
+          "retentionSeconds": 86400,
+          "retentionMode": "up-to",
+          "maxTerminalRuns": 500,
+          "appliesWhen": {
+            "dryRun": false
+          }
+        }
+      }
+    },
+    {
+      "id": "run_task",
+      "method": "POST",
+      "path": "/api/agent/actions/run-task",
+      "description": "Run one whitelisted maa-cli task with explicit args. Prefer semantic actions when available.",
+      "body_schema": {
+        "type": "object",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string",
+            "enum": [
+              "startup",
+              "closedown",
+              "fight",
+              "infrast",
+              "recruit",
+              "mall",
+              "award",
+              "copilot",
+              "ssscopilot",
+              "paradoxcopilot",
+              "roguelike",
+              "reclamation",
+              "depot",
+              "operbox",
+              "activity",
+              "run",
+              "list"
+            ]
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "taskConfig": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "name",
+                  "type"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "type": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                },
+                "additionalProperties": true
+              },
+              {
+                "type": "string",
+                "description": "A JSON-encoded task configuration object."
+              }
+            ],
+            "description": "When supplied, La Pluma writes a validated temporary MAA task and executes it."
+          },
+          "taskName": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Human-readable task name exposed through task status."
+          },
+          "taskType": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "Caller-defined task category exposed through task status."
+          },
+          "userResource": {
+            "type": "boolean",
+            "default": false
+          },
+          "waitForCompletion": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "header_schema": {
+        "type": "object",
+        "properties": {
+          "Idempotency-Key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._~:-]{0,127}$",
+            "description": "Client-generated key that identifies one logical execution request."
+          }
+        }
+      },
+      "safety": {
+        "level": "consequential",
+        "riskLevel": "consequential",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": true,
+        "destructive": false,
+        "confirmationRequired": true,
+        "confirmationRecommended": true,
+        "sideEffects": [
+          "run_maa_command"
+        ]
+      },
+      "execution": {
+        "mode": "sync-or-background",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": true,
+        "waitForCompletion": {
+          "supported": true,
+          "parameter": "waitForCompletion",
+          "default": true
+        },
+        "pollAction": "get_current_run",
+        "stopAction": "stop_task",
+        "conflictsWith": [
+          "maa-execution"
+        ],
+        "producesRun": true,
+        "runLookupAction": "get_run",
+        "idempotency": {
+          "supported": true,
+          "required": false,
+          "header": "Idempotency-Key",
+          "scope": "local-instance",
+          "namespace": "operationId",
+          "survivesRestart": true,
+          "restartBehavior": "active-runs-become-interrupted",
+          "retentionSeconds": 86400,
+          "retentionMode": "up-to",
+          "maxTerminalRuns": 500
+        }
+      }
+    },
+    {
+      "id": "stop_task",
+      "method": "POST",
+      "path": "/api/agent/actions/stop",
+      "description": "Stop the currently running MAA task if any.",
+      "body_schema": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional guard: only stop the current execution when its run id matches."
+          }
+        }
+      },
+      "safety": {
+        "level": "low-risk-write",
+        "riskLevel": "low-risk-write",
+        "readOnly": false,
+        "idempotent": true,
+        "mutatesDevice": true,
+        "destructive": true,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": [
+          "interrupt_running_automation"
+        ]
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "get_current_run",
+      "method": "GET",
+      "path": "/api/agent/runs/current",
+      "description": "Return a compact current MAA task status, schedule execution state, and a short recent log tail for polling.",
+      "query_schema": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 80,
+            "description": "Maximum number of recent log lines to include in recentLogs."
+          }
+        }
+      },
+      "safety": {
+        "level": "read-only",
+        "riskLevel": "read-only",
+        "readOnly": true,
+        "idempotent": true,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": []
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "get_run",
+      "method": "GET",
+      "path": "/api/agent/runs/{runId}",
+      "description": "Return the retained state and outcome of one Agent API execution.",
+      "path_schema": {
+        "type": "object",
+        "required": [
+          "runId"
+        ],
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Server-generated id for one Agent API execution."
+          }
+        }
+      },
+      "safety": {
+        "level": "read-only",
+        "riskLevel": "read-only",
+        "readOnly": true,
+        "idempotent": true,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": []
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "stop_run",
+      "method": "POST",
+      "path": "/api/agent/runs/{runId}/stop",
+      "description": "Stop one retained Agent run by id. Accepted runs are canceled without touching the device; running runs are stopped only when they are current.",
+      "body_schema": {
+        "type": "object",
+        "properties": {}
+      },
+      "path_schema": {
+        "type": "object",
+        "required": [
+          "runId"
+        ],
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Server-generated id for one Agent API execution."
+          }
+        }
+      },
+      "safety": {
+        "level": "low-risk-write",
+        "riskLevel": "low-risk-write",
+        "readOnly": false,
+        "idempotent": true,
+        "mutatesDevice": true,
+        "destructive": true,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": [
+          "interrupt_running_automation"
+        ]
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "get_screenshot",
+      "method": "POST",
+      "path": "/api/agent/screen/screenshot",
+      "description": "Capture the emulator screen as base64 PNG with timestamp and dimensions.",
+      "body_schema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "default": "default",
+            "description": "Saved connection profile id. Explicit connection fields override values loaded from this profile."
+          },
+          "adbPath": {
+            "type": "string",
+            "default": "/custom/platform-tools/adb"
+          },
+          "address": {
+            "type": "string",
+            "default": "127.0.0.1:7555"
+          }
+        }
+      },
+      "safety": {
+        "level": "low-risk-write",
+        "riskLevel": "low-risk-write",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": [
+          "adb_connect",
+          "capture_screenshot"
+        ]
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "run_daily_flow",
+      "method": "POST",
+      "path": "/api/agent/actions/run-daily-flow",
+      "description": "Run the saved enabled automation task flow. Use dryRun=true first to inspect the command plan.",
+      "body_schema": {
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean",
+            "default": false
+          },
+          "scheduleId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "default": "agent-daily-flow"
+          },
+          "taskFlow": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "Optional task flow override; defaults to saved automation-tasks config."
+          }
+        }
+      },
+      "header_schema": {
+        "type": "object",
+        "properties": {
+          "Idempotency-Key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._~:-]{0,127}$",
+            "description": "Client-generated key that identifies one logical execution request."
+          }
+        }
+      },
+      "safety": {
+        "level": "consequential",
+        "riskLevel": "consequential",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": true,
+        "destructive": false,
+        "confirmationRequired": true,
+        "confirmationRecommended": true,
+        "sideEffects": [
+          "run_saved_automation_flow"
+        ]
+      },
+      "execution": {
+        "mode": "long-running",
+        "supportsDryRun": true,
+        "dryRun": {
+          "supported": true,
+          "parameter": "dryRun"
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        },
+        "pollAction": "get_current_run",
+        "stopAction": "stop_task",
+        "conflictsWith": [
+          "maa-execution"
+        ],
+        "producesRun": true,
+        "runLookupAction": "get_run",
+        "idempotency": {
+          "supported": true,
+          "required": false,
+          "header": "Idempotency-Key",
+          "scope": "local-instance",
+          "namespace": "operationId",
+          "survivesRestart": true,
+          "restartBehavior": "active-runs-become-interrupted",
+          "retentionSeconds": 86400,
+          "retentionMode": "up-to",
+          "maxTerminalRuns": 500,
+          "appliesWhen": {
+            "dryRun": false
+          }
+        }
+      }
+    },
+    {
+      "id": "recent_logs",
+      "method": "GET",
+      "path": "/api/agent/logs/recent",
+      "description": "Return recent in-memory MAA logs with optional line count and an incremental sequence cursor.",
+      "query_schema": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 80,
+            "description": "Maximum number of log lines to return."
+          },
+          "afterSequence": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Return only entries newer than this sequence number; 0 returns the trailing window."
+          }
+        }
+      },
+      "safety": {
+        "level": "read-only",
+        "riskLevel": "read-only",
+        "readOnly": true,
+        "idempotent": true,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": []
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "maa_callback_summary",
+      "method": "GET",
+      "path": "/api/agent/logs/maa-callbacks",
+      "description": "Summarize BlackFlow, copilot precheck, stage navigation and public recruit callbacks from recent MAA logs.",
+      "query_schema": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000,
+            "default": 2000,
+            "description": "Number of trailing MAA log lines to scan."
+          }
+        }
+      },
+      "safety": {
+        "level": "read-only",
+        "riskLevel": "read-only",
+        "readOnly": true,
+        "idempotent": true,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": []
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "webrtc_status",
+      "method": "GET",
+      "path": "/api/agent/webrtc/status",
+      "description": "Return WebRTC endpoint hints, the installed server version, and device-agent version status. Agents older than v0.4.3 are reported as outdated.",
+      "query_schema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "default": "default",
+            "description": "Saved connection profile id. Explicit connection fields override values loaded from this profile."
+          },
+          "adbPath": {
+            "type": "string",
+            "default": "/custom/platform-tools/adb"
+          },
+          "address": {
+            "type": "string",
+            "default": "127.0.0.1:7555"
+          },
+          "deviceId": {
+            "type": "string",
+            "default": "mumu-la-pluma",
+            "description": "ScrcpyOverWebRTC device id whose agent version should be inspected."
+          }
+        }
+      },
+      "safety": {
+        "level": "read-only",
+        "riskLevel": "read-only",
+        "readOnly": true,
+        "idempotent": true,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": []
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "webrtc_devices",
+      "method": "GET",
+      "path": "/api/agent/webrtc/devices",
+      "description": "Return online ScrcpyOverWebRTC device ids in an AI-readable shape. Retained offline records are excluded.",
+      "safety": {
+        "level": "read-only",
+        "riskLevel": "read-only",
+        "readOnly": true,
+        "idempotent": true,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": []
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "webrtc_snapshot",
+      "method": "GET",
+      "path": "/api/agent/webrtc/snapshot",
+      "description": "Return the latest ScrcpyOverWebRTC device snapshot as a base64 JPEG for dashboard fallback previews.",
+      "query_schema": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "default": "mumu-la-pluma",
+            "description": "ScrcpyOverWebRTC device id whose latest snapshot should be returned."
+          }
+        }
+      },
+      "safety": {
+        "level": "read-only",
+        "riskLevel": "read-only",
+        "readOnly": true,
+        "idempotent": true,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": []
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "webrtc_start",
+      "method": "POST",
+      "path": "/api/agent/webrtc/start",
+      "description": "Start signaling/TURN and MuMu agent, then return the same-origin signaling path, ICE servers, and device id.",
+      "body_schema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "default": "default",
+            "description": "Saved connection profile id. Explicit connection fields override values loaded from this profile."
+          },
+          "adbPath": {
+            "type": "string",
+            "default": "/custom/platform-tools/adb"
+          },
+          "address": {
+            "type": "string",
+            "default": "127.0.0.1:7555"
+          },
+          "deviceId": {
+            "type": "string",
+            "default": "mumu-la-pluma"
+          }
+        }
+      },
+      "safety": {
+        "level": "low-risk-write",
+        "riskLevel": "low-risk-write",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": true,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": [
+          "start_local_webrtc_services"
+        ]
+      },
+      "execution": {
+        "mode": "long-running",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "webrtc_stop",
+      "method": "POST",
+      "path": "/api/agent/webrtc/stop",
+      "description": "Stop MuMu agent and signaling/TURN managed by La Pluma.",
+      "body_schema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "default": "default",
+            "description": "Saved connection profile id. Explicit connection fields override values loaded from this profile."
+          },
+          "adbPath": {
+            "type": "string",
+            "default": "/custom/platform-tools/adb"
+          },
+          "address": {
+            "type": "string",
+            "default": "127.0.0.1:7555"
+          }
+        }
+      },
+      "safety": {
+        "level": "low-risk-write",
+        "riskLevel": "low-risk-write",
+        "readOnly": false,
+        "idempotent": true,
+        "mutatesDevice": true,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": [
+          "stop_local_webrtc_services"
+        ]
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "preview_orientation",
+      "method": "POST",
+      "path": "/api/agent/preview/orientation",
+      "description": "Set Android emulator orientation for the live preview/device. Uses ADB settings + keyevent fallback and returns observed display state.",
+      "body_schema": {
+        "type": "object",
+        "required": [
+          "orientation"
+        ],
+        "properties": {
+          "orientation": {
+            "type": "string",
+            "enum": [
+              "portrait",
+              "landscape",
+              "auto"
+            ]
+          },
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "default": "default",
+            "description": "Saved connection profile id. Explicit connection fields override values loaded from this profile."
+          },
+          "adbPath": {
+            "type": "string",
+            "default": "/custom/platform-tools/adb"
+          },
+          "address": {
+            "type": "string",
+            "default": "127.0.0.1:7555"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "safety": {
+        "level": "low-risk-write",
+        "riskLevel": "low-risk-write",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": true,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": [
+          "change_device_orientation"
+        ]
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": true,
+        "dryRun": {
+          "supported": true,
+          "parameter": "dryRun"
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "get_current_activity",
+      "method": "GET",
+      "path": "/api/agent/activity",
+      "description": "Return the current event, available stages, source metadata, and completion state.",
+      "query_schema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "default": "default",
+            "description": "Saved connection profile id. Explicit connection fields override values loaded from this profile."
+          },
+          "clientType": {
+            "type": "string",
+            "default": "Bilibili"
+          }
+        }
+      },
+      "safety": {
+        "level": "read-only",
+        "riskLevel": "read-only",
+        "readOnly": true,
+        "idempotent": true,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": []
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "list_custom_tools",
+      "method": "GET",
+      "path": "/api/agent/custom-tools",
+      "description": "List whitelisted Custom tools and their parameter requirements.",
+      "safety": {
+        "level": "read-only",
+        "riskLevel": "read-only",
+        "readOnly": true,
+        "idempotent": true,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": []
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "run_custom_tool",
+      "method": "POST",
+      "path": "/api/agent/actions/run-custom-tool",
+      "description": "Run a whitelisted MaaCore Custom tool, such as pixel paint or material synthesis.",
+      "body_schema": {
+        "type": "object",
+        "required": [
+          "toolId"
+        ],
+        "properties": {
+          "toolId": {
+            "type": "string",
+            "enum": [
+              "pixel-paint",
+              "auto-raise-potential",
+              "material-synthesis",
+              "cursed-relic",
+              "event-shop-blacklist"
+            ]
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": true,
+            "default": {}
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false
+          },
+          "waitForCompletion": {
+            "type": "boolean",
+            "default": true
+          },
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "default": "default",
+            "description": "Saved connection profile id. Explicit connection fields override values loaded from this profile."
+          }
+        }
+      },
+      "header_schema": {
+        "type": "object",
+        "properties": {
+          "Idempotency-Key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._~:-]{0,127}$",
+            "description": "Client-generated key that identifies one logical execution request."
+          }
+        }
+      },
+      "safety": {
+        "level": "consequential",
+        "riskLevel": "consequential",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": true,
+        "destructive": false,
+        "confirmationRequired": true,
+        "confirmationRecommended": true,
+        "sideEffects": [
+          "run_maa_command"
+        ]
+      },
+      "execution": {
+        "mode": "sync-or-background",
+        "supportsDryRun": true,
+        "dryRun": {
+          "supported": true,
+          "parameter": "dryRun"
+        },
+        "supportsWaitForCompletion": true,
+        "waitForCompletion": {
+          "supported": true,
+          "parameter": "waitForCompletion",
+          "default": true
+        },
+        "pollAction": "get_current_run",
+        "stopAction": "stop_task",
+        "conflictsWith": [
+          "maa-execution"
+        ],
+        "producesRun": true,
+        "runLookupAction": "get_run",
+        "idempotency": {
+          "supported": true,
+          "required": false,
+          "header": "Idempotency-Key",
+          "scope": "local-instance",
+          "namespace": "operationId",
+          "survivesRestart": true,
+          "restartBehavior": "active-runs-become-interrupted",
+          "retentionSeconds": 86400,
+          "retentionMode": "up-to",
+          "maxTerminalRuns": 500
+        }
+      }
+    },
+    {
+      "id": "get_mastery_preflight",
+      "method": "GET",
+      "path": "/api/agent/operator-mastery/preflight",
+      "description": "Check mastery data, MAA version, and runtime support for OperProgress. This never starts training.",
+      "query_schema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "default": "default",
+            "description": "Saved connection profile id. Explicit connection fields override values loaded from this profile."
+          },
+          "clientType": {
+            "type": "string",
+            "default": "Bilibili"
+          }
+        }
+      },
+      "safety": {
+        "level": "read-only",
+        "riskLevel": "read-only",
+        "readOnly": true,
+        "idempotent": true,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": []
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "list_mastery_candidates",
+      "method": "GET",
+      "path": "/api/agent/operator-mastery/catalog",
+      "description": "List operators with skill mastery data and their E2 eligibility. This never starts training.",
+      "query_schema": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string"
+          },
+          "rarity": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "eligible",
+              "owned",
+              "all"
+            ],
+            "default": "all"
+          },
+          "limit": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1000,
+            "default": 500
+          },
+          "clientType": {
+            "type": "string",
+            "default": "Bilibili"
+          }
+        }
+      },
+      "safety": {
+        "level": "read-only",
+        "riskLevel": "read-only",
+        "readOnly": true,
+        "idempotent": true,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": []
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "get_mastery_operator",
+      "method": "GET",
+      "path": "/api/agent/operator-mastery/operators/{operatorId}",
+      "description": "Return one operator skill, mastery costs, and the current advisory material gap.",
+      "query_schema": {
+        "type": "object",
+        "properties": {
+          "declaredLevel": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3,
+            "default": 0
+          },
+          "clientType": {
+            "type": "string",
+            "default": "Bilibili"
+          }
+        }
+      },
+      "path_schema": {
+        "type": "object",
+        "required": [
+          "operatorId"
+        ],
+        "properties": {
+          "operatorId": {
+            "type": "string"
+          }
+        }
+      },
+      "safety": {
+        "level": "read-only",
+        "riskLevel": "read-only",
+        "readOnly": true,
+        "idempotent": true,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": []
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "get_mastery_status",
+      "method": "GET",
+      "path": "/api/agent/operator-mastery/status",
+      "description": "Return the mastery campaign, queue items, counts, and scheduler state.",
+      "safety": {
+        "level": "read-only",
+        "riskLevel": "read-only",
+        "readOnly": true,
+        "idempotent": true,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": []
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "add_mastery_targets",
+      "method": "POST",
+      "path": "/api/agent/operator-mastery/items",
+      "description": "Add one or more operator-skill mastery targets to the queue. This does not start training.",
+      "body_schema": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "operatorId",
+                "skillIndex",
+                "targetLevel"
+              ],
+              "properties": {
+                "operatorId": {
+                  "type": "string"
+                },
+                "skillIndex": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 3
+                },
+                "targetLevel": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 3
+                },
+                "declaredLevel": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 2,
+                  "default": 0
+                }
+              }
+            }
+          }
+        }
+      },
+      "safety": {
+        "level": "low-risk-write",
+        "riskLevel": "low-risk-write",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": [
+          "write_mastery_queue"
+        ]
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "update_mastery_target",
+      "method": "PATCH",
+      "path": "/api/agent/operator-mastery/items/{id}",
+      "description": "Update a queued mastery target level or enabled state. Execution is locked while a step is in flight.",
+      "body_schema": {
+        "type": "object",
+        "properties": {
+          "targetLevel": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "path_schema": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "safety": {
+        "level": "low-risk-write",
+        "riskLevel": "low-risk-write",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": [
+          "write_mastery_queue"
+        ]
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "remove_mastery_target",
+      "method": "DELETE",
+      "path": "/api/agent/operator-mastery/items/{id}",
+      "description": "Remove a mastery target from the queue. An in-game training already started is not canceled.",
+      "path_schema": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "safety": {
+        "level": "low-risk-write",
+        "riskLevel": "low-risk-write",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": [
+          "write_mastery_queue"
+        ]
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "reorder_mastery_targets",
+      "method": "PUT",
+      "path": "/api/agent/operator-mastery/items/order",
+      "description": "Reorder the mastery queue. The active item is locked while its step is running.",
+      "body_schema": {
+        "type": "object",
+        "required": [
+          "order"
+        ],
+        "properties": {
+          "order": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "safety": {
+        "level": "low-risk-write",
+        "riskLevel": "low-risk-write",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": [
+          "write_mastery_queue"
+        ]
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "update_mastery_settings",
+      "method": "PUT",
+      "path": "/api/agent/operator-mastery/settings",
+      "description": "Update the mastery probe interval, blocked-item policy, and notifications.",
+      "body_schema": {
+        "type": "object",
+        "properties": {
+          "probeIntervalMinutes": {
+            "type": "number",
+            "enum": [
+              60,
+              120,
+              360
+            ]
+          },
+          "onItemBlocked": {
+            "type": "string",
+            "enum": [
+              "skip",
+              "pause"
+            ]
+          },
+          "autoStartGame": {
+            "type": "boolean"
+          },
+          "notifyOnComplete": {
+            "type": "boolean"
+          },
+          "notifyOnBlocked": {
+            "type": "boolean"
+          }
+        }
+      },
+      "safety": {
+        "level": "low-risk-write",
+        "riskLevel": "low-risk-write",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": [
+          "write_mastery_queue"
+        ]
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "start_mastery_campaign",
+      "method": "POST",
+      "path": "/api/agent/operator-mastery/start",
+      "description": "Arm the mastery queue and let the server scheduler start the next OperProgress step. This can consume materials and start a multi-hour training.",
+      "body_schema": {
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean",
+            "default": false
+          },
+          "profileId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "default": "default",
+            "description": "Saved connection profile id. Explicit connection fields override values loaded from this profile."
+          },
+          "clientType": {
+            "type": "string",
+            "default": "Bilibili"
+          }
+        }
+      },
+      "safety": {
+        "level": "consequential",
+        "riskLevel": "consequential",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": true,
+        "destructive": false,
+        "confirmationRequired": true,
+        "confirmationRecommended": true,
+        "sideEffects": [
+          "start_training_room_training",
+          "consume_mastery_materials"
+        ]
+      },
+      "execution": {
+        "mode": "sync-or-background",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        },
+        "pollAction": "get_mastery_status",
+        "stopAction": "stop_mastery_campaign",
+        "conflictsWith": [
+          "maa-execution"
+        ]
+      }
+    },
+    {
+      "id": "pause_mastery_campaign",
+      "method": "POST",
+      "path": "/api/agent/operator-mastery/pause",
+      "description": "Stop starting new mastery steps. An in-game training already started continues.",
+      "body_schema": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "safety": {
+        "level": "low-risk-write",
+        "riskLevel": "low-risk-write",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": [
+          "pause_mastery_campaign"
+        ]
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "resume_mastery_campaign",
+      "method": "POST",
+      "path": "/api/agent/operator-mastery/resume",
+      "description": "Resume a paused or interrupted mastery campaign. The next step re-verifies the game state first.",
+      "body_schema": {
+        "type": "object",
+        "properties": {}
+      },
+      "safety": {
+        "level": "consequential",
+        "riskLevel": "consequential",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": true,
+        "destructive": false,
+        "confirmationRequired": true,
+        "confirmationRecommended": true,
+        "sideEffects": [
+          "resume_mastery_training"
+        ]
+      },
+      "execution": {
+        "mode": "sync-or-background",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        },
+        "pollAction": "get_mastery_status",
+        "stopAction": "stop_mastery_campaign",
+        "conflictsWith": [
+          "maa-execution"
+        ]
+      }
+    },
+    {
+      "id": "stop_mastery_campaign",
+      "method": "POST",
+      "path": "/api/agent/operator-mastery/stop",
+      "description": "Stop the scheduler and current step. In-game training continues and materials are not refunded.",
+      "body_schema": {
+        "type": "object",
+        "properties": {}
+      },
+      "safety": {
+        "level": "low-risk-write",
+        "riskLevel": "low-risk-write",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": [
+          "stop_mastery_campaign"
+        ]
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    },
+    {
+      "id": "retry_mastery_target",
+      "method": "POST",
+      "path": "/api/agent/operator-mastery/items/{id}/retry",
+      "description": "Move a blocked or failed mastery target back to the queue after the external cause is fixed.",
+      "body_schema": {
+        "type": "object",
+        "properties": {}
+      },
+      "path_schema": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "safety": {
+        "level": "low-risk-write",
+        "riskLevel": "low-risk-write",
+        "readOnly": false,
+        "idempotent": false,
+        "mutatesDevice": false,
+        "destructive": false,
+        "confirmationRequired": false,
+        "confirmationRecommended": false,
+        "sideEffects": [
+          "write_mastery_queue"
+        ]
+      },
+      "execution": {
+        "mode": "request-response",
+        "supportsDryRun": false,
+        "dryRun": {
+          "supported": false
+        },
+        "supportsWaitForCompletion": false,
+        "waitForCompletion": {
+          "supported": false
+        }
+      }
+    }
+  ]
+}

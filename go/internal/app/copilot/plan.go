@@ -80,6 +80,13 @@ type ServiceOptions struct {
 	ManualExecutor StepExecutor
 	Executor       Executor
 	LeaseRunner    LeaseRunner
+	DropRecorder   DropRecorder
+}
+
+// DropRecorder persists one completed copilot stage in the shared drop
+// statistics, matching recordCompletedCopilotEntries in the Node service.
+type DropRecorder interface {
+	RecordDrops(payload any) error
 }
 
 // Service owns the PRTS plan cache, progress persistence and stage index.
@@ -95,6 +102,7 @@ type Service struct {
 	manualExecutor StepExecutor
 	executor       Executor
 	lease          LeaseRunner
+	dropRecorder   DropRecorder
 
 	planMu       sync.Mutex
 	planCache    map[string]planCacheEntry
@@ -140,6 +148,7 @@ func NewWithOptions(options ServiceOptions) *Service {
 		battleSampler: options.BattleSampler,
 		executor:      options.Executor,
 		lease:         options.LeaseRunner,
+		dropRecorder:  options.DropRecorder,
 		planCache:     map[string]planCacheEntry{},
 		planInFlight:  map[string]*planBuildCall{},
 	}

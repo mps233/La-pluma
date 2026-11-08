@@ -80,6 +80,26 @@ func (e *fakeExecutionExecutor) taskCount() int {
 	return len(e.taskConfigs)
 }
 
+type fakeDropRecorder struct {
+	mu       sync.Mutex
+	payloads []any
+}
+
+func (r *fakeDropRecorder) RecordDrops(payload any) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.payloads = append(r.payloads, payload)
+	return nil
+}
+
+func (r *fakeDropRecorder) snapshot() []any {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]any{}, r.payloads...)
+}
+
+func floatPointer(value float64) *float64 { return &value }
+
 type fakeLeaseRunner struct {
 	mu       sync.Mutex
 	requests []LeaseRequest
@@ -253,8 +273,10 @@ func TestExecutePlanDynamicTask(t *testing.T) {
 		Raid:  "normal",
 		Plan:  dynamicExecutionPlan(),
 		Options: map[string]any{
-			"loopTimes": 2,
-			"preTasks":  []any{map[string]any{"name": "导航", "type": "Stage", "params": map[string]any{}}},
+			"loopTimes":  2,
+			"clientType": "Bilibili",
+			"address":    "10.0.0.2:5555",
+			"preTasks":   []any{map[string]any{"name": "导航", "type": "Stage", "params": map[string]any{}}},
 		},
 		Lifecycle: lifecycle,
 	})
@@ -268,6 +290,9 @@ func TestExecutePlanDynamicTask(t *testing.T) {
 		t.Fatalf("lease requests = %#v", lease.requests)
 	}
 	first := executor.taskConfig(0)
+	if first["address"] != "10.0.0.2:5555" || first["client_type"] != "Bilibili" {
+		t.Fatalf("connection not injected: %#v", first)
+	}
 	tasks := taskList(t, first)
 	if len(tasks) != 2 || asRecord(tasks[0])["name"] != "导航" {
 		t.Fatalf("first task config = %#v", first)
@@ -546,6 +571,36 @@ func TestManualManagerUsesExecutionLayer(t *testing.T) {
 	}
 	if lease.runs != 2 {
 		t.Fatalf("manual lease runs = %d", lease.runs)
+	}
+}
+
+func TestExecutePlanRecordsCopilotDrops(t *testing.T) {
+	executor := &fakeExecutionExecutor{}
+	fixture := newExecutionFixture(t, executor, nil)
+	recorder := &fakeDropRecorder{}
+	fixture.service.dropRecorder = recorder
+
+	plan := nativeExecutionPlan()
+	plan.Entries[0].APCost = floatPointer(21)
+	plan.Entries[1].APCost = floatPointer(0)
+	result, err := fixture.service.ExecutePlan(context.Background(), PlanExecution{SetID: "1", Plan: plan})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if success, _ := result.Data["success"].(bool); !success {
+		t.Fatalf("execution result = %#v", result.Data)
+	}
+
+	payloads := recorder.snapshot()
+	if len(payloads) != 2 {
+		t.Fatalf("drop payloads = %#v", payloads)
+	}
+	first, _ := payloads[0].(map[string]any)
+	if first["stage"] != "T-1" || first["times"] != 1 || first["sanity"] != float64(21) {
+		t.Fatalf("first drop payload = %#v", first)
+	}
+	if first["medicine"] != 0 || first["stone"] != 0 || first["source"] != "copilot" || first["mode"] != "normal" {
+		t.Fatalf("first drop payload = %#v", first)
 	}
 }
 

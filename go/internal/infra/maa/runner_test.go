@@ -91,6 +91,17 @@ func TestExecFailure(t *testing.T) {
 	}
 }
 
+func TestSetPath(t *testing.T) {
+	runner := New("old-maa", nil)
+	if runner.Path() != "old-maa" {
+		t.Fatalf("path = %s", runner.Path())
+	}
+	runner.SetPath("new-maa")
+	if runner.Path() != "new-maa" {
+		t.Fatalf("path = %s", runner.Path())
+	}
+}
+
 func TestMissingCLI(t *testing.T) {
 	runner := New(filepath.Join(t.TempDir(), "missing-maa"), testLogger())
 	if _, err := runner.Exec(context.Background(), "run", nil, ExecOptions{Wait: true}); err == nil || errorCode(err) != "MAA_CLI_NOT_FOUND" {

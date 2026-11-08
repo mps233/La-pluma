@@ -2,8 +2,10 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/mps233/la-pluma/go/internal/config"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
@@ -181,5 +183,179 @@ func TestFileConfigSource(t *testing.T) {
 	}
 	if _, err := source.Load("../escape"); err == nil {
 		t.Fatal("invalid config type should fail")
+	}
+}
+
+func TestCronFlowUsesRunWrapper(t *testing.T) {
+	executor := &fakeExecutor{}
+	wrapped := 0
+	service := newTestService(executor, Options{
+		WrapDailyFlow: func(ctx context.Context, scheduleID string, run func(context.Context) DailyFlowResult) DailyFlowResult {
+			wrapped++
+			if scheduleID != "cron" {
+				t.Fatalf("schedule id = %s", scheduleID)
+			}
+			return run(ctx)
+		},
+	})
+	defer service.Close()
+
+	service.triggerTaskFlow([]any{map[string]any{
+		"id": "recruit", "commandId": "recruit", "name": "自动公招", "enabled": true, "params": map[string]any{},
+	}}, "cron")
+	if wrapped != 1 {
+		t.Fatalf("wrapper calls = %d", wrapped)
+	}
+	executor.mu.Lock()
+	calls := len(executor.calls)
+	executor.mu.Unlock()
+	if calls == 0 {
+		t.Fatal("cron flow did not invoke the executor")
+	}
+}
+
+type fakeDepotRecognizer struct{ called int }
+
+func (r *fakeDepotRecognizer) RecognizeDepot(context.Context) error {
+	r.called++
+	return nil
+}
+
+func TestClosedownRunsDepotRecognitionBeforeClose(t *testing.T) {
+	executor := &fakeExecutor{}
+	recognizer := &fakeDepotRecognizer{}
+	service := newTestService(executor, Options{DepotRecognizer: recognizer})
+	defer service.Close()
+
+	result := service.StartDailyFlow(context.Background(), DailyFlowRequest{
+		ScheduleID: "depot-before-close",
+		TaskFlow: []any{map[string]any{
+			"id": "closedown-1", "commandId": "closedown", "name": "关闭游戏", "enabled": true,
+			"params": map[string]any{"recognizeDepotBeforeClose": true},
+		}},
+	})
+	if !result.Success {
+		t.Fatalf("flow = %+v", result)
+	}
+	if recognizer.called != 1 {
+		t.Fatalf("recognizer calls = %d", recognizer.called)
+	}
+	executor.mu.Lock()
+	defer executor.mu.Unlock()
+	depotTasks := 0
+	for _, call := range executor.calls {
+		if call.TaskConfig != nil && call.TaskConfig["type"] == "Depot" {
+			depotTasks++
+		}
+	}
+	if depotTasks != 1 {
+		t.Fatalf("depot tasks = %d, calls = %#v", depotTasks, executor.calls)
+	}
+}
+
+type fakeSmartStagesUpdater struct{ called chan struct{} }
+
+func (u *fakeSmartStagesUpdater) UpdateSmartTrainingStages() error {
+	select {
+	case u.called <- struct{}{}:
+	default:
+	}
+	return nil
+}
+
+func TestFlowRefreshesSmartStagesAfterCompletion(t *testing.T) {
+	executor := &fakeExecutor{}
+	updater := &fakeSmartStagesUpdater{called: make(chan struct{}, 1)}
+	service := newTestService(executor, Options{SmartStagesUpdater: updater})
+	defer service.Close()
+
+	result := service.StartDailyFlow(context.Background(), DailyFlowRequest{
+		ScheduleID: "smart",
+		TaskFlow: []any{map[string]any{
+			"id": "recruit", "commandId": "recruit", "name": "自动公招", "enabled": true, "params": map[string]any{},
+		}},
+	})
+	if !result.Success {
+		t.Fatalf("flow = %+v", result)
+	}
+	select {
+	case <-updater.called:
+	case <-time.After(2 * time.Second):
+		t.Fatal("smart stage updater was not called")
+	}
+}
+
+func TestFlowSendsCompletionNotification(t *testing.T) {
+	executor := &fakeExecutor{}
+	notified := make(chan *ExecutionSummary, 1)
+	service := newTestService(executor, Options{
+		CompletionNotifier: func(_ context.Context, scheduleID string, summary *ExecutionSummary) error {
+			if scheduleID != "notify" {
+				t.Errorf("schedule id = %s", scheduleID)
+			}
+			notified <- summary
+			return nil
+		},
+	})
+	defer service.Close()
+
+	result := service.StartDailyFlow(context.Background(), DailyFlowRequest{
+		ScheduleID: "notify",
+		TaskFlow: []any{map[string]any{
+			"id": "recruit", "commandId": "recruit", "name": "自动公招", "enabled": true, "params": map[string]any{},
+		}},
+	})
+	if !result.Success {
+		t.Fatalf("flow = %+v", result)
+	}
+	select {
+	case summary := <-notified:
+		if summary == nil || summary.SuccessCount != 1 {
+			t.Fatalf("summary = %+v", summary)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("completion notification was not sent")
+	}
+}
+
+type fakeDeviceProbe struct {
+	connectionErr  error
+	foreground     bool
+	foregroundName string
+	captureErr     error
+}
+
+func (p *fakeDeviceProbe) TestConnection(context.Context, string, string) error {
+	return p.connectionErr
+}
+
+func (p *fakeDeviceProbe) GameForeground(context.Context, string, string, string) (bool, string, error) {
+	return p.foreground, p.foregroundName, nil
+}
+
+func (p *fakeDeviceProbe) CaptureScreen(context.Context, string, string) error {
+	return p.captureErr
+}
+
+func TestStartupPreflightFailsBeforeMAA(t *testing.T) {
+	executor := &fakeExecutor{}
+	service := newTestService(executor, Options{DeviceProbe: &fakeDeviceProbe{connectionErr: errors.New("offline")}})
+	defer service.Close()
+
+	result := service.StartDailyFlow(context.Background(), DailyFlowRequest{
+		ScheduleID: "preflight",
+		TaskFlow: []any{map[string]any{
+			"id": "startup-1", "commandId": "startup", "name": "启动游戏", "enabled": true,
+			"params": map[string]any{"startGameEnabled": true},
+		}},
+	})
+	if !result.Success || result.Summary == nil || result.Summary.FailedCount != 1 {
+		t.Fatalf("flow = %+v", result)
+	}
+	executor.mu.Lock()
+	calls := len(executor.calls)
+	executor.mu.Unlock()
+	if calls != 0 {
+		t.Fatalf("MAA calls after failed preflight = %d", calls)
 	}
 }

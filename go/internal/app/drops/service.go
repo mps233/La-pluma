@@ -468,6 +468,57 @@ func (s *Service) loadMaterialsMap() map[string]MaterialInfo {
 	return materials
 }
 
+// LoadMaterials builds the material metadata map from a MaaResource directory.
+// It mirrors buildMaaMaterialDatabase closely enough for drop statistics:
+// item_index.json supplies names/rarity and item_table.json supplies iconId.
+func LoadMaterials(resourceDir string) (map[string]MaterialInfo, error) {
+	indexValue, err := jsonstore.Read(filepath.Join(resourceDir, "item_index.json"), map[string]any{})
+	if err != nil {
+		return nil, err
+	}
+	tableValue, _ := jsonstore.Read(filepath.Join(resourceDir, "gamedata", "excel", "item_table.json"), map[string]any{})
+	index := asRecord(indexValue)
+	if index == nil {
+		return map[string]MaterialInfo{}, nil
+	}
+	table := asRecord(tableValue)
+	tableItems := map[string]any{}
+	if table != nil {
+		tableItems = asRecord(table["items"])
+	}
+	result := map[string]MaterialInfo{}
+	for id, raw := range index {
+		item := asRecord(raw)
+		if item == nil {
+			item = map[string]any{}
+		}
+		tableItem := asRecord(tableItems[id])
+		if tableItem == nil {
+			tableItem = map[string]any{}
+		}
+		name, _ := item["name"].(string)
+		if name == "" {
+			name, _ = tableItem["name"].(string)
+		}
+		if name == "" {
+			name = "物品_" + id
+		}
+		iconID := tableItem["iconId"]
+		if iconID == nil {
+			iconID = id
+		}
+		rarity := item["rarity"]
+		if rarity == nil {
+			rarity = tableItem["rarity"]
+		}
+		if rarity == nil {
+			rarity = float64(0)
+		}
+		result[name] = MaterialInfo{Name: name, IconID: iconID, Rarity: rarity}
+	}
+	return result, nil
+}
+
 // MaterialsFromDatabase adapts a decoded MAA material database (the shape
 // returned by maaResourceDataService) into the map keyed by material name.
 func MaterialsFromDatabase(database any) map[string]MaterialInfo {

@@ -127,6 +127,9 @@ func newMasteryService(cfg config.Config, logger *slog.Logger, executor maaServi
 		ExternalExecution: masteryExternalExecution{execution: executionManager},
 		Notifier:          masteryNotifier{notifications: notificationService},
 	})
+	if err := service.RecoverOnStartup(); err != nil {
+		logger.Warn("恢复专精队列状态失败", "error", err)
+	}
 	service.StartScheduler(context.Background())
 	return service
 }

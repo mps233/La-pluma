@@ -34,6 +34,13 @@ const (
 	CtrlSetDisplayPower         byte = 10
 	CtrlRotateDevice            byte = 11
 
+	// Device-to-client message types.
+	DeviceMsgClipboard    byte = 0
+	DeviceMsgAckClipboard byte = 1
+
+	// MaxClipboardBytes matches scrcpy's clipboard payload limit.
+	MaxClipboardBytes = 262130
+
 	// Android MotionEvent actions used by touch injection.
 	TouchActionDown   = 0
 	TouchActionUp     = 1
@@ -141,6 +148,42 @@ func WriteScroll(w io.Writer, x, y int32, width, height uint16, hScroll, vScroll
 	binary.BigEndian.PutUint16(buffer[15:17], fixedI16(vScroll/16))
 	binary.BigEndian.PutUint32(buffer[17:21], uint32(buttons))
 	_, err := w.Write(buffer[:])
+	return err
+}
+
+// NormalizeTouchAction maps ACTION_CANCEL to ACTION_UP. scrcpy's
+// PointersState only clears a pointer on UP, so forwarding CANCEL would leave a
+// ghost pointer that eventually exhausts the pointer table.
+func NormalizeTouchAction(action int) int {
+	if action == TouchActionCancel {
+		return TouchActionUp
+	}
+	return action
+}
+
+// WriteGetClipboard requests the device clipboard. copyKey 0 requests the
+// current clipboard without injecting a copy/cut key.
+func WriteGetClipboard(w io.Writer, copyKey byte) error {
+	_, err := w.Write([]byte{CtrlGetClipboard, copyKey})
+	return err
+}
+
+// WriteSetClipboard writes the clipboard and optionally asks the device to
+// paste it. sequence 0 requests no acknowledgement.
+func WriteSetClipboard(w io.Writer, sequence uint64, paste bool, text string) error {
+	if len(text) > MaxClipboardBytes {
+		return fmt.Errorf("clipboard text too large: %d", len(text))
+	}
+	data := []byte(text)
+	buffer := make([]byte, 14+len(data))
+	buffer[0] = CtrlSetClipboard
+	binary.BigEndian.PutUint64(buffer[1:9], sequence)
+	if paste {
+		buffer[9] = 1
+	}
+	binary.BigEndian.PutUint32(buffer[10:14], uint32(len(data)))
+	copy(buffer[14:], data)
+	_, err := w.Write(buffer)
 	return err
 }
 

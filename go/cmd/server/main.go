@@ -44,6 +44,7 @@ func main() {
 	signalServer := signaling.New(func() *scwebrtc.Publisher {
 		return application.WebRTC.CurrentPublisher()
 	}, logger)
+	signalServer.SetICEServers(application.WebRTC.ICEServers)
 	server := httpapi.New(cfg, logger,
 		httpapi.WithAgentHandler(agentapi.New(application, logger)),
 		httpapi.WithSignalingHandler(signalServer.Handler()),

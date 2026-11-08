@@ -12,13 +12,14 @@ The React client in `../client` is served unchanged. The Node implementation in
 
 - Agent API: all 105 Node route paths registered; contract has 46 operations
   (40 advertised), manifest/OpenAPI generated from one Go registry.
-- Device preview/control: Pion WebRTC + scrcpy protocol. ScrcpyOverWebRTC is
-  not used by this backend.
+- Device preview/control: Pion WebRTC + scrcpy protocol, including touch, scroll,
+  key/text and clipboard; an embedded Pion TURN/STUN server is advertised over
+  signaling. ScrcpyOverWebRTC is not used by this backend.
 - MAA: start-game, dynamic run-task, scheduler task flows, fight, activity
   copilot, depot/OperBox recognition, operator mastery, MAA update actions.
 - Data: config/profile storage, training, copilot, activity, drops, assets,
   quotes, notifications/Telegram, debug logs, generated game data tools.
-- Desktop: `mygo build` produces a signed `.app`/`.dmg`; tray, single-instance,
+- Desktop: `mygo build` produces an ad-hoc signed `.app` (DMG optional); tray, single-instance,
   loopback server, native bindings, PWA gating and file logging.
 
 ## Run
@@ -64,7 +65,8 @@ The desktop/`mygo build` script runs `seed` when no seed snapshot is present.
 
 ```bash
 docker build -f go/Dockerfile -t la-pluma-go .
-docker run --rm -p 3055:3000 \
+docker run --rm -p 3055:3000 -p 3478:3478/udp \
+  -e LA_PLUMA_WEBRTC_TURN_PUBLIC_IP=<host-lan-ip> \
   -v "$PWD/la-pluma-data:/app/server/data" \
   -v "$HOME/.config/maa:/root/.config/maa" \
   la-pluma-go
@@ -86,6 +88,12 @@ Real-device smoke tests were run against MuMu (`127.0.0.1:16384`) for Pion
 video/touch/key, MAA startup from a closed game, one fight, activity copilot,
 depot/OperBox recognition, and mastery scheduling. See
 `docs/go-rewrite/PLAN.md` for the remaining gaps and test notes.
+
+## Known gaps
+
+- Developer ID signing/notarization and an app updater are not configured.
+- Runtime scrcpy quality changes are not implemented. Embedded TURN uses UDP 3478 and needs `LA_PLUMA_WEBRTC_TURN_PUBLIC_IP` plus a published port behind Docker/NAT.
+- Phone PWA install, headless preview, Windows/Linux runtime and real-device destructive flows still need verification.
 
 ## Migration plan
 

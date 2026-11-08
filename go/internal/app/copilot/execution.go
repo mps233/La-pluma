@@ -115,6 +115,7 @@ type dynamicExecution struct {
 	preTasks          []any
 	navigationStage   string
 	clientType        string
+	address           string
 	persistCompletion bool
 	taskPrefix        string
 	completed         map[string]struct{}
@@ -222,6 +223,7 @@ func (s *Service) ExecutePlan(ctx context.Context, request PlanExecution) (*Exec
 		preTasks:          preTasks,
 		navigationStage:   optionString(options, "navigationStage"),
 		clientType:        executionClientType(options),
+		address:           optionString(options, "address"),
 		persistCompletion: true,
 		taskPrefix:        planTaskPrefix,
 		completed:         completed,
@@ -278,6 +280,7 @@ func (s *Service) ExecuteSelectedEntries(ctx context.Context, request EntriesExe
 		preTasks:          optionPreTasks(options),
 		navigationStage:   optionString(options, "navigationStage"),
 		clientType:        executionClientType(options),
+		address:           optionString(options, "address"),
 		persistCompletion: false,
 		taskPrefix:        activityTaskPrefix,
 		completed:         map[string]struct{}{},
@@ -353,6 +356,7 @@ func (s *Service) executeNativePlan(
 	for _, entry := range entries {
 		results = append(results, succeededExecutionResult(entry))
 	}
+	s.recordCompletedEntries(entries, loopTimes)
 	if keys := entryKeys(entries); len(keys) > 0 {
 		if err := s.MarkCompleted(planID, keys); err != nil {
 			data := planExecutionData(plan, "native", results, entries, completed, loopTimes)
@@ -491,6 +495,9 @@ func (s *Service) executeDynamicEntries(ctx context.Context, execution dynamicEx
 		if execution.clientType != "" {
 			taskConfig["client_type"] = execution.clientType
 		}
+		if execution.address != "" {
+			taskConfig["address"] = execution.address
+		}
 
 		if execution.tracker != nil {
 			execution.tracker.MarkRunning(group.entries[0])
@@ -579,6 +586,7 @@ func (s *Service) executeDynamicEntries(ctx context.Context, execution dynamicEx
 				completed[progressEntryKey(entry)] = struct{}{}
 			}
 		}
+		s.recordCompletedEntries(group.entries, execution.loopTimes)
 		if execution.tracker != nil {
 			execution.tracker.MarkGroupSuccess(group.entries)
 		}
@@ -735,6 +743,34 @@ func settleGroupFailure(
 		tracker.SettleRunning(ProgressStopped, message)
 	}
 	return results, successfulKeys
+}
+
+func (s *Service) recordCompletedEntries(entries []PlanEntry, loopTimes int) {
+	if s.dropRecorder == nil || len(entries) == 0 {
+		return
+	}
+	if loopTimes < 1 {
+		loopTimes = 1
+	}
+	for _, entry := range entries {
+		sanity := float64(0)
+		if entry.APCost != nil {
+			sanity = *entry.APCost * float64(loopTimes)
+		}
+		payload := map[string]any{
+			"stage":    entry.DisplayStage,
+			"times":    loopTimes,
+			"sanity":   sanity,
+			"medicine": 0,
+			"stone":    0,
+			"items":    []any{},
+			"source":   "copilot",
+			"mode":     entry.Mode,
+		}
+		if err := s.dropRecorder.RecordDrops(payload); err != nil {
+			s.logger.Warn("record copilot drops", "stage", entry.DisplayStage, "error", err)
+		}
+	}
 }
 
 func succeededExecutionResult(entry PlanEntry) ExecutionEntryResult {

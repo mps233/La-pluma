@@ -102,6 +102,12 @@ func (s *staticHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 
 func (s *staticHandler) serveFile(w http.ResponseWriter, r *http.Request, clean string) {
 	w.Header().Set("Cache-Control", cacheControlFor(clean))
+	switch strings.ToLower(path.Base(clean)) {
+	case "manifest.webmanifest":
+		w.Header().Set("Content-Type", "application/manifest+json")
+	case "manifest.json":
+		w.Header().Set("Content-Type", "application/manifest+json")
+	}
 	clone := new(http.Request)
 	*clone = *r
 	clone.URL = newURL(r.URL)

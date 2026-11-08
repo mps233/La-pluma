@@ -871,3 +871,32 @@ func TestGetOperatorListFallsBackToOperBox(t *testing.T) {
 		t.Fatalf("expected missing material status, got %s", operators[0].TrainingStatus)
 	}
 }
+
+func TestUpdateSmartTrainingStagesRegeneratesPlan(t *testing.T) {
+	service := newTestService(t)
+	writeTrainingFixtures(t, service)
+	plan, err := service.GenerateTrainingPlan("current", "Official")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ApplyPlanToTasks(plan, map[string]any{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.UpdateSmartTrainingStages(); err != nil {
+		t.Fatal(err)
+	}
+	config := decodeJSON(t, filepath.Join(service.paths.DataDir, "user-configs", "automation-tasks.json"))
+	fight := config["taskFlow"].([]any)[1].(map[string]any)
+	stages := fight["params"].(map[string]any)["stages"].([]any)
+	found := false
+	for _, raw := range stages {
+		stage, ok := raw.(map[string]any)
+		if ok && stage["smart"] == true {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("smart stages were not regenerated: %v", stages)
+	}
+}

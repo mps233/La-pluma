@@ -45,6 +45,12 @@ type CommandRunner interface {
 	RunCommand(ctx context.Context, command string, args []string, taskName, taskType string, wait bool) (domainrun.DTO, error)
 }
 
+// UntrackedRunner is an optional query-only command surface. Services that
+// implement it avoid creating an Agent run for metadata commands.
+type UntrackedRunner interface {
+	RunCommandUntracked(ctx context.Context, command string, args []string) (domainrun.DTO, error)
+}
+
 // SystemRunner runs non-MAA maintenance commands such as `brew upgrade`. It is
 // separate from CommandRunner because those commands are not maa-cli
 // subcommands. Tests inject a fake; the default uses os/exec.
@@ -174,6 +180,13 @@ type MaaVersionInfo struct {
 
 // GetVersion runs `maa version` and parses the version banner.
 func (s *Service) GetVersion(ctx context.Context) (MaaVersionInfo, error) {
+	if runner, ok := s.runner.(UntrackedRunner); ok {
+		run, err := runner.RunCommandUntracked(ctx, "version", []string{})
+		if err != nil {
+			return MaaVersionInfo{}, err
+		}
+		return parseVersionOutput(commandStdout(run)), nil
+	}
 	run, err := s.runMAA(ctx, "version", []string{}, "", "")
 	if err != nil {
 		return MaaVersionInfo{}, err

@@ -252,3 +252,86 @@ func (s *Service) clearSmartTrainingStages() error {
 	}
 	return nil
 }
+
+// UpdateSmartTrainingStages regenerates smart fight stages after a scheduled
+// flow. It mirrors updateSmartTrainingStages: an empty queue clears the stages,
+// no open stage clears them, and autoSwitch advances to the next operator.
+func (s *Service) UpdateSmartTrainingStages() error {
+	config, err := s.loadAutomationConfig()
+	if err != nil {
+		return err
+	}
+	if !configHasSmartStages(config) {
+		return nil
+	}
+
+	s.mu.Lock()
+	queue, err := s.loadTrainingQueue()
+	s.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	if len(queue.Queue) == 0 {
+		return s.clearSmartTrainingStages()
+	}
+
+	plan, err := s.GenerateTrainingPlan("current", "")
+	if err != nil {
+		return err
+	}
+	if len(getApplicableStages(plan)) > 0 {
+		_, err := s.ApplyPlanToTasks(plan, map[string]any{})
+		return err
+	}
+
+	if settingsAutoSwitch(queue.Settings) && len(queue.Queue) > 1 {
+		s.mu.Lock()
+		queue, err = s.loadTrainingQueue()
+		if err == nil && len(queue.Queue) > 1 {
+			queue.Queue = append([]QueueItem{}, queue.Queue[1:]...)
+			for index := range queue.Queue {
+				queue.Queue[index].Priority = index + 1
+			}
+			if !s.saveTrainingQueue(queue) {
+				err = apperrors.WithStatus("AGENT_TRAINING_QUEUE_SAVE_FAILED", "保存养成队列失败", http.StatusInternalServerError, false, nil)
+			}
+		}
+		s.mu.Unlock()
+		if err != nil {
+			return err
+		}
+		if nextPlan, planErr := s.GenerateTrainingPlan("current", ""); planErr == nil {
+			if len(getApplicableStages(nextPlan)) > 0 {
+				_, applyErr := s.ApplyPlanToTasks(nextPlan, map[string]any{})
+				return applyErr
+			}
+		}
+	}
+	return s.clearSmartTrainingStages()
+}
+
+func configHasSmartStages(config map[string]any) bool {
+	taskFlow, _ := asArray(config["taskFlow"])
+	for _, raw := range taskFlow {
+		task, ok := asRecord(raw)
+		if !ok || task["commandId"] != "fight" {
+			continue
+		}
+		params, _ := asRecord(task["params"])
+		stages, _ := asArray(params["stages"])
+		for _, stageRaw := range stages {
+			stage, ok := asRecord(stageRaw)
+			if ok && isTruthy(stage["smart"]) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func settingsAutoSwitch(settings TrainingSettings) bool {
+	if value, ok := settings["autoSwitch"].(bool); ok {
+		return value
+	}
+	return true
+}

@@ -3,6 +3,7 @@ package scrcpy
 import (
 	"bufio"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"log/slog"
@@ -27,18 +28,19 @@ const (
 )
 
 type Options struct {
-	ADB           *adb.Client
-	Serial        string
-	ServerPath    string
-	ServerVersion string
-	BitRate       int
-	MaxSize       int
-	MaxFPS        int
-	VideoCodec    string
-	Control       bool
-	Audio         bool
-	TunnelForward bool
-	Logger        *slog.Logger
+	ADB               *adb.Client
+	Serial            string
+	ServerPath        string
+	ServerVersion     string
+	BitRate           int
+	MaxSize           int
+	MaxFPS            int
+	VideoCodec        string
+	Control           bool
+	Audio             bool
+	ClipboardAutosync bool
+	TunnelForward     bool
+	Logger            *slog.Logger
 }
 
 type Session struct {
@@ -56,6 +58,11 @@ type Session struct {
 	videoConn net.Conn
 	ctrlConn  net.Conn
 	video     *bufio.Reader
+
+	clipboardMu    sync.Mutex
+	clipboard      string
+	clipboardKnown bool
+	clipboardCh    chan struct{}
 
 	listener    net.Listener
 	reverseUsed bool
@@ -125,6 +132,9 @@ func (s *Session) Start(ctx context.Context) error {
 		s.Close()
 		return err
 	}
+	if s.opts.Control {
+		s.startControlReader()
+	}
 	if err := s.readDeviceNameAndHeader(); err != nil {
 		s.Close()
 		return err
@@ -182,6 +192,7 @@ func (s *Session) startServer(ctx context.Context) error {
 	if !s.opts.Control {
 		args = append(args, "control=false")
 	}
+	args = append(args, fmt.Sprintf("clipboard_autosync=%t", s.opts.ClipboardAutosync))
 	if s.opts.BitRate != defaultBitRate {
 		args = append(args, fmt.Sprintf("video_bit_rate=%d", s.opts.BitRate))
 	}
@@ -268,6 +279,116 @@ func (s *Session) connectForward(ctx context.Context) error {
 	return nil
 }
 
+func (s *Session) logInfo(message string, args ...any) {
+	if s.logger != nil {
+		s.logger.Info(message, args...)
+	}
+}
+
+func (s *Session) startControlReader() {
+	s.mu.Lock()
+	conn := s.ctrlConn
+	if s.clipboardCh == nil {
+		s.clipboardCh = make(chan struct{}, 1)
+	}
+	s.mu.Unlock()
+	if conn == nil {
+		return
+	}
+	s.logInfo("scrcpy control reader started")
+	go s.readControlLoop(bufio.NewReader(conn))
+}
+
+func (s *Session) readControlLoop(reader *bufio.Reader) {
+	for {
+		messageType, err := reader.ReadByte()
+		if err != nil {
+			s.logInfo("scrcpy control reader ended", "error", err)
+			return
+		}
+		switch messageType {
+		case DeviceMsgClipboard:
+			var lengthBytes [4]byte
+			if _, err := io.ReadFull(reader, lengthBytes[:]); err != nil {
+				return
+			}
+			length := binary.BigEndian.Uint32(lengthBytes[:])
+			if length > MaxClipboardBytes {
+				return
+			}
+			data := make([]byte, length)
+			if _, err := io.ReadFull(reader, data); err != nil {
+				return
+			}
+			s.logInfo("scrcpy clipboard message", "length", length)
+			s.setClipboard(string(data))
+		case DeviceMsgAckClipboard:
+			var sequence [8]byte
+			if _, err := io.ReadFull(reader, sequence[:]); err != nil {
+				return
+			}
+		default:
+			return
+		}
+	}
+}
+
+func (s *Session) setClipboard(text string) {
+	s.clipboardMu.Lock()
+	s.clipboard = text
+	s.clipboardKnown = true
+	ch := s.clipboardCh
+	s.clipboardMu.Unlock()
+	if ch != nil {
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+	}
+}
+
+func (s *Session) GetClipboard(ctx context.Context) (string, error) {
+	s.mu.Lock()
+	if s.clipboardCh == nil {
+		s.clipboardCh = make(chan struct{}, 1)
+	}
+	ch := s.clipboardCh
+	conn := s.ctrlConn
+	s.mu.Unlock()
+	if conn == nil {
+		return "", fmt.Errorf("scrcpy control is disabled")
+	}
+	select {
+	case <-ch:
+	default:
+	}
+	s.ctrlMu.Lock()
+	err := WriteGetClipboard(conn, 0)
+	s.ctrlMu.Unlock()
+	s.logInfo("scrcpy clipboard request sent", "error", err)
+	if err != nil {
+		return "", err
+	}
+	select {
+	case <-ch:
+		s.clipboardMu.Lock()
+		text := s.clipboard
+		s.clipboardMu.Unlock()
+		return text, nil
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+}
+
+func (s *Session) SetClipboard(_ context.Context, text string, paste bool) error {
+	s.ctrlMu.Lock()
+	defer s.ctrlMu.Unlock()
+	if s.ctrlConn == nil {
+		return fmt.Errorf("scrcpy control is disabled")
+	}
+	return WriteSetClipboard(s.ctrlConn, 0, paste, text)
+}
+
 func (s *Session) readDeviceNameAndHeader() error {
 	s.video = bufio.NewReaderSize(s.videoConn, 1<<20)
 	if s.opts.TunnelForward {
@@ -310,6 +431,7 @@ func (s *Session) SendTouch(action int, pointerID uint64, x, y int32, width, hei
 	if s.ctrlConn == nil {
 		return fmt.Errorf("scrcpy control is disabled")
 	}
+	action = NormalizeTouchAction(action)
 	buttons := 1
 	actionButton := 1
 	if action == TouchActionUp || action == TouchActionCancel {

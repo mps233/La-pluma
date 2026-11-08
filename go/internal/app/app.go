@@ -59,6 +59,7 @@ type App struct {
 	Mastery       *mastery.Service
 	Assets        *assets.Handler
 	WebRTC        *webrtcapp.Service
+	Bot           *notifications.Bot
 
 	startedAt time.Time
 	closeOnce sync.Once
@@ -92,16 +93,21 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	maaActions := maaapp.NewService(cfg, logger, runner, executionManager, runs)
 	logService := logs.New(5000)
 	configStore := configapp.NewStorage(cfg.Paths)
-	dropService := drops.New(cfg.Paths)
+	dropService := drops.NewWithOptions(cfg.Paths, drops.Options{
+		Materials: func() (map[string]drops.MaterialInfo, error) {
+			return drops.LoadMaterials(filepath.Join(cfg.Paths.MaaDataDir, "resource"))
+		},
+	})
 	trainingService := training.NewWithOptions(training.Options{
 		Paths:   cfg.Paths,
 		Logger:  logger,
 		Fetcher: trainingMaterialFetcher{paths: cfg.Paths},
 	})
 	copilotService := copilot.NewWithOptions(copilot.ServiceOptions{
-		Paths:    cfg.Paths,
-		Logger:   logger,
-		Executor: maaServiceAdapter{service: maaActions},
+		Paths:        cfg.Paths,
+		Logger:       logger,
+		Executor:     maaServiceAdapter{service: maaActions},
+		DropRecorder: dropsRecorder{service: dropService},
 	})
 	activityService := activity.NewWithOptions(activity.Options{
 		Paths:              cfg.Paths,
@@ -129,12 +135,19 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Logger: logger,
 		Runner: maaServiceAdapter{service: maaActions},
 	})
-	schedulerService := newScheduler(cfg, logger, maaActions, dropService, trainingService, configStore, updatesAutoUpdater{service: updatesService})
+	schedulerService := newScheduler(cfg, logger, runs, maaActions, dropService, trainingService, activityService, recognitionService, notificationService, configStore, updatesAutoUpdater{service: updatesService})
 	masteryService := newMasteryService(cfg, logger, maaServiceAdapter{service: maaActions}, executionManager, notificationService)
 	profiles := configapp.NewProfiles(cfg.Paths.MaaConfigDir)
-	maaActions.SetLineHandler(logService.AppendLine)
+	maaActions.SetLineHandler(func(stream, line string) {
+		runID, operationID := "", ""
+		if current, ok := runs.Current(); ok {
+			runID = current.RunID
+			operationID = current.OperationID
+		}
+		logService.AppendLineWithRun(stream, line, runID, operationID)
+	})
 
-	return &App{
+	application := &App{
 		cfg:           cfg,
 		logger:        logger,
 		Runs:          runs,
@@ -158,7 +171,39 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Assets:        assetsHandler,
 		WebRTC:        webrtcapp.New(cfg, logger),
 		startedAt:     time.Now(),
-	}, nil
+	}
+	application.Bot = notifications.NewBot(notifications.BotOptions{
+		Paths:   cfg.Paths,
+		Logger:  logger,
+		Handler: telegramCommandHandler{app: application},
+	})
+	if err := application.ConfigureTelegramBot(context.Background(), notificationService.GetConfig()); err != nil {
+		logger.Warn("Telegram Bot 启动失败", "error", err)
+	}
+	return application, nil
+}
+
+// ConfigureTelegramBot applies the notification config and starts or stops the
+// inbound bot. The bot is optional; incomplete/disabled config never polls.
+func (a *App) ConfigureTelegramBot(ctx context.Context, config notifications.Config) error {
+	if a.Bot == nil {
+		return nil
+	}
+	botConfig := notifications.BotConfigFromChannel(config.Channels["telegram"])
+	if !config.Enabled {
+		botConfig.Enabled = false
+	}
+	if a.Profiles != nil {
+		if profile, err := a.Profiles.Load(configapp.DefaultProfileName); err == nil {
+			if resolved, err := configapp.ResolveConnection(profile, nil); err == nil {
+				botConfig.ADBPath = resolved.ADBPath
+				botConfig.ADBAddress = resolved.Address
+			}
+		}
+	}
+	_ = a.Bot.Stop(ctx)
+	// Polling must outlive the HTTP request that saved the config.
+	return a.Bot.Init(context.Background(), botConfig)
 }
 
 func (a *App) Config() config.Config { return a.cfg }
@@ -166,6 +211,11 @@ func (a *App) Config() config.Config { return a.cfg }
 func (a *App) Close(ctx context.Context) error {
 	var result error
 	a.closeOnce.Do(func() {
+		if a.Bot != nil {
+			if err := a.Bot.Stop(ctx); err != nil && result == nil {
+				result = err
+			}
+		}
 		a.Execution.CloseAdmission("server_shutdown")
 		if a.Scheduler != nil {
 			a.Scheduler.Close()

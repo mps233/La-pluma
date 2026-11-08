@@ -15,11 +15,13 @@ const (
 )
 
 type Entry struct {
-	Time     string `json:"time"`
-	Level    Level  `json:"level"`
-	Message  string `json:"message"`
-	Service  string `json:"service,omitempty"`
-	Sequence int64  `json:"sequence"`
+	Time        string `json:"time"`
+	Level       Level  `json:"level"`
+	Message     string `json:"message"`
+	Service     string `json:"service,omitempty"`
+	RunID       string `json:"runId,omitempty"`
+	OperationID string `json:"operationId,omitempty"`
+	Sequence    int64  `json:"sequence"`
 }
 
 type Service struct {
@@ -37,6 +39,10 @@ func New(max int) *Service {
 }
 
 func (s *Service) Append(level Level, service, message string) {
+	s.AppendWithRun(level, service, message, "", "")
+}
+
+func (s *Service) AppendWithRun(level Level, service, message, runID, operationID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.next++
@@ -46,20 +52,26 @@ func (s *Service) Append(level Level, service, message string) {
 		s.entries = s.entries[:len(s.entries)-1]
 	}
 	s.entries = append(s.entries, Entry{
-		Time:     time.Now().UTC().Format(time.RFC3339),
-		Level:    level,
-		Message:  message,
-		Service:  service,
-		Sequence: s.next,
+		Time:        time.Now().UTC().Format(time.RFC3339),
+		Level:       level,
+		Message:     message,
+		Service:     service,
+		RunID:       runID,
+		OperationID: operationID,
+		Sequence:    s.next,
 	})
 }
 
 func (s *Service) AppendLine(stream, line string) {
+	s.AppendLineWithRun(stream, line, "", "")
+}
+
+func (s *Service) AppendLineWithRun(stream, line, runID, operationID string) {
 	level := LevelInfo
 	if stream == "stderr" {
 		level = LevelWarn
 	}
-	s.Append(level, "MAA", line)
+	s.AppendWithRun(level, "MAA", line, runID, operationID)
 }
 
 func (s *Service) RecentAfter(lines int, afterSequence int64) []Entry {

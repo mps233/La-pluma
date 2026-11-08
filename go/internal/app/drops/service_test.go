@@ -2,7 +2,9 @@ package drops
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -300,5 +302,34 @@ func TestDropStatisticsJSONShape(t *testing.T) {
 	dateRange := asRecord(decoded["dateRange"])
 	if dateRange["start"] != nil || dateRange["end"] != nil || dateRange["days"] != float64(0) {
 		t.Fatalf("dateRange = %s", encoded)
+	}
+}
+
+func TestLoadMaterialsFromResource(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "gamedata", "excel"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "item_index.json"), []byte(`{
+		"2001": {"name":"龙门币","rarity":2},
+		"30011": {"name":"固源岩","rarity":1}
+	}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "gamedata", "excel", "item_table.json"), []byte(`{
+		"items": {"2001":{"iconId":"2001"},"30011":{"iconId":"30011"}}
+	}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	materials, err := LoadMaterials(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := materials["龙门币"]
+	if item.IconID != "2001" || fmt.Sprint(item.Rarity) != "2" {
+		t.Fatalf("material = %#v", item)
+	}
+	if _, ok := materials["固源岩"]; !ok {
+		t.Fatalf("materials = %#v", materials)
 	}
 }

@@ -25,6 +25,9 @@ type TouchMessage struct {
 	Y          float64 `json:"y"`
 	Width      float64 `json:"w"`
 	Height     float64 `json:"h"`
+	HScroll    float64 `json:"hscroll"`
+	VScroll    float64 `json:"vscroll"`
+	Buttons    int     `json:"buttons"`
 }
 
 type Publisher struct {
@@ -36,6 +39,8 @@ type Publisher struct {
 	stop    chan struct{}
 	closed  sync.Once
 	onPeer  func(connected bool)
+	onEnded func()
+	ended   sync.Once
 
 	cacheMu      sync.Mutex
 	lastConfig   []byte
@@ -203,6 +208,24 @@ func (p *Publisher) PeerCount() int {
 	return len(p.peers)
 }
 
+// SetOnEnded installs a callback for a terminal video-read error.
+func (p *Publisher) SetOnEnded(fn func()) {
+	p.mu.Lock()
+	p.onEnded = fn
+	p.mu.Unlock()
+}
+
+func (p *Publisher) notifyEnded() {
+	p.ended.Do(func() {
+		p.mu.RLock()
+		fn := p.onEnded
+		p.mu.RUnlock()
+		if fn != nil {
+			fn()
+		}
+	})
+}
+
 func (p *Publisher) notifyPeer(connected bool) {
 	p.mu.RLock()
 	listener := p.onPeer
@@ -217,9 +240,6 @@ func (p *Publisher) handleInput(data []byte) {
 	if err := json.Unmarshal(data, &message); err != nil {
 		return
 	}
-	if message.Type != "touch" {
-		return
-	}
 	width := uint16(message.Width)
 	height := uint16(message.Height)
 	if width == 0 {
@@ -228,13 +248,21 @@ func (p *Publisher) handleInput(data []byte) {
 	if height == 0 {
 		height = uint16(p.session.Height)
 	}
-	pressure := float32(1)
-	if message.Action == scrcpy.TouchActionUp || message.Action == scrcpy.TouchActionCancel {
-		pressure = 0
-	}
-	p.logger.Info("touch input", "action", message.Action, "id", message.ID, "x", message.X, "y", message.Y, "w", width, "h", height)
-	if err := p.session.SendTouch(message.Action, message.ID, int32(message.X), int32(message.Y), width, height, pressure); err != nil {
-		p.logger.Warn("touch input failed", "error", err)
+	switch message.Type {
+	case "touch":
+		pressure := float32(1)
+		if message.Action == scrcpy.TouchActionUp || message.Action == scrcpy.TouchActionCancel {
+			pressure = 0
+		}
+		p.logger.Info("touch input", "action", message.Action, "id", message.ID, "x", message.X, "y", message.Y, "w", width, "h", height)
+		if err := p.session.SendTouch(message.Action, message.ID, int32(message.X), int32(message.Y), width, height, pressure); err != nil {
+			p.logger.Warn("touch input failed", "error", err)
+		}
+	case "scroll":
+		p.logger.Info("scroll input", "x", message.X, "y", message.Y, "h", message.HScroll, "v", message.VScroll)
+		if err := p.session.SendScroll(int32(message.X), int32(message.Y), width, height, float32(message.HScroll), float32(message.VScroll), message.Buttons); err != nil {
+			p.logger.Warn("scroll input failed", "error", err)
+		}
 	}
 }
 
@@ -254,6 +282,7 @@ func (p *Publisher) FeedVideo() {
 		header, data, err := p.session.ReadVideoPacket()
 		if err != nil {
 			p.logger.Warn("scrcpy video ended", "error", err)
+			p.notifyEnded()
 			return
 		}
 		if header.IsConfig() {

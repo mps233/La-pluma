@@ -253,7 +253,15 @@ func (s *Service) triggerTaskFlow(taskFlow any, scheduleID string) {
 	if s.baseCtx.Err() != nil {
 		return
 	}
-	result := s.StartDailyFlow(s.baseCtx, DailyFlowRequest{ScheduleID: scheduleID, TaskFlow: taskFlow})
+	execute := func(ctx context.Context) DailyFlowResult {
+		return s.StartDailyFlow(ctx, DailyFlowRequest{ScheduleID: scheduleID, TaskFlow: taskFlow})
+	}
+	var result DailyFlowResult
+	if s.options.WrapDailyFlow != nil {
+		result = s.options.WrapDailyFlow(s.baseCtx, scheduleID, execute)
+	} else {
+		result = execute(s.baseCtx)
+	}
 	if !result.Success {
 		s.logger.Warn("定时任务执行失败", "scheduleId", scheduleID, "message", result.Message)
 	}

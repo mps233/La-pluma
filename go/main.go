@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -25,6 +26,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"github.com/mps233/la-pluma/go/internal/app"
+	configapp "github.com/mps233/la-pluma/go/internal/app/config"
 	"github.com/mps233/la-pluma/go/internal/app/quotes"
 	"github.com/mps233/la-pluma/go/internal/config"
 	scwebrtc "github.com/mps233/la-pluma/go/internal/infra/webrtc"
@@ -46,11 +48,107 @@ func main() {
 	mygo.App.OnWindowAllClosed(func() {
 		// Keep the scheduler and device service alive in the tray.
 	})
+	// A second launch and a Dock click must recover the window after the user
+	// closed it; both events arrive on this process, not on a new one.
+	mygo.App.OnSecondInstance(func([]string, string) {
+		if activeDesktop != nil {
+			activeDesktop.showWindow()
+		}
+	})
+	mygo.App.OnActivate(func(hasVisibleWindows bool) {
+		if !hasVisibleWindows && activeDesktop != nil {
+			activeDesktop.showWindow()
+		}
+	})
 	mygo.App.WhenReady(startDesktop)
 	if err := mygo.App.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "la pluma:", err)
 		os.Exit(1)
 	}
+}
+
+// abortStartup exits instead of returning into a windowless event loop. A
+// failed listen or app.New would otherwise leave a process that holds the
+// single-instance lock with no window and no tray icon.
+func abortStartup(logger *slog.Logger, message string, err error) {
+	logger.Error(message, "error", err)
+	mygo.App.Exit(1)
+}
+
+// rotatingFileWriter keeps the desktop log bounded. HTTP access logs are
+// appended per request, so an unbounded file would grow without limit.
+type rotatingFileWriter struct {
+	path    string
+	maxSize int64
+	keep    int
+	mu      sync.Mutex
+	file    *os.File
+	size    int64
+}
+
+func newRotatingFileWriter(path string, maxSize int64, keep int) (*rotatingFileWriter, error) {
+	writer := &rotatingFileWriter{path: path, maxSize: maxSize, keep: keep}
+	if err := writer.open(); err != nil {
+		return nil, err
+	}
+	return writer, nil
+}
+
+func (w *rotatingFileWriter) open() error {
+	file, err := os.OpenFile(w.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	info, err := file.Stat()
+	if err != nil {
+		_ = file.Close()
+		return err
+	}
+	w.file = file
+	w.size = info.Size()
+	return nil
+}
+
+func (w *rotatingFileWriter) Write(data []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.file == nil {
+		if err := w.open(); err != nil {
+			return 0, err
+		}
+	}
+	if w.maxSize > 0 && w.size > 0 && w.size+int64(len(data)) > w.maxSize {
+		w.rotate()
+	}
+	written, err := w.file.Write(data)
+	w.size += int64(written)
+	return written, err
+}
+
+func (w *rotatingFileWriter) Close() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.file == nil {
+		return nil
+	}
+	err := w.file.Close()
+	w.file = nil
+	return err
+}
+
+func (w *rotatingFileWriter) rotate() {
+	_ = w.file.Close()
+	w.file = nil
+	if w.keep > 0 {
+		for index := w.keep - 1; index >= 1; index-- {
+			_ = os.Rename(fmt.Sprintf("%s.%d", w.path, index), fmt.Sprintf("%s.%d", w.path, index+1))
+		}
+		_ = os.Rename(w.path, w.path+".1")
+	} else {
+		_ = os.Remove(w.path)
+	}
+	w.size = 0
+	_ = w.open()
 }
 
 type desktopRuntime struct {
@@ -66,13 +164,14 @@ type desktopRuntime struct {
 }
 
 func startDesktop() {
+	applySavedMAAExecutable()
 	resolveDesktopMAA()
 	logOutput := io.Writer(os.Stderr)
 	logPath := ""
 	if logsDir, err := mygo.App.Path(mygo.PathLogs); err == nil {
 		logPath = filepath.Join(logsDir, "la-pluma.log")
-		if file, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
-			logOutput = io.MultiWriter(os.Stderr, file)
+		if writer, err := newRotatingFileWriter(logPath, 10<<20, 3); err == nil {
+			logOutput = io.MultiWriter(os.Stderr, writer)
 		}
 	}
 	logger := slog.New(slog.NewTextHandler(logOutput, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -80,12 +179,12 @@ func startDesktop() {
 
 	userData, err := mygo.App.Path(mygo.PathUserData)
 	if err != nil {
-		logger.Error("user data path", "error", err)
+		abortStartup(logger, "user data path", err)
 		return
 	}
 	cacheDir, err := mygo.App.Path(mygo.PathCache)
 	if err != nil {
-		logger.Error("cache path", "error", err)
+		abortStartup(logger, "cache path", err)
 		return
 	}
 	resources, _ := mygo.App.Path(mygo.PathResources)
@@ -113,7 +212,7 @@ func startDesktop() {
 	if token == "" {
 		token, err = randomHex(16)
 		if err != nil {
-			logger.Error("token", "error", err)
+			abortStartup(logger, "token", err)
 			return
 		}
 	}
@@ -131,12 +230,13 @@ func startDesktop() {
 	}
 	application, err := app.New(cfg, logger)
 	if err != nil {
-		logger.Error("app", "error", err)
+		abortStartup(logger, "app", err)
 		return
 	}
 	signalServer := signaling.New(func() *scwebrtc.Publisher {
 		return application.WebRTC.CurrentPublisher()
 	}, logger)
+	signalServer.SetICEServers(application.WebRTC.ICEServers)
 	handler := httpapi.New(cfg, logger,
 		httpapi.WithAgentHandler(agentapi.New(application, logger)),
 		httpapi.WithSignalingHandler(signalServer.Handler()),
@@ -146,8 +246,8 @@ func startDesktop() {
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", desktopPort))
 	if err != nil {
-		logger.Error("listen", "port", desktopPort, "error", err)
 		_ = application.Close(context.Background())
+		abortStartup(logger, "listen", fmt.Errorf("port %d: %w", desktopPort, err))
 		return
 	}
 	runtimeState := &desktopRuntime{
@@ -173,23 +273,8 @@ func startDesktop() {
 	// otherwise keep an old UI alive. Local storage (token, prefs) stays.
 	_ = mygo.DefaultSession().ClearData(mygo.SiteDataServiceWorkers | mygo.SiteDataCaches)
 
-	runtimeState.window = mygo.NewWindow(mygo.WindowOptions{
-		Title:           "La Pluma",
-		URL:             runtimeState.baseURL,
-		Width:           1180,
-		Height:          800,
-		MinWidth:        980,
-		MinHeight:       680,
-		BackgroundColor: "#101318",
-		StateKey:        "main",
-		Page: mygo.PageOptions{
-			TrustedOrigins:       []string{"http://" + listener.Addr().String()},
-			BackgroundThrottling: mygo.ThrottlingOff,
-			Autoplay:             mygo.AutoplayAllow,
-			PreloadScript:        preloadScript(token),
-		},
-	})
 	activeDesktop = runtimeState
+	runtimeState.showWindow()
 	runtimeState.setupTray(logger)
 	mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) {
 		runtimeState.close(logger)
@@ -333,6 +418,47 @@ func (DesktopBridge) ChooseExecutable(kind string) (string, error) {
 	return paths[0], nil
 }
 
+// SetExecutable persists the path chosen in the desktop settings and applies
+// it to the running services. ADB is saved into the default MAA profile so the
+// MAA CLI and the Go execution adapters read the same connection.
+func (DesktopBridge) SetExecutable(kind, path string) error {
+	path = strings.TrimSpace(path)
+	if path == "" || !fileExists(path) {
+		return errors.New("可执行文件路径不存在")
+	}
+	if activeDesktop == nil || activeDesktop.app == nil {
+		return errors.New("桌面服务尚未就绪")
+	}
+	switch kind {
+	case "maa":
+		settings := loadDesktopSettings()
+		settings.MAAExecutable = path
+		if err := saveDesktopSettings(settings); err != nil {
+			return err
+		}
+		activeDesktop.app.MAA.SetPath(path)
+		_ = os.Setenv("MAA_CLI_PATH", path)
+		return nil
+	case "adb":
+		profile, err := activeDesktop.app.Profiles.Load(configapp.DefaultProfileName)
+		if err != nil {
+			return err
+		}
+		merged := activeDesktop.app.Profiles.MergeConnection(profile, map[string]any{"adb_path": path})
+		if merged == nil {
+			return errors.New("无法更新连接配置")
+		}
+		if err := activeDesktop.app.Profiles.Save(configapp.DefaultProfileName, merged); err != nil {
+			return err
+		}
+		address, _ := profile["address"].(string)
+		activeDesktop.app.WebRTC.SetConnection(path, address)
+		return nil
+	default:
+		return errors.New("不支持的可执行文件类型")
+	}
+}
+
 func (DesktopBridge) OpenDataDir() error {
 	path, err := mygo.App.Path(mygo.PathUserData)
 	if err != nil {
@@ -408,6 +534,7 @@ func seedDataDir(resources, dataDir string) {
 func (r *desktopRuntime) showWindow() {
 	if r.window != nil {
 		r.window.Show()
+		r.window.Focus()
 		return
 	}
 	window := mygo.NewWindow(mygo.WindowOptions{
@@ -432,6 +559,77 @@ func (r *desktopRuntime) showWindow() {
 		}
 	})
 	r.window = window
+}
+
+// stopAllTasks stops the scheduler flow, the mastery campaign and the current
+// MAA process. The tray button must not leave a scheduled flow or the mastery
+// tick loop to start the next MAA task a few seconds later.
+func (r *desktopRuntime) stopAllTasks(ctx context.Context) {
+	if r.app == nil {
+		return
+	}
+	r.app.Scheduler.Stop(ctx)
+	if _, err := r.app.Mastery.StopCampaign(ctx); err != nil {
+		slog.Default().Warn("stop mastery campaign", "error", err)
+	}
+	if err := r.app.MAAService.Stop(ctx); err != nil {
+		slog.Default().Warn("stop MAA task", "error", err)
+	}
+}
+
+const desktopSettingsFileName = "desktop-settings.json"
+
+type desktopSettings struct {
+	MAAExecutable string `json:"maaExecutable,omitempty"`
+}
+
+func desktopSettingsPath() (string, error) {
+	userData, err := mygo.App.Path(mygo.PathUserData)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(userData, desktopSettingsFileName), nil
+}
+
+func loadDesktopSettings() desktopSettings {
+	path, err := desktopSettingsPath()
+	if err != nil {
+		return desktopSettings{}
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return desktopSettings{}
+	}
+	var settings desktopSettings
+	if err := json.Unmarshal(data, &settings); err != nil {
+		return desktopSettings{}
+	}
+	return settings
+}
+
+func saveDesktopSettings(settings desktopSettings) error {
+	path, err := desktopSettingsPath()
+	if err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o600)
+}
+
+// applySavedMAAExecutable lets a path chosen in the desktop settings survive a
+// restart. An explicit environment override still wins.
+func applySavedMAAExecutable() {
+	if strings.TrimSpace(os.Getenv("MAA_CLI_PATH")) != "" {
+		return
+	}
+	path := strings.TrimSpace(loadDesktopSettings().MAAExecutable)
+	if path == "" || !fileExists(path) {
+		return
+	}
+	_ = os.Setenv("MAA_CLI_PATH", path)
 }
 
 // resolveDesktopMAA makes a GUI-launched app find maa even when Finder or the
@@ -518,7 +716,7 @@ func (r *desktopRuntime) panelView(c *ui.Context) {
 				go func() {
 					ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 					defer cancel()
-					_ = r.app.MAAService.Stop(ctx)
+					r.stopAllTasks(ctx)
 				}()
 			})
 		})

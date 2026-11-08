@@ -707,10 +707,16 @@ func (s *Service) TodayOpenStages(clientType string, resourceCollectionOpen bool
 	return getTodayOpenStages(s.now(), clientType, resourceCollectionOpen)
 }
 
+// ResourceCollectionOpen reports whether the current activity opens all
+// resource stages.
+func (s *Service) ResourceCollectionOpen(clientType string) bool {
+	return s.isResourceCollectionOpen(clientType, s.now())
+}
+
 // IsStageOpen reports resource-stage availability for the scheduler.
 func (s *Service) IsStageOpen(stage, clientType string) (bool, string) {
 	_, weekday := gameDay(s.now(), clientType)
-	info := isStageOpenToday(stage, weekday, false)
+	info := isStageOpenToday(stage, weekday, s.isResourceCollectionOpen(clientType, s.now()))
 	reason := ""
 	if info.Reason != nil {
 		reason = *info.Reason

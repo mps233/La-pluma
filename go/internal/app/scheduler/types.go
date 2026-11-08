@@ -66,6 +66,38 @@ type Options struct {
 	Now                 func() time.Time
 	Delay               func(ctx context.Context, duration time.Duration) bool
 	DisableCronSchedule bool
+	// WrapDailyFlow optionally runs a cron-triggered flow under an outer
+	// tracked run. HTTP callers wrap their own request before calling
+	// StartDailyFlow and leave this nil.
+	WrapDailyFlow func(ctx context.Context, scheduleID string, run func(context.Context) DailyFlowResult) DailyFlowResult
+	// ResolveStage rewrites an activity stage alias such as HD-7 to the
+	// current activity code. Nil leaves stages unchanged.
+	ResolveStage func(stage, clientType string) string
+	// DepotRecognizer parses the MAA log after the closedown pre-task.
+	DepotRecognizer DepotRecognizer
+	// SmartStagesUpdater refreshes smart training stages after a flow.
+	SmartStagesUpdater SmartStagesUpdater
+	// CompletionNotifier sends the post-flow completion message.
+	CompletionNotifier func(ctx context.Context, scheduleID string, summary *ExecutionSummary) error
+	// DeviceProbe validates the emulator before and after a startup task.
+	DeviceProbe DeviceProbe
+}
+
+// DeviceProbe is the ADB surface used by startup preflight and post-checks.
+type DeviceProbe interface {
+	TestConnection(ctx context.Context, adbPath, address string) error
+	GameForeground(ctx context.Context, adbPath, address, clientType string) (running bool, foreground string, err error)
+	CaptureScreen(ctx context.Context, adbPath, address string) error
+}
+
+// SmartStagesUpdater regenerates smart training stages from the queue.
+type SmartStagesUpdater interface {
+	UpdateSmartTrainingStages() error
+}
+
+// DepotRecognizer parses and persists the latest depot callback.
+type DepotRecognizer interface {
+	RecognizeDepot(ctx context.Context) error
 }
 
 // StageOpenChecker optionally supplies the daily stage-open decision that the

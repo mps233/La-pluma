@@ -72,13 +72,27 @@ func New(path string, logger *slog.Logger) *Runner {
 	return &Runner{path: path, logger: logger}
 }
 
-func (r *Runner) Path() string { return r.path }
+func (r *Runner) Path() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.path
+}
+
+// SetPath changes the executable used by the next MAA command. It does not
+// interrupt a running task.
+func (r *Runner) SetPath(path string) {
+	r.mu.Lock()
+	r.path = path
+	r.mu.Unlock()
+}
 
 func (r *Runner) Exec(ctx context.Context, command string, args []string, options ExecOptions) (*Task, error) {
-	if strings.TrimSpace(r.path) == "" {
+	r.mu.Lock()
+	executable := r.path
+	if strings.TrimSpace(executable) == "" {
+		r.mu.Unlock()
 		return nil, apperrors.WithStatus("MAA_CLI_NOT_FOUND", "MAA CLI 路径为空", 503, false, nil)
 	}
-	r.mu.Lock()
 	if r.current != nil && r.current.Running() {
 		current := r.current
 		r.mu.Unlock()
@@ -96,14 +110,14 @@ func (r *Runner) Exec(ctx context.Context, command string, args []string, option
 	if env == nil {
 		env = os.Environ()
 	}
-	child, err := process.Start(r.path, fullArgs, process.Options{
+	child, err := process.Start(executable, fullArgs, process.Options{
 		Dir:    options.Dir,
 		Env:    env,
 		Stdout: io.MultiWriter(stdout, stdoutLog),
 		Stderr: io.MultiWriter(stderr, stderrLog),
 	})
 	if err != nil {
-		return nil, apperrors.WithStatus("MAA_CLI_NOT_FOUND", "无法启动 MAA CLI: "+err.Error(), 503, false, map[string]any{"path": r.path, "error": err.Error()})
+		return nil, apperrors.WithStatus("MAA_CLI_NOT_FOUND", "无法启动 MAA CLI: "+err.Error(), 503, false, map[string]any{"path": executable, "error": err.Error()})
 	}
 	task := &Task{
 		runner:    r,

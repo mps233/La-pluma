@@ -74,6 +74,9 @@ func (s *Service) Run(ctx context.Context, request RunRequest) (domainrun.DTO, b
 	if strings.TrimSpace(request.Command) == "" {
 		return domainrun.DTO{}, false, apperrors.Validation("MAA_COMMAND_REQUIRED", "MAA 命令不能为空", nil)
 	}
+	if parentRunID := runapp.ParentRunID(ctx); parentRunID != "" {
+		return s.runUnderParent(ctx, parentRunID, request)
+	}
 	operationID := request.OperationID
 	if operationID == "" {
 		operationID = "run_task"
@@ -103,6 +106,66 @@ func (s *Service) Run(ctx context.Context, request RunRequest) (domainrun.DTO, b
 		}
 	}()
 	return run, false, nil
+}
+
+// runUnderParent executes an MAA command inside an outer tracked action. The
+// parent run owns the idempotency key, stop link and terminal state; the MAA
+// command only contributes a task result.
+func (s *Service) runUnderParent(ctx context.Context, parentRunID string, request RunRequest) (domainrun.DTO, bool, error) {
+	parent, ok := s.runs.Get(parentRunID)
+	if !ok {
+		return domainrun.DTO{}, false, apperrors.WithStatus("AGENT_RUN_NOT_FOUND", "父级 Agent run 不存在", 404, false, map[string]any{"runId": parentRunID})
+	}
+	if parent.State.Terminal() {
+		return parent, false, apperrors.WithStatus("AGENT_RUN_NOT_RUNNING", "父级 Agent run 已结束", 409, false, map[string]any{"runId": parentRunID, "state": parent.State})
+	}
+	lease, err := s.execution.Acquire(ctx, execution.Request{
+		Source:   request.TaskType,
+		TaskName: stringPtr(request.TaskName),
+		Command:  stringPtr(request.Command),
+		RunID:    &parentRunID,
+	})
+	if err != nil {
+		return parent, false, err
+	}
+	defer lease.Release()
+
+	task, err := s.runner.Exec(ctx, request.Command, request.Args, infraMaa.ExecOptions{
+		TaskName: request.TaskName,
+		Wait:     true,
+		Dir:      s.cfg.Paths.MaaConfigDir,
+		Env:      os.Environ(),
+		OnLine:   s.lineHandler(),
+	})
+	if err != nil {
+		_, _ = s.appendParentTaskResult(parentRunID, parent, request, "failed", err)
+		return parent, false, err
+	}
+	result := task.Wait(ctx)
+	if result.Err != nil {
+		_, _ = s.appendParentTaskResult(parentRunID, parent, request, "failed", result.Err)
+		return parent, false, result.Err
+	}
+	updated, err := s.appendParentTaskResult(parentRunID, parent, request, "succeeded", nil)
+	if err != nil {
+		return domainrun.DTO{}, false, err
+	}
+	return updated, false, nil
+}
+
+func (s *Service) appendParentTaskResult(runID string, parent domainrun.DTO, request RunRequest, state string, cause error) (domainrun.DTO, error) {
+	results := append([]any{}, parent.TaskResults...)
+	entry := map[string]any{
+		"taskName": request.TaskName,
+		"taskType": request.TaskType,
+		"command":  request.Command,
+		"state":    state,
+	}
+	if cause != nil {
+		entry["error"] = cause.Error()
+	}
+	results = append(results, entry)
+	return s.runs.UpdateProgress(runID, nil, results)
 }
 
 func (s *Service) execute(ctx context.Context, run domainrun.DTO, request RunRequest) (domainrun.DTO, bool, error) {
@@ -147,10 +210,21 @@ func (s *Service) execute(ctx context.Context, run domainrun.DTO, request RunReq
 	return completed, false, nil
 }
 
+// RunTaskOptions overrides the device target for a dynamic task. Empty values
+// fall back to ADB_ADDRESS and the local emulator default.
+type RunTaskOptions struct {
+	Address string
+}
+
 // RunTask writes a MAA dynamic task file and executes it with `maa run
 // --batch`. The temporary file lives under the MAA tasks directory and is
 // removed after the run.
 func (s *Service) RunTask(ctx context.Context, input any, wait bool, idempotencyKey *string) (domainrun.DTO, bool, error) {
+	return s.RunTaskWithOptions(ctx, input, wait, idempotencyKey, RunTaskOptions{})
+}
+
+// RunTaskWithOptions is RunTask with an explicit device address.
+func (s *Service) RunTaskWithOptions(ctx context.Context, input any, wait bool, idempotencyKey *string, options RunTaskOptions) (domainrun.DTO, bool, error) {
 	configMap, ok := input.(map[string]any)
 	if !ok {
 		return domainrun.DTO{}, false, apperrors.Validation("AGENT_VALIDATION_TASK_CONFIG_INVALID", "taskConfig 必须是对象", nil)
@@ -170,8 +244,11 @@ func (s *Service) RunTask(ctx context.Context, input any, wait bool, idempotency
 		return domainrun.DTO{}, false, apperrors.WithStatus("MAA_TASK_FILE_FAILED", "无法写入动态任务文件", 500, false, map[string]any{"error": err.Error()})
 	}
 	cleanup := func() { _ = os.Remove(taskPath) }
-	address := os.Getenv("ADB_ADDRESS")
-	if strings.TrimSpace(address) == "" {
+	address := strings.TrimSpace(options.Address)
+	if address == "" {
+		address = strings.TrimSpace(os.Getenv("ADB_ADDRESS"))
+	}
+	if address == "" {
 		address = "127.0.0.1:16384"
 	}
 	args := []string{"--batch", filepath.ToSlash(filepath.Join(dynamicTaskDir, taskID)), "--addr", address}
@@ -203,42 +280,126 @@ func (s *Service) RunTask(ctx context.Context, input any, wait bool, idempotency
 	return run, replayed, nil
 }
 
+// StartGameOptions carries the connection and launch intent for a start-game
+// request. StartGameEnabled=false means "initialize MAA only"; it must not
+// launch the game.
+type StartGameOptions struct {
+	ClientType       string
+	Address          string
+	AccountName      string
+	StartGameEnabled bool
+	Wait             bool
+	IdempotencyKey   *string
+}
+
 func (s *Service) StartGame(ctx context.Context, wait bool, idempotencyKey *string) (domainrun.DTO, bool, error) {
-	address := os.Getenv("ADB_ADDRESS")
-	if strings.TrimSpace(address) == "" {
-		address = "127.0.0.1:16384"
-	}
-	return s.Run(ctx, RunRequest{
-		OperationID:    "start_game",
-		Command:        "startup",
-		Args:           []string{"Official", "--addr", address},
-		TaskName:       "启动游戏",
-		TaskType:       "StartUp",
-		Wait:           wait,
-		Input:          map[string]any{"action": "start-game"},
-		Metadata:       map[string]any{"taskName": "启动游戏", "taskType": "StartUp"},
-		IdempotencyKey: idempotencyKey,
+	return s.StartGameWithOptions(ctx, StartGameOptions{
+		ClientType:       "Official",
+		StartGameEnabled: true,
+		Wait:             wait,
+		IdempotencyKey:   idempotencyKey,
 	})
 }
 
-func (s *Service) Stop(ctx context.Context) error {
-	current, ok := s.runs.Current()
-	if ok {
+// StartGameWithOptions mirrors the Node route: the startup command launches a
+// closed game, while a dynamic StartUp task with start_game_enabled=false only
+// initializes the MAA connection.
+func (s *Service) StartGameWithOptions(ctx context.Context, options StartGameOptions) (domainrun.DTO, bool, error) {
+	clientType := strings.TrimSpace(options.ClientType)
+	if clientType == "" {
+		clientType = "Official"
+	}
+	address := strings.TrimSpace(options.Address)
+	if address == "" {
+		address = strings.TrimSpace(os.Getenv("ADB_ADDRESS"))
+	}
+	if address == "" {
+		address = "127.0.0.1:16384"
+	}
+	accountName := strings.TrimSpace(options.AccountName)
+
+	if options.StartGameEnabled {
+		args := []string{clientType, "--addr", address}
+		if accountName != "" {
+			args = append(args, "--account-name", accountName)
+		}
+		return s.Run(ctx, RunRequest{
+			OperationID:    "start_game",
+			Command:        "startup",
+			Args:           args,
+			TaskName:       "启动游戏",
+			TaskType:       "StartUp",
+			Wait:           options.Wait,
+			Input:          map[string]any{"action": "start-game", "clientType": clientType, "address": address, "accountName": accountName, "startGameEnabled": true},
+			Metadata:       map[string]any{"taskName": "启动游戏", "taskType": "agent"},
+			IdempotencyKey: options.IdempotencyKey,
+		})
+	}
+
+	params := map[string]any{"start_game_enabled": false}
+	if accountName != "" {
+		params["account_name"] = accountName
+	}
+	taskConfig := map[string]any{
+		"name":        "启动游戏",
+		"type":        "StartUp",
+		"client_type": clientType,
+		"params":      params,
+	}
+	return s.RunTaskWithOptions(ctx, taskConfig, options.Wait, options.IdempotencyKey, RunTaskOptions{Address: address})
+}
+
+// QueryCommand runs a read-only MAA command without creating an Agent run.
+// Use it for metadata such as `maa version`, not for device side effects.
+func (s *Service) QueryCommand(ctx context.Context, command string, args []string) (infraMaa.Result, error) {
+	task, err := s.runner.Exec(ctx, command, args, infraMaa.ExecOptions{
+		Wait:   true,
+		Dir:    s.cfg.Paths.MaaConfigDir,
+		Env:    os.Environ(),
+		OnLine: s.lineHandler(),
+	})
+	if err != nil {
+		return infraMaa.Result{}, err
+	}
+	result := task.Wait(ctx)
+	return result, result.Err
+}
+
+// StopResult reports whether an MAA task was actually running when stop was
+// requested. The HTTP layer exposes this as task.success to the shared client.
+type StopResult struct {
+	Success bool
+	Message string
+	Err     error
+}
+
+// StopCurrent stops the current MAA process and settles its Agent run.
+func (s *Service) StopCurrent(ctx context.Context) StopResult {
+	current, hasRun := s.runs.Current()
+	task, hasTask := s.runner.Current()
+	running := hasTask && task != nil && task.Running()
+	activeRun := hasRun && !current.State.Terminal()
+	if hasRun {
 		_, _ = s.runs.MarkStopping(current.RunID)
 	}
 	if err := s.runner.Stop(ctx, 3*time.Second); err != nil {
-		return err
+		return StopResult{Message: "终止失败: " + err.Error(), Err: err}
 	}
-	if ok {
-		_, err := s.runs.Stop(current.RunID, map[string]any{"stopped": true})
-		if err != nil {
-			if record, exists := s.runs.Get(current.RunID); exists && record.State.Terminal() {
-				return nil
+	if hasRun {
+		if _, err := s.runs.Stop(current.RunID, map[string]any{"stopped": true}); err != nil {
+			if record, exists := s.runs.Get(current.RunID); !exists || !record.State.Terminal() {
+				return StopResult{Message: "终止失败: " + err.Error(), Err: err}
 			}
-			return err
 		}
 	}
-	return nil
+	if running || activeRun {
+		return StopResult{Success: true, Message: "已发送终止请求"}
+	}
+	return StopResult{Message: "当前没有正在运行的任务"}
+}
+
+func (s *Service) Stop(ctx context.Context) error {
+	return s.StopCurrent(ctx).Err
 }
 
 func buildTaskFile(input map[string]any) (map[string]any, error) {

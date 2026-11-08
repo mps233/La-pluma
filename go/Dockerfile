@@ -25,7 +25,8 @@ ENV NODE_ENV=production \
     LA_PLUMA_CLIENT_DIST=/app/client/dist \
     LA_PLUMA_DATA_DIR=/app/server/data \
     MAA_CLI_PATH=/usr/local/bin/maa \
-    ADB_PATH=/usr/bin/adb
+    ADB_PATH=/usr/bin/adb \
+    LA_PLUMA_SCRCPY_SERVER_PATH=/app/resources/scrcpy-server
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -41,10 +42,12 @@ RUN mkdir -p /opt/maa-cli/bin && \
 
 COPY --from=backend /out/la-pluma /app/la-pluma
 COPY --from=frontend /app/client/dist /app/client/dist
+COPY go/resources /app/resources
 COPY go/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 3000
+EXPOSE 3478/udp
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD scheme=http; if [ -n "$LA_PLUMA_HTTPS_CERT_PATH" ]; then scheme=https; fi; curl -fk "$scheme://localhost:${PORT:-3000}/health" || exit 1
 

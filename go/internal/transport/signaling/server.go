@@ -33,6 +33,9 @@ type Server struct {
 	mu      sync.Mutex
 	tickets map[string]time.Time
 
+	iceMu       sync.RWMutex
+	iceProvider func() []any
+
 	viewerMu sync.Mutex
 	viewers  int
 }
@@ -49,6 +52,23 @@ func New(provider func() *scwebrtc.Publisher, logger *slog.Logger) *Server {
 		logger:   logger,
 		tickets:  make(map[string]time.Time),
 	}
+}
+
+// SetICEServers installs the ICE server list advertised in the config message.
+func (s *Server) SetICEServers(provider func() []any) {
+	s.iceMu.Lock()
+	s.iceProvider = provider
+	s.iceMu.Unlock()
+}
+
+func (s *Server) iceServers() []any {
+	s.iceMu.RLock()
+	provider := s.iceProvider
+	s.iceMu.RUnlock()
+	if provider == nil {
+		return []any{}
+	}
+	return provider()
 }
 
 func (s *Server) publisher() *scwebrtc.Publisher {
@@ -130,7 +150,7 @@ func (s *Server) Connect(w http.ResponseWriter, r *http.Request) {
 	s.addViewer()
 	defer s.removeViewer()
 
-	client.writeJSON(map[string]any{"type": "config", "ice_servers": []any{}})
+	client.writeJSON(map[string]any{"type": "config", "ice_servers": s.iceServers()})
 
 	for {
 		_, data, err := conn.ReadMessage()

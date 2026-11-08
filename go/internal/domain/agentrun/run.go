@@ -87,6 +87,7 @@ type DTO struct {
 	FinishedAt  *string  `json:"finishedAt"`
 	DurationMS  *int64   `json:"durationMs,omitempty"`
 	Trigger     any      `json:"trigger"`
+	Metadata    any      `json:"metadata"`
 	Progress    any      `json:"progress,omitempty"`
 	TaskResults []any    `json:"taskResults"`
 	Result      any      `json:"result"`
@@ -106,6 +107,7 @@ func (r *Run) ToDTO() DTO {
 		StartedAt:   r.StartedAt,
 		FinishedAt:  r.FinishedAt,
 		Trigger:     r.Trigger,
+		Metadata:    r.Metadata,
 		TaskResults: r.TaskResults,
 		Result:      r.Result,
 		Links: Links{

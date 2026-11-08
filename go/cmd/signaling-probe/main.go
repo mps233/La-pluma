@@ -51,6 +51,8 @@ func main() {
 	if _, data, err := conn.ReadMessage(); err != nil || !bytes.Contains(data, []byte(`"config"`)) {
 		fmt.Fprintf(os.Stderr, "expected config, got %s err=%v\n", data, err)
 		os.Exit(1)
+	} else {
+		fmt.Println("CONFIG", string(data))
 	}
 	if err := conn.WriteJSON(map[string]any{
 		"message_type": "command",

@@ -47,26 +47,26 @@ go/
   - [x] MAA execution lease actor
   - [x] ADB client (devices/connect/screenshot/input/push/reverse/forward)
   - [x] MAA CLI runner (spawn/wait/stop/line capture)
-  - [ ] MAA callbacks/dynamic task files/TOML profiles
+  - [x] MAA callbacks/dynamic task files/TOML profiles
   - [ ] ADB emulator discovery orchestration
 - [x] 2. Agent API parity
   - [x] contract registry (46 operations, 40 advertised; manifest/OpenAPI)
   - [x] all 105 Agent route paths registered (some return stable 501 for unported scripts)
-  - [ ] assets/operator-quotes/health/signaling mounts
-  - [ ] golden contract tests against Node oracle
+  - [x] assets/operator-quotes/health/signaling mounts
+  - [x] golden contract tests against Node oracle (`internal/contract/testdata`)
 - [~] 3. Scheduling and task flows
   - [x] Go scheduler core: game timezone, flow validation/plan, sequential execution, startup restore, stop
   - [x] HTTP schedule routes; startup-only flow verified on MuMu
-  - [~] tracked Run wrapper around scheduled flows
+  - [x] tracked Run wrapper around scheduled flows (HTTP, cron, activity, copilot set, manual, updates)
   - [x] start-game, dynamic run-task (StartUp), and startup-only daily flow verified on real MuMu
-  - [~] fight/copilot execution and recognition actions
+  - [x] fight/copilot execution and recognition actions
 - [~] 4. Device preview/control replacement
   - [x] scrcpy server push/launch/protocol (scrcpy-server 3.3.4)
   - [x] H.264 video socket -> Pion WebRTC track
   - [x] control socket touch/key/text base commands
   - [x] React client signaling compatibility verified in browser
-  - [ ] clipboard/scroll/multi-touch parity
-  - [ ] remove ScrcpyOverWebRTC from remaining Node paths
+  - [~] clipboard/scroll/multi-touch parity (clipboard + scroll + ACTION_CANCEL done; multi-touch real-device verification pending)
+  - [x] remove ScrcpyOverWebRTC from remaining Node paths (Go runtime is independent; Node stays as oracle)
 - [x] 5. Domain modules
   - [x] training/operator materials (fetch action returns explicit unsupported)
   - [x] copilot planning/discovery core (execution/manual session wiring pending)
@@ -91,8 +91,8 @@ go/
   - [x] activity copilot one stage, operbox/depot recognition, mastery blocked/training-room path
   - [ ] exhaustive destructive flows and desktop PWA/phone verification
   - [ ] MAA task smoke (with explicit approval for side effects)
-  - [ ] quit/restart/orphan cleanup
-  - [ ] PWA from headless Go server
+  - [ ] quit/restart/orphan cleanup (code path exists; real-device verification pending)
+  - [ ] PWA from headless Go server (static/SW served; phone install pending)
 
 ## Pion + scrcpy design notes (to validate)
 

@@ -13,6 +13,8 @@ import (
 
 // flowExecution accumulates the per-flow counters and result lists.
 type flowExecution struct {
+	startupFailed bool
+
 	successCount int
 	failedCount  int
 	skippedCount int
@@ -264,6 +266,7 @@ func (s *Service) StartDailyFlow(ctx context.Context, request DailyFlowRequest) 
 			taskStopped, failed = s.executeStartup(runCtx, e, task, defaults)
 			if failed {
 				startupFailed = true
+				e.startupFailed = true
 			}
 		case "recruit":
 			taskStopped = s.executeSimpleCommand(runCtx, e, task, defaults, "recruit")
@@ -338,6 +341,22 @@ func (s *Service) StartDailyFlow(ctx context.Context, request DailyFlowRequest) 
 
 	s.emitProgress(currentStep, totalSteps, "", "", completionMessage, e.taskResults)
 	s.logger.Info(completionMessage, "scheduleId", scheduleID, "successCount", e.successCount, "failedCount", e.failedCount, "skippedCount", e.skippedCount, "durationSeconds", duration/1000)
+
+	if !wasStopped && s.options.SmartStagesUpdater != nil {
+		go func() {
+			if err := s.options.SmartStagesUpdater.UpdateSmartTrainingStages(); err != nil {
+				s.logger.Error("动态更新智能养成关卡失败", "scheduleId", scheduleID, "error", err.Error())
+			}
+		}()
+	}
+	if !wasStopped && s.options.CompletionNotifier != nil {
+		summaryCopy := summary
+		go func() {
+			if err := s.options.CompletionNotifier(context.Background(), scheduleID, summaryCopy); err != nil {
+				s.logger.Error("发送任务完成通知失败", "scheduleId", scheduleID, "error", err.Error())
+			}
+		}()
+	}
 
 	return DailyFlowResult{
 		Success:    true,
@@ -417,6 +436,11 @@ func (s *Service) runSpec(ctx context.Context, spec CommandSpec, task map[string
 	taskType := stringField(task, "taskType")
 	var result domainrun.DTO
 	if spec.TaskConfig != nil {
+		if _, exists := spec.TaskConfig["address"]; !exists {
+			if address := s.connectionDefaults().Address; address != "" {
+				spec.TaskConfig["address"] = address
+			}
+		}
 		result, err = s.executor.RunTask(ctx, spec.TaskConfig, true)
 	} else {
 		result, err = s.executor.RunCommand(ctx, spec.Command, spec.Args, name, taskType, true)
@@ -603,6 +627,18 @@ func (s *Service) executeStartup(ctx context.Context, e *flowExecution, task map
 		e.recordAction(TaskActionResult{Task: name, Action: "startup", Status: "failed", Message: err.Error()})
 		return false, true
 	}
+	clientType := firstNonEmptyString(params["clientType"], defaults.ClientType)
+	if clientType == "" {
+		clientType = DefaultClientType
+	}
+	if s.options.DeviceProbe != nil {
+		if probeErr := s.options.DeviceProbe.TestConnection(ctx, defaults.ADBPath, defaults.Address); probeErr != nil {
+			message := "模拟器连接失败：" + probeErr.Error()
+			e.recordError(name, probeErr)
+			e.recordAction(TaskActionResult{Task: name, Action: "startup", Status: "failed", Message: message})
+			return false, true
+		}
+	}
 
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
@@ -615,8 +651,26 @@ func (s *Service) executeStartup(ctx context.Context, e *flowExecution, task map
 				return true, false
 			}
 		}
+		if !launchGame && s.options.DeviceProbe != nil {
+			running, foreground, probeErr := s.options.DeviceProbe.GameForeground(ctx, defaults.ADBPath, defaults.Address, clientType)
+			if probeErr != nil || !running {
+				lastErr = fmt.Errorf("启动游戏客户端未勾选，且游戏未在前台运行（当前应用：%s）", firstNonEmptyString(foreground, "未知"))
+				continue
+			}
+		}
 		_, _, _, runErr := s.runSpec(ctx, spec, task)
 		if runErr == nil {
+			if s.options.DeviceProbe != nil {
+				running, foreground, probeErr := s.options.DeviceProbe.GameForeground(ctx, defaults.ADBPath, defaults.Address, clientType)
+				if probeErr != nil || !running {
+					lastErr = fmt.Errorf("游戏未在前台，当前应用：%s", firstNonEmptyString(foreground, "未知"))
+					continue
+				}
+				if probeErr := s.options.DeviceProbe.CaptureScreen(ctx, defaults.ADBPath, defaults.Address); probeErr != nil {
+					lastErr = fmt.Errorf("游戏截图校验失败：%w", probeErr)
+					continue
+				}
+			}
 			accountName := stringField(params, "accountName")
 			message := ""
 			switch {
@@ -651,6 +705,9 @@ func (s *Service) executeStartup(ctx context.Context, e *flowExecution, task map
 
 func (s *Service) executeGeneric(ctx context.Context, e *flowExecution, task map[string]any, defaults ConnectionDefaults, commandID string) bool {
 	name := taskName(task)
+	if commandID == "closedown" && !e.startupFailed && boolField(taskParams(task), "recognizeDepotBeforeClose") {
+		s.recognizeDepotBeforeClose(ctx, defaults)
+	}
 	spec, err := BuildScheduledTaskCommand(task, defaults)
 	if err != nil {
 		e.recordError(name, err)
@@ -692,6 +749,28 @@ func (s *Service) executeGeneric(ctx context.Context, e *flowExecution, task map
 		delay = 3 * time.Second
 	}
 	return !s.delay(ctx, delay)
+}
+
+func (s *Service) recognizeDepotBeforeClose(ctx context.Context, defaults ConnectionDefaults) {
+	if s.options.DepotRecognizer == nil {
+		s.logger.Warn("仓库识别服务未接入，跳过关闭前识别")
+		return
+	}
+	taskConfig := map[string]any{
+		"name":   "仓库识别",
+		"type":   "Depot",
+		"params": map[string]any{"enable": true},
+	}
+	if defaults.ClientType != "" {
+		taskConfig["client_type"] = defaults.ClientType
+	}
+	if _, err := s.executor.RunTask(ctx, taskConfig, true); err != nil {
+		s.logger.Warn("关闭前仓库识别失败", "error", err.Error())
+		return
+	}
+	if err := s.options.DepotRecognizer.RecognizeDepot(ctx); err != nil {
+		s.logger.Warn("关闭前仓库解析失败", "error", err.Error())
+	}
 }
 
 func parseStageEntries(stageInput string) []NormalizedFightStage {
@@ -761,6 +840,7 @@ func (s *Service) stageOpen(stage string) (bool, string) {
 }
 
 func (s *Service) executeFight(ctx context.Context, e *flowExecution, task map[string]any, defaults ConnectionDefaults) bool {
+	task = s.resolveFightStages(task, defaults)
 	spec, err := BuildScheduledTaskCommand(task, defaults)
 	if err != nil {
 		s.fightBuildFailure(e, task, err)
@@ -780,6 +860,39 @@ func (s *Service) executeFight(ctx context.Context, e *flowExecution, task map[s
 		return s.executeSingleStage(ctx, e, task, spec, entries[0])
 	}
 	return s.executeMultiStage(ctx, e, task, spec, entries)
+}
+
+func (s *Service) resolveFightStages(task map[string]any, defaults ConnectionDefaults) map[string]any {
+	if s.options.ResolveStage == nil {
+		return task
+	}
+	params := taskParams(task)
+	clientType := firstNonEmptyString(params["clientType"], params["client_type"], defaults.ClientType)
+	nextParams := copyMap(params)
+	if stage, ok := nextParams["stage"].(string); ok {
+		nextParams["stage"] = s.options.ResolveStage(stage, clientType)
+	}
+	if stages, ok := nextParams["stages"].([]any); ok {
+		resolved := make([]any, 0, len(stages))
+		for _, raw := range stages {
+			switch typed := raw.(type) {
+			case string:
+				resolved = append(resolved, s.options.ResolveStage(typed, clientType))
+			case map[string]any:
+				item := copyMap(typed)
+				if stage, ok := item["stage"].(string); ok {
+					item["stage"] = s.options.ResolveStage(stage, clientType)
+				}
+				resolved = append(resolved, item)
+			default:
+				resolved = append(resolved, raw)
+			}
+		}
+		nextParams["stages"] = resolved
+	}
+	clone := copyMap(task)
+	clone["params"] = nextParams
+	return clone
 }
 
 func (s *Service) fightBuildFailure(e *flowExecution, task map[string]any, err error) {

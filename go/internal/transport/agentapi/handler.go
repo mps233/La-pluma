@@ -5,20 +5,32 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"image"
+	stddraw "image/draw"
+	"image/png"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	xdraw "golang.org/x/image/draw"
 
 	"github.com/mps233/la-pluma/go/internal/app"
 	"github.com/mps233/la-pluma/go/internal/app/activity"
+	runapp "github.com/mps233/la-pluma/go/internal/app/agentrun"
+	appconfig "github.com/mps233/la-pluma/go/internal/app/config"
 	"github.com/mps233/la-pluma/go/internal/app/copilot"
+	maaapp "github.com/mps233/la-pluma/go/internal/app/maa"
 	"github.com/mps233/la-pluma/go/internal/app/mastery"
 	"github.com/mps233/la-pluma/go/internal/app/notifications"
 	"github.com/mps233/la-pluma/go/internal/app/scheduler"
@@ -29,16 +41,29 @@ import (
 	"github.com/mps233/la-pluma/go/internal/domain/agentrun"
 	"github.com/mps233/la-pluma/go/internal/infra/adb"
 	"github.com/mps233/la-pluma/go/internal/transport/httpx"
+	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
-	_ "image/png"
 )
 
 const apiVersion = "2026-07-12"
+
+const (
+	screenFrameMaxWidth = 720
+	screenFrameCacheTTL = 500 * time.Millisecond
+)
 
 type Handler struct {
 	app     *app.App
 	logger  *slog.Logger
 	handler http.Handler
+
+	frameMu    sync.Mutex
+	frameCache map[string]screenFrameCacheEntry
+}
+
+type screenFrameCacheEntry struct {
+	data []byte
+	at   time.Time
 }
 
 func New(application *app.App, logger *slog.Logger) *Handler {
@@ -139,6 +164,8 @@ func New(application *app.App, logger *slog.Logger) *Handler {
 	mux.HandleFunc("GET /logs/files/{filePath...}", handler.readLogFile)
 	mux.HandleFunc("POST /logs/cleanup", handler.cleanupLogs)
 	mux.HandleFunc("GET /device-stats", handler.deviceStats)
+	mux.HandleFunc("GET /clipboard", handler.getClipboard)
+	mux.HandleFunc("POST /clipboard", handler.setClipboard)
 	mux.HandleFunc("GET /paradox/operators", handler.paradoxOperators)
 	mux.HandleFunc("GET /custom-tools", handler.customTools)
 	mux.HandleFunc("POST /actions/run-custom-tool", handler.runCustomTool)
@@ -168,7 +195,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) status(w http.ResponseWriter, r *http.Request) {
-	task := h.app.TaskStatus()
+	connection, err := h.resolveRequestConnectionFor(r, nil)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
 	slim := r.URL.Query().Get("slim")
 	api := map[string]any{
 		"name":     "la-pluma-agent-api",
@@ -176,30 +207,89 @@ func (h *Handler) status(w http.ResponseWriter, r *http.Request) {
 		"manifest": "/api/agent/manifest",
 		"openapi":  "/api/agent/openapi.json",
 	}
-	maa := map[string]any{"version": nil, "task": task}
+	task := h.app.TaskStatus()
+	schedule := h.app.Scheduler.ExecutionStatus()
+	current, hasRun := h.app.CurrentRun()
+	taskPayload := taskStatusPayload(h.app, task, schedule, current, hasRun)
+
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+	var (
+		versionInfo updates.MaaVersionInfo
+		versionErr  error
+		devices     []adb.Device
+		deviceErr   error
+	)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		versionInfo, versionErr = h.app.Updates.GetVersion(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		devices, deviceErr = adb.New(connection.ADBPath).Devices(ctx)
+	}()
+	wg.Wait()
+
+	var maaVersion any
+	if versionErr == nil {
+		maaVersion = versionInfo
+	}
+	connected := false
+	deviceList := make([]any, 0, len(devices))
+	for _, device := range devices {
+		if device.Serial == connection.Address && device.State == "device" {
+			connected = true
+		}
+		deviceList = append(deviceList, map[string]any{"serial": device.Serial, "state": device.State, "model": device.Model})
+	}
+	connectionPayload := map[string]any{
+		"adbPath":    connection.ADBPath,
+		"address":    connection.Address,
+		"clientType": connection.ClientType,
+	}
+	maa := map[string]any{"version": maaVersion, "task": taskPayload}
 	if slim == "true" || slim == "1" {
 		httpx.Success(w, http.StatusOK, map[string]any{
 			"api":        api,
 			"maa":        maa,
-			"connection": map[string]any{"adbPath": nil, "address": nil},
+			"connection": connectionPayload,
 		}, "", nil)
 		return
 	}
+	recommendations := make([]string, 0, 2)
+	if deviceErr != nil || !connected {
+		recommendations = append(recommendations, "模拟器未连接，请检查 ADB 路径与地址")
+	}
+	if versionErr != nil {
+		recommendations = append(recommendations, "无法读取 MAA 版本，请检查 MAA CLI 路径")
+	}
+	preview := h.app.WebRTC.Status()
+	screen := map[string]any{
+		"previewRunning": preview["serverRunning"],
+		"width":          preview["width"],
+		"height":         preview["height"],
+	}
+	if address, ok := preview["address"]; ok {
+		screen["address"] = address
+	}
 	httpx.Success(w, http.StatusOK, map[string]any{
-		"api":        api,
-		"maa":        maa,
-		"device":     map[string]any{"connected": false},
-		"screen":     map[string]any{},
-		"recentLogs": h.app.Logs.Recent(25),
-		"recommendations": []string{
-			"Go backend migration in progress",
-		},
+		"api":             api,
+		"maa":             maa,
+		"connection":      connectionPayload,
+		"device":          map[string]any{"connected": connected, "adbPath": connection.ADBPath, "address": connection.Address, "devices": deviceList},
+		"screen":          screen,
+		"schedule":        schedule,
+		"recentLogs":      h.app.Logs.Recent(parseBoundedInt(r.URL.Query().Get("lines"), 25, 1, 500)),
+		"recommendations": recommendations,
 	}, "", nil)
 }
 
 func (h *Handler) currentRun(w http.ResponseWriter, r *http.Request) {
 	lines := parseBoundedInt(r.URL.Query().Get("lines"), 80, 1, 500)
-	_ = lines
+	task := h.app.TaskStatus()
+	schedule := h.app.Scheduler.ExecutionStatus()
 	current, ok := h.app.CurrentRun()
 	var run any
 	if ok {
@@ -210,15 +300,17 @@ func (h *Handler) currentRun(w http.ResponseWriter, r *http.Request) {
 	if hasLast {
 		lastRun = last
 	}
-	httpx.Success(w, http.StatusOK, map[string]any{
-		"isRunning":  h.app.TaskStatus().IsRunning,
-		"taskName":   h.app.TaskStatus().TaskName,
-		"schedule":   map[string]any{"isRunning": false},
-		"recentLogs": h.app.Logs.Recent(25),
+	data := map[string]any{
+		"isRunning":  task.IsRunning || schedule.IsRunning,
+		"taskName":   runStatusTaskName(task, schedule, current, ok),
+		"task":       taskStatusPayload(h.app, task, schedule, current, ok),
+		"schedule":   schedule,
+		"recentLogs": h.app.Logs.Recent(lines),
 		"run":        run,
 		"lastRun":    lastRun,
 		"lease":      h.app.LeaseSnapshot(),
-	}, "", nil)
+	}
+	httpx.Success(w, http.StatusOK, data, "", nil)
 }
 
 func (h *Handler) getRun(w http.ResponseWriter, r *http.Request) {
@@ -273,7 +365,95 @@ func (h *Handler) stopRun(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) taskStatus(w http.ResponseWriter, r *http.Request) {
-	httpx.Success(w, http.StatusOK, h.app.TaskStatus(), "", nil)
+	task := h.app.TaskStatus()
+	schedule := h.app.Scheduler.ExecutionStatus()
+	current, ok := h.app.CurrentRun()
+	httpx.Success(w, http.StatusOK, taskStatusPayload(h.app, task, schedule, current, ok), "", nil)
+}
+
+func runStatusTaskName(task app.TaskStatus, schedule scheduler.ExecutionStatus, run agentrun.DTO, hasRun bool) string {
+	if schedule.IsRunning && schedule.CurrentTask != nil && *schedule.CurrentTask != "" {
+		return *schedule.CurrentTask
+	}
+	if task.TaskName != "" {
+		return task.TaskName
+	}
+	if hasRun {
+		if record, ok := run.Metadata.(map[string]any); ok {
+			if name, ok := record["taskName"].(string); ok && name != "" {
+				return name
+			}
+		}
+	}
+	return ""
+}
+
+func taskStatusPayload(application *app.App, task app.TaskStatus, schedule scheduler.ExecutionStatus, run agentrun.DTO, hasRun bool) map[string]any {
+	var startTime int64
+	if schedule.StartTime != nil {
+		startTime = *schedule.StartTime
+	} else if hasRun && run.StartedAt != nil {
+		if parsed, err := time.Parse(time.RFC3339, *run.StartedAt); err == nil {
+			startTime = parsed.UnixMilli()
+		}
+	}
+	currentStage := ""
+	if schedule.CurrentTask != nil {
+		currentStage = *schedule.CurrentTask
+	}
+	currentStep := schedule.CurrentStep
+	totalSteps := schedule.TotalSteps
+	if hasRun {
+		if progress, ok := run.Progress.(map[string]any); ok {
+			if currentStage == "" {
+				if value, ok := progress["currentStage"].(string); ok {
+					currentStage = value
+				}
+			}
+			if currentStep <= 0 {
+				if value, ok := progress["currentStep"].(float64); ok {
+					currentStep = int(value)
+				}
+			}
+			if totalSteps <= 0 {
+				if value, ok := progress["totalSteps"].(float64); ok {
+					totalSteps = int(value)
+				}
+			}
+		}
+	}
+	taskType := ""
+	if hasRun {
+		if record, ok := run.Metadata.(map[string]any); ok {
+			if value, ok := record["taskType"].(string); ok {
+				taskType = value
+			}
+		}
+	}
+	stopRequested := schedule.ShouldStop || task.StopRequested
+	if hasRun && run.State == agentrun.StatusStopping {
+		stopRequested = true
+	}
+	data := map[string]any{
+		"isRunning":     task.IsRunning || schedule.IsRunning,
+		"taskName":      runStatusTaskName(task, schedule, run, hasRun),
+		"taskType":      taskType,
+		"startTime":     startTime,
+		"currentStage":  currentStage,
+		"currentStep":   currentStep,
+		"totalSteps":    totalSteps,
+		"stopRequested": stopRequested,
+		"pid":           task.PID,
+		"logs":          application.Logs.Recent(50),
+	}
+	if hasRun {
+		data["runId"] = run.RunID
+		data["operationId"] = run.OperationID
+	}
+	if schedule.ScheduleID != nil {
+		data["scheduleId"] = *schedule.ScheduleID
+	}
+	return data
 }
 
 func (h *Handler) manifest(w http.ResponseWriter, r *http.Request) {
@@ -308,6 +488,7 @@ func parseBoundedInt(raw string, fallback, min, max int) int {
 }
 
 type webrtcStartBody struct {
+	ProfileID     string `json:"profileId"`
 	DeviceID      string `json:"deviceId"`
 	Address       string `json:"address"`
 	ADBPath       string `json:"adbPath"`
@@ -325,9 +506,25 @@ func (h *Handler) webrtcStatus(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) webrtcStart(w http.ResponseWriter, r *http.Request) {
 	var body webrtcStartBody
 	_ = json.NewDecoder(r.Body).Decode(&body)
+	connection, err := h.resolveRequestConnection(map[string]any{
+		"profileId": body.ProfileID,
+		"adbPath":   body.ADBPath,
+		"address":   body.Address,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	request := webrtcStartRequest(body)
+	if request.ADBPath == "" {
+		request.ADBPath = connection.ADBPath
+	}
+	if request.Address == "" {
+		request.Address = connection.Address
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
 	defer cancel()
-	status, err := h.app.WebRTC.Start(ctx, webrtcStartRequest(body))
+	status, err := h.app.WebRTC.Start(ctx, request)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -353,9 +550,14 @@ func (h *Handler) webrtcStop(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) webrtcDevices(w http.ResponseWriter, r *http.Request) {
+	connection, err := h.resolveRequestConnectionFor(r, nil)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	devices, err := h.app.WebRTC.Devices(ctx)
+	devices, err := h.app.WebRTC.DevicesWithConnection(ctx, connection.ADBPath)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -365,9 +567,14 @@ func (h *Handler) webrtcDevices(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) webrtcSnapshot(w http.ResponseWriter, r *http.Request) {
 	deviceID := r.URL.Query().Get("deviceId")
+	connection, err := h.resolveRequestConnectionFor(r, nil)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	snapshot, err := h.app.WebRTC.Snapshot(ctx, deviceID)
+	snapshot, err := h.app.WebRTC.SnapshotWithConnection(ctx, deviceID, connection.ADBPath, connection.Address)
 	if err != nil {
 		httpx.Failure(w, http.StatusNotFound, &httpx.APIError{
 			Code: "WEBRTC_SNAPSHOT_UNAVAILABLE", Message: "无法读取设备快照，请确认设备已连接",
@@ -379,12 +586,18 @@ func (h *Handler) webrtcSnapshot(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) webrtcInstall(w http.ResponseWriter, r *http.Request) {
-	httpx.Success(w, http.StatusOK, map[string]any{
-		"status":     "succeeded",
-		"installed":  true,
-		"startedAt":  time.Now().UTC().Format(time.RFC3339),
-		"finishedAt": time.Now().UTC().Format(time.RFC3339),
-	}, "Pion + scrcpy 组件已内置", nil)
+	status := h.app.WebRTC.Status()
+	installed, _ := status["installed"].(bool)
+	message := "Pion + scrcpy 组件已内置"
+	if !installed {
+		status["status"] = "failed"
+		message = "未找到 scrcpy-server，请设置 LA_PLUMA_SCRCPY_SERVER_PATH"
+	} else {
+		status["status"] = "succeeded"
+	}
+	status["startedAt"] = time.Now().UTC().Format(time.RFC3339)
+	status["finishedAt"] = time.Now().UTC().Format(time.RFC3339)
+	httpx.Success(w, http.StatusOK, status, message, nil)
 }
 
 func webrtcStartRequest(body webrtcStartBody) webrtcapp.StartRequest {
@@ -419,85 +632,691 @@ func decodeBody(r *http.Request) map[string]any {
 	return body
 }
 
-func waitForCompletion(body map[string]any) bool {
-	value, _ := body["waitForCompletion"].(bool)
-	return value
+func parseWaitForCompletion(body map[string]any, defaultValue bool) (bool, error) {
+	value, exists := body["waitForCompletion"]
+	if !exists || value == nil {
+		return defaultValue, nil
+	}
+	flag, ok := value.(bool)
+	if !ok {
+		return false, apperrors.Validation(
+			"AGENT_VALIDATION_WAIT_FOR_COMPLETION_INVALID",
+			"waitForCompletion 必须是布尔值",
+			map[string]any{"receivedType": fmt.Sprintf("%T", value)},
+		)
+	}
+	return flag, nil
+}
+
+// resolveRequestConnectionFor merges query parameters under the JSON body,
+// matching resolveRequestConnection in the Node route.
+func (h *Handler) resolveRequestConnectionFor(r *http.Request, body map[string]any) (appconfig.ResolvedConnection, error) {
+	input := map[string]any{}
+	for key, values := range r.URL.Query() {
+		if len(values) > 0 {
+			input[key] = values[0]
+		}
+	}
+	for key, value := range body {
+		input[key] = value
+	}
+	return h.resolveRequestConnection(input)
+}
+
+func (h *Handler) resolveRequestConnection(body map[string]any) (appconfig.ResolvedConnection, error) {
+	profileID := appconfig.DefaultProfileName
+	if value, ok := body["profileId"].(string); ok && strings.TrimSpace(value) != "" {
+		profileID = strings.TrimSpace(value)
+	}
+	if _, err := appconfig.ValidateProfileName(profileID); err != nil {
+		return appconfig.ResolvedConnection{}, apperrors.Validation(
+			"AGENT_VALIDATION_PROFILE_ID_INVALID",
+			"连接配置名称不合法",
+			map[string]any{"profileId": profileID},
+		)
+	}
+	profile, err := h.app.Profiles.Load(profileID)
+	if err != nil {
+		return appconfig.ResolvedConnection{}, err
+	}
+	overrides := map[string]any{}
+	for _, key := range []string{"adbPath", "address", "clientType"} {
+		if value, ok := body[key]; ok {
+			overrides[key] = value
+		}
+	}
+	return appconfig.ResolveConnection(profile, overrides)
+}
+
+var errTrackedActionStopped = errors.New("tracked action stopped")
+
+func isTrackedStopError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, errTrackedActionStopped) || errors.Is(err, context.Canceled) {
+		return true
+	}
+	if appErr, ok := apperrors.As(err); ok {
+		if appErr.Code == "COPILOT_PLAN_STOPPED" {
+			return true
+		}
+		if stopped, _ := appErr.Details["stopped"].(bool); stopped {
+			return true
+		}
+	}
+	return false
+}
+
+// executeTrackedResult runs a short, synchronous side effect under the shared
+// Agent run lifecycle.
+func (h *Handler) executeTrackedResult(ctx context.Context, operationID string, input, metadata any, idem *string, action func(context.Context) (any, error)) (agentrun.DTO, bool, error) {
+	return h.executeTrackedOperation(ctx, operationID, input, metadata, idem, action)
+}
+
+// executeTrackedOperation wraps a long action in one durable Agent run. MAA
+// commands invoked by the action attach to this run through the context
+// parent, so the stop endpoint and polling see one run id.
+func (h *Handler) executeTrackedOperation(ctx context.Context, operationID string, input, metadata any, idem *string, action func(context.Context) (any, error)) (agentrun.DTO, bool, error) {
+	run, replayed, err := h.app.Runs.Begin(runapp.BeginInput{
+		OperationID:    operationID,
+		IdempotencyKey: idem,
+		Input:          input,
+		Metadata:       metadata,
+	})
+	if err != nil {
+		return agentrun.DTO{}, false, err
+	}
+	if replayed {
+		return run, true, nil
+	}
+	if _, err := h.app.Runs.StartForExecution(run.RunID); err != nil {
+		failed, _ := h.app.Runs.Fail(run.RunID, err)
+		return failed, false, err
+	}
+	actionCtx := runapp.WithParentRun(ctx, run.RunID)
+	result, actionErr := action(actionCtx)
+
+	current, ok := h.app.Runs.Get(run.RunID)
+	if !ok {
+		current = run
+	}
+	if current.State.Terminal() {
+		if current.State == agentrun.StatusStopped {
+			return current, false, nil
+		}
+		return current, false, runFailureError(current)
+	}
+	if actionErr != nil {
+		if isTrackedStopError(actionErr) || current.State == agentrun.StatusStopping {
+			stopped, stopErr := h.app.Runs.Stop(run.RunID, map[string]any{"message": actionErr.Error()})
+			if stopErr != nil {
+				return agentrun.DTO{}, false, stopErr
+			}
+			return stopped, false, nil
+		}
+		failed, _ := h.app.Runs.Fail(run.RunID, actionErr)
+		return failed, false, actionErr
+	}
+	if current.State == agentrun.StatusStopping {
+		stopped, stopErr := h.app.Runs.Stop(run.RunID, result)
+		if stopErr != nil {
+			return agentrun.DTO{}, false, stopErr
+		}
+		return stopped, false, nil
+	}
+	completed, err := h.app.Runs.Complete(run.RunID, result)
+	if err != nil {
+		return agentrun.DTO{}, false, err
+	}
+	return completed, false, nil
+}
+
+func runFailureError(run agentrun.DTO) error {
+	if run.Error != nil {
+		return apperrors.WithStatus(run.Error.Code, run.Error.Message, run.Error.StatusCode, run.Error.Retryable, run.Error.Details)
+	}
+	return apperrors.New("AGENT_RUN_FAILED", "Agent run 执行失败")
+}
+
+type fightStage struct {
+	Stage string
+	Times string
+}
+
+func normalizeFightStages(body map[string]any) []fightStage {
+	raw := []any{}
+	fallback := []any{map[string]any{"stage": body["stage"], "times": body["times"]}}
+	if value, ok := body["stages"]; ok && value != nil {
+		if array, ok := value.([]any); ok {
+			raw = array
+		} else {
+			raw = fallback
+		}
+	} else {
+		raw = fallback
+	}
+	stages := make([]fightStage, 0, len(raw))
+	for _, item := range raw {
+		switch typed := item.(type) {
+		case string:
+			stage := strings.TrimSpace(typed)
+			if stage != "" {
+				stages = append(stages, fightStage{Stage: stage})
+			}
+		case map[string]any:
+			stage, _ := typed["stage"].(string)
+			stage = strings.TrimSpace(stage)
+			if stage == "" {
+				continue
+			}
+			times := ""
+			if value, ok := typed["times"]; ok && value != nil {
+				times = scalarText(value)
+			}
+			stages = append(stages, fightStage{Stage: stage, Times: times})
+		}
+	}
+	return stages
+}
+
+func scalarText(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case float64:
+		return strconv.FormatFloat(typed, 'f', -1, 64)
+	case json.Number:
+		return typed.String()
+	default:
+		return fmt.Sprint(value)
+	}
+}
+
+func numberValue(value any) (float64, bool) {
+	switch typed := value.(type) {
+	case float64:
+		return typed, true
+	case float32:
+		return float64(typed), true
+	case int:
+		return float64(typed), true
+	case int64:
+		return float64(typed), true
+	case json.Number:
+		parsed, err := typed.Float64()
+		return parsed, err == nil
+	case string:
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(typed), 64)
+		return parsed, err == nil
+	}
+	return 0, false
+}
+
+var activityStageAliasPattern = regexp.MustCompile(`(?i)^hd-(\d+)$`)
+
+func (h *Handler) replaceActivityStage(stage, clientType string) string {
+	match := activityStageAliasPattern.FindStringSubmatch(strings.TrimSpace(stage))
+	if len(match) != 2 {
+		return stage
+	}
+	info, err := h.app.Activity.GetStageActivityInfo(context.Background(), clientType, time.Now())
+	if err != nil || info == nil || strings.TrimSpace(info.Code) == "" {
+		return stage
+	}
+	return strings.TrimSpace(info.Code) + "-" + match[1]
+}
+
+var agentTaskCommandList = []string{
+	"startup", "closedown", "fight", "infrast", "recruit", "mall", "award",
+	"copilot", "ssscopilot", "paradoxcopilot", "roguelike", "reclamation",
+	"depot", "operbox", "activity", "run", "list",
+}
+
+var agentTaskCommandSet = stringSet(agentTaskCommandList)
+
+var agentQueryCommandSet = stringSet([]string{"activity", "list"})
+
+func stringSet(values []string) map[string]struct{} {
+	result := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		result[value] = struct{}{}
+	}
+	return result
+}
+
+func normalizeTaskArgs(value any) ([]string, error) {
+	if value == nil {
+		return nil, nil
+	}
+	array, ok := value.([]any)
+	if !ok {
+		return nil, apperrors.Validation(
+			"AGENT_VALIDATION_ARGS_INVALID",
+			"args 必须是数组",
+			map[string]any{"receivedType": fmt.Sprintf("%T", value)},
+		)
+	}
+	args := make([]string, 0, len(array))
+	for _, item := range array {
+		args = append(args, scalarText(item))
+	}
+	return args, nil
+}
+
+var fightDropIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+func normalizeFightDrops(value any) (map[string]any, error) {
+	if value == nil || value == "" {
+		return nil, nil
+	}
+	result := map[string]any{}
+	if record, ok := value.(map[string]any); ok {
+		for itemID, rawCount := range record {
+			count, valid := numberValue(rawCount)
+			if !fightDropIDPattern.MatchString(itemID) || !valid || count <= 0 {
+				return nil, apperrors.Validation("AGENT_VALIDATION_DROPS_INVALID", "掉落目标格式应为物品 ID=数量，多个目标用逗号分隔", nil)
+			}
+			result[itemID] = count
+		}
+		if len(result) == 0 {
+			return nil, nil
+		}
+		return result, nil
+	}
+	text, ok := value.(string)
+	if !ok {
+		return nil, apperrors.Validation("AGENT_VALIDATION_DROPS_INVALID", "掉落目标格式应为物品 ID=数量，多个目标用逗号分隔", nil)
+	}
+	for _, entry := range strings.Split(text, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		parts := strings.SplitN(entry, "=", 2)
+		if len(parts) != 2 {
+			return nil, apperrors.Validation("AGENT_VALIDATION_DROPS_INVALID", "掉落目标格式应为物品 ID=数量，多个目标用逗号分隔", nil)
+		}
+		itemID := strings.TrimSpace(parts[0])
+		count, valid := numberValue(strings.TrimSpace(parts[1]))
+		if !fightDropIDPattern.MatchString(itemID) || !valid || count <= 0 {
+			return nil, apperrors.Validation("AGENT_VALIDATION_DROPS_INVALID", "掉落目标格式应为物品 ID=数量，多个目标用逗号分隔", nil)
+		}
+		result[itemID] = count
+	}
+	if len(result) == 0 {
+		return nil, nil
+	}
+	return result, nil
+}
+
+func buildDynamicFightTask(body map[string]any, stages []fightStage, connection appconfig.ResolvedConnection) (map[string]any, error) {
+	common := map[string]any{}
+	for _, mapping := range []struct{ from, to string }{
+		{"medicine", "medicine"},
+		{"medicineExpireDays", "medicine_expire_days"},
+		{"expiringMedicine", "expiring_medicine"},
+		{"stone", "stone"},
+		{"series", "series"},
+	} {
+		raw, exists := body[mapping.from]
+		if !exists || raw == nil || raw == "" {
+			continue
+		}
+		if number, ok := numberValue(raw); ok {
+			common[mapping.to] = number
+		}
+	}
+	drops, err := normalizeFightDrops(body["drops"])
+	if err != nil {
+		return nil, err
+	}
+	if drops != nil {
+		common["drops"] = drops
+	}
+	if server, ok := body["server"].(string); ok && strings.TrimSpace(server) != "" {
+		common["server"] = strings.TrimSpace(server)
+	}
+	for _, mapping := range []struct{ from, to string }{
+		{"DrGrandet", "DrGrandet"},
+		{"reportToPenguin", "report_to_penguin"},
+		{"reportToYituliu", "report_to_yituliu"},
+	} {
+		if value, ok := body[mapping.from].(bool); ok {
+			common[mapping.to] = value
+		}
+	}
+	for _, mapping := range []struct{ from, to string }{
+		{"penguinId", "penguin_id"},
+		{"yituliuId", "yituliu_id"},
+	} {
+		if value, ok := body[mapping.from].(string); ok && strings.TrimSpace(value) != "" {
+			common[mapping.to] = strings.TrimSpace(value)
+		}
+	}
+
+	tasks := make([]any, 0, len(stages))
+	for _, stage := range stages {
+		params := map[string]any{"stage": stage.Stage}
+		for key, value := range common {
+			params[key] = value
+		}
+		if stage.Times != "" {
+			if number, ok := numberValue(stage.Times); ok {
+				params["times"] = number
+			}
+		}
+		tasks = append(tasks, map[string]any{
+			"name":   "Agent: 理智作战 (" + stage.Stage + ")",
+			"type":   "Fight",
+			"params": params,
+		})
+	}
+	task := map[string]any{
+		"name":  "Agent: 理智作战",
+		"type":  "Fight",
+		"tasks": tasks,
+	}
+	if connection.ClientType != "" {
+		task["client_type"] = connection.ClientType
+	}
+	return task, nil
+}
+
+func buildFightPlan(body map[string]any, stages []fightStage, taskConfig map[string]any, connection appconfig.ResolvedConnection) map[string]any {
+	semanticStages := make([]any, 0, len(stages))
+	for _, stage := range stages {
+		semanticStages = append(semanticStages, map[string]any{"stage": stage.Stage, "times": stage.Times})
+	}
+	semantic := map[string]any{
+		"stages":     semanticStages,
+		"medicine":   body["medicine"],
+		"stone":      body["stone"],
+		"series":     body["series"],
+		"drops":      body["drops"],
+		"clientType": connection.ClientType,
+		"server":     body["server"],
+	}
+	if value, ok := body["medicineExpireDays"]; ok {
+		semantic["medicineExpireDays"] = value
+	}
+	if value, ok := body["expiringMedicine"]; ok {
+		semantic["expiringMedicine"] = value
+	}
+	return map[string]any{
+		"command":    "run",
+		"taskConfig": taskConfig,
+		"semantic":   semantic,
+	}
+}
+
+func structMap(value any) map[string]any {
+	if record, ok := value.(map[string]any); ok {
+		return record
+	}
+	data, err := json.Marshal(value)
+	if err != nil {
+		return map[string]any{}
+	}
+	var record map[string]any
+	if err := json.Unmarshal(data, &record); err != nil {
+		return map[string]any{}
+	}
+	return record
 }
 
 func (h *Handler) startGame(w http.ResponseWriter, r *http.Request) {
 	body := decodeBody(r)
-	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
-	defer cancel()
-	run, replayed, err := h.app.MAAServiceService().StartGame(ctx, waitForCompletion(body), idempotencyKey(r))
+	wait, err := parseWaitForCompletion(body, true)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	sendRunResponse(w, run, replayed, !waitForCompletion(body), map[string]any{"action": "start-game"})
+	connection, err := h.resolveRequestConnection(body)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	accountName := stringField(body, "accountName")
+	startGameEnabled := true
+	if value, ok := body["startGameEnabled"].(bool); ok {
+		startGameEnabled = value
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	defer cancel()
+	run, replayed, err := h.app.MAAServiceService().StartGameWithOptions(ctx, maaapp.StartGameOptions{
+		ClientType:       connection.ClientType,
+		Address:          connection.Address,
+		AccountName:      accountName,
+		StartGameEnabled: startGameEnabled,
+		Wait:             wait,
+		IdempotencyKey:   idempotencyKey(r),
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	sendRunResponse(w, run, replayed, !wait, map[string]any{
+		"action":           "start-game",
+		"clientType":       connection.ClientType,
+		"address":          connection.Address,
+		"accountName":      accountName,
+		"startGameEnabled": startGameEnabled,
+	})
 }
 
 func (h *Handler) runTask(w http.ResponseWriter, r *http.Request) {
 	body := decodeBody(r)
-	taskConfig, ok := body["taskConfig"]
-	if !ok {
-		taskConfig = body
-	}
-	if text, ok := taskConfig.(string); ok {
-		var parsed any
-		if err := json.Unmarshal([]byte(text), &parsed); err == nil {
-			taskConfig = parsed
-		}
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
-	defer cancel()
-	run, replayed, err := h.app.MAAServiceService().RunTask(ctx, taskConfig, waitForCompletion(body), idempotencyKey(r))
+	wait, err := parseWaitForCompletion(body, true)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	sendRunResponse(w, run, replayed, !waitForCompletion(body), nil)
+	connection, err := h.resolveRequestConnection(body)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	taskConfig, hasTaskConfig := body["taskConfig"]
+	if hasTaskConfig && taskConfig != nil {
+		if text, ok := taskConfig.(string); ok {
+			var parsed any
+			if err := json.Unmarshal([]byte(text), &parsed); err == nil {
+				taskConfig = parsed
+			}
+		}
+		if record, ok := taskConfig.(map[string]any); ok {
+			if _, exists := record["client_type"]; !exists {
+				record["client_type"] = connection.ClientType
+			}
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+		defer cancel()
+		run, replayed, err := h.app.MAAServiceService().RunTaskWithOptions(ctx, taskConfig, wait, idempotencyKey(r), maaapp.RunTaskOptions{
+			Address: connection.Address,
+		})
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		sendRunResponse(w, run, replayed, !wait, nil)
+		return
+	}
+
+	command := strings.TrimSpace(stringField(body, "command"))
+	if _, allowed := agentTaskCommandSet[command]; !allowed {
+		httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{
+			Code:      "AGENT_VALIDATION_COMMAND_NOT_ALLOWED",
+			Message:   "不允许的 command: " + command,
+			Retryable: false,
+			Details:   map[string]any{"command": command, "allowed": agentTaskCommandList},
+		})
+		return
+	}
+	args, err := normalizeTaskArgs(body["args"])
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if _, query := agentQueryCommandSet[command]; query {
+		wait = true
+	}
+	taskName := stringField(body, "taskName")
+	if taskName == "" {
+		taskName = "Agent: " + command
+	}
+	taskType := stringField(body, "taskType")
+	if taskType == "" {
+		taskType = "agent"
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	defer cancel()
+	run, replayed, err := h.app.MAAServiceService().Run(ctx, maaapp.RunRequest{
+		OperationID:    "run_task",
+		Command:        command,
+		Args:           args,
+		TaskName:       taskName,
+		TaskType:       taskType,
+		Wait:           wait,
+		Input:          body,
+		Metadata:       map[string]any{"taskName": taskName, "taskType": taskType},
+		IdempotencyKey: idempotencyKey(r),
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	sendRunResponse(w, run, replayed, !wait, nil)
 }
 
 func (h *Handler) fight(w http.ResponseWriter, r *http.Request) {
 	body := decodeBody(r)
-	stage, _ := body["stage"].(string)
-	if strings.TrimSpace(stage) == "" {
-		httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{Code: "AGENT_VALIDATION_STAGE_REQUIRED", Message: "请提供作战关卡", Retryable: false})
-		return
-	}
-	params := map[string]any{"stage": stage}
-	if times, ok := body["times"]; ok {
-		params["times"] = times
-	}
-	if drops, ok := body["drop"]; ok {
-		params["drop"] = drops
-	}
-	taskConfig := map[string]any{
-		"name":   "作战",
-		"type":   "Fight",
-		"params": params,
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
-	defer cancel()
-	run, replayed, err := h.app.MAAServiceService().RunTask(ctx, taskConfig, waitForCompletion(body), idempotencyKey(r))
+	wait, err := parseWaitForCompletion(body, true)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	sendRunResponse(w, run, replayed, !waitForCompletion(body), map[string]any{"stage": stage})
-}
-
-func (h *Handler) stopActions(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-	defer cancel()
-	if err := h.app.MAAServiceService().Stop(ctx); err != nil {
+	connection, err := h.resolveRequestConnection(body)
+	if err != nil {
 		writeError(w, err)
 		return
 	}
-	httpx.Success(w, http.StatusOK, map[string]any{"stopped": true}, "任务已停止", nil)
+	stages := normalizeFightStages(body)
+	for index := range stages {
+		stages[index].Stage = h.replaceActivityStage(stages[index].Stage, connection.ClientType)
+	}
+	if len(stages) == 0 {
+		httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{
+			Code:      "AGENT_VALIDATION_MISSING_STAGES",
+			Message:   "至少需要一个有效关卡",
+			Retryable: false,
+			Details:   map[string]any{"fightOptions": body},
+		})
+		return
+	}
+	taskConfig, err := buildDynamicFightTask(body, stages, connection)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	plan := buildFightPlan(body, stages, taskConfig, connection)
+	if dryRun, _ := body["dryRun"].(bool); dryRun {
+		httpx.Success(w, http.StatusOK, map[string]any{"plan": plan}, "Dry run only", map[string]any{"dryRun": true})
+		return
+	}
+	effectiveWait := wait
+	if len(stages) > 1 {
+		effectiveWait = true
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	defer cancel()
+	run, replayed, err := h.app.MAAServiceService().RunTaskWithOptions(ctx, taskConfig, effectiveWait, idempotencyKey(r), maaapp.RunTaskOptions{
+		Address: connection.Address,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	sendRunResponse(w, run, replayed, !effectiveWait, map[string]any{"plan": plan})
+}
+
+func (h *Handler) stopActions(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+
+	requestedRunID := strings.TrimSpace(stringField(body, "runId"))
+	if requestedRunID != "" {
+		requested, ok := h.app.Runs.Get(requestedRunID)
+		if !ok {
+			writeError(w, apperrors.WithStatus("AGENT_RUN_NOT_FOUND", "未找到 Agent run: "+requestedRunID, http.StatusNotFound, false, map[string]any{"runId": requestedRunID}))
+			return
+		}
+		if requested.State.Terminal() {
+			httpx.Success(w, http.StatusOK, map[string]any{"stopped": false, "alreadyTerminal": true, "run": requested}, "任务已经结束", nil)
+			return
+		}
+		if requested.State == agentrun.StatusWaiting {
+			if stopped, ok := h.app.Copilot.Manual().StopManualSetRun(requestedRunID); ok {
+				updated, stopErr := h.app.Runs.Stop(requestedRunID, stopped)
+				if stopErr != nil {
+					writeError(w, stopErr)
+					return
+				}
+				httpx.Success(w, http.StatusOK, map[string]any{"stopped": true, "run": updated}, "手动作业集已停止", nil)
+				return
+			}
+		}
+		if requested.State == agentrun.StatusAccepted {
+			writeError(w, apperrors.WithStatus("AGENT_RUN_NOT_STARTED", "目标 run 尚未获得执行权，未发送终止命令", http.StatusConflict, true, map[string]any{"requestedRunId": requestedRunID, "state": requested.State}))
+			return
+		}
+		current, hasCurrent := h.app.Runs.Current()
+		if !hasCurrent || current.RunID != requestedRunID {
+			details := map[string]any{"requestedRunId": requestedRunID}
+			if hasCurrent {
+				details["currentRunId"] = current.RunID
+			}
+			writeError(w, apperrors.WithStatus("AGENT_RUN_NOT_CURRENT", "目标 run 不是当前执行，未发送终止命令", http.StatusConflict, false, details))
+			return
+		}
+	}
+
+	outcome := h.app.MAAServiceService().StopCurrent(ctx)
+	scheduleStopped := h.app.Scheduler.Stop(ctx)
+	stopRequested := outcome.Success || scheduleStopped
+
+	var run any
+	if requestedRunID != "" {
+		if requested, ok := h.app.Runs.Get(requestedRunID); ok {
+			run = requested
+		}
+	} else if current, ok := h.app.Runs.Current(); ok {
+		run = current
+	}
+
+	data := map[string]any{
+		"task":            map[string]any{"success": outcome.Success, "message": outcome.Message},
+		"scheduleStopped": scheduleStopped,
+		"stopRequested":   stopRequested,
+		"run":             run,
+	}
+	message := "当前没有可终止的任务"
+	if stopRequested {
+		message = "已发送终止请求"
+	}
+	httpx.Success(w, http.StatusOK, data, message, nil)
 }
 
 func sendRunResponse(w http.ResponseWriter, run agentrun.DTO, replayed bool, accepted bool, extra map[string]any) {
+	message := "操作成功"
+	if accepted {
+		message = "任务已接受"
+	}
+	sendRunResponseMessage(w, run, replayed, accepted, extra, message)
+}
+
+func sendRunResponseMessage(w http.ResponseWriter, run agentrun.DTO, replayed bool, accepted bool, extra map[string]any, message string) {
 	w.Header().Set("X-La-Pluma-Run-Id", run.RunID)
 	w.Header().Set("Idempotency-Replayed", strconv.FormatBool(replayed))
 	data := map[string]any{
@@ -511,12 +1330,44 @@ func sendRunResponse(w http.ResponseWriter, run agentrun.DTO, replayed bool, acc
 		data[key] = value
 	}
 	status := http.StatusOK
-	message := "操作成功"
 	if accepted {
 		status = http.StatusAccepted
-		message = "任务已接受"
 	}
 	httpx.Success(w, status, data, message, map[string]any{"runId": run.RunID, "idempotentReplay": replayed})
+}
+
+func sendTrackedRunResponse(w http.ResponseWriter, run agentrun.DTO, replayed bool, message string) {
+	if run.State == agentrun.StatusFailed || run.State == agentrun.StatusInterrupted {
+		sendRunFailureResponse(w, run)
+		return
+	}
+	if run.State == agentrun.StatusStopped {
+		message = "任务已终止"
+	}
+	sendRunResponseMessage(w, run, replayed, false, structMap(run.Result), message)
+}
+
+func sendRunFailureResponse(w http.ResponseWriter, run agentrun.DTO) {
+	code := "AGENT_RUN_FAILED"
+	message := "Agent run 执行失败"
+	status := http.StatusInternalServerError
+	retryable := false
+	details := map[string]any{}
+	if run.Error != nil {
+		code = firstNonEmpty(run.Error.Code, code)
+		message = firstNonEmpty(run.Error.Message, message)
+		if run.Error.StatusCode > 0 {
+			status = run.Error.StatusCode
+		}
+		retryable = run.Error.Retryable
+		for key, value := range run.Error.Details {
+			details[key] = value
+		}
+	}
+	details["runId"] = run.RunID
+	details["run"] = run
+	w.Header().Set("X-La-Pluma-Run-Id", run.RunID)
+	httpx.Failure(w, status, &httpx.APIError{Code: code, Message: message, Retryable: retryable, Details: details})
 }
 
 func (h *Handler) recentLogs(w http.ResponseWriter, r *http.Request) {
@@ -648,24 +1499,83 @@ func (h *Handler) dropsStatistics(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) screenFrame(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
-	defer cancel()
-	image, err := h.app.WebRTC.Screenshot(ctx)
+	connection, err := h.resolveRequestConnectionFor(r, nil)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	key := connection.ADBPath + "\x00" + connection.Address
+	frame, err := h.cachedScreenFrame(key, func() ([]byte, error) {
+		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+		defer cancel()
+		return h.app.WebRTC.ScreenshotWithConnection(ctx, connection.ADBPath, connection.Address)
+	})
 	if err != nil {
 		writeError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "image/png")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Content-Length", strconv.Itoa(len(image)))
+	w.Header().Set("Content-Length", strconv.Itoa(len(frame)))
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(image)
+	_, _ = w.Write(frame)
+}
+
+func (h *Handler) cachedScreenFrame(key string, capture func() ([]byte, error)) ([]byte, error) {
+	h.frameMu.Lock()
+	entry, ok := h.frameCache[key]
+	h.frameMu.Unlock()
+	if ok && time.Since(entry.at) < screenFrameCacheTTL {
+		return entry.data, nil
+	}
+	data, err := capture()
+	if err != nil {
+		return nil, err
+	}
+	data = downscalePNG(data, screenFrameMaxWidth)
+	h.frameMu.Lock()
+	if h.frameCache == nil {
+		h.frameCache = map[string]screenFrameCacheEntry{}
+	}
+	h.frameCache[key] = screenFrameCacheEntry{data: data, at: time.Now()}
+	h.frameMu.Unlock()
+	return data, nil
+}
+
+// downscalePNG keeps the dashboard fallback near 720px wide. It returns the
+// original bytes for small frames or unsupported payloads.
+func downscalePNG(data []byte, maxWidth int) []byte {
+	source, err := png.Decode(bytes.NewReader(data))
+	if err != nil {
+		return data
+	}
+	bounds := source.Bounds()
+	if bounds.Dx() <= maxWidth || maxWidth <= 0 {
+		return data
+	}
+	height := bounds.Dy() * maxWidth / bounds.Dx()
+	if height < 1 {
+		height = 1
+	}
+	target := image.NewRGBA(image.Rect(0, 0, maxWidth, height))
+	xdraw.ApproxBiLinear.Scale(target, target.Bounds(), source, bounds, stddraw.Src, nil)
+	var buffer bytes.Buffer
+	if err := png.Encode(&buffer, target); err != nil {
+		return data
+	}
+	return buffer.Bytes()
 }
 
 func (h *Handler) screenScreenshot(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	connection, err := h.resolveRequestConnectionFor(r, body)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	image, err := h.app.WebRTC.Screenshot(ctx)
+	image, err := h.app.WebRTC.ScreenshotWithConnection(ctx, connection.ADBPath, connection.Address)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -852,6 +1762,9 @@ func (h *Handler) saveNotificationConfig(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	h.app.Notifications.SetConfig(config)
+	if err := h.app.ConfigureTelegramBot(r.Context(), config); err != nil {
+		h.logger.Warn("Telegram Bot 重载失败", "error", err)
+	}
 	httpx.Success(w, http.StatusOK, nil, "通知配置已保存", nil)
 }
 
@@ -907,7 +1820,7 @@ func (h *Handler) sendNotification(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) openStages(w http.ResponseWriter, r *http.Request) {
 	clientType := firstNonEmpty(r.URL.Query().Get("clientType"), "Official")
-	value := h.app.Training.TodayOpenStages(clientType, false)
+	value := h.app.Training.TodayOpenStages(clientType, h.app.Training.ResourceCollectionOpen(clientType))
 	httpx.Success(w, http.StatusOK, value, "已获取今日开放日常关卡", nil)
 }
 
@@ -968,20 +1881,75 @@ func (h *Handler) stopSchedule(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, http.StatusOK, result, result.Message, nil)
 }
 
+func dailyFlowError(result scheduler.DailyFlowResult, fallbackCode string) error {
+	code := fallbackCode
+	status := http.StatusBadRequest
+	retryable := false
+	if result.Busy {
+		code = "AGENT_SCHEDULE_ALREADY_RUNNING"
+		status = http.StatusConflict
+		retryable = true
+	}
+	return apperrors.WithStatus(code, firstNonEmpty(result.Message, "任务流程执行失败"), status, retryable, map[string]any{
+		"scheduleId": result.ScheduleID,
+		"owner":      result.Owner,
+	})
+}
+
+func (h *Handler) resolveAutomationTaskFlow(requested any) (any, error) {
+	if requested != nil {
+		if _, ok := requested.([]any); !ok {
+			return nil, apperrors.Validation("AGENT_VALIDATION_TASK_FLOW_INVALID", "任务流程格式无效", nil)
+		}
+		return requested, nil
+	}
+	value, err := h.app.ConfigStore.Load("automation-tasks")
+	if err != nil {
+		return nil, err
+	}
+	if flow, ok := value["taskFlow"]; ok && flow != nil {
+		return flow, nil
+	}
+	return nil, apperrors.Validation("AGENT_VALIDATION_EMPTY_TASK_FLOW", "没有可执行的自动化任务", nil)
+}
+
 func (h *Handler) executeSchedule(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		TaskFlow any `json:"taskFlow"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
-	result := h.app.Scheduler.StartDailyFlow(r.Context(), scheduler.DailyFlowRequest{
-		ScheduleID: r.PathValue("scheduleId"),
-		TaskFlow:   body.TaskFlow,
-	})
-	if !result.Success {
-		httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{Code: "AGENT_SCHEDULE_EXECUTE_FAILED", Message: result.Message, Retryable: false})
+	if _, ok := body.TaskFlow.([]any); !ok {
+		writeError(w, apperrors.Validation("AGENT_VALIDATION_TASK_FLOW_INVALID", "任务流程格式无效", nil))
 		return
 	}
-	httpx.Success(w, http.StatusOK, result, result.Message, nil)
+	scheduleID := r.PathValue("scheduleId")
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Hour)
+	defer cancel()
+	run, replayed, err := h.executeTrackedOperation(ctx, "execute_schedule", map[string]any{
+		"scheduleId": scheduleID,
+		"taskFlow":   body.TaskFlow,
+	}, map[string]any{"taskName": "定时任务 " + scheduleID, "taskType": "schedule"}, idempotencyKey(r), func(actionCtx context.Context) (any, error) {
+		result := h.app.Scheduler.StartDailyFlow(actionCtx, scheduler.DailyFlowRequest{
+			ScheduleID: scheduleID,
+			TaskFlow:   body.TaskFlow,
+		})
+		if !result.Success {
+			return nil, dailyFlowError(result, "AGENT_SCHEDULE_EXECUTE_FAILED")
+		}
+		if result.Stopped {
+			return nil, errTrackedActionStopped
+		}
+		return structMap(result), nil
+	})
+	if err != nil {
+		if run.State == agentrun.StatusFailed || run.State == agentrun.StatusInterrupted {
+			sendRunFailureResponse(w, run)
+			return
+		}
+		writeError(w, err)
+		return
+	}
+	sendTrackedRunResponse(w, run, replayed, "定时任务执行完成")
 }
 
 func (h *Handler) runDailyFlow(w http.ResponseWriter, r *http.Request) {
@@ -991,22 +1959,61 @@ func (h *Handler) runDailyFlow(w http.ResponseWriter, r *http.Request) {
 		DryRun     bool   `json:"dryRun"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
-	result := h.app.Scheduler.StartDailyFlow(r.Context(), scheduler.DailyFlowRequest{
-		ScheduleID: body.ScheduleID,
-		TaskFlow:   body.TaskFlow,
-		DryRun:     body.DryRun,
-	})
-	if !result.Success {
-		httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{Code: "AGENT_DAILY_FLOW_FAILED", Message: result.Message, Retryable: false})
+	scheduleID := strings.TrimSpace(body.ScheduleID)
+	if scheduleID == "" {
+		scheduleID = "default"
+	}
+	taskFlow, err := h.resolveAutomationTaskFlow(body.TaskFlow)
+	if err != nil {
+		writeError(w, err)
 		return
 	}
-	httpx.Success(w, http.StatusOK, result, result.Message, nil)
+	if body.DryRun {
+		result := h.app.Scheduler.StartDailyFlow(r.Context(), scheduler.DailyFlowRequest{
+			ScheduleID: scheduleID,
+			TaskFlow:   taskFlow,
+			DryRun:     true,
+		})
+		if !result.Success {
+			httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{Code: "AGENT_DAILY_FLOW_FAILED", Message: result.Message, Retryable: false})
+			return
+		}
+		httpx.Success(w, http.StatusOK, result, result.Message, map[string]any{"dryRun": true})
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Hour)
+	defer cancel()
+	run, replayed, err := h.executeTrackedOperation(ctx, "run_daily_flow", map[string]any{
+		"scheduleId": scheduleID,
+		"taskFlow":   taskFlow,
+	}, map[string]any{"taskName": "今日流程 " + scheduleID, "taskType": "schedule"}, idempotencyKey(r), func(actionCtx context.Context) (any, error) {
+		result := h.app.Scheduler.StartDailyFlow(actionCtx, scheduler.DailyFlowRequest{
+			ScheduleID: scheduleID,
+			TaskFlow:   taskFlow,
+		})
+		if !result.Success {
+			return nil, dailyFlowError(result, "AGENT_DAILY_FLOW_REJECTED")
+		}
+		if result.Stopped {
+			return nil, errTrackedActionStopped
+		}
+		return structMap(result), nil
+	})
+	if err != nil {
+		if run.State == agentrun.StatusFailed || run.State == agentrun.StatusInterrupted {
+			sendRunFailureResponse(w, run)
+			return
+		}
+		writeError(w, err)
+		return
+	}
+	sendTrackedRunResponse(w, run, replayed, "今日流程执行完成")
 }
 
 func (h *Handler) getCopilot(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	value, err := h.app.Copilot.PRTS().GetCopilot(ctx, r.PathValue("id"))
+	value, err := h.app.Copilot.PRTS().GetCopilotRaw(ctx, r.PathValue("id"))
 	if err != nil {
 		writeError(w, err)
 		return
@@ -1017,7 +2024,7 @@ func (h *Handler) getCopilot(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getCopilotSet(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	value, err := h.app.Copilot.PRTS().GetSet(ctx, r.PathValue("id"))
+	value, err := h.app.Copilot.PRTS().GetSetRaw(ctx, r.PathValue("id"))
 	if err != nil {
 		writeError(w, err)
 		return
@@ -1045,20 +2052,104 @@ func (h *Handler) resetCopilotProgress(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, http.StatusOK, map[string]any{"reset": true}, "进度已重置", nil)
 }
 
+var copilotTitleStagePattern = regexp.MustCompile(`^([A-Z]{2,4}-\d+[A-Z]?)`)
+
+func (h *Handler) resolveStageSearchKeyword(stage string) string {
+	record, ok, err := h.app.Copilot.Resource().StageByCode(stage)
+	if err != nil || !ok {
+		return stage
+	}
+	stageID, _ := record["stageId"].(string)
+	stageID = strings.ReplaceAll(stageID, "#f#", "")
+	stageID = strings.ReplaceAll(stageID, "#n#", "")
+	if strings.TrimSpace(stageID) == "" {
+		return stage
+	}
+	return stageID
+}
+
+func parseCopilotSearchItem(item any) map[string]any {
+	record, _ := item.(map[string]any)
+	if record == nil {
+		return nil
+	}
+	title := "无标题"
+	stageName := ""
+	if doc, ok := record["doc"].(map[string]any); ok {
+		if value, ok := doc["title"].(string); ok && value != "" {
+			title = value
+		}
+	}
+	if contentText, ok := record["content"].(string); ok && contentText != "" {
+		var content map[string]any
+		if json.Unmarshal([]byte(contentText), &content) == nil {
+			if doc, ok := content["doc"].(map[string]any); ok {
+				if value, ok := doc["title"].(string); ok && value != "" {
+					title = value
+				}
+			}
+			if value, ok := content["stage_name"].(string); ok {
+				stageName = value
+			}
+		}
+	}
+	id := record["id"]
+	return map[string]any{
+		"id":        id,
+		"uri":       "prts://" + fmt.Sprint(id),
+		"views":     record["views"],
+		"hotScore":  record["hot_score"],
+		"uploader":  record["uploader_id"],
+		"title":     title,
+		"stageName": stageName,
+	}
+}
+
 func (h *Handler) searchCopilots(w http.ResponseWriter, r *http.Request) {
 	stage := strings.TrimSpace(r.URL.Query().Get("stage"))
 	if stage == "" {
 		httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{Code: "AGENT_VALIDATION_STAGE_REQUIRED", Message: "缺少 stage 参数", Retryable: false})
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	value, err := h.app.Copilot.PRTS().QueryCopilots(ctx, stage, 1, 20, "hot")
-	if err != nil {
-		writeError(w, err)
+	searchKeyword := h.resolveStageSearchKeyword(stage)
+	normalizedStage := strings.ToUpper(stage)
+	normalizedKeyword := strings.ToUpper(searchKeyword)
+	copilots := make([]map[string]any, 0, 10)
+	for page := 1; page <= 5 && len(copilots) < 10; page++ {
+		items, err := h.app.Copilot.PRTS().QueryCopilots(ctx, searchKeyword, page, 50, "hot")
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		if len(items) == 0 {
+			break
+		}
+		for _, item := range items {
+			parsed := parseCopilotSearchItem(item)
+			if parsed == nil {
+				continue
+			}
+			stageName := strings.ToUpper(strings.TrimSpace(stringField(parsed, "stageName")))
+			if stageName == "" {
+				stageName = normalizedStage
+			}
+			title := stringField(parsed, "title")
+			titleCode := copilotTitleStagePattern.FindString(strings.ToUpper(title))
+			if stageName == normalizedStage || stageName == normalizedKeyword || titleCode == normalizedStage {
+				copilots = append(copilots, parsed)
+				if len(copilots) >= 10 {
+					break
+				}
+			}
+		}
+	}
+	if len(copilots) == 0 {
+		httpx.Failure(w, http.StatusNotFound, &httpx.APIError{Code: "AGENT_COPILOT_NOT_FOUND", Message: fmt.Sprintf("未找到关卡%q的作业", stage), Retryable: false, Details: map[string]any{"stage": stage, "searchKeyword": searchKeyword}})
 		return
 	}
-	httpx.Success(w, http.StatusOK, value, "", nil)
+	httpx.Success(w, http.StatusOK, map[string]any{"stage": stage, "copilots": copilots, "recommended": copilots[0]}, "", nil)
 }
 
 func (h *Handler) version(w http.ResponseWriter, r *http.Request) {
@@ -1073,9 +2164,14 @@ func (h *Handler) version(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) deviceStats(w http.ResponseWriter, r *http.Request) {
+	connection, err := h.resolveRequestConnectionFor(r, nil)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	stats, err := h.app.WebRTC.DeviceStats(ctx)
+	stats, err := h.app.WebRTC.DeviceStatsWithConnection(ctx, connection.ADBPath, connection.Address)
 	if err != nil {
 		httpx.Success(w, http.StatusOK, nil, "", nil)
 		return
@@ -1171,7 +2267,10 @@ func (h *Handler) activity(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	httpx.Success(w, http.StatusOK, info, "", nil)
+	infoMap := structMap(info)
+	infoMap["completion"] = h.app.Activity.GetActivityCompletion(ctx, infoMap)
+	infoMap["available"] = info.Code != nil && *info.Code != ""
+	httpx.Success(w, http.StatusOK, infoMap, "", nil)
 }
 
 func (h *Handler) activityPreflight(w http.ResponseWriter, r *http.Request) {
@@ -1205,8 +2304,13 @@ func defaultADBAddress() string {
 
 func (h *Handler) testConnection(w http.ResponseWriter, r *http.Request) {
 	body := decodeBody(r)
-	adbPath := firstNonEmpty(stringField(body, "adbPath"), defaultADBPath())
-	address := firstNonEmpty(stringField(body, "address"), defaultADBAddress())
+	connection, err := h.resolveRequestConnection(body)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	adbPath := firstNonEmpty(stringField(body, "adbPath"), connection.ADBPath)
+	address := firstNonEmpty(stringField(body, "address"), connection.Address)
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 	client := adb.New(adbPath)
@@ -1241,7 +2345,12 @@ func (h *Handler) testConnection(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) discoverDevices(w http.ResponseWriter, r *http.Request) {
-	adbPath := firstNonEmpty(r.URL.Query().Get("adbPath"), defaultADBPath())
+	connection, err := h.resolveRequestConnectionFor(r, nil)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	adbPath := firstNonEmpty(r.URL.Query().Get("adbPath"), connection.ADBPath)
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 	devices, err := adb.New(adbPath).Devices(ctx)
@@ -1256,8 +2365,56 @@ func (h *Handler) discoverDevices(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, http.StatusOK, map[string]any{"devices": out, "adbPath": adbPath}, "", nil)
 }
 
+func (h *Handler) getClipboard(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	text, err := h.app.WebRTC.GetClipboard(ctx)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, map[string]any{"text": text}, "", nil)
+}
+
+func (h *Handler) setClipboard(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	text, ok := body["text"].(string)
+	if !ok {
+		httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{Code: "AGENT_VALIDATION_CLIPBOARD_TEXT_REQUIRED", Message: "请提供剪贴板文本", Retryable: false})
+		return
+	}
+	paste := true
+	if value, ok := body["paste"].(bool); ok {
+		paste = value
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	if err := h.app.WebRTC.SetClipboard(ctx, text, paste); err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, map[string]any{"set": true, "paste": paste}, "", nil)
+}
+
 func (h *Handler) openConfigDirectory(w http.ResponseWriter, r *http.Request) {
-	httpx.Success(w, http.StatusOK, map[string]any{"path": h.app.Config().Paths.MaaConfigDir}, "配置目录已定位", nil)
+	dir := h.app.Config().Paths.MaaConfigDir
+	var command string
+	var args []string
+	switch runtime.GOOS {
+	case "darwin":
+		command, args = "open", []string{dir}
+	case "windows":
+		command, args = "explorer", []string{dir}
+	default:
+		command, args = "xdg-open", []string{dir}
+	}
+	if err := exec.Command(command, args...).Start(); err != nil {
+		httpx.Failure(w, http.StatusInternalServerError, &httpx.APIError{
+			Code: "AGENT_OPEN_CONFIG_DIRECTORY_FAILED", Message: "无法打开配置目录", Retryable: false, Details: map[string]any{"path": dir, "error": err.Error()},
+		})
+		return
+	}
+	httpx.Success(w, http.StatusOK, map[string]any{"path": dir}, "配置目录已打开", nil)
 }
 
 func (h *Handler) configureAutoUpdate(w http.ResponseWriter, r *http.Request) {
@@ -1271,50 +2428,57 @@ func (h *Handler) configureAutoUpdate(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, http.StatusOK, result, result.Message, nil)
 }
 
+func recognitionFailure(err error, code, message string) error {
+	if _, ok := apperrors.As(err); ok {
+		return err
+	}
+	return apperrors.WithStatus(code, message, http.StatusInternalServerError, false, map[string]any{"error": err.Error()})
+}
+
 func (h *Handler) depotRecognition(w http.ResponseWriter, r *http.Request) {
 	body := decodeBody(r)
+	plan := map[string]any{"action": "depot-recognition", "sideEffects": []string{"parse_maa_logs", "update_local_depot_cache"}}
 	if dryRun, _ := body["dryRun"].(bool); dryRun {
-		httpx.Success(w, http.StatusOK, map[string]any{"action": "depot-recognition", "sideEffects": []string{"parse_maa_logs", "update_local_depot_cache"}}, "Dry run only", nil)
+		httpx.Success(w, http.StatusOK, map[string]any{"plan": plan}, "Dry run only", map[string]any{"dryRun": true})
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
-	run, _, err := h.app.MAAService.RunTask(ctx, map[string]any{
-		"name": "仓库识别", "type": "Depot", "params": map[string]any{},
-	}, true, nil)
+	run, replayed, err := h.executeTrackedResult(ctx, "depot_recognition", map[string]any{"action": "depot-recognition"}, map[string]any{"taskName": "仓库识别", "taskType": "statistics"}, idempotencyKey(r), func(ctx context.Context) (any, error) {
+		result, err := h.app.Recognition.RecognizeDepot(ctx)
+		if err != nil {
+			return nil, recognitionFailure(err, "AGENT_DEPOT_RECOGNITION_FAILED", "仓库识别失败")
+		}
+		return structMap(result.Data), nil
+	})
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	result, err := h.app.Recognition.RecognizeDepot(ctx)
-	if err != nil {
-		writeError(w, err)
-		return
-	}
-	httpx.Success(w, http.StatusOK, map[string]any{"run": run, "data": result.Data, "written": result.Written}, "仓库识别完成", nil)
+	sendRunResponse(w, run, replayed, false, structMap(run.Result))
 }
 
 func (h *Handler) operboxRecognition(w http.ResponseWriter, r *http.Request) {
 	body := decodeBody(r)
+	plan := map[string]any{"action": "operbox-recognition", "sideEffects": []string{"parse_maa_logs", "update_local_operbox_cache"}}
 	if dryRun, _ := body["dryRun"].(bool); dryRun {
-		httpx.Success(w, http.StatusOK, map[string]any{"action": "operbox-recognition", "sideEffects": []string{"parse_maa_logs", "update_local_operbox_cache"}}, "Dry run only", nil)
+		httpx.Success(w, http.StatusOK, map[string]any{"plan": plan}, "Dry run only", map[string]any{"dryRun": true})
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 	defer cancel()
-	run, _, err := h.app.MAAService.RunTask(ctx, map[string]any{
-		"name": "干员识别", "type": "OperBox", "params": map[string]any{},
-	}, true, nil)
+	run, replayed, err := h.executeTrackedResult(ctx, "operbox_recognition", map[string]any{"action": "operbox-recognition"}, map[string]any{"taskName": "干员识别", "taskType": "statistics"}, idempotencyKey(r), func(ctx context.Context) (any, error) {
+		result, err := h.app.Recognition.RecognizeOperBox(ctx)
+		if err != nil {
+			return nil, recognitionFailure(err, "AGENT_OPERBOX_RECOGNITION_FAILED", "干员识别失败")
+		}
+		return structMap(result.Data), nil
+	})
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	result, err := h.app.Recognition.RecognizeOperBox(ctx)
-	if err != nil {
-		writeError(w, err)
-		return
-	}
-	httpx.Success(w, http.StatusOK, map[string]any{"run": run, "data": result.Data, "written": result.Written}, "干员识别完成", nil)
+	sendRunResponse(w, run, replayed, false, structMap(run.Result))
 }
 
 func (h *Handler) copilotUnsupported(w http.ResponseWriter, r *http.Request) {
@@ -1326,16 +2490,37 @@ func (h *Handler) copilotUnsupported(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) updateCore(w http.ResponseWriter, r *http.Request) {
 	body := decodeBody(r)
-	version := firstNonEmpty(stringField(body, "version"), "stable")
+	version := firstNonEmpty(stringField(body, "version"), "current")
 	dryRun, _ := body["dryRun"].(bool)
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	if dryRun {
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+		defer cancel()
+		outcome, err := h.app.Updates.UpdateCoreAction(ctx, version, true)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		httpx.Success(w, http.StatusOK, outcome.Data, outcome.Message, map[string]any{"dryRun": true})
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
 	defer cancel()
-	outcome, err := h.app.Updates.UpdateCoreAction(ctx, version, dryRun)
+	run, replayed, err := h.executeTrackedOperation(ctx, "update_core", map[string]any{"version": version}, map[string]any{"taskName": "更新 MaaCore 与资源", "taskType": "maintenance"}, idempotencyKey(r), func(actionCtx context.Context) (any, error) {
+		outcome, runErr := h.app.Updates.UpdateCoreAction(actionCtx, version, false)
+		if runErr != nil {
+			return nil, runErr
+		}
+		return structMap(outcome.Data), nil
+	})
 	if err != nil {
+		if run.State == agentrun.StatusFailed || run.State == agentrun.StatusInterrupted {
+			sendRunFailureResponse(w, run)
+			return
+		}
 		writeError(w, err)
 		return
 	}
-	httpx.Success(w, http.StatusOK, outcome.Data, outcome.Message, map[string]any{"dryRun": outcome.DryRun})
+	sendTrackedRunResponse(w, run, replayed, "更新 MaaCore 与资源完成")
 }
 
 func (h *Handler) updateCLI(w http.ResponseWriter, r *http.Request) {
@@ -1354,38 +2539,58 @@ func (h *Handler) updateCLI(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) hotUpdateResources(w http.ResponseWriter, r *http.Request) {
 	body := decodeBody(r)
 	dryRun, _ := body["dryRun"].(bool)
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Minute)
+	if dryRun {
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Minute)
+		defer cancel()
+		outcome, err := h.app.Updates.HotUpdateResourcesAction(ctx, true)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		httpx.Success(w, http.StatusOK, outcome.Data, outcome.Message, map[string]any{"dryRun": true})
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
 	defer cancel()
-	outcome, err := h.app.Updates.HotUpdateResourcesAction(ctx, dryRun)
+	run, replayed, err := h.executeTrackedOperation(ctx, "hot_update_resources", map[string]any{"action": "hot-update"}, map[string]any{"taskName": "同步 MAA 资源", "taskType": "maintenance"}, idempotencyKey(r), func(actionCtx context.Context) (any, error) {
+		outcome, runErr := h.app.Updates.HotUpdateResourcesAction(actionCtx, false)
+		if runErr != nil {
+			return nil, runErr
+		}
+		return structMap(outcome.Data), nil
+	})
 	if err != nil {
+		if run.State == agentrun.StatusFailed || run.State == agentrun.StatusInterrupted {
+			sendRunFailureResponse(w, run)
+			return
+		}
 		writeError(w, err)
 		return
 	}
-	httpx.Success(w, http.StatusOK, outcome.Data, outcome.Message, map[string]any{"dryRun": outcome.DryRun})
+	sendTrackedRunResponse(w, run, replayed, "资源更新完成")
 }
 
 func (h *Handler) logFiles(w http.ResponseWriter, r *http.Request) {
 	dir := filepath.Join(h.app.Config().Paths.MaaStateDir, "debug")
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		httpx.Success(w, http.StatusOK, map[string]any{"files": []any{}, "path": dir}, "", nil)
-		return
-	}
-	files := make([]map[string]any, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".log") {
-			continue
+	files := make([]map[string]any, 0)
+	_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil || info.IsDir() || !strings.HasSuffix(info.Name(), ".log") {
+			return nil
 		}
-		info, _ := entry.Info()
-		modified := ""
-		size := int64(0)
-		if info != nil {
-			modified = info.ModTime().UTC().Format(time.RFC3339)
-			size = info.Size()
-		}
-		files = append(files, map[string]any{"name": entry.Name(), "path": filepath.Join(dir, entry.Name()), "size": size, "modified": modified})
-	}
-	httpx.Success(w, http.StatusOK, map[string]any{"files": files, "path": dir}, "", nil)
+		files = append(files, map[string]any{
+			"name":     info.Name(),
+			"path":     path,
+			"size":     info.Size(),
+			"modified": info.ModTime().UTC().Format(time.RFC3339),
+		})
+		return nil
+	})
+	sort.Slice(files, func(i, j int) bool {
+		left, _ := files[i]["modified"].(string)
+		right, _ := files[j]["modified"].(string)
+		return left > right
+	})
+	httpx.Success(w, http.StatusOK, files, "", nil)
 }
 
 func (h *Handler) readLogFile(w http.ResponseWriter, r *http.Request) {
@@ -1484,28 +2689,66 @@ func (h *Handler) activityCandidates(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) activityRun(w http.ResponseWriter, r *http.Request) {
 	body := decodeBody(r)
-	clientType := firstNonEmpty(stringField(body, "clientType"), "Official")
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
-	defer cancel()
-	var result map[string]any
-	var err error
-	setID := stringField(body, "setId")
-	if setID != "" {
-		result, err = h.app.Activity.RunCurrentActivitySet(ctx, activity.SetExecutionOptions{
-			SetID:           setID,
-			SelectedIndexes: intSlice(body["selectedIndexes"]),
-			Raid:            firstNonEmpty(stringField(body, "raid"), "normal"),
-			Options:         mapField(body["options"]),
-			ClientType:      clientType,
-		}, nil)
-	} else {
-		result, err = h.app.Activity.RunCurrentActivityCopilots(ctx, clientType, nil)
-	}
+	connection, err := h.resolveRequestConnection(body)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	httpx.Success(w, http.StatusOK, result, "活动作业执行完成", nil)
+	clientType := firstNonEmpty(stringField(body, "clientType"), connection.ClientType)
+	options := mapField(body["options"])
+	if _, exists := options["address"]; !exists && connection.Address != "" {
+		options["address"] = connection.Address
+	}
+	setID := stringField(body, "setId")
+	selectedIndexes := intSlice(body["selectedIndexes"])
+	raid := firstNonEmpty(stringField(body, "raid"), "normal")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
+	defer cancel()
+	run, replayed, err := h.executeTrackedOperation(ctx, "run_current_activity_copilots", map[string]any{
+		"clientType":      clientType,
+		"setId":           setID,
+		"selectedIndexes": selectedIndexes,
+		"raid":            raid,
+		"options":         options,
+	}, map[string]any{"taskName": "当前活动作业", "taskType": "activity"}, idempotencyKey(r), func(actionCtx context.Context) (any, error) {
+		runID := runapp.ParentRunID(actionCtx)
+		lifecycle := &activity.Lifecycle{
+			RunID: runID,
+			OnProgress: func(progress any, taskResults []any) any {
+				updated, _ := h.app.Runs.UpdateProgress(runID, progress, taskResults)
+				return updated
+			},
+		}
+		var result map[string]any
+		var runErr error
+		if setID != "" {
+			result, runErr = h.app.Activity.RunCurrentActivitySet(actionCtx, activity.SetExecutionOptions{
+				SetID:           setID,
+				SelectedIndexes: selectedIndexes,
+				Raid:            raid,
+				Options:         options,
+				ClientType:      clientType,
+			}, lifecycle)
+		} else {
+			result, runErr = h.app.Activity.RunCurrentActivityCopilotsWithConnection(actionCtx, clientType, connection.Address, lifecycle)
+		}
+		if runErr != nil {
+			return nil, runErr
+		}
+		if stopped, _ := result["stopped"].(bool); stopped {
+			return nil, errTrackedActionStopped
+		}
+		return result, nil
+	})
+	if err != nil {
+		if run.State == agentrun.StatusFailed || run.State == agentrun.StatusInterrupted {
+			sendRunFailureResponse(w, run)
+			return
+		}
+		writeError(w, err)
+		return
+	}
+	sendTrackedRunResponse(w, run, replayed, "活动作业执行完成")
 }
 
 func mapField(value any) map[string]any {
@@ -1534,82 +2777,272 @@ func (h *Handler) paradoxSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	list, _ := value.([]any)
-	matches := make([]any, 0)
+	var operator map[string]any
 	for _, item := range list {
 		record, ok := item.(map[string]any)
 		if !ok {
 			continue
 		}
 		candidate := firstNonEmpty(stringField(record, "name"), stringField(record, "operator"))
-		if strings.Contains(strings.ToLower(candidate), strings.ToLower(name)) {
-			matches = append(matches, item)
+		if strings.Contains(candidate, name) || strings.Contains(name, candidate) {
+			operator = record
+			break
 		}
 	}
-	httpx.Success(w, http.StatusOK, matches, "", nil)
+	if operator == nil {
+		httpx.Failure(w, http.StatusNotFound, &httpx.APIError{Code: "AGENT_PARADOX_OPERATOR_NOT_FOUND", Message: fmt.Sprintf("未找到干员%q的悖论模拟关卡", name), Retryable: false, Details: map[string]any{"name": name}})
+		return
+	}
+	operatorName := firstNonEmpty(stringField(operator, "name"), stringField(operator, "operator"))
+	stageID := firstNonEmpty(stringField(operator, "stage_id"), stringField(operator, "stageId"))
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	items, err := h.app.Copilot.PRTS().QueryCopilots(ctx, stageID, 1, 10, "hot")
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	copilots := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		if parsed := parseCopilotSearchItem(item); parsed != nil {
+			copilots = append(copilots, parsed)
+		}
+	}
+	if len(copilots) == 0 {
+		httpx.Failure(w, http.StatusNotFound, &httpx.APIError{Code: "AGENT_PARADOX_COPILOT_NOT_FOUND", Message: fmt.Sprintf("未找到干员%q的作业", operatorName), Retryable: false, Details: map[string]any{"operator": operatorName, "stageId": stageID}})
+		return
+	}
+	httpx.Success(w, http.StatusOK, map[string]any{"operator": operatorName, "stageId": stageID, "copilots": copilots, "recommended": copilots[0]}, "", nil)
+}
+
+func injectConnectionOptions(options map[string]any, connection appconfig.ResolvedConnection) {
+	if _, exists := options["clientType"]; !exists {
+		if _, exists := options["client_type"]; !exists && connection.ClientType != "" {
+			options["clientType"] = connection.ClientType
+		}
+	}
+	if _, exists := options["address"]; !exists && connection.Address != "" {
+		options["address"] = connection.Address
+	}
 }
 
 func (h *Handler) executeCopilotSet(w http.ResponseWriter, r *http.Request) {
 	body := decodeBody(r)
+	connection, err := h.resolveRequestConnection(body)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
 	selectedIndexes := intSlice(body["selectedIndexes"])
 	options, _ := body["options"].(map[string]any)
 	if options == nil {
 		options = map[string]any{}
 	}
+	injectConnectionOptions(options, connection)
 	raid := firstNonEmpty(stringField(body, "raid"), "normal")
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	setID := r.PathValue("id")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
 	defer cancel()
-	result, err := h.app.Copilot.ExecutePlan(ctx, copilot.PlanExecution{
-		SetID:           r.PathValue("id"),
-		Raid:            raid,
-		SelectedIndexes: selectedIndexes,
-		Options:         options,
+	run, replayed, err := h.executeTrackedOperation(ctx, "run_copilot_set", map[string]any{
+		"clientType":      connection.ClientType,
+		"setId":           setID,
+		"selectedIndexes": selectedIndexes,
+		"raid":            raid,
+		"options":         options,
+	}, map[string]any{"taskName": "作业集执行", "taskType": "copilot"}, idempotencyKey(r), func(actionCtx context.Context) (any, error) {
+		runID := runapp.ParentRunID(actionCtx)
+		lifecycle := &copilot.ExecutionLifecycle{
+			RunID: runID,
+			OnProgress: func(progress map[string]any, taskResults []copilot.ProgressEntryResult) {
+				results := make([]any, 0, len(taskResults))
+				for _, item := range taskResults {
+					results = append(results, item)
+				}
+				_, _ = h.app.Runs.UpdateProgress(runID, progress, results)
+			},
+		}
+		result, runErr := h.app.Copilot.ExecutePlan(actionCtx, copilot.PlanExecution{
+			SetID:           setID,
+			Raid:            raid,
+			SelectedIndexes: selectedIndexes,
+			Options:         options,
+			Lifecycle:       lifecycle,
+		})
+		if runErr != nil {
+			return nil, runErr
+		}
+		data := map[string]any{"results": result.Results, "taskResults": result.TaskResults}
+		for key, value := range result.Data {
+			data[key] = value
+		}
+		return data, nil
+	})
+	if err != nil {
+		if run.State == agentrun.StatusFailed || run.State == agentrun.StatusInterrupted {
+			sendRunFailureResponse(w, run)
+			return
+		}
+		writeError(w, err)
+		return
+	}
+	sendTrackedRunResponse(w, run, replayed, "作业集执行完成")
+}
+
+func (h *Handler) settleManualRun(runID string, result *copilot.ManualStepResult, actionErr error) error {
+	if current, ok := h.app.Runs.Get(runID); ok && current.State.Terminal() {
+		if current.State == agentrun.StatusStopped {
+			return nil
+		}
+		return runFailureError(current)
+	}
+	if actionErr != nil {
+		if isTrackedStopError(actionErr) {
+			_, stopErr := h.app.Runs.Stop(runID, map[string]any{"message": actionErr.Error()})
+			return stopErr
+		}
+		_, _ = h.app.Runs.Fail(runID, actionErr)
+		return actionErr
+	}
+	if result == nil {
+		_, err := h.app.Runs.Complete(runID, nil)
+		return err
+	}
+	if result.Stopped {
+		_, err := h.app.Runs.Stop(runID, result)
+		return err
+	}
+	if result.Finished {
+		_, err := h.app.Runs.Complete(runID, result)
+		return err
+	}
+	if _, err := h.app.Runs.MarkWaiting(runID); err != nil {
+		return err
+	}
+	_, err := h.app.Runs.SetAcceptedResult(runID, result)
+	return err
+}
+
+func (h *Handler) sendManualResult(w http.ResponseWriter, runID string, result *copilot.ManualStepResult) {
+	data := structMap(result)
+	if run, ok := h.app.Runs.Get(runID); ok {
+		data["run"] = run
+	}
+	httpx.Success(w, http.StatusOK, data, result.Message, nil)
+}
+
+func (h *Handler) startManualCopilotSet(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	connection, err := h.resolveRequestConnection(body)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	options, _ := body["options"].(map[string]any)
+	if options == nil {
+		options = map[string]any{}
+	}
+	injectConnectionOptions(options, connection)
+	setID := r.PathValue("id")
+	raid := firstNonEmpty(stringField(body, "raid"), "normal")
+	selectedIndexes := anySlice(body["selectedIndexes"])
+	run, replayed, err := h.app.Runs.Begin(runapp.BeginInput{
+		OperationID: "run_copilot_set_manual",
+		Input: map[string]any{
+			"clientType":      connection.ClientType,
+			"setId":           setID,
+			"selectedIndexes": selectedIndexes,
+			"raid":            raid,
+			"options":         options,
+		},
+		Metadata: map[string]any{"taskName": "手动作业集", "taskType": "copilot"},
 	})
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	data := map[string]any{"results": result.Results, "taskResults": result.TaskResults}
-	for key, value := range result.Data {
-		data[key] = value
+	if replayed {
+		data := map[string]any{"runId": run.RunID, "state": run.State, "run": run}
+		httpx.Success(w, http.StatusOK, data, "返回已有手动作业集", nil)
+		return
 	}
-	httpx.Success(w, http.StatusOK, data, "作业集执行完成", nil)
-}
-
-func (h *Handler) startManualCopilotSet(w http.ResponseWriter, r *http.Request) {
-	body := decodeBody(r)
-	options, _ := body["options"].(map[string]any)
-	request := copilot.ManualStartRequest{
-		SetID:           r.PathValue("id"),
-		Raid:            firstNonEmpty(stringField(body, "raid"), "normal"),
-		SelectedIndexes: anySlice(body["selectedIndexes"]),
-		Options:         options,
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
-	defer cancel()
-	result, err := h.app.Copilot.Manual().StartManualSet(ctx, request)
-	if err != nil {
+	if _, err := h.app.Runs.StartForExecution(run.RunID); err != nil {
+		_, _ = h.app.Runs.Fail(run.RunID, err)
 		writeError(w, err)
 		return
 	}
-	httpx.Success(w, http.StatusOK, result, result.Message, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
+	defer cancel()
+	result, actionErr := h.app.Copilot.Manual().StartManualSet(runapp.WithParentRun(ctx, run.RunID), copilot.ManualStartRequest{
+		SetID:           setID,
+		Raid:            raid,
+		SelectedIndexes: selectedIndexes,
+		Options:         options,
+		RunID:           run.RunID,
+	})
+	if result != nil && result.RunID == "" {
+		result.RunID = run.RunID
+	}
+	if err := h.settleManualRun(run.RunID, result, actionErr); err != nil {
+		current, ok := h.app.Runs.Get(run.RunID)
+		if ok && (current.State == agentrun.StatusFailed || current.State == agentrun.StatusInterrupted) {
+			sendRunFailureResponse(w, current)
+			return
+		}
+		writeError(w, err)
+		return
+	}
+	if result == nil {
+		result = &copilot.ManualStepResult{RunID: run.RunID, State: copilot.ManualStateSucceeded, Finished: true}
+	}
+	h.sendManualResult(w, run.RunID, result)
 }
 
 func (h *Handler) continueManualCopilotSet(w http.ResponseWriter, r *http.Request) {
 	body := decodeBody(r)
-	runID := stringField(body, "runId")
-	if strings.TrimSpace(runID) == "" {
+	runID := strings.TrimSpace(stringField(body, "runId"))
+	if runID == "" {
 		httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{Code: "AGENT_RUN_ID_REQUIRED", Message: "继续手动作业集需要 runId", Retryable: false})
 		return
 	}
-	options, _ := body["options"].(map[string]any)
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
-	defer cancel()
-	result, err := h.app.Copilot.Manual().ContinueManualSet(ctx, runID, options)
+	connection, err := h.resolveRequestConnection(body)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	httpx.Success(w, http.StatusOK, result, result.Message, nil)
+	options, _ := body["options"].(map[string]any)
+	if options == nil {
+		options = map[string]any{}
+	}
+	injectConnectionOptions(options, connection)
+	run, ok := h.app.Runs.Get(runID)
+	if !ok {
+		writeError(w, apperrors.WithStatus("AGENT_RUN_NOT_FOUND", "未找到 Agent run: "+runID, http.StatusNotFound, false, map[string]any{"runId": runID}))
+		return
+	}
+	if run.State.Terminal() {
+		writeError(w, apperrors.WithStatus("AGENT_RUN_NOT_RUNNING", "手动作业集 Run 已结束", http.StatusConflict, false, map[string]any{"runId": runID, "state": run.State}))
+		return
+	}
+	if _, err := h.app.Runs.StartForExecution(runID); err != nil {
+		writeError(w, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
+	defer cancel()
+	result, actionErr := h.app.Copilot.Manual().ContinueManualSet(runapp.WithParentRun(ctx, runID), runID, options)
+	if err := h.settleManualRun(runID, result, actionErr); err != nil {
+		current, exists := h.app.Runs.Get(runID)
+		if exists && (current.State == agentrun.StatusFailed || current.State == agentrun.StatusInterrupted) {
+			sendRunFailureResponse(w, current)
+			return
+		}
+		writeError(w, err)
+		return
+	}
+	if result == nil {
+		result = &copilot.ManualStepResult{RunID: runID, State: copilot.ManualStateSucceeded, Finished: true}
+	}
+	h.sendManualResult(w, runID, result)
 }
 
 func (h *Handler) manualCopilotSession(w http.ResponseWriter, r *http.Request) {
@@ -1875,8 +3308,13 @@ func (h *Handler) previewOrientation(w http.ResponseWriter, r *http.Request) {
 		httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{Code: "AGENT_VALIDATION_ORIENTATION_INVALID", Message: "orientation 必须是 portrait、landscape 或 auto", Retryable: false})
 		return
 	}
-	adbPath := firstNonEmpty(stringField(body, "adbPath"), defaultADBPath())
-	address := firstNonEmpty(stringField(body, "address"), defaultADBAddress())
+	connection, err := h.resolveRequestConnection(body)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	adbPath := firstNonEmpty(stringField(body, "adbPath"), connection.ADBPath)
+	address := firstNonEmpty(stringField(body, "address"), connection.Address)
 	commands := [][]string{}
 	if orientation == "auto" {
 		commands = append(commands, []string{"settings", "put", "system", "accelerometer_rotation", "1"})

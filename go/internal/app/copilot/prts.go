@@ -96,6 +96,25 @@ func (c *PRTSClient) GetSet(ctx context.Context, setId string) (map[string]any, 
 	return asRecord(value), nil
 }
 
+// GetSetRaw returns the raw /set/get envelope, matching the Node proxy.
+func (c *PRTSClient) GetSetRaw(ctx context.Context, setId string) (map[string]any, error) {
+	value, err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("%s/set/get?id=%s", c.baseURL, url.QueryEscape(setId)), nil)
+	if err != nil {
+		return nil, err
+	}
+	return asRecord(value), nil
+}
+
+// GetCopilotRaw returns the raw /copilot/get/{id} envelope, matching the Node
+// proxy. Plan builders still use GetCopilot for the unwrapped content.
+func (c *PRTSClient) GetCopilotRaw(ctx context.Context, id string) (map[string]any, error) {
+	value, err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("%s/copilot/get/%s", c.baseURL, id), nil)
+	if err != nil {
+		return nil, err
+	}
+	return asRecord(value), nil
+}
+
 // GetCopilot reads /copilot/get/{id} and returns the unwrapped data object.
 func (c *PRTSClient) GetCopilot(ctx context.Context, id string) (map[string]any, error) {
 	value, err := c.fetchJSON(ctx, http.MethodGet, fmt.Sprintf("%s/copilot/get/%s", c.baseURL, id), nil)

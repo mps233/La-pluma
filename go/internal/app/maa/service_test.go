@@ -29,7 +29,7 @@ func newTestService(t *testing.T) (*Service, string) {
 	}
 	script := filepath.Join(root, "maa")
 	body := "#!/bin/sh\necho \"$@\" > \"" + filepath.Join(root, "args.txt") + "\"\n" +
-		"if [ \"$1\" = run ]; then cat \"$3\"; fi\nexit 0\n"
+		"if [ \"$1\" = run ]; then cat \"tasks/$3.json\" 2>/dev/null || cat \"$3\" 2>/dev/null; fi\nexit 0\n"
 	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -62,6 +62,108 @@ func TestStartGameRecordsRun(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "data", "maa-execution.lock")); !os.IsNotExist(err) {
 		t.Fatalf("lease should be released: %v", err)
+	}
+}
+
+func TestStartGameDisabledUsesDynamicStartup(t *testing.T) {
+	service, root := newTestService(t)
+	run, replayed, err := service.StartGameWithOptions(context.Background(), StartGameOptions{
+		ClientType:       "Bilibili",
+		Address:          "10.0.0.2:5555",
+		AccountName:      "alt",
+		StartGameEnabled: false,
+		Wait:             true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replayed || run.State != domainrun.StatusSucceeded {
+		t.Fatalf("unexpected run: %+v replayed=%v", run, replayed)
+	}
+	args, err := os.ReadFile(filepath.Join(root, "args.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(strings.TrimSpace(string(args)), "run --batch ") || !strings.Contains(string(args), "--addr 10.0.0.2:5555") {
+		t.Fatalf("args = %q", string(args))
+	}
+	result, _ := run.Result.(map[string]any)
+	stdout, _ := result["stdout"].(string)
+	for _, want := range []string{`"start_game_enabled": false`, `"account_name": "alt"`, `"client_type": "Bilibili"`} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("task config missing %s: %s", want, stdout)
+		}
+	}
+}
+
+func TestRunTaskWithOptionsUsesAddress(t *testing.T) {
+	service, root := newTestService(t)
+	_, _, err := service.RunTaskWithOptions(context.Background(), map[string]any{
+		"name": "测试任务", "type": "Fight", "params": map[string]any{"stage": "1-7"},
+	}, true, nil, RunTaskOptions{Address: "192.168.1.9:5555"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	args, err := os.ReadFile(filepath.Join(root, "args.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(args), "--addr 192.168.1.9:5555") {
+		t.Fatalf("args = %q", string(args))
+	}
+}
+
+func TestRunUnderParentAttachesToOuterRun(t *testing.T) {
+	service, _ := newTestService(t)
+	outer, _, err := service.runs.Begin(runapp.BeginInput{
+		OperationID: "run_daily_flow",
+		Input:       map[string]any{"scheduleId": "default"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.runs.StartForExecution(outer.RunID); err != nil {
+		t.Fatal(err)
+	}
+	ctx := runapp.WithParentRun(context.Background(), outer.RunID)
+	run, replayed, err := service.Run(ctx, RunRequest{
+		OperationID: "run_task",
+		Command:     "fight",
+		Args:        []string{"CE-6"},
+		TaskName:    "作战",
+		TaskType:    "fight",
+		Wait:        true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replayed || run.RunID != outer.RunID {
+		t.Fatalf("parent run = %+v replayed=%v", run, replayed)
+	}
+	if runs := service.runs.List(); len(runs) != 1 {
+		t.Fatalf("nested runs = %d", len(runs))
+	}
+	current, ok := service.runs.Get(outer.RunID)
+	if !ok || current.State != domainrun.StatusRunning {
+		t.Fatalf("outer run state = %+v", current)
+	}
+	if len(current.TaskResults) != 1 {
+		t.Fatalf("task results = %#v", current.TaskResults)
+	}
+	result, _ := current.TaskResults[0].(map[string]any)
+	if result["command"] != "fight" || result["state"] != "succeeded" {
+		t.Fatalf("task result = %#v", result)
+	}
+}
+
+func TestStopCurrentReportsRunningTask(t *testing.T) {
+	service, _ := newTestService(t)
+	outcome := service.StopCurrent(context.Background())
+	if outcome.Success {
+		t.Fatalf("expected no running task: %+v", outcome)
+	}
+	if outcome.Message != "当前没有正在运行的任务" || outcome.Err != nil {
+		t.Fatalf("outcome = %+v", outcome)
 	}
 }
 

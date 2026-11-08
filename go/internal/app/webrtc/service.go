@@ -12,10 +12,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pion/turn/v5"
+
 	"github.com/mps233/la-pluma/go/internal/config"
 	"github.com/mps233/la-pluma/go/internal/infra/adb"
 	"github.com/mps233/la-pluma/go/internal/infra/scrcpy"
 	scwebrtc "github.com/mps233/la-pluma/go/internal/infra/webrtc"
+	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 )
 
 const defaultDeviceID = "mumu-la-pluma"
@@ -37,6 +40,10 @@ type Service struct {
 
 	mu      sync.Mutex
 	current *activeRuntime
+
+	turnMu          sync.Mutex
+	turnServer      *turn.Server
+	turnCredentials *turnCredentials
 
 	adbPath       string
 	address       string
@@ -127,6 +134,7 @@ func resolveServerPath() string {
 }
 
 func (s *Service) Start(ctx context.Context, request StartRequest) (map[string]any, error) {
+	s.ensureTURN()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -164,6 +172,7 @@ func (s *Service) Start(ctx context.Context, request StartRequest) (map[string]a
 		session.Close()
 		return nil, err
 	}
+	publisher.SetOnEnded(func() { s.handleVideoEnded(publisher) })
 	go publisher.FeedVideo()
 	s.current = &activeRuntime{
 		session:   session,
@@ -176,7 +185,22 @@ func (s *Service) Start(ctx context.Context, request StartRequest) (map[string]a
 	return s.statusLocked(), nil
 }
 
+// handleVideoEnded clears a session whose scrcpy stream died, so /status stops
+// reporting a live preview and the next Start can create a fresh session.
+func (s *Service) handleVideoEnded(publisher *scwebrtc.Publisher) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.current == nil || s.current.publisher != publisher {
+		return
+	}
+	publisher.Close()
+	_ = s.current.session.Close()
+	s.current = nil
+	s.logger.Warn("webrtc session ended after video failure")
+}
+
 func (s *Service) Stop(ctx context.Context) error {
+	s.stopTURN()
 	s.mu.Lock()
 	entry := s.current
 	s.current = nil
@@ -186,6 +210,41 @@ func (s *Service) Stop(ctx context.Context) error {
 	}
 	entry.publisher.Close()
 	return entry.session.Close()
+}
+
+func (s *Service) currentSession() (*scrcpy.Session, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.current == nil || s.current.session == nil {
+		return nil, apperrors.WithStatus("WEBRTC_NOT_RUNNING", "实时预览未启动", 409, false, nil)
+	}
+	return s.current.session, nil
+}
+
+// GetClipboard requests the device clipboard from the active preview.
+func (s *Service) GetClipboard(ctx context.Context) (string, error) {
+	session, err := s.currentSession()
+	if err != nil {
+		return "", err
+	}
+	text, err := session.GetClipboard(ctx)
+	if err != nil {
+		return "", apperrors.WithStatus("WEBRTC_CLIPBOARD_READ_FAILED", "读取设备剪贴板失败", 502, true, map[string]any{"error": err.Error()})
+	}
+	return text, nil
+}
+
+// SetClipboard writes text to the device clipboard; paste asks the device to
+// inject a paste keyevent after setting it.
+func (s *Service) SetClipboard(ctx context.Context, text string, paste bool) error {
+	session, err := s.currentSession()
+	if err != nil {
+		return err
+	}
+	if err := session.SetClipboard(ctx, text, paste); err != nil {
+		return apperrors.WithStatus("WEBRTC_CLIPBOARD_WRITE_FAILED", "写入设备剪贴板失败", 502, true, map[string]any{"error": err.Error()})
+	}
+	return nil
 }
 
 func (s *Service) CurrentPublisher() *scwebrtc.Publisher {
@@ -205,9 +264,13 @@ func (s *Service) Status() map[string]any {
 
 func (s *Service) statusLocked() map[string]any {
 	running := s.current != nil
+	installed := s.serverPath != ""
+	if info, err := os.Stat(s.serverPath); err != nil || info.IsDir() {
+		installed = false
+	}
 	status := map[string]any{
-		"installed":            true,
-		"built":                true,
+		"installed":            installed,
+		"built":                installed,
 		"serverRunning":        running,
 		"agentRunning":         running,
 		"signalingUrl":         "/webrtc-signaling",
@@ -235,8 +298,42 @@ func (s *Service) statusLocked() map[string]any {
 	return status
 }
 
+// SetConnection updates the default ADB path and address used by later
+// previews and screenshots. A running preview keeps its own session.
+func (s *Service) SetConnection(adbPath, address string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if value := strings.TrimSpace(adbPath); value != "" {
+		s.adbPath = value
+	}
+	if value := strings.TrimSpace(address); value != "" {
+		s.address = value
+	}
+}
+
+func (s *Service) defaultADBPath() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.adbPath
+}
+
+func (s *Service) effectiveAddress() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	address := s.address
+	if s.current != nil {
+		address = s.current.address
+	}
+	return address
+}
+
 func (s *Service) Devices(ctx context.Context) ([]string, error) {
-	client := adb.New(s.adbPath)
+	return s.DevicesWithConnection(ctx, "")
+}
+
+// DevicesWithConnection lists online devices with an optional ADB override.
+func (s *Service) DevicesWithConnection(ctx context.Context, adbPath string) ([]string, error) {
+	client := adb.New(firstNonEmpty(adbPath, s.defaultADBPath()))
 	devices, err := client.Devices(ctx)
 	if err != nil {
 		return nil, err
@@ -251,27 +348,33 @@ func (s *Service) Devices(ctx context.Context) ([]string, error) {
 }
 
 func (s *Service) DeviceStats(ctx context.Context) (*adb.DeviceStats, error) {
-	s.mu.Lock()
-	address := s.address
-	if s.current != nil {
-		address = s.current.address
-	}
-	s.mu.Unlock()
-	return adb.New(s.adbPath).DeviceStats(ctx, address)
+	return s.DeviceStatsWithConnection(ctx, "", "")
+}
+
+// DeviceStatsWithConnection reads device stats with optional connection
+// overrides. Empty values fall back to the service defaults.
+func (s *Service) DeviceStatsWithConnection(ctx context.Context, adbPath, address string) (*adb.DeviceStats, error) {
+	return adb.New(firstNonEmpty(adbPath, s.defaultADBPath())).DeviceStats(ctx, firstNonEmpty(address, s.effectiveAddress()))
 }
 
 func (s *Service) Screenshot(ctx context.Context) ([]byte, error) {
-	s.mu.Lock()
-	address := s.address
-	if s.current != nil {
-		address = s.current.address
-	}
-	s.mu.Unlock()
-	return adb.New(s.adbPath).Screenshot(ctx, address)
+	return s.ScreenshotWithConnection(ctx, "", "")
+}
+
+// ScreenshotWithConnection captures a frame with optional connection
+// overrides. Empty values fall back to the service defaults.
+func (s *Service) ScreenshotWithConnection(ctx context.Context, adbPath, address string) ([]byte, error) {
+	return adb.New(firstNonEmpty(adbPath, s.defaultADBPath())).Screenshot(ctx, firstNonEmpty(address, s.effectiveAddress()))
 }
 
 func (s *Service) Snapshot(ctx context.Context, deviceID string) (map[string]any, error) {
-	image, err := s.Screenshot(ctx)
+	return s.SnapshotWithConnection(ctx, deviceID, "", "")
+}
+
+// SnapshotWithConnection captures a base64 snapshot with optional connection
+// overrides.
+func (s *Service) SnapshotWithConnection(ctx context.Context, deviceID, adbPath, address string) (map[string]any, error) {
+	image, err := s.ScreenshotWithConnection(ctx, adbPath, address)
 	if err != nil {
 		return nil, err
 	}

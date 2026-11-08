@@ -795,6 +795,12 @@ func uniqueItemIndexes(entries []PlanEntry) []int {
 // RunCurrentActivityCopilots mirrors runCurrentActivityCopilots. The matching
 // set wins when available; otherwise each stage's best copilot is composed.
 func (s *Service) RunCurrentActivityCopilots(ctx context.Context, clientType string, lifecycle *Lifecycle) (map[string]any, error) {
+	return s.RunCurrentActivityCopilotsWithConnection(ctx, clientType, "", lifecycle)
+}
+
+// RunCurrentActivityCopilotsWithConnection adds an explicit device address to
+// the execution options. An empty address keeps the service defaults.
+func (s *Service) RunCurrentActivityCopilotsWithConnection(ctx context.Context, clientType, address string, lifecycle *Lifecycle) (map[string]any, error) {
 	if clientType == "" {
 		clientType = DefaultClientType
 	}
@@ -844,6 +850,9 @@ func (s *Service) RunCurrentActivityCopilots(ctx context.Context, clientType str
 
 	preferences := selection.Preferences
 	preferencesMap := preferences.Map()
+	if value := strings.TrimSpace(address); value != "" {
+		preferencesMap["address"] = value
+	}
 	plan := BuildActivityCopilotRunPlan(candidates, preferencesMap)
 	activity := candidates.Preflight.Activity
 	if plan.Activity != nil {
