@@ -60,6 +60,11 @@ func main() {
 			activeDesktop.showWindow()
 		}
 	})
+	mygo.App.OnDidBecomeActive(func() {
+		if activeDesktop != nil {
+			activeDesktop.showWindow()
+		}
+	})
 	mygo.App.WhenReady(startDesktop)
 	if err := mygo.App.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "la pluma:", err)
