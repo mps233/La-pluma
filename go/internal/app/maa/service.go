@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -244,7 +245,7 @@ func buildTaskFile(input map[string]any) (map[string]any, error) {
 	tasksInput, hasTasks := input["tasks"]
 	tasks := []any{}
 	if hasTasks {
-		array, ok := tasksInput.([]any)
+		array, ok := asAnyArray(tasksInput)
 		if !ok {
 			return nil, apperrors.Validation("AGENT_VALIDATION_TASK_CONFIG_INVALID", "taskConfig.tasks 必须是数组", nil)
 		}
@@ -285,7 +286,7 @@ func buildTaskFile(input map[string]any) (map[string]any, error) {
 func taskIdentity(input map[string]any) (string, string) {
 	name := "MAA 任务"
 	taskType := "Custom"
-	if tasks, ok := input["tasks"].([]any); ok && len(tasks) > 0 {
+	if tasks, ok := asAnyArray(input["tasks"]); ok && len(tasks) > 0 {
 		if first, ok := tasks[0].(map[string]any); ok {
 			if value, ok := first["name"].(string); ok && value != "" {
 				name = value
@@ -330,4 +331,26 @@ func randomSuffix() string {
 // MarshalTaskConfig is exported for diagnostics/tests.
 func MarshalTaskConfig(value map[string]any) ([]byte, error) {
 	return json.MarshalIndent(value, "", "  ")
+}
+
+func asAnyArray(value any) ([]any, bool) {
+	if value == nil {
+		return nil, false
+	}
+	rv := reflect.ValueOf(value)
+	if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
+		return nil, false
+	}
+	if typed, ok := value.([]any); ok {
+		return typed, true
+	}
+	data, err := json.Marshal(value)
+	if err != nil {
+		return nil, false
+	}
+	var result []any
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, false
+	}
+	return result, true
 }
