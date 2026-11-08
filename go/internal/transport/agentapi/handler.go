@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1416,7 +1417,47 @@ func (h *Handler) readLogFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) cleanupLogs(w http.ResponseWriter, r *http.Request) {
-	httpx.Success(w, http.StatusOK, map[string]any{"removed": 0}, "日志清理完成", nil)
+	body := decodeBody(r)
+	maxMB := intField(body, "maxSizeMB")
+	if maxMB <= 0 {
+		maxMB = 10
+	}
+	dir := filepath.Join(h.app.Config().Paths.MaaStateDir, "debug")
+	entries, _ := os.ReadDir(dir)
+	type logFile struct {
+		path    string
+		size    int64
+		modTime time.Time
+	}
+	files := make([]logFile, 0, len(entries))
+	var total int64
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".log") {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		files = append(files, logFile{path: path, size: info.Size(), modTime: info.ModTime()})
+		total += info.Size()
+	}
+	sort.Slice(files, func(i, j int) bool { return files[i].modTime.Before(files[j].modTime) })
+	limit := int64(maxMB) * 1024 * 1024
+	removed := 0
+	var freed int64
+	for _, file := range files {
+		if total <= limit {
+			break
+		}
+		if err := os.Remove(file.path); err == nil {
+			removed++
+			freed += file.size
+			total -= file.size
+		}
+	}
+	httpx.Success(w, http.StatusOK, map[string]any{"removed": removed, "freedBytes": freed, "remainingBytes": total}, "日志清理完成", nil)
 }
 
 func stringField(record map[string]any, key string) string {

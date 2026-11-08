@@ -22,7 +22,7 @@ type ParadoxOperator struct {
 
 // ParseParadoxOperators joins handbook_info_table.json and character_table.json
 // into the paradox operator list. Entries without a stage id are dropped and
-// the result is sorted by display name with Chinese collation, matching
+// the result is sorted by display name with Chinese collation, approximating
 // name.localeCompare(name, 'zh-Hans-CN').
 //
 // Go maps have no insertion order, so equal names use the character id as a
