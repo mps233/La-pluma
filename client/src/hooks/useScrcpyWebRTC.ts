@@ -846,6 +846,43 @@ export function useScrcpyWebRTC({
     return sendTouchPacket(x, y, targetW, targetH)
   }, [deviceSize.height, deviceSize.width, videoRef])
 
+  const sendScroll = useCallback((deltaX: number, deltaY: number, clientX: number, clientY: number, targetVideo?: HTMLVideoElement | null) => {
+    const channel = inputChannelRef.current
+    const video = targetVideo || videoRef.current
+    if (!channel || channel.readyState !== 'open') return false
+    if (!video || !video.videoWidth || !video.videoHeight) return false
+    const rect = video.getBoundingClientRect()
+    if (!rect.width || !rect.height) return false
+    const geometry = getRenderedVideoGeometry(rect.width, rect.height, video.videoWidth, video.videoHeight)
+    if (!geometry) return false
+    if (!isPointInsideRenderedVideo(clientX, clientY, rect, geometry)) return false
+    const { actualW, actualH, offsetX, offsetY } = geometry
+    const { width: targetW, height: targetH } = resolveTouchTargetSize(
+      deviceSize.width,
+      deviceSize.height,
+      video.videoWidth,
+      video.videoHeight
+    )
+    const x = Math.max(0, Math.min(targetW - 1, Math.round((clientX - rect.left - offsetX) / actualW * targetW)))
+    const y = Math.max(0, Math.min(targetH - 1, Math.round((clientY - rect.top - offsetY) / actualH * targetH)))
+    try {
+      channel.send(JSON.stringify({
+        type: 'scroll',
+        x,
+        y,
+        w: targetW,
+        h: targetH,
+        hscroll: deltaX,
+        vscroll: deltaY,
+        buttons: 0,
+        client_ts_ms: Date.now()
+      }))
+      return true
+    } catch {
+      return false
+    }
+  }, [deviceSize.height, deviceSize.width, videoRef])
+
   const sendCommand = useCallback((command: string): Promise<ScrcpyCommandResult> => {
     const ws = wsRef.current
     if (ws?.readyState !== WebSocket.OPEN) {
@@ -962,5 +999,5 @@ export function useScrcpyWebRTC({
     return () => document.removeEventListener('visibilitychange', handleVisibility)
   }, [cancelHiddenDisconnect, connect, passive, scheduleHiddenDisconnect])
 
-  return { status, error, stats, inputReady, mediaStream, connect, disconnect, sendTouch, sendCommand }
+  return { status, error, stats, inputReady, mediaStream, connect, disconnect, sendTouch, sendScroll, sendCommand }
 }

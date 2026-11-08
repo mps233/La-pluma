@@ -21,6 +21,7 @@ import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import DesktopSettings from './DesktopSettings'
+import AccessTokenSettings from './AccessTokenSettings'
 import type {
   MaaConnectionConfig,
   AutoUpdateConfig,
@@ -1187,6 +1188,9 @@ export default function ConfigManager() {
         </div>
       </div>
       <DesktopSettings />
+      <div className="config-access-token">
+        <AccessTokenSettings />
+      </div>
     </div>
   )
 }

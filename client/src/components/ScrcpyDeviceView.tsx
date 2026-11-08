@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
+import { ArrowLeft, Clipboard, ClipboardPaste, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
+import { maaApi } from '../services/api'
 import { Button, IconButton, TruncatedText } from './common'
 import { keepNumberWithUnit } from '../utils/typography'
 import { previewQualityPresets, usePreviewStore, type PreviewQuality } from '../stores'
@@ -169,6 +170,10 @@ export default function ScrcpyDeviceView({
   }, [webrtc.sendTouch])
 
   useEffect(() => {
+    if (webrtc.status === 'connected') setSettingsDirty(false)
+  }, [webrtc.status])
+
+  useEffect(() => {
     const width = webrtc.stats?.width ?? 0
     const height = webrtc.stats?.height ?? 0
     const previous = lastPreviewGeometryRef.current
@@ -245,23 +250,64 @@ export default function ScrcpyDeviceView({
     void action()
   }
 
+  const showCommandError = (message: string) => {
+    if (commandErrorTimerRef.current !== null) {
+      window.clearTimeout(commandErrorTimerRef.current)
+      commandErrorTimerRef.current = null
+    }
+    setCommandError(message)
+    commandErrorTimerRef.current = window.setTimeout(() => {
+      commandErrorTimerRef.current = null
+      setCommandError(null)
+    }, 4000)
+  }
+
   const sendDeviceCommand = (command: string) => {
     if (!automationAvailable) return
     void webrtc.sendCommand(command).then(result => {
-      if (commandErrorTimerRef.current !== null) {
-        window.clearTimeout(commandErrorTimerRef.current)
-        commandErrorTimerRef.current = null
-      }
       if (result.success) {
         setCommandError(null)
         return
       }
-      setCommandError(result.error || '命令执行失败')
-      commandErrorTimerRef.current = window.setTimeout(() => {
-        commandErrorTimerRef.current = null
-        setCommandError(null)
-      }, 4000)
+      showCommandError(result.error || '命令执行失败')
     })
+  }
+
+  const copyDeviceClipboard = () => {
+    if (!automationAvailable || webrtc.status !== 'connected') return
+    void maaApi.getClipboard().then(async result => {
+      if (!result.success) {
+        showCommandError(maaApi.getErrorMessage(result))
+        return
+      }
+      const text = result.data?.text ?? ''
+      if (!text) {
+        showCommandError('设备剪贴板为空')
+        return
+      }
+      try {
+        await navigator.clipboard.writeText(text)
+        setCommandError(null)
+      } catch {
+        showCommandError('无法写入本机剪贴板')
+      }
+    }).catch(() => showCommandError('读取设备剪贴板失败'))
+  }
+
+  const pasteLocalClipboard = () => {
+    if (!automationAvailable || webrtc.status !== 'connected') return
+    void navigator.clipboard.readText().then(async text => {
+      if (!text) {
+        showCommandError('本机剪贴板为空')
+        return
+      }
+      const result = await maaApi.setClipboard(text, true)
+      if (!result.success) {
+        showCommandError(maaApi.getErrorMessage(result))
+        return
+      }
+      setCommandError(null)
+    }).catch(() => showCommandError('无法读取本机剪贴板'))
   }
 
   useEffect(() => {
@@ -299,6 +345,13 @@ export default function ScrcpyDeviceView({
       event.currentTarget.setPointerCapture(event.pointerId)
     } catch {
       // The pointer may already have ended between the down event and capture.
+    }
+  }
+
+  const onWheel = (event: React.WheelEvent<HTMLVideoElement>) => {
+    if (!automationAvailable || !webrtc.inputReady) return
+    if (webrtc.sendScroll(event.deltaX, event.deltaY, event.clientX, event.clientY, event.currentTarget)) {
+      event.preventDefault()
     }
   }
 
@@ -588,6 +641,7 @@ export default function ScrcpyDeviceView({
             className="w-full h-full object-contain touch-none select-none"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
+            onWheel={onWheel}
             onPointerUp={(event) => finishPointer(event)}
             onPointerCancel={(event) => finishPointer(event, true)}
             onLostPointerCapture={onLostPointerCapture}
@@ -666,6 +720,28 @@ export default function ScrcpyDeviceView({
             automationAvailable={automationAvailable}
             automationUnavailableMessage={automationUnavailableMessage}
             onCommand={sendDeviceCommand}
+          />
+          <IconButton
+            icon={<Clipboard className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />}
+            variant="secondary"
+            size="md"
+            onClick={copyDeviceClipboard}
+            disabled={!automationAvailable || webrtc.status !== 'connected'}
+            aria-label="读取设备剪贴板"
+            tooltip="读取设备剪贴板"
+            tooltipSide="top"
+            className="scrcpy-preview-control"
+          />
+          <IconButton
+            icon={<ClipboardPaste className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />}
+            variant="secondary"
+            size="md"
+            onClick={pasteLocalClipboard}
+            disabled={!automationAvailable || webrtc.status !== 'connected'}
+            aria-label="发送本机剪贴板"
+            tooltip="发送本机剪贴板"
+            tooltipSide="top"
+            className="scrcpy-preview-control"
           />
           <IconButton
             icon={<Maximize2 className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />}
@@ -897,6 +973,7 @@ export default function ScrcpyDeviceView({
             className="h-full w-full object-contain touch-none select-none"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
+            onWheel={onWheel}
             onPointerUp={(event) => finishPointer(event)}
             onPointerCancel={(event) => finishPointer(event, true)}
             onLostPointerCapture={onLostPointerCapture}

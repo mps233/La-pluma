@@ -20,6 +20,7 @@ import type {
 } from '@/types/components'
 import { parseJsonResponse } from '@/utils/apiResponse'
 import { bumpItemIconCacheVersion, getItemIconCacheVersion } from './itemIconCache'
+import { notifyAuthRequired, readAccessToken } from '@/utils/accessToken'
 
 export { parseJsonResponse } from '@/utils/apiResponse'
 
@@ -40,19 +41,8 @@ export const getItemIconUrl = (iconId: string | number): string => {
   return version > 0 ? `${path}?v=${version}` : path
 }
 
-const getStoredToken = (): string => {
-  const rawToken = localStorage.getItem('laPlumaToken') || ''
-  const token = rawToken.replace(/^Bearer\s+/i, '').trim()
-
-  // Headers.set() throws "The string did not match the expected pattern" when
-  // the value contains CR/LF or other control characters. Treat malformed
-  // stored tokens as absent so API calls can return a normal 401 instead of
-  // crashing the UI action.
-  return /[\u0000-\u001f\u007f]/.test(token) ? '' : token
-}
-
 const getAuthHeaders = (): Record<string, string> => {
-  const token = getStoredToken()
+  const token = readAccessToken()
   return token ? { Authorization: `Bearer ${token}`, 'X-La-Pluma-Token': token } : {}
 }
 
@@ -61,7 +51,9 @@ export const fetchWithAuth = async (input: RequestInfo | URL, init: RequestInit 
   Object.entries(getAuthHeaders()).forEach(([key, value]) => headers.set(key, value))
 
   try {
-    return await fetch(input, { ...init, headers })
+    const response = await fetch(input, { ...init, headers })
+    if (response.status === 401) notifyAuthRequired()
+    return response
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') throw error
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -557,15 +549,39 @@ export const maaApi = {
     return parseJsonResponse(response)
   },
 
+  async getClipboard(): Promise<ApiResponse<{ text?: string }>> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/clipboard`)
+    return parseJsonResponse<ApiResponse<{ text?: string }>>(response)
+  },
+
+  async setClipboard(text: string, paste: boolean = true): Promise<ApiResponse> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/clipboard`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, paste })
+    })
+    return parseJsonResponse(response)
+  },
+
+  async stopWebrtc(): Promise<ApiResponse> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/stop`, { method: 'POST' })
+    return parseJsonResponse(response)
+  },
+
   async startWebrtc(
     profileId: string = 'default',
     deviceId: string = 'mumu-la-pluma',
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: { max_fps?: number; max_size?: number; bitrate?: number }
   ): Promise<ApiResponse<WebrtcStatusData>> {
+    const body: Record<string, unknown> = { profileId, deviceId }
+    if (options?.max_fps) body.maxFps = options.max_fps
+    if (options?.max_size) body.maxSize = options.max_size
+    if (options?.bitrate) body.bitRate = options.bitrate
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profileId, deviceId }),
+      body: JSON.stringify(body),
       signal
     })
     return parseJsonResponse(response)

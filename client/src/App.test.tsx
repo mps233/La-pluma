@@ -40,6 +40,7 @@ vi.mock('./hooks/useScrcpyWebRTC', () => ({
     connect: () => undefined,
     disconnect: () => undefined,
     sendTouch: () => false,
+    sendScroll: () => false,
     sendCommand: () => Promise.resolve({ success: false }),
   }),
 }))
@@ -54,7 +55,14 @@ vi.mock('./components/Layout', () => ({
 vi.mock('./components/PWAInstallPrompt', () => ({ default: () => null }))
 vi.mock('./hooks/useBackendStatusMonitor', () => ({ useBackendStatusMonitor: () => undefined }))
 vi.mock('./hooks/useRunStatusMonitor', () => ({ useRunStatusMonitor: () => undefined }))
-vi.mock('./components/common', () => ({ PageSkeleton: ({ variant }: { variant: string }) => <div>{variant} skeleton</div> }))
+vi.mock('./components/common', () => ({
+  PageSkeleton: ({ variant }: { variant: string }) => <div>{variant} skeleton</div>,
+  Modal: ({ isOpen, children }: { isOpen: boolean; children?: ReactNode }) => (isOpen ? <div>{children}</div> : null),
+  Input: ({ value, onChange, placeholder }: { value?: string; onChange?: (value: string) => void; placeholder?: string }) => (
+    <input value={value} placeholder={placeholder} onChange={event => onChange?.(event.target.value)} />
+  ),
+  Button: ({ children, onClick }: { children?: ReactNode; onClick?: () => void }) => <button onClick={onClick}>{children}</button>,
+}))
 vi.mock('./components/Dashboard', () => ({
   default: function MockDashboard() {
     if (appMocks.dashboardShouldThrow) throw new Error('dashboard render failed')

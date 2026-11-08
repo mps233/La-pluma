@@ -17,6 +17,7 @@ const webrtcMock = vi.hoisted(() => ({
   connect: vi.fn(),
   disconnect: vi.fn(),
   sendTouch: vi.fn(),
+  sendScroll: vi.fn(),
   sendCommand: vi.fn(),
 }))
 

@@ -132,7 +132,7 @@ describe('ConfigManager layout surfaces', () => {
     expect(page?.querySelector('.app-page-header-icon')).toBeNull()
 
     const cards = page?.querySelectorAll('.app-card[data-smooth-corners="true"]') ?? []
-    expect(cards).toHaveLength(3)
+    expect(cards).toHaveLength(4)
     cards.forEach((card) => {
       expect(card.classList.contains('!p-0')).toBe(true)
       expect(card.querySelector(':scope > .app-card-smooth-surface')).not.toBeNull()

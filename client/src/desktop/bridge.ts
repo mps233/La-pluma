@@ -29,6 +29,7 @@ async function desktopCall<T>(method: string, ...args: unknown[]): Promise<T> {
 export const desktopBridge = {
   appInfo: () => desktopCall<DesktopAppInfo>('DesktopBridge.AppInfo'),
   chooseExecutable: (kind: 'adb' | 'maa') => desktopCall<string>('DesktopBridge.ChooseExecutable', kind),
+  setExecutable: (kind: 'adb' | 'maa', path: string) => desktopCall<void>('DesktopBridge.SetExecutable', kind, path),
   openDataDir: () => desktopCall<void>('DesktopBridge.OpenDataDir'),
   openLogs: () => desktopCall<void>('DesktopBridge.OpenLogs'),
   notify: (title: string, body: string) => desktopCall<void>('DesktopBridge.Notify', title, body),

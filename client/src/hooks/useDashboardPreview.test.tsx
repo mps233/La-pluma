@@ -36,6 +36,7 @@ vi.mock('./useScrcpyWebRTC', () => ({
     connect: mocks.connect,
     disconnect: mocks.disconnect,
     sendTouch: vi.fn(),
+    sendScroll: vi.fn(),
     sendCommand: vi.fn(),
   }),
 }))

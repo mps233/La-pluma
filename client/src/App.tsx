@@ -2,6 +2,7 @@ import React, { Activity, lazy, Suspense, useEffect, useState } from 'react'
 import Dashboard from './components/Dashboard'
 import Layout from './components/Layout'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
+import AccessTokenGate from './components/AccessTokenGate'
 import { PageSkeleton } from './components/common'
 import { useBackendStatusMonitor } from './hooks/useBackendStatusMonitor'
 import { useRunStatusMonitor } from './hooks/useRunStatusMonitor'
@@ -117,6 +118,7 @@ function App() {
         </Layout>
       </PreviewSessionProvider>
       <PWAInstallPrompt />
+      <AccessTokenGate />
     </div>
   )
 }

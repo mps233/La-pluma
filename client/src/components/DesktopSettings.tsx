@@ -43,8 +43,9 @@ export default function DesktopSettings() {
   const choose = (kind: 'adb' | 'maa') => run(`选择 ${kind.toUpperCase()} 路径`, async () => {
     const path = await desktopBridge.chooseExecutable(kind)
     if (!path) return
+    await desktopBridge.setExecutable(kind, path)
     setSelected({ kind, path })
-    setMessage(`已选择 ${kind.toUpperCase()} 路径，可复制到上方连接设置`)
+    setMessage(`已保存并应用 ${kind.toUpperCase()} 路径`)
   })
 
   return (

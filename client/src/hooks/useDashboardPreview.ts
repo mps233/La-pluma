@@ -50,7 +50,7 @@ export function useDashboardPreview() {
     autoConnectRef.current = false
     disconnectPreview()
     if (!serverRunning || !agentRunning) {
-      void maaApi.startWebrtc()
+      void maaApi.startWebrtc('default', 'mumu-la-pluma', undefined, scrcpyOptions)
         .then(result => {
           if (!result.success) throw new Error(maaApi.getErrorMessage(result))
           setPreviewStartError(null)
@@ -110,7 +110,7 @@ export function useDashboardPreview() {
   useEffect(() => {
     if (mode !== 'live' || !statusSettled || (serverRunning && agentRunning) || infrastructureStartingRef.current) return
     infrastructureStartingRef.current = true
-    void maaApi.startWebrtc()
+    void maaApi.startWebrtc('default', 'mumu-la-pluma', undefined, scrcpyOptions)
       .then(result => {
         if (!result.success) throw new Error(maaApi.getErrorMessage(result))
         setPreviewStartError(null)
@@ -122,7 +122,7 @@ export function useDashboardPreview() {
       .finally(() => {
         infrastructureStartingRef.current = false
       })
-  }, [agentRunning, mode, serverRunning, statusSettled])
+  }, [agentRunning, mode, serverRunning, scrcpyOptions, statusSettled])
 
   useEffect(() => {
     const canvas = document.createElement('canvas')
