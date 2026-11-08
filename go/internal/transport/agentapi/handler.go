@@ -522,13 +522,26 @@ func (h *Handler) webrtcStart(w http.ResponseWriter, r *http.Request) {
 	if request.Address == "" {
 		request.Address = connection.Address
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	status, err := h.app.WebRTC.Start(ctx, request)
+	run, replayed, err := h.executeTrackedResult(ctx, "webrtc_start", map[string]any{
+		"profileId": body.ProfileID, "adbPath": request.ADBPath, "address": request.Address, "deviceId": request.DeviceID,
+	}, map[string]any{"taskName": "启动实时预览", "taskType": "preview"}, idempotencyKey(r), func(actionCtx context.Context) (any, error) {
+		status, startErr := h.app.WebRTC.Start(actionCtx, request)
+		if startErr != nil {
+			return nil, startErr
+		}
+		return status, nil
+	})
 	if err != nil {
+		if run.State == agentrun.StatusFailed || run.State == agentrun.StatusInterrupted {
+			sendRunFailureResponse(w, run)
+			return
+		}
 		writeError(w, err)
 		return
 	}
+	status := structMap(run.Result)
 	deviceID, _ := status["deviceId"].(string)
 	status["protocol"] = map[string]any{
 		"websocket":           "/webrtc-signaling/connect_client?token=",
@@ -536,7 +549,7 @@ func (h *Handler) webrtcStart(w http.ResponseWriter, r *http.Request) {
 		"requestOfferPayload": map[string]any{"type": "request-offer", "ip_preference": "ipv4"},
 		"candidatePolicy":     "relay preferred / ipv4",
 	}
-	httpx.Success(w, http.StatusOK, status, "WebRTC 预览已启动", nil)
+	sendRunResponseMessage(w, run, replayed, false, status, "WebRTC 预览已启动")
 }
 
 func (h *Handler) webrtcStop(w http.ResponseWriter, r *http.Request) {
@@ -1246,6 +1259,7 @@ func (h *Handler) stopActions(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	requestedRunID := strings.TrimSpace(stringField(body, "runId"))
+	stopOperationID := ""
 	if requestedRunID != "" {
 		requested, ok := h.app.Runs.Get(requestedRunID)
 		if !ok {
@@ -1267,6 +1281,7 @@ func (h *Handler) stopActions(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		stopOperationID = requested.OperationID
 		if requested.State == agentrun.StatusAccepted {
 			writeError(w, apperrors.WithStatus("AGENT_RUN_NOT_STARTED", "目标 run 尚未获得执行权，未发送终止命令", http.StatusConflict, true, map[string]any{"requestedRunId": requestedRunID, "state": requested.State}))
 			return
@@ -1282,9 +1297,20 @@ func (h *Handler) stopActions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if stopOperationID == "" {
+		if current, ok := h.app.Runs.Current(); ok {
+			stopOperationID = current.OperationID
+		}
+	}
 	outcome := h.app.MAAServiceService().StopCurrent(ctx)
 	scheduleStopped := h.app.Scheduler.Stop(ctx)
-	stopRequested := outcome.Success || scheduleStopped
+	webrtcStopped := false
+	if stopOperationID == "webrtc_start" {
+		if err := h.app.WebRTC.Stop(ctx); err == nil {
+			webrtcStopped = true
+		}
+	}
+	stopRequested := outcome.Success || scheduleStopped || webrtcStopped
 
 	var run any
 	if requestedRunID != "" {
@@ -1298,6 +1324,7 @@ func (h *Handler) stopActions(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{
 		"task":            map[string]any{"success": outcome.Success, "message": outcome.Message},
 		"scheduleStopped": scheduleStopped,
+		"webrtcStopped":   webrtcStopped,
 		"stopRequested":   stopRequested,
 		"run":             run,
 	}
@@ -2628,26 +2655,21 @@ func (h *Handler) cleanupLogs(w http.ResponseWriter, r *http.Request) {
 		maxMB = 10
 	}
 	dir := filepath.Join(h.app.Config().Paths.MaaStateDir, "debug")
-	entries, _ := os.ReadDir(dir)
 	type logFile struct {
 		path    string
 		size    int64
 		modTime time.Time
 	}
-	files := make([]logFile, 0, len(entries))
+	files := make([]logFile, 0)
 	var total int64
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".log") {
-			continue
+	_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil || info.IsDir() || !strings.HasSuffix(info.Name(), ".log") {
+			return nil
 		}
-		info, err := entry.Info()
-		if err != nil {
-			continue
-		}
-		path := filepath.Join(dir, entry.Name())
 		files = append(files, logFile{path: path, size: info.Size(), modTime: info.ModTime()})
 		total += info.Size()
-	}
+		return nil
+	})
 	sort.Slice(files, func(i, j int) bool { return files[i].modTime.Before(files[j].modTime) })
 	limit := int64(maxMB) * 1024 * 1024
 	removed := 0

@@ -296,7 +296,7 @@ func parseDevices(output string) []Device {
 	var devices []Device
 	for _, rawLine := range strings.Split(output, "\n") {
 		line := strings.TrimSpace(rawLine)
-		if line == "" || strings.HasPrefix(line, "List of devices attached") {
+		if line == "" || strings.HasPrefix(line, "List of devices attached") || strings.HasPrefix(line, "(no serial number)") {
 			continue
 		}
 		fields := strings.Fields(line)

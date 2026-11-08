@@ -58,8 +58,12 @@ type Service struct {
 type activeRuntime struct {
 	session   *scrcpy.Session
 	publisher *scwebrtc.Publisher
+	adbPath   string
 	address   string
 	deviceID  string
+	maxSize   int
+	maxFPS    int
+	bitRate   int
 	startedAt time.Time
 }
 
@@ -138,13 +142,28 @@ func (s *Service) Start(ctx context.Context, request StartRequest) (map[string]a
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.current != nil {
-		return s.statusLocked(), nil
-	}
 	adbPath := firstNonEmpty(request.ADBPath, s.adbPath)
 	address := firstNonEmpty(request.Address, s.address)
 	deviceID := firstNonEmpty(request.DeviceID, s.deviceID)
 	serverPath := firstNonEmpty(request.ServerPath, s.serverPath)
+	maxSize := positive(request.MaxSize, s.maxSize)
+	maxFPS := positive(request.MaxFPS, s.maxFPS)
+	bitRate := positive(request.BitRate, s.bitRate)
+	if s.current != nil {
+		changed := (request.MaxSize > 0 && maxSize != s.current.maxSize) ||
+			(request.MaxFPS > 0 && maxFPS != s.current.maxFPS) ||
+			(request.BitRate > 0 && bitRate != s.current.bitRate) ||
+			(request.ADBPath != "" && adbPath != s.current.adbPath) ||
+			(request.Address != "" && address != s.current.address) ||
+			(request.DeviceID != "" && deviceID != s.current.deviceID)
+		if !changed {
+			return s.statusLocked(), nil
+		}
+		previous := s.current
+		s.current = nil
+		previous.publisher.Close()
+		_ = previous.session.Close()
+	}
 	if serverPath == "" {
 		return nil, fmt.Errorf("找不到 scrcpy-server jar；请设置 LA_PLUMA_SCRCPY_SERVER_PATH")
 	}
@@ -157,9 +176,9 @@ func (s *Service) Start(ctx context.Context, request StartRequest) (map[string]a
 		Serial:        address,
 		ServerPath:    serverPath,
 		ServerVersion: firstNonEmpty(request.ServerVersion, s.serverVersion),
-		BitRate:       positive(request.BitRate, s.bitRate),
-		MaxSize:       positive(request.MaxSize, s.maxSize),
-		MaxFPS:        positive(request.MaxFPS, s.maxFPS),
+		BitRate:       bitRate,
+		MaxSize:       maxSize,
+		MaxFPS:        maxFPS,
 		Control:       true,
 		Audio:         false,
 		Logger:        s.logger,
@@ -177,8 +196,12 @@ func (s *Service) Start(ctx context.Context, request StartRequest) (map[string]a
 	s.current = &activeRuntime{
 		session:   session,
 		publisher: publisher,
+		adbPath:   adbPath,
 		address:   address,
 		deviceID:  deviceID,
+		maxSize:   maxSize,
+		maxFPS:    maxFPS,
+		bitRate:   bitRate,
 		startedAt: time.Now(),
 	}
 	s.logger.Info("webrtc start", "address", address, "device_id", deviceID, "width", session.Width, "height", session.Height)
