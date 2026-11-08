@@ -280,14 +280,41 @@ function candidateHasIpv4(candidate: string) {
   return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(candidateAddress(candidate))
 }
 
-export function shouldKeepCandidate(candidate: string, connectionPath: 'auto' | 'relay' | 'direct', ipPreference: 'auto' | 'ipv4' | 'ipv6') {
-  if (!candidate) return false
+export function candidateIsLoopback(candidate: string) {
+  const address = candidateAddress(candidate)
+  return address.startsWith('127.') || address === '::1'
+}
+
+function filterCandidateLine(candidate: string, connectionPath: 'auto' | 'relay' | 'direct', ipPreference: 'auto' | 'ipv4' | 'ipv6') {
   const isRelay = candidate.includes(' typ relay')
   if (connectionPath === 'relay' && !isRelay) return false
   if (connectionPath === 'direct' && isRelay) return false
   if (ipPreference === 'ipv4' && candidateHasIpv6(candidate)) return false
   if (ipPreference === 'ipv6' && candidateHasIpv4(candidate)) return false
   return true
+}
+
+export function shouldKeepCandidate(candidate: string, connectionPath: 'auto' | 'relay' | 'direct', ipPreference: 'auto' | 'ipv4' | 'ipv6') {
+  if (!candidate) return false
+  return filterCandidateLine(candidate, connectionPath, ipPreference)
+}
+
+// WebKit can advertise 127.0.0.1 while sending from the LAN address; Pion
+// then discards the STUN response and ICE never starts. Drop loopback only
+// when the SDP also offers a real address, so a loopback-only setup still works.
+export function filterSdpCandidatesForPolicy(
+  sdp: string,
+  connectionPath: 'auto' | 'relay' | 'direct',
+  ipPreference: 'auto' | 'ipv4' | 'ipv6'
+) {
+  const lines = sdp.split('\r\n')
+  const candidates = lines.filter(line => line.startsWith('a=candidate:'))
+  const hasNonLoopback = candidates.some(line => !candidateIsLoopback(line))
+  return lines.filter(line => {
+    if (!line.startsWith('a=candidate:')) return true
+    if (hasNonLoopback && candidateIsLoopback(line)) return false
+    return filterCandidateLine(line, connectionPath, ipPreference)
+  }).join('\r\n')
 }
 
 export function useScrcpyWebRTC({
@@ -375,10 +402,7 @@ export function useScrcpyWebRTC({
   }, [])
 
   const filterSdpCandidates = useCallback((sdp: string) => {
-    return sdp.split('\r\n').filter(line => {
-      if (!line.startsWith('a=candidate:')) return true
-      return shouldKeepCandidate(line, connectionPath, ipPreference)
-    }).join('\r\n')
+    return filterSdpCandidatesForPolicy(sdp, connectionPath, ipPreference)
   }, [connectionPath, ipPreference])
 
   const sendAnswer = useCallback(() => {
@@ -422,6 +446,7 @@ export function useScrcpyWebRTC({
       if (pcRef.current !== pc) return
       if (!evt.candidate) return
       const candidate = evt.candidate.candidate
+      if (candidateIsLoopback(candidate)) return
       if (!shouldKeepCandidate(candidate, connectionPath, ipPreference)) return
       sendForward({
         type: 'ice-candidate',
@@ -749,6 +774,7 @@ export function useScrcpyWebRTC({
               })()
             } else if (payload.type === 'ice-candidate' && payload.candidate) {
               const candidate = payload.candidate.candidate ?? ''
+              if (candidateIsLoopback(candidate)) return
               if (!shouldKeepCandidate(candidate, connectionPath, ipPreference)) return
               void pcRef.current?.addIceCandidate(new RTCIceCandidate(payload.candidate)).catch(() => {})
             }

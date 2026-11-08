@@ -110,6 +110,12 @@ func (p *Publisher) CreateOffer(peerID string) (string, []webrtc.ICECandidateIni
 		pc.Close()
 		return "", nil, fmt.Errorf("create input channel: %w", err)
 	}
+	input.OnOpen(func() {
+		p.logger.Info("input channel open", "peer", peerID)
+	})
+	input.OnClose(func() {
+		p.logger.Info("input channel closed", "peer", peerID)
+	})
 	input.OnMessage(func(message webrtc.DataChannelMessage) {
 		p.handleInput(message.Data)
 	})

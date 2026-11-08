@@ -288,6 +288,7 @@ func (c *wsClient) forward(payload map[string]any) error {
 		if sdp == "" {
 			return fmt.Errorf("缺少 SDP answer")
 		}
+		c.server.logger.Debug("signaling answer", "peer", c.peerID, "sections", sdpSections(sdp))
 		return publisher.SetAnswer(c.peerID, sdp)
 	case "ice-candidate":
 		raw, ok := payload["candidate"].(map[string]any)
@@ -360,4 +361,20 @@ func randomToken() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(bytes[:]), nil
+}
+
+// sdpSections returns only the m-lines and SCTP/DTLS setup lines, which is
+// enough to tell whether a peer accepted the data channel without logging
+// candidates or fingerprints.
+func sdpSections(sdp string) string {
+	var parts []string
+	for _, line := range strings.Split(sdp, "\r\n") {
+		for _, prefix := range []string{"m=", "a=setup:", "a=sctp-port:", "a=max-message-size:"} {
+			if strings.HasPrefix(line, prefix) {
+				parts = append(parts, line)
+				break
+			}
+		}
+	}
+	return strings.Join(parts, " | ")
 }

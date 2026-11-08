@@ -11,6 +11,7 @@ import {
   resolveSignalingEndpoints,
   resolveTouchTargetSize,
   normalizeIceServers,
+  filterSdpCandidatesForPolicy,
   shouldKeepCandidate,
   useScrcpyWebRTC,
   type ScrcpyCommandResult,
@@ -583,11 +584,14 @@ describe('WebRTC candidate filtering', () => {
   const ipv4Line = 'a=candidate:1 1 UDP 2122260223 192.168.50.14 54321 typ host'
   const relayLine = 'a=candidate:2 1 UDP 16777215 192.168.50.14 49152 typ relay raddr 10.0.2.15 rport 50000'
   const ipv6Line = 'a=candidate:3 1 UDP 2122260223 2001:db8::1 54321 typ host'
+  const loopbackLine = 'a=candidate:4 1 UDP 2122260223 127.0.0.1 54321 typ host'
+  const loopback6Line = 'a=candidate:5 1 UDP 2122260223 ::1 54321 typ host'
 
   it('keeps IPv4 candidates in SDP lines with the a= prefix', () => {
     expect(shouldKeepCandidate(ipv4Line, 'auto', 'ipv4')).toBe(true)
     expect(shouldKeepCandidate(relayLine, 'auto', 'ipv4')).toBe(true)
     expect(shouldKeepCandidate(ipv6Line, 'auto', 'ipv4')).toBe(false)
+    expect(shouldKeepCandidate(loopbackLine, 'auto', 'ipv4')).toBe(true)
   })
 
   it('keeps IPv6 candidates when requested and filters relay/direct policy', () => {
@@ -595,9 +599,26 @@ describe('WebRTC candidate filtering', () => {
     expect(shouldKeepCandidate(ipv4Line, 'auto', 'ipv6')).toBe(false)
     expect(shouldKeepCandidate(ipv4Line, 'relay', 'ipv4')).toBe(false)
     expect(shouldKeepCandidate(relayLine, 'relay', 'ipv4')).toBe(true)
+    expect(shouldKeepCandidate(loopback6Line, 'auto', 'ipv6')).toBe(true)
   })
 })
 
+
+describe('SDP loopback filtering', () => {
+  const lanLine = 'a=candidate:1 1 UDP 2122260223 192.168.50.14 54321 typ host'
+  const loopbackLine = 'a=candidate:4 1 UDP 2122260223 127.0.0.1 54321 typ host'
+
+  it('drops loopback when the SDP also offers a LAN address', () => {
+    const filtered = filterSdpCandidatesForPolicy(`${lanLine}\r\n${loopbackLine}`, 'auto', 'ipv4')
+    expect(filtered).toContain('192.168.50.14')
+    expect(filtered).not.toContain('127.0.0.1')
+  })
+
+  it('keeps loopback when it is the only candidate', () => {
+    const filtered = filterSdpCandidatesForPolicy(loopbackLine, 'auto', 'ipv4')
+    expect(filtered).toContain('127.0.0.1')
+  })
+})
 
 describe('WebRTC ICE server normalization', () => {
   it('removes the empty userinfo marker emitted by the signaling server', () => {
