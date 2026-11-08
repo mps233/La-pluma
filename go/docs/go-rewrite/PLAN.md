@@ -80,10 +80,10 @@ go/
   - [x] desktop shell: window/loopback server/single-instance/tray/quit
   - [x] `mygo build` app bundle (ad-hoc signed, 27 MB)
   - [x] native bindings: file picker/notify/open/autostart/app info
-  - [ ] tray flyout (native UI)
+  - [x] tray flyout (native UI) + desktop settings panel
   - [x] PWA gating + desktop worker/cache cleanup
-  - [ ] Developer ID signing/notarization/updater
-  - [ ] desktop bridge wired into React UI
+  - [ ] Developer ID signing/notarization/updater (needs credentials)
+  - [x] desktop bridge wired into React Config page
 - [x] 7. Real MuMu verification
   - [x] device connect/screenshot read-only
   - [x] live view + touch/key control (Pion probe + React client)

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/ui"
 
 	"github.com/mps233/la-pluma/go/internal/app"
 	"github.com/mps233/la-pluma/go/internal/app/quotes"
@@ -61,6 +62,7 @@ type desktopRuntime struct {
 	closeOnce sync.Once
 	window    *mygo.Window
 	tray      *mygo.Tray
+	panel     *mygo.Window
 }
 
 func startDesktop() {
@@ -206,6 +208,9 @@ func (r *desktopRuntime) setupTray(logger *slog.Logger) {
 	}
 	r.tray = tray
 	menu := mygo.NewMenu([]*mygo.MenuItem{
+		{Label: "状态面板", Click: func(*mygo.MenuItem, *mygo.Window) {
+			r.togglePanel()
+		}},
 		{Label: "显示主窗口", Click: func(*mygo.MenuItem, *mygo.Window) {
 			r.showWindow()
 		}},
@@ -220,7 +225,7 @@ func (r *desktopRuntime) setupTray(logger *slog.Logger) {
 	} else {
 		tray.SetMenu(menu)
 		tray.OnClick(func() {
-			r.showWindow()
+			r.togglePanel()
 		})
 	}
 	mygo.App.OnWillQuit(func(*mygo.QuitEvent) { tray.Destroy() })
@@ -461,4 +466,72 @@ func resolveDesktopMAA() {
 			return
 		}
 	}
+}
+
+func (r *desktopRuntime) togglePanel() {
+	if r.panel != nil {
+		r.panel.Close()
+		return
+	}
+	r.panel = mygo.NewFlyout(mygo.FlyoutOptions{
+		Tray:      r.tray,
+		Placement: mygo.PlacementBottom,
+		Gap:       4,
+		Width:     320,
+		Height:    230,
+		Focusable: true,
+		Shadow:    true,
+		Popover:   true,
+		Content:   ui.View(r.panelView),
+	})
+	r.panel.OnClosed(func() { r.panel = nil })
+}
+
+func (r *desktopRuntime) panelView(c *ui.Context) {
+	theme := c.Theme()
+	column := ui.Column(c).Fill().Padding(16).Gap(10)
+	column.Background(theme.Surface).Radius(10)
+	column.Children(func() {
+		ui.Text(c, "La Pluma").FontSize(17).Bold()
+		status := "空闲"
+		if task := r.app.TaskStatus(); task.IsRunning {
+			status = "运行中"
+			if task.TaskName != "" {
+				status += "：" + task.TaskName
+			}
+		}
+		ui.Textf(c, "状态：%s", status).FontSize(12).TextColor(theme.TextMuted)
+		if run, ok := r.app.CurrentRun(); ok {
+			ui.Textf(c, "当前 Run：%s", run.OperationID).FontSize(12).TextColor(theme.TextMuted)
+		}
+		if info := r.app.Execution.Status(); info.State != "" {
+			ui.Textf(c, "MAA 租约：%s", info.State).FontSize(12).TextColor(theme.TextMuted)
+		}
+		ui.Row(c).Gap(8).Children(func() {
+			ui.Button(c.Key("show"), "打开主窗口").OnClick(func() {
+				r.showWindow()
+				if r.panel != nil {
+					r.panel.Close()
+				}
+			})
+			ui.Button(c.Key("stop"), "停止任务").OnClick(func() {
+				go func() {
+					ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+					defer cancel()
+					_ = r.app.MAAService.Stop(ctx)
+				}()
+			})
+		})
+		ui.Row(c).Gap(8).Children(func() {
+			ui.Button(c.Key("logs"), "打开日志").OnClick(func() {
+				if logs, err := mygo.App.Path(mygo.PathLogs); err == nil {
+					_ = mygo.Shell.OpenPath(logs)
+				}
+			})
+			ui.Button(c.Key("quit"), "退出").OnClick(func() {
+				r.close(slog.Default())
+				mygo.App.Quit()
+			})
+		})
+	})
 }

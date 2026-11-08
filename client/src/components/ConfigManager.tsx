@@ -20,6 +20,7 @@ import { PageHeader, Card, CardHeader, CardContent, Button, Input, Select, Check
 import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
+import DesktopSettings from './DesktopSettings'
 import type {
   MaaConnectionConfig,
   AutoUpdateConfig,
@@ -1185,6 +1186,7 @@ export default function ConfigManager() {
       </Card>
         </div>
       </div>
+      <DesktopSettings />
     </div>
   )
 }

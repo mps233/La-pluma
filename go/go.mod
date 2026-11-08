@@ -3,16 +3,18 @@ module github.com/mps233/la-pluma/go
 go 1.27.3
 
 require (
+	github.com/egoist/mygo v0.8.3
 	github.com/gorilla/websocket v1.5.3
+	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/pion/webrtc/v4 v4.2.26
 	golang.org/x/sys v0.48.0
+	golang.org/x/text v0.43.0
 )
 
 require (
 	github.com/ebitengine/purego v0.11.1 // indirect
-	github.com/egoist/mygo v0.8.3 // indirect
+	github.com/go-text/typesetting v0.3.5 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
 	github.com/pion/datachannel v1.6.3 // indirect
 	github.com/pion/dtls/v3 v3.1.15 // indirect
 	github.com/pion/ice/v4 v4.4.8 // indirect
@@ -30,7 +32,7 @@ require (
 	github.com/pion/turn/v5 v5.1.3 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/image v0.46.0 // indirect
 	golang.org/x/net v0.59.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 )
