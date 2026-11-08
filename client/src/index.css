@@ -3350,7 +3350,7 @@ svg.w-5.h-5 {
     animation: app-popover-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  .floating-status-dot {
+  .floating-status-dot.is-pulsing {
     animation: app-status-pulse 2s ease-out infinite;
   }
 

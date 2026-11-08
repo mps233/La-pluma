@@ -112,6 +112,18 @@ describe('FloatingStatusIndicator', () => {
     expect(container.querySelector('.floating-status-dismiss')).toBeNull()
     expect(container.querySelector('.floating-status-anchor .floating-status-indicator')).not.toBeNull()
     expect(container.querySelector('.floating-status-overlay')).toBeNull()
+    expect(container.querySelector('.floating-status-dot')?.classList.contains('is-pulsing')).toBe(true)
+  })
+
+  it('keeps the idle dot static so the glass surfaces stop repainting', async () => {
+    mocks.status.message = ''
+    mocks.status.messageType = null
+
+    await act(async () => root.render(<FloatingStatusIndicator />))
+    await act(async () => { await Promise.resolve() })
+
+    const dot = container.querySelector<HTMLElement>('.floating-status-dot')
+    expect(dot?.classList.contains('is-pulsing')).toBe(false)
   })
 
   it('shows the global run status when there is no transient message', async () => {
