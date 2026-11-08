@@ -43,6 +43,7 @@ go/
   - [x] tests green
 - [~] 1. Data + execution core
   - [x] atomic JSON store + file locks
+  - [x] cross-process data-directory lock (second instance fails closed)
   - [x] agent run FSM/idempotency/restore/flush
   - [x] MAA execution lease actor
   - [x] ADB client (devices/connect/screenshot/input/push/reverse/forward)

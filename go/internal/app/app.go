@@ -29,6 +29,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/infra/assets"
 	"github.com/mps233/la-pluma/go/internal/infra/maa"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
+	"github.com/mps233/la-pluma/go/internal/util/instancelock"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
 )
 
@@ -61,6 +62,8 @@ type App struct {
 	WebRTC        *webrtcapp.Service
 	Bot           *notifications.Bot
 
+	instanceLock *instancelock.Lock
+
 	startedAt time.Time
 	closeOnce sync.Once
 }
@@ -71,6 +74,12 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	}
 	if err := jsonstore.EnsureDir(cfg.Paths.DataDir); err != nil {
 		return nil, apperrors.WithStatus("LA_PLUMA_DATA_DIR_FAILED", "无法创建数据目录", 500, false, map[string]any{"path": cfg.Paths.DataDir, "error": err.Error()})
+	}
+	// The Agent run store is a single-process JSON store. Refuse a second
+	// instance on the same data directory instead of racing on its writes.
+	instanceLock, err := instancelock.AcquireAs(filepath.Join(cfg.Paths.DataDir, instancelock.FileName), instanceRole())
+	if err != nil {
+		return nil, err
 	}
 
 	runs := agentrun.New(filepath.Join(cfg.Paths.DataDir, "agent-runs.json"), logger)
@@ -170,6 +179,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Mastery:       masteryService,
 		Assets:        assetsHandler,
 		WebRTC:        webrtcapp.New(cfg, logger),
+		instanceLock:  instanceLock,
 		startedAt:     time.Now(),
 	}
 	application.Bot = notifications.NewBot(notifications.BotOptions{
@@ -232,8 +242,20 @@ func (a *App) Close(ctx context.Context) error {
 		if err := a.Runs.Flush(); err != nil && result == nil {
 			result = err
 		}
+		// Release last: the data directory must not become writable by a new
+		// instance before this one finished flushing.
+		if err := a.instanceLock.Release(); err != nil && result == nil {
+			result = err
+		}
 	})
 	return result
+}
+
+func instanceRole() string {
+	if executable, err := os.Executable(); err == nil && executable != "" {
+		return filepath.Base(executable)
+	}
+	return "la-pluma"
 }
 
 func (a *App) StartedAt() time.Time { return a.startedAt }

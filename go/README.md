@@ -18,7 +18,10 @@ The React client in `../client` is served unchanged. The Node implementation in
 - MAA: start-game, dynamic run-task, scheduler task flows, fight, activity
   copilot, depot/OperBox recognition, operator mastery, MAA update actions.
 - Data: config/profile storage, training, copilot, activity, drops, assets,
-  quotes, notifications/Telegram, debug logs, generated game data tools.
+  quotes, notifications/Telegram, debug logs, generated game data tools. The
+  data directory is guarded by a cross-process lock (`la-pluma.instance.lock`);
+  a second instance fails with `LA_PLUMA_INSTANCE_LOCKED` instead of racing on
+  the single-process Agent run store.
 - Desktop: `mygo build` produces an ad-hoc signed `.app` (DMG optional); tray, single-instance,
   loopback server, native bindings, PWA gating and file logging.
 
@@ -97,6 +100,9 @@ depot/OperBox recognition, and mastery scheduling. See
 
 ## Migration plan
 
-See `docs/go-rewrite/PLAN.md`. The Node server must not run against the same
-data root or MAA lease file as the Go server; concurrent MAA runs from another
-install are not coordinated by this process.
+See `docs/go-rewrite/PLAN.md`. The Go server takes
+`<data-dir>/la-pluma.instance.lock` for its lifetime, so two Go instances can
+never write the same Agent run store or MAA lease. The Node server does not
+participate in this lock: do not run Node and Go against the same data root.
+MAA runs from a different install with a different data root are not
+coordinated.
