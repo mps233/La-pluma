@@ -97,6 +97,12 @@ export function useDashboardPreview() {
   }, [mode])
 
   useEffect(() => {
+    if (!serverRunning || !agentRunning) {
+      autoConnectRef.current = false
+    }
+  }, [agentRunning, serverRunning])
+
+  useEffect(() => {
     if (mode !== 'live') {
       autoConnectRef.current = false
       disconnectPreview()

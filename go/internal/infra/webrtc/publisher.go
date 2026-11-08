@@ -96,7 +96,6 @@ func (p *Publisher) CreateOffer(peerID string) (string, []webrtc.ICECandidateIni
 		return "", nil, err
 	}
 	settingEngine := webrtc.SettingEngine{}
-	settingEngine.SetIncludeLoopbackCandidate(true)
 
 	api := webrtc.NewAPI(webrtc.WithMediaEngine(mediaEngine), webrtc.WithSettingEngine(settingEngine))
 	pc, err := api.NewPeerConnection(webrtc.Configuration{})
@@ -132,7 +131,11 @@ func (p *Publisher) CreateOffer(peerID string) (string, []webrtc.ICECandidateIni
 		candidates = append(candidates, candidate.ToJSON())
 		candidateMu.Unlock()
 	})
+	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
+		p.logger.Debug("ice state", "peer", peerID, "state", state)
+	})
 	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+		p.logger.Debug("peer state", "peer", peerID, "state", state)
 		switch state {
 		case webrtc.PeerConnectionStateConnected:
 			p.notifyPeer(true)
@@ -185,6 +188,7 @@ func (p *Publisher) SetAnswer(peerID, sdp string) error {
 }
 
 func (p *Publisher) AddICECandidate(peerID string, candidate webrtc.ICECandidateInit) error {
+	p.logger.Debug("remote candidate", "peer", peerID, "summary", candidateSummary(candidate.Candidate))
 	p.mu.RLock()
 	entry := p.peers[peerID]
 	p.mu.RUnlock()
@@ -201,6 +205,7 @@ func (p *Publisher) AddICECandidate(peerID string, candidate webrtc.ICECandidate
 }
 
 func (p *Publisher) RemovePeer(peerID string) {
+	p.logger.Debug("remove peer", "peer", peerID)
 	p.mu.Lock()
 	entry := p.peers[peerID]
 	delete(p.peers, peerID)
@@ -431,4 +436,14 @@ func spsProfileLevelID(data []byte) string {
 		return fmt.Sprintf("%02x%02x%02x", data[nalStart+1], data[nalStart+2], data[nalStart+3])
 	}
 	return ""
+}
+
+func candidateSummary(candidate string) string {
+	fields := strings.Fields(strings.TrimPrefix(candidate, "candidate:"))
+	if len(fields) < 8 || fields[6] != "typ" {
+		return "invalid"
+	}
+	address := fields[4]
+	loopback := strings.HasPrefix(address, "127.") || address == "::1"
+	return "typ=" + fields[7] + " loopback=" + fmt.Sprintf("%t", loopback) + " protocol=" + fields[2]
 }

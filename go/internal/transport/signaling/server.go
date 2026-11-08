@@ -288,7 +288,7 @@ func (c *wsClient) forward(payload map[string]any) error {
 		if sdp == "" {
 			return fmt.Errorf("缺少 SDP answer")
 		}
-		c.server.logger.Debug("signaling answer", "peer", c.peerID, "sections", sdpSections(sdp))
+		c.server.logger.Debug("signaling answer", "peer", c.peerID, "sections", sdpSections(sdp), "candidates", candidateSummary(sdp))
 		return publisher.SetAnswer(c.peerID, sdp)
 	case "ice-candidate":
 		raw, ok := payload["candidate"].(map[string]any)
@@ -377,4 +377,33 @@ func sdpSections(sdp string) string {
 		}
 	}
 	return strings.Join(parts, " | ")
+}
+
+// candidateSummary counts remote candidates by type and loopback status without
+// logging addresses or ports.
+func candidateSummary(sdp string) string {
+	counts := map[string]int{}
+	for _, line := range strings.Split(sdp, "\r\n") {
+		if !strings.HasPrefix(line, "a=candidate:") {
+			continue
+		}
+		fields := strings.Fields(strings.TrimPrefix(line, "a=candidate:"))
+		if len(fields) < 8 || fields[6] != "typ" {
+			continue
+		}
+		address := fields[4]
+		loopback := strings.HasPrefix(address, "127.") || address == "::1"
+		key := fields[7]
+		if loopback {
+			key += "-loopback"
+		}
+		counts[key]++
+	}
+	var parts []string
+	for _, key := range []string{"host", "host-loopback", "srflx", "prflx", "relay"} {
+		if counts[key] > 0 {
+			parts = append(parts, key+"="+fmt.Sprintf("%d", counts[key]))
+		}
+	}
+	return strings.Join(parts, ",")
 }
