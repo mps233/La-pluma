@@ -91,8 +91,8 @@ go/
   - [x] activity copilot one stage, operbox/depot recognition, mastery blocked/training-room path
   - [ ] exhaustive destructive flows and desktop PWA/phone verification
   - [ ] MAA task smoke (with explicit approval for side effects)
-  - [ ] quit/restart/orphan cleanup (code path exists; real-device verification pending)
-  - [ ] PWA from headless Go server (static/SW served; phone install pending)
+  - [x] quit/restart/second-instance/Dock recovery (active-preview orphan cleanup still manual)
+  - [~] PWA from headless Go server (static assets, manifest MIME, SW and token auth verified; phone install pending)
 
 ## Pion + scrcpy design notes (to validate)
 
