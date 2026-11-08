@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,6 +46,7 @@ type Publisher struct {
 	cacheMu      sync.Mutex
 	lastConfig   []byte
 	lastKeyframe []byte
+	profileLevel string
 }
 
 type peer struct {
@@ -159,7 +161,7 @@ func (p *Publisher) CreateOffer(peerID string) (string, []webrtc.ICECandidateIni
 	p.peers[peerID] = &peer{pc: pc, input: input}
 	p.mu.Unlock()
 
-	return pc.LocalDescription().SDP, gathered, nil
+	return p.applyProfileLevel(pc.LocalDescription().SDP), gathered, nil
 }
 
 func (p *Publisher) SetAnswer(peerID, sdp string) error {
@@ -293,9 +295,12 @@ func (p *Publisher) FeedVideo() {
 		}
 		if header.IsConfig() {
 			configData = append([]byte(nil), data...)
+			profileLevel := spsProfileLevelID(data)
 			p.cacheMu.Lock()
 			p.lastConfig = append([]byte(nil), data...)
+			p.profileLevel = profileLevel
 			p.cacheMu.Unlock()
+			p.logger.Info("video config", "bytes", len(data), "nals", nalTypes(data), "profile_level_id", profileLevel)
 			continue
 		}
 		sample := data
@@ -309,6 +314,7 @@ func (p *Publisher) FeedVideo() {
 			p.cacheMu.Lock()
 			p.lastKeyframe = append([]byte(nil), sample...)
 			p.cacheMu.Unlock()
+			p.logger.Debug("video keyframe", "bytes", len(sample), "config_bytes", len(configData), "nals", nalTypes(sample))
 		}
 		pts := header.PTS()
 		duration := 33 * time.Millisecond
@@ -365,3 +371,64 @@ func (p *Publisher) SessionHeight() int { return p.session.Height }
 
 func (p *Publisher) SendKeyTap(keycode int) error { return p.session.SendKeyTap(keycode) }
 func (p *Publisher) SendText(text string) error   { return p.session.SendText(text) }
+
+// nalTypes reports the H.264 NAL unit types in an Annex-B access unit. It is
+// diagnostic: WebKit is sensitive to missing access-unit delimiters and to
+// oversized keyframes, and both are visible here.
+func nalTypes(data []byte) []int {
+	types := make([]int, 0, 8)
+	for index := 0; index+3 < len(data); {
+		if data[index] != 0 || data[index+1] != 0 {
+			index++
+			continue
+		}
+		if data[index+2] == 1 {
+			types = append(types, int(data[index+3]&0x1f))
+			index += 4
+			continue
+		}
+		if data[index+2] == 0 && data[index+3] == 1 && index+4 < len(data) {
+			types = append(types, int(data[index+4]&0x1f))
+			index += 5
+			continue
+		}
+		index++
+	}
+	return types
+}
+
+// applyProfileLevel replaces the hardcoded baseline/3.1 fmtp with the SPS's
+// real profile-level-id. WebKit configures its H.264 decoder from this value,
+// so advertising a lower level than the encoder emits can drop frames.
+func (p *Publisher) applyProfileLevel(sdp string) string {
+	p.cacheMu.Lock()
+	profileLevel := p.profileLevel
+	p.cacheMu.Unlock()
+	if profileLevel == "" {
+		return sdp
+	}
+	return strings.ReplaceAll(sdp, "profile-level-id=42001f", "profile-level-id="+profileLevel)
+}
+
+// spsProfileLevelID returns profile_idc, constraint flags and level_idc from
+// the SPS NAL as the six hex digits used by SDP fmtp.
+func spsProfileLevelID(data []byte) string {
+	for index := 0; index+3 < len(data); index++ {
+		if data[index] != 0 || data[index+1] != 0 {
+			continue
+		}
+		var nalStart int
+		if data[index+2] == 1 {
+			nalStart = index + 3
+		} else if data[index+2] == 0 && data[index+3] == 1 {
+			nalStart = index + 4
+		} else {
+			continue
+		}
+		if nalStart+3 >= len(data) || data[nalStart]&0x1f != 7 {
+			continue
+		}
+		return fmt.Sprintf("%02x%02x%02x", data[nalStart+1], data[nalStart+2], data[nalStart+3])
+	}
+	return ""
+}

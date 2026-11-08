@@ -3,10 +3,11 @@
  * 模拟器监控组件 - WebRTC 实时预览
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { maaApi, type WebrtcStatusData } from '../services/api'
 import type { ApiResponse } from '../types/api'
 import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
+import { buildPreviewScrcpyOptions, usePreviewStore } from '../stores'
 import ScrcpyDeviceView from './ScrcpyDeviceView'
 
 interface ScreenMonitorProps {
@@ -15,6 +16,14 @@ interface ScreenMonitorProps {
 
 export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) {
   const { isAvailable: automationAvailable, unavailableMessage } = useAutomationAvailability()
+  const quality = usePreviewStore(state => state.quality)
+  const fps = usePreviewStore(state => state.fps)
+  const maxSize = usePreviewStore(state => state.maxSize)
+  const bitrateMbps = usePreviewStore(state => state.bitrateMbps)
+  const scrcpyOptions = useMemo(
+    () => buildPreviewScrcpyOptions({ quality, fps, maxSize, bitrateMbps }),
+    [bitrateMbps, fps, maxSize, quality]
+  )
   const [webrtcStatus, setWebrtcStatus] = useState<WebrtcStatusData | null>(null)
   const [webrtcStatusState, setWebrtcStatusState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [webrtcLoading, setWebrtcLoading] = useState<string | null>(null)
@@ -100,7 +109,7 @@ export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) 
     const controller = new AbortController()
     startAbortRef.current = controller
     try {
-      const result = await maaApi.startWebrtc('default', 'mumu-la-pluma', controller.signal)
+      const result = await maaApi.startWebrtc('default', 'mumu-la-pluma', controller.signal, scrcpyOptions)
       if (!result.success) throw new Error(maaApi.getErrorMessage(result))
       if (!result.data?.signalingUrl) throw new Error('预览服务未返回信令地址')
       if (!mountedRef.current) return undefined
