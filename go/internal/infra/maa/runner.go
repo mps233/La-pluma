@@ -111,10 +111,11 @@ func (r *Runner) Exec(ctx context.Context, command string, args []string, option
 		env = os.Environ()
 	}
 	child, err := process.Start(executable, fullArgs, process.Options{
-		Dir:    options.Dir,
-		Env:    env,
-		Stdout: io.MultiWriter(stdout, stdoutLog),
-		Stderr: io.MultiWriter(stderr, stderrLog),
+		Dir:      options.Dir,
+		Env:      env,
+		Detached: true,
+		Stdout:   io.MultiWriter(stdout, stdoutLog),
+		Stderr:   io.MultiWriter(stderr, stderrLog),
 	})
 	if err != nil {
 		return nil, apperrors.WithStatus("MAA_CLI_NOT_FOUND", "无法启动 MAA CLI: "+err.Error(), 503, false, map[string]any{"path": executable, "error": err.Error()})
