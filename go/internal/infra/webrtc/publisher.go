@@ -475,7 +475,6 @@ func (p *Publisher) watchVideo(lastPacket *atomic.Int64) {
 					p.logger.Info("video recovered after capture reset")
 				}
 				resets = 0
-				lastReset = time.Time{}
 				continue
 			}
 			if !lastReset.IsZero() && now.Sub(lastReset) < 30*time.Second {
