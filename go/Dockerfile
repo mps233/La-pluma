@@ -33,9 +33,16 @@ RUN apt-get update && \
       ca-certificates curl wget unzip android-tools-adb libatomic1 && \
     rm -rf /var/lib/apt/lists/*
 
+ARG MAA_CLI_VERSION=0.7.8
+ARG TARGETARCH=amd64
 RUN mkdir -p /opt/maa-cli/bin && \
-    wget -qO- https://raw.githubusercontent.com/MaaAssistantArknights/maa-cli/main/install.sh | \
-    MAA_INSTALL_DIR=/opt/maa-cli/bin bash && \
+    arch="x86_64"; checksum="8ac10686a36bd227cd7b2f2625652cb8bbcf2b9ea001fc88d788030fedb05fbf"; \
+    if [ "$TARGETARCH" = "arm64" ]; then arch="aarch64"; checksum="7aadb2ee402694c5c9f7ff0d391d546f2e71e02e32f0d545ad4a18df3e4510b4"; fi; \
+    wget -q --tries=5 --retry-connrefused --timeout=60 -O /tmp/maa-cli.tar.gz \
+      "https://github.com/MaaAssistantArknights/maa-cli/releases/download/v${MAA_CLI_VERSION}/maa_cli-v${MAA_CLI_VERSION}-${arch}-unknown-linux-gnu.tar.gz" && \
+    echo "${checksum}  /tmp/maa-cli.tar.gz" | sha256sum -c - && \
+    tar -xzf /tmp/maa-cli.tar.gz -C /opt/maa-cli/bin maa && \
+    rm /tmp/maa-cli.tar.gz && \
     ln -s /opt/maa-cli/bin/maa /usr/local/bin/maa && \
     maa --version && \
     mkdir -p /root/.config/maa /app/server/data /app/client
