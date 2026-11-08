@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -63,6 +64,7 @@ type desktopRuntime struct {
 }
 
 func startDesktop() {
+	resolveDesktopMAA()
 	logOutput := io.Writer(os.Stderr)
 	logPath := ""
 	if logsDir, err := mygo.App.Path(mygo.PathLogs); err == nil {
@@ -425,4 +427,38 @@ func (r *desktopRuntime) showWindow() {
 		}
 	})
 	r.window = window
+}
+
+// resolveDesktopMAA makes a GUI-launched app find maa even when Finder or the
+// Windows start menu did not inherit the user's shell PATH.
+func resolveDesktopMAA() {
+	if strings.TrimSpace(os.Getenv("MAA_CLI_PATH")) != "" {
+		return
+	}
+	if path, err := exec.LookPath("maa"); err == nil && path != "" {
+		_ = os.Setenv("MAA_CLI_PATH", path)
+		return
+	}
+	home, _ := os.UserHomeDir()
+	candidates := []string{}
+	switch runtime.GOOS {
+	case "darwin":
+		candidates = []string{"/opt/homebrew/bin/maa", "/usr/local/bin/maa", filepath.Join(home, ".local", "bin", "maa")}
+	case "windows":
+		candidates = []string{
+			filepath.Join(home, ".local", "bin", "maa.exe"),
+			filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "maa", "maa.exe"),
+		}
+	default:
+		candidates = []string{"/usr/local/bin/maa", "/usr/bin/maa", filepath.Join(home, ".local", "bin", "maa")}
+	}
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			_ = os.Setenv("MAA_CLI_PATH", candidate)
+			return
+		}
+	}
 }

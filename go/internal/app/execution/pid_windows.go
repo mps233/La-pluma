@@ -17,5 +17,5 @@ func processAlive(pid int) bool {
 	if err := windows.GetExitCodeProcess(handle, &code); err != nil {
 		return true
 	}
-	return code == windows.STILL_ACTIVE
+	return code == 259 // STILL_ACTIVE
 }
