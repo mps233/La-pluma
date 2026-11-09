@@ -34,6 +34,9 @@ RUN apt-get update && \
 
 ARG MAA_CLI_VERSION=0.7.8
 ARG TARGETARCH=amd64
+# buildx builds both platforms on one runner, so the stage that downloads the
+# target binary can run under the other architecture. The checksum still
+# verifies the pinned asset; execute it only when the stage matches its target.
 RUN mkdir -p /opt/maa-cli/bin && \
     arch="x86_64"; checksum="8ac10686a36bd227cd7b2f2625652cb8bbcf2b9ea001fc88d788030fedb05fbf"; \
     if [ "$TARGETARCH" = "arm64" ]; then arch="aarch64"; checksum="7aadb2ee402694c5c9f7ff0d391d546f2e71e02e32f0d545ad4a18df3e4510b4"; fi; \
@@ -43,7 +46,8 @@ RUN mkdir -p /opt/maa-cli/bin && \
     tar -xzf /tmp/maa-cli.tar.gz -C /opt/maa-cli/bin maa && \
     rm /tmp/maa-cli.tar.gz && \
     ln -s /opt/maa-cli/bin/maa /usr/local/bin/maa && \
-    maa --version && \
+    test -x /opt/maa-cli/bin/maa && \
+    if [ "$TARGETARCH" = "$(dpkg --print-architecture)" ]; then maa --version; fi && \
     mkdir -p /root/.config/maa /app/data /app/client
 
 COPY --from=backend /out/la-pluma /app/la-pluma
