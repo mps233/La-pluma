@@ -76,7 +76,7 @@ go/
   - [x] notifications/Telegram service and bot
   - [x] config/profile storage, quotes, MaaResource assets
   - [x] activity current/preflight/discovery/run execution (real TL-1 copilot run verified)
-  - [x] battle OCR interface remains a feature flag/gap (no tesseract replacement yet)
+  - [x] battle progress reads MaaCore's own counter OCR from `asst.log` (live battle verification pending)
   - [x] recognition depot/operbox (real device verified)
 - [x] 6. MyGo desktop 2/3
   - [x] desktop shell: window/loopback server/single-instance/tray/quit

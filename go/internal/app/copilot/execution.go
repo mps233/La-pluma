@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	domainrun "github.com/mps233/la-pluma/go/internal/domain/agentrun"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
@@ -502,7 +503,7 @@ func (s *Service) executeDynamicEntries(ctx context.Context, execution dynamicEx
 		if execution.tracker != nil {
 			execution.tracker.MarkRunning(group.entries[0])
 		}
-		emitExecutionProgress(execution.lifecycle, execution.tracker, map[string]any{
+		baseProgress := map[string]any{
 			"setId":        execution.planID,
 			"name":         execution.name,
 			"phase":        "running",
@@ -510,7 +511,8 @@ func (s *Service) executeDynamicEntries(ctx context.Context, execution dynamicEx
 			"currentStage": group.entries[0].DisplayStage,
 			"currentStep":  len(results) + 1,
 			"totalSteps":   len(ordered),
-		})
+		}
+		emitExecutionProgress(execution.lifecycle, execution.tracker, baseProgress)
 
 		if group.presetFormation {
 			if err := EnsurePresetFormationResource(s.resource.ResourceDir(), configDir); err != nil {
@@ -532,7 +534,9 @@ func (s *Service) executeDynamicEntries(ctx context.Context, execution dynamicEx
 			}
 		}
 
+		stopBattleProgress := s.startBattleProgressSampler(ctx, execution.lifecycle, baseProgress)
 		dto, err := s.executor.RunTask(ctx, taskConfig, true)
+		stopBattleProgress()
 		if err == nil {
 			err = runDTOError(dto)
 		}
@@ -876,6 +880,65 @@ func dtoOutput(dto domainrun.DTO) string {
 func emitExecutionStarted(lifecycle *ExecutionLifecycle) {
 	if lifecycle != nil && lifecycle.OnStarted != nil {
 		lifecycle.OnStarted()
+	}
+}
+
+// startBattleProgressSampler emits the battle counter MaaCore writes to its
+// trace log while the dynamic MAA task runs. It returns a stop function that
+// waits for the sampler goroutine, so the next stage cannot reuse its counter.
+func (s *Service) startBattleProgressSampler(ctx context.Context, lifecycle *ExecutionLifecycle, base map[string]any) func() {
+	noop := func() {}
+	if s == nil || s.battleSampler == nil || lifecycle == nil || lifecycle.OnProgress == nil || !BattleProgressEnabled() {
+		return noop
+	}
+	interval := s.battleInterval
+	if interval <= 0 {
+		interval = BattleProgressInterval()
+	}
+	checkpoint := s.battleSampler.Checkpoint(ctx)
+	sampleCtx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		lastKills, lastTotal := -1, -1
+		sample := func() {
+			if sampleCtx.Err() != nil {
+				return
+			}
+			battle, err := s.battleSampler.SampleBattleProgress(sampleCtx, checkpoint, nil)
+			if err != nil || battle == nil {
+				return
+			}
+			if battle.Total != lastTotal {
+				lastKills = -1
+				lastTotal = battle.Total
+			}
+			if battle.Kills < lastKills || battle.Kills == lastKills {
+				return
+			}
+			lastKills = battle.Kills
+			progress := make(map[string]any, len(base)+1)
+			for key, value := range base {
+				progress[key] = value
+			}
+			progress["battle"] = map[string]any{"kills": battle.Kills, "total": battle.Total}
+			lifecycle.OnProgress(progress, nil)
+		}
+		sample()
+		for {
+			select {
+			case <-sampleCtx.Done():
+				return
+			case <-ticker.C:
+				sample()
+			}
+		}
+	}()
+	return func() {
+		cancel()
+		<-done
 	}
 }
 

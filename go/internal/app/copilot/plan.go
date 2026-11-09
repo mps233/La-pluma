@@ -77,6 +77,7 @@ type ServiceOptions struct {
 	Now            func() time.Time
 	Logger         *slog.Logger
 	BattleSampler  BattleProgressSampler
+	BattleInterval time.Duration
 	ManualExecutor StepExecutor
 	Executor       Executor
 	LeaseRunner    LeaseRunner
@@ -99,6 +100,7 @@ type Service struct {
 	logger   *slog.Logger
 
 	battleSampler  BattleProgressSampler
+	battleInterval time.Duration
 	manualExecutor StepExecutor
 	executor       Executor
 	lease          LeaseRunner
@@ -138,19 +140,24 @@ func NewWithOptions(options ServiceOptions) *Service {
 	if logger == nil {
 		logger = slog.Default()
 	}
+	battleInterval := options.BattleInterval
+	if battleInterval <= 0 {
+		battleInterval = BattleProgressInterval()
+	}
 	service := &Service{
-		paths:         options.Paths,
-		prts:          prts,
-		resource:      NewResourceIndex(options.Paths),
-		now:           now,
-		planTTL:       ttl,
-		logger:        logger,
-		battleSampler: options.BattleSampler,
-		executor:      options.Executor,
-		lease:         options.LeaseRunner,
-		dropRecorder:  options.DropRecorder,
-		planCache:     map[string]planCacheEntry{},
-		planInFlight:  map[string]*planBuildCall{},
+		paths:          options.Paths,
+		prts:           prts,
+		resource:       NewResourceIndex(options.Paths),
+		now:            now,
+		planTTL:        ttl,
+		logger:         logger,
+		battleSampler:  options.BattleSampler,
+		battleInterval: battleInterval,
+		executor:       options.Executor,
+		lease:          options.LeaseRunner,
+		dropRecorder:   options.DropRecorder,
+		planCache:      map[string]planCacheEntry{},
+		planInFlight:   map[string]*planBuildCall{},
 	}
 	manualExecutor := options.ManualExecutor
 	if manualExecutor == nil {

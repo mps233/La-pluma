@@ -97,7 +97,8 @@ depot/OperBox recognition, and mastery scheduling. See
 
 - Developer ID signing/notarization and an app updater are not configured.
 - Embedded TURN uses UDP 3478 and needs `LA_PLUMA_WEBRTC_TURN_PUBLIC_IP` plus a published port behind Docker/NAT. If 3478 is occupied, set `LA_PLUMA_WEBRTC_TURN_PORT`.
-- Phone PWA install, multi-touch, battle OCR, Windows/Linux runtime and broader destructive flows still need verification.
+- Phone PWA install, multi-touch, Windows/Linux runtime and broader destructive flows still need verification.
+- Battle progress follows MaaCore's own counter OCR in `asst.log`; a live battle on a real device is still the remaining verification for that path.
 
 ## Migration plan
 

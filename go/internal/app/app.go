@@ -113,10 +113,11 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Fetcher: trainingMaterialFetcher{paths: cfg.Paths},
 	})
 	copilotService := copilot.NewWithOptions(copilot.ServiceOptions{
-		Paths:        cfg.Paths,
-		Logger:       logger,
-		Executor:     maaServiceAdapter{service: maaActions},
-		DropRecorder: dropsRecorder{service: dropService},
+		Paths:         cfg.Paths,
+		Logger:        logger,
+		Executor:      maaServiceAdapter{service: maaActions},
+		DropRecorder:  dropsRecorder{service: dropService},
+		BattleSampler: newCopilotBattleSampler(cfg.Paths),
 	})
 	activityService := activity.NewWithOptions(activity.Options{
 		Paths:              cfg.Paths,

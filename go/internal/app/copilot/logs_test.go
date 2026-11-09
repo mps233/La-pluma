@@ -50,6 +50,30 @@ func TestParseCopilotBattleTotalUsesLatestStageLoad(t *testing.T) {
 	}
 }
 
+func TestParseBattleProgressUsesLatestCounter(t *testing.T) {
+	logText := strings.Join([]string{
+		"[2026-11-04 03:11:00.000][TRC][Px1][Tx1] Kills: 0 / 35",
+		"[2026-11-04 03:11:01.733][TRC][Px1][Tx1] Kills: 11 / 35",
+		"[2026-11-04 03:11:02.000][TRC][Px1][Tx1] Kills: 12 / 35",
+	}, "\n")
+	progress := ParseBattleProgress(logText)
+	if progress == nil || progress.Kills != 12 || progress.Total != 35 {
+		t.Fatalf("progress = %#v", progress)
+	}
+	if progress := ParseBattleProgress("Kills: 0 / 0"); progress != nil {
+		t.Fatalf("zero total must be rejected: %#v", progress)
+	}
+	if progress := ParseBattleProgress("Kills: 42 / 41"); progress != nil {
+		t.Fatalf("kills above total must be rejected: %#v", progress)
+	}
+	if progress := ParseBattleProgress("Kills: 0 / 501"); progress != nil {
+		t.Fatalf("out-of-range total must be rejected: %#v", progress)
+	}
+	if progress := ParseBattleProgress("no battle lines"); progress != nil {
+		t.Fatalf("missing lines must return nil: %#v", progress)
+	}
+}
+
 func TestExtractLoadedCopilotFiles(t *testing.T) {
 	logText := `{"details":{"file_name":"/tmp/6-97353-normal-1.json"},"what":"CopilotListLoadTaskFileSuccess"}`
 	files := ExtractLoadedCopilotFiles(logText)

@@ -10,6 +10,7 @@ var (
 	loadedCopilotFilePattern = regexp.MustCompile(`"file_name"\s*:\s*"([^"]+)"(?s:.{0,500}?)"what"\s*:\s*"CopilotListLoadTaskFileSuccess"`)
 	copilotLoadEventPattern  = regexp.MustCompile(`"what"\s*:\s*"CopilotListLoadTaskFileSuccess"`)
 	battleTotalPattern       = regexp.MustCompile(`Kills:\s*\d+\s*/\s*(\d+)`)
+	battleProgressPattern    = regexp.MustCompile(`Kills:\s*(\d{1,4})\s*/\s*(\d{1,4})`)
 )
 
 // ExtractLoadedCopilotFiles returns file_name values that precede a successful
@@ -43,6 +44,26 @@ func ParseCopilotBattleTotal(logText string) *int {
 		return nil
 	}
 	return &total
+}
+
+// ParseBattleProgress reads the latest `Kills: X / Y` line from MAA's trace
+// log. Values outside 1..500 for the total, or a kill count above it, are
+// rejected so a result-screen counter cannot become the battle counter.
+func ParseBattleProgress(logText string) *BattleProgress {
+	matches := battleProgressPattern.FindAllStringSubmatch(logText, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	last := matches[len(matches)-1]
+	kills, err := strconv.Atoi(last[1])
+	if err != nil {
+		return nil
+	}
+	total, err := strconv.Atoi(last[2])
+	if err != nil || total <= 0 || total > 500 || kills < 0 || kills > total {
+		return nil
+	}
+	return &BattleProgress{Kills: kills, Total: total}
 }
 
 // StageProgressItem maps one generated copilot file to its display stage.

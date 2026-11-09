@@ -614,3 +614,54 @@ func TestManualManagerWithoutExecutorStaysUnsupported(t *testing.T) {
 		t.Fatalf("error code = %s", code)
 	}
 }
+
+type fakeBattleSampler struct {
+	progress *BattleProgress
+}
+
+func (f fakeBattleSampler) Checkpoint(context.Context) string { return "checkpoint" }
+
+func (f fakeBattleSampler) SampleBattleProgress(context.Context, string, *int) (*BattleProgress, error) {
+	return f.progress, nil
+}
+
+func TestExecutePlanEmitsBattleProgress(t *testing.T) {
+	emitted := make(chan struct{})
+	var once sync.Once
+	executor := &fakeExecutionExecutor{}
+	executor.runTask = func(context.Context, map[string]any) (domainrun.DTO, error) {
+		select {
+		case <-emitted:
+		case <-time.After(2 * time.Second):
+			t.Error("battle progress was not emitted")
+		}
+		return domainrun.DTO{State: domainrun.StatusSucceeded}, nil
+	}
+	fixture := newExecutionFixture(t, executor, &fakeLeaseRunner{})
+	fixture.service.battleSampler = fakeBattleSampler{progress: &BattleProgress{Kills: 7, Total: 21}}
+	fixture.service.battleInterval = 10 * time.Millisecond
+
+	var battle map[string]any
+	lifecycle := &ExecutionLifecycle{
+		RunID: "run-battle",
+		OnProgress: func(progress map[string]any, _ []ProgressEntryResult) {
+			value, ok := progress["battle"].(map[string]any)
+			if !ok {
+				return
+			}
+			battle = value
+			once.Do(func() { close(emitted) })
+		},
+	}
+	if _, err := fixture.service.ExecutePlan(context.Background(), PlanExecution{
+		SetID:     "1",
+		Raid:      "normal",
+		Plan:      dynamicExecutionPlan(),
+		Lifecycle: lifecycle,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if battle == nil || battle["kills"] != 7 || battle["total"] != 21 {
+		t.Fatalf("battle progress = %#v", battle)
+	}
+}
