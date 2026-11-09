@@ -9,6 +9,7 @@ import {
   Check,
   ClipboardList,
   Filter,
+  GraduationCap,
   Package,
   Search,
   Sparkles,
@@ -17,11 +18,14 @@ import {
 } from 'lucide-react'
 import { getOperatorList, getOperatorCounts, getAllOperators, getOperBoxData, getTrainingQueue, addToTrainingQueue, removeFromTrainingQueue, updateTrainingQueueOrder, updateTrainingSettings, generateTrainingPlan, applyTrainingPlan, getItemIconUrl } from '../services/api'
 import { getOperatorAvatarUrl } from '../services/operatorQuotes'
-import { PageHeader, Card, SmoothPanel, Button, EmptyState, IconButton, Input, Loading, Select, Switch, CjkText, TruncatedText } from './common'
+import { PageHeader, Card, SmoothPanel, Button, EmptyState, IconButton, Input, Loading, Select, Switch, CjkText, TruncatedText, SwipeModePager } from './common'
 import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
+import { useUIStore } from '../stores'
+import MasteryTrainingWorkspace from './training/MasteryTrainingWorkspace'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useItemIconCacheVersion } from '../hooks/useItemIconCacheVersion'
+import { useSwipeModeTrack } from '../hooks/useSwipeModeTrack'
 import type {
   MaterialHierarchyNodeProps,
   TrainingOperator,
@@ -346,6 +350,8 @@ export default function OperatorTraining() {
   useItemIconCacheVersion()
   const shouldReduceMotion = useReducedMotion();
   const { setMessage: setStatusMessage } = useStatusStore()
+  const trainingMode = useUIStore(state => state.trainingMode)
+  const setTrainingMode = useUIStore(state => state.setTrainingMode)
 
   // 辅助函数：使用 statusMessage 显示消息
   const showSuccess = (msg: string) => {
@@ -414,6 +420,20 @@ export default function OperatorTraining() {
     }));
   };
 
+  const trainingStatusIndex = Math.max(
+    0,
+    TRAINING_STATUS_OPTIONS.findIndex(option => option.value === filters.status),
+  );
+  const trainingTrack = useSwipeModeTrack({
+    count: TRAINING_STATUS_OPTIONS.length,
+    index: trainingStatusIndex,
+    onChange: (index) => {
+      const option = TRAINING_STATUS_OPTIONS[index];
+      if (option) handleTrainingStatusChange(option.value);
+    },
+    extraIgnoreSelector: '.training-status-shell',
+  });
+
   const getOpenStagePlan = (sourcePlan: TrainingPlan): TrainingPlan => ({
     ...sourcePlan,
     stages: sourcePlan.openStages ?? sourcePlan.stages?.filter(stage => stage.isOpen !== false) ?? []
@@ -479,15 +499,18 @@ export default function OperatorTraining() {
 
   const loadOperators = useCallback(async () => {
     const requestId = ++operatorsRequestRef.current;
-    const requestedFilters = { ...filters };
+    const requestedFilters = { rarity: filters.rarity, needsElite2: filters.needsElite2 };
     const controller = new AbortController();
     operatorsAbortRef.current?.abort();
     operatorsAbortRef.current = controller;
     try {
       setOperatorsLoading(true);
       setOperatorsError(null);
+      // Load the full catalog once; the three status slides derive from it so
+      // the adjacent card already has data while the finger drags.
       const response = await getOperatorList({
         ...requestedFilters,
+        status: 'all',
         rarity: requestedFilters.rarity ? parseInt(requestedFilters.rarity) : undefined
       }, controller.signal);
       if (requestId !== operatorsRequestRef.current || controller.signal.aborted) return;
@@ -501,7 +524,7 @@ export default function OperatorTraining() {
           ? operatorPayload
           : operatorPayload?.operators ?? [];
 
-        if (requestedFilters.status === 'all' && nextOperators.length === 0) {
+        if (nextOperators.length === 0) {
           const [allOperatorsResponse, operBoxResponse] = await Promise.all([
             getAllOperators(),
             getOperBoxData()
@@ -538,6 +561,9 @@ export default function OperatorTraining() {
                   trainingStatus: disabledReason
                 };
               });
+            if (requestedFilters.needsElite2) {
+              nextOperators = nextOperators.filter(operator => !(operator.owned && operator.currentElite >= 2));
+            }
           } else {
             throw new Error(allOperatorsResponse.message || allOperatorsResponse.errorInfo?.message || allOperatorsResponse.error || '完整干员列表加载失败');
           }
@@ -555,7 +581,7 @@ export default function OperatorTraining() {
       if (operatorsAbortRef.current === controller) operatorsAbortRef.current = null;
       if (requestId === operatorsRequestRef.current) setOperatorsLoading(false);
     }
-  }, [filters]);
+  }, [filters.needsElite2, filters.rarity]);
 
   // 加载干员列表
   useEffect(() => {
@@ -880,8 +906,41 @@ export default function OperatorTraining() {
     }
     return true;
   });
-  const visibleOperators = filteredOperators.slice(0, visibleOperatorLimit);
-  const hiddenOperatorCount = Math.max(filteredOperators.length - visibleOperators.length, 0);
+  // The catalog is one fetch filtered by rarity/elite; each status slide slices
+  // it locally so the adjacent card is ready during a swipe.
+  const operatorsByStatus: Record<TrainingFilters['status'], TrainingOperator[]> = {
+    trainable: filteredOperators.filter(op => op.canTrain),
+    owned: filteredOperators.filter(op => op.owned),
+    all: filteredOperators,
+  };
+  const getOperatorEmptyState = (status: TrainingFilters['status']): OperatorEmptyStateProps | null => {
+    if (operatorsLoading || operatorsByStatus[status].length > 0) return null;
+    if (normalizedSearchTerm || filters.rarity) {
+      return {
+        title: '没有找到符合条件的干员',
+        description: '换个名称、稀有度或状态筛选再试。'
+      };
+    }
+
+    if (status === 'trainable') {
+      return {
+        title: '没有可养成干员',
+        description: '当前没有可直接加入队列的干员，可以切到“已拥有”或“全部”查看其他状态。'
+      };
+    }
+
+    if (status === 'owned') {
+      return {
+        title: '还没有已拥有干员',
+        description: '请先在“数据统计”页面识别干员，或切到“全部”查看完整干员列表。'
+      };
+    }
+
+    return {
+      title: '没有干员数据',
+      description: '全量干员数据暂不可用，请先更新资源或稍后重试。'
+    };
+  };
   const openStageCount = getOpenStageCount(plan);
   const currentTarget = queue[0] ?? null;
   const backlogCount = Math.max(queue.length - 1, 0);
@@ -895,48 +954,177 @@ export default function OperatorTraining() {
   const previewStages = todayStages.slice(0, 5);
   const hiddenStageCount = Math.max(todayStages.length - previewStages.length, 0);
   const queueMutationPending = pendingOperatorIds.size > 0;
-  const operatorEmptyState: OperatorEmptyStateProps | null = !operatorsLoading && filteredOperators.length === 0
-    ? (() => {
-        if (normalizedSearchTerm || filters.rarity) {
-          return {
-            title: '没有找到符合条件的干员',
-            description: '换个名称、稀有度或状态筛选再试。'
-          };
-        }
+  const renderOperatorList = (status: TrainingFilters['status']) => {
+    if (operatorsLoading) {
+      return (
+        <div className="flex min-h-[260px] items-center justify-center">
+          <Loading text="正在读取干员..." />
+        </div>
+      );
+    }
+    if (operatorsError) {
+      return (
+        <TrainingLoadError
+          title="干员列表加载失败"
+          description={operatorsError}
+          onRetry={() => void loadOperators()}
+        />
+      );
+    }
+    const emptyState = getOperatorEmptyState(status);
+    if (emptyState) return <OperatorEmptyState {...emptyState} />;
 
-        if (filters.status === 'trainable') {
-          return {
-            title: '没有可养成干员',
-            description: '当前没有可直接加入队列的干员，可以切到“已拥有”或“全部”查看其他状态。'
-          };
-        }
+    const statusOperators = operatorsByStatus[status];
+    const visibleStatusOperators = statusOperators.slice(0, visibleOperatorLimit);
+    const hiddenStatusCount = Math.max(statusOperators.length - visibleStatusOperators.length, 0);
 
-        if (filters.status === 'owned') {
-          return {
-            title: '还没有已拥有干员',
-            description: '请先在“数据统计”页面识别干员，或切到“全部”查看完整干员列表。'
-          };
-        }
+    return (
+      <div className="min-h-[260px]">
+        <div className="training-operator-grid grid grid-cols-3 overflow-hidden rounded-xl surface-soft sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-4 2xl:grid-cols-6">
+          {visibleStatusOperators.map((operator, idx) => {
+            const isInQueue = queue.some(q => q.operatorId === operator.id);
+            const imageLoaded = loadedImages[operator.id] || false;
+            const isOwned = operator.owned !== false;
+            const isAlreadyElite2 = operator.disabledReason === 'already_elite2';
+            const canAdd = Boolean(operator.canTrain) && !isInQueue;
+            const actionLabel = isInQueue
+              ? '已添加'
+              : !isOwned
+                ? '未拥有'
+                : !operator.hasMaterialData
+                  ? '暂无数据'
+                  : isAlreadyElite2
+                    ? '已完成'
+                    : '添加';
 
-        return {
-          title: '没有干员数据',
-          description: '全量干员数据暂不可用，请先更新资源或稍后重试。'
-        };
-      })()
-    : null;
+            return (
+              <div
+                key={operator.id}
+                className={`training-operator-item relative overflow-hidden p-2.5 ${!isOwned ? 'opacity-75' : ''}`}
+              >
+              {/* 干员头像 */}
+              <div className="relative mb-2.5 aspect-square w-full overflow-hidden rounded-xl surface-panel">
+                {operator.id ? (
+                  <>
+                    {/* 骨架屏 */}
+                    {!imageLoaded && (
+                      <div className="app-skeleton absolute inset-0 surface-soft" />
+                    )}
+                    <img
+                      src={getOperatorAvatarUrl(operator.id)}
+                      alt={operator.name}
+                      loading={idx < 12 ? 'eager' : 'lazy'}
+                      decoding="async"
+                      className={`h-full w-full object-cover transition-opacity duration-200 ${
+                        imageLoaded ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      onLoad={() => setLoadedImages(prev => prev[operator.id] ? prev : ({ ...prev, [operator.id]: true }))}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        setLoadedImages(prev => prev[operator.id] ? prev : ({ ...prev, [operator.id]: true }));
+                      }}
+                    />
+                    {/* 不可添加时的半透明蒙版 */}
+                    {!canAdd && imageLoaded && (
+                      <div className={`absolute inset-0 ${isOwned ? 'bg-[var(--app-surface)]/25' : 'bg-[var(--app-surface)]/50'}`} />
+                    )}
+                  </>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-tertiary">
+                    无头像
+                  </div>
+                )}
+                {/* 稀有度标识 */}
+                {operator.rarity !== undefined && operator.rarity > 0 && (
+                  <div className="absolute right-2 top-2 rounded-full px-2 py-0.5 text-xs font-semibold surface-panel brand-text">
+                    {operator.rarity}★
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2 text-center">
+                <div className="truncate text-sm font-semibold text-primary" title={operator.name}>
+                  {operator.name || '未知干员'}
+                </div>
+                <div className="flex min-h-5 flex-wrap items-center justify-center gap-1 text-xs">
+                  {isOwned && operator.currentElite !== undefined && (
+                    <span className="whitespace-nowrap rounded-full px-2 py-0.5 surface-panel text-secondary">
+                      {keepNumberWithUnit(`精${operator.currentElite}${operator.currentLevel ? ` · ${operator.currentLevel} 级` : ''}`)}
+                    </span>
+                  )}
+                </div>
+
+                {/* 添加按钮 */}
+                <Button
+                  onClick={() => handleAddToQueue(operator)}
+                  disabled={!canAdd || (queueMutationPending && !pendingOperatorIds.has(operator.id))}
+                  loading={pendingOperatorIds.has(operator.id)}
+                  loadingText="添加中"
+                  variant={canAdd ? 'primary' : 'secondary'}
+                  size="sm"
+                  fullWidth
+                >
+                  {actionLabel}
+                </Button>
+              </div>
+              </div>
+            );
+          })}
+        </div>
+        {hiddenStatusCount > 0 && (
+          <div className="flex flex-col items-center gap-2 py-3">
+            <Button
+              onClick={() => setVisibleOperatorLimit(limit => limit + OPERATOR_RENDER_BATCH_SIZE)}
+              variant="secondary"
+              size="md"
+              className="min-w-36"
+            >
+              继续显示 {Math.min(OPERATOR_RENDER_BATCH_SIZE, hiddenStatusCount)} 个
+            </Button>
+            <div className="text-xs text-tertiary">
+              已显示 {visibleStatusOperators.length} / {statusOperators.length}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
   return (
     <div className="app-page ios-workspace-page ios-borderless-cards" data-page="training">
       <div className="app-stack-section">
         {/* 页面标题 */}
         <PageHeader
           title="养成"
-          subtitle="整理干员目标、材料缺口与今日刷取流程"
+          subtitle={trainingMode === 'mastery' ? '规划干员技能专精与自动训练队列' : '整理干员目标、材料缺口与今日刷取流程'}
           mobileLayout="inline"
           actions={<FloatingStatusIndicator />}
         />
 
+        <div className="training-mode-row">
+          <span className="training-mode-label text-xs font-medium text-tertiary">养成方式</span>
+          <div className="training-mode-shell">
+            <GlassSegmented
+              options={[
+                { label: '精英化', icon: <GraduationCap size={14} strokeWidth={1.9} aria-hidden="true" /> },
+                { label: '技能专精', icon: <Sparkles size={14} strokeWidth={1.9} aria-hidden="true" /> },
+              ]}
+              value={trainingMode === 'mastery' ? 1 : 0}
+              onChange={(index) => {
+                if (index === 0) setTrainingMode('elite')
+                else setTrainingMode('mastery')
+              }}
+              aria-label="养成方式"
+            />
+          </div>
+        </div>
+
+        {trainingMode === 'elite' && (
         <div className="grid grid-cols-1 items-start gap-[var(--app-space-section)] xl:grid-cols-[minmax(0,1fr)_minmax(22rem,27rem)]">
-          <section className={`training-operator-column min-w-0 space-y-4 ${currentTarget ? 'order-2 xl:order-1' : 'order-1'}`}>
+          <section
+            className={`training-operator-column min-w-0 space-y-4 app-swipe-surface ${currentTarget ? 'order-2 xl:order-1' : 'order-1'}`}
+            {...trainingTrack.handlers}
+          >
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-primary"><CjkText>添加干员</CjkText></h2>
@@ -962,6 +1150,7 @@ export default function OperatorTraining() {
                 })}
                 value={Math.max(0, TRAINING_STATUS_OPTIONS.findIndex(option => option.value === filters.status))}
                 onChange={(index) => {
+                  if (trainingTrack.isAnimating()) return
                   const option = TRAINING_STATUS_OPTIONS[index];
                   if (option) handleTrainingStatusChange(option.value);
                 }}
@@ -1006,130 +1195,13 @@ export default function OperatorTraining() {
           </div>
           </div>
 
-          {/* 干员卡片列表 */}
-          {operatorsLoading ? (
-            <div className="flex min-h-[260px] items-center justify-center">
-              <Loading text="正在读取干员..." />
-            </div>
-          ) : operatorsError ? (
-            <TrainingLoadError
-              title="干员列表加载失败"
-              description={operatorsError}
-              onRetry={() => void loadOperators()}
-            />
-          ) : operatorEmptyState ? (
-            <OperatorEmptyState {...operatorEmptyState} />
-          ) : (
-            <div className="min-h-[260px]">
-              <div className="training-operator-grid grid grid-cols-3 overflow-hidden rounded-xl surface-soft sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-4 2xl:grid-cols-6">
-                {visibleOperators.map((operator, idx) => {
-                  const isInQueue = queue.some(q => q.operatorId === operator.id);
-                  const imageLoaded = loadedImages[operator.id] || false;
-                  const isOwned = operator.owned !== false;
-                  const isAlreadyElite2 = operator.disabledReason === 'already_elite2';
-                  const canAdd = Boolean(operator.canTrain) && !isInQueue;
-                  const actionLabel = isInQueue
-                    ? '已添加'
-                    : !isOwned
-                      ? '未拥有'
-                      : !operator.hasMaterialData
-                        ? '暂无数据'
-                        : isAlreadyElite2
-                          ? '已完成'
-                          : '添加';
-
-                  return (
-                    <div
-                      key={operator.id}
-                      className={`training-operator-item relative overflow-hidden p-2.5 ${!isOwned ? 'opacity-75' : ''}`}
-                    >
-                    {/* 干员头像 */}
-                    <div className="relative mb-2.5 aspect-square w-full overflow-hidden rounded-xl surface-panel">
-                      {operator.id ? (
-                        <>
-                          {/* 骨架屏 */}
-                          {!imageLoaded && (
-                            <div className="app-skeleton absolute inset-0 surface-soft" />
-                          )}
-                          <img
-                            src={getOperatorAvatarUrl(operator.id)}
-                            alt={operator.name}
-                            loading={idx < 12 ? 'eager' : 'lazy'}
-                            decoding="async"
-                            className={`h-full w-full object-cover transition-opacity duration-200 ${
-                              imageLoaded ? 'opacity-100' : 'opacity-0'
-                            }`}
-                            onLoad={() => setLoadedImages(prev => prev[operator.id] ? prev : ({ ...prev, [operator.id]: true }))}
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
-                              setLoadedImages(prev => prev[operator.id] ? prev : ({ ...prev, [operator.id]: true }));
-                            }}
-                          />
-                          {/* 不可添加时的半透明蒙版 */}
-                          {!canAdd && imageLoaded && (
-                            <div className={`absolute inset-0 ${isOwned ? 'bg-[var(--app-surface)]/25' : 'bg-[var(--app-surface)]/50'}`} />
-                          )}
-                        </>
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-tertiary">
-                          无头像
-                        </div>
-                      )}
-                      {/* 稀有度标识 */}
-                      {operator.rarity !== undefined && operator.rarity > 0 && (
-                        <div className="absolute right-2 top-2 rounded-full px-2 py-0.5 text-xs font-semibold surface-panel brand-text">
-                          {operator.rarity}★
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-2 text-center">
-                      <div className="truncate text-sm font-semibold text-primary" title={operator.name}>
-                        {operator.name || '未知干员'}
-                      </div>
-                      <div className="flex min-h-5 flex-wrap items-center justify-center gap-1 text-xs">
-                        {isOwned && operator.currentElite !== undefined && (
-                          <span className="whitespace-nowrap rounded-full px-2 py-0.5 surface-panel text-secondary">
-                            {keepNumberWithUnit(`精${operator.currentElite}${operator.currentLevel ? ` · ${operator.currentLevel} 级` : ''}`)}
-                          </span>
-                        )}
-                      </div>
-                      
-                      {/* 添加按钮 */}
-                      <Button
-                        onClick={() => handleAddToQueue(operator)}
-                        disabled={!canAdd || (queueMutationPending && !pendingOperatorIds.has(operator.id))}
-                        loading={pendingOperatorIds.has(operator.id)}
-                        loadingText="添加中"
-                        variant={canAdd ? 'primary' : 'secondary'}
-                        size="sm"
-                        fullWidth
-                      >
-                        {actionLabel}
-                      </Button>
-                    </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {hiddenOperatorCount > 0 && (
-                <div className="flex flex-col items-center gap-2 py-3">
-                  <Button
-                    onClick={() => setVisibleOperatorLimit(limit => limit + OPERATOR_RENDER_BATCH_SIZE)}
-                    variant="secondary"
-                    size="md"
-                    className="min-w-36"
-                  >
-                    继续显示 {Math.min(OPERATOR_RENDER_BATCH_SIZE, hiddenOperatorCount)} 个
-                  </Button>
-                  <div className="text-xs text-tertiary">
-                    已显示 {visibleOperators.length} / {filteredOperators.length}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          <SwipeModePager
+            track={trainingTrack}
+            index={trainingStatusIndex}
+            className="training-operator-pager"
+          >
+            {TRAINING_STATUS_OPTIONS.map(option => renderOperatorList(option.value))}
+          </SwipeModePager>
         </div>
           </section>
 
@@ -1507,6 +1579,9 @@ export default function OperatorTraining() {
         </div>
           </aside>
         </div>
+        )}
+
+        {trainingMode === 'mastery' && <MasteryTrainingWorkspace />}
       </div>
       {recentlyRemoved && createPortal(
         <div

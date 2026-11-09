@@ -4,6 +4,7 @@ import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import LogViewer from './LogViewer'
+import { installMobileMatchMedia, swipe } from '../test/swipe'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -165,6 +166,22 @@ describe('LogViewer recovery and controls', () => {
     expect(consoleElement!.scrollTop).toBe(1000)
     expect(container.querySelector('.log-console-jump')).toBeNull()
     expect(autoScrollSwitch?.getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('switches the log content mode with a horizontal swipe', async () => {
+    installMobileMatchMedia()
+    mocks.getRealtimeLogs.mockResolvedValue({ success: true, data: [] })
+    await renderComponent()
+
+    const modeTabs = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('.log-mode-shell .lg-track:not([data-lg-copy]) > .lg-track__item'),
+    )
+    expect(modeTabs[0]?.getAttribute('aria-selected')).toBe('true')
+
+    await swipe(container.querySelector<HTMLElement>('.log-viewer')!, 240, 200, 120, 204)
+    await flush()
+
+    expect(modeTabs[1]?.getAttribute('aria-selected')).toBe('true')
   })
 
   it('keeps existing realtime rows visible when a background refresh fails', async () => {

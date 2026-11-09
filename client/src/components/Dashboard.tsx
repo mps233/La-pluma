@@ -288,6 +288,7 @@ function refreshDashboardData(force = false): Promise<void> {
 }
 
 interface DashboardFlowMetric {
+  id: 'activity' | 'training' | 'drops'
   label: string
   value: string
   sub: string
@@ -612,6 +613,7 @@ export default function Dashboard() {
 
   const dashboardFlowMetrics: DashboardFlowMetric[] = [
     {
+      id: 'activity',
       label: '当前活动',
       value: activitySummary.available ? (activitySummary.name || activitySummary.code || '进行中') : '暂无活动',
       sub: keepNumberWithUnit(formatActivitySubtitle(activitySummary)),
@@ -619,12 +621,14 @@ export default function Dashboard() {
       progress: activityProgress,
     },
     {
+      id: 'training',
       label: '养成目标',
       value: keepNumberWithUnit(`${trainingSummary.count} 项`),
       sub: trainingSummary.topNames.length > 0 ? trainingSummary.topNames.join('、') : '尚未添加目标',
       Icon: Target,
     },
     {
+      id: 'drops',
       label: '今日掉落',
       value: keepNumberWithUnit(`${dropSummary.count} 条`),
       sub: dropSummary.recent[0]?.items || '作战后自动汇总',
@@ -827,7 +831,7 @@ export default function Dashboard() {
 
               <div className="dashboard-flow-metrics">
                 {dashboardFlowMetrics.map(({ Icon, progress, ...item }) => (
-                  <div key={item.label} className="dashboard-flow-metric">
+                  <div key={item.label} className="dashboard-flow-metric" data-flow-metric={item.id}>
                     <div className="flex items-center gap-2">
                       <Icon className="h-3.5 w-3.5 text-[var(--app-accent-strong)]" strokeWidth={1.8} />
                       <span className={`text-xs font-medium ${labelClass}`}>{item.label}</span>

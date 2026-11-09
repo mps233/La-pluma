@@ -4,12 +4,11 @@ import { forwardRef, useImperativeHandle, useLayoutEffect, useState, useEffect, 
 import { createPortal } from 'react-dom'
 import { generateTrainingPlan, maaApi, type TaskConfig } from '../services/api'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { GlassCard } from '@zakisheriff/liquid-glass'
 import { AlertTriangle, Cable, Check, CheckCircle2, ChevronDown, ChevronUp, CircleMinus, CirclePlus, ClipboardList, Clock3, GraduationCap, GripVertical, Info, ListPlus, LoaderCircle, Minus, Pin, Play, Plus, SlidersHorizontal, Square, Trash2 } from 'lucide-react'
 import Icons from './Icons'
 import ScreenMonitor from './ScreenMonitor'
 import NotificationSettings from './NotificationSettings'
-import { EmptyState, PageHeader, Button, IconButton, SmoothPanel, Switch, CjkText, TruncatedText } from './common'
+import { EmptyState, PageHeader, Button, IconButton, Modal, SmoothPanel, Switch, CjkText, TruncatedText } from './common'
 import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import { useRunStore } from '../store/runStore'
@@ -972,8 +971,6 @@ const appliedExecutionRevisionRef = useRef(-1)
   const pointerSortRef = useRef<PointerSortSession | null>(null)
   const sequenceItemRefs = useRef(new Map<string, HTMLDivElement>())
   const editorColumnRef = useRef<HTMLDivElement>(null)
-  const taskPickerRegionRef = useRef<HTMLDivElement>(null)
-  const taskPickerButtonRef = useRef<HTMLButtonElement>(null)
   const activeTaskId = selectedTaskId && taskFlow.some(task => task.id === selectedTaskId)
     ? selectedTaskId
     : taskFlow[0]?.id ?? null
@@ -989,28 +986,6 @@ const appliedExecutionRevisionRef = useRef(-1)
       })
     })
   }
-
-  useEffect(() => {
-    if (!taskPickerOpen) return
-
-    const closeOnOutsidePress = (event: PointerEvent) => {
-      if (!taskPickerRegionRef.current?.contains(event.target as Node)) {
-        setTaskPickerOpen(false)
-      }
-    }
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      setTaskPickerOpen(false)
-      taskPickerButtonRef.current?.focus()
-    }
-
-    document.addEventListener('pointerdown', closeOnOutsidePress)
-    document.addEventListener('keydown', closeOnEscape)
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePress)
-      document.removeEventListener('keydown', closeOnEscape)
-    }
-  }, [taskPickerOpen])
 
   useEffect(() => {
     if (isRunning) setTaskPickerOpen(false)
@@ -2994,60 +2969,19 @@ const appliedExecutionRevisionRef = useRef(-1)
                 </div>
               )}
 
-              <div ref={taskPickerRegionRef} className="automation-sequence-footer">
-                  <button
-                    ref={taskPickerButtonRef}
+              <div className="automation-sequence-footer">
+                <div className="automation-sequence-actions">
+                  <Button
                     type="button"
-                    className={`automation-task-picker-toggle${taskPickerOpen ? ' is-open' : ''}`}
-                    onClick={() => setTaskPickerOpen(open => !open)}
+                    onClick={() => setTaskPickerOpen(true)}
                     disabled={isRunning}
-                    aria-expanded={taskPickerOpen}
-                    aria-haspopup="menu"
-                    aria-controls="automation-task-picker"
+                    variant="secondary"
+                    className="automation-task-add-button w-full justify-center whitespace-nowrap"
+                    icon={<Plus size={16} strokeWidth={2.1} aria-hidden="true" />}
+                    aria-haspopup="dialog"
                   >
-                    <Plus size={16} strokeWidth={2.1} />
-                    <span>添加任务</span>
-                    <small>{availableTasks.length}</small>
-                  </button>
-                  <AnimatePresence initial={false}>
-                    {taskPickerOpen && (
-                      <motion.div
-                        id="automation-task-picker"
-                        role="menu"
-                        aria-label="可添加任务"
-                        className="automation-task-picker"
-                        initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.98 }}
-                        transition={{ duration: shouldReduceMotion ? 0.12 : 0.32, ease: [0.32, 0.72, 0, 1] }}
-                      >
-                        <GlassCard
-                          className="app-glass-panel automation-task-picker-surface"
-                          padding="6px"
-                          radius="var(--app-radius-md)"
-                        >
-                          {availableTasks.map(task => {
-                            const addedCount = taskFlow.filter(flowTask => flowTask.commandId === task.id).length
-
-                            return (
-                              <button
-                                key={task.id}
-                                type="button"
-                                role="menuitem"
-                                onClick={() => addTaskToFlow(task)}
-                                className="automation-task-picker-option"
-                              >
-                                <span>{task.icon}</span>
-                                <TruncatedText as="strong" tooltip={task.name}>{task.name}</TruncatedText>
-                                {addedCount > 0 && <small>{addedCount}</small>}
-                                <Plus size={14} strokeWidth={2} />
-                              </button>
-                            )
-                          })}
-                        </GlassCard>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                    添加任务
+                  </Button>
                   {!(isRunning && isStopping) && (
                     <Button
                       onClick={executeTaskFlow}
@@ -3077,7 +3011,54 @@ const appliedExecutionRevisionRef = useRef(-1)
                       终止执行
                     </Button>
                   )}
+                </div>
               </div>
+
+              <Modal
+                isOpen={taskPickerOpen}
+                onClose={() => setTaskPickerOpen(false)}
+                title="添加任务"
+                size="md"
+                footer={(
+                  <Button onClick={() => setTaskPickerOpen(false)} variant="primary" size="md">
+                    完成
+                  </Button>
+                )}
+              >
+                <p className="automation-task-picker-hint">选择任务加入流程，可重复添加。</p>
+                <div className="automation-task-picker-grid">
+                  {availableTasks.map(task => {
+                    const addedCount = taskFlow.filter(flowTask => flowTask.commandId === task.id).length
+
+                    return (
+                      <button
+                        key={task.id}
+                        type="button"
+                        onClick={() => addTaskToFlow(task)}
+                        disabled={isRunning}
+                        className="automation-task-picker-card"
+                        aria-label={`${task.name}${addedCount > 0 ? `，已添加 ${addedCount} 次` : ''}，点击添加`}
+                        data-autofocus={task.id === availableTasks[0]?.id ? '' : undefined}
+                      >
+                        <span className="automation-task-picker-card-head">
+                          <span className="automation-task-picker-card-icon" aria-hidden="true">{task.icon}</span>
+                          {addedCount > 0 && (
+                            <span className="automation-task-picker-card-count">{addedCount}</span>
+                          )}
+                        </span>
+                        <span className="automation-task-picker-card-copy">
+                          <strong>{task.name}</strong>
+                          <small>{task.description}</small>
+                        </span>
+                        <span className="automation-task-picker-card-add">
+                          <Plus size={14} strokeWidth={2.2} aria-hidden="true" />
+                          <span>添加</span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </Modal>
 
               {lastExecutionSummary && (
                 <section className="border-t border-[var(--app-border)] px-3.5 py-3 sm:px-4" aria-label="最近执行结果">

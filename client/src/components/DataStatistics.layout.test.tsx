@@ -4,6 +4,7 @@ import { Activity, act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import DataStatistics from './DataStatistics'
+import { installMobileMatchMedia, swipe } from '../test/swipe'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -94,6 +95,8 @@ const click = async (element: HTMLElement) => {
 
 const findButton = (label: string) => Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
   .find(button => button.textContent?.includes(label))
+
+const activePanel = () => container.querySelector<HTMLElement>('.swipe-mode-slide:not([aria-hidden="true"])')
 
 const deferred = <T,>() => {
   let resolve!: (value: T) => void
@@ -197,11 +200,11 @@ describe('DataStatistics layout surfaces', () => {
     expect(depotTab?.getAttribute('aria-selected')).toBe('true')
     expect(document.activeElement).toBe(depotTab)
 
-    const depotCard = page?.querySelector('.data-statistics-task-card')
+    const depotCard = activePanel()?.querySelector('.data-statistics-task-card')
     expect(depotCard?.getAttribute('data-smooth-corners')).toBe('true')
     expect(depotCard?.textContent).toContain('仓库识别')
 
-    const depotSummary = page?.querySelector('.data-readout')
+    const depotSummary = activePanel()?.querySelector('.data-readout')
     const kpis = Array.from(depotSummary?.querySelectorAll('.data-readout-stat') ?? [])
     expect(kpis).toHaveLength(2)
     expect(depotSummary?.querySelectorAll('.data-readout-meta > span')).toHaveLength(2)
@@ -210,12 +213,30 @@ describe('DataStatistics layout surfaces', () => {
     expect(depotSummary?.classList.contains('surface-soft')).toBe(false)
     expect(depotCard?.querySelector('#depot-category-title')?.textContent).toContain('1\u00A0类')
     expect(depotCard?.querySelector('.data-statistics-category-section')?.classList.contains('surface-soft')).toBe(false)
-    const depotGrid = page?.querySelector('.data-statistics-item-grid')
+    const depotGrid = activePanel()?.querySelector('.data-statistics-item-grid')
     expect(depotGrid?.classList.contains('surface-soft')).toBe(false)
     expect(depotGrid?.classList.contains('gap-3')).toBe(true)
-    const depotItem = page?.querySelector('.data-statistics-depot-item')
+    const depotItem = activePanel()?.querySelector('.data-statistics-depot-item')
     expect(depotItem?.classList.contains('surface-soft')).toBe(false)
     expect(depotItem?.classList.contains('border')).toBe(false)
+  })
+
+  it('switches statistics views with a horizontal swipe', async () => {
+    installMobileMatchMedia()
+    await act(async () => root.render(<DataStatistics />))
+    await flush()
+
+    const track = container.querySelector('[role="tablist"][aria-label="数据统计视图"]')
+    const items = Array.from(
+      track?.querySelectorAll<HTMLButtonElement>(':scope > .lg-track__item') ?? [],
+    )
+    expect(items[0]?.getAttribute('aria-selected')).toBe('true')
+
+    await swipe(container.querySelector<HTMLElement>('.data-statistics-page')!, 240, 200, 120, 204)
+    await flush()
+
+    expect(items[1]?.getAttribute('aria-selected')).toBe('true')
+    expect(items[1]?.textContent).toContain('仓库识别')
   })
 
   it('shows local loading and recovers from an operator data error with retry', async () => {
@@ -245,16 +266,16 @@ describe('DataStatistics layout surfaces', () => {
     await act(async () => root.render(<DataStatistics />))
     await flush()
 
-    const alert = container.querySelector('[role="alert"]')
+    const alert = activePanel()?.querySelector('[role="alert"]')
     expect(alert?.textContent).toContain('干员数据读取失败')
     expect(alert?.textContent).not.toContain('Internal Server Error')
 
-    const retry = findButton('重新加载')
+    const retry = alert?.querySelector<HTMLButtonElement>('button')
     expect(retry).toBeDefined()
     await click(retry!)
 
     expect(mocks.getOperBoxData).toHaveBeenCalledTimes(3)
-    expect(container.querySelector('[role="alert"]')).toBeNull()
+    expect(activePanel()?.querySelector('[role="alert"]')).toBeNull()
     expect(container.textContent).toContain('测试干员')
   })
 
@@ -405,15 +426,17 @@ describe('DataStatistics layout surfaces', () => {
     await flush()
     await click(findButton('仓库识别')!)
 
-    const alert = container.querySelector('[role="alert"]')
+    const alert = activePanel()?.querySelector('[role="alert"]')
     expect(alert?.textContent).toContain('仓库数据读取失败')
-    expect(container.textContent).not.toContain('还没有仓库识别结果')
+    expect(activePanel()?.textContent).not.toContain('还没有仓库识别结果')
     expect(alert?.textContent).not.toContain('Internal Server Error')
 
-    await click(findButton('重新加载')!)
+    const depotRetry = alert?.querySelector<HTMLButtonElement>('button')
+    expect(depotRetry).toBeDefined()
+    await click(depotRetry!)
     expect(mocks.getDepotData).toHaveBeenCalledTimes(2)
-    expect(container.querySelector('[role="alert"]')).toBeNull()
-    expect(container.textContent).toContain('物品种类')
+    expect(activePanel()?.querySelector('[role="alert"]')).toBeNull()
+    expect(activePanel()?.textContent).toContain('物品种类')
   })
 
   it('ignores stale data loaders across an Activity hide and restore cycle', async () => {

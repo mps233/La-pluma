@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import { GlassSegmented } from '@zakisheriff/liquid-glass'
 import { ChevronRight, FileText, Info, Play, Puzzle, Search, ShieldCheck, Square } from 'lucide-react'
 import Icons from './Icons'
-import { PageHeader, Button, Card, ConfirmDialog, EmptyState, SmoothPanel, StatusMark, TruncatedText } from './common'
+import { PageHeader, Button, Card, ConfirmDialog, EmptyState, SmoothPanel, StatusMark, TruncatedText, SwipeModePager } from './common'
 import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import { useRunStore } from '../store/runStore'
@@ -28,6 +28,7 @@ import type {
   CopilotSetItem
 } from '@/types/components'
 import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
+import { useSwipeModeTrack } from '../hooks/useSwipeModeTrack'
 import { useUIStore, type CombatCopilotPrefill } from '@/stores'
 
 type CopilotSetExecutionMode = 'manual' | 'cli'
@@ -83,6 +84,13 @@ const formatCopilotUri = ({ id, isSet }: CopilotUriInfo): string =>
   isSet ? `prts://s${id}` : `prts://${id}`
 type CopilotSetSelections = Record<string, number[]>
 type CombatMode = 'copilot' | 'ssscopilot' | 'paradoxcopilot'
+
+const combatModeOptions = [
+  { id: 'copilot' as const, title: '普通作业', icon: <FileText className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" /> },
+  { id: 'ssscopilot' as const, title: '保全派驻', icon: <ShieldCheck className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" /> },
+  { id: 'paradoxcopilot' as const, title: '悖论模拟', icon: <Puzzle className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" /> },
+] as const
+
 type CombatUserConfig = {
   taskInputs: CombatTaskInputs
   advancedParams: CombatAdvancedParams
@@ -299,6 +307,18 @@ export default function CombatTasks() {
   const [isSearchingCopilot, setIsSearchingCopilot] = useState(false)
   const copilotSearchInputRef = useRef<HTMLInputElement | null>(null)
   const [activeCombatMode, setActiveCombatMode] = useState<CombatMode>('copilot')
+  const activeCombatModeIndex = Math.max(
+    0,
+    combatModeOptions.findIndex(option => option.id === activeCombatMode),
+  )
+  const combatTrack = useSwipeModeTrack({
+    count: combatModeOptions.length,
+    index: activeCombatModeIndex,
+    onChange: (nextIndex) => {
+      const nextMode = combatModeOptions[nextIndex]?.id
+      if (nextMode) setActiveCombatMode(nextMode)
+    },
+  })
 
   useEffect(() => {
     // Activity retains state while hidden, so clear loading left behind by
@@ -1667,69 +1687,10 @@ export default function CombatTasks() {
     )
   }
 
-  const combatModeOptions = [
-    { id: 'copilot' as const, title: '普通作业', icon: <FileText className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" /> },
-    { id: 'ssscopilot' as const, title: '保全派驻', icon: <ShieldCheck className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" /> },
-    { id: 'paradoxcopilot' as const, title: '悖论模拟', icon: <Puzzle className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" /> },
-  ]
-  const activeCombatModeIndex = Math.max(
-    0,
-    combatModeOptions.findIndex(option => option.id === activeCombatMode),
-  )
 
-  return (
-    <>
-      <div className="app-page combat-page ios-workspace-page" data-workbench-tasks>
-        <div className="app-stack-section">
-        <PageHeader
-          title="自动战斗"
-          subtitle="支持单作业、作业集、保全派驻、悖论模拟与链接识别"
-          mobileLayout="inline"
-          actions={<FloatingStatusIndicator />}
-        />
-
-        {configSyncError && (
-          <div
-            role="alert"
-            className="status-warning flex min-h-11 flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm leading-5"
-          >
-            <span className="min-w-0 flex-1">{configSyncError}</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              loading={isRetryingConfigSave}
-              loadingText="同步中"
-              onClick={() => void handleRetryConfigSave()}
-              className="min-h-11 shrink-0"
-            >
-              重新同步
-            </Button>
-          </div>
-        )}
-
-        <div className="task-monitor-layout">
-          <div className="task-monitor-main">
-        <div
-          className="combat-mode-shell"
-          data-theme={theme === 'system' ? undefined : theme}
-        >
-          <GlassSegmented
-            options={combatModeOptions.map(({ title, icon }) => ({ label: title, icon }))}
-            value={activeCombatModeIndex}
-            onChange={(index) => {
-              const nextMode = combatModeOptions[index]?.id
-              if (nextMode) setActiveCombatMode(nextMode)
-            }}
-            aria-label="作业类型"
-            className="combat-mode-segmented"
-          />
-        </div>
-
-        {/* 任务列表 */}
-        <div className="app-stack-section">
-          {/* 自动抄作业 - 单独一行 */}
-          {activeCombatMode === 'copilot' && tasks.filter(task => task.id === 'copilot').map((task) => {
+  const renderCopilotPanel = () => (
+    <div className="app-stack-section">
+      {tasks.filter(task => task.id === 'copilot').map((task) => {
             return (
               <Card
                 key={task.id}
@@ -2299,10 +2260,12 @@ export default function CombatTasks() {
               </Card>
             )
           })}
+    </div>
+  )
 
-          {/* 保全派驻 / 悖论模拟 */}
-          <div className="app-stack-section">
-            {tasks.filter(task => task.id === activeCombatMode && task.id !== 'copilot').map((task) => {
+  const renderSpecialPanel = (mode: CombatMode) => (
+<div className="app-stack-section">
+            {tasks.filter(task => task.id === mode && task.id !== 'copilot').map((task) => {
               const taskUris = splitCopilotInputToArgs(taskInputs[task.id] || '')
               const isParadox = task.id === 'paradoxcopilot'
               const isSss = task.id === 'ssscopilot'
@@ -2534,7 +2497,67 @@ export default function CombatTasks() {
               )
             })}
           </div>
+  )
+
+  return (
+    <>
+      <div className="app-page combat-page ios-workspace-page" data-workbench-tasks {...combatTrack.handlers}>
+        <div className="app-stack-section">
+        <PageHeader
+          title="自动战斗"
+          subtitle="支持单作业、作业集、保全派驻、悖论模拟与链接识别"
+          mobileLayout="inline"
+          actions={<FloatingStatusIndicator />}
+        />
+
+        {configSyncError && (
+          <div
+            role="alert"
+            className="status-warning flex min-h-11 flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm leading-5"
+          >
+            <span className="min-w-0 flex-1">{configSyncError}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              loading={isRetryingConfigSave}
+              loadingText="同步中"
+              onClick={() => void handleRetryConfigSave()}
+              className="min-h-11 shrink-0"
+            >
+              重新同步
+            </Button>
+          </div>
+        )}
+
+        <div className="task-monitor-layout">
+          <div className="task-monitor-main">
+        <div
+          className="combat-mode-shell"
+          data-theme={theme === 'system' ? undefined : theme}
+        >
+          <GlassSegmented
+            options={combatModeOptions.map(({ title, icon }) => ({ label: title, icon }))}
+            value={activeCombatModeIndex}
+            onChange={(index) => {
+              if (combatTrack.isAnimating()) return
+              const nextMode = combatModeOptions[index]?.id
+              if (nextMode) setActiveCombatMode(nextMode)
+            }}
+            aria-label="作业类型"
+            className="combat-mode-segmented"
+          />
         </div>
+
+        {/* 任务列表 */}
+        
+        <SwipeModePager track={combatTrack} index={activeCombatModeIndex}>
+          {combatModeOptions.map(option => (
+            <div key={option.id}>
+              {option.id === 'copilot' ? renderCopilotPanel() : renderSpecialPanel(option.id)}
+            </div>
+          ))}
+        </SwipeModePager>
           </div>
 
           <aside className="task-monitor-column" aria-label="模拟器实时预览">

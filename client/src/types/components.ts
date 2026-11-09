@@ -615,6 +615,208 @@ export interface TrainingPlan {
   }
 }
 
+// ============================================
+// 技能专精（OperProgress）类型
+// ============================================
+
+export type MasteryCandidateStatus = 'eligible' | 'owned' | 'all'
+
+export type MasteryDisabledReason =
+  | 'unowned'
+  | 'state_unknown'
+  | 'not_elite2'
+  | 'missing_mastery_data'
+  | 'no_skills'
+  | 'invalid_skill'
+
+export interface MasteryCandidate {
+  id: string
+  name: string
+  rarity: number
+  profession: string
+  professionId: string
+  currentElite: number
+  currentLevel: number
+  owned: boolean
+  ownedStateKnown: boolean
+  skillCount: number
+  eligible: boolean
+  disabledReason: MasteryDisabledReason | null
+}
+
+export interface MasteryLevelMaterial extends MaterialNode {
+  iconId: string
+}
+
+export interface MasterySkillDetail {
+  index: number
+  skillId: string
+  name: string
+  iconId: string | null
+  levels: Array<{
+    level: number
+    materials: Array<{ id: string; name: string; count: number }>
+    unlock?: { phase?: string; level?: number }
+    materialNodes: MasteryLevelMaterial[]
+  }>
+  nextLevel: {
+    level: number
+    materials: Array<{ id: string; name: string; count: number }>
+    materialNodes: MasteryLevelMaterial[]
+  } | null
+  nextMaterialNodes: MasteryLevelMaterial[]
+}
+
+export interface MasteryOperatorDetail {
+  id: string
+  name: string
+  nameForMaa: string
+  role: string | null
+  rarity: number
+  profession: string
+  professionId: string
+  currentElite: number
+  currentLevel: number
+  owned: boolean
+  ownedStateKnown: boolean
+  skills: MasterySkillDetail[]
+  clientType: string
+  dataFreshness: {
+    operbox: { timestamp: string | null; ageDays: number | null }
+    depot: { timestamp: string | null; ageDays: number | null }
+    mastery: { lastUpdated: string | null }
+  }
+}
+
+export type MasteryItemPhase =
+  | 'queued'
+  | 'starting'
+  | 'running'
+  | 'training'
+  | 'verifying'
+  | 'blocked'
+  | 'skipped'
+  | 'completed'
+  | 'failed'
+  | 'interrupted'
+
+export type MasteryCampaignStatus =
+  | 'idle'
+  | 'running'
+  | 'paused'
+  | 'stopping'
+  | 'blocked'
+  | 'completed'
+  | 'interrupted'
+
+export interface MasteryQueueSettings {
+  probeIntervalMinutes: 60 | 120 | 360
+  onItemBlocked: 'skip' | 'pause'
+  autoStartGame: boolean
+  notifyOnComplete: boolean
+  notifyOnBlocked: boolean
+}
+
+export interface MasteryQueueItem {
+  id: string
+  operatorId: string
+  operatorName: string
+  role: string | null
+  skillIndex: number
+  skillId: string | null
+  skillName: string
+  targetLevel: number
+  declaredLevel: number
+  confirmedLevel: number
+  levelVerified: boolean
+  startedLevel: number | null
+  phase: MasteryItemPhase
+  enabled: boolean
+  order: number
+  verifyCount: number
+  attempts: number
+  consecutiveFailures: number
+  lastErrorCode: string | null
+  lastOutcome: {
+    result?: string | null
+    resultDetail?: string | null
+    skillMastery?: number[] | null
+    runId?: string | null
+    at?: string | null
+    logCheckpointPresent?: boolean
+  } | null
+  trainingStartedAt: string | null
+  nextProbeAt: string | null
+  probeBackoffIndex: number
+  blocked: {
+    code: string
+    message: string
+    detail?: unknown
+    retryable: boolean
+    at: string
+  } | null
+  activeRunId: string | null
+  lastRunId: string | null
+  recovery: { previousPhase: MasteryItemPhase; previousRunId: string | null; detectedAt: string } | null
+  addedAt: string
+  updatedAt: string
+  completedAt: string | null
+  skippedAt: string | null
+}
+
+export interface MasteryCampaign {
+  status: MasteryCampaignStatus
+  activeItemId: string | null
+  activeStepRunId: string | null
+  settings: MasteryQueueSettings
+  clientProfileId: string | null
+  clientType: string | null
+  startedAt: string | null
+  pausedReason: string | null
+  updatedAt: string
+}
+
+export interface MasteryQueueStatus {
+  campaign: MasteryCampaign
+  items: MasteryQueueItem[]
+  counts: {
+    total: number
+    queued: number
+    training: number
+    blocked: number
+    completed: number
+  }
+  activeItem: MasteryQueueItem | null
+  nextActionableItem: MasteryQueueItem | null
+  scheduler?: {
+    running: boolean
+    tickMs: number
+    lastTickAt: string | null
+    lastTickError: string | null
+    tickInFlight: boolean
+  }
+}
+
+export interface MasteryPreflight {
+  supported: boolean
+  masteryData: {
+    available: boolean
+    operatorCount: number
+    error: string | null
+  }
+  clientType: string
+  minimumMaaCliVersion: string
+  minimumMaaCoreVersion: string
+  runtime: {
+    supported: boolean
+    cli: string
+    core: string
+    minimumCli: string
+    minimumCore: string
+    reason: string | null
+  }
+}
+
 // 筛选条件
 export interface TrainingFilters {
   rarity: string

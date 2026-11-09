@@ -4,6 +4,7 @@ import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ConfigManager from './ConfigManager'
+import { installMobileMatchMedia, swipe } from '../test/swipe'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -132,7 +133,7 @@ describe('ConfigManager layout surfaces', () => {
     expect(page?.querySelector('.app-page-header-icon')).toBeNull()
 
     const cards = page?.querySelectorAll('.app-card[data-smooth-corners="true"]') ?? []
-    expect(cards).toHaveLength(4)
+    expect(cards).toHaveLength(6)
     cards.forEach((card) => {
       expect(card.classList.contains('!p-0')).toBe(true)
       expect(card.querySelector(':scope > .app-card-smooth-surface')).not.toBeNull()
@@ -144,11 +145,11 @@ describe('ConfigManager layout surfaces', () => {
     expect(workspace?.children).toHaveLength(2)
     expect(primaryColumn?.classList.contains('min-w-0')).toBe(true)
     expect(secondaryColumn?.classList.contains('min-w-0')).toBe(true)
-    expect(Array.from(primaryColumn?.querySelectorAll(':scope > .app-card') ?? [])).toEqual([cards[0], cards[1]])
-    expect(Array.from(secondaryColumn?.querySelectorAll(':scope > .app-card') ?? [])).toEqual([cards[2]])
+    expect(Array.from(primaryColumn?.querySelectorAll(':scope > .app-card') ?? [])).toEqual([cards[3]])
+    expect(Array.from(secondaryColumn?.querySelectorAll(':scope > .app-card') ?? [])).toEqual([cards[4]])
     expect(cards[0]?.classList.contains('config-editor-card')).toBe(true)
-    expect(cards[1]?.classList.contains('config-directory-card')).toBe(true)
-    expect(cards[2]?.classList.contains('config-update-card')).toBe(true)
+    expect(cards[3]?.classList.contains('config-directory-card')).toBe(true)
+    expect(cards[4]?.classList.contains('config-update-card')).toBe(true)
     expect(page?.querySelectorAll(':scope > .app-card')).toHaveLength(0)
     expect(cards[0]?.querySelector(':scope > .app-card-smooth-surface > .app-card-content')).not.toBeNull()
 
@@ -175,6 +176,24 @@ describe('ConfigManager layout surfaces', () => {
     const configPath = Array.from(page?.querySelectorAll('p') ?? []).find(element => element.textContent === '/tmp/la-pluma')
     expect(configPath?.classList.contains('break-all')).toBe(false)
     expect(configPath?.classList.contains('break-words')).toBe(true)
+  })
+
+  it('switches configuration sections with a horizontal swipe', async () => {
+    installMobileMatchMedia()
+    await act(async () => root.render(<ConfigManager />))
+    await flush()
+
+    const navigationTrack = container.querySelector('[data-config-sections] .lg-track[role="tablist"]')
+    const navigationItems = Array.from(
+      navigationTrack?.querySelectorAll<HTMLButtonElement>(':scope > .lg-track__item') ?? [],
+    )
+    expect(navigationItems[0]?.getAttribute('aria-selected')).toBe('true')
+
+    await swipe(container.querySelector<HTMLElement>('.ios-workspace-page')!, 240, 200, 120, 204)
+    await flush()
+
+    expect(navigationItems[1]?.getAttribute('aria-selected')).toBe('true')
+    expect(localStorage.getItem('laPlumaConfigSection')).toBe('resource')
   })
 
   it('shows a retryable config-directory error instead of an endless loading label', async () => {
@@ -441,7 +460,8 @@ describe('ConfigManager layout surfaces', () => {
     await act(async () => root.render(<ConfigManager />))
     await flush()
 
-    const editor = container.querySelector('.config-editor-card')
+    const activeEditor = () => container.querySelector('.swipe-mode-slide:not([aria-hidden="true"]) .config-editor-card')
+    const editor = activeEditor()
     expect(editor?.textContent).toContain('当前资源来源保持不变')
     expect(editor?.querySelector('select')).toBeNull()
     expect(Array.from(editor?.querySelectorAll('button') ?? []).some(button => button.textContent?.trim() === '保存')).toBe(false)
@@ -450,8 +470,10 @@ describe('ConfigManager layout surfaces', () => {
     await act(async () => {
       instanceButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
+    await flush()
 
-    expect(editor?.textContent).toContain('触摸模式等实例选项保持当前设置')
-    expect(editor?.querySelector('select')).toBeNull()
+    const instanceEditor = activeEditor()
+    expect(instanceEditor?.textContent).toContain('触摸模式等实例选项保持当前设置')
+    expect(instanceEditor?.querySelector('select')).toBeNull()
   })
 })

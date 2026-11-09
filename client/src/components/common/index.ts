@@ -9,6 +9,7 @@ export { Card, CardHeader, CardContent } from './Card.tsx'
 export { default as SmoothPanel } from './SmoothPanel.tsx'
 export { default as CjkText } from './CjkText.tsx'
 export { default as TruncatedText } from './TruncatedText.tsx'
+export { default as SwipeModePager } from './SwipeModePager.tsx'
 
 // 表单组件
 export { default as Button, IconButton } from './Button.tsx'

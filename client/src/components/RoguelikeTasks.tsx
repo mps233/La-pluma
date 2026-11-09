@@ -3,7 +3,7 @@ import '../styles/pages/roguelike.css'
 import { GlassSegmented } from '@zakisheriff/liquid-glass'
 import { Check, Play, Square } from 'lucide-react'
 import { maaApi } from '../services/api'
-import { PageHeader, Input, Select, Button, SmoothPanel, Switch, CjkText, TruncatedText } from './common'
+import { PageHeader, Input, Select, Button, SmoothPanel, Switch, CjkText, TruncatedText, SwipeModePager } from './common'
 import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import { useRunStore } from '../store/runStore'
@@ -18,6 +18,7 @@ import type {
   RoguelikeCoreChar
 } from '@/types/components'
 import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
+import { useSwipeModeTrack } from '../hooks/useSwipeModeTrack'
 import {
   getRoguelikeModeChoices,
   getRoguelikeRoleChoices,
@@ -977,11 +978,24 @@ export default function RoguelikeTasks() {
   }
 
   const activeTask = tasks.find(task => task.id === activeMode) ?? tasks[0]
+  const activeModeIndex = Math.max(0, tasks.findIndex(task => task.id === activeMode))
+  const modeTrack = useSwipeModeTrack({
+    count: tasks.length,
+    index: activeModeIndex,
+    onChange: (index) => {
+      const task = tasks[index]
+      if (task) setActiveMode(task.id as RoguelikeMode)
+    },
+    extraIgnoreSelector: '.roguelike-mode-shell, .roguelike-monitor-column',
+  })
   if (!activeTask) return null
-  const activeTheme = taskInputs[activeTask.id] || ''
 
   return (
-    <div className="app-page ios-workspace-page roguelike-page" data-workbench-tasks>
+    <div
+      className="app-page ios-workspace-page roguelike-page app-swipe-surface"
+      data-workbench-tasks
+      {...modeTrack.handlers}
+    >
       <div className="app-stack-section">
         <PageHeader
           title="肉鸽模式"
@@ -1022,6 +1036,7 @@ export default function RoguelikeTasks() {
                 options={tasks.map(task => ({ label: task.name }))}
                 value={Math.max(0, tasks.findIndex(task => task.id === activeMode))}
                 onChange={(index) => {
+                  if (modeTrack.isAnimating()) return
                   const task = tasks[index]
                   if (task) setActiveMode(task.id as RoguelikeMode)
                 }}
@@ -1031,88 +1046,102 @@ export default function RoguelikeTasks() {
             </div>
           </div>
 
-          <SmoothPanel className="roguelike-panel roguelike-theme-panel">
-            <div className="roguelike-panel-heading">
-              <div>
-                <h3><CjkText>主题</CjkText></h3>
-                <p>选择本次运行内容</p>
-              </div>
-              <span>{keepNumberWithUnit(`${THEME_PRESETS[activeMode].length} 个可用`)}</span>
-            </div>
-            <div className="roguelike-panel-body">
-              <div className="roguelike-theme-grid">
-                {THEME_PRESETS[activeMode].map(theme => {
-                  const selected = activeTheme === theme.value
-                  return (
-                    <button
-                      key={theme.value}
-                      type="button"
-                      onClick={() => handleInputChange(activeTask.id, theme.value)}
-                      aria-pressed={selected}
-                      className={`roguelike-theme-option min-h-11 ${selected ? 'is-active' : ''}`}
-                    >
-                      <span className="roguelike-theme-copy">
-                        <strong>{theme.label}</strong>
-                        <small>{theme.value}</small>
-                      </span>
-                      {selected && <Check size={15} strokeWidth={2.4} aria-hidden="true" />}
-                    </button>
-                  )
-                })}
-              </div>
-              <Input
-                id={`roguelike-${activeTask.id}-theme`}
-                name={`maa-${activeTask.id}-theme`}
-                type="text"
-                label="自定义主题代号"
-                placeholder={activeTask.placeholder}
-                value={activeTheme}
-                onChange={(value: string) => handleInputChange(activeTask.id, value)}
-                className="roguelike-custom-theme"
-              />
-            </div>
-          </SmoothPanel>
+          <SwipeModePager
+            track={modeTrack}
+            index={activeModeIndex}
+            className="roguelike-mode-pager"
+          >
+            {tasks.map((task) => {
+              const themeId = task.id as RoguelikeMode
+              const taskTheme = taskInputs[task.id] || ''
+              return (
+                <div key={task.id} className="roguelike-mode-panels">
+                  <SmoothPanel className="roguelike-panel roguelike-theme-panel">
+                    <div className="roguelike-panel-heading">
+                      <div>
+                        <h3><CjkText>主题</CjkText></h3>
+                        <p>选择本次运行内容</p>
+                      </div>
+                      <span>{keepNumberWithUnit(`${THEME_PRESETS[themeId].length} 个可用`)}</span>
+                    </div>
+                    <div className="roguelike-panel-body">
+                      <div className="roguelike-theme-grid">
+                        {THEME_PRESETS[themeId].map(themeOption => {
+                          const selected = taskTheme === themeOption.value
+                          return (
+                            <button
+                              key={themeOption.value}
+                              type="button"
+                              onClick={() => handleInputChange(task.id, themeOption.value)}
+                              aria-pressed={selected}
+                              className={`roguelike-theme-option min-h-11 ${selected ? 'is-active' : ''}`}
+                            >
+                              <span className="roguelike-theme-copy">
+                                <strong>{themeOption.label}</strong>
+                                <small>{themeOption.value}</small>
+                              </span>
+                              {selected && <Check size={15} strokeWidth={2.4} aria-hidden="true" />}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <Input
+                        id={`roguelike-${task.id}-theme`}
+                        name={`maa-${task.id}-theme`}
+                        type="text"
+                        label="自定义主题代号"
+                        placeholder={task.placeholder}
+                        value={taskTheme}
+                        onChange={(value: string) => handleInputChange(task.id, value)}
+                        className="roguelike-custom-theme"
+                      />
+                    </div>
+                  </SmoothPanel>
 
-          <SmoothPanel className="roguelike-panel roguelike-settings-panel">
-            <div className="roguelike-panel-heading">
-              <div>
-                <h3><CjkText>策略设置</CjkText></h3>
-                <TruncatedText as="p" tooltip={activeTask.name}>{activeTask.name}</TruncatedText>
-              </div>
-              <span>{keepNumberWithUnit(`${getVisibleAdvancedOptions(activeTask.id).length} 项`)}</span>
-            </div>
-            <div className="roguelike-panel-body roguelike-settings-body">
-              {renderAdvancedOptions(activeTask)}
-            </div>
-            <div className="roguelike-panel-footer">
-              {isRunning ? (
-                <Button
-                  onClick={handleStopTask}
-                  disabled={isStopping}
-                  loading={isStopping}
-                  loadingText="正在终止"
-                  variant="danger"
-                  size="md"
-                  icon={!isStopping ? <Square size={14} fill="currentColor" aria-hidden="true" /> : undefined}
-                  className="roguelike-run-button"
-                >
-                  终止执行
-                </Button>
-              ) : (
-                <Button
-                  onClick={() => handleExecute(activeTask)}
-                  disabled={!automationAvailable}
-                  title={!automationAvailable ? unavailableMessage : undefined}
-                  variant="primary"
-                  size="md"
-                  icon={<Play size={15} fill="currentColor" aria-hidden="true" />}
-                  className="roguelike-run-button"
-                >
-                  立即执行
-                </Button>
-              )}
-            </div>
-          </SmoothPanel>
+                  <SmoothPanel className="roguelike-panel roguelike-settings-panel">
+                    <div className="roguelike-panel-heading">
+                      <div>
+                        <h3><CjkText>策略设置</CjkText></h3>
+                        <TruncatedText as="p" tooltip={task.name}>{task.name}</TruncatedText>
+                      </div>
+                      <span>{keepNumberWithUnit(`${getVisibleAdvancedOptions(task.id).length} 项`)}</span>
+                    </div>
+                    <div className="roguelike-panel-body roguelike-settings-body">
+                      {renderAdvancedOptions(task)}
+                    </div>
+                    <div className="roguelike-panel-footer">
+                      {isRunning ? (
+                        <Button
+                          onClick={handleStopTask}
+                          disabled={isStopping}
+                          loading={isStopping}
+                          loadingText="正在终止"
+                          variant="danger"
+                          size="md"
+                          icon={!isStopping ? <Square size={14} fill="currentColor" aria-hidden="true" /> : undefined}
+                          className="roguelike-run-button"
+                        >
+                          终止执行
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={() => handleExecute(task)}
+                          disabled={!automationAvailable}
+                          title={!automationAvailable ? unavailableMessage : undefined}
+                          variant="primary"
+                          size="md"
+                          icon={<Play size={15} fill="currentColor" aria-hidden="true" />}
+                          className="roguelike-run-button"
+                        >
+                          立即执行
+                        </Button>
+                      )}
+                    </div>
+                  </SmoothPanel>
+                </div>
+              )
+            })}
+          </SwipeModePager>
 
           <aside className="roguelike-monitor-column" aria-label="模拟器实时预览">
             <SmoothPanel

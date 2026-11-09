@@ -18,12 +18,13 @@ import {
 import Icons from './Icons'
 import DropRecords from './DropRecords'
 import StatisticsSummary from './StatisticsSummary'
-import { PageHeader, Button, Card, EmptyState, Loading, CjkText } from './common'
+import { PageHeader, Button, Card, EmptyState, Loading, CjkText, SwipeModePager } from './common'
 import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import { useUIStore } from '../stores'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useItemIconCacheVersion } from '../hooks/useItemIconCacheVersion'
+import { useSwipeModeTrack } from '../hooks/useSwipeModeTrack'
 import type {
   DepotDataDetailed,
   OperBoxData,
@@ -1125,8 +1126,22 @@ export default function DataStatistics() {
     setSortBy('default')
   }
 
+  const activeTabIndex = Math.max(0, statisticsTabs.findIndex(tab => tab.id === activeTab))
+  const statisticsTrack = useSwipeModeTrack({
+    count: statisticsTabs.length,
+    index: activeTabIndex,
+    onChange: (index) => {
+      const tab = statisticsTabs[index]
+      if (tab) selectStatisticsTab(tab.id)
+    },
+    extraIgnoreSelector: '.data-statistics-view-switcher, .data-statistics-mode-shell',
+  })
+
   return (
-    <div className="app-page ios-workspace-page ios-borderless-cards data-statistics-page">
+    <div
+      className="app-page ios-workspace-page ios-borderless-cards data-statistics-page app-swipe-surface"
+      {...statisticsTrack.handlers}
+    >
       <div className="app-stack-section">
         {/* 页面标题 */}
         <PageHeader
@@ -1154,6 +1169,7 @@ export default function DataStatistics() {
             })}
             value={Math.max(0, statisticsTabs.findIndex(tab => tab.id === activeTab))}
             onChange={(index) => {
+              if (statisticsTrack.isAnimating()) return
               const tab = statisticsTabs[index]
               if (tab) selectStatisticsTab(tab.id)
             }}
@@ -1164,9 +1180,7 @@ export default function DataStatistics() {
 
         <div>
           {/* 功能卡片 */}
-          <div className="min-w-0 app-stack-section">
-          {/* 干员识别 */}
-          {activeTab === 'operbox' && (
+          <SwipeModePager track={statisticsTrack} index={activeTabIndex}>
           <motion.div
             id="data-statistics-panel-operbox"
             role="tabpanel"
@@ -1403,10 +1417,7 @@ export default function DataStatistics() {
               </div>
             </Card>
           </motion.div>
-          )}
 
-          {/* 仓库识别 */}
-          {activeTab === 'depot' && (
           <motion.div
             id="data-statistics-panel-depot"
             role="tabpanel"
@@ -1582,10 +1593,7 @@ export default function DataStatistics() {
               </div>
             </Card>
           </motion.div>
-          )}
-          
-          {/* 掉落记录 */}
-          {activeTab === 'drops' && (
+
             <motion.div
               id="data-statistics-panel-drops"
               role="tabpanel"
@@ -1604,8 +1612,7 @@ export default function DataStatistics() {
                 error={dropDataError}
               />
             </motion.div>
-          )}
-          </div>
+          </SwipeModePager>
 
         </div>
       </div>

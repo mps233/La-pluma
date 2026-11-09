@@ -360,9 +360,11 @@ html.la-pluma-standalone #app-root .page {
 }
 
 .la-pluma-navbar-title {
+  margin: 0;
   color: var(--app-text) !important;
   font-size: 1rem !important;
   font-weight: 700 !important;
+  line-height: 1.2;
 }
 
 .la-pluma-navbar-left,
@@ -434,8 +436,14 @@ html.la-pluma-standalone #app-root .page {
   .la-pluma-app .la-pluma-sidebar-surface.lg-card.lg-glass {
     width: 100%;
     height: 100%;
-    --lg-glass-fill: color-mix(in srgb, var(--app-surface-solid) 78%, transparent);
-    --lg-glass-blur: 28px;
+    --lg-glass-fill: color-mix(in srgb, var(--app-surface-solid) 62%, transparent);
+    --lg-glass-blur: 18px;
+  }
+
+  /* Keep a little more separation from the page in the light theme, where a
+     translucent white panel washes out faster than the dark surface. */
+  :root[data-theme='light'] .la-pluma-app .la-pluma-sidebar-surface.lg-card.lg-glass {
+    --lg-glass-fill: color-mix(in srgb, var(--app-surface-solid) 70%, transparent);
   }
 
   .la-pluma-app .la-pluma-sidebar {
@@ -696,6 +704,13 @@ html.la-pluma-standalone #app-root .page {
   --lg-glass-fill: color-mix(in srgb, var(--app-surface-solid) 95%, transparent);
 }
 
+/* Modal content must stay above the glass fill even when a stale package
+   stylesheet is missing `.lg-glass > * { position: relative; z-index: 1 }`. */
+.app-modal-layer .app-glass-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
 @media (prefers-reduced-transparency: reduce) {
   .app-glass-panel.lg-card.lg-glass,
   .app-glass-panel.lg-card.lg-glass::before {
@@ -867,6 +882,25 @@ html.la-pluma-standalone #app-root .page {
 .la-pluma-tab-link.is-desktop-tab:hover:not(.is-active),
 .la-pluma-tab-link.is-desktop-tab:focus-visible:not(.is-active) {
   color: var(--app-text) !important;
+}
+
+/* Only the active workspace keeps a filled pill. Unselected rows stay plain
+   so the glass rim does not draw a border around every navigation item. */
+.la-pluma-app .la-pluma-tab-link.is-desktop-tab:not(.is-active) {
+  background: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.la-pluma-app .la-pluma-tab-link.is-desktop-tab:not(.is-active)::before,
+.la-pluma-app .la-pluma-tab-link.is-desktop-tab:not(.is-active)::after {
+  display: none !important;
+}
+
+.la-pluma-app .la-pluma-tab-link.is-desktop-tab:not(.is-active):hover,
+.la-pluma-app .la-pluma-tab-link.is-desktop-tab:not(.is-active):focus-visible {
+  background: color-mix(in srgb, var(--app-text) 6%, transparent) !important;
 }
 
 .la-pluma-tab-link.is-desktop-tab.is-active {
@@ -1418,6 +1452,44 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
       #000 calc(100% - var(--la-pluma-tabbar-reserved-height)),
       transparent 100%
     );
+  }
+}
+
+/* Phones show the active workspace title in the navbar and omit the duplicate
+   page headings and their operator-quote chip. The sr-only status region stays
+   mounted so screen readers still receive status updates. */
+@media (max-width: 639px) {
+  .la-pluma-app .la-pluma-navbar-title {
+    display: block;
+    max-width: 8rem;
+    overflow: hidden;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .la-pluma-app .app-page-header {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    clip: rect(0 0 0 0) !important;
+    clip-path: inset(50%) !important;
+    white-space: nowrap !important;
+    pointer-events: none !important;
+  }
+
+  .la-pluma-app .app-page-header :is(.app-page-heading, .floating-status-anchor) {
+    display: none !important;
+  }
+
+  .la-pluma-app .la-pluma-content {
+    padding-top: calc(var(--app-navbar-height) + var(--app-safe-area-top));
   }
 }
 

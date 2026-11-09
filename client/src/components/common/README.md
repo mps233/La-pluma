@@ -78,6 +78,39 @@ Card Props：
 
 ---
 
+### SwipeModePager - 分段模式轨道
+
+页面内分段控件的手机端跟手轨道。一个子元素对应一个模式，顺序必须和 `GlassSegmented` 的选项一致；非当前子元素保持挂载但 `inert` + `aria-hidden`，所以拖拽时相邻卡片已经可见。
+
+```tsx
+import { SwipeModePager } from '@/components/common'
+import { useSwipeModeTrack } from '@/hooks/useSwipeModeTrack'
+
+const track = useSwipeModeTrack({
+  count: modes.length,
+  index: activeIndex,
+  onChange: (next) => setActiveIndex(next),
+  extraIgnoreSelector: '.my-mode-shell',
+})
+
+<div className="app-page ... app-swipe-surface" {...track.handlers}>
+  <SwipeModePager track={track} index={activeIndex}>
+    {modes.map(mode => <div key={mode.id}>{mode.content}</div>)}
+  </SwipeModePager>
+</div>
+```
+
+Props：
+
+- `track`（`SwipeModeTrack`，required）- `useSwipeModeTrack` 的返回值，提供 viewport/track/active-slide refs 和高度
+- `index`（number，required）- 当前模式索引，必须与分段控件一致
+- `children`（ReactNode，required）- 每个模式一个子元素
+- `className` / `slideClassName`（string）- 追加到 viewport / slide 的类名；用 CSS 变量 `--swipe-mode-gap` 调整卡片间距
+
+`useSwipeModeTrack` 会在松手动画结束后才调用 `onChange`；分段控件的 `onChange` 应先用 `track.isAnimating()` 拦截动画中的重复点击。宿主需要 `app-swipe-surface`，并通过 `extraIgnoreSelector` 排除分段控件外壳和次要操作区。
+
+---
+
 ### Button / IconButton - 按钮组件
 
 统一按钮样式，支持主要、次要、危险、成功、幽灵等变体。`Button` 与 `IconButton` 内部由 `@zakisheriff/liquid-glass` 的 `GlassButton` 承载：primary / danger / success 使用实心玻璃填充（分别取 accent、danger、success 色），secondary / outline 使用玻璃，ghost 使用透明玻璃；loading 时把内置活动指示器放进 icon 并显示 `loadingText`。尺寸映射为 36 / 44 / 48px，粗指针设备下小号自动提升到 44px；明暗主题由 `html[data-theme]` 统一提供，页面不要给按钮单独包裹主题属性。
@@ -282,7 +315,7 @@ Props：
 
 ### Modal / ConfirmDialog - 覆盖层
 
-`Modal` 和 `ConfirmDialog` 从 common 导出。`Modal` 用于 ≤6 字段的短表单：`size` 为 `sm` / `md` / `lg` / `xl`（max-width 28 / 32 / 42 / 56rem），内置焦点陷阱、关闭归还、滚动锁和背景 inert。移动端「更多工作区」由 `Layout` 内的 `GlassMenu` 提供，不是公共导出。
+`Modal` 和 `ConfirmDialog` 从 common 导出。`Modal` 用于 ≤6 字段的短表单或小型选择列表：`size` 为 `sm` / `md` / `lg` / `xl`（max-width 28 / 32 / 42 / 56rem），内置焦点陷阱、关闭归还、滚动锁和背景 inert。移动端「更多工作区」由 `Layout` 内的 `GlassMenu` 提供，不是公共导出。
 
 - `ConfirmDialog`：删除、清空等不可逆操作的确认弹窗。异步 `onConfirm` 返回 `false` 或抛出错误时会保持打开并就地显示失败原因。
 

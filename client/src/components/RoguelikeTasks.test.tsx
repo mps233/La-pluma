@@ -4,6 +4,7 @@ import { Activity, act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RoguelikeTasks from './RoguelikeTasks'
+import { installMobileMatchMedia, swipe } from '../test/swipe'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -75,8 +76,14 @@ const flush = async () => {
   })
 }
 
-const buttonByText = (text: string) => Array.from(document.querySelectorAll('button'))
-  .find(button => button.textContent?.trim() === text) as HTMLButtonElement | undefined
+const buttonByText = (text: string) => {
+  const find = (root: ParentNode) => Array.from(root.querySelectorAll('button'))
+    .find(button => button.textContent?.trim() === text) as HTMLButtonElement | undefined
+  // Mode slides stay mounted so the incoming card can follow the finger; only
+  // the visible slide is interactive.
+  const activeSlide = document.querySelector('.swipe-mode-slide:not([aria-hidden="true"])')
+  return (activeSlide ? find(activeSlide) : undefined) ?? find(document)
+}
 
 const click = async (element: HTMLElement) => {
   await act(async () => {
@@ -142,7 +149,7 @@ describe('RoguelikeTasks execution recovery', () => {
     expect(modeShell?.querySelector('.lg-track[role="tablist"]')?.getAttribute('aria-label')).toBe('肉鸽模式')
 
     const panels = page?.querySelectorAll('.roguelike-theme-panel, .roguelike-settings-panel, .roguelike-monitor-panel')
-    expect(panels).toHaveLength(3)
+    expect(panels).toHaveLength(5)
     panels?.forEach(panel => {
       expect(panel.getAttribute('data-smooth-corners')).toBe('true')
       expect(panel.querySelector(':scope > .smooth-panel-surface')).not.toBeNull()
@@ -194,6 +201,23 @@ describe('RoguelikeTasks execution recovery', () => {
     expect(container.querySelector('input[name="maa-reclamation-theme"]')).not.toBeNull()
     expect(Array.from(container.querySelectorAll('.roguelike-theme-option'))
       .some(option => option.textContent?.includes('沙洲遗闻'))).toBe(true)
+  })
+
+  it('switches the roguelike mode with a horizontal swipe', async () => {
+    installMobileMatchMedia()
+    await act(async () => root.render(<RoguelikeTasks />))
+    await flush()
+
+    const modeButtons = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('.roguelike-mode-shell > .lg-track > .lg-track__item'),
+    )
+    expect(modeButtons[0]?.getAttribute('aria-selected')).toBe('true')
+
+    await swipe(container.querySelector<HTMLElement>('.roguelike-page')!, 240, 200, 120, 204)
+    await flush()
+
+    expect(modeButtons[1]?.getAttribute('aria-selected')).toBe('true')
+    expect(container.querySelector('.swipe-mode-slide:not([aria-hidden="true"]) input[name="maa-reclamation-theme"]')).not.toBeNull()
   })
 
   it('keeps an unsynced local draft across remounts and retries the save', async () => {

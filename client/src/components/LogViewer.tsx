@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import '../styles/pages/logs.css'
 import { GlassSegmented } from '@zakisheriff/liquid-glass'
 import {
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { maaApi } from '../services/api'
 import { useRunStore } from '../store/runStore'
+import { useSwipeModeTrack } from '../hooks/useSwipeModeTrack'
 import {
   PageHeader,
   Card,
@@ -29,6 +30,7 @@ import {
   ConfirmDialog,
   SmoothPanel,
   Switch,
+  SwipeModePager,
 } from './common'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { summarizeMaaCliMessage, summarizeMaaCliSummaryBlock } from '../utils/maaLogSummary'
@@ -411,6 +413,187 @@ function summarizeLog(log: LogEntry): LogEntry | null {
     : null
 }
 
+interface LogModeCardProps {
+  active: boolean
+  title: string
+  count: number
+  viewingHistory: boolean
+  onBackToRealtime: () => void
+  selectedFile: LogFile | null
+  loading: boolean
+  activeError: string | null
+  logsCount: number
+  visibleLogs: VisibleLog[]
+  summaryEmpty: boolean
+  filteredEmpty: boolean
+  autoScroll: boolean
+  atLogTop: boolean
+  atLogBottom: boolean
+  newLogCount: number
+  collapseRepeats: boolean
+  containerRef: RefObject<HTMLDivElement | null>
+  onScroll: () => void
+  onRetry: () => void
+  onJumpToLatest: () => void
+}
+
+/**
+ * One content-mode log card. Both cards stay mounted in the mode track so the
+ * incoming card is visible while swiping; only the active card owns the scroll
+ * container and aria-controls target.
+ */
+function LogModeCard({
+  active,
+  title,
+  count,
+  viewingHistory,
+  onBackToRealtime,
+  selectedFile,
+  loading,
+  activeError,
+  logsCount,
+  visibleLogs,
+  summaryEmpty,
+  filteredEmpty,
+  autoScroll,
+  atLogTop,
+  atLogBottom,
+  newLogCount,
+  collapseRepeats,
+  containerRef,
+  onScroll,
+  onRetry,
+  onJumpToLatest,
+}: LogModeCardProps) {
+  return (
+    <Card className="log-card min-w-0 !p-0" smoothCorners>
+      <CardHeader
+        title={title}
+        actions={(
+          <div className="log-console-heading-actions">
+            <span className="log-count">{keepNumberWithUnit(`${count} 条`)}</span>
+            {viewingHistory && (
+              <Button
+                onClick={onBackToRealtime}
+                variant="outline"
+                size="sm"
+                icon={<ArrowLeft className="h-4 w-4" aria-hidden="true" />}
+              >
+                返回实时
+              </Button>
+            )}
+          </div>
+        )}
+      />
+      <CardContent className="log-console-content">
+        {viewingHistory && selectedFile && (
+          <div className="surface-soft mb-3 flex min-w-0 items-center gap-2 rounded-xl px-3 py-2 text-xs text-secondary">
+            <FileText className="h-4 w-4 shrink-0 text-tertiary" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate font-medium text-primary" title={selectedFile.name}>
+              {selectedFile.name}
+            </span>
+            <span className="hidden shrink-0 text-tertiary sm:inline">
+              {(selectedFile.size / 1024).toFixed(2)} KB
+            </span>
+          </div>
+        )}
+        {loading ? (
+          <div id={active ? 'log-console-panel' : undefined} className="log-console" aria-busy="true">
+            <div className="flex min-h-full items-center justify-center font-sans">
+              <Loading text="正在读取日志..." />
+            </div>
+          </div>
+        ) : (
+          <div className="log-console-frame">
+            <div
+              id={active ? 'log-console-panel' : undefined}
+              ref={active ? containerRef : undefined}
+              className="log-console focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] focus-visible:ring-inset"
+              role="log"
+              aria-label="日志内容"
+              aria-live={active && autoScroll && !viewingHistory ? 'polite' : 'off'}
+              aria-relevant="additions text"
+              tabIndex={0}
+              onScroll={active ? onScroll : undefined}
+            >
+              {activeError && (
+                <div
+                  className={`log-console-state is-error flex-wrap ${logsCount > 0 ? 'status-danger m-3 !min-h-0 !justify-start !p-3 text-left font-sans text-sm' : ''}`}
+                  role="alert"
+                >
+                  <AlertCircle className="h-5 w-5" aria-hidden="true" />
+                  <span>{activeError}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onRetry}
+                  >
+                    重新加载
+                  </Button>
+                </div>
+              )}
+              {!activeError && logsCount === 0 && (
+                <div className="log-console-state">
+                  <FileText className="h-5 w-5" aria-hidden="true" />
+                  <span>{viewingHistory ? '这个日志文件没有内容' : '暂无实时日志，等待任务执行'}</span>
+                </div>
+              )}
+              {!activeError && summaryEmpty && (
+                <div className="log-console-state">
+                  <FileText className="h-5 w-5" aria-hidden="true" />
+                  <span>当前日志没有需要关注的事件</span>
+                </div>
+              )}
+              {!activeError && filteredEmpty && (
+                <div className="log-console-state">
+                  <Search className="h-5 w-5" aria-hidden="true" />
+                  <span>没有符合当前筛选条件的日志</span>
+                </div>
+              )}
+              {visibleLogs.map((log, index) => (
+                <div className="log-row" key={typeof log.sequence === 'number'
+                  ? `seq-${log.sequence}`
+                  : `${log.time}-${log.level}-${log.message}-${index}`}>
+                  <div className="log-row-meta">
+                    {log.time && <time>{log.time}</time>}
+                    <span className={`log-level is-${log.level.toLowerCase()}`}>{log.level}</span>
+                  </div>
+                  <div className="log-message">
+                    <span>{keepNumberWithUnit(log.message)}</span>
+                    {collapseRepeats && log.count > 1 && <span className="log-repeat">x{log.count}</span>}
+                    {log.rawMessage && log.rawMessage !== log.message && (
+                      <details className="log-row-details">
+                        <summary>原文</summary>
+                        <pre>{log.rawMessage}</pre>
+                      </details>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className={`log-console-fade is-top${atLogTop ? '' : ' is-visible'}`} aria-hidden="true" />
+            <div className={`log-console-fade is-bottom${atLogBottom ? '' : ' is-visible'}`} aria-hidden="true" />
+            {!atLogBottom && (
+              <div className="log-console-jump">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  icon={<ArrowDown className="h-4 w-4" aria-hidden="true" />}
+                  onClick={onJumpToLatest}
+                >
+                  {viewingHistory ? '回到底部' : newLogCount > 0 ? keepNumberWithUnit(`回到最新 · ${newLogCount} 条`) : '回到最新'}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function LogViewer() {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [autoScroll, setAutoScroll] = useState(true)
@@ -643,7 +826,7 @@ export default function LogViewer() {
     container.scrollTop = container.scrollHeight
     setAtLogBottom(true)
     setAtLogTop(container.scrollHeight <= container.clientHeight)
-  }, [logs, autoScroll, viewingHistory])
+  }, [logs, autoScroll, viewingHistory, contentMode])
 
   useEffect(() => {
     const buttons = logModeRef.current?.querySelectorAll<HTMLButtonElement>(
@@ -652,36 +835,48 @@ export default function LogViewer() {
     buttons?.forEach(button => button.setAttribute('aria-controls', 'log-console-panel'))
   }, [])
 
-  const readableLogs = useMemo(() => {
-    if (contentMode === 'raw') return logs
-    return logs.map(summarizeLog).filter((log): log is LogEntry => log !== null)
-  }, [contentMode, logs])
+  const readableLogsByMode = useMemo<Record<LogContentMode, LogEntry[]>>(() => {
+    const summary = logs.map(summarizeLog).filter((log): log is LogEntry => log !== null)
+    return { summary, raw: logs }
+  }, [logs])
 
-  const filteredLogs = useMemo(() => {
+  const filteredLogsByMode = useMemo<Record<LogContentMode, LogEntry[]>>(() => {
     const query = search.trim().toLocaleLowerCase('zh-CN')
-    return readableLogs.filter(log => {
+    const filterMode = (source: LogEntry[]) => source.filter(log => {
       const matchesLevel = filter === 'all' || log.level === filter
       const matchesSearch = !query || `${log.time} ${log.level} ${log.message}`.toLocaleLowerCase('zh-CN').includes(query)
       const matchesRun = !runOnly || !currentRunId || log.runId === currentRunId
       return matchesLevel && matchesSearch && matchesRun
     })
-  }, [currentRunId, filter, readableLogs, runOnly, search])
+    return {
+      summary: filterMode(readableLogsByMode.summary),
+      raw: filterMode(readableLogsByMode.raw),
+    }
+  }, [currentRunId, filter, readableLogsByMode, runOnly, search])
 
-  const visibleLogs = useMemo<VisibleLog[]>(() => {
-    if (!collapseRepeats) return filteredLogs.map(log => ({ ...log, count: 1 }))
+  const visibleLogsByMode = useMemo<Record<LogContentMode, VisibleLog[]>>(() => {
+    const collapse = (source: LogEntry[]): VisibleLog[] => {
+      if (!collapseRepeats) return source.map(log => ({ ...log, count: 1 }))
+      return source.reduce<VisibleLog[]>((entries, log) => {
+        const previous = entries[entries.length - 1]
+        if (previous && previous.level === log.level && previous.message === log.message
+          && previous.runId === log.runId && previous.operationId === log.operationId) {
+          previous.count += 1
+          previous.time = log.time || previous.time
+        } else {
+          entries.push({ ...log, count: 1 })
+        }
+        return entries
+      }, [])
+    }
+    return {
+      summary: collapse(filteredLogsByMode.summary),
+      raw: collapse(filteredLogsByMode.raw),
+    }
+  }, [collapseRepeats, filteredLogsByMode])
 
-    return filteredLogs.reduce<VisibleLog[]>((entries, log) => {
-      const previous = entries[entries.length - 1]
-      if (previous && previous.level === log.level && previous.message === log.message
-        && previous.runId === log.runId && previous.operationId === log.operationId) {
-        previous.count += 1
-        previous.time = log.time || previous.time
-      } else {
-        entries.push({ ...log, count: 1 })
-      }
-      return entries
-    }, [])
-  }, [collapseRepeats, filteredLogs])
+  const filteredLogs = filteredLogsByMode[contentMode]
+  const visibleLogs = visibleLogsByMode[contentMode]
 
   useEffect(() => {
     updateLogScrollState()
@@ -745,15 +940,27 @@ export default function LogViewer() {
   }
 
   const activeError = viewingHistory ? historyError : realtimeError
-  const isSummaryEmpty = logs.length > 0 && readableLogs.length === 0
-  const isFilteredEmpty = readableLogs.length > 0 && visibleLogs.length === 0
   const retryActiveLogs = () => {
     if (viewingHistory && selectedFile) void viewHistoryFile(selectedFile)
     else void loadRealtimeLogs()
   }
 
+  const contentModeIndex = Math.max(0, CONTENT_MODE_OPTIONS.findIndex(option => option.id === contentMode))
+  const logTrack = useSwipeModeTrack({
+    count: CONTENT_MODE_OPTIONS.length,
+    index: contentModeIndex,
+    onChange: (index) => {
+      const option = CONTENT_MODE_OPTIONS[index]
+      if (option) setContentMode(option.id)
+    },
+    extraIgnoreSelector: '.log-mode-shell, .log-toolbar-card',
+  })
+
   return (
-    <div className="app-page log-viewer ios-workspace-page ios-borderless-cards">
+    <div
+      className="app-page log-viewer ios-workspace-page ios-borderless-cards app-swipe-surface"
+      {...logTrack.handlers}
+    >
       <div className="app-stack-section">
         <PageHeader
           title="日志"
@@ -795,6 +1002,7 @@ export default function LogViewer() {
             })}
             value={Math.max(0, CONTENT_MODE_OPTIONS.findIndex(option => option.id === contentMode))}
             onChange={(index) => {
+              if (logTrack.isAnimating()) return
               const option = CONTENT_MODE_OPTIONS[index]
               if (option) setContentMode(option.id)
             }}
@@ -882,131 +1090,39 @@ export default function LogViewer() {
           </CardContent>
         </Card>
 
-        <Card className="log-card min-w-0 !p-0" smoothCorners>
-          <CardHeader
-            title={viewingHistory ? '历史日志' : '实时日志'}
-            actions={
-              <div className="log-console-heading-actions">
-                <span className="log-count">{keepNumberWithUnit(`${visibleLogs.length} 条`)}</span>
-                {viewingHistory && (
-                  <Button
-                    onClick={backToRealtime}
-                    variant="outline"
-                    size="sm"
-                    icon={<ArrowLeft className="h-4 w-4" aria-hidden="true" />}
-                  >
-                    返回实时
-                  </Button>
-                )}
-              </div>
-            }
-          />
-          <CardContent className="log-console-content">
-            {viewingHistory && selectedFile && (
-              <div className="surface-soft mb-3 flex min-w-0 items-center gap-2 rounded-xl px-3 py-2 text-xs text-secondary">
-                <FileText className="h-4 w-4 shrink-0 text-tertiary" aria-hidden="true" />
-                <span className="min-w-0 flex-1 truncate font-medium text-primary" title={selectedFile.name}>
-                  {selectedFile.name}
-                </span>
-                <span className="hidden shrink-0 text-tertiary sm:inline">
-                  {(selectedFile.size / 1024).toFixed(2)} KB
-                </span>
-              </div>
-            )}
-            {loading ? (
-              <div id="log-console-panel" className="log-console" aria-busy="true">
-                <div className="flex min-h-full items-center justify-center font-sans">
-                  <Loading text="正在读取日志..." />
-                </div>
-              </div>
-            ) : (
-              <div className="log-console-frame">
-                <div
-                  id="log-console-panel"
-                  ref={logContainerRef}
-                  className="log-console focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)] focus-visible:ring-inset"
-                  role="log"
-                  aria-label="日志内容"
-                  aria-live={autoScroll && !viewingHistory ? 'polite' : 'off'}
-                  aria-relevant="additions text"
-                  tabIndex={0}
-                  onScroll={updateLogScrollState}
-                >
-                {activeError && (
-                  <div
-                    className={`log-console-state is-error flex-wrap ${logs.length > 0 ? 'status-danger m-3 !min-h-0 !justify-start !p-3 text-left font-sans text-sm' : ''}`}
-                    role="alert"
-                  >
-                    <AlertCircle className="h-5 w-5" aria-hidden="true" />
-                    <span>{activeError}</span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={retryActiveLogs}
-                    >
-                      重新加载
-                    </Button>
-                  </div>
-                )}
-                {!activeError && logs.length === 0 && (
-                  <div className="log-console-state">
-                    <FileText className="h-5 w-5" aria-hidden="true" />
-                    <span>{viewingHistory ? '这个日志文件没有内容' : '暂无实时日志，等待任务执行'}</span>
-                  </div>
-                )}
-                {!activeError && isSummaryEmpty && (
-                  <div className="log-console-state">
-                    <FileText className="h-5 w-5" aria-hidden="true" />
-                    <span>当前日志没有需要关注的事件</span>
-                  </div>
-                )}
-                {!activeError && isFilteredEmpty && (
-                  <div className="log-console-state">
-                    <Search className="h-5 w-5" aria-hidden="true" />
-                    <span>没有符合当前筛选条件的日志</span>
-                  </div>
-                )}
-                {visibleLogs.map((log, index) => (
-                  <div className="log-row" key={typeof log.sequence === 'number'
-                  ? `seq-${log.sequence}`
-                  : `${log.time}-${log.level}-${log.message}-${index}`}>
-                    <div className="log-row-meta">
-                      {log.time && <time>{log.time}</time>}
-                      <span className={`log-level is-${log.level.toLowerCase()}`}>{log.level}</span>
-                    </div>
-                    <div className="log-message">
-                      <span>{keepNumberWithUnit(log.message)}</span>
-                      {collapseRepeats && log.count > 1 && <span className="log-repeat">x{log.count}</span>}
-                      {log.rawMessage && log.rawMessage !== log.message && (
-                        <details className="log-row-details">
-                          <summary>原文</summary>
-                          <pre>{log.rawMessage}</pre>
-                        </details>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                </div>
-                <div className={`log-console-fade is-top${atLogTop ? '' : ' is-visible'}`} aria-hidden="true" />
-                <div className={`log-console-fade is-bottom${atLogBottom ? '' : ' is-visible'}`} aria-hidden="true" />
-                {!atLogBottom && (
-                  <div className="log-console-jump">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      icon={<ArrowDown className="h-4 w-4" aria-hidden="true" />}
-                      onClick={scrollToLatest}
-                    >
-                      {viewingHistory ? '回到底部' : newLogCount > 0 ? keepNumberWithUnit(`回到最新 · ${newLogCount} 条`) : '回到最新'}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <SwipeModePager track={logTrack} index={contentModeIndex}>
+          {CONTENT_MODE_OPTIONS.map(option => {
+            const mode = option.id
+            const modeReadable = readableLogsByMode[mode]
+            const modeLogs = visibleLogsByMode[mode]
+            return (
+              <LogModeCard
+                key={mode}
+                active={mode === contentMode}
+                title={viewingHistory ? '历史日志' : '实时日志'}
+                count={modeLogs.length}
+                viewingHistory={viewingHistory}
+                onBackToRealtime={backToRealtime}
+                selectedFile={selectedFile}
+                loading={loading}
+                activeError={activeError}
+                logsCount={logs.length}
+                visibleLogs={modeLogs}
+                summaryEmpty={logs.length > 0 && modeReadable.length === 0}
+                filteredEmpty={modeReadable.length > 0 && modeLogs.length === 0}
+                autoScroll={autoScroll}
+                atLogTop={atLogTop}
+                atLogBottom={atLogBottom}
+                newLogCount={newLogCount}
+                collapseRepeats={collapseRepeats}
+                containerRef={logContainerRef}
+                onScroll={updateLogScrollState}
+                onRetry={retryActiveLogs}
+                onJumpToLatest={scrollToLatest}
+              />
+            )
+          })}
+        </SwipeModePager>
 
         <Card className="log-card log-history-card min-w-0 !p-0" smoothCorners>
           <CardHeader

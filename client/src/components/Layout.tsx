@@ -332,7 +332,7 @@ export default function Layout({ children }: LayoutProps) {
               </div>
             </div>
             <div className="title">
-              <div className="la-pluma-navbar-title">{tabs.find(tab => tab.id === activeTab)?.name}</div>
+              <h1 className="la-pluma-navbar-title">{tabs.find(tab => tab.id === activeTab)?.name}</h1>
             </div>
             <div className="right">
               <div className="la-pluma-navbar-actions">

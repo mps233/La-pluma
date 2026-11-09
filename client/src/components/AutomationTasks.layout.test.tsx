@@ -719,57 +719,63 @@ describe('AutomationTasks layout surfaces', () => {
     expect(stageEditor.querySelector('[aria-label="加入智能养成关卡"]')).not.toBeNull()
   })
 
-  it('exposes the add-task picker as a labelled menu', async () => {
+  it('opens the add-task dialog with a task grid', async () => {
     await act(async () => root.render(<AutomationTasks />))
     await flush()
 
-    const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!
+    const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="dialog"]')!
     expect(trigger.textContent).toContain('添加任务')
-    expect(trigger.getAttribute('aria-controls')).toBe('automation-task-picker')
-    expect(trigger.getAttribute('aria-expanded')).toBe('false')
 
     await act(async () => trigger.click())
+    await flush()
 
-    const menu = container.querySelector<HTMLElement>('#automation-task-picker')!
-    expect(trigger.getAttribute('aria-expanded')).toBe('true')
-    expect(menu.getAttribute('role')).toBe('menu')
-    expect(menu.getAttribute('aria-label')).toBe('可添加任务')
-    expect(menu.querySelectorAll('[role="menuitem"]').length).toBeGreaterThan(0)
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!
+    expect(dialog).not.toBeNull()
+    expect(dialog.getAttribute('aria-modal')).toBe('true')
+    const title = document.getElementById(dialog.getAttribute('aria-labelledby') ?? '')
+    expect(title?.textContent).toContain('添加任务')
+    expect(dialog.querySelectorAll('.automation-task-picker-card')).toHaveLength(7)
+    expect(dialog.textContent).toContain('启动游戏')
+    expect(dialog.textContent).toContain('关闭游戏')
   })
 
-  it('closes the add-task picker with Escape and restores trigger focus', async () => {
+  it('closes the add-task dialog with Escape and restores trigger focus', async () => {
     await act(async () => root.render(<AutomationTasks />))
     await flush()
 
-    const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!
+    const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="dialog"]')!
+    trigger.focus()
     await act(async () => trigger.click())
-    const firstMenuItem = container.querySelector<HTMLButtonElement>('[role="menuitem"]')!
-    firstMenuItem.focus()
-    expect(document.activeElement).toBe(firstMenuItem)
+    await flush()
+    const firstCard = document.querySelector<HTMLButtonElement>('.automation-task-picker-card')!
+    firstCard.focus()
+    expect(document.activeElement).toBe(firstCard)
 
     await act(async () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     })
+    await flush()
 
-    expect(container.querySelector('[role="menu"]')).toBeNull()
-    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
     expect(document.activeElement).toBe(trigger)
   })
 
-  it('closes the add-task picker when pressing outside its region', async () => {
+  it('closes the add-task dialog when clicking the backdrop', async () => {
     await act(async () => root.render(<AutomationTasks />))
     await flush()
 
-    const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!
+    const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="dialog"]')!
     await act(async () => trigger.click())
-    expect(container.querySelector('[role="menu"]')).not.toBeNull()
+    await flush()
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
 
+    const backdrop = document.querySelector<HTMLElement>('.app-modal-backdrop')!
     await act(async () => {
-      document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+      backdrop.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
+    await flush()
 
-    expect(container.querySelector('[role="menu"]')).toBeNull()
-    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
   })
 
   it('moves a task with a floating ghost while dragging its handle', async () => {

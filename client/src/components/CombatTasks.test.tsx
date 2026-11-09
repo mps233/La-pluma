@@ -538,10 +538,11 @@ describe('CombatTasks execution recovery', () => {
     await setInput('TL-1')
     await click(container.querySelector<HTMLButtonElement>('button[aria-label="搜索关卡作业"]')!)
     await flush()
-    expect(container.textContent).toContain('推荐作业')
+    const activeSlide = () => container.querySelector<HTMLElement>('.swipe-mode-slide:not([aria-hidden="true"])')
+    expect(activeSlide()?.textContent).toContain('推荐作业')
 
     await setInput('prts://108821')
-    expect(container.textContent).not.toContain('推荐作业')
+    expect(activeSlide()?.textContent).not.toContain('推荐作业')
     expect(container.querySelector<HTMLButtonElement>('button[aria-label="预览作业"]')).not.toBeNull()
   })
 

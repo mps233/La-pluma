@@ -16,12 +16,13 @@ import {
   Search,
   SlidersHorizontal,
 } from 'lucide-react'
-import { PageHeader, Card, CardHeader, CardContent, Button, Input, Select, Checkbox, Switch, CjkText, TruncatedText } from './common'
+import { PageHeader, Card, CardHeader, CardContent, Button, Input, Select, Checkbox, Switch, CjkText, TruncatedText, SwipeModePager } from './common'
 import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import DesktopSettings from './DesktopSettings'
 import AccessTokenSettings from './AccessTokenSettings'
+import { useSwipeModeTrack } from '../hooks/useSwipeModeTrack'
 import type {
   MaaConnectionConfig,
   AutoUpdateConfig,
@@ -644,8 +645,23 @@ export default function ConfigManager() {
     },
   ] satisfies Array<ConfigSection & { description: string }>
 
+  const configSectionIndex = Math.max(0, CONFIG_SECTION_IDS.indexOf(configType))
+  const configTrack = useSwipeModeTrack({
+    count: CONFIG_SECTION_IDS.length,
+    index: configSectionIndex,
+    onChange: (index) => {
+      const section = CONFIG_SECTION_IDS[index]
+      if (section) handleConfigTypeChange(section)
+    },
+    extraIgnoreSelector: '[data-config-sections], .config-workspace-secondary',
+  })
+
   return (
-    <div className="app-page app-stack-section ios-workspace-page ios-borderless-cards" data-page="config">
+    <div
+      className="app-page app-stack-section ios-workspace-page ios-borderless-cards app-swipe-surface"
+      data-page="config"
+      {...configTrack.handlers}
+    >
       <PageHeader
         title="配置"
         subtitle="连接设备、管理运行选项与组件更新"
@@ -663,6 +679,7 @@ export default function ConfigManager() {
           options={configSections.map(section => ({ label: section.name, icon: section.icon }))}
           value={Math.max(0, CONFIG_SECTION_IDS.indexOf(configType))}
           onChange={(index) => {
+            if (configTrack.isAnimating()) return
             const section = configSections[index]
             if (section) handleConfigTypeChange(section.id)
           }}
@@ -673,276 +690,284 @@ export default function ConfigManager() {
 
       <div className="config-workspace-grid grid min-w-0 gap-[var(--app-space-section)] xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)] xl:items-start">
         <div className="config-workspace-primary app-stack-section min-w-0">
-      <Card smoothCorners className="config-editor-card !p-0">
-        <CardHeader
-          title={configSections.find(section => section.id === configType)?.name || '配置'}
-          actions={configType === 'connection' ? (
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={handleReset}
-                disabled={loading}
-                variant="outline"
-                size="sm"
-                icon={<RotateCcw size={16} aria-hidden="true" />}
-              >
-                重置
-              </Button>
-              <Button
-                onClick={handleSave}
-                loading={loading}
-                loadingText="保存中"
-                variant="primary"
-                size="sm"
-                icon={<Save size={16} aria-hidden="true" />}
-              >
-                保存
-              </Button>
-            </div>
-          ) : (
-            <Button
-              type="button"
-              onClick={handleOpenConfigDir}
-              variant="outline"
-              size="sm"
-              disabled={configDirStatus !== 'ready' || !configDir}
-              icon={<FolderOpen size={16} aria-hidden="true" />}
-            >
-              打开目录
-            </Button>
-          )}
-        />
-        <CardContent>
-          {configType === 'connection' && (
-            <div className="app-stack-card">
-              {configFeedback && (
-                <div
-                  className={`rounded-[var(--app-radius-md)] px-3 py-2.5 text-xs leading-5 ${
-                    configFeedback.type === 'success'
-                      ? 'status-success'
-                      : configFeedback.type === 'warning'
-                        ? 'status-warning'
-                        : 'status-danger'
-                  }`}
-                  role={configFeedback.type === 'error' ? 'alert' : 'status'}
+      <SwipeModePager
+        track={configTrack}
+        index={configSectionIndex}
+        className="config-editor-pager"
+      >
+        {CONFIG_SECTION_IDS.map((section) => (
+          <Card key={section} smoothCorners className="config-editor-card !p-0">
+            <CardHeader
+              title={configSections.find(option => option.id === section)?.name || '配置'}
+              actions={section === 'connection' ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={handleReset}
+                    disabled={loading}
+                    variant="outline"
+                    size="sm"
+                    icon={<RotateCcw size={16} aria-hidden="true" />}
+                  >
+                    重置
+                  </Button>
+                  <Button
+                    onClick={handleSave}
+                    loading={loading}
+                    loadingText="保存中"
+                    variant="primary"
+                    size="sm"
+                    icon={<Save size={16} aria-hidden="true" />}
+                  >
+                    保存
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={handleOpenConfigDir}
+                  variant="outline"
+                  size="sm"
+                  disabled={configDirStatus !== 'ready' || !configDir}
+                  icon={<FolderOpen size={16} aria-hidden="true" />}
                 >
-                  {configFeedback.message}
+                  打开目录
+                </Button>
+              )}
+            />
+            <CardContent>
+              {section === 'connection' && (
+                <div className="app-stack-card">
+                  {configFeedback && (
+                    <div
+                      className={`rounded-[var(--app-radius-md)] px-3 py-2.5 text-xs leading-5 ${
+                        configFeedback.type === 'success'
+                          ? 'status-success'
+                          : configFeedback.type === 'warning'
+                            ? 'status-warning'
+                            : 'status-danger'
+                      }`}
+                      role={configFeedback.type === 'error' ? 'alert' : 'status'}
+                    >
+                      {configFeedback.message}
+                    </div>
+                  )}
+
+                  <div className="grid min-w-0 gap-[var(--app-space-card)] md:grid-cols-2">
+                    <Input
+                      label="ADB 路径"
+                      value={configData.adb_path}
+                      onChange={(value: string) => {
+                        updateConnectionConfig(current => ({ ...current, adb_path: value }))
+                      }}
+                      hint="ADB 可执行文件的完整路径"
+                    />
+                    <Input
+                      label="连接地址"
+                      value={configData.address}
+                      onChange={(value: string) => {
+                        updateConnectionConfig(current => ({ ...current, address: value }))
+                        setConnectionFeedback(null)
+                      }}
+                      hint="模拟器地址，例如 127.0.0.1:16384"
+                    />
+                  </div>
+
+                  <section className="surface-soft rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]" aria-label="模拟器查找与连接测试">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <span className="icon-well flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] brand-text">
+                          <Cable size={18} aria-hidden="true" />
+                        </span>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-semibold text-primary"><CjkText>模拟器连接</CjkText></h3>
+                          <p className="mt-1 text-xs leading-5 text-tertiary">查找本机模拟器，或测试当前连接地址。</p>
+                        </div>
+                      </div>
+                      <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          loading={discoveringDevices}
+                          loadingText="查找中"
+                          onClick={() => void handleDiscoverDevices()}
+                          className="flex-1 sm:flex-none"
+                          icon={<Search size={16} aria-hidden="true" />}
+                        >
+                          查找模拟器
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          loading={testingConnection}
+                          loadingText="测试中"
+                          onClick={() => void handleTestConnection()}
+                          className="flex-1 sm:flex-none"
+                          icon={<Cable size={16} aria-hidden="true" />}
+                        >
+                          测试连接
+                        </Button>
+                      </div>
+                    </div>
+
+                    {discoveryMessage && (
+                      <p className="mt-3 text-xs text-secondary" role="status">{discoveryMessage}</p>
+                    )}
+
+                    {discoveredDevices.length > 0 && (
+                      <div className="config-device-list mt-3 divide-y divide-[var(--app-border)] overflow-hidden rounded-[var(--app-radius-md)] bg-[var(--app-surface)] shadow-[inset_0_0_0_1px_var(--app-border)]">
+                        {discoveredDevices.map(device => {
+                          const selectable = device.state === 'device' || device.state === 'candidate'
+                          const stateLabel = device.state === 'device'
+                            ? '已连接'
+                            : device.state === 'candidate'
+                              ? '可尝试连接'
+                              : device.state === 'offline'
+                                ? '设备离线'
+                                : device.state === 'unauthorized'
+                                  ? '等待授权'
+                                  : '状态未知'
+                          const deviceDetails = device.details || (device.source === 'adb' ? 'ADB 已识别设备' : device.source === 'emulator-adb' ? '模拟器内置 ADB' : '本机端口')
+                          return (
+                            <button
+                              key={`${device.source}-${device.address}`}
+                              type="button"
+                              disabled={!selectable || testingConnection}
+                              onClick={() => void handleUseDiscoveredDevice(device)}
+                              className="flex min-h-12 w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--app-accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <span className="min-w-0">
+                                <TruncatedText as="span" className="block text-sm font-medium text-primary" tooltip={device.address}>{device.address}</TruncatedText>
+                                <TruncatedText as="span" className="mt-0.5 block text-xs text-tertiary" tooltip={deviceDetails}>{deviceDetails}</TruncatedText>
+                              </span>
+                              <span className="shrink-0 rounded-[var(--app-radius-pill)] bg-[var(--app-surface-muted)] px-2 py-1 text-xs text-secondary">{stateLabel}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {hasSearchedDevices && !discoveredDevices.length && (
+                      <p className="mt-3 text-xs leading-5 text-tertiary">未找到已连接设备。启动模拟器后重新查找，或手动填写连接地址。</p>
+                    )}
+
+                    {connectionFeedback && (
+                      <div className={`mt-3 rounded-[var(--app-radius-md)] px-3 py-2.5 text-xs ${connectionFeedback.success ? 'status-success' : 'status-danger'}`} role={connectionFeedback.success ? 'status' : 'alert'}>
+                        {connectionFeedback.message}
+                      </div>
+                    )}
+                  </section>
+
+                  <div className="grid min-w-0 gap-[var(--app-space-card)] md:grid-cols-2 md:items-end">
+                    <Select
+                      label="平台配置"
+                      value={configData.config}
+                      onChange={(value: string) => {
+                        updateConnectionConfig(current => ({ ...current, config: value }))
+                      }}
+                      options={[
+                        { value: 'CompatMac', label: 'CompatMac (macOS)' },
+                        { value: 'CompatPOSIXShell', label: 'CompatPOSIXShell (Linux)' },
+                        { value: 'General', label: 'General (Windows)' },
+                      ]}
+                      hint="选择与服务器系统匹配的平台预设"
+                    />
+                    <Select
+                      label="客户端类型"
+                      value={configData.client_type || 'Official'}
+                      onChange={(value: string) => {
+                        updateConnectionConfig(current => ({ ...current, client_type: value }))
+                      }}
+                      options={[
+                        { value: 'Official', label: '官服' },
+                        { value: 'Bilibili', label: 'B 服' },
+                        { value: 'Txwy', label: '繁中服' },
+                        { value: 'YostarEN', label: '美服' },
+                        { value: 'YostarJP', label: '日服' },
+                        { value: 'YostarKR', label: '韩服' },
+                      ]}
+                      hint="用于动态任务、作业集和活动识别"
+                    />
+                  </div>
+
+                  <div className="grid min-w-0 gap-[var(--app-space-card)] md:grid-cols-2 md:items-end">
+                    <Select
+                      label="连接预设"
+                      value={configData.preset || ''}
+                      onChange={(value: string) => {
+                        updateConnectionConfig(current => ({ ...current, preset: value }))
+                      }}
+                      options={[
+                        { value: '', label: '自动（不指定）' },
+                        { value: 'Adb', label: 'ADB' },
+                        { value: 'MuMuPro', label: 'MuMu Pro' },
+                        { value: 'PlayCover', label: 'PlayCover (macOS)' },
+                        { value: 'Waydroid', label: 'Waydroid (Linux)' },
+                        { value: 'Androws', label: 'Androws (Windows)' },
+                      ]}
+                      hint="对应 maa-cli 的 connection.preset；自动时不写入"
+                    />
+                    <Select
+                      label="触控模式"
+                      value={configData.touch_mode || ''}
+                      onChange={(value: string) => {
+                        updateConnectionConfig(current => ({ ...current, touch_mode: value }))
+                      }}
+                      options={[
+                        { value: '', label: '跟随默认' },
+                        { value: 'ADB', label: 'ADB' },
+                        { value: 'MiniTouch', label: 'MiniTouch' },
+                        { value: 'MaaTouch', label: 'MaaTouch' },
+                        { value: 'MacPlayTools', label: 'MacPlayTools' },
+                        { value: 'MaaFwAdb', label: 'MaaFwAdb' },
+                      ]}
+                      hint="对应 instance_options.touch_mode；自动时不写入"
+                    />
+                    <div className="config-reconnect-row flex min-h-[3.5rem] items-center justify-between gap-3 py-1 md:col-span-2">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-primary">自动重连</div>
+                        <div className="mt-1 text-xs leading-5 text-tertiary">连接中断后自动尝试恢复</div>
+                      </div>
+                      <Switch
+                        label="启用自动重连"
+                        checked={configData.auto_reconnect !== false}
+                        onChange={(checked: boolean) => {
+                          updateConnectionConfig(current => ({ ...current, auto_reconnect: checked }))
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 
-              <div className="grid min-w-0 gap-[var(--app-space-card)] md:grid-cols-2">
-                <Input
-                  label="ADB 路径"
-                  value={configData.adb_path}
-                  onChange={(value: string) => {
-                    updateConnectionConfig(current => ({ ...current, adb_path: value }))
-                  }}
-                  hint="ADB 可执行文件的完整路径"
-                />
-                <Input
-                  label="连接地址"
-                  value={configData.address}
-                  onChange={(value: string) => {
-                    updateConnectionConfig(current => ({ ...current, address: value }))
-                    setConnectionFeedback(null)
-                  }}
-                  hint="模拟器地址，例如 127.0.0.1:16384"
-                />
-              </div>
-
-              <section className="surface-soft rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]" aria-label="模拟器查找与连接测试">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <span className="icon-well flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] brand-text">
-                      <Cable size={18} aria-hidden="true" />
-                    </span>
-                    <div className="min-w-0">
-                      <h3 className="text-sm font-semibold text-primary"><CjkText>模拟器连接</CjkText></h3>
-                      <p className="mt-1 text-xs leading-5 text-tertiary">查找本机模拟器，或测试当前连接地址。</p>
-                    </div>
-                  </div>
-                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      loading={discoveringDevices}
-                      loadingText="查找中"
-                      onClick={() => void handleDiscoverDevices()}
-                      className="flex-1 sm:flex-none"
-                      icon={<Search size={16} aria-hidden="true" />}
-                    >
-                      查找模拟器
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      loading={testingConnection}
-                      loadingText="测试中"
-                      onClick={() => void handleTestConnection()}
-                      className="flex-1 sm:flex-none"
-                      icon={<Cable size={16} aria-hidden="true" />}
-                    >
-                      测试连接
-                    </Button>
-                  </div>
-                </div>
-
-                {discoveryMessage && (
-                  <p className="mt-3 text-xs text-secondary" role="status">{discoveryMessage}</p>
-                )}
-
-                {discoveredDevices.length > 0 && (
-                  <div className="config-device-list mt-3 divide-y divide-[var(--app-border)] overflow-hidden rounded-[var(--app-radius-md)] bg-[var(--app-surface)] shadow-[inset_0_0_0_1px_var(--app-border)]">
-                    {discoveredDevices.map(device => {
-                      const selectable = device.state === 'device' || device.state === 'candidate'
-                      const stateLabel = device.state === 'device'
-                        ? '已连接'
-                        : device.state === 'candidate'
-                          ? '可尝试连接'
-                          : device.state === 'offline'
-                            ? '设备离线'
-                            : device.state === 'unauthorized'
-                              ? '等待授权'
-                              : '状态未知'
-                      const deviceDetails = device.details || (device.source === 'adb' ? 'ADB 已识别设备' : device.source === 'emulator-adb' ? '模拟器内置 ADB' : '本机端口')
-                      return (
-                        <button
-                          key={`${device.source}-${device.address}`}
-                          type="button"
-                          disabled={!selectable || testingConnection}
-                          onClick={() => void handleUseDiscoveredDevice(device)}
-                          className="flex min-h-12 w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--app-accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <span className="min-w-0">
-                            <TruncatedText as="span" className="block text-sm font-medium text-primary" tooltip={device.address}>{device.address}</TruncatedText>
-                            <TruncatedText as="span" className="mt-0.5 block text-xs text-tertiary" tooltip={deviceDetails}>{deviceDetails}</TruncatedText>
-                          </span>
-                          <span className="shrink-0 rounded-[var(--app-radius-pill)] bg-[var(--app-surface-muted)] px-2 py-1 text-xs text-secondary">{stateLabel}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-
-                {hasSearchedDevices && !discoveredDevices.length && (
-                  <p className="mt-3 text-xs leading-5 text-tertiary">未找到已连接设备。启动模拟器后重新查找，或手动填写连接地址。</p>
-                )}
-
-                {connectionFeedback && (
-                  <div className={`mt-3 rounded-[var(--app-radius-md)] px-3 py-2.5 text-xs ${connectionFeedback.success ? 'status-success' : 'status-danger'}`} role={connectionFeedback.success ? 'status' : 'alert'}>
-                    {connectionFeedback.message}
-                  </div>
-                )}
-              </section>
-
-              <div className="grid min-w-0 gap-[var(--app-space-card)] md:grid-cols-2 md:items-end">
-                <Select
-                  label="平台配置"
-                  value={configData.config}
-                  onChange={(value: string) => {
-                    updateConnectionConfig(current => ({ ...current, config: value }))
-                  }}
-                  options={[
-                    { value: 'CompatMac', label: 'CompatMac (macOS)' },
-                    { value: 'CompatPOSIXShell', label: 'CompatPOSIXShell (Linux)' },
-                    { value: 'General', label: 'General (Windows)' },
-                  ]}
-                  hint="选择与服务器系统匹配的平台预设"
-                />
-                <Select
-                  label="客户端类型"
-                  value={configData.client_type || 'Official'}
-                  onChange={(value: string) => {
-                    updateConnectionConfig(current => ({ ...current, client_type: value }))
-                  }}
-                  options={[
-                    { value: 'Official', label: '官服' },
-                    { value: 'Bilibili', label: 'B 服' },
-                    { value: 'Txwy', label: '繁中服' },
-                    { value: 'YostarEN', label: '美服' },
-                    { value: 'YostarJP', label: '日服' },
-                    { value: 'YostarKR', label: '韩服' },
-                  ]}
-                  hint="用于动态任务、作业集和活动识别"
-                />
-              </div>
-
-              <div className="grid min-w-0 gap-[var(--app-space-card)] md:grid-cols-2 md:items-end">
-                <Select
-                  label="连接预设"
-                  value={configData.preset || ''}
-                  onChange={(value: string) => {
-                    updateConnectionConfig(current => ({ ...current, preset: value }))
-                  }}
-                  options={[
-                    { value: '', label: '自动（不指定）' },
-                    { value: 'Adb', label: 'ADB' },
-                    { value: 'MuMuPro', label: 'MuMu Pro' },
-                    { value: 'PlayCover', label: 'PlayCover (macOS)' },
-                    { value: 'Waydroid', label: 'Waydroid (Linux)' },
-                    { value: 'Androws', label: 'Androws (Windows)' },
-                  ]}
-                  hint="对应 maa-cli 的 connection.preset；自动时不写入"
-                />
-                <Select
-                  label="触控模式"
-                  value={configData.touch_mode || ''}
-                  onChange={(value: string) => {
-                    updateConnectionConfig(current => ({ ...current, touch_mode: value }))
-                  }}
-                  options={[
-                    { value: '', label: '跟随默认' },
-                    { value: 'ADB', label: 'ADB' },
-                    { value: 'MiniTouch', label: 'MiniTouch' },
-                    { value: 'MaaTouch', label: 'MaaTouch' },
-                    { value: 'MacPlayTools', label: 'MacPlayTools' },
-                    { value: 'MaaFwAdb', label: 'MaaFwAdb' },
-                  ]}
-                  hint="对应 instance_options.touch_mode；自动时不写入"
-                />
-                <div className="config-reconnect-row flex min-h-[3.5rem] items-center justify-between gap-3 py-1 md:col-span-2">
+              {section === 'resource' && (
+                <section className="surface-soft flex items-start gap-3 rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]" aria-labelledby="resource-config-readonly-title">
+                  <span className="icon-well flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] brand-text">
+                    <LockKeyhole size={18} aria-hidden="true" />
+                  </span>
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-primary">自动重连</div>
-                    <div className="mt-1 text-xs leading-5 text-tertiary">连接中断后自动尝试恢复</div>
+                    <h3 id="resource-config-readonly-title" className="text-sm font-semibold text-primary"><CjkText>资源配置由 MAA 管理</CjkText></h3>
+                    <p className="mt-1 text-sm leading-6 text-secondary">当前资源来源保持不变。需要调整时，可打开配置目录编辑对应文件。</p>
                   </div>
-                  <Switch
-                    label="启用自动重连"
-                    checked={configData.auto_reconnect !== false}
-                    onChange={(checked: boolean) => {
-                      updateConnectionConfig(current => ({ ...current, auto_reconnect: checked }))
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
+                </section>
+              )}
 
-          {configType === 'resource' && (
-            <section className="surface-soft flex items-start gap-3 rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]" aria-labelledby="resource-config-readonly-title">
-              <span className="icon-well flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] brand-text">
-                <LockKeyhole size={18} aria-hidden="true" />
-              </span>
-              <div className="min-w-0">
-                <h3 id="resource-config-readonly-title" className="text-sm font-semibold text-primary"><CjkText>资源配置由 MAA 管理</CjkText></h3>
-                <p className="mt-1 text-sm leading-6 text-secondary">当前资源来源保持不变。需要调整时，可打开配置目录编辑对应文件。</p>
-              </div>
-            </section>
-          )}
-
-          {configType === 'instance' && (
-            <section className="surface-soft flex items-start gap-3 rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]" aria-labelledby="instance-config-readonly-title">
-              <span className="icon-well flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] brand-text">
-                <LockKeyhole size={18} aria-hidden="true" />
-              </span>
-              <div className="min-w-0">
-                <h3 id="instance-config-readonly-title" className="text-sm font-semibold text-primary"><CjkText>实例选项由 MAA 管理</CjkText></h3>
-                <p className="mt-1 text-sm leading-6 text-secondary">触摸模式等实例选项保持当前设置。需要调整时，可打开配置目录编辑对应文件。</p>
-              </div>
-            </section>
-          )}
-        </CardContent>
-      </Card>
+              {section === 'instance' && (
+                <section className="surface-soft flex items-start gap-3 rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]" aria-labelledby="instance-config-readonly-title">
+                  <span className="icon-well flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] brand-text">
+                    <LockKeyhole size={18} aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 id="instance-config-readonly-title" className="text-sm font-semibold text-primary"><CjkText>实例选项由 MAA 管理</CjkText></h3>
+                    <p className="mt-1 text-sm leading-6 text-secondary">触摸模式等实例选项保持当前设置。需要调整时，可打开配置目录编辑对应文件。</p>
+                  </div>
+                </section>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </SwipeModePager>
 
       <Card smoothCorners className="config-directory-card !p-0">
         <CardContent>

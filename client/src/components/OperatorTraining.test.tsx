@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TrainingOperator, TrainingQueueItem, TrainingSettings } from '@/types/components'
 import OperatorTraining from './OperatorTraining'
+import { installMobileMatchMedia, swipe } from '../test/swipe'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -19,6 +20,20 @@ const mocks = vi.hoisted(() => ({
   updateTrainingSettings: vi.fn(),
   generateTrainingPlan: vi.fn(),
   applyTrainingPlan: vi.fn(),
+  getMasteryPreflight: vi.fn(),
+  getMasteryCatalog: vi.fn(),
+  getMasteryOperator: vi.fn(),
+  getMasteryStatus: vi.fn(),
+  addMasteryTargets: vi.fn(),
+  updateMasteryTarget: vi.fn(),
+  removeMasteryTarget: vi.fn(),
+  reorderMasteryTargets: vi.fn(),
+  updateMasterySettings: vi.fn(),
+  startMasteryCampaign: vi.fn(),
+  pauseMasteryCampaign: vi.fn(),
+  resumeMasteryCampaign: vi.fn(),
+  stopMasteryCampaign: vi.fn(),
+  retryMasteryTarget: vi.fn(),
   setMessage: vi.fn(),
 }))
 
@@ -52,6 +67,20 @@ vi.mock('../services/api', () => ({
   updateTrainingSettings: mocks.updateTrainingSettings,
   generateTrainingPlan: mocks.generateTrainingPlan,
   applyTrainingPlan: mocks.applyTrainingPlan,
+  getMasteryPreflight: mocks.getMasteryPreflight,
+  getMasteryCatalog: mocks.getMasteryCatalog,
+  getMasteryOperator: mocks.getMasteryOperator,
+  getMasteryStatus: mocks.getMasteryStatus,
+  addMasteryTargets: mocks.addMasteryTargets,
+  updateMasteryTarget: mocks.updateMasteryTarget,
+  removeMasteryTarget: mocks.removeMasteryTarget,
+  reorderMasteryTargets: mocks.reorderMasteryTargets,
+  updateMasterySettings: mocks.updateMasterySettings,
+  startMasteryCampaign: mocks.startMasteryCampaign,
+  pauseMasteryCampaign: mocks.pauseMasteryCampaign,
+  resumeMasteryCampaign: mocks.resumeMasteryCampaign,
+  stopMasteryCampaign: mocks.stopMasteryCampaign,
+  retryMasteryTarget: mocks.retryMasteryTarget,
   getItemIconUrl: (id: string | number) => `/items/${id}.png`,
 }))
 
@@ -144,6 +173,35 @@ describe('OperatorTraining async interactions', () => {
     mocks.getAllOperators.mockReset().mockResolvedValue({ success: true, data: { operators: [] } })
     mocks.getOperBoxData.mockReset().mockResolvedValue({ success: true, data: { data: [] } })
     mocks.getTrainingQueue.mockReset().mockResolvedValue({ success: true, data: { queue: [], settings } })
+    mocks.getMasteryPreflight.mockReset().mockResolvedValue({
+      success: true,
+      data: {
+        supported: true,
+        masteryData: { available: true, operatorCount: 0, error: null },
+        clientType: 'Official',
+        minimumMaaCliVersion: '0.7.8',
+        minimumMaaCoreVersion: '6.21.4',
+        runtime: {
+          supported: true, cli: '0.7.8', core: '6.21.4',
+          minimumCli: '0.7.8', minimumCore: '6.21.4', reason: null,
+        },
+      },
+    })
+    mocks.getMasteryCatalog.mockReset().mockResolvedValue({ success: true, data: { operators: [], total: 0, dataFreshness: {} } })
+    mocks.getMasteryStatus.mockReset().mockResolvedValue({
+      success: true,
+      data: {
+        campaign: {
+          status: 'idle', activeItemId: null, activeStepRunId: null,
+          settings: { probeIntervalMinutes: 60, onItemBlocked: 'skip', autoStartGame: false, notifyOnComplete: true, notifyOnBlocked: true },
+          clientProfileId: null, clientType: null, startedAt: null, pausedReason: null,
+          updatedAt: '2026-11-07T00:00:00.000Z',
+        },
+        items: [], counts: { total: 0, queued: 0, training: 0, blocked: 0, completed: 0 },
+        activeItem: null, nextActionableItem: null,
+        scheduler: { running: true, tickMs: 60000, lastTickAt: null, lastTickError: null, tickInFlight: false },
+      },
+    })
     mocks.addToTrainingQueue.mockReset()
     mocks.removeFromTrainingQueue.mockReset()
     mocks.updateTrainingQueueOrder.mockReset().mockResolvedValue({ success: true })
@@ -260,6 +318,24 @@ describe('OperatorTraining async interactions', () => {
 
     expect(buttons[0]?.getAttribute('aria-selected')).toBe('true')
     expect(document.activeElement).toBe(buttons[0])
+  })
+
+  it('switches the operator scope with a horizontal swipe', async () => {
+    installMobileMatchMedia()
+    await renderComponent()
+
+    const toolbar = container.querySelector<HTMLElement>('[role="tablist"][aria-label="干员范围"]')
+    const buttons = Array.from(
+      toolbar?.querySelectorAll<HTMLButtonElement>(':scope > .lg-track__item') ?? [],
+    )
+    expect(buttons[0]?.getAttribute('aria-selected')).toBe('true')
+
+    await swipe(container.querySelector<HTMLElement>('.training-operator-column')!, 240, 200, 120, 204)
+    await flush()
+
+    expect(buttons[1]?.getAttribute('aria-selected')).toBe('true')
+    expect(container.querySelector('.swipe-mode-slide:not([aria-hidden="true"])')?.textContent)
+      .toContain('还没有已拥有干员')
   })
 
   it('serializes settings writes so an older response cannot overwrite the latest value on disk', async () => {
@@ -418,6 +494,25 @@ describe('OperatorTraining async interactions', () => {
       '能天使 已添加，但队列刷新失败，请稍后重试',
       'warning',
     )
+  })
+
+  it('switches between elite and mastery workspaces', async () => {
+    await renderComponent()
+
+    const toolbar = container.querySelector<HTMLElement>('[role="tablist"][aria-label="养成方式"]')
+    expect(toolbar).not.toBeNull()
+    const buttons = Array.from(toolbar?.querySelectorAll<HTMLButtonElement>(':scope > .lg-track__item') ?? [])
+    expect(buttons).toHaveLength(2)
+    expect(buttons[0]?.getAttribute('aria-selected')).toBe('true')
+    expect(container.textContent).toContain('添加干员')
+
+    await click(buttons[1]!)
+    expect(buttons[1]?.getAttribute('aria-selected')).toBe('true')
+    expect(container.textContent).toContain('添加专精目标')
+    expect(container.textContent).toContain('自动专精')
+
+    await click(buttons[0]!)
+    expect(container.textContent).toContain('添加干员')
   })
 
   it('removes the local item and warns when a successful delete cannot be refreshed', async () => {
