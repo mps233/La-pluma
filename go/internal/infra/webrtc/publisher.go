@@ -1,5 +1,5 @@
 // Package webrtc publishes the scrcpy H.264 stream to browser peers and
-// accepts input on a WebRTC data channel. It does not use ScrcpyOverWebRTC.
+// accepts input on a WebRTC data channel.
 package webrtc
 
 import (

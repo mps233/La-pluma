@@ -385,7 +385,7 @@ func buildRegistry() []Operation {
 				"deviceId": map[string]any{
 					"type":        "string",
 					"default":     "mumu-la-pluma",
-					"description": "ScrcpyOverWebRTC device id whose agent version should be inspected.",
+					"description": "preview device id whose agent version should be inspected.",
 				},
 			})),
 
@@ -393,20 +393,20 @@ func buildRegistry() []Operation {
 			"webrtc_devices",
 			"GET",
 			"/api/agent/webrtc/devices",
-			"Return online ScrcpyOverWebRTC device ids in an AI-readable shape. Retained offline records are excluded.",
+			"Return online preview device ids in an AI-readable shape. Retained offline records are excluded.",
 		).withTags("Preview"),
 
 		operation(
 			"webrtc_snapshot",
 			"GET",
 			"/api/agent/webrtc/snapshot",
-			"Return the latest ScrcpyOverWebRTC device snapshot as a base64 JPEG for dashboard fallback previews.",
+			"Return the latest preview device snapshot as a base64 JPEG for dashboard fallback previews.",
 		).withTags("Preview").
 			withQuerySchema(objectSchema(map[string]any{
 				"deviceId": map[string]any{
 					"type":        "string",
 					"default":     "mumu-la-pluma",
-					"description": "ScrcpyOverWebRTC device id whose latest snapshot should be returned.",
+					"description": "preview device id whose latest snapshot should be returned.",
 				},
 			})),
 

@@ -2612,11 +2612,11 @@
             "name": "deviceId",
             "in": "query",
             "required": false,
-            "description": "ScrcpyOverWebRTC device id whose agent version should be inspected.",
+            "description": "preview device id whose agent version should be inspected.",
             "schema": {
               "type": "string",
               "default": "mumu-la-pluma",
-              "description": "ScrcpyOverWebRTC device id whose agent version should be inspected."
+              "description": "preview device id whose agent version should be inspected."
             }
           }
         ]
@@ -2628,8 +2628,8 @@
         "tags": [
           "Preview"
         ],
-        "summary": "Return online ScrcpyOverWebRTC device ids in an AI-readable shape. Retained offline records are excluded.",
-        "description": "Return online ScrcpyOverWebRTC device ids in an AI-readable shape. Retained offline records are excluded.",
+        "summary": "Return online preview device ids in an AI-readable shape. Retained offline records are excluded.",
+        "description": "Return online preview device ids in an AI-readable shape. Retained offline records are excluded.",
         "security": [
           {
             "bearerAuth": []
@@ -2702,8 +2702,8 @@
         "tags": [
           "Preview"
         ],
-        "summary": "Return the latest ScrcpyOverWebRTC device snapshot as a base64 JPEG for dashboard fallback previews.",
-        "description": "Return the latest ScrcpyOverWebRTC device snapshot as a base64 JPEG for dashboard fallback previews.",
+        "summary": "Return the latest preview device snapshot as a base64 JPEG for dashboard fallback previews.",
+        "description": "Return the latest preview device snapshot as a base64 JPEG for dashboard fallback previews.",
         "security": [
           {
             "bearerAuth": []
@@ -2773,11 +2773,11 @@
             "name": "deviceId",
             "in": "query",
             "required": false,
-            "description": "ScrcpyOverWebRTC device id whose latest snapshot should be returned.",
+            "description": "preview device id whose latest snapshot should be returned.",
             "schema": {
               "type": "string",
               "default": "mumu-la-pluma",
-              "description": "ScrcpyOverWebRTC device id whose latest snapshot should be returned."
+              "description": "preview device id whose latest snapshot should be returned."
             }
           }
         ]

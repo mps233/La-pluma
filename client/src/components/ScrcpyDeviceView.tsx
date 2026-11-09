@@ -573,7 +573,7 @@ export default function ScrcpyDeviceView({
             {infrastructureStatus?.usingDefaultPassword && (
               <span
                 className="status-warning rounded-full px-2 py-1"
-                title="建议修改 ScrcpyOverWebRTC 管理员密码并设置 LA_PLUMA_WEBRTC_PASSWORD"
+                title="建议设置访问令牌保护预览服务"
               >
                 默认密码
               </span>

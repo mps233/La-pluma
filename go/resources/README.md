@@ -5,4 +5,4 @@
   and speaks the scrcpy 3.3.4 wire protocol over an adb tunnel.
 - `icon.png` is the La Pluma application/tray icon.
 
-The desktop app launches the server directly; ScrcpyOverWebRTC is not used.
+The desktop app launches the server directly.

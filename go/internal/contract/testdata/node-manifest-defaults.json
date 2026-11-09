@@ -1250,7 +1250,7 @@
           "deviceId": {
             "type": "string",
             "default": "mumu-la-pluma",
-            "description": "ScrcpyOverWebRTC device id whose agent version should be inspected."
+            "description": "preview device id whose agent version should be inspected."
           }
         }
       },
@@ -1281,7 +1281,7 @@
       "id": "webrtc_devices",
       "method": "GET",
       "path": "/api/agent/webrtc/devices",
-      "description": "Return online ScrcpyOverWebRTC device ids in an AI-readable shape. Retained offline records are excluded.",
+      "description": "Return online preview device ids in an AI-readable shape. Retained offline records are excluded.",
       "safety": {
         "level": "read-only",
         "riskLevel": "read-only",
@@ -1309,14 +1309,14 @@
       "id": "webrtc_snapshot",
       "method": "GET",
       "path": "/api/agent/webrtc/snapshot",
-      "description": "Return the latest ScrcpyOverWebRTC device snapshot as a base64 JPEG for dashboard fallback previews.",
+      "description": "Return the latest preview device snapshot as a base64 JPEG for dashboard fallback previews.",
       "query_schema": {
         "type": "object",
         "properties": {
           "deviceId": {
             "type": "string",
             "default": "mumu-la-pluma",
-            "description": "ScrcpyOverWebRTC device id whose latest snapshot should be returned."
+            "description": "preview device id whose latest snapshot should be returned."
           }
         }
       },

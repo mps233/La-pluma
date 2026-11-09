@@ -2,7 +2,7 @@
 
 Branch: `feat/go-backend`
 Goal: replace the Node backend with a pure-Go backend, ship a MyGo desktop app
-(form 2/3: React/WebView UI + Go-native shell), replace ScrcpyOverWebRTC with a
+(form 2/3: React/WebView UI + Go-native shell), replace the external WebRTC preview service with a
 Pion WebRTC + scrcpy-protocol implementation, and verify on the real MuMu
 emulator.
 
@@ -68,7 +68,7 @@ go/
   - [x] control socket touch/key/text base commands
   - [x] React client signaling compatibility verified in browser
   - [~] clipboard/scroll/multi-touch parity (clipboard verified on OnePlus; MuMu clears clipboard by OS policy; scroll/ACTION_CANCEL covered; multi-touch real-device pending)
-  - [x] remove ScrcpyOverWebRTC from remaining Node paths (Go runtime is independent)
+  - [x] remove the external WebRTC preview service from remaining paths (Go runtime is independent)
 - [x] 5. Domain modules
   - [x] training/operator materials (fetch action returns explicit unsupported)
   - [x] copilot planning/discovery core (execution/manual session wiring pending)
@@ -107,7 +107,7 @@ go/
   (down/up/move), multi-pointer, key events, text, scroll, clipboard.
 - Audio (optional in v1) uses an Opus stream; do not block video/control on it.
 - Do not add cgo. Use Pion v4 and a pure-Go RTP/H264 packetizer.
-- The React client currently expects ScrcpyOverWebRTC signaling semantics;
+- The React client currently expects the legacy signaling semantics;
   either preserve the same signaling surface or add a new transport and update
   the client deliberately.
 

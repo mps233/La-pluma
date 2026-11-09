@@ -15,7 +15,7 @@ under `internal/contract/testdata`.
   (40 advertised), manifest/OpenAPI generated from one Go registry.
 - Device preview/control: Pion WebRTC + scrcpy protocol, including touch, scroll,
   key/text and clipboard; an embedded Pion TURN/STUN server is advertised over
-  signaling. ScrcpyOverWebRTC is not used by this backend.
+  signaling. The external preview service is not used by this backend.
 - MAA: start-game, dynamic run-task, scheduler task flows, fight, activity
   copilot, depot/OperBox recognition, operator mastery, MAA update actions.
 - Data: config/profile storage, training, copilot, activity, drops, assets,
