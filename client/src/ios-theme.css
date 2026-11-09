@@ -425,10 +425,10 @@ html.la-pluma-standalone #app-root .page {
     display: block;
     position: fixed;
     z-index: 1;
-    top: 0.75rem;
-    bottom: 0.75rem;
-    left: 0.75rem;
-    width: calc(var(--la-pluma-sidebar-width) - 1.5rem);
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: calc(var(--la-pluma-sidebar-width) - 0.75rem);
     border-radius: 1.625rem;
     pointer-events: none;
   }
