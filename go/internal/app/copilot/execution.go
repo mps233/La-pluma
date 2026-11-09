@@ -491,6 +491,12 @@ func (s *Service) executeDynamicEntries(ctx context.Context, execution dynamicEx
 		var preTasks []any
 		if groupIndex == 0 {
 			preTasks = execution.preTasks
+			if len(preTasks) == 0 {
+				// Copilot starts from the game's main screen. Add the launch
+				// step by default so "run now" also works from the desktop;
+				// later groups reuse the running game.
+				preTasks = []any{BuildCopilotStartUpTask(execution.clientType)}
+			}
 		}
 		taskConfig := BuildCopilotDynamicTaskConfig(preTasks, map[string]any{
 			"name":   taskID,

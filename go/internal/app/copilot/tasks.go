@@ -231,6 +231,21 @@ func BuildCopilotRepeatFiles(entry RepeatSource, loopTimes any, planDir string) 
 	return files
 }
 
+// BuildCopilotStartUpTask returns the preparation task that launches the game
+// and enters its main screen before a copilot set runs. The Copilot task
+// navigates to the stage from there.
+func BuildCopilotStartUpTask(clientType string) map[string]any {
+	task := map[string]any{
+		"name":   "startup",
+		"type":   "StartUp",
+		"params": map[string]any{"start_game_enabled": true},
+	}
+	if clientType = strings.TrimSpace(clientType); clientType != "" {
+		task["client_type"] = clientType
+	}
+	return task
+}
+
 // BuildCopilotDynamicTaskConfig puts preparation tasks before Copilot in one
 // dynamic MAA task file.
 func BuildCopilotDynamicTaskConfig(preTasks []any, task map[string]any) map[string]any {

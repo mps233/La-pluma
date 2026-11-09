@@ -408,3 +408,18 @@ func TestAppErrorCode(t *testing.T) {
 		t.Fatalf("unexpected error: %#v", err)
 	}
 }
+
+func TestBuildCopilotStartUpTask(t *testing.T) {
+	task := BuildCopilotStartUpTask("Bilibili")
+	if task["type"] != "StartUp" || task["client_type"] != "Bilibili" {
+		t.Fatalf("startup task = %#v", task)
+	}
+	params := asRecord(task["params"])
+	if params == nil || params["start_game_enabled"] != true {
+		t.Fatalf("startup params = %#v", task["params"])
+	}
+	withoutClient := BuildCopilotStartUpTask("")
+	if _, exists := withoutClient["client_type"]; exists {
+		t.Fatalf("empty client type must be omitted: %#v", withoutClient)
+	}
+}

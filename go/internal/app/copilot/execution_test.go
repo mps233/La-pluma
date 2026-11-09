@@ -373,7 +373,8 @@ func TestExecuteSelectedEntries(t *testing.T) {
 	if len(visited) != 0 {
 		t.Fatalf("selected entries must not write plan progress: %#v", visited)
 	}
-	params := taskParams(t, taskList(t, executor.taskConfig(0))[0])
+	tasks := taskList(t, executor.taskConfig(0))
+	params := taskParams(t, tasks[len(tasks)-1])
 	list := copilotList(t, params)
 	if len(list) != 2 {
 		t.Fatalf("list = %#v", list)
@@ -761,5 +762,39 @@ func TestExecutePlanRetriesTransientMAAUpdateFailure(t *testing.T) {
 	}
 	if success, _ := result.Data["success"].(bool); !success {
 		t.Fatalf("execution result = %#v", result.Data)
+	}
+}
+
+func TestExecutePlanAddsStartUpBeforeFirstCopilotGroup(t *testing.T) {
+	executor := &fakeExecutionExecutor{}
+	fixture := newExecutionFixture(t, executor, &fakeLeaseRunner{})
+	if _, err := fixture.service.ExecutePlan(context.Background(), PlanExecution{
+		SetID:     "1",
+		Raid:      "normal",
+		Plan:      dynamicExecutionPlan(),
+		Lifecycle: &ExecutionLifecycle{RunID: "run-startup"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if executor.taskCount() != 2 {
+		t.Fatalf("task count = %d", executor.taskCount())
+	}
+	firstTasks := taskList(t, executor.taskConfig(0))
+	if len(firstTasks) != 2 {
+		t.Fatalf("first tasks = %#v", firstTasks)
+	}
+	startup := asRecord(firstTasks[0])
+	if startup["type"] != "StartUp" {
+		t.Fatalf("first task = %#v", firstTasks[0])
+	}
+	if params := asRecord(startup["params"]); params == nil || params["start_game_enabled"] != true {
+		t.Fatalf("startup params = %#v", startup["params"])
+	}
+	if asRecord(firstTasks[1])["type"] != "Copilot" {
+		t.Fatalf("second task = %#v", firstTasks[1])
+	}
+	secondTasks := taskList(t, executor.taskConfig(1))
+	if len(secondTasks) != 1 || asRecord(secondTasks[0])["type"] != "Copilot" {
+		t.Fatalf("later group tasks = %#v", secondTasks)
 	}
 }
