@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	domainrun "github.com/mps233/la-pluma/go/internal/domain/agentrun"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
 )
 
@@ -107,7 +108,15 @@ func BuildResourceInfo(versionData any, modifiedAt *time.Time, now time.Time) Ma
 // GetResourceInfo mirrors getMaaResourceInfo: ask maa-cli for the resource
 // directory, then read <dir>/version.json and its mtime.
 func (s *Service) GetResourceInfo(ctx context.Context) (MaaResourceInfo, error) {
-	run, err := s.runMAA(ctx, "dir", []string{"resource"}, "", "")
+	var run domainrun.DTO
+	var err error
+	if runner, ok := s.runner.(UntrackedRunner); ok {
+		// Metadata queries must not run inside the parent action's Run: the
+		// parent DTO carries the action result, not the command's stdout.
+		run, err = runner.RunCommandUntracked(ctx, "dir", []string{"resource"})
+	} else {
+		run, err = s.runMAA(ctx, "dir", []string{"resource"}, "", "")
+	}
 	if err != nil {
 		return MaaResourceInfo{}, err
 	}

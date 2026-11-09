@@ -1006,3 +1006,38 @@ func TestRunAutoUpdateSkipsUnsupportedPlatformCLI(t *testing.T) {
 		t.Fatalf("calls = %+v", calls)
 	}
 }
+
+type untrackedResourceRunner struct {
+	*fakeRunner
+	resourceDir   string
+	untrackedHits int
+}
+
+func (r *untrackedResourceRunner) RunCommandUntracked(context.Context, string, []string) (domainrun.DTO, error) {
+	r.untrackedHits++
+	return successDTO(r.resourceDir), nil
+}
+
+func TestGetResourceInfoUsesUntrackedDirQuery(t *testing.T) {
+	resourceDir := writeResourceVersion(t, t.TempDir(), "2026-07-09 23:28:49.000", time.Now())
+	runner := &untrackedResourceRunner{fakeRunner: &fakeRunner{}, resourceDir: resourceDir}
+	service := NewWithOptions(Options{
+		Paths:        tempPaths(t),
+		Logger:       testLogger(),
+		Runner:       runner,
+		SystemRunner: &fakeSystemRunner{},
+	})
+	info, err := service.GetResourceInfo(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.LastUpdated == nil || *info.LastUpdated != "2026-07-09 23:28:49.000" {
+		t.Fatalf("last updated = %#v", info.LastUpdated)
+	}
+	if runner.untrackedHits != 1 {
+		t.Fatalf("untracked queries = %d", runner.untrackedHits)
+	}
+	if calls := runner.Calls(); len(calls) != 0 {
+		t.Fatalf("tracked calls = %#v", calls)
+	}
+}
