@@ -141,6 +141,10 @@ func (p *Publisher) CreateOffer(peerID string) (string, []webrtc.ICECandidateIni
 		case webrtc.PeerConnectionStateConnected:
 			p.notifyPeer(true)
 			p.writeCachedKeyframe()
+			// A late peer may only have the first (often black) keyframe cached,
+			// while scrcpy sends no frames for a static screen. Force a fresh
+			// keyframe, then send it once the video reader has cached it.
+			go p.refreshKeyframeForPeer()
 		case webrtc.PeerConnectionStateFailed, webrtc.PeerConnectionStateClosed, webrtc.PeerConnectionStateDisconnected:
 			p.RemovePeer(peerID)
 			p.notifyPeer(false)
@@ -489,4 +493,15 @@ func (p *Publisher) watchVideo(lastPacket *atomic.Int64) {
 			p.logger.Warn("video stalled; reset capture", "idle", idle.String(), "attempt", resets)
 		}
 	}
+}
+
+func (p *Publisher) refreshKeyframeForPeer() {
+	if err := p.session.ResetVideo(); err != nil {
+		p.logger.Warn("peer keyframe reset failed", "error", err)
+		return
+	}
+	time.Sleep(700 * time.Millisecond)
+	p.writeCachedKeyframe()
+	time.Sleep(500 * time.Millisecond)
+	p.writeCachedKeyframe()
 }
