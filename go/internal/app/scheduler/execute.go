@@ -1066,7 +1066,5 @@ var transientRetryDelay = 2 * time.Second
 // failing on the network before MaaCore starts. The next attempt usually
 // succeeds, and no game action has happened yet.
 func isTransientMAAUpdateFailure(err error) bool {
-	_, stderr := errorOutput(err)
-	text := strings.ToLower(stderr)
-	return strings.Contains(text, "network error") || strings.Contains(text, "unexpected end of file")
+	return apperrors.IsTransientMAAUpdateFailure(err)
 }

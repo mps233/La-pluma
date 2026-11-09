@@ -25,6 +25,10 @@ const (
 
 var errExecutionStopped = errors.New("作业集执行已停止")
 
+// transientCopilotRetryDelay is the pause before retrying a Copilot task that
+// failed in maa-cli's automatic resource update, before MaaCore started.
+var transientCopilotRetryDelay = 2 * time.Second
+
 // Executor is the narrow MAA process surface used by plan and manual
 // execution. It matches the scheduler and activity adapter shapes so the app
 // layer can reuse one adapter for every copilot entry point.
@@ -554,6 +558,16 @@ func (s *Service) executeDynamicEntries(ctx context.Context, execution dynamicEx
 
 		stopBattleProgress := s.startBattleProgressSampler(ctx, execution.lifecycle, baseProgress)
 		dto, err := s.executor.RunTask(ctx, taskConfig, true)
+		if err != nil && apperrors.IsTransientMAAUpdateFailure(err) && ctx.Err() == nil {
+			if s.logger != nil {
+				s.logger.Warn("MAA 资源更新网络失败，重试作业集任务", "setId", execution.planID, "error", err.Error())
+			}
+			select {
+			case <-time.After(transientCopilotRetryDelay):
+				dto, err = s.executor.RunTask(ctx, taskConfig, true)
+			case <-ctx.Done():
+			}
+		}
 		stopBattleProgress()
 		if err == nil {
 			err = runDTOError(dto)

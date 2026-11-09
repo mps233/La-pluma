@@ -110,13 +110,17 @@ func TestMissingCLI(t *testing.T) {
 	}
 }
 
-func TestMaaFailureMessageHintsInvalidParams(t *testing.T) {
+func TestMaaFailureMessageClassifiesKnownFailures(t *testing.T) {
 	message, retryable := maaFailureMessage(1, "Error: Failed to add task with params: invalid params")
 	if retryable || !strings.Contains(message, "热更新") {
-		t.Fatalf("message = %q, retryable = %v", message, retryable)
+		t.Fatalf("invalid params: message = %q, retryable = %v", message, retryable)
 	}
-	message, retryable = maaFailureMessage(1, "network error")
+	message, retryable = maaFailureMessage(1, "Error: Network error\nCaused by:\n    io: unexpected end of file\n")
+	if !retryable || !strings.Contains(message, "网络失败") {
+		t.Fatalf("network failure: message = %q, retryable = %v", message, retryable)
+	}
+	message, retryable = maaFailureMessage(1, "some other failure")
 	if !retryable || message != "MAA 退出码 1" {
-		t.Fatalf("message = %q, retryable = %v", message, retryable)
+		t.Fatalf("other failure: message = %q, retryable = %v", message, retryable)
 	}
 }

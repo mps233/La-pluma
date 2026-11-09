@@ -4,6 +4,7 @@ import (
 	stderrors "errors"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // Error is a stable, transport-agnostic application error. HTTP handlers map
@@ -52,4 +53,18 @@ func As(err error) (*Error, bool) {
 		return target, true
 	}
 	return nil, false
+}
+
+// IsTransientMAAUpdateFailure reports whether err is maa-cli's automatic
+// resource update failing on the network before MaaCore starts. A retry is
+// safe because no game action has happened yet, and the next attempt usually
+// succeeds.
+func IsTransientMAAUpdateFailure(err error) bool {
+	appErr, ok := As(err)
+	if !ok || appErr.Details == nil {
+		return false
+	}
+	stderr, _ := appErr.Details["stderr"].(string)
+	text := strings.ToLower(stderr)
+	return strings.Contains(text, "network error") || strings.Contains(text, "unexpected end of file")
 }

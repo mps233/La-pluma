@@ -330,10 +330,15 @@ func (w *lineWriter) emit(line string) {
 // maaFailureMessage turns the CLI exit into a user-facing message. MaaCore
 // rejects a Copilot task whose stages are missing from the resource with
 // "invalid params"; retrying the same command cannot help until the resource
-// is refreshed.
+// is refreshed. A network failure during the automatic resource update is
+// transient and retryable.
 func maaFailureMessage(exitCode int, stderr string) (string, bool) {
-	if strings.Contains(stderr, "invalid params") {
+	text := strings.ToLower(stderr)
+	if strings.Contains(text, "invalid params") {
 		return "MAA 拒绝了任务参数，请先热更新 MAA 资源或检查作业配置", false
+	}
+	if strings.Contains(text, "network error") || strings.Contains(text, "unexpected end of file") {
+		return "MAA 检查资源更新时网络失败，请稍后重试", true
 	}
 	return fmt.Sprintf("MAA 退出码 %d", exitCode), true
 }

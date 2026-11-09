@@ -721,3 +721,45 @@ func TestExecutePlanRejectsStageMissingFromResource(t *testing.T) {
 		t.Fatal("MAA must not start when the stage is missing")
 	}
 }
+
+func TestExecutePlanRetriesTransientMAAUpdateFailure(t *testing.T) {
+	previous := transientCopilotRetryDelay
+	transientCopilotRetryDelay = time.Millisecond
+	t.Cleanup(func() { transientCopilotRetryDelay = previous })
+
+	calls := 0
+	executor := &fakeExecutionExecutor{}
+	executor.runTask = func(context.Context, map[string]any) (domainrun.DTO, error) {
+		calls++
+		if calls == 1 {
+			return domainrun.DTO{}, apperrors.WithStatus(
+				"MAA_COMMAND_FAILED",
+				"MAA 退出码 1",
+				500,
+				true,
+				map[string]any{"stderr": "Error: Network error\nCaused by:\n    io: unexpected end of file\n"},
+			)
+		}
+		return domainrun.DTO{State: domainrun.StatusSucceeded}, nil
+	}
+	fixture := newExecutionFixture(t, executor, &fakeLeaseRunner{})
+	plan := dynamicExecutionPlan()
+	plan.Items = plan.Items[:1]
+	plan.Entries = plan.Entries[:1]
+
+	result, err := fixture.service.ExecutePlan(context.Background(), PlanExecution{
+		SetID:     "1",
+		Raid:      "normal",
+		Plan:      plan,
+		Lifecycle: &ExecutionLifecycle{RunID: "run-transient"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("RunTask calls = %d, want 2", calls)
+	}
+	if success, _ := result.Data["success"].(bool); !success {
+		t.Fatalf("execution result = %#v", result.Data)
+	}
+}
