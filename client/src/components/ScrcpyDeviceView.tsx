@@ -608,7 +608,7 @@ export default function ScrcpyDeviceView({
                     ? '预览服务尚未连接。'
                     : '点击“启动实时预览”后，La-pluma 会自动启动服务、连接 MuMu 并显示实时画面。')}
                 </div>
-                <div className="scrcpy-empty-actions mt-4 flex justify-center">
+                <div className="scrcpy-empty-actions mt-4 flex justify-center gap-2">
                   <Button
                     size="sm"
                     variant="primary"

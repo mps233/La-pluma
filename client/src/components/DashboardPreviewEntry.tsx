@@ -188,7 +188,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
                       {emptyState.description}
                     </div>
                     {emptyState.action && (
-                      <div className="scrcpy-empty-actions mt-4 flex justify-center">
+                      <div className="scrcpy-empty-actions mt-4 flex justify-center gap-2">
                         {emptyState.action}
                       </div>
                     )}
