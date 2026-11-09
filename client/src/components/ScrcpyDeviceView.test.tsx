@@ -115,7 +115,7 @@ describe('ScrcpyDeviceView automation availability', () => {
     expect(findButton('启动预览')?.title).toBe('正在检查后端服务，请稍候')
 
     findButton('启动预览')?.click()
-    container.querySelector('video')?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+    container.querySelector('[data-scrcpy-touch-surface]')?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
 
     expect(onStartInfrastructure).not.toHaveBeenCalled()
     expect(webrtcMock.sendTouch).not.toHaveBeenCalled()
@@ -285,10 +285,10 @@ describe('ScrcpyDeviceView automation availability', () => {
     ))
 
     expect(container.textContent).toContain('触控连接中，画面暂不可操作')
-    const video = container.querySelector('video')!
+    const surface = container.querySelector<HTMLElement>('[data-scrcpy-touch-surface]')!
     const event = new MouseEvent('pointerdown', { bubbles: true, clientX: 20, clientY: 20, button: 0 })
     Object.defineProperty(event, 'pointerId', { value: 1 })
-    video.dispatchEvent(event)
+    surface.dispatchEvent(event)
 
     expect(webrtcMock.sendTouch).not.toHaveBeenCalled()
   })
@@ -348,7 +348,8 @@ describe('ScrcpyDeviceView automation availability', () => {
     ))
 
     const video = container.querySelector('video')!
-    Object.assign(video, {
+    const surface = container.querySelector<HTMLElement>('[data-scrcpy-touch-surface]')!
+    Object.assign(surface, {
       setPointerCapture: vi.fn(),
       hasPointerCapture: vi.fn(() => true),
       releasePointerCapture: vi.fn(),
@@ -356,7 +357,7 @@ describe('ScrcpyDeviceView automation availability', () => {
     const dispatchPointer = (type: string, pointerId: number, clientX: number, clientY: number) => {
       const event = new MouseEvent(type, { bubbles: true, clientX, clientY, button: 0 })
       Object.defineProperty(event, 'pointerId', { value: pointerId })
-      video.dispatchEvent(event)
+      surface.dispatchEvent(event)
     }
 
     act(() => {
@@ -391,12 +392,12 @@ describe('ScrcpyDeviceView automation availability', () => {
       />
     ))
 
-    const video = container.querySelector('video')!
-    Object.assign(video, { setPointerCapture: vi.fn() })
+    const surface = container.querySelector<HTMLElement>('[data-scrcpy-touch-surface]')!
+    Object.assign(surface, { setPointerCapture: vi.fn() })
     const dispatchPointer = (type: string) => {
       const event = new MouseEvent(type, { bubbles: true, clientX: 2, clientY: 2, button: 0 })
       Object.defineProperty(event, 'pointerId', { value: 7 })
-      video.dispatchEvent(event)
+      surface.dispatchEvent(event)
     }
     act(() => {
       dispatchPointer('pointerdown')

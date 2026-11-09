@@ -316,9 +316,18 @@ export default function ScrcpyDeviceView({
     })
   }, [])
 
-  const onPointerDown = (event: React.PointerEvent<HTMLVideoElement>) => {
+  // iOS Safari does not deliver pointer events reliably on a bare <video>.
+  // A transparent sibling layer owns the gesture and maps it through the
+  // video element beside it.
+  const videoForPointerEvent = (event: { currentTarget: HTMLElement }) => (
+    event.currentTarget.parentElement?.querySelector('video') as HTMLVideoElement | null
+  ) ?? videoRef.current
+
+  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!automationAvailable || !webrtc.inputReady) return
-    const pointer = { clientX: event.clientX, clientY: event.clientY, target: event.currentTarget }
+    const video = videoForPointerEvent(event)
+    if (!video) return
+    const pointer = { clientX: event.clientX, clientY: event.clientY, target: video }
     if (!webrtc.sendTouch(0, pointer.clientX, pointer.clientY, event.pointerId, pointer.target)) return
 
     trackedPointersRef.current.set(event.pointerId, pointer)
@@ -329,16 +338,19 @@ export default function ScrcpyDeviceView({
     }
   }
 
-  const onWheel = (event: React.WheelEvent<HTMLVideoElement>) => {
+  const onWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     if (!automationAvailable || !webrtc.inputReady) return
-    if (webrtc.sendScroll(event.deltaX, event.deltaY, event.clientX, event.clientY, event.currentTarget)) {
+    const video = videoForPointerEvent(event)
+    if (video && webrtc.sendScroll(event.deltaX, event.deltaY, event.clientX, event.clientY, video)) {
       event.preventDefault()
     }
   }
 
-  const onPointerMove = (event: React.PointerEvent<HTMLVideoElement>) => {
+  const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!automationAvailable || !trackedPointersRef.current.has(event.pointerId)) return
-    const pointer = { clientX: event.clientX, clientY: event.clientY, target: event.currentTarget }
+    const video = videoForPointerEvent(event)
+    if (!video) return
+    const pointer = { clientX: event.clientX, clientY: event.clientY, target: video }
     trackedPointersRef.current.set(event.pointerId, pointer)
     pendingPointerMovesRef.current.set(event.pointerId, pointer)
     if (pointerMoveFrameRef.current === null) {
@@ -346,7 +358,7 @@ export default function ScrcpyDeviceView({
     }
   }
 
-  const finishPointer = (event: React.PointerEvent<HTMLVideoElement>, cancelled = false) => {
+  const finishPointer = (event: React.PointerEvent<HTMLDivElement>, cancelled = false) => {
     const trackedPointer = trackedPointersRef.current.get(event.pointerId)
     if (!trackedPointer) return
 
@@ -368,7 +380,7 @@ export default function ScrcpyDeviceView({
     }
   }
 
-  const onLostPointerCapture = (event: React.PointerEvent<HTMLVideoElement>) => {
+  const onLostPointerCapture = (event: React.PointerEvent<HTMLDivElement>) => {
     const trackedPointer = trackedPointersRef.current.get(event.pointerId)
     if (!trackedPointer) return
     pendingPointerMovesRef.current.delete(event.pointerId)
@@ -571,7 +583,12 @@ export default function ScrcpyDeviceView({
             muted
             aria-label="模拟器实时画面"
             aria-disabled={!webrtc.inputReady}
-            className="w-full h-full object-contain touch-none select-none"
+            className="w-full h-full object-contain pointer-events-none touch-none select-none"
+          />
+          <div
+            className="absolute inset-0 touch-none select-none"
+            data-scrcpy-touch-surface="true"
+            aria-hidden="true"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onWheel={onWheel}
@@ -877,7 +894,12 @@ export default function ScrcpyDeviceView({
             muted
             aria-label="模拟器沉浸画面"
             aria-disabled={!webrtc.inputReady}
-            className="h-full w-full object-contain touch-none select-none"
+            className="h-full w-full object-contain pointer-events-none touch-none select-none"
+          />
+          <div
+            className="absolute inset-0 touch-none select-none"
+            data-scrcpy-touch-surface="true"
+            aria-hidden="true"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onWheel={onWheel}
