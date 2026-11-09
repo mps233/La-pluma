@@ -543,19 +543,22 @@ func (r *desktopRuntime) showWindow() {
 		return
 	}
 	titleBarStyle := mygo.TitleBarDefault
+	var trafficLightPosition *mygo.Point
 	if runtime.GOOS == "darwin" {
 		titleBarStyle = mygo.TitleBarHiddenInset
+		trafficLightPosition = &mygo.Point{X: 22, Y: 22}
 	}
 	window := mygo.NewWindow(mygo.WindowOptions{
-		Title:           "La Pluma",
-		URL:             r.baseURL,
-		Width:           1180,
-		Height:          800,
-		MinWidth:        980,
-		MinHeight:       680,
-		BackgroundColor: "#101318",
-		StateKey:        "main",
-		TitleBarStyle:   titleBarStyle,
+		Title:                "La Pluma",
+		URL:                  r.baseURL,
+		Width:                1180,
+		Height:               800,
+		MinWidth:             980,
+		MinHeight:            680,
+		BackgroundColor:      "#101318",
+		StateKey:             "main",
+		TitleBarStyle:        titleBarStyle,
+		TrafficLightPosition: trafficLightPosition,
 		Page: mygo.PageOptions{
 			TrustedOrigins:       []string{r.baseURL[:len(r.baseURL)-1]},
 			BackgroundThrottling: mygo.ThrottlingOff,
