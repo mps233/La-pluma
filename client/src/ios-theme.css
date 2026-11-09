@@ -2239,18 +2239,23 @@ html.dark .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .sm
 /* A hidden native title bar leaves the traffic lights over the page. The
    transparent strip gives them a draggable home and keeps the sidebar clear. */
 .desktop-titlebar {
+  display: none;
+}
+
+.la-pluma-app.is-desktop-shell .desktop-titlebar {
   position: fixed;
   top: 0;
   right: 0;
   left: 0;
   z-index: 80;
-  height: var(--mygo-titlebar-height, 0px);
+  display: block;
+  height: max(28px, var(--mygo-titlebar-height, 0px));
   --app-region: drag;
   background: transparent;
 }
 
 @media (min-width: 1024px) {
-  .la-pluma-app .la-pluma-sidebar {
-    padding-top: calc(1.125rem + var(--mygo-titlebar-height, 0px));
+  .la-pluma-app.is-desktop-shell .la-pluma-sidebar {
+    padding-top: calc(1.125rem + max(28px, var(--mygo-titlebar-height, 0px)));
   }
 }

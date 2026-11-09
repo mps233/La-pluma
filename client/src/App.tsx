@@ -4,6 +4,7 @@ import Layout from './components/Layout'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
 import AccessTokenGate from './components/AccessTokenGate'
 import { PageSkeleton } from './components/common'
+import { isDesktopRuntime } from './desktop/bridge'
 import { useBackendStatusMonitor } from './hooks/useBackendStatusMonitor'
 import { useRunStatusMonitor } from './hooks/useRunStatusMonitor'
 import { useUIStore } from './stores'
@@ -101,6 +102,7 @@ function VisitedWorkspaces({ activeTab }: { activeTab: string }) {
 
 function App() {
   useBackendStatusMonitor()
+  const desktopShell = isDesktopRuntime()
   useRunStatusMonitor()
   const theme = useUIStore(state => state.theme)
   const isDark = theme === 'dark'
@@ -111,7 +113,7 @@ function App() {
   }, [isDark])
 
   return (
-    <div id="app-root" className="la-pluma-app">
+    <div id="app-root" className={`la-pluma-app${desktopShell ? ' is-desktop-shell' : ''}`}>
       <div className="desktop-titlebar" aria-hidden="true" />
       <PreviewSessionProvider>
         <Layout>
