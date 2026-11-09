@@ -1,16 +1,17 @@
 # La Pluma Go backend
 
-This module is the Go rewrite of `server/`. It builds as two entry points:
+This module is the Go backend and desktop shell. It builds as two entry points:
 
 - `cmd/server`: headless HTTP service for Docker/NAS/PWA.
 - `.` / `MyGo` (`main.go`): desktop app (form 2/3) with the backend in-process.
 
-The React client in `../client` is served unchanged. The Node implementation in
-`../server` remains the behavioral oracle during migration.
+The React client in `../client` is served unchanged. The former Node backend was
+archived and removed after parity was proven; its golden contract fixtures remain
+under `internal/contract/testdata`.
 
 ## Status
 
-- Agent API: all 105 Node route paths registered; contract has 46 operations
+- Agent API: all 105 legacy route paths registered; contract has 46 operations
   (40 advertised), manifest/OpenAPI generated from one Go registry.
 - Device preview/control: Pion WebRTC + scrcpy protocol, including touch, scroll,
   key/text and clipboard; an embedded Pion TURN/STUN server is advertised over
@@ -62,7 +63,7 @@ go run ./cmd/tools materials  # material table + formulas
 ```
 
 The desktop/`mygo build` script runs `seed` when no seed snapshot is present.
-`server/data` is user data and is never committed.
+The default data directory is `server/data` relative to the working directory; it is user data and is never committed.
 
 ## Docker
 
@@ -70,7 +71,7 @@ The desktop/`mygo build` script runs `seed` when no seed snapshot is present.
 docker build -f go/Dockerfile -t la-pluma-go .
 docker run --rm -p 3055:3000 -p 3478:3478/udp \
   -e LA_PLUMA_WEBRTC_TURN_PUBLIC_IP=<host-lan-ip> \
-  -v "$PWD/la-pluma-data:/app/server/data" \
+  -v "$PWD/la-pluma-data:/app/data" \
   -v "$HOME/.config/maa:/root/.config/maa" \
   la-pluma-go
 ```
@@ -102,7 +103,5 @@ depot/OperBox recognition, and mastery scheduling. See
 
 See `docs/go-rewrite/PLAN.md`. The Go server takes
 `<data-dir>/la-pluma.instance.lock` for its lifetime, so two Go instances can
-never write the same Agent run store or MAA lease. The Node server does not
-participate in this lock: do not run Node and Go against the same data root.
-MAA runs from a different install with a different data root are not
-coordinated.
+never write the same Agent run store or MAA lease. MAA runs from a different
+install with a different data root are not coordinated.

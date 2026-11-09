@@ -9,8 +9,9 @@ emulator.
 ## Hard constraints
 
 - Preserve the existing HTTP/JSON contract while the React client is shared.
-- Keep `server/` (Node) as the migration oracle until parity is proven. Never
-  run two writers against the same data root or MAA lease file.
+- The Node backend was archived and removed after parity was proven. Keep the
+  golden contract fixtures; never run two writers against the same data root or
+  MAA lease file.
 - Do not modify or commit unrelated dirty worktree files.
 - No real combat / sanity / medicine consumption without explicit confirmation.
   Read-only device checks (devices, screenshots, UI state) are allowed.
@@ -54,7 +55,7 @@ go/
   - [x] contract registry (46 operations, 40 advertised; manifest/OpenAPI)
   - [x] all 105 Agent route paths registered (some return stable 501 for unported scripts)
   - [x] assets/operator-quotes/health/signaling mounts
-  - [x] golden contract tests against Node oracle (`internal/contract/testdata`)
+  - [x] golden contract tests against the former Node oracle (`internal/contract/testdata`)
 - [~] 3. Scheduling and task flows
   - [x] Go scheduler core: game timezone, flow validation/plan, sequential execution, startup restore, stop
   - [x] HTTP schedule routes; startup-only flow verified on MuMu
@@ -67,7 +68,7 @@ go/
   - [x] control socket touch/key/text base commands
   - [x] React client signaling compatibility verified in browser
   - [~] clipboard/scroll/multi-touch parity (clipboard verified on OnePlus; MuMu clears clipboard by OS policy; scroll/ACTION_CANCEL covered; multi-touch real-device pending)
-  - [x] remove ScrcpyOverWebRTC from remaining Node paths (Go runtime is independent; Node stays as oracle)
+  - [x] remove ScrcpyOverWebRTC from remaining Node paths (Go runtime is independent)
 - [x] 5. Domain modules
   - [x] training/operator materials (fetch action returns explicit unsupported)
   - [x] copilot planning/discovery core (execution/manual session wiring pending)

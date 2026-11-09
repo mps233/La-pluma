@@ -12,14 +12,14 @@
   <a href="https://hub.docker.com/r/miaona/la-pluma"><img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/miaona/la-pluma"></a>
   <a href="https://hub.docker.com/r/miaona/la-pluma"><img alt="Docker Image Size" src="https://img.shields.io/docker/image-size/miaona/la-pluma/latest"></a>
   <a href="https://github.com/mps233/La-pluma/actions/workflows/docker-publish.yml"><img alt="Docker Build and Push" src="https://github.com/mps233/La-pluma/actions/workflows/docker-publish.yml/badge.svg"></a>
-  <a href="https://nodejs.org/"><img alt="Node.js 22.12+" src="https://img.shields.io/badge/Node.js-22.12%2B-5FA04E"></a>
+  <a href="https://go.dev/"><img alt="Go 1.27+" src="https://img.shields.io/badge/Go-1.27%2B-00ADD8"></a>
   <a href="https://react.dev/"><img alt="React 19" src="https://img.shields.io/badge/React-19-61DAFB"></a>
   <a href="https://github.com/MaaAssistantArknights/maa-cli"><img alt="MAA CLI" src="https://img.shields.io/badge/MAA-CLI-111111"></a>
 </p>
 
 ## Overview
 
-La Pluma is a self-hosted web console for Arknights automation. It puts the `maa` CLI, ADB and ScrcpyOverWebRTC behind one interface: compose a daily task flow, run copilot plans and roguelike runs, schedule the routine, and watch the emulator from a browser. Configuration, run history, drop records and operator data stay on the machine that runs the server.
+La Pluma is a self-hosted web console for Arknights automation. It puts the `maa` CLI, ADB and a Pion WebRTC preview behind one interface: compose a daily task flow, run copilot plans and roguelike runs, schedule the routine, and watch the emulator from a browser. Configuration, run history, drop records and operator data stay on the machine that runs the server.
 
 Beyond the UI, `/api/agent` exposes the same capabilities as a semantic manifest and OpenAPI surface, so scripts and AI agents can discover actions, read status, dry-run a plan and follow a run to its terminal state.
 
@@ -33,6 +33,7 @@ The project is named after La Pluma, the five-star Guard in Arknights.
 - **One-click routine** — run the saved daily flow from the dashboard, or prepare a matching copilot plan for the current event without starting combat.
 - **Optional preview** — keep the preview off, refresh a snapshot every 10 seconds, or open a live WebRTC view. Snapshot mode falls back to ADB screenshots, and the console keeps its last successful data when a refresh fails. Touch control is available in the device preview on the task workspaces.
 - **Responsive shell** — desktop sidebar with workspace search, mobile bottom bar with a secondary sheet, light/dark/system themes, and an iOS-style material shell. The PWA can be installed and updated from the UI.
+- **Operator growth** — plan elite-promotion materials and, in the same 养成 workspace, queue operator skills with a current/target mastery level. The server scheduler starts one OperProgress level at a time, pauses on blocked targets, and keeps the queue state across browser sessions. MAA does not farm mastery materials; missing materials block the target.
 
 ### Daily automation
 
@@ -82,15 +83,15 @@ The project is named after La Pluma, the five-star Guard in Arknights.
 
 ### Agent API
 
-- **Discoverable surface** — `/api/agent/manifest` and `/api/agent/openapi.json` are generated from one registry. The manifest advertises 26 public actions with risk, dry-run, polling and stop metadata; the OpenAPI document includes all registered operations.
-- **Semantic actions** — status, connection test, device discovery, current-event preflight, start game, fight, daily flow, screenshots, recent logs, WebRTC preview and a custom-tool runner for five whitelisted tools, alongside a whitelisted `run-task` escape hatch.
+- **Discoverable surface** — `/api/agent/manifest` and `/api/agent/openapi.json` are generated from one registry. The manifest advertises 40 public actions with risk, dry-run, polling and stop metadata; the OpenAPI document includes all registered operations.
+- **Semantic actions** — status, connection test, device discovery, current-event preflight, start game, fight, daily flow, screenshots, recent logs, WebRTC preview, a custom-tool runner for five whitelisted tools, and an operator-mastery queue that runs OperProgress one level at a time, alongside a whitelisted `run-task` escape hatch.
 - **Tracked runs** — consequential actions return a `runId`, `run`, `pollUrl` and `stopUrl`; background work returns HTTP 202. Runs and idempotency records are persisted before the external side effect starts, become non-retryable `interrupted` after a restart, and are retained for up to 24 hours or 500 records.
 - **Safe execution** — `dryRun` returns the plan without starting MAA, `Idempotency-Key` replays the original run, and the shared MAA lease returns HTTP 409 when another La Pluma execution holds the device.
 
 ### Interface and deployment
 
-- **Stack** — React 19, TypeScript, Vite, Tailwind CSS, Framer Motion and Zustand on the client; Node.js, Express and node-cron on the server.
-- **Deployment** — local Node.js, a multi-arch Docker image (`linux/amd64`, `linux/arm64`), optional HTTPS, and subpath hosting.
+- **Stack** — React 19, TypeScript, Vite, Tailwind CSS, Framer Motion and Zustand on the client; Go 1.27 with `net/http`, Pion WebRTC and an embedded TURN server on the backend.
+- **Deployment** — a single Go binary or the multi-arch Docker image (`linux/amd64`, `linux/arm64`), optional HTTPS, and subpath hosting.
 - **PWA** — installable on HTTPS or localhost, with an offline UI shell. Automation and device control always require the backend.
 - **Language** — the interface is currently in Chinese.
 
@@ -112,7 +113,8 @@ The project is named after La Pluma, the five-star Guard in Arknights.
 
 ### Requirements
 
-- **Node.js 22.12+** — the server runs TypeScript directly with `--experimental-strip-types`.
+- **Go 1.27+** — builds the backend and the MyGo desktop shell.
+- **Node.js 22.12+** — only for the React client build and tests; the running server does not use Node.
 - **maa CLI with MaaCore** — install the CLI, then run `maa install` once. On macOS: `brew install MaaAssistantArknights/tap/maa-cli`.
 - **ADB** — a system install or the copy bundled with your emulator. Point **Config → Connection** at it; the default path is the macOS Homebrew location.
 - **Host** — macOS, Linux or Docker.
@@ -124,18 +126,21 @@ git clone https://github.com/mps233/La-pluma.git
 cd La-pluma
 npm run install:all
 
-# Run these in separate terminals for reliable process cleanup
-npm run dev:server
-npm run dev:client
+# Terminal 1: Go backend on http://localhost:3000
+cd go && go run ./cmd/server
+
+# Terminal 2: Vite client on http://localhost:5173
+cd .. && npm run dev:client
 ```
 
-Open http://localhost:5173. Vite proxies `/api` and `/webrtc-signaling` to the server on port 3000.
+Open http://localhost:5173. Vite proxies `/api` and `/webrtc-signaling` to the Go server on port 3000.
 
-For a production build served by Express:
+For a production build served by the Go backend:
 
 ```bash
 npm run build
-NODE_ENV=production npm run start --prefix server
+cd go
+LA_PLUMA_CLIENT_DIST=../client/dist go run ./cmd/server
 ```
 
 ### Run with Docker
@@ -146,7 +151,7 @@ docker pull miaona/la-pluma:latest
 docker run -d \
   --name la-pluma \
   -p 3055:3000 \
-  -v /path/to/data:/app/server/data \
+  -v /path/to/data:/app/data \
   -v /path/to/maa-config:/root/.config/maa \
   -v /path/to/maa-data:/root/.local/share/maa \
   -e ADB_PATH=/usr/bin/adb \
@@ -154,7 +159,7 @@ docker run -d \
   miaona/la-pluma:latest
 ```
 
-Open http://localhost:3055. `ADB_ADDRESS` must point at the host or emulator from inside the container; with the default bridge network, `127.0.0.1` refers to the container itself. The `ADB_PATH` override is required in Docker because the image installs ADB at `/usr/bin/adb`.
+Open http://localhost:3055. `ADB_ADDRESS` must point at the host or emulator from inside the container; with the default bridge network, `127.0.0.1` refers to the container itself. The `ADB_PATH` override is required in Docker because the image installs ADB at `/usr/bin/adb`. The Go image is built from `go/Dockerfile`.
 
 The image installs MaaCore on first start when it is missing. `docker-compose.yml` is also included; edit its host paths and ADB address, and add `ADB_PATH=/usr/bin/adb` under `environment`, before running `docker compose up -d`.
 
@@ -166,30 +171,22 @@ Key environment variables:
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `PORT` | Server port | `3000` |
-| `ADB_PATH` | ADB executable | `/opt/homebrew/bin/adb` |
-| `ADB_ADDRESS` | Default ADB device address | `127.0.0.1:16384` |
-| `MAA_CLI_PATH` | `maa` executable | `maa`; Docker uses `/usr/local/bin/maa` |
-| `MAA_CLIENT_TYPE` | Default client | `Official` |
-| `LA_PLUMA_TOKEN` | Require a bearer token or `X-La-Pluma-Token` on `/api` (except public `/api/maa-assets`) and the WebRTC ticket endpoint | empty, auth off |
-| `LA_PLUMA_AGENT_RUN_STORE` | Run and idempotency store | `server/data/agent-runs.json` |
+| `PORT` | HTTP port | `3000` |
+| `LA_PLUMA_HOST` | Listen address | `0.0.0.0` |
+| `LA_PLUMA_DATA_DIR` | Config, run store and MAA task files | `<working-dir>/server/data` |
+| `LA_PLUMA_CLIENT_DIST` | Built React client | `<working-dir>/client/dist` |
+| `LA_PLUMA_TOKEN` | Require a bearer token or `X-La-Pluma-Token` on `/api` and the WebRTC ticket endpoint | empty, auth off |
 | `LA_PLUMA_BASE_PATH` | Runtime mount path; must match the build-time `VITE_BASE_PATH` | `/` |
 | `LA_PLUMA_HTTPS_CERT_PATH` | Certificate chain; set together with the key | empty, HTTP |
 | `LA_PLUMA_HTTPS_KEY_PATH` | Private key; set together with the chain | empty, HTTP |
-| `LA_PLUMA_WEBRTC_DIR` | ScrcpyOverWebRTC working directory | `$HOME/ScrcpyOverWebRTC` |
-| `LA_PLUMA_WEBRTC_PORT` | ScrcpyOverWebRTC port | `8443` |
-| `LA_PLUMA_WEBRTC_VERSION` | Install or upgrade release; `latest` follows stable | `latest` |
-| `LA_PLUMA_MAX_REALTIME_LOGS` | In-memory log line cap | `5000` |
-| `LA_PLUMA_MAX_REALTIME_LOG_CHARS` | In-memory log character cap; older entries rotate out | `1000000` |
-| `LA_PLUMA_AGENT_RUN_PERSIST_COALESCE_MS` | Progress persistence window; terminal states still flush immediately | `10000` |
-| `LA_PLUMA_COPILOT_PLAN_TTL_MS` | Cache lifetime for immutable PRTS copilot plans | `1800000` |
-| `LA_PLUMA_BATTLE_OCR` | Enable battle counter OCR; set `0`/`false`/`off` to disable | `1` |
-| `LA_PLUMA_BATTLE_OCR_SCALE` | OCR crop upscale factor (2-6) | `3` |
-| `LA_PLUMA_BATTLE_OCR_IDLE_MS` | Release the Tesseract worker after this idle period | `120000` |
-| `LA_PLUMA_ASSET_CACHE_DIR` | Disk cache for WebP MaaResource derivatives | `$TMPDIR/la-pluma-asset-cache` |
-| `LA_PLUMA_ASSET_WEBP_CONCURRENCY` | Concurrent WebP conversions (1-16) | `4` |
-| `LA_PLUMA_DROP_STATS_TTL_MS` | Drop statistics aggregate cache TTL | `30000` |
-| `LA_PLUMA_SCREEN_FRAME_MAX_WIDTH` | Max width for the binary dashboard preview frame (px) | `720` |
+| `ADB_PATH` | ADB executable | platform default (`/opt/homebrew/bin/adb` on macOS, `adb` elsewhere) |
+| `ADB_ADDRESS` | Default ADB device address | `127.0.0.1:16384` |
+| `MAA_CLI_PATH` | `maa` executable | `maa`; Docker uses `/usr/local/bin/maa` |
+| `MAA_CONFIG_DIR` | MAA profiles and task files | platform MAA config directory |
+| `LA_PLUMA_WEBRTC_TURN_PORT` | Embedded TURN/STUN UDP port | `3478` |
+| `LA_PLUMA_WEBRTC_TURN_PUBLIC_IP` | Relay address advertised to browsers | detected LAN IPv4 |
+| `LA_PLUMA_WEBRTC_TURN_USERNAME` / `..._PASSWORD` | TURN credentials | `la-pluma` / generated |
+| `LA_PLUMA_WEBRTC_TURN_DISABLED` | Disable the embedded TURN server | unset |
 
 <details>
 <summary>HTTPS, subpath hosting and WebRTC notes</summary>
@@ -243,16 +240,17 @@ La-pluma/
 │  ├─ src/services/api.ts  /api/agent client
 │  ├─ src/stores/          Zustand stores
 │  └─ public/              PWA icons and logo
-├─ server/                 Express backend
-│  ├─ routes/              agent.ts, agentContract.ts, operatorQuotes.ts, maaAssets.ts
-│  ├─ services/            MAA, scheduler, runs, WebRTC, training, notifications, data
-│  ├─ data/                Local configuration and runtime data (not committed)
-│  └─ server.ts            Entry point
+├─ go/                     Go backend and MyGo desktop shell
+│  ├─ cmd/server/          headless HTTP server
+│  ├─ cmd/desktop/         MyGo desktop entry
+│  ├─ internal/app/        MAA, scheduler, runs, WebRTC, training, notifications
+│  ├─ internal/infra/      ADB, MAA, scrcpy and WebRTC adapters
+│  └─ internal/transport/  HTTP, Agent API and signaling
 ├─ screenshots/            README images
 ├─ docs/                   MAA integration notes
-├─ Dockerfile
+├─ go/Dockerfile
 ├─ docker-compose.yml
-└─ package.json
+└─ package.json            client build/test scripts only
 ```
 
 ## Documentation
@@ -264,7 +262,7 @@ La-pluma/
 | `AGENTS.md` | Repository rules and verification commands for coding agents |
 | `DESIGN.md` | Visual and component specification |
 | `client/src/components/common/README.md` | Shared component props and examples |
-| `server/README.md` | Server helpers and data scripts |
+| `go/README.md` | Go backend setup, status and known gaps |
 | `docs/maa.md` | MAA CLI/Core integration status, boundaries and known gaps |
 
 ## License
@@ -275,5 +273,5 @@ MIT License.
 
 - [MAA (MaaAssistantArknights)](https://github.com/MaaAssistantArknights/MaaAssistantArknights) — the automation engine.
 - [maa-cli](https://github.com/MaaAssistantArknights/maa-cli) — the command-line interface La Pluma drives.
-- [ScrcpyOverWebRTC](https://github.com/hqw700/ScrcpyOverWebRTC) — browser preview and device control.
+- [Pion WebRTC](https://github.com/pion/webrtc) — browser preview transport; scrcpy provides the device stream.
 - [PenguinStats](https://penguin-stats.io/) and [PRTS](https://prts.maa.plus/) — drop data and copilot plans.

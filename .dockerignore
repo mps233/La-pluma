@@ -1,7 +1,6 @@
 # 依赖
 node_modules/
 client/node_modules/
-server/node_modules/
 
 # 构建产物（Docker 会在镜像内重新构建）
 client/dist/
@@ -42,7 +41,7 @@ tmp/
 temp/
 
 # 用户配置和数据（不要打包进镜像）
-server/data/
+data/
 docker-data/
 
 # 学习参考资料

@@ -6,12 +6,12 @@ services:
     # 或者本地构建（如果需要修改代码）
     # build:
     #   context: .
-    #   dockerfile: Dockerfile
+    #   dockerfile: go/Dockerfile
     
     container_name: la-pluma
     volumes:
       # 持久化用户配置和数据
-      - /vol1/1000/la-pluma/data:/app/server/data
+      - /vol1/1000/la-pluma/data:/app/data
       # 持久化 MAA 配置目录（任务、profiles 等）
       - /vol1/1000/la-pluma/config:/root/.config/maa
       # 持久化 MAA 数据目录（MaaCore、资源文件等）
@@ -19,7 +19,6 @@ services:
       # 可选：HTTPS 证书目录，只读挂载
       # - /path/to/certs:/app/certs:ro
     environment:
-      - NODE_ENV=production
       - PORT=3000  # 容器内监听 3000 端口
       # 自定义镜像若使用 VITE_BASE_PATH 构建，运行路径会自动匹配；手动覆盖时两者需一致
       # - LA_PLUMA_BASE_PATH=/la-pluma/
@@ -36,6 +35,7 @@ services:
     # 使用 bridge 网络模式
     ports:
       - "3055:3000"  # 宿主机 3055 映射到容器 3000
+      - "3478:3478/udp"  # 内嵌 TURN/STUN
     
     restart: unless-stopped
     healthcheck:

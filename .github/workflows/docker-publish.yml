@@ -18,6 +18,8 @@ env:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
@@ -28,21 +30,25 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: |
-            client/package-lock.json
-            server/package-lock.json
+          cache-dependency-path: client/package-lock.json
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
 
       - name: Install client dependencies
         run: npm ci --prefix client
 
-      - name: Install server dependencies
-        run: npm ci --prefix server
-
       - name: Verify client
         run: npm run verify --prefix client
 
-      - name: Verify server
-        run: npm run verify --prefix server
+      - name: Verify Go backend
+        working-directory: go
+        run: |
+          go test ./...
+          go vet ./...
 
   build-and-push:
     needs: verify
@@ -86,6 +92,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: ./go/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}

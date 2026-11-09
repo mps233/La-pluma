@@ -106,7 +106,7 @@ docker pull miaona/la-pluma:v1.0.0
 docker run -d \
   --name la-pluma \
   -p 3000:3000 \
-  -v /path/to/data:/app/server/data \
+  -v /path/to/data:/app/data \
   -v /path/to/config:/root/.config/maa \
   -v /path/to/maacore:/root/.local/share/maa \
   -e ADB_ADDRESS=127.0.0.1:5555 \

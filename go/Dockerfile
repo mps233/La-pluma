@@ -19,11 +19,10 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/la-pluma ./cmd/ser
 
 FROM debian:bookworm-slim
 ARG VITE_BASE_PATH=/
-ENV NODE_ENV=production \
-    PORT=3000 \
+ENV PORT=3000 \
     LA_PLUMA_BASE_PATH=${VITE_BASE_PATH} \
     LA_PLUMA_CLIENT_DIST=/app/client/dist \
-    LA_PLUMA_DATA_DIR=/app/server/data \
+    LA_PLUMA_DATA_DIR=/app/data \
     MAA_CLI_PATH=/usr/local/bin/maa \
     ADB_PATH=/usr/bin/adb \
     LA_PLUMA_SCRCPY_SERVER_PATH=/app/resources/scrcpy-server
@@ -45,7 +44,7 @@ RUN mkdir -p /opt/maa-cli/bin && \
     rm /tmp/maa-cli.tar.gz && \
     ln -s /opt/maa-cli/bin/maa /usr/local/bin/maa && \
     maa --version && \
-    mkdir -p /root/.config/maa /app/server/data /app/client
+    mkdir -p /root/.config/maa /app/data /app/client
 
 COPY --from=backend /out/la-pluma /app/la-pluma
 COPY --from=frontend /app/client/dist /app/client/dist

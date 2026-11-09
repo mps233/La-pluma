@@ -12,14 +12,14 @@
   <a href="https://hub.docker.com/r/miaona/la-pluma"><img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/miaona/la-pluma"></a>
   <a href="https://hub.docker.com/r/miaona/la-pluma"><img alt="Docker Image Size" src="https://img.shields.io/docker/image-size/miaona/la-pluma/latest"></a>
   <a href="https://github.com/mps233/La-pluma/actions/workflows/docker-publish.yml"><img alt="Docker Build and Push" src="https://github.com/mps233/La-pluma/actions/workflows/docker-publish.yml/badge.svg"></a>
-  <a href="https://nodejs.org/"><img alt="Node.js 22.12+" src="https://img.shields.io/badge/Node.js-22.12%2B-5FA04E"></a>
+  <a href="https://go.dev/"><img alt="Go 1.27+" src="https://img.shields.io/badge/Go-1.27%2B-00ADD8"></a>
   <a href="https://react.dev/"><img alt="React 19" src="https://img.shields.io/badge/React-19-61DAFB"></a>
   <a href="https://github.com/MaaAssistantArknights/maa-cli"><img alt="MAA CLI" src="https://img.shields.io/badge/MAA-CLI-111111"></a>
 </p>
 
 ## 简介
 
-La Pluma 是一个自托管的《明日方舟》自动化 Web 控制台。它把 `maa` CLI、ADB 与 ScrcpyOverWebRTC 收进同一个界面：编排日常任务流、执行作业与肉鸽、设置定时运行，并在浏览器里查看模拟器画面。配置、运行记录、掉落数据和干员数据都留在运行服务的主机上。
+La Pluma 是一个自托管的《明日方舟》自动化 Web 控制台。它把 `maa` CLI、ADB 与 Pion WebRTC 实时预览收进同一个界面：编排日常任务流、执行作业与肉鸽、设置定时运行，并在浏览器里查看模拟器画面。配置、运行记录、掉落数据和干员数据都留在运行服务的主机上。
 
 除界面外，`/api/agent` 以语义化的 manifest 与 OpenAPI 暴露同一批能力，脚本和 AI Agent 可以查询动作、读取状态、预演计划并跟踪任务到终态。
 
@@ -89,8 +89,8 @@ La Pluma 是一个自托管的《明日方舟》自动化 Web 控制台。它把
 
 ### 界面与部署
 
-- **技术栈** — 前端 React 19、TypeScript、Vite、Tailwind CSS、Framer Motion、Zustand；后端 Node.js、Express、node-cron。
-- **部署** — 本地 Node.js、多架构 Docker 镜像（`linux/amd64`、`linux/arm64`）、可选 HTTPS 与子路径托管。
+- **技术栈** — 前端 React 19、TypeScript、Vite、Tailwind CSS、Framer Motion、Zustand；后端 Go 1.27，使用 `net/http`、Pion WebRTC 与内嵌 TURN。
+- **部署** — 单个 Go 二进制或多架构 Docker 镜像（`linux/amd64`、`linux/arm64`）、可选 HTTPS 与子路径托管。
 - **PWA** — 可在 HTTPS 或 localhost 安装，离线时能打开界面壳层；自动化与设备控制始终需要后端。
 - **语言** — 界面目前为中文。
 
@@ -112,7 +112,8 @@ La Pluma 是一个自托管的《明日方舟》自动化 Web 控制台。它把
 
 ### 环境要求
 
-- **Node.js 22.12+** — 服务端用 `--experimental-strip-types` 直接运行 TypeScript。
+- **Go 1.27+** — 构建后端与 MyGo 桌面外壳。
+- **Node.js 22.12+** — 仅用于 React 客户端的构建与测试；运行中的服务端不依赖 Node。
 - **maa CLI 与 MaaCore** — 安装 CLI 后执行一次 `maa install`。macOS：`brew install MaaAssistantArknights/tap/maa-cli`。
 - **ADB** — 系统安装或模拟器自带均可；请在 **配置 → 连接** 中指向实际路径，默认值是 macOS Homebrew 的位置。
 - **运行环境** — macOS、Linux 或 Docker。
@@ -124,18 +125,21 @@ git clone https://github.com/mps233/La-pluma.git
 cd La-pluma
 npm run install:all
 
-# 分别在两个终端运行，便于可靠地结束进程
-npm run dev:server
-npm run dev:client
+# 终端 1：Go 后端，监听 http://localhost:3000
+cd go && go run ./cmd/server
+
+# 终端 2：Vite 客户端，监听 http://localhost:5173
+cd .. && npm run dev:client
 ```
 
-打开 http://localhost:5173。Vite 会把 `/api` 与 `/webrtc-signaling` 代理到 3000 端口的服务端。
+打开 http://localhost:5173。Vite 会把 `/api` 与 `/webrtc-signaling` 代理到 3000 端口的 Go 服务。
 
-由 Express 提供正式构建时：
+由 Go 后端提供正式构建时：
 
 ```bash
 npm run build
-NODE_ENV=production npm run start --prefix server
+cd go
+LA_PLUMA_CLIENT_DIST=../client/dist go run ./cmd/server
 ```
 
 ### Docker 运行
@@ -146,7 +150,7 @@ docker pull miaona/la-pluma:latest
 docker run -d \
   --name la-pluma \
   -p 3055:3000 \
-  -v /path/to/data:/app/server/data \
+  -v /path/to/data:/app/data \
   -v /path/to/maa-config:/root/.config/maa \
   -v /path/to/maa-data:/root/.local/share/maa \
   -e ADB_PATH=/usr/bin/adb \
@@ -156,7 +160,7 @@ docker run -d \
 
 打开 http://localhost:3055。`ADB_ADDRESS` 必须是容器内可访问的宿主机或模拟器地址；默认 bridge 网络下，`127.0.0.1` 指向容器自身。镜像把 ADB 安装在 `/usr/bin/adb`，因此 Docker 中必须覆盖 `ADB_PATH`。
 
-镜像首次启动时若缺少 MaaCore 会自动安装。仓库也提供 `docker-compose.yml`；运行 `docker compose up -d` 前请先修改其中的宿主机路径与 ADB 地址，并在 `environment` 中加入 `ADB_PATH=/usr/bin/adb`。
+镜像首次启动时若缺少 MaaCore 会自动安装。Go 镜像由 `go/Dockerfile` 构建。仓库也提供 `docker-compose.yml`；运行 `docker compose up -d` 前请先修改其中的宿主机路径与 ADB 地址，并在 `environment` 中加入 `ADB_PATH=/usr/bin/adb`。
 
 ## 配置
 
@@ -166,20 +170,22 @@ docker run -d \
 
 | 变量 | 用途 | 默认值 |
 | --- | --- | --- |
-| `PORT` | 服务端端口 | `3000` |
-| `ADB_PATH` | ADB 可执行文件 | `/opt/homebrew/bin/adb` |
+| `PORT` | HTTP 端口 | `3000` |
+| `LA_PLUMA_HOST` | 监听地址 | `0.0.0.0` |
+| `LA_PLUMA_DATA_DIR` | 配置、Run 存储与 MAA 任务文件 | `<工作目录>/server/data` |
+| `LA_PLUMA_CLIENT_DIST` | 构建后的 React 客户端 | `<工作目录>/client/dist` |
+| `LA_PLUMA_TOKEN` | 要求 `/api` 与 WebRTC 票据接口携带令牌 | 空，关闭鉴权 |
+| `LA_PLUMA_BASE_PATH` | 运行时挂载路径；需与构建时 `VITE_BASE_PATH` 一致 | `/` |
+| `LA_PLUMA_HTTPS_CERT_PATH` | 证书链；与私钥同时设置 | 空，HTTP |
+| `LA_PLUMA_HTTPS_KEY_PATH` | 私钥；与证书链同时设置 | 空，HTTP |
+| `ADB_PATH` | ADB 可执行文件 | 平台默认（macOS 为 `/opt/homebrew/bin/adb`，其它为 `adb`） |
 | `ADB_ADDRESS` | 默认 ADB 设备地址 | `127.0.0.1:16384` |
-| `MAA_CLI_PATH` | `maa` 可执行文件 | `maa`；Docker 为 `/usr/local/bin/maa` |
-| `MAA_CLIENT_TYPE` | 默认客户端 | `Official` |
-| `LA_PLUMA_TOKEN` | `/api`（公开的 `/api/maa-assets` 除外）与 WebRTC 票据入口要求 Bearer Token 或 `X-La-Pluma-Token` | 空，不启用 |
-| `LA_PLUMA_AGENT_RUN_STORE` | Run 与幂等记录存储 | `server/data/agent-runs.json` |
-| `LA_PLUMA_BASE_PATH` | 运行时挂载路径，需与构建时 `VITE_BASE_PATH` 一致 | `/` |
-| `LA_PLUMA_HTTPS_CERT_PATH` | 证书链，必须与私钥同时设置 | 空，使用 HTTP |
-| `LA_PLUMA_HTTPS_KEY_PATH` | 私钥，必须与证书链同时设置 | 空，使用 HTTP |
-| `LA_PLUMA_WEBRTC_DIR` | ScrcpyOverWebRTC 工作目录 | `$HOME/ScrcpyOverWebRTC` |
-| `LA_PLUMA_WEBRTC_PORT` | ScrcpyOverWebRTC 端口 | `8443` |
-| `LA_PLUMA_WEBRTC_VERSION` | 安装或升级使用的 Release；`latest` 跟随稳定版 | `latest` |
-| `LA_PLUMA_MAX_REALTIME_LOGS` | 实时日志内存上限 | `5000` |
+| `MAA_CLI_PATH` | `maa` 可执行文件 | `maa`；Docker 使用 `/usr/local/bin/maa` |
+| `MAA_CONFIG_DIR` | MAA profiles 与任务文件 | 平台 MAA 配置目录 |
+| `LA_PLUMA_WEBRTC_TURN_PORT` | 内嵌 TURN/STUN UDP 端口 | `3478` |
+| `LA_PLUMA_WEBRTC_TURN_PUBLIC_IP` | 向浏览器通告的中继地址 | 自动检测局域网 IPv4 |
+| `LA_PLUMA_WEBRTC_TURN_USERNAME` / `..._PASSWORD` | TURN 凭据 | `la-pluma` / 自动生成 |
+| `LA_PLUMA_WEBRTC_TURN_DISABLED` | 关闭内嵌 TURN | 未设置 |
 
 <details>
 <summary>HTTPS、子路径与 WebRTC 说明</summary>
@@ -233,16 +239,17 @@ La-pluma/
 │  ├─ src/services/api.ts  /api/agent 客户端
 │  ├─ src/stores/          Zustand 状态
 │  └─ public/              PWA 图标与 Logo
-├─ server/                 Express 后端
-│  ├─ routes/              agent.ts、agentContract.ts、operatorQuotes.ts、maaAssets.ts
-│  ├─ services/            MAA、调度、Run、WebRTC、养成、通知、数据
-│  ├─ data/                本地配置与运行数据（不提交）
-│  └─ server.ts            入口
+├─ go/                     Go 后端与 MyGo 桌面外壳
+│  ├─ cmd/server/          headless HTTP 服务
+│  ├─ cmd/desktop/         MyGo 桌面入口
+│  ├─ internal/app/        MAA、调度、Run、WebRTC、养成、通知
+│  ├─ internal/infra/      ADB、MAA、scrcpy 与 WebRTC 适配
+│  └─ internal/transport/  HTTP、Agent API 与信令
 ├─ screenshots/            README 图片
 ├─ docs/                   MAA 集成说明
-├─ Dockerfile
+├─ go/Dockerfile
 ├─ docker-compose.yml
-└─ package.json
+└─ package.json            仅客户端构建/测试脚本
 ```
 
 ## 文档
@@ -254,7 +261,7 @@ La-pluma/
 | `AGENTS.md` | 仓库规则与编码 Agent 的验证命令 |
 | `DESIGN.md` | 视觉与组件规范 |
 | `client/src/components/common/README.md` | 通用组件 props 与示例 |
-| `server/README.md` | 服务端工具与数据脚本 |
+| `go/README.md` | Go 后端安装、状态与已知缺口 |
 | `docs/maa.md` | MAA CLI/Core 集成现状、边界与已知缺口 |
 
 ## 许可证
@@ -265,5 +272,5 @@ MIT 许可证。
 
 - [MAA (MaaAssistantArknights)](https://github.com/MaaAssistantArknights/MaaAssistantArknights) — 自动化引擎。
 - [maa-cli](https://github.com/MaaAssistantArknights/maa-cli) — La Pluma 驱动的命令行接口。
-- [ScrcpyOverWebRTC](https://github.com/hqw700/ScrcpyOverWebRTC) — 浏览器预览与设备控制。
+- [Pion WebRTC](https://github.com/pion/webrtc) — 浏览器预览传输；设备画面由 scrcpy 提供。
 - [PenguinStats](https://penguin-stats.io/) 与 [PRTS](https://prts.maa.plus/) — 掉落数据与作业。

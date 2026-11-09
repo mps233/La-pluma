@@ -4,12 +4,14 @@ This file contains durable repository guidance for coding agents. Keep it concis
 
 ## Project Context
 
-La Pluma is a local web console for Arknights automation. The frontend configures, schedules, and visualizes work; the backend integrates with `maa` CLI, ADB, ScrcpyOverWebRTC, notifications, and local JSON configuration.
+La Pluma is a local web console for Arknights automation. The frontend configures, schedules, and visualizes work; the Go backend integrates with the `maa` CLI, ADB, scrcpy/WebRTC, notifications, and local JSON configuration. A MyGo desktop shell embeds the same client and backend.
 
 - `client/`: React, TypeScript, Vite, Tailwind CSS, Framer Motion, and Zustand.
-- `server/`: Node.js ESM, Express routes, service modules, schedulers, and external-process integration.
-- `server/routes/agent.ts`: primary `/api/agent` route surface.
-- `server/routes/agentContract.ts`: shared Agent API manifest/OpenAPI registry.
+- `go/`: Go backend and MyGo desktop shell.
+- `go/internal/transport/agentapi/handler.go`: primary `/api/agent` route surface.
+- `go/internal/contract/operations.go`: shared Agent API manifest/OpenAPI registry.
+- `go/internal/app/`: MAA, scheduler, Agent runs, WebRTC, training, notifications, and domain services.
+- `go/internal/infra/`: ADB, MAA, scrcpy, and Pion WebRTC adapters.
 - `client/src/services/api.ts`: frontend API access layer.
 - `client/src/components/common/`: shared UI primitives.
 - `client/src/index.css`: semantic design tokens and utility classes.
@@ -19,15 +21,16 @@ Read these before broad work:
 - `README.md` for architecture, setup, Agent API behavior, and deployment.
 - `DESIGN.md` for the authoritative visual and component rules.
 - `client/src/components/common/README.md` for component props and usage examples only; the visual rules live in the guide.
-- `server/README.md` for the server-side helpers and data scripts.
+- `go/README.md` and `go/docs/go-rewrite/PLAN.md` for backend setup, status, and known gaps.
 
 ## Working Rules
 
-- Use Node.js `22.12+`; this matches the current Vite/Vitest toolchain and CI expectations.
+- Use Go `1.27+` for the backend. Use Node.js `22.12+` only for the client build and tests.
+- Run `gofmt` on changed Go files. Keep Go packages small and follow the existing `internal/` layering.
 - Inspect the related source, tests, and `git status` before editing.
 - Keep changes focused on the requested behavior. Do not reformat or refactor unrelated code.
 - Preserve user changes in a dirty worktree and work with overlapping edits.
-- Follow the style already used by the file: strict TypeScript and path aliases in the client; ESM and semicolons in the server.
+- Follow the style already used by the file: strict TypeScript and path aliases in the client; idiomatic Go with explicit error codes in the backend.
 - Prefer existing components, services, helpers, and semantic abstractions over new parallel implementations.
 - Use structured parsers and JSON helpers instead of ad hoc string manipulation.
 - Do not treat README claims or external MAA data as proof of runtime behavior; verify the current implementation and data source.
@@ -52,16 +55,16 @@ Non-negotiables (these are pointers; `DESIGN.md` is authoritative if the summary
 ## Backend And Agent API
 
 - Add new backend capabilities to `/api/agent` unless there is a clear ownership reason not to.
-- Keep route handlers thin. Put reusable business and integration logic in `server/services`.
-- Use `server/utils/apiHelper.ts` so responses preserve the standard `success`, `message`, `data` or structured `error`, and `meta` envelope.
+- Keep handlers thin. Put reusable business and integration logic in `go/internal/app/`.
+- Use the error helpers in `go/internal/util/errors` so responses preserve the standard `success`, `message`, `data` or structured `error`, and `meta` envelope.
 - Agent errors need stable codes, useful details, an accurate HTTP status, and a truthful `retryable` value.
-- Public Agent API changes must update `server/routes/agentContract.ts` and the corresponding contract, route, and service tests. Manifest and OpenAPI must continue to derive from the same registry.
+- Public Agent API changes must update `go/internal/contract/operations.go` and the corresponding contract, route, and service tests. Manifest and OpenAPI must continue to derive from the same registry.
 - Long-running or consequential Agent actions must use the tracked Run lifecycle. Preserve `runId`, polling and stop links, idempotency, the shared MAA execution lease, and stable terminal outcomes.
 - An accepted Run and its idempotency record must be durably persisted before the external side effect starts. Persistence failure must fail closed instead of starting MAA.
 - Restored active Runs become non-retryable `interrupted`; they are not silently resumed. Preserve the current single-process storage limitation unless the storage design is intentionally replaced.
-- Never run multiple server instances against the same Agent Run JSON store. Persistence tests and smoke tests must isolate storage under `/tmp` with `LA_PLUMA_AGENT_RUN_STORE`.
+- The data directory is guarded by a cross-process lock; a second instance must fail with `LA_PLUMA_INSTANCE_LOCKED`. Do not remove that guard without replacing the single-writer storage design.
 - Do not bypass the shared MAA process lifecycle, stop escalation, readiness checks, or cleanup paths. Concurrent starts and start/stop races require deterministic tests.
-- Prefer `fileHelper` for JSON file operations and `createLogger` for structured service logs. Do not add routine `console.log` calls in services.
+- Prefer `jsonstore` for JSON file operations and the service logger for structured logs. Do not add routine `fmt.Println` calls in services.
 
 ## External Integrations And Side Effects
 
@@ -70,10 +73,11 @@ Non-negotiables (these are pointers; `DESIGN.md` is authoritative if the summary
 - MAA, ADB, activity copilots, notifications, schedulers, updates, and device control can affect a real account or device. Tests should use mocks, dry-run, or read-only preflight by default.
 - Do not start real combat, consume sanity/medicine/originium, send notifications, update MAA Core/CLI/resources, delete configuration, or run network data-generation scripts unless the user explicitly requests that side effect.
 - WebRTC startup must retain serialized readiness, authenticated device matching, timeout cleanup, and stop behavior. Do not leave child processes, ports, or timers running after tests.
+- The preview must tolerate maa-cli's automatic resource update failing on the network; keep the retry/error classification in the scheduler covered by tests.
 
 ## Data And Secrets
 
-- `server/data/`, `server/debug/`, `.env*`, logs, screenshots, and local Docker data are runtime or user-owned data. Do not commit, overwrite, or expose them.
+- The runtime data directory (`LA_PLUMA_DATA_DIR`, desktop user data), `go/build/`, `go/web/dist/`, `.env*`, logs, screenshots, and local Docker data are runtime or user-owned data. Do not commit, overwrite, or expose them.
 - Never print or commit tokens, cookies, Telegram chat IDs, device secrets, or authorization headers.
 - Generated game-data updates must record their source and be reviewed as data changes, not hidden inside unrelated feature work.
 
@@ -88,16 +92,16 @@ Non-negotiables (these are pointers; `DESIGN.md` is authoritative if the summary
 
 ## Commands
 
-Install and run from the repository root:
+Install client dependencies and run the backend:
 
 ```bash
-npm ci
 npm ci --prefix client
-npm ci --prefix server
 
-# Run in separate terminals for reliable process cleanup.
-npm run dev:server   # http://localhost:3000
-npm run dev:client   # http://localhost:5173, proxies /api to port 3000
+# Terminal 1: Go backend on http://localhost:3000
+cd go && go run ./cmd/server
+
+# Terminal 2: Vite client on http://localhost:5173
+npm run dev:client
 ```
 
 Use the narrowest relevant checks while iterating:
@@ -108,23 +112,22 @@ npm run type-check --prefix client
 npm run test --prefix client
 npm run build --prefix client
 
-npm run check --prefix server
-npm run check:repo --prefix server
-npm run typecheck --prefix server
-npm run test --prefix server
+cd go && go test ./...
+cd go && go vet ./...
 ```
 
 Run the complete repository verification before handing off broad, shared, or release-facing changes:
 
 ```bash
 npm run verify
+cd go && go test ./... && go vet ./...
 ```
 
-For a focused server test, run Node's test runner from `server/`, for example:
+For a focused Go test, run it from `go/`, for example:
 
 ```bash
-cd server
-node --experimental-strip-types --test services/__tests__/webrtcService.test.ts
+cd go
+go test ./internal/app/scheduler -run TestRecruitRetriesTransientMAAUpdateFailure -count=1
 ```
 
 ## Definition Of Done

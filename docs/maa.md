@@ -6,8 +6,8 @@
 
 | 组件 | 立项 | 当前 |
 | --- | --- | --- |
-| MaaCore | `v6.2.3` | `v6.20.1`（预览 `v6.21.0-beta.3`） |
-| maa-cli | `v0.7.0` | `v0.7.7`（预览 `0.8.0-nightly`） |
+| MaaCore | `v6.2.3` | `v6.21.4` |
+| maa-cli | `v0.7.0` | `v0.7.8` |
 
 本文只讨论能通过 maa-cli 或 MaaCore 任务 JSON / 回调使用的能力；WPF 界面独占功能标注为 `gui-only`，不要按 CLI 能力实现。
 
@@ -19,7 +19,7 @@
 
 | 项 | 现状 |
 | --- | --- |
-| 每日流程任务文件 | 仍走 `executeTaskFlowUnlocked`，逐任务结果归属未重做（`server/services/schedulerService.ts`） |
+| 每日流程任务文件 | 仍走 `executeTaskFlowUnlocked`，逐任务结果归属未重做（`go/internal/app/scheduler`） |
 | 开放日判断 | `condition` / `variants` 已支持透传，但硬编码的 `isStageOpenToday` 尚未替换（同文件） |
 | 真实 CLI fixture | 尚未用真实回调固化 Depot / OperBox / Recruit / Infrast / Mall / Award / Fight 的回归样本 |
 
@@ -35,9 +35,17 @@
 | 更新失败自动修复、任务时长上限、完成后动作 | WPF 独占 |
 | 6 星自动公招的 GUI 配置项 | Core 可用星级数组等价实现，GUI 配置项本身不可用 |
 | 干员识别读取一图流练度快照 | GUI-only；CLI 只能读 OperBox 回调 |
-| `SwitchTheme` / `OperProgress` | Core 有，但 maa-cli 0.7.7 的 `TaskType` 不支持，`maa run` 会报 unknown variant |
 | Copilot 新动作 / `elapsed_time` / `skill` 默认 0 | 由 Core 解析，项目原样透传，不改写作业 JSON |
 | 6.21 beta / 0.8 nightly 的 Breaking 项 | 不纳入当前实现；`maa://` 仅保留输入兼容 |
+
+## 技能专精（OperProgress）
+
+MaaCore 6.21.4 / maa-cli 0.7.8 已支持 `OperProgress` 任务类型；La Pluma 的专精队列在 `autoStartGame` 开启时，每次步骤前附加 `CloseDown` + `StartUp`，强制回到主界面，避免上一次导航停留在设置/场景页时 `OperProgress` 误点；关闭该选项后只保留 `StartUp`，游戏未启动时不会自动拉起。La Pluma 只通过 `plans` 执行单级专精：每项计划使用 `name`、可选 `role`，以及一个长度为 3 的 `skill_mastery` 数组，只把本次要推进的技能槽设为下一级，其余为 0。
+
+- `Completed` / `PrerequisiteTraining` 只表示本次训练已经发起，不代表专精完成；只有 `AlreadySatisfied` 表示目标等级已到达。
+- 一次运行最多启动一级；训练室必须空闲；MAA 只在加工站合成仓库已有材料，不刷关卡。
+- 2026-11-08 已用本机 maa-cli 0.7.8 / MaaCore 6.21.4 验证：`maa run --dry-run` 接受合法 plans、拒绝非法 `skill_mastery`；真机单步观察到 `AlreadySatisfied`（`skill_mastery:[3,0,0]`）、`Completed`（训练已开始）、`TrainingRoomBusy`（训练中）、`PrerequisiteNotMet` 与 `RecognitionFailed` 回调。`Completed` / `PrerequisiteTraining` 只代表训练已开始，`AlreadySatisfied` 才代表目标等级已到达。
+- 专精数据由历史 Node 脚本生成到 `operator-mastery.json`；Go 运行时不依赖该脚本，Node 后端已归档移除。
 
 ## 关键路径与数据源
 
@@ -53,9 +61,9 @@
 | MirrorChyan 快照 | `$(maa dir data)/mirrorchyan/MaaResource/current.json` 指向的目录 |
 | 配置/任务 | `maa dir config`（`profiles/`、`tasks/`） |
 | 日志/截图 | `maa dir log`（`asst.log`、`asst.bak.log`、`debug/`） |
-| 项目 Agent Run 存储 | `server/data/agent-runs.json`（可用 `LA_PLUMA_AGENT_RUN_STORE` 覆盖） |
+| 项目 Agent Run 存储 | `<LA_PLUMA_DATA_DIR>/agent-runs.json` |
 
-`server/data/paradox-operators.json` 和 `server/data/stages.json` 已不再参与运行时；悖论干员与关卡名都从 MaaResource 推导，两个旧文件仅保留为历史数据。
+`paradox-operators.json` 和 `stages.json` 旧文件已不再参与运行时；悖论干员与关卡名都从 MaaResource 推导，两个旧文件仅保留为历史数据。
 
 `/api/maa-assets/{item,avatar}/:key` 是只读的 MaaResource 图片路由，挂在 `LA_PLUMA_TOKEN` 鉴权之前（`<img>` 无法附带 bearer 头）；它只接受受限文件名，并且只暴露 `template/items` 与 `template/avatar`。
 
