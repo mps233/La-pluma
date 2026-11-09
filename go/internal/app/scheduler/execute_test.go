@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 )
 
 func TestSequentialExecution(t *testing.T) {
@@ -264,5 +266,38 @@ func TestMultiStageFightStopsAtSanityDepletion(t *testing.T) {
 	}
 	if result.Summary.SuccessCount != 1 || result.Summary.SkippedCount != 0 {
 		t.Fatalf("summary = %+v", result.Summary)
+	}
+}
+
+func TestRecruitRetriesTransientMAAUpdateFailure(t *testing.T) {
+	previousDelay := transientRetryDelay
+	transientRetryDelay = 10 * time.Millisecond
+	defer func() { transientRetryDelay = previousDelay }()
+
+	networkErr := apperrors.WithStatus("MAA_COMMAND_FAILED", "MAA 退出码 1", 500, true, map[string]any{
+		"stderr": "Error: Network error\nCaused by:\n    io: unexpected end of file\n",
+	})
+	executor := &fakeExecutor{taskErrorSequence: []error{networkErr, nil}}
+	service := newTestService(executor, Options{})
+	defer service.Close()
+
+	flow := []any{
+		map[string]any{
+			"id": "recruit-1", "name": "自动公招", "enabled": true,
+			"commandId": "recruit", "taskType": "Recruit", "params": map[string]any{},
+		},
+	}
+	result := service.StartDailyFlow(context.Background(), DailyFlowRequest{ScheduleID: "recruit-retry", TaskFlow: flow})
+	if !result.Success || result.Summary.FailedCount != 0 || result.Summary.SuccessCount != 1 {
+		t.Fatalf("result = %+v", result)
+	}
+	attempts := 0
+	for _, call := range executor.callsSnapshot() {
+		if call.Kind == "task" {
+			attempts++
+		}
+	}
+	if attempts != 2 {
+		t.Fatalf("recruit attempts = %d, want 2", attempts)
 	}
 }

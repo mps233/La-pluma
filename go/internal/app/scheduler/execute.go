@@ -563,6 +563,14 @@ func (s *Service) executeSimpleCommand(ctx context.Context, e *flowExecution, ta
 	}
 
 	stdout, _, _, runErr := s.runSpec(ctx, spec, task)
+	if runErr != nil && isTransientMAAUpdateFailure(runErr) && ctx.Err() == nil {
+		s.logger.Warn("MAA 资源更新网络失败，重试任务", "taskName", name, "error", runErr.Error())
+		select {
+		case <-time.After(transientRetryDelay):
+			stdout, _, _, runErr = s.runSpec(ctx, spec, task)
+		case <-ctx.Done():
+		}
+	}
 	if runErr != nil {
 		if s.stopRequested(ctx) {
 			return true
@@ -1050,4 +1058,15 @@ func (s *Service) executeMultiStage(ctx context.Context, e *flowExecution, task 
 		return true
 	}
 	return !s.delay(ctx, 2*time.Second)
+}
+
+var transientRetryDelay = 2 * time.Second
+
+// isTransientMAAUpdateFailure detects maa-cli's automatic resource update
+// failing on the network before MaaCore starts. The next attempt usually
+// succeeds, and no game action has happened yet.
+func isTransientMAAUpdateFailure(err error) bool {
+	_, stderr := errorOutput(err)
+	text := strings.ToLower(stderr)
+	return strings.Contains(text, "network error") || strings.Contains(text, "unexpected end of file")
 }

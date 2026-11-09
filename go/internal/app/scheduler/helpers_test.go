@@ -25,16 +25,17 @@ type fakeCall struct {
 }
 
 type fakeExecutor struct {
-	mu            sync.Mutex
-	calls         []fakeCall
-	stdout        string
-	stderr        string
-	commandErrors map[string]error
-	taskError     error
-	blockCommands map[string]bool
-	started       chan string
-	stopCount     int
-	runSequence   int
+	mu                sync.Mutex
+	calls             []fakeCall
+	stdout            string
+	stderr            string
+	commandErrors     map[string]error
+	taskError         error
+	taskErrorSequence []error
+	blockCommands     map[string]bool
+	started           chan string
+	stopCount         int
+	runSequence       int
 }
 
 func (f *fakeExecutor) RunCommand(ctx context.Context, command string, args []string, taskName, taskType string, wait bool) (domainrun.DTO, error) {
@@ -88,6 +89,10 @@ func (f *fakeExecutor) RunTask(ctx context.Context, taskConfig map[string]any, w
 	f.runSequence++
 	sequence := f.runSequence
 	taskErr := f.taskError
+	if len(f.taskErrorSequence) > 0 {
+		taskErr = f.taskErrorSequence[0]
+		f.taskErrorSequence = f.taskErrorSequence[1:]
+	}
 	stdout, stderr := f.stdout, f.stderr
 	f.mu.Unlock()
 

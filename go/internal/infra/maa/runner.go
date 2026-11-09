@@ -150,7 +150,7 @@ func (r *Runner) Exec(ctx context.Context, command string, args []string, option
 		if waitErr != nil && exitCode < 0 {
 			task.result.Err = apperrors.WithStatus("MAA_PROCESS_EXITED", "MAA 进程异常退出", 503, true, map[string]any{"error": waitErr.Error()})
 		} else if exitCode != 0 && !task.stopped {
-			task.result.Err = apperrors.WithStatus("MAA_COMMAND_FAILED", fmt.Sprintf("MAA 退出码 %d", exitCode), 500, true, map[string]any{"exitCode": exitCode, "stderr": stderr.String()})
+			task.result.Err = apperrors.WithStatus("MAA_COMMAND_FAILED", fmt.Sprintf("MAA 退出码 %d", exitCode), 500, true, map[string]any{"exitCode": exitCode, "stdout": stdout.String(), "stderr": stderr.String()})
 		}
 		task.mu.Unlock()
 		close(task.done)

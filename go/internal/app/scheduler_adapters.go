@@ -7,7 +7,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/mps233/la-pluma/go/internal/app/activity"
 	runapp "github.com/mps233/la-pluma/go/internal/app/agentrun"
@@ -97,7 +96,7 @@ func replaceActivityCode(service *activity.Service, stage, clientType string) st
 	if len(match) != 2 || service == nil {
 		return stage
 	}
-	info, err := service.GetStageActivityInfo(context.Background(), clientType, time.Now())
+	info, err := service.GetStageActivityInfo(context.Background(), clientType, service.Now())
 	if err != nil || info == nil || strings.TrimSpace(info.Code) == "" {
 		return stage
 	}

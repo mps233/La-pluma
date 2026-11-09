@@ -185,6 +185,15 @@ func NewWithOptions(options Options) *Service {
 	return service
 }
 
+// Now returns the service clock. Scheduler adapters use it so activity-stage
+// resolution follows the same injected clock as activity selection.
+func (s *Service) Now() time.Time {
+	if s == nil || s.now == nil {
+		return time.Now()
+	}
+	return s.now()
+}
+
 func (s *Service) Paths() config.Paths        { return s.paths }
 func (s *Service) Fallback() *FallbackService { return s.fallback }
 func (s *Service) Resource() *ResourceIndex   { return s.resource }
