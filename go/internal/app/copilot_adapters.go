@@ -12,8 +12,9 @@ import (
 )
 
 // battleLogTailLimit bounds each read. MaaCore appends many trace lines per
-// second, but the latest battle counter is always near the end of the file.
-const battleLogTailLimit = 256 * 1024
+// second, but the latest battle counter and the current stage-load event are
+// near the end of the file.
+const battleLogTailLimit = 1024 * 1024
 
 // copilotBattleSampler reads MaaCore's own battle counter OCR from asst.log.
 // The checkpoint is the log size at task start, so a previous stage's final
@@ -34,11 +35,16 @@ func (s copilotBattleSampler) Checkpoint(context.Context) string {
 	return strconv.FormatInt(info.Size(), 10)
 }
 
-func (s copilotBattleSampler) SampleBattleProgress(_ context.Context, checkpoint string, expectedTotal *int) (*copilot.BattleProgress, error) {
+func (s copilotBattleSampler) ReadLogSince(_ context.Context, checkpoint string) string {
 	text, err := readBattleLogTail(s.path, checkpoint)
 	if err != nil {
-		return nil, err
+		return ""
 	}
+	return text
+}
+
+func (s copilotBattleSampler) SampleBattleProgress(ctx context.Context, checkpoint string, expectedTotal *int) (*copilot.BattleProgress, error) {
+	text := s.ReadLogSince(ctx, checkpoint)
 	battle := copilot.ParseBattleProgress(text)
 	if battle == nil {
 		return nil, nil

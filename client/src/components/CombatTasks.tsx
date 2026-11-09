@@ -912,7 +912,7 @@ export default function CombatTasks() {
         }
         const step = status.data?.currentStep
         const total = status.data?.totalSteps
-        const stageLabel = `${stage}${typeof step === 'number' && typeof total === 'number' ? `（${step}/${total}）` : ''}`
+        const stageLabel = `${stage}${typeof step === 'number' && typeof total === 'number' && step >= 0 && total > 0 ? `（${step}/${total}）` : ''}`
         setStatusMessage(`正在执行 ${stageLabel}`)
       } catch {
         // Keep the previous status while the task query is temporarily unavailable.
@@ -1205,7 +1205,7 @@ export default function CombatTasks() {
         if (!stage) return
         const step = status.data?.currentStep
         const total = status.data?.totalSteps
-        const stageLabel = `${stage}${typeof step === 'number' && typeof total === 'number' ? `（${step}/${total}）` : ''}`
+        const stageLabel = `${stage}${typeof step === 'number' && typeof total === 'number' && step >= 0 && total > 0 ? `（${step}/${total}）` : ''}`
         setStatusMessage(`正在执行 ${stageLabel}`)
       } catch {
         // Keep the previous status while the task query is temporarily unavailable.

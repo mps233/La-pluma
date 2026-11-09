@@ -405,13 +405,13 @@ func taskStatusPayload(application *app.App, task app.TaskStatus, schedule sched
 				}
 			}
 			if currentStep <= 0 {
-				if value, ok := progress["currentStep"].(float64); ok {
-					currentStep = int(value)
+				if _, exists := progress["currentStep"]; exists {
+					currentStep = intField(progress, "currentStep")
 				}
 			}
 			if totalSteps <= 0 {
-				if value, ok := progress["totalSteps"].(float64); ok {
-					totalSteps = int(value)
+				if _, exists := progress["totalSteps"]; exists {
+					totalSteps = intField(progress, "totalSteps")
 				}
 			}
 		}

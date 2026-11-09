@@ -620,9 +620,16 @@ type fakeBattleSampler struct {
 	mu         sync.Mutex
 	progresses []*BattleProgress
 	index      int
+	logText    string
 }
 
 func (f *fakeBattleSampler) Checkpoint(context.Context) string { return "checkpoint" }
+
+func (f *fakeBattleSampler) ReadLogSince(context.Context, string) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.logText
+}
 
 func (f *fakeBattleSampler) SampleBattleProgress(context.Context, string, *int) (*BattleProgress, error) {
 	f.mu.Lock()
@@ -796,5 +803,56 @@ func TestExecutePlanAddsStartUpBeforeFirstCopilotGroup(t *testing.T) {
 	secondTasks := taskList(t, executor.taskConfig(1))
 	if len(secondTasks) != 1 || asRecord(secondTasks[0])["type"] != "Copilot" {
 		t.Fatalf("later group tasks = %#v", secondTasks)
+	}
+}
+
+func TestExecutePlanEmitsLiveCopilotStage(t *testing.T) {
+	done := make(chan struct{})
+	var once sync.Once
+	var stageEvent map[string]any
+	var stageResults []ProgressEntryResult
+	executor := &fakeExecutionExecutor{}
+	executor.runTask = func(context.Context, map[string]any) (domainrun.DTO, error) {
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Error("live copilot stage was not emitted")
+		}
+		return domainrun.DTO{State: domainrun.StatusSucceeded}, nil
+	}
+	fixture := newExecutionFixture(t, executor, &fakeLeaseRunner{})
+	plan := dynamicExecutionPlan()
+	plan.Items[1].PresetFormation = false
+	plan.Entries[1].PresetFormation = false
+	filename := filepath.Join(fixture.configDir, "copilot-plans", "1", "1-11-normal-1.json")
+	fixture.service.battleSampler = &fakeBattleSampler{
+		logText: `{"details":{"file_name":"` + filename + `"},"what":"CopilotListLoadTaskFileSuccess"}`,
+	}
+	fixture.service.battleInterval = 10 * time.Millisecond
+
+	lifecycle := &ExecutionLifecycle{
+		RunID: "run-live-stage",
+		OnProgress: func(progress map[string]any, results []ProgressEntryResult) {
+			if progress["currentStage"] != "T-S-1" {
+				return
+			}
+			stageEvent = progress
+			stageResults = results
+			once.Do(func() { close(done) })
+		},
+	}
+	if _, err := fixture.service.ExecutePlan(context.Background(), PlanExecution{
+		SetID:     "1",
+		Raid:      "normal",
+		Plan:      plan,
+		Lifecycle: lifecycle,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if stageEvent == nil || stageEvent["currentStep"] != 2 || stageEvent["totalSteps"] != 2 {
+		t.Fatalf("stage event = %#v", stageEvent)
+	}
+	if len(stageResults) != 2 || stageResults[0].Status != ProgressSuccess || stageResults[1].Status != ProgressRunning {
+		t.Fatalf("stage results = %#v", stageResults)
 	}
 }

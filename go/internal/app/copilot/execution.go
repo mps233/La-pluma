@@ -197,7 +197,7 @@ func (s *Service) ExecutePlan(ctx context.Context, request PlanExecution) (*Exec
 		"phase":       "starting",
 		"message":     "准备执行",
 		"currentStep": 0,
-		"totalSteps":  len(pending),
+		"totalSteps":  len(uniqueItemSteps(pending)),
 	})
 
 	copilotOptions := ParseCopilotOptions(options)
@@ -270,7 +270,7 @@ func (s *Service) ExecuteSelectedEntries(ctx context.Context, request EntriesExe
 		"phase":       "starting",
 		"message":     "准备执行",
 		"currentStep": 0,
-		"totalSteps":  len(entries),
+		"totalSteps":  len(uniqueItemSteps(entries)),
 	})
 
 	execution := dynamicExecution{
@@ -405,6 +405,8 @@ func (s *Service) executeDynamicEntries(ctx context.Context, execution dynamicEx
 
 	ordered := OrderEntriesForNavigation(execution.entries, execution.navigationStage)
 	groups := groupPlanEntries(ordered)
+	stepByItem := uniqueItemSteps(ordered)
+	totalSteps := len(stepByItem)
 	results := make([]ExecutionEntryResult, 0, len(ordered))
 	copilotOptions := ParseCopilotOptions(execution.options)
 	completed := execution.completed
@@ -519,8 +521,8 @@ func (s *Service) executeDynamicEntries(ctx context.Context, execution dynamicEx
 			"phase":        "running",
 			"message":      "正在执行作业集",
 			"currentStage": group.entries[0].DisplayStage,
-			"currentStep":  len(results) + 1,
-			"totalSteps":   len(ordered),
+			"currentStep":  stepByItem[group.entries[0].ItemIndex],
+			"totalSteps":   totalSteps,
 		}
 		emitExecutionProgress(execution.lifecycle, execution.tracker, baseProgress)
 
@@ -562,7 +564,7 @@ func (s *Service) executeDynamicEntries(ctx context.Context, execution dynamicEx
 			}
 		}
 
-		stopBattleProgress := s.startBattleProgressSampler(ctx, execution.lifecycle, baseProgress)
+		stopBattleProgress := s.startExecutionProgressSampler(ctx, execution.lifecycle, execution.tracker, baseProgress, progressItems, stepByItem, totalSteps)
 		dto, err := s.executor.RunTask(ctx, taskConfig, true)
 		if err != nil && apperrors.IsTransientMAAUpdateFailure(err) && ctx.Err() == nil {
 			if s.logger != nil {
@@ -695,6 +697,19 @@ func selectedExecutionData(planID, name, source string, results []ExecutionEntry
 		"loopTimes": loopTimes,
 		"source":    source,
 	}
+}
+
+// uniqueItemSteps numbers the plan's distinct items in execution order, so
+// the UI's step counter matches the stage rows even when a stage has both a
+// normal and a raid entry.
+func uniqueItemSteps(entries []PlanEntry) map[int]int {
+	steps := map[int]int{}
+	for _, entry := range entries {
+		if _, exists := steps[entry.ItemIndex]; !exists {
+			steps[entry.ItemIndex] = len(steps) + 1
+		}
+	}
+	return steps
 }
 
 func groupPlanEntries(entries []PlanEntry) []planEntryGroup {
@@ -957,10 +972,11 @@ func (s *Service) missingStageError(entries []PlanEntry) *apperrors.Error {
 	)
 }
 
-// startBattleProgressSampler emits the battle counter MaaCore writes to its
-// trace log while the dynamic MAA task runs. It returns a stop function that
-// waits for the sampler goroutine, so the next stage cannot reuse its counter.
-func (s *Service) startBattleProgressSampler(ctx context.Context, lifecycle *ExecutionLifecycle, base map[string]any) func() {
+// startExecutionProgressSampler emits the current copilot stage and the battle
+// counter MaaCore writes to its trace log while the dynamic MAA task runs. It
+// returns a stop function that waits for the sampler goroutine, so the next
+// group cannot reuse its state.
+func (s *Service) startExecutionProgressSampler(ctx context.Context, lifecycle *ExecutionLifecycle, tracker *ProgressTracker, base map[string]any, items []StageProgressItem, stepByItem map[int]int, totalSteps int) func() {
 	noop := func() {}
 	if s == nil || s.battleSampler == nil || lifecycle == nil || lifecycle.OnProgress == nil || !BattleProgressEnabled() {
 		return noop
@@ -977,27 +993,59 @@ func (s *Service) startBattleProgressSampler(ctx context.Context, lifecycle *Exe
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		lastKills, lastTotal := -1, -1
+		lastStageIndex := -1
+		lastStage := ""
+		lastStep := 0
 		sample := func() {
 			if sampleCtx.Err() != nil {
 				return
 			}
-			battle, err := s.battleSampler.SampleBattleProgress(sampleCtx, checkpoint, nil)
-			if err != nil || battle == nil {
-				return
-			}
-			// A new stage can reuse the previous stage's enemy total, so the
-			// pair is compared as a whole; a reset to 0 / total is a real
-			// update, not a stale frame.
-			if battle.Kills == lastKills && battle.Total == lastTotal {
-				return
-			}
-			lastKills, lastTotal = battle.Kills, battle.Total
-			progress := make(map[string]any, len(base)+1)
+			progress := make(map[string]any, len(base)+2)
 			for key, value := range base {
 				progress[key] = value
 			}
-			progress["battle"] = map[string]any{"kills": battle.Kills, "total": battle.Total}
-			lifecycle.OnProgress(progress, nil)
+			changed := false
+			if text := s.battleSampler.ReadLogSince(sampleCtx, checkpoint); text != "" {
+				if stage := FindCopilotStageProgress(items, text); stage != nil && stage.Index >= 0 && stage.Index != lastStageIndex {
+					lastStageIndex = stage.Index
+					lastStage = stage.DisplayStage
+					if stage.Index < len(items) {
+						if entry := items[stage.Index].Entry; entry != nil {
+							if step, ok := stepByItem[entry.ItemIndex]; ok {
+								lastStep = step
+							}
+							if tracker != nil {
+								tracker.MarkRunning(*entry)
+							}
+						}
+					}
+					changed = true
+				}
+			}
+			if lastStageIndex >= 0 {
+				progress["currentStage"] = lastStage
+				if lastStep > 0 {
+					progress["currentStep"] = lastStep
+				}
+				progress["totalSteps"] = totalSteps
+			}
+			battle, err := s.battleSampler.SampleBattleProgress(sampleCtx, checkpoint, nil)
+			if err == nil && battle != nil && (battle.Kills != lastKills || battle.Total != lastTotal) {
+				// A new stage can reuse the previous stage's enemy total, so
+				// the pair is compared as a whole; a reset to 0 / total is a
+				// real update, not a stale frame.
+				lastKills, lastTotal = battle.Kills, battle.Total
+				progress["battle"] = map[string]any{"kills": battle.Kills, "total": battle.Total}
+				changed = true
+			}
+			if !changed {
+				return
+			}
+			var snapshot []ProgressEntryResult
+			if tracker != nil {
+				snapshot = tracker.Snapshot()
+			}
+			lifecycle.OnProgress(progress, snapshot)
 		}
 		sample()
 		for {

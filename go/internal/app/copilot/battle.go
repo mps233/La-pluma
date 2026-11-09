@@ -16,12 +16,12 @@ type BattleProgress struct {
 	Total int `json:"total"`
 }
 
-// BattleProgressSampler reads the MAA battle counter from the asst.log tail.
-// Checkpoint records the log position at task start; SampleBattleProgress
-// reads only lines at or after it. expectedTotal, when non-nil, rejects a
-// counter from another stage.
+// BattleProgressSampler reads the MAA battle counter and the current copilot
+// stage from the asst.log tail. Checkpoint records the log position at task
+// start; the read and sample methods inspect only lines at or after it.
 type BattleProgressSampler interface {
 	Checkpoint(ctx context.Context) string
+	ReadLogSince(ctx context.Context, checkpoint string) string
 	SampleBattleProgress(ctx context.Context, checkpoint string, expectedTotal *int) (*BattleProgress, error)
 }
 
