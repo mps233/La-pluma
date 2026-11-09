@@ -295,7 +295,9 @@ func startDesktop() {
 		listener:    listener,
 		tokenHolder: tokenHolder,
 		tokenEnv:    tokenFromEnv,
-		baseURL:     "http://" + listener.Addr().String() + "/",
+		// The embedded window always loads loopback, even when the server is
+		// bound to all interfaces for a phone on the LAN.
+		baseURL: fmt.Sprintf("http://127.0.0.1:%d/", desktopPort),
 	}
 	runtimeState.server = &http.Server{
 		Handler:           handler,
@@ -644,8 +646,10 @@ func (r *desktopRuntime) showWindow() {
 		trafficLightPosition = &mygo.Point{X: 22, Y: 22}
 	}
 	window := mygo.NewWindow(mygo.WindowOptions{
-		Title:                "La Pluma",
-		URL:                  r.baseURL,
+		Title: "La Pluma",
+		// A fresh query bypasses a WKWebView document cache that may still
+		// point at asset hashes from an earlier build.
+		URL:                  fmt.Sprintf("%s?desktop=%d", r.baseURL, time.Now().UnixMilli()),
 		Width:                1180,
 		Height:               800,
 		MinWidth:             980,

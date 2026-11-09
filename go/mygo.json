@@ -14,6 +14,9 @@
     "infoPlist": {
       "NSAppTransportSecurity": {
         "NSAllowsLocalNetworking": true
+      },
+      "LSEnvironment": {
+        "LA_PLUMA_HOST": "0.0.0.0"
       }
     }
   }
