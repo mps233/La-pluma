@@ -514,6 +514,24 @@ func (s *Service) executeDynamicEntries(ctx context.Context, execution dynamicEx
 		}
 		emitExecutionProgress(execution.lifecycle, execution.tracker, baseProgress)
 
+		if stageErr := s.missingStageError(group.entries); stageErr != nil {
+			groupResults, _ := settleGroupFailure(execution.tracker, group.entries, progressItems, "", executionErrorMessage(stageErr), false)
+			results = append(results, groupResults...)
+			data := execution.data(results, completed)
+			data["success"] = false
+			emitExecutionProgress(execution.lifecycle, execution.tracker, map[string]any{
+				"setId":   execution.planID,
+				"name":    execution.name,
+				"phase":   "failed",
+				"message": executionErrorMessage(stageErr),
+			})
+			return &ExecutionResult{
+				Results:     append([]ExecutionEntryResult{}, results...),
+				TaskResults: execution.tracker.Snapshot(),
+				Data:        data,
+			}, executionRunError(stageErr, false, data)
+		}
+
 		if group.presetFormation {
 			if err := EnsurePresetFormationResource(s.resource.ResourceDir(), configDir); err != nil {
 				groupResults, _ := settleGroupFailure(execution.tracker, group.entries, progressItems, "", executionErrorMessage(err), false)
@@ -881,6 +899,42 @@ func emitExecutionStarted(lifecycle *ExecutionLifecycle) {
 	if lifecycle != nil && lifecycle.OnStarted != nil {
 		lifecycle.OnStarted()
 	}
+}
+
+// missingStageError rejects a copilot group whose stages are absent from the
+// installed MAA resource. MaaCore otherwise fails later with "invalid params"
+// and an opaque exit code, which gives the user no actionable next step.
+func (s *Service) missingStageError(entries []PlanEntry) *apperrors.Error {
+	if s == nil || s.resource == nil {
+		return nil
+	}
+	missing := make([]string, 0)
+	for _, entry := range entries {
+		stageID := strings.TrimSpace(entry.StageID)
+		if stageID == "" || s.resource.HasStageTile(stageID) {
+			continue
+		}
+		label := strings.TrimSpace(entry.DisplayStage)
+		if label == "" {
+			label = stageID
+		} else {
+			label += "（" + stageID + "）"
+		}
+		missing = append(missing, label)
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return apperrors.WithStatus(
+		"MAA_COPILOT_STAGE_UNAVAILABLE",
+		"当前 MAA 资源不包含作业关卡 "+strings.Join(missing, "、")+"，请先热更新 MAA 资源后重试",
+		http.StatusConflict,
+		false,
+		map[string]any{
+			"stages": missing,
+			"action": "maa hot-update",
+		},
+	)
 }
 
 // startBattleProgressSampler emits the battle counter MaaCore writes to its

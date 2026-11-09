@@ -692,3 +692,32 @@ func TestExecutePlanEmitsBattleProgress(t *testing.T) {
 		t.Fatalf("battle progress = %#v", received)
 	}
 }
+
+func TestExecutePlanRejectsStageMissingFromResource(t *testing.T) {
+	executor := &fakeExecutionExecutor{}
+	fixture := newExecutionFixture(t, executor, &fakeLeaseRunner{})
+	writeJSONFile(t, filepath.Join(fixture.maaDir, "resource", "Arknights-Tile-Pos", "other-1.json"), map[string]any{"code": "OTHER-1"})
+	plan := dynamicExecutionPlan()
+	plan.Items = plan.Items[:1]
+	plan.Entries = plan.Entries[:1]
+
+	_, err := fixture.service.ExecutePlan(context.Background(), PlanExecution{
+		SetID:     "1",
+		Raid:      "normal",
+		Plan:      plan,
+		Lifecycle: &ExecutionLifecycle{RunID: "run-missing-stage"},
+	})
+	if err == nil {
+		t.Fatal("expected missing stage error")
+	}
+	if code := appErrorCode(t, err); code != "MAA_COPILOT_STAGE_UNAVAILABLE" {
+		t.Fatalf("error code = %s", code)
+	}
+	appError, _ := apperrors.As(err)
+	if !strings.Contains(appError.Message, "act_test_01") {
+		t.Fatalf("message = %s", appError.Message)
+	}
+	if executor.taskCount() != 0 {
+		t.Fatal("MAA must not start when the stage is missing")
+	}
+}

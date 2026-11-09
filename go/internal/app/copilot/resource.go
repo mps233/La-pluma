@@ -65,6 +65,29 @@ func NewResourceIndex(paths config.Paths) *ResourceIndex {
 
 func (r *ResourceIndex) ResourceDir() string { return r.resourceDir }
 
+// HasStageTile reports whether the installed MAA resource has tile metadata
+// for the internal stage id. A missing Arknights-Tile-Pos directory means the
+// resource cannot be inspected, so execution is not blocked on it; an existing
+// directory without the stage is a stale resource MaaCore would reject.
+func (r *ResourceIndex) HasStageTile(stageID string) bool {
+	stageID = strings.TrimSpace(stageID)
+	if stageID == "" {
+		return true
+	}
+	tileDir := filepath.Join(r.resourceDir, tilePosDirName)
+	if info, err := os.Stat(tileDir); err != nil || !info.IsDir() {
+		return true
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, name := range r.tileFilenamesLocked(tileDir) {
+		if strings.HasPrefix(name, stageID+"-") || strings.HasPrefix(name, stageID+"#") {
+			return true
+		}
+	}
+	return false
+}
+
 // StageByCode looks up a stage record in MaaResource stages.json by display
 // code (case-insensitive). It mirrors getMaaStageByCode.
 func (r *ResourceIndex) StageByCode(code string) (map[string]any, bool, error) {

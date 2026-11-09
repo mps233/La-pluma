@@ -150,7 +150,8 @@ func (r *Runner) Exec(ctx context.Context, command string, args []string, option
 		if waitErr != nil && exitCode < 0 {
 			task.result.Err = apperrors.WithStatus("MAA_PROCESS_EXITED", "MAA 进程异常退出", 503, true, map[string]any{"error": waitErr.Error()})
 		} else if exitCode != 0 && !task.stopped {
-			task.result.Err = apperrors.WithStatus("MAA_COMMAND_FAILED", fmt.Sprintf("MAA 退出码 %d", exitCode), 500, true, map[string]any{"exitCode": exitCode, "stdout": stdout.String(), "stderr": stderr.String()})
+			message, retryable := maaFailureMessage(exitCode, stderr.String())
+			task.result.Err = apperrors.WithStatus("MAA_COMMAND_FAILED", message, 500, retryable, map[string]any{"exitCode": exitCode, "stdout": stdout.String(), "stderr": stderr.String()})
 		}
 		task.mu.Unlock()
 		close(task.done)
@@ -324,4 +325,15 @@ func (w *lineWriter) emit(line string) {
 		return
 	}
 	w.onLine(w.stream, line)
+}
+
+// maaFailureMessage turns the CLI exit into a user-facing message. MaaCore
+// rejects a Copilot task whose stages are missing from the resource with
+// "invalid params"; retrying the same command cannot help until the resource
+// is refreshed.
+func maaFailureMessage(exitCode int, stderr string) (string, bool) {
+	if strings.Contains(stderr, "invalid params") {
+		return "MAA 拒绝了任务参数，请先热更新 MAA 资源或检查作业配置", false
+	}
+	return fmt.Sprintf("MAA 退出码 %d", exitCode), true
 }

@@ -307,3 +307,20 @@ func TestBuildPlanUncachedDoesNotUseCache(t *testing.T) {
 		t.Fatalf("uncached requests = %d, want %d", requests.Load(), before+4)
 	}
 }
+
+func TestHasStageTileDetectsStaleResource(t *testing.T) {
+	maaDataDir := t.TempDir()
+	tileDir := filepath.Join(maaDataDir, "resource", "Arknights-Tile-Pos")
+	writeJSONFile(t, filepath.Join(tileDir, "act_ex01-activities-act_ex01.json"), map[string]any{"code": "EX-1"})
+	index := NewResourceIndex(config.Paths{MaaDataDir: maaDataDir})
+	if !index.HasStageTile("act_ex01") {
+		t.Fatal("existing tile metadata must be found")
+	}
+	if index.HasStageTile("act_ex02") {
+		t.Fatal("missing tile metadata must be reported")
+	}
+	missing := NewResourceIndex(config.Paths{MaaDataDir: t.TempDir()})
+	if !missing.HasStageTile("act_ex01") {
+		t.Fatal("a missing tile directory must not block execution")
+	}
+}

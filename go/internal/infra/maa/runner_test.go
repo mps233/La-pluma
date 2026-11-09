@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -106,5 +107,16 @@ func TestMissingCLI(t *testing.T) {
 	runner := New(filepath.Join(t.TempDir(), "missing-maa"), testLogger())
 	if _, err := runner.Exec(context.Background(), "run", nil, ExecOptions{Wait: true}); err == nil || errorCode(err) != "MAA_CLI_NOT_FOUND" {
 		t.Fatalf("expected CLI not found, got %v", err)
+	}
+}
+
+func TestMaaFailureMessageHintsInvalidParams(t *testing.T) {
+	message, retryable := maaFailureMessage(1, "Error: Failed to add task with params: invalid params")
+	if retryable || !strings.Contains(message, "热更新") {
+		t.Fatalf("message = %q, retryable = %v", message, retryable)
+	}
+	message, retryable = maaFailureMessage(1, "network error")
+	if !retryable || message != "MAA 退出码 1" {
+		t.Fatalf("message = %q, retryable = %v", message, retryable)
 	}
 }
