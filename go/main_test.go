@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mps233/la-pluma/go/internal/app"
@@ -64,5 +65,32 @@ func TestStopAllTasksIsSafeWhenIdle(t *testing.T) {
 	}
 	if status.Campaign.Status == mastery.CampaignRunning {
 		t.Fatalf("mastery campaign still running: %+v", status)
+	}
+}
+
+func TestNormalizeDesktopAccessToken(t *testing.T) {
+	cases := []struct {
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{"  abcdefgh12345678  ", "abcdefgh12345678", false},
+		{"Bearer abcdefgh12345678", "abcdefgh12345678", false},
+		{"short", "", true},
+		{"has space token", "", true},
+		{"中文令牌abcdefgh", "", true},
+		{strings.Repeat("a", 129), "", true},
+	}
+	for _, testCase := range cases {
+		got, err := normalizeDesktopAccessToken(testCase.input)
+		if testCase.wantErr {
+			if err == nil {
+				t.Fatalf("input %q: expected error", testCase.input)
+			}
+			continue
+		}
+		if err != nil || got != testCase.want {
+			t.Fatalf("input %q: got %q, err %v", testCase.input, got, err)
+		}
 	}
 }

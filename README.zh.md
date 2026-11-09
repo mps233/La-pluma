@@ -78,7 +78,7 @@ La Pluma 是一个自托管的《明日方舟》自动化 Web 控制台。它把
 
 - **Telegram 完成通知** — 默认关闭。开启渠道并保存 Bot Token 与 Chat ID 后，会收到逐任务结果、掉落、上报、警告、跳过与失败汇总。只有流程执行过领取奖励步骤时才附带截图；图片超过 10 MB 或发送失败时回退为文字。
 - **Bot 命令** — `/status`、`/screenshot`、`/startup`、`/closedown`、`/fight`、`/roguelike`、`/copilot`、`/stop`、`/run`（运行已保存流程）；也可直接发送 `prts://` 链接，或使用中文关键词别名。只接受配置的 Chat ID 或用户 ID。
-- **本地凭据** — Bot Token 与 Chat ID 保存在本地通知配置中。控制台若可被 localhost 以外访问，请设置 `LA_PLUMA_TOKEN` 并避免暴露到不可信网络。
+- **本地凭据** — Bot Token 与 Chat ID 保存在本地通知配置中。桌面版会生成并保存访问令牌（可在「配置 → 访问令牌」修改或复制）；设置 `LA_PLUMA_TOKEN` 可覆盖它。控制台若可被 localhost 以外访问，请避免暴露到不可信网络。
 
 ### Agent API
 
@@ -174,7 +174,7 @@ docker run -d \
 | `LA_PLUMA_HOST` | 监听地址 | `0.0.0.0` |
 | `LA_PLUMA_DATA_DIR` | 配置、Run 存储与 MAA 任务文件 | `<工作目录>/server/data` |
 | `LA_PLUMA_CLIENT_DIST` | 构建后的 React 客户端 | `<工作目录>/client/dist` |
-| `LA_PLUMA_TOKEN` | 要求 `/api` 与 WebRTC 票据接口携带令牌 | 空，关闭鉴权 |
+| `LA_PLUMA_TOKEN` | 要求 `/api` 与 WebRTC 票据接口携带令牌（headless；覆盖桌面端令牌） | 空：headless 关闭鉴权，桌面版使用已保存的令牌 |
 | `LA_PLUMA_BASE_PATH` | 运行时挂载路径；需与构建时 `VITE_BASE_PATH` 一致 | `/` |
 | `LA_PLUMA_HTTPS_CERT_PATH` | 证书链；与私钥同时设置 | 空，HTTP |
 | `LA_PLUMA_HTTPS_KEY_PATH` | 私钥；与证书链同时设置 | 空，HTTP |

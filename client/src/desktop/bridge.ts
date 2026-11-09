@@ -5,6 +5,11 @@ export interface DesktopAppInfo {
   userData: string
 }
 
+export interface DesktopAccessToken {
+  token: string
+  source: 'env' | 'settings'
+}
+
 interface MyGoRuntime {
   call: (method: string, ...args: unknown[]) => Promise<unknown>
 }
@@ -35,4 +40,6 @@ export const desktopBridge = {
   notify: (title: string, body: string) => desktopCall<void>('DesktopBridge.Notify', title, body),
   getAutostart: () => desktopCall<boolean>('DesktopBridge.GetAutostart'),
   setAutostart: (enabled: boolean) => desktopCall<void>('DesktopBridge.SetAutostart', enabled),
+  getAccessToken: () => desktopCall<DesktopAccessToken>('DesktopBridge.GetAccessToken'),
+  setAccessToken: (token: string) => desktopCall<string>('DesktopBridge.SetAccessToken', token),
 }

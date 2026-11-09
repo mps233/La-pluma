@@ -20,6 +20,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -157,15 +158,26 @@ func (w *rotatingFileWriter) rotate() {
 }
 
 type desktopRuntime struct {
-	app       *app.App
-	server    *http.Server
-	listener  net.Listener
-	token     string
-	baseURL   string
-	closeOnce sync.Once
-	window    *mygo.Window
-	tray      *mygo.Tray
-	panel     *mygo.Window
+	app         *app.App
+	server      *http.Server
+	listener    net.Listener
+	tokenHolder *atomic.Value
+	tokenEnv    bool
+	baseURL     string
+	closeOnce   sync.Once
+	window      *mygo.Window
+	tray        *mygo.Tray
+	panel       *mygo.Window
+}
+
+func (r *desktopRuntime) currentToken() string {
+	if r.tokenHolder == nil {
+		return ""
+	}
+	if token, ok := r.tokenHolder.Load().(string); ok {
+		return token
+	}
+	return ""
 }
 
 func startDesktop() {
@@ -213,14 +225,27 @@ func startDesktop() {
 			_ = os.Setenv("LA_PLUMA_SCRCPY_SERVER_PATH", scrcpyServer)
 		}
 	}
+	tokenSettings := loadDesktopSettings()
 	token := strings.TrimSpace(os.Getenv("LA_PLUMA_TOKEN"))
+	tokenFromEnv := token != ""
 	if token == "" {
-		token, err = randomHex(16)
-		if err != nil {
-			abortStartup(logger, "token", err)
-			return
+		savedToken, savedErr := normalizeDesktopAccessToken(tokenSettings.AccessToken)
+		if savedErr == nil {
+			token = savedToken
+		} else {
+			token, err = randomHex(16)
+			if err != nil {
+				abortStartup(logger, "token", err)
+				return
+			}
+			tokenSettings.AccessToken = token
+			if saveErr := saveDesktopSettings(tokenSettings); saveErr != nil {
+				logger.Warn("persist access token", "error", saveErr)
+			}
 		}
 	}
+	tokenHolder := &atomic.Value{}
+	tokenHolder.Store(token)
 
 	defaultPaths := config.DefaultPaths(".")
 	defaultPaths.DataDir = filepath.Join(userData, "data")
@@ -247,6 +272,7 @@ func startDesktop() {
 		httpapi.WithSignalingHandler(signalServer.Handler()),
 		httpapi.WithQuotesHandler(quotes.NewHandler(application.Quotes)),
 		httpapi.WithAssetsHandler(application.Assets),
+		httpapi.WithTokenSource(func() string { return tokenHolder.Load().(string) }),
 	).Handler()
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", desktopPort))
@@ -256,10 +282,11 @@ func startDesktop() {
 		return
 	}
 	runtimeState := &desktopRuntime{
-		app:      application,
-		listener: listener,
-		token:    token,
-		baseURL:  "http://" + listener.Addr().String() + "/",
+		app:         application,
+		listener:    listener,
+		tokenHolder: tokenHolder,
+		tokenEnv:    tokenFromEnv,
+		baseURL:     "http://" + listener.Addr().String() + "/",
 	}
 	runtimeState.server = &http.Server{
 		Handler:           handler,
@@ -507,6 +534,65 @@ func (DesktopBridge) AppInfo() map[string]any {
 	}
 }
 
+// GetAccessToken returns the token the loopback server currently accepts and
+// where it came from. The token is shown in the desktop settings so the user
+// can use the same value on a phone or another browser.
+func (DesktopBridge) GetAccessToken() (map[string]any, error) {
+	if activeDesktop == nil {
+		return nil, errors.New("桌面服务尚未就绪")
+	}
+	source := "settings"
+	if activeDesktop.tokenEnv {
+		source = "env"
+	}
+	return map[string]any{"token": activeDesktop.currentToken(), "source": source}, nil
+}
+
+// SetAccessToken validates and persists a user-chosen token and applies it to
+// the running loopback server immediately. The caller updates the page's
+// stored token after this returns so the next request uses the new value.
+func (DesktopBridge) SetAccessToken(value string) (string, error) {
+	if activeDesktop == nil {
+		return "", errors.New("桌面服务尚未就绪")
+	}
+	if activeDesktop.tokenEnv {
+		return "", errors.New("访问令牌由环境变量 LA_PLUMA_TOKEN 设置，无法在应用内修改")
+	}
+	if activeDesktop.tokenHolder == nil {
+		return "", errors.New("桌面服务尚未就绪")
+	}
+	token, err := normalizeDesktopAccessToken(value)
+	if err != nil {
+		return "", err
+	}
+	settings := loadDesktopSettings()
+	settings.AccessToken = token
+	if err := saveDesktopSettings(settings); err != nil {
+		return "", err
+	}
+	activeDesktop.tokenHolder.Store(token)
+	return token, nil
+}
+
+// normalizeDesktopAccessToken keeps the token usable in HTTP headers and
+// compatible with the browser input: visible ASCII only, 8–128 characters.
+func normalizeDesktopAccessToken(value string) (string, error) {
+	token := strings.TrimSpace(value)
+	token = strings.TrimSpace(strings.TrimPrefix(token, "Bearer "))
+	if token == "" {
+		return "", errors.New("访问令牌不能为空")
+	}
+	if len(token) < 8 || len(token) > 128 {
+		return "", errors.New("访问令牌需要 8–128 个字符")
+	}
+	for _, char := range token {
+		if char < 0x21 || char > 0x7e {
+			return "", errors.New("访问令牌只能使用可见的 ASCII 字符，且不能包含空格")
+		}
+	}
+	return token, nil
+}
+
 // seedDataDir copies static game data shipped under resources/seed into the
 // user data directory. Existing files are never overwritten, and
 // account-specific snapshots are not part of the seed.
@@ -563,7 +649,7 @@ func (r *desktopRuntime) showWindow() {
 			TrustedOrigins:       []string{r.baseURL[:len(r.baseURL)-1]},
 			BackgroundThrottling: mygo.ThrottlingOff,
 			Autoplay:             mygo.AutoplayAllow,
-			PreloadScript:        preloadScript(r.token),
+			PreloadScript:        preloadScript(r.currentToken()),
 		},
 	})
 	if runtime.GOOS == "darwin" {
@@ -598,6 +684,7 @@ const desktopSettingsFileName = "desktop-settings.json"
 
 type desktopSettings struct {
 	MAAExecutable string `json:"maaExecutable,omitempty"`
+	AccessToken   string `json:"accessToken,omitempty"`
 }
 
 func desktopSettingsPath() (string, error) {

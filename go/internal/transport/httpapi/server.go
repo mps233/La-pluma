@@ -27,6 +27,9 @@ type serverOptions struct {
 	signalingHandler http.Handler
 	quotesHandler    http.Handler
 	assetsHandler    http.Handler
+	// tokenSource overrides cfg.Token so a desktop app can change the token
+	// without restarting the loopback server.
+	tokenSource func() string
 }
 
 // WithAgentHandler mounts the /api/agent subtree before the generic API
@@ -34,6 +37,14 @@ type serverOptions struct {
 func WithAgentHandler(handler http.Handler) Option {
 	return func(options *serverOptions) {
 		options.agentHandler = handler
+	}
+}
+
+// WithTokenSource supplies the access token per request. It takes precedence
+// over cfg.Token; a nil source falls back to cfg.Token.
+func WithTokenSource(source func() string) Option {
+	return func(options *serverOptions) {
+		options.tokenSource = source
 	}
 }
 
@@ -77,6 +88,10 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) *Server {
 	for _, option := range options {
 		option(&opts)
 	}
+	tokenSource := opts.tokenSource
+	if tokenSource == nil {
+		tokenSource = func() string { return cfg.Token }
+	}
 	if opts.agentHandler != nil {
 		mux.Handle("/api/agent/", http.StripPrefix("/api/agent", opts.agentHandler))
 	}
@@ -114,7 +129,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) *Server {
 		AccessLog(logger),
 		CORS(),
 		Gzip(),
-		Auth(cfg.Token),
+		AuthSource(tokenSource),
 	)
 	return &Server{cfg: cfg, logger: logger, handler: handler}
 }

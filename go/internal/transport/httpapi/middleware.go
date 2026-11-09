@@ -149,11 +149,23 @@ func requiresAuth(path string) bool {
 
 // Auth enforces the optional bearer / X-La-Pluma-Token contract.
 func Auth(token string) Middleware {
+	return AuthSource(func() string { return token })
+}
+
+// AuthSource is Auth with a token read per request, so the desktop app can
+// change its access token without restarting the loopback server. A source
+// that returns an empty token disables auth for that request.
+func AuthSource(source func() string) Middleware {
 	return func(next http.Handler) http.Handler {
-		if token == "" {
-			return next
-		}
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			token := ""
+			if source != nil {
+				token = source()
+			}
+			if token == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
 			if !requiresAuth(r.URL.Path) {
 				next.ServeHTTP(w, r)
 				return

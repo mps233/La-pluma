@@ -217,3 +217,21 @@ func TestCORSAndGzip(t *testing.T) {
 		t.Fatalf("decoded body = %s", string(decoded))
 	}
 }
+
+func TestTokenSourceCanChangeAtRuntime(t *testing.T) {
+	cfg := newTestConfig(t, "initial-token", "/")
+	current := "initial-token"
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	handler := New(cfg, logger, WithTokenSource(func() string { return current })).Handler()
+
+	if rec := request(t, handler, http.MethodGet, "/api/nope", map[string]string{"X-La-Pluma-Token": "initial-token"}); rec.Code == http.StatusUnauthorized {
+		t.Fatalf("initial token rejected: %s", rec.Body.String())
+	}
+	current = "updated-token"
+	if rec := request(t, handler, http.MethodGet, "/api/nope", map[string]string{"X-La-Pluma-Token": "updated-token"}); rec.Code == http.StatusUnauthorized {
+		t.Fatalf("updated token rejected: %s", rec.Body.String())
+	}
+	if rec := request(t, handler, http.MethodGet, "/api/nope", map[string]string{"X-La-Pluma-Token": "initial-token"}); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("old token still accepted: %d %s", rec.Code, rec.Body.String())
+	}
+}

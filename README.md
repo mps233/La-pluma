@@ -79,7 +79,7 @@ The project is named after La Pluma, the five-star Guard in Arknights.
 
 - **Telegram completion reports** — off by default. Turn on the channel, save a bot token and chat ID, and receive a summary with per-task results, drops, reports, warnings, skips and failures. A screenshot is attached only when the flow ran the Awards step; images over 10 MB or failed image sends fall back to text.
 - **Bot commands** — `/status`, `/screenshot`, `/startup`, `/closedown`, `/fight`, `/roguelike`, `/copilot`, `/stop`, `/run` for saved flows, direct `prts://` links, and Chinese keyword aliases. Only the configured chat or user IDs are accepted.
-- **Local secrets** — the bot token and chat ID are stored in the local notification config. Set `LA_PLUMA_TOKEN` and keep the console off untrusted networks when it is reachable beyond localhost.
+- **Local secrets** — the bot token and chat ID are stored in the local notification config. The desktop app generates and persists an access token (change or copy it under Settings → Access token); set `LA_PLUMA_TOKEN` to override it, and keep the console off untrusted networks when it is reachable beyond localhost.
 
 ### Agent API
 
@@ -175,7 +175,7 @@ Key environment variables:
 | `LA_PLUMA_HOST` | Listen address | `0.0.0.0` |
 | `LA_PLUMA_DATA_DIR` | Config, run store and MAA task files | `<working-dir>/server/data` |
 | `LA_PLUMA_CLIENT_DIST` | Built React client | `<working-dir>/client/dist` |
-| `LA_PLUMA_TOKEN` | Require a bearer token or `X-La-Pluma-Token` on `/api` and the WebRTC ticket endpoint | empty, auth off |
+| `LA_PLUMA_TOKEN` | Require a bearer token or `X-La-Pluma-Token` on `/api` and the WebRTC ticket endpoint (headless; overrides the desktop token) | empty: auth off for headless, persisted desktop token for the app |
 | `LA_PLUMA_BASE_PATH` | Runtime mount path; must match the build-time `VITE_BASE_PATH` | `/` |
 | `LA_PLUMA_HTTPS_CERT_PATH` | Certificate chain; set together with the key | empty, HTTP |
 | `LA_PLUMA_HTTPS_KEY_PATH` | Private key; set together with the chain | empty, HTTP |
