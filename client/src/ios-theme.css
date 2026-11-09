@@ -2180,7 +2180,10 @@ html.dark .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .sm
   left: 0;
   z-index: 80;
   display: block;
-  height: max(28px, var(--mygo-titlebar-height, 0px));
+  /* Keep the drag surface to the title-bar strip. The reported title-bar
+     height includes the traffic lights' offset, and using it here would
+     cover the toolbar controls in the navbar. */
+  height: 28px;
   --app-region: drag;
   background: transparent;
 }
