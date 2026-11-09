@@ -336,7 +336,6 @@ export function useScrcpyWebRTC({
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<VideoStats | null>(null)
   const [inputReady, setInputReady] = useState(false)
-  const [signalingReady, setSignalingReady] = useState(false)
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null)
   const [deviceSize, setDeviceSize] = useState({ width: 1080, height: 1920 })
   const wsRef = useRef<WebSocket | null>(null)
@@ -518,7 +517,6 @@ export function useScrcpyWebRTC({
     inputChannelCleanupRef.current?.()
     inputChannelCleanupRef.current = null
     setInputReady(false)
-    setSignalingReady(false)
     const pc = pcRef.current
     pcRef.current = null
     if (pc) {
@@ -648,7 +646,6 @@ export function useScrcpyWebRTC({
             clearAttemptResources()
             setError(null)
             setStatus('signaling')
-            setSignalingReady(true)
             startHeartbeat(ws)
             ws.send(JSON.stringify({ message_type: 'connect', device_id: deviceId }))
             armProtocolTimeout('等待信令配置超时，请重新连接预览')
@@ -790,7 +787,6 @@ export function useScrcpyWebRTC({
           }
           ws.onclose = event => {
             if (connectionGenerationRef.current !== generation) return
-            setSignalingReady(false)
             stopHeartbeat()
             clearOfferTimeout()
             resolvePendingCommands('信令连接已中断')
@@ -826,55 +822,48 @@ export function useScrcpyWebRTC({
     }
   }, [clearOfferTimeout, connectionPath, createPeerConnection, deviceId, filterSdpCandidates, ipPreference, passive, resolvePendingCommands, sendAnswer, sendForward, signalingUrl, startHeartbeat, stopHeartbeat, teardownConnection, videoRef])
 
-  const sendTouch = useCallback((action: number, clientX: number, clientY: number, id = 0, targetDisplay?: HTMLElement | null) => {
-    const source = videoRef.current
-    const display = targetDisplay || source
+  const sendTouch = useCallback((action: number, clientX: number, clientY: number, id = 0, targetVideo?: HTMLVideoElement | null) => {
+    const channel = inputChannelRef.current
+    const video = targetVideo || videoRef.current
+    if (!channel || channel.readyState !== 'open') return false
+    if (isTouchMoveBackpressured(action, channel.bufferedAmount)) return false
+
     const isRelease = action === 1 || action === 3
     const sendTouchPacket = (x: number, y: number, w: number, h: number) => {
-      const packet = {
-        type: 'touch',
-        id,
-        seq: ++touchSeqRef.current,
-        client_ts_ms: Date.now(),
-        action,
-        x,
-        y,
-        w,
-        h
-      }
-      const channel = inputChannelRef.current
-      if (channel && channel.readyState === 'open') {
-        if (isTouchMoveBackpressured(action, channel.bufferedAmount)) return false
-        try {
-          channel.send(JSON.stringify(packet))
-          return true
-        } catch {
-          // Fall through to the authenticated signaling socket.
-        }
-      }
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        sendForward(packet)
+      try {
+        channel.send(JSON.stringify({
+          type: 'touch',
+          id,
+          seq: ++touchSeqRef.current,
+          client_ts_ms: Date.now(),
+          action,
+          x,
+          y,
+          w,
+          h
+        }))
         return true
+      } catch {
+        return false
       }
-      return false
     }
     const sendReleaseFallback = () => sendTouchPacket(0, 0, deviceSize.width, deviceSize.height)
 
-    if (!source || !display || !source.videoWidth || !source.videoHeight) {
+    if (!video || !video.videoWidth || !video.videoHeight) {
       return isRelease ? sendReleaseFallback() : false
     }
 
-    const rect = display.getBoundingClientRect()
+    const rect = video.getBoundingClientRect()
     if (!rect.width || !rect.height) return isRelease ? sendReleaseFallback() : false
-    const geometry = getRenderedVideoGeometry(rect.width, rect.height, source.videoWidth, source.videoHeight)
+    const geometry = getRenderedVideoGeometry(rect.width, rect.height, video.videoWidth, video.videoHeight)
     if (!geometry) return isRelease ? sendReleaseFallback() : false
     const { actualW, actualH, offsetX, offsetY } = geometry
 
     const { width: targetW, height: targetH } = resolveTouchTargetSize(
       deviceSize.width,
       deviceSize.height,
-      source.videoWidth,
-      source.videoHeight
+      video.videoWidth,
+      video.videoHeight
     )
     const relativeX = clientX - rect.left - offsetX
     const relativeY = clientY - rect.top - offsetY
@@ -883,52 +872,44 @@ export function useScrcpyWebRTC({
     const x = Math.max(0, Math.min(targetW - 1, Math.round(relativeX / actualW * targetW)))
     const y = Math.max(0, Math.min(targetH - 1, Math.round(relativeY / actualH * targetH)))
     return sendTouchPacket(x, y, targetW, targetH)
-  }, [deviceSize.height, deviceSize.width, sendForward, videoRef])
+  }, [deviceSize.height, deviceSize.width, videoRef])
 
-  const sendScroll = useCallback((deltaX: number, deltaY: number, clientX: number, clientY: number, targetDisplay?: HTMLElement | null) => {
-    const source = videoRef.current
-    const display = targetDisplay || source
-    if (!source || !display || !source.videoWidth || !source.videoHeight) return false
-    const rect = display.getBoundingClientRect()
+  const sendScroll = useCallback((deltaX: number, deltaY: number, clientX: number, clientY: number, targetVideo?: HTMLVideoElement | null) => {
+    const channel = inputChannelRef.current
+    const video = targetVideo || videoRef.current
+    if (!channel || channel.readyState !== 'open') return false
+    if (!video || !video.videoWidth || !video.videoHeight) return false
+    const rect = video.getBoundingClientRect()
     if (!rect.width || !rect.height) return false
-    const geometry = getRenderedVideoGeometry(rect.width, rect.height, source.videoWidth, source.videoHeight)
+    const geometry = getRenderedVideoGeometry(rect.width, rect.height, video.videoWidth, video.videoHeight)
     if (!geometry) return false
     if (!isPointInsideRenderedVideo(clientX, clientY, rect, geometry)) return false
     const { actualW, actualH, offsetX, offsetY } = geometry
     const { width: targetW, height: targetH } = resolveTouchTargetSize(
       deviceSize.width,
       deviceSize.height,
-      source.videoWidth,
-      source.videoHeight
+      video.videoWidth,
+      video.videoHeight
     )
     const x = Math.max(0, Math.min(targetW - 1, Math.round((clientX - rect.left - offsetX) / actualW * targetW)))
     const y = Math.max(0, Math.min(targetH - 1, Math.round((clientY - rect.top - offsetY) / actualH * targetH)))
-    const packet = {
-      type: 'scroll',
-      x,
-      y,
-      w: targetW,
-      h: targetH,
-      hscroll: deltaX,
-      vscroll: deltaY,
-      buttons: 0,
-      client_ts_ms: Date.now()
-    }
-    const channel = inputChannelRef.current
-    if (channel && channel.readyState === 'open') {
-      try {
-        channel.send(JSON.stringify(packet))
-        return true
-      } catch {
-        // Fall through to the authenticated signaling socket.
-      }
-    }
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      sendForward(packet)
+    try {
+      channel.send(JSON.stringify({
+        type: 'scroll',
+        x,
+        y,
+        w: targetW,
+        h: targetH,
+        hscroll: deltaX,
+        vscroll: deltaY,
+        buttons: 0,
+        client_ts_ms: Date.now()
+      }))
       return true
+    } catch {
+      return false
     }
-    return false
-  }, [deviceSize.height, deviceSize.width, sendForward, videoRef])
+  }, [deviceSize.height, deviceSize.width, videoRef])
 
   const sendCommand = useCallback((command: string): Promise<ScrcpyCommandResult> => {
     const ws = wsRef.current
@@ -962,16 +943,6 @@ export function useScrcpyWebRTC({
       }
     })
   }, [deviceId])
-
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && inputChannelRef.current?.readyState !== 'open') {
-        setInputReady(false)
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [])
 
   useEffect(() => {
     const timer = window.setInterval(async () => {
@@ -1056,5 +1027,5 @@ export function useScrcpyWebRTC({
     return () => document.removeEventListener('visibilitychange', handleVisibility)
   }, [cancelHiddenDisconnect, connect, passive, scheduleHiddenDisconnect])
 
-  return { status, error, stats, inputReady, signalingReady, mediaStream, connect, disconnect, sendTouch, sendScroll, sendCommand }
+  return { status, error, stats, inputReady, mediaStream, connect, disconnect, sendTouch, sendScroll, sendCommand }
 }

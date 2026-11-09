@@ -115,7 +115,7 @@ describe('ScrcpyDeviceView automation availability', () => {
     expect(findButton('启动预览')?.title).toBe('正在检查后端服务，请稍候')
 
     findButton('启动预览')?.click()
-    container.querySelector('[data-scrcpy-touch-surface]')?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+    container.querySelector('video')?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
 
     expect(onStartInfrastructure).not.toHaveBeenCalled()
     expect(webrtcMock.sendTouch).not.toHaveBeenCalled()
@@ -285,10 +285,10 @@ describe('ScrcpyDeviceView automation availability', () => {
     ))
 
     expect(container.textContent).toContain('触控连接中，画面暂不可操作')
-    const surface = container.querySelector<HTMLElement>('[data-scrcpy-touch-surface]')!
+    const video = container.querySelector('video')!
     const event = new MouseEvent('pointerdown', { bubbles: true, clientX: 20, clientY: 20, button: 0 })
     Object.defineProperty(event, 'pointerId', { value: 1 })
-    surface.dispatchEvent(event)
+    video.dispatchEvent(event)
 
     expect(webrtcMock.sendTouch).not.toHaveBeenCalled()
   })
@@ -347,9 +347,8 @@ describe('ScrcpyDeviceView automation availability', () => {
       />
     ))
 
-    const canvas = container.querySelector('canvas')!
-    const surface = container.querySelector<HTMLElement>('[data-scrcpy-touch-surface]')!
-    Object.assign(surface, {
+    const video = container.querySelector('video')!
+    Object.assign(video, {
       setPointerCapture: vi.fn(),
       hasPointerCapture: vi.fn(() => true),
       releasePointerCapture: vi.fn(),
@@ -357,7 +356,7 @@ describe('ScrcpyDeviceView automation availability', () => {
     const dispatchPointer = (type: string, pointerId: number, clientX: number, clientY: number) => {
       const event = new MouseEvent(type, { bubbles: true, clientX, clientY, button: 0 })
       Object.defineProperty(event, 'pointerId', { value: pointerId })
-      surface.dispatchEvent(event)
+      video.dispatchEvent(event)
     }
 
     act(() => {
@@ -370,15 +369,15 @@ describe('ScrcpyDeviceView automation availability', () => {
 
     expect(webrtcMock.sendTouch).toHaveBeenCalledTimes(2)
     act(() => frameCallback?.(16))
-    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(2, 12, 22, 1, canvas)
-    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(2, 32, 42, 2, canvas)
+    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(2, 12, 22, 1, video)
+    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(2, 32, 42, 2, video)
 
     act(() => {
       dispatchPointer('pointerup', 1, 13, 23)
       dispatchPointer('pointercancel', 2, 33, 43)
     })
-    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(1, 13, 23, 1, canvas)
-    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(3, 32, 42, 2, canvas)
+    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(1, 13, 23, 1, video)
+    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(3, 32, 42, 2, video)
   })
 
   it('does not track a pointer when the initial touch is rejected', async () => {
@@ -392,12 +391,12 @@ describe('ScrcpyDeviceView automation availability', () => {
       />
     ))
 
-    const surface = container.querySelector<HTMLElement>('[data-scrcpy-touch-surface]')!
-    Object.assign(surface, { setPointerCapture: vi.fn() })
+    const video = container.querySelector('video')!
+    Object.assign(video, { setPointerCapture: vi.fn() })
     const dispatchPointer = (type: string) => {
       const event = new MouseEvent(type, { bubbles: true, clientX: 2, clientY: 2, button: 0 })
       Object.defineProperty(event, 'pointerId', { value: 7 })
-      surface.dispatchEvent(event)
+      video.dispatchEvent(event)
     }
     act(() => {
       dispatchPointer('pointerdown')
@@ -466,32 +465,5 @@ describe('ScrcpyDeviceView automation availability', () => {
 
     expect(immersiveVideo?.srcObject).toBe(lateStream)
     await act(async () => document.body.querySelector<HTMLButtonElement>('[aria-label="退出全屏"]')?.click())
-  })
-
-  it('sends touch events through the input channel on touch devices', async () => {
-    webrtcMock.status = 'connected'
-    webrtcMock.inputReady = true
-    await act(async () => root.render(
-      <ScrcpyDeviceView
-        enabled
-        infrastructureStatus={{ installed: true, serverRunning: true }}
-      />
-    ))
-
-    const canvas = container.querySelector('canvas')!
-    const surface = container.querySelector<HTMLElement>('[data-scrcpy-touch-surface]')!
-    const touch = { identifier: 3, clientX: 12, clientY: 24, target: surface }
-    const dispatchTouch = (type: string, touches: unknown[]) => {
-      const event = new Event(type, { bubbles: true, cancelable: true })
-      Object.defineProperty(event, 'changedTouches', { value: touches })
-      Object.defineProperty(event, 'touches', { value: touches })
-      surface.dispatchEvent(event)
-    }
-
-    await act(async () => dispatchTouch('touchstart', [touch]))
-    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(0, 12, 24, 3, canvas)
-
-    await act(async () => dispatchTouch('touchend', [touch]))
-    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(1, 12, 24, 3, canvas)
   })
 })

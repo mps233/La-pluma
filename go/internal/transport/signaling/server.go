@@ -173,17 +173,6 @@ func (s *Server) Connect(w http.ResponseWriter, r *http.Request) {
 			client.writeJSON(map[string]any{"type": "pong"})
 		case "forward":
 			payload, _ := message["payload"].(map[string]any)
-			if payload != nil {
-				switch payload["type"] {
-				case "touch", "scroll":
-					if publisher := s.publisher(); publisher != nil {
-						if data, err := json.Marshal(payload); err == nil {
-							publisher.HandleClientInput(data)
-						}
-					}
-					continue
-				}
-			}
 			if err := client.forward(payload); err != nil {
 				client.sendError(err.Error())
 			}

@@ -85,7 +85,7 @@ function DeviceNavigationButtons({
 interface TrackedPointer {
   clientX: number
   clientY: number
-  target: HTMLElement
+  target: HTMLVideoElement
 }
 
 export default function ScrcpyDeviceView({
@@ -106,8 +106,6 @@ export default function ScrcpyDeviceView({
 }: ScrcpyDeviceViewProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const immersiveVideoRef = useRef<HTMLVideoElement | null>(null)
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const immersiveCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const immersiveDialogRef = useRef<HTMLDivElement | null>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
   const immersiveBackgroundStateRef = useRef(new Map<HTMLElement, { inert: boolean; ariaHidden: string | null }>())
@@ -318,19 +316,9 @@ export default function ScrcpyDeviceView({
     })
   }, [])
 
-  // iOS Safari does not deliver pointer events reliably on a bare <video>.
-  // A transparent sibling layer owns the gesture and maps it through the
-  // video element beside it.
-  const videoForPointerEvent = (event: { currentTarget: HTMLElement }) => (
-    event.currentTarget.parentElement?.querySelector('canvas') as HTMLElement | null
-  ) ?? canvasRef.current
-
-  const onPointerDown = (event: React.PointerEvent<HTMLElement>) => {
-    if (event.pointerType === 'touch') return
-    if (!automationAvailable || (!webrtc.inputReady && !webrtc.signalingReady)) return
-    const video = videoForPointerEvent(event)
-    if (!video) return
-    const pointer = { clientX: event.clientX, clientY: event.clientY, target: video }
+  const onPointerDown = (event: React.PointerEvent<HTMLVideoElement>) => {
+    if (!automationAvailable || !webrtc.inputReady) return
+    const pointer = { clientX: event.clientX, clientY: event.clientY, target: event.currentTarget }
     if (!webrtc.sendTouch(0, pointer.clientX, pointer.clientY, event.pointerId, pointer.target)) return
 
     trackedPointersRef.current.set(event.pointerId, pointer)
@@ -341,20 +329,16 @@ export default function ScrcpyDeviceView({
     }
   }
 
-  const onWheel = (event: React.WheelEvent<HTMLElement>) => {
-    if (!automationAvailable || (!webrtc.inputReady && !webrtc.signalingReady)) return
-    const video = videoForPointerEvent(event)
-    if (video && webrtc.sendScroll(event.deltaX, event.deltaY, event.clientX, event.clientY, video)) {
+  const onWheel = (event: React.WheelEvent<HTMLVideoElement>) => {
+    if (!automationAvailable || !webrtc.inputReady) return
+    if (webrtc.sendScroll(event.deltaX, event.deltaY, event.clientX, event.clientY, event.currentTarget)) {
       event.preventDefault()
     }
   }
 
-  const onPointerMove = (event: React.PointerEvent<HTMLElement>) => {
-    if (event.pointerType === 'touch') return
+  const onPointerMove = (event: React.PointerEvent<HTMLVideoElement>) => {
     if (!automationAvailable || !trackedPointersRef.current.has(event.pointerId)) return
-    const video = videoForPointerEvent(event)
-    if (!video) return
-    const pointer = { clientX: event.clientX, clientY: event.clientY, target: video }
+    const pointer = { clientX: event.clientX, clientY: event.clientY, target: event.currentTarget }
     trackedPointersRef.current.set(event.pointerId, pointer)
     pendingPointerMovesRef.current.set(event.pointerId, pointer)
     if (pointerMoveFrameRef.current === null) {
@@ -362,54 +346,7 @@ export default function ScrcpyDeviceView({
     }
   }
 
-  const onTouchStart = (event: React.TouchEvent<HTMLElement>) => {
-    if (!automationAvailable || (!webrtc.inputReady && !webrtc.signalingReady)) return
-    const video = videoForPointerEvent(event)
-    if (!video) return
-    event.preventDefault()
-    for (const touch of Array.from(event.changedTouches)) {
-      const pointer = { clientX: touch.clientX, clientY: touch.clientY, target: video }
-      if (!webrtc.sendTouch(0, pointer.clientX, pointer.clientY, touch.identifier, video)) continue
-      trackedPointersRef.current.set(touch.identifier, pointer)
-    }
-  }
-
-  const onTouchMove = (event: React.TouchEvent<HTMLElement>) => {
-    if (!automationAvailable) return
-    const video = videoForPointerEvent(event)
-    if (!video) return
-    event.preventDefault()
-    let changed = false
-    for (const touch of Array.from(event.changedTouches)) {
-      if (!trackedPointersRef.current.has(touch.identifier)) continue
-      const pointer = { clientX: touch.clientX, clientY: touch.clientY, target: video }
-      trackedPointersRef.current.set(touch.identifier, pointer)
-      pendingPointerMovesRef.current.set(touch.identifier, pointer)
-      changed = true
-    }
-    if (changed && pointerMoveFrameRef.current === null) {
-      pointerMoveFrameRef.current = window.requestAnimationFrame(flushPointerMoves)
-    }
-  }
-
-  const finishTouch = (event: React.TouchEvent<HTMLElement>, cancelled = false) => {
-    event.preventDefault()
-    for (const touch of Array.from(event.changedTouches)) {
-      const tracked = trackedPointersRef.current.get(touch.identifier)
-      if (!tracked) continue
-      pendingPointerMovesRef.current.delete(touch.identifier)
-      trackedPointersRef.current.delete(touch.identifier)
-      webrtc.sendTouch(
-        cancelled ? 3 : 1,
-        cancelled ? tracked.clientX : touch.clientX,
-        cancelled ? tracked.clientY : touch.clientY,
-        touch.identifier,
-        tracked.target
-      )
-    }
-  }
-
-  const finishPointer = (event: React.PointerEvent<HTMLElement>, cancelled = false) => {
+  const finishPointer = (event: React.PointerEvent<HTMLVideoElement>, cancelled = false) => {
     const trackedPointer = trackedPointersRef.current.get(event.pointerId)
     if (!trackedPointer) return
 
@@ -431,7 +368,7 @@ export default function ScrcpyDeviceView({
     }
   }
 
-  const onLostPointerCapture = (event: React.PointerEvent<HTMLElement>) => {
+  const onLostPointerCapture = (event: React.PointerEvent<HTMLVideoElement>) => {
     const trackedPointer = trackedPointersRef.current.get(event.pointerId)
     if (!trackedPointer) return
     pendingPointerMovesRef.current.delete(event.pointerId)
@@ -557,83 +494,6 @@ export default function ScrcpyDeviceView({
     }
   }, [immersiveMode, webrtc.mediaStream])
 
-  // iOS composites a bare <video> above the page, so pointer/touch events do
-  // not reliably reach an overlay. Draw the decoded frames into a canvas and
-  // keep the video as a hidden decoder source.
-  useEffect(() => {
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    if (!video || !canvas) return
-    let cancelled = false
-    let frame = 0
-    const draw = () => {
-      if (cancelled) return
-      if (video.videoWidth && video.videoHeight) {
-        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-          canvas.width = video.videoWidth
-          canvas.height = video.videoHeight
-        }
-        canvas.getContext('2d')?.drawImage(video, 0, 0)
-      }
-      schedule()
-    }
-    const schedule = () => {
-      if (cancelled) return
-      if (!video.videoWidth || !video.videoHeight) {
-        frame = window.setTimeout(draw, 100)
-        return
-      }
-      const withCallback = video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number }
-      if (withCallback.requestVideoFrameCallback) withCallback.requestVideoFrameCallback(draw)
-      else frame = window.requestAnimationFrame(draw)
-    }
-    schedule()
-    return () => {
-      cancelled = true
-      if (frame) {
-        window.cancelAnimationFrame(frame)
-        window.clearTimeout(frame)
-      }
-    }
-  }, [webrtc.mediaStream])
-
-  useEffect(() => {
-    const video = immersiveVideoRef.current
-    const canvas = immersiveCanvasRef.current
-    if (!immersiveMode || !video || !canvas) return
-    let cancelled = false
-    let frame = 0
-    const draw = () => {
-      if (cancelled) return
-      if (video.videoWidth && video.videoHeight) {
-        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-          canvas.width = video.videoWidth
-          canvas.height = video.videoHeight
-        }
-        canvas.getContext('2d')?.drawImage(video, 0, 0)
-      }
-      schedule()
-    }
-    const schedule = () => {
-      if (cancelled) return
-      if (!video.videoWidth || !video.videoHeight) {
-        frame = window.setTimeout(draw, 100)
-        return
-      }
-      const withCallback = video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number }
-      if (withCallback.requestVideoFrameCallback) withCallback.requestVideoFrameCallback(draw)
-      else frame = window.requestAnimationFrame(draw)
-    }
-    schedule()
-    return () => {
-      cancelled = true
-      if (frame) {
-        window.cancelAnimationFrame(frame)
-        window.clearTimeout(frame)
-      }
-    }
-  }, [immersiveMode, webrtc.mediaStream])
-
   const statusCards = [
     ['信令', statusLabel[webrtc.status] || webrtc.status],
     ['ICE', webrtc.stats?.iceState || '--'],
@@ -642,7 +502,7 @@ export default function ScrcpyDeviceView({
     ['FPS', webrtc.stats?.fps ?? '--'],
     ['码率', webrtc.stats?.bitrate ? `${webrtc.stats.bitrate} kbps` : '--'],
     ['延迟', webrtc.stats?.rtt ? `${webrtc.stats.rtt} ms` : '--'],
-    ['触控', webrtc.inputReady ? 'ready' : webrtc.signalingReady ? '备用通道' : webrtc.status === 'connected' ? '等待通道' : '--']
+    ['触控', webrtc.inputReady ? 'ready' : webrtc.status === 'connected' ? '等待通道' : '--']
   ]
   const unavailableInfrastructureLabel = resolvedInfrastructureState === 'loading' ? '检查中' : '未知'
   const serverStatusLabel = infrastructureKnown
@@ -709,28 +569,17 @@ export default function ScrcpyDeviceView({
             autoPlay
             playsInline
             muted
-            aria-hidden="true"
-            aria-label="模拟器实时画面"
-            className="pointer-events-none absolute h-px w-px opacity-0"
-          />
-          <canvas
-            ref={canvasRef}
             aria-label="模拟器实时画面"
             aria-disabled={!webrtc.inputReady}
-            data-scrcpy-touch-surface="true"
-            className="h-full w-full touch-none select-none object-contain"
+            className="w-full h-full object-contain touch-none select-none"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onWheel={onWheel}
             onPointerUp={(event) => finishPointer(event)}
             onPointerCancel={(event) => finishPointer(event, true)}
             onLostPointerCapture={onLostPointerCapture}
-            onTouchStart={onTouchStart}
-            onTouchMove={onTouchMove}
-            onTouchEnd={(event) => finishTouch(event)}
-            onTouchCancel={(event) => finishTouch(event, true)}
           />
-          {webrtc.status === 'connected' && !webrtc.inputReady && !webrtc.signalingReady && (
+          {webrtc.status === 'connected' && !webrtc.inputReady && (
             <div
               className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-md bg-black/70 px-2.5 py-1.5 text-xs text-white/90"
               role="status"
@@ -741,7 +590,7 @@ export default function ScrcpyDeviceView({
           )}
           {webrtc.status !== 'connected' && (
             <div
-              className="scrcpy-empty-state absolute inset-0 z-20 flex items-center justify-center px-6 text-center"
+              className="scrcpy-empty-state absolute inset-0 flex items-center justify-center px-6 text-center"
               role={visibleError ? 'alert' : 'status'}
               aria-live="polite"
             >
@@ -1026,28 +875,17 @@ export default function ScrcpyDeviceView({
             autoPlay
             playsInline
             muted
-            aria-hidden="true"
-            aria-label="模拟器沉浸画面"
-            className="pointer-events-none absolute h-px w-px opacity-0"
-          />
-          <canvas
-            ref={immersiveCanvasRef}
             aria-label="模拟器沉浸画面"
             aria-disabled={!webrtc.inputReady}
-            data-scrcpy-touch-surface="true"
-            className="h-full w-full touch-none select-none object-contain"
+            className="h-full w-full object-contain touch-none select-none"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onWheel={onWheel}
             onPointerUp={(event) => finishPointer(event)}
             onPointerCancel={(event) => finishPointer(event, true)}
             onLostPointerCapture={onLostPointerCapture}
-            onTouchStart={onTouchStart}
-            onTouchMove={onTouchMove}
-            onTouchEnd={(event) => finishTouch(event)}
-            onTouchCancel={(event) => finishTouch(event, true)}
           />
-          {!webrtc.inputReady && !webrtc.signalingReady && (
+          {!webrtc.inputReady && (
             <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-md bg-black/70 px-2.5 py-1.5 text-xs text-white/90" role="status">
               触控连接中，画面暂不可操作
             </div>
