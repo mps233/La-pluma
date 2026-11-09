@@ -170,10 +170,6 @@ export default function ScrcpyDeviceView({
   }, [webrtc.sendTouch])
 
   useEffect(() => {
-    if (webrtc.status === 'connected') setSettingsDirty(false)
-  }, [webrtc.status])
-
-  useEffect(() => {
     const width = webrtc.stats?.width ?? 0
     const height = webrtc.stats?.height ?? 0
     const previous = lastPreviewGeometryRef.current
@@ -318,7 +314,8 @@ export default function ScrcpyDeviceView({
     if (!enabled || !automationAvailable || autoConnectStartedRef.current) return
     autoConnectStartedRef.current = true
     void connect().then(started => {
-      if (!started) autoConnectStartedRef.current = false
+      if (started) setSettingsDirty(false)
+      else autoConnectStartedRef.current = false
     })
     return () => {
       autoConnectStartedRef.current = false
