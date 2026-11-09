@@ -911,14 +911,13 @@ func (s *Service) startBattleProgressSampler(ctx context.Context, lifecycle *Exe
 			if err != nil || battle == nil {
 				return
 			}
-			if battle.Total != lastTotal {
-				lastKills = -1
-				lastTotal = battle.Total
-			}
-			if battle.Kills < lastKills || battle.Kills == lastKills {
+			// A new stage can reuse the previous stage's enemy total, so the
+			// pair is compared as a whole; a reset to 0 / total is a real
+			// update, not a stale frame.
+			if battle.Kills == lastKills && battle.Total == lastTotal {
 				return
 			}
-			lastKills = battle.Kills
+			lastKills, lastTotal = battle.Kills, battle.Total
 			progress := make(map[string]any, len(base)+1)
 			for key, value := range base {
 				progress[key] = value

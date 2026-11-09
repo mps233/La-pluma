@@ -616,52 +616,79 @@ func TestManualManagerWithoutExecutorStaysUnsupported(t *testing.T) {
 }
 
 type fakeBattleSampler struct {
-	progress *BattleProgress
+	mu         sync.Mutex
+	progresses []*BattleProgress
+	index      int
 }
 
-func (f fakeBattleSampler) Checkpoint(context.Context) string { return "checkpoint" }
+func (f *fakeBattleSampler) Checkpoint(context.Context) string { return "checkpoint" }
 
-func (f fakeBattleSampler) SampleBattleProgress(context.Context, string, *int) (*BattleProgress, error) {
-	return f.progress, nil
+func (f *fakeBattleSampler) SampleBattleProgress(context.Context, string, *int) (*BattleProgress, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.progresses) == 0 {
+		return nil, nil
+	}
+	index := f.index
+	if index >= len(f.progresses) {
+		index = len(f.progresses) - 1
+	}
+	if f.index < len(f.progresses)-1 {
+		f.index++
+	}
+	return f.progresses[index], nil
 }
 
 func TestExecutePlanEmitsBattleProgress(t *testing.T) {
-	emitted := make(chan struct{})
-	var once sync.Once
+	done := make(chan struct{})
+	var mu sync.Mutex
+	received := make([]map[string]any, 0, 2)
 	executor := &fakeExecutionExecutor{}
 	executor.runTask = func(context.Context, map[string]any) (domainrun.DTO, error) {
 		select {
-		case <-emitted:
+		case <-done:
 		case <-time.After(2 * time.Second):
 			t.Error("battle progress was not emitted")
 		}
 		return domainrun.DTO{State: domainrun.StatusSucceeded}, nil
 	}
 	fixture := newExecutionFixture(t, executor, &fakeLeaseRunner{})
-	fixture.service.battleSampler = fakeBattleSampler{progress: &BattleProgress{Kills: 7, Total: 21}}
+	fixture.service.battleSampler = &fakeBattleSampler{progresses: []*BattleProgress{
+		{Kills: 35, Total: 35},
+		{Kills: 0, Total: 35},
+	}}
 	fixture.service.battleInterval = 10 * time.Millisecond
 
-	var battle map[string]any
 	lifecycle := &ExecutionLifecycle{
 		RunID: "run-battle",
 		OnProgress: func(progress map[string]any, _ []ProgressEntryResult) {
-			value, ok := progress["battle"].(map[string]any)
+			battle, ok := progress["battle"].(map[string]any)
 			if !ok {
 				return
 			}
-			battle = value
-			once.Do(func() { close(emitted) })
+			mu.Lock()
+			received = append(received, battle)
+			count := len(received)
+			mu.Unlock()
+			if count == 2 {
+				close(done)
+			}
 		},
 	}
+	plan := dynamicExecutionPlan()
+	plan.Items = plan.Items[:1]
+	plan.Entries = plan.Entries[:1]
 	if _, err := fixture.service.ExecutePlan(context.Background(), PlanExecution{
 		SetID:     "1",
 		Raid:      "normal",
-		Plan:      dynamicExecutionPlan(),
+		Plan:      plan,
 		Lifecycle: lifecycle,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if battle == nil || battle["kills"] != 7 || battle["total"] != 21 {
-		t.Fatalf("battle progress = %#v", battle)
+	mu.Lock()
+	defer mu.Unlock()
+	if len(received) != 2 || received[0]["kills"] != 35 || received[1]["kills"] != 0 || received[1]["total"] != 35 {
+		t.Fatalf("battle progress = %#v", received)
 	}
 }
