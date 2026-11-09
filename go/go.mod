@@ -3,6 +3,7 @@ module github.com/mps233/la-pluma/go
 go 1.27.3
 
 require (
+	github.com/ebitengine/purego v0.11.1
 	github.com/egoist/mygo v0.8.3
 	github.com/gorilla/websocket v1.5.3
 	github.com/pelletier/go-toml/v2 v2.4.3
@@ -14,7 +15,6 @@ require (
 )
 
 require (
-	github.com/ebitengine/purego v0.11.1 // indirect
 	github.com/go-text/typesetting v0.3.5 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/pion/datachannel v1.6.3 // indirect

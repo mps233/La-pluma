@@ -566,6 +566,10 @@ func (r *desktopRuntime) showWindow() {
 			PreloadScript:        preloadScript(r.token),
 		},
 	})
+	if runtime.GOOS == "darwin" {
+		// Match the sidebar glass radius (1.625rem at the default root size).
+		roundWindowCorners(window, 26)
+	}
 	window.OnClosed(func() {
 		if r.window == window {
 			r.window = nil
