@@ -300,7 +300,7 @@ describe('top-level application navigation', () => {
     expect(container.querySelector('.la-pluma-tabbar-nav .lg-track:not([data-lg-copy]) > [data-lg-item][aria-selected="true"]')).toBeNull()
 
     await act(async () => {
-      sidebar.querySelector<HTMLButtonElement>('button[aria-label="清除搜索"]')?.click()
+      sidebar.querySelector<HTMLButtonElement>('button[aria-label="Clear"]')?.click()
     })
     expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(9)
   })

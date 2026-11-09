@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, Search, Settings2, Swords, Wrench, X } from 'lucide-react'
-import { GlassButton, GlassCard, GlassMenu, GlassNav } from '@zakisheriff/liquid-glass'
+import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, Settings2, Swords, Wrench } from 'lucide-react'
+import { GlassButton, GlassCard, GlassInput, GlassMenu, GlassNav } from '@zakisheriff/liquid-glass'
 import ThemeToggle from './ThemeToggle'
 import AeroBackdrop from './backgrounds/AeroBackdrop'
 import { useUIStore } from '@/stores'
@@ -355,8 +355,7 @@ export default function Layout({ children }: LayoutProps) {
         <div className="la-pluma-page-body">
           <aside className="la-pluma-sidebar" aria-label="主要功能">
             <div className="la-pluma-sidebar-search" role="search">
-              <Search size={17} strokeWidth={2} aria-hidden="true" />
-              <input
+              <GlassInput
                 type="search"
                 value={sidebarQuery}
                 onChange={(event) => setSidebarQuery(event.target.value)}
@@ -366,22 +365,12 @@ export default function Layout({ children }: LayoutProps) {
                     setSidebarQuery('')
                   }
                 }}
+                onClear={() => setSidebarQuery('')}
                 placeholder="搜索工作区"
                 aria-label="搜索工作区"
                 autoComplete="off"
                 spellCheck={false}
               />
-              {sidebarQuery && (
-                <button
-                  type="button"
-                  className="la-pluma-sidebar-search-clear"
-                  onClick={() => setSidebarQuery('')}
-                  title="清除搜索"
-                  aria-label="清除搜索"
-                >
-                  <X size={13} strokeWidth={2.2} aria-hidden="true" />
-                </button>
-              )}
             </div>
 
             <div

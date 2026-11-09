@@ -81,7 +81,6 @@
   --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.16);
   --la-pluma-navbar-fade-color: #ffffff;
   --la-pluma-sidebar-width: 17rem;
-  --la-pluma-sidebar-search-bg: rgba(118, 118, 128, 0.12);
   --la-pluma-sidebar-selection: var(--app-accent-action);
   --la-pluma-sidebar-selection-fill: linear-gradient(
     180deg,
@@ -179,7 +178,6 @@ html.dark,
   --app-info-text: #a5a3ff;
   --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.3);
   --la-pluma-navbar-fade-color: #101318;
-  --la-pluma-sidebar-search-bg: rgba(118, 118, 128, 0.2);
   --la-pluma-sidebar-selection: var(--app-accent-action);
   --la-pluma-sidebar-selection-fill: linear-gradient(
     180deg,
@@ -767,74 +765,7 @@ html.la-pluma-standalone #app-root .page {
 }
 
 .la-pluma-sidebar-search {
-  display: flex;
-  min-height: 2.5rem;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0 0.625rem;
-  border-radius: 1.25rem;
-  background: var(--la-pluma-sidebar-search-bg);
-  color: var(--app-text-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-border) 60%, transparent);
-  transition: background 160ms ease, box-shadow 160ms ease;
-}
-
-.la-pluma-sidebar-search:focus-within {
-  background: color-mix(in srgb, var(--la-pluma-sidebar-search-bg) 72%, var(--app-surface-solid));
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 62%, transparent),
-    0 0 0 3px var(--app-accent-soft);
-}
-
-.la-pluma-sidebar-search > svg {
-  flex: none;
-}
-
-.la-pluma-sidebar-search input {
   width: 100%;
-  min-width: 0;
-  height: 2.5rem;
-  padding: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--app-text);
-  font: inherit;
-  font-size: 0.875rem;
-  letter-spacing: 0;
-}
-
-.la-pluma-sidebar-search input::placeholder {
-  color: var(--app-text-soft);
-}
-
-.la-pluma-sidebar-search input::-webkit-search-cancel-button {
-  display: none;
-}
-
-.la-pluma-sidebar-search-clear {
-  display: inline-flex;
-  width: 1.75rem;
-  min-width: 1.75rem;
-  height: 1.75rem;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--app-text-soft) 20%, transparent);
-  color: var(--app-text-muted);
-}
-
-.la-pluma-sidebar-search-clear:hover,
-.la-pluma-sidebar-search-clear:focus-visible {
-  background: color-mix(in srgb, var(--app-text-soft) 30%, transparent);
-  color: var(--app-text);
-}
-
-.la-pluma-sidebar-search-clear:focus-visible {
-  outline: 2px solid var(--app-accent);
-  outline-offset: 1px;
 }
 
 .la-pluma-sidebar-identity {
