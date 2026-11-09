@@ -66,26 +66,34 @@ func NewResourceIndex(paths config.Paths) *ResourceIndex {
 func (r *ResourceIndex) ResourceDir() string { return r.resourceDir }
 
 // HasStageTile reports whether the installed MAA resource has tile metadata
-// for the internal stage id. A missing Arknights-Tile-Pos directory means the
-// resource cannot be inspected, so execution is not blocked on it; an existing
-// directory without the stage is a stale resource MaaCore would reject.
+// for the internal stage id. MaaCore loads the base resource plus the
+// hot-update checkout, so both are inspected. A missing tile directory means
+// the resource cannot be inspected, so execution is not blocked on it.
 func (r *ResourceIndex) HasStageTile(stageID string) bool {
 	stageID = strings.TrimSpace(stageID)
 	if stageID == "" {
 		return true
 	}
-	tileDir := filepath.Join(r.resourceDir, tilePosDirName)
-	if info, err := os.Stat(tileDir); err != nil || !info.IsDir() {
-		return true
+	tileDirs := []string{
+		filepath.Join(r.resourceDir, tilePosDirName),
+		// maa hot-update keeps its checkout next to the base resource.
+		filepath.Join(filepath.Dir(r.resourceDir), "MaaResource", "resource", tilePosDirName),
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for _, name := range r.tileFilenamesLocked(tileDir) {
-		if strings.HasPrefix(name, stageID+"-") || strings.HasPrefix(name, stageID+"#") {
-			return true
+	inspected := false
+	for _, tileDir := range tileDirs {
+		if info, err := os.Stat(tileDir); err != nil || !info.IsDir() {
+			continue
+		}
+		inspected = true
+		for _, name := range r.tileFilenamesLocked(tileDir) {
+			if strings.HasPrefix(name, stageID+"-") || strings.HasPrefix(name, stageID+"#") {
+				return true
+			}
 		}
 	}
-	return false
+	return !inspected
 }
 
 // StageByCode looks up a stage record in MaaResource stages.json by display

@@ -312,9 +312,14 @@ func TestHasStageTileDetectsStaleResource(t *testing.T) {
 	maaDataDir := t.TempDir()
 	tileDir := filepath.Join(maaDataDir, "resource", "Arknights-Tile-Pos")
 	writeJSONFile(t, filepath.Join(tileDir, "act_ex01-activities-act_ex01.json"), map[string]any{"code": "EX-1"})
+	hotTileDir := filepath.Join(maaDataDir, "MaaResource", "resource", "Arknights-Tile-Pos")
+	writeJSONFile(t, filepath.Join(hotTileDir, "act_ex03-activities-act_ex03.json"), map[string]any{"code": "EX-3"})
 	index := NewResourceIndex(config.Paths{MaaDataDir: maaDataDir})
 	if !index.HasStageTile("act_ex01") {
-		t.Fatal("existing tile metadata must be found")
+		t.Fatal("base resource tile metadata must be found")
+	}
+	if !index.HasStageTile("act_ex03") {
+		t.Fatal("hot-update resource tile metadata must be found")
 	}
 	if index.HasStageTile("act_ex02") {
 		t.Fatal("missing tile metadata must be reported")
