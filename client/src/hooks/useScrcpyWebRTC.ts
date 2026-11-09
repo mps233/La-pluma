@@ -945,6 +945,16 @@ export function useScrcpyWebRTC({
   }, [deviceId])
 
   useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && inputChannelRef.current?.readyState !== 'open') {
+        setInputReady(false)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
+
+  useEffect(() => {
     const timer = window.setInterval(async () => {
       const pc = pcRef.current
       if (!pc) return

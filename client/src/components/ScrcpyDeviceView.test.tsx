@@ -467,4 +467,31 @@ describe('ScrcpyDeviceView automation availability', () => {
     expect(immersiveVideo?.srcObject).toBe(lateStream)
     await act(async () => document.body.querySelector<HTMLButtonElement>('[aria-label="退出全屏"]')?.click())
   })
+
+  it('sends touch events through the input channel on touch devices', async () => {
+    webrtcMock.status = 'connected'
+    webrtcMock.inputReady = true
+    await act(async () => root.render(
+      <ScrcpyDeviceView
+        enabled
+        infrastructureStatus={{ installed: true, serverRunning: true }}
+      />
+    ))
+
+    const video = container.querySelector('video')!
+    const surface = container.querySelector<HTMLElement>('[data-scrcpy-touch-surface]')!
+    const touch = { identifier: 3, clientX: 12, clientY: 24, target: surface }
+    const dispatchTouch = (type: string, touches: unknown[]) => {
+      const event = new Event(type, { bubbles: true, cancelable: true })
+      Object.defineProperty(event, 'changedTouches', { value: touches })
+      Object.defineProperty(event, 'touches', { value: touches })
+      surface.dispatchEvent(event)
+    }
+
+    await act(async () => dispatchTouch('touchstart', [touch]))
+    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(0, 12, 24, 3, video)
+
+    await act(async () => dispatchTouch('touchend', [touch]))
+    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(1, 12, 24, 3, video)
+  })
 })

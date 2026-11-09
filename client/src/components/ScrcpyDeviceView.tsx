@@ -324,6 +324,7 @@ export default function ScrcpyDeviceView({
   ) ?? videoRef.current
 
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') return
     if (!automationAvailable || !webrtc.inputReady) return
     const video = videoForPointerEvent(event)
     if (!video) return
@@ -347,6 +348,7 @@ export default function ScrcpyDeviceView({
   }
 
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') return
     if (!automationAvailable || !trackedPointersRef.current.has(event.pointerId)) return
     const video = videoForPointerEvent(event)
     if (!video) return
@@ -355,6 +357,53 @@ export default function ScrcpyDeviceView({
     pendingPointerMovesRef.current.set(event.pointerId, pointer)
     if (pointerMoveFrameRef.current === null) {
       pointerMoveFrameRef.current = window.requestAnimationFrame(flushPointerMoves)
+    }
+  }
+
+  const onTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!automationAvailable || !webrtc.inputReady) return
+    const video = videoForPointerEvent(event)
+    if (!video) return
+    event.preventDefault()
+    for (const touch of Array.from(event.changedTouches)) {
+      const pointer = { clientX: touch.clientX, clientY: touch.clientY, target: video }
+      if (!webrtc.sendTouch(0, pointer.clientX, pointer.clientY, touch.identifier, video)) continue
+      trackedPointersRef.current.set(touch.identifier, pointer)
+    }
+  }
+
+  const onTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!automationAvailable) return
+    const video = videoForPointerEvent(event)
+    if (!video) return
+    event.preventDefault()
+    let changed = false
+    for (const touch of Array.from(event.changedTouches)) {
+      if (!trackedPointersRef.current.has(touch.identifier)) continue
+      const pointer = { clientX: touch.clientX, clientY: touch.clientY, target: video }
+      trackedPointersRef.current.set(touch.identifier, pointer)
+      pendingPointerMovesRef.current.set(touch.identifier, pointer)
+      changed = true
+    }
+    if (changed && pointerMoveFrameRef.current === null) {
+      pointerMoveFrameRef.current = window.requestAnimationFrame(flushPointerMoves)
+    }
+  }
+
+  const finishTouch = (event: React.TouchEvent<HTMLDivElement>, cancelled = false) => {
+    event.preventDefault()
+    for (const touch of Array.from(event.changedTouches)) {
+      const tracked = trackedPointersRef.current.get(touch.identifier)
+      if (!tracked) continue
+      pendingPointerMovesRef.current.delete(touch.identifier)
+      trackedPointersRef.current.delete(touch.identifier)
+      webrtc.sendTouch(
+        cancelled ? 3 : 1,
+        cancelled ? tracked.clientX : touch.clientX,
+        cancelled ? tracked.clientY : touch.clientY,
+        touch.identifier,
+        tracked.target
+      )
     }
   }
 
@@ -595,6 +644,10 @@ export default function ScrcpyDeviceView({
             onPointerUp={(event) => finishPointer(event)}
             onPointerCancel={(event) => finishPointer(event, true)}
             onLostPointerCapture={onLostPointerCapture}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={(event) => finishTouch(event)}
+            onTouchCancel={(event) => finishTouch(event, true)}
           />
           {webrtc.status === 'connected' && !webrtc.inputReady && (
             <div
@@ -906,6 +959,10 @@ export default function ScrcpyDeviceView({
             onPointerUp={(event) => finishPointer(event)}
             onPointerCancel={(event) => finishPointer(event, true)}
             onLostPointerCapture={onLostPointerCapture}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={(event) => finishTouch(event)}
+            onTouchCancel={(event) => finishTouch(event, true)}
           />
           {!webrtc.inputReady && (
             <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-md bg-black/70 px-2.5 py-1.5 text-xs text-white/90" role="status">
