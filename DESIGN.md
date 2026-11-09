@@ -481,6 +481,7 @@ iOS 风格三档 `Button` 高度由 `Button` 的 `size` 统一管理，经 `app-
 - `selected/current` 必须同时有表面填充、`aria-selected` / `aria-pressed` 和文字/图标提示，不能只靠颜色。
 - `loading` 必须禁用重复提交，把 `aria-busy` 放在内容区；>1s 才显示骨架/进度，≤100ms 不显示指示器。
 - `read-only` 与 `disabled` 不同：read-only 可聚焦、可复制，不触发校验；disabled 不可聚焦、不可点击。
+- 默认禁止文本选中（`user-select: none`），让标题、标签和布局文字表现得像原生控件；输入框、文本域、日志、`pre`/`code` 和显式 `data-selectable` 区域保留选中与复制。
 - 脏数据（dirty）用保存条或行内标记提示；离开前用 ConfirmDialog 或路由拦截，不要静默丢失。
 - 所有可点击元素必须有明确的 `focus-visible` 状态，不能只提供 hover。
 
