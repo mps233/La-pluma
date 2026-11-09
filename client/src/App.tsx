@@ -112,6 +112,7 @@ function App() {
 
   return (
     <div id="app-root" className="la-pluma-app">
+      <div className="desktop-titlebar" aria-hidden="true" />
       <PreviewSessionProvider>
         <Layout>
           {({ activeTab }) => <VisitedWorkspaces activeTab={activeTab} />}

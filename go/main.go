@@ -542,6 +542,10 @@ func (r *desktopRuntime) showWindow() {
 		r.window.Focus()
 		return
 	}
+	titleBarStyle := mygo.TitleBarDefault
+	if runtime.GOOS == "darwin" {
+		titleBarStyle = mygo.TitleBarHiddenInset
+	}
 	window := mygo.NewWindow(mygo.WindowOptions{
 		Title:           "La Pluma",
 		URL:             r.baseURL,
@@ -551,6 +555,7 @@ func (r *desktopRuntime) showWindow() {
 		MinHeight:       680,
 		BackgroundColor: "#101318",
 		StateKey:        "main",
+		TitleBarStyle:   titleBarStyle,
 		Page: mygo.PageOptions{
 			TrustedOrigins:       []string{r.baseURL[:len(r.baseURL)-1]},
 			BackgroundThrottling: mygo.ThrottlingOff,
