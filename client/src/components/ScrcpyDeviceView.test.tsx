@@ -97,11 +97,8 @@ describe('ScrcpyDeviceView automation availability', () => {
     vi.restoreAllMocks()
   })
 
-  it('disables startup, installation, connection, and device controls while unavailable', async () => {
+  it('disables preview startup and device controls while unavailable', async () => {
     const onStartInfrastructure = vi.fn().mockResolvedValue('/webrtc-signaling')
-    const onInstall = vi.fn()
-    const onToggleServer = vi.fn()
-    const onToggleAgent = vi.fn()
 
     await act(async () => root.render(
       <ScrcpyDeviceView
@@ -109,30 +106,18 @@ describe('ScrcpyDeviceView automation availability', () => {
         autoConnect
         automationAvailable={false}
         automationUnavailableMessage="正在检查后端服务，请稍候"
-        infrastructureStatus={{ installed: false, built: false, serverRunning: false, agentRunning: false }}
+        infrastructureStatus={{ installed: true, serverRunning: false }}
         onStartInfrastructure={onStartInfrastructure}
-        onInstall={onInstall}
-        onToggleServer={onToggleServer}
-        onToggleAgent={onToggleAgent}
       />
     ))
 
-    expect(findButton('安装预览组件')?.disabled).toBe(true)
-    expect(findButton('启动服务')?.disabled).toBe(true)
-    expect(findButton('连接 Agent')?.disabled).toBe(true)
-    expect(findButton('安装组件')?.disabled).toBe(true)
-    expect(findButton('安装预览组件')?.title).toBe('正在检查后端服务，请稍候')
+    expect(findButton('启动预览')?.disabled).toBe(true)
+    expect(findButton('启动预览')?.title).toBe('正在检查后端服务，请稍候')
 
-    findButton('安装预览组件')?.click()
-    findButton('启动服务')?.click()
-    findButton('连接 Agent')?.click()
-    findButton('安装组件')?.click()
+    findButton('启动预览')?.click()
     container.querySelector('video')?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
 
     expect(onStartInfrastructure).not.toHaveBeenCalled()
-    expect(onInstall).not.toHaveBeenCalled()
-    expect(onToggleServer).not.toHaveBeenCalled()
-    expect(onToggleAgent).not.toHaveBeenCalled()
     expect(webrtcMock.sendTouch).not.toHaveBeenCalled()
   })
 
@@ -145,7 +130,7 @@ describe('ScrcpyDeviceView automation availability', () => {
             <ScrcpyDeviceView
               enabled
               autoConnect
-              infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
+              infrastructureStatus={{ installed: true, serverRunning: true }}
               onStartInfrastructure={onStartInfrastructure}
             />
           </Activity>,
@@ -170,7 +155,7 @@ describe('ScrcpyDeviceView automation availability', () => {
     await act(async () => root.render(
       <ScrcpyDeviceView
         enabled
-        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
+        infrastructureStatus={{ installed: true, serverRunning: true }}
       />
     ))
 
@@ -183,63 +168,12 @@ describe('ScrcpyDeviceView automation availability', () => {
     await act(async () => root.render(
       <ScrcpyDeviceView
         enabled
-        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
+        infrastructureStatus={{ installed: true, serverRunning: true }}
       />
     ))
 
     expect(frame?.classList.contains('is-active')).toBe(false)
     expect(frame?.getAttribute('aria-busy')).toBe('false')
-  })
-
-  it('warns and offers a redeploy when the device agent is outdated', async () => {
-    const onRedeployAgent = vi.fn()
-    await act(async () => root.render(
-      <ScrcpyDeviceView
-        enabled
-        infrastructureStatus={{
-          installed: true,
-          built: true,
-          serverRunning: true,
-          agentRunning: true,
-          serverVersion: 'v0.4.3',
-          agentVersion: 'v0.2.7-abcdef',
-          agentVersionStatus: 'outdated',
-          minimumAgentVersion: '0.4.3',
-          screenState: 'off',
-          usingDefaultPassword: true
-        }}
-        onRedeployAgent={onRedeployAgent}
-      />
-    ))
-
-    expect(container.textContent).toContain('设备端 Agent v0.2.7-abcdef 低于 v0.4.3')
-    expect(container.textContent).toContain('服务：运行中 · v0.4.3')
-    expect(container.textContent).toContain('Agent：运行中 · v0.2.7-abcdef')
-    expect(container.textContent).toContain('设备息屏')
-    expect(container.textContent).toContain('默认密码')
-
-    await act(async () => findButton('重新部署 Agent')?.click())
-    expect(onRedeployAgent).toHaveBeenCalledOnce()
-  })
-
-  it('does not warn about an agent that meets the minimum version', async () => {
-    await act(async () => root.render(
-      <ScrcpyDeviceView
-        enabled
-        infrastructureStatus={{
-          installed: true,
-          built: true,
-          serverRunning: true,
-          agentRunning: true,
-          serverVersion: 'v0.4.3',
-          agentVersion: 'v0.4.3-1b7d786',
-          agentVersionStatus: 'ok',
-          minimumAgentVersion: '0.4.3'
-        }}
-      />
-    ))
-
-    expect(container.textContent).not.toContain('低于 v0.4.3')
   })
 
   it('shows a command failure returned by the preview channel', async () => {
@@ -253,7 +187,7 @@ describe('ScrcpyDeviceView automation availability', () => {
     await act(async () => root.render(
       <ScrcpyDeviceView
         enabled
-        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
+        infrastructureStatus={{ installed: true, serverRunning: true }}
       />
     ))
 
@@ -271,7 +205,7 @@ describe('ScrcpyDeviceView automation availability', () => {
       <ScrcpyDeviceView
         variant="compact"
         enabled={false}
-        infrastructureStatus={{ installed: true, built: true, serverRunning: false, agentRunning: false }}
+        infrastructureStatus={{ installed: true, serverRunning: false }}
       />
     ))
 
@@ -297,57 +231,48 @@ describe('ScrcpyDeviceView automation availability', () => {
     expect(findButton('收起预览设置')?.getAttribute('aria-controls')).toBe(rail?.id)
   })
 
-  it('keeps recovery controls available while blocking new device actions', async () => {
+  it('keeps preview recovery controls available while blocking new device actions', async () => {
     webrtcMock.status = 'connected'
-    const onToggleServer = vi.fn()
-    const onToggleAgent = vi.fn()
+    const onStopPreview = vi.fn()
 
     await act(async () => root.render(
       <ScrcpyDeviceView
         enabled
         automationAvailable={false}
         automationUnavailableMessage="后端服务暂不可用"
-        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
-        onToggleServer={onToggleServer}
-        onToggleAgent={onToggleAgent}
+        infrastructureStatus={{ installed: true, serverRunning: true }}
+        onStopPreview={onStopPreview}
       />
     ))
 
-    expect(findButton('停止服务')?.disabled).toBe(false)
-    expect(findButton('停止 Agent')?.disabled).toBe(false)
+    expect(findButton('停止预览')?.disabled).toBe(false)
     expect(findButton('断开')?.disabled).toBe(false)
     expect(findButton('返回')?.disabled).toBe(true)
 
     await act(async () => {
-      findButton('停止服务')?.click()
-      findButton('停止 Agent')?.click()
+      findButton('停止预览')?.click()
       findButton('断开')?.click()
       findButton('返回')?.click()
     })
 
-    expect(onToggleServer).toHaveBeenCalledOnce()
-    expect(onToggleAgent).toHaveBeenCalledOnce()
+    expect(onStopPreview).toHaveBeenCalledOnce()
     expect(webrtcMock.disconnect).toHaveBeenCalledOnce()
     expect(webrtcMock.sendCommand).not.toHaveBeenCalled()
   })
 
-  it('disables every infrastructure control while one operation is running', async () => {
+  it('disables preview controls while an operation is running', async () => {
     webrtcMock.status = 'connected'
     await act(async () => root.render(
       <ScrcpyDeviceView
         enabled
-        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
-        infrastructureLoading="server"
-        onToggleServer={vi.fn()}
-        onToggleAgent={vi.fn()}
-        onInstall={vi.fn()}
+        infrastructureStatus={{ installed: true, serverRunning: true }}
+        infrastructureLoading="stop"
+        onStopPreview={vi.fn()}
       />
     ))
 
     expect(findButton('重连预览')?.disabled).toBe(true)
     expect(findButton('处理中')?.disabled).toBe(true)
-    expect(findButton('停止 Agent')?.disabled).toBe(true)
-    expect(findButton('重装组件')?.disabled).toBe(true)
   })
 
   it('shows input readiness and never starts a gesture while the input channel is unavailable', async () => {
@@ -355,7 +280,7 @@ describe('ScrcpyDeviceView automation availability', () => {
     await act(async () => root.render(
       <ScrcpyDeviceView
         enabled
-        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
+        infrastructureStatus={{ installed: true, serverRunning: true }}
       />
     ))
 
@@ -378,16 +303,15 @@ describe('ScrcpyDeviceView automation availability', () => {
       />
     ))
 
-    expect(container.textContent).toContain('组件：未知')
-    expect(container.textContent).toContain('服务：未知')
-    expect(container.textContent).not.toContain('组件：未安装')
+    expect(container.textContent).toContain('预览服务：未知')
+    expect(container.textContent).not.toContain('未安装')
   })
 
   it('applies preset FPS and marks manual quality changes as custom', async () => {
     await act(async () => root.render(
       <ScrcpyDeviceView
         enabled={false}
-        infrastructureStatus={{ installed: true, built: true, serverRunning: false, agentRunning: false }}
+        infrastructureStatus={{ installed: true, serverRunning: false }}
       />
     ))
 
@@ -419,7 +343,7 @@ describe('ScrcpyDeviceView automation availability', () => {
     await act(async () => root.render(
       <ScrcpyDeviceView
         enabled
-        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
+        infrastructureStatus={{ installed: true, serverRunning: true }}
       />
     ))
 
@@ -463,7 +387,7 @@ describe('ScrcpyDeviceView automation availability', () => {
     await act(async () => root.render(
       <ScrcpyDeviceView
         enabled
-        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
+        infrastructureStatus={{ installed: true, serverRunning: true }}
       />
     ))
 
@@ -496,7 +420,7 @@ describe('ScrcpyDeviceView automation availability', () => {
     await act(async () => root.render(
       <ScrcpyDeviceView
         enabled
-        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
+        infrastructureStatus={{ installed: true, serverRunning: true }}
       />
     ))
     const fullscreenButton = findButton('全屏')!
@@ -528,7 +452,7 @@ describe('ScrcpyDeviceView automation availability', () => {
 
     const props = {
       enabled: true,
-      infrastructureStatus: { installed: true, built: true, serverRunning: true, agentRunning: true },
+      infrastructureStatus: { installed: true, serverRunning: true,  },
     }
     await act(async () => root.render(<ScrcpyDeviceView {...props} />))
     await act(async () => findButton('全屏')?.click())

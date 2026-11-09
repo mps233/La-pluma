@@ -30,7 +30,6 @@ export function useDashboardPreview() {
   const [statusSettled, setStatusSettled] = useState(false)
   const [previewStartError, setPreviewStartError] = useState<string | null>(null)
   const serverRunning = Boolean(webrtcStatus?.serverRunning)
-  const agentRunning = Boolean(webrtcStatus?.agentRunning)
   const scrcpyOptions = useMemo(
     () => buildPreviewScrcpyOptions({ quality, fps, maxSize, bitrateMbps }),
     [bitrateMbps, fps, maxSize, quality]
@@ -49,7 +48,7 @@ export function useDashboardPreview() {
   const reconnectPreview = () => {
     autoConnectRef.current = false
     disconnectPreview()
-    if (!serverRunning || !agentRunning) {
+    if (!serverRunning) {
       void maaApi.startWebrtc('default', 'mumu-la-pluma', undefined, scrcpyOptions)
         .then(result => {
           if (!result.success) throw new Error(maaApi.getErrorMessage(result))
@@ -97,10 +96,10 @@ export function useDashboardPreview() {
   }, [mode])
 
   useEffect(() => {
-    if (!serverRunning || !agentRunning) {
+    if (!serverRunning) {
       autoConnectRef.current = false
     }
-  }, [agentRunning, serverRunning])
+  }, [serverRunning])
 
   useEffect(() => {
     if (mode !== 'live') {
@@ -108,13 +107,13 @@ export function useDashboardPreview() {
       disconnectPreview()
       return
     }
-    if (!serverRunning || !agentRunning || autoConnectRef.current) return
+    if (!serverRunning || autoConnectRef.current) return
     autoConnectRef.current = true
     connectPreview()
-  }, [agentRunning, connectPreview, disconnectPreview, mode, serverRunning])
+  }, [connectPreview, disconnectPreview, mode, serverRunning])
 
   useEffect(() => {
-    if (mode !== 'live' || !statusSettled || (serverRunning && agentRunning) || infrastructureStartingRef.current) return
+    if (mode !== 'live' || !statusSettled || serverRunning || infrastructureStartingRef.current) return
     infrastructureStartingRef.current = true
     void maaApi.startWebrtc('default', 'mumu-la-pluma', undefined, scrcpyOptions)
       .then(result => {
@@ -128,7 +127,7 @@ export function useDashboardPreview() {
       .finally(() => {
         infrastructureStartingRef.current = false
       })
-  }, [agentRunning, mode, serverRunning, scrcpyOptions, statusSettled])
+  }, [mode, serverRunning, scrcpyOptions, statusSettled])
 
   useEffect(() => {
     const canvas = document.createElement('canvas')
@@ -252,23 +251,19 @@ export function useDashboardPreview() {
         ? visibleFallback ? '画面快照 · 10s' : '等待画面快照'
         : showLivePreview
           ? 'Live'
-          : webrtcStatus?.screenState === 'off'
-            ? '设备息屏'
-            : previewError
-              ? '实时连接失败'
-              : visibleFallback
-                ? '正在连接实时画面'
-                : preview.status,
+          : previewError
+            ? '实时连接失败'
+            : visibleFallback
+              ? '正在连接实时画面'
+              : preview.status,
     headerStatusText: mode === 'off'
       ? '已关闭'
       : mode === 'snapshot'
         ? visibleFallback ? '画面快照' : '等待快照'
         : showLivePreview
           ? `${preview.stats?.width || 0}×${preview.stats?.height || 0}`
-          : webrtcStatus?.screenState === 'off'
-            ? '设备息屏'
-            : visibleFallback
-              ? '实时连接中'
-              : '连接中'
+          : visibleFallback
+            ? '实时连接中'
+            : '连接中'
   }
 }

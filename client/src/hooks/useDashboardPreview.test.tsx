@@ -54,7 +54,7 @@ describe('useDashboardPreview Activity lifecycle', () => {
     usePreviewStore.setState({ mode: 'snapshot' })
     mocks.getWebrtcStatus.mockReset().mockResolvedValue({
       success: true,
-      data: { serverRunning: true, agentRunning: true, signalingUrl: '/webrtc-signaling' },
+      data: { serverRunning: true, signalingUrl: '/webrtc-signaling' },
     })
     mocks.getWebrtcSnapshot.mockReset().mockResolvedValue({ success: false })
     mocks.captureScreen.mockReset().mockResolvedValue({ success: false })

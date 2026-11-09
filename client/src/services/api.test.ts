@@ -14,8 +14,7 @@ describe('maaApi WebRTC preview', () => {
       success: true,
       data: {
         serverRunning: true,
-        agentRunning: true,
-        signalingUrl: 'ws://192.168.1.2:8443'
+        signalingUrl: '/webrtc-signaling'
       }
     }), {
       status: 200,
@@ -28,7 +27,7 @@ describe('maaApi WebRTC preview', () => {
       method: 'POST',
       body: JSON.stringify({ profileId: 'default', deviceId: 'mumu-la-pluma' })
     }))
-    expect(result.data?.signalingUrl).toBe('ws://192.168.1.2:8443')
+    expect(result.data?.signalingUrl).toBe('/webrtc-signaling')
   })
 })
 

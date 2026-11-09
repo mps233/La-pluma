@@ -111,21 +111,11 @@ interface ApplyTrainingPlanData {
 
 export interface WebrtcStatusData {
   installed?: boolean
-  built?: boolean
   serverRunning?: boolean
-  agentRunning?: boolean
   signalingUrl?: string
-  directSignalingUrl?: string
   deviceId?: string
   devices?: string[]
   serverVersion?: string | null
-  agentVersion?: string | null
-  agentOnline?: boolean
-  agentVersionStatus?: 'ok' | 'outdated' | 'unknown'
-  minimumAgentVersion?: string
-  screenState?: string | null
-  usingDefaultPassword?: boolean
-  runtimeVersion?: string | null
   [key: string]: unknown
 }
 
@@ -135,19 +125,6 @@ export interface WebrtcSnapshotData {
   mediaType: string
   size?: number
   capturedAt?: string
-}
-
-export interface WebrtcInstallState {
-  status: 'idle' | 'running' | 'succeeded' | 'failed'
-  startedAt?: string | null
-  finishedAt?: string | null
-  result?: unknown
-  error?: {
-    code: string
-    message: string
-    retryable: boolean
-    details?: unknown
-  } | null
 }
 
 export interface MaaVersionData {
@@ -584,40 +561,6 @@ export const maaApi = {
       body: JSON.stringify(body),
       signal
     })
-    return parseJsonResponse(response)
-  },
-
-  async installWebrtc(): Promise<ApiResponse<WebrtcInstallState>> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/install`, { method: 'POST' })
-    return parseJsonResponse(response)
-  },
-
-  async getWebrtcInstallStatus(): Promise<ApiResponse<WebrtcInstallState>> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/install/status`)
-    return parseJsonResponse(response)
-  },
-
-  async startWebrtcServer(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/start-server`, { method: 'POST' })
-    return parseJsonResponse(response)
-  },
-
-  async stopWebrtcServer(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/stop-server`, { method: 'POST' })
-    return parseJsonResponse(response)
-  },
-
-  async startWebrtcAgent(profileId: string = 'default'): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/start-agent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profileId })
-    })
-    return parseJsonResponse(response)
-  },
-
-  async stopWebrtcAgent(): Promise<ApiResponse> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/webrtc/stop-agent`, { method: 'POST' })
     return parseJsonResponse(response)
   },
 

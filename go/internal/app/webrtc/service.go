@@ -292,22 +292,12 @@ func (s *Service) statusLocked() map[string]any {
 		installed = false
 	}
 	status := map[string]any{
-		"installed":            installed,
-		"built":                installed,
-		"serverRunning":        running,
-		"agentRunning":         running,
-		"signalingUrl":         "/webrtc-signaling",
-		"directSignalingUrl":   "",
-		"deviceId":             s.deviceID,
-		"devices":              []string{},
-		"serverVersion":        s.serverVersion,
-		"agentVersion":         "pion-scrcpy",
-		"agentOnline":          running,
-		"agentVersionStatus":   "ok",
-		"minimumAgentVersion":  "0.0.0",
-		"screenState":          nil,
-		"usingDefaultPassword": false,
-		"runtimeVersion":       "pion-scrcpy",
+		"installed":     installed,
+		"serverRunning": running,
+		"signalingUrl":  "/webrtc-signaling",
+		"deviceId":      s.deviceID,
+		"devices":       []string{},
+		"serverVersion": s.serverVersion,
 	}
 	if s.current != nil {
 		status["deviceId"] = s.current.deviceID

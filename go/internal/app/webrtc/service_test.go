@@ -15,7 +15,7 @@ import (
 
 func TestStatusReportsScrcpyServerAvailability(t *testing.T) {
 	missing := &Service{serverPath: filepath.Join(t.TempDir(), "missing-scrcpy-server")}
-	if status := missing.Status(); status["installed"] != false || status["built"] != false {
+	if status := missing.Status(); status["installed"] != false {
 		t.Fatalf("missing component status = %#v", status)
 	}
 
@@ -24,7 +24,7 @@ func TestStatusReportsScrcpyServerAvailability(t *testing.T) {
 		t.Fatal(err)
 	}
 	present := &Service{serverPath: path}
-	if status := present.Status(); status["installed"] != true || status["built"] != true {
+	if status := present.Status(); status["installed"] != true {
 		t.Fatalf("present component status = %#v", status)
 	}
 }

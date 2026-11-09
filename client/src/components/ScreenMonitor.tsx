@@ -129,33 +129,11 @@ export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) 
     }
   }
 
-  const redeployWebrtcAgent = async () => {
-    return runWebrtcAction('agent', async () => {
-      if (webrtcStatus?.agentRunning) {
-        const stopped = await maaApi.stopWebrtcAgent()
-        if (stopped?.success === false) throw new Error(maaApi.getErrorMessage(stopped))
-      }
-      return maaApi.startWebrtcAgent()
-    })
-  }
-
-  const installWebrtcAndWait = async () => {
-    const started = await maaApi.installWebrtc()
-    if (started?.success === false) throw new Error(maaApi.getErrorMessage(started))
-
-    const deadline = Date.now() + 15 * 60 * 1000
-    while (true) {
-      if (!mountedRef.current) return undefined
-      const result = await maaApi.getWebrtcInstallStatus()
-      if (result?.success === false) throw new Error(maaApi.getErrorMessage(result))
-      const state = result?.data
-      if (state?.status === 'succeeded') return undefined
-      if (state?.status === 'failed') throw new Error(state.error?.message || 'WebRTC 组件安装失败')
-      if (state?.status === 'idle') throw new Error('WebRTC 组件安装任务未启动，请重试')
-      if (Date.now() >= deadline) throw new Error('WebRTC 组件安装超时，请检查网络后重试')
-      await new Promise(resolve => setTimeout(resolve, 1000))
-    }
-  }
+  const stopWebrtcPreview = () => runWebrtcAction('stop', async () => {
+    const result = await maaApi.stopWebrtc()
+    if (result?.success === false) throw new Error(maaApi.getErrorMessage(result))
+    return result
+  }, true)
 
   const cancelWebrtcStart = () => {
     startAbortRef.current?.abort()
@@ -181,18 +159,7 @@ export default function ScreenMonitor({ variant = 'full' }: ScreenMonitorProps) 
         infrastructureStatusState={webrtcStatusState}
         infrastructureLoading={webrtcLoading}
         infrastructureError={webrtcActionError}
-        onInstall={() => runWebrtcAction('install', installWebrtcAndWait)}
-        onToggleServer={() => runWebrtcAction(
-          'server',
-          () => webrtcStatus?.serverRunning ? maaApi.stopWebrtcServer() : maaApi.startWebrtcServer(),
-          !!webrtcStatus?.serverRunning
-        )}
-        onToggleAgent={() => runWebrtcAction(
-          'agent',
-          () => webrtcStatus?.agentRunning ? maaApi.stopWebrtcAgent() : maaApi.startWebrtcAgent(),
-          !!webrtcStatus?.agentRunning
-        )}
-        onRedeployAgent={redeployWebrtcAgent}
+        onStopPreview={stopWebrtcPreview}
       />
     </div>
   )

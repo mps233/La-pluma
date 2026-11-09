@@ -178,12 +178,6 @@ func New(application *app.App, logger *slog.Logger) *Handler {
 	mux.HandleFunc("POST /webrtc/stop", handler.webrtcStop)
 	mux.HandleFunc("GET /webrtc/devices", handler.webrtcDevices)
 	mux.HandleFunc("GET /webrtc/snapshot", handler.webrtcSnapshot)
-	mux.HandleFunc("POST /webrtc/start-server", handler.webrtcStart)
-	mux.HandleFunc("POST /webrtc/stop-server", handler.webrtcStop)
-	mux.HandleFunc("POST /webrtc/start-agent", handler.webrtcStart)
-	mux.HandleFunc("POST /webrtc/stop-agent", handler.webrtcStop)
-	mux.HandleFunc("POST /webrtc/install", handler.webrtcInstall)
-	mux.HandleFunc("GET /webrtc/install/status", handler.webrtcInstall)
 	mux.HandleFunc("GET /manifest", handler.manifest)
 	mux.HandleFunc("GET /openapi.json", handler.openapi)
 	handler.handler = mux
@@ -596,21 +590,6 @@ func (h *Handler) webrtcSnapshot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.Success(w, http.StatusOK, snapshot, "", nil)
-}
-
-func (h *Handler) webrtcInstall(w http.ResponseWriter, r *http.Request) {
-	status := h.app.WebRTC.Status()
-	installed, _ := status["installed"].(bool)
-	message := "Pion + scrcpy 组件已内置"
-	if !installed {
-		status["status"] = "failed"
-		message = "未找到 scrcpy-server，请设置 LA_PLUMA_SCRCPY_SERVER_PATH"
-	} else {
-		status["status"] = "succeeded"
-	}
-	status["startedAt"] = time.Now().UTC().Format(time.RFC3339)
-	status["finishedAt"] = time.Now().UTC().Format(time.RFC3339)
-	httpx.Success(w, http.StatusOK, status, message, nil)
 }
 
 func webrtcStartRequest(body webrtcStartBody) webrtcapp.StartRequest {

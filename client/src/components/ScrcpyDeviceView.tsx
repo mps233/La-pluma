@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, Clipboard, ClipboardPaste, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
+import { ArrowLeft, Clipboard, ClipboardPaste, Gauge, Home, Maximize2, Minimize2, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
 import { maaApi } from '../services/api'
 import { Button, IconButton, TruncatedText } from './common'
 import { keepNumberWithUnit } from '../utils/typography'
@@ -19,23 +19,13 @@ interface ScrcpyDeviceViewProps {
   autoConnect?: boolean
   infrastructureStatus?: {
     installed?: boolean
-    built?: boolean
     serverRunning?: boolean
-    agentRunning?: boolean
     serverVersion?: string | null
-    agentVersion?: string | null
-    agentVersionStatus?: 'ok' | 'outdated' | 'unknown'
-    minimumAgentVersion?: string
-    screenState?: string | null
-    usingDefaultPassword?: boolean
   } | null
   infrastructureStatusState?: 'loading' | 'ready' | 'error'
   infrastructureLoading?: string | null
   infrastructureError?: string | null
-  onInstall?: () => Promise<void> | void
-  onToggleServer?: () => Promise<void> | void
-  onToggleAgent?: () => Promise<void> | void
-  onRedeployAgent?: () => Promise<void> | void
+  onStopPreview?: () => Promise<void> | void
 }
 
 const statusLabel: Record<string, string> = {
@@ -112,10 +102,7 @@ export default function ScrcpyDeviceView({
   infrastructureStatusState,
   infrastructureLoading,
   infrastructureError,
-  onInstall,
-  onToggleServer,
-  onToggleAgent,
-  onRedeployAgent
+  onStopPreview
 }: ScrcpyDeviceViewProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const immersiveVideoRef = useRef<HTMLVideoElement | null>(null)
@@ -198,10 +185,7 @@ export default function ScrcpyDeviceView({
   const resolvedInfrastructureState = infrastructureStatusState || (infrastructureStatus ? 'ready' : 'loading')
   const infrastructureKnown = infrastructureStatus !== null && infrastructureStatus !== undefined
   const infrastructureBusy = infrastructureLoading !== null && infrastructureLoading !== undefined
-  const needsInstall = infrastructureKnown && (!infrastructureStatus.installed || !infrastructureStatus.built)
   const visibleError = webrtc.error || infrastructureError
-  const minimumAgentVersion = infrastructureStatus?.minimumAgentVersion || '0.4.3'
-  const agentVersionOutdated = infrastructureStatus?.agentVersionStatus === 'outdated'
   const statusDotClass = visibleError
     ? 'bg-[var(--app-danger)]'
     : webrtc.status === 'connected'
@@ -521,14 +505,8 @@ export default function ScrcpyDeviceView({
     ['触控', webrtc.inputReady ? 'ready' : webrtc.status === 'connected' ? '等待通道' : '--']
   ]
   const unavailableInfrastructureLabel = resolvedInfrastructureState === 'loading' ? '检查中' : '未知'
-  const componentStatusLabel = infrastructureKnown
-    ? infrastructureStatus.built ? '已安装' : infrastructureStatus.installed ? '待构建' : '未安装'
-    : unavailableInfrastructureLabel
   const serverStatusLabel = infrastructureKnown
     ? infrastructureStatus.serverRunning ? '运行中' : '已停止'
-    : unavailableInfrastructureLabel
-  const agentStatusLabel = infrastructureKnown
-    ? infrastructureStatus.agentRunning ? '运行中' : '已停止'
     : unavailableInfrastructureLabel
 
   return (
@@ -559,55 +537,13 @@ export default function ScrcpyDeviceView({
           )}
           {!isCompact && <div className="flex flex-wrap gap-2 text-xs justify-end">
             <span className="surface-soft rounded-full px-2 py-1 text-secondary">
-              组件：{componentStatusLabel}
+              预览服务：{serverStatusLabel}{infrastructureStatus?.serverVersion ? ` · scrcpy ${infrastructureStatus.serverVersion}` : ''}
             </span>
-            <span className="surface-soft rounded-full px-2 py-1 text-secondary">
-              服务：{serverStatusLabel}{infrastructureStatus?.serverVersion ? ` · ${infrastructureStatus.serverVersion}` : ''}
-            </span>
-            <span className="surface-soft rounded-full px-2 py-1 text-secondary">
-              Agent：{agentStatusLabel}{infrastructureStatus?.agentVersion ? ` · ${infrastructureStatus.agentVersion}` : ''}
-            </span>
-            {infrastructureStatus?.screenState === 'off' && (
-              <span className="status-warning rounded-full px-2 py-1">设备息屏</span>
-            )}
-            {infrastructureStatus?.usingDefaultPassword && (
-              <span
-                className="status-warning rounded-full px-2 py-1"
-                title="建议设置访问令牌保护预览服务"
-              >
-                默认密码
-              </span>
-            )}
             {visibleError && (
               <span className="px-2 py-1 rounded-full status-danger">{visibleError}</span>
             )}
           </div>}
         </div>
-
-        {agentVersionOutdated && (
-          <div
-            className="status-warning flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs leading-5"
-            role="alert"
-          >
-            <span>
-              设备端 Agent {infrastructureStatus?.agentVersion || '版本未知'} 低于 v{minimumAgentVersion}，旧版可能因到期限制无法启动。
-              {onRedeployAgent ? '重新部署即可更新设备端 Agent。' : '请先停止 Agent，再重新连接以部署新版。'}
-            </span>
-            {onRedeployAgent && (
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => void onRedeployAgent()}
-                disabled={!automationAvailable || infrastructureBusy}
-                loading={infrastructureLoading === 'agent'}
-                loadingText="部署中"
-                title={!automationAvailable ? automationUnavailableMessage : undefined}
-              >
-                重新部署 Agent
-              </Button>
-            )}
-          </div>
-        )}
 
         {!isCompact && <div className="scrcpy-status-grid">
           {statusCards.map(([label, value]) => (
@@ -677,21 +613,13 @@ export default function ScrcpyDeviceView({
                     size="sm"
                     variant="primary"
                     className="scrcpy-empty-action min-w-32 px-4"
-                    icon={needsInstall
-                      ? <Package className="h-3.5 w-3.5" strokeWidth={1.8} />
-                      : <Plug className="h-3.5 w-3.5" strokeWidth={1.8} />}
-                    onClick={needsInstall
-                      ? () => runInfrastructureAction(onInstall)
-                      : connectFromControl}
+                    icon={<Plug className="h-3.5 w-3.5" strokeWidth={1.8} />}
+                    onClick={connectFromControl}
                     disabled={!automationAvailable || infrastructureBusy || isConnecting}
                     title={!automationAvailable ? automationUnavailableMessage : undefined}
-                    loading={infrastructureLoading === 'install' || infrastructureLoading === 'preview' || isConnecting}
+                    loading={infrastructureLoading === 'preview' || isConnecting}
                   >
-                    {needsInstall
-                      ? '安装预览组件'
-                      : visibleError
-                        ? '重试预览'
-                        : '启动预览'}
+                    {visibleError ? '重试预览' : '启动预览'}
                   </Button>
                   {previewBusy && onCancelInfrastructure && (
                     <Button
@@ -804,27 +732,19 @@ export default function ScrcpyDeviceView({
             </Button>
           )}
 
-          <div className="scrcpy-service-grid">
-            {[
-              { label: infrastructureStatus?.serverRunning ? '停止服务' : '启动服务', icon: Server, onClick: onToggleServer, disabled: !infrastructureKnown || infrastructureBusy || (!infrastructureStatus?.serverRunning && !automationAvailable), allowWhenUnavailable: !!infrastructureStatus?.serverRunning, loading: infrastructureLoading === 'server' },
-              { label: infrastructureStatus?.agentRunning ? '停止 Agent' : '连接 Agent', icon: Smartphone, onClick: onToggleAgent, disabled: !infrastructureKnown || infrastructureBusy || (infrastructureStatus?.agentRunning ? false : !infrastructureStatus?.serverRunning || !automationAvailable), allowWhenUnavailable: !!infrastructureStatus?.agentRunning, loading: infrastructureLoading === 'agent' }
-            ].map(action => {
-              const Icon = action.icon
-              return (
-                <button
-                  key={action.label}
-                  type="button"
-                  onClick={() => runInfrastructureAction(action.onClick, action.allowWhenUnavailable)}
-                  disabled={action.disabled}
-                  title={action.disabled && !automationAvailable ? automationUnavailableMessage : action.label}
-                  className="scrcpy-service-action control-surface min-h-11"
-                >
-                  <Icon className="h-3.5 w-3.5" strokeWidth={1.7} />
-                  <span>{action.loading ? '处理中' : action.label}</span>
-                </button>
-              )
-            })}
-          </div>
+          {infrastructureStatus?.serverRunning && (
+            <div className="scrcpy-service-grid">
+              <button
+                type="button"
+                onClick={() => runInfrastructureAction(onStopPreview, true)}
+                disabled={!infrastructureKnown || infrastructureBusy}
+                className="scrcpy-service-action control-surface min-h-11"
+              >
+                <Server className="h-3.5 w-3.5" strokeWidth={1.7} />
+                <span>{infrastructureLoading === 'stop' ? '处理中' : '停止预览'}</span>
+              </button>
+            </div>
+          )}
 
           <div className="scrcpy-service-utilities">
             <button
@@ -835,16 +755,6 @@ export default function ScrcpyDeviceView({
             >
               <Unplug className="h-3.5 w-3.5" strokeWidth={1.8} />
               <span>断开</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => runInfrastructureAction(onInstall)}
-              disabled={!automationAvailable || infrastructureBusy || !infrastructureKnown}
-              title={!automationAvailable ? automationUnavailableMessage : undefined}
-              className="scrcpy-utility-action min-h-11"
-            >
-              <Package className="h-3.5 w-3.5" strokeWidth={1.8} />
-              <span>{infrastructureLoading === 'install' ? '安装中' : infrastructureStatus?.built ? '重装组件' : '安装组件'}</span>
             </button>
           </div>
         </section>
