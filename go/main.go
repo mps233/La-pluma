@@ -575,15 +575,15 @@ func (DesktopBridge) SetAccessToken(value string) (string, error) {
 }
 
 // normalizeDesktopAccessToken keeps the token usable in HTTP headers and
-// compatible with the browser input: visible ASCII only, 8–128 characters.
+// compatible with the browser input: visible ASCII only, 6–128 characters.
 func normalizeDesktopAccessToken(value string) (string, error) {
 	token := strings.TrimSpace(value)
 	token = strings.TrimSpace(strings.TrimPrefix(token, "Bearer "))
 	if token == "" {
 		return "", errors.New("访问令牌不能为空")
 	}
-	if len(token) < 8 || len(token) > 128 {
-		return "", errors.New("访问令牌需要 8–128 个字符")
+	if len(token) < 6 || len(token) > 128 {
+		return "", errors.New("访问令牌需要 6–128 个字符")
 	}
 	for _, char := range token {
 		if char < 0x21 || char > 0x7e {

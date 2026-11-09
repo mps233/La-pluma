@@ -9,7 +9,7 @@ import {
   writeAccessToken,
 } from '@/utils/accessToken'
 
-const DESKTOP_TOKEN_PATTERN = /^[!-~]{8,128}$/
+const DESKTOP_TOKEN_PATTERN = /^[!-~]{6,128}$/
 
 export default function AccessTokenSettings() {
   const desktop = isDesktopRuntime()
@@ -57,7 +57,7 @@ export default function AccessTokenSettings() {
   const saveDesktopToken = async () => {
     const token = value.trim().replace(/^Bearer\s+/i, '').trim()
     if (!DESKTOP_TOKEN_PATTERN.test(token)) {
-      setMessage('访问令牌需要 8–128 个可见 ASCII 字符，且不能包含空格')
+      setMessage('访问令牌需要 6–128 个可见 ASCII 字符，且不能包含空格')
       return
     }
     setSaving(true)
@@ -112,7 +112,7 @@ export default function AccessTokenSettings() {
               setValue(next)
               setMessage('')
             }}
-            placeholder="8–128 个可见 ASCII 字符"
+            placeholder="6–128 个可见 ASCII 字符"
             hint="只能使用可见 ASCII 字符，不能包含空格。保存后立即生效。"
             disabled={desktopLoading || desktopLocked}
           />

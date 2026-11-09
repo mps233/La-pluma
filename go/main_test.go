@@ -75,6 +75,7 @@ func TestNormalizeDesktopAccessToken(t *testing.T) {
 		wantErr bool
 	}{
 		{"  abcdefgh12345678  ", "abcdefgh12345678", false},
+		{"123456", "123456", false},
 		{"Bearer abcdefgh12345678", "abcdefgh12345678", false},
 		{"short", "", true},
 		{"has space token", "", true},
