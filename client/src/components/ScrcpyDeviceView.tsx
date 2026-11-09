@@ -635,7 +635,7 @@ export default function ScrcpyDeviceView({
             className="w-full h-full object-contain pointer-events-none touch-none select-none"
           />
           <div
-            className="absolute inset-0 touch-none select-none"
+            className="absolute inset-0 z-10 touch-none select-none"
             data-scrcpy-touch-surface="true"
             aria-hidden="true"
             onPointerDown={onPointerDown}
@@ -660,7 +660,7 @@ export default function ScrcpyDeviceView({
           )}
           {webrtc.status !== 'connected' && (
             <div
-              className="scrcpy-empty-state absolute inset-0 flex items-center justify-center px-6 text-center"
+              className="scrcpy-empty-state absolute inset-0 z-20 flex items-center justify-center px-6 text-center"
               role={visibleError ? 'alert' : 'status'}
               aria-live="polite"
             >
@@ -950,7 +950,7 @@ export default function ScrcpyDeviceView({
             className="h-full w-full object-contain pointer-events-none touch-none select-none"
           />
           <div
-            className="absolute inset-0 touch-none select-none"
+            className="absolute inset-0 z-10 touch-none select-none"
             data-scrcpy-touch-surface="true"
             aria-hidden="true"
             onPointerDown={onPointerDown}
