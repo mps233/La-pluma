@@ -38,6 +38,14 @@ import (
 
 const desktopPort = 32123
 
+func desktopHost() string {
+	host := strings.TrimSpace(os.Getenv("LA_PLUMA_HOST"))
+	if host == "" {
+		return "127.0.0.1"
+	}
+	return host
+}
+
 var activeDesktop *desktopRuntime
 
 func main() {
@@ -251,8 +259,9 @@ func startDesktop() {
 	defaultPaths.DataDir = filepath.Join(userData, "data")
 	defaultPaths.CacheDir = cacheDir
 	defaultPaths.ClientDist = clientDist
+	host := desktopHost()
 	cfg := config.Config{
-		Host:     "127.0.0.1",
+		Host:     host,
 		Port:     desktopPort,
 		BasePath: "/",
 		Token:    token,
@@ -275,7 +284,7 @@ func startDesktop() {
 		httpapi.WithTokenSource(func() string { return tokenHolder.Load().(string) }),
 	).Handler()
 
-	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", desktopPort))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, desktopPort))
 	if err != nil {
 		_ = application.Close(context.Background())
 		abortStartup(logger, "listen", fmt.Errorf("port %d: %w", desktopPort, err))
@@ -294,7 +303,7 @@ func startDesktop() {
 		IdleTimeout:       120 * time.Second,
 	}
 	go func() {
-		logger.Info("desktop server", "url", runtimeState.baseURL, "data_dir", cfg.Paths.DataDir)
+		logger.Info("desktop server", "bind", listener.Addr().String(), "url", runtimeState.baseURL, "data_dir", cfg.Paths.DataDir)
 		if err := runtimeState.server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("desktop server", "error", err)
 		}

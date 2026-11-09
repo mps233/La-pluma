@@ -171,7 +171,7 @@ docker run -d \
 | 变量 | 用途 | 默认值 |
 | --- | --- | --- |
 | `PORT` | HTTP 端口 | `3000` |
-| `LA_PLUMA_HOST` | 监听地址 | `0.0.0.0` |
+| `LA_PLUMA_HOST` | 监听地址（headless；桌面版也读取，默认 `127.0.0.1`，设为 `0.0.0.0` 可允许局域网访问） | `0.0.0.0` headless / `127.0.0.1` 桌面版 |
 | `LA_PLUMA_DATA_DIR` | 配置、Run 存储与 MAA 任务文件 | `<工作目录>/server/data` |
 | `LA_PLUMA_CLIENT_DIST` | 构建后的 React 客户端 | `<工作目录>/client/dist` |
 | `LA_PLUMA_TOKEN` | 要求 `/api` 与 WebRTC 票据接口携带令牌（headless；覆盖桌面端令牌） | 空：headless 关闭鉴权，桌面版使用已保存的令牌 |

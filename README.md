@@ -172,7 +172,7 @@ Key environment variables:
 | Variable | Purpose | Default |
 | --- | --- | --- |
 | `PORT` | HTTP port | `3000` |
-| `LA_PLUMA_HOST` | Listen address | `0.0.0.0` |
+| `LA_PLUMA_HOST` | Listen address (headless; the desktop app also honors it, default `127.0.0.1` — set `0.0.0.0` for LAN access) | `0.0.0.0` headless / `127.0.0.1` desktop |
 | `LA_PLUMA_DATA_DIR` | Config, run store and MAA task files | `<working-dir>/server/data` |
 | `LA_PLUMA_CLIENT_DIST` | Built React client | `<working-dir>/client/dist` |
 | `LA_PLUMA_TOKEN` | Require a bearer token or `X-La-Pluma-Token` on `/api` and the WebRTC ticket endpoint (headless; overrides the desktop token) | empty: auth off for headless, persisted desktop token for the app |

@@ -40,6 +40,8 @@ LA_PLUMA_CLIENT_DIST=../client/dist \
 go run ./cmd/server
 ```
 
+For the desktop app, set `LA_PLUMA_HOST=0.0.0.0` to allow a phone on the same LAN to open `http://<mac-lan-ip>:32123`; the default bind is `127.0.0.1`.
+
 Open `http://localhost:3000`. Set `LA_PLUMA_TOKEN` to require the existing
 bearer/`X-La-Pluma-Token` auth contract.
 
