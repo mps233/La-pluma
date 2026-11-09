@@ -253,6 +253,13 @@ func (p *Publisher) notifyPeer(connected bool) {
 	}
 }
 
+// HandleClientInput injects an input packet from an authenticated signaling
+// client. It is the fallback when the WebRTC data channel is unavailable,
+// for example through a TCP-only tunnel.
+func (p *Publisher) HandleClientInput(data []byte) {
+	p.handleInput(data)
+}
+
 func (p *Publisher) handleInput(data []byte) {
 	var message TouchMessage
 	if err := json.Unmarshal(data, &message); err != nil {

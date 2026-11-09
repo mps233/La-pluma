@@ -347,7 +347,7 @@ describe('ScrcpyDeviceView automation availability', () => {
       />
     ))
 
-    const video = container.querySelector('video')!
+    const canvas = container.querySelector('canvas')!
     const surface = container.querySelector<HTMLElement>('[data-scrcpy-touch-surface]')!
     Object.assign(surface, {
       setPointerCapture: vi.fn(),
@@ -370,15 +370,15 @@ describe('ScrcpyDeviceView automation availability', () => {
 
     expect(webrtcMock.sendTouch).toHaveBeenCalledTimes(2)
     act(() => frameCallback?.(16))
-    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(2, 12, 22, 1, video)
-    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(2, 32, 42, 2, video)
+    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(2, 12, 22, 1, canvas)
+    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(2, 32, 42, 2, canvas)
 
     act(() => {
       dispatchPointer('pointerup', 1, 13, 23)
       dispatchPointer('pointercancel', 2, 33, 43)
     })
-    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(1, 13, 23, 1, video)
-    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(3, 32, 42, 2, video)
+    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(1, 13, 23, 1, canvas)
+    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(3, 32, 42, 2, canvas)
   })
 
   it('does not track a pointer when the initial touch is rejected', async () => {
@@ -478,7 +478,7 @@ describe('ScrcpyDeviceView automation availability', () => {
       />
     ))
 
-    const video = container.querySelector('video')!
+    const canvas = container.querySelector('canvas')!
     const surface = container.querySelector<HTMLElement>('[data-scrcpy-touch-surface]')!
     const touch = { identifier: 3, clientX: 12, clientY: 24, target: surface }
     const dispatchTouch = (type: string, touches: unknown[]) => {
@@ -489,9 +489,9 @@ describe('ScrcpyDeviceView automation availability', () => {
     }
 
     await act(async () => dispatchTouch('touchstart', [touch]))
-    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(0, 12, 24, 3, video)
+    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(0, 12, 24, 3, canvas)
 
     await act(async () => dispatchTouch('touchend', [touch]))
-    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(1, 12, 24, 3, video)
+    expect(webrtcMock.sendTouch).toHaveBeenCalledWith(1, 12, 24, 3, canvas)
   })
 })
