@@ -50,7 +50,7 @@ go/
   - [x] ADB client (devices/connect/screenshot/input/push/reverse/forward)
   - [x] MAA CLI runner (spawn/wait/stop/line capture)
   - [x] MAA callbacks/dynamic task files/TOML profiles
-  - [ ] ADB emulator discovery orchestration
+  - [x] ADB emulator discovery orchestration
 - [x] 2. Agent API parity
   - [x] contract registry (46 operations, 40 advertised; manifest/OpenAPI)
   - [x] all 105 Agent route paths registered (some return stable 501 for unported scripts)

@@ -11,6 +11,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/app/activity"
 	"github.com/mps233/la-pluma/go/internal/app/agentrun"
 	configapp "github.com/mps233/la-pluma/go/internal/app/config"
+	connectionapp "github.com/mps233/la-pluma/go/internal/app/connection"
 	"github.com/mps233/la-pluma/go/internal/app/copilot"
 	"github.com/mps233/la-pluma/go/internal/app/customtools"
 	"github.com/mps233/la-pluma/go/internal/app/drops"
@@ -52,6 +53,7 @@ type App struct {
 	Training      *training.Service
 	Activity      *activity.Service
 	Copilot       *copilot.Service
+	Connection    *connectionapp.Service
 	Notifications *notifications.Service
 	Quotes        *quotes.Service
 	CustomTools   *customtools.Service
@@ -147,6 +149,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	})
 	schedulerService := newScheduler(cfg, logger, runs, maaActions, dropService, trainingService, activityService, recognitionService, notificationService, configStore, updatesAutoUpdater{service: updatesService})
 	masteryService := newMasteryService(cfg, logger, maaServiceAdapter{service: maaActions}, executionManager, notificationService)
+	connectionService := connectionapp.New(connectionapp.Options{Logger: logger})
 	profiles := configapp.NewProfiles(cfg.Paths.MaaConfigDir)
 	maaActions.SetLineHandler(func(stream, line string) {
 		runID, operationID := "", ""
@@ -172,6 +175,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Training:      trainingService,
 		Activity:      activityService,
 		Copilot:       copilotService,
+		Connection:    connectionService,
 		Notifications: notificationService,
 		Quotes:        quotesService,
 		CustomTools:   customToolsService,

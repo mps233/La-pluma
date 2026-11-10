@@ -585,12 +585,54 @@ func TestTestConnectionUsesSavedProfile(t *testing.T) {
 	if data["adbPath"] != adbPath || data["address"] != "10.0.0.2:5555" || data["connected"] != true {
 		t.Fatalf("connection response = %#v", data)
 	}
+	if data["success"] != true || data["message"] != "已连接到 10.0.0.2:5555" {
+		t.Fatalf("connection feedback = %#v", data)
+	}
 	args, err := os.ReadFile(argsFile)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(args), "devices -l") {
 		t.Fatalf("adb args = %q", string(args))
+	}
+}
+
+func TestDiscoverDevicesUsesSavedProfile(t *testing.T) {
+	root := t.TempDir()
+	adbPath := filepath.Join(root, "adb")
+	writeTestFile(t, adbPath, "#!/bin/sh\nif [ \"$1\" = devices ]; then echo \"List of devices attached\"; printf '10.0.0.2:5555\\tdevice product:foo model:Pixel\\n'; fi\nexit 0\n")
+	if err := os.Chmod(adbPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	paths := config.Paths{DataDir: filepath.Join(root, "data"), MaaConfigDir: filepath.Join(root, "maa-config")}
+	application, handler := newActionApp(t, paths, filepath.Join(root, "missing-maa"))
+	if err := application.Profiles.Save(appconfig.DefaultProfileName, map[string]any{
+		"connection": map[string]any{"adb_path": adbPath, "address": "10.0.0.2:5555"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := doRequest(t, handler, http.MethodGet, "/actions/discover-devices")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	data := envelopeData(t, rec)
+	if data["success"] != true {
+		t.Fatalf("discovery response = %#v", data)
+	}
+	if message, _ := data["message"].(string); !strings.HasPrefix(message, "找到 ") {
+		t.Fatalf("message = %q", message)
+	}
+	devices, _ := data["devices"].([]any)
+	if len(devices) != 1 {
+		t.Fatalf("devices = %#v", devices)
+	}
+	device, _ := devices[0].(map[string]any)
+	if device["address"] != "10.0.0.2:5555" || device["state"] != "device" || device["source"] != "adb" || device["adbPath"] != adbPath {
+		t.Fatalf("device = %#v", device)
+	}
+	if _, ok := data["candidates"].([]any); !ok {
+		t.Fatalf("candidates missing: %#v", data)
 	}
 }
 

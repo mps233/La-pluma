@@ -2327,35 +2327,12 @@ func (h *Handler) testConnection(w http.ResponseWriter, r *http.Request) {
 	address := firstNonEmpty(stringField(body, "address"), connection.Address)
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	client := adb.New(adbPath)
-	devices, err := client.Devices(ctx)
+	result, err := h.app.Connection.Test(ctx, adbPath, address)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	connected := false
-	state := "offline"
-	for _, device := range devices {
-		if device.Serial == address {
-			connected = device.State == "device"
-			state = device.State
-			break
-		}
-	}
-	if !connected && strings.Contains(address, ":") {
-		_, _ = client.Connect(ctx, address)
-		devices, _ = client.Devices(ctx)
-		for _, device := range devices {
-			if device.Serial == address {
-				connected = device.State == "device"
-				state = device.State
-				break
-			}
-		}
-	}
-	httpx.Success(w, http.StatusOK, map[string]any{
-		"connected": connected, "state": state, "adbPath": adbPath, "address": address,
-	}, "", nil)
+	httpx.Success(w, http.StatusOK, result, result.Message, nil)
 }
 
 func (h *Handler) discoverDevices(w http.ResponseWriter, r *http.Request) {
@@ -2367,16 +2344,12 @@ func (h *Handler) discoverDevices(w http.ResponseWriter, r *http.Request) {
 	adbPath := firstNonEmpty(r.URL.Query().Get("adbPath"), connection.ADBPath)
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	devices, err := adb.New(adbPath).Devices(ctx)
+	result, err := h.app.Connection.Discover(ctx, adbPath)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	out := make([]map[string]any, 0, len(devices))
-	for _, device := range devices {
-		out = append(out, map[string]any{"serial": device.Serial, "state": device.State, "model": device.Model, "raw": device.Raw})
-	}
-	httpx.Success(w, http.StatusOK, map[string]any{"devices": out, "adbPath": adbPath}, "", nil)
+	httpx.Success(w, http.StatusOK, result, result.Message, nil)
 }
 
 func (h *Handler) getClipboard(w http.ResponseWriter, r *http.Request) {
