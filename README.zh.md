@@ -15,6 +15,7 @@
   <a href="https://go.dev/"><img alt="Go 1.27+" src="https://img.shields.io/badge/Go-1.27%2B-00ADD8"></a>
   <a href="https://react.dev/"><img alt="React 19" src="https://img.shields.io/badge/React-19-61DAFB"></a>
   <a href="https://github.com/MaaAssistantArknights/maa-cli"><img alt="MAA CLI" src="https://img.shields.io/badge/MAA-CLI-111111"></a>
+  <a href="https://awesomemygo.dev/apps/la-pluma"><img alt="Listed on Awesome MyGo" src="https://awesomemygo.dev/badge.svg"></a>
 </p>
 
 ## 简介
