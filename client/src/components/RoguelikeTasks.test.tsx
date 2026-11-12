@@ -47,9 +47,13 @@ vi.mock('../services/api', () => ({
   },
 }))
 
-vi.mock('../store/statusStore', () => ({
-  useStatusStore: () => ({ setMessage: mocks.setMessage, setActive: mocks.setActive }),
-}))
+vi.mock('../store/statusStore', () => {
+  const state = { setMessage: mocks.setMessage, setActive: mocks.setActive }
+  return {
+    useStatusStore: (selector?: (value: typeof state) => unknown) =>
+      selector ? selector(state) : state,
+  }
+})
 
 vi.mock('../hooks/useBackendStatusMonitor', () => ({
   useAutomationAvailability: () => ({ isAvailable: true, unavailableMessage: '' }),

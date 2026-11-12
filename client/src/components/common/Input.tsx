@@ -63,7 +63,7 @@ export default function Input({
   'aria-invalid': ariaInvalid,
   ...props
 }: InputProps) {
-  const generatedId = useId().replace(/:/g, '')
+  const generatedId = useId()
   const inputId = id ?? `input-${generatedId}`
   const errorId = `${inputId}-error`
   const hintId = `${inputId}-hint`
@@ -137,7 +137,7 @@ export function Select({
   'aria-invalid': ariaInvalid,
   ...props
 }: SelectProps) {
-  const generatedId = useId().replace(/:/g, '')
+  const generatedId = useId()
   const selectId = id ?? `select-${generatedId}`
   const errorId = `${selectId}-error`
   const hintId = `${selectId}-hint`

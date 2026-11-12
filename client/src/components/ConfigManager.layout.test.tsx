@@ -58,9 +58,13 @@ vi.mock('../services/api', () => ({
   },
 }))
 
-vi.mock('../store/statusStore', () => ({
-  useStatusStore: () => ({ setMessage: mocks.setMessage }),
-}))
+vi.mock('../store/statusStore', () => {
+  const state = { setMessage: mocks.setMessage }
+  return {
+    useStatusStore: (selector?: (value: typeof state) => unknown) =>
+      selector ? selector(state) : state,
+  }
+})
 
 vi.mock('./FloatingStatusIndicator', () => ({ default: () => null }))
 

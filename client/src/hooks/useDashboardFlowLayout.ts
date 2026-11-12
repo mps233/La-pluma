@@ -90,14 +90,12 @@ export function useDashboardFlowLayout(enabled = true) {
     if (previewFrame) resizeObserver.observe(previewFrame)
 
     mediaQuery.addEventListener('change', syncColumns)
-    window.addEventListener('resize', syncColumns)
     syncColumns()
 
     return () => {
       window.cancelAnimationFrame(frameId)
       resizeObserver.disconnect()
       mediaQuery.removeEventListener('change', syncColumns)
-      window.removeEventListener('resize', syncColumns)
     }
   }, [enabled])
 

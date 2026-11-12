@@ -45,8 +45,8 @@ export function PreviewSessionProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({ session, activeVideoRef }), [session])
 
   return (
-    <PreviewSessionContext.Provider value={value}>
+    <PreviewSessionContext value={value}>
       {children}
-    </PreviewSessionContext.Provider>
+    </PreviewSessionContext>
   )
 }

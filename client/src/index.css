@@ -116,7 +116,6 @@
     color: var(--app-text);
     overscroll-behavior-y: none;
     scrollbar-width: none;
-    -ms-overflow-style: none;
     -webkit-user-select: none;
     user-select: none;
     -webkit-touch-callout: none;

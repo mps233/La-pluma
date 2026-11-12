@@ -283,6 +283,9 @@ export default function NotificationSettings() {
                 placeholder="Telegram Bot Token"
                 disabled={loading || saving || Boolean(loadError)}
                 autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
                 className="app-native-control"
               />
             </label>
@@ -296,6 +299,9 @@ export default function NotificationSettings() {
                 placeholder="Telegram Chat ID"
                 disabled={loading || saving || Boolean(loadError)}
                 autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
                 className="app-native-control"
               />
             </label>

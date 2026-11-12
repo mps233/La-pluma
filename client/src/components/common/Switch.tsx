@@ -22,7 +22,7 @@ export default function Switch({
   className = '',
   ...props
 }: SwitchProps) {
-  const generatedId = useId().replace(/:/g, '')
+  const generatedId = useId()
   const switchId = id ?? `switch-${generatedId}`
 
   return (

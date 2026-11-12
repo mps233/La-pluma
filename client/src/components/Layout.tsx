@@ -369,6 +369,8 @@ export default function Layout({ children }: LayoutProps) {
                 placeholder="搜索工作区"
                 aria-label="搜索工作区"
                 autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
                 spellCheck={false}
               />
             </div>

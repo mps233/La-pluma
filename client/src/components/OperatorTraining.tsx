@@ -50,7 +50,9 @@ const TRAINING_STATUS_OPTIONS: Array<{
 // 材料层级节点组件
 function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) {
   const hasChildren = node.children && node.children.length > 0;
-  
+  const [failedIconId, setFailedIconId] = useState<string | null>(null);
+  const iconFailed = node.iconId !== undefined && failedIconId === String(node.iconId);
+
   const getColorByDepth = (_d: number): string => 'bg-[var(--app-accent)] text-white';
   
   const getBgColorByDepth = (): string => 'surface-soft';
@@ -64,28 +66,15 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
           <div className="flex items-center gap-3">
             {/* 材料图标 */}
             <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl surface-panel">
-              {node.iconId ? (
+              {node.iconId && !iconFailed ? (
                 <img
                   src={getItemIconUrl(node.iconId)}
                   alt={node.name}
                   className="maa-item-icon w-full h-full object-cover"
-                  onError={(e) => {
-                    // 图标加载失败时，隐藏图片并显示默认图标
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    const parent = target.parentElement;
-                    if (parent && !parent.querySelector('.default-icon')) {
-                      const iconDiv = document.createElement('div');
-                      iconDiv.className = `default-icon w-10 h-10 rounded-lg ${getColorByDepth(depth)} flex items-center justify-center`;
-                      iconDiv.innerHTML = hasChildren 
-                        ? '<svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>'
-                        : '<svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>';
-                      parent.appendChild(iconDiv);
-                    }
-                  }}
+                  onError={() => setFailedIconId(String(node.iconId))}
                 />
               ) : (
-                <div className={`w-10 h-10 rounded-lg ${getColorByDepth(depth)} flex items-center justify-center`}>
+                <div className={`default-icon w-10 h-10 rounded-lg ${getColorByDepth(depth)} flex items-center justify-center`}>
                   {hasChildren ? (
                     <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -156,28 +145,15 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
       <div className="flex items-center gap-2">
         {/* 材料图标 */}
         <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg surface-panel">
-          {node.iconId ? (
+          {node.iconId && !iconFailed ? (
             <img
               src={getItemIconUrl(node.iconId)}
               alt={node.name}
               className="maa-item-icon w-full h-full object-cover"
-              onError={(e) => {
-                // 图标加载失败，显示默认图标
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                const parent = target.parentElement;
-                if (parent && !parent.querySelector('.fallback-icon')) {
-                  const fallbackDiv = document.createElement('div');
-                  fallbackDiv.className = `fallback-icon w-7 h-7 rounded-lg ${getColorByDepth(depth)} flex items-center justify-center`;
-                  fallbackDiv.innerHTML = hasChildren 
-                    ? '<svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>'
-                    : '<svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>';
-                  parent.appendChild(fallbackDiv);
-                }
-              }}
+              onError={() => setFailedIconId(String(node.iconId))}
             />
           ) : (
-            <div className={`w-7 h-7 rounded-lg ${getColorByDepth(depth)} flex items-center justify-center`}>
+            <div className={`fallback-icon w-7 h-7 rounded-lg ${getColorByDepth(depth)} flex items-center justify-center`}>
               {hasChildren ? (
                 <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -349,7 +325,7 @@ const extractOperatorRows = (payload: unknown): FallbackOperatorRow[] => {
 export default function OperatorTraining() {
   useItemIconCacheVersion()
   const shouldReduceMotion = useReducedMotion();
-  const { setMessage: setStatusMessage } = useStatusStore()
+  const setStatusMessage = useStatusStore(state => state.setMessage)
   const trainingMode = useUIStore(state => state.trainingMode)
   const setTrainingMode = useUIStore(state => state.setTrainingMode)
 

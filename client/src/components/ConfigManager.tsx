@@ -113,7 +113,7 @@ const isValidUpdateTime = (value: string) => {
 }
 
 export default function ConfigManager() {
-  const { setMessage: setStatusMessage } = useStatusStore()
+  const setStatusMessage = useStatusStore(state => state.setMessage)
   const shouldReduceMotion = useReducedMotion()
   const [configType, setConfigType] = useState<ConfigSectionId>(() => {
     const saved = localStorage.getItem('laPlumaConfigSection')
@@ -760,6 +760,10 @@ export default function ConfigManager() {
                         updateConnectionConfig(current => ({ ...current, adb_path: value }))
                       }}
                       hint="ADB 可执行文件的完整路径"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
                     />
                     <Input
                       label="连接地址"
@@ -769,6 +773,10 @@ export default function ConfigManager() {
                         setConnectionFeedback(null)
                       }}
                       hint="模拟器地址，例如 127.0.0.1:16384"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
                     />
                   </div>
 

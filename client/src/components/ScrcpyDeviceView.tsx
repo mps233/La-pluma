@@ -121,7 +121,7 @@ export default function ScrcpyDeviceView({
   const commandErrorTimerRef = useRef<number | null>(null)
   const [immersiveMode, setImmersiveMode] = useState(false)
   const [compactControlsOpen, setCompactControlsOpen] = useState(false)
-  const compactControlsId = `scrcpy-controls-${useId().replace(/:/g, '')}`
+  const compactControlsId = `scrcpy-controls-${useId()}`
   const bitrateProgress = ((customBitrateMbps - 2) / (32 - 2)) * 100
   const selectedPreset = quality === 'custom' ? null : qualityPresets[quality]
   const scrcpyOptions = useMemo(() => ({

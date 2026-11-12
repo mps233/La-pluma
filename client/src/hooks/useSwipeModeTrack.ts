@@ -200,9 +200,13 @@ export function useSwipeModeTrack<T extends HTMLElement = HTMLDivElement>({
     initialSnapRef.current = false
     void animateTrack(target, immediate)
 
+    let observedWidth = track.offsetWidth
     const handleResize = () => {
       const nextTrack = trackRef.current
       if (!nextTrack) return
+      const nextWidth = nextTrack.offsetWidth
+      if (nextWidth === observedWidth) return
+      observedWidth = nextWidth
       const nextStep = getStep(nextTrack)
       if (!nextStep) return
       springRef.current?.stop()
@@ -213,8 +217,14 @@ export function useSwipeModeTrack<T extends HTMLElement = HTMLDivElement>({
       nextTrack.style.transform = `translate3d(${nextTarget}px, 0, 0)`
     }
 
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', handleResize)
+      return () => window.removeEventListener('resize', handleResize)
+    }
+
+    const resizeObserver = new ResizeObserver(handleResize)
+    resizeObserver.observe(track)
+    return () => resizeObserver.disconnect()
   }, [index, animateTrack])
 
   const isAnimating = useCallback(() => animatingRef.current, [])

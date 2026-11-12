@@ -58,7 +58,7 @@ export function PreviewModeControls() {
 export function PreviewAutoStartToggle() {
   const autoStart = usePreviewStore(state => state.autoStart)
   const setAutoStart = usePreviewStore(state => state.setAutoStart)
-  const inputId = `preview-auto-start-${useId().replace(/:/g, '')}`
+  const inputId = `preview-auto-start-${useId()}`
 
   return (
     <div className="dashboard-preview-auto-toggle" title="重新打开应用时恢复上次预览模式">

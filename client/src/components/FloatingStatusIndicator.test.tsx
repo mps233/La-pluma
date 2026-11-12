@@ -47,7 +47,8 @@ vi.mock('../services/api', () => ({
 }))
 
 vi.mock('../store/statusStore', () => ({
-  useStatusStore: () => mocks.status,
+  useStatusStore: (selector?: (value: typeof mocks.status) => unknown) =>
+    selector ? selector(mocks.status) : mocks.status,
 }))
 
 vi.mock('../hooks/useOnlineStatus', () => ({ useOnlineStatus: () => true }))

@@ -140,6 +140,7 @@ export const createWebManifest = (basePath: string): Partial<ManifestOptions> =>
   theme_color: '#101318',
   background_color: '#101318',
   display: 'standalone',
+  id: basePath,
   scope: basePath,
   start_url: basePath,
   icons: [

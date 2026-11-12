@@ -75,8 +75,6 @@ export default function TruncatedText({
     }
 
     let cancelled = false
-    const handleResize = () => measure()
-    window.addEventListener('resize', handleResize)
 
     const fonts = typeof document === 'undefined' ? undefined : document.fonts
     fonts?.ready
@@ -88,7 +86,6 @@ export default function TruncatedText({
     return () => {
       cancelled = true
       observer?.disconnect()
-      window.removeEventListener('resize', handleResize)
     }
   }, [measure, children, tooltip])
 

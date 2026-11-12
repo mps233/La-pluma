@@ -1,6 +1,6 @@
 import { getErrorMessage } from '@/utils/errorMessage'
 import '../styles/pages/automation.css'
-import { forwardRef, useImperativeHandle, useLayoutEffect, useState, useEffect, useEffectEvent, useRef } from 'react'
+import { useImperativeHandle, useLayoutEffect, useState, useEffect, useEffectEvent, useRef, type Ref } from 'react'
 import { createPortal } from 'react-dom'
 import { generateTrainingPlan, maaApi, type TaskConfig } from '../services/api'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
@@ -219,14 +219,17 @@ export const placeClosedownLast = <T extends { id: string; commandId?: string },
   ...tasks.filter(task => task.commandId === 'closedown' || task.id.startsWith('closedown-'))
 ]
 
-const AutomationDragGhost = forwardRef<AutomationDragGhostHandle, {
+interface AutomationDragGhostProps {
   task: TaskFlowItem
   index: number
   width: number
   height: number
   initialX: number
   initialY: number
-}>(function AutomationDragGhost({ task, index, width, height, initialX, initialY }, ref) {
+  ref?: Ref<AutomationDragGhostHandle>
+}
+
+function AutomationDragGhost({ task, index, width, height, initialX, initialY, ref }: AutomationDragGhostProps) {
   const elementRef = useRef<HTMLDivElement | null>(null)
 
   useImperativeHandle(ref, () => ({
@@ -254,7 +257,7 @@ const AutomationDragGhost = forwardRef<AutomationDragGhostHandle, {
     </div>,
     document.body
   )
-})
+}
 
 
 const commaSeparatedArrayKeys = new Set(['buy_first', 'blacklist', 'first_tags', 'preserve_tags', 'fiammetta_targets'])
@@ -911,7 +914,8 @@ export default function AutomationTasks() {
     if (id) runResultById.set(id, result)
   }
   const shouldReduceMotion = useReducedMotion()
-  const { setMessage: setStatusMessage, setActive: setIsActiveStatus } = useStatusStore()
+  const setStatusMessage = useStatusStore(state => state.setMessage)
+  const setIsActiveStatus = useStatusStore(state => state.setActive)
   const { isAvailable: automationAvailable, unavailableMessage } = useAutomationAvailability()
 
   // 辅助函数：显示消息

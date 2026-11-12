@@ -3,6 +3,7 @@ import {
   loadRandomOperatorQuote,
   type OperatorQuote,
 } from '../services/operatorQuotes'
+import { useShallow } from 'zustand/react/shallow'
 import { useStatusStore } from '../store/statusStore'
 import { detectStatusMessageType, getStatusVisualConfig } from '../utils/statusMessage'
 import { useEffect, useState, type CSSProperties } from 'react'
@@ -19,7 +20,14 @@ interface FloatingStatusIndicatorProps {
  * 其他状态在原位置可见时显示在原位置，不可见时悬浮到右上角
  */
 export default function FloatingStatusIndicator({ className = '', textClassName = '' }: FloatingStatusIndicatorProps) {
-  const { message, messageType, isActive, runStatus, backendStatus, backendMessage } = useStatusStore()
+  const { message, messageType, isActive, runStatus, backendStatus, backendMessage } = useStatusStore(useShallow(state => ({
+    message: state.message,
+    messageType: state.messageType,
+    isActive: state.isActive,
+    runStatus: state.runStatus,
+    backendStatus: state.backendStatus,
+    backendMessage: state.backendMessage,
+  })))
   const isOnline = useOnlineStatus()
   const [readyQuote, setReadyQuote] = useState<OperatorQuote>(DEFAULT_RANDOM_OPERATOR_QUOTE)
 

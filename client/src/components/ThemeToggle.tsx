@@ -24,7 +24,7 @@ export default function ThemeToggle() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const mobileTriggerRef = useRef<HTMLButtonElement>(null)
   const mobileMenuRef = useRef<HTMLDivElement>(null)
-  const mobileMenuId = `theme-menu-${useId().replace(/:/g, '')}`
+  const mobileMenuId = `theme-menu-${useId()}`
 
   const closeMobileMenu = useCallback((restoreFocus = false) => {
     setMobileMenuOpen(false)

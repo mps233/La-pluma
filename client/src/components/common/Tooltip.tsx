@@ -210,12 +210,6 @@ export default function Tooltip({
       setPosition({ top, left })
     }
     updatePosition()
-    window.addEventListener('scroll', updatePosition, true)
-    window.addEventListener('resize', updatePosition)
-    return () => {
-      window.removeEventListener('scroll', updatePosition, true)
-      window.removeEventListener('resize', updatePosition)
-    }
   }, [open, side, content])
 
   const portal = open && typeof document !== 'undefined'

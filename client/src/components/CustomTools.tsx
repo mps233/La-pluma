@@ -51,7 +51,7 @@ function groupCells(cells: Record<string, number>) {
 }
 
 export default function CustomTools() {
-  const { setMessage } = useStatusStore()
+  const setMessage = useStatusStore(state => state.setMessage)
   const [tools, setTools] = useState<CustomTool[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

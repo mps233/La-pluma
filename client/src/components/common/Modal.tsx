@@ -292,7 +292,7 @@ function ModalLayer({
 }
 
 export function Modal({ isOpen, ...props }: ModalProps) {
-  const generatedId = useId().replace(/:/g, '')
+  const generatedId = useId()
   if (typeof document === 'undefined') return null
 
   return createPortal(

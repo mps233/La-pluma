@@ -239,7 +239,7 @@ function FilterMenu({
   const menuRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [menuPosition, setMenuPosition] = useState<FilterMenuPosition | null>(null)
-  const menuId = `data-filter-${menuKey}-${useId().replace(/:/g, '')}`
+  const menuId = `data-filter-${menuKey}-${useId()}`
 
   const updateMenuPosition = useCallback(() => {
     const trigger = triggerRef.current
@@ -563,7 +563,7 @@ export default function DataStatistics() {
   useItemIconCacheVersion()
   const [isRunning, setIsRunning] = useState(false)
   const [activeTask, setActiveTask] = useState<ActiveTask>(null)
-  const { setMessage: setStatusMessage } = useStatusStore()
+  const setStatusMessage = useStatusStore(state => state.setMessage)
   const [depotData, setDepotData] = useState<DepotDataDetailed | null>(null)
   const [operBoxData, setOperBoxData] = useState<OperBoxData | null>(null)
   const [allOperators, setAllOperators] = useState<OperatorDetailed[]>([])

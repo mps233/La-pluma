@@ -13,6 +13,7 @@ import { formatActivitySubtitle } from '../utils/activitySummary'
 import { keepNumberWithUnit } from '../utils/typography'
 import { formatExecutionSummary, getExecutionLastTask } from '../utils/executionSummary'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
+import { useShallow } from 'zustand/react/shallow'
 import { useStatusStore } from '../store/statusStore'
 import { useDashboardStore, type DashboardBusinessSnapshot } from '../store/dashboardStore'
 import { probeBackendAvailability } from '../hooks/useBackendStatusMonitor'
@@ -305,13 +306,13 @@ export default function Dashboard() {
   const setActiveTab = useUIStore(state => state.setActiveTab)
   const setStatisticsTab = useUIStore(state => state.setStatisticsTab)
   const setCombatCopilotPrefill = useUIStore(state => state.setCombatCopilotPrefill)
-  const {
-    backendStatus,
-    backendMessage,
-    runStatus,
-    setMessage: setStatusMessage,
-    setActive: setStatusActive,
-  } = useStatusStore()
+  const { backendStatus, backendMessage, runStatus } = useStatusStore(useShallow(state => ({
+    backendStatus: state.backendStatus,
+    backendMessage: state.backendMessage,
+    runStatus: state.runStatus,
+  })))
+  const setStatusMessage = useStatusStore(state => state.setMessage)
+  const setStatusActive = useStatusStore(state => state.setActive)
   const isOnline = useOnlineStatus()
   const openDropStatistics = useCallback(() => {
     setStatisticsTab('drops')
