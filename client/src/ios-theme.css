@@ -784,6 +784,7 @@ html.la-pluma-standalone #app-root .page {
 }
 
 .la-pluma-sidebar-search {
+  display: block;
   width: 100%;
 }
 

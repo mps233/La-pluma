@@ -42,6 +42,7 @@ export const hasDocumentBuildChanged = async ({
   const response = await fetchDocument(requestUrl, {
     cache: 'no-store',
     credentials: 'same-origin',
+    priority: 'low',
     headers: {
       'Cache-Control': 'no-cache',
     },

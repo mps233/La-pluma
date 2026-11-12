@@ -599,23 +599,6 @@
 .automation-flow-progress.is-stopping {
   color: var(--app-warning-text);
 }
-@media (min-width: 1200px) {
-  .automation-flow-card-header {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .automation-flow-card-identity,
-  .automation-flow-card-controls {
-    width: 100%;
-  }
-
-  .automation-flow-card-controls {
-    justify-content: space-between;
-    padding-left: 2.375rem;
-  }
-}
 .automation-flow-card-header {
   display: flex;
   align-items: center;
@@ -646,22 +629,6 @@
     flex-direction: column;
     padding: 0.875rem;
   }
-
-  .automation-flow-card-header {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .automation-flow-card-identity,
-  .automation-flow-card-controls {
-    width: 100%;
-  }
-
-  .automation-flow-card-controls {
-    justify-content: space-between;
-    padding-left: 2.375rem;
-  }
 }
 /* Automation workspace */
 .automation-workspace-grid {
@@ -686,6 +653,7 @@
 }
 .automation-editor-column {
   grid-area: editor;
+  container-type: inline-size;
 }
 .automation-support-column {
   display: grid;
@@ -911,7 +879,7 @@
 .automation-sequence-panel {
   position: sticky;
   top: 1rem;
-  max-height: calc(100vh - 2rem);
+  max-height: calc(var(--la-pluma-viewport-height, 100dvh) - 2rem);
 }
 .automation-sequence-surface {
   display: flex;
@@ -1347,6 +1315,23 @@ html.dark button.automation-schedule-add:hover:not(:disabled) {
 .automation-task-editor .automation-flow-card-controls {
   width: auto;
 }
+@container (max-width: 36rem) {
+  .automation-task-editor .automation-flow-card-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .automation-task-editor .automation-flow-card-identity,
+  .automation-task-editor .automation-flow-card-controls {
+    width: 100%;
+  }
+
+  .automation-task-editor .automation-flow-card-controls {
+    justify-content: space-between;
+    padding-left: 2.375rem;
+  }
+}
 .automation-task-editor .automation-flow-card-controls {
   justify-content: flex-end;
   padding-left: 0;
@@ -1768,30 +1753,36 @@ html.dark button.automation-schedule-add:hover:not(:disabled) {
     font-size: 14px;
   }
 }
-/* 滚动条样式 */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* 滚动条样式：标准属性供 Firefox 等引擎使用，WebKit 保留 8px 圆角样式。 */
+:root {
+  --scrollbar-thumb: color-mix(in srgb, var(--app-text) 32%, transparent);
+  --scrollbar-track: color-mix(in srgb, var(--app-text) 6%, transparent);
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
-::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: var(--app-radius-xs);
-}
-.dark ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: var(--app-radius-xs);
-}
-.dark ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
-}
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+
+@supports selector(::-webkit-scrollbar) {
+  :root {
+    scrollbar-color: auto;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    border-radius: var(--app-radius-xs);
+    background: var(--scrollbar-track);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border-radius: var(--app-radius-xs);
+    background: var(--scrollbar-thumb);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--app-text) 48%, transparent);
+  }
 }
 /* 确保正方形按钮不被挤压 */
 button.w-8.h-8,

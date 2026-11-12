@@ -354,7 +354,7 @@ export default function Layout({ children }: LayoutProps) {
 
         <div className="la-pluma-page-body">
           <aside className="la-pluma-sidebar" aria-label="主要功能">
-            <div className="la-pluma-sidebar-search" role="search">
+            <search className="la-pluma-sidebar-search" role="search">
               <GlassInput
                 type="search"
                 value={sidebarQuery}
@@ -373,7 +373,7 @@ export default function Layout({ children }: LayoutProps) {
                 autoCapitalize="none"
                 spellCheck={false}
               />
-            </div>
+            </search>
 
             <div
               className="la-pluma-sidebar-identity"
