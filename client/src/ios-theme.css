@@ -449,6 +449,10 @@ html.la-pluma-standalone #app-root .page {
   .la-pluma-app .la-pluma-sidebar {
     top: 0.75rem;
     height: calc(var(--la-pluma-viewport-height) - 1.5rem);
+    /* The glass frame is 0.75rem narrower than the grid column, so pad the
+       right side by the same amount to keep the content optically centered
+       inside the visible panel. */
+    padding-right: calc(1.5rem + 0.75rem);
   }
 
   .la-pluma-app .la-pluma-navbar {
@@ -2262,6 +2266,9 @@ html.dark .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .sm
 
 @media (min-width: 1024px) {
   .la-pluma-app.is-desktop-shell .la-pluma-sidebar {
-    padding-top: calc(1.125rem + max(28px, var(--mygo-titlebar-height, 0px)));
+    /* MyGo reports the full native title-bar height, which includes chrome
+       below the traffic lights. Cap the reservation so the search field sits
+       close to the lights instead of leaving a large dead band. */
+    padding-top: calc(1.125rem + clamp(28px, var(--mygo-titlebar-height, 0px), 40px));
   }
 }

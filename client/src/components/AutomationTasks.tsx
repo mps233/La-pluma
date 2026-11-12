@@ -758,16 +758,17 @@ function AutomationStageEditor({
                     <GraduationCap size={17} strokeWidth={1.9} aria-hidden="true" />
                   </span>
                 ) : (
-                  <IconButton
-                    icon={<Pin size={16} strokeWidth={1.9} aria-hidden="true" />}
-                    variant="ghost"
-                    size="md"
+                  <button
+                    type="button"
                     onClick={() => togglePinned(stageIndex)}
                     disabled={stageControlsDisabled}
                     className={`automation-stage-pin min-h-11 min-w-11${isPinnedStage ? ' is-active' : ''}`}
                     title={isPinnedStage ? '取消置顶' : '置顶'}
                     aria-label={`${isPinnedStage ? '取消置顶' : '置顶'}：${field.label} ${stageIndex + 1}`}
-                  />
+                    aria-pressed={isPinnedStage}
+                  >
+                    <Pin size={16} strokeWidth={1.9} aria-hidden="true" />
+                  </button>
                 )}
 
                 <input
@@ -823,16 +824,16 @@ function AutomationStageEditor({
                 )}
 
                 {canDeleteStage && (
-                  <IconButton
-                    icon={<Trash2 size={16} strokeWidth={1.9} aria-hidden="true" />}
-                    variant="ghost"
-                    size="md"
+                  <button
+                    type="button"
                     onClick={() => deleteStage(stageIndex)}
                     disabled={stageControlsDisabled}
                     className="automation-stage-delete min-h-11 min-w-11"
                     title="删除此关卡"
                     aria-label={`删除${field.label} ${stageIndex + 1}`}
-                  />
+                  >
+                    <Trash2 size={16} strokeWidth={1.9} aria-hidden="true" />
+                  </button>
                 )}
               </div>
             </div>

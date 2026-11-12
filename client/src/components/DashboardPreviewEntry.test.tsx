@@ -9,9 +9,12 @@ import DashboardPreviewEntry from './DashboardPreviewEntry'
 
 const preview = vi.hoisted(() => ({
   mode: 'snapshot' as 'off' | 'snapshot' | 'live',
-  fallbackSnapshot: 'data:image/png;base64,c25hcHNob3Q=',
+  fallbackSnapshot: 'data:image/png;base64,c25hcHNob3Q=' as string | null,
   showLivePreview: false,
   isConnecting: false,
+  inputReady: true,
+  sendTouch: vi.fn(() => true),
+  sendScroll: vi.fn(() => true),
 }))
 
 vi.mock('../hooks/useDashboardPreview', () => ({
@@ -20,6 +23,9 @@ vi.mock('../hooks/useDashboardPreview', () => ({
     videoRef: { current: null },
     fallbackSnapshot: preview.fallbackSnapshot,
     showLivePreview: preview.showLivePreview,
+    inputReady: preview.inputReady,
+    sendTouch: preview.sendTouch,
+    sendScroll: preview.sendScroll,
     isConnecting: preview.isConnecting,
     statusText: '快照可用',
     headerStatusText: '已连接',
@@ -54,6 +60,9 @@ describe('DashboardPreviewEntry', () => {
     preview.fallbackSnapshot = 'data:image/png;base64,c25hcHNob3Q='
     preview.showLivePreview = false
     preview.isConnecting = false
+    preview.inputReady = true
+    preview.sendTouch.mockClear()
+    preview.sendScroll.mockClear()
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
@@ -77,6 +86,40 @@ describe('DashboardPreviewEntry', () => {
     await act(async () => root.render(<DashboardPreviewEntry />))
 
     expect(container.querySelector('video')?.className).toContain('opacity-100')
+  })
+
+  it('forwards pointer input when a live frame is visible', async () => {
+    preview.mode = 'live'
+    preview.showLivePreview = true
+    preview.fallbackSnapshot = null
+    await act(async () => root.render(<DashboardPreviewEntry />))
+
+    const video = container.querySelector('video')!
+    Object.assign(video, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: vi.fn(() => true),
+      releasePointerCapture: vi.fn(),
+    })
+    const down = new MouseEvent('pointerdown', { bubbles: true, clientX: 40, clientY: 60, button: 0 })
+    Object.defineProperty(down, 'pointerId', { value: 3 })
+    act(() => video.dispatchEvent(down))
+
+    expect(preview.sendTouch).toHaveBeenCalledWith(0, 40, 60, 3, video)
+    expect(video.getAttribute('aria-hidden')).toBeNull()
+    expect(video.className).toContain('touch-none')
+  })
+
+  it('keeps the snapshot frame view-only', async () => {
+    await act(async () => root.render(<DashboardPreviewEntry />))
+
+    const video = container.querySelector('video')!
+    const down = new MouseEvent('pointerdown', { bubbles: true, clientX: 10, clientY: 20, button: 0 })
+    Object.defineProperty(down, 'pointerId', { value: 4 })
+    act(() => video.dispatchEvent(down))
+
+    expect(preview.sendTouch).not.toHaveBeenCalled()
+    expect(video.getAttribute('aria-hidden')).toBe('true')
+    expect(video.className).toContain('pointer-events-none')
   })
 
   it('keeps the auto-start toggle anchored after the reconnect control', async () => {

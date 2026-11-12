@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 
 	"github.com/mps233/la-pluma/go/internal/app"
@@ -805,7 +806,7 @@ func (r *desktopRuntime) togglePanel() {
 func (r *desktopRuntime) panelView(c *ui.Context) {
 	theme := c.Theme()
 	column := ui.Column(c).Fill().Padding(16).Gap(10)
-	column.Background(theme.Surface).Radius(10)
+	column.Radius(10).Material(glass.Glass{Tint: ui.RGBA(theme.Surface.R, theme.Surface.G, theme.Surface.B, 0.72)})
 	column.Children(func() {
 		ui.Text(c, "La Pluma").FontSize(17).Bold()
 		status := "空闲"

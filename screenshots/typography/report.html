@@ -1,0 +1,996 @@
+<title>中文排版校准</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f2f5f8;
+    --surface: #ffffff;
+    --surface-2: #e8eef4;
+    --ink: #111a23;
+    --muted: #5d6b7a;
+    --line: #d6e0e9;
+    --line-strong: #b7c5d3;
+    --accent: #0b6bcb;
+    --accent-ink: #ffffff;
+    --accent-soft: #dcecff;
+    --good: #0f766e;
+    --good-soft: #d8f3ee;
+    --warn: #915700;
+    --warn-soft: #fff0cf;
+    --shot-bg: #0a0f14;
+    --shot-line: #263442;
+    --shadow: 0 18px 50px rgba(21, 40, 60, 0.08);
+    --radius: 14px;
+    --radius-sm: 9px;
+    --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    --font-mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #090d12;
+      --surface: #111820;
+      --surface-2: #17222d;
+      --ink: #edf4fb;
+      --muted: #99a8b7;
+      --line: #24313e;
+      --line-strong: #35475a;
+      --accent: #5aa9ff;
+      --accent-ink: #08111b;
+      --accent-soft: #11283f;
+      --good: #5eead4;
+      --good-soft: #0d2b2a;
+      --warn: #fbbf24;
+      --warn-soft: #2e2410;
+      --shot-bg: #05090d;
+      --shot-line: #263442;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #090d12;
+    --surface: #111820;
+    --surface-2: #17222d;
+    --ink: #edf4fb;
+    --muted: #99a8b7;
+    --line: #24313e;
+    --line-strong: #35475a;
+    --accent: #5aa9ff;
+    --accent-ink: #08111b;
+    --accent-soft: #11283f;
+    --good: #5eead4;
+    --good-soft: #0d2b2a;
+    --warn: #fbbf24;
+    --warn-soft: #2e2410;
+    --shot-bg: #05090d;
+    --shot-line: #263442;
+    --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: var(--accent); text-underline-offset: 0.18em; }
+  a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  .wrap {
+    width: min(1120px, 100%);
+    margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 40px 72px;
+  }
+
+  .eyebrow {
+    margin: 0 0 14px;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  h1, h2, h3 {
+    text-wrap: balance;
+    margin: 0;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+
+  h1 {
+    max-width: 16ch;
+    font-size: clamp(2.2rem, 6vw, 4.2rem);
+    font-weight: 750;
+  }
+
+  h2 {
+    font-size: clamp(1.35rem, 3vw, 1.9rem);
+    font-weight: 700;
+  }
+
+  h3 {
+    font-size: 1.02rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  p { margin: 0; text-wrap: pretty; }
+
+  .lede {
+    max-width: 62ch;
+    margin-top: 18px;
+    color: var(--muted);
+    font-size: 1.05rem;
+  }
+
+  .masthead {
+    padding-bottom: 30px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .masthead-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+  }
+
+  .stamp {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  .stamp::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--good);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 16%, transparent);
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 34px;
+  }
+
+  .stat {
+    min-width: 0;
+    padding: 16px 16px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+  }
+
+  .stat-value {
+    font-family: var(--font-mono);
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
+
+  .stat-label {
+    margin-top: 9px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  main { display: grid; gap: 56px; margin-top: 48px; }
+
+  section { min-width: 0; }
+
+  .section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px 24px;
+    margin-bottom: 22px;
+  }
+
+  .section-note {
+    max-width: 56ch;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .intro-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+    gap: 20px;
+  }
+
+  .panel {
+    min-width: 0;
+    padding: 22px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+
+  .panel p + p { margin-top: 12px; }
+
+  .panel strong { font-weight: 650; }
+
+  .measure-box {
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.9;
+  }
+
+  .measure-box .ok { color: var(--good); }
+  .measure-box .dim { color: var(--muted); }
+
+  .demo-list { display: grid; gap: 34px; }
+
+  .demo {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+    gap: 26px;
+    padding-top: 26px;
+    border-top: 1px solid var(--line);
+  }
+
+  .demo:first-child { padding-top: 0; border-top: 0; }
+
+  .demo-copy { min-width: 0; }
+
+  .demo-index {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+  }
+
+  .demo-copy p {
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .verdict {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  .chip.good { background: var(--good-soft); color: var(--good); }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+
+  .shots {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    align-items: start;
+  }
+
+  .shot {
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid var(--shot-line);
+    border-radius: var(--radius-sm);
+    background: var(--shot-bg);
+  }
+
+  .shot-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+    color: #9fb0c2;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .shot-label .tag {
+    padding: 2px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 4px;
+    color: #d9e4ee;
+  }
+
+  .shot img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+  }
+
+  .shot figcaption {
+    margin-top: 8px;
+    color: #9fb0c2;
+    font-size: 11px;
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+
+  .shot figcaption strong {
+    color: #f2f7fc;
+    font-weight: 600;
+  }
+
+  .num-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .num-card {
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+  }
+
+  .num-card.is-before { border-style: dashed; }
+
+  .num-card header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .num-card img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    border-radius: 3px;
+    background: var(--shot-bg);
+  }
+
+  .num-card p {
+    margin-top: 9px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  th, td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  tr:last-child td { border-bottom: 0; }
+
+  code {
+    padding: 0.12em 0.34em;
+    border-radius: 4px;
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    word-break: break-word;
+  }
+
+  .rules td:first-child {
+    width: 3.2rem;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .rules td:last-child { color: var(--muted); }
+
+  details {
+    border-top: 1px solid var(--line);
+  }
+
+  details:first-of-type { border-top: 0; }
+
+  summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 15px 2px;
+    cursor: pointer;
+    font-weight: 650;
+    list-style: none;
+  }
+
+  summary::-webkit-details-marker { display: none; }
+
+  summary::after {
+    content: "+";
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: 500;
+  }
+
+  details[open] summary::after { content: "−"; }
+
+  .detail-body {
+    padding: 0 2px 18px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .detail-body ul {
+    margin: 0;
+    padding-left: 1.1em;
+  }
+
+  .detail-body li + li { margin-top: 5px; }
+
+  .file-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .file-row {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr);
+    gap: 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+  }
+
+  .file-row > div { min-width: 0; }
+
+  .file-row .path {
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    overflow-wrap: anywhere;
+  }
+
+  .file-row .what {
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+
+  .note-list {
+    display: grid;
+    gap: 10px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+
+  .note-list li {
+    display: grid;
+    grid-template-columns: 2.4rem minmax(0, 1fr);
+    gap: 10px;
+    padding: 13px 0;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13.5px;
+  }
+
+  .note-list li:first-child { border-top: 0; }
+
+  .note-list .mark {
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+
+  .note-list strong { color: var(--ink); font-weight: 650; }
+
+  footer {
+    margin-top: 52px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  @media (max-width: 820px) {
+    .intro-grid, .demo { grid-template-columns: minmax(0, 1fr); }
+    .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .demo { gap: 16px; }
+    .shots { gap: 10px; }
+    .file-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  }
+
+  @media (max-width: 520px) {
+    .wrap { padding-block: 28px 56px; }
+    .shots, .num-grid { grid-template-columns: minmax(0, 1fr); }
+    .stat-grid { gap: 8px; }
+    .stat { padding: 13px; }
+    .panel { padding: 17px; }
+    main { gap: 42px; margin-top: 34px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow">Typography audit · 2026-11-06 · working tree</p>
+    <div class="masthead-row">
+      <div>
+        <h1>中文排版校准</h1>
+        <p class="lede">把换行、中文断词、数字宽度、截断与避头尾做成全局开关。不改字体、字号、颜色和布局，只改文字怎么落行。</p>
+      </div>
+      <span class="stamp">已完成 · 未提交</span>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat">
+        <div class="stat-value">5 / 5</div>
+        <div class="stat-label">前后对比项</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">360</div>
+        <div class="stat-label">客户端测试通过</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">0</div>
+        <div class="stat-label"><code>line-break: anywhere</code></div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">1</div>
+        <div class="stat-label"><code>break-all</code> 保留（技术 URI）</div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <div class="section-head">
+        <h2>结论</h2>
+        <p class="section-note">规则写在 <code>index.css</code> 既有的 <code>@layer base</code> 与 <code>@layer components</code> 中，每个页面继承；Tailwind utilities 仍能在单个元素上覆盖。</p>
+      </div>
+
+      <div class="intro-grid">
+        <div class="panel">
+          <p><strong>中文标题</strong>用 <code>CjkText</code> 调 BudouX，只在词间插入 <code>&lt;wbr&gt;</code>；<code>.app-cjk-breaks</code> 再应用 <code>word-break: keep-all</code> + <code>overflow-wrap: anywhere</code>。短标题若只有一个词，原样返回，不产生额外 DOM，也不会在没有断点时使用 <code>keep-all</code>。</p>
+          <p><strong>截断</strong>统一走 <code>TruncatedText</code>：只有 <code>scrollWidth &gt; clientWidth</code> 时才出现完整文本 Tooltip；flex 行内的触发器用 <code>flex-1 min-w-0</code>，不再让文字把行撑开。</p>
+          <p><strong>数字</strong>在会变化或成列的位置使用 <code>tabular-nums</code>。本机 SF Pro / system-ui 确认带有 <code>tnum</code> 特性：比例数字下 <code>111111</code> 为 38.06px、<code>000000</code> 为 52.02px；开启 tabular 后两者都是 52.02px。</p>
+        </div>
+
+        <div class="panel measure-box" aria-label="实测摘要">
+          <div><span class="dim">heading</span> 资源配置由 MAA 管理</div>
+          <div><span class="dim">before</span> 资源配置由 MAA / 管理</div>
+          <div><span class="ok">after&nbsp;&nbsp;</span> 资源配置由 / MAA 管理</div>
+          <div style="margin-top:10px"><span class="dim">paragraph</span> 末行 员。 → 干员。</div>
+          <div><span class="dim">number</span> 18% 25.20px → 27.00px</div>
+          <div><span class="dim">number</span> 80% 27.19px → 27.00px</div>
+          <div><span class="dim">truncate</span> 236 / 96 → Tooltip</div>
+          <div><span class="dim">autospace</span> 麒麟R夜刀 65.58 → 69.08px</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>五组前后对比</h2>
+        <p class="section-note">截图来自本机 5173 开发服务器。对比时在同一个页面会话里切换新规则，避免数据变化造成误判。</p>
+      </div>
+
+      <div class="demo-list">
+        <article class="demo">
+          <div class="demo-copy">
+            <span class="demo-index">01 / HEADING</span>
+            <h3>标题按词断行，并平衡两行长度</h3>
+            <p>390px 宽、150% 字号下的真实卡片标题。默认字号时这条标题不会换行，所以放大到 24px 根字号让换行发生。修复前在词内断开；修复后在 BudouX 词界断开，并由 <code>text-wrap: balance</code> 平衡两行。</p>
+            <div class="verdict">
+              <span class="chip">text-wrap: balance</span>
+              <span class="chip">keep-all</span>
+              <span class="chip good">wbr 词界</span>
+            </div>
+          </div>
+          <div class="shots">
+            <figure class="shot">
+              <div class="shot-label"><span>before</span><span class="tag">auto</span></div>
+              <img src="01-heading-before.png" alt="修复前：资源配置由 MAA 换行，管理单独一行" loading="lazy">
+              <figcaption>两行：<strong>资源配置由 MAA</strong> / <strong>管理</strong></figcaption>
+            </figure>
+            <figure class="shot">
+              <div class="shot-label"><span>after</span><span class="tag">balance</span></div>
+              <img src="01-heading-after.png" alt="修复后：资源配置由 换行，MAA 管理 在第二行" loading="lazy">
+              <figcaption>两行：<strong>资源配置由</strong> / <strong>MAA 管理</strong></figcaption>
+            </figure>
+          </div>
+        </article>
+
+        <article class="demo">
+          <div class="demo-copy">
+            <span class="demo-index">02 / PARAGRAPH</span>
+            <h3>段末不再只剩一个「员」</h3>
+            <p>战斗页的高级设置说明，390px 宽、三行。修复前 Chrome 把「员。」单独留在末行；<code>text-wrap: pretty</code> 重新分配后，末行变成「干员。」。这只是段落换行，不改字号、行高或容器。</p>
+            <div class="verdict">
+              <span class="chip">text-wrap: pretty</span>
+              <span class="chip good">末行 1 → 3 字符</span>
+            </div>
+          </div>
+          <div class="shots">
+            <figure class="shot">
+              <div class="shot-label"><span>before</span><span class="tag">auto</span></div>
+              <img src="02-paragraph-before.png" alt="修复前：段落最后一行只有 员。" loading="lazy">
+              <figcaption>末行：<strong>员。</strong></figcaption>
+            </figure>
+            <figure class="shot">
+              <div class="shot-label"><span>after</span><span class="tag">pretty</span></div>
+              <img src="02-paragraph-after.png" alt="修复后：段落最后一行是 干员。" loading="lazy">
+              <figcaption>末行：<strong>干员。</strong></figcaption>
+            </figure>
+          </div>
+        </article>
+
+        <article class="demo">
+          <div class="demo-copy">
+            <span class="demo-index">03 / NUMBER</span>
+            <h3>变化的数字不再改变宽度</h3>
+            <p>同一个仪表数值，分别填入 18% 与 80%，强制数字宽度差出现。修复前 1 比 8 窄，整段右对齐数字的左边缘会跳；开启 <code>tabular-nums</code> 后两个值宽度一致。</p>
+            <div class="verdict">
+              <span class="chip">tabular-nums</span>
+              <span class="chip good">18% / 80% 均为 27.00px</span>
+            </div>
+          </div>
+          <div class="num-grid">
+            <div class="num-card is-before">
+              <header><span>before · 18%</span><span>25.20px</span></header>
+              <img src="03-number-before-18.png" alt="修复前：18% 宽度 25.20px" loading="lazy">
+              <p>比例数字，1 更窄</p>
+            </div>
+            <div class="num-card is-before">
+              <header><span>before · 80%</span><span>27.19px</span></header>
+              <img src="03-number-before-80.png" alt="修复前：80% 宽度 27.19px" loading="lazy">
+              <p>同一元素，宽度变了</p>
+            </div>
+            <div class="num-card">
+              <header><span>after · 18%</span><span>27.00px</span></header>
+              <img src="03-number-after-18.png" alt="修复后：18% 宽度 27.00px" loading="lazy">
+              <p>tnum 让 1 占满数字位</p>
+            </div>
+            <div class="num-card">
+              <header><span>after · 80%</span><span>27.00px</span></header>
+              <img src="03-number-after-80.png" alt="修复后：80% 宽度 27.00px" loading="lazy">
+              <p>两个值宽度完全一致</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="demo">
+          <div class="demo-copy">
+            <span class="demo-index">04 / TRUNCATION</span>
+            <h3>真的被截断时才出现 Tooltip</h3>
+            <p>控制台「今日掉落」摘要。修复前只有省略号，完整内容无处查看；修复后 <code>TruncatedText</code> 实测 <code>scrollWidth 236 / clientWidth 96</code>，标为 <code>data-truncated="true"</code>，悬停显示完整材料清单。未截断的同类文本不会出现提示。</p>
+            <div class="verdict">
+              <span class="chip">min-width: 0</span>
+              <span class="chip">text-overflow: ellipsis</span>
+              <span class="chip good">条件 Tooltip</span>
+            </div>
+          </div>
+          <div class="shots">
+            <figure class="shot">
+              <div class="shot-label"><span>before</span><span class="tag">no tooltip</span></div>
+              <img src="04-truncate-before.png" alt="修复前：掉落摘要被截断，没有提示" loading="lazy">
+              <figcaption>可见：<strong>固源岩×10、基…</strong></figcaption>
+            </figure>
+            <figure class="shot">
+              <div class="shot-label"><span>after</span><span class="tag">hover</span></div>
+              <img src="04-truncate-after.png" alt="修复后：悬停显示完整掉落清单" loading="lazy">
+              <figcaption>完整：<strong>固源岩×10、基础作战记录×9、龙门币×576</strong></figcaption>
+            </figure>
+          </div>
+        </article>
+
+        <article class="demo">
+          <div class="demo-copy">
+            <span class="demo-index">05 / CJK + LATIN</span>
+            <h3>中文与拉丁、数字之间自动留薄缝</h3>
+            <p>干员名「麒麟R夜刀」与标签「精2」是真实的无空格混排。修复前 R 与 2 紧贴汉字；<code>text-autospace: normal</code> 后在汉字与拉丁/数字之间插入薄缝。名称文本宽度 65.58 → 69.08px，标签 19.25 → 20.75px。</p>
+            <div class="verdict">
+              <span class="chip">text-autospace: normal</span>
+              <span class="chip good">+3.50px / +1.50px</span>
+            </div>
+          </div>
+          <div class="shots">
+            <figure class="shot">
+              <div class="shot-label"><span>before</span><span class="tag">no autospace</span></div>
+              <img src="05-mixed-before.png" alt="修复前：麒麟R夜刀与精2紧贴" loading="lazy">
+              <figcaption>名称 65.58px · 标签 19.25px</figcaption>
+            </figure>
+            <figure class="shot">
+              <div class="shot-label"><span>after</span><span class="tag">autospace</span></div>
+              <img src="05-mixed-after.png" alt="修复后：麒麟 R 夜刀与精 2 之间有薄缝" loading="lazy">
+              <figcaption>名称 69.08px · 标签 20.75px</figcaption>
+            </figure>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>11 条规则映射</h2>
+        <p class="section-note">所有属性都是渐进增强；不支持的浏览器直接忽略对应声明，没有 polyfill。</p>
+      </div>
+
+      <div class="table-wrap">
+        <table class="rules">
+          <thead>
+            <tr><th>#</th><th>规则</th><th>落地位置</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>0</td><td>全局继承；中文规则用 <code>:lang(zh)</code>；<code>html lang="zh-CN"</code> 已存在</td><td><code>index.css</code> 的 base / components 层；<code>index.html:2</code></td></tr>
+            <tr><td>1</td><td><code>text-wrap: balance</code></td><td><code>h1–h3</code>、<code>.app-page-title</code>、<code>.app-section-title</code>、<code>.app-card-title</code>、<code>.dashboard-flow-title</code>、<code>.app-hero-title</code>、<code>[data-typography~="balance"]</code></td></tr>
+            <tr><td>2</td><td><code>text-wrap: pretty</code> + 数字/单位 NBSP</td><td><code>p, li, dd, figcaption, .app-page-subtitle, .form-error-text, .app-empty-state span</code>；<code>keepNumberWithUnit</code> 在摘要、统计、日志、养成等动态文本处</td></tr>
+            <tr><td>3</td><td><code>font-variant-numeric: tabular-nums</code></td><td><code>table, time, output, [role="timer"], .app-numeric, [data-numeric], .data-readout-*</code>、仪表/流程/日志/肉鸽计数</td></tr>
+            <tr><td>4</td><td>flex 行内标签单行</td><td><code>.app-button</code> 原本已有；补充 <code>.app-icon-button, .tab-link, .theme-toggle-btn, .drop-records-period-button, .app-workspace-segment-copy &gt; span, .dashboard-flow-shortcut &gt; span</code></td></tr>
+            <tr><td>5</td><td><code>min-width: 0</code> + 省略号 + 条件 Tooltip</td><td><code>.app-truncate</code>、<code>.app-truncate-trigger</code>、<code>TruncatedText</code></td></tr>
+            <tr><td>6</td><td>中文正文两端对齐，整字符行宽</td><td><code>:lang(zh):where(.app-prose-zh)</code> → <code>max-width: min(100%, 32em)</code> + <code>text-align: justify</code>；<code>.is-indented</code> 用 <code>space-first</code></td></tr>
+            <tr><td>7</td><td><code>text-autospace: normal</code></td><td><code>:lang(zh)</code>；<code>code, kbd, samp, pre, input, textarea, select, [contenteditable], .font-mono</code> 重置为 <code>no-autospace</code></td></tr>
+            <tr><td>8</td><td><code>text-spacing-trim: trim-start</code></td><td><code>:lang(zh)</code>；缩进长文 <code>.app-prose-zh.is-indented</code> 用 <code>space-first</code>；Chrome only</td></tr>
+            <tr><td>9</td><td>BudouX 词间 <code>&lt;wbr&gt;</code> + <code>keep-all</code> + <code>overflow-wrap: anywhere</code></td><td><code>CjkText</code>、<code>.app-cjk-breaks</code>；vite alias 只引入 parser + zh-hans / zh-hant 模型</td></tr>
+            <tr><td>10</td><td>不改避头尾；去掉 <code>line-break: anywhere</code></td><td>源码内 0 处 <code>line-break</code>；保留 1 处技术 URI 的 <code>break-all</code>（见下节）</td></tr>
+            <tr><td>11</td><td>文件/选择器、断行审计、前后对比</td><td>本页 + 下方清单</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>断行规则审计</h2>
+        <p class="section-note">按你的要求，逐条说明 <code>line-break: anywhere</code> 与 <code>word-break: break-all</code> 的去留。</p>
+      </div>
+
+      <ul class="note-list">
+        <li>
+          <span class="mark">0</span>
+          <div><strong><code>line-break: anywhere</code>：0 处，未删除也未新增。</strong> 在 <code>client/src</code> 的 CSS、TS、TSX 中全量搜索无结果。需要兜底断行的位置原本就用 <code>overflow-wrap: anywhere</code> 或 Tailwind <code>break-words</code>，包括配置路径/错误、掉落错误、统计数据错误和日志消息。</div>
+        </li>
+        <li>
+          <span class="mark">1</span>
+          <div><strong><code>word-break: break-all</code>：保留 1 处。</strong> <code>client/src/components/CombatTasks.tsx:1992</code> 的 <code>copilot.uri</code> 是 <code>font-mono</code> 技术 URI，没有中文标点，窄预览里必须允许任意断行；CSS 避头尾规则对它没有意义。配置路径等其余位置继续用 <code>break-words + [overflow-wrap:anywhere]</code>，并有测试断言不使用 <code>break-all</code>。</div>
+        </li>
+        <li>
+          <span class="mark">2</span>
+          <div><strong>Canvas / SVG / 手写 JS 换行：不适用。</strong> 应用没有 <code>fillText</code>、SVG <code>&lt;text&gt;</code> 或手写字符串截断；只有列表 <code>slice</code> 和仪表 sparkline，不承载正文换行。</div>
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>改动清单</h2>
+        <p class="section-note">按区域分组。新文件为未跟踪状态；没有提交或推送。</p>
+      </div>
+
+      <div class="file-list">
+        <div class="file-row">
+          <div class="path">client/src/index.css</div>
+          <div class="what">全局 base 层 11 条规则；components 层 <code>.app-truncate</code> / <code>.app-truncate-trigger</code> / <code>.app-cjk-breaks</code>；任务选择器 <code>&gt; span:first-child</code> 避免把截断触发器当成图标。</div>
+        </div>
+        <div class="file-row">
+          <div class="path">client/src/ios-theme.css</div>
+          <div class="what">移除移动端 inline 页面标题的 <code>white-space: nowrap</code> / <code>overflow: hidden</code> / <code>text-overflow: ellipsis</code>，让标题可以按词换行；状态文字继续单行截断。</div>
+        </div>
+        <div class="file-row">
+          <div class="path">common/CjkText.tsx · TruncatedText.tsx · Tooltip.tsx</div>
+          <div class="what">新增 CjkText、TruncatedText；Tooltip 增加 <code>triggerClassName</code> / <code>triggerAs</code>，让截断触发器保持弹性布局；<code>common/index.ts</code> 导出。</div>
+        </div>
+        <div class="file-row">
+          <div class="path">PageHeader.tsx · Card.tsx · Modal.tsx</div>
+          <div class="what">共享页面标题、卡片标题、弹窗标题统一走 CjkText，保留 tag/id/aria-labelledby。</div>
+        </div>
+        <div class="file-row">
+          <div class="path">utils/typography.ts · cjkScript.ts · budouxHant.ts</div>
+          <div class="what"><code>keepNumberWithUnit</code>（NBSP）、语言解析、繁体模型懒加载；<code>types/budoux-deep.d.ts</code> 为深层导入提供类型。</div>
+        </div>
+        <div class="file-row">
+          <div class="path">vite.config.ts · package.json · package-lock.json</div>
+          <div class="what">加入 <code>budoux@0.10.2</code>；vite alias 指向 <code>budoux/module/parser.js</code> 与两个中文模型，避免包入口把 linkedom/cssomnom 拉进入口 chunk。</div>
+        </div>
+        <div class="file-row">
+          <div class="path">Dashboard · ConfigManager · DataStatistics · DropRecords</div>
+          <div class="what">CjkText 标题、TruncatedText 截断点、NBSP 计数/单位、tabular 数值范围；Dashboard 新增 <code>.app-card-title</code> 与 hero 平衡。</div>
+        </div>
+        <div class="file-row">
+          <div class="path">OperatorTraining · AutomationTasks · RoguelikeTasks · CombatTasks</div>
+          <div class="what">标题 CjkText；任务/材料/作业名截断 → 条件 Tooltip；NBSP 覆盖长计划、执行摘要、关卡/次数/理智等单位。</div>
+        </div>
+        <div class="file-row">
+          <div class="path">Layout · PWAInstallPrompt · CustomTools · ScrcpyDeviceView · LogViewer · NotificationSettings · PreviewModeControls · DashboardPreviewEntry</div>
+          <div class="what">剩余中文标题、设备信息截断、日志消息 NBSP、快照 10 秒文案、通知标题。</div>
+        </div>
+        <div class="file-row">
+          <div class="path">DESIGN.md · common/README.md</div>
+          <div class="what">补充全局排版行为的权威规则，以及 CjkText / TruncatedText / Tooltip 新 prop 的用法。</div>
+        </div>
+        <div class="file-row">
+          <div class="path">测试</div>
+          <div class="what">新增 CjkText、TruncatedText、typography 单测；更新 Dashboard / CombatTasks / DataStatistics.layout / DropRecords / ScrcpyDeviceView 的 NBSP 断言和 common mock。</div>
+        </div>
+      </div>
+
+      <details>
+        <summary>逐文件选择器 / 类名清单</summary>
+        <div class="detail-body">
+          <div class="file-list">
+            <div class="file-row">
+              <div class="path">index.css · base</div>
+              <div class="what"><code>:where(h1,h2,h3,.app-page-title,.app-section-title,.app-card-title,.dashboard-flow-title,.app-hero-title,[data-typography~="balance"])</code>; <code>:where(p,li,dd,figcaption,.app-page-subtitle,.form-error-text,.app-empty-state span,[data-typography~="pretty"])</code>; <code>:where(table,time,output,[role="timer"],.app-numeric,[data-numeric],.data-readout-value,.data-readout-detail,.data-readout-meta,.dashboard-device-card,.dashboard-flow-metric,.dashboard-flow-stages,.dashboard-summary-card,.dashboard-summary-count,.dashboard-stage-count,.dashboard-summary-number,.automation-flow-summary,.automation-flow-progress,.log-count,.log-repeat,.log-history-copy small,.roguelike-panel-heading)</code>; <code>:where(.app-icon-button,.tab-link,.theme-toggle-btn,.drop-records-period-button,.app-workspace-segment-copy &gt; span,.dashboard-flow-shortcut &gt; span)</code>; <code>:lang(zh)</code>; <code>:where(code,kbd,samp,pre,input,textarea,select,[contenteditable="true"],.font-mono):lang(zh)</code>; <code>:lang(zh):where(.app-prose-zh)</code>; <code>:lang(zh):where(.app-prose-zh.is-indented)</code>; <code>:lang(zh) :where(.app-cjk-breaks)</code></div>
+            </div>
+            <div class="file-row">
+              <div class="path">index.css · components</div>
+              <div class="what"><code>.app-truncate</code>; <code>.app-truncate-trigger</code>; <code>.app-cjk-breaks</code>；任务选择器的 <code>.automation-task-picker-option &gt; span:first-child</code>（含 <code>svg</code> 与 <code>[data-automation-tasks]</code> 变体），避免截断触发器被图标规则命中。</div>
+            </div>
+            <div class="file-row">
+              <div class="path">ios-theme.css / index.css</div>
+              <div class="what">删除 <code>.app-page-header.is-mobile-inline .app-page-title</code> 的 <code>white-space: nowrap</code>、<code>overflow: hidden</code>、<code>text-overflow: ellipsis</code>；保留 <code>.floating-status-text</code> 的单行截断。</div>
+            </div>
+            <div class="file-row">
+              <div class="path">Dashboard.tsx</div>
+              <div class="what"><code>.app-card-title</code>（<code>sectionTitleClass</code>）；<code>.app-hero-title</code>；<code>TruncatedText</code> 用于 <code>.dashboard-flow-metric</code> 的值/副标题、<code>.dashboard-summary-value</code>、<code>.dashboard-summary-detail</code>、<code>.dashboard-drop-items</code>、设备副标题、流程说明。</div>
+            </div>
+            <div class="file-row">
+              <div class="path">ConfigManager.tsx</div>
+              <div class="what"><code>h3/h2</code> 文本 → <code>CjkText</code>；设备地址/详情 → <code>TruncatedText</code>；<code>00:00 到 23:59</code>、自动更新时间 → NBSP。</div>
+            </div>
+            <div class="file-row">
+              <div class="path">DataStatistics.tsx / DropRecords.tsx</div>
+              <div class="what"><code>h2/h3</code> 文本 → <code>CjkText</code>（保留 <code>#operator-filter-title</code>、<code>#depot-category-title</code>）；统计计数与 <code>共 … 种/个关卡</code> → <code>keepNumberWithUnit</code>。</div>
+            </div>
+            <div class="file-row">
+              <div class="path">OperatorTraining.tsx</div>
+              <div class="what"><code>h2/h3/h4</code> → <code>CjkText</code>；材料名/干员名/关卡材料 → <code>TruncatedText</code>；队列、缺口、后续、计划行 → NBSP。</div>
+            </div>
+            <div class="file-row">
+              <div class="path">AutomationTasks.tsx / RoguelikeTasks.tsx</div>
+              <div class="what"><code>h3/h4</code> → <code>CjkText</code>；<code>.automation-flow-task-name strong/small</code>、<code>.automation-sequence-copy strong/small</code>、<code>.automation-task-picker-option strong</code>、<code>.roguelike-panel-heading p</code> → <code>TruncatedText</code>；执行摘要与倒计时 → NBSP。</div>
+            </div>
+            <div class="file-row">
+              <div class="path">CombatTasks.tsx / LogViewer.tsx / ScrcpyDeviceView.tsx</div>
+              <div class="what"><code>h4</code> 作业名 → <code>TruncatedText</code>；续跑/作业名/阶段 → <code>TruncatedText</code>；<code>p.app-prose-zh</code> 用于任务描述；日志消息/计数 → NBSP；设备信息值 → <code>TruncatedText</code>；画质 <code>… FPS</code> → NBSP；<code>break-all</code> 仅保留在 <code>copilot.uri</code>。</div>
+            </div>
+            <div class="file-row">
+              <div class="path">Layout.tsx / PWAInstallPrompt.tsx / CustomTools.tsx / NotificationSettings.tsx</div>
+              <div class="what"><code>h2#…more-sheet-title</code>、<code>h2#pwa-prompt-title</code>、<code>h3.app-section-title</code>、<code>h4</code> 通知 → <code>CjkText</code>；点阵计数 → NBSP。</div>
+            </div>
+            <div class="file-row">
+              <div class="path">PreviewModeControls.tsx / DashboardPreviewEntry.tsx</div>
+              <div class="what">快照 <code>10 秒</code> 文案 → NBSP。</div>
+            </div>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>验证</h2>
+        <p class="section-note">在 macOS、Chrome 156、Node 22 下执行。</p>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>检查</th><th>结果</th></tr></thead>
+          <tbody>
+            <tr><td><code>npm run lint --prefix client</code></td><td>0 errors；1 条既有 warning（<code>CombatTasks.tsx:1503</code>，与本改动无关）</td></tr>
+            <tr><td><code>npm run type-check --prefix client</code></td><td>通过</td></tr>
+            <tr><td><code>npm run test --prefix client</code></td><td>54 个文件 / 360 个测试通过</td></tr>
+            <tr><td><code>npm run build --prefix client</code></td><td>通过；入口 295.76 kB / 101.36 kB gzip；繁体模型懒加载 chunk 50.12 kB / 26.61 kB gzip；入口无 linkedom/cssomnom</td></tr>
+            <tr><td><code>npm run typecheck --prefix server</code></td><td>通过</td></tr>
+            <tr><td><code>npm run test --prefix server</code></td><td>54 个文件通过</td></tr>
+            <tr><td><code>npm run verify</code></td><td>客户端全段通过；服务端 <code>check:repo</code> 被既有未跟踪文件 <code>client/src/glasswork/lens.js</code> 拦下，与本次排版改动无关</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>限制与说明</h2>
+      </div>
+
+      <ul class="note-list">
+        <li><span class="mark">A</span><div><strong>标题截图用了 150% 字号。</strong> 390px 默认字号下，产品现有标题都不会换行；为了看到 balance / keep-all 的差异，把根字号设为 24px。真实响应式状态仍然是逐级继承的。</div></li>
+        <li><span class="mark">B</span><div><strong>混排示例用真实标签，而不是伪段落。</strong> 产品正文已经用显式空格分隔拉丁词（如“由 MaaCore 校验”），<code>text-autospace</code> 不会在已有空格处再加缝。真正无空格的是干员名「麒麟R夜刀」和「精2」标签，因此用它们展示。</div></li>
+        <li><span class="mark">C</span><div><strong><code>text-spacing-trim</code> 目前 Chrome only。</strong> 其他浏览器忽略该声明；<code>text-autospace</code> 同样按渐进增强处理。</div></li>
+        <li><span class="mark">D</span><div><strong>没有可测的 table / canvas / SVG 文本。</strong> 应用里没有 <code>&lt;table&gt;</code>、<code>fillText</code> 或 SVG <code>&lt;text&gt;</code>；全局规则为未来内容保留，当前没有对应页面改动。</div></li>
+        <li><span class="mark">E</span><div><strong>仍保留少量低价值截断。</strong> 技术 URI、aria-hidden 的拖拽影子、已有原生 <code>title</code> 的状态/名称、短静态标签没有迁移到 <code>TruncatedText</code>，避免给数百个卡片增加包装层；高价值的长文本截断点已迁移。</div></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    本页由工作区实时代码与截图生成。截图目录：<code>screenshots/typography/</code>。未提交、未推送；工作区原有的 glasswork / 视觉改动保持原样。
+  </footer>
+</div>

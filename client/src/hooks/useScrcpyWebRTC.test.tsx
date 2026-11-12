@@ -62,9 +62,9 @@ let hook: WebrtcHook | null = null
 let root: Root
 let container: HTMLDivElement
 
-function Harness({ signalingUrl = 'ws://old-host:8443' }: { signalingUrl?: string }) {
+function Harness({ signalingUrl = 'ws://old-host:8443', passive = false }: { signalingUrl?: string; passive?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const currentHook = useScrcpyWebRTC({ signalingUrl, videoRef })
+  const currentHook = useScrcpyWebRTC({ signalingUrl, videoRef, passive })
   useEffect(() => {
     hook = currentHook
   }, [currentHook])
@@ -487,16 +487,19 @@ describe('WebRTC touch transport safeguards', () => {
       onerror: null,
     } as unknown as RTCDataChannel
     const readiness: boolean[] = []
-    const cleanup = bindInputChannelReadiness(channel, ready => readiness.push(ready))
+    const closed = vi.fn()
+    const cleanup = bindInputChannelReadiness(channel, ready => readiness.push(ready), closed)
 
     expect(readiness).toEqual([false])
     Object.defineProperty(channel, 'readyState', { value: 'open', configurable: true })
     channel.onopen?.(new Event('open'))
     expect(readiness).toEqual([false, true])
+    expect(closed).not.toHaveBeenCalled()
 
     Object.defineProperty(channel, 'readyState', { value: 'closed', configurable: true })
     channel.onclose?.(new Event('close'))
     expect(readiness).toEqual([false, true, false])
+    expect(closed).toHaveBeenCalledTimes(1)
 
     cleanup()
     expect(channel.onopen).toBeNull()
@@ -540,7 +543,7 @@ describe('useScrcpyWebRTC preview grace', () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
-    await act(async () => root.render(<Harness />))
+    await act(async () => root.render(<Activity mode="visible"><Harness /></Activity>))
   })
 
   afterEach(async () => {
@@ -579,6 +582,585 @@ describe('useScrcpyWebRTC preview grace', () => {
   })
 })
 
+
+describe('useScrcpyWebRTC input recovery', () => {
+  class MockMediaStream {
+    private tracks: MediaStreamTrack[] = []
+    getTracks() { return this.tracks }
+    getVideoTracks() { return this.tracks }
+    addTrack(track: MediaStreamTrack) { this.tracks.push(track) }
+  }
+
+  class MockDataChannel {
+    label = 'input-channel'
+    readyState: RTCDataChannelState = 'connecting'
+    bufferedAmount = 0
+    bufferedAmountLowThreshold = 0
+    onopen: ((event: Event) => void) | null = null
+    onclose: ((event: Event) => void) | null = null
+    onerror: ((event: Event) => void) | null = null
+    send = vi.fn()
+
+    open() {
+      this.readyState = 'open'
+      this.onopen?.(new Event('open'))
+    }
+
+    close() {
+      this.readyState = 'closed'
+      this.onclose?.(new Event('close'))
+    }
+  }
+
+  class MockPeerConnection {
+    static instances: MockPeerConnection[] = []
+    localDescription: RTCSessionDescription | null = null
+    iceConnectionState: RTCIceConnectionState = 'new'
+    connectionState: RTCPeerConnectionState = 'new'
+    signalingState: RTCSignalingState = 'stable'
+    iceGatheringState: RTCIceGatheringState = 'new'
+    ondatachannel: ((event: { channel: MockDataChannel }) => void) | null = null
+    oniceconnectionstatechange: (() => void) | null = null
+    onconnectionstatechange: (() => void) | null = null
+    ontrack: ((event: { track: MediaStreamTrack }) => void) | null = null
+    onicecandidate: ((event: { candidate: RTCIceCandidate | null }) => void) | null = null
+    setRemoteDescription = vi.fn(async () => undefined)
+    createAnswer = vi.fn(async () => ({
+      type: 'answer' as RTCSdpType,
+      sdp: 'v=0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\n'
+    }))
+    setLocalDescription = vi.fn(async (description: RTCSessionDescription) => {
+      this.localDescription = description
+    })
+    addIceCandidate = vi.fn(async () => undefined)
+    getStats = vi.fn(async () => new Map())
+    close = vi.fn(() => { this.connectionState = 'closed' })
+
+    constructor() {
+      MockPeerConnection.instances.push(this)
+    }
+
+    setConnected() {
+      this.connectionState = 'connected'
+      this.iceConnectionState = 'connected'
+      this.onconnectionstatechange?.()
+    }
+
+    setDisconnected() {
+      this.connectionState = 'disconnected'
+      this.onconnectionstatechange?.()
+    }
+
+    deliverChannel(channel: MockDataChannel) {
+      this.ondatachannel?.({ channel })
+    }
+  }
+
+  class MockRTCSessionDescription {
+    type: RTCSdpType
+    sdp: string
+    constructor(init: RTCSessionDescriptionInit) {
+      this.type = init.type
+      this.sdp = init.sdp || ''
+    }
+  }
+
+  const originalHidden = Object.getOwnPropertyDescriptor(document, 'hidden')
+
+  beforeEach(async () => {
+    vi.useFakeTimers()
+    MockWebSocket.instances = []
+    MockPeerConnection.instances = []
+    vi.stubGlobal('WebSocket', MockWebSocket)
+    vi.stubGlobal('RTCPeerConnection', MockPeerConnection as unknown as typeof RTCPeerConnection)
+    vi.stubGlobal('RTCSessionDescription', MockRTCSessionDescription)
+    vi.stubGlobal('MediaStream', MockMediaStream)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({ token: 'fresh-token' })
+    }))
+    window.localStorage.clear()
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    await act(async () => root.render(<Harness />))
+  })
+
+  afterEach(async () => {
+    await act(async () => root.unmount())
+    container.remove()
+    hook = null
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+    if (originalHidden) Object.defineProperty(document, 'hidden', originalHidden)
+    else Reflect.deleteProperty(document, 'hidden')
+  })
+
+  function setDocumentHidden(value: boolean) {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => value })
+  }
+
+  async function settleAsyncWork() {
+    await act(async () => {
+      for (let index = 0; index < 8; index += 1) await Promise.resolve()
+    })
+  }
+
+  async function connectWithInputChannel() {
+    act(() => hook!.connect())
+    await settleAsyncWork()
+    const socket = MockWebSocket.instances[MockWebSocket.instances.length - 1]!
+    act(() => socket.open())
+    act(() => {
+      socket.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({ message_type: 'config', ice_servers: [] }),
+      }))
+    })
+    act(() => {
+      socket.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({
+          message_type: 'device_msg',
+          payload: { type: 'offer', sdp: 'v=0\r\n' },
+        }),
+      }))
+    })
+    await settleAsyncWork()
+
+    const pc = MockPeerConnection.instances[MockPeerConnection.instances.length - 1]!
+    const channel = new MockDataChannel()
+    act(() => pc.deliverChannel(channel))
+    act(() => channel.open())
+    act(() => pc.setConnected())
+    await settleAsyncWork()
+    return { socket, pc, channel }
+  }
+
+  async function openRecoveredSession() {
+    const socket = MockWebSocket.instances[MockWebSocket.instances.length - 1]!
+    act(() => socket.open())
+    act(() => {
+      socket.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({ message_type: 'config', ice_servers: [] }),
+      }))
+    })
+    act(() => {
+      socket.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({
+          message_type: 'device_msg',
+          payload: { type: 'offer', sdp: 'v=0\r\n' },
+        }),
+      }))
+    })
+    await settleAsyncWork()
+
+    const pc = MockPeerConnection.instances[MockPeerConnection.instances.length - 1]!
+    const channel = new MockDataChannel()
+    act(() => pc.deliverChannel(channel))
+    act(() => channel.open())
+    act(() => pc.setConnected())
+    await settleAsyncWork()
+    return { socket, pc, channel }
+  }
+
+  async function connectWithoutInputChannel() {
+    act(() => hook!.connect())
+    await settleAsyncWork()
+    const socket = MockWebSocket.instances[MockWebSocket.instances.length - 1]!
+    act(() => socket.open())
+    act(() => {
+      socket.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({ message_type: 'config', ice_servers: [] }),
+      }))
+    })
+    act(() => {
+      socket.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({
+          message_type: 'device_msg',
+          payload: { type: 'offer', sdp: 'v=0\r\n' },
+        }),
+      }))
+    })
+    await settleAsyncWork()
+    const pc = MockPeerConnection.instances[MockPeerConnection.instances.length - 1]!
+    act(() => pc.setConnected())
+    await settleAsyncWork()
+    return { socket, pc }
+  }
+
+  it('reconnects when the input channel closes while the page is visible', async () => {
+    const { channel } = await connectWithInputChannel()
+    expect(hook!.inputReady).toBe(true)
+
+    act(() => channel.close())
+    expect(hook!.inputReady).toBe(false)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_700)
+    })
+    await settleAsyncWork()
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(MockWebSocket.instances.length).toBeGreaterThan(1)
+  })
+
+  it('does not reconnect after an explicit disconnect', async () => {
+    const { channel } = await connectWithInputChannel()
+
+    act(() => channel.close())
+    act(() => hook!.disconnect())
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_000)
+    })
+
+    expect(MockWebSocket.instances).toHaveLength(1)
+    expect(hook!.status).toBe('disconnected')
+  })
+
+  it('recovers on pageshow when the data channel is stale', async () => {
+    const { channel } = await connectWithInputChannel()
+    Object.defineProperty(channel, 'readyState', { value: 'closed', configurable: true })
+
+    act(() => {
+      window.dispatchEvent(new Event('pageshow'))
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_700)
+    })
+    await settleAsyncWork()
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('recovers on online when the data channel is stale', async () => {
+    const { channel } = await connectWithInputChannel()
+    Object.defineProperty(channel, 'readyState', { value: 'closed', configurable: true })
+
+    act(() => {
+      window.dispatchEvent(new Event('online'))
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_700)
+    })
+    await settleAsyncWork()
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('waits until the page is visible before recovering', async () => {
+    const { channel } = await connectWithInputChannel()
+    setDocumentHidden(true)
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    act(() => channel.close())
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000)
+    })
+    expect(fetch).toHaveBeenCalledTimes(1)
+
+    setDocumentHidden(false)
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_700)
+    })
+    await settleAsyncWork()
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('leaves a healthy channel untouched on resume', async () => {
+    await connectWithInputChannel()
+
+    act(() => {
+      window.dispatchEvent(new Event('pageshow'))
+      window.dispatchEvent(new Event('online'))
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000)
+    })
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(hook!.inputReady).toBe(true)
+  })
+
+  it('reconnects when the peer connection fails', async () => {
+    const { pc } = await connectWithInputChannel()
+
+    act(() => {
+      pc.connectionState = 'failed'
+      pc.onconnectionstatechange?.()
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_700)
+    })
+    await settleAsyncWork()
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('reconnects after the ICE disconnected grace expires', async () => {
+    const { pc } = await connectWithInputChannel()
+
+    act(() => {
+      pc.setDisconnected()
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(9_800)
+    })
+    await settleAsyncWork()
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('restores touch readiness after a successful recovery', async () => {
+    const { channel: oldChannel } = await connectWithInputChannel()
+    const oldSocket = MockWebSocket.instances[0]!
+
+    act(() => oldChannel.close())
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_700)
+    })
+    await settleAsyncWork()
+    expect(oldSocket.readyState).toBe(MockWebSocket.CLOSED)
+
+    const { channel } = await openRecoveredSession()
+    expect(hook!.status).toBe('connected')
+    expect(hook!.inputReady).toBe(true)
+    expect(channel.readyState).toBe('open')
+  })
+
+  it('keeps a connection that heals during the recovery delay', async () => {
+    const { pc } = await connectWithInputChannel()
+
+    act(() => pc.setDisconnected())
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(8_000)
+    })
+    act(() => pc.setConnected())
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000)
+    })
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(hook!.status).toBe('connected')
+  })
+
+  it('retries after a transient scrcpy error', async () => {
+    const { socket } = await connectWithInputChannel()
+
+    act(() => {
+      socket.onmessage?.(new MessageEvent('message', {
+        data: JSON.stringify({
+          message_type: 'device_msg',
+          payload: { type: 'scrcpy_error', message: 'unknown peer' },
+        }),
+      }))
+    })
+    await settleAsyncWork()
+    expect(hook!.status).toBe('error')
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6_000)
+    })
+    await settleAsyncWork()
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps retrying after a recovery attempt fails during signaling startup', async () => {
+    const { channel } = await connectWithInputChannel()
+    vi.mocked(fetch).mockImplementation(async () => {
+      throw new Error('offline')
+    })
+
+    act(() => channel.close())
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000)
+    })
+    await settleAsyncWork()
+    expect(hook!.status).toBe('error')
+
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({ token: 'fresh-token' }),
+    } as unknown as Response)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_000)
+    })
+    await settleAsyncWork()
+
+    expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThanOrEqual(5)
+    expect(MockWebSocket.instances.length).toBeGreaterThan(1)
+  })
+
+  it('lets the health interval notice a channel that closes without an event', async () => {
+    const { channel } = await connectWithInputChannel()
+    Object.defineProperty(channel, 'readyState', { value: 'closed', configurable: true })
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_700)
+    })
+    await settleAsyncWork()
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the retry budget when a recovered channel opens only briefly', async () => {
+    const { channel: firstChannel } = await connectWithInputChannel()
+    act(() => firstChannel.close())
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_700)
+    })
+    await settleAsyncWork()
+
+    const { channel: secondChannel } = await openRecoveredSession()
+    act(() => secondChannel.close())
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_700)
+    })
+    await settleAsyncWork()
+    expect(fetch).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_500)
+    })
+    await settleAsyncWork()
+    expect(fetch).toHaveBeenCalledTimes(3)
+  })
+
+  it('ignores pageshow while hidden and still reclaims after the grace', async () => {
+    await connectWithInputChannel()
+    setDocumentHidden(true)
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+      window.dispatchEvent(new Event('pageshow'))
+      window.dispatchEvent(new Event('online'))
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000)
+    })
+    expect(fetch).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(178_000)
+    })
+    const socket = MockWebSocket.instances[0]!
+    expect(socket.readyState).toBe(MockWebSocket.CLOSED)
+
+    setDocumentHidden(false)
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_700)
+    })
+    await settleAsyncWork()
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('reconnects when ICE fails while the aggregate state still says connected', async () => {
+    const { pc } = await connectWithInputChannel()
+
+    act(() => {
+      pc.iceConnectionState = 'failed'
+      pc.oniceconnectionstatechange?.()
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_700)
+    })
+    await settleAsyncWork()
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('recovers when the signaling socket dies but the media channel stays open', async () => {
+    const { socket } = await connectWithInputChannel()
+
+    act(() => {
+      socket.readyState = MockWebSocket.CLOSED
+      window.dispatchEvent(new Event('pageshow'))
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_700)
+    })
+    await settleAsyncWork()
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('recovers when the control channel never opens', async () => {
+    await connectWithoutInputChannel()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000)
+    })
+    await settleAsyncWork()
+
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not connect in passive mode', async () => {
+    await act(async () => root.render(<Harness passive />))
+    await settleAsyncWork()
+
+    act(() => hook!.connect())
+    act(() => {
+      window.dispatchEvent(new Event('online'))
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000)
+    })
+
+    expect(fetch).not.toHaveBeenCalled()
+    expect(MockWebSocket.instances).toHaveLength(0)
+  })
+
+  it('does not reconnect after unmounting while recovery is pending', async () => {
+    const { channel } = await connectWithInputChannel()
+
+    act(() => channel.close())
+    await act(async () => {
+      root.render(<></>)
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000)
+    })
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(MockWebSocket.instances).toHaveLength(1)
+  })
+
+  it('stays disconnected when the user disconnects while the hidden grace is armed', async () => {
+    const { channel } = await connectWithInputChannel()
+    setDocumentHidden(true)
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    act(() => hook!.disconnect())
+    act(() => channel.close())
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200_000)
+    })
+    setDocumentHidden(false)
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000)
+    })
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(MockWebSocket.instances).toHaveLength(1)
+    expect(hook!.status).toBe('disconnected')
+  })
+})
 
 describe('WebRTC candidate filtering', () => {
   const ipv4Line = 'a=candidate:1 1 UDP 2122260223 192.168.50.14 54321 typ host'

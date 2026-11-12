@@ -50,6 +50,22 @@ const HEARTBEAT_INTERVAL_MS = 5_000
 const OFFER_TIMEOUT_MS = 15_000
 const RECONNECT_DELAY_MS = 800
 const COMMAND_TIMEOUT_MS = 12_000
+/** 输入通道失效后的自动恢复退避；三次仍失败就交给用户手动重试。 */
+const RECOVERY_DELAYS_MS = [800, 2_000, 5_000]
+/** 可见状态下定期检查 PeerConnection / input channel 的健康度。 */
+const CONNECTION_HEALTH_INTERVAL_MS = 4_000
+/** ICE disconnected 可能只是网络切换，给短暂恢复留出时间。 */
+const DISCONNECT_GRACE_MS = 8_000
+/** 媒体已连上但 input channel 迟迟不 open 时，视为控制面失效。 */
+const CONTROL_PLANE_GRACE_MS = 8_000
+/** 通道连续保持 open 这么久才清空重连预算，避免短暂 open→close 无限重连。 */
+const INPUT_STABLE_WINDOW_MS = 4_000
+const IN_PROGRESS_STATUSES: WebRTCStatus[] = [
+  'connecting',
+  'signaling',
+  'waiting_offer',
+  'connecting_webrtc'
+]
 
 /** 离开工作区或页面隐藏后保留媒体连接的时间，与预览服务的 3 秒回收宽限区分。 */
 const PREVIEW_HIDDEN_DISCONNECT_MS = 180_000;
@@ -163,11 +179,19 @@ export function isTouchMoveBackpressured(action: number, bufferedAmount: number)
   return action === 2 && bufferedAmount > INPUT_CHANNEL_BACKPRESSURE_BYTES
 }
 
-export function bindInputChannelReadiness(channel: RTCDataChannel, onChange: (ready: boolean) => void) {
+export function bindInputChannelReadiness(
+  channel: RTCDataChannel,
+  onChange: (ready: boolean) => void,
+  onClosed?: () => void
+) {
   channel.bufferedAmountLowThreshold = INPUT_CHANNEL_BACKPRESSURE_BYTES / 2
   const update = () => onChange(channel.readyState === 'open')
+  const handleClose = () => {
+    update()
+    onClosed?.()
+  }
   channel.onopen = update
-  channel.onclose = update
+  channel.onclose = handleClose
   channel.onerror = update
   update()
   return () => {
@@ -354,12 +378,28 @@ export function useScrcpyWebRTC({
   const reconnectTimerRef = useRef<number | null>(null)
   const hiddenDisconnectTimerRef = useRef<number | null>(null)
   const disconnectedByHiddenRef = useRef(false)
+  const connectionIntentRef = useRef(false)
+  const recoveryTimerRef = useRef<number | null>(null)
+  const recoveryAttemptRef = useRef(0)
+  const recoveryExhaustedRef = useRef(false)
+  const recoveryInFlightRef = useRef(false)
+  const disconnectGraceTimerRef = useRef<number | null>(null)
+  const controlPlaneTimerRef = useRef<number | null>(null)
+  const controlPlaneExpiredRef = useRef(false)
+  const inputStableTimerRef = useRef<number | null>(null)
+  const mountedRef = useRef(true)
+  const connectRef = useRef<((signalingUrlOverride?: string) => void) | null>(null)
+  const statusRef = useRef<WebRTCStatus>('idle')
   const pendingCommandsRef = useRef(new Map<string, {
     requestId: string
     resolve: (result: ScrcpyCommandResult) => void
     timer: number
   }>())
   const prevStatsRef = useRef({ timestamp: 0, bytesReceived: 0, framesDecoded: 0 })
+
+  useEffect(() => {
+    statusRef.current = status
+  }, [status])
 
   const sendForward = useCallback((payload: unknown) => {
     const ws = wsRef.current
@@ -402,6 +442,158 @@ export function useScrcpyWebRTC({
       entry.resolve({ requestId: entry.requestId, success: false, error })
     })
   }, [])
+
+  const clearRecoveryTimer = useCallback(() => {
+    if (recoveryTimerRef.current !== null) {
+      window.clearTimeout(recoveryTimerRef.current)
+      recoveryTimerRef.current = null
+    }
+  }, [])
+
+  const clearDisconnectGrace = useCallback(() => {
+    if (disconnectGraceTimerRef.current !== null) {
+      window.clearTimeout(disconnectGraceTimerRef.current)
+      disconnectGraceTimerRef.current = null
+    }
+  }, [])
+
+  const clearControlPlaneGrace = useCallback(() => {
+    controlPlaneExpiredRef.current = false
+    if (controlPlaneTimerRef.current !== null) {
+      window.clearTimeout(controlPlaneTimerRef.current)
+      controlPlaneTimerRef.current = null
+    }
+  }, [])
+
+  const clearInputStableTimer = useCallback(() => {
+    if (inputStableTimerRef.current !== null) {
+      window.clearTimeout(inputStableTimerRef.current)
+      inputStableTimerRef.current = null
+    }
+  }, [])
+
+  const resetRecoveryBudget = useCallback(() => {
+    recoveryAttemptRef.current = 0
+    recoveryExhaustedRef.current = false
+  }, [])
+
+  const resetRecoveryState = useCallback(() => {
+    resetRecoveryBudget()
+    controlPlaneExpiredRef.current = false
+    clearRecoveryTimer()
+    clearDisconnectGrace()
+    clearControlPlaneGrace()
+    clearInputStableTimer()
+  }, [clearControlPlaneGrace, clearDisconnectGrace, clearInputStableTimer, clearRecoveryTimer, resetRecoveryBudget])
+
+  const scheduleRecovery = useCallback((force = false) => {
+    if (!mountedRef.current || passive || !connectionIntentRef.current || document.hidden) return
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return
+    if (recoveryTimerRef.current !== null) return
+    if (IN_PROGRESS_STATUSES.includes(statusRef.current)) return
+    if (!force && inputChannelRef.current?.readyState === 'open') {
+      clearRecoveryTimer()
+      clearControlPlaneGrace()
+      return
+    }
+    if (recoveryExhaustedRef.current) return
+    const attempt = recoveryAttemptRef.current
+    if (attempt >= RECOVERY_DELAYS_MS.length) {
+      recoveryExhaustedRef.current = true
+      setError('预览连接已断开，请重新连接预览')
+      setStatus('error')
+      return
+    }
+    recoveryTimerRef.current = window.setTimeout(() => {
+      recoveryTimerRef.current = null
+      if (!mountedRef.current || passive || !connectionIntentRef.current || document.hidden) return
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return
+      if (IN_PROGRESS_STATUSES.includes(statusRef.current)) return
+      const pc = pcRef.current
+      const channel = inputChannelRef.current
+      const signalingHealthy = wsRef.current?.readyState === WebSocket.OPEN
+      if (pc?.connectionState === 'connected' && pc.iceConnectionState !== 'failed' && signalingHealthy) {
+        if (channel?.readyState === 'open') {
+          clearRecoveryTimer()
+          clearControlPlaneGrace()
+          return
+        }
+        // The peer connection is healthy but the control plane is still being
+        // negotiated; the control-plane grace decides instead of tearing down
+        // a session that is about to become usable.
+        if ((channel === null || channel.readyState === 'connecting') && !controlPlaneExpiredRef.current) return
+      }
+      if (pc && (pc.connectionState === 'new' || pc.connectionState === 'connecting')) return
+      if (!force && channel?.readyState === 'open') {
+        clearRecoveryTimer()
+        clearControlPlaneGrace()
+        return
+      }
+      recoveryAttemptRef.current += 1
+      recoveryInFlightRef.current = true
+      try {
+        connectRef.current?.()
+      } finally {
+        recoveryInFlightRef.current = false
+      }
+    }, RECOVERY_DELAYS_MS[attempt])
+  }, [clearControlPlaneGrace, clearRecoveryTimer, passive])
+
+  const armControlPlaneGrace = useCallback(() => {
+    if (!mountedRef.current || passive || !connectionIntentRef.current || document.hidden) return
+    if (controlPlaneExpiredRef.current) {
+      scheduleRecovery(true)
+      return
+    }
+    if (controlPlaneTimerRef.current !== null) return
+    controlPlaneTimerRef.current = window.setTimeout(() => {
+      controlPlaneTimerRef.current = null
+      if (!mountedRef.current || passive || !connectionIntentRef.current || document.hidden) return
+      const pc = pcRef.current
+      if (pc?.connectionState !== 'connected') return
+      if (inputChannelRef.current?.readyState === 'open') return
+      controlPlaneExpiredRef.current = true
+      scheduleRecovery(true)
+    }, CONTROL_PLANE_GRACE_MS)
+  }, [passive, scheduleRecovery])
+
+  const ensureConnectionHealth = useCallback(() => {
+    if (passive || !connectionIntentRef.current || document.hidden) return
+    if (IN_PROGRESS_STATUSES.includes(statusRef.current)) return
+    if (statusRef.current === 'error' && inputChannelRef.current?.readyState !== 'open') {
+      scheduleRecovery(true)
+      return
+    }
+    // Permanent signaling/scrcpy errors set recoveryExhaustedRef, so a
+    // transient transport failure can still recover after the page resumes.
+    const pc = pcRef.current
+    const channel = inputChannelRef.current
+    if (!pc) {
+      scheduleRecovery(true)
+      return
+    }
+    if (pc.connectionState === 'connected') {
+      if (pc.iceConnectionState === 'failed') {
+        scheduleRecovery(true)
+        return
+      }
+      const ws = wsRef.current
+      if (ws?.readyState !== WebSocket.OPEN) {
+        scheduleRecovery(true)
+        return
+      }
+      if (channel?.readyState === 'open') return
+      if (channel?.readyState === 'closed') {
+        scheduleRecovery()
+        return
+      }
+      armControlPlaneGrace()
+      return
+    }
+    if (pc.connectionState === 'failed' || pc.connectionState === 'closed' || pc.connectionState === 'disconnected') {
+      scheduleRecovery(true)
+    }
+  }, [armControlPlaneGrace, passive, scheduleRecovery])
 
   const filterSdpCandidates = useCallback((sdp: string, forceDropLoopback = false) => {
     return filterSdpCandidatesForPolicy(sdp, connectionPath, ipPreference, forceDropLoopback)
@@ -470,6 +662,29 @@ export function useScrcpyWebRTC({
       inputChannelCleanupRef.current = bindInputChannelReadiness(channel, ready => {
         if (inputChannelRef.current !== channel) return
         setInputReady(ready)
+        if (ready) {
+          clearRecoveryTimer()
+          clearControlPlaneGrace()
+          clearInputStableTimer()
+          // A brief open must not zero the retry budget; only a channel that
+          // stays usable for a stability window counts as a successful recovery.
+          inputStableTimerRef.current = window.setTimeout(() => {
+            inputStableTimerRef.current = null
+            if (inputChannelRef.current !== channel || channel.readyState !== 'open') return
+            resetRecoveryBudget()
+            clearRecoveryTimer()
+            clearControlPlaneGrace()
+          }, INPUT_STABLE_WINDOW_MS)
+          if (pc.connectionState === 'connected') {
+            setError(null)
+            setStatus('connected')
+          }
+        } else {
+          clearInputStableTimer()
+        }
+      }, () => {
+        if (inputChannelRef.current !== channel) return
+        scheduleRecovery()
       })
     }
 
@@ -479,25 +694,68 @@ export function useScrcpyWebRTC({
       if (pc.iceConnectionState === 'failed') {
         setError('ICE connection failed')
         setStatus('error')
+        clearControlPlaneGrace()
+        clearInputStableTimer()
+        scheduleRecovery(true)
       }
     }
 
     pc.onconnectionstatechange = () => {
       if (pcRef.current !== pc) return
-      if (pc.connectionState === 'connected') setStatus('connected')
+      if (pc.connectionState === 'connected') {
+        clearDisconnectGrace()
+        setStatus('connected')
+        const channel = inputChannelRef.current
+        if (channel?.readyState === 'open') {
+          clearControlPlaneGrace()
+          clearRecoveryTimer()
+        } else if (channel?.readyState === 'closed') {
+          clearControlPlaneGrace()
+          scheduleRecovery()
+        } else {
+          armControlPlaneGrace()
+        }
+        return
+      }
       if (pc.connectionState === 'failed') {
         setError('WebRTC connection failed')
         setStatus('error')
+        clearControlPlaneGrace()
+        clearInputStableTimer()
+        scheduleRecovery(true)
+        return
       }
-      if (pc.connectionState === 'closed' || pc.connectionState === 'disconnected') setStatus('disconnected')
+      if (pc.connectionState === 'closed') {
+        setStatus('disconnected')
+        clearControlPlaneGrace()
+        clearInputStableTimer()
+        scheduleRecovery(true)
+        return
+      }
+      if (pc.connectionState === 'disconnected') {
+        setStatus('disconnected')
+        clearControlPlaneGrace()
+        clearInputStableTimer()
+        if (disconnectGraceTimerRef.current === null) {
+          disconnectGraceTimerRef.current = window.setTimeout(() => {
+            disconnectGraceTimerRef.current = null
+            if (pcRef.current !== pc || pc.connectionState === 'connected') return
+            scheduleRecovery(true)
+          }, DISCONNECT_GRACE_MS)
+        }
+      }
     }
 
     return pc
-  }, [connectionPath, ipPreference, sendForward, videoRef])
+  }, [armControlPlaneGrace, clearControlPlaneGrace, clearDisconnectGrace, clearInputStableTimer, clearRecoveryTimer, connectionPath, ipPreference, resetRecoveryBudget, scheduleRecovery, sendForward, videoRef])
 
   const teardownConnection = useCallback(() => {
     stopHeartbeat()
     clearOfferTimeout()
+    clearRecoveryTimer()
+    clearDisconnectGrace()
+    clearControlPlaneGrace()
+    clearInputStableTimer()
     if (reconnectTimerRef.current !== null) {
       window.clearTimeout(reconnectTimerRef.current)
       reconnectTimerRef.current = null
@@ -533,18 +791,29 @@ export function useScrcpyWebRTC({
     if (videoRef.current) videoRef.current.srcObject = null
     prevStatsRef.current = { timestamp: 0, bytesReceived: 0, framesDecoded: 0 }
     setStats(null)
-  }, [clearOfferTimeout, resolvePendingCommands, stopHeartbeat, videoRef])
+  }, [clearControlPlaneGrace, clearDisconnectGrace, clearInputStableTimer, clearOfferTimeout, clearRecoveryTimer, resolvePendingCommands, stopHeartbeat, videoRef])
 
   const disconnect = useCallback(() => {
     if (passive) return
+    connectionIntentRef.current = false
+    resetRecoveryState()
+    disconnectedByHiddenRef.current = false
+    if (hiddenDisconnectTimerRef.current !== null) {
+      window.clearTimeout(hiddenDisconnectTimerRef.current)
+      hiddenDisconnectTimerRef.current = null
+    }
     connectionGenerationRef.current += 1
     teardownConnection()
     setError(null)
     setStatus('disconnected')
-  }, [passive, teardownConnection])
+  }, [passive, resetRecoveryState, teardownConnection])
 
   const connect = useCallback((signalingUrlOverride?: string) => {
     if (passive) return
+    connectionIntentRef.current = true
+    // A user-initiated connect resets the recovery budget; an automatic
+    // recovery keeps it so repeated failures still stop after three tries.
+    if (!recoveryInFlightRef.current) resetRecoveryState()
     connectionGenerationRef.current += 1
     const generation = connectionGenerationRef.current
     const hadActiveConnection = Boolean(wsRef.current || pcRef.current)
@@ -692,6 +961,7 @@ export function useScrcpyWebRTC({
             }
             if (type === 'error') {
               clearOfferTimeout()
+              clearRecoveryTimer()
               const message = msg.error || '信令服务返回错误'
               setError(message)
               setStatus('error')
@@ -712,6 +982,7 @@ export function useScrcpyWebRTC({
             }
             if (payload.type === 'scrcpy_error') {
               clearOfferTimeout()
+              clearRecoveryTimer()
               const message = typeof payload.message === 'string' && payload.message
                 ? payload.message
                 : '设备端视频服务启动失败'
@@ -820,7 +1091,13 @@ export function useScrcpyWebRTC({
     } else {
       beginConnection()
     }
-  }, [clearOfferTimeout, connectionPath, createPeerConnection, deviceId, filterSdpCandidates, ipPreference, passive, resolvePendingCommands, sendAnswer, sendForward, signalingUrl, startHeartbeat, stopHeartbeat, teardownConnection, videoRef])
+  }, [clearOfferTimeout, clearRecoveryTimer, connectionPath, createPeerConnection, deviceId, filterSdpCandidates, ipPreference, passive, resetRecoveryState, resolvePendingCommands, sendAnswer, sendForward, signalingUrl, startHeartbeat, stopHeartbeat, teardownConnection, videoRef])
+
+  // Recovery timers run outside React's render cycle; keep them pointed at the
+  // latest connect closure without threading it through every peer callback.
+  useEffect(() => {
+    connectRef.current = connect
+  }, [connect])
 
   const sendTouch = useCallback((action: number, clientX: number, clientY: number, id = 0, targetVideo?: HTMLVideoElement | null) => {
     const channel = inputChannelRef.current
@@ -982,14 +1259,24 @@ export function useScrcpyWebRTC({
     return () => window.clearInterval(timer)
   }, [inputReady, videoRef])
 
+  const suspendForHidden = useCallback(() => {
+    if (!connectionIntentRef.current) return
+    connectionGenerationRef.current += 1
+    teardownConnection()
+    setError(null)
+    setStatus('disconnected')
+  }, [teardownConnection])
+
   const scheduleHiddenDisconnect = useCallback(() => {
+    if (!connectionIntentRef.current) return
     if (hiddenDisconnectTimerRef.current !== null) return
     hiddenDisconnectTimerRef.current = window.setTimeout(() => {
       hiddenDisconnectTimerRef.current = null
+      if (!connectionIntentRef.current) return
       disconnectedByHiddenRef.current = true
-      disconnect()
+      suspendForHidden()
     }, PREVIEW_HIDDEN_DISCONNECT_MS)
-  }, [disconnect])
+  }, [suspendForHidden])
 
   const cancelHiddenDisconnect = useCallback(() => {
     if (hiddenDisconnectTimerRef.current !== null) {
@@ -1012,20 +1299,89 @@ export function useScrcpyWebRTC({
 
   useEffect(() => {
     if (passive) return undefined
+    const handleResume = () => {
+      if (document.hidden) return
+      cancelHiddenDisconnect()
+      if (!connectionIntentRef.current) return
+      if (disconnectedByHiddenRef.current) {
+        disconnectedByHiddenRef.current = false
+        connect()
+        return
+      }
+      // iOS/Android 可能冻结后台页面，visibilitychange 和 3 分钟定时器
+      // 都不可靠；回到前台时主动验证控制通道，失效就重新协商。
+      ensureConnectionHealth()
+    }
     const handleVisibility = () => {
       if (document.hidden) {
         scheduleHiddenDisconnect()
         return
       }
-      cancelHiddenDisconnect()
-      if (disconnectedByHiddenRef.current) {
-        disconnectedByHiddenRef.current = false
-        connect()
-      }
+      handleResume()
     }
     document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [cancelHiddenDisconnect, connect, passive, scheduleHiddenDisconnect])
+    window.addEventListener('pageshow', handleResume)
+    window.addEventListener('online', handleResume)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('pageshow', handleResume)
+      window.removeEventListener('online', handleResume)
+    }
+  }, [cancelHiddenDisconnect, connect, ensureConnectionHealth, passive, scheduleHiddenDisconnect])
+
+  useEffect(() => {
+    if (passive) return undefined
+    const timer = window.setInterval(() => {
+      if (!mountedRef.current || document.hidden || !connectionIntentRef.current) return
+      if (IN_PROGRESS_STATUSES.includes(statusRef.current)) return
+      const pc = pcRef.current
+      const channel = inputChannelRef.current
+      if (statusRef.current === 'error' && channel?.readyState !== 'open') {
+        scheduleRecovery(true)
+        return
+      }
+      if (!pc) {
+        // A failed recovery that stops before creating a PeerConnection leaves
+        // status in 'error'; keep retrying until the shared budget is spent.
+        if (statusRef.current === 'disconnected' || (statusRef.current === 'error' && !recoveryExhaustedRef.current)) {
+          scheduleRecovery(true)
+        }
+        return
+      }
+      if (pc.connectionState === 'connected') {
+        if (pc.iceConnectionState === 'failed') {
+          scheduleRecovery(true)
+          return
+        }
+        const ws = wsRef.current
+        if (ws?.readyState !== WebSocket.OPEN) {
+          scheduleRecovery(true)
+          return
+        }
+        if (channel?.readyState === 'closed') {
+          scheduleRecovery()
+          return
+        }
+        if (channel?.readyState !== 'open') armControlPlaneGrace()
+        return
+      }
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+        scheduleRecovery(true)
+      }
+    }, CONNECTION_HEALTH_INTERVAL_MS)
+    return () => window.clearInterval(timer)
+  }, [armControlPlaneGrace, passive, scheduleRecovery])
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      clearRecoveryTimer()
+      clearDisconnectGrace()
+      clearControlPlaneGrace()
+      clearInputStableTimer()
+    }
+  }, [clearControlPlaneGrace, clearDisconnectGrace, clearInputStableTimer, clearRecoveryTimer])
 
   return { status, error, stats, inputReady, mediaStream, connect, disconnect, sendTouch, sendScroll, sendCommand }
 }

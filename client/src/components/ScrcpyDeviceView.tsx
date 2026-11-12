@@ -6,6 +6,7 @@ import { Button, IconButton, TruncatedText } from './common'
 import { keepNumberWithUnit } from '../utils/typography'
 import { previewQualityPresets, usePreviewStore, type PreviewQuality } from '../stores'
 import { usePreviewConnection } from '../contexts/previewSession'
+import { useScrcpyInput } from '../hooks/useScrcpyInput'
 
 interface ScrcpyDeviceViewProps {
   enabled: boolean
@@ -82,12 +83,6 @@ function DeviceNavigationButtons({
   ))
 }
 
-interface TrackedPointer {
-  clientX: number
-  clientY: number
-  target: HTMLVideoElement
-}
-
 export default function ScrcpyDeviceView({
   enabled,
   automationAvailable = true,
@@ -110,9 +105,6 @@ export default function ScrcpyDeviceView({
   const previousFocusRef = useRef<HTMLElement | null>(null)
   const immersiveBackgroundStateRef = useRef(new Map<HTMLElement, { inert: boolean; ariaHidden: string | null }>())
   const immersiveHistoryEntryRef = useRef(false)
-  const trackedPointersRef = useRef(new Map<number, TrackedPointer>())
-  const pendingPointerMovesRef = useRef(new Map<number, TrackedPointer>())
-  const pointerMoveFrameRef = useRef<number | null>(null)
   const lastPreviewGeometryRef = useRef({ width: 0, height: 0, status: 'idle' })
   const autoConnectStartedRef = useRef(false)
   const connectRequestGenerationRef = useRef(0)
@@ -151,10 +143,13 @@ export default function ScrcpyDeviceView({
     scrcpyOptions
   })
   const connectWebrtc = webrtc.connect
-  const sendTouchRef = useRef(webrtc.sendTouch)
-  useEffect(() => {
-    sendTouchRef.current = webrtc.sendTouch
-  }, [webrtc.sendTouch])
+  const previewInput = useScrcpyInput({
+    enabled: automationAvailable,
+    inputReady: webrtc.inputReady,
+    sendTouch: webrtc.sendTouch,
+    sendScroll: webrtc.sendScroll,
+  })
+  const cancelActiveGestures = previewInput.cancelActiveGestures
 
   useEffect(() => {
     const width = webrtc.stats?.width ?? 0
@@ -167,16 +162,8 @@ export default function ScrcpyDeviceView({
     lastPreviewGeometryRef.current = { width, height, status: webrtc.status }
     if (!geometryChanged && !connectionEnded) return
     // 旋转、重连或画面尺寸变化后，旧手势的坐标不再对应新画面，先发送取消。
-    if (pointerMoveFrameRef.current !== null) {
-      window.cancelAnimationFrame(pointerMoveFrameRef.current)
-      pointerMoveFrameRef.current = null
-    }
-    pendingPointerMovesRef.current.clear()
-    trackedPointersRef.current.forEach((pointer, pointerId) => {
-      sendTouchRef.current(3, pointer.clientX, pointer.clientY, pointerId, pointer.target)
-    })
-    trackedPointersRef.current.clear()
-  }, [webrtc.stats?.height, webrtc.stats?.width, webrtc.status])
+    cancelActiveGestures()
+  }, [cancelActiveGestures, webrtc.stats?.height, webrtc.stats?.width, webrtc.status])
   const isCompact = variant === 'compact'
   const connectingStatuses = ['connecting', 'signaling', 'waiting_offer', 'connecting_webrtc']
   const isConnecting = connectingStatuses.includes(webrtc.status)
@@ -306,89 +293,12 @@ export default function ScrcpyDeviceView({
     }
   }, [autoConnect, automationAvailable, connect, enabled])
 
-  const flushPointerMoves = useCallback(() => {
-    pointerMoveFrameRef.current = null
-    const pendingMoves = Array.from(pendingPointerMovesRef.current.entries())
-    pendingPointerMovesRef.current.clear()
-    pendingMoves.forEach(([pointerId, pointer]) => {
-      if (!trackedPointersRef.current.has(pointerId)) return
-      sendTouchRef.current(2, pointer.clientX, pointer.clientY, pointerId, pointer.target)
-    })
-  }, [])
-
-  const onPointerDown = (event: React.PointerEvent<HTMLVideoElement>) => {
-    if (!automationAvailable || !webrtc.inputReady) return
-    const pointer = { clientX: event.clientX, clientY: event.clientY, target: event.currentTarget }
-    if (!webrtc.sendTouch(0, pointer.clientX, pointer.clientY, event.pointerId, pointer.target)) return
-
-    trackedPointersRef.current.set(event.pointerId, pointer)
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId)
-    } catch {
-      // The pointer may already have ended between the down event and capture.
-    }
-  }
-
-  const onWheel = (event: React.WheelEvent<HTMLVideoElement>) => {
-    if (!automationAvailable || !webrtc.inputReady) return
-    if (webrtc.sendScroll(event.deltaX, event.deltaY, event.clientX, event.clientY, event.currentTarget)) {
-      event.preventDefault()
-    }
-  }
-
-  const onPointerMove = (event: React.PointerEvent<HTMLVideoElement>) => {
-    if (!automationAvailable || !trackedPointersRef.current.has(event.pointerId)) return
-    const pointer = { clientX: event.clientX, clientY: event.clientY, target: event.currentTarget }
-    trackedPointersRef.current.set(event.pointerId, pointer)
-    pendingPointerMovesRef.current.set(event.pointerId, pointer)
-    if (pointerMoveFrameRef.current === null) {
-      pointerMoveFrameRef.current = window.requestAnimationFrame(flushPointerMoves)
-    }
-  }
-
-  const finishPointer = (event: React.PointerEvent<HTMLVideoElement>, cancelled = false) => {
-    const trackedPointer = trackedPointersRef.current.get(event.pointerId)
-    if (!trackedPointer) return
-
-    pendingPointerMovesRef.current.delete(event.pointerId)
-    trackedPointersRef.current.delete(event.pointerId)
-    webrtc.sendTouch(
-      cancelled ? 3 : 1,
-      cancelled ? trackedPointer.clientX : event.clientX,
-      cancelled ? trackedPointer.clientY : event.clientY,
-      event.pointerId,
-      trackedPointer.target
-    )
-    try {
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId)
-      }
-    } catch {
-      // Losing capture is already equivalent to finishing this local gesture.
-    }
-  }
-
-  const onLostPointerCapture = (event: React.PointerEvent<HTMLVideoElement>) => {
-    const trackedPointer = trackedPointersRef.current.get(event.pointerId)
-    if (!trackedPointer) return
-    pendingPointerMovesRef.current.delete(event.pointerId)
-    trackedPointersRef.current.delete(event.pointerId)
-    webrtc.sendTouch(3, trackedPointer.clientX, trackedPointer.clientY, event.pointerId, trackedPointer.target)
-  }
-
   useEffect(() => () => {
     connectRequestGenerationRef.current += 1
-    if (pointerMoveFrameRef.current !== null) window.cancelAnimationFrame(pointerMoveFrameRef.current)
-    pointerMoveFrameRef.current = null
     if (commandErrorTimerRef.current !== null) {
       window.clearTimeout(commandErrorTimerRef.current)
       commandErrorTimerRef.current = null
     }
-    pendingPointerMovesRef.current.clear()
-    trackedPointersRef.current.forEach((pointer, pointerId) => {
-      sendTouchRef.current(3, pointer.clientX, pointer.clientY, pointerId, pointer.target)
-    })
-    trackedPointersRef.current.clear()
   }, [])
 
   const fullscreen = () => {
@@ -572,12 +482,12 @@ export default function ScrcpyDeviceView({
             aria-label="模拟器实时画面"
             aria-disabled={!webrtc.inputReady}
             className="w-full h-full object-contain touch-none select-none"
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onWheel={onWheel}
-            onPointerUp={(event) => finishPointer(event)}
-            onPointerCancel={(event) => finishPointer(event, true)}
-            onLostPointerCapture={onLostPointerCapture}
+            onPointerDown={previewInput.onPointerDown}
+            onPointerMove={previewInput.onPointerMove}
+            onWheel={previewInput.onWheel}
+            onPointerUp={previewInput.onPointerUp}
+            onPointerCancel={previewInput.onPointerCancel}
+            onLostPointerCapture={previewInput.onLostPointerCapture}
           />
           {webrtc.status === 'connected' && !webrtc.inputReady && (
             <div
@@ -878,12 +788,12 @@ export default function ScrcpyDeviceView({
             aria-label="模拟器沉浸画面"
             aria-disabled={!webrtc.inputReady}
             className="h-full w-full object-contain touch-none select-none"
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onWheel={onWheel}
-            onPointerUp={(event) => finishPointer(event)}
-            onPointerCancel={(event) => finishPointer(event, true)}
-            onLostPointerCapture={onLostPointerCapture}
+            onPointerDown={previewInput.onPointerDown}
+            onPointerMove={previewInput.onPointerMove}
+            onWheel={previewInput.onWheel}
+            onPointerUp={previewInput.onPointerUp}
+            onPointerCancel={previewInput.onPointerCancel}
+            onLostPointerCapture={previewInput.onLostPointerCapture}
           />
           {!webrtc.inputReady && (
             <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-md bg-black/70 px-2.5 py-1.5 text-xs text-white/90" role="status">

@@ -3,6 +3,7 @@ import { Play, Radio, RotateCw, Smartphone } from 'lucide-react'
 import { Button, SmoothPanel } from './common'
 import PreviewModeControls, { PreviewAutoStartToggle } from './PreviewModeControls'
 import { useDashboardPreview } from '../hooks/useDashboardPreview'
+import { useScrcpyInput } from '../hooks/useScrcpyInput'
 import { usePreviewStore } from '../stores'
 
 const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
@@ -11,6 +12,9 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
     videoRef,
     fallbackSnapshot,
     showLivePreview,
+    inputReady,
+    sendTouch,
+    sendScroll,
     isConnecting,
     statusText,
     headerStatusText,
@@ -19,6 +23,12 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
     reconnectPreview,
   } = useDashboardPreview()
   const setMode = usePreviewStore(state => state.setMode)
+  const previewInput = useScrcpyInput({
+    enabled: mode === 'live' && showLivePreview,
+    inputReady,
+    sendTouch,
+    sendScroll,
+  })
   const hasFrame = showLivePreview || Boolean(fallbackSnapshot)
   const showReconnect = mode === 'live' && !showLivePreview
 
@@ -49,7 +59,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
     if (mode === 'snapshot') {
       return {
         title: '等待画面快照',
-        description: '快照每 10\u00A0秒刷新一次，也可以切换到实时画面。',
+        description: '快照每 10\u00A0秒刷新一次，仅可查看；切换到实时画面即可直接操作。',
         action: (
           <Button
             size="sm"
@@ -162,8 +172,18 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
                 autoPlay
                 muted
                 playsInline
-                aria-hidden="true"
-                className={`relative h-full w-full bg-black object-contain ${showLivePreview ? 'opacity-100' : 'opacity-0'}`}
+                aria-label={showLivePreview ? '模拟器实时画面' : undefined}
+                aria-hidden={showLivePreview ? undefined : 'true'}
+                aria-disabled={!showLivePreview || !inputReady ? true : undefined}
+                className={`relative h-full w-full bg-black object-contain ${
+                  showLivePreview ? 'opacity-100 touch-none select-none' : 'pointer-events-none opacity-0'
+                }`}
+                onPointerDown={previewInput.onPointerDown}
+                onPointerMove={previewInput.onPointerMove}
+                onWheel={previewInput.onWheel}
+                onPointerUp={previewInput.onPointerUp}
+                onPointerCancel={previewInput.onPointerCancel}
+                onLostPointerCapture={previewInput.onLostPointerCapture}
               />
               {!showLivePreview && fallbackSnapshot && (
                 <img
@@ -172,6 +192,15 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
                   draggable={false}
                   className="absolute inset-0 h-full w-full select-none object-contain pointer-events-none"
                 />
+              )}
+              {mode === 'live' && showLivePreview && !inputReady && (
+                <div
+                  className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-md bg-black/70 px-2.5 py-1.5 text-xs text-white/90"
+                  role="status"
+                  aria-live="polite"
+                >
+                  触控连接中，画面暂不可操作
+                </div>
               )}
               {!hasFrame && (
                 <div

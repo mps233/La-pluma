@@ -19,15 +19,6 @@
 
 
 
-.combat-task-icon > * {
-    width: 2.25rem;
-    height: 2.25rem;
-    background: transparent;
-    box-shadow: none;
-  }
-
-
-
 
 .combat-task-icon svg {
     width: 1.125rem;
