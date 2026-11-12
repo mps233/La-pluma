@@ -1118,41 +1118,6 @@ html.la-pluma-standalone #app-root .page {
   backdrop-filter: none;
 }
 
-/* The combat task card reuses the same neutral glass recipe, with a
-   card-scale tint opacity and no rim. */
-
-.la-pluma-app .combat-task-card {
-  box-shadow: none;
-}
-
-.la-pluma-app .combat-task-card[data-smooth-corners='true'] {
-  border-radius: var(--app-continuous-radius-compact);
-}
-
-.la-pluma-app .combat-task-card .app-card-smooth-surface {
-  border: 0;
-  box-shadow: inset 0 0 0 1px var(--app-border);
-  /* The simulator viewport is a preview fill over the monitor card's glass
-     surface; reuse that whole stack over an opaque base so the page texture
-     behind the card cannot change the result. Every translucent layer is a
-     gradient; the last layer is the opaque background color. */
-  background-color: var(--app-bg-soft);
-  background-image:
-    linear-gradient(var(--app-preview-frame-bg), var(--app-preview-frame-bg)),
-    linear-gradient(180deg, var(--la-pluma-liquid-surface-lift), transparent 34%),
-    linear-gradient(
-      var(--app-surface-solid),
-      var(--app-surface-solid)
-    );
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
-#app-root.dark .la-pluma-app .combat-task-card .app-card-smooth-surface {
-  background-color: var(--app-bg);
-}
-
 .la-pluma-app .smooth-panel-shell.surface-panel {
   display: flex;
   min-width: 0;
@@ -1636,10 +1601,6 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
     box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
   }
 
-  .la-pluma-app .ios-workspace-page .combat-task-card[data-smooth-corners='true'],
-  .dark .la-pluma-app .ios-workspace-page .combat-task-card[data-smooth-corners='true'] {
-    box-shadow: none;
-  }
 }
 
 /* These secondary workspaces use the same borderless grouped-card material as
@@ -1924,14 +1885,6 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
   }
 
 
-  .la-pluma-app .combat-task-card .app-card-smooth-surface,
-  html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
-  #app-root.dark .la-pluma-app .combat-task-card .app-card-smooth-surface {
-    background: var(--app-surface-solid);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-
   .la-pluma-app .app-card[data-smooth-corners='true'],
   .la-pluma-app .smooth-panel-shell.surface-panel {
     background: transparent;
@@ -1983,15 +1936,6 @@ html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
   .la-pluma-app .data-statistics-view-switcher .lg-track__glass,
   .la-pluma-app [data-config-sections] .lg-track__glass,
   .la-pluma-app .preview-mode-shell .lg-track__glass {
-    background: var(--app-surface-solid);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    box-shadow: inset 0 0 0 1px var(--app-border-strong);
-  }
-
-  .la-pluma-app .combat-task-card .app-card-smooth-surface,
-  html.dark .la-pluma-app .combat-task-card .app-card-smooth-surface,
-  #app-root.dark .la-pluma-app .combat-task-card .app-card-smooth-surface {
     background: var(--app-surface-solid);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;

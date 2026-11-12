@@ -82,9 +82,13 @@ vi.mock('../services/api', () => ({
   searchParadoxCopilot: mocks.searchParadoxCopilot,
 }))
 
-vi.mock('../store/statusStore', () => ({
-  useStatusStore: () => ({ setMessage: mocks.setMessage, clearMessage: mocks.clearMessage, setActive: mocks.setActive }),
-}))
+vi.mock('../store/statusStore', () => {
+  const state = { setMessage: mocks.setMessage, clearMessage: mocks.clearMessage, setActive: mocks.setActive }
+  return {
+    useStatusStore: (selector?: (value: typeof state) => unknown) =>
+      selector ? selector(state) : state,
+  }
+})
 
 vi.mock('../hooks/useBackendStatusMonitor', () => ({
   useAutomationAvailability: () => ({ isAvailable: true, unavailableMessage: '' }),
@@ -671,6 +675,9 @@ describe('CombatTasks execution recovery', () => {
 
     expect(container.textContent).toContain('TL-10')
     expect(container.textContent).not.toContain('act55side_10')
+    expect(container.textContent).toContain('单个作业')
+    expect(container.textContent).toContain('作业编号')
+    expect(container.textContent).toContain('已加载')
   })
 
   it('previews the canonical prts://s<id> set form', async () => {
@@ -694,6 +701,12 @@ describe('CombatTasks execution recovery', () => {
 
     expect(mocks.getCopilotSetPlan).toHaveBeenCalledWith('56593', 'normal')
     expect(container.textContent).toContain('作业集')
+    expect(container.textContent).toContain('作业数')
+    expect(container.textContent).toContain('已选')
+    expect(container.textContent).toContain('已完成')
+    expect(container.textContent).toContain('当前关卡')
+    expect(container.textContent).toContain('下一作业')
+    expect(container.textContent).toContain('定位')
   })
 
   it('normalizes the legacy prts://<id>s set form before preview', async () => {
@@ -717,6 +730,12 @@ describe('CombatTasks execution recovery', () => {
 
     expect(mocks.getCopilotSetPlan).toHaveBeenCalledWith('56593', 'normal')
     expect(container.textContent).toContain('作业集')
+    expect(container.textContent).toContain('作业数')
+    expect(container.textContent).toContain('已选')
+    expect(container.textContent).toContain('已完成')
+    expect(container.textContent).toContain('当前关卡')
+    expect(container.textContent).toContain('下一作业')
+    expect(container.textContent).toContain('定位')
   })
 
   it('associates visible form controls with labels and keeps touch targets at least 44px', async () => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
 import '../styles/pages/combat.css'
 import { maaApi, searchCopilot, searchParadoxCopilot, type ManualCopilotSetResult, type ScheduleExecutionResultData } from '../services/api'
 import { motion } from 'framer-motion'
@@ -156,6 +156,53 @@ function SingleCopilotSummary({
   )
 }
 
+function splitOperatorNames(value?: string): string[] {
+  return (value || '')
+    .split(/[、,，]/)
+    .map(name => name.trim())
+    .filter(name => Boolean(name) && name !== '未知')
+}
+
+function CopilotMetricGrid({ items }: { items: Array<{ label: string; value: ReactNode; tone?: 'success' }> }) {
+  return (
+    <div className="combat-info-metrics">
+      {items.map(item => (
+        <div key={item.label} className="combat-info-metric">
+          <span className="combat-info-metric-label">{item.label}</span>
+          <span className={`combat-info-metric-value${item.tone === 'success' ? ' is-success' : ''}`}>{item.value}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function CopilotOperatorChips({ operators }: { operators: string[] }) {
+  if (operators.length === 0) return null
+
+  return (
+    <div className="combat-info-operators">
+      <span className="combat-info-metric-label">干员</span>
+      <div className="combat-info-operator-chips">
+        {operators.slice(0, 10).map((operator, index) => (
+          <span key={`${operator}-${index}`} className="combat-info-operator-chip">{operator}</span>
+        ))}
+        {operators.length > 10 && (
+          <span className="combat-info-operator-chip is-more">+{operators.length - 10}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CopilotInfoFooter({ meta, onClear }: { meta: ReactNode; onClear: () => void }) {
+  return (
+    <div className="combat-info-footer">
+      <span className="combat-info-footer-meta">{meta}</span>
+      <Button onClick={onClear} variant="ghost" size="sm" className="shrink-0 text-xs">清除预览</Button>
+    </div>
+  )
+}
+
 export default function CombatTasks() {
   const [isRunning, setIsRunning] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
@@ -165,7 +212,9 @@ export default function CombatTasks() {
   const stopRequestedRef = useRef(false)
   const executionGenerationRef = useRef(0)
   const stopWaitControllerRef = useRef<AbortController | null>(null)
-  const { setMessage: setStatusMessage, clearMessage: clearStatusMessage, setActive: setIsActiveStatus } = useStatusStore()
+  const setStatusMessage = useStatusStore(state => state.setMessage)
+  const clearStatusMessage = useStatusStore(state => state.clearMessage)
+  const setIsActiveStatus = useStatusStore(state => state.setActive)
   const { isAvailable: automationAvailable, unavailableMessage } = useAutomationAvailability()
   const [taskInputs, setTaskInputs] = useState<CombatTaskInputs>({})
   const [copilotSetInfo, setCopilotSetInfo] = useState<CopilotSetInfo | null>(null)
@@ -267,6 +316,18 @@ export default function CombatTasks() {
     currentIndex: runBelongsToSet ? runCurrentItemIndex : (isRunning ? effectiveCurrentIndex : null),
     enabled: copilotSetInfo?.type === 'set' && Boolean(copilotSetInfo.copilots?.length)
   })
+
+  const focusCopilotListItem = (index: number) => {
+    const list = copilotListRef.current
+    const row = list?.querySelector<HTMLElement>(`[data-copilot-item-index="${index}"]`)
+    if (!list || !row) return
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    list.scrollTo({
+      top: list.scrollTop + row.getBoundingClientRect().top - list.getBoundingClientRect().top
+        - (list.clientHeight - row.offsetHeight) / 2,
+      behavior: reducedMotion ? 'auto' : 'smooth',
+    })
+  }
   const runBattle = runBelongsToSet ? currentRun?.progress?.battle ?? null : null
   const validRunBattle = runBattle
     && Number.isFinite(runBattle.kills)
@@ -1695,7 +1756,6 @@ export default function CombatTasks() {
               <Card
                 key={task.id}
                 smoothCorners
-                smoothRadius={16}
                 className="combat-task-card !p-0"
               >
                 <div className="combat-task-heading flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -1845,7 +1905,7 @@ export default function CombatTasks() {
                           value={taskInputs[task.id] || ''}
                           onChange={(e) => handleInputChange(task.id, e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key !== 'Enter') return
+                            if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229) return
                             e.preventDefault()
                             handleCopilotSubmit()
                           }}
@@ -2388,7 +2448,7 @@ export default function CombatTasks() {
                               value={paradoxSearchName}
                               onChange={(e) => handleParadoxSearchNameChange(e.target.value)}
                               onKeyDown={(e) => {
-                                if (e.key !== 'Enter' || isSearchingParadox || !paradoxSearchName.trim()) return
+                                if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229 || isSearchingParadox || !paradoxSearchName.trim()) return
                                 e.preventDefault()
                                 void handleSearchParadox()
                               }}
@@ -2571,94 +2631,107 @@ export default function CombatTasks() {
             </SmoothPanel>
 
             {/* 作业介绍 */}
-            <div className="combat-workspace-section mt-[var(--app-space-section)]">
-              <h5 className="mb-3 flex items-center space-x-2 text-sm font-semibold text-primary">
-                <svg className="w-4 h-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>作业信息</span>
-              </h5>
-
-              {copilotSetInfo ? (
-                <div className="space-y-2">
-                  {copilotSetInfo.type === 'set' && copilotSetInfo.copilots ? (
+            <SmoothPanel
+              className="combat-info-panel"
+              surfaceClassName="combat-info-surface"
+            >
+              <div className="combat-info-header">
+                <span className="combat-info-icon" aria-hidden="true">
+                  <Info size={16} strokeWidth={1.9} />
+                </span>
+                <h5 className="combat-info-title">作业信息</h5>
+                {copilotSetInfo && (
+                  <span className={`combat-info-kind${copilotSetInfo.type === 'set' ? ' is-set' : ''}`}>
+                    {copilotSetInfo.type === 'set' ? '作业集' : '单个作业'}
+                  </span>
+                )}
+              </div>
+              <div className="combat-info-body">
+                {copilotSetInfo ? (
+                  copilotSetInfo.type === 'set' && copilotSetInfo.copilots ? (
                     (() => {
-                      // 作业集模式：显示当前作业或第一个作业的详细信息
                       const currentIndex = effectiveCurrentIndex
                       const currentCopilot = copilotSetInfo.copilots[currentIndex] || copilotSetInfo.copilots[0]
                       const total = copilotSetInfo.copilots.length
                       const selectedCount = selectedCopilotIndexes.size
                       const completed = copilotSetResults.filter(r => r.success && selectedCopilotIndexes.has(r.index)).length
+                      const operators = splitOperatorNames(currentCopilot?.operators)
+                      const currentStage = currentCopilot?.stage || (currentCopilot ? `第 ${currentIndex + 1} 关` : '—')
 
                       return (
-                        <>
-                          <div className="flex items-center space-x-2">
-                            <span className="rounded-md px-2 py-0.5 text-xs font-medium brand-chip">作业集</span>
-                            <span className="text-xs text-tertiary">已选 {selectedCount}/{total} 个</span>
-                          </div>
+                        <div className="combat-info-stack">
+                          <CopilotMetricGrid items={[
+                            { label: '作业数', value: total },
+                            { label: '已选', value: `${selectedCount}/${total}` },
+                            { label: '已完成', value: completed, tone: completed > 0 ? 'success' : undefined },
+                            { label: '当前关卡', value: currentStage },
+                          ]} />
 
-                          {/* 当前进度 */}
-                          <div className="flex items-center space-x-2 text-xs">
-                            <span className="text-tertiary">进度</span>
-                            <span className="font-medium brand-text">
-                              {isRunning ? `第 ${currentIndex + 1} 关` : `${completed}/${selectedCount} 完成`}
-                            </span>
-                          </div>
-
-                          {/* 当前作业详情 */}
                           {currentCopilot && (
-                            <div className="border-t border-[var(--app-border)] pt-2">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-xs text-tertiary">
-                                  {isRunning ? '当前作业' : '下一作业'}
-                                </span>
-                                <span className="font-mono text-xs brand-text">
-                                  prts://{currentCopilot.id}
-                                </span>
+                            <div className="combat-info-next">
+                              <div className="min-w-0 flex-1">
+                                <span className="combat-info-metric-label">{isRunning ? '当前作业' : '下一作业'}</span>
+                                <div className="combat-info-next-name">
+                                  {currentCopilot.name || `作业 #${currentCopilot.id}`}
+                                </div>
+                                <div className="combat-info-next-meta">
+                                  关卡 {currentStage} · <span className="combat-info-uri">prts://{currentCopilot.id}</span>
+                                </div>
                               </div>
-                              <p className="text-sm font-medium text-primary">
-                                {currentCopilot.name || `作业 #${currentCopilot.id}`}
-                              </p>
-                              {currentCopilot.stage && (
-                                <div className="mt-1 text-xs text-secondary">
-                                  <span className="font-medium">关卡:</span> {currentCopilot.stage}
-                                </div>
-                              )}
-                              {currentCopilot.operators && (
-                                <div className="text-xs text-secondary">
-                                  <span className="font-medium">干员:</span> {currentCopilot.operators}
-                                </div>
-                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="shrink-0 text-xs"
+                                onClick={() => focusCopilotListItem(currentIndex)}
+                              >
+                                定位
+                              </Button>
                             </div>
                           )}
 
-                          {copilotSetInfo.note && (
-                            <p className="text-xs text-tertiary">{copilotSetInfo.note}</p>
-                          )}
-                        </>
+                          <CopilotOperatorChips operators={operators} />
+
+                          <CopilotInfoFooter
+                            meta={`prts://s${copilotSetInfo.id}${copilotSetInfo.note ? ` · ${copilotSetInfo.note}` : ''}`}
+                            onClear={() => setCopilotSetInfo(null)}
+                          />
+                        </div>
                       )
                     })()
                   ) : (
-                    <SingleCopilotSummary info={copilotSetInfo} compact />
-                  )}
-                  <Button
-                    onClick={() => setCopilotSetInfo(null)}
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2 text-xs"
-                  >
-                    清除预览
-                  </Button>
-                </div>
-              ) : (
-                <EmptyState
-                  compact
-                  icon={<Info size={22} strokeWidth={1.7} />}
-                  title="等待预览"
-                  description="预览作业后会在这里显示详情。"
-                />
-              )}
-            </div>
+                    (() => {
+                      const operators = splitOperatorNames(copilotSetInfo.operators)
+
+                      return (
+                        <div className="combat-info-stack">
+                          <div className="combat-info-copilot-name">{copilotSetInfo.name}</div>
+                          <CopilotMetricGrid items={[
+                            { label: '关卡', value: copilotSetInfo.stage || '—' },
+                            { label: '干员', value: operators.length },
+                            { label: '作业编号', value: `#${copilotSetInfo.id}` },
+                            { label: '状态', value: '已加载' },
+                          ]} />
+
+                          <CopilotOperatorChips operators={operators} />
+
+                          <CopilotInfoFooter
+                            meta={`prts://${copilotSetInfo.id}`}
+                            onClear={() => setCopilotSetInfo(null)}
+                          />
+                        </div>
+                      )
+                    })()
+                  )
+                ) : (
+                  <EmptyState
+                    compact
+                    icon={<Info size={22} strokeWidth={1.7} />}
+                    title="等待预览"
+                    description="预览作业后会在这里显示详情。"
+                  />
+                )}
+              </div>
+            </SmoothPanel>
           </aside>
         </div>
       </div>
