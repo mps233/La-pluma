@@ -122,8 +122,13 @@ describe('DataStatistics layout surfaces', () => {
     mocks.getDepotData.mockReset().mockResolvedValue({
       success: true,
       data: {
-        itemCount: 12,
-        items: [{ id: '30012', name: '固源岩', count: 12, iconId: 'rock', classifyType: 'MATERIAL' }],
+        itemCount: 4,
+        items: [
+          { id: '30012', name: '固源岩', count: 12, iconId: 'rock', classifyType: 'MATERIAL' },
+          { id: '30013', name: '固源岩组', count: 3, iconId: 'rock-group', classifyType: 'MATERIAL' },
+          { id: '2001', name: '龙门币', count: 5000, iconId: 'coin', classifyType: 'NORMAL' },
+          { id: '30014', name: '技巧概要·卷一', count: 7, iconId: 'book', classifyType: 'CARD_EXP' },
+        ],
         timestamp: '2026-07-20T08:00:00.000Z',
       },
     })
@@ -215,14 +220,75 @@ describe('DataStatistics layout surfaces', () => {
     expect(kpis.every(kpi => !kpi.classList.contains('surface-soft'))).toBe(true)
     expect(kpis.every(kpi => !kpi.classList.contains('border'))).toBe(true)
     expect(depotSummary?.classList.contains('surface-soft')).toBe(false)
-    expect(depotCard?.querySelector('#depot-category-title')?.textContent).toContain('1\u00A0类')
-    expect(depotCard?.querySelector('.data-statistics-category-section')?.classList.contains('surface-soft')).toBe(false)
-    const depotGrid = activePanel()?.querySelector('.data-statistics-item-grid')
+
+    const inventory = depotCard?.querySelector('.depot-inventory')
+    expect(inventory).not.toBeNull()
+    const chips = Array.from(inventory?.querySelectorAll<HTMLButtonElement>('.depot-filter-chip') ?? [])
+    expect(chips).toHaveLength(4)
+    expect(chips[0]?.getAttribute('aria-pressed')).toBe('true')
+    expect(chips[0]?.textContent).toContain('全部')
+    expect(chips[1]?.textContent).toContain('材料')
+    expect(inventory?.querySelector('input[aria-label="搜索仓库物品"]')).not.toBeNull()
+
+    const depotGrid = inventory?.querySelector('.depot-item-grid')
     expect(depotGrid?.classList.contains('surface-soft')).toBe(false)
-    expect(depotGrid?.classList.contains('gap-3')).toBe(true)
-    const depotItem = activePanel()?.querySelector('.data-statistics-depot-item')
+    expect(depotGrid?.querySelectorAll('.depot-item')).toHaveLength(4)
+    const depotItem = depotGrid?.querySelector('.depot-item')
     expect(depotItem?.classList.contains('surface-soft')).toBe(false)
     expect(depotItem?.classList.contains('border')).toBe(false)
+    expect(depotItem?.querySelector('.depot-item-count')?.textContent).toContain('12')
+  })
+
+  it('filters the depot inventory by category and search', async () => {
+    window.history.replaceState(null, '', '/?tab=depot')
+    await act(async () => root.render(<DataStatistics />))
+    await flush()
+
+    const panel = activePanel()!
+    const grid = () => panel.querySelector('.depot-item-grid')
+    const meta = () => panel.querySelector('.depot-inventory-meta')?.textContent ?? ''
+    const search = panel.querySelector<HTMLInputElement>('input[aria-label="搜索仓库物品"]')!
+
+    expect(grid()?.querySelectorAll('.depot-item')).toHaveLength(4)
+    expect(panel.querySelectorAll('.depot-filter-chip')).toHaveLength(4)
+
+    const materialChip = Array.from(panel.querySelectorAll<HTMLButtonElement>('.depot-filter-chip'))
+      .find(chip => chip.textContent?.includes('材料'))!
+    await click(materialChip)
+
+    expect(materialChip.getAttribute('aria-pressed')).toBe('true')
+    expect(grid()?.querySelectorAll('.depot-item')).toHaveLength(2)
+    expect(meta()).toMatch(/材料\s*·\s*2\s+种/)
+    expect(meta()).toMatch(/15\s+件/)
+
+    const typeSearch = async (value: string) => {
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+        setter.call(search, value)
+        search.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      await flush()
+    }
+
+    await typeSearch('固源岩组')
+    expect(search.value).toBe('固源岩组')
+    expect(grid()?.querySelectorAll('.depot-item')).toHaveLength(1)
+    expect(grid()?.textContent).toContain('固源岩组')
+    expect(meta()).toMatch(/1\s+种/)
+
+    await typeSearch('龙门币')
+    const empty = panel.querySelector('.depot-inventory-empty')
+    expect(empty?.textContent).toContain('没有匹配的物品')
+    expect(grid()).toBeNull()
+
+    const clearButtons = Array.from(panel.querySelectorAll<HTMLButtonElement>('button'))
+      .filter(button => button.textContent?.trim() === '清除筛选')
+    expect(clearButtons).toHaveLength(1)
+    await click(clearButtons[0]!)
+
+    expect(search.value).toBe('')
+    expect(grid()?.querySelectorAll('.depot-item')).toHaveLength(4)
+    expect(panel.querySelector('.depot-filter-chip')?.getAttribute('aria-pressed')).toBe('true')
   })
 
   it('switches statistics views with a horizontal swipe', async () => {
@@ -554,12 +620,15 @@ describe('DataStatistics layout surfaces', () => {
     await flush()
     await click(findButton('仓库识别')!)
 
-    const image = container.querySelector<HTMLImageElement>('img[alt="固源岩"]')
+    const image = container.querySelector<HTMLImageElement>('.depot-item-image')
     expect(image).not.toBeNull()
+    expect(image?.getAttribute('alt')).toBe('')
+    const tile = image?.closest('.depot-item')
+    expect(tile).not.toBeNull()
     await act(async () => image?.dispatchEvent(new Event('error', { bubbles: true })))
     await flush()
 
-    expect(container.querySelector('img[alt="固源岩"]')).toBeNull()
-    expect(container.querySelector('[role="img"][aria-label="固源岩图标不可用"]')).not.toBeNull()
+    expect(tile?.querySelector('img')).toBeNull()
+    expect(tile?.querySelector('[role="img"][aria-label="固源岩图标不可用"]')).not.toBeNull()
   })
 })

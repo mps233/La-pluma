@@ -227,8 +227,7 @@
 
 
 
-.data-statistics-depot-item,
-  .drop-records-item-row,
+.drop-records-item-row,
   .drop-records-stage-row {
     border-radius: var(--app-radius-lg);
     background: color-mix(in srgb, var(--app-surface-muted) 56%, transparent);
@@ -336,3 +335,241 @@
     }
   }
 
+
+
+/* Inventory board: a dense, icon-first item grid with a category rail.
+   The tile is a flat group; only the icon well carries a surface. */
+
+.depot-inventory {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--app-space-3);
+}
+
+.depot-inventory-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-space-3);
+}
+
+.depot-inventory-title {
+  min-width: 0;
+  color: var(--app-text);
+  font-size: var(--app-font-card-title);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.depot-inventory-search {
+  width: min(18rem, 100%);
+  flex: none;
+}
+
+.depot-filter-rail {
+  display: flex;
+  gap: var(--app-space-1);
+  margin-inline: calc(var(--app-space-1) * -1);
+  padding: var(--app-space-1);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: var(--app-space-1);
+  scrollbar-width: none;
+}
+
+.depot-filter-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.depot-filter-chip {
+  display: inline-flex;
+  min-height: 2.75rem;
+  flex: none;
+  align-items: center;
+  gap: var(--app-space-2);
+  border: 0;
+  border-radius: var(--app-radius-pill);
+  padding: 0 var(--app-space-3);
+  background: transparent;
+  color: var(--app-text-muted);
+  font-size: var(--app-font-caption);
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.depot-filter-chip:hover {
+  background: var(--app-surface-muted);
+  color: var(--app-text);
+}
+
+.depot-filter-chip:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
+}
+
+.depot-filter-chip.is-active {
+  background: var(--app-accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 22%, transparent);
+  color: var(--app-accent-strong);
+}
+
+.depot-filter-count {
+  min-width: 1.25rem;
+  border-radius: var(--app-radius-pill);
+  padding: 0 0.25rem;
+  background: var(--app-surface-muted);
+  color: var(--app-text-soft);
+  font-size: var(--app-font-meta);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.depot-filter-chip.is-active .depot-filter-count {
+  background: color-mix(in srgb, var(--app-accent) 14%, transparent);
+  color: var(--app-accent-strong);
+}
+
+.depot-inventory-result {
+  display: flex;
+  min-height: 2.75rem;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-space-2);
+}
+
+.depot-inventory-meta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--app-space-2);
+  margin: 0;
+  color: var(--app-text-soft);
+  font-size: var(--app-font-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.45;
+}
+
+.depot-inventory-meta-strong {
+  color: var(--app-text);
+  font-weight: 600;
+}
+
+.depot-inventory-query {
+  color: var(--app-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.depot-item-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(4.25rem, 1fr));
+  gap: var(--app-space-3) var(--app-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.depot-item {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--app-space-2);
+}
+
+.depot-item-icon {
+  position: relative;
+  display: flex;
+  width: 100%;
+  aspect-ratio: 1;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--app-radius-md);
+  background: color-mix(in srgb, var(--app-surface-muted) 76%, transparent);
+}
+
+.depot-item-image {
+  width: 100%;
+  height: 100%;
+  padding: 10%;
+  object-fit: contain;
+}
+
+.depot-item-fallback {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  color: var(--app-text-soft);
+}
+
+.depot-item-count {
+  position: absolute;
+  right: 0.25rem;
+  bottom: 0.25rem;
+  max-width: calc(100% - 0.5rem);
+  overflow: hidden;
+  border-radius: var(--app-radius-pill);
+  padding: 0 0.25rem;
+  background: color-mix(in srgb, var(--app-surface-solid) 90%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-border) 72%, transparent);
+  color: var(--app-text);
+  font-size: var(--app-font-meta);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1.55;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.depot-item-name {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--app-text-muted);
+  font-size: var(--app-font-caption);
+  font-weight: 500;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.depot-item.is-empty .depot-item-icon {
+  opacity: 0.55;
+}
+
+.depot-item.is-empty .depot-item-name,
+.depot-item.is-empty .depot-item-count {
+  color: var(--app-text-soft);
+}
+
+.depot-inventory-empty {
+  min-height: 10rem;
+}
+
+@media (max-width: 639px) {
+  .depot-inventory-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--app-space-2);
+  }
+
+  .depot-inventory-search {
+    width: 100%;
+  }
+
+  .depot-filter-rail {
+    /* Keep the last chip clear of the edge fade at maximum scroll. */
+    padding-right: 1.25rem;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.25rem), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 1.25rem), transparent);
+  }
+}

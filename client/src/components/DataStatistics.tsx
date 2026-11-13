@@ -12,13 +12,14 @@ import {
   Package as PackageIcon,
   Play,
   RotateCcw,
+  Search,
   TrendingUp,
   Users,
 } from 'lucide-react'
 import Icons from './Icons'
 import DropRecords from './DropRecords'
 import StatisticsSummary from './StatisticsSummary'
-import { PageHeader, Button, Card, EmptyState, Loading, CjkText, SwipeModePager } from './common'
+import { PageHeader, Button, Card, EmptyState, Input, Loading, CjkText, SwipeModePager } from './common'
 import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import { useUIStore } from '../stores'
@@ -222,6 +223,29 @@ function getDepotTypeLabel(classifyType?: string) {
   if (!classifyType) return '未分类'
   return depotTypeLabelMap[classifyType] || '其他'
 }
+
+// Keep the filter rail in the order players scan an inventory: growth
+// materials first, then currencies, event items and furniture.
+const depotTypeOrder = [
+  'MATERIAL',
+  'CARD_EXP',
+  'CONSUME',
+  'NORMAL',
+  'DIAMOND',
+  'HGG_SHD',
+  'LGG_SHD',
+  'TKT',
+  'CHARM',
+  'EXP_ITEM',
+  'ACTIVITY_ITEM',
+  'FURN',
+  'FURN_PART',
+  'MEMENTO',
+  'RECRUIT_TAG',
+]
+const depotTypeRank = new Map(depotTypeOrder.map((type, index) => [type, index]))
+
+const getDepotTypeRank = (type: string) => depotTypeRank.get(type) ?? depotTypeOrder.length
 
 function FilterMenu({
   menuKey,
@@ -585,6 +609,8 @@ export default function DataStatistics() {
   const [filterOwnership, setFilterOwnership] = useState<FilterOwnership>('all')
   const [filterProfession, setFilterProfession] = useState<FilterProfession>('all')
   const [sortBy, setSortBy] = useState<SortBy>('default')
+  const [depotFilter, setDepotFilter] = useState('all')
+  const [depotQuery, setDepotQuery] = useState('')
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null)
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => readStatisticsTabFromUrl())
   const requestedStatisticsTab = useUIStore(state => state.statisticsTab)
@@ -624,8 +650,32 @@ export default function DataStatistics() {
     }
     return Array.from(grouped.entries())
       .map(([type, value]) => ({ type, ...value, label: getDepotTypeLabel(type) }))
-      .sort((a, b) => b.count - a.count)
+      .sort((a, b) => getDepotTypeRank(a.type) - getDepotTypeRank(b.type) || b.count - a.count)
   }, [depotData])
+
+  const depotFilteredItems = useMemo(() => {
+    const query = depotQuery.trim().toLocaleLowerCase()
+    return (depotData?.items || []).filter((item) => {
+      if (depotFilter !== 'all' && (item.classifyType || 'UNKNOWN') !== depotFilter) return false
+      if (!query) return true
+      return item.name.toLocaleLowerCase().includes(query)
+    })
+  }, [depotData, depotFilter, depotQuery])
+
+  const depotFilterSummary = useMemo(() => {
+    let count = 0
+    for (const item of depotFilteredItems) count += Number(item.count) || 0
+    return { kinds: depotFilteredItems.length, count }
+  }, [depotFilteredItems])
+
+  const depotFilterLabel = depotFilter === 'all'
+    ? '全部'
+    : depotTypeSummary.find(group => group.type === depotFilter)?.label || '其他'
+  const isDepotFiltered = depotFilter !== 'all' || depotQuery.trim().length > 0
+  const clearDepotFilters = useCallback(() => {
+    setDepotFilter('all')
+    setDepotQuery('')
+  }, [])
 
   const depotOverview = useMemo(() => {
     let materialKinds = 0
@@ -1513,81 +1563,138 @@ export default function DataStatistics() {
                   ]}
                 />
 
-                {depotTypeSummary.length > 0 && (
-                  <section className="data-statistics-category-section" aria-labelledby="depot-category-title">
-                    <h3 id="depot-category-title" className="mb-2 flex min-w-0 flex-wrap items-baseline gap-2 text-sm font-semibold text-primary">
-                      <span><CjkText>分类汇总</CjkText></span>
-                      <span className="text-xs font-normal text-tertiary">{keepNumberWithUnit(`${depotTypeSummary.length} 类`)}</span>
+                <section className="depot-inventory" aria-labelledby="depot-inventory-title">
+                  <div className="depot-inventory-head">
+                    <h3 id="depot-inventory-title" className="depot-inventory-title">
+                      <CjkText>物品清单</CjkText>
                     </h3>
-                    <div className="flex flex-wrap gap-2">
+                    <Input
+                      value={depotQuery}
+                      onChange={setDepotQuery}
+                      placeholder="搜索物品名称"
+                      aria-label="搜索仓库物品"
+                      icon={<Search size={16} strokeWidth={1.9} aria-hidden="true" />}
+                      className="depot-inventory-search"
+                    />
+                  </div>
+
+                  {depotTypeSummary.length > 0 && (
+                    <div className="depot-filter-rail" role="group" aria-label="按分类筛选仓库物品">
+                      <button
+                        type="button"
+                        className={`depot-filter-chip${depotFilter === 'all' ? ' is-active' : ''}`}
+                        aria-pressed={depotFilter === 'all'}
+                        aria-label={`全部，${depotData.items.length} 种，共 ${depotOverview.totalCount.toLocaleString()} 件`}
+                        onClick={() => setDepotFilter('all')}
+                      >
+                        <span>全部</span>
+                        <span className="depot-filter-count" aria-hidden="true">
+                          {depotData.items.length.toLocaleString()}
+                        </span>
+                      </button>
                       {depotTypeSummary.map((group) => (
-                        <div
+                        <button
                           key={group.type}
-                          className="flex min-w-0 items-baseline gap-2 rounded-full bg-[var(--app-surface-muted)] px-3 py-1.5 text-xs text-secondary"
+                          type="button"
+                          className={`depot-filter-chip${depotFilter === group.type ? ' is-active' : ''}`}
+                          aria-pressed={depotFilter === group.type}
+                          aria-label={`${group.label}，${group.kinds} 种，共 ${group.count.toLocaleString()} 件`}
+                          onClick={() => setDepotFilter(group.type)}
                         >
-                          <span className="font-medium text-primary">{group.label}</span>
-                          <span className="tabular-nums">{keepNumberWithUnit(`${group.kinds} 种`)}</span>
-                          <span className="text-tertiary" aria-hidden="true">·</span>
-                          <span className="tabular-nums">{keepNumberWithUnit(`${group.count.toLocaleString()} 件`)}</span>
-                        </div>
+                          <span>{group.label}</span>
+                          <span className="depot-filter-count" aria-hidden="true">
+                            {group.kinds.toLocaleString()}
+                          </span>
+                        </button>
                       ))}
                     </div>
-                  </section>
-                )}
+                  )}
 
-                {/* 物品卡片网格 */}
-                {depotData.items && depotData.items.length > 0 && (
-                  <div className="data-statistics-item-grid grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-                    {depotData.items.map((item) => {
-                      const itemKey = item.id || item.iconId
-                      const imageKey = `${itemKey}:${item.iconId}`
-
-                      return (
-                        <div
-                          key={itemKey}
-                          className="data-statistics-depot-item flex min-w-0 items-center gap-3 p-3"
-                        >
-                          {/* 物品图标 */}
-                          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--app-surface-muted)]">
-                            {failedDepotImages[imageKey] ? (
-                              <span role="img" aria-label={`${item.name}图标不可用`}>
-                                <PackageIcon className="h-6 w-6 brand-text" aria-hidden="true" />
-                              </span>
-                            ) : (
-                              <img
-                                src={getItemIconUrl(item.iconId)}
-                                alt={item.name}
-                                loading="lazy"
-                                decoding="async"
-                                className="maa-item-icon w-full h-full object-cover"
-                                onError={() => {
-                                  setFailedDepotImages(previous => ({ ...previous, [imageKey]: true }))
-                                }}
-                              />
-                            )}
-                          </div>
-
-                          {/* 物品信息 */}
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold text-primary truncate" title={item.name}>
-                              {item.name}
-                            </div>
-                            <div className="mt-1 flex min-w-0 items-baseline gap-2">
-                              {item.classifyType && (
-                                <span className="min-w-0 truncate text-xs text-tertiary">
-                                  {getDepotTypeLabel(item.classifyType)}
-                                </span>
-                              )}
-                              <span className="ml-auto shrink-0 text-xs font-medium tabular-nums text-secondary">
-                                ×{item.count.toLocaleString()}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
+                  <div className="depot-inventory-result">
+                    <p className="depot-inventory-meta" aria-live="polite">
+                      <span className="depot-inventory-meta-strong">{depotFilterLabel}</span>
+                      {depotQuery.trim() && (
+                        <span className="depot-inventory-query">“{depotQuery.trim()}”</span>
+                      )}
+                      <span aria-hidden="true">·</span>
+                      <span>{keepNumberWithUnit(`${depotFilterSummary.kinds} 种`)}</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{keepNumberWithUnit(`${depotFilterSummary.count.toLocaleString()} 件`)}</span>
+                    </p>
+                    {isDepotFiltered && depotFilteredItems.length > 0 && (
+                      <Button variant="ghost" size="sm" onClick={clearDepotFilters}>
+                        清除筛选
+                      </Button>
+                    )}
                   </div>
-                )}
+
+                  {depotData.items.length === 0 ? (
+                    <EmptyState
+                      compact
+                      className="depot-inventory-empty"
+                      icon={<PackageIcon className="h-7 w-7" strokeWidth={1.6} aria-hidden="true" />}
+                      title="还没有物品记录"
+                      description="下一次仓库识别会重新读取物品清单。"
+                    />
+                  ) : depotFilteredItems.length > 0 ? (
+                    <ul className="depot-item-grid" aria-label={`${depotFilterLabel}物品`}>
+                      {depotFilteredItems.map((item) => {
+                        const itemKey = item.id || item.iconId
+                        const imageKey = `${itemKey}:${item.iconId}`
+                        const countValue = Number(item.count) || 0
+                        const itemCount = countValue.toLocaleString()
+
+                        return (
+                          <li
+                            key={itemKey}
+                            className={`data-statistics-depot-item depot-item${countValue === 0 ? ' is-empty' : ''}`}
+                          >
+                            <div className="depot-item-icon">
+                              {failedDepotImages[imageKey] ? (
+                                <span
+                                  className="depot-item-fallback"
+                                  role="img"
+                                  aria-label={`${item.name}图标不可用`}
+                                >
+                                  <PackageIcon className="h-6 w-6" strokeWidth={1.6} aria-hidden="true" />
+                                </span>
+                              ) : (
+                                <img
+                                  src={getItemIconUrl(item.iconId)}
+                                  alt=""
+                                  loading="lazy"
+                                  decoding="async"
+                                  className="maa-item-icon depot-item-image"
+                                  onError={() => {
+                                    setFailedDepotImages(previous => ({ ...previous, [imageKey]: true }))
+                                  }}
+                                />
+                              )}
+                              <span className="depot-item-count">
+                                {itemCount}
+                                <span className="sr-only"> 件</span>
+                              </span>
+                            </div>
+                            <span className="depot-item-name">{item.name}</span>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  ) : (
+                    <EmptyState
+                      compact
+                      className="depot-inventory-empty"
+                      icon={<Search className="h-7 w-7" strokeWidth={1.6} aria-hidden="true" />}
+                      title="没有匹配的物品"
+                      description="试着换一个分类，或者检查搜索关键词。"
+                      action={(
+                        <Button variant="secondary" size="sm" onClick={clearDepotFilters}>
+                          清除筛选
+                        </Button>
+                      )}
+                    />
+                  )}
+                </section>
               </div>
             )}
               </div>
