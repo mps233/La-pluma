@@ -1,4 +1,5 @@
-import { HintTooltip, Select } from '@/shared/components'
+import { HintTooltip } from '@/shared/components'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import type {
   CombatTask,
   CopilotRaid,
@@ -81,12 +82,20 @@ export default function CombatSettingsPanel({
       <div className="mb-3">
         <label htmlFor="combat-copilot-raid" className="mb-1.5 block text-xs text-muted-foreground">难度</label>
         <Select
-          id="combat-copilot-raid"
           name="maa-copilot-raid"
+          items={RAID_OPTIONS}
           value={raid}
-          options={RAID_OPTIONS}
-          onChange={(value) => onRaidChange(value as CopilotRaid)}
-        />
+          onValueChange={(next, details) => { if (details.reason !== 'none' && next !== null) onRaidChange(next as CopilotRaid) }}
+        >
+          <SelectTrigger id="combat-copilot-raid" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {RAID_OPTIONS.map(item => (
+              <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div>

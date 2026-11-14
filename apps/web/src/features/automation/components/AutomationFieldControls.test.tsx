@@ -87,9 +87,11 @@ describe('AutomationCheckboxField', () => {
     )
 
     expect(container.querySelector('button')).toBeNull()
-    expect(container.querySelector('label')?.getAttribute('for')).toBe('start-game')
+    const label = container.querySelector('label')
+    const control = label?.querySelector('[role="checkbox"]')
+    expect(label?.contains(control ?? null)).toBe(true)
 
-    await act(async () => container.querySelector<HTMLInputElement>('input')?.click())
+    await act(async () => label?.click())
     expect(onChange).toHaveBeenCalledWith(true)
   })
 

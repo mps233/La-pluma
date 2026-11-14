@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, LoaderCircle, Save } from 'lucide-react'
 import { getErrorMessage, isRecord } from '@/shared/api'
 import { Button } from '@/shared/ui/button'
-import { Input, Select } from '@/shared/components'
 import { Modal } from '@/shared/components/Modal'
+import { FieldInput, FieldSelect } from './InfrastScheduleFieldControls'
 import { saveInfrastSchedule } from '../api'
 import {
   addInfrastPlan,
@@ -24,6 +24,7 @@ import {
 } from '../model/infrastSchedule'
 import { infrastScheduleListQueryOptions, infrastScheduleQueryOptions } from '../model/queries'
 import InfrastScheduleRoomsEditor from './InfrastScheduleRoomsEditor'
+import InfrastScheduleFileList from './InfrastScheduleFileList'
 
 interface InfrastScheduleEditorProps {
   filename: string
@@ -43,6 +44,7 @@ export default function InfrastScheduleEditor({
   onSaved,
 }: InfrastScheduleEditorProps) {
   const queryClient = useQueryClient()
+  const editorId = useId().replace(/:/g, '')
   const [name, setName] = useState(filename)
   const [loadName, setLoadName] = useState(filename.trim())
   const [document, setDocument] = useState<InfrastScheduleDocument | null>(null)
@@ -177,13 +179,14 @@ export default function InfrastScheduleEditor({
 
         <section className="space-y-3">
           <div className="flex flex-wrap items-end gap-2">
-            <Input
+            <FieldInput
+              id={`${editorId}-filename`}
               label="排班文件"
               className="min-w-0 flex-1"
               value={name}
               placeholder="schedules/base.json"
               disabled={saving}
-              onChange={setName}
+              onChange={event => setName(event.target.value)}
             />
             <Button variant="secondary" disabled={saving || loading} onClick={load}>加载</Button>
             <Button variant="secondary" disabled={saving || loading} onClick={createNew}>新建排班</Button>
@@ -193,33 +196,16 @@ export default function InfrastScheduleEditor({
           </p>
 
           {listQuery.data && (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">目录：{listQuery.data.directory}</p>
-              {schedules.length > 0 ? (
-                <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
-                  {schedules.map(schedule => (
-                    <button
-                      key={schedule.name}
-                      type="button"
-                      disabled={saving}
-                      className="flex min-h-11 w-full items-center justify-between gap-2 rounded-md px-2 text-left text-sm text-muted-foreground hover:bg-muted"
-                      onClick={() => {
-                        setName(schedule.name)
-                        setLoadName(schedule.name)
-                        setError(null)
-                      }}
-                    >
-                      <span className="truncate">{schedule.name}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {schedule.valid ? `${schedule.planCount} 个方案` : '无法解析'}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">目录中还没有排班文件，填写文件名后点击“新建排班”。</p>
-              )}
-            </div>
+            <InfrastScheduleFileList
+              directory={listQuery.data.directory}
+              schedules={schedules}
+              disabled={saving}
+              onSelect={name => {
+                setName(name)
+                setLoadName(name)
+                setError(null)
+              }}
+            />
           )}
         </section>
 
@@ -227,32 +213,35 @@ export default function InfrastScheduleEditor({
           <>
             <section className="space-y-3 border-t border-border pt-4">
               <div className="grid min-w-0 gap-3.5 @sm:grid-cols-2">
-                <Input
+                <FieldInput
+                  id={`${editorId}-document-title`}
                   label="排班表标题"
                   value={typeof document.title === 'string' ? document.title : ''}
                   placeholder="可选"
                   disabled={saving}
-                  onChange={value => setDocument(updateInfrastDocumentMeta(document, { title: value }))}
+                  onChange={event => setDocument(updateInfrastDocumentMeta(document, { title: event.target.value }))}
                 />
-                <Input
+                <FieldInput
+                  id={`${editorId}-document-description`}
                   label="排班表说明"
                   value={typeof document.description === 'string' ? document.description : ''}
                   placeholder="可选"
                   disabled={saving}
-                  onChange={value => setDocument(updateInfrastDocumentMeta(document, { description: value }))}
+                  onChange={event => setDocument(updateInfrastDocumentMeta(document, { description: event.target.value }))}
                 />
               </div>
             </section>
 
             <section className="space-y-3 border-t border-border pt-4">
               <div className="flex flex-wrap items-end gap-2">
-                <Select
+                <FieldSelect
+                  id={`${editorId}-plan-index`}
                   label="方案"
                   className="min-w-0 flex-1"
-                  value={planIndex}
-                  options={document.plans.map((current, index) => ({ value: index, label: getInfrastPlanLabel(current, index) }))}
+                  value={String(planIndex)}
+                  items={document.plans.map((current, index) => ({ value: String(index), label: getInfrastPlanLabel(current, index) }))}
                   disabled={saving}
-                  onChange={value => setPlanIndex(normalizeInfrastPlanIndex(value, document.plans.length))}
+                  onValueChange={value => setPlanIndex(normalizeInfrastPlanIndex(value, document.plans.length))}
                 />
                 <Button
                   variant="secondary"
@@ -278,19 +267,21 @@ export default function InfrastScheduleEditor({
                 </Button>
               </div>
               <div className="grid min-w-0 gap-3.5 @sm:grid-cols-2">
-                <Input
+                <FieldInput
+                  id={`${editorId}-plan-name`}
                   label="方案名称"
                   value={typeof plan.name === 'string' ? plan.name : ''}
                   placeholder="例如：早班"
                   disabled={saving}
-                  onChange={value => updatePlan(current => updateInfrastPlanMeta(current, { name: value }))}
+                  onChange={event => updatePlan(current => updateInfrastPlanMeta(current, { name: event.target.value }))}
                 />
-                <Input
+                <FieldInput
+                  id={`${editorId}-plan-description`}
                   label="方案说明"
                   value={typeof plan.description === 'string' ? plan.description : ''}
                   placeholder="可选"
                   disabled={saving}
-                  onChange={value => updatePlan(current => updateInfrastPlanMeta(current, { description: value }))}
+                  onChange={event => updatePlan(current => updateInfrastPlanMeta(current, { description: event.target.value }))}
                 />
               </div>
             </section>

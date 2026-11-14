@@ -1,6 +1,10 @@
+import type { ComponentProps } from 'react'
 import { LoaderCircle, Play, Square } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { Input, Select, SmoothPanel, Switch } from '@/shared/components'
+import { HintTooltip, SmoothPanel } from '@/shared/components'
+import { Input } from '@/shared/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
+import { Switch } from '@/shared/ui/switch'
 import type { StopMode } from '@/features/task-execution'
 import {
   getRoguelikeAdvancedOptions,
@@ -10,6 +14,90 @@ import {
 } from '../model/roguelikeTasks'
 import RoguelikeCoreOperatorField from './RoguelikeCoreOperatorField'
 import type { RoguelikeAdvancedOption, RoguelikeAdvancedValues, RoguelikeTask } from '../types'
+
+interface RoguelikeSelectProps {
+  id: string
+  label: string
+  name?: string
+  items: ReadonlyArray<{ value: string; label: string }>
+  value: string
+  hint?: string
+  hintPlacement?: 'below' | 'tooltip'
+  disabled?: boolean
+  onValueChange: (value: string) => void
+}
+
+function RoguelikeSelect({
+  id,
+  label,
+  name,
+  items,
+  value,
+  hint,
+  hintPlacement = 'below',
+  disabled,
+  onValueChange,
+}: RoguelikeSelectProps) {
+  const hintId = `${id}-hint`
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-1">
+        <label htmlFor={id} className="text-sm font-medium text-muted-foreground">{label}</label>
+        {hintPlacement === 'tooltip' && hint && (
+          <HintTooltip id={hintId} label={label} hint={hint} />
+        )}
+      </div>
+      <Select
+        name={name}
+        items={items}
+        value={value}
+        onValueChange={(next, details) => { if (details.reason === 'none' || next === null) return; onValueChange(next) }}
+        disabled={disabled}
+      >
+        <SelectTrigger id={id} aria-describedby={hint && hintPlacement === 'below' ? hintId : undefined} className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {items.map(item => (
+            <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {hint && hintPlacement === 'below' && <p id={hintId} className="mt-2 text-xs text-tertiary">{hint}</p>}
+    </div>
+  )
+}
+
+interface RoguelikeFieldInputProps {
+  id: string
+  label: string
+  hint?: string
+  hintPlacement?: 'below' | 'tooltip'
+  className?: string
+}
+
+function RoguelikeFieldInput({
+  id,
+  label,
+  hint,
+  hintPlacement = 'below',
+  className,
+  ...inputProps
+}: RoguelikeFieldInputProps & ComponentProps<'input'>) {
+  const hintId = `${id}-hint`
+  return (
+    <div className={className}>
+      <div className="mb-2 flex items-center gap-1">
+        <label htmlFor={id} className="text-sm font-medium text-muted-foreground">{label}</label>
+        {hintPlacement === 'tooltip' && hint && (
+          <HintTooltip id={hintId} label={label} hint={hint} />
+        )}
+      </div>
+      <Input id={id} autoComplete="off" aria-describedby={hint && hintPlacement === 'below' ? hintId : undefined} {...inputProps} />
+      {hint && hintPlacement === 'below' && <p id={hintId} className="mt-2 text-xs text-tertiary">{hint}</p>}
+    </div>
+  )
+}
 
 interface RoguelikeExecutionControls {
   isRunning: boolean
@@ -62,13 +150,13 @@ export default function RoguelikeSettingsPanel({
                 className={option.span === 'full' ? 'roguelike-field-span-full' : undefined}
               >
                 {option.type === 'select' ? (
-                  <Select
+                  <RoguelikeSelect
                     id={`roguelike-${task.id}-${option.key}`}
-                    name={`maa-${task.id}-${option.key}`}
                     label={option.label}
+                    name={`maa-${task.id}-${option.key}`}
                     value={displayValue}
-                    onChange={(value: string) => onAdvancedChange(option.key, value)}
-                    options={selectOptionsFor(option, theme, displayValue, task.id)}
+                    onValueChange={value => onAdvancedChange(option.key, value)}
+                    items={selectOptionsFor(option, theme, displayValue, task.id)}
                     hint={option.hint}
                     hintPlacement={option.hintPlacement}
                   />
@@ -80,7 +168,7 @@ export default function RoguelikeSettingsPanel({
                     onChange={(value: string) => onAdvancedChange(option.key, value)}
                   />
                 ) : (
-                  <Input
+                  <RoguelikeFieldInput
                     id={`roguelike-${task.id}-${option.key}`}
                     name={`maa-${task.id}-${option.key}`}
                     type={option.type === 'number' ? 'number' : 'text'}
@@ -89,7 +177,7 @@ export default function RoguelikeSettingsPanel({
                     step={option.type === 'number' ? 1 : undefined}
                     label={option.label}
                     value={displayValue}
-                    onChange={(value: string) => onAdvancedChange(option.key, value)}
+                    onChange={event => onAdvancedChange(option.key, event.target.value)}
                     placeholder={option.placeholder}
                     hint={option.hint}
                     hintPlacement={option.hintPlacement}
@@ -102,32 +190,26 @@ export default function RoguelikeSettingsPanel({
         {toggleOptions.length > 0 && (
           <div className="roguelike-toggle-list">
             {toggleOptions.map(option => (
-              <div key={option.key} className="roguelike-toggle-row">
-                <div className="min-w-0 flex-1">
-                  <label
-                    htmlFor={`roguelike-${task.id}-${option.key}`}
-                    className="roguelike-toggle-label min-h-11"
-                  >
-                    {option.label}
-                  </label>
+              <label key={option.key} className="roguelike-toggle-row">
+                <span className="min-w-0 flex-1">
+                  <span className="roguelike-toggle-label min-h-11">{option.label}</span>
                   {option.hint && (
-                    <p
+                    <span
                       id={`roguelike-${task.id}-${option.key}-hint`}
-                      className="pb-2 pr-2 text-xs leading-5 text-tertiary"
+                      className="block pb-2 pr-2 text-xs leading-5 text-tertiary"
                     >
                       {option.hint}
-                    </p>
+                    </span>
                   )}
-                </div>
+                </span>
                 <Switch
-                  id={`roguelike-${task.id}-${option.key}`}
                   name={`maa-${task.id}-${option.key}`}
                   checked={resolveRoguelikeAdvancedValue(option, advanced, theme, task.id) === true}
-                  onChange={(checked: boolean) => onAdvancedChange(option.key, checked)}
-                  label={option.label}
+                  onCheckedChange={checked => onAdvancedChange(option.key, checked)}
+                  aria-label={option.label}
                   aria-describedby={option.hint ? `roguelike-${task.id}-${option.key}-hint` : undefined}
                 />
-              </div>
+              </label>
             ))}
           </div>
         )}

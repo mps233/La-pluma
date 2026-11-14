@@ -165,7 +165,7 @@ const click = async (element: HTMLElement) => {
   await settle()
 }
 
-const scheduleSwitch = () => container.querySelector<HTMLInputElement>('[aria-label="启用定时执行"]')!
+const scheduleSwitch = () => container.querySelector<HTMLElement>('[role="switch"][aria-label="启用定时执行"]')!
 const pendingDraft = () => localStorage.getItem('automationConfigSyncPending')
 
 const renderAutomation = async () => {
@@ -350,7 +350,7 @@ describe('AutomationTasks config persistence', () => {
     })
 
     await renderAutomation()
-    const entrySwitch = container.querySelector<HTMLInputElement>('[aria-label="08:00 启用"]')!
+    const entrySwitch = container.querySelector<HTMLElement>('[role="switch"][aria-label="08:00 启用"]')!
     await click(entrySwitch)
     mocks.setupSchedule.mockClear()
     await click(entrySwitch)
@@ -580,7 +580,7 @@ describe('AutomationTasks config persistence', () => {
     await click(scheduleSwitch())
     expect(mocks.loadUserConfig).toHaveBeenCalledOnce()
     expect(pendingDraft()).not.toBeNull()
-    expect(scheduleSwitch().checked).toBe(true)
+    expect(scheduleSwitch().getAttribute('aria-checked')).toBe('true')
 
     await act(async () => {
       publishPlanApplied()
@@ -601,7 +601,7 @@ describe('AutomationTasks config persistence', () => {
       expect.any(Array),
     )
     expect(pendingDraft()).toBeNull()
-    expect(scheduleSwitch().checked).toBe(true)
+    expect(scheduleSwitch().getAttribute('aria-checked')).toBe('true')
     expect(mocks.setMessage).toHaveBeenCalledWith('智能养成计划已更新：3 个关卡', 'success')
   })
 

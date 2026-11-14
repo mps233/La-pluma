@@ -1,7 +1,8 @@
 // 实例选项与连接配置分属同一 MAA profile 的不同 section：面板只在 instance
 // section 渲染，但草稿与读取反馈由模块级 owner 持有，切换 section 不丢草稿。
 
-import { Select, Switch } from '@/shared/components'
+import { Switch } from '@/shared/ui/switch'
+import { ConfigFieldSelect } from './ConfigFieldControls'
 import { useStatusStore } from '@/features/runtime-status'
 import { useConfigDraftPanel } from '../hooks/useConfigDraftPanel'
 import { useSettingsInstanceOptions } from '../hooks/useSettingsInstanceOptions'
@@ -84,14 +85,15 @@ export default function InstanceOptionsPanel({ isActive }: InstanceOptionsPanelP
       onSave={handleSave}
       onReset={handleReset}
     >
-      <Select
+      <ConfigFieldSelect
+        id="instance-touch-mode"
         label="触控模式"
         value={draft.touch_mode}
-        onChange={(value: string) => {
+        onValueChange={(value) => {
           updateInstanceOptions({ touch_mode: value as MaaTouchMode })
         }}
         disabled={!loaded}
-        options={TOUCH_MODE_OPTIONS}
+        items={TOUCH_MODE_OPTIONS}
         hint="ADB 兼容性最好；MaaTouch 触控更接近真实点击"
       />
 
@@ -102,9 +104,9 @@ export default function InstanceOptionsPanel({ isActive }: InstanceOptionsPanelP
             <div className="mt-1 text-xs leading-5 text-tertiary">开启后部署干员时暂停游戏，适用于部分特殊关卡</div>
           </div>
           <Switch
-            label="部署时暂停"
+            aria-label="部署时暂停"
             checked={draft.deployment_with_pause}
-            onChange={(checked: boolean) => {
+            onCheckedChange={(checked: boolean) => {
               updateInstanceOptions({ deployment_with_pause: checked })
             }}
             disabled={!loaded}
@@ -116,9 +118,9 @@ export default function InstanceOptionsPanel({ isActive }: InstanceOptionsPanelP
             <div className="mt-1 text-xs leading-5 text-tertiary">使用 AdbLite 减少 ADB 调用开销</div>
           </div>
           <Switch
-            label="启用 ADB Lite"
+            aria-label="启用 ADB Lite"
             checked={draft.adb_lite_enabled}
-            onChange={(checked: boolean) => {
+            onCheckedChange={(checked: boolean) => {
               updateInstanceOptions({ adb_lite_enabled: checked })
             }}
             disabled={!loaded}
@@ -130,9 +132,9 @@ export default function InstanceOptionsPanel({ isActive }: InstanceOptionsPanelP
             <div className="mt-1 text-xs leading-5 text-tertiary">任务结束后由 MAA 关闭自己启动的 ADB 进程</div>
           </div>
           <Switch
-            label="退出时结束 ADB"
+            aria-label="退出时结束 ADB"
             checked={draft.kill_adb_on_exit}
-            onChange={(checked: boolean) => {
+            onCheckedChange={(checked: boolean) => {
               updateInstanceOptions({ kill_adb_on_exit: checked })
             }}
             disabled={!loaded}

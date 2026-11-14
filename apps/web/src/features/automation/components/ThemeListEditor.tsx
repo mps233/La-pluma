@@ -1,6 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { Input } from '@/shared/components'
+import { Input } from '@/shared/ui/input'
 
 interface ThemeListEditorProps {
   themes: string[]
@@ -16,7 +16,15 @@ export default function ThemeListEditor({ themes, disabled, onChange }: ThemeLis
       {themes.length === 0 && <p className="text-sm text-muted-foreground">添加至少一个主题名。</p>}
       {themes.map((theme, index) => (
         <div className="flex min-w-0 items-center gap-2" key={index}>
-          <Input className="min-w-0 flex-1" aria-label={`主题 ${index + 1}`} value={theme} placeholder="游戏内主题名" disabled={disabled} onChange={value => onChange(themes.map((current, currentIndex) => currentIndex === index ? value : current))} />
+          <Input
+            className="min-w-0 flex-1"
+            autoComplete="off"
+            aria-label={`主题 ${index + 1}`}
+            value={theme}
+            placeholder="游戏内主题名"
+            disabled={disabled}
+            onChange={event => onChange(themes.map((current, currentIndex) => currentIndex === index ? event.target.value : current))}
+          />
           <Button size="icon" variant="ghost" title={`删除主题 ${index + 1}`} aria-label={`删除主题 ${index + 1}`} disabled={disabled} onClick={() => onChange(themes.filter((_, current) => current !== index))}>
             <Trash2 size={16} aria-hidden="true" />
           </Button>

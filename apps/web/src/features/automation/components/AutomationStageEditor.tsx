@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { CircleMinus, CirclePlus, GraduationCap, ListPlus, LoaderCircle, Minus, Pin, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { HintTooltip } from '@/shared/components'
+import { Input } from '@/shared/ui/input'
 import { generateTrainingPlan } from '@/features/training'
 import { loadUserConfig } from '@/features/user-config'
 import type { StageConfig, TaskFlowItem, TaskParamField } from '../types'
@@ -187,7 +188,7 @@ export default function AutomationStageEditor({
                   </Button>
                 )}
 
-                <input
+                <Input
                   id={`${fieldId}-${stageIndex}`}
                   type="text"
                   autoComplete="off"
@@ -197,7 +198,7 @@ export default function AutomationStageEditor({
                   onChange={event => updateStageName(stageIndex, event.target.value)}
                   placeholder={field.placeholder}
                   disabled={stageControlsDisabled || isSmartStageRow}
-                  className="automation-stage-name-input"
+                  className="automation-stage-name-input h-auto min-w-0 flex-1 rounded-none border-0 bg-transparent px-1.5 shadow-none md:text-sm focus-visible:ring-0"
                   data-automation-stage-name
                 />
                 <datalist id={suggestionsId}>
@@ -207,15 +208,17 @@ export default function AutomationStageEditor({
                 </datalist>
 
                 <div className="automation-stage-times">
-                  <input
+                  <Input
                     id={`${fieldId}-${stageIndex}-times`}
                     type="number"
+                    autoComplete="off"
                     aria-label={`${field.label} ${stageIndex + 1} 执行次数`}
                     value={stageTimes}
                     onChange={event => updateStageTimes(stageIndex, event.target.value)}
                     placeholder="0"
                     disabled={stageControlsDisabled || isSmartStageRow}
                     min="0"
+                    className="h-full min-w-0 rounded-none border-0 bg-transparent px-1 text-center shadow-none focus-visible:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span aria-hidden="true">次</span>
                 </div>

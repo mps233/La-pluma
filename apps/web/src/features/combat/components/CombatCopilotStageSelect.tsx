@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type UIEvent } from 'react'
 import { Search } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { Input } from '@/shared/components'
+import { Input } from '@/shared/ui/input'
 import type { CopilotStageCandidate } from '../types'
 import {
   COPILOT_DISCOVERY_STAGE_PAGE_SIZE,
@@ -105,14 +105,18 @@ export default function CombatCopilotStageSelect({
 
       {open && (
         <div className="combat-copilot-discovery-stage-panel" role="dialog" aria-label="选择关卡">
-          <Input
-            type="text"
-            aria-label="搜索关卡"
-            placeholder="搜索关卡代号或名称"
-            value={term}
-            onChange={handleTermChange}
-            icon={<Search size={17} strokeWidth={1.9} aria-hidden="true" />}
-          />
+          <div className="relative">
+            <Search size={17} strokeWidth={1.9} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" />
+            <Input
+              type="text"
+              autoComplete="off"
+              aria-label="搜索关卡"
+              placeholder="搜索关卡代号或名称"
+              value={term}
+              onChange={event => handleTermChange(event.target.value)}
+              className="pl-9"
+            />
+          </div>
 
           {loading && <p className="combat-copilot-discovery-stage-state" role="status">关卡数据加载中…</p>}
 

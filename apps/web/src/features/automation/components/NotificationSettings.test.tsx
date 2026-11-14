@@ -210,8 +210,8 @@ describe('NotificationSettings Query lifecycle', () => {
 
     await renderMode('visible')
 
-    expect(container.querySelector<HTMLInputElement>('input[aria-label="启用通知"]')?.checked).toBe(false)
-    expect(container.querySelector<HTMLInputElement>('input[aria-label="启用 Telegram"]')?.disabled).toBe(true)
+    expect(container.querySelector('[aria-label="启用通知"]')?.getAttribute('aria-checked')).toBe('false')
+    expect(container.querySelector('[aria-label="启用 Telegram"]')?.getAttribute('aria-disabled')).toBe('true')
     expect(tokenInput()?.disabled).toBe(true)
     expect(testButton()?.disabled).toBe(true)
     expect(container.textContent).toContain('先启用通知')
@@ -225,7 +225,7 @@ describe('NotificationSettings Query lifecycle', () => {
 
     await renderMode('visible')
 
-    expect(container.querySelector<HTMLInputElement>('input[aria-label="启用 Telegram"]')?.disabled).toBe(false)
+    expect(container.querySelector('[aria-label="启用 Telegram"]')?.getAttribute('aria-disabled')).toBeNull()
     expect(testButton()?.disabled).toBe(true)
     expect(container.textContent).toContain('填写 Bot Token 与 Chat ID 后可测试')
     expect(container.textContent).toContain('凭据不完整，不会发送')
@@ -312,7 +312,7 @@ describe('NotificationSettings Query lifecycle', () => {
     expect(tokenInput()).toBeNull()
     expect(saveButton()).toBeUndefined()
     expect(container.querySelector('.automation-side-card-footer')).toBeNull()
-    expect(container.querySelector<HTMLInputElement>('input[aria-label="启用通知"]')?.disabled).toBe(true)
+    expect(container.querySelector('[aria-label="启用通知"]')?.getAttribute('aria-disabled')).toBe('true')
   })
 
   it('keeps saving available while a notification test is pending', async () => {

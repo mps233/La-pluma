@@ -1,4 +1,5 @@
 import { HintTooltip } from '@/shared/components'
+import { Checkbox } from '@/shared/ui/checkbox'
 
 interface AutomationFieldLabelProps {
   htmlFor: string
@@ -49,14 +50,12 @@ interface AutomationCheckboxFieldProps {
 
 export function AutomationCheckboxField({ id, label, checked, disabled, hint, onChange }: AutomationCheckboxFieldProps) {
   const control = (
-    <label htmlFor={id} className="group flex min-h-11 cursor-pointer items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
-      <input
+    <label className="group flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+      <Checkbox
         id={id}
-        type="checkbox"
         checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
+        onCheckedChange={nextChecked => onChange(nextChecked)}
         disabled={disabled}
-        className="custom-checkbox cursor-pointer"
       />
       <span className="group-hover:text-primary transition-colors">{label}</span>
     </label>

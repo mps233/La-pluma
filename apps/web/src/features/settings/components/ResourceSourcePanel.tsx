@@ -1,4 +1,5 @@
-import { Checkbox, Input, Select, Switch } from '@/shared/components'
+import { Switch } from '@/shared/ui/switch'
+import { ConfigFieldCheckbox, ConfigFieldInput, ConfigFieldSelect } from './ConfigFieldControls'
 import { useStatusStore } from '@/features/runtime-status'
 import { useConfigDraftPanel } from '../hooks/useConfigDraftPanel'
 import { useSettingsResourceSource } from '../hooks/useSettingsResourceSource'
@@ -117,57 +118,61 @@ export default function ResourceSourcePanel({ isActive }: ResourceSourcePanelPro
       onSave={handleSave}
       onReset={handleReset}
     >
-      <Select
+      <ConfigFieldSelect
+        id="resource-source"
         label="资源来源"
         value={draft.source}
-        onChange={(value: string) => {
+        onValueChange={(value) => {
           update({ source: value as ResourceSourceType })
           setConfigFeedback(null)
         }}
         disabled={!loaded}
-        options={SOURCE_OPTIONS}
+        items={SOURCE_OPTIONS}
       />
 
       {draft.source === 'git' && (
-        <Select
+        <ConfigFieldSelect
+          id="resource-git-backend"
           label="Git 后端"
           value={draft.git.backend}
-          onChange={(value: string) => {
+          onValueChange={(value) => {
             update({ git: { backend: value as GitBackend } })
             setConfigFeedback(null)
           }}
           disabled={!loaded}
-          options={BACKEND_OPTIONS}
+          items={BACKEND_OPTIONS}
         />
       )}
 
       {draft.source === 'mirrorchyan' && (
         <>
-          <Input
+          <ConfigFieldInput
+            id="resource-mirrorchyan-cdk"
             label="MirrorChyan CDK"
             type="password"
             value={draft.mirrorchyan.cdk}
-            onChange={(value: string) => {
-              updateMirrorChyan({ cdk: value, clearCdk: false })
+            onChange={(event) => {
+              updateMirrorChyan({ cdk: event.target.value, clearCdk: false })
             }}
             disabled={!loaded || draft.mirrorchyan.clearCdk}
             hint={describeCdk(draft.mirrorchyan.cdkKind)}
           />
           {draft.mirrorchyan.cdkKind !== 'none' && (
-            <Checkbox
+            <ConfigFieldCheckbox
               label="清除已保存的 CDK"
               checked={draft.mirrorchyan.clearCdk}
-              onChange={(checked: boolean) => {
+              onCheckedChange={(checked: boolean) => {
                 updateMirrorChyan({ clearCdk: checked, cdk: checked ? '' : draft.mirrorchyan.cdk })
               }}
               disabled={!loaded}
             />
           )}
-          <Input
+          <ConfigFieldInput
+            id="resource-mirrorchyan-interval"
             label="检查间隔（秒）"
             type="number"
             value={draft.mirrorchyan.checkInterval}
-            onChange={handleCheckIntervalChange}
+            onChange={event => handleCheckIntervalChange(event.target.value)}
             disabled={!loaded}
             hint="0 表示禁用缓存；默认 600 秒"
           />
@@ -181,9 +186,9 @@ export default function ResourceSourcePanel({ isActive }: ResourceSourcePanelPro
             <div className="mt-1 text-xs leading-5 text-tertiary">由 maa-cli 在运行前按需同步 MaaResource</div>
           </div>
           <Switch
-            label="自动更新资源"
+            aria-label="自动更新资源"
             checked={draft.autoUpdate}
-            onChange={(checked: boolean) => {
+            onCheckedChange={(checked: boolean) => {
               update({ autoUpdate: checked })
               setConfigFeedback(null)
             }}
@@ -196,9 +201,9 @@ export default function ResourceSourcePanel({ isActive }: ResourceSourcePanelPro
             <div className="mt-1 text-xs leading-5 text-tertiary">资源自动更新失败时输出警告而不是静默跳过</div>
           </div>
           <Switch
-            label="更新失败时告警"
+            aria-label="更新失败时告警"
             checked={draft.warnOnUpdateFailure}
-            onChange={(checked: boolean) => {
+            onCheckedChange={(checked: boolean) => {
               update({ warnOnUpdateFailure: checked })
               setConfigFeedback(null)
             }}

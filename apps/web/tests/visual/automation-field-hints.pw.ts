@@ -205,7 +205,7 @@ test.describe('automation field hints', () => {
       )),
     })
     await page.goto('/app/automation')
-    await page.locator('label[for="automation-mall-visual-1-shopping"]').waitFor({ state: 'visible', timeout: 20_000 })
+    await page.locator('label:has(#automation-mall-visual-1-shopping)').waitFor({ state: 'visible', timeout: 20_000 })
     await page.evaluate(() => document.fonts.ready)
 
     const measure = async (label: Locator, hint: Locator) => {
@@ -222,7 +222,7 @@ test.describe('automation field hints', () => {
     const gaps = new Set<number>()
     for (const hint of MALL_HINTS) {
       const box = await measure(
-        page.locator(`label[for="automation-mall-visual-1-${hint.key}"]`),
+        page.locator(`label:has(#automation-mall-visual-1-${hint.key})`),
         page.getByRole('button', { name: `${hint.label}说明`, exact: true }),
       )
       // 标签到 ⓘ 之间只留 inline 的 4px 小间距，而不是被推到行尾。
@@ -322,7 +322,7 @@ test.describe('automation field hints', () => {
     await page.keyboard.press('Escape')
 
     const checkboxRow = await hintGap(
-      page.locator('label[for="automation-recruit-visual-1-force_refresh"]'),
+      page.locator('label:has(#automation-recruit-visual-1-force_refresh)'),
       forceRefreshHint,
     )
     const numberRow = await hintGap(
@@ -408,7 +408,7 @@ test.describe('automation field hints', () => {
       page.getByRole('button', { name: '切换账号说明', exact: true }),
     )
     const launch = await measure(
-      page.locator('label[for="automation-startup-visual-1-start_game_enabled"]'),
+      page.locator('label:has(#automation-startup-visual-1-start_game_enabled)'),
       page.getByRole('button', { name: '启动游戏客户端说明', exact: true }),
     )
 

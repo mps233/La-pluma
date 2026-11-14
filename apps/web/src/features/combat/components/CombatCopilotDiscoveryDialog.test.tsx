@@ -22,6 +22,14 @@ import CombatCopilotDiscoveryDialog from './CombatCopilotDiscoveryDialog'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
+const optionInTriggerPopup = (trigger: HTMLElement, optionLabel: string) => {
+  const popupId = trigger.getAttribute('aria-controls')
+  const popup = popupId ? document.getElementById(popupId) : null
+  return popup
+    ? [...popup.querySelectorAll('[role="option"]')].find(node => node.textContent?.trim() === optionLabel)
+    : undefined
+}
+
 const STAGES: readonly CopilotStageCandidate[] = [
   { stageId: 'main_01-07', code: '1-7', name: '暴君', category: '主线', zone: '切尔诺伯格' },
   { stageId: 'lt_02_01', code: 'LT-2', name: '未授权区域', category: '保全派驻', zone: '塔山农业实验平台' },
@@ -159,13 +167,12 @@ const typeInto = async (input: HTMLInputElement | null, value: string) => {
   })
 }
 
-const selectValue = async (select: HTMLSelectElement | null, value: string) => {
+const selectValue = async (select: HTMLElement | null, label: string) => {
   expect(select).not.toBeNull()
-  const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set
-  await act(async () => {
-    setter?.call(select, value)
-    select!.dispatchEvent(new Event('change', { bubbles: true }))
-  })
+  await act(async () => (select as HTMLElement).click())
+  const option = optionInTriggerPopup(select as HTMLElement, label)
+  expect(option, `未找到选项：${label}`).toBeTruthy()
+  await act(async () => (option as HTMLElement).click())
 }
 
 const pressEnter = async (input: HTMLInputElement | null) => {
@@ -332,7 +339,7 @@ describe('CombatCopilotDiscoveryDialog', () => {
   it('searches page one when the order changes', async () => {
     const search = await renderDialog()
 
-    await selectValue(document.querySelector<HTMLSelectElement>('select[aria-label="排序"]'), 'views')
+    await selectValue(document.querySelector('[aria-label="排序"]'), '访问量')
 
     expect(search.orderStore.get()).toBe('views')
     expect(search.onSearch).toHaveBeenCalledWith(expect.objectContaining({ orderBy: 'views', page: 1, limit: 30 }))
@@ -407,7 +414,7 @@ describe('CombatCopilotDiscoveryDialog', () => {
     expect(JSON.parse(localStorage.getItem(COPILOT_DISCOVERY_VIEW_STORAGE_KEY) ?? 'null')).toBe('list')
 
     await click(findButton('匹配'))
-    await click(document.querySelector('input[role="switch"]'))
+    await click(document.querySelector('[role="switch"]'))
     expect(JSON.parse(localStorage.getItem(COPILOT_MATCH_STORAGE_KEY) ?? 'null')).toMatchObject({
       enabled: true,
     })
@@ -493,7 +500,7 @@ describe('CombatCopilotDiscoveryDialog', () => {
     const search = await renderDialog()
 
     await click(findButton('匹配'))
-    await click(document.querySelector('input[role="switch"]'))
+    await click(document.querySelector('[role="switch"]'))
     expect(search.matchStore.get().enabled).toBe(true)
     expect(search.onSearch).not.toHaveBeenCalled()
 
@@ -510,9 +517,9 @@ describe('CombatCopilotDiscoveryDialog', () => {
     expect(matchDialog).not.toBeNull()
     expect(matchDialog?.textContent).toContain('先识别持有干员')
 
-    const toggle = document.querySelector<HTMLInputElement>('input[role="switch"]')
+    const toggle = document.querySelector('[role="switch"]')
     expect(toggle).not.toBeNull()
-    expect(toggle?.disabled).toBe(true)
+    expect(toggle?.getAttribute('aria-disabled')).toBe('true')
     await click(toggle)
     expect(search.matchStore.get().enabled).toBe(false)
   })

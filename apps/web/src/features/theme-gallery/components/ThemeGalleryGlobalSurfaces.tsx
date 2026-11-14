@@ -1,17 +1,19 @@
 import { useState } from 'react'
 import { Download, FileText, LoaderCircle, Plus, RefreshCw, Save, Square, Trash2, type LucideIcon } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
+import { Checkbox } from '@/shared/ui/checkbox'
+import { Input } from '@/shared/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
+import { Switch } from '@/shared/ui/switch'
 import Icons from '@/shared/components/Icons'
 import {
   Card,
   CardContent,
   CardHeader,
   EmptyState,
-  Input,
   Loading,
   PageSkeleton,
   SmoothPanel,
-  Switch,
 } from '@/shared/components'
 
 const buttonVariants: Array<{ variant: 'default' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'link', label: string, icon: LucideIcon }> = [
@@ -37,10 +39,26 @@ const iconButtonSizes: Array<{ size: 'icon-xs' | 'icon-sm' | 'icon' | 'icon-lg',
   { size: 'icon-lg', label: '图标 大尺寸' },
 ]
 
+const GALLERY_SOURCE_OPTIONS: Array<{ value: string; label: string; disabled?: boolean }> = [
+  { value: 'local', label: '本地目录' },
+  { value: 'git', label: 'Git 仓库' },
+  { value: 'mirrorchyan', label: 'MirrorChyan' },
+  { value: 'offline', label: '离线镜像（禁用）', disabled: true },
+]
+
+const GALLERY_CHANNEL_OPTIONS = [
+  { value: 'stable', label: '稳定版' },
+  { value: 'beta', label: '测试版' },
+  { value: 'alpha', label: '内测版' },
+]
+
 export function ThemeGalleryGlobalSurfaces() {
   const [address, setAddress] = useState('')
-  const [jobUri, setJobUri] = useState('maa://10086')
-  const [scheduled, setScheduled] = useState(false)
+  const [checkInterval, setCheckInterval] = useState('600')
+  const [source, setSource] = useState('git')
+  const [autofill, setAutofill] = useState(true)
+  const [sortRooms, setSortRooms] = useState(false)
+  const [autoUpdate, setAutoUpdate] = useState(true)
 
   return (
     <>
@@ -154,24 +172,134 @@ export function ThemeGalleryGlobalSurfaces() {
               <Trash2 size={16} aria-hidden="true" />
             </Button>
           </div>
-          <div className="grid gap-3.5 md:grid-cols-2">
-            <Input
-              label="连接地址"
-              value={address}
-              onChange={setAddress}
-              placeholder="127.0.0.1:5555"
-              hint="ADB 设备连接地址。"
-            />
-            <Input
-              label="作业 URI"
-              value={jobUri}
-              onChange={setJobUri}
-              error="未找到匹配的作业"
-            />
-          </div>
-          <Switch label="启用定时执行" checked={scheduled} onChange={setScheduled} />
         </CardContent>
       </Card>
+
+      <div data-region="gallery-form-controls">
+        <Card>
+          <CardHeader title="表单控件" />
+          <CardContent className="grid gap-3.5 md:grid-cols-2">
+            <div className="grid gap-3.5 md:col-span-2 md:grid-cols-2">
+              <div>
+                <label htmlFor="gallery-input-text" className="mb-2 block text-sm font-medium text-muted-foreground">连接地址</label>
+                <Input
+                  id="gallery-input-text"
+                  type="text"
+                  autoComplete="off"
+                  value={address}
+                  onChange={event => setAddress(event.target.value)}
+                  placeholder="127.0.0.1:5555"
+                />
+                <p id="gallery-input-text-hint" className="mt-2 text-xs text-tertiary">ADB 设备连接地址。</p>
+              </div>
+              <div>
+                <label htmlFor="gallery-input-number" className="mb-2 block text-sm font-medium text-muted-foreground">检查间隔（秒）</label>
+                <Input
+                  id="gallery-input-number"
+                  type="number"
+                  autoComplete="off"
+                  min={0}
+                  value={checkInterval}
+                  onChange={event => setCheckInterval(event.target.value)}
+                />
+                <p className="mt-2 text-xs text-tertiary">0 表示禁用缓存。</p>
+              </div>
+              <div>
+                <label htmlFor="gallery-input-disabled" className="mb-2 block text-sm font-medium text-muted-foreground">排班文件（禁用）</label>
+                <Input
+                  id="gallery-input-disabled"
+                  type="text"
+                  autoComplete="off"
+                  value="schedules/base.json"
+                  disabled
+                  onChange={() => undefined}
+                />
+              </div>
+              <div>
+                <label htmlFor="gallery-input-error" className="mb-2 block text-sm font-medium text-muted-foreground">作业 URI</label>
+                <Input
+                  id="gallery-input-error"
+                  type="text"
+                  autoComplete="off"
+                  aria-invalid
+                  aria-describedby="gallery-input-error-message"
+                  aria-errormessage="gallery-input-error-message"
+                  value="maa://10086"
+                  onChange={() => undefined}
+                />
+                <p id="gallery-input-error-message" role="alert" className="mt-2 text-xs form-error-text">未找到匹配的作业</p>
+              </div>
+            </div>
+            <div>
+              <label htmlFor="gallery-select-source" className="mb-2 block text-sm font-medium text-muted-foreground">资源来源</label>
+              <Select
+                items={GALLERY_SOURCE_OPTIONS}
+                value={source}
+                onValueChange={(next, details) => {
+                  // Base UI 在受控值未注册到当前选项时以 reason 为 none 自动回退；写回会清空仍未渲染选项的值。
+                  if (details.reason === 'none' || next === null) return
+                  setSource(next)
+                }}
+              >
+                <SelectTrigger id="gallery-select-source" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {GALLERY_SOURCE_OPTIONS.map(item => (
+                    <SelectItem key={item.value} value={item.value} disabled={item.disabled}>{item.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-2 text-xs text-tertiary">本地目录、Git 仓库或 MirrorChyan。</p>
+            </div>
+            <div>
+              <label htmlFor="gallery-select-disabled" className="mb-2 block text-sm font-medium text-muted-foreground">更新渠道（禁用）</label>
+              <Select items={GALLERY_CHANNEL_OPTIONS} value="stable" onValueChange={() => undefined} disabled>
+                <SelectTrigger id="gallery-select-disabled" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {GALLERY_CHANNEL_OPTIONS.map(item => (
+                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="group flex min-h-11 cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                <Checkbox checked={autofill} onCheckedChange={setAutofill} />
+                <span className="transition-colors group-hover:text-primary">自动补位</span>
+              </label>
+              <label className="group flex min-h-11 cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                <Checkbox checked={sortRooms} onCheckedChange={setSortRooms} />
+                <span className="transition-colors group-hover:text-primary">按填写顺序排序</span>
+              </label>
+              <label className="group flex min-h-11 cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                <Checkbox indeterminate onCheckedChange={() => undefined} />
+                <span>部分选择（混合态）</span>
+              </label>
+              <label className="group flex min-h-11 cursor-not-allowed items-center gap-2 text-sm text-muted-foreground opacity-50">
+                <Checkbox checked disabled onCheckedChange={() => undefined} />
+                <span>清除已保存的 CDK（禁用）</span>
+              </label>
+            </div>
+            <div className="space-y-3">
+              <label className="flex min-h-11 items-center justify-between gap-2 text-sm text-muted-foreground">
+                启用自动更新
+                <Switch checked={autoUpdate} onCheckedChange={setAutoUpdate} aria-label="启用自动更新" />
+              </label>
+              <label className="flex min-h-11 items-center justify-between gap-2 text-sm text-muted-foreground">
+                定时执行（关闭）
+                <Switch checked={false} onCheckedChange={() => undefined} aria-label="定时执行关闭" />
+              </label>
+              <label className="flex min-h-11 items-center justify-between gap-2 text-sm text-muted-foreground">
+                定时执行（禁用）
+                <Switch checked disabled onCheckedChange={() => undefined} aria-label="定时执行禁用" size="sm" />
+              </label>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </>
   )
 }

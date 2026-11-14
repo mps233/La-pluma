@@ -1,11 +1,8 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Clock3, LoaderCircle, Save } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import {
-  Checkbox,
-  Input,
-  Switch,
-} from '@/shared/components'
+import { Switch } from '@/shared/ui/switch'
+import { ConfigFieldCheckbox, ConfigFieldInput } from './ConfigFieldControls'
 import { useStatusStore } from '@/features/runtime-status'
 import { useSettingsAutoUpdate } from '../hooks/useSettingsAutoUpdate'
 
@@ -39,8 +36,8 @@ export default function AutoUpdateConfigPanel() {
         </div>
         <Switch
           checked={autoUpdate.enabled}
-          onChange={checked => updateAutoUpdate({ enabled: checked })}
-          label="启用自动更新"
+          onCheckedChange={checked => updateAutoUpdate({ enabled: checked })}
+          aria-label="启用自动更新"
         />
       </div>
 
@@ -53,23 +50,24 @@ export default function AutoUpdateConfigPanel() {
             transition={{ duration: shouldReduceMotion ? 0.12 : 0.2 }}
             className="mt-4 grid gap-3.5 border-t border-border pt-4 md:grid-cols-[12rem_minmax(0,1fr)] md:items-end xl:grid-cols-1 xl:items-stretch"
           >
-            <Input
+            <ConfigFieldInput
+              id="auto-update-time"
               type="text"
               label="更新时间"
               value={autoUpdate.time}
-              onChange={(value: string) => updateAutoUpdate({ time: value })}
+              onChange={event => updateAutoUpdate({ time: event.target.value })}
               placeholder="HH:MM"
               className="max-w-48"
             />
             <div className="flex min-h-11 flex-wrap items-center gap-x-4.5 gap-y-2">
-              <Checkbox
+              <ConfigFieldCheckbox
                 checked={autoUpdate.updateCore}
-                onChange={(checked: boolean) => updateAutoUpdate({ updateCore: checked })}
+                onCheckedChange={(checked: boolean) => updateAutoUpdate({ updateCore: checked })}
                 label="更新 MaaCore"
               />
-              <Checkbox
+              <ConfigFieldCheckbox
                 checked={autoUpdate.updateCli}
-                onChange={(checked: boolean) => updateAutoUpdate({ updateCli: checked })}
+                onCheckedChange={(checked: boolean) => updateAutoUpdate({ updateCli: checked })}
                 label="更新 MAA CLI"
               />
             </div>

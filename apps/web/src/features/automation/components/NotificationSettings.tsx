@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, LoaderCircle, Save, Send } from 'lucide-react'
 import type { ApiResponse } from '@/shared/api'
 import { Button } from '@/shared/ui/button'
-import { SmoothPanel, Switch } from '@/shared/components'
+import { Switch } from '@/shared/ui/switch'
+import { SmoothPanel } from '@/shared/components'
 import { saveNotificationConfig, testNotificationChannel } from '../api'
 import {
   cloneNotificationConfig,
@@ -169,9 +170,9 @@ export default function NotificationSettings() {
         <div className="automation-side-card-heading-actions">
           <Switch
             checked={config.enabled}
-            onChange={(enabled) => updateConfig(current => ({ ...current, enabled }))}
+            onCheckedChange={(enabled) => updateConfig(current => ({ ...current, enabled }))}
             disabled={loading || saving || Boolean(loadError)}
-            label="启用通知"
+            aria-label="启用通知"
             className="automation-card-switch"
           />
         </div>
@@ -201,9 +202,9 @@ export default function NotificationSettings() {
               </div>
               <Switch
                 checked={telegram.enabled}
-                onChange={(enabled) => updateTelegram({ enabled })}
+                onCheckedChange={(enabled) => updateTelegram({ enabled })}
                 disabled={!config.enabled || saving}
-                label="启用 Telegram"
+                aria-label="启用 Telegram"
                 className="automation-card-switch"
               />
             </div>

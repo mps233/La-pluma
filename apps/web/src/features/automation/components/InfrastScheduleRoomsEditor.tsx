@@ -1,6 +1,6 @@
 import { ChevronDown, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { Checkbox, Input, Select } from '@/shared/components'
+import { FieldFlagCheckbox, FieldInput, FieldSelect } from './InfrastScheduleFieldControls'
 import {
   INFRASTRUCT_MANUFACTURE_PRODUCTS,
   INFRASTRUCT_SCHEDULE_FACILITIES,
@@ -98,35 +98,38 @@ function RoomEditor({ facility, index, room, disabled, onChange, onRemove }: Roo
         </Button>
       </div>
 
-      <Select
+      <FieldSelect
+        id={`${facility}-${index}-state`}
         label="房间处理方式"
-        aria-label={`${getInfrastFacilityLabel(facility)}房间 ${index + 1}处理方式`}
+        ariaLabel={`${getInfrastFacilityLabel(facility)}房间 ${index + 1}处理方式`}
+        items={roomStateOptions}
         value={state}
-        options={roomStateOptions}
         disabled={disabled}
-        onChange={value => onChange(setInfrastRoomState(room, value as InfrastRoomState))}
+        onValueChange={value => onChange(setInfrastRoomState(room, value as InfrastRoomState))}
       />
       <p className="text-xs leading-5 text-muted-foreground">{roomStateHints[state]}</p>
 
       {state !== 'skip' && isTraining && (
         <>
-          <Input
+          <FieldInput
+            id={`${facility}-${index}-operators-b`}
             label="训练位干员"
             aria-label={`${getInfrastFacilityLabel(facility)}房间 ${index + 1}训练位干员`}
             value={formatInfrastOperatorText(room.operatorsB)}
             placeholder="银灰"
             hint="按顺序取第一个可进驻的干员；需精二且仍有未专精满级的技能"
             disabled={disabled}
-            onChange={value => onChange(setInfrastRoomOperators(room, 'operatorsB', parseInfrastOperatorText(value)))}
+            onChange={event => onChange(setInfrastRoomOperators(room, 'operatorsB', parseInfrastOperatorText(event.target.value)))}
           />
-          <Input
+          <FieldInput
+            id={`${facility}-${index}-operators-a`}
             label="协助者候选"
             aria-label={`${getInfrastFacilityLabel(facility)}房间 ${index + 1}协助者`}
             value={formatInfrastOperatorText(room.operatorsA)}
             placeholder="杜宾"
             hint="按顺序取第一个可用的协助者；不更换训练位时也可单独配置"
             disabled={disabled}
-            onChange={value => onChange(setInfrastRoomOperators(room, 'operatorsA', parseInfrastOperatorText(value)))}
+            onChange={event => onChange(setInfrastRoomOperators(room, 'operatorsA', parseInfrastOperatorText(event.target.value)))}
           />
           <p className="text-xs leading-5 text-muted-foreground">训练室只使用训练位与协助者候选；operators/candidates 等通用字段对训练室无效。</p>
         </>
@@ -134,48 +137,51 @@ function RoomEditor({ facility, index, room, disabled, onChange, onRemove }: Roo
 
       {state !== 'skip' && !isTraining && (
         <>
-          <Input
+          <FieldInput
+            id={`${facility}-${index}-operators`}
             label="干员"
             aria-label={`${getInfrastFacilityLabel(facility)}房间 ${index + 1}干员`}
             value={formatInfrastOperatorText(room.operators)}
             placeholder="按优先级填写，逗号分隔"
             hint="留空且未启用自动补位时，Core 保持该房间原样"
             disabled={disabled}
-            onChange={value => onChange(setInfrastRoomOperators(room, 'operators', parseInfrastOperatorText(value)))}
+            onChange={event => onChange(setInfrastRoomOperators(room, 'operators', parseInfrastOperatorText(event.target.value)))}
           />
-          <Input
+          <FieldInput
+            id={`${facility}-${index}-candidates`}
             label="备选干员"
             aria-label={`${getInfrastFacilityLabel(facility)}房间 ${index + 1}备选干员`}
             value={formatInfrastOperatorText(room.candidates)}
             placeholder="有谁用谁，选满为止"
             disabled={disabled}
-            onChange={value => onChange(setInfrastRoomOperators(room, 'candidates', parseInfrastOperatorText(value)))}
+            onChange={event => onChange(setInfrastRoomOperators(room, 'candidates', parseInfrastOperatorText(event.target.value)))}
           />
-          <div className="space-y-1">
-            <Checkbox
+          <div className="group space-y-1">
+            <FieldFlagCheckbox
               label="自动补位"
               checked={room.autofill === true}
               disabled={disabled}
-              onChange={value => onChange(setInfrastRoomFlag(room, 'autofill', value))}
+              onCheckedChange={value => onChange(setInfrastRoomFlag(room, 'autofill', value))}
             />
-            <Checkbox
+            <FieldFlagCheckbox
               label="按填写顺序排序"
               checked={room.sort === true}
               disabled={disabled}
-              onChange={value => onChange(setInfrastRoomFlag(room, 'sort', value))}
+              onCheckedChange={value => onChange(setInfrastRoomFlag(room, 'sort', value))}
             />
           </div>
           {products.length > 0 && (
-            <Select
+            <FieldSelect
+              id={`${facility}-${index}-product`}
               label="产物"
-              aria-label={`${getInfrastFacilityLabel(facility)}房间 ${index + 1}产物`}
-              value={typeof room.product === 'string' ? room.product : ''}
-              options={[
+              ariaLabel={`${getInfrastFacilityLabel(facility)}房间 ${index + 1}产物`}
+              items={[
                 { value: '', label: '不指定' },
                 ...productChoices.map(product => ({ value: product, label: product })),
               ]}
+              value={typeof room.product === 'string' ? room.product : ''}
               disabled={disabled}
-              onChange={value => onChange(setInfrastRoomProduct(room, value))}
+              onValueChange={value => onChange(setInfrastRoomProduct(room, value))}
             />
           )}
         </>
@@ -209,13 +215,14 @@ export default function InfrastScheduleRoomsEditor({ plan, disabled, onChange }:
             </summary>
 
             <div className="mt-3 space-y-3 border-t border-border pt-3">
-              <Select
+              <FieldSelect
+                id={`${facility.key}-facility-state`}
                 label="设施处理方式"
-                aria-label={`${facility.label}设施处理方式`}
+                ariaLabel={`${facility.label}设施处理方式`}
+                items={facilityStateOptions}
                 value={state}
-                options={facilityStateOptions}
                 disabled={disabled}
-                onChange={value => onChange(setInfrastFacilityState(plan, facility.key, value as InfrastFacilityState))}
+                onValueChange={value => onChange(setInfrastFacilityState(plan, facility.key, value as InfrastFacilityState))}
               />
 
               {state === 'default' && (

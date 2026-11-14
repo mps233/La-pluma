@@ -73,9 +73,10 @@ typography:
     lineHeight: 1.4
 rounded:
   xs: "6px"
-  sm: "10px"
-  md: "13px"
-  lg: "16px"
+  sm: "8px"
+  md: "10px"
+  lg: "12px"
+  xl: "16px"
   continuous: "20px"
   continuous-compact: "16px"
   pill: "9999px"
@@ -96,36 +97,36 @@ components:
     backgroundColor: "{colors.accent-action}"
     textColor: "#ffffff"
     rounded: "{rounded.lg}"
-    padding: "0 16px"
-    height: "44px"
+    padding: "0 10px"
+    height: "32px"
   button-primary-hover:
     backgroundColor: "{colors.accent-action-pressed}"
     textColor: "#ffffff"
     rounded: "{rounded.lg}"
-    padding: "0 16px"
-    height: "44px"
+    padding: "0 10px"
+    height: "32px"
   button-secondary:
     backgroundColor: "{colors.surface-muted}"
     textColor: "{colors.text}"
     rounded: "{rounded.lg}"
-    padding: "0 16px"
-    height: "44px"
+    padding: "0 10px"
+    height: "32px"
   button-ghost:
     backgroundColor: "transparent"
     textColor: "{colors.text-muted}"
     rounded: "{rounded.lg}"
-    padding: "0 12px"
-    height: "36px"
+    padding: "0 10px"
+    height: "32px"
   input:
     backgroundColor: "{colors.surface-solid}"
     textColor: "{colors.text}"
     rounded: "{rounded.lg}"
-    padding: "0 12px"
-    height: "44px"
+    padding: "0 10px"
+    height: "32px"
   card:
     backgroundColor: "{colors.surface-solid}"
     textColor: "{colors.text}"
-    rounded: "{rounded.lg}"
+    rounded: "{rounded.xl}"
     padding: "16px"
   nav-active:
     backgroundColor: "{colors.accent}"
@@ -146,7 +147,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 浅色主题读起来像冷调纸面与磨砂玻璃，深色主题则是近黑石墨与同一支蓝色信号。密度是刻意保留的：信息可以很满，但层级必须由字重、1px 发丝线和间距 token 建立，而不是由彩色卡片、渐变或投影堆出来。强调色是稀缺资源，只出现在当前导航项、主操作、焦点和运行中的状态上。
 
 **Key Characteristics:**
-- 原生语义优先：`Button`、`Card`、`Input`、`Switch` 等 `shared/components` 通用组件使用真实语义元素，浏览器、jsdom、SSR 和嵌入式场景渲染一致。
+- 原生语义优先：`Button`、`Input`、`Select`、`Checkbox`、`Switch` 使用 `shared/ui` 的 shadcn 生成物，`Card`、`Modal`、`PageHeader` 等应用组件位于 `shared/components`；两者都使用真实语义元素，浏览器、jsdom、SSR 和嵌入式场景渲染一致。
 - 单强调色：系统蓝承担品牌、主操作、焦点和选中态；状态色只表达成功、警告、危险和信息。
 - 分层而不炫技：普通内容面保持平整，只有 chrome、弹层和可点击卡片使用玻璃、抬升或 hover 阴影。
 - 4px 节奏：布局间距使用 Tailwind 原生档位与组件类；圆角使用 `--radius` 派生档位。
@@ -156,7 +157,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 - `apps/web/src/styles/index.css`：语义 token 的**唯一来源**（base 层）、Tailwind 入口、`@theme` 圆角派生与 `@theme inline` 颜色映射、通用组件类与跨域 keyframes；页面样式由各功能域自持。
 - `apps/web/src/styles/ios-theme.css`：只保留 iOS 26 独有的材质 token（`--glass-*`）、结构几何 token（`--la-pluma-*`）与对应样式；不再重定义语义 token。
-- `apps/web/src/shared/components`：`Button`、`IconButton`、`Card`、`Input`、`Select`、`Checkbox`、`Switch`、`Modal`、`PageHeader`、`EmptyState`、`Loading` 等通用组件；shadcn 生成物（sheet、sidebar、button 等）位于 `apps/web/src/shared/ui`。
+- `apps/web/src/shared/components`：`Card`、`Modal`、`PageHeader`、`EmptyState`、`Loading` 等应用级通用组件；`Button`、`Input`、`Select`、`Checkbox`、`Switch` 等 shadcn 生成物位于 `apps/web/src/shared/ui`（sheet、sidebar 也在该目录）。
 
 本文件描述规则；token 的具体数值以 `apps/web/src/styles/index.css` 为准，调整 token 时同步更新本文件的表格与说明。
 
@@ -286,12 +287,13 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 ## Shapes
 
-形状语言来自 iOS 连续圆角：圆角足够柔和，但不做成大号“药丸卡片”。普通控件和卡片使用 `rounded-xl`（16px），需要 iOS 连续圆角视觉的卡片和面板使用 `SmoothSurface` / `SmoothPanel`（20px，紧凑 16px）。
+形状语言来自 iOS 连续圆角：圆角足够柔和，但不做成大号“药丸卡片”。卡片和面板使用 `rounded-xl`（16px），Button、Input、Select 等表单控件使用 `rounded-lg`（12px），需要 iOS 连续圆角视觉的卡片和面板使用 `SmoothSurface` / `SmoothPanel`（20px，紧凑 16px）。
 
 - `rounded-sm`（8px）：细小元素、默认边界。
-- `rounded-md`（10px）：checkbox、小控件、紧凑标签。
-- `rounded-lg`（12px）：紧凑控件、列表项和局部容器。
-- `rounded-xl`（16px）：卡片、面板、分段控件、通用按钮和输入。
+- `rounded-[4px]`：Checkbox。
+- `rounded-md`（10px）：小控件、紧凑标签。
+- `rounded-lg`（12px）：Button、Input、Select 等表单控件、紧凑控件、列表项和局部容器。
+- `rounded-xl`（16px）：卡片、面板、分段控件。
 - `--continuous-radius`（20px）：`SmoothPanel` 的标准连续圆角；紧凑版为 16px。
 - `rounded-full`：胶囊、开关、头像和圆形状态点。
 
@@ -302,20 +304,20 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 整体气质是**精密而克制**：控件像加工过的系统零件，尺寸和反馈都精确，但不以装饰、渐变或夸张动效吸引注意。
 
 ### Buttons
-- **Shape:** `rounded-xl`（16px），无边框；`Button` 和 `IconButton` 共享高度档位。
-- **Sizes:** `sm` 36px、`md` 44px、`lg` 48px；手机断点和粗指针设备把所有标准按钮、图标按钮与表单点击区提升到至少 44px。
+- **Shape:** `rounded-lg`（12px），无边框；`Button` 的尺寸档位由 shadcn base-nova 提供。
+- **Sizes:** `xs` 24px、`sm` 28px、`default` 32px、`lg` 36px；图标档 `icon-xs` 24px、`icon-sm` 28px、`icon` 32px、`icon-lg` 36px。手机断点和粗指针设备沿用同一紧凑档位，不额外放大。
 - **Primary:** `brand-action`（`#0066cc` 实心、白字、轻微蓝色投影）；hover 只压暗，不增加渐变或光晕。
 - **Secondary / Outline:** `control-surface` + `text-foreground`；hover 使用弱主题背景和轻描边。
 - **Danger / Success:** `status-danger-action` / `status-success-action`，语义必须与操作后果一致。
 - **Ghost:** 透明底 + `text-muted-foreground`；hover 只使用弱主题背景。
-- **Focus:** `outline: 2px solid color-mix(in srgb, var(--primary) 62%, transparent)`，`outline-offset: 2px`；所有可点击元素都必须有明确的 `focus-visible` 状态。
+- **Focus:** `focus-visible:border-ring` 与 `focus-visible:ring-3 focus-visible:ring-ring/50`；所有可点击元素都必须有明确的 `focus-visible` 状态。
 - **Disabled / Loading:** disabled 使用 `opacity-50`、`cursor-not-allowed`，关闭点击与 hover；loading 期间自动禁用，仅显示加载指示器和 `loadingText`。不要在调用处叠加 `h-*`、`px-*`、`py-*` 缩小标准控件。
 
 ### Inputs / Fields
-- **Style:** 44px 高、16px 圆角、`app-input control-surface`；静态边界使用 `inset 0 0 0 1px var(--input)` 和极轻的投影。
-- **Focus:** `inset 0 0 0 1px var(--primary), 0 0 0 3px var(--primary-soft)`；不要用高饱和外发光。
-- **Error:** `form-error-surface` 红色内描边，错误文字使用 `form-error-text`；`hint` 只在没有错误时显示。
-- **Controls:** 二元启停使用 `Switch`（51×31px 胶囊，compact 41×25px）；多选或参数组合使用 `Checkbox`；新增表单优先使用 `Input`、`Select`、`Checkbox`、`Switch`，手写原生控件使用 `app-input control-surface`、`app-checkbox`。
+- **Style:** 32px 高（`h-8`）、`rounded-lg`（12px）的 shadcn `Input`；边框、背景与状态色使用 shadcn 语义 token。
+- **Focus:** `focus-visible:border-ring` 与 `focus-visible:ring-3 focus-visible:ring-ring/50`；不要用高饱和外发光。
+- **Error:** `aria-invalid` 触发 destructive 边框与 ring，错误文本使用 `form-error-text`；`hint` 只在没有错误时显示。
+- **Controls:** 二元启停使用 `Switch`（默认 32×18.4px 胶囊，`sm` 24×14px）；多选或参数组合使用 `Checkbox`（16×16px）；新增表单优先使用 `Input`、`Select`、`Checkbox`、`Switch`，手写原生控件使用 `app-input control-surface`、`app-checkbox`。
 
 ### Cards / Containers
 - **Corner Style:** 普通卡片 16px；需要连续圆角时使用 `SmoothPanel` 的 20px / 16px。
@@ -341,7 +343,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 | 情况 | 使用方式 |
 | --- | --- |
-| 字段校验失败 | `Input`、`Select` 的 `error` prop；`hint` 只在没有错误时显示 |
+| 字段校验失败 | `Input`、`Select` 使用 `aria-invalid` 与错误文本；`hint` 只在没有错误时显示 |
 | 控制台首次且没有本地缓存 | 控制台内部的 `DashboardSkeleton`；恢复或返回页面时先显示最后一次成功快照并后台刷新，不要重播整页骨架 |
 | 局部内容正在读取 | `Loading` |
 | 列表、流程或卡片无数据 | `EmptyState`，按容器选择 `compact` |
@@ -354,7 +356,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ### Icons
 - 普通功能图标优先使用已引入的 `lucide-react`；业务身份和概览图标优先复用 `Icons.tsx`。一级工作区标题与控制台一致，不添加装饰图标；不要在普通页面重复手写 SVG。
 - 行内或文字旁图标使用 16px，常规操作和字段图标使用 20px，页面标题或大操作使用 24px。`icon-well` 只用于页面、概览和卡片的内容身份图标，不能包裹普通按钮图标。
-- 无文字操作使用 `IconButton`，调用时必须提供 `title` 和 `aria-label`；有文字的操作使用 `Button icon`，不要在调用处额外覆盖图标与文字间距或按钮尺寸。
+- 无文字操作使用 Button 的 `size="icon"`（`icon-xs`/`icon-sm`/`icon`/`icon-lg`），调用时必须提供 `title` 和 `aria-label`；有文字的操作通过 `data-icon` 传入图标，不要在调用处额外覆盖图标与文字间距或按钮尺寸。
 - 装饰图标加 `aria-hidden="true"`；状态和结果必须同时提供可读文字或 `aria-label`，不能只依赖颜色和图标。
 
 ## Do's and Don'ts
@@ -363,7 +365,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 - **Do** 先读 `apps/web/src/styles/index.css` 和 `apps/web/src/styles/ios-theme.css`，再用语义类实现界面；新页面优先使用 `Layout`、`PageHeader`、`Card`、`Button`、`Input` 等现有组件。
 - **Do** 把间距收敛到 Tailwind 原生档位与组件类、圆角收敛到 `--radius` 派生档位，保持 4px 基线和 1px 发丝线。
 - **Do** 让系统蓝保持稀缺：只用于当前项、主操作、焦点和运行中状态；状态色只表达语义。
-- **Do** 在手机和粗指针设备上保证至少 44px 的点击区域，并检查 light/dark、loading、disabled、empty、error 以及长标题/长操作文案。
+- **Do** 在手机和粗指针设备上沿用 shadcn base-nova 的紧凑控件度量，不额外放大表单控件，并检查 light/dark、loading、disabled、empty、error 以及长标题/长操作文案。
 - **Do** 在 `viewport-fit=cover` 的安全区设备上确认 chrome 与页面内容没有双重留白。
 - **Do** 为所有可点击元素提供 `focus-visible` 状态，装饰图标加 `aria-hidden="true"`。
 

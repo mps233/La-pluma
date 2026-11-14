@@ -2,7 +2,8 @@
 // 也不清空草稿与保存/读取反馈。
 
 import { useCallback } from 'react'
-import { Input, Select, Switch } from '@/shared/components'
+import { Switch } from '@/shared/ui/switch'
+import { ConfigFieldInput, ConfigFieldSelect } from './ConfigFieldControls'
 import { useStatusStore } from '@/features/runtime-status'
 import { useConfigDraftPanel } from '../hooks/useConfigDraftPanel'
 import { useSettingsConnectionConfig } from '../hooks/useSettingsConnectionConfig'
@@ -92,20 +93,22 @@ export default function ConnectionConfigPanel({ isActive }: ConnectionConfigPane
       onReset={handleReset}
     >
       <div className="grid min-w-0 gap-3.5 md:grid-cols-2">
-        <Input
+        <ConfigFieldInput
+          id="connection-adb-path"
           label="ADB 路径"
           value={configData.adb_path}
-          onChange={(value: string) => {
-            updateConnectionConfig({ adb_path: value })
+          onChange={(event) => {
+            updateConnectionConfig({ adb_path: event.target.value })
           }}
           disabled={!connectionLoaded}
           hint="ADB 可执行文件的完整路径"
         />
-        <Input
+        <ConfigFieldInput
+          id="connection-address"
           label="连接地址"
           value={configData.address}
-          onChange={(value: string) => {
-            updateConnectionConfig({ address: value })
+          onChange={(event) => {
+            updateConnectionConfig({ address: event.target.value })
             clearTestFeedback()
           }}
           disabled={!connectionLoaded}
@@ -121,24 +124,26 @@ export default function ConnectionConfigPanel({ isActive }: ConnectionConfigPane
       />
 
       <div className="grid min-w-0 gap-3.5 md:grid-cols-2 md:items-end">
-        <Select
+        <ConfigFieldSelect
+          id="connection-preset"
           label="连接预设"
           value={configData.preset}
-          onChange={(value: string) => {
+          onValueChange={(value) => {
             updateConnectionConfig({ preset: value as MaaConnectionPreset })
           }}
           disabled={!connectionLoaded}
-          options={PRESET_OPTIONS}
+          items={PRESET_OPTIONS}
           hint="预设提供默认 ADB 路径与平台配置；显式填写的值优先"
         />
-        <Select
+        <ConfigFieldSelect
+          id="connection-platform-config"
           label="平台配置"
           value={configData.config}
-          onChange={(value: string) => {
+          onValueChange={(value) => {
             updateConnectionConfig({ config: value })
           }}
           disabled={!connectionLoaded}
-          options={[
+          items={[
             { value: 'CompatMac', label: 'CompatMac (macOS)' },
             { value: 'CompatPOSIXShell', label: 'CompatPOSIXShell (Linux)' },
             { value: 'General', label: 'General (Windows)' },
@@ -152,9 +157,9 @@ export default function ConnectionConfigPanel({ isActive }: ConnectionConfigPane
           <div className="mt-1 text-xs leading-5 text-tertiary">连接中断后自动尝试恢复</div>
         </div>
         <Switch
-          label="启用自动重连"
+          aria-label="启用自动重连"
           checked={configData.auto_reconnect !== false}
-          onChange={(checked: boolean) => {
+          onCheckedChange={(checked: boolean) => {
             updateConnectionConfig({ auto_reconnect: checked })
           }}
           disabled={!connectionLoaded}

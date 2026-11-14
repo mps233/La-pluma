@@ -7,6 +7,14 @@ import LogsToolbar from './LogsToolbar'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
+const optionInTriggerPopup = (trigger: HTMLElement, optionLabel: string) => {
+  const popupId = trigger.getAttribute('aria-controls')
+  const popup = popupId ? document.getElementById(popupId) : null
+  return popup
+    ? [...popup.querySelectorAll('[role="option"]')].find(node => node.textContent?.trim() === optionLabel)
+    : undefined
+}
+
 type ToolbarProps = ComponentProps<typeof LogsToolbar>
 
 const baseProps = (): ToolbarProps => ({
@@ -43,8 +51,23 @@ const renderToolbar = async (overrides: Partial<ToolbarProps> = {}) => {
 }
 
 const findSwitchByLabel = (label: string) =>
-  Array.from(container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'))
-    .find(input => input.getAttribute('aria-label') === label || container.querySelector(`label[for="${input.id}"]`)?.textContent?.includes(label))
+    container.querySelector(`[role="switch"][aria-label="${label}"]`)
+
+const isSelectOpen = () => {
+  const listbox = document.querySelector('[role="listbox"]')
+  if (!listbox) return false
+  return !listbox.parentElement?.hasAttribute('data-closed')
+}
+
+const chooseSelectOption = async (label: string, optionLabel: string) => {
+  const trigger = container.querySelector(`[aria-label="${label}"]`)
+  expect(trigger).not.toBeNull()
+  await act(async () => (trigger as HTMLElement).click())
+  const option = optionInTriggerPopup(trigger as HTMLElement, optionLabel)
+  expect(option, `未找到选项：${optionLabel}`).toBeTruthy()
+  await act(async () => (option as HTMLElement).click())
+  await act(async () => {})
+}
 
 describe('LogsToolbar', () => {
   beforeEach(() => {
@@ -60,29 +83,40 @@ describe('LogsToolbar', () => {
   })
 
   it('offers all logs or a specific run independently of the event filter', async () => {
-    await renderToolbar()
-    const scope = container.querySelector<HTMLSelectElement>('[aria-label="执行范围"]')
-    expect(scope?.value).toBe('')
-    expect(Array.from(scope?.options || []).map(option => option.text)).toEqual(['全部执行与未关联日志', 'Run · run-1'])
-    expect(container.querySelector<HTMLSelectElement>('[aria-label="事件范围"]')?.value).toBe('key')
+    const onRunIdChange = vi.fn()
+    await renderToolbar({ onRunIdChange })
+    const scope = container.querySelector('[aria-label="执行范围"]')
+    expect(scope?.textContent).toContain('全部执行与未关联日志')
+    await act(async () => (scope as HTMLElement).click())
+    const popupId = scope!.getAttribute('aria-controls')
+    const options = [...(document.getElementById(popupId!)?.querySelectorAll('[role="option"]') ?? [])]
+    expect(options.map(node => node.textContent?.trim())).toEqual(['全部执行与未关联日志', 'Run · run-1'])
+    const target = options.find(node => node.textContent?.trim() === 'Run · run-1') as HTMLElement
+    await act(async () => target.click())
+    await act(async () => {})
+    expect(isSelectOpen()).toBe(false)
+    expect(onRunIdChange).toHaveBeenCalledWith('run-1')
+    expect(container.querySelector('[aria-label="事件范围"]')?.textContent).toContain('关键事件')
   })
 
   it('reports an explicit run selection', async () => {
     const onRunIdChange = vi.fn()
     await renderToolbar({ onRunIdChange })
-    const scope = container.querySelector<HTMLSelectElement>('[aria-label="执行范围"]')!
-    await act(async () => {
-      scope.value = 'run-1'
-      scope.dispatchEvent(new Event('change', { bubbles: true }))
-    })
+    await chooseSelectOption('执行范围', 'Run · run-1')
     expect(onRunIdChange).toHaveBeenCalledWith('run-1')
   })
 
   it('disables run scope and following for files and keeps event selection available', async () => {
     await renderToolbar({ viewingHistory: true })
-    expect(container.querySelector<HTMLSelectElement>('[aria-label="执行范围"]')?.disabled).toBe(true)
-    expect(container.querySelector<HTMLSelectElement>('[aria-label="事件范围"]')?.disabled).toBe(false)
-    expect(findSwitchByLabel('自动滚动')?.disabled).toBe(true)
+    expect((container.querySelector('[aria-label="执行范围"]') as HTMLButtonElement)?.disabled).toBe(true)
+    expect((container.querySelector('[aria-label="事件范围"]') as HTMLButtonElement)?.disabled).toBe(false)
+    expect(findSwitchByLabel('自动滚动')?.getAttribute('aria-disabled')).toBe('true')
+  })
+
+  it('turns browser autofill off for the log search field', async () => {
+    await renderToolbar()
+    const search = container.querySelector('input[aria-label="搜索日志内容"]')
+    expect(search?.getAttribute('autocomplete')).toBe('off')
   })
 
   it('distinguishes clearing the screen and exporting selected records', async () => {

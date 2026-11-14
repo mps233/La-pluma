@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FileJson } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
+import { Input } from '@/shared/ui/input'
 import { normalizeInfrastPlanIndex } from '../model/infrastScheduleEditing'
 import InfrastScheduleEditor from './InfrastScheduleEditor'
 
@@ -28,7 +29,7 @@ export default function InfrastScheduleField({
       <div className="automation-field-row">
         <label htmlFor={filenameId} className="automation-field-label">排班文件</label>
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <input
+          <Input
             id={filenameId}
             type="text"
             autoComplete="off"
@@ -36,7 +37,7 @@ export default function InfrastScheduleField({
             placeholder="schedules/base.json"
             onChange={event => onChange('filename', event.target.value)}
             disabled={disabled}
-            className="automation-text-control min-w-0 flex-1"
+            className="min-w-0 flex-1"
           />
           <Button
             variant="secondary"
@@ -53,14 +54,14 @@ export default function InfrastScheduleField({
       <div className="automation-field-row">
         <label htmlFor={planId} className="automation-field-label">方案序号</label>
         <div className="number-input-wrapper flex-1">
-          <input
+          <Input
             id={planId}
             type="number"
+            autoComplete="off"
             min={0}
             value={planIndex === '' ? '' : normalizeInfrastPlanIndex(planIndex)}
             onChange={event => onChange('plan_index', normalizeInfrastPlanIndex(event.target.value))}
             disabled={disabled}
-            className="automation-number-control"
           />
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { LoaderCircle } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
+import { Input } from '@/shared/ui/input'
 import { usePanelState } from '../hooks/usePanelState'
 import type { PanelStateStore } from '../model/panelState'
 import type { ParadoxSearchResult } from '../types'
@@ -39,7 +40,7 @@ export default function CombatParadoxSearchPanel({
       </h5>
       <div className="flex space-x-2">
         <label htmlFor="combat-paradox-operator" className="sr-only">搜索悖论模拟干员</label>
-        <input
+        <Input
           id="combat-paradox-operator"
           type="text"
           name="maa-paradox-operator"
@@ -55,7 +56,7 @@ export default function CombatParadoxSearchPanel({
             e.preventDefault()
             onSearch(name)
           }}
-          className="app-input app-native-control min-h-11 min-w-0 flex-1 control-surface"
+          className="min-h-11 min-w-0 flex-1"
         />
         <Button
           onClick={() => onSearch(name)}

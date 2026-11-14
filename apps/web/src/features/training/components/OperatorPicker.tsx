@@ -3,7 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Filter, LoaderCircle, Search, UserRoundSearch } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { EmptyState, Input, Loading, Select } from '@/shared/components'
+import { EmptyState, Loading } from '@/shared/components'
+import { Input } from '@/shared/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { Modal } from '@/shared/components/Modal'
 import { useFluidTabIndicator } from '@/shared/hooks/useFluidTabIndicator'
 import { trainingCandidatesQueryOptions, trainingStatusCountsQueryOptions } from '../model/queries'
@@ -241,34 +243,56 @@ export default function OperatorPicker({
           </div>
 
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_9rem_auto]">
-          <Input
-            type="text"
-            aria-label="搜索干员名称"
-            placeholder="搜索干员"
-            value={searchTerm}
-            onChange={setSearchTerm}
-            icon={<Search size={17} strokeWidth={1.9} aria-hidden="true" />}
-            className="min-w-0"
-          />
+          <div className="relative min-w-0">
+            <Search size={17} strokeWidth={1.9} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" />
+            <Input
+              type="text"
+              autoComplete="off"
+              aria-label="搜索干员名称"
+              placeholder="搜索干员"
+              value={searchTerm}
+              onChange={event => setSearchTerm(event.target.value)}
+              className="w-full pl-9"
+            />
+          </div>
           <Select
-            aria-label="职业"
+            items={[...OPERATOR_PROFESSION_FILTERS]}
             value={professionFilter}
-            onChange={handleProfessionFilterChange}
-            options={[...OPERATOR_PROFESSION_FILTERS]}
-            className="min-w-0"
-          />
+            onValueChange={(next, details) => { if (details.reason !== 'none' && next !== null) handleProfessionFilterChange(next) }}
+          >
+            <SelectTrigger aria-label="职业" className="min-w-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[...OPERATOR_PROFESSION_FILTERS].map(item => (
+                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select
-            aria-label="稀有度"
             value={filters.rarity}
-            onChange={(rarity) => setFilters({ ...filters, rarity })}
-            options={[
+            onValueChange={(rarity, details) => { if (details.reason !== 'none' && rarity !== null) setFilters({ ...filters, rarity }) }}
+            items={[
               { value: '', label: '全部稀有度' },
               { value: '6', label: '6 星' },
               { value: '5', label: '5 星' },
               { value: '4', label: '4 星' },
             ]}
-            className="min-w-0"
-          />
+          >
+            <SelectTrigger aria-label="稀有度" className="min-w-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[
+                { value: '', label: '全部稀有度' },
+                { value: '6', label: '6 星' },
+                { value: '5', label: '5 星' },
+                { value: '4', label: '4 星' },
+              ].map(item => (
+                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             type="button"
             variant={filters.needsElite2 ? 'default' : 'secondary'}

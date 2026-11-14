@@ -30,11 +30,11 @@ const findButton = (name: string | RegExp): HTMLButtonElement => {
   return match!
 }
 
-const checkboxByLabel = (label: string): HTMLInputElement => {
-  const match = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'))
-    .find(input => input.closest('label')?.textContent?.replace(/\s+/g, ' ').trim() === label)
+const checkboxByLabel = (label: string): HTMLElement => {
+  const match = Array.from(document.querySelectorAll('[role="checkbox"]'))
+    .find(checkbox => checkbox.closest('label')?.textContent?.replace(/\s+/g, ' ').trim() === label)
   expect(match, `未找到复选框：${label}`).toBeDefined()
-  return match!
+  return match as HTMLElement
 }
 
 const click = async (element: Element | null) => {
@@ -98,8 +98,8 @@ describe('CombatCopilotMatchDialog', () => {
   it('enables matching and reports mode changes', async () => {
     const props = await renderDialog()
 
-    const toggle = document.querySelector<HTMLInputElement>('input[role="switch"]')
-    expect(toggle?.disabled).toBe(false)
+    const toggle = document.querySelector('[role="switch"]')
+    expect(toggle?.getAttribute('aria-disabled')).toBeNull()
     expect(toggle?.getAttribute('aria-label')).toBe('按持有干员匹配')
     await click(toggle)
 
@@ -124,8 +124,8 @@ describe('CombatCopilotMatchDialog', () => {
   it('disables the switch and asks for owned operator recognition first', async () => {
     const props = await renderDialog({ ownedOperatorNames: new Set<string>() })
 
-    const toggle = document.querySelector<HTMLInputElement>('input[role="switch"]')
-    expect(toggle?.disabled).toBe(true)
+    const toggle = document.querySelector('[role="switch"]')
+    expect(toggle?.getAttribute('aria-disabled')).toBe('true')
     expect(document.body.textContent).toContain('先识别持有干员')
 
     await click(toggle)

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, Trash2, UserRound, UserRoundSearch, X } from 'lucide-react'
 import {
@@ -9,7 +9,7 @@ import {
 } from '@/features/game-data'
 import { OperatorSelectModal, type OperatorPickerOption } from '@/features/training'
 import { Button } from '@/shared/ui/button'
-import { Select } from '@/shared/components'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import {
   OPER_PROGRESS_ROLES,
   resolveOperProgressRole,
@@ -27,16 +27,16 @@ interface OperProgressPlansEditorProps {
 
 const eliteOptions = [
   { value: '', label: '不提升精英阶段' },
-  { value: 1, label: '精英一' },
-  { value: 2, label: '精英二' },
+  { value: '1', label: '精英一' },
+  { value: '2', label: '精英二' },
 ]
 const skillOptions = [
   { value: '', label: '不提升技能等级' },
-  ...[2, 3, 4, 5, 6, 7].map(level => ({ value: level, label: `${level} 级` })),
+  ...[2, 3, 4, 5, 6, 7].map(level => ({ value: String(level), label: `${level} 级` })),
 ]
 const masteryOptions = [
-  { value: 0, label: '不专精' },
-  ...[1, 2, 3].map(level => ({ value: level, label: `专精 ${level}` })),
+  { value: '0', label: '不专精' },
+  ...[1, 2, 3].map(level => ({ value: String(level), label: `专精 ${level}` })),
 ]
 
 const roleLabel = (role: string | undefined): string | null => {
@@ -45,6 +45,34 @@ const roleLabel = (role: string | undefined): string | null => {
 }
 
 const EMPTY_OPERATORS: readonly OperatorDetailed[] = []
+
+interface PlanSelectProps {
+  id: string
+  label: string
+  ariaLabel: string
+  items: ReadonlyArray<{ value: string; label: string }>
+  value: string
+  disabled?: boolean
+  onValueChange: (value: string) => void
+}
+
+function PlanSelect({ id, label, ariaLabel, items, value, disabled, onValueChange }: PlanSelectProps) {
+  return (
+    <div className="min-w-0">
+      <label htmlFor={id} className="mb-2 block text-sm font-medium text-muted-foreground">{label}</label>
+      <Select items={items} value={value} onValueChange={(next, details) => { if (details.reason === 'none' || next === null) return; onValueChange(next) }} disabled={disabled}>
+        <SelectTrigger id={id} aria-label={ariaLabel} className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {items.map(item => (
+            <SelectItem key={String(item.value)} value={item.value}>{item.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
 
 interface PlanOperatorAvatarProps {
   operatorId: string | null
@@ -76,6 +104,7 @@ function PlanOperatorAvatar({ operatorId }: PlanOperatorAvatarProps) {
 
 export default function OperProgressPlansEditor({ plans, disabled, onChange }: OperProgressPlansEditorProps) {
   const [pickerPlanIndex, setPickerPlanIndex] = useState<number | null>(null)
+  const editorId = useId().replace(/:/g, '')
   const catalogQuery = useQuery({
     ...operatorCatalogQueryOptions(),
     enabled: plans.some(plan => plan.name.trim() !== ''),
@@ -149,11 +178,38 @@ export default function OperProgressPlansEditor({ plans, disabled, onChange }: O
               </Button>
             </div>
             <div className="grid min-w-0 gap-3.5 @sm:grid-cols-2">
-              <Select label="精英目标" aria-label={`培养计划 ${index + 1} 精英目标`} value={plan.elite ?? ''} options={eliteOptions} disabled={disabled} onChange={value => updatePlan(index, updateOperProgressTarget(plan, 'elite', value))} />
-              <Select label="技能等级" aria-label={`培养计划 ${index + 1} 技能等级`} value={plan.skill_level ?? ''} options={skillOptions} disabled={disabled} onChange={value => updatePlan(index, updateOperProgressTarget(plan, 'skill_level', value))} />
+              <PlanSelect
+                id={`${editorId}-elite-${index}`}
+                label="精英目标"
+                ariaLabel={`培养计划 ${index + 1} 精英目标`}
+                items={eliteOptions}
+                value={plan.elite === undefined ? '' : String(plan.elite)}
+                disabled={disabled}
+                onValueChange={value => updatePlan(index, updateOperProgressTarget(plan, 'elite', String(value)))}
+              />
+              <PlanSelect
+                id={`${editorId}-skill-level-${index}`}
+                label="技能等级"
+                ariaLabel={`培养计划 ${index + 1} 技能等级`}
+                items={skillOptions}
+                value={plan.skill_level === undefined ? '' : String(plan.skill_level)}
+                disabled={disabled}
+                onValueChange={value => updatePlan(index, updateOperProgressTarget(plan, 'skill_level', String(value)))}
+              />
             </div>
             <div className="grid min-w-0 gap-3.5 @sm:grid-cols-2 @md:grid-cols-3">
-              {[0, 1, 2].map(skill => <Select key={skill} label={`技能 ${skill + 1} 专精`} aria-label={`培养计划 ${index + 1} 技能 ${skill + 1} 专精`} value={plan.skill_mastery?.[skill] ?? 0} options={masteryOptions} disabled={disabled} onChange={value => updatePlan(index, updateOperProgressMastery(plan, skill, value))} />)}
+              {[0, 1, 2].map(skill => (
+                <PlanSelect
+                  key={skill}
+                  id={`${editorId}-mastery-${index}-${skill}`}
+                  label={`技能 ${skill + 1} 专精`}
+                  ariaLabel={`培养计划 ${index + 1} 技能 ${skill + 1} 专精`}
+                  items={masteryOptions}
+                  value={String(plan.skill_mastery?.[skill] ?? 0)}
+                  disabled={disabled}
+                  onValueChange={value => updatePlan(index, updateOperProgressMastery(plan, skill, String(value)))}
+                />
+              ))}
             </div>
           </fieldset>
         )

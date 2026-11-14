@@ -1,63 +1,73 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
+import { act, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import Switch from './Switch'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { Switch } from '@/shared/ui/switch'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-describe('Switch', () => {
-  let container: HTMLDivElement
-  let root: Root
+let container: HTMLDivElement
+let root: Root
 
-  beforeEach(() => {
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
-  })
+beforeEach(() => {
+  container = document.createElement('div')
+  document.body.appendChild(container)
+  root = createRoot(container)
+})
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
-  })
+afterEach(async () => {
+  await act(async () => root.unmount())
+  container.remove()
+})
 
-  it('keeps native switch semantics and reports the next value', async () => {
-    const onChange = vi.fn()
+describe('Switch consumption contract', () => {
+  function Host({ initial, disabled, onValue }: { initial: boolean; disabled?: boolean; onValue?: (value: boolean) => void }) {
+    const [checked, setChecked] = useState(initial)
+    return (
+      <Switch
+        checked={checked}
+        disabled={disabled}
+        aria-label="启用定时执行"
+        onCheckedChange={next => {
+          onValue?.(next)
+          setChecked(next)
+        }}
+      />
+    )
+  }
 
+  it('toggles from unchecked to checked and reports the next value', async () => {
+    const values: boolean[] = []
     await act(async () => {
-      root.render(
-        <Switch
-          compact
-          checked={false}
-          label="启用定时执行"
-          onChange={onChange}
-        />,
-      )
+      root.render(<Host initial={false} onValue={value => values.push(value)} />)
     })
 
-    const input = container.querySelector<HTMLInputElement>('input[role="switch"]')
-    const wrapper = container.querySelector<HTMLLabelElement>('label')
-    expect(input?.getAttribute('aria-label')).toBe('启用定时执行')
-    expect(input?.checked).toBe(false)
-    expect(wrapper?.htmlFor).toBe(input?.id)
+    const control = container.querySelector('[role="switch"]')
+    expect(control?.getAttribute('aria-label')).toBe('启用定时执行')
+    expect(control?.getAttribute('aria-checked')).toBe('false')
 
-    await act(async () => input?.click())
-    expect(onChange).toHaveBeenCalledWith(true)
+    await act(async () => (control as HTMLElement).click())
+    expect(values).toEqual([true])
+    expect(container.querySelector('[role="switch"]')?.getAttribute('aria-checked')).toBe('true')
+
+    await act(async () => (control as HTMLElement).click())
+    expect(values).toEqual([true, false])
+    expect(container.querySelector('[role="switch"]')?.getAttribute('aria-checked')).toBe('false')
   })
 
-  it('renders a disabled native control', async () => {
+  it('ignores interaction while disabled and keeps the current value', async () => {
+    const values: boolean[] = []
     await act(async () => {
-      root.render(
-        <Switch
-          checked
-          disabled
-          label="关闭通知"
-          onChange={() => undefined}
-        />,
-      )
+      root.render(<Host initial disabled onValue={value => values.push(value)} />)
     })
 
-    expect(container.querySelector<HTMLInputElement>('input[role="switch"]')?.disabled).toBe(true)
+    const control = container.querySelector('[role="switch"]') as HTMLElement
+    expect(control.getAttribute('aria-checked')).toBe('true')
+    expect(control.getAttribute('aria-disabled')).toBe('true')
+
+    await act(async () => control.click())
+    expect(values).toEqual([])
+    expect(control.getAttribute('aria-checked')).toBe('true')
   })
 })

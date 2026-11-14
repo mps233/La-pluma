@@ -7,7 +7,9 @@ import {
   type OperatorDetailed,
 } from '@/features/game-data'
 import { Button } from '@/shared/ui/button'
-import { EmptyState, Input, Loading, Select } from '@/shared/components'
+import { EmptyState, Loading } from '@/shared/components'
+import { Input } from '@/shared/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { Modal } from '@/shared/components/Modal'
 import {
   OPERATOR_RENDER_BATCH_SIZE,
@@ -191,23 +193,33 @@ export default function OperatorSelectModal({
     >
       <div className="space-y-3.5">
         <div className="flex items-center gap-2">
-          <Input
-            type="text"
-            aria-label="搜索干员名称"
-            placeholder="搜索干员"
-            value={searchTerm}
-            onChange={handleSearchChange}
-            icon={<Search size={17} strokeWidth={1.9} aria-hidden="true" />}
-            className="min-w-0 flex-1"
-          />
+          <div className="relative min-w-0 flex-1">
+            <Search size={17} strokeWidth={1.9} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" />
+            <Input
+              type="text"
+              autoComplete="off"
+              aria-label="搜索干员名称"
+              placeholder="搜索干员"
+              value={searchTerm}
+              onChange={event => handleSearchChange(event.target.value)}
+              className="w-full pl-9"
+            />
+          </div>
           {professionFilterVisible && (
             <Select
-              aria-label="职业筛选"
+              items={[...OPERATOR_PROFESSION_FILTERS]}
               value={professionFilter}
-              onChange={handleProfessionFilterChange}
-              options={[...OPERATOR_PROFESSION_FILTERS]}
-              className="w-36 shrink-0"
-            />
+              onValueChange={(next, details) => { if (details.reason !== 'none' && next !== null) handleProfessionFilterChange(next) }}
+            >
+              <SelectTrigger aria-label="职业筛选" className="w-36 shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[...OPERATOR_PROFESSION_FILTERS].map(item => (
+                  <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
         </div>
 

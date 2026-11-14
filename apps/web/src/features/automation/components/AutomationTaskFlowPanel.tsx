@@ -13,7 +13,8 @@ import {
   Trash2,
 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { EmptyState, SmoothPanel, Switch } from '@/shared/components'
+import { Switch } from '@/shared/ui/switch'
+import { EmptyState, SmoothPanel } from '@/shared/components'
 import AutomationTaskPicker from './AutomationTaskPicker'
 import AutomationExecutionSummary from './AutomationExecutionSummary'
 import {
@@ -128,11 +129,11 @@ export default function AutomationTaskFlowPanel({
                 </button>
                 <span className="automation-sequence-enabled">
                   <Switch
-                    compact
+                    size="sm"
                     checked={task.enabled}
-                    onChange={() => onToggleTask(index)}
+                    onCheckedChange={() => onToggleTask(index)}
                     disabled={execution.isRunning}
-                    label={`${task.name}启用状态`}
+                    aria-label={`${task.name}启用状态`}
                   />
                 </span>
                 {execution.isRunning && isCompletedStep ? (

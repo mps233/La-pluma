@@ -10,6 +10,14 @@ import OperatorSelectModal from './OperatorSelectModal'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
+const optionInTriggerPopup = (trigger: HTMLElement, optionLabel: string) => {
+  const popupId = trigger.getAttribute('aria-controls')
+  const popup = popupId ? document.getElementById(popupId) : null
+  return popup
+    ? [...popup.querySelectorAll('[role="option"]')].find(node => node.textContent?.trim() === optionLabel)
+    : undefined
+}
+
 const mocks = vi.hoisted(() => ({
   getOperBoxData: vi.fn(),
   getAllOperators: vi.fn(),
@@ -115,21 +123,26 @@ const typeSearch = async (value: string) => {
 
 const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]')
 
-const professionSelect = () => document.querySelector<HTMLSelectElement>('select[aria-label="职业筛选"]')
+const professionSelect = () => document.querySelector('[aria-label="职业筛选"]')
 
-const professionOptionLabels = () => Array.from(professionSelect()?.options ?? [])
-  .map(option => option.textContent?.trim())
+const professionOptionLabels = async () => {
+  const trigger = professionSelect() as HTMLElement
+  await act(async () => trigger.click())
+  const popupId = trigger.getAttribute('aria-controls')
+  const labels = popupId
+    ? [...(document.getElementById(popupId)?.querySelectorAll('[role="option"]') ?? [])].map(node => node.textContent?.trim())
+    : []
+  await act(async () => trigger.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })))
+  return labels
+}
 
 const selectProfession = async (label: string) => {
-  const select = professionSelect()
-  expect(select, 'profession select').not.toBeNull()
-  const option = Array.from(select!.options).find(candidate => candidate.textContent?.trim() === label)
+  const trigger = professionSelect()
+  expect(trigger, 'profession select').not.toBeNull()
+  await act(async () => (trigger as HTMLElement).click())
+  const option = optionInTriggerPopup(trigger as HTMLElement, label)
   expect(option, `profession option ${label}`).toBeTruthy()
-  const valueSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set
-  await act(async () => {
-    valueSetter?.call(select, option!.value)
-    select!.dispatchEvent(new Event('change', { bubbles: true }))
-  })
+  await act(async () => (option as HTMLElement).click())
   await flush()
 }
 
@@ -191,10 +204,10 @@ describe('shared operator select modal', () => {
 
     await renderModal('asc')
 
-    expect(professionOptionLabels()).toEqual([
+    expect(await professionOptionLabels()).toEqual([
       '全部职业', '先锋', '近卫', '重装', '狙击', '术师', '医疗', '辅助', '特种',
     ])
-    expect(professionSelect()?.value).toBe('all')
+    expect(professionSelect()?.textContent).toContain('全部职业')
     expect(document.querySelector('[role="group"][aria-label="职业筛选"]')).toBeNull()
     expect(visibleOperatorNames()).toHaveLength(4)
   })

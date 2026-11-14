@@ -1,5 +1,6 @@
 import { Check } from 'lucide-react'
-import { Input, SmoothPanel } from '@/shared/components'
+import { SmoothPanel } from '@/shared/components'
+import { Input } from '@/shared/ui/input'
 import { ROGUELIKE_THEME_PRESETS } from '../model/roguelikeTasks'
 import type { RoguelikeTask } from '../types'
 
@@ -46,16 +47,20 @@ export default function RoguelikeThemePanel({
             )
           })}
         </div>
-        <Input
-          id={`roguelike-${task.id}-theme`}
-          name={`maa-${task.id}-theme`}
-          type="text"
-          label="自定义主题代号"
-          placeholder={task.placeholder}
-          value={theme}
-          onChange={onThemeChange}
-          className="roguelike-custom-theme"
-        />
+        <div className="roguelike-custom-theme">
+          <label htmlFor={`roguelike-${task.id}-theme`} className="mb-2 block text-sm font-medium text-muted-foreground">
+            自定义主题代号
+          </label>
+          <Input
+            id={`roguelike-${task.id}-theme`}
+            name={`maa-${task.id}-theme`}
+            type="text"
+            autoComplete="off"
+            placeholder={task.placeholder}
+            value={theme}
+            onChange={event => onThemeChange(event.target.value)}
+          />
+        </div>
       </div>
     </SmoothPanel>
   )

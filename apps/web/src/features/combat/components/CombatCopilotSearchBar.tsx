@@ -1,7 +1,8 @@
 import { useRef, type KeyboardEvent } from 'react'
 import { LayoutGrid, List, LoaderCircle, Power, Search, X } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { Input, Select } from '@/shared/components'
+import { Input } from '@/shared/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import {
   COPILOT_SEARCH_ORDERS,
   COPILOT_SEARCH_ORDER_LABELS,
@@ -87,16 +88,19 @@ export default function CombatCopilotSearchBar({
     <section className="combat-copilot-discovery-search" aria-label="作业搜索">
       <div className="combat-copilot-discovery-search-row">
         <div ref={keywordFieldRef} className="combat-copilot-discovery-keyword-field">
-          <Input
-            type="text"
-            className="combat-copilot-discovery-keyword"
-            aria-label="搜索作业关键词"
-            placeholder="搜索作业标题、说明"
-            value={keyword}
-            onChange={onKeywordChange}
-            onKeyDown={handleKeywordKeyDown}
-            icon={<Search size={17} strokeWidth={1.9} aria-hidden="true" />}
-          />
+          <div className="relative">
+            <Search size={17} strokeWidth={1.9} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" />
+            <Input
+              type="text"
+              autoComplete="off"
+              className="combat-copilot-discovery-keyword pl-9"
+              aria-label="搜索作业关键词"
+              placeholder="搜索作业标题、说明"
+              value={keyword}
+              onChange={event => onKeywordChange(event.target.value)}
+              onKeyDown={handleKeywordKeyDown}
+            />
+          </div>
           {keyword !== '' && (
             <Button
               size="icon"
@@ -165,12 +169,19 @@ export default function CombatCopilotSearchBar({
         </Button>
 
         <Select
-          className="combat-copilot-discovery-order"
-          aria-label="排序"
+          items={ORDER_OPTIONS}
           value={order}
-          onChange={handleOrderChange}
-          options={ORDER_OPTIONS}
-        />
+          onValueChange={(next, details) => { if (details.reason !== 'none' && next !== null) handleOrderChange(next) }}
+        >
+          <SelectTrigger aria-label="排序" className="combat-copilot-discovery-order w-fit">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {ORDER_OPTIONS.map(item => (
+              <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <div className="combat-copilot-discovery-view-toggle" role="group" aria-label="结果视图">
           <Button

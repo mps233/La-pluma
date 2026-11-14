@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { expectNoBrowserErrors, recordBrowserErrors } from './browser-errors'
 import { apiFixtures, ok } from './fixtures'
 import {
@@ -11,6 +11,14 @@ const gameTaskFixtures = [
   ...apiFixtures,
   { path: '/agent/schedules', method: 'POST', payload: ok({}) },
 ]
+
+async function chooseComboboxOption(page: Page, name: string, optionLabel: string) {
+  const trigger = page.getByRole('combobox', { name, exact: true })
+  await trigger.click()
+  const option = page.getByRole('option', { name: optionLabel, exact: true })
+  await option.click()
+  await expect(trigger).toContainText(optionLabel)
+}
 
 test.describe('game tasks', () => {
   test.beforeEach(async ({ page }) => {
@@ -34,9 +42,9 @@ test.describe('game tasks', () => {
     await chenChoice.waitFor({ state: 'visible' })
     await chenChoice.click()
     await page.getByRole('button', { name: '确认选择', exact: true }).click()
-    await page.getByLabel('培养计划 1 精英目标', { exact: true }).selectOption('2')
-    await page.getByLabel('培养计划 1 技能等级', { exact: true }).selectOption('7')
-    await page.getByLabel('培养计划 1 技能 3 专精', { exact: true }).selectOption('1')
+    await chooseComboboxOption(page, '培养计划 1 精英目标', '精英二')
+    await chooseComboboxOption(page, '培养计划 1 技能等级', '7 级')
+    await chooseComboboxOption(page, '培养计划 1 技能 3 专精', '专精 1')
     await page.getByRole('heading', { name: '任务配置', exact: true }).scrollIntoViewIfNeeded()
 
     await expect(page).toHaveScreenshot('operator-progression-top-dark.png', {

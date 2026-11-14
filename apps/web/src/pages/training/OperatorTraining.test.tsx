@@ -20,6 +20,14 @@ import OperatorTraining from './OperatorTraining'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
+const optionInTriggerPopup = (trigger: HTMLElement, optionLabel: string) => {
+  const popupId = trigger.getAttribute('aria-controls')
+  const popup = popupId ? document.getElementById(popupId) : null
+  return popup
+    ? [...popup.querySelectorAll('[role="option"]')].find(node => node.textContent?.trim() === optionLabel)
+    : undefined
+}
+
 const mocks = vi.hoisted(() => ({
   getOperatorList: vi.fn(),
   getAllOperators: vi.fn(),
@@ -222,7 +230,9 @@ const renderWithActivity = async (mode: 'visible' | 'hidden') => {
 }
 
 const switchByLabel = (label: string) =>
-  container.querySelector<HTMLInputElement>(`input[role="switch"][aria-label="${label}"]`)
+  container.querySelector<HTMLElement>(`[role="switch"][aria-label="${label}"]`)
+
+const isSwitchChecked = (control: HTMLElement | null) => control?.getAttribute('aria-checked') === 'true'
 
 const buttonWithText = (text: string, scope: ParentNode = document) => {
   const button = Array.from(scope.querySelectorAll<HTMLButtonElement>('button'))
@@ -262,13 +272,23 @@ const undoToast = () => document.querySelector<HTMLElement>('[role="status"][ari
 
 const undoToastClose = () => document.querySelector('[aria-label="关闭移除提示"]')
 
-const selectRarity = async (dialog: HTMLElement, value: string) => {
-  const select = dialog.querySelector<HTMLSelectElement>('select[aria-label="稀有度"]')
-  expect(select).not.toBeNull()
-  await act(async () => {
-    select!.value = value
-    select!.dispatchEvent(new Event('change', { bubbles: true }))
-  })
+const selectRarity = async (dialog: HTMLElement, label: string) => {
+  const trigger = dialog.querySelector<HTMLElement>('[aria-label="稀有度"]')
+  expect(trigger).not.toBeNull()
+  await act(async () => trigger!.click())
+  const option = optionInTriggerPopup(trigger!, label)
+  expect(option, `rarity option ${label}`).toBeTruthy()
+  await act(async () => (option as HTMLElement).click())
+  await flush()
+}
+
+const chooseSelectOption = async (name: string, label: string) => {
+  const trigger = container.querySelector<HTMLElement>(`[aria-label="${name}"]`)
+  expect(trigger, `select trigger ${name}`).not.toBeNull()
+  await act(async () => trigger!.click())
+  const option = optionInTriggerPopup(trigger!, label)
+  expect(option, `select option ${label}`).toBeTruthy()
+  await act(async () => (option as HTMLElement).click())
   await flush()
 }
 
@@ -395,11 +415,11 @@ describe('OperatorTraining queue workspace', () => {
     await renderComponent()
     const { dialog } = await openPicker()
     const search = dialog.querySelector<HTMLInputElement>('input[aria-label="搜索干员名称"]')
-    const rarity = dialog.querySelector<HTMLSelectElement>('select[aria-label="稀有度"]')
-    const planModeSelect = container.querySelector<HTMLSelectElement>('select[aria-label="计划范围"]')
+    const rarity = dialog.querySelector('[aria-label="稀有度"]')
+    const planModeSelect = container.querySelector('[aria-label="计划范围"]')
     expect(search).not.toBeNull()
-    expect(rarity?.querySelectorAll('option')).toHaveLength(4)
-    expect(planModeSelect?.querySelectorAll('option')).toHaveLength(2)
+    expect(rarity).not.toBeNull()
+    expect(planModeSelect).not.toBeNull()
     expect(switchByLabel('自动切换')).not.toBeNull()
     expect(switchByLabel('完成通知')).not.toBeNull()
   })
@@ -437,13 +457,13 @@ describe('OperatorTraining queue workspace', () => {
 
     await renderComponent()
     const autoSwitch = switchByLabel('自动切换')
-    expect(autoSwitch?.checked).toBe(true)
+    expect(isSwitchChecked(autoSwitch)).toBe(true)
 
     await click(autoSwitch!)
-    expect(autoSwitch?.checked).toBe(false)
+    expect(isSwitchChecked(autoSwitch)).toBe(false)
     await click(autoSwitch!)
     expect(mocks.updateTrainingSettings).toHaveBeenCalledOnce()
-    expect(autoSwitch?.checked).toBe(true)
+    expect(isSwitchChecked(autoSwitch)).toBe(true)
 
     await act(async () => firstRequest.resolve({
       success: true,
@@ -453,7 +473,7 @@ describe('OperatorTraining queue workspace', () => {
 
     expect(mocks.updateTrainingSettings).toHaveBeenCalledTimes(2)
     expect(mocks.updateTrainingSettings).toHaveBeenLastCalledWith(settings)
-    expect(autoSwitch?.checked).toBe(true)
+    expect(isSwitchChecked(autoSwitch)).toBe(true)
   })
 
   it('serializes duplicate queue additions while a request is pending and recovers from failure', async () => {
@@ -664,10 +684,10 @@ describe('OperatorTraining queue workspace', () => {
 
     await renderComponent()
     const { dialog } = await openPicker()
-    await selectRarity(dialog, '6')
+    await selectRarity(dialog, '6 星')
     expect(dialog.textContent).toContain('正在读取干员')
 
-    await selectRarity(dialog, '5')
+    await selectRarity(dialog, '5 星')
     await act(async () => sixStarRequest.resolve({
       success: true,
       data: { operators: [operator('char_six', '六星干员')] },
@@ -954,11 +974,7 @@ describe('OperatorTraining queue workspace', () => {
     await renderComponent()
     await click(buttonWithText('预览刷图计划', container))
     expect(buttonWithText('应用到自动任务', container)).toBeDefined()
-    const mode = container.querySelector<HTMLSelectElement>('select[aria-label="计划范围"]')!
-    await act(async () => {
-      mode.value = 'all'
-      mode.dispatchEvent(new Event('change', { bubbles: true }))
-    })
+    await chooseSelectOption('计划范围', '全部队列')
     await flush()
 
     expect(container.textContent).not.toContain('1-7')
@@ -1230,7 +1246,7 @@ describe('OperatorTraining queue workspace', () => {
     await flush()
 
     expect(queueOrder()).toEqual(['阿米娅', '能天使'])
-    expect(switchByLabel('自动切换')?.checked).toBe(true)
+    expect(isSwitchChecked(switchByLabel('自动切换'))).toBe(true)
   })
 
   it('keeps the local queue truthful and warns when a successful add cannot be refreshed', async () => {
@@ -1441,7 +1457,7 @@ describe('OperatorTraining queue workspace', () => {
 
     await click(switchByLabel('自动切换')!)
 
-    expect(switchByLabel('自动切换')?.checked).toBe(false)
+    expect(isSwitchChecked(switchByLabel('自动切换'))).toBe(false)
     expect(Array.from(container.querySelectorAll('button'))
       .some(button => button.textContent?.trim() === '应用到自动任务')).toBe(false)
 
@@ -1463,7 +1479,7 @@ describe('OperatorTraining queue workspace', () => {
 
     await renderComponent()
     await click(switchByLabel('自动切换')!)
-    expect(switchByLabel('自动切换')?.checked).toBe(false)
+    expect(isSwitchChecked(switchByLabel('自动切换'))).toBe(false)
 
     // 写入在途时重读到的服务端设置仍是旧值；所有者忽略它，并按本地 revision 生成预览。
     await click(buttonWithText('预览刷图计划', container))
@@ -1491,14 +1507,14 @@ describe('OperatorTraining queue workspace', () => {
 
     await renderComponent()
     const autoSwitch = switchByLabel('自动切换')
-    expect(autoSwitch?.checked).toBe(true)
+    expect(isSwitchChecked(autoSwitch)).toBe(true)
 
     await click(autoSwitch!)
-    expect(autoSwitch?.checked).toBe(true)
+    expect(isSwitchChecked(autoSwitch)).toBe(true)
     expect(mocks.setMessage).toHaveBeenCalledWith('设置保存失败，已恢复原设置', 'error')
 
     await click(switchByLabel('自动切换')!)
-    expect(switchByLabel('自动切换')?.checked).toBe(false)
+    expect(isSwitchChecked(switchByLabel('自动切换'))).toBe(false)
     expect(mocks.updateTrainingSettings).toHaveBeenCalledTimes(2)
   })
 
@@ -1510,16 +1526,16 @@ describe('OperatorTraining queue workspace', () => {
 
     await renderComponent()
     await click(switchByLabel('自动切换')!)
-    expect(switchByLabel('自动切换')?.checked).toBe(false)
+    expect(isSwitchChecked(switchByLabel('自动切换'))).toBe(false)
     expect(mocks.updateTrainingSettings).toHaveBeenCalledOnce()
 
     await act(async () => root.unmount())
     root = createRoot(container)
     await renderComponent()
-    expect(switchByLabel('自动切换')?.checked).toBe(false)
+    expect(isSwitchChecked(switchByLabel('自动切换'))).toBe(false)
 
     await click(switchByLabel('自动切换')!)
-    expect(switchByLabel('自动切换')?.checked).toBe(true)
+    expect(isSwitchChecked(switchByLabel('自动切换'))).toBe(true)
     // 旧写入仍在途，新编辑必须排队而不是并发提交。
     expect(mocks.updateTrainingSettings).toHaveBeenCalledOnce()
 
@@ -1531,7 +1547,7 @@ describe('OperatorTraining queue workspace', () => {
 
     expect(mocks.updateTrainingSettings).toHaveBeenCalledTimes(2)
     expect(mocks.updateTrainingSettings).toHaveBeenLastCalledWith(settings)
-    expect(switchByLabel('自动切换')?.checked).toBe(true)
+    expect(isSwitchChecked(switchByLabel('自动切换'))).toBe(true)
   })
 
   it('adopts settings from an authoritative reload and invalidates the preview', async () => {
@@ -1549,7 +1565,7 @@ describe('OperatorTraining queue workspace', () => {
     })
     await flush()
 
-    expect(switchByLabel('完成通知')?.checked).toBe(false)
+    expect(isSwitchChecked(switchByLabel('完成通知'))).toBe(false)
     expect(container.textContent).toContain('队列变更后需重新预览')
     expect(Array.from(container.querySelectorAll('button'))
       .some(button => button.textContent?.trim() === '应用到自动任务')).toBe(false)

@@ -10,6 +10,26 @@ import AutomationTasks from './AutomationTasks'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
+const checkboxRowLabel = (id: string) => {
+  const control = container.querySelector(`[id="${id}"]`)
+  const label = control?.closest('label') ?? container.querySelector(`label[for="${id}"]`)
+  expect(label, `label row for ${id}`).not.toBeNull()
+  return label as HTMLLabelElement
+}
+
+const selectOptionLabels = async (trigger: HTMLElement) => {
+  await act(async () => trigger.click())
+  const popupId = trigger.getAttribute('aria-controls')
+  const labels = popupId
+    ? [...(document.getElementById(popupId)?.querySelectorAll('[role="option"]') ?? [])].map(node => node.textContent?.trim())
+    : []
+  await act(async () => {
+    trigger.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+  })
+  await act(async () => {})
+  return labels
+}
+
 const mocks = vi.hoisted(() => ({
   getActivity: vi.fn(),
   getScheduleExecutionStatus: vi.fn(),
@@ -325,7 +345,7 @@ describe('AutomationTasks layout surfaces', () => {
 
     await renderPage()
 
-    expect(container.querySelector<HTMLInputElement>('[aria-label="启用定时执行"]')?.checked).toBe(true)
+    expect(container.querySelector('[role="switch"][aria-label="启用定时执行"]')?.getAttribute('aria-checked')).toBe('true')
     expect(mocks.setupSchedule).not.toHaveBeenCalled()
     expect(mocks.stopSchedule).not.toHaveBeenCalled()
   })
@@ -353,7 +373,7 @@ describe('AutomationTasks layout surfaces', () => {
 
     await renderPage()
 
-    expect(container.querySelector<HTMLInputElement>('[aria-label="启用定时执行"]')?.checked).toBe(false)
+    expect(container.querySelector('[role="switch"][aria-label="启用定时执行"]')?.getAttribute('aria-checked')).toBe('false')
     expect(container.textContent).toContain('已暂停')
     expect(container.textContent).toContain('08:00 / 14:00')
     expect(container.querySelector('[aria-label="第 1 个执行时间"]')).toBeNull()
@@ -649,11 +669,11 @@ describe('AutomationTasks layout surfaces', () => {
 
     const clientTypeLabel = container.querySelector<HTMLLabelElement>('label[for="automation-startup-1-clientType"]')
     expect(clientTypeLabel?.textContent).toContain('客户端类型')
-    expect(container.querySelector('#automation-startup-1-clientType')?.tagName).toBe('SELECT')
+    expect(container.querySelector('#automation-startup-1-clientType')?.getAttribute('role')).toBe('combobox')
     const accountNameLabel = container.querySelector<HTMLLabelElement>('label[for="automation-startup-1-accountName"]')
     expect(accountNameLabel?.textContent).toContain('切换账号')
 
-    expect(container.querySelector('label[for="automation-startup-1-start_game_enabled"]')?.textContent)
+    expect(checkboxRowLabel('automation-startup-1-start_game_enabled')?.textContent)
       .toContain('启动游戏客户端')
 
     const taskDeleteButtons = container.querySelectorAll<HTMLButtonElement>('[aria-label="删除启动游戏"]')
@@ -701,9 +721,8 @@ describe('AutomationTasks layout surfaces', () => {
     expect(container.querySelector('label[for="automation-fight-1-medicineExpireDays"]')?.textContent)
       .toContain('临期药天数')
 
-    const series = container.querySelector<HTMLSelectElement>('#automation-fight-1-series')
-    expect(Array.from(series?.options ?? []).map(option => option.value))
-      .toEqual(['-1', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'])
+    const series = container.querySelector<HTMLElement>('#automation-fight-1-series')
+    expect(await selectOptionLabels(series!)).toHaveLength(12)
 
     const stageLabel = container.querySelector<HTMLLabelElement>('label[for="automation-fight-1-stages-0"]')!
     const stageEditor = stageLabel.closest('fieldset')
@@ -712,11 +731,11 @@ describe('AutomationTasks layout surfaces', () => {
     expect(stageEditor?.textContent).toContain('智能养成关卡')
 
     await clickSequenceTask('自动公招')
-    expect(container.querySelector('label[for="automation-recruit-1-refresh"]')).not.toBeNull()
+    expect(checkboxRowLabel('automation-recruit-1-refresh')).not.toBeNull()
     expect(container.querySelector('fieldset legend')?.textContent).toContain('招募星级')
-    expect(container.querySelector('label[for="automation-recruit-1-level3_recruitment_permit_reserve"]')?.textContent)
+    expect(checkboxRowLabel('automation-recruit-1-level3_recruitment_permit_reserve')?.textContent)
       .toContain('3 星保留招聘许可')
-    expect(container.querySelector<HTMLSelectElement>('#recruit-1-extra-tags-mode')?.textContent)
+    expect(container.querySelector('#recruit-1-extra-tags-mode')?.textContent)
       .toContain('默认行为')
   })
 
@@ -777,11 +796,12 @@ describe('AutomationTasks layout surfaces', () => {
     await flush()
     expect(details.open).toBe(true)
 
-    const extraTagsMode = container.querySelector<HTMLSelectElement>('#recruit-1-extra-tags-mode')!
-    await act(async () => {
-      extraTagsMode.value = '2'
-      extraTagsMode.dispatchEvent(new Event('change', { bubbles: true }))
-    })
+    const extraTagsMode = container.querySelector<HTMLElement>('#recruit-1-extra-tags-mode')!
+    await act(async () => extraTagsMode.click())
+    const modeOption = [...document.getElementById(extraTagsMode.getAttribute('aria-controls')!)?.querySelectorAll('[role="option"]') ?? []]
+      .find(node => node.textContent?.trim() === '尽量多选高星 Tag 组合')
+    expect(modeOption, '尽量多选高星 Tag 组合 option').toBeTruthy()
+    await act(async () => (modeOption as HTMLElement | null)?.click())
     await flush()
     expect(savedRecruitParams().extra_tags_mode).toBe(2)
 
@@ -1432,7 +1452,7 @@ describe('AutomationTasks layout surfaces', () => {
     expect(container.querySelector('#automation-infrast-1-facility-AssistantChange')).not.toBeNull()
 
     await clickSequenceTask('领取奖励')
-    expect(container.querySelector('label[for="automation-award-1-signinevent"]')?.textContent)
+    expect(checkboxRowLabel('automation-award-1-signinevent')?.textContent)
       .toContain('限时签到活动奖励')
   })
 
@@ -1458,8 +1478,8 @@ describe('AutomationTasks layout surfaces', () => {
     await clickSequenceTask('基建换班')
 
     expect(container.querySelector('label[for="automation-infrast-1-mode"]')?.textContent).toBe('换班模式')
-    const modeSelect = container.querySelector<HTMLSelectElement>('#automation-infrast-1-mode')
-    expect(Array.from(modeSelect?.options ?? []).map(option => option.textContent)).toEqual([
+    const modeSelect = container.querySelector<HTMLElement>('#automation-infrast-1-mode')
+    expect(await selectOptionLabels(modeSelect!)).toEqual([
       '默认换班',
       '自定义换班',
       '一键轮换',

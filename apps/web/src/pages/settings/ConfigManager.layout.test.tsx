@@ -21,6 +21,14 @@ import ConfigManager from './ConfigManager'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
+const optionInTriggerPopup = (trigger: HTMLElement, optionLabel: string) => {
+  const popupId = trigger.getAttribute('aria-controls')
+  const popup = popupId ? document.getElementById(popupId) : null
+  return popup
+    ? [...popup.querySelectorAll('[role="option"]')].find(node => node.textContent?.trim() === optionLabel)
+    : undefined
+}
+
 const mocks = vi.hoisted(() => ({
   discoverDevices: vi.fn(),
   getConfig: vi.fn(),
@@ -273,8 +281,8 @@ describe('ConfigManager layout surfaces', () => {
       expect(button.tabIndex).toBe(button.getAttribute('aria-pressed') === 'true' ? 0 : -1)
     })
 
-    const autoUpdateToggle = container.querySelector<HTMLInputElement>('input[aria-label="启用自动更新"]')
-    expect(autoUpdateToggle?.getAttribute('role')).toBe('switch')
+    const autoUpdateToggle = container.querySelector('[role="switch"][aria-label="启用自动更新"]')
+    expect(autoUpdateToggle).not.toBeNull()
   })
 
   it('shows a retryable config-directory error instead of an endless loading label', async () => {
@@ -558,14 +566,12 @@ describe('ConfigManager layout surfaces', () => {
     await act(async () => root.render(page()))
     await flush()
 
-    const cliSelect = container.querySelector<HTMLSelectElement>('select[aria-label="MAA CLI 更新渠道"]')
+    const cliSelect = container.querySelector('[aria-label="MAA CLI 更新渠道"]')
     expect(cliSelect).not.toBeNull()
-    await act(async () => {
-      if (cliSelect) {
-        cliSelect.value = 'beta'
-        cliSelect.dispatchEvent(new Event('change', { bubbles: true }))
-      }
-    })
+    await act(async () => (cliSelect as HTMLElement).click())
+    const betaOption = optionInTriggerPopup(cliSelect as HTMLElement, 'Beta')
+    expect(betaOption).toBeTruthy()
+    await act(async () => (betaOption as HTMLElement).click())
     await settle()
 
     expect(mocks.saveUpdateChannel).toHaveBeenCalledWith('cli', 'beta')
@@ -956,7 +962,7 @@ describe('ConfigManager layout surfaces', () => {
       .find(button => button.textContent?.includes('连接'))
     await act(async () => connectionButton?.click())
     expect(localStorage.getItem(CONFIG_SECTION_STORAGE_KEY)).toBe('connection')
-    expect(container.querySelector('select')).not.toBeNull()
+    expect(container.querySelector('#connection-preset')).not.toBeNull()
 
     await act(async () => {
       root.render(null)

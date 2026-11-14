@@ -2,7 +2,9 @@ import { useMemo, useState, type UIEvent } from 'react'
 import { Search } from 'lucide-react'
 import { getOperatorAvatarUrl, useItemIconCacheVersion } from '@/features/game-data'
 import { Button } from '@/shared/ui/button'
-import { Checkbox, EmptyState, Input, Loading } from '@/shared/components'
+import { EmptyState, Loading } from '@/shared/components'
+import { Checkbox } from '@/shared/ui/checkbox'
+import { Input } from '@/shared/ui/input'
 import { Modal } from '@/shared/components/Modal'
 import {
   filterOperatorOptions,
@@ -95,14 +97,18 @@ function OperatorSection({
         </div>
       )}
 
-      <Input
-        type="text"
-        aria-label={`搜索${title}`}
-        placeholder="搜索干员名称或拼音"
-        value={term}
-        onChange={handleTermChange}
-        icon={<Search size={17} strokeWidth={1.9} aria-hidden="true" />}
-      />
+      <div className="relative">
+        <Search size={17} strokeWidth={1.9} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" />
+        <Input
+          type="text"
+          autoComplete="off"
+          aria-label={`搜索${title}`}
+          placeholder="搜索干员名称或拼音"
+          value={term}
+          onChange={event => handleTermChange(event.target.value)}
+          className="pl-9"
+        />
+      </div>
 
       {filtered.length === 0 ? (
         <p className="combat-copilot-operator-hint">
@@ -232,11 +238,13 @@ function OperatorFilterForm({
         </>
       )}
 
-      <Checkbox
-        label="记住筛选结果"
-        checked={remember}
-        onChange={setRemember}
-      />
+      <label className="group flex min-h-11 cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+        <Checkbox
+          checked={remember}
+          onCheckedChange={setRemember}
+        />
+        <span className="transition-colors group-hover:text-primary">记住筛选结果</span>
+      </label>
 
       <div className="combat-copilot-operator-actions">
         <span className="combat-copilot-operator-summary">

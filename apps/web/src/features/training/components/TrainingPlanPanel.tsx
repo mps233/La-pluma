@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Check, LoaderCircle, Sparkles } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { Select } from '@/shared/components'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { summarizeTargetMaterials } from '../model/materials'
 import {
   getPlanFocusName,
@@ -71,7 +71,7 @@ export default function TrainingPlanPanel({
   return (
     <section className="training-surface" aria-labelledby="training-plan-title">
       <div className="training-section-heading"><div><h2 id="training-plan-title">刷图计划</h2><p>先预览，再应用到任务流程</p></div><Sparkles size={20} className="text-tertiary" aria-hidden="true" /></div>
-      <div className="training-plan-controls"><Select aria-label="计划范围" value={planMode} onChange={mode => { setPlanMode(mode as TrainingPlanMode); onInvalidate(); }} disabled={busy} options={[{ value: 'current', label: '仅当前目标' }, { value: 'all', label: '全部队列' }]} /><Button onClick={() => onGenerate(planMode)} disabled={!previewAvailable || generating} aria-busy={generating || undefined} variant={plan && basisCurrent ? 'secondary' : 'default'}>{generating ? <><LoaderCircle className="animate-spin" aria-hidden="true" />计算中</> : <><Sparkles size={16} aria-hidden="true" />预览刷图计划</>}</Button></div>
+      <div className="training-plan-controls"><Select value={planMode} onValueChange={(mode, details) => { if (details.reason !== 'none' && mode !== null) { setPlanMode(mode as TrainingPlanMode); onInvalidate(); } }} disabled={busy} items={[{ value: 'current', label: '仅当前目标' }, { value: 'all', label: '全部队列' }]}><SelectTrigger aria-label="计划范围"><SelectValue /></SelectTrigger><SelectContent>{[{ value: 'current', label: '仅当前目标' }, { value: 'all', label: '全部队列' }].map(item => (<SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>))}</SelectContent></Select><Button onClick={() => onGenerate(planMode)} disabled={!previewAvailable || generating} aria-busy={generating || undefined} variant={plan && basisCurrent ? 'secondary' : 'default'}>{generating ? <><LoaderCircle className="animate-spin" aria-hidden="true" />计算中</> : <><Sparkles size={16} aria-hidden="true" />预览刷图计划</>}</Button></div>
       {error && <div role="alert" className="training-feedback status-danger">{error}</div>}
       {warning && <div role="alert" className="training-feedback status-warning"><span>{warning}</span><Button variant="ghost" onClick={onReload} disabled={busy}>重新加载</Button></div>}
       {plan && basisCurrent ? <>

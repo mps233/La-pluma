@@ -96,7 +96,7 @@ test.describe('automation award field hints', () => {
 
     for (const field of fields) {
       const { gap, centerOffset } = await measure(
-        page.locator(`label[for="automation-award-visual-3-${field.key}"]`),
+        page.locator(`label:has(#automation-award-visual-3-${field.key})`),
         page.getByRole('button', { name: field.hint, exact: true }),
       )
       // 图标紧跟在标签文字之后，中间只留 inline 的小间距，而不是被推到行尾。

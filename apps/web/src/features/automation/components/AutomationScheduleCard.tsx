@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Clock3, Plus, X } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { SmoothPanel, Switch } from '@/shared/components'
+import { Switch } from '@/shared/ui/switch'
+import { SmoothPanel } from '@/shared/components'
 import {
   MAX_SCHEDULE_ENTRIES,
   appendScheduleEntry,
@@ -157,9 +158,9 @@ export default function AutomationScheduleCard({
           </span>
           <Switch
             checked={enabled}
-            onChange={handleEnabledChange}
+            onCheckedChange={handleEnabledChange}
             disabled={disabled}
-            label="启用定时执行"
+            aria-label="启用定时执行"
             className="automation-card-switch"
           />
         </div>
@@ -189,10 +190,10 @@ export default function AutomationScheduleCard({
                   />
                   <Switch
                     checked={entry.enabled}
-                    onChange={(nextEnabled) => updateScheduleTimeEnabled(index, nextEnabled)}
+                    onCheckedChange={(nextEnabled) => updateScheduleTimeEnabled(index, nextEnabled)}
                     disabled={disabled}
-                    label={`${entry.time} 启用`}
-                    compact
+                    aria-label={`${entry.time} 启用`}
+                    size="sm"
                     className="automation-schedule-row-switch"
                   />
                   {entries.length > 1 ? (

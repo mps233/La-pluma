@@ -11,6 +11,14 @@ import ThemeListEditor from './ThemeListEditor'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
+const optionInTriggerPopup = (trigger: HTMLElement, optionLabel: string) => {
+  const popupId = trigger.getAttribute('aria-controls')
+  const popup = popupId ? document.getElementById(popupId) : null
+  return popup
+    ? [...popup.querySelectorAll('[role="option"]')].find(node => node.textContent?.trim() === optionLabel)
+    : undefined
+}
+
 const mocks = vi.hoisted(() => ({
   getOperBoxData: vi.fn(),
   getAllOperators: vi.fn(),
@@ -109,12 +117,22 @@ const click = async (name: string) => {
 }
 
 const setValue = async (name: string, value: string) => {
-  const input = document.querySelector<HTMLInputElement | HTMLSelectElement>(`[aria-label="${name}"]`)
-  if (!input) throw new Error(`未找到控件：${name}`)
+  const control = document.querySelector<HTMLElement>(`[aria-label="${name}"]`)
+  if (!control) throw new Error(`未找到控件：${name}`)
+
+  if (control.getAttribute('role') === 'combobox') {
+    await act(async () => control.click())
+    const option = optionInTriggerPopup(control, value)
+    if (!option) throw new Error(`未找到选项：${value}`)
+    await act(async () => (option as HTMLElement).click())
+    await flush()
+    return
+  }
+
+  const input = control as HTMLInputElement
   await act(async () => {
-    const prototype = input.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype
-    Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(input, value)
-    input.dispatchEvent(new Event(input.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }))
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
   })
   await flush()
 }
@@ -174,7 +192,7 @@ describe('game task editors', () => {
     expect(container.textContent).toContain('术师')
     expect(findButton('更换干员')).toBeDefined()
 
-    await setValue('培养计划 1 技能等级', '7')
+    await setValue('培养计划 1 技能等级', '7 级')
     expect(onPlans).toHaveBeenLastCalledWith([{ role: 'Caster', name: '阿米娅', elite: 2, skill_level: 7 }])
   })
 
@@ -188,7 +206,7 @@ describe('game task editors', () => {
     expect(container.textContent).toContain('阿米娅')
     expect(container.textContent).toContain('未选择干员')
     expect(container.textContent).toContain('重装')
-    expect(document.querySelector<HTMLSelectElement>('[aria-label="培养计划 2 技能等级"]')?.value).toBe('7')
+    expect(document.querySelector('[aria-label="培养计划 2 技能等级"]')?.textContent).toContain('7 级')
 
     await click('清除培养计划 3 的干员')
     expect(onPlans).toHaveBeenLastCalledWith([
@@ -236,7 +254,7 @@ describe('game task editors', () => {
     expect(dialog()).toBeNull()
     expect(container.textContent).toContain('更换干员')
 
-    await setValue('培养计划 1 精英目标', '2')
+    await setValue('培养计划 1 精英目标', '精英二')
     expect(onPlans).toHaveBeenLastCalledWith([{ role: 'Caster', name: '阿米娅', elite: 2 }])
   })
 

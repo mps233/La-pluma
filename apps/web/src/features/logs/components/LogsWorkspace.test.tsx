@@ -9,6 +9,14 @@ import type { AgentRun } from '@/features/task-execution'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
+const optionInTriggerPopup = (trigger: HTMLElement, optionLabel: string) => {
+  const popupId = trigger.getAttribute('aria-controls')
+  const popup = popupId ? document.getElementById(popupId) : null
+  return popup
+    ? [...popup.querySelectorAll('[role="option"]')].find(node => node.textContent?.trim() === optionLabel)
+    : undefined
+}
+
 const row = (message: string, runId?: string): LogEntry => ({
   id: message,
   time: '10:00:00',
@@ -75,11 +83,14 @@ const renderWorkspace = async () => {
 
 const logText = () => container.querySelector('[role="log"]')?.textContent || ''
 const selectRun = async (runId: string) => {
-  const scope = container.querySelector<HTMLSelectElement>('[aria-label="执行范围"]')!
-  await act(async () => {
-    scope.value = runId
-    scope.dispatchEvent(new Event('change', { bubbles: true }))
-  })
+  const trigger = container.querySelector<HTMLElement>('[aria-label="执行范围"]')
+  if (!trigger) throw new Error('未找到执行范围控件')
+  const optionLabel = runId === '' ? '全部执行与未关联日志' : `Run · ${runId}`
+  await act(async () => trigger.click())
+  const option = optionInTriggerPopup(trigger, optionLabel)
+  if (!option) throw new Error(`未找到选项：${optionLabel}`)
+  await act(async () => (option as HTMLElement).click())
+  await act(async () => {})
 }
 
 const activeRun = (runId: string): AgentRun => ({
@@ -129,7 +140,7 @@ describe('LogsWorkspace observation scope', () => {
     await renderWorkspace()
     expect(logText()).toContain('本次执行的输出')
     expect(logText()).not.toContain('新执行的输出')
-    expect(container.querySelector<HTMLSelectElement>('[aria-label="执行范围"]')?.value).toBe('run-1')
+    expect(container.querySelector('[aria-label="执行范围"]')?.textContent).toContain('Run · run-1')
   })
 
   it('returns to all logs explicitly and preserves pinned choice across file browsing', async () => {
@@ -138,7 +149,7 @@ describe('LogsWorkspace observation scope', () => {
     viewingHistory = true
     await renderWorkspace()
     expect(logText()).toContain('历史文件输出')
-    expect(container.querySelector<HTMLSelectElement>('[aria-label="执行范围"]')?.disabled).toBe(true)
+    expect((container.querySelector('[aria-label="执行范围"]') as HTMLButtonElement).disabled).toBe(true)
     viewingHistory = false
     await renderWorkspace()
     expect(logText()).not.toContain('上一次执行的输出')
@@ -169,6 +180,6 @@ describe('LogsWorkspace observation scope', () => {
       .find(button => button.textContent === '显示全部事件')
     await act(async () => showAll?.click())
     expect(logText()).toContain('load diagnostic-needle')
-    expect(container.querySelector<HTMLSelectElement>('[aria-label="事件范围"]')?.value).toBe('all')
+    expect(container.querySelector('[aria-label="事件范围"]')?.textContent).toContain('全部事件')
   })
 })

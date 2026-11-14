@@ -1,6 +1,7 @@
 import { Button } from '@/shared/ui/button'
-import { Checkbox, Switch } from '@/shared/components'
+import { Checkbox } from '@/shared/ui/checkbox'
 import { Modal } from '@/shared/components/Modal'
+import { Switch } from '@/shared/ui/switch'
 import {
   COPILOT_MATCH_MODES,
   type CopilotMatchMode,
@@ -52,10 +53,10 @@ export default function CombatCopilotMatchDialog({
             <span className="combat-copilot-match-toggle-hint">使用最近一次持有干员识别结果</span>
           </div>
           <Switch
-            label="按持有干员匹配"
+            aria-label="按持有干员匹配"
             checked={settings.enabled}
             disabled={!hasOwnedOperators}
-            onChange={handleEnabledChange}
+            onCheckedChange={handleEnabledChange}
           />
         </div>
 
@@ -74,12 +75,13 @@ export default function CombatCopilotMatchDialog({
           <span className="combat-copilot-match-modes-title">显示以下匹配结论</span>
           <div className="combat-copilot-match-mode-list">
             {COPILOT_MATCH_MODES.map(({ mode, label }) => (
-              <Checkbox
-                key={mode}
-                label={label}
-                checked={settings.modes.includes(mode)}
-                onChange={checked => handleModeChange(mode, checked)}
-              />
+              <label key={mode} className="group flex min-h-11 cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                <Checkbox
+                  checked={settings.modes.includes(mode)}
+                  onCheckedChange={checked => handleModeChange(mode, checked)}
+                />
+                <span className="transition-colors group-hover:text-primary">{label}</span>
+              </label>
             ))}
           </div>
         </div>

@@ -184,7 +184,7 @@ describe('InfrastScheduleEditor', () => {
     await renderEditor({ filename: 'base.json', onSaved })
 
     expect(inputByLabel('训练室房间 1训练位干员').value).toBe('银灰')
-    expect(controlByLabel('回收站房间 1处理方式').value).toBe('skip')
+    expect(controlByLabel('回收站房间 1处理方式')?.textContent).toContain('跳过')
 
     await setInputValue(inputByLabel('制造站房间 1干员'), '克洛丝')
     await click(buttonByText('保存'))

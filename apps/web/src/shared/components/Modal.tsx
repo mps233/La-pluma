@@ -51,7 +51,7 @@ interface ConfirmDialogProps {
 const FOCUSABLE_SELECTOR = [
   'a[href]',
   'button:not([disabled])',
-  'input:not([disabled]):not([type="hidden"])',
+  'input:not([disabled]):not([type="hidden"]):not([tabindex="-1"])',
   'select:not([disabled])',
   'textarea:not([disabled])',
   '[contenteditable="true"]',
@@ -61,6 +61,10 @@ const FOCUSABLE_SELECTOR = [
 function getFocusableElements(container: HTMLElement) {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
     .filter(element => element.getAttribute('aria-hidden') !== 'true')
+}
+
+function isSelectPopupOpen() {
+  return Boolean(document.querySelector('[data-slot="select-content"][data-open]'))
 }
 
 interface ModalLayerProps extends Omit<ModalProps, 'isOpen'> {
@@ -116,6 +120,7 @@ function ModalLayer({
       if (!isTopModal(modalId)) return
 
       if (event.key === 'Escape' && dismissibleRef.current) {
+        if (isSelectPopupOpen()) return
         event.preventDefault()
         onCloseRef.current()
         return

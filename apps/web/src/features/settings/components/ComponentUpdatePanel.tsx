@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Download, LoaderCircle, RefreshCw } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { Select } from '@/shared/components'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { useStatusStore } from '@/features/runtime-status'
 import { saveUpdateChannel } from '../api'
 import { resolveCoreChannel } from '../model/updateCommandPolicy'
@@ -94,13 +94,20 @@ export default function ComponentUpdatePanel() {
             <h3 className="text-base font-semibold text-foreground">MaaCore</h3>
             {versionInfo && <span className="text-sm brand-text">{versionInfo.core}</span>}
             <Select
-              aria-label="MaaCore 更新渠道"
+              items={CORE_CHANNEL_OPTIONS}
               value={coreChannel}
-              options={CORE_CHANNEL_OPTIONS}
-              onChange={value => void handleChannelChange('core', value)}
+              onValueChange={(value, details) => { if (details.reason !== 'none' && value !== null) void handleChannelChange('core', value) }}
               disabled={channelSavingBusy}
-              className="ml-auto w-32"
-            />
+            >
+              <SelectTrigger aria-label="MaaCore 更新渠道" className="ml-auto w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CORE_CHANNEL_OPTIONS.map(item => (
+                  <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">核心组件与游戏资源</p>
           {versionInfo?.resource && (
@@ -168,13 +175,20 @@ export default function ComponentUpdatePanel() {
             <h3 className="text-base font-semibold text-foreground">MAA CLI</h3>
             {versionInfo && <span className="text-sm brand-text">{versionInfo.cli}</span>}
             <Select
-              aria-label="MAA CLI 更新渠道"
+              items={CLI_CHANNEL_OPTIONS}
               value={cliChannel}
-              options={CLI_CHANNEL_OPTIONS}
-              onChange={value => void handleChannelChange('cli', value)}
+              onValueChange={(value, details) => { if (details.reason !== 'none' && value !== null) void handleChannelChange('cli', value) }}
               disabled={channelSavingBusy}
-              className="ml-auto w-32"
-            />
+            >
+              <SelectTrigger aria-label="MAA CLI 更新渠道" className="ml-auto w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CLI_CHANNEL_OPTIONS.map(item => (
+                  <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">命令行工具与任务运行入口</p>
           <div className="mt-auto pt-4">

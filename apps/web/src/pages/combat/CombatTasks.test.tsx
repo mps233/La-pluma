@@ -19,6 +19,19 @@ import CombatTasks from './CombatTasks'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
+const selectOptionLabels = async (trigger: HTMLElement) => {
+  await act(async () => trigger.click())
+  const popupId = trigger.getAttribute('aria-controls')
+  const labels = popupId
+    ? [...(document.getElementById(popupId)?.querySelectorAll('[role="option"]') ?? [])].map(node => node.textContent?.trim())
+    : []
+  await act(async () => {
+    trigger.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+  })
+  await act(async () => {})
+  return labels
+}
+
 const mocks = vi.hoisted(() => ({
   controller: { current: null as unknown as ExecutionController },
   executePredefinedTaskArgs: vi.fn(),
@@ -566,18 +579,37 @@ const setRecognitionMode = async (mode: 'auto' | 'single' | 'set') => {
   await selectNativeValue(select as HTMLSelectElement, mode)
 }
 
-const difficultySelect = () => {
-  const select = container.querySelector<HTMLSelectElement>('select[name="maa-copilot-raid"]')
-  expect(select, '难度下拉').not.toBeNull()
-  return select as HTMLSelectElement
+const chooseComboboxOption = async (trigger: HTMLElement, optionLabel: string) => {
+  await act(async () => trigger.click())
+  const popupId = trigger.getAttribute('aria-controls')
+  const option = popupId
+    ? [...(document.getElementById(popupId)?.querySelectorAll('[role="option"]') ?? [])]
+      .find(node => node.textContent?.trim() === optionLabel)
+    : undefined
+  expect(option, `选项 ${optionLabel}`).toBeTruthy()
+  await act(async () => (option as HTMLElement).click())
+  await flush()
+}
+
+const RAID_LABELS: Record<string, string> = {
+  auto: '按作业标注',
+  normal: '普通模式',
+  raid: '突袭模式',
+  both: '普通+突袭',
+}
+
+const difficultySelect = (): HTMLElement => {
+  const trigger = container.querySelector<HTMLElement>('#combat-copilot-raid')
+  expect(trigger, '难度下拉').not.toBeNull()
+  return trigger as HTMLElement
 }
 
 const selectDifficulty = async (value: 'auto' | 'normal' | 'raid' | 'both') => {
-  await selectNativeValue(difficultySelect(), value)
+  await chooseComboboxOption(difficultySelect(), RAID_LABELS[value]!)
 }
 
 const expectDifficulty = (value: 'auto' | 'normal' | 'raid' | 'both') => {
-  expect(difficultySelect().value).toBe(value)
+  expect(difficultySelect().textContent).toContain(RAID_LABELS[value]!)
 }
 
 const segmentedGroup = (label: string) => {
@@ -790,9 +822,8 @@ describe('CombatTasks execution', () => {
     }
 
     const difficulty = difficultySelect()
-    expect(Array.from(difficulty.options)).toHaveLength(4)
-    expect(difficulty.className).toContain('app-input')
-    expect(difficulty.disabled).toBe(false)
+    expect(await selectOptionLabels(difficulty)).toHaveLength(4)
+    expect(difficulty.getAttribute('aria-disabled')).toBeNull()
   })
 
   it('keeps execution progress without a separate log observer or entry', async () => {
@@ -1129,9 +1160,8 @@ describe('CombatTasks execution', () => {
     await renderComponent()
     await previewSet()
 
-    const strategySelect = Array.from(container.querySelectorAll<HTMLSelectElement>('select'))
-      .find(select => Array.from(select.options).some(option => option.value === 'stop'))!
-    await selectNativeValue(strategySelect, 'stop')
+    const strategySelect = container.querySelector<HTMLElement>('[id="combat-copilot-executionStrategy"]')!
+    await chooseComboboxOption(strategySelect, '失败后停止')
 
     const waitingAfterFailure = setRun('run-set-manual', 'waiting', {
       progress: setProgress(
@@ -2264,7 +2294,9 @@ describe('CombatTasks execution', () => {
 
     await click(buttonByAriaLabel('关卡筛选')!)
     await click(buttonByAriaLabel('选择关卡 1-7 暴君 第一章 黑暗时代·下')!)
-    await selectNativeValue(document.querySelector<HTMLSelectElement>('select[aria-label="排序"]')!, 'views')
+    const orderTrigger = document.querySelector<HTMLElement>('[aria-label="排序"]')
+  expect(orderTrigger, '排序下拉').not.toBeNull()
+  await chooseComboboxOption(orderTrigger!, '访问量')
     await setInputValue(discoverySearchInput()!, '1-7')
     mocks.searchCopilot.mockResolvedValueOnce(ok({
       stage: '1-7',
@@ -2274,7 +2306,7 @@ describe('CombatTasks execution', () => {
     expect(discoveryDialog()?.textContent).toContain('旧搜索作业')
     expect(discoverySearchInput()?.value).toBe('1-7')
     expect(buttonByAriaLabel('关卡筛选：1-7')).toBeDefined()
-    expect(document.querySelector<HTMLSelectElement>('select[aria-label="排序"]')?.value).toBe('views')
+    expect(document.querySelector('[aria-label="排序"]')?.textContent).toContain('访问量')
 
     await click(buttonByAriaLabel('关闭对话框')!)
     expect(discoveryDialog()).toBeNull()
@@ -2284,7 +2316,7 @@ describe('CombatTasks execution', () => {
     expect(discoverySearchInput()?.value).toBe('')
     expect(buttonByAriaLabel('关卡筛选')).toBeDefined()
     expect(buttonByAriaLabel('关卡筛选：1-7')).toBeUndefined()
-    expect(document.querySelector<HTMLSelectElement>('select[aria-label="排序"]')?.value).toBe('hot')
+    expect(document.querySelector('[aria-label="排序"]')?.textContent).toContain('热度')
     expect(discoveryDialog()?.textContent).toContain('默认作业')
     expect(discoveryDialog()?.textContent).not.toContain('旧搜索作业')
     expect(discoveryDialog()?.textContent).not.toContain('正在搜索作业')
@@ -2594,13 +2626,21 @@ describe('CombatTasks execution', () => {
   it('associates every visible form control with a label', async () => {
     await renderComponent()
 
-    const controls = Array.from(container.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('input, select, textarea'))
+    const controls = Array.from(
+      container.querySelectorAll<HTMLElement>('input:not([aria-hidden="true"]), [role="combobox"], [role="checkbox"], [role="switch"]'),
+    )
     expect(controls.length).toBeGreaterThan(0)
     controls.forEach(control => {
+      if (control.matches('[role="checkbox"], [role="switch"]')) {
+        const label = Array.from(container.querySelectorAll<HTMLLabelElement>('label'))
+          .find(candidate => candidate.contains(control))
+        expect(label ?? control.getAttribute('aria-label')).toBeTruthy()
+        return
+      }
       expect(control.id).not.toBe('')
       const label = Array.from(container.querySelectorAll<HTMLLabelElement>('label'))
         .find(candidate => candidate.htmlFor === control.id)
-      expect(label).toBeDefined()
+      expect(label ?? control.getAttribute('aria-label')).toBeTruthy()
     })
   })
 

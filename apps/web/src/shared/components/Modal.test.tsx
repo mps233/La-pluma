@@ -195,6 +195,78 @@ describe('Modal placement', () => {
   })
 })
 
+describe('Modal keyboard boundaries', () => {
+  beforeEach(() => {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(prefers-reduced-motion: reduce)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+  })
+
+  afterEach(async () => {
+    await act(async () => root.unmount())
+    container.remove()
+    document.body.style.overflow = ''
+    vi.restoreAllMocks()
+  })
+
+  it('keeps the dialog open while a select popup owns Escape', async () => {
+    const onClose = vi.fn()
+    await act(async () => {
+      root.render(
+        <Modal isOpen onClose={onClose} title="带下拉的弹层">
+          <div data-slot="select-content" data-open="" role="listbox" aria-label="选项" />
+        </Modal>,
+      )
+    })
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(onClose).not.toHaveBeenCalled()
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+
+    await act(async () => {
+      const popup = document.querySelector('[data-slot="select-content"]')
+      popup?.removeAttribute('data-open')
+      popup?.setAttribute('data-closed', '')
+    })
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('cycles Tab focus past inputs removed from the tab order', async () => {
+    await act(async () => {
+      root.render(
+        <Modal isOpen onClose={vi.fn()} title="焦点循环" showClose={false}>
+          <input tabIndex={-1} aria-label="镜像输入" />
+          <button type="button">第一项</button>
+          <button type="button">第二项</button>
+        </Modal>,
+      )
+    })
+
+    expect(document.activeElement).toBe(getButton('第一项'))
+    expect(document.activeElement).not.toBe(document.querySelector('[aria-label="镜像输入"]'))
+
+    getButton('第二项').focus()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
+    expect(document.activeElement).toBe(getButton('第一项'))
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true }))
+    expect(document.activeElement).toBe(getButton('第二项'))
+
+    expect(document.querySelector('[aria-label="镜像输入"]')?.getAttribute('tabindex')).toBe('-1')
+  })
+})
+
 describe('useModalLayer', () => {
   beforeEach(() => {
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({

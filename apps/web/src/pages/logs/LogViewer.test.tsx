@@ -8,6 +8,14 @@ import LogViewer from './LogViewer'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
+const optionInTriggerPopup = (trigger: HTMLElement, optionLabel: string) => {
+  const popupId = trigger.getAttribute('aria-controls')
+  const popup = popupId ? document.getElementById(popupId) : null
+  return popup
+    ? [...popup.querySelectorAll('[role="option"]')].find(node => node.textContent?.trim() === optionLabel)
+    : undefined
+}
+
 const mocks = vi.hoisted(() => ({
   getRealtimeLogs: vi.fn(),
   getLogFiles: vi.fn(),
@@ -92,12 +100,12 @@ const findAction = (label: string) => Array.from(container.querySelectorAll<HTML
 const findHistoryRow = (file: string) => Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
   .find(button => button.textContent?.includes(file))
 
-const changeSelect = async (select: HTMLSelectElement, value: string) => {
-  await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set
-    setter?.call(select, value)
-    select.dispatchEvent(new Event('change', { bubbles: true }))
-  })
+const changeSelect = async (select: HTMLSelectElement | HTMLElement, optionLabel: string) => {
+  const trigger = select as HTMLElement
+  await act(async () => trigger.click())
+  const option = optionInTriggerPopup(trigger, optionLabel)
+  if (!option) throw new Error(`未找到选项：${optionLabel}`)
+  await act(async () => (option as HTMLElement).click())
   await flush()
 }
 
@@ -182,10 +190,10 @@ describe('LogViewer recovery and controls', () => {
     expect(container.querySelector('[role="alert"]')).toBeNull()
     expect(container.textContent).toContain('TaskChainStart')
 
-    const switches = Array.from(container.querySelectorAll<HTMLInputElement>('[role="switch"]'))
+    const switches = Array.from(container.querySelectorAll('[role="switch"]'))
     expect(switches.map(input => input.getAttribute('aria-label')))
       .toEqual(['自动滚动', '折叠重复日志'])
-    expect(switches.every(input => input.checked)).toBe(true)
+    expect(switches.every(input => input.getAttribute('aria-checked') === 'true')).toBe(true)
   })
 
   it('keeps existing realtime rows visible when a background refresh fails', async () => {
@@ -268,15 +276,15 @@ describe('LogViewer recovery and controls', () => {
 
     await renderComponent()
     expect(container.textContent).toContain('进入前')
-    const autoScroll = () => Array.from(container.querySelectorAll<HTMLInputElement>('[role="switch"]'))
+    const autoScroll = () => Array.from(container.querySelectorAll('[role="switch"]'))
       .find(input => input.getAttribute('aria-label') === '自动滚动')
-    expect(autoScroll()?.checked).toBe(true)
+    expect(autoScroll()?.getAttribute('aria-checked')).toBe('true')
 
     await click(findHistoryRow('maa.log')!)
     expect(mocks.readLogFile).toHaveBeenCalledWith(target.path, 1000, expect.any(AbortSignal))
     expect(container.textContent).toContain('历史内容')
-    expect(autoScroll()?.checked).toBe(false)
-    expect(autoScroll()?.disabled).toBe(true)
+    expect(autoScroll()?.getAttribute('aria-checked')).toBe('false')
+    expect(autoScroll()?.getAttribute('aria-disabled')).toBe('true')
 
     const back = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
       .find(button => button.textContent === '返回实时')
@@ -285,8 +293,8 @@ describe('LogViewer recovery and controls', () => {
     expect(mocks.getRealtimeLogs).toHaveBeenCalledTimes(2)
     expect(container.textContent).not.toContain('历史内容')
     expect(container.textContent).not.toContain('进入前')
-    expect(autoScroll()?.checked).toBe(true)
-    expect(autoScroll()?.disabled).toBe(false)
+    expect(autoScroll()?.getAttribute('aria-checked')).toBe('true')
+    expect(autoScroll()?.getAttribute('aria-disabled')).toBeNull()
 
     returned.resolve({
       success: true,
@@ -335,12 +343,12 @@ describe('LogViewer recovery and controls', () => {
       .mockResolvedValueOnce({ success: true, data: { content: historyLine('历史内容') } })
 
     await renderComponent()
-    const autoScroll = () => Array.from(container.querySelectorAll<HTMLInputElement>('[role="switch"]'))
+    const autoScroll = () => Array.from(container.querySelectorAll('[role="switch"]'))
       .find(input => input.getAttribute('aria-label') === '自动滚动')
 
     await click(findHistoryRow('maa.log')!)
-    expect(autoScroll()?.checked).toBe(false)
-    expect(autoScroll()?.disabled).toBe(true)
+    expect(autoScroll()?.getAttribute('aria-checked')).toBe('false')
+    expect(autoScroll()?.getAttribute('aria-disabled')).toBe('true')
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('日志文件读取失败')
 
     await click(container.querySelector<HTMLButtonElement>('[role="alert"] button')!)
@@ -350,8 +358,8 @@ describe('LogViewer recovery and controls', () => {
       .find(button => button.textContent === '返回实时')
     await click(back!)
 
-    expect(autoScroll()?.checked).toBe(true)
-    expect(autoScroll()?.disabled).toBe(false)
+    expect(autoScroll()?.getAttribute('aria-checked')).toBe('true')
+    expect(autoScroll()?.getAttribute('aria-disabled')).toBeNull()
   })
 
   it('keeps level filters across realtime and history views', async () => {
@@ -373,9 +381,9 @@ describe('LogViewer recovery and controls', () => {
 
     await renderComponent()
     expect(container.textContent).toContain('实时普通行')
-    const level = container.querySelector<HTMLSelectElement>('select[aria-label="日志级别"]')
+    const level = container.querySelector<HTMLElement>('[aria-label="日志级别"]')
     expect(level).not.toBeNull()
-    await changeSelect(level!, 'ERROR')
+    await changeSelect(level!, '错误')
     expect(container.textContent).toContain('实时错误行')
     expect(container.textContent).not.toContain('实时普通行')
 
@@ -386,7 +394,7 @@ describe('LogViewer recovery and controls', () => {
     const back = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
       .find(button => button.textContent === '返回实时')
     await click(back!)
-    expect(level?.value).toBe('ERROR')
+    expect(level?.textContent).toContain('错误')
     expect(container.textContent).toContain('实时错误行')
     expect(container.textContent).not.toContain('实时普通行')
   })
@@ -626,7 +634,7 @@ describe('LogViewer recovery and controls', () => {
     expect(clickSpy).toHaveBeenCalledTimes(1)
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:log-export')
 
-    await changeSelect(container.querySelector<HTMLSelectElement>('select[aria-label="日志级别"]')!, 'ERROR')
+    await changeSelect(container.querySelector<HTMLElement>('[aria-label="日志级别"]')!, '错误')
     expect(findButton('导出筛选结果')?.disabled).toBe(true)
   })
 })

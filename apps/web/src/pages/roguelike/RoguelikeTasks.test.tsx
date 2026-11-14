@@ -313,29 +313,88 @@ const setControlValue = async (
   value: string,
   eventName: 'input' | 'change' = 'input',
 ) => {
-  const control = container.querySelector<HTMLInputElement | HTMLSelectElement>(selector)!
+  const control = container.querySelector<HTMLInputElement>(selector)!
   await act(async () => {
-    const prototype = control instanceof HTMLSelectElement
-      ? HTMLSelectElement.prototype
-      : HTMLInputElement.prototype
-    const valueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
     valueSetter?.call(control, value)
     control.dispatchEvent(new Event(eventName, { bubbles: true }))
   })
   await flush()
 }
 
+const controlForName = (name: string) => {
+  const field = container.querySelector<HTMLInputElement>(`input[name="${name}"]`)
+  if (!field) throw new Error(`missing control: ${name}`)
+  const control = field.previousElementSibling
+  if (!(control instanceof HTMLElement)) throw new Error(`missing control element: ${name}`)
+  return control
+}
+
+const pressTrigger = async (trigger: HTMLElement) => {
+  await act(async () => {
+    trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+    trigger.click()
+  })
+}
+
+const chooseSelectOption = async (name: string, optionLabel: string) => {
+  const trigger = controlForName(name)
+  await pressTrigger(trigger)
+  const popupId = trigger.getAttribute('aria-controls')
+  const popup = popupId ? document.getElementById(popupId) : null
+  const options = popup ? [...popup.querySelectorAll('[role="option"]')] : []
+  const targetIndex = options.findIndex(node => node.textContent?.trim() === optionLabel)
+  expect(targetIndex, `option ${optionLabel} for ${name}`).toBeGreaterThanOrEqual(0)
+
+  const highlightedOf = () => popup?.querySelector('[role="option"][data-highlighted]') as HTMLElement | null
+  const pressKey = async (key: string) => {
+    await act(async () => {
+      trigger.dispatchEvent(new window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }))
+    })
+  }
+
+  let highlighted = highlightedOf()
+  if (!highlighted) {
+    await pressKey(targetIndex === 0 ? 'ArrowUp' : 'ArrowDown')
+    highlighted = highlightedOf()
+  }
+  expect(highlighted, `highlighted option for ${name}`).toBeTruthy()
+  const startIndex = options.indexOf(highlighted!)
+  const key = targetIndex >= startIndex ? 'ArrowDown' : 'ArrowUp'
+  for (let step = 0; step < Math.abs(targetIndex - startIndex); step += 1) {
+    await pressKey(key)
+  }
+  const finalHighlighted = highlightedOf()
+  expect(finalHighlighted?.textContent?.trim(), `highlighted option for ${name}`).toBe(optionLabel)
+  await act(async () => (finalHighlighted as HTMLElement).click())
+  await flush()
+}
+
+const selectOptionLabels = async (name: string) => {
+  const trigger = controlForName(name)
+  await pressTrigger(trigger)
+  const popupId = trigger.getAttribute('aria-controls')
+  const labels = popupId
+    ? [...(document.getElementById(popupId)?.querySelectorAll('[role="option"]') ?? [])].map(node => node.textContent?.trim())
+    : []
+  await act(async () => {
+    trigger.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+  })
+  await flush()
+  return labels
+}
+
+const selectValueFor = (name: string) =>
+  container.querySelector<HTMLInputElement>(`input[name="${name}"]`)?.value
+
+const toggleSwitchByName = async (name: string) => {
+  await act(async () => controlForName(name).click())
+  await flush()
+}
+
 const setReclamationCraftValues = async (tools = '荧光棒', batches = '16') => {
   await setControlValue('input[name="maa-reclamation-toolsToCraft"]', tools)
   await setControlValue('input[name="maa-reclamation-numBatches"]', batches)
-}
-
-const toggleSwitch = async (selector: string) => {
-  const input = container.querySelector<HTMLInputElement>(selector)!
-  await act(async () => {
-    input.click()
-  })
-  await flush()
 }
 
 const findModeButton = (name: string) => Array.from(
@@ -443,9 +502,9 @@ describe('RoguelikeTasks execution', () => {
   it('builds the command from the active mode and advanced fields', async () => {
     await renderPage()
     await setTheme('Phantom')
-    await setControlValue('select[name="maa-roguelike-mode"]', '1', 'change')
-    await setControlValue('select[name="maa-roguelike-squad"]', '指挥分队', 'change')
-    await toggleSwitch('input[name="maa-roguelike-useSupport"]')
+    await chooseSelectOption('maa-roguelike-mode', '刷源石锭')
+    await chooseSelectOption('maa-roguelike-squad', '指挥分队')
+    await toggleSwitchByName('maa-roguelike-useSupport')
 
     await click(buttonByText('立即执行')!)
 
@@ -465,9 +524,9 @@ describe('RoguelikeTasks execution', () => {
     await renderPage()
     await setTheme('JieGarden')
 
-    const roles = container.querySelector<HTMLSelectElement>('select[name="maa-roguelike-roles"]')
-    expect(roles?.value).toBe('稳扎稳打')
-    await setControlValue('select[name="maa-roguelike-roles"]', '先手必胜', 'change')
+    const roles = controlForName('maa-roguelike-roles')
+    expect(roles.textContent).toContain('稳扎稳打')
+    await chooseSelectOption('maa-roguelike-roles', '先手必胜（先锋、狙击、特种）')
 
     await click(buttonByText('立即执行')!)
 
@@ -487,40 +546,36 @@ describe('RoguelikeTasks execution', () => {
     await renderPage()
     await setTheme('Sami')
 
-    const samiSquads = Array.from(
-      container.querySelectorAll<HTMLOptionElement>('select[name="maa-roguelike-squad"] option'),
-    ).map(option => option.value)
+    const samiSquads = await selectOptionLabels('maa-roguelike-squad')
     expect(samiSquads).toContain('生活至上分队')
     expect(container.querySelector('input[name="maa-roguelike-useFoldartal"]')).not.toBeNull()
     expect(container.querySelector('input[name="maa-roguelike-startWithSeed"]')).toBeNull()
     expect(container.querySelector('input[name="maa-roguelike-startFoldartals"]')).toBeNull()
 
-    await setControlValue('select[name="maa-roguelike-mode"]', '4', 'change')
+    await chooseSelectOption('maa-roguelike-mode', '刷开局')
     expect(container.querySelector('input[name="maa-roguelike-startFoldartals"]')).toBeNull()
 
-    await setControlValue('select[name="maa-roguelike-squad"]', '生活至上分队', 'change')
+    await chooseSelectOption('maa-roguelike-squad', '生活至上分队')
     expect(container.querySelector('input[name="maa-roguelike-startFoldartals"]')).not.toBeNull()
 
     await setTheme('Sarkaz')
 
-    const sarkazSquads = Array.from(
-      container.querySelectorAll<HTMLOptionElement>('select[name="maa-roguelike-squad"] option'),
-    ).map(option => option.value)
+    const sarkazSquads = await selectOptionLabels('maa-roguelike-squad')
     expect(sarkazSquads).toContain('蓝图测绘分队')
     expect(container.querySelector('input[name="maa-roguelike-useFoldartal"]')).toBeNull()
 
-    await setControlValue('select[name="maa-roguelike-mode"]', '1', 'change')
+    await chooseSelectOption('maa-roguelike-mode', '刷源石锭')
     expect(container.querySelector('input[name="maa-roguelike-startWithSeed"]')).toBeNull()
 
-    await setControlValue('select[name="maa-roguelike-squad"]', '点刺成锭分队', 'change')
+    await chooseSelectOption('maa-roguelike-squad', '点刺成锭分队')
     expect(container.querySelector('input[name="maa-roguelike-startWithSeed"]')).not.toBeNull()
   })
 
   it('submits the seed string for the eligible Sarkaz investment squad', async () => {
     await renderPage()
     await setTheme('Sarkaz')
-    await setControlValue('select[name="maa-roguelike-mode"]', '1', 'change')
-    await setControlValue('select[name="maa-roguelike-squad"]', '点刺成锭分队', 'change')
+    await chooseSelectOption('maa-roguelike-mode', '刷源石锭')
+    await chooseSelectOption('maa-roguelike-squad', '点刺成锭分队')
     await setControlValue('input[name="maa-roguelike-startWithSeed"]', '2b3c4d,rogue_1,120')
 
     await click(buttonByText('立即执行')!)
@@ -540,14 +595,12 @@ describe('RoguelikeTasks execution', () => {
   it('marks and rejects a squad left over from another theme', async () => {
     await renderPage()
     await setTheme('Sarkaz')
-    await setControlValue('select[name="maa-roguelike-squad"]', '蓝图测绘分队', 'change')
+    await chooseSelectOption('maa-roguelike-squad', '蓝图测绘分队')
 
     await setTheme('Sami')
 
-    const squad = container.querySelector<HTMLSelectElement>('select[name="maa-roguelike-squad"]')!
-    expect(squad.value).toBe('蓝图测绘分队')
-    expect(Array.from(squad.options).find(option => option.value === '蓝图测绘分队')?.textContent)
-      .toContain('不适用于当前主题')
+    const squad = controlForName('maa-roguelike-squad')
+    expect(squad.textContent).toContain('蓝图测绘分队（不适用于当前主题）')
 
     await click(buttonByText('立即执行')!)
     expect(mocks.executePredefinedTask).not.toHaveBeenCalled()
@@ -555,7 +608,7 @@ describe('RoguelikeTasks execution', () => {
       '起始分队「蓝图测绘分队」不在当前主题的可选范围内，请重新选择',
     )
 
-    await setControlValue('select[name="maa-roguelike-squad"]', '指挥分队', 'change')
+    await chooseSelectOption('maa-roguelike-squad', '指挥分队')
     await click(buttonByText('立即执行')!)
 
     expect(mocks.executePredefinedTask).toHaveBeenCalledWith(
@@ -597,7 +650,7 @@ describe('RoguelikeTasks execution', () => {
   it('rejects the collapsal mode without expected paradigms and resets it on theme change', async () => {
     await renderPage()
     await setTheme('Sami')
-    await setControlValue('select[name="maa-roguelike-mode"]', '5', 'change')
+    await chooseSelectOption('maa-roguelike-mode', '刷坍缩范式')
 
     expect(container.querySelector('input[name="maa-roguelike-expectedCollapsalParadigms"]')).not.toBeNull()
 
@@ -619,7 +672,7 @@ describe('RoguelikeTasks execution', () => {
     )
 
     await setTheme('Sarkaz')
-    expect(container.querySelector<HTMLSelectElement>('select[name="maa-roguelike-mode"]')?.value).toBe('0')
+    expect(selectValueFor('maa-roguelike-mode')).toBe('0')
     expect(container.querySelector('input[name="maa-roguelike-expectedCollapsalParadigms"]')).toBeNull()
   })
 
@@ -660,8 +713,7 @@ describe('RoguelikeTasks execution', () => {
     await renderPage()
     await click(findModeButton('生息演算')!)
 
-    const modeSelect = container.querySelector<HTMLSelectElement>('select[name="maa-reclamation-mode"]')
-    expect(modeSelect?.value).toBe('1')
+    expect(selectValueFor('maa-reclamation-mode')).toBe('1')
 
     await setControlValue('input[name="maa-reclamation-theme"]', 'Tales')
     await setReclamationCraftValues()
@@ -678,7 +730,7 @@ describe('RoguelikeTasks execution', () => {
       { idempotencyKey: expect.stringMatching(/^run_task-/) },
     )
 
-    await setControlValue('select[name="maa-reclamation-mode"]', '0', 'change')
+    await chooseSelectOption('maa-reclamation-mode', '刷繁荣度（无存档）')
     await click(buttonByText('立即执行')!)
 
     expect(mocks.executePredefinedTask).toHaveBeenLastCalledWith(
@@ -700,7 +752,7 @@ describe('RoguelikeTasks execution', () => {
     expect(container.querySelector('input[name="maa-reclamation-toolsToCraft"]')).not.toBeNull()
     expect(container.querySelector('input[name="maa-reclamation-numBatches"]')).not.toBeNull()
 
-    await setControlValue('select[name="maa-reclamation-mode"]', '0', 'change')
+    await chooseSelectOption('maa-reclamation-mode', '刷繁荣度（无存档）')
 
     expect(container.querySelector('input[name="maa-reclamation-toolsToCraft"]')).toBeNull()
     expect(container.querySelector('input[name="maa-reclamation-numBatches"]')).toBeNull()
@@ -715,8 +767,7 @@ describe('RoguelikeTasks execution', () => {
     await renderPage()
     await click(findModeButton('生息演算')!)
 
-    expect(container.querySelector<HTMLSelectElement>('select[name="maa-reclamation-mode"]')?.value)
-      .toBe('1')
+    expect(selectValueFor('maa-reclamation-mode')).toBe('1')
     expect(mocks.saveUserConfig).not.toHaveBeenCalled()
 
     await setReclamationCraftValues()
@@ -738,8 +789,7 @@ describe('RoguelikeTasks execution', () => {
     await renderPage()
     await click(findModeButton('生息演算')!)
 
-    const modeSelect = container.querySelector<HTMLSelectElement>('select[name="maa-reclamation-mode"]')!
-    const describedBy = modeSelect.getAttribute('aria-describedby')
+    const describedBy = controlForName('maa-reclamation-mode').getAttribute('aria-describedby')
     expect(describedBy).toBeTruthy()
 
     const hint = document.getElementById(describedBy!)
@@ -1158,14 +1208,15 @@ describe('RoguelikeTasks layout and config recovery', () => {
     const modeButtons = Array.from(modeToolbar!.querySelectorAll<HTMLButtonElement>('button'))
     expect(modeButtons.filter(button => button.getAttribute('aria-pressed') === 'true')).toHaveLength(1)
 
-    const switches = Array.from(container.querySelectorAll<HTMLInputElement>('[role="switch"]'))
+    const switches = Array.from(container.querySelectorAll('[role="switch"]'))
     expect(switches.length).toBeGreaterThanOrEqual(2)
-    expect(switches.map(input => input.name)).toEqual(
+    const switchNames = switches.map(input => input.nextElementSibling?.getAttribute('name'))
+    expect(switchNames).toEqual(
       expect.arrayContaining(['maa-roguelike-useSupport', 'maa-roguelike-disableInvestment']),
     )
     switches.forEach(input => {
       const label = Array.from(container.querySelectorAll<HTMLLabelElement>('label'))
-        .find(candidate => candidate.htmlFor === input.id)
+        .find(candidate => candidate.textContent === input.textContent || candidate.contains(input))
       expect(label).toBeDefined()
     })
 
@@ -1198,10 +1249,9 @@ describe('RoguelikeTasks layout and config recovery', () => {
     ]
 
     for (const { key, label, hint } of cases) {
-      const select = container.querySelector<HTMLSelectElement>(`select[name="maa-roguelike-${key}"]`)!
-      const tooltip = document.getElementById(select.getAttribute('aria-describedby') ?? '')!
-      const labelElement = container.querySelector<HTMLLabelElement>(`label[for="${select.id}"]`)!
-      const trigger = labelElement.parentElement?.querySelector('button')
+      expect(controlForName(`maa-roguelike-${key}`)).not.toBeNull()
+      const trigger = container.querySelector<HTMLButtonElement>(`button[aria-label="${label}说明"]`)!
+      const tooltip = document.getElementById(trigger.getAttribute('aria-describedby') ?? '')!
 
       expect(tooltip.getAttribute('role')).toBe('tooltip')
       expect(tooltip.textContent).toBe(hint)
@@ -1282,7 +1332,7 @@ describe('RoguelikeTasks layout and config recovery', () => {
       },
     })
 
-    await setControlValue('select[name="maa-reclamation-mode"]', '0', 'change')
+    await chooseSelectOption('maa-reclamation-mode', '刷繁荣度（无存档）')
     await act(async () => {
       await vi.advanceTimersByTimeAsync(300)
     })
@@ -1417,7 +1467,7 @@ describe('RoguelikeTasks layout and config recovery', () => {
     expect(mocks.loadUserConfig).not.toHaveBeenCalled()
     expect(mocks.saveUserConfig).not.toHaveBeenCalled()
     expect(container.querySelector<HTMLInputElement>('input[name="maa-roguelike-theme"]')?.value).toBe('Sarkaz')
-    expect(container.querySelector<HTMLSelectElement>('select[name="maa-roguelike-mode"]')?.value).toBe('1')
+    expect(selectValueFor('maa-roguelike-mode')).toBe('1')
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('尚未同步到服务器')
   })
 
@@ -1482,15 +1532,12 @@ describe('RoguelikeTasks layout and config recovery', () => {
     await click(findModeButton('生息演算')!)
     await setControlValue('input[name="maa-reclamation-theme"]', 'Tales')
 
-    const increment = container.querySelector<HTMLSelectElement>(
-      'select[name="maa-reclamation-incrementMode"]',
-    )
-    expect(increment).not.toBeNull()
-    expect(increment?.value).toBe('0')
+    expect(container.querySelector('input[name="maa-reclamation-incrementMode"]')).not.toBeNull()
+    expect(selectValueFor('maa-reclamation-incrementMode')).toBe('0')
 
-    await setControlValue('select[name="maa-reclamation-mode"]', '0', 'change')
-    expect(container.querySelector('select[name="maa-reclamation-incrementMode"]')).toBeNull()
-    await toggleSwitch('input[name="maa-reclamation-clearStore"]')
+    await chooseSelectOption('maa-reclamation-mode', '刷繁荣度（无存档）')
+    expect(container.querySelector('input[name="maa-reclamation-incrementMode"]')).toBeNull()
+    await toggleSwitchByName('maa-reclamation-clearStore')
     await click(buttonByText('立即执行')!)
 
     expect(mocks.executePredefinedTask).toHaveBeenLastCalledWith(
@@ -1512,11 +1559,10 @@ describe('RoguelikeTasks layout and config recovery', () => {
     await click(findModeButton('生息演算')!)
     await setControlValue('input[name="maa-reclamation-theme"]', 'RelaunchAnchor')
 
-    const modeSelect = container.querySelector<HTMLSelectElement>('select[name="maa-reclamation-mode"]')!
-    expect(modeSelect.value).toBe('16')
-    expect(Array.from(modeSelect.options).map(option => option.value)).toEqual(['16', '32', '48'])
+    expect(selectValueFor('maa-reclamation-mode')).toBe('16')
+    expect(await selectOptionLabels('maa-reclamation-mode')).toEqual(['RA-1（精耕细作循环）', 'RA-15（60 杀任务）', 'RA-4（解锁区域并击杀 Boss）'])
 
-    await setControlValue('select[name="maa-reclamation-mode"]', '32', 'change')
+    await chooseSelectOption('maa-reclamation-mode', 'RA-15（60 杀任务）')
     await click(buttonByText('立即执行')!)
 
     expect(mocks.executePredefinedTask).toHaveBeenLastCalledWith(
@@ -1670,13 +1716,21 @@ describe('RoguelikeTasks layout and config recovery', () => {
   it('associates every form control with a label', async () => {
     await renderPage()
 
-    const controls = Array.from(container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input, select'))
+    const controls = Array.from(
+      container.querySelectorAll<HTMLElement>('input:not([aria-hidden="true"]), [role="combobox"], [role="checkbox"], [role="switch"]'),
+    )
     expect(controls.length).toBeGreaterThan(0)
     controls.forEach(control => {
+      if (control.matches('[role="checkbox"], [role="switch"]')) {
+        const label = Array.from(container.querySelectorAll<HTMLLabelElement>('label'))
+          .find(candidate => candidate.contains(control))
+        expect(label ?? control.getAttribute('aria-label')).toBeTruthy()
+        return
+      }
       expect(control.id).not.toBe('')
       const label = Array.from(container.querySelectorAll<HTMLLabelElement>('label'))
         .find(candidate => candidate.htmlFor === control.id || candidate.contains(control))
-      expect(label).toBeDefined()
+      expect(label ?? control.getAttribute('aria-label')).toBeTruthy()
     })
   })
 })
