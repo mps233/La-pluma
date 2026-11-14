@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { Package as PackageIcon } from 'lucide-react'
-import Icons from '@/shared/ui/Icons'
+import Icons from '@/shared/components/Icons'
 import { getItemIconUrl, useItemIconCacheVersion } from '@/features/game-data'
 import { DROP_ITEM_DISPLAY_LIMIT, sortDropItems, sortDropStages } from '../model/dropRecords'
 import type { DropRecordsProps } from '../types'
-import { Button, Card, EmptyState, Loading } from '@/shared/ui'
+import { Button, Card, EmptyState, Loading } from '@/shared/components'
 
 interface DropRecordsViewProps extends DropRecordsProps {
   isLoading?: boolean
@@ -20,9 +20,9 @@ function DropRecordsError({ description, onRetry }: DropRecordsErrorProps) {
   return (
     <Card smoothCorners className="drop-records-panel p-0!">
       <div className="drop-records-panel-content">
-        <div className="form-error-surface flex flex-col items-start gap-3 rounded-xl p-4 sm:flex-row sm:items-center sm:justify-between" role="alert">
+        <div className="form-error-surface flex flex-col items-start gap-3.5 rounded-xl p-4 sm:flex-row sm:items-center sm:justify-between" role="alert">
           <div className="min-w-0">
-            <p className="font-semibold text-primary">掉落记录读取失败</p>
+            <p className="font-semibold text-foreground">掉落记录读取失败</p>
             <p className="mt-1 wrap-break-word text-sm leading-6 wrap-anywhere form-error-text">{description}</p>
           </div>
           <Button
@@ -104,9 +104,9 @@ export default function DropRecords({
   return (
     <div className="app-stack-section">
       {error && (
-        <div className="form-error-surface flex flex-col items-start gap-3 rounded-xl p-4 sm:flex-row sm:items-center sm:justify-between" role="alert">
+        <div className="form-error-surface flex flex-col items-start gap-3.5 rounded-xl p-4 sm:flex-row sm:items-center sm:justify-between" role="alert">
           <div className="min-w-0">
-            <p className="font-semibold text-primary">掉落记录刷新失败</p>
+            <p className="font-semibold text-foreground">掉落记录刷新失败</p>
             <p className="mt-1 wrap-break-word text-sm leading-6 wrap-anywhere form-error-text">{error}</p>
           </div>
           <Button
@@ -124,12 +124,12 @@ export default function DropRecords({
       <div className="drop-records-metric-panel grid grid-cols-2 overflow-hidden rounded-xl surface-soft md:grid-cols-4">
         {metricCards.map((metric) => (
           <div key={metric.label} className="drop-records-metric-row min-w-0 p-4">
-            <div className="mb-2 flex items-center justify-between text-secondary">
+            <div className="mb-2 flex items-center justify-between text-muted-foreground">
               <p className="text-xs">{metric.label}</p>
               <span className="brand-text">{metric.icon}</span>
             </div>
             <p
-              className="wrap-break-word text-xl font-bold text-primary wrap-anywhere sm:text-2xl"
+              className="wrap-break-word text-xl font-bold text-foreground wrap-anywhere sm:text-2xl"
               title={String(metric.value)}
             >
               {metric.value}
@@ -138,9 +138,9 @@ export default function DropRecords({
         ))}
       </div>
 
-      <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
+      <div className="flex flex-col items-stretch justify-between gap-3.5 sm:flex-row sm:items-center">
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-          <span className="text-sm text-secondary">统计周期</span>
+          <span className="text-sm text-muted-foreground">统计周期</span>
           <div className="grid w-full grid-cols-4 gap-1 sm:inline-grid sm:w-auto" role="group" aria-label="统计周期">
             {[3, 7, 14, 30].map((days) => (
               <button
@@ -177,10 +177,10 @@ export default function DropRecords({
       <div className="min-w-0">
         <Card smoothCorners className="drop-records-panel p-0!">
           <div className="drop-records-panel-content">
-        <h3 className="mb-4 flex min-w-0 flex-wrap items-center gap-2 text-lg font-bold text-primary">
+        <h3 className="mb-4 flex min-w-0 flex-wrap items-center gap-2 text-lg font-bold text-foreground">
           <span className="shrink-0"><Icons.Package /></span>
           <span className="min-w-0">材料掉落统计</span>
-          <span className="wrap-break-word text-sm font-normal text-secondary wrap-anywhere">
+          <span className="wrap-break-word text-sm font-normal text-muted-foreground wrap-anywhere">
             (共 {sortedItems.length} 种)
           </span>
         </h3>
@@ -201,10 +201,10 @@ export default function DropRecords({
             return (
               <div
                 key={itemData.name}
-                className="drop-records-item-row group flex min-w-0 items-center gap-3 p-3 transition-colors hover:bg-(--app-surface-muted)"
+                className="drop-records-item-row group flex min-w-0 items-center gap-3.5 p-3 transition-colors hover:bg-muted"
               >
                 {iconKey && (
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-(--app-surface-muted)">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted">
                     {failedItemImages[itemData.name] ? (
                       <span role="img" aria-label={`${itemData.name}图标不可用`}>
                         <PackageIcon className="h-6 w-6 brand-text" aria-hidden="true" />
@@ -221,7 +221,7 @@ export default function DropRecords({
                 )}
                 
                 <div className="flex-1 min-w-0">
-                  <div className="wrap-break-word text-sm font-bold text-primary wrap-anywhere" title={itemData.name}>
+                  <div className="wrap-break-word text-sm font-bold text-foreground wrap-anywhere" title={itemData.name}>
                     {itemData.name}
                   </div>
                   <div className="flex items-center gap-2 mt-1">
@@ -237,7 +237,7 @@ export default function DropRecords({
         )}
 
         {sortedItems.length > DROP_ITEM_DISPLAY_LIMIT && (
-          <p className="mt-4 text-center text-sm text-secondary">
+          <p className="mt-4 text-center text-sm text-muted-foreground">
             仅显示前 20 种材料
           </p>
         )}
@@ -248,10 +248,10 @@ export default function DropRecords({
       <div className="min-w-0">
         <Card smoothCorners className="drop-records-panel p-0!">
           <div className="drop-records-panel-content">
-        <h3 className="mb-4 flex min-w-0 flex-wrap items-center gap-2 text-lg font-bold text-primary">
+        <h3 className="mb-4 flex min-w-0 flex-wrap items-center gap-2 text-lg font-bold text-foreground">
           <span className="shrink-0"><Icons.Target /></span>
           <span className="min-w-0">关卡统计</span>
-          <span className="wrap-break-word text-sm font-normal text-secondary wrap-anywhere">
+          <span className="wrap-break-word text-sm font-normal text-muted-foreground wrap-anywhere">
             (共 {sortedStages.length} 个关卡)
           </span>
         </h3>
@@ -273,7 +273,7 @@ export default function DropRecords({
             >
               <div className="mb-3 min-w-0">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <span className="min-w-0 wrap-break-word text-lg font-bold text-primary wrap-anywhere">
+                  <span className="min-w-0 wrap-break-word text-lg font-bold text-foreground wrap-anywhere">
                     {stageData.name}
                   </span>
                   <span className="shrink-0 whitespace-nowrap brand-chip rounded-full px-2 py-0.5 text-xs font-medium">
@@ -292,7 +292,7 @@ export default function DropRecords({
                 {Object.entries(stageData.items).map(([itemName, count]) => (
                   <span
                     key={itemName}
-                    className="max-w-full wrap-break-word whitespace-normal control-surface rounded-md px-2 py-1 text-xs text-secondary wrap-anywhere"
+                    className="max-w-full wrap-break-word whitespace-normal control-surface rounded-md px-2 py-1 text-xs text-muted-foreground wrap-anywhere"
                   >
                     {itemName} ×{count}
                   </span>
@@ -307,7 +307,7 @@ export default function DropRecords({
       </div>
 
       {dateRange.start && dateRange.end && (
-        <div className="wrap-break-word text-center text-sm text-secondary wrap-anywhere">
+        <div className="wrap-break-word text-center text-sm text-muted-foreground wrap-anywhere">
           统计时间: {dateRange.start} 至 {dateRange.end} (共 {dateRange.days} 天)
         </div>
       )}

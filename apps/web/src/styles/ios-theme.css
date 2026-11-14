@@ -2,21 +2,12 @@
 
 @layer base {
   :root {
-    --app-chrome-page-bg: #f2f2f7;
-    --app-chrome-bg: rgba(255, 255, 255, 0.72);
-    --app-glass-bg: rgba(255, 255, 255, 0.68);
-    --app-glass-border: rgba(60, 60, 67, 0.18);
-    --app-glass-shadow: 0 12px 32px rgba(60, 60, 67, 0.12);
-    --app-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF UI Text", system-ui, sans-serif;
-    --app-navbar-height: 4.75rem;
-    --app-toolbar-height: 4rem;
-    --app-tabbar-icons-height: 5rem;
-    --app-safe-area-top: env(safe-area-inset-top, 0px);
-    --app-safe-area-right: env(safe-area-inset-right, 0px);
-    --app-safe-area-bottom: env(safe-area-inset-bottom, 0px);
-    --app-safe-area-left: env(safe-area-inset-left, 0px);
+    --glass-page-bg: #f2f2f7;
+    --glass-bg: rgba(255, 255, 255, 0.68);
+    --glass-border: rgba(60, 60, 67, 0.18);
+    --glass-shadow: 0 12px 32px rgba(60, 60, 67, 0.12);
     --la-pluma-viewport-height: 100dvh;
-    --la-pluma-tabbar-safe-bottom: max(var(--app-safe-area-bottom, 0px), env(safe-area-inset-bottom, 0px));
+    --la-pluma-tabbar-safe-bottom: env(safe-area-inset-bottom, 0px);
     --la-pluma-tabbar-floating-height: 4rem;
     --la-pluma-tabbar-floating-offset: 0.5rem;
     --la-pluma-tabbar-bottom-clearance: clamp(
@@ -27,80 +18,29 @@
     --la-pluma-tabbar-reserved-height: calc(
       var(--la-pluma-tabbar-floating-height) + var(--la-pluma-tabbar-bottom-clearance)
     );
-    --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.16);
-    --la-pluma-tabbar-active-edge: inset 0 0 0 0.5px var(--app-glass-border);
-    --la-pluma-tabbar-shadow: 0 1rem 2.25rem rgba(60, 60, 67, 0.18);
-    --la-pluma-tabbar-fade-color: #ffffff;
-    --la-pluma-navbar-fade-color: #ffffff;
+    --glass-tabbar-active-bg: rgba(118, 118, 128, 0.16);
+    --glass-tabbar-active-edge: inset 0 0 0 0.5px var(--glass-border);
+    --glass-tabbar-shadow: 0 1rem 2.25rem rgba(60, 60, 67, 0.18);
+    --glass-tabbar-fade-color: #ffffff;
+    --glass-navbar-fade-color: #ffffff;
     --la-pluma-sidebar-width: 17rem;
-    --la-pluma-sidebar-frame-fill: rgba(244, 245, 248, 0.62);
-    --la-pluma-sidebar-frame-inner-edge: rgba(255, 255, 255, 0.42);
-    --la-pluma-sidebar-frame-sheen: linear-gradient(
-      145deg,
-      rgba(255, 255, 255, 0.86) 0%,
-      rgba(255, 255, 255, 0.36) 38%,
-      rgba(255, 255, 255, 0) 72%
-    );
-    --la-pluma-sidebar-frame-top-refraction: linear-gradient(
-      to bottom,
-      rgba(177, 192, 218, 0.3) 0%,
-      rgba(204, 216, 235, 0.16) 22%,
-      rgba(222, 231, 246, 0) 42%
-    );
-    --la-pluma-sidebar-frame-bottom-refraction: linear-gradient(
-      to top,
-      rgba(255, 255, 255, 0.94) 0%,
-      rgba(255, 255, 255, 0.46) 24%,
-      rgba(255, 255, 255, 0) 54%
-    );
-    --la-pluma-sidebar-frame-shadow: 0 0.875rem 2.625rem rgba(60, 60, 67, 0.17);
-    --la-pluma-sidebar-frame-edge: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.98) 0%,
-      rgba(255, 255, 255, 0.72) 26%,
-      rgba(60, 60, 67, 0.16) 58%,
-      rgba(60, 60, 67, 0.06) 100%
-    );
-    --la-pluma-sidebar-frame-corner-glow: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0) 0%,
-      rgba(255, 255, 255, 0) 72%,
-      rgba(255, 255, 255, 0.68) 100%
-    );
-    --la-pluma-sidebar-frame-bottom-edge: linear-gradient(
-      to top,
-      rgba(255, 255, 255, 0.92) 0,
-      rgba(255, 255, 255, 0.92) 1px,
-      rgba(255, 255, 255, 0) 1px
-    );
-    --la-pluma-sidebar-selection: var(--app-accent);
-    --la-pluma-sidebar-selection-fill: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--app-accent) 82%, white) 0%,
-      var(--app-accent) 58%,
-      color-mix(in srgb, var(--app-accent) 90%, black) 100%
-    );
-    --la-pluma-sidebar-selection-glow:
-      inset 0 0.5px 0 rgba(255, 255, 255, 0.48),
-      inset 0 -0.5px 0 rgba(0, 0, 0, 0.16),
-      0 2px 6px color-mix(in srgb, var(--app-accent) 24%, transparent);
-    --la-pluma-liquid-surface-lift: rgba(255, 255, 255, 0.04);
-    --la-pluma-liquid-edge-light: rgba(255, 255, 255, 0.48);
-    --la-pluma-liquid-edge-clear: rgba(255, 255, 255, 0);
-    --la-pluma-liquid-edge-high: color-mix(
+    --glass-liquid-surface-lift: rgba(255, 255, 255, 0.04);
+    --glass-edge-light: rgba(255, 255, 255, 0.48);
+    --glass-edge-clear: rgba(255, 255, 255, 0);
+    --glass-edge-high: color-mix(
       in srgb,
-      var(--la-pluma-liquid-edge-light) 75%,
-      var(--la-pluma-liquid-edge-clear)
+      var(--glass-edge-light) 75%,
+      var(--glass-edge-clear)
     );
-    --la-pluma-liquid-edge-mid: color-mix(
+    --glass-edge-mid: color-mix(
       in srgb,
-      var(--la-pluma-liquid-edge-light) 50%,
-      var(--la-pluma-liquid-edge-clear)
+      var(--glass-edge-light) 50%,
+      var(--glass-edge-clear)
     );
-    --la-pluma-liquid-edge-faint: color-mix(
+    --glass-edge-faint: color-mix(
       in srgb,
-      var(--la-pluma-liquid-edge-light) 25%,
-      var(--la-pluma-liquid-edge-clear)
+      var(--glass-edge-light) 25%,
+      var(--glass-edge-clear)
     );
   }
 
@@ -131,68 +71,16 @@
 
   html.dark,
   #app-root.dark {
-    --app-chrome-page-bg: #000000;
-    --app-chrome-bg: rgba(28, 28, 30, 0.74);
-    --app-glass-bg: rgba(28, 28, 30, 0.72);
-    --app-glass-border: rgba(235, 235, 245, 0.18);
-    --app-glass-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
-    --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.3);
-    --la-pluma-tabbar-shadow: 0 1rem 2.25rem rgba(0, 0, 0, 0.44);
-    --la-pluma-tabbar-fade-color: #000000;
-    --la-pluma-navbar-fade-color: #000000;
-    --la-pluma-sidebar-frame-fill: rgba(28, 28, 30, 0.78);
-    --la-pluma-sidebar-frame-inner-edge: rgba(255, 255, 255, 0.14);
-    --la-pluma-sidebar-frame-sheen: linear-gradient(
-      145deg,
-      rgba(255, 255, 255, 0.06) 0%,
-      rgba(255, 255, 255, 0.018) 38%,
-      rgba(0, 0, 0, 0.05) 100%
-    );
-    --la-pluma-sidebar-frame-top-refraction: linear-gradient(
-      to bottom,
-      rgba(255, 255, 255, 0.026) 0%,
-      rgba(255, 255, 255, 0.009) 22%,
-      rgba(255, 255, 255, 0) 42%
-    );
-    --la-pluma-sidebar-frame-bottom-refraction: linear-gradient(
-      to top,
-      rgba(255, 255, 255, 0.026) 0%,
-      rgba(255, 255, 255, 0.009) 22%,
-      rgba(255, 255, 255, 0) 42%
-    );
-    --la-pluma-sidebar-frame-shadow: 0 0.75rem 2.5rem rgba(0, 0, 0, 0.08);
-    --la-pluma-sidebar-frame-edge: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.18) 0%,
-      rgba(255, 255, 255, 0.1) 25%,
-      rgba(235, 235, 245, 0.05) 56%,
-      rgba(235, 235, 245, 0.016) 100%
-    );
-    --la-pluma-sidebar-frame-corner-glow: linear-gradient(
-      135deg,
-      rgba(235, 235, 245, 0) 0%,
-      rgba(235, 235, 245, 0) 72%,
-      rgba(235, 235, 245, 0.1) 100%
-    );
-    --la-pluma-sidebar-frame-bottom-edge: linear-gradient(
-      to top,
-      rgba(235, 235, 245, 0.12) 0,
-      rgba(235, 235, 245, 0.12) 1px,
-      rgba(235, 235, 245, 0) 1px
-    );
-    --la-pluma-sidebar-selection: var(--app-accent);
-    --la-pluma-sidebar-selection-fill: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--app-accent) 82%, white) 0%,
-      var(--app-accent) 58%,
-      color-mix(in srgb, var(--app-accent) 90%, black) 100%
-    );
-    --la-pluma-sidebar-selection-glow:
-      inset 0 0.5px 0 rgba(255, 255, 255, 0.48),
-      inset 0 -0.5px 0 rgba(0, 0, 0, 0.16),
-      0 2px 6px color-mix(in srgb, var(--app-accent) 28%, transparent);
-    --la-pluma-liquid-surface-lift: rgba(255, 255, 255, 0.05);
-    --la-pluma-liquid-edge-light: rgba(255, 255, 255, 0.18);
+    --glass-page-bg: #000000;
+    --glass-bg: rgba(28, 28, 30, 0.72);
+    --glass-border: rgba(235, 235, 245, 0.18);
+    --glass-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
+    --glass-tabbar-active-bg: rgba(118, 118, 128, 0.3);
+    --glass-tabbar-shadow: 0 1rem 2.25rem rgba(0, 0, 0, 0.44);
+    --glass-tabbar-fade-color: #000000;
+    --glass-navbar-fade-color: #000000;
+    --glass-liquid-surface-lift: rgba(255, 255, 255, 0.05);
+    --glass-edge-light: rgba(255, 255, 255, 0.18);
   }
 
   html,
@@ -201,13 +89,13 @@
   input,
   select,
   textarea {
-    font-family: var(--app-font-family);
+    font-family: var(--font-app);
   }
 
   html,
   body {
     /* 无需 !important，base 层内本规则位于 index.css 之后。 */
-    background: var(--app-chrome-page-bg);
+    background: var(--glass-page-bg);
   }
 
   body {
@@ -246,114 +134,38 @@
 
   .la-pluma-app .la-pluma-page {
     isolation: isolate;
-    color: var(--app-text);
+    color: var(--foreground);
   }
 
-  .la-pluma-app .navbar {
+  .la-pluma-app .la-pluma-navbar {
     box-sizing: border-box;
     width: 100%;
-    min-height: calc(var(--app-navbar-height) + var(--app-safe-area-top));
-    padding-top: var(--app-safe-area-top);
+    min-height: calc(4.75rem + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0);
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    color: var(--foreground);
+    background: var(--background);
+    border-bottom: 1px solid var(--border);
   }
 
-  .la-pluma-app .navbar-bg {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-  }
-
-  .la-pluma-app .navbar-inner {
+  .la-pluma-app .la-pluma-navbar-inner {
     position: relative;
     display: grid;
     box-sizing: border-box;
     width: 100%;
+    min-height: 4.75rem;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
-  }
-
-  .la-pluma-app .navbar-inner > :is(.left, .title, .right) {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-  }
-
-  .la-pluma-app .navbar-inner > .left {
-    justify-self: start;
-  }
-
-  .la-pluma-app .navbar-inner > .title {
-    justify-self: center;
-    text-align: center;
-  }
-
-  .la-pluma-app .navbar-inner > .right {
-    justify-self: end;
-  }
-
-  .la-pluma-app :is(.link, .tab-link) {
-    color: inherit;
-    text-decoration: none;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .la-pluma-app button:is(.la-pluma-brand, .la-pluma-tab-link, .la-pluma-tabbar-search) {
-    appearance: none;
-    margin: 0;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    cursor: pointer;
-  }
-
-  .la-pluma-sidebar-frame {
-    display: none;
-  }
-
-  .la-pluma-app .la-pluma-navbar {
-    position: sticky;
-    top: 0;
-    z-index: 60;
-    color: var(--app-text);
-    background: var(--app-chrome-bg);
-    border: 0;
-    box-shadow: 0 1px 0 var(--app-border);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    backdrop-filter: blur(24px) saturate(180%);
-  }
-
-  .la-pluma-app .la-pluma-navbar::after {
-    display: none;
-  }
-
-  .la-pluma-app .la-pluma-navbar .navbar-inner {
-    min-height: var(--app-navbar-height);
-    padding-right: calc(0.875rem + var(--app-safe-area-right, 0px));
-    padding-left: calc(0.875rem + var(--app-safe-area-left, 0px));
-  }
-
-  .la-pluma-brand {
-    display: inline-flex !important;
-    align-items: center;
-    gap: 0.625rem;
-    min-height: 2.75rem;
-    padding: 0 0.25rem !important;
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0;
-    color: var(--app-text) !important;
-  }
-
-  .la-pluma-brand-mark {
-    width: 1.875rem;
-    height: 1.875rem;
-    object-fit: contain;
+    padding-right: calc(0.875rem + env(safe-area-inset-right, 0px));
+    padding-left: calc(0.875rem + env(safe-area-inset-left, 0px));
   }
 
   .la-pluma-navbar-title {
-    color: var(--app-text) !important;
-    font-size: 1rem !important;
-    font-weight: 700 !important;
+    color: var(--foreground);
+    font-size: 1rem;
+    font-weight: 700;
   }
 
   .la-pluma-navbar-left,
@@ -365,6 +177,55 @@
 
   .la-pluma-navbar-actions {
     gap: 0;
+  }
+
+  .la-pluma-app .la-pluma-navbar-inner > :is(.la-pluma-navbar-left, .la-pluma-navbar-actions) {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+  }
+
+  .la-pluma-app .la-pluma-navbar-inner > .la-pluma-navbar-left {
+    justify-self: start;
+  }
+
+  .la-pluma-app .la-pluma-navbar-inner > .la-pluma-navbar-title {
+    min-width: 0;
+    justify-self: center;
+    text-align: center;
+  }
+
+  .la-pluma-app .la-pluma-navbar-inner > .la-pluma-navbar-actions {
+    justify-self: end;
+  }
+
+  .la-pluma-app :is(.la-pluma-brand, .la-pluma-tabbar-link, .la-pluma-tabbar-more) {
+    appearance: none;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .la-pluma-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: 2.75rem;
+    padding: 0 0.25rem;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    color: var(--foreground);
+  }
+
+  .la-pluma-brand-mark {
+    width: 1.875rem;
+    height: 1.875rem;
+    object-fit: contain;
   }
 
   .la-pluma-theme-desktop {
@@ -409,7 +270,7 @@
     justify-content: center;
     padding: 0 !important;
     border-radius: 999px;
-    color: var(--app-text-muted) !important;
+    color: var(--muted-foreground) !important;
   }
 
   .la-pluma-github-link svg {
@@ -419,44 +280,7 @@
   }
 
   @media (min-width: 1024px) {
-    .la-pluma-app .la-pluma-sidebar-frame {
-      display: block;
-      position: fixed;
-
-      /* The frame stays below sidebar content but above the page-level fade. */
-      z-index: 1;
-      top: 0.75rem;
-      bottom: 0.75rem;
-      left: 0.75rem;
-      width: calc(var(--la-pluma-sidebar-width) - 1.5rem);
-      border: 1px solid transparent;
-      border-radius: 1.625rem;
-      background:
-        var(--la-pluma-sidebar-frame-bottom-edge) padding-box,
-        var(--la-pluma-sidebar-frame-top-refraction) padding-box,
-        var(--la-pluma-sidebar-frame-bottom-refraction) padding-box,
-        var(--la-pluma-sidebar-frame-sheen) padding-box,
-        linear-gradient(var(--la-pluma-sidebar-frame-fill), var(--la-pluma-sidebar-frame-fill)) padding-box,
-        var(--la-pluma-sidebar-frame-corner-glow) border-box,
-        var(--la-pluma-sidebar-frame-edge) border-box;
-      box-shadow:
-        inset 0 1px 0 var(--la-pluma-sidebar-frame-inner-edge),
-        inset 0 -1px 0 rgba(60, 60, 67, 0.1),
-        var(--la-pluma-sidebar-frame-shadow);
-      -webkit-backdrop-filter: blur(28px) saturate(165%);
-      backdrop-filter: blur(28px) saturate(165%);
-      pointer-events: none;
-    }
-
-    .la-pluma-app .la-pluma-sidebar {
-      grid-area: sidebar;
-      top: 0.75rem;
-      height: calc(var(--la-pluma-viewport-height) - 1.5rem);
-    }
-
     .la-pluma-app .la-pluma-navbar {
-      /* The brand entry lives in the workspace top bar, in the header cell to
-         the right of the sidebar; it must never enter the rounded glass area. */
       grid-area: header;
       position: relative;
       top: auto;
@@ -465,39 +289,14 @@
       width: 100%;
       z-index: auto;
       background: transparent;
-      box-shadow: none;
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
+      border-bottom: 0;
     }
 
-    .la-pluma-app .la-pluma-navbar-title {
+    .la-pluma-app .la-pluma-navbar-inner > .la-pluma-navbar-title {
       display: none;
     }
 
-    .la-pluma-app .la-pluma-navbar .navbar-bg {
-      display: none;
-      background: transparent;
-      box-shadow: none;
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-    }
-
-    .la-pluma-app .la-pluma-navbar :is(.left, .right) {
-      background: transparent;
-      box-shadow: none;
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-    }
-
-    .la-pluma-app .la-pluma-navbar::before {
-      /* Content no longer scrolls under the header on desktop: the scroll host
-         lives in its own grid cell below the header row, so the page-level top
-         fade would only tint the workspace top bar. */
-      display: none;
-      content: none;
-    }
-
-    .la-pluma-app .la-pluma-navbar .navbar-inner {
+    .la-pluma-app .la-pluma-navbar-inner {
       z-index: 2;
       padding-right: 2rem;
       padding-left: 1.25rem;
@@ -511,7 +310,20 @@
         'sidebar header'
         'sidebar main';
       grid-template-columns: var(--la-pluma-sidebar-width) minmax(0, 1fr);
-      grid-template-rows: calc(var(--app-navbar-height) + var(--app-safe-area-top)) minmax(0, 1fr);
+      grid-template-rows: calc(4.75rem + env(safe-area-inset-top, 0px)) minmax(0, 1fr);
+    }
+
+    .la-pluma-app .la-pluma-sidebar {
+      grid-area: sidebar;
+      position: relative;
+      top: auto;
+      height: var(--la-pluma-viewport-height);
+      padding: 0;
+      overflow: visible;
+    }
+
+    .la-pluma-app .la-pluma-sidebar-body {
+      border-right: 1px solid var(--sidebar-border);
     }
 
     .la-pluma-app .la-pluma-scroll-host {
@@ -524,46 +336,20 @@
 
     .la-pluma-app .la-pluma-content {
       max-width: 112rem;
-      padding-top: var(--app-space-page);
+      padding-top: 1.25rem;
       padding-right: 2rem;
-
-      /* The visible sidebar frame ends 0.75rem before the workspace column. */
       padding-left: 1.25rem;
-      padding-bottom: var(--app-space-3);
+      padding-bottom: 0.75rem;
     }
 
     .la-pluma-app .la-pluma-navbar-actions {
       gap: 0.625rem;
     }
 
-    .la-pluma-app .la-pluma-theme-desktop,
-    .la-pluma-app .la-pluma-github-link {
-      --la-pluma-liquid-surface: color-mix(
-        in srgb,
-        var(--app-glass-bg) 58%,
-        transparent
-      );
+    .la-pluma-app .la-pluma-theme-desktop {
       box-sizing: border-box;
       position: relative;
       isolation: isolate;
-      border: 0;
-      background:
-        linear-gradient(
-          var(--la-pluma-liquid-surface-lift),
-          var(--la-pluma-liquid-surface-lift)
-        ),
-        var(--la-pluma-liquid-surface);
-      box-shadow:
-        inset 0 0 0 0.5px color-mix(in srgb, var(--app-border-strong) 58%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--la-pluma-liquid-edge-light) 36%, transparent),
-        inset 1px 0 0 color-mix(in srgb, var(--la-pluma-liquid-edge-light) 10%, transparent),
-        inset 0 -1px 0 color-mix(in srgb, var(--la-pluma-liquid-edge-light) 18%, transparent),
-        0 5px 18px color-mix(in srgb, black 12%, transparent);
-      -webkit-backdrop-filter: blur(8px) saturate(145%);
-      backdrop-filter: blur(8px) saturate(145%);
-    }
-
-    .la-pluma-app .la-pluma-theme-desktop {
       display: flex;
       height: 2.5rem;
       align-items: center;
@@ -571,11 +357,8 @@
       padding: 0.25rem;
       border: 0;
       border-radius: 999px;
-    }
-
-    .la-pluma-app .la-pluma-theme-desktop::before,
-    .la-pluma-app .la-pluma-github-link::before {
-      display: none;
+      background: var(--card);
+      box-shadow: inset 0 0 0 1px var(--border);
     }
 
     .la-pluma-app .la-pluma-theme-desktop::after {
@@ -586,16 +369,7 @@
       width: 2rem;
       height: 2rem;
       border-radius: 50%;
-      background: linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--app-accent) 82%, white) 0%,
-        var(--app-accent) 58%,
-        color-mix(in srgb, var(--app-accent) 90%, black) 100%
-      );
-      box-shadow:
-        inset 0 0.5px 0 rgba(255, 255, 255, 0.48),
-        inset 0 -0.5px 0 rgba(0, 0, 0, 0.16),
-        0 2px 6px color-mix(in srgb, var(--app-accent) 24%, transparent);
+      background: var(--primary);
       content: '';
       transform: translateX(0);
       transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -619,7 +393,7 @@
       border: 0;
       border-radius: 0.75rem;
       background: transparent;
-      color: var(--app-text-soft);
+      color: var(--tertiary-foreground);
       transition:
         color 160ms ease,
         background-color 160ms ease;
@@ -632,16 +406,16 @@
     }
 
     .la-pluma-app .theme-toggle-btn:hover:not(.is-active) {
-      background: color-mix(in srgb, var(--app-surface-solid) 38%, transparent);
-      color: var(--app-text);
+      background: color-mix(in srgb, var(--card) 38%, transparent);
+      color: var(--foreground);
     }
 
     .la-pluma-app .theme-toggle-btn.is-active {
-      color: white;
+      color: var(--primary-foreground);
     }
 
     .la-pluma-app .theme-toggle-btn:focus-visible {
-      outline: 2px solid color-mix(in srgb, var(--app-accent) 72%, white);
+      outline: 2px solid color-mix(in srgb, var(--primary) 72%, white);
       outline-offset: -2px;
     }
 
@@ -652,7 +426,7 @@
       height: 2.5rem !important;
       min-height: 2.5rem !important;
       border-radius: 50%;
-      color: var(--app-text-muted) !important;
+      color: var(--muted-foreground) !important;
     }
 
     .la-pluma-app .la-pluma-github-link svg {
@@ -662,20 +436,6 @@
       height: 1.25rem;
     }
 
-    .la-pluma-app .la-pluma-github-link:hover {
-      --la-pluma-liquid-surface: color-mix(
-        in srgb,
-        var(--app-surface-muted) 82%,
-        transparent
-      );
-      color: var(--app-text) !important;
-    }
-
-    .la-pluma-app .la-pluma-github-link:focus-visible {
-      outline: 2px solid color-mix(in srgb, var(--app-accent) 72%, transparent);
-      outline-offset: 2px;
-    }
-
     .la-pluma-theme-mobile {
       display: none;
     }
@@ -683,12 +443,12 @@
 
   .la-pluma-github-link:hover,
   .la-pluma-github-link:focus-visible {
-    background: var(--app-surface-muted);
-    color: var(--app-text) !important;
+    background: var(--muted);
+    color: var(--foreground) !important;
   }
 
   .la-pluma-app .la-pluma-github-link:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--app-accent) 72%, transparent);
+    outline: 2px solid color-mix(in srgb, var(--primary) 72%, transparent);
     outline-offset: 2px;
   }
 
@@ -697,39 +457,16 @@
     z-index: 1;
     display: grid;
     grid-template-columns: var(--la-pluma-sidebar-width) minmax(0, 1fr);
-    min-height: calc(var(--la-pluma-viewport-height) - var(--app-navbar-height) - var(--app-safe-area-top));
+    min-height: calc(var(--la-pluma-viewport-height) - 4.75rem - env(safe-area-inset-top, 0px));
   }
 
   .la-pluma-sidebar {
-    position: sticky;
-    top: calc(var(--app-navbar-height) + var(--app-safe-area-top));
     display: flex;
     min-width: 0;
-    height: calc(var(--la-pluma-viewport-height) - var(--app-navbar-height) - var(--app-safe-area-top) - 0.75rem);
     flex-direction: column;
-    gap: 0.875rem;
-    padding: 1.125rem 1.5rem 1rem max(1.5rem, env(safe-area-inset-left));
     overflow-y: auto;
-    border: 0;
     background: transparent;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
     scrollbar-width: none;
-  }
-
-  .la-pluma-eyebrow {
-    color: var(--app-text-soft);
-    font-size: 0.6875rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .la-pluma-sidebar-nav,
-  .la-pluma-sheet-nav {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
   }
 
   .la-pluma-sidebar::-webkit-scrollbar {
@@ -743,7 +480,6 @@
     flex: 0 0 auto;
     align-items: center;
     gap: 0.75rem;
-    margin-top: auto;
     padding: 0 0.625rem;
   }
 
@@ -756,9 +492,9 @@
     justify-content: center;
     overflow: hidden;
     border-radius: 50%;
-    background: var(--app-surface-muted);
+    background: var(--muted);
     box-shadow:
-      inset 0 0 0 1px var(--app-border),
+      inset 0 0 0 1px var(--border),
       0 1px 3px rgba(0, 0, 0, 0.14);
   }
 
@@ -782,116 +518,27 @@
   }
 
   .la-pluma-sidebar-identity-copy strong {
-    color: var(--app-text);
+    color: var(--foreground);
     font-size: 0.9375rem;
     font-weight: 600;
     line-height: 1.3;
   }
 
   .la-pluma-sidebar-identity-copy small {
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     font-size: 0.75rem;
     line-height: 1.35;
   }
 
-  .la-pluma-tab-link {
-    color: var(--app-text-muted) !important;
-    text-decoration: none;
-    transition: color 180ms ease, background 180ms ease, transform 180ms ease;
-  }
-
-  .la-pluma-tab-link:active {
-    transform: scale(0.98);
-  }
-
-  .la-pluma-tab-link.is-desktop-tab {
-    display: flex !important;
-    min-height: 2.75rem;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 0.625rem;
-    border-radius: 0.875rem;
-    padding: 0 0.75rem !important;
-    color: var(--app-text) !important;
-    font-size: 0.9375rem;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    isolation: isolate;
-    transition:
-      color 180ms ease,
-      background 180ms ease,
-      box-shadow 180ms ease,
-      transform 180ms ease;
-  }
-
-  .la-pluma-tab-link.is-desktop-tab:hover,
-  .la-pluma-tab-link.is-desktop-tab:focus-visible {
-    background: var(--app-surface-muted);
-    color: var(--app-text) !important;
-  }
-
-  .la-pluma-tab-link.is-desktop-tab.is-active {
-    color: #fff !important;
-    background: var(--la-pluma-sidebar-selection-fill);
-    box-shadow: var(--la-pluma-sidebar-selection-glow);
-  }
-
-  .la-pluma-tab-link.is-desktop-tab.is-active:hover,
-  .la-pluma-tab-link.is-desktop-tab.is-active:focus-visible {
-    color: #fff !important;
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--app-accent) 74%, white) 0%,
-      color-mix(in srgb, var(--app-accent) 94%, white) 58%,
-      color-mix(in srgb, var(--app-accent) 88%, black) 100%
-    );
-  }
-
-  .la-pluma-tab-link.is-desktop-tab:focus-visible {
-    outline: 2px solid var(--app-accent);
-    outline-offset: 1px;
-  }
-
-  .la-pluma-tab-link.is-desktop-tab.is-active:focus-visible {
-    outline-color: color-mix(in srgb, white 80%, var(--app-accent));
-  }
-
-  .la-pluma-sidebar-icon {
-    display: inline-flex;
-    width: 1.5rem;
-    height: 1.5rem;
-    flex: 0 0 1.5rem;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.45rem;
-    background: transparent;
-    color: var(--app-text-muted);
-    box-shadow: none;
-  }
-
-  .la-pluma-tab-link.is-desktop-tab.is-active .la-pluma-sidebar-icon {
-    background: transparent;
-    color: #fff;
-    box-shadow: none;
-    filter: drop-shadow(0 0.5px 0.5px rgba(0, 40, 120, 0.18));
-  }
-
-  .la-pluma-sidebar-label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   .la-pluma-scroll-host {
     min-width: 0;
-    height: calc(var(--la-pluma-viewport-height) - var(--app-navbar-height) - var(--app-safe-area-top));
-    min-height: calc(var(--la-pluma-viewport-height) - var(--app-navbar-height) - var(--app-safe-area-top));
+    height: calc(var(--la-pluma-viewport-height) - 4.75rem - env(safe-area-inset-top, 0px));
+    min-height: calc(var(--la-pluma-viewport-height) - 4.75rem - env(safe-area-inset-top, 0px));
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
     scroll-padding-bottom: calc(
-      var(--la-pluma-tabbar-reserved-height) + var(--app-space-page)
+      var(--la-pluma-tabbar-reserved-height) + 1.25rem
     );
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
@@ -905,8 +552,8 @@
 
   .la-pluma-content {
     min-width: 0;
-    padding-top: var(--app-space-page);
-    padding-bottom: var(--app-space-page);
+    padding-top: 1.25rem;
+    padding-bottom: 1.25rem;
   }
 
   .la-pluma-tabbar {
@@ -915,21 +562,15 @@
     box-sizing: border-box;
     height: var(--la-pluma-tabbar-reserved-height);
     overflow: visible;
-    background: transparent !important;
-    background-color: transparent !important;
+    background: transparent;
     border: 0;
     box-shadow: none;
     pointer-events: none;
   }
 
-  .la-pluma-app .la-pluma-tabbar::before,
-  .la-pluma-app .la-pluma-tabbar::after {
-    display: none;
-  }
-
-  .la-pluma-app .la-pluma-tabbar .toolbar-inner {
-    position: absolute !important;
-    top: auto !important;
+  .la-pluma-app .la-pluma-tabbar-inner {
+    position: absolute;
+    top: auto;
     right: 0;
     bottom: var(--la-pluma-tabbar-bottom-clearance);
     left: 0;
@@ -942,40 +583,30 @@
     min-height: 0;
     box-sizing: border-box;
     padding: 0 max(1.25rem, env(safe-area-inset-right, 0px)) 0
-      max(1.25rem, env(safe-area-inset-left, 0px)) !important;
+      max(1.25rem, env(safe-area-inset-left, 0px));
     pointer-events: none;
   }
 
-  .la-pluma-app .app-liquid-tab-pill,
-  .la-pluma-app .la-pluma-tabbar-search {
-    box-sizing: border-box;
-    border: 1px solid var(--app-glass-border);
-    background: var(--app-glass-bg);
-    -webkit-backdrop-filter: blur(28px) saturate(180%);
-    backdrop-filter: blur(28px) saturate(180%);
-    box-shadow: var(--la-pluma-tabbar-shadow);
-    pointer-events: auto;
-  }
-
-  /* Shared with the mobile tab bar so in-page mode pickers use the exact same
-     liquid material without inheriting the tab bar's navigation geometry. */
+  /* Shared with in-page mode pickers: the liquid material is app-wide, the
+     navigation geometry lives on the tabbar classes above. */
   .la-pluma-app .app-liquid-tab-pill {
-    --la-pluma-liquid-surface: color-mix(
+    --glass-liquid-surface: color-mix(
       in srgb,
-      var(--app-glass-bg) 42%,
+      var(--glass-bg) 42%,
       transparent
     );
-    position: relative;
-    isolation: isolate;
-    border-color: transparent;
+    box-sizing: border-box;
+    border: 1px solid transparent;
     background:
       linear-gradient(
-        var(--la-pluma-liquid-surface-lift),
-        var(--la-pluma-liquid-surface-lift)
+        var(--glass-liquid-surface-lift),
+        var(--glass-liquid-surface-lift)
       ),
-      var(--la-pluma-liquid-surface);
+      var(--glass-liquid-surface);
     -webkit-backdrop-filter: blur(6px) saturate(140%);
     backdrop-filter: blur(6px) saturate(140%);
+    box-shadow: var(--glass-tabbar-shadow);
+    pointer-events: auto;
   }
 
   .la-pluma-app .app-liquid-tab-pill::before {
@@ -986,26 +617,26 @@
     border-radius: inherit;
     background: conic-gradient(
       from 0deg,
-      var(--la-pluma-liquid-edge-light) 0deg,
-      var(--la-pluma-liquid-edge-light) 72deg,
-      var(--la-pluma-liquid-edge-high) 73deg,
-      var(--la-pluma-liquid-edge-mid) 75deg,
-      var(--la-pluma-liquid-edge-faint) 77deg,
-      var(--la-pluma-liquid-edge-clear) 79deg,
-      var(--la-pluma-liquid-edge-faint) 82deg,
-      var(--la-pluma-liquid-edge-mid) 84deg,
-      var(--la-pluma-liquid-edge-high) 87deg,
-      var(--la-pluma-liquid-edge-light) 90deg,
-      var(--la-pluma-liquid-edge-light) 252deg,
-      var(--la-pluma-liquid-edge-high) 253deg,
-      var(--la-pluma-liquid-edge-mid) 255deg,
-      var(--la-pluma-liquid-edge-faint) 257deg,
-      var(--la-pluma-liquid-edge-clear) 259deg,
-      var(--la-pluma-liquid-edge-faint) 262deg,
-      var(--la-pluma-liquid-edge-mid) 264deg,
-      var(--la-pluma-liquid-edge-high) 267deg,
-      var(--la-pluma-liquid-edge-light) 270deg,
-      var(--la-pluma-liquid-edge-light) 360deg
+      var(--glass-edge-light) 0deg,
+      var(--glass-edge-light) 72deg,
+      var(--glass-edge-high) 73deg,
+      var(--glass-edge-mid) 75deg,
+      var(--glass-edge-faint) 77deg,
+      var(--glass-edge-clear) 79deg,
+      var(--glass-edge-faint) 82deg,
+      var(--glass-edge-mid) 84deg,
+      var(--glass-edge-high) 87deg,
+      var(--glass-edge-light) 90deg,
+      var(--glass-edge-light) 252deg,
+      var(--glass-edge-high) 253deg,
+      var(--glass-edge-mid) 255deg,
+      var(--glass-edge-faint) 257deg,
+      var(--glass-edge-clear) 259deg,
+      var(--glass-edge-faint) 262deg,
+      var(--glass-edge-mid) 264deg,
+      var(--glass-edge-high) 267deg,
+      var(--glass-edge-light) 270deg,
+      var(--glass-edge-light) 360deg
     );
     -webkit-mask:
       linear-gradient(#000 0 0) content-box,
@@ -1032,40 +663,53 @@
     height: 100%;
     gap: 0.125rem;
     padding: 0.25rem;
+    border: 1px solid var(--border);
     border-radius: 999px;
+    background: var(--card);
+    box-shadow: var(--glass-tabbar-shadow);
+    pointer-events: auto;
   }
 
-  .la-pluma-app .la-pluma-tabbar-search {
-    display: inline-flex !important;
+  .la-pluma-app :where(.la-pluma-tabbar-link[data-app-tab='dashboard'].is-active) svg {
+    fill: currentColor;
+    stroke: none;
+  }
+
+  .la-pluma-app .la-pluma-tabbar-more {
+    box-sizing: border-box;
+    display: inline-flex;
     flex: 0 0 var(--la-pluma-tabbar-floating-height);
     width: var(--la-pluma-tabbar-floating-height);
     height: var(--la-pluma-tabbar-floating-height);
     align-items: center;
     justify-content: center;
+    border: 1px solid var(--border);
     border-radius: 50%;
-    color: var(--app-text) !important;
-    text-decoration: none;
+    background: var(--card);
+    color: var(--foreground);
+    box-shadow: var(--glass-tabbar-shadow);
+    pointer-events: auto;
     transition: transform 180ms ease, background 180ms ease, color 180ms ease;
   }
 
-  .la-pluma-app .la-pluma-tabbar-search:hover,
-  .la-pluma-app .la-pluma-tabbar-search:focus-visible,
-  .la-pluma-app .la-pluma-tabbar-search.is-active {
-    --la-pluma-liquid-surface: var(--app-surface-muted);
-    color: var(--app-accent) !important;
+  .la-pluma-app .la-pluma-tabbar-more:hover,
+  .la-pluma-app .la-pluma-tabbar-more:focus-visible,
+  .la-pluma-app .la-pluma-tabbar-more.is-active {
+    background: var(--muted);
+    color: var(--primary);
   }
 
-  .la-pluma-app .la-pluma-tabbar-search:active {
+  .la-pluma-app .la-pluma-tabbar-more:active {
     transform: scale(0.94);
   }
 
-  .la-pluma-tabbar-search-icon {
+  .la-pluma-app .la-pluma-tabbar-more svg {
     width: 1.75rem;
     height: 1.75rem;
   }
 
-  .la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab {
-    display: inline-flex !important;
+  .la-pluma-app .la-pluma-tabbar-link {
+    display: inline-flex;
     min-width: 0;
     flex: 1 1 0;
     flex-direction: column;
@@ -1074,8 +718,8 @@
     gap: 0.1875rem;
     min-height: 0;
     border-radius: 999px;
-    padding: 0.25rem 0.3rem !important;
-    color: var(--app-text-muted) !important;
+    padding: 0.25rem 0.3rem;
+    color: var(--muted-foreground);
     font-size: 0.6875rem;
     font-weight: 600;
     line-height: 1;
@@ -1084,7 +728,7 @@
     transition: transform 180ms ease, background 180ms ease, color 180ms ease;
   }
 
-  .la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab .tabbar-label {
+  .la-pluma-app .la-pluma-tabbar-link .la-pluma-tabbar-label {
     display: block;
     max-width: 100%;
     overflow: hidden;
@@ -1093,138 +737,141 @@
     white-space: nowrap;
   }
 
-  .la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab svg {
-    /* tabbar 图标固定 24px，需压过导航图标上的 w-5 / h-5 utilities。 */
-    width: 1.5rem !important;
-    height: 1.5rem !important;
+  .la-pluma-app .la-pluma-tabbar-link svg {
+    width: 1.5rem;
+    height: 1.5rem;
     flex: 0 0 auto;
   }
 
-  /* Match iOS tab symbols: the dashboard grid is outlined at rest and becomes
-     the filled variant only while its destination is selected. */
-  .la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab[data-app-tab='dashboard'].is-active svg {
-    fill: currentColor;
-    stroke: none;
+  .la-pluma-app .la-pluma-tabbar-link.is-active {
+    background: var(--glass-tabbar-active-bg);
+    color: var(--primary-strong);
+    box-shadow: var(--glass-tabbar-active-edge);
   }
 
-  .la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab.is-active,
-  .la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab.tab-link-active {
-    background: var(--la-pluma-tabbar-active-bg) !important;
-    color: var(--app-accent-strong) !important;
-    box-shadow: var(--la-pluma-tabbar-active-edge);
+  .la-pluma-app .la-pluma-tabbar-link:hover {
+    color: var(--foreground);
   }
 
-  .la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab:hover {
-    color: var(--app-text) !important;
-  }
-
-  .la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab:active {
+  .la-pluma-app .la-pluma-tabbar-link:active {
     transform: scale(0.95);
   }
 
-  .la-pluma-app .la-pluma-tabbar-pill .la-pluma-tab-link.is-mobile-tab:focus-visible,
-  .la-pluma-app .la-pluma-tabbar-search:focus-visible {
-    outline: 2px solid var(--app-accent);
+  .la-pluma-app .la-pluma-tabbar-link:focus-visible,
+  .la-pluma-app .la-pluma-tabbar-more:focus-visible {
+    outline: 2px solid var(--primary);
     outline-offset: -3px;
   }
 
   .la-pluma-more-sheet {
-    position: fixed;
-    z-index: 1110;
-    right: 0;
-    bottom: 0;
-    left: 0;
     box-sizing: border-box;
-    width: 100%;
-    height: auto;
     max-height: min(28rem, 78dvh);
-    margin: 0;
     padding: 0.75rem max(1rem, env(safe-area-inset-right)) max(1.25rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
     overflow: hidden;
-    border: 1px solid color-mix(in srgb, var(--app-glass-border) 72%, transparent);
-    border-bottom: 0;
     border-radius: 1.25rem 1.25rem 0 0;
-    outline: none;
-    background: var(--app-glass-bg);
-    -webkit-backdrop-filter: blur(28px) saturate(180%);
-    backdrop-filter: blur(28px) saturate(180%);
-    box-shadow: 0 -1.25rem 3rem rgba(0, 0, 0, 0.16);
-    will-change: transform, opacity;
   }
 
-  .la-pluma-app .sheet-backdrop {
-    position: fixed;
-    z-index: 1100;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.32);
+  .la-pluma-more-sheet-header [data-slot='sheet-title'] {
+    font-size: 1.375rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0;
+    line-height: 1.3;
+  }
+
+  .la-pluma-more-sheet-close {
+    appearance: none;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    width: 2.75rem;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    min-height: 2.75rem;
+    flex: 0 0 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: var(--muted-foreground);
     -webkit-tap-highlight-color: transparent;
   }
 
-  .la-pluma-app .sheet-modal-inner {
-    max-height: inherit;
-    overflow-x: hidden;
+  .la-pluma-more-sheet-header .la-pluma-more-sheet-close svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .la-pluma-more-sheet-close:hover,
+  .la-pluma-more-sheet-close:focus-visible {
+    color: var(--foreground);
+    background: var(--muted);
+  }
+
+  .la-pluma-more-sheet-nav {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: 0.25rem;
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
   }
 
-  .la-pluma-app .sheet-modal-inner::-webkit-scrollbar {
+  .la-pluma-more-sheet-nav::-webkit-scrollbar {
     display: none;
   }
 
-  .la-pluma-sheet-grabber {
-    width: 2.25rem;
-    height: 0.3125rem;
-    margin: 0 auto 1.125rem;
-    border-radius: 999px;
-    background: var(--app-text-soft);
-    opacity: 0.48;
-  }
-
-  .la-pluma-sheet-heading {
+  .la-pluma-more-sheet .la-pluma-more-sheet-nav .la-pluma-tabbar-link {
+    appearance: none;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    color: var(--muted-foreground);
+    font: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    margin: 0 0 1rem;
-  }
-
-  .la-pluma-sheet-heading h2 {
-    margin: 0.25rem 0 0;
-    color: var(--app-text);
-    font-size: 1.375rem;
-    font-weight: 700;
-    letter-spacing: 0;
-  }
-
-  .la-pluma-sheet-close {
-    display: inline-flex !important;
-    width: 2.75rem !important;
-    min-width: 2.75rem !important;
-    height: 2.75rem !important;
-    min-height: 2.75rem !important;
+    flex: 0 0 auto;
+    flex-direction: row;
     align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    color: var(--app-text-muted) !important;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    min-height: 3rem;
+    padding: 0 0.875rem;
+    font-size: 0.9375rem;
+    font-weight: 400;
+    line-height: inherit;
+    text-align: left;
+    text-decoration: none;
+    transition: transform 180ms ease, background 180ms ease, color 180ms ease;
   }
 
-  .la-pluma-sheet-close:hover,
-  .la-pluma-sheet-close:focus-visible {
-    color: var(--app-text) !important;
-    background: var(--app-surface-muted);
+  .la-pluma-more-sheet .la-pluma-more-sheet-nav .la-pluma-tabbar-link:hover {
+    color: var(--foreground);
   }
 
-  .la-pluma-sheet-nav .la-pluma-tab-link {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    gap: 0.75rem !important;
-    min-height: 3rem !important;
-    padding: 0 0.875rem !important;
-    font-size: 0.9375rem !important;
+  .la-pluma-more-sheet .la-pluma-more-sheet-nav .la-pluma-tabbar-link:active {
+    transform: scale(0.98);
+  }
+
+  .la-pluma-more-sheet .la-pluma-more-sheet-nav .la-pluma-tabbar-link.is-active {
+    background: var(--glass-tabbar-active-bg);
+    color: var(--primary-strong);
+    box-shadow: var(--glass-tabbar-active-edge);
+  }
+
+  .la-pluma-more-sheet .la-pluma-more-sheet-nav .la-pluma-tabbar-link:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -3px;
+  }
+
+  .la-pluma-more-sheet .la-pluma-more-sheet-nav .la-pluma-tabbar-link svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: 0 0 auto;
   }
 
   .la-pluma-app .app-page {
@@ -1238,7 +885,7 @@
   }
 
   .la-pluma-app .app-page-title {
-    color: var(--app-text);
+    color: var(--foreground);
     font-size: 1.875rem;
     font-weight: 700;
     letter-spacing: 0;
@@ -1246,23 +893,23 @@
   }
 
   .la-pluma-app .app-page-subtitle {
-    color: var(--app-text-muted);
+    color: var(--muted-foreground);
   }
 
   .la-pluma-app .app-page-header-icon {
     /* 页头图标不再使用圆角底色，压过 rounded-* utilities。 */
     border-radius: 0 !important;
     background: transparent;
-    color: var(--app-text-muted);
+    color: var(--muted-foreground);
     box-shadow: none;
   }
 
   .la-pluma-app .app-card,
   .la-pluma-app .surface-panel {
     margin: 0;
-    border: 1px solid var(--app-border);
-    border-radius: var(--app-radius-lg);
-    background: var(--app-surface-solid);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    background: var(--card);
     box-shadow:
       0 1px 3px rgba(60, 60, 67, 0.05),
       0 14px 40px rgba(60, 60, 67, 0.05);
@@ -1282,7 +929,7 @@
     /* smooth 卡片由外壳裁剪，卡片本身保持 visible，压过页面级 overflow 规则。 */
     display: flex;
     border: 0;
-    border-radius: var(--app-continuous-radius);
+    border-radius: var(--continuous-radius);
     background: transparent;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -1298,9 +945,9 @@
     flex: 1 1 auto;
     align-self: stretch;
     overflow: hidden;
-    border: 1px solid var(--app-border);
+    border: 1px solid var(--border);
     border-radius: inherit;
-    background: var(--app-surface-solid);
+    background: var(--card);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -1309,7 +956,7 @@
     display: flex;
     min-width: 0;
     border: 0;
-    border-radius: var(--app-continuous-radius);
+    border-radius: var(--continuous-radius);
     background: transparent;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -1317,7 +964,7 @@
   }
 
   .la-pluma-app .smooth-panel-shell.smooth-panel-compact {
-    border-radius: var(--app-continuous-radius-compact);
+    border-radius: var(--radius-xl);
   }
 
   .la-pluma-app .smooth-panel-surface {
@@ -1328,24 +975,24 @@
     flex: 1 1 auto;
     align-self: stretch;
     overflow: hidden;
-    border: 1px solid var(--app-border);
+    border: 1px solid var(--border);
     border-radius: inherit;
-    background: var(--app-surface-solid);
+    background: var(--card);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
 
   .la-pluma-app .smooth-panel-surface.status-warning {
-    background: color-mix(in srgb, var(--app-warning) 10%, var(--app-surface-solid));
+    background: color-mix(in srgb, var(--warning) 10%, var(--card));
   }
 
   .la-pluma-app .smooth-panel-surface.status-danger {
-    background: color-mix(in srgb, var(--app-danger) 10%, var(--app-surface-solid));
+    background: color-mix(in srgb, var(--destructive) 10%, var(--card));
   }
 
   .la-pluma-app .app-card-header {
     min-height: 3.25rem;
-    border-bottom: 1px solid var(--app-border);
+    border-bottom: 1px solid var(--border);
     box-shadow: none;
   }
 
@@ -1354,7 +1001,7 @@
   }
 
   .la-pluma-app .app-info-card {
-    border: 1px solid var(--app-border);
+    border: 1px solid var(--border);
     border-radius: 0.875rem;
   }
 
@@ -1362,7 +1009,7 @@
     /* 空状态/页头图标使用无底色方形视觉，压过 rounded-* utilities。 */
     border-radius: 0 !important;
     background: transparent;
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     box-shadow: none;
   }
 
@@ -1384,23 +1031,11 @@
       left: 0;
       isolation: isolate;
       width: 100%;
-      background: transparent !important;
-      box-shadow: none;
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
+      background: transparent;
+      border-bottom: 0;
       pointer-events: none;
     }
 
-    .la-pluma-app .la-pluma-navbar .navbar-bg {
-      display: none;
-      background: transparent !important;
-      box-shadow: none;
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-    }
-
-    /* Fade across the full Navbar so scrolling content disappears smoothly at
-       the top edge without introducing blur or a separate solid header. */
     .la-pluma-app .la-pluma-navbar::before {
       display: block;
       position: absolute;
@@ -1411,30 +1046,18 @@
       height: 100%;
       background: linear-gradient(
         to bottom,
-        var(--la-pluma-navbar-fade-color) 0%,
+        var(--glass-navbar-fade-color) 0%,
         transparent 100%
       );
       content: '';
       pointer-events: none;
     }
 
-    /* The page body owns the workspace title on phones. */
-    .la-pluma-app .la-pluma-navbar-title {
+    .la-pluma-app .la-pluma-navbar-inner > .la-pluma-navbar-title {
       display: none;
     }
 
-    .la-pluma-app .la-pluma-navbar .left,
-    .la-pluma-app .la-pluma-navbar .right {
-      min-width: 0;
-      margin-left: 0;
-      border-radius: 0;
-      background: transparent;
-      box-shadow: none;
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-    }
-
-    .la-pluma-app .la-pluma-navbar .navbar-inner {
+    .la-pluma-app .la-pluma-navbar-inner {
       z-index: 1;
       padding-right: max(1rem, env(safe-area-inset-right));
       padding-left: max(1rem, env(safe-area-inset-left));
@@ -1458,11 +1081,10 @@
       min-height: 2.75rem;
       align-items: center;
       justify-content: center;
-      padding: 0.25rem !important;
-      border: 1px solid var(--app-glass-border);
+      padding: 0.25rem;
+      border: 1px solid var(--border);
       border-radius: 999px;
-      background: var(--app-glass-bg);
-      box-shadow: var(--app-glass-shadow);
+      background: var(--card);
       overflow: hidden;
       pointer-events: auto;
     }
@@ -1483,33 +1105,18 @@
 
     .la-pluma-app .la-pluma-theme-trigger,
     .la-pluma-app .la-pluma-github-link {
-      border: 1px solid var(--app-glass-border);
-      background: var(--app-glass-bg);
-      box-shadow: var(--app-glass-shadow);
+      border: 1px solid var(--border);
+      background: var(--card);
       pointer-events: auto;
     }
 
-    .la-pluma-app .la-pluma-theme-trigger:hover,
-    .la-pluma-app .la-pluma-theme-trigger:focus-visible,
-    .la-pluma-app .la-pluma-theme-trigger[aria-expanded='true'],
-    .la-pluma-app .la-pluma-github-link:hover,
-    .la-pluma-app .la-pluma-github-link:focus-visible {
-      --la-pluma-liquid-surface: var(--app-surface-muted);
-    }
-
-    /* Adapt the layered edge-light approach from liquid-glass-react (MIT)
-       without its SVG displacement runtime, which Safari does not render. */
     .la-pluma-app :is(
-      .la-pluma-brand,
-      .la-pluma-theme-trigger,
-      .la-pluma-github-link,
       .automation-preview-glass-button,
-      .pwa-install-entry-button,
-      .la-pluma-tabbar-search
+      .pwa-install-entry-button
     ) {
-      --la-pluma-liquid-surface: color-mix(
+      --glass-liquid-surface: color-mix(
         in srgb,
-        var(--app-glass-bg) 42%,
+        var(--glass-bg) 42%,
         transparent
       );
       position: relative;
@@ -1517,21 +1124,17 @@
       border-color: transparent;
       background:
         linear-gradient(
-          var(--la-pluma-liquid-surface-lift),
-          var(--la-pluma-liquid-surface-lift)
+          var(--glass-liquid-surface-lift),
+          var(--glass-liquid-surface-lift)
         ),
-        var(--la-pluma-liquid-surface);
+        var(--glass-liquid-surface);
       -webkit-backdrop-filter: blur(6px) saturate(140%);
       backdrop-filter: blur(6px) saturate(140%);
     }
 
     .la-pluma-app :is(
-      .la-pluma-brand,
-      .la-pluma-theme-trigger,
-      .la-pluma-github-link,
       .automation-preview-glass-button,
-      .pwa-install-entry-button,
-      .la-pluma-tabbar-search
+      .pwa-install-entry-button
     )::before {
       position: absolute;
       inset: 0;
@@ -1539,26 +1142,26 @@
       border-radius: inherit;
       background: conic-gradient(
         from 0deg,
-        var(--la-pluma-liquid-edge-light) 0deg,
-        var(--la-pluma-liquid-edge-light) 26deg,
-        var(--la-pluma-liquid-edge-high) 32deg,
-        var(--la-pluma-liquid-edge-mid) 38deg,
-        var(--la-pluma-liquid-edge-faint) 44deg,
-        var(--la-pluma-liquid-edge-clear) 50deg,
-        var(--la-pluma-liquid-edge-faint) 56deg,
-        var(--la-pluma-liquid-edge-mid) 62deg,
-        var(--la-pluma-liquid-edge-high) 68deg,
-        var(--la-pluma-liquid-edge-light) 74deg,
-        var(--la-pluma-liquid-edge-light) 206deg,
-        var(--la-pluma-liquid-edge-high) 212deg,
-        var(--la-pluma-liquid-edge-mid) 218deg,
-        var(--la-pluma-liquid-edge-faint) 224deg,
-        var(--la-pluma-liquid-edge-clear) 230deg,
-        var(--la-pluma-liquid-edge-faint) 236deg,
-        var(--la-pluma-liquid-edge-mid) 242deg,
-        var(--la-pluma-liquid-edge-high) 248deg,
-        var(--la-pluma-liquid-edge-light) 254deg,
-        var(--la-pluma-liquid-edge-light) 360deg
+        var(--glass-edge-light) 0deg,
+        var(--glass-edge-light) 26deg,
+        var(--glass-edge-high) 32deg,
+        var(--glass-edge-mid) 38deg,
+        var(--glass-edge-faint) 44deg,
+        var(--glass-edge-clear) 50deg,
+        var(--glass-edge-faint) 56deg,
+        var(--glass-edge-mid) 62deg,
+        var(--glass-edge-high) 68deg,
+        var(--glass-edge-light) 74deg,
+        var(--glass-edge-light) 206deg,
+        var(--glass-edge-high) 212deg,
+        var(--glass-edge-mid) 218deg,
+        var(--glass-edge-faint) 224deg,
+        var(--glass-edge-clear) 230deg,
+        var(--glass-edge-faint) 236deg,
+        var(--glass-edge-mid) 242deg,
+        var(--glass-edge-high) 248deg,
+        var(--glass-edge-light) 254deg,
+        var(--glass-edge-light) 360deg
       );
       -webkit-mask:
         linear-gradient(#000 0 0) content-box,
@@ -1591,8 +1194,6 @@
       isolation: isolate;
     }
 
-    /* Mirror the Navbar edge treatment: content remains visible above the
-       toolbar and fades continuously into the page color at the screen edge. */
     .la-pluma-app .la-pluma-tabbar::before {
       display: block;
       position: absolute;
@@ -1606,27 +1207,25 @@
       background: linear-gradient(
         to bottom,
         transparent 0%,
-        color-mix(in srgb, var(--la-pluma-tabbar-fade-color) 20%, transparent) 100%
+        color-mix(in srgb, var(--glass-tabbar-fade-color) 20%, transparent) 100%
       );
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
       content: '';
       transform: none;
       pointer-events: none;
     }
 
-    .la-pluma-app .la-pluma-tabbar .toolbar-inner {
+    .la-pluma-app .la-pluma-tabbar-inner {
       z-index: 1;
     }
 
     .la-pluma-app .la-pluma-content {
       padding-top: calc(
-        var(--app-navbar-height) + var(--app-safe-area-top) + var(--app-space-page)
+        4.75rem + env(safe-area-inset-top, 0px) + 1.25rem
       );
-      padding-right: max(var(--app-page-gutter), env(safe-area-inset-right));
-      padding-left: max(var(--app-page-gutter), env(safe-area-inset-left));
+      padding-right: max(1.25rem, env(safe-area-inset-right));
+      padding-left: max(1.25rem, env(safe-area-inset-left));
       padding-bottom: calc(
-        var(--la-pluma-tabbar-reserved-height) + var(--app-space-page)
+        var(--la-pluma-tabbar-reserved-height) + 1.25rem
       );
     }
 
@@ -1636,14 +1235,14 @@
       -webkit-mask-image: linear-gradient(
         to bottom,
         transparent 0,
-        #000 calc(var(--app-safe-area-top) + var(--app-navbar-height)),
+        #000 calc(env(safe-area-inset-top, 0px) + 4.75rem),
         #000 calc(100% - var(--la-pluma-tabbar-reserved-height)),
         transparent 100%
       );
       mask-image: linear-gradient(
         to bottom,
         transparent 0,
-        #000 calc(var(--app-safe-area-top) + var(--app-navbar-height)),
+        #000 calc(env(safe-area-inset-top, 0px) + 4.75rem),
         #000 calc(100% - var(--la-pluma-tabbar-reserved-height)),
         transparent 100%
       );
@@ -1651,9 +1250,31 @@
   }
 
   @media (max-width: 639px) {
-    .la-pluma-app .la-pluma-navbar .navbar-inner {
+    .la-pluma-app .la-pluma-navbar-inner {
       padding-right: max(1.25rem, env(safe-area-inset-right));
       padding-left: max(1.25rem, env(safe-area-inset-left));
+    }
+
+    .la-pluma-scroll-host {
+      scroll-padding-bottom: calc(
+        var(--la-pluma-tabbar-reserved-height) + 0.875rem
+      );
+    }
+
+    .la-pluma-content {
+      padding-top: 0.875rem;
+      padding-bottom: 0.875rem;
+    }
+
+    .la-pluma-app .la-pluma-content {
+      padding-top: calc(
+        4.75rem + env(safe-area-inset-top, 0px) + 0.875rem
+      );
+      padding-right: max(0.875rem, env(safe-area-inset-right));
+      padding-left: max(0.875rem, env(safe-area-inset-left));
+      padding-bottom: calc(
+        var(--la-pluma-tabbar-reserved-height) + 0.875rem
+      );
     }
 
     .la-pluma-app .la-pluma-brand span {
@@ -1738,11 +1359,10 @@
   }
 
   @media (prefers-reduced-transparency: reduce) {
-    .la-pluma-app .la-pluma-sidebar-frame,
     .la-pluma-app .la-pluma-tabbar,
     .la-pluma-app .app-liquid-tab-pill,
-    .la-pluma-app .la-pluma-tabbar-search,
-    .la-pluma-app .la-pluma-more-sheet,
+    .la-pluma-app .la-pluma-tabbar-pill,
+    .la-pluma-app .la-pluma-tabbar-more,
     .la-pluma-app .la-pluma-brand,
     .la-pluma-app .la-pluma-theme-desktop,
     .la-pluma-app .la-pluma-theme-trigger,
@@ -1751,21 +1371,9 @@
     .la-pluma-app .app-card-smooth-surface,
     .la-pluma-app .smooth-panel-surface,
     .la-pluma-app .surface-panel {
-      background: var(--app-surface-solid);
+      background: var(--card);
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
-    }
-
-    .la-pluma-app .la-pluma-sidebar {
-      background: transparent;
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-    }
-
-    .la-pluma-app .la-pluma-tab-link.is-desktop-tab.is-active {
-      background: var(--la-pluma-sidebar-selection);
-      box-shadow:
-        0 2px 6px color-mix(in srgb, var(--app-accent) 24%, transparent);
     }
 
     .la-pluma-app .app-card[data-smooth-corners='true'],
@@ -1774,13 +1382,8 @@
     }
 
     .la-pluma-app :is(
-      .la-pluma-brand,
-      .la-pluma-theme-desktop,
-      .la-pluma-theme-trigger,
-      .la-pluma-github-link,
       .automation-preview-glass-button,
-      .app-liquid-tab-pill,
-      .la-pluma-tabbar-search
+      .app-liquid-tab-pill
     )::before {
       display: none;
     }
@@ -1788,8 +1391,8 @@
 
   @media (prefers-contrast: more) {
     .la-pluma-app .app-liquid-tab-pill {
-      border-color: var(--app-border-strong);
-      background: var(--app-surface-solid);
+      border-color: var(--input);
+      background: var(--card);
     }
 
     .la-pluma-app .app-liquid-tab-pill::before {
@@ -1803,22 +1406,22 @@
   :is(.la-pluma-app .la-pluma-content, .app-modal-layer) .app-native-control {
     /* 原生控件的字体与尺寸是组件基线，压过调用处的 font-mono / text-sm 等 utilities。 */
     box-sizing: border-box;
-    min-height: var(--app-control-height-md);
-    border: 1px solid var(--app-border-strong);
-    border-radius: var(--app-radius-md);
-    background: color-mix(in srgb, var(--app-surface-solid) 82%, transparent);
-    color: var(--app-text);
+    min-height: 2.75rem;
+    border: 1px solid var(--input);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--card) 82%, transparent);
+    color: var(--foreground);
     box-shadow: none;
-    font-family: var(--app-font-family) !important;
+    font-family: var(--font-app) !important;
     font-size: inherit !important;
     font-weight: 400 !important;
     line-height: inherit !important;
     -webkit-tap-highlight-color: transparent;
-    accent-color: var(--app-accent);
+    accent-color: var(--primary);
   }
 
   :is(.la-pluma-app .la-pluma-content, .app-modal-layer) .app-native-control:not(textarea) {
-    padding: 0 var(--app-space-control-x) !important;
+    padding: 0 1rem !important;
   }
 
   :is(.la-pluma-app .la-pluma-content, .app-modal-layer) input.app-native-control.app-input-has-icon {
@@ -1828,7 +1431,7 @@
   :is(.la-pluma-app .la-pluma-content, .app-modal-layer) select.app-native-control {
     appearance: none;
     -webkit-appearance: none;
-    background-image: var(--app-select-chevron);
+    background-image: var(--select-chevron);
     background-position: right 0.75rem center;
     background-repeat: no-repeat;
     background-size: 1rem 1rem;
@@ -1861,7 +1464,7 @@
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     transform: translateY(-50%);
     transition: color 160ms ease, background-color 160ms ease;
     pointer-events: none;
@@ -1873,8 +1476,8 @@
 
   :is(.la-pluma-app .la-pluma-content, .app-modal-layer) .app-native-control:focus-visible {
     outline: none;
-    border-color: var(--app-accent);
-    box-shadow: 0 0 0 3px var(--app-accent-soft);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-soft);
   }
 
   :is(.la-pluma-app .la-pluma-content, .app-modal-layer) .app-native-control:disabled {
@@ -1883,21 +1486,21 @@
   }
 
   :is(.la-pluma-app .la-pluma-content, .app-modal-layer) .app-native-control::placeholder {
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     opacity: 1;
   }
 
   .la-pluma-app .la-pluma-content .app-native-button {
     /* 原生按钮的 iOS 尺寸/排版是组件基线，需压过页面级按钮覆盖。 */
     display: inline-flex;
-    min-height: var(--app-control-height-md) !important;
+    min-height: 2.75rem !important;
     align-items: center;
     justify-content: center;
     gap: 0.5rem !important;
-    border: 1px solid var(--app-border);
-    border-radius: var(--app-radius-md) !important;
-    background: var(--app-surface-muted);
-    color: var(--app-text) !important;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg) !important;
+    background: var(--muted);
+    color: var(--foreground) !important;
     box-shadow: none !important;
     font: inherit !important;
     font-weight: 600 !important;
@@ -1907,9 +1510,9 @@
   }
 
   .la-pluma-app .la-pluma-content .app-native-button:hover:not(:disabled) {
-    border-color: color-mix(in srgb, var(--app-accent) 28%, var(--app-border));
-    background: color-mix(in srgb, var(--app-accent-soft) 34%, var(--app-surface-muted));
-    color: var(--app-accent);
+    border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
+    background: color-mix(in srgb, var(--primary-soft) 34%, var(--muted));
+    color: var(--primary);
   }
 
   .la-pluma-app .la-pluma-content .app-native-button:active:not(:disabled) {
@@ -1917,7 +1520,7 @@
   }
 
   .la-pluma-app .la-pluma-content .app-native-button:focus-visible {
-    outline: 2px solid var(--app-accent);
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
   }
 
@@ -1928,27 +1531,27 @@
 
   .la-pluma-app .la-pluma-content .app-native-button-primary {
     /* 主按钮的前景色是组件语义，需压过页面级 .is-primary 覆盖。 */
-    border-color: var(--app-accent-action);
-    background: var(--app-accent-action);
+    border-color: var(--primary-action);
+    background: var(--primary-action);
     color: #fff !important;
   }
 
   .la-pluma-app .la-pluma-content .app-native-button-primary:hover:not(:disabled) {
-    border-color: var(--app-accent-action-pressed) !important;
-    background: var(--app-accent-action-pressed) !important;
+    border-color: var(--primary-action-pressed) !important;
+    background: var(--primary-action-pressed) !important;
     color: #fff !important;
   }
 
   html.dark .la-pluma-app .la-pluma-content .app-native-control,
   .la-pluma-app.dark .la-pluma-content .app-native-control {
-    background: color-mix(in srgb, var(--app-surface-muted) 92%, transparent);
+    background: color-mix(in srgb, var(--muted) 92%, transparent);
   }
 
   @media (max-width: 768px) {
     /* Opt-in controls retain the iOS 44px touch target on phones. */
     .la-pluma-app .la-pluma-content .app-native-control {
-      height: var(--app-control-height-md);
-      min-height: var(--app-control-height-md) !important;
+      height: 2.75rem;
+      min-height: 2.75rem !important;
     }
   }
 
@@ -1999,8 +1602,8 @@
   ) {
     border-width: 1px;
     border-style: solid;
-    border-color: color-mix(in srgb, var(--app-border-strong) 72%, transparent);
-    background: color-mix(in srgb, var(--app-surface-solid) 78%, transparent);
+    border-color: color-mix(in srgb, var(--input) 72%, transparent);
+    background: color-mix(in srgb, var(--card) 78%, transparent);
     -webkit-backdrop-filter: blur(24px) saturate(165%);
     backdrop-filter: blur(24px) saturate(165%);
     box-shadow:
@@ -2112,8 +1715,8 @@
       .la-pluma-app .pwa-install-prompt,
       .app-modal-layer .surface-panel
     ) {
-      border-color: var(--app-border-strong);
-      background: var(--app-surface-solid);
+      border-color: var(--input);
+      background: var(--card);
     }
   }
 
@@ -2125,7 +1728,7 @@
     [data-workbench-tasks]
   ) .app-native-control:not(.form-error-surface) {
     border: 0;
-    background-color: var(--app-surface-muted);
+    background-color: var(--muted);
     box-shadow: none;
   }
 
@@ -2134,7 +1737,7 @@
     [data-automation-tasks],
     [data-workbench-tasks]
   ) .app-native-control:not(.form-error-surface):hover:not(:disabled) {
-    background-color: color-mix(in srgb, var(--app-accent-soft) 16%, var(--app-surface-muted));
+    background-color: color-mix(in srgb, var(--primary-soft) 16%, var(--muted));
     box-shadow: none;
   }
 
@@ -2149,8 +1752,8 @@
     [data-workbench-tasks]
   ) .app-native-control:not(.form-error-surface):focus-visible {
     border: 0;
-    background-color: color-mix(in srgb, var(--app-accent-soft) 22%, var(--app-surface-muted));
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 16%, transparent);
+    background-color: color-mix(in srgb, var(--primary-soft) 22%, var(--muted));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
   }
 
   .la-pluma-app .la-pluma-content :is(
@@ -2158,8 +1761,8 @@
     [data-automation-tasks],
     [data-workbench-tasks]
   ) select.app-native-control:not(.form-error-surface) {
-    background-color: color-mix(in srgb, var(--app-accent-soft) 12%, var(--app-surface-muted));
-    color: var(--app-text);
+    background-color: color-mix(in srgb, var(--primary-soft) 12%, var(--muted));
+    color: var(--foreground);
     font-weight: 500;
   }
 
@@ -2168,7 +1771,7 @@
     [data-automation-tasks],
     [data-workbench-tasks]
   ) select.app-native-control:not(.form-error-surface):hover:not(:disabled) {
-    background-color: color-mix(in srgb, var(--app-accent-soft) 22%, var(--app-surface-muted));
+    background-color: color-mix(in srgb, var(--primary-soft) 22%, var(--muted));
   }
 
   .la-pluma-app .la-pluma-content :is(
@@ -2181,7 +1784,7 @@
     [data-automation-tasks],
     [data-workbench-tasks]
   ) select.app-native-control:not(.form-error-surface):focus-visible {
-    background-color: color-mix(in srgb, var(--app-accent-soft) 28%, var(--app-surface-muted));
+    background-color: color-mix(in srgb, var(--primary-soft) 28%, var(--muted));
   }
 
   .la-pluma-app .la-pluma-content :is(
@@ -2189,8 +1792,8 @@
     [data-automation-tasks],
     [data-workbench-tasks]
   ) .app-select-trailing-icon {
-    background: color-mix(in srgb, var(--app-accent) 10%, transparent);
-    color: var(--app-accent);
+    background: color-mix(in srgb, var(--primary) 10%, transparent);
+    color: var(--primary);
   }
 
   .la-pluma-app .la-pluma-content :is(
@@ -2203,7 +1806,7 @@
     [data-automation-tasks],
     [data-workbench-tasks]
   ) .app-select-shell:focus-within .app-select-trailing-icon {
-    background: color-mix(in srgb, var(--app-accent) 16%, transparent);
+    background: color-mix(in srgb, var(--primary) 16%, transparent);
   }
 
   /* Apple Liquid Glass keeps ordinary Automation content solid. The preview
@@ -2216,14 +1819,14 @@
 
   .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .smooth-panel-surface {
     border: 0;
-    background: var(--app-surface-solid);
+    background: var(--card);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
 
   .la-pluma-app [data-workbench-tasks] .app-card-smooth-surface {
     border: 0;
-    background: var(--app-surface-solid);
+    background: var(--card);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -2238,7 +1841,7 @@
   @media (prefers-contrast: more) {
     .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .smooth-panel-surface,
     .la-pluma-app [data-workbench-tasks] .app-card-smooth-surface {
-      border: 1px solid var(--app-border-strong);
+      border: 1px solid var(--input);
     }
   }
 

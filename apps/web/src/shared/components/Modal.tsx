@@ -10,7 +10,7 @@ import {
   type UIEvent,
 } from 'react'
 import { createPortal } from 'react-dom'
-import Button, { IconButton } from './Button'
+import Button, { IconButton } from './LegacyButton'
 import {
   isTopModal,
   lockBackground,
@@ -220,9 +220,9 @@ function ModalLayer({
           style={isSheet ? { paddingBottom: 'env(safe-area-inset-bottom)' } : undefined}
         >
           {(title || showClose) && (
-            <div className="flex min-h-14 items-center justify-between gap-4 px-5 py-3 shadow-[inset_0_-1px_0_var(--app-border)] sm:px-6">
+            <div className="flex min-h-14 items-center justify-between gap-3.5 px-5 py-3 shadow-[inset_0_-1px_0_var(--border)] sm:px-6">
               {title
-                ? <h2 id={titleId} className="min-w-0 text-base font-semibold text-primary sm:text-lg">{title}</h2>
+                ? <h2 id={titleId} className="min-w-0 text-base font-semibold text-foreground sm:text-lg">{title}</h2>
                 : <span />}
               {showClose && (
                 <IconButton
@@ -247,7 +247,7 @@ function ModalLayer({
           </div>
 
           {footer && (
-            <div className="flex flex-wrap items-center justify-end gap-3 px-5 py-4 shadow-[inset_0_1px_0_var(--app-border)] sm:px-6">
+            <div className="flex flex-wrap items-center justify-end gap-3.5 px-5 py-4 shadow-[inset_0_1px_0_var(--border)] sm:px-6">
               {footer}
             </div>
           )}
@@ -348,7 +348,7 @@ export function ConfirmDialog({
       }
     >
       <div className="space-y-3">
-        {message && <div className="text-sm leading-6 text-secondary">{message}</div>}
+        {message && <div className="text-sm leading-6 text-muted-foreground">{message}</div>}
         {error && (
           <div role="alert" className="status-danger flex items-start gap-2 rounded-lg px-3 py-2 text-sm leading-5">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />

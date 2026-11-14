@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getErrorMessage } from '@/shared/api'
-import { Button, ConfirmDialog } from '@/shared/ui'
+import { Button, ConfirmDialog } from '@/shared/components'
 import { useAutomationAvailability, useStatusStore } from '@/features/runtime-status'
 import { DeviceMonitorPanel } from '@/features/device-mirror'
 import { isTerminalRunState } from '@/features/task-execution'
@@ -1003,7 +1003,7 @@ export default function CombatWorkspace() {
       {configSyncError && (
         <div
           role="alert"
-          className="status-warning flex min-h-11 flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm leading-5"
+          className="status-warning flex min-h-11 flex-wrap items-center justify-between gap-3.5 rounded-lg px-3 py-2 text-sm leading-5"
         >
           <span className="min-w-0 flex-1">{configSyncError}</span>
           <Button

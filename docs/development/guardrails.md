@@ -129,6 +129,6 @@ pnpm --filter la-pluma-next-client verify
 - API 模块的纯辅助导出（例如 `getItemIconUrl`）也会按来源被视为端点；当前页面未直接使用。若确需在页面直接使用纯函数，应由领域公开面提供非 `api/` 位置的导出或扩展白名单。
 - 搬移检查是启发式：页面缩减与非页面增长同域同时发生即触发，真正拆分需要更新基线并评审；它不能证明代码是否只是被搬动。
 - 搬移检查只比较同一域的 `pages/<domain>` 与 `features/<domain>` 的 hooks/model/components 总行数；跨域搬移、搬到 `api/`、`store/`、`utils/` 或新建 feature 不在启发式内，需由评审把关。
-- `shared/` 的深路径没有统一公开面约定（`shared/ui`、`shared/hooks` 等按目录使用），本检查只约束 feature 公开面。
+- `shared/` 的深路径没有统一公开面约定（`shared/components`、`shared/ui`、`shared/hooks` 等按目录使用），本检查只约束 feature 公开面。
 - 规模预算只覆盖四个分类的 feature 生产源码；不评价单个函数的复杂度、渲染次数或包体积。
 - 测试文件被有意排除：它们可以 import 内部实现、使用 fetch 与计时器，且不会进入生产包。

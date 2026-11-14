@@ -6,7 +6,7 @@ import {
   type AutomationActivityCompletion,
   type AutomationActivityEntry,
 } from '@/features/automation'
-import { formatExecutionSummary, getExecutionLastTask } from '@/shared/utils/executionSummary'
+import { formatExecutionSummary, getExecutionLastTask } from '@/shared/lib/executionSummary'
 import { buildDropSummary, type DropSummary } from './dropSummary'
 
 export type { DropSummary } from './dropSummary'

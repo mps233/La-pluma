@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Check, Sparkles } from 'lucide-react'
-import { Button, Select } from '@/shared/ui'
+import { Button, Select } from '@/shared/components'
 import { summarizeTargetMaterials } from '../model/materials'
 import {
   getPlanFocusName,

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { SmoothPanel } from '@/shared/ui'
+import { SmoothPanel } from '@/shared/components'
 import ScreenMonitor from './ScreenMonitor'
 
 export function DeviceMonitorPanel({ className = '', surfaceClassName = '' }: { className?: string; surfaceClassName?: string }) {

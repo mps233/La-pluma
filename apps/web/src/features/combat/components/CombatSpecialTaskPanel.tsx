@@ -1,4 +1,4 @@
-import { Card } from '@/shared/ui'
+import { Card } from '@/shared/components'
 import type { AdvancedValues } from '../model/combatCommands'
 import { splitCopilotInputToArgs } from '../utils/copilotUri'
 import type { CombatTask } from '../types'
@@ -52,10 +52,10 @@ export default function CombatSpecialTaskPanel({
       />
 
       <div className="combat-special-layout">
-        <div className="min-w-0 space-y-4">
+        <div className="min-w-0 space-y-3.5">
           <div className="combat-workspace-section">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h5 className="flex items-center gap-2 text-sm font-semibold text-primary">
+            <div className="mb-3 flex items-center justify-between gap-3.5">
+              <h5 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <svg className="h-4 w-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
@@ -83,7 +83,7 @@ export default function CombatSpecialTaskPanel({
               value={input}
               onChange={(e) => onInputChange(e.target.value)}
               rows={isSss ? 4 : 5}
-              className="app-native-control w-full resize-none rounded-lg px-4 py-3 font-mono text-sm font-medium text-primary control-surface focus:outline-hidden focus:ring-2 focus:ring-(--app-accent-soft)"
+              className="app-native-control w-full resize-none rounded-lg px-4 py-3 font-mono text-sm font-medium text-foreground control-surface focus:outline-hidden focus:ring-2 focus:ring-primary-soft"
             />
             {isSss && taskUris.length > 1 && (
               <div className="mt-2 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-500 dark:text-rose-300">
@@ -94,7 +94,7 @@ export default function CombatSpecialTaskPanel({
 
           {task.hasAdvanced && (
             <div className="combat-workspace-section">
-              <h5 className="mb-2 text-sm font-semibold text-primary">高级设置</h5>
+              <h5 className="mb-2 text-sm font-semibold text-foreground">高级设置</h5>
               <CombatAdvancedFields
                 taskId={task.id}
                 advanced={advanced}
@@ -109,41 +109,41 @@ export default function CombatSpecialTaskPanel({
             <CombatParadoxSearchPanel {...paradoxSearch} />
           ) : (
             <div className="combat-workspace-section">
-              <h5 className="mb-3 text-sm font-semibold text-primary">执行概览</h5>
-              <div className="divide-y divide-(--app-border) overflow-hidden rounded-lg border border-(--app-border) bg-(--app-surface-solid) text-xs">
+              <h5 className="mb-3 text-sm font-semibold text-foreground">执行概览</h5>
+              <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card text-xs">
                 <div className="flex items-center justify-between px-3 py-2">
                   <span className="text-tertiary">作业数量</span>
-                  <span className={taskUris.length > 1 ? 'text-rose-500 dark:text-rose-300' : 'text-primary'}>{taskUris.length || 0}</span>
+                  <span className={taskUris.length > 1 ? 'text-rose-500 dark:text-rose-300' : 'text-foreground'}>{taskUris.length || 0}</span>
                 </div>
                 <div className="flex items-center justify-between px-3 py-2">
                   <span className="text-tertiary">循环次数</span>
-                  <span className="text-primary">{advanced.loopTimes || '1'}</span>
+                  <span className="text-foreground">{advanced.loopTimes || '1'}</span>
                 </div>
               </div>
             </div>
           )}
 
           <div className="combat-workspace-section">
-            <h5 className="mb-3 text-sm font-semibold text-primary">参数概览</h5>
+            <h5 className="mb-3 text-sm font-semibold text-foreground">参数概览</h5>
             <div className="space-y-2 text-xs">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between gap-3.5">
                 <span className="text-tertiary">命令</span>
                 <span className="font-mono brand-text">{task.command}</span>
               </div>
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between gap-3.5">
                 <span className="text-tertiary">输入</span>
-                <span className="text-primary">{taskUris.length ? `${taskUris.length} 项` : '待填写'}</span>
+                <span className="text-foreground">{taskUris.length ? `${taskUris.length} 项` : '待填写'}</span>
               </div>
               {isParadox && (
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center justify-between gap-3.5">
                   <span className="text-tertiary">队列策略</span>
-                  <span className="text-primary">
+                  <span className="text-foreground">
                     {advanced.executionStrategy === 'stop' ? '失败停止' : '失败继续'}
                   </span>
                 </div>
               )}
               {isParadox && recommendedParadox && (
-                <div className="rounded-lg border border-(--app-border) bg-(--app-surface) px-3 py-2">
+                <div className="rounded-lg border border-border bg-card px-3 py-2">
                   <div className="mb-1 text-tertiary">当前推荐</div>
                   <div className="truncate font-mono brand-text">{recommendedParadox.uri}</div>
                 </div>

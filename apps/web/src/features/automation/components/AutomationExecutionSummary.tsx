@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { AlertTriangle, CheckCircle2, ChevronDown, CircleMinus } from 'lucide-react'
-import { formatExecutionActionSummary, isUnconfirmedGameAction } from '@/shared/utils/executionSummary'
+import { formatExecutionActionSummary, isUnconfirmedGameAction } from '@/shared/lib/executionSummary'
 import {
   executionSummaryHasFailure,
   type AutomationExecutionSummary as AutomationExecutionSummaryData,
@@ -46,7 +46,7 @@ export default function AutomationExecutionSummary({
   }
 
   return (
-    <section className="border-t border-(--app-border) px-3.5 py-3 sm:px-4" aria-label="最近执行结果">
+    <section className="border-t border-border px-3.5 py-3 sm:px-4" aria-label="最近执行结果">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-200">最近执行</h4>
         <span className="text-[11px] text-gray-400 dark:text-gray-500">
@@ -95,7 +95,7 @@ export default function AutomationExecutionSummary({
           className="overflow-hidden"
         >
           {lastSummary.summaries.some(summary => summary.stage || summary.drops) && (
-            <div className="mt-2 space-y-2 border-t border-(--app-border) pt-2">
+            <div className="mt-2 space-y-2 border-t border-border pt-2">
               {lastSummary.summaries
                 .filter(summary => summary.stage || summary.drops)
                 .map((summary, summaryIndex) => (
@@ -114,7 +114,7 @@ export default function AutomationExecutionSummary({
           )}
 
           {lastSummary.reports.length > 0 && (
-            <div className="mt-2 space-y-1.5 border-t border-(--app-border) pt-2">
+            <div className="mt-2 space-y-1.5 border-t border-border pt-2">
               {lastSummary.reports.map((report, reportIndex) => (
                 <div
                   key={`${report.provider}-${report.stage || reportIndex}-${reportIndex}`}
@@ -132,7 +132,7 @@ export default function AutomationExecutionSummary({
           )}
 
           {lastSummary.actions?.length > 0 && (
-            <div className="mt-2 space-y-1.5 border-t border-(--app-border) pt-2">
+            <div className="mt-2 space-y-1.5 border-t border-border pt-2">
               {lastSummary.actions.map((action, actionIndex) => {
                 const unconfirmed = isUnconfirmedGameAction(action)
                 return (

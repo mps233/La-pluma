@@ -1,6 +1,6 @@
 import { useRef, type KeyboardEvent } from 'react'
 import { LayoutGrid, List, Power, Search, X } from 'lucide-react'
-import { Button, IconButton, Input, Select } from '@/shared/ui'
+import { Button, IconButton, Input, Select } from '@/shared/components'
 import {
   COPILOT_SEARCH_ORDERS,
   COPILOT_SEARCH_ORDER_LABELS,

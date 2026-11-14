@@ -1,4 +1,4 @@
-import { HintTooltip } from '@/shared/ui'
+import { HintTooltip } from '@/shared/components'
 
 interface AutomationFieldLabelProps {
   htmlFor: string
@@ -58,7 +58,7 @@ export function AutomationCheckboxField({ id, label, checked, disabled, hint, on
         disabled={disabled}
         className="custom-checkbox cursor-pointer"
       />
-      <span className="group-hover:text-(--app-accent) transition-colors">{label}</span>
+      <span className="group-hover:text-primary transition-colors">{label}</span>
     </label>
   )
 

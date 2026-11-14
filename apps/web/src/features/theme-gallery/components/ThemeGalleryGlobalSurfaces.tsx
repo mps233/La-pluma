@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { RefreshCw, Save, Trash2 } from 'lucide-react'
-import Icons from '@/shared/ui/Icons'
+import Icons from '@/shared/components/Icons'
 import {
   Button,
   Card,
@@ -13,7 +13,7 @@ import {
   PageSkeleton,
   SmoothPanel,
   Switch,
-} from '@/shared/ui'
+} from '@/shared/components'
 
 export function ThemeGalleryGlobalSurfaces() {
   const [address, setAddress] = useState('')
@@ -24,7 +24,7 @@ export function ThemeGalleryGlobalSurfaces() {
     <>
       <Card>
         <CardHeader title="状态与加载" />
-        <CardContent className="grid gap-4 md:grid-cols-2">
+        <CardContent className="grid gap-3.5 md:grid-cols-2">
           <Loading text="正在读取运行数据" />
           <EmptyState
             compact
@@ -39,7 +39,7 @@ export function ThemeGalleryGlobalSurfaces() {
       <Card>
         <CardHeader title="整页骨架" />
         <CardContent>
-          <div className="h-72 overflow-hidden rounded-xl border border-(--app-border)">
+          <div className="h-72 overflow-hidden rounded-xl border border-border">
             <PageSkeleton variant="config" />
           </div>
         </CardContent>
@@ -48,7 +48,7 @@ export function ThemeGalleryGlobalSurfaces() {
       <Card>
         <CardHeader title="领域字形" />
         <CardContent className="app-stack-card">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3.5">
             <Icons.Play />
             <Icons.Sword />
             <Icons.Gift />
@@ -58,7 +58,7 @@ export function ThemeGalleryGlobalSurfaces() {
             <Icons.Document />
             <Icons.Target />
           </div>
-          <div className="flex items-center gap-3 text-secondary">
+          <div className="flex items-center gap-3.5 text-muted-foreground">
             <Icons.TrendingUp />
             <Icons.Zap />
             <Icons.Star />
@@ -70,15 +70,15 @@ export function ThemeGalleryGlobalSurfaces() {
 
       <Card>
         <CardHeader title="面板容器" />
-        <CardContent className="grid gap-4 md:grid-cols-3">
+        <CardContent className="grid gap-3.5 md:grid-cols-3">
           <Card>
-            <p className="text-sm text-secondary">基础卡片，外层负责阴影与边框。</p>
+            <p className="text-sm text-muted-foreground">基础卡片，外层负责阴影与边框。</p>
           </Card>
           <Card smoothCorners>
-            <p className="text-sm text-secondary">连续圆角卡片，内部表面负责裁切。</p>
+            <p className="text-sm text-muted-foreground">连续圆角卡片，内部表面负责裁切。</p>
           </Card>
           <SmoothPanel surfaceClassName="flex items-center px-4 py-4">
-            <p className="text-sm text-secondary">连续圆角独立面板。</p>
+            <p className="text-sm text-muted-foreground">连续圆角独立面板。</p>
           </SmoothPanel>
         </CardContent>
       </Card>
@@ -86,14 +86,14 @@ export function ThemeGalleryGlobalSurfaces() {
       <Card>
         <CardHeader title="操作与输入" />
         <CardContent className="app-stack-card">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3.5">
             <Button icon={<Save size={15} />}>保存草稿</Button>
             <Button variant="secondary">查看日志</Button>
             <Button variant="danger">停止执行</Button>
             <Button variant="success">重试</Button>
             <Button variant="ghost">忽略</Button>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3.5">
             <Button variant="secondary" size="sm">小尺寸</Button>
             <Button variant="secondary">中尺寸</Button>
             <Button variant="secondary" size="lg">大尺寸</Button>
@@ -102,7 +102,7 @@ export function ThemeGalleryGlobalSurfaces() {
             <IconButton icon={<RefreshCw size={16} />} title="刷新" />
             <IconButton variant="danger" icon={<Trash2 size={16} />} title="删除" />
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-3.5 md:grid-cols-2">
             <Input
               label="连接地址"
               value={address}

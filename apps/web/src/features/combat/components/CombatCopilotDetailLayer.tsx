@@ -7,8 +7,8 @@ import {
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { IconButton, useModalLayer } from '@/shared/ui'
-import { Modal } from '@/shared/ui/Modal'
+import { IconButton, useModalLayer } from '@/shared/components'
+import { Modal } from '@/shared/components/Modal'
 import type { CopilotDetailTarget } from '../model/copilotDetail'
 import { COPILOT_DETAIL_LAYER_ID } from './combatPanelTypes'
 import { DetailBody, DetailPlaceholder } from './CombatCopilotDetailBody'

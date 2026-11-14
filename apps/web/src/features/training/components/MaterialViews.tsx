@@ -14,14 +14,14 @@ export function MaterialTable({ materials }: { materials: MaterialNode[] }) {
     {materials.map(material => <div className="training-material-line" role="row" key={material.id}>
       <span role="cell" className="training-material-name"><ResourceIcon id={material.iconId} /><span>{material.name}</span></span>
       <span role="cell">{material.have}</span><span role="cell">{material.needed}</span>
-      <span role="cell" className={material.stillNeeded > 0 ? 'brand-text font-semibold' : 'text-secondary'}>{material.stillNeeded > 0 ? material.stillNeeded : '已齐'}</span>
+      <span role="cell" className={material.stillNeeded > 0 ? 'brand-text font-semibold' : 'text-muted-foreground'}>{material.stillNeeded > 0 ? material.stillNeeded : '已齐'}</span>
     </div>)}
   </div>
 }
 
 export function MaterialTree({ nodes }: { nodes: MaterialNode[] }) {
   return <ul className="training-material-tree">{nodes.map(node => <li key={node.id}>
-    <div><ResourceIcon id={node.iconId} /><span className="min-w-0 flex-1">{node.name}</span><span className="text-secondary tabular-nums">{node.have} / {node.needed}</span><span className="brand-text">{node.stillNeeded > 0 ? `缺 ${node.stillNeeded}` : '已齐'}</span></div>
+    <div><ResourceIcon id={node.iconId} /><span className="min-w-0 flex-1">{node.name}</span><span className="text-muted-foreground tabular-nums">{node.have} / {node.needed}</span><span className="brand-text">{node.stillNeeded > 0 ? `缺 ${node.stillNeeded}` : '已齐'}</span></div>
     {node.children && node.children.length > 0 && <MaterialTree nodes={node.children} />}
   </li>)}</ul>
 }

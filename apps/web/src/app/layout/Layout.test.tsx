@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { act, useLayoutEffect, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { BrowserRouter, useNavigate } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,36 +12,6 @@ import Layout from './Layout'
 const mocks = vi.hoisted(() => ({
   loadDailyOperatorQuote: vi.fn(),
 }))
-
-vi.mock('framer-motion', async () => {
-  const React = await import('react')
-  type MotionTestProps = Record<string, unknown> & { children?: ReactNode }
-  const motionComponent = (tag: 'div' | 'section') => React.forwardRef<HTMLElement, MotionTestProps>(
-    ({
-      children,
-      initial: _initial,
-      animate: _animate,
-      exit: _exit,
-      transition: _transition,
-      drag: _drag,
-      dragConstraints: _dragConstraints,
-      dragElastic: _dragElastic,
-      dragMomentum: _dragMomentum,
-      dragDirectionLock: _dragDirectionLock,
-      onDragEnd: _onDragEnd,
-      ...props
-    }, ref) => React.createElement(tag, { ...props, ref }, children as ReactNode),
-  )
-
-  return {
-    AnimatePresence: ({ children }: { children: ReactNode }) => children,
-    motion: {
-      div: motionComponent('div'),
-      section: motionComponent('section'),
-    },
-    useReducedMotion: () => false,
-  }
-})
 
 vi.mock('./ThemeToggle', () => ({ default: () => <button type="button">主题</button> }))
 vi.mock('@/features/operator-quotes', () => ({
@@ -175,12 +145,20 @@ function desktopLink(tab: string) {
 }
 
 function mobileMoreTrigger() {
-  return container.querySelector<HTMLButtonElement>('button[aria-label="更多页面"]')!
+  return document.querySelector<HTMLButtonElement>('button[aria-label="更多页面"]')!
+}
+
+function mobileTabLinks() {
+  return container.querySelectorAll<HTMLButtonElement>('footer[data-region="tabbar"] button[data-app-tab]')
 }
 
 /** 侧边栏身份区以「干员：台词」作为无障碍名称，不依赖包裹类名。 */
 function sidebarIdentity() {
   return container.querySelector<HTMLElement>('aside [aria-label*="："]')!
+}
+
+function moreSheet() {
+  return document.querySelector<HTMLElement>('[data-slot="sheet-content"]')
 }
 
 describe('top-level application navigation', () => {
@@ -218,6 +196,7 @@ describe('top-level application navigation', () => {
   afterEach(async () => {
     await act(async () => root.unmount())
     container.remove()
+    document.querySelectorAll('[data-slot="sheet-portal"]').forEach(node => node.remove())
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
@@ -378,9 +357,9 @@ describe('top-level application navigation', () => {
   it('keeps all desktop workspaces in one flat navigation list', async () => {
     await renderLayout()
 
-    const sidebar = container.querySelector<HTMLElement>('aside[aria-label="主要功能"]')!
+    const sidebar = container.querySelector<HTMLElement>('aside[data-region="sidebar"][aria-label="主要功能"]')!
     const sidebarNav = sidebar.querySelector<HTMLElement>('nav[aria-label="工作台"]')!
-    expect(sidebarNav.querySelector('[role="group"]')).toBeNull()
+    expect(sidebarNav.querySelectorAll('ul')).toHaveLength(1)
     expect([...sidebarNav.querySelectorAll<HTMLButtonElement>('button[data-app-tab]')]
       .map(button => button.dataset.appTab)).toEqual([
       'dashboard',
@@ -392,9 +371,8 @@ describe('top-level application navigation', () => {
       'logs',
       'config',
     ])
-    expect(sidebar.querySelectorAll('button[data-app-tab]')).toHaveLength(8)
 
-    const mobileDestinations = [...container.querySelectorAll<HTMLButtonElement>('nav[aria-label="主要功能"] button[data-app-tab]')]
+    const mobileDestinations = [...mobileTabLinks()]
       .map(button => button.dataset.appTab)
     expect(mobileDestinations).toEqual([
       'dashboard',
@@ -449,48 +427,76 @@ describe('top-level application navigation', () => {
     expect(githubLink.getAttribute('rel')?.split(/\s+/).sort()).toEqual(['noopener', 'noreferrer'])
   })
 
-  it('opens and dismisses the mobile overflow sheet without losing trigger focus', async () => {
+  it('opens the mobile overflow sheet with an accessible title and the remaining workspaces', async () => {
     await renderLayout()
     const trigger = mobileMoreTrigger()
-    trigger.focus()
+    expect(trigger.getAttribute('aria-haspopup')).toBe('dialog')
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
 
+    trigger.focus()
     await act(async () => trigger.click())
 
-    let sheet = container.querySelector<HTMLElement>('#la-pluma-more-sheet')
+    const sheet = moreSheet()
     expect(sheet?.getAttribute('role')).toBe('dialog')
-    expect(sheet?.getAttribute('aria-modal')).toBe('true')
+    expect(document.querySelector('[data-slot="sheet-title"]')?.textContent).toBe('更多工作区')
     expect(sheet?.querySelector('[aria-label="关闭更多工作区"]')).not.toBeNull()
-    expect(document.body.style.overflow).toBe('hidden')
-    expect(getScrollHost().style.overflow).toBe('hidden')
+    expect([...sheet!.querySelectorAll<HTMLButtonElement>('button[data-app-tab]')]
+      .map(button => button.dataset.appTab)).toEqual([
+      'roguelike',
+      'training',
+      'statistics',
+      'logs',
+    ])
+  })
+
+  it('dismisses the mobile overflow sheet through close, backdrop, and escape', async () => {
+    await renderLayout()
+    const trigger = mobileMoreTrigger()
+
+    trigger.focus()
+    await act(async () => trigger.click())
+    expect(moreSheet()).not.toBeNull()
 
     await act(async () => {
-      sheet?.querySelector<HTMLButtonElement>('[aria-label="关闭更多工作区"]')?.click()
+      moreSheet()?.querySelector<HTMLButtonElement>('[aria-label="关闭更多工作区"]')?.click()
     })
-    expect(container.querySelector('#la-pluma-more-sheet')).toBeNull()
+    await act(async () => new Promise(resolve => { window.setTimeout(resolve, 0) }))
+    expect(moreSheet()).toBeNull()
     expect(document.activeElement).toBe(trigger)
-    expect(document.body.style.overflow).toBe('')
-    expect(getScrollHost().style.overflow).toBe('')
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
 
     await act(async () => trigger.click())
-    await act(async () => container.querySelector<HTMLElement>('[data-app-sheet-backdrop]')?.click())
-    expect(container.querySelector('#la-pluma-more-sheet')).toBeNull()
-    expect(document.activeElement).toBe(trigger)
-
-    await act(async () => trigger.click())
-    expect(container.querySelector('#la-pluma-more-sheet')).toBeTruthy()
-    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
-    expect(container.querySelector('#la-pluma-more-sheet')).toBeNull()
+    await act(async () => {
+      document.querySelector<HTMLElement>('[data-slot="sheet-overlay"]')?.click()
+    })
+    await act(async () => new Promise(resolve => { window.setTimeout(resolve, 0) }))
+    expect(moreSheet()).toBeNull()
     expect(document.activeElement).toBe(trigger)
 
     await act(async () => trigger.click())
-    sheet = container.querySelector('#la-pluma-more-sheet')
-    const overflowLink = sheet?.querySelector<HTMLButtonElement>('button[data-app-tab="roguelike"]')
+    expect(moreSheet()).not.toBeNull()
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    await act(async () => new Promise(resolve => { window.setTimeout(resolve, 0) }))
+    expect(moreSheet()).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('closes the mobile overflow sheet when a workspace is chosen', async () => {
+    await renderLayout()
+    const trigger = mobileMoreTrigger()
+
+    trigger.focus()
+    await act(async () => trigger.click())
+    const overflowLink = moreSheet()?.querySelector<HTMLButtonElement>('button[data-app-tab="roguelike"]')
     expect(overflowLink).toBeTruthy()
 
     await act(async () => overflowLink?.click())
 
     expect(activeTabLabel()).toBe('roguelike')
-    expect(container.querySelector('#la-pluma-more-sheet')).toBeNull()
+    await act(async () => new Promise(resolve => { window.setTimeout(resolve, 0) }))
+    expect(moreSheet()).toBeNull()
     expect(document.activeElement).toBe(trigger)
   })
 })

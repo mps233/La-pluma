@@ -6,22 +6,22 @@
     min-height: 4.75rem;
     gap: 1rem;
     padding: 1rem 1.125rem;
-    border-bottom: 1px solid var(--app-border);
+    border-bottom: 1px solid var(--border);
   }
 
   .automation-flow-header h3 {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: var(--app-text);
-    font-size: var(--app-font-card-title);
+    color: var(--foreground);
+    font-size: 1rem;
     font-weight: 600;
   }
 
   .automation-flow-header h3 svg {
     width: 1.05rem;
     height: 1.05rem;
-    color: var(--app-accent);
+    color: var(--primary);
   }
 
   .automation-flow-summary {
@@ -32,8 +32,8 @@
     min-height: 1.75rem;
     border-radius: 999px;
     padding: 0 0.625rem;
-    background: color-mix(in srgb, var(--app-surface-muted) 88%, transparent);
-    color: var(--app-text-muted);
+    background: color-mix(in srgb, var(--muted) 88%, transparent);
+    color: var(--muted-foreground);
     box-shadow: none;
     font-size: 0.6875rem;
     font-weight: 700;
@@ -59,26 +59,26 @@
 
   .automation-flow-card {
     min-width: 0;
-    border: 1px solid var(--app-border);
-    border-radius: var(--app-radius-lg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
     padding: 1rem;
-    background: var(--app-surface-muted);
+    background: var(--muted);
     transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, opacity 160ms ease, transform 160ms ease;
   }
 
   .automation-flow-card:hover {
-    border-color: color-mix(in srgb, var(--app-accent) 42%, var(--app-border));
-    box-shadow: 0 8px 22px color-mix(in srgb, var(--app-accent) 9%, transparent);
+    border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+    box-shadow: 0 8px 22px color-mix(in srgb, var(--primary) 9%, transparent);
   }
 
   .automation-flow-card.is-current {
-    border-color: var(--app-accent);
-    background: var(--app-accent-soft);
+    border-color: var(--primary);
+    background: var(--primary-soft);
     box-shadow: none;
   }
 
   .automation-flow-card.is-disabled {
-    background: color-mix(in srgb, var(--app-surface-muted) 56%, transparent);
+    background: color-mix(in srgb, var(--muted) 56%, transparent);
     opacity: 0.58;
   }
 
@@ -95,7 +95,7 @@
     gap: 1rem;
     margin-bottom: 1rem;
     padding-bottom: 0.875rem;
-    border-bottom: 1px solid var(--app-border);
+    border-bottom: 1px solid var(--border);
   }
 
   .automation-flow-card-identity,
@@ -116,7 +116,7 @@
 
   .automation-flow-sequence {
     flex: 0 0 auto;
-    color: var(--app-accent);
+    color: var(--primary);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 0.625rem;
     font-weight: 700;
@@ -130,8 +130,8 @@
 
   .automation-flow-task-name strong {
     overflow: hidden;
-    color: var(--app-text);
-    font-size: var(--app-font-body);
+    color: var(--foreground);
+    font-size: 0.875rem;
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -139,9 +139,9 @@
 
   .automation-flow-task-name small {
     overflow: hidden;
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: var(--app-font-meta);
+    font-size: 0.6875rem;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -183,7 +183,7 @@
       "editor"
       "support";
     align-items: start;
-    gap: var(--app-space-section);
+    gap: 1.125rem;
   }
 
   .automation-monitor-column,
@@ -205,7 +205,7 @@
     display: grid;
     grid-area: support;
     align-content: start;
-    gap: var(--app-space-section);
+    gap: 1.125rem;
   }
 
   .automation-monitor-panel {
@@ -233,7 +233,7 @@
     max-height: 17rem;
     margin: 0 0.75rem;
     overflow: hidden;
-    border-radius: var(--app-continuous-radius-compact);
+    border-radius: var(--radius-xl);
   }
 
   .automation-monitor-skeleton-toolbar {
@@ -307,7 +307,7 @@
     align-items: center;
     justify-content: center;
     flex-direction: column;
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     text-align: center;
   }
 
@@ -319,20 +319,20 @@
   .automation-sequence-empty svg,
   .automation-editor-empty svg {
     margin-bottom: 0.625rem;
-    color: var(--app-accent);
+    color: var(--primary);
   }
 
   .automation-sequence-empty strong,
   .automation-editor-empty strong {
-    color: var(--app-text);
-    font-size: var(--app-font-body);
+    color: var(--foreground);
+    font-size: 0.875rem;
     font-weight: 600;
   }
 
   .automation-sequence-empty span,
   .automation-editor-empty span {
     margin-top: 0.25rem;
-    font-size: var(--app-font-caption);
+    font-size: 0.75rem;
   }
 
   .automation-sequence-list {
@@ -342,8 +342,8 @@
     overflow-y: auto;
     margin: 0.5rem 0.75rem 0.75rem;
     padding: 0;
-    border-radius: var(--app-radius-lg);
-    background: color-mix(in srgb, var(--app-surface-muted) 88%, transparent);
+    border-radius: var(--radius-xl);
+    background: color-mix(in srgb, var(--muted) 88%, transparent);
     scrollbar-width: none;
   }
 
@@ -362,7 +362,7 @@
     gap: var(--automation-sequence-gap);
     border-radius: 0;
     padding: 0.25rem;
-    color: var(--app-text-muted);
+    color: var(--muted-foreground);
     box-shadow: none;
     isolation: isolate;
     transition: color 160ms ease, opacity 160ms ease, transform 160ms ease;
@@ -386,7 +386,7 @@
     bottom: 0;
     left: calc(5rem + var(--automation-sequence-gap));
     height: 1px;
-    background: var(--app-border);
+    background: var(--border);
     content: '';
     opacity: 0.72;
     transform: scaleY(0.5);
@@ -394,33 +394,33 @@
   }
 
   .automation-sequence-item:not(.is-selected):not(.is-current):hover::before {
-    background: color-mix(in srgb, var(--app-surface-solid) 52%, transparent);
+    background: color-mix(in srgb, var(--card) 52%, transparent);
   }
 
   .automation-sequence-item.is-selected {
-    color: var(--app-text);
+    color: var(--foreground);
   }
 
   .automation-sequence-item.is-selected::before {
     inset: 0.125rem 0;
-    border-radius: var(--app-continuous-radius-compact);
-    background: color-mix(in srgb, var(--app-text) 5%, transparent);
+    border-radius: var(--radius-xl);
+    background: color-mix(in srgb, var(--foreground) 5%, transparent);
     box-shadow: 0 1px 3px color-mix(in srgb, black 6%, transparent);
   }
 
   .automation-sequence-item.is-current:not(.is-selected) {
-    color: var(--app-text);
+    color: var(--foreground);
   }
 
   .automation-sequence-item.is-current:not(.is-selected)::before {
     inset: 0.125rem 0;
-    border-radius: var(--app-continuous-radius-compact);
-    background: color-mix(in srgb, var(--app-accent) 7%, transparent);
-    box-shadow: 0 1px 3px color-mix(in srgb, var(--app-accent) 8%, transparent);
+    border-radius: var(--radius-xl);
+    background: color-mix(in srgb, var(--primary) 7%, transparent);
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--primary) 8%, transparent);
   }
 
   .automation-sequence-item.is-completed {
-    color: var(--app-text);
+    color: var(--foreground);
   }
 
   .automation-sequence-item.is-disabled {
@@ -441,8 +441,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: var(--app-radius-sm);
-    color: var(--app-text-soft);
+    border-radius: var(--radius-md);
+    color: var(--tertiary-foreground);
   }
 
   .automation-sequence-drag {
@@ -477,13 +477,13 @@
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
     gap: 0.5rem;
-    border-radius: var(--app-radius-sm);
+    border-radius: var(--radius-md);
     text-align: left;
   }
 
   .automation-sequence-select:focus-visible,
   .automation-sequence-delete:focus-visible {
-    outline: 2px solid var(--app-accent);
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
   }
 
@@ -496,12 +496,12 @@
     align-items: center;
     justify-content: center;
     border-radius: 999px;
-    background: var(--app-surface);
-    color: var(--app-accent);
+    background: var(--card);
+    color: var(--primary);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: var(--app-font-meta);
+    font-size: 0.6875rem;
     font-weight: 700;
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 30%, var(--app-border));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 30%, var(--border));
     transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
   }
 
@@ -517,7 +517,7 @@
     z-index: -1;
     left: calc(0.25rem + 2.75rem + var(--automation-sequence-gap) + 0.75rem);
     width: 1px;
-    background: var(--app-border);
+    background: var(--border);
     content: '';
     transform: translateX(-50%);
     pointer-events: none;
@@ -535,20 +535,20 @@
   }
 
   .automation-sequence-item.is-current .automation-sequence-node {
-    background: var(--app-accent);
+    background: var(--primary);
     color: white;
     box-shadow: inset 0 0 0 1px color-mix(in srgb, white 16%, transparent);
   }
 
   .automation-sequence-item.is-completed .automation-sequence-node {
-    background: var(--app-success);
+    background: var(--success);
     color: white;
     box-shadow: inset 0 0 0 1px color-mix(in srgb, white 18%, transparent);
   }
 
   .automation-sequence-item.is-completed .automation-sequence-select::before,
   .automation-sequence-item.is-completed .automation-sequence-select::after {
-    background: color-mix(in srgb, var(--app-success) 68%, var(--app-border));
+    background: color-mix(in srgb, var(--success) 68%, var(--border));
   }
 
   .automation-sequence-progress {
@@ -569,9 +569,9 @@
     justify-content: center;
     justify-self: center;
     border-radius: 50%;
-    background: color-mix(in srgb, var(--app-success) 11%, var(--app-surface-solid));
-    color: var(--app-success-text);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-success) 22%, var(--app-border));
+    background: color-mix(in srgb, var(--success) 11%, var(--card));
+    color: var(--success-text);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 22%, var(--border));
   }
 
   .automation-sequence-copy {
@@ -588,14 +588,14 @@
   }
 
   .automation-sequence-copy strong {
-    color: var(--app-text);
-    font-size: var(--app-font-body);
+    color: var(--foreground);
+    font-size: 0.875rem;
     font-weight: 600;
   }
 
   .automation-sequence-copy small {
-    color: var(--app-text-soft);
-    font-size: var(--app-font-caption);
+    color: var(--tertiary-foreground);
+    font-size: 0.75rem;
   }
 
   .automation-sequence-enabled {
@@ -608,33 +608,33 @@
     position: relative;
     display: grid;
     flex: 0 0 auto;
-    gap: var(--app-space-2);
-    padding: var(--app-space-3);
-    border-top: 1px solid var(--app-border);
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border-top: 1px solid var(--border);
   }
 
   [data-automation-tasks] .automation-run-button.is-running:is(:disabled, .disabled) {
     cursor: progress;
     opacity: 1 !important;
-    background: color-mix(in srgb, var(--app-accent) 11%, var(--app-surface-solid)) !important;
-    color: var(--app-accent-strong) !important;
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 24%, var(--app-border)) !important;
+    background: color-mix(in srgb, var(--primary) 11%, var(--card)) !important;
+    color: var(--primary-strong) !important;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 24%, var(--border)) !important;
   }
 
   [data-automation-tasks] .automation-stop-button.is-stopping:is(:disabled, .disabled) {
     cursor: progress;
     opacity: 1 !important;
-    background: var(--app-accent-soft) !important;
-    color: var(--app-accent-strong) !important;
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 28%, var(--app-border)) !important;
+    background: var(--primary-soft) !important;
+    color: var(--primary-strong) !important;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 28%, var(--border)) !important;
   }
 
   [data-automation-tasks] .automation-test-connection.is-testing:is(:disabled, .disabled) {
     cursor: progress;
     opacity: 1 !important;
-    background: var(--app-accent-soft) !important;
-    color: var(--app-accent-strong) !important;
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 28%, var(--app-border)) !important;
+    background: var(--primary-soft) !important;
+    color: var(--primary-strong) !important;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 28%, var(--border)) !important;
   }
 
   .automation-task-picker-toggle {
@@ -644,10 +644,10 @@
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 0.5rem;
-    border-radius: var(--app-radius-md);
+    border-radius: var(--radius-lg);
     padding: 0 0.75rem;
-    color: var(--app-text-muted);
-    background: color-mix(in srgb, var(--app-surface-muted) 86%, transparent);
+    color: var(--muted-foreground);
+    background: color-mix(in srgb, var(--muted) 86%, transparent);
     box-shadow: none;
     text-align: left;
     transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
@@ -655,9 +655,9 @@
 
   .automation-task-picker-toggle:hover,
   .automation-task-picker-toggle.is-open {
-    background: var(--app-accent-soft);
-    color: var(--app-accent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 26%, transparent);
+    background: var(--primary-soft);
+    color: var(--primary);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 26%, transparent);
   }
 
   .automation-task-picker-toggle:disabled {
@@ -666,7 +666,7 @@
   }
 
   .automation-task-picker-toggle span {
-    font-size: var(--app-font-caption);
+    font-size: 0.75rem;
     font-weight: 700;
   }
 
@@ -676,9 +676,9 @@
     justify-content: center;
     min-width: 1.25rem;
     height: 1.25rem;
-    border-radius: var(--app-radius-pill);
-    background: var(--app-accent-soft);
-    color: var(--app-accent);
+    border-radius: 9999px;
+    background: var(--primary-soft);
+    color: var(--primary);
     font-size: 0.5625rem;
     font-weight: 700;
   }
@@ -690,10 +690,10 @@
     max-height: 14rem;
     gap: 0.25rem;
     overflow-y: auto;
-    border-radius: var(--app-radius-md);
+    border-radius: var(--radius-lg);
     padding: 0.375rem;
-    background: var(--app-surface-solid);
-    box-shadow: inset 0 0 0 1px var(--app-border), 0 14px 30px rgba(2, 8, 12, 0.28);
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px var(--border), 0 14px 30px rgba(2, 8, 12, 0.28);
     scrollbar-width: none;
   }
 
@@ -707,17 +707,17 @@
     grid-template-columns: 1.75rem minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 0.5rem;
-    border-radius: var(--app-radius-sm);
+    border-radius: var(--radius-md);
     min-height: 2.75rem;
     padding: 0.375rem 0.5rem;
-    color: var(--app-text-muted);
+    color: var(--muted-foreground);
     text-align: left;
     transition: background 160ms ease, color 160ms ease;
   }
 
   .automation-task-picker-option:hover {
-    background: var(--app-accent-soft);
-    color: var(--app-accent);
+    background: var(--primary-soft);
+    color: var(--primary);
   }
 
   .automation-task-picker-option > span {
@@ -726,9 +726,9 @@
     justify-content: center;
     width: 1.75rem;
     height: 1.75rem;
-    border-radius: var(--app-radius-md);
-    background: var(--app-accent-soft);
-    color: var(--app-accent);
+    border-radius: var(--radius-lg);
+    background: var(--primary-soft);
+    color: var(--primary);
   }
 
   .automation-task-picker-option > span svg {
@@ -738,8 +738,8 @@
 
   .automation-task-picker-option strong {
     overflow: hidden;
-    color: var(--app-text);
-    font-size: var(--app-font-caption);
+    color: var(--foreground);
+    font-size: 0.75rem;
     font-weight: 700;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -751,8 +751,8 @@
     justify-content: center;
     width: 1.125rem;
     height: 1.125rem;
-    border-radius: var(--app-radius-pill);
-    background: var(--app-accent);
+    border-radius: 9999px;
+    background: var(--primary);
     color: white;
     font-size: 0.625rem;
     font-weight: 700;
@@ -770,20 +770,20 @@
     min-height: 4.75rem;
     gap: 1rem;
     padding: 1rem 1.125rem;
-    border-bottom: 1px solid var(--app-border);
+    border-bottom: 1px solid var(--border);
   }
 
   .automation-editor-heading h3 {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: var(--app-text);
-    font-size: var(--app-font-card-title);
+    color: var(--foreground);
+    font-size: 1rem;
     font-weight: 600;
   }
 
   .automation-editor-heading h3 svg {
-    color: var(--app-accent);
+    color: var(--primary);
   }
 
   .automation-editor-heading > span {
@@ -792,9 +792,9 @@
     justify-content: center;
     min-width: 1.875rem;
     height: 1.75rem;
-    border-radius: var(--app-radius-pill);
-    background: var(--app-accent-soft);
-    color: var(--app-accent);
+    border-radius: 9999px;
+    background: var(--primary-soft);
+    color: var(--primary);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 0.625rem;
     font-weight: 700;
@@ -810,7 +810,7 @@
     justify-content: space-between;
     gap: 0.75rem;
     padding: 0.875rem 1rem;
-    border-bottom: 1px solid var(--app-border);
+    border-bottom: 1px solid var(--border);
   }
 
   .automation-side-card-heading-text {
@@ -821,15 +821,15 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: var(--app-text);
-    font-size: var(--app-font-card-title);
+    color: var(--foreground);
+    font-size: 1rem;
     font-weight: 600;
   }
 
   .automation-side-card-heading h3 svg {
     width: 1rem;
     height: 1rem;
-    color: var(--app-accent);
+    color: var(--primary);
   }
 
   .automation-flow-header h3 .icon-well svg,
@@ -842,8 +842,8 @@
 
   .automation-side-card-heading p {
     margin-top: 0.2rem;
-    color: var(--app-text-soft);
-    font-size: var(--app-font-caption);
+    color: var(--tertiary-foreground);
+    font-size: 0.75rem;
     line-height: 1.45;
   }
 
@@ -865,10 +865,10 @@
     height: 1.5rem;
     align-items: center;
     justify-content: center;
-    border-radius: var(--app-radius-pill);
+    border-radius: 9999px;
     padding: 0 0.5rem;
-    background: var(--app-surface-muted);
-    color: var(--app-text-muted);
+    background: var(--muted);
+    color: var(--muted-foreground);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.625rem;
     font-variant-numeric: tabular-nums;
@@ -881,7 +881,7 @@
     justify-content: space-between;
     gap: 0.75rem;
     padding: 0.75rem 1rem;
-    border-top: 1px solid var(--app-border);
+    border-top: 1px solid var(--border);
   }
 
   .automation-schedule-body {
@@ -902,7 +902,7 @@
   }
 
   .automation-schedule-time-row + .automation-schedule-time-row {
-    border-top: 1px solid var(--app-border);
+    border-top: 1px solid var(--border);
   }
 
   .automation-schedule-time-row.is-off .automation-time-input {
@@ -914,12 +914,12 @@
     width: 6.25rem;
     height: 2.25rem;
     border: 0;
-    border-radius: var(--app-radius-md);
+    border-radius: var(--radius-lg);
     padding: 0 0.5rem;
-    background: var(--app-surface-muted);
-    color: var(--app-text);
+    background: var(--muted);
+    color: var(--foreground);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: var(--app-font-body);
+    font-size: 0.875rem;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.04em;
     text-align: center;
@@ -944,12 +944,12 @@
   }
 
   .automation-schedule-row-remove {
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
   }
 
   .automation-schedule-row-remove:hover:not(:disabled) {
-    background: var(--app-surface-muted);
-    color: var(--app-danger);
+    background: var(--muted);
+    color: var(--destructive);
   }
 
   .automation-schedule-row-remove-placeholder {
@@ -962,18 +962,18 @@
     min-height: 2.5rem;
     align-items: center;
     gap: 0.5rem;
-    border-radius: var(--app-radius-md);
+    border-radius: var(--radius-lg);
     padding: 0 0.75rem;
-    background: color-mix(in srgb, var(--app-surface-muted) 86%, transparent);
-    color: var(--app-text-muted);
-    font-size: var(--app-font-caption);
+    background: color-mix(in srgb, var(--muted) 86%, transparent);
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
     font-weight: 700;
     text-align: left;
   }
 
   .automation-schedule-add:hover:not(:disabled) {
-    background: var(--app-accent-soft);
-    color: var(--app-accent);
+    background: var(--primary-soft);
+    color: var(--primary);
   }
 
   .automation-schedule-add:disabled {
@@ -983,15 +983,15 @@
 
   .automation-schedule-add small {
     margin-left: auto;
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     font-size: 0.625rem;
     font-weight: 600;
   }
 
   .automation-schedule-empty {
     padding: 0.5rem 0;
-    color: var(--app-text-soft);
-    font-size: var(--app-font-caption);
+    color: var(--tertiary-foreground);
+    font-size: 0.75rem;
   }
 
   .automation-schedule-paused {
@@ -1006,24 +1006,24 @@
     display: inline-flex;
     height: 1.5rem;
     align-items: center;
-    border-radius: var(--app-radius-pill);
+    border-radius: 9999px;
     padding: 0 0.5rem;
-    background: var(--app-surface-muted);
-    color: var(--app-text-muted);
+    background: var(--muted);
+    color: var(--muted-foreground);
     font-size: 0.625rem;
     font-weight: 700;
   }
 
   .automation-schedule-paused-times {
-    color: var(--app-text-muted);
-    font-size: var(--app-font-body);
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
     font-variant-numeric: tabular-nums;
   }
 
   .automation-schedule-timezone {
     padding: 0 1rem 0.75rem;
-    color: var(--app-text-soft);
-    font-size: var(--app-font-caption);
+    color: var(--tertiary-foreground);
+    font-size: 0.75rem;
     line-height: 1.45;
   }
 
@@ -1051,14 +1051,14 @@
   }
 
   .automation-notification-channel-heading strong {
-    color: var(--app-text);
-    font-size: var(--app-font-body);
+    color: var(--foreground);
+    font-size: 0.875rem;
     font-weight: 600;
   }
 
   .automation-notification-channel-heading small {
-    color: var(--app-text-soft);
-    font-size: var(--app-font-caption);
+    color: var(--tertiary-foreground);
+    font-size: 0.75rem;
   }
 
   .automation-notification-details {
@@ -1072,8 +1072,8 @@
   }
 
   .automation-notification-field > span {
-    color: var(--app-text-muted);
-    font-size: var(--app-font-caption);
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
     font-weight: 700;
   }
 
@@ -1082,11 +1082,11 @@
     min-width: 0;
     height: 2.25rem;
     border: 0;
-    border-radius: var(--app-radius-md);
+    border-radius: var(--radius-lg);
     padding: 0 0.625rem;
-    background: var(--app-surface-muted);
-    color: var(--app-text);
-    font-size: var(--app-font-body);
+    background: var(--muted);
+    color: var(--foreground);
+    font-size: 0.875rem;
     outline: 0;
     transition: box-shadow 160ms ease, opacity 160ms ease;
   }
@@ -1104,8 +1104,8 @@
   }
 
   .automation-notification-hint {
-    color: var(--app-text-soft);
-    font-size: var(--app-font-caption);
+    color: var(--tertiary-foreground);
+    font-size: 0.75rem;
     line-height: 1.45;
   }
 
@@ -1116,9 +1116,9 @@
 
   .automation-notification-notice {
     margin: 0 1rem 0.75rem;
-    border-radius: var(--app-radius-md);
+    border-radius: var(--radius-lg);
     padding: 0.5rem 0.625rem;
-    font-size: var(--app-font-caption);
+    font-size: 0.75rem;
     font-weight: 600;
   }
 
@@ -1128,30 +1128,30 @@
 
   .automation-notification-notice.is-success {
     background: rgb(5 150 105 / 10%);
-    color: var(--app-success);
+    color: var(--success);
     box-shadow: inset 0 0 0 1px rgb(5 150 105 / 20%);
   }
 
   .automation-notification-notice.is-error {
     background: rgb(225 29 72 / 10%);
-    color: var(--app-danger);
+    color: var(--destructive);
     box-shadow: inset 0 0 0 1px rgb(225 29 72 / 20%);
   }
 
   .automation-notification-status {
-    color: var(--app-text-soft);
-    font-size: var(--app-font-caption);
+    color: var(--tertiary-foreground);
+    font-size: 0.75rem;
     font-weight: 600;
   }
 
   .automation-notification-status.is-error {
-    color: var(--app-danger);
+    color: var(--destructive);
   }
 
   .automation-notification-loading {
     padding: 1rem;
-    color: var(--app-text-soft);
-    font-size: var(--app-font-caption);
+    color: var(--tertiary-foreground);
+    font-size: 0.75rem;
   }
 
   .automation-editor-empty {
@@ -1176,7 +1176,7 @@
   }
 
   .automation-task-editor.is-current .automation-flow-card-header {
-    border-bottom-color: color-mix(in srgb, var(--app-accent) 42%, var(--app-border));
+    border-bottom-color: color-mix(in srgb, var(--primary) 42%, var(--border));
   }
 
   .automation-task-editor .automation-flow-card-header {
@@ -1225,7 +1225,7 @@
 
   .automation-field-label {
     min-width: 0;
-    color: var(--app-text-muted);
+    color: var(--muted-foreground);
     font-size: 0.8125rem;
     font-weight: 500;
     line-height: 1.25rem;
@@ -1238,7 +1238,7 @@
     gap: 0.375rem;
     margin-top: 0.5rem;
     padding-left: 5.75rem;
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     font-size: 0.6875rem;
     line-height: 1.45;
   }
@@ -1259,10 +1259,10 @@
     height: 2.75rem;
     min-height: 2.75rem;
     border: 0;
-    border-radius: var(--app-radius-md);
+    border-radius: var(--radius-lg);
     padding: 0 2.5rem 0 0.875rem;
-    background: var(--app-surface-muted);
-    color: var(--app-text);
+    background: var(--muted);
+    color: var(--foreground);
     box-shadow: inset 0 0 0 0.5px var(--automation-hairline);
     font-size: 1rem;
     font-weight: 500;
@@ -1273,20 +1273,20 @@
   }
 
   .automation-select-control:hover select {
-    background: color-mix(in srgb, var(--app-surface-muted) 86%, var(--app-surface-solid));
-    box-shadow: inset 0 0 0 0.5px var(--app-border-strong);
+    background: color-mix(in srgb, var(--muted) 86%, var(--card));
+    box-shadow: inset 0 0 0 0.5px var(--input);
   }
 
   .automation-select-control:has(select:focus-visible) select {
-    background: var(--app-surface-solid);
-    box-shadow: inset 0 0 0 1px var(--app-accent), 0 0 0 3px var(--app-accent-soft);
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px var(--primary), 0 0 0 3px var(--primary-soft);
   }
 
   .automation-select-control > svg {
     position: absolute;
     top: 50%;
     right: 0.75rem;
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     pointer-events: none;
     transform: translateY(-50%);
     transition: color 160ms ease, transform 160ms ease;
@@ -1294,7 +1294,7 @@
 
   .automation-select-control:hover > svg,
   .automation-select-control:has(select:focus-visible) > svg {
-    color: var(--app-accent);
+    color: var(--primary);
   }
 
   .automation-select-control select:disabled {
@@ -1308,8 +1308,8 @@
     min-width: 0;
     height: 2.75rem;
     min-height: 2.75rem;
-    border-radius: var(--app-radius-md);
-    background: var(--app-surface-muted);
+    border-radius: var(--radius-lg);
+    background: var(--muted);
     box-shadow: inset 0 0 0 0.5px var(--automation-hairline);
     transition: background 160ms ease, box-shadow 160ms ease, color 160ms ease;
   }
@@ -1318,10 +1318,10 @@
     width: 100%;
     flex: 1;
     border: 0;
-    border-radius: var(--app-radius-md);
+    border-radius: var(--radius-lg);
     padding: 0 0.875rem;
-    background: var(--app-surface-muted);
-    color: var(--app-text);
+    background: var(--muted);
+    color: var(--foreground);
     box-shadow: inset 0 0 0 0.5px var(--automation-hairline);
     font-size: 1rem;
     font-weight: 500;
@@ -1330,7 +1330,7 @@
   }
 
   .automation-task-editor .automation-text-control::placeholder {
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     font-weight: 400;
     opacity: 1;
   }
@@ -1338,15 +1338,15 @@
   .automation-task-editor .automation-text-control:hover,
   .automation-task-editor .number-input-wrapper:hover,
   .automation-composite-control:hover {
-    background: color-mix(in srgb, var(--app-surface-muted) 86%, var(--app-surface-solid));
-    box-shadow: inset 0 0 0 0.5px var(--app-border-strong);
+    background: color-mix(in srgb, var(--muted) 86%, var(--card));
+    box-shadow: inset 0 0 0 0.5px var(--input);
   }
 
   .automation-task-editor .automation-text-control:focus-visible,
   .automation-task-editor .number-input-wrapper:has(input:focus-visible),
   .automation-composite-control:has(input:focus-visible) {
-    background: var(--app-surface-solid);
-    box-shadow: inset 0 0 0 1px var(--app-accent), 0 0 0 3px var(--app-accent-soft);
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px var(--primary), 0 0 0 3px var(--primary-soft);
   }
 
   .automation-task-editor .automation-text-control:disabled,
@@ -1372,8 +1372,8 @@
   .automation-param-fields.is-grouped {
     gap: 0;
     overflow: hidden;
-    border-radius: var(--app-radius-lg);
-    background: var(--app-surface-muted);
+    border-radius: var(--radius-xl);
+    background: var(--muted);
     box-shadow: inset 0 0 0 0.5px var(--automation-hairline);
   }
 
@@ -1414,7 +1414,7 @@
   }
 
   .automation-param-fields.is-grouped .automation-param-field:focus-within {
-    background: color-mix(in srgb, var(--app-accent-soft) 22%, transparent);
+    background: color-mix(in srgb, var(--primary-soft) 22%, transparent);
   }
 
   .automation-param-fields.is-grouped :is(
@@ -1438,7 +1438,7 @@
     border-radius: 0;
     padding: 0 6.25rem 0 0.75rem;
     background: transparent;
-    color: var(--app-text);
+    color: var(--foreground);
     box-shadow: none;
     font-size: 1rem;
     font-weight: 500;
@@ -1448,7 +1448,7 @@
   .automation-task-editor .number-input-controls {
     width: 5.5rem;
     flex-direction: row;
-    border-left-color: var(--app-border);
+    border-left-color: var(--border);
   }
 
   .automation-task-editor .number-input-controls button {
@@ -1458,22 +1458,22 @@
     flex: 0 0 2.75rem;
     border-radius: 0;
     background: transparent;
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
   }
 
   .automation-task-editor .number-input-controls button:hover {
-    background: var(--app-accent-soft);
-    color: var(--app-accent);
+    background: var(--primary-soft);
+    color: var(--primary);
   }
 
   .automation-task-editor .number-input-controls button:first-child {
-    border-right: 1px solid var(--app-border);
+    border-right: 1px solid var(--border);
     border-bottom: 0;
     border-radius: 0;
   }
 
   .automation-task-editor .number-input-controls button:last-child {
-    border-radius: 0 var(--app-radius-md) var(--app-radius-md) 0;
+    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
   }
 
   .automation-composite-control {
@@ -1492,11 +1492,11 @@
 
   .automation-composite-control > .w-px,
   .automation-composite-control > .border-l {
-    border-color: var(--app-border);
+    border-color: var(--border);
   }
 
   .automation-composite-control > .w-px {
-    background: var(--app-border);
+    background: var(--border);
   }
 
   .automation-composite-control > .border-l {
@@ -1509,7 +1509,7 @@
   }
 
   .automation-composite-control > .border-l button:hover {
-    background: var(--app-accent-soft);
+    background: var(--primary-soft);
   }
 
   .automation-stage-editor {
@@ -1538,7 +1538,7 @@
   }
 
   .automation-stage-editor-title label {
-    color: var(--app-text);
+    color: var(--foreground);
     font-size: 0.875rem;
     font-weight: 600;
     line-height: 1.25rem;
@@ -1546,7 +1546,7 @@
 
   .automation-stage-editor-title span {
     overflow: hidden;
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     font-size: 0.6875rem;
     line-height: 1rem;
     text-overflow: ellipsis;
@@ -1560,8 +1560,8 @@
   .automation-stage-list {
     min-width: 0;
     overflow: hidden;
-    border-radius: var(--app-radius-lg);
-    background: var(--app-surface-muted);
+    border-radius: var(--radius-xl);
+    background: var(--muted);
     box-shadow: inset 0 0 0 1px var(--automation-hairline);
   }
 
@@ -1591,15 +1591,15 @@
   }
 
   .automation-stage-row:hover {
-    background: color-mix(in srgb, var(--app-surface-solid) 24%, transparent);
+    background: color-mix(in srgb, var(--card) 24%, transparent);
   }
 
   .automation-stage-row:focus-within {
-    background: color-mix(in srgb, var(--app-accent-soft) 32%, transparent);
+    background: color-mix(in srgb, var(--primary-soft) 32%, transparent);
   }
 
   .automation-stage-item.is-smart .automation-stage-row {
-    background: color-mix(in srgb, var(--app-accent-soft) 42%, transparent);
+    background: color-mix(in srgb, var(--primary-soft) 42%, transparent);
   }
 
   .automation-stage-kind,
@@ -1609,23 +1609,23 @@
     height: 2.75rem;
     min-height: 2.75rem;
     flex: 0 0 2.75rem;
-    border-radius: var(--app-radius-md);
+    border-radius: var(--radius-lg);
   }
 
   .automation-stage-kind {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--app-accent);
+    color: var(--primary);
   }
 
   .automation-stage-pin {
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
   }
 
   .automation-stage-pin.is-active {
-    background: var(--app-accent-soft);
-    color: var(--app-accent-strong);
+    background: var(--primary-soft);
+    color: var(--primary-strong);
   }
 
   input.automation-stage-name-input {
@@ -1638,7 +1638,7 @@
     padding: 0 0.75rem 0 0.25rem;
     background: transparent;
     background-color: transparent;
-    color: var(--app-text);
+    color: var(--foreground);
     box-shadow: none;
     font-size: 0.9375rem;
     font-weight: 500;
@@ -1647,7 +1647,7 @@
   }
 
   input.automation-stage-name-input::placeholder {
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     font-weight: 400;
     opacity: 1;
   }
@@ -1659,8 +1659,8 @@
     height: 2rem;
     flex: 0 0 4.25rem;
     align-items: center;
-    border-left: 1px solid var(--app-border);
-    color: var(--app-text-soft);
+    border-left: 1px solid var(--border);
+    color: var(--tertiary-foreground);
   }
 
   .automation-stage-times input {
@@ -1671,7 +1671,7 @@
     border-radius: 0;
     padding: 0 0.1875rem 0 0.375rem;
     background: transparent;
-    color: var(--app-text);
+    color: var(--foreground);
     box-shadow: none;
     font-size: 0.8125rem;
     font-variant-numeric: tabular-nums;
@@ -1699,7 +1699,7 @@
 
   input.automation-stage-name-input:focus-visible,
   .automation-stage-times input:focus-visible {
-    color: var(--app-accent-strong);
+    color: var(--primary-strong);
   }
 
   input.automation-stage-name-input:disabled,
@@ -1712,9 +1712,9 @@
     input.automation-stage-name-input:disabled,
     .automation-stage-times input:disabled
   ) {
-    color: var(--app-text);
+    color: var(--foreground);
     opacity: 1;
-    -webkit-text-fill-color: var(--app-text);
+    -webkit-text-fill-color: var(--foreground);
   }
 
   .automation-stage-stepper {
@@ -1722,7 +1722,7 @@
     height: 2.75rem;
     flex: 0 0 auto;
     align-items: center;
-    border-left: 1px solid var(--app-border);
+    border-left: 1px solid var(--border);
   }
 
   .automation-stage-stepper button {
@@ -1736,23 +1736,23 @@
     border: 0;
     border-radius: 0;
     background: transparent;
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
   }
 
   .automation-stage-stepper button + button {
-    border-left: 1px solid var(--app-border);
+    border-left: 1px solid var(--border);
   }
 
   .automation-stage-stepper button:hover:not(:disabled) {
-    background: var(--app-accent-soft);
-    color: var(--app-accent-strong);
+    background: var(--primary-soft);
+    color: var(--primary-strong);
   }
 
   .automation-stage-stepper button:focus-visible {
     position: relative;
     z-index: 1;
-    outline: 2px solid var(--app-accent);
+    outline: 2px solid var(--primary);
     outline-offset: -2px;
   }
 
@@ -1762,12 +1762,12 @@
   }
 
   .automation-stage-delete {
-    color: var(--app-danger);
+    color: var(--destructive);
   }
 
   .automation-stage-delete:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--app-danger) 10%, transparent);
-    color: var(--app-danger);
+    background: color-mix(in srgb, var(--destructive) 10%, transparent);
+    color: var(--destructive);
   }
 
   .automation-stage-add {
@@ -1776,13 +1776,13 @@
     border-radius: 0;
     padding-right: 0.875rem;
     padding-left: 1rem;
-    color: var(--app-accent-strong);
+    color: var(--primary-strong);
     box-shadow: none;
   }
 
   .automation-stage-add:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--app-accent-soft) 42%, transparent);
-    color: var(--app-accent-strong);
+    background: color-mix(in srgb, var(--primary-soft) 42%, transparent);
+    color: var(--primary-strong);
   }
 
   .automation-stage-list :is(
@@ -1800,15 +1800,15 @@
     align-items: center;
     gap: 0.625rem;
     padding: 0.625rem 0.75rem;
-    border-radius: var(--app-radius-lg);
-    background: var(--app-surface-muted);
+    border-radius: var(--radius-xl);
+    background: var(--muted);
     box-shadow: inset 0 0 0 1px var(--automation-hairline);
     transition: background 160ms ease, box-shadow 160ms ease;
   }
 
   .automation-smart-stage-entry.is-active {
-    background: color-mix(in srgb, var(--app-accent-soft) 52%, var(--app-surface-muted));
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 22%, var(--app-border));
+    background: color-mix(in srgb, var(--primary-soft) 52%, var(--muted));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 22%, var(--border));
   }
 
   .automation-smart-stage-icon {
@@ -1819,10 +1819,10 @@
     flex: 0 0 2.25rem;
     align-items: center;
     justify-content: center;
-    border-radius: var(--app-radius-md);
-    background: color-mix(in srgb, var(--app-surface-solid) 72%, transparent);
-    color: var(--app-accent-strong);
-    box-shadow: inset 0 0 0 1px var(--app-border);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--card) 72%, transparent);
+    color: var(--primary-strong);
+    box-shadow: inset 0 0 0 1px var(--border);
   }
 
   .automation-smart-stage-copy {
@@ -1834,7 +1834,7 @@
 
   .automation-smart-stage-copy strong {
     overflow: hidden;
-    color: var(--app-text);
+    color: var(--foreground);
     font-size: 0.8125rem;
     font-weight: 600;
     line-height: 1.125rem;
@@ -1844,7 +1844,7 @@
 
   .automation-smart-stage-copy > span {
     overflow: hidden;
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     font-size: 0.6875rem;
     line-height: 1rem;
     text-overflow: ellipsis;
@@ -1866,7 +1866,7 @@
   @media (prefers-contrast: more) {
     .automation-stage-list,
     .automation-smart-stage-entry {
-      box-shadow: inset 0 0 0 1px var(--app-border-strong);
+      box-shadow: inset 0 0 0 1px var(--input);
     }
   }
 
@@ -1924,7 +1924,7 @@
     .automation-schedule-add {
       min-height: 2.75rem;
       padding: 0 0.875rem;
-      border-radius: var(--app-radius-lg);
+      border-radius: var(--radius-xl);
       font-size: 0.75rem;
     }
 
@@ -1988,7 +1988,7 @@
     .automation-notification-channel,
     [aria-label="最近执行结果"]
   ) {
-    /* S3: 自动化分组使用更淡的发丝线，压过 border-[var(--app-border)]。 */
+    /* S3: 自动化分组使用更淡的发丝线，压过 border-border。 */
     border-color: var(--automation-hairline) !important;
   }
 
@@ -1997,7 +1997,7 @@
     .automation-editor-heading,
     .automation-side-card-heading
   ) h3 svg {
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
   }
 
   [data-automation-tasks] :is(
@@ -2010,8 +2010,8 @@
   }
 
   [data-automation-tasks] .automation-editor-heading > span {
-    background: var(--app-surface-muted);
-    color: var(--app-text-muted);
+    background: var(--muted);
+    color: var(--muted-foreground);
   }
 
   [data-automation-tasks] .automation-sequence-list {
@@ -2034,43 +2034,43 @@
   }
 
   [data-automation-tasks] .automation-sequence-node {
-    background: var(--app-surface-solid);
-    color: var(--app-text-soft);
+    background: var(--card);
+    color: var(--tertiary-foreground);
     box-shadow: inset 0 0 0 1px var(--automation-hairline);
   }
 
   [data-automation-tasks] .automation-sequence-item.is-selected:not(.is-current, .is-completed) .automation-sequence-node {
-    background: var(--app-accent-soft);
-    color: var(--app-accent-strong);
+    background: var(--primary-soft);
+    color: var(--primary-strong);
     box-shadow: none;
   }
 
   [data-automation-tasks] .automation-sequence-item.is-current .automation-sequence-node {
-    background: var(--app-accent);
+    background: var(--primary);
     color: #fff;
     box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 16%, transparent);
   }
 
   [data-automation-tasks] .automation-sequence-item.is-current .automation-sequence-copy small {
-    color: var(--app-accent-strong);
+    color: var(--primary-strong);
     font-weight: 600;
   }
 
   [data-automation-tasks] .automation-sequence-item.is-completed .automation-sequence-node {
-    background: var(--app-success);
+    background: var(--success);
     color: #fff;
     box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 18%, transparent);
   }
 
   [data-automation-tasks] .automation-sequence-item.is-failed .automation-sequence-node {
-    background: var(--app-danger);
+    background: var(--destructive);
     color: #fff;
     box-shadow: none;
   }
 
   [data-automation-tasks] .automation-sequence-item.is-skipped .automation-sequence-node {
-    background: var(--app-surface-muted);
-    color: var(--app-text-muted);
+    background: var(--muted);
+    color: var(--muted-foreground);
   }
 
   [data-automation-tasks] :is(
@@ -2079,7 +2079,7 @@
     .automation-stop-button,
     .automation-test-connection
   ) {
-    border-radius: var(--app-radius-pill);
+    border-radius: 9999px;
   }
 
   [data-automation-tasks] :is(
@@ -2103,8 +2103,8 @@
   [data-automation-tasks] .automation-task-picker {
     gap: 0;
     border: 1px solid var(--automation-hairline);
-    border-radius: var(--app-continuous-radius-compact);
-    background: color-mix(in srgb, var(--app-surface-solid) 76%, transparent);
+    border-radius: var(--radius-xl);
+    background: color-mix(in srgb, var(--card) 76%, transparent);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     backdrop-filter: saturate(180%) blur(20px);
     box-shadow: var(--automation-overlay-shadow);
@@ -2121,19 +2121,19 @@
   }
 
   [data-automation-tasks] .automation-task-picker-option > span {
-    border-radius: var(--app-radius-sm);
-    background: var(--app-surface-muted);
-    color: var(--app-text-muted);
+    border-radius: var(--radius-md);
+    background: var(--muted);
+    color: var(--muted-foreground);
   }
 
   [data-automation-tasks] .automation-task-picker-option:hover > span,
   [data-automation-tasks] .automation-task-picker-option:focus-visible > span {
-    color: var(--app-accent);
+    color: var(--primary);
   }
 
   [data-automation-tasks] .automation-task-picker-option small {
-    background: var(--app-surface-muted);
-    color: var(--app-text-muted);
+    background: var(--muted);
+    color: var(--muted-foreground);
     font-variant-numeric: tabular-nums;
   }
 
@@ -2154,8 +2154,8 @@
     display: grid;
     gap: 0;
     overflow: hidden;
-    border-radius: var(--app-radius-lg);
-    background: var(--app-surface-muted);
+    border-radius: var(--radius-xl);
+    background: var(--muted);
   }
 
   .automation-recruitment-time-row {
@@ -2173,7 +2173,7 @@
 
   @media (prefers-reduced-transparency: reduce) {
     [data-automation-tasks] .automation-task-picker {
-      background: var(--app-surface-solid);
+      background: var(--card);
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
     }
@@ -2181,8 +2181,8 @@
 
   @media (prefers-contrast: more) {
     [data-automation-tasks] .automation-task-picker {
-      border-color: var(--app-border-strong);
-      background: var(--app-surface-solid);
+      border-color: var(--input);
+      background: var(--card);
     }
   }
 
@@ -2216,22 +2216,22 @@
   .la-pluma-app [data-automation-tasks] .automation-task-editor .automation-text-control:focus,
   .la-pluma-app [data-automation-tasks] .automation-task-editor .number-input-wrapper:has(input:focus),
   .la-pluma-app [data-automation-tasks] .automation-composite-control:has(input:focus) {
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 16%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
   }
 
   .la-pluma-app [data-automation-tasks] .automation-monitor-surface .automation-preview-glass-button {
-    background: color-mix(in srgb, var(--app-glass-bg) 84%, transparent);
+    background: color-mix(in srgb, var(--glass-bg) 84%, transparent);
     -webkit-backdrop-filter: blur(12px) saturate(150%);
     backdrop-filter: blur(12px) saturate(150%);
     box-shadow:
-      inset 0 0 0 0.5px color-mix(in srgb, var(--app-glass-border) 55%, transparent),
+      inset 0 0 0 0.5px color-mix(in srgb, var(--glass-border) 55%, transparent),
       0 3px 10px rgb(60 60 67 / 8%);
   }
 
   html.dark .la-pluma-app [data-automation-tasks] .automation-monitor-surface .automation-preview-glass-button,
   .la-pluma-app.dark [data-automation-tasks] .automation-monitor-surface .automation-preview-glass-button {
     box-shadow:
-      inset 0 0 0 0.5px color-mix(in srgb, var(--app-glass-border) 42%, transparent),
+      inset 0 0 0 0.5px color-mix(in srgb, var(--glass-border) 42%, transparent),
       0 3px 10px rgb(0 0 0 / 20%);
   }
 

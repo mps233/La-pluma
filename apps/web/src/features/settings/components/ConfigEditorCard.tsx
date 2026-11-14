@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { RotateCcw, Save } from 'lucide-react'
-import { Button, Card, CardContent, CardHeader } from '@/shared/ui'
+import { Button, Card, CardContent, CardHeader } from '@/shared/components'
 
 export interface SettingsFeedback {
   type: 'success' | 'error' | 'warning'

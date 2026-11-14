@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, Save, Send } from 'lucide-react'
 import type { ApiResponse } from '@/shared/api'
-import { Button, SmoothPanel, Switch } from '@/shared/ui'
+import { Button, SmoothPanel, Switch } from '@/shared/components'
 import { saveNotificationConfig, testNotificationChannel } from '../api'
 import {
   cloneNotificationConfig,

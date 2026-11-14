@@ -1,4 +1,4 @@
-import { Card } from '@/shared/ui'
+import { Card } from '@/shared/components'
 import { useResolvedCopilotDetailTarget } from '../hooks/useResolvedCopilotDetailTarget'
 import type { CopilotDetailTarget } from '../model/copilotDetail'
 import type { CopilotSetView } from '../model/copilotSetView'

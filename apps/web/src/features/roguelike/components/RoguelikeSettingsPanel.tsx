@@ -1,5 +1,5 @@
 import { Play, Square } from 'lucide-react'
-import { Button, Input, Select, SmoothPanel, Switch } from '@/shared/ui'
+import { Button, Input, Select, SmoothPanel, Switch } from '@/shared/components'
 import type { StopMode } from '@/features/task-execution'
 import {
   getRoguelikeAdvancedOptions,

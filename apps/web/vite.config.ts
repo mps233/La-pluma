@@ -284,7 +284,7 @@ export const createViteConfig = (basePath: string, env: Record<string, string | 
         manualChunks(id: string) {
           if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react-vendor'
           if (/node_modules\/(framer-motion|motion-dom|motion-utils)\//.test(id)) return 'motion-vendor'
-          if (/node_modules\/(@base-ui\/react|@base-ui\/utils|sonner|clsx|tailwind-merge|class-variance-authority)\//.test(id)) return 'ui-vendor'
+          if (/node_modules\/(@base-ui\/react|@base-ui\/utils|sonner|cn|class-variance-authority)\//.test(id)) return 'ui-vendor'
           return undefined
         }
       }

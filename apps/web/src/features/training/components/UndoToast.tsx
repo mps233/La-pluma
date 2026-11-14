@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, X } from 'lucide-react'
-import { Button, IconButton } from '@/shared/ui'
+import { Button, IconButton } from '@/shared/components'
 
 export interface UndoToastProps {
   name: string

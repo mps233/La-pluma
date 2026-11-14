@@ -1,5 +1,5 @@
 import { AlertCircle, CheckCircle2, X } from 'lucide-react'
-import { IconButton, SmoothPanel } from '@/shared/ui'
+import { IconButton, SmoothPanel } from '@/shared/components'
 
 export interface LogNoticeData {
   readonly type: 'success' | 'error'

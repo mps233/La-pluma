@@ -1,4 +1,4 @@
-import { Switch } from '@/shared/ui'
+import { Switch } from '@/shared/components'
 import type { TrainingSettings } from '../types'
 
 export interface TrainingSettingsPanelProps {

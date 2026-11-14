@@ -1,12 +1,7 @@
-# 通用组件库
+# shadcn 生成物
 
-本目录是项目通用 UI 组件的实现，统一通过 `index.ts` 导出。页面中统一从 `@/shared/ui` 引入。
+本目录只存放 shadcn CLI 生成的 UI 原语，随上游原样保留。
 
-- 设计规范（颜色、文字层级、间距、圆角、交互与反馈）：[DESIGN.md](../../../../DESIGN.md)，项目内唯一来源。
-- 组件 API、用法与组件接入约定：[docs/frontend/components.md](../../../../docs/frontend/components.md)。
-
-## 目录约定
-
-- 每个组件一个文件，测试与实现放在同一目录（`*.test.tsx`）。
-- 新增或调整组件时，同步更新 `index.ts` 与组件库文档；不要在页面里复制同一套 DOM 和样式。
-- 设计规则只在根目录 `DESIGN.md` 维护，本目录的说明和代码注释不要另写一份。
+- 来源：`pnpm dlx shadcn@latest add <name>`，生成结果与本仓库 `components.json` aliases（base-nova / Base UI）下的上游原文逐字一致；`cn` 直接来自官方 `cn` 包。
+- 上游注释与 `use client` 指令（本项目无 RSC）随原文保留，不适用仓库零注释政策；任何有意本地修改必须是明确的语义决策并记录。
+- 应用层通用组件位于 `src/shared/components/`，统一经其 `index.ts` 导出；不要向本目录添加手写组件。

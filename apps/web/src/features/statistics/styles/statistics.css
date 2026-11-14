@@ -9,27 +9,27 @@
   }
 
   .data-statistics-task-card.is-active > .app-card-smooth-surface {
-    border-color: color-mix(in srgb, var(--app-info) 28%, var(--app-border));
-    background: color-mix(in srgb, var(--app-info) 6%, var(--app-surface));
+    border-color: color-mix(in srgb, var(--info) 28%, var(--border));
+    background: color-mix(in srgb, var(--info) 6%, var(--card));
   }
 
   .data-statistics-task-content,
   .drop-records-panel-content {
-    padding: var(--app-space-panel);
+    padding: 1rem;
   }
 
   .data-statistics-kpi-grid {
     gap: 1px;
     overflow: hidden;
-    border-radius: var(--app-radius-lg);
+    border-radius: var(--radius-xl);
     padding: 1px;
-    background: var(--app-border);
+    background: var(--border);
   }
 
   .data-statistics-kpi {
     min-width: 0;
     padding: 0.75rem;
-    background: color-mix(in srgb, var(--app-surface-muted) 78%, var(--app-surface));
+    background: color-mix(in srgb, var(--muted) 78%, var(--card));
   }
 
   @media (max-width: 639px) {
@@ -68,8 +68,8 @@
   .la-pluma-app .drop-records-item-grid,
   .la-pluma-app .drop-records-stage-list {
     gap: 1px;
-    background: var(--app-border);
-    box-shadow: inset 0 0 0 1px var(--app-border);
+    background: var(--border);
+    box-shadow: inset 0 0 0 1px var(--border);
   }
 
   .la-pluma-app .data-statistics-operator-item,
@@ -77,7 +77,7 @@
   .la-pluma-app .drop-records-metric-row,
   .la-pluma-app .drop-records-item-row,
   .la-pluma-app .drop-records-stage-row {
-    background: var(--app-surface-solid);
+    background: var(--card);
   }
 
   /* 筛选菜单通过 createPortal 挂到 document.body，位于 .la-pluma-app 之外；
@@ -86,8 +86,8 @@
   .surface-panel.data-statistics-menu-surface {
     border-width: 1px;
     border-style: solid;
-    border-color: color-mix(in srgb, var(--app-border-strong) 72%, transparent);
-    background: color-mix(in srgb, var(--app-surface-solid) 78%, transparent);
+    border-color: color-mix(in srgb, var(--input) 72%, transparent);
+    background: color-mix(in srgb, var(--card) 78%, transparent);
     -webkit-backdrop-filter: blur(24px) saturate(165%);
     backdrop-filter: blur(24px) saturate(165%);
     box-shadow:
@@ -101,8 +101,8 @@
 
   @media (prefers-contrast: more) {
     .surface-panel.data-statistics-menu-surface {
-      border-color: var(--app-border-strong);
-      background: var(--app-surface-solid);
+      border-color: var(--input);
+      background: var(--card);
     }
   }
 }

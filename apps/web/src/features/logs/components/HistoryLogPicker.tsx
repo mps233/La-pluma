@@ -2,7 +2,7 @@
 // 在未恢复自动滚动前不开放该路径。
 
 import { AlertCircle, ChevronRight, FileText, Trash2 } from 'lucide-react'
-import { Button, Card, CardContent, CardHeader } from '@/shared/ui'
+import { Button, Card, CardContent, CardHeader } from '@/shared/components'
 import type { LogFile } from '../types'
 
 interface HistoryLogPickerProps {

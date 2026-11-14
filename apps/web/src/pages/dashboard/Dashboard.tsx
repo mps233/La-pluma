@@ -1,4 +1,4 @@
-import { PageHeader } from '@/shared/ui'
+import { PageHeader } from '@/shared/components'
 import { FloatingStatusIndicator } from '@/features/runtime-status'
 import { DashboardSkeleton } from '@/features/dashboard'
 import { DashboardWorkspace } from '@/features/dashboard'

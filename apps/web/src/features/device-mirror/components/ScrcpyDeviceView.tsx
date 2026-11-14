@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
-import { Button } from '@/shared/ui'
+import { Button } from '@/shared/components'
 import { usePreviewSession } from '../hooks/usePreviewSession'
 import { usePreviewSnapshot } from '../hooks/usePreviewSnapshot'
 import { usePreviewStore } from '../store/previewStore'
@@ -71,7 +71,7 @@ function DeviceNavigationButtons({
       aria-label={label}
       className={immersive
         ? 'group flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-xs transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-35'
-        : `control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-secondary transition-colors hover:text-(--app-accent) disabled:cursor-not-allowed disabled:opacity-35 ${compact ? 'automation-preview-glass-button' : ''}`}
+        : `control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-35 ${compact ? 'automation-preview-glass-button' : ''}`}
     >
       <Icon className="h-3.5 w-3.5" strokeWidth={1.8} />
     </button>
@@ -397,7 +397,7 @@ export default function ScrcpyDeviceView({
     <>
     <div className={`scrcpy-device-layout ${isCompact ? 'is-compact' : ''}`}>
       <div className="space-y-3 min-w-0">
-        <div className={`scrcpy-view-header flex items-center justify-between gap-3 ${isCompact ? 'is-compact' : 'flex-wrap'}`}>
+        <div className={`scrcpy-view-header flex items-center justify-between gap-3.5 ${isCompact ? 'is-compact' : 'flex-wrap'}`}>
           <div className="min-w-0">
             <div className="scrcpy-view-title-row flex items-center gap-2">
               <span
@@ -418,13 +418,13 @@ export default function ScrcpyDeviceView({
             <PreviewModeSegmented unavailable={!automationAvailable} />
           ) : (
             <div className="flex flex-wrap gap-2 text-xs justify-end">
-              <span className="surface-soft rounded-full px-2 py-1 text-secondary">
+              <span className="surface-soft rounded-full px-2 py-1 text-muted-foreground">
                 组件：{componentStatusLabel}
               </span>
-              <span className="surface-soft rounded-full px-2 py-1 text-secondary">
+              <span className="surface-soft rounded-full px-2 py-1 text-muted-foreground">
                 服务：{serverStatusLabel}
               </span>
-              <span className="surface-soft rounded-full px-2 py-1 text-secondary">
+              <span className="surface-soft rounded-full px-2 py-1 text-muted-foreground">
                 Agent：{agentStatusLabel}
               </span>
               {visibleError && (
@@ -440,7 +440,7 @@ export default function ScrcpyDeviceView({
           {statusCards.map(([label, value, description]) => (
             <div key={label} title={description} className="surface-soft rounded-lg px-2 py-1.5">
               <div className="text-tertiary">{label}</div>
-              <div className="truncate font-medium text-primary">{value}</div>
+              <div className="truncate font-medium text-foreground">{value}</div>
             </div>
           ))}
         </div>}
@@ -451,7 +451,7 @@ export default function ScrcpyDeviceView({
           }${
             webrtc.status === 'connected'
               ? 'is-connected bg-black'
-              : 'is-empty ring-1 ring-inset ring-(--app-border)'
+              : 'is-empty ring-1 ring-inset ring-border'
           }`}
           aria-busy={previewBusy}
         >
@@ -489,11 +489,11 @@ export default function ScrcpyDeviceView({
                 <div className="device-preview-empty-icon mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-lg">
                   <Smartphone className="h-5 w-5" strokeWidth={1.6} aria-hidden="true" />
                 </div>
-                <div className="scrcpy-empty-title mb-1 text-sm font-semibold text-primary">
+                <div className="scrcpy-empty-title mb-1 text-sm font-semibold text-foreground">
                   {webrtc.mode === 'off' ? '预览已关闭' : visibleError ? '预览启动失败' : previewBusy ? '正在连接实时画面' : webrtc.mode === 'snapshot' ? '正在获取快照' : '等待实时画面'}
                 </div>
                 {(visibleError || !automationAvailable) && (
-                  <div className="scrcpy-empty-description mx-auto max-w-md text-xs leading-5 text-secondary">
+                  <div className="scrcpy-empty-description mx-auto max-w-md text-xs leading-5 text-muted-foreground">
                     {visibleError || automationUnavailableMessage}
                   </div>
                 )}
@@ -515,7 +515,7 @@ export default function ScrcpyDeviceView({
             disabled={webrtc.status !== 'connected'}
             title="全屏"
             aria-label="全屏"
-            className={`control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-secondary transition-colors hover:text-(--app-accent) disabled:cursor-not-allowed disabled:opacity-35 ${isCompact ? 'automation-preview-glass-button' : ''}`}
+            className={`control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-35 ${isCompact ? 'automation-preview-glass-button' : ''}`}
           >
             <Maximize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
           </button>
@@ -527,7 +527,7 @@ export default function ScrcpyDeviceView({
               aria-label={compactControlsOpen ? '收起预览设置' : '打开预览设置'}
               aria-expanded={compactControlsOpen}
               aria-controls={compactControlsId}
-              className={`automation-preview-glass-button control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-secondary${compactControlsOpen ? ' is-active' : ''}`}
+              className={`automation-preview-glass-button control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-muted-foreground${compactControlsOpen ? ' is-active' : ''}`}
             >
               <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.8} />
             </button>
@@ -549,7 +549,7 @@ export default function ScrcpyDeviceView({
             </span>
           </div>
 
-          <p className="text-xs leading-5 text-secondary">停止服务或 Agent 会断开其他观看者。</p>
+          <p className="text-xs leading-5 text-muted-foreground">停止服务或 Agent 会断开其他观看者。</p>
 
           {webrtc.status === 'connected' && (
             <Button
@@ -665,9 +665,9 @@ export default function ScrcpyDeviceView({
                 </div>
               </div>
 
-              <label className="scrcpy-setting-group text-xs text-secondary">
+              <label className="scrcpy-setting-group text-xs text-muted-foreground">
                 最长边
-                <select aria-label="视频最长边" value={customMaxSize} className="control-surface min-h-11 rounded-md px-3 text-primary" onChange={event => {
+                <select aria-label="视频最长边" value={customMaxSize} className="control-surface min-h-11 rounded-md px-3 text-foreground" onChange={event => {
                   setCustomMaxSize(Number(event.target.value))
                   setSettingsDirty(true)
                 }}>
@@ -709,7 +709,7 @@ export default function ScrcpyDeviceView({
                   />
                 </div>
               </div>
-              <p className={`text-xs leading-5 ${settingsDirty ? 'text-(--app-accent)' : 'text-secondary'}`} role="status">
+              <p className={`text-xs leading-5 ${settingsDirty ? 'text-primary' : 'text-muted-foreground'}`} role="status">
                 {settingsDirty ? '画质已修改，重连预览后生效' : '画质调整会在下次连接时生效'}
               </p>
             </div>

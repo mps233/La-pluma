@@ -1,8 +1,8 @@
 import { useMemo, useState, type UIEvent } from 'react'
 import { Search } from 'lucide-react'
 import { getOperatorAvatarUrl, useItemIconCacheVersion } from '@/features/game-data'
-import { Button, Checkbox, EmptyState, Input, Loading } from '@/shared/ui'
-import { Modal } from '@/shared/ui/Modal'
+import { Button, Checkbox, EmptyState, Input, Loading } from '@/shared/components'
+import { Modal } from '@/shared/components/Modal'
 import {
   filterOperatorOptions,
   normalizeOperatorSelection,

@@ -14,6 +14,7 @@
 | `src/shared/` | 通用 UI、传输、Query 基础设施和纯工具；不感知业务域。`shared/api` 不新增业务端点。 |
 
 - 跨域显式从 `@/features/<domain>` 导入，禁止深路径与跨域相对路径；域内使用相对 import。领域协作须保持无环，`task-execution` 只能依赖自身与 `shared`。
+- `src/shared/ui/` 中 shadcn CLI 生成文件随上游原样保留，不适用仓库零注释政策；有意修改必须是明确的语义决策并记录。
 - 不把页面逻辑原样搬入 hook 来绕过职责或规模护栏。结构调整后审查实际所有权；预算只辅助评审，不能为通过检查直接放大阈值。
 - 新应用代码、脚本和测试使用 TypeScript；组件沿用 PascalCase，hooks 使用 `use` 前缀，测试与实现就近放置。纯类型依赖用 `import type` 或内联 `type`。
 - Node 脚本由 Node 24 直接执行，只用可擦除 TypeScript 语法，不用 `enum`、`namespace` 或构造器参数属性。保留工具配置及原样复制的公共脚本已有的 JS 例外。

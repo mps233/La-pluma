@@ -6,8 +6,8 @@ import {
   operatorCatalogQueryOptions,
   type OperatorDetailed,
 } from '@/features/game-data'
-import { Button, EmptyState, Input, Loading, Select } from '@/shared/ui'
-import { Modal } from '@/shared/ui/Modal'
+import { Button, EmptyState, Input, Loading, Select } from '@/shared/components'
+import { Modal } from '@/shared/components/Modal'
 import {
   OPERATOR_RENDER_BATCH_SIZE,
   filterOperatorRows,
@@ -178,18 +178,18 @@ export default function OperatorSelectModal({
       title={title}
       size="xl"
       footer={(
-        <div className="flex w-full flex-wrap items-center justify-between gap-3">
-          <span className="text-sm text-secondary">
+        <div className="flex w-full flex-wrap items-center justify-between gap-3.5">
+          <span className="text-sm text-muted-foreground">
             {selectedOperator ? `已选择 ${selectedOperator.name}` : '选择一名干员'}
           </span>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3.5">
             <Button variant="secondary" onClick={handleClose}>取消</Button>
             <Button onClick={handleConfirm} disabled={!selectedOperator}>确认选择</Button>
           </div>
         </div>
       )}
     >
-      <div className="space-y-4">
+      <div className="space-y-3.5">
         <div className="flex items-center gap-2">
           <Input
             type="text"

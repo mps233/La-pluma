@@ -1,4 +1,4 @@
-import { Button } from '@/shared/ui'
+import { Button } from '@/shared/components'
 import type { CopilotSearchItem } from '../types'
 import type { CombatCopilotDiscoveryView } from './combatPanelTypes'
 import {

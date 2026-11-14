@@ -43,7 +43,7 @@ interface MockButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   statusKey?: string | number
 }
 
-vi.mock('@/shared/ui', () => ({
+vi.mock('@/shared/components', () => ({
   Button: ({
     children,
     icon: _icon,

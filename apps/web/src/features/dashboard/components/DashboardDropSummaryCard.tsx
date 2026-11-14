@@ -1,8 +1,8 @@
 import { ChevronRight, PackageOpen } from 'lucide-react'
-import { Card, IconButton } from '@/shared/ui'
+import { Card, IconButton } from '@/shared/components'
 import { useDashboardStore } from '../store/dashboardStore'
 
-const sectionTitleClass = 'text-base font-bold text-primary'
+const sectionTitleClass = 'text-base font-bold text-foreground'
 
 interface DashboardDropSummaryCardProps {
   onOpenStatistics: () => void
@@ -39,7 +39,7 @@ export default function DashboardDropSummaryCard({ onOpenStatistics }: Dashboard
             <div className="dashboard-summary-number-label">掉落记录</div>
           </div>
           <div className="dashboard-summary-copy">
-            <div className="text-sm font-semibold text-primary">{dropSummary.count > 0 ? '今日已记录' : '尚无作战产出'}</div>
+            <div className="text-sm font-semibold text-foreground">{dropSummary.count > 0 ? '今日已记录' : '尚无作战产出'}</div>
             <div className="dashboard-summary-detail">
               {dropSummary.count > 0 ? '最近的关卡与材料已完成汇总' : '完成作战后会自动记录关卡与材料'}
             </div>

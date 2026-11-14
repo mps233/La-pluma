@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Download, RefreshCw, Share2, SquarePlus } from 'lucide-react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useStatusStore } from '@/features/runtime-status'
-import { Button, IconButton } from '@/shared/ui'
+import { Button, IconButton } from '@/shared/components'
 import { hasDocumentBuildChanged } from './pwaUpdate'
 
 interface BeforeInstallPromptEvent extends Event {
@@ -239,7 +239,7 @@ export default function PWAInstallPrompt() {
               : { type: 'spring', stiffness: 390, damping: 35, mass: 0.8 }}
             className="pwa-install-prompt surface-panel fixed z-50 rounded-xl p-4 sm:w-96"
           >
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3.5">
               <img
                 src={logoUrl}
                 alt=""
@@ -247,10 +247,10 @@ export default function PWAInstallPrompt() {
                 className="h-11 w-11 shrink-0"
               />
               <div className="min-w-0 flex-1">
-                <h2 id="pwa-prompt-title" className="text-base font-semibold text-primary">
+                <h2 id="pwa-prompt-title" className="text-base font-semibold text-foreground">
                   {showUpdateCard ? '发现新版本' : '安装 La Pluma Next'}
                 </h2>
-                <p className="mt-1 text-sm leading-6 text-secondary">
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
                   {showUpdateCard
                     ? '刷新页面后即可使用最新版本。'
                     : isIos
@@ -259,7 +259,7 @@ export default function PWAInstallPrompt() {
                 </p>
 
                 {showInstallCard && isIos && (
-                  <ol className="surface-soft mt-3 space-y-2 rounded-lg p-3 text-xs leading-5 text-secondary">
+                  <ol className="surface-soft mt-3 space-y-2 rounded-lg p-3 text-xs leading-5 text-muted-foreground">
                     <li className="flex items-center gap-2">
                       <Share2 className="h-4 w-4 shrink-0 brand-text" aria-hidden="true" />
                       在 Safari 工具栏中点击“分享”

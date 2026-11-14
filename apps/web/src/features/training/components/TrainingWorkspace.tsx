@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
-import { Button, PageHeader } from '@/shared/ui'
+import { Button, PageHeader } from '@/shared/components'
 import { FloatingStatusIndicator, useStatusStore } from '@/features/runtime-status'
 import { useResourceInvalidation } from '@/features/resource-invalidation'
 import { gameDataKeys } from '@/features/game-data'

@@ -2,7 +2,7 @@ import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
 import type { ThemeMode } from '@/shared/theme/bootTheme'
 import { DEFAULT_THEME_ID } from '@/shared/theme/registry'
 import { useTheme } from '@/shared/theme/useTheme'
-import { Button, Card, CardContent, CardHeader } from '@/shared/ui'
+import { Button, Card, CardContent, CardHeader } from '@/shared/components'
 
 const modeOptions: Array<{ value: ThemeMode; label: string; icon: LucideIcon }> = [
   { value: 'light', label: '亮色', icon: Sun },
@@ -19,21 +19,21 @@ export function ThemeGalleryCurrentTheme() {
     <Card>
       <CardHeader title="当前主题" />
       <CardContent className="app-stack-card">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="text-sm font-medium text-primary">{activeTheme.name}</span>
+        <div className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1">
+          <span className="text-sm font-medium text-foreground">{activeTheme.name}</span>
           <span className="text-xs text-tertiary">{activeTheme.description}</span>
         </div>
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3.5">
           {activeTheme.swatches.map(swatch => (
             <div key={swatch.label} className="flex items-center gap-2.5 rounded-xl px-3 py-2 surface-soft">
               <span
-                className="h-6 w-6 shrink-0 rounded-lg border border-(--app-border)"
+                className="h-6 w-6 shrink-0 rounded-lg border border-border"
                 style={{ backgroundColor: swatch[resolvedMode] }}
                 aria-hidden="true"
               />
               <span>
-                <span className="block text-xs text-secondary">{swatch.label}</span>
+                <span className="block text-xs text-muted-foreground">{swatch.label}</span>
                 <span className="block font-mono text-xs text-tertiary">{swatch[resolvedMode]}</span>
               </span>
             </div>

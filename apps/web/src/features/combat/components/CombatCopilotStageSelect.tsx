@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type UIEvent } from 'react'
 import { Search } from 'lucide-react'
-import { Button, Input } from '@/shared/ui'
+import { Button, Input } from '@/shared/components'
 import type { CopilotStageCandidate } from '../types'
 import {
   COPILOT_DISCOVERY_STAGE_PAGE_SIZE,

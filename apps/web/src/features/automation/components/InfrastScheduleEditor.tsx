@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, Save } from 'lucide-react'
 import { getErrorMessage, isRecord } from '@/shared/api'
-import { Button, Input, Select } from '@/shared/ui'
-import { Modal } from '@/shared/ui/Modal'
+import { Button, Input, Select } from '@/shared/components'
+import { Modal } from '@/shared/components/Modal'
 import { saveInfrastSchedule } from '../api'
 import {
   addInfrastPlan,
@@ -151,8 +151,8 @@ export default function InfrastScheduleEditor({
       dismissible={!saving}
       closeOnOverlay={!saving}
       footer={(
-        <div className="flex w-full flex-wrap items-center justify-between gap-3">
-          <span className="text-xs text-secondary">
+        <div className="flex w-full flex-wrap items-center justify-between gap-3.5">
+          <span className="text-xs text-muted-foreground">
             {document ? `${document.plans.length} 个方案` : '未加载排班文件'}
           </span>
           <div className="flex items-center gap-2">
@@ -164,7 +164,7 @@ export default function InfrastScheduleEditor({
         </div>
       )}
     >
-      <div className="@container space-y-4">
+      <div className="@container space-y-3.5">
         {error && (
           <div role="alert" className="status-danger flex items-start gap-2 rounded-lg px-3 py-2 text-sm leading-5">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -185,21 +185,21 @@ export default function InfrastScheduleEditor({
             <Button variant="secondary" disabled={saving || loading} onClick={load}>加载</Button>
             <Button variant="secondary" disabled={saving || loading} onClick={createNew}>新建排班</Button>
           </div>
-          <p className="text-xs leading-5 text-secondary">
+          <p className="text-xs leading-5 text-muted-foreground">
             相对路径基于 MAA 配置目录的 infrast 文件夹，与 maa-cli 解析 filename 的规则一致；保存时省略默认值，未编辑的房间保持原样。
           </p>
 
           {listQuery.data && (
             <div className="space-y-2">
-              <p className="text-xs text-secondary">目录：{listQuery.data.directory}</p>
+              <p className="text-xs text-muted-foreground">目录：{listQuery.data.directory}</p>
               {schedules.length > 0 ? (
-                <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-(--app-border) p-2">
+                <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
                   {schedules.map(schedule => (
                     <button
                       key={schedule.name}
                       type="button"
                       disabled={saving}
-                      className="flex min-h-11 w-full items-center justify-between gap-2 rounded-md px-2 text-left text-sm text-secondary hover:bg-(--app-surface-muted)"
+                      className="flex min-h-11 w-full items-center justify-between gap-2 rounded-md px-2 text-left text-sm text-muted-foreground hover:bg-muted"
                       onClick={() => {
                         setName(schedule.name)
                         setLoadName(schedule.name)
@@ -207,14 +207,14 @@ export default function InfrastScheduleEditor({
                       }}
                     >
                       <span className="truncate">{schedule.name}</span>
-                      <span className="shrink-0 text-xs text-secondary">
+                      <span className="shrink-0 text-xs text-muted-foreground">
                         {schedule.valid ? `${schedule.planCount} 个方案` : '无法解析'}
                       </span>
                     </button>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-secondary">目录中还没有排班文件，填写文件名后点击“新建排班”。</p>
+                <p className="text-xs text-muted-foreground">目录中还没有排班文件，填写文件名后点击“新建排班”。</p>
               )}
             </div>
           )}
@@ -222,8 +222,8 @@ export default function InfrastScheduleEditor({
 
         {document && plan ? (
           <>
-            <section className="space-y-3 border-t border-(--app-border) pt-4">
-              <div className="grid min-w-0 gap-3 @sm:grid-cols-2">
+            <section className="space-y-3 border-t border-border pt-4">
+              <div className="grid min-w-0 gap-3.5 @sm:grid-cols-2">
                 <Input
                   label="排班表标题"
                   value={typeof document.title === 'string' ? document.title : ''}
@@ -241,7 +241,7 @@ export default function InfrastScheduleEditor({
               </div>
             </section>
 
-            <section className="space-y-3 border-t border-(--app-border) pt-4">
+            <section className="space-y-3 border-t border-border pt-4">
               <div className="flex flex-wrap items-end gap-2">
                 <Select
                   label="方案"
@@ -274,7 +274,7 @@ export default function InfrastScheduleEditor({
                   删除方案
                 </Button>
               </div>
-              <div className="grid min-w-0 gap-3 @sm:grid-cols-2">
+              <div className="grid min-w-0 gap-3.5 @sm:grid-cols-2">
                 <Input
                   label="方案名称"
                   value={typeof plan.name === 'string' ? plan.name : ''}
@@ -292,20 +292,20 @@ export default function InfrastScheduleEditor({
               </div>
             </section>
 
-            <section className="space-y-2 border-t border-(--app-border) pt-4">
-              <h4 className="text-sm font-semibold text-primary">房间</h4>
+            <section className="space-y-2 border-t border-border pt-4">
+              <h4 className="text-sm font-semibold text-foreground">房间</h4>
               <InfrastScheduleRoomsEditor
                 plan={plan}
                 disabled={saving}
                 onChange={next => updatePlan(() => next)}
               />
-              <p className="text-xs leading-5 text-secondary">
+              <p className="text-xs leading-5 text-muted-foreground">
                 无人机、菲亚梅塔、干员编组、时间段与其他扩展字段不在本编辑器内，保存时原样保留。
               </p>
             </section>
           </>
         ) : (
-          <p className="text-sm text-secondary">
+          <p className="text-sm text-muted-foreground">
             输入或选择已有排班文件后点击“加载”；新文件可点击“新建排班”后再保存。
           </p>
         )}

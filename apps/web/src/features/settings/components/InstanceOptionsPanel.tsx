@@ -1,7 +1,7 @@
 // 实例选项与连接配置分属同一 MAA profile 的不同 section：面板只在 instance
 // section 渲染，但草稿与读取反馈由模块级 owner 持有，切换 section 不丢草稿。
 
-import { Select, Switch } from '@/shared/ui'
+import { Select, Switch } from '@/shared/components'
 import { useStatusStore } from '@/features/runtime-status'
 import { useConfigDraftPanel } from '../hooks/useConfigDraftPanel'
 import { useSettingsInstanceOptions } from '../hooks/useSettingsInstanceOptions'
@@ -95,10 +95,10 @@ export default function InstanceOptionsPanel({ isActive }: InstanceOptionsPanelP
         hint="ADB 兼容性最好；MaaTouch 触控更接近真实点击"
       />
 
-      <div className="config-switch-list flex flex-col gap-3">
-        <div className="config-reconnect-row flex min-h-14 items-center justify-between gap-3 py-1">
+      <div className="config-switch-list flex flex-col gap-3.5">
+        <div className="config-reconnect-row flex min-h-14 items-center justify-between gap-3.5 py-1">
           <div className="min-w-0">
-            <div className="text-sm font-medium text-primary">部署时暂停</div>
+            <div className="text-sm font-medium text-foreground">部署时暂停</div>
             <div className="mt-1 text-xs leading-5 text-tertiary">开启后部署干员时暂停游戏，适用于部分特殊关卡</div>
           </div>
           <Switch
@@ -110,9 +110,9 @@ export default function InstanceOptionsPanel({ isActive }: InstanceOptionsPanelP
             disabled={!loaded}
           />
         </div>
-        <div className="config-reconnect-row flex min-h-14 items-center justify-between gap-3 py-1">
+        <div className="config-reconnect-row flex min-h-14 items-center justify-between gap-3.5 py-1">
           <div className="min-w-0">
-            <div className="text-sm font-medium text-primary">ADB Lite</div>
+            <div className="text-sm font-medium text-foreground">ADB Lite</div>
             <div className="mt-1 text-xs leading-5 text-tertiary">使用 AdbLite 减少 ADB 调用开销</div>
           </div>
           <Switch
@@ -124,9 +124,9 @@ export default function InstanceOptionsPanel({ isActive }: InstanceOptionsPanelP
             disabled={!loaded}
           />
         </div>
-        <div className="config-reconnect-row flex min-h-14 items-center justify-between gap-3 py-1">
+        <div className="config-reconnect-row flex min-h-14 items-center justify-between gap-3.5 py-1">
           <div className="min-w-0">
-            <div className="text-sm font-medium text-primary">退出时结束 ADB</div>
+            <div className="text-sm font-medium text-foreground">退出时结束 ADB</div>
             <div className="mt-1 text-xs leading-5 text-tertiary">任务结束后由 MAA 关闭自己启动的 ADB 进程</div>
           </div>
           <Switch

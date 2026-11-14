@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import Icons from '@/shared/ui/Icons'
+import Icons from '@/shared/components/Icons'
 import type { CombatMode, CombatTask } from '../types'
 
 export const COMBAT_TASKS: Record<CombatMode, CombatTask> = {

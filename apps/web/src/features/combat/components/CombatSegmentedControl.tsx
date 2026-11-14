@@ -39,9 +39,9 @@ export default function CombatSegmentedControl<T extends string>({
             aria-pressed={isActive}
             disabled={isDisabled}
             onClick={() => onChange(option.value)}
-            className={`inline-flex min-h-11 min-w-0 items-center justify-center whitespace-nowrap rounded-lg px-1.5 text-xs font-medium sm:px-2.5 sm:text-sm transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-(--app-accent) disabled:cursor-not-allowed disabled:opacity-50 ${
+            className={`inline-flex min-h-11 min-w-0 items-center justify-center whitespace-nowrap rounded-lg px-1.5 text-xs font-medium sm:px-2.5 sm:text-sm transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 ${
               fullWidth ? 'flex-1' : ''
-            } ${isActive ? 'brand-action text-white' : 'text-secondary hover:bg-(--app-surface-muted)'}`}
+            } ${isActive ? 'brand-action text-white' : 'text-muted-foreground hover:bg-muted'}`}
           >
             {option.label}
           </button>

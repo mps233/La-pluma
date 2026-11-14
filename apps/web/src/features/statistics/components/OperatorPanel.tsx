@@ -8,8 +8,8 @@ import {
 } from '@/features/game-data'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Download, Play, RotateCcw } from 'lucide-react'
-import Icons from '@/shared/ui/Icons'
-import { Button, Card, EmptyState, Loading } from '@/shared/ui'
+import Icons from '@/shared/components/Icons'
+import { Button, Card, EmptyState, Loading } from '@/shared/components'
 import {
   DEFAULT_OPERATOR_FILTERS,
   buildKnownOperatorIdSet,
@@ -215,14 +215,14 @@ export default function OperatorPanel({ isActive, command }: OperatorPanelProps)
         className={taskPanelClass(command.activeTask === 'operbox')}
       >
         <div className="data-statistics-task-content app-stack-card">
-          <div className="data-statistics-task-header flex items-start gap-3 sm:items-center">
-            <div className="flex w-full min-w-0 flex-1 items-center gap-3 sm:w-auto">
+          <div className="data-statistics-task-header flex items-start gap-3.5 sm:items-center">
+            <div className="flex w-full min-w-0 flex-1 items-center gap-3.5 sm:w-auto">
               <div className="flex h-10 w-10 flex-none items-center justify-center" aria-hidden="true">
                 <Icons.Users />
               </div>
               <div className="min-w-0">
-                <h2 className="text-lg font-semibold text-primary">干员识别</h2>
-                <p className="mt-1 text-sm leading-relaxed text-secondary">
+                <h2 className="text-lg font-semibold text-foreground">干员识别</h2>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                   读取档案、等级、精英化与潜能数据
                 </p>
               </div>
@@ -286,39 +286,39 @@ export default function OperatorPanel({ isActive, command }: OperatorPanelProps)
                 aria-label="干员数据概览"
               >
                 <div className={statCardClass}>
-                  <p className="text-xs text-secondary">已识别</p>
-                  <p className="mt-1 text-2xl font-semibold text-primary">{ownedOperatorCount}</p>
+                  <p className="text-xs text-muted-foreground">已识别</p>
+                  <p className="mt-1 text-2xl font-semibold text-foreground">{ownedOperatorCount}</p>
                 </div>
                 <div className={statCardClass}>
-                  <p className="text-xs text-secondary">干员资料</p>
-                  <p className="mt-1 text-2xl font-semibold text-primary">{operatorCatalogCount}</p>
+                  <p className="text-xs text-muted-foreground">干员资料</p>
+                  <p className="mt-1 text-2xl font-semibold text-foreground">{operatorCatalogCount}</p>
                 </div>
                 <div className={statCardClass}>
-                  <p className="text-xs text-secondary">当前显示</p>
-                  <p className="mt-1 text-2xl font-semibold text-primary">{filteredOperators.length}</p>
+                  <p className="text-xs text-muted-foreground">当前显示</p>
+                  <p className="mt-1 text-2xl font-semibold text-foreground">{filteredOperators.length}</p>
                 </div>
                 <div className={statCardClass}>
-                  <p className="text-xs text-secondary">档案覆盖</p>
-                  <p className="mt-1 text-2xl font-semibold text-primary">{operatorCoverage}%</p>
+                  <p className="text-xs text-muted-foreground">档案覆盖</p>
+                  <p className="mt-1 text-2xl font-semibold text-foreground">{operatorCoverage}%</p>
                 </div>
               </div>
 
               <section className="rounded-xl surface-soft p-3" aria-labelledby="operator-filter-title">
-                <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="mb-3 flex items-center justify-between gap-3.5">
                   <div className="min-w-0">
-                    <h3 id="operator-filter-title" className="text-sm font-semibold text-primary">筛选与排序</h3>
+                    <h3 id="operator-filter-title" className="text-sm font-semibold text-foreground">筛选与排序</h3>
                     {operBoxData.timestamp && (
                       <p className="mt-1 truncate text-xs text-tertiary">
                         更新于 {new Date(operBoxData.timestamp).toLocaleString('zh-CN')}
                       </p>
                     )}
                     {recognitionHint && (
-                      <p role="status" className="mt-1 text-xs leading-5 text-(--app-warning)">
+                      <p role="status" className="mt-1 text-xs leading-5 text-warning">
                         {recognitionHint}
                       </p>
                     )}
                   </div>
-                  <p className="shrink-0 text-xs text-secondary" aria-live="polite">
+                  <p className="shrink-0 text-xs text-muted-foreground" aria-live="polite">
                     显示 <span className="font-semibold brand-text">{filteredOperators.length}</span> 项
                   </p>
                 </div>
@@ -439,16 +439,16 @@ export default function OperatorPanel({ isActive, command }: OperatorPanelProps)
                         }`}
                       >
                         {!isOwned && (
-                          <div className="control-surface absolute left-2 top-2 z-10 rounded-full px-2 py-0.5 text-xs font-semibold text-secondary">
+                          <div className="control-surface absolute left-2 top-2 z-10 rounded-full px-2 py-0.5 text-xs font-semibold text-muted-foreground">
                             {isUnknown ? '未知' : '未拥有'}
                           </div>
                         )}
 
-                        <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-xl bg-(--app-surface-muted)">
+                        <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-xl bg-muted">
                           {oper.id ? (
                             <>
                               {!imageLoaded && (
-                                <div className="absolute inset-0 animate-pulse bg-(--app-surface-muted)"></div>
+                                <div className="absolute inset-0 animate-pulse bg-muted"></div>
                               )}
                               <img
                                 src={getOperatorAvatarUrl(oper.id, 'base', itemIconVersion)}
@@ -471,11 +471,11 @@ export default function OperatorPanel({ isActive, command }: OperatorPanelProps)
                                 }}
                               />
                               {!isOwned && imageLoaded && (
-                                <div className="absolute inset-0 bg-[color-mix(in_srgb,var(--app-bg)_62%,transparent)]"></div>
+                                <div className="absolute inset-0 bg-[color-mix(in_srgb,var(--background)_62%,transparent)]"></div>
                               )}
                             </>
                           ) : (
-                            <div className="absolute inset-0 flex items-center justify-center text-secondary">
+                            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
                               无头像
                             </div>
                           )}
@@ -487,7 +487,7 @@ export default function OperatorPanel({ isActive, command }: OperatorPanelProps)
                         </div>
 
                         <div className="text-center space-y-2">
-                          <div className="text-sm font-bold text-primary truncate" title={oper.name}>
+                          <div className="text-sm font-bold text-foreground truncate" title={oper.name}>
                             {oper.name || '未知干员'}
                           </div>
                           {isOwned && (
@@ -505,7 +505,7 @@ export default function OperatorPanel({ isActive, command }: OperatorPanelProps)
                                 )}
                               </div>
                               {oper.potential !== undefined && (
-                                <div className="text-xs text-secondary">
+                                <div className="text-xs text-muted-foreground">
                                   潜能 {oper.potential}
                                 </div>
                               )}

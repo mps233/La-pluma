@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type UIEvent } from 'react'
 import { SearchX } from 'lucide-react'
-import { EmptyState, Loading } from '@/shared/ui'
-import { Modal } from '@/shared/ui/Modal'
+import { EmptyState, Loading } from '@/shared/components'
+import { Modal } from '@/shared/components/Modal'
 import { usePanelState } from '../hooks/usePanelState'
 import {
   DEFAULT_COPILOT_SEARCH_LIMIT,

@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Filter, Search, UserRoundSearch } from 'lucide-react'
-import { Button, EmptyState, Input, Loading, Select } from '@/shared/ui'
-import { Modal } from '@/shared/ui/Modal'
+import { Button, EmptyState, Input, Loading, Select } from '@/shared/components'
+import { Modal } from '@/shared/components/Modal'
 import { useFluidTabIndicator } from '@/shared/hooks/useFluidTabIndicator'
 import { trainingCandidatesQueryOptions, trainingStatusCountsQueryOptions } from '../model/queries'
 import { EMPTY_TRAINING_COUNTS } from '../model/statusCounts'
@@ -175,10 +175,10 @@ export default function OperatorPicker({
   })
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="添加干员" size="xl" footer={<div className="flex w-full items-center justify-between gap-3"><span className="text-sm text-secondary">已加入 {queueLength} 名干员</span><Button onClick={onClose} variant="secondary">完成选择</Button></div>}>
+    <Modal isOpen={isOpen} onClose={onClose} title="添加干员" size="xl" footer={<div className="flex w-full items-center justify-between gap-3.5"><span className="text-sm text-muted-foreground">已加入 {queueLength} 名干员</span><Button onClick={onClose} variant="secondary">完成选择</Button></div>}>
       {operationError && <div role="alert" className="training-feedback status-danger">{operationError}</div>}
-      <div className="space-y-4">
-        <div className="flex flex-col gap-3">
+      <div className="space-y-3.5">
+        <div className="flex flex-col gap-3.5">
           <div className="app-workspace-segments app-liquid-tab-pill training-status-shell">
             <div
               ref={statusTabsRef}

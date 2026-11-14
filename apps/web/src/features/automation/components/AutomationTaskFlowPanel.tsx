@@ -12,7 +12,7 @@ import {
   Square,
   Trash2,
 } from 'lucide-react'
-import { Button, EmptyState, SmoothPanel, Switch } from '@/shared/ui'
+import { Button, EmptyState, SmoothPanel, Switch } from '@/shared/components'
 import AutomationTaskPicker from './AutomationTaskPicker'
 import AutomationExecutionSummary from './AutomationExecutionSummary'
 import {
@@ -157,13 +157,13 @@ export default function AutomationTaskFlowPanel({
         )}
 
         {lastDeletedTaskName && (
-          <div className="mx-3.5 flex min-h-11 items-center justify-between gap-3 border-t border-(--app-border) text-xs text-secondary sm:mx-4" role="status">
+          <div className="mx-3.5 flex min-h-11 items-center justify-between gap-3.5 border-t border-border text-xs text-muted-foreground sm:mx-4" role="status">
             <span className="min-w-0 truncate">已删除“{lastDeletedTaskName}”</span>
             <button
               type="button"
               onClick={onRestoreDeletedTask}
               disabled={execution.isRunning}
-              className="min-h-11 shrink-0 px-2 font-medium text-(--app-accent) disabled:cursor-not-allowed disabled:opacity-40"
+              className="min-h-11 shrink-0 px-2 font-medium text-primary disabled:cursor-not-allowed disabled:opacity-40"
             >
               恢复
             </button>

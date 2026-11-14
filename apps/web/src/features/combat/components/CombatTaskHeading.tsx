@@ -1,5 +1,5 @@
 import { ChevronRight, Play, Square } from 'lucide-react'
-import { Button } from '@/shared/ui'
+import { Button } from '@/shared/components'
 import type { CombatTask } from '../types'
 
 export interface CombatRunActionProps {
@@ -100,14 +100,14 @@ export default function CombatTaskHeading({
   ...run
 }: CombatTaskHeadingProps) {
   return (
-    <div className="combat-task-heading flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-      <div className="flex min-w-0 items-center gap-3">
+    <div className="combat-task-heading flex flex-col gap-3.5 md:flex-row md:items-center md:justify-between">
+      <div className="flex min-w-0 items-center gap-3.5">
         <div className="combat-task-icon">
           {task.icon}
         </div>
         <div className="min-w-0">
-          <h4 className="truncate text-lg font-semibold text-primary">{task.name}</h4>
-          <p className="mt-1 text-sm leading-relaxed text-secondary">{task.description}</p>
+          <h4 className="truncate text-lg font-semibold text-foreground">{task.name}</h4>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{task.description}</p>
         </div>
       </div>
 

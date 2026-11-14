@@ -2,7 +2,7 @@
 // 也不清空草稿与保存/读取反馈。
 
 import { useCallback } from 'react'
-import { Input, Select, Switch } from '@/shared/ui'
+import { Input, Select, Switch } from '@/shared/components'
 import { useStatusStore } from '@/features/runtime-status'
 import { useConfigDraftPanel } from '../hooks/useConfigDraftPanel'
 import { useSettingsConnectionConfig } from '../hooks/useSettingsConnectionConfig'
@@ -91,7 +91,7 @@ export default function ConnectionConfigPanel({ isActive }: ConnectionConfigPane
       onSave={handleSave}
       onReset={handleReset}
     >
-      <div className="grid min-w-0 gap-(--app-space-card) md:grid-cols-2">
+      <div className="grid min-w-0 gap-3.5 md:grid-cols-2">
         <Input
           label="ADB 路径"
           value={configData.adb_path}
@@ -120,7 +120,7 @@ export default function ConnectionConfigPanel({ isActive }: ConnectionConfigPane
         disabled={!connectionLoaded}
       />
 
-      <div className="grid min-w-0 gap-(--app-space-card) md:grid-cols-2 md:items-end">
+      <div className="grid min-w-0 gap-3.5 md:grid-cols-2 md:items-end">
         <Select
           label="连接预设"
           value={configData.preset}
@@ -146,9 +146,9 @@ export default function ConnectionConfigPanel({ isActive }: ConnectionConfigPane
           hint="选择与服务器系统匹配的平台预设"
         />
       </div>
-      <div className="config-reconnect-row flex min-h-14 items-center justify-between gap-3 py-1">
+      <div className="config-reconnect-row flex min-h-14 items-center justify-between gap-3.5 py-1">
         <div className="min-w-0">
-          <div className="text-sm font-medium text-primary">自动重连</div>
+          <div className="text-sm font-medium text-foreground">自动重连</div>
           <div className="mt-1 text-xs leading-5 text-tertiary">连接中断后自动尝试恢复</div>
         </div>
         <Switch

@@ -1,21 +1,21 @@
 import { Cpu, Database, HardDrive, Thermometer } from 'lucide-react'
-import { SmoothPanel } from '@/shared/ui'
+import { SmoothPanel } from '@/shared/components'
 import { useDashboardStore } from '../store/dashboardStore'
 import { buildTemperatureSeries, getUsageTone, type UsageTone } from '../model/deviceView'
 
-const labelClass = 'text-secondary'
-const progressTrackClass = 'h-1.5 rounded-full bg-(--app-surface-muted) overflow-hidden'
+const labelClass = 'text-muted-foreground'
+const progressTrackClass = 'h-1.5 rounded-full bg-muted overflow-hidden'
 
 const getUsageBarClass = (tone: UsageTone) => {
-  if (tone === 'danger') return 'bg-(--app-danger)'
-  if (tone === 'warning') return 'bg-(--app-warning)'
-  return 'bg-(--app-accent)'
+  if (tone === 'danger') return 'bg-destructive'
+  if (tone === 'warning') return 'bg-warning'
+  return 'bg-primary'
 }
 
 const getUsageValueClass = (tone: UsageTone) => {
-  if (tone === 'danger') return 'text-(--app-danger)'
-  if (tone === 'warning') return 'text-(--app-warning)'
-  return 'text-primary'
+  if (tone === 'danger') return 'text-destructive'
+  if (tone === 'warning') return 'text-warning'
+  return 'text-foreground'
 }
 
 function TemperatureSparkline({ values }: { values: number[] }) {
@@ -29,8 +29,8 @@ function TemperatureSparkline({ values }: { values: number[] }) {
       <svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
         <defs>
           <linearGradient id="dashboard-temperature-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--app-accent)" stopOpacity="0.2" />
-            <stop offset="100%" stopColor="var(--app-accent)" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
           </linearGradient>
         </defs>
         <line x1="0" y1="14" x2="100" y2="14" className="dashboard-temperature-gridline" />
@@ -56,9 +56,9 @@ export default function DashboardDeviceSection() {
   return (
     <div className="dashboard-device-section">
       <div className="flex items-center gap-2">
-        <div className="h-0.5 flex-1 bg-(--app-border) rounded-full" />
+        <div className="h-0.5 flex-1 bg-border rounded-full" />
         <span className={`text-xs font-medium ${labelClass} uppercase shrink-0`}>设备状态</span>
-        <div className="h-0.5 flex-1 bg-(--app-border) rounded-full" />
+        <div className="h-0.5 flex-1 bg-border rounded-full" />
       </div>
       <div className="dashboard-device-grid">
         {([
@@ -80,11 +80,11 @@ export default function DashboardDeviceSection() {
                   <Icon className={`h-4 w-4 ${labelClass}`} strokeWidth={1.5} />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-xs font-medium text-primary">{label}</div>
+                  <div className="text-xs font-medium text-foreground">{label}</div>
                   <div className={`truncate text-xs ${labelClass}`}>{sub || '实时采样'}</div>
                 </div>
                 {value != null && (
-                  <div className="ml-auto text-sm font-semibold text-primary">{value}</div>
+                  <div className="ml-auto text-sm font-semibold text-foreground">{value}</div>
                 )}
               </div>
               {label === '温度' ? (

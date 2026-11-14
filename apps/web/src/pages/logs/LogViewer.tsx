@@ -1,4 +1,4 @@
-import { PageHeader } from '@/shared/ui'
+import { PageHeader } from '@/shared/components'
 import { FloatingStatusIndicator } from '@/features/runtime-status'
 import { LogsWorkspace } from '@/features/logs'
 import { DeviceMonitorLayout } from '@/features/device-mirror'

@@ -289,7 +289,7 @@ function findDeclaration(
 // （index.html 内联启动样式、index.css / ios-theme.css 页面底色）；不一致时首帧会闪旧色。
 // 这是 docs/development/README.md「禁止枚举式 grep CSS」的例外（同 animations.test.ts）：
 // 不枚举选择器清单，只核对同一语义在两处的取值一致。深色页面底色候选有两个：
-// index.css 的 --app-bg 与 ios-theme.css 的 --app-chrome-page-bg；两者同属 @layer base，
+// index.css 的 --background 与 ios-theme.css 的 --glass-page-bg；两者同属 @layer base，
 // ios-theme.css 后加载，其 html, body { background: ... } 简写覆盖前者，因此校验后者。
 describe('first-paint background colors', () => {
   const checks = [
@@ -311,14 +311,14 @@ describe('first-paint background colors', () => {
       label: 'index.css light page background',
       file: 'src/styles/index.css',
       blockPattern: /^\s*:root\s*\{/m,
-      property: '--app-bg',
+      property: '--background',
       expected: BOOT_THEME_COLORS.light.background,
     },
     {
       label: 'ios-theme.css dark page background',
       file: 'src/styles/ios-theme.css',
       blockPattern: /^\s*html\.dark,\s*\n\s*#app-root\.dark\s*\{/m,
-      property: '--app-chrome-page-bg',
+      property: '--glass-page-bg',
       expected: BOOT_THEME_COLORS.dark.background,
     },
   ]

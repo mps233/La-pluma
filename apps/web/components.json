@@ -13,8 +13,8 @@
   "iconLibrary": "lucide",
   "rtl": false,
   "aliases": {
-    "components": "@/shared",
-    "utils": "@/shared/ui/cn",
+    "components": "@/shared/components",
+    "utils": "@/shared/lib/utils",
     "ui": "@/shared/ui",
     "lib": "@/shared/lib",
     "hooks": "@/shared/hooks"

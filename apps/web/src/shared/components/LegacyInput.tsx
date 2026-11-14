@@ -206,7 +206,7 @@ function FieldLabel({ htmlFor, label, hint, hintId, hintPlacement }: FieldLabelP
   if (hintPlacement === 'tooltip' && hint) {
     return (
       <div className="mb-2 flex items-center gap-1">
-        <label htmlFor={htmlFor} className="text-sm font-medium text-secondary">
+        <label htmlFor={htmlFor} className="text-sm font-medium text-muted-foreground">
           {label}
         </label>
         <HintTooltip id={hintId} label={label} hint={hint} />
@@ -215,7 +215,7 @@ function FieldLabel({ htmlFor, label, hint, hintId, hintPlacement }: FieldLabelP
   }
 
   return (
-    <label htmlFor={htmlFor} className="mb-2 block text-sm font-medium text-secondary">
+    <label htmlFor={htmlFor} className="mb-2 block text-sm font-medium text-muted-foreground">
       {label}
     </label>
   )
@@ -240,7 +240,7 @@ export function Checkbox({
         {...props}
       />
       {label && (
-        <span className="text-sm text-secondary transition-colors group-hover:text-(--app-accent)">
+        <span className="text-sm text-muted-foreground transition-colors group-hover:text-primary">
           {label}
         </span>
       )}

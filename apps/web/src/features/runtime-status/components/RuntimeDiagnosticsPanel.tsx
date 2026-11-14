@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, CircleHelp, XCircle } from 'lucide-react'
-import { Button } from '@/shared/ui'
+import { Button } from '@/shared/components'
 import type {
   RuntimeDiagnosticCheck,
   RuntimeDiagnosticCheckStatus,
@@ -19,7 +19,7 @@ const CHECK_META: Record<
   pass: { label: '通过', surface: 'status-success', Icon: CheckCircle2 },
   warn: { label: '注意', surface: 'status-warning', Icon: AlertTriangle },
   fail: { label: '失败', surface: 'status-danger', Icon: XCircle },
-  unknown: { label: '未知', surface: 'surface-soft text-secondary', Icon: CircleHelp },
+  unknown: { label: '未知', surface: 'surface-soft text-muted-foreground', Icon: CircleHelp },
 }
 
 const REPORT_META: Record<RuntimeDiagnosticsStatus, { label: string; surface: string }> = {
@@ -36,18 +36,18 @@ function DiagnosticsCheckItem({ check }: { check: RuntimeDiagnosticCheck }) {
     <li className={`min-w-0 rounded-lg px-3 py-2.5 ${meta.surface}`}>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <Icon size={15} strokeWidth={2} aria-hidden="true" />
-        <span className="min-w-0 flex-1 text-sm font-semibold text-primary">{check.title}</span>
+        <span className="min-w-0 flex-1 text-sm font-semibold text-foreground">{check.title}</span>
         <span className="text-xs font-semibold">{meta.label}</span>
       </div>
-      <p className="mt-1 text-xs leading-5 text-secondary">{check.summary}</p>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">{check.summary}</p>
       {check.details.length > 0 && (
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-secondary">
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-muted-foreground">
           {check.details.map((detail, index) => (
             <li key={`${detail}-${index}`} className="wrap-break-word">{detail}</li>
           ))}
         </ul>
       )}
-      {check.hint && <p className="mt-2 text-xs leading-5 text-secondary">建议：{check.hint}</p>}
+      {check.hint && <p className="mt-2 text-xs leading-5 text-muted-foreground">建议：{check.hint}</p>}
       {check.locations && check.locations.length > 0 && (
         <p className="mt-1 text-xs leading-5 text-tertiary">定位：{check.locations.join('、')}</p>
       )}
@@ -69,9 +69,9 @@ export default function RuntimeDiagnosticsPanel({
       aria-label="辅助诊断"
       aria-busy={loading || undefined}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3.5">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-primary">辅助诊断</h3>
+          <h3 className="text-sm font-semibold text-foreground">辅助诊断</h3>
           <p className="mt-0.5 text-xs leading-5 text-tertiary">
             检查运行环境、设备连接、资源与执行链路，不会启动任务。
           </p>
@@ -92,7 +92,7 @@ export default function RuntimeDiagnosticsPanel({
       {error && (
         <div
           role="alert"
-          className="status-warning mt-3 flex min-h-11 flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm leading-5"
+          className="status-warning mt-3 flex min-h-11 flex-wrap items-center justify-between gap-3.5 rounded-lg px-3 py-2 text-sm leading-5"
         >
           <span className="min-w-0 flex-1">{error}</span>
           <Button

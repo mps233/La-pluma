@@ -44,11 +44,11 @@ export default function Button({
 
   const variantStyles: Record<string, string> = {
     primary: 'brand-action',
-    secondary: 'control-surface text-primary',
+    secondary: 'control-surface text-foreground',
     danger: 'status-danger-action',
     success: 'status-success-action',
-    ghost: 'app-button-ghost text-secondary',
-    outline: 'control-surface text-primary',
+    ghost: 'app-button-ghost text-muted-foreground',
+    outline: 'control-surface text-foreground',
   }
   
   const sizeStyles: Record<string, string> = {
@@ -114,9 +114,9 @@ export function IconButton({
 
   const variantStyles: Record<string, string> = {
     primary: 'brand-action',
-    secondary: 'control-surface text-primary',
+    secondary: 'control-surface text-foreground',
     danger: 'status-danger-action',
-    ghost: 'app-button-ghost text-secondary',
+    ghost: 'app-button-ghost text-muted-foreground',
   }
 
   const sizeStyles: Record<string, string> = {

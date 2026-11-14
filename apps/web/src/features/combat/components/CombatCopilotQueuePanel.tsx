@@ -1,5 +1,5 @@
 import { Check, ChevronDown, ChevronUp, ListChecks, RotateCcw, SkipForward, Trash2 } from 'lucide-react'
-import { Button, EmptyState, IconButton } from '@/shared/ui'
+import { Button, EmptyState, IconButton } from '@/shared/components'
 import { firstErrorLine } from '../model/copilotDetail'
 import type { CopilotQueueEntry } from '../model/copilotQueue'
 import { COPILOT_DETAIL_LAYER_ID, type CombatCopilotQueueProjection } from './combatPanelTypes'

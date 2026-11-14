@@ -1,4 +1,4 @@
-import Icons from '@/shared/ui/Icons'
+import Icons from '@/shared/components/Icons'
 import { GraduationCap, Palette } from 'lucide-react'
 import type { AutomationAvailableTask } from '../types'
 

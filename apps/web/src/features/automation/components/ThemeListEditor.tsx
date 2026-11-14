@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react'
-import { Button, IconButton, Input } from '@/shared/ui'
+import { Button, IconButton, Input } from '@/shared/components'
 
 interface ThemeListEditorProps {
   themes: string[]
@@ -10,9 +10,9 @@ interface ThemeListEditorProps {
 export default function ThemeListEditor({ themes, disabled, onChange }: ThemeListEditorProps) {
   return (
     <fieldset disabled={disabled} className="min-w-0 space-y-3">
-      <legend className="mb-2 text-sm font-medium text-secondary">候选主题</legend>
-      <p className="text-xs leading-5 text-secondary">填写游戏内显示的主题名。多个候选会随机选择一个，需已解锁。</p>
-      {themes.length === 0 && <p className="text-sm text-secondary">添加至少一个主题名。</p>}
+      <legend className="mb-2 text-sm font-medium text-muted-foreground">候选主题</legend>
+      <p className="text-xs leading-5 text-muted-foreground">填写游戏内显示的主题名。多个候选会随机选择一个，需已解锁。</p>
+      {themes.length === 0 && <p className="text-sm text-muted-foreground">添加至少一个主题名。</p>}
       {themes.map((theme, index) => (
         <div className="flex min-w-0 items-center gap-2" key={index}>
           <Input className="min-w-0 flex-1" aria-label={`主题 ${index + 1}`} value={theme} placeholder="游戏内主题名" disabled={disabled} onChange={value => onChange(themes.map((current, currentIndex) => currentIndex === index ? value : current))} />

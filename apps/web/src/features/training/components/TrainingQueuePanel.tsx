@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { ArrowDown, ArrowUp, ArrowUpToLine, ClipboardList, Plus, Trash2, UserRoundSearch } from 'lucide-react'
 import { getOperatorAvatarUrl, useItemIconCacheVersion } from '@/features/game-data'
-import { Button, EmptyState, IconButton, Loading } from '@/shared/ui'
+import { Button, EmptyState, IconButton, Loading } from '@/shared/components'
 import { getQueueMaterials, selectMissingMaterials } from '../model/materials'
 import TrainingLoadError from './TrainingLoadError'
 import UndoToast from './UndoToast'
@@ -74,7 +74,7 @@ export default function TrainingQueuePanel({
     <>
       <section className="training-queue-section training-surface" aria-labelledby="training-queue-title">
         <div className="training-section-heading">
-          <div><h2 ref={queueHeadingRef} tabIndex={-1} id="training-queue-title">养成队列 <span className="text-secondary font-normal">{queue.length}</span></h2></div>
+          <div><h2 ref={queueHeadingRef} tabIndex={-1} id="training-queue-title">养成队列 <span className="text-muted-foreground font-normal">{queue.length}</span></h2></div>
           <ClipboardList size={20} className="text-tertiary" aria-hidden="true" />
         </div>
         {operationError && <div role="alert" className="training-feedback status-danger">{operationError}</div>}
@@ -102,7 +102,7 @@ export default function TrainingQueuePanel({
             </div>
           </li>)}
         </ol>}
-        {queue.length > 0 && <div className="training-queue-footer"><span className="text-xs text-secondary">进度仅表示材料筹备情况</span><Button variant="ghost" onClick={onOpenPicker} icon={<Plus size={15} />}>继续添加</Button></div>}
+        {queue.length > 0 && <div className="training-queue-footer"><span className="text-xs text-muted-foreground">进度仅表示材料筹备情况</span><Button variant="ghost" onClick={onOpenPicker} icon={<Plus size={15} />}>继续添加</Button></div>}
       </section>
       {recentlyRemoved && <UndoToast key={recentlyRemoved.item.operatorId} name={recentlyRemoved.item.operator.name} pending={queueMutationPending} onUndo={() => void handleUndo()} onDismiss={onDismissUndo} />}
     </>

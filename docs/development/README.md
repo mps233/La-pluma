@@ -95,9 +95,9 @@ pnpm screenshots:readme
 当前约定：
 
 - **构建链路**：依赖为 `tailwindcss@^4` + `@tailwindcss/vite`，由 Vite 插件处理样式；`autoprefixer`、`postcss` 与 `apps/web/postcss.config.js` 已退役，不再有 `@config` 指令与 `apps/web/tailwind.config.js`。
-- **层序与 token 单源**：语义 token 只在 `index.css` 的 `:root`、`html.dark, #app-root.dark` 与对比度/透明度媒体查询中定义，`ios-theme.css` 只保留 chrome/材质独有 token；项目语义 token 以 `index.css` 显式定义为准，不依赖 v4 默认色板。层序声明、`page` 层归属与 utilities 优先级详见 [设计规范](../../DESIGN.md) 的「层序与 token 单源」。
-- **映射即规范**：`@theme` 圆角压缩映射、`gap-*`/`space-*` 定向 `@utility` 及其 `!important` 覆盖限制、content 自动检测，以 [设计规范](../../DESIGN.md)「配置即规范」的映射表为唯一依据，不要按通用 v4 迁移指南改写这些类名。
-- **canonical 类名**：`eslint-plugin-tailwindcss` 的 `enforces-canonical-classname` 在 `apps/web/eslint.config.js` 中对 `src/**/*.{ts,tsx}` 启用（只开这一条），由 `lint` 拦截非规范写法：CSS 变量写 `bg-(--app-surface-muted)` 而非 `bg-[var(--app-surface-muted)]`；`break-words` 写 `wrap-break-word`，`[overflow-wrap:anywhere]` 写 `wrap-anywhere`，两者同时出现时保留两个类。
+- **层序与 token 单源**：语义 token 只在 `index.css` 的 `:root`、`html.dark, #app-root.dark` 与对比度/透明度媒体查询中定义，`ios-theme.css` 只保留 `--glass-*` 材质 token 与 `--la-pluma-*` 结构几何 token；项目语义 token 以 `index.css` 显式定义为准，不依赖 v4 默认色板。层序声明、`page` 层归属与 utilities 优先级详见 [设计规范](../../DESIGN.md) 的「层序与 token 单源」。
+- **档位即规范**：圆角由 `index.css` 的 `--radius` 经标准派生档位生效、间距沿用 v4 原生档位与 .5 步进、content 自动检测，以 [设计规范](../../DESIGN.md)「档位即规范」为唯一依据。
+- **canonical 类名**：`eslint-plugin-tailwindcss` 的 `enforces-canonical-classname` 在 `apps/web/eslint.config.js` 中对 `src/**/*.{ts,tsx}` 启用（只开这一条），由 `lint` 拦截非规范写法：CSS 变量写 `bg-(--muted)` 而非 `bg-[var(--muted)]`；`break-words` 写 `wrap-break-word`，`[overflow-wrap:anywhere]` 写 `wrap-anywhere`，两者同时出现时保留两个类。
 - **v3→v4 类名**：`shadow-sm→shadow-xs`、`backdrop-blur-sm→backdrop-blur-xs`、`outline-none→outline-hidden`、`flex-shrink-0→shrink-0`，`!` 前缀改后缀（如 `dark:text-white!` 仍有效）；**`shadow-md` 及以上档位在 v4 中数值与 v3 相同，不要按 "shadow-lg→shadow-md" 的通用口诀改名**。`ring`、裸 `border`/`divide` 已显式给色。
 - **preflight 对齐**：v4 移除了按钮 `cursor: pointer` 与 `:disabled` 的 default cursor，并把 placeholder 改为 currentColor/50%、默认 border-color 改为 currentColor；`index.css` 的 base 层保留了 v3 等价规则（按钮 pointer、disabled default、placeholder gray-400、border gray-200），避免 cursor 这类截图捕获不到的行为回归。
 - **浏览器下限**：Tailwind v4 依赖原生 cascade layers、`color-mix()`、OKLCH 与 `@property`，前端最低支持 **Safari 16.4+ / Chrome 111+ / Firefox 128+**。低于该下限的浏览器不再保证样式正确。

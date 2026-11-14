@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 import { AlertCircle, ArrowDown, ArrowLeft, FileText, Search } from 'lucide-react'
-import { Button, Card, CardContent, CardHeader, Loading } from '@/shared/ui'
+import { Button, Card, CardContent, CardHeader, Loading } from '@/shared/components'
 import { countAppendedRows, initialLogFollowState, reduceLogFollow } from '../model/logFollow'
 import { getLogIdentity, getLogSourceText, type LogView } from '../model/logModel'
 import type { LogEntry, LogFile } from '../types'
@@ -126,9 +126,9 @@ export default function LogConsole({
       />
       <CardContent className="log-console-content">
         {viewingHistory && selectedFile && (
-          <div className="surface-soft mb-3 flex min-w-0 items-center gap-2 rounded-xl px-3 py-2 text-xs text-secondary">
+          <div className="surface-soft mb-3 flex min-w-0 items-center gap-2 rounded-xl px-3 py-2 text-xs text-muted-foreground">
             <FileText className="h-4 w-4 shrink-0 text-tertiary" aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate font-medium text-primary" title={selectedFile.name}>
+            <span className="min-w-0 flex-1 truncate font-medium text-foreground" title={selectedFile.name}>
               {selectedFile.name}
             </span>
             <span className="hidden shrink-0 text-tertiary sm:inline">

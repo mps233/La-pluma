@@ -21,7 +21,7 @@
       "settings"
       "monitor";
     align-items: start;
-    gap: var(--app-space-section);
+    gap: 1.125rem;
   }
 
   .roguelike-mode-area {
@@ -34,7 +34,7 @@
     grid-area: main;
     min-width: 0;
     align-content: start;
-    gap: var(--app-space-section);
+    gap: 1.125rem;
   }
 
   .roguelike-settings-panel {
@@ -61,22 +61,22 @@
     min-height: 4.5rem;
     align-items: center;
     justify-content: space-between;
-    gap: var(--app-space-card);
-    padding: 0.875rem var(--app-space-panel);
-    border-bottom: 1px solid var(--app-border);
+    gap: 0.875rem;
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid var(--border);
   }
 
   .roguelike-panel-heading h3 {
-    color: var(--app-text);
-    font-size: var(--app-font-card-title);
+    color: var(--foreground);
+    font-size: 1rem;
     font-weight: 650;
   }
 
   .roguelike-panel-heading p {
     overflow: hidden;
     margin-top: 0.2rem;
-    color: var(--app-text-soft);
-    font-size: var(--app-font-caption);
+    color: var(--tertiary-foreground);
+    font-size: 0.75rem;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -86,31 +86,31 @@
     min-height: 1.75rem;
     flex: none;
     align-items: center;
-    border-radius: var(--app-radius-pill);
+    border-radius: 9999px;
     padding: 0 0.625rem;
-    background: var(--app-surface-muted);
-    color: var(--app-text-soft);
-    font-size: var(--app-font-meta);
+    background: var(--muted);
+    color: var(--tertiary-foreground);
+    font-size: 0.6875rem;
     font-weight: 700;
   }
 
   .roguelike-panel-body {
     min-width: 0;
-    padding: var(--app-space-panel);
+    padding: 1rem;
   }
 
   .roguelike-panel-footer {
-    padding: 0 var(--app-space-panel) var(--app-space-panel);
+    padding: 0 1rem 1rem;
   }
 
   .roguelike-result-body {
     display: grid;
-    gap: var(--app-space-card);
+    gap: 0.875rem;
   }
 
   .roguelike-result-content {
     display: grid;
-    gap: var(--app-space-card);
+    gap: 0.875rem;
   }
 
   .roguelike-result-active {
@@ -118,14 +118,14 @@
     flex-wrap: wrap;
     align-items: baseline;
     gap: 0.5rem;
-    border-radius: var(--app-radius-md);
+    border-radius: var(--radius-lg);
     padding: 0.75rem 0.875rem;
-    background: var(--app-accent-soft);
+    background: var(--primary-soft);
   }
 
   .roguelike-result-message {
-    color: var(--app-text);
-    font-size: var(--app-font-body);
+    color: var(--foreground);
+    font-size: 0.875rem;
     font-weight: 550;
     line-height: 1.5;
     overflow-wrap: anywhere;
@@ -143,7 +143,7 @@
     gap: 0.15rem;
     border-radius: 0.75rem;
     padding: 0.5rem 0.625rem;
-    background: color-mix(in srgb, var(--app-surface-muted) 88%, transparent);
+    background: color-mix(in srgb, var(--muted) 88%, transparent);
   }
 
   .roguelike-result-list {
@@ -152,52 +152,52 @@
   }
 
   .roguelike-result-previous {
-    border-top: 1px solid var(--app-border);
-    padding-top: var(--app-space-card);
+    border-top: 1px solid var(--border);
+    padding-top: 0.875rem;
   }
 
   .roguelike-result-previous-note,
   .roguelike-result-missing {
-    color: var(--app-text-muted);
-    font-size: var(--app-font-caption);
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
     line-height: 1.5;
   }
 
   .roguelike-result-diagnostics {
-    border-top: 1px solid var(--app-border);
-    padding-top: var(--app-space-card);
+    border-top: 1px solid var(--border);
+    padding-top: 0.875rem;
   }
 
   .roguelike-result-active strong {
-    color: var(--app-accent-strong);
-    font-size: var(--app-font-body);
+    color: var(--primary-strong);
+    font-size: 0.875rem;
     font-weight: 650;
   }
 
   .roguelike-result-active p {
     min-width: 0;
-    color: var(--app-text-muted);
-    font-size: var(--app-font-caption);
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
     line-height: 1.5;
     overflow-wrap: anywhere;
   }
 
   .roguelike-result-metric dt {
-    color: var(--app-text-soft);
-    font-size: var(--app-font-meta);
+    color: var(--tertiary-foreground);
+    font-size: 0.6875rem;
   }
 
   .roguelike-result-metric dd {
     min-width: 0;
-    color: var(--app-text);
-    font-size: var(--app-font-body);
+    color: var(--foreground);
+    font-size: 0.875rem;
     font-weight: 600;
     overflow-wrap: anywhere;
   }
 
   .roguelike-result-list h4 {
-    color: var(--app-text-muted);
-    font-size: var(--app-font-caption);
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
     font-weight: 650;
   }
 
@@ -205,16 +205,16 @@
     display: grid;
     gap: 0.25rem;
     padding-left: 1rem;
-    color: var(--app-text-muted);
-    font-size: var(--app-font-caption);
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
     line-height: 1.5;
     list-style: disc;
     overflow-wrap: anywhere;
   }
 
   .roguelike-result-previous h4 {
-    color: var(--app-text-soft);
-    font-size: var(--app-font-caption);
+    color: var(--tertiary-foreground);
+    font-size: 0.75rem;
     font-weight: 650;
   }
 
@@ -251,25 +251,25 @@
     gap: 0.5rem;
     border-radius: 0.75rem;
     padding: 0.5rem 0.75rem;
-    background: color-mix(in srgb, var(--app-surface-muted) 88%, transparent);
-    color: var(--app-text-muted);
+    background: color-mix(in srgb, var(--muted) 88%, transparent);
+    color: var(--muted-foreground);
     box-shadow: none;
     text-align: left;
     transition: color 160ms ease, background 160ms ease;
   }
 
   .roguelike-theme-option:hover:not(.is-active) {
-    background: color-mix(in srgb, var(--app-accent-soft) 45%, var(--app-surface-muted));
-    color: var(--app-text);
+    background: color-mix(in srgb, var(--primary-soft) 45%, var(--muted));
+    color: var(--foreground);
   }
 
   .roguelike-theme-option.is-active {
-    background: var(--app-accent-soft);
-    color: var(--app-accent-strong);
+    background: var(--primary-soft);
+    color: var(--primary-strong);
   }
 
   .roguelike-theme-option:focus-visible {
-    outline: 2px solid var(--app-accent);
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
   }
 
@@ -288,28 +288,28 @@
 
   .roguelike-theme-copy strong {
     color: inherit;
-    font-size: var(--app-font-body);
+    font-size: 0.875rem;
     font-weight: 650;
   }
 
   .roguelike-theme-copy small {
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: var(--app-font-meta);
+    font-size: 0.6875rem;
   }
 
   .roguelike-theme-option.is-active small {
-    color: color-mix(in srgb, var(--app-accent-strong) 68%, var(--app-text-muted));
+    color: color-mix(in srgb, var(--primary-strong) 68%, var(--muted-foreground));
   }
 
   .roguelike-custom-theme {
-    margin-top: var(--app-space-card);
+    margin-top: 0.875rem;
   }
 
   .roguelike-field-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--app-space-card);
+    gap: 0.875rem;
   }
 
   .roguelike-field-span-full {
@@ -321,7 +321,7 @@
     min-width: 0;
     min-height: 2.75rem;
     align-items: center;
-    gap: var(--app-space-3);
+    gap: 0.75rem;
   }
 
   .roguelike-core-operator-placeholder,
@@ -331,15 +331,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: var(--app-font-body);
+    font-size: 0.875rem;
   }
 
   .roguelike-core-operator-placeholder {
-    color: var(--app-text-muted);
+    color: var(--muted-foreground);
   }
 
   .roguelike-core-operator-name {
-    color: var(--app-text);
+    color: var(--foreground);
     font-weight: 600;
   }
 
@@ -352,9 +352,9 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    border-radius: var(--app-radius-sm);
-    background: var(--app-surface-muted);
-    color: var(--app-text-soft);
+    border-radius: var(--radius-md);
+    background: var(--muted);
+    color: var(--tertiary-foreground);
   }
 
   .roguelike-core-operator-avatar img {
@@ -370,8 +370,8 @@
     grid-template-columns: minmax(0, 1fr);
     margin-top: 1rem;
     overflow: hidden;
-    border-radius: var(--app-continuous-radius-compact);
-    background: color-mix(in srgb, var(--app-surface-muted) 86%, transparent);
+    border-radius: var(--radius-xl);
+    background: color-mix(in srgb, var(--muted) 86%, transparent);
   }
 
   .roguelike-toggle-row {
@@ -385,7 +385,7 @@
   }
 
   .roguelike-toggle-row + .roguelike-toggle-row {
-    border-top: 1px solid var(--app-border);
+    border-top: 1px solid var(--border);
   }
 
   .roguelike-toggle-label {
@@ -395,8 +395,8 @@
     flex: 1;
     cursor: pointer;
     align-items: center;
-    color: var(--app-text-muted);
-    font-size: var(--app-font-body);
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
     font-weight: 550;
   }
 
@@ -431,8 +431,8 @@
   @media (max-width: 639px) {
     .roguelike-panel-heading,
     .roguelike-panel-body {
-      padding-right: var(--app-space-panel);
-      padding-left: var(--app-space-panel);
+      padding-right: 1rem;
+      padding-left: 1rem;
     }
   }
 }

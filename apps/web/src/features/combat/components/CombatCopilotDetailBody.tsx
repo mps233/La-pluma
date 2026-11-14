@@ -1,6 +1,6 @@
 import { Copy } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Button, Loading } from '@/shared/ui'
+import { Button, Loading } from '@/shared/components'
 import { useStatusStore } from '@/features/runtime-status'
 import type { CopilotDetailOperator, CopilotDetailTarget } from '../model/copilotDetail'
 import { DetailField, DetailSection } from './CombatCopilotDetailSection'

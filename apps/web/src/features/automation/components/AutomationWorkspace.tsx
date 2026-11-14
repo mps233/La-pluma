@@ -12,7 +12,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react'
 import { DeviceMonitorPanel } from '@/features/device-mirror'
-import { Button, EmptyState, HintTooltip, SmoothPanel, Switch } from '@/shared/ui'
+import { Button, EmptyState, HintTooltip, SmoothPanel, Switch } from '@/shared/components'
 import { useAutomationAvailability, useStatusStore } from '@/features/runtime-status'
 import { useUserConfig } from '@/features/user-config'
 import { useResourceInvalidation, type ResourceInvalidation } from '@/features/resource-invalidation'
@@ -372,7 +372,7 @@ export default function AutomationWorkspace() {
       {configSyncError && (
         <div
           role="alert"
-          className="status-warning flex min-h-11 flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm leading-5"
+          className="status-warning flex min-h-11 flex-wrap items-center justify-between gap-3.5 rounded-lg px-3 py-2 text-sm leading-5"
         >
           <span className="min-w-0 flex-1">{configSyncError}</span>
           <Button
@@ -607,7 +607,7 @@ export default function AutomationWorkspace() {
                                           disabled={isRunning || !task.enabled}
                                           className="custom-checkbox cursor-pointer"
                                         />
-                                        <span className="group-hover:text-(--app-accent) transition-colors flex items-center space-x-1">
+                                        <span className="group-hover:text-primary transition-colors flex items-center space-x-1">
                                           <span>{star}</span>
                                           <svg className="w-3.5 h-3.5 brand-text" fill="currentColor" viewBox="0 0 20 20">
                                             <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -658,7 +658,7 @@ export default function AutomationWorkspace() {
                                           disabled={isRunning || !task.enabled}
                                           className="custom-checkbox cursor-pointer"
                                         />
-                                        <span className="group-hover:text-(--app-accent) transition-colors">{facility.label}</span>
+                                        <span className="group-hover:text-primary transition-colors">{facility.label}</span>
                                       </label>
                                     );
                                   })}
@@ -761,8 +761,8 @@ export default function AutomationWorkspace() {
                     )}
 
                     {task.commandId === 'fight' && (
-                      <details className="group mt-3 rounded-lg border border-(--app-border) bg-(--app-surface-muted) px-3 py-2">
-                        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
+                      <details className="group mt-3 rounded-lg border border-border bg-muted px-3 py-2">
+                        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3.5 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
                           <span className="flex items-center gap-2">
                             <SlidersHorizontal size={15} strokeWidth={1.9} />
                             高级设置
@@ -770,7 +770,7 @@ export default function AutomationWorkspace() {
                           <ChevronDown size={15} strokeWidth={2} className="transition-transform group-open:rotate-180" />
                         </summary>
 
-                        <div className="mt-3 space-y-3 border-t border-(--app-border) pt-3">
+                        <div className="mt-3 space-y-3 border-t border-border pt-3">
                           <div className="flex items-center gap-2">
                             <span className="flex w-24 shrink-0 items-center gap-1">
                               <label htmlFor={`${task.id}-fight-client-type`} className="whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">闪退重启:</label>
@@ -809,7 +809,7 @@ export default function AutomationWorkspace() {
                             <HintTooltip id={`${task.id}-dr-grandet-hint`} label="葛朗台碎石模式" hint="使用源石前等待自然恢复 1 点理智，尽量减少碎石浪费。" />
                           </div>
 
-                          <section className="space-y-2 border-t border-(--app-border) pt-3">
+                          <section className="space-y-2 border-t border-border pt-3">
                             <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                               <input
                                 type="checkbox"
@@ -837,7 +837,7 @@ export default function AutomationWorkspace() {
                             )}
                           </section>
 
-                          <section className="space-y-2 border-t border-(--app-border) pt-3">
+                          <section className="space-y-2 border-t border-border pt-3">
                             <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                               <input
                                 type="checkbox"
@@ -869,8 +869,8 @@ export default function AutomationWorkspace() {
                     )}
 
                     {task.commandId === 'infrast' && (
-                      <details className="group mt-3 rounded-lg border border-(--app-border) bg-(--app-surface-muted) px-3 py-2">
-                        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
+                      <details className="group mt-3 rounded-lg border border-border bg-muted px-3 py-2">
+                        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3.5 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
                           <span className="flex items-center gap-2">
                             <SlidersHorizontal size={15} strokeWidth={1.9} />
                             高级设置
@@ -878,7 +878,7 @@ export default function AutomationWorkspace() {
                           <ChevronDown size={15} strokeWidth={2} className="transition-transform group-open:rotate-180" />
                         </summary>
 
-                        <div className="mt-3 space-y-3 border-t border-(--app-border) pt-3">
+                        <div className="mt-3 space-y-3 border-t border-border pt-3">
                           {Array.isArray(task.params.facility) && task.params.facility.includes('Dorm') && (
                             <section className="space-y-2">
                               <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">宿舍</h4>
@@ -906,7 +906,7 @@ export default function AutomationWorkspace() {
                           )}
 
                           {Array.isArray(task.params.facility) && task.params.facility.includes('Reception') && (
-                            <section className="space-y-2 border-t border-(--app-border) pt-3">
+                            <section className="space-y-2 border-t border-border pt-3">
                               <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">会客室</h4>
                               <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                                 <input
@@ -942,7 +942,7 @@ export default function AutomationWorkspace() {
                           )}
 
                           {Array.isArray(task.params.facility) && task.params.facility.includes('Training') && (
-                            <section className="space-y-2 border-t border-(--app-border) pt-3">
+                            <section className="space-y-2 border-t border-border pt-3">
                               <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">训练室</h4>
                               <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                                 <input
@@ -961,8 +961,8 @@ export default function AutomationWorkspace() {
                     )}
 
                     {task.commandId === 'recruit' && (
-                      <details className="group mt-3 rounded-lg border border-(--app-border) bg-(--app-surface-muted) px-3 py-2">
-                        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
+                      <details className="group mt-3 rounded-lg border border-border bg-muted px-3 py-2">
+                        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3.5 text-sm font-medium text-gray-700 marker:hidden dark:text-gray-200 [&::-webkit-details-marker]:hidden">
                           <span className="flex items-center gap-2">
                             <SlidersHorizontal size={15} strokeWidth={1.9} />
                             高级设置
@@ -970,7 +970,7 @@ export default function AutomationWorkspace() {
                           <ChevronDown size={15} strokeWidth={2} className="transition-transform group-open:rotate-180" />
                         </summary>
 
-                        <div className="mt-3 space-y-3 border-t border-(--app-border) pt-3">
+                        <div className="mt-3 space-y-3 border-t border-border pt-3">
                           <div className="flex items-center gap-2">
                             <span className="flex w-32 shrink-0 items-center gap-1">
                               <label htmlFor={`${task.id}-extra-tags-mode`} className="whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">多选 Tag 策略:</label>

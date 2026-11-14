@@ -58,7 +58,7 @@ vi.mock('../utils/statusMessage', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/statusMessage')>()
   return { ...actual, detectStatusMessageType: () => 'error' }
 })
-vi.mock('@/shared/ui', () => ({
+vi.mock('@/shared/components', () => ({
   SmoothSurface: ({ children, ...props }: HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
 }))
 

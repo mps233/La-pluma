@@ -1,0 +1,45 @@
+@layer base {
+  :root {
+    --glass-page-bg: #f2f2f7;
+    --glass-bg: rgb(255 255 255 / 68%);
+    --glass-border: rgb(60 60 67 / 18%);
+    --glass-shadow: 0 12px 32px rgb(60 60 67 / 12%);
+    --glass-liquid-surface-lift: rgb(255 255 255 / 4%);
+    --glass-edge-light: rgb(255 255 255 / 48%);
+    --glass-edge-clear: rgb(255 255 255 / 0%);
+    --glass-edge-high: color-mix(
+      in srgb,
+      var(--glass-edge-light) 75%,
+      var(--glass-edge-clear)
+    );
+    --glass-edge-mid: color-mix(
+      in srgb,
+      var(--glass-edge-light) 50%,
+      var(--glass-edge-clear)
+    );
+    --glass-edge-faint: color-mix(
+      in srgb,
+      var(--glass-edge-light) 25%,
+      var(--glass-edge-clear)
+    );
+    --glass-tabbar-active-bg: rgb(118 118 128 / 16%);
+    --glass-tabbar-active-edge: inset 0 0 0 0.5px var(--glass-border);
+    --glass-tabbar-shadow: 0 1rem 2.25rem rgb(60 60 67 / 18%);
+    --glass-tabbar-fade-color: #fff;
+    --glass-navbar-fade-color: #fff;
+  }
+
+  html.dark,
+  #app-root.dark {
+    --glass-page-bg: #000;
+    --glass-bg: rgb(28 28 30 / 72%);
+    --glass-border: rgb(235 235 245 / 18%);
+    --glass-shadow: 0 14px 34px rgb(0 0 0 / 34%);
+    --glass-liquid-surface-lift: rgb(255 255 255 / 5%);
+    --glass-edge-light: rgb(255 255 255 / 18%);
+    --glass-tabbar-active-bg: rgb(118 118 128 / 30%);
+    --glass-tabbar-shadow: 0 1rem 2.25rem rgb(0 0 0 / 44%);
+    --glass-tabbar-fade-color: #000;
+    --glass-navbar-fade-color: #000;
+  }
+}

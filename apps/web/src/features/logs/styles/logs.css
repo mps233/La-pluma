@@ -1,6 +1,6 @@
 @layer page {
   .log-viewer {
-    --log-row-divider: color-mix(in srgb, var(--app-border) 72%, transparent);
+    --log-row-divider: color-mix(in srgb, var(--border) 72%, transparent);
   }
 
   .log-card {
@@ -13,22 +13,22 @@
     min-height: 2.75rem;
     align-items: center;
     gap: 0.625rem;
-    border-radius: var(--app-radius-lg);
+    border-radius: var(--radius-xl);
     padding: 0.625rem 0.875rem;
     font-size: 0.75rem;
     font-weight: 600;
   }
 
   .log-notice.is-success {
-    background: color-mix(in srgb, var(--app-success) 9%, var(--app-surface));
-    color: var(--app-success);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-success) 22%, transparent);
+    background: color-mix(in srgb, var(--success) 9%, var(--card));
+    color: var(--success);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 22%, transparent);
   }
 
   .log-notice.is-error {
-    background: color-mix(in srgb, var(--app-danger) 9%, var(--app-surface));
-    color: var(--app-danger);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-danger) 22%, transparent);
+    background: color-mix(in srgb, var(--destructive) 9%, var(--card));
+    color: var(--destructive);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--destructive) 22%, transparent);
   }
 
   .log-notice > span {
@@ -79,10 +79,10 @@
     display: inline-flex;
     min-height: 1.75rem;
     align-items: center;
-    border-radius: var(--app-radius-pill);
+    border-radius: 9999px;
     padding: 0.25rem 0.625rem;
-    background: var(--app-accent-soft);
-    color: var(--app-accent-strong);
+    background: var(--primary-soft);
+    color: var(--primary-strong);
     font-size: 0.6875rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
@@ -95,10 +95,10 @@
   .log-console {
     height: clamp(20rem, 55dvh, 28rem);
     overflow-y: auto;
-    border-radius: var(--app-radius-md);
-    background: var(--app-surface-muted);
-    box-shadow: inset 0 0 0 1px var(--app-border);
-    color: var(--app-text);
+    border-radius: var(--radius-lg);
+    background: var(--muted);
+    box-shadow: inset 0 0 0 1px var(--border);
+    color: var(--foreground);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     font-size: 0.75rem;
     line-height: 1.55;
@@ -127,7 +127,7 @@
 
   .log-row-meta time {
     padding-top: 0.125rem;
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     font-variant-numeric: tabular-nums;
   }
 
@@ -138,35 +138,35 @@
     justify-content: center;
     border-radius: 4px;
     padding: 0.125rem 0.35rem;
-    background: var(--app-surface-muted);
-    color: var(--app-text-muted);
-    box-shadow: inset 0 0 0 1px var(--app-border);
+    background: var(--muted);
+    color: var(--muted-foreground);
+    box-shadow: inset 0 0 0 1px var(--border);
     font-size: 0.625rem;
     font-weight: 700;
     line-height: 1;
   }
 
   .log-level.is-info {
-    background: var(--app-accent-soft);
-    color: var(--app-accent-strong);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 22%, transparent);
+    background: var(--primary-soft);
+    color: var(--primary-strong);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 22%, transparent);
   }
 
   .log-level.is-warn {
-    background: color-mix(in srgb, var(--app-warning) 10%, transparent);
-    color: var(--app-warning);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-warning) 22%, transparent);
+    background: color-mix(in srgb, var(--warning) 10%, transparent);
+    color: var(--warning);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warning) 22%, transparent);
   }
 
   .log-level.is-error {
-    background: color-mix(in srgb, var(--app-danger) 10%, transparent);
-    color: var(--app-danger);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-danger) 22%, transparent);
+    background: color-mix(in srgb, var(--destructive) 10%, transparent);
+    color: var(--destructive);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--destructive) 22%, transparent);
   }
 
   .log-message {
     min-width: 0;
-    color: var(--app-text-muted);
+    color: var(--muted-foreground);
     overflow-wrap: anywhere;
     white-space: pre-wrap;
   }
@@ -174,10 +174,10 @@
   .log-repeat {
     display: inline-flex;
     margin-left: 0.5rem;
-    border-radius: var(--app-radius-pill);
+    border-radius: 9999px;
     padding: 0.05rem 0.375rem;
-    background: var(--app-accent-soft);
-    color: var(--app-accent-strong);
+    background: var(--primary-soft);
+    color: var(--primary-strong);
     font-size: 0.625rem;
     font-weight: 700;
   }
@@ -188,7 +188,7 @@
     align-items: center;
     justify-content: center;
     gap: 0.625rem;
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     font-family: inherit;
     font-size: 0.75rem;
     text-align: center;
@@ -201,7 +201,7 @@
 
   .log-console-state.is-error,
   .log-history-state.is-error {
-    color: var(--app-danger);
+    color: var(--destructive);
   }
 
   .log-history-content {
@@ -220,8 +220,8 @@
     width: 100%;
     min-width: 0;
     padding: 0.875rem 1rem;
-    border-bottom: 1px solid var(--app-border);
-    color: var(--app-text-muted);
+    border-bottom: 1px solid var(--border);
+    color: var(--muted-foreground);
     text-align: left;
     transition: color 180ms ease, background 180ms ease;
   }
@@ -232,14 +232,14 @@
 
   .log-history-row:hover,
   .log-history-row.is-active {
-    background: color-mix(in srgb, var(--app-accent-soft) 62%, transparent);
-    color: var(--app-accent-strong);
+    background: color-mix(in srgb, var(--primary-soft) 62%, transparent);
+    color: var(--primary-strong);
   }
 
   .log-history-row:focus-visible {
     position: relative;
     z-index: 1;
-    outline: 2px solid var(--app-accent);
+    outline: 2px solid var(--primary);
     outline-offset: -2px;
   }
 
@@ -249,9 +249,9 @@
     height: 2rem;
     align-items: center;
     justify-content: center;
-    border-radius: var(--app-radius-md);
-    background: var(--app-accent-soft);
-    color: var(--app-accent-strong);
+    border-radius: var(--radius-lg);
+    background: var(--primary-soft);
+    color: var(--primary-strong);
   }
 
   .log-history-copy {
@@ -268,13 +268,13 @@
   }
 
   .log-history-copy strong {
-    color: var(--app-text);
+    color: var(--foreground);
     font-size: 0.75rem;
     font-weight: 600;
   }
 
   .log-history-copy small {
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     font-size: 0.6875rem;
   }
 
@@ -284,7 +284,7 @@
   }
 
   .log-history-state p {
-    color: var(--app-text-muted);
+    color: var(--muted-foreground);
     font-weight: 600;
   }
 
@@ -296,7 +296,7 @@
 
   .log-coverage {
     margin: 0;
-    color: var(--app-text-muted);
+    color: var(--muted-foreground);
     font-size: 0.75rem;
     line-height: 1.5;
   }
@@ -306,20 +306,20 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 0.5rem 1rem;
-    color: var(--app-text-muted);
+    color: var(--muted-foreground);
     font-size: 0.75rem;
   }
 
   .log-hidden-matches button {
     min-height: 2.75rem;
-    color: var(--app-accent-strong);
+    color: var(--primary-strong);
     text-decoration: underline;
     text-underline-offset: 0.2em;
   }
 
   .log-record-detail {
     margin-top: 0.5rem;
-    color: var(--app-text-muted);
+    color: var(--muted-foreground);
     font-size: 0.6875rem;
   }
 
@@ -331,7 +331,7 @@
     display: inline-flex;
     min-height: 2rem;
     align-items: center;
-    color: var(--app-text-soft);
+    color: var(--tertiary-foreground);
     cursor: pointer;
     font-size: 0.6875rem;
     font-weight: 600;
@@ -339,22 +339,22 @@
   }
 
   .log-raw summary:hover {
-    color: var(--app-accent-strong);
+    color: var(--primary-strong);
   }
 
   .log-hidden-matches button:focus-visible,
   .log-raw summary:focus-visible {
-    outline: 2px solid var(--app-accent);
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
   }
 
   .log-raw pre {
     margin: 0.375rem 0 0;
     padding: 0.5rem 0.625rem;
-    border-radius: var(--app-radius-sm);
-    background: var(--app-surface);
-    box-shadow: inset 0 0 0 1px var(--app-border);
-    color: var(--app-text-muted);
+    border-radius: var(--radius-md);
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px var(--border);
+    color: var(--muted-foreground);
     font-family: inherit;
     font-size: 0.6875rem;
     line-height: 1.5;
@@ -409,7 +409,7 @@
 
     .log-message {
       padding-left: 0;
-      color: var(--app-text);
+      color: var(--foreground);
     }
 
     .log-history-row {

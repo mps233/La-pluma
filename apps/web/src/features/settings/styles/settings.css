@@ -13,23 +13,23 @@
 
   .la-pluma-app .config-update-card .app-card-content > .grid {
     gap: 0 !important;
-    border-top: 1px solid var(--app-border);
+    border-top: 1px solid var(--border);
   }
 
   .la-pluma-app .config-update-card .app-card-content > .grid > section + section {
-    border-top: 1px solid var(--app-border);
+    border-top: 1px solid var(--border);
   }
 
   .la-pluma-app :is(.config-editor-card, .config-directory-card, .config-update-card) .icon-well {
     background: transparent;
-    color: var(--app-text-muted);
+    color: var(--muted-foreground);
     box-shadow: none;
   }
 
   @media (min-width: 768px) and (max-width: 1279px) {
     .la-pluma-app .config-update-card .app-card-content > .grid > section + section {
       border-top: 0;
-      border-left: 1px solid var(--app-border);
+      border-left: 1px solid var(--border);
     }
   }
 

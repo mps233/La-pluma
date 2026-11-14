@@ -23,87 +23,87 @@
      becomes the hairline, while each child stays on a solid content material. */
   .la-pluma-app .training-operator-grid {
     gap: 1px;
-    background: var(--app-border);
-    box-shadow: inset 0 0 0 1px var(--app-border);
+    background: var(--border);
+    box-shadow: inset 0 0 0 1px var(--border);
   }
 
   .la-pluma-app .training-operator-item {
-    background: var(--app-surface-solid);
+    background: var(--card);
   }
 
-  .training-workspace { display: flex; flex-direction: column; gap: var(--app-space-section); }
-  .training-workspace-grid { display: grid; align-items: start; gap: var(--app-space-section); }
-  .training-surface { min-width: 0; overflow: hidden; border-radius: var(--app-radius-lg); background: var(--app-surface-solid); }
-  .training-section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--app-space-4); padding: var(--app-space-panel); }
-  .training-section-heading h2 { color: var(--app-text); font-size: 1.125rem; line-height: 1.45; font-weight: 600; overflow-wrap: anywhere; }
-  .training-section-heading p { margin-top: var(--app-space-1); color: var(--app-text-muted); font-size: .8125rem; line-height: 1.6; }
-  .training-detail-column { display: grid; min-width: 0; gap: var(--app-space-section); }
-  .training-state { display: flex; min-height: 240px; flex-direction: column; align-items: center; justify-content: center; gap: var(--app-space-4); padding: var(--app-space-panel); }
+  .training-workspace { display: flex; flex-direction: column; gap: 1.125rem; }
+  .training-workspace-grid { display: grid; align-items: start; gap: 1.125rem; }
+  .training-surface { min-width: 0; overflow: hidden; border-radius: var(--radius-xl); background: var(--card); }
+  .training-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem; }
+  .training-section-heading h2 { color: var(--foreground); font-size: 1.125rem; line-height: 1.45; font-weight: 600; overflow-wrap: anywhere; }
+  .training-section-heading p { margin-top: 0.25rem; color: var(--muted-foreground); font-size: .8125rem; line-height: 1.6; }
+  .training-detail-column { display: grid; min-width: 0; gap: 1.125rem; }
+  .training-state { display: flex; min-height: 240px; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 1rem; }
   .training-queue-list { list-style: none; padding: 0; margin: 0; }
-  .training-queue-row { border-top: 1px solid var(--app-border); padding: var(--app-space-panel); }
-  .training-queue-identity { display: flex; align-items: center; gap: var(--app-space-3); min-width: 0; }
-  .training-queue-rank { flex-shrink: 0; width: 1.25rem; color: var(--app-text-soft); font-size: .75rem; font-variant-numeric: tabular-nums; }
-  .training-avatar { position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; width: 3rem; height: 3rem; border-radius: var(--app-radius-sm); background: var(--app-surface-muted); color: var(--app-text-soft); }
+  .training-queue-row { border-top: 1px solid var(--border); padding: 1rem; }
+  .training-queue-identity { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
+  .training-queue-rank { flex-shrink: 0; width: 1.25rem; color: var(--tertiary-foreground); font-size: .75rem; font-variant-numeric: tabular-nums; }
+  .training-avatar { position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; width: 3rem; height: 3rem; border-radius: var(--radius-md); background: var(--muted); color: var(--tertiary-foreground); }
   .training-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  .training-operator-name { font-size: .9375rem; font-weight: 600; color: var(--app-text); overflow-wrap: anywhere; }
-  .training-current-label { font-size: .75rem; color: var(--app-accent); font-weight: 600; }
-  .training-queue-meta { display: flex; flex-wrap: wrap; gap: var(--app-space-3); margin-top: 4px; font-size: .75rem; color: var(--app-text-muted); }
-  .training-row-progress { display: flex; align-items: center; gap: var(--app-space-2); margin-top: 6px; color: var(--app-text-muted); font-size: .75rem; font-variant-numeric: tabular-nums; }
-  .training-progress-track { width: 5rem; height: 3px; overflow: hidden; border-radius: 3px; background: var(--app-surface-muted); }
-  .training-progress-track > span { display: block; height: 100%; background: var(--app-text-soft); }
-  .is-current .training-progress-track > span { background: var(--app-accent); }
-  .training-queue-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; margin-top: var(--app-space-2); gap: var(--app-space-1); }
+  .training-operator-name { font-size: .9375rem; font-weight: 600; color: var(--foreground); overflow-wrap: anywhere; }
+  .training-current-label { font-size: .75rem; color: var(--primary); font-weight: 600; }
+  .training-queue-meta { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 4px; font-size: .75rem; color: var(--muted-foreground); }
+  .training-row-progress { display: flex; align-items: center; gap: 0.5rem; margin-top: 6px; color: var(--muted-foreground); font-size: .75rem; font-variant-numeric: tabular-nums; }
+  .training-progress-track { width: 5rem; height: 3px; overflow: hidden; border-radius: 3px; background: var(--muted); }
+  .training-progress-track > span { display: block; height: 100%; background: var(--tertiary-foreground); }
+  .is-current .training-progress-track > span { background: var(--primary); }
+  .training-queue-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; margin-top: 0.5rem; gap: 0.25rem; }
   .training-queue-actions .app-button { min-height: 44px; min-width: 44px; }
-  .training-queue-actions .training-remove { color: var(--app-danger); }
-  .training-queue-footer { border-top: 1px solid var(--app-border); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--app-space-2); padding: var(--app-space-2) var(--app-space-panel); }
-  .training-progress-value { flex-shrink: 0; text-align: right; font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--app-text); }
-  .training-progress-value small { display: block; margin-top: 3px; font-size: .6875rem; font-weight: 400; color: var(--app-text-muted); }
-  .training-current-progress { height: 3px; background: var(--app-surface-muted); margin: 0 var(--app-space-panel) var(--app-space-3); border-radius: 3px; overflow: hidden; }
-  .training-current-progress > span { display: block; height: 100%; background: var(--app-accent); }
-  .training-material-table { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, minmax(2.7rem, max-content)); column-gap: var(--app-space-2); padding: 0 var(--app-space-panel); }
-  .training-material-line { display: grid; align-items: center; grid-column: 1 / -1; grid-template-columns: subgrid; gap: var(--app-space-2); min-height: 56px; border-top: 1px solid var(--app-border); font-size: .8125rem; font-variant-numeric: tabular-nums; color: var(--app-text); }
+  .training-queue-actions .training-remove { color: var(--destructive); }
+  .training-queue-footer { border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.5rem 1rem; }
+  .training-progress-value { flex-shrink: 0; text-align: right; font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--foreground); }
+  .training-progress-value small { display: block; margin-top: 3px; font-size: .6875rem; font-weight: 400; color: var(--muted-foreground); }
+  .training-current-progress { height: 3px; background: var(--muted); margin: 0 1rem 0.75rem; border-radius: 3px; overflow: hidden; }
+  .training-current-progress > span { display: block; height: 100%; background: var(--primary); }
+  .training-material-table { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, minmax(2.7rem, max-content)); column-gap: 0.5rem; padding: 0 1rem; }
+  .training-material-line { display: grid; align-items: center; grid-column: 1 / -1; grid-template-columns: subgrid; gap: 0.5rem; min-height: 56px; border-top: 1px solid var(--border); font-size: .8125rem; font-variant-numeric: tabular-nums; color: var(--foreground); }
   .training-material-line > span:not(:first-child) { text-align: right; }
-  .training-material-labels { min-height: 36px; border-top: 0; color: var(--app-text-muted); font-size: .75rem; }
-  .training-material-name { display: flex; align-items: center; min-width: 0; gap: var(--app-space-2); overflow-wrap: anywhere; }
-  .training-resource-icon { display: inline-flex; align-items: center; justify-content: center; position: relative; flex-shrink: 0; width: 32px; height: 32px; color: var(--app-text-soft); }
+  .training-material-labels { min-height: 36px; border-top: 0; color: var(--muted-foreground); font-size: .75rem; }
+  .training-material-name { display: flex; align-items: center; min-width: 0; gap: 0.5rem; overflow-wrap: anywhere; }
+  .training-resource-icon { display: inline-flex; align-items: center; justify-content: center; position: relative; flex-shrink: 0; width: 32px; height: 32px; color: var(--tertiary-foreground); }
   .training-resource-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
-  .training-inline-empty { display: flex; align-items: center; gap: var(--app-space-2); padding: var(--app-space-panel); color: var(--app-text-muted); font-size: .875rem; line-height: 1.7; }
-  .training-disclosure { border-top: 1px solid var(--app-border); padding: 0 var(--app-space-panel) var(--app-space-2); }
-  .training-disclosure summary { cursor: pointer; min-height: 48px; align-content: center; color: var(--app-text-muted); font-size: .8125rem; }
-  .training-material-tree { list-style: none; padding: 0; color: var(--app-text); font-size: .8125rem; }
-  .training-material-tree li > div { display: flex; align-items: center; flex-wrap: wrap; gap: var(--app-space-2); min-height: 44px; }
-  .training-material-tree ul { margin-left: var(--app-space-4); padding-left: var(--app-space-3); border-left: 1px solid var(--app-border); }
-  .training-plan-controls { display: grid; grid-template-columns: minmax(0,1fr); gap: var(--app-space-2); padding: 0 var(--app-space-panel) var(--app-space-panel); }
-  .training-plan-overview { padding: var(--app-space-panel); border-top: 1px solid var(--app-border); }
-  .training-plan-overview h3 { color: var(--app-text); font-size: 1rem; font-weight: 600; }
-  .training-plan-overview p { margin-top: var(--app-space-1); font-size: .8125rem; line-height: 1.7; color: var(--app-text-muted); }
-  .training-plan-placeholder { color: var(--app-text-muted); font-size: .875rem; line-height: 1.7; padding: var(--app-space-panel); border-top: 1px solid var(--app-border); }
-  .training-stage-list { padding: 0 var(--app-space-panel); }
-  .training-stage-row { display: flex; align-items: center; justify-content: space-between; gap: var(--app-space-4); padding: var(--app-space-3) 0; border-top: 1px solid var(--app-border); color: var(--app-text); font-size: .875rem; }
+  .training-inline-empty { display: flex; align-items: center; gap: 0.5rem; padding: 1rem; color: var(--muted-foreground); font-size: .875rem; line-height: 1.7; }
+  .training-disclosure { border-top: 1px solid var(--border); padding: 0 1rem 0.5rem; }
+  .training-disclosure summary { cursor: pointer; min-height: 48px; align-content: center; color: var(--muted-foreground); font-size: .8125rem; }
+  .training-material-tree { list-style: none; padding: 0; color: var(--foreground); font-size: .8125rem; }
+  .training-material-tree li > div { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; min-height: 44px; }
+  .training-material-tree ul { margin-left: 1rem; padding-left: 0.75rem; border-left: 1px solid var(--border); }
+  .training-plan-controls { display: grid; grid-template-columns: minmax(0,1fr); gap: 0.5rem; padding: 0 1rem 1rem; }
+  .training-plan-overview { padding: 1rem; border-top: 1px solid var(--border); }
+  .training-plan-overview h3 { color: var(--foreground); font-size: 1rem; font-weight: 600; }
+  .training-plan-overview p { margin-top: 0.25rem; font-size: .8125rem; line-height: 1.7; color: var(--muted-foreground); }
+  .training-plan-placeholder { color: var(--muted-foreground); font-size: .875rem; line-height: 1.7; padding: 1rem; border-top: 1px solid var(--border); }
+  .training-stage-list { padding: 0 1rem; }
+  .training-stage-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.75rem 0; border-top: 1px solid var(--border); color: var(--foreground); font-size: .875rem; }
   .training-stage-row > div { min-width: 0; }
-  .training-stage-row p { color: var(--app-text-muted); margin-top: var(--app-space-1); font-size: .8125rem; line-height: 1.6; overflow-wrap: anywhere; }
+  .training-stage-row p { color: var(--muted-foreground); margin-top: 0.25rem; font-size: .8125rem; line-height: 1.6; overflow-wrap: anywhere; }
   .training-stage-row > span { flex-shrink: 0; }
-  .training-apply { padding: var(--app-space-panel); }
-  .training-apply p { margin-top: var(--app-space-2); color: var(--app-text-muted); text-align: center; font-size: .75rem; line-height: 1.6; }
-  .training-sync-status { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--app-space-3); padding: var(--app-space-panel); border-top: 1px solid var(--app-border); font-size: .75rem; line-height: 1.7; color: var(--app-text-muted); }
+  .training-apply { padding: 1rem; }
+  .training-apply p { margin-top: 0.5rem; color: var(--muted-foreground); text-align: center; font-size: .75rem; line-height: 1.6; }
+  .training-sync-status { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; padding: 1rem; border-top: 1px solid var(--border); font-size: .75rem; line-height: 1.7; color: var(--muted-foreground); }
   .training-sync-status > div { flex: 1 1 12rem; }
   .training-sync-status strong { color: inherit; font-weight: 600; }
-  .training-plan-warnings { margin: 0 var(--app-space-panel) var(--app-space-3); padding: var(--app-space-3); border-radius: var(--app-radius-sm); font-size: .8125rem; line-height: 1.7; }
-  .training-closed-stages { padding-bottom: var(--app-space-3); color: var(--app-text); font-size: .8125rem; }
-  .training-closed-stages h3 { font-weight: 600; padding-top: var(--app-space-3); margin-bottom: var(--app-space-2); }
-  .training-closed-stages p { display: flex; justify-content: space-between; gap: var(--app-space-3); padding: var(--app-space-2) 0; }
-  .training-closed-stages p span { color: var(--app-text-muted); }
-  .training-settings { padding: 0 var(--app-space-panel); }
-  .training-settings > summary { min-height: 56px; align-content: center; cursor: pointer; font-size: .875rem; font-weight: 600; color: var(--app-text); }
-  .training-settings > summary span { margin-left: var(--app-space-3); font-size: .75rem; font-weight: 400; color: var(--app-text-muted); }
-  .training-settings-grid { display: grid; gap: var(--app-space-4); padding-bottom: var(--app-space-panel); }
-  .training-settings-grid > div { display: flex; align-items: center; justify-content: space-between; gap: var(--app-space-4); }
-  .training-settings-grid h3 { color: var(--app-text); font-size: .875rem; font-weight: 500; }
-  .training-settings-grid p { color: var(--app-text-muted); font-size: .75rem; margin-top: var(--app-space-1); }
-  .training-feedback { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--app-space-2); margin: 0 var(--app-space-panel) var(--app-space-3); padding: var(--app-space-3); border-radius: var(--app-radius-sm); font-size: .8125rem; line-height: 1.7; }
-  .training-undo-toast { position: fixed; z-index: 1100; left: 50%; bottom: calc(var(--la-pluma-tabbar-reserved-height, 5rem) + var(--app-safe-area-bottom, 0px) + 1rem); transform: translateX(-50%); display: flex; align-items: center; gap: var(--app-space-2, 8px); width: max-content; max-width: calc(100vw - 2rem); padding: 8px 8px 8px 16px; border-radius: var(--app-radius-lg, 16px); color: var(--app-text, #1c1c1e); background: var(--app-surface-solid, #fff); box-shadow: 0 4px 12px rgb(0 0 0 / 12%), 0 16px 40px rgb(0 0 0 / 12%); font-size: .875rem; }
+  .training-plan-warnings { margin: 0 1rem 0.75rem; padding: 0.75rem; border-radius: var(--radius-md); font-size: .8125rem; line-height: 1.7; }
+  .training-closed-stages { padding-bottom: 0.75rem; color: var(--foreground); font-size: .8125rem; }
+  .training-closed-stages h3 { font-weight: 600; padding-top: 0.75rem; margin-bottom: 0.5rem; }
+  .training-closed-stages p { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 0; }
+  .training-closed-stages p span { color: var(--muted-foreground); }
+  .training-settings { padding: 0 1rem; }
+  .training-settings > summary { min-height: 56px; align-content: center; cursor: pointer; font-size: .875rem; font-weight: 600; color: var(--foreground); }
+  .training-settings > summary span { margin-left: 0.75rem; font-size: .75rem; font-weight: 400; color: var(--muted-foreground); }
+  .training-settings-grid { display: grid; gap: 1rem; padding-bottom: 1rem; }
+  .training-settings-grid > div { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .training-settings-grid h3 { color: var(--foreground); font-size: .875rem; font-weight: 500; }
+  .training-settings-grid p { color: var(--muted-foreground); font-size: .75rem; margin-top: 0.25rem; }
+  .training-feedback { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin: 0 1rem 0.75rem; padding: 0.75rem; border-radius: var(--radius-md); font-size: .8125rem; line-height: 1.7; }
+  .training-undo-toast { position: fixed; z-index: 1100; left: 50%; bottom: calc(var(--la-pluma-tabbar-reserved-height, 5rem) + env(safe-area-inset-bottom, 0px) + 1rem); transform: translateX(-50%); display: flex; align-items: center; gap: 0.5rem; width: max-content; max-width: calc(100vw - 2rem); padding: 8px 8px 8px 16px; border-radius: var(--radius-xl); color: var(--foreground); background: var(--card); box-shadow: 0 4px 12px rgb(0 0 0 / 12%), 0 16px 40px rgb(0 0 0 / 12%); font-size: .875rem; }
   .training-undo-toast > span { overflow-wrap: anywhere; }
-  .training-undo-toast > svg { flex-shrink: 0; color: var(--app-accent, #007aff); }
+  .training-undo-toast > svg { flex-shrink: 0; color: var(--primary); }
   .training-undo-toast .app-button { flex-shrink: 0; min-height: 44px; }
   @media (min-width: 640px) {
     .training-plan-controls { grid-template-columns: minmax(0,1fr) auto; }
@@ -115,7 +115,7 @@
   }
   @media (min-width: 1280px) {
     .training-workspace-grid { grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); }
-    .training-queue-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--app-space-2); }
+    .training-queue-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.5rem; }
     .training-queue-actions { margin: 0; flex-direction: column; align-items: flex-end; }
   }
 }

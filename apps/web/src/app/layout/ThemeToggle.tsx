@@ -140,7 +140,7 @@ export default function ThemeToggle() {
           ref={mobileTriggerRef}
           type="button"
           onClick={() => setMobileMenuOpen(open => !open)}
-          className={`la-pluma-theme-trigger group text-secondary transition-colors hover:bg-(--app-surface-muted) hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-(--app-accent) ${mobileMenuOpen ? 'bg-(--app-surface-muted)' : ''}`}
+          className={`la-pluma-theme-trigger group text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary ${mobileMenuOpen ? 'bg-muted' : ''}`}
           whileTap={shouldReduceMotion ? {} : { scale: 0.96 }}
           title={`主题：${currentTheme.label}`}
           aria-label={`切换界面主题，当前${currentTheme.label}`}
@@ -182,13 +182,13 @@ export default function ThemeToggle() {
                     role="menuitemradio"
                     aria-checked={selected}
                     onClick={() => handleThemeChange(option.value, true)}
-                    className={`flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 text-sm transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-(--app-accent) ${
-                      selected ? 'brand-action-subtle' : 'text-secondary hover:bg-(--app-surface-muted) hover:text-primary'
+                    className={`flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 text-sm transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary ${
+                      selected ? 'brand-action-subtle' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`}
                   >
                     <ThemeIcon className="h-4 w-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
                     <span className="flex-1 text-left">{option.label}</span>
-                    {selected && <Check className="h-4 w-4 shrink-0 text-(--app-accent)" aria-hidden="true" />}
+                    {selected && <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />}
                   </button>
                 )
               })}

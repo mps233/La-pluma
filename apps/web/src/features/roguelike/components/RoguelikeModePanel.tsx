@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion'
-import Icons from '@/shared/ui/Icons'
+import Icons from '@/shared/components/Icons'
 import { useFluidTabIndicator } from '@/shared/hooks/useFluidTabIndicator'
 import { ROGUELIKE_TASKS } from '../model/roguelikeTasks'
 import type { RoguelikeMode } from '../types'

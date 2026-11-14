@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader } from '@/shared/ui'
+import { Card, CardContent, CardHeader } from '@/shared/components'
 import AutoUpdateConfigPanel from './AutoUpdateConfigPanel'
 import ComponentUpdatePanel from './ComponentUpdatePanel'
 

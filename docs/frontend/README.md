@@ -77,7 +77,7 @@ Activity 隐藏保留页面 React 状态并清理 Effects；它与真正卸载�
 
 ## 样式、验证与性能方法
 
-`main.tsx` 只引入启动族 `styles` 并挂载 App。全局层序、语义 token、Tailwind v4 映射与 chrome 材质归 `apps/web/src/styles/`；领域页面 CSS 放在 `features/<domain>/styles/`，由领域根入口引入并归入 `@layer page`。通用组件复用 `shared/ui`；新增页面不重复实现导航、安全区或主题。样式边界详见[开发指南](../development/README.md)与[通用组件库](components.md)。
+`main.tsx` 只引入启动族 `styles` 并挂载 App。全局层序、语义 token、Tailwind v4 映射与 chrome 材质归 `apps/web/src/styles/`；领域页面 CSS 放在 `features/<domain>/styles/`，由领域根入口引入并归入 `@layer page`。通用组件复用 `shared/components`；新增页面不重复实现导航、安全区或主题。样式边界详见[开发指南](../development/README.md)与[通用组件库](components.md)。
 
 客户端 `verify` 执行依赖与页面职责护栏、lint、样式预算、类型检查、单元测试和构建；视觉与浏览器集成检查覆盖布局、交互和生命周期，静态护栏不证明运行时所有权。测试可深路径构造领域内部状态，但不进入生产依赖图。规模预算用于提示大文件增长与整块搬移，不代表性能指标。
 

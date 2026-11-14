@@ -6,7 +6,7 @@
 
 ## 概述
 
-为了减少重复代码、统一视觉风格、提升开发效率，项目维护一套通用 UI 组件。组件位于 `apps/web/src/shared/ui/*.tsx`，通过 `apps/web/src/shared/ui/index.ts` 统一导出，页面中统一从 `@/shared/ui` 引入。
+为了减少重复代码、统一视觉风格、提升开发效率，项目维护一套通用 UI 组件。组件位于 `apps/web/src/shared/components/*.tsx`，通过 `apps/web/src/shared/components/index.ts` 统一导出，页面中统一从 `@/shared/components` 引入。shadcn CLI 生成的上游原语位于 `apps/web/src/shared/ui/`，随上游原样保留，不在本文件范围内。
 
 新增或调整组件时，在本文件补充 API 与用法；颜色、字号、间距、圆角、交互状态等规则不要在组件文档里另写一份。
 
@@ -16,7 +16,7 @@
 
 ### PageHeader - 页面标题组件
 
-**文件位置**：`apps/web/src/shared/ui/PageHeader.tsx`
+**文件位置**：`apps/web/src/shared/components/PageHeader.tsx`
 
 **适用场景**：所有页面的顶部标题区域。
 
@@ -31,7 +31,7 @@
 ```
 
 ```tsx
-import { PageHeader } from '@/shared/ui'
+import { PageHeader } from '@/shared/components'
 import { FloatingStatusIndicator } from '@/features/runtime-status'
 
 <PageHeader
@@ -49,12 +49,12 @@ import { FloatingStatusIndicator } from '@/features/runtime-status'
 
 ### Card - 卡片组件系列
 
-**文件位置**：`apps/web/src/shared/ui/Card.tsx`
+**文件位置**：`apps/web/src/shared/components/Card.tsx`
 
 **适用场景**：主要面板、信息卡片、带标题的内容区域。
 
 ```tsx
-import { Card, CardHeader, CardContent } from '@/shared/ui'
+import { Card, CardHeader, CardContent } from '@/shared/components'
 
 <Card smoothCorners>
   <CardHeader
@@ -79,7 +79,7 @@ import { Card, CardHeader, CardContent } from '@/shared/ui'
 
 ### SmoothPanel - 连续圆角面板
 
-**文件位置**：`apps/web/src/shared/ui/SmoothPanel.tsx`
+**文件位置**：`apps/web/src/shared/components/SmoothPanel.tsx`
 
 **适用场景**：不使用 `Card` 语义的独立面板，例如工作区面板、设备卡片、通知提示和骨架占位。
 
@@ -90,7 +90,7 @@ Props：
 - 其余 props 透传给外层 `div`（继承 `HTMLAttributes<HTMLDivElement>`），`className` 追加到外层 shell；`role`、`aria-*` 等语义属性因此落在外层。
 
 ```tsx
-import { SmoothPanel } from '@/shared/ui'
+import { SmoothPanel } from '@/shared/components'
 
 <SmoothPanel className="roguelike-theme-panel">
   <p>面板内容</p>
@@ -112,12 +112,12 @@ import { SmoothPanel } from '@/shared/ui'
 
 ### Button / IconButton
 
-**文件位置**：`apps/web/src/shared/ui/Button.tsx`
+**文件位置**：`apps/web/src/shared/components/LegacyButton.tsx`
 
 **适用场景**：文本按钮、主要操作、危险操作、图标按钮。
 
 ```tsx
-import { Button, IconButton } from '@/shared/ui'
+import { Button, IconButton } from '@/shared/components'
 import { RefreshCw, Save } from 'lucide-react'
 
 <Button variant="primary" icon={<Save />}>保存</Button>
@@ -133,12 +133,12 @@ import { RefreshCw, Save } from 'lucide-react'
 
 ### Input / Select / Checkbox / Switch
 
-**文件位置**：`apps/web/src/shared/ui/Input.tsx`、`apps/web/src/shared/ui/Switch.tsx`
+**文件位置**：`apps/web/src/shared/components/LegacyInput.tsx`、`apps/web/src/shared/components/Switch.tsx`
 
 **适用场景**：表单输入、选择、错误提示、说明文字与二元设置。
 
 ```tsx
-import { Input, Select, Checkbox, Switch } from '@/shared/ui'
+import { Input, Select, Checkbox, Switch } from '@/shared/components'
 
 <Input
   label="ADB 路径"
@@ -175,12 +175,12 @@ import { Input, Select, Checkbox, Switch } from '@/shared/ui'
 
 ### HintTooltip - 标签说明提示
 
-**文件位置**：`apps/web/src/shared/ui/HintTooltip.tsx`
+**文件位置**：`apps/web/src/shared/components/HintTooltip.tsx`
 
 **适用场景**：字段说明需要从控件下方的常驻段落收敛为标签旁的 ⓘ 提示。`Input`、`Select` 的 `hintPlacement="tooltip"` 已内置该组件；自定义标签行时直接复用。
 
 ```tsx
-import { HintTooltip } from '@/shared/ui'
+import { HintTooltip } from '@/shared/components'
 
 <HintTooltip id="field-hint" label="难度" hint="不切换时沿用游戏内当前难度。" />
 ```
@@ -191,12 +191,12 @@ import { HintTooltip } from '@/shared/ui'
 
 ### EmptyState
 
-**文件位置**：`apps/web/src/shared/ui/EmptyState.tsx`
+**文件位置**：`apps/web/src/shared/components/EmptyState.tsx`
 
-**适用场景**：流程、列表、统计区或数据面板暂时没有内容。通过 `@/shared/ui` 导入，不要在页面中各自拼装“暂无数据”的图标、文案和间距。
+**适用场景**：流程、列表、统计区或数据面板暂时没有内容。通过 `@/shared/components` 导入，不要在页面中各自拼装“暂无数据”的图标、文案和间距。
 
 ```tsx
-import { EmptyState, Button } from '@/shared/ui'
+import { EmptyState, Button } from '@/shared/components'
 
 <EmptyState
   compact
@@ -222,12 +222,12 @@ Props：
 
 ### ConfirmDialog / Loading
 
-**文件位置**：`apps/web/src/shared/ui/Modal.tsx`、`apps/web/src/shared/ui/Loading.tsx`
+**文件位置**：`apps/web/src/shared/components/Modal.tsx`、`apps/web/src/shared/components/Loading.tsx`
 
-**适用场景**：需要确认的破坏性操作使用 `ConfirmDialog`；短时局部等待使用 `Loading`。两者都由 `shared/ui` 的 `index.ts` 导出。
+**适用场景**：需要确认的破坏性操作使用 `ConfirmDialog`；短时局部等待使用 `Loading`。两者都由 `shared/components` 的 `index.ts` 导出。
 
 ```tsx
-import { ConfirmDialog, Loading } from '@/shared/ui'
+import { ConfirmDialog, Loading } from '@/shared/components'
 
 {loading ? <Loading text="正在读取日志..." /> : content}
 <ConfirmDialog
@@ -243,7 +243,7 @@ import { ConfirmDialog, Loading } from '@/shared/ui'
 
 `Modal` 的 `placement` 默认为 `center`（既有居中弹层）；传 `sheet` 时改为贴底 Sheet，最大高度 `85dvh`、顶部连续圆角并预留底部安全区，焦点陷阱、背景 `inert`、Esc、滚动锁与焦点归还保持与居中弹层一致。`dialogId` 可选，用于让触发元素的 `aria-controls` 指向对话框根节点。`onBodyScroll` 可选，透传正文滚动事件（滚动发生在正文层），用于滚动加载等场景；它不改变布局、焦点陷阱与背景锁。
 
-`useModalLayer(ref, enabled?)` 由 `shared/ui` 导出，用于把已有 portal 图层登记进同一个 Modal 栈：登记期间按栈序分配 `z-index`，非顶层弹窗自动设为 `inert`/`aria-hidden`，停用后移除内联层级并恢复原样式。它只负责图层栈，不创建弹窗；普通 `Modal` 仍自行管理背景锁与焦点陷阱。桌面端作业详情抽屉叠在“发现作业”弹窗之上时使用该能力，并在叠层期间提供 `aria-modal="true"` 与面板内的 Tab 循环；未叠层时保持非模态抽屉语义，不劫持 Tab。
+`useModalLayer(ref, enabled?)` 由 `shared/components` 导出，用于把已有 portal 图层登记进同一个 Modal 栈：登记期间按栈序分配 `z-index`，非顶层弹窗自动设为 `inert`/`aria-hidden`，停用后移除内联层级并恢复原样式。它只负责图层栈，不创建弹窗；普通 `Modal` 仍自行管理背景锁与焦点陷阱。桌面端作业详情抽屉叠在“发现作业”弹窗之上时使用该能力，并在叠层期间提供 `aria-modal="true"` 与面板内的 Tab 循环；未叠层时保持非模态抽屉语义，不劫持 Tab。
 
 ```tsx
 <Modal
@@ -257,13 +257,13 @@ import { ConfirmDialog, Loading } from '@/shared/ui'
 </Modal>
 ```
 
-`ActivityIndicator` 是供 `Button` 和 `Loading` 内部复用的 iOS 活动指示器，页面不要直接调用或叠加第二个动态指示器。`DashboardSkeleton` 是控制台域专用骨架，位于 `features/dashboard/components/DashboardSkeleton.tsx`，不属于 `shared/ui` 的公共导出。
+`ActivityIndicator` 是供 `Button` 和 `Loading` 内部复用的 iOS 活动指示器，页面不要直接调用或叠加第二个动态指示器。`DashboardSkeleton` 是控制台域专用骨架，位于 `features/dashboard/components/DashboardSkeleton.tsx`，不属于 `shared/components` 的公共导出。
 
 ---
 
 ### PageSkeleton
 
-**文件位置**：`apps/web/src/shared/ui/Loading.tsx`，与 `Loading` 同文件导出。
+**文件位置**：`apps/web/src/shared/components/Loading.tsx`，与 `Loading` 同文件导出。
 
 **适用场景**：懒加载路由的整页骨架占位。按 `variant` 复刻目标工作区的布局比例，减少加载完成后的跳动。
 
@@ -272,7 +272,7 @@ Props：
 - `variant` (string, required) - 目标页面标识。内置 `automation`、`combat`、`roguelike`、`training`、`logs`、`statistics`、`config` 七种工作区骨架，其余取值只渲染页头骨架。
 
 ```tsx
-import { PageSkeleton } from '@/shared/ui'
+import { PageSkeleton } from '@/shared/components'
 
 <PageSkeleton variant="automation" />
 ```

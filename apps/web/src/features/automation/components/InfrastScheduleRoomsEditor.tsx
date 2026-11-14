@@ -1,5 +1,5 @@
 import { ChevronDown, Plus, Trash2 } from 'lucide-react'
-import { Button, Checkbox, IconButton, Input, Select } from '@/shared/ui'
+import { Button, Checkbox, IconButton, Input, Select } from '@/shared/components'
 import {
   INFRASTRUCT_MANUFACTURE_PRODUCTS,
   INFRASTRUCT_SCHEDULE_FACILITIES,
@@ -82,9 +82,9 @@ function RoomEditor({ facility, index, room, disabled, onChange, onRemove }: Roo
     : products
 
   return (
-    <div className="space-y-3 rounded-lg border border-(--app-border) p-3">
+    <div className="space-y-3 rounded-lg border border-border p-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-primary">房间 {index + 1}</span>
+        <span className="text-sm font-medium text-foreground">房间 {index + 1}</span>
         <IconButton
           icon={<Trash2 size={16} />}
           title={`删除${getInfrastFacilityLabel(facility)}房间 ${index + 1}`}
@@ -101,7 +101,7 @@ function RoomEditor({ facility, index, room, disabled, onChange, onRemove }: Roo
         disabled={disabled}
         onChange={value => onChange(setInfrastRoomState(room, value as InfrastRoomState))}
       />
-      <p className="text-xs leading-5 text-secondary">{roomStateHints[state]}</p>
+      <p className="text-xs leading-5 text-muted-foreground">{roomStateHints[state]}</p>
 
       {state !== 'skip' && isTraining && (
         <>
@@ -123,7 +123,7 @@ function RoomEditor({ facility, index, room, disabled, onChange, onRemove }: Roo
             disabled={disabled}
             onChange={value => onChange(setInfrastRoomOperators(room, 'operatorsA', parseInfrastOperatorText(value)))}
           />
-          <p className="text-xs leading-5 text-secondary">训练室只使用训练位与协助者候选；operators/candidates 等通用字段对训练室无效。</p>
+          <p className="text-xs leading-5 text-muted-foreground">训练室只使用训练位与协助者候选；operators/candidates 等通用字段对训练室无效。</p>
         </>
       )}
 
@@ -177,7 +177,7 @@ function RoomEditor({ facility, index, room, disabled, onChange, onRemove }: Roo
       )}
 
       {room.use_operator_groups === true && (
-        <p className="text-xs leading-5 text-secondary">
+        <p className="text-xs leading-5 text-muted-foreground">
           该房间引用了干员编组（use_operator_groups），编组定义不在本编辑器中；保存时原样保留，干员名称会按编组名解释。
         </p>
       )}
@@ -192,18 +192,18 @@ export default function InfrastScheduleRoomsEditor({ plan, disabled, onChange }:
         const state = getInfrastFacilityState(plan, facility.key)
         const rooms = readInfrastFacilityRooms(plan, facility.key)
         return (
-          <details key={facility.key} className="group rounded-lg border border-(--app-border) px-3 py-2">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-primary marker:hidden [&::-webkit-details-marker]:hidden">
+          <details key={facility.key} className="group rounded-lg border border-border px-3 py-2">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3.5 text-sm font-medium text-foreground marker:hidden [&::-webkit-details-marker]:hidden">
               <span className="flex items-center gap-2">
                 <ChevronDown size={15} strokeWidth={2} className="transition-transform group-open:rotate-180" aria-hidden="true" />
                 {facility.label}
               </span>
-              <span className="text-xs text-secondary">
+              <span className="text-xs text-muted-foreground">
                 {facilityStateLabels[state]}{state === 'rooms' ? ` · ${rooms.length} 间` : ''}
               </span>
             </summary>
 
-            <div className="mt-3 space-y-3 border-t border-(--app-border) pt-3">
+            <div className="mt-3 space-y-3 border-t border-border pt-3">
               <Select
                 label="设施处理方式"
                 aria-label={`${facility.label}设施处理方式`}
@@ -214,10 +214,10 @@ export default function InfrastScheduleRoomsEditor({ plan, disabled, onChange }:
               />
 
               {state === 'default' && (
-                <p className="text-xs leading-5 text-secondary">未配置该设施，MAA 使用默认算法换班。</p>
+                <p className="text-xs leading-5 text-muted-foreground">未配置该设施，MAA 使用默认算法换班。</p>
               )}
               {state === 'keep' && (
-                <p className="text-xs leading-5 text-secondary">
+                <p className="text-xs leading-5 text-muted-foreground">
                   整个设施保持原样，不换人也不换产物；会客室线索、训练室继续训练等设施级操作照常执行。
                 </p>
               )}
@@ -235,7 +235,7 @@ export default function InfrastScheduleRoomsEditor({ plan, disabled, onChange }:
                     />
                   ))}
                   {rooms.length === 0 && (
-                    <p className="text-xs leading-5 text-secondary">添加房间后按序号生效；数组短于实际房间数时，剩余房间保持原样。</p>
+                    <p className="text-xs leading-5 text-muted-foreground">添加房间后按序号生效；数组短于实际房间数时，剩余房间保持原样。</p>
                   )}
                   <Button
                     variant="secondary"

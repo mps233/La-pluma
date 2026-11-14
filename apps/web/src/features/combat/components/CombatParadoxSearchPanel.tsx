@@ -1,4 +1,4 @@
-import { Button } from '@/shared/ui'
+import { Button } from '@/shared/components'
 import { usePanelState } from '../hooks/usePanelState'
 import type { PanelStateStore } from '../model/panelState'
 import type { ParadoxSearchResult } from '../types'
@@ -30,7 +30,7 @@ export default function CombatParadoxSearchPanel({
 
   return (
     <div className="combat-workspace-section">
-      <h5 className="mb-3 flex items-center space-x-2 text-sm font-semibold text-primary">
+      <h5 className="mb-3 flex items-center space-x-2 text-sm font-semibold text-foreground">
         <svg className="h-4 w-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
@@ -74,7 +74,7 @@ export default function CombatParadoxSearchPanel({
             <span className="font-medium brand-text">{result.operator}</span>
             <span className="text-tertiary">{result.copilots.length} 个作业</span>
           </div>
-          <div className="max-h-56 divide-y divide-(--app-border) overflow-hidden overflow-y-auto rounded-lg border border-(--app-border) bg-(--app-surface-solid)">
+          <div className="max-h-56 divide-y divide-border overflow-hidden overflow-y-auto rounded-lg border border-border bg-card">
             {result.copilots.slice(0, 6).map((copilot, idx) => {
               const stars = Math.min(5, Math.max(1, Math.ceil(copilot.hotScore)))
 
@@ -82,7 +82,7 @@ export default function CombatParadoxSearchPanel({
                 <button
                   key={copilot.id}
                   onClick={() => onSelectUri(copilot.uri)}
-                  className="min-h-11 w-full px-3 py-2 text-left text-xs transition-colors hover:bg-(--app-surface-muted) focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-(--app-accent)"
+                  className="min-h-11 w-full px-3 py-2 text-left text-xs transition-colors hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
                 >
                   <div className="flex min-w-0 items-center justify-between gap-2">
                     <span className="truncate font-mono brand-text">{copilot.uri}</span>
@@ -90,7 +90,7 @@ export default function CombatParadoxSearchPanel({
                       <span className="shrink-0 rounded-md px-2 py-0.5 text-xs font-medium brand-chip">推荐</span>
                     )}
                   </div>
-                  <div className="mt-1 flex items-center space-x-2 text-secondary">
+                  <div className="mt-1 flex items-center space-x-2 text-muted-foreground">
                     <span>浏览 {copilot.views.toLocaleString()}</span>
                     <span>/</span>
                     <div className="flex items-center">

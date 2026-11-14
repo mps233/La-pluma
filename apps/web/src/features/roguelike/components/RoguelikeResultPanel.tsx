@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { FileText } from 'lucide-react'
-import { EmptyState, SmoothPanel } from '@/shared/ui'
+import { EmptyState, SmoothPanel } from '@/shared/components'
 import { isActiveRunState, isTerminalRunState, type AgentRun } from '@/features/task-execution'
 import { RuntimeDiagnosticsPanel } from '@/features/runtime-status'
 import {
@@ -27,7 +27,7 @@ const BADGE_SURFACE: Record<ResultBadgeTone, string> = {
   warning: 'status-warning',
   danger: 'status-danger',
   info: 'status-info',
-  neutral: 'surface-soft text-secondary',
+  neutral: 'surface-soft text-muted-foreground',
 }
 
 function formatRunDuration(durationMs: number | null): string | null {

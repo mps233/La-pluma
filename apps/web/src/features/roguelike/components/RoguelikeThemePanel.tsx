@@ -1,5 +1,5 @@
 import { Check } from 'lucide-react'
-import { Input, SmoothPanel } from '@/shared/ui'
+import { Input, SmoothPanel } from '@/shared/components'
 import { ROGUELIKE_THEME_PRESETS } from '../model/roguelikeTasks'
 import type { RoguelikeTask } from '../types'
 

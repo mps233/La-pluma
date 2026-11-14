@@ -1,9 +1,7 @@
-import path from 'node:path'
 import js from '@eslint/js'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
-import tailwindcss from 'eslint-plugin-tailwindcss'
 import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
@@ -59,17 +57,12 @@ export default defineConfig([
       }],
     },
   },
-  // Tailwind v4 canonical 类名：只开这一条，避免 no-custom-classname 把项目自定义类全部报出。
+  // shadcn CLI 生成物随上游原样入库（hook 与 variants 常量是官方 API 面的一部分），
+  // fast refresh 检查不对生成物生效；自研组件仍在约束范围内。
   {
-    files: ['src/**/*.{ts,tsx}'],
-    plugins: { tailwindcss },
-    settings: {
-      tailwindcss: {
-        cssConfigPath: path.resolve(import.meta.dirname, 'src/styles/index.css'),
-      },
-    },
+    files: ['src/shared/ui/**/*.tsx'],
     rules: {
-      'tailwindcss/enforces-canonical-classname': 'error',
+      'react-refresh/only-export-components': 'off',
     },
   },
   // flat config 中同一规则后置块会整体覆盖前置块，因此每个块都写全该目录需要的 patterns。

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { FileJson } from 'lucide-react'
-import { Button } from '@/shared/ui'
+import { Button } from '@/shared/components'
 import { normalizeInfrastPlanIndex } from '../model/infrastScheduleEditing'
 import InfrastScheduleEditor from './InfrastScheduleEditor'
 
@@ -65,7 +65,7 @@ export default function InfrastScheduleField({
         </div>
       </div>
 
-      <p className="text-xs leading-5 text-secondary">
+      <p className="text-xs leading-5 text-muted-foreground">
         排班文件位于 MAA 配置目录的 infrast 文件夹，相对路径与 maa-cli 解析 filename 的规则一致。
         路径留空或文件不存在时，可在编辑器中新建并保存；方案序号从 0 开始，超出方案数会导致执行失败。
       </p>

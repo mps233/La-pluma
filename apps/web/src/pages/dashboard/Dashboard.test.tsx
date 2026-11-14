@@ -119,11 +119,11 @@ vi.mock('@/features/runtime-status', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/features/runtime-status')>()
   return { ...actual, FloatingStatusIndicator: () => null }
 })
-vi.mock('@/shared/ui/Icons', () => {
+vi.mock('@/shared/components/Icons', () => {
   const Icon = () => null
   return { default: new Proxy({}, { get: () => Icon }) }
 })
-vi.mock('@/shared/ui', () => ({
+vi.mock('@/shared/components', () => ({
   PageHeader: ({ title, actions }: { title: string; actions?: React.ReactNode }) => <header><h1>{title}</h1>{actions}</header>,
   Card: ({ children }: { children: React.ReactNode }) => <section>{children}</section>,
   SmoothPanel: ({

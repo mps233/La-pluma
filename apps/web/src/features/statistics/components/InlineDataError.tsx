@@ -1,5 +1,5 @@
-import { Button } from '@/shared/ui'
-import Icons from '@/shared/ui/Icons'
+import { Button } from '@/shared/components'
+import Icons from '@/shared/components/Icons'
 
 interface InlineDataErrorProps {
   title: string
@@ -16,11 +16,11 @@ export default function InlineDataError({
 }: InlineDataErrorProps) {
   return (
     <div
-      className="form-error-surface flex flex-col items-start gap-3 rounded-xl p-4 sm:flex-row sm:items-center sm:justify-between"
+      className="form-error-surface flex flex-col items-start gap-3.5 rounded-xl p-4 sm:flex-row sm:items-center sm:justify-between"
       role="alert"
     >
       <div className="min-w-0">
-        <p className="font-semibold text-primary">{title}</p>
+        <p className="font-semibold text-foreground">{title}</p>
         <p className="mt-1 wrap-break-word text-sm leading-6 wrap-anywhere form-error-text">{description}</p>
       </div>
       <Button

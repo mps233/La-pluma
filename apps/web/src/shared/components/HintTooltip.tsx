@@ -84,7 +84,7 @@ export default function HintTooltip({ label, hint, id }: HintTooltipProps) {
       <button
         ref={triggerRef}
         type="button"
-        className="-my-1 inline-flex h-7 w-7 flex-none items-center justify-center rounded-full text-tertiary transition-colors hover:bg-(--app-surface-muted) hover:text-secondary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-(--app-accent)"
+        className="-my-1 inline-flex h-7 w-7 flex-none items-center justify-center rounded-full text-tertiary transition-colors hover:bg-muted hover:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
         aria-label={`${label}说明`}
         aria-describedby={id}
         onMouseEnter={show}
@@ -101,7 +101,7 @@ export default function HintTooltip({ label, hint, id }: HintTooltipProps) {
           id={id}
           role="tooltip"
           hidden={!open}
-          className="pointer-events-none fixed z-2000 max-h-60 overflow-y-auto rounded-xl px-3 py-2 text-xs leading-5 text-secondary surface-panel"
+          className="pointer-events-none fixed z-2000 max-h-60 overflow-y-auto rounded-xl px-3 py-2 text-xs leading-5 text-muted-foreground surface-panel"
           style={open && position
             ? {
                 top: position.top,

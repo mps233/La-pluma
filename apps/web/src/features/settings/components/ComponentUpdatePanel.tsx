@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Download, RefreshCw } from 'lucide-react'
-import { Button, Select } from '@/shared/ui'
+import { Button, Select } from '@/shared/components'
 import { useStatusStore } from '@/features/runtime-status'
 import { saveUpdateChannel } from '../api'
 import { resolveCoreChannel } from '../model/updateCommandPolicy'
@@ -87,10 +87,10 @@ export default function ComponentUpdatePanel() {
 
   return (
     <>
-      <div className="grid gap-(--app-space-card) md:grid-cols-2 xl:grid-cols-1">
-        <section className="surface-soft flex min-w-0 flex-col rounded-xl p-(--app-space-panel)">
+      <div className="grid gap-3.5 md:grid-cols-2 xl:grid-cols-1">
+        <section className="surface-soft flex min-w-0 flex-col rounded-xl p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold text-primary">MaaCore</h3>
+            <h3 className="text-base font-semibold text-foreground">MaaCore</h3>
             {versionInfo && <span className="text-sm brand-text">{versionInfo.core}</span>}
             <Select
               aria-label="MaaCore 更新渠道"
@@ -101,7 +101,7 @@ export default function ComponentUpdatePanel() {
               className="ml-auto w-32"
             />
           </div>
-          <p className="mt-1 text-xs leading-5 text-secondary">核心组件与游戏资源</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">核心组件与游戏资源</p>
           {versionInfo?.resource && (
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
               <span className="text-tertiary">
@@ -115,7 +115,7 @@ export default function ComponentUpdatePanel() {
             </div>
           )}
           {versionInfo?.resource && versionInfo.resource.status !== 'current' && (
-            <p className="mt-2 text-xs leading-5 text-(--app-warning)">{versionInfo.resource.message}</p>
+            <p className="mt-2 text-xs leading-5 text-warning">{versionInfo.resource.message}</p>
           )}
           <div className="mt-auto grid gap-2 pt-4 sm:grid-cols-2">
             <Button
@@ -153,9 +153,9 @@ export default function ComponentUpdatePanel() {
           </div>
         </section>
 
-        <section className="surface-soft flex min-w-0 flex-col rounded-xl p-(--app-space-panel)">
+        <section className="surface-soft flex min-w-0 flex-col rounded-xl p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold text-primary">MAA CLI</h3>
+            <h3 className="text-base font-semibold text-foreground">MAA CLI</h3>
             {versionInfo && <span className="text-sm brand-text">{versionInfo.cli}</span>}
             <Select
               aria-label="MAA CLI 更新渠道"
@@ -166,7 +166,7 @@ export default function ComponentUpdatePanel() {
               className="ml-auto w-32"
             />
           </div>
-          <p className="mt-1 text-xs leading-5 text-secondary">命令行工具与任务运行入口</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">命令行工具与任务运行入口</p>
           <div className="mt-auto pt-4">
             <Button
               onClick={handleUpdateCli}

@@ -1,5 +1,5 @@
 import { FolderOpen, RefreshCw } from 'lucide-react'
-import { Button, Card, CardContent } from '@/shared/ui'
+import { Button, Card, CardContent } from '@/shared/components'
 import { useStatusStore } from '@/features/runtime-status'
 import { useSettingsConfigDirectory } from '../hooks/useSettingsConfigDirectory'
 
@@ -21,17 +21,17 @@ export default function ConfigDirectoryPanel() {
   return (
     <Card smoothCorners className="config-directory-card p-0!">
       <CardContent>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3.5">
+          <div className="flex min-w-0 items-start gap-3.5">
             <span className="icon-well flex h-10 w-10 shrink-0 items-center justify-center rounded-lg brand-text">
               <FolderOpen size={20} aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <h2 className="text-base font-semibold text-primary">配置目录</h2>
+              <h2 className="text-base font-semibold text-foreground">配置目录</h2>
               {configDirStatus === 'error' ? (
                 <p className="mt-1 wrap-break-word text-sm text-danger wrap-anywhere" role="alert">{configDirError}</p>
               ) : (
-                <p className="mt-1 wrap-break-word font-mono text-xs leading-5 text-secondary wrap-anywhere" aria-live="polite">
+                <p className="mt-1 wrap-break-word font-mono text-xs leading-5 text-muted-foreground wrap-anywhere" aria-live="polite">
                   {configDirStatus === 'loading' ? '正在读取目录...' : configDir}
                 </p>
               )}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { CircleMinus, CirclePlus, GraduationCap, ListPlus, Minus, Pin, Plus, Trash2 } from 'lucide-react'
-import { Button, HintTooltip, IconButton } from '@/shared/ui'
+import { Button, HintTooltip, IconButton } from '@/shared/components'
 import { generateTrainingPlan } from '@/features/training'
 import { loadUserConfig } from '@/features/user-config'
 import type { StageConfig, TaskFlowItem, TaskParamField } from '../types'

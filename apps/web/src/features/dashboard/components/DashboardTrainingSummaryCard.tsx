@@ -1,8 +1,8 @@
 import { ChevronRight, Target } from 'lucide-react'
-import { Card, IconButton } from '@/shared/ui'
+import { Card, IconButton } from '@/shared/components'
 import { useDashboardStore } from '../store/dashboardStore'
 
-const sectionTitleClass = 'text-base font-bold text-primary'
+const sectionTitleClass = 'text-base font-bold text-foreground'
 
 interface DashboardTrainingSummaryCardProps {
   onOpenTraining: () => void
@@ -39,7 +39,7 @@ export default function DashboardTrainingSummaryCard({ onOpenTraining }: Dashboa
             <div className="dashboard-summary-number-label">培养目标</div>
           </div>
           <div className="dashboard-summary-copy">
-            <div className="text-sm font-semibold text-primary">{trainingSummary.count > 0 ? '队列已建立' : '等待添加目标'}</div>
+            <div className="text-sm font-semibold text-foreground">{trainingSummary.count > 0 ? '队列已建立' : '等待添加目标'}</div>
             <div className="dashboard-summary-detail">
               {trainingSummary.count > 0 ? '按优先级推进当前培养计划' : '添加干员后会在这里汇总优先目标'}
             </div>

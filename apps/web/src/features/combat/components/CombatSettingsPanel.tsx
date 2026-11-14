@@ -1,4 +1,4 @@
-import { HintTooltip, Select } from '@/shared/ui'
+import { HintTooltip, Select } from '@/shared/components'
 import type {
   CombatTask,
   CopilotRaid,
@@ -52,7 +52,7 @@ export default function CombatSettingsPanel({
 }: CombatSettingsPanelProps) {
   return (
     <div className="combat-workspace-section">
-      <h5 className="mb-3 flex items-center space-x-2 text-sm font-semibold text-primary">
+      <h5 className="mb-3 flex items-center space-x-2 text-sm font-semibold text-foreground">
         <svg className="w-4 h-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -62,7 +62,7 @@ export default function CombatSettingsPanel({
 
       <div className="mb-3">
         <div className="mb-1.5 flex items-center gap-1">
-          <span className="text-xs text-secondary">编队</span>
+          <span className="text-xs text-muted-foreground">编队</span>
           <HintTooltip
             id="combat-copilot-formation-hint"
             label="编队"
@@ -79,7 +79,7 @@ export default function CombatSettingsPanel({
       </div>
 
       <div className="mb-3">
-        <label htmlFor="combat-copilot-raid" className="mb-1.5 block text-xs text-secondary">难度</label>
+        <label htmlFor="combat-copilot-raid" className="mb-1.5 block text-xs text-muted-foreground">难度</label>
         <Select
           id="combat-copilot-raid"
           name="maa-copilot-raid"
@@ -91,7 +91,7 @@ export default function CombatSettingsPanel({
 
       <div>
         <div className="mb-1.5 flex items-center gap-1">
-          <span className="text-xs text-secondary">执行方式</span>
+          <span className="text-xs text-muted-foreground">执行方式</span>
           <HintTooltip
             id="combat-copilot-set-mode-hint"
             label="执行方式"
@@ -109,7 +109,7 @@ export default function CombatSettingsPanel({
 
       {task.hasAdvanced && (
         <details className="combat-advanced-disclosure mt-4">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center px-3 text-sm font-medium text-secondary">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center px-3 text-sm font-medium text-muted-foreground">
             高级设置
           </summary>
           <CombatAdvancedFields

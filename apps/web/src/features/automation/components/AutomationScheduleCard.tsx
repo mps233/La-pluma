@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Clock3, Plus, X } from 'lucide-react'
-import { IconButton, SmoothPanel, Switch } from '@/shared/ui'
+import { IconButton, SmoothPanel, Switch } from '@/shared/components'
 import {
   MAX_SCHEDULE_ENTRIES,
   appendScheduleEntry,

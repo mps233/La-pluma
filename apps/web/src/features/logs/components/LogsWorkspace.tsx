@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useExecutionSnapshot } from '@/features/task-execution'
-import { ConfirmDialog } from '@/shared/ui'
+import { ConfirmDialog } from '@/shared/components'
 import { useLogsSession } from '../hooks/useLogsSession'
 import {
   buildLogView,
