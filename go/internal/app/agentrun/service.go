@@ -472,6 +472,30 @@ func (s *Service) Fail(runID string, cause any) (agentrun.DTO, error) {
 	})
 }
 
+// Interrupt marks an active Run as interrupted by a deliberate shutdown. The
+// startup resumer treats "server_shutdown" like "server_restart" and continues
+// a supported flow; a user stop still goes through Stop and is not resumed.
+func (s *Service) Interrupt(runID, reason string) (agentrun.DTO, error) {
+	if reason == "" {
+		reason = "server_shutdown"
+	}
+	return s.transition(runID, agentrun.StatusInterrupted, []agentrun.Status{
+		agentrun.StatusAccepted,
+		agentrun.StatusWaiting,
+		agentrun.StatusRunning,
+		agentrun.StatusStopping,
+	}, func(run *agentrun.Run) {
+		run.Result = nil
+		run.Error = &agentrun.Failure{
+			Code:       "AGENT_RUN_INTERRUPTED",
+			Message:    "服务关闭时该执行尚未结束，将在下次启动时继续",
+			StatusCode: 503,
+			Details:    map[string]any{"reason": reason},
+			Retryable:  true,
+		}
+	})
+}
+
 func (s *Service) Stop(runID string, result any) (agentrun.DTO, error) {
 	normalized, err := normalizeJSON(result, "result")
 	if err != nil {

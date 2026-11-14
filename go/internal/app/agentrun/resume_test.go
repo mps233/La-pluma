@@ -125,3 +125,28 @@ func TestResumeCandidatesIgnoreUserStops(t *testing.T) {
 		t.Fatalf("a stopped run must not resume: %+v", candidates)
 	}
 }
+
+func TestInterruptMakesAGracefulShutdownResumable(t *testing.T) {
+	service := resumeTestService(t)
+	run, _, err := service.Begin(BeginInput{OperationID: "execute_schedule", Input: map[string]any{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.StartForExecution(run.RunID); err != nil {
+		t.Fatal(err)
+	}
+	interrupted, err := service.Interrupt(run.RunID, "server_shutdown")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if interrupted.State != "interrupted" {
+		t.Fatalf("state = %s, want interrupted", interrupted.State)
+	}
+	if interrupted.Error == nil || interrupted.Error.Details["reason"] != "server_shutdown" {
+		t.Fatalf("error = %+v", interrupted.Error)
+	}
+	candidates := service.ResumeCandidates()
+	if len(candidates) != 1 || candidates[0].RunID != run.RunID {
+		t.Fatalf("graceful shutdown should be a resume candidate: %+v", candidates)
+	}
+}

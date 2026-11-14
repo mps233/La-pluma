@@ -231,6 +231,14 @@ func (a *App) Close(ctx context.Context) error {
 				result = err
 			}
 		}
+		// Mark the current Run resumable before the scheduler and MAA stop.
+		// A graceful quit is a restart for the user, not a request to abandon
+		// the flow; a user-initiated stop already went through Runs.Stop.
+		if current, ok := a.Runs.Current(); ok {
+			if _, err := a.Runs.Interrupt(current.RunID, "server_shutdown"); err != nil && result == nil {
+				result = err
+			}
+		}
 		a.Execution.CloseAdmission("server_shutdown")
 		if a.Scheduler != nil {
 			a.Scheduler.Close()

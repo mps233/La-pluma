@@ -38,7 +38,7 @@ func (s *Service) ResumeCandidates() []ResumeCandidate {
 		if run.Error.Code != "AGENT_RUN_INTERRUPTED" {
 			continue
 		}
-		if reason, _ := run.Error.Details["reason"].(string); reason != "server_restart" {
+		if reason, _ := run.Error.Details["reason"].(string); reason != "server_restart" && reason != "server_shutdown" {
 			continue
 		}
 		if _, resumed := run.Error.Details["resumedBy"]; resumed {
