@@ -1,5 +1,5 @@
+import { LoaderCircle } from 'lucide-react'
 import type { CSSProperties } from 'react'
-import ActivityIndicator from './ActivityIndicator'
 import { Card } from './Card'
 import SmoothPanel from './SmoothPanel'
 
@@ -7,6 +7,12 @@ interface LoadingProps {
   size?: 'sm' | 'md' | 'lg'
   text?: string
 }
+
+const spinnerSizes = {
+  sm: 'size-4',
+  md: 'size-5',
+  lg: 'size-7',
+} as const
 
 export default function Loading({
   size = 'md',
@@ -19,7 +25,7 @@ export default function Loading({
       aria-live="polite"
       aria-busy="true"
     >
-      <ActivityIndicator size={size} className="app-preloader" />
+      <LoaderCircle className={`animate-spin text-primary-strong ${spinnerSizes[size]}`} aria-hidden="true" />
 
       {text && (
         <p className="text-sm text-muted-foreground">

@@ -1,5 +1,6 @@
 import { ChevronRight, PackageOpen } from 'lucide-react'
-import { Card, IconButton } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { Card } from '@/shared/components'
 import { useDashboardStore } from '../store/dashboardStore'
 
 const sectionTitleClass = 'text-base font-bold text-foreground'
@@ -22,15 +23,16 @@ export default function DashboardDropSummaryCard({ onOpenStatistics }: Dashboard
             <div className={sectionTitleClass}>今日掉落摘要</div>
           </div>
         </div>
-        <IconButton
+        <Button
           onClick={onOpenStatistics}
-          icon={<ChevronRight className="h-4 w-4" />}
+          size="icon-sm"
           variant="ghost"
-          size="sm"
           title="打开数据"
           aria-label="打开数据"
           className="dashboard-summary-action"
-        />
+        >
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </Button>
       </div>
       <div className="dashboard-summary-body">
         <div className="dashboard-summary-statline">

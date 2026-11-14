@@ -1,4 +1,4 @@
-import { Button } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
 import type { CopilotSetView } from '../model/copilotSetView'
 import type { CopilotSetInfo } from '../types'
 import CombatCopilotQueueSummary from './CombatCopilotQueueSummary'

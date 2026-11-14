@@ -7,9 +7,10 @@ import {
   useItemIconCacheVersion,
 } from '@/features/game-data'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Download, Play, RotateCcw } from 'lucide-react'
+import { Download, LoaderCircle, Play, RotateCcw } from 'lucide-react'
 import Icons from '@/shared/components/Icons'
-import { Button, Card, EmptyState, Loading } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { Card, EmptyState, Loading } from '@/shared/components'
 import {
   DEFAULT_OPERATOR_FILTERS,
   buildKnownOperatorIdSet,
@@ -231,25 +232,32 @@ export default function OperatorPanel({ isActive, command }: OperatorPanelProps)
             <div className="data-statistics-task-actions flex shrink-0 items-center gap-2">
               <Button
                 onClick={command.fetchMaterials}
-                disabled={command.isRunning}
-                loading={isFetchingMaterials}
-                loadingText="正在获取"
+                disabled={command.isRunning || isFetchingMaterials}
+                aria-busy={isFetchingMaterials || undefined}
                 variant="outline"
-                size="md"
-                icon={<Download size={16} aria-hidden="true" />}
               >
-                获取材料数据
+                {isFetchingMaterials
+                  ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在获取</>
+                  : (
+                    <>
+                      <Download size={16} aria-hidden="true" />
+                      获取材料数据
+                    </>
+                  )}
               </Button>
               <Button
                 onClick={() => command.startRecognition('operbox')}
-                disabled={command.isRunning}
-                loading={isRecognizing}
-                loadingText="正在执行"
-                variant="primary"
-                size="md"
-                icon={<Play size={15} fill="currentColor" aria-hidden="true" />}
+                disabled={command.isRunning || isRecognizing}
+                aria-busy={isRecognizing || undefined}
               >
-                {command.actionLabel('operbox')}
+                {isRecognizing
+                  ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在执行</>
+                  : (
+                    <>
+                      <Play size={15} fill="currentColor" aria-hidden="true" />
+                      {command.actionLabel('operbox')}
+                    </>
+                  )}
               </Button>
             </div>
           </div>
@@ -400,9 +408,9 @@ export default function OperatorPanel({ isActive, command }: OperatorPanelProps)
                       onClick={resetOperatorFilters}
                       variant="ghost"
                       size="sm"
-                      icon={<RotateCcw size={14} aria-hidden="true" />}
                       className="min-h-11 w-[calc(33.333%-0.5rem)] sm:w-auto"
                     >
+                      <RotateCcw size={14} aria-hidden="true" />
                       重置
                     </Button>
                   )}

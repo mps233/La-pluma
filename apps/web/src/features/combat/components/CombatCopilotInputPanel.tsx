@@ -1,7 +1,6 @@
 import { useRef, type ChangeEvent, type ClipboardEvent } from 'react'
-import { Compass, ListPlus, Upload, X } from 'lucide-react'
-import { Button, IconButton } from '@/shared/components'
-import ActivityIndicator from '@/shared/components/ActivityIndicator'
+import { Compass, ListPlus, LoaderCircle, Upload, X } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
 import type { CopilotPreviewMode } from '../model/copilotPreview'
 import { COPILOT_DISCOVERY_DIALOG_ID } from './combatPanelTypes'
 import type { CombatCopilotFileImportProjection } from './combatPanelTypes'
@@ -92,15 +91,17 @@ export default function CombatCopilotInputPanel({
             className="combat-copilot-uri-input"
           />
           {input !== '' && (
-            <IconButton
-              icon={<X size={15} aria-hidden="true" />}
+            <Button
+              size="icon"
+              variant="ghost"
               title="清除作业链接"
               aria-label="清除作业链接"
-              size="sm"
               disabled={isLoading || isAddingToQueue}
               onClick={handleClear}
               className="combat-copilot-clear-button"
-            />
+            >
+              <X size={15} aria-hidden="true" />
+            </Button>
           )}
           <div className="combat-copilot-uri-trailing">
             {fileImport && (
@@ -115,17 +116,20 @@ export default function CombatCopilotInputPanel({
                   onChange={handleFileChange}
                   className="sr-only"
                 />
-                <IconButton
-                  icon={fileImport.isImporting
-                    ? <ActivityIndicator size="sm" />
-                    : <Upload size={16} aria-hidden="true" />}
+                <Button
+                  size="icon"
+                  variant="ghost"
                   title="导入 JSON 作业文件"
                   aria-label="导入 JSON 作业文件"
                   aria-busy={fileImport.isImporting || undefined}
                   disabled={fileImport.isImporting}
                   onClick={() => fileInputRef.current?.click()}
                   className="combat-copilot-import-button"
-                />
+                >
+                  {fileImport.isImporting
+                    ? <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+                    : <Upload size={16} aria-hidden="true" />}
+                </Button>
               </>
             )}
             <select
@@ -145,33 +149,38 @@ export default function CombatCopilotInputPanel({
           onClick={onPreview}
           aria-haspopup="dialog"
           disabled={isLoading || !input.trim()}
-          loading={isLoading}
+          aria-busy={isLoading || undefined}
           variant="secondary"
-          size="md"
           className="shrink-0 px-3"
-          icon={
-            !isLoading && (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-            )
-          }
         >
-          {!isLoading && '预览'}
+          {isLoading
+            ? <><LoaderCircle className="animate-spin" aria-hidden="true" />加载中...</>
+            : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                预览
+              </>
+            )}
         </Button>
         {onAddToQueue && (
           <Button
             onClick={onAddToQueue}
             disabled={isAddingToQueue || isLoading || !input.trim()}
-            loading={isAddingToQueue}
-            loadingText="加入中"
+            aria-busy={isAddingToQueue || undefined}
             variant="secondary"
-            size="md"
             className="shrink-0 px-3"
-            icon={!isAddingToQueue && <ListPlus size={15} aria-hidden="true" />}
           >
-            {!isAddingToQueue && '加入队列'}
+            {isAddingToQueue
+              ? <><LoaderCircle className="animate-spin" aria-hidden="true" />加入中</>
+              : (
+                <>
+                  <ListPlus size={15} aria-hidden="true" />
+                  加入队列
+                </>
+              )}
           </Button>
         )}
         <Button
@@ -179,10 +188,9 @@ export default function CombatCopilotInputPanel({
           aria-haspopup="dialog"
           aria-controls={COPILOT_DISCOVERY_DIALOG_ID}
           variant="secondary"
-          size="md"
           className="shrink-0 px-3"
-          icon={<Compass size={15} aria-hidden="true" />}
         >
+          <Compass size={15} aria-hidden="true" />
           发现
         </Button>
         <details className="combat-copilot-help">

@@ -1,5 +1,5 @@
-import { AlertTriangle, CheckCircle2, CircleHelp, XCircle } from 'lucide-react'
-import { Button } from '@/shared/components'
+import { AlertTriangle, CheckCircle2, CircleHelp, LoaderCircle, XCircle } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
 import type {
   RuntimeDiagnosticCheck,
   RuntimeDiagnosticCheckStatus,
@@ -81,11 +81,13 @@ export default function RuntimeDiagnosticsPanel({
           variant="secondary"
           size="sm"
           className="min-h-11 shrink-0"
-          loading={loading}
-          loadingText="诊断中"
+          disabled={loading}
+          aria-busy={loading || undefined}
           onClick={start}
         >
-          运行诊断
+          {loading
+            ? <><LoaderCircle className="animate-spin" aria-hidden="true" />诊断中</>
+            : '运行诊断'}
         </Button>
       </div>
 

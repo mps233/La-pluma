@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { Download, RefreshCw, Share2, SquarePlus } from 'lucide-react'
+import { Download, LoaderCircle, RefreshCw, Share2, SquarePlus } from 'lucide-react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useStatusStore } from '@/features/runtime-status'
-import { Button, IconButton } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
 import { hasDocumentBuildChanged } from './pwaUpdate'
 
 interface BeforeInstallPromptEvent extends Event {
@@ -273,18 +273,22 @@ export default function PWAInstallPrompt() {
 
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <Button
-                    variant="primary"
                     size="sm"
-                    loading={showUpdateCard && isUpdating}
-                    loadingText="更新中..."
-                    icon={showUpdateCard
-                      ? <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                      : <Download className="h-4 w-4" aria-hidden="true" />}
+                    disabled={showInstallCard && isIos || (showUpdateCard && isUpdating)}
+                    aria-busy={showUpdateCard && isUpdating || undefined}
                     onClick={showUpdateCard ? handleUpdate : handleInstall}
-                    disabled={showInstallCard && isIos}
                     className={showInstallCard && isIos ? 'hidden' : ''}
                   >
-                    {showUpdateCard ? '立即更新' : '安装'}
+                    {showUpdateCard && isUpdating
+                      ? <><LoaderCircle className="animate-spin" aria-hidden="true" />更新中...</>
+                      : (
+                        <>
+                          {showUpdateCard
+                            ? <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                            : <Download className="h-4 w-4" aria-hidden="true" />}
+                          {showUpdateCard ? '立即更新' : '安装'}
+                        </>
+                      )}
                   </Button>
                   <Button
                     variant="secondary"
@@ -310,16 +314,17 @@ export default function PWAInstallPrompt() {
           transition={{ duration: shouldReduceMotion ? 0.08 : 0.18, ease: 'easeOut' }}
           className="pwa-install-entry fixed z-50"
         >
-          <IconButton
+          <Button
+            size="icon"
             variant="secondary"
-            size="md"
-            icon={<SquarePlus className="h-5 w-5" aria-hidden="true" />}
             onClick={() => setIsInstallExpanded(true)}
             className="pwa-install-entry-button"
             title="安装 La Pluma Next"
             aria-label="安装 La Pluma Next"
             aria-expanded="false"
-          />
+          >
+            <SquarePlus className="h-5 w-5" aria-hidden="true" />
+          </Button>
         </motion.div>
       )}
 
@@ -334,9 +339,9 @@ export default function PWAInstallPrompt() {
             <Button
               variant="secondary"
               size="sm"
-              icon={<RefreshCw className="h-4 w-4 brand-text" aria-hidden="true" />}
               onClick={() => setIsUpdateCollapsed(false)}
             >
+              <RefreshCw className="h-4 w-4 brand-text" aria-hidden="true" />
               应用更新
             </Button>
           </motion.div>

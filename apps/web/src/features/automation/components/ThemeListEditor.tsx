@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react'
-import { Button, IconButton, Input } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { Input } from '@/shared/components'
 
 interface ThemeListEditorProps {
   themes: string[]
@@ -16,10 +17,15 @@ export default function ThemeListEditor({ themes, disabled, onChange }: ThemeLis
       {themes.map((theme, index) => (
         <div className="flex min-w-0 items-center gap-2" key={index}>
           <Input className="min-w-0 flex-1" aria-label={`主题 ${index + 1}`} value={theme} placeholder="游戏内主题名" disabled={disabled} onChange={value => onChange(themes.map((current, currentIndex) => currentIndex === index ? value : current))} />
-          <IconButton icon={<Trash2 size={16} />} title={`删除主题 ${index + 1}`} disabled={disabled} onClick={() => onChange(themes.filter((_, current) => current !== index))} />
+          <Button size="icon" variant="ghost" title={`删除主题 ${index + 1}`} aria-label={`删除主题 ${index + 1}`} disabled={disabled} onClick={() => onChange(themes.filter((_, current) => current !== index))}>
+            <Trash2 size={16} aria-hidden="true" />
+          </Button>
         </div>
       ))}
-      <Button variant="secondary" icon={<Plus size={16} />} disabled={disabled} onClick={() => onChange([...themes, ''])}>添加主题</Button>
+      <Button variant="secondary" disabled={disabled} onClick={() => onChange([...themes, ''])}>
+        <Plus size={16} aria-hidden="true" />
+        添加主题
+      </Button>
     </fieldset>
   )
 }

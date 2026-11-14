@@ -1,5 +1,5 @@
-import { ChevronRight, Play, Square } from 'lucide-react'
-import { Button } from '@/shared/components'
+import { ChevronRight, LoaderCircle, Play, Square } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
 import type { CombatTask } from '../types'
 
 export interface CombatRunActionProps {
@@ -36,26 +36,29 @@ export function CombatRunAction({
         <Button
           onClick={onStartNext}
           disabled={!automationAvailable || isContinuing || isStopping}
-          loading={isContinuing}
-          loadingText="正在开始"
+          aria-busy={isContinuing || undefined}
           title={!automationAvailable ? unavailableMessage : undefined}
-          variant="primary"
-          size="md"
-          icon={<ChevronRight size={16} aria-hidden="true" />}
           className={buttonClassName}
         >
-          开始下一关
+          {isContinuing
+            ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在开始</>
+            : (
+              <>
+                <ChevronRight size={16} aria-hidden="true" />
+                开始下一关
+              </>
+            )}
         </Button>
         <Button
           onClick={onStop}
           disabled={isStopping}
-          loading={isStopping}
-          loadingText="正在终止"
+          aria-busy={isStopping || undefined}
           variant="secondary"
-          size="md"
           className={buttonClassName}
         >
-          终止执行
+          {isStopping
+            ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在终止</>
+            : '终止执行'}
         </Button>
       </div>
     )
@@ -65,28 +68,35 @@ export function CombatRunAction({
     <Button
       onClick={onStop}
       disabled={isStopping}
-      loading={isStopping}
-      loadingText="正在终止"
-      variant="danger"
-      size="md"
-      icon={!isStopping ? <Square size={14} fill="currentColor" aria-hidden="true" /> : undefined}
+      aria-busy={isStopping || undefined}
+      variant="destructive"
       className={buttonClassName}
     >
-      终止执行
+      {isStopping
+        ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在终止</>
+        : (
+          <>
+            <Square size={14} fill="currentColor" aria-hidden="true" />
+            终止执行
+          </>
+        )}
     </Button>
   ) : (
     <Button
       onClick={onExecute}
-      disabled={!automationAvailable}
-      loading={isSubmitting}
-      loadingText="正在启动"
+      disabled={!automationAvailable || isSubmitting}
+      aria-busy={isSubmitting || undefined}
       title={!automationAvailable ? unavailableMessage : undefined}
-      variant="primary"
-      size="md"
-      icon={<Play size={15} fill="currentColor" aria-hidden="true" />}
       className={buttonClassName}
     >
-      立即执行
+      {isSubmitting
+        ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在启动</>
+        : (
+          <>
+            <Play size={15} fill="currentColor" aria-hidden="true" />
+            立即执行
+          </>
+        )}
     </Button>
   )
 }

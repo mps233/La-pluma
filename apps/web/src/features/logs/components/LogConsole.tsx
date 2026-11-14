@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 import { AlertCircle, ArrowDown, ArrowLeft, FileText, Search } from 'lucide-react'
-import { Button, Card, CardContent, CardHeader, Loading } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { Card, CardContent, CardHeader, Loading } from '@/shared/components'
 import { countAppendedRows, initialLogFollowState, reduceLogFollow } from '../model/logFollow'
 import { getLogIdentity, getLogSourceText, type LogView } from '../model/logModel'
 import type { LogEntry, LogFile } from '../types'
@@ -116,8 +117,8 @@ export default function LogConsole({
                 onClick={onBackToRealtime}
                 variant="outline"
                 size="sm"
-                icon={<ArrowLeft className="h-4 w-4" aria-hidden="true" />}
               >
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                 返回实时
               </Button>
             )}
@@ -223,12 +224,11 @@ export default function LogConsole({
             {followEligible && follow.paused && (
               <Button
                 type="button"
-                variant="primary"
                 size="sm"
                 className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 shadow-lg"
-                icon={<ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />}
                 onClick={resumeFollow}
               >
+                <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
                 {follow.pendingCount > 0 ? '有新日志' : '回到底部'}
               </Button>
             )}

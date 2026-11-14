@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { getOperatorAvatarUrl, useItemIconCacheVersion } from '@/features/game-data'
-import { Button } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
 import { OPERATOR_RENDER_BATCH_SIZE } from '../model/operatorRows'
 
 export interface OperatorPickerGridItem {
@@ -115,7 +115,6 @@ export default function OperatorPickerGrid({
           <Button
             onClick={onShowMore}
             variant="secondary"
-            size="md"
             className="min-w-36"
           >
             继续显示 {Math.min(OPERATOR_RENDER_BATCH_SIZE, hiddenCount)} 个

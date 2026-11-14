@@ -35,7 +35,6 @@ vi.mock('../hooks/useDashboardFlowLayout', () => ({
 vi.mock('./DashboardFlowPanel', () => ({ default: () => <div data-testid="flow-panel" /> }))
 
 vi.mock('@/shared/components', () => ({
-  Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props}>{children}</button>,
   SmoothPanel: ({
     children,
     className = '',

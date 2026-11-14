@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import { Activity, act } from 'react'
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ScrcpyDeviceView from './ScrcpyDeviceView'
@@ -31,34 +30,6 @@ const webrtcMock = vi.hoisted(() => ({
 
 vi.mock('../hooks/useScrcpyWebRTC', () => ({
   useScrcpyWebRTC: () => webrtcMock,
-}))
-
-interface MockButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  icon?: ReactNode
-  loading?: boolean
-  loadingText?: ReactNode
-  variant?: string
-  size?: string
-  fullWidth?: boolean
-  statusKey?: string | number
-}
-
-vi.mock('@/shared/components', () => ({
-  Button: ({
-    children,
-    icon: _icon,
-    loading = false,
-    loadingText,
-    variant: _variant,
-    size: _size,
-    fullWidth: _fullWidth,
-    statusKey: _statusKey,
-    ...props
-  }: MockButtonProps) => (
-    <button {...props} disabled={props.disabled || loading}>
-      {loading ? loadingText : children}
-    </button>
-  ),
 }))
 
 let container: HTMLDivElement

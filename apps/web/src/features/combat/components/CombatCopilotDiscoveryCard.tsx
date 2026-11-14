@@ -1,4 +1,5 @@
-import { Button } from '@/shared/components'
+import { LoaderCircle } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
 import type { CopilotSearchItem } from '../types'
 import type { CombatCopilotDiscoveryView } from './combatPanelTypes'
 import {
@@ -98,12 +99,14 @@ export default function CombatCopilotDiscoveryCard({
         <Button
           size="sm"
           variant="secondary"
-          loading={adding}
-          loadingText="加入中"
+          disabled={adding}
+          aria-busy={adding || undefined}
           aria-label={`加入队列: ${title}`}
           onClick={() => onAddToQueue(item.uri)}
         >
-          加入队列
+          {adding
+            ? <><LoaderCircle className="animate-spin" aria-hidden="true" />加入中</>
+            : '加入队列'}
         </Button>
       </div>
     </article>

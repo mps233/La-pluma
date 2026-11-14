@@ -8,7 +8,8 @@ import {
   type OperatorDetailed,
 } from '@/features/game-data'
 import { OperatorSelectModal, type OperatorPickerOption } from '@/features/training'
-import { Button, IconButton, Select } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { Select } from '@/shared/components'
 import {
   OPER_PROGRESS_ROLES,
   resolveOperProgressRole,
@@ -125,22 +126,27 @@ export default function OperProgressPlansEditor({ plans, disabled, onChange }: O
               <Button
                 variant="secondary"
                 size="sm"
-                icon={<UserRoundSearch size={15} strokeWidth={1.9} aria-hidden="true" />}
                 disabled={disabled}
                 onClick={() => setPickerPlanIndex(index)}
               >
+                <UserRoundSearch size={15} strokeWidth={1.9} aria-hidden="true" />
                 {plan.name ? '更换干员' : '选择干员'}
               </Button>
               {plan.name && (
-                <IconButton
-                  icon={<X size={16} />}
+                <Button
+                  size="icon"
+                  variant="ghost"
                   title={`清除培养计划 ${index + 1} 的干员`}
                   aria-label={`清除培养计划 ${index + 1} 的干员`}
                   disabled={disabled}
                   onClick={() => clearOperator(index)}
-                />
+                >
+                  <X size={16} aria-hidden="true" />
+                </Button>
               )}
-              <IconButton icon={<Trash2 size={16} />} title={`删除培养计划 ${index + 1}`} disabled={disabled} onClick={() => onChange(plans.filter((_, current) => current !== index))} />
+              <Button size="icon" variant="ghost" title={`删除培养计划 ${index + 1}`} aria-label={`删除培养计划 ${index + 1}`} disabled={disabled} onClick={() => onChange(plans.filter((_, current) => current !== index))}>
+                <Trash2 size={16} aria-hidden="true" />
+              </Button>
             </div>
             <div className="grid min-w-0 gap-3.5 @sm:grid-cols-2">
               <Select label="精英目标" aria-label={`培养计划 ${index + 1} 精英目标`} value={plan.elite ?? ''} options={eliteOptions} disabled={disabled} onChange={value => updatePlan(index, updateOperProgressTarget(plan, 'elite', value))} />
@@ -152,7 +158,10 @@ export default function OperProgressPlansEditor({ plans, disabled, onChange }: O
           </fieldset>
         )
       })}
-      <Button variant="secondary" icon={<Plus size={16} />} disabled={disabled} onClick={() => onChange([...plans, { role: 'Unknown', name: '' }])}>添加培养计划</Button>
+      <Button variant="secondary" disabled={disabled} onClick={() => onChange([...plans, { role: 'Unknown', name: '' }])}>
+        <Plus size={16} aria-hidden="true" />
+        添加培养计划
+      </Button>
       <p className="text-xs leading-5 text-muted-foreground">只处理明确选择的目标。专精可能先启动前置等级，实际结果以执行详情为准。</p>
       <OperatorSelectModal
         isOpen={pickerPlanIndex !== null}

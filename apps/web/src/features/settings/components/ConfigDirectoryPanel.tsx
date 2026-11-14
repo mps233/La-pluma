@@ -1,5 +1,6 @@
 import { FolderOpen, RefreshCw } from 'lucide-react'
-import { Button, Card, CardContent } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { Card, CardContent } from '@/shared/components'
 import { useStatusStore } from '@/features/runtime-status'
 import { useSettingsConfigDirectory } from '../hooks/useSettingsConfigDirectory'
 
@@ -44,8 +45,8 @@ export default function ConfigDirectoryPanel() {
                 variant="outline"
                 size="sm"
                 className="flex-1 sm:flex-none"
-                icon={<RefreshCw size={16} aria-hidden="true" />}
               >
+                <RefreshCw size={16} aria-hidden="true" />
                 重试
               </Button>
             )}
@@ -55,8 +56,8 @@ export default function ConfigDirectoryPanel() {
               size="sm"
               className="flex-1 sm:flex-none"
               disabled={configDirStatus !== 'ready' || !configDir}
-              icon={<FolderOpen size={16} aria-hidden="true" />}
             >
+              <FolderOpen size={16} aria-hidden="true" />
               打开目录
             </Button>
           </div>

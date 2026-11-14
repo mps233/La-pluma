@@ -137,10 +137,6 @@ vi.mock('@/shared/components', () => ({
       <div className={`smooth-panel-surface ${surfaceClassName}`}>{children}</div>
     </div>
   ),
-  Button: ({ children, icon: _icon, loading, loadingText, statusKey: _statusKey, variant: _variant, size: _size, className: _className, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { loading?: boolean; loadingText?: React.ReactNode; statusKey?: string; variant?: string; size?: string; icon?: React.ReactNode }) => (
-    <button {...props}>{loading ? loadingText : children}</button>
-  ),
-  IconButton: ({ icon: _icon, variant: _variant, size: _size, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: React.ReactNode; variant?: string; size?: string }) => <button {...props} />,
 }))
 
 const createExecutionController = (taskExecutionModule as unknown as {

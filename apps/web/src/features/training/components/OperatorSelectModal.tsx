@@ -6,7 +6,8 @@ import {
   operatorCatalogQueryOptions,
   type OperatorDetailed,
 } from '@/features/game-data'
-import { Button, EmptyState, Input, Loading, Select } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { EmptyState, Input, Loading, Select } from '@/shared/components'
 import { Modal } from '@/shared/components/Modal'
 import {
   OPERATOR_RENDER_BATCH_SIZE,
@@ -158,9 +159,8 @@ export default function OperatorSelectModal({
       level: operator.level,
       action: (
         <Button
-          variant={isSelected ? 'primary' : 'secondary'}
-          size="md"
-          fullWidth
+          variant={isSelected ? 'default' : 'secondary'}
+          className="w-full"
           aria-pressed={isSelected}
           aria-label={`${isSelected ? '已选择' : '选择'}${operator.name}`}
           onClick={() => setPendingSelection(operator)}

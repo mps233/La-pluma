@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bell, Save, Send } from 'lucide-react'
+import { Bell, LoaderCircle, Save, Send } from 'lucide-react'
 import type { ApiResponse } from '@/shared/api'
-import { Button, SmoothPanel, Switch } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { SmoothPanel, Switch } from '@/shared/components'
 import { saveNotificationConfig, testNotificationChannel } from '../api'
 import {
   cloneNotificationConfig,
@@ -247,13 +248,18 @@ export default function NotificationSettings() {
               <Button
                 size="sm"
                 variant="secondary"
-                icon={<Send size={14} />}
-                loading={testing}
-                loadingText="发送中"
                 onClick={() => void testNotification()}
                 disabled={loading || Boolean(loadError) || testing || !canTest}
+                aria-busy={testing || undefined}
               >
-                发送测试消息
+                {testing
+                  ? <><LoaderCircle className="animate-spin" aria-hidden="true" />发送中</>
+                  : (
+                    <>
+                      <Send size={14} aria-hidden="true" />
+                      发送测试消息
+                    </>
+                  )}
               </Button>
               {config.enabled && testBlockedReason && (
                 <small className="automation-notification-hint">{testBlockedReason}</small>
@@ -289,14 +295,18 @@ export default function NotificationSettings() {
             </span>
             <Button
               size="sm"
-              variant="primary"
-              icon={<Save size={14} />}
-              loading={saving}
-              loadingText="保存中"
               onClick={() => void saveConfig()}
               disabled={!dirty || loading || saving}
+              aria-busy={saving || undefined}
             >
-              保存
+              {saving
+                ? <><LoaderCircle className="animate-spin" aria-hidden="true" />保存中</>
+                : (
+                  <>
+                    <Save size={14} aria-hidden="true" />
+                    保存
+                  </>
+                )}
             </Button>
           </div>
         </>

@@ -2,7 +2,8 @@
 // 在未恢复自动滚动前不开放该路径。
 
 import { AlertCircle, ChevronRight, FileText, Trash2 } from 'lucide-react'
-import { Button, Card, CardContent, CardHeader } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { Card, CardContent, CardHeader } from '@/shared/components'
 import type { LogFile } from '../types'
 
 interface HistoryLogPickerProps {
@@ -35,9 +36,9 @@ export default function HistoryLogPicker({
               onClick={onCleanup}
               variant="outline"
               size="sm"
-              icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
               disabled={cleanupDisabled}
             >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
               清理旧日志
             </Button>
           </div>

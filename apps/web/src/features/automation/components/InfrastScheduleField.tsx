@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { FileJson } from 'lucide-react'
-import { Button } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
 import { normalizeInfrastPlanIndex } from '../model/infrastScheduleEditing'
 import InfrastScheduleEditor from './InfrastScheduleEditor'
 
@@ -41,10 +41,10 @@ export default function InfrastScheduleField({
           <Button
             variant="secondary"
             size="sm"
-            icon={<FileJson size={15} />}
             disabled={disabled}
             onClick={() => setIsOpen(true)}
           >
+            <FileJson size={15} aria-hidden="true" />
             编辑排班
           </Button>
         </div>

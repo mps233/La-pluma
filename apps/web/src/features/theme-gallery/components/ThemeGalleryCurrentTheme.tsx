@@ -2,7 +2,8 @@ import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
 import type { ThemeMode } from '@/shared/theme/bootTheme'
 import { DEFAULT_THEME_ID } from '@/shared/theme/registry'
 import { useTheme } from '@/shared/theme/useTheme'
-import { Button, Card, CardContent, CardHeader } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { Card, CardContent, CardHeader } from '@/shared/components'
 
 const modeOptions: Array<{ value: ThemeMode; label: string; icon: LucideIcon }> = [
   { value: 'light', label: '亮色', icon: Sun },
@@ -47,12 +48,12 @@ export function ThemeGalleryCurrentTheme() {
             return (
               <Button
                 key={option.value}
-                variant={selected ? 'primary' : 'secondary'}
+                variant={selected ? 'default' : 'secondary'}
                 size="sm"
-                icon={<ModeIcon size={15} />}
                 aria-pressed={selected}
                 onClick={() => setMode(option.value)}
               >
+                <ModeIcon size={15} aria-hidden="true" />
                 {option.label}
               </Button>
             )

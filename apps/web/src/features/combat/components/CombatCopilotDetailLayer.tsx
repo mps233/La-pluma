@@ -7,7 +7,8 @@ import {
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { IconButton, useModalLayer } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { useModalLayer } from '@/shared/components'
 import { Modal } from '@/shared/components/Modal'
 import type { CopilotDetailTarget } from '../model/copilotDetail'
 import { COPILOT_DETAIL_LAYER_ID } from './combatPanelTypes'
@@ -176,14 +177,15 @@ export default function CombatCopilotDetailLayer({
       >
         <header className="combat-copilot-detail-head">
           <h2 id={titleId} className="combat-copilot-detail-title">{title}</h2>
-          <IconButton
-            icon={<X className="h-4 w-4" aria-hidden="true" />}
+          <Button
+            size="icon"
             variant="ghost"
-            size="sm"
             onClick={onClose}
             title="关闭详情"
             aria-label="关闭详情"
-          />
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </Button>
         </header>
         <div className="combat-copilot-detail-scroll">
           {target ? <DetailBody target={target}>{children}</DetailBody> : <DetailPlaceholder />}

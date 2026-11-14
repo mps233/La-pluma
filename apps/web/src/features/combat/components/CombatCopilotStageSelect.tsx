@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type UIEvent } from 'react'
 import { Search } from 'lucide-react'
-import { Button, Input } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { Input } from '@/shared/components'
 import type { CopilotStageCandidate } from '../types'
 import {
   COPILOT_DISCOVERY_STAGE_PAGE_SIZE,
@@ -94,7 +95,6 @@ export default function CombatCopilotStageSelect({
     <div className="combat-copilot-discovery-stage" ref={containerRef}>
       <Button
         variant="secondary"
-        size="md"
         className="combat-copilot-discovery-stage-trigger"
         aria-expanded={open}
         aria-label={selectedOption ? `关卡筛选：${selectedOption.code}` : '关卡筛选'}

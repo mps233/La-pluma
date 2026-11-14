@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { AlertCircle, X } from 'lucide-react'
+import { AlertCircle, LoaderCircle, X } from 'lucide-react'
 import {
   useEffect,
   useId,
@@ -10,7 +10,7 @@ import {
   type UIEvent,
 } from 'react'
 import { createPortal } from 'react-dom'
-import Button, { IconButton } from './LegacyButton'
+import { Button } from '@/shared/ui/button'
 import {
   isTopModal,
   lockBackground,
@@ -225,15 +225,16 @@ function ModalLayer({
                 ? <h2 id={titleId} className="min-w-0 text-base font-semibold text-foreground sm:text-lg">{title}</h2>
                 : <span />}
               {showClose && (
-                <IconButton
-                  icon={<X className="h-4 w-4" aria-hidden="true" />}
-                  size="sm"
+                <Button
+                  size="icon"
                   variant="ghost"
                   onClick={onClose}
                   disabled={!dismissible}
                   title="关闭对话框"
                   aria-label="关闭对话框"
-                />
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </Button>
               )}
             </div>
           )}
@@ -280,6 +281,12 @@ export function Modal({ isOpen, ...props }: ModalProps) {
 function getConfirmErrorMessage(error: unknown) {
   return error instanceof Error && error.message ? error.message : '操作失败，请重试'
 }
+
+const confirmVariants = {
+  danger: 'destructive',
+  primary: 'default',
+  success: 'default',
+} as const
 
 export function ConfirmDialog({
   isOpen,
@@ -337,12 +344,14 @@ export function ConfirmDialog({
             {cancelText}
           </Button>
           <Button
-            variant={variant}
+            variant={confirmVariants[variant]}
             onClick={() => void handleConfirm()}
-            loading={isPending}
-            loadingText="处理中..."
+            disabled={isPending}
+            aria-busy={isPending || undefined}
           >
-            {confirmText}
+            {isPending
+              ? <><LoaderCircle className="animate-spin" aria-hidden="true" />处理中...</>
+              : confirmText}
           </Button>
         </>
       }

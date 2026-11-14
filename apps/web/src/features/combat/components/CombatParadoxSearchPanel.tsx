@@ -1,4 +1,5 @@
-import { Button } from '@/shared/components'
+import { LoaderCircle } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
 import { usePanelState } from '../hooks/usePanelState'
 import type { PanelStateStore } from '../model/panelState'
 import type { ParadoxSearchResult } from '../types'
@@ -59,12 +60,13 @@ export default function CombatParadoxSearchPanel({
         <Button
           onClick={() => onSearch(name)}
           disabled={searching || !name.trim()}
-          loading={searching}
+          aria-busy={searching || undefined}
           variant="secondary"
-          size="md"
           className="shrink-0 px-3"
         >
-          {!searching && '搜索'}
+          {searching
+            ? <><LoaderCircle className="animate-spin" aria-hidden="true" />加载中...</>
+            : '搜索'}
         </Button>
       </div>
 

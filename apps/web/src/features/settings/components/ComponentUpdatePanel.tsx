@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Download, RefreshCw } from 'lucide-react'
-import { Button, Select } from '@/shared/components'
+import { Download, LoaderCircle, RefreshCw } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
+import { Select } from '@/shared/components'
 import { useStatusStore } from '@/features/runtime-status'
 import { saveUpdateChannel } from '../api'
 import { resolveCoreChannel } from '../model/updateCommandPolicy'
@@ -120,14 +121,18 @@ export default function ComponentUpdatePanel() {
           <div className="mt-auto grid gap-2 pt-4 sm:grid-cols-2">
             <Button
               onClick={handleUpdateCore}
-              disabled={updateBusy || channelSavingBusy}
-              loading={updatingCore}
-              loadingText="更新中"
-              variant="primary"
+              disabled={updateBusy || channelSavingBusy || updatingCore}
+              aria-busy={updatingCore || undefined}
               className="w-full"
-              icon={<Download size={16} aria-hidden="true" />}
             >
-              更新 MaaCore
+              {updatingCore
+                ? <><LoaderCircle className="animate-spin" aria-hidden="true" />更新中</>
+                : (
+                  <>
+                    <Download size={16} aria-hidden="true" />
+                    更新 MaaCore
+                  </>
+                )}
             </Button>
             <Button
               type="button"
@@ -135,20 +140,25 @@ export default function ComponentUpdatePanel() {
               disabled={updateBusy || channelSavingBusy}
               variant="secondary"
               className="w-full"
-              icon={<RefreshCw size={16} aria-hidden="true" />}
             >
+              <RefreshCw size={16} aria-hidden="true" />
               {installedCoreChannel === 'beta' ? '切换正式版' : '切换测试版'}
             </Button>
             <Button
               onClick={handleHotUpdate}
-              disabled={updateBusy || channelSavingBusy}
-              loading={hotUpdating}
-              loadingText="同步中"
+              disabled={updateBusy || channelSavingBusy || hotUpdating}
+              aria-busy={hotUpdating || undefined}
               variant="outline"
               className="w-full sm:col-span-2"
-              icon={<RefreshCw size={16} aria-hidden="true" />}
             >
-              仅同步游戏资源
+              {hotUpdating
+                ? <><LoaderCircle className="animate-spin" aria-hidden="true" />同步中</>
+                : (
+                  <>
+                    <RefreshCw size={16} aria-hidden="true" />
+                    仅同步游戏资源
+                  </>
+                )}
             </Button>
           </div>
         </section>
@@ -170,14 +180,18 @@ export default function ComponentUpdatePanel() {
           <div className="mt-auto pt-4">
             <Button
               onClick={handleUpdateCli}
-              disabled={updateBusy || channelSavingBusy}
-              loading={updatingCli}
-              loadingText="更新中"
-              variant="primary"
-              fullWidth
-              icon={<Download size={16} aria-hidden="true" />}
+              disabled={updateBusy || channelSavingBusy || updatingCli}
+              aria-busy={updatingCli || undefined}
+              className="w-full"
             >
-              更新 MAA CLI
+              {updatingCli
+                ? <><LoaderCircle className="animate-spin" aria-hidden="true" />更新中</>
+                : (
+                  <>
+                    <Download size={16} aria-hidden="true" />
+                    更新 MAA CLI
+                  </>
+                )}
             </Button>
           </div>
         </section>
@@ -189,12 +203,13 @@ export default function ComponentUpdatePanel() {
             type="button"
             onClick={handleCancelUpdate}
             disabled={updateCanceling}
-            loading={updateCanceling}
-            loadingText="停止中"
+            aria-busy={updateCanceling || undefined}
             variant="outline"
-            fullWidth
+            className="w-full"
           >
-            停止更新
+            {updateCanceling
+              ? <><LoaderCircle className="animate-spin" aria-hidden="true" />停止中</>
+              : '停止更新'}
           </Button>
         </div>
       )}
@@ -211,8 +226,8 @@ export default function ComponentUpdatePanel() {
                 variant="ghost"
                 size="sm"
                 className="min-h-11! lg:min-h-0!"
-                icon={<RefreshCw size={16} aria-hidden="true" />}
               >
+                <RefreshCw size={16} aria-hidden="true" />
                 重试资源同步
               </Button>
             )}

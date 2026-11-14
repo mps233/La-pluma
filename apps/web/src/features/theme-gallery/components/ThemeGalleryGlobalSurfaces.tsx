@@ -1,19 +1,41 @@
 import { useState } from 'react'
-import { RefreshCw, Save, Trash2 } from 'lucide-react'
+import { Download, FileText, LoaderCircle, Plus, RefreshCw, Save, Square, Trash2, type LucideIcon } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
 import Icons from '@/shared/components/Icons'
 import {
-  Button,
   Card,
   CardContent,
   CardHeader,
   EmptyState,
-  IconButton,
   Input,
   Loading,
   PageSkeleton,
   SmoothPanel,
   Switch,
 } from '@/shared/components'
+
+const buttonVariants: Array<{ variant: 'default' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'link', label: string, icon: LucideIcon }> = [
+  { variant: 'default', label: '保存草稿', icon: Save },
+  { variant: 'secondary', label: '查看日志', icon: RefreshCw },
+  { variant: 'outline', label: '导出数据', icon: Download },
+  { variant: 'ghost', label: '忽略', icon: Square },
+  { variant: 'destructive', label: '停止执行', icon: Trash2 },
+  { variant: 'link', label: '查看文档', icon: FileText },
+]
+
+const buttonSizes: Array<{ size: 'xs' | 'sm' | 'default' | 'lg', label: string }> = [
+  { size: 'xs', label: '超小' },
+  { size: 'sm', label: '小尺寸' },
+  { size: 'default', label: '中尺寸' },
+  { size: 'lg', label: '大尺寸' },
+]
+
+const iconButtonSizes: Array<{ size: 'icon-xs' | 'icon-sm' | 'icon' | 'icon-lg', label: string }> = [
+  { size: 'icon-xs', label: '图标 超小' },
+  { size: 'icon-sm', label: '图标 小尺寸' },
+  { size: 'icon', label: '图标 中尺寸' },
+  { size: 'icon-lg', label: '图标 大尺寸' },
+]
 
 export function ThemeGalleryGlobalSurfaces() {
   const [address, setAddress] = useState('')
@@ -84,23 +106,53 @@ export function ThemeGalleryGlobalSurfaces() {
       </Card>
 
       <Card>
-        <CardHeader title="操作与输入" />
+        <CardHeader title="按钮变体" />
         <CardContent className="app-stack-card">
           <div className="flex flex-wrap items-center gap-3.5">
-            <Button icon={<Save size={15} />}>保存草稿</Button>
-            <Button variant="secondary">查看日志</Button>
-            <Button variant="danger">停止执行</Button>
-            <Button variant="success">重试</Button>
-            <Button variant="ghost">忽略</Button>
+            {buttonVariants.map(({ variant, label, icon }) => {
+              const VariantIcon = icon
+              return (
+                <Button key={variant} variant={variant}>
+                  <VariantIcon size={16} aria-hidden="true" />
+                  {label}
+                </Button>
+              )
+            })}
           </div>
           <div className="flex flex-wrap items-center gap-3.5">
-            <Button variant="secondary" size="sm">小尺寸</Button>
-            <Button variant="secondary">中尺寸</Button>
-            <Button variant="secondary" size="lg">大尺寸</Button>
-            <Button variant="secondary" loading loadingText="执行中">开始执行</Button>
+            {buttonVariants.map(({ variant, label }) => (
+              <Button key={variant} variant={variant}>{label}</Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader title="按钮状态与尺寸" />
+        <CardContent className="app-stack-card">
+          <div className="flex flex-wrap items-center gap-3.5">
+            {buttonSizes.map(({ size, label }) => (
+              <Button key={size} variant="secondary" size={size}>{label}</Button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-3.5">
+            <Button><LoaderCircle className="animate-spin" aria-hidden="true" />执行中</Button>
+            <Button variant="secondary" disabled><LoaderCircle className="animate-spin" aria-hidden="true" />同步中</Button>
             <Button variant="ghost" disabled>不可用</Button>
-            <IconButton icon={<RefreshCw size={16} />} title="刷新" />
-            <IconButton variant="danger" icon={<Trash2 size={16} />} title="删除" />
+            <Button variant="destructive" disabled>已停止</Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-3.5">
+            {iconButtonSizes.map(({ size, label }) => (
+              <Button key={size} size={size} variant="secondary" title={label} aria-label={label}>
+                <Plus aria-hidden="true" />
+              </Button>
+            ))}
+            <Button size="icon" variant="ghost" title="刷新" aria-label="刷新">
+              <RefreshCw size={16} aria-hidden="true" />
+            </Button>
+            <Button size="icon" variant="destructive" title="删除" aria-label="删除">
+              <Trash2 size={16} aria-hidden="true" />
+            </Button>
           </div>
           <div className="grid gap-3.5 md:grid-cols-2">
             <Input

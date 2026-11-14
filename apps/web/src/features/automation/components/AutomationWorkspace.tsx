@@ -7,12 +7,14 @@ import {
   CheckCircle2,
   ChevronDown,
   Info,
+  LoaderCircle,
   Minus,
   Plus,
   SlidersHorizontal,
 } from 'lucide-react'
 import { DeviceMonitorPanel } from '@/features/device-mirror'
-import { Button, EmptyState, HintTooltip, SmoothPanel, Switch } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { EmptyState, HintTooltip, SmoothPanel, Switch } from '@/shared/components'
 import { useAutomationAvailability, useStatusStore } from '@/features/runtime-status'
 import { useUserConfig } from '@/features/user-config'
 import { useResourceInvalidation, type ResourceInvalidation } from '@/features/resource-invalidation'
@@ -379,12 +381,14 @@ export default function AutomationWorkspace() {
             type="button"
             variant="ghost"
             size="sm"
-            loading={isRetryingConfigSave}
-            loadingText="同步中"
             onClick={() => void handleRetryConfigSave()}
+            disabled={isRetryingConfigSave}
+            aria-busy={isRetryingConfigSave || undefined}
             className="min-h-11 shrink-0"
           >
-            重新同步
+            {isRetryingConfigSave
+              ? <><LoaderCircle className="animate-spin" aria-hidden="true" />同步中</>
+              : '重新同步'}
           </Button>
         </div>
       )}
@@ -1064,23 +1068,25 @@ export default function AutomationWorkspace() {
                       <div className="mt-4 pt-4 border-t border-gray-200 dark:border-white/10">
                         <Button
                           type="button"
-                          fullWidth
-                          size="md"
                           variant="secondary"
                           onClick={() => void testConnection(task.id)}
-                          disabled={isRunning || !task.enabled || testingConnectionTaskId !== null}
-                          loading={isTestingConnection}
-                          loadingText="正在检查"
-                          statusKey={isTestingConnection ? 'testing' : connectionFeedback?.success ? 'success' : connectionFeedback ? 'error' : 'idle'}
-                          icon={connectionFeedback?.success
-                            ? <CheckCircle2 size={16} strokeWidth={2.2} aria-hidden="true" />
-                            : connectionFeedback
-                              ? <AlertTriangle size={16} strokeWidth={2.2} aria-hidden="true" />
-                              : <Cable size={16} strokeWidth={2.1} aria-hidden="true" />}
-                          aria-busy={isTestingConnection}
-                          className={`automation-test-connection${isTestingConnection ? ' is-testing' : ''}`}
+                          disabled={isRunning || !task.enabled || testingConnectionTaskId !== null || isTestingConnection}
+                          data-status-key={isTestingConnection ? 'testing' : connectionFeedback?.success ? 'success' : connectionFeedback ? 'error' : 'idle'}
+                          aria-busy={isTestingConnection || undefined}
+                          className={`automation-test-connection w-full${isTestingConnection ? ' is-testing' : ''}`}
                         >
-                          {connectionFeedback ? '重新测试' : '测试连接'}
+                          {isTestingConnection
+                            ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在检查</>
+                            : (
+                              <>
+                                {connectionFeedback?.success
+                                  ? <CheckCircle2 size={16} strokeWidth={2.2} aria-hidden="true" />
+                                  : connectionFeedback
+                                    ? <AlertTriangle size={16} strokeWidth={2.2} aria-hidden="true" />
+                                    : <Cable size={16} strokeWidth={2.1} aria-hidden="true" />}
+                                {connectionFeedback ? '重新测试' : '测试连接'}
+                              </>
+                            )}
                         </Button>
 
                         <AnimatePresence initial={false}>

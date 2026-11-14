@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Clock3, Plus, X } from 'lucide-react'
-import { IconButton, SmoothPanel, Switch } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { SmoothPanel, Switch } from '@/shared/components'
 import {
   MAX_SCHEDULE_ENTRIES,
   appendScheduleEntry,
@@ -195,16 +196,17 @@ export default function AutomationScheduleCard({
                     className="automation-schedule-row-switch"
                   />
                   {entries.length > 1 ? (
-                    <IconButton
-                      icon={<X size={16} strokeWidth={2.2} aria-hidden="true" />}
+                    <Button
+                      size="icon"
                       variant="ghost"
-                      size="md"
                       onClick={() => removeScheduleTime(index)}
                       disabled={disabled}
                       className="automation-schedule-row-remove"
                       aria-label={`删除 ${entry.time}`}
                       title="删除时间"
-                    />
+                    >
+                      <X size={16} strokeWidth={2.2} aria-hidden="true" />
+                    </Button>
                   ) : <span className="automation-schedule-row-remove-placeholder" aria-hidden="true" />}
                 </div>
               ))}

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, Save } from 'lucide-react'
+import { AlertCircle, LoaderCircle, Save } from 'lucide-react'
 import { getErrorMessage, isRecord } from '@/shared/api'
-import { Button, Input, Select } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { Input, Select } from '@/shared/components'
 import { Modal } from '@/shared/components/Modal'
 import { saveInfrastSchedule } from '../api'
 import {
@@ -157,8 +158,10 @@ export default function InfrastScheduleEditor({
           </span>
           <div className="flex items-center gap-2">
             <Button variant="secondary" disabled={saving} onClick={onClose}>取消</Button>
-            <Button icon={<Save size={15} />} loading={saving} loadingText="保存中..." disabled={!document} onClick={() => void save()}>
-              保存
+            <Button disabled={!document || saving} aria-busy={saving || undefined} onClick={() => void save()}>
+              {saving
+                ? <><LoaderCircle className="animate-spin" aria-hidden="true" />保存中...</>
+                : <><Save size={15} aria-hidden="true" />保存</>}
             </Button>
           </div>
         </div>

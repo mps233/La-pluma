@@ -1,6 +1,7 @@
 import { useRef, type KeyboardEvent } from 'react'
-import { LayoutGrid, List, Power, Search, X } from 'lucide-react'
-import { Button, IconButton, Input, Select } from '@/shared/components'
+import { LayoutGrid, List, LoaderCircle, Power, Search, X } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
+import { Input, Select } from '@/shared/components'
 import {
   COPILOT_SEARCH_ORDERS,
   COPILOT_SEARCH_ORDER_LABELS,
@@ -97,25 +98,27 @@ export default function CombatCopilotSearchBar({
             icon={<Search size={17} strokeWidth={1.9} aria-hidden="true" />}
           />
           {keyword !== '' && (
-            <IconButton
-              icon={<X size={15} aria-hidden="true" />}
+            <Button
+              size="icon"
+              variant="ghost"
               title="清除搜索关键词"
               aria-label="清除搜索关键词"
-              size="sm"
               onClick={handleClearKeyword}
               className="combat-copilot-discovery-clear"
-            />
+            >
+              <X size={15} aria-hidden="true" />
+            </Button>
           )}
         </div>
         <Button
-          variant="primary"
-          size="md"
           className="combat-copilot-discovery-submit"
-          loading={searching}
-          loadingText="搜索中"
+          disabled={searching}
+          aria-busy={searching || undefined}
           onClick={onSubmit}
         >
-          搜索
+          {searching
+            ? <><LoaderCircle className="animate-spin" aria-hidden="true" />搜索中</>
+            : '搜索'}
         </Button>
       </div>
 
@@ -132,28 +135,27 @@ export default function CombatCopilotSearchBar({
         <div className={`combat-copilot-discovery-operator-control${operatorFilterEnabled ? '' : ' is-disabled'}`}>
           <Button
             variant="secondary"
-            size="md"
             className="combat-copilot-discovery-operator-trigger"
             aria-haspopup="dialog"
             onClick={onOpenOperatorFilter}
           >
             干员{operatorCount > 0 ? ` ${operatorCount}` : ''}
           </Button>
-          <IconButton
-            icon={<Power className="h-4 w-4" aria-hidden="true" />}
+          <Button
+            size="icon"
             variant="secondary"
-            size="md"
             className="combat-copilot-discovery-operator-toggle"
             aria-label={operatorFilterEnabled ? '停用干员筛选' : '启用干员筛选'}
             title={operatorFilterEnabled ? '停用干员筛选' : '启用干员筛选'}
             aria-pressed={operatorFilterEnabled}
             onClick={onToggleOperatorFilter}
-          />
+          >
+            <Power className="h-4 w-4" aria-hidden="true" />
+          </Button>
         </div>
 
         <Button
           variant="secondary"
-          size="md"
           className={`combat-copilot-discovery-toggle${matchEnabled ? ' is-active' : ''}`}
           aria-pressed={matchEnabled}
           aria-haspopup="dialog"
@@ -171,26 +173,28 @@ export default function CombatCopilotSearchBar({
         />
 
         <div className="combat-copilot-discovery-view-toggle" role="group" aria-label="结果视图">
-          <IconButton
-            icon={<LayoutGrid className="h-4 w-4" aria-hidden="true" />}
-            size="sm"
+          <Button
+            size="icon-sm"
             variant="ghost"
             className={`combat-copilot-discovery-view-button${view === 'grid' ? ' is-active' : ''}`}
             aria-label="网格视图"
             title="网格视图"
             aria-pressed={view === 'grid'}
             onClick={() => onViewChange('grid')}
-          />
-          <IconButton
-            icon={<List className="h-4 w-4" aria-hidden="true" />}
-            size="sm"
+          >
+            <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+          </Button>
+          <Button
+            size="icon-sm"
             variant="ghost"
             className={`combat-copilot-discovery-view-button${view === 'list' ? ' is-active' : ''}`}
             aria-label="列表视图"
             title="列表视图"
             aria-pressed={view === 'list'}
             onClick={() => onViewChange('list')}
-          />
+          >
+            <List className="h-4 w-4" aria-hidden="true" />
+          </Button>
         </div>
       </div>
     </section>

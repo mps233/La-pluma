@@ -1,4 +1,5 @@
-import { Button, Checkbox, Switch } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { Checkbox, Switch } from '@/shared/components'
 import { Modal } from '@/shared/components/Modal'
 import {
   COPILOT_MATCH_MODES,

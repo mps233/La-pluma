@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, Gauge, Home, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
-import { Button } from '@/shared/components'
+import { ArrowLeft, Gauge, Home, LoaderCircle, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
 import { usePreviewSession } from '../hooks/usePreviewSession'
 import { usePreviewSnapshot } from '../hooks/usePreviewSnapshot'
 import { usePreviewStore } from '../store/previewStore'
@@ -555,15 +555,20 @@ export default function ScrcpyDeviceView({
             <Button
               size="sm"
               variant="secondary"
-              fullWidth
-              className="scrcpy-preview-action"
-              icon={<RotateCw className="h-3.5 w-3.5" strokeWidth={1.8} />}
+              className="scrcpy-preview-action w-full"
               onClick={connectFromControl}
               disabled={!automationAvailable || infrastructureBusy}
               title={!automationAvailable ? automationUnavailableMessage : undefined}
-              loading={infrastructureLoading === 'preview'}
+              aria-busy={infrastructureLoading === 'preview' || undefined}
             >
-              重连预览
+              {infrastructureLoading === 'preview'
+                ? <><LoaderCircle className="animate-spin" aria-hidden="true" />加载中...</>
+                : (
+                  <>
+                    <RotateCw className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
+                    重连预览
+                  </>
+                )}
             </Button>
           )}
 

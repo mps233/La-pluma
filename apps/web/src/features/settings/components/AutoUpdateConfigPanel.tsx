@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { Clock3, Save } from 'lucide-react'
+import { Clock3, LoaderCircle, Save } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
 import {
-  Button,
   Checkbox,
   Input,
   Switch,
@@ -98,13 +98,18 @@ export default function AutoUpdateConfigPanel() {
           type="button"
           variant="outline"
           size="sm"
-          loading={autoUpdateSaving}
-          loadingText="保存中"
           disabled={!autoUpdateDirty || autoUpdateSaving}
+          aria-busy={autoUpdateSaving || undefined}
           onClick={handleSaveAutoUpdate}
-          icon={<Save size={16} aria-hidden="true" />}
         >
-          保存自动更新
+          {autoUpdateSaving
+            ? <><LoaderCircle className="animate-spin" aria-hidden="true" />保存中</>
+            : (
+              <>
+                <Save size={16} aria-hidden="true" />
+                保存自动更新
+              </>
+            )}
         </Button>
       </div>
     </section>

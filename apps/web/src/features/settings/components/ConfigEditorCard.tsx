@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
-import { RotateCcw, Save } from 'lucide-react'
-import { Button, Card, CardContent, CardHeader } from '@/shared/components'
+import { LoaderCircle, RotateCcw, Save } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
+import { Card, CardContent, CardHeader } from '@/shared/components'
 
 export interface SettingsFeedback {
   type: 'success' | 'error' | 'warning'
@@ -52,20 +53,24 @@ export default function ConfigEditorCard({
               disabled={saving || editingDisabled}
               variant="outline"
               size="sm"
-              icon={<RotateCcw size={16} aria-hidden="true" />}
             >
+              <RotateCcw size={16} aria-hidden="true" />
               重置
             </Button>
             <Button
               onClick={onSave}
-              loading={saving}
-              disabled={saveDisabled}
-              loadingText="保存中"
-              variant="primary"
+              disabled={saveDisabled || saving}
+              aria-busy={saving || undefined}
               size="sm"
-              icon={<Save size={16} aria-hidden="true" />}
             >
-              保存
+              {saving
+                ? <><LoaderCircle className="animate-spin" aria-hidden="true" />保存中</>
+                : (
+                  <>
+                    <Save size={16} aria-hidden="true" />
+                    保存
+                  </>
+                )}
             </Button>
           </div>
         )}

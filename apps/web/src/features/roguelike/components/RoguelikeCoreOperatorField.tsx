@@ -7,7 +7,7 @@ import {
   useItemIconCacheVersion,
 } from '@/features/game-data'
 import { OperatorSelectModal, type OperatorPickerOption } from '@/features/training'
-import { Button, IconButton } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
 
 export interface RoguelikeCoreOperatorFieldProps {
   id: string
@@ -67,18 +67,21 @@ export default function RoguelikeCoreOperatorField({
           type="button"
           variant="secondary"
           size="sm"
-          icon={<UserRoundSearch size={15} strokeWidth={1.9} aria-hidden="true" />}
           onClick={() => setIsOpen(true)}
         >
+          <UserRoundSearch size={15} strokeWidth={1.9} aria-hidden="true" />
           {operatorName === '' ? '选择干员' : '更换'}
         </Button>
         {operatorName !== '' && (
-          <IconButton
-            icon={<X size={16} aria-hidden="true" />}
+          <Button
+            size="icon"
+            variant="ghost"
             title="清除核心干员"
             aria-label="清除核心干员"
             onClick={() => onChange('')}
-          />
+          >
+            <X size={16} aria-hidden="true" />
+          </Button>
         )}
       </div>
       <OperatorSelectModal

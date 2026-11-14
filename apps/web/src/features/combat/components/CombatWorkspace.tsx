@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getErrorMessage } from '@/shared/api'
-import { Button, ConfirmDialog } from '@/shared/components'
+import { LoaderCircle } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
+import { ConfirmDialog } from '@/shared/components'
 import { useAutomationAvailability, useStatusStore } from '@/features/runtime-status'
 import { DeviceMonitorPanel } from '@/features/device-mirror'
 import { isTerminalRunState } from '@/features/task-execution'
@@ -1010,12 +1012,14 @@ export default function CombatWorkspace() {
             type="button"
             variant="ghost"
             size="sm"
-            loading={isRetryingConfigSave}
-            loadingText="同步中"
             onClick={() => void handleRetryConfigSave()}
+            disabled={isRetryingConfigSave}
+            aria-busy={isRetryingConfigSave || undefined}
             className="min-h-11 shrink-0"
           >
-            重新同步
+            {isRetryingConfigSave
+              ? <><LoaderCircle className="animate-spin" aria-hidden="true" />同步中</>
+              : '重新同步'}
           </Button>
         </div>
       )}

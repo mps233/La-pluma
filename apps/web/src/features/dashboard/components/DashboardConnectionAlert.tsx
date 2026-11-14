@@ -1,6 +1,6 @@
-import { ServerOff, WifiOff } from 'lucide-react'
-import { Button, SmoothPanel } from '@/shared/components'
-import Icons from '@/shared/components/Icons'
+import { RefreshCw, ServerOff, WifiOff } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
+import { SmoothPanel } from '@/shared/components'
 import { useDashboardServiceStatus } from '../hooks/useDashboardServiceStatus'
 
 interface DashboardConnectionAlertProps {
@@ -31,8 +31,8 @@ export default function DashboardConnectionAlert({ refreshDashboard }: Dashboard
           onClick={() => refreshDashboard()}
           variant="secondary"
           size="sm"
-          icon={<Icons.RefreshCw />}
         >
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
           重试连接
         </Button>
       )}

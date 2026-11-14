@@ -6,9 +6,10 @@ import {
   useItemIconCacheVersion,
 } from '@/features/game-data'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Package as PackageIcon, Play } from 'lucide-react'
+import { LoaderCircle, Package as PackageIcon, Play } from 'lucide-react'
 import Icons from '@/shared/components/Icons'
-import { Button, Card, EmptyState, Loading } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { Card, EmptyState, Loading } from '@/shared/components'
 import { getDepotTypeLabel, summarizeDepot } from '../model/depotSummary'
 import InlineDataError from './InlineDataError'
 import type { StatisticsCommands } from '../hooks/useStatisticsCommands'
@@ -74,14 +75,17 @@ export default function DepotPanel({ isActive, command }: DepotPanelProps) {
             <div className="data-statistics-task-actions shrink-0">
               <Button
                 onClick={() => command.startRecognition('depot')}
-                disabled={command.isRunning}
-                loading={isRecognizing}
-                loadingText="正在执行"
-                variant="primary"
-                size="md"
-                icon={<Play size={15} fill="currentColor" aria-hidden="true" />}
+                disabled={command.isRunning || isRecognizing}
+                aria-busy={isRecognizing || undefined}
               >
-                {command.actionLabel('depot')}
+                {isRecognizing
+                  ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在执行</>
+                  : (
+                    <>
+                      <Play size={15} fill="currentColor" aria-hidden="true" />
+                      {command.actionLabel('depot')}
+                    </>
+                  )}
               </Button>
             </div>
           </div>

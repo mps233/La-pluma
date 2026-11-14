@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Button } from '@/shared/components'
+import { LoaderCircle } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
 import { useAutomationAvailability, useStatusStore } from '@/features/runtime-status'
 import { DeviceMonitorPanel } from '@/features/device-mirror'
 import { useUserConfig } from '@/features/user-config'
@@ -117,12 +118,14 @@ export default function RoguelikeWorkspace() {
             type="button"
             variant="ghost"
             size="sm"
-            loading={isRetryingConfigSave}
-            loadingText="同步中"
             onClick={() => void handleRetryConfigSave()}
+            disabled={isRetryingConfigSave}
+            aria-busy={isRetryingConfigSave || undefined}
             className="min-h-11 shrink-0"
           >
-            重新同步
+            {isRetryingConfigSave
+              ? <><LoaderCircle className="animate-spin" aria-hidden="true" />同步中</>
+              : '重新同步'}
           </Button>
         </div>
       )}

@@ -1,4 +1,5 @@
-import { Button } from '@/shared/components'
+import { LoaderCircle } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
 import Icons from '@/shared/components/Icons'
 
 interface InlineDataErrorProps {
@@ -26,13 +27,19 @@ export default function InlineDataError({
       <Button
         variant="secondary"
         size="sm"
-        loading={isRetrying}
-        loadingText="正在重试..."
+        disabled={isRetrying}
+        aria-busy={isRetrying || undefined}
         onClick={onRetry}
         className="w-full sm:w-auto"
-        icon={<Icons.RefreshCw className="h-4 w-4" />}
       >
-        重新加载
+        {isRetrying
+          ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在重试...</>
+          : (
+            <>
+              <Icons.RefreshCw className="h-4 w-4" aria-hidden="true" />
+              重新加载
+            </>
+          )}
       </Button>
     </div>
   )

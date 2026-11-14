@@ -53,7 +53,6 @@ describe('ConfigEditorCard save gating', () => {
 
     const saveButton = findButton('保存')
     expect(saveButton.disabled).toBe(true)
-    expect(saveButton.getAttribute('aria-disabled')).toBe('true')
 
     const blocked = container.querySelector('[role="status"]')
     expect(blocked?.textContent).toBe('连接配置正在读取，加载完成后才能保存')

@@ -1,6 +1,7 @@
 import { Copy } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Button, Loading } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { Loading } from '@/shared/components'
 import { useStatusStore } from '@/features/runtime-status'
 import type { CopilotDetailOperator, CopilotDetailTarget } from '../model/copilotDetail'
 import { DetailField, DetailSection } from './CombatCopilotDetailSection'
@@ -99,8 +100,8 @@ export function DetailBody({ target, children }: { target: CopilotDetailTarget; 
                 variant="ghost"
                 size="sm"
                 className="min-h-11 shrink-0"
-                icon={<Copy size={14} aria-hidden="true" />}
               >
+                <Copy size={14} aria-hidden="true" />
                 复制链接
               </Button>
             </span>

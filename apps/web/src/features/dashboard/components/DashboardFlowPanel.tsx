@@ -1,5 +1,6 @@
-import { Activity, CalendarDays, Play } from 'lucide-react'
-import { Button, Card } from '@/shared/components'
+import { Activity, CalendarDays, LoaderCircle, Play } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
+import { Card } from '@/shared/components'
 import { useDashboardStore } from '../store/dashboardStore'
 import { useDashboardFlowActions } from '../hooks/useDashboardFlowActions'
 import { buildDashboardFlowView } from '../model/flowView'
@@ -82,15 +83,19 @@ export default function DashboardFlowPanel({ refreshDashboard, onMissingFlow }: 
         <div className="dashboard-flow-actions">
           <Button
             onClick={runTodayFlow}
-            variant="primary"
-            disabled={view.controlsDisabled}
-            loading={quickStartLoading}
-            loadingText="启动中"
-            statusKey={view.primaryActionStatusKey}
+            disabled={view.controlsDisabled || quickStartLoading}
+            aria-busy={quickStartLoading || undefined}
+            data-status-key={view.primaryActionStatusKey}
             className="dashboard-flow-primary-action dashboard-flow-shining-action justify-center whitespace-nowrap"
-            icon={<Play className="h-4 w-4" strokeWidth={2} />}
           >
-            {view.primaryActionLabel}
+            {quickStartLoading
+              ? <><LoaderCircle className="animate-spin" aria-hidden="true" />启动中</>
+              : (
+                <>
+                  <Play className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+                  {view.primaryActionLabel}
+                </>
+              )}
           </Button>
         </div>
       </div>
@@ -119,13 +124,15 @@ export default function DashboardFlowPanel({ refreshDashboard, onMissingFlow }: 
               <Button
                 size="sm"
                 variant="ghost"
-                loading={isRefreshing}
-                loadingText="刷新中"
+                disabled={isRefreshing}
+                aria-busy={isRefreshing || undefined}
                 onClick={() => {
                   void refreshDashboard()
                 }}
               >
-                重试
+                {isRefreshing
+                  ? <><LoaderCircle className="animate-spin" aria-hidden="true" />刷新中</>
+                  : '重试'}
               </Button>
             )}
           </div>

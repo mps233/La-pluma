@@ -1,5 +1,5 @@
-import { Cable, Search } from 'lucide-react'
-import { Button } from '@/shared/components'
+import { Cable, LoaderCircle, Search } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
 import { useSettingsDeviceConnection } from '../hooks/useSettingsDeviceConnection'
 import type { DiscoveredDevice } from '../model/deviceConnection'
 
@@ -57,27 +57,37 @@ export default function DeviceConnectionPanel({
             type="button"
             variant="secondary"
             size="sm"
-            loading={discoveringDevices}
-            loadingText="查找中"
-            disabled={disabled}
+            disabled={disabled || discoveringDevices}
+            aria-busy={discoveringDevices || undefined}
             onClick={() => void discoverDevices(adbPath)}
             className="flex-1 sm:flex-none"
-            icon={<Search size={16} aria-hidden="true" />}
           >
-            查找模拟器
+            {discoveringDevices
+              ? <><LoaderCircle className="animate-spin" aria-hidden="true" />查找中</>
+              : (
+                <>
+                  <Search size={16} aria-hidden="true" />
+                  查找模拟器
+                </>
+              )}
           </Button>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            loading={testingConnection}
-            loadingText="测试中"
-            disabled={disabled}
+            disabled={disabled || testingConnection}
+            aria-busy={testingConnection || undefined}
             onClick={() => void testConnection(adbPath, address)}
             className="flex-1 sm:flex-none"
-            icon={<Cable size={16} aria-hidden="true" />}
           >
-            测试连接
+            {testingConnection
+              ? <><LoaderCircle className="animate-spin" aria-hidden="true" />测试中</>
+              : (
+                <>
+                  <Cable size={16} aria-hidden="true" />
+                  测试连接
+                </>
+              )}
           </Button>
         </div>
       </div>

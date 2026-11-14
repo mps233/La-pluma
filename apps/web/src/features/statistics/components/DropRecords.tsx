@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Package as PackageIcon } from 'lucide-react'
+import { LoaderCircle, Package as PackageIcon } from 'lucide-react'
 import Icons from '@/shared/components/Icons'
 import { getItemIconUrl, useItemIconCacheVersion } from '@/features/game-data'
 import { DROP_ITEM_DISPLAY_LIMIT, sortDropItems, sortDropStages } from '../model/dropRecords'
 import type { DropRecordsProps } from '../types'
-import { Button, Card, EmptyState, Loading } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { Card, EmptyState, Loading } from '@/shared/components'
 
 interface DropRecordsViewProps extends DropRecordsProps {
   isLoading?: boolean
@@ -30,8 +31,8 @@ function DropRecordsError({ description, onRetry }: DropRecordsErrorProps) {
             size="sm"
             onClick={onRetry}
             className="w-full sm:w-auto"
-            icon={<Icons.RefreshCw className="h-4 w-4" />}
           >
+            <Icons.RefreshCw className="h-4 w-4" aria-hidden="true" />
             重新加载
           </Button>
         </div>
@@ -79,8 +80,8 @@ export default function DropRecords({
                 variant="secondary"
                 size="sm"
                 onClick={onRefresh}
-                icon={<Icons.RefreshCw className="h-4 w-4" />}
               >
+                <Icons.RefreshCw className="h-4 w-4" aria-hidden="true" />
                 重新加载
               </Button>
             )}
@@ -114,8 +115,8 @@ export default function DropRecords({
             size="sm"
             onClick={onRefresh}
             className="w-full sm:w-auto"
-            icon={<Icons.RefreshCw className="h-4 w-4" />}
           >
+            <Icons.RefreshCw className="h-4 w-4" aria-hidden="true" />
             重新加载
           </Button>
         </div>
@@ -164,13 +165,19 @@ export default function DropRecords({
         <Button
           variant="secondary"
           size="sm"
-          loading={isLoading}
-          loadingText="正在刷新..."
+          disabled={isLoading}
+          aria-busy={isLoading || undefined}
           onClick={onRefresh}
           className="w-full sm:w-auto"
-          icon={<Icons.RefreshCw className="h-4 w-4" />}
         >
-          刷新
+          {isLoading
+            ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在刷新...</>
+            : (
+              <>
+                <Icons.RefreshCw className="h-4 w-4" aria-hidden="true" />
+                刷新
+              </>
+            )}
         </Button>
       </div>
 

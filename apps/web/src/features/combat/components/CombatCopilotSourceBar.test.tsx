@@ -310,7 +310,7 @@ describe('CombatCopilotSourceBar', () => {
     expect(button).not.toBeNull()
     expect(button?.disabled).toBe(true)
     expect(button?.getAttribute('aria-busy')).toBe('true')
-    expect(button?.querySelector('svg')).toBeNull()
+    expect(button?.querySelector('svg')).not.toBeNull()
     expect(container.textContent).not.toContain('导入文件')
   })
 

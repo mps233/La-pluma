@@ -1,5 +1,6 @@
-import { Play, Square } from 'lucide-react'
-import { Button, Input, Select, SmoothPanel, Switch } from '@/shared/components'
+import { LoaderCircle, Play, Square } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
+import { Input, Select, SmoothPanel, Switch } from '@/shared/components'
 import type { StopMode } from '@/features/task-execution'
 import {
   getRoguelikeAdvancedOptions,
@@ -137,42 +138,50 @@ export default function RoguelikeSettingsPanel({
             <Button
               onClick={() => execution.onStop('now')}
               disabled={execution.isStopping || execution.pendingStopMode !== null}
-              loading={execution.pendingStopMode === 'now'
-                || (execution.isStopping && execution.pendingStopMode !== 'after-combat')}
-              loadingText="正在终止"
-              variant="danger"
-              size="md"
-              icon={!execution.isStopping ? <Square size={14} fill="currentColor" aria-hidden="true" /> : undefined}
+              aria-busy={execution.isStopping || undefined}
+              variant="destructive"
               className="roguelike-run-button min-h-11"
             >
-              立即终止
+              {execution.pendingStopMode === 'now' || (execution.isStopping && execution.pendingStopMode !== 'after-combat')
+                ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在终止</>
+                : (
+                  <>
+                    {execution.isStopping
+                      ? null
+                      : <Square size={14} fill="currentColor" aria-hidden="true" />}
+                    立即终止
+                  </>
+                )}
             </Button>
             <Button
               onClick={() => execution.onStop('after-combat')}
               disabled={execution.isWaitingForCombat || execution.isStopping || execution.pendingStopMode !== null}
-              loading={execution.isWaitingForCombat || execution.pendingStopMode === 'after-combat'}
-              loadingText="等待战斗结束"
+              aria-busy={execution.isWaitingForCombat || undefined}
               title={execution.isWaitingForCombat ? '最多等待 10 分钟' : undefined}
               variant="secondary"
-              size="md"
               className="roguelike-run-button min-h-11"
             >
-              等待战斗结束
+              {execution.isWaitingForCombat
+                ? <><LoaderCircle className="animate-spin" aria-hidden="true" />等待战斗结束</>
+                : '等待战斗结束'}
             </Button>
           </div>
         ) : (
           <Button
             onClick={execution.onExecute}
-            disabled={!execution.automationAvailable}
-            loading={execution.isSubmitting}
-            loadingText="正在启动"
+            disabled={!execution.automationAvailable || execution.isSubmitting}
+            aria-busy={execution.isSubmitting || undefined}
             title={!execution.automationAvailable ? execution.unavailableMessage : undefined}
-            variant="primary"
-            size="md"
-            icon={<Play size={15} fill="currentColor" aria-hidden="true" />}
             className="roguelike-run-button"
           >
-            立即执行
+            {execution.isSubmitting
+              ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在启动</>
+              : (
+                <>
+                  <Play size={15} fill="currentColor" aria-hidden="true" />
+                  立即执行
+                </>
+              )}
           </Button>
         )}
       </div>

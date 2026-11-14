@@ -1,5 +1,6 @@
-import { Check, ChevronDown, ChevronUp, ListChecks, RotateCcw, SkipForward, Trash2 } from 'lucide-react'
-import { Button, EmptyState, IconButton } from '@/shared/components'
+import { Check, ChevronDown, ChevronUp, ListChecks, LoaderCircle, RotateCcw, SkipForward, Trash2 } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
+import { EmptyState } from '@/shared/components'
 import { firstErrorLine } from '../model/copilotDetail'
 import type { CopilotQueueEntry } from '../model/copilotQueue'
 import { COPILOT_DETAIL_LAYER_ID, type CombatCopilotQueueProjection } from './combatPanelTypes'
@@ -91,23 +92,29 @@ export default function CombatCopilotQueuePanel({ queue, detailEntryId, onOpenDe
                     variant="secondary"
                     onClick={queue.onContinueQueue}
                     disabled={!queue.automationAvailable || queue.isContinuing}
-                    loading={queue.isContinuing}
-                    loadingText="正在开始"
+                    aria-busy={queue.isContinuing || undefined}
                     title={!queue.automationAvailable ? queue.unavailableMessage : undefined}
                   >
-                    开始下一项{nextModeLabel}
+                    {queue.isContinuing
+                      ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在开始</>
+                      : `开始下一项${nextModeLabel}`}
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={queue.onSkipEntry}
                     disabled={!queue.automationAvailable || queue.isSkipping}
-                    loading={queue.isSkipping}
-                    loadingText="正在跳过"
+                    aria-busy={queue.isSkipping || undefined}
                     title={!queue.automationAvailable ? queue.unavailableMessage : undefined}
-                    icon={<SkipForward size={14} aria-hidden="true" />}
                   >
-                    跳过此项
+                    {queue.isSkipping
+                      ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在跳过</>
+                      : (
+                        <>
+                          <SkipForward size={14} aria-hidden="true" />
+                          跳过此项
+                        </>
+                      )}
                   </Button>
                 </>
               )}
@@ -118,8 +125,8 @@ export default function CombatCopilotQueuePanel({ queue, detailEntryId, onOpenDe
                   onClick={queue.onRetryFailed}
                   disabled={locked || !queue.automationAvailable}
                   title={!queue.automationAvailable ? queue.unavailableMessage : undefined}
-                  icon={<RotateCcw size={14} aria-hidden="true" />}
                 >
+                  <RotateCcw size={14} aria-hidden="true" />
                   重试失败项
                 </Button>
               )}
@@ -181,28 +188,36 @@ export default function CombatCopilotQueuePanel({ queue, detailEntryId, onOpenDe
                   <span className="combat-copilot-mine-status">{state.label}</span>
 
                   <div className="combat-copilot-mine-actions">
-                    <IconButton
-                      icon={<ChevronUp size={16} aria-hidden="true" />}
+                    <Button
+                      size="icon"
+                      variant="ghost"
                       title={`上移第 ${index + 1} 项`}
                       aria-label={`上移第 ${index + 1} 项 ${title}`}
                       disabled={locked || index === 0}
                       onClick={() => queue.onMove(entry.id, 'up')}
-                    />
-                    <IconButton
-                      icon={<ChevronDown size={16} aria-hidden="true" />}
+                    >
+                      <ChevronUp size={16} aria-hidden="true" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
                       title={`下移第 ${index + 1} 项`}
                       aria-label={`下移第 ${index + 1} 项 ${title}`}
                       disabled={locked || index === entries.length - 1}
                       onClick={() => queue.onMove(entry.id, 'down')}
-                    />
-                    <IconButton
-                      icon={<Trash2 size={15} aria-hidden="true" />}
+                    >
+                      <ChevronDown size={16} aria-hidden="true" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
                       title={`删除第 ${index + 1} 项`}
                       aria-label={`删除第 ${index + 1} 项 ${title}`}
-                      variant="ghost"
                       disabled={locked}
                       onClick={() => queue.onRemove(entry.id)}
-                    />
+                    >
+                      <Trash2 size={15} aria-hidden="true" />
+                    </Button>
                   </div>
                 </div>
               )

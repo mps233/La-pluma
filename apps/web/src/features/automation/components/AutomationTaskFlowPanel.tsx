@@ -12,7 +12,8 @@ import {
   Square,
   Trash2,
 } from 'lucide-react'
-import { Button, EmptyState, SmoothPanel, Switch } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { EmptyState, SmoothPanel, Switch } from '@/shared/components'
 import AutomationTaskPicker from './AutomationTaskPicker'
 import AutomationExecutionSummary from './AutomationExecutionSummary'
 import {
@@ -181,27 +182,36 @@ export default function AutomationTaskFlowPanel({
               onClick={execution.onExecute}
               disabled={!execution.automationAvailable || execution.isRunning || execution.isSubmitting || enabledCount === 0}
               title={!execution.automationAvailable ? execution.unavailableMessage : undefined}
-              loading={execution.isRunning || execution.isSubmitting}
-              loadingText={execution.isRunning ? '执行中' : '正在启动'}
-              statusKey={execution.isRunning || execution.isSubmitting ? 'running' : 'ready'}
-              variant="primary"
+              aria-busy={execution.isRunning || execution.isSubmitting || undefined}
+              data-status-key={execution.isRunning || execution.isSubmitting ? 'running' : 'ready'}
               className={`automation-run-button w-full justify-center whitespace-nowrap${execution.isRunning ? ' is-running' : ''}`}
-              icon={<Play size={16} fill="currentColor" aria-hidden="true" />}
             >
-              立即执行
+              {execution.isRunning || execution.isSubmitting
+                ? <><LoaderCircle className="animate-spin" aria-hidden="true" />{execution.isRunning ? '执行中' : '正在启动'}</>
+                : (
+                  <>
+                    <Play size={16} fill="currentColor" aria-hidden="true" />
+                    立即执行
+                  </>
+                )}
             </Button>
             {execution.isRunning && (
               <Button
                 onClick={execution.onStop}
                 disabled={execution.isStopping}
-                loading={execution.isStopping}
-                loadingText="正在终止"
-                statusKey={execution.isStopping ? 'stopping' : 'stop-ready'}
-                variant={execution.isStopping ? 'secondary' : 'danger'}
+                aria-busy={execution.isStopping || undefined}
+                data-status-key={execution.isStopping ? 'stopping' : 'stop-ready'}
+                variant={execution.isStopping ? 'secondary' : 'destructive'}
                 className={`automation-stop-button w-full justify-center${execution.isStopping ? ' is-stopping' : ''}`}
-                icon={<Square size={14} fill="currentColor" />}
               >
-                终止执行
+                {execution.isStopping
+                  ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在终止</>
+                  : (
+                    <>
+                      <Square size={14} fill="currentColor" aria-hidden="true" />
+                      终止执行
+                    </>
+                  )}
               </Button>
             )}
         </div>

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Filter, Search, UserRoundSearch } from 'lucide-react'
-import { Button, EmptyState, Input, Loading, Select } from '@/shared/components'
+import { Filter, LoaderCircle, Search, UserRoundSearch } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
+import { EmptyState, Input, Loading, Select } from '@/shared/components'
 import { Modal } from '@/shared/components/Modal'
 import { useFluidTabIndicator } from '@/shared/hooks/useFluidTabIndicator'
 import { trainingCandidatesQueryOptions, trainingStatusCountsQueryOptions } from '../model/queries'
@@ -161,14 +162,14 @@ export default function OperatorPicker({
         <Button
           onClick={() => void onAdd(operator)}
           aria-label={row.canAdd ? `添加${operator.name}` : undefined}
-          disabled={!row.canAdd || busy}
-          loading={pendingOperatorIds.has(operator.id)}
-          loadingText="添加中"
+          disabled={!row.canAdd || busy || pendingOperatorIds.has(operator.id)}
+          aria-busy={pendingOperatorIds.has(operator.id) || undefined}
           variant="secondary"
-          size="md"
-          fullWidth
+          className="w-full"
         >
-          {row.actionLabel}
+          {pendingOperatorIds.has(operator.id)
+            ? <><LoaderCircle className="animate-spin" aria-hidden="true" />添加中</>
+            : row.actionLabel}
         </Button>
       ),
     }
@@ -270,13 +271,12 @@ export default function OperatorPicker({
           />
           <Button
             type="button"
-            variant={filters.needsElite2 ? 'primary' : 'secondary'}
-            size="md"
+            variant={filters.needsElite2 ? 'default' : 'secondary'}
             onClick={() => setFilters({ ...filters, needsElite2: !filters.needsElite2 })}
             aria-pressed={filters.needsElite2}
-            icon={<Filter size={15} strokeWidth={1.9} aria-hidden="true" />}
             className="whitespace-nowrap"
           >
+            <Filter size={15} strokeWidth={1.9} aria-hidden="true" />
             未精二
           </Button>
         </div>

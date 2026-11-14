@@ -1,7 +1,8 @@
 import { useRef } from 'react'
 import { ArrowDown, ArrowUp, ArrowUpToLine, ClipboardList, Plus, Trash2, UserRoundSearch } from 'lucide-react'
 import { getOperatorAvatarUrl, useItemIconCacheVersion } from '@/features/game-data'
-import { Button, EmptyState, IconButton, Loading } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { EmptyState, Loading } from '@/shared/components'
 import { getQueueMaterials, selectMissingMaterials } from '../model/materials'
 import TrainingLoadError from './TrainingLoadError'
 import UndoToast from './UndoToast'
@@ -80,7 +81,7 @@ export default function TrainingQueuePanel({
         {operationError && <div role="alert" className="training-feedback status-danger">{operationError}</div>}
         {refreshError && !error && <div role="alert" className="training-feedback status-warning"><span>{uncertain ?? '队列已更新，但刷新失败。重新加载后再预览计划。'}</span><Button variant="ghost" onClick={onReload} disabled={busy}>重新加载</Button></div>}
         {loading ? <div className="training-state"><Loading text="正在读取养成队列..." /></div> : error ? <TrainingLoadError title="养成队列加载失败" description={error} onRetry={onRetryLoad} /> : queue.length === 0 ? (
-          <div className="training-state"><EmptyState compact icon={<ClipboardList size={24} />} title="养成队列还是空的" description="添加需要筹备材料的干员，按目标安排刷图。" /><Button onClick={onOpenPicker} variant="secondary" icon={<Plus size={17} />}>选择干员</Button></div>
+          <div className="training-state"><EmptyState compact icon={<ClipboardList size={24} />} title="养成队列还是空的" description="添加需要筹备材料的干员，按目标安排刷图。" /><Button onClick={onOpenPicker} variant="secondary"><Plus size={17} aria-hidden="true" />选择干员</Button></div>
         ) : <ol className="training-queue-list">
           {queue.map((item, index) => <li key={item.operatorId} className={`training-queue-row ${index === 0 ? 'is-current' : ''}`}>
             <div className="training-queue-identity">
@@ -93,16 +94,16 @@ export default function TrainingQueuePanel({
               </div>
             </div>
             <div className="training-queue-actions">
-              {index > 0 && <Button variant="ghost" size="md" disabled={busy} onClick={() => void handleReorder(item.operatorId, 0)} aria-label={`将${item.operator.name}设为当前`} icon={<ArrowUpToLine size={15} />}>设为当前</Button>}
+              {index > 0 && <Button variant="ghost" disabled={busy} onClick={() => void handleReorder(item.operatorId, 0)} aria-label={`将${item.operator.name}设为当前`}><ArrowUpToLine size={15} aria-hidden="true" />设为当前</Button>}
               <div className="flex items-center">
-                <IconButton variant="ghost" disabled={busy || index === 0} onClick={() => void handleReorder(item.operatorId, index - 1)} aria-label={`上移${item.operator.name}`} title="上移" icon={<ArrowUp size={16} />} />
-                <IconButton variant="ghost" disabled={busy || index === queue.length - 1} onClick={() => void handleReorder(item.operatorId, index + 1)} aria-label={`下移${item.operator.name}`} title="下移" icon={<ArrowDown size={16} />} />
-                <IconButton variant="ghost" disabled={busy} onClick={() => void handleRemove(item.operatorId)} aria-label={`移除${item.operator.name}`} title="移除" className="training-remove" icon={pendingOperatorIds.has(item.operatorId) ? <span className="h-4 w-4 motion-safe:animate-spin rounded-full border-2 border-current border-r-transparent" /> : <Trash2 size={16} />} />
+                <Button size="icon" variant="ghost" disabled={busy || index === 0} onClick={() => void handleReorder(item.operatorId, index - 1)} aria-label={`上移${item.operator.name}`} title="上移"><ArrowUp size={16} aria-hidden="true" /></Button>
+                <Button size="icon" variant="ghost" disabled={busy || index === queue.length - 1} onClick={() => void handleReorder(item.operatorId, index + 1)} aria-label={`下移${item.operator.name}`} title="下移"><ArrowDown size={16} aria-hidden="true" /></Button>
+                <Button size="icon" variant="ghost" disabled={busy} onClick={() => void handleRemove(item.operatorId)} aria-label={`移除${item.operator.name}`} title="移除" className="training-remove">{pendingOperatorIds.has(item.operatorId) ? <span className="h-4 w-4 motion-safe:animate-spin rounded-full border-2 border-current border-r-transparent" aria-hidden="true" /> : <Trash2 size={16} aria-hidden="true" />}</Button>
               </div>
             </div>
           </li>)}
         </ol>}
-        {queue.length > 0 && <div className="training-queue-footer"><span className="text-xs text-muted-foreground">进度仅表示材料筹备情况</span><Button variant="ghost" onClick={onOpenPicker} icon={<Plus size={15} />}>继续添加</Button></div>}
+        {queue.length > 0 && <div className="training-queue-footer"><span className="text-xs text-muted-foreground">进度仅表示材料筹备情况</span><Button variant="ghost" onClick={onOpenPicker}><Plus size={15} aria-hidden="true" />继续添加</Button></div>}
       </section>
       {recentlyRemoved && <UndoToast key={recentlyRemoved.item.operatorId} name={recentlyRemoved.item.operator.name} pending={queueMutationPending} onUndo={() => void handleUndo()} onDismiss={onDismissUndo} />}
     </>

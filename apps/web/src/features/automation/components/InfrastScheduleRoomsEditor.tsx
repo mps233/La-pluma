@@ -1,5 +1,6 @@
 import { ChevronDown, Plus, Trash2 } from 'lucide-react'
-import { Button, Checkbox, IconButton, Input, Select } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { Checkbox, Input, Select } from '@/shared/components'
 import {
   INFRASTRUCT_MANUFACTURE_PRODUCTS,
   INFRASTRUCT_SCHEDULE_FACILITIES,
@@ -85,12 +86,16 @@ function RoomEditor({ facility, index, room, disabled, onChange, onRemove }: Roo
     <div className="space-y-3 rounded-lg border border-border p-3">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium text-foreground">房间 {index + 1}</span>
-        <IconButton
-          icon={<Trash2 size={16} />}
+        <Button
+          size="icon"
+          variant="ghost"
           title={`删除${getInfrastFacilityLabel(facility)}房间 ${index + 1}`}
+          aria-label={`删除${getInfrastFacilityLabel(facility)}房间 ${index + 1}`}
           disabled={disabled}
           onClick={onRemove}
-        />
+        >
+          <Trash2 size={16} aria-hidden="true" />
+        </Button>
       </div>
 
       <Select
@@ -240,10 +245,10 @@ export default function InfrastScheduleRoomsEditor({ plan, disabled, onChange }:
                   <Button
                     variant="secondary"
                     size="sm"
-                    icon={<Plus size={15} />}
                     disabled={disabled}
                     onClick={() => onChange(appendInfrastFacilityRoom(plan, facility.key))}
                   >
+                    <Plus size={15} aria-hidden="true" />
                     添加房间
                   </Button>
                 </>

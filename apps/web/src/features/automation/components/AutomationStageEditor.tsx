@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { CircleMinus, CirclePlus, GraduationCap, ListPlus, Minus, Pin, Plus, Trash2 } from 'lucide-react'
-import { Button, HintTooltip, IconButton } from '@/shared/components'
+import { CircleMinus, CirclePlus, GraduationCap, ListPlus, LoaderCircle, Minus, Pin, Plus, Trash2 } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
+import { HintTooltip } from '@/shared/components'
 import { generateTrainingPlan } from '@/features/training'
 import { loadUserConfig } from '@/features/user-config'
 import type { StageConfig, TaskFlowItem, TaskParamField } from '../types'
@@ -173,16 +174,17 @@ export default function AutomationStageEditor({
                     <GraduationCap size={17} strokeWidth={1.9} aria-hidden="true" />
                   </span>
                 ) : (
-                  <IconButton
-                    icon={<Pin size={16} strokeWidth={1.9} aria-hidden="true" />}
+                  <Button
+                    size="icon"
                     variant="ghost"
-                    size="md"
                     onClick={() => togglePinned(stageIndex)}
                     disabled={stageControlsDisabled}
                     className={`automation-stage-pin min-h-11 min-w-11${isPinnedStage ? ' is-active' : ''}`}
                     title={isPinnedStage ? '取消置顶' : '置顶'}
                     aria-label={`${isPinnedStage ? '取消置顶' : '置顶'}：${field.label} ${stageIndex + 1}`}
-                  />
+                  >
+                    <Pin size={16} strokeWidth={1.9} aria-hidden="true" />
+                  </Button>
                 )}
 
                 <input
@@ -240,16 +242,17 @@ export default function AutomationStageEditor({
                 )}
 
                 {canDeleteStage && (
-                  <IconButton
-                    icon={<Trash2 size={16} strokeWidth={1.9} aria-hidden="true" />}
+                  <Button
+                    size="icon"
                     variant="ghost"
-                    size="md"
                     onClick={() => deleteStage(stageIndex)}
                     disabled={stageControlsDisabled}
                     className="automation-stage-delete min-h-11 min-w-11"
                     title="删除此关卡"
                     aria-label={`删除${field.label} ${stageIndex + 1}`}
-                  />
+                  >
+                    <Trash2 size={16} strokeWidth={1.9} aria-hidden="true" />
+                  </Button>
                 )}
               </div>
             </div>
@@ -258,13 +261,11 @@ export default function AutomationStageEditor({
 
         <Button
           variant="ghost"
-          size="md"
-          fullWidth
-          icon={<ListPlus size={17} strokeWidth={1.9} aria-hidden="true" />}
           onClick={() => updateStages([...stages, { stage: '', times: '' }])}
           disabled={stageControlsDisabled}
-          className="automation-stage-add"
+          className="automation-stage-add w-full"
         >
+          <ListPlus size={17} strokeWidth={1.9} aria-hidden="true" />
           添加关卡
         </Button>
       </div>
@@ -279,19 +280,23 @@ export default function AutomationStageEditor({
         </div>
         <Button
           variant={hasSmartStages ? 'ghost' : 'secondary'}
-          size="md"
-          icon={hasSmartStages
-            ? <CircleMinus size={16} strokeWidth={1.9} aria-hidden="true" />
-            : <CirclePlus size={16} strokeWidth={1.9} aria-hidden="true" />}
           onClick={() => void toggleSmartStages()}
-          disabled={controlsDisabled}
-          loading={isSmartStageLoading}
-          loadingText={hasSmartStages ? '移除中' : '同步中'}
+          disabled={controlsDisabled || isSmartStageLoading}
+          aria-busy={isSmartStageLoading || undefined}
           aria-pressed={hasSmartStages}
           aria-label={hasSmartStages ? '移除智能养成关卡' : '加入智能养成关卡'}
           className="automation-smart-stage-action"
         >
-          {hasSmartStages ? '移除' : '加入'}
+          {isSmartStageLoading
+            ? <><LoaderCircle className="animate-spin" aria-hidden="true" />{hasSmartStages ? '移除中' : '同步中'}</>
+            : (
+              <>
+                {hasSmartStages
+                  ? <CircleMinus size={16} strokeWidth={1.9} aria-hidden="true" />
+                  : <CirclePlus size={16} strokeWidth={1.9} aria-hidden="true" />}
+                {hasSmartStages ? '移除' : '加入'}
+              </>
+            )}
         </Button>
       </div>
     </fieldset>

@@ -1,5 +1,6 @@
 import { ChevronRight, Target } from 'lucide-react'
-import { Card, IconButton } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { Card } from '@/shared/components'
 import { useDashboardStore } from '../store/dashboardStore'
 
 const sectionTitleClass = 'text-base font-bold text-foreground'
@@ -22,15 +23,16 @@ export default function DashboardTrainingSummaryCard({ onOpenTraining }: Dashboa
             <div className={sectionTitleClass}>养成摘要</div>
           </div>
         </div>
-        <IconButton
+        <Button
           onClick={onOpenTraining}
-          icon={<ChevronRight className="h-4 w-4" />}
+          size="icon-sm"
           variant="ghost"
-          size="sm"
           title="打开养成"
           aria-label="打开养成"
           className="dashboard-summary-action"
-        />
+        >
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </Button>
       </div>
       <div className="dashboard-summary-body" data-dashboard-summary="training">
         <div className="dashboard-summary-statline">

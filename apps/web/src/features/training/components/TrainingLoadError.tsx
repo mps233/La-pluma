@@ -1,5 +1,5 @@
 import { AlertCircle } from 'lucide-react'
-import { Button } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
 
 export interface TrainingLoadErrorProps {
   title: string

@@ -1,5 +1,6 @@
 import { Download, Pause, Play, Search, Trash2 } from 'lucide-react'
-import { Button, Card, CardContent, Input, Select, Switch } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import { Card, CardContent, Input, Select, Switch } from '@/shared/components'
 import type { LogEventFilter, LogFilter } from '../model/logModel'
 
 interface LogsToolbarProps {
@@ -119,12 +120,12 @@ export default function LogsToolbar({
               onClick={onTogglePause}
               variant="outline"
               size="sm"
-              icon={paused
-                ? <Play className="h-4 w-4" aria-hidden="true" />
-                : <Pause className="h-4 w-4" aria-hidden="true" />}
               disabled={actionBusy}
               aria-label={paused ? '继续读取日志' : '暂停读取日志'}
             >
+              {paused
+                ? <Play className="h-4 w-4" aria-hidden="true" />
+                : <Pause className="h-4 w-4" aria-hidden="true" />}
               {paused ? '继续' : '暂停'}
             </Button>
           )}
@@ -133,19 +134,18 @@ export default function LogsToolbar({
               onClick={onClear}
               variant="outline"
               size="sm"
-              icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
               disabled={actionBusy}
             >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
               清屏
             </Button>
           )}
           <Button
             onClick={onExport}
-            variant="primary"
             size="sm"
-            icon={<Download className="h-4 w-4" aria-hidden="true" />}
             disabled={!canExport}
           >
+            <Download className="h-4 w-4" aria-hidden="true" />
             导出筛选结果
           </Button>
         </div>
