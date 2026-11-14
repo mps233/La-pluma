@@ -667,8 +667,11 @@ func (r *desktopRuntime) showWindow() {
 		},
 	})
 	if runtime.GOOS == "darwin" {
-		// Match the sidebar glass radius (1.625rem at the default root size).
-		roundWindowCorners(window, 26)
+		// The sidebar frame is inset 0.75rem (12 DIPs) from the window edge, so
+		// concentric corners need the window radius to be the panel's 1.625rem
+		// (26) plus that inset, not the same 26: equal radii with an inset leave
+		// a wider gap at the curve than along the straight edges.
+		roundWindowCorners(window, 26+12)
 	}
 	window.OnClosed(func() {
 		if r.window == window {

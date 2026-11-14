@@ -50,6 +50,7 @@ function phaseOf(operation: MaaUpdateOperation) {
   if (operation.state === 'running') {
     return {
       title: `${name} 更新中`,
+      displayTitle: '正在更新',
       detail: operation.detail,
       compact: '',
       color: islandAccent.blue,
@@ -59,6 +60,7 @@ function phaseOf(operation: MaaUpdateOperation) {
   if (operation.state === 'success') {
     return {
       title: `${name} 已更新`,
+      displayTitle: '更新完成',
       detail: operation.message || '更新完成',
       compact: '完成',
       color: islandAccent.green,
@@ -67,6 +69,7 @@ function phaseOf(operation: MaaUpdateOperation) {
   }
   return {
     title: `${name} 更新失败`,
+    displayTitle: '更新失败',
     detail: operation.message || '请稍后重试',
     compact: '失败',
     color: islandAccent.red,
@@ -133,7 +136,7 @@ function UpdateActivity({ operation }: { operation: MaaUpdateOperation }) {
         ),
         bottom: (
           <ExpandedBottom gap={4}>
-            <ExpandedTitle>{phase.title}</ExpandedTitle>
+            <ExpandedTitle>{phase.displayTitle}</ExpandedTitle>
             <ExpandedSubtitle>{phase.detail}</ExpandedSubtitle>
           </ExpandedBottom>
         ),
@@ -144,6 +147,7 @@ function UpdateActivity({ operation }: { operation: MaaUpdateOperation }) {
       duration,
       phase.compact,
       phase.detail,
+      phase.displayTitle,
       phase.glyph,
       phase.title,
       operation.kind,

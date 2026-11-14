@@ -6,6 +6,7 @@ import {
   runFinishedWithin,
   runProgressOf,
   runResultSummary,
+  runStepText,
   runTaskName,
 } from './runIsland'
 
@@ -39,6 +40,21 @@ describe('runProgressOf', () => {
   it('reads zero for a run with no evidence of progress', () => {
     expect(runProgressOf(null)).toBe(0)
     expect(runProgressOf(run({ progress: {} }))).toBe(0)
+  })
+})
+
+describe('runStepText', () => {
+  it('keeps the task name out of the expanded title when the stage repeats it', () => {
+    expect(runStepText('基建换班', '基建换班', 3, 7)).toBe('第 3 / 7 项')
+  })
+
+  it('adds a stage that tells the user something new', () => {
+    expect(runStepText('理智作战', '2-7', 3, 7)).toBe('第 3 / 7 项 · 2-7')
+  })
+
+  it('does not invent a step when the run only has a stage', () => {
+    expect(runStepText('理智作战', '2-7', null, null)).toBe('2-7')
+    expect(runStepText('基建换班', '基建换班', null, null)).toBe('自动化任务流程')
   })
 })
 

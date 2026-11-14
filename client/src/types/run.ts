@@ -26,6 +26,8 @@ export interface RunTaskResult {
   itemIndex?: number
   name?: string
   status?: RunTaskResultStatus
+  /** The server's terminal word for the result (`succeeded`, `failed`, …). */
+  state?: string
   error?: string
   [key: string]: unknown
 }
@@ -69,9 +71,43 @@ export interface AgentRun {
   [key: string]: unknown
 }
 
+/** The schedule executor's live status; currentStep is zero-based here. */
+export interface RunScheduleProgress {
+  isRunning?: boolean
+  scheduleId?: string | null
+  currentStep?: number | null
+  totalSteps?: number | null
+  currentTask?: string | null
+  currentTaskId?: string | null
+  currentStage?: string | null
+  message?: string | null
+  startTime?: number | null
+  shouldStop?: boolean
+  [key: string]: unknown
+}
+
+/** The legacy task snapshot the server keeps beside the Run. */
+export interface LegacyRunTaskProgress {
+  isRunning?: boolean
+  currentStage?: string | null
+  currentTask?: string | null
+  currentStep?: number | null
+  totalSteps?: number | null
+  taskName?: string | null
+  [key: string]: unknown
+}
+
 export interface CurrentRunSnapshot {
   run: AgentRun | null
   lastRun: AgentRun | null
+  isRunning?: boolean
+  taskName?: string | null
+  currentStage?: string | null
+  currentTask?: string | null
+  /** The scheduled flow's own progress, which the Run itself does not carry. */
+  schedule?: RunScheduleProgress | null
+  /** The legacy task process status, used when a run has no progress. */
+  task?: LegacyRunTaskProgress | null
   [key: string]: unknown
 }
 

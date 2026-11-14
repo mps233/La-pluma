@@ -1,14 +1,35 @@
-import type { AgentRun, RunTaskResult } from '@/types/run'
+import type { AgentRun, RunTaskResult, RunTaskResultStatus } from '@/types/run'
 import { isActiveRunState } from '@/types/run'
 
-const finishedTaskStatuses = new Set(['success', 'failed', 'skipped', 'stopped'])
+/**
+ * The server writes task results with `state` ("succeeded", "failed", …) while the copilot path
+ * writes `status` ("success", "running", …). Normalize both; progress counts any terminal result,
+ * while the summary below distinguishes success from failure and skips.
+ */
+function statusOf(result: RunTaskResult): 'success' | 'failed' | 'skipped' | 'stopped' | 'running' | 'pending' {
+  const status: RunTaskResultStatus | string | undefined = result.status
+  const state = typeof result.state === 'string' ? result.state : undefined
+  if (status === 'success' || status === 'failed' || status === 'skipped' || status === 'stopped') return status
+  if (state === 'succeeded' || state === 'success') return 'success'
+  if (state === 'failed') return 'failed'
+  if (state === 'skipped') return 'skipped'
+  if (state === 'stopped') return 'stopped'
+  if (status === 'running' || state === 'running') return 'running'
+  return 'pending'
+}
+
+const failedStatuses = new Set(['failed'])
+const skippedStatuses = new Set(['skipped', 'stopped'])
 
 function taskResultsOf(run: AgentRun | null): RunTaskResult[] {
   if (!run) return []
   return run.taskResults ?? run.progress?.taskResults ?? []
 }
 
-/** Progress for the island's ring: explicit steps first, otherwise the terminal task results. */
+/**
+ * Progress for the island's ring. The schedule's step count is the source when present; task
+ * results only tell success from the rest, so they are used only when no step count exists.
+ */
 export function runProgressOf(run: AgentRun | null): number {
   if (!run) return 0
   const step = run.progress?.currentStep ?? null
@@ -18,7 +39,20 @@ export function runProgressOf(run: AgentRun | null): number {
   }
   const results = taskResultsOf(run)
   if (results.length === 0) return 0
-  return results.filter(result => finishedTaskStatuses.has(result.status ?? '')).length / results.length
+  const finished = results.filter(result => {
+    const status = statusOf(result)
+    return status !== 'pending' && status !== 'running'
+  }).length
+  return finished / results.length
+}
+
+/** The expanded title: the step count, with the stage only when it adds something new. */
+export function runStepText(task: string, stage: string, step: number | null, total: number | null): string {
+  const stageLabel = stage && stage !== task ? stage : ''
+  if (step !== null && total !== null && total > 0) {
+    return `第 ${step} / ${total} 项${stageLabel ? ` · ${stageLabel}` : ''}`
+  }
+  return stageLabel || '自动化任务流程'
 }
 
 /** The task name a person recognises, from the active snapshot or the last named result. */
@@ -27,6 +61,10 @@ export function runTaskName(run: AgentRun | null): string {
     ? run.progress.currentTask.trim()
     : ''
   if (currentTask) return currentTask
+  const stage = typeof run?.progress?.currentStage === 'string'
+    ? run.progress.currentStage.trim()
+    : ''
+  if (stage) return stage
   const results = taskResultsOf(run)
   for (let index = results.length - 1; index >= 0; index -= 1) {
     const result = results[index]
@@ -40,9 +78,10 @@ export function runTaskName(run: AgentRun | null): string {
 export function runResultSummary(run: AgentRun | null): string {
   const results = taskResultsOf(run)
   if (results.length === 0) return ''
-  const succeeded = results.filter(result => result.status === 'success').length
-  const failed = results.filter(result => result.status === 'failed').length
-  const skipped = results.filter(result => result.status === 'skipped').length
+  const statuses = results.map(statusOf)
+  const succeeded = statuses.filter(status => status === 'success').length
+  const failed = statuses.filter(status => failedStatuses.has(status)).length
+  const skipped = statuses.filter(status => skippedStatuses.has(status)).length
   if (succeeded === results.length) return `全部 ${results.length} 项完成`
   const parts = [
     succeeded > 0 ? `成功 ${succeeded}` : '',

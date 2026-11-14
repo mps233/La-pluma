@@ -32,6 +32,7 @@ import {
   runFinishedWithin,
   runProgressOf,
   runResultSummary,
+  runStepText,
   runTaskName,
 } from '@/utils/runIsland'
 
@@ -86,9 +87,7 @@ function RunActivity({ run, final, task, step, total, stage, progress, stateText
   const finish = final && run ? finishOf(run.state) : null
   const color = finish ? toneColor(finish.tone) : accent
   const percent = Math.round(progress * 100)
-  const stepText = step !== null && total !== null && total > 0
-    ? `第 ${step} / ${total} 项${stage ? ` · ${stage}` : ''}`
-    : stage || '自动化任务流程'
+  const stepText = runStepText(task, stage, step, total)
   const actionText = task && task !== '任务执行中' ? `${stateText} ${task}` : stateText
   const summary = finish && run ? runResultSummary(run) : ''
   const duration = finish && run ? formatRunDuration(run.startedAt, run.finishedAt) : null

@@ -8,11 +8,20 @@ const runSignature = (run: AgentRun | null): string => {
     run.runId,
     run.state,
     run.progress?.setId ?? '',
+    run.progress?.currentStage ?? '',
     run.progress?.currentStep ?? '',
+    run.progress?.totalSteps ?? '',
     run.progress?.currentTask ?? '',
     run.progress?.message ?? '',
     run.progress?.battle ? `${run.progress.battle.kills}/${run.progress.battle.total}` : '',
-    results.map(result => `${result.itemIndex ?? ''}:${result.status ?? ''}`).join(','),
+    results
+      .map(result => [
+        result.itemIndex ?? '',
+        result.status ?? '',
+        result.state ?? '',
+        result.name ?? '',
+      ].join(':'))
+      .join(','),
   ].join('|')
 }
 

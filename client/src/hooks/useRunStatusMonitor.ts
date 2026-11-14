@@ -9,17 +9,11 @@ import {
   type CurrentRunSnapshot,
   type GlobalRunStatus,
 } from '../types/run'
+import { applyScheduleProgress } from '../utils/runSnapshot'
 
 const ACTIVE_RUN_POLL_MS = 2_000
 const IDLE_RUN_POLL_MS = 10_000
 const HIDDEN_RUN_POLL_MS = 10_000
-
-interface LegacyTaskSnapshot {
-  isRunning?: boolean
-  taskName?: string | null
-  currentStage?: string | null
-  currentTask?: string | null
-}
 
 /**
  * 把服务端 Run 投影成全局可读状态。
@@ -94,20 +88,25 @@ export function useRunStatusMonitor() {
         if (disposed) return
         if (!result.success) throw new Error(result.message || '获取运行状态失败')
 
-        const snapshot = result.data as (CurrentRunSnapshot & LegacyTaskSnapshot) | undefined
-        useRunStore.getState().applyRun(snapshot?.run ?? null)
+        const snapshot = result.data as CurrentRunSnapshot | undefined
+        const run = applyScheduleProgress(snapshot?.run ?? null, snapshot)
+        useRunStore.getState().applyRun(run)
         useRunStore.getState().applyLastRun(snapshot?.lastRun ?? null)
-        const runStatus = runToGlobalStatus(snapshot?.run ?? null)
+        const runStatus = runToGlobalStatus(run)
+        const legacyTask = snapshot?.schedule?.currentTask
+          || snapshot?.task?.currentTask
+          || snapshot?.currentStage
+          || snapshot?.currentTask
+          || snapshot?.taskName
+          || snapshot?.task?.taskName
+          || ''
         const legacyStatus = runStatus.phase === 'idle' && snapshot?.isRunning === true
           ? {
               phase: 'running' as const,
               isRunning: true,
               runId: null,
-              label: (() => {
-                const legacyTask = snapshot.currentStage || snapshot.currentTask || snapshot.taskName || ''
-                return legacyTask ? `正在执行: ${legacyTask}` : '任务执行中'
-              })(),
-              detail: snapshot.currentStage || null,
+              label: legacyTask ? `正在执行: ${legacyTask}` : '任务执行中',
+              detail: snapshot?.schedule?.currentTask || snapshot?.currentStage || null,
             }
           : runStatus
 

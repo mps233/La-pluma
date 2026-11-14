@@ -404,27 +404,11 @@ html.la-pluma-standalone #app-root .page {
 }
 
 @media (max-width: 639px) {
+  /* Phones do not show the island at all: the navbar's middle column belongs to the workspace
+     title, and a black capsule there reads as a second, competing status element. Activities are
+     still started and kept by the islands below; this only removes the stage from the phone
+     layout. */
   .la-pluma-island-layer {
-    right: calc(max(1.25rem, env(safe-area-inset-right)) + 6.25rem);
-    left: calc(max(1.25rem, env(safe-area-inset-left)) + 2.75rem);
-  }
-
-  /* The compact pill fits between the brand and the two actions. The expanded view is 374 wide,
-     and the two-activity split needs both capsules, so either claims the screen instead of being
-     squeezed by those controls. */
-  .la-pluma-island-layer:has([data-islandcn][data-presentation='expanded']),
-  .la-pluma-island-layer:has([data-islandcn][data-presentation='minimal']) {
-    right: max(0.5rem, env(safe-area-inset-right));
-    left: max(0.5rem, env(safe-area-inset-left));
-  }
-
-  /* Phones keep the workspace title while nothing runs; a live activity takes the slot over
-     and the title returns when the island goes idle again. */
-  .la-pluma-island-layer [data-islandcn][data-presentation='idle'] {
-    display: none;
-  }
-
-  .la-pluma-navbar:has(.la-pluma-island-layer [data-islandcn]:not([data-presentation='idle'])) .la-pluma-navbar-title {
     display: none;
   }
 }
@@ -483,10 +467,11 @@ html.la-pluma-standalone #app-root .page {
     display: block;
     position: fixed;
     z-index: 1;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    width: calc(var(--la-pluma-sidebar-width) - 0.75rem);
+    top: 0.75rem;
+    right: auto;
+    bottom: 0.75rem;
+    left: 0.75rem;
+    width: calc(var(--la-pluma-sidebar-width) - 1.5rem);
     border-radius: 1.625rem;
     pointer-events: none;
   }
@@ -507,10 +492,10 @@ html.la-pluma-standalone #app-root .page {
   .la-pluma-app .la-pluma-sidebar {
     top: 0.75rem;
     height: calc(var(--la-pluma-viewport-height) - 1.5rem);
-    /* The glass frame is 0.75rem narrower than the grid column, so pad the
-       right side by the same amount to keep the content optically centered
-       inside the visible panel. */
+    /* The glass frame is inset 0.75rem from the window edge and 0.75rem narrower
+       than the grid column; pad both sides equally to keep the content inside it. */
     padding-right: calc(1.5rem + 0.75rem);
+    padding-left: calc(1.5rem + 0.75rem);
   }
 
   .la-pluma-app .la-pluma-navbar {
