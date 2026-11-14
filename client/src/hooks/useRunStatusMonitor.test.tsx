@@ -44,6 +44,7 @@ describe('useRunStatusMonitor', () => {
     useStatusStore.getState().setActive(false)
     useStatusStore.getState().applyRunStatus(IDLE_RUN_STATUS)
     useRunStore.getState().applyRun(null)
+    useRunStore.getState().applyLastRun(null)
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
@@ -55,6 +56,7 @@ describe('useRunStatusMonitor', () => {
     vi.useRealTimers()
     useStatusStore.getState().applyRunStatus(IDLE_RUN_STATUS)
     useRunStore.getState().applyRun(null)
+    useRunStore.getState().applyLastRun(null)
   })
 
   it('projects an active Run into the global status store', async () => {
@@ -114,6 +116,33 @@ describe('useRunStatusMonitor', () => {
 
     expect(useStatusStore.getState().runStatus.phase).toBe('idle')
     expect(useRunStore.getState().run).toBeNull()
+    expect(useRunStore.getState().lastRun).toBeNull()
+  })
+
+  it('projects the last finished Run for the island outcome', async () => {
+    mocks.getCurrentRun.mockResolvedValue({
+      success: true,
+      data: {
+        run: null,
+        lastRun: {
+          runId: 'run-0',
+          operationId: 'execute_schedule',
+          state: 'succeeded',
+          finishedAt: '2026-11-14T10:28:00.329Z',
+          taskResults: [{ name: '理智作战', status: 'success' }],
+        },
+      },
+    })
+
+    await act(async () => root.render(<HookHarness />))
+    await flush()
+
+    expect(useStatusStore.getState().runStatus.phase).toBe('idle')
+    expect(useRunStore.getState().run).toBeNull()
+    expect(useRunStore.getState().lastRun).toMatchObject({
+      runId: 'run-0',
+      state: 'succeeded',
+    })
   })
 
   it('polls again while a Run is active', async () => {

@@ -360,7 +360,7 @@ func buildRegistry() []Operation {
 			"maa_callback_summary",
 			"GET",
 			"/api/agent/logs/maa-callbacks",
-			"Summarize BlackFlow, copilot precheck, stage navigation and public recruit callbacks from recent MAA logs.",
+			"Summarize the current sanity reading and recent BlackFlow, copilot precheck, stage navigation and public recruit callbacks from the newest MAA log lines.",
 		).withTags("Logs").
 			withQuerySchema(objectSchema(map[string]any{
 				"lines": map[string]any{

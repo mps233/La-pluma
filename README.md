@@ -34,6 +34,7 @@ The project is named after La Pluma, the five-star Guard in Arknights.
 - **One-click routine** — run the saved daily flow from the dashboard, or prepare a matching copilot plan for the current event without starting combat.
 - **Optional preview** — keep the preview off, refresh a snapshot every 10 seconds, or open a live WebRTC view. Snapshot mode falls back to ADB screenshots, and the console keeps its last successful data when a refresh fails. Touch control is available in the device preview on the task workspaces.
 - **Responsive shell** — desktop sidebar with workspace search, mobile bottom bar with a secondary sheet, light/dark/system themes, and an iOS-style material shell. The PWA can be installed and updated from the UI.
+- **Live activity island** — a Dynamic Island-style pill in the navbar ([islandcn](https://islandcn.dev)) reports what is running: the automation run with its ring and current step, MAA component updates with elapsed time, and the account's sanity regenerating. It expands on long-press for details, surfaces a failed run or update, and stays out of the way on phones until something runs.
 - **Operator growth** — plan elite-promotion materials and, in the same 养成 workspace, queue operator skills with a current/target mastery level. The server scheduler starts one OperProgress level at a time, pauses on blocked targets, and keeps the queue state across browser sessions. MAA does not farm mastery materials; missing materials block the target.
 
 ### Daily automation
@@ -238,8 +239,11 @@ When `LA_PLUMA_TOKEN` is set, send `Authorization: Bearer <token>` or `X-La-Plum
 La-pluma/
 ├─ client/                 React + TypeScript + Vite frontend
 │  ├─ src/components/      Dashboard, automation, combat, roguelike, training, data, tools
+│  ├─ src/components/islandcn/  Activity island content kit (islandcn)
+│  ├─ src/lib/island/      Activity island engine (islandcn)
+│  ├─ src/hooks/           Backend, run, preview, sanity and update monitors
 │  ├─ src/services/api.ts  /api/agent client
-│  ├─ src/stores/          Zustand stores
+│  ├─ src/store/           Zustand stores
 │  └─ public/              PWA icons and logo
 ├─ go/                     Go backend and MyGo desktop shell
 │  ├─ cmd/server/          headless HTTP server

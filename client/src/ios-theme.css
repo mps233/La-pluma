@@ -378,6 +378,64 @@ html.la-pluma-standalone #app-root .page {
   gap: 0;
 }
 
+/* The islandcn stage is drawn from the navbar's content column. The engine's top metric already
+   includes 13.91px above the capsule; the remainder centres the 36.84px capsule in the navbar. */
+.la-pluma-island-layer {
+  position: absolute;
+  top: calc((var(--app-navbar-height) - 36.84px) / 2 - 13.91px);
+  right: max(1rem, env(safe-area-inset-right));
+  left: max(1rem, env(safe-area-inset-left));
+  z-index: 3;
+  height: 0;
+  pointer-events: none;
+}
+
+.la-pluma-island-layer [data-islandcn-hit] {
+  pointer-events: auto;
+}
+
+@media (max-width: 1023px) {
+  /* Keep the compact pill in the gap between the 44px brand and the two 44px actions, not in the
+     middle of the whole navbar; the centred layer would overlap the theme control. */
+  .la-pluma-island-layer {
+    right: calc(max(1rem, env(safe-area-inset-right)) + 6.25rem);
+    left: calc(max(1rem, env(safe-area-inset-left)) + 2.75rem);
+  }
+}
+
+@media (max-width: 639px) {
+  .la-pluma-island-layer {
+    right: calc(max(1.25rem, env(safe-area-inset-right)) + 6.25rem);
+    left: calc(max(1.25rem, env(safe-area-inset-left)) + 2.75rem);
+  }
+
+  /* The compact pill fits between the brand and the two actions. The expanded view is 374 wide,
+     and the two-activity split needs both capsules, so either claims the screen instead of being
+     squeezed by those controls. */
+  .la-pluma-island-layer:has([data-islandcn][data-presentation='expanded']),
+  .la-pluma-island-layer:has([data-islandcn][data-presentation='minimal']) {
+    right: max(0.5rem, env(safe-area-inset-right));
+    left: max(0.5rem, env(safe-area-inset-left));
+  }
+
+  /* Phones keep the workspace title while nothing runs; a live activity takes the slot over
+     and the title returns when the island goes idle again. */
+  .la-pluma-island-layer [data-islandcn][data-presentation='idle'] {
+    display: none;
+  }
+
+  .la-pluma-navbar:has(.la-pluma-island-layer [data-islandcn]:not([data-presentation='idle'])) .la-pluma-navbar-title {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .la-pluma-island-layer {
+    right: 2rem;
+    left: calc(var(--la-pluma-sidebar-width) + 1.25rem);
+  }
+}
+
 .la-pluma-theme-desktop {
   display: none;
 }

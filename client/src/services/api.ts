@@ -176,6 +176,21 @@ export interface ScheduleExecutionStatusData {
   lastResultRevision?: number
 }
 
+export interface MaaSanityReadingData {
+  current: number
+  max: number
+  reportAt: string
+}
+
+export interface MaaCallbackLogData {
+  content: string
+  logPath: string
+  totalLines: number
+  returnedLines: number
+  /** The newest sanity MaaCore reported, or absent when no fight is in the log. */
+  sanity?: MaaSanityReadingData
+}
+
 export interface ActivityData {
   code: string | null
   name: string | null
@@ -441,6 +456,14 @@ export const maaApi = {
   async getRealtimeLogs(lines: number = 100, signal?: AbortSignal, afterSequence = 0): Promise<ApiResponse> {
     const cursor = afterSequence > 0 ? `&afterSequence=${afterSequence}` : ''
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/logs/recent?lines=${lines}${cursor}`, { signal })
+    return parseJsonResponse(response)
+  },
+
+  /**
+   * 读取最近的 MAA 回调日志原文（用于提取当前理智、关卡掉落等运行事实）
+   */
+  async getMaaCallbacks(lines: number = 2000, signal?: AbortSignal): Promise<ApiResponse<MaaCallbackLogData>> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/logs/maa-callbacks?lines=${lines}`, { signal })
     return parseJsonResponse(response)
   },
 

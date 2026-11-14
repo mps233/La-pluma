@@ -227,6 +227,38 @@ func SummarizeAuxiliaryCallbacks(logOutput any) AuxiliaryCallbacks {
 	return result
 }
 
+// SanityReading is the newest current/max sanity MaaCore reported.
+type SanityReading struct {
+	Current  float64 `json:"current"`
+	Max      float64 `json:"max"`
+	ReportAt string  `json:"reportAt"`
+}
+
+// LatestSanityState returns the newest SanityBeforeStage reading in a log window, in log order.
+// Only fight callbacks report it; a log with no fight in the window has none.
+func LatestSanityState(logOutput any) (SanityReading, bool) {
+	var latest SanityReading
+	found := false
+	for _, payload := range ParseMaaCallbackPayloads(logOutput) {
+		if payload.What != "SanityBeforeStage" {
+			continue
+		}
+		details := asRecord(payload.Details)
+		current, okCurrent := lookupNumber(details, "current_sanity")
+		max, okMax := lookupNumber(details, "max_sanity")
+		if !okCurrent || !okMax || max <= 0 {
+			continue
+		}
+		latest = SanityReading{
+			Current:  current,
+			Max:      max,
+			ReportAt: truthyString(details["report_time"]),
+		}
+		found = true
+	}
+	return latest, found
+}
+
 // SummarizeFightCallbacks collapses Fight callback events into one result.
 // StageDrops.stats[].addQuantity is the per-run delta, FightTimes.sanity_cost
 // is per fight, and SanityBeforeStage is the fallback sanity source.

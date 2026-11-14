@@ -96,6 +96,7 @@ export function useRunStatusMonitor() {
 
         const snapshot = result.data as (CurrentRunSnapshot & LegacyTaskSnapshot) | undefined
         useRunStore.getState().applyRun(snapshot?.run ?? null)
+        useRunStore.getState().applyLastRun(snapshot?.lastRun ?? null)
         const runStatus = runToGlobalStatus(snapshot?.run ?? null)
         const legacyStatus = runStatus.phase === 'idle' && snapshot?.isRunning === true
           ? {
@@ -159,6 +160,7 @@ export function useRunStatusMonitor() {
       window.removeEventListener('online', handleOnline)
       useStatusStore.getState().applyRunStatus(IDLE_RUN_STATUS)
       useRunStore.getState().applyRun(null)
+      useRunStore.getState().applyLastRun(null)
     }
   }, [])
 }

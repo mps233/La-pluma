@@ -19,6 +19,7 @@ import {
 import { PageHeader, Card, CardHeader, CardContent, Button, Input, Select, Checkbox, Switch, CjkText, TruncatedText, SwipeModePager } from './common'
 import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
+import { startMaaUpdate } from '../hooks/useMaaUpdateIsland'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import DesktopSettings from './DesktopSettings'
 import AccessTokenSettings from './AccessTokenSettings'
@@ -497,7 +498,7 @@ export default function ConfigManager() {
     try {
       // 更新到当前渠道的最新版本
       // 不传版本号，后端会使用 maa update 命令
-      const result = await maaApi.updateMaaCore()
+      const result = await startMaaUpdate('core', () => maaApi.updateMaaCore(), '下载 MaaCore 与资源')
 
       if (result.success) {
         const message = result.message || 'MaaCore 和资源已更新'
@@ -532,7 +533,7 @@ export default function ConfigManager() {
     setStatusMessage('正在更新 MAA CLI...')
 
     try {
-      const result = await maaApi.updateMaaCli()
+      const result = await startMaaUpdate('cli', () => maaApi.updateMaaCli(), '替换 CLI 可执行文件')
 
       if (result.success) {
         setStatusMessage('MAA CLI 更新成功')
@@ -564,7 +565,11 @@ export default function ConfigManager() {
     try {
       // 切换渠道并安装
       const versionToInstall = targetIsBeta ? 'beta' : 'stable'
-      const result = await maaApi.updateMaaCore(versionToInstall)
+      const result = await startMaaUpdate(
+        'core',
+        () => maaApi.updateMaaCore(versionToInstall),
+        `切换到 ${targetChannel} 渠道`,
+      )
 
       if (result.success) {
         const message = `已切换到 ${targetChannel} 渠道并同步最新资源`
@@ -600,7 +605,7 @@ export default function ConfigManager() {
     setStatusMessage('正在热更新资源文件...')
 
     try {
-      const result = await maaApi.hotUpdateResources()
+      const result = await startMaaUpdate('resources', () => maaApi.hotUpdateResources(), '拉取最新资源文件')
 
       if (result.success) {
         const message = result.message || '资源文件更新成功'

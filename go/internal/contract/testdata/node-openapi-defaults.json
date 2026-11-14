@@ -2420,8 +2420,8 @@
         "tags": [
           "Logs"
         ],
-        "summary": "Summarize BlackFlow, copilot precheck, stage navigation and public recruit callbacks from recent MAA logs.",
-        "description": "Summarize BlackFlow, copilot precheck, stage navigation and public recruit callbacks from recent MAA logs.",
+        "summary": "Summarize the current sanity reading and recent BlackFlow, copilot precheck, stage navigation and public recruit callbacks from the newest MAA log lines.",
+        "description": "Summarize the current sanity reading and recent BlackFlow, copilot precheck, stage navigation and public recruit callbacks from the newest MAA log lines.",
         "security": [
           {
             "bearerAuth": []

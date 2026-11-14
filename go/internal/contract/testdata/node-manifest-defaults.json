@@ -1187,7 +1187,7 @@
       "id": "maa_callback_summary",
       "method": "GET",
       "path": "/api/agent/logs/maa-callbacks",
-      "description": "Summarize BlackFlow, copilot precheck, stage navigation and public recruit callbacks from recent MAA logs.",
+      "description": "Summarize the current sanity reading and recent BlackFlow, copilot precheck, stage navigation and public recruit callbacks from the newest MAA log lines.",
       "query_schema": {
         "type": "object",
         "properties": {

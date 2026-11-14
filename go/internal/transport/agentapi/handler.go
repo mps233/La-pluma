@@ -10,6 +10,7 @@ import (
 	"image"
 	stddraw "image/draw"
 	"image/png"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -1395,24 +1396,60 @@ func (h *Handler) clearLogs(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, http.StatusOK, map[string]any{"cleared": true}, "日志已清空", nil)
 }
 
+// maaCallbackTailBytes bounds the read of asst.log: the newest events live at the end of a log
+// that can grow past 40 MB, and a whole-file read on every status poll would stall the server.
+const maaCallbackTailBytes = 4 * 1024 * 1024
+
 func (h *Handler) maaCallbacks(w http.ResponseWriter, r *http.Request) {
 	lines := parseBoundedInt(r.URL.Query().Get("lines"), 2000, 1, 5000)
 	logPath := filepath.Join(h.app.Config().Paths.MaaStateDir, "debug", "asst.log")
-	data, err := os.ReadFile(logPath)
+	data, err := readFileTail(logPath, maaCallbackTailBytes)
 	if err != nil {
 		httpx.Failure(w, http.StatusNotFound, &httpx.APIError{Code: "AGENT_MAA_LOG_UNAVAILABLE", Message: "无法读取 MAA 日志", Retryable: true, Details: map[string]any{"logPath": logPath}})
 		return
 	}
 	all := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
+	// A tail read can start mid-line; drop that fragment so every returned line parses.
+	if len(all) > 0 && !strings.Contains(all[0], "Assistant::append_callback") && len(all) > 1 {
+		all = all[1:]
+	}
 	if len(all) > lines {
 		all = all[len(all)-lines:]
 	}
-	httpx.Success(w, http.StatusOK, map[string]any{
+	payload := map[string]any{
 		"content":       strings.Join(all, "\n"),
 		"logPath":       logPath,
 		"totalLines":    len(all),
 		"returnedLines": len(all),
-	}, "", nil)
+	}
+	// The newest sanity reading can sit far behind the tail (it is written during fights), so it is
+	// scanned on its own rather than left to the caller to find inside `content`.
+	if reading, ok, err := h.app.MAAService.LatestSanity(r.Context()); err == nil && ok {
+		payload["sanity"] = reading
+	}
+	httpx.Success(w, http.StatusOK, payload, "", nil)
+}
+
+// readFileTail returns at most the last maxBytes of path.
+func readFileTail(path string, maxBytes int64) ([]byte, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	size := info.Size()
+	offset := int64(0)
+	if size > maxBytes {
+		offset = size - maxBytes
+	}
+	if _, err := file.Seek(offset, 0); err != nil {
+		return nil, err
+	}
+	return io.ReadAll(file)
 }
 
 func (h *Handler) loadUserConfig(w http.ResponseWriter, r *http.Request) {

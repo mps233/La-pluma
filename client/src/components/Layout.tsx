@@ -1,8 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, Settings2, Swords, Wrench } from 'lucide-react'
 import { GlassButton, GlassCard, GlassInput, GlassMenu, GlassNav } from '@zakisheriff/liquid-glass'
 import ThemeToggle from './ThemeToggle'
+import RunIsland from './RunIsland'
+import SanityBatteryIsland from './SanityBatteryIsland'
+import MaaUpdateIsland from './MaaUpdateIsland'
 import AeroBackdrop from './backgrounds/AeroBackdrop'
+import { Island } from '@/lib/island'
+import { IslandContext } from '@/lib/island/context'
 import { useUIStore } from '@/stores'
 import { appTabFromPath, appTabPath, isAppTab, type AppTab } from '@/stores/uiStore'
 import { preloadPage } from '@/utils/pagePreload'
@@ -123,6 +128,7 @@ export default function Layout({ children }: LayoutProps) {
   const storedActiveTab = useUIStore(state => state.activeTab)
   const setActiveTab = useUIStore(state => state.setActiveTab)
   const theme = useUIStore(state => state.theme)
+  const hasIslandProvider = useContext(IslandContext) !== null
   const activeTab: AppTab = isAppTab(storedActiveTab) ? storedActiveTab : 'dashboard'
   const [sidebarQuery, setSidebarQuery] = useState('')
   const [sidebarIdentity, setSidebarIdentity] = useState(DEFAULT_OPERATOR_QUOTE)
@@ -349,6 +355,14 @@ export default function Layout({ children }: LayoutProps) {
                 />
               </div>
             </div>
+            {hasIslandProvider && (
+              <div className="la-pluma-island-layer">
+                <Island placement="container" label="La Pluma 活动" />
+                <RunIsland />
+                <MaaUpdateIsland />
+                <SanityBatteryIsland />
+              </div>
+            )}
           </div>
         </header>
 

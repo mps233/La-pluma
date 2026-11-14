@@ -34,6 +34,7 @@ La Pluma 是一个自托管的《明日方舟》自动化 Web 控制台。它把
 - **一键日常** — 从控制台直接运行已保存的日常流程；「打当前活动」只准备匹配的作业，不会立即开战。
 - **可选预览** — 关闭、每 10 秒刷新快照或打开 WebRTC 实时画面。快照失败时回退 ADB 截图；刷新失败时保留上一份成功数据。任务工作台的设备预览支持触摸控制。
 - **响应式壳层** — 桌面侧栏支持工作区搜索；移动端底栏加「更多」弹层；亮色、暗色、跟随系统三档主题；iOS 风格材质。PWA 可在界面内安装和更新。
+- **活动岛** — 导航栏中央的 Dynamic Island 式胶囊（[islandcn](https://islandcn.dev)）实时显示正在发生的事：自动化任务的环形进度与当前步骤、MAA 组件更新的已用时间，以及理智恢复情况。长按展开详情，任务或更新失败时会主动展开，手机上没有活动时自动让位给页面标题。
 
 ### 日常自动化
 
@@ -237,8 +238,11 @@ curl -X POST http://localhost:3000/api/agent/runs/<runId>/stop
 La-pluma/
 ├─ client/                 React + TypeScript + Vite 前端
 │  ├─ src/components/      控制台、自动化、作业、肉鸽、养成、数据、小工具
+│  ├─ src/components/islandcn/  活动岛内容组件（islandcn）
+│  ├─ src/lib/island/      活动岛引擎（islandcn）
+│  ├─ src/hooks/           后端、Run、预览、理智与更新状态监控
 │  ├─ src/services/api.ts  /api/agent 客户端
-│  ├─ src/stores/          Zustand 状态
+│  ├─ src/store/           Zustand 状态
 │  └─ public/              PWA 图标与 Logo
 ├─ go/                     Go 后端与 MyGo 桌面外壳
 │  ├─ cmd/server/          headless HTTP 服务

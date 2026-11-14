@@ -18,7 +18,10 @@ const runSignature = (run: AgentRun | null): string => {
 
 interface RunStore {
   run: AgentRun | null
+  /** 最近一次结束的 Run，供岛在任务结束时展示最终状态。 */
+  lastRun: AgentRun | null
   applyRun: (run: AgentRun | null) => void
+  applyLastRun: (run: AgentRun | null) => void
 }
 
 /**
@@ -27,8 +30,13 @@ interface RunStore {
  */
 export const useRunStore = create<RunStore>((set, get) => ({
   run: null,
+  lastRun: null,
   applyRun: (run) => {
     if (runSignature(get().run) === runSignature(run)) return
     set({ run })
+  },
+  applyLastRun: (run) => {
+    if (runSignature(get().lastRun) === runSignature(run)) return
+    set({ lastRun: run })
   },
 }))
