@@ -273,6 +273,7 @@ func startDesktop() {
 		abortStartup(logger, "app", err)
 		return
 	}
+	application.ResumeInterruptedFlows(context.Background(), logger)
 	signalServer := signaling.New(func() *scwebrtc.Publisher {
 		return application.WebRTC.CurrentPublisher()
 	}, logger)

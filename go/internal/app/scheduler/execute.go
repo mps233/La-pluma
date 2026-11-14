@@ -141,6 +141,23 @@ func (e *flowExecution) buildSummary(durationMS int64) *ExecutionSummary {
 	}
 }
 
+// EnabledTaskCount returns the number of tasks that a flow will actually run.
+// It is used by restore to size the checkpoint before StartDailyFlow emits its
+// first progress event.
+func EnabledTaskCount(taskFlow any) int {
+	tasks, ok := taskFlowSlice(taskFlow)
+	if !ok {
+		return 0
+	}
+	count := 0
+	for _, task := range tasks {
+		if taskEnabled(task) {
+			count++
+		}
+	}
+	return count
+}
+
 // StartDailyFlow validates and runs a task flow sequentially. DryRun returns
 // the same plan as the Agent API's dry-run response without touching MAA.
 func (s *Service) StartDailyFlow(ctx context.Context, request DailyFlowRequest) DailyFlowResult {
@@ -177,6 +194,13 @@ func (s *Service) StartDailyFlow(ctx context.Context, request DailyFlowRequest) 
 		}
 	}
 	totalSteps := len(enabled)
+	startIndex := request.ResumeFrom
+	if startIndex < 0 {
+		startIndex = 0
+	}
+	if startIndex > totalSteps {
+		startIndex = totalSteps
+	}
 
 	s.mu.Lock()
 	if s.status.isRunning {
@@ -190,12 +214,18 @@ func (s *Service) StartDailyFlow(ctx context.Context, request DailyFlowRequest) 
 	}
 	runCtx, cancel := context.WithCancel(ctx)
 	startMillis := s.nowMillis()
+	initialStep := -1
+	initialMessage := "开始执行任务流程"
+	if startIndex > 0 {
+		initialStep = startIndex
+		initialMessage = "继续执行上次任务流程"
+	}
 	s.status = executionStatus{
 		isRunning:   true,
 		scheduleID:  &scheduleID,
-		currentStep: -1,
+		currentStep: initialStep,
 		totalSteps:  totalSteps,
-		message:     "开始执行任务流程",
+		message:     initialMessage,
 		startTime:   &startMillis,
 		shouldStop:  false,
 	}
@@ -219,7 +249,8 @@ func (s *Service) StartDailyFlow(ctx context.Context, request DailyFlowRequest) 
 	startupFailed := false
 	stopped := false
 
-	for index, task := range enabled {
+	for index := startIndex; index < len(enabled); index++ {
+		task := enabled[index]
 		if s.stopRequested(runCtx) {
 			s.markStopping()
 			stopped = true

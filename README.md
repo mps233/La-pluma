@@ -45,6 +45,7 @@ The project is named after La Pluma, the five-star Guard in Arknights.
 - **Per-task options** — base shift modes with facility and drone settings, recruit star/tag/time rules, credit-store priority and blacklist, seven award categories, and an optional depot scan before closing the game.
 - **Scheduling** — up to six daily times per flow, each enabled separately, and restored after a restart. Only one flow runs at a time.
 - **Run feedback** — step progress and elapsed time, stop by `runId`, per-task success/failure/skip counts, and expandable drops, reports, errors and warnings. Ordinary task failures continue the flow; a Start Game failure that exhausts its retries ends it.
+- **Resume after a restart** — a scheduled flow cut off by a server or desktop restart continues from its first unfinished top-level task under a new linked Run. Completed tasks are kept, the task that was in flight runs again from its start, and flows the user stopped are not resumed.
 
 ### Combat
 

@@ -316,6 +316,11 @@ func newScheduler(cfg config.Config, logger *slog.Logger, runs *runapp.Service, 
 		StageOpenChecker:   trainingStageChecker{service: trainingService},
 		AutoUpdater:        autoUpdater,
 		WrapDailyFlow:      trackedFlowWrapper{runs: runs}.WrapDailyFlow,
+		OnProgress: func(progress map[string]any, _ []scheduler.ScheduleTaskResult) {
+			if current, ok := runs.Current(); ok {
+				_, _ = runs.UpdateProgress(current.RunID, progress, nil)
+			}
+		},
 		ResolveStage: func(stage, clientType string) string {
 			return replaceActivityCode(activityService, stage, clientType)
 		},

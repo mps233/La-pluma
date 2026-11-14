@@ -284,6 +284,9 @@ type DailyFlowRequest struct {
 	ScheduleID string
 	TaskFlow   any
 	DryRun     bool
+	// ResumeFrom is the zero-based index into the enabled tasks at which a
+	// restored flow continues. Zero starts a normal run.
+	ResumeFrom int
 }
 
 // DailyFlowResult mirrors ScheduleExecutionResult plus plan fields.

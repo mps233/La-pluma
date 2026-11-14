@@ -41,6 +41,7 @@ func main() {
 		logger.Error("app init", "error", err)
 		os.Exit(1)
 	}
+	application.ResumeInterruptedFlows(context.Background(), logger)
 	signalServer := signaling.New(func() *scwebrtc.Publisher {
 		return application.WebRTC.CurrentPublisher()
 	}, logger)

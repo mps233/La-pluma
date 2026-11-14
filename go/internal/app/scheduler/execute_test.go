@@ -301,3 +301,57 @@ func TestRecruitRetriesTransientMAAUpdateFailure(t *testing.T) {
 		t.Fatalf("recruit attempts = %d, want 2", attempts)
 	}
 }
+
+func TestResumeFromSkipsCompletedTasks(t *testing.T) {
+	executor := &fakeExecutor{}
+	service := newTestService(executor, Options{})
+	defer service.Close()
+
+	flow := []any{
+		map[string]any{"id": "a-1", "name": "启动游戏", "enabled": true, "commandId": "alpha", "params": map[string]any{}},
+		map[string]any{"id": "b-1", "name": "理智作战", "enabled": true, "commandId": "beta", "params": map[string]any{}},
+		map[string]any{"id": "c-1", "name": "基建换班", "enabled": true, "commandId": "gamma", "params": map[string]any{}},
+	}
+	result := service.StartDailyFlow(context.Background(), DailyFlowRequest{ScheduleID: "resume", TaskFlow: flow, ResumeFrom: 2})
+	if !result.Success || result.Stopped {
+		t.Fatalf("result = %+v", result)
+	}
+	calls := executor.callsSnapshot()
+	if len(calls) != 1 || calls[0].Command != "gamma" {
+		t.Fatalf("resumed flow should run only the remaining task: %+v", calls)
+	}
+	if result.Summary == nil || result.Summary.SuccessCount != 1 {
+		t.Fatalf("summary = %+v", result.Summary)
+	}
+}
+
+func TestResumeFromBeyondTheFlowRunsNothing(t *testing.T) {
+	executor := &fakeExecutor{}
+	service := newTestService(executor, Options{})
+	defer service.Close()
+
+	flow := []any{
+		map[string]any{"id": "a-1", "name": "A", "enabled": true, "commandId": "alpha", "params": map[string]any{}},
+	}
+	result := service.StartDailyFlow(context.Background(), DailyFlowRequest{ScheduleID: "resume-done", TaskFlow: flow, ResumeFrom: 5})
+	if !result.Success {
+		t.Fatalf("result = %+v", result)
+	}
+	if calls := executor.callsSnapshot(); len(calls) != 0 {
+		t.Fatalf("nothing should run: %+v", calls)
+	}
+}
+
+func TestEnabledTaskCountIgnoresDisabledTasks(t *testing.T) {
+	flow := []any{
+		map[string]any{"id": "a-1", "enabled": true},
+		map[string]any{"id": "b-1", "enabled": false},
+		map[string]any{"id": "c-1", "enabled": true},
+	}
+	if got := EnabledTaskCount(flow); got != 2 {
+		t.Fatalf("EnabledTaskCount = %d, want 2", got)
+	}
+	if got := EnabledTaskCount(nil); got != 0 {
+		t.Fatalf("EnabledTaskCount(nil) = %d, want 0", got)
+	}
+}
