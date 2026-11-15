@@ -61,4 +61,28 @@ test.describe('app tabs', () => {
     environment.assertNoUnmatchedApi()
     await expectNoBrowserErrors(page)
   })
+
+  test('navbar actions stay at the trailing edge', async ({ page }) => {
+    const environment = await installDeterministicEnvironment(page)
+
+    await page.goto('/app/dashboard')
+    await waitForPageReady(page, 'dashboard')
+
+    const edges = await page.evaluate(() => {
+      const navbarInner = document.querySelector<HTMLElement>('.la-pluma-navbar-inner')
+      const actions = document.querySelector<HTMLElement>('.la-pluma-navbar-actions')
+      if (!navbarInner || !actions) throw new Error('navbar structure missing')
+      const innerRect = navbarInner.getBoundingClientRect()
+      const paddingRight = Number.parseFloat(getComputedStyle(navbarInner).paddingRight)
+      return {
+        contentRight: innerRect.right - paddingRight,
+        actionsRight: actions.getBoundingClientRect().right,
+      }
+    })
+
+    expect(Math.abs(edges.actionsRight - edges.contentRight)).toBeLessThanOrEqual(1)
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
 })

@@ -186,16 +186,19 @@
   }
 
   .la-pluma-app .la-pluma-navbar-inner > .la-pluma-navbar-left {
+    grid-column: 1;
     justify-self: start;
   }
 
   .la-pluma-app .la-pluma-navbar-inner > .la-pluma-navbar-title {
+    grid-column: 2;
     min-width: 0;
     justify-self: center;
     text-align: center;
   }
 
   .la-pluma-app .la-pluma-navbar-inner > .la-pluma-navbar-actions {
+    grid-column: 3;
     justify-self: end;
   }
 
