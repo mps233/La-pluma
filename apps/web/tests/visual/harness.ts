@@ -1,4 +1,6 @@
 import { expect, type Page, type Route } from '@playwright/test'
+import { THEME_STORAGE_KEY } from '../../src/shared/theme/bootTheme'
+import { DEFAULT_THEME_ID } from '../../src/shared/theme/registry'
 import {
   apiFixtures,
   FIXED_NOW,
@@ -27,11 +29,11 @@ export const READY_MARKER: Record<string, { text?: string; input?: string }> = {
   gallery: { text: '主题画廊' },
 }
 
-/** 主题种子：与 shared/theme/bootTheme.ts 的 lpn-ui key/结构保持一致。 */
+/** 主题种子：key 与默认主题 id 取自 shared/theme 单一来源。 */
 export function themeSeedScript(theme: Theme) {
   return `
-    localStorage.setItem('lpn-ui', JSON.stringify({
-      themeId: 'default',
+    localStorage.setItem(${JSON.stringify(THEME_STORAGE_KEY)}, JSON.stringify({
+      themeId: ${JSON.stringify(DEFAULT_THEME_ID)},
       mode: ${JSON.stringify(theme)},
     }))
   `

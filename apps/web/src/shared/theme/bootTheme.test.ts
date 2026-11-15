@@ -5,16 +5,24 @@ import { join } from 'node:path'
 import { cwd } from 'node:process'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  applyBootSettingsToDom,
   applyUiSettings,
   BOOT_THEME_COLORS,
+  BOOT_THEME_COLORS_BY_ID,
   createBootScript,
   DEFAULT_THEME_SETTINGS,
+  KNOWN_THEME_IDS,
   LEGACY_THEME_STORAGE_KEY,
   readLegacyThemeMode,
   readStoredSettings,
+  resolveBootSettings,
   resolveDark,
+  resolveInitialSettings,
+  THEME_MODES,
   THEME_STORAGE_KEY,
+  type UiThemeSettings,
 } from './bootTheme'
+import { DEFAULT_THEME_ID } from './registry'
 
 let systemDark = false
 
@@ -160,10 +168,206 @@ describe('applyUiSettings', () => {
     expect(document.documentElement.style.backgroundColor).toBe('rgb(0, 0, 0)')
     expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
   })
+
+  it('does not resolve object prototype keys as theme ids', () => {
+    systemDark = false
+
+    applyUiSettings({ themeId: 'toString', mode: 'light' })
+
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+    expect(document.documentElement.style.backgroundColor).toBe('rgb(242, 242, 247)')
+    expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
+  })
+
+  it('falls back to the default theme for non-string theme ids', () => {
+    systemDark = false
+
+    applyUiSettings({ themeId: ['default'], mode: 'light' } as unknown as UiThemeSettings)
+
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+    expect(document.documentElement.style.backgroundColor).toBe('rgb(242, 242, 247)')
+    expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
+    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#f6f8fb')
+  })
+})
+
+describe('resolveBootSettings', () => {
+  const defaults = DEFAULT_THEME_SETTINGS
+
+  it('returns null when neither storage value is usable', () => {
+    expect(resolveBootSettings(null, null, KNOWN_THEME_IDS, THEME_MODES, defaults)).toBeNull()
+    expect(resolveBootSettings('{invalid-json', '{invalid-json', KNOWN_THEME_IDS, THEME_MODES, defaults)).toBeNull()
+    expect(resolveBootSettings('{}', JSON.stringify({ state: {} }), KNOWN_THEME_IDS, THEME_MODES, defaults)).toBeNull()
+  })
+
+  it('merges each usable field over the defaults', () => {
+    expect(resolveBootSettings(JSON.stringify({ mode: 'light' }), null, KNOWN_THEME_IDS, THEME_MODES, defaults))
+      .toEqual({ themeId: DEFAULT_THEME_ID, mode: 'light' })
+    expect(resolveBootSettings(JSON.stringify({ themeId: DEFAULT_THEME_ID }), null, KNOWN_THEME_IDS, THEME_MODES, defaults))
+      .toEqual({ themeId: DEFAULT_THEME_ID, mode: 'dark' })
+  })
+
+  it('falls back to the legacy mode only when the lpn-ui value has no usable field', () => {
+    const legacy = JSON.stringify({ state: { theme: 'light' }, version: 0 })
+
+    expect(resolveBootSettings(
+      JSON.stringify({ themeId: 'missing-theme', mode: 'sepia' }),
+      legacy,
+      KNOWN_THEME_IDS,
+      THEME_MODES,
+      defaults,
+    )).toEqual({ themeId: DEFAULT_THEME_ID, mode: 'light' })
+    expect(resolveBootSettings(
+      JSON.stringify({ themeId: 'missing-theme', mode: 'light' }),
+      legacy,
+      KNOWN_THEME_IDS,
+      THEME_MODES,
+      defaults,
+    )).toEqual({ themeId: DEFAULT_THEME_ID, mode: 'light' })
+  })
+
+  it('does not treat object prototype keys as known theme ids', () => {
+    expect(resolveBootSettings(
+      JSON.stringify({ themeId: 'toString', mode: 'light' }),
+      null,
+      KNOWN_THEME_IDS,
+      THEME_MODES,
+      defaults,
+    )).toEqual({ themeId: DEFAULT_THEME_ID, mode: 'light' })
+    expect(resolveBootSettings(
+      JSON.stringify({ themeId: 'toString' }),
+      null,
+      KNOWN_THEME_IDS,
+      THEME_MODES,
+      defaults,
+    )).toBeNull()
+  })
+})
+
+describe('applyBootSettingsToDom', () => {
+  beforeEach(installThemeEnvironment)
+
+  const palettes = {
+    default: {
+      light: { background: '#f2f2f7', themeColor: '#f6f8fb', statusBar: 'default' },
+      dark: { background: '#000000', themeColor: '#05090c', statusBar: 'black-translucent' },
+    },
+    alt: {
+      light: { background: '#eeeeee', themeColor: '#222222', statusBar: 'default' },
+      dark: { background: '#111111', themeColor: '#333333', statusBar: 'black-translucent' },
+    },
+  }
+
+  it('applies an explicit theme palette and data-theme attribute', () => {
+    applyBootSettingsToDom({ themeId: 'alt', mode: 'dark' }, palettes, DEFAULT_THEME_ID, true, document)
+
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+    expect(document.documentElement.getAttribute('data-theme')).toBe('alt')
+    expect(document.documentElement.style.backgroundColor).toBe('rgb(17, 17, 17)')
+    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#333333')
+  })
+
+  it('falls back to the default palette and removes data-theme for unknown ids', () => {
+    document.documentElement.setAttribute('data-theme', 'stale-theme')
+
+    applyBootSettingsToDom({ themeId: 'missing-theme', mode: 'light' }, palettes, DEFAULT_THEME_ID, false, document)
+
+    expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
+    expect(document.documentElement.style.backgroundColor).toBe('rgb(242, 242, 247)')
+    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#f6f8fb')
+  })
+})
+
+interface BootStorageCase {
+  name: string
+  lpn: string | null
+  legacy: string | null
+  systemDark: boolean
+}
+
+const BOOT_STORAGE_CASES: BootStorageCase[] = [
+  { name: 'nothing stored with a light system', lpn: null, legacy: null, systemDark: false },
+  { name: 'nothing stored with a dark system', lpn: null, legacy: null, systemDark: true },
+  { name: 'stored light mode', lpn: JSON.stringify({ themeId: 'default', mode: 'light' }), legacy: null, systemDark: false },
+  { name: 'stored dark mode', lpn: JSON.stringify({ themeId: 'default', mode: 'dark' }), legacy: null, systemDark: false },
+  { name: 'stored system mode with a dark system', lpn: JSON.stringify({ themeId: 'default', mode: 'system' }), legacy: null, systemDark: true },
+  { name: 'stored system mode with a light system', lpn: JSON.stringify({ themeId: 'default', mode: 'system' }), legacy: null, systemDark: false },
+  { name: 'lpn-ui missing the theme id', lpn: JSON.stringify({ mode: 'light' }), legacy: null, systemDark: false },
+  { name: 'lpn-ui missing the mode', lpn: JSON.stringify({ themeId: 'default' }), legacy: null, systemDark: false },
+  { name: 'lpn-ui with an unknown theme', lpn: JSON.stringify({ themeId: 'missing-theme', mode: 'light' }), legacy: null, systemDark: false },
+  { name: 'lpn-ui with a non-string theme id', lpn: JSON.stringify({ themeId: ['default'], mode: 'light' }), legacy: null, systemDark: false },
+  { name: 'lpn-ui empty object', lpn: '{}', legacy: null, systemDark: false },
+  { name: 'lpn-ui corrupt JSON', lpn: '{invalid-json', legacy: null, systemDark: false },
+  { name: 'lpn-ui null literal', lpn: 'null', legacy: null, systemDark: false },
+  { name: 'legacy light mode', lpn: null, legacy: JSON.stringify({ state: { theme: 'light' }, version: 0 }), systemDark: false },
+  { name: 'legacy dark mode', lpn: null, legacy: JSON.stringify({ state: { theme: 'dark' }, version: 0 }), systemDark: false },
+  { name: 'legacy system mode with a dark system', lpn: null, legacy: JSON.stringify({ state: { theme: 'system' }, version: 0 }), systemDark: true },
+  { name: 'legacy corrupt JSON', lpn: null, legacy: '{invalid-json', systemDark: false },
+  { name: 'lpn-ui wins over legacy', lpn: JSON.stringify({ themeId: 'default', mode: 'light' }), legacy: JSON.stringify({ state: { theme: 'dark' }, version: 0 }), systemDark: false },
+  { name: 'partial lpn-ui wins over legacy', lpn: JSON.stringify({ themeId: 'default' }), legacy: JSON.stringify({ state: { theme: 'light' }, version: 0 }), systemDark: false },
+  { name: 'lpn-ui unusable fields fall back to legacy', lpn: JSON.stringify({ themeId: 'missing-theme', mode: 'sepia' }), legacy: JSON.stringify({ state: { theme: 'system' }, version: 0 }), systemDark: true },
+  { name: 'both storage values corrupt', lpn: '{invalid-json', legacy: '{invalid-json', systemDark: false },
+  { name: 'prototype-key theme id falls back to legacy', lpn: JSON.stringify({ themeId: 'toString', mode: 'sepia' }), legacy: JSON.stringify({ state: { theme: 'light' }, version: 0 }), systemDark: false },
+]
+
+interface BootDomSnapshot {
+  rootDark: boolean
+  appRootDark: boolean | null
+  colorScheme: string
+  backgroundColor: string
+  dataTheme: string | null
+  themeColor: string | null
+  statusBar: string | null
+}
+
+function seedBootEnvironment(testCase: BootStorageCase) {
+  installThemeEnvironment()
+  systemDark = testCase.systemDark
+  if (testCase.lpn !== null) window.localStorage.setItem(THEME_STORAGE_KEY, testCase.lpn)
+  if (testCase.legacy !== null) window.localStorage.setItem(LEGACY_THEME_STORAGE_KEY, testCase.legacy)
+}
+
+function snapshotBootDom(): BootDomSnapshot {
+  return {
+    rootDark: document.documentElement.classList.contains('dark'),
+    appRootDark: document.getElementById('app-root')?.classList.contains('dark') ?? null,
+    colorScheme: document.documentElement.style.colorScheme,
+    backgroundColor: document.documentElement.style.backgroundColor,
+    dataTheme: document.documentElement.getAttribute('data-theme'),
+    themeColor: document.querySelector('meta[name="theme-color"]')?.getAttribute('content') ?? null,
+    statusBar: document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.getAttribute('content') ?? null,
+  }
+}
+
+describe('boot script and runtime parity', () => {
+  it.each(BOOT_STORAGE_CASES)('$name', (testCase) => {
+    seedBootEnvironment(testCase)
+    window.eval(createBootScript())
+    const fromScript = snapshotBootDom()
+
+    seedBootEnvironment(testCase)
+    applyUiSettings(resolveInitialSettings(
+      window.localStorage.getItem(THEME_STORAGE_KEY),
+      window.localStorage.getItem(LEGACY_THEME_STORAGE_KEY),
+    ))
+    const fromRuntime = snapshotBootDom()
+
+    expect(fromRuntime).toEqual(fromScript)
+  })
 })
 
 describe('createBootScript', () => {
   beforeEach(installThemeEnvironment)
+
+  it('contains no module imports, bundler helpers or TypeScript-only syntax', () => {
+    const script = createBootScript()
+
+    expect(script).not.toMatch(/\b(?:import|export)\b/)
+    expect(script).not.toContain('__name')
+    expect(script).not.toMatch(/\b(?:interface|satisfies)\b/)
+    expect(script).not.toContain('UiThemeSettings')
+    expect(script).not.toContain(' as ThemeMode')
+  })
 
   it('boots into the dark default when nothing is stored', () => {
     window.eval(createBootScript())
@@ -242,6 +446,11 @@ describe('default settings', () => {
   it('keeps the dark default consistent with the boot colors', () => {
     expect(DEFAULT_THEME_SETTINGS).toEqual({ themeId: 'default', mode: 'dark' })
     expect(BOOT_THEME_COLORS.dark.background).toBe('#000000')
+  })
+
+  it('keeps the default theme registered in the theme list and boot palette', () => {
+    expect(KNOWN_THEME_IDS).toContain(DEFAULT_THEME_ID)
+    expect(BOOT_THEME_COLORS_BY_ID[DEFAULT_THEME_ID]).toBeDefined()
   })
 })
 

@@ -3,30 +3,28 @@ import {
   applyUiSettings,
   DEFAULT_THEME_SETTINGS,
   LEGACY_THEME_STORAGE_KEY,
-  readLegacyThemeMode,
-  readStoredSettings,
+  PREFERS_DARK_MEDIA,
   resolveDark,
+  resolveInitialSettings,
   THEME_STORAGE_KEY,
   type ThemeMode,
   type UiThemeSettings,
 } from './bootTheme'
-import { DEFAULT_THEME_ID, getTheme, THEMES } from './registry'
+import { getTheme, THEMES } from './registry'
 import { ThemeContext, type ThemeContextValue, type ResolvedMode } from './useTheme'
 
 export type { ResolvedMode, ThemeMode }
 
-const DARK_MEDIA = '(prefers-color-scheme: dark)'
-
 function readInitialSettings(): UiThemeSettings {
   if (typeof window === 'undefined') return DEFAULT_THEME_SETTINGS
-  const stored = readStoredSettings(window.localStorage.getItem(THEME_STORAGE_KEY))
-  if (stored) return stored
-  const legacyMode = readLegacyThemeMode(window.localStorage.getItem(LEGACY_THEME_STORAGE_KEY))
-  return legacyMode ? { themeId: DEFAULT_THEME_ID, mode: legacyMode } : DEFAULT_THEME_SETTINGS
+  return resolveInitialSettings(
+    window.localStorage.getItem(THEME_STORAGE_KEY),
+    window.localStorage.getItem(LEGACY_THEME_STORAGE_KEY),
+  )
 }
 
 function subscribeSystemDark(onChange: () => void) {
-  const media = window.matchMedia(DARK_MEDIA)
+  const media = window.matchMedia(PREFERS_DARK_MEDIA)
   media.addEventListener('change', onChange)
   return () => media.removeEventListener('change', onChange)
 }
@@ -36,7 +34,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const systemDark = useSyncExternalStore(
     subscribeSystemDark,
-    () => window.matchMedia(DARK_MEDIA).matches,
+    () => window.matchMedia(PREFERS_DARK_MEDIA).matches,
     () => false,
   )
 
