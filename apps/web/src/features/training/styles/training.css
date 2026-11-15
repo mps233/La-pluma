@@ -31,7 +31,6 @@
     background: var(--card);
   }
 
-  .training-workspace { display: flex; flex-direction: column; gap: 1.125rem; }
   .training-workspace-grid { display: grid; align-items: start; gap: 1.125rem; }
   .training-surface { min-width: 0; overflow: hidden; border-radius: var(--radius-xl); background: var(--card); }
   .training-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem; }

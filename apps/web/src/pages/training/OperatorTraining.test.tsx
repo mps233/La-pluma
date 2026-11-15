@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createQueryClient } from '@/shared/query'
 import { AppToaster } from '@/shared/components'
 import type { TrainingOperator, TrainingPlan, TrainingQueueItem, TrainingSettings } from '@/features/training/types'
+import { trainingKeys } from '@/features/training/model/queryKeys'
 import { trainingQueueCommandOwner } from '@/features/training/model/queueCommands'
 import { trainingSettingsOwner } from '@/features/training/model/settingsCommands'
 import { trainingPlanOwner } from '@/features/training/model/planCommands'
@@ -308,12 +309,17 @@ const chooseSelectOption = async (name: string, label: string) => {
 }
 
 const openPicker = async () => {
-  const opener = buttonWithText('添加干员', container)
-  opener.focus()
-  await click(opener)
+  const opener = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+    .find(button => {
+      const label = button.textContent?.trim()
+      return label === '选择干员' || label === '继续添加'
+    })
+  expect(opener, 'operator picker opener').toBeDefined()
+  opener!.focus()
+  await click(opener!)
   const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
   expect(dialog).not.toBeNull()
-  return { opener, dialog: dialog! }
+  return { opener: opener!, dialog: dialog! }
 }
 
 describe('OperatorTraining queue workspace', () => {
@@ -391,6 +397,27 @@ describe('OperatorTraining queue workspace', () => {
     expect(queueOrder()).toEqual(['阿米娅'])
   })
 
+  it('opens the operator picker from the empty queue and the non-empty queue footer', async () => {
+    await renderComponent()
+
+    const { dialog: emptyDialog } = await openPicker()
+    expect(emptyDialog.querySelector('input[aria-label="搜索干员名称"]')).not.toBeNull()
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    await flush()
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+
+    mocks.getTrainingQueue.mockResolvedValue(queueResponse([queueItem('char_current', '阿米娅')]))
+    await act(async () => {
+      publishResourceInvalidation({ resources: ['training-queue'], cause: 'training-queue' })
+    })
+    await flush()
+
+    const { dialog: nonEmptyDialog } = await openPicker()
+    expect(nonEmptyDialog.querySelector('input[aria-label="搜索干员名称"]')).not.toBeNull()
+  })
+
   it('shows retryable candidate and queue errors instead of empty states', async () => {
     mocks.getOperatorList.mockImplementation(async (filters: { status?: string } = {}) => {
       if (filters.status === 'trainable') throw new Error('干员服务暂不可用')
@@ -401,23 +428,12 @@ describe('OperatorTraining queue workspace', () => {
       .mockResolvedValueOnce(queueResponse([]))
 
     await renderComponent()
-    await openPicker()
 
-    expect(document.body.textContent).toContain('干员列表加载失败')
-    expect(document.body.textContent).toContain('干员服务暂不可用')
     expect(document.body.textContent).toContain('养成队列加载失败')
     expect(document.body.textContent).toContain('队列服务暂不可用')
-    expect(document.body.textContent).not.toContain('没有可养成干员')
     expect(document.body.textContent).not.toContain('养成队列还是空的')
-
-    mocks.getOperatorList.mockResolvedValue({ success: true, data: { operators: [] } })
-    const listAlert = Array.from(document.querySelectorAll<HTMLElement>('[role="alert"]'))
-      .find(alert => alert.textContent?.includes('干员服务暂不可用'))
-    const listRetry = listAlert?.querySelector<HTMLButtonElement>('button')
-    expect(listRetry).not.toBeNull()
-    await click(listRetry!)
-    expect(document.body.textContent).not.toContain('干员服务暂不可用')
-    expect(document.body.textContent).toContain('没有可养成干员')
+    expect(container.textContent).not.toContain('选择干员')
+    expect(container.textContent).not.toContain('继续添加')
 
     const queueAlert = Array.from(container.querySelectorAll<HTMLElement>('[role="alert"]'))
       .find(alert => alert.textContent?.includes('队列服务暂不可用'))
@@ -428,6 +444,21 @@ describe('OperatorTraining queue workspace', () => {
     expect(mocks.getTrainingQueue).toHaveBeenCalledTimes(2)
     expect(document.body.textContent).not.toContain('队列服务暂不可用')
     expect(document.body.textContent).toContain('养成队列还是空的')
+
+    await openPicker()
+
+    expect(document.body.textContent).toContain('干员列表加载失败')
+    expect(document.body.textContent).toContain('干员服务暂不可用')
+    expect(document.body.textContent).not.toContain('没有可养成干员')
+
+    mocks.getOperatorList.mockResolvedValue({ success: true, data: { operators: [] } })
+    const listAlert = Array.from(document.querySelectorAll<HTMLElement>('[role="alert"]'))
+      .find(alert => alert.textContent?.includes('干员服务暂不可用'))
+    const listRetry = listAlert?.querySelector<HTMLButtonElement>('button')
+    expect(listRetry).not.toBeNull()
+    await click(listRetry!)
+    expect(document.body.textContent).not.toContain('干员服务暂不可用')
+    expect(document.body.textContent).toContain('没有可养成干员')
   })
 
   it('keeps the picker, plan, and automation controls accessible', async () => {
@@ -1248,7 +1279,7 @@ describe('OperatorTraining queue workspace', () => {
     expect(buttonWithText('应用到自动任务', container).disabled).toBe(false)
   })
 
-  it('ignores a slow initial queue response after a newer post-add refresh', async () => {
+  it('ignores a stale queue read that resolves after a newer post-add refresh', async () => {
     const initialRequest = deferred<ReturnType<typeof queueResponse>>()
     mocks.getOperatorList.mockResolvedValue({
       success: true,
@@ -1258,6 +1289,11 @@ describe('OperatorTraining queue workspace', () => {
       .mockReturnValueOnce(initialRequest.promise)
       .mockResolvedValueOnce(queueResponse([queueItem('char_current', '阿米娅'), queueItem('char_added', '能天使')]))
     mocks.addToTrainingQueue.mockResolvedValue({ success: true })
+    client.setQueryData(
+      trainingKeys.resource('queue'),
+      queueResponse([]).data,
+      { updatedAt: 0 },
+    )
 
     await renderComponent()
     const { dialog } = await openPicker()

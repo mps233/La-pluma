@@ -1,9 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
-import { Button } from '@/shared/ui/button'
-import { PageHeader } from '@/shared/components'
-import { FloatingStatusIndicator, useStatusStore } from '@/features/runtime-status'
+import { useStatusStore } from '@/features/runtime-status'
 import { useResourceInvalidation } from '@/features/resource-invalidation'
 import { gameDataKeys } from '@/features/game-data'
 import { DeviceMonitorLayout } from '@/features/device-mirror'
@@ -252,7 +249,6 @@ export default function TrainingWorkspace() {
 
   return (
     <>
-      <PageHeader title="养成材料筹备" subtitle="管理材料目标并安排刷取计划；游戏内培养请在日常中添加任务" actions={<><FloatingStatusIndicator /><Button onClick={() => setSelectorOpen(true)}><Plus size={17} aria-hidden="true" />添加干员</Button></>} />
       <DeviceMonitorLayout>
         <div className="training-workspace-grid">
           <TrainingQueuePanel
