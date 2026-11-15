@@ -20,7 +20,7 @@
 
 | 内容 | 唯一归属 | 说明 |
 | --- | --- | --- |
-| 页头、全局状态指示与工作区组合 | `pages/automation/AutomationTasks.tsx` | 只调用 `PageHeader`、`FloatingStatusIndicator` 与 `AutomationWorkspace` |
+| 页面壳与工作区组合 | `pages/automation/AutomationTasks.tsx` | 只渲染 `app-page`/`app-stack-section` 与 `AutomationWorkspace` |
 | 配置订阅、Run 订阅、选中项、撤销、连接测试、跨域失效、任务编辑 | `components/AutomationWorkspace.tsx` | 页面级领域容器；仍调用所属领域 hook，不直接调用 API/存储/轮询 |
 | 流程列表、页脚与摘要组合 | `components/AutomationTaskFlowPanel.tsx` | 接收只读 Run 投影、排序投影与配置回调；页脚仍是任务挑选菜单的点击区域 |
 | 定时编辑 | `components/AutomationScheduleCard.tsx` | 绑定 `model/automationSchedule.ts`；结果经 `onChange` 交给唯一配置 owner |
@@ -59,7 +59,7 @@
 ### 2. 组合与状态边界
 
 ```
-AutomationTasks（页头 + 全局指示）
+AutomationTasks（app-page > app-stack-section > AutomationWorkspace）
 └─ AutomationWorkspace（配置/执行/选中/撤销/连接/失效）
    ├─ AutomationTaskFlowPanel
    │  ├─ 任务流程列表（拖拽、启用、删除、撤销）
@@ -249,7 +249,7 @@ browser releases pointer capture”用例固定；DOM/CSS 未变化。性能复�
 | 参数编辑 | `updateTaskFlowParams` 只替换目标任务；`clientType` 变化时同步启动/关闭游戏步骤，与迁移前一致 |
 | 关卡分组 | `splitStagesForEditing` 负责 置顶/智能养成/普通/空白 分类，`orderStagesForEditing` 按 置顶 → 智能养成 → 普通 → 空白输入行拼接；任务编辑面板的智能养成增删复用同一分类。组内保持原顺序，每个条目只归类一次，长度与多重集合不变 |
 | 执行前校验 | `findTaskFlowValidationFailure` 先检查启用中的自定义换班（`taskType === 'Infrast'`、`mode === 10000`、`filename` 为空），再检查启用中的 `fight` 掉落目标；返回第一个无效任务 id 与提示 |
-| 提示文案 | 两条校验文案由模型返回，工作区负责写入全局状态消息并选中该任务 |
+| 提示文案 | 两条校验文案由模型返回，工作区负责发送全局通知并选中该任务 |
 
 同时带 `pinned` 与 `smart` 的异常关卡形状按置顶归类一次；旧页面会把它复制到两个分组。正常编辑路径不会产生该形状。
 
@@ -323,7 +323,7 @@ browser releases pointer capture”用例固定；DOM/CSS 未变化。性能复�
 ### 2. 组合与状态边界
 
 ```
-AutomationTasks（页头 + 全局指示）
+AutomationTasks（app-page > app-stack-section > AutomationWorkspace）
 └─ AutomationWorkspace（配置/执行/选中/撤销/连接/失效）
    ├─ AutomationTaskFlowPanel
    │  ├─ 任务流程列表（拖拽预览、拖拽公告）

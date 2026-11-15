@@ -4,7 +4,7 @@
 import { useCallback } from 'react'
 import { Switch } from '@/shared/ui/switch'
 import { ConfigFieldInput, ConfigFieldSelect } from './ConfigFieldControls'
-import { useStatusStore } from '@/features/runtime-status'
+import { notify, SETTINGS_CONFIG_CONNECTION_NOTICE_ID } from '@/shared/notifications'
 import { useConfigDraftPanel } from '../hooks/useConfigDraftPanel'
 import { useSettingsConnectionConfig } from '../hooks/useSettingsConnectionConfig'
 import { useClearConnectionTestFeedback } from '../hooks/useSettingsDeviceConnection'
@@ -33,7 +33,6 @@ export interface ConnectionConfigPanelProps {
 }
 
 export default function ConnectionConfigPanel({ isActive }: ConnectionConfigPanelProps) {
-  const setStatusMessage = useStatusStore(state => state.setMessage)
   const {
     draft: configData,
     update: updateConnectionDraft,
@@ -53,6 +52,7 @@ export default function ConnectionConfigPanel({ isActive }: ConnectionConfigPane
     save: saveConnectionConfig,
   } = useConfigDraftPanel({
     label: '连接配置',
+    noticeId: SETTINGS_CONFIG_CONNECTION_NOTICE_ID,
     savingMessage: '正在保存配置...',
     loadError: connectionLoadError,
     loaded: connectionLoaded,
@@ -72,7 +72,7 @@ export default function ConnectionConfigPanel({ isActive }: ConnectionConfigPane
   const handleReset = () => {
     restoreDefaults()
     setConfigFeedback(null)
-    setStatusMessage('已重置为默认值')
+    notify('已重置为默认值')
   }
 
   // 地址输入变更清除旧测试反馈；不取消在途测试，与迁移前一致。

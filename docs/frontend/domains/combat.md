@@ -16,7 +16,7 @@
 
 | 内容 | 唯一归属 | 说明 |
 | --- | --- | --- |
-| 页面壳、页头与全局状态指示 | `pages/combat/CombatTasks.tsx` | 只渲染 `app-page`/`app-stack-section`、`PageHeader` 与工作区；不调用搜索/预览/执行 hook，不持有请求生命周期 |
+| 页面壳与工作区组合 | `pages/combat/CombatTasks.tsx` | 只渲染 `app-page`/`app-stack-section` 与工作区；不调用搜索/预览/执行 hook，不持有请求生命周期 |
 | 模式、配置订阅、预览/搜索入口、执行订阅、作业集选择、队列实例、同步反馈与重置弹层 | `features/combat/components/CombatWorkspace.tsx` | 跨面板唯一容器；`activeCombatMode`、`selectedCopilotIndexes`、`useCopilotQueue` 实例与面板会话存储在这里创建 |
 | 任务目录与模式展示项 | `features/combat/components/CombatTaskCatalog.tsx` | 名称、命令、图标、占位与描述；不读取配置/Query/执行状态 |
 | 模式分段控件的测量与键盘导航 | `features/combat/components/CombatModeTabs.tsx` | 受控组件；只持有 `useFluidTabIndicator` 的测量状态 |
@@ -49,7 +49,7 @@
 ### 2. 组合与状态边界
 
 ```
-CombatTasks（页面壳：PageHeader + FloatingStatusIndicator）
+CombatTasks（app-page > app-stack-section > CombatWorkspace）
 └─ CombatWorkspace（模式、配置、预览/搜索、执行、选择、同步反馈、重置弹层）
    ├─ CombatModeTabs（受控分段 + 高亮测量）
    ├─ CombatExecutionProgressPanel（本次执行条目位置 / 关卡 / 已用时）

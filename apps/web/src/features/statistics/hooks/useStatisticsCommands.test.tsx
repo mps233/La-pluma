@@ -24,6 +24,19 @@ const mocks = vi.hoisted(() => {
   }
 })
 
+const notifications = vi.hoisted(() => ({
+  notify: vi.fn(),
+  notifyProgress: vi.fn(),
+  dismissNotice: vi.fn(),
+}))
+
+vi.mock('@/shared/notifications', () => ({
+  notify: notifications.notify,
+  notifyProgress: notifications.notifyProgress,
+  dismissNotice: notifications.dismissNotice,
+  STATISTICS_NOTICE_ID: 'statistics',
+}))
+
 vi.mock('../model/commandOwner', () => ({
   statisticsCommandOwner: {
     run: mocks.run,
@@ -71,6 +84,9 @@ describe('useStatisticsCommands snapshot writes', () => {
     commands = null
     mocks.run.mockReset()
     mocks.resume.mockReset()
+    notifications.notify.mockReset()
+    notifications.notifyProgress.mockReset()
+    notifications.dismissNotice.mockReset()
     await act(async () => root.render(
       <QueryClientProvider client={queryClient}>
         <Harness />
@@ -109,6 +125,7 @@ describe('useStatisticsCommands snapshot writes', () => {
       queryKey: ['game-data', 'depot'],
     })
     expect(queryClient.setQueryData).toHaveBeenCalledWith(['game-data', 'depot'], depot)
+    expect(notifications.notify).toHaveBeenCalledWith('识别完成', 'success', { id: 'statistics' })
   })
 
   it('writes the operbox snapshot through the same cancel-then-write path', async () => {
@@ -133,5 +150,31 @@ describe('useStatisticsCommands snapshot writes', () => {
 
     expect(order).toEqual(['cancel', 'set'])
     expect(queryClient.setQueryData).toHaveBeenCalledWith(['game-data', 'operbox'], operBox)
+  })
+
+  it('reports command progress under the statistics notice id', async () => {
+    mocks.run.mockImplementation(async (_kind, options) => {
+      options.onProgress?.('正在识别仓库物品...')
+      return { status: 'succeeded', kind: 'depot', message: '识别完成', depot }
+    })
+
+    await act(async () => {
+      commands!.startRecognition('depot')
+    })
+    await flush()
+
+    expect(notifications.notifyProgress).toHaveBeenCalledWith('正在识别仓库物品...', 'statistics')
+  })
+
+  it('dismisses the progress notice when a terminal result has no message', async () => {
+    mocks.run.mockResolvedValue({ status: 'failed', kind: 'depot', message: '' })
+
+    await act(async () => {
+      commands!.startRecognition('depot')
+    })
+    await flush()
+
+    expect(notifications.dismissNotice).toHaveBeenCalledWith('statistics')
+    expect(notifications.notify).not.toHaveBeenCalled()
   })
 })

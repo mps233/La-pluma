@@ -6,6 +6,13 @@ import { useCallback, useEffect, useSyncExternalStore } from 'react'
 import { invalidateItemIconCache } from '@/features/game-data'
 import { publishResourceInvalidation } from '@/features/resource-invalidation'
 import {
+  detectNoticeType,
+  dismissNotice,
+  notifyProgress,
+  SETTINGS_UPDATE_NOTICE_ID,
+  type Notify,
+} from '@/shared/notifications'
+import {
   SETTINGS_UPDATE_RESOURCE_SCOPES,
   resolveCoreChannelSwitch,
   settingsUpdateOwner,
@@ -14,11 +21,6 @@ import {
   type UpdateFeedback,
   type UpdateOperation,
 } from '../model/updateCommands'
-
-type SettingsNotify = (
-  message: string,
-  type?: 'success' | 'error' | 'warning' | 'info' | 'default',
-) => void
 
 export interface UseSettingsUpdatesResult {
   readonly running: UpdateOperation | null
@@ -36,7 +38,7 @@ export interface UseSettingsUpdatesResult {
 }
 
 export function useSettingsUpdates(
-  notify: SettingsNotify,
+  notify: Notify,
   reloadVersion: () => Promise<void>,
   owner: SettingsUpdateOwner = settingsUpdateOwner,
 ): UseSettingsUpdatesResult {
@@ -44,8 +46,11 @@ export function useSettingsUpdates(
 
   const finish = useCallback(async (outcome: UpdateCommandOutcome) => {
     if (outcome.message) {
-      if (outcome.messageType) notify(outcome.message, outcome.messageType)
-      else notify(outcome.message)
+      notify(outcome.message, outcome.messageType ?? detectNoticeType(outcome.message), {
+        id: SETTINGS_UPDATE_NOTICE_ID,
+      })
+    } else {
+      dismissNotice(SETTINGS_UPDATE_NOTICE_ID)
     }
 
     if (outcome.status === 'succeeded' && outcome.resourcesChanged) {
@@ -71,9 +76,13 @@ export function useSettingsUpdates(
     action: () => Promise<UpdateCommandOutcome>,
   ): Promise<UpdateCommandOutcome> => {
     // 已有一条命令在途时不再显示第二条开始提示；owner 会返回 ignored。
-    if (owner.getState().running === null) notify(startMessage)
-    return finish(await action())
-  }, [finish, notify, owner])
+    if (owner.getState().running === null) {
+      notifyProgress(startMessage, SETTINGS_UPDATE_NOTICE_ID)
+    }
+    const outcome = await action()
+    if (outcome.status === 'ignored') return outcome
+    return finish(outcome)
+  }, [finish, owner])
 
   // 刷新后服务端更新可能仍在运行：恢复观察、占回命令槽位并保留停止入口。
   useEffect(() => (
@@ -105,10 +114,12 @@ export function useSettingsUpdates(
   const cancelUpdate = useCallback(async () => {
     const result = await owner.cancel()
     if (!result.ok) {
-      if (result.message) notify(`停止更新失败: ${result.message}`, 'error')
+      if (result.message) {
+        notify(`停止更新失败: ${result.message}`, 'error', { id: SETTINGS_UPDATE_NOTICE_ID })
+      }
       return
     }
-    notify('已发送停止请求，等待更新退出...', 'info')
+    notify('已发送停止请求，等待更新退出...', 'info', { id: SETTINGS_UPDATE_NOTICE_ID })
   }, [notify, owner])
 
   return {

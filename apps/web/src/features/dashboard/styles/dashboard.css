@@ -574,18 +574,6 @@
     color: var(--muted-foreground);
   }
 
-  @media (max-width: 639px) {
-    .la-pluma-app .dashboard-page .app-page-header.is-mobile-inline .app-page-heading {
-      max-width: calc(100% - 3.25rem);
-      flex: 0 0 auto;
-    }
-
-    .la-pluma-app .dashboard-page .app-page-header.is-mobile-inline .app-page-actions {
-      max-width: 7.75rem;
-      flex: 1 1 auto;
-    }
-  }
-
   .la-pluma-app .dashboard-page .dashboard-summary-header {
     background: transparent;
   }
@@ -608,72 +596,6 @@
 
     .la-pluma-app .dashboard-page > .app-stack-section {
       gap: var(--dashboard-card-gap);
-    }
-
-    /* Keep the dashboard title in the normal content flow. The translucent
-       gradient belongs to the top three-button Navbar, not this section. */
-    .la-pluma-app .dashboard-page .app-page-header {
-      box-sizing: border-box;
-      min-height: 0;
-      margin: 0;
-      padding: 0.25rem 0 1rem;
-      align-items: center;
-      flex-direction: row;
-      gap: 0.75rem;
-    }
-
-    .la-pluma-app .dashboard-page .app-page-heading {
-      display: flex;
-      flex: 1 1 auto;
-      min-width: 0;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .la-pluma-app .dashboard-page .app-page-header-icon {
-      display: flex;
-      width: 2.75rem;
-      height: 2.75rem;
-      flex: 0 0 2.75rem;
-    }
-
-    .la-pluma-app .dashboard-page .app-page-subtitle {
-      display: none;
-    }
-
-    .la-pluma-app .dashboard-page .app-page-title {
-      font-size: 2rem;
-      font-weight: 700;
-      line-height: 1;
-    }
-
-    .la-pluma-app .dashboard-page .app-page-actions {
-      width: auto;
-      min-width: 0;
-      min-height: 0;
-      justify-content: flex-end;
-    }
-
-    .la-pluma-app .dashboard-page .dashboard-page-actions {
-      width: auto;
-      min-width: 0;
-    }
-
-    .la-pluma-app .dashboard-page .dashboard-status-slot {
-      /* S3: 移动端状态槽按内容伸缩，压过 flex-1 的 0% basis。 */
-      flex: 1 1 auto !important;
-      min-width: 0;
-      max-width: 100%;
-      overflow: visible;
-    }
-
-    .la-pluma-app .dashboard-page .dashboard-status-slot > * {
-      max-width: 100%;
-    }
-
-    .la-pluma-app .dashboard-page .dashboard-status-indicator {
-      max-width: 100%;
-      overflow: hidden;
     }
 
     .la-pluma-app .dashboard-page .dashboard-flow-layout {

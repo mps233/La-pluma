@@ -22,7 +22,9 @@ const mocks = vi.hoisted(() => ({
   getActivity: vi.fn(),
   executeScheduleNow: vi.fn(),
   status: vi.fn(),
-  setMessage: vi.fn(),
+  notify: vi.fn(),
+  notifyProgress: vi.fn(),
+  dismissNotice: vi.fn(),
 }))
 
 const flow: TaskFlowItem[] = [
@@ -65,17 +67,29 @@ vi.mock('@/features/training', () => ({
   generateTrainingPlan: vi.fn(),
 }))
 vi.mock('@/features/runtime-status', () => ({
-  useStatusStore: (selector?: (state: { setMessage: typeof mocks.setMessage }) => unknown) => {
-    if (!selector) throw new Error('useStatusStore must be called with a selector')
-    return selector({ setMessage: mocks.setMessage })
-  },
-  FloatingStatusIndicator: () => null,
   useAutomationAvailability: () => ({ isAvailable: true, unavailableMessage: '' }),
+}))
+vi.mock('@/shared/notifications', () => ({
+  notify: mocks.notify,
+  notifyProgress: mocks.notifyProgress,
+  dismissNotice: mocks.dismissNotice,
+  detectNoticeType: () => 'default',
+  EXECUTION_NOTICE_ID: 'execution',
+  STATISTICS_NOTICE_ID: 'statistics',
+  SETTINGS_UPDATE_NOTICE_ID: 'settings-update',
 }))
 vi.mock('@/features/device-mirror', () => ({ DeviceMonitorPanel: () => null }))
 vi.mock('@/features/automation/components/NotificationSettings', () => ({ default: () => null }))
 
 const ok = <T,>(data: T): ApiResponse<T> => ({ success: true, data })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>(nextResolve => {
+    resolve = nextResolve
+  })
+  return { promise, resolve }
+}
 
 function dailyRun(runId: string, state: AgentRun['state'], overrides: Partial<AgentRun> = {}): AgentRun {
   return {
@@ -170,7 +184,9 @@ beforeEach(() => {
   // 活动读取走 Query：每个用例独立客户端，避免复用上一个用例的 mock 结果。
   queryClient = createQueryClient()
   mocks.getActivity.mockReset().mockResolvedValue({ success: false })
-  mocks.setMessage.mockReset()
+  mocks.notify.mockReset()
+  mocks.notifyProgress.mockReset()
+  mocks.dismissNotice.mockReset()
   mocks.executeScheduleNow.mockReset().mockResolvedValue(ok({
     accepted: true,
     runId: 'run-1',
@@ -229,4 +245,39 @@ it('keeps completed task marks after Activity hides a finishing run', async () =
   expect(container.querySelector('button[data-status-key="ready"]')?.textContent).toContain('立即执行')
   expect(api.stopRun).not.toHaveBeenCalled()
   expect(mocks.executeScheduleNow).toHaveBeenCalledOnce()
+})
+
+it('replaces the execution progress when a submitted run finishes while hidden', async () => {
+  const submission = deferred<ApiResponse>()
+  mocks.executeScheduleNow.mockReturnValueOnce(submission.promise)
+  const render = async (mode: 'visible' | 'hidden') => {
+    await act(async () => root.render(
+      <QueryClientProvider client={queryClient}>
+        <Activity mode={mode}><AutomationTasks /></Activity>
+      </QueryClientProvider>,
+    ))
+    await flush()
+  }
+
+  await render('visible')
+  await act(async () => container.querySelector<HTMLButtonElement>('button[data-status-key="ready"]')?.click())
+  await flush()
+
+  expect(mocks.notifyProgress).toHaveBeenCalledWith('开始执行任务流程...', 'execution')
+
+  await render('hidden')
+  await act(async () => submission.resolve(ok({
+    accepted: true,
+    runId: 'run-1',
+    run: dailyRun('run-1', 'running'),
+  })))
+  await flush()
+  api.fetchSnapshot.mockResolvedValue(ok(finishedSnapshot()))
+  await act(async () => {
+    await mocks.controller.current.refresh('poll')
+  })
+  await flush()
+  await render('visible')
+
+  expect(mocks.notify).toHaveBeenCalledWith('任务流程执行完成', 'success', { id: 'execution' })
 })

@@ -2,7 +2,7 @@ import { Copy } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Button } from '@/shared/ui/button'
 import { Loading } from '@/shared/components'
-import { useStatusStore } from '@/features/runtime-status'
+import { notify } from '@/shared/notifications'
 import type { CopilotDetailOperator, CopilotDetailTarget } from '../model/copilotDetail'
 import { DetailField, DetailSection } from './CombatCopilotDetailSection'
 import CopilotDescription from './CopilotDescription'
@@ -32,7 +32,6 @@ function requirementLabels(operator: CopilotDetailOperator): string[] {
 }
 
 export function DetailBody({ target, children }: { target: CopilotDetailTarget; children?: ReactNode }) {
-  const setStatusMessage = useStatusStore(state => state.setMessage)
   const operators = target.operators ?? []
   const groups = target.groups ?? []
   const groupedOperators = groupOperators(operators)
@@ -42,9 +41,9 @@ export function DetailBody({ target, children }: { target: CopilotDetailTarget; 
     if (!target.uri) return
     try {
       await navigator.clipboard.writeText(target.uri)
-      setStatusMessage('已复制作业链接', 'success')
+      notify('已复制作业链接', 'success')
     } catch {
-      setStatusMessage('复制失败，请手动选择链接', 'error')
+      notify('复制失败，请手动选择链接', 'error')
     }
   }
 

@@ -36,30 +36,6 @@ export default function Loading({
   )
 }
 
-export function PageHeaderSkeleton({ dashboard = false }: { dashboard?: boolean }) {
-  return (
-    <div className="app-page-header is-mobile-inline" aria-hidden="true">
-      <div className="app-page-heading">
-        <div className="min-w-0 space-y-2">
-          <Skeleton className="rounded-sm h-8 w-28 max-w-[42vw]" />
-          <Skeleton className="rounded-sm app-page-subtitle h-4 w-64 max-w-[58vw]" />
-        </div>
-      </div>
-      <div className="app-page-actions">
-        {dashboard ? (
-          <div className="dashboard-page-actions flex w-full items-center sm:w-auto">
-            <div className="dashboard-status-slot min-w-0 flex-1 sm:flex-none">
-              <Skeleton className="h-8 w-full rounded-full sm:h-9 sm:w-28" />
-            </div>
-          </div>
-        ) : (
-          <Skeleton className="h-8 w-full rounded-full sm:h-9 sm:w-28" />
-        )}
-      </div>
-    </div>
-  )
-}
-
 function PanelHeadingSkeleton({ className, showIcon = true }: { className: string; showIcon?: boolean }) {
   return (
     <div className={className}>
@@ -693,7 +669,6 @@ export function PageSkeleton({ variant }: { variant: string }) {
 
   const pageContent = (
     <>
-      <PageHeaderSkeleton />
       {variant === 'automation' && <AutomationSkeleton />}
       {variant === 'combat' && <CombatSkeleton />}
       {variant === 'roguelike' && <RoguelikeSkeleton />}

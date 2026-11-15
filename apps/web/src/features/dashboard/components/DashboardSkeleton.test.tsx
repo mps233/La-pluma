@@ -45,5 +45,6 @@ describe('DashboardSkeleton', () => {
     const region = container.querySelector('[aria-busy="true"]')
     expect(region?.getAttribute('aria-label')).toBe('概览加载中')
     expect(region?.querySelector('[aria-hidden="true"]')).not.toBeNull()
+    expect(region?.querySelector('h1')).toBeNull()
   })
 })

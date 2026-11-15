@@ -3,7 +3,7 @@
 
 import { Switch } from '@/shared/ui/switch'
 import { ConfigFieldSelect } from './ConfigFieldControls'
-import { useStatusStore } from '@/features/runtime-status'
+import { notify, SETTINGS_CONFIG_INSTANCE_NOTICE_ID } from '@/shared/notifications'
 import { useConfigDraftPanel } from '../hooks/useConfigDraftPanel'
 import { useSettingsInstanceOptions } from '../hooks/useSettingsInstanceOptions'
 import { CONFIG_SECTION_VIEWS } from './configSectionViews'
@@ -30,7 +30,6 @@ export interface InstanceOptionsPanelProps {
 }
 
 export default function InstanceOptionsPanel({ isActive }: InstanceOptionsPanelProps) {
-  const setStatusMessage = useStatusStore(state => state.setMessage)
   const {
     draft,
     update,
@@ -49,6 +48,7 @@ export default function InstanceOptionsPanel({ isActive }: InstanceOptionsPanelP
     save: saveInstanceOptions,
   } = useConfigDraftPanel({
     label: '实例选项',
+    noticeId: SETTINGS_CONFIG_INSTANCE_NOTICE_ID,
     savingMessage: '正在保存实例选项...',
     loadError,
     loaded,
@@ -68,7 +68,7 @@ export default function InstanceOptionsPanel({ isActive }: InstanceOptionsPanelP
   const handleReset = () => {
     restoreDefaults()
     setConfigFeedback(null)
-    setStatusMessage('已重置实例选项为默认值')
+    notify('已重置实例选项为默认值')
   }
 
   if (!isActive) return null

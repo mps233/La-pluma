@@ -1,9 +1,4 @@
 @layer page {
-  .data-statistics-status {
-    width: 100%;
-    overflow: hidden;
-  }
-
   .data-statistics-task-content,
   .drop-records-panel-content {
     padding: 1rem;

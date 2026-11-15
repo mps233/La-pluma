@@ -3,11 +3,10 @@ import { Clock3, LoaderCircle, Save } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Switch } from '@/shared/ui/switch'
 import { ConfigFieldCheckbox, ConfigFieldInput } from './ConfigFieldControls'
-import { useStatusStore } from '@/features/runtime-status'
+import { notify } from '@/shared/notifications'
 import { useSettingsAutoUpdate } from '../hooks/useSettingsAutoUpdate'
 
 export default function AutoUpdateConfigPanel() {
-  const setStatusMessage = useStatusStore(state => state.setMessage)
   const shouldReduceMotion = useReducedMotion()
   const {
     draft: autoUpdate,
@@ -16,7 +15,7 @@ export default function AutoUpdateConfigPanel() {
     feedback: autoUpdateFeedback,
     update: updateAutoUpdate,
     save: saveAutoUpdateConfig,
-  } = useSettingsAutoUpdate(setStatusMessage)
+  } = useSettingsAutoUpdate(notify)
 
   const handleSaveAutoUpdate = () => {
     void saveAutoUpdateConfig()

@@ -15,7 +15,7 @@
 
 | 内容 | 唯一归属 | 说明 |
 | --- | --- | --- |
-| 页面壳、页头与预览布局 | `pages/roguelike/RoguelikeTasks.tsx` | 只渲染 `app-page`/`app-stack-section`、`PageHeader` 与工作区 |
+| 页面壳与工作区组合 | `pages/roguelike/RoguelikeTasks.tsx` | 只渲染 `app-page`/`app-stack-section` 与工作区 |
 | 当前模式、配置订阅、执行订阅与同步反馈 | `features/roguelike/components/RoguelikeWorkspace.tsx` | 跨面板状态的唯一容器；模式选择不写入持久化载荷 |
 | 模式分段控件的测量与键盘导航 | `features/roguelike/components/RoguelikeModePanel.tsx` | 受控组件；只持有 `useFluidTabIndicator` 的测量状态 |
 | 主题快捷项与自定义代号 | `features/roguelike/components/RoguelikeThemePanel.tsx` | 从草稿派生值，编辑经回调交给工作区 |
@@ -41,7 +41,7 @@
 ### 2. 组合与状态边界
 
 ```
-RoguelikeTasks（页面壳：页头、预览布局）
+RoguelikeTasks（app-page > app-stack-section > RoguelikeWorkspace）
 └─ RoguelikeWorkspace（配置/执行/模式唯一容器）
    ├─ RoguelikeModePanel（受控分段控件 + 高亮测量）
    ├─ RoguelikeThemePanel（主题快捷项 + 自定义输入）

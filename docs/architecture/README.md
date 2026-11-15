@@ -15,7 +15,7 @@ La Pluma Next 是一个面向《明日方舟》自动化的本地 Web 控制台�
 
 ### 前端 UI 与响应式壳层
 
-前端使用 React 19、Tailwind CSS v4（`@tailwindcss/vite`；`@theme` 圆角映射 + 定向 `@utility` 间距映射，无 JS 配置）和 Framer Motion。`Layout` 与 `shared/components` 通用组件使用原生语义元素实现页面 chrome、导航栏、移动 tabbar 和模态交互；`styles/` 下的语义 token 与 `ios-theme.css` 统一 iOS 26 材质、La Pluma Next 品牌色和信息密度。
+前端使用 React 19、Tailwind CSS v4（`@tailwindcss/vite`；`@theme` 圆角映射 + 定向 `@utility` 间距映射，无 JS 配置）和 Framer Motion。`Layout` 与 `shared/components` 通用组件使用原生语义元素实现页面 chrome、导航栏、移动 tabbar 和模态交互；`styles/` 下的默认主题语义 token 与共享布局 token 统一品牌色、信息密度和水平留白，液态玻璃由后续主题层提供。
 
 URL 导航、路径归一、PWA 历史记录与 Activity 保活的约定统一见[前端架构与所有权](../frontend/README.md)。
 
@@ -48,7 +48,7 @@ La-pluma-next/
 │   │   ├── src/
 │   │   │   ├── main.tsx       # 入口：import './styles' 并挂载 @/app/App
 │   │   │   ├── app/           # 应用组装层：router（路由表、URL 归一与保活出口）、layout、providers
-│   │   │   ├── pages/         # 页面层：按域组合页头与领域工作区
+│   │   │   ├── pages/         # 页面层：按域组合页面壳与领域工作区
 │   │   │   ├── features/      # 功能域（对外只有 index.ts）：dashboard、automation、combat、roguelike、training、
 │   │   │   │                  #   statistics、logs、settings 等页面域，以及 task-execution、user-config、game-data、
 │   │   │   │                  #   resource-invalidation、runtime-status、device-mirror、operator-quotes 等跨域微域

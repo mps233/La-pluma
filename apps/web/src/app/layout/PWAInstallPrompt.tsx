@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Download, LoaderCircle, RefreshCw, Share2, SquarePlus } from 'lucide-react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
-import { useStatusStore } from '@/features/runtime-status'
+import { notify } from '@/shared/notifications'
 import { Button } from '@/shared/ui/button'
 import { hasDocumentBuildChanged } from './pwaUpdate'
 
@@ -77,15 +77,14 @@ export default function PWAInstallPrompt() {
   const serviceWorkerRegistrationRef = useRef<ServiceWorkerRegistration | null>(null)
   const lastUpdateCheckRef = useRef(0)
   const shouldReduceMotion = useReducedMotion()
-  const setStatusMessage = useStatusStore(state => state.setMessage)
 
   const handleOfflineReady = useCallback(() => {
-    setStatusMessage('界面已准备好；自动化操作仍需连接服务', 'success')
-  }, [setStatusMessage])
+    notify('界面已准备好；自动化操作仍需连接服务', 'success')
+  }, [])
 
   const handleRegisterError = useCallback(() => {
-    setStatusMessage('应用安装服务启动失败，请刷新页面重试', 'error')
-  }, [setStatusMessage])
+    notify('应用安装服务启动失败，请刷新页面重试', 'error')
+  }, [])
 
   const handleRegisteredSW = useCallback((
     _swScriptUrl: string,
@@ -157,7 +156,7 @@ export default function PWAInstallPrompt() {
       setDeferredPrompt(null)
       setShowInstallPrompt(false)
       setIsInstallExpanded(false)
-      setStatusMessage('La Pluma Next 已安装', 'success')
+      notify('La Pluma Next 已安装', 'success')
     }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
@@ -167,7 +166,7 @@ export default function PWAInstallPrompt() {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
       window.removeEventListener('appinstalled', handleAppInstalled)
     }
-  }, [setStatusMessage])
+  }, [])
 
   const handleInstall = async () => {
     if (!deferredPrompt) return
@@ -181,7 +180,7 @@ export default function PWAInstallPrompt() {
       setShowInstallPrompt(false)
       setIsInstallExpanded(false)
     } catch {
-      setStatusMessage('未能打开安装窗口，请稍后重试', 'error')
+      notify('未能打开安装窗口，请稍后重试', 'error')
     }
   }
 
@@ -196,7 +195,7 @@ export default function PWAInstallPrompt() {
     try {
       await updateServiceWorker(true)
     } catch {
-      setStatusMessage('更新失败，请检查连接后重试', 'error')
+      notify('更新失败，请检查连接后重试', 'error')
     } finally {
       setIsUpdating(false)
     }

@@ -46,7 +46,9 @@ const mocks = vi.hoisted(() => ({
   updateMaaCore: vi.fn(),
   updateMaaCli: vi.fn(),
   hotUpdateResources: vi.fn(),
-  setMessage: vi.fn(),
+  notify: vi.fn(),
+  notifyProgress: vi.fn(),
+  dismissNotice: vi.fn(),
 }))
 
 vi.mock('framer-motion', async () => {
@@ -97,13 +99,13 @@ vi.mock('@/features/user-config', () => ({
   saveUserConfig: mocks.saveUserConfig,
 }))
 
-vi.mock('@/features/runtime-status', () => {
-  const state = { setMessage: mocks.setMessage }
+vi.mock('@/shared/notifications', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/shared/notifications')>()
   return {
-    useStatusStore: (selector?: (store: typeof state) => unknown) => (
-      selector ? selector(state) : state
-    ),
-    FloatingStatusIndicator: () => null,
+    ...actual,
+    notify: mocks.notify,
+    notifyProgress: mocks.notifyProgress,
+    dismissNotice: mocks.dismissNotice,
   }
 })
 
@@ -241,7 +243,9 @@ describe('ConfigManager layout surfaces', () => {
     mocks.updateMaaCore.mockReset().mockResolvedValue({ success: true })
     mocks.updateMaaCli.mockReset().mockResolvedValue({ success: true })
     mocks.hotUpdateResources.mockReset().mockResolvedValue({ success: true })
-    mocks.setMessage.mockReset()
+    mocks.notify.mockReset()
+    mocks.notifyProgress.mockReset()
+    mocks.dismissNotice.mockReset()
     invalidationEvents = []
     stopInvalidations = subscribeResourceInvalidation(event => {
       invalidationEvents.push(event)
@@ -393,7 +397,10 @@ describe('ConfigManager layout surfaces', () => {
 
     const inlineError = container.querySelector('[role="alert"]')
     expect(inlineError?.textContent).toContain('连接配置保存失败: 磁盘只读')
-    expect(mocks.setMessage).toHaveBeenCalledWith('连接配置保存失败: 磁盘只读', 'error')
+    expect(mocks.notifyProgress).toHaveBeenCalledWith('正在保存配置...', 'settings-config:connection')
+    expect(mocks.notify).toHaveBeenCalledWith('连接配置保存失败: 磁盘只读', 'error', {
+      id: 'settings-config:connection',
+    })
   })
 
   it('keeps an auto-update draft editable when persistence fails', async () => {
@@ -426,7 +433,9 @@ describe('ConfigManager layout surfaces', () => {
     expect(timeInput?.value).toBe('06:15')
     expect(saveButton?.disabled).toBe(false)
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('自动更新设置保存失败: 配置目录不可写')
-    expect(mocks.setMessage).toHaveBeenCalledWith('自动更新设置保存失败: 配置目录不可写', 'error')
+    expect(mocks.notify).toHaveBeenCalledWith('自动更新设置保存失败: 配置目录不可写', 'error', {
+      id: 'settings-auto-update',
+    })
   })
 
   it('keeps the connection form read-only until a slow first response is adopted', async () => {
@@ -486,12 +495,12 @@ describe('ConfigManager layout surfaces', () => {
     expect(mocks.updateMaaCore).toHaveBeenCalledOnce()
     expect(mocks.updateMaaCli).not.toHaveBeenCalled()
     expect(cliButton.disabled).toBe(true)
-    expect(mocks.setMessage).toHaveBeenCalledWith('正在更新 MaaCore 并同步最新资源（大包下载最长可能需要约 15 分钟）...')
+    expect(mocks.notifyProgress).toHaveBeenCalledWith('正在更新 MaaCore 并同步最新资源（大包下载最长可能需要约 15 分钟）...', 'settings-update')
 
     await act(async () => pendingCoreUpdate.resolve({ success: true, message: '已更新' }))
     await settle()
     expect(cliButton.disabled).toBe(false)
-    expect(mocks.setMessage).toHaveBeenCalledWith('已更新')
+    expect(mocks.notify).toHaveBeenCalledWith('已更新', 'success', { id: 'settings-update' })
     expect(mocks.getVersion).toHaveBeenCalledTimes(2)
     expect(getItemIconCacheVersion()).toBeGreaterThan(iconVersionBefore)
     expect(invalidationEvents).toEqual([{
@@ -499,10 +508,10 @@ describe('ConfigManager layout surfaces', () => {
       cause: 'resource-update',
     }])
 
-    const successCall = mocks.setMessage.mock.calls
+    const successCall = mocks.notify.mock.calls
       .findIndex(([message]) => message === '已更新')
     expect(successCall).toBeGreaterThanOrEqual(0)
-    expect(mocks.setMessage.mock.invocationCallOrder[successCall]!)
+    expect(mocks.notify.mock.invocationCallOrder[successCall]!)
       .toBeLessThan(mocks.getVersion.mock.invocationCallOrder[1]!)
   })
 
@@ -521,7 +530,7 @@ describe('ConfigManager layout surfaces', () => {
     await act(async () => buttonByText('更新 MaaCore')?.click())
     await flush()
 
-    expect(mocks.setMessage).toHaveBeenCalledWith('已更新')
+    expect(mocks.notify).toHaveBeenCalledWith('已更新', 'success', { id: 'settings-update' })
     expect(buttonByText('更新 MaaCore')?.disabled).toBe(false)
     expect(mocks.getVersion).toHaveBeenCalledTimes(2)
 
@@ -575,7 +584,10 @@ describe('ConfigManager layout surfaces', () => {
     await settle()
 
     expect(mocks.saveUpdateChannel).toHaveBeenCalledWith('cli', 'beta')
-    expect(mocks.setMessage).toHaveBeenCalledWith('更新渠道已保存')
+    expect(mocks.notifyProgress).toHaveBeenCalledWith('正在保存更新渠道...', 'settings-update-channel')
+    expect(mocks.notify).toHaveBeenCalledWith('更新渠道已保存', 'success', {
+      id: 'settings-update-channel',
+    })
     expect(mocks.getVersion).toHaveBeenCalledTimes(2)
   })
 
@@ -587,7 +599,7 @@ describe('ConfigManager layout surfaces', () => {
     await flush()
 
     expect(mocks.updateMaaCore).toHaveBeenCalledWith('beta')
-    expect(mocks.setMessage).toHaveBeenCalledWith('正在切换到 Beta 渠道（大包下载最长可能需要约 15 分钟）...')
+    expect(mocks.notifyProgress).toHaveBeenCalledWith('正在切换到 Beta 渠道（大包下载最长可能需要约 15 分钟）...', 'settings-update')
     expect(container.textContent).toContain('已切换到 Beta 渠道并同步最新资源')
     expect(mocks.getVersion).toHaveBeenCalledTimes(2)
     expect(invalidationEvents).toHaveLength(1)
@@ -604,7 +616,7 @@ describe('ConfigManager layout surfaces', () => {
     await flush()
 
     expect(mocks.updateMaaCli).toHaveBeenCalledOnce()
-    expect(mocks.setMessage).toHaveBeenCalledWith('MAA CLI 更新成功')
+    expect(mocks.notify).toHaveBeenCalledWith('MAA CLI 更新成功', 'success', { id: 'settings-update' })
     expect(mocks.getVersion).toHaveBeenCalledTimes(2)
     expect(invalidationEvents).toEqual([])
     expect(getItemIconCacheVersion()).toBe(iconVersionBefore)
@@ -693,7 +705,10 @@ describe('ConfigManager layout surfaces', () => {
     await settle()
 
     expect(mocks.setupAutoUpdate).toHaveBeenCalledOnce()
-    expect(mocks.setMessage).toHaveBeenCalledWith('自动更新已启用，每天 05:30 执行', 'success')
+    expect(mocks.notifyProgress).toHaveBeenCalledWith('正在保存自动更新设置...', 'settings-auto-update')
+    expect(mocks.notify).toHaveBeenCalledWith('自动更新已启用，每天 05:30 执行', 'success', {
+      id: 'settings-auto-update',
+    })
 
     await renderMode('visible')
     await settle()
@@ -719,7 +734,7 @@ describe('ConfigManager layout surfaces', () => {
     expect(container.textContent).toContain(expected)
     expect(container.querySelector<HTMLInputElement>('input[placeholder="HH:MM"]')?.value).toBe('06:00')
     expect(container.textContent).toContain('有尚未保存的更改')
-    expect(mocks.setMessage).toHaveBeenCalledWith(expected, 'warning')
+    expect(mocks.notify).toHaveBeenCalledWith(expected, 'warning')
   })
 
   it('does not report success when the scheduler rejects an enabled setting', async () => {
@@ -752,7 +767,9 @@ describe('ConfigManager layout surfaces', () => {
 
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('自动更新设置应用失败: 无法创建定时任务')
     expect(saveButton?.disabled).toBe(false)
-    expect(mocks.setMessage).toHaveBeenCalledWith('自动更新设置应用失败: 无法创建定时任务', 'error')
+    expect(mocks.notify).toHaveBeenCalledWith('自动更新设置应用失败: 无法创建定时任务', 'error', {
+      id: 'settings-auto-update',
+    })
   })
 
   it('hides the repository address and branch and keeps instance options editable', async () => {
@@ -847,7 +864,7 @@ describe('ConfigManager layout surfaces', () => {
     expect(buttonByText('保存')?.disabled).toBe(true)
     expect(addressInputWithValue('127.0.0.1:16384')?.disabled).toBe(true)
     expect(buttonByText('重置')?.disabled).toBe(true)
-    expect(mocks.setMessage).toHaveBeenCalledWith(
+    expect(mocks.notify).toHaveBeenCalledWith(
       '连接配置读取失败: 配置不可读（保存已禁用，请重试读取）',
       'error',
     )
@@ -893,7 +910,9 @@ describe('ConfigManager layout surfaces', () => {
       .find(input => input.value === '127.0.0.1:6666')).toBeDefined()
     expect(container.textContent).toContain('当前更改尚未保存')
     expect(buttonByText('保存')?.disabled).toBe(false)
-    expect(mocks.setMessage).toHaveBeenCalledWith('此前连接配置已保存，当前更改尚未保存', 'warning')
+    expect(mocks.notify).toHaveBeenCalledWith('此前连接配置已保存，当前更改尚未保存', 'warning', {
+      id: 'settings-config:connection',
+    })
   })
 
   it('resets the connection draft without saving until an explicit save', async () => {
@@ -1319,7 +1338,7 @@ describe('ConfigManager layout surfaces', () => {
     await flush()
 
     expect(mocks.openConfigDir).toHaveBeenCalledTimes(1)
-    expect(mocks.setMessage).toHaveBeenCalledWith('已打开配置目录')
+    expect(mocks.notify).toHaveBeenCalledWith('已打开配置目录')
 
     const resourceButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
       .find(button => button.textContent?.includes('资源'))
@@ -1333,6 +1352,6 @@ describe('ConfigManager layout surfaces', () => {
     await act(async () => openButtons[0]?.click())
     await flush()
 
-    expect(mocks.setMessage).toHaveBeenCalledWith('打开失败: 没有桌面环境')
+    expect(mocks.notify).toHaveBeenCalledWith('打开失败: 没有桌面环境')
   })
 })

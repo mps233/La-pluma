@@ -16,7 +16,7 @@
 
 | 内容 | 唯一归属 | 说明 |
 | --- | --- | --- |
-| 页面壳、首屏门禁、页头与全局状态指示 | `pages/dashboard/Dashboard.tsx` | 未加载时返回完整骨架；加载后组合工作区；只订阅 `hasLoaded` 并持有唯一的 `useDashboardSnapshotRefresh` |
+| 页面壳、首屏门禁与工作区组合 | `pages/dashboard/Dashboard.tsx` | 未加载时返回完整骨架；加载后组合工作区；只订阅 `hasLoaded` 并持有唯一的 `useDashboardSnapshotRefresh` |
 | 区域组合与导航回调 | `features/dashboard/components/DashboardWorkspace.tsx` | 组合连接提示、流程、设备与摘要区域；创建“打开自动化/养成/数据（掉落记录）”三个回调 |
 | 设备采样投影 | `DashboardWorkspace` 内的 `DashboardDeviceSampleProjection` | 只调用一次 `useDashboardDeviceStats`，返回 `null`；样本更新不推动兄弟区域重渲染 |
 | 连接健康提示与重试 | `features/dashboard/components/DashboardConnectionAlert.tsx` | 离线/后端不可用时渲染；重试调用完整快照协调器 |
@@ -47,7 +47,7 @@
 ### 2. 组合与订阅边界
 
 ```
-Dashboard（首屏门禁、页头、唯一刷新调度）
+Dashboard（app-page > app-stack-section > DashboardWorkspace；首屏门禁与唯一刷新调度）
 └─ DashboardWorkspace（区域组合 + 导航回调）
    ├─ DashboardDeviceSampleProjection（采样投影，返回 null）
    ├─ DashboardConnectionAlert（连接健康 + 重试）
@@ -80,7 +80,7 @@ Dashboard（首屏门禁、页头、唯一刷新调度）
 | 掉落摘要 | `DashboardDropSummaryCard` | 养成卡、流程、设备、连接提示 |
 | 后端状态 / 在线状态 | `DashboardConnectionAlert`、`DashboardFlowPanel` | 设备、摘要 |
 
-页面不再整体订阅状态消息：流程卡从 `useStatusStore` 只取 `setMessage` 动作，因此成功/警告消息不会重渲染总览工作区。全局状态指示器仍自行订阅消息。
+页面不再整体订阅执行结果：流程卡通过 `notify` 发送成功/警告提示，因此通知正文不会重渲染总览工作区。通知由应用根挂载的 sonner `AppToaster` 渲染。
 
 ### 3. 今日流程入口
 
@@ -155,7 +155,7 @@ Dashboard（首屏门禁、页头、唯一刷新调度）
 - 行为变化：
  1. **温度点去重（缺陷修复）。** 迁移前 `useDashboardDeviceStats` 在 Activity 恢复重跑 Effect 时会把缓存中的同一份样本再追加一次，随后立即采样又追加一次，导致“近 N 秒”偏大。现在同一 `dataUpdatedAt` 的缓存回放只记录一次；新采样仍逐次追加。相关回归见 `useDashboardDeviceStats.test.tsx` 与 store 测试。
   2. **设备采样投影的启动时机。** 投影从页面顶层移到工作区（页面脱离骨架后）。骨架阶段没有设备区域，可见行为不变；采样间隔、暂停与失败保旧未变。
-  3. **状态消息不再重渲染页面。** 流程卡只从 `useStatusStore` 取 `setMessage` 动作，总览不再因全局消息正文整体重渲染；显示内容与计时器仍由 `statusStore` 决定。
+  3. **状态消息不再重渲染页面。** 流程卡通过 `notify` 发送提示，总览不再因全局通知正文整体重渲染；显示内容与计时器由 sonner 通知器持有。
   4. **执行订阅随工作区挂载。** 首屏骨架期间不再建立流程卡的执行订阅；骨架期间完成的 run 不产生页面内终态提示，全局运行投影仍独立展示。页面正常装载后的观察、身份与提示规则不变。
   5. **活动卡状态化。** `/agent/activity` 返回 `status`、`clientType`、来源时间与失败原因；卡片不再读取 `tip`/`description`/`isActive` 或用固定文案冒充加载态。成功空窗显示“暂无当前刷关活动”，来源失败显示“无法获取活动信息”与重试；刷新失败保留旧快照并标记“可能已过期”。
 

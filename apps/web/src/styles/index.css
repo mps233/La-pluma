@@ -569,38 +569,13 @@
     box-shadow: inset 0 0 0 1px var(--border);
   }
 
-  .app-shell {
-    width: 100%;
-    max-width: 100rem;
-    margin-inline: auto;
-    padding-inline: 1.25rem;
-  }
-
-  @media (display-mode: standalone) {
-    .app-shell {
-      padding-right: max(1.25rem, env(safe-area-inset-right));
-      padding-left: max(1.25rem, env(safe-area-inset-left));
-    }
-  }
-
   @media (width <= 639px) {
-    .app-shell {
-      padding-inline: 0.875rem;
-    }
-
     .app-page {
       padding-block: 0.875rem;
     }
 
     .app-empty-state {
       padding: 0.875rem;
-    }
-
-    @media (display-mode: standalone) {
-      .app-shell {
-        padding-right: max(0.875rem, env(safe-area-inset-right));
-        padding-left: max(0.875rem, env(safe-area-inset-left));
-      }
     }
   }
 
@@ -680,100 +655,10 @@
     padding-block: 1.25rem;
   }
 
-  .app-page-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-  }
-
-  .app-page-heading {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .app-page-header-icon {
-    display: flex;
-    width: 2.75rem;
-    height: 2.75rem;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-xl);
-  }
-
-  .app-page-actions {
-    display: flex;
-    flex: none;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .app-page-title {
-    font-size: 1.5rem;
-    font-weight: 600;
-    line-height: 1.35;
-  }
-
-  @media (width <= 640px) {
-    .app-page-title {
-      font-size: 1.25rem;
-    }
-  }
-
-  .app-page-subtitle {
-    display: none;
-    margin-top: 0.25rem;
-    font-size: 0.875rem;
-    line-height: 1.5;
-  }
-
   .app-section-title {
     font-size: 1.125rem;
     font-weight: 600;
     line-height: 1.45;
-  }
-
-  @media (min-width: 640px) {
-    .app-page-subtitle {
-      display: block;
-    }
-  }
-
-  @media (max-width: 420px) {
-    .app-page-header:not(.is-mobile-inline) {
-      align-items: stretch;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .app-page-header.is-mobile-inline {
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .app-page-header.is-mobile-inline .app-page-heading {
-      flex: 1 1 auto;
-    }
-
-    .app-page-header.is-mobile-inline .app-page-title {
-      white-space: nowrap;
-    }
-
-    .app-page-header.is-mobile-inline .app-page-actions {
-      flex: 0 1 auto;
-    }
-
-    .app-page-heading {
-      gap: 0.75rem;
-    }
-
-    .app-page-actions {
-      min-width: 0;
-      justify-content: flex-end;
-    }
   }
 
   .app-stack-card {

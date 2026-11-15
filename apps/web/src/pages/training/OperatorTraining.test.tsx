@@ -42,7 +42,9 @@ const mocks = vi.hoisted(() => ({
   generateTrainingPlan: vi.fn(),
   applyTrainingPlan: vi.fn(),
   retryTrainingSync: vi.fn(),
-  setMessage: vi.fn(),
+  notify: vi.fn(),
+  notifyProgress: vi.fn(),
+  dismissNotice: vi.fn(),
 }))
 
 vi.mock('@/features/device-mirror', () => ({
@@ -87,12 +89,14 @@ vi.mock('@/features/game-data/api', () => ({
   getOperatorAvatarUrl: (id: string) => `/avatars/${id}.png`,
 }))
 
-vi.mock('@/features/runtime-status', () => ({
-  useStatusStore: (selector?: (state: { setMessage: typeof mocks.setMessage }) => unknown) => {
-    if (!selector) throw new Error('useStatusStore must be called with a selector')
-    return selector({ setMessage: mocks.setMessage })
-  },
-  FloatingStatusIndicator: () => null,
+vi.mock('@/shared/notifications', () => ({
+  notify: mocks.notify,
+  notifyProgress: mocks.notifyProgress,
+  dismissNotice: mocks.dismissNotice,
+  detectNoticeType: () => 'default',
+  EXECUTION_NOTICE_ID: 'execution',
+  STATISTICS_NOTICE_ID: 'statistics',
+  SETTINGS_UPDATE_NOTICE_ID: 'settings-update',
 }))
 
 let client: ReturnType<typeof createQueryClient>
@@ -351,7 +355,9 @@ describe('OperatorTraining queue workspace', () => {
     mocks.generateTrainingPlan.mockReset().mockResolvedValue({ success: true, data: plan() })
     mocks.applyTrainingPlan.mockReset().mockResolvedValue({ success: true, data: { stageCount: 1 } })
     mocks.retryTrainingSync.mockReset()
-    mocks.setMessage.mockReset()
+    mocks.notify.mockReset()
+    mocks.notifyProgress.mockReset()
+    mocks.dismissNotice.mockReset()
     client = createQueryClient()
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -553,7 +559,7 @@ describe('OperatorTraining queue workspace', () => {
 
     expect(queueOrder()).toEqual([])
     expect(buttonWithText('添加', dialog).disabled).toBe(false)
-    expect(mocks.setMessage).toHaveBeenCalledWith(expect.stringContaining('添加失败'), 'error')
+    expect(mocks.notify).toHaveBeenCalledWith(expect.stringContaining('添加失败'), 'error')
   })
 
   it('adds the first target without applying a task flow and requires an explicit preview and apply', async () => {
@@ -998,7 +1004,7 @@ describe('OperatorTraining queue workspace', () => {
 
     expect(queueOrder()).toEqual(['阿米娅'])
     expect(queueButton('移除阿米娅').disabled).toBe(false)
-    expect(mocks.setMessage).toHaveBeenCalledWith(expect.stringContaining('删除失败'), 'error')
+    expect(mocks.notify).toHaveBeenCalledWith(expect.stringContaining('删除失败'), 'error')
     expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === '撤销')).toBe(false)
     await click(queueButton('移除阿米娅'))
     expect(queueOrder()).toEqual([])
@@ -1324,7 +1330,7 @@ describe('OperatorTraining queue workspace', () => {
     await click(buttonWithText('添加', dialog))
 
     expect(queueOrder()).toEqual(['能天使'])
-    expect(mocks.setMessage).toHaveBeenCalledWith(expect.stringContaining('队列刷新失败'), 'warning')
+    expect(mocks.notify).toHaveBeenCalledWith(expect.stringContaining('队列刷新失败'), 'warning')
   })
 
   it('removes the local item and warns when a successful delete cannot be refreshed', async () => {
@@ -1338,7 +1344,7 @@ describe('OperatorTraining queue workspace', () => {
 
     expect(queueOrder()).toEqual(['阿米娅'])
     expect(document.body.textContent).toContain('已移除 能天使')
-    expect(mocks.setMessage).toHaveBeenCalledWith(expect.stringContaining('队列刷新失败'), 'warning')
+    expect(mocks.notify).toHaveBeenCalledWith(expect.stringContaining('队列刷新失败'), 'warning')
   })
 
   it('publishes automation and dashboard invalidation after a synced plan application', async () => {
@@ -1571,7 +1577,7 @@ describe('OperatorTraining queue workspace', () => {
 
     await click(autoSwitch!)
     expect(isSwitchChecked(autoSwitch)).toBe(true)
-    expect(mocks.setMessage).toHaveBeenCalledWith('设置保存失败，已恢复原设置', 'error')
+    expect(mocks.notify).toHaveBeenCalledWith('设置保存失败，已恢复原设置', 'error')
 
     await click(switchByLabel('自动切换')!)
     expect(isSwitchChecked(switchByLabel('自动切换'))).toBe(false)

@@ -22,8 +22,9 @@ const mocks = vi.hoisted(() => ({
   stopSchedule: vi.fn(),
   testConnection: vi.fn(),
   executeScheduleNow: vi.fn(),
-  setActive: vi.fn(),
-  setMessage: vi.fn(),
+  notify: vi.fn(),
+  notifyProgress: vi.fn(),
+  dismissNotice: vi.fn(),
 }))
 
 vi.mock('framer-motion', async () => {
@@ -95,12 +96,17 @@ vi.mock('@/features/settings', () => ({ testConnection: mocks.testConnection }))
 vi.mock('@/features/training', () => ({ generateTrainingPlan: mocks.generateTrainingPlan }))
 
 vi.mock('@/features/runtime-status', () => ({
-  useStatusStore: (selector?: (state: { setMessage: typeof mocks.setMessage; setActive: typeof mocks.setActive }) => unknown) => {
-    if (!selector) throw new Error('useStatusStore must be called with a selector')
-    return selector({ setMessage: mocks.setMessage, setActive: mocks.setActive })
-  },
-  FloatingStatusIndicator: () => null,
   useAutomationAvailability: () => ({ isAvailable: true, unavailableMessage: '' }),
+}))
+
+vi.mock('@/shared/notifications', () => ({
+  notify: mocks.notify,
+  notifyProgress: mocks.notifyProgress,
+  dismissNotice: mocks.dismissNotice,
+  detectNoticeType: () => 'default',
+  EXECUTION_NOTICE_ID: 'execution',
+  STATISTICS_NOTICE_ID: 'statistics',
+  SETTINGS_UPDATE_NOTICE_ID: 'settings-update',
 }))
 
 vi.mock('@/features/device-mirror', () => ({ DeviceMonitorPanel: () => <div data-testid="screen-monitor" /> }))
@@ -227,8 +233,9 @@ describe('AutomationTasks config persistence', () => {
     mocks.stopSchedule.mockReset().mockResolvedValue({ success: true })
     mocks.testConnection.mockReset().mockResolvedValue({ success: true })
     mocks.executeScheduleNow.mockReset()
-    mocks.setActive.mockReset()
-    mocks.setMessage.mockReset()
+    mocks.notify.mockReset()
+    mocks.notifyProgress.mockReset()
+    mocks.dismissNotice.mockReset()
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
@@ -285,7 +292,7 @@ describe('AutomationTasks config persistence', () => {
     expect(pendingDraft()).not.toBeNull()
     expect(container.querySelector('[role="alert"]')?.textContent)
       .toContain('配置已保存在此设备，但尚未同步到服务器：配置存储暂不可用')
-    expect(mocks.setMessage).not.toHaveBeenCalled()
+    expect(mocks.notify).not.toHaveBeenCalled()
   })
 
   it('keeps the pending draft when the schedule step fails after the config save, then clears it on a later full success', async () => {
@@ -526,7 +533,7 @@ describe('AutomationTasks config persistence', () => {
     expect(mocks.setupSchedule).toHaveBeenCalledTimes(2)
     expect(pendingDraft()).toBeNull()
     expect(container.querySelector('[role="alert"]')).toBeNull()
-    expect(mocks.setMessage).toHaveBeenCalledWith('自动化配置已同步', 'success')
+    expect(mocks.notify).toHaveBeenCalledWith('自动化配置已同步', 'success')
   })
 
   it('does not confirm a newer revision when an older commit finishes late', async () => {
@@ -602,7 +609,7 @@ describe('AutomationTasks config persistence', () => {
     )
     expect(pendingDraft()).toBeNull()
     expect(scheduleSwitch().getAttribute('aria-checked')).toBe('true')
-    expect(mocks.setMessage).toHaveBeenCalledWith('智能养成计划已更新：3 个关卡', 'success')
+    expect(mocks.notify).toHaveBeenCalledWith('智能养成计划已更新：3 个关卡', 'success')
   })
 
   it('keeps local-only disabled schedule entries when adopting an applied plan', async () => {
@@ -663,7 +670,7 @@ describe('AutomationTasks config persistence', () => {
 
     expect(mocks.loadUserConfig).toHaveBeenCalledTimes(2)
     expect(container.textContent).toContain('信用收支')
-    expect(mocks.setMessage).toHaveBeenCalledWith('智能养成计划已更新', 'success')
+    expect(mocks.notify).toHaveBeenCalledWith('智能养成计划已更新', 'success')
   })
 
   it('refuses a forced server reload while a pending local draft is restored', async () => {
@@ -682,7 +689,7 @@ describe('AutomationTasks config persistence', () => {
     await settle()
 
     expect(mocks.loadUserConfig).not.toHaveBeenCalled()
-    expect(mocks.setMessage).toHaveBeenCalledWith(
+    expect(mocks.notify).toHaveBeenCalledWith(
       '检测到本设备有未同步的流程编辑，已保留本地草稿；养成计划更新未覆盖本地配置',
       'warning',
     )
@@ -704,7 +711,7 @@ describe('AutomationTasks config persistence', () => {
     await settle()
 
     expect(mocks.loadUserConfig).toHaveBeenCalledTimes(2)
-    expect(mocks.setMessage).toHaveBeenCalledWith('自动化配置刷新失败，请稍后重试', 'warning')
+    expect(mocks.notify).toHaveBeenCalledWith('自动化配置刷新失败，请稍后重试', 'warning')
   })
 
   it('reloads the automation flow when training applies a plan', async () => {
@@ -733,7 +740,7 @@ describe('AutomationTasks config persistence', () => {
     await settle()
 
     expect(mocks.loadUserConfig).toHaveBeenCalledTimes(2)
-    expect(mocks.setMessage).toHaveBeenCalledWith('智能养成计划已更新：3 个关卡', 'success')
+    expect(mocks.notify).toHaveBeenCalledWith('智能养成计划已更新：3 个关卡', 'success')
     expect(container.textContent).toContain('信用收支')
   })
 })

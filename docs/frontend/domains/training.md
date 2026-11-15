@@ -17,7 +17,7 @@
 
 | 内容 | 唯一归属 | 说明 |
 | --- | --- | --- |
-| 页面壳与页头 | `pages/training/OperatorTraining.tsx` | 渲染 `app-page` 页面壳、`app-stack-section` 与 `PageHeader`，并组合工作区 |
+| 页面壳与工作区组合 | `pages/training/OperatorTraining.tsx` | 渲染 `app-page` 页面壳与 `app-stack-section`，并组合工作区 |
 | 工作区布局与共享版本边界 | `features/training/components/TrainingWorkspace.tsx` | 队列读取、计划/设置/队列命令适配、失效订阅、选择器开关与操作错误 |
 | 队列列表、行内操作与撤销提示 | `features/training/components/TrainingQueuePanel.tsx` | 操作成功后把焦点还给队列标题；`TrainingUndoToast` 跟随该面板渲染 |
 | 当前目标材料 | `features/training/components/TrainingMaterialsPanel.tsx` | 只从队列首位派生，不读取资源 |
@@ -41,8 +41,7 @@
 ### 2. 组合与状态边界
 
 ```
-OperatorTraining（页面壳）
-├─ PageHeader（标题、说明、全局状态指示）
+OperatorTraining（app-page > app-stack-section > TrainingWorkspace）
 └─ TrainingWorkspace（队列读取、共享版本边界、失效订阅、选择器/错误/撤销快照）
    ├─ TrainingQueuePanel（队列列表 + 行内操作 + TrainingUndoToast）
    ├─ TrainingMaterialsPanel（当前目标材料）→ MaterialViews
@@ -51,7 +50,7 @@ OperatorTraining（页面壳）
    └─ OperatorPicker（候选/计数读取 + 筛选/搜索/分批 + Dialog）
 ```
 
-- **页面无请求。** `OperatorTraining` 不导入 API、Query、领域命令或 localStorage；它只组合页头与工作区。页头只承载标题、说明与全局状态指示，选择器开关仍在工作区；添加入口位于队列空态的“选择干员”与非空队列页脚的“继续添加”。首次读取中或首次读取失败时队列面板不提供添加入口，需等待读取完成或重试成功。
+- **页面无请求。** `OperatorTraining` 不导入 API、Query、领域命令或 localStorage；它只组合页面壳与工作区，页面标题由顶栏统一提供。选择器开关仍在工作区；添加入口位于队列空态的“选择干员”与非空队列页脚的“继续添加”。首次读取中或首次读取失败时队列面板不提供添加入口，需等待读取完成或重试成功。
 - **共享版本边界在工作区。** 工作区是唯一同时持有队列快照、设置 revision 与计划 basis 的位置：队列供队列面板/材料面板/计划面板/选择器共用，`queueRevision` 与 `settingsRevision` 的合流只在这里发生一次。
 - **队列写入仍归领域命令。** 工作区把 QueryClient 注入 `useTrainingQueueCommands()`，并把 `add`/`remove`/`undo`/`reorder` 的意图交给模块级命令所有者；写后刷新、重复合并、`uncertain` fallback 与失效发布都不在组件里。
 - **面板可调用所属领域 hook；展示组件只接 props。** 选择器持有候选/计数 Query 与自身交互状态；计划、设置、队列面板只接收工作区投影与回调。计划范围切换、队列行操作、撤销提示关闭等局部交互都在最近的使用点。
@@ -135,7 +134,7 @@ OperatorTraining（页面壳）
 
 - Query key、读取时机、失效作用域、失败保旧与 `uncertain` 语义未变；选择器关闭不改变候选/计数读取的启动时机。
 - 队列/设置/计划的所有者 API、端点与失效发布未变；`training-plan-applied` window 事件仍未恢复。
-- 保持工作区内部渲染结构、DOM 类名、表单 `id` 前缀、`aria-*` 与默认态视觉；页面壳统一为 `app-page > app-stack-section > PageHeader + Workspace`；选择器焦点、标签和交互由下列组件/页面回归测试覆盖。
+- 保持工作区内部渲染结构、DOM 类名、表单 `id` 前缀、`aria-*` 与默认态视觉；页面壳统一为 `app-page > app-stack-section > Workspace`；选择器焦点、标签和交互由下列组件/页面回归测试覆盖。
 - `getOpenStagePlan` 归 `planDisplay.ts`；它不是 feature 公开面成员，供渲染层与计划所有者使用。
 
 ## 队列命令
@@ -220,7 +219,7 @@ add / remove / undo / reorder → 排队 → 前一条写入并刷新完成 → 
 
 ### 6. 页面与生命周期
 
-- 目前 `TrainingWorkspace` 用 `useQuery(trainingQueueQueryOptions())` 读取队列，用 `useTrainingQueueCommands()` 发起命令并派生 `pendingOperatorIds` / `queueMutationPending`；页面只组合页头与工作区。
+- 目前 `TrainingWorkspace` 用 `useQuery(trainingQueueQueryOptions())` 读取队列，用 `useTrainingQueueCommands()` 发起命令并派生 `pendingOperatorIds` / `queueMutationPending`；页面只组合页面壳与工作区。
 - 队列命令所有者为模块级单例；Activity 隐藏只注销页面 Effect，不中断串行链与写后刷新。隐藏期间完成的命令仍会写入应用级 Query 缓存，恢复时按新鲜度使用。
 - 真正卸载后重挂载：命令继续完成（请求没有 AbortController 绑定页面），新页面从 Query 缓存读取结果；pending 提示是否仍显示取决于命令是否完成，不再由旧页面闭包维护。
 - 页面首屏：`useTrainingPlan()` 把队列快照交给计划所有者，由其采用 `flowSync` 并把 `settings` 交给设置所有者 hydrate；若用户先编辑设置，则不采用迟到的首屏值。`TrainingPlanOwner` 的权威重读在读取期间本地设置未变化时采用服务端值（外部设置变化由此被发现）。

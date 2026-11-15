@@ -18,7 +18,7 @@
 
 | 内容 | 唯一归属 | 说明 |
 | --- | --- | --- |
-| 页面壳与页头 | `pages/settings/ConfigManager.tsx` | 渲染 `app-page` 页面壳、`app-stack-section` 与 `PageHeader`，并组合工作区 |
+| 页面壳与工作区组合 | `pages/settings/ConfigManager.tsx` | 渲染 `app-page` 页面壳与 `app-stack-section`，并组合工作区 |
 | section 导航与布局 | `features/settings/components/SettingsWorkspace.tsx` | section 订阅、工作区网格与面板组合 |
 | 配置 section 分段 | `features/settings/components/ConfigSectionNav.tsx` | `role="toolbar"`、`aria-pressed`、方向键导航与流体高亮 |
 | section 展示文案 | `features/settings/components/configSectionViews.tsx` | 名称、说明与图标；不持有存储或事件 |
@@ -42,8 +42,7 @@
 ### 2. 组合与订阅边界
 
 ```
-ConfigManager（页面壳）
-├─ PageHeader（标题、说明、全局状态指示）
+ConfigManager（app-page > app-stack-section > SettingsWorkspace）
 └─ SettingsWorkspace（section 订阅、布局、设备命令的 Activity 清理）
    ├─ ConfigSectionNav（分段 + 流体高亮）
    ├─ ConnectionConfigPanel（connection Query/草稿/保存反馈，非当前 section 返回 null）
@@ -56,7 +55,7 @@ ConfigManager（页面壳）
       └─ ComponentUpdatePanel（版本 Query + 更新命令/反馈）
 ```
 
-- **页面无请求。** `ConfigManager` 不导入 API、Query、领域所有者或 localStorage，只组合页头与工作区。
+- **页面无请求。** `ConfigManager` 不导入 API、Query、领域所有者或 localStorage，只组合页面壳与工作区。
 - **section 只有一份。** `SettingsWorkspace` 是唯一调用 `useConfigSection()` 的位置，也负责 `useFluidTabIndicator` 所驱动的分段导航。
 - **三个编辑面板始终挂载。** `ConnectionConfigPanel`、`ResourceSourcePanel`、`InstanceOptionsPanel` 在所有 section 下保持组件挂载，只在自身 section 渲染 Card；切换 section 不重建各自的 Query 观察者，也不清空草稿、保存 loading 或读取/保存反馈。隐藏面板的 Query 以 `enabled: false` 跳过读取。
 - **设备面板按 section 挂载，命令不随 section 取消。** `DeviceConnectionPanel` 只在自己的可见子树内订阅 `DeviceConnectionOwner`；切到其它 section 会卸载面板 DOM，但 owner 继续持有在途命令与已完成结果，恢复 connection 后从 owner 读取最新状态。
@@ -74,7 +73,7 @@ ConfigManager（页面壳）
 | 自动更新草稿/保存状态 | `AutoUpdateConfigPanel` | 连接、设备、目录、组件更新面板 |
 | 配置目录状态 | `ConfigDirectoryPanel` | 连接、设备、更新卡片内面板、资源源/实例表单 |
 
-`ConfigManager.subscriptions.test.tsx` 用领域 hook 的调用次数作为面板渲染次数的代理，覆盖“设备/更新状态不驱动连接表单”和“草稿编辑不驱动更新/目录面板”。各面板只从 `useStatusStore` 选择 `setMessage` 动作，不订阅全局消息正文，因此更新/设备产生的全局提示也不会重渲染连接表单。
+`ConfigManager.subscriptions.test.tsx` 用领域 hook 的调用次数作为面板渲染次数的代理，覆盖“设备/更新状态不驱动连接表单”和“草稿编辑不驱动更新/目录面板”。各面板通过 `notify` 发送全局提示，不订阅通知正文，因此更新/设备产生的全局提示也不会重渲染连接表单。
 
 ### 3. Section 与草稿生命期
 
@@ -113,7 +112,7 @@ ConfigManager（页面壳）
 | 自动更新读取/保存/调度失败 | 更新卡片自动更新分组 | `AutoUpdateConfigOwner` |
 | 组件更新失败与资源重试 | 更新卡片底部 | `SettingsUpdateOwner` |
 
-各面板只渲染自己的反馈；一个用例的失败不会写入另一个面板的页内状态。全局状态消息仍由各面板在明确结果后调用 `useStatusStore`。
+各面板只渲染自己的反馈；一个用例的失败不会写入另一个面板的页内状态。全局通知仍由各面板在明确结果后调用 `notify` / `notifyProgress` 发送。
 
 ### 6. 兼容与维护约束
 
@@ -215,7 +214,7 @@ ConfigManager（页面壳）
 
 #### 2.6 读取失败
 
-初始读取失败（尚无 Query 数据）在对应面板显示页内 `role="alert"` 与全局状态消息（`连接配置读取失败: <原因>`、`实例选项读取失败: <原因>`、`资源源配置读取失败: <原因>`），提示文案同时说明“保存已禁用，请重试读取”，并在页内反馈提供“重新读取”按钮调用同一 Query 的 `refetch`；已有服务端数据后的后台 refresh 失败不打断编辑，也不重复写全局消息。读取成功后清除对应的初始失败提示并恢复编辑与保存。
+初始读取失败（尚无 Query 数据）在对应面板显示页内 `role="alert"` 与全局通知（`连接配置读取失败: <原因>`、`实例选项读取失败: <原因>`、`资源源配置读取失败: <原因>`），提示文案同时说明“保存已禁用，请重试读取”，并在页内反馈提供“重新读取”按钮调用同一 Query 的 `refetch`；已有服务端数据后的后台 refresh 失败不打断编辑，也不重复发送全局通知。读取成功后清除对应的初始失败提示并恢复编辑与保存。
 
 `loaded` 保持 `false` 期间编辑、重置与保存都不可用；`ConfigDraftOwner.adoptServer()` 仍按 revision/dirty 规则丢弃过期的后台快照，但首次快照按当前 revision 采纳（加载期间没有可推进 revision 的编辑），因此慢请求与显式重试都能恢复到可保存状态。
 
@@ -243,7 +242,7 @@ section 只控制渲染哪个面板：三个编辑面板在所有 section 下保
 
 ### 4. 面板接线
 
-- `ConfigManager` 组合 `PageHeader` 与 `SettingsWorkspace`；section 导航与网格由工作区渲染。
+- `ConfigManager` 只组合页面壳与 `SettingsWorkspace`；section 导航与网格由工作区渲染。
 - `useSettingsConnectionConfig()` / `useSettingsInstanceOptions()` / `useSettingsResourceSource()` 返回各自的 `draft`、`dirty`、`syncState`、`error`、`loaded`、`loadError`、`update`、`restoreDefaults`、`save`、`reload`；三个面板只渲染表单、按钮 loading 与反馈，卡片外壳共用 `ConfigEditorCard`。隐藏面板向 hook 传 `enabled: false`，不触发读取。
 - 页面删除的职责：`configData` state、`loadConfig()`、`connectionRevisionRef`、`connectionSaveInFlightRef`、section `localStorage` 读写与 window 监听。
 - 连接、实例与资源源表单字段都通过 `update(patch)` 写入各自 owner；编辑清空页内反馈与保存错误。
@@ -344,7 +343,7 @@ section 只控制渲染哪个面板：三个编辑面板在所有 section 下保
 
 ### 4. 面板接线与遗留清理
 
-`ConfigManager` 只组合页头与 `SettingsWorkspace`；设备发现、连接测试、版本、配置目录与打开目录由 hooks 持有，当前分别由设备、更新与目录面板订阅。`ConfigManager` 与各面板都不直接导入 `discoverDevices`、`testConnection`、`getVersion`、`getConfigDir`、`openConfigDir`，也不保存设备列表、查找/测试 loading、测试反馈、版本、目录路径/状态/错误的页面 state。对这些资源，面板只保留渲染与全局状态提示；组件更新与自动更新由 模块级所有者持有，见[设置组件更新与自动更新](#组件更新与自动更新)。
+`ConfigManager` 只组合页面壳与 `SettingsWorkspace`；设备发现、连接测试、版本、配置目录与打开目录由 hooks 持有，当前分别由设备、更新与目录面板订阅。`ConfigManager` 与各面板都不直接导入 `discoverDevices`、`testConnection`、`getVersion`、`getConfigDir`、`openConfigDir`，也不保存设备列表、查找/测试 loading、测试反馈、版本、目录路径/状态/错误的页面 state。对这些资源，面板只保留渲染与全局通知；组件更新与自动更新由 模块级所有者持有，见[设置组件更新与自动更新](#组件更新与自动更新)。
 
 | 页面原职责 | 新归属 |
 | --- | --- |
@@ -483,7 +482,7 @@ section 只控制渲染哪个面板：三个编辑面板在所有 section 下保
 
 ### 5. 面板接线
 
-`ConfigManager` 只组合页头与 `SettingsWorkspace`；`SettingsUpdatesPanel` 只提供卡片壳，自动更新策略与组件更新分别由 `AutoUpdateConfigPanel`、`ComponentUpdatePanel` 订阅。两个面板都不导入 `loadUserConfig`、`saveUserConfig`、`updateMaaCore`、`updateMaaCli`、`hotUpdateResources`、`setupAutoUpdate`，也不保存更新/自动更新的页面 state：
+`ConfigManager` 只组合页面壳与 `SettingsWorkspace`；`SettingsUpdatesPanel` 只提供卡片壳，自动更新策略与组件更新分别由 `AutoUpdateConfigPanel`、`ComponentUpdatePanel` 订阅。两个面板都不导入 `loadUserConfig`、`saveUserConfig`、`updateMaaCore`、`updateMaaCli`、`hotUpdateResources`、`setupAutoUpdate`，也不保存更新/自动更新的页面 state：
 
 | 页面原职责 | 新归属 |
 | --- | --- |
@@ -494,7 +493,7 @@ section 只控制渲染哪个面板：三个编辑面板在所有 section 下保
 | core/渠道/CLI/资源命令与开始/结束提示 | `useSettingsUpdates()` |
 | 更新成功后的版本重取 | `useSettingsUpdates()` 调用 `useSettingsVersion().reload()`（`invalidateQueries`） |
 | 自动更新 `autoUpdate`/`dirty`/`saving`/`feedback`、touched/revision、本地回退、保存 + 调度 | `AutoUpdateConfigOwner` + `useSettingsAutoUpdate()` |
-| 自动更新页内/全局提示 | owner 反馈；hook 转发到全局状态 |
+| 自动更新页内/全局提示 | owner 反馈；hook 转发到全局通知 |
 
 按钮语义：core/资源按钮显示各自 loading，切换渠道按钮只禁用不 loading，CLI 按钮显示自己的 loading；全部更新按钮在任意命令运行期间禁用。命令运行期间额外渲染一个“停止更新”按钮（`canceling` 时显示停止中），其余默认渲染结构、DOM、CSS 与文案未改变。
 
@@ -517,7 +516,7 @@ section 只控制渲染哪个面板：三个编辑面板在所有 section 下保
 - 实例选项与资源源：实例保存只提交 `instance_options`、连接保存只提交 `connection`；资源源保存不发送空白凭据、`clearCdk` 写回 `cdk = false`、响应不回显明文。
 - 设备命令：取消跟随页面/Activity 而不是 section，查找与测试 loading 互不影响，测试期间编辑标记 `test.superseded`，选择回填保留未知字段与最新编辑。
 - 更新互斥与失效：单槽位重复发起返回 `ignored`，命令等待 Run 终态后才完成，停止只作用于本次 `runId`；core/热更新发布资源失效并推进图标 epoch，CLI 只重取版本；自动更新保存 = 写 user config + 应用调度，跨 Activity 隐藏继续完成，迟到读取不覆盖编辑。
-- 草稿隔离：connection/instance/resource 三个 owner 各自持有草稿与保存状态，隐藏面板的 Query 不发起读取；设备/更新/版本状态与全局消息不重渲染连接表单。
+- 草稿隔离：connection/instance/resource 三个 owner 各自持有草稿与保存状态，隐藏面板的 Query 不发起读取；设备/更新/版本状态与全局通知不重渲染连接表单。
 
 视觉基线只覆盖默认 connection 页面；connection 表单新增「连接预设」后已更新 6 张 config 基线，resource/instance 表单态不在截图内。仓库内保留 section 切换、草稿保留与保存反馈的行为回归。
 

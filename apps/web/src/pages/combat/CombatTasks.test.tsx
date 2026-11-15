@@ -52,7 +52,9 @@ const mocks = vi.hoisted(() => ({
   getOperBoxData: vi.fn(),
   uploadCopilotFile: vi.fn(),
   getRealtimeLogs: vi.fn(),
-  setMessage: vi.fn(),
+  notify: vi.fn(),
+  notifyProgress: vi.fn(),
+  dismissNotice: vi.fn(),
 }))
 
 const renderCounts = vi.hoisted(() => ({ setPanel: 0 }))
@@ -130,12 +132,20 @@ vi.mock('@/features/game-data/api', async () => {
 })
 
 vi.mock('@/features/runtime-status', () => ({
-  useStatusStore: (selector?: (state: { setMessage: typeof mocks.setMessage }) => unknown) => {
-    if (!selector) throw new Error('useStatusStore must be called with a selector')
-    return selector({ setMessage: mocks.setMessage })
-  },
-  FloatingStatusIndicator: () => null,
   useAutomationAvailability: () => ({ isAvailable: true, unavailableMessage: '' }),
+}))
+
+vi.mock('@/shared/notifications', () => ({
+  notify: mocks.notify,
+  notifyProgress: mocks.notifyProgress,
+  dismissNotice: mocks.dismissNotice,
+  detectNoticeType: () => 'default',
+  EXECUTION_NOTICE_ID: 'execution',
+  STATISTICS_NOTICE_ID: 'statistics',
+  SETTINGS_UPDATE_NOTICE_ID: 'settings-update',
+  COMBAT_PREVIEW_NOTICE_ID: 'combat-preview',
+  COMBAT_QUEUE_PREVIEW_NOTICE_ID: 'combat-queue-preview',
+  COMBAT_PARADOX_SEARCH_NOTICE_ID: 'combat-paradox-search',
 }))
 
 vi.mock('@/features/logs/api', () => ({
@@ -707,7 +717,9 @@ describe('CombatTasks execution', () => {
     mocks.getOperBoxData.mockReset().mockResolvedValue(ok(null))
     mocks.uploadCopilotFile.mockReset()
     mocks.getRealtimeLogs.mockReset()
-    mocks.setMessage.mockReset()
+    mocks.notify.mockReset()
+    mocks.notifyProgress.mockReset()
+    mocks.dismissNotice.mockReset()
     renderCounts.setPanel = 0
 
     api = createApi()
@@ -933,7 +945,7 @@ describe('CombatTasks execution', () => {
     await click(buttonByText('开始下一关')!)
     await flush()
 
-    expect(mocks.setMessage).toHaveBeenCalledWith('设备正被其他任务占用，请稍后重试', 'warning')
+    expect(mocks.notify).toHaveBeenCalledWith('设备正被其他任务占用，请稍后重试', 'warning', { id: 'execution' })
     expect(buttonByText('开始下一关')?.disabled).toBe(false)
     expect(mocks.executeCopilotSetPlan).not.toHaveBeenCalled()
 
@@ -966,9 +978,10 @@ describe('CombatTasks execution', () => {
     api.fetchRun.mockResolvedValue(ok(failedRun))
     await refreshController()
 
-    expect(mocks.setMessage).toHaveBeenCalledWith(
+    expect(mocks.notify).toHaveBeenCalledWith(
       '作业集执行失败: 作业集执行失败，1 项未完成',
       'error',
+      { id: 'execution' },
     )
     expect(copilotDrawer()?.textContent).toContain('失败 1')
     expect(buttonByText('立即执行')).toBeDefined()
@@ -999,7 +1012,7 @@ describe('CombatTasks execution', () => {
 
     expect(api.stopRun).toHaveBeenCalledOnce()
     expect(api.stopRun).toHaveBeenCalledWith('run-set-5')
-    expect(mocks.setMessage).toHaveBeenCalledWith('正在终止自动战斗...', 'warning')
+    expect(mocks.notifyProgress).toHaveBeenCalledWith('正在终止自动战斗...', 'execution')
 
     const stopped = setRun('run-set-5', 'stopped', {
       result: setResult([planEntry(0, 'success'), planEntry(1, 'pending')], {
@@ -1011,7 +1024,7 @@ describe('CombatTasks execution', () => {
     api.fetchRun.mockResolvedValue(ok(stopped))
     await refreshController()
 
-    expect(mocks.setMessage).toHaveBeenCalledWith('作业集已终止：1/2 成功', 'warning')
+    expect(mocks.notify).toHaveBeenCalledWith('作业集已终止：1/2 成功', 'warning', { id: 'execution' })
     expect(buttonByText('立即执行')).toBeDefined()
     expect(mocks.executeCopilotSetPlan).not.toHaveBeenCalled()
     expect(mocks.executePredefinedTaskArgs).not.toHaveBeenCalled()
@@ -1045,9 +1058,10 @@ describe('CombatTasks execution', () => {
     })
     await flush()
 
-    expect(mocks.setMessage).toHaveBeenCalledWith(
+    expect(mocks.notify).toHaveBeenCalledWith(
       '终止失败: 终止请求已发送，但尚未确认任务停止',
       'error',
+      { id: 'execution' },
     )
     expect(buttonByText('终止执行')?.disabled).toBe(false)
 
@@ -1087,7 +1101,43 @@ describe('CombatTasks execution', () => {
     expect(buttonByText('立即执行')).toBeDefined()
     expect(api.stopRun).not.toHaveBeenCalled()
     expect(mocks.executeCopilotSetPlan).not.toHaveBeenCalled()
-    expect(mocks.setMessage).not.toHaveBeenCalledWith(expect.stringContaining('执行完成'), 'success')
+    expect(mocks.notify).not.toHaveBeenCalledWith(expect.stringContaining('执行完成'), 'success', { id: 'execution' })
+  })
+
+  it('replaces the execution progress when a submitted set finishes while hidden', async () => {
+    const submission = deferred<ApiResponse>()
+    mocks.executeCopilotSetPlan.mockReturnValueOnce(submission.promise)
+    useIdentity(null)
+    startController()
+    await flush()
+    await renderActivityMode('visible')
+    await previewSet()
+
+    await click(buttonByText('立即执行')!)
+    expect(mocks.notifyProgress).toHaveBeenCalledWith('正在连续执行作业集', 'execution')
+
+    await renderActivityMode('hidden')
+    const running = setRun('run-set-hidden', 'running', {
+      progress: setProgress([planEntry(0, 'running')]),
+    })
+    api.fetchSnapshot.mockResolvedValue(ok(runSnapshot({ activeRuns: [running] })))
+    api.fetchRun.mockResolvedValue(ok(running))
+    await act(async () => submission.resolve(ok({
+      runId: 'run-set-hidden',
+      state: 'accepted',
+      run: running,
+    })))
+    await flush()
+
+    const terminal = setRun('run-set-hidden', 'succeeded', {
+      result: setResult([planEntry(0, 'success')]),
+    })
+    api.fetchSnapshot.mockResolvedValue(ok(runSnapshot({ lastRun: terminal })))
+    api.fetchRun.mockResolvedValue(ok(terminal))
+    await refreshController()
+    await renderActivityMode('visible')
+
+    expect(mocks.notify).toHaveBeenCalledWith(expect.stringContaining('作业集执行完成'), 'success', { id: 'execution' })
   })
 
   it('keeps the last running state when a snapshot fails and recovers on reconnect', async () => {
@@ -1178,7 +1228,7 @@ describe('CombatTasks execution', () => {
     api.fetchRun.mockResolvedValue(ok(waitingAfterFailure))
     await refreshController()
 
-    expect(mocks.setMessage).toHaveBeenCalledWith('作业 2/3 执行失败: 作战失败，已按队列策略停止', 'error')
+    expect(mocks.notify).toHaveBeenCalledWith('作业 2/3 执行失败: 作战失败，已按队列策略停止', 'error')
     expect(api.stopRun).toHaveBeenCalledWith('run-set-manual')
     expect(buttonByText('开始下一关')).toBeUndefined()
   })
@@ -1203,7 +1253,7 @@ describe('CombatTasks execution', () => {
     await previewSet()
 
     expect(buttonByText('终止执行')).toBeDefined()
-    expect(mocks.setMessage).not.toHaveBeenCalledWith(expect.stringContaining('旧的执行失败'), 'error')
+    expect(mocks.notify).not.toHaveBeenCalledWith(expect.stringContaining('旧的执行失败'), 'error', { id: 'execution' })
     expect(controller.getState().trackedRunId).toBe('run-set-new')
   })
 
@@ -1228,8 +1278,8 @@ describe('CombatTasks execution', () => {
 
     expect(controller.getState().identity).toBe('unknown')
     expect(buttonByText('立即执行')).toBeDefined()
-    expect(mocks.setMessage).not.toHaveBeenCalledWith(expect.stringContaining('作业集执行完成'), 'success')
-    expect(mocks.setMessage).not.toHaveBeenCalledWith(expect.stringContaining('作业集执行失败'), 'error')
+    expect(mocks.notify).not.toHaveBeenCalledWith(expect.stringContaining('作业集执行完成'), 'success', { id: 'execution' })
+    expect(mocks.notify).not.toHaveBeenCalledWith(expect.stringContaining('作业集执行失败'), 'error', { id: 'execution' })
     expect(mocks.executeCopilotSetPlan).not.toHaveBeenCalled()
   })
 
@@ -1487,7 +1537,7 @@ describe('CombatTasks execution', () => {
 
     expect(mocks.executeCopilotQueue).not.toHaveBeenCalled()
     expect(mocks.executePredefinedTaskArgs).not.toHaveBeenCalled()
-    expect(mocks.setMessage).toHaveBeenCalledWith('请至少勾选一项队列作业', 'warning')
+    expect(mocks.notify).toHaveBeenCalledWith('请至少勾选一项队列作业', 'warning')
 
     await click(buttonByAriaLabel('删除第 1 项 链接作业')!)
     await flush()
@@ -1531,7 +1581,7 @@ describe('CombatTasks execution', () => {
 
     await click(buttonByText('跳过此项')!)
     expect(mocks.skipCopilotQueueEntry).toHaveBeenCalledWith('run-queue-waiting')
-    expect(mocks.setMessage).toHaveBeenCalledWith('已跳过当前项', 'success')
+    expect(mocks.notify).toHaveBeenCalledWith('已跳过当前项', 'success', { id: 'execution' })
 
     await click(buttonByText('开始下一项（突袭）')!)
     expect(mocks.continueCopilotQueue).toHaveBeenCalledWith('run-queue-waiting', false)
@@ -1606,7 +1656,7 @@ describe('CombatTasks execution', () => {
     expect(mocks.uploadCopilotFile).toHaveBeenCalledOnce()
     expect(container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')?.value)
       .toBe('prts://s48990')
-    expect(mocks.setMessage).toHaveBeenCalledWith('已导入本地作业: job.json', 'success')
+    expect(mocks.notify).toHaveBeenCalledWith('已导入本地作业: job.json', 'success')
     const queue = container.querySelector<HTMLElement>('section[aria-label="作业队列"]')
     expect(queue?.querySelectorAll('[role="listitem"]')).toHaveLength(3)
     expect(queue?.textContent).toContain('job.json')
@@ -1622,13 +1672,13 @@ describe('CombatTasks execution', () => {
     await selectCopilotFile(new File(['not-json'], 'bad.json', { type: 'application/json' }))
 
     expect(input.value).toBe('prts://1234')
-    expect(mocks.setMessage).toHaveBeenCalledWith('作业文件不是合法 JSON', 'error')
+    expect(mocks.notify).toHaveBeenCalledWith('作业文件不是合法 JSON', 'error')
 
     mocks.uploadCopilotFile.mockRejectedValueOnce(new Error('网络连接中断'))
     await selectCopilotFile(new File(['{}'], 'retry.json', { type: 'application/json' }))
 
     expect(input.value).toBe('prts://1234')
-    expect(mocks.setMessage).toHaveBeenLastCalledWith('网络连接中断', 'error')
+    expect(mocks.notify).toHaveBeenLastCalledWith('网络连接中断', 'error')
   })
 
   it('keeps the current preview and skips the upload when the queue is full', async () => {
@@ -1643,7 +1693,7 @@ describe('CombatTasks execution', () => {
     await selectCopilotFile(new File(['{}'], 'job.json', { type: 'application/json' }))
 
     expect(mocks.uploadCopilotFile).not.toHaveBeenCalled()
-    expect(mocks.setMessage).toHaveBeenLastCalledWith('队列已满，最多 50 个作业', 'warning')
+    expect(mocks.notify).toHaveBeenLastCalledWith('队列已满，最多 50 个作业', 'warning')
     expect(document.querySelector('section[aria-label="作业集摘要"]')).not.toBeNull()
   })
 
@@ -1669,7 +1719,7 @@ describe('CombatTasks execution', () => {
     await act(async () => pending.resolve(ok({ path: '/data/copilot-files/job.json' })))
     await flush()
 
-    expect(mocks.setMessage).toHaveBeenLastCalledWith('队列已满，最多 50 个作业', 'warning')
+    expect(mocks.notify).toHaveBeenLastCalledWith('队列已满，最多 50 个作业', 'warning')
     expect(copilotDrawer()?.textContent).toContain('另一份作业')
     expect(container.textContent).not.toContain('job.json')
   })
@@ -1694,7 +1744,7 @@ describe('CombatTasks execution', () => {
     await flush()
 
     expect(container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')?.value).toBe('')
-    expect(mocks.setMessage).toHaveBeenCalledWith('已导入本地作业: job.json', 'success')
+    expect(mocks.notify).toHaveBeenCalledWith('已导入本地作业: job.json', 'success')
     expect(buttonByAriaLabel('导入 JSON 作业文件')?.disabled).toBe(false)
   })
 
@@ -1798,7 +1848,7 @@ describe('CombatTasks execution', () => {
     expect(mocks.saveUserConfig).toHaveBeenCalledTimes(2)
     expect(localStorage.getItem('combatConfigSyncPending')).toBeNull()
     expect(container.querySelector('[role="alert"]')).toBeNull()
-    expect(mocks.setMessage).toHaveBeenCalledWith('自动战斗配置已同步', 'success')
+    expect(mocks.notify).toHaveBeenCalledWith('自动战斗配置已同步', 'success')
   })
 
   it('migrates a saved app set mode to cli and normalizes legacy raid values on load', async () => {
@@ -1903,7 +1953,7 @@ describe('CombatTasks execution', () => {
 
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('网络连接中断')
     expect(mocks.saveUserConfig).toHaveBeenCalledOnce()
-    expect(mocks.setMessage).not.toHaveBeenCalledWith('自动战斗配置已同步', 'success')
+    expect(mocks.notify).not.toHaveBeenCalledWith('自动战斗配置已同步', 'success')
 
     const retrySave = deferred<{ success: boolean }>()
     mocks.saveUserConfig.mockReturnValueOnce(retrySave.promise)
@@ -1913,14 +1963,14 @@ describe('CombatTasks execution', () => {
     // 重试请求在途时再次点击不会产生第二个提交。
     await click(buttonByText('同步中')!)
     expect(mocks.saveUserConfig).toHaveBeenCalledTimes(2)
-    expect(mocks.setMessage).not.toHaveBeenCalledWith('自动战斗配置已同步', 'success')
+    expect(mocks.notify).not.toHaveBeenCalledWith('自动战斗配置已同步', 'success')
 
     await act(async () => retrySave.resolve({ success: true }))
     await flush()
 
     expect(localStorage.getItem('combatConfigSyncPending')).toBeNull()
     expect(container.querySelector('[role="alert"]')).toBeNull()
-    expect(mocks.setMessage).toHaveBeenCalledWith('自动战斗配置已同步', 'success')
+    expect(mocks.notify).toHaveBeenCalledWith('自动战斗配置已同步', 'success')
   })
 
   it('keeps the hydrated draft and does not reload config after Activity restore', async () => {
@@ -2011,6 +2061,27 @@ describe('CombatTasks execution', () => {
     expect(paradoxInput.value).toBe('能天使')
   })
 
+  it('reports paradox search progress and result under one id', async () => {
+    mocks.searchParadoxCopilot.mockResolvedValueOnce(ok({
+      copilots: [{ id: 1, uri: 'prts://1', title: '悖论作业' }],
+    }))
+    await renderComponent()
+
+    const paradoxModeButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button[aria-pressed]'))
+      .find(button => button.textContent?.includes('悖论模拟'))
+    expect(paradoxModeButton).toBeDefined()
+    await click(paradoxModeButton!)
+
+    const paradoxInput = container.querySelector<HTMLInputElement>('input[name="maa-paradox-operator"]')!
+    await setInputValue(paradoxInput, '能天使')
+    await click(buttonByText('搜索')!)
+
+    expect(mocks.notifyProgress).toHaveBeenCalledWith('正在搜索作业...', 'combat-paradox-search')
+    expect(mocks.notify).toHaveBeenCalledWith('找到 1 个作业', undefined, {
+      id: 'combat-paradox-search',
+    })
+  })
+
   it('ignores an older search response after the keyword changes', async () => {
     const olderSearch = deferred<any>()
     const newerSearch = deferred<any>()
@@ -2080,6 +2151,64 @@ describe('CombatTasks execution', () => {
     await flush()
     expect(copilotDrawer()?.textContent).toContain('新预览')
     expect(copilotDrawer()?.textContent).not.toContain('旧预览')
+  })
+
+  it('dismisses stale preview progress when the input changes and keeps the next preview notice', async () => {
+    const stalePreview = deferred<ApiResponse>()
+    const nextPreview = deferred<ApiResponse>()
+    mocks.getCopilotInfo
+      .mockReturnValueOnce(stalePreview.promise)
+      .mockReturnValueOnce(nextPreview.promise)
+    await renderComponent()
+    await setRecognitionMode('single')
+    const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')!
+
+    await setInputValue(input, 'prts://1')
+    mocks.dismissNotice.mockClear()
+    await click(buttonByText('预览')!)
+    expect(mocks.notifyProgress).toHaveBeenCalledWith('正在获取作业信息...', 'combat-preview')
+    expect(mocks.dismissNotice).not.toHaveBeenCalled()
+
+    await setInputValue(input, 'prts://2')
+    await flush()
+
+    expect(mocks.dismissNotice).toHaveBeenCalledTimes(1)
+    expect(mocks.dismissNotice).toHaveBeenCalledWith('combat-preview')
+    expect(mocks.notify).not.toHaveBeenCalledWith(expect.anything(), undefined, {
+      id: 'combat-preview',
+    })
+
+    await click(buttonByText('预览')!)
+    expect(mocks.notifyProgress).toHaveBeenCalledTimes(2)
+    expect(mocks.notifyProgress).toHaveBeenLastCalledWith('正在获取作业信息...', 'combat-preview')
+    expect(mocks.dismissNotice).toHaveBeenCalledTimes(1)
+
+    await act(async () => stalePreview.resolve({
+      success: true,
+      data: {
+        status_code: 200,
+        data: { content: JSON.stringify({ doc: { title: '旧预览' }, stage_name: 'OLD-1' }) },
+      },
+    }))
+    await flush()
+    expect(mocks.notify).not.toHaveBeenCalledWith('已加载作业：旧预览', undefined, {
+      id: 'combat-preview',
+    })
+    expect(mocks.dismissNotice).toHaveBeenCalledTimes(1)
+
+    await act(async () => nextPreview.resolve({
+      success: true,
+      data: {
+        status_code: 200,
+        data: { content: JSON.stringify({ doc: { title: '新预览' }, stage_name: 'NEW-2' }) },
+      },
+    }))
+    await flush()
+
+    expect(mocks.notify).toHaveBeenCalledWith('已加载作业：新预览', undefined, {
+      id: 'combat-preview',
+    })
+    expect(mocks.dismissNotice).toHaveBeenCalledTimes(1)
   })
 
   it('syncs a previewed set into the queue and submits its checked members as a set run', async () => {
@@ -2156,8 +2285,129 @@ describe('CombatTasks execution', () => {
     await click(buttonByText('预览')!)
     await flush()
 
-    expect(mocks.setMessage).toHaveBeenCalledWith('网络错误: set unavailable')
+    expect(mocks.notifyProgress).toHaveBeenCalledWith('正在获取作业信息...', 'combat-preview')
+    expect(mocks.notify).toHaveBeenCalledWith('网络错误: set unavailable', undefined, {
+      id: 'combat-preview',
+    })
     expect(container.textContent).toContain('TEST-ONLY')
+  })
+
+  it('replaces the loaded preview notice when it is added to the queue', async () => {
+    mocks.getCopilotInfo.mockResolvedValueOnce({
+      success: true,
+      data: {
+        status_code: 200,
+        stage: 'TEST-1',
+        stageId: 'test_1',
+        data: { content: JSON.stringify({ stage_name: 'test_1', doc: { title: '队列预览作业' } }) },
+      },
+    })
+    await renderComponent()
+    await setInputValue(container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')!, 'prts://1234')
+    await click(buttonByText('预览')!)
+    await flush()
+
+    await click(buttonByText('加入队列')!)
+
+    expect(mocks.notify).toHaveBeenCalledWith('已加入 1 个作业到队列', 'success', {
+      id: 'combat-preview',
+    })
+    expect(mocks.notify).not.toHaveBeenCalledWith('已加入 1 个作业到队列', 'success')
+  })
+
+  it('reports restored set progress under the preview notice when the set preview is ready', async () => {
+    mockSetPlan()
+    await renderComponent()
+    await setInputValue(container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')!, 'prts://s48990')
+
+    await click(buttonByText('立即执行')!)
+
+    expect(mocks.notifyProgress).toHaveBeenCalledWith('正在获取作业信息...', 'combat-preview')
+    expect(mocks.notify).toHaveBeenCalledWith(
+      '已恢复作业集进度，请确认待执行关卡后再次执行',
+      undefined,
+      { id: 'combat-preview' },
+    )
+  })
+
+  it('does not report restored set progress when the set preview fails', async () => {
+    await renderComponent()
+    await setInputValue(container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')!, 'prts://s48990')
+    mocks.getCopilotSetPlan.mockRejectedValueOnce(new Error('plan unavailable'))
+    mocks.getCopilotSet.mockRejectedValueOnce(new Error('set unavailable'))
+
+    await click(buttonByText('立即执行')!)
+
+    expect(mocks.notify.mock.calls
+      .filter(([message]) => String(message).includes('已恢复作业集进度'))).toHaveLength(0)
+    expect(mocks.notify).toHaveBeenCalledWith('网络错误: set unavailable', undefined, {
+      id: 'combat-preview',
+    })
+  })
+
+  it('replaces the queue preview notice when a searched job is added', async () => {
+    await renderComponent()
+    await openDiscovery()
+    mocks.searchCopilot.mockResolvedValueOnce(ok({
+      copilots: [{ id: 1, uri: 'prts://1234', title: '队列预览作业' }],
+    }))
+    await submitDiscoverySearch('1-7')
+    mocks.getCopilotInfo.mockResolvedValueOnce({
+      success: true,
+      data: {
+        status_code: 200,
+        stage: 'TEST-1',
+        stageId: 'test_1',
+        data: { content: JSON.stringify({ stage_name: 'test_1', doc: { title: '队列预览作业' } }) },
+      },
+    })
+
+    await click(buttonByAriaLabel('加入队列: 队列预览作业')!)
+
+    expect(mocks.notifyProgress).toHaveBeenCalledWith('正在获取作业信息...', 'combat-queue-preview')
+    expect(mocks.notify).toHaveBeenCalledWith('已加入 1 个作业到队列', 'success', {
+      id: 'combat-queue-preview',
+    })
+    expect(mocks.notify).not.toHaveBeenCalledWith('已加入 1 个作业到队列', 'success')
+    expect(mocks.dismissNotice).not.toHaveBeenCalledWith('combat-queue-preview')
+  })
+
+  it('replaces the queue preview notice when a searched job fails', async () => {
+    await renderComponent()
+    await openDiscovery()
+    mocks.searchCopilot.mockResolvedValueOnce(ok({
+      copilots: [{ id: 1, uri: 'prts://1235', title: '失败预览作业' }],
+    }))
+    await submitDiscoverySearch('1-7')
+    mocks.getCopilotInfo.mockRejectedValueOnce(new Error('queue unavailable'))
+
+    await click(buttonByAriaLabel('加入队列: 失败预览作业')!)
+
+    expect(mocks.notify).toHaveBeenCalledWith('网络错误: queue unavailable', 'error', {
+      id: 'combat-queue-preview',
+    })
+    expect(mocks.notify).not.toHaveBeenCalledWith('网络错误: queue unavailable', 'error')
+    expect(mocks.dismissNotice).not.toHaveBeenCalledWith('combat-queue-preview')
+  })
+
+  it('dismisses the queue preview notice when the add request is cancelled', async () => {
+    await renderComponent()
+    await openDiscovery()
+    mocks.searchCopilot.mockResolvedValueOnce(ok({
+      copilots: [{ id: 1, uri: 'prts://s1236', title: '取消预览作业' }],
+    }))
+    await submitDiscoverySearch('1-7')
+    const plan = deferred<ApiResponse>()
+    mocks.getCopilotSetPlan.mockReturnValueOnce(plan.promise)
+    mocks.notify.mockClear()
+
+    await click(buttonByAriaLabel('加入队列: 取消预览作业')!)
+    await renderActivityMode('hidden')
+    await act(async () => plan.resolve(ok({ setId: '1236', name: '作业集', items: [], entries: [] })))
+    await settleQueries()
+
+    expect(mocks.dismissNotice).toHaveBeenCalledWith('combat-queue-preview')
+    expect(mocks.notify).not.toHaveBeenCalled()
   })
 
   it('shows recommendations without changing the current job input', async () => {
@@ -2194,7 +2444,7 @@ describe('CombatTasks execution', () => {
     await click(discoverySearchButton()!)
     await flush()
 
-    expect(mocks.setMessage).toHaveBeenCalledWith('未找到关卡"1-7"的作业')
+    expect(mocks.notify).toHaveBeenCalledWith('未找到关卡"1-7"的作业')
     expect(discoveryDialog()?.textContent).toContain('旧作业')
   })
 
@@ -2671,6 +2921,6 @@ describe('CombatTasks execution', () => {
     expect(mocks.resetCopilotSetProgress).toHaveBeenCalledWith('48990')
     expect(document.querySelector('[role="alertdialog"]')).not.toBeNull()
     expect(buttonByText('确认重置')?.disabled).toBe(false)
-    expect(mocks.setMessage).toHaveBeenCalledWith('重置失败: 进度存储不可用', 'error')
+    expect(mocks.notify).toHaveBeenCalledWith('重置失败: 进度存储不可用', 'error')
   })
 })

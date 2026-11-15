@@ -140,6 +140,15 @@ function activeTabLabel() {
   return container.querySelector('[data-testid="active-tab"]')?.textContent
 }
 
+function pageTitle() {
+  return container.querySelector<HTMLElement>('[data-region="page-title"]')!
+}
+
+/** 侧栏品牌区是非交互标识，不应引入按钮或链接焦点停点。 */
+function sidebarBrand() {
+  return container.querySelector<HTMLElement>('[data-region="sidebar-brand"]')!
+}
+
 function desktopLink(tab: string) {
   return container.querySelector<HTMLButtonElement>(`nav[aria-label="工作台"] button[data-app-tab="${tab}"]`)!
 }
@@ -167,6 +176,7 @@ describe('top-level application navigation', () => {
     availableScroll = Number.POSITIVE_INFINITY
     clampViewportOnTabSwitch = false
     asyncNavigationGate = null
+    document.title = ''
     window.history.replaceState({}, '', '/app/dashboard')
     window.matchMedia = vi.fn(mediaQueryList)
     Object.defineProperty(window, 'scrollY', {
@@ -197,6 +207,7 @@ describe('top-level application navigation', () => {
     await act(async () => root.unmount())
     container.remove()
     document.querySelectorAll('[data-slot="sheet-portal"]').forEach(node => node.remove())
+    document.title = ''
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
@@ -385,6 +396,38 @@ describe('top-level application navigation', () => {
     await act(async () => desktopLink('statistics').click())
     expect(sidebar.querySelectorAll('[aria-current="page"]')).toHaveLength(1)
     expect(sidebar.querySelector<HTMLElement>('[aria-current="page"]')?.dataset.appTab).toBe('statistics')
+  })
+
+  it('renders the active workspace name as the single page heading and document title', async () => {
+    await renderLayout()
+
+    expect(pageTitle().tagName).toBe('H1')
+    expect(pageTitle().textContent).toBe('概览')
+    expect(document.title).toBe('概览 · La Pluma Next')
+
+    await act(async () => desktopLink('automation').click())
+
+    expect(pageTitle().textContent).toBe('日常')
+    expect(document.title).toBe('日常 · La Pluma Next')
+  })
+
+  it('labels the theme gallery route from the same page title source', async () => {
+    window.history.replaceState({}, '', '/dev/theme-gallery')
+    await renderLayout()
+
+    expect(pageTitle().textContent).toBe('主题画廊')
+    expect(document.title).toBe('主题画廊 · La Pluma Next')
+  })
+
+  it('keeps the brand in a non-interactive sidebar header', async () => {
+    await renderLayout()
+
+    const brand = sidebarBrand()
+    expect(brand.tagName).toBe('DIV')
+    expect(brand.textContent).toBe('La Pluma Next')
+    expect(brand.querySelector('button, a')).toBeNull()
+    expect(brand.querySelector('img')?.getAttribute('alt')).toBe('')
+    expect(sidebarIdentity()).not.toBeNull()
   })
 
   it('shows the daily operator portrait, name, and quote in the desktop identity area', async () => {

@@ -45,5 +45,6 @@ describe('PageSkeleton', () => {
     const region = container.querySelector('[aria-busy="true"][aria-label="页面内容加载中"]')
     expect(region).not.toBeNull()
     expect(region?.querySelector('[aria-hidden="true"]')).not.toBeNull()
+    expect(region?.querySelector('h1')).toBeNull()
   })
 })

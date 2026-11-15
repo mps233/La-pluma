@@ -1,6 +1,6 @@
 ---
 name: La Pluma Next
-description: 面向《明日方舟》自动化的本地 Web 控制台，使用 macOS 工作台结构与 iOS 26 材质。
+description: 面向《明日方舟》自动化的本地 Web 控制台，使用 macOS 工作台结构、默认主题语义 token 与共享布局 token。
 colors:
   bg: "#f2f2f7"
   bg-soft: "#e5e5ea"
@@ -136,24 +136,24 @@ components:
 
 **Creative North Star: "The Precision Workbench"**
 
-La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面。它的界面首先是一张工作台：macOS 风格的固定侧栏负责工作区导航，中央区域承载任务编排、日志、数据和设备预览，移动端则退化为悬浮的 iOS 26 胶囊导航。所有控件都应当像加工过的系统控件：尺寸精确、反馈短促、层级清楚，不靠装饰制造存在感。
+La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面。它的界面首先是一张工作台：macOS 风格的固定侧栏负责工作区导航，中央区域承载任务编排、日志、数据和设备预览，移动端则退化为悬浮胶囊导航。所有控件都应当像加工过的系统控件：尺寸精确、反馈短促、层级清楚，不靠装饰制造存在感。
 
-浅色主题读起来像冷调纸面与磨砂玻璃，深色主题则是近黑石墨与同一支蓝色信号。密度是刻意保留的：信息可以很满，但层级必须由字重、1px 发丝线和间距 token 建立，而不是由彩色卡片、渐变或投影堆出来。强调色是稀缺资源，只出现在当前导航项、主操作、焦点和运行中的状态上。
+浅色主题读起来像冷调纸面与分层表面，深色主题则是近黑石墨与同一支蓝色信号。密度是刻意保留的：信息可以很满，但层级必须由字重、1px 发丝线和间距 token 建立，而不是由彩色卡片、渐变或投影堆出来。强调色是稀缺资源，只出现在当前导航项、主操作、焦点和运行中的状态上。
 
 **Key Characteristics:**
-- 原生语义优先：`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card`、`Dialog`、`AlertDialog`、`Sheet` 使用 `shared/ui` 的 shadcn 生成物，`ConfirmAlertDialog`、`PageHeader`、`Loading` 等应用组件位于 `shared/components`；两者都使用真实语义元素，浏览器、jsdom、SSR 和嵌入式场景渲染一致。
+- 原生语义优先：`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card`、`Dialog`、`AlertDialog`、`Sheet` 使用 `shared/ui` 的 shadcn 生成物，`ConfirmAlertDialog`、`Loading` 等应用组件位于 `shared/components`；两者都使用真实语义元素，浏览器、jsdom、SSR 和嵌入式场景渲染一致。
 - 单强调色：系统蓝承担品牌、主操作、焦点和选中态；状态色只表达成功、警告、危险和信息。
-- 分层而不炫技：普通内容面保持平整，只有 chrome、弹层和可点击卡片使用玻璃、抬升或 hover 阴影。
+- 分层而不炫技：普通内容面保持平整，只有 chrome、弹层和可点击卡片使用抬升或 hover 阴影；玻璃由后续主题层提供。
 - 4px 节奏：布局间距使用 Tailwind 原生档位与组件类；圆角使用 `--radius` 派生档位。
 - 移动优先：断点从内容需要出发，不复制桌面布局，也不建立第二套导航状态。
 
 ### Source of Truth
 
 - `apps/web/src/styles/index.css`：语义 token 的**唯一来源**（base 层）、Tailwind 入口、`@theme` 圆角派生与 `@theme inline` 颜色映射、通用组件类与跨域 keyframes；页面样式由各功能域自持。
-- `apps/web/src/styles/ios-theme.css`：只保留 iOS 26 独有的材质 token（`--glass-*`）、结构几何 token（`--la-pluma-*`）与对应样式；不再重定义语义 token。
-- `apps/web/src/shared/components`：`ConfirmAlertDialog`、`PageHeader`、`EmptyState`、`Loading` 等应用级通用组件；`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card`、`Dialog`、`AlertDialog`、`Sheet` 等 shadcn 生成物位于 `apps/web/src/shared/ui`（sidebar 也在该目录）。
+- `apps/web/src/styles/ios-theme.css`：保留结构几何与布局 token（`--la-pluma-*`）、主题层材质 token（`--glass-*`）与对应样式；默认基线不依赖玻璃材质，液态玻璃由后续主题提供。
+- `apps/web/src/shared/components`：`ConfirmAlertDialog`、`EmptyState`、`Loading` 等应用级通用组件；`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card`、`Dialog`、`AlertDialog`、`Sheet` 等 shadcn 生成物位于 `apps/web/src/shared/ui`（sidebar 也在该目录）。
 
-本文件描述规则；token 的具体数值以 `apps/web/src/styles/index.css` 为准，调整 token 时同步更新本文件的表格与说明。
+本文件描述规则；语义 token 的具体数值以 `apps/web/src/styles/index.css` 为准，布局与结构几何 token 以 `apps/web/src/styles/ios-theme.css` 为准。调整 token 时同步更新本文件的表格与说明。
 
 ## 层序与 token 单源
 
@@ -165,7 +165,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ```
 
 - **utilities 永远赢**：`page` 位于 `components` 之后、`utilities` 之前；页面 CSS 可以覆盖 base/preflight 与 components，但普通声明不再压过 utilities。确实需要压过 utilities 的页面/组件规则使用 `!important` 并在原位注释原因。
-- **page 层**：每个功能域自持自己的页面样式，放在 `features/<domain>/styles/<domain>.css`，由该域 `index.ts` 导入一次，全部位于 `@layer page`；`index.css` 只保留跨域 keyframes，`ios-theme.css` 只保留 iOS 26 chrome 与跨域 page-kind 材质（`.ios-workspace-page`、`.ios-borderless-cards`、`[data-automation-tasks]` + `[data-workbench-tasks]` 组合、`.la-pluma-content` 控件、浮层）；通用组件类留在 `@layer components`。
+- **page 层**：每个功能域自持自己的页面样式，放在 `features/<domain>/styles/<domain>.css`，由该域 `index.ts` 导入一次，全部位于 `@layer page`；`index.css` 只保留跨域 keyframes，`ios-theme.css` 只保留应用 chrome、布局 token 与跨域 page-kind 材质（`.ios-workspace-page`、`.ios-borderless-cards`、`[data-automation-tasks]` + `[data-workbench-tasks]` 组合、`.la-pluma-content` 控件、浮层）；通用组件类留在 `@layer components`。
 - **域内 CSS 按普通 CSS 处理**：功能域样式文件不经过 Tailwind 入口的编译与降级流水线，不要在其中使用 `@apply`/`@theme` 等 Tailwind 指令；需要厂商前缀的能力按现有写法显式补齐（如 `-webkit-backdrop-filter`），浏览器下限仍以 v4 目标为准。
 - **token 单源**：语义 token（颜色、圆角、间距、字号、控件高度等）只在 `index.css` 的 `:root` / `html.dark, #app-root.dark` / 媒体查询中定义一次。浅色、深色、`prefers-contrast`、`prefers-reduced-transparency` 的最终生效值都写在这里；`ios-theme.css` 不再出现同名重定义。
 - **深色切换**：主题仍同时给 `html` 与 `#app-root` 加 `.dark`；`html.dark` 与 `#app-root.dark` 都保留为有效选择器。
@@ -223,7 +223,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 **Character:** 字体是“系统原生”的一部分，不表演个性。层级靠字号、字重和颜色（primary / secondary / tertiary）建立；中文标题和正文不增加字距，只有英文全大写微标签可以使用更宽字距。
 
 ### Hierarchy
-- **Display / 页面标题** (600, `1.5rem` / `1.35`，移动端 `1.25rem`)：仅 `PageHeader` 的页面主标题。
+- **Page title / chrome 页面标题** (600, `1.5rem` / `1.35`)：顶栏唯一的 `h1`，直接使用当前工作区名称；桌面与移动端同字号，`document.title` 使用同一来源，页面内不再重复页头。
 - **Headline / 区块标题** (600, `1.125rem` / `1.45`)：`CardHeader`、主要内容区标题。
 - **Title / 卡片标题** (600, `1rem` / `1.4`)：紧凑区块、列表分组和卡片内标题。
 - **Body / 正文与表单标签** (400–500, `0.875rem` / `1.5`)：描述、输入标签、普通按钮；多行正文使用 `leading-6` 或 `1.6`。
@@ -239,20 +239,22 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 ## Layout
 
-布局模型是“固定工作台 + 弹性内容区”。`app-shell` 负责最大宽度和左右留白，页面内部不再嵌套同用途的 `max-w-*` 或水平 padding。
+布局模型是“固定工作台 + 弹性内容区”。横向宽度与留白只由布局 token 控制，`.la-pluma-content` 与 `.la-pluma-navbar-inner` 共用同一份最大宽度、居中与左右 padding；页面内部不再嵌套同用途的 `max-w-*` 或水平 padding。
 
-- 内容最大宽度 `1600px`（`100rem`）；桌面左右留白通常 `32px`，`1600px` 以上为 `40px`，移动端为 `14px`。
+- 内容最大宽度 `112rem`（`--la-pluma-content-max`），两侧对称居中。
+- 页面左右留白由 `--la-pluma-page-gutter` 提供：桌面（`1024px` 及以上）`32px`，平板（`640–1023px`）`20px`，移动（`639px` 及以下）`14px`。安全区取 `max(gutter, env(safe-area-inset-*))`，不叠加第二份 inset。
 - 基础节奏为 4px。页面外层用 `app-page`，区块之间用 `app-stack-section` / `app-grid-section`，卡片内部用 `app-stack-card` / `app-grid-card`。
 - 卡片内边距 `16px`；卡片内部紧密间距 `14px`（`gap-3.5`）；区块间距 `18px`（`gap-4.5`）；页面外层 `20px`，移动端 `14px`。不要用大量 `space-y-6`、`gap-6`、`p-6` 手写版式基准。
 - 常规信息卡片使用 `repeat(2, minmax(0, 1fr))`；主次栏建议保持约 `1.1–1.75 : 0.9–1`，工具/筛选窄栏最小约 `16rem`。每一列都要有 `minmax(0, ...)` 或 `min-w-0`，避免长文本横向溢出。
-- 阅读型长文本在自己的内容区单独限制行宽；不要把整页内容压成一条窄栏，也不要用 `max-w-7xl` 在 `app-shell` 内重复收窄。
+- 阅读型长文本在自己的内容区单独限制行宽；不要把整页内容压成一条窄栏，也不要在内容容器内重复收窄整页宽度。
 
 ### Responsive Shell
 
-应用使用原生 `.la-pluma-app` 根节点。Navbar、页面区域、移动 tabbar 和 Sheet 等 chrome 与交互统一由 `Layout` 及 `shared/components` 通用组件提供；`styles/ios-theme.css` 负责 iOS 26 材质、应用 chrome、安全区和品牌适配，不要在页面中另起一套导航或 modal 基础样式。
+应用使用原生 `.la-pluma-app` 根节点。Navbar、侧栏、页面区域、移动 tabbar 和 Sheet 等 chrome 与交互统一由 `Layout` 及 `shared/components` 通用组件提供；`styles/ios-theme.css` 负责默认主题下的应用 chrome、布局 token 与安全区，不要在页面中另起一套导航或 modal 基础样式。液态玻璃是后续主题能力，不属于默认 chrome。
 
-- 桌面端（`lg` 及以上）显示 `17rem` 左侧工作台导航：一条跨越顶栏与导航区的连续圆角玻璃边界、可用搜索、单列导航和 28px 语义色图标底座；导航项从面板顶部开始排列，干员身份区固定在面板底部。当前项使用整行系统强调色和白色文字；品牌入口属于侧栏右侧的工作区顶栏，不能进入或遮挡侧栏圆角区。
-- 移动端使用悬浮的 iOS 风格底部胶囊导航，右侧搜索/更多入口承载次要页面。两端必须复用 `Layout` 的 URL 路由和 active 状态，不要按 viewport 建立第二份导航状态。
+- 桌面端（`1024px` 及以上）显示 `17rem` 左侧工作台：顶部是侧栏品牌头（普通非交互标识，不是按钮或链接），其下是单列工作区导航，底部固定干员身份区与每日语录。当前项使用侧栏强调背景与中等字重，不使用整行实心蓝。
+- 顶栏固定为两列：页面标题在左（唯一 `h1`，来自当前工作区名称并可截断），操作区在右。页面不再渲染自己的标题、副标题或页头操作区。
+- 移动端隐藏侧栏与品牌，顶栏仍保留页面标题与操作区；底部使用悬浮胶囊导航，右侧“更多”入口承载次要页面。两端必须复用 `Layout` 的 URL 路由和 active 状态，不要按 viewport 建立第二份导航状态。
 - 主题由 `useUIStore` 的 `light`、`dark`、`system` 管理，并同步到文档根节点和 `.la-pluma-app`。组件或页面不要直接操作 `.dark`，也不要创建局部主题开关。
 - `apps/web/index.html` 使用 `viewport-fit=cover`。`Layout` 通过统一 token 管理 navbar、移动 tabbar 和对应安全区高度；自定义 fixed/sticky 层只有在不属于这些 chrome 时才使用 `env(safe-area-inset-*)`，内容区不要重复叠加顶部或底部 inset。
 - 页面边缘留白统一由 `Layout` 的 `.la-pluma-content` 提供，内部 `.app-page` 不重复增加上下内边距。桌面底部使用 `0.75rem`（12px）；移动端由外层预留底部导航、安全区和页面间距。
@@ -261,12 +263,12 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 ## Elevation & Depth
 
-这是混合体系：普通内容面是平的，靠色阶和 1px 发丝线分层；只有 chrome、弹层、浮层和可点击卡片使用阴影或玻璃。深度不是装饰，而是“这一层是否浮在另一层之上”的答案。
+这是混合体系：普通内容面是平的，靠色阶和 1px 发丝线分层；只有 chrome、弹层、浮层和可点击卡片使用阴影。深度不是装饰，而是“这一层是否浮在另一层之上”的答案。默认基线以语义表面与发丝线构成 chrome，液态玻璃材质由后续主题层提供。
 
 ### Shadow Vocabulary
 - **Panel rest (light)** (`0 0 0 1px rgba(60, 60, 67, 0.18), 0 1px 3px rgba(15, 23, 42, 0.05), 0 14px 40px rgba(15, 23, 42, 0.05)`)：`surface-panel` 召唤层与独立面板的默认抬升。
 - **Panel rest (dark)** (`inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px rgba(235, 235, 245, 0.18), 0 16px 40px rgba(0, 0, 0, 0.28)`)：深色主题的同等层级。
-- **Glass chrome** (`0 12px 32px rgba(60, 60, 67, 0.12)`；深色 `0 14px 34px rgba(0, 0, 0, 0.34)`)：侧栏框、移动 tabbar 和悬浮 chrome。
+- **Glass chrome** (`0 12px 32px rgba(60, 60, 67, 0.12)`；深色 `0 14px 34px rgba(0, 0, 0, 0.34)`)：仅用于液态玻璃主题下的移动 tabbar 与悬浮 chrome，默认基线不启用。
 - **Summoned layer** (`0 2px 8px rgba(0, 0, 0, 0.1), 0 30px 80px rgba(0, 0, 0, 0.24)`)：Dialog/Sheet、主题菜单、PWA 提示等被召唤的叠加层，配合 `blur(24px) saturate(165%)`。
 - **Control rest** (`inset 0 0 0 1px rgba(60, 60, 67, 0.28), 0 1px 2px rgba(15, 23, 42, 0.025)`)：输入框、选择框和次级按钮的静态边界。
 
@@ -275,7 +277,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ### Named Rules
 **The Flat-By-Default Rule.** 普通卡片、列表和页面区块在静止状态保持平整。阴影只用于表达层级、可点击性或状态，不要给静态内容卡片加投影闪动或位移。
 
-**The Liquid Glass Exception.** 只有 chrome、Dialog/Sheet、主题菜单、PWA 提示和明确的浮层可以使用 `backdrop-filter` 与深阴影。普通卡片保持不透明，避免整页都是玻璃导致可读性下降。
+**The Liquid Glass Theme.** 液态玻璃是后续主题层的能力，不属于默认 chrome。shell chrome 的玻璃材质由后续主题提供；现有分段控件与召唤层（Dialog/Sheet、主题菜单、PWA 提示等）的材质保持不变。普通卡片始终不透明，避免整页都是玻璃导致可读性下降。
 
 **The Single Beam Rule.** `status-border-beam` 仅用于启动、连接或执行中的局部状态反馈，并通过 `is-active` 控制；完成、空闲和静态卡片不得常驻光效，也不要叠加第二条可见边框。
 
@@ -322,8 +324,8 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 - 通用组件优先级：能用 `Card`、`CardHeader`、`CardTitle`、`CardDescription`、`CardAction`、`CardContent`、`CardFooter` 时优先使用组合；特殊布局使用 `surface-soft`、`app-info-card`；不要把页面区块做成层层嵌套卡片。
 
 ### Navigation
-- **Desktop:** 固定 17rem 侧栏，0.75rem 内缩的连续圆角玻璃框（`blur(28px) saturate(165%)`），单列导航、底部干员身份区和 28px 语义色图标底座；当前项为整行系统蓝和白色文字。
-- **Mobile:** 悬浮 4rem 胶囊 tabbar，底部安全区由 `--la-pluma-tabbar-*` token 统一管理；右侧搜索/更多入口承载次要页面。
+- **Desktop:** 固定 17rem 侧栏；顶部 `SidebarHeader` 承载非交互品牌标识，其下是单列工作区导航，底部固定干员身份区与每日语录。当前项使用侧栏强调背景与中等字重，不使用整行实心蓝；侧栏不使用玻璃框、搜索或图标底座。
+- **Mobile:** 悬浮 4rem 胶囊 tabbar，底部安全区由 `--la-pluma-tabbar-*` token 统一管理；右侧“更多”入口经 Sheet 承载次要页面。移动端隐藏侧栏与品牌，顶栏仍显示页面标题。
 - **Shared State:** 两端复用 `Layout` 的 URL 路由和 active 状态；不要按 viewport 维护第二套导航状态，也不要让桌面侧栏样式扩散到移动底栏或“更多”Sheet。
 
 ### Dialog / Sheet
@@ -342,10 +344,10 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 | 局部内容正在读取 | `Loading` |
 | 列表、流程或卡片无数据 | `EmptyState`，按容器选择 `compact` |
 | 区域读取失败 | 在原区域显示可恢复的错误与重试操作；不要改成空状态 |
-| 全局结果与错误 | `useStatusStore.setMessage`，由 `FloatingStatusIndicator` 展示；错误持续到用户关闭，其他短消息由 store 自动收起，不要自行写清除定时器 |
+| 全局结果与错误 | `notify`（sonner `AppToaster`）；错误常驻到关闭，其他类型按默认时长收起，最多同时显示 3 条。同一流程使用固定 id 复用通知（`execution`、`statistics`、`settings-update`、`settings-update-channel`、`settings-auto-update`、`settings-config:connection`、`settings-config:instance`、`settings-config:resource-source`、`combat-preview`、`combat-queue-preview`、`combat-paradox-search`），进度用 `notifyProgress`；有终态文案时用同一 id 替换，没有终态文案时才 `dismissNotice` |
 | 删除、清空等不可逆操作 | 使用 `AlertDialog` 或应用层 `ConfirmAlertDialog`；新代码不得使用 `window.confirm` |
 
-日志控制台、养成筛选空结果等固定高度或高密度区域可保留专用状态样式。局部表单成功提示、日志提示等需要紧邻操作区或可手动关闭时，也可保留在面板内。项目没有通用页面 Toast 组件（撤销提示使用 sonner `AppToaster`），`FloatingStatusIndicator` 是全局任务状态和短消息载体，不应被当作普通 toast 复刻。
+日志控制台、养成筛选空结果等固定高度或高密度区域可保留专用状态样式。局部表单成功提示、日志提示等需要紧邻操作区或可手动关闭时，也可保留在面板内。全局通知统一走 `shared/notifications` 的 `notify`、`notifyProgress` 与 `dismissNotice`，由应用根挂载的 sonner `AppToaster` 渲染；撤销提示使用 `UndoToastCard`，不要让页面自建第二套 toast。
 
 ### Icons
 - 普通功能图标优先使用已引入的 `lucide-react`；业务身份和概览图标优先复用 `Icons.tsx`。一级工作区标题与控制台一致，不添加装饰图标；不要在普通页面重复手写 SVG。
@@ -356,7 +358,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ## Do's and Don'ts
 
 ### Do:
-- **Do** 先读 `apps/web/src/styles/index.css` 和 `apps/web/src/styles/ios-theme.css`，再用语义类实现界面；新页面优先使用 `Layout`、`PageHeader`、`Card`、`Button`、`Input` 等现有组件。
+- **Do** 先读 `apps/web/src/styles/index.css` 和 `apps/web/src/styles/ios-theme.css`，再用语义类实现界面；新页面优先使用 `Layout`、`Card`、`Button`、`Input` 等现有组件。
 - **Do** 把间距收敛到 Tailwind 原生档位与组件类、圆角收敛到 `--radius` 派生档位，保持 4px 基线和 1px 发丝线。
 - **Do** 让系统蓝保持稀缺：只用于当前项、主操作、焦点和运行中状态；状态色只表达语义。
 - **Do** 在手机和粗指针设备上沿用 shadcn base-nova 的紧凑控件度量，不额外放大表单控件，并检查 light/dark、loading、disabled、empty、error 以及长标题/长操作文案。

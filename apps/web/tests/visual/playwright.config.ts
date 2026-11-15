@@ -50,7 +50,7 @@ export default defineConfig({
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 } },
     // 中间断点：820 落在 640（sm）与 900（页面自持的 stage stepper 断点）之间，
-    // 与 desktop 一起把 min-[900px] 两侧夹住；同时也是"无侧栏 + 内联页头"的组合，
+    // 与 desktop 一起把 min-[900px] 两侧夹住；同时也是"无侧栏 + 顶栏标题"的组合，
     // 390 与 1440 都覆盖不到。
     { name: 'tablet', use: { ...devices['Desktop Chrome'], viewport: { width: 820, height: 1180 }, deviceScaleFactor: 1 } },
     { name: 'mobile', use: { ...devices['Pixel 5'], viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 } },

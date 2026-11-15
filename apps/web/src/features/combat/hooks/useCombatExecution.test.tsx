@@ -3,12 +3,21 @@
 import { act, useEffect, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { StatusMessageType } from '@/features/runtime-status'
+import type { NoticeOptions, NoticeType } from '@/shared/notifications'
 import type { AgentRun, ExecutionController, ExecutionControllerState } from '@/features/task-execution'
 import type { CopilotSetItemStatus } from '../model/copilotSetRun'
 import { COMBAT_EXECUTION_SCOPE, useCombatExecution, type CombatExecution } from './useCombatExecution'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+const notifications = vi.hoisted(() => ({
+  notifyProgress: vi.fn(),
+}))
+
+vi.mock('@/shared/notifications', () => ({
+  notifyProgress: notifications.notifyProgress,
+  EXECUTION_NOTICE_ID: 'execution',
+}))
 
 const apiMocks = vi.hoisted(() => ({
   executeCopilotQueue: vi.fn(),
@@ -109,12 +118,15 @@ let root: Root
 let container: HTMLDivElement
 let rerender: (() => void) | null = null
 let latest: CombatExecution | null = null
-const messages: Array<{ message: string; type?: StatusMessageType }> = []
+const messages: Array<{ message: string; type?: NoticeType; options?: NoticeOptions }> = []
 
 function Harness({ controller, stopOnFailure }: { controller: ExecutionController; stopOnFailure: boolean }) {
   const [, setTick] = useState(0)
   const execution = useCombatExecution({
-    notify: (message, type) => messages.push({ message, type }),
+    notify: (message, type, options) => {
+      messages.push({ message, type, options })
+      return 'notice'
+    },
     stopOnFailure,
     controller,
   })
@@ -128,6 +140,7 @@ function Harness({ controller, stopOnFailure }: { controller: ExecutionControlle
 describe('useCombatExecution run projection', () => {
   beforeEach(() => {
     messages.length = 0
+    notifications.notifyProgress.mockReset()
     rerender = null
     latest = null
     container = document.createElement('div')
@@ -199,7 +212,7 @@ describe('useCombatExecution run projection', () => {
     ))
     await renderHarness({ getState: () => controllerState.current } as unknown as ExecutionController)
 
-    expect(messages).toContainEqual({ message: '作业 1/4 完成，等待开始下一关' })
+    expect(notifications.notifyProgress).toHaveBeenCalledWith('作业 1/4 完成，等待开始下一关', 'execution')
 
     // 继续执行后新的结算要能覆盖提示去重键，不能被尾部 skipped 条目遮蔽。
     controllerState.current = combatState(manualRun(
@@ -210,7 +223,7 @@ describe('useCombatExecution run projection', () => {
     await act(async () => rerender?.())
     await flush()
 
-    expect(messages).toContainEqual({ message: '作业 2/4 执行失败: 作战失败，等待开始下一关' })
+    expect(notifications.notifyProgress).toHaveBeenCalledWith('作业 2/4 执行失败: 作战失败，等待开始下一关', 'execution')
     expect(messages.some(({ message }) => message.includes('已跳过'))).toBe(false)
   })
 })
@@ -257,6 +270,7 @@ describe('useCombatExecution queue submissions', () => {
 
   beforeEach(() => {
     messages.length = 0
+    notifications.notifyProgress.mockReset()
     rerender = null
     latest = null
     container = document.createElement('div')
@@ -315,7 +329,37 @@ describe('useCombatExecution queue submissions', () => {
       options: { formationMode: 'auto' },
       waitForCompletion: false,
     }, { idempotencyKey: 'run_copilot_queue-test' })
-    expect(messages).toContainEqual({ message: '正在连续执行作业队列' })
+    expect(notifications.notifyProgress).toHaveBeenCalledWith('正在连续执行作业队列', 'execution')
+  })
+
+  it('warns instead of leaving an unobservable submission in progress', async () => {
+    controllerState.current = combatState(null)
+    apiMocks.executeCopilotQueue.mockResolvedValue({
+      success: true,
+      data: { accepted: true },
+    })
+    const controller = queueController(null)
+    await renderHarness(controller)
+
+    let submitted = true
+    await act(async () => {
+      submitted = await latest!.submitQueue({
+        queueId: 'copilot-queue',
+        name: '作业队列',
+        mode: 'continuous',
+        failurePolicy: 'continue',
+        entries: [{ clientId: 'queue-a', source: 'prts', copilotId: 101 }],
+        options: {},
+        taskName: '自动战斗作业',
+      })
+    })
+
+    expect(submitted).toBe(false)
+    expect(messages).toContainEqual({
+      message: '服务端未返回运行身份，无法确认本次执行状态',
+      type: 'warning',
+      options: { id: 'execution' },
+    })
   })
 
   it('reads the waiting state from the queue run projection and continues it', async () => {
@@ -342,7 +386,7 @@ describe('useCombatExecution queue submissions', () => {
 
     expect(apiMocks.continueCopilotQueue).toHaveBeenCalledWith('run-queue', false)
     expect(controller.refresh).toHaveBeenCalledWith('manual')
-    expect(messages).toContainEqual({ message: '正在执行下一项...' })
+    expect(notifications.notifyProgress).toHaveBeenCalledWith('正在执行下一项...', 'execution')
   })
 
   it('skips the waiting queue entry and refreshes without a second submission', async () => {
@@ -367,8 +411,8 @@ describe('useCombatExecution queue submissions', () => {
     expect(apiMocks.skipCopilotQueueEntry).toHaveBeenCalledWith('run-queue')
     expect(apiMocks.executeCopilotQueue).not.toHaveBeenCalled()
     expect(controller.refresh).toHaveBeenCalledWith('manual')
-    expect(messages).toContainEqual({ message: '正在跳过当前项...' })
-    expect(messages).toContainEqual({ message: '已跳过当前项', type: 'success' })
+    expect(notifications.notifyProgress).toHaveBeenCalledWith('正在跳过当前项...', 'execution')
+    expect(messages).toContainEqual({ message: '已跳过当前项', type: 'success', options: { id: 'execution' } })
   })
 
   it('keeps a busy device as a retryable continue warning', async () => {
@@ -393,6 +437,7 @@ describe('useCombatExecution queue submissions', () => {
     expect(messages).toContainEqual({
       message: '设备正被其他任务占用，请稍后重试',
       type: 'warning',
+      options: { id: 'execution' },
     })
     expect(controller.refresh).toHaveBeenCalledWith('manual')
   })

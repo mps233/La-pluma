@@ -89,7 +89,7 @@ const result = await executionController.submitExecution('run_task', ({ idempote
 | `unknown` | 观察断线（保留最后已知 `isRunning`），或 `occupancy.state=unknown` | `执行状态未知` | 按最后已知值 |
 | `idle` | 其余情况 | 无 | 否 |
 
-`statusStore` 只保留阶段、身份、标签和进度说明，不复制 `AgentRun`；相同投影重复写入会被忽略。`FloatingStatusIndicator` 的显示优先级是连接健康 > 临时消息 > 运行投影 > 干员台词。连接监测器只在投影进入忙态时把探针间隔调到 2s，并且只写 `backendStatus`/`backendMessage`，不再从 `tasks/status.isRunning` 推断运行状态。
+`statusStore` 只保留阶段、身份、标签和进度说明，不复制 `AgentRun`；相同投影重复写入会被忽略。用户可见的执行结果与临时消息通过 `shared/notifications` 的 `notify` / `notifyProgress` 进入 sonner 通知器，与运行投影和连接健康互不覆盖。连接监测器只在投影进入忙态时把探针间隔调到 2s，并且只写 `backendStatus`/`backendMessage`，不再从 `tasks/status.isRunning` 推断运行状态。
 
 ## 3. 身份、幂等与旧响应
 
@@ -153,7 +153,7 @@ const result = await executionController.submitExecution('run_task', ({ idempote
   - 仓库/干员识别通过 `beginExecutionIntent('run_task', { scope: 'statistics' })` 生成幂等键，以 `waitForCompletion=true` 提交；命令确认成功后才轮询解析端点等待 MAA 日志可解析。
   - 命令超时或本地取消只结束本地等待，不调用停止；继续时复用同一幂等键确认已有 Run，已接受 Run 只读取终态，绝不产生第二个设备命令。Run 终态等待或解析超时后只继续等待/解析，不再提交 `run-task`。
   - 识别成功由 `features/statistics/model/commandOwner.ts` 发布作用域失效；材料刷新是脚本入口，不产生 Run。命令状态归域内所有者，页面不再内联 `executeCommand`、固定延迟或读 queue 决定提示。详见[统计识别命令与失效联动](../frontend/domains/statistics.md#识别命令)。
-- 肉鸽、作业、自动化、Dashboard 与统计识别的运行身份都来自同一控制器；Dashboard 启动的 run 带有 `scope: 'dashboard'`，统计识别带有 `scope: 'statistics'`，其它页面不会把它们显示成自己的执行，但全局投影、浮动指示器和 Dashboard 会看到同一个活动 run。
+- 肉鸽、作业、自动化、Dashboard 与统计识别的运行身份都来自同一控制器；Dashboard 启动的 run 带有 `scope: 'dashboard'`，统计识别带有 `scope: 'statistics'`，其它页面不会把它们显示成自己的执行，但全局运行投影和 Dashboard 会看到同一个活动 run。
 
 ## 7. 回归清单
 
@@ -175,8 +175,7 @@ const result = await executionController.submitExecution('run_task', ({ idempote
 | `pages/automation/AutomationTasks.activity.test.tsx` | 流程结束时 Activity 隐藏再恢复，完成标记不丢失、不发送停止、不重新提交 |
 | `features/runtime-status/hooks/useRunStatusProjection.test.tsx` | 空闲/运行/等待继续/等待战斗结束后停止（仍算设备忙）/正在停止/外部占用/未知占用/断线保留最后活动 run/终态才回到空闲 |
 | `features/runtime-status/hooks/useBackendStatusMonitor.test.tsx` | 探针只写连接健康，不写运行状态；投影进入忙态后探针改按 2s 间隔 |
-| `features/runtime-status/components/FloatingStatusIndicator.test.tsx` | 连接健康 > 临时消息 > 运行投影（标签与颜色）> 干员台词；运行/等待为 info，占用/未知为 warning |
-| `features/runtime-status/store/statusStore.test.ts` | 运行字段只接受投影；忙态保留消息，离开忙态才恢复自动消失；相同投影不重复通知；连接健康与消息互不影响 |
+| `features/runtime-status/store/statusStore.test.ts` | 运行字段只接受投影；相同投影不重复通知；连接健康与运行投影互不影响 |
 | `pages/dashboard/Dashboard.test.tsx` | 日常入口单次异步 `run_daily_flow` 幂等提交（`scope: dashboard`）；在途重复点击不产生第二个提交；终态通知只宣告实际观察过的本页 run；其它域启动/停止不冒充本页执行但全局保持一致；外部占用与断线未知禁用启动入口 |
 
 ## 8. 当前限制

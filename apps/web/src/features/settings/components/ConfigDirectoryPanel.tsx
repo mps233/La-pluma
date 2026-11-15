@@ -1,11 +1,10 @@
 import { FolderOpen, RefreshCw } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
-import { useStatusStore } from '@/features/runtime-status'
+import { notify } from '@/shared/notifications'
 import { useSettingsConfigDirectory } from '../hooks/useSettingsConfigDirectory'
 
 export default function ConfigDirectoryPanel() {
-  const setStatusMessage = useStatusStore(state => state.setMessage)
   const {
     path: configDir,
     status: configDirStatus,
@@ -16,7 +15,7 @@ export default function ConfigDirectoryPanel() {
 
   const handleOpenConfigDir = async () => {
     const result = await openConfigDirectory()
-    setStatusMessage(result.success ? '已打开配置目录' : `打开失败: ${result.message}`)
+    notify(result.success ? '已打开配置目录' : `打开失败: ${result.message}`)
   }
 
   return (

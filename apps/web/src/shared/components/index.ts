@@ -1,4 +1,3 @@
-export { default as PageHeader } from './PageHeader.tsx'
 export { default as FieldHint } from './FieldHint.tsx'
 
 export { ConfirmAlertDialog } from './ConfirmAlertDialog.tsx'

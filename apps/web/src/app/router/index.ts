@@ -1,4 +1,5 @@
 export { AppRoutes } from './AppRoutes'
 export { VisitedWorkspaces } from './VisitedWorkspaces'
 export { appRoutes } from './pages'
+export { resolvePageTitle } from './pageTitle'
 export { appTabs, type AppTabDefinition } from './tabs'

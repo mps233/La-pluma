@@ -20,7 +20,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/shared/ui/switch'
 import { Card } from '@/shared/ui/card'
 import { EmptyState, FieldHint } from '@/shared/components'
-import { useAutomationAvailability, useStatusStore } from '@/features/runtime-status'
+import { notify } from '@/shared/notifications'
+import { useAutomationAvailability } from '@/features/runtime-status'
 import { useUserConfig } from '@/features/user-config'
 import { useResourceInvalidation, type ResourceInvalidation } from '@/features/resource-invalidation'
 import { testConnection as testAdbConnection } from '@/features/settings'
@@ -127,7 +128,6 @@ interface DeletedTaskSnapshot {
 
 export default function AutomationWorkspace() {
   const shouldReduceMotion = useReducedMotion()
-  const setStatusMessage = useStatusStore(state => state.setMessage)
   const { isAvailable: automationAvailable, unavailableMessage } = useAutomationAvailability()
   const {
     isRunning,
@@ -139,13 +139,13 @@ export default function AutomationWorkspace() {
     scheduleSummary: executionScheduleSummary,
     submitFlow,
     stop: stopTaskFlow,
-  } = useAutomationExecution({ notify: setStatusMessage })
+  } = useAutomationExecution({ notify })
 
   const showSuccess = (msg: string) => {
-    setStatusMessage(msg, 'success')
+    notify(msg, 'success')
   }
   const showError = (msg: string) => {
-    setStatusMessage(msg, 'error')
+    notify(msg, 'error')
   }
 
   const {
@@ -179,7 +179,7 @@ export default function AutomationWorkspace() {
   const handleRetryConfigSave = async () => {
     if (isRetryingConfigSave) return
     const saved = await retryConfigSave()
-    if (saved) setStatusMessage('自动化配置已同步', 'success')
+    if (saved) notify('自动化配置已同步', 'success')
   }
 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
@@ -388,14 +388,14 @@ export default function AutomationWorkspace() {
       ? detail.stageCount
       : null
     if (outcome.reason === 'loaded') {
-      setStatusMessage(
+      notify(
         stageCount === null ? '智能养成计划已更新' : `智能养成计划已更新：${stageCount} 个关卡`,
         'success',
       )
     } else if (outcome.reason === 'local-draft' || outcome.reason === 'stale') {
-      setStatusMessage('检测到本设备有未同步的流程编辑，已保留本地草稿；养成计划更新未覆盖本地配置', 'warning')
+      notify('检测到本设备有未同步的流程编辑，已保留本地草稿；养成计划更新未覆盖本地配置', 'warning')
     } else if (outcome.reason === 'failed') {
-      setStatusMessage('自动化配置刷新失败，请稍后重试', 'warning')
+      notify('自动化配置刷新失败，请稍后重试', 'warning')
     }
   }
 

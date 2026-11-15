@@ -27,7 +27,9 @@ const mocks = vi.hoisted(() => ({
   getRun: vi.fn(),
   parseDepotData: vi.fn(),
   parseOperBoxData: vi.fn(),
-  setMessage: vi.fn(),
+  notify: vi.fn(),
+  notifyProgress: vi.fn(),
+  dismissNotice: vi.fn(),
 }))
 
 vi.mock('@/features/device-mirror', () => ({
@@ -91,14 +93,14 @@ vi.mock('@/features/task-execution', async (importOriginal) => {
   }
 })
 
-vi.mock('@/features/runtime-status', () => ({
-  useStatusStore: (selector?: (state: { setMessage: typeof mocks.setMessage }) => unknown) => {
-    if (!selector) throw new Error('useStatusStore must be called with a selector')
-    return selector({ setMessage: mocks.setMessage })
-  },
-  FloatingStatusIndicator: ({ className, textClassName }: { className?: string; textClassName?: string }) => (
-    <div data-testid="floating-status" data-class-name={className} data-text-class-name={textClassName} />
-  ),
+vi.mock('@/shared/notifications', () => ({
+  notify: mocks.notify,
+  notifyProgress: mocks.notifyProgress,
+  dismissNotice: mocks.dismissNotice,
+  detectNoticeType: () => 'default',
+  EXECUTION_NOTICE_ID: 'execution',
+  STATISTICS_NOTICE_ID: 'statistics',
+  SETTINGS_UPDATE_NOTICE_ID: 'settings-update',
 }))
 
 vi.mock('@/features/statistics/components/DropRecords', () => ({
@@ -277,7 +279,7 @@ describe('DataStatistics layout surfaces', () => {
     await renderPage()
     await flush()
 
-    expect(container.querySelector('h1')?.textContent).toBe('数据')
+    expect(container.querySelector('h1')).toBeNull()
 
     const tabs = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
     expect(tabs).toHaveLength(3)
@@ -547,7 +549,7 @@ describe('DataStatistics layout surfaces', () => {
 
       expect(mocks.fetchOperatorMaterials).toHaveBeenCalledOnce()
       expect(mocks.getAllOperators).toHaveBeenCalledTimes(1)
-      expect(mocks.setMessage).toHaveBeenCalledWith('干员材料数据获取成功！')
+      expect(mocks.notify).toHaveBeenCalledWith('干员材料数据获取成功！', 'success', { id: 'statistics' })
       expect(events).toContainEqual({
         resources: ['materials', 'training-queue', 'dashboard-snapshot'],
         cause: 'recognition',
@@ -589,7 +591,7 @@ describe('DataStatistics layout surfaces', () => {
 
     expect(mocks.executeCommand).toHaveBeenCalledOnce()
     expect(mocks.parseDepotData).toHaveBeenCalledOnce()
-    expect(mocks.setMessage).toHaveBeenCalledWith('识别完成！共识别 3 种物品')
+    expect(mocks.notify).toHaveBeenCalledWith('识别完成！共识别 3 种物品', 'success', { id: 'statistics' })
     expect(client.getQueryData(gameDataKeys.resource('depot'))).toMatchObject({
       itemCount: 3,
       items: [{ name: '识别后的固源岩', count: 30 }],
@@ -636,7 +638,7 @@ describe('DataStatistics layout surfaces', () => {
     await flush()
 
     expect(mocks.parseOperBoxData).toHaveBeenCalledOnce()
-    expect(mocks.setMessage).toHaveBeenCalledWith('识别完成！共识别 2 名干员')
+    expect(mocks.notify).toHaveBeenCalledWith('识别完成！共识别 2 名干员', 'success', { id: 'statistics' })
     expect(client.getQueryData(gameDataKeys.resource('operbox'))).toMatchObject({
       operCount: 2,
       data: [{ name: '识别后的干员' }, { name: '另一位干员' }],

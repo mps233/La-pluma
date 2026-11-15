@@ -1,6 +1,5 @@
 import { Card } from '@/shared/ui/card'
 import { Skeleton } from '@/shared/ui/skeleton'
-import { PageHeaderSkeleton } from '@/shared/components/Loading'
 import { useDashboardFlowLayout } from '../hooks/useDashboardFlowLayout'
 
 function DashboardSummarySkeleton({ variant }: { variant: 'training' | 'drops' }) {
@@ -73,8 +72,6 @@ export function DashboardSkeleton() {
   return (
     <div className="app-page dashboard-page" data-page="dashboard" aria-busy="true" aria-label="概览加载中">
       <div className="app-stack-section">
-        <PageHeaderSkeleton dashboard />
-
         <div ref={flowGridRef} className="dashboard-flow-layout" style={flowGridStyle}>
           <div ref={flowCardRef} className="min-w-0">
             <div className="dashboard-flow-glow-shell status-border-beam">

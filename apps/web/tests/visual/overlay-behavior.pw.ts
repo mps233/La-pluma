@@ -3,6 +3,12 @@ import { expectNoBrowserErrors, recordBrowserErrors } from './browser-errors'
 import { apiFixtures, ok, type ApiFixture } from './fixtures'
 import { installDeterministicEnvironment, themeSeedScript, waitForPageReady } from './harness'
 
+function undoToast(page: Page) {
+  return page.locator('[data-sonner-toast]').filter({
+    has: page.getByRole('button', { name: '关闭移除提示', exact: true }),
+  })
+}
+
 const TRAINING_QUEUE_ITEMS = [
   {
     operatorId: 'char_180_amgoat',
@@ -469,7 +475,7 @@ test.describe('feature overlay behavior', () => {
     await page.getByRole('button', { name: '移除艾雅法拉', exact: true }).click()
     await page.clock.runFor(10)
 
-    const toast = page.locator('[data-sonner-toast]')
+    const toast = undoToast(page)
     await expect(toast).toBeVisible()
     await expect(toast).toContainText('已移除 艾雅法拉')
 
@@ -509,7 +515,7 @@ test.describe('feature overlay behavior', () => {
     await page.goto('/app/training')
     await waitForPageReady(page, 'training')
 
-    const toast = page.locator('[data-sonner-toast]')
+    const toast = undoToast(page)
     await page.getByRole('button', { name: '移除艾雅法拉', exact: true }).click()
     await expect(toast).toHaveCount(1)
     await expect(toast).toContainText('已移除 艾雅法拉')

@@ -42,7 +42,7 @@ test('README automation screenshot', async ({ page }, testInfo) => {
 
   await page.goto('/app/automation')
 
-  // 等任务流、定时设置和状态指示器都完成固定数据渲染，避免截到加载中间态。
+  // 等任务流、定时设置和通知都完成固定数据渲染，避免截到加载中间态。
   await page.getByText('任务流程', { exact: true }).first().waitFor({ state: 'visible' })
   await page.getByText('7/7', { exact: true }).first().waitFor({ state: 'visible' })
   await page.getByText('关闭游戏', { exact: true }).first().waitFor({ state: 'visible' })

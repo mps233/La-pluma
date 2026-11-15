@@ -62,6 +62,119 @@ test.describe('app tabs', () => {
     await expectNoBrowserErrors(page)
   })
 
+  test('page title names the active tab and drives the document title', async ({ page }) => {
+    const environment = await installDeterministicEnvironment(page)
+
+    await page.goto('/app/dashboard')
+    await waitForPageReady(page, 'dashboard')
+
+    const title = page.locator('[data-region="page-title"]')
+    await expect(title).toBeVisible()
+    await expect(title).toHaveText('概览')
+    await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
+    expect(await title.evaluate(element => getComputedStyle(element).fontSize)).toBe('24px')
+    expect(await title.evaluate(element => getComputedStyle(element).fontWeight)).toBe('600')
+    await expect(page).toHaveTitle('概览 · La Pluma Next')
+
+    await page.goto('/app/automation')
+    await waitForPageReady(page, 'automation')
+
+    await expect(title).toBeVisible()
+    await expect(title).toHaveText('日常')
+    await expect(page).toHaveTitle('日常 · La Pluma Next')
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
+
+  test('page title starts at the content leading edge', async ({ page }) => {
+    const environment = await installDeterministicEnvironment(page)
+
+    await page.goto('/app/dashboard')
+    await waitForPageReady(page, 'dashboard')
+
+    const edges = await page.evaluate(() => {
+      const title = document.querySelector<HTMLElement>('[data-region="page-title"]')
+      const content = document.querySelector<HTMLElement>('.la-pluma-content')
+      if (!title || !content) throw new Error('page title structure missing')
+      const contentLeft = content.getBoundingClientRect().left
+        + Number.parseFloat(getComputedStyle(content).paddingLeft)
+      return { contentLeft, titleLeft: title.getBoundingClientRect().left }
+    })
+
+    expect(Math.abs(edges.titleLeft - edges.contentLeft)).toBeLessThanOrEqual(1)
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
+
+  test('desktop brand lives in the sidebar instead of the navbar', async ({ page }) => {
+    test.skip(test.info().project.name !== 'desktop', 'the sidebar is desktop-only')
+
+    const environment = await installDeterministicEnvironment(page)
+
+    await page.goto('/app/dashboard')
+    await waitForPageReady(page, 'dashboard')
+
+    const brand = page.locator('[data-region="sidebar-brand"]')
+    await expect(brand).toBeVisible()
+    await expect(brand).toContainText('La Pluma Next')
+    await expect(brand.locator('button, a')).toHaveCount(0)
+    await expect(brand.locator('img')).toHaveAttribute('alt', '')
+    await expect(brand.locator('img')).toHaveJSProperty('draggable', false)
+    expect(await brand.evaluate(element => getComputedStyle(element).userSelect)).toBe('none')
+
+    const navbar = page.locator('[data-region="navbar"]')
+    await expect(navbar).not.toContainText('La Pluma Next')
+    await expect(navbar.locator('img')).toHaveCount(0)
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
+
+  test('mobile hides the sidebar brand and still shows the page title', async ({ page }) => {
+    test.skip(test.info().project.name !== 'mobile', 'the sidebar is desktop-only')
+
+    const environment = await installDeterministicEnvironment(page)
+
+    await page.goto('/app/dashboard')
+    await waitForPageReady(page, 'dashboard')
+
+    await expect(page.locator('[data-region="sidebar"]')).toBeHidden()
+    await expect(page.locator('[data-region="sidebar-brand"]')).toBeHidden()
+    await expect(page.locator('[data-region="page-title"]')).toBeVisible()
+    await expect(page.locator('[data-region="page-title"]')).toHaveText('概览')
+    await expect(page.locator('[data-region="navbar"]')).not.toContainText('La Pluma Next')
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
+
+  test('theme gallery route uses its own page title', async ({ page }) => {
+    const environment = await installDeterministicEnvironment(page)
+
+    await page.goto('/dev/theme-gallery')
+    await waitForPageReady(page, 'gallery')
+
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('主题画廊')
+    await expect(page).toHaveTitle('主题画廊 · La Pluma Next')
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
+
+  test('pages no longer render their own page header', async ({ page }) => {
+    const environment = await installDeterministicEnvironment(page)
+
+    await page.goto('/app/dashboard')
+    await waitForPageReady(page, 'dashboard')
+
+    await expect(page.locator('.app-page-header, .app-page-title')).toHaveCount(0)
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
+
   test('navbar actions stay at the trailing edge', async ({ page }) => {
     const environment = await installDeterministicEnvironment(page)
 

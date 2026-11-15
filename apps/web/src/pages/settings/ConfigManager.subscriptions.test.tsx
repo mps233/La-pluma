@@ -5,7 +5,6 @@ import { createRoot, type Root } from 'react-dom/client'
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createQueryClient } from '@/shared/query'
-import { useStatusStore } from '@/features/runtime-status'
 import { settingsAutoUpdateOwner } from '@/features/settings/model/autoUpdateConfig'
 import { settingsConnectionOwner } from '@/features/settings/model/connectionConfig'
 import { settingsDeviceConnectionOwner } from '@/features/settings/model/deviceConnection'
@@ -147,13 +146,20 @@ vi.mock('@/features/user-config', () => ({
   saveUserConfig: mocks.saveUserConfig,
 }))
 
-vi.mock('@/features/runtime-status', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/features/runtime-status')>()
-  return {
-    ...actual,
-    FloatingStatusIndicator: () => null,
-  }
-})
+vi.mock('@/shared/notifications', () => ({
+  notify: vi.fn(),
+  notifyProgress: vi.fn(),
+  dismissNotice: vi.fn(),
+  detectNoticeType: () => 'default',
+  EXECUTION_NOTICE_ID: 'execution',
+  STATISTICS_NOTICE_ID: 'statistics',
+  SETTINGS_UPDATE_NOTICE_ID: 'settings-update',
+  SETTINGS_UPDATE_CHANNEL_NOTICE_ID: 'settings-update-channel',
+  SETTINGS_AUTO_UPDATE_NOTICE_ID: 'settings-auto-update',
+  SETTINGS_CONFIG_CONNECTION_NOTICE_ID: 'settings-config:connection',
+  SETTINGS_CONFIG_INSTANCE_NOTICE_ID: 'settings-config:instance',
+  SETTINGS_CONFIG_RESOURCE_SOURCE_NOTICE_ID: 'settings-config:resource-source',
+}))
 
 let container: HTMLDivElement
 let root: Root
@@ -259,8 +265,6 @@ describe('ConfigManager panel subscriptions', () => {
 
   afterEach(async () => {
     await act(async () => root.unmount())
-    // 真实 status store 会为 success/warning 安排消失计时器。
-    useStatusStore.getState().clearMessage()
     queryClient.clear()
     container.remove()
     vi.restoreAllMocks()

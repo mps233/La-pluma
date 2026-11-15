@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Download, LoaderCircle, RefreshCw } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
-import { useStatusStore } from '@/features/runtime-status'
+import { notify, notifyProgress, SETTINGS_UPDATE_CHANNEL_NOTICE_ID } from '@/shared/notifications'
 import { saveUpdateChannel } from '../api'
 import { resolveCoreChannel } from '../model/updateCommandPolicy'
 import {
@@ -26,7 +26,6 @@ const CLI_CHANNEL_OPTIONS = CLI_UPDATE_CHANNELS.map(value => ({
 }))
 
 export default function ComponentUpdatePanel() {
-  const setStatusMessage = useStatusStore(state => state.setMessage)
   const [channelSaving, setChannelSaving] = useState<UpdateChannelScope | null>(null)
   const {
     version: versionInfo,
@@ -42,7 +41,7 @@ export default function ComponentUpdatePanel() {
     updateCli,
     updateResources,
     cancelUpdate,
-  } = useSettingsUpdates(setStatusMessage, reloadVersion)
+  } = useSettingsUpdates(notify, reloadVersion)
   const updatingCore = updateOperation === 'core' || updateOperation === 'core-channel'
   const updatingCli = updateOperation === 'cli'
   const hotUpdating = updateOperation === 'resources'
@@ -74,16 +73,30 @@ export default function ComponentUpdatePanel() {
 
   const handleChannelChange = async (scope: UpdateChannelScope, channel: string) => {
     setChannelSaving(scope)
-    setStatusMessage('正在保存更新渠道...', 'info')
-    const result = await saveUpdateChannel(scope, channel)
-    if (!result.success) {
-      setStatusMessage(`更新渠道保存失败: ${result.message || '未知错误'}`, 'error')
+    notifyProgress('正在保存更新渠道...', SETTINGS_UPDATE_CHANNEL_NOTICE_ID)
+    try {
+      const result = await saveUpdateChannel(scope, channel)
+      if (!result.success) {
+        notify(`更新渠道保存失败: ${result.message || '未知错误'}`, 'error', {
+          id: SETTINGS_UPDATE_CHANNEL_NOTICE_ID,
+        })
+        return
+      }
+      notify('更新渠道已保存', 'success', { id: SETTINGS_UPDATE_CHANNEL_NOTICE_ID })
+      try {
+        await reloadVersion()
+      } catch (error) {
+        notify(`更新渠道已保存，但版本刷新失败: ${error instanceof Error ? error.message : '未知错误'}`, 'warning', {
+          id: SETTINGS_UPDATE_CHANNEL_NOTICE_ID,
+        })
+      }
+    } catch (error) {
+      notify(`更新渠道保存失败: ${error instanceof Error ? error.message : '未知错误'}`, 'error', {
+        id: SETTINGS_UPDATE_CHANNEL_NOTICE_ID,
+      })
+    } finally {
       setChannelSaving(null)
-      return
     }
-    setStatusMessage('更新渠道已保存')
-    await reloadVersion()
-    setChannelSaving(null)
   }
 
   return (

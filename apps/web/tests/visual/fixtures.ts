@@ -50,10 +50,6 @@ export const apiFixtures: ApiFixture[] = [
     }),
   },
   {
-    path: '/operator-quotes/random',
-    payload: ok({ operatorId: 'char_002_amiya', operator: '阿米娅', quote: '博士，情报已经同步完毕' }),
-  },
-  {
     path: '/operator-quotes/daily',
     payload: ok({ operatorId: 'char_002_amiya', operator: '阿米娅', quote: '今天也请多指教' }),
   },

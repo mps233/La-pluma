@@ -36,8 +36,6 @@ vi.mock('framer-motion', async () => {
 
 vi.mock('@/features/logs/api', () => mocks)
 
-vi.mock('@/features/runtime-status', () => ({ FloatingStatusIndicator: () => null }))
-
 const row = (message: string) => ({
   time: '2026-07-22T10:11:12',
   level: 'INFO',

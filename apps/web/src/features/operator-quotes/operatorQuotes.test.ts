@@ -50,22 +50,4 @@ describe('operator quote service', () => {
 
     await expect(loadDailyOperatorQuote()).resolves.toEqual(DEFAULT_OPERATOR_QUOTE)
   })
-
-  it('loads and caches the random ready quote independently', async () => {
-    mocks.parseJsonResponse.mockResolvedValue({
-      operator: '澄闪',
-      quote: '信号稳定，可以开始',
-    })
-    const { loadRandomOperatorQuote } = await import('./operatorQuotes')
-
-    await expect(loadRandomOperatorQuote()).resolves.toEqual({
-      operatorId: '澄闪',
-      operator: '澄闪',
-      quote: '信号稳定，可以开始',
-    })
-    await loadRandomOperatorQuote()
-
-    expect(mocks.fetchWithAuth).toHaveBeenCalledTimes(1)
-    expect(mocks.fetchWithAuth).toHaveBeenCalledWith('/api/operator-quotes/random')
-  })
 })

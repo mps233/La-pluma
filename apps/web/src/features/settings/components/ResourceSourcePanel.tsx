@@ -1,6 +1,6 @@
 import { Switch } from '@/shared/ui/switch'
 import { ConfigFieldCheckbox, ConfigFieldInput, ConfigFieldSelect } from './ConfigFieldControls'
-import { useStatusStore } from '@/features/runtime-status'
+import { notify, SETTINGS_CONFIG_RESOURCE_SOURCE_NOTICE_ID } from '@/shared/notifications'
 import { useConfigDraftPanel } from '../hooks/useConfigDraftPanel'
 import { useSettingsResourceSource } from '../hooks/useSettingsResourceSource'
 import { CONFIG_SECTION_VIEWS } from './configSectionViews'
@@ -56,7 +56,6 @@ export interface ResourceSourcePanelProps {
 }
 
 export default function ResourceSourcePanel({ isActive }: ResourceSourcePanelProps) {
-  const setStatusMessage = useStatusStore(state => state.setMessage)
   const {
     draft,
     update,
@@ -75,6 +74,7 @@ export default function ResourceSourcePanel({ isActive }: ResourceSourcePanelPro
     save: saveResourceSource,
   } = useConfigDraftPanel({
     label: '资源源配置',
+    noticeId: SETTINGS_CONFIG_RESOURCE_SOURCE_NOTICE_ID,
     savingMessage: '正在保存资源源配置...',
     loadError,
     loaded,
@@ -94,7 +94,7 @@ export default function ResourceSourcePanel({ isActive }: ResourceSourcePanelPro
   const handleReset = () => {
     restoreDefaults()
     setConfigFeedback(null)
-    setStatusMessage('已重置资源源配置为默认值')
+    notify('已重置资源源配置为默认值')
   }
 
   const handleCheckIntervalChange = (value: string) => {

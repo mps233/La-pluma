@@ -1,12 +1,12 @@
 import { useCallback, useRef, useState } from 'react'
-import { useStatusStore, type StatusMessageType } from '@/features/runtime-status'
+import { notify, type NoticeType } from '@/shared/notifications'
 import { loadUserConfig } from '@/features/user-config'
 import { useDashboardExecution } from './useDashboardExecution'
 import { useDashboardServiceStatus } from './useDashboardServiceStatus'
 
 export interface DashboardFlowFeedback {
   readonly message: string
-  readonly type: StatusMessageType
+  readonly type: NoticeType
 }
 
 export interface DashboardFlowActionsOptions {
@@ -15,14 +15,13 @@ export interface DashboardFlowActionsOptions {
 }
 
 export function useDashboardFlowActions({ refreshDashboard, onMissingFlow }: DashboardFlowActionsOptions) {
-  const setStatusMessage = useStatusStore(state => state.setMessage)
   const { serviceStatus, isAvailable, connectionTitle, connectionDescription } = useDashboardServiceStatus()
   const {
     status,
     isBusy,
     observationError,
     startFlow,
-  } = useDashboardExecution({ notify: setStatusMessage })
+  } = useDashboardExecution({ notify })
 
   const [quickStartLoading, setQuickStartLoading] = useState(false)
   const [feedback, setFeedback] = useState<DashboardFlowFeedback>({ message: '', type: 'default' })

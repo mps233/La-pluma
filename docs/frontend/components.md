@@ -8,46 +8,13 @@
 
 为了减少重复代码、统一视觉风格、提升开发效率，项目维护一套通用 UI 组件。shadcn CLI 生成的上游原语位于 `apps/web/src/shared/ui/`，随上游原样保留；`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card` 等控件直接从对应的 `@/shared/ui/*` 模块导入。应用层组合组件位于 `apps/web/src/shared/components/*.tsx`，通过 `apps/web/src/shared/components/index.ts` 统一导出，页面从 `@/shared/components` 引入。本文件记录生成原语的组合用法与必须遵循的应用层约定。
 
-加载占位直接使用 `@/shared/ui/skeleton` 的 `Skeleton`，不要在应用层重写 shimmer 或另建骨架原语。
+加载占位直接使用 `@/shared/ui/skeleton` 的 `Skeleton`，不要在应用层重写 shimmer 或另建骨架原语。页面标题归 `Layout` 顶栏所有，页面只保留 `app-page` / `app-stack-section` 与工作区内容。
 
 新增或调整组件时，在本文件补充 API 与用法；颜色、字号、间距、圆角、交互状态等规则不要在组件文档里另写一份。
 
 ---
 
 ## 组件列表
-
-### PageHeader - 页面标题组件
-
-**文件位置**：`apps/web/src/shared/components/PageHeader.tsx`
-
-**适用场景**：所有页面的顶部标题区域。
-
-```typescript
-{
-  icon?: ReactNode
-  title: string
-  subtitle?: string
-  actions?: ReactNode
-  mobileLayout?: 'stack' | 'inline'
-}
-```
-
-```tsx
-import { PageHeader } from '@/shared/components'
-import { FloatingStatusIndicator } from '@/features/runtime-status'
-
-<PageHeader
-  title="自动战斗"
-  mobileLayout="inline"
-  actions={<FloatingStatusIndicator />}
-/>
-```
-
-页面标题统一使用全局品牌色，不再支持页面单独传入渐变色。一级工作区标题不使用 `icon-well`，只有确有身份识别需要的独立页面才传入 `icon`。手机端默认使用 `stack` 保护长标题和多操作；控制台及同级 `ios-workspace-page` 使用 `mobileLayout="inline"`，由右侧状态浮条主动收缩。
-
-`subtitle` 可选，只在需要补充标题与布局无法表达的信息时传入，不用来复述页面用途或铺陈说明。
-
----
 
 ### Card - 卡片组件
 
@@ -88,7 +55,7 @@ import {
 
 `Card` 使用 shadcn 语义 token（`bg-card`、`ring-foreground/10`、`--card-spacing`）与普通圆角；标题、描述、操作分别使用 `CardTitle`、`CardDescription`、`CardAction`，页脚使用 `CardFooter`。需要分节面板且各分节自持内边距时，给 `Card` 加 `gap-0 p-0!`，不再引入独立面板包装组件。标题需要保留文档层级时，在 `CardTitle` 上使用 `role="heading"` 与 `aria-level`。紧凑提示容器使用语义类 `app-info-card` 配合对应状态类；`surface-panel` 继续用于主题菜单与 PWA 提示等应用自绘召唤层，不用于 `Card` 或 shadcn 生成弹层。
 
-控制台同类功能页在根节点添加 `ios-workspace-page`，并显式给 `PageHeader` 传 `mobileLayout="inline"`。卡片材质统一由 shadcn 语义 token 控制，不要在页面级另造卡片材质。
+控制台同类功能页在根节点添加 `ios-workspace-page`。页面标题由 `Layout` 顶栏统一渲染，页面内不再声明标题或副标题。卡片材质统一由 shadcn 语义 token 控制，不要在页面级另造卡片材质。
 
 ---
 
@@ -279,6 +246,27 @@ toast.custom(() => (
 
 ---
 
+### Notifications - 全局通知
+
+**文件位置**：`apps/web/src/shared/notifications/notify.ts`；渲染由应用根挂载的 `AppToaster`（sonner）承担。
+
+**适用场景**：跨页面结果、错误和执行进度提示。统一从 `@/shared/notifications` 导入，不要在页面里直接调用 sonner 或自建 toast。
+
+```typescript
+notify(message: string, type?: 'success' | 'error' | 'warning' | 'info' | 'default', options?: {
+  id?: string
+  duration?: number
+}): string
+
+notifyProgress(message: string, id: string): string
+
+dismissNotice(id?: string): void
+```
+
+同一流程复用固定 id，后续更新会替换原通知而不是堆叠。固定 id：`execution`（自动化、作业、肉鸽与 Dashboard 执行）、`statistics`（识别与材料）、`settings-update`（组件更新）、`settings-update-channel`（更新渠道保存）、`settings-auto-update`（自动更新保存）、`settings-config:connection` / `settings-config:instance` / `settings-config:resource-source`（设置草稿保存）、`combat-preview`（作业预览）、`combat-queue-preview`（搜索作业加入队列）、`combat-paradox-search`（悖论模拟搜索）。开始用 `notifyProgress(message, id)`；有终态文案时用同一 id 的 `notify(..., { id })` 替换；没有终态文案时才 `dismissNotice(id)` 收起进度。不传 `type` 时按文案推断；错误默认常驻到用户关闭，成功默认约 2.5 秒，警告与信息默认约 4 秒。`duration` 可显式覆盖，进度通知默认不自动消失。应用最多同时显示 3 条通知；`AppToaster` 为每条通知提供关闭按钮（无障碍名称「关闭通知」）。
+
+---
+
 ### PageSkeleton
 
 **文件位置**：`apps/web/src/shared/components/Loading.tsx`，与 `Loading` 同文件导出。
@@ -287,7 +275,7 @@ toast.custom(() => (
 
 Props：
 
-- `variant` (string, required) - 目标页面标识。内置 `automation`、`combat`、`roguelike`、`training`、`logs`、`statistics`、`config` 七种工作区骨架，其余取值只渲染页头骨架。
+- `variant` (string, required) - 目标页面标识。内置 `automation`、`combat`、`roguelike`、`training`、`logs`、`statistics`、`config` 七种工作区骨架，其余取值只渲染页面壳。
 
 ```tsx
 import { PageSkeleton } from '@/shared/components'
@@ -346,17 +334,16 @@ const { containerRef, activeRect, setTabRef } = useFluidTabIndicator(activeTab)
 
 ## 组件接入
 
-新增页面或改老页面时，按下面顺序处理：
+页面标题由 `Layout` 顶栏统一提供，页面不接收标题、副标题或页头操作。新增页面或改老页面时，按下面顺序处理：
 
-1. 页面外层使用 `app-page`，主内容使用 `app-stack-section`。
-2. 页面标题使用 `PageHeader`。
-3. 大面板使用 `Card` 组合；分节自持内边距时给 `Card` 加 `gap-0 p-0!`。
-4. 表单使用 `@/shared/ui` 的 `Input`、`Select`、`Checkbox`、`Switch` 原语，并用所属 feature 的 field helper 组合标签与错误；多行文本使用原生 `textarea`。
-5. 没有内容时使用 `EmptyState`，不要重复手写空状态。
-6. 动态分段标签优先使用 `useFluidTabIndicator`，不要复制测量逻辑。
-7. 页面全局执行状态使用 `FloatingStatusIndicator`；局部状态使用既有 `status-*` 语义类并紧邻相关操作。
-8. 操作用 `@/shared/ui/button` 的 `Button`；无文字操作使用 `size="icon"` 档位并同时提供 `title` 与 `aria-label`。
-9. 如果出现新的颜色、圆角、间距需求，先按根目录 [设计规范](../../DESIGN.md) 判断是否应抽成 token 或语义类。
+1. 页面外层使用 `app-page`，主内容使用 `app-stack-section`，内容直接进入工作区。
+2. 大面板使用 `Card` 组合；分节自持内边距时给 `Card` 加 `gap-0 p-0!`。
+3. 表单使用 `@/shared/ui` 的 `Input`、`Select`、`Checkbox`、`Switch` 原语，并用所属 feature 的 field helper 组合标签与错误；多行文本使用原生 `textarea`。
+4. 没有内容时使用 `EmptyState`，不要重复手写空状态。
+5. 动态分段标签优先使用 `useFluidTabIndicator`，不要复制测量逻辑。
+6. 全局执行结果、错误与进度使用 `notify` / `notifyProgress`；局部状态使用既有 `status-*` 语义类并紧邻相关操作。
+7. 操作用 `@/shared/ui/button` 的 `Button`；无文字操作使用 `size="icon"` 档位并同时提供 `title` 与 `aria-label`。
+8. 如果出现新的颜色、圆角、间距需求，先按根目录 [设计规范](../../DESIGN.md) 判断是否应抽成 token 或语义类。
 
 ### Tailwind 动态类名
 

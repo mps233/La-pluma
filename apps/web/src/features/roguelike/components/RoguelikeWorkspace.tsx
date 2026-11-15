@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { LoaderCircle } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { useAutomationAvailability, useStatusStore } from '@/features/runtime-status'
+import { notify } from '@/shared/notifications'
+import { useAutomationAvailability } from '@/features/runtime-status'
 import { DeviceMonitorPanel } from '@/features/device-mirror'
 import { useUserConfig } from '@/features/user-config'
 import { roguelikeConfigAdapter } from '../model/roguelikeConfig'
@@ -29,7 +30,6 @@ const EMPTY_ADVANCED_PARAMS: RoguelikeAdvancedParams = {}
 const EMPTY_ADVANCED_VALUES: RoguelikeAdvancedValues = {}
 
 export default function RoguelikeWorkspace() {
-  const setStatusMessage = useStatusStore(state => state.setMessage)
   const { isAvailable: automationAvailable, unavailableMessage } = useAutomationAvailability()
   const {
     isRunning,
@@ -40,7 +40,7 @@ export default function RoguelikeWorkspace() {
     trackedRun,
     execute,
     stop,
-  } = useRoguelikeExecution({ notify: setStatusMessage })
+  } = useRoguelikeExecution({ notify })
   const {
     draft: configDraft,
     syncState: configSyncState,
@@ -62,7 +62,7 @@ export default function RoguelikeWorkspace() {
   const handleRetryConfigSave = async () => {
     if (isRetryingConfigSave) return
     const saved = await retryConfigSave()
-    if (saved) setStatusMessage('肉鸽配置已同步', 'success')
+    if (saved) notify('肉鸽配置已同步', 'success')
   }
 
   const handleThemeChange = (value: string) => {
@@ -87,13 +87,13 @@ export default function RoguelikeWorkspace() {
 
   const handleExecute = async () => {
     if (!automationAvailable) {
-      setStatusMessage(unavailableMessage, 'error')
+      notify(unavailableMessage, 'error')
       return
     }
 
     const inputError = validateRoguelikeTaskInput(activeTask.id, taskInputs, advancedParams)
     if (inputError) {
-      setStatusMessage(inputError)
+      notify(inputError)
       return
     }
 

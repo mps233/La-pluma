@@ -31,7 +31,9 @@ const mocks = vi.hoisted(() => ({
   generateTrainingPlan: vi.fn(),
   getAllOperators: vi.fn(),
   getOperBoxData: vi.fn(),
-  setMessage: vi.fn(),
+  notify: vi.fn(),
+  notifyProgress: vi.fn(),
+  dismissNotice: vi.fn(),
 }))
 
 vi.mock('framer-motion', async () => {
@@ -93,12 +95,16 @@ vi.mock('@/features/training', () => ({
   OperatorSelectModal: () => null,
 }))
 vi.mock('@/features/runtime-status', () => ({
-  useStatusStore: (selector?: (state: { setMessage: typeof mocks.setMessage }) => unknown) => {
-    if (!selector) throw new Error('useStatusStore must be called with a selector')
-    return selector({ setMessage: mocks.setMessage })
-  },
-  FloatingStatusIndicator: () => null,
   useAutomationAvailability: () => ({ isAvailable: true, unavailableMessage: '' }),
+}))
+vi.mock('@/shared/notifications', () => ({
+  notify: mocks.notify,
+  notifyProgress: mocks.notifyProgress,
+  dismissNotice: mocks.dismissNotice,
+  detectNoticeType: () => 'default',
+  EXECUTION_NOTICE_ID: 'execution',
+  STATISTICS_NOTICE_ID: 'statistics',
+  SETTINGS_UPDATE_NOTICE_ID: 'settings-update',
 }))
 vi.mock('@/features/device-mirror', () => ({ DeviceMonitorPanel: () => null }))
 vi.mock('@/features/automation/components/NotificationSettings', () => ({ default: () => null }))
@@ -374,7 +380,9 @@ beforeEach(() => {
   mocks.generateTrainingPlan.mockReset().mockResolvedValue({ success: false })
   mocks.getAllOperators.mockReset().mockResolvedValue({ success: true, data: [] })
   mocks.getOperBoxData.mockReset().mockResolvedValue({ success: true, data: null })
-  mocks.setMessage.mockReset()
+  mocks.notify.mockReset()
+  mocks.notifyProgress.mockReset()
+  mocks.dismissNotice.mockReset()
   mocks.executeScheduleNow.mockReset().mockResolvedValue(ok({
     accepted: true,
     runId: 'run-1',
@@ -497,7 +505,7 @@ describe('AutomationTasks execution', () => {
     await click(runButton())
 
     expect(mocks.executeScheduleNow).not.toHaveBeenCalled()
-    expect(mocks.setMessage).toHaveBeenCalledWith('自定义换班需要填写排班文件路径', 'error')
+    expect(mocks.notify).toHaveBeenCalledWith('自定义换班需要填写排班文件路径', 'error')
     expect(container.querySelector('#automation-task-editor')?.textContent).toContain('基建换班')
   })
 
@@ -514,7 +522,7 @@ describe('AutomationTasks execution', () => {
     await click(runButton())
 
     expect(mocks.executeScheduleNow).not.toHaveBeenCalled()
-    expect(mocks.setMessage).toHaveBeenCalledWith(
+    expect(mocks.notify).toHaveBeenCalledWith(
       '掉落目标格式应为物品 ID=数量，多个目标用逗号分隔',
       'error',
     )
@@ -552,6 +560,7 @@ describe('AutomationTasks execution', () => {
     expect(runningItems()).toHaveLength(0)
     expect(sequenceLabels()).toEqual(['已完成', '已完成', '等待执行'])
     expect(stopButton()).not.toBeNull()
+    expect(mocks.notifyProgress).toHaveBeenCalledWith('今日流程执行中', 'execution')
 
     api.fetchSnapshot.mockResolvedValue(ok(terminalSnapshot('succeeded', {
       message: '任务流程执行完成',
@@ -564,7 +573,7 @@ describe('AutomationTasks execution', () => {
     expect(stopButton()).toBeNull()
     expect(runButton()?.textContent).toContain('立即执行')
     expect(container.textContent).toContain('最近执行')
-    expect(mocks.setMessage).toHaveBeenLastCalledWith('任务流程执行完成', 'success')
+    expect(mocks.notify).toHaveBeenLastCalledWith('任务流程执行完成', 'success', { id: 'execution' })
   })
 
   it('ignores a schedule projection owned by another run and restores observation without resubmitting', async () => {
@@ -654,7 +663,7 @@ describe('AutomationTasks execution', () => {
     await refreshController()
 
     expect(stopButton()).toBeNull()
-    expect(mocks.setMessage).toHaveBeenLastCalledWith('任务流程已被用户终止', 'warning')
+    expect(mocks.notify).toHaveBeenLastCalledWith('任务流程已被用户终止', 'warning', { id: 'execution' })
     expect(sequenceLabels()).toEqual(['已终止', '未执行', '未执行'])
   })
 
@@ -676,7 +685,7 @@ describe('AutomationTasks execution', () => {
       scope: 'automation',
     })
     expect(stopButton()).not.toBeNull()
-    expect(mocks.setMessage).toHaveBeenCalledWith('已恢复上次任务流程，继续观察运行进度', 'info')
+    expect(mocks.notify).toHaveBeenCalledWith('已恢复上次任务流程，继续观察运行进度', 'info')
   })
 
   it('adopts a terminal legacy checkpoint for display without announcing a new run', async () => {
@@ -706,7 +715,7 @@ describe('AutomationTasks execution', () => {
 
     expect(localStorage.getItem(LEGACY_KEY)).toBeNull()
     expect(mocks.executeScheduleNow).not.toHaveBeenCalled()
-    expect(mocks.setMessage).toHaveBeenCalledWith('上次任务流程断点无法识别，已清理，请重新开始', 'warning')
+    expect(mocks.notify).toHaveBeenCalledWith('上次任务流程断点无法识别，已清理，请重新开始', 'warning')
 
     await act(async () => root.unmount())
     root = createRoot(container)
@@ -717,7 +726,7 @@ describe('AutomationTasks execution', () => {
 
     expect(localStorage.getItem(LEGACY_KEY)).toBeNull()
     expect(mocks.executeScheduleNow).not.toHaveBeenCalled()
-    expect(mocks.setMessage).toHaveBeenCalledWith('上次任务流程断点已过期，未重新提交，请重新开始', 'warning')
+    expect(mocks.notify).toHaveBeenCalledWith('上次任务流程断点已过期，未重新提交，请重新开始', 'warning')
   })
 
   it('discards a legacy checkpoint when another execution owns the device', async () => {
@@ -735,7 +744,7 @@ describe('AutomationTasks execution', () => {
     expect(localStorage.getItem(LEGACY_KEY)).toBeNull()
     expect(mocks.executeScheduleNow).not.toHaveBeenCalled()
     expect(stopButton()).toBeNull()
-    expect(mocks.setMessage).toHaveBeenCalledWith(
+    expect(mocks.notify).toHaveBeenCalledWith(
       '检测到其他执行或本页已有运行身份，已清理上次任务流程断点',
       'warning',
     )

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useStatusStore } from '@/features/runtime-status'
+import { notify } from '@/shared/notifications'
 import { useResourceInvalidation } from '@/features/resource-invalidation'
 import { gameDataKeys } from '@/features/game-data'
 import { DeviceMonitorLayout } from '@/features/device-mirror'
@@ -41,7 +41,6 @@ const TRAINING_RESOURCE_SCOPES = [
 ] as const
 
 export default function TrainingWorkspace() {
-  const setStatusMessage = useStatusStore(state => state.setMessage)
   const queryClient = useQueryClient()
   const {
     settings,
@@ -92,10 +91,10 @@ export default function TrainingWorkspace() {
   const [recentlyRemoved, setRecentlyRemoved] = useState<RemovedTrainingQueueItem | null>(null)
 
   const showSuccess = (msg: string) => {
-    setStatusMessage(msg, 'success')
+    notify(msg, 'success')
   }
   const showError = (msg: string) => {
-    setStatusMessage(msg, 'error')
+    notify(msg, 'error')
   }
 
   // 识别、材料刷新与资源更新可能来自本页之外。候选列表与计数按资源作用域
@@ -146,7 +145,7 @@ export default function TrainingWorkspace() {
       return null
     }
     recordFlowSync(outcome.flowSync)
-    if (outcome.status === 'uncertain') setStatusMessage(outcome.message, 'warning')
+    if (outcome.status === 'uncertain') notify(outcome.message, 'warning')
     else if (outcome.message) showSuccess(outcome.message)
     return outcome
   }
@@ -220,13 +219,13 @@ export default function TrainingWorkspace() {
     if (outcome.status === 'applied') {
       showSuccess(`养成计划已应用到${outcome.flowName}`)
     } else if (outcome.status === 'partial') {
-      setStatusMessage(outcome.message, 'warning')
+      notify(outcome.message, 'warning')
     }
   }
 
   const handleRetrySync = async () => {
     const outcome = await retryFlowSync()
-    if (outcome.status === 'partial') setStatusMessage(outcome.message, 'warning')
+    if (outcome.status === 'partial') notify(outcome.message, 'warning')
   }
 
   const handleUpdateSettings = (newSettings: TrainingSettings) => {

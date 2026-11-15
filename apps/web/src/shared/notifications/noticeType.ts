@@ -1,40 +1,6 @@
-export type StatusMessageType = 'success' | 'error' | 'warning' | 'info' | 'default'
+export type NoticeType = 'success' | 'error' | 'warning' | 'info' | 'default'
 
-interface StatusVisualConfig {
-  className: string
-  dotColor: string
-  pulseRgb: string
-}
-
-const STATUS_VISUAL_CONFIG: Record<StatusMessageType, StatusVisualConfig> = {
-  success: {
-    className: 'status-success',
-    dotColor: 'var(--success)',
-    pulseRgb: '5, 150, 105',
-  },
-  error: {
-    className: 'status-danger',
-    dotColor: 'var(--destructive)',
-    pulseRgb: '225, 29, 72',
-  },
-  warning: {
-    className: 'status-warning',
-    dotColor: 'var(--warning)',
-    pulseRgb: '217, 119, 6',
-  },
-  info: {
-    className: 'status-info',
-    dotColor: 'var(--info)',
-    pulseRgb: '37, 99, 235',
-  },
-  default: {
-    className: 'surface-soft text-muted-foreground',
-    dotColor: 'var(--tertiary-foreground)',
-    pulseRgb: '148, 163, 184',
-  },
-}
-
-export function detectStatusMessageType(message: string): StatusMessageType {
+export function detectNoticeType(message: string): NoticeType {
   if (!message) return 'default'
 
   const lowerMessage = message.toLowerCase()
@@ -96,8 +62,4 @@ export function detectStatusMessageType(message: string): StatusMessageType {
   }
 
   return 'default'
-}
-
-export function getStatusVisualConfig(type: StatusMessageType): StatusVisualConfig {
-  return STATUS_VISUAL_CONFIG[type] ?? STATUS_VISUAL_CONFIG.default
 }

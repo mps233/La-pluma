@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getErrorMessage } from '@/shared/api'
-import type { StatusMessageType } from '@/features/runtime-status'
+import {
+  EXECUTION_NOTICE_ID,
+  notifyProgress,
+  type NoticeType,
+  type Notify,
+} from '@/shared/notifications'
 import {
   executionController as defaultExecutionController,
   isActiveRunState,
@@ -54,7 +59,7 @@ export interface AutomationExecution {
 }
 
 interface UseAutomationExecutionOptions {
-  notify: (message: string, type?: StatusMessageType) => void
+  notify: Notify
   controller?: ExecutionController
   storage?: LegacyFlowCheckpointStorage | null
 }
@@ -72,7 +77,7 @@ function cleanFlow(flow: TaskFlowItem[]) {
 
 function legacyCheckpointMessage(
   result: ReturnType<typeof migrateLegacyFlowCheckpoint>,
-): { message: string; type: StatusMessageType } | null {
+): { message: string; type: NoticeType } | null {
   if (result.status === 'adopted') {
     if (result.run && isTerminalRunState(result.run.state)) {
       const notice = describeAutomationRunTerminal(
@@ -143,7 +148,7 @@ export function useAutomationExecution({
   const announceTerminal = useCallback((run: AgentRun) => {
     announcedRunRef.current = run.runId
     const notice = describeAutomationRunTerminal(run, readAutomationExecutionSummary(run))
-    notify(notice.message, notice.type)
+    notify(notice.message, notice.type, { id: EXECUTION_NOTICE_ID })
   }, [notify])
 
   useEffect(() => {
@@ -183,7 +188,13 @@ export function useAutomationExecution({
       )
     }
     const notice = legacyCheckpointMessage(result)
-    if (notice) notify(notice.message, notice.type)
+    if (notice) {
+      if (result.status === 'adopted' && result.run && isTerminalRunState(result.run.state)) {
+        notify(notice.message, notice.type, { id: EXECUTION_NOTICE_ID })
+      } else {
+        notify(notice.message, notice.type)
+      }
+    }
   }, [controller, execution.snapshot, execution.trackedRunId, execution.trackedScope, notify, storage])
 
   useEffect(() => {
@@ -195,7 +206,7 @@ export function useAutomationExecution({
     const key = `${activeRun.runId}:${progress.currentTaskId ?? progress.currentStep}:${progress.currentTask}`
     if (stepMessageRef.current === key) return
     stepMessageRef.current = key
-    notify(progress.message || `正在执行: ${progress.currentTask}`, 'info')
+    notifyProgress(progress.message || `正在执行: ${progress.currentTask}`, EXECUTION_NOTICE_ID)
   }, [activeRun, notify, progress])
 
   useEffect(() => {
@@ -205,7 +216,7 @@ export function useAutomationExecution({
 
     const timer = window.setTimeout(() => {
       setStopAcknowledged(false)
-      notify('终止失败: 终止请求已发送，但尚未确认任务停止', 'error')
+      notify('终止失败: 终止请求已发送，但尚未确认任务停止', 'error', { id: EXECUTION_NOTICE_ID })
     }, AUTOMATION_STOP_CONFIRM_TIMEOUT_MS)
 
     return () => window.clearTimeout(timer)
@@ -214,7 +225,7 @@ export function useAutomationExecution({
   const submitFlow = useCallback(async (flow: TaskFlowItem[]) => {
     if (isRunning || controller.getState().submission === 'pending') return false
 
-    notify('开始执行任务流程...', 'info')
+    notifyProgress('开始执行任务流程...', EXECUTION_NOTICE_ID)
     try {
       const result = await controller.submitExecution(
         AUTOMATION_FLOW_OPERATION_ID,
@@ -227,49 +238,52 @@ export function useAutomationExecution({
       )
 
       if (!result.success) {
-        notify(`任务流程执行失败: ${getErrorMessage(result)}`, 'error')
+        notify(`任务流程执行失败: ${getErrorMessage(result)}`, 'error', { id: EXECUTION_NOTICE_ID })
         return false
       }
 
       const runId = readSubmittedRunId(result.data)
       const submittedRun = runId ? readSubmittedRun(result.data, runId) : null
+      if (runId) observedActiveRunRef.current = runId
       if (submittedRun && isTerminalRunState(submittedRun.state)) announceTerminal(submittedRun)
       if (!runId) {
         // 旧服务端不会返回身份：此时无法观察或停止，不能伪造运行状态。
-        notify('服务端未返回运行身份，无法确认本次执行状态', 'warning')
+        notify('服务端未返回运行身份，无法确认本次执行状态', 'warning', { id: EXECUTION_NOTICE_ID })
         return false
       }
       return true
     } catch (error) {
       // 传输失败时服务端可能已经接受执行，不能宣称失败或自动重提。
-      notify(`无法确认执行状态: ${(error as Error).message}`, 'warning')
+      notify(`无法确认执行状态: ${(error as Error).message}`, 'warning', { id: EXECUTION_NOTICE_ID })
       return false
     }
   }, [announceTerminal, controller, isRunning, notify])
 
   const stop = useCallback(async () => {
     if (stopRequestRef.current) return
-    if (!controller.getState().trackedRunId) return
+    const trackedRunId = controller.getState().trackedRunId
+    if (!trackedRunId) return
 
+    observedActiveRunRef.current = trackedRunId
     stopRequestRef.current = true
     setStopRequestPending(true)
-    notify('正在终止任务流程...', 'warning')
+    notifyProgress('正在终止任务流程...', EXECUTION_NOTICE_ID)
 
     try {
       const result = await controller.stopTrackedRun()
       if (!result) {
-        notify('未找到可终止的任务流程', 'warning')
+        notify('未找到可终止的任务流程', 'warning', { id: EXECUTION_NOTICE_ID })
         setStopAcknowledged(false)
         return
       }
       if (!result.success) {
-        notify(`终止失败: ${getErrorMessage(result)}`, 'error')
+        notify(`终止失败: ${getErrorMessage(result)}`, 'error', { id: EXECUTION_NOTICE_ID })
         setStopAcknowledged(false)
         return
       }
       setStopAcknowledged(!result.data?.alreadyTerminal)
     } catch (error) {
-      notify(`终止失败: ${(error as Error).message}`, 'error')
+      notify(`终止失败: ${(error as Error).message}`, 'error', { id: EXECUTION_NOTICE_ID })
       setStopAcknowledged(false)
     } finally {
       stopRequestRef.current = false

@@ -28,6 +28,9 @@ const apiMocks = vi.hoisted(() => ({
   getTrainingQueue: vi.fn(),
   getTodayDrops: vi.fn(),
   getOpenTodayStages: vi.fn(),
+  notify: vi.fn(),
+  notifyProgress: vi.fn(),
+  dismissNotice: vi.fn(),
   executionApi: {
     fetchSnapshot: vi.fn(),
     fetchRun: vi.fn(),
@@ -115,9 +118,14 @@ vi.mock('@/features/dashboard/hooks/useDashboardFlowLayout', () => ({
 vi.mock('@/features/dashboard/components/DashboardPreviewEntry', () => ({
   default: () => <div data-dashboard-preview-card />,
 }))
-vi.mock('@/features/runtime-status', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/features/runtime-status')>()
-  return { ...actual, FloatingStatusIndicator: () => null }
+vi.mock('@/shared/notifications', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/shared/notifications')>()
+  return {
+    ...actual,
+    notify: apiMocks.notify,
+    notifyProgress: apiMocks.notifyProgress,
+    dismissNotice: apiMocks.dismissNotice,
+  }
 })
 vi.mock('@/shared/components/Icons', () => {
   const Icon = () => null
@@ -286,7 +294,9 @@ describe('Dashboard connectivity state', () => {
     }))
 
     useDashboardStore.getState().reset()
-    useStatusStore.getState().clearMessage()
+    apiMocks.notify.mockReset()
+    apiMocks.notifyProgress.mockReset()
+    apiMocks.dismissNotice.mockReset()
     useStatusStore.getState().applyRunStatus({ phase: 'idle', isRunning: false, runId: null, label: null, detail: null })
     useStatusStore.getState().setBackendStatus('unknown')
     client = createQueryClient()
@@ -302,7 +312,9 @@ describe('Dashboard connectivity state', () => {
     releaseExecution?.()
     releaseExecution = null
     useDashboardStore.getState().reset()
-    useStatusStore.getState().clearMessage()
+    apiMocks.notify.mockReset()
+    apiMocks.notifyProgress.mockReset()
+    apiMocks.dismissNotice.mockReset()
     useStatusStore.getState().applyRunStatus({ phase: 'idle', isRunning: false, runId: null, label: null, detail: null })
     useStatusStore.getState().setBackendStatus('unknown')
     vi.clearAllMocks()
@@ -658,8 +670,7 @@ describe('Dashboard connectivity state', () => {
     await act(async () => controller().refresh())
     await flushDashboard()
 
-    expect(useStatusStore.getState().message).toBe('今日流程执行完成')
-    expect(useStatusStore.getState().messageType).toBe('success')
+    expect(apiMocks.notify).toHaveBeenCalledWith('今日流程执行完成', 'success', { id: 'execution' })
     expect(container.textContent).toContain('准备就绪')
     expect(findButton('开始今日流程')?.disabled).toBe(false)
   })
@@ -685,8 +696,7 @@ describe('Dashboard connectivity state', () => {
     await act(async () => controller().refresh())
     await flushDashboard()
 
-    expect(useStatusStore.getState().message).toBe('今日流程已停止')
-    expect(useStatusStore.getState().messageType).toBe('warning')
+    expect(apiMocks.notify).toHaveBeenCalledWith('今日流程已停止', 'warning', { id: 'execution' })
     expect(container.textContent).toContain('准备就绪')
   })
 
@@ -708,7 +718,7 @@ describe('Dashboard connectivity state', () => {
     await act(async () => controller().refresh())
     await flushDashboard()
 
-    expect(useStatusStore.getState().message).toBe('')
+    expect(apiMocks.notify).not.toHaveBeenCalled()
     expect(container.textContent).toContain('准备就绪')
   })
 
@@ -742,7 +752,7 @@ describe('Dashboard connectivity state', () => {
     expect(container.textContent).toContain('执行状态未知')
     expect(container.textContent).toContain('网络中断')
     expect(findButton('开始今日流程')?.disabled).toBe(true)
-    expect(useStatusStore.getState().message).toBe('')
+    expect(apiMocks.notify).not.toHaveBeenCalled()
   })
 
   it('shows a distinct first-load activity failure and recovers through retry', async () => {

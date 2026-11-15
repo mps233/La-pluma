@@ -33,15 +33,6 @@ const dailyQuoteFixture: ApiFixture = {
   }),
 }
 
-const randomQuoteFixture: ApiFixture = {
-  path: '/operator-quotes/random',
-  payload: ok({
-    operatorId: 'char_002_amiya',
-    operator: '阿米娅',
-    quote: '博士，情报已经同步完毕',
-  }),
-}
-
 const automationTaskFixture: ApiFixture = {
   path: '/agent/config/user/automation-tasks',
   payload: ok({
@@ -241,7 +232,7 @@ const automationTaskFixture: ApiFixture = {
   }),
 }
 
-const overrides = [noRecentExecutionFixture, dailyQuoteFixture, randomQuoteFixture, automationTaskFixture]
+const overrides = [noRecentExecutionFixture, dailyQuoteFixture, automationTaskFixture]
 
 export const readmeApiFixtures: ApiFixture[] = [
   ...apiFixtures.filter(fixture => !overrides.some(override => override.path === fixture.path)),

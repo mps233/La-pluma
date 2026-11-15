@@ -4,7 +4,15 @@ import { getErrorMessage } from '@/shared/api'
 import { LoaderCircle } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { ConfirmAlertDialog } from '@/shared/components'
-import { useAutomationAvailability, useStatusStore } from '@/features/runtime-status'
+import {
+  COMBAT_PARADOX_SEARCH_NOTICE_ID,
+  COMBAT_PREVIEW_NOTICE_ID,
+  COMBAT_QUEUE_PREVIEW_NOTICE_ID,
+  dismissNotice,
+  notify,
+  notifyProgress,
+} from '@/shared/notifications'
+import { useAutomationAvailability } from '@/features/runtime-status'
 import { DeviceMonitorPanel } from '@/features/device-mirror'
 import { isTerminalRunState } from '@/features/task-execution'
 import { operBoxQueryOptions } from '@/features/game-data'
@@ -122,7 +130,6 @@ async function readCopilotFileText(file: File): Promise<string> {
 }
 
 export default function CombatWorkspace() {
-  const setStatusMessage = useStatusStore(state => state.setMessage)
   const { isAvailable: automationAvailable, unavailableMessage } = useAutomationAvailability()
   const {
     draft: configDraft,
@@ -207,6 +214,7 @@ export default function CombatWorkspace() {
     setPendingPreviewTarget(null)
     clearPreviewData()
     setCopilotDetail(current => current?.type === 'preview' ? null : current)
+    dismissNotice(COMBAT_PREVIEW_NOTICE_ID)
   }, [clearPreviewData])
   const [isResettingProgress, setIsResettingProgress] = useState(false)
   const [isImportingCopilotFile, setIsImportingCopilotFile] = useState(false)
@@ -271,7 +279,7 @@ export default function CombatWorkspace() {
     skipQueueEntry,
     stop,
   } = useCombatExecution({
-    notify: setStatusMessage,
+    notify,
     stopOnFailure: advancedParams.copilot?.executionStrategy === 'stop',
   })
 
@@ -283,7 +291,7 @@ export default function CombatWorkspace() {
   const handleRetryConfigSave = async () => {
     if (isRetryingConfigSave) return
     const saved = await retryConfigSave()
-    if (saved) setStatusMessage('自动战斗配置已同步', 'success')
+    if (saved) notify('自动战斗配置已同步', 'success')
   }
 
   const saveSelectedCopilotIndexes = useCallback((indexes: readonly number[], setId: string) => {
@@ -318,10 +326,10 @@ export default function CombatWorkspace() {
       // 服务端进度已改变：下次预览必须重新读取计划，不能复用旧的 completedModes。
       void invalidateCopilotSetPlan(queryClient, preview.id)
       if (setRun) setDismissedRunId(setRun.runId)
-      setStatusMessage('已重置作业集进度，将从第一关开始', 'success')
+      notify('已重置作业集进度，将从第一关开始', 'success')
       return true
     } catch (error) {
-      setStatusMessage(`重置失败: ${(error as Error).message}`, 'error')
+      notify(`重置失败: ${(error as Error).message}`, 'error')
       return false
     } finally {
       setIsResettingProgress(false)
@@ -400,7 +408,7 @@ export default function CombatWorkspace() {
 
   const handleStartNextCopilot = async () => {
     if (!automationAvailable) {
-      setStatusMessage(unavailableMessage, 'error')
+      notify(unavailableMessage, 'error')
       return
     }
     await continueSet()
@@ -449,18 +457,18 @@ export default function CombatWorkspace() {
 
   const handleExecute = async (task: CombatTask) => {
     if (!automationAvailable) {
-      setStatusMessage(unavailableMessage, 'error')
+      notify(unavailableMessage, 'error')
       return
     }
 
     if (task.id === 'copilot' && queue.entries.length) {
       const queueEntries = checkedCopilotQueueEntries(queue.entries, queue.selected)
       if (!queueEntries.length) {
-        setStatusMessage('请至少勾选一项队列作业', 'warning')
+        notify('请至少勾选一项队列作业', 'warning')
         return
       }
       if (isRunning || isSubmitting) {
-        setStatusMessage('正在执行其他任务，请稍后再试', 'warning')
+        notify('正在执行其他任务，请稍后再试', 'warning')
         return
       }
       await executeCheckedQueue(queueEntries)
@@ -470,21 +478,25 @@ export default function CombatWorkspace() {
     const inputValue = taskInputs[task.id] || ''
     const inputError = validateCombatInput(task.id, inputValue)
     if (inputError) {
-      setStatusMessage(inputError)
+      notify(inputError)
       return
     }
 
     if (task.id === 'copilot' && !preview) {
       const firstArg = splitCopilotInputToArgs(inputValue)[0] || ''
       if (parseCopilotUri(firstArg)?.isSet) {
-        await requestCopilotPreview(inputValue)
-        setStatusMessage('已恢复作业集进度，请确认待执行关卡后再次执行')
+        const outcome = await requestCopilotPreview(inputValue)
+        if (outcome.status === 'ready') {
+          notify('已恢复作业集进度，请确认待执行关卡后再次执行', undefined, {
+            id: COMBAT_PREVIEW_NOTICE_ID,
+          })
+        }
         return
       }
     }
 
     if (task.id === 'copilot' && preview?.type === 'set' && preview.copilots?.length) {
-      setStatusMessage('请至少勾选一项队列作业', 'warning')
+      notify('请至少勾选一项队列作业', 'warning')
       return
     }
 
@@ -506,7 +518,7 @@ export default function CombatWorkspace() {
   const handleImportCopilotFile = async (file: File) => {
     if (importingCopilotFileRef.current) return
     if (queue.entries.length >= COPILOT_QUEUE_LIMIT) {
-      setStatusMessage(COPILOT_QUEUE_FULL_MESSAGE, 'warning')
+      notify(COPILOT_QUEUE_FULL_MESSAGE, 'warning')
       return
     }
     importingCopilotFileRef.current = true
@@ -514,7 +526,7 @@ export default function CombatWorkspace() {
     try {
       const result = await uploadCopilotFile(file)
       if (!result.success || !result.data?.path) {
-        setStatusMessage(getErrorMessage(result), 'error')
+        notify(getErrorMessage(result), 'error')
         return
       }
       const content = await readCopilotFileText(file)
@@ -525,13 +537,13 @@ export default function CombatWorkspace() {
         { stage: result.data.stage, stageId: result.data.stageId },
       )])
       if (!added) {
-        setStatusMessage(COPILOT_QUEUE_FULL_MESSAGE, 'warning')
+        notify(COPILOT_QUEUE_FULL_MESSAGE, 'warning')
         return
       }
       clearCopilotPreview()
-      setStatusMessage(`已导入本地作业: ${result.data.name || file.name}`, 'success')
+      notify(`已导入本地作业: ${result.data.name || file.name}`, 'success')
     } catch (error) {
-      setStatusMessage(getErrorMessage({ message: error instanceof Error ? error.message : undefined }), 'error')
+      notify(getErrorMessage({ message: error instanceof Error ? error.message : undefined }), 'error')
     } finally {
       importingCopilotFileRef.current = false
       setIsImportingCopilotFile(false)
@@ -576,14 +588,19 @@ export default function CombatWorkspace() {
       setPendingPreviewTarget(pendingTarget)
       setCopilotDetail({ type: 'preview' })
     }
-    setStatusMessage('正在获取作业信息...')
+    notifyProgress('正在获取作业信息...', COMBAT_PREVIEW_NOTICE_ID)
     try {
       const outcome = await loadCopilotPreview({
         input: rawValue ?? (taskInputs['copilot'] || ''),
         mode: panelStores.copilotPreviewMode.get(),
         raid,
       })
-      if (outcome.status === 'cancelled') return outcome
+      if (outcome.status === 'cancelled') {
+        if (pendingPreviewRequestRef.current === requestId) {
+          dismissNotice(COMBAT_PREVIEW_NOTICE_ID)
+        }
+        return outcome
+      }
 
       if (outcome.status === 'ready') {
         if (outcome.preview.type === 'set') {
@@ -592,20 +609,22 @@ export default function CombatWorkspace() {
           const selected = syncQueueSet(setId, buildCopilotQueueEntries(outcome.preview), indexes)
           saveSelectedCopilotIndexes(selected, setId)
         }
-        setStatusMessage(outcome.message)
+        notify(outcome.message, undefined, { id: COMBAT_PREVIEW_NOTICE_ID })
         return outcome
       }
 
       if (outcome.status === 'failed') {
-        setStatusMessage(
+        notify(
           outcome.kind === 'transport' || outcome.kind === 'unknown'
             ? `网络错误: ${outcome.message}`
             : outcome.message,
+          undefined,
+          { id: COMBAT_PREVIEW_NOTICE_ID },
         )
         return outcome
       }
 
-      setStatusMessage(outcome.message)
+      notify(outcome.message, undefined, { id: COMBAT_PREVIEW_NOTICE_ID })
       return outcome
     } finally {
       if (pendingPreviewRequestRef.current === requestId) setPendingPreviewTarget(null)
@@ -616,7 +635,6 @@ export default function CombatWorkspace() {
     panelStores.copilotPreviewMode,
     copilotSetSelections,
     saveSelectedCopilotIndexes,
-    setStatusMessage,
     syncQueueSet,
     taskInputs,
   ])
@@ -652,7 +670,8 @@ export default function CombatWorkspace() {
     }
   }
 
-  const reportQueueAdd = (preview: CopilotSetInfo) => {
+  const reportQueueAdd = (preview: CopilotSetInfo, noticeId?: string) => {
+    const noticeOptions = noticeId === undefined ? {} : { id: noticeId }
     if (preview.type === 'set') {
       const raid = normalizeRaidValue(advancedParams.copilot?.raid)
       const existingEntries = queue.entries.filter(entry => entry.setId === preview.id)
@@ -666,34 +685,37 @@ export default function CombatWorkspace() {
           copilotSetSelections[preview.id],
         )
       syncQueueSet(preview.id, buildCopilotQueueEntries(preview), checkedIndexes)
-      setStatusMessage(`已同步作业集 ${preview.copilots?.length ?? 0} 个作业到队列`, 'success')
+      notify(`已同步作业集 ${preview.copilots?.length ?? 0} 个作业到队列`, 'success', noticeOptions)
       return
     }
     const wasFull = queue.entries.length >= COPILOT_QUEUE_LIMIT
     const added = queue.add(buildCopilotQueueEntries(preview))
-    setStatusMessage(
+    notify(
       added
         ? `已加入 ${added} 个作业到队列`
         : wasFull
           ? COPILOT_QUEUE_FULL_MESSAGE
           : '这些作业已在队列中',
       added ? 'success' : 'warning',
+      noticeOptions,
     )
   }
 
-  const reportQueueAddFailure = (outcome: CopilotPreviewOutcome) => {
+  const reportQueueAddFailure = (outcome: CopilotPreviewOutcome, noticeId?: string) => {
     if (outcome.status === 'cancelled') return
+    const noticeOptions = noticeId === undefined ? {} : { id: noticeId }
     if (outcome.status === 'failed') {
-      setStatusMessage(
+      notify(
         outcome.kind === 'transport' || outcome.kind === 'unknown'
           ? `网络错误: ${outcome.message}`
           : outcome.message,
         'error',
+        noticeOptions,
       )
       return
     }
     if (outcome.status === 'invalid' || outcome.status === 'empty') {
-      setStatusMessage(outcome.message)
+      notify(outcome.message, undefined, noticeOptions)
     }
   }
 
@@ -701,18 +723,20 @@ export default function CombatWorkspace() {
     if (isAddingToQueue) return
     const inputValue = taskInputs.copilot || ''
     if (!inputValue.trim()) {
-      setStatusMessage('请输入作业链接')
+      notify('请输入作业链接')
       return
     }
     if (previewMatchesInput(preview, inputValue)) {
-      reportQueueAdd(preview)
+      reportQueueAdd(preview, COMBAT_PREVIEW_NOTICE_ID)
       return
     }
 
     setIsAddingToQueue(true)
     try {
       const outcome = await requestCopilotPreview(inputValue)
-      if (outcome.status === 'ready') reportQueueAdd(outcome.preview)
+      if (outcome.status === 'ready') {
+        reportQueueAdd(outcome.preview, COMBAT_PREVIEW_NOTICE_ID)
+      }
     } finally {
       setIsAddingToQueue(false)
     }
@@ -723,14 +747,22 @@ export default function CombatWorkspace() {
 
     setIsAddingToQueue(true)
     setAddingQueueUri(uri)
-    setStatusMessage('正在获取作业信息...')
+    notifyProgress('正在获取作业信息...', COMBAT_QUEUE_PREVIEW_NOTICE_ID)
     try {
       const { preview: loaded, outcome } = await resolveQueuePreview(uri, 'auto')
       if (loaded) {
-        reportQueueAdd(loaded)
+        reportQueueAdd(loaded, COMBAT_QUEUE_PREVIEW_NOTICE_ID)
         return
       }
-      if (outcome) reportQueueAddFailure(outcome)
+      if (outcome?.status === 'cancelled') {
+        dismissNotice(COMBAT_QUEUE_PREVIEW_NOTICE_ID)
+        return
+      }
+      if (outcome) {
+        reportQueueAddFailure(outcome, COMBAT_QUEUE_PREVIEW_NOTICE_ID)
+        return
+      }
+      dismissNotice(COMBAT_QUEUE_PREVIEW_NOTICE_ID)
     } finally {
       setIsAddingToQueue(false)
       setAddingQueueUri(null)
@@ -744,7 +776,7 @@ export default function CombatWorkspace() {
     const raid = normalizeRaidValue(advancedParams.copilot?.raid)
     const runEntries = toCopilotQueueRunEntries(entries, raid, retryModes)
     if (!runEntries.length || runEntries.length !== entries.length) {
-      setStatusMessage('队列中存在无法解析的作业链接', 'error')
+      notify('队列中存在无法解析的作业链接', 'error')
       return false
     }
     const submitted = await submitQueue({
@@ -772,7 +804,7 @@ export default function CombatWorkspace() {
 
   const handleContinueQueue = async () => {
     if (!automationAvailable) {
-      setStatusMessage(unavailableMessage, 'error')
+      notify(unavailableMessage, 'error')
       return
     }
     await continueQueue()
@@ -780,7 +812,7 @@ export default function CombatWorkspace() {
 
   const handleSkipQueueEntry = async () => {
     if (!automationAvailable) {
-      setStatusMessage(unavailableMessage, 'error')
+      notify(unavailableMessage, 'error')
       return
     }
     await skipQueueEntry()
@@ -791,15 +823,15 @@ export default function CombatWorkspace() {
     const entriesById = new Map(queue.entries.map(entry => [entry.id, entry]))
     const failedEntries = [...retryModes.keys()].flatMap(id => entriesById.get(id) ?? [])
     if (!failedEntries.length) {
-      setStatusMessage('没有可重试的失败项', 'warning')
+      notify('没有可重试的失败项', 'warning')
       return
     }
     if (!automationAvailable) {
-      setStatusMessage(unavailableMessage, 'error')
+      notify(unavailableMessage, 'error')
       return
     }
     if (isRunning || isSubmitting) {
-      setStatusMessage('正在执行其他任务，请稍后再试', 'warning')
+      notify('正在执行其他任务，请稍后再试', 'warning')
       return
     }
     selectQueueEntries(failedEntries.map(entry => entry.id))
@@ -821,30 +853,35 @@ export default function CombatWorkspace() {
   const handleSearchParadox = async (operatorName: string) => {
     if (isSearchingParadox) return
     if (!operatorName.trim()) {
-      setStatusMessage('请输入干员名字')
+      notify('请输入干员名字')
       return
     }
 
-    setStatusMessage('正在搜索作业...')
+    notifyProgress('正在搜索作业...', COMBAT_PARADOX_SEARCH_NOTICE_ID)
     const outcome = await searchParadoxJobs(operatorName)
-    if (outcome.status === 'cancelled') return
+    if (outcome.status === 'cancelled') {
+      dismissNotice(COMBAT_PARADOX_SEARCH_NOTICE_ID)
+      return
+    }
 
     if (outcome.status === 'failed') {
-      setStatusMessage(
+      notify(
         outcome.kind === 'transport' || outcome.kind === 'unknown'
           ? `搜索失败: ${outcome.message}`
           : outcome.message,
+        undefined,
+        { id: COMBAT_PARADOX_SEARCH_NOTICE_ID },
       )
       return
     }
 
     const { result } = outcome
     if (!result.copilots.length) {
-      setStatusMessage('未找到作业')
+      notify('未找到作业', undefined, { id: COMBAT_PARADOX_SEARCH_NOTICE_ID })
       return
     }
 
-    setStatusMessage(`找到 ${result.copilots.length} 个作业`)
+    notify(`找到 ${result.copilots.length} 个作业`, undefined, { id: COMBAT_PARADOX_SEARCH_NOTICE_ID })
     const recommendedUri = result.recommended?.uri
     if (recommendedUri) {
       updateCombatConfig(current => ({
@@ -858,7 +895,7 @@ export default function CombatWorkspace() {
     const outcome = await searchCopilotJobs(request)
     if (outcome.status === 'cancelled') return
     if (outcome.status === 'failed') {
-      setStatusMessage(
+      notify(
         outcome.kind === 'transport' || outcome.kind === 'unknown'
           ? `搜索失败: ${outcome.message}`
           : outcome.message,

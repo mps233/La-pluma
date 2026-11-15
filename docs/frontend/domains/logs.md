@@ -8,7 +8,7 @@
 
 | 内容 | 所有者 | 职责 |
 | --- | --- | --- |
-| 页面壳 | `pages/logs/LogViewer.tsx` | 页头、状态指示与工作区组合 |
+| 页面壳 | `pages/logs/LogViewer.tsx` | `app-page`/`app-stack-section` 与工作区组合 |
 | 观察条件 | `features/logs/components/LogsWorkspace.tsx` | 事件范围、Run 范围、级别、搜索、折叠与导出 |
 | 受控面板 | `LogsToolbar`、`HistoryLogPicker` | 控件、键盘导航和用户动作回调；不获取日志 |
 | 列表与跟随 | `LogConsole`、`model/logFollow.ts` | 单条“原文与详情”、滚动容器、跟随与新日志提示 |

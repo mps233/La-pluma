@@ -1,6 +1,3 @@
-import { useNavigate } from 'react-router'
-import { appTabRoute, type AppTab } from '@/shared/navigation'
-import { appTabs } from '../router/tabs'
 import ThemeToggle from './ThemeToggle'
 
 function GitHubMark() {
@@ -12,27 +9,14 @@ function GitHubMark() {
 }
 
 interface AppNavbarProps {
-  activeTab: AppTab
+  pageTitle: string
 }
 
-export default function AppNavbar({ activeTab }: AppNavbarProps) {
-  const navigate = useNavigate()
-
+export default function AppNavbar({ pageTitle }: AppNavbarProps) {
   return (
     <header data-region="navbar" className="la-pluma-navbar">
       <div className="la-pluma-navbar-inner">
-        <div className="la-pluma-navbar-left">
-          <button
-            type="button"
-            className="la-pluma-brand"
-            aria-label="La Pluma Next 概览"
-            onClick={() => navigate(appTabRoute('dashboard'))}
-          >
-            <img src={`${import.meta.env.BASE_URL}logo-graphite.svg?v=1`} alt="" className="la-pluma-brand-mark" />
-            <span>La Pluma Next</span>
-          </button>
-        </div>
-        <div className="la-pluma-navbar-title">{appTabs.find(tab => tab.id === activeTab)?.name}</div>
+        <h1 data-region="page-title" className="la-pluma-navbar-title">{pageTitle}</h1>
         <div className="la-pluma-navbar-actions">
           <ThemeToggle />
           <a

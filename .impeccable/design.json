@@ -128,7 +128,7 @@
     "typographyMeta": {
       "page-title": {
         "displayName": "Page Title",
-        "purpose": "Only the main title inside PageHeader."
+        "purpose": "Only the main page title."
       },
       "section-title": {
         "displayName": "Section Title",
@@ -333,7 +333,7 @@
       }
     ],
     "dos": [
-      "Do 先读 apps/web/src/styles/index.css 和 apps/web/src/styles/ios-theme.css，再用语义类实现界面；新页面优先使用 Layout、PageHeader、Card、Button、Input 等现有组件。",
+      "Do 先读 apps/web/src/styles/index.css 和 apps/web/src/styles/ios-theme.css，再用语义类实现界面；新页面优先使用 Layout、Card、Button、Input 等现有组件。",
       "Do 把间距回到 --app-space-*、圆角回到 --app-radius-*，保持 4px 基线和 1px 发丝线。",
       "Do 让系统蓝保持稀缺：只用于当前项、主操作、焦点和运行中状态；状态色只表达语义。",
       "Do 在手机和粗指针设备上保证至少 44px 的点击区域，并检查 light/dark、loading、disabled、empty、error 以及长标题/长操作文案。",

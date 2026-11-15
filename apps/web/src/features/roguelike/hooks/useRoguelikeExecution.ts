@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getErrorMessage } from '@/shared/api'
-import type { StatusMessageType } from '@/features/runtime-status'
+import {
+  EXECUTION_NOTICE_ID,
+  notifyProgress,
+  type Notify,
+} from '@/shared/notifications'
 import {
   executionController as defaultExecutionController,
   executePredefinedTask,
@@ -50,7 +54,7 @@ export interface RoguelikeExecution {
 }
 
 interface UseRoguelikeExecutionOptions {
-  notify: (message: string, type?: StatusMessageType) => void
+  notify: Notify
   controller?: ExecutionController
 }
 
@@ -116,7 +120,7 @@ export function useRoguelikeExecution({
     announcedRunRef.current = trackedRun.runId
     const label = runLabelsRef.current.get(trackedRun.runId)
     const terminal = describeRoguelikeTerminalRun(trackedRun, label)
-    notify(terminal.message, terminal.type)
+    notify(terminal.message, terminal.type, { id: EXECUTION_NOTICE_ID })
   }, [activeRun, notify, ownedRunId, trackedRun])
 
   useEffect(() => {
@@ -126,7 +130,7 @@ export function useRoguelikeExecution({
 
     const timer = window.setTimeout(() => {
       setStopAcknowledged(false)
-      notify('终止失败: 终止请求已发送，但尚未确认任务停止', 'error')
+      notify('终止失败: 终止请求已发送，但尚未确认任务停止', 'error', { id: EXECUTION_NOTICE_ID })
     }, ROGUELIKE_STOP_CONFIRM_TIMEOUT_MS)
 
     return () => window.clearTimeout(timer)
@@ -135,7 +139,7 @@ export function useRoguelikeExecution({
   const execute = useCallback(async ({ command, params, taskConfig, taskName }: RoguelikeExecutionRequest) => {
     if (isRunning || controller.getState().submission === 'pending') return
 
-    notify('正在执行命令...')
+    notifyProgress('正在执行命令...', EXECUTION_NOTICE_ID)
     try {
       const result = await controller.submitExecution(
         'run_task',
@@ -153,52 +157,58 @@ export function useRoguelikeExecution({
       )
 
       if (!result.success) {
-        notify(`执行失败: ${getErrorMessage(result)}`, 'error')
+        notify(`执行失败: ${getErrorMessage(result)}`, 'error', { id: EXECUTION_NOTICE_ID })
         return
       }
 
       const runId = readSubmittedRunId(result.data)
-      if (runId) runLabelsRef.current.set(runId, taskName)
-      else notify(`${taskName} 已提交`, 'info')
+      if (runId) {
+        runLabelsRef.current.set(runId, taskName)
+        observedActiveRunRef.current = runId
+      } else {
+        notify(`${taskName} 已提交`, 'info', { id: EXECUTION_NOTICE_ID })
+      }
     } catch (error) {
       // 传输失败时服务端可能已经接受执行，不能宣称失败或自动重提。
-      notify(`无法确认执行状态: ${(error as Error).message}`, 'warning')
+      notify(`无法确认执行状态: ${(error as Error).message}`, 'warning', { id: EXECUTION_NOTICE_ID })
     }
   }, [controller, isRunning, notify])
 
   const stop = useCallback(async (mode: StopMode = 'now') => {
     if (stopRequestRef.current) return
-    if (!controller.getState().trackedRunId) return
+    const trackedRunId = controller.getState().trackedRunId
+    if (!trackedRunId) return
 
+    observedActiveRunRef.current = trackedRunId
     stopRequestRef.current = mode
     setPendingStopMode(mode)
     if (mode === 'now') setWaitAccepted(false)
-    notify(STOP_REQUEST_MESSAGES[mode], 'warning')
+    notifyProgress(STOP_REQUEST_MESSAGES[mode], EXECUTION_NOTICE_ID)
 
     try {
       const result = await controller.stopTrackedRun({ mode })
       if (!result) {
-        notify('未找到可终止的肉鸽运行', 'warning')
+        notify('未找到可终止的肉鸽运行', 'warning', { id: EXECUTION_NOTICE_ID })
         setStopAcknowledged(false)
         return
       }
       if (!result.success) {
-        notify(`终止失败: ${getErrorMessage(result)}`, 'error')
+        notify(`终止失败: ${getErrorMessage(result)}`, 'error', { id: EXECUTION_NOTICE_ID })
         setStopAcknowledged(false)
         return
       }
       if (result.data?.pendingStop) {
         setWaitAccepted(true)
         setStopAcknowledged(false)
-        notify('已受理，等待战斗结束后终止', 'warning')
+        notify('已受理，等待战斗结束后终止', 'warning', { id: EXECUTION_NOTICE_ID })
         return
       }
       setStopAcknowledged(!result.data?.alreadyTerminal)
       if (mode === 'after-combat' && !result.data?.alreadyTerminal && !result.data?.alreadyStopping) {
-        notify('未在战斗中，已立即终止', 'warning')
+        notify('未在战斗中，已立即终止', 'warning', { id: EXECUTION_NOTICE_ID })
       }
     } catch (error) {
-      notify(`终止失败: ${(error as Error).message}`, 'error')
+      notify(`终止失败: ${(error as Error).message}`, 'error', { id: EXECUTION_NOTICE_ID })
       setStopAcknowledged(false)
     } finally {
       stopRequestRef.current = null

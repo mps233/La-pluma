@@ -37,8 +37,9 @@ const mocks = vi.hoisted(() => ({
   generateTrainingPlan: vi.fn(),
   loadUserConfig: vi.fn(),
   saveUserConfig: vi.fn(),
-  setActive: vi.fn(),
-  setMessage: vi.fn(),
+  notify: vi.fn(),
+  notifyProgress: vi.fn(),
+  dismissNotice: vi.fn(),
   setupSchedule: vi.fn(),
   stopSchedule: vi.fn(),
   testConnection: vi.fn(),
@@ -120,12 +121,17 @@ vi.mock('@/features/training', () => ({
 }))
 
 vi.mock('@/features/runtime-status', () => ({
-  useStatusStore: (selector?: (state: { setMessage: typeof mocks.setMessage; setActive: typeof mocks.setActive }) => unknown) => {
-    if (!selector) throw new Error('useStatusStore must be called with a selector')
-    return selector({ setMessage: mocks.setMessage, setActive: mocks.setActive })
-  },
-  FloatingStatusIndicator: () => null,
   useAutomationAvailability: () => ({ isAvailable: true, unavailableMessage: '' }),
+}))
+
+vi.mock('@/shared/notifications', () => ({
+  notify: mocks.notify,
+  notifyProgress: mocks.notifyProgress,
+  dismissNotice: mocks.dismissNotice,
+  detectNoticeType: () => 'default',
+  EXECUTION_NOTICE_ID: 'execution',
+  STATISTICS_NOTICE_ID: 'statistics',
+  SETTINGS_UPDATE_NOTICE_ID: 'settings-update',
 }))
 
 vi.mock('@/features/device-mirror', () => ({
@@ -309,8 +315,9 @@ describe('AutomationTasks layout surfaces', () => {
     mocks.testConnection.mockReset().mockResolvedValue({ success: true, data: { success: true, message: '连接正常' } })
     mocks.executeScheduleNow.mockReset()
     mocks.scrollIntoView.mockReset()
-    mocks.setActive.mockReset()
-    mocks.setMessage.mockReset()
+    mocks.notify.mockReset()
+    mocks.notifyProgress.mockReset()
+    mocks.dismissNotice.mockReset()
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
@@ -494,7 +501,7 @@ describe('AutomationTasks layout surfaces', () => {
     await act(async () => timeInput.blur())
     await flush()
 
-    expect(mocks.setMessage).toHaveBeenCalledWith('请输入 00:00–23:59 的时间', 'error')
+    expect(mocks.notify).toHaveBeenCalledWith('请输入 00:00–23:59 的时间', 'error')
     expect(container.querySelector<HTMLInputElement>('#automation-schedule-time-0')?.value).toBe('09:00')
     expect(JSON.parse(localStorage.getItem('maa-schedule') || '{}')).toMatchObject({
       enabled: true,
@@ -525,7 +532,7 @@ describe('AutomationTasks layout surfaces', () => {
     })
     await flush()
 
-    expect(mocks.setMessage).toHaveBeenCalledWith('该执行时间已经存在', 'error')
+    expect(mocks.notify).toHaveBeenCalledWith('该执行时间已经存在', 'error')
     expect(container.querySelector<HTMLInputElement>('#automation-schedule-time-0')?.value).toBe('08:30')
     expect(JSON.parse(localStorage.getItem('maa-schedule') || '{}')).toMatchObject({
       enabled: true,

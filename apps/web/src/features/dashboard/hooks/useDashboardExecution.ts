@@ -13,7 +13,8 @@ import {
   type ExecutionController,
   type GlobalRunStatus,
 } from '@/features/task-execution'
-import { isRunStatusBusy, type StatusMessageType } from '@/features/runtime-status'
+import { EXECUTION_NOTICE_ID, type Notify, type NoticeType } from '@/shared/notifications'
+import { isRunStatusBusy } from '@/features/runtime-status'
 import { describeDashboardRunTerminal } from '../model/runNotice'
 
 export const DASHBOARD_EXECUTION_SCOPE = 'dashboard'
@@ -22,11 +23,11 @@ export interface DashboardFlowStartOutcome {
   /** 服务端是否接受了本次提交；传输失败时不能当作失败或完成。 */
   ok: boolean
   message: string
-  type: StatusMessageType
+  type: NoticeType
 }
 
 export interface DashboardExecution {
-  /** 唯一快照的运行状态投影，和全局浮动指示器同源。 */
+  /** 唯一快照的运行状态投影，与执行控制器同源。 */
   status: GlobalRunStatus
   /** 设备忙：有活动 run（含等待继续）或被未纳管执行占用。 */
   isBusy: boolean
@@ -38,7 +39,7 @@ export interface DashboardExecution {
 }
 
 interface UseDashboardExecutionOptions {
-  notify: (message: string, type?: StatusMessageType) => void
+  notify: Notify
   controller?: ExecutionController
 }
 
@@ -72,7 +73,7 @@ export function useDashboardExecution({
     observedActiveRunRef.current = null
     announcedRunRef.current = ownedRun.runId
     const notice = describeDashboardRunTerminal(ownedRun)
-    if (notice) notify(notice.message, notice.type)
+    if (notice) notify(notice.message, notice.type, { id: EXECUTION_NOTICE_ID })
   }, [notify, ownedRun])
 
   const startFlow = useCallback(async (flow: unknown[]): Promise<DashboardFlowStartOutcome> => {
@@ -112,12 +113,13 @@ export function useDashboardExecution({
         }
       }
 
+      observedActiveRunRef.current = runId
       const submittedRun = readSubmittedRun(result.data, runId)
       const notice = describeDashboardRunTerminal(submittedRun)
       if (notice) {
         observedActiveRunRef.current = null
         announcedRunRef.current = submittedRun?.runId ?? null
-        notify(notice.message, notice.type)
+        notify(notice.message, notice.type, { id: EXECUTION_NOTICE_ID })
       }
       return { ok: true, message: '今日流程已开始执行', type: 'success' }
     } catch (error) {

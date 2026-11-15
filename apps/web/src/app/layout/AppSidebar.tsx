@@ -5,6 +5,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -72,6 +73,17 @@ export default function AppSidebar({ activeTab, onNavigate }: AppSidebarProps) {
         style={{ '--sidebar-width': 'var(--la-pluma-sidebar-width)' } as CSSProperties}
       >
         <Sidebar collapsible="none" className="la-pluma-sidebar-body">
+          <SidebarHeader>
+            <div data-region="sidebar-brand" className="la-pluma-sidebar-brand">
+              <img
+                src={`${import.meta.env.BASE_URL}logo-graphite.svg?v=1`}
+                alt=""
+                draggable={false}
+                className="la-pluma-sidebar-brand-mark"
+              />
+              <span>La Pluma Next</span>
+            </div>
+          </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
               <SidebarGroupContent>

@@ -11,7 +11,7 @@
 | 层 | 职责 | 入口与约束 |
 | --- | --- | --- |
 | `app/` | 组装 Router、Provider、全局观察、布局和页面出口 | [App.tsx](../../apps/web/src/app/App.tsx)；不承载领域配置或执行状态机 |
-| `pages/<domain>/` | 组合页头、领域工作区与布局 | [页面路由表](../../apps/web/src/app/router/pages.ts)登记八个页面；生产页面只经 `@/features/<domain>` 根入口消费领域能力 |
+| `pages/<domain>/` | 组合页面壳、领域工作区与布局；页面标题由顶栏提供 | [页面路由表](../../apps/web/src/app/router/pages.ts)登记八个页面；生产页面只经 `@/features/<domain>` 根入口消费领域能力 |
 | `features/<domain>/` | 自持领域组件、hooks、纯模型、API、类型、样式与状态所有者 | 每个域以 `index.ts` 为唯一对外入口；域内使用相对 import；不依赖 `pages` 或 `app` |
 | `shared/` | 通用 UI、协议传输、Query 基础设施、路由词汇、通用 hooks 与纯函数 | 不感知业务域；`shared/api` 不新增业务端点，`shared/query` 不持有领域资源 |
 

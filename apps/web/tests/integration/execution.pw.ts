@@ -23,7 +23,7 @@ test('停止中切页、断线重连和刷新都保留同一 Run，旧终态不�
   await page.getByRole('button', { name: '立即执行', exact: true }).click()
   await expect.poll(() => state.submissions.length).toBe(1)
   await expect(page.getByRole('button', { name: '终止执行', exact: true })).toBeVisible()
-  await expect(page.locator('[data-floating-status-text]:visible').first()).toHaveText('正在执行跨页场景任务')
+  await expect(page.locator('[data-sonner-toast]').getByText('正在执行跨页场景任务', { exact: true })).toBeVisible()
   await navigateTo(page, 'dashboard')
   await expect(page.locator('[data-dashboard-flow-command]').getByText('正在执行跨页场景任务', { exact: true })).toBeVisible()
   await navigateTo(page, 'automation')
@@ -31,7 +31,7 @@ test('停止中切页、断线重连和刷新都保留同一 Run，旧终态不�
   await page.getByRole('button', { name: '终止执行', exact: true }).click()
   await expect.poll(() => state.stopCalls).toEqual([state.runId])
 
-  // 停止确认尚未到达终态时切到总览：页面组合层和全局指示器来自同一快照。
+  // 停止确认尚未到达终态时切到总览：页面组合层仍反映同一快照。
   await navigateTo(page, 'dashboard')
   await expect(page.locator('[data-dashboard-flow-command]').getByText('正在停止', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '正在运行', exact: true })).toBeDisabled()
@@ -40,7 +40,6 @@ test('停止中切页、断线重连和刷新都保留同一 Run，旧终态不�
   await context.setOffline(true)
   await expect(page.locator('[data-dashboard-flow-command]').getByText('当前网络离线', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '开始今日流程', exact: true })).toBeDisabled()
-  await expect.poll(() => page.locator('[data-floating-status-text]:visible').first().getAttribute('title')).toBe('网络连接已断开，页面控制暂不可用')
 
   // 在线请求失败期间也没有提交新任务；恢复后先按原 runId 对账。
   await context.setOffline(false)

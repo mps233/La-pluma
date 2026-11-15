@@ -203,7 +203,7 @@ function CombatWorkspace() {
 - 工作区只订阅与编辑通道，不建立第二份 revision、pending 状态或保存队列。
 - `Activity` 隐藏/恢复只影响 Effects；`hydrate()` 的已加载守卫保证恢复时不重读，pending 草稿仍优先。
 - automation 订阅 `automation-config`/`automation-schedule` 失效后通过 `reload({ force: true })` 重读；返回 `local-draft` 时不得丢弃本地编辑。计划应用不再使用 window `training-plan-applied` 事件。
-- 状态消息（成功 toast）与页内错误文案由页面从 `syncState`/`error` 和 `retry()` 结果派生，协调器不直接写 `statusStore`。
+- 成功/失败通知由页面通过 `notify` 发送，页内错误文案由页面从 `syncState`/`error` 和 `retry()` 结果派生；协调器不直接写 `statusStore` 或通知器。
 
 ### 6.1 肉鸽适配器
 

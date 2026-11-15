@@ -1,9 +1,9 @@
 import { isTerminalRunState, type AgentRun } from '@/features/task-execution'
-import type { StatusMessageType } from '@/features/runtime-status'
+import type { NoticeType } from '@/shared/notifications'
 
 export interface DashboardRunNotice {
   message: string
-  type: StatusMessageType
+  type: NoticeType
 }
 
 function readResultMessage(run: AgentRun): string | null {

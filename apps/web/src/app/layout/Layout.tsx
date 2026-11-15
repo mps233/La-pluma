@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { appTabRoute, type AppTab } from '@/shared/navigation'
+import { resolvePageTitle } from '../router/pageTitle'
 import AppNavbar from './AppNavbar'
 import AppSidebar from './AppSidebar'
 import AppTabbar from './AppTabbar'
@@ -29,6 +30,8 @@ function setScrollTop(top: number) {
 
 export default function Layout({ activeTab, children }: LayoutProps) {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const pageTitle = resolvePageTitle(pathname, activeTab)
   const scrollPositions = useRef(new Map<AppTab, number>())
   const activeTabRef = useRef<AppTab>(activeTab)
   const restoreFrame = useRef<number | null>(null)
@@ -134,14 +137,18 @@ export default function Layout({ activeTab, children }: LayoutProps) {
     navigate(appTabRoute(tab))
   }, [activeTab, navigate])
 
+  useEffect(() => {
+    document.title = `${pageTitle} · La Pluma Next`
+  }, [pageTitle])
+
   return (
     <div className="view view-main la-pluma-view">
       <div className="page no-swipeback la-pluma-page" data-name="la-pluma">
         <div className="la-pluma-page-body">
-          <AppNavbar activeTab={activeTab} />
+          <AppNavbar pageTitle={pageTitle} />
           <AppSidebar activeTab={activeTab} onNavigate={navigateToTab} />
           <main className="la-pluma-scroll-host">
-            <div className="la-pluma-content app-shell">
+            <div className="la-pluma-content">
               {children}
             </div>
           </main>

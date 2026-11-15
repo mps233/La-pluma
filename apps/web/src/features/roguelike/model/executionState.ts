@@ -1,4 +1,4 @@
-import type { StatusMessageType } from '@/features/runtime-status'
+import type { NoticeType } from '@/shared/notifications'
 import type { AgentRun, StopMode } from '@/features/task-execution'
 
 export interface RoguelikeStopProjection {
@@ -32,7 +32,7 @@ export function projectRoguelikeStopState({
 export function describeRoguelikeTerminalRun(
   run: AgentRun,
   label: string | undefined,
-): { message: string; type: StatusMessageType } {
+): { message: string; type: NoticeType } {
   if (run.state === 'succeeded') {
     return { message: label ? `${label} 执行成功` : '肉鸽任务执行成功', type: 'success' }
   }

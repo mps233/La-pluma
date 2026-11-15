@@ -51,7 +51,10 @@ export default function AutomationTaskPicker({
       Math.max(VIEWPORT_MARGIN, viewportWidth - VIEWPORT_MARGIN - width),
     )
     const naturalHeight = Math.min(AVAILABLE_TASKS.length * MENU_OPTION_HEIGHT + 12, MENU_MAX_HEIGHT)
-    const spaceAbove = Math.max(0, rect.top - MENU_GAP - VIEWPORT_MARGIN)
+    const navbarBottom = document.querySelector<HTMLElement>('[data-region="navbar"]')
+      ?.getBoundingClientRect().bottom ?? 0
+    const topInset = Math.max(VIEWPORT_MARGIN, navbarBottom)
+    const spaceAbove = Math.max(0, rect.top - MENU_GAP - topInset)
     const spaceBelow = Math.max(0, viewportHeight - rect.bottom - MENU_GAP - VIEWPORT_MARGIN)
     const placement = spaceAbove >= naturalHeight || spaceAbove >= spaceBelow ? 'top' : 'bottom'
     const maxHeight = Math.max(0, Math.min(naturalHeight, placement === 'top' ? spaceAbove : spaceBelow))

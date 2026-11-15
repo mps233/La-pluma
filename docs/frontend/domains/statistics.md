@@ -16,7 +16,7 @@
 
 | 内容 | 唯一归属 | 说明 |
 | --- | --- | --- |
-| 页面壳、页头与全局状态指示 | `pages/statistics/DataStatistics.tsx` | 只渲染 `app-page`/`app-stack-section`、`PageHeader` 与工作区 |
+| 页面壳与工作区组合 | `pages/statistics/DataStatistics.tsx` | 只渲染 `app-page`/`app-stack-section` 与工作区 |
 | 当前 tab、命令投影与失效订阅 | `features/statistics/components/StatisticsWorkspace.tsx` | 跨面板唯一容器；tab 由 URL 查询串 `?tab=` 承载 |
 | tab 分段控件的测量与键盘导航 | `features/statistics/components/StatisticsTabs.tsx` | 受控组件；只持有 `useFluidTabIndicator` 的测量状态 |
 | 干员读取、筛选/排序、筛选菜单、头像缓存 | `features/statistics/components/OperatorPanel.tsx` | 读取 `operbox` 与 `catalog` 两路 Query |
@@ -38,7 +38,7 @@
 ### 2. 组合与状态边界
 
 ```
-DataStatistics（页面壳：页头、全局状态指示）
+DataStatistics（app-page > app-stack-section > StatisticsWorkspace）
 └─ StatisticsWorkspace（当前 tab、命令投影、资源失效订阅）
    ├─ StatisticsTabs（受控分段控件 + 高亮测量）
    ├─ OperatorPanel（operbox/catalog 读取 + 筛选/排序/菜单/头像缓存）

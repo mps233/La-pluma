@@ -22,7 +22,9 @@ const mocks = vi.hoisted(() => ({
   loadUserConfig: vi.fn(),
   saveUserConfig: vi.fn(),
   getRealtimeLogs: vi.fn(),
-  setMessage: vi.fn(),
+  notify: vi.fn(),
+  notifyProgress: vi.fn(),
+  dismissNotice: vi.fn(),
   getOperBoxData: vi.fn(),
   getAllOperators: vi.fn(),
 }))
@@ -92,15 +94,20 @@ vi.mock('@/features/user-config', async () => {
 })
 
 vi.mock('@/features/runtime-status', () => ({
-  useStatusStore: (selector?: (state: { setMessage: typeof mocks.setMessage }) => unknown) => {
-    if (!selector) throw new Error('useStatusStore must be called with a selector')
-    return selector({ setMessage: mocks.setMessage })
-  },
-  FloatingStatusIndicator: () => null,
   RuntimeDiagnosticsPanel: ({ command }: { command?: string }) => (
     <div data-testid="runtime-diagnostics" data-command={command ?? ''} />
   ),
   useAutomationAvailability: () => ({ isAvailable: true, unavailableMessage: '' }),
+}))
+
+vi.mock('@/shared/notifications', () => ({
+  notify: mocks.notify,
+  notifyProgress: mocks.notifyProgress,
+  dismissNotice: mocks.dismissNotice,
+  detectNoticeType: () => 'default',
+  EXECUTION_NOTICE_ID: 'execution',
+  STATISTICS_NOTICE_ID: 'statistics',
+  SETTINGS_UPDATE_NOTICE_ID: 'settings-update',
 }))
 
 vi.mock('@/features/logs/api', () => ({
@@ -420,7 +427,9 @@ describe('RoguelikeTasks execution', () => {
     mocks.loadUserConfig.mockReset().mockResolvedValue({ success: false })
     mocks.saveUserConfig.mockReset().mockResolvedValue({ success: true })
     mocks.getRealtimeLogs.mockReset()
-    mocks.setMessage.mockReset()
+    mocks.notify.mockReset()
+    mocks.notifyProgress.mockReset()
+    mocks.dismissNotice.mockReset()
     resetGameDataMocks()
     resetQueryClient()
 
@@ -497,6 +506,47 @@ describe('RoguelikeTasks execution', () => {
 
     expect(mocks.executePredefinedTask).toHaveBeenCalledOnce()
     expect(buttonByText('立即终止')).toBeDefined()
+  })
+
+  it('replaces the execution progress when a submitted run finishes while hidden', async () => {
+    const submission = deferred<ApiResponse>()
+    mocks.executePredefinedTask.mockReturnValueOnce(submission.promise)
+    useIdentity(null)
+    startController()
+    await flush()
+    const renderActivity = async (mode: 'visible' | 'hidden') => {
+      await act(async () => {
+        root.render(
+          <Activity mode={mode}>
+            <TestApp />
+          </Activity>,
+        )
+      })
+      await flush()
+    }
+    await renderActivity('visible')
+    await setTheme('Phantom')
+
+    await click(buttonByText('立即执行')!)
+    expect(mocks.notifyProgress).toHaveBeenCalledWith('正在执行命令...', 'execution')
+
+    await renderActivity('hidden')
+    const running = activeRun('run-rl-hidden', 'running')
+    api.fetchSnapshot.mockResolvedValue(ok(runSnapshot({ activeRuns: [running] })))
+    api.fetchRun.mockResolvedValue(ok(running))
+    await act(async () => submission.resolve(ok({
+      runId: 'run-rl-hidden',
+      run: running,
+    })))
+    await flush()
+
+    const terminal = activeRun('run-rl-hidden', 'succeeded')
+    api.fetchSnapshot.mockResolvedValue(ok(runSnapshot({ lastRun: terminal })))
+    api.fetchRun.mockResolvedValue(ok(terminal))
+    await refreshController()
+    await renderActivity('visible')
+
+    expect(mocks.notify).toHaveBeenCalledWith(expect.stringContaining('执行成功'), 'success', { id: 'execution' })
   })
 
   it('builds the command from the active mode and advanced fields', async () => {
@@ -604,7 +654,7 @@ describe('RoguelikeTasks execution', () => {
 
     await click(buttonByText('立即执行')!)
     expect(mocks.executePredefinedTask).not.toHaveBeenCalled()
-    expect(mocks.setMessage).toHaveBeenCalledWith(
+    expect(mocks.notify).toHaveBeenCalledWith(
       '起始分队「蓝图测绘分队」不在当前主题的可选范围内，请重新选择',
     )
 
@@ -630,7 +680,7 @@ describe('RoguelikeTasks execution', () => {
 
     await click(buttonByText('立即执行')!)
     expect(mocks.executePredefinedTask).not.toHaveBeenCalled()
-    expect(mocks.setMessage).toHaveBeenCalledWith('运行次数需为整数')
+    expect(mocks.notify).toHaveBeenCalledWith('运行次数需为整数')
 
     await setControlValue('input[name="maa-roguelike-startCount"]', '3')
     await click(buttonByText('立即执行')!)
@@ -656,7 +706,7 @@ describe('RoguelikeTasks execution', () => {
 
     await click(buttonByText('立即执行')!)
     expect(mocks.executePredefinedTask).not.toHaveBeenCalled()
-    expect(mocks.setMessage).toHaveBeenCalledWith('刷坍缩范式模式需要填写期望坍缩范式')
+    expect(mocks.notify).toHaveBeenCalledWith('刷坍缩范式模式需要填写期望坍缩范式')
 
     await setControlValue('input[name="maa-roguelike-expectedCollapsalParadigms"]', '目空一些，图像损坏')
     await click(buttonByText('立即执行')!)
@@ -704,7 +754,7 @@ describe('RoguelikeTasks execution', () => {
     await click(buttonByText('立即执行')!)
 
     expect(mocks.executePredefinedTask).not.toHaveBeenCalled()
-    expect(mocks.setMessage).toHaveBeenCalledWith(
+    expect(mocks.notify).toHaveBeenCalledWith(
       '请填写「制作工具名称」：留空时 maa-cli 会默认制作 16 批荧光棒',
     )
   })
@@ -804,7 +854,7 @@ describe('RoguelikeTasks execution', () => {
     await click(buttonByText('立即执行')!)
 
     expect(mocks.executePredefinedTask).not.toHaveBeenCalled()
-    expect(mocks.setMessage).toHaveBeenCalledWith('请输入主题名称')
+    expect(mocks.notify).toHaveBeenCalledWith('请输入主题名称')
   })
 
   it('keeps the run observable after the page unmounts without sending a stop', async () => {
@@ -842,7 +892,7 @@ describe('RoguelikeTasks execution', () => {
     await refreshController()
 
     expect(buttonByText('立即执行')).toBeDefined()
-    expect(mocks.setMessage).toHaveBeenCalledWith('肉鸽任务执行成功', 'success')
+    expect(mocks.notify).toHaveBeenCalledWith('肉鸽任务执行成功', 'success', { id: 'execution' })
   })
 
   it('feeds the page-owned run and the active command into the result panel', async () => {
@@ -887,7 +937,7 @@ describe('RoguelikeTasks execution', () => {
 
     expect(api.stopRun).toHaveBeenCalledOnce()
     expect(api.stopRun).toHaveBeenCalledWith('run-1', { mode: 'now' })
-    expect(mocks.setMessage).toHaveBeenCalledWith('正在终止肉鸽任务...', 'warning')
+    expect(mocks.notifyProgress).toHaveBeenCalledWith('正在终止肉鸽任务...', 'execution')
     expect(buttonByText('正在终止')?.disabled).toBe(true)
 
     // 停止确认中的重复点击不会重复发送停止请求。
@@ -898,7 +948,7 @@ describe('RoguelikeTasks execution', () => {
     await refreshController()
 
     expect(buttonByText('立即执行')).toBeDefined()
-    expect(mocks.setMessage).toHaveBeenCalledWith('肉鸽任务已终止', 'warning')
+    expect(mocks.notify).toHaveBeenCalledWith('肉鸽任务已终止', 'warning', { id: 'execution' })
   })
 
   it('keeps the stop confirmation across Activity hide/show and never leaves a locked button', async () => {
@@ -966,9 +1016,10 @@ describe('RoguelikeTasks execution', () => {
     })
     await flush()
 
-    expect(mocks.setMessage).toHaveBeenCalledWith(
+    expect(mocks.notify).toHaveBeenCalledWith(
       '终止失败: 终止请求已发送，但尚未确认任务停止',
       'error',
+      { id: 'execution' },
     )
     expect(buttonByText('立即终止')?.disabled).toBe(false)
 
@@ -986,7 +1037,7 @@ describe('RoguelikeTasks execution', () => {
 
     await click(buttonByText('立即终止')!)
 
-    expect(mocks.setMessage).toHaveBeenCalledWith('终止失败: 目标运行已不是当前运行', 'error')
+    expect(mocks.notify).toHaveBeenCalledWith('终止失败: 目标运行已不是当前运行', 'error', { id: 'execution' })
     expect(buttonByText('立即终止')?.disabled).toBe(false)
   })
 
@@ -1011,7 +1062,7 @@ describe('RoguelikeTasks execution', () => {
     await click(buttonByText('等待战斗结束')!)
 
     expect(api.stopRun).toHaveBeenCalledWith('run-1', { mode: 'after-combat' })
-    expect(mocks.setMessage).toHaveBeenCalledWith('已受理，等待战斗结束后终止', 'warning')
+    expect(mocks.notify).toHaveBeenCalledWith('已受理，等待战斗结束后终止', 'warning', { id: 'execution' })
     expect(buttonByText('等待战斗结束')?.disabled).toBe(true)
     expect(buttonByText('等待战斗结束')?.title).toBe('最多等待 10 分钟')
     expect(buttonByText('立即终止')?.disabled).toBe(false)
@@ -1036,9 +1087,10 @@ describe('RoguelikeTasks execution', () => {
     })
     await flush()
 
-    expect(mocks.setMessage).not.toHaveBeenCalledWith(
+    expect(mocks.notify).not.toHaveBeenCalledWith(
       '终止失败: 终止请求已发送，但尚未确认任务停止',
       'error',
+      { id: 'execution' },
     )
     expect(buttonByText('等待战斗结束')?.disabled).toBe(true)
     expect(buttonByText('立即终止')?.disabled).toBe(false)
@@ -1054,7 +1106,7 @@ describe('RoguelikeTasks execution', () => {
     await click(buttonByText('立即终止')!)
 
     expect(api.stopRun).toHaveBeenCalledWith('run-1', { mode: 'now' })
-    expect(mocks.setMessage).toHaveBeenCalledWith('正在终止肉鸽任务...', 'warning')
+    expect(mocks.notifyProgress).toHaveBeenCalledWith('正在终止肉鸽任务...', 'execution')
 
     api.fetchSnapshot.mockResolvedValue(ok(runSnapshot({ activeRuns: [activeRun('run-1', 'stopping')] })))
     await refreshController()
@@ -1076,7 +1128,7 @@ describe('RoguelikeTasks execution', () => {
 
     await click(buttonByText('等待战斗结束')!)
 
-    expect(mocks.setMessage).toHaveBeenCalledWith('未在战斗中，已立即终止', 'warning')
+    expect(mocks.notify).toHaveBeenCalledWith('未在战斗中，已立即终止', 'warning', { id: 'execution' })
     expect(buttonByText('正在终止')?.disabled).toBe(true)
     expect(buttonByText('等待战斗结束')?.getAttribute('title')).toBeNull()
   })
@@ -1096,7 +1148,7 @@ describe('RoguelikeTasks execution', () => {
 
     await click(buttonByText('等待战斗结束')!)
 
-    expect(mocks.setMessage).not.toHaveBeenCalledWith('未在战斗中，已立即终止', 'warning')
+    expect(mocks.notify).not.toHaveBeenCalledWith('未在战斗中，已立即终止', 'warning', { id: 'execution' })
     expect(buttonByText('等待战斗结束')?.getAttribute('title')).toBeNull()
     expect(buttonByText('正在终止')?.disabled).toBe(true)
   })
@@ -1116,7 +1168,7 @@ describe('RoguelikeTasks execution', () => {
     })))
     await refreshController()
 
-    expect(mocks.setMessage).toHaveBeenCalledWith('执行失败: 设备连接中断', 'error')
+    expect(mocks.notify).toHaveBeenCalledWith('执行失败: 设备连接中断', 'error', { id: 'execution' })
     expect(buttonByText('立即执行')).toBeDefined()
   })
 
@@ -1135,7 +1187,7 @@ describe('RoguelikeTasks execution', () => {
     await flush()
 
     expect(buttonByText('立即终止')).toBeDefined()
-    expect(mocks.setMessage).not.toHaveBeenCalledWith('肉鸽任务已终止', 'warning')
+    expect(mocks.notify).not.toHaveBeenCalledWith('肉鸽任务已终止', 'warning', { id: 'execution' })
   })
 
   it('treats a transport failure while submitting as unknown and allows a retry', async () => {
@@ -1145,9 +1197,10 @@ describe('RoguelikeTasks execution', () => {
 
     await click(buttonByText('立即执行')!)
 
-    expect(mocks.setMessage).toHaveBeenCalledWith(
+    expect(mocks.notify).toHaveBeenCalledWith(
       '无法确认执行状态: 无法连接后端服务',
       'warning',
+      { id: 'execution' },
     )
     expect(buttonByText('立即执行')?.disabled).toBe(false)
   })
@@ -1172,7 +1225,9 @@ describe('RoguelikeTasks layout and config recovery', () => {
     mocks.loadUserConfig.mockReset().mockResolvedValue({ success: false })
     mocks.saveUserConfig.mockReset().mockResolvedValue({ success: true })
     mocks.getRealtimeLogs.mockReset()
-    mocks.setMessage.mockReset()
+    mocks.notify.mockReset()
+    mocks.notifyProgress.mockReset()
+    mocks.dismissNotice.mockReset()
     resetGameDataMocks()
     resetQueryClient()
 
@@ -1406,7 +1461,7 @@ describe('RoguelikeTasks layout and config recovery', () => {
     expect(mocks.saveUserConfig).toHaveBeenCalledTimes(2)
     expect(localStorage.getItem('roguelikeConfigSyncPending')).toBeNull()
     expect(container.querySelector('[role="alert"]')).toBeNull()
-    expect(mocks.setMessage).toHaveBeenCalledWith('肉鸽配置已同步', 'success')
+    expect(mocks.notify).toHaveBeenCalledWith('肉鸽配置已同步', 'success')
   })
 
   it('keeps a manual retry single-flight and announces success only after confirmation', async () => {
@@ -1425,7 +1480,7 @@ describe('RoguelikeTasks layout and config recovery', () => {
 
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('网络连接中断')
     expect(mocks.saveUserConfig).toHaveBeenCalledOnce()
-    expect(mocks.setMessage).not.toHaveBeenCalledWith('肉鸽配置已同步', 'success')
+    expect(mocks.notify).not.toHaveBeenCalledWith('肉鸽配置已同步', 'success')
 
     const retrySave = deferred<{ success: boolean }>()
     mocks.saveUserConfig.mockReturnValueOnce(retrySave.promise)
@@ -1435,14 +1490,14 @@ describe('RoguelikeTasks layout and config recovery', () => {
     // 重试请求在途时再次点击不会产生第二个提交。
     await click(buttonByText('同步中')!)
     expect(mocks.saveUserConfig).toHaveBeenCalledTimes(2)
-    expect(mocks.setMessage).not.toHaveBeenCalledWith('肉鸽配置已同步', 'success')
+    expect(mocks.notify).not.toHaveBeenCalledWith('肉鸽配置已同步', 'success')
 
     await act(async () => retrySave.resolve({ success: true }))
     await flush()
 
     expect(localStorage.getItem('roguelikeConfigSyncPending')).toBeNull()
     expect(container.querySelector('[role="alert"]')).toBeNull()
-    expect(mocks.setMessage).toHaveBeenCalledWith('肉鸽配置已同步', 'success')
+    expect(mocks.notify).toHaveBeenCalledWith('肉鸽配置已同步', 'success')
   })
 
   it('prefers an unsynced local draft from a previous session without reading the server', async () => {
@@ -1602,7 +1657,7 @@ describe('RoguelikeTasks layout and config recovery', () => {
     await click(buttonByText('立即执行')!)
 
     expect(mocks.executePredefinedTask).not.toHaveBeenCalled()
-    expect(mocks.setMessage).toHaveBeenCalledWith(expect.stringContaining('未知主题「UnknownTheme」'))
+    expect(mocks.notify).toHaveBeenCalledWith(expect.stringContaining('未知主题「UnknownTheme」'))
   })
 
   it('selects a core operator from the shared picker, saves its name and clears back to automatic', async () => {
