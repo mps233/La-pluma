@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useExecutionSnapshot } from '@/features/task-execution'
-import { ConfirmDialog } from '@/shared/components'
+import { ConfirmAlertDialog } from '@/shared/components'
 import { useLogsSession } from '../hooks/useLogsSession'
 import {
   buildLogView,
@@ -177,7 +177,7 @@ export default function LogsWorkspace() {
         onReload={() => void history.reloadFiles()}
       />
 
-      <ConfirmDialog
+      <ConfirmAlertDialog
         isOpen={confirmCleanup}
         onClose={() => setConfirmCleanup(false)}
         onConfirm={cleanupHistoryLogs}

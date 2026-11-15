@@ -55,14 +55,14 @@ pnpm --filter la-pluma-next-client stylelint:baseline  # 违规数下降或有�
 
 CI 在 PR/main 运行浏览器跨页集成和视觉检查，只等待客户端构建，通过 artifact 复用产物；PR 和发布还验证两种原生架构的容器启动。纯文档变更合入 main 时不再重复触发 CI。发布不重复运行浏览器检查。必选的 `verify` 状态是适用任务的汇总结果，详见[工作流说明](../../.github/workflows/README.md)。
 
-### 视觉基线（8 tab + 3 弹层 + 启动壳 × 深/浅主题 × 3 视口 = 72 张）
+### 视觉基线（8 tab + portal 弹层 + 启动壳 × 深/浅主题 × 3 视口）
 
 视觉基线用于验收布局、材质与交互层级，harness 在 `apps/web/tests/visual/`，基线截图入库于 `apps/web/tests/visual/__screenshots__/`。
 
 - **环境钉死**：截图生成与比对统一跑在 `mcr.microsoft.com/playwright` 官方镜像内（tag 自动取 client 实际安装的 `@playwright/test` 版本，如 `v1.64.1-noble`），字体与浏览器由此与 CI 完全一致。基线截图是 **Linux/Chromium 专属**：更换镜像、Playwright 版本或操作系统后，必须用 `pnpm visual:update` 重新生成并逐项评审 diff，不要试图跨环境复用。
 - **确定性**：`/api` 请求全部由 `apps/web/tests/visual/fixtures.ts` 的固定数据应答（不依赖真实后端与 MAA 运行状态）；`page.clock` 固定到 2026-10-24 04:00（UTC+8），日期敏感内容（今日开放关卡、资源更新时间等）不随运行当天变化；`reducedMotion: 'reduce'` 加文档级样式禁用 CSS 动画/过渡；主题通过 zustand persist 的 `ui-storage` localStorage 预置，首帧即目标主题。公共部分集中在 `harness.ts`。
 - **三个视口**：桌面 1440×900、平板 820×1180、移动 390×844，deviceScaleFactor 1。tab 基线（`app.pw.ts`）整页截图；弹层基线（`overlays.pw.ts`）为视口截图。820 落在 640（`sm`）与 900（页面自持的 stepper 断点）之间，与桌面一起把 `min-[900px]` 两侧夹住，同时也是「无侧栏 + 内联页头」这个 390 与 1440 都覆盖不到的组合；1024 / 1200 两档只在桌面侧出现，改动时注意同步核对。
-- **弹层基线守 portal**：Modal、统计筛选菜单、PWA 安装提示都由 `createPortal` 渲染到 `document.body`，位于 `.la-pluma-app` 作用域之外，材质、遮罩与定位只由 portal 处的选择器决定。它们 `position: fixed` 按视口定位，`fullPage` 会把 fixed 元素拉到整页顶部，所以单独取视口。
+- **弹层基线守 portal**：Dialog、AlertDialog、Sheet、统计筛选菜单与 PWA 安装提示都由 Base UI portal 渲染到 `document.body`，位于 `.la-pluma-app` 作用域之外，材质、遮罩与定位只由 portal 处的选择器决定。它们 `position: fixed` 按视口定位，`fullPage` 会把 fixed 元素拉到整页顶部，所以单独取视口或按 `data-region` / `data-slot` 做 locator 截图。
 - **启动壳基线守首帧**：启动壳（`boot.pw.ts`）在 `installDeterministicEnvironment` 之后 abort `assets/index-*.js`，让 React 模块不执行、页面停在 `index.html` 的内联启动壳上；按视口截图验收 safe-area / dvh / standalone 的真实渲染。
 
 ```bash
@@ -72,8 +72,6 @@ pnpm visual --grep "dashboard"   # 透传 playwright 过滤参数，只跑部分
 ```
 
 视觉测试的浏览器与静态服务运行在同一 Docker 容器中，使用容器自己的网络，不占用宿主机 4300 端口；不同 worktree 可以同时运行。基线更新只选择实际受影响的用例，例如 `pnpm visual:update --grep dashboard`，更新后审核图片差异。同一 worktree 的构建产物和测试输出仍共用目录，不并发启动多个构建或同类浏览器检查。
-
-`operator-select-modal-*` 对弹层内输入框占位文本的 1px 栅格抖动保留 250 像素容差：它在分数像素纵坐标上偶发整体错位一行，与布局、字体和 DOM 状态无关。其余基线仍是「diff 非零即失败」。
 
 ### README 界面截图
 
@@ -126,7 +124,7 @@ pnpm screenshots:readme
 | 纯逻辑（解析、格式化、store、URL 生成） | 单元测试 | 直接调函数 |
 | 竞态、轮询、生命周期、WebRTC 状态机 | jsdom 组件/钩子测试 | 假定时器 + 回调断言 |
 | 布局、断点、材质、遮罩层、视觉层级 | 视觉基线 | Playwright 像素比对 |
-| 弹层（Modal、筛选菜单、PWA 提示） | 视觉基线 | 打开状态单独截图 |
+| 弹层（Dialog、Sheet、筛选菜单、PWA 提示） | 视觉基线 | 打开状态单独截图 |
 | CSS 引用完整性（`@keyframes`） | 单测 | `src/styles/animations.test.ts` |
 
 新增样式约束时先问：这条规则能不能被视觉基线捕获？能就补基线，不能才考虑写测试——且只断言结果（元素实际位置、可见性），不复述选择器。

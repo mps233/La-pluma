@@ -147,7 +147,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 浅色主题读起来像冷调纸面与磨砂玻璃，深色主题则是近黑石墨与同一支蓝色信号。密度是刻意保留的：信息可以很满，但层级必须由字重、1px 发丝线和间距 token 建立，而不是由彩色卡片、渐变或投影堆出来。强调色是稀缺资源，只出现在当前导航项、主操作、焦点和运行中的状态上。
 
 **Key Characteristics:**
-- 原生语义优先：`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card` 使用 `shared/ui` 的 shadcn 生成物，`Modal`、`PageHeader`、`Loading` 等应用组件位于 `shared/components`；两者都使用真实语义元素，浏览器、jsdom、SSR 和嵌入式场景渲染一致。
+- 原生语义优先：`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card`、`Dialog`、`AlertDialog`、`Sheet` 使用 `shared/ui` 的 shadcn 生成物，`ConfirmAlertDialog`、`PageHeader`、`Loading` 等应用组件位于 `shared/components`；两者都使用真实语义元素，浏览器、jsdom、SSR 和嵌入式场景渲染一致。
 - 单强调色：系统蓝承担品牌、主操作、焦点和选中态；状态色只表达成功、警告、危险和信息。
 - 分层而不炫技：普通内容面保持平整，只有 chrome、弹层和可点击卡片使用玻璃、抬升或 hover 阴影。
 - 4px 节奏：布局间距使用 Tailwind 原生档位与组件类；圆角使用 `--radius` 派生档位。
@@ -157,7 +157,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 - `apps/web/src/styles/index.css`：语义 token 的**唯一来源**（base 层）、Tailwind 入口、`@theme` 圆角派生与 `@theme inline` 颜色映射、通用组件类与跨域 keyframes；页面样式由各功能域自持。
 - `apps/web/src/styles/ios-theme.css`：只保留 iOS 26 独有的材质 token（`--glass-*`）、结构几何 token（`--la-pluma-*`）与对应样式；不再重定义语义 token。
-- `apps/web/src/shared/components`：`Modal`、`PageHeader`、`EmptyState`、`Loading` 等应用级通用组件；`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card` 等 shadcn 生成物位于 `apps/web/src/shared/ui`（sheet、sidebar 也在该目录）。
+- `apps/web/src/shared/components`：`ConfirmAlertDialog`、`PageHeader`、`EmptyState`、`Loading` 等应用级通用组件；`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card`、`Dialog`、`AlertDialog`、`Sheet` 等 shadcn 生成物位于 `apps/web/src/shared/ui`（sidebar 也在该目录）。
 
 本文件描述规则；token 的具体数值以 `apps/web/src/styles/index.css` 为准，调整 token 时同步更新本文件的表格与说明。
 
@@ -273,7 +273,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 - **Panel rest (light)** (`0 0 0 1px rgba(60, 60, 67, 0.18), 0 1px 3px rgba(15, 23, 42, 0.05), 0 14px 40px rgba(15, 23, 42, 0.05)`)：`surface-panel` 召唤层与独立面板的默认抬升。
 - **Panel rest (dark)** (`inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px rgba(235, 235, 245, 0.18), 0 16px 40px rgba(0, 0, 0, 0.28)`)：深色主题的同等层级。
 - **Glass chrome** (`0 12px 32px rgba(60, 60, 67, 0.12)`；深色 `0 14px 34px rgba(0, 0, 0, 0.34)`)：侧栏框、移动 tabbar 和悬浮 chrome。
-- **Summoned layer** (`0 2px 8px rgba(0, 0, 0, 0.1), 0 30px 80px rgba(0, 0, 0, 0.24)`)：Modal、主题菜单、PWA 提示等被召唤的叠加层，配合 `blur(24px) saturate(165%)`。
+- **Summoned layer** (`0 2px 8px rgba(0, 0, 0, 0.1), 0 30px 80px rgba(0, 0, 0, 0.24)`)：Dialog/Sheet、主题菜单、PWA 提示等被召唤的叠加层，配合 `blur(24px) saturate(165%)`。
 - **Control rest** (`inset 0 0 0 1px rgba(60, 60, 67, 0.28), 0 1px 2px rgba(15, 23, 42, 0.025)`)：输入框、选择框和次级按钮的静态边界。
 
 通用颜色、背景、阴影和变形过渡保持约 160–180ms；开关 thumb 使用 240ms。新增 CSS 或 Framer Motion 动效必须尊重 `prefers-reduced-motion`；玻璃层与阴影在 `prefers-reduced-transparency: reduce` 时退化为不透明表面；`prefers-contrast: more` 时加深边框和次级文字。
@@ -281,7 +281,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ### Named Rules
 **The Flat-By-Default Rule.** 普通卡片、列表和页面区块在静止状态保持平整。阴影只用于表达层级、可点击性或状态，不要给静态内容卡片加投影闪动或位移。
 
-**The Liquid Glass Exception.** 只有 chrome、Modal、主题菜单、PWA 提示和明确的浮层可以使用 `backdrop-filter` 与深阴影。普通卡片保持不透明，避免整页都是玻璃导致可读性下降。
+**The Liquid Glass Exception.** 只有 chrome、Dialog/Sheet、主题菜单、PWA 提示和明确的浮层可以使用 `backdrop-filter` 与深阴影。普通卡片保持不透明，避免整页都是玻璃导致可读性下降。
 
 **The Single Beam Rule.** `status-border-beam` 仅用于启动、连接或执行中的局部状态反馈，并通过 `is-active` 控制；完成、空闲和静态卡片不得常驻光效，也不要叠加第二条可见边框。
 
@@ -321,7 +321,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 ### Cards / Containers
 - **Corner Style:** shadcn `Card` 使用 `rounded-xl`（16px）；连续曲率只由玻璃主题皮肤层提供。
-- **Background:** `Card` 的 `bg-card` 为主要卡片与面板；`surface-soft` 为弱背景、状态条和次级容器；`surface-panel` 保留给 Modal、菜单与 PWA 提示等召唤层。
+- **Background:** `Card` 的 `bg-card` 为主要卡片与面板；`surface-soft` 为弱背景、状态条和次级容器；`surface-panel` 保留给筛选菜单与 PWA 提示等应用自绘召唤层。
 - **Shadow Strategy:** 静止卡片使用 `Card` 的 1px ring；只有卡片本身可点击时才使用 `surface-panel-hover`。召唤层使用 `surface-panel` 的静止阴影。
 - **Border:** 1px 发丝线，不使用 `border-2`。
 - **Internal Padding:** 卡片使用 shadcn `--card-spacing`（默认 16px，`size="sm"` 为 12px）；分节自持内边距的面板给 `Card` 加 `gap-0 p-0!`。
@@ -332,11 +332,11 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 - **Mobile:** 悬浮 4rem 胶囊 tabbar，底部安全区由 `--la-pluma-tabbar-*` token 统一管理；右侧搜索/更多入口承载次要页面。
 - **Shared State:** 两端复用 `Layout` 的 URL 路由和 active 状态；不要按 viewport 维护第二套导航状态，也不要让桌面侧栏样式扩散到移动底栏或“更多”Sheet。
 
-### Modal / Dialog
-- **Sizes:** `sm` `max-w-md`、`md` `max-w-lg`、`lg` `max-w-2xl`、`xl` `max-w-4xl`。
-- **Surface:** 叠加层使用 `blur(24px) saturate(165%)` 和 summoned-layer 阴影；backdrop 为 `rgba(0, 0, 0, 0.42)` + `blur(10px)`。
-- **Behavior:** 焦点陷阱、背景 `inert`、Esc 关闭、打开时锁定滚动、关闭后归还焦点；这些由 `Modal` 统一处理，页面不要自行实现。
-- **ConfirmDialog:** 删除、清空等不可逆操作必须使用 `ConfirmDialog`，新代码不得使用 `window.confirm`。`onConfirm` 可以返回 Promise；返回 `false` 或抛出错误时弹窗保持打开，错误在弹窗内展示。
+### Dialog / Sheet
+- **Sizes:** 组合生成原语时按内容选择 `sm:max-w-md`、`sm:max-w-lg`、`sm:max-w-2xl`、`sm:max-w-4xl`；确认框使用 `AlertDialog` 的默认宽度。
+- **Surface:** 使用 shadcn 生成物的 `bg-popover`、ring 与阴影；遮罩由 `DialogOverlay` 或 `Sheet` 原语提供。
+- **Behavior:** 焦点陷阱、背景 `aria-hidden`、Esc 关闭、打开时锁定滚动、关闭后归还焦点由 Base UI 原语处理，页面不要自行实现；嵌套弹层按 React 父子关系组合。
+- **AlertDialog:** 删除、清空等不可逆操作必须使用 `AlertDialog` 或应用层 `ConfirmAlertDialog`，新代码不得使用 `window.confirm`。`onConfirm` 可以返回 Promise；返回 `false` 或抛出错误时弹窗保持打开，错误在弹窗内展示。
 
 ### Feedback
 按下面顺序选择反馈方式，不要用空状态伪装错误，也不要为同一结果重复显示多种提示：
@@ -349,7 +349,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 | 列表、流程或卡片无数据 | `EmptyState`，按容器选择 `compact` |
 | 区域读取失败 | 在原区域显示可恢复的错误与重试操作；不要改成空状态 |
 | 全局结果与错误 | `useStatusStore.setMessage`，由 `FloatingStatusIndicator` 展示；错误持续到用户关闭，其他短消息由 store 自动收起，不要自行写清除定时器 |
-| 删除、清空等不可逆操作 | `ConfirmDialog`；新代码不得使用 `window.confirm` |
+| 删除、清空等不可逆操作 | 使用 `AlertDialog` 或应用层 `ConfirmAlertDialog`；新代码不得使用 `window.confirm` |
 
 日志控制台、养成筛选空结果等固定高度或高密度区域可保留专用状态样式。局部表单成功提示、日志提示等需要紧邻操作区或可手动关闭时，也可保留在面板内。项目没有通用 Toast 组件，`FloatingStatusIndicator` 是全局任务状态和短消息载体，不应被当作普通 toast 复刻。
 

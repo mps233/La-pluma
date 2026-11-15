@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getErrorMessage } from '@/shared/api'
 import { LoaderCircle } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { ConfirmDialog } from '@/shared/components'
+import { ConfirmAlertDialog } from '@/shared/components'
 import { useAutomationAvailability, useStatusStore } from '@/features/runtime-status'
 import { DeviceMonitorPanel } from '@/features/device-mirror'
 import { isTerminalRunState } from '@/features/task-execution'
@@ -1060,7 +1060,21 @@ export default function CombatWorkspace() {
                 execution={copilotExecution}
                 detail={copilotDetail}
                 onOpenQueueDetail={id => setCopilotDetail({ type: 'queue', id })}
-                onCloseDetail={() => setCopilotDetail(null)}
+                onCloseDetail={() => {
+                  setResetProgressDialogOpen(false)
+                  setCopilotDetail(null)
+                }}
+                resetDialog={(
+                  <ConfirmAlertDialog
+                    isOpen={resetProgressDialogOpen}
+                    onClose={() => setResetProgressDialogOpen(false)}
+                    onConfirm={resetCopilotSetProgress}
+                    title="重置作业集进度？"
+                    message="已记录的通关进度会被清除，下次将从第一关重新开始。"
+                    confirmText="确认重置"
+                    variant="danger"
+                  />
+                )}
               />
             )}
 
@@ -1088,15 +1102,6 @@ export default function CombatWorkspace() {
         </aside>
       </div>
 
-      <ConfirmDialog
-        isOpen={resetProgressDialogOpen}
-        onClose={() => setResetProgressDialogOpen(false)}
-        onConfirm={resetCopilotSetProgress}
-        title="重置作业集进度？"
-        message="已记录的通关进度会被清除，下次将从第一关重新开始。"
-        confirmText="确认重置"
-        variant="danger"
-      />
     </>
   )
 }

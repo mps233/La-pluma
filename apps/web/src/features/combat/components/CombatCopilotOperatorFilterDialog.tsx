@@ -1,11 +1,17 @@
 import { useMemo, useState, type UIEvent } from 'react'
-import { Search } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 import { getOperatorAvatarUrl, useItemIconCacheVersion } from '@/features/game-data'
 import { Button } from '@/shared/ui/button'
 import { EmptyState, Loading } from '@/shared/components'
 import { Checkbox } from '@/shared/ui/checkbox'
 import { Input } from '@/shared/ui/input'
-import { Modal } from '@/shared/components/Modal'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/ui/dialog'
 import {
   filterOperatorOptions,
   normalizeOperatorSelection,
@@ -265,8 +271,22 @@ export default function CombatCopilotOperatorFilterDialog({
   ...props
 }: CombatCopilotOperatorFilterDialogProps) {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="筛选干员" size="xl">
-      {isOpen && <OperatorFilterForm {...props} onClose={onClose} />}
-    </Modal>
+    <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose() }}>
+      <DialogContent
+        showCloseButton={false}
+        aria-modal="true"
+        className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
+      >
+        <DialogHeader className="flex-row items-center justify-between gap-3 border-b px-4 py-3">
+          <DialogTitle>筛选干员</DialogTitle>
+          <DialogClose render={<Button size="icon" variant="ghost" aria-label="关闭对话框" />}>
+            <X className="size-4" aria-hidden="true" />
+          </DialogClose>
+        </DialogHeader>
+        <div data-slot="dialog-body" className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          {isOpen && <OperatorFilterForm {...props} onClose={onClose} />}
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

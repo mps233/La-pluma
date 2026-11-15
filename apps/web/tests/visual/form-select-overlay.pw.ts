@@ -56,7 +56,7 @@ async function expectPopupCoversItsCenter(popup: Locator) {
     const hit = document.elementFromPoint(point.x, point.y)
     return Boolean(hit && (hit === element || element.contains(hit)))
   }, { x: box!.x + box!.width / 2, y: box!.y + box!.height / 2 })
-  expect(hitInside, '弹层中心应命中弹层自身而不是被 Modal 遮罩挡住').toBe(true)
+  expect(hitInside, '弹层中心应命中弹层自身而不是被弹层遮罩挡住').toBe(true)
 }
 
 test.describe('form select overlays inside modals', () => {

@@ -74,6 +74,12 @@ describe('CombatCopilotDetailLayer', () => {
     vi.restoreAllMocks()
   })
 
+  const flush = async () => {
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 20))
+    })
+  }
+
   const renderLayer = async (
     target: CopilotDetailTarget | null,
     loading = false,
@@ -89,11 +95,10 @@ describe('CombatCopilotDetailLayer', () => {
         />,
       )
     })
+    await flush()
   }
 
   const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]')
-
-  const closeButton = () => dialog()?.querySelector<HTMLButtonElement>('button[aria-label="关闭详情"]') ?? null
 
   const copyButton = () => Array.from(dialog()?.querySelectorAll('button') ?? [])
     .find(button => button.textContent?.trim() === '复制链接') ?? null
@@ -147,58 +152,12 @@ describe('CombatCopilotDetailLayer', () => {
     await renderLayer(richTarget, false, true)
 
     expect(dialog()?.getAttribute('aria-modal')).toBe('true')
-    expect(document.body.style.overflow).toBe('hidden')
+    expect(document.documentElement.hasAttribute('data-base-ui-scroll-locked')).toBe(true)
+    expect(document.body.style.overflowY).toBe('hidden')
+    expect(container.getAttribute('aria-hidden')).toBe('true')
   })
 
-  it('keeps Tab inside the stacked drawer and wraps at both ends', async () => {
-    await renderLayer(richTarget, false, true)
-    const panel = dialog()
-    const close = closeButton()
-    const copy = copyButton()
-    expect(close).not.toBeNull()
-    expect(copy).not.toBeNull()
-
-    copy?.focus()
-    const wrapForward = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
-    document.dispatchEvent(wrapForward)
-    expect(wrapForward.defaultPrevented).toBe(true)
-    expect(document.activeElement).toBe(close)
-
-    close?.focus()
-    const forwardInside = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
-    document.dispatchEvent(forwardInside)
-    expect(forwardInside.defaultPrevented).toBe(false)
-    expect(document.activeElement).toBe(close)
-
-    const wrapBackward = new KeyboardEvent('keydown', {
-      key: 'Tab',
-      shiftKey: true,
-      bubbles: true,
-      cancelable: true,
-    })
-    document.dispatchEvent(wrapBackward)
-    expect(wrapBackward.defaultPrevented).toBe(true)
-    expect(document.activeElement).toBe(copy)
-
-    panel?.focus()
-    const fromPanelForward = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
-    document.dispatchEvent(fromPanelForward)
-    expect(fromPanelForward.defaultPrevented).toBe(true)
-    expect(document.activeElement).toBe(close)
-
-    panel?.focus()
-    const fromPanelBackward = new KeyboardEvent('keydown', {
-      key: 'Tab',
-      shiftKey: true,
-      bubbles: true,
-      cancelable: true,
-    })
-    document.dispatchEvent(fromPanelBackward)
-    expect(fromPanelBackward.defaultPrevented).toBe(true)
-    expect(document.activeElement).toBe(copy)
-  })
-
-  it('leaves Tab alone while the drawer is not stacked', async () => {
+  it('keeps the desktop drawer non-modal while it is not stacked', async () => {
     await renderLayer(richTarget)
     const copy = copyButton()
     copy?.focus()
@@ -208,6 +167,10 @@ describe('CombatCopilotDetailLayer', () => {
 
     expect(event.defaultPrevented).toBe(false)
     expect(document.activeElement).toBe(copy)
+    expect(dialog()?.getAttribute('aria-modal')).toBe('false')
+    expect(document.querySelector('[data-slot="sheet-overlay"]')).toBeNull()
+    expect(document.documentElement.hasAttribute('data-base-ui-scroll-locked')).toBe(false)
+    expect(container.getAttribute('aria-hidden')).toBeNull()
   })
 
   it('closes on an outside press but keeps presses inside the drawer', async () => {
@@ -316,8 +279,11 @@ describe('CombatCopilotDetailLayer', () => {
     expect(sheet?.getAttribute('aria-modal')).toBe('true')
     expect(document.getElementById(sheet?.getAttribute('aria-labelledby') || '')?.textContent)
       .toBe('第一关')
-    expect(container.inert).toBe(true)
-    expect(document.body.style.overflow).toBe('hidden')
+    expect(container.getAttribute('aria-hidden')).toBe('true')
+    expect(document.documentElement.hasAttribute('data-base-ui-scroll-locked')).toBe(true)
+    expect(document.body.style.overflowY).toBe('hidden')
+    expect(document.querySelector('[data-slot="sheet-overlay"]')).not.toBeNull()
+    expect(sheet?.getAttribute('data-side')).toBe('bottom')
     expect(sheet?.textContent).toContain('缺少干员：桃金娘')
   })
 })

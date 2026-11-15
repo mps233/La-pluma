@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Search, UserRoundSearch } from 'lucide-react'
+import { Search, UserRoundSearch, X } from 'lucide-react'
 import {
   operBoxQueryOptions,
   operatorCatalogQueryOptions,
@@ -10,7 +10,14 @@ import { Button } from '@/shared/ui/button'
 import { EmptyState, Loading } from '@/shared/components'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
-import { Modal } from '@/shared/components/Modal'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/ui/dialog'
 import {
   OPERATOR_RENDER_BATCH_SIZE,
   filterOperatorRows,
@@ -174,13 +181,78 @@ export default function OperatorSelectModal({
   })
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={handleClose}
-      title={title}
-      size="xl"
-      footer={(
-        <div className="flex w-full flex-wrap items-center justify-between gap-3.5">
+    <Dialog open={isOpen} onOpenChange={open => { if (!open) handleClose() }}>
+      <DialogContent
+        showCloseButton={false}
+        aria-modal="true"
+        className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
+      >
+        <DialogHeader className="flex-row items-center justify-between gap-3 border-b px-4 py-3">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogClose render={<Button size="icon" variant="ghost" aria-label="关闭对话框" />}>
+            <X className="size-4" aria-hidden="true" />
+          </DialogClose>
+        </DialogHeader>
+        <div data-slot="dialog-body" className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <div className="space-y-3.5">
+            <div className="flex items-center gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Search size={17} strokeWidth={1.9} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" />
+                <Input
+                  type="text"
+                  autoComplete="off"
+                  aria-label="搜索干员名称"
+                  placeholder="搜索干员"
+                  value={searchTerm}
+                  onChange={event => handleSearchChange(event.target.value)}
+                  className="w-full pl-9"
+                />
+              </div>
+              {professionFilterVisible && (
+                <Select
+                  items={[...OPERATOR_PROFESSION_FILTERS]}
+                  value={professionFilter}
+                  onValueChange={(next, details) => { if (details.reason !== 'none' && next !== null) handleProfessionFilterChange(next) }}
+                >
+                  <SelectTrigger aria-label="职业筛选" className="w-36 shrink-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[...OPERATOR_PROFESSION_FILTERS].map(item => (
+                      <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {loading ? (
+              <div className="flex min-h-65 items-center justify-center">
+                <Loading text="正在读取干员..." />
+              </div>
+            ) : hasError ? (
+              <TrainingLoadError
+                title="干员列表加载失败"
+                description={LOAD_ERROR_MESSAGE}
+                onRetry={handleRetry}
+              />
+            ) : emptyState ? (
+              <OperatorEmptyState
+                title={hasActiveFilter ? '没有找到符合条件的干员' : '没有可选择的干员'}
+                description={hasActiveFilter ? emptyDescription : undefined}
+              />
+            ) : (
+              <OperatorPickerGrid
+                items={gridItems}
+                visibleCount={visibleOperators.length}
+                totalCount={filteredOperators.length}
+                hiddenCount={hiddenCount}
+                onShowMore={() => setVisibleLimit(nextOperatorRenderLimit)}
+              />
+            )}
+            </div>
+          </div>
+        <DialogFooter className="mx-0 mb-0 flex-row flex-wrap items-center justify-between gap-3 px-4 py-3 sm:justify-between">
           <span className="text-sm text-muted-foreground">
             {selectedOperator ? `已选择 ${selectedOperator.name}` : '选择一名干员'}
           </span>
@@ -188,66 +260,8 @@ export default function OperatorSelectModal({
             <Button variant="secondary" onClick={handleClose}>取消</Button>
             <Button onClick={handleConfirm} disabled={!selectedOperator}>确认选择</Button>
           </div>
-        </div>
-      )}
-    >
-      <div className="space-y-3.5">
-        <div className="flex items-center gap-2">
-          <div className="relative min-w-0 flex-1">
-            <Search size={17} strokeWidth={1.9} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" />
-            <Input
-              type="text"
-              autoComplete="off"
-              aria-label="搜索干员名称"
-              placeholder="搜索干员"
-              value={searchTerm}
-              onChange={event => handleSearchChange(event.target.value)}
-              className="w-full pl-9"
-            />
-          </div>
-          {professionFilterVisible && (
-            <Select
-              items={[...OPERATOR_PROFESSION_FILTERS]}
-              value={professionFilter}
-              onValueChange={(next, details) => { if (details.reason !== 'none' && next !== null) handleProfessionFilterChange(next) }}
-            >
-              <SelectTrigger aria-label="职业筛选" className="w-36 shrink-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[...OPERATOR_PROFESSION_FILTERS].map(item => (
-                  <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-
-        {loading ? (
-          <div className="flex min-h-65 items-center justify-center">
-            <Loading text="正在读取干员..." />
-          </div>
-        ) : hasError ? (
-          <TrainingLoadError
-            title="干员列表加载失败"
-            description={LOAD_ERROR_MESSAGE}
-            onRetry={handleRetry}
-          />
-        ) : emptyState ? (
-          <OperatorEmptyState
-            title={hasActiveFilter ? '没有找到符合条件的干员' : '没有可选择的干员'}
-            description={hasActiveFilter ? emptyDescription : undefined}
-          />
-        ) : (
-          <OperatorPickerGrid
-            items={gridItems}
-            visibleCount={visibleOperators.length}
-            totalCount={filteredOperators.length}
-            hiddenCount={hiddenCount}
-            onShowMore={() => setVisibleLimit(nextOperatorRenderLimit)}
-          />
-        )}
-      </div>
-    </Modal>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

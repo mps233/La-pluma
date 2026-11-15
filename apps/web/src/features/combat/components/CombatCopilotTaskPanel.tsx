@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Card } from '@/shared/ui/card'
 import { useResolvedCopilotDetailTarget } from '../hooks/useResolvedCopilotDetailTarget'
 import type { CopilotDetailTarget } from '../model/copilotDetail'
@@ -34,6 +35,7 @@ interface CombatCopilotTaskPanelProps {
   detail: CombatCopilotDetailSelection | null
   onOpenQueueDetail: (id: string) => void
   onCloseDetail: () => void
+  resetDialog?: ReactNode
 }
 
 function buildPreviewDetailTarget(preview: CopilotSetInfo): CopilotDetailTarget {
@@ -70,6 +72,7 @@ export default function CombatCopilotTaskPanel({
   detail,
   onOpenQueueDetail,
   onCloseDetail,
+  resetDialog,
 }: CombatCopilotTaskPanelProps) {
   const previewInfo = detail?.type === 'preview' ? preview.info : null
   const pendingTarget = detail?.type === 'preview' ? preview.pendingTarget : null
@@ -110,6 +113,25 @@ export default function CombatCopilotTaskPanel({
         onPreview={preview.onPreview}
         onAddToQueue={queue.onAddCurrent}
         onCancelPreview={preview.onCancel}
+        detailLayer={(
+          <CombatCopilotDetailLayer
+            target={detailTarget}
+            loading={detailLoading}
+            onClose={onCloseDetail}
+            stacked={search.isOpen}
+          >
+            {previewInfo?.type === 'set' && (
+              <CombatCopilotSetPanel
+                preview={previewInfo}
+                view={view}
+                isRunning={execution.isRunning}
+                isResetting={selection.isResetting}
+                onOpenReset={selection.onOpenReset}
+              />
+            )}
+            {resetDialog}
+          </CombatCopilotDetailLayer>
+        )}
       />
 
       <div className="combat-copilot-body">
@@ -136,22 +158,6 @@ export default function CombatCopilotTaskPanel({
         </div>
       </div>
 
-      <CombatCopilotDetailLayer
-        target={detailTarget}
-        loading={detailLoading}
-        onClose={onCloseDetail}
-        stacked={search.isOpen}
-      >
-        {previewInfo?.type === 'set' && (
-          <CombatCopilotSetPanel
-            preview={previewInfo}
-            view={view}
-            isRunning={execution.isRunning}
-            isResetting={selection.isResetting}
-            onOpenReset={selection.onOpenReset}
-          />
-        )}
-      </CombatCopilotDetailLayer>
     </Card>
   )
 }

@@ -1009,14 +1009,6 @@
     box-shadow: none;
   }
 
-  /* Modals portal to document.body, outside .la-pluma-app, so the backdrop
-     cannot carry the app-root scope. */
-  .app-modal-backdrop {
-    background: rgba(0, 0, 0, 0.42);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
-  }
-
   @media (max-width: 1023px) {
     /* On phones the chrome floats as separate controls over the page material,
        so each action owns one clear circular hit target. */
@@ -1399,7 +1391,7 @@
   /* Native business controls use the same iOS touch target and glass surface as
      the shared controls. Opt-in semantics keep compact, specialized controls
      (time pickers, sliders, and task editors) unchanged. */
-  :is(.la-pluma-app .la-pluma-content, .app-modal-layer) .app-native-control {
+  .la-pluma-app .la-pluma-content .app-native-control {
     /* 原生控件的字体与尺寸是组件基线，压过调用处的 font-mono / text-sm 等 utilities。 */
     box-sizing: border-box;
     min-height: 2.75rem;
@@ -1416,15 +1408,15 @@
     accent-color: var(--primary);
   }
 
-  :is(.la-pluma-app .la-pluma-content, .app-modal-layer) .app-native-control:not(textarea) {
+  .la-pluma-app .la-pluma-content .app-native-control:not(textarea) {
     padding: 0 1rem !important;
   }
 
-  :is(.la-pluma-app .la-pluma-content, .app-modal-layer) input.app-native-control.app-input-has-icon {
+  .la-pluma-app .la-pluma-content input.app-native-control.app-input-has-icon {
     padding-left: 2.5rem !important;
   }
 
-  :is(.la-pluma-app .la-pluma-content, .app-modal-layer) select.app-native-control {
+  .la-pluma-app .la-pluma-content select.app-native-control {
     appearance: none;
     -webkit-appearance: none;
     background-image: var(--select-chevron);
@@ -1436,7 +1428,7 @@
     padding-right: 2.5rem !important;
   }
 
-  :is(.la-pluma-app .la-pluma-content, .app-modal-layer) select.app-select-control {
+  .la-pluma-app .la-pluma-content select.app-select-control {
     background-image: none;
     padding-right: 3rem !important;
   }
@@ -1450,7 +1442,7 @@
     font-weight: 500 !important;
   }
 
-  :is(.la-pluma-app .la-pluma-content, .app-modal-layer) .app-select-trailing-icon {
+  .la-pluma-app .la-pluma-content .app-select-trailing-icon {
     position: absolute;
     top: 50%;
     right: 0.375rem;
@@ -1466,22 +1458,22 @@
     pointer-events: none;
   }
 
-  :is(.la-pluma-app .la-pluma-content, .app-modal-layer) .app-select-trailing-icon.is-disabled {
+  .la-pluma-app .la-pluma-content .app-select-trailing-icon.is-disabled {
     opacity: 0.5;
   }
 
-  :is(.la-pluma-app .la-pluma-content, .app-modal-layer) .app-native-control:focus-visible {
+  .la-pluma-app .la-pluma-content .app-native-control:focus-visible {
     outline: none;
     border-color: var(--primary);
     box-shadow: 0 0 0 3px var(--primary-soft);
   }
 
-  :is(.la-pluma-app .la-pluma-content, .app-modal-layer) .app-native-control:disabled {
+  .la-pluma-app .la-pluma-content .app-native-control:disabled {
     cursor: not-allowed;
     opacity: 0.5;
   }
 
-  :is(.la-pluma-app .la-pluma-content, .app-modal-layer) .app-native-control::placeholder {
+  .la-pluma-app .la-pluma-content .app-native-control::placeholder {
     color: var(--tertiary-foreground);
     opacity: 1;
   }
@@ -1587,14 +1579,10 @@
      page shell cannot override it; same cascade as the former unlayered rule). */
 @layer page {
   /* Only summoned, overlapping layers receive Liquid Glass. Ordinary cards and
-     grouped content remain opaque so the material hierarchy stays legible.
-     Modal dialogs render through createPortal to document.body, outside
-     .la-pluma-app, so the modal layer is referenced unscoped; only the
-     app-rendered overlays keep the app-root scope. */
+     grouped content remain opaque so the material hierarchy stays legible. */
   :is(
     .la-pluma-app .theme-menu-popover,
-    .la-pluma-app .pwa-install-prompt,
-    .app-modal-layer .surface-panel
+    .la-pluma-app .pwa-install-prompt
   ) {
     border-width: 1px;
     border-style: solid;
@@ -1708,8 +1696,7 @@
   @media (prefers-contrast: more) {
     :is(
       .la-pluma-app .theme-menu-popover,
-      .la-pluma-app .pwa-install-prompt,
-      .app-modal-layer .surface-panel
+      .la-pluma-app .pwa-install-prompt
     ) {
       border-color: var(--input);
       background: var(--card);

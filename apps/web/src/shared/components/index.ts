@@ -1,7 +1,6 @@
 export { default as PageHeader } from './PageHeader.tsx'
 export { default as FieldHint } from './FieldHint.tsx'
 
-export { ConfirmDialog } from './Modal.tsx'
-export { useModalLayer } from './modalLayer.ts'
+export { ConfirmAlertDialog } from './ConfirmAlertDialog.tsx'
 export { default as Loading, PageSkeleton } from './Loading.tsx'
 export { default as EmptyState } from './EmptyState.tsx'

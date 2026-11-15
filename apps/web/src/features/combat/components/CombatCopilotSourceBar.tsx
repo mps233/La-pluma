@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { usePanelState } from '../hooks/usePanelState'
 import type { CopilotPreviewMode } from '../model/copilotPreview'
 import type { PanelStateStore } from '../model/panelState'
@@ -19,6 +20,7 @@ interface CombatCopilotSourceBarProps {
   onPreview: () => void
   onAddToQueue?: () => void
   onCancelPreview: () => void
+  detailLayer?: ReactNode
 }
 
 export default function CombatCopilotSourceBar({
@@ -32,6 +34,7 @@ export default function CombatCopilotSourceBar({
   onPreview,
   onAddToQueue,
   onCancelPreview,
+  detailLayer,
 }: CombatCopilotSourceBarProps) {
   const [previewMode, setPreviewMode] = usePanelState(previewModeStore)
 
@@ -55,7 +58,7 @@ export default function CombatCopilotSourceBar({
         onOpenDiscovery={search.onOpen}
       />
 
-      <CombatCopilotDiscoveryDialog search={search} />
+      <CombatCopilotDiscoveryDialog search={search}>{detailLayer}</CombatCopilotDiscoveryDialog>
     </section>
   )
 }

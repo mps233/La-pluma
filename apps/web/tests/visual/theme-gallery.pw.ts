@@ -130,6 +130,126 @@ for (const theme of THEMES) {
       await expectNoBrowserErrors(page)
     })
 
+    test(`dialog standard ${theme}`, async ({ page }) => {
+      test.skip(test.info().project.name !== 'desktop', 'the dialog group is captured once per theme')
+
+      const environment = await installDeterministicEnvironment(page)
+
+      await page.goto('/dev/theme-gallery')
+      await waitForPageReady(page, 'gallery')
+
+      const group = page.locator('[data-region="gallery-dialogs"]')
+      await group.scrollIntoViewIfNeeded()
+      await expect(group).toBeVisible()
+
+      await page.getByRole('button', { name: '打开标准对话框', exact: true }).click()
+      const dialog = page.locator('#gallery-dialog-standard')
+      await expect(dialog).toBeVisible()
+      await expect(dialog).toHaveScreenshot(`theme-gallery-dialog-standard-${theme}.png`, {
+        animations: 'disabled',
+        caret: 'hide',
+      })
+
+      environment.assertNoUnmatchedApi()
+      await expectNoBrowserErrors(page)
+    })
+
+    test(`dialog large ${theme}`, async ({ page }) => {
+      test.skip(test.info().project.name !== 'desktop', 'the dialog group is captured once per theme')
+
+      const environment = await installDeterministicEnvironment(page)
+
+      await page.goto('/dev/theme-gallery')
+      await waitForPageReady(page, 'gallery')
+
+      const group = page.locator('[data-region="gallery-dialogs"]')
+      await group.scrollIntoViewIfNeeded()
+      await expect(group).toBeVisible()
+
+      await page.getByRole('button', { name: '打开大尺寸对话框', exact: true }).click()
+      const dialog = page.locator('#gallery-dialog-large')
+      await expect(dialog).toBeVisible()
+      await expect(dialog).toHaveScreenshot(`theme-gallery-dialog-large-${theme}.png`, {
+        animations: 'disabled',
+        caret: 'hide',
+      })
+
+      environment.assertNoUnmatchedApi()
+      await expectNoBrowserErrors(page)
+    })
+
+    test(`alert dialog ${theme}`, async ({ page }) => {
+      test.skip(test.info().project.name !== 'desktop', 'the dialog group is captured once per theme')
+
+      const environment = await installDeterministicEnvironment(page)
+
+      await page.goto('/dev/theme-gallery')
+      await waitForPageReady(page, 'gallery')
+
+      const group = page.locator('[data-region="gallery-dialogs"]')
+      await group.scrollIntoViewIfNeeded()
+      await expect(group).toBeVisible()
+
+      await page.getByRole('button', { name: '打开确认对话框', exact: true }).click()
+      const dialog = page.locator('#gallery-alert-dialog')
+      await expect(dialog).toBeVisible()
+      await expect(dialog).toHaveScreenshot(`theme-gallery-alert-dialog-${theme}.png`, {
+        animations: 'disabled',
+        caret: 'hide',
+      })
+
+      environment.assertNoUnmatchedApi()
+      await expectNoBrowserErrors(page)
+    })
+
+    test(`sheet right ${theme}`, async ({ page }) => {
+      test.skip(test.info().project.name !== 'desktop', 'the sheet group is captured once per theme')
+
+      const environment = await installDeterministicEnvironment(page)
+
+      await page.goto('/dev/theme-gallery')
+      await waitForPageReady(page, 'gallery')
+
+      const group = page.locator('[data-region="gallery-dialogs"]')
+      await group.scrollIntoViewIfNeeded()
+      await expect(group).toBeVisible()
+
+      await page.getByRole('button', { name: '打开右侧抽屉', exact: true }).click()
+      const sheet = page.locator('#gallery-sheet-right')
+      await expect(sheet).toBeVisible()
+      await expect(sheet).toHaveScreenshot(`theme-gallery-sheet-right-${theme}.png`, {
+        animations: 'disabled',
+        caret: 'hide',
+      })
+
+      environment.assertNoUnmatchedApi()
+      await expectNoBrowserErrors(page)
+    })
+
+    test(`sheet bottom ${theme}`, async ({ page }) => {
+      test.skip(test.info().project.name !== 'mobile', 'the bottom sheet is captured on the mobile projection')
+
+      const environment = await installDeterministicEnvironment(page)
+
+      await page.goto('/dev/theme-gallery')
+      await waitForPageReady(page, 'gallery')
+
+      const group = page.locator('[data-region="gallery-dialogs"]')
+      await group.scrollIntoViewIfNeeded()
+      await expect(group).toBeVisible()
+
+      await page.getByRole('button', { name: '打开底部抽屉', exact: true }).click()
+      const sheet = page.locator('#gallery-sheet-bottom')
+      await expect(sheet).toBeVisible()
+      await expect(sheet).toHaveScreenshot(`theme-gallery-sheet-bottom-${theme}.png`, {
+        animations: 'disabled',
+        caret: 'hide',
+      })
+
+      environment.assertNoUnmatchedApi()
+      await expectNoBrowserErrors(page)
+    })
+
     test(`tooltip open ${theme}`, async ({ page }) => {
       test.skip(test.info().project.name !== 'desktop', 'the tooltip group is captured once per theme')
 

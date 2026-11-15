@@ -86,7 +86,7 @@ import {
 </Card>
 ```
 
-`Card` 使用 shadcn 语义 token（`bg-card`、`ring-foreground/10`、`--card-spacing`）与普通圆角；标题、描述、操作分别使用 `CardTitle`、`CardDescription`、`CardAction`，页脚使用 `CardFooter`。需要分节面板且各分节自持内边距时，给 `Card` 加 `gap-0 p-0!`，不再引入独立面板包装组件。标题需要保留文档层级时，在 `CardTitle` 上使用 `role="heading"` 与 `aria-level`。紧凑提示容器使用语义类 `app-info-card` 配合对应状态类；`surface-panel` 继续用于 Modal、菜单与 PWA 提示等召唤层，不用于 `Card`。
+`Card` 使用 shadcn 语义 token（`bg-card`、`ring-foreground/10`、`--card-spacing`）与普通圆角；标题、描述、操作分别使用 `CardTitle`、`CardDescription`、`CardAction`，页脚使用 `CardFooter`。需要分节面板且各分节自持内边距时，给 `Card` 加 `gap-0 p-0!`，不再引入独立面板包装组件。标题需要保留文档层级时，在 `CardTitle` 上使用 `role="heading"` 与 `aria-level`。紧凑提示容器使用语义类 `app-info-card` 配合对应状态类；`surface-panel` 继续用于筛选菜单与 PWA 提示等应用自绘召唤层，不用于 `Card` 或 shadcn 生成弹层。
 
 控制台同类功能页在根节点添加 `ios-workspace-page`，并显式给 `PageHeader` 传 `mobileLayout="inline"`。卡片材质统一由 shadcn 语义 token 控制，不要在页面级另造卡片材质。
 
@@ -204,17 +204,17 @@ Props：
 
 ---
 
-### ConfirmDialog / Loading
+### ConfirmAlertDialog / Loading
 
-**文件位置**：`apps/web/src/shared/components/Modal.tsx`、`apps/web/src/shared/components/Loading.tsx`
+**文件位置**：`apps/web/src/shared/components/ConfirmAlertDialog.tsx`、`apps/web/src/shared/components/Loading.tsx`
 
-**适用场景**：需要确认的破坏性操作使用 `ConfirmDialog`；短时局部等待使用 `Loading`。两者都由 `shared/components` 的 `index.ts` 导出。
+**适用场景**：需要确认的破坏性操作使用 `ConfirmAlertDialog`；短时局部等待使用 `Loading`。两者都由 `shared/components` 的 `index.ts` 导出。
 
 ```tsx
-import { ConfirmDialog, Loading } from '@/shared/components'
+import { ConfirmAlertDialog, Loading } from '@/shared/components'
 
 {loading ? <Loading text="正在读取日志..." /> : content}
-<ConfirmDialog
+<ConfirmAlertDialog
   isOpen={confirmOpen}
   onClose={() => setConfirmOpen(false)}
   onConfirm={handleDelete}
@@ -223,23 +223,14 @@ import { ConfirmDialog, Loading } from '@/shared/components'
 />
 ```
 
-`ConfirmDialog.onConfirm` 可以返回 Promise：返回 `false` 或抛出错误时弹窗保持打开，并在弹窗内展示失败原因。
+`ConfirmAlertDialog.onConfirm` 可以返回 Promise：返回 `false` 或抛出错误时弹窗保持打开，并在弹窗内展示失败原因；确认处理中会禁用取消与确认按钮并阻止 Escape 关闭。组件内部组合 `shared/ui/alert-dialog`，初始焦点落在取消按钮。
 
-`Modal` 的 `placement` 默认为 `center`（既有居中弹层）；传 `sheet` 时改为贴底 Sheet，最大高度 `85dvh`、顶部连续圆角并预留底部安全区，焦点陷阱、背景 `inert`、Esc、滚动锁与焦点归还保持与居中弹层一致。`dialogId` 可选，用于让触发元素的 `aria-controls` 指向对话框根节点。`onBodyScroll` 可选，透传正文滚动事件（滚动发生在正文层），用于滚动加载等场景；它不改变布局、焦点陷阱与背景锁。
+页面级对话框、抽屉与确认框直接组合 `@/shared/ui` 的生成原语，不经过应用层包装：
 
-`useModalLayer(ref, enabled?)` 由 `shared/components` 导出，用于把已有 portal 图层登记进同一个 Modal 栈：登记期间按栈序分配 `z-index`，非顶层弹窗自动设为 `inert`/`aria-hidden`，停用后移除内联层级并恢复原样式。它只负责图层栈，不创建弹窗；普通 `Modal` 仍自行管理背景锁与焦点陷阱。桌面端作业详情抽屉叠在“发现作业”弹窗之上时使用该能力，并在叠层期间提供 `aria-modal="true"` 与面板内的 Tab 循环；未叠层时保持非模态抽屉语义，不劫持 Tab。
-
-```tsx
-<Modal
-  isOpen={open}
-  onClose={close}
-  title="作业详情"
-  placement="sheet"
-  dialogId="combat-copilot-detail-panel"
->
-  内容
-</Modal>
-```
+- `Dialog` 用于表单、选择器与发现弹窗；内容区滚动、页头与页脚由调用点用 `DialogHeader`、`DialogTitle`、`DialogDescription`、`DialogFooter` 组合。
+- `Sheet` 用于作业详情抽屉：桌面 `side="right"`、移动 `side="bottom"`；需要保留页面可交互时使用 Root 的 `modal={false}` 并自行处理外部点击关闭。
+- `AlertDialog` 用于必须显式确认的操作；`role="alertdialog"` 由原语提供。
+- 嵌套弹层按 React 父子关系组合（如发现弹窗内的筛选弹窗、详情抽屉上的重置确认框），Base UI 依此管理 Escape 层级、焦点归还与滚动锁。
 
 `ActivityIndicator` 是供 `Button` 和 `Loading` 内部复用的 iOS 活动指示器，页面不要直接调用或叠加第二个动态指示器。`DashboardSkeleton` 是控制台域专用骨架，位于 `features/dashboard/components/DashboardSkeleton.tsx`，不属于 `shared/components` 的公共导出。
 

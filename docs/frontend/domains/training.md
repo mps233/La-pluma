@@ -47,7 +47,7 @@ OperatorTraining（页面壳）
    ├─ TrainingMaterialsPanel（当前目标材料）→ MaterialViews
    ├─ TrainingPlanPanel（计划范围 + 计划展示 + 生成/应用/同步入口）
    ├─ TrainingSettingsPanel（自动切换/完成通知）
-   └─ OperatorPicker（候选/计数读取 + 筛选/搜索/分批 + Modal）
+   └─ OperatorPicker（候选/计数读取 + 筛选/搜索/分批 + Dialog）
 ```
 
 - **页面无请求。** `OperatorTraining` 不导入 API、Query、领域命令或 localStorage；它只组合工作区。页头里的“添加干员”按钮依赖选择器开关，因此页头随工作区渲染，避免把跨面板交互状态上移到页面。
@@ -89,7 +89,7 @@ OperatorTraining（页面壳）
 | 计划范围（`current`/`all`） | `TrainingPlanPanel` | 保留 | 回到 `current` |
 | 队列、设置、计划、pending | 领域所有者/Query | 不随页面重建；Query 观察者随 Effect 注销/恢复 | 队列与设置所有者、缓存继续存在；计划状态保留到所有者在动作中重置 |
 
-- 选择器关闭只卸载 Modal 内容；选择器组件本身常驻，因此搜索、筛选与分批游标在再次打开时保留，与迁移前页面状态的行为一致。
+- 选择器关闭只卸载 Dialog 内容；选择器组件本身常驻，因此搜索、筛选与分批游标在再次打开时保留，与迁移前页面状态的行为一致。
 - 候选/计数 Query 在选择器挂载时就启动，因此仍随页面首屏并行读取；选择器关闭不会取消已完成的读取，也不会在打开时重新建立 key。
 - 状态筛选切换仍会把“未精二”重置为 `false`（`status === 'all'` 时），与迁移前一致。
 - 计划范围被清空只发生在真正卸载；切换范围仍会立即作废旧预览。
@@ -118,7 +118,7 @@ OperatorTraining（页面壳）
 
 ### 6. 选择器焦点、键盘与弹层
 
-- `Modal` 继续负责 portal、背景 `inert`/滚动锁定、Tab 循环、Escape 关闭与触发器焦点归还；“添加干员”和“继续添加”仍是同一个开关入口。
+- `Dialog`（Base UI）负责 portal、背景 `aria-hidden`/滚动锁定、Tab 循环、Escape 关闭与触发器焦点归还；“添加干员”和“继续添加”仍是同一个开关入口。
 - 状态分段保留 `role="toolbar"`、`aria-pressed`、`tabIndex` 与方向键/Home/End 导航；高亮测量仍由 `useFluidTabIndicator` 持有。
 - 搜索框 `aria-label="搜索干员名称"`、职业 `select[aria-label="职业"]`、稀有度 `select[aria-label="稀有度"]`、添加按钮的 `aria-label`/禁用/加载文案均保持。
 - 分批按钮仍显示 `继续显示 N 个` 与 `已显示 X / Y`；搜索或筛选变化会把游标复位到 72。

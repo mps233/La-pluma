@@ -1,35 +1,24 @@
+import { Dialog as SheetPrimitive } from '@base-ui/react/dialog'
 import { X } from 'lucide-react'
 import {
   useEffect,
-  useId,
   useRef,
   useState,
   type ReactNode,
 } from 'react'
-import { createPortal } from 'react-dom'
 import { Button } from '@/shared/ui/button'
-import { useModalLayer } from '@/shared/components'
-import { Modal } from '@/shared/components/Modal'
+import {
+  Sheet,
+  SheetClose,
+  SheetTitle,
+} from '@/shared/ui/sheet'
 import type { CopilotDetailTarget } from '../model/copilotDetail'
 import { COPILOT_DETAIL_LAYER_ID } from './combatPanelTypes'
 import { DetailBody, DetailPlaceholder } from './CombatCopilotDetailBody'
 
 const MOBILE_DETAIL_QUERY = '(max-width: 40rem)'
-
-const FOCUSABLE_SELECTOR = [
-  'a[href]',
-  'button:not([disabled])',
-  'input:not([disabled]):not([type="hidden"])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  '[contenteditable="true"]',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',')
-
-function getFocusableElements(container: HTMLElement): HTMLElement[] {
-  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-    .filter(element => element.getAttribute('aria-hidden') !== 'true')
-}
+const DESKTOP_SHEET_CLASS = 'fixed inset-y-0 right-0 z-50 flex h-full w-[min(24rem,calc(100vw-1.5rem))] flex-col gap-0 overflow-hidden border-l bg-popover text-sm text-popover-foreground shadow-lg outline-none transition duration-200 ease-in-out data-ending-style:translate-x-[2.5rem] data-ending-style:opacity-0 data-starting-style:translate-x-[2.5rem] data-starting-style:opacity-0'
+const MOBILE_SHEET_CLASS = 'fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col gap-0 overflow-hidden border-t bg-popover text-sm text-popover-foreground shadow-lg outline-none transition duration-200 ease-in-out data-ending-style:translate-y-[2.5rem] data-ending-style:opacity-0 data-starting-style:translate-y-[2.5rem] data-starting-style:opacity-0'
 
 export interface CombatCopilotDetailLayerProps {
   target: CopilotDetailTarget | null
@@ -69,129 +58,86 @@ export default function CombatCopilotDetailLayer({
   children,
 }: CombatCopilotDetailLayerProps) {
   const isMobile = useMobileDetailLayout()
-  const generatedId = useId().replace(/:/g, '')
-  const titleId = `combat-copilot-detail-title-${generatedId}`
-  const panelRef = useRef<HTMLElement>(null)
-  const layerRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
-
   const isOpen = target !== null || loading
   const title = target?.title ?? PENDING_TITLE
-  const isModalDrawer = stacked && isOpen && !isMobile
-
-  useModalLayer(layerRef, isModalDrawer)
+  const isModalSheet = isMobile || stacked
+  const side = isMobile ? 'bottom' : 'right'
 
   useEffect(() => {
     onCloseRef.current = onClose
   }, [onClose])
 
   useEffect(() => {
-    if (!isOpen || isMobile) return
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    panelRef.current?.focus({ preventScroll: true })
+    if (!isOpen || isMobile || stacked) return
     let closing = false
     const requestClose = () => {
       if (closing) return
       closing = true
       onCloseRef.current()
     }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented) return
-      event.preventDefault()
-      requestClose()
-    }
     const handleOutsidePress = (event: MouseEvent) => {
-      const panel = panelRef.current
+      const panel = document.getElementById(COPILOT_DETAIL_LAYER_ID)
       if (!panel || !(event.target instanceof Node)) return
-      if (panel.contains(event.target) || (event.target instanceof Element && event.target.closest('[data-app-modal-layer]'))) return
+      if (panel.contains(event.target)) return
+      if (event.target instanceof Element
+        && event.target.closest('[data-slot="alert-dialog-content"], [data-slot="dialog-content"], [data-slot="sheet-content"]')) {
+        return
+      }
       requestClose()
     }
 
-    document.addEventListener('keydown', handleKeyDown)
     document.addEventListener('pointerdown', handleOutsidePress)
     document.addEventListener('mousedown', handleOutsidePress)
     return () => {
-      document.removeEventListener('keydown', handleKeyDown)
       document.removeEventListener('pointerdown', handleOutsidePress)
       document.removeEventListener('mousedown', handleOutsidePress)
-      if (opener?.isConnected) opener.focus({ preventScroll: true })
     }
-  }, [isOpen, isMobile])
+  }, [isMobile, isOpen, stacked])
 
-  useEffect(() => {
-    if (!isModalDrawer) return
-    const handleTabKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab' || event.defaultPrevented) return
-      const panel = panelRef.current
-      const active = document.activeElement
-      if (!panel || !(active instanceof Node) || !panel.contains(active)) return
-      const focusable = getFocusableElements(panel)
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (!first || !last) {
-        event.preventDefault()
-        panel.focus({ preventScroll: true })
-        return
-      }
-      const wraps = event.shiftKey
-        ? active === first || active === panel
-        : active === last || active === panel
-      if (!wraps) return
-      const target = event.shiftKey ? last : first
-      event.preventDefault()
-      target.focus({ preventScroll: true })
-    }
-
-    document.addEventListener('keydown', handleTabKey)
-    return () => document.removeEventListener('keydown', handleTabKey)
-  }, [isModalDrawer])
-
-  if (isMobile) {
-    return (
-      <Modal
-        isOpen={isOpen}
-        onClose={onClose}
-        title={title}
-        placement="sheet"
-        dialogId={COPILOT_DETAIL_LAYER_ID}
-        size="lg"
-      >
+  const panel = (
+    <>
+      <header className="flex items-start justify-between gap-2 border-b p-3.5">
+        <SheetTitle className="min-w-0 text-base font-semibold text-foreground [overflow-wrap:anywhere]">
+          {title}
+        </SheetTitle>
+        <SheetClose render={<Button size="icon" variant="ghost" aria-label="关闭详情" />}>
+          <X className="size-4" aria-hidden="true" />
+        </SheetClose>
+      </header>
+      <div className="combat-copilot-detail-scroll">
         {target ? <DetailBody target={target}>{children}</DetailBody> : <DetailPlaceholder />}
-      </Modal>
-    )
-  }
+      </div>
+    </>
+  )
 
-  if (!isOpen || typeof document === 'undefined') return null
-
-  return createPortal(
-    <div ref={layerRef} className="combat-copilot-detail-layer">
-      <aside
-        ref={panelRef}
-        id={COPILOT_DETAIL_LAYER_ID}
-        role="dialog"
-        aria-modal={isModalDrawer ? 'true' : 'false'}
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        className="combat-copilot-detail-drawer surface-panel"
-      >
-        <header className="combat-copilot-detail-head">
-          <h2 id={titleId} className="combat-copilot-detail-title">{title}</h2>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={onClose}
-            title="关闭详情"
-            aria-label="关闭详情"
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </Button>
-        </header>
-        <div className="combat-copilot-detail-scroll">
-          {target ? <DetailBody target={target}>{children}</DetailBody> : <DetailPlaceholder />}
-        </div>
-      </aside>
-    </div>,
-    document.body,
+  return (
+    <Sheet
+      open={isOpen}
+      onOpenChange={open => { if (!open) onClose() }}
+      modal={isModalSheet}
+      disablePointerDismissal={!isModalSheet}
+    >
+      <SheetPrimitive.Portal>
+        {isMobile && (
+          <SheetPrimitive.Backdrop
+            forceRender
+            data-slot="sheet-overlay"
+            className="fixed inset-0 z-50 bg-black/10 transition-opacity duration-150 supports-backdrop-filter:backdrop-blur-xs data-ending-style:opacity-0 data-starting-style:opacity-0"
+          />
+        )}
+        <SheetPrimitive.Popup
+          id={COPILOT_DETAIL_LAYER_ID}
+          data-slot="sheet-content"
+          data-side={side}
+          aria-modal={isModalSheet ? 'true' : 'false'}
+          initialFocus={isMobile ? undefined : () => document.getElementById(COPILOT_DETAIL_LAYER_ID) ?? true}
+          className={isMobile ? MOBILE_SHEET_CLASS : DESKTOP_SHEET_CLASS}
+          style={isMobile ? { paddingBottom: 'env(safe-area-inset-bottom)' } : undefined}
+        >
+          {panel}
+        </SheetPrimitive.Popup>
+      </SheetPrimitive.Portal>
+    </Sheet>
   )
 }

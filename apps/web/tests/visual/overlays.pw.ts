@@ -8,7 +8,7 @@ import {
 } from './harness'
 
 /**
- * 弹层视觉基线：portal 渲染到 document.body 的 Modal、筛选菜单与 PWA 提示。
+ * 弹层视觉基线：portal 渲染到 document.body 的筛选菜单与 PWA 提示。
  * 这些表面不在 `.la-pluma-app` 作用域内，材质/遮罩/定位只由 portal 处的 CSS 决定；
  * tab 基线只截默认状态覆盖不到，所以单独截"打开"状态，且均为视口截图
  * （弹层按视口定位，fullPage 会把 fixed 元素拉到整页顶部）。
@@ -30,24 +30,6 @@ for (const theme of THEMES) {
       await page.getByRole('menu', { name: '拥有状态筛选' }).waitFor({ state: 'visible' })
 
       await expect(page).toHaveScreenshot(`statistics-filter-menu-${theme}.png`, {
-        animations: 'disabled',
-        caret: 'hide',
-      })
-
-      environment.assertNoUnmatchedApi()
-      await expectNoBrowserErrors(page)
-    })
-
-    test(`training operator modal ${theme}`, async ({ page }) => {
-      const environment = await installDeterministicEnvironment(page)
-
-      await page.goto('/app/training')
-      await waitForPageReady(page, 'training')
-
-      await page.getByRole('button', { name: '添加干员' }).first().click()
-      await page.getByRole('dialog').waitFor({ state: 'visible' })
-
-      await expect(page).toHaveScreenshot(`training-operator-modal-${theme}.png`, {
         animations: 'disabled',
         caret: 'hide',
       })

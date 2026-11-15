@@ -215,9 +215,9 @@ const pagedResult = (
 const discoveryBody = (): HTMLElement => {
   const dialog = findDialogByTitle('发现作业')
   expect(dialog).not.toBeNull()
-  const bodyId = dialog!.getAttribute('aria-describedby')
-  expect(bodyId).toBeTruthy()
-  return document.getElementById(bodyId!)!
+  const body = dialog!.querySelector<HTMLElement>('[data-slot="dialog-body"]')
+  expect(body).not.toBeNull()
+  return body!
 }
 
 const scrollDiscoveryToBottom = async () => {
