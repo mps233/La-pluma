@@ -6,17 +6,17 @@
     box-shadow: none;
   }
 
-  .la-pluma-app .config-update-card .app-card-content {
+  .la-pluma-app .config-update-card [data-slot='card-content'] {
     /* S3: 配置更新卡内部使用 0 间距分组，需压过调用处的 gap-*。 */
     gap: 0 !important;
   }
 
-  .la-pluma-app .config-update-card .app-card-content > .grid {
+  .la-pluma-app .config-update-card [data-slot='card-content'] > .grid {
     gap: 0 !important;
     border-top: 1px solid var(--border);
   }
 
-  .la-pluma-app .config-update-card .app-card-content > .grid > section + section {
+  .la-pluma-app .config-update-card [data-slot='card-content'] > .grid > section + section {
     border-top: 1px solid var(--border);
   }
 
@@ -27,7 +27,7 @@
   }
 
   @media (min-width: 768px) and (max-width: 1279px) {
-    .la-pluma-app .config-update-card .app-card-content > .grid > section + section {
+    .la-pluma-app .config-update-card [data-slot='card-content'] > .grid > section + section {
       border-top: 0;
       border-left: 1px solid var(--border);
     }

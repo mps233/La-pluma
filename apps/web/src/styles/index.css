@@ -1451,11 +1451,7 @@
       animation: none !important;
     }
 
-    .app-skeleton-shimmer {
-      display: none;
-    }
-
-    .app-skeleton {
+    [data-slot='skeleton'] {
       animation: none !important;
     }
 
@@ -1471,27 +1467,6 @@
 
   .app-loading > .app-activity-indicator {
     color: var(--primary-strong) !important;
-  }
-
-  .app-skeleton-shimmer {
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgba(255, 255, 255, 0.72) 50%,
-      transparent 100%
-    );
-    transform: translate3d(-120%, 0, 0);
-    animation: app-skeleton-sweep 1.25s linear infinite;
-    will-change: transform, opacity;
-  }
-
-  .dark .app-skeleton-shimmer {
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgba(255, 255, 255, 0.1) 50%,
-      transparent 100%
-    );
   }
 
   @media (prefers-reduced-transparency: reduce) {
@@ -1766,26 +1741,6 @@
 
 @layer page {
   /* 页面/组件规则引用的动画必须保留在输出中，勿随层重构删除。 */
-  @keyframes app-skeleton-sweep {
-    0% {
-      opacity: 0.35;
-      transform: translate3d(-120%, 0, 0);
-    }
-
-    10% {
-      opacity: 1;
-    }
-
-    90% {
-      opacity: 1;
-    }
-
-    100% {
-      opacity: 0.35;
-      transform: translate3d(285%, 0, 0);
-    }
-  }
-
   @keyframes automation-progress-spin {
     to {
       transform: rotate(1turn);

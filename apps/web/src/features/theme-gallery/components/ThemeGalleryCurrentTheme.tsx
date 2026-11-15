@@ -3,7 +3,7 @@ import type { ThemeMode } from '@/shared/theme/bootTheme'
 import { DEFAULT_THEME_ID } from '@/shared/theme/registry'
 import { useTheme } from '@/shared/theme/useTheme'
 import { Button } from '@/shared/ui/button'
-import { Card, CardContent, CardHeader } from '@/shared/components'
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
 
 const modeOptions: Array<{ value: ThemeMode; label: string; icon: LucideIcon }> = [
   { value: 'light', label: '亮色', icon: Sun },
@@ -18,7 +18,9 @@ export function ThemeGalleryCurrentTheme() {
 
   return (
     <Card>
-      <CardHeader title="当前主题" />
+      <CardHeader className="border-b py-3.5">
+        <CardTitle role="heading" aria-level={3}>当前主题</CardTitle>
+      </CardHeader>
       <CardContent className="app-stack-card">
         <div className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1">
           <span className="text-sm font-medium text-foreground">{activeTheme.name}</span>

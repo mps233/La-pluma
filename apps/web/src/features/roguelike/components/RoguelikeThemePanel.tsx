@@ -1,5 +1,5 @@
 import { Check } from 'lucide-react'
-import { SmoothPanel } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
 import { Input } from '@/shared/ui/input'
 import { ROGUELIKE_THEME_PRESETS } from '../model/roguelikeTasks'
 import type { RoguelikeTask } from '../types'
@@ -18,7 +18,7 @@ export default function RoguelikeThemePanel({
   const presets = ROGUELIKE_THEME_PRESETS[task.id]
 
   return (
-    <SmoothPanel className="roguelike-panel roguelike-theme-panel">
+    <Card className="roguelike-panel roguelike-theme-panel gap-0 p-0!">
       <div className="roguelike-panel-heading">
         <div>
           <h3>主题</h3>
@@ -62,6 +62,6 @@ export default function RoguelikeThemePanel({
           />
         </div>
       </div>
-    </SmoothPanel>
+    </Card>
   )
 }

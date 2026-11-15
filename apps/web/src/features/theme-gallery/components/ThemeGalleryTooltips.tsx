@@ -1,13 +1,15 @@
 import { Info } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip'
-import { Card, CardContent, CardHeader } from '@/shared/components'
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
 
 export function ThemeGalleryTooltips() {
   return (
     <div data-region="gallery-tooltips">
       <Card>
-        <CardHeader title="提示层" />
+        <CardHeader className="border-b py-3.5">
+          <CardTitle role="heading" aria-level={3}>提示层</CardTitle>
+        </CardHeader>
         <CardContent>
           <div className="grid gap-3.5 rounded-xl border border-border p-4 md:grid-cols-2">
             <div className="flex min-h-56 items-center justify-center">

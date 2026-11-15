@@ -1,7 +1,8 @@
 import type { ComponentProps } from 'react'
 import { LoaderCircle, Play, Square } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { FieldHint, SmoothPanel } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
+import { FieldHint } from '@/shared/components'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { Switch } from '@/shared/ui/switch'
@@ -132,7 +133,7 @@ export default function RoguelikeSettingsPanel({
   const toggleOptions = options.filter(option => option.type === 'checkbox')
 
   return (
-    <SmoothPanel className="roguelike-panel roguelike-settings-panel">
+    <Card className="roguelike-panel roguelike-settings-panel gap-0 p-0!">
       <div className="roguelike-panel-heading">
         <div>
           <h3>策略设置</h3>
@@ -267,7 +268,7 @@ export default function RoguelikeSettingsPanel({
           </Button>
         )}
       </div>
-    </SmoothPanel>
+    </Card>
   )
 }
 

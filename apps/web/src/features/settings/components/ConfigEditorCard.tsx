@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { LoaderCircle, RotateCcw, Save } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { Card, CardContent, CardHeader } from '@/shared/components'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
 
 export interface SettingsFeedback {
   type: 'success' | 'error' | 'warning'
@@ -43,10 +43,10 @@ export default function ConfigEditorCard({
     : null
 
   return (
-    <Card smoothCorners className="config-editor-card p-0!">
-      <CardHeader
-        title={title}
-        actions={(
+    <Card className="config-editor-card gap-0 p-0!">
+      <CardHeader className="border-b py-3.5">
+        <CardTitle role="heading" aria-level={3}>{title}</CardTitle>
+        <CardAction>
           <div className="flex items-center gap-2">
             <Button
               onClick={onReset}
@@ -73,9 +73,9 @@ export default function ConfigEditorCard({
                 )}
             </Button>
           </div>
-        )}
-      />
-      <CardContent>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="py-4">
         <div className="app-stack-card">
           {blockedReason && (
             <div

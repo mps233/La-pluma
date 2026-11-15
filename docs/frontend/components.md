@@ -6,7 +6,9 @@
 
 ## 概述
 
-为了减少重复代码、统一视觉风格、提升开发效率，项目维护一套通用 UI 组件。组件位于 `apps/web/src/shared/components/*.tsx`，通过 `apps/web/src/shared/components/index.ts` 统一导出，页面中统一从 `@/shared/components` 引入。shadcn CLI 生成的上游原语位于 `apps/web/src/shared/ui/`，随上游原样保留，不在本文件范围内。
+为了减少重复代码、统一视觉风格、提升开发效率，项目维护一套通用 UI 组件。应用层组件位于 `apps/web/src/shared/components/*.tsx`，通过 `apps/web/src/shared/components/index.ts` 统一导出，页面中统一从 `@/shared/components` 引入。shadcn CLI 生成的上游原语位于 `apps/web/src/shared/ui/`，随上游原样保留；本文件记录这些原语的组合用法（如 `Card`）与必须遵循的应用层约定。
+
+加载占位直接使用 `@/shared/ui/skeleton` 的 `Skeleton`，不要在应用层重写 shimmer 或另建骨架原语。
 
 新增或调整组件时，在本文件补充 API 与用法；颜色、字号、间距、圆角、交互状态等规则不要在组件文档里另写一份。
 
@@ -47,66 +49,46 @@ import { FloatingStatusIndicator } from '@/features/runtime-status'
 
 ---
 
-### Card - 卡片组件系列
+### Card - 卡片组件
 
-**文件位置**：`apps/web/src/shared/components/Card.tsx`
+**文件位置**：`apps/web/src/shared/ui/card.tsx`（shadcn 生成物，随上游原文保留）
 
-**适用场景**：主要面板、信息卡片、带标题的内容区域。
+**适用场景**：卡片、信息区块、带标题的内容区域与独立工作区面板。
 
 ```tsx
-import { Card, CardHeader, CardContent } from '@/shared/components'
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/shared/ui/card'
 
-<Card smoothCorners>
-  <CardHeader
-    icon={<Icons.Package />}
-    title="材料掉落统计"
-  />
+<Card>
+  <CardHeader>
+    <CardTitle role="heading" aria-level={3}>材料掉落统计</CardTitle>
+    <CardDescription>最近一次作战的掉落汇总。</CardDescription>
+    <CardAction><Button size="sm">刷新</Button></CardAction>
+  </CardHeader>
   <CardContent>
     <p>卡片内容区域</p>
   </CardContent>
+  <CardFooter>
+    <p>页脚说明</p>
+  </CardFooter>
 </Card>
 
-<div className="app-info-card status-warning">
-  <p>需要用户注意的信息。</p>
-</div>
+<Card className="roguelike-theme-panel gap-0 p-0!">
+  <div className="border-b border-border px-4 py-3.5">分节标题</div>
+  <div className="px-4 py-4">自管理内边距的面板内容</div>
+</Card>
 ```
 
-`Card` 支持 `className` 和显式的 `smoothCorners`。静态内容直接渲染，不提供整卡进场动画。`smoothCorners` 使用 Lisse 的 `20px / 80%` 连续曲率，外层仍负责布局和阴影，内部表面负责裁切与材质；只在已经验证内部包裹不会破坏直接子元素布局语义的卡片上启用。不要直接给带外阴影的根元素调用 `useSmoothCorners`，也不要对需要保留原生结构的交互控件使用 `SmoothCorners asChild`。`CardHeader` 可传入 `actions`，`CardContent` 支持 `className`；紧凑提示容器使用语义类 `app-info-card` 配合对应状态类。
+`Card` 使用 shadcn 语义 token（`bg-card`、`ring-foreground/10`、`--card-spacing`）与普通圆角；标题、描述、操作分别使用 `CardTitle`、`CardDescription`、`CardAction`，页脚使用 `CardFooter`。需要分节面板且各分节自持内边距时，给 `Card` 加 `gap-0 p-0!`，不再引入独立面板包装组件。标题需要保留文档层级时，在 `CardTitle` 上使用 `role="heading"` 与 `aria-level`。紧凑提示容器使用语义类 `app-info-card` 配合对应状态类；`surface-panel` 继续用于 Modal、菜单与 PWA 提示等召唤层，不用于 `Card`。
 
-控制台同类功能页在根节点添加 `ios-workspace-page`，并显式给 `PageHeader` 传 `mobileLayout="inline"`。手机端只有 `Card smoothCorners` 和 `SmoothPanel` 会获得无外描边的柔和阴影；不要给卡内 `surface-soft`、菜单、输入或列表项添加该页面级材质。
-
----
-
-### SmoothPanel - 连续圆角面板
-
-**文件位置**：`apps/web/src/shared/components/SmoothPanel.tsx`
-
-**适用场景**：不使用 `Card` 语义的独立面板，例如工作区面板、设备卡片、通知提示和骨架占位。
-
-Props：
-
-- `cornerSize` (`'panel' | 'compact'`) - 连续圆角档位，`panel` 为 20px，`compact` 为 16px，平滑度固定 80%，默认 `'panel'`。
-- `surfaceClassName` (string) - 追加到内部裁切表面的类名，内容的内边距和材质类写在这里。
-- 其余 props 透传给外层 `div`（继承 `HTMLAttributes<HTMLDivElement>`），`className` 追加到外层 shell；`role`、`aria-*` 等语义属性因此落在外层。
-
-```tsx
-import { SmoothPanel } from '@/shared/components'
-
-<SmoothPanel className="roguelike-theme-panel">
-  <p>面板内容</p>
-</SmoothPanel>
-
-<SmoothPanel
-  cornerSize="compact"
-  surfaceClassName="log-notice"
-  role="status"
-  aria-live="polite"
->
-  <p>提示内容</p>
-</SmoothPanel>
-```
-
-外层 shell 持有 `surface-panel`，负责布局和阴影；内部 `SmoothSurface` 负责连续圆角裁切，所以内容内边距要通过 `surfaceClassName` 写在表面层。自动化调度面板、肉鸽主题面板和日志通知已使用该组件。
+控制台同类功能页在根节点添加 `ios-workspace-page`，并显式给 `PageHeader` 传 `mobileLayout="inline"`。卡片材质统一由 shadcn 语义 token 控制，不要在页面级另造卡片材质。
 
 ---
 
@@ -318,7 +300,7 @@ const { containerRef, activeRect, setTabRef } = useFluidTabIndicator(activeTab)
 
 1. 页面外层使用 `app-page`，主内容使用 `app-stack-section`。
 2. 页面标题使用 `PageHeader`。
-3. 大面板使用 `Card` 或 `app-card surface-panel`。
+3. 大面板使用 `Card` 组合；分节自持内边距时给 `Card` 加 `gap-0 p-0!`。
 4. 表单使用 `Input`、`Select`、`Checkbox`、`Switch`；多行文本复用 `app-input control-surface`。
 5. 没有内容时使用 `EmptyState`，不要重复手写空状态。
 6. 动态分段标签优先使用 `useFluidTabIndicator`，不要复制测量逻辑。

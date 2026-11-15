@@ -922,11 +922,7 @@
     overflow: hidden;
   }
 
-  /* Lisse clips the visible surface while the card root remains the
-     layout and shadow shell. This preserves grid/flex semantics and keeps the
-     soft outer shadow outside the clipped region. */
   .la-pluma-app .app-card[data-smooth-corners='true'] {
-    /* smooth 卡片由外壳裁剪，卡片本身保持 visible，压过页面级 overflow 规则。 */
     display: flex;
     border: 0;
     border-radius: var(--continuous-radius);

@@ -29,6 +29,81 @@ const shortFlowFixtures: ApiFixture[] = apiFixtures.map(fixture =>
       }
     : fixture)
 
+const longFlowFixtures: ApiFixture[] = apiFixtures.map(fixture =>
+  fixture.path === '/agent/config/user/automation-tasks'
+    ? {
+        ...fixture,
+        payload: ok({
+          taskFlow: Array.from({ length: 12 }, (_, index) => ({
+            id: index === 0 ? 'startup-visual-long' : `award-visual-long-${index}`,
+            commandId: index === 0 ? 'startup' : 'award',
+            name: index === 0 ? '启动游戏' : `领取奖励 ${index}`,
+            description: index === 0 ? '启动游戏客户端' : '领取每日奖励',
+            defaultParams: index === 0 ? { clientType: 'Official' } : { award: true },
+            params: index === 0
+              ? { clientType: 'Official', address: '127.0.0.1:5555' }
+              : { award: true, mail: true, recruit: true },
+            enabled: true,
+          })),
+          schedule: { enabled: false, entries: [] },
+        }),
+      }
+    : fixture)
+
+test.describe('task flow scroll containment', () => {
+  test('keeps a long task flow scrollable inside the viewport', async ({ page }) => {
+    test.skip(test.info().project.name !== 'desktop', 'the flow containment regression is measured on desktop')
+
+    recordBrowserErrors(page)
+    await page.addInitScript(themeSeedScript('dark'))
+    const environment = await installDeterministicEnvironment(page, { fixtures: longFlowFixtures })
+
+    await page.goto('/app/automation')
+    await waitForPageReady(page, 'automation')
+
+    const panel = page.locator('.automation-sequence-panel')
+    const list = page.locator('.automation-sequence-list')
+    await expect(panel).toBeVisible()
+    await expect(list).toBeVisible()
+
+    await panel.evaluate(node => {
+      const host = document.querySelector<HTMLElement>('.la-pluma-scroll-host')
+      if (!host) throw new Error('application scroll host is missing')
+      const panelTop = node.getBoundingClientRect().top - host.getBoundingClientRect().top
+      host.scrollTop += panelTop - 16
+    })
+
+    const metrics = await page.evaluate(() => {
+      const hostNode = document.querySelector<HTMLElement>('.la-pluma-scroll-host')
+      const panelNode = document.querySelector<HTMLElement>('.automation-sequence-panel')
+      const listNode = document.querySelector<HTMLElement>('.automation-sequence-list')
+      if (!hostNode || !panelNode || !listNode) throw new Error('automation sequence panel is missing')
+      return {
+        scrollportTop: hostNode.getBoundingClientRect().top,
+        scrollportBottom: hostNode.getBoundingClientRect().bottom,
+        panelTop: panelNode.getBoundingClientRect().top,
+        panelBottom: panelNode.getBoundingClientRect().bottom,
+        scrollHeight: listNode.scrollHeight,
+        clientHeight: listNode.clientHeight,
+        overflowY: getComputedStyle(listNode).overflowY,
+      }
+    })
+
+    expect(metrics.panelTop).toBeGreaterThanOrEqual(metrics.scrollportTop - 1)
+    expect(metrics.panelBottom).toBeLessThanOrEqual(metrics.scrollportBottom + 1)
+    expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight)
+    expect(metrics.overflowY).toBe('auto')
+
+    const before = await list.evaluate(element => element.scrollTop)
+    await list.evaluate(element => { element.scrollTop = element.scrollHeight })
+    const after = await list.evaluate(element => element.scrollTop)
+    expect(after).toBeGreaterThan(before)
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
+})
+
 for (const theme of THEMES) {
   test.describe(`task picker: ${theme}`, () => {
     test.beforeEach(async ({ page }) => {

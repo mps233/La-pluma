@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { Monitor } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { SmoothPanel } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
 import { useDashboardPreview } from '../hooks/useDashboardPreview'
 import { PreviewModeSegmented } from '@/features/device-mirror'
 
@@ -9,9 +9,9 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
   const { videoRef, fallbackSnapshot, showLivePreview, isConnecting, connectionState, statusText, error, retry, available = true } = useDashboardPreview()
 
   return (
-    <SmoothPanel
+    <Card
       data-dashboard-preview-card
-      className={`status-border-beam ${isConnecting ? 'is-active' : ''}`}
+      className={`status-border-beam gap-0 p-0! ${isConnecting ? 'is-active' : ''}`}
       aria-busy={isConnecting}
     >
       <div className="dashboard-preview-header flex items-center justify-between gap-3.5 px-4 py-2 border-b border-border">
@@ -67,7 +67,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
           </Button>
         )}
       </div>
-    </SmoothPanel>
+    </Card>
   )
 })
 

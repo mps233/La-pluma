@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { getOperatorAvatarUrl, useItemIconCacheVersion } from '@/features/game-data'
 import { Button } from '@/shared/ui/button'
+import { Skeleton } from '@/shared/ui/skeleton'
 import { OPERATOR_RENDER_BATCH_SIZE } from '../model/operatorRows'
 
 export interface OperatorPickerGridItem {
@@ -30,7 +31,7 @@ function OperatorPickerCard({ item, eager }: OperatorPickerCardProps) {
         {item.id ? (
           <>
             {!imageLoaded && (
-              <div className="app-skeleton absolute inset-0 surface-soft" />
+              <Skeleton className="absolute inset-0 rounded-none" />
             )}
             <img
               src={getOperatorAvatarUrl(item.id, 'base', itemIconVersion)}

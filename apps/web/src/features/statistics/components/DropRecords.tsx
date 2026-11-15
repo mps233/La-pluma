@@ -5,7 +5,8 @@ import { getItemIconUrl, useItemIconCacheVersion } from '@/features/game-data'
 import { DROP_ITEM_DISPLAY_LIMIT, sortDropItems, sortDropStages } from '../model/dropRecords'
 import type { DropRecordsProps } from '../types'
 import { Button } from '@/shared/ui/button'
-import { Card, EmptyState, Loading } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
+import { EmptyState, Loading } from '@/shared/components'
 
 interface DropRecordsViewProps extends DropRecordsProps {
   isLoading?: boolean
@@ -19,7 +20,7 @@ interface DropRecordsErrorProps {
 
 function DropRecordsError({ description, onRetry }: DropRecordsErrorProps) {
   return (
-    <Card smoothCorners className="drop-records-panel p-0!">
+    <Card className="drop-records-panel gap-0 p-0!">
       <div className="drop-records-panel-content">
         <div className="form-error-surface flex flex-col items-start gap-3.5 rounded-xl p-4 sm:flex-row sm:items-center sm:justify-between" role="alert">
           <div className="min-w-0">
@@ -54,7 +55,7 @@ export default function DropRecords({
 
   if (isLoading && !dropStatistics && !error) {
     return (
-      <Card smoothCorners className="drop-records-panel p-0!">
+      <Card className="drop-records-panel gap-0 p-0!">
         <div className="drop-records-panel-content py-12">
           <Loading text="正在读取掉落记录..." />
         </div>
@@ -68,7 +69,7 @@ export default function DropRecords({
 
   if (!dropStatistics) {
     return (
-      <Card smoothCorners className="drop-records-panel p-0!">
+      <Card className="drop-records-panel gap-0 p-0!">
         <div className="drop-records-panel-content">
           <EmptyState
             className="py-12"
@@ -182,7 +183,7 @@ export default function DropRecords({
       </div>
 
       <div className="min-w-0">
-        <Card smoothCorners className="drop-records-panel p-0!">
+        <Card className="drop-records-panel gap-0 p-0!">
           <div className="drop-records-panel-content">
         <h3 className="mb-4 flex min-w-0 flex-wrap items-center gap-2 text-lg font-bold text-foreground">
           <span className="shrink-0"><Icons.Package /></span>
@@ -253,7 +254,7 @@ export default function DropRecords({
       </div>
 
       <div className="min-w-0">
-        <Card smoothCorners className="drop-records-panel p-0!">
+        <Card className="drop-records-panel gap-0 p-0!">
           <div className="drop-records-panel-content">
         <h3 className="mb-4 flex min-w-0 flex-wrap items-center gap-2 text-lg font-bold text-foreground">
           <span className="shrink-0"><Icons.Target /></span>

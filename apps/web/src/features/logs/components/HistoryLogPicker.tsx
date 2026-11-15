@@ -3,7 +3,7 @@
 
 import { AlertCircle, ChevronRight, FileText, Trash2 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { Card, CardContent, CardHeader } from '@/shared/components'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
 import type { LogFile } from '../types'
 
 interface HistoryLogPickerProps {
@@ -26,10 +26,10 @@ export default function HistoryLogPicker({
   onReload,
 }: HistoryLogPickerProps) {
   return (
-    <Card className="log-card log-history-card min-w-0 p-0!" smoothCorners>
-      <CardHeader
-        title="历史日志文件"
-        actions={
+    <Card className="log-card log-history-card min-w-0 gap-0 p-0!">
+      <CardHeader className="border-b py-3.5">
+        <CardTitle role="heading" aria-level={3}>历史日志文件</CardTitle>
+        <CardAction>
           <div className="log-console-heading-actions">
             <span className="log-count hidden sm:inline-flex">{files.length} 个</span>
             <Button
@@ -42,9 +42,9 @@ export default function HistoryLogPicker({
               清理旧日志
             </Button>
           </div>
-        }
-      />
-      <CardContent className="log-history-content">
+        </CardAction>
+      </CardHeader>
+      <CardContent className="log-history-content px-0">
         {filesError && (
           <div className="log-history-state is-error flex-wrap px-4 py-6" role="alert">
             <AlertCircle className="h-5 w-5" aria-hidden="true" />

@@ -123,21 +123,6 @@ vi.mock('@/shared/components/Icons', () => {
   const Icon = () => null
   return { default: new Proxy({}, { get: () => Icon }) }
 })
-vi.mock('@/shared/components', () => ({
-  PageHeader: ({ title, actions }: { title: string; actions?: React.ReactNode }) => <header><h1>{title}</h1>{actions}</header>,
-  Card: ({ children }: { children: React.ReactNode }) => <section>{children}</section>,
-  SmoothPanel: ({
-    children,
-    className = '',
-    cornerSize: _cornerSize,
-    surfaceClassName = '',
-    ...props
-  }: React.HTMLAttributes<HTMLDivElement> & { cornerSize?: string; surfaceClassName?: string }) => (
-    <div className={`smooth-panel-shell ${className}`} {...props}>
-      <div className={`smooth-panel-surface ${surfaceClassName}`}>{children}</div>
-    </div>
-  ),
-}))
 
 const createExecutionController = (taskExecutionModule as unknown as {
   __createExecutionController: () => ExecutionController

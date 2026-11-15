@@ -1,6 +1,4 @@
 export { default as PageHeader } from './PageHeader.tsx'
-export { Card, CardHeader, CardContent } from './Card.tsx'
-export { default as SmoothPanel } from './SmoothPanel.tsx'
 export { default as FieldHint } from './FieldHint.tsx'
 
 export { ConfirmDialog } from './Modal.tsx'

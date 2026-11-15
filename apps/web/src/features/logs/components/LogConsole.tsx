@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 import { AlertCircle, ArrowDown, ArrowLeft, FileText, Search } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { Card, CardContent, CardHeader, Loading } from '@/shared/components'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
+import { Loading } from '@/shared/components'
 import { countAppendedRows, initialLogFollowState, reduceLogFollow } from '../model/logFollow'
 import { getLogIdentity, getLogSourceText, type LogView } from '../model/logModel'
 import type { LogEntry, LogFile } from '../types'
@@ -106,10 +107,10 @@ export default function LogConsole({
   const isFilteredEmpty = logs.length > 0 && visibleLogs.length === 0
 
   return (
-    <Card className="log-card min-w-0 p-0!" smoothCorners>
-      <CardHeader
-        title={headingTitle}
-        actions={
+    <Card className="log-card min-w-0 gap-0 p-0!">
+      <CardHeader className="border-b py-3.5">
+        <CardTitle role="heading" aria-level={3}>{headingTitle}</CardTitle>
+        <CardAction>
           <div className="log-console-heading-actions">
             <span className="log-count">{visibleLogs.length} 条</span>
             {viewingHistory && (
@@ -123,8 +124,8 @@ export default function LogConsole({
               </Button>
             )}
           </div>
-        }
-      />
+        </CardAction>
+      </CardHeader>
       <CardContent className="log-console-content">
         {viewingHistory && selectedFile && (
           <div className="surface-soft mb-3 flex min-w-0 items-center gap-2 rounded-xl px-3 py-2 text-xs text-muted-foreground">

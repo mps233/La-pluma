@@ -1,6 +1,6 @@
 import { FolderOpen, RefreshCw } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { Card, CardContent } from '@/shared/components'
+import { Card, CardContent } from '@/shared/ui/card'
 import { useStatusStore } from '@/features/runtime-status'
 import { useSettingsConfigDirectory } from '../hooks/useSettingsConfigDirectory'
 
@@ -20,8 +20,8 @@ export default function ConfigDirectoryPanel() {
   }
 
   return (
-    <Card smoothCorners className="config-directory-card p-0!">
-      <CardContent>
+    <Card className="config-directory-card gap-0 p-0!">
+      <CardContent className="py-4">
         <div className="flex flex-wrap items-center justify-between gap-3.5">
           <div className="flex min-w-0 items-start gap-3.5">
             <span className="icon-well flex h-10 w-10 shrink-0 items-center justify-center rounded-lg brand-text">

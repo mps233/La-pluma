@@ -9,7 +9,8 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { LoaderCircle, Package as PackageIcon, Play } from 'lucide-react'
 import Icons from '@/shared/components/Icons'
 import { Button } from '@/shared/ui/button'
-import { Card, EmptyState, Loading } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
+import { EmptyState, Loading } from '@/shared/components'
 import { getDepotTypeLabel, summarizeDepot } from '../model/depotSummary'
 import InlineDataError from './InlineDataError'
 import type { StatisticsCommands } from '../hooks/useStatisticsCommands'
@@ -17,7 +18,7 @@ import type { StatisticsCommands } from '../hooks/useStatisticsCommands'
 const DEPOT_READ_ERROR = '暂时无法读取仓库数据，请检查服务连接后重试。'
 
 const taskPanelClass = (isActive: boolean) =>
-  `data-statistics-task-card p-0!${isActive ? ' is-active' : ''}`
+  `data-statistics-task-card gap-0 p-0! transition-colors${isActive ? ' bg-info/5 ring-info/30' : ''}`
 
 const statCardClass = 'data-statistics-kpi'
 const chipClass = 'control-surface rounded-full px-2 py-0.5 text-xs whitespace-nowrap'
@@ -55,7 +56,6 @@ export default function DepotPanel({ isActive, command }: DepotPanelProps) {
       className="min-w-0"
     >
       <Card
-        smoothCorners
         className={taskPanelClass(command.activeTask === 'depot')}
       >
         <div className="data-statistics-task-content app-stack-card">

@@ -32,19 +32,6 @@ vi.mock('../hooks/useDashboardPreview', () => ({
   }),
 }))
 
-vi.mock('@/shared/components', () => ({
-  SmoothPanel: ({
-    children,
-    className = '',
-    surfaceClassName = '',
-    ...props
-  }: React.HTMLAttributes<HTMLDivElement> & { surfaceClassName?: string }) => (
-    <div className={`smooth-panel-shell ${className}`} {...props}>
-      <div className={`smooth-panel-surface ${surfaceClassName}`}>{children}</div>
-    </div>
-  ),
-}))
-
 let container: HTMLDivElement
 let root: Root
 

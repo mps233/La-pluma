@@ -147,7 +147,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 浅色主题读起来像冷调纸面与磨砂玻璃，深色主题则是近黑石墨与同一支蓝色信号。密度是刻意保留的：信息可以很满，但层级必须由字重、1px 发丝线和间距 token 建立，而不是由彩色卡片、渐变或投影堆出来。强调色是稀缺资源，只出现在当前导航项、主操作、焦点和运行中的状态上。
 
 **Key Characteristics:**
-- 原生语义优先：`Button`、`Input`、`Select`、`Checkbox`、`Switch` 使用 `shared/ui` 的 shadcn 生成物，`Card`、`Modal`、`PageHeader` 等应用组件位于 `shared/components`；两者都使用真实语义元素，浏览器、jsdom、SSR 和嵌入式场景渲染一致。
+- 原生语义优先：`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card` 使用 `shared/ui` 的 shadcn 生成物，`Modal`、`PageHeader`、`Loading` 等应用组件位于 `shared/components`；两者都使用真实语义元素，浏览器、jsdom、SSR 和嵌入式场景渲染一致。
 - 单强调色：系统蓝承担品牌、主操作、焦点和选中态；状态色只表达成功、警告、危险和信息。
 - 分层而不炫技：普通内容面保持平整，只有 chrome、弹层和可点击卡片使用玻璃、抬升或 hover 阴影。
 - 4px 节奏：布局间距使用 Tailwind 原生档位与组件类；圆角使用 `--radius` 派生档位。
@@ -157,7 +157,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 - `apps/web/src/styles/index.css`：语义 token 的**唯一来源**（base 层）、Tailwind 入口、`@theme` 圆角派生与 `@theme inline` 颜色映射、通用组件类与跨域 keyframes；页面样式由各功能域自持。
 - `apps/web/src/styles/ios-theme.css`：只保留 iOS 26 独有的材质 token（`--glass-*`）、结构几何 token（`--la-pluma-*`）与对应样式；不再重定义语义 token。
-- `apps/web/src/shared/components`：`Card`、`Modal`、`PageHeader`、`EmptyState`、`Loading` 等应用级通用组件；`Button`、`Input`、`Select`、`Checkbox`、`Switch` 等 shadcn 生成物位于 `apps/web/src/shared/ui`（sheet、sidebar 也在该目录）。
+- `apps/web/src/shared/components`：`Modal`、`PageHeader`、`EmptyState`、`Loading` 等应用级通用组件；`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card` 等 shadcn 生成物位于 `apps/web/src/shared/ui`（sheet、sidebar 也在该目录）。
 
 本文件描述规则；token 的具体数值以 `apps/web/src/styles/index.css` 为准，调整 token 时同步更新本文件的表格与说明。
 
@@ -216,7 +216,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ### Named Rules
 **The One Accent Rule.** 系统蓝是唯一的品牌强调色。任一屏幕中，实心蓝色面积应保持克制；如果所有按钮、图标和标题都在抢蓝色，先删掉装饰性的那些。
 
-**The Semantic Surface Rule.** 页面通过 `surface-panel`、`surface-soft`、`control-surface`、`control-active`、`brand-action`、`brand-text`、`status-*`、`form-error-*` 使用颜色，不直接写 `from-violet-*`、`text-orange-*`、`bg-cyan-*` 这类页面级色板。
+**The Semantic Surface Rule.** 页面通过 `Card` 语义 token、`surface-panel`、`surface-soft`、`control-surface`、`control-active`、`brand-action`、`brand-text`、`status-*`、`form-error-*` 使用颜色，不直接写 `from-violet-*`、`text-orange-*`、`bg-cyan-*` 这类页面级色板。
 
 **The Dark Mirror Rule.** 深色主题不是浅色的机械反转：页面变为近黑石墨，文字变为暖白，蓝色略微提亮，但语义关系和强调色的稀缺性保持不变。不要在页面里另建一套深色 token。
 
@@ -270,7 +270,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 这是混合体系：普通内容面是平的，靠色阶和 1px 发丝线分层；只有 chrome、弹层、浮层和可点击卡片使用阴影或玻璃。深度不是装饰，而是“这一层是否浮在另一层之上”的答案。
 
 ### Shadow Vocabulary
-- **Panel rest (light)** (`0 0 0 1px rgba(60, 60, 67, 0.18), 0 1px 3px rgba(15, 23, 42, 0.05), 0 14px 40px rgba(15, 23, 42, 0.05)`)：`surface-panel` 卡片和大面板的默认抬升。
+- **Panel rest (light)** (`0 0 0 1px rgba(60, 60, 67, 0.18), 0 1px 3px rgba(15, 23, 42, 0.05), 0 14px 40px rgba(15, 23, 42, 0.05)`)：`surface-panel` 召唤层与独立面板的默认抬升。
 - **Panel rest (dark)** (`inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px rgba(235, 235, 245, 0.18), 0 16px 40px rgba(0, 0, 0, 0.28)`)：深色主题的同等层级。
 - **Glass chrome** (`0 12px 32px rgba(60, 60, 67, 0.12)`；深色 `0 14px 34px rgba(0, 0, 0, 0.34)`)：侧栏框、移动 tabbar 和悬浮 chrome。
 - **Summoned layer** (`0 2px 8px rgba(0, 0, 0, 0.1), 0 30px 80px rgba(0, 0, 0, 0.24)`)：Modal、主题菜单、PWA 提示等被召唤的叠加层，配合 `blur(24px) saturate(165%)`。
@@ -287,14 +287,14 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 ## Shapes
 
-形状语言来自 iOS 连续圆角：圆角足够柔和，但不做成大号“药丸卡片”。卡片和面板使用 `rounded-xl`（16px），Button、Input、Select 等表单控件使用 `rounded-lg`（12px），需要 iOS 连续圆角视觉的卡片和面板使用 `SmoothSurface` / `SmoothPanel`（20px，紧凑 16px）。
+形状语言来自 iOS 连续圆角：圆角足够柔和，但不做成大号“药丸卡片”。卡片和面板使用 `rounded-xl`（16px），Button、Input、Select 等表单控件使用 `rounded-lg`（12px）。基线组件保持普通圆角；连续曲率只由玻璃主题皮肤层以纯 CSS `corner-shape` 提供，不支持的浏览器降级为普通圆角。
 
 - `rounded-sm`（8px）：细小元素、默认边界。
 - `rounded-[4px]`：Checkbox。
 - `rounded-md`（10px）：小控件、紧凑标签。
 - `rounded-lg`（12px）：Button、Input、Select 等表单控件、紧凑控件、列表项和局部容器。
 - `rounded-xl`（16px）：卡片、面板、分段控件。
-- `--continuous-radius`（20px）：`SmoothPanel` 的标准连续圆角；紧凑版为 16px。
+- `--continuous-radius`（20px）：玻璃主题连续曲率的参考半径。
 - `rounded-full`：胶囊、开关、头像和圆形状态点。
 
 普通可见边框统一使用 `1px`，颜色使用 `var(--border)`；需要更明确分隔时使用 `var(--input)`。卡片、输入框、分段控件和普通信息容器不得按页面单独改成 `border-2` 或重色描边。`2px` 只用于复选框外框和勾选符号、层级引导线、加载圈等小尺寸控件的可辨识性；焦点环和阴影不是容器边框。
@@ -320,12 +320,12 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 - **Controls:** 二元启停使用 `Switch`（默认 32×18.4px 胶囊，`sm` 24×14px）；多选或参数组合使用 `Checkbox`（16×16px）；新增表单优先使用 `Input`、`Select`、`Checkbox`、`Switch`，手写原生控件使用 `app-input control-surface`、`app-checkbox`。
 
 ### Cards / Containers
-- **Corner Style:** 普通卡片 16px；需要连续圆角时使用 `SmoothPanel` 的 20px / 16px。
-- **Background:** `surface-panel` 为主要卡片和大面板；`surface-soft` 为弱背景、状态条和次级容器。
-- **Shadow Strategy:** 默认使用 `surface-panel` 的静止阴影；只有卡片本身可点击时才使用 `surface-panel-hover` 或启用 `Card hover`。
+- **Corner Style:** shadcn `Card` 使用 `rounded-xl`（16px）；连续曲率只由玻璃主题皮肤层提供。
+- **Background:** `Card` 的 `bg-card` 为主要卡片与面板；`surface-soft` 为弱背景、状态条和次级容器；`surface-panel` 保留给 Modal、菜单与 PWA 提示等召唤层。
+- **Shadow Strategy:** 静止卡片使用 `Card` 的 1px ring；只有卡片本身可点击时才使用 `surface-panel-hover`。召唤层使用 `surface-panel` 的静止阴影。
 - **Border:** 1px 发丝线，不使用 `border-2`。
-- **Internal Padding:** `16px`；`CardHeader` 使用 `14px 16px`，`CardContent` 使用 `16px`。
-- 通用组件优先级：能用 `Card`、`CardHeader`、`CardContent`、`SmoothPanel` 时优先使用组件；特殊布局使用 `app-card surface-panel`、`app-card surface-soft`、`app-info-card`；不要把页面区块做成层层嵌套卡片。
+- **Internal Padding:** 卡片使用 shadcn `--card-spacing`（默认 16px，`size="sm"` 为 12px）；分节自持内边距的面板给 `Card` 加 `gap-0 p-0!`。
+- 通用组件优先级：能用 `Card`、`CardHeader`、`CardTitle`、`CardDescription`、`CardAction`、`CardContent`、`CardFooter` 时优先使用组合；特殊布局使用 `surface-soft`、`app-info-card`；不要把页面区块做成层层嵌套卡片。
 
 ### Navigation
 - **Desktop:** 固定 17rem 侧栏，0.75rem 内缩的连续圆角玻璃框（`blur(28px) saturate(165%)`），单列导航、底部干员身份区和 28px 语义色图标底座；当前项为整行系统蓝和白色文字。

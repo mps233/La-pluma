@@ -1,5 +1,5 @@
 import { Cpu, Database, HardDrive, Thermometer } from 'lucide-react'
-import { SmoothPanel } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
 import { useDashboardStore } from '../store/dashboardStore'
 import { buildTemperatureSeries, getUsageTone, type UsageTone } from '../model/deviceView'
 
@@ -69,11 +69,9 @@ export default function DashboardDeviceSection() {
         ] as const).map(({ label, pct, sub, Icon, value }) => {
           const tone = getUsageTone(pct)
           return (
-            <SmoothPanel
+            <Card
               key={label}
-              cornerSize="compact"
-              className="dashboard-device-card-shell group surface-panel-hover transition-colors"
-              surfaceClassName="dashboard-device-card"
+              className="dashboard-device-card-shell dashboard-device-card group surface-panel-hover gap-0 p-3.5! max-sm:p-4! transition-colors"
             >
               <div className="flex items-center gap-2.5 mb-3">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center text-tertiary">
@@ -100,7 +98,7 @@ export default function DashboardDeviceSection() {
                   </div>
                 </div>
               )}
-            </SmoothPanel>
+            </Card>
           )
         })}
       </div>

@@ -10,11 +10,10 @@ import {
   Card,
   CardContent,
   CardHeader,
-  EmptyState,
-  Loading,
-  PageSkeleton,
-  SmoothPanel,
-} from '@/shared/components'
+  CardTitle,
+} from '@/shared/ui/card'
+import { EmptyState, Loading, PageSkeleton } from '@/shared/components'
+import { ThemeGalleryCards } from './ThemeGalleryCards'
 import { ThemeGalleryTooltips } from './ThemeGalleryTooltips'
 
 const buttonVariants: Array<{ variant: 'default' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'link', label: string, icon: LucideIcon }> = [
@@ -64,7 +63,9 @@ export function ThemeGalleryGlobalSurfaces() {
   return (
     <>
       <Card>
-        <CardHeader title="状态与加载" />
+        <CardHeader className="border-b py-3.5">
+          <CardTitle role="heading" aria-level={3}>状态与加载</CardTitle>
+        </CardHeader>
         <CardContent className="grid gap-3.5 md:grid-cols-2">
           <Loading text="正在读取运行数据" />
           <EmptyState
@@ -78,7 +79,9 @@ export function ThemeGalleryGlobalSurfaces() {
       </Card>
 
       <Card>
-        <CardHeader title="整页骨架" />
+        <CardHeader className="border-b py-3.5">
+          <CardTitle role="heading" aria-level={3}>整页骨架</CardTitle>
+        </CardHeader>
         <CardContent>
           <div className="h-72 overflow-hidden rounded-xl border border-border">
             <PageSkeleton variant="config" />
@@ -87,7 +90,9 @@ export function ThemeGalleryGlobalSurfaces() {
       </Card>
 
       <Card>
-        <CardHeader title="领域字形" />
+        <CardHeader className="border-b py-3.5">
+          <CardTitle role="heading" aria-level={3}>领域字形</CardTitle>
+        </CardHeader>
         <CardContent className="app-stack-card">
           <div className="flex flex-wrap items-center gap-3.5">
             <Icons.Play />
@@ -109,23 +114,12 @@ export function ThemeGalleryGlobalSurfaces() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader title="面板容器" />
-        <CardContent className="grid gap-3.5 md:grid-cols-3">
-          <Card>
-            <p className="text-sm text-muted-foreground">基础卡片，外层负责阴影与边框。</p>
-          </Card>
-          <Card smoothCorners>
-            <p className="text-sm text-muted-foreground">连续圆角卡片，内部表面负责裁切。</p>
-          </Card>
-          <SmoothPanel surfaceClassName="flex items-center px-4 py-4">
-            <p className="text-sm text-muted-foreground">连续圆角独立面板。</p>
-          </SmoothPanel>
-        </CardContent>
-      </Card>
+      <ThemeGalleryCards />
 
       <Card>
-        <CardHeader title="按钮变体" />
+        <CardHeader className="border-b py-3.5">
+          <CardTitle role="heading" aria-level={3}>按钮变体</CardTitle>
+        </CardHeader>
         <CardContent className="app-stack-card">
           <div className="flex flex-wrap items-center gap-3.5">
             {buttonVariants.map(({ variant, label, icon }) => {
@@ -147,7 +141,9 @@ export function ThemeGalleryGlobalSurfaces() {
       </Card>
 
       <Card>
-        <CardHeader title="按钮状态与尺寸" />
+        <CardHeader className="border-b py-3.5">
+          <CardTitle role="heading" aria-level={3}>按钮状态与尺寸</CardTitle>
+        </CardHeader>
         <CardContent className="app-stack-card">
           <div className="flex flex-wrap items-center gap-3.5">
             {buttonSizes.map(({ size, label }) => (
@@ -178,7 +174,9 @@ export function ThemeGalleryGlobalSurfaces() {
 
       <div data-region="gallery-form-controls">
         <Card>
-          <CardHeader title="表单控件" />
+          <CardHeader className="border-b py-3.5">
+            <CardTitle role="heading" aria-level={3}>表单控件</CardTitle>
+          </CardHeader>
           <CardContent className="grid gap-3.5 md:grid-cols-2">
             <div className="grid gap-3.5 md:col-span-2 md:grid-cols-2">
               <div>

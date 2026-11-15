@@ -21,7 +21,6 @@
   .dashboard-device-card {
     min-width: 0;
     border-radius: var(--radius-xl);
-    padding: 0.875rem;
   }
 
   .dashboard-temperature-chart {
@@ -148,12 +147,6 @@
       flex: 1;
     }
 
-    .dashboard-flow-card > .app-card-smooth-surface,
-    .dashboard-flow-layout [data-dashboard-preview-card] > .smooth-panel-surface {
-      display: flex;
-      flex-direction: column;
-    }
-
     /* Let the stage summary absorb extra height without stretching the controls. */
     .dashboard-flow-stages,
     .dashboard-flow-layout [data-dashboard-preview-frame] {
@@ -165,69 +158,6 @@
     position: relative;
     isolation: isolate;
     border-radius: var(--radius-xl);
-  }
-
-  .dashboard-flow-glow-shell::before {
-    content: '';
-    position: absolute;
-    inset: 4px;
-    z-index: 0;
-    border-radius: calc(var(--radius-xl) - 4px);
-    background: radial-gradient(
-      ellipse 52% 68% at top left,
-      color-mix(in srgb, var(--primary) 24%, transparent) 0%,
-      color-mix(in srgb, var(--primary) 12%, transparent) 44%,
-      transparent 76%
-    );
-    filter: blur(12px);
-    opacity: 0.2;
-    transform: translate(-4px, -4px);
-    pointer-events: none;
-  }
-
-  .dark .dashboard-flow-glow-shell::before {
-    opacity: 0.26;
-  }
-
-  .dashboard-flow-card {
-    position: relative;
-    z-index: 1;
-    overflow: hidden;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.72),
-      0 24px 56px rgba(15, 23, 42, 0.09);
-  }
-
-  .dashboard-flow-card::before,
-  .dashboard-flow-card > .app-card-smooth-surface::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: 2;
-    padding: 1px;
-    border-radius: inherit;
-    background: radial-gradient(
-      ellipse 48% 62% at top left,
-      color-mix(in srgb, var(--primary) 28%, var(--border)) 0%,
-      color-mix(in srgb, var(--primary) 14%, var(--border)) 48%,
-      var(--border) 100%
-    );
-    -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-  }
-
-  .dashboard-flow-card[data-smooth-corners='true']::before {
-    display: none;
-  }
-
-  .dark .dashboard-flow-card {
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 26px 64px rgba(0, 0, 0, 0.42);
   }
 
   .dashboard-flow-header {
@@ -596,10 +526,6 @@
   }
 
   @media (max-width: 640px) {
-    .dashboard-device-card {
-      padding: 1rem;
-    }
-
     .dashboard-flow-skeleton .dashboard-flow-command {
       min-height: 142px;
       height: auto;
@@ -660,51 +586,8 @@
     }
   }
 
-  /* Dashboard cards use one continuous, softly lifted material at every width.
-     Remove only the outer strokes; internal row and control separators remain. */
-  .la-pluma-app .dashboard-flow-glow-shell::before,
-  .la-pluma-app .dashboard-flow-glow-shell.status-border-beam::after,
-  .la-pluma-app .dashboard-flow-card::before,
-  .la-pluma-app .dashboard-flow-card > .app-card-smooth-surface::before {
-    display: none;
-  }
-
-  .la-pluma-app .dashboard-page .app-card,
-  .la-pluma-app .dashboard-page .surface-panel,
-  .la-pluma-app .dashboard-page .app-info-card {
-    border: 0 !important;
-    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
-  }
-
-  .la-pluma-app .dashboard-page .app-card-smooth-surface,
-  .la-pluma-app .dashboard-page .smooth-panel-surface {
-    border: 0;
-  }
-
-  /* Device and summary cards are grouped content, so give them the solid iOS
-     grouped surface. Their former translucent gray nearly matched the page and
-     made the top of summary cards disappear after the outer stroke was removed. */
-  .la-pluma-app .dashboard-page .dashboard-device-card,
-  .la-pluma-app .dashboard-page .dashboard-summary-card > .app-card-smooth-surface {
-    background: var(--card);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-
   .la-pluma-app .dashboard-page .dashboard-summary-header {
     background: transparent;
-  }
-
-  .la-pluma-app .dashboard-page .app-info-card.status-warning {
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--warning) 30%, transparent),
-      0 12px 30px rgba(15, 23, 42, 0.1);
-  }
-
-  .la-pluma-app .dashboard-page .app-info-card.status-danger {
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--destructive) 34%, transparent),
-      0 12px 30px rgba(15, 23, 42, 0.1);
   }
 
   .la-pluma-app .dashboard-page .status-border-beam::after {
@@ -713,24 +596,6 @@
 
   .la-pluma-app .dashboard-page .surface-panel-hover:hover:not(:disabled) {
     transform: none;
-  }
-
-  .dark .la-pluma-app .dashboard-page .app-card,
-  .dark .la-pluma-app .dashboard-page .surface-panel,
-  .dark .la-pluma-app .dashboard-page .app-info-card {
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
-  }
-
-  .dark .la-pluma-app .dashboard-page .app-info-card.status-warning {
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--warning) 38%, transparent),
-      0 16px 36px rgba(0, 0, 0, 0.28);
-  }
-
-  .dark .la-pluma-app .dashboard-page .app-info-card.status-danger {
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--destructive) 40%, transparent),
-      0 16px 36px rgba(0, 0, 0, 0.28);
   }
 
   @media (max-width: 639px) {

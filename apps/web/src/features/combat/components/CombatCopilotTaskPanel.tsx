@@ -1,4 +1,4 @@
-import { Card } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
 import { useResolvedCopilotDetailTarget } from '../hooks/useResolvedCopilotDetailTarget'
 import type { CopilotDetailTarget } from '../model/copilotDetail'
 import type { CopilotSetView } from '../model/copilotSetView'
@@ -82,8 +82,7 @@ export default function CombatCopilotTaskPanel({
 
   return (
     <Card
-      smoothCorners
-      className="combat-task-card p-0!"
+      className="combat-task-card gap-0 p-0!"
     >
       <CombatTaskHeading
         task={task}

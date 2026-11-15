@@ -1,6 +1,6 @@
 import { ChevronRight, PackageOpen } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { Card } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
 import { useDashboardStore } from '../store/dashboardStore'
 
 const sectionTitleClass = 'text-base font-bold text-foreground'
@@ -13,7 +13,7 @@ export default function DashboardDropSummaryCard({ onOpenStatistics }: Dashboard
   const dropSummary = useDashboardStore(state => state.dropSummary)
 
   return (
-    <Card smoothCorners className="dashboard-summary-card is-drops p-0!">
+    <Card className="dashboard-summary-card is-drops gap-0 p-0!">
       <div className="dashboard-summary-header">
         <div className="dashboard-summary-heading">
           <span className="dashboard-summary-icon" aria-hidden="true">

@@ -1,6 +1,6 @@
 import { ChevronRight, Target } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { Card } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
 import { useDashboardStore } from '../store/dashboardStore'
 
 const sectionTitleClass = 'text-base font-bold text-foreground'
@@ -13,7 +13,7 @@ export default function DashboardTrainingSummaryCard({ onOpenTraining }: Dashboa
   const trainingSummary = useDashboardStore(state => state.trainingSummary)
 
   return (
-    <Card smoothCorners className="dashboard-summary-card is-training p-0!">
+    <Card className="dashboard-summary-card is-training gap-0 p-0!">
       <div className="dashboard-summary-header">
         <div className="dashboard-summary-heading">
           <span className="dashboard-summary-icon" aria-hidden="true">

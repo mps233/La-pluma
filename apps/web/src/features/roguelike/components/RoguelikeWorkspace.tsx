@@ -163,8 +163,7 @@ export default function RoguelikeWorkspace() {
 
         <aside className="roguelike-monitor-column" aria-label="设备画面">
           <DeviceMonitorPanel
-            className="roguelike-monitor-panel"
-            surfaceClassName="roguelike-monitor-surface"
+            className="roguelike-monitor-panel roguelike-monitor-surface"
           />
         </aside>
       </div>

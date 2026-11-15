@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { Clock3, Plus, X } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Switch } from '@/shared/ui/switch'
-import { SmoothPanel } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
 import {
   MAX_SCHEDULE_ENTRIES,
   appendScheduleEntry,
@@ -146,7 +146,7 @@ export default function AutomationScheduleCard({
   }
 
   return (
-    <SmoothPanel className="automation-side-card">
+    <Card className="automation-side-card gap-0 p-0!">
       <div className="automation-side-card-heading">
         <div className="automation-side-card-heading-text">
           <h3><Clock3 size={16} strokeWidth={1.8} aria-hidden="true" /><span>定时执行</span></h3>
@@ -235,6 +235,6 @@ export default function AutomationScheduleCard({
       )}
 
       <p className="automation-schedule-timezone">游戏服务区时区 · 每日 04:00 刷新游戏日</p>
-    </SmoothPanel>
+    </Card>
   )
 }

@@ -4,15 +4,6 @@
     overflow: hidden;
   }
 
-  .data-statistics-task-card > .app-card-smooth-surface {
-    transition: background 180ms ease, border-color 180ms ease;
-  }
-
-  .data-statistics-task-card.is-active > .app-card-smooth-surface {
-    border-color: color-mix(in srgb, var(--info) 28%, var(--border));
-    background: color-mix(in srgb, var(--info) 6%, var(--card));
-  }
-
   .data-statistics-task-content,
   .drop-records-panel-content {
     padding: 1rem;

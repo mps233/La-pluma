@@ -80,6 +80,29 @@ for (const theme of THEMES) {
       await expectNoBrowserErrors(page)
     })
 
+    test(`card surfaces ${theme}`, async ({ page }) => {
+      test.skip(test.info().project.name !== 'desktop', 'the card surface group is captured once per theme')
+
+      const environment = await installDeterministicEnvironment(page)
+
+      await page.goto('/dev/theme-gallery')
+      await waitForPageReady(page, 'gallery')
+
+      const surfaces = page.locator('[data-region="gallery-card-surfaces"]')
+      await surfaces.scrollIntoViewIfNeeded()
+      await expect(surfaces).toBeVisible()
+      await expect(surfaces.locator('[data-slot="card"]').first()).toBeVisible()
+      await expect(surfaces.locator('[data-slot="skeleton"]').first()).toBeVisible()
+
+      await expect(surfaces).toHaveScreenshot(`theme-gallery-card-surfaces-${theme}.png`, {
+        animations: 'disabled',
+        caret: 'hide',
+      })
+
+      environment.assertNoUnmatchedApi()
+      await expectNoBrowserErrors(page)
+    })
+
     test(`select popup ${theme}`, async ({ page }) => {
       test.skip(test.info().project.name !== 'desktop', 'the select popup state is captured once per theme')
 

@@ -10,7 +10,8 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { Download, LoaderCircle, Play, RotateCcw } from 'lucide-react'
 import Icons from '@/shared/components/Icons'
 import { Button } from '@/shared/ui/button'
-import { Card, EmptyState, Loading } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
+import { EmptyState, Loading } from '@/shared/components'
 import {
   DEFAULT_OPERATOR_FILTERS,
   buildKnownOperatorIdSet,
@@ -37,7 +38,7 @@ const OPER_BOX_READ_ERROR = '暂时无法读取干员识别结果，请检查服
 const OPERATOR_CATALOG_READ_ERROR = '暂时无法读取干员资料，请检查资源状态后重试。'
 
 const taskPanelClass = (isActive: boolean) =>
-  `data-statistics-task-card p-0!${isActive ? ' is-active' : ''}`
+  `data-statistics-task-card gap-0 p-0! transition-colors${isActive ? ' bg-info/5 ring-info/30' : ''}`
 
 const statCardClass = 'data-statistics-kpi'
 const chipClass = 'control-surface rounded-full px-2 py-0.5 text-xs whitespace-nowrap'
@@ -212,7 +213,6 @@ export default function OperatorPanel({ isActive, command }: OperatorPanelProps)
       className="min-w-0"
     >
       <Card
-        smoothCorners
         className={taskPanelClass(command.activeTask === 'operbox')}
       >
         <div className="data-statistics-task-content app-stack-card">

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FileText } from 'lucide-react'
-import { EmptyState, SmoothPanel } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
+import { EmptyState } from '@/shared/components'
 import { isActiveRunState, isTerminalRunState, type AgentRun } from '@/features/task-execution'
 import { RuntimeDiagnosticsPanel } from '@/features/runtime-status'
 import {
@@ -117,8 +118,8 @@ export default function RoguelikeResultPanel({ run, command }: RoguelikeResultPa
         : { label: '无结果', tone: 'neutral' }
 
   return (
-    <SmoothPanel
-      className="roguelike-panel roguelike-result-panel"
+    <Card
+      className="roguelike-panel roguelike-result-panel gap-0 p-0!"
       role="region"
       aria-label="执行结果"
     >
@@ -172,6 +173,6 @@ export default function RoguelikeResultPanel({ run, command }: RoguelikeResultPa
 
         <RuntimeDiagnosticsPanel command={command} className="roguelike-result-diagnostics" />
       </div>
-    </SmoothPanel>
+    </Card>
   )
 }

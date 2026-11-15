@@ -1,6 +1,6 @@
 import { Activity, CalendarDays, LoaderCircle, Play } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { Card } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
 import { useDashboardStore } from '../store/dashboardStore'
 import { useDashboardFlowActions } from '../hooks/useDashboardFlowActions'
 import { buildDashboardFlowView } from '../model/flowView'
@@ -62,7 +62,7 @@ export default function DashboardFlowPanel({ refreshDashboard, onMissingFlow }: 
       aria-busy={quickStartLoading || view.isRunning}
       data-dashboard-flow-card
     >
-      <Card smoothCorners className="dashboard-flow-card p-0!">
+      <Card className="dashboard-flow-card gap-0 p-0!">
       <div className="dashboard-flow-header">
         <div className="flex min-w-0 items-center gap-3.5">
           <div className="dashboard-flow-mark" aria-hidden="true">

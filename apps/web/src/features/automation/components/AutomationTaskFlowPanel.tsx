@@ -14,7 +14,8 @@ import {
 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Switch } from '@/shared/ui/switch'
-import { EmptyState, SmoothPanel } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
+import { EmptyState } from '@/shared/components'
 import AutomationTaskPicker from './AutomationTaskPicker'
 import AutomationExecutionSummary from './AutomationExecutionSummary'
 import {
@@ -46,9 +47,8 @@ export default function AutomationTaskFlowPanel({
 
   return (
     <div className="automation-sequence-column">
-      <SmoothPanel
-        className="automation-sequence-panel"
-        surfaceClassName="automation-sequence-surface"
+      <Card
+        className="automation-sequence-panel automation-sequence-surface gap-0 p-0!"
       >
         <div className="automation-flow-header">
           <div className="min-w-0">
@@ -221,7 +221,7 @@ export default function AutomationTaskFlowPanel({
           summary={execution.displaySummary}
           runId={execution.runId}
         />
-      </SmoothPanel>
+      </Card>
     </div>
   )
 }

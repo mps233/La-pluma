@@ -208,9 +208,6 @@ importers:
       '@base-ui/react':
         specifier: ^1.9.0
         version: 1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@lisse/react':
-        specifier: ^0.5.2
-        version: 0.5.2(react@19.3.1)
       '@tanstack/react-query':
         specifier: ^5.104.5
         version: 5.104.5(@types/react@19.3.0)(react@19.3.1)
@@ -1078,16 +1075,6 @@ packages:
 
   '@keyv/serialize@1.1.1':
     resolution: {integrity: sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==}
-
-  '@lisse/core@0.5.2':
-    resolution: {integrity: sha512-9gMuO1Cqwerm8dFmzpspZYyEAJaId8TmVaOrqUBxMJNpkRmeVYXIthwfC1Mz7Ciph9bT7xtPXKVyPC+t58lTSA==}
-    engines: {node: '>=18'}
-
-  '@lisse/react@0.5.2':
-    resolution: {integrity: sha512-KgoMO0rjMMTrikvspFkkxg/Ctmr6FAQqtf79f2a6/otZeUoxya4hfjAkxdNxvHfDbzqqugAlJyRhhi6rsMlXcA==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      react: '>=18.0.0'
 
   '@modelcontextprotocol/core@2.4.0':
     resolution: {integrity: sha512-z8QBKqdfXLPzkLQuG4xp8hrVEMm1PZ1IgxMN2sMbJiFiAKOWXnAzogXn2W4aqIBlP1ea6U5yiqVquvUNM1Cj6Q==}
@@ -5309,13 +5296,6 @@ snapshots:
       keyv: 5.6.0
 
   '@keyv/serialize@1.1.1': {}
-
-  '@lisse/core@0.5.2': {}
-
-  '@lisse/react@0.5.2(react@19.3.1)':
-    dependencies:
-      '@lisse/core': 0.5.2
-      react: 19.3.1
 
   '@modelcontextprotocol/core@2.4.0':
     dependencies:

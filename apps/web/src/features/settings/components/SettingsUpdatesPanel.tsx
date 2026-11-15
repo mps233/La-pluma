@@ -1,12 +1,14 @@
-import { Card, CardContent, CardHeader } from '@/shared/components'
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
 import AutoUpdateConfigPanel from './AutoUpdateConfigPanel'
 import ComponentUpdatePanel from './ComponentUpdatePanel'
 
 export default function SettingsUpdatesPanel() {
   return (
-    <Card smoothCorners className="config-update-card p-0!">
-      <CardHeader title="组件更新" />
-      <CardContent className="app-stack-card">
+    <Card className="config-update-card gap-0 p-0!">
+      <CardHeader className="border-b py-3.5">
+        <CardTitle role="heading" aria-level={3}>组件更新</CardTitle>
+      </CardHeader>
+      <CardContent className="app-stack-card py-4">
         <AutoUpdateConfigPanel />
         <ComponentUpdatePanel />
       </CardContent>

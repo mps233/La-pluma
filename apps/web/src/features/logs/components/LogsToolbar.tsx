@@ -1,6 +1,6 @@
 import { Download, Pause, Play, Search, Trash2 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { Card, CardContent } from '@/shared/components'
+import { Card, CardContent } from '@/shared/ui/card'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { Switch } from '@/shared/ui/switch'
@@ -52,7 +52,7 @@ export default function LogsToolbar({
   onExport,
 }: LogsToolbarProps) {
   return (
-    <Card className="log-card log-toolbar-card p-0!" smoothCorners>
+    <Card className="log-card log-toolbar-card gap-0 p-0!">
       <CardContent className="log-toolbar">
         <div className="log-toolbar-controls">
           <div className={`log-toggle-control flex min-h-11 min-w-0 items-center justify-between gap-3.5 ${viewingHistory ? 'opacity-50' : ''}`}>

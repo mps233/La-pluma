@@ -1,14 +1,14 @@
 import type { ReactNode } from 'react'
-import { SmoothPanel } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
 import ScreenMonitor from './ScreenMonitor'
 
-export function DeviceMonitorPanel({ className = '', surfaceClassName = '' }: { className?: string; surfaceClassName?: string }) {
+export function DeviceMonitorPanel({ className = '' }: { className?: string }) {
   return (
-    <SmoothPanel className={className} surfaceClassName={`automation-monitor-surface ${surfaceClassName}`}>
+    <Card className={`automation-monitor-surface ${className} gap-0 p-0!`}>
       <div className="task-monitor-panel is-compact">
         <ScreenMonitor variant="compact" />
       </div>
-    </SmoothPanel>
+    </Card>
   )
 }
 

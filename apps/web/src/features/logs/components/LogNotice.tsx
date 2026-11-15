@@ -1,6 +1,6 @@
 import { AlertCircle, CheckCircle2, X } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { SmoothPanel } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
 
 export interface LogNoticeData {
   readonly type: 'success' | 'error'
@@ -13,9 +13,12 @@ interface LogNoticeProps extends LogNoticeData {
 
 export default function LogNotice({ type, text, onDismiss }: LogNoticeProps) {
   return (
-    <SmoothPanel
-      cornerSize="compact"
-      surfaceClassName={`log-notice ${type === 'error' ? 'is-error' : 'is-success'}`}
+    <Card
+      className={`log-notice flex flex-row items-center gap-2.5 px-3.5 py-2.5 ${
+        type === 'error'
+          ? 'bg-destructive/10 text-destructive ring-destructive/20'
+          : 'bg-success/10 text-success ring-success/20'
+      }`}
       role={type === 'error' ? 'alert' : 'status'}
       aria-live={type === 'error' ? 'assertive' : 'polite'}
     >
@@ -32,6 +35,6 @@ export default function LogNotice({ type, text, onDismiss }: LogNoticeProps) {
       >
         <X className="h-4 w-4" aria-hidden="true" />
       </Button>
-    </SmoothPanel>
+    </Card>
   )
 }

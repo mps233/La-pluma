@@ -39,4 +39,26 @@ test.describe('app tabs', () => {
       await expectNoBrowserErrors(page)
     })
   }
+
+  test('dashboard device cards keep their responsive padding', async ({ page }) => {
+    const environment = await installDeterministicEnvironment(page)
+
+    await page.goto('/app/dashboard')
+    await waitForPageReady(page, 'dashboard')
+
+    const card = page.locator('.dashboard-device-card').first()
+    await expect(card).toBeVisible()
+
+    const expected = test.info().project.name === 'mobile' ? 16 : 14
+    const padding = await card.evaluate(element => {
+      const style = getComputedStyle(element)
+      return [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft]
+        .map(value => Number.parseFloat(value))
+    })
+
+    expect(padding).toEqual([expected, expected, expected, expected])
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
 })

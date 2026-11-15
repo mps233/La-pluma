@@ -4,7 +4,7 @@ import { Bell, LoaderCircle, Save, Send } from 'lucide-react'
 import type { ApiResponse } from '@/shared/api'
 import { Button } from '@/shared/ui/button'
 import { Switch } from '@/shared/ui/switch'
-import { SmoothPanel } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
 import { saveNotificationConfig, testNotificationChannel } from '../api'
 import {
   cloneNotificationConfig,
@@ -161,7 +161,7 @@ export default function NotificationSettings() {
         : null
 
   return (
-    <SmoothPanel className="automation-side-card">
+    <Card className="automation-side-card gap-0 p-0!">
       <div className="automation-side-card-heading">
         <div className="automation-side-card-heading-text">
           <h3><Bell size={16} strokeWidth={1.8} aria-hidden="true" /><span>通知</span></h3>
@@ -312,6 +312,6 @@ export default function NotificationSettings() {
           </div>
         </>
       )}
-    </SmoothPanel>
+    </Card>
   )
 }

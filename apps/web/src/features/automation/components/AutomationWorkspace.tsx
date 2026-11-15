@@ -18,7 +18,8 @@ import { Checkbox } from '@/shared/ui/checkbox'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { Switch } from '@/shared/ui/switch'
-import { EmptyState, FieldHint, SmoothPanel } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
+import { EmptyState, FieldHint } from '@/shared/components'
 import { useAutomationAvailability, useStatusStore } from '@/features/runtime-status'
 import { useUserConfig } from '@/features/user-config'
 import { useResourceInvalidation, type ResourceInvalidation } from '@/features/resource-invalidation'
@@ -475,7 +476,7 @@ export default function AutomationWorkspace() {
         />
 
         <div ref={editorColumnRef} id="automation-task-editor" className="automation-editor-column" tabIndex={-1}>
-          <SmoothPanel className="automation-editor-panel">
+          <Card className="automation-editor-panel gap-0 p-0!">
             <div className="automation-editor-heading">
               <div>
                 <h3><SlidersHorizontal size={16} strokeWidth={1.8} aria-hidden="true" /><span>任务配置</span></h3>
@@ -1133,7 +1134,7 @@ export default function AutomationWorkspace() {
                 })}
               </div>
             )}
-          </SmoothPanel>
+          </Card>
         </div>
 
         <div className="automation-support-column">

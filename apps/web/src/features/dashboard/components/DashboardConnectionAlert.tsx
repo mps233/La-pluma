@@ -1,6 +1,6 @@
 import { RefreshCw, ServerOff, WifiOff } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { SmoothPanel } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
 import { useDashboardServiceStatus } from '../hooks/useDashboardServiceStatus'
 
 interface DashboardConnectionAlertProps {
@@ -13,10 +13,12 @@ export default function DashboardConnectionAlert({ refreshDashboard }: Dashboard
   if (serviceStatus !== 'offline' && serviceStatus !== 'unavailable') return null
 
   return (
-    <SmoothPanel
-      cornerSize="compact"
-      className="dashboard-connection-alert"
-      surfaceClassName={`app-info-card flex min-w-0 flex-wrap items-center gap-3.5 ${serviceStatus === 'offline' ? 'status-warning' : 'status-danger'}`}
+    <Card
+      className={`dashboard-connection-alert flex min-w-0 flex-row flex-wrap items-center gap-3.5 p-3.5 ${
+        serviceStatus === 'offline'
+          ? 'bg-warning/10 text-warning ring-warning/25'
+          : 'bg-destructive/10 text-destructive ring-destructive/25'
+      }`}
       role="alert"
     >
       {serviceStatus === 'offline'
@@ -36,6 +38,6 @@ export default function DashboardConnectionAlert({ refreshDashboard }: Dashboard
           重试连接
         </Button>
       )}
-    </SmoothPanel>
+    </Card>
   )
 }

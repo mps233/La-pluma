@@ -1,4 +1,4 @@
-import { Card } from '@/shared/components'
+import { Card } from '@/shared/ui/card'
 import type { AdvancedValues } from '../model/combatCommands'
 import { splitCopilotInputToArgs } from '../utils/copilotUri'
 import type { CombatTask } from '../types'
@@ -36,8 +36,7 @@ export default function CombatSpecialTaskPanel({
 
   return (
     <Card
-      smoothCorners
-      className="combat-task-card p-0!"
+      className="combat-task-card gap-0 p-0!"
     >
       <CombatTaskHeading
         task={task}
