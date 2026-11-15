@@ -1926,19 +1926,13 @@
       height: 2.75rem;
     }
 
-    .automation-side-card-footer .app-button {
-      min-height: 2.75rem;
-    }
-
-    [data-automation-tasks] .app-button,
     .automation-task-picker-toggle,
     .automation-task-picker-option,
     .automation-sequence-select {
       min-height: 2.75rem;
     }
 
-    .automation-schedule-add svg,
-    .automation-side-card-footer .app-button svg {
+    .automation-schedule-add svg {
       width: 1rem;
       height: 1rem;
     }

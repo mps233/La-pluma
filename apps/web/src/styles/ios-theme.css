@@ -904,7 +904,6 @@
     box-shadow: none;
   }
 
-  .la-pluma-app .app-card,
   .la-pluma-app .surface-panel {
     margin: 0;
     border: 1px solid var(--border);
@@ -915,85 +914,6 @@
       0 14px 40px rgba(60, 60, 67, 0.05);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
-  }
-
-  .la-pluma-app .app-card {
-    width: auto;
-    overflow: hidden;
-  }
-
-  .la-pluma-app .app-card[data-smooth-corners='true'] {
-    display: flex;
-    border: 0;
-    border-radius: var(--continuous-radius);
-    background: transparent;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    overflow: visible !important;
-  }
-
-  .la-pluma-app .app-card-smooth-surface {
-    position: relative;
-    box-sizing: border-box;
-    width: 100%;
-    min-width: 0;
-    min-height: 100%;
-    flex: 1 1 auto;
-    align-self: stretch;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: inherit;
-    background: var(--card);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-
-  .la-pluma-app .smooth-panel-shell.surface-panel {
-    display: flex;
-    min-width: 0;
-    border: 0;
-    border-radius: var(--continuous-radius);
-    background: transparent;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    overflow: visible;
-  }
-
-  .la-pluma-app .smooth-panel-shell.smooth-panel-compact {
-    border-radius: var(--radius-xl);
-  }
-
-  .la-pluma-app .smooth-panel-surface {
-    position: relative;
-    box-sizing: border-box;
-    width: 100%;
-    min-width: 0;
-    flex: 1 1 auto;
-    align-self: stretch;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: inherit;
-    background: var(--card);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-
-  .la-pluma-app .smooth-panel-surface.status-warning {
-    background: color-mix(in srgb, var(--warning) 10%, var(--card));
-  }
-
-  .la-pluma-app .smooth-panel-surface.status-danger {
-    background: color-mix(in srgb, var(--destructive) 10%, var(--card));
-  }
-
-  .la-pluma-app .app-card-header {
-    min-height: 3.25rem;
-    border-bottom: 1px solid var(--border);
-    box-shadow: none;
-  }
-
-  .la-pluma-app .app-card-content {
-    min-width: 0;
   }
 
   .la-pluma-app .app-info-card {
@@ -1340,10 +1260,6 @@
       transition-duration: 0.01ms !important;
       animation-duration: 0.01ms !important;
     }
-
-    .la-pluma-app .app-activity-indicator-fallback {
-      animation: none !important;
-    }
   }
 
   @media (prefers-reduced-transparency: reduce) {
@@ -1355,18 +1271,10 @@
     .la-pluma-app .la-pluma-theme-desktop,
     .la-pluma-app .la-pluma-theme-trigger,
     .la-pluma-app .la-pluma-github-link,
-    .la-pluma-app .app-card,
-    .la-pluma-app .app-card-smooth-surface,
-    .la-pluma-app .smooth-panel-surface,
     .la-pluma-app .surface-panel {
       background: var(--card);
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
-    }
-
-    .la-pluma-app .app-card[data-smooth-corners='true'],
-    .la-pluma-app .smooth-panel-shell.surface-panel {
-      background: transparent;
     }
 
     .la-pluma-app :is(
@@ -1410,10 +1318,6 @@
 
   .la-pluma-app .la-pluma-content .app-native-control:not(textarea) {
     padding: 0 1rem !important;
-  }
-
-  .la-pluma-app .la-pluma-content input.app-native-control.app-input-has-icon {
-    padding-left: 2.5rem !important;
   }
 
   .la-pluma-app .la-pluma-content select.app-native-control {
@@ -1638,39 +1542,6 @@
       max-width: 100%;
       justify-content: flex-end;
     }
-
-    .la-pluma-app .ios-workspace-page .app-card[data-smooth-corners='true'],
-    .la-pluma-app .ios-workspace-page .smooth-panel-shell[data-smooth-corners='true'] {
-      border: 0 !important;
-      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
-    }
-
-    .la-pluma-app .ios-workspace-page .app-card-smooth-surface,
-    .la-pluma-app .ios-workspace-page .smooth-panel-surface {
-      border: 0;
-    }
-
-    .dark .la-pluma-app .ios-workspace-page .app-card[data-smooth-corners='true'],
-    .dark .la-pluma-app .ios-workspace-page .smooth-panel-shell[data-smooth-corners='true'] {
-      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
-    }
-  }
-
-  /* These secondary workspaces use the same borderless grouped-card material as
-     the dashboard. Controls, status outlines, and internal dividers stay intact. */
-  .la-pluma-app .ios-borderless-cards :is(
-    .app-card[data-smooth-corners='true'],
-    .smooth-panel-shell[data-smooth-corners='true']
-  ) {
-    border: 0 !important;
-    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
-  }
-
-  .la-pluma-app .ios-borderless-cards :is(
-    .app-card-smooth-surface,
-    .smooth-panel-surface
-  ) {
-    border: 0;
   }
 
   .la-pluma-app .ios-borderless-cards .surface-soft {
@@ -1684,13 +1555,6 @@
     .status-success
   ) {
     border: 0;
-  }
-
-  .dark .la-pluma-app .ios-borderless-cards :is(
-    .app-card[data-smooth-corners='true'],
-    .smooth-panel-shell[data-smooth-corners='true']
-  ) {
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
   }
 
   @media (prefers-contrast: more) {
@@ -1790,42 +1654,6 @@
     [data-workbench-tasks]
   ) .app-select-shell:focus-within .app-select-trailing-icon {
     background: color-mix(in srgb, var(--primary) 16%, transparent);
-  }
-
-  /* Apple Liquid Glass keeps ordinary Automation content solid. The preview
-     controls and task picker remain the only translucent layers in this view. */
-  .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .smooth-panel-shell[data-smooth-corners='true'] {
-    box-shadow:
-      0 1px 3px rgba(0, 0, 0, 0.05),
-      0 14px 40px rgba(0, 0, 0, 0.05);
-  }
-
-  .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .smooth-panel-surface {
-    border: 0;
-    background: var(--card);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-
-  .la-pluma-app [data-workbench-tasks] .app-card-smooth-surface {
-    border: 0;
-    background: var(--card);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-
-  html.dark .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .smooth-panel-shell[data-smooth-corners='true'],
-  .la-pluma-app.dark :is([data-automation-tasks], [data-workbench-tasks]) .smooth-panel-shell[data-smooth-corners='true'] {
-    box-shadow:
-      0 1px 3px rgba(0, 0, 0, 0.24),
-      0 14px 40px rgba(0, 0, 0, 0.3);
-  }
-
-  @media (prefers-contrast: more) {
-    .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .smooth-panel-surface,
-    .la-pluma-app [data-workbench-tasks] .app-card-smooth-surface {
-      border: 1px solid var(--input);
-    }
   }
 
 }

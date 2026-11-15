@@ -1,26 +1,25 @@
 {
   "_comment": "stylelint ratchet 基线：按文件记录存量违规数（文件 -> 规则 -> 数量）。禁止手工放宽，仅可通过 `pnpm --filter la-pluma-next-client stylelint:baseline` 在违规数下降或有意的重构后重新生成。",
-  "_total": 802,
+  "_total": 405,
   "files": {
     "src/features/automation/styles/automation.css": {
-      "alpha-value-notation": 23,
-      "color-function-alias-notation": 23,
-      "color-function-notation": 25,
-      "declaration-block-no-redundant-longhand-properties": 4,
+      "alpha-value-notation": 8,
+      "color-function-alias-notation": 8,
+      "color-function-notation": 9,
+      "declaration-block-no-redundant-longhand-properties": 2,
       "declaration-empty-line-before": 1,
       "media-feature-range-notation": 6,
-      "no-descending-specificity": 39,
-      "property-no-vendor-prefix": 4,
+      "no-descending-specificity": 27,
+      "property-no-vendor-prefix": 3,
       "selector-not-notation": 1
     },
     "src/features/dashboard/styles/dashboard.css": {
-      "alpha-value-notation": 11,
-      "color-function-alias-notation": 11,
-      "color-function-notation": 11,
+      "alpha-value-notation": 1,
+      "color-function-alias-notation": 1,
+      "color-function-notation": 1,
       "declaration-empty-line-before": 2,
       "media-feature-range-notation": 7,
-      "no-descending-specificity": 7,
-      "property-no-vendor-prefix": 3
+      "no-descending-specificity": 7
     },
     "src/features/device-mirror/styles/device-mirror.css": {
       "no-descending-specificity": 10
@@ -38,41 +37,35 @@
       "media-feature-range-notation": 2
     },
     "src/features/statistics/styles/statistics.css": {
-      "alpha-value-notation": 2,
-      "color-function-alias-notation": 2,
-      "color-function-notation": 2,
-      "media-feature-range-notation": 1,
-      "property-no-vendor-prefix": 1
+      "media-feature-range-notation": 1
     },
     "src/features/training/styles/training.css": {
-      "at-rule-empty-line-before": 3,
-      "declaration-block-single-line-max-declarations": 66,
-      "media-feature-range-notation": 3,
-      "no-descending-specificity": 8
+      "at-rule-empty-line-before": 2,
+      "declaration-block-single-line-max-declarations": 62,
+      "media-feature-range-notation": 2,
+      "no-descending-specificity": 7
     },
     "src/styles/index.css": {
-      "alpha-value-notation": 48,
-      "color-function-alias-notation": 48,
-      "color-function-notation": 49,
-      "declaration-block-single-line-max-declarations": 8,
+      "alpha-value-notation": 32,
+      "color-function-alias-notation": 32,
+      "color-function-notation": 33,
       "declaration-empty-line-before": 1,
       "length-zero-no-unit": 1,
       "media-feature-range-notation": 8,
-      "no-descending-specificity": 13,
-      "property-no-vendor-prefix": 16,
-      "value-keyword-case": 1
+      "no-descending-specificity": 8,
+      "property-no-vendor-prefix": 10
     },
     "src/styles/ios-theme.css": {
-      "alpha-value-notation": 85,
-      "color-function-alias-notation": 85,
-      "color-function-notation": 85,
+      "alpha-value-notation": 20,
+      "color-function-alias-notation": 20,
+      "color-function-notation": 20,
       "color-hex-length": 5,
       "declaration-block-no-redundant-longhand-properties": 7,
-      "declaration-empty-line-before": 5,
+      "declaration-empty-line-before": 2,
       "media-feature-range-notation": 6,
-      "no-descending-specificity": 10,
-      "property-no-vendor-prefix": 33,
-      "value-keyword-case": 3
+      "no-descending-specificity": 9,
+      "property-no-vendor-prefix": 12,
+      "value-keyword-case": 2
     }
   }
 }

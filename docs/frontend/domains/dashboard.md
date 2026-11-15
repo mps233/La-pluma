@@ -124,7 +124,7 @@ Dashboard（首屏门禁、页头、唯一刷新调度）
 | `statusLabel` | 有活动 run 时为“当前任务”；否则 loading 时为“当前操作”；否则“运行状态” |
 | `commandTitle` | 不可用 → 连接标题；启动 loading → 对应进行中文案；再按 `waiting`/`running`（标签 → 当前任务 → 默认）/`occupied`/`unknown`/`idle` 回退 |
 | `commandDescription` | 不可用 → 连接说明；loading → 对应说明；再按阶段回退到运行说明、计划消息或待命文案 |
-| `primaryActionLabel` / `statusKey` | `waiting` → “等待继续”；运行 → “正在运行”；否则“开始今日流程”；loading 时状态为 `starting` |
+| `primaryActionLabel` / `primaryActionStatusKey` | `waiting` → “等待继续”；运行 → “正在运行”；否则“开始今日流程”；loading 时状态为 `starting` |
 
 `model/deviceView.ts` 的规则：
 

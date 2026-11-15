@@ -564,39 +564,6 @@
       0 16px 40px rgba(0, 0, 0, 0.28);
   }
 
-  .smooth-panel-shell {
-    display: flex;
-    min-width: 0;
-    border-radius: var(--continuous-radius);
-    overflow: visible;
-  }
-
-  .smooth-panel-shell.smooth-panel-compact {
-    border-radius: var(--radius-xl);
-  }
-
-  .smooth-panel-shell.surface-panel {
-    border: 0;
-    background: transparent;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-
-  .smooth-panel-surface {
-    position: relative;
-    box-sizing: border-box;
-    width: 100%;
-    min-width: 0;
-    flex: 1 1 auto;
-    align-self: stretch;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: inherit;
-    background: var(--card);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-
   .surface-soft {
     background: var(--muted);
     box-shadow: inset 0 0 0 1px var(--border);
@@ -831,86 +798,9 @@
     gap: 1.125rem;
   }
 
-  .app-card {
-    border-radius: var(--radius-xl);
-    padding: 1rem;
-    transition: background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
-  }
-
-  .app-card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.875rem;
-    padding: 0.875rem 1rem;
-    box-shadow: inset 0 -1px 0 var(--border);
-  }
-
-  .app-card-content {
-    padding: 1rem;
-  }
-
   .app-info-card {
     border-radius: var(--radius-xl);
     padding: 0.875rem;
-  }
-
-  .app-button {
-    display: inline-flex;
-    box-sizing: border-box;
-    flex-shrink: 0;
-    align-items: center;
-    justify-content: center;
-    border: 0;
-    border-radius: var(--radius-xl);
-    font-weight: 600;
-    line-height: 1.25;
-    white-space: nowrap;
-    transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
-  }
-
-  .app-activity-indicator {
-    display: inline-flex;
-    flex: 0 0 auto;
-    color: inherit;
-    vertical-align: middle;
-  }
-
-  .app-activity-indicator-fallback {
-    position: relative;
-    animation: app-activity-indicator-spin 1s steps(8, end) infinite;
-  }
-
-  .app-activity-indicator-fallback > span {
-    position: absolute;
-    top: 0;
-    left: 44%;
-    width: 12%;
-    height: 32%;
-    border-radius: 9999px;
-    background: currentColor;
-    transform-origin: 50% 156.25%;
-  }
-
-  .app-activity-indicator-fallback > span:nth-child(1) { opacity: 0.26; transform: rotate(0deg); }
-
-  .app-activity-indicator-fallback > span:nth-child(2) { opacity: 0.35; transform: rotate(45deg); }
-
-  .app-activity-indicator-fallback > span:nth-child(3) { opacity: 0.44; transform: rotate(90deg); }
-
-  .app-activity-indicator-fallback > span:nth-child(4) { opacity: 0.52; transform: rotate(135deg); }
-
-  .app-activity-indicator-fallback > span:nth-child(5) { opacity: 0.6; transform: rotate(180deg); }
-
-  .app-activity-indicator-fallback > span:nth-child(6) { opacity: 0.68; transform: rotate(225deg); }
-
-  .app-activity-indicator-fallback > span:nth-child(7) { opacity: 0.77; transform: rotate(270deg); }
-
-  .app-activity-indicator-fallback > span:nth-child(8) { opacity: 0.86; transform: rotate(315deg); }
-
-  .app-button.is-loading:is(:disabled, .disabled) {
-    cursor: progress !important;
-    opacity: 1 !important;
   }
 
   .theme-toggle-btn {
@@ -924,68 +814,6 @@
     background: color-mix(in srgb, var(--card) 94%, transparent);
     backdrop-filter: blur(22px) saturate(135%);
     -webkit-backdrop-filter: blur(22px) saturate(135%);
-  }
-
-  .app-button:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--primary) 62%, transparent);
-    outline-offset: 2px;
-  }
-
-  .app-button:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-  }
-
-  .app-button-size-sm {
-    height: 2.25rem;
-    padding: 0 0.75rem;
-  }
-
-  .app-button-size-md {
-    height: 2.75rem;
-    padding: 0 1rem;
-  }
-
-  .app-button-size-lg {
-    height: 3rem;
-    padding: 0 1.5rem;
-  }
-
-  .app-icon-button {
-    display: inline-flex;
-    box-sizing: border-box;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    border: 0;
-    border-radius: var(--radius-xl);
-    font-weight: 600;
-    transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
-  }
-
-  .app-icon-button:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--primary) 62%, transparent);
-    outline-offset: 2px;
-  }
-
-  .app-icon-button:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-  }
-
-  .app-icon-button-size-sm {
-    width: 2.25rem;
-    height: 2.25rem;
-  }
-
-  .app-icon-button-size-md {
-    width: 2.75rem;
-    height: 2.75rem;
-  }
-
-  .app-icon-button-size-lg {
-    width: 3rem;
-    height: 3rem;
   }
 
   .app-empty-state {
@@ -1033,56 +861,6 @@
     margin-top: 0.875rem;
   }
 
-  .app-input {
-    width: 100%;
-    height: 2.75rem;
-    min-height: 2.75rem;
-    box-sizing: border-box;
-    border: 0;
-    border-radius: var(--radius-xl);
-    padding: 0 0.75rem;
-    color: var(--foreground);
-    font-size: 0.875rem;
-    font-weight: 500;
-    line-height: 1.25;
-    transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease;
-  }
-
-  select.app-input {
-    padding-right: 2.5rem;
-  }
-
-  .app-input:focus,
-  .app-input:focus-visible {
-    outline: none;
-  }
-
-  .app-input:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-  }
-
-  .app-input:disabled:hover {
-    background: color-mix(in srgb, var(--card) 78%, transparent);
-    box-shadow:
-      inset 0 0 0 1px var(--input),
-      0 1px 2px rgba(15, 23, 42, 0.025);
-  }
-
-  .dark .app-input:disabled:hover {
-    background: var(--muted);
-    box-shadow:
-      inset 0 0 0 1px var(--input),
-      0 1px 3px rgba(0, 0, 0, 0.18);
-  }
-
-  .app-checkbox {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
-  }
-
   [data-slot="checkbox"][data-indeterminate] {
     border-color: var(--primary) !important;
     background-color: var(--primary) !important;
@@ -1102,8 +880,6 @@
   }
 
   @media (max-width: 640px) {
-    .app-card-header,
-    .app-card-content,
     .app-info-card {
       padding: 0.875rem;
     }
@@ -1157,13 +933,6 @@
       0 2px 6px rgba(0, 0, 0, 0.24);
   }
 
-  .app-button.control-surface,
-  .app-icon-button.control-surface {
-    background: var(--muted);
-    color: var(--foreground);
-    box-shadow: none;
-  }
-
   input.control-surface:not(.app-native-control),
   textarea.control-surface:not(.app-native-control),
   select.control-surface:not(.app-native-control) {
@@ -1178,22 +947,6 @@
     background-position: right 0.625rem center;
     background-repeat: no-repeat;
     background-size: 1rem 1rem;
-  }
-
-  .app-input.control-surface:focus,
-  .app-input.control-surface:focus-visible {
-    box-shadow:
-      inset 0 0 0 1px var(--primary),
-      0 0 0 3px var(--primary-soft);
-  }
-
-  .app-button-ghost:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--primary-soft) 36%, transparent);
-    color: var(--foreground);
-  }
-
-  .dark .app-button-ghost:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--primary-soft) 28%, transparent);
   }
 
   .control-active {
@@ -1284,13 +1037,6 @@
 
   .form-error-surface {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--destructive) 34%, transparent);
-  }
-
-  .app-input.form-error-surface:focus,
-  .app-input.form-error-surface:focus-visible {
-    box-shadow:
-      inset 0 0 0 1px var(--destructive),
-      0 0 0 3px color-mix(in srgb, var(--destructive) 18%, transparent);
   }
 
   .app-workspace-segments {
@@ -1441,26 +1187,15 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .app-activity-indicator-fallback {
-      animation: none !important;
-    }
-
     [data-slot='skeleton'] {
       animation: none !important;
     }
 
-    .app-card,
-    .app-button,
-    .app-icon-button,
     .theme-toggle-btn,
     .surface-panel-hover {
       scroll-behavior: auto !important;
       transition-duration: 0.01ms !important;
     }
-  }
-
-  .app-loading > .app-activity-indicator {
-    color: var(--primary-strong) !important;
   }
 
   @media (prefers-reduced-transparency: reduce) {
@@ -1469,188 +1204,15 @@
       backdrop-filter: none !important;
       -webkit-backdrop-filter: none !important;
     }
-
-    .app-card-smooth-surface,
-    .smooth-panel-surface {
-      background: var(--card) !important;
-      backdrop-filter: none !important;
-      -webkit-backdrop-filter: none !important;
-    }
-
-    .app-card[data-smooth-corners='true'],
-    .smooth-panel-shell.surface-panel {
-      background: transparent !important;
-      backdrop-filter: none !important;
-      -webkit-backdrop-filter: none !important;
-    }
   }
 
   @media (pointer: coarse), (max-width: 768px) {
-    .app-button-size-sm,
-    .app-button-size-md,
-    .app-button-size-lg,
-    .app-input,
     .theme-toggle-btn {
-      min-height: 2.75rem !important;
-      height: 2.75rem !important;
-    }
-
-    .app-icon-button-size-sm,
-    .app-icon-button-size-md,
-    .app-icon-button-size-lg,
-    .theme-toggle-btn {
-      min-width: 2.75rem !important;
       width: 2.75rem !important;
-      min-height: 2.75rem !important;
+      min-width: 2.75rem !important;
       height: 2.75rem !important;
-    }
-
-    .app-checkbox {
       min-height: 2.75rem !important;
     }
-  }
-
-  .app-switch {
-    position: relative;
-    display: block;
-    width: 3.1875rem;
-    height: 1.9375rem;
-    flex: 0 0 auto;
-    border-radius: 9999px;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .app-switch-compact {
-    width: 2.5625rem;
-    height: 1.5625rem;
-  }
-
-  .app-switch > input[type="checkbox"] {
-    position: absolute;
-    top: 50%;
-    left: 0;
-    z-index: 4;
-    display: block;
-    width: 100%;
-    height: 2.75rem;
-    margin: 0;
-    opacity: 0;
-    cursor: pointer;
-    transform: translateY(-50%);
-  }
-
-  .app-switch:has(input:focus-visible) {
-    outline: 2px solid var(--primary);
-    outline-offset: 3px;
-  }
-
-  .app-switch.is-disabled {
-    opacity: 0.42;
-  }
-
-  .app-switch.is-disabled > input[type="checkbox"] {
-    cursor: not-allowed;
-  }
-
-  .app-switch-track {
-    position: relative;
-    display: block;
-    width: 100%;
-    height: 100%;
-    border-radius: inherit;
-    background: color-mix(in srgb, var(--tertiary-foreground) 28%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tertiary-foreground) 12%, transparent);
-    transition: background-color 220ms ease, box-shadow 220ms ease;
-  }
-
-  .app-switch-thumb {
-    position: absolute;
-    top: 0.125rem;
-    left: 0.125rem;
-    width: 1.6875rem;
-    height: 1.6875rem;
-    border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.24), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
-    transform: translateX(0);
-    transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .app-switch-compact .app-switch-thumb {
-    width: 1.3125rem;
-    height: 1.3125rem;
-  }
-
-  .app-switch > input[type="checkbox"]:checked + .app-switch-track {
-    background: var(--primary);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 72%, transparent);
-  }
-
-  .app-switch > input[type="checkbox"]:checked + .app-switch-track .app-switch-thumb {
-    transform: translateX(1.25rem);
-  }
-
-  .app-switch-compact > input[type="checkbox"]:checked + .app-switch-track .app-switch-thumb {
-    transform: translateX(1rem);
-  }
-
-  .app-switch:active:not(.is-disabled) .app-switch-thumb {
-    transform: scale(0.94);
-  }
-
-  .app-switch:active:not(.is-disabled) > input[type="checkbox"]:checked + .app-switch-track .app-switch-thumb {
-    transform: translateX(1.25rem) scale(0.94);
-  }
-
-  .app-switch-compact:active:not(.is-disabled) > input[type="checkbox"]:checked + .app-switch-track .app-switch-thumb {
-    transform: translateX(1rem) scale(0.94);
-  }
-
-  .custom-checkbox {
-    appearance: none;
-    -webkit-appearance: none;
-
-    /* 自定义复选框视觉尺寸固定 20px，调用处的 h-4 / w-4 不应再缩小它。 */
-    width: 1.25rem !important;
-    height: 1.25rem !important;
-    border: 2px solid var(--input);
-    border-radius: var(--radius-md);
-    background-color: var(--card);
-    cursor: pointer;
-    position: relative;
-    transition: all 0.2s;
-    flex-shrink: 0;
-  }
-
-  .dark .custom-checkbox {
-    background-color: var(--muted);
-  }
-
-  .custom-checkbox:hover {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--primary-soft);
-  }
-
-  .dark .custom-checkbox:hover {
-    background-color: var(--primary-soft);
-  }
-
-  .custom-checkbox:checked {
-    background: linear-gradient(135deg, var(--primary), var(--primary-strong));
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--primary-soft);
-  }
-
-  .custom-checkbox:checked::after {
-    content: '';
-    position: absolute;
-    left: 50%;
-    top: 45%;
-    transform: translate(-50%, -50%) rotate(45deg);
-    width: 0.35rem;
-    height: 0.65rem;
-    border: solid white;
-    border-width: 0 2px 2px 0;
   }
 
   .dark ::-webkit-scrollbar-track {
@@ -1780,12 +1342,6 @@
 
     50% {
       opacity: 0.35;
-    }
-  }
-
-  @keyframes app-activity-indicator-spin {
-    to {
-      transform: rotate(360deg);
     }
   }
 

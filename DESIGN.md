@@ -94,34 +94,28 @@ spacing:
   control-x: "16px"
 components:
   button-primary:
-    backgroundColor: "{colors.accent-action}"
-    textColor: "#ffffff"
-    rounded: "{rounded.lg}"
-    padding: "0 10px"
-    height: "32px"
-  button-primary-hover:
-    backgroundColor: "{colors.accent-action-pressed}"
+    backgroundColor: "{colors.accent}"
     textColor: "#ffffff"
     rounded: "{rounded.lg}"
     padding: "0 10px"
     height: "32px"
   button-secondary:
-    backgroundColor: "{colors.surface-muted}"
+    backgroundColor: "{colors.bg-soft}"
     textColor: "{colors.text}"
     rounded: "{rounded.lg}"
     padding: "0 10px"
     height: "32px"
   button-ghost:
     backgroundColor: "transparent"
-    textColor: "{colors.text-muted}"
+    textColor: "{colors.text}"
     rounded: "{rounded.lg}"
     padding: "0 10px"
     height: "32px"
   input:
-    backgroundColor: "{colors.surface-solid}"
+    backgroundColor: "transparent"
     textColor: "{colors.text}"
     rounded: "{rounded.lg}"
-    padding: "0 10px"
+    padding: "4px 10px"
     height: "32px"
   card:
     backgroundColor: "{colors.surface-solid}"
@@ -195,7 +189,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 整体调色板是 Apple 系统色在冷灰纸面上的克制组合：一个系统蓝强调色，一组石墨中性色，以及只用于状态反馈的语义色。
 
 ### Primary
-- **System Blue** (`#007aff`；深色 `#0a84ff`)：当前导航项、主操作、链接、焦点环、选中控件和运行中状态。实心操作使用 `#0066cc`，按下使用 `#0055b3`，弱背景使用 `rgba(0, 122, 255, 0.12)`。
+- **System Blue** (`#007aff`；深色 `#0a84ff`)：当前导航项、主操作、链接、焦点环、选中控件和运行中状态。按钮主操作使用 shadcn `bg-primary`（即上述 System Blue，hover 为 `bg-primary/80`）；`.brand-action` 实心表面使用 `#0066cc`，按下 `#0055b3`，用于分段控件等应用自绘表面；弱背景使用 `rgba(0, 122, 255, 0.12)`。
 - **Blue Signal Rule**：蓝色只承担“当前 / 主要 / 可交互”的信号，不用于装饰性标题、图标底色或大面积背景。
 
 ### Secondary
@@ -306,18 +300,18 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ### Buttons
 - **Shape:** `rounded-lg`（12px），无边框；`Button` 的尺寸档位由 shadcn base-nova 提供。
 - **Sizes:** `xs` 24px、`sm` 28px、`default` 32px、`lg` 36px；图标档 `icon-xs` 24px、`icon-sm` 28px、`icon` 32px、`icon-lg` 36px。手机断点和粗指针设备沿用同一紧凑档位，不额外放大。
-- **Primary:** `brand-action`（`#0066cc` 实心、白字、轻微蓝色投影）；hover 只压暗，不增加渐变或光晕。
-- **Secondary / Outline:** `control-surface` + `text-foreground`；hover 使用弱主题背景和轻描边。
-- **Danger / Success:** `status-danger-action` / `status-success-action`，语义必须与操作后果一致。
-- **Ghost:** 透明底 + `text-muted-foreground`；hover 只使用弱主题背景。
+- **Primary:** shadcn `bg-primary`（浅色 `#007aff`、深色 `#0a84ff`、白字）；hover 使用 `bg-primary/80`，不增加渐变或光晕。
+- **Secondary / Outline:** Secondary 使用 `bg-secondary`；Outline 使用 `border-border bg-background`，hover 使用 `bg-muted`。
+- **Danger:** 使用 `destructive` variant（`bg-destructive/10` + `text-destructive`），语义必须与操作后果一致。
+- **Ghost:** 透明底、文字继承 `foreground`；hover 使用 `bg-muted`。
 - **Focus:** `focus-visible:border-ring` 与 `focus-visible:ring-3 focus-visible:ring-ring/50`；所有可点击元素都必须有明确的 `focus-visible` 状态。
-- **Disabled / Loading:** disabled 使用 `opacity-50`、`cursor-not-allowed`，关闭点击与 hover；loading 期间自动禁用，仅显示加载指示器和 `loadingText`。不要在调用处叠加 `h-*`、`px-*`、`py-*` 缩小标准控件。
+- **Disabled / Loading:** disabled 使用 `pointer-events-none`、`opacity-50`，关闭点击与 hover；loading 由调用点用 `disabled` + `aria-busy` 表达，并以 `LoaderCircle` 和进行中文案替换内容。不要在调用处叠加 `h-*`、`px-*`、`py-*` 缩小标准控件。
 
 ### Inputs / Fields
-- **Style:** 32px 高（`h-8`）、`rounded-lg`（12px）的 shadcn `Input`；边框、背景与状态色使用 shadcn 语义 token。
+- **Style:** 32px 高（`h-8`）、`rounded-lg`（12px）的 shadcn `Input`；`bg-transparent`、边框与状态色使用 shadcn 语义 token，深色模式由生成物的 `dark:bg-input/30` 叠加。
 - **Focus:** `focus-visible:border-ring` 与 `focus-visible:ring-3 focus-visible:ring-ring/50`；不要用高饱和外发光。
-- **Error:** `aria-invalid` 触发 destructive 边框与 ring，错误文本使用 `form-error-text`；`hint` 只在没有错误时显示。
-- **Controls:** 二元启停使用 `Switch`（默认 32×18.4px 胶囊，`sm` 24×14px）；多选或参数组合使用 `Checkbox`（16×16px）；新增表单优先使用 `Input`、`Select`、`Checkbox`、`Switch`，手写原生控件使用 `app-input control-surface`、`app-checkbox`。
+- **Error:** `aria-invalid` 触发 destructive 边框与 ring，错误文本使用 `form-error-text`；字段说明由 feature field helper 或 `FieldHint` 承担，原语没有 `hint` prop。
+- **Controls:** 二元启停使用 `Switch`（默认 32×18.4px 胶囊，`sm` 24×14px）；多选或参数组合使用 `Checkbox`（16×16px）；新增表单直接使用 `@/shared/ui` 的 `Input`、`Select`、`Checkbox`、`Switch`，字段行由 feature field helper 组合标签、错误与说明。`autoComplete="off"` 由消费点或 field helper 显式传入，生成原语没有该默认值。
 
 ### Cards / Containers
 - **Corner Style:** shadcn `Card` 使用 `rounded-xl`（16px）；连续曲率只由玻璃主题皮肤层提供。
@@ -343,7 +337,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 | 情况 | 使用方式 |
 | --- | --- |
-| 字段校验失败 | `Input`、`Select` 使用 `aria-invalid` 与错误文本；`hint` 只在没有错误时显示 |
+| 字段校验失败 | 字段行由 feature field helper 传 `aria-invalid` 与错误文本；说明由 helper 或 `FieldHint` 承担，错误显示时不叠加说明 |
 | 控制台首次且没有本地缓存 | 控制台内部的 `DashboardSkeleton`；恢复或返回页面时先显示最后一次成功快照并后台刷新，不要重播整页骨架 |
 | 局部内容正在读取 | `Loading` |
 | 列表、流程或卡片无数据 | `EmptyState`，按容器选择 `compact` |
@@ -356,7 +350,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ### Icons
 - 普通功能图标优先使用已引入的 `lucide-react`；业务身份和概览图标优先复用 `Icons.tsx`。一级工作区标题与控制台一致，不添加装饰图标；不要在普通页面重复手写 SVG。
 - 行内或文字旁图标使用 16px，常规操作和字段图标使用 20px，页面标题或大操作使用 24px。`icon-well` 只用于页面、概览和卡片的内容身份图标，不能包裹普通按钮图标。
-- 无文字操作使用 Button 的 `size="icon"`（`icon-xs`/`icon-sm`/`icon`/`icon-lg`），调用时必须提供 `title` 和 `aria-label`；有文字的操作通过 `data-icon` 传入图标，不要在调用处额外覆盖图标与文字间距或按钮尺寸。
+- 无文字操作使用 Button 的 `size="icon"`（`icon-xs`/`icon-sm`/`icon`/`icon-lg`），调用时必须提供 `title` 和 `aria-label`；有文字的操作把图标作为 children 传入并加 `aria-hidden="true"`，图标尺寸由生成组件的内建规则处理，不要在调用处额外覆盖图标与文字间距或按钮尺寸。
 - 装饰图标加 `aria-hidden="true"`；状态和结果必须同时提供可读文字或 `aria-label`，不能只依赖颜色和图标。
 
 ## Do's and Don'ts

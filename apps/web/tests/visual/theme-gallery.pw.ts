@@ -103,6 +103,71 @@ for (const theme of THEMES) {
       await expectNoBrowserErrors(page)
     })
 
+    test(`buttons ${theme}`, async ({ page }) => {
+      test.skip(test.info().project.name !== 'desktop', 'the button group is captured once per theme')
+
+      const environment = await installDeterministicEnvironment(page)
+
+      await page.goto('/dev/theme-gallery')
+      await waitForPageReady(page, 'gallery')
+
+      const buttons = page.locator('[data-region="gallery-buttons"]')
+      await buttons.scrollIntoViewIfNeeded()
+      await expect(buttons).toBeVisible()
+
+      for (const name of ['保存草稿', '查看日志', '导出数据', '忽略', '停止执行', '查看文档']) {
+        await expect(buttons.getByRole('button', { name, exact: true }).first()).toBeVisible()
+      }
+      for (const name of ['超小', '小尺寸', '中尺寸', '大尺寸']) {
+        await expect(buttons.getByRole('button', { name, exact: true })).toBeVisible()
+      }
+
+      const loading = buttons.getByRole('button', { name: '执行中', exact: true })
+      await expect(loading).toBeVisible()
+      await expect(loading.locator('svg')).toBeVisible()
+      await expect(buttons.getByRole('button', { name: '同步中', exact: true })).toBeDisabled()
+      await expect(buttons.getByRole('button', { name: '不可用', exact: true })).toBeDisabled()
+      await expect(buttons.getByRole('button', { name: '已停止', exact: true })).toBeDisabled()
+
+      for (const name of ['图标 超小', '图标 小尺寸', '图标 中尺寸', '图标 大尺寸', '刷新', '删除']) {
+        await expect(buttons.getByRole('button', { name, exact: true })).toBeVisible()
+      }
+
+      await expect(buttons).toHaveScreenshot(`theme-gallery-buttons-${theme}.png`, {
+        animations: 'disabled',
+        caret: 'hide',
+      })
+
+      environment.assertNoUnmatchedApi()
+      await expectNoBrowserErrors(page)
+    })
+
+    test(`page skeletons ${theme}`, async ({ page }) => {
+      test.skip(test.info().project.name !== 'desktop', 'the page skeleton group is captured once per theme')
+
+      const environment = await installDeterministicEnvironment(page)
+
+      await page.goto('/dev/theme-gallery')
+      await waitForPageReady(page, 'gallery')
+
+      const skeletons = page.locator('[data-region="gallery-page-skeletons"]')
+      await skeletons.scrollIntoViewIfNeeded()
+      await expect(skeletons).toBeVisible()
+
+      const busy = skeletons.locator('[aria-busy="true"]')
+      await expect(busy).toBeVisible()
+      await expect(busy).toHaveAttribute('aria-label', '页面内容加载中')
+      await expect(busy.locator('[aria-hidden="true"]').first()).toBeVisible()
+
+      await expect(skeletons).toHaveScreenshot(`theme-gallery-page-skeletons-${theme}.png`, {
+        animations: 'disabled',
+        caret: 'hide',
+      })
+
+      environment.assertNoUnmatchedApi()
+      await expectNoBrowserErrors(page)
+    })
+
     test(`select popup ${theme}`, async ({ page }) => {
       test.skip(test.info().project.name !== 'desktop', 'the select popup state is captured once per theme')
 

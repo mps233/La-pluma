@@ -78,16 +78,18 @@ export function ThemeGalleryGlobalSurfaces() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="border-b py-3.5">
-          <CardTitle role="heading" aria-level={3}>整页骨架</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-72 overflow-hidden rounded-xl border border-border">
-            <PageSkeleton variant="config" />
-          </div>
-        </CardContent>
-      </Card>
+      <div data-region="gallery-page-skeletons">
+        <Card>
+          <CardHeader className="border-b py-3.5">
+            <CardTitle role="heading" aria-level={3}>整页骨架</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-72 overflow-hidden rounded-xl border border-border">
+              <PageSkeleton variant="config" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader className="border-b py-3.5">
@@ -116,61 +118,63 @@ export function ThemeGalleryGlobalSurfaces() {
 
       <ThemeGalleryCards />
 
-      <Card>
-        <CardHeader className="border-b py-3.5">
-          <CardTitle role="heading" aria-level={3}>按钮变体</CardTitle>
-        </CardHeader>
-        <CardContent className="app-stack-card">
-          <div className="flex flex-wrap items-center gap-3.5">
-            {buttonVariants.map(({ variant, label, icon }) => {
-              const VariantIcon = icon
-              return (
-                <Button key={variant} variant={variant}>
-                  <VariantIcon size={16} aria-hidden="true" />
-                  {label}
-                </Button>
-              )
-            })}
-          </div>
-          <div className="flex flex-wrap items-center gap-3.5">
-            {buttonVariants.map(({ variant, label }) => (
-              <Button key={variant} variant={variant}>{label}</Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div data-region="gallery-buttons" className="grid gap-4.5">
+        <Card>
+          <CardHeader className="border-b py-3.5">
+            <CardTitle role="heading" aria-level={3}>按钮变体</CardTitle>
+          </CardHeader>
+          <CardContent className="app-stack-card">
+            <div className="flex flex-wrap items-center gap-3.5">
+              {buttonVariants.map(({ variant, label, icon }) => {
+                const VariantIcon = icon
+                return (
+                  <Button key={variant} variant={variant}>
+                    <VariantIcon size={16} aria-hidden="true" />
+                    {label}
+                  </Button>
+                )
+              })}
+            </div>
+            <div className="flex flex-wrap items-center gap-3.5">
+              {buttonVariants.map(({ variant, label }) => (
+                <Button key={variant} variant={variant}>{label}</Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader className="border-b py-3.5">
-          <CardTitle role="heading" aria-level={3}>按钮状态与尺寸</CardTitle>
-        </CardHeader>
-        <CardContent className="app-stack-card">
-          <div className="flex flex-wrap items-center gap-3.5">
-            {buttonSizes.map(({ size, label }) => (
-              <Button key={size} variant="secondary" size={size}>{label}</Button>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-3.5">
-            <Button><LoaderCircle className="animate-spin" aria-hidden="true" />执行中</Button>
-            <Button variant="secondary" disabled><LoaderCircle className="animate-spin" aria-hidden="true" />同步中</Button>
-            <Button variant="ghost" disabled>不可用</Button>
-            <Button variant="destructive" disabled>已停止</Button>
-          </div>
-          <div className="flex flex-wrap items-center gap-3.5">
-            {iconButtonSizes.map(({ size, label }) => (
-              <Button key={size} size={size} variant="secondary" title={label} aria-label={label}>
-                <Plus aria-hidden="true" />
+        <Card>
+          <CardHeader className="border-b py-3.5">
+            <CardTitle role="heading" aria-level={3}>按钮状态与尺寸</CardTitle>
+          </CardHeader>
+          <CardContent className="app-stack-card">
+            <div className="flex flex-wrap items-center gap-3.5">
+              {buttonSizes.map(({ size, label }) => (
+                <Button key={size} variant="secondary" size={size}>{label}</Button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-3.5">
+              <Button><LoaderCircle className="animate-spin" aria-hidden="true" />执行中</Button>
+              <Button variant="secondary" disabled><LoaderCircle className="animate-spin" aria-hidden="true" />同步中</Button>
+              <Button variant="ghost" disabled>不可用</Button>
+              <Button variant="destructive" disabled>已停止</Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-3.5">
+              {iconButtonSizes.map(({ size, label }) => (
+                <Button key={size} size={size} variant="secondary" title={label} aria-label={label}>
+                  <Plus aria-hidden="true" />
+                </Button>
+              ))}
+              <Button size="icon" variant="ghost" title="刷新" aria-label="刷新">
+                <RefreshCw size={16} aria-hidden="true" />
               </Button>
-            ))}
-            <Button size="icon" variant="ghost" title="刷新" aria-label="刷新">
-              <RefreshCw size={16} aria-hidden="true" />
-            </Button>
-            <Button size="icon" variant="destructive" title="删除" aria-label="删除">
-              <Trash2 size={16} aria-hidden="true" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              <Button size="icon" variant="destructive" title="删除" aria-label="删除">
+                <Trash2 size={16} aria-hidden="true" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <div data-region="gallery-form-controls">
         <Card>

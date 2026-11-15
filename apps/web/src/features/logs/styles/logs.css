@@ -375,17 +375,8 @@
       gap: 0.75rem;
     }
 
-    .log-toolbar-actions > .app-button {
-      flex: 1;
-    }
-
     .log-console-heading-actions {
       gap: 0.375rem;
-    }
-
-    .log-console-heading-actions .app-button {
-      padding-right: 0.625rem;
-      padding-left: 0.625rem;
     }
 
     .log-console-content {

@@ -6,7 +6,7 @@
 
 ## 概述
 
-为了减少重复代码、统一视觉风格、提升开发效率，项目维护一套通用 UI 组件。应用层组件位于 `apps/web/src/shared/components/*.tsx`，通过 `apps/web/src/shared/components/index.ts` 统一导出，页面中统一从 `@/shared/components` 引入。shadcn CLI 生成的上游原语位于 `apps/web/src/shared/ui/`，随上游原样保留；本文件记录这些原语的组合用法（如 `Card`）与必须遵循的应用层约定。
+为了减少重复代码、统一视觉风格、提升开发效率，项目维护一套通用 UI 组件。shadcn CLI 生成的上游原语位于 `apps/web/src/shared/ui/`，随上游原样保留；`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card` 等控件直接从对应的 `@/shared/ui/*` 模块导入。应用层组合组件位于 `apps/web/src/shared/components/*.tsx`，通过 `apps/web/src/shared/components/index.ts` 统一导出，页面从 `@/shared/components` 引入。本文件记录生成原语的组合用法与必须遵循的应用层约定。
 
 加载占位直接使用 `@/shared/ui/skeleton` 的 `Skeleton`，不要在应用层重写 shimmer 或另建骨架原语。
 
@@ -92,66 +92,81 @@ import {
 
 ---
 
-### Button / IconButton
+### Button
 
-**文件位置**：`apps/web/src/shared/components/LegacyButton.tsx`
+**文件位置**：`apps/web/src/shared/ui/button.tsx`（shadcn 生成物，随上游原文保留）
 
-**适用场景**：文本按钮、主要操作、危险操作、图标按钮。
+**适用场景**：文本按钮、主要操作、危险操作与图标按钮。
 
 ```tsx
-import { Button, IconButton } from '@/shared/components'
-import { RefreshCw, Save } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
+import { LoaderCircle, RefreshCw, Save } from 'lucide-react'
 
-<Button variant="primary" icon={<Save />}>保存</Button>
-<Button variant="danger" loading={deleting}>删除</Button>
-<IconButton icon={<RefreshCw />} title="刷新" />
+<Button><Save aria-hidden="true" />保存</Button>
+<Button variant="destructive" disabled={deleting} aria-busy={deleting || undefined}>
+  {deleting ? <><LoaderCircle className="animate-spin" aria-hidden="true" />删除中</> : '删除'}
+</Button>
+<Button variant="ghost" size="icon" title="刷新" aria-label="刷新">
+  <RefreshCw aria-hidden="true" />
+</Button>
 ```
 
-`Button` 支持 `primary`、`secondary`、`outline`、`success`、`danger`、`ghost`。`IconButton` 仅支持 `primary`、`secondary`、`danger`、`ghost`。新增按钮优先走 `variant`，不要在页面里手写一套按钮颜色、阴影和圆角。
+`Button` 的 `variant` 为 `default`、`secondary`、`outline`、`ghost`、`destructive`、`link`；`size` 为 `xs`、`sm`、`default`、`lg`、`icon-xs`、`icon-sm`、`icon`、`icon-lg`。新增按钮优先使用这些档位，不要在页面里手写一套按钮颜色、阴影和圆角。
 
-`Button` 的 loading 状态会显示紧凑的 iOS 活动指示器并保留 `loadingText`；页面不要再给同一操作叠加第二个旋转图标。
+图标作为按钮的 children 直接渲染，并添加 `aria-hidden="true"`；图标尺寸由生成组件的内建规则处理，不要在调用处传旧的 `icon` prop 或覆盖图标与文字间距。无文字操作使用 `size="icon"` 档位，调用时必须同时提供 `title` 和 `aria-label`。
+
+loading 不是 `Button` 的 prop：调用点用 `disabled` 阻止重复提交，加 `aria-busy`，并用 `LoaderCircle` 与进行中文案替换原内容；不存在 `loadingText`。同一操作不要叠加第二个旋转图标。
 
 ---
 
 ### Input / Select / Checkbox / Switch
 
-**文件位置**：`apps/web/src/shared/components/LegacyInput.tsx`、`apps/web/src/shared/components/Switch.tsx`
+**文件位置**：`apps/web/src/shared/ui/input.tsx`、`apps/web/src/shared/ui/select.tsx`、`apps/web/src/shared/ui/checkbox.tsx`、`apps/web/src/shared/ui/switch.tsx`（均为 shadcn 生成物）
 
 **适用场景**：表单输入、选择、错误提示、说明文字与二元设置。
 
 ```tsx
-import { Input, Select, Checkbox, Switch } from '@/shared/components'
+import { Input } from '@/shared/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
+import { Checkbox } from '@/shared/ui/checkbox'
+import { Switch } from '@/shared/ui/switch'
 
-<Input
-  label="ADB 路径"
-  value={adbPath}
-  onChange={setAdbPath}
-  error={adbPathError}
-/>
+<div>
+  <label htmlFor="adb-path" className="mb-2 block text-sm font-medium text-muted-foreground">ADB 路径</label>
+  <Input
+    id="adb-path"
+    autoComplete="off"
+    aria-invalid={Boolean(adbPathError)}
+    aria-errormessage={adbPathError ? 'adb-path-error' : undefined}
+  />
+  {adbPathError && <p id="adb-path-error" role="alert" className="form-error-text">{adbPathError}</p>}
+</div>
 
-<Select
-  label="队列策略"
-  value={strategy}
-  onChange={setStrategy}
-  options={strategyOptions}
-/>
+<Select items={strategyOptions} value={strategy} onValueChange={setStrategy}>
+  <SelectTrigger id="strategy" className="w-full"><SelectValue /></SelectTrigger>
+  <SelectContent>
+    {strategyOptions.map(item => (
+      <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+    ))}
+  </SelectContent>
+</Select>
 
-<Checkbox
-  label="失败后继续下一个"
-  checked={continueOnFailure}
-  onChange={setContinueOnFailure}
-/>
+<label className="group flex min-h-11 cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+  <Checkbox checked={continueOnFailure} onCheckedChange={setContinueOnFailure} />
+  <span className="transition-colors group-hover:text-primary">失败后继续下一个</span>
+</label>
 
-<Switch
-  label="启用定时执行"
-  checked={scheduleEnabled}
-  onChange={setScheduleEnabled}
-/>
+<label className="flex min-h-11 items-center justify-between gap-2 text-sm text-muted-foreground">
+  启用定时执行
+  <Switch checked={scheduleEnabled} onCheckedChange={setScheduleEnabled} aria-label="启用定时执行" />
+</label>
 ```
 
-`Input`、`Select` 使用 `@/shared/ui` 的 shadcn 原语，不内置 `hint`/`error` 布局；字段行由各 feature 的 field helper 组合标签与错误态，说明提示使用下方 `FieldHint`。多行文本使用原生 `textarea`。表单错误态使用 `aria-invalid` 与 `aria-errormessage`，不要在页面里单独手写红色边框和错误文字。
+`Input`、`Select`、`Checkbox`、`Switch` 直接导入 `@/shared/ui/*`，原语不提供 `label`、`error`、`hint` 或 `hintPlacement` props。字段行由各 feature 的 field helper 组合标签、控件与错误态；说明提示使用下方 `FieldHint`，不要给原语另加说明参数。多行文本使用原生 `textarea`。
 
-`Input` 默认关闭浏览器自动填充历史（`autoComplete="off"`），避免配置值与搜索词混入输入框下拉提示；确实需要浏览器记住输入时才显式传 `autoComplete`。原生 `input` 同样补上该属性。
+错误态给控件传 `aria-invalid`，需要与错误文本建立关联时再传 `aria-errormessage`；错误文本使用 `form-error-text`，不要在页面里单独手写红色边框。`Select` 由 Root、`SelectTrigger`、`SelectValue`、`SelectContent` 与 `SelectItem` 组合，受控值通过 `value` / `onValueChange` 传递；选项数组传给 Root 的 `items`，`SelectValue` 才能显示当前标签。
+
+`autoComplete="off"` 是消费点（feature field helper 或直接调用处）的契约，不是 `@/shared/ui/input` 原语的默认值。配置值与搜索词在新增输入时显式关闭浏览器自动填充历史，确实需要浏览器记住输入时才改为显式传入其他值。
 
 ---
 
@@ -180,7 +195,9 @@ import { FieldHint } from '@/shared/components'
 **适用场景**：流程、列表、统计区或数据面板暂时没有内容。通过 `@/shared/components` 导入，不要在页面中各自拼装“暂无数据”的图标、文案和间距。
 
 ```tsx
-import { EmptyState, Button } from '@/shared/components'
+import { EmptyState } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
+import Icons from '@/shared/components/Icons'
 
 <EmptyState
   compact
@@ -232,7 +249,7 @@ import { ConfirmAlertDialog, Loading } from '@/shared/components'
 - `AlertDialog` 用于必须显式确认的操作；`role="alertdialog"` 由原语提供。
 - 嵌套弹层按 React 父子关系组合（如发现弹窗内的筛选弹窗、详情抽屉上的重置确认框），Base UI 依此管理 Escape 层级、焦点归还与滚动锁。
 
-`ActivityIndicator` 是供 `Button` 和 `Loading` 内部复用的 iOS 活动指示器，页面不要直接调用或叠加第二个动态指示器。`DashboardSkeleton` 是控制台域专用骨架，位于 `features/dashboard/components/DashboardSkeleton.tsx`，不属于 `shared/components` 的公共导出。
+`DashboardSkeleton` 是控制台域专用骨架，位于 `features/dashboard/components/DashboardSkeleton.tsx`，不属于 `shared/components` 的公共导出。
 
 ---
 
@@ -282,6 +299,22 @@ import { PageSkeleton } from '@/shared/components'
 
 ---
 
+### Icons
+
+**文件位置**：`apps/web/src/shared/components/Icons.tsx`
+
+**适用场景**：业务身份与概览图标。组件以默认对象导出，页面从 `@/shared/components/Icons` 导入后按名称使用；普通功能图标优先使用 `lucide-react`，不要在页面重复手写 SVG。
+
+```tsx
+import Icons from '@/shared/components/Icons'
+
+<Icons.TrendingUp />
+```
+
+业务身份图标（Play、Sword、Gift 等）自带 `icon-well` 身份底座，只用于页面、概览和卡片的内容身份，不能包裹普通按钮图标；`TrendingUp`、`Zap`、`Star`、`RefreshCw`、`Crosshair` 等概览/内联图标是裸 SVG。装饰图标加 `aria-hidden="true"`；状态与结果同时提供可读文字或 `aria-label`。
+
+---
+
 ### useFluidTabIndicator
 
 **文件位置**：`apps/web/src/shared/hooks/useFluidTabIndicator.ts`
@@ -318,11 +351,11 @@ const { containerRef, activeRect, setTabRef } = useFluidTabIndicator(activeTab)
 1. 页面外层使用 `app-page`，主内容使用 `app-stack-section`。
 2. 页面标题使用 `PageHeader`。
 3. 大面板使用 `Card` 组合；分节自持内边距时给 `Card` 加 `gap-0 p-0!`。
-4. 表单使用 `Input`、`Select`、`Checkbox`、`Switch`；多行文本复用 `app-input control-surface`。
+4. 表单使用 `@/shared/ui` 的 `Input`、`Select`、`Checkbox`、`Switch` 原语，并用所属 feature 的 field helper 组合标签与错误；多行文本使用原生 `textarea`。
 5. 没有内容时使用 `EmptyState`，不要重复手写空状态。
 6. 动态分段标签优先使用 `useFluidTabIndicator`，不要复制测量逻辑。
 7. 页面全局执行状态使用 `FloatingStatusIndicator`；局部状态使用既有 `status-*` 语义类并紧邻相关操作。
-8. 操作用 `Button`、`IconButton`。
+8. 操作用 `@/shared/ui/button` 的 `Button`；无文字操作使用 `size="icon"` 档位并同时提供 `title` 与 `aria-label`。
 9. 如果出现新的颜色、圆角、间距需求，先按根目录 [设计规范](../../DESIGN.md) 判断是否应抽成 token 或语义类。
 
 ### Tailwind 动态类名
