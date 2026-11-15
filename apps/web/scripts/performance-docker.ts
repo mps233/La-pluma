@@ -67,7 +67,7 @@ if (buildMetadata && (buildMetadata.buildMode !== 'production-with-react-profili
 // --pull=never ensures this entry point uses the existing, reviewed environment.
 const metadata = {
   sourceCommit: command('git', ['rev-parse', 'HEAD']),
-  sourceFilesDirty: command('git', ['status', '--porcelain', '--', 'apps/web/src', 'apps/web/vite.config.ts', 'pnpm-lock.yaml']) !== '',
+  sourceFilesDirty: command('git', ['status', '--porcelain', '--', 'apps/web/src', 'apps/web/scripts/vite', 'apps/web/vite.config.ts', 'pnpm-lock.yaml']) !== '',
   buildMode: 'production',
   ...(buildMetadata ?? {}),
   distSha256,

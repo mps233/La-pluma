@@ -62,7 +62,7 @@ const missing = assetScripts
 if (missing.length > 0) {
   console.error(`预缓存校验失败：${missing.length} 个 JS 产物未进入 sw.js 的 precache 清单。`)
   console.error('离线时这些 chunk 会加载失败（白屏）。请把它们加入')
-  console.error('apps/web/vite.config.ts 中 createWorkboxConfig 的 globPatterns：')
+  console.error('apps/web/scripts/vite/pwa.ts 中 createWorkboxConfig 的 globPatterns：')
   console.error('')
   for (const url of missing) {
     console.error(`  缺失：${url}`)
