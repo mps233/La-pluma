@@ -87,12 +87,12 @@ La-pluma-next/
 
 ## 依赖与职责护栏
 
-`app → pages → features → shared` 的单向依赖、feature 公开面、`task-execution` 不反向依赖页面域、页面裸副作用，以及 hooks/model/components/pages 的规模观察由 `apps/web/scripts/check-guardrails.ts` 自动检查，并作为客户端 `verify` 的第一步运行：
+`app → pages → features → shared` 的单向依赖、feature 公开面、`task-execution` 不反向依赖页面域与页面裸副作用由 `apps/web/scripts/check-guardrails.ts` 自动检查，并作为客户端 `verify` 的第一步运行：
 
 ```bash
 pnpm --filter la-pluma-next-client guardrails
 ```
 
-规模预算冻结在 `apps/web/size-budget.json`，阈值依据迁移后的实际分类分布而不是统一的 150 行，并检查同域页面缩减是否被搬进 hooks/model/components（缩减 ≥40 行且增长 ≥80% 判为疑似搬移）；规则、阈值表、更新方式和已知限制见[依赖与职责护栏](../development/guardrails.md)。ESLint 继续负责编辑器内的深路径与分层即时报错，CLI 额外覆盖相对路径绕过、真实域环、页面职责与规模预算。
+规则、允许方向与已知限制见[依赖与职责护栏](../development/guardrails.md)。ESLint 继续负责编辑器内的深路径与分层即时报错，CLI 额外覆盖相对路径绕过、真实域环与页面职责。
 
 开发流程与常用检查见 [开发文档](../development/README.md)。

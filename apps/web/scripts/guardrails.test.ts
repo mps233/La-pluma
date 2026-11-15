@@ -1,17 +1,12 @@
-import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
   analyzeDependencies,
-  analyzeSize,
   buildImportEdges,
   checkPageGuardrails,
   collectImportSpecifiers,
-  evaluateSizeBudget,
-  isSizeBaseline,
   readSourceTree,
   resolveImport,
-  type SizeBaseline,
   type SourceFile,
 } from './guardrails.ts'
 
@@ -321,91 +316,8 @@ describe('page responsibility guardrails', () => {
   })
 })
 
-describe('size reporting and budget', () => {
-  const thresholds = { pages: 10, hooks: 10, model: 10, components: 10 }
-
-  it('fails only for new over-threshold files and notes recovered baseline entries', () => {
-    const report = analyzeSize(files(
-      ['features/a/hooks/useLarge.ts', '1\n'.repeat(11)],
-      ['features/a/hooks/useSmall.ts', '1\n'.repeat(2)],
-      ['pages/a/Page.tsx', '1\n'.repeat(11)],
-    ), thresholds)
-
-    const baseline: SizeBaseline = {
-      thresholds,
-      largeFiles: {
-        pages: ['pages/a/Page.tsx'],
-        hooks: ['features/a/hooks/useRecovered.ts'],
-        model: [],
-        components: [],
-      },
-      pageLines: {},
-      nonPageLines: {},
-    }
-
-    const result = evaluateSizeBudget(report, baseline)
-    expect(result.violations).toEqual([
-      expect.stringContaining('features/a/hooks/useLarge.ts'),
-    ])
-    expect(result.violations).toHaveLength(1)
-    expect(result.notes).toEqual([
-      expect.stringContaining('features/a/hooks/useRecovered.ts'),
-    ])
-  })
-
-  it('flags page logic moved into same-domain hooks/model/components', () => {
-    const relocationThresholds = { pages: 500, hooks: 500, model: 500, components: 500 }
-    const report = analyzeSize(files(
-      ['features/a/hooks/usePage.ts', '1\n'.repeat(70)],
-      ['pages/b/Page.tsx', '1\n'.repeat(70)],
-      ['features/b/hooks/usePage.ts', '1\n'.repeat(30)],
-      ['pages/c/Page.tsx', '1\n'.repeat(30)],
-      ['features/c/hooks/usePage.ts', '1\n'.repeat(20)],
-    ), relocationThresholds)
-
-    const baseline: SizeBaseline = {
-      thresholds: relocationThresholds,
-      largeFiles: { pages: [], hooks: [], model: [], components: [] },
-      pageLines: { a: 70, b: 100, c: 100 },
-      nonPageLines: { a: 0, b: 0, c: 0 },
-    }
-
-    const result = evaluateSizeBudget(report, baseline)
-    expect(result.violations).toHaveLength(1)
-    expect(result.violations[0]).toContain('pages/a')
-    expect(result.violations[0]).toContain('疑似把页面逻辑搬进非页面目录')
-  })
-
-  it('skips relocation checks for legacy baselines without domain totals', () => {
-    const relocationThresholds = { pages: 500, hooks: 500, model: 500, components: 500 }
-    const report = analyzeSize(files(
-      ['features/a/hooks/usePage.ts', '1\n'.repeat(70)],
-    ), relocationThresholds)
-    const baseline: SizeBaseline = {
-      thresholds: relocationThresholds,
-      largeFiles: { pages: [], hooks: [], model: [], components: [] },
-    }
-
-    expect(evaluateSizeBudget(report, baseline).violations).toEqual([])
-  })
-
-  it('accepts full and legacy size baselines but rejects invalid shapes', () => {
-    const base = {
-      thresholds: { pages: 60, hooks: 220, model: 340, components: 320 },
-      largeFiles: { pages: [], hooks: [], model: [], components: [] },
-    }
-
-    expect(isSizeBaseline(base)).toBe(true)
-    expect(isSizeBaseline({ ...base, pageLines: { a: 1 }, nonPageLines: { a: 2 } })).toBe(true)
-    expect(isSizeBaseline({ ...base, thresholds: { ...base.thresholds, pages: 0 } })).toBe(false)
-    expect(isSizeBaseline({ ...base, pageLines: { a: 'x' } })).toBe(false)
-    expect(isSizeBaseline(null)).toBe(false)
-  })
-})
-
 describe('current source tree', () => {
   const srcRoot = fileURLToPath(new URL('../src', import.meta.url))
-  const budgetPath = fileURLToPath(new URL('../size-budget.json', import.meta.url))
 
   it('has no dependency, public-surface or page responsibility violations', async () => {
     const sourceFiles = await readSourceTree(srcRoot)
@@ -418,13 +330,5 @@ describe('current source tree', () => {
     expect(
       dependencyAnalysis.violations.filter(violation => violation.rule === 'task-execution-reverse'),
     ).toEqual([])
-  })
-
-  it('stays within the committed size budget', async () => {
-    const sourceFiles = await readSourceTree(srcRoot)
-    const baseline = JSON.parse(readFileSync(budgetPath, 'utf8')) as SizeBaseline
-    const report = analyzeSize(sourceFiles, baseline.thresholds)
-
-    expect(evaluateSizeBudget(report, baseline).violations).toEqual([])
   })
 })

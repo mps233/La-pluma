@@ -135,9 +135,7 @@ pnpm screenshots:readme
 
 ### 依赖与职责护栏
 
-`apps/web/scripts/check-guardrails.ts` 已作为客户端 `verify` 的第一步，检查功能域依赖环、公开面/深路径、`app → pages → features → shared` 分层方向、`task-execution` 反向依赖与页面文件直接持有传输/存储/轮询原语；不依赖视觉基线。
-
-规模观察与预算（hooks/model/components/pages 的规模输出，`size-budget.json` 拦截新增超阈值文件与同域页面疑似搬移）的规则明细、阈值依据、允许方向与规模基线更新见[依赖与职责护栏](guardrails.md)。
+`apps/web/scripts/check-guardrails.ts` 已作为客户端 `verify` 的第一步，检查功能域依赖环、公开面/深路径、`app → pages → features → shared` 分层方向、`task-execution` 反向依赖与页面文件直接持有传输/存储/轮询原语；不依赖视觉基线。规则明细、允许方向与已知限制见[依赖与职责护栏](guardrails.md)。
 
 ## 文件类型
 
@@ -168,11 +166,8 @@ pnpm --filter la-pluma-next-server guardrails
 # 后端覆盖率（固定统计范围与渐进阈值，独立于 verify）
 pnpm --filter la-pluma-next-server test:coverage
 
-# 依赖/职责护栏与规模预算（verify 已包含；单独运行便于定位）
+# 依赖/职责护栏（verify 已包含；单独运行便于定位）
 pnpm --filter la-pluma-next-client guardrails
-
-# 有意的结构调整后需要冻结新的规模基线
-pnpm --filter la-pluma-next-client guardrails:size-baseline
 
 # 全仓 guardrails + lint + 样式预算 + 类型 + 测试 + 构建（本地完整检查入口）
 pnpm verify

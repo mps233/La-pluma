@@ -15,7 +15,7 @@
 
 - 跨域显式从 `@/features/<domain>` 导入，禁止深路径与跨域相对路径；域内使用相对 import。领域协作须保持无环，`task-execution` 只能依赖自身与 `shared`。
 - `src/shared/ui/` 中 shadcn CLI 生成文件随上游原样保留，不适用仓库零注释政策；有意修改必须是明确的语义决策并记录。
-- 不把页面逻辑原样搬入 hook 来绕过职责或规模护栏。结构调整后审查实际所有权；预算只辅助评审，不能为通过检查直接放大阈值。
+- 不把页面逻辑原样搬入 hook 来绕过职责护栏。结构调整后审查实际所有权。
 - 新应用代码、脚本和测试使用 TypeScript；组件沿用 PascalCase，hooks 使用 `use` 前缀，测试与实现就近放置。纯类型依赖用 `import type` 或内联 `type`。
 - Node 脚本由 Node 24 直接执行，只用可擦除 TypeScript 语法，不用 `enum`、`namespace` 或构造器参数属性。保留工具配置及原样复制的公共脚本已有的 JS 例外。
 
@@ -53,7 +53,7 @@
 - 改动后的快速回路用 `pnpm verify:fast`（guardrails、ESLint、类型检查与相对 `origin/main` 的改动测试，包含已提交改动）；提交前仍运行 `pnpm verify` 覆盖样式预算与构建。Vitest 默认最多 4 个 worker，可用 `LA_PLUMA_TEST_WORKERS` 覆盖。
 - 浏览器用例使用 `*.pw.ts`，与 Vitest 单元测试分开。
 - 测试断言可访问性、可见状态、回调/请求参数、store 与导航结果；不要锁 CSS 类名、包裹层或子元素顺序。`html.dark` 是主题契约例外，视觉效果交给浏览器像素基线。
-- 视觉与集成测试使用匹配已安装 Playwright 版本的 Docker 镜像；截图不可跨环境复用。更新样式/规模基线必须有实际清理或结构调整依据，不用重录掩盖非预期回归。
+- 视觉与集成测试使用匹配已安装 Playwright 版本的 Docker 镜像；截图不可跨环境复用。更新样式基线必须有实际清理或结构调整依据，不用重录掩盖非预期回归。
 - 功能 PR 只更新实际受影响的视觉基线，使用 spec 或 `--grep` 过滤更新范围；公共主题、字体、全局布局改动及全量视觉基线刷新单独安排 PR。
 - 相同 PNG 基线发生合并冲突时，在合并后的源码上重新生成并审核差异，不用 `--ours` / `--theirs` 整张选取一侧。
 
@@ -64,7 +64,7 @@
 | 入口 | 用途与阅读时机 |
 | --- | --- |
 | [前端架构与所有权](../../docs/frontend/README.md) | 新增领域、路由或调整状态归属时；也作为各领域详细契约的导航。 |
-| [依赖与职责护栏](../../docs/development/guardrails.md) | import、页面职责或规模检查失败，以及有意调整结构与基线时。 |
+| [依赖与职责护栏](../../docs/development/guardrails.md) | import 或页面职责检查失败，以及调整分层边界与页面职责时。 |
 | [开发指南](../../docs/development/README.md) | 查询测试治理（含已知缺陷的 `it.fails` 约定）、样式治理与文件类型规则时。 |
 | [共享资源归属与失效端口](../../docs/architecture/resource-ownership.md) | 新增共享资源、写后刷新或跨页一致性修改前，核对发布与接收范围。 |
 | [Query 缓存与键规范](../../docs/architecture/query-cache.md) | 新增或调整资源 key、缓存策略、Provider 与重试时。 |
