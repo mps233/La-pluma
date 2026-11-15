@@ -19,13 +19,13 @@
 | --- | --- | --- |
 | 页面壳 | `pages/training/OperatorTraining.tsx` | 只渲染 `app-page`/`data-page` 并组合工作区 |
 | 页头、工作区布局与共享版本边界 | `features/training/components/TrainingWorkspace.tsx` | 队列读取、计划/设置/队列命令适配、失效订阅、选择器开关与操作错误 |
-| 队列列表、行内操作与撤销提示 | `features/training/components/TrainingQueuePanel.tsx` | 操作成功后把焦点还给队列标题；`UndoToast` 跟随该面板渲染 |
+| 队列列表、行内操作与撤销提示 | `features/training/components/TrainingQueuePanel.tsx` | 操作成功后把焦点还给队列标题；`TrainingUndoToast` 跟随该面板渲染 |
 | 当前目标材料 | `features/training/components/TrainingMaterialsPanel.tsx` | 只从队列首位派生，不读取资源 |
 | 刷图计划展示与范围选择 | `features/training/components/TrainingPlanPanel.tsx` | 持有 `current`/`all` 这一局部状态；生成/应用/同步仍调用工作区回调 |
 | 自动化设置开关 | `features/training/components/TrainingSettingsPanel.tsx` | 只把开关变化组成完整设置交给设置所有者 |
 | 添加干员选择器 | `features/training/components/OperatorPicker.tsx` | 候选/计数 Query、状态筛选、职业、稀有度、未精二、搜索、分批渲染与头像缓存 |
 | 材料表格与合成树 | `features/training/components/MaterialViews.tsx` | 纯展示；图标失败时隐藏图片保留占位 |
-| 撤销提示 | `features/training/components/UndoToast.tsx` | portal、8 秒自动关闭、悬停/焦点/pending 暂停 |
+| 撤销提示 | `features/training/components/TrainingUndoToast.tsx`、`shared/components/UndoToastCard.tsx` | `TrainingUndoToast` 通过 sonner 挂载；`UndoToastCard` 负责 8 秒自动关闭、悬停/焦点/pending 暂停 |
 | 干员行规则 | `features/training/model/operatorRows.ts` | 搜索匹配、分批、空态文案与卡片动作 |
 | 材料规则 | `features/training/model/materials.ts` | 龙门币追加、缺口筛选与当前目标摘要 |
 | 计划展示规则 | `features/training/model/planDisplay.ts` | 当日开放关卡投影、次数/理智与焦点干员 |
@@ -43,7 +43,7 @@
 ```
 OperatorTraining（页面壳）
 └─ TrainingWorkspace（队列读取、共享版本边界、失效订阅、选择器/错误/撤销快照）
-   ├─ TrainingQueuePanel（队列列表 + 行内操作 + UndoToast）
+   ├─ TrainingQueuePanel（队列列表 + 行内操作 + TrainingUndoToast）
    ├─ TrainingMaterialsPanel（当前目标材料）→ MaterialViews
    ├─ TrainingPlanPanel（计划范围 + 计划展示 + 生成/应用/同步入口）
    ├─ TrainingSettingsPanel（自动切换/完成通知）

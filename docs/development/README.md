@@ -62,7 +62,7 @@ CI 在 PR/main 运行浏览器跨页集成和视觉检查，只等待客户端�
 - **环境钉死**：截图生成与比对统一跑在 `mcr.microsoft.com/playwright` 官方镜像内（tag 自动取 client 实际安装的 `@playwright/test` 版本，如 `v1.64.1-noble`），字体与浏览器由此与 CI 完全一致。基线截图是 **Linux/Chromium 专属**：更换镜像、Playwright 版本或操作系统后，必须用 `pnpm visual:update` 重新生成并逐项评审 diff，不要试图跨环境复用。
 - **确定性**：`/api` 请求全部由 `apps/web/tests/visual/fixtures.ts` 的固定数据应答（不依赖真实后端与 MAA 运行状态）；`page.clock` 固定到 2026-10-24 04:00（UTC+8），日期敏感内容（今日开放关卡、资源更新时间等）不随运行当天变化；`reducedMotion: 'reduce'` 加文档级样式禁用 CSS 动画/过渡；主题通过 zustand persist 的 `ui-storage` localStorage 预置，首帧即目标主题。公共部分集中在 `harness.ts`。
 - **三个视口**：桌面 1440×900、平板 820×1180、移动 390×844，deviceScaleFactor 1。tab 基线（`app.pw.ts`）整页截图；弹层基线（`overlays.pw.ts`）为视口截图。820 落在 640（`sm`）与 900（页面自持的 stepper 断点）之间，与桌面一起把 `min-[900px]` 两侧夹住，同时也是「无侧栏 + 内联页头」这个 390 与 1440 都覆盖不到的组合；1024 / 1200 两档只在桌面侧出现，改动时注意同步核对。
-- **弹层基线守 portal**：Dialog、AlertDialog、Sheet、统计筛选菜单与 PWA 安装提示都由 Base UI portal 渲染到 `document.body`，位于 `.la-pluma-app` 作用域之外，材质、遮罩与定位只由 portal 处的选择器决定。它们 `position: fixed` 按视口定位，`fullPage` 会把 fixed 元素拉到整页顶部，所以单独取视口或按 `data-region` / `data-slot` 做 locator 截图。
+- **弹层基线守 portal**：Dialog、AlertDialog、Sheet、DropdownMenu 与 PWA 安装提示都由 Base UI portal 渲染到 `document.body`，位于 `.la-pluma-app` 作用域之外，材质、遮罩与定位只由 portal 处的选择器决定。它们 `position: fixed` 按视口定位，`fullPage` 会把 fixed 元素拉到整页顶部，所以单独取视口或按 `data-region` / `data-slot` 做 locator 截图。
 - **启动壳基线守首帧**：启动壳（`boot.pw.ts`）在 `installDeterministicEnvironment` 之后 abort `assets/index-*.js`，让 React 模块不执行、页面停在 `index.html` 的内联启动壳上；按视口截图验收 safe-area / dvh / standalone 的真实渲染。
 
 ```bash
@@ -124,7 +124,7 @@ pnpm screenshots:readme
 | 纯逻辑（解析、格式化、store、URL 生成） | 单元测试 | 直接调函数 |
 | 竞态、轮询、生命周期、WebRTC 状态机 | jsdom 组件/钩子测试 | 假定时器 + 回调断言 |
 | 布局、断点、材质、遮罩层、视觉层级 | 视觉基线 | Playwright 像素比对 |
-| 弹层（Dialog、Sheet、筛选菜单、PWA 提示） | 视觉基线 | 打开状态单独截图 |
+| 弹层（Dialog、Sheet、DropdownMenu、PWA 提示） | 视觉基线 | 打开状态单独截图 |
 | CSS 引用完整性（`@keyframes`） | 单测 | `src/styles/animations.test.ts` |
 
 新增样式约束时先问：这条规则能不能被视觉基线捕获？能就补基线，不能才考虑写测试——且只断言结果（元素实际位置、可见性），不复述选择器。

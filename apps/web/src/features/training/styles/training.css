@@ -101,17 +101,10 @@
   .training-settings-grid h3 { color: var(--foreground); font-size: .875rem; font-weight: 500; }
   .training-settings-grid p { color: var(--muted-foreground); font-size: .75rem; margin-top: 0.25rem; }
   .training-feedback { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin: 0 1rem 0.75rem; padding: 0.75rem; border-radius: var(--radius-md); font-size: .8125rem; line-height: 1.7; }
-  .training-undo-toast { position: fixed; z-index: 1100; left: 50%; bottom: calc(var(--la-pluma-tabbar-reserved-height, 5rem) + env(safe-area-inset-bottom, 0px) + 1rem); transform: translateX(-50%); display: flex; align-items: center; gap: 0.5rem; width: max-content; max-width: calc(100vw - 2rem); padding: 8px 8px 8px 16px; border-radius: var(--radius-xl); color: var(--foreground); background: var(--card); box-shadow: 0 4px 12px rgb(0 0 0 / 12%), 0 16px 40px rgb(0 0 0 / 12%); font-size: .875rem; }
-  .training-undo-toast > span { overflow-wrap: anywhere; }
-  .training-undo-toast > svg { flex-shrink: 0; color: var(--primary); }
-  .training-undo-toast .app-button { flex-shrink: 0; min-height: 44px; }
   @media (min-width: 640px) {
     .training-plan-controls { grid-template-columns: minmax(0,1fr) auto; }
     .training-queue-actions { margin-left: 5rem; margin-top: 0; }
     .training-settings-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  }
-  @media (min-width: 1024px) {
-    .training-undo-toast { bottom: 24px; }
   }
   @media (min-width: 1280px) {
     .training-workspace-grid { grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); }

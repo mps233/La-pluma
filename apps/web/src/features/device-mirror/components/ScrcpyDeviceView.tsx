@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
-import { createPortal } from 'react-dom'
+import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import { ArrowLeft, Gauge, Home, LoaderCircle, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
+import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/dialog'
 import { usePreviewSession } from '../hooks/usePreviewSession'
 import { usePreviewSnapshot } from '../hooks/usePreviewSnapshot'
 import { usePreviewStore } from '../store/previewStore'
@@ -104,9 +104,7 @@ export default function ScrcpyDeviceView({
 }: ScrcpyDeviceViewProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const immersiveVideoRef = useRef<HTMLVideoElement | null>(null)
-  const immersiveDialogRef = useRef<HTMLDivElement | null>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
-  const immersiveBackgroundStateRef = useRef(new Map<HTMLElement, { inert: boolean; ariaHidden: string | null }>())
   const immersiveHistoryEntryRef = useRef(false)
   const trackedPointersRef = useRef(new Map<number, TrackedPointer>())
   const pendingPointerMovesRef = useRef(new Map<number, TrackedPointer>())
@@ -121,6 +119,7 @@ export default function ScrcpyDeviceView({
   const setCustomBitrateMbps = usePreviewStore(state => state.setCustomBitrateMbps)
   const [settingsDirty, setSettingsDirty] = useState(false)
   const [immersiveMode, setImmersiveMode] = useState(false)
+  const [immersiveVideoMounted, setImmersiveVideoMounted] = useState(false)
   const [compactControlsOpen, setCompactControlsOpen] = useState(false)
   const compactControlsId = `scrcpy-controls-${useId().replace(/:/g, '')}`
   const bitrateProgress = ((customBitrateMbps - 1) / (32 - 1)) * 100
@@ -251,7 +250,7 @@ export default function ScrcpyDeviceView({
   }, [])
 
   const fullscreen = () => {
-    // 不走浏览器真实 fullscreen，直接打开应用内“画面全屏”遮罩，手机上更可靠。
+    // 不走浏览器真实 fullscreen，直接打开应用内“画面全屏”对话框，手机上更可靠。
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     if (!immersiveHistoryEntryRef.current) {
       const currentState = window.history.state && typeof window.history.state === 'object'
@@ -270,77 +269,22 @@ export default function ScrcpyDeviceView({
     }
   }, [])
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!immersiveMode) return
-    const dialog = immersiveDialogRef.current
-    const previousOverflow = document.body.style.overflow
-    const previousOverscrollBehavior = document.body.style.overscrollBehavior
-    const backgroundStates = immersiveBackgroundStateRef.current
-    dialog?.focus({ preventScroll: true })
-    backgroundStates.clear()
-    Array.from(document.body.children).forEach(child => {
-      if (!(child instanceof HTMLElement) || child === dialog) return
-      backgroundStates.set(child, {
-        inert: child.inert,
-        ariaHidden: child.getAttribute('aria-hidden')
-      })
-      child.inert = true
-      child.setAttribute('aria-hidden', 'true')
-    })
-    document.body.style.overflow = 'hidden'
-    document.body.style.overscrollBehavior = 'none'
-
     const handlePopState = () => {
       immersiveHistoryEntryRef.current = false
       setImmersiveMode(false)
     }
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        exitImmersive()
-        return
-      }
-      if (event.key !== 'Tab' || !dialog) return
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), [href], [tabindex]:not([tabindex="-1"])'))
-      if (focusable.length === 0) {
-        event.preventDefault()
-        dialog.focus({ preventScroll: true })
-        return
-      }
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault()
-        last?.focus()
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault()
-        first?.focus()
-      }
-    }
-
     window.addEventListener('popstate', handlePopState)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('popstate', handlePopState)
-      document.removeEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = previousOverflow
-      document.body.style.overscrollBehavior = previousOverscrollBehavior
-      backgroundStates.forEach((state, element) => {
-        if (!element.isConnected) return
-        element.inert = state.inert
-        if (state.ariaHidden === null) element.removeAttribute('aria-hidden')
-        else element.setAttribute('aria-hidden', state.ariaHidden)
-      })
-      backgroundStates.clear()
-      previousFocusRef.current?.focus({ preventScroll: true })
-      previousFocusRef.current = null
-    }
-  }, [exitImmersive, immersiveMode])
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [immersiveMode])
 
   useEffect(() => {
+    if (!immersiveMode || !immersiveVideoMounted) return
+
     const mainVideo = videoRef.current
     const overlayVideo = immersiveVideoRef.current
-    if (!immersiveMode || !mainVideo || !overlayVideo) return
+    if (!mainVideo || !overlayVideo) return
 
     const sourceStream = webrtc.mediaStream || mainVideo.srcObject as MediaStream | null
     if (sourceStream) {
@@ -370,7 +314,12 @@ export default function ScrcpyDeviceView({
       }
       overlayVideo.srcObject = null
     }
-  }, [immersiveMode, webrtc.mediaStream])
+  }, [immersiveMode, immersiveVideoMounted, webrtc.mediaStream])
+
+  const attachImmersiveVideo = useCallback((node: HTMLVideoElement | null) => {
+    immersiveVideoRef.current = node
+    setImmersiveVideoMounted(node !== null)
+  }, [])
 
   const statusCards: [string, string | number, string?][] = [
     ['信令', statusLabel[webrtc.status] || webrtc.status],
@@ -722,25 +671,25 @@ export default function ScrcpyDeviceView({
         </section>
       </aside>}
     </div>
-    {immersiveMode && createPortal(
-      <div
-        ref={immersiveDialogRef}
+    <Dialog open={immersiveMode} onOpenChange={open => { if (!open) exitImmersive() }}>
+      <DialogContent
         data-scrcpy-immersive-layer="true"
-        role="dialog"
         aria-modal="true"
-        aria-label="模拟器沉浸预览"
-        tabIndex={-1}
-        className="fixed inset-0 z-9999 bg-black flex flex-col landscape:flex-row items-center justify-center gap-2 outline-hidden"
+        showCloseButton={false}
+        finalFocus={previousFocusRef}
+        className="fixed top-0 right-0 bottom-0 left-0 z-9999 flex h-dvh w-screen max-w-none translate-x-0 translate-y-0 flex-col items-center justify-center gap-2 rounded-none bg-black p-0 text-white outline-hidden landscape:flex-row sm:max-w-none"
         style={{
+          animation: 'none',
           paddingTop: 'max(0.5rem, env(safe-area-inset-top))',
           paddingRight: 'max(0.5rem, env(safe-area-inset-right))',
           paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
           paddingLeft: 'max(0.5rem, env(safe-area-inset-left))'
         }}
       >
+        <DialogTitle className="sr-only">模拟器沉浸预览</DialogTitle>
         <div className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center self-stretch">
           <video
-            ref={immersiveVideoRef}
+            ref={attachImmersiveVideo}
             autoPlay
             playsInline
             muted
@@ -777,9 +726,8 @@ export default function ScrcpyDeviceView({
             <Minimize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
           </button>
         </div>
-      </div>,
-      document.body
-    )}
+      </DialogContent>
+    </Dialog>
     </>
   )
 }

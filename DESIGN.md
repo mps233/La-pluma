@@ -321,7 +321,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 ### Cards / Containers
 - **Corner Style:** shadcn `Card` 使用 `rounded-xl`（16px）；连续曲率只由玻璃主题皮肤层提供。
-- **Background:** `Card` 的 `bg-card` 为主要卡片与面板；`surface-soft` 为弱背景、状态条和次级容器；`surface-panel` 保留给筛选菜单与 PWA 提示等应用自绘召唤层。
+- **Background:** `Card` 的 `bg-card` 为主要卡片与面板；`surface-soft` 为弱背景、状态条和次级容器；`surface-panel` 保留给主题菜单与 PWA 提示等应用自绘召唤层。
 - **Shadow Strategy:** 静止卡片使用 `Card` 的 1px ring；只有卡片本身可点击时才使用 `surface-panel-hover`。召唤层使用 `surface-panel` 的静止阴影。
 - **Border:** 1px 发丝线，不使用 `border-2`。
 - **Internal Padding:** 卡片使用 shadcn `--card-spacing`（默认 16px，`size="sm"` 为 12px）；分节自持内边距的面板给 `Card` 加 `gap-0 p-0!`。
@@ -351,7 +351,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 | 全局结果与错误 | `useStatusStore.setMessage`，由 `FloatingStatusIndicator` 展示；错误持续到用户关闭，其他短消息由 store 自动收起，不要自行写清除定时器 |
 | 删除、清空等不可逆操作 | 使用 `AlertDialog` 或应用层 `ConfirmAlertDialog`；新代码不得使用 `window.confirm` |
 
-日志控制台、养成筛选空结果等固定高度或高密度区域可保留专用状态样式。局部表单成功提示、日志提示等需要紧邻操作区或可手动关闭时，也可保留在面板内。项目没有通用 Toast 组件，`FloatingStatusIndicator` 是全局任务状态和短消息载体，不应被当作普通 toast 复刻。
+日志控制台、养成筛选空结果等固定高度或高密度区域可保留专用状态样式。局部表单成功提示、日志提示等需要紧邻操作区或可手动关闭时，也可保留在面板内。项目没有通用页面 Toast 组件（撤销提示使用 sonner `AppToaster`），`FloatingStatusIndicator` 是全局任务状态和短消息载体，不应被当作普通 toast 复刻。
 
 ### Icons
 - 普通功能图标优先使用已引入的 `lucide-react`；业务身份和概览图标优先复用 `Icons.tsx`。一级工作区标题与控制台一致，不添加装饰图标；不要在普通页面重复手写 SVG。

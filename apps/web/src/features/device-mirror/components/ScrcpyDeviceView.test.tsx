@@ -434,20 +434,21 @@ describe('ScrcpyDeviceView automation availability', () => {
     const fullscreenButton = findButton('全屏')!
     fullscreenButton.focus()
     await act(async () => fullscreenButton.click())
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
 
     const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]')
+    expect(dialog).not.toBeNull()
     expect(dialog?.getAttribute('aria-modal')).toBe('true')
-    expect(document.activeElement).toBe(dialog)
-    expect(container.inert).toBe(true)
-    expect(container.getAttribute('aria-hidden')).toBe('true')
-    expect(document.body.style.overflow).toBe('hidden')
+    expect(dialog?.getAttribute('aria-labelledby')).toBeTruthy()
+    expect(document.getElementById(dialog!.getAttribute('aria-labelledby')!)?.textContent).toBe('模拟器沉浸预览')
+    expect(dialog!.contains(document.activeElement)).toBe(true)
+    expect(document.body.style.overflowY).toBe('hidden')
     expect(dialog?.querySelector('[aria-label="退出全屏"]')).not.toBeNull()
 
     await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
     expect(document.body.querySelector('[role="dialog"]')).toBeNull()
-    expect(document.body.style.overflow).toBe('')
-    expect(container.inert).toBeFalsy()
-    expect(container.hasAttribute('aria-hidden')).toBe(false)
+    expect(document.body.style.overflowY).toBe('')
     expect(document.activeElement).toBe(fullscreenButton)
   })
 

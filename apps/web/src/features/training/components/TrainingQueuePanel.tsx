@@ -5,7 +5,7 @@ import { Button } from '@/shared/ui/button'
 import { EmptyState, Loading } from '@/shared/components'
 import { getQueueMaterials, selectMissingMaterials } from '../model/materials'
 import TrainingLoadError from './TrainingLoadError'
-import UndoToast from './UndoToast'
+import TrainingUndoToast from './TrainingUndoToast'
 import type { TrainingQueueItem } from '../types'
 
 export interface RemovedTrainingQueueItem {
@@ -105,7 +105,7 @@ export default function TrainingQueuePanel({
         </ol>}
         {queue.length > 0 && <div className="training-queue-footer"><span className="text-xs text-muted-foreground">进度仅表示材料筹备情况</span><Button variant="ghost" onClick={onOpenPicker}><Plus size={15} aria-hidden="true" />继续添加</Button></div>}
       </section>
-      {recentlyRemoved && <UndoToast key={recentlyRemoved.item.operatorId} name={recentlyRemoved.item.operator.name} pending={queueMutationPending} onUndo={() => void handleUndo()} onDismiss={onDismissUndo} />}
+      {recentlyRemoved && <TrainingUndoToast key={recentlyRemoved.item.operatorId} name={recentlyRemoved.item.operator.name} pending={queueMutationPending} onUndo={() => void handleUndo()} onDismiss={onDismissUndo} />}
     </>
   )
 }

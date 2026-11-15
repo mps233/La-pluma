@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createQueryClient } from '@/shared/query'
+import { AppToaster } from '@/shared/components'
 import type { TrainingOperator, TrainingPlan, TrainingQueueItem, TrainingSettings } from '@/features/training/types'
 import { trainingQueueCommandOwner } from '@/features/training/model/queueCommands'
 import { trainingSettingsOwner } from '@/features/training/model/settingsCommands'
@@ -96,6 +97,8 @@ vi.mock('@/features/runtime-status', () => ({
 let client: ReturnType<typeof createQueryClient>
 let container: HTMLDivElement
 let root: Root
+let toasterContainer: HTMLDivElement
+let toasterRoot: Root
 
 const settings: TrainingSettings = {
   useMedicine: 0,
@@ -268,9 +271,21 @@ const planPanel = () => {
 
 const planPanelText = () => planPanel().textContent ?? ''
 
-const undoToast = () => document.querySelector<HTMLElement>('[role="status"][aria-live="polite"]')
+const undoToast = () => document.querySelector<HTMLElement>('[data-sonner-toast]')
 
-const undoToastClose = () => document.querySelector('[aria-label="关闭移除提示"]')
+const undoToastClose = () => document.querySelector('[data-sonner-toast] [aria-label="关闭移除提示"]')
+
+const settleToastRemoval = async () => {
+  for (let attempt = 0; attempt < 20 && undoToast(); attempt += 1) {
+    await act(async () => {
+      if (vi.isFakeTimers()) {
+        await vi.advanceTimersByTimeAsync(100)
+        return
+      }
+      await new Promise(resolve => setTimeout(resolve, 100))
+    })
+  }
+}
 
 const selectRarity = async (dialog: HTMLElement, label: string) => {
   const trigger = dialog.querySelector<HTMLElement>('[aria-label="稀有度"]')
@@ -302,7 +317,7 @@ const openPicker = async () => {
 }
 
 describe('OperatorTraining queue workspace', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     trainingQueueCommandOwner.reset()
     trainingSettingsOwner.reset()
     trainingPlanOwner.reset()
@@ -335,12 +350,18 @@ describe('OperatorTraining queue workspace', () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
+    toasterContainer = document.createElement('div')
+    document.body.appendChild(toasterContainer)
+    toasterRoot = createRoot(toasterContainer)
+    await act(async () => toasterRoot.render(<AppToaster />))
   })
 
   afterEach(async () => {
     await act(async () => root.unmount())
+    await act(async () => toasterRoot.unmount())
     client.clear()
     container.remove()
+    toasterContainer.remove()
     vi.useRealTimers()
     vi.restoreAllMocks()
   })
@@ -812,6 +833,7 @@ describe('OperatorTraining queue workspace', () => {
     expect(mocks.updateTrainingQueueOrder).not.toHaveBeenCalled()
     expect(getQueue().map(item => item.operatorId)).toEqual(['char_current'])
     expect(queueOrder()).toEqual(['阿米娅'])
+    await settleToastRemoval()
     expect(document.body.textContent).not.toContain('已移除 阿米娅')
   })
 
@@ -829,6 +851,7 @@ describe('OperatorTraining queue workspace', () => {
     expect(close).not.toBeNull()
     await click(close!)
 
+    await settleToastRemoval()
     expect(undoToast()).toBeNull()
     expect(undoToastClose()).toBeNull()
     expect(queueOrder()).toEqual([])
@@ -851,6 +874,7 @@ describe('OperatorTraining queue workspace', () => {
 
     await act(async () => undoButton.blur())
     await act(async () => { await vi.advanceTimersByTimeAsync(8000) })
+    await settleToastRemoval()
     expect(undoToast()).toBeNull()
     expect(undoToastClose()).toBeNull()
     expect(queueOrder()).toEqual([])

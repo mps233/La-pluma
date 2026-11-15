@@ -2,6 +2,7 @@ import {
   ThemeGalleryCurrentTheme,
   ThemeGalleryDialogs,
   ThemeGalleryGlobalSurfaces,
+  ThemeGalleryOverlays,
 } from '@/features/theme-gallery'
 import { PageHeader } from '@/shared/components'
 
@@ -15,6 +16,7 @@ export default function ThemeGalleryPage() {
       <ThemeGalleryCurrentTheme />
       <ThemeGalleryGlobalSurfaces />
       <ThemeGalleryDialogs />
+      <ThemeGalleryOverlays />
     </div>
   )
 }

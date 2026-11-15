@@ -86,7 +86,7 @@ import {
 </Card>
 ```
 
-`Card` 使用 shadcn 语义 token（`bg-card`、`ring-foreground/10`、`--card-spacing`）与普通圆角；标题、描述、操作分别使用 `CardTitle`、`CardDescription`、`CardAction`，页脚使用 `CardFooter`。需要分节面板且各分节自持内边距时，给 `Card` 加 `gap-0 p-0!`，不再引入独立面板包装组件。标题需要保留文档层级时，在 `CardTitle` 上使用 `role="heading"` 与 `aria-level`。紧凑提示容器使用语义类 `app-info-card` 配合对应状态类；`surface-panel` 继续用于筛选菜单与 PWA 提示等应用自绘召唤层，不用于 `Card` 或 shadcn 生成弹层。
+`Card` 使用 shadcn 语义 token（`bg-card`、`ring-foreground/10`、`--card-spacing`）与普通圆角；标题、描述、操作分别使用 `CardTitle`、`CardDescription`、`CardAction`，页脚使用 `CardFooter`。需要分节面板且各分节自持内边距时，给 `Card` 加 `gap-0 p-0!`，不再引入独立面板包装组件。标题需要保留文档层级时，在 `CardTitle` 上使用 `role="heading"` 与 `aria-level`。紧凑提示容器使用语义类 `app-info-card` 配合对应状态类；`surface-panel` 继续用于主题菜单与 PWA 提示等应用自绘召唤层，不用于 `Card` 或 shadcn 生成弹层。
 
 控制台同类功能页在根节点添加 `ios-workspace-page`，并显式给 `PageHeader` 传 `mobileLayout="inline"`。卡片材质统一由 shadcn 语义 token 控制，不要在页面级另造卡片材质。
 
@@ -233,6 +233,32 @@ import { ConfirmAlertDialog, Loading } from '@/shared/components'
 - 嵌套弹层按 React 父子关系组合（如发现弹窗内的筛选弹窗、详情抽屉上的重置确认框），Base UI 依此管理 Escape 层级、焦点归还与滚动锁。
 
 `ActivityIndicator` 是供 `Button` 和 `Loading` 内部复用的 iOS 活动指示器，页面不要直接调用或叠加第二个动态指示器。`DashboardSkeleton` 是控制台域专用骨架，位于 `features/dashboard/components/DashboardSkeleton.tsx`，不属于 `shared/components` 的公共导出。
+
+---
+
+### UndoToastCard / AppToaster
+
+**文件位置**：`apps/web/src/shared/components/UndoToastCard.tsx`、`apps/web/src/shared/components/AppToaster.tsx`
+
+**适用场景**：需要「已移除 + 撤销」语义的应用级提示。`AppToaster` 在应用根挂载一次，主题跟随 `useTheme` 的解析明暗与 `lpn-ui`；提示固定在底部居中，桌面停留 24px，窄屏抬高以避开 tab bar 与安全区。`UndoToastCard` 是提示内容，默认 8 秒后自动关闭，悬停或键盘聚焦时暂停，`pending` 时禁用撤销与关闭并显示恢复中；宽度按内容收缩并居中，窄屏上限为 `calc(100vw - 2rem)`，播报由 sonner 外层 live region 承担。
+
+```tsx
+import { toast } from 'sonner'
+import { AppToaster, UndoToastCard } from '@/shared/components'
+
+// 应用根：<AppToaster />
+
+toast.custom(() => (
+  <UndoToastCard
+    message="已移除 阿米娅"
+    pending={false}
+    onUndo={handleUndo}
+    onDismiss={handleDismiss}
+  />
+), { id: 'undo-toast', duration: Infinity, dismissible: false })
+```
+
+使用 `toast.custom` 时让卡片自己管理 8 秒计时与暂停，因此传入 `duration: Infinity`；关闭按钮与撤销动作由卡片提供，因此传入 `dismissible: false`。同一提示复用稳定 id，避免重复堆叠。
 
 ---
 

@@ -29,7 +29,7 @@ import {
   type SortBy,
 } from '../model/operatorFilters'
 import { describeOperBoxRecognitionHint } from '../model/operatorRecognition'
-import FilterMenu, { type FilterMenuOption } from './FilterMenu'
+import OperatorFilterMenu, { type FilterMenuOption } from './OperatorFilterMenu'
 import InlineDataError from './InlineDataError'
 import type { StatisticsCommands } from '../hooks/useStatisticsCommands'
 import type { OpenMenu } from '../types'
@@ -332,74 +332,74 @@ export default function OperatorPanel({ isActive, command }: OperatorPanelProps)
                 </div>
 
                 <div className="flex w-full flex-wrap items-center gap-2">
-                  <FilterMenu
+                  <OperatorFilterMenu
                     menuKey="ownership"
                     label={ownershipLabels[filters.ownership]}
                     value={filters.ownership}
                     options={ownershipOptions}
                     isActive={filters.ownership !== 'all'}
-                    isOpen={openMenu === 'ownership'}
-                    onOpenChange={setOpenMenu}
+                    open={openMenu === 'ownership'}
+                    onOpenChange={open => setOpenMenu(open ? 'ownership' : null)}
                     onSelect={value => setFilters(current => ({ ...current, ownership: value as FilterOwnership }))}
                   />
 
-                  <FilterMenu
+                  <OperatorFilterMenu
                     menuKey="rarity"
                     label={filters.rarity === 'all' ? '星级' : `${filters.rarity}星`}
                     value={filters.rarity}
                     options={rarityOptions}
                     isActive={filters.rarity !== 'all'}
-                    isOpen={openMenu === 'rarity'}
+                    open={openMenu === 'rarity'}
                     menuWidth={112}
-                    onOpenChange={setOpenMenu}
+                    onOpenChange={open => setOpenMenu(open ? 'rarity' : null)}
                     onSelect={value => setFilters(current => ({ ...current, rarity: value as FilterRarity }))}
                   />
 
-                  <FilterMenu
+                  <OperatorFilterMenu
                     menuKey="profession"
                     label={professionLabels[filters.profession]}
                     value={filters.profession}
                     options={professionOptions}
                     isActive={filters.profession !== 'all'}
-                    isOpen={openMenu === 'profession'}
+                    open={openMenu === 'profession'}
                     mobileAlign="end"
-                    onOpenChange={setOpenMenu}
+                    onOpenChange={open => setOpenMenu(open ? 'profession' : null)}
                     onSelect={value => setFilters(current => ({ ...current, profession: value as FilterProfession }))}
                   />
 
-                  <FilterMenu
+                  <OperatorFilterMenu
                     menuKey="elite"
                     label={filters.elite === 'all' ? '精英化' : `精英${filters.elite}`}
                     value={filters.elite}
                     options={eliteOptions}
                     isActive={filters.elite !== 'all'}
-                    isOpen={openMenu === 'elite'}
+                    open={openMenu === 'elite'}
                     menuWidth={112}
-                    onOpenChange={setOpenMenu}
+                    onOpenChange={open => setOpenMenu(open ? 'elite' : null)}
                     onSelect={value => setFilters(current => ({ ...current, elite: value as FilterElite }))}
                   />
 
-                  <FilterMenu
+                  <OperatorFilterMenu
                     menuKey="potential"
                     label={filters.potential === 'all' ? '潜能' : `潜能${filters.potential}`}
                     value={filters.potential}
                     options={potentialOptions}
                     isActive={filters.potential !== 'all'}
-                    isOpen={openMenu === 'potential'}
+                    open={openMenu === 'potential'}
                     menuWidth={112}
-                    onOpenChange={setOpenMenu}
+                    onOpenChange={open => setOpenMenu(open ? 'potential' : null)}
                     onSelect={value => setFilters(current => ({ ...current, potential: value as FilterPotential }))}
                   />
 
-                  <FilterMenu
+                  <OperatorFilterMenu
                     menuKey="sort"
                     label={sortLabels[filters.sortBy]}
                     value={filters.sortBy}
                     options={sortOptions}
                     isActive={filters.sortBy !== 'default'}
-                    isOpen={openMenu === 'sort'}
+                    open={openMenu === 'sort'}
                     mobileAlign="end"
-                    onOpenChange={setOpenMenu}
+                    onOpenChange={open => setOpenMenu(open ? 'sort' : null)}
                     onSelect={value => setFilters(current => ({ ...current, sortBy: value as SortBy }))}
                   />
 

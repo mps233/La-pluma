@@ -287,6 +287,84 @@ for (const theme of THEMES) {
       await expectNoBrowserErrors(page)
     })
 
+    test(`dropdown menu open ${theme}`, async ({ page }) => {
+      test.skip(test.info().project.name !== 'desktop', 'the overlay group is captured once per theme')
+
+      const environment = await installDeterministicEnvironment(page)
+
+      await page.goto('/dev/theme-gallery')
+      await waitForPageReady(page, 'gallery')
+
+      const group = page.locator('[data-region="gallery-overlays"]')
+      await group.scrollIntoViewIfNeeded()
+      await expect(group).toBeVisible()
+
+      await page.locator('#gallery-dropdown-trigger').click()
+      const menu = page.locator('[data-slot="dropdown-menu-content"]')
+      await expect(menu).toBeVisible()
+      await expect(page.getByRole('menu', { name: '筛选排序' })).toBeVisible()
+
+      await expect(menu).toHaveScreenshot(`theme-gallery-dropdown-menu-${theme}.png`, {
+        animations: 'disabled',
+        caret: 'hide',
+      })
+
+      environment.assertNoUnmatchedApi()
+      await expectNoBrowserErrors(page)
+    })
+
+    test(`toast undo ${theme}`, async ({ page }) => {
+      test.skip(test.info().project.name !== 'desktop', 'the overlay group is captured once per theme')
+
+      const environment = await installDeterministicEnvironment(page)
+
+      await page.goto('/dev/theme-gallery')
+      await waitForPageReady(page, 'gallery')
+
+      const group = page.locator('[data-region="gallery-overlays"]')
+      await group.scrollIntoViewIfNeeded()
+      await expect(group).toBeVisible()
+
+      await page.getByRole('button', { name: '显示可撤销提示', exact: true }).click()
+      const toast = page.locator('[data-sonner-toast]')
+      await expect(toast).toBeVisible()
+      await expect(toast).toContainText('已移除 阿米娅')
+
+      await expect(toast).toHaveScreenshot(`theme-gallery-toast-undo-${theme}.png`, {
+        animations: 'disabled',
+        caret: 'hide',
+      })
+
+      environment.assertNoUnmatchedApi()
+      await expectNoBrowserErrors(page)
+    })
+
+    test(`toast pending ${theme}`, async ({ page }) => {
+      test.skip(test.info().project.name !== 'desktop', 'the overlay group is captured once per theme')
+
+      const environment = await installDeterministicEnvironment(page)
+
+      await page.goto('/dev/theme-gallery')
+      await waitForPageReady(page, 'gallery')
+
+      const group = page.locator('[data-region="gallery-overlays"]')
+      await group.scrollIntoViewIfNeeded()
+      await expect(group).toBeVisible()
+
+      await page.getByRole('button', { name: '显示恢复中提示', exact: true }).click()
+      const toast = page.locator('[data-sonner-toast]')
+      await expect(toast).toBeVisible()
+      await expect(toast).toContainText('恢复中')
+
+      await expect(toast).toHaveScreenshot(`theme-gallery-toast-pending-${theme}.png`, {
+        animations: 'disabled',
+        caret: 'hide',
+      })
+
+      environment.assertNoUnmatchedApi()
+      await expectNoBrowserErrors(page)
+    })
+
     test(`sidebar ${theme}`, async ({ page }) => {
       test.skip(test.info().project.name !== 'desktop', 'the workspace sidebar is desktop-only')
 

@@ -1,20 +1,23 @@
 // @vitest-environment jsdom
 
-import { act, type ComponentProps } from 'react'
+import { StrictMode, act, type ComponentProps } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import UndoToast from './UndoToast'
+import TrainingUndoToast from './TrainingUndoToast'
+import { AppToaster } from '@/shared/components'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 let container: HTMLDivElement
 let root: Root
+let toasterContainer: HTMLDivElement
+let toasterRoot: Root
 
-const toast = () => document.querySelector<HTMLElement>('[role="status"]')
+const toast = () => document.querySelector<HTMLElement>('[data-sonner-toast]')
 
-const renderToast = async (props: Partial<ComponentProps<typeof UndoToast>> = {}) => {
+const renderToast = async (props: Partial<ComponentProps<typeof TrainingUndoToast>> = {}) => {
   await act(async () => root.render(
-    <UndoToast
+    <TrainingUndoToast
       name="阿米娅"
       pending={false}
       onUndo={vi.fn()}
@@ -22,19 +25,36 @@ const renderToast = async (props: Partial<ComponentProps<typeof UndoToast>> = {}
       {...props}
     />,
   ))
+  await act(async () => { await vi.advanceTimersByTimeAsync(0) })
 }
 
 describe('training undo toast', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers()
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
+    toasterContainer = document.createElement('div')
+    document.body.appendChild(toasterContainer)
+    toasterRoot = createRoot(toasterContainer)
+    await act(async () => toasterRoot.render(<AppToaster />))
   })
 
   afterEach(async () => {
     await act(async () => root.unmount())
+    await act(async () => toasterRoot.unmount())
     container.remove()
+    toasterContainer.remove()
     vi.useRealTimers()
   })
 
@@ -45,8 +65,7 @@ describe('training undo toast', () => {
     const element = toast()
     expect(element).not.toBeNull()
     expect(container.contains(element)).toBe(false)
-    expect(element?.getAttribute('role')).toBe('status')
-    expect(element?.getAttribute('aria-live')).toBe('polite')
+    expect(element?.closest('section[aria-live="polite"]')).not.toBeNull()
     expect(element?.textContent).toContain('已移除 阿米娅')
     expect(element?.querySelector('button[aria-label="关闭移除提示"]')).not.toBeNull()
 
@@ -59,7 +78,7 @@ describe('training undo toast', () => {
     await renderToast({ onDismiss })
 
     await act(async () => {
-      toast()!.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      toast()!.closest('[data-sonner-toast]')!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
     })
     await act(async () => { await vi.advanceTimersByTimeAsync(8000) })
     expect(onDismiss).not.toHaveBeenCalled()
@@ -82,11 +101,24 @@ describe('training undo toast', () => {
     expect(onDismiss).toHaveBeenCalledOnce()
   })
 
+  it('keeps the toast visible after a strict mode effect replay', async () => {
+    await act(async () => root.render(
+      <StrictMode>
+        <TrainingUndoToast name="阿米娅" pending={false} onUndo={vi.fn()} onDismiss={vi.fn()} />
+      </StrictMode>,
+    ))
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+
+    expect(toast()).not.toBeNull()
+  })
+
   it('does not expire while an undo request is pending', async () => {
     const onDismiss = vi.fn()
     await renderToast({ onDismiss, pending: true })
 
     await act(async () => { await vi.advanceTimersByTimeAsync(8000) })
     expect(onDismiss).not.toHaveBeenCalled()
+    expect(toast()!.textContent).toContain('恢复中')
+    expect(toast()!.querySelector<HTMLButtonElement>('button[aria-label="关闭移除提示"]')?.disabled).toBe(true)
   })
 })

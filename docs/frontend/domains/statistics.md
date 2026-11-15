@@ -22,7 +22,7 @@
 | 干员读取、筛选/排序、筛选菜单、头像缓存 | `features/statistics/components/OperatorPanel.tsx` | 读取 `operbox` 与 `catalog` 两路 Query |
 | 仓库读取、失败图标与分类展示 | `features/statistics/components/DepotPanel.tsx` | 汇总结果由纯模型派生 |
 | 掉落周期与掉落读取 | `features/statistics/components/DropPanel.tsx` | `DropRecords` 退为纯视图 |
-| 筛选菜单的测量、portal、焦点与键盘 | `features/statistics/components/FilterMenu.tsx` | 规则跟随组件，面板只传值与选项 |
+| 筛选菜单的 DropdownMenu 组合、焦点与键盘 | `features/statistics/components/OperatorFilterMenu.tsx` | 规则跟随组件，面板只传值与选项 |
 | 筛选、排序与阿米娅形态规则 | `features/statistics/model/operatorFilters.ts` | 已实现 |
 | 仓库分类标签、分组与概览 | `features/statistics/model/depotSummary.ts` | 纯模型 |
 | 掉落材料/关卡排序与展示上限 | `features/statistics/model/dropRecords.ts` | 纯模型 |
@@ -64,12 +64,12 @@ DataStatistics（页面壳：页头、全局状态指示）
 
 ### 3. 筛选菜单规则
 
-`FilterMenu` 从页面迁出后仍保持原规则：
+`OperatorFilterMenu` 以 shadcn `DropdownMenu` 承接原筛选规则：
 
-- 打开状态与当前值由面板持有，组件只接收 `isOpen`/`value`/`options`，测量状态（`menuPosition`）留在组件内。
-- 菜单通过 `createPortal` 挂到 `document.body`；按视口剩余空间选择上下方向，左右夹在最小 16px 边距内；手机端行尾菜单可用 `mobileAlign="end"` 对齐触发器右缘。
-- 打开时聚焦已选项（不存在则第一项）；`ArrowUp`/`ArrowDown` 循环、`Home`/`End` 跳转；`Escape` 关闭并把焦点还给触发器；选择后关闭并归还焦点；外部 `pointerdown`/`focusin` 关闭。
-- 触发器保留 `aria-haspopup`、`aria-expanded`、`aria-controls`，菜单保留 `role="menu"` 与 `role="menuitemradio"` 的 `aria-checked`。
+- 打开状态与当前值由面板持有，组件只接收 `open`/`value`/`options`；单开由面板共享的 `openMenu` 保证，打开时聚焦当前已选项（不存在则第一项）。
+- 菜单由 Base UI portal 与 positioner 负责视口碰撞与翻转；手机端行尾菜单使用 `mobileAlign="end"` 对齐触发器右缘，`menuWidth` 保持 112/128px，菜单项保持 44px 最小触达。
+- 键盘打开或进入菜单后，`ArrowUp`/`ArrowDown` 首尾环绕、`Home`/`End` 跳转；`Escape` 关闭并把焦点还给触发器；选择后关闭并归还焦点；外部点击或焦点移出菜单关闭。
+- 触发器由 Base UI 提供 `aria-haspopup`、`aria-expanded`、`aria-controls`，菜单使用 `role="menu"` 与 `role="menuitemradio"` 的 `aria-checked`。
 
 ### 4. 纯模型
 
@@ -84,7 +84,7 @@ DataStatistics（页面壳：页头、全局状态指示）
 
 ### 5. Activity 与卸载
 
-- `Activity` 隐藏会清理页面与面板的 Effects（筛选菜单的 document/window 监听、Query 观察者、`useFluidTabIndicator` 的 ResizeObserver/resize 监听），但保留 React state：筛选、打开状态、掉落周期与图标缓存不变；当前 tab 随 URL 保留。恢复时 Query 按 `staleTime` 决定是否重取；筛选菜单若仍处于打开状态会重新附加监听并聚焦选中项。
+- `Activity` 隐藏会清理页面与面板的 Effects（筛选菜单的 Base UI 弹层监听、Query 观察者、`useFluidTabIndicator` 的 ResizeObserver/resize 监听），但保留 React state：筛选、打开状态、掉落周期与图标缓存不变；当前 tab 随 URL 保留。恢复时 Query 按 `staleTime` 决定是否重取；筛选菜单若仍处于打开状态会按当前 `open` 重新挂载。
 - 命令所有者不随页面生命周期重建或中止：隐藏期间识别/材料命令继续完成，解析快照写入应用级 QueryClient；恢复后按失效 revision 补一次读取。页面不会因隐藏或重挂载重复提交设备命令。
 - 真正卸载或刷新会销毁面板局部状态；当前 tab 从 URL 恢复，Query 缓存（`game-data` 的 depot/operbox/catalog 与 `statistics` 的 drops）由应用级 QueryClient 持有，可在新鲜期内复用。
 - 页面不使用业务 localStorage；执行控制器持久化的是 Run 身份，不属于本页。
