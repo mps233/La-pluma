@@ -1,4 +1,4 @@
-import { HintTooltip } from '@/shared/components'
+import { FieldHint } from '@/shared/components'
 import { Checkbox } from '@/shared/ui/checkbox'
 
 interface AutomationFieldLabelProps {
@@ -15,7 +15,7 @@ export function AutomationFieldLabel({ htmlFor, label, hint }: AutomationFieldLa
   return (
     <span className="inline-flex min-w-max items-center gap-1">
       {labelElement}
-      <HintTooltip id={`${htmlFor}-hint`} label={label} hint={hint} />
+      <FieldHint id={`${htmlFor}-hint`} label={label} hint={hint} />
     </span>
   )
 }
@@ -33,7 +33,7 @@ export function AutomationFieldLegend({ label, hintId, hint }: AutomationFieldLe
     <legend className="automation-field-label mb-2 block">
       <span className="inline-flex items-center gap-1">
         {label}
-        <HintTooltip id={hintId} label={label} hint={hint} />
+        <FieldHint id={hintId} label={label} hint={hint} />
       </span>
     </legend>
   )
@@ -66,7 +66,7 @@ export function AutomationCheckboxField({ id, label, checked, disabled, hint, on
   return (
     <div className="flex items-center gap-1">
       {control}
-      <HintTooltip id={`${id}-hint`} label={label} hint={hint} />
+      <FieldHint id={`${id}-hint`} label={label} hint={hint} />
     </div>
   )
 }

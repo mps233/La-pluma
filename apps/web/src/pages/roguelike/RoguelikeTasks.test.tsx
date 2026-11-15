@@ -1251,39 +1251,31 @@ describe('RoguelikeTasks layout and config recovery', () => {
     for (const { key, label, hint } of cases) {
       expect(controlForName(`maa-roguelike-${key}`)).not.toBeNull()
       const trigger = container.querySelector<HTMLButtonElement>(`button[aria-label="${label}说明"]`)!
-      const tooltip = document.getElementById(trigger.getAttribute('aria-describedby') ?? '')!
+      const tooltipFor = () => {
+        const describedBy = trigger.getAttribute('aria-describedby')
+        return describedBy ? document.getElementById(describedBy) : null
+      }
 
-      expect(tooltip.getAttribute('role')).toBe('tooltip')
-      expect(tooltip.textContent).toBe(hint)
-      expect(tooltip.hidden).toBe(true)
-      expect(trigger?.getAttribute('aria-label')).toBe(`${label}说明`)
-      expect(trigger?.getAttribute('aria-describedby')).toBe(tooltip.id)
+      expect(trigger).not.toBeNull()
+      expect(trigger.getAttribute('aria-describedby')).toBeNull()
+      expect(trigger.getAttribute('aria-label')).toBe(`${label}说明`)
+
+      await act(async () => trigger.focus())
+      await flush()
+      const focusedTooltip = tooltipFor()
+      expect(focusedTooltip?.getAttribute('role')).toBe('tooltip')
+      expect(focusedTooltip?.textContent).toBe(hint)
+      expect(trigger.getAttribute('aria-describedby')).toBe(focusedTooltip?.id)
+
+      await act(async () => trigger.blur())
+      await flush()
+      expect(trigger.getAttribute('aria-describedby')).toBeNull()
 
       await act(async () => {
-        trigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+        trigger.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
-      expect(tooltip.hidden).toBe(false)
-
-      await act(async () => {
-        trigger?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }))
-      })
-      await flush()
-      expect(tooltip.hidden).toBe(true)
-
-      await act(async () => trigger?.focus())
-      await flush()
-      expect(tooltip.hidden).toBe(false)
-
-      await act(async () => trigger?.blur())
-      await flush()
-      expect(tooltip.hidden).toBe(true)
-
-      await act(async () => {
-        trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      })
-      await flush()
-      expect(tooltip.hidden).toBe(false)
+      expect(tooltipFor()?.textContent).toBe(hint)
     }
 
     const paragraphs = Array.from(container.querySelectorAll('p'))

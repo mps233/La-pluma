@@ -15,6 +15,7 @@ import {
   PageSkeleton,
   SmoothPanel,
 } from '@/shared/components'
+import { ThemeGalleryTooltips } from './ThemeGalleryTooltips'
 
 const buttonVariants: Array<{ variant: 'default' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'link', label: string, icon: LucideIcon }> = [
   { variant: 'default', label: '保存草稿', icon: Save },
@@ -300,6 +301,8 @@ export function ThemeGalleryGlobalSurfaces() {
           </CardContent>
         </Card>
       </div>
+
+      <ThemeGalleryTooltips />
     </>
   )
 }

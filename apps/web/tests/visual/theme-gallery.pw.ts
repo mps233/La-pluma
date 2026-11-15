@@ -7,6 +7,8 @@ import {
   waitForPageReady,
 } from './harness'
 
+const TOOLTIP_LONG_COPY = '使用 HD-数字代表当前活动关卡；置顶关卡会优先执行。次数为该关卡的累计作战局数上限，留空表示不限制局数。'
+
 /**
  * 主题画廊是 shadcn 迁移的护栏画布：零 API 依赖（布局 chrome 的干员语录走既有
  * fixture），整页截图只关心主题种子与确定性环境；迁移批次在同一画布上比对全局
@@ -97,6 +99,43 @@ for (const theme of THEMES) {
       await expect(disabledOption).toBeVisible()
       await expect(disabledOption).toHaveAttribute('aria-disabled', 'true')
       await expect(listbox).toHaveScreenshot(`theme-gallery-select-popup-${theme}.png`, {
+        animations: 'disabled',
+        caret: 'hide',
+      })
+
+      environment.assertNoUnmatchedApi()
+      await expectNoBrowserErrors(page)
+    })
+
+    test(`tooltip open ${theme}`, async ({ page }) => {
+      test.skip(test.info().project.name !== 'desktop', 'the tooltip group is captured once per theme')
+
+      const environment = await installDeterministicEnvironment(page)
+
+      await page.goto('/dev/theme-gallery')
+      await waitForPageReady(page, 'gallery')
+
+      const group = page.locator('[data-region="gallery-tooltips"]')
+      await group.scrollIntoViewIfNeeded()
+      await expect(group).toBeVisible()
+
+      const trigger = page.getByRole('button', { name: '上方长文案说明', exact: true })
+      await trigger.hover()
+
+      const tooltip = page.getByRole('tooltip').filter({ hasText: TOOLTIP_LONG_COPY })
+      await expect(tooltip).toBeVisible()
+      await expect(tooltip).toHaveText(TOOLTIP_LONG_COPY)
+
+      const groupBox = await group.boundingBox()
+      const tooltipBox = await tooltip.boundingBox()
+      expect(groupBox).not.toBeNull()
+      expect(tooltipBox).not.toBeNull()
+      expect(tooltipBox!.x).toBeGreaterThanOrEqual(groupBox!.x - 1)
+      expect(tooltipBox!.y).toBeGreaterThanOrEqual(groupBox!.y - 1)
+      expect(tooltipBox!.x + tooltipBox!.width).toBeLessThanOrEqual(groupBox!.x + groupBox!.width + 1)
+      expect(tooltipBox!.y + tooltipBox!.height).toBeLessThanOrEqual(groupBox!.y + groupBox!.height + 1)
+
+      await expect(group).toHaveScreenshot(`theme-gallery-tooltips-${theme}.png`, {
         animations: 'disabled',
         caret: 'hide',
       })

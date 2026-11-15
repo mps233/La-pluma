@@ -18,7 +18,7 @@ import { Checkbox } from '@/shared/ui/checkbox'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { Switch } from '@/shared/ui/switch'
-import { EmptyState, HintTooltip, SmoothPanel } from '@/shared/components'
+import { EmptyState, FieldHint, SmoothPanel } from '@/shared/components'
 import { useAutomationAvailability, useStatusStore } from '@/features/runtime-status'
 import { useUserConfig } from '@/features/user-config'
 import { useResourceInvalidation, type ResourceInvalidation } from '@/features/resource-invalidation'
@@ -815,7 +815,7 @@ export default function AutomationWorkspace() {
                           <div className="flex items-center gap-2">
                             <span className="flex w-24 shrink-0 items-center gap-1">
                               <label htmlFor={`${task.id}-fight-client-type`} className="whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">闪退重启:</label>
-                              <HintTooltip id={`${task.id}-fight-client-type-hint`} label="闪退重启" hint="选择客户端后，游戏闪退时会自动重新启动。" />
+                              <FieldHint id={`${task.id}-fight-client-type-hint`} label="闪退重启" hint="选择客户端后，游戏闪退时会自动重新启动。" />
                             </span>
                             <SelectField
                               id={`${task.id}-fight-client-type`}
@@ -844,7 +844,7 @@ export default function AutomationWorkspace() {
                               />
                               <span>葛朗台碎石模式</span>
                             </label>
-                            <HintTooltip id={`${task.id}-dr-grandet-hint`} label="葛朗台碎石模式" hint="使用源石前等待自然恢复 1 点理智，尽量减少碎石浪费。" />
+                            <FieldHint id={`${task.id}-dr-grandet-hint`} label="葛朗台碎石模式" hint="使用源石前等待自然恢复 1 点理智，尽量减少碎石浪费。" />
                           </div>
 
                           <section className="space-y-2 border-t border-border pt-3">
@@ -996,7 +996,7 @@ export default function AutomationWorkspace() {
                           <div className="flex items-center gap-2">
                             <span className="flex w-32 shrink-0 items-center gap-1">
                               <label htmlFor={`${task.id}-extra-tags-mode`} className="whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">多选 Tag 策略:</label>
-                              <HintTooltip
+                              <FieldHint
                                 id={`${task.id}-extra-tags-mode-hint`}
                                 label="多选 Tag 策略"
                                 hint="默认行为只选能组成有效组合的 Tag；“选 3 个 Tags”会尽量凑满 3 个；“尽量多选高星 Tag 组合”优先保留高星组合，可能包含冲突标签。"
@@ -1019,7 +1019,7 @@ export default function AutomationWorkspace() {
                           <div className="flex items-center gap-2">
                             <span className="flex w-32 shrink-0 items-center gap-1">
                               <label htmlFor={`${task.id}-first-tags`} className="whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">三星首选:</label>
-                              <HintTooltip
+                              <FieldHint
                                 id={`${task.id}-first-tags-hint`}
                                 label="三星首选"
                                 hint="仅在三星组合中优先选择，多个标签用逗号分隔。"
@@ -1041,7 +1041,7 @@ export default function AutomationWorkspace() {
                             <legend className="mb-2 block text-sm text-gray-600 dark:text-gray-400">
                               <span className="inline-flex items-center gap-1">
                                 招募时长:
-                                <HintTooltip
+                                <FieldHint
                                   id={`${task.id}-recruitment-time-hint`}
                                   label="招募时长"
                                   hint="可设置 60 至 540 分钟，按 10 分钟调整；五星和六星固定为 540 分钟。"

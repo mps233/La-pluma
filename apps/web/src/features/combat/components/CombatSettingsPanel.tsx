@@ -1,5 +1,5 @@
-import { HintTooltip } from '@/shared/components'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
+import { FieldHint } from '@/shared/components'
 import type {
   CombatTask,
   CopilotRaid,
@@ -64,7 +64,7 @@ export default function CombatSettingsPanel({
       <div className="mb-3">
         <div className="mb-1.5 flex items-center gap-1">
           <span className="text-xs text-muted-foreground">编队</span>
-          <HintTooltip
+          <FieldHint
             id="combat-copilot-formation-hint"
             label="编队"
             hint="“自动决定”会在队列执行时启用自动编队，单作业沿用 Maa CLI 的默认设置。"
@@ -101,7 +101,7 @@ export default function CombatSettingsPanel({
       <div>
         <div className="mb-1.5 flex items-center gap-1">
           <span className="text-xs text-muted-foreground">执行方式</span>
-          <HintTooltip
+          <FieldHint
             id="combat-copilot-set-mode-hint"
             label="执行方式"
             hint="连续执行会自动开始下一项。手动逐关需要在每个执行步骤后确认。"

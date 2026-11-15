@@ -6,10 +6,24 @@ const RECRUIT_HINT = '活动期间领取限定池赠送的每日免费单抽；�
 const ANNIVERSARY_HINT = '领取周年活动赠送的月卡奖励'
 const SIGN_IN_HINT = '领取限时签到活动的每日奖励（仅支持常见横向版型）'
 
+const isMobileProject = () => test.info().project.name === 'mobile'
+
+const revealHint = async (hint: Locator) => {
+  if (isMobileProject()) await hint.tap()
+  else await hint.hover()
+}
+
+const dismissHint = async (page: Page) => {
+  if (isMobileProject()) await page.touchscreen.tap(4, 4)
+  else await page.mouse.move(4, 4)
+}
+
 const selectAwardTask = async (page: Page) => {
   await page.goto('/app/automation')
   await waitForPageReady(page, 'automation')
-  await page.locator('button[aria-controls="automation-task-editor"]').filter({ hasText: '领取奖励' }).click()
+  const task = page.locator('button[aria-controls="automation-task-editor"]').filter({ hasText: '领取奖励' })
+  if (isMobileProject()) await task.tap()
+  else await task.click()
   await page.getByRole('button', { name: '限定池免费单抽说明', exact: true }).waitFor()
 }
 
@@ -29,29 +43,29 @@ test.describe('automation award field hints', () => {
     await expect(anniversaryHint).toBeVisible()
     await expect(signInHint).toBeVisible()
 
-    const tooltipOf = (hint: string) => page.locator('[role="tooltip"]').filter({ hasText: hint })
+    const tooltipOf = (hint: string) => page.getByRole('tooltip').filter({ hasText: hint })
     const recruitTooltip = tooltipOf(RECRUIT_HINT)
     const anniversaryTooltip = tooltipOf(ANNIVERSARY_HINT)
     const signInTooltip = tooltipOf(SIGN_IN_HINT)
 
-    // 说明文字只存在于默认收起的提示层里，不再有常驻段落。
-    await expect(recruitTooltip).toHaveCount(1)
-    await expect(anniversaryTooltip).toHaveCount(1)
-    await expect(signInTooltip).toHaveCount(1)
+    // 说明文字只在打开提示层时挂载，不再有常驻段落。
     await expect(recruitTooltip).toBeHidden()
     await expect(anniversaryTooltip).toBeHidden()
     await expect(signInTooltip).toBeHidden()
+    await expect(page.getByText(RECRUIT_HINT, { exact: true })).toHaveCount(0)
+    await expect(page.getByText(ANNIVERSARY_HINT, { exact: true })).toHaveCount(0)
+    await expect(page.getByText(SIGN_IN_HINT, { exact: true })).toHaveCount(0)
 
-    await recruitHint.hover()
+    await revealHint(recruitHint)
     await expect(recruitTooltip).toBeVisible()
     await expect(recruitTooltip).toHaveText(RECRUIT_HINT)
-    await page.mouse.move(4, 4)
+    await dismissHint(page)
     await expect(recruitTooltip).toBeHidden()
 
-    await anniversaryHint.hover()
+    await revealHint(anniversaryHint)
     await expect(anniversaryTooltip).toBeVisible()
     await expect(anniversaryTooltip).toHaveText(ANNIVERSARY_HINT)
-    await page.mouse.move(4, 4)
+    await dismissHint(page)
     await expect(anniversaryTooltip).toBeHidden()
 
     await signInHint.focus()

@@ -739,18 +739,11 @@ describe('AutomationTasks layout surfaces', () => {
       .toContain('默认行为')
   })
 
+  // 整页 jsdom 用例在 4 worker 并行下争用 CPU，默认 5s 会被调度抖动击穿。
   it('moves every recruit helper into a label tooltip and keeps the card behaviours', async () => {
     mocks.loadUserConfig.mockResolvedValue({ success: true, data: { taskFlow: taskFlowFixture } })
     await renderPage()
     await clickSequenceTask('自动公招')
-
-    const tooltipFor = (accessibilityName: string) => {
-      const trigger = container.querySelector<HTMLButtonElement>(`button[aria-label="${accessibilityName}"]`)
-      expect(trigger, accessibilityName).not.toBeNull()
-      const tooltip = document.getElementById(trigger!.getAttribute('aria-describedby') ?? '')
-      expect(tooltip?.getAttribute('role')).toBe('tooltip')
-      return { trigger: trigger!, tooltip }
-    }
 
     const hintCopies: Record<string, string> = {
       '无许可时仍刷新说明': '招聘许可耗尽后，仍会使用可用刷新次数',
@@ -765,21 +758,21 @@ describe('AutomationTasks layout surfaces', () => {
     }
 
     for (const [accessibilityName, copy] of Object.entries(hintCopies)) {
-      const { tooltip } = tooltipFor(accessibilityName)
-      expect(tooltip?.textContent).toBe(copy)
-      expect(tooltip?.hidden).toBe(true)
-    }
-
-    // 常驻说明段落已删除，文案只存在于默认收起的 tooltip 里。
-    for (const copy of Object.values(hintCopies)) {
+      const trigger = container.querySelector<HTMLButtonElement>(`button[aria-label="${accessibilityName}"]`)
+      expect(trigger, accessibilityName).not.toBeNull()
+      expect(trigger!.getAttribute('aria-describedby')).toBeNull()
       expect(container.textContent).not.toContain(copy)
     }
 
-    const timesHint = tooltipFor('招募次数说明')
-    await act(async () => timesHint.trigger.focus())
-    expect(timesHint.tooltip?.hidden).toBe(false)
-    await act(async () => timesHint.trigger.blur())
-    expect(timesHint.tooltip?.hidden).toBe(true)
+    // 常驻说明段落已删除，文案只存在于按需挂载的 tooltip 里。
+    const timesHintTrigger = container.querySelector<HTMLButtonElement>('button[aria-label="招募次数说明"]')!
+    await act(async () => timesHintTrigger.focus())
+    const timesTooltipId = timesHintTrigger.getAttribute('aria-describedby')
+    const timesTooltip = timesTooltipId ? document.getElementById(timesTooltipId) : null
+    expect(timesTooltip?.getAttribute('role')).toBe('tooltip')
+    expect(timesTooltip?.textContent).toBe(hintCopies['招募次数说明'])
+    await act(async () => timesHintTrigger.blur())
+    expect(timesHintTrigger.getAttribute('aria-describedby')).toBeNull()
 
     const savedRecruitParams = () => {
       const flow = JSON.parse(localStorage.getItem('maa-task-flow') || '[]') as Array<{
@@ -847,7 +840,7 @@ describe('AutomationTasks layout surfaces', () => {
     await act(async () => increasePermitReserve?.click())
     await flush()
     expect(savedRecruitParams().level3_recruitment_permit_reserve).toBe('1')
-  })
+  }, 20_000)
 
   it('moves the startup helper texts into focusable tooltips', async () => {
     mocks.loadUserConfig.mockResolvedValue({ success: true, data: { taskFlow: taskFlowFixture } })
@@ -858,26 +851,29 @@ describe('AutomationTasks layout surfaces', () => {
     const launchHint = container.querySelector<HTMLButtonElement>('button[aria-label="启动游戏客户端说明"]')
     expect(accountHint).not.toBeNull()
     expect(launchHint).not.toBeNull()
-
-    const tooltipFor = (trigger: HTMLButtonElement) => {
-      const tooltip = document.getElementById(trigger.getAttribute('aria-describedby') ?? '')
-      expect(tooltip?.getAttribute('role')).toBe('tooltip')
-      return tooltip
-    }
-
-    expect(tooltipFor(accountHint!)?.textContent)
-      .toBe('输入已登录账号的部分字符即可，如 "123****4567" 可输入 "4567"')
-    expect(tooltipFor(launchHint!)?.textContent)
-      .toBe('关闭后只连接设备并进入已有游戏的主界面，不会启动游戏客户端')
-    expect(tooltipFor(accountHint!)?.hidden).toBe(true)
-    expect(tooltipFor(launchHint!)?.hidden).toBe(true)
+    expect(accountHint!.getAttribute('aria-describedby')).toBeNull()
+    expect(launchHint!.getAttribute('aria-describedby')).toBeNull()
+    expect(document.querySelector('[role="tooltip"]')).toBeNull()
 
     await act(async () => accountHint!.focus())
-    expect(tooltipFor(accountHint!)?.hidden).toBe(false)
+    const accountTooltipId = accountHint!.getAttribute('aria-describedby')
+    const accountTooltip = accountTooltipId ? document.getElementById(accountTooltipId) : null
+    expect(accountTooltip?.getAttribute('role')).toBe('tooltip')
+    expect(accountTooltip?.textContent)
+      .toBe('输入已登录账号的部分字符即可，如 "123****4567" 可输入 "4567"')
     await act(async () => accountHint!.blur())
-    expect(tooltipFor(accountHint!)?.hidden).toBe(true)
+    expect(accountHint!.getAttribute('aria-describedby')).toBeNull()
 
-    // 常驻说明段落已删除，说明文字只存在于默认收起的 tooltip 里。
+    await act(async () => launchHint!.focus())
+    const launchTooltipId = launchHint!.getAttribute('aria-describedby')
+    const launchTooltip = launchTooltipId ? document.getElementById(launchTooltipId) : null
+    expect(launchTooltip?.getAttribute('role')).toBe('tooltip')
+    expect(launchTooltip?.textContent)
+      .toBe('关闭后只连接设备并进入已有游戏的主界面，不会启动游戏客户端')
+    await act(async () => launchHint!.blur())
+    expect(launchHint!.getAttribute('aria-describedby')).toBeNull()
+
+    // 常驻说明段落已删除，说明文字只存在于按需挂载的 tooltip 里。
     expect(container.textContent).not.toContain('输入已登录账号的部分字符即可')
     expect(container.textContent).not.toContain('关闭后只连接设备并进入已有游戏的主界面')
   })
@@ -899,23 +895,19 @@ describe('AutomationTasks layout surfaces', () => {
       ['葛朗台碎石模式说明', '使用源石前等待自然恢复 1 点理智，尽量减少碎石浪费。'],
     ]
 
-    const tooltipFor = (trigger: HTMLButtonElement) => {
-      const tooltip = document.getElementById(trigger.getAttribute('aria-describedby') ?? '')
-      expect(tooltip?.getAttribute('role')).toBe('tooltip')
-      return tooltip
-    }
-
     for (const [accessibilityName, copy] of expectedHints) {
       const trigger = container.querySelector<HTMLButtonElement>(`button[aria-label="${accessibilityName}"]`)
       expect(trigger).not.toBeNull()
-      expect(tooltipFor(trigger!)?.textContent).toBe(copy)
-      expect(tooltipFor(trigger!)?.hidden).toBe(true)
+      expect(trigger!.getAttribute('aria-describedby')).toBeNull()
       expect(container.textContent).not.toContain(copy)
 
       await act(async () => trigger!.focus())
-      expect(tooltipFor(trigger!)?.hidden).toBe(false)
+      const tooltipId = trigger!.getAttribute('aria-describedby')
+      const tooltip = tooltipId ? document.getElementById(tooltipId) : null
+      expect(tooltip?.getAttribute('role')).toBe('tooltip')
+      expect(tooltip?.textContent).toBe(copy)
       await act(async () => trigger!.blur())
-      expect(tooltipFor(trigger!)?.hidden).toBe(true)
+      expect(trigger!.getAttribute('aria-describedby')).toBeNull()
     }
 
     // 区块级提示挂在「关卡计划」标题行内、关卡数量徽标右侧。
@@ -1003,21 +995,21 @@ describe('AutomationTasks layout surfaces', () => {
     for (const [label, copy] of hints) {
       const trigger = container.querySelector<HTMLButtonElement>(`button[aria-label="${label}说明"]`)
       expect(trigger).not.toBeNull()
-      const tooltip = document.getElementById(trigger!.getAttribute('aria-describedby') ?? '')
-      expect(tooltip?.getAttribute('role')).toBe('tooltip')
-      expect(tooltip?.textContent).toBe(copy)
-      expect(tooltip?.hidden).toBe(true)
+      expect(trigger!.getAttribute('aria-describedby')).toBeNull()
 
-      // 常驻说明段落已删除，说明文字只存在于默认收起的 tooltip 里。
+      // 常驻说明段落已删除，说明文字只存在于按需挂载的 tooltip 里。
       expect(container.textContent).not.toContain(copy)
     }
+    expect(document.querySelector('[role="tooltip"]')).toBeNull()
 
     const discountHint = container.querySelector<HTMLButtonElement>('button[aria-label="只买折扣商品说明"]')!
-    const discountTooltip = document.getElementById(discountHint.getAttribute('aria-describedby') ?? '')
     await act(async () => discountHint.focus())
-    expect(discountTooltip?.hidden).toBe(false)
+    const discountTooltipId = discountHint.getAttribute('aria-describedby')
+    const discountTooltip = discountTooltipId ? document.getElementById(discountTooltipId) : null
+    expect(discountTooltip?.getAttribute('role')).toBe('tooltip')
+    expect(discountTooltip?.textContent).toBe(hints[0]![1])
     await act(async () => discountHint.blur())
-    expect(discountTooltip?.hidden).toBe(true)
+    expect(discountHint.getAttribute('aria-describedby')).toBeNull()
 
     // 本来就没有说明文案的开关不会出现孤立图标。
     expect(container.querySelector('button[aria-label="信用溢出时无视黑名单说明"]')).toBeNull()
@@ -1093,29 +1085,25 @@ describe('AutomationTasks layout surfaces', () => {
 
     await renderPage()
 
-    const tooltipFor = (label: string) => {
+    const awardHints = [
+      ['限定池免费单抽', '活动期间领取限定池赠送的每日免费单抽；没有免费次数时不抽取'],
+      ['周年赠送月卡', '领取周年活动赠送的月卡奖励'],
+      ['限时签到活动奖励', '领取限时签到活动的每日奖励（仅支持常见横向版型）'],
+    ] as const
+
+    for (const [label, copy] of awardHints) {
       const trigger = container.querySelector<HTMLButtonElement>(`button[aria-label="${label}说明"]`)
       expect(trigger).not.toBeNull()
-      const tooltip = document.getElementById(trigger?.getAttribute('aria-describedby') ?? '')
+      expect(trigger!.getAttribute('aria-describedby')).toBeNull()
+
+      await act(async () => trigger!.focus())
+      const tooltipId = trigger!.getAttribute('aria-describedby')
+      const tooltip = tooltipId ? document.getElementById(tooltipId) : null
       expect(tooltip?.getAttribute('role')).toBe('tooltip')
-      return { trigger: trigger!, tooltip }
+      expect(tooltip?.textContent).toBe(copy)
+      await act(async () => trigger!.blur())
+      expect(trigger!.getAttribute('aria-describedby')).toBeNull()
     }
-
-    const recruit = tooltipFor('限定池免费单抽')
-    const anniversary = tooltipFor('周年赠送月卡')
-    const signIn = tooltipFor('限时签到活动奖励')
-
-    expect(recruit.tooltip?.textContent).toBe('活动期间领取限定池赠送的每日免费单抽；没有免费次数时不抽取')
-    expect(anniversary.tooltip?.textContent).toBe('领取周年活动赠送的月卡奖励')
-    expect(signIn.tooltip?.textContent).toBe('领取限时签到活动的每日奖励（仅支持常见横向版型）')
-    expect(recruit.tooltip?.hidden).toBe(true)
-    expect(anniversary.tooltip?.hidden).toBe(true)
-    expect(signIn.tooltip?.hidden).toBe(true)
-
-    await act(async () => recruit.trigger.focus())
-    expect(recruit.tooltip?.hidden).toBe(false)
-    await act(async () => recruit.trigger.blur())
-    expect(recruit.tooltip?.hidden).toBe(true)
 
     // 常驻说明段落已删除：编辑器内不再有承载这段文字的段落。
     const editor = container.querySelector('#automation-task-editor')
@@ -1487,18 +1475,18 @@ describe('AutomationTasks layout surfaces', () => {
 
     const shiftModeHint = container.querySelector<HTMLButtonElement>('button[aria-label="换班模式说明"]')
     expect(shiftModeHint).not.toBeNull()
-    const tooltip = document.getElementById(shiftModeHint!.getAttribute('aria-describedby') ?? '')
-    expect(tooltip?.getAttribute('role')).toBe('tooltip')
-    expect(tooltip?.textContent).toBe('一键轮换使用游戏内队列，并保留无人机、会客室等基础操作')
-    expect(tooltip?.hidden).toBe(true)
+    expect(shiftModeHint!.getAttribute('aria-describedby')).toBeNull()
+    expect(container.textContent).not.toContain('一键轮换使用游戏内队列')
 
     await act(async () => shiftModeHint!.focus())
-    expect(tooltip?.hidden).toBe(false)
+    const shiftModeTooltipId = shiftModeHint!.getAttribute('aria-describedby')
+    const shiftModeTooltip = shiftModeTooltipId ? document.getElementById(shiftModeTooltipId) : null
+    expect(shiftModeTooltip?.getAttribute('role')).toBe('tooltip')
+    expect(shiftModeTooltip?.textContent).toBe('一键轮换使用游戏内队列，并保留无人机、会客室等基础操作')
     await act(async () => shiftModeHint!.blur())
-    expect(tooltip?.hidden).toBe(true)
+    expect(shiftModeHint!.getAttribute('aria-describedby')).toBeNull()
 
-    // 常驻说明段落已删除，说明文字只存在于默认收起的 tooltip 里。
-    expect(container.textContent).not.toContain('一键轮换使用游戏内队列')
+    // 常驻说明段落已删除，说明文字只存在于按需挂载的 tooltip 里。
     expect(container.textContent).not.toContain('选择要换班的设施')
 
     const facilityLegend = Array.from(container.querySelectorAll('legend'))

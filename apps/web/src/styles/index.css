@@ -1752,12 +1752,13 @@
   }
 
   /*
-   * Base UI Select 的弹层经 portal 挂在 body 下，上游 z-50 低于应用 chrome
-   * （navbar 60 / tabbar 70）与 app-modal-layer 80；utilities 层拥有 z-50，
-   * 只有 components 层的 !important 能压过它，使弹层与 HintTooltip、FilterMenu
-   * 的 z-2000 约定一致。
+   * Base UI Select/Tooltip 的弹层经 portal 挂在 body 下，上游 z-50 低于应用
+   * chrome（navbar 60 / tabbar 70）与 app-modal-layer 80；utilities 层拥有
+   * z-50，只有 components 层的 !important 能压过它，使弹层与 FilterMenu 的
+   * z-2000 约定一致。
    */
-  div:has(> [data-slot="select-content"]) {
+  div:has(> [data-slot="select-content"]),
+  div:has(> [data-slot="tooltip-content"]) {
     z-index: 2000 !important;
   }
 

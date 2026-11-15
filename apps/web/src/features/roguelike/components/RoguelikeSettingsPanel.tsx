@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react'
 import { LoaderCircle, Play, Square } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { HintTooltip, SmoothPanel } from '@/shared/components'
+import { FieldHint, SmoothPanel } from '@/shared/components'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { Switch } from '@/shared/ui/switch'
@@ -44,7 +44,7 @@ function RoguelikeSelect({
       <div className="mb-2 flex items-center gap-1">
         <label htmlFor={id} className="text-sm font-medium text-muted-foreground">{label}</label>
         {hintPlacement === 'tooltip' && hint && (
-          <HintTooltip id={hintId} label={label} hint={hint} />
+          <FieldHint id={hintId} label={label} hint={hint} />
         )}
       </div>
       <Select
@@ -90,7 +90,7 @@ function RoguelikeFieldInput({
       <div className="mb-2 flex items-center gap-1">
         <label htmlFor={id} className="text-sm font-medium text-muted-foreground">{label}</label>
         {hintPlacement === 'tooltip' && hint && (
-          <HintTooltip id={hintId} label={label} hint={hint} />
+          <FieldHint id={hintId} label={label} hint={hint} />
         )}
       </div>
       <Input id={id} autoComplete="off" aria-describedby={hint && hintPlacement === 'below' ? hintId : undefined} {...inputProps} />

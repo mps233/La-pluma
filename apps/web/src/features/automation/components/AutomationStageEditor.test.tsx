@@ -214,18 +214,17 @@ describe('AutomationStageEditor', () => {
     expect(trigger).not.toBeNull()
     expect(trigger?.previousElementSibling?.tagName).toBe('SPAN')
     expect(trigger?.previousElementSibling?.textContent).toBe('2 个关卡')
-
-    const tooltip = document.getElementById(trigger?.getAttribute('aria-describedby') ?? '')
-    expect(tooltip?.getAttribute('role')).toBe('tooltip')
-    expect(tooltip?.textContent).toBe(stageHint)
-    expect(tooltip?.hidden).toBe(true)
+    expect(trigger?.getAttribute('aria-describedby')).toBeNull()
     expect(container.querySelector('p')).toBeNull()
 
     await act(async () => trigger?.focus())
-    expect(tooltip?.hidden).toBe(false)
+    const tooltipId = trigger?.getAttribute('aria-describedby')
+    const tooltip = tooltipId ? document.getElementById(tooltipId) : null
+    expect(tooltip?.getAttribute('role')).toBe('tooltip')
+    expect(tooltip?.textContent).toBe(stageHint)
 
     await act(async () => trigger?.blur())
-    expect(tooltip?.hidden).toBe(true)
+    expect(trigger?.getAttribute('aria-describedby')).toBeNull()
   })
 
   it('disables stage editing controls while running', async () => {
