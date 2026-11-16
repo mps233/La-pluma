@@ -1,3 +1,4 @@
+import { PageShell } from '@/shared/components'
 import {
   ThemeGalleryCurrentTheme,
   ThemeGalleryDialogs,
@@ -7,11 +8,11 @@ import {
 
 export default function ThemeGalleryPage() {
   return (
-    <div className="app-page app-stack-section">
+    <PageShell pageKind="gallery">
       <ThemeGalleryCurrentTheme />
       <ThemeGalleryGlobalSurfaces />
       <ThemeGalleryDialogs />
       <ThemeGalleryOverlays />
-    </div>
+    </PageShell>
   )
 }

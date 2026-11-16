@@ -1,3 +1,4 @@
+import { PageShell } from '@/shared/components'
 import { DashboardSkeleton } from '@/features/dashboard'
 import { DashboardWorkspace } from '@/features/dashboard'
 import { useDashboardSnapshotRefresh } from '@/features/dashboard'
@@ -12,10 +13,8 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="app-page dashboard-page" data-page="dashboard">
-      <div className="app-stack-section">
-        <DashboardWorkspace refreshDashboard={refreshDashboard} />
-      </div>
-    </div>
+    <PageShell pageKind="dashboard" className="dashboard-page">
+      <DashboardWorkspace refreshDashboard={refreshDashboard} />
+    </PageShell>
   )
 }

@@ -606,7 +606,7 @@
     border-top: 1px solid var(--border);
   }
 
-  [data-automation-tasks] .automation-run-button.is-running:is(:disabled, .disabled) {
+  [data-page-kind="automation"] .automation-run-button.is-running:is(:disabled, .disabled) {
     cursor: progress;
     opacity: 1 !important;
     background: color-mix(in srgb, var(--primary) 11%, var(--card)) !important;
@@ -614,7 +614,7 @@
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 24%, var(--border)) !important;
   }
 
-  [data-automation-tasks] .automation-stop-button.is-stopping:is(:disabled, .disabled) {
+  [data-page-kind="automation"] .automation-stop-button.is-stopping:is(:disabled, .disabled) {
     cursor: progress;
     opacity: 1 !important;
     background: var(--primary-soft) !important;
@@ -622,7 +622,7 @@
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 28%, var(--border)) !important;
   }
 
-  [data-automation-tasks] .automation-test-connection.is-testing:is(:disabled, .disabled) {
+  [data-page-kind="automation"] .automation-test-connection.is-testing:is(:disabled, .disabled) {
     cursor: progress;
     opacity: 1 !important;
     background: var(--primary-soft) !important;
@@ -1952,21 +1952,21 @@
   /* Apple Liquid Glass: automation content stays on unified solid surfaces.
      Accent is reserved for active rows and commands; only the picker and
      preview controls behave as overlapping glass. */
-  [data-automation-tasks] {
+  [data-page-kind="automation"] {
     --automation-hairline: rgba(60, 60, 67, 0.1);
     --automation-overlay-shadow:
       0 2px 8px rgba(0, 0, 0, 0.1),
       0 30px 80px rgba(0, 0, 0, 0.2);
   }
 
-  .dark [data-automation-tasks] {
+  .dark [data-page-kind="automation"] {
     --automation-hairline: rgba(235, 235, 245, 0.12);
     --automation-overlay-shadow:
       0 2px 8px rgba(0, 0, 0, 0.24),
       0 30px 80px rgba(0, 0, 0, 0.44);
   }
 
-  [data-automation-tasks] :is(
+  [data-page-kind="automation"] :is(
     .automation-flow-header,
     .automation-editor-heading,
     .automation-side-card-heading,
@@ -1979,7 +1979,7 @@
     border-color: var(--automation-hairline) !important;
   }
 
-  [data-automation-tasks] :is(
+  [data-page-kind="automation"] :is(
     .automation-flow-header,
     .automation-editor-heading,
     .automation-side-card-heading
@@ -1987,7 +1987,7 @@
     color: var(--tertiary-foreground);
   }
 
-  [data-automation-tasks] :is(
+  [data-page-kind="automation"] :is(
     .automation-flow-summary,
     .automation-editor-heading > span,
     .automation-schedule-paused-times,
@@ -1996,71 +1996,71 @@
     font-variant-numeric: tabular-nums;
   }
 
-  [data-automation-tasks] .automation-editor-heading > span {
+  [data-page-kind="automation"] .automation-editor-heading > span {
     background: var(--muted);
     color: var(--muted-foreground);
   }
 
-  [data-automation-tasks] .automation-sequence-list {
+  [data-page-kind="automation"] .automation-sequence-list {
     border-radius: 0;
     background: transparent;
   }
 
-  [data-automation-tasks] .automation-schedule-time-row + .automation-schedule-time-row {
+  [data-page-kind="automation"] .automation-schedule-time-row + .automation-schedule-time-row {
     border-color: var(--automation-hairline);
   }
 
-  [data-automation-tasks] .automation-sequence-item:not(:last-child)::after {
+  [data-page-kind="automation"] .automation-sequence-item:not(:last-child)::after {
     background: var(--automation-hairline);
     opacity: 1;
   }
 
-  [data-automation-tasks] .automation-sequence-item:is(.is-selected, .is-current)::after,
-  [data-automation-tasks] .automation-sequence-item:has(+ :is(.is-selected, .is-current))::after {
+  [data-page-kind="automation"] .automation-sequence-item:is(.is-selected, .is-current)::after,
+  [data-page-kind="automation"] .automation-sequence-item:has(+ :is(.is-selected, .is-current))::after {
     opacity: 0;
   }
 
-  [data-automation-tasks] .automation-sequence-node {
+  [data-page-kind="automation"] .automation-sequence-node {
     background: var(--card);
     color: var(--tertiary-foreground);
     box-shadow: inset 0 0 0 1px var(--automation-hairline);
   }
 
-  [data-automation-tasks] .automation-sequence-item.is-selected:not(.is-current, .is-completed) .automation-sequence-node {
+  [data-page-kind="automation"] .automation-sequence-item.is-selected:not(.is-current, .is-completed) .automation-sequence-node {
     background: var(--primary-soft);
     color: var(--primary-strong);
     box-shadow: none;
   }
 
-  [data-automation-tasks] .automation-sequence-item.is-current .automation-sequence-node {
+  [data-page-kind="automation"] .automation-sequence-item.is-current .automation-sequence-node {
     background: var(--primary);
     color: #fff;
     box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 16%, transparent);
   }
 
-  [data-automation-tasks] .automation-sequence-item.is-current .automation-sequence-copy small {
+  [data-page-kind="automation"] .automation-sequence-item.is-current .automation-sequence-copy small {
     color: var(--primary-strong);
     font-weight: 600;
   }
 
-  [data-automation-tasks] .automation-sequence-item.is-completed .automation-sequence-node {
+  [data-page-kind="automation"] .automation-sequence-item.is-completed .automation-sequence-node {
     background: var(--success);
     color: #fff;
     box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 18%, transparent);
   }
 
-  [data-automation-tasks] .automation-sequence-item.is-failed .automation-sequence-node {
+  [data-page-kind="automation"] .automation-sequence-item.is-failed .automation-sequence-node {
     background: var(--destructive);
     color: #fff;
     box-shadow: none;
   }
 
-  [data-automation-tasks] .automation-sequence-item.is-skipped .automation-sequence-node {
+  [data-page-kind="automation"] .automation-sequence-item.is-skipped .automation-sequence-node {
     background: var(--muted);
     color: var(--muted-foreground);
   }
 
-  [data-automation-tasks] :is(
+  [data-page-kind="automation"] :is(
     .automation-task-picker-toggle,
     .automation-run-button,
     .automation-stop-button,
@@ -2069,7 +2069,7 @@
     border-radius: 9999px;
   }
 
-  [data-automation-tasks] :is(
+  [data-page-kind="automation"] :is(
     .automation-task-picker-toggle,
     .automation-task-picker-option,
     .automation-run-button,
@@ -2081,13 +2081,13 @@
     transition-duration: 100ms;
   }
 
-  [data-automation-tasks] :is(
+  [data-page-kind="automation"] :is(
     .automation-sequence-delete
   ) {
     border-radius: 50%;
   }
 
-  [data-automation-tasks] .automation-task-picker {
+  [data-page-kind="automation"] .automation-task-picker {
     gap: 0;
     border: 1px solid var(--automation-hairline);
     border-radius: var(--radius-xl);
@@ -2099,32 +2099,32 @@
     will-change: transform, opacity;
   }
 
-  [data-automation-tasks] .automation-task-picker-option {
+  [data-page-kind="automation"] .automation-task-picker-option {
     border-radius: 0;
   }
 
-  [data-automation-tasks] .automation-task-picker-option + .automation-task-picker-option {
+  [data-page-kind="automation"] .automation-task-picker-option + .automation-task-picker-option {
     border-top: 1px solid var(--automation-hairline);
   }
 
-  [data-automation-tasks] .automation-task-picker-option > span {
+  [data-page-kind="automation"] .automation-task-picker-option > span {
     border-radius: var(--radius-md);
     background: var(--muted);
     color: var(--muted-foreground);
   }
 
-  [data-automation-tasks] .automation-task-picker-option:hover > span,
-  [data-automation-tasks] .automation-task-picker-option:focus-visible > span {
+  [data-page-kind="automation"] .automation-task-picker-option:hover > span,
+  [data-page-kind="automation"] .automation-task-picker-option:focus-visible > span {
     color: var(--primary);
   }
 
-  [data-automation-tasks] .automation-task-picker-option small {
+  [data-page-kind="automation"] .automation-task-picker-option small {
     background: var(--muted);
     color: var(--muted-foreground);
     font-variant-numeric: tabular-nums;
   }
 
-  [data-automation-tasks] .automation-task-editor details.group {
+  [data-page-kind="automation"] .automation-task-editor details.group {
     margin-top: 1rem;
     border: 0;
     border-top: 1px solid var(--automation-hairline);
@@ -2133,7 +2133,7 @@
     background: transparent;
   }
 
-  [data-automation-tasks] .automation-task-editor details.group > summary {
+  [data-page-kind="automation"] .automation-task-editor details.group > summary {
     padding: 0;
   }
 
@@ -2159,7 +2159,7 @@
   }
 
   @media (prefers-reduced-transparency: reduce) {
-    [data-automation-tasks] .automation-task-picker {
+    [data-page-kind="automation"] .automation-task-picker {
       background: var(--card);
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
@@ -2167,7 +2167,7 @@
   }
 
   @media (prefers-contrast: more) {
-    [data-automation-tasks] .automation-task-picker {
+    [data-page-kind="automation"] .automation-task-picker {
       border-color: var(--input);
       background: var(--card);
     }
@@ -2176,7 +2176,7 @@
   /* Automation owns a few compact field implementations instead of the shared
      Input component. Keep their filled grouping while removing the permanent
      hairlines used by the former desktop control treatment. */
-  .la-pluma-app [data-automation-tasks] :is(
+  .la-pluma-app [data-page-kind="automation"] :is(
     .automation-select-control select,
     .automation-task-editor .automation-text-control,
     .automation-task-editor .number-input-wrapper,
@@ -2188,7 +2188,7 @@
     box-shadow: none;
   }
 
-  .la-pluma-app [data-automation-tasks] :is(
+  .la-pluma-app [data-page-kind="automation"] :is(
     .automation-select-control:hover select,
     .automation-task-editor .automation-text-control:hover,
     .automation-task-editor .number-input-wrapper:hover,
@@ -2197,16 +2197,16 @@
     box-shadow: none;
   }
 
-  .la-pluma-app [data-automation-tasks] .automation-time-input:focus,
-  .la-pluma-app [data-automation-tasks] .automation-notification-field input:focus,
-  .la-pluma-app [data-automation-tasks] .automation-select-control:has(select:focus) select,
-  .la-pluma-app [data-automation-tasks] .automation-task-editor .automation-text-control:focus,
-  .la-pluma-app [data-automation-tasks] .automation-task-editor .number-input-wrapper:has(input:focus),
-  .la-pluma-app [data-automation-tasks] .automation-composite-control:has(input:focus) {
+  .la-pluma-app [data-page-kind="automation"] .automation-time-input:focus,
+  .la-pluma-app [data-page-kind="automation"] .automation-notification-field input:focus,
+  .la-pluma-app [data-page-kind="automation"] .automation-select-control:has(select:focus) select,
+  .la-pluma-app [data-page-kind="automation"] .automation-task-editor .automation-text-control:focus,
+  .la-pluma-app [data-page-kind="automation"] .automation-task-editor .number-input-wrapper:has(input:focus),
+  .la-pluma-app [data-page-kind="automation"] .automation-composite-control:has(input:focus) {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
   }
 
-  .la-pluma-app [data-automation-tasks] .automation-monitor-surface .automation-preview-glass-button {
+  .la-pluma-app [data-page-kind="automation"] .automation-monitor-surface .automation-preview-glass-button {
     background: color-mix(in srgb, var(--glass-bg) 84%, transparent);
     -webkit-backdrop-filter: blur(12px) saturate(150%);
     backdrop-filter: blur(12px) saturate(150%);
@@ -2215,8 +2215,8 @@
       0 3px 10px rgb(60 60 67 / 8%);
   }
 
-  html.dark .la-pluma-app [data-automation-tasks] .automation-monitor-surface .automation-preview-glass-button,
-  .la-pluma-app.dark [data-automation-tasks] .automation-monitor-surface .automation-preview-glass-button {
+  html.dark .la-pluma-app [data-page-kind="automation"] .automation-monitor-surface .automation-preview-glass-button,
+  .la-pluma-app.dark [data-page-kind="automation"] .automation-monitor-surface .automation-preview-glass-button {
     box-shadow:
       inset 0 0 0 0.5px color-mix(in srgb, var(--glass-border) 42%, transparent),
       0 3px 10px rgb(0 0 0 / 20%);

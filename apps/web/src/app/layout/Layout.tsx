@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
-import { useLocation, useNavigate } from 'react-router'
+import { useLocation, useNavigate, useNavigationType } from 'react-router'
 import { appTabRoute, type AppTab } from '@/shared/navigation'
 import { resolvePageTitle } from '../router/pageTitle'
 import AppNavbar from './AppNavbar'
@@ -12,7 +12,7 @@ interface LayoutProps {
 }
 
 function getScrollHost() {
-  return document.querySelector<HTMLElement>('.la-pluma-scroll-host')
+  return document.querySelector<HTMLElement>('[data-region="scroll"]')
 }
 
 function getScrollTop() {
@@ -30,8 +30,13 @@ function setScrollTop(top: number) {
 
 export default function Layout({ activeTab, children }: LayoutProps) {
   const navigate = useNavigate()
+  const navigationType = useNavigationType()
   const { pathname } = useLocation()
   const pageTitle = resolvePageTitle(pathname, activeTab)
+  const mainRef = useRef<HTMLElement>(null)
+  const announcementRef = useRef<HTMLDivElement>(null)
+  const previousPathname = useRef(pathname)
+  const dialogNavigationTargetRef = useRef<string | null>(null)
   const scrollPositions = useRef(new Map<AppTab, number>())
   const activeTabRef = useRef<AppTab>(activeTab)
   const restoreFrame = useRef<number | null>(null)
@@ -133,22 +138,66 @@ export default function Layout({ activeTab, children }: LayoutProps) {
 
   const navigateToTab = useCallback((tab: AppTab) => {
     if (tab === activeTab) return
+    const target = appTabRoute(tab)
+    const focused = document.activeElement
+    dialogNavigationTargetRef.current = focused instanceof Element
+      && focused.closest('[role="dialog"], [role="alertdialog"]')
+      ? target
+      : null
     scrollPositions.current.set(activeTab, getScrollTop())
-    navigate(appTabRoute(tab))
+    navigate(target)
   }, [activeTab, navigate])
 
   useEffect(() => {
     document.title = `${pageTitle} · La Pluma Next`
   }, [pageTitle])
 
+  useEffect(() => {
+    if (previousPathname.current === pathname) return
+    previousPathname.current = pathname
+
+    const startedFromDialog = dialogNavigationTargetRef.current === pathname
+    dialogNavigationTargetRef.current = null
+
+    if (navigationType === 'REPLACE') return
+
+    if (announcementRef.current) announcementRef.current.textContent = `已切换到${pageTitle}`
+    if (startedFromDialog) return
+
+    const focused = document.activeElement
+    if (focused instanceof Element && focused.closest('[role="dialog"], [role="alertdialog"]')) return
+    mainRef.current?.focus({ preventScroll: true })
+  }, [navigationType, pathname, pageTitle])
+
   return (
-    <div className="view view-main la-pluma-view">
-      <div className="page no-swipeback la-pluma-page" data-name="la-pluma">
+    <div className="view la-pluma-view">
+      <div className="page la-pluma-page">
+        <a className="la-pluma-skip-link" href="#main-content">跳到主要内容</a>
+        <a className="la-pluma-skip-link la-pluma-skip-link-desktop" href="#app-sidebar-navigation">
+          跳到主导航
+        </a>
+        <a className="la-pluma-skip-link la-pluma-skip-link-mobile" href="#app-tabbar-navigation">
+          跳到主导航
+        </a>
+        <div
+          ref={announcementRef}
+          id="page-announcement"
+          className="sr-only"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        />
         <div className="la-pluma-page-body">
           <AppNavbar pageTitle={pageTitle} />
           <AppSidebar activeTab={activeTab} onNavigate={navigateToTab} />
-          <main className="la-pluma-scroll-host">
-            <div className="la-pluma-content">
+          <main
+            ref={mainRef}
+            id="main-content"
+            className="la-pluma-scroll-host"
+            data-region="scroll"
+            tabIndex={-1}
+          >
+            <div className="la-pluma-content" data-region="page-content">
               {children}
             </div>
           </main>

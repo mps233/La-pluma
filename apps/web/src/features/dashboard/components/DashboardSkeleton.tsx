@@ -1,3 +1,4 @@
+import { PageShell } from '@/shared/components'
 import { Card } from '@/shared/ui/card'
 import { Skeleton } from '@/shared/ui/skeleton'
 import { useDashboardFlowLayout } from '../hooks/useDashboardFlowLayout'
@@ -70,8 +71,7 @@ export function DashboardSkeleton() {
   const { flowGridRef, flowCardRef, flowPreviewRef, flowGridStyle } = useDashboardFlowLayout()
 
   return (
-    <div className="app-page dashboard-page" data-page="dashboard" aria-busy="true" aria-label="概览加载中">
-      <div className="app-stack-section">
+    <PageShell pageKind="dashboard" className="dashboard-page" aria-busy="true" aria-label="概览加载中">
         <div ref={flowGridRef} className="dashboard-flow-layout" style={flowGridStyle}>
           <div ref={flowCardRef} className="min-w-0">
             <div className="dashboard-flow-glow-shell status-border-beam">
@@ -185,7 +185,6 @@ export function DashboardSkeleton() {
           <DashboardSummarySkeleton variant="drops" />
         </div>
 
-      </div>
-    </div>
+    </PageShell>
   )
 }

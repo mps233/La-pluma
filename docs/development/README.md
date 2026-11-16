@@ -66,6 +66,7 @@ CI 在 PR/main 运行浏览器跨页集成和视觉检查，只等待客户端�
 - **三个视口**：桌面 1440×900、平板 820×1180、移动 390×844，deviceScaleFactor 1。tab 基线（`app.pw.ts`）整页截图；弹层基线（`overlays.pw.ts`）为视口截图。820 落在 `sm`（640）与 `workbench`（900）之间，与桌面一起把 `workbench` 具名断点两侧夹住，同时也是「无侧栏 + 顶栏标题」这个 390 与 1440 都覆盖不到的组合；1024 / 1200 两档只在桌面侧出现，改动时注意同步核对。断点定义见 [设计规范](../../DESIGN.md#breakpoints)。
 - **弹层基线守 portal**：Dialog、AlertDialog、Sheet、DropdownMenu 与 PWA 安装提示都由 Base UI portal 渲染到 `document.body`，位于 `.la-pluma-app` 作用域之外，材质、遮罩与定位只由 portal 处的选择器决定。它们 `position: fixed` 按视口定位，`fullPage` 会把 fixed 元素拉到整页顶部，所以单独取视口或按 `data-region` / `data-slot` 做 locator 截图。
 - **启动壳基线守首帧**：启动壳（`boot.pw.ts`）在 `installDeterministicEnvironment` 之后 abort `assets/index-*.js`，让 React 模块不执行、页面停在 `index.html` 的内联启动壳上；按视口截图验收 safe-area / dvh / standalone 的真实渲染。
+- **锚点定位**：布局与可访问性断言使用 `data-region` / `data-page-*` 锚点，滚动宿主为 `[data-region="scroll"]`，不依赖实现类名。
 
 ```bash
 pnpm visual          # 比对模式：与入库基线比对，diff 非零即失败（CI 同款）

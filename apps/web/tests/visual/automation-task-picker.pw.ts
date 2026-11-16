@@ -67,14 +67,14 @@ test.describe('task flow scroll containment', () => {
     await expect(list).toBeVisible()
 
     await panel.evaluate(node => {
-      const host = document.querySelector<HTMLElement>('.la-pluma-scroll-host')
+      const host = document.querySelector<HTMLElement>('[data-region="scroll"]')
       if (!host) throw new Error('application scroll host is missing')
       const panelTop = node.getBoundingClientRect().top - host.getBoundingClientRect().top
       host.scrollTop += panelTop - 16
     })
 
     const metrics = await page.evaluate(() => {
-      const hostNode = document.querySelector<HTMLElement>('.la-pluma-scroll-host')
+      const hostNode = document.querySelector<HTMLElement>('[data-region="scroll"]')
       const panelNode = document.querySelector<HTMLElement>('.automation-sequence-panel')
       const listNode = document.querySelector<HTMLElement>('.automation-sequence-list')
       if (!hostNode || !panelNode || !listNode) throw new Error('automation sequence panel is missing')

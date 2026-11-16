@@ -8,7 +8,7 @@
 
 为了减少重复代码、统一视觉风格、提升开发效率，项目维护一套通用 UI 组件。shadcn CLI 生成的上游原语位于 `apps/web/src/shared/ui/`，随上游原样保留；`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card` 等控件直接从对应的 `@/shared/ui/*` 模块导入。应用层组合组件位于 `apps/web/src/shared/components/*.tsx`，通过 `apps/web/src/shared/components/index.ts` 统一导出，页面从 `@/shared/components` 引入。本文件记录生成原语的组合用法与必须遵循的应用层约定。
 
-加载占位直接使用 `@/shared/ui/skeleton` 的 `Skeleton`，不要在应用层重写 shimmer 或另建骨架原语。页面标题归 `Layout` 顶栏所有，页面只保留 `app-page` / `app-stack-section` 与工作区内容。
+加载占位直接使用 `@/shared/ui/skeleton` 的 `Skeleton`，不要在应用层重写 shimmer 或另建骨架原语。页面根统一使用 `PageShell`，页面标题归 `Layout` 顶栏所有，页面只提供工作区内容。
 
 新增或调整组件时，在本文件补充 API 与用法；颜色、字号、间距、圆角、交互状态等规则不要在组件文档里另写一份。
 
@@ -55,7 +55,27 @@ import {
 
 `Card` 使用 shadcn 语义 token（`bg-card`、`ring-foreground/10`、`--card-spacing`）与普通圆角；标题、描述、操作分别使用 `CardTitle`、`CardDescription`、`CardAction`，页脚使用 `CardFooter`。需要分节面板且各分节自持内边距时，给 `Card` 加 `gap-0 p-0!`，不再引入独立面板包装组件。标题需要保留文档层级时，在 `CardTitle` 上使用 `role="heading"` 与 `aria-level`。紧凑提示容器使用语义类 `app-info-card` 配合对应状态类；`surface-panel` 继续用于主题菜单与 PWA 提示等应用自绘召唤层，不用于 `Card` 或 shadcn 生成弹层。
 
-控制台同类功能页在根节点添加 `ios-workspace-page`。页面标题由 `Layout` 顶栏统一渲染，页面内不再声明标题或副标题。卡片材质统一由 shadcn 语义 token 控制，不要在页面级另造卡片材质。
+所有页面根统一使用下方的 `PageShell`：工作台页设置 `layout="workspace"`，无边框卡片页再设置 `surface="borderless"`。页面标题由 `Layout` 顶栏统一渲染，页面内不再声明标题或副标题。卡片材质统一由 shadcn 语义 token 控制，不要在页面级另造卡片材质。
+
+---
+
+### PageShell - 页面壳
+
+**文件位置**：`apps/web/src/shared/components/PageShell.tsx`
+
+**适用场景**：所有路由页面与主题画廊的根节点。页面只提供内容，标题与页头归 `Layout` 顶栏。
+
+```tsx
+import { PageShell } from '@/shared/components'
+
+<PageShell pageKind="automation" layout="workspace" surface="borderless">
+  <AutomationWorkspace />
+</PageShell>
+```
+
+Props：`pageKind`（`AppTab` 或 `gallery`，必填）、`layout`（工作台页为 `workspace`）、`surface`（无边框卡片页为 `borderless`）、`className`、`children`；其余原生 `div` 属性（如 `aria-busy`、`aria-label`）直接透传。根节点固定输出 `app-page`、`data-region="page"` 与 `data-page-kind`，有值时输出 `data-page-layout` / `data-page-surface`；内部固定一个 `app-stack-section` 承载内容。
+
+页面根只用 `PageShell`，不要恢复页面级 `ios-*` 类或旧 data 属性；布局、视觉与浏览器测试通过 `data-region` / `data-page-*` 定位。
 
 ---
 
@@ -348,7 +368,7 @@ import { PageSkeleton } from '@/shared/components'
 <PageSkeleton variant="automation" />
 ```
 
-输出为 `aria-busy="true"`、`aria-label="页面内容加载中"` 的忙碌区域，内部骨架标记 `aria-hidden="true"`；根节点携带目标页面的页面级类名（`app-page`、`ios-workspace-page` 及各页专属类）。控制台骨架由域内 `DashboardSkeleton` 提供，见上文。
+输出为 `aria-busy="true"`、`aria-label="页面内容加载中"` 的忙碌区域，内部骨架标记 `aria-hidden="true"`；根节点输出 `data-page-kind` 与 `data-page-layout="workspace"`，按变体输出 `data-page-surface="borderless"`，并保留各页专属类名；未知变体不输出 `data-page-kind`。控制台骨架由域内 `DashboardSkeleton` 提供，见上文。
 
 ---
 
@@ -386,7 +406,7 @@ Hook 返回高亮容器 ref、当前高亮矩形、标签 ref 设置器与方向
 
 页面标题由 `Layout` 顶栏统一提供，页面不接收标题、副标题或页头操作。新增页面或改老页面时，按下面顺序处理：
 
-1. 页面外层使用 `app-page`，主内容使用 `app-stack-section`，内容直接进入工作区。
+1. 页面根使用 `PageShell`；它提供 `app-stack-section` 承载内容，页面内容直接进入工作区。
 2. 大面板使用 `Card` 组合；分节自持内边距时给 `Card` 加 `gap-0 p-0!`。
 3. 表单使用 `@/shared/ui` 的 `Input`、`Select`、`Checkbox`、`Switch` 原语，并用所属 feature 的 field helper 组合标签与错误；多行文本使用原生 `textarea`。
 4. 没有内容时使用 `EmptyState`，不要重复手写空状态。

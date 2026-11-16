@@ -124,7 +124,7 @@ async function expectParentLayerInteractive(parent: Locator) {
 }
 
 async function expectBackgroundScrollBlocked(page: Page) {
-  const host = page.locator('.la-pluma-scroll-host')
+  const host = page.locator('[data-region="scroll"]')
   await host.evaluate(element => { element.scrollTop = 200 })
   const before = await host.evaluate(element => element.scrollTop)
   await page.mouse.move(700, 300)
@@ -134,7 +134,7 @@ async function expectBackgroundScrollBlocked(page: Page) {
 }
 
 async function expectBackgroundScrollable(page: Page) {
-  const host = page.locator('.la-pluma-scroll-host')
+  const host = page.locator('[data-region="scroll"]')
   const before = await host.evaluate(element => element.scrollTop)
   await page.mouse.move(700, 300)
   await page.mouse.wheel(0, 400)

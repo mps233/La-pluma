@@ -19,21 +19,21 @@ const pageMocks = vi.hoisted(() => ({
 vi.mock('@/pages/dashboard/Dashboard', () => ({
   default: () => {
     pageMocks.dashboardRenders += 1
-    return <div data-page="dashboard">dashboard</div>
+    return <div data-page-kind="dashboard">dashboard</div>
   },
 }))
 vi.mock('@/pages/automation/AutomationTasks', () => ({
   default: () => {
     pageMocks.automationRenders += 1
-    return <div data-page="automation">automation</div>
+    return <div data-page-kind="automation">automation</div>
   },
 }))
-vi.mock('@/pages/combat/CombatTasks', () => ({ default: () => <div data-page="combat">combat</div> }))
-vi.mock('@/pages/roguelike/RoguelikeTasks', () => ({ default: () => <div data-page="roguelike">roguelike</div> }))
-vi.mock('@/pages/training/OperatorTraining', () => ({ default: () => <div data-page="training">training</div> }))
-vi.mock('@/pages/statistics/DataStatistics', () => ({ default: () => <div data-page="statistics">statistics</div> }))
-vi.mock('@/pages/logs/LogViewer', () => ({ default: () => <div data-page="logs">logs</div> }))
-vi.mock('@/pages/settings/ConfigManager', () => ({ default: () => <div data-page="config">config</div> }))
+vi.mock('@/pages/combat/CombatTasks', () => ({ default: () => <div data-page-kind="combat">combat</div> }))
+vi.mock('@/pages/roguelike/RoguelikeTasks', () => ({ default: () => <div data-page-kind="roguelike">roguelike</div> }))
+vi.mock('@/pages/training/OperatorTraining', () => ({ default: () => <div data-page-kind="training">training</div> }))
+vi.mock('@/pages/statistics/DataStatistics', () => ({ default: () => <div data-page-kind="statistics">statistics</div> }))
+vi.mock('@/pages/logs/LogViewer', () => ({ default: () => <div data-page-kind="logs">logs</div> }))
+vi.mock('@/pages/settings/ConfigManager', () => ({ default: () => <div data-page-kind="config">config</div> }))
 
 function Harness() {
   const activeTab = useActiveAppTab()
@@ -120,23 +120,23 @@ describe('app route table and keep-alive outlet', () => {
   it('restores a deep link and keeps the visited workspace mounted after switching', async () => {
     await renderWithRouter('memory', '/app/automation')
 
-    const automationPage = container.querySelector<HTMLElement>('[data-page="automation"]')
+    const automationPage = container.querySelector<HTMLElement>('[data-page-kind="automation"]')
     expect(automationPage).not.toBeNull()
     expect(automationPage?.style.display).not.toBe('none')
-    expect(container.querySelector('[data-page="dashboard"]')).toBeNull()
+    expect(container.querySelector('[data-page-kind="dashboard"]')).toBeNull()
     expect(locationLabel()).toBe('/app/automation')
 
     await act(async () => clickButton('go-dashboard'))
 
     expect(locationLabel()).toBe('/app/dashboard')
-    expect(container.querySelector('[data-page="dashboard"]')).not.toBeNull()
+    expect(container.querySelector('[data-page-kind="dashboard"]')).not.toBeNull()
     // 旧页面仍然挂载（同一个 DOM 节点），只是被 Activity 隐藏。
-    expect(container.querySelector('[data-page="automation"]')).toBe(automationPage)
+    expect(container.querySelector('[data-page-kind="automation"]')).toBe(automationPage)
     expect(automationPage?.style.display).toBe('none')
 
     await act(async () => clickButton('go-automation'))
 
-    expect(container.querySelector('[data-page="automation"]')).toBe(automationPage)
+    expect(container.querySelector('[data-page-kind="automation"]')).toBe(automationPage)
     expect(automationPage?.style.display).not.toBe('none')
     expect(pageMocks.automationRenders).toBeGreaterThan(0)
   })
@@ -145,7 +145,7 @@ describe('app route table and keep-alive outlet', () => {
     await renderWithRouter('browser', '/app/dashboard')
     await act(async () => clickButton('go-automation'))
 
-    const automationPage = container.querySelector<HTMLElement>('[data-page="automation"]')
+    const automationPage = container.querySelector<HTMLElement>('[data-page-kind="automation"]')
     expect(locationLabel()).toBe('/app/automation')
 
     await act(async () => {
@@ -154,7 +154,7 @@ describe('app route table and keep-alive outlet', () => {
     })
 
     expect(locationLabel()).toBe('/app/dashboard')
-    expect(container.querySelector('[data-page="automation"]')).toBe(automationPage)
+    expect(container.querySelector('[data-page-kind="automation"]')).toBe(automationPage)
     expect(automationPage?.style.display).toBe('none')
 
     await act(async () => {
@@ -163,7 +163,7 @@ describe('app route table and keep-alive outlet', () => {
     })
 
     expect(locationLabel()).toBe('/app/automation')
-    expect(container.querySelector('[data-page="automation"]')).toBe(automationPage)
+    expect(container.querySelector('[data-page-kind="automation"]')).toBe(automationPage)
     expect(automationPage?.style.display).not.toBe('none')
   })
 
@@ -175,7 +175,7 @@ describe('app route table and keep-alive outlet', () => {
     expect(window.location.pathname).toBe('/app/dashboard')
     expect(window.history.length).toBe(historyLength)
     expect(locationLabel()).toBe('/app/dashboard')
-    expect(container.querySelector('[data-page="dashboard"]')).not.toBeNull()
+    expect(container.querySelector('[data-page-kind="dashboard"]')).not.toBeNull()
   })
 
   it('normalizes a trailing-slash bare app path to the dashboard route with a replace', async () => {
@@ -186,7 +186,7 @@ describe('app route table and keep-alive outlet', () => {
     expect(window.location.pathname).toBe('/app/dashboard')
     expect(window.history.length).toBe(historyLength)
     expect(locationLabel()).toBe('/app/dashboard')
-    expect(container.querySelector('[data-page="dashboard"]')).not.toBeNull()
+    expect(container.querySelector('[data-page-kind="dashboard"]')).not.toBeNull()
   })
 
   it('normalizes the bare app path to the dashboard route with a replace', async () => {
@@ -197,7 +197,7 @@ describe('app route table and keep-alive outlet', () => {
     expect(window.location.pathname).toBe('/app/dashboard')
     expect(window.history.length).toBe(historyLength)
     expect(locationLabel()).toBe('/app/dashboard')
-    expect(container.querySelector('[data-page="dashboard"]')).not.toBeNull()
+    expect(container.querySelector('[data-page-kind="dashboard"]')).not.toBeNull()
   })
 
   it('normalizes an unknown tab to the dashboard route with a replace', async () => {
@@ -218,7 +218,7 @@ describe('app route table and keep-alive outlet', () => {
     expect(window.location.pathname).toBe('/app/logs')
     expect(window.history.length).toBe(historyLength)
     expect(locationLabel()).toBe('/app/logs')
-    expect(container.querySelector('[data-page="logs"]')).not.toBeNull()
+    expect(container.querySelector('[data-page-kind="logs"]')).not.toBeNull()
   })
 
   it('leaves an already canonical path and its query untouched', async () => {
@@ -248,13 +248,13 @@ describe('app route table and keep-alive outlet', () => {
     expect(window.location.pathname).toBe('/la-pluma/app/dashboard')
     expect(window.history.length).toBe(historyLength)
     expect(locationLabel()).toBe('/app/dashboard')
-    expect(container.querySelector('[data-page="dashboard"]')).not.toBeNull()
+    expect(container.querySelector('[data-page-kind="dashboard"]')).not.toBeNull()
 
     await act(async () => clickButton('go-automation'))
 
     expect(window.location.pathname).toBe('/la-pluma/app/automation')
     expect(locationLabel()).toBe('/app/automation')
-    expect(container.querySelector('[data-page="automation"]')).not.toBeNull()
+    expect(container.querySelector('[data-page-kind="automation"]')).not.toBeNull()
   })
 
   it('restores a deep link under a non-root base without rewriting the URL', async () => {
@@ -271,6 +271,6 @@ describe('app route table and keep-alive outlet', () => {
     expect(window.location.pathname).toBe('/la-pluma/app/logs')
     expect(window.history.length).toBe(historyLength)
     expect(locationLabel()).toBe('/app/logs')
-    expect(container.querySelector('[data-page="logs"]')).not.toBeNull()
+    expect(container.querySelector('[data-page-kind="logs"]')).not.toBeNull()
   })
 })

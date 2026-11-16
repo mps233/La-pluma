@@ -910,11 +910,7 @@
     padding-right: 3rem !important;
   }
 
-  .la-pluma-app .la-pluma-content :is(
-    .ios-borderless-cards,
-    [data-automation-tasks],
-    [data-workbench-tasks]
-  ) select.app-native-control:not(.form-error-surface) {
+  .la-pluma-app .la-pluma-content [data-page-surface="borderless"] select.app-native-control:not(.form-error-surface) {
     /* 无边框工作区的下拉框使用 500 字重，压过通用控件的 400。 */
     font-weight: 500 !important;
   }
@@ -1041,23 +1037,23 @@
   }
 
   @media (width < 640px) {
-    .la-pluma-app .ios-workspace-page {
+    .la-pluma-app [data-page-layout="workspace"] {
       padding-top: 0;
       margin-right: 0.125rem;
       margin-left: 0.125rem;
     }
 
-    .la-pluma-app .ios-workspace-page > .app-stack-section,
-    .la-pluma-app .ios-workspace-page.app-stack-section {
+    .la-pluma-app [data-page-layout="workspace"] > .app-stack-section,
+    .la-pluma-app [data-page-layout="workspace"].app-stack-section {
       gap: 1rem;
     }
   }
 
-  .la-pluma-app .ios-borderless-cards .surface-soft {
+  .la-pluma-app [data-page-surface="borderless"] .surface-soft {
     box-shadow: none;
   }
 
-  .la-pluma-app .ios-borderless-cards .app-info-card:not(
+  .la-pluma-app [data-page-surface="borderless"] .app-info-card:not(
     .status-info,
     .status-warning,
     .status-danger,
@@ -1078,90 +1074,46 @@
 
   /* Borderless workspaces distinguish fields with a quiet filled surface. Focus
      remains explicit without bringing back a permanent control outline. */
-  .la-pluma-app .la-pluma-content :is(
-    .ios-borderless-cards,
-    [data-automation-tasks],
-    [data-workbench-tasks]
-  ) .app-native-control:not(.form-error-surface) {
+  .la-pluma-app .la-pluma-content [data-page-surface="borderless"] .app-native-control:not(.form-error-surface) {
     border: 0;
     background-color: var(--muted);
     box-shadow: none;
   }
 
-  .la-pluma-app .la-pluma-content :is(
-    .ios-borderless-cards,
-    [data-automation-tasks],
-    [data-workbench-tasks]
-  ) .app-native-control:not(.form-error-surface):hover:not(:disabled) {
+  .la-pluma-app .la-pluma-content [data-page-surface="borderless"] .app-native-control:not(.form-error-surface):hover:not(:disabled) {
     background-color: color-mix(in srgb, var(--primary-soft) 16%, var(--muted));
     box-shadow: none;
   }
 
-  .la-pluma-app .la-pluma-content :is(
-    .ios-borderless-cards,
-    [data-automation-tasks],
-    [data-workbench-tasks]
-  ) .app-native-control:not(.form-error-surface):focus,
-  .la-pluma-app .la-pluma-content :is(
-    .ios-borderless-cards,
-    [data-automation-tasks],
-    [data-workbench-tasks]
-  ) .app-native-control:not(.form-error-surface):focus-visible {
+  .la-pluma-app .la-pluma-content [data-page-surface="borderless"] .app-native-control:not(.form-error-surface):focus,
+  .la-pluma-app .la-pluma-content [data-page-surface="borderless"] .app-native-control:not(.form-error-surface):focus-visible {
     border: 0;
     background-color: color-mix(in srgb, var(--primary-soft) 22%, var(--muted));
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
   }
 
-  .la-pluma-app .la-pluma-content :is(
-    .ios-borderless-cards,
-    [data-automation-tasks],
-    [data-workbench-tasks]
-  ) select.app-native-control:not(.form-error-surface) {
+  .la-pluma-app .la-pluma-content [data-page-surface="borderless"] select.app-native-control:not(.form-error-surface) {
     background-color: color-mix(in srgb, var(--primary-soft) 12%, var(--muted));
     color: var(--foreground);
     font-weight: 500;
   }
 
-  .la-pluma-app .la-pluma-content :is(
-    .ios-borderless-cards,
-    [data-automation-tasks],
-    [data-workbench-tasks]
-  ) select.app-native-control:not(.form-error-surface):hover:not(:disabled) {
+  .la-pluma-app .la-pluma-content [data-page-surface="borderless"] select.app-native-control:not(.form-error-surface):hover:not(:disabled) {
     background-color: color-mix(in srgb, var(--primary-soft) 22%, var(--muted));
   }
 
-  .la-pluma-app .la-pluma-content :is(
-    .ios-borderless-cards,
-    [data-automation-tasks],
-    [data-workbench-tasks]
-  ) select.app-native-control:not(.form-error-surface):focus,
-  .la-pluma-app .la-pluma-content :is(
-    .ios-borderless-cards,
-    [data-automation-tasks],
-    [data-workbench-tasks]
-  ) select.app-native-control:not(.form-error-surface):focus-visible {
+  .la-pluma-app .la-pluma-content [data-page-surface="borderless"] select.app-native-control:not(.form-error-surface):focus,
+  .la-pluma-app .la-pluma-content [data-page-surface="borderless"] select.app-native-control:not(.form-error-surface):focus-visible {
     background-color: color-mix(in srgb, var(--primary-soft) 28%, var(--muted));
   }
 
-  .la-pluma-app .la-pluma-content :is(
-    .ios-borderless-cards,
-    [data-automation-tasks],
-    [data-workbench-tasks]
-  ) .app-select-trailing-icon {
+  .la-pluma-app .la-pluma-content [data-page-surface="borderless"] .app-select-trailing-icon {
     background: color-mix(in srgb, var(--primary) 10%, transparent);
     color: var(--primary);
   }
 
-  .la-pluma-app .la-pluma-content :is(
-    .ios-borderless-cards,
-    [data-automation-tasks],
-    [data-workbench-tasks]
-  ) .app-select-shell:hover .app-select-trailing-icon,
-  .la-pluma-app .la-pluma-content :is(
-    .ios-borderless-cards,
-    [data-automation-tasks],
-    [data-workbench-tasks]
-  ) .app-select-shell:focus-within .app-select-trailing-icon {
+  .la-pluma-app .la-pluma-content [data-page-surface="borderless"] .app-select-shell:hover .app-select-trailing-icon,
+  .la-pluma-app .la-pluma-content [data-page-surface="borderless"] .app-select-shell:focus-within .app-select-trailing-icon {
     background: color-mix(in srgb, var(--primary) 16%, transparent);
   }
 

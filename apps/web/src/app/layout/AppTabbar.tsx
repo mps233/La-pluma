@@ -79,7 +79,12 @@ export default function AppTabbar({ activeTab, onNavigate }: AppTabbarProps) {
   return (
     <footer data-region="tabbar" className="la-pluma-tabbar">
       <div className="la-pluma-tabbar-inner">
-        <nav className="la-pluma-tabbar-pill" aria-label="主要功能">
+        <nav
+          id="app-tabbar-navigation"
+          className="la-pluma-tabbar-pill"
+          aria-label="主要功能"
+          tabIndex={-1}
+        >
           {mobileTabs.map(tab => (
             <TabbarLink key={tab.id} tab={tab} active={activeTab === tab.id} onNavigate={onNavigate} />
           ))}

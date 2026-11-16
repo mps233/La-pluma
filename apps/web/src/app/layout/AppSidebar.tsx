@@ -87,7 +87,12 @@ export default function AppSidebar({ activeTab, onNavigate }: AppSidebarProps) {
           <SidebarContent>
             <SidebarGroup>
               <SidebarGroupContent>
-                <nav aria-label="工作台" className="la-pluma-sidebar-nav">
+                <nav
+                  id="app-sidebar-navigation"
+                  aria-label="工作台"
+                  tabIndex={-1}
+                  className="la-pluma-sidebar-nav"
+                >
                   <SidebarMenu>
                     {appTabs.map(tab => (
                       <SidebarTabButton key={tab.id} tab={tab} active={activeTab === tab.id} onNavigate={onNavigate} />

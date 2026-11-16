@@ -150,9 +150,9 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ### Source of Truth
 
 - `apps/web/src/styles/index.css`：语义 token 的**唯一来源**（base 层）、Tailwind 入口、`@theme` 圆角派生与 `@theme inline` 颜色映射、通用组件类与跨域 keyframes；页面样式由各功能域自持。
-- `apps/web/src/styles/layout.css`：主题无关的结构几何与 `--layout-*` token（视口、navbar、侧栏、内容宽度与留白、tabbar 安全区）；应用 chrome 的尺寸、定位、网格与滚动宿主都在这里，不承载颜色、材质或控件外观。
+- `apps/web/src/styles/layout.css`：结构几何与 `--layout-*` token（视口、navbar、侧栏、内容宽度与留白、tabbar 安全区）；应用 chrome 的尺寸、定位、网格、滚动宿主与 skip link 可访问性样式都在这里，不承载页面级颜色、材质或控件外观。
 - `apps/web/src/styles/ios-theme.css`：只保留默认主题的 chrome 材质 token（`--glass-*`）与对应视觉样式；默认基线不依赖玻璃材质，液态玻璃由后续主题提供。
-- `apps/web/src/shared/components`：`ConfirmAlertDialog`、`EmptyState`、`Loading` 等应用级通用组件；`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card`、`Dialog`、`AlertDialog`、`Sheet` 等 shadcn 生成物位于 `apps/web/src/shared/ui`（sidebar 也在该目录）。
+- `apps/web/src/shared/components`：`PageShell`、`ConfirmAlertDialog`、`EmptyState`、`Loading` 等应用级通用组件；`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card`、`Dialog`、`AlertDialog`、`Sheet` 等 shadcn 生成物位于 `apps/web/src/shared/ui`（sidebar 也在该目录）。
 
 本文件描述规则；语义 token 的具体数值以 `apps/web/src/styles/index.css` 为准，布局与结构几何 token 以 `apps/web/src/styles/layout.css` 为准，chrome 材质 token 以 `apps/web/src/styles/ios-theme.css` 为准。调整 token 时同步更新本文件的表格与说明。
 
@@ -166,7 +166,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ```
 
 - **utilities 永远赢**：`page` 位于 `components` 之后、`utilities` 之前；页面 CSS 可以覆盖 base/preflight 与 components，但普通声明不再压过 utilities。确实需要压过 utilities 的页面/组件规则使用 `!important` 并在原位注释原因。
-- **page 层**：每个功能域自持自己的页面样式，放在 `features/<domain>/styles/<domain>.css`，由该域 `index.ts` 导入一次，全部位于 `@layer page`；`index.css` 只保留跨域 keyframes，`layout.css` 只保留应用壳层的布局几何与结构 token，`ios-theme.css` 只保留应用 chrome 材质与跨域 page-kind 材质（`.ios-workspace-page`、`.ios-borderless-cards`、`[data-automation-tasks]` + `[data-workbench-tasks]` 组合、`.la-pluma-content` 控件、浮层）；通用组件类留在 `@layer components`。
+- **page 层**：每个功能域自持自己的页面样式，放在 `features/<domain>/styles/<domain>.css`，由该域 `index.ts` 导入一次，全部位于 `@layer page`；`index.css` 只保留跨域 keyframes，`layout.css` 只保留应用壳层的布局几何与结构 token，`ios-theme.css` 只保留应用 chrome 材质与跨域 page-kind 材质（`[data-page-layout="workspace"]`、`[data-page-surface="borderless"]`、`.la-pluma-content` 控件、浮层）；automation 的 `[data-page-kind="automation"]` 材质归 `features/automation/styles/automation.css` 自持；通用组件类留在 `@layer components`。
 - **域内 CSS 按普通 CSS 处理**：功能域样式文件不经过 Tailwind 入口的编译与降级流水线，不要在其中使用 `@apply`/`@theme` 等 Tailwind 指令；需要厂商前缀的能力按现有写法显式补齐（如 `-webkit-backdrop-filter`），浏览器下限仍以 v4 目标为准。
 - **token 单源**：语义 token（颜色、圆角、间距、字号、控件高度等）只在 `index.css` 的 `:root` / `html.dark, #app-root.dark` / 媒体查询中定义一次；结构布局 token（`--layout-*`）只由 `layout.css` 定义。浅色、深色、`prefers-contrast`、`prefers-reduced-transparency` 的最终生效值都写在这里；`ios-theme.css` 不再出现同名重定义。
 - **深色切换**：主题仍同时给 `html` 与 `#app-root` 加 `.dark`；`html.dark` 与 `#app-root.dark` 都保留为有效选择器。
@@ -242,6 +242,9 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 布局模型是“固定工作台 + 弹性内容区”。横向宽度与留白只由布局 token 控制，`.la-pluma-content` 与 `.la-pluma-navbar-inner` 共用同一份最大宽度、居中与左右 padding；页面内部不再嵌套同用途的 `max-w-*` 或水平 padding。
 
+页面根统一由 `shared/components` 的 `PageShell` 提供：根节点输出 `data-region="page"` 与 `data-page-kind`，工作台页追加 `data-page-layout="workspace"`，无边框卡片页追加 `data-page-surface="borderless"`；`PageShell` 内部固定一个 `app-stack-section`，页面只提供内容，不自建标题或页头。布局、视觉与浏览器测试通过 `data-region` / `data-page-*` 定位，不依赖实现类名。
+
+- 应用壳的稳定 region 锚点：`page`、`page-header`、`page-title`、`page-content`、`scroll`、`monitor`、`toolbar`、`navbar`、`sidebar`、`tabbar`；滚动宿主固定为 `[data-region="scroll"]`。
 - 内容最大宽度 `112rem`（`--layout-content-max`），两侧对称居中。
 - 页面左右留白由 `--layout-page-gutter` 提供：桌面（`1024px` 及以上）`32px`；平板（`640px` 及以上且小于 `1024px`）`20px`；移动（小于 `640px`）`14px`。安全区取 `max(gutter, env(safe-area-inset-*))`，不叠加第二份 inset。
 - 基础节奏为 4px。页面外层用 `app-page`，区块之间用 `app-stack-section` / `app-grid-section`，卡片内部用 `app-stack-card` / `app-grid-card`。
@@ -256,6 +259,9 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 - 桌面端（`1024px` 及以上）显示 `17rem` 左侧工作台：顶部是侧栏品牌头（普通非交互标识，不是按钮或链接），其下是单列工作区导航，底部固定干员身份区与每日语录。当前项使用侧栏强调背景与中等字重，不使用整行实心蓝。
 - 顶栏固定为两列：页面标题在左（唯一 `h1`，来自当前工作区名称并可截断），操作区在右。页面不再渲染自己的标题、副标题或页头操作区。
 - 移动端隐藏侧栏与品牌，顶栏仍保留页面标题与操作区；底部使用悬浮胶囊导航，右侧“更多”入口承载次要页面。两端必须复用 `Layout` 的 URL 路由和 active 状态，不要按 viewport 建立第二份导航状态。
+- 页面内提供 skip links：`跳到主要内容` 指向 `#main-content`；`跳到主导航` 在桌面（`1024px` 及以上）指向侧栏 `#app-sidebar-navigation`，在移动/平板指向 tabbar `#app-tabbar-navigation`。链接默认移出视口，`:focus` 时固定显示在左上角并避开安全区；未聚焦时不占布局，不可用的那一个在对应断点 `display: none`，不进入焦点顺序。
+- 路由 pathname 变化后，焦点移到 `<main id="main-content" tabIndex="-1">`，并通过常驻的 `#page-announcement`（`role="status"`、`aria-live="polite"`、`aria-atomic="true"`）播报 `已切换到<页面名>`。首次挂载不聚焦、不播报；启动期 URL 归一化（replace）同样不触发。当前焦点位于 `role="dialog"` / `role="alertdialog"` 内时不抢焦点。`document.title` 继续使用同一页面标题源。
+- 移动 tabbar 的 `<footer>` 保持在 `<main>` 之后，以维持 landmark 与阅读顺序；不要为了 DOM 顺序把 footer 移到 main 之前，直达导航由 `跳到主导航` skip link 提供。
 - 主题由 `useUIStore` 的 `light`、`dark`、`system` 管理，并同步到文档根节点和 `.la-pluma-app`。组件或页面不要直接操作 `.dark`，也不要创建局部主题开关。
 - `apps/web/index.html` 使用 `viewport-fit=cover`。`Layout` 通过统一 token 管理 navbar、移动 tabbar 和对应安全区高度；自定义 fixed/sticky 层只有在不属于这些 chrome 时才使用 `env(safe-area-inset-*)`，内容区不要重复叠加顶部或底部 inset。
 - 页面边缘留白统一由 `Layout` 的 `.la-pluma-content` 提供，内部 `.app-page` 不重复增加上下内边距。桌面底部使用 `0.75rem`（12px）；移动端由外层预留底部导航、安全区和页面间距。

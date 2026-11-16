@@ -656,10 +656,12 @@ function ConfigSkeleton() {
  */
 export function PageSkeleton({ variant }: { variant: string }) {
   // dashboard 骨架由域内 DashboardSkeleton 提供，shared 不反向依赖 feature
+  const isWorkspace = ['automation', 'combat', 'roguelike', 'training', 'logs', 'statistics', 'config']
+    .includes(variant)
+  const isBorderless = ['automation', 'combat', 'roguelike', 'logs', 'statistics', 'config']
+    .includes(variant)
   const pageClassNames = [
     'app-page',
-    'ios-workspace-page',
-    ['training', 'logs', 'statistics', 'config'].includes(variant) ? 'ios-borderless-cards' : '',
     variant === 'combat' ? 'combat-page' : '',
     variant === 'roguelike' ? 'roguelike-page' : '',
     variant === 'logs' ? 'log-viewer' : '',
@@ -682,9 +684,9 @@ export function PageSkeleton({ variant }: { variant: string }) {
   return (
     <div
       className={pageClassNames}
-      data-automation-tasks={variant === 'automation' ? true : undefined}
-      data-workbench-tasks={variant === 'combat' || variant === 'roguelike' ? true : undefined}
-      data-page={variant === 'training' || variant === 'config' ? variant : undefined}
+      data-page-kind={isWorkspace ? variant : undefined}
+      data-page-layout={isWorkspace ? 'workspace' : undefined}
+      data-page-surface={isBorderless ? 'borderless' : undefined}
       aria-busy="true"
       aria-label="页面内容加载中"
     >

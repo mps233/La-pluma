@@ -15,7 +15,7 @@ interface AppNavbarProps {
 export default function AppNavbar({ pageTitle }: AppNavbarProps) {
   return (
     <header data-region="navbar" className="la-pluma-navbar">
-      <div className="la-pluma-navbar-inner">
+      <div className="la-pluma-navbar-inner" data-region="page-header">
         <h1 data-region="page-title" className="la-pluma-navbar-title">{pageTitle}</h1>
         <div className="la-pluma-navbar-actions">
           <ThemeToggle />

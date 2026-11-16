@@ -408,7 +408,7 @@ test.describe('feature overlay behavior', () => {
     const fullscreen = page.getByRole('button', { name: '全屏', exact: true })
     await expect(fullscreen).toBeEnabled({ timeout: 20_000 })
 
-    const scrollHost = page.locator('.la-pluma-scroll-host')
+    const scrollHost = page.locator('[data-region="scroll"]')
     await scrollHost.evaluate(element => { element.scrollTop = 200 })
     const scrollBefore = await scrollHost.evaluate(element => element.scrollTop)
 

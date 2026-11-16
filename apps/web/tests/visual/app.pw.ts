@@ -11,6 +11,17 @@ import {
 // roguelike-settings）与浏览器像素断言兜底，控制全量基线的维护面。
 const REPRESENTATIVE_TABS = ['dashboard', 'automation'] as const
 
+const PAGE_SHELL_CONTRACT = [
+  { tab: 'dashboard', layout: null, surface: null, monitor: 0, toolbar: 0 },
+  { tab: 'automation', layout: 'workspace', surface: 'borderless', monitor: 1, toolbar: 0 },
+  { tab: 'combat', layout: 'workspace', surface: 'borderless', monitor: 1, toolbar: 0 },
+  { tab: 'roguelike', layout: 'workspace', surface: 'borderless', monitor: 1, toolbar: 0 },
+  { tab: 'training', layout: 'workspace', surface: null, monitor: 1, toolbar: 0 },
+  { tab: 'logs', layout: 'workspace', surface: 'borderless', monitor: 1, toolbar: 1 },
+  { tab: 'statistics', layout: 'workspace', surface: 'borderless', monitor: 1, toolbar: 1 },
+  { tab: 'config', layout: 'workspace', surface: 'borderless', monitor: 0, toolbar: 0 },
+] as const
+
 test.describe('app tabs', () => {
   test.beforeEach(async ({ page }) => {
     recordBrowserErrors(page)
@@ -39,6 +50,38 @@ test.describe('app tabs', () => {
       await expectNoBrowserErrors(page)
     })
   }
+
+  test('page shell anchors define stable regions for every workspace', async ({ page }) => {
+    test.skip(test.info().project.name !== 'desktop', 'the region contract is checked on desktop')
+
+    const environment = await installDeterministicEnvironment(page)
+
+    for (const contract of PAGE_SHELL_CONTRACT) {
+      await page.goto(`/app/${contract.tab}`)
+      await waitForPageReady(page, contract.tab)
+
+      if (contract.tab === 'statistics') {
+        await page.getByRole('tab', { name: /掉落记录/ }).click()
+        await expect(page.getByText('总理智消耗')).toBeVisible()
+      }
+
+      const pageRegion = page.locator('[data-region="page"]')
+      await expect(pageRegion).toHaveCount(1)
+      await expect(pageRegion).toHaveAttribute('data-page-kind', contract.tab)
+
+      for (const anchor of ['page-header', 'page-title', 'scroll', 'page-content']) {
+        await expect(page.locator(`[data-region="${anchor}"]`)).toHaveCount(1)
+      }
+
+      expect(await pageRegion.getAttribute('data-page-layout')).toBe(contract.layout)
+      expect(await pageRegion.getAttribute('data-page-surface')).toBe(contract.surface)
+      await expect(page.locator('[data-region="monitor"]')).toHaveCount(contract.monitor)
+      await expect(page.locator('[data-region="toolbar"]')).toHaveCount(contract.toolbar)
+    }
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
 
   test('dashboard device cards keep their responsive padding', async ({ page }) => {
     const environment = await installDeterministicEnvironment(page)
@@ -87,6 +130,106 @@ test.describe('app tabs', () => {
     await expectNoBrowserErrors(page)
   })
 
+  test('skip links move focus to main content and the active navigation', async ({ page }) => {
+    const environment = await installDeterministicEnvironment(page)
+
+    await page.goto('/app/dashboard')
+    await waitForPageReady(page, 'dashboard')
+
+    await page.keyboard.press('Tab')
+    const contentSkipLink = page.getByRole('link', { name: '跳到主要内容', exact: true })
+    await expect(contentSkipLink).toBeFocused()
+    await expect(contentSkipLink).toBeInViewport()
+
+    await page.keyboard.press('Enter')
+    await expect(page.locator('[data-region="scroll"]')).toBeFocused()
+
+    await page.goto('/app/dashboard')
+    await waitForPageReady(page, 'dashboard')
+
+    await page.keyboard.press('Tab')
+    await page.keyboard.press('Tab')
+    const navigationSkipLink = page.getByRole('link', { name: '跳到主导航', exact: true })
+    await expect(navigationSkipLink).toBeFocused()
+    await page.keyboard.press('Enter')
+    const navigationTarget = test.info().project.name === 'desktop'
+      ? '#app-sidebar-navigation'
+      : '#app-tabbar-navigation'
+    await expect(page.locator(navigationTarget)).toBeFocused()
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
+
+  test('route focus moves to main content and announces the new page', async ({ page }) => {
+    const environment = await installDeterministicEnvironment(page)
+
+    await page.goto('/app/dashboard')
+    await waitForPageReady(page, 'dashboard')
+
+    const navButton = test.info().project.name === 'desktop'
+      ? page.locator('nav[aria-label="工作台"] button[data-app-tab="automation"]')
+      : page.locator('footer[data-region="tabbar"] button[data-app-tab="automation"]')
+    await navButton.click()
+
+    await expect(page).toHaveURL(/\/app\/automation$/)
+    await expect(page.locator('#main-content')).toBeFocused()
+    await expect(page.locator('#page-announcement')).toHaveText('已切换到日常')
+    await expect(page).toHaveTitle('日常 · La Pluma Next')
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
+
+  test('initial route normalization skips route focus and announcements', async ({ page }) => {
+    const environment = await installDeterministicEnvironment(page)
+    const navButton = test.info().project.name === 'desktop'
+      ? page.locator('nav[aria-label="工作台"] button[data-app-tab="automation"]')
+      : page.locator('footer[data-region="tabbar"] button[data-app-tab="automation"]')
+
+    for (const entry of ['/', '/app', '/app/', '/app/unknown']) {
+      await page.goto(entry)
+      await waitForPageReady(page, 'dashboard')
+
+      await expect(page).toHaveURL(/\/app\/dashboard$/)
+      await expect(page.locator('#main-content')).not.toBeFocused()
+      await expect(page.locator('#page-announcement')).toHaveText('')
+
+      await navButton.click()
+
+      await expect(page).toHaveURL(/\/app\/automation$/)
+      await expect(page.locator('#main-content')).toBeFocused()
+      await expect(page.locator('#page-announcement')).toHaveText('已切换到日常')
+    }
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
+
+  test('more sheet returns focus to the trigger after choosing a workspace', async ({ page }) => {
+    test.skip(test.info().project.name === 'desktop', 'the overflow sheet is available below the desktop breakpoint')
+
+    const environment = await installDeterministicEnvironment(page)
+
+    await page.goto('/app/dashboard')
+    await waitForPageReady(page, 'dashboard')
+
+    const moreTrigger = page.getByRole('button', { name: '更多页面', exact: true })
+    await moreTrigger.click()
+
+    const sheet = page.getByRole('dialog')
+    await expect(sheet).toBeVisible()
+    await sheet.getByRole('button', { name: '肉鸽', exact: true }).click()
+
+    await expect(page).toHaveURL(/\/app\/roguelike$/)
+    await expect(sheet).toBeHidden()
+    await expect(moreTrigger).toBeFocused()
+    await expect(page.locator('#page-announcement')).toHaveText('已切换到肉鸽')
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
+
   test('page title starts at the content leading edge', async ({ page }) => {
     const environment = await installDeterministicEnvironment(page)
 
@@ -95,7 +238,7 @@ test.describe('app tabs', () => {
 
     const edges = await page.evaluate(() => {
       const title = document.querySelector<HTMLElement>('[data-region="page-title"]')
-      const content = document.querySelector<HTMLElement>('.la-pluma-content')
+      const content = document.querySelector<HTMLElement>('[data-region="page-content"]')
       if (!title || !content) throw new Error('page title structure missing')
       const contentLeft = content.getBoundingClientRect().left
         + Number.parseFloat(getComputedStyle(content).paddingLeft)
@@ -158,6 +301,7 @@ test.describe('app tabs', () => {
 
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('主题画廊')
     await expect(page).toHaveTitle('主题画廊 · La Pluma Next')
+    await expect(page.locator('[data-region="page"]')).toHaveAttribute('data-page-kind', 'gallery')
 
     environment.assertNoUnmatchedApi()
     await expectNoBrowserErrors(page)
@@ -169,7 +313,8 @@ test.describe('app tabs', () => {
     await page.goto('/app/dashboard')
     await waitForPageReady(page, 'dashboard')
 
-    await expect(page.locator('.app-page-header, .app-page-title')).toHaveCount(0)
+    await expect(page.locator('[data-region="page"] h1')).toHaveCount(0)
+    await expect(page.locator('[data-region="page-header"] [data-region="page-title"]')).toHaveCount(1)
 
     environment.assertNoUnmatchedApi()
     await expectNoBrowserErrors(page)

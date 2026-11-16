@@ -408,7 +408,7 @@
     }
   }
 
-  .la-pluma-app .ios-borderless-cards .log-console {
+  .la-pluma-app [data-page-surface="borderless"] .log-console {
     box-shadow: none;
   }
 }

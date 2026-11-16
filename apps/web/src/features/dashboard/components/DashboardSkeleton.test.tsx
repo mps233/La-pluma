@@ -42,7 +42,9 @@ describe('DashboardSkeleton', () => {
   it('announces a busy dashboard and hides placeholder chrome from assistive tech', async () => {
     await act(async () => root.render(<DashboardSkeleton />))
 
-    const region = container.querySelector('[aria-busy="true"]')
+    const region = container.querySelector<HTMLElement>('[data-region="page"]')
+    expect(region?.dataset.pageKind).toBe('dashboard')
+    expect(region?.getAttribute('aria-busy')).toBe('true')
     expect(region?.getAttribute('aria-label')).toBe('概览加载中')
     expect(region?.querySelector('[aria-hidden="true"]')).not.toBeNull()
     expect(region?.querySelector('h1')).toBeNull()

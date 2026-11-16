@@ -62,7 +62,7 @@
     background: var(--card);
   }
 
-  .la-pluma-app .ios-borderless-cards .data-statistics-kpi-grid {
+  .la-pluma-app [data-page-surface="borderless"] .data-statistics-kpi-grid {
     padding: 0;
   }
 }

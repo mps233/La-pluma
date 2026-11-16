@@ -152,6 +152,46 @@
     padding-bottom: 1.25rem;
   }
 
+  .la-pluma-skip-link {
+    position: fixed;
+    z-index: 40;
+    top: max(0.75rem, env(safe-area-inset-top, 0px));
+    left: max(0.75rem, env(safe-area-inset-left, 0px));
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+    color: var(--foreground);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    transform: translateY(calc(-100% - env(safe-area-inset-top, 0px) - 0.75rem));
+  }
+
+  .la-pluma-skip-link:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    transform: none;
+  }
+
+  .la-pluma-skip-link-mobile {
+    display: none;
+  }
+
+  @media (width < 1024px) {
+    .la-pluma-skip-link-desktop {
+      display: none;
+    }
+
+    .la-pluma-skip-link-mobile {
+      display: inline-flex;
+    }
+  }
+
   .la-pluma-tabbar {
     display: none;
     z-index: 70;

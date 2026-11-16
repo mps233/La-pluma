@@ -52,7 +52,7 @@ export default function LogsToolbar({
   onExport,
 }: LogsToolbarProps) {
   return (
-    <Card className="log-card log-toolbar-card gap-0 p-0!">
+    <Card className="log-card log-toolbar-card gap-0 p-0!" data-region="toolbar">
       <CardContent className="log-toolbar">
         <div className="log-toolbar-controls">
           <div className={`log-toggle-control flex min-h-11 min-w-0 items-center justify-between gap-3.5 ${viewingHistory ? 'opacity-50' : ''}`}>

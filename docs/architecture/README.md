@@ -19,7 +19,7 @@ La Pluma Next 是一个面向《明日方舟》自动化的本地 Web 控制台�
 
 URL 导航、路径归一、PWA 历史记录与 Activity 保活的约定统一见[前端架构与所有权](../frontend/README.md)。
 
-桌面与移动导航、主题、安全区、响应式断点等界面规则以根目录 [设计规范](../../DESIGN.md) 为唯一来源；组件 API 见 [通用组件库](../frontend/components.md)。新增页面应复用现有 `Layout`、`shared/components` 通用组件和语义 token，不要重复实现导航壳层或页面级安全区计算。
+桌面与移动导航、主题、安全区、响应式断点等界面规则以根目录 [设计规范](../../DESIGN.md) 为唯一来源；组件 API 见 [通用组件库](../frontend/components.md)。新增页面应复用 `PageShell`、现有 `Layout`、`shared/components` 通用组件和语义 token，不要重复实现导航壳层或页面级安全区计算。
 
 ## 技术栈
 

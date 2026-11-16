@@ -141,7 +141,7 @@ export default function DropRecords({
         ))}
       </div>
 
-      <div className="flex flex-col items-stretch justify-between gap-3.5 sm:flex-row sm:items-center">
+      <div className="flex flex-col items-stretch justify-between gap-3.5 sm:flex-row sm:items-center" data-region="toolbar">
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
           <span className="text-sm text-muted-foreground">统计周期</span>
           <div className="grid w-full grid-cols-4 gap-1 sm:inline-grid sm:w-auto" role="group" aria-label="统计周期">

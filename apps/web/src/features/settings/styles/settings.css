@@ -33,7 +33,7 @@
     }
   }
 
-  .la-pluma-app .ios-borderless-cards .config-device-list {
+  .la-pluma-app [data-page-surface="borderless"] .config-device-list {
     box-shadow: none;
   }
 }
