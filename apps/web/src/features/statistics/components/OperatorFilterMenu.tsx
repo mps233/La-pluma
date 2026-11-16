@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { BREAKPOINTS } from '@/shared/lib/breakpoints'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,7 +30,7 @@ interface OperatorFilterMenuProps {
   onSelect: (value: string) => void
 }
 
-const PHONE_QUERY = '(max-width: 639px)'
+const PHONE_QUERY = `(width < ${BREAKPOINTS.sm}px)`
 
 function subscribePhone(callback: () => void) {
   if (typeof window.matchMedia !== 'function') return () => {}

@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { BREAKPOINTS } from '@/shared/lib/breakpoints'
 
 const FLOW_GRID_COLUMNS_FALLBACK = 'minmax(0, 0.78fr) minmax(0, 1.22fr)'
 const PREVIEW_ASPECT_RATIO = 16 / 9
@@ -21,7 +22,7 @@ export function useDashboardFlowLayout(enabled = true) {
 
     if (!grid || !flowCard || !previewShell) return
 
-    const mediaQuery = window.matchMedia('(min-width: 1280px)')
+    const mediaQuery = window.matchMedia(`(width >= ${BREAKPOINTS.xl}px)`)
     let frameId = 0
 
     const updateColumns = (columns: string) => {

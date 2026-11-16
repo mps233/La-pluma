@@ -61,7 +61,7 @@ describe('useDashboardFlowLayout', () => {
 
     vi.stubGlobal('matchMedia', () => ({
       matches: true,
-      media: '(min-width: 1280px)',
+      media: '(width >= 1280px)',
       onchange: null,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),

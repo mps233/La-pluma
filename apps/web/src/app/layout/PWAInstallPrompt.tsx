@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Download, LoaderCircle, RefreshCw, Share2, SquarePlus } from 'lucide-react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { notify } from '@/shared/notifications'
+import { BREAKPOINTS } from '@/shared/lib/breakpoints'
 import { Button } from '@/shared/ui/button'
 import { hasDocumentBuildChanged } from './pwaUpdate'
 
@@ -34,7 +35,7 @@ const canOfferInstallation = () =>
   || ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)
 
 const isCompactInstallViewport = () =>
-  window.matchMedia('(max-width: 639px)').matches
+  window.matchMedia(`(width < ${BREAKPOINTS.sm}px)`).matches
 
 const shouldRemindAboutInstall = () => {
   try {

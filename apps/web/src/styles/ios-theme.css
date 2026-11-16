@@ -169,7 +169,7 @@
     height: 1.25rem;
   }
 
-  @media (min-width: 1024px) {
+  @media (width >= 1024px) {
     .la-pluma-app .la-pluma-navbar {
       background: transparent;
       border-bottom: 0;
@@ -687,7 +687,7 @@
     box-shadow: none;
   }
 
-  @media (max-width: 1023px) {
+  @media (width < 1024px) {
     /* On phones the chrome floats as separate controls over the page material,
        so each action owns one clear circular hit target. */
     .la-pluma-app .la-pluma-navbar {
@@ -1012,7 +1012,7 @@
     background: color-mix(in srgb, var(--muted) 92%, transparent);
   }
 
-  @media (max-width: 768px) {
+  @media (width < 768px) {
     /* Opt-in controls retain the iOS 44px touch target on phones. */
     .la-pluma-app .la-pluma-content .app-native-control {
       height: 2.75rem;
@@ -1040,7 +1040,7 @@
       0 30px 80px rgba(0, 0, 0, 0.24);
   }
 
-  @media (max-width: 639px) {
+  @media (width < 640px) {
     .la-pluma-app .ios-workspace-page {
       padding-top: 0;
       margin-right: 0.125rem;

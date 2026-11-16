@@ -224,7 +224,7 @@ export default function AutomationStageEditor({
                 </div>
 
                 {!isSmartStageRow && (
-                  <div className="automation-stage-stepper hidden min-[900px]:flex">
+                  <div className="automation-stage-stepper hidden workbench:flex">
                     <button
                       type="button"
                       onClick={() => adjustStageTimes(stageIndex, -1)}

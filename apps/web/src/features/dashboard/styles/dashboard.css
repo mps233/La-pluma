@@ -121,13 +121,13 @@
     min-height: 209px;
   }
 
-  @media (min-width: 1024px) {
+  @media (width >= 1024px) {
     .dashboard-device-grid {
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
 
-  @media (min-width: 1280px) {
+  @media (width >= 1280px) {
     .dashboard-flow-layout {
       align-items: stretch;
       grid-template-columns: var(
@@ -506,13 +506,13 @@
     white-space: nowrap;
   }
 
-  @media (min-width: 1280px) {
+  @media (width >= 1280px) {
     .dashboard-summary-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
-  @media (max-width: 639px) {
+  @media (width < 640px) {
     .dashboard-summary-header,
     .dashboard-summary-statline {
       padding-right: 0.875rem;
@@ -525,7 +525,7 @@
     }
   }
 
-  @media (max-width: 640px) {
+  @media (width < 640px) {
     .dashboard-flow-skeleton .dashboard-flow-command {
       min-height: 142px;
       height: auto;
@@ -586,7 +586,7 @@
     transform: none;
   }
 
-  @media (max-width: 639px) {
+  @media (width < 640px) {
     .la-pluma-app .dashboard-page {
       --dashboard-card-gap: 1rem;
       padding-top: 0;

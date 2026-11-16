@@ -406,7 +406,7 @@
     }
   }
 
-  @media (min-width: 768px) {
+  @media (width >= 768px) {
     .roguelike-workspace-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       grid-template-areas:
@@ -416,7 +416,7 @@
     }
   }
 
-  @media (min-width: 1360px) {
+  @media (width >= 1360px) {
     .roguelike-workspace-grid {
       grid-template-columns: repeat(3, minmax(0, 1fr));
 
@@ -428,7 +428,7 @@
     }
   }
 
-  @media (max-width: 639px) {
+  @media (width < 640px) {
     .roguelike-panel-heading,
     .roguelike-panel-body {
       padding-right: 1rem;

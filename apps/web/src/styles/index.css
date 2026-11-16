@@ -7,6 +7,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
+  --breakpoint-workbench: 900px;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -416,7 +417,7 @@
     }
   }
 
-  @media (max-width: 768px) {
+  @media (width < 768px) {
     /* Textareas grow from their row/content sizing instead of a fixed control height. */
     textarea {
       min-height: auto !important;
@@ -572,7 +573,7 @@
     box-shadow: inset 0 0 0 1px var(--border);
   }
 
-  @media (width <= 639px) {
+  @media (width < 640px) {
     .app-page {
       padding-block: 0.875rem;
     }
@@ -616,7 +617,7 @@
     bottom: max(1rem, env(safe-area-inset-bottom));
   }
 
-  @media (max-width: 1023px) {
+  @media (width < 1024px) {
     .pwa-install-prompt {
       bottom: calc(
         5rem
@@ -642,7 +643,7 @@
     }
   }
 
-  @media (min-width: 640px) {
+  @media (width >= 640px) {
     .pwa-install-prompt {
       right: max(1rem, env(safe-area-inset-right));
       left: auto;
@@ -767,7 +768,7 @@
     background-color: currentcolor;
   }
 
-  @media (max-width: 640px) {
+  @media (width < 640px) {
     .app-info-card {
       padding: 0.875rem;
     }
@@ -1041,7 +1042,7 @@
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 18%, var(--border));
   }
 
-  @media (max-width: 1023px) {
+  @media (width < 1024px) {
     .app-workspace-segment-indicator,
     .app-workspace-segment {
       height: 3.375rem;
@@ -1094,7 +1095,7 @@
     }
   }
 
-  @media (pointer: coarse), (max-width: 768px) {
+  @media (pointer: coarse), (width < 768px) {
     .theme-toggle-btn {
       width: 2.75rem !important;
       min-width: 2.75rem !important;

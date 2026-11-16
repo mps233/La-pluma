@@ -362,7 +362,7 @@
     white-space: pre-wrap;
   }
 
-  @media (max-width: 639px) {
+  @media (width < 640px) {
     .log-toolbar {
       align-items: stretch;
       flex-direction: column;

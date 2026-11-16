@@ -41,6 +41,8 @@ PORT=3100 LA_PLUMA_DEV_PORT=5273 pnpm dev
 
 `apps/web/src/styles/index.css`、`apps/web/src/styles/layout.css` 与 `apps/web/src/styles/ios-theme.css` 已完成分层，不再接受页面级选择器：页面样式由各功能域自持，写在 `features/<domain>/styles/<domain>.css` 并由该域 `index.ts` 导入，统一收进 `@layer page`；新样式按组件目录或功能域目录新增。完整规则见 [设计规范](../../DESIGN.md) 的「层序与 token 单源」「配置即规范」两节。
 
+视口断点集合与方向以 [设计规范](../../DESIGN.md#breakpoints) 的 Breakpoints 表为准：CSS 使用 `width < Npx` / `width >= Npx` 区间语法，JS 媒体查询用 `apps/web/src/shared/lib/breakpoints.ts` 的 `BREAKPOINTS` 生成，不新增未登记阈值。
+
 ### stylelint 预算制（ratchet）
 
 存量违规数冻结在 `apps/web/stylelint-baseline.json`（按文件粒度记录，文件移动/改名时比单一总数更稳）。存量违规一律 warning，不阻塞本地开发；拦净新增靠脚本：
@@ -61,7 +63,7 @@ CI 在 PR/main 运行浏览器跨页集成和视觉检查，只等待客户端�
 
 - **环境钉死**：截图生成与比对统一跑在 `mcr.microsoft.com/playwright` 官方镜像内（tag 自动取 client 实际安装的 `@playwright/test` 版本，如 `v1.64.1-noble`），字体与浏览器由此与 CI 完全一致。基线截图是 **Linux/Chromium 专属**：更换镜像、Playwright 版本或操作系统后，必须用 `pnpm visual:update` 重新生成并逐项评审 diff，不要试图跨环境复用。
 - **确定性**：`/api` 请求全部由 `apps/web/tests/visual/fixtures.ts` 的固定数据应答（不依赖真实后端与 MAA 运行状态）；`page.clock` 固定到 2026-10-24 04:00（UTC+8），日期敏感内容（今日开放关卡、资源更新时间等）不随运行当天变化；`reducedMotion: 'reduce'` 加文档级样式禁用 CSS 动画/过渡；主题通过 zustand persist 的 `ui-storage` localStorage 预置，首帧即目标主题。公共部分集中在 `harness.ts`。
-- **三个视口**：桌面 1440×900、平板 820×1180、移动 390×844，deviceScaleFactor 1。tab 基线（`app.pw.ts`）整页截图；弹层基线（`overlays.pw.ts`）为视口截图。820 落在 640（`sm`）与 900（页面自持的 stepper 断点）之间，与桌面一起把 `min-[900px]` 两侧夹住，同时也是「无侧栏 + 顶栏标题」这个 390 与 1440 都覆盖不到的组合；1024 / 1200 两档只在桌面侧出现，改动时注意同步核对。
+- **三个视口**：桌面 1440×900、平板 820×1180、移动 390×844，deviceScaleFactor 1。tab 基线（`app.pw.ts`）整页截图；弹层基线（`overlays.pw.ts`）为视口截图。820 落在 `sm`（640）与 `workbench`（900）之间，与桌面一起把 `workbench` 具名断点两侧夹住，同时也是「无侧栏 + 顶栏标题」这个 390 与 1440 都覆盖不到的组合；1024 / 1200 两档只在桌面侧出现，改动时注意同步核对。断点定义见 [设计规范](../../DESIGN.md#breakpoints)。
 - **弹层基线守 portal**：Dialog、AlertDialog、Sheet、DropdownMenu 与 PWA 安装提示都由 Base UI portal 渲染到 `document.body`，位于 `.la-pluma-app` 作用域之外，材质、遮罩与定位只由 portal 处的选择器决定。它们 `position: fixed` 按视口定位，`fullPage` 会把 fixed 元素拉到整页顶部，所以单独取视口或按 `data-region` / `data-slot` 做 locator 截图。
 - **启动壳基线守首帧**：启动壳（`boot.pw.ts`）在 `installDeterministicEnvironment` 之后 abort `assets/index-*.js`，让 React 模块不执行、页面停在 `index.html` 的内联启动壳上；按视口截图验收 safe-area / dvh / standalone 的真实渲染。
 

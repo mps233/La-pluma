@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getErrorMessage, isRecord } from '@/shared/api'
+import { BREAKPOINTS } from '@/shared/lib/breakpoints'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   AlertTriangle,
@@ -223,7 +224,7 @@ export default function AutomationWorkspace() {
 
   const selectTaskForEditing = (taskId: string) => {
     setSelectedTaskId(taskId)
-    if (!window.matchMedia?.('(max-width: 899px)').matches) return
+    if (!window.matchMedia?.(`(width < ${BREAKPOINTS.workbench}px)`).matches) return
 
     window.requestAnimationFrame(() => {
       editorColumnRef.current?.scrollIntoView({
@@ -603,7 +604,7 @@ export default function AutomationWorkspace() {
                                     min="0"
                                     className="h-full w-16 rounded-none border-0 bg-transparent px-2 text-center focus-visible:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   />
-                                  <div className="hidden flex-col self-stretch overflow-hidden border-l border-white/10 min-[900px]:flex">
+                                  <div className="hidden flex-col self-stretch overflow-hidden border-l border-white/10 workbench:flex">
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -743,7 +744,7 @@ export default function AutomationWorkspace() {
                                       disabled={isRunning || !task.enabled}
                                       className="min-w-0"
                                     />
-                                    <div className="number-input-controls hidden min-[900px]:flex">
+                                    <div className="number-input-controls hidden workbench:flex">
                                       <button
                                         type="button"
                                         onClick={() => {

@@ -18,7 +18,7 @@
     background: color-mix(in srgb, var(--muted) 78%, var(--card));
   }
 
-  @media (max-width: 639px) {
+  @media (width < 640px) {
     .data-statistics-task-header {
       flex-direction: column;
     }

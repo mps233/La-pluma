@@ -229,7 +229,7 @@
     overflow-wrap: anywhere;
   }
 
-  @media (width >= 40rem) {
+  @media (width >= 640px) {
     .combat-copilot-detail-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }

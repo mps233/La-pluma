@@ -463,7 +463,7 @@ describe('DataStatistics layout surfaces', () => {
     mocks.getAllOperators.mockResolvedValue(catalogFixture)
     mocks.getOperBoxData.mockResolvedValue(ownedOperatorFixture)
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-      matches: query === '(max-width: 639px)',
+      matches: query === '(width < 640px)',
       media: query,
       onchange: null,
       addListener: vi.fn(),

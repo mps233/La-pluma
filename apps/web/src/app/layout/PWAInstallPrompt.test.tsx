@@ -113,7 +113,7 @@ describe('PWAInstallPrompt', () => {
   it('shows iOS Add to Home Screen guidance', async () => {
     setNavigator('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1', 5)
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-      matches: query === '(max-width: 639px)' || query === '(prefers-reduced-motion: reduce)',
+      matches: query === '(width < 640px)' || query === '(prefers-reduced-motion: reduce)',
       media: query,
       onchange: null,
       addListener: vi.fn(),

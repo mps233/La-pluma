@@ -39,7 +39,7 @@
     font-weight: 700;
   }
 
-  @media (min-width: 1200px) {
+  @media (width >= 1200px) {
     .automation-flow-card-header {
       align-items: flex-start;
       flex-direction: column;
@@ -146,7 +146,7 @@
     white-space: nowrap;
   }
 
-  @media (max-width: 639px) {
+  @media (width < 640px) {
     .automation-flow-header {
       min-height: 0;
       align-items: stretch;
@@ -258,7 +258,7 @@
 
   }
 
-  @media (min-width: 900px) {
+  @media (width >= 900px) {
     .automation-workspace-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       grid-template-areas:
@@ -271,7 +271,7 @@
     }
   }
 
-  @media (min-width: 1360px) {
+  @media (width >= 1360px) {
     .automation-workspace-grid {
       grid-template-columns: repeat(3, minmax(0, 1fr));
       grid-template-areas: "sequence editor support";
@@ -1863,7 +1863,7 @@
     }
   }
 
-  @media (max-width: 899px) {
+  @media (width < 900px) {
     .automation-sequence-panel,
     .automation-editor-panel {
       position: static;
@@ -1887,7 +1887,7 @@
     }
   }
 
-  @media (max-width: 639px) {
+  @media (width < 640px) {
     .automation-sequence-surface > .automation-flow-header {
       align-items: center;
       flex-direction: row;

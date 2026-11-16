@@ -18,13 +18,13 @@
     --layout-page-gutter: 2rem;
   }
 
-  @media (width <= 1023px) {
+  @media (width < 1024px) {
     :root {
       --layout-page-gutter: 1.25rem;
     }
   }
 
-  @media (width <= 639px) {
+  @media (width < 640px) {
     :root {
       --layout-page-gutter: 0.875rem;
     }
@@ -266,7 +266,7 @@
     }
   }
 
-  @media (width <= 1023px) {
+  @media (width < 1024px) {
     .la-pluma-app .la-pluma-navbar {
       position: absolute;
       top: 0;
@@ -324,7 +324,7 @@
     }
   }
 
-  @media (width <= 639px) {
+  @media (width < 640px) {
     .la-pluma-scroll-host {
       scroll-padding-bottom: calc(
         var(--layout-tabbar-reserved-height) + 0.875rem
@@ -369,7 +369,7 @@
   /* In an installed app the page is the full physical viewport. Keeping the
      tabbar page-relative avoids WebKit anchoring `position: fixed` to the
      smaller dynamic layout viewport reported during PWA startup. */
-  @media (width <= 1023px) {
+  @media (width < 1024px) {
     html.la-pluma-standalone .la-pluma-app .la-pluma-tabbar {
       position: absolute;
       bottom: 0;

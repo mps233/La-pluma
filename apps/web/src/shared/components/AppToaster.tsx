@@ -2,8 +2,9 @@ import { useContext, useSyncExternalStore, type CSSProperties } from 'react'
 import { CircleCheckIcon, InfoIcon, Loader2Icon, OctagonXIcon, TriangleAlertIcon } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { ThemeContext } from '@/shared/theme/useTheme'
+import { BREAKPOINTS } from '@/shared/lib/breakpoints'
 
-const DESKTOP_QUERY = '(min-width: 1024px)'
+const DESKTOP_QUERY = `(width >= ${BREAKPOINTS.lg}px)`
 const TABBAR_TOAST_BOTTOM = 'calc(var(--layout-tabbar-reserved-height, 5rem) + env(safe-area-inset-bottom, 0px) + 1rem)'
 
 function subscribeDesktop(callback: () => void) {
@@ -30,7 +31,7 @@ export function AppToaster() {
       mobileOffset={{ bottom }}
       visibleToasts={3}
       closeButton
-      className="max-[600px]:w-[calc(100vw-2rem)]!"
+      className="max-sm:w-[calc(100vw-2rem)]!"
       toastOptions={{
         closeButtonAriaLabel: '关闭通知',
         classNames: {

@@ -367,7 +367,7 @@ function TrainingSkeleton() {
             <Skeleton className="h-11 w-24 rounded-xl" />
           </div>
           <div className="min-h-65">
-            <div className="training-operator-grid grid grid-cols-3 gap-3.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-4 2xl:grid-cols-6">
+            <div className="training-operator-grid grid grid-cols-3 gap-3.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-4">
               {Array.from({ length: 12 }, (_, index) => (
                 <div key={index} className="training-operator-skeleton relative overflow-hidden rounded-xl p-2.5 surface-soft">
                   <Skeleton className="mb-2.5 aspect-square h-auto w-full rounded-xl" />

@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react'
 import { Button } from '@/shared/ui/button'
+import { BREAKPOINTS } from '@/shared/lib/breakpoints'
 import {
   Sheet,
   SheetClose,
@@ -16,7 +17,7 @@ import type { CopilotDetailTarget } from '../model/copilotDetail'
 import { COPILOT_DETAIL_LAYER_ID } from './combatPanelTypes'
 import { DetailBody, DetailPlaceholder } from './CombatCopilotDetailBody'
 
-const MOBILE_DETAIL_QUERY = '(max-width: 40rem)'
+const MOBILE_DETAIL_QUERY = `(width < ${BREAKPOINTS.sm}px)`
 const DESKTOP_SHEET_CLASS = 'fixed inset-y-0 right-0 z-50 flex h-full w-[min(24rem,calc(100vw-1.5rem))] flex-col gap-0 overflow-hidden border-l bg-popover text-sm text-popover-foreground shadow-lg outline-none transition duration-200 ease-in-out data-ending-style:translate-x-[2.5rem] data-ending-style:opacity-0 data-starting-style:translate-x-[2.5rem] data-starting-style:opacity-0'
 const MOBILE_SHEET_CLASS = 'fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col gap-0 overflow-hidden border-t bg-popover text-sm text-popover-foreground shadow-lg outline-none transition duration-200 ease-in-out data-ending-style:translate-y-[2.5rem] data-ending-style:opacity-0 data-starting-style:translate-y-[2.5rem] data-starting-style:opacity-0'
 

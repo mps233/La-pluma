@@ -20,7 +20,7 @@ const labels: Record<string, string> = {
 }
 
 const mediaQueryList = (matches: boolean) => (query: string) => ({
-  matches: matches && query === '(max-width: 639px)',
+  matches: matches && query === '(width < 640px)',
   media: query,
   onchange: null,
   addListener: vi.fn(),

@@ -1114,7 +1114,7 @@
     }
   }
 
-  @media (width <= 767px) {
+  @media (width < 768px) {
     .combat-task-heading {
       align-items: stretch;
       padding: 1rem;
@@ -1806,7 +1806,7 @@
     outline-offset: 2px;
   }
 
-  @media (width <= 767px) {
+  @media (width < 768px) {
     .combat-copilot-discovery-search-row {
       flex-wrap: wrap;
     }

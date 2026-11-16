@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Ellipsis, X } from 'lucide-react'
+import { BREAKPOINTS } from '@/shared/lib/breakpoints'
 import {
   Sheet,
   SheetClose,
@@ -54,7 +55,7 @@ export default function AppTabbar({ activeTab, onNavigate }: AppTabbarProps) {
   }
 
   useEffect(() => {
-    const desktopQuery = window.matchMedia('(min-width: 1024px)')
+    const desktopQuery = window.matchMedia(`(width >= ${BREAKPOINTS.lg}px)`)
     const closeOnDesktop = (event?: MediaQueryListEvent) => {
       if (event?.matches ?? desktopQuery.matches) setMoreOpen(false)
     }
