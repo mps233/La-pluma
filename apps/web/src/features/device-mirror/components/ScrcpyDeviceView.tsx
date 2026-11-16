@@ -71,7 +71,7 @@ function DeviceNavigationButtons({
       aria-label={label}
       className={immersive
         ? 'group flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-xs transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-35'
-        : `control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-35 ${compact ? 'automation-preview-glass-button' : ''}`}
+        : `control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-35 ${compact ? 'device-preview-glass-button' : ''}`}
     >
       <Icon className="h-3.5 w-3.5" strokeWidth={1.8} />
     </button>
@@ -464,7 +464,7 @@ export default function ScrcpyDeviceView({
             disabled={webrtc.status !== 'connected'}
             title="全屏"
             aria-label="全屏"
-            className={`control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-35 ${isCompact ? 'automation-preview-glass-button' : ''}`}
+            className={`control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-35 ${isCompact ? 'device-preview-glass-button' : ''}`}
           >
             <Maximize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
           </button>
@@ -476,7 +476,7 @@ export default function ScrcpyDeviceView({
               aria-label={compactControlsOpen ? '收起预览设置' : '打开预览设置'}
               aria-expanded={compactControlsOpen}
               aria-controls={compactControlsId}
-              className={`automation-preview-glass-button control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-muted-foreground${compactControlsOpen ? ' is-active' : ''}`}
+              className={`device-preview-glass-button control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-muted-foreground${compactControlsOpen ? ' is-active' : ''}`}
             >
               <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.8} />
             </button>

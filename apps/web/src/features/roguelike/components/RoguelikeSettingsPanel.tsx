@@ -133,7 +133,7 @@ export default function RoguelikeSettingsPanel({
   const toggleOptions = options.filter(option => option.type === 'checkbox')
 
   return (
-    <Card className="roguelike-panel roguelike-settings-panel gap-0 p-0!">
+    <Card className="roguelike-panel roguelike-settings-panel gap-0 p-0!" data-monitor-area="settings">
       <div className="roguelike-panel-heading">
         <div>
           <h3>策略设置</h3>

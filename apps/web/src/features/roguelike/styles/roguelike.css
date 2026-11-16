@@ -41,18 +41,14 @@
     grid-area: settings;
   }
 
-  .roguelike-monitor-column {
+  .roguelike-workspace-grid [data-monitor-area="monitor"] {
     grid-area: monitor;
     min-width: 0;
   }
 
-  .roguelike-panel,
-  .roguelike-monitor-panel {
+  .roguelike-panel {
     width: 100%;
     min-width: 0;
-  }
-
-  .roguelike-panel {
     container-type: inline-size;
   }
 

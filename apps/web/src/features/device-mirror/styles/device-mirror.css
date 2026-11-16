@@ -603,6 +603,15 @@
     justify-self: center;
   }
 
+  .device-monitor-column {
+    min-width: 0;
+  }
+
+  .device-monitor-panel {
+    width: 100%;
+    min-width: 0;
+  }
+
   .task-monitor-panel {
     border-radius: var(--radius-xl);
     padding: 1rem;
@@ -673,11 +682,56 @@
     }
   }
 
-  .automation-monitor-surface {
+  .device-monitor-skeleton-surface {
     padding: 0;
   }
 
-  .automation-monitor-surface > .task-monitor-panel.is-compact {
+  .device-monitor-skeleton {
+    container-type: inline-size;
+  }
+
+  .device-monitor-skeleton-header {
+    display: flex;
+    min-height: 3.25rem;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .device-monitor-skeleton-frame {
+    width: calc(100% - 1.5rem);
+    max-height: 17rem;
+    margin: 0 0.75rem;
+    overflow: hidden;
+    border-radius: var(--radius-xl);
+  }
+
+  .device-monitor-skeleton-toolbar {
+    display: flex;
+    min-height: 4rem;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(0.25rem, 2cqw, 0.75rem);
+    padding: 0.625rem 1rem 0.75rem;
+  }
+
+  .device-monitor-skeleton-toolbar [data-slot='skeleton'] {
+    flex: 0 0 2.75rem;
+  }
+
+  @container (min-width: 34rem) {
+    .device-monitor-skeleton-frame {
+      height: 13.5rem;
+      max-height: none;
+      aspect-ratio: auto;
+    }
+  }
+
+  .device-monitor-surface {
+    padding: 0;
+  }
+
+  .device-monitor-surface > .task-monitor-panel.is-compact {
     --scrcpy-compact-inset: 0.75rem;
 
     background: transparent;
@@ -685,35 +739,35 @@
     padding: 0;
   }
 
-  .automation-monitor-surface .task-monitor-panel.is-compact .scrcpy-device-layout.is-compact > .space-y-3 > :not([hidden]) ~ :not([hidden]) {
-    /* S3: 自动化页的紧凑投屏取消 space-y-3 间距（提高特异性以压过通用紧凑 inset）。 */
+  .device-monitor-surface .task-monitor-panel.is-compact .scrcpy-device-layout.is-compact > .space-y-3 > :not([hidden]) ~ :not([hidden]) {
+    /* S3: 共享设备画面的紧凑投屏取消 space-y-3 间距（提高特异性以压过通用紧凑 inset）。 */
     margin-top: 0 !important;
   }
 
-  .automation-monitor-surface .scrcpy-view-header.is-compact {
+  .device-monitor-surface .scrcpy-view-header.is-compact {
     min-height: 3.25rem;
     padding: 0.625rem 1rem;
   }
 
-  .automation-monitor-surface .scrcpy-view-header.is-compact > .min-w-0 {
+  .device-monitor-surface .scrcpy-view-header.is-compact > .min-w-0 {
     flex: 1 1 auto;
     min-width: 0;
   }
 
-  .automation-monitor-surface .scrcpy-view-title-row {
+  .device-monitor-surface .scrcpy-view-title-row {
     width: 100%;
     min-width: 0;
     gap: 0.5rem;
   }
 
-  .automation-monitor-surface .scrcpy-view-status-dot {
+  .device-monitor-surface .scrcpy-view-status-dot {
     /* S3: 紧凑投屏的状态点保持 6px，需压过调用处的 h-2 / w-2。 */
     width: 0.375rem !important;
     height: 0.375rem !important;
     flex: 0 0 0.375rem;
   }
 
-  .automation-monitor-surface .scrcpy-view-title {
+  .device-monitor-surface .scrcpy-view-title {
     /* S3: 紧凑投屏标题使用 15px 与语义前景色，压过调用处的 text-sm / text-gray-900。 */
     overflow: hidden;
     color: var(--foreground) !important;
@@ -723,12 +777,12 @@
     white-space: nowrap;
   }
 
-  html.dark .automation-monitor-surface .scrcpy-view-title {
+  html.dark .device-monitor-surface .scrcpy-view-title {
     /* 深色标题保持白色（与 dark:text-white! 一致），需要显式压过上面的语义色。 */
     color: #fff !important;
   }
 
-  .automation-monitor-surface .scrcpy-view-status {
+  .device-monitor-surface .scrcpy-view-status {
     margin-left: auto;
     flex: none;
     color: var(--tertiary-foreground);
@@ -737,8 +791,8 @@
     line-height: 1rem;
   }
 
-  .automation-monitor-surface .task-monitor-panel.is-compact .scrcpy-video-frame {
-    /* S3: 自动化紧凑投屏移除阴影，需压过调用处的 shadow-xs。 */
+  .device-monitor-surface .task-monitor-panel.is-compact .scrcpy-video-frame {
+    /* S3: 共享设备画面的紧凑投屏移除阴影，需压过调用处的 shadow-xs。 */
     width: calc(100% - 1.5rem);
     margin-right: 0.75rem;
     margin-left: 0.75rem;
@@ -746,12 +800,12 @@
     box-shadow: none !important;
   }
 
-  .automation-monitor-surface .task-monitor-panel.is-compact .scrcpy-video-frame.is-empty {
+  .device-monitor-surface .task-monitor-panel.is-compact .scrcpy-video-frame.is-empty {
     max-height: 17rem;
     background: color-mix(in srgb, var(--muted) 86%, var(--card));
   }
 
-  .automation-monitor-surface .scrcpy-empty-state {
+  .device-monitor-surface .scrcpy-empty-state {
     /* S3: 空状态使用 16px 内边距与 safe center，需压过 px-6 / justify-center。 */
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -760,16 +814,16 @@
     scrollbar-width: none;
   }
 
-  .automation-monitor-surface .scrcpy-empty-state::-webkit-scrollbar {
+  .device-monitor-surface .scrcpy-empty-state::-webkit-scrollbar {
     display: none;
   }
 
-  .automation-monitor-surface .scrcpy-empty-content {
+  .device-monitor-surface .scrcpy-empty-content {
     /* S3: 紧凑空状态限制 18rem，需压过 max-w-sm。 */
     max-width: 18rem !important;
   }
 
-  .automation-monitor-surface .device-preview-empty-icon {
+  .device-monitor-surface .device-preview-empty-icon {
     width: 2.75rem;
     height: 2.75rem;
 
@@ -782,11 +836,11 @@
       0 2px 7px rgb(60 60 67 / 8%);
   }
 
-  .automation-monitor-surface .scrcpy-empty-description {
+  .device-monitor-surface .scrcpy-empty-description {
     color: var(--tertiary-foreground);
   }
 
-  .automation-monitor-surface .task-monitor-panel.is-compact .scrcpy-preview-toolbar {
+  .device-monitor-surface .task-monitor-panel.is-compact .scrcpy-preview-toolbar {
     /* S3: 工具栏间距与内边距由紧凑投屏接管，需压过 gap-2 / px-2 / py-1。 */
     width: 100%;
     min-height: 4rem;
@@ -794,7 +848,7 @@
     padding: 0.625rem 1rem 0.75rem !important;
   }
 
-  .automation-monitor-surface .scrcpy-preview-toolbar svg {
+  .device-monitor-surface .scrcpy-preview-toolbar svg {
     /* S3: 工具栏图标固定 16px，需压过图标上的 w-3.5。 */
     width: 1rem !important;
     height: 1rem !important;
@@ -802,13 +856,13 @@
 
   /* S3: 紧凑投屏的宽容器覆盖需压过 max-w-sm / 工具类间距，important 仅限本容器内。 */
   @container (min-width: 34rem) {
-    .automation-monitor-surface .task-monitor-panel.is-compact .scrcpy-video-frame.is-empty {
+    .device-monitor-surface .task-monitor-panel.is-compact .scrcpy-video-frame.is-empty {
       height: 13.5rem;
       max-height: none;
       aspect-ratio: auto;
     }
 
-    .automation-monitor-surface .scrcpy-empty-content {
+    .device-monitor-surface .scrcpy-empty-content {
       display: grid;
 
       /* S3: 宽容器下放宽到 34rem，同样需要压过 max-w-sm。 */
@@ -822,24 +876,93 @@
       text-align: left;
     }
 
-    .automation-monitor-surface .device-preview-empty-icon {
+    .device-monitor-surface .device-preview-empty-icon {
       grid-area: icon;
       margin: 0 !important;
     }
 
-    .automation-monitor-surface .scrcpy-empty-title {
+    .device-monitor-surface .scrcpy-empty-title {
       grid-area: title;
       align-self: end;
     }
 
-    .automation-monitor-surface .scrcpy-empty-description {
+    .device-monitor-surface .scrcpy-empty-description {
       grid-area: description;
       align-self: start;
       margin: 0;
     }
   }
 
-  .la-pluma-app .task-monitor-panel.is-compact .automation-preview-glass-button {
+  @media (width < 1024px) {
+    .la-pluma-app .device-preview-glass-button {
+      --glass-liquid-surface: color-mix(
+        in srgb,
+        var(--glass-bg) 42%,
+        transparent
+      );
+
+      position: relative;
+      isolation: isolate;
+      border-color: transparent;
+      background:
+        linear-gradient(
+          var(--glass-liquid-surface-lift),
+          var(--glass-liquid-surface-lift)
+        ),
+        var(--glass-liquid-surface);
+      -webkit-backdrop-filter: blur(6px) saturate(140%); /* stylelint-disable-line property-no-vendor-prefix -- Safari 仍需前缀 */
+      backdrop-filter: blur(6px) saturate(140%);
+    }
+
+    .la-pluma-app .device-preview-glass-button::before {
+      position: absolute;
+      inset: 0;
+      padding: 0.5px;
+      border-radius: inherit;
+      background: conic-gradient(
+        from 0deg,
+        var(--glass-edge-light) 0deg,
+        var(--glass-edge-light) 26deg,
+        var(--glass-edge-high) 32deg,
+        var(--glass-edge-mid) 38deg,
+        var(--glass-edge-faint) 44deg,
+        var(--glass-edge-clear) 50deg,
+        var(--glass-edge-faint) 56deg,
+        var(--glass-edge-mid) 62deg,
+        var(--glass-edge-high) 68deg,
+        var(--glass-edge-light) 74deg,
+        var(--glass-edge-light) 206deg,
+        var(--glass-edge-high) 212deg,
+        var(--glass-edge-mid) 218deg,
+        var(--glass-edge-faint) 224deg,
+        var(--glass-edge-clear) 230deg,
+        var(--glass-edge-faint) 236deg,
+        var(--glass-edge-mid) 242deg,
+        var(--glass-edge-high) 248deg,
+        var(--glass-edge-light) 254deg,
+        var(--glass-edge-light) 360deg
+      );
+      /* stylelint-disable-next-line property-no-vendor-prefix -- Safari 仍需前缀 */
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor; /* stylelint-disable-line property-no-vendor-prefix -- Safari 仍需前缀 */
+      mask-composite: exclude;
+      content: '';
+      pointer-events: none;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .la-pluma-app .device-preview-glass-button::before {
+      display: none;
+    }
+  }
+
+  .la-pluma-app .task-monitor-panel.is-compact .device-preview-glass-button {
     position: relative;
     width: 2.75rem;
     min-width: 2.75rem;
@@ -859,12 +982,28 @@
     transition: color 160ms ease, background 160ms ease, transform 120ms ease;
   }
 
-  .la-pluma-app .task-monitor-panel.is-compact .automation-preview-glass-button:active:not(:disabled) {
+  .la-pluma-app [data-device-monitor-layout="workbench"] .device-monitor-surface .device-preview-glass-button {
+    background: color-mix(in srgb, var(--glass-bg) 84%, transparent);
+    -webkit-backdrop-filter: blur(12px) saturate(150%); /* stylelint-disable-line property-no-vendor-prefix -- Safari 仍需前缀 */
+    backdrop-filter: blur(12px) saturate(150%);
+    box-shadow:
+      inset 0 0 0 0.5px color-mix(in srgb, var(--glass-border) 55%, transparent),
+      0 3px 10px rgb(60 60 67 / 8%);
+  }
+
+  .la-pluma-app.dark [data-device-monitor-layout="workbench"] .device-monitor-surface .device-preview-glass-button,
+  html.dark .la-pluma-app [data-device-monitor-layout="workbench"] .device-monitor-surface .device-preview-glass-button {
+    box-shadow:
+      inset 0 0 0 0.5px color-mix(in srgb, var(--glass-border) 42%, transparent),
+      0 3px 10px rgb(0 0 0 / 20%);
+  }
+
+  .la-pluma-app .task-monitor-panel.is-compact .device-preview-glass-button:active:not(:disabled) {
     transform: scale(0.94);
   }
 
-  .la-pluma-app .task-monitor-panel.is-compact .automation-preview-glass-button:hover:not(:disabled),
-  .la-pluma-app .task-monitor-panel.is-compact .automation-preview-glass-button.is-active {
+  .la-pluma-app .task-monitor-panel.is-compact .device-preview-glass-button:hover:not(:disabled),
+  .la-pluma-app .task-monitor-panel.is-compact .device-preview-glass-button.is-active {
     color: var(--primary);
     background: color-mix(in srgb, var(--glass-bg) 76%, var(--primary-soft));
   }

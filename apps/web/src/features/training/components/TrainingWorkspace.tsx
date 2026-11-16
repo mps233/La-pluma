@@ -248,7 +248,7 @@ export default function TrainingWorkspace() {
 
   return (
     <>
-      <DeviceMonitorLayout>
+      <DeviceMonitorLayout variant="standard">
         <div className="training-workspace-grid">
           <TrainingQueuePanel
             queue={queue}

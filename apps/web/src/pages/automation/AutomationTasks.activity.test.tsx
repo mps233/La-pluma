@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { Activity, act } from 'react'
+import { Activity, act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -78,7 +78,24 @@ vi.mock('@/shared/notifications', () => ({
   STATISTICS_NOTICE_ID: 'statistics',
   SETTINGS_UPDATE_NOTICE_ID: 'settings-update',
 }))
-vi.mock('@/features/device-mirror', () => ({ DeviceMonitorPanel: () => null }))
+type DeviceMonitorLayoutMockProps = {
+  variant?: 'standard' | 'workbench' | 'mode'
+  children?: ReactNode
+  sequence?: ReactNode
+  editor?: ReactNode
+  support?: ReactNode
+  mode?: ReactNode
+  content?: ReactNode
+}
+
+vi.mock('@/features/device-mirror', () => ({
+  DeviceMonitorPanel: () => null,
+  DeviceMonitorLayout: ({ variant, children, sequence, editor, support, mode, content }: DeviceMonitorLayoutMockProps) => {
+    if (variant === 'workbench') return <>{sequence}{editor}<div>{support}</div></>
+    if (variant === 'mode') return <>{mode}{content}</>
+    return <>{children}</>
+  },
+}))
 vi.mock('@/features/automation/components/NotificationSettings', () => ({ default: () => null }))
 
 const ok = <T,>(data: T): ApiResponse<T> => ({ success: true, data })

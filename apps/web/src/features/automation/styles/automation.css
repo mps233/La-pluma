@@ -186,7 +186,6 @@
     gap: 1.125rem;
   }
 
-  .automation-monitor-column,
   .automation-sequence-column,
   .automation-editor-column,
   .automation-support-column {
@@ -206,56 +205,6 @@
     grid-area: support;
     align-content: start;
     gap: 1.125rem;
-  }
-
-  .automation-monitor-panel {
-    width: 100%;
-  }
-
-  .automation-monitor-skeleton-surface {
-    padding: 0;
-  }
-
-  .automation-monitor-skeleton {
-    container-type: inline-size;
-  }
-
-  .automation-monitor-skeleton-header {
-    display: flex;
-    min-height: 3.25rem;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-  }
-
-  .automation-monitor-skeleton-frame {
-    width: calc(100% - 1.5rem);
-    max-height: 17rem;
-    margin: 0 0.75rem;
-    overflow: hidden;
-    border-radius: var(--radius-xl);
-  }
-
-  .automation-monitor-skeleton-toolbar {
-    display: flex;
-    min-height: 4rem;
-    align-items: center;
-    justify-content: center;
-    gap: clamp(0.25rem, 2cqw, 0.75rem);
-    padding: 0.625rem 1rem 0.75rem;
-  }
-
-  .automation-monitor-skeleton-toolbar [data-slot='skeleton'] {
-    flex: 0 0 2.75rem;
-  }
-
-  @container (min-width: 34rem) {
-    .automation-monitor-skeleton-frame {
-      height: 13.5rem;
-      max-height: none;
-      aspect-ratio: auto;
-    }
-
   }
 
   @media (width >= 900px) {
@@ -2214,22 +2163,6 @@
   .la-pluma-app [data-page-kind="automation"] .automation-task-editor .number-input-wrapper:has(input:focus),
   .la-pluma-app [data-page-kind="automation"] .automation-composite-control:has(input:focus) {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
-  }
-
-  .la-pluma-app [data-page-kind="automation"] .automation-monitor-surface .automation-preview-glass-button {
-    background: color-mix(in srgb, var(--glass-bg) 84%, transparent);
-    -webkit-backdrop-filter: blur(12px) saturate(150%);
-    backdrop-filter: blur(12px) saturate(150%);
-    box-shadow:
-      inset 0 0 0 0.5px color-mix(in srgb, var(--glass-border) 55%, transparent),
-      0 3px 10px rgb(60 60 67 / 8%);
-  }
-
-  html.dark .la-pluma-app [data-page-kind="automation"] .automation-monitor-surface .automation-preview-glass-button,
-  .la-pluma-app.dark [data-page-kind="automation"] .automation-monitor-surface .automation-preview-glass-button {
-    box-shadow:
-      inset 0 0 0 0.5px color-mix(in srgb, var(--glass-border) 42%, transparent),
-      0 3px 10px rgb(0 0 0 / 20%);
   }
 
 }

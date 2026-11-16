@@ -61,18 +61,21 @@
 ```
 AutomationTasks（app-page > app-stack-section > AutomationWorkspace）
 └─ AutomationWorkspace（配置/执行/选中/撤销/连接/失效）
-   ├─ AutomationTaskFlowPanel
-   │  ├─ 任务流程列表（拖拽、启用、删除、撤销）
-   │  ├─ automation-sequence-footer
-   │  │  ├─ AutomationTaskPicker（页脚区域仍由本面板传入）
-   │  │  └─ 立即执行 / 终止执行
-   │  └─ AutomationExecutionSummary
-   ├─ automation-task-editor（任务配置；同一草稿与执行投影）
-   └─ automation-support-column
-      ├─ DeviceMonitorPanel（共享实时会话）
-      ├─ AutomationScheduleCard（定时编辑；关闭时保留时间摘要）
-      └─ NotificationSettings（独立通知卡；显式保存）
+   └─ DeviceMonitorLayout(workbench)
+      ├─ AutomationTaskFlowPanel（sequence 区域）
+      │  ├─ 任务流程列表（拖拽、启用、删除、撤销）
+      │  ├─ automation-sequence-footer
+      │  │  ├─ AutomationTaskPicker（页脚区域仍由本面板传入）
+      │  │  └─ 立即执行 / 终止执行
+      │  └─ AutomationExecutionSummary
+      ├─ automation-task-editor（editor 区域；任务配置；同一草稿与执行投影）
+      └─ automation-support-column（support 区域）
+         ├─ DeviceMonitorPanel（共享实时会话）
+         ├─ AutomationScheduleCard（定时编辑；关闭时保留时间摘要）
+         └─ NotificationSettings（独立通知卡；显式保存）
 ```
+
+工作区网格与设备画面由 `DeviceMonitorLayout(workbench)` 持有；`AutomationTaskFlowPanel` 根节点输出 `data-monitor-area="sequence"`，任务编辑列输出 `data-monitor-area="editor"`，页面只提供三个具名区域，不自行渲染 `DeviceMonitorPanel` 或复制支撑列布局。monitor 列与面板由布局输出 `device-monitor-column` / `device-monitor-panel`，画面材质归 device-mirror 域，本页不定义 monitor 专属玻璃或骨架样式。
 
 | 状态 | 所有者 | Activity 隐藏/恢复 | 真正卸载/刷新 |
 | --- | --- | --- | --- |

@@ -12,14 +12,14 @@ import {
 const REPRESENTATIVE_TABS = ['dashboard', 'automation'] as const
 
 const PAGE_SHELL_CONTRACT = [
-  { tab: 'dashboard', layout: null, surface: null, monitor: 0, toolbar: 0 },
-  { tab: 'automation', layout: 'workspace', surface: 'borderless', monitor: 1, toolbar: 0 },
-  { tab: 'combat', layout: 'workspace', surface: 'borderless', monitor: 1, toolbar: 0 },
-  { tab: 'roguelike', layout: 'workspace', surface: 'borderless', monitor: 1, toolbar: 0 },
-  { tab: 'training', layout: 'workspace', surface: null, monitor: 1, toolbar: 0 },
-  { tab: 'logs', layout: 'workspace', surface: 'borderless', monitor: 1, toolbar: 1 },
-  { tab: 'statistics', layout: 'workspace', surface: 'borderless', monitor: 1, toolbar: 1 },
-  { tab: 'config', layout: 'workspace', surface: 'borderless', monitor: 0, toolbar: 0 },
+  { tab: 'dashboard', layout: null, surface: null, monitor: 0, monitorLayout: null, toolbar: 0 },
+  { tab: 'automation', layout: 'workspace', surface: 'borderless', monitor: 1, monitorLayout: 'workbench', toolbar: 0 },
+  { tab: 'combat', layout: 'workspace', surface: 'borderless', monitor: 1, monitorLayout: 'standard', toolbar: 0 },
+  { tab: 'roguelike', layout: 'workspace', surface: 'borderless', monitor: 1, monitorLayout: 'mode', toolbar: 0 },
+  { tab: 'training', layout: 'workspace', surface: null, monitor: 1, monitorLayout: 'standard', toolbar: 0 },
+  { tab: 'logs', layout: 'workspace', surface: 'borderless', monitor: 1, monitorLayout: 'standard', toolbar: 1 },
+  { tab: 'statistics', layout: 'workspace', surface: 'borderless', monitor: 1, monitorLayout: 'standard', toolbar: 1 },
+  { tab: 'config', layout: 'workspace', surface: 'borderless', monitor: 0, monitorLayout: null, toolbar: 0 },
 ] as const
 
 test.describe('app tabs', () => {
@@ -76,6 +76,13 @@ test.describe('app tabs', () => {
       expect(await pageRegion.getAttribute('data-page-layout')).toBe(contract.layout)
       expect(await pageRegion.getAttribute('data-page-surface')).toBe(contract.surface)
       await expect(page.locator('[data-region="monitor"]')).toHaveCount(contract.monitor)
+      if (contract.monitorLayout) {
+        const monitorLayout = page.locator('[data-device-monitor-layout]')
+        await expect(monitorLayout).toHaveCount(1)
+        await expect(monitorLayout).toHaveAttribute('data-device-monitor-layout', contract.monitorLayout)
+      } else {
+        await expect(page.locator('[data-device-monitor-layout]')).toHaveCount(0)
+      }
       await expect(page.locator('[data-region="toolbar"]')).toHaveCount(contract.toolbar)
     }
 

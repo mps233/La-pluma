@@ -4,7 +4,7 @@ import { Button } from '@/shared/ui/button'
 import { SegmentedTabs, SegmentedTabPanel } from '@/shared/components'
 import { notify } from '@/shared/notifications'
 import { useAutomationAvailability } from '@/features/runtime-status'
-import { DeviceMonitorPanel } from '@/features/device-mirror'
+import { DeviceMonitorLayout } from '@/features/device-mirror'
 import { useUserConfig } from '@/features/user-config'
 import { roguelikeConfigAdapter } from '../model/roguelikeConfig'
 import {
@@ -132,45 +132,41 @@ export default function RoguelikeWorkspace() {
       )}
 
       <SegmentedTabs value={activeMode} onValueChange={setActiveMode}>
-        <div className="roguelike-workspace-grid">
-          <RoguelikeModePanel activeMode={activeMode} />
+        <DeviceMonitorLayout
+          variant="mode"
+          mode={<RoguelikeModePanel activeMode={activeMode} />}
+          content={(
+            <SegmentedTabPanel value={activeMode} id="roguelike-mode-panel" className="contents">
+              <div className="roguelike-main-column" data-monitor-area="main">
+                <RoguelikeThemePanel
+                  task={activeTask}
+                  theme={activeTheme}
+                  onThemeChange={handleThemeChange}
+                />
 
-          <SegmentedTabPanel value={activeMode} id="roguelike-mode-panel" className="contents">
-            <div className="roguelike-main-column">
-              <RoguelikeThemePanel
+                <RoguelikeResultPanel run={trackedRun} command={activeTask.command} />
+              </div>
+
+              <RoguelikeSettingsPanel
                 task={activeTask}
                 theme={activeTheme}
-                onThemeChange={handleThemeChange}
+                advanced={activeAdvanced}
+                onAdvancedChange={handleAdvancedChange}
+                execution={{
+                  isRunning,
+                  isStopping,
+                  isWaitingForCombat,
+                  pendingStopMode,
+                  isSubmitting,
+                  automationAvailable,
+                  unavailableMessage,
+                  onExecute: () => void handleExecute(),
+                  onStop: mode => void stop(mode),
+                }}
               />
-
-              <RoguelikeResultPanel run={trackedRun} command={activeTask.command} />
-            </div>
-
-            <RoguelikeSettingsPanel
-              task={activeTask}
-              theme={activeTheme}
-              advanced={activeAdvanced}
-              onAdvancedChange={handleAdvancedChange}
-              execution={{
-                isRunning,
-                isStopping,
-                isWaitingForCombat,
-                pendingStopMode,
-                isSubmitting,
-                automationAvailable,
-                unavailableMessage,
-                onExecute: () => void handleExecute(),
-                onStop: mode => void stop(mode),
-              }}
-            />
-          </SegmentedTabPanel>
-
-          <aside className="roguelike-monitor-column" aria-label="设备画面">
-            <DeviceMonitorPanel
-              className="roguelike-monitor-panel roguelike-monitor-surface"
-            />
-          </aside>
-        </div>
+            </SegmentedTabPanel>
+          )}
+        />
       </SegmentedTabs>
     </>
   )

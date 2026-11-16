@@ -19,7 +19,7 @@ const options: readonly SegmentedTabOption<RoguelikeMode>[] = ROGUELIKE_TASKS.ma
 
 export default function RoguelikeModePanel({ activeMode }: RoguelikeModePanelProps) {
   return (
-    <div className="roguelike-mode-area">
+    <div className="roguelike-mode-area" data-monitor-area="mode">
       <SegmentedTabNav
         ariaLabel="肉鸽模式"
         value={activeMode}

@@ -60,21 +60,21 @@ function CardHeaderSkeleton({ actionWidth = 'w-20' }: { actionWidth?: string | n
   )
 }
 
-function MonitorSkeleton({ variant }: { variant: 'automation' | 'combat' | 'roguelike' }) {
+function MonitorSkeleton() {
   return (
     <Card
-      className={`${variant}-monitor-panel automation-monitor-skeleton automation-monitor-surface ${variant}-monitor-surface automation-monitor-skeleton-surface gap-0 p-0!`}
+      className="device-monitor-panel device-monitor-skeleton device-monitor-surface device-monitor-skeleton-surface gap-0 p-0!"
       aria-hidden="true"
     >
-      <div className="automation-monitor-skeleton-header">
+      <div className="device-monitor-skeleton-header">
         <Skeleton className="rounded-full h-1.5 w-1.5 shrink-0" />
         <Skeleton className="rounded-sm h-4 w-24" />
         <Skeleton className="rounded-sm ml-auto h-3 w-12" />
       </div>
-      <div className="automation-monitor-skeleton-frame aspect-video">
+      <div className="device-monitor-skeleton-frame aspect-video">
         <Skeleton className="h-full w-full rounded-[inherit]" />
       </div>
-      <div className="automation-monitor-skeleton-toolbar">
+      <div className="device-monitor-skeleton-toolbar">
         {[1, 2, 3, 4, 5].map(item => <Skeleton key={item} className="rounded-full h-11 w-11" />)}
       </div>
     </Card>
@@ -192,7 +192,7 @@ function AutomationSkeleton() {
       <div className="automation-sequence-column"><AutomationSequenceSkeleton /></div>
       <div className="automation-editor-column"><AutomationEditorSkeleton /></div>
       <div className="automation-support-column">
-        <div className="automation-monitor-column"><MonitorSkeleton variant="automation" /></div>
+        <div className="device-monitor-column"><MonitorSkeleton /></div>
         <AutomationScheduleSkeleton />
         <AutomationNotificationSkeleton />
       </div>
@@ -271,7 +271,7 @@ function CombatSkeleton() {
           </Card>
         </div>
       </div>
-      <div className="task-monitor-column"><MonitorSkeleton variant="combat" /></div>
+      <div className="task-monitor-column"><MonitorSkeleton /></div>
     </div>
   )
 }
@@ -328,7 +328,7 @@ function RoguelikeSkeleton() {
           <Skeleton className="roguelike-run-button h-11 rounded-xl" />
         </div>
       </Card>
-      <aside className="roguelike-monitor-column"><MonitorSkeleton variant="roguelike" /></aside>
+      <aside className="device-monitor-column" data-monitor-area="monitor"><MonitorSkeleton /></aside>
     </div>
   )
 }

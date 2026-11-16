@@ -106,7 +106,24 @@ vi.mock('@/shared/notifications', () => ({
   STATISTICS_NOTICE_ID: 'statistics',
   SETTINGS_UPDATE_NOTICE_ID: 'settings-update',
 }))
-vi.mock('@/features/device-mirror', () => ({ DeviceMonitorPanel: () => null }))
+type DeviceMonitorLayoutMockProps = {
+  variant?: 'standard' | 'workbench' | 'mode'
+  children?: ReactNode
+  sequence?: ReactNode
+  editor?: ReactNode
+  support?: ReactNode
+  mode?: ReactNode
+  content?: ReactNode
+}
+
+vi.mock('@/features/device-mirror', () => ({
+  DeviceMonitorPanel: () => null,
+  DeviceMonitorLayout: ({ variant, children, sequence, editor, support, mode, content }: DeviceMonitorLayoutMockProps) => {
+    if (variant === 'workbench') return <>{sequence}{editor}<div>{support}</div></>
+    if (variant === 'mode') return <>{mode}{content}</>
+    return <>{children}</>
+  },
+}))
 vi.mock('@/features/automation/components/NotificationSettings', () => ({ default: () => null }))
 
 const CONTROLLER_INTERVALS = { active: 1_000, idle: 5_000, disconnected: 2_000 }

@@ -729,10 +729,7 @@
       pointer-events: auto;
     }
 
-    .la-pluma-app :is(
-      .automation-preview-glass-button,
-      .pwa-install-entry-button
-    ) {
+    .la-pluma-app .pwa-install-entry-button {
       --glass-liquid-surface: color-mix(
         in srgb,
         var(--glass-bg) 42%,
@@ -751,10 +748,7 @@
       backdrop-filter: blur(6px) saturate(140%);
     }
 
-    .la-pluma-app :is(
-      .automation-preview-glass-button,
-      .pwa-install-entry-button
-    )::before {
+    .la-pluma-app .pwa-install-entry-button::before {
       position: absolute;
       inset: 0;
       padding: 0.5px;
@@ -859,10 +853,7 @@
       backdrop-filter: none;
     }
 
-    .la-pluma-app :is(
-      .automation-preview-glass-button,
-      .app-liquid-tab-pill
-    )::before {
+    .la-pluma-app .app-liquid-tab-pill::before {
       display: none;
     }
   }

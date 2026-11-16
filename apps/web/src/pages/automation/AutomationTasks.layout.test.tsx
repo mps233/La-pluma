@@ -134,10 +134,26 @@ vi.mock('@/shared/notifications', () => ({
   SETTINGS_UPDATE_NOTICE_ID: 'settings-update',
 }))
 
+type DeviceMonitorLayoutMockProps = {
+  variant?: 'standard' | 'workbench' | 'mode'
+  children?: ReactNode
+  sequence?: ReactNode
+  editor?: ReactNode
+  support?: ReactNode
+  mode?: ReactNode
+  content?: ReactNode
+}
+
 vi.mock('@/features/device-mirror', () => ({
   DeviceMonitorPanel: () => (
     <div data-testid="screen-monitor" data-variant="compact" />
   ),
+  DeviceMonitorLayout: ({ variant, children, sequence, editor, support, mode, content }: DeviceMonitorLayoutMockProps) => {
+    const monitor = <div data-testid="screen-monitor" data-variant="compact" />
+    if (variant === 'workbench') return <>{sequence}{editor}<div>{monitor}{support}</div></>
+    if (variant === 'mode') return <>{mode}{content}{monitor}</>
+    return <>{children}{monitor}</>
+  },
 }))
 
 vi.mock('@/features/automation/components/NotificationSettings', () => ({ default: () => <div data-testid="notification-settings" /> }))

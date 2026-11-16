@@ -5,7 +5,7 @@ import { DeviceMonitorLayout } from '@/features/device-mirror'
 export default function LogViewer() {
   return (
     <PageShell pageKind="logs" layout="workspace" surface="borderless" className="log-viewer">
-      <DeviceMonitorLayout>
+      <DeviceMonitorLayout variant="standard">
         <LogsWorkspace />
       </DeviceMonitorLayout>
     </PageShell>

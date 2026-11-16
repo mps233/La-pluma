@@ -79,6 +79,48 @@ Props：`pageKind`（`AppTab` 或 `gallery`，必填）、`layout`（工作台�
 
 ---
 
+### DeviceMonitorLayout - 设备画面布局
+
+**文件位置**：`apps/web/src/features/device-mirror/components/DeviceMonitorPanel.tsx`
+
+**适用场景**：工作区把页面内容与共享设备画面（`DeviceMonitorPanel`）组合为统一网格。页面只提供具名区域，网格、monitor 列与画面渲染由本组件持有；不要在页面另写设备画面网格或重复渲染 `DeviceMonitorPanel`。
+
+```tsx
+import { DeviceMonitorLayout } from '@/features/device-mirror'
+
+// standard：内容主列 + 设备画面（日志、数据、养成、作业）
+<DeviceMonitorLayout variant="standard">
+  <WorkspaceContent />
+</DeviceMonitorLayout>
+
+// workbench：任务流程 / 任务配置 / 支撑列（日常）
+<DeviceMonitorLayout
+  variant="workbench"
+  sequence={<AutomationTaskFlowPanel ... />}
+  editor={<div data-monitor-area="editor">...</div>}
+  support={<><AutomationScheduleCard ... /><NotificationSettings /></>}
+/>
+
+// mode：模式导航 + display: contents 面板（肉鸽）
+<DeviceMonitorLayout
+  variant="mode"
+  mode={<RoguelikeModePanel ... />}
+  content={<SegmentedTabPanel className="contents">...</SegmentedTabPanel>}
+/>
+```
+
+Props 是 discriminated union：`standard` 接收 `children`；`workbench` 接收 `sequence`、`editor`、`support`；`mode` 接收 `mode`、`content`。不提供列数、区域、间距或画面位置等通用网格配置。
+
+根节点输出 `data-device-monitor-layout="standard|workbench|mode"`，区域输出 `data-monitor-area`（`main`、`monitor`、`sequence`、`editor`、`support`、`mode`、`settings`）。`standard` 的 `main`/`monitor` 和各 variant 的 `monitor` 由布局渲染；`workbench` 的 `sequence`/`editor`、`mode` 的 `mode` 以及 `main`/`settings` 由页面提供的根节点携带，布局不克隆或包裹这些节点。`mode` 的 `content` 保持页面传入的 `display: contents` 面板，由内部的 `main`/`settings` 参与网格。
+
+`standard` 的 monitor 列在视口小于 1360px 且内容宽度超过 48rem 时使用 `max-width: 48rem` 并居中；视口达到 1360px 后改用三列网格并解除该上限。组件持有 grid 根节点 DOM、`monitor` 区域与 monitor 列；`workbench`/`mode` 的页面网格模板与断点仍由对应页面样式（`automation.css` / `roguelike.css`）提供，页面只通过 `data-monitor-area` 提供具名区域。
+
+`data-region="monitor"` 仍只由 `DeviceMonitorPanel` 的卡片输出，每个页面恰好一个。概览页的设备卡片不纳入此布局，不输出 `data-device-monitor-layout`，也不渲染 `data-region="monitor"`。
+
+共享设备画面样式归 `features/device-mirror/styles/device-mirror.css`：画面根节点为 `device-monitor-surface`，`workbench`/`mode` 的 monitor 列与面板为 `device-monitor-column` / `device-monitor-panel`，紧凑玻璃按钮为 `device-preview-glass-button`，骨架屏使用 `device-monitor-skeleton*`；`standard` 继续使用 `task-monitor-*` 布局类。页面不得新增 `automation-*` / `roguelike-*` monitor 类，也不得按 `data-page-kind` 切换设备画面样式。
+
+---
+
 ### SegmentedTabs - 分段页面导航
 
 **文件位置**：`apps/web/src/shared/components/SegmentedTabs.tsx`（组合 `@/shared/ui/tabs` 的 shadcn Base UI 原语）

@@ -156,7 +156,26 @@ vi.mock('@/features/logs/api', () => ({
   cleanupLogs: vi.fn(),
 }))
 
-vi.mock('@/features/device-mirror', () => ({ DeviceMonitorPanel: () => <div data-testid="screen-monitor" /> }))
+type DeviceMonitorLayoutMockProps = {
+  variant?: 'standard' | 'workbench' | 'mode'
+  children?: ReactNode
+  sequence?: ReactNode
+  editor?: ReactNode
+  support?: ReactNode
+  mode?: ReactNode
+  content?: ReactNode
+}
+
+vi.mock('@/features/device-mirror', () => ({
+  DeviceMonitorPanel: () => <div data-testid="screen-monitor" />,
+  DeviceMonitorLayout: ({ variant, children, sequence, editor, support, mode, content }: DeviceMonitorLayoutMockProps) => {
+    if (variant === 'workbench') {
+      return <>{sequence}{editor}<div><div data-testid="screen-monitor" />{support}</div></>
+    }
+    if (variant === 'mode') return <>{mode}{content}<div data-testid="screen-monitor" /></>
+    return <>{children}<div data-testid="screen-monitor" /></>
+  },
+}))
 
 vi.mock('@/features/combat/components/CombatCopilotSetPanel', async (importOriginal) => {
   const React = await import('react')

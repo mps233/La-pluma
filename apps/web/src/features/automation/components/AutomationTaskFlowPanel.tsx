@@ -46,7 +46,7 @@ export default function AutomationTaskFlowPanel({
   const enabledCount = tasks.filter(task => task.enabled).length
 
   return (
-    <div className="automation-sequence-column">
+    <div className="automation-sequence-column" data-monitor-area="sequence">
       <Card
         className="automation-sequence-panel automation-sequence-surface gap-0 p-0!"
       >
