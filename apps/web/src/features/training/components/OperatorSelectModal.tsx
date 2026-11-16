@@ -1,23 +1,15 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Search, UserRoundSearch, X } from 'lucide-react'
+import { Search, UserRoundSearch } from 'lucide-react'
 import {
   operBoxQueryOptions,
   operatorCatalogQueryOptions,
   type OperatorDetailed,
 } from '@/features/game-data'
 import { Button } from '@/shared/ui/button'
-import { EmptyState, Loading } from '@/shared/components'
+import { DialogBody, DialogFrame, DialogFrameFooter, EmptyState, Loading } from '@/shared/components'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/shared/ui/dialog'
 import {
   OPERATOR_RENDER_BATCH_SIZE,
   filterOperatorRows,
@@ -181,20 +173,25 @@ export default function OperatorSelectModal({
   })
 
   return (
-    <Dialog open={isOpen} onOpenChange={open => { if (!open) handleClose() }}>
-      <DialogContent
-        showCloseButton={false}
-        aria-modal="true"
-        className="flex max-h-(--layout-dialog-max-height) flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
-      >
-        <DialogHeader className="flex-row items-center justify-between gap-3 border-b px-4 py-3">
-          <DialogTitle>{title}</DialogTitle>
-          <DialogClose render={<Button size="icon" variant="ghost" aria-label="关闭对话框" />}>
-            <X className="size-4" aria-hidden="true" />
-          </DialogClose>
-        </DialogHeader>
-        <div data-slot="dialog-body" className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          <div className="space-y-3.5">
+    <DialogFrame
+      open={isOpen}
+      onOpenChange={open => { if (!open) handleClose() }}
+      title={title}
+      size="4xl"
+      footer={(
+        <DialogFrameFooter align="between">
+          <span className="text-sm text-muted-foreground">
+            {selectedOperator ? `已选择 ${selectedOperator.name}` : '选择一名干员'}
+          </span>
+          <div className="flex items-center gap-3.5">
+            <Button variant="secondary" onClick={handleClose}>取消</Button>
+            <Button onClick={handleConfirm} disabled={!selectedOperator}>确认选择</Button>
+          </div>
+        </DialogFrameFooter>
+      )}
+    >
+      <DialogBody>
+        <div className="space-y-3.5">
             <div className="flex items-center gap-2">
               <div className="relative min-w-0 flex-1">
                 <Search size={17} strokeWidth={1.9} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" />
@@ -251,17 +248,7 @@ export default function OperatorSelectModal({
               />
             )}
             </div>
-          </div>
-        <DialogFooter className="mx-0 mb-0 flex-row flex-wrap items-center justify-between gap-3 px-4 py-3 sm:justify-between">
-          <span className="text-sm text-muted-foreground">
-            {selectedOperator ? `已选择 ${selectedOperator.name}` : '选择一名干员'}
-          </span>
-          <div className="flex items-center gap-3.5">
-            <Button variant="secondary" onClick={handleClose}>取消</Button>
-            <Button onClick={handleConfirm} disabled={!selectedOperator}>确认选择</Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </DialogBody>
+    </DialogFrame>
   )
 }

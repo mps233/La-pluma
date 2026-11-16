@@ -658,7 +658,7 @@
   }
 
   .automation-task-picker-toggle:hover,
-  .automation-task-picker-toggle.is-open {
+  .automation-task-picker-toggle[data-popup-open] {
     background: var(--primary-soft);
     color: var(--primary);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 26%, transparent);
@@ -688,8 +688,6 @@
   }
 
   .automation-task-picker {
-    position: fixed;
-    z-index: 20;
     display: grid;
     max-height: 14rem;
     gap: 0.25rem;
@@ -1968,6 +1966,7 @@
     --automation-overlay-shadow:
       0 2px 8px rgba(0, 0, 0, 0.1),
       0 30px 80px rgba(0, 0, 0, 0.2);
+    --automation-picker-surface: color-mix(in srgb, var(--card) 76%, transparent);
   }
 
   .dark [data-page-kind="automation"] {
@@ -2098,16 +2097,14 @@
     border-radius: 50%;
   }
 
-  [data-page-kind="automation"] .automation-task-picker {
+  .automation-task-picker[data-page-kind="automation"] {
     gap: 0;
     border: 1px solid var(--automation-hairline);
     border-radius: var(--radius-xl);
-    background: color-mix(in srgb, var(--card) 76%, transparent);
+    background: var(--automation-picker-surface);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     backdrop-filter: saturate(180%) blur(20px);
     box-shadow: var(--automation-overlay-shadow);
-    transform-origin: bottom center;
-    will-change: transform, opacity;
   }
 
   [data-page-kind="automation"] .automation-task-picker-option {
@@ -2170,17 +2167,19 @@
   }
 
   @media (prefers-reduced-transparency: reduce) {
-    [data-page-kind="automation"] .automation-task-picker {
-      background: var(--card);
+    .automation-task-picker[data-page-kind="automation"] {
+      --automation-picker-surface: var(--card);
+
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
     }
   }
 
   @media (prefers-contrast: more) {
-    [data-page-kind="automation"] .automation-task-picker {
+    .automation-task-picker[data-page-kind="automation"] {
+      --automation-picker-surface: var(--card);
+
       border-color: var(--input);
-      background: var(--card);
     }
   }
 

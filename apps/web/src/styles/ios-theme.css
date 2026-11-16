@@ -835,7 +835,10 @@
   @media (prefers-reduced-motion: reduce) {
     .la-pluma-app *,
     .la-pluma-app *::before,
-    .la-pluma-app *::after {
+    .la-pluma-app *::after,
+    [data-base-ui-portal] *,
+    [data-base-ui-portal] *::before,
+    [data-base-ui-portal] *::after {
       scroll-behavior: auto !important;
       transition-duration: 0.01ms !important;
       animation-duration: 0.01ms !important;

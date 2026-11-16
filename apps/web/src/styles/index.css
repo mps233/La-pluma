@@ -1154,15 +1154,10 @@
   }
 
   /*
-   * Base UI Select/Tooltip/DropdownMenu 的弹层经 portal 挂在 body 下，上游 z-50
-   * 低于应用 chrome（navbar 60 / tabbar 70）；utilities 层拥有 z-50，只有
-   * components 层的 !important 能压过它，使弹层与既有 z-2000 约定一致。
+   * `.la-pluma-page` 以 isolation 自成 stacking context，navbar/tabbar 的层序只在
+   * 页面内部比较；Base UI 弹层 portal 挂在 body 根并使用 portal token，因此总是
+   * 高于页面内的 chrome，无需再抬高 portal 包装层。
    */
-  div:has(> [data-slot="select-content"]),
-  div:has(> [data-slot="tooltip-content"]),
-  div:has(> [data-slot="dropdown-menu-content"]) {
-    z-index: 2000 !important;
-  }
 
   /*
    * Base UI 只在父 Popup 上标记 data-nested-dialog-open 和 aria-hidden，
@@ -1183,7 +1178,15 @@
   [data-base-ui-portal]:has(> [data-slot="dialog-content"]) > [role="presentation"][data-base-ui-inert],
   [data-base-ui-portal]:has(> [data-slot="sheet-content"]) > [role="presentation"][data-base-ui-inert],
   [data-base-ui-portal]:has(> [data-slot="alert-dialog-content"]) > [role="presentation"][data-base-ui-inert] {
-    z-index: 50 !important;
+    z-index: var(--layout-z-portal) !important;
+  }
+
+  /*
+   * sonner 在运行时注入 `[data-sonner-toaster]` 的极高 z-index；toast 层序必须以
+   * !important 覆盖注入样式。
+   */
+  [data-sonner-toaster] {
+    z-index: var(--layout-z-toast) !important;
   }
 
 }

@@ -170,7 +170,7 @@ export default function ThemeToggle() {
               transition={shouldReduceMotion
                 ? { duration: 0.08 }
                 : { type: 'spring', stiffness: 440, damping: 38, mass: 0.7 }}
-              className="theme-menu-popover surface-panel absolute right-0 top-[calc(100%+0.5rem)] z-60 w-40 origin-top-right rounded-xl p-1.5"
+              className="theme-menu-popover surface-panel absolute right-0 top-[calc(100%+0.5rem)] z-(--layout-z-portal) w-40 origin-top-right rounded-xl p-1.5"
             >
               {themeOptions.map(option => {
                 const ThemeIcon = option.icon

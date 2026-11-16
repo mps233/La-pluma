@@ -237,7 +237,7 @@ export default function PWAInstallPrompt() {
             transition={shouldReduceMotion
               ? { duration: 0.08 }
               : { type: 'spring', stiffness: 390, damping: 35, mass: 0.8 }}
-            className="pwa-install-prompt surface-panel fixed z-50 rounded-xl p-4 sm:w-96"
+            className="pwa-install-prompt surface-panel fixed z-(--layout-z-raised) rounded-xl p-4 sm:w-96"
           >
             <div className="flex items-start gap-3.5">
               <img
@@ -312,7 +312,7 @@ export default function PWAInstallPrompt() {
           initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: shouldReduceMotion ? 0.08 : 0.18, ease: 'easeOut' }}
-          className="pwa-install-entry fixed z-50"
+          className="pwa-install-entry fixed z-(--layout-z-raised)"
         >
           <Button
             size="icon"
@@ -334,7 +334,7 @@ export default function PWAInstallPrompt() {
             initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="pwa-update-chip fixed z-50"
+            className="pwa-update-chip fixed z-(--layout-z-raised)"
           >
             <Button
               variant="secondary"

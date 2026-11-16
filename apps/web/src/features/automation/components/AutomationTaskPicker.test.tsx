@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, useRef, type ReactNode } from 'react'
+import { act, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AutomationAvailableTask, TaskFlowItem } from '../types'
@@ -8,21 +8,6 @@ import AutomationTaskPicker from './AutomationTaskPicker'
 import { AVAILABLE_TASKS } from './automationTaskCatalog'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-
-vi.mock('framer-motion', async () => {
-  const React = await import('react')
-  type MotionTestProps = Record<string, unknown> & { children?: ReactNode }
-  const motionComponent = (tag: 'div') => React.forwardRef<HTMLElement, MotionTestProps>(
-    ({ children, initial: _initial, animate: _animate, exit: _exit, transition: _transition, ...props }, ref) =>
-      React.createElement(tag, { ...props, ref }, children as ReactNode),
-  )
-
-  return {
-    AnimatePresence: ({ children }: { children: ReactNode }) => children,
-    motion: { div: motionComponent('div') },
-    useReducedMotion: () => true,
-  }
-})
 
 const flowTask = (id: string): TaskFlowItem => ({
   id,
@@ -61,33 +46,37 @@ function Host({ disabled = false, flow = [] as TaskFlowItem[] }: {
 }
 
 const trigger = () => container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!
-const menu = () => container.querySelector<HTMLElement>('#automation-task-picker')
+const menu = () => document.body.querySelector<HTMLElement>('[role="menu"]')
+const menuItems = () => (
+  Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'))
+)
+
+const flushTimers = async () => {
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) })
+}
 
 const openPicker = async () => {
   await act(async () => trigger().click())
+  await flushTimers()
+}
+
+const clickItem = async (item: HTMLElement) => {
+  await act(async () => item.click())
+  await flushTimers()
 }
 
 const dispatchPointerDown = async (target: EventTarget) => {
   await act(async () => {
     target.dispatchEvent(new Event('pointerdown', { bubbles: true }))
   })
+  await flushTimers()
 }
 
-const stubTriggerRect = (
-  element: HTMLButtonElement,
-  rect: { top: number; bottom: number; left: number; width: number },
-) => {
-  vi.spyOn(element, 'getBoundingClientRect').mockReturnValue({
-    x: rect.left,
-    y: rect.top,
-    top: rect.top,
-    bottom: rect.bottom,
-    left: rect.left,
-    right: rect.left + rect.width,
-    width: rect.width,
-    height: rect.bottom - rect.top,
-    toJSON: () => ({}),
-  } as DOMRect)
+const pressEscape = async () => {
+  await act(async () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  })
+  await flushTimers()
 }
 
 describe('AutomationTaskPicker', () => {
@@ -102,66 +91,30 @@ describe('AutomationTaskPicker', () => {
     await act(async () => root.unmount())
     container.remove()
     vi.restoreAllMocks()
-    vi.unstubAllGlobals()
   })
 
-  it('anchors the menu above the footer when the viewport has room', async () => {
+  it('exposes the add-task options as a labelled menu', async () => {
     await act(async () => root.render(<Host />))
-    vi.stubGlobal('innerWidth', 390)
-    vi.stubGlobal('innerHeight', 844)
-    stubTriggerRect(trigger(), { top: 400, bottom: 444, left: 24, width: 320 })
-
     await openPicker()
 
+    expect(trigger().getAttribute('aria-expanded')).toBe('true')
     const surface = menu()!
-    expect(surface.dataset.placement).toBe('top')
-    expect(surface.style.bottom).toBe(`${844 - 400 + 8}px`)
-    expect(surface.style.top).toBe('')
-    expect(surface.style.left).toBe('24px')
-    expect(surface.style.width).toBe('320px')
-    expect(surface.style.maxHeight).toBe('224px')
-  })
-
-  it('flips the menu below the trigger when the footer sits near the top edge', async () => {
-    await act(async () => root.render(<Host />))
-    vi.stubGlobal('innerWidth', 390)
-    vi.stubGlobal('innerHeight', 600)
-    stubTriggerRect(trigger(), { top: 40, bottom: 84, left: 24, width: 320 })
-
-    await openPicker()
-
-    const surface = menu()!
-    expect(surface.dataset.placement).toBe('bottom')
-    expect(surface.style.top).toBe(`${84 + 8}px`)
-    expect(surface.style.bottom).toBe('')
-    expect(surface.style.maxHeight).toBe('224px')
-  })
-
-  it('keeps the menu inside the viewport width', async () => {
-    await act(async () => root.render(<Host />))
-    vi.stubGlobal('innerWidth', 360)
-    vi.stubGlobal('innerHeight', 844)
-    stubTriggerRect(trigger(), { top: 400, bottom: 444, left: 320, width: 200 })
-
-    await openPicker()
-
-    const surface = menu()!
-    expect(surface.style.left).toBe('148px')
-    expect(surface.style.width).toBe('200px')
+    expect(surface).not.toBeNull()
+    expect(container.contains(surface)).toBe(false)
+    expect(trigger().getAttribute('aria-controls')).toBe(surface.id)
+    expect(surface.getAttribute('aria-label')).toBe('可添加任务')
+    expect(menuItems()).toHaveLength(AVAILABLE_TASKS.length)
+    expect(menuItems().map(item => item.textContent)).toEqual(
+      expect.arrayContaining(AVAILABLE_TASKS.map(task => expect.stringContaining(task.name))),
+    )
   })
 
   it('adds a task through the page callback and closes the menu', async () => {
     await act(async () => root.render(<Host />))
     await openPicker()
 
-    expect(trigger().getAttribute('aria-expanded')).toBe('true')
-    expect(menu()?.getAttribute('role')).toBe('menu')
-    expect(menu()?.getAttribute('aria-label')).toBe('可添加任务')
-    expect(menu()?.querySelectorAll('[role="menuitem"]')).toHaveLength(AVAILABLE_TASKS.length)
-
-    const fightOption = Array.from(menu()!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
-      .find(option => option.textContent?.includes('理智作战'))!
-    await act(async () => fightOption.click())
+    const fightOption = menuItems().find(item => item.textContent?.includes('理智作战'))!
+    await clickItem(fightOption)
 
     expect(onAddTask).toHaveBeenCalledOnce()
     expect(onAddTask.mock.calls[0]?.[0]).toMatchObject({ id: 'fight', name: '理智作战' })
@@ -173,8 +126,7 @@ describe('AutomationTaskPicker', () => {
     await act(async () => root.render(<Host flow={[flowTask('fight-1'), flowTask('fight-2')]} />))
     await openPicker()
 
-    const fightOption = Array.from(menu()!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
-      .find(option => option.textContent?.includes('理智作战'))!
+    const fightOption = menuItems().find(item => item.textContent?.includes('理智作战'))!
     expect(fightOption.textContent).toContain('2')
   })
 
@@ -195,13 +147,11 @@ describe('AutomationTaskPicker', () => {
     await act(async () => root.render(<Host />))
     await openPicker()
 
-    const firstMenuItem = menu()!.querySelector<HTMLButtonElement>('[role="menuitem"]')!
+    const firstMenuItem = menuItems()[0]!
     firstMenuItem.focus()
     expect(document.activeElement).toBe(firstMenuItem)
 
-    await act(async () => {
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-    })
+    await pressEscape()
 
     expect(menu()).toBeNull()
     expect(document.activeElement).toBe(trigger())
@@ -213,9 +163,16 @@ describe('AutomationTaskPicker', () => {
     expect(menu()).not.toBeNull()
 
     await act(async () => root.render(<Host disabled />))
+    await flushTimers()
 
     expect(menu()).toBeNull()
     expect(trigger().disabled).toBe(true)
+    expect(trigger().getAttribute('aria-expanded')).toBe('false')
+
+    await act(async () => root.render(<Host />))
+    await flushTimers()
+
+    expect(menu()).toBeNull()
     expect(trigger().getAttribute('aria-expanded')).toBe('false')
   })
 })

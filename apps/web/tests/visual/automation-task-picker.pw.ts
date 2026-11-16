@@ -4,6 +4,8 @@ import { apiFixtures, ok, type ApiFixture } from './fixtures'
 import {
   THEMES,
   installDeterministicEnvironment,
+  readMotionDurations,
+  removeMotionFreeze,
   themeSeedScript,
   waitForPageReady,
 } from './harness'
@@ -166,26 +168,29 @@ for (const theme of THEMES) {
       await page.addInitScript(themeSeedScript(theme))
     })
 
-    test(`shows the add-task options above a short flow without clipping ${theme}`, async ({ page }) => {
+    test(`shows the add-task options without clipping the menu or its options ${theme}`, async ({ page }) => {
       const environment = await installDeterministicEnvironment(page, { fixtures: shortFlowFixtures })
 
       await page.goto('/app/automation')
       await waitForPageReady(page, 'automation')
 
-      await page.getByRole('button', { name: '添加任务' }).click()
+      const trigger = page.getByRole('button', { name: /添加任务/ })
+      await trigger.click()
       const menu = page.getByRole('menu', { name: '可添加任务' })
       await expect(menu).toBeVisible()
       await expect(menu).toHaveCSS('opacity', '1')
 
       const viewport = page.viewportSize()!
+      const triggerBox = await trigger.boundingBox()
       const menuBox = await menu.boundingBox()
+      expect(triggerBox).not.toBeNull()
       expect(menuBox).not.toBeNull()
       expect(menuBox!.y).toBeGreaterThanOrEqual(0)
       expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(viewport.height)
+      expect(Math.abs(menuBox!.width - triggerBox!.width)).toBeLessThanOrEqual(1)
+      expect(menuBox!.height).toBeLessThanOrEqual(225)
 
-      const clippedOptions = await page.evaluate(() => {
-        const picker = document.querySelector('#automation-task-picker')
-        if (!picker) throw new Error('task picker menu is missing')
+      const clippedOptions = await menu.evaluate((picker) => {
         const menuRect = picker.getBoundingClientRect()
 
         return Array.from(picker.querySelectorAll<HTMLElement>('[role="menuitem"]')).flatMap(option => {
@@ -203,5 +208,88 @@ for (const theme of THEMES) {
       environment.assertNoUnmatchedApi()
       await expectNoBrowserErrors(page)
     })
+
+    test(`keeps the menu open for presses inside the footer and closes outside it ${theme}`, async ({ page }) => {
+      const environment = await installDeterministicEnvironment(page, { fixtures: shortFlowFixtures })
+
+      await page.goto('/app/automation')
+      await waitForPageReady(page, 'automation')
+
+      await page.getByRole('button', { name: /添加任务/ }).click()
+      const menu = page.getByRole('menu', { name: '可添加任务' })
+      await expect(menu).toBeVisible()
+
+      const footerBox = await page.locator('.automation-sequence-footer').boundingBox()
+      expect(footerBox).not.toBeNull()
+      await page.mouse.click(footerBox!.x + 4, footerBox!.y + footerBox!.height - 4)
+      await expect(menu).toBeVisible()
+
+      await page.mouse.click(8, 400)
+      await expect(menu).toBeHidden()
+
+      environment.assertNoUnmatchedApi()
+      await expectNoBrowserErrors(page)
+    })
+
+    test(`flips the menu below when the footer sits near the top edge ${theme}`, async ({ page }) => {
+      const environment = await installDeterministicEnvironment(page, { fixtures: shortFlowFixtures })
+
+      await page.goto('/app/automation')
+      await waitForPageReady(page, 'automation')
+
+      const trigger = page.getByRole('button', { name: /添加任务/ })
+      const scrollTop = await page.locator('[data-region="scroll"]')
+        .evaluate(host => host.getBoundingClientRect().top)
+      const initialBox = await trigger.boundingBox()
+      expect(initialBox).not.toBeNull()
+
+      await page.evaluate((delta) => {
+        const panel = document.querySelector<HTMLElement>('.automation-sequence-panel')
+        if (!panel) throw new Error('automation sequence panel is missing')
+        panel.style.transform = `translateY(${delta}px)`
+      }, scrollTop + 96 - initialBox!.y)
+
+      await expect.poll(async () => (await trigger.boundingBox())!.y)
+        .toBeLessThan(scrollTop + 160)
+
+      await trigger.click()
+      const menu = page.getByRole('menu', { name: '可添加任务' })
+      await expect(menu).toBeVisible()
+      await expect(menu).toHaveAttribute('data-side', 'bottom')
+
+      const viewport = page.viewportSize()!
+      const triggerBox = await trigger.boundingBox()
+      const menuBox = await menu.boundingBox()
+      expect(triggerBox).not.toBeNull()
+      expect(menuBox).not.toBeNull()
+      expect(menuBox!.y).toBeGreaterThanOrEqual(triggerBox!.y + triggerBox!.height)
+      expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(viewport.height)
+
+      environment.assertNoUnmatchedApi()
+      await expectNoBrowserErrors(page)
+    })
   })
 }
+
+test.describe('task picker reduced motion', () => {
+  test('disables the portal menu animation', async ({ page }) => {
+    recordBrowserErrors(page)
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    const environment = await installDeterministicEnvironment(page, { fixtures: shortFlowFixtures })
+
+    await page.goto('/app/automation')
+    await waitForPageReady(page, 'automation')
+    await removeMotionFreeze(page)
+
+    await page.getByRole('button', { name: /添加任务/ }).click()
+    const menu = page.getByRole('menu', { name: '可添加任务' })
+    await expect(menu).toBeVisible()
+
+    const motion = await readMotionDurations(menu)
+    expect(motion.animation.every(duration => duration <= 0.000011)).toBe(true)
+    expect(motion.transition.every(duration => duration <= 0.000011)).toBe(true)
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
+})

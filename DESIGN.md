@@ -171,6 +171,27 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 - **token 单源**：语义 token（颜色、圆角、间距、字号、控件高度等）只在 `index.css` 的 `:root` / `html.dark, #app-root.dark` / 媒体查询中定义一次；结构布局 token（`--layout-*`）只由 `layout.css` 定义。浅色、深色、`prefers-contrast`、`prefers-reduced-transparency` 的最终生效值都写在这里；`ios-theme.css` 不再出现同名重定义。
 - **深色切换**：主题仍同时给 `html` 与 `#app-root` 加 `.dark`；`html.dark` 与 `#app-root.dark` 都保留为有效选择器。
 
+### 层序（z-index scale）
+
+`layout.css` 的 `:root` 定义八个有限层序 token；组件与页面只引用 token，不新增裸 z-index 层：
+
+| token | 值 | 用途 |
+| --- | --- | --- |
+| `--layout-z-content` | 0 | 页面内容基础层 |
+| `--layout-z-sticky` | 10 | 页面内 sticky 元素 |
+| `--layout-z-chrome` | 20 | 应用壳 navbar 与顶栏区域内元素 |
+| `--layout-z-tabbar` | 30 | 移动端浮动 tabbar |
+| `--layout-z-raised` | 40 | 高于 chrome 的应用自绘浮层，如 skip link 与 PWA 提示 |
+| `--layout-z-portal` | 50 | Base UI portal 弹层：select、tooltip、dropdown、dialog、sheet 与应用抽屉 |
+| `--layout-z-toast` | 60 | sonner toast |
+| `--layout-z-immersive` | 70 | 设备沉浸预览 |
+
+`.la-pluma-page` 以 `isolation: isolate` 自成 stacking context，页面内 navbar/tabbar 的 z-index 只在该上下文内比较；Base UI 弹层经 portal 挂在 `document.body` 根并使用 portal token，因此总是高于页面内 chrome。应用代码使用 Tailwind v4 变量简写 `z-(--layout-z-*)`；`shared/ui` 生成物中的 `z-50` 即 portal 层字面量，不由应用层再覆盖。
+
+页面内的局部层仍可保留小数值（如 `z-index: 0/1/2`）。automation 任务选择器是非模态 DropdownMenu，combat 关卡面板是非模态 Popover；两者都随 Base UI portal 挂在 `document.body`，层序使用 `--layout-z-portal`，不设页面局部高位。非模态表示不锁页面滚动、不遮断页脚之外的交互，Escape、外部点击与焦点归还仍由原语管理；任务选择器仅在页脚区域内取消 outside-press 关闭。2000、9999 之类的高位特例不再使用。
+
+主题菜单按审计建议延后迁移：当前仍是 navbar 内绝对定位菜单，暂借 `--layout-z-portal` token，不代表它已走 body portal。
+
 ## 档位即规范（Tailwind 原生尺度）
 
 应用直接使用 Tailwind v4 原生档位，不做压缩映射或定向重映射。
@@ -368,8 +389,12 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 - **Shared State:** 两端复用 `Layout` 的 URL 路由和 active 状态；不要按 viewport 维护第二套导航状态，也不要让桌面侧栏样式扩散到移动底栏或“更多”Sheet。
 
 ### Dialog / Sheet
-- **Sizes:** 组合生成原语时按内容选择 `sm:max-w-md`、`sm:max-w-lg`、`sm:max-w-2xl`、`sm:max-w-4xl`；确认框使用 `AlertDialog` 的默认宽度。
+- **Frame:** 高度受限的表单、选择器与发现弹窗使用 `shared/components` 的 `DialogFrame`、`DialogBody` 与 `DialogFrameFooter`，不复制标题栏、关闭按钮、滚动体与页脚壳层；无高度上限的简单弹窗仍直接组合生成原语。
+- **Sizes:** `DialogFrame` 使用 `md`、`lg`、`4xl` 三档宽度；其他生成原语组合按内容选择 `sm:max-w-md`、`sm:max-w-lg`、`sm:max-w-2xl`、`sm:max-w-4xl`，确认框使用 `AlertDialog` 的默认宽度。
 - **Surface:** 使用 shadcn 生成物的 `bg-popover`、ring 与阴影；遮罩由 `DialogOverlay` 或 `Sheet` 原语提供。
+- **Height / Scroll:** 高度受限弹窗的最大高度只取自 `--layout-dialog-max-height`，标题栏与页脚固定在滚动内容之外，只有 `DialogBody` 纵向滚动；不手写视口高度或另建滚动宿主。
+- **Close:** 标题栏关闭按钮统一使用 `size="icon"`、`variant="ghost"`、`aria-label="关闭对话框"` 与 `X size-4`；保存或提交等待期间通过 `closeDisabled` 同时禁用按钮并拒绝 Escape 与遮罩关闭。
+- **Safe area:** 弹层最大高度 token 已预留 2rem 视口边距；移动端软键盘与真机 safe-area 按 Viewport Contract 的声明处理，不在弹窗内再叠 `env(safe-area-inset-*)`。
 - **Behavior:** 焦点陷阱、背景 `aria-hidden`、Esc 关闭、打开时锁定滚动、关闭后归还焦点由 Base UI 原语处理，页面不要自行实现；嵌套弹层按 React 父子关系组合。
 - **AlertDialog:** 删除、清空等不可逆操作必须使用 `AlertDialog` 或应用层 `ConfirmAlertDialog`，新代码不得使用 `window.confirm`。`onConfirm` 可以返回 Promise；返回 `false` 或抛出错误时弹窗保持打开，错误在弹窗内展示。
 

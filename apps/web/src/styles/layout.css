@@ -1,6 +1,14 @@
 @layer base {
   :root {
     --layout-viewport-height: 100dvh;
+    --layout-z-content: 0;
+    --layout-z-sticky: 10;
+    --layout-z-chrome: 20;
+    --layout-z-tabbar: 30;
+    --layout-z-raised: 40;
+    --layout-z-portal: 50;
+    --layout-z-toast: 60;
+    --layout-z-immersive: 70;
     --layout-navbar-height: 4.75rem;
     --layout-navbar-safe-height: calc(
       var(--layout-navbar-height) + env(safe-area-inset-top, 0px)
@@ -103,7 +111,7 @@
     padding-top: env(safe-area-inset-top, 0);
     position: sticky;
     top: 0;
-    z-index: 60;
+    z-index: var(--layout-z-chrome);
   }
 
   .la-pluma-app :is(.la-pluma-content, .la-pluma-navbar-inner) {
@@ -142,7 +150,7 @@
 
   .la-pluma-page-body {
     position: relative;
-    z-index: 1;
+    z-index: var(--layout-z-content);
     display: grid;
     grid-template-columns: var(--layout-sidebar-width) minmax(0, 1fr);
     min-height: calc(var(--layout-viewport-height) - var(--layout-navbar-safe-height));
@@ -174,7 +182,7 @@
 
   .la-pluma-skip-link {
     position: fixed;
-    z-index: 40;
+    z-index: var(--layout-z-raised);
     top: max(0.75rem, env(safe-area-inset-top, 0px));
     left: max(0.75rem, env(safe-area-inset-left, 0px));
     display: inline-flex;
@@ -214,7 +222,7 @@
 
   .la-pluma-tabbar {
     display: none;
-    z-index: 70;
+    z-index: var(--layout-z-tabbar);
     box-sizing: border-box;
     height: var(--layout-tabbar-reserved-height);
     overflow: visible;

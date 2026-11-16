@@ -1,4 +1,4 @@
-import { expect, type Page, type Route } from '@playwright/test'
+import { expect, type Locator, type Page, type Route } from '@playwright/test'
 import { THEME_STORAGE_KEY } from '../../src/shared/theme/bootTheme'
 import { DEFAULT_THEME_ID } from '../../src/shared/theme/registry'
 import {
@@ -171,4 +171,25 @@ export async function waitForPageReady(page: Page, tab: string) {
     )
   }
   await page.evaluate(() => document.fonts.ready)
+}
+
+export async function removeMotionFreeze(page: Page) {
+  await page.evaluate(() => {
+    document.querySelector('style[data-la-pluma-motion-freeze]')?.remove()
+  })
+}
+
+export async function readMotionDurations(locator: Locator) {
+  return locator.evaluate(element => {
+    const style = getComputedStyle(element)
+    const parse = (value: string) => value.split(',').map(entry => {
+      const duration = entry.trim()
+      const amount = Number.parseFloat(duration)
+      return duration.endsWith('ms') ? amount / 1000 : amount
+    })
+    return {
+      animation: parse(style.animationDuration),
+      transition: parse(style.transitionDuration),
+    }
+  })
 }

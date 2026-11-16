@@ -1250,18 +1250,16 @@
   }
 
   .combat-copilot-discovery-stage-panel {
-    position: absolute;
-    z-index: 30;
-    top: calc(100% + 0.5rem);
-    left: 0;
+    --combat-stage-panel-width: min(24rem, calc(100vw - 4rem));
+    --combat-stage-panel-shadow: 0 12px 32px color-mix(in srgb, var(--foreground) 16%, transparent);
+
     display: grid;
-    width: min(24rem, calc(100vw - 4rem));
+    width: var(--combat-stage-panel-width);
     gap: 0.5rem;
     padding: 0.75rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    background: var(--card);
-    box-shadow: 0 12px 32px color-mix(in srgb, var(--foreground) 16%, transparent);
+    box-shadow: var(--combat-stage-panel-shadow);
   }
 
   .combat-copilot-discovery-stage-list {
@@ -1820,7 +1818,7 @@
     }
 
     .combat-copilot-discovery-stage-panel {
-      width: min(20rem, calc(100vw - 3rem));
+      --combat-stage-panel-width: min(20rem, calc(100vw - 3rem));
     }
   }
 }

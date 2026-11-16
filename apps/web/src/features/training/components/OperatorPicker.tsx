@@ -1,19 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Filter, LoaderCircle, Search, UserRoundSearch, X } from 'lucide-react'
+import { Filter, LoaderCircle, Search, UserRoundSearch } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { EmptyState, Loading } from '@/shared/components'
+import { DialogBody, DialogFrame, DialogFrameFooter, EmptyState, Loading } from '@/shared/components'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/shared/ui/dialog'
 import { useFluidTabIndicator } from '@/shared/hooks/useFluidTabIndicator'
 import { trainingCandidatesQueryOptions, trainingStatusCountsQueryOptions } from '../model/queries'
 import { EMPTY_TRAINING_COUNTS } from '../model/statusCounts'
@@ -185,20 +177,20 @@ export default function OperatorPicker({
   })
 
   return (
-    <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose() }}>
-      <DialogContent
-        showCloseButton={false}
-        aria-modal="true"
-        className="flex max-h-(--layout-dialog-max-height) flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
-      >
-        <DialogHeader className="flex-row items-center justify-between gap-3 border-b px-4 py-3">
-          <DialogTitle>添加干员</DialogTitle>
-          <DialogClose render={<Button size="icon" variant="ghost" aria-label="关闭对话框" />}>
-            <X className="size-4" aria-hidden="true" />
-          </DialogClose>
-        </DialogHeader>
-        <div data-slot="dialog-body" className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          {operationError && <div role="alert" className="training-feedback status-danger">{operationError}</div>}
+    <DialogFrame
+      open={isOpen}
+      onOpenChange={open => { if (!open) onClose() }}
+      title="添加干员"
+      size="4xl"
+      footer={(
+        <DialogFrameFooter align="between">
+          <span className="text-sm text-muted-foreground">已加入 {queueLength} 名干员</span>
+          <Button onClick={onClose} variant="secondary">完成选择</Button>
+        </DialogFrameFooter>
+      )}
+    >
+      <DialogBody>
+        {operationError && <div role="alert" className="training-feedback status-danger">{operationError}</div>}
           <div className="space-y-3.5">
             <div className="flex flex-col gap-3.5">
               <div className="app-workspace-segments app-liquid-tab-pill training-status-shell">
@@ -356,12 +348,7 @@ export default function OperatorPicker({
               />
             )}
             </div>
-          </div>
-        <DialogFooter className="mx-0 mb-0 flex-row flex-wrap items-center justify-between gap-3 px-4 py-3 sm:justify-between">
-          <span className="text-sm text-muted-foreground">已加入 {queueLength} 名干员</span>
-          <Button onClick={onClose} variant="secondary">完成选择</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </DialogBody>
+    </DialogFrame>
   )
 }

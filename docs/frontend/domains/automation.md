@@ -83,7 +83,7 @@ AutomationTasks（app-page > app-stack-section > AutomationWorkspace）
 | 摘要保留与详情展开 | `AutomationExecutionSummary` | 保留；恢复时按当前摘要调整 | 重置 |
 | 通知配置 | `automation/notification-config` Query | 观察者注销，恢复后按新鲜度重取 | 缓存按 `gcTime` 回收 |
 | 通知草稿、脏态与测试反馈 | `NotificationSettings` | 保留 | 重置 |
-| 菜单开关、外部点击、Escape 回焦 | `AutomationTaskPicker` | 保留；Effect 清理后恢复时重新注册 | 关闭 |
+| 菜单开关 | `AutomationTaskPicker`；外部点击、Escape 与回焦由 Base UI DropdownMenu 管理 | 保留；Base UI 恢复后重新注册 dismiss 与焦点管理 | 关闭 |
 
 - **配置写入仍然单通道。** 流程、定时和任务编辑都调用工作区的
   `updateConfig`；面板不创建草稿副本，也不调用 `saveUserConfig`。
@@ -94,7 +94,8 @@ AutomationTasks（app-page > app-stack-section > AutomationWorkspace）
 - **执行摘要不推断完成。** 步间延迟期间 run 仍活动；只有服务端终态摘要或
   `schedule.lastResult` 投影会进入“最近执行”。
 - **页脚点击区域语义不变。** `AutomationTaskFlowPanel` 自己创建页脚 ref 并
-  传给 `AutomationTaskPicker`；运行/停止按钮仍在页脚内，按下不会关闭菜单。
+  传给 `AutomationTaskPicker`；运行/停止按钮仍在页脚内。Base UI 的
+  outside-press 关闭请求落在页脚区域内时，面板取消该请求，因此按下不会关闭菜单。
 
 ### 3. 流程列表与排序
 
@@ -289,7 +290,7 @@ browser releases pointer capture”用例固定；DOM/CSS 未变化。性能复�
 
 ## 任务编辑
 
-配置草稿仍由 `automationConfig` 适配器与 `user-config` 协调器持有，执行仍由 `task-execution` 控制器与服务端 Run 持有；这些面板持有菜单开关、外部点击、Escape 回焦与智能养成在途标记，不新增第二份配置、保存队列或执行状态。
+配置草稿仍由 `automationConfig` 适配器与 `user-config` 协调器持有，执行仍由 `task-execution` 控制器与服务端 Run 持有；这些面板持有菜单开关与智能养成在途标记，外部点击、Escape 与回焦交给 Base UI 原语，不新增第二份配置、保存队列或执行状态。
 
 ### 1. 定位与边界
 
@@ -301,7 +302,7 @@ browser releases pointer capture”用例固定；DOM/CSS 未变化。性能复�
 | 通知卡 | `components/NotificationSettings.tsx` | 独立卡片；Query、草稿、脏态与测试反馈归卡内 |
 | 关卡列表编辑、次数步进、置顶、增删行 | `components/AutomationStageEditor.tsx` | 受控面板：参数经 `onUpdate(index, 'stages', value)` 写回工作区 |
 | 智能养成加入/移除与在途标记 | `components/AutomationStageEditor.tsx` + `model/stageEditing.ts` | 读取 `training-queue`、调用 `generateTrainingPlan({ mode: 'current' })`；合成规则在纯模型 |
-| 任务挑选菜单 | `components/AutomationTaskPicker.tsx` | 菜单开关、外部 pointerdown、Escape 回焦与运行态收起都在面板内 |
+| 任务挑选菜单 | `components/AutomationTaskPicker.tsx` | 菜单开关与页脚点击区域例外由面板持有；外部 pointerdown、Escape 与回焦交给 Base UI DropdownMenu，运行态收起仍由面板派生 |
 | 可添加任务目录 | `components/automationTaskCatalog.tsx` | 名称、图标、默认参数与参数字段；不读取配置/Query/执行状态 |
 | 游戏内培养计划编辑 | `components/OperProgressPlansEditor.tsx` | 复用 `features/training` 的 `OperatorSelectModal`；计划仍只保存中文名与职业，只读全量干员目录回显头像（同名干员用职业消歧），目录里找不到时保留通用人像占位 |
 | 关卡分组与智能养成合成 | `model/stageEditing.ts` | 纯模型；`orderStagesForEditing` 也复用同一分组 |
@@ -316,7 +317,7 @@ browser releases pointer capture”用例固定；DOM/CSS 未变化。性能复�
 
 - 配置 key、pending、本地布局与 wire 形状以[配置持久化协调器](../../architecture/config-persistence.md)为准；保持 `/agent/schedules/*` 端点兼容。
 - 任务参数默认值、表单文案与旧配置迁移必须同步修改并在同一提交内补测试；智能养成计划生成参数、执行前校验顺序与执行身份保持不变。
-- 保持渲染结构、DOM/CSS 类名、表单 `id`/`aria-label`、菜单 `id`/`role`、焦点顺序与键盘行为；视觉回归遵循[开发指南](../../development/README.md)。
+- 保持渲染结构、DOM/CSS 类名、表单 `id`/`aria-label`、菜单 `role`/`aria-label`、焦点顺序与键盘行为；菜单 `id` 与 `aria-controls` 由 Base UI 生成。视觉回归遵循[开发指南](../../development/README.md)。
 - 挑选面板仍把“整条流程页脚”作为点击区域：在页脚内按下指针（包括运行/停止按钮）不关闭菜单，页脚之外按下才关闭，与迁移前一致。
 - 自定义排班编辑只改写用户实际触碰的字段；未编辑的房间、未识别的扩展字段与“保持原样”语义不得被默认值覆盖。排班文件本身仍由 MAA/maa-cli 执行侧读取。
 
@@ -340,7 +341,7 @@ AutomationTasks（app-page > app-stack-section > AutomationWorkspace）
 | 配置草稿、pending 与提交队列 | `user-config` 协调器 | 保留；不重读已 hydrate 的草稿 | 应用级通道继续持有 |
 | 关卡列表 | 配置草稿 `task.params.stages` | 保留 | 随草稿恢复 |
 | 智能养成在途标记 | `AutomationStageEditor` | 保留；在途 promise 不受 Effect 清理取消，`finally` 继续清标记 | 重置 |
-| 菜单开关 | `AutomationTaskPicker` | 保留；Effect 清理时注销 document 监听，恢复后重新注册 | 重置为关闭 |
+| 菜单开关 | `AutomationTaskPicker` | 保留；Base UI 在恢复后重新注册 dismiss 与焦点管理 | 重置为关闭 |
 | 选中任务、撤销、连接反馈 | `AutomationWorkspace` | 保留 | 重置 |
 | 拖拽预览、公告 | `useTaskFlowSorting` | 清理 document 监听并丢弃进行中的预览 | 重置 |
 | 执行详情 | `AutomationExecutionSummary` | 保留 | 重置 |
@@ -379,21 +380,22 @@ AutomationTasks（app-page > app-stack-section > AutomationWorkspace）
 
 | 交互 | 行为 |
 | --- | --- |
-| 触发器 | `aria-haspopup="menu"`、`aria-expanded`、`aria-controls="automation-task-picker"`；菜单打开时追加 `is-open` |
-| 菜单 | `role="menu"`、`aria-label="可添加任务"`，每项 `role="menuitem"` |
+| 触发器 | `aria-haspopup="menu"`、`aria-expanded`、`aria-controls` 由 Base UI DropdownMenu 生成；菜单打开时触发器带 `data-popup-open` |
+| 菜单 | `role="menu"`、`aria-label="可添加任务"`，每项 `role="menuitem"`；Base UI 接管方向键、Home/End 与焦点归还 |
 | 选择 | 调用页面 `onAddTask` 后关闭菜单；页面负责加入流程并选中新任务 |
-| Escape | 关闭菜单并把焦点还给触发器 |
-| 外部按下 | 指针落在页面传入的页脚区域之外时关闭；区域之内（含运行/停止按钮）不关闭 |
+| Escape | Base UI 关闭菜单并把焦点还给触发器 |
+| 外部按下 | Base UI 在页脚区域之外按下时关闭；请求落在页脚区域之内（含运行/停止按钮）时，面板通过 `onOpenChange` 取消关闭 |
 | 运行态 | `disabled` 变为 true 时收起菜单并禁用触发器；组件挂载时若已禁用则保持关闭 |
 | 计数 | 菜单项显示当前流程中同 `commandId` 的数量（含拖拽预览顺序） |
-| 定位 | 以视口固定定位锚在触发器上方；上方空间不足时改选上下空间更大的一侧，宽度、水平位置与最大高度夹取在视口内，超出高度的选项在菜单内滚动 |
+| 定位 | Base UI portal 弹层，优先在触发器上方展开并自动翻转；宽度跟随触发器，最大高度为 `min(14rem, --available-height)`，视口碰撞留白 12px，超出高度的选项在菜单内滚动 |
 
-面板不实现焦点陷阱；菜单项的 Tab 顺序与迁移前一致。
-菜单使用视口固定定位；面板的 overflow 裁剪不会影响固定定位层。
+菜单是非模态的（`modal={false}`）：不锁页面滚动，也不阻止页脚之外的页面交互；
+焦点与 Escape 仍由 Base UI 管理。portal 内容位于 `document.body`，层序随
+`--layout-z-portal`，玻璃材质由带 `data-page-kind="automation"` 的 popup 自身命中。
 
 ### 5. Activity 与兼容约束
 
-- **Activity 隐藏/恢复**：面板 state 保留；document 监听在 Effect 清理时注销，恢复后按当前 `open` 重新注册，不会遗留监听。智能养成在途 promise 继续完成，隐藏期间只更新自身状态，不写配置以外的资源。流程排序的 document 监听同样在 Activity 隐藏时清理并丢弃进行中的预览。
+- **Activity 隐藏/恢复**：面板 state 保留；Base UI 在 Effect 清理时注销 dismiss 与焦点监听，恢复后按当前 `open` 重新注册，不会遗留监听。智能养成在途 promise 继续完成，隐藏期间只更新自身状态，不写配置以外的资源。流程排序的 document 监听同样在 Activity 隐藏时清理并丢弃进行中的预览。
 - **真正卸载/刷新**：菜单回到关闭，在途标记重置；配置草稿、pending 队列与 Run 身份仍由应用级所有者持有。
 - 配置 key、本地存储键、迁移与 wire 形状未变化；旧草稿可直接读取。
 - 默认态视觉、表单标签、菜单焦点与键盘行为继续由下列组件/页面回归覆盖。

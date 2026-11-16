@@ -18,8 +18,8 @@ import { COPILOT_DETAIL_LAYER_ID } from './combatPanelTypes'
 import { DetailBody, DetailPlaceholder } from './CombatCopilotDetailBody'
 
 const MOBILE_DETAIL_QUERY = `(width < ${BREAKPOINTS.sm}px)`
-const DESKTOP_SHEET_CLASS = 'fixed inset-y-0 right-0 z-50 flex h-full w-[min(24rem,calc(100vw-1.5rem))] flex-col gap-0 overflow-hidden border-l bg-popover text-sm text-popover-foreground shadow-lg outline-none transition duration-200 ease-in-out data-ending-style:translate-x-[2.5rem] data-ending-style:opacity-0 data-starting-style:translate-x-[2.5rem] data-starting-style:opacity-0'
-const MOBILE_SHEET_CLASS = 'fixed inset-x-0 bottom-0 z-50 flex max-h-(--layout-sheet-max-height) flex-col gap-0 overflow-hidden border-t bg-popover text-sm text-popover-foreground shadow-lg outline-none transition duration-200 ease-in-out data-ending-style:translate-y-[2.5rem] data-ending-style:opacity-0 data-starting-style:translate-y-[2.5rem] data-starting-style:opacity-0'
+const DESKTOP_SHEET_CLASS = 'fixed inset-y-0 right-0 z-(--layout-z-portal) flex h-full w-[min(24rem,calc(100vw-1.5rem))] flex-col gap-0 overflow-hidden border-l bg-popover text-sm text-popover-foreground shadow-lg outline-none transition duration-200 ease-in-out data-ending-style:translate-x-[2.5rem] data-ending-style:opacity-0 data-starting-style:translate-x-[2.5rem] data-starting-style:opacity-0'
+const MOBILE_SHEET_CLASS = 'fixed inset-x-0 bottom-0 z-(--layout-z-portal) flex max-h-(--layout-sheet-max-height) flex-col gap-0 overflow-hidden border-t bg-popover text-sm text-popover-foreground shadow-lg outline-none transition duration-200 ease-in-out data-ending-style:translate-y-[2.5rem] data-ending-style:opacity-0 data-starting-style:translate-y-[2.5rem] data-starting-style:opacity-0'
 
 export interface CombatCopilotDetailLayerProps {
   target: CopilotDetailTarget | null
@@ -124,7 +124,7 @@ export default function CombatCopilotDetailLayer({
           <SheetPrimitive.Backdrop
             forceRender
             data-slot="sheet-overlay"
-            className="fixed inset-0 z-50 bg-black/10 transition-opacity duration-150 supports-backdrop-filter:backdrop-blur-xs data-ending-style:opacity-0 data-starting-style:opacity-0"
+            className="fixed inset-0 z-(--layout-z-portal) bg-black/10 transition-opacity duration-150 supports-backdrop-filter:backdrop-blur-xs data-ending-style:opacity-0 data-starting-style:opacity-0"
           />
         )}
         <SheetPrimitive.Popup

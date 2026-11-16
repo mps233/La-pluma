@@ -7,6 +7,42 @@ const ACCOUNT_HINT = '输入已登录账号的部分字符即可，如 "123****4
 const LAUNCH_HINT = '关闭后只连接设备并进入已有游戏的主界面，不会启动游戏客户端'
 const INFRAST_HINT = '一键轮换使用游戏内队列，并保留无人机、会客室等基础操作'
 
+async function layoutZIndex(page: Page, token: string) {
+  return page.evaluate(
+    name => Number(getComputedStyle(document.documentElement).getPropertyValue(name)),
+    token,
+  )
+}
+
+async function expectTooltipOnPortalLayer(page: Page, tooltip: Locator) {
+  const portalZ = await layoutZIndex(page, '--layout-z-portal')
+  const [chromeZ, tabbarZ] = await Promise.all([
+    layoutZIndex(page, '--layout-z-chrome'),
+    layoutZIndex(page, '--layout-z-tabbar'),
+  ])
+  const layer = await tooltip.evaluate(element => {
+    const positioner = element.parentElement
+    if (!positioner) return null
+    const rect = element.getBoundingClientRect()
+    const target = document.elementFromPoint(
+      rect.left + rect.width / 2,
+      rect.top + rect.height / 2,
+    )
+    return {
+      positionerZ: Number(getComputedStyle(positioner).zIndex),
+      pointerEvents: getComputedStyle(positioner).pointerEvents,
+      passesPointerThrough: target !== null && !positioner.contains(target),
+    }
+  })
+
+  expect(layer).not.toBeNull()
+  expect(layer!.positionerZ).toBe(portalZ)
+  expect(layer!.positionerZ).toBeGreaterThan(chromeZ)
+  expect(layer!.positionerZ).toBeGreaterThan(tabbarZ)
+  expect(layer!.pointerEvents).toBe('none')
+  expect(layer!.passesPointerThrough).toBe(true)
+}
+
 const infrastFixtures = [
   {
     path: '/agent/config/user/automation-tasks',
@@ -394,11 +430,7 @@ test.describe('automation field hints', () => {
 
     // 提示层挂在 body 下，祖先链上没有会裁切它的 overflow 容器。
     await expectTooltipNotClipped(accountTooltip)
-    // 提示层与旧实现一样位于应用 chrome（navbar 60 / tabbar 70）和模态层 80 之上。
-    expect(await accountTooltip.evaluate(element => {
-      const positioner = element.parentElement
-      return positioner ? Number(getComputedStyle(positioner).zIndex) : 0
-    })).toBeGreaterThanOrEqual(2000)
+    await expectTooltipOnPortalLayer(page, accountTooltip)
     // 纯文本提示不接收指针事件，覆盖到相邻控件时不能吞掉点击。
     expect(await accountTooltip.evaluate(element => getComputedStyle(element).pointerEvents)).toBe('none')
     expect(await accountTooltip.evaluate(element => {
@@ -725,10 +757,7 @@ test.describe('automation field hints', () => {
     expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height)
     await expectTooltipNotClipped(accountTooltip)
     expect(await accountTooltip.evaluate(element => getComputedStyle(element).pointerEvents)).toBe('none')
-    expect(await accountTooltip.evaluate(element => {
-      const positioner = element.parentElement
-      return positioner ? Number(getComputedStyle(positioner).zIndex) : 0
-    })).toBeGreaterThanOrEqual(2000)
+    await expectTooltipOnPortalLayer(page, accountTooltip)
 
     await page.touchscreen.tap(4, 4)
     await expect(accountTooltip).toBeHidden()

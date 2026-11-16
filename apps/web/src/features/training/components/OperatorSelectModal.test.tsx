@@ -295,6 +295,50 @@ describe('shared operator select modal', () => {
     expect(visibleOperatorNames()).toEqual(['阿米娅'])
   })
 
+  it('confirms the selected operator from the footer', async () => {
+    mocks.getOperBoxData.mockResolvedValue({ success: true, data: { data: RECOGNIZED_OPERATORS } })
+    mocks.getAllOperators.mockResolvedValue({ success: true, data: OPERATOR_CATALOG })
+    const { onClose, onConfirm } = await renderModal('asc')
+
+    const select = document.querySelector<HTMLButtonElement>('button[aria-label="选择艾雅法拉"]')
+    expect(select).not.toBeNull()
+    await act(async () => {
+      select!.click()
+    })
+    await flush()
+
+    const confirm = Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
+      .find(button => button.textContent?.trim() === '确认选择')
+    expect(confirm?.disabled).toBe(false)
+    await act(async () => {
+      confirm!.click()
+    })
+    await flush()
+
+    expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'char_180_amgoat',
+      name: '艾雅法拉',
+    }))
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('cancels from the footer without selecting an operator', async () => {
+    mocks.getOperBoxData.mockResolvedValue({ success: true, data: { data: RECOGNIZED_OPERATORS } })
+    mocks.getAllOperators.mockResolvedValue({ success: true, data: OPERATOR_CATALOG })
+    const { onClose, onConfirm } = await renderModal()
+
+    const cancel = Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
+      .find(button => button.textContent?.trim() === '取消')
+    expect(cancel).not.toBeUndefined()
+    await act(async () => {
+      cancel!.click()
+    })
+    await flush()
+
+    expect(onClose).toHaveBeenCalled()
+    expect(onConfirm).not.toHaveBeenCalled()
+  })
+
   it('keeps a real empty state when the profession filter matches nothing', async () => {
     mocks.getOperBoxData.mockResolvedValue({ success: true, data: { data: RECOGNIZED_OPERATORS } })
     mocks.getAllOperators.mockResolvedValue({ success: true, data: OPERATOR_CATALOG })

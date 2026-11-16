@@ -1,14 +1,6 @@
-import { X } from 'lucide-react'
+import { DialogBody, DialogFrame, DialogFrameFooter } from '@/shared/components'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/shared/ui/dialog'
 import { Switch } from '@/shared/ui/switch'
 import {
   COPILOT_MATCH_MODES,
@@ -47,64 +39,59 @@ export default function CombatCopilotMatchDialog({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose() }}>
-      <DialogContent
-        showCloseButton={false}
-        aria-modal="true"
-        className="flex max-h-(--layout-dialog-max-height) flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
-      >
-        <DialogHeader className="flex-row items-center justify-between gap-3 border-b px-4 py-3">
-          <DialogTitle>干员匹配</DialogTitle>
-          <DialogClose render={<Button size="icon" variant="ghost" aria-label="关闭对话框" />}>
-            <X className="size-4" aria-hidden="true" />
-          </DialogClose>
-        </DialogHeader>
-        <div data-slot="dialog-body" className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          <div className="combat-copilot-match">
-            <div className="combat-copilot-match-toggle">
-              <div className="combat-copilot-match-toggle-copy">
-                <span className="combat-copilot-match-toggle-title">按持有干员匹配</span>
-                <span className="combat-copilot-match-toggle-hint">使用最近一次持有干员识别结果</span>
-              </div>
-              <Switch
-                aria-label="按持有干员匹配"
-                checked={settings.enabled}
-                disabled={!hasOwnedOperators}
-                onCheckedChange={handleEnabledChange}
-              />
+    <DialogFrame
+      open={isOpen}
+      onOpenChange={open => { if (!open) onClose() }}
+      title="干员匹配"
+      size="md"
+      footer={(
+        <DialogFrameFooter>
+          <Button variant="secondary" onClick={onClose}>关闭</Button>
+        </DialogFrameFooter>
+      )}
+    >
+      <DialogBody>
+        <div className="combat-copilot-match">
+          <div className="combat-copilot-match-toggle">
+            <div className="combat-copilot-match-toggle-copy">
+              <span className="combat-copilot-match-toggle-title">按持有干员匹配</span>
+              <span className="combat-copilot-match-toggle-hint">使用最近一次持有干员识别结果</span>
             </div>
+            <Switch
+              aria-label="按持有干员匹配"
+              checked={settings.enabled}
+              disabled={!hasOwnedOperators}
+              onCheckedChange={handleEnabledChange}
+            />
+          </div>
 
-            {!hasOwnedOperators && (
-              <p className="combat-copilot-match-warning" role="status">
-                还没有识别到持有干员，先识别持有干员后再启用匹配。
-              </p>
-            )}
-
-            <p className="combat-copilot-match-note">
-              按精英化阶段与等级估算；技能等级与模组尚未识别，相关作业统一归入“待确认”。
-              匹配只过滤当前搜索结果，不会重新请求作业站。
+          {!hasOwnedOperators && (
+            <p className="combat-copilot-match-warning" role="status">
+              还没有识别到持有干员，先识别持有干员后再启用匹配。
             </p>
+          )}
 
-            <div className="combat-copilot-match-modes" role="group" aria-label="匹配模式">
-              <span className="combat-copilot-match-modes-title">显示以下匹配结论</span>
-              <div className="combat-copilot-match-mode-list">
-                {COPILOT_MATCH_MODES.map(({ mode, label }) => (
-                  <label key={mode} className="group flex min-h-11 cursor-pointer items-center gap-2 text-sm text-muted-foreground">
-                    <Checkbox
-                      checked={settings.modes.includes(mode)}
-                      onCheckedChange={checked => handleModeChange(mode, checked)}
-                    />
-                    <span className="transition-colors group-hover:text-primary">{label}</span>
-                  </label>
-                ))}
-              </div>
+          <p className="combat-copilot-match-note">
+            按精英化阶段与等级估算；技能等级与模组尚未识别，相关作业统一归入“待确认”。
+            匹配只过滤当前搜索结果，不会重新请求作业站。
+          </p>
+
+          <div className="combat-copilot-match-modes" role="group" aria-label="匹配模式">
+            <span className="combat-copilot-match-modes-title">显示以下匹配结论</span>
+            <div className="combat-copilot-match-mode-list">
+              {COPILOT_MATCH_MODES.map(({ mode, label }) => (
+                <label key={mode} className="group flex min-h-11 cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                  <Checkbox
+                    checked={settings.modes.includes(mode)}
+                    onCheckedChange={checked => handleModeChange(mode, checked)}
+                  />
+                  <span className="transition-colors group-hover:text-primary">{label}</span>
+                </label>
+              ))}
             </div>
           </div>
         </div>
-        <DialogFooter className="mx-0 mb-0 flex-row justify-end px-4 py-3">
-          <Button variant="secondary" onClick={onClose}>关闭</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </DialogBody>
+    </DialogFrame>
   )
 }

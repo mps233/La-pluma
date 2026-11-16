@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type UIEvent } from 'react'
+import { useMemo, useState, type UIEvent } from 'react'
 import { Search } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover'
 import type { CopilotStageCandidate } from '../types'
 import {
   COPILOT_DISCOVERY_STAGE_PAGE_SIZE,
@@ -37,39 +38,20 @@ export default function CombatCopilotStageSelect({
   const [open, setOpen] = useState(false)
   const [term, setTerm] = useState('')
   const [renderedCount, setRenderedCount] = useState(COPILOT_DISCOVERY_STAGE_PAGE_SIZE)
-  const containerRef = useRef<HTMLDivElement>(null)
   const selected = stages.find(candidate => candidate.stageId === value) ?? null
   const selectedOption = selected ? deriveCopilotStageOption(selected) : null
-
-  useEffect(() => {
-    if (!open) return
-    const handlePointerDown = (event: PointerEvent) => {
-      if (containerRef.current?.contains(event.target as Node)) return
-      setOpen(false)
-    }
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      setOpen(false)
-    }
-    document.addEventListener('pointerdown', handlePointerDown)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [open])
 
   const visibleStages = useMemo(() => {
     const query = normalize(term)
     return stages.filter(candidate => matchesStage(candidate, query))
   }, [stages, term])
 
-  const handleToggle = () => {
-    if (!open) {
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) {
       setTerm('')
       setRenderedCount(COPILOT_DISCOVERY_STAGE_PAGE_SIZE)
     }
-    setOpen(!open)
+    setOpen(nextOpen)
   }
 
   const handleTermChange = (next: string) => {
@@ -92,19 +74,28 @@ export default function CombatCopilotStageSelect({
   }
 
   return (
-    <div className="combat-copilot-discovery-stage" ref={containerRef}>
-      <Button
-        variant="secondary"
-        className="combat-copilot-discovery-stage-trigger"
-        aria-expanded={open}
-        aria-label={selectedOption ? `关卡筛选：${selectedOption.code}` : '关卡筛选'}
-        onClick={handleToggle}
-      >
-        {selectedOption?.code ?? '关卡'}
-      </Button>
+    <div className="combat-copilot-discovery-stage">
+      <Popover open={open} onOpenChange={handleOpenChange}>
+        <PopoverTrigger
+          render={
+            <Button
+              variant="secondary"
+              className="combat-copilot-discovery-stage-trigger"
+              aria-label={selectedOption ? `关卡筛选：${selectedOption.code}` : '关卡筛选'}
+            />
+          }
+        >
+          {selectedOption?.code ?? '关卡'}
+        </PopoverTrigger>
 
-      {open && (
-        <div className="combat-copilot-discovery-stage-panel" role="dialog" aria-label="选择关卡">
+        <PopoverContent
+          side="bottom"
+          align="start"
+          sideOffset={8}
+          collisionPadding={12}
+          aria-label="选择关卡"
+          className="combat-copilot-discovery-stage-panel grid w-(--combat-stage-panel-width) gap-2 bg-card p-3 shadow-(--combat-stage-panel-shadow) ring-0"
+        >
           <div className="relative">
             <Search size={17} strokeWidth={1.9} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" />
             <Input
@@ -174,8 +165,8 @@ export default function CombatCopilotStageSelect({
               )}
             </>
           )}
-        </div>
-      )}
+        </PopoverContent>
+      </Popover>
     </div>
   )
 }

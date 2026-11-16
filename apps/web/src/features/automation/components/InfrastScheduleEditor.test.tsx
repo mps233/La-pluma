@@ -119,6 +119,7 @@ const setInputValue = async (input: HTMLInputElement, value: string) => {
 const renderEditor = async (props: {
   filename?: string
   initialPlanIndex?: number
+  onClose?: () => void
   onSaved?: (target: { filename: string; planIndex: number }) => void
 }) => {
   await act(async () => {
@@ -127,7 +128,7 @@ const renderEditor = async (props: {
         <InfrastScheduleEditor
           filename={props.filename ?? ''}
           initialPlanIndex={props.initialPlanIndex ?? 0}
-          onClose={vi.fn()}
+          onClose={props.onClose ?? vi.fn()}
           onSaved={props.onSaved ?? vi.fn()}
         />
       </QueryClientProvider>,
@@ -194,6 +195,42 @@ describe('InfrastScheduleEditor', () => {
     expect(savedDocument.custom_top_field).toEqual({ keep: true })
     expect(savedPlan?.rooms.manufacture?.[0]).toEqual({ operators: ['克洛丝'], custom_room: 'a' })
     expect(onSaved).toHaveBeenCalledWith({ filename: 'base.json', planIndex: 0 })
+  })
+
+  it('keeps the editor open while a save is pending', async () => {
+    mocks.readInfrastSchedule.mockResolvedValue({
+      success: true,
+      data: { name: 'base.json', document: userDocument },
+    })
+    let resolveSave: ((value: unknown) => void) | undefined
+    mocks.saveInfrastSchedule.mockReturnValue(new Promise(resolve => {
+      resolveSave = resolve
+    }))
+    const onClose = vi.fn()
+    await renderEditor({ filename: 'base.json', onClose })
+
+    await click(buttonByText('保存'))
+
+    const closeButton = document.querySelector<HTMLButtonElement>('button[aria-label="关闭对话框"]')
+    expect(closeButton?.disabled).toBe(true)
+    expect(buttonByText('保存中...').getAttribute('aria-busy')).toBe('true')
+
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(onClose).not.toHaveBeenCalled()
+
+    const overlay = document.querySelector('[data-slot="dialog-overlay"]')
+    expect(overlay).not.toBeNull()
+    await act(async () => {
+      overlay!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(onClose).not.toHaveBeenCalled()
+
+    await act(async () => {
+      resolveSave?.({ success: true, data: { name: 'base.json', planCount: 1 } })
+    })
+    await flush()
   })
 
   it('keeps the saved document in the query cache when the editor is reopened', async () => {

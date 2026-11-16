@@ -242,7 +242,7 @@ CombatTasks（app-page > app-stack-section > CombatWorkspace）
 
 同一提交词再次搜索失败时，Query 保留上一次成功结果并提示错误。切换提交词时新 key 没有旧数据，列表清空。默认列表的后台刷新失败只保留旧缓存，不覆盖显式结果，也不在弹窗内显示错误。普通作业搜索的推荐项显示在结果中，点击结果才修改输入并打开预览。
 
-关卡筛选由发现弹窗的关卡目录下拉完成：客户端从 `/agent/copilot/stages` 读取服务端缓存的作业站目录（30 分钟 TTL，失败可重试），选中条目后以内部 `stageId` 请求 `/agent/copilot/search?level=`。下拉项对 `code`/`name`/`zone` 去重后展示，首次渲染 50 条并在滚动近底时继续追加，直到全部过滤结果都可访问；客户端不再维护本地关卡表，也不在结果上方展示候选关卡。服务端仍保留 `level` 的 code/name 解析与 400 `AGENT_COPILOT_STAGE_AMBIGUOUS`（`details.candidates`）、404 `AGENT_COPILOT_STAGE_NOT_FOUND`、502 `AGENT_COPILOT_STAGE_CATALOG_UNAVAILABLE`，供其他调用方使用；目录只参与展示投影：服务端用已缓存快照同步返回搜索结果，目录刷新在后台完成，因此冷缓存的首次搜索可能缺少 `stageCode`/`stageLabel`，后续搜索补全；目录查不到时搜索结果仍成功返回。
+关卡筛选由发现弹窗的关卡目录 Popover 完成：客户端从 `/agent/copilot/stages` 读取服务端缓存的作业站目录（30 分钟 TTL，失败可重试），选中条目后以内部 `stageId` 请求 `/agent/copilot/search?level=`。Popover 是非模态的（`role="dialog"`、`aria-label="选择关卡"`），打开后焦点进入搜索框；外部点击或 Escape 关闭并把焦点还给触发器，Escape 先关 Popover 再关发现弹窗。面板经 Base UI portal 挂到 `document.body`，不受 Dialog 滚动体裁剪，宽度与视口碰撞留白由原语处理。选项对 `code`/`name`/`zone` 去重后展示，首次渲染 50 条并在滚动近底时继续追加，直到全部过滤结果都可访问；客户端不再维护本地关卡表，也不在结果上方展示候选关卡。服务端仍保留 `level` 的 code/name 解析与 400 `AGENT_COPILOT_STAGE_AMBIGUOUS`（`details.candidates`）、404 `AGENT_COPILOT_STAGE_NOT_FOUND`、502 `AGENT_COPILOT_STAGE_CATALOG_UNAVAILABLE`，供其他调用方使用；目录只参与展示投影：服务端用已缓存快照同步返回搜索结果，目录刷新在后台完成，因此冷缓存的首次搜索可能缺少 `stageCode`/`stageLabel`，后续搜索补全；目录查不到时搜索结果仍成功返回。
 
 ### 4. 预览：会话与取消
 

@@ -19,6 +19,7 @@ const VIEWPORT_UNIT_RE = /(?<![\w-])(?:\d+(?:\.\d+)?(?:dvh|svh|lvh|vh)|(?:min-|m
 
 const DIALOG_MAX_HEIGHT_TOKEN = '--layout-dialog-max-height'
 const SHEET_MAX_HEIGHT_TOKEN = '--layout-sheet-max-height'
+const DIALOG_FRAME_FILE = 'src/shared/components/DialogFrame.tsx'
 
 const DIALOG_FILES = [
   'src/features/automation/components/InfrastScheduleEditor.tsx',
@@ -246,11 +247,15 @@ describe('viewport contract', () => {
       const source = stripComments(readSource(file))
       return [
         ...(source.includes('100dvh') ? [`${file}: 仍包含 100dvh 字面量`] : []),
-        ...(referencesMaxHeight(source, DIALOG_MAX_HEIGHT_TOKEN)
-          ? []
-          : [`${file}: 缺少引用 ${DIALOG_MAX_HEIGHT_TOKEN} 的 max-h 工具类`]),
+        ...(source.includes('<DialogFrame') ? [] : [`${file}: 未使用 DialogFrame`]),
       ]
     })
+
+    const dialogFrame = stripComments(readSource(DIALOG_FRAME_FILE))
+    if (dialogFrame.includes('100dvh')) problems.push(`${DIALOG_FRAME_FILE}: 仍包含 100dvh 字面量`)
+    if (!referencesMaxHeight(dialogFrame, DIALOG_MAX_HEIGHT_TOKEN)) {
+      problems.push(`${DIALOG_FRAME_FILE}: 缺少引用 ${DIALOG_MAX_HEIGHT_TOKEN} 的 max-h 工具类`)
+    }
 
     const detailLayer = stripComments(readSource('src/features/combat/components/CombatCopilotDetailLayer.tsx'))
     if (detailLayer.includes('85dvh')) problems.push('CombatCopilotDetailLayer.tsx: 仍包含 85dvh 字面量')

@@ -1,16 +1,9 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, LoaderCircle, Save, X } from 'lucide-react'
+import { AlertCircle, LoaderCircle, Save } from 'lucide-react'
 import { getErrorMessage, isRecord } from '@/shared/api'
+import { DialogBody, DialogFrame, DialogFrameFooter } from '@/shared/components'
 import { Button } from '@/shared/ui/button'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/shared/ui/dialog'
 import { FieldInput } from './InfrastScheduleFieldControls'
 import { saveInfrastSchedule } from '../api'
 import {
@@ -138,96 +131,17 @@ export default function InfrastScheduleEditor({
   const plan = document?.plans[planIndex]
   const schedules = listQuery.data?.schedules ?? []
   return (
-    <Dialog
+    <DialogFrame
       open
-      onOpenChange={(open, details) => {
-        if (open) return
-        if (saving) {
-          details.cancel()
-          return
-        }
-        onClose()
+      onOpenChange={open => {
+        if (!open) onClose()
       }}
+      title="自定义基建排班"
+      size="4xl"
+      closeDisabled={saving}
       disablePointerDismissal={saving}
-    >
-      <DialogContent
-        showCloseButton={false}
-        aria-modal="true"
-        className="flex max-h-(--layout-dialog-max-height) flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
-      >
-        <DialogHeader className="flex-row items-center justify-between gap-3 border-b px-4 py-3">
-          <DialogTitle>自定义基建排班</DialogTitle>
-          <DialogClose
-            render={<Button size="icon" variant="ghost" aria-label="关闭对话框" disabled={saving} />}
-          >
-            <X className="size-4" aria-hidden="true" />
-          </DialogClose>
-        </DialogHeader>
-        <div data-slot="dialog-body" className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          <div className="@container space-y-3.5">
-            {error && (
-              <div role="alert" className="status-danger flex items-start gap-2 rounded-lg px-3 py-2 text-sm leading-5">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <section className="space-y-3">
-              <div className="flex flex-wrap items-end gap-2">
-                <FieldInput
-                  id={`${editorId}-filename`}
-                  label="排班文件"
-                  className="min-w-0 flex-1"
-                  value={name}
-                  placeholder="schedules/base.json"
-                  disabled={saving}
-                  onChange={event => setName(event.target.value)}
-                />
-                <Button variant="secondary" disabled={saving || loading} onClick={load}>加载</Button>
-                <Button variant="secondary" disabled={saving || loading} onClick={createNew}>新建排班</Button>
-              </div>
-              <p className="text-xs leading-5 text-muted-foreground">
-                相对路径基于 MAA 配置目录的 infrast 文件夹，与 maa-cli 解析 filename 的规则一致；保存时省略默认值，未编辑的房间保持原样。
-              </p>
-
-              {listQuery.data && (
-                <InfrastScheduleFileList
-                  directory={listQuery.data.directory}
-                  schedules={schedules}
-                  disabled={saving}
-                  onSelect={name => {
-                    setName(name)
-                    setLoadName(name)
-                    setError(null)
-                  }}
-                />
-              )}
-            </section>
-
-            {document && plan ? (
-              <InfrastSchedulePlanMeta
-                editorId={editorId}
-                document={document}
-                plan={plan}
-                planIndex={planIndex}
-                saving={saving}
-                onDocumentChange={setDocument}
-                onPlanIndexChange={setPlanIndex}
-                onPlanChange={updater => {
-                  const current = document.plans[planIndex]
-                  if (!current) return
-                  setDocument(updateInfrastPlanAt(document, planIndex, updater(current)))
-                }}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                输入或选择已有排班文件后点击“加载”；新文件可点击“新建排班”后再保存。
-              </p>
-            )}
-
-          </div>
-        </div>
-        <DialogFooter className="mx-0 mb-0 flex-row flex-wrap items-center justify-between gap-3 px-4 py-3 sm:justify-between">
+      footer={(
+        <DialogFrameFooter align="between">
           <span className="text-xs text-muted-foreground">
             {document ? `${document.plans.length} 个方案` : '未加载排班文件'}
           </span>
@@ -239,8 +153,73 @@ export default function InfrastScheduleEditor({
                 : <><Save size={15} aria-hidden="true" />保存</>}
             </Button>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </DialogFrameFooter>
+      )}
+    >
+      <DialogBody>
+        <div className="@container space-y-3.5">
+          {error && (
+            <div role="alert" className="status-danger flex items-start gap-2 rounded-lg px-3 py-2 text-sm leading-5">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-end gap-2">
+              <FieldInput
+                id={`${editorId}-filename`}
+                label="排班文件"
+                className="min-w-0 flex-1"
+                value={name}
+                placeholder="schedules/base.json"
+                disabled={saving}
+                onChange={event => setName(event.target.value)}
+              />
+              <Button variant="secondary" disabled={saving || loading} onClick={load}>加载</Button>
+              <Button variant="secondary" disabled={saving || loading} onClick={createNew}>新建排班</Button>
+            </div>
+            <p className="text-xs leading-5 text-muted-foreground">
+              相对路径基于 MAA 配置目录的 infrast 文件夹，与 maa-cli 解析 filename 的规则一致；保存时省略默认值，未编辑的房间保持原样。
+            </p>
+
+            {listQuery.data && (
+              <InfrastScheduleFileList
+                directory={listQuery.data.directory}
+                schedules={schedules}
+                disabled={saving}
+                onSelect={name => {
+                  setName(name)
+                  setLoadName(name)
+                  setError(null)
+                }}
+              />
+            )}
+          </section>
+
+          {document && plan ? (
+            <InfrastSchedulePlanMeta
+              editorId={editorId}
+              document={document}
+              plan={plan}
+              planIndex={planIndex}
+              saving={saving}
+              onDocumentChange={setDocument}
+              onPlanIndexChange={setPlanIndex}
+              onPlanChange={updater => {
+                const current = document.plans[planIndex]
+                if (!current) return
+                setDocument(updateInfrastPlanAt(document, planIndex, updater(current)))
+              }}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              输入或选择已有排班文件后点击“加载”；新文件可点击“新建排班”后再保存。
+            </p>
+          )}
+
+        </div>
+      </DialogBody>
+    </DialogFrame>
   )
 }

@@ -222,6 +222,37 @@ import { Switch } from '@/shared/ui/switch'
 
 ---
 
+### DropdownMenu / Popover - 浮层菜单与富内容弹层
+
+**文件位置**：`apps/web/src/shared/ui/dropdown-menu.tsx`、`apps/web/src/shared/ui/popover.tsx`（shadcn 生成物）
+
+**适用场景**：`DropdownMenu` 用于动作列表与选项菜单（`role="menu"`）；`Popover` 用于带搜索框、说明或表单的富内容浮层（`role="dialog"`）。不要为这两类浮层手写 `fixed`/`absolute` 定位、外部点击或 Escape 监听。
+
+```tsx
+import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover'
+
+<Popover>
+  <PopoverTrigger render={<Button variant="secondary" />}>关卡</PopoverTrigger>
+  <PopoverContent
+    side="bottom"
+    align="start"
+    sideOffset={8}
+    collisionPadding={12}
+    aria-label="选择关卡"
+  >
+    浮层内容
+  </PopoverContent>
+</Popover>
+```
+
+`Popover` 的 Root 默认非模态；`DropdownMenu` 的 Root 默认 `modal=true`，需要保留页面滚动与外部交互时显式传 `modal={false}`。Popup 经 Base UI portal 挂到 `document.body`，层序使用 `--layout-z-portal`，不要为浮层另写 `position: fixed` 或高位 z-index。
+
+`side`、`align`、`sideOffset` 与 `collisionPadding` 交给 Base UI 做翻转与视口夹取；菜单内容宽度默认跟随触发器（`--anchor-width`），需要限制高度时使用 `max-h-[min(<上限>,var(--available-height))]`。触发器的 `aria-haspopup`、`aria-expanded`、`aria-controls`、Escape 回焦与方向键导航由原语提供。非模态菜单若要保留某个点击区域，在 `onOpenChange` 中对该次 outside-press 调用 `eventDetails.cancel()`，不要再注册 document 监听。
+
+`PopoverContent` 默认带 `role="dialog"`，应传 `aria-label` 或组合 `PopoverTitle`/`PopoverDescription`；`DropdownMenuContent` 默认带 `role="menu"`，选项使用 `DropdownMenuItem`、`DropdownMenuRadioItem` 等。本仓库为生成物增加了 `collisionPadding` 透传（`PopoverContent`、`DropdownMenuContent`），其余内容保持上游原样。
+
+---
+
 ### FieldHint - 标签说明提示
 
 **文件位置**：`apps/web/src/shared/components/FieldHint.tsx`
@@ -273,6 +304,35 @@ Props：
 
 ---
 
+### DialogFrame / DialogBody / DialogFrameFooter
+
+**文件位置**：`apps/web/src/shared/components/DialogFrame.tsx`
+
+**适用场景**：需要限制在 `--layout-dialog-max-height` 内的表单、选择器与发现弹窗。`DialogFrame` 统一组合 `Dialog`、`DialogContent`、标题栏与关闭按钮，固定最大高度与各区域职责；内容通过 `DialogBody` 滚动，页脚使用 `DialogFrameFooter`。无高度上限的简单弹窗仍可直接组合生成原语。
+
+```tsx
+import { DialogBody, DialogFrame, DialogFrameFooter } from '@/shared/components'
+
+<DialogFrame
+  open={isOpen}
+  onOpenChange={open => { if (!open) onClose() }}
+  title="添加干员"
+  size="4xl"
+  footer={(
+    <DialogFrameFooter align="between">
+      <span>已加入 2 名干员</span>
+      <Button onClick={onClose}>完成选择</Button>
+    </DialogFrameFooter>
+  )}
+>
+  <DialogBody onScroll={handleScroll}>{content}</DialogBody>
+</DialogFrame>
+```
+
+`DialogFrame` 的 props：`open`、`onOpenChange`、`title`、`description`、`children`、`footer`、`layers`、`size`（`md` 为默认，另有 `lg`、`4xl`）、`closeDisabled`、`disablePointerDismissal`、`id`、`className`。`closeDisabled` 禁用标题栏关闭按钮，并拒绝 Escape、遮罩点击与关闭请求；保存或提交等待期间使用。`layers` 承载与对话框同一 Base UI root 的嵌套弹层（如发现作业中的详情抽屉），以保持 Escape 顺序与层级关系。`DialogBody` 是唯一可滚动内容区，透传原生 `div` 属性（如 `onScroll`）；`DialogFrameFooter` 透传 `div` 属性，`align` 为 `end`（默认）或 `between`。
+
+---
+
 ### ConfirmAlertDialog / Loading
 
 **文件位置**：`apps/web/src/shared/components/ConfirmAlertDialog.tsx`、`apps/web/src/shared/components/Loading.tsx`
@@ -294,12 +354,12 @@ import { ConfirmAlertDialog, Loading } from '@/shared/components'
 
 `ConfirmAlertDialog.onConfirm` 可以返回 Promise：返回 `false` 或抛出错误时弹窗保持打开，并在弹窗内展示失败原因；确认处理中会禁用取消与确认按钮并阻止 Escape 关闭。组件内部组合 `shared/ui/alert-dialog`，初始焦点落在取消按钮。
 
-页面级对话框、抽屉与确认框直接组合 `@/shared/ui` 的生成原语，不经过应用层包装：
+高度受限的表单、选择器与发现弹窗使用 shared `DialogFrame` + `DialogBody` + `DialogFrameFooter`；无高度上限的简单弹窗仍可直接组合生成原语：
 
-- `Dialog` 用于表单、选择器与发现弹窗；内容区滚动、页头与页脚由调用点用 `DialogHeader`、`DialogTitle`、`DialogDescription`、`DialogFooter` 组合。
 - `Sheet` 用于作业详情抽屉：桌面 `side="right"`、移动 `side="bottom"`；需要保留页面可交互时使用 Root 的 `modal={false}` 并自行处理外部点击关闭。
 - `AlertDialog` 用于必须显式确认的操作；`role="alertdialog"` 由原语提供。
 - 嵌套弹层按 React 父子关系组合（如发现弹窗内的筛选弹窗、详情抽屉上的重置确认框），Base UI 依此管理 Escape 层级、焦点归还与滚动锁。
+- 弹层经 Base UI portal 挂到 `document.body`，层序使用 `--layout-z-portal`；应用自绘浮层按 [设计规范](../../DESIGN.md) 的 z-index scale 取 token，不在组件里补高位 z-index。
 
 `DashboardSkeleton` 是控制台域专用骨架，位于 `features/dashboard/components/DashboardSkeleton.tsx`，不属于 `shared/components` 的公共导出。
 

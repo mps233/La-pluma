@@ -1,7 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { expectNoBrowserErrors, recordBrowserErrors } from './browser-errors'
 import { apiFixtures, ok } from './fixtures'
-import { installDeterministicEnvironment, waitForPageReady } from './harness'
+import {
+  installDeterministicEnvironment,
+  readMotionDurations,
+  removeMotionFreeze,
+  waitForPageReady,
+} from './harness'
 
 const combatDiscoveryFixtures = [
   { path: '/agent/copilot/stages', payload: ok([]) },
@@ -34,6 +39,18 @@ const combatDiscoveryFixtures = [
   },
   ...apiFixtures,
 ]
+
+const combatDiscoveryWithStagesFixtures = combatDiscoveryFixtures.map(fixture => (
+  fixture.path === '/agent/copilot/stages'
+    ? {
+        ...fixture,
+        payload: ok([
+          { stageId: 'main_01-07', code: '1-7', name: '暴君', category: '主线', zone: '切尔诺伯格' },
+          { stageId: 'lt_02_01', code: 'LT-2', name: '未授权区域', category: '保全派驻', zone: '塔山农业实验平台' },
+        ]),
+      }
+    : fixture
+))
 
 const combatSetFixtures = [
   { path: '/agent/copilot/stages', payload: ok([]) },
@@ -403,6 +420,75 @@ test.describe('dialog overlay behavior', () => {
     await expect(discovery).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(discovery).toBeHidden()
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
+
+  test('stacks the stage popover over the discovery dialog without clipping', async ({ page }) => {
+    const environment = await installDeterministicEnvironment(page, {
+      fixtures: combatDiscoveryWithStagesFixtures,
+    })
+    await page.goto('/app/combat')
+    await waitForPageReady(page, 'combat')
+
+    const discoveryTrigger = page.getByRole('button', { name: '发现', exact: true })
+    await discoveryTrigger.focus()
+    await discoveryTrigger.click()
+
+    const discovery = page.locator('#combat-copilot-discovery-dialog')
+    await expect(discovery).toBeVisible()
+
+    const stageTrigger = page.getByRole('button', { name: '关卡筛选', exact: true })
+    await stageTrigger.focus()
+    await stageTrigger.click()
+
+    const stagePanel = page.getByRole('dialog', { name: '选择关卡' })
+    await expect(stagePanel).toBeVisible()
+    await expect(stageTrigger).toHaveAttribute('aria-expanded', 'true')
+    await expectPopupCoversItsCenter(stagePanel)
+
+    const viewport = page.viewportSize()!
+    const panelBox = await stagePanel.boundingBox()
+    expect(panelBox).not.toBeNull()
+    expect(panelBox!.x).toBeGreaterThanOrEqual(0)
+    expect(panelBox!.y).toBeGreaterThanOrEqual(0)
+    expect(panelBox!.x + panelBox!.width).toBeLessThanOrEqual(viewport.width)
+    expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(viewport.height)
+    expect(await stagePanel.evaluate(element => Boolean(element.closest('[data-region="scroll"]'))))
+      .toBe(false)
+
+    await page.keyboard.press('Escape')
+    await expect(stagePanel).toBeHidden()
+    await expect(discovery).toBeVisible()
+    await expect(stageTrigger).toBeFocused()
+
+    await page.keyboard.press('Escape')
+    await expect(discovery).toBeHidden()
+    await expect(discoveryTrigger).toBeFocused()
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
+
+  test('disables the stage popover animation when reduced motion is requested', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    const environment = await installDeterministicEnvironment(page, {
+      fixtures: combatDiscoveryWithStagesFixtures,
+    })
+    await page.goto('/app/combat')
+    await waitForPageReady(page, 'combat')
+    await removeMotionFreeze(page)
+
+    await page.getByRole('button', { name: '发现', exact: true }).click()
+    await page.getByRole('button', { name: '关卡筛选', exact: true }).click()
+
+    const stagePanel = page.getByRole('dialog', { name: '选择关卡' })
+    await expect(stagePanel).toBeVisible()
+
+    const motion = await readMotionDurations(stagePanel)
+    expect(motion.animation.every(duration => duration <= 0.000011)).toBe(true)
+    expect(motion.transition.every(duration => duration <= 0.000011)).toBe(true)
 
     environment.assertNoUnmatchedApi()
     await expectNoBrowserErrors(page)

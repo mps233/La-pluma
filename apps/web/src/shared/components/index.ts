@@ -1,6 +1,8 @@
 export { default as FieldHint } from './FieldHint.tsx'
 
 export { ConfirmAlertDialog } from './ConfirmAlertDialog.tsx'
+export { DialogBody, DialogFrame, DialogFrameFooter } from './DialogFrame.tsx'
+export type { DialogFrameProps, DialogFrameFooterProps, DialogFrameSize } from './DialogFrame.tsx'
 export { default as Loading, PageSkeleton } from './Loading.tsx'
 export { default as PageShell } from './PageShell.tsx'
 export type { PageKind } from './PageShell.tsx'

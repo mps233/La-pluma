@@ -47,6 +47,14 @@ const click = async (element: Element | null) => {
   })
 }
 
+const flushTimers = async () => {
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) })
+}
+
+const stagePanel = (): HTMLElement | null => (
+  document.querySelector<HTMLElement>('[role="dialog"][aria-label="选择关卡"]')
+)
+
 const typeInto = async (input: HTMLInputElement | null, value: string) => {
   expect(input).not.toBeNull()
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
@@ -91,6 +99,45 @@ describe('CombatCopilotStageSelect', () => {
     })
     return props
   }
+
+  it('exposes the stage panel as a labelled dialog and closes it with Escape', async () => {
+    await renderSelect()
+    const trigger = findButton('关卡筛选')
+    expect(trigger.getAttribute('aria-haspopup')).toBe('dialog')
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+
+    await click(trigger)
+
+    const panel = stagePanel()
+    expect(panel).not.toBeNull()
+    expect(container.contains(panel)).toBe(false)
+    expect(trigger.getAttribute('aria-controls')).toBe(panel!.id)
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    await flushTimers()
+
+    expect(stagePanel()).toBeNull()
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('closes the stage panel when clicking outside it', async () => {
+    await renderSelect()
+    const trigger = findButton('关卡筛选')
+    await click(trigger)
+    expect(stagePanel()).not.toBeNull()
+
+    await act(async () => {
+      document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await flushTimers()
+
+    expect(stagePanel()).toBeNull()
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+  })
 
   it('filters stages by code, name, category or zone and selects one', async () => {
     const props = await renderSelect()

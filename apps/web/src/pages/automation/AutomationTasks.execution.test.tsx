@@ -474,11 +474,11 @@ describe('AutomationTasks execution', () => {
     await renderPage()
 
     await click(container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]'))
-    expect(container.querySelector('#automation-task-picker')).not.toBeNull()
+    expect(document.querySelector('[role="menu"]')).not.toBeNull()
 
     await click(runButton())
 
-    expect(container.querySelector('#automation-task-picker')).toBeNull()
+    expect(document.querySelector('[role="menu"]')).toBeNull()
     expect(container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')?.disabled).toBe(true)
   })
 

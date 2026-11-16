@@ -95,6 +95,25 @@ function readBootTokens(): Map<string, CustomPropertyDeclaration[]> {
 }
 
 const TEXT_EXTENSIONS = new Set(['.css', '.html', '.js', '.json', '.md', '.mjs', '.ts', '.tsx'])
+const PRODUCTION_SOURCE_EXTENSIONS = new Set(['.css', '.ts', '.tsx'])
+const TEST_SOURCE_RE = /\.(?:test|spec)\.(?:ts|tsx)$/
+const EXAMPLES_SOURCE_RE = /\.pw\.ts$/
+const RETIRED_Z_INDEX_RE = new RegExp(String.raw`z-index:\s*2000\b|\bz-${'9999'}\b`)
+const RAW_LAYER_CLASS_RE = new RegExp(String.raw`\bz-(?:50|60|${'9999'})\b`)
+
+const Z_LAYER_TOKENS = [
+  ['--layout-z-content', '0'],
+  ['--layout-z-sticky', '10'],
+  ['--layout-z-chrome', '20'],
+  ['--layout-z-tabbar', '30'],
+  ['--layout-z-raised', '40'],
+  ['--layout-z-portal', '50'],
+  ['--layout-z-toast', '60'],
+  ['--layout-z-immersive', '70'],
+] as const
+
+const WEB_SRC_ROOT = join(REPO_ROOT, 'apps', 'web', 'src')
+
 const IGNORED_DIRECTORIES = new Set([
   '.git',
   '__screenshots__',
@@ -116,6 +135,24 @@ function collectTextFiles(dir: string): string[] {
 
 function matches(source: string, pattern: RegExp): string[] {
   return [...source.matchAll(pattern)].flatMap(match => (match[1] ? [match[1]] : []))
+}
+
+function collectProductionSourceFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap(entry => {
+    if (TEST_SOURCE_RE.test(entry) || EXAMPLES_SOURCE_RE.test(entry)) return []
+    const path = join(dir, entry)
+    if (statSync(path).isDirectory()) return collectProductionSourceFiles(path)
+    return PRODUCTION_SOURCE_EXTENSIONS.has(extname(entry)) ? [path] : []
+  })
+}
+
+function cssRuleBody(css: string, selector: string): string {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`${escaped}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? ''
+}
+
+function occurrenceCount(source: string, needle: string): number {
+  return source.split(needle).length - 1
 }
 
 describe('layout style layer', () => {
@@ -221,5 +258,65 @@ describe('layout style layer', () => {
     ])
     expect(() => resolveCustomProperty('--fixture-outer', dependency))
       .toThrow(/ambiguous token declaration: --fixture-inner 出现 2 次/)
+  })
+})
+
+describe('z-index layer scale', () => {
+  it('defines the finite scale with strictly increasing values', () => {
+    const tokens = readLayoutTokens()
+    const values = Z_LAYER_TOKENS.map(([token]) => resolveCustomProperty(token, tokens))
+
+    expect(values).toEqual(Z_LAYER_TOKENS.map(([, value]) => value))
+    const numeric = values.map(Number)
+    expect(numeric.every((value, index) => index === 0 || value > numeric[index - 1]!)).toBe(true)
+  })
+
+  it('maps shell regions to their scale tokens', () => {
+    const layoutCss = readFileSync(join(STYLES_ROOT, 'layout.css'), 'utf8')
+    const expected = [
+      ['.la-pluma-navbar', '--layout-z-chrome'],
+      ['.la-pluma-page-body', '--layout-z-content'],
+      ['.la-pluma-skip-link', '--layout-z-raised'],
+      ['.la-pluma-tabbar', '--layout-z-tabbar'],
+    ] as const
+
+    for (const [selector, token] of expected) {
+      expect(cssRuleBody(layoutCss, selector)).toContain(`z-index: var(${token});`)
+    }
+  })
+
+  it('keeps retired high z-index values out of production source', () => {
+    const offenders = collectProductionSourceFiles(WEB_SRC_ROOT).flatMap(file => {
+      const source = readFileSync(file, 'utf8')
+      return RETIRED_Z_INDEX_RE.test(source) ? [relative(REPO_ROOT, file)] : []
+    })
+
+    expect(offenders).toEqual([])
+  })
+
+  it('uses scale tokens for application floating layers', () => {
+    const expectations = [
+      ['app/layout/PWAInstallPrompt.tsx', '--layout-z-raised', 3],
+      ['app/layout/ThemeToggle.tsx', '--layout-z-portal', 1],
+      ['features/combat/components/CombatCopilotDetailLayer.tsx', '--layout-z-portal', 3],
+      ['features/device-mirror/components/ScrcpyDeviceView.tsx', '--layout-z-immersive', 1],
+    ] as const
+
+    for (const [file, token, count] of expectations) {
+      const source = readFileSync(join(WEB_SRC_ROOT, file), 'utf8')
+      expect(occurrenceCount(source, `z-(${token})`), file).toBe(count)
+      expect(RAW_LAYER_CLASS_RE.test(source), file).toBe(false)
+    }
+  })
+
+  it('wires portal backdrops and toasts to the scale', () => {
+    const indexCss = readFileSync(join(STYLES_ROOT, 'index.css'), 'utf8')
+
+    expect(indexCss).toMatch(
+      /\[data-base-ui-portal\][^{]*\{[^}]*z-index:\s*var\(--layout-z-portal\)\s*!important/,
+    )
+    expect(indexCss).toMatch(
+      /\[data-sonner-toaster\]\s*\{[^}]*z-index:\s*var\(--layout-z-toast\)\s*!important/,
+    )
   })
 })

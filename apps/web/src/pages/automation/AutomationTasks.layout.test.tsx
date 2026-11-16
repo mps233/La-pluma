@@ -1352,14 +1352,14 @@ describe('AutomationTasks layout surfaces', () => {
 
     const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!
     expect(trigger.textContent).toContain('添加任务')
-    expect(trigger.getAttribute('aria-controls')).toBe('automation-task-picker')
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
 
     await act(async () => trigger.click())
+    await flush()
 
-    const menu = container.querySelector<HTMLElement>('#automation-task-picker')!
+    const menu = document.querySelector<HTMLElement>('[role="menu"]')!
     expect(trigger.getAttribute('aria-expanded')).toBe('true')
-    expect(menu.getAttribute('role')).toBe('menu')
+    expect(trigger.getAttribute('aria-controls')).toBe(menu.id)
     expect(menu.getAttribute('aria-label')).toBe('可添加任务')
     expect(menu.querySelectorAll('[role="menuitem"]').length).toBeGreaterThan(0)
   })
@@ -1369,15 +1369,17 @@ describe('AutomationTasks layout surfaces', () => {
 
     const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!
     await act(async () => trigger.click())
-    const firstMenuItem = container.querySelector<HTMLButtonElement>('[role="menuitem"]')!
+    await flush()
+    const firstMenuItem = document.querySelector<HTMLElement>('[role="menuitem"]')!
     firstMenuItem.focus()
     expect(document.activeElement).toBe(firstMenuItem)
 
     await act(async () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     })
+    await flush()
 
-    expect(container.querySelector('[role="menu"]')).toBeNull()
+    expect(document.querySelector('[role="menu"]')).toBeNull()
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
     expect(document.activeElement).toBe(trigger)
   })
@@ -1399,17 +1401,19 @@ describe('AutomationTasks layout surfaces', () => {
     await renderMode('visible')
     const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!
     await act(async () => trigger.click())
-    expect(container.querySelector('[role="menu"]')).not.toBeNull()
+    await flush()
+    expect(document.querySelector('[role="menu"]')).not.toBeNull()
 
     await renderMode('hidden')
     await renderMode('visible')
 
-    expect(container.querySelector('#automation-task-picker')).not.toBeNull()
+    expect(document.querySelector('[role="menu"]')).not.toBeNull()
     await act(async () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     })
+    await flush()
 
-    expect(container.querySelector('#automation-task-picker')).toBeNull()
+    expect(document.querySelector('[role="menu"]')).toBeNull()
     expect(document.activeElement).toBe(trigger)
   })
 
@@ -1531,13 +1535,15 @@ describe('AutomationTasks layout surfaces', () => {
 
     const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!
     await act(async () => trigger.click())
-    expect(container.querySelector('[role="menu"]')).not.toBeNull()
+    await flush()
+    expect(document.querySelector('[role="menu"]')).not.toBeNull()
 
     await act(async () => {
       document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
     })
+    await flush()
 
-    expect(container.querySelector('[role="menu"]')).toBeNull()
+    expect(document.querySelector('[role="menu"]')).toBeNull()
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
   })
 })
