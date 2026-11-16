@@ -195,7 +195,7 @@ export default function CombatCopilotDiscoveryDialog({ search, children }: Comba
         id={COPILOT_DISCOVERY_DIALOG_ID}
         showCloseButton={false}
         aria-modal="true"
-        className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
+        className="flex max-h-(--layout-dialog-max-height) flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
       >
         <DialogHeader className="flex-row items-center justify-between gap-3 border-b px-4 py-3">
           <DialogTitle>发现作业</DialogTitle>

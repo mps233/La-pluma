@@ -93,7 +93,7 @@
   }
 
   .log-console {
-    height: clamp(20rem, 55dvh, 28rem);
+    height: clamp(20rem, 55vh, 28rem);
     overflow-y: auto;
     border-radius: var(--radius-lg);
     background: var(--muted);
@@ -102,6 +102,12 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     font-size: 0.75rem;
     line-height: 1.55;
+  }
+
+  @supports (height: 55svh) {
+    .log-console {
+      height: clamp(20rem, 55svh, 28rem);
+    }
   }
 
   .log-row {

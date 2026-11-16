@@ -553,10 +553,16 @@
 
   .la-pluma-more-sheet {
     box-sizing: border-box;
-    max-height: min(28rem, 78dvh);
+    max-height: min(28rem, 78vh);
     padding: 0.75rem max(1rem, env(safe-area-inset-right)) max(1.25rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
     overflow: hidden;
     border-radius: 1.25rem 1.25rem 0 0;
+  }
+
+  @supports (height: 78dvh) {
+    .la-pluma-more-sheet {
+      max-height: min(28rem, 78dvh);
+    }
   }
 
   .la-pluma-more-sheet-header [data-slot='sheet-title'] {

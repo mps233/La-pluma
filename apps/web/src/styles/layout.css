@@ -23,6 +23,16 @@
     --layout-content-max: 112rem;
     --layout-page-gutter: 2rem;
     --layout-content-sticky-top: 1rem;
+    --layout-dialog-max-height: calc(100dvh - 2rem);
+    --layout-sheet-max-height: 85dvh;
+  }
+
+  @supports not (height: 100dvh) {
+    :root {
+      --layout-viewport-height: 100vh;
+      --layout-dialog-max-height: calc(100vh - 2rem);
+      --layout-sheet-max-height: 85vh;
+    }
   }
 
   @media (width < 1024px) {

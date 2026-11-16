@@ -73,6 +73,27 @@ function resolveCustomProperty(
   ).replace(/\s+/g, ' ').trim()
 }
 
+function customPropertyValues(
+  name: string,
+  grouped: Map<string, CustomPropertyDeclaration[]>,
+): string[] {
+  return (grouped.get(name) ?? []).map(({ value }) => value)
+}
+
+function readLayoutTokens(): Map<string, CustomPropertyDeclaration[]> {
+  return groupCustomProperties(customPropertyDeclarations(
+    readFileSync(join(STYLES_ROOT, 'layout.css'), 'utf8'),
+    'layout.css',
+  ))
+}
+
+function readBootTokens(): Map<string, CustomPropertyDeclaration[]> {
+  const html = readFileSync(join(REPO_ROOT, 'apps', 'web', 'index.html'), 'utf8')
+  const bootStyle = BOOT_STYLE_RE.exec(html)?.[1]
+  if (!bootStyle) throw new Error('index.html 缺少启动壳样式块')
+  return groupCustomProperties(customPropertyDeclarations(bootStyle, 'index.html 启动壳样式'))
+}
+
 const TEXT_EXTENSIONS = new Set(['.css', '.html', '.js', '.json', '.md', '.mjs', '.ts', '.tsx'])
 const IGNORED_DIRECTORIES = new Set([
   '.git',
@@ -142,18 +163,8 @@ describe('layout style layer', () => {
   })
 
   it('keeps the boot shell geometry in sync with layout tokens', () => {
-    const layoutTokens = groupCustomProperties(
-      customPropertyDeclarations(
-        readFileSync(join(STYLES_ROOT, 'layout.css'), 'utf8'),
-        'layout.css',
-      ),
-    )
-    const html = readFileSync(join(REPO_ROOT, 'apps', 'web', 'index.html'), 'utf8')
-    const bootStyle = BOOT_STYLE_RE.exec(html)?.[1]
-    if (!bootStyle) throw new Error('index.html 缺少启动壳样式块')
-    const bootTokens = groupCustomProperties(
-      customPropertyDeclarations(bootStyle, 'index.html 启动壳样式'),
-    )
+    const layoutTokens = readLayoutTokens()
+    const bootTokens = readBootTokens()
 
     const checks = [
       {
@@ -176,6 +187,12 @@ describe('layout style layer', () => {
     })
 
     expect(mismatches).toEqual([])
+  })
+
+  it('keeps viewport height branches in sync between the boot shell and layout tokens', () => {
+    const bootValues = customPropertyValues('--boot-viewport-height', readBootTokens())
+    expect(bootValues.length).toBeGreaterThan(0)
+    expect(customPropertyValues('--layout-viewport-height', readLayoutTokens())).toEqual(bootValues)
   })
 
   it('rejects duplicate declarations instead of masking them with a later context', () => {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="%BASE_URL%favicon-graphite.png?v=1" />
     <link rel="apple-touch-icon" href="%BASE_URL%apple-touch-icon-graphite.png?v=1" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
 
     <!-- PWA Meta Tags -->
     <meta name="description" content="MAA CLI 的现代化 Web 界面 - 自动化明日方舟游戏任务" />
@@ -25,6 +25,11 @@
           env(safe-area-inset-bottom, 0px),
           1.25rem
         );
+      }
+      @supports not (height: 100dvh) {
+        :root {
+          --boot-viewport-height: 100vh;
+        }
       }
       html.dark {
         --boot-bg: #000000;

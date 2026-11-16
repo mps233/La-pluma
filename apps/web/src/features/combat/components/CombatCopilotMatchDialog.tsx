@@ -51,7 +51,7 @@ export default function CombatCopilotMatchDialog({
       <DialogContent
         showCloseButton={false}
         aria-modal="true"
-        className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
+        className="flex max-h-(--layout-dialog-max-height) flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
       >
         <DialogHeader className="flex-row items-center justify-between gap-3 border-b px-4 py-3">
           <DialogTitle>干员匹配</DialogTitle>
