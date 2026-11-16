@@ -15,7 +15,7 @@ La Pluma Next 是一个面向《明日方舟》自动化的本地 Web 控制台�
 
 ### 前端 UI 与响应式壳层
 
-前端使用 React 19、Tailwind CSS v4（`@tailwindcss/vite`；`@theme` 圆角映射 + 定向 `@utility` 间距映射，无 JS 配置）和 Framer Motion。`Layout` 与 `shared/components` 通用组件使用原生语义元素实现页面 chrome、导航栏、移动 tabbar 和模态交互；`styles/` 下的默认主题语义 token 与共享布局 token 统一品牌色、信息密度和水平留白，液态玻璃由后续主题层提供。
+前端使用 React 19、Tailwind CSS v4（`@tailwindcss/vite`；`@theme` 圆角映射 + 定向 `@utility` 间距映射，无 JS 配置）和 Framer Motion。`Layout` 与 `shared/components` 通用组件使用原生语义元素实现页面 chrome、导航栏、移动 tabbar 和模态交互；`styles/index.css` 的语义 token、`styles/layout.css` 的布局几何 token 与 `styles/ios-theme.css` 的 chrome 材质分别统一品牌色、信息密度、水平留白与默认主题外观，液态玻璃由后续主题层提供。
 
 URL 导航、路径归一、PWA 历史记录与 Activity 保活的约定统一见[前端架构与所有权](../frontend/README.md)。
 
@@ -24,7 +24,7 @@ URL 导航、路径归一、PWA 历史记录与 Activity 保活的约定统一�
 ## 技术栈
 
 - **前端框架**: React 19 + TypeScript + Vite
-- **UI 框架**: Tailwind CSS v4（`@tailwindcss/vite`，CSS-first 配置）+ Framer Motion + 项目语义组件与 `src/styles/ios-theme.css`
+- **UI 框架**: Tailwind CSS v4（`@tailwindcss/vite`，CSS-first 配置）+ Framer Motion + 项目语义组件与 `src/styles/` 全局样式
 - **图标**: Lucide React
 - **路由**: React Router 7（`BrowserRouter`，URL 即 tab 状态）
 - **状态管理**: Zustand（跨页客户端状态）
@@ -53,7 +53,7 @@ La-pluma-next/
 │   │   │   │                  #   statistics、logs、settings 等页面域，以及 task-execution、user-config、game-data、
 │   │   │   │                  #   resource-invalidation、runtime-status、device-mirror、operator-quotes 等跨域微域
 │   │   │   ├── shared/        # 横向下层：ui、theme（启动主题单一真源）、navigation、stores、api、query、hooks、utils
-│   │   │   └── styles/        # 全局样式资产（不参与四层分层）：index.css 语义 token 单源与 ios-theme.css
+│   │   │   └── styles/        # 全局样式资产（不参与四层分层）：index.css 语义 token 单源、layout.css 布局几何与 ios-theme.css 材质
 │   │   └── public/            # 静态资源（Logo、图标）
 │   └── server/                # 后端 (Node.js + Express)
 │       ├── src/

@@ -35,7 +35,7 @@
 
 - 通用控件从 `@/shared/ui` 复用；新增或调整公共组件时同步公开导出和组件 API 文档，不在页面复制已有控件。
 - 避免不必要的辅助标签与说明。让布局本身发挥解释作用。
-- 全局语义 token 与层序归 `src/styles/`；`index.css`、`ios-theme.css` 不接收页面选择器。领域样式置于 `features/<domain>/styles/`，由域入口导入并收进 `@layer page`。
+- 全局语义 token 与层序归 `src/styles/`；`index.css`、`layout.css`、`ios-theme.css` 不接收页面选择器。领域样式置于 `features/<domain>/styles/`，由域入口导入并收进 `@layer page`。
 - 保持 `theme, base, components, page, utilities` 层序，使用现有语义 token 和 Tailwind v4 canonical 类名；动态状态使用完整类名映射，不拼接 Tailwind 类名。
 - Dialog、Sheet、筛选菜单和 PWA 提示等 portal 位于 `document.body`，不受应用根作用域包裹；样式改动同时核对弹层、深浅主题和响应式断点。
 - 修改分包或 PWA 配置时确保所有 JS chunk 进入预缓存；新增 chunk 同步 `createWorkboxConfig` 的匹配规则。保留 API、health、信令路由的导航回退排除，以及启动主题和静态启动壳行为。

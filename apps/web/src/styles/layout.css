@@ -1,0 +1,378 @@
+@layer base {
+  :root {
+    --layout-viewport-height: 100dvh;
+    --layout-navbar-height: 4.75rem;
+    --layout-tabbar-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --layout-tabbar-floating-height: 4rem;
+    --layout-tabbar-floating-offset: 0.5rem;
+    --layout-tabbar-bottom-clearance: clamp(
+      var(--layout-tabbar-floating-offset),
+      var(--layout-tabbar-safe-bottom),
+      1.25rem
+    );
+    --layout-tabbar-reserved-height: calc(
+      var(--layout-tabbar-floating-height) + var(--layout-tabbar-bottom-clearance)
+    );
+    --layout-sidebar-width: 17rem;
+    --layout-content-max: 112rem;
+    --layout-page-gutter: 2rem;
+  }
+
+  @media (width <= 1023px) {
+    :root {
+      --layout-page-gutter: 1.25rem;
+    }
+  }
+
+  @media (width <= 639px) {
+    :root {
+      --layout-page-gutter: 0.875rem;
+    }
+  }
+
+  /* Safari's dynamic viewport is intentionally used in a normal browser so
+     the app follows the address bar. An installed app has no browser chrome;
+     use the largest viewport so fixed bars reach the physical screen edge. */
+  @media (display-mode: standalone), (display-mode: fullscreen) {
+    :root {
+      --layout-viewport-height: 100lvh;
+    }
+  }
+
+  html.la-pluma-standalone {
+    --layout-viewport-height: 100lvh;
+  }
+
+  @supports not (height: 100lvh) {
+    @media (display-mode: standalone), (display-mode: fullscreen) {
+      :root {
+        --layout-viewport-height: 100vh;
+      }
+    }
+
+    html.la-pluma-standalone {
+      --layout-viewport-height: 100vh;
+    }
+  }
+
+  body {
+    overflow: hidden;
+  }
+}
+
+@layer components {
+  .la-pluma-app,
+  .la-pluma-app .view,
+  .la-pluma-app .page {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: var(--layout-viewport-height);
+    height: auto;
+    overflow: visible;
+  }
+
+  .la-pluma-app .la-pluma-page {
+    isolation: isolate;
+  }
+
+  .la-pluma-app .la-pluma-navbar {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: calc(var(--layout-navbar-height) + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0);
+    position: sticky;
+    top: 0;
+    z-index: 60;
+  }
+
+  .la-pluma-app :is(.la-pluma-content, .la-pluma-navbar-inner) {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: var(--layout-content-max);
+    margin-inline: auto;
+    padding-right: max(var(--layout-page-gutter), env(safe-area-inset-right, 0px));
+    padding-left: max(var(--layout-page-gutter), env(safe-area-inset-left, 0px));
+  }
+
+  .la-pluma-app .la-pluma-navbar-inner {
+    position: relative;
+    display: grid;
+    min-height: var(--layout-navbar-height);
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .la-pluma-navbar-actions {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0;
+  }
+
+  .la-pluma-app .la-pluma-navbar-inner > .la-pluma-navbar-title {
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  .la-pluma-app .la-pluma-navbar-inner > .la-pluma-navbar-actions {
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  .la-pluma-page-body {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: var(--layout-sidebar-width) minmax(0, 1fr);
+    min-height: calc(var(--layout-viewport-height) - var(--layout-navbar-height) - env(safe-area-inset-top, 0px));
+  }
+
+  .la-pluma-sidebar {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .la-pluma-scroll-host {
+    min-width: 0;
+    height: calc(var(--layout-viewport-height) - var(--layout-navbar-height) - env(safe-area-inset-top, 0px));
+    min-height: calc(var(--layout-viewport-height) - var(--layout-navbar-height) - env(safe-area-inset-top, 0px));
+    overflow: hidden auto;
+    overscroll-behavior: contain;
+    scroll-padding-bottom: calc(
+      var(--layout-tabbar-reserved-height) + 1.25rem
+    );
+  }
+
+  .la-pluma-content {
+    min-width: 0;
+    padding-top: 1.25rem;
+    padding-bottom: 1.25rem;
+  }
+
+  .la-pluma-tabbar {
+    display: none;
+    z-index: 70;
+    box-sizing: border-box;
+    height: var(--layout-tabbar-reserved-height);
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .la-pluma-app .la-pluma-tabbar-inner {
+    position: absolute;
+    inset: auto 0 var(--layout-tabbar-bottom-clearance);
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    height: var(--layout-tabbar-floating-height);
+    min-height: 0;
+    box-sizing: border-box;
+    padding: 0 max(1.25rem, env(safe-area-inset-right, 0px)) 0
+      max(1.25rem, env(safe-area-inset-left, 0px));
+    pointer-events: none;
+  }
+
+  .la-pluma-app .la-pluma-tabbar-pill {
+    display: flex;
+    flex: 1 1 auto;
+    width: min(100%, 31rem);
+    min-width: 0;
+    height: 100%;
+    gap: 0.125rem;
+    padding: 0.25rem;
+    pointer-events: auto;
+  }
+
+  .la-pluma-app .la-pluma-tabbar-more {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex: 0 0 var(--layout-tabbar-floating-height);
+    width: var(--layout-tabbar-floating-height);
+    height: var(--layout-tabbar-floating-height);
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+  }
+
+  .la-pluma-app .la-pluma-tabbar-link {
+    display: inline-flex;
+    min-width: 0;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.1875rem;
+    min-height: 0;
+    padding: 0.25rem 0.3rem;
+  }
+
+  .la-pluma-app .app-page {
+    /* Layout owns page-edge spacing; nested pages must not add it again. */
+    padding-block: 0;
+  }
+
+  @media (width >= 1024px) {
+    .la-pluma-app .la-pluma-navbar {
+      grid-area: header;
+      position: relative;
+      top: auto;
+      right: auto;
+      left: auto;
+      width: 100%;
+      z-index: auto;
+    }
+
+    .la-pluma-app .la-pluma-navbar-inner {
+      z-index: 2;
+    }
+
+    .la-pluma-app .la-pluma-page-body {
+      display: grid;
+      height: var(--layout-viewport-height);
+      min-height: var(--layout-viewport-height);
+      grid-template:
+        'sidebar header' calc(var(--layout-navbar-height) + env(safe-area-inset-top, 0px))
+        'sidebar main' minmax(0, 1fr)
+        / var(--layout-sidebar-width) minmax(0, 1fr);
+    }
+
+    .la-pluma-app .la-pluma-sidebar {
+      grid-area: sidebar;
+      position: relative;
+      top: auto;
+      height: var(--layout-viewport-height);
+      padding: 0;
+      overflow: visible;
+    }
+
+    .la-pluma-app .la-pluma-scroll-host {
+      grid-area: main;
+      height: 100%;
+      min-height: 0;
+    }
+
+    .la-pluma-app .la-pluma-content {
+      padding-top: 1.25rem;
+      padding-bottom: 0.75rem;
+    }
+
+    .la-pluma-app .la-pluma-navbar-actions {
+      gap: 0.625rem;
+    }
+  }
+
+  @media (width <= 1023px) {
+    .la-pluma-app .la-pluma-navbar {
+      position: absolute;
+      top: 0;
+      right: 0;
+      left: 0;
+      isolation: isolate;
+      width: 100%;
+      pointer-events: none;
+    }
+
+    .la-pluma-app .la-pluma-navbar-inner {
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .la-pluma-app .la-pluma-navbar-actions {
+      gap: 0.75rem;
+    }
+
+    .la-pluma-app .la-pluma-page-body {
+      display: block;
+      height: var(--layout-viewport-height);
+      min-height: var(--layout-viewport-height);
+    }
+
+    .la-pluma-app .la-pluma-sidebar {
+      display: none;
+    }
+
+    .la-pluma-app .la-pluma-tabbar {
+      display: flex;
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      isolation: isolate;
+    }
+
+    .la-pluma-app .la-pluma-tabbar-inner {
+      z-index: 1;
+    }
+
+    .la-pluma-app .la-pluma-content {
+      padding-top: calc(
+        var(--layout-navbar-height) + env(safe-area-inset-top, 0px) + 1.25rem
+      );
+      padding-bottom: calc(
+        var(--layout-tabbar-reserved-height) + 1.25rem
+      );
+    }
+
+    .la-pluma-app .la-pluma-scroll-host {
+      height: var(--layout-viewport-height);
+      min-height: var(--layout-viewport-height);
+    }
+  }
+
+  @media (width <= 639px) {
+    .la-pluma-scroll-host {
+      scroll-padding-bottom: calc(
+        var(--layout-tabbar-reserved-height) + 0.875rem
+      );
+    }
+
+    .la-pluma-content {
+      padding-top: 0.875rem;
+      padding-bottom: 0.875rem;
+    }
+
+    .la-pluma-app .la-pluma-content {
+      padding-top: calc(
+        var(--layout-navbar-height) + env(safe-area-inset-top, 0px) + 0.875rem
+      );
+      padding-bottom: calc(
+        var(--layout-tabbar-reserved-height) + 0.875rem
+      );
+    }
+  }
+
+  html,
+  body,
+  #root,
+  #app-root {
+    min-height: 100%;
+  }
+
+  /* A standalone iOS document can report a dynamic layout height while its
+     screen is still the full largest viewport. Link every root in the height
+     chain so fixed tabbars are positioned against the physical viewport. */
+  html.la-pluma-standalone,
+  html.la-pluma-standalone body,
+  html.la-pluma-standalone #root,
+  html.la-pluma-standalone #app-root,
+  html.la-pluma-standalone #app-root .view,
+  html.la-pluma-standalone #app-root .page {
+    height: var(--layout-viewport-height);
+    min-height: var(--layout-viewport-height);
+  }
+
+  /* In an installed app the page is the full physical viewport. Keeping the
+     tabbar page-relative avoids WebKit anchoring `position: fixed` to the
+     smaller dynamic layout viewport reported during PWA startup. */
+  @media (width <= 1023px) {
+    html.la-pluma-standalone .la-pluma-app .la-pluma-tabbar {
+      position: absolute;
+      bottom: 0;
+    }
+  }
+}

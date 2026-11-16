@@ -281,7 +281,7 @@
   .automation-sequence-panel {
     position: sticky;
     top: 1rem;
-    max-height: calc(var(--la-pluma-viewport-height, 100dvh) - 4.75rem - 2rem);
+    max-height: calc(var(--layout-viewport-height, 100dvh) - 4.75rem - 2rem);
   }
 
   .automation-sequence-surface {

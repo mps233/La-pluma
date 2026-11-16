@@ -70,7 +70,7 @@ export default function AppSidebar({ activeTab, onNavigate }: AppSidebarProps) {
     <aside data-region="sidebar" className="la-pluma-sidebar" aria-label="主要功能">
       <SidebarProvider
         className="contents"
-        style={{ '--sidebar-width': 'var(--la-pluma-sidebar-width)' } as CSSProperties}
+        style={{ '--sidebar-width': 'var(--layout-sidebar-width)' } as CSSProperties}
       >
         <Sidebar collapsible="none" className="la-pluma-sidebar-body">
           <SidebarHeader>

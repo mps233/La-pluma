@@ -4,7 +4,7 @@ import { Toaster } from 'sonner'
 import { ThemeContext } from '@/shared/theme/useTheme'
 
 const DESKTOP_QUERY = '(min-width: 1024px)'
-const TABBAR_TOAST_BOTTOM = 'calc(var(--la-pluma-tabbar-reserved-height, 5rem) + env(safe-area-inset-bottom, 0px) + 1rem)'
+const TABBAR_TOAST_BOTTOM = 'calc(var(--layout-tabbar-reserved-height, 5rem) + env(safe-area-inset-bottom, 0px) + 1rem)'
 
 function subscribeDesktop(callback: () => void) {
   if (typeof window.matchMedia !== 'function') return () => {}

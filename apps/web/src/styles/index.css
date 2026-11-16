@@ -587,7 +587,7 @@
     bottom: max(1rem, env(safe-area-inset-bottom));
     left: max(0.75rem, env(safe-area-inset-left));
     max-height: calc(
-      var(--la-pluma-viewport-height, 100dvh)
+      var(--layout-viewport-height, 100dvh)
       - max(0.75rem, env(safe-area-inset-top))
       - max(1rem, env(safe-area-inset-bottom))
     );

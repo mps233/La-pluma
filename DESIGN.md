@@ -150,10 +150,11 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ### Source of Truth
 
 - `apps/web/src/styles/index.css`：语义 token 的**唯一来源**（base 层）、Tailwind 入口、`@theme` 圆角派生与 `@theme inline` 颜色映射、通用组件类与跨域 keyframes；页面样式由各功能域自持。
-- `apps/web/src/styles/ios-theme.css`：保留结构几何与布局 token（`--la-pluma-*`）、主题层材质 token（`--glass-*`）与对应样式；默认基线不依赖玻璃材质，液态玻璃由后续主题提供。
+- `apps/web/src/styles/layout.css`：主题无关的结构几何与 `--layout-*` token（视口、navbar、侧栏、内容宽度与留白、tabbar 安全区）；应用 chrome 的尺寸、定位、网格与滚动宿主都在这里，不承载颜色、材质或控件外观。
+- `apps/web/src/styles/ios-theme.css`：只保留默认主题的 chrome 材质 token（`--glass-*`）与对应视觉样式；默认基线不依赖玻璃材质，液态玻璃由后续主题提供。
 - `apps/web/src/shared/components`：`ConfirmAlertDialog`、`EmptyState`、`Loading` 等应用级通用组件；`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card`、`Dialog`、`AlertDialog`、`Sheet` 等 shadcn 生成物位于 `apps/web/src/shared/ui`（sidebar 也在该目录）。
 
-本文件描述规则；语义 token 的具体数值以 `apps/web/src/styles/index.css` 为准，布局与结构几何 token 以 `apps/web/src/styles/ios-theme.css` 为准。调整 token 时同步更新本文件的表格与说明。
+本文件描述规则；语义 token 的具体数值以 `apps/web/src/styles/index.css` 为准，布局与结构几何 token 以 `apps/web/src/styles/layout.css` 为准，chrome 材质 token 以 `apps/web/src/styles/ios-theme.css` 为准。调整 token 时同步更新本文件的表格与说明。
 
 ## 层序与 token 单源
 
@@ -165,9 +166,9 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ```
 
 - **utilities 永远赢**：`page` 位于 `components` 之后、`utilities` 之前；页面 CSS 可以覆盖 base/preflight 与 components，但普通声明不再压过 utilities。确实需要压过 utilities 的页面/组件规则使用 `!important` 并在原位注释原因。
-- **page 层**：每个功能域自持自己的页面样式，放在 `features/<domain>/styles/<domain>.css`，由该域 `index.ts` 导入一次，全部位于 `@layer page`；`index.css` 只保留跨域 keyframes，`ios-theme.css` 只保留应用 chrome、布局 token 与跨域 page-kind 材质（`.ios-workspace-page`、`.ios-borderless-cards`、`[data-automation-tasks]` + `[data-workbench-tasks]` 组合、`.la-pluma-content` 控件、浮层）；通用组件类留在 `@layer components`。
+- **page 层**：每个功能域自持自己的页面样式，放在 `features/<domain>/styles/<domain>.css`，由该域 `index.ts` 导入一次，全部位于 `@layer page`；`index.css` 只保留跨域 keyframes，`layout.css` 只保留应用壳层的布局几何与结构 token，`ios-theme.css` 只保留应用 chrome 材质与跨域 page-kind 材质（`.ios-workspace-page`、`.ios-borderless-cards`、`[data-automation-tasks]` + `[data-workbench-tasks]` 组合、`.la-pluma-content` 控件、浮层）；通用组件类留在 `@layer components`。
 - **域内 CSS 按普通 CSS 处理**：功能域样式文件不经过 Tailwind 入口的编译与降级流水线，不要在其中使用 `@apply`/`@theme` 等 Tailwind 指令；需要厂商前缀的能力按现有写法显式补齐（如 `-webkit-backdrop-filter`），浏览器下限仍以 v4 目标为准。
-- **token 单源**：语义 token（颜色、圆角、间距、字号、控件高度等）只在 `index.css` 的 `:root` / `html.dark, #app-root.dark` / 媒体查询中定义一次。浅色、深色、`prefers-contrast`、`prefers-reduced-transparency` 的最终生效值都写在这里；`ios-theme.css` 不再出现同名重定义。
+- **token 单源**：语义 token（颜色、圆角、间距、字号、控件高度等）只在 `index.css` 的 `:root` / `html.dark, #app-root.dark` / 媒体查询中定义一次；结构布局 token（`--layout-*`）只由 `layout.css` 定义。浅色、深色、`prefers-contrast`、`prefers-reduced-transparency` 的最终生效值都写在这里；`ios-theme.css` 不再出现同名重定义。
 - **深色切换**：主题仍同时给 `html` 与 `#app-root` 加 `.dark`；`html.dark` 与 `#app-root.dark` 都保留为有效选择器。
 
 ## 档位即规范（Tailwind 原生尺度）
@@ -180,8 +181,8 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 ### 冻结规则（全局样式入口）
 
-- `apps/web/src/styles/index.css` 与 `apps/web/src/styles/ios-theme.css` 是全局样式的**冻结入口**，不接收新增页面级选择器。
-- 页面选择器归 `features/<domain>/styles/`，由该域 `index.ts` 导入；两个全局入口对页面级选择器保持冻结，新样式按组件目录或功能域目录新增。
+- `apps/web/src/styles/index.css`、`apps/web/src/styles/layout.css` 与 `apps/web/src/styles/ios-theme.css` 是全局样式的**冻结入口**，不接收新增页面级选择器。
+- 页面选择器归 `features/<domain>/styles/`，由该域 `index.ts` 导入；上述全局入口对页面级选择器保持冻结，新样式按组件目录或功能域目录新增。
 - 拦截机制：stylelint 预算制（ratchet）冻结存量违规数、只拦净新增，用法见 [开发文档](docs/development/README.md) 的「样式治理」一节。
 
 ## Colors
@@ -241,8 +242,8 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 布局模型是“固定工作台 + 弹性内容区”。横向宽度与留白只由布局 token 控制，`.la-pluma-content` 与 `.la-pluma-navbar-inner` 共用同一份最大宽度、居中与左右 padding；页面内部不再嵌套同用途的 `max-w-*` 或水平 padding。
 
-- 内容最大宽度 `112rem`（`--la-pluma-content-max`），两侧对称居中。
-- 页面左右留白由 `--la-pluma-page-gutter` 提供：桌面（`1024px` 及以上）`32px`，平板（`640–1023px`）`20px`，移动（`639px` 及以下）`14px`。安全区取 `max(gutter, env(safe-area-inset-*))`，不叠加第二份 inset。
+- 内容最大宽度 `112rem`（`--layout-content-max`），两侧对称居中。
+- 页面左右留白由 `--layout-page-gutter` 提供：桌面（`1024px` 及以上）`32px`，平板（`640–1023px`）`20px`，移动（`639px` 及以下）`14px`。安全区取 `max(gutter, env(safe-area-inset-*))`，不叠加第二份 inset。
 - 基础节奏为 4px。页面外层用 `app-page`，区块之间用 `app-stack-section` / `app-grid-section`，卡片内部用 `app-stack-card` / `app-grid-card`。
 - 卡片内边距 `16px`；卡片内部紧密间距 `14px`（`gap-3.5`）；区块间距 `18px`（`gap-4.5`）；页面外层 `20px`，移动端 `14px`。不要用大量 `space-y-6`、`gap-6`、`p-6` 手写版式基准。
 - 常规信息卡片使用 `repeat(2, minmax(0, 1fr))`；主次栏建议保持约 `1.1–1.75 : 0.9–1`，工具/筛选窄栏最小约 `16rem`。每一列都要有 `minmax(0, ...)` 或 `min-w-0`，避免长文本横向溢出。
@@ -250,7 +251,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 ### Responsive Shell
 
-应用使用原生 `.la-pluma-app` 根节点。Navbar、侧栏、页面区域、移动 tabbar 和 Sheet 等 chrome 与交互统一由 `Layout` 及 `shared/components` 通用组件提供；`styles/ios-theme.css` 负责默认主题下的应用 chrome、布局 token 与安全区，不要在页面中另起一套导航或 modal 基础样式。液态玻璃是后续主题能力，不属于默认 chrome。
+应用使用原生 `.la-pluma-app` 根节点。Navbar、侧栏、页面区域、移动 tabbar 和 Sheet 等 chrome 与交互统一由 `Layout` 及 `shared/components` 通用组件提供；`styles/layout.css` 提供主题无关的布局几何与安全区 token，`styles/ios-theme.css` 负责默认主题下的应用 chrome 材质，不要在页面中另起一套导航或 modal 基础样式。液态玻璃是后续主题能力，不属于默认 chrome。
 
 - 桌面端（`1024px` 及以上）显示 `17rem` 左侧工作台：顶部是侧栏品牌头（普通非交互标识，不是按钮或链接），其下是单列工作区导航，底部固定干员身份区与每日语录。当前项使用侧栏强调背景与中等字重，不使用整行实心蓝。
 - 顶栏固定为两列：页面标题在左（唯一 `h1`，来自当前工作区名称并可截断），操作区在右。页面不再渲染自己的标题、副标题或页头操作区。
@@ -325,7 +326,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 ### Navigation
 - **Desktop:** 固定 17rem 侧栏；顶部 `SidebarHeader` 承载非交互品牌标识，其下是单列工作区导航，底部固定干员身份区与每日语录。当前项使用侧栏强调背景与中等字重，不使用整行实心蓝；侧栏不使用玻璃框、搜索或图标底座。
-- **Mobile:** 悬浮 4rem 胶囊 tabbar，底部安全区由 `--la-pluma-tabbar-*` token 统一管理；右侧“更多”入口经 Sheet 承载次要页面。移动端隐藏侧栏与品牌，顶栏仍显示页面标题。
+- **Mobile:** 悬浮 4rem 胶囊 tabbar，底部安全区由 `--layout-tabbar-*` token 统一管理；右侧“更多”入口经 Sheet 承载次要页面。移动端隐藏侧栏与品牌，顶栏仍显示页面标题。
 - **Shared State:** 两端复用 `Layout` 的 URL 路由和 active 状态；不要按 viewport 维护第二套导航状态，也不要让桌面侧栏样式扩散到移动底栏或“更多”Sheet。
 
 ### Dialog / Sheet
@@ -358,7 +359,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ## Do's and Don'ts
 
 ### Do:
-- **Do** 先读 `apps/web/src/styles/index.css` 和 `apps/web/src/styles/ios-theme.css`，再用语义类实现界面；新页面优先使用 `Layout`、`Card`、`Button`、`Input` 等现有组件。
+- **Do** 先读 `apps/web/src/styles/index.css`、`apps/web/src/styles/layout.css` 和 `apps/web/src/styles/ios-theme.css`，再用语义类实现界面；新页面优先使用 `Layout`、`Card`、`Button`、`Input` 等现有组件。
 - **Do** 把间距收敛到 Tailwind 原生档位与组件类、圆角收敛到 `--radius` 派生档位，保持 4px 基线和 1px 发丝线。
 - **Do** 让系统蓝保持稀缺：只用于当前项、主操作、焦点和运行中状态；状态色只表达语义。
 - **Do** 在手机和粗指针设备上沿用 shadcn base-nova 的紧凑控件度量，不额外放大表单控件，并检查 light/dark、loading、disabled、empty、error 以及长标题/长操作文案。

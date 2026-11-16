@@ -1,31 +1,14 @@
-@layer base, components, page;
-
 @layer base {
   :root {
     --glass-page-bg: #f2f2f7;
     --glass-bg: rgba(255, 255, 255, 0.68);
     --glass-border: rgba(60, 60, 67, 0.18);
     --glass-shadow: 0 12px 32px rgba(60, 60, 67, 0.12);
-    --la-pluma-viewport-height: 100dvh;
-    --la-pluma-tabbar-safe-bottom: env(safe-area-inset-bottom, 0px);
-    --la-pluma-tabbar-floating-height: 4rem;
-    --la-pluma-tabbar-floating-offset: 0.5rem;
-    --la-pluma-tabbar-bottom-clearance: clamp(
-      var(--la-pluma-tabbar-floating-offset),
-      var(--la-pluma-tabbar-safe-bottom),
-      1.25rem
-    );
-    --la-pluma-tabbar-reserved-height: calc(
-      var(--la-pluma-tabbar-floating-height) + var(--la-pluma-tabbar-bottom-clearance)
-    );
     --glass-tabbar-active-bg: rgba(118, 118, 128, 0.16);
     --glass-tabbar-active-edge: inset 0 0 0 0.5px var(--glass-border);
     --glass-tabbar-shadow: 0 1rem 2.25rem rgba(60, 60, 67, 0.18);
     --glass-tabbar-fade-color: #ffffff;
     --glass-navbar-fade-color: #ffffff;
-    --la-pluma-sidebar-width: 17rem;
-    --la-pluma-content-max: 112rem;
-    --la-pluma-page-gutter: 2rem;
     --glass-liquid-surface-lift: rgba(255, 255, 255, 0.04);
     --glass-edge-light: rgba(255, 255, 255, 0.48);
     --glass-edge-clear: rgba(255, 255, 255, 0);
@@ -44,43 +27,6 @@
       var(--glass-edge-light) 25%,
       var(--glass-edge-clear)
     );
-  }
-
-  @media (width <= 1023px) {
-    :root {
-      --la-pluma-page-gutter: 1.25rem;
-    }
-  }
-
-  @media (width <= 639px) {
-    :root {
-      --la-pluma-page-gutter: 0.875rem;
-    }
-  }
-
-  /* Safari's dynamic viewport is intentionally used in a normal browser so
-     the app follows the address bar. An installed app has no browser chrome;
-     use the largest viewport so fixed bars reach the physical screen edge. */
-  @media (display-mode: standalone), (display-mode: fullscreen) {
-    :root {
-      --la-pluma-viewport-height: 100lvh;
-    }
-  }
-
-  html.la-pluma-standalone {
-    --la-pluma-viewport-height: 100lvh;
-  }
-
-  @supports not (height: 100lvh) {
-    @media (display-mode: standalone), (display-mode: fullscreen) {
-      :root {
-        --la-pluma-viewport-height: 100vh;
-      }
-    }
-
-    html.la-pluma-standalone {
-      --la-pluma-viewport-height: 100vh;
-    }
   }
 
   html.dark,
@@ -114,7 +60,6 @@
 
   body {
     /* 无需 !important，这里覆盖 index.css 的同层 body 规则。 */
-    overflow: hidden;
     background-image: none;
     padding-bottom: 0;
     -webkit-font-smoothing: antialiased;
@@ -137,48 +82,17 @@
   .la-pluma-app,
   .la-pluma-app .view,
   .la-pluma-app .page {
-    position: relative;
-    box-sizing: border-box;
-    width: 100%;
-    min-height: var(--la-pluma-viewport-height);
-    height: auto;
-    overflow: visible;
     background: transparent;
   }
 
   .la-pluma-app .la-pluma-page {
-    isolation: isolate;
     color: var(--foreground);
   }
 
   .la-pluma-app .la-pluma-navbar {
-    box-sizing: border-box;
-    width: 100%;
-    min-height: calc(4.75rem + env(safe-area-inset-top, 0px));
-    padding-top: env(safe-area-inset-top, 0);
-    position: sticky;
-    top: 0;
-    z-index: 60;
     color: var(--foreground);
     background: var(--background);
     border-bottom: 1px solid var(--border);
-  }
-
-  .la-pluma-app :is(.la-pluma-content, .la-pluma-navbar-inner) {
-    box-sizing: border-box;
-    width: 100%;
-    max-width: var(--la-pluma-content-max);
-    margin-inline: auto;
-    padding-right: max(var(--la-pluma-page-gutter), env(safe-area-inset-right, 0px));
-    padding-left: max(var(--la-pluma-page-gutter), env(safe-area-inset-left, 0px));
-  }
-
-  .la-pluma-app .la-pluma-navbar-inner {
-    position: relative;
-    display: grid;
-    min-height: 4.75rem;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
   }
 
   .la-pluma-navbar-title {
@@ -191,23 +105,6 @@
     text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .la-pluma-navbar-actions {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: 0;
-  }
-
-  .la-pluma-app .la-pluma-navbar-inner > .la-pluma-navbar-title {
-    grid-column: 1;
-    justify-self: start;
-  }
-
-  .la-pluma-app .la-pluma-navbar-inner > .la-pluma-navbar-actions {
-    grid-column: 2;
-    justify-self: end;
   }
 
   .la-pluma-app :is(.la-pluma-tabbar-link, .la-pluma-tabbar-more) {
@@ -274,39 +171,8 @@
 
   @media (min-width: 1024px) {
     .la-pluma-app .la-pluma-navbar {
-      grid-area: header;
-      position: relative;
-      top: auto;
-      right: auto;
-      left: auto;
-      width: 100%;
-      z-index: auto;
       background: transparent;
       border-bottom: 0;
-    }
-
-    .la-pluma-app .la-pluma-navbar-inner {
-      z-index: 2;
-    }
-
-    .la-pluma-app .la-pluma-page-body {
-      display: grid;
-      height: var(--la-pluma-viewport-height);
-      min-height: var(--la-pluma-viewport-height);
-      grid-template-areas:
-        'sidebar header'
-        'sidebar main';
-      grid-template-columns: var(--la-pluma-sidebar-width) minmax(0, 1fr);
-      grid-template-rows: calc(4.75rem + env(safe-area-inset-top, 0px)) minmax(0, 1fr);
-    }
-
-    .la-pluma-app .la-pluma-sidebar {
-      grid-area: sidebar;
-      position: relative;
-      top: auto;
-      height: var(--la-pluma-viewport-height);
-      padding: 0;
-      overflow: visible;
     }
 
     .la-pluma-app .la-pluma-sidebar-body {
@@ -314,20 +180,8 @@
     }
 
     .la-pluma-app .la-pluma-scroll-host {
-      grid-area: main;
-      height: 100%;
-      min-height: 0;
       -webkit-mask-image: none;
       mask-image: none;
-    }
-
-    .la-pluma-app .la-pluma-content {
-      padding-top: 1.25rem;
-      padding-bottom: 0.75rem;
-    }
-
-    .la-pluma-app .la-pluma-navbar-actions {
-      gap: 0.625rem;
     }
 
     .la-pluma-app .la-pluma-theme-desktop {
@@ -436,19 +290,7 @@
     outline-offset: 2px;
   }
 
-  .la-pluma-page-body {
-    position: relative;
-    z-index: 1;
-    display: grid;
-    grid-template-columns: var(--la-pluma-sidebar-width) minmax(0, 1fr);
-    min-height: calc(var(--la-pluma-viewport-height) - 4.75rem - env(safe-area-inset-top, 0px));
-  }
-
   .la-pluma-sidebar {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    overflow-y: auto;
     background: transparent;
     scrollbar-width: none;
   }
@@ -542,15 +384,6 @@
   }
 
   .la-pluma-scroll-host {
-    min-width: 0;
-    height: calc(var(--la-pluma-viewport-height) - 4.75rem - env(safe-area-inset-top, 0px));
-    min-height: calc(var(--la-pluma-viewport-height) - 4.75rem - env(safe-area-inset-top, 0px));
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scroll-padding-bottom: calc(
-      var(--la-pluma-tabbar-reserved-height) + 1.25rem
-    );
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
   }
@@ -561,45 +394,14 @@
     height: 0;
   }
 
-  .la-pluma-content {
-    min-width: 0;
-    padding-top: 1.25rem;
-    padding-bottom: 1.25rem;
-  }
-
   .la-pluma-tabbar {
-    display: none;
-    z-index: 70;
-    box-sizing: border-box;
-    height: var(--la-pluma-tabbar-reserved-height);
-    overflow: visible;
     background: transparent;
     border: 0;
     box-shadow: none;
-    pointer-events: none;
-  }
-
-  .la-pluma-app .la-pluma-tabbar-inner {
-    position: absolute;
-    top: auto;
-    right: 0;
-    bottom: var(--la-pluma-tabbar-bottom-clearance);
-    left: 0;
-    display: flex;
-    align-items: stretch;
-    justify-content: center;
-    gap: 0.5rem;
-    width: 100%;
-    height: var(--la-pluma-tabbar-floating-height);
-    min-height: 0;
-    box-sizing: border-box;
-    padding: 0 max(1.25rem, env(safe-area-inset-right, 0px)) 0
-      max(1.25rem, env(safe-area-inset-left, 0px));
-    pointer-events: none;
   }
 
   /* Shared with in-page mode pickers: the liquid material is app-wide, the
-     navigation geometry lives on the tabbar classes above. */
+     navigation geometry lives in layout.css. */
   .la-pluma-app .app-liquid-tab-pill {
     --glass-liquid-surface: color-mix(
       in srgb,
@@ -667,18 +469,10 @@
   }
 
   .la-pluma-app .la-pluma-tabbar-pill {
-    display: flex;
-    flex: 1 1 auto;
-    width: min(100%, 31rem);
-    min-width: 0;
-    height: 100%;
-    gap: 0.125rem;
-    padding: 0.25rem;
     border: 1px solid var(--border);
     border-radius: 999px;
     background: var(--card);
     box-shadow: var(--glass-tabbar-shadow);
-    pointer-events: auto;
   }
 
   .la-pluma-app :where(.la-pluma-tabbar-link[data-app-tab='dashboard'].is-active) svg {
@@ -687,19 +481,11 @@
   }
 
   .la-pluma-app .la-pluma-tabbar-more {
-    box-sizing: border-box;
-    display: inline-flex;
-    flex: 0 0 var(--la-pluma-tabbar-floating-height);
-    width: var(--la-pluma-tabbar-floating-height);
-    height: var(--la-pluma-tabbar-floating-height);
-    align-items: center;
-    justify-content: center;
     border: 1px solid var(--border);
     border-radius: 50%;
     background: var(--card);
     color: var(--foreground);
     box-shadow: var(--glass-tabbar-shadow);
-    pointer-events: auto;
     transition: transform 180ms ease, background 180ms ease, color 180ms ease;
   }
 
@@ -720,16 +506,7 @@
   }
 
   .la-pluma-app .la-pluma-tabbar-link {
-    display: inline-flex;
-    min-width: 0;
-    flex: 1 1 0;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.1875rem;
-    min-height: 0;
     border-radius: 999px;
-    padding: 0.25rem 0.3rem;
     color: var(--muted-foreground);
     font-size: 0.6875rem;
     font-weight: 600;
@@ -885,11 +662,6 @@
     flex: 0 0 auto;
   }
 
-  .la-pluma-app .app-page {
-    /* Layout owns page-edge spacing; nested pages must not add it again. */
-    padding-block: 0;
-  }
-
   .la-pluma-app .surface-panel {
     margin: 0;
     border: 1px solid var(--border);
@@ -919,15 +691,8 @@
     /* On phones the chrome floats as separate controls over the page material,
        so each action owns one clear circular hit target. */
     .la-pluma-app .la-pluma-navbar {
-      position: absolute;
-      top: 0;
-      right: 0;
-      left: 0;
-      isolation: isolate;
-      width: 100%;
       background: transparent;
       border-bottom: 0;
-      pointer-events: none;
     }
 
     .la-pluma-app .la-pluma-navbar::before {
@@ -947,17 +712,8 @@
       pointer-events: none;
     }
 
-    .la-pluma-app .la-pluma-navbar-inner {
-      z-index: 1;
-      pointer-events: none;
-    }
-
     .la-pluma-app .la-pluma-theme-mobile {
       pointer-events: auto;
-    }
-
-    .la-pluma-app .la-pluma-navbar-actions {
-      gap: 0.75rem;
     }
 
     .la-pluma-app .la-pluma-theme-trigger,
@@ -1032,25 +788,6 @@
       pointer-events: none;
     }
 
-    .la-pluma-app .la-pluma-page-body {
-      display: block;
-      height: var(--la-pluma-viewport-height);
-      min-height: var(--la-pluma-viewport-height);
-    }
-
-    .la-pluma-app .la-pluma-sidebar {
-      display: none;
-    }
-
-    .la-pluma-app .la-pluma-tabbar {
-      display: flex;
-      position: fixed;
-      right: 0;
-      bottom: 0;
-      left: 0;
-      isolation: isolate;
-    }
-
     .la-pluma-app .la-pluma-tabbar::before {
       display: block;
       position: absolute;
@@ -1071,57 +808,20 @@
       pointer-events: none;
     }
 
-    .la-pluma-app .la-pluma-tabbar-inner {
-      z-index: 1;
-    }
-
-    .la-pluma-app .la-pluma-content {
-      padding-top: calc(
-        4.75rem + env(safe-area-inset-top, 0px) + 1.25rem
-      );
-      padding-bottom: calc(
-        var(--la-pluma-tabbar-reserved-height) + 1.25rem
-      );
-    }
-
     .la-pluma-app .la-pluma-scroll-host {
-      height: var(--la-pluma-viewport-height);
-      min-height: var(--la-pluma-viewport-height);
       -webkit-mask-image: linear-gradient(
         to bottom,
         transparent 0,
-        #000 calc(env(safe-area-inset-top, 0px) + 4.75rem),
-        #000 calc(100% - var(--la-pluma-tabbar-reserved-height)),
+        #000 calc(env(safe-area-inset-top, 0px) + var(--layout-navbar-height)),
+        #000 calc(100% - var(--layout-tabbar-reserved-height)),
         transparent 100%
       );
       mask-image: linear-gradient(
         to bottom,
         transparent 0,
-        #000 calc(env(safe-area-inset-top, 0px) + 4.75rem),
-        #000 calc(100% - var(--la-pluma-tabbar-reserved-height)),
+        #000 calc(env(safe-area-inset-top, 0px) + var(--layout-navbar-height)),
+        #000 calc(100% - var(--layout-tabbar-reserved-height)),
         transparent 100%
-      );
-    }
-  }
-
-  @media (max-width: 639px) {
-    .la-pluma-scroll-host {
-      scroll-padding-bottom: calc(
-        var(--la-pluma-tabbar-reserved-height) + 0.875rem
-      );
-    }
-
-    .la-pluma-content {
-      padding-top: 0.875rem;
-      padding-bottom: 0.875rem;
-    }
-
-    .la-pluma-app .la-pluma-content {
-      padding-top: calc(
-        4.75rem + env(safe-area-inset-top, 0px) + 0.875rem
-      );
-      padding-bottom: calc(
-        var(--la-pluma-tabbar-reserved-height) + 0.875rem
       );
     }
   }
@@ -1320,40 +1020,8 @@
     }
   }
 
-  html,
-  body,
-  #root,
-  #app-root {
-    min-height: 100%;
-  }
-
-  /* A standalone iOS document can report a dynamic layout height while its
-     screen is still the full largest viewport. Link every root in the height
-     chain so fixed tabbars are positioned against the physical viewport. */
-  html.la-pluma-standalone,
-  html.la-pluma-standalone body,
-  html.la-pluma-standalone #root,
-  html.la-pluma-standalone #app-root,
-  html.la-pluma-standalone #app-root .view,
-  html.la-pluma-standalone #app-root .page {
-    height: var(--la-pluma-viewport-height);
-    min-height: var(--la-pluma-viewport-height);
-  }
-
-  /* In an installed app the page is the full physical viewport. Keeping the
-     tabbar page-relative avoids WebKit anchoring `position: fixed` to the
-     smaller dynamic layout viewport reported during PWA startup. */
-  @media (max-width: 1023px) {
-    html.la-pluma-standalone .la-pluma-app .la-pluma-tabbar {
-      position: absolute;
-      bottom: 0;
-    }
-  }
-
 }
 
-  /* Root/standalone height chain (moved from base so the component
-     page shell cannot override it; same cascade as the former unlayered rule). */
 @layer page {
   /* Only summoned, overlapping layers receive Liquid Glass. Ordinary cards and
      grouped content remain opaque so the material hierarchy stays legible. */

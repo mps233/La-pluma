@@ -39,7 +39,7 @@ PORT=3100 LA_PLUMA_DEV_PORT=5273 pnpm dev
 
 ### 全局样式冻结
 
-`apps/web/src/styles/index.css` 与 `apps/web/src/styles/ios-theme.css` 已完成分层，不再接受页面级选择器：页面样式由各功能域自持，写在 `features/<domain>/styles/<domain>.css` 并由该域 `index.ts` 导入，统一收进 `@layer page`；新样式按组件目录或功能域目录新增。完整规则见 [设计规范](../../DESIGN.md) 的「层序与 token 单源」「配置即规范」两节。
+`apps/web/src/styles/index.css`、`apps/web/src/styles/layout.css` 与 `apps/web/src/styles/ios-theme.css` 已完成分层，不再接受页面级选择器：页面样式由各功能域自持，写在 `features/<domain>/styles/<domain>.css` 并由该域 `index.ts` 导入，统一收进 `@layer page`；新样式按组件目录或功能域目录新增。完整规则见 [设计规范](../../DESIGN.md) 的「层序与 token 单源」「配置即规范」两节。
 
 ### stylelint 预算制（ratchet）
 
@@ -93,7 +93,7 @@ pnpm screenshots:readme
 当前约定：
 
 - **构建链路**：依赖为 `tailwindcss@^4` + `@tailwindcss/vite`，由 Vite 插件处理样式；`autoprefixer`、`postcss` 与 `apps/web/postcss.config.js` 已退役，不再有 `@config` 指令与 `apps/web/tailwind.config.js`。
-- **层序与 token 单源**：语义 token 只在 `index.css` 的 `:root`、`html.dark, #app-root.dark` 与对比度/透明度媒体查询中定义，`ios-theme.css` 只保留 `--glass-*` 材质 token 与 `--la-pluma-*` 结构几何 token；项目语义 token 以 `index.css` 显式定义为准，不依赖 v4 默认色板。层序声明、`page` 层归属与 utilities 优先级详见 [设计规范](../../DESIGN.md) 的「层序与 token 单源」。
+- **层序与 token 单源**：语义 token 只在 `index.css` 的 `:root`、`html.dark, #app-root.dark` 与对比度/透明度媒体查询中定义；布局几何与结构 token（`--layout-*`）只由 `layout.css` 定义；`ios-theme.css` 只保留 `--glass-*` 材质 token 与 chrome 视觉。项目语义 token 以 `index.css` 显式定义为准，不依赖 v4 默认色板。层序声明、`page` 层归属与 utilities 优先级详见 [设计规范](../../DESIGN.md) 的「层序与 token 单源」。
 - **档位即规范**：圆角由 `index.css` 的 `--radius` 经标准派生档位生效、间距沿用 v4 原生档位与 .5 步进、content 自动检测，以 [设计规范](../../DESIGN.md)「档位即规范」为唯一依据。
 - **canonical 类名**：`eslint-plugin-tailwindcss` 的 `enforces-canonical-classname` 在 `apps/web/eslint.config.js` 中对 `src/**/*.{ts,tsx}` 启用（只开这一条），由 `lint` 拦截非规范写法：CSS 变量写 `bg-(--muted)` 而非 `bg-[var(--muted)]`；`break-words` 写 `wrap-break-word`，`[overflow-wrap:anywhere]` 写 `wrap-anywhere`，两者同时出现时保留两个类。
 - **v3→v4 类名**：`shadow-sm→shadow-xs`、`backdrop-blur-sm→backdrop-blur-xs`、`outline-none→outline-hidden`、`flex-shrink-0→shrink-0`，`!` 前缀改后缀（如 `dark:text-white!` 仍有效）；**`shadow-md` 及以上档位在 v4 中数值与 v3 相同，不要按 "shadow-lg→shadow-md" 的通用口诀改名**。`ring`、裸 `border`/`divide` 已显式给色。
