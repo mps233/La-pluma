@@ -618,27 +618,17 @@
   }
 
   @media (width < 1024px) {
-    .pwa-install-prompt {
-      bottom: calc(
-        5rem
-        + env(safe-area-inset-bottom, 0px)
-        + 1rem
-      );
-    }
-
-    .pwa-install-entry {
-      bottom: calc(
-        5rem
-        + env(safe-area-inset-bottom, 0px)
-        + 1rem
-      );
-    }
-
+    .pwa-install-prompt,
+    .pwa-install-entry,
     .pwa-update-chip {
-      bottom: calc(
-        5rem
-        + env(safe-area-inset-bottom, 0px)
-        + 1rem
+      bottom: var(--layout-floating-bottom-offset);
+    }
+
+    .pwa-install-prompt {
+      max-height: calc(
+        var(--layout-viewport-height, 100dvh)
+        - max(0.75rem, env(safe-area-inset-top))
+        - var(--layout-floating-bottom-offset)
       );
     }
   }

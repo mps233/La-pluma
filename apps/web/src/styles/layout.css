@@ -2,6 +2,9 @@
   :root {
     --layout-viewport-height: 100dvh;
     --layout-navbar-height: 4.75rem;
+    --layout-navbar-safe-height: calc(
+      var(--layout-navbar-height) + env(safe-area-inset-top, 0px)
+    );
     --layout-tabbar-safe-bottom: env(safe-area-inset-bottom, 0px);
     --layout-tabbar-floating-height: 4rem;
     --layout-tabbar-floating-offset: 0.5rem;
@@ -13,14 +16,21 @@
     --layout-tabbar-reserved-height: calc(
       var(--layout-tabbar-floating-height) + var(--layout-tabbar-bottom-clearance)
     );
+    --layout-floating-bottom-offset: calc(
+      var(--layout-tabbar-reserved-height) + 1rem
+    );
     --layout-sidebar-width: 17rem;
     --layout-content-max: 112rem;
     --layout-page-gutter: 2rem;
+    --layout-content-sticky-top: 1rem;
   }
 
   @media (width < 1024px) {
     :root {
       --layout-page-gutter: 1.25rem;
+      --layout-content-sticky-top: calc(
+        var(--layout-navbar-safe-height) + 1rem
+      );
     }
   }
 
@@ -79,7 +89,7 @@
   .la-pluma-app .la-pluma-navbar {
     box-sizing: border-box;
     width: 100%;
-    min-height: calc(var(--layout-navbar-height) + env(safe-area-inset-top, 0px));
+    min-height: var(--layout-navbar-safe-height);
     padding-top: env(safe-area-inset-top, 0);
     position: sticky;
     top: 0;
@@ -125,7 +135,7 @@
     z-index: 1;
     display: grid;
     grid-template-columns: var(--layout-sidebar-width) minmax(0, 1fr);
-    min-height: calc(var(--layout-viewport-height) - var(--layout-navbar-height) - env(safe-area-inset-top, 0px));
+    min-height: calc(var(--layout-viewport-height) - var(--layout-navbar-safe-height));
   }
 
   .la-pluma-sidebar {
@@ -137,8 +147,8 @@
 
   .la-pluma-scroll-host {
     min-width: 0;
-    height: calc(var(--layout-viewport-height) - var(--layout-navbar-height) - env(safe-area-inset-top, 0px));
-    min-height: calc(var(--layout-viewport-height) - var(--layout-navbar-height) - env(safe-area-inset-top, 0px));
+    height: calc(var(--layout-viewport-height) - var(--layout-navbar-safe-height));
+    min-height: calc(var(--layout-viewport-height) - var(--layout-navbar-safe-height));
     overflow: hidden auto;
     overscroll-behavior: contain;
     scroll-padding-bottom: calc(
@@ -276,7 +286,7 @@
       height: var(--layout-viewport-height);
       min-height: var(--layout-viewport-height);
       grid-template:
-        'sidebar header' calc(var(--layout-navbar-height) + env(safe-area-inset-top, 0px))
+        'sidebar header' var(--layout-navbar-safe-height)
         'sidebar main' minmax(0, 1fr)
         / var(--layout-sidebar-width) minmax(0, 1fr);
     }
@@ -351,7 +361,7 @@
 
     .la-pluma-app .la-pluma-content {
       padding-top: calc(
-        var(--layout-navbar-height) + env(safe-area-inset-top, 0px) + 1.25rem
+        var(--layout-navbar-safe-height) + 1.25rem
       );
       padding-bottom: calc(
         var(--layout-tabbar-reserved-height) + 1.25rem
@@ -378,7 +388,7 @@
 
     .la-pluma-app .la-pluma-content {
       padding-top: calc(
-        var(--layout-navbar-height) + env(safe-area-inset-top, 0px) + 0.875rem
+        var(--layout-navbar-safe-height) + 0.875rem
       );
       padding-bottom: calc(
         var(--layout-tabbar-reserved-height) + 0.875rem

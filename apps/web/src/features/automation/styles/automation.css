@@ -3,7 +3,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    min-height: 4.75rem;
+    min-height: var(--layout-navbar-height);
     gap: 1rem;
     padding: 1rem 1.125rem;
     border-bottom: 1px solid var(--border);
@@ -280,8 +280,19 @@
 
   .automation-sequence-panel {
     position: sticky;
-    top: 1rem;
-    max-height: calc(var(--layout-viewport-height, 100dvh) - 4.75rem - 2rem);
+    top: var(--layout-content-sticky-top);
+    max-height: calc(var(--layout-viewport-height, 100dvh) - var(--layout-navbar-height) - 2rem);
+  }
+
+  @media (900px <= width < 1024px) {
+    .automation-sequence-panel {
+      max-height: calc(
+        var(--layout-viewport-height, 100dvh) -
+        var(--layout-content-sticky-top) -
+        var(--layout-tabbar-reserved-height) -
+        1rem
+      );
+    }
   }
 
   .automation-sequence-surface {
@@ -753,14 +764,14 @@
 
   .automation-editor-panel {
     position: sticky;
-    top: 1rem;
+    top: var(--layout-content-sticky-top);
   }
 
   .automation-editor-heading {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    min-height: 4.75rem;
+    min-height: var(--layout-navbar-height);
     gap: 1rem;
     padding: 1rem 1.125rem;
     border-bottom: 1px solid var(--border);

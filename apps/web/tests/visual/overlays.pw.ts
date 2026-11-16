@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Locator } from '@playwright/test'
 import { expectNoBrowserErrors, recordBrowserErrors } from './browser-errors'
 import {
   THEMES,
@@ -46,3 +46,41 @@ for (const theme of THEMES) {
     })
   })
 }
+
+test.describe('floating PWA offsets', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  test('keeps the install prompt one spacing step above the tabbar', async ({ page }) => {
+    test.skip(test.info().project.name !== 'mobile', 'the compact install entry is only offered below the sm breakpoint')
+
+    recordBrowserErrors(page)
+    await page.addInitScript(themeSeedScript('dark'))
+    const environment = await installDeterministicEnvironment(page)
+
+    await page.goto('/app/dashboard')
+    await waitForPageReady(page, 'dashboard')
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('beforeinstallprompt'))
+    })
+
+    const gapAboveTabbar = (target: Locator) => target.evaluate(element => {
+      const tabbar = document.querySelector<HTMLElement>('[data-region="tabbar"]')
+      if (!tabbar) throw new Error('tabbar region is missing')
+      return tabbar.getBoundingClientRect().top - element.getBoundingClientRect().bottom
+    })
+
+    const installEntry = page.getByRole('button', { name: '安装 La Pluma Next' })
+    await expect(installEntry).toBeVisible()
+    expect(await gapAboveTabbar(installEntry)).toBeCloseTo(16, 1)
+
+    await installEntry.click()
+
+    const installPrompt = page.getByRole('region', { name: '安装 La Pluma Next' })
+    await expect(installPrompt).toBeVisible()
+    expect(await gapAboveTabbar(installPrompt)).toBeCloseTo(16, 1)
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
+})

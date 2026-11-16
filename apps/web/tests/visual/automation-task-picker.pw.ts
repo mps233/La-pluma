@@ -50,6 +50,61 @@ const longFlowFixtures: ApiFixture[] = apiFixtures.map(fixture =>
       }
     : fixture)
 
+test.describe('compact shell sticky flow panel', () => {
+  test.use({ viewport: { width: 960, height: 800 } })
+
+  test('keeps the flow panel below the navbar and above the tabbar while scrolling', async ({ page }) => {
+    test.skip(test.info().project.name !== 'desktop', 'the compact shell geometry is measured under a dedicated viewport')
+
+    recordBrowserErrors(page)
+    await page.addInitScript(themeSeedScript('dark'))
+    const environment = await installDeterministicEnvironment(page, { fixtures: longFlowFixtures })
+
+    await page.goto('/app/automation')
+    await waitForPageReady(page, 'automation')
+
+    const panel = page.locator('.automation-sequence-panel')
+    await expect(panel).toBeVisible()
+
+    const scrollHost = page.locator('[data-region="scroll"]')
+    const readGeometry = () => page.evaluate(() => {
+      const navbar = document.querySelector<HTMLElement>('[data-region="navbar"]')
+      const tabbar = document.querySelector<HTMLElement>('[data-region="tabbar"]')
+      const sequencePanel = document.querySelector<HTMLElement>('.automation-sequence-panel')
+      const host = document.querySelector<HTMLElement>('[data-region="scroll"]')
+      if (!navbar || !tabbar || !sequencePanel || !host) throw new Error('compact shell geometry anchors are missing')
+      const navbarRect = navbar.getBoundingClientRect()
+      const tabbarRect = tabbar.getBoundingClientRect()
+      const panelRect = sequencePanel.getBoundingClientRect()
+      return {
+        scrollTop: host.scrollTop,
+        navbarBottom: navbarRect.bottom,
+        tabbarTop: tabbarRect.top,
+        panelTop: panelRect.top,
+        panelBottom: panelRect.bottom,
+      }
+    })
+
+    await scrollHost.evaluate(host => {
+      const maxScroll = host.scrollHeight - host.clientHeight
+      host.scrollTop = Math.max(200, Math.floor(maxScroll / 2))
+    })
+
+    const midway = await readGeometry()
+    expect(midway.scrollTop).toBeGreaterThan(0)
+    expect(midway.panelTop).toBeGreaterThanOrEqual(midway.navbarBottom + 8)
+    expect(midway.panelBottom).toBeLessThanOrEqual(midway.tabbarTop - 8)
+
+    await scrollHost.evaluate(host => { host.scrollTop += 120 })
+    const scrolled = await readGeometry()
+    expect(scrolled.scrollTop).toBeGreaterThan(midway.scrollTop)
+    expect(Math.abs(scrolled.panelTop - midway.panelTop)).toBeLessThanOrEqual(1)
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
+})
+
 test.describe('task flow scroll containment', () => {
   test('keeps a long task flow scrollable inside the viewport', async ({ page }) => {
     test.skip(test.info().project.name !== 'desktop', 'the flow containment regression is measured on desktop')

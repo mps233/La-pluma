@@ -5,6 +5,7 @@ import {
   THEMES,
   installDeterministicEnvironment,
   themeSeedScript,
+  waitForPageReady,
 } from './harness'
 
 /**
@@ -43,3 +44,28 @@ for (const theme of THEMES) {
     await expectNoBrowserErrors(page)
   })
 }
+
+test('boot shell header matches the live navbar height', async ({ page }) => {
+  recordBrowserErrors(page)
+  await page.addInitScript(themeSeedScript('dark'))
+  const environment = await installDeterministicEnvironment(page)
+
+  await page.goto('/app/dashboard')
+  await waitForPageReady(page, 'dashboard')
+
+  const navbarHeight = await page.locator('[data-region="navbar"]').evaluate(element =>
+    element.getBoundingClientRect().height)
+  expect(navbarHeight).toBeGreaterThan(0)
+
+  await page.route('**/assets/index-*.js', route => route.abort())
+  await page.reload()
+  await page.locator('[role="status"][aria-label="正在打开 La Pluma Next"]').waitFor({ state: 'visible' })
+
+  const bootHeaderHeight = await page.locator('.la-pluma-boot-header').evaluate(element =>
+    element.getBoundingClientRect().height)
+
+  expect(bootHeaderHeight).toBe(navbarHeight)
+
+  environment.assertNoUnmatchedApi()
+  await expectNoBrowserErrors(page)
+})

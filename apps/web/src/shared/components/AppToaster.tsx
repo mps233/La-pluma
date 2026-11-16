@@ -5,7 +5,7 @@ import { ThemeContext } from '@/shared/theme/useTheme'
 import { BREAKPOINTS } from '@/shared/lib/breakpoints'
 
 const DESKTOP_QUERY = `(width >= ${BREAKPOINTS.lg}px)`
-const TABBAR_TOAST_BOTTOM = 'calc(var(--layout-tabbar-reserved-height, 5rem) + env(safe-area-inset-bottom, 0px) + 1rem)'
+const TABBAR_TOAST_BOTTOM = 'var(--layout-floating-bottom-offset)'
 
 function subscribeDesktop(callback: () => void) {
   if (typeof window.matchMedia !== 'function') return () => {}

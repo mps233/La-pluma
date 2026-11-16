@@ -19,6 +19,7 @@
         --boot-line: rgba(60, 60, 67, 0.11);
         --boot-accent: #007aff;
         --boot-viewport-height: 100dvh;
+        --boot-navbar-height: 4.75rem;
         --boot-bottom-clearance: clamp(
           0.5rem,
           env(safe-area-inset-bottom, 0px),
@@ -77,7 +78,7 @@
         background: var(--boot-surface);
       }
       .la-pluma-boot-header {
-        min-height: calc(3.5rem + env(safe-area-inset-top, 0px));
+        min-height: calc(var(--boot-navbar-height) + env(safe-area-inset-top, 0px));
         background: var(--boot-chrome);
       }
       @media (prefers-reduced-motion: reduce) {
