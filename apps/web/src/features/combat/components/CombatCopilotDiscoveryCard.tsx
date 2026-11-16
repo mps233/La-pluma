@@ -68,16 +68,18 @@ export default function CombatCopilotDiscoveryCard({
         <span className="combat-copilot-discovery-card-title">{title}</span>
         {operators.length > 0 && (
           <span className="combat-copilot-discovery-card-operators">
-            {visibleOperators.map((name, index) => (
-              <span
-                key={`${name}-${index}`}
-                className={`combat-copilot-discovery-operator-chip ${
-                  ownedOperatorNames.has(name) ? 'is-owned' : 'is-missing'
-                }`}
-              >
-                {name}
-              </span>
-            ))}
+            {visibleOperators.map((name, index) => {
+              const owned = ownedOperatorNames.has(name)
+              return (
+                <span
+                  key={`${name}-${index}`}
+                  className={`combat-copilot-discovery-operator-chip ${owned ? 'is-owned' : 'is-missing'}`}
+                  title={`${name}（${owned ? '已拥有' : '未拥有'}）`}
+                >
+                  {name}
+                </span>
+              )
+            })}
             {hiddenOperatorCount > 0 && (
               <span className="combat-copilot-discovery-operator-chip is-more">+{hiddenOperatorCount}</span>
             )}

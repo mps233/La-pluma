@@ -44,7 +44,6 @@ const mocks = vi.hoisted(() => ({
   stopSchedule: vi.fn(),
   testConnection: vi.fn(),
   executeScheduleNow: vi.fn(),
-  scrollIntoView: vi.fn(),
 }))
 
 vi.mock('framer-motion', async () => {
@@ -313,7 +312,7 @@ describe('AutomationTasks layout surfaces', () => {
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
       configurable: true,
       writable: true,
-      value: mocks.scrollIntoView,
+      value: vi.fn(),
     })
     localStorage.clear()
     // 协调器是应用级单例：每个用例从空通道与空存储开始，避免跨用例沿用草稿/队列。
@@ -330,7 +329,6 @@ describe('AutomationTasks layout surfaces', () => {
     mocks.stopSchedule.mockReset().mockResolvedValue({ success: true })
     mocks.testConnection.mockReset().mockResolvedValue({ success: true, data: { success: true, message: '连接正常' } })
     mocks.executeScheduleNow.mockReset()
-    mocks.scrollIntoView.mockReset()
     mocks.notify.mockReset()
     mocks.notifyProgress.mockReset()
     mocks.dismissNotice.mockReset()
@@ -665,7 +663,7 @@ describe('AutomationTasks layout surfaces', () => {
     expect(restoredButton?.disabled).toBe(false)
   })
 
-  it('scrolls the selected task editor into view on narrow screens', async () => {
+  it('selects the clicked task for editing on narrow screens', async () => {
     mocks.loadUserConfig.mockResolvedValue({ success: true, data: { taskFlow: taskFlowFixture } })
 
     await renderPage()
@@ -676,7 +674,6 @@ describe('AutomationTasks layout surfaces', () => {
     expect(selectedButton?.getAttribute('aria-controls')).toBe('automation-task-editor')
     expect(selectedButton?.getAttribute('aria-pressed')).toBe('true')
     expect(editor?.textContent).toContain('理智作战')
-    expect(mocks.scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' })
   })
 
   it('associates dynamic labels and names compact destructive controls', async () => {
@@ -933,13 +930,12 @@ describe('AutomationTasks layout surfaces', () => {
       expect(trigger!.getAttribute('aria-describedby')).toBeNull()
     }
 
-    // 区块级提示挂在「关卡计划」标题行内、关卡数量徽标右侧。
-    const stageTitle = container.querySelector('.automation-stage-editor-title')
-    const stageHint = stageTitle?.querySelector<HTMLButtonElement>('button[aria-label="关卡计划说明"]')
-    expect(stageTitle?.textContent).toContain('关卡计划')
-    expect(stageTitle?.textContent).toContain('2 个关卡')
-    expect(stageHint?.previousElementSibling?.tagName).toBe('SPAN')
-    expect(stageHint?.previousElementSibling?.textContent).toBe('2 个关卡')
+    const stageFieldset = findStageEditor()
+    expect(stageFieldset).toBeDefined()
+    expect(stageFieldset?.textContent).toContain('关卡计划')
+    expect(stageFieldset?.textContent).toContain('2 个关卡')
+    const stageHint = stageFieldset?.querySelector<HTMLButtonElement>('button[aria-label="关卡计划说明"]')
+    expect(stageHint).not.toBeNull()
 
     // 说明段落不再常驻页面。
     const helperParagraphs = Array.from(container.querySelectorAll('p')).map(paragraph => paragraph.textContent)

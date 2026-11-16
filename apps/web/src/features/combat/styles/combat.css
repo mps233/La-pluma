@@ -3,11 +3,6 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .combat-mode-skeleton-highlight {
-    inset: 0 auto auto 0;
-    width: calc((100% - 0.25rem) / 3);
-  }
-
   .combat-segment-active {
     background: var(--primary-soft);
     color: var(--primary-strong);
@@ -75,10 +70,6 @@
     border-radius: var(--radius-xl);
     padding: 0.875rem;
     background: color-mix(in srgb, var(--muted) 86%, transparent);
-  }
-
-  .combat-job-list-section {
-    min-height: 18rem;
   }
 
   .combat-copilot-source-bar {

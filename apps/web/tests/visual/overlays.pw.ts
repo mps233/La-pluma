@@ -8,11 +8,12 @@ import {
 } from './harness'
 
 /**
- * 弹层视觉基线：portal 渲染到 document.body 的 PWA 提示。
- * 这些表面不在 `.la-pluma-app` 作用域内，材质/遮罩/定位只由 portal 处的 CSS 决定；
- * tab 基线只截默认状态覆盖不到，所以单独截"打开"状态，且均为视口截图
- * （弹层按视口定位，fullPage 会把 fixed 元素拉到整页顶部）。
- * 组件级弹层（DropdownMenu、toast）由主题画廊的 locator 基线覆盖。
+ * 固定表面视觉基线：PWA 安装提示。
+ * 它渲染在 `#app-root.la-pluma-app` 内，是应用根里的 position: fixed 表面，
+ * 不是 Base UI portal；tab 整页基线覆盖不到打开状态，所以单独截"打开"状态，
+ * 且为视口截图（fixed 表面按视口定位，fullPage 会把 fixed 元素拉到整页顶部）。
+ * Portal 弹层（Dialog、AlertDialog、Sheet、DropdownMenu）由主题画廊的 locator
+ * 基线覆盖。
  */
 for (const theme of THEMES) {
   test.describe(`overlays: ${theme}`, () => {

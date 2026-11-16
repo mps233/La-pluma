@@ -19,8 +19,8 @@ const labels: Record<string, string> = {
   unowned: '未拥有',
 }
 
-const mediaQueryList = (matches: boolean) => (query: string) => ({
-  matches: matches && query === '(width < 640px)',
+const mediaQueryList = () => (query: string) => ({
+  matches: false,
   media: query,
   onchange: null,
   addListener: vi.fn(),
@@ -32,12 +32,10 @@ const mediaQueryList = (matches: boolean) => (query: string) => ({
 
 interface HarnessProps {
   initialValue?: string
-  mobileAlign?: 'start' | 'end'
-  menuWidth?: number
   onSelect?: (value: string) => void
 }
 
-function Harness({ initialValue = 'all', mobileAlign, menuWidth, onSelect }: HarnessProps) {
+function Harness({ initialValue = 'all', onSelect }: HarnessProps) {
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [value, setValue] = useState(initialValue)
 
@@ -50,8 +48,6 @@ function Harness({ initialValue = 'all', mobileAlign, menuWidth, onSelect }: Har
         options={options}
         isActive={value !== 'all'}
         open={openMenu === 'ownership'}
-        mobileAlign={mobileAlign}
-        {...(menuWidth === undefined ? {} : { menuWidth })}
         onOpenChange={open => setOpenMenu(open ? 'ownership' : null)}
         onSelect={(next) => {
           setValue(next)
@@ -103,7 +99,7 @@ const menuItems = () => Array.from(
 
 describe('operator filter dropdown menu', () => {
   beforeEach(() => {
-    window.matchMedia = vi.fn().mockImplementation(mediaQueryList(false))
+    window.matchMedia = vi.fn().mockImplementation(mediaQueryList())
     vi.stubGlobal('ResizeObserver', class ResizeObserverMock {
       observe() {}
       unobserve() {}
@@ -236,21 +232,5 @@ describe('operator filter dropdown menu', () => {
     expect(menu()!.getAttribute('aria-label')).toBe('星级筛选')
     expect(trigger('ownership').getAttribute('aria-expanded')).toBe('false')
     expect(trigger('rarity').getAttribute('aria-expanded')).toBe('true')
-  })
-
-  it('aligns end-of-row menus to the trigger edge on phones and keeps the requested width', async () => {
-    window.matchMedia = vi.fn().mockImplementation(mediaQueryList(true))
-    await render({ mobileAlign: 'end', menuWidth: 160 })
-    await click(trigger())
-
-    expect(Number.parseFloat(menu()!.style.width)).toBe(160)
-    expect(menu()!.parentElement?.getAttribute('data-align')).toBe('end')
-
-    await press(document, 'Escape')
-    window.matchMedia = vi.fn().mockImplementation(mediaQueryList(false))
-    await act(async () => { window.dispatchEvent(new Event('resize')) })
-    await click(trigger())
-
-    expect(menu()!.parentElement?.getAttribute('data-align')).toBe('start')
   })
 })

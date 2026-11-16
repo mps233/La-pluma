@@ -46,6 +46,9 @@ export type GuardrailRule =
   | 'page-transport'
   | 'page-storage'
   | 'page-polling'
+  | 'layout-region'
+  | 'global-style-scope'
+  | 'layout-test-detail'
 
 export interface GuardrailViolation {
   rule: GuardrailRule
@@ -1363,7 +1366,357 @@ export function checkPageGuardrails(files: readonly SourceFile[]): GuardrailViol
   return violations
 }
 
+interface RegionAnchor {
+  attribute: string
+  value?: string
+}
+
+const LAYOUT_REGION_CONTRACT: Readonly<Record<string, readonly RegionAnchor[]>> = {
+  'app/layout/Layout.tsx': [
+    { attribute: 'data-region', value: 'scroll' },
+    { attribute: 'data-region', value: 'page-content' },
+  ],
+  'app/layout/AppNavbar.tsx': [
+    { attribute: 'data-region', value: 'navbar' },
+    { attribute: 'data-region', value: 'page-header' },
+    { attribute: 'data-region', value: 'page-title' },
+  ],
+  'app/layout/AppSidebar.tsx': [
+    { attribute: 'data-region', value: 'sidebar' },
+    { attribute: 'data-region', value: 'sidebar-brand' },
+  ],
+  'app/layout/AppTabbar.tsx': [
+    { attribute: 'data-region', value: 'tabbar' },
+  ],
+  'shared/components/PageShell.tsx': [
+    { attribute: 'data-region', value: 'page' },
+    { attribute: 'data-page-kind' },
+    { attribute: 'data-page-layout' },
+    { attribute: 'data-page-surface' },
+  ],
+}
+
+function collectJsxAttributes(sourceFile: ts.SourceFile): Map<string, Set<string | null>> {
+  const attributes = new Map<string, Set<string | null>>()
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name)) {
+      const name = node.name.text
+      let values = attributes.get(name)
+      if (!values) {
+        values = new Set<string | null>()
+        attributes.set(name, values)
+      }
+      values.add(
+        node.initializer && ts.isStringLiteral(node.initializer)
+          ? node.initializer.text
+          : null,
+      )
+    }
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sourceFile)
+  return attributes
+}
+
+function hasRegionAnchor(
+  attributes: ReadonlyMap<string, ReadonlySet<string | null>>,
+  anchor: RegionAnchor,
+): boolean {
+  const values = attributes.get(anchor.attribute)
+  if (!values) return false
+  return anchor.value === undefined || values.has(anchor.value)
+}
+
+function formatRegionAnchor(anchor: RegionAnchor): string {
+  return anchor.value === undefined ? anchor.attribute : `${anchor.attribute}="${anchor.value}"`
+}
+
+export function checkLayoutRegions(files: readonly SourceFile[]): GuardrailViolation[] {
+  const filesByPath = new Map(files.map(file => [file.path, file]))
+  const violations: GuardrailViolation[] = []
+
+  for (const [filePath, anchors] of Object.entries(LAYOUT_REGION_CONTRACT)) {
+    const file = filesByPath.get(filePath)
+    if (!file) {
+      violations.push({
+        rule: 'layout-region',
+        file: filePath,
+        message: `缺少布局文件：${filePath}，无法核对壳层稳定锚点`,
+      })
+      continue
+    }
+
+    const attributes = collectJsxAttributes(parseSourceFile(file))
+    for (const anchor of anchors) {
+      if (hasRegionAnchor(attributes, anchor)) continue
+      violations.push({
+        rule: 'layout-region',
+        file: filePath,
+        message: `缺少壳层稳定锚点：${formatRegionAnchor(anchor)}`,
+      })
+    }
+  }
+
+  return violations
+}
+
+const GLOBAL_STYLE_FILES = [
+  'styles/index.css',
+  'styles/layout.css',
+  'styles/ios-theme.css',
+] as const
+
+const GLOBAL_STYLE_FORBIDDEN_SELECTORS: readonly RegExp[] = [
+  /\[data-page-kind\b/,
+  /\.(?:automation|combat|roguelike|training|statistics|logs|dashboard|settings|config)-/,
+]
+
+interface CssSelectorPrelude {
+  selector: string
+  index: number
+}
+
+function stripCssComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, comment => comment.replace(/[^\n]/g, ' '))
+}
+
+function collectCssSelectorPreludes(css: string): CssSelectorPrelude[] {
+  const preludes: CssSelectorPrelude[] = []
+  let segmentStart = 0
+  let quote: string | null = null
+  let depth = 0
+
+  for (let index = 0; index < css.length; index += 1) {
+    const character = css[index]
+
+    if (quote) {
+      if (character === '\\') {
+        index += 1
+      } else if (character === quote) {
+        quote = null
+      }
+      continue
+    }
+
+    if (character === '"' || character === "'") {
+      quote = character
+      continue
+    }
+
+    if (character === '{') {
+      const raw = css.slice(segmentStart, index)
+      const selector = raw.trim()
+      if (selector && !selector.startsWith('@')) {
+        preludes.push({
+          selector,
+          index: segmentStart + (raw.length - raw.trimStart().length),
+        })
+      }
+      depth += 1
+      segmentStart = index + 1
+    } else if (character === '}') {
+      depth = Math.max(0, depth - 1)
+      segmentStart = index + 1
+    } else if (character === ';' && depth === 0) {
+      segmentStart = index + 1
+    }
+  }
+
+  return preludes
+}
+
+function lineNumberAt(source: string, index: number): number {
+  let line = 1
+  for (let cursor = 0; cursor < index; cursor += 1) {
+    if (source[cursor] === '\n') line += 1
+  }
+  return line
+}
+
+function compactSelector(selector: string): string {
+  const compact = selector.replace(/\s+/g, ' ')
+  return compact.length > 120 ? `${compact.slice(0, 117)}...` : compact
+}
+
+export function checkGlobalStyleScope(files: readonly SourceFile[]): GuardrailViolation[] {
+  const filesByPath = new Map(files.map(file => [file.path, file]))
+  const violations: GuardrailViolation[] = []
+
+  for (const filePath of GLOBAL_STYLE_FILES) {
+    const file = filesByPath.get(filePath)
+    if (!file) {
+      violations.push({
+        rule: 'global-style-scope',
+        file: filePath,
+        message: `缺少全局样式文件：${filePath}，无法核对页面选择器`,
+      })
+      continue
+    }
+
+    const css = stripCssComments(file.source)
+    for (const prelude of collectCssSelectorPreludes(css)) {
+      for (const pattern of GLOBAL_STYLE_FORBIDDEN_SELECTORS) {
+        const match = pattern.exec(prelude.selector)
+        if (!match) continue
+        const line = lineNumberAt(css, prelude.index)
+        violations.push({
+          rule: 'global-style-scope',
+          file: filePath,
+          message: `全局样式不得包含页面或领域选择器（第 ${line} 行：${compactSelector(prelude.selector)}；命中 ${match[0]}）`,
+        })
+        break
+      }
+    }
+  }
+
+  return violations
+}
+
+const LAYOUT_TEST_FILE_PATTERN = /\.layout\.test\.tsx$/
+const LAYOUT_TEST_STYLE_PROPERTIES = new Set([
+  'width',
+  'height',
+  'top',
+  'left',
+  'right',
+  'bottom',
+  'display',
+  'maxHeight',
+])
+const LAYOUT_TEST_INVOCATION_KEYS = new Set(['behavior', 'block'])
+const LAYOUT_TEST_SELECTOR_FUNCTIONS = new Set(['querySelector', 'querySelectorAll'])
+
+function isClassSelectorArgument(argument: ts.Expression | undefined): boolean {
+  if (!argument) return false
+  const expression = unwrapExpression(argument)
+  return ts.isStringLiteralLike(expression) && expression.text.trimStart().startsWith('.')
+}
+
+function callExpressionName(node: ts.CallExpression): string | null {
+  const expression = unwrapExpression(node.expression)
+  if (ts.isIdentifier(expression)) return expression.text
+  if (ts.isPropertyAccessExpression(expression)) return expression.name.text
+  return null
+}
+
+function objectLiteralContainsKey(node: ts.Node, keys: ReadonlySet<string>): boolean {
+  if (ts.isObjectLiteralExpression(node)) {
+    for (const property of node.properties) {
+      if (!ts.isPropertyAssignment(property) && !ts.isShorthandPropertyAssignment(property)) continue
+      const key = assignmentPropertyKey(property)
+      if (key !== null && keys.has(key)) return true
+    }
+  }
+
+  let found = false
+  ts.forEachChild(node, (child) => {
+    if (found) return
+    if (objectLiteralContainsKey(child, keys)) found = true
+  })
+  return found
+}
+
+function collectLayoutTestViolations(file: SourceFile, violations: GuardrailViolation[]): void {
+  const sourceFile = parseSourceFile(file)
+  const report = (node: ts.Node, detail: string): void => {
+    const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1
+    violations.push({
+      rule: 'layout-test-detail',
+      file: file.path,
+      message: `布局测试不得锁定实现细节（第 ${line} 行：${detail}）`,
+    })
+  }
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node)) {
+      const name = callExpressionName(node)
+      if (name === 'toHaveClass') report(node, 'toHaveClass')
+      if (name === 'toHaveStyle') report(node, 'toHaveStyle')
+      if (
+        (name === 'toHaveBeenCalledWith' || name === 'toHaveBeenLastCalledWith')
+        && node.arguments.some(argument => objectLiteralContainsKey(argument, LAYOUT_TEST_INVOCATION_KEYS))
+      ) {
+        report(node, `${name} 的 behavior/block 精确参数`)
+      }
+      if (
+        name !== null
+        && LAYOUT_TEST_SELECTOR_FUNCTIONS.has(name)
+        && isClassSelectorArgument(node.arguments[0])
+      ) {
+        report(node, `${name} 的类选择器`)
+      }
+    }
+
+    if (ts.isPropertyAccessExpression(node)) {
+      const member = node.name.text
+      if (member === 'classList') report(node, 'classList')
+      if (member === 'previousElementSibling' || member === 'nextElementSibling') report(node, member)
+      if (
+        LAYOUT_TEST_STYLE_PROPERTIES.has(member)
+        && ts.isPropertyAccessExpression(node.expression)
+        && node.expression.name.text === 'style'
+      ) {
+        report(node, `.style.${member}`)
+      }
+    }
+
+    if (ts.isElementAccessExpression(node)) {
+      const member = staticMemberName(node)
+      if (member === 'classList') report(node, 'classList')
+      if (
+        member !== null
+        && LAYOUT_TEST_STYLE_PROPERTIES.has(member)
+        && ts.isPropertyAccessExpression(node.expression)
+        && node.expression.name.text === 'style'
+      ) {
+        report(node, `.style.${member}`)
+      }
+    }
+
+    if (ts.isStringLiteralLike(node) && node.text.includes('data-align')) report(node, 'data-align')
+    if (
+      ts.isJsxAttribute(node)
+      && ts.isIdentifier(node.name)
+      && node.name.text === 'data-align'
+    ) {
+      report(node, 'data-align')
+    }
+
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sourceFile)
+}
+
+export function checkLayoutTestDetails(files: readonly SourceFile[]): GuardrailViolation[] {
+  const layoutTests = files.filter(file => LAYOUT_TEST_FILE_PATTERN.test(file.path))
+  if (layoutTests.length === 0) {
+    return [{
+      rule: 'layout-test-detail',
+      file: 'src/**/*.layout.test.tsx',
+      message: '未找到布局测试文件，无法核对测试是否锁定实现细节',
+    }]
+  }
+
+  const violations: GuardrailViolation[] = []
+  for (const file of layoutTests) collectLayoutTestViolations(file, violations)
+  return violations
+}
+
 export async function readSourceTree(srcRoot: string): Promise<SourceFile[]> {
+  return readMatchingTree(srcRoot, name => /\.(?:ts|tsx)$/.test(name))
+}
+
+export async function readStyleTree(srcRoot: string): Promise<SourceFile[]> {
+  return readMatchingTree(srcRoot, name => name.endsWith('.css'))
+}
+
+async function readMatchingTree(
+  root: string,
+  matches: (name: string) => boolean,
+): Promise<SourceFile[]> {
   const files: SourceFile[] = []
 
   const walk = async (directory: string): Promise<void> => {
@@ -1376,14 +1729,14 @@ export async function readSourceTree(srcRoot: string): Promise<SourceFile[]> {
         await walk(absolute)
         continue
       }
-      if (!/\.(?:ts|tsx)$/.test(entry.name)) continue
+      if (!matches(entry.name)) continue
       files.push({
-        path: path.relative(srcRoot, absolute).split(path.sep).join('/'),
+        path: path.relative(root, absolute).split(path.sep).join('/'),
         source: await readFile(absolute, 'utf8'),
       })
     }
   }
 
-  await walk(srcRoot)
+  await walk(root)
   return files
 }

@@ -15,7 +15,7 @@ La Pluma Next 是一个面向《明日方舟》自动化的本地 Web 控制台�
 
 ### 前端 UI 与响应式壳层
 
-前端使用 React 19、Tailwind CSS v4（`@tailwindcss/vite`；`@theme` 圆角映射 + 定向 `@utility` 间距映射，无 JS 配置）和 Framer Motion。`Layout` 与 `shared/components` 通用组件使用原生语义元素实现页面 chrome、导航栏、移动 tabbar 和模态交互；`styles/index.css` 的语义 token、`styles/layout.css` 的布局几何 token 与 `styles/ios-theme.css` 的 chrome 材质分别统一品牌色、信息密度、水平留白与默认主题外观，液态玻璃由后续主题层提供。
+前端使用 React 19、Tailwind CSS v4（`@tailwindcss/vite`；`@theme` 圆角/断点映射与 `@theme inline` 颜色映射，无 JS 配置，spacing 使用 v4 原生档位）和 Framer Motion。`Layout` 与 `shared/components` 通用组件使用原生语义元素实现页面 chrome、导航栏、移动 tabbar 和模态交互；`styles/index.css` 的语义 token、`styles/layout.css` 的布局几何 token 与 `styles/ios-theme.css` 的 chrome 材质分别统一品牌色、信息密度、水平留白与默认主题外观，液态玻璃由后续主题层提供。
 
 URL 导航、路径归一、PWA 历史记录与 Activity 保活的约定统一见[前端架构与所有权](../frontend/README.md)。
 
@@ -87,12 +87,12 @@ La-pluma-next/
 
 ## 依赖与职责护栏
 
-`app → pages → features → shared` 的单向依赖、feature 公开面、`task-execution` 不反向依赖页面域与页面裸副作用由 `apps/web/scripts/check-guardrails.ts` 自动检查，并作为客户端 `verify` 的第一步运行：
+`app → pages → features → shared` 的单向依赖、feature 公开面、`task-execution` 不反向依赖页面域、页面裸副作用、壳层稳定锚点、全局样式作用域与布局测试细节由 `apps/web/scripts/check-guardrails.ts` 自动检查，并作为客户端 `verify` 的第一步运行：
 
 ```bash
 pnpm --filter la-pluma-next-client guardrails
 ```
 
-规则、允许方向与已知限制见[依赖与职责护栏](../development/guardrails.md)。ESLint 继续负责编辑器内的深路径与分层即时报错，CLI 额外覆盖相对路径绕过、真实域环与页面职责。
+规则、允许方向与已知限制见[依赖与职责护栏](../development/guardrails.md)。ESLint 继续负责编辑器内的深路径与分层即时报错，CLI 额外覆盖相对路径绕过、真实域环、页面职责与布局/样式/测试护栏。
 
 开发流程与常用检查见 [开发文档](../development/README.md)。

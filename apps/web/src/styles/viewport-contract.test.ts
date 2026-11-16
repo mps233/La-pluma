@@ -38,7 +38,6 @@ const BARE_VIEWPORT_UNIT_ALLOWLIST = new Map([
   ['src/features/automation/styles/automation.css', '自动化配置面板沿用 --layout-viewport-height 的既有 fallback'],
   ['src/features/logs/styles/logs.css', '日志控制台使用 svh 的页内固定高度，带 vh 前置兜底'],
   ['src/features/device-mirror/components/ScrcpyDeviceView.tsx', '沉浸设备画面按自身全屏契约使用视口高度，属 DESIGN 登记的局部例外'],
-  ['src/shared/ui/sidebar.tsx', 'shadcn 生成文件按上游保留'],
 ])
 
 const SOURCE_EXTENSIONS = new Set(['.css', '.ts', '.tsx'])

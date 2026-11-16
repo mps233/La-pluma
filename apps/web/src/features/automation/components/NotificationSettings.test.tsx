@@ -309,9 +309,10 @@ describe('NotificationSettings Query lifecycle', () => {
     await renderMode('visible')
 
     expect(container.textContent).toContain('读取通知配置…')
+    expect(container.textContent).not.toContain('已保存')
+    expect(container.textContent).not.toContain('有未保存的更改')
     expect(tokenInput()).toBeNull()
     expect(saveButton()).toBeUndefined()
-    expect(container.querySelector('.automation-side-card-footer')).toBeNull()
     expect(container.querySelector('[aria-label="启用通知"]')?.getAttribute('aria-disabled')).toBe('true')
   })
 

@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/shared/ui/card'
-import { EmptyState, Loading, PageSkeleton } from '@/shared/components'
+import { EmptyState, Loading } from '@/shared/components'
 import { ThemeGalleryCards } from './ThemeGalleryCards'
 import { ThemeGalleryTooltips } from './ThemeGalleryTooltips'
 
@@ -77,19 +77,6 @@ export function ThemeGalleryGlobalSurfaces() {
           />
         </CardContent>
       </Card>
-
-      <div data-region="gallery-page-skeletons">
-        <Card>
-          <CardHeader className="border-b py-3.5">
-            <CardTitle role="heading" aria-level={3}>整页骨架</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-72 overflow-hidden rounded-xl border border-border">
-              <PageSkeleton variant="config" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       <Card>
         <CardHeader className="border-b py-3.5">

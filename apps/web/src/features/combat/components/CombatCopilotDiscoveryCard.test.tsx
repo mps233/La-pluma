@@ -84,7 +84,9 @@ describe('CombatCopilotDiscoveryCard', () => {
   it('opens the preview from the card text without double-firing', async () => {
     const card = await renderCard()
 
-    await click(card.container.querySelector('.combat-copilot-discovery-card-title'))
+    const titleText = Array.from(card.container.querySelectorAll<HTMLElement>('span'))
+      .find(node => node.textContent === '突袭 1-7 挂机')
+    await click(titleText ?? null)
 
     expect(card.onPreview).toHaveBeenCalledOnce()
     await card.unmount()
@@ -102,13 +104,13 @@ describe('CombatCopilotDiscoveryCard', () => {
     await card.unmount()
   })
 
-  it('marks owned and missing operators with distinct classes', async () => {
+  it('labels owned and missing operators in the card chips', async () => {
     const card = await renderCard()
 
-    const chips = Array.from(card.container.querySelectorAll('.combat-copilot-discovery-operator-chip'))
+    const cardMain = card.container.querySelector('button[aria-label="查看作业 突袭 1-7 挂机"]')
+    const chips = Array.from(cardMain?.querySelectorAll<HTMLElement>('[title]') ?? [])
     expect(chips.map(chip => chip.textContent)).toEqual(['阿米娅', '陈'])
-    expect(chips[0]?.classList.contains('is-owned')).toBe(true)
-    expect(chips[1]?.classList.contains('is-missing')).toBe(true)
+    expect(chips.map(chip => chip.getAttribute('title'))).toEqual(['阿米娅（已拥有）', '陈（未拥有）'])
     await card.unmount()
   })
 })

@@ -117,7 +117,7 @@ Props 是 discriminated union：`standard` 接收 `children`；`workbench` 接�
 
 `data-region="monitor"` 仍只由 `DeviceMonitorPanel` 的卡片输出，每个页面恰好一个。概览页的设备卡片不纳入此布局，不输出 `data-device-monitor-layout`，也不渲染 `data-region="monitor"`。
 
-共享设备画面样式归 `features/device-mirror/styles/device-mirror.css`：画面根节点为 `device-monitor-surface`，`workbench`/`mode` 的 monitor 列与面板为 `device-monitor-column` / `device-monitor-panel`，紧凑玻璃按钮为 `device-preview-glass-button`，骨架屏使用 `device-monitor-skeleton*`；`standard` 继续使用 `task-monitor-*` 布局类。页面不得新增 `automation-*` / `roguelike-*` monitor 类，也不得按 `data-page-kind` 切换设备画面样式。
+共享设备画面样式归 `features/device-mirror/styles/device-mirror.css`：画面根节点为 `device-monitor-surface`，`workbench`/`mode` 的 monitor 列与面板为 `device-monitor-column` / `device-monitor-panel`，紧凑玻璃按钮为 `device-preview-glass-button`；`standard` 继续使用 `task-monitor-*` 布局类。页面不得新增 `automation-*` / `roguelike-*` monitor 类，也不得按 `data-page-kind` 切换设备画面样式。
 
 ---
 
@@ -403,7 +403,7 @@ import { ConfirmAlertDialog, Loading } from '@/shared/components'
 - 嵌套弹层按 React 父子关系组合（如发现弹窗内的筛选弹窗、详情抽屉上的重置确认框），Base UI 依此管理 Escape 层级、焦点归还与滚动锁。
 - 弹层经 Base UI portal 挂到 `document.body`，层序使用 `--layout-z-portal`；应用自绘浮层按 [设计规范](../../DESIGN.md) 的 z-index scale 取 token，不在组件里补高位 z-index。
 
-`DashboardSkeleton` 是控制台域专用骨架，位于 `features/dashboard/components/DashboardSkeleton.tsx`，不属于 `shared/components` 的公共导出。
+`DashboardSkeleton` 是控制台域内唯一的整页骨架，位于 `features/dashboard/components/DashboardSkeleton.tsx`，不属于 `shared/components` 的公共导出；`shared/components` 不提供整页骨架。
 
 ---
 
@@ -451,26 +451,6 @@ dismissNotice(id?: string): void
 ```
 
 同一流程复用固定 id，后续更新会替换原通知而不是堆叠。固定 id：`execution`（自动化、作业、肉鸽与 Dashboard 执行）、`statistics`（识别与材料）、`settings-update`（组件更新）、`settings-update-channel`（更新渠道保存）、`settings-auto-update`（自动更新保存）、`settings-config:connection` / `settings-config:instance` / `settings-config:resource-source`（设置草稿保存）、`combat-preview`（作业预览）、`combat-queue-preview`（搜索作业加入队列）、`combat-paradox-search`（悖论模拟搜索）。开始用 `notifyProgress(message, id)`；有终态文案时用同一 id 的 `notify(..., { id })` 替换；没有终态文案时才 `dismissNotice(id)` 收起进度。不传 `type` 时按文案推断；错误默认常驻到用户关闭，成功默认约 2.5 秒，警告与信息默认约 4 秒。`duration` 可显式覆盖，进度通知默认不自动消失。应用最多同时显示 3 条通知；`AppToaster` 为每条通知提供关闭按钮（无障碍名称「关闭通知」）。
-
----
-
-### PageSkeleton
-
-**文件位置**：`apps/web/src/shared/components/Loading.tsx`，与 `Loading` 同文件导出。
-
-**适用场景**：懒加载路由的整页骨架占位。按 `variant` 复刻目标工作区的布局比例，减少加载完成后的跳动。
-
-Props：
-
-- `variant` (string, required) - 目标页面标识。内置 `automation`、`combat`、`roguelike`、`training`、`logs`、`statistics`、`config` 七种工作区骨架，其余取值只渲染页面壳。
-
-```tsx
-import { PageSkeleton } from '@/shared/components'
-
-<PageSkeleton variant="automation" />
-```
-
-输出为 `aria-busy="true"`、`aria-label="页面内容加载中"` 的忙碌区域，内部骨架标记 `aria-hidden="true"`；根节点输出 `data-page-kind` 与 `data-page-layout="workspace"`，按变体输出 `data-page-surface="borderless"`，并保留各页专属类名；未知变体不输出 `data-page-kind`。控制台骨架由域内 `DashboardSkeleton` 提供，见上文。
 
 ---
 

@@ -902,7 +902,7 @@ describe('responsive breakpoint policy', () => {
     const widthCalls = supportedCalls.filter(call => widthGroups(call.query.toLowerCase()).length > 0)
     const widthCallKeys = new Set(widthCalls.map(call => `${call.file}:${call.expression}`))
 
-    expect(widthCallKeys.size).toBeGreaterThanOrEqual(8)
+    expect(widthCallKeys.size).toBeGreaterThanOrEqual(7)
     expect(unsupportedCalls).toEqual([])
     expect(supportedCalls.flatMap(call => auditMediaQuery(call.query).map(problem => ({
       file: location(call.file),

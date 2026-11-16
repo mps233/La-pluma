@@ -161,6 +161,30 @@ test.describe('task flow scroll containment', () => {
   })
 })
 
+test.describe('selected task editor', () => {
+  test('keeps the selected task editor in the viewport on a narrow screen', async ({ page }) => {
+    test.skip(test.info().project.name !== 'mobile', 'the narrow-screen selection scroll is measured on the mobile viewport')
+
+    recordBrowserErrors(page)
+    await page.addInitScript(themeSeedScript('dark'))
+    const environment = await installDeterministicEnvironment(page, { fixtures: longFlowFixtures })
+
+    await page.goto('/app/automation')
+    await waitForPageReady(page, 'automation')
+
+    const task = page.locator('button[aria-controls="automation-task-editor"]').filter({ hasText: '领取奖励 6' })
+    await task.click()
+
+    const editor = page.locator('#automation-task-editor')
+    await expect(editor).toBeInViewport()
+    await expect(editor).toContainText('领取奖励 6')
+    await expect(task).toHaveAttribute('aria-pressed', 'true')
+
+    environment.assertNoUnmatchedApi()
+    await expectNoBrowserErrors(page)
+  })
+})
+
 for (const theme of THEMES) {
   test.describe(`task picker: ${theme}`, () => {
     test.beforeEach(async ({ page }) => {

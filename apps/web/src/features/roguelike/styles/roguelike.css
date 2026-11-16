@@ -3,11 +3,6 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .roguelike-mode-skeleton-highlight {
-    inset: 0 auto auto 0;
-    width: calc((100% - 0.125rem) / 2);
-  }
-
   .roguelike-mode-shell {
     width: 100%;
   }
@@ -415,9 +410,7 @@
   @media (width >= 1360px) {
     .roguelike-workspace-grid {
       grid-template-columns: repeat(3, minmax(0, 1fr));
-
-      /* Prevent the two-row preview from redistributing height into the mode row. */
-      grid-template-rows: calc(3.25rem + 0.5rem + 2px) auto;
+      grid-template-rows: max-content auto;
       grid-template-areas:
         "mode mode monitor"
         "main settings monitor";

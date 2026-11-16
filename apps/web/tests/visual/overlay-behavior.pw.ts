@@ -347,11 +347,22 @@ test.describe('feature overlay behavior', () => {
       await sort.scrollIntoViewIfNeeded()
       await sort.click()
       const content = page.locator('[data-slot="dropdown-menu-content"]')
-      const positioner = content.locator('..')
-      await expect(positioner).toHaveAttribute('data-align', 'end')
-      await page.waitForTimeout(200)
-      const box = await content.boundingBox()
+      await expect(content).toBeVisible()
+      await expect.poll(async () => {
+        const [sortBox, box] = await Promise.all([sort.boundingBox(), content.boundingBox()])
+        if (!sortBox || !box) return false
+        return Math.round(box.width) === 128
+          && Math.abs((box.x + box.width) - (sortBox.x + sortBox.width)) <= 1
+          && box.x >= 0
+          && box.x + box.width <= page.viewportSize()!.width
+      }).toBe(true)
+      const [sortBox, box] = await Promise.all([sort.boundingBox(), content.boundingBox()])
+      expect(sortBox).not.toBeNull()
+      expect(box).not.toBeNull()
       expect(Math.round(box?.width ?? 0)).toBe(128)
+      expect(Math.abs((box!.x + box!.width) - (sortBox!.x + sortBox!.width))).toBeLessThanOrEqual(1)
+      expect(box!.x).toBeGreaterThanOrEqual(0)
+      expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width)
     }
 
     environment.assertNoUnmatchedApi()

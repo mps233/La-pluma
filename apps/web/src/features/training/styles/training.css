@@ -14,11 +14,6 @@
     font-weight: 700;
   }
 
-  .training-status-skeleton-highlight {
-    inset: 0 auto auto 0;
-    width: calc((100% - 0.25rem) / 3);
-  }
-
   /* Dense sibling data belongs to one grouped surface. The one-pixel grid gap
      becomes the hairline, while each child stays on a solid content material. */
   .la-pluma-app .training-operator-grid {

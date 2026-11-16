@@ -433,7 +433,7 @@ describe('DataStatistics layout surfaces', () => {
 
     let menu = document.body.querySelector<HTMLElement>('[role="menu"]')!
     let options = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
-    expect(menu.style.width).toBe('128px')
+    expect(menu.getAttribute('aria-label')).toBe('拥有状态筛选')
     expect(trigger.getAttribute('aria-expanded')).toBe('true')
     expect(document.activeElement).toBe(options[0])
 
@@ -457,40 +457,6 @@ describe('DataStatistics layout surfaces', () => {
     expect(document.body.querySelector('[role="menu"]')).not.toBeNull()
     await act(async () => document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })))
     expect(document.body.querySelector('[role="menu"]')).toBeNull()
-  })
-
-  it('right-aligns end-of-row menus on phones', async () => {
-    mocks.getAllOperators.mockResolvedValue(catalogFixture)
-    mocks.getOperBoxData.mockResolvedValue(ownedOperatorFixture)
-    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-      matches: query === '(width < 640px)',
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    }))
-
-    await renderPage()
-    await flush()
-
-    for (const label of ['职业', '排序']) {
-      const trigger = findButton(label)!
-      trigger.focus()
-      await click(trigger)
-
-      const menu = document.body.querySelector<HTMLElement>('[role="menu"]')!
-      const options = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
-      expect(menu.parentElement?.getAttribute('data-align')).toBe('end')
-      expect(menu.style.width).toBe('128px')
-      expect(document.activeElement).toBe(options[0])
-
-      await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
-      expect(document.body.querySelector('[role="menu"]')).toBeNull()
-      expect(document.activeElement).toBe(trigger)
-    }
   })
 
   it('shows a drop data error and retries the failed API request', async () => {

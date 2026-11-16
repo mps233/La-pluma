@@ -69,7 +69,7 @@ docs/
 | 文档 | 内容 |
 | --- | --- |
 | [开发指南](development/README.md) | 样式/测试治理、文件类型与常用检查 |
-| [依赖与职责护栏](development/guardrails.md) | 分层、公开面、页面职责与限制 |
+| [依赖与职责护栏](development/guardrails.md) | 分层、公开面、页面职责、布局/样式/测试护栏与限制 |
 | [跨页一致性集成测试](development/integration.md) | Chromium 场景、复现方法、观察结果与覆盖边界 |
 | [维护说明](development/maintaining.md) | 分支、发布、运行时依赖与文档归属 |
 

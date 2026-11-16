@@ -110,6 +110,6 @@ Activity 隐藏取消进行中的读取并转为 `cancelled`，保留选择与�
 pnpm --filter la-pluma-next-client exec vitest run src/features/logs src/pages/logs
 ```
 
-关键不变量包括事实完整保留、未知/错误/缺字段兜底、详情输出源记录、搜索源文本、分组成员保留、固定 Run 范围、本地清屏、相同快照不报未读、失败保旧、取消与迟到响应、Activity 隐藏恢复，以及历史选择和清理裁决。浏览器集成补充真实导航和 Activity 行为，视觉回归覆盖两种主题与三个视口。
+关键不变量包括事实完整保留、未知/错误/缺字段兜底、详情输出源记录、搜索源文本、分组成员保留、固定 Run 范围、本地清屏、相同快照不报未读、失败保旧、取消与迟到响应、Activity 隐藏恢复，以及历史选择和清理裁决。浏览器集成补充真实导航和 Activity 行为；视觉侧由日志沉浸弹层的行为/几何断言与日志页设备画面的布局断言覆盖，日志页没有整页截图基线（整页基线只覆盖 dashboard 与 automation 的深色 desktop/mobile 投影）。
 
 全仓验证与视觉入口见[开发指南](../../development/README.md)，服务端来源与文件读取边界见[MAA、ADB 与通知渠道](../../server/integrations.md)。

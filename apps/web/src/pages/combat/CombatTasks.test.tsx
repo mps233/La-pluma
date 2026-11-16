@@ -1663,10 +1663,8 @@ describe('CombatTasks execution', () => {
 
     const queue = container.querySelector<HTMLElement>('section[aria-label="作业队列"]')
     expect(queue).not.toBeNull()
-    expect(queue?.querySelectorAll('.app-empty-state')).toHaveLength(1)
-    expect(queue?.querySelector('.app-empty-state')?.textContent).toContain('队列为空')
-    expect(queue?.querySelector('.app-empty-state')?.textContent)
-      .toContain('输入作业集链接会自动展开到队列')
+    expect(queue?.textContent).toContain('队列为空')
+    expect(queue?.textContent).toContain('输入作业集链接会自动展开到队列')
     expect(container.querySelectorAll('section[aria-label="作业队列"]')).toHaveLength(1)
   })
 

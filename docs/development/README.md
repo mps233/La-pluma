@@ -59,14 +59,18 @@ pnpm --filter la-pluma-next-client stylelint:baseline  # 违规数下降或有�
 
 CI 在 PR/main 运行浏览器跨页集成和视觉检查，只等待客户端构建，通过 artifact 复用产物；PR 和发布还验证两种原生架构的容器启动。纯文档变更合入 main 时不再重复触发 CI。发布不重复运行浏览器检查。必选的 `verify` 状态是适用任务的汇总结果，详见[工作流说明](../../.github/workflows/README.md)。
 
-### 视觉基线（8 tab + portal 弹层 + 启动壳 × 深/浅主题 × 3 视口）
+### 视觉基线（代表页整页 + 局部表面）
 
 视觉基线用于验收布局、材质与交互层级，harness 在 `apps/web/tests/visual/`，基线截图入库于 `apps/web/tests/visual/__screenshots__/`。
 
 - **环境钉死**：截图生成与比对统一跑在 `mcr.microsoft.com/playwright` 官方镜像内（tag 自动取 client 实际安装的 `@playwright/test` 版本，如 `v1.64.1-noble`），字体与浏览器由此与 CI 完全一致。基线截图是 **Linux/Chromium 专属**：更换镜像、Playwright 版本或操作系统后，必须用 `pnpm visual:update` 重新生成并逐项评审 diff，不要试图跨环境复用。
 - **确定性**：`/api` 请求全部由 `apps/web/tests/visual/fixtures.ts` 的固定数据应答（不依赖真实后端与 MAA 运行状态）；`page.clock` 固定到 2026-10-24 04:00（UTC+8），日期敏感内容（今日开放关卡、资源更新时间等）不随运行当天变化；`reducedMotion: 'reduce'` 加文档级样式禁用 CSS 动画/过渡；主题通过 zustand persist 的 `ui-storage` localStorage 预置，首帧即目标主题。公共部分集中在 `harness.ts`。
-- **三个视口**：桌面 1440×900、平板 820×1180、移动 390×844，deviceScaleFactor 1。tab 基线（`app.pw.ts`）整页截图；弹层基线（`overlays.pw.ts`）为视口截图。820 落在 `sm`（640）与 `workbench`（900）之间，与桌面一起把 `workbench` 具名断点两侧夹住，同时也是「无侧栏 + 顶栏标题」这个 390 与 1440 都覆盖不到的组合；1024 / 1200 两档只在桌面侧出现，改动时注意同步核对。断点定义见 [设计规范](../../DESIGN.md#breakpoints)。
-- **弹层基线守 portal**：Dialog、AlertDialog、Sheet、DropdownMenu 与 PWA 安装提示都由 Base UI portal 渲染到 `document.body`，位于 `.la-pluma-app` 作用域之外，材质、遮罩与定位只由 portal 处的选择器决定。它们 `position: fixed` 按视口定位，`fullPage` 会把 fixed 元素拉到整页顶部，所以单独取视口或按 `data-region` / `data-slot` 做 locator 截图。
+- **三个视口**：桌面 1440×900、平板 820×1180、移动 390×844，deviceScaleFactor 1。Playwright 配置为三个 project 都运行 spec，但截图基线按 spec 与用例选择投影，不是每页都有 3 视口 × 双主题：
+  - `app.pw.ts` 的整页基线只覆盖 dashboard 与 automation 两个代表页，仅深色，desktop 与 mobile 各一张，tablet 跳过。同一文件的 `PAGE_SHELL_CONTRACT` 在 desktop 上逐 tab 核对 8 个页面壳的锚点与布局属性，属于行为契约，不是 8 张整页基线。
+  - `overlays.pw.ts` 的 PWA 安装提示在 desktop / tablet / mobile × 深/浅主题各取一张视口截图；固定偏移用例只在 mobile 视口测量。
+  - `boot.pw.ts` 只在 desktop 截启动壳的深/浅基线；`theme-gallery.pw.ts` 的桌面画布与组件组只在 desktop 截图，移动 tab bar、更多弹层与底部 Sheet 只在 mobile 截图，tablet 没有主题画廊基线；`roguelike-settings.pw.ts` 只在 desktop 的 1920×1080 视口截取宽屏设置面板。
+  - 其余 spec 按用例补充局部 locator 基线或几何、焦点、可见性断言。820 落在 `sm`（640）与 `workbench`（900）之间，与桌面一起把 `workbench` 具名断点两侧夹住，同时也是「无侧栏 + 顶栏标题」这个 390 与 1440 都覆盖不到的组合；1024 / 1200 两档只在桌面侧出现，改动时注意同步核对。断点定义见 [设计规范](../../DESIGN.md#breakpoints)。
+- **弹层与固定表面基线**：Dialog、AlertDialog、Sheet、DropdownMenu 由 Base UI portal 渲染到 `document.body`，位于 `.la-pluma-app` 作用域之外，材质、遮罩与定位只由 portal 处的选择器决定；这些弹层按 `data-slot` 做 locator 截图。PWA 安装/更新提示不是 portal：它渲染在 `#app-root.la-pluma-app` 内，是应用根里的 `position: fixed` 表面，样式仍落在应用根作用域，排查时不要把它当作 portal 证据。两类表面都按视口定位，`fullPage` 会把 fixed 元素拉到整页顶部，所以使用视口截图而不是整页截图。
 - **启动壳基线守首帧**：启动壳（`boot.pw.ts`）在 `installDeterministicEnvironment` 之后 abort `assets/index-*.js`，让 React 模块不执行、页面停在 `index.html` 的内联启动壳上；按视口截图验收 safe-area / dvh / standalone 的真实渲染。
 - **锚点定位**：布局与可访问性断言使用 `data-region` / `data-page-*` 锚点，滚动宿主为 `[data-region="scroll"]`，不依赖实现类名。
 
@@ -128,8 +132,9 @@ pnpm screenshots:readme
 | --- | --- | --- |
 | 纯逻辑（解析、格式化、store、URL 生成） | 单元测试 | 直接调函数 |
 | 竞态、轮询、生命周期、WebRTC 状态机 | jsdom 组件/钩子测试 | 假定时器 + 回调断言 |
-| 布局、断点、材质、遮罩层、视觉层级 | 视觉基线 | Playwright 像素比对 |
-| 弹层（Dialog、Sheet、DropdownMenu、PWA 提示） | 视觉基线 | 打开状态单独截图 |
+| 布局、断点、材质、遮罩层、视觉层级 | 视觉基线 | Playwright 像素比对（代表页整页 + 局部 locator） |
+| Portal 弹层（Dialog、AlertDialog、Sheet、DropdownMenu） | 视觉基线 | 打开状态按 `data-slot` locator 截图 |
+| 应用根固定提示（PWA 安装/更新） | 视觉基线 | 打开状态视口截图 |
 | CSS 引用完整性（`@keyframes`） | 单测 | `src/styles/animations.test.ts` |
 
 新增样式约束时先问：这条规则能不能被视觉基线捕获？能就补基线，不能才考虑写测试——且只断言结果（元素实际位置、可见性），不复述选择器。
@@ -140,7 +145,7 @@ pnpm screenshots:readme
 
 ### 依赖与职责护栏
 
-`apps/web/scripts/check-guardrails.ts` 已作为客户端 `verify` 的第一步，检查功能域依赖环、公开面/深路径、`app → pages → features → shared` 分层方向、`task-execution` 反向依赖与页面文件直接持有传输/存储/轮询原语；不依赖视觉基线。规则明细、允许方向与已知限制见[依赖与职责护栏](guardrails.md)。
+`apps/web/scripts/check-guardrails.ts` 已作为客户端 `verify` 的第一步，检查功能域依赖环、公开面/深路径、`app → pages → features → shared` 分层方向、`task-execution` 反向依赖、页面文件直接持有传输/存储/轮询原语，以及壳层稳定锚点、全局样式作用域与布局测试细节；不依赖视觉基线。规则明细、允许方向与已知限制见[依赖与职责护栏](guardrails.md)。
 
 ## 文件类型
 

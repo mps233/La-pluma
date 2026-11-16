@@ -682,51 +682,6 @@
     }
   }
 
-  .device-monitor-skeleton-surface {
-    padding: 0;
-  }
-
-  .device-monitor-skeleton {
-    container-type: inline-size;
-  }
-
-  .device-monitor-skeleton-header {
-    display: flex;
-    min-height: 3.25rem;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-  }
-
-  .device-monitor-skeleton-frame {
-    width: calc(100% - 1.5rem);
-    max-height: 17rem;
-    margin: 0 0.75rem;
-    overflow: hidden;
-    border-radius: var(--radius-xl);
-  }
-
-  .device-monitor-skeleton-toolbar {
-    display: flex;
-    min-height: 4rem;
-    align-items: center;
-    justify-content: center;
-    gap: clamp(0.25rem, 2cqw, 0.75rem);
-    padding: 0.625rem 1rem 0.75rem;
-  }
-
-  .device-monitor-skeleton-toolbar [data-slot='skeleton'] {
-    flex: 0 0 2.75rem;
-  }
-
-  @container (min-width: 34rem) {
-    .device-monitor-skeleton-frame {
-      height: 13.5rem;
-      max-height: none;
-      aspect-ratio: auto;
-    }
-  }
-
   .device-monitor-surface {
     padding: 0;
   }

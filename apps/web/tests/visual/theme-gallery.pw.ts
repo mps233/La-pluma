@@ -142,32 +142,6 @@ for (const theme of THEMES) {
       await expectNoBrowserErrors(page)
     })
 
-    test(`page skeletons ${theme}`, async ({ page }) => {
-      test.skip(test.info().project.name !== 'desktop', 'the page skeleton group is captured once per theme')
-
-      const environment = await installDeterministicEnvironment(page)
-
-      await page.goto('/dev/theme-gallery')
-      await waitForPageReady(page, 'gallery')
-
-      const skeletons = page.locator('[data-region="gallery-page-skeletons"]')
-      await skeletons.scrollIntoViewIfNeeded()
-      await expect(skeletons).toBeVisible()
-
-      const busy = skeletons.locator('[aria-busy="true"]')
-      await expect(busy).toBeVisible()
-      await expect(busy).toHaveAttribute('aria-label', '页面内容加载中')
-      await expect(busy.locator('[aria-hidden="true"]').first()).toBeVisible()
-
-      await expect(skeletons).toHaveScreenshot(`theme-gallery-page-skeletons-${theme}.png`, {
-        animations: 'disabled',
-        caret: 'hide',
-      })
-
-      environment.assertNoUnmatchedApi()
-      await expectNoBrowserErrors(page)
-    })
-
     test(`select popup ${theme}`, async ({ page }) => {
       test.skip(test.info().project.name !== 'desktop', 'the select popup state is captured once per theme')
 

@@ -3,9 +3,13 @@ import { describe, expect, it } from 'vitest'
 import {
   analyzeDependencies,
   buildImportEdges,
+  checkGlobalStyleScope,
+  checkLayoutRegions,
+  checkLayoutTestDetails,
   checkPageGuardrails,
   collectImportSpecifiers,
   readSourceTree,
+  readStyleTree,
   resolveImport,
   type SourceFile,
 } from './guardrails.ts'
@@ -316,17 +320,213 @@ describe('page responsibility guardrails', () => {
   })
 })
 
+const layoutRegionSource: Record<string, string> = {
+  'app/layout/Layout.tsx': '<main data-region="scroll"><div data-region="page-content" /></main>',
+  'app/layout/AppNavbar.tsx': '<header data-region="navbar"><div data-region="page-header"><h1 data-region="page-title" /></div></header>',
+  'app/layout/AppSidebar.tsx': '<aside data-region="sidebar"><div data-region="sidebar-brand" /></aside>',
+  'app/layout/AppTabbar.tsx': '<footer data-region="tabbar" />',
+  'shared/components/PageShell.tsx': '<div data-region="page" data-page-kind={pageKind} data-page-layout={layout} data-page-surface={surface} />',
+}
+
+const layoutRegionFiles = (overrides: Record<string, string> = {}): SourceFile[] =>
+  Object.entries(layoutRegionSource).map(([path, source]) => ({
+    path,
+    source: overrides[path] ?? source,
+  }))
+
+const globalStyleFilePaths = ['styles/index.css', 'styles/layout.css', 'styles/ios-theme.css']
+
+const globalStyleFiles = (overrides: Record<string, string> = {}): SourceFile[] =>
+  globalStyleFilePaths.map(path => ({
+    path,
+    source: overrides[path] ?? ':root { --radius: 0.5rem; }',
+  }))
+
+const layoutTestFiles = (source: string): SourceFile[] => [{
+  path: 'pages/a/Page.layout.test.tsx',
+  source,
+}]
+
+describe('layout region guardrails', () => {
+  it('accepts the declared shell anchors', () => {
+    expect(checkLayoutRegions(layoutRegionFiles())).toEqual([])
+  })
+
+  it('flags a missing shell anchor with the file and anchor name', () => {
+    const violations = checkLayoutRegions(layoutRegionFiles({
+      'app/layout/AppTabbar.tsx': '<footer className="la-pluma-tabbar" />',
+    }))
+
+    expect(violations).toEqual([
+      expect.objectContaining({
+        rule: 'layout-region',
+        file: 'app/layout/AppTabbar.tsx',
+      }),
+    ])
+    expect(violations[0]?.message).toContain('data-region="tabbar"')
+  })
+
+  it('flags a missing layout file instead of skipping it', () => {
+    const violations = checkLayoutRegions(
+      layoutRegionFiles().filter(file => file.path !== 'shared/components/PageShell.tsx'),
+    )
+
+    expect(violations).toEqual([
+      expect.objectContaining({
+        rule: 'layout-region',
+        file: 'shared/components/PageShell.tsx',
+      }),
+    ])
+    expect(violations[0]?.message).toContain('shared/components/PageShell.tsx')
+  })
+})
+
+describe('global style scope guardrails', () => {
+  it('ignores selector-like text in declarations and comments', () => {
+    const violations = checkGlobalStyleScope(globalStyleFiles({
+      'styles/index.css': [
+        ':root { --automation-label: "automation-"; }',
+        '/* .automation-card { color: red } [data-page-kind="x"] { color: red } */',
+        '@theme { --radius-lg: var(--radius); }',
+      ].join('\n'),
+    }))
+
+    expect(violations).toEqual([])
+  })
+
+  it('flags selectors after a top-level at-rule statement', () => {
+    const violations = checkGlobalStyleScope(globalStyleFiles({
+      'styles/index.css': [
+        '@import "theme.css";',
+        '.automation-evil { color: red; }',
+      ].join('\n'),
+    }))
+
+    expect(violations).toHaveLength(1)
+    expect(violations[0]?.message).toContain('第 2 行')
+    expect(violations[0]?.message).toContain('.automation-evil')
+  })
+
+  it('flags page and domain selectors with the file and line number', () => {
+    const violations = checkGlobalStyleScope(globalStyleFiles({
+      'styles/layout.css': [
+        ':root { --x: 1; }',
+        '.automation-workspace { color: red; }',
+        '',
+        '[data-page-kind="automation"] { color: red; }',
+      ].join('\n'),
+    }))
+
+    expect(violations).toHaveLength(2)
+    expect(violations).toEqual([
+      expect.objectContaining({
+        rule: 'global-style-scope',
+        file: 'styles/layout.css',
+      }),
+      expect.objectContaining({
+        rule: 'global-style-scope',
+        file: 'styles/layout.css',
+      }),
+    ])
+    expect(violations[0]?.message).toContain('第 2 行')
+    expect(violations[0]?.message).toContain('.automation-workspace')
+    expect(violations[1]?.message).toContain('第 4 行')
+    expect(violations[1]?.message).toContain('data-page-kind')
+  })
+
+  it('flags missing global style files instead of skipping them', () => {
+    const violations = checkGlobalStyleScope(
+      globalStyleFiles().filter(file => file.path !== 'styles/ios-theme.css'),
+    )
+
+    expect(violations).toEqual([
+      expect.objectContaining({
+        rule: 'global-style-scope',
+        file: 'styles/ios-theme.css',
+      }),
+    ])
+    expect(violations[0]?.message).toContain('ios-theme.css')
+  })
+})
+
+describe('layout test detail guardrails', () => {
+  it('allows prototype stubs and behavioural assertions', () => {
+    const violations = checkLayoutTestDetails(layoutTestFiles([
+      "// expect(element).toHaveClass('ignored')",
+      "it('stubs scrolling', () => {",
+      "  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { value: vi.fn() })",
+      "  expect(element.getAttribute('aria-label')).toBe('inspect')",
+      "  expect(document.body.querySelector('[role=\"dialog\"]')).not.toBeNull()",
+      "  expect(container.querySelectorAll('[data-region=\"page\"]')).toHaveLength(1)",
+      '})',
+    ].join('\n')))
+
+    expect(violations).toEqual([])
+  })
+
+  it('flags class, style, alignment and scroll details with line numbers', () => {
+    const violations = checkLayoutTestDetails(layoutTestFiles([
+      "expect(element).toHaveClass('min-h-11')",
+      "expect(element.classList.contains('x')).toBe(true)",
+      "expect(element.style.width).toBe('10px')",
+      "expect(container.querySelector('[data-align=\"start\"]')).not.toBeNull()",
+      'expect(handle.nextElementSibling).not.toBeNull()',
+      "expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })",
+      "expect(element).toHaveStyle({ display: 'none' })",
+      "expect(handler).toHaveBeenLastCalledWith({ behavior: 'smooth', block: 'end' })",
+      "expect(container.querySelector('.min-h-11')).not.toBeNull()",
+      "expect(container.querySelectorAll('.sr-only')).toHaveLength(1)",
+    ].join('\n')))
+
+    expect(violations).toHaveLength(10)
+    expect(violations.every(violation => violation.rule === 'layout-test-detail')).toBe(true)
+    const messages = violations.map(violation => violation.message).join('\n')
+    for (const detail of [
+      'toHaveClass',
+      'classList',
+      '.style.width',
+      'data-align',
+      'nextElementSibling',
+      'toHaveBeenCalledWith',
+      'toHaveStyle',
+      'toHaveBeenLastCalledWith',
+      'querySelector 的类选择器',
+      'querySelectorAll 的类选择器',
+    ]) {
+      expect(messages).toContain(detail)
+    }
+    expect(violations[0]?.message).toContain('第 1 行')
+    expect(violations[9]?.message).toContain('第 10 行')
+  })
+
+  it('fails closed when no layout test files are found', () => {
+    const violations = checkLayoutTestDetails([])
+
+    expect(violations).toEqual([
+      expect.objectContaining({ rule: 'layout-test-detail' }),
+    ])
+    expect(violations[0]?.message).toContain('未找到布局测试文件')
+  })
+})
+
 describe('current source tree', () => {
   const srcRoot = fileURLToPath(new URL('../src', import.meta.url))
 
-  it('has no dependency, public-surface or page responsibility violations', async () => {
+  it('has no dependency, public-surface, page responsibility or layout governance violations', async () => {
     const sourceFiles = await readSourceTree(srcRoot)
+    const styleFiles = await readStyleTree(srcRoot)
+    const layoutTestSourceFiles = sourceFiles.filter(file => file.path.endsWith('.layout.test.tsx'))
     const dependencyAnalysis = analyzeDependencies(sourceFiles)
 
     expect(sourceFiles.length).toBeGreaterThan(0)
+    expect(styleFiles.length).toBeGreaterThan(0)
+    expect(layoutTestSourceFiles.length).toBeGreaterThan(0)
     expect(dependencyAnalysis.cycles).toEqual([])
     expect(dependencyAnalysis.violations).toEqual([])
     expect(checkPageGuardrails(sourceFiles)).toEqual([])
+    expect(checkLayoutRegions(sourceFiles)).toEqual([])
+    expect(checkGlobalStyleScope(styleFiles)).toEqual([])
+    expect(checkLayoutTestDetails(layoutTestSourceFiles)).toEqual([])
     expect(
       dependencyAnalysis.violations.filter(violation => violation.rule === 'task-execution-reverse'),
     ).toEqual([])

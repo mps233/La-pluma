@@ -109,6 +109,7 @@ Dashboard（app-page > app-stack-section > DashboardWorkspace；首屏门禁与�
 ### 5. 预览生命期
 
 - `DashboardPreviewEntry` 始终渲染在流程网格的预览壳内，不按流程 loading、执行阶段、连接健康或设备样本条件卸载；网格测量依赖它提供的 `[data-dashboard-preview-card]` 与 `[data-dashboard-preview-frame]`。
+- 宽屏列宽的默认值只由 `dashboard.css` 的 CSS fallback 提供；`useDashboardFlowLayout` 仅在测量成功后写入 inline `--dashboard-flow-columns`，非宽屏、缺少预览锚点或尺寸不可用时移除覆盖，JS 不维护第二份默认列宽。
 - 预览会话由 device-mirror 的应用级 `PreviewSessionProvider` 持有；总览经 `usePreviewSession`/`usePreviewSnapshot` 消费共享视频流与截图。Activity 隐藏只解除当前视频绑定，切页不重连；文档隐藏暂停不影响业务快照。
 - 点击预览画面不再导航，概览保持当前页；预览模式仍只由卡片头部的“关闭 / 快照 / 实时”控制切换，日常、作业、肉鸽、养成、数据和日志页提供完整模拟器控制台。
 - 区域测试只验证流程区域不条件卸载预览入口；真正的连接/截图生命周期仍由 device-mirror 的预览测试覆盖。

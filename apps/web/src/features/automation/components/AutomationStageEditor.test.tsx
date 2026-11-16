@@ -203,19 +203,17 @@ describe('AutomationStageEditor', () => {
     ])
   })
 
-  it('renders the stage hint as a focusable tooltip beside the block title badge', async () => {
+  it('renders the stage hint as a focusable tooltip on the stage fieldset', async () => {
     const stageHint = '使用 HD-数字代表当前活动关卡；置顶关卡会优先执行。次数为该关卡的累计作战局数上限（连战中的每一局都计 1），留空表示不限制局数'
     await renderEditor(['1-7', stage('CE-6', '2')], false, stageHint)
 
-    const title = container.querySelector('.automation-stage-editor-title')
-    const trigger = title?.querySelector<HTMLButtonElement>('button[aria-label="关卡计划说明"]')
-    expect(title?.textContent).toContain('关卡计划')
-    expect(title?.textContent).toContain('2 个关卡')
+    const fieldset = container.querySelector('fieldset')
+    expect(fieldset?.querySelector('legend')?.textContent).toBe('关卡计划')
+    expect(fieldset?.textContent).toContain('2 个关卡')
+    const trigger = fieldset?.querySelector<HTMLButtonElement>('button[aria-label="关卡计划说明"]')
     expect(trigger).not.toBeNull()
-    expect(trigger?.previousElementSibling?.tagName).toBe('SPAN')
-    expect(trigger?.previousElementSibling?.textContent).toBe('2 个关卡')
     expect(trigger?.getAttribute('aria-describedby')).toBeNull()
-    expect(container.querySelector('p')).toBeNull()
+    expect(container.textContent).not.toContain(stageHint)
 
     await act(async () => trigger?.focus())
     const tooltipId = trigger?.getAttribute('aria-describedby')

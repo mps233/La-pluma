@@ -72,7 +72,7 @@ export default function AppSidebar({ activeTab, onNavigate }: AppSidebarProps) {
         className="contents"
         style={{ '--sidebar-width': 'var(--layout-sidebar-width)' } as CSSProperties}
       >
-        <Sidebar collapsible="none" className="la-pluma-sidebar-body">
+        <Sidebar className="la-pluma-sidebar-body">
           <SidebarHeader>
             <div data-region="sidebar-brand" className="la-pluma-sidebar-brand">
               <img
