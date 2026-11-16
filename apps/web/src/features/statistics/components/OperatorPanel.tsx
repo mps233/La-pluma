@@ -204,9 +204,6 @@ export default function OperatorPanel({ isActive, command }: OperatorPanelProps)
 
   return (
     <motion.div
-      id="data-statistics-panel-operbox"
-      role="tabpanel"
-      aria-labelledby="data-statistics-tab-operbox"
       initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}

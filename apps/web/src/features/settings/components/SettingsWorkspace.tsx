@@ -1,3 +1,4 @@
+import { SegmentedTabs, SegmentedTabPanel } from '@/shared/components'
 import { useConfigSection } from '../hooks/useConfigSection'
 import { useDeviceConnectionActivityCleanup } from '../hooks/useSettingsDeviceConnection'
 import ConfigDirectoryPanel from './ConfigDirectoryPanel'
@@ -14,13 +15,21 @@ export default function SettingsWorkspace() {
 
   return (
     <div className="config-workspace-grid grid min-w-0 gap-4.5 xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)] xl:items-start">
-      <div className="config-workspace-primary app-stack-section min-w-0">
-        <ConfigSectionNav section={section} onSelect={selectSection} />
-        <ConnectionConfigPanel isActive={section === 'connection'} />
-        <ResourceSourcePanel isActive={section === 'resource'} />
-        <InstanceOptionsPanel isActive={section === 'instance'} />
-        <ConfigDirectoryPanel />
-      </div>
+      <SegmentedTabs value={section} onValueChange={selectSection}>
+        <div className="config-workspace-primary app-stack-section min-w-0">
+          <ConfigSectionNav section={section} />
+          <SegmentedTabPanel value="connection" id="config-section-panel-connection" keepMounted>
+            <ConnectionConfigPanel isActive={section === 'connection'} />
+          </SegmentedTabPanel>
+          <SegmentedTabPanel value="resource" id="config-section-panel-resource" keepMounted>
+            <ResourceSourcePanel isActive={section === 'resource'} />
+          </SegmentedTabPanel>
+          <SegmentedTabPanel value="instance" id="config-section-panel-instance" keepMounted>
+            <InstanceOptionsPanel isActive={section === 'instance'} />
+          </SegmentedTabPanel>
+          <ConfigDirectoryPanel />
+        </div>
+      </SegmentedTabs>
 
       <div className="config-workspace-secondary app-stack-section min-w-0">
         <SettingsUpdatesPanel />

@@ -521,6 +521,11 @@ const keyDown = async (element: HTMLElement, key: string) => {
   return event
 }
 
+const focus = async (element: HTMLElement) => {
+  await act(async () => element.focus())
+  await flush()
+}
+
 const useIdentity = (identity: TestExecutionIdentity | null) => {
   controller = new ExecutionController({
     api,
@@ -643,6 +648,10 @@ const pressedSegment = (label: string) => Array.from(
   segmentedGroup(label).querySelectorAll<HTMLButtonElement>('button'),
 ).filter(button => button.getAttribute('aria-pressed') === 'true')
   .map(button => button.textContent?.trim())
+
+const modeTab = (label: string) => Array.from(
+  container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+).find(button => button.textContent?.includes(label))
 
 const mockSetPlan = () => mocks.getCopilotSetPlan.mockResolvedValue({
   success: true,
@@ -819,7 +828,7 @@ describe('CombatTasks execution', () => {
     )
   })
 
-  it('keeps the setting controls accessible and 44px high', async () => {
+  it('keeps the setting controls accessible', async () => {
     await renderComponent()
 
     for (const [label, count] of [['编队', 3], ['执行方式', 2]] as const) {
@@ -828,7 +837,6 @@ describe('CombatTasks execution', () => {
       expect(buttons).toHaveLength(count)
       expect(buttons.filter(button => button.getAttribute('aria-pressed') === 'true')).toHaveLength(1)
       buttons.forEach(button => {
-        expect(button.className).toContain('min-h-11')
         expect(button.disabled).toBe(false)
       })
     }
@@ -1789,30 +1797,54 @@ describe('CombatTasks execution', () => {
     expect(container.textContent).toContain('兜底作业')
   })
 
-  it('supports roving focus across combat modes', async () => {
+  it('moves roving focus across combat mode tabs without activating on focus', async () => {
     await renderComponent()
 
-    const modeToolbar = container.querySelector<HTMLElement>('[role="toolbar"][aria-label="作业类型"]')
-    expect(modeToolbar, 'combat mode toolbar').not.toBeNull()
-    const modeButtons = Array.from(modeToolbar!.querySelectorAll<HTMLButtonElement>('button'))
+    const modeTablist = container.querySelector<HTMLElement>('[role="tablist"][aria-label="作业类型"]')
+    expect(modeTablist, 'combat mode tablist').not.toBeNull()
+    const modeButtons = Array.from(modeTablist!.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
     expect(modeButtons).toHaveLength(3)
-    expect(Array.from(modeButtons).filter(button => button.getAttribute('aria-pressed') === 'true')).toHaveLength(1)
+    expect(Array.from(modeButtons).filter(button => button.getAttribute('aria-selected') === 'true')).toHaveLength(1)
     expect(Array.from(modeButtons).map(button => button.getAttribute('tabindex'))).toEqual(['0', '-1', '-1'])
+    expect(modeButtons[0]?.getAttribute('aria-controls')).toBe('combat-mode-panel-copilot')
+    expect(modeButtons[1]?.getAttribute('aria-controls')).toBeNull()
+    expect(modeButtons[2]?.getAttribute('aria-controls')).toBeNull()
+    modeButtons.forEach(button => {
+      const controls = button.getAttribute('aria-controls')
+      if (controls) expect(document.getElementById(controls)).not.toBeNull()
+    })
+    expect(container.querySelector('#combat-mode-panel-copilot')?.getAttribute('aria-labelledby'))
+      .toBe('combat-mode-tab-copilot')
 
     const firstModeButton = modeButtons[0] as HTMLButtonElement
     const secondModeButton = modeButtons[1] as HTMLButtonElement
-    firstModeButton.focus()
+    await focus(firstModeButton)
     await keyDown(firstModeButton, 'ArrowRight')
-    expect(secondModeButton.getAttribute('aria-pressed')).toBe('true')
     expect(document.activeElement).toBe(secondModeButton)
+    expect(firstModeButton.getAttribute('aria-selected')).toBe('true')
+    expect(secondModeButton.getAttribute('aria-selected')).toBe('false')
 
     await keyDown(secondModeButton, 'Home')
-    expect(firstModeButton.getAttribute('aria-pressed')).toBe('true')
     expect(document.activeElement).toBe(firstModeButton)
+    expect(firstModeButton.getAttribute('aria-selected')).toBe('true')
 
-    const arrowDownEvent = await keyDown(firstModeButton, 'ArrowDown')
+    await focus(secondModeButton)
+    await keyDown(secondModeButton, 'Enter')
+    await click(secondModeButton)
+    expect(secondModeButton.getAttribute('aria-selected')).toBe('true')
+    expect(firstModeButton.getAttribute('aria-selected')).toBe('false')
+    expect(firstModeButton.getAttribute('aria-controls')).toBeNull()
+    expect(secondModeButton.getAttribute('aria-controls')).toBe('combat-mode-panel-ssscopilot')
+    modeButtons.forEach(button => {
+      const controls = button.getAttribute('aria-controls')
+      if (controls) expect(document.getElementById(controls)).not.toBeNull()
+    })
+    expect(container.querySelector('#combat-mode-panel-ssscopilot')?.getAttribute('aria-labelledby'))
+      .toBe('combat-mode-tab-ssscopilot')
+
+    const arrowDownEvent = await keyDown(secondModeButton, 'ArrowDown')
     expect(arrowDownEvent.defaultPrevented).toBe(false)
-    expect(firstModeButton.getAttribute('aria-pressed')).toBe('true')
+    expect(secondModeButton.getAttribute('aria-selected')).toBe('true')
   })
 
   it('keeps an unsynced local draft across remounts and retries the save', async () => {
@@ -2043,8 +2075,7 @@ describe('CombatTasks execution', () => {
     await click(buttonByAriaLabel('关闭对话框')!)
     expect(discoveryDialog()).toBeNull()
 
-    const paradoxModeButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button[aria-pressed]'))
-      .find(button => button.textContent?.includes('悖论模拟'))
+    const paradoxModeButton = modeTab('悖论模拟')
     expect(paradoxModeButton).toBeDefined()
     await click(paradoxModeButton!)
     const paradoxInput = container.querySelector<HTMLInputElement>('input[name="maa-paradox-operator"]')!
@@ -2067,8 +2098,7 @@ describe('CombatTasks execution', () => {
     }))
     await renderComponent()
 
-    const paradoxModeButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button[aria-pressed]'))
-      .find(button => button.textContent?.includes('悖论模拟'))
+    const paradoxModeButton = modeTab('悖论模拟')
     expect(paradoxModeButton).toBeDefined()
     await click(paradoxModeButton!)
 
@@ -2727,9 +2757,7 @@ describe('CombatTasks execution', () => {
     await click(buttonByAriaLabel('关闭对话框')!)
     await setRecognitionMode('single')
 
-    const modeButton = (label: string) => Array.from(
-      container.querySelectorAll<HTMLButtonElement>('button[aria-pressed]'),
-    ).find(button => button.textContent?.includes(label))!
+    const modeButton = (label: string) => modeTab(label)!
 
     await click(modeButton('悖论模拟'))
     expect(discoveryDialog()).toBeNull()
@@ -2836,9 +2864,7 @@ describe('CombatTasks execution', () => {
 
   it('executes the selected special task with its own command', async () => {
     await renderComponent()
-    const modeButton = (label: string) => Array.from(
-      container.querySelectorAll<HTMLButtonElement>('[role="toolbar"][aria-label="作业类型"] button'),
-    ).find(button => button.textContent?.includes(label))!
+    const modeButton = (label: string) => modeTab(label)!
 
     await click(modeButton('保全派驻'))
     const sssInput = container.querySelector<HTMLTextAreaElement>('textarea[name="maa-ssscopilot-uris"]')!

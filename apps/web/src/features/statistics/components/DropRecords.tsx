@@ -105,6 +105,7 @@ export default function DropRecords({
 
   return (
     <div className="app-stack-section">
+      <h2 className="text-lg font-semibold text-foreground">掉落记录</h2>
       {error && (
         <div className="form-error-surface flex flex-col items-start gap-3.5 rounded-xl p-4 sm:flex-row sm:items-center sm:justify-between" role="alert">
           <div className="min-w-0">

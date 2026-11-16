@@ -59,6 +59,71 @@ import {
 
 ---
 
+### SegmentedTabs - 分段页面导航
+
+**文件位置**：`apps/web/src/shared/components/SegmentedTabs.tsx`（组合 `@/shared/ui/tabs` 的 shadcn Base UI 原语）
+
+**适用场景**：页面内一级视图切换，例如配置 section、作业类型、肉鸽模式与统计视图。三个同源导出必须一起使用：`SegmentedTabs` 提供受控 Tabs 上下文，`SegmentedTabNav` 渲染分段标签，`SegmentedTabPanel` 渲染对应面板。页面不再手写 tablist、`aria-pressed` 按钮或高亮测量。
+
+```tsx
+import { SegmentedTabs, SegmentedTabNav, SegmentedTabPanel } from '@/shared/components'
+
+<SegmentedTabs value={activeTab} onValueChange={setActiveTab}>
+  <SegmentedTabNav
+    ariaLabel="数据统计视图"
+    value={activeTab}
+    options={options}
+    tabId={id => `statistics-tab-${id}`}
+    panelId={id => `statistics-panel-${id}`}
+  />
+  <SegmentedTabPanel value="operbox" id="statistics-panel-operbox" keepMounted>
+    干员面板
+  </SegmentedTabPanel>
+  <SegmentedTabPanel value="depot" id="statistics-panel-depot" keepMounted>
+    仓库面板
+  </SegmentedTabPanel>
+  <SegmentedTabPanel value="drops" id="statistics-panel-drops" keepMounted>
+    <DropPanel isActive={activeTab === 'drops'} />
+  </SegmentedTabPanel>
+</SegmentedTabs>
+```
+
+- `SegmentedTabs` 的根节点使用 `display: contents`，不引入额外布局层；tab 导航与面板可以继续作为原网格或弹性布局的直接子项。
+- `SegmentedTabNav` 保留 `app-workspace-segments`、`app-liquid-tab-pill`、`app-workspace-segment-list`、`app-workspace-segment-indicator`、`app-workspace-segment(-icon|-copy)`、`is-selected` 与流体高亮。`className`、`listClassName`、`indicatorClassName`、`tabClassName`、`iconClassName` 只承载页面差异；测量复用 `useFluidTabIndicator`，不要逐页复制。
+- 标签使用 Base UI 的 tablist/tab 语义，`activateOnFocus` 固定为 `false`：左右方向键、Home、End 只移动 roving focus，Enter、Space 或点击才切换选中项。不要恢复方向键直接激活的旧行为。
+- `tabId` / `panelId` 可选：传入时提供稳定 id 与 `aria-controls`，省略时由 Base UI 生成并注册关联。`panelId` 只能指向当前实际渲染的面板；默认卸载的页面只在当前 tab 上返回 `panelId`，避免 `aria-controls` 指向不存在的元素。`SegmentedTabPanel` 的 `id` 同样可选；输出 `role="tabpanel"` 与 `aria-labelledby`。如果给面板传 `id`，对应 tab 必须传相同的 `panelId`；或者两侧都省略，交给 Base UI 生成。只传一侧会破坏关联。不传 `keepMounted` 时隐藏面板卸载，传 `true` 时保留 DOM 并设置 `hidden`。配置与统计需要保留草稿、反馈、Query 与统计周期，使用 `keepMounted`；作业使用默认卸载；肉鸽使用始终打开的单个 `contents` 面板承载跨 grid-area 内容。
+- 无法把整块内容包进面板时（例如肉鸽网格的多个 grid-area），保留原网格，把模式相关区域放进单个 `className="contents"` 的面板，并让所有 tab 指向同一个 `panelId`。
+
+---
+
+### SegmentedControl - 单值分段控件
+
+**文件位置**：`apps/web/src/shared/components/SegmentedControl.tsx`（组合 `@/shared/ui/toggle-group` 的 shadcn Base UI 原语）
+
+**适用场景**：表单内的互斥选项，例如编队与执行方式。不要再写私有的分段按钮组件。
+
+```tsx
+import { SegmentedControl, type SegmentedControlOption } from '@/shared/components'
+
+const FORMATION_OPTIONS: readonly SegmentedControlOption<FormationMode>[] = [
+  { value: 'auto', label: '自动决定' },
+  { value: 'on', label: '自动编队' },
+  { value: 'off', label: '保留当前编队' },
+]
+
+<SegmentedControl
+  ariaLabel="编队"
+  value={formationMode}
+  options={FORMATION_OPTIONS}
+  onChange={onFormationChange}
+  fullWidth
+/>
+```
+
+Props：`ariaLabel`、`value`、`options`（每项 `value`、`label`、可选 `disabled`）、`onChange`、`fullWidth`、`disabled`、`className`。控件使用 `role="group"` 与 `aria-pressed`，单选且始终保留一个选中项；点击已选项不会清空选择。按钮保持 `min-h-11` 触达高度，选中态沿用 `brand-action` 视觉。
+
+---
+
 ### Button
 
 **文件位置**：`apps/web/src/shared/ui/button.tsx`（shadcn 生成物，随上游原文保留）
@@ -307,28 +372,13 @@ import Icons from '@/shared/components/Icons'
 
 **文件位置**：`apps/web/src/shared/hooks/useFluidTabIndicator.ts`
 
-**适用场景**：带有 Framer Motion 高亮底层的分段标签。它会在切换、容器尺寸变化、标签内容变化和窗口缩放时，把高亮层对齐到当前按钮。不要在每个页面重复维护 `ResizeObserver`、元素 ref 和坐标计算。
+**适用场景**：已有自定义分段按钮组需要复用高亮矩形测量与 roving focus 键盘处理时使用。页面级分段导航统一使用 `SegmentedTabs` / `SegmentedTabNav`，其内部复用本 Hook 的测量逻辑；不要在新页面复制 `ResizeObserver`、元素 ref 和坐标计算。
 
 ```tsx
-const { containerRef, activeRect, setTabRef } = useFluidTabIndicator(activeTab)
-
-<div ref={containerRef} className="relative">
-  <motion.div
-    className="pointer-events-none absolute"
-    animate={{
-      x: activeRect.x,
-      y: activeRect.y,
-      width: activeRect.width,
-      height: activeRect.height,
-    }}
-  />
-  {tabs.map((tab) => (
-    <button key={tab.id} ref={setTabRef(tab.id)}>{tab.label}</button>
-  ))}
-</div>
+const { containerRef, activeRect, setTabRef, handleTabKeyDown } = useFluidTabIndicator(activeTab)
 ```
 
-标签 ID 需是字符串联合类型，且高亮容器需要 `relative` 定位。作业、养成和肉鸽页面已使用该 Hook。
+Hook 返回高亮容器 ref、当前高亮矩形、标签 ref 设置器与方向键/Home/End 处理函数，并在切换、容器尺寸变化、标签内容变化和窗口缩放时重新测量。标签 ID 需是字符串联合类型，且高亮容器需要 `relative` 定位。当前只有 `OperatorPicker` 的干员范围分段直接使用；页面导航应改用共享的 `SegmentedTabNav`。
 
 ---
 
@@ -340,7 +390,7 @@ const { containerRef, activeRect, setTabRef } = useFluidTabIndicator(activeTab)
 2. 大面板使用 `Card` 组合；分节自持内边距时给 `Card` 加 `gap-0 p-0!`。
 3. 表单使用 `@/shared/ui` 的 `Input`、`Select`、`Checkbox`、`Switch` 原语，并用所属 feature 的 field helper 组合标签与错误；多行文本使用原生 `textarea`。
 4. 没有内容时使用 `EmptyState`，不要重复手写空状态。
-5. 动态分段标签优先使用 `useFluidTabIndicator`，不要复制测量逻辑。
+5. 页面级分段导航使用 `SegmentedTabs` + `SegmentedTabNav` + `SegmentedTabPanel`；表单内单值分段使用 `SegmentedControl`。不要复制测量逻辑，也不要自建 tablist。
 6. 全局执行结果、错误与进度使用 `notify` / `notifyProgress`；局部状态使用既有 `status-*` 语义类并紧邻相关操作。
 7. 操作用 `@/shared/ui/button` 的 `Button`；无文字操作使用 `size="icon"` 档位并同时提供 `title` 与 `aria-label`。
 8. 如果出现新的颜色、圆角、间距需求，先按根目录 [设计规范](../../DESIGN.md) 判断是否应抽成 token 或语义类。

@@ -19,7 +19,7 @@
 | 页面壳与工作区组合 | `pages/combat/CombatTasks.tsx` | 只渲染 `app-page`/`app-stack-section` 与工作区；不调用搜索/预览/执行 hook，不持有请求生命周期 |
 | 模式、配置订阅、预览/搜索入口、执行订阅、作业集选择、队列实例、同步反馈与重置弹层 | `features/combat/components/CombatWorkspace.tsx` | 跨面板唯一容器；`activeCombatMode`、`selectedCopilotIndexes`、`useCopilotQueue` 实例与面板会话存储在这里创建 |
 | 任务目录与模式展示项 | `features/combat/components/CombatTaskCatalog.tsx` | 名称、命令、图标、占位与描述；不读取配置/Query/执行状态 |
-| 模式分段控件的测量与键盘导航 | `features/combat/components/CombatModeTabs.tsx` | 受控组件；只持有 `useFluidTabIndicator` 的测量状态 |
+| 模式分段控件的键盘与高亮 | `features/combat/components/CombatModeTabs.tsx` | 组合共享 `SegmentedTabNav`：tablist/tab 语义、方向键移动焦点、Enter/Space 激活与流体高亮 |
 | 执行设置、编队/突袭/作业集模式与高级字段 | `components/CombatSettingsPanel.tsx`、`components/CombatAdvancedFields.tsx` | 受控表单；选项表来自 `model/combatCommands.ts` |
 | 作业来源栏（链接输入、预览、JSON 导入、识别方式、发现与说明） | `components/CombatCopilotSourceBar.tsx` + `components/CombatCopilotInputPanel.tsx` | 输入值来自配置草稿；JSON 导入按钮位于链接输入框内、识别方式下拉左侧，文件选择与从文件管理器复制后粘贴的 JSON 文件走同一上传通道；识别方式保存在面板会话存储；“发现”只打开独立弹窗，不在来源栏内嵌搜索 |
 | 发现作业弹窗（关键词、关卡、干员、排序、视图与结果卡片） | `components/CombatCopilotDiscoveryDialog.tsx` + `CombatCopilotSearchBar.tsx`、`CombatCopilotDiscoveryCard.tsx`、`CombatCopilotStageSelect.tsx` | 工作区在页面挂载时按已保存的干员偏好后台预取默认热度列表并缓存；打开弹窗先展示缓存，再在后台刷新，刷新不显示 loading、不阻塞输入；关键词/关卡/排序每次打开重置，干员包含/排除、匹配设置与视图按界面偏好恢复；请求统一经 `normalizeCopilotSearchRequest`，关卡/干员/排序变化立即重搜，视图与匹配模式只影响本地展示；关键词输入框在有关键词时显示右侧清除按钮，清空后焦点回到输入框；整张卡片可点击打开该条目的详情预览，不改写主输入，也不标记“已选中” |
@@ -43,7 +43,7 @@
 - 不改变 `/agent/copilot-sets/*` 等既有端点、配置 key、既有本地存储键或执行 wire 形状；`/agent/copilot/search` 保留 `stage` 作为 `level` 别名，新增可选 `document`/`level`/`operator`/`orderBy`/`page`/`limit` 与响应字段（`stageId`/`stageCode`/`stageLabel`/`uploader`/`uploadTime`/`operators`/`match`/`details`/`operatorDetails`/`groupNames`/`recommendedMode`/`total`/`hasNext` 等），旧调用方不传新参数时行为不变。新增的 `/agent/copilot/stages` 是只读关卡目录，`/api/copilot-files` 与 `/agent/copilot-queues/*` 是 Web UI 专用入口，均不进入 Agent manifest。新增的 `la-pluma-copilot-queue-v1` 只服务本地作业队列。
 - 不改变三种作业集执行方式的服务端映射：`app`/`cli` → `continuous`，`manual` → `manual`。
 - 不把搜索词、关卡、排序或识别方式写进配置或 localStorage；干员筛选（含启用状态与记住开关）、匹配模式与网格/列表视图只作为界面偏好写入 `la-pluma-copilot-operator-filter-v1`、`la-pluma-copilot-operator-match-v1`、`la-pluma-copilot-discovery-view-v1`，不进入配置通道或 Query key；不新增跨页共享。
-- 作业输入与搜索的 `name`、状态文案、关键 `aria-*` 契约与配置 key 保持稳定；执行参数中编队与执行方式为分段控件、难度为下拉框，字段语义不变；DOM/CSS 类名随布局调整。作业输入与搜索在前，队列卡居中，执行参数在后，窄容器按阅读顺序纵向排列。
+- 作业输入与搜索的 `name`、状态文案、关键 `aria-*` 契约与配置 key 保持稳定；执行参数中编队与执行方式使用共享 `SegmentedControl`（`role="group"` 与 `aria-pressed`），难度为下拉框，字段语义不变；DOM/CSS 类名随布局调整。作业输入与搜索在前，队列卡居中，执行参数在后，窄容器按阅读顺序纵向排列。
 - 页面壳不包含业务状态机；工作区是唯一领域容器，面板只接收投影。
 
 ### 2. 组合与状态边界
@@ -51,25 +51,30 @@
 ```
 CombatTasks（app-page > app-stack-section > CombatWorkspace）
 └─ CombatWorkspace（模式、配置、预览/搜索、执行、选择、同步反馈、重置弹层）
-   ├─ CombatModeTabs（受控分段 + 高亮测量）
-   ├─ CombatExecutionProgressPanel（本次执行条目位置 / 关卡 / 已用时）
-   ├─ CombatCopilotTaskPanel（普通作业卡）
-   │  ├─ CombatCopilotSourceBar（CombatCopilotInputPanel + CombatCopilotDiscoveryDialog）
-   │  │  ├─ CombatCopilotInputPanel（作业链接输入 + JSON 导入图标 + 识别方式下拉 + 预览 / 加入队列 / 发现 / 说明）
-   │  │  └─ CombatCopilotDiscoveryDialog（关键词 + 关卡 + 干员 + 排序 + 视图 + 匹配）
-   │  │     ├─ CombatCopilotSearchBar / CombatCopilotStageSelect
-   │  │     ├─ CombatCopilotDiscoveryCard（网格/列表）
-   │  │     ├─ CombatCopilotOperatorFilterDialog（包含/排除）
-   │  │     └─ CombatCopilotMatchDialog（匹配模式）
-   │  ├─ CombatCopilotQueuePanel（唯一作业列表）
-   │  ├─ CombatCopilotDetailLayer（预览 / 队列行详情 / 作业集摘要）
-   │  └─ 参数区：CombatSettingsPanel → CombatAdvancedFields
-   ├─ CombatSpecialTaskPanel（保全派驻 / 悖论模拟卡）
-   │  ├─ CombatAdvancedFields
-   │  ├─ CombatParadoxSearchPanel（悖论干员搜索）
-   │  └─ 执行/参数概览
-   └─ aside（DeviceMonitorPanel，共享实时会话）
+   └─ SegmentedTabs（模式受控上下文）
+      ├─ CombatModeTabs（共享 SegmentedTabNav + 高亮）
+      ├─ CombatExecutionProgressPanel（本次执行条目位置 / 关卡 / 已用时）
+      ├─ SegmentedTabPanel(copilot)
+      │  └─ CombatCopilotTaskPanel（普通作业卡）
+      │     ├─ CombatCopilotSourceBar（CombatCopilotInputPanel + CombatCopilotDiscoveryDialog）
+      │     │  ├─ CombatCopilotInputPanel（作业链接输入 + JSON 导入图标 + 识别方式下拉 + 预览 / 加入队列 / 发现 / 说明）
+      │     │  └─ CombatCopilotDiscoveryDialog（关键词 + 关卡 + 干员 + 排序 + 视图 + 匹配）
+      │     │     ├─ CombatCopilotSearchBar / CombatCopilotStageSelect
+      │     │     ├─ CombatCopilotDiscoveryCard（网格/列表）
+      │     │     ├─ CombatCopilotOperatorFilterDialog（包含/排除）
+      │     │     └─ CombatCopilotMatchDialog（匹配模式）
+      │     ├─ CombatCopilotQueuePanel（唯一作业列表）
+      │     ├─ CombatCopilotDetailLayer（预览 / 队列行详情 / 作业集摘要）
+      │     └─ 参数区：CombatSettingsPanel → CombatAdvancedFields
+      ├─ SegmentedTabPanel(ssscopilot | paradoxcopilot)
+      │  └─ CombatSpecialTaskPanel（保全派驻 / 悖论模拟卡）
+      │     ├─ CombatAdvancedFields
+      │     ├─ CombatParadoxSearchPanel（悖论干员搜索）
+      │     └─ 执行/参数概览
+      └─ aside（DeviceMonitorPanel，共享实时会话）
 ```
+
+- 模式 tab 使用 `combat-mode-tab-*` 与当前渲染面板的 `combat-mode-panel-*` 建立 `aria-controls`/`aria-labelledby` 配对；默认卸载的隐藏模式不输出 `aria-controls`，因此每个渲染出的 `aria-controls` 都指向存在的元素。方向键/Home/End 只移动 roving focus，Enter/Space 或点击才切换。`copilot` 与特殊任务面板使用默认卸载，切换作业类型时卡片 DOM 卸载；活动状态仍只由 `CombatWorkspace` 的 `activeCombatMode` 决定。
 
 | 状态 | 所有者 | 切换作业类型 | Activity 隐藏/恢复 | 真正卸载/刷新 |
 | --- | --- | --- | --- | --- |
@@ -161,7 +166,7 @@ CombatTasks（app-page > app-stack-section > CombatWorkspace）
 
 ### 6. Activity 与卸载
 
-- **Activity 隐藏/恢复**：搜索 hook 的清理取消在途 Query，预览会话 `stop()` 取消在途读取并保留已显示预览，执行 hook 清理停止确认与继续/跳过计时器，模式分段清理 `ResizeObserver`/resize 监听；工作区与面板 state 保留。恢复时不自动重放搜索/预览/提交，Query 缓存按新鲜度复用，后台 Run 身份不变。
+- **Activity 隐藏/恢复**：搜索 hook 的清理取消在途 Query，预览会话 `stop()` 取消在途读取并保留已显示预览，执行 hook 清理停止确认与继续/跳过计时器，共享 `SegmentedTabNav` 清理 `ResizeObserver`/resize 监听；工作区与面板 state 保留。恢复时不自动重放搜索/预览/提交，Query 缓存按新鲜度复用，后台 Run 身份不变。
 - **队列执行**：队列 Run 与作业集 Run 都由 `task-execution` 控制器观察；隐藏/恢复只重建观察，继续或跳过在途标记不带到新 Run，等待态与逐项结果始终从当前 Run 投影重新读取。
 - **切换作业类型**：卡片 DOM 卸载，面板会话存储与工作区预览/搜索/执行实例保留；返回时输入与识别方式恢复。
 - **真正卸载/刷新**：工作区与面板 store 销毁，搜索词/识别方式/搜索结果/选中索引/弹层重置；配置草稿、pending 队列和 Run 身份仍由应用级所有者持有，重新挂载后继续使用。

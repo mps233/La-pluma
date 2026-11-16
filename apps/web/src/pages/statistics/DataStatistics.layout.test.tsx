@@ -272,7 +272,7 @@ describe('DataStatistics layout surfaces', () => {
     vi.unstubAllGlobals()
   })
 
-  it('switches statistics tabs with arrow keys and keeps a single focusable tab', async () => {
+  it('moves statistics tab focus with arrow keys and activates the focused tab on Enter', async () => {
     mocks.getAllOperators.mockResolvedValue(catalogFixture)
     mocks.getOperBoxData.mockResolvedValue(ownedOperatorFixture)
 
@@ -281,19 +281,65 @@ describe('DataStatistics layout surfaces', () => {
 
     expect(container.querySelector('h1')).toBeNull()
 
+    expect(container.querySelector('[role="tablist"]')?.getAttribute('aria-label')).toBe('数据统计视图')
     const tabs = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
     expect(tabs).toHaveLength(3)
     expect(tabs[0]?.getAttribute('aria-selected')).toBe('true')
     expect(tabs[0]?.tabIndex).toBe(0)
     expect(tabs[1]?.tabIndex).toBe(-1)
+    expect(tabs[0]?.getAttribute('aria-controls')).toBe('data-statistics-panel-operbox')
+    expect(container.querySelector('#data-statistics-panel-operbox')?.getAttribute('aria-labelledby'))
+      .toBe('data-statistics-tab-operbox')
 
     const depotTab = tabs.find(tab => tab.textContent?.includes('仓库识别'))
     expect(depotTab).toBeDefined()
     await act(async () => tabs[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })))
     await flush()
-    expect(depotTab?.getAttribute('aria-selected')).toBe('true')
     expect(document.activeElement).toBe(depotTab)
-    expect(container.textContent).toContain('仓库识别')
+    expect(tabs[0]?.getAttribute('aria-selected')).toBe('true')
+    expect(depotTab?.getAttribute('aria-selected')).toBe('false')
+    expect(container.querySelector('#data-statistics-panel-depot')?.hasAttribute('hidden')).toBe(true)
+
+    await act(async () => depotTab?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+    ))
+    await click(depotTab!)
+    expect(depotTab?.getAttribute('aria-selected')).toBe('true')
+    expect(container.querySelector('#data-statistics-panel-depot')?.hasAttribute('hidden')).toBe(false)
+    expect(container.querySelector('#data-statistics-panel-operbox')?.hasAttribute('hidden')).toBe(true)
+    expect(container.querySelector('#data-statistics-panel-depot')?.textContent).toContain('仓库识别')
+  })
+
+  it('keeps the drops tab and panel ids linked across visibility transitions', async () => {
+    mocks.getAllOperators.mockResolvedValue(catalogFixture)
+    mocks.getOperBoxData.mockResolvedValue(ownedOperatorFixture)
+
+    await renderPage()
+    await flush()
+
+    const dropsTab = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+      .find(tab => tab.textContent?.includes('掉落记录'))
+    expect(dropsTab?.id).toBe('data-statistics-tab-drops')
+    expect(dropsTab?.getAttribute('aria-controls')).toBe('data-statistics-panel-drops')
+
+    const dropsPanel = container.querySelector<HTMLElement>('#data-statistics-panel-drops')
+    const operboxPanel = container.querySelector<HTMLElement>('#data-statistics-panel-operbox')
+    expect(dropsPanel?.getAttribute('role')).toBe('tabpanel')
+    expect(dropsPanel?.getAttribute('aria-labelledby')).toBe('data-statistics-tab-drops')
+    expect(dropsPanel?.hasAttribute('hidden')).toBe(true)
+    expect(operboxPanel?.hasAttribute('hidden')).toBe(false)
+    expect(document.getElementById(dropsTab!.getAttribute('aria-controls')!)).toBe(dropsPanel)
+
+    await click(dropsTab!)
+    expect(dropsTab?.getAttribute('aria-selected')).toBe('true')
+    expect(dropsPanel?.hasAttribute('hidden')).toBe(false)
+    expect(operboxPanel?.hasAttribute('hidden')).toBe(true)
+
+    const operboxTab = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+      .find(tab => tab.textContent?.includes('干员识别'))
+    await click(operboxTab!)
+    expect(dropsPanel?.hasAttribute('hidden')).toBe(true)
+    expect(operboxPanel?.hasAttribute('hidden')).toBe(false)
   })
 
   it('opens the tab named by the url of the page entry', async () => {

@@ -10,8 +10,8 @@ interface FluidTabRect {
 const emptyRect: FluidTabRect = { x: 0, y: 0, width: 0, height: 0 }
 
 export function measureFluidTabRect(
-  container: HTMLDivElement,
-  activeElement: HTMLButtonElement,
+  container: HTMLElement,
+  activeElement: HTMLElement,
 ): FluidTabRect {
   const transform = window.getComputedStyle(activeElement).transform
   if (!transform || transform === 'none') {
@@ -35,7 +35,7 @@ export function measureFluidTabRect(
 
 export function useFluidTabIndicator<T extends string>(activeTab: T) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const tabRefs = useRef<Partial<Record<T, HTMLButtonElement | null>>>({})
+  const tabRefs = useRef<Partial<Record<T, HTMLElement | null>>>({})
   const [activeRect, setActiveRect] = useState<FluidTabRect>(emptyRect)
 
   useLayoutEffect(() => {
@@ -63,7 +63,7 @@ export function useFluidTabIndicator<T extends string>(activeTab: T) {
     }
   }, [activeTab])
 
-  const setTabRef = (tab: T) => (element: HTMLButtonElement | null) => {
+  const setTabRef = (tab: T) => (element: HTMLElement | null) => {
     tabRefs.current[tab] = element
   }
 

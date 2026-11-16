@@ -19,9 +19,6 @@ export default function DropPanel({ isActive }: DropPanelProps) {
 
   return (
     <motion.div
-      id="data-statistics-panel-drops"
-      role="tabpanel"
-      aria-labelledby="data-statistics-tab-drops"
       initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}

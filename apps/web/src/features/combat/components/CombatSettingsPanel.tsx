@@ -1,5 +1,5 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
-import { FieldHint } from '@/shared/components'
+import { FieldHint, SegmentedControl, type SegmentedControlOption } from '@/shared/components'
 import type {
   CombatTask,
   CopilotRaid,
@@ -8,7 +8,6 @@ import type {
 } from '../types'
 import type { AdvancedValues } from '../model/combatCommands'
 import CombatAdvancedFields from './CombatAdvancedFields'
-import CombatSegmentedControl, { type CombatSegmentedOption } from './CombatSegmentedControl'
 
 interface CombatSettingsPanelProps {
   task: CombatTask
@@ -22,7 +21,7 @@ interface CombatSettingsPanelProps {
   onAdvancedChange: (key: string, value: string | number | boolean) => void
 }
 
-const FORMATION_OPTIONS: readonly CombatSegmentedOption<FormationMode>[] = [
+const FORMATION_OPTIONS: readonly SegmentedControlOption<FormationMode>[] = [
   { value: 'auto', label: '自动决定' },
   { value: 'on', label: '自动编队' },
   { value: 'off', label: '保留当前编队' },
@@ -35,7 +34,7 @@ const RAID_OPTIONS: Array<{ value: CopilotRaid; label: string }> = [
   { value: 'both', label: '普通+突袭' },
 ]
 
-const SET_EXECUTION_MODE_OPTIONS: readonly CombatSegmentedOption<CopilotSetExecutionMode>[] = [
+const SET_EXECUTION_MODE_OPTIONS: readonly SegmentedControlOption<CopilotSetExecutionMode>[] = [
   { value: 'cli', label: '连续执行' },
   { value: 'manual', label: '手动逐关' },
 ]
@@ -70,7 +69,7 @@ export default function CombatSettingsPanel({
             hint="“自动决定”会在队列执行时启用自动编队，单作业沿用 Maa CLI 的默认设置。"
           />
         </div>
-        <CombatSegmentedControl
+        <SegmentedControl
           ariaLabel="编队"
           value={formationMode}
           options={FORMATION_OPTIONS}
@@ -107,7 +106,7 @@ export default function CombatSettingsPanel({
             hint="连续执行会自动开始下一项。手动逐关需要在每个执行步骤后确认。"
           />
         </div>
-        <CombatSegmentedControl
+        <SegmentedControl
           ariaLabel="执行方式"
           value={setExecutionMode === 'app' ? 'cli' : setExecutionMode}
           options={SET_EXECUTION_MODE_OPTIONS}

@@ -47,9 +47,6 @@ export default function DepotPanel({ isActive, command }: DepotPanelProps) {
 
   return (
     <motion.div
-      id="data-statistics-panel-depot"
-      role="tabpanel"
-      aria-labelledby="data-statistics-tab-depot"
       initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 38, mass: 0.72 }}

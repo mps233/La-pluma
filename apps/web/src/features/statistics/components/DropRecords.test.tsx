@@ -103,6 +103,30 @@ describe('DropRecords read states', () => {
     expect(onRefresh).toHaveBeenCalledTimes(1)
   })
 
+  it('heads the drop records section with an h2 above both h3 subsections', async () => {
+    await act(async () => root.render(
+      <DropRecords
+        dropStatistics={{
+          total: { sanity: 42, battles: 3, medicine: 0, stone: 0 },
+          items: { '固源岩': { count: 6, iconId: 'rock' } },
+          stages: { '1-7': { battles: 3, sanity: 42, items: { '固源岩': 6 } } },
+          dateRange: { start: '2026-07-14', end: '2026-07-20', days: 7 },
+        }}
+        dropDays={7}
+        setDropDays={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    ))
+
+    const h2 = container.querySelector('h2')
+    expect(h2?.textContent).toBe('掉落记录')
+    const h3s = Array.from(container.querySelectorAll('h3')).map(heading => heading.textContent)
+    expect(h3s[0]).toContain('材料掉落统计')
+    expect(h3s[1]).toContain('关卡统计')
+    expect(h2?.compareDocumentPosition(container.querySelectorAll('h3')[0]!))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+
   it('prefers the payload item id when building item icon urls', async () => {
     await act(async () => root.render(
       <DropRecords

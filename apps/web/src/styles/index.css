@@ -30,6 +30,7 @@
   --color-primary-soft: var(--primary-soft);
   --color-primary-action: var(--primary-action);
   --color-primary-action-pressed: var(--primary-action-pressed);
+  --color-primary-action-hover: var(--primary-action-hover);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
@@ -102,6 +103,7 @@
     --primary-strong: #005ecb;
     --primary-action: #06c;
     --primary-action-pressed: #0055b3;
+    --primary-action-hover: color-mix(in srgb, var(--primary) 78%, black);
     --primary-soft: rgba(0, 122, 255, 0.12);
     --success-text: #1f7a36;
     --success-action: #248a3d;
@@ -153,6 +155,7 @@
     --primary-strong: #64b5ff;
     --primary-action: #06c;
     --primary-action-pressed: #0055b3;
+    --primary-action-hover: color-mix(in srgb, var(--primary) 78%, black);
     --primary-soft: rgba(10, 132, 255, 0.2);
     --success-text: #30d158;
     --success-action: #1f7a36;

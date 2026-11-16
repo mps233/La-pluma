@@ -101,12 +101,11 @@ describe('DropPanel state lifecycle', () => {
 
     expect(mocks.getDropStatistics).toHaveBeenCalledTimes(1)
     expect(mocks.getDropStatistics).toHaveBeenCalledWith(7, expect.any(AbortSignal))
-    expect(container.querySelector('[role="tabpanel"]')).toBeNull()
+    expect(container.textContent).not.toContain('总理智消耗')
 
     await render(true)
     await flush()
 
-    expect(container.querySelector('[role="tabpanel"]')?.id).toBe('data-statistics-panel-drops')
     expect(container.textContent).toContain('总理智消耗')
     expect(container.textContent).toContain('装置')
     expect(periodButton(7)?.getAttribute('aria-pressed')).toBe('true')
@@ -117,7 +116,7 @@ describe('DropPanel state lifecycle', () => {
     expect(periodButton(14)?.getAttribute('aria-pressed')).toBe('true')
 
     await render(false)
-    expect(container.querySelector('[role="tabpanel"]')).toBeNull()
+    expect(container.textContent).not.toContain('总理智消耗')
     await render(true)
     await flush()
 

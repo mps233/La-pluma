@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { gameDataKeys } from '@/features/game-data'
 import { useResourceInvalidation } from '@/features/resource-invalidation'
+import { SegmentedTabs, SegmentedTabPanel } from '@/shared/components'
 import { useStatisticsCommands } from '../hooks/useStatisticsCommands'
 import { statisticsKeys } from '../model/queryKeys'
 import {
@@ -58,16 +59,22 @@ export default function StatisticsWorkspace() {
   })
 
   return (
-    <>
-      <StatisticsTabs activeTab={activeTab} onTabChange={selectTab} />
+    <SegmentedTabs value={activeTab} onValueChange={selectTab}>
+      <StatisticsTabs activeTab={activeTab} />
 
       <div>
         <div className="min-w-0 app-stack-section">
-          <OperatorPanel isActive={activeTab === 'operbox'} command={command} />
-          <DepotPanel isActive={activeTab === 'depot'} command={command} />
-          <DropPanel isActive={activeTab === 'drops'} />
+          <SegmentedTabPanel value="operbox" id="data-statistics-panel-operbox" keepMounted>
+            <OperatorPanel isActive={activeTab === 'operbox'} command={command} />
+          </SegmentedTabPanel>
+          <SegmentedTabPanel value="depot" id="data-statistics-panel-depot" keepMounted>
+            <DepotPanel isActive={activeTab === 'depot'} command={command} />
+          </SegmentedTabPanel>
+          <SegmentedTabPanel value="drops" id="data-statistics-panel-drops" keepMounted>
+            <DropPanel isActive={activeTab === 'drops'} />
+          </SegmentedTabPanel>
         </div>
       </div>
-    </>
+    </SegmentedTabs>
   )
 }

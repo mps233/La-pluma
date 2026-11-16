@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getErrorMessage } from '@/shared/api'
 import { LoaderCircle } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { ConfirmAlertDialog } from '@/shared/components'
+import { ConfirmAlertDialog, SegmentedTabs, SegmentedTabPanel } from '@/shared/components'
 import {
   COMBAT_PARADOX_SEARCH_NOTICE_ID,
   COMBAT_PREVIEW_NOTICE_ID,
@@ -927,6 +927,14 @@ export default function CombatWorkspace() {
   const copilotTask = getCombatTask('copilot')
   const specialTask = activeCombatMode === 'copilot' ? null : getCombatTask(activeCombatMode)
 
+  const handleModeSelect = (mode: CombatMode) => {
+    setActiveCombatMode(mode)
+    if (mode !== 'copilot') {
+      setCopilotDetail(null)
+      handleCloseDiscovery()
+    }
+  }
+
   const copilotConfig: CombatCopilotConfig = {
     input: taskInputs.copilot || '',
     advanced: advancedParams.copilot ?? {},
@@ -1061,84 +1069,85 @@ export default function CombatWorkspace() {
         </div>
       )}
 
-      <div className="combat-workspace-grid">
-        <div className="combat-main-column">
-          <CombatModeTabs
-            activeMode={activeCombatMode}
-            onSelect={mode => {
-              setActiveCombatMode(mode)
-              if (mode !== 'copilot') {
-                setCopilotDetail(null)
-                handleCloseDiscovery()
-              }
-            }}
-          />
+      <SegmentedTabs value={activeCombatMode} onValueChange={handleModeSelect}>
+        <div className="combat-workspace-grid">
+          <div className="combat-main-column">
+            <CombatModeTabs
+              activeMode={activeCombatMode}
+            />
 
-          <CombatExecutionProgressPanel progress={executionProgress} />
+            <CombatExecutionProgressPanel progress={executionProgress} />
 
-          <div className="app-stack-section">
-            {activeCombatMode === 'copilot' && (
-              <CombatCopilotTaskPanel
-                task={copilotTask}
-                config={copilotConfig}
-                preview={{
-                  info: preview,
-                  loading: isLoadingSet,
-                  pendingTarget: pendingPreviewTarget,
-                  modeStore: panelStores.copilotPreviewMode,
-                  onPreview: () => void requestCopilotPreview(undefined, true),
-                  onCancel: cancelCopilotPreview,
-                }}
-                fileImport={copilotFileImport}
-                view={setView}
-                selection={copilotSelection}
-                queue={copilotQueue}
-                search={copilotSearch}
-                execution={copilotExecution}
-                detail={copilotDetail}
-                onOpenQueueDetail={id => setCopilotDetail({ type: 'queue', id })}
-                onCloseDetail={() => {
-                  setResetProgressDialogOpen(false)
-                  setCopilotDetail(null)
-                }}
-                resetDialog={(
-                  <ConfirmAlertDialog
-                    isOpen={resetProgressDialogOpen}
-                    onClose={() => setResetProgressDialogOpen(false)}
-                    onConfirm={resetCopilotSetProgress}
-                    title="重置作业集进度？"
-                    message="已记录的通关进度会被清除，下次将从第一关重新开始。"
-                    confirmText="确认重置"
-                    variant="danger"
+            <div className="app-stack-section">
+              <SegmentedTabPanel value="copilot" id="combat-mode-panel-copilot">
+                {activeCombatMode === 'copilot' && (
+                  <CombatCopilotTaskPanel
+                    task={copilotTask}
+                    config={copilotConfig}
+                    preview={{
+                      info: preview,
+                      loading: isLoadingSet,
+                      pendingTarget: pendingPreviewTarget,
+                      modeStore: panelStores.copilotPreviewMode,
+                      onPreview: () => void requestCopilotPreview(undefined, true),
+                      onCancel: cancelCopilotPreview,
+                    }}
+                    fileImport={copilotFileImport}
+                    view={setView}
+                    selection={copilotSelection}
+                    queue={copilotQueue}
+                    search={copilotSearch}
+                    execution={copilotExecution}
+                    detail={copilotDetail}
+                    onOpenQueueDetail={id => setCopilotDetail({ type: 'queue', id })}
+                    onCloseDetail={() => {
+                      setResetProgressDialogOpen(false)
+                      setCopilotDetail(null)
+                    }}
+                    resetDialog={(
+                      <ConfirmAlertDialog
+                        isOpen={resetProgressDialogOpen}
+                        onClose={() => setResetProgressDialogOpen(false)}
+                        onConfirm={resetCopilotSetProgress}
+                        title="重置作业集进度？"
+                        message="已记录的通关进度会被清除，下次将从第一关重新开始。"
+                        confirmText="确认重置"
+                        variant="danger"
+                      />
+                    )}
                   />
                 )}
-              />
-            )}
+              </SegmentedTabPanel>
 
-            {specialTask && (
-              <CombatSpecialTaskPanel
-                task={specialTask}
-                input={taskInputs[specialTask.id] || ''}
-                advanced={advancedParams[specialTask.id] ?? {}}
-                onInputChange={value => handleInputChange(specialTask.id, value)}
-                onAdvancedChange={(key, value) => handleAdvancedChange(specialTask.id, key, value)}
-                paradoxSearch={specialTask.id === 'paradoxcopilot' ? paradoxSearch : undefined}
-                execution={{
-                  ...baseExecution,
-                  onExecute: () => void handleExecute(specialTask),
-                }}
-              />
-            )}
+              {specialTask && (
+                <SegmentedTabPanel
+                  value={specialTask.id}
+                  id={`combat-mode-panel-${specialTask.id}`}
+                >
+                  <CombatSpecialTaskPanel
+                    task={specialTask}
+                    input={taskInputs[specialTask.id] || ''}
+                    advanced={advancedParams[specialTask.id] ?? {}}
+                    onInputChange={value => handleInputChange(specialTask.id, value)}
+                    onAdvancedChange={(key, value) => handleAdvancedChange(specialTask.id, key, value)}
+                    paradoxSearch={specialTask.id === 'paradoxcopilot' ? paradoxSearch : undefined}
+                    execution={{
+                      ...baseExecution,
+                      onExecute: () => void handleExecute(specialTask),
+                    }}
+                  />
+                </SegmentedTabPanel>
+              )}
+            </div>
           </div>
+
+          <aside className="combat-monitor-column" aria-label="设备画面">
+            <DeviceMonitorPanel
+              className="combat-monitor-panel combat-monitor-surface"
+            />
+          </aside>
         </div>
-
-        <aside className="combat-monitor-column" aria-label="设备画面">
-          <DeviceMonitorPanel
-            className="combat-monitor-panel combat-monitor-surface"
-          />
-        </aside>
-      </div>
-
+      </SegmentedTabs>
     </>
   )
 }

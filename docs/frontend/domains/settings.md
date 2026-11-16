@@ -20,7 +20,7 @@
 | --- | --- | --- |
 | 页面壳与工作区组合 | `pages/settings/ConfigManager.tsx` | 渲染 `app-page` 页面壳与 `app-stack-section`，并组合工作区 |
 | section 导航与布局 | `features/settings/components/SettingsWorkspace.tsx` | section 订阅、工作区网格与面板组合 |
-| 配置 section 分段 | `features/settings/components/ConfigSectionNav.tsx` | `role="toolbar"`、`aria-pressed`、方向键导航与流体高亮 |
+| 配置 section 分段 | `features/settings/components/ConfigSectionNav.tsx` | 组合共享 `SegmentedTabNav`：tablist/tab 语义、方向键移动焦点、Enter/Space 激活与流体高亮 |
 | section 展示文案 | `features/settings/components/configSectionViews.tsx` | 名称、说明与图标；不持有存储或事件 |
 | connection 表单、保存与读取反馈 | `features/settings/components/ConnectionConfigPanel.tsx` | Query/草稿适配、保存/重置、迟到读取提示；非 connection section 返回 null |
 | 模拟器查找与连接测试 | `features/settings/components/DeviceConnectionPanel.tsx` | 命令 owner 订阅、设备列表、独立 loading/反馈 |
@@ -37,27 +37,30 @@
 - 不改变 connection 字段、wire 与保存时机；自动更新仍先写 user config 再应用调度。
 - 不改变 Query key、读取时机、失败/重试、失效作用域与展示文案。
 - 不改变设备发现/连接测试的取消、迟到响应与草稿回填语义；取消仍跟随页面/Activity，而不是 section。
-- 不改变配置面板的渲染结构、DOM 类名、CSS 或默认态视觉；不更新视觉基线。
+- 不改变配置面板的字段结构、表单 id、保存语义或默认态视觉；section 导航改为共享 tablist，不更新视觉基线。
 
 ### 2. 组合与订阅边界
 
 ```
 ConfigManager（app-page > app-stack-section > SettingsWorkspace）
 └─ SettingsWorkspace（section 订阅、布局、设备命令的 Activity 清理）
-   ├─ ConfigSectionNav（分段 + 流体高亮）
-   ├─ ConnectionConfigPanel（connection Query/草稿/保存反馈，非当前 section 返回 null）
-   │  └─ DeviceConnectionPanel（设备命令订阅 + 列表/反馈）
-   ├─ ResourceSourcePanel（resource Query/草稿/保存反馈，非当前 section 返回 null）
-   ├─ InstanceOptionsPanel（instance Query/草稿/保存反馈，非当前 section 返回 null）
-   ├─ ConfigDirectoryPanel（目录 Query + 打开目录）
+   ├─ ConfigSectionNav（共享 SegmentedTabNav + 流体高亮）
+   ├─ SegmentedTabPanel(connection, keepMounted)
+   │  └─ ConnectionConfigPanel（connection Query/草稿/保存反馈，非当前 section 返回 null）
+   │     └─ DeviceConnectionPanel（设备命令订阅 + 列表/反馈）
+   ├─ SegmentedTabPanel(resource, keepMounted)
+   │  └─ ResourceSourcePanel（resource Query/草稿/保存反馈，非当前 section 返回 null）
+   ├─ SegmentedTabPanel(instance, keepMounted)
+   │  └─ InstanceOptionsPanel（instance Query/草稿/保存反馈，非当前 section 返回 null）
+   ├─ ConfigDirectoryPanel（目录 Query + 打开目录，位于 tab 面板之外）
    └─ SettingsUpdatesPanel（卡片壳）
       ├─ AutoUpdateConfigPanel（自动更新草稿/保存）
       └─ ComponentUpdatePanel（版本 Query + 更新命令/反馈）
 ```
 
 - **页面无请求。** `ConfigManager` 不导入 API、Query、领域所有者或 localStorage，只组合页面壳与工作区。
-- **section 只有一份。** `SettingsWorkspace` 是唯一调用 `useConfigSection()` 的位置，也负责 `useFluidTabIndicator` 所驱动的分段导航。
-- **三个编辑面板始终挂载。** `ConnectionConfigPanel`、`ResourceSourcePanel`、`InstanceOptionsPanel` 在所有 section 下保持组件挂载，只在自身 section 渲染 Card；切换 section 不重建各自的 Query 观察者，也不清空草稿、保存 loading 或读取/保存反馈。隐藏面板的 Query 以 `enabled: false` 跳过读取。
+- **section 只有一份。** `SettingsWorkspace` 是唯一调用 `useConfigSection()` 的位置，也用 `SegmentedTabs` 提供受控上下文；`ConfigSectionNav` 只渲染共享 `SegmentedTabNav`。方向键/Home/End 只移动 roving focus，Enter/Space 或点击才切换，`aria-controls`/`aria-labelledby` 与 `config-section-panel-*` 一一对应。
+- **三个编辑面板始终挂载。** 三个 `SegmentedTabPanel` 都使用 `keepMounted`；`ConnectionConfigPanel`、`ResourceSourcePanel`、`InstanceOptionsPanel` 在所有 section 下保持组件挂载，只在自身 section 渲染 Card；切换 section 不重建各自的 Query 观察者，也不清空草稿、保存 loading 或读取/保存反馈。隐藏面板的 Query 以 `enabled: false` 跳过读取。`ConfigDirectoryPanel` 留在 tab 面板之外。
 - **设备面板按 section 挂载，命令不随 section 取消。** `DeviceConnectionPanel` 只在自己的可见子树内订阅 `DeviceConnectionOwner`；切到其它 section 会卸载面板 DOM，但 owner 继续持有在途命令与已完成结果，恢复 connection 后从 owner 读取最新状态。
 - **更新用例分成两个面板。** `SettingsUpdatesPanel` 只提供卡片壳；`AutoUpdateConfigPanel` 订阅 `AutoUpdateConfigOwner`，`ComponentUpdatePanel` 订阅版本 Query 与 `SettingsUpdateOwner`。自动更新草稿/保存状态不会重渲染组件更新按钮，组件更新/版本状态也不会重渲染自动更新表单。
 - **目录 Query 只有一个观察者。** 配置目录卡片是 `settings/config-directory` 的唯一观察者；resource/instance 面板不读取目录，切 section 不产生目录请求，失败后的重试入口仍只在目录卡片。

@@ -279,6 +279,11 @@ const keyDown = async (element: HTMLElement, key: string) => {
   return event
 }
 
+const focus = async (element: HTMLElement) => {
+  await act(async () => element.focus())
+  await flush()
+}
+
 const useIdentity = (identity: TestExecutionIdentity | null) => {
   controller = new ExecutionController({
     api,
@@ -405,7 +410,7 @@ const setReclamationCraftValues = async (tools = '荧光棒', batches = '16') =>
 }
 
 const findModeButton = (name: string) => Array.from(
-  container.querySelectorAll<HTMLButtonElement>('button[aria-pressed]'),
+  container.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
 ).find(button => button.textContent?.includes(name))
 
 describe('RoguelikeTasks execution', () => {
@@ -1258,10 +1263,13 @@ describe('RoguelikeTasks layout and config recovery', () => {
   it('keeps mode selection keyboard-navigable and toggles labelled', async () => {
     await renderPage()
 
-    const modeToolbar = container.querySelector<HTMLElement>('[role="toolbar"][aria-label="肉鸽模式"]')
-    expect(modeToolbar, 'roguelike mode toolbar').not.toBeNull()
-    const modeButtons = Array.from(modeToolbar!.querySelectorAll<HTMLButtonElement>('button'))
-    expect(modeButtons.filter(button => button.getAttribute('aria-pressed') === 'true')).toHaveLength(1)
+    const modeTabs = container.querySelector<HTMLElement>('[role="tablist"][aria-label="肉鸽模式"]')
+    expect(modeTabs, 'roguelike mode tablist').not.toBeNull()
+    const modeButtons = Array.from(modeTabs!.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+    expect(modeButtons.filter(button => button.getAttribute('aria-selected') === 'true')).toHaveLength(1)
+    expect(modeButtons[0]?.getAttribute('aria-controls')).toBe('roguelike-mode-panel')
+    expect(container.querySelector('#roguelike-mode-panel')?.getAttribute('aria-labelledby'))
+      .toBe(modeButtons[0]?.id)
 
     const switches = Array.from(container.querySelectorAll('[role="switch"]'))
     expect(switches.length).toBeGreaterThanOrEqual(2)
@@ -1276,14 +1284,22 @@ describe('RoguelikeTasks layout and config recovery', () => {
     })
 
     expect(modeButtons.map(button => button.tabIndex)).toEqual([0, -1])
-    modeButtons[0]?.focus()
+    await focus(modeButtons[0]!)
     await keyDown(modeButtons[0]!, 'End')
-    expect(modeButtons[1]?.getAttribute('aria-pressed')).toBe('true')
     expect(document.activeElement).toBe(modeButtons[1])
+    expect(modeButtons[0]?.getAttribute('aria-selected')).toBe('true')
+    expect(modeButtons[1]?.getAttribute('aria-selected')).toBe('false')
+
+    await keyDown(modeButtons[1]!, 'Enter')
+    await click(modeButtons[1]!)
+    expect(modeButtons[1]?.getAttribute('aria-selected')).toBe('true')
+    expect(modeButtons[0]?.getAttribute('aria-selected')).toBe('false')
+    expect(container.querySelector('#roguelike-mode-panel')?.getAttribute('aria-labelledby'))
+      .toBe(modeButtons[1]?.id)
 
     const arrowDownEvent = await keyDown(modeButtons[1]!, 'ArrowDown')
     expect(arrowDownEvent.defaultPrevented).toBe(false)
-    expect(modeButtons[1]?.getAttribute('aria-pressed')).toBe('true')
+    expect(modeButtons[1]?.getAttribute('aria-selected')).toBe('true')
   })
 
   it('moves the difficulty and starting roles guidance into label tooltips', async () => {
@@ -1350,9 +1366,8 @@ describe('RoguelikeTasks layout and config recovery', () => {
     expect(reclamationMode).toBeDefined()
     await click(reclamationMode!)
 
-    expect(reclamationMode?.getAttribute('aria-pressed')).toBe('true')
-    expect(Array.from(container.querySelectorAll('button[aria-pressed="true"]'))
-      .filter(button => button.textContent?.includes('生息演算'))).toHaveLength(1)
+    expect(reclamationMode?.getAttribute('aria-selected')).toBe('true')
+    expect(container.querySelectorAll('[role="tab"][aria-selected="true"]')).toHaveLength(1)
     expect(container.querySelector('input[name="maa-reclamation-theme"]')).not.toBeNull()
     expect(Array.from(container.querySelectorAll('button[aria-pressed]'))
       .some(option => option.textContent?.includes('沙洲遗闻'))).toBe(true)
@@ -1412,11 +1427,11 @@ describe('RoguelikeTasks layout and config recovery', () => {
 
     await renderMode('visible')
     await click(findModeButton('生息演算')!)
-    expect(findModeButton('生息演算')?.getAttribute('aria-pressed')).toBe('true')
+    expect(findModeButton('生息演算')?.getAttribute('aria-selected')).toBe('true')
 
     await renderMode('hidden')
     await renderMode('visible')
-    expect(findModeButton('生息演算')?.getAttribute('aria-pressed')).toBe('true')
+    expect(findModeButton('生息演算')?.getAttribute('aria-selected')).toBe('true')
     expect(container.querySelector('input[name="maa-reclamation-theme"]')).not.toBeNull()
 
     await act(async () => root.unmount())
@@ -1424,7 +1439,7 @@ describe('RoguelikeTasks layout and config recovery', () => {
     await act(async () => root.render(<TestApp />))
     await flush()
 
-    expect(findModeButton('集成战略')?.getAttribute('aria-pressed')).toBe('true')
+    expect(findModeButton('集成战略')?.getAttribute('aria-selected')).toBe('true')
     expect(container.querySelector('input[name="maa-roguelike-theme"]')).not.toBeNull()
   })
 

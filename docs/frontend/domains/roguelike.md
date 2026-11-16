@@ -17,7 +17,7 @@
 | --- | --- | --- |
 | 页面壳与工作区组合 | `pages/roguelike/RoguelikeTasks.tsx` | 只渲染 `app-page`/`app-stack-section` 与工作区 |
 | 当前模式、配置订阅、执行订阅与同步反馈 | `features/roguelike/components/RoguelikeWorkspace.tsx` | 跨面板状态的唯一容器；模式选择不写入持久化载荷 |
-| 模式分段控件的测量与键盘导航 | `features/roguelike/components/RoguelikeModePanel.tsx` | 受控组件；只持有 `useFluidTabIndicator` 的测量状态 |
+| 模式分段控件的键盘与高亮 | `features/roguelike/components/RoguelikeModePanel.tsx` | 组合共享 `SegmentedTabNav`：tablist/tab 语义、方向键移动焦点、Enter/Space 激活与流体高亮 |
 | 主题快捷项与自定义代号 | `features/roguelike/components/RoguelikeThemePanel.tsx` | 从草稿派生值，编辑经回调交给工作区 |
 | 高级字段与三态底部操作（空闲执行 / 运行中双停止 / 等待战斗结束） | `features/roguelike/components/RoguelikeSettingsPanel.tsx` | 只渲染当前生效的字段与注入的执行投影，不创建执行状态机 |
 | 核心干员单选字段 | `features/roguelike/components/RoguelikeCoreOperatorField.tsx` | 复用 `features/training` 的 `OperatorSelectModal`；字段值仍是单个中文干员名，只读目录用于回显头像 |
@@ -43,11 +43,13 @@
 ```
 RoguelikeTasks（app-page > app-stack-section > RoguelikeWorkspace）
 └─ RoguelikeWorkspace（配置/执行/模式唯一容器）
-   ├─ RoguelikeModePanel（受控分段控件 + 高亮测量）
-   ├─ RoguelikeThemePanel（主题快捷项 + 自定义输入）
-   ├─ RoguelikeSettingsPanel（高级字段 + 三态执行操作）
-   ├─ RoguelikeResultPanel（结果摘要 + 辅助诊断）
-   └─ aside（DeviceMonitorPanel，共享实时会话）
+   └─ SegmentedTabs（模式受控上下文）
+      ├─ RoguelikeModePanel（共享 SegmentedTabNav + 高亮）
+      ├─ SegmentedTabPanel（单个稳定区域 roguelike-mode-panel，display: contents）
+      │  ├─ RoguelikeThemePanel（主题快捷项 + 自定义输入）
+      │  ├─ RoguelikeSettingsPanel（高级字段 + 三态执行操作）
+      │  └─ RoguelikeResultPanel（结果摘要 + 辅助诊断）
+      └─ aside（DeviceMonitorPanel，共享实时会话）
 ```
 
 - **当前模式**是跨面板的局部交互状态：它决定主题与高级字段面板展示哪一份 `taskInputs`/`advancedParams`。它不进入配置 wire；`Activity` 隐藏/恢复保留，真正卸载或刷新后回到默认的 `roguelike`。
@@ -55,7 +57,7 @@ RoguelikeTasks（app-page > app-stack-section > RoguelikeWorkspace）
 - **同步反馈**由工作区从通道的 `error`/`syncState` 派生：失败时显示页内 `role="alert"` 与“重新同步”，`syncState === 'saving'` 期间按钮显示“同步中”；只有手动 `retry()` 返回 true 才提示“肉鸽配置已同步”。
 - **执行**只由工作区的一次 `useRoguelikeExecution` 订阅。设置面板拿到的是 `isRunning`/`isStopping`/`isWaitingForCombat`/`pendingStopMode`/`isSubmitting` 与 `onExecute`/`onStop(mode)` 投影；停止确认、等待意图、终态提示和 run 身份仍由 hook/控制器持有，面板没有第二份状态机。结果面板另取同一次订阅返回的 `trackedRun`，不新建观察者。
 - **停止**分两种意图：运行中左「立即终止」发 `mode: 'now'`，右「等待战斗结束」发 `mode: 'after-combat'`；空闲态仍是单个「立即执行」。`after-combat` 被受理后 run 仍是 `running`，等待态由 `trackedRun.progress.stopIntent`（或刚收到的 `pendingStop`）派生，右侧按钮禁用并提示最多等待 10 分钟，左侧保持可点用于取消等待并立即停止；响应没有 `pendingStop` 表示服务端退化为立即停止，页面提示“未在战斗中，已立即终止”而不进入等待态。等待态不属于停止确认，不触发 15s 确认超时。
-- 模式面板只保存 `useFluidTabIndicator` 的容器 ref、高亮矩形与键盘处理；这些测量状态不参与配置或执行。
+- 模式面板使用共享 `SegmentedTabNav`，不持有测量或键盘状态。模式网格无法用单个面板包裹多个 grid-area，因此工作区保留 `roguelike-workspace-grid`，把主题、结果与设置面板放进 `display: contents` 的 `SegmentedTabPanel`；所有模式 tab 的 `aria-controls` 指向稳定的 `roguelike-mode-panel`，`aria-labelledby` 指向当前 tab。方向键/Home/End 只移动 roving focus，Enter/Space 或点击才切换模式。
 
 ### 3. 纯命令模型
 
@@ -133,7 +135,7 @@ maa-cli 0.7.8 只认识部分主题、模式与参数；MaaCore 新增的黑流�
 
 ### 6. Activity 与卸载
 
-- `Activity` 隐藏会清理工作区与模式面板的 Effects（执行 hook 的确认计时器、`useFluidTabIndicator` 的 ResizeObserver/resize 监听），但保留 React state：当前模式、已加载草稿和面板输入不变。恢复时不会重新读取服务端配置（通道的 hydrated 守卫），也不会重放执行提交。
+- `Activity` 隐藏会清理工作区与共享 `SegmentedTabNav` 的 Effects（执行 hook 的确认计时器、`useFluidTabIndicator` 的 ResizeObserver/resize 监听），但保留 React state：当前模式、已加载草稿和面板输入不变。恢复时不会重新读取服务端配置（通道的 hydrated 守卫），也不会重放执行提交。
 - 真正卸载/刷新会销毁 `activeMode` 与面板输入；配置草稿、pending 标记与在途提交仍属于应用级 `user-config` 通道，重新挂载后继续使用；运行身份由 `task-execution` 控制器持久化，页面重新订阅同一 run，不重新提交。
 - 页面隐藏或 Activity 隐藏不改变后台 Run 的所有权；停止仍按控制器持有的 `runId` 执行。
 
