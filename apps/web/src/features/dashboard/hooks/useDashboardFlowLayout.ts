@@ -48,8 +48,6 @@ export function useDashboardFlowLayout(enabled = true) {
         const flowRect = flowCard.getBoundingClientRect()
         const previewCardRect = previewCard.getBoundingClientRect()
         const previewFrameRect = previewFrame.getBoundingClientRect()
-        const feedbackRow = flowCard.querySelector<HTMLElement>('[data-dashboard-flow-feedback]')
-        const feedbackRowHeight = feedbackRow?.getBoundingClientRect().height ?? 0
         const stages = flowCard.querySelector<HTMLElement>('[data-dashboard-flow-stages]')
         const stagesContent = stages?.lastElementChild
         let stagesExtraHeight = 0
@@ -78,9 +76,9 @@ export function useDashboardFlowLayout(enabled = true) {
         const columnGap = Number.parseFloat(gridStyle.columnGap) || 20
         const previewChromeHeight = Math.max(0, previewCardRect.height - previewFrameRect.height)
         const previewChromeWidth = Math.max(0, previewCardRect.width - previewFrameRect.width)
-        // Ignore transient feedback and the stage section's empty stretch space.
+        // Ignore the stage section's empty stretch space.
         // Column sizing must use content height so equal-height cards cannot resize themselves.
-        const stableFlowHeight = Math.max(0, flowRect.height - feedbackRowHeight - stagesExtraHeight)
+        const stableFlowHeight = Math.max(0, flowRect.height - stagesExtraHeight)
         const targetFrameHeight = Math.max(180, stableFlowHeight - previewChromeHeight)
         const desiredPreviewWidth = targetFrameHeight * PREVIEW_ASPECT_RATIO + previewChromeWidth
         const minLeftWidth = Math.min(420, Math.max(GRID_MIN_LEFT_WIDTH, gridRect.width * 0.32))

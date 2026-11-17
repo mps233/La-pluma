@@ -156,6 +156,20 @@ describe('usePreviewSnapshotOwner', () => {
     expect(snapshot.image).toBe('data:image/png;base64,fresh-image')
     expect(snapshot.error).toBeNull()
   })
+
+  it('retries immediately when retry is requested', async () => {
+    mocks.captureScreen.mockResolvedValueOnce({ success: false })
+    await render()
+    await selectMode('snapshot')
+    expect(snapshot.error).toBe('无法获取设备截图')
+    expect(mocks.captureScreen).toHaveBeenCalledTimes(1)
+
+    await act(async () => snapshot.retry())
+
+    expect(mocks.captureScreen).toHaveBeenCalledTimes(2)
+    expect(snapshot.image).toBe('data:image/png;base64,fresh-image')
+    expect(snapshot.error).toBeNull()
+  })
   it('aborts a stalled capture, reports timeout, and retries without accepting its late image', async () => {
     const stalled = deferred<ReturnType<typeof captured>>()
     mocks.captureScreen.mockReturnValueOnce(stalled.promise)

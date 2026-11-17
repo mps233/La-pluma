@@ -2,6 +2,7 @@ import { isRecord } from '@/shared/api'
 
 export interface DropSummary {
   count: number
+  items?: string
   recent: Array<{
     stage: string
     items: string
@@ -71,7 +72,7 @@ const accumulateItems = (
   }
 }
 
-const formatStageItems = (items: ReadonlyMap<string, AggregatedDropItem>): string => {
+const formatDropItems = (items: ReadonlyMap<string, AggregatedDropItem>): string => {
   if (items.size === 0) return EMPTY_DROP_DETAIL
   return [...items.values()]
     .sort((left, right) => (right.count ?? -1) - (left.count ?? -1))
@@ -86,11 +87,12 @@ const parseRecordStage = (record: Record<string, unknown>): { key: string; label
 }
 
 /**
- * 把当天的逐条掉落记录按关卡合并为摘要行：同一关卡只出现一次，物品按键累加，
- * 行内按累加数量倒序，行间按该关卡最近一次掉落倒序。
+ * 把当天的逐条掉落记录按关卡合并为兼容缓存用的摘要行，同时把所有关卡的物品
+ * 合并为一个展示串：同一物品按键累加，按累加数量倒序。
  */
 export function buildDropSummary(records: ReadonlyArray<Record<string, unknown>>): DropSummary {
   const stages = new Map<string, AggregatedDropStage>()
+  const allItems = new Map<string, AggregatedDropItem>()
 
   records.forEach((record, index) => {
     const { key, label } = parseRecordStage(record)
@@ -100,13 +102,16 @@ export function buildDropSummary(records: ReadonlyArray<Record<string, unknown>>
     stages.set(key, group)
 
     const parsedItems = parseRecordItems(record)
-    if (parsedItems) accumulateItems(group.items, parsedItems)
+    if (parsedItems) {
+      accumulateItems(group.items, parsedItems)
+      accumulateItems(allItems, parsedItems)
+    }
   })
 
   const recent = [...stages.values()]
     .sort((left, right) => right.lastIndex - left.lastIndex)
     .slice(0, MAX_RECENT_DROP_STAGES)
-    .map(group => ({ stage: group.stage, items: formatStageItems(group.items) }))
+    .map(group => ({ stage: group.stage, items: formatDropItems(group.items) }))
 
-  return { count: records.length, recent }
+  return { count: records.length, items: formatDropItems(allItems), recent }
 }

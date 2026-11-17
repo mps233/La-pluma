@@ -1,5 +1,9 @@
 import { useOnlineStatus } from '@/shared/hooks/useOnlineStatus'
 import { useStatusStore } from '@/features/runtime-status'
+import {
+  DASHBOARD_CONNECTION_CHECKING_DESCRIPTION,
+  DASHBOARD_CONNECTION_CHECKING_TITLE,
+} from '../model/flowView'
 
 export type DashboardServiceStatus = 'offline' | 'unknown' | 'checking' | 'available' | 'unavailable'
 
@@ -23,11 +27,11 @@ export function useDashboardServiceStatus(): DashboardServiceStatusView {
       ? '当前网络离线'
       : serviceStatus === 'unavailable'
         ? '后端服务不可用'
-        : '正在检查服务',
+        : DASHBOARD_CONNECTION_CHECKING_TITLE,
     connectionDescription: serviceStatus === 'offline'
       ? '恢复网络连接后会自动重新检查服务'
       : serviceStatus === 'unavailable'
         ? (backendMessage || '确认 La Pluma Next 服务已启动后重试')
-        : '正在确认自动化服务状态',
+        : DASHBOARD_CONNECTION_CHECKING_DESCRIPTION,
   }
 }

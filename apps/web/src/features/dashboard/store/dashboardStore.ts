@@ -161,6 +161,7 @@ function isTrainingSummary(value: unknown): value is TrainingSummary {
 function isDropSummary(value: unknown): value is DropSummary {
   return isRecord(value)
     && isNonNegativeInteger(value.count)
+    && (value.items === undefined || typeof value.items === 'string')
     && Array.isArray(value.recent)
     && value.recent.length <= MAX_RECENT_DROPS
     && value.recent.every(item => (

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router'
 import { statisticsTabRoute } from '@/features/statistics'
 import { appTabRoute } from '@/shared/navigation'
 import { useDashboardDeviceStats } from '../hooks/useDashboardDeviceStats'
-import DashboardConnectionAlert from './DashboardConnectionAlert'
+import DashboardConnectionNotice from './DashboardConnectionNotice'
 import DashboardDeviceSection from './DashboardDeviceSection'
 import DashboardFlowSection from './DashboardFlowSection'
 import DashboardSummarySection from './DashboardSummarySection'
@@ -27,7 +27,7 @@ export default function DashboardWorkspace({ refreshDashboard }: DashboardWorksp
   return (
     <>
       <DashboardDeviceSampleProjection />
-      <DashboardConnectionAlert refreshDashboard={refreshDashboard} />
+      <DashboardConnectionNotice refreshDashboard={refreshDashboard} />
       <DashboardFlowSection refreshDashboard={refreshDashboard} onOpenAutomation={openAutomation} />
       <DashboardDeviceSection />
       <DashboardSummarySection onOpenTraining={openTraining} onOpenStatistics={openStatistics} />

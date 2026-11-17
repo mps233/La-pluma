@@ -1,4 +1,4 @@
-import { ChevronRight, Target } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Card } from '@/shared/ui/card'
 import { useDashboardStore } from '../store/dashboardStore'
@@ -16,9 +16,6 @@ export default function DashboardTrainingSummaryCard({ onOpenTraining }: Dashboa
     <Card className="dashboard-summary-card is-training gap-0 p-0!">
       <div className="dashboard-summary-header">
         <div className="dashboard-summary-heading">
-          <span className="dashboard-summary-icon" aria-hidden="true">
-            <Target className="h-4 w-4" strokeWidth={1.8} />
-          </span>
           <div className="min-w-0">
             <div className={sectionTitleClass}>养成摘要</div>
           </div>

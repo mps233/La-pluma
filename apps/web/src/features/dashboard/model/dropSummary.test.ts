@@ -26,6 +26,7 @@ describe('buildDropSummary', () => {
 
     expect(summary).toEqual({
       count: 2,
+      items: '龙门币×2520、失败的记录×210、电极单元×6',
       recent: [{ stage: 'TL-9', items: '龙门币×2520、失败的记录×210、电极单元×6' }],
     })
   })
@@ -39,6 +40,7 @@ describe('buildDropSummary', () => {
 
     expect(summary).toEqual({
       count: 3,
+      items: '龙门币×15、采购凭证×2',
       recent: [
         { stage: 'CE-6', items: '龙门币×15' },
         { stage: 'AP-5', items: '采购凭证×2' },
@@ -52,6 +54,7 @@ describe('buildDropSummary', () => {
       { stage: '1-7', items: [{ name: '装置', count: 5 }] },
     ])
 
+    expect(summary.items).toBe('装置×5、固源岩×2')
     expect(summary.recent).toEqual([{ stage: '1-7', items: '装置×5、固源岩×2' }])
   })
 
@@ -60,6 +63,7 @@ describe('buildDropSummary', () => {
       { stage: '1-7', items: [{ itemId: '30011', name: '固源岩', count: 4 }] },
     ])).toEqual({
       count: 1,
+      items: '固源岩×4',
       recent: [{ stage: '1-7', items: '固源岩×4' }],
     })
   })
@@ -67,15 +71,18 @@ describe('buildDropSummary', () => {
   it('falls back to the empty-detail placeholder when no record carries item detail', () => {
     expect(buildDropSummary([{ stage: 'AP-5' }, { stage: 'AP-5' }])).toEqual({
       count: 2,
+      items: '已记录作战，暂无材料明细',
       recent: [{ stage: 'AP-5', items: '已记录作战，暂无材料明细' }],
     })
   })
 
   it('prefers item detail over the empty-detail placeholder within one stage', () => {
-    expect(buildDropSummary([
+    const summary = buildDropSummary([
       { stage: '1-7' },
       { stage: '1-7', items: [{ name: '固源岩', count: 4 }] },
-    ]).recent).toEqual([{ stage: '1-7', items: '固源岩×4' }])
+    ])
+    expect(summary.items).toBe('固源岩×4')
+    expect(summary.recent).toEqual([{ stage: '1-7', items: '固源岩×4' }])
   })
 
   it('merges items by item id instead of display name', () => {
@@ -85,6 +92,7 @@ describe('buildDropSummary', () => {
       { stage: '1-7', items: [{ itemId: '30011', name: '源岩', count: 4 }] },
     ])
 
+    expect(summary.items).toBe('固源岩×6、固源岩×3')
     expect(summary.recent).toEqual([{ stage: '1-7', items: '固源岩×6、固源岩×3' }])
   })
 
@@ -101,6 +109,7 @@ describe('buildDropSummary', () => {
       },
     ])
 
+    expect(summary.items).toBe('固源岩×9、装置×1、破损装置×1、源岩×1')
     expect(summary.recent).toEqual([
       { stage: '1-7', items: '固源岩×9、装置×1、破损装置×1、源岩×1' },
     ])
@@ -115,6 +124,7 @@ describe('buildDropSummary', () => {
     ])
 
     expect(summary.count).toBe(4)
+    expect(summary.items).toBe('材料×4')
     expect(summary.recent.map(row => row.stage)).toEqual(['S-4', 'S-3', 'S-2'])
   })
 
@@ -125,6 +135,7 @@ describe('buildDropSummary', () => {
       { items: [{ name: '材料', count: 1 }] },
     ])
 
+    expect(summary.items).toBe('材料×3')
     expect(summary.recent).toEqual([
       { stage: '未知关卡', items: '材料×1' },
       { stage: '显示名', items: '材料×2' },

@@ -32,7 +32,7 @@ export function useDashboardPreview() {
     connectionState,
     statusText,
     headerStatusText: showLivePreview ? `${preview.stats?.width || 0}×${preview.stats?.height || 0}` : statusText,
-    retry: preview.connect,
+    retry: preview.mode === 'snapshot' ? snapshot.retry : preview.connect,
     error,
     available: isAvailable,
   }

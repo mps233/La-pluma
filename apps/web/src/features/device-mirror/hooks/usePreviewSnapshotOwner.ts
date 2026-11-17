@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { getErrorMessage } from '@/shared/api'
 import { captureScreen } from '../api'
 import { usePreviewStore } from '../store/previewStore'
@@ -7,6 +7,7 @@ import { usePageVisible } from '@/shared/hooks/usePageVisible'
 export function usePreviewSnapshotOwner(available = true) {
   const mode = usePreviewStore(state => state.mode)
   const visible = usePageVisible()
+  const [attempt, setAttempt] = useState(0)
   const [image, setImage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -52,7 +53,13 @@ export function usePreviewSnapshotOwner(available = true) {
       clearTimeout(deadline)
       clearTimeout(timer)
     }
-  }, [mode, visible, available])
+  }, [mode, visible, available, attempt])
 
-  return { image: mode === 'snapshot' && visible ? image : null, error: mode === 'snapshot' ? error : null }
+  const retry = useCallback(() => setAttempt(value => value + 1), [])
+
+  return {
+    image: mode === 'snapshot' && visible ? image : null,
+    error: mode === 'snapshot' ? error : null,
+    retry,
+  }
 }

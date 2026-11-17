@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  DASHBOARD_CONNECTION_NOTICE_ID,
   dismissNotice,
   EXECUTION_NOTICE_ID,
   notify,
@@ -64,6 +65,23 @@ describe('notify', () => {
     expect(toastMock.success).toHaveBeenCalledWith('已更新', {
       id: 'execution',
       duration: 2500,
+    })
+  })
+
+  it('passes a description and action through to the toast', () => {
+    const onClick = vi.fn()
+    notify('当前网络离线', 'warning', {
+      id: DASHBOARD_CONNECTION_NOTICE_ID,
+      duration: Infinity,
+      description: '恢复网络连接后会自动重新检查服务',
+      action: { label: '重试连接', onClick },
+    })
+
+    expect(toastMock.warning).toHaveBeenCalledWith('当前网络离线', {
+      id: 'dashboard-connection',
+      duration: Infinity,
+      description: '恢复网络连接后会自动重新检查服务',
+      action: { label: '重试连接', onClick },
     })
   })
 

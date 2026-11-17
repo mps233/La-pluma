@@ -104,6 +104,7 @@ describe('normalizeDashboardSnapshot', () => {
     })
     expect(snapshot?.dropSummary).toEqual({
       count: 3,
+      items: '固源岩×4、龙门币×3',
       recent: [
         { stage: 'AP-5', items: '已记录作战，暂无材料明细' },
         { stage: 'CE-6', items: '龙门币×3' },
@@ -126,6 +127,7 @@ describe('normalizeDashboardSnapshot', () => {
     expect(snapshot?.trainingSummary).toEqual({ count: 1, topNames: ['能天使'] })
     expect(snapshot?.dropSummary).toEqual({
       count: 1,
+      items: '固源岩×4',
       recent: [{ stage: '1-7', items: '固源岩×4' }],
     })
   })
@@ -153,6 +155,7 @@ describe('normalizeDashboardSnapshot', () => {
 
     expect(normalizeDashboardSnapshot(payloads)?.dropSummary).toEqual({
       count: 2,
+      items: '龙门币×2520、失败的记录×210、电极单元×6',
       recent: [{ stage: 'TL-9', items: '龙门币×2520、失败的记录×210、电极单元×6' }],
     })
   })

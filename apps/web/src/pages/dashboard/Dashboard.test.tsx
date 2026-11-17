@@ -501,37 +501,117 @@ describe('Dashboard connectivity state', () => {
     expect(useDashboardStore.getState().temperatureHistory).toEqual([38])
   })
 
-  it('disables execution actions as soon as the browser goes offline', async () => {
+  it('still renders the device cards without usage values when device stats are null', async () => {
+    apiMocks.getDeviceStats.mockResolvedValue({ success: true, data: null })
+
+    await act(async () => renderDashboard())
+    await flushDashboard()
+
+    const text = container.textContent ?? ''
+    expect(text).toContain('CPU')
+    expect(text).toContain('内存')
+    expect(text).toContain('磁盘')
+    expect(text).toContain('温度')
+    expect(text).toContain('实时采样')
+    expect(text).toContain('-- / --')
+    expect(text).toContain('等待温度采样')
+    expect(text).not.toContain('使用率')
+    expect(text).not.toMatch(/\d+%/)
+  })
+
+  it('shows an offline notice and disables execution without inline page content', async () => {
     await act(async () => renderDashboard())
     await flushDashboard()
 
     expect(container.textContent).toContain('准备就绪')
-    expect(findButton('开始今日流程')?.disabled).toBe(false)
+    expect(findButton('执行日常')?.disabled).toBe(false)
+    expect(apiMocks.notify).not.toHaveBeenCalled()
 
     online = false
-    act(() => window.dispatchEvent(new Event('offline')))
+    await act(async () => {
+      window.dispatchEvent(new Event('offline'))
+    })
 
-    expect(container.textContent).toContain('当前网络离线')
-    expect(findButton('开始今日流程')?.disabled).toBe(true)
+    expect(apiMocks.notify).toHaveBeenCalledWith(
+      '当前网络离线',
+      'warning',
+      {
+        id: 'dashboard-connection',
+        duration: Infinity,
+        description: '恢复网络连接后会自动重新检查服务',
+      },
+    )
+    expect(container.textContent).not.toContain('当前网络离线')
+    expect(container.textContent).toContain('连接不可用')
+    expect(container.textContent).toContain('连接恢复后可以继续操作')
+    expect(findButton('执行日常')?.disabled).toBe(true)
   })
 
-  it('shows a retry action and recovers after the backend becomes available', async () => {
+  it('shows the checking copy while the backend status is being verified', async () => {
+    await act(async () => renderDashboard())
+    await flushDashboard()
+
+    await act(async () => {
+      useStatusStore.getState().setBackendStatus('checking')
+    })
+
+    expect(container.textContent).toContain('正在检查服务')
+    expect(container.textContent).toContain('正在确认自动化服务状态')
+    expect(container.textContent).not.toContain('连接不可用')
+    expect(findButton('执行日常')?.disabled).toBe(true)
+  })
+
+  it('retries the full snapshot from the unavailable notice and recovers', async () => {
     apiMocks.getTaskStatus.mockRejectedValueOnce(new Error('无法连接后端服务，请确认服务已启动'))
 
     await act(async () => renderDashboard())
     await flushDashboard()
 
-    expect(container.textContent).toContain('后端服务不可用')
+    expect(apiMocks.notify).toHaveBeenCalledWith(
+      '后端服务不可用',
+      'error',
+      {
+        id: 'dashboard-connection',
+        duration: Infinity,
+        description: '无法连接后端服务，请确认服务已启动',
+        action: { label: '重试连接', onClick: expect.any(Function) },
+      },
+    )
+    expect(container.textContent).not.toContain('后端服务不可用')
+    expect(container.textContent).toContain('连接不可用')
     expect(container.textContent).toContain('测试活动')
     expect(useDashboardStore.getState().lastUpdate).not.toBeNull()
-    expect(findButton('重试连接')).toBeDefined()
-    expect(findButton('开始今日流程')?.disabled).toBe(true)
+    expect(findButton('执行日常')?.disabled).toBe(true)
 
-    await act(async () => findButton('重试连接')?.click())
+    const lastCall = apiMocks.notify.mock.calls[apiMocks.notify.mock.calls.length - 1]!
+    const { action } = lastCall[2] as {
+      action: { label: string; onClick: () => void }
+    }
+    expect(action.label).toBe('重试连接')
+    let resolveRetry: ((value: unknown) => void) | undefined
+    apiMocks.getTaskStatus.mockReturnValueOnce(new Promise(resolve => {
+      resolveRetry = resolve
+    }))
+    apiMocks.dismissNotice.mockClear()
+
+    await act(async () => {
+      action.onClick()
+      await Promise.resolve()
+    })
+
+    expect(useStatusStore.getState().backendStatus).toBe('checking')
+    expect(apiMocks.dismissNotice).not.toHaveBeenCalledWith('dashboard-connection')
+
+    await act(async () => resolveRetry?.({
+      success: true,
+      data: { isRunning: false },
+    }))
     await flushDashboard()
 
+    expect(useStatusStore.getState().backendStatus).toBe('available')
+    expect(apiMocks.dismissNotice).toHaveBeenCalledWith('dashboard-connection')
     expect(container.textContent).toContain('准备就绪')
-    expect(findButton('开始今日流程')?.disabled).toBe(false)
+    expect(findButton('执行日常')?.disabled).toBe(false)
   })
 
   it('omits redundant manual refresh controls', async () => {
@@ -604,7 +684,7 @@ describe('Dashboard connectivity state', () => {
     apiMocks.getTodayDrops.mockClear()
     apiMocks.getOpenTodayStages.mockClear()
 
-    const action = findButton('开始今日流程')
+    const action = findButton('执行日常')
     await act(async () => {
       action?.click()
       action?.click()
@@ -627,7 +707,7 @@ describe('Dashboard connectivity state', () => {
     })))
     await flushDashboard()
 
-    expect(container.querySelector('[data-dashboard-flow-feedback]')?.textContent).toBe('今日流程已开始执行')
+    expect(apiMocks.notify).toHaveBeenCalledWith('今日流程已开始执行', 'success', { id: 'execution' })
     expect(findButton('正在运行')?.disabled).toBe(true)
     expect(controller().getState().trackedScope).toBe('dashboard')
     expect(apiMocks.getActivity).toHaveBeenCalledTimes(1)
@@ -642,11 +722,14 @@ describe('Dashboard connectivity state', () => {
     await flushDashboard()
     apiMocks.loadUserConfig.mockResolvedValueOnce({ success: true, data: { taskFlow: [] } })
 
-    await act(async () => findButton('开始今日流程')?.click())
+    await act(async () => findButton('执行日常')?.click())
     await flushDashboard()
 
-    expect(container.querySelector('[data-dashboard-flow-feedback]')?.textContent)
-      .toBe('还没有配置今日流程，先去日常页保存任务流。')
+    expect(apiMocks.notify).toHaveBeenCalledWith(
+      '还没有配置今日流程，先去日常页保存任务流。',
+      'warning',
+      { id: 'execution' },
+    )
     expect(container.querySelector('[data-testid="location"]')?.textContent).toBe('/app/automation')
     expect(apiMocks.executeScheduleNow).not.toHaveBeenCalled()
   })
@@ -655,7 +738,7 @@ describe('Dashboard connectivity state', () => {
     await act(async () => renderDashboard())
     await flushDashboard()
 
-    await act(async () => findButton('开始今日流程')?.click())
+    await act(async () => findButton('执行日常')?.click())
     await flushDashboard()
     expect(container.textContent).toContain('正在执行: 收取信用')
 
@@ -672,13 +755,13 @@ describe('Dashboard connectivity state', () => {
 
     expect(apiMocks.notify).toHaveBeenCalledWith('今日流程执行完成', 'success', { id: 'execution' })
     expect(container.textContent).toContain('准备就绪')
-    expect(findButton('开始今日流程')?.disabled).toBe(false)
+    expect(findButton('执行日常')?.disabled).toBe(false)
   })
 
   it('lets another domain stop the dashboard run while keeping the global state consistent', async () => {
     await act(async () => renderDashboard())
     await flushDashboard()
-    await act(async () => findButton('开始今日流程')?.click())
+    await act(async () => findButton('执行日常')?.click())
     await flushDashboard()
     expect(findButton('正在运行')?.disabled).toBe(true)
 
@@ -730,7 +813,7 @@ describe('Dashboard connectivity state', () => {
     await flushDashboard()
 
     expect(container.textContent).toContain('设备被其他任务占用')
-    expect(findButton('开始今日流程')?.disabled).toBe(true)
+    expect(findButton('执行日常')?.disabled).toBe(true)
   })
 
   it('keeps the unknown phase and the last active run when observation disconnects', async () => {
@@ -751,11 +834,11 @@ describe('Dashboard connectivity state', () => {
 
     expect(container.textContent).toContain('执行状态未知')
     expect(container.textContent).toContain('网络中断')
-    expect(findButton('开始今日流程')?.disabled).toBe(true)
+    expect(findButton('执行日常')?.disabled).toBe(true)
     expect(apiMocks.notify).not.toHaveBeenCalled()
   })
 
-  it('shows a distinct first-load activity failure and recovers through retry', async () => {
+  it('shows a distinct first-load activity failure and recovers on the next snapshot refresh', async () => {
     apiMocks.getActivity.mockResolvedValueOnce({ success: false, message: '活动服务不可用' })
 
     await act(async () => renderDashboard())
@@ -765,12 +848,15 @@ describe('Dashboard connectivity state', () => {
     expect(failed?.textContent).toContain('活动数据加载失败')
     expect(failed?.textContent).toContain('活动服务不可用')
     expect(failed?.textContent).not.toContain('暂无')
+    expect(failed?.querySelector('button')).toBeNull()
     expect(useDashboardStore.getState().lastRefreshError).toBe('活动服务不可用')
 
     apiMocks.getActivity.mockResolvedValueOnce(ok(activityDto({ name: '恢复活动' })))
-    const retry = Array.from(failed?.querySelectorAll('button') ?? [])
-      .find(button => button.textContent?.includes('重试'))
-    await act(async () => retry?.click())
+    useDashboardStore.setState({
+      lastRefreshAttemptAt: Date.now() - DASHBOARD_REFRESH_INTERVAL_MS,
+    })
+    await act(async () => root.render(<div>其他页面</div>))
+    await act(async () => renderDashboard())
     await flushDashboard()
 
     expect(apiMocks.getActivity).toHaveBeenCalledTimes(2)
@@ -836,11 +922,11 @@ describe('Dashboard connectivity state', () => {
 
     const stale = container.querySelector('[data-activity-status="stale"]')
     expect(stale?.textContent).toContain('已确认活动')
-    expect(stale?.textContent).toContain('可能已过期')
+    expect(stale?.textContent).not.toContain('可能已过期')
     expect(stale?.textContent).toContain('上次成功')
     expect(stale?.textContent).toContain('暂时不可用')
     expect(stale?.textContent).not.toContain('未确认活动')
-    expect(stale?.querySelector('button')?.textContent).toContain('重试')
+    expect(stale?.querySelector('button')).toBeNull()
   })
 
   it('refreshes a restored v1 cache immediately when the activity status is missing', async () => {

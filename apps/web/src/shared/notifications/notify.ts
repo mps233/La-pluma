@@ -12,10 +12,13 @@ export const SETTINGS_CONFIG_RESOURCE_SOURCE_NOTICE_ID = 'settings-config:resour
 export const COMBAT_PREVIEW_NOTICE_ID = 'combat-preview'
 export const COMBAT_QUEUE_PREVIEW_NOTICE_ID = 'combat-queue-preview'
 export const COMBAT_PARADOX_SEARCH_NOTICE_ID = 'combat-paradox-search'
+export const DASHBOARD_CONNECTION_NOTICE_ID = 'dashboard-connection'
 
 export interface NoticeOptions {
   id?: string
   duration?: number
+  description?: string
+  action?: { label: string; onClick: () => void }
 }
 
 export type Notify = (message: string, type?: NoticeType, options?: NoticeOptions) => string
@@ -36,6 +39,8 @@ export function notify(message: string, type?: NoticeType, options: NoticeOption
   const toastOptions = {
     duration,
     ...(options.id === undefined ? {} : { id: options.id }),
+    ...(options.description === undefined ? {} : { description: options.description }),
+    ...(options.action === undefined ? {} : { action: options.action }),
   }
   const id = resolvedType === 'default'
     ? toast(message, toastOptions)

@@ -14,6 +14,7 @@ const preview = vi.hoisted(() => ({
   isConnecting: false,
   connectionState: 'snapshot' as 'off' | 'connecting' | 'snapshot' | 'live' | 'idle' | 'error',
   statusText: '快照可用',
+  error: null as string | null,
   available: true,
 }))
 
@@ -27,7 +28,7 @@ vi.mock('../hooks/useDashboardPreview', () => ({
     statusText: preview.statusText,
     headerStatusText: '已连接',
     retry: vi.fn(),
-    error: null,
+    error: preview.error,
     available: preview.available,
   }),
 }))
@@ -42,6 +43,7 @@ describe('DashboardPreviewEntry', () => {
     preview.isConnecting = false
     preview.connectionState = 'snapshot'
     preview.statusText = '快照可用'
+    preview.error = null
     preview.available = true
     usePreviewStore.setState({ mode: 'off' })
     container = document.createElement('div')
@@ -120,5 +122,18 @@ describe('DashboardPreviewEntry', () => {
     expect(buttons.find(button => button.textContent === '关闭')?.disabled).toBe(false)
     expect(buttons.find(button => button.textContent === '快照')?.disabled).toBe(true)
     expect(buttons.find(button => button.textContent === '实时')?.disabled).toBe(true)
+  })
+
+  it('labels the failed-preview action without mode-specific wording', async () => {
+    preview.fallbackSnapshot = null
+    preview.connectionState = 'error'
+    preview.statusText = '服务器内部错误'
+    preview.error = '服务器内部错误'
+    await act(async () => root.render(<DashboardPreviewEntry />))
+
+    const retry = Array.from(container.querySelectorAll('button')).find(button => button.textContent === '重试')
+    expect(retry).not.toBeUndefined()
+    expect(container.querySelector('.dashboard-preview-empty')?.contains(retry ?? null)).toBe(true)
+    expect(container.textContent).not.toContain('重试实时预览')
   })
 })

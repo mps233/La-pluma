@@ -1,7 +1,8 @@
-import { ChevronRight, PackageOpen } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Card } from '@/shared/ui/card'
 import { useDashboardStore } from '../store/dashboardStore'
+import { useFittedDropItems } from '../hooks/useFittedDropItems'
 
 const sectionTitleClass = 'text-base font-bold text-foreground'
 
@@ -11,14 +12,15 @@ interface DashboardDropSummaryCardProps {
 
 export default function DashboardDropSummaryCard({ onOpenStatistics }: DashboardDropSummaryCardProps) {
   const dropSummary = useDashboardStore(state => state.dropSummary)
+  const dropItemsText = dropSummary.count > 0
+    ? (dropSummary.items ?? dropSummary.recent.map(record => record.items).join('、'))
+    : ''
+  const { containerRef, visible, truncated } = useFittedDropItems(dropItemsText)
 
   return (
     <Card className="dashboard-summary-card is-drops gap-0 p-0!">
       <div className="dashboard-summary-header">
         <div className="dashboard-summary-heading">
-          <span className="dashboard-summary-icon" aria-hidden="true">
-            <PackageOpen className="h-4 w-4" strokeWidth={1.8} />
-          </span>
           <div className="min-w-0">
             <div className={sectionTitleClass}>今日掉落摘要</div>
           </div>
@@ -49,13 +51,10 @@ export default function DashboardDropSummaryCard({ onOpenStatistics }: Dashboard
         </div>
         <div className={`dashboard-summary-footer${dropSummary.count === 0 ? ' is-action' : ''}`}>
           {dropSummary.count > 0 ? (
-            <div className="dashboard-drop-list">
-              {dropSummary.recent.map((record, index) => (
-                <div key={`${record.stage}-${index}`} className="dashboard-drop-row">
-                  <span className="dashboard-drop-stage">{record.stage}</span>
-                  <span className="dashboard-drop-items">{record.items}</span>
-                </div>
-              ))}
+            <div ref={containerRef} className="dashboard-drop-list">
+              <span className="dashboard-drop-items">
+                {visible.join('、')}{truncated ? (visible.length > 0 ? '、…' : '…') : ''}
+              </span>
             </div>
           ) : (
             <button type="button" onClick={onOpenStatistics} className="dashboard-summary-link min-h-11">

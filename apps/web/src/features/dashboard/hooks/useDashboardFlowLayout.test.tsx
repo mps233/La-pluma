@@ -37,12 +37,10 @@ const rect = (width: number, height: number): DOMRect => ({
 
 function Harness({
   enabled = true,
-  showFeedback,
   showPreview = true,
   showStages = false,
 }: {
   enabled?: boolean
-  showFeedback: boolean
   showPreview?: boolean
   showStages?: boolean
 }) {
@@ -56,7 +54,6 @@ function Harness({
   return (
     <div ref={flowGridRef} data-testid="grid" style={flowGridStyle}>
       <div ref={flowCardRef} data-testid="flow">
-        {showFeedback && <div data-dashboard-flow-feedback />}
         {showStages && (
           <div data-dashboard-flow-stages style={{ paddingBottom: 12 }}>
             <div data-testid="stages-content" />
@@ -198,7 +195,7 @@ describe('useDashboardFlowLayout', () => {
   })
 
   it('leaves the columns to the stylesheet until the first measurement', async () => {
-    await act(async () => root.render(<Harness showFeedback />))
+    await act(async () => root.render(<Harness />))
 
     expect(flowColumns()).toBe('')
 
@@ -208,31 +205,8 @@ describe('useDashboardFlowLayout', () => {
     expect(flowColumns()).toBe('minmax(0, 360px) minmax(0, 736px)')
   })
 
-  it('keeps the columns stable when transient feedback is removed', async () => {
-    await act(async () => root.render(<Harness showFeedback />))
-
-    gridElement().getBoundingClientRect = () => rect(1116, flowHeight)
-    flowElement().getBoundingClientRect = () => rect(390, flowHeight)
-    container.querySelector<HTMLElement>('[data-dashboard-flow-feedback]')!
-      .getBoundingClientRect = () => rect(390, 37)
-    previewCardElement().getBoundingClientRect = () => rect(706, 437)
-    previewFrameElement().getBoundingClientRect = () => rect(706, 397)
-
-    await flushFrames()
-
-    const stableColumns = 'minmax(0, 390px) minmax(0, 706px)'
-    expect(flowColumns()).toBe(stableColumns)
-
-    flowHeight = 437
-    await act(async () => root.render(<Harness showFeedback={false} />))
-    await act(async () => resizeCallback?.([], {} as ResizeObserver))
-    await flushFrames()
-
-    expect(flowColumns()).toBe(stableColumns)
-  })
-
   it('keeps the columns stable when the stage section stretches to match the preview', async () => {
-    await act(async () => root.render(<Harness showFeedback={false} showStages />))
+    await act(async () => root.render(<Harness showStages />))
 
     gridElement().getBoundingClientRect = () => rect(1116, flowHeight)
     flowElement().getBoundingClientRect = () => rect(390, flowHeight)
@@ -254,7 +228,7 @@ describe('useDashboardFlowLayout', () => {
   })
 
   it('recomputes the columns when the grid resizes', async () => {
-    await act(async () => root.render(<Harness showFeedback={false} />))
+    await act(async () => root.render(<Harness />))
 
     applyDesktopGeometry()
     await flushFrames()
@@ -267,7 +241,7 @@ describe('useDashboardFlowLayout', () => {
   })
 
   it('clears the inline override below the wide breakpoint and restores it above', async () => {
-    await act(async () => root.render(<Harness showFeedback={false} />))
+    await act(async () => root.render(<Harness />))
 
     applyDesktopGeometry()
     await flushFrames()
@@ -281,7 +255,7 @@ describe('useDashboardFlowLayout', () => {
   })
 
   it('leaves the columns to the stylesheet when the preview anchors are missing', async () => {
-    await act(async () => root.render(<Harness showFeedback={false} showPreview={false} />))
+    await act(async () => root.render(<Harness showPreview={false} />))
 
     gridElement().getBoundingClientRect = () => rect(1116, flowHeight)
     flowElement().getBoundingClientRect = () => rect(390, flowHeight)
@@ -292,7 +266,7 @@ describe('useDashboardFlowLayout', () => {
   })
 
   it('drops the inline override while measurements are unavailable', async () => {
-    await act(async () => root.render(<Harness showFeedback={false} />))
+    await act(async () => root.render(<Harness />))
 
     await flushFrames()
     expect(flowColumns()).toBe('')
@@ -307,7 +281,7 @@ describe('useDashboardFlowLayout', () => {
   })
 
   it('observes the grid, flow card, preview shell, card and frame', async () => {
-    await act(async () => root.render(<Harness showFeedback={false} />))
+    await act(async () => root.render(<Harness />))
 
     expect(resizeObserverConstructions).toBe(1)
     expect(new Set(observedTargets)).toEqual(new Set([
@@ -323,7 +297,7 @@ describe('useDashboardFlowLayout', () => {
     const addEventListenerSpy = vi.spyOn(window, 'addEventListener')
     const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener')
 
-    await act(async () => root.render(<Harness showFeedback={false} />))
+    await act(async () => root.render(<Harness />))
 
     const resizeListener = addEventListenerSpy.mock.calls.find(([type]) => type === 'resize')?.[1]
     expect(resizeListener).toBeDefined()
@@ -340,7 +314,7 @@ describe('useDashboardFlowLayout', () => {
   it('does not observe or listen while disabled', async () => {
     const addEventListenerSpy = vi.spyOn(window, 'addEventListener')
 
-    await act(async () => root.render(<Harness enabled={false} showFeedback={false} />))
+    await act(async () => root.render(<Harness enabled={false} />))
 
     expect(resizeObserverConstructions).toBe(0)
     expect(observedTargets).toEqual([])
@@ -351,7 +325,7 @@ describe('useDashboardFlowLayout', () => {
   })
 
   it('coalesces a burst of notifications into one measurement pass', async () => {
-    await act(async () => root.render(<Harness showFeedback={false} />))
+    await act(async () => root.render(<Harness />))
     applyDesktopGeometry()
     await flushFrames()
 

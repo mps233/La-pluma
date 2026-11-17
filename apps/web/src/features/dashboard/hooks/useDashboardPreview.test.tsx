@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { Activity, act } from 'react'
+import { Activity, act, useEffect } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useDashboardPreview } from './useDashboardPreview'
@@ -51,8 +51,11 @@ vi.mock('@/shared/api', async (importOriginal) => {
   return { ...actual, fetchWithAuth: mocks.fetchWithAuth }
 })
 
+let retryPreview: () => void
+
 function PreviewHarness() {
-  const { videoRef, statusText, connectionState } = useDashboardPreview()
+  const { videoRef, statusText, connectionState, retry } = useDashboardPreview()
+  useEffect(() => { retryPreview = retry })
   return <video ref={videoRef} data-preview-status={statusText} data-preview-connection={connectionState} />
 }
 
@@ -141,5 +144,24 @@ describe('useDashboardPreview Activity lifecycle', () => {
     await renderMode('visible')
     expect(signalingConnections).toHaveLength(1)
     expect(screenshotCalls()).toHaveLength(0)
+  })
+
+  it('retries a failed snapshot without switching to live mode', async () => {
+    usePreviewStore.getState().setMode('snapshot')
+    await renderMode('visible')
+
+    expect(container.querySelector('video')?.dataset.previewConnection).toBe('error')
+    const captures = screenshotCalls().length
+
+    await act(async () => {
+      retryPreview()
+      await Promise.resolve()
+      await Promise.resolve()
+      await new Promise(resolve => setTimeout(resolve, 0))
+    })
+
+    expect(usePreviewStore.getState().mode).toBe('snapshot')
+    expect(screenshotCalls()).toHaveLength(captures + 1)
+    expect(startCalls()).toHaveLength(0)
   })
 })
