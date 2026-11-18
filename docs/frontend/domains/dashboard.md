@@ -89,7 +89,7 @@ Dashboard（app-page > app-stack-section > DashboardWorkspace；首屏门禁与�
 
 | 操作 | 行为 | 领域所有者 |
 | --- | --- | --- |
-| 执行日常 | 校验在线/后端可用 → `loadUserConfig('automation-tasks')` → 空流程时提示并导航自动化 → `startFlow(flow)` 经控制器提交 `run_daily_flow` | `user-config` 读取 + `task-execution` 控制器 |
+| 开始 | 校验在线/后端可用 → `loadUserConfig('automation-tasks')` → 空流程时提示并导航自动化 → `startFlow(flow)` 经控制器提交 `run_daily_flow` | `user-config` 读取 + `task-execution` 控制器 |
 | 启动成功后的刷新 | `await refreshDashboard()`（`force` 完整快照） | `dashboardSnapshotRefresher` |
 | 设备忙/提交在途 | 按钮禁用或返回 warning；同一时刻只允许一次提交 | 控制器 `submission` + 区域在途 ref |
 
@@ -125,7 +125,7 @@ Dashboard（app-page > app-stack-section > DashboardWorkspace；首屏门禁与�
 | `controlsDisabled` | 启动 loading、设备忙或后端不可用 |
 | `commandTitle` | 检查中 → “正在检查服务”；不可用 → “连接不可用”；启动 loading → 对应进行中文案；再按 `waiting`/`running`（标签 → 当前任务 → 默认）/`occupied`/`unknown`/`idle` 回退 |
 | `commandDescription` | 检查中 → “正在确认自动化服务状态”；不可用 → “连接恢复后可以继续操作”；loading → 对应说明；再按阶段回退到运行说明、计划消息或待命文案 |
-| `primaryActionLabel` | `waiting` → “等待继续”；运行 → “正在运行”；否则“执行日常” |
+| `primaryActionLabel` | `waiting` → “等待继续”；运行 → “正在运行”；否则“开始” |
 
 `model/deviceView.ts` 的规则：
 
@@ -233,7 +233,7 @@ Dashboard（app-page > app-stack-section > DashboardWorkspace；首屏门禁与�
 | `unavailable` | 服务端 `status=unavailable`，或首轮刷新失败且没有旧快照 | 显示失败原因 |
 | `stale` | 服务端 `status=stale`，或最近一次快照刷新失败但有旧快照 | 保留旧活动与右侧时间窗口，显示失败原因与上次成功时间 |
 
-当前活动卡只读展示；页面唯一的执行入口是“执行日常”，活动区不提供卡内重试。活动时间窗口作为 `duration` 显示在活动名称右侧；主视图的 detail/meta 只保留地区、来源、更新时间或上次成功、复刻标记与关卡数，不再重复时间窗口。多活动 chips 仍各自带窗口与关卡数。
+当前活动卡只读展示；页面唯一的执行入口是“开始”，活动区不提供卡内重试。活动时间窗口作为 `duration` 显示在活动名称右侧；主视图的 detail/meta 只保留地区、来源、更新时间或上次成功、复刻标记与关卡数，不再重复时间窗口。多活动 chips 仍各自带窗口与关卡数。
 
 ### 3. 原子提交与失败策略
 

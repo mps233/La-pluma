@@ -21,7 +21,7 @@ export interface DashboardFlowView {
   readonly controlsDisabled: boolean
   readonly commandTitle: string
   readonly commandDescription: string
-  readonly primaryActionLabel: '等待继续' | '正在运行' | '执行日常'
+  readonly primaryActionLabel: '等待继续' | '正在运行' | '开始'
 }
 
 export function buildDashboardFlowView({
@@ -68,7 +68,7 @@ export function buildDashboardFlowView({
               ? '设备被未纳管的执行占用，等待结束后再开始'
               : phase === 'unknown'
                 ? (observationError || '暂时无法确认执行状态，恢复连接后会自动刷新')
-                : (scheduleMessage || '设备待命，可以开始今天的自动化任务')
+                : (scheduleMessage || '设备待命，可以开始日常任务')
 
   return {
     isRunning,
@@ -79,6 +79,6 @@ export function buildDashboardFlowView({
       ? '等待继续'
       : isRunning
         ? '正在运行'
-        : '执行日常',
+        : '开始',
   }
 }

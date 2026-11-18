@@ -1,4 +1,4 @@
-import { LoaderCircle, Play } from 'lucide-react'
+import { LoaderCircle } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Card } from '@/shared/ui/card'
 import { Separator } from '@/shared/ui/separator'
@@ -74,12 +74,7 @@ export default function DashboardFlowPanel({ refreshDashboard, onMissingFlow }: 
           >
             {quickStartLoading
               ? <><LoaderCircle className="animate-spin" aria-hidden="true" />启动中</>
-              : (
-                <>
-                  <Play className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-                  {view.primaryActionLabel}
-                </>
-              )}
+              : view.primaryActionLabel}
           </Button>
         </div>
       </div>
