@@ -4,6 +4,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { hasDocumentBuildChanged } from '@/utils/pwaUpdate'
+import { PWA_INSTALL_REQUEST_EVENT } from '@/utils/pwaInstallPrompt'
 import PWAInstallPrompt from './PWAInstallPrompt'
 
 const swMock = vi.hoisted(() => ({
@@ -108,6 +109,19 @@ describe('PWAInstallPrompt', () => {
 
     await clickButton('安装')
     expect(installEvent.prompt).toHaveBeenCalledOnce()
+  })
+
+  it('reopens the install card when another surface requests installation', async () => {
+    await renderPrompt()
+
+    act(() => window.dispatchEvent(createInstallPromptEvent()))
+    expect(container.querySelector('.pwa-install-prompt')).not.toBeNull()
+
+    await clickButton('稍后')
+    expect(container.querySelector('.pwa-install-prompt')).toBeNull()
+
+    act(() => window.dispatchEvent(new Event(PWA_INSTALL_REQUEST_EVENT)))
+    expect(container.querySelector('.pwa-install-prompt')).not.toBeNull()
   })
 
   it('shows iOS Add to Home Screen guidance', async () => {

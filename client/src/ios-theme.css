@@ -1818,6 +1818,31 @@ html.la-pluma-standalone #app-root .page {
     justify-content: flex-end;
   }
 
+  /* Phones hide page headers app-wide. Keep the Dashboard onboarding entry
+     reachable in a compact action row while the duplicate heading stays hidden. */
+  .la-pluma-app .dashboard-page .app-page-header {
+    position: relative !important;
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    clip: auto !important;
+    clip-path: none !important;
+    pointer-events: auto !important;
+    padding: 0 0 0.25rem !important;
+  }
+
+  .la-pluma-app .dashboard-page .app-page-header .app-page-heading {
+    display: none !important;
+  }
+
+  .la-pluma-app .dashboard-page .app-page-header.is-mobile-inline .app-page-actions {
+    width: auto !important;
+    max-width: none !important;
+    flex: none !important;
+    justify-content: flex-end !important;
+    margin-left: auto !important;
+  }
+
   .la-pluma-app .dashboard-page .dashboard-page-actions {
     width: auto;
     min-width: 0;
