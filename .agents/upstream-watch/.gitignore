@@ -1,0 +1,19 @@
+# 上游巡检运行时产物：不提交
+
+reports/ 与 logs/ 每轮都会覆盖，属于运行时数据，保留在本地即可。
+state.json / decisions.md 是本地状态，也不进版本库。
+
+logs/
+reports/
+partials/
+worktrees/
+merge-worktree/
+.npm-cache/
+state.json
+decisions.md
+
+# 本机配置（含绝对路径），按机器重新生成
+claude-settings.json
+apply-settings.json
+review-settings.json
+bin/*.plist

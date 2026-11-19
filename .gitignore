@@ -26,3 +26,11 @@ study/
 
 # Local browser/agent verification artifacts
 .playwright-mcp/
+
+# 本地验证截图与构建缓存
+client/.shot-check.png
+client/.sidebar-crop.png
+client/tsconfig.tsbuildinfo
+
+# .agents 下的 skill 副本（.claude/skills 为规范位置）
+.agents/skills/islandcn/
