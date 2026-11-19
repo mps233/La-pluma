@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { Package as PackageIcon, RefreshCw, Target, TrendingUp } from 'lucide-react'
 import { getItemIconUrl } from '../services/api'
 import { useItemIconCacheVersion } from '../hooks/useItemIconCacheVersion'
@@ -6,6 +6,8 @@ import type { DropRecordsProps } from '@/types/components'
 import { Button, Card, EmptyState, Loading, CjkText } from './common'
 import { keepNumberWithUnit } from '../utils/typography'
 import StatisticsSummary from './StatisticsSummary'
+
+const DropTrendChart = lazy(() => import('./DropTrendChart'))
 
 interface DropRecordsViewProps extends DropRecordsProps {
   isLoading?: boolean
@@ -95,6 +97,7 @@ export default function DropRecords({
 
   // 按掉落数量排序物品
   const sortedItems = Object.entries(items).sort((a, b) => b[1].count - a[1].count)
+  const chartData = sortedItems.slice(0, 10).map(([name, item]) => ({ name, count: item.count }))
   
   // 按战斗次数排序关卡
   const sortedStages = Object.entries(stages).sort((a, b) => b[1].battles - a[1].battles)
@@ -194,6 +197,15 @@ export default function DropRecords({
           <span className="min-w-0"><CjkText>材料掉落统计</CjkText></span>
           <span className="text-sm font-normal text-tertiary">共 {keepNumberWithUnit(`${sortedItems.length} 种`)}</span>
         </h3>
+
+        {sortedItems.length > 0 && (
+          <figure className="drop-records-chart" aria-labelledby="drop-records-chart-title">
+            <figcaption id="drop-records-chart-title" className="sr-only">材料掉落数量前 10 名</figcaption>
+            <Suspense fallback={<div className="drop-records-chart-canvas" aria-hidden="true" />}>
+              <DropTrendChart data={chartData} />
+            </Suspense>
+          </figure>
+        )}
 
         {sortedItems.length === 0 ? (
           <EmptyState

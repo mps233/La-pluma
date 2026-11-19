@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
 import { useStatusStore } from '../store/statusStore'
@@ -11,7 +10,7 @@ import {
   useBackendStatusMonitor,
 } from './useBackendStatusMonitor'
 
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+afterEach(cleanup)
 
 const apiMocks = vi.hoisted(() => ({
   getTaskStatus: vi.fn(),
@@ -66,21 +65,7 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-function HookHarness() {
-  useBackendStatusMonitor()
-  return null
-}
-
 let online = true
-let container: HTMLDivElement
-let root: Root
-
-async function flushEffects() {
-  await act(async () => {
-    await Promise.resolve()
-    await Promise.resolve()
-  })
-}
 
 describe('useBackendStatusMonitor', () => {
   beforeEach(() => {
@@ -93,14 +78,9 @@ describe('useBackendStatusMonitor', () => {
     useStatusStore.getState().setBackendStatus('unknown')
     useStatusStore.getState().setActive(false)
     invalidateBackendStatusProbe()
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
     useStatusStore.getState().setBackendStatus('unknown')
     useStatusStore.getState().setActive(false)
     invalidateBackendStatusProbe()
@@ -110,16 +90,14 @@ describe('useBackendStatusMonitor', () => {
     const request = deferred<ProbeResult>()
     apiMocks.getTaskStatus.mockReturnValueOnce(request.promise)
 
-    act(() => root.render(<HookHarness />))
+    renderHook(() => useBackendStatusMonitor())
 
     expect(apiMocks.getTaskStatus).toHaveBeenCalledTimes(1)
     expect(apiMocks.getTaskStatus).toHaveBeenCalledWith(expect.any(AbortSignal))
     expect(useStatusStore.getState().backendStatus).toBe('checking')
 
     request.resolve({ success: true, data: { isRunning: false } })
-    await flushEffects()
-
-    expect(useStatusStore.getState().backendStatus).toBe('available')
+    await waitFor(() => expect(useStatusStore.getState().backendStatus).toBe('available'))
   })
 
   it('switches to checking immediately when the browser comes back online', async () => {
@@ -128,18 +106,20 @@ describe('useBackendStatusMonitor', () => {
     const request = deferred<ProbeResult>()
     apiMocks.getTaskStatus.mockReturnValueOnce(request.promise)
 
-    act(() => root.render(<HookHarness />))
+    renderHook(() => useBackendStatusMonitor())
     expect(apiMocks.getTaskStatus).not.toHaveBeenCalled()
 
     online = true
-    act(() => window.dispatchEvent(new Event('online')))
+    act(() => {
+      window.dispatchEvent(new Event('online'))
+    })
 
     expect(apiMocks.getTaskStatus).toHaveBeenCalledTimes(1)
     expect(useStatusStore.getState().backendStatus).toBe('checking')
     expect(useStatusStore.getState().backendMessage).toBe('')
 
     request.resolve({ success: true, data: { isRunning: false } })
-    await flushEffects()
+    await waitFor(() => expect(useStatusStore.getState().backendStatus).toBe('available'))
   })
 
   it('does not let an older failed probe overwrite a newer success', async () => {
@@ -179,20 +159,17 @@ describe('useBackendStatusMonitor', () => {
     const request = deferred<ProbeResult>()
     apiMocks.getTaskStatus.mockReturnValueOnce(request.promise)
 
-    act(() => root.render(<App />))
-    await flushEffects()
+    render(<App />)
 
-    const action = Array.from(container.querySelectorAll('button'))
-      .find(button => button.textContent === '非首页执行入口')
+    const action = await screen.findByRole('button', { name: '非首页执行入口' })
 
     expect(apiMocks.getTaskStatus).toHaveBeenCalledTimes(1)
     expect(useStatusStore.getState().backendStatus).toBe('checking')
-    expect(action?.disabled).toBe(true)
+    expect((action as HTMLButtonElement).disabled).toBe(true)
 
     request.reject(new Error('后端服务不可用'))
-    await flushEffects()
+    await waitFor(() => expect(useStatusStore.getState().backendStatus).toBe('unavailable'))
 
-    expect(useStatusStore.getState().backendStatus).toBe('unavailable')
-    expect(action?.disabled).toBe(true)
+    expect((action as HTMLButtonElement).disabled).toBe(true)
   })
 })

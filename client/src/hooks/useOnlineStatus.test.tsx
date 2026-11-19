@@ -1,20 +1,10 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { cleanup, fireEvent, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { useOnlineStatus } from './useOnlineStatus'
 
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-
 let online = true
-let container: HTMLDivElement
-let root: Root
-
-function Harness() {
-  const isOnline = useOnlineStatus()
-  return <div>{isOnline ? 'online' : 'offline'}</div>
-}
 
 describe('useOnlineStatus', () => {
   beforeEach(() => {
@@ -23,26 +13,20 @@ describe('useOnlineStatus', () => {
       configurable: true,
       get: () => online,
     })
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
-  })
+  afterEach(cleanup)
 
-  it('tracks browser offline and online events', async () => {
-    await act(async () => root.render(<Harness />))
-    expect(container.textContent).toBe('online')
+  it('tracks browser offline and online events', () => {
+    const { result } = renderHook(() => useOnlineStatus())
+    expect(result.current).toBe(true)
 
     online = false
-    act(() => window.dispatchEvent(new Event('offline')))
-    expect(container.textContent).toBe('offline')
+    fireEvent(window, new Event('offline'))
+    expect(result.current).toBe(false)
 
     online = true
-    act(() => window.dispatchEvent(new Event('online')))
-    expect(container.textContent).toBe('online')
+    fireEvent(window, new Event('online'))
+    expect(result.current).toBe(true)
   })
 })

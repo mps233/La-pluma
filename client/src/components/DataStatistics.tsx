@@ -1,7 +1,10 @@
 import { getErrorMessage } from '@/utils/errorMessage'
 import '../styles/pages/statistics.css'
-import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { memo, forwardRef, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { Ref } from 'react'
 import { createPortal } from 'react-dom'
+import { VirtuosoGrid } from 'react-virtuoso'
+import type { GridComponents, GridItemProps, GridListProps } from 'react-virtuoso'
 import { maaApi, getAllOperators, getDropStatistics, getItemIconUrl, getOperBoxData, fetchOperatorMaterials, getTrainingQueue } from '../services/api'
 import { getOperatorAvatarUrl } from '../services/operatorQuotes'
 import { motion, useReducedMotion } from 'framer-motion'
@@ -43,6 +46,52 @@ import type {
 } from '@/types/components'
 
 type FilterMenuKey = Exclude<OpenMenu, null>
+
+type DepotEntry = DepotDataDetailed['items'][number]
+
+interface DepotGridContext {
+  items: DepotEntry[]
+  label: string
+}
+
+const DepotGridList = forwardRef<HTMLUListElement, GridListProps<HTMLUListElement> & { context?: DepotGridContext }>(
+  function DepotGridList({ children, className, style, 'data-testid': testId, context, ...rest }, ref) {
+    return (
+      <ul
+        ref={ref}
+        aria-label={context?.label}
+        className={`depot-item-grid depot-item-grid-virtual ${className ?? ''}`.trim()}
+        style={style}
+        data-testid={testId}
+        {...rest}
+      >
+        {children}
+      </ul>
+    )
+  },
+)
+
+const DepotGridItem = forwardRef<HTMLLIElement, GridItemProps & { context?: DepotGridContext }>(
+  function DepotGridItem({ children, className, style, 'data-index': dataIndex, context, ...rest }, ref) {
+    const item = context?.items[dataIndex]
+    const empty = Number(item?.count ?? 0) === 0
+    return (
+      <li
+        ref={ref as unknown as Ref<HTMLLIElement>}
+        className={`data-statistics-depot-item depot-item${empty ? ' is-empty' : ''} ${className ?? ''}`.trim()}
+        style={style}
+        {...rest}
+      >
+        {children}
+      </li>
+    )
+  },
+)
+
+const depotGridComponents = {
+  List: DepotGridList,
+  Item: DepotGridItem,
+} as unknown as GridComponents<DepotGridContext, HTMLUListElement>
 
 interface FilterMenuOption {
   value: string
@@ -617,6 +666,11 @@ export default function DataStatistics() {
   const setRequestedStatisticsTab = useUIStore(state => state.setStatisticsTab)
   const shouldReduceMotion = useReducedMotion()
   const statisticsTabsRef = useRef<HTMLDivElement>(null)
+  const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null)
+
+  useLayoutEffect(() => {
+    setScrollParent(document.querySelector<HTMLElement>('.la-pluma-scroll-host'))
+  }, [])
 
   const selectStatisticsTab = useCallback((tab: ActiveTab) => {
     setActiveTab(tab)
@@ -668,9 +722,53 @@ export default function DataStatistics() {
     return { kinds: depotFilteredItems.length, count }
   }, [depotFilteredItems])
 
+  const renderDepotItemBody = useCallback((item: DepotEntry) => {
+    const itemKey = item.id || item.iconId
+    const imageKey = `${itemKey}:${item.iconId}`
+    const countValue = Number(item.count) || 0
+    const itemCount = countValue.toLocaleString()
+
+    return (
+      <>
+        <div className="depot-item-icon">
+          {failedDepotImages[imageKey] ? (
+            <span
+              className="depot-item-fallback"
+              role="img"
+              aria-label={`${item.name}图标不可用`}
+            >
+              <PackageIcon className="h-6 w-6" strokeWidth={1.6} aria-hidden="true" />
+            </span>
+          ) : (
+            <img
+              src={getItemIconUrl(item.iconId)}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="maa-item-icon depot-item-image"
+              onError={() => {
+                setFailedDepotImages(previous => ({ ...previous, [imageKey]: true }))
+              }}
+            />
+          )}
+          <span className="depot-item-count">
+            {itemCount}
+            <span className="sr-only"> 件</span>
+          </span>
+        </div>
+        <span className="depot-item-name">{item.name}</span>
+      </>
+    )
+  }, [failedDepotImages])
+
   const depotFilterLabel = depotFilter === 'all'
     ? '全部'
     : depotTypeSummary.find(group => group.type === depotFilter)?.label || '其他'
+  const depotGridContext = useMemo(() => ({
+    items: depotFilteredItems,
+    label: `${depotFilterLabel}物品`,
+  }), [depotFilteredItems, depotFilterLabel])
+
   const isDepotFiltered = depotFilter !== 'all' || depotQuery.trim().length > 0
   const clearDepotFilters = useCallback(() => {
     setDepotFilter('all')
@@ -1452,15 +1550,29 @@ export default function DataStatistics() {
                     ) : undefined}
                   />
                 ) : (
-                <div className="data-statistics-item-grid grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-                  {getFilteredAndSortedOperators.map((oper) => (
-                    <OperatorCard
-                      key={oper.id}
-                      oper={oper}
-                      owned={oper.level > 0 || ownedOperatorIds.has(oper.id)}
-                    />
-                  ))}
-                </div>
+                scrollParent ? (
+                  <VirtuosoGrid
+                    data={getFilteredAndSortedOperators}
+                    customScrollParent={scrollParent}
+                    computeItemKey={(_, oper) => oper.id}
+                    itemContent={(_, oper) => (
+                      <OperatorCard oper={oper} owned={oper.level > 0 || ownedOperatorIds.has(oper.id)} />
+                    )}
+                    listClassName="data-statistics-item-grid grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+                    itemClassName="min-w-0"
+                    increaseViewportBy={400}
+                  />
+                ) : (
+                  <div className="data-statistics-item-grid grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                    {getFilteredAndSortedOperators.map((oper) => (
+                      <OperatorCard
+                        key={oper.id}
+                        oper={oper}
+                        owned={oper.level > 0 || ownedOperatorIds.has(oper.id)}
+                      />
+                    ))}
+                  </div>
+                )
                 )}
                   </div>
                 )}
@@ -1637,49 +1749,28 @@ export default function DataStatistics() {
                       description="下一次仓库识别会重新读取物品清单。"
                     />
                   ) : depotFilteredItems.length > 0 ? (
-                    <ul className="depot-item-grid" aria-label={`${depotFilterLabel}物品`}>
-                      {depotFilteredItems.map((item) => {
-                        const itemKey = item.id || item.iconId
-                        const imageKey = `${itemKey}:${item.iconId}`
-                        const countValue = Number(item.count) || 0
-                        const itemCount = countValue.toLocaleString()
-
-                        return (
+                    scrollParent ? (
+                      <VirtuosoGrid<DepotEntry, DepotGridContext>
+                        data={depotFilteredItems}
+                        customScrollParent={scrollParent}
+                        context={depotGridContext}
+                        components={depotGridComponents}
+                        computeItemKey={(_, item) => item.id || item.iconId}
+                        itemContent={(_, item) => renderDepotItemBody(item)}
+                        increaseViewportBy={400}
+                      />
+                    ) : (
+                      <ul className="depot-item-grid depot-item-grid-static" aria-label={`${depotFilterLabel}物品`}>
+                        {depotFilteredItems.map((item) => (
                           <li
-                            key={itemKey}
-                            className={`data-statistics-depot-item depot-item${countValue === 0 ? ' is-empty' : ''}`}
+                            key={item.id || item.iconId}
+                            className={`data-statistics-depot-item depot-item${Number(item.count) === 0 ? ' is-empty' : ''}`}
                           >
-                            <div className="depot-item-icon">
-                              {failedDepotImages[imageKey] ? (
-                                <span
-                                  className="depot-item-fallback"
-                                  role="img"
-                                  aria-label={`${item.name}图标不可用`}
-                                >
-                                  <PackageIcon className="h-6 w-6" strokeWidth={1.6} aria-hidden="true" />
-                                </span>
-                              ) : (
-                                <img
-                                  src={getItemIconUrl(item.iconId)}
-                                  alt=""
-                                  loading="lazy"
-                                  decoding="async"
-                                  className="maa-item-icon depot-item-image"
-                                  onError={() => {
-                                    setFailedDepotImages(previous => ({ ...previous, [imageKey]: true }))
-                                  }}
-                                />
-                              )}
-                              <span className="depot-item-count">
-                                {itemCount}
-                                <span className="sr-only"> 件</span>
-                              </span>
-                            </div>
-                            <span className="depot-item-name">{item.name}</span>
+                            {renderDepotItemBody(item)}
                           </li>
-                        )
-                      })}
-                    </ul>
+                        ))}
+                      </ul>
+                    )
                   ) : (
                     <EmptyState
                       compact

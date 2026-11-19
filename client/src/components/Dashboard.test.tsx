@@ -1,13 +1,11 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { cleanup, fireEvent, render, screen, waitFor, within, type RenderResult } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useDashboardStore } from '../store/dashboardStore'
 import { useStatusStore } from '../store/statusStore'
 import Dashboard, { DASHBOARD_REFRESH_INTERVAL_MS } from './Dashboard'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const apiMocks = vi.hoisted(() => ({
   getTaskStatus: vi.fn(),
@@ -112,22 +110,24 @@ vi.mock('./common', () => ({
 }))
 
 let online = true
-let container: HTMLDivElement
-let root: Root
+let view: RenderResult
 
-const findButton = (text: string) => Array.from(container.querySelectorAll('button'))
+const mountDashboard = () => {
+  view = render(<Dashboard />)
+  return view
+}
+
+const findButton = (text: string) => (screen.queryAllByRole('button') as HTMLButtonElement[])
   .find(button => button.textContent?.includes(text))
 
-const findActivityMetric = () => Array.from(container.querySelectorAll('.dashboard-flow-metric'))
+const findActivityMetric = () => Array.from(view.container.querySelectorAll('.dashboard-flow-metric'))
   .find(metric => metric.textContent?.includes('当前活动'))
 
-async function flushDashboard() {
-  await act(async () => {
-    await Promise.resolve()
-    await Promise.resolve()
-    await Promise.resolve()
-  })
+async function waitForDashboardReady() {
+  await waitFor(() => expect(view.container.textContent).toContain('准备就绪'))
 }
+
+afterEach(cleanup)
 
 describe('Dashboard connectivity state', () => {
   beforeEach(() => {
@@ -152,14 +152,9 @@ describe('Dashboard connectivity state', () => {
     useStatusStore.getState().setActive(false)
     useStatusStore.getState().setBackendStatus('unknown')
     window.localStorage.setItem('onboarding-seen-at', '1')
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
     useDashboardStore.getState().reset()
     useStatusStore.getState().clearMessage()
     useStatusStore.getState().setActive(false)
@@ -174,33 +169,30 @@ describe('Dashboard connectivity state', () => {
       resolveActivity = resolve
     }))
 
-    await act(async () => root.render(<Dashboard />))
+    mountDashboard()
 
-    expect(container.textContent).toContain('loading')
+    expect(view.container.textContent).toContain('loading')
     expect(renderSpies.dashboardSkeleton).toHaveBeenCalled()
 
-    await act(async () => resolveActivity?.({ success: true, data: { available: true, name: '首次活动' } }))
-    await flushDashboard()
+    resolveActivity?.({ success: true, data: { available: true, name: '首次活动' } })
+    await waitFor(() => expect(view.container.textContent).toContain('首次活动'))
 
-    expect(container.textContent).not.toContain('loading')
-    expect(container.textContent).toContain('首次活动')
+    expect(view.container.textContent).not.toContain('loading')
   })
 
   it('restores a fresh dashboard cache immediately without returning to the skeleton', async () => {
     apiMocks.getActivity.mockResolvedValueOnce({ success: true, data: { available: true, name: '缓存活动' } })
 
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
-
-    expect(container.textContent).toContain('缓存活动')
+    mountDashboard()
+    await waitFor(() => expect(view.container.textContent).toContain('缓存活动'))
     const skeletonRenders = renderSpies.dashboardSkeleton.mock.calls.length
 
-    await act(async () => root.render(<div>其他页面</div>))
+    view.rerender(<div>其他页面</div>)
     apiMocks.getActivity.mockClear()
-    await act(async () => root.render(<Dashboard />))
+    view.rerender(<Dashboard />)
 
-    expect(container.textContent).toContain('缓存活动')
-    expect(container.textContent).not.toContain('loading')
+    expect(view.container.textContent).toContain('缓存活动')
+    expect(view.container.textContent).not.toContain('loading')
     expect(renderSpies.dashboardSkeleton).toHaveBeenCalledTimes(skeletonRenders)
     expect(apiMocks.getActivity).not.toHaveBeenCalled()
   })
@@ -208,8 +200,8 @@ describe('Dashboard connectivity state', () => {
   it('keeps stale content visible while refreshing it in the background', async () => {
     apiMocks.getActivity.mockResolvedValueOnce({ success: true, data: { available: true, name: '缓存活动' } })
 
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
+    mountDashboard()
+    await waitFor(() => expect(view.container.textContent).toContain('缓存活动'))
     useDashboardStore.setState({
       lastRefreshAttemptAt: Date.now() - DASHBOARD_REFRESH_INTERVAL_MS,
     })
@@ -220,40 +212,39 @@ describe('Dashboard connectivity state', () => {
     }))
     const skeletonRenders = renderSpies.dashboardSkeleton.mock.calls.length
 
-    await act(async () => root.render(<div>其他页面</div>))
-    await act(async () => root.render(<Dashboard />))
+    view.rerender(<div>其他页面</div>)
+    view.rerender(<Dashboard />)
 
-    expect(container.textContent).toContain('缓存活动')
-    expect(container.textContent).not.toContain('loading')
+    expect(view.container.textContent).toContain('缓存活动')
+    expect(view.container.textContent).not.toContain('loading')
     expect(renderSpies.dashboardSkeleton).toHaveBeenCalledTimes(skeletonRenders)
-    expect(apiMocks.getActivity).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(apiMocks.getActivity).toHaveBeenCalledTimes(2))
 
-    await act(async () => resolveActivity?.({ success: true, data: { available: true, name: '更新活动' } }))
-    await flushDashboard()
-
-    expect(container.textContent).toContain('更新活动')
+    resolveActivity?.({ success: true, data: { available: true, name: '更新活动' } })
+    await waitFor(() => expect(view.container.textContent).toContain('更新活动'))
   })
 
   it('keeps the last complete snapshot when one background request fails', async () => {
     apiMocks.getActivity.mockResolvedValueOnce({ success: true, data: { available: true, name: '已确认活动' } })
 
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
+    mountDashboard()
+    await waitFor(() => expect(view.container.textContent).toContain('已确认活动'))
     const lastSuccessfulUpdate = useDashboardStore.getState().lastUpdate
     const persistedSnapshot = window.localStorage.getItem('la-pluma-dashboard-cache')
+    const staleRefreshAttempt = Date.now() - DASHBOARD_REFRESH_INTERVAL_MS
     useDashboardStore.setState({
-      lastRefreshAttemptAt: Date.now() - DASHBOARD_REFRESH_INTERVAL_MS,
+      lastRefreshAttemptAt: staleRefreshAttempt,
     })
 
     apiMocks.getActivity.mockResolvedValueOnce({ success: true, data: { available: true, name: '未确认活动' } })
     apiMocks.getTodayDrops.mockResolvedValueOnce({ success: false, message: '暂时不可用' })
 
-    await act(async () => root.render(<div>其他页面</div>))
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
+    view.rerender(<div>其他页面</div>)
+    view.rerender(<Dashboard />)
+    await waitFor(() => expect(useDashboardStore.getState().lastRefreshAttemptAt).not.toBe(staleRefreshAttempt))
 
-    expect(container.textContent).toContain('已确认活动')
-    expect(container.textContent).not.toContain('未确认活动')
+    expect(view.container.textContent).toContain('已确认活动')
+    expect(view.container.textContent).not.toContain('未确认活动')
     expect(useDashboardStore.getState().lastUpdate).toBe(lastSuccessfulUpdate)
     expect(window.localStorage.getItem('la-pluma-dashboard-cache')).toBe(persistedSnapshot)
   })
@@ -261,23 +252,24 @@ describe('Dashboard connectivity state', () => {
   it('keeps the last complete snapshot when a successful response has malformed data', async () => {
     apiMocks.getActivity.mockResolvedValueOnce({ success: true, data: { available: true, name: '稳定活动' } })
 
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
+    mountDashboard()
+    await waitFor(() => expect(view.container.textContent).toContain('稳定活动'))
     const lastSuccessfulUpdate = useDashboardStore.getState().lastUpdate
     const persistedSnapshot = window.localStorage.getItem('la-pluma-dashboard-cache')
+    const staleRefreshAttempt = Date.now() - DASHBOARD_REFRESH_INTERVAL_MS
     useDashboardStore.setState({
-      lastRefreshAttemptAt: Date.now() - DASHBOARD_REFRESH_INTERVAL_MS,
+      lastRefreshAttemptAt: staleRefreshAttempt,
     })
 
     apiMocks.getActivity.mockResolvedValueOnce({ success: true, data: { available: true, name: '异常活动' } })
     apiMocks.getOpenTodayStages.mockResolvedValueOnce({ success: true, data: undefined })
 
-    await act(async () => root.render(<div>其他页面</div>))
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
+    view.rerender(<div>其他页面</div>)
+    view.rerender(<Dashboard />)
+    await waitFor(() => expect(useDashboardStore.getState().lastRefreshAttemptAt).not.toBe(staleRefreshAttempt))
 
-    expect(container.textContent).toContain('稳定活动')
-    expect(container.textContent).not.toContain('异常活动')
+    expect(view.container.textContent).toContain('稳定活动')
+    expect(view.container.textContent).not.toContain('异常活动')
     expect(useDashboardStore.getState().lastUpdate).toBe(lastSuccessfulUpdate)
     expect(window.localStorage.getItem('la-pluma-dashboard-cache')).toBe(persistedSnapshot)
   })
@@ -293,12 +285,12 @@ describe('Dashboard connectivity state', () => {
       },
     })
 
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
+    mountDashboard()
+    await waitFor(() => expect(view.container.textContent).toContain('时间啊，向前！'))
 
     const activityMetric = findActivityMetric()
     expect(activityMetric?.textContent).toContain('时间啊，向前！')
-    expect(activityMetric?.textContent).toContain('剩余 3\u00A0天')
+    expect(activityMetric?.textContent).toContain('剩余 3 天')
     expect(activityMetric?.textContent).not.toContain('等待活动数据')
   })
 
@@ -321,11 +313,11 @@ describe('Dashboard connectivity state', () => {
       },
     })
 
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
+    mountDashboard()
+    await waitFor(() => expect(view.container.textContent).toContain('时间啊，向前！'))
 
     const activityMetric = findActivityMetric()
-    expect(activityMetric?.textContent).toContain('剩余 3\u00A0天')
+    expect(activityMetric?.textContent).toContain('剩余 3 天')
     expect(activityMetric?.textContent).not.toContain('2/8')
     const progressbar = activityMetric?.querySelector('[role="progressbar"]')
     expect(progressbar?.getAttribute('aria-label')).toBe('当前活动剩余时间')
@@ -341,8 +333,8 @@ describe('Dashboard connectivity state', () => {
       data: { available: true, code: 'TL', name: '时间啊，向前！' },
     })
 
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
+    mountDashboard()
+    await waitFor(() => expect(view.container.textContent).toContain('时间啊，向前！'))
 
     const activityMetric = findActivityMetric()
     expect(activityMetric?.textContent).toContain('时间啊，向前！')
@@ -366,11 +358,11 @@ describe('Dashboard connectivity state', () => {
       },
     })
 
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
+    mountDashboard()
+    await waitFor(() => expect(view.container.textContent).toContain('时间啊，向前！'))
 
     const activityMetric = findActivityMetric()
-    expect(activityMetric?.textContent).toContain('已通关 1/3\u00A0关')
+    expect(activityMetric?.textContent).toContain('已通关 1/3 关')
     expect(activityMetric?.textContent).not.toContain('等待活动数据')
     const progressbar = activityMetric?.querySelector('[role="progressbar"]')
     expect(progressbar?.getAttribute('aria-label')).toBe('当前活动通关进度')
@@ -378,17 +370,17 @@ describe('Dashboard connectivity state', () => {
   })
 
   it('disables execution actions as soon as the browser goes offline', async () => {
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
+    mountDashboard()
+    await waitForDashboardReady()
 
-    expect(container.textContent).toContain('准备就绪')
+    expect(view.container.textContent).toContain('准备就绪')
     expect(findButton('开始今日流程')?.disabled).toBe(false)
     expect(findButton('打当前活动')?.disabled).toBe(false)
 
     online = false
-    act(() => window.dispatchEvent(new Event('offline')))
+    fireEvent(window, new Event('offline'))
 
-    expect(container.textContent).toContain('当前网络离线')
+    expect(view.container.textContent).toContain('当前网络离线')
     expect(findButton('开始今日流程')?.disabled).toBe(true)
     expect(findButton('打当前活动')?.disabled).toBe(true)
   })
@@ -396,36 +388,36 @@ describe('Dashboard connectivity state', () => {
   it('shows a retry action and recovers after the backend becomes available', async () => {
     apiMocks.getTaskStatus.mockRejectedValueOnce(new Error('无法连接后端服务，请确认服务已启动'))
 
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
+    mountDashboard()
+    await waitFor(() => expect(view.container.textContent).toContain('后端服务不可用'))
 
-    expect(container.textContent).toContain('后端服务不可用')
-    expect(container.textContent).toContain('测试活动')
+    expect(view.container.textContent).toContain('测试活动')
     expect(useDashboardStore.getState().lastUpdate).not.toBeNull()
-    expect(findButton('重试连接')).toBeDefined()
+    const retryButton = findButton('重试连接')
+    expect(retryButton).toBeDefined()
     expect(findButton('开始今日流程')?.disabled).toBe(true)
     expect(findButton('打当前活动')?.disabled).toBe(true)
 
-    await act(async () => findButton('重试连接')?.click())
-    await flushDashboard()
+    await userEvent.setup().click(retryButton!)
+    await waitForDashboardReady()
 
-    expect(container.textContent).toContain('准备就绪')
+    expect(view.container.textContent).toContain('准备就绪')
     expect(findButton('开始今日流程')?.disabled).toBe(false)
     expect(findButton('打当前活动')?.disabled).toBe(false)
   })
 
   it('omits redundant manual refresh controls', async () => {
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
+    mountDashboard()
+    await waitForDashboardReady()
 
     expect(findButton('刷新数据')).toBeUndefined()
-    expect(container.querySelector('.dashboard-mobile-refresh')).toBeNull()
-    expect(container.querySelector('button[aria-label="刷新执行状态"]')).toBeNull()
+    expect(view.container.querySelector('.dashboard-mobile-refresh')).toBeNull()
+    expect(view.container.querySelector('button[aria-label="刷新执行状态"]')).toBeNull()
   })
 
   it('keeps empty summary actions at the iOS touch target size', async () => {
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
+    mountDashboard()
+    await waitForDashboardReady()
 
     const emptyActions = [findButton('添加首个培养目标'), findButton('查看掉落数据')]
     emptyActions.forEach(action => {
@@ -441,10 +433,12 @@ describe('Dashboard connectivity state', () => {
       data: { isRunning: true, currentTask: '收取信用' },
     })
 
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
+    mountDashboard()
+    await waitFor(() => expect(
+      view.container.querySelector('.dashboard-flow-glow-shell')?.classList.contains('is-active'),
+    ).toBe(true))
 
-    const flow = container.querySelector('.dashboard-flow-glow-shell')
+    const flow = view.container.querySelector('.dashboard-flow-glow-shell')
     expect(flow?.classList.contains('status-border-beam')).toBe(true)
     expect(flow?.classList.contains('is-active')).toBe(true)
     expect(flow?.getAttribute('aria-busy')).toBe('true')
@@ -459,16 +453,14 @@ describe('Dashboard connectivity state', () => {
       resolveCandidates = resolve
     }))
 
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
+    mountDashboard()
+    await waitForDashboardReady()
 
-    const activityButton = container.querySelector<HTMLButtonElement>('button[aria-label="打当前活动"]')
-    await act(async () => {
-      activityButton?.click()
-      await Promise.resolve()
-    })
+    const activityButton = view.container.querySelector<HTMLButtonElement>('button[aria-label="打当前活动"]')
+    expect(activityButton).not.toBeNull()
+    await userEvent.setup().click(activityButton!)
 
-    const flow = container.querySelector('.dashboard-flow-glow-shell')
+    const flow = view.container.querySelector('.dashboard-flow-glow-shell')
     const status = useStatusStore.getState()
     expect(apiMocks.getActivityCopilotCandidates).toHaveBeenCalledTimes(1)
     expect(activityButton?.disabled).toBe(true)
@@ -479,21 +471,20 @@ describe('Dashboard connectivity state', () => {
     expect(status.message).toContain('当前活动')
     expect(status.messageType).toBe('info')
 
-    await act(async () => resolveCandidates?.({
+    resolveCandidates?.({
       success: true,
       data: {
         matchingSet: { id: '56877', name: '时间啊，向前！全关卡作业' },
         matchingSets: [],
       },
-    }))
-    await flushDashboard()
+    })
+    await waitFor(() => expect(useStatusStore.getState().message).toContain('立即执行'))
 
     expect(uiMocks.setCombatCopilotPrefill).toHaveBeenCalledWith(expect.objectContaining({
       setId: '56877',
       name: '时间啊，向前！全关卡作业',
     }))
     expect(uiMocks.setActiveTab).toHaveBeenCalledWith('combat')
-    expect(useStatusStore.getState().message).toContain('立即执行')
   })
 
   it('hands off per-stage activity candidates when no set is available', async () => {
@@ -508,19 +499,18 @@ describe('Dashboard connectivity state', () => {
       },
     })
 
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>('button[aria-label="打当前活动"]')?.click()
-    })
-    await flushDashboard()
+    mountDashboard()
+    await waitForDashboardReady()
+    await userEvent.setup().click(
+      view.container.querySelector<HTMLButtonElement>('button[aria-label="打当前活动"]')!,
+    )
+    await waitFor(() => expect(useStatusStore.getState().message).toContain('逐关'))
 
     expect(uiMocks.setCombatCopilotPrefill).toHaveBeenCalledWith(expect.objectContaining({
       fallback: true,
       activityName: expect.any(String),
     }))
     expect(uiMocks.setActiveTab).toHaveBeenCalledWith('combat')
-    expect(useStatusStore.getState().message).toContain('逐关')
   })
 
   it('surfaces the exact activity preflight blocker as a warning and leaves the active state', async () => {
@@ -534,15 +524,17 @@ describe('Dashboard connectivity state', () => {
       },
     })
 
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>('button[aria-label="打当前活动"]')?.click()
-    })
-    await flushDashboard()
+    mountDashboard()
+    await waitForDashboardReady()
+    await userEvent.setup().click(
+      view.container.querySelector<HTMLButtonElement>('button[aria-label="打当前活动"]')!,
+    )
+    await waitFor(() => expect(
+      view.container.querySelector('[data-dashboard-flow-feedback]')?.textContent,
+    ).toBe(blocker))
 
-    const flow = container.querySelector('.dashboard-flow-glow-shell')
-    const feedback = container.querySelector('[data-dashboard-flow-feedback]')
+    const flow = view.container.querySelector('.dashboard-flow-glow-shell')
+    const feedback = view.container.querySelector('[data-dashboard-flow-feedback]')
     const status = useStatusStore.getState()
     expect(feedback?.textContent).toBe(blocker)
     expect(status.message).toBe(blocker)
@@ -573,23 +565,18 @@ describe('Dashboard drop summary navigation', () => {
     useStatusStore.getState().setActive(false)
     useStatusStore.getState().setBackendStatus('unknown')
     window.localStorage.setItem('onboarding-seen-at', '1')
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
-    act(() => root.render(<Dashboard />))
-    await flushDashboard()
+    mountDashboard()
+    await waitForDashboardReady()
   })
 
   afterEach(() => {
-    act(() => root.unmount())
-    container.remove()
     window.localStorage.removeItem('onboarding-seen-at')
   })
 
-  it('opens the drops tab instead of the default statistics tab', () => {
-    const open = container.querySelector<HTMLButtonElement>('button[aria-label="打开掉落记录"]')
+  it('opens the drops tab instead of the default statistics tab', async () => {
+    const open = view.container.querySelector<HTMLButtonElement>('button[aria-label="打开掉落记录"]')
     expect(open).not.toBeNull()
-    act(() => open?.click())
+    await userEvent.setup().click(open!)
     expect(uiMocks.setStatisticsTab).toHaveBeenCalledWith('drops')
     expect(uiMocks.setActiveTab).toHaveBeenCalledWith('statistics')
   })
@@ -614,22 +601,17 @@ describe('Dashboard onboarding', () => {
     useStatusStore.getState().setActive(false)
     useStatusStore.getState().setBackendStatus('unknown')
     window.localStorage.removeItem('onboarding-seen-at')
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
     useDashboardStore.getState().reset()
     window.localStorage.removeItem('onboarding-seen-at')
     vi.clearAllMocks()
   })
 
   const renderDashboard = async () => {
-    await act(async () => root.render(<Dashboard />))
-    await flushDashboard()
+    mountDashboard()
+    await waitForDashboardReady()
   }
 
   const getOnboardingDialog = () => document.querySelector<HTMLElement>('[role="dialog"]')
@@ -646,9 +628,7 @@ describe('Dashboard onboarding', () => {
     await renderDashboard()
     expect(window.localStorage.getItem('onboarding-seen-at')).toBeNull()
 
-    await act(async () => {
-      getOnboardingDialog()?.querySelector<HTMLButtonElement>('button[aria-label="关闭对话框"]')?.click()
-    })
+    await userEvent.setup().click(within(getOnboardingDialog()!).getByRole('button', { name: '关闭对话框' }))
 
     expect(getOnboardingDialog()).toBeNull()
     const seenAt = Number(window.localStorage.getItem('onboarding-seen-at'))
@@ -657,12 +637,11 @@ describe('Dashboard onboarding', () => {
 
   it('does not auto-show after closing and mounting the dashboard again', async () => {
     await renderDashboard()
-    await act(async () => {
-      getOnboardingDialog()?.querySelector<HTMLButtonElement>('button[aria-label="关闭对话框"]')?.click()
-    })
+    await userEvent.setup().click(within(getOnboardingDialog()!).getByRole('button', { name: '关闭对话框' }))
 
-    await act(async () => root.render(<div>其他页面</div>))
-    await renderDashboard()
+    view.rerender(<div>其他页面</div>)
+    view.rerender(<Dashboard />)
+    await waitForDashboardReady()
 
     expect(getOnboardingDialog()).toBeNull()
   })
@@ -673,9 +652,9 @@ describe('Dashboard onboarding', () => {
 
     expect(getOnboardingDialog()).toBeNull()
 
-    const entry = container.querySelector<HTMLButtonElement>('button[aria-label="新手引导"]')
+    const entry = view.container.querySelector<HTMLButtonElement>('button[aria-label="新手引导"]')
     expect(entry).not.toBeNull()
-    await act(async () => entry?.click())
+    await userEvent.setup().click(entry!)
 
     expect(getOnboardingDialog()).not.toBeNull()
     expect(getOnboardingDialog()?.getAttribute('aria-label')).toBe('新手引导')

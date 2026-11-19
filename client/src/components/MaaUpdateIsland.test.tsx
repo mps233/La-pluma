@@ -1,13 +1,10 @@
 // @vitest-environment jsdom
 
 import { useEffect } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act } from 'react'
 import MaaUpdateIsland from './MaaUpdateIsland'
 import { useMaaUpdateStore } from '@/store/maaUpdateStore'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const mocks = vi.hoisted(() => ({
   start: vi.fn(),
@@ -81,40 +78,26 @@ vi.mock('@/components/islandcn/island-text', () => ({
 vi.mock('@/components/islandcn/spinner', () => ({ Spinner: () => null }))
 vi.mock('@/components/islandcn/ticking-time', () => ({ TickingTime: () => null }))
 
-let container: HTMLDivElement
-let root: Root
-
-const flush = async () => {
-  await act(async () => {
-    await Promise.resolve()
-  })
-}
+afterEach(cleanup)
 
 describe('MaaUpdateIsland', () => {
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
+    cleanup()
     useMaaUpdateStore.setState({ operation: null })
     vi.clearAllMocks()
   })
 
-  const mount = async () => {
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
-    await act(async () => root.render(<MaaUpdateIsland />))
-    await flush()
-  }
+  const mount = () => render(<MaaUpdateIsland />)
 
-  it('stays out of the island when no update runs', async () => {
+  it('stays out of the island when no update runs', () => {
     useMaaUpdateStore.setState({ operation: null })
-    await mount()
+    mount()
     expect(mocks.start).not.toHaveBeenCalled()
   })
 
   it('reports a running update with its own id and label', async () => {
     const token = useMaaUpdateStore.getState().begin('cli', '替换 CLI 可执行文件')
-    await mount()
+    mount()
 
     expect(mocks.start).toHaveBeenCalledOnce()
     expect(mocks.start.mock.calls[0]?.[0]).toMatchObject({
@@ -123,19 +106,21 @@ describe('MaaUpdateIsland', () => {
       label: 'MAA CLI 更新中：替换 CLI 可执行文件',
     })
 
-    useMaaUpdateStore.getState().finish(token, 'success', 'MAA CLI 已更新到 0.7.8')
-    await flush()
+    await act(async () => {
+      useMaaUpdateStore.getState().finish(token, 'success', 'MAA CLI 已更新到 0.7.8')
+    })
 
-    const last = mocks.update.mock.calls.at(-1)?.[1]
-    expect(last?.label).toBe('MAA CLI 已更新：MAA CLI 已更新到 0.7.8')
+    await waitFor(() => {
+      const last = mocks.update.mock.calls.at(-1)?.[1]
+      expect(last?.label).toBe('MAA CLI 已更新：MAA CLI 已更新到 0.7.8')
+    })
   })
 
   it('ends the activity when the operation clears', async () => {
     const token = useMaaUpdateStore.getState().begin('core', '下载 MaaCore 与资源')
-    await mount()
+    mount()
     await act(async () => useMaaUpdateStore.getState().clear(token))
-    await flush()
 
-    expect(mocks.end).toHaveBeenCalledWith('la-pluma-maa-update')
+    await waitFor(() => expect(mocks.end).toHaveBeenCalledWith('la-pluma-maa-update'))
   })
 })

@@ -1,14 +1,11 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { IDLE_RUN_STATUS } from '../types/run'
 import { useRunStore } from '../store/runStore'
 import { useStatusStore } from '../store/statusStore'
 import { useRunStatusMonitor } from './useRunStatusMonitor'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const mocks = vi.hoisted(() => ({
   getCurrentRun: vi.fn(),
@@ -20,13 +17,7 @@ vi.mock('../services/api', () => ({
   },
 }))
 
-function HookHarness() {
-  useRunStatusMonitor()
-  return null
-}
-
-let container: HTMLDivElement
-let root: Root
+const renderMonitor = () => renderHook(() => useRunStatusMonitor())
 
 const flush = async () => {
   await act(async () => {
@@ -45,14 +36,12 @@ describe('useRunStatusMonitor', () => {
     useStatusStore.getState().applyRunStatus(IDLE_RUN_STATUS)
     useRunStore.getState().applyRun(null)
     useRunStore.getState().applyLastRun(null)
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(cleanup)
+
+  afterEach(() => {
+    cleanup()
     vi.useRealTimers()
     useStatusStore.getState().applyRunStatus(IDLE_RUN_STATUS)
     useRunStore.getState().applyRun(null)
@@ -73,7 +62,7 @@ describe('useRunStatusMonitor', () => {
       },
     })
 
-    await act(async () => root.render(<HookHarness />))
+    renderMonitor()
     await flush()
 
     expect(useStatusStore.getState().runStatus).toMatchObject({
@@ -97,7 +86,7 @@ describe('useRunStatusMonitor', () => {
       },
     })
 
-    await act(async () => root.render(<HookHarness />))
+    renderMonitor()
     await flush()
 
     expect(useStatusStore.getState().runStatus).toMatchObject({
@@ -111,7 +100,7 @@ describe('useRunStatusMonitor', () => {
   it('returns to idle when the Run is absent', async () => {
     mocks.getCurrentRun.mockResolvedValue({ success: true, data: { run: null, lastRun: null } })
 
-    await act(async () => root.render(<HookHarness />))
+    renderMonitor()
     await flush()
 
     expect(useStatusStore.getState().runStatus.phase).toBe('idle')
@@ -134,7 +123,7 @@ describe('useRunStatusMonitor', () => {
       },
     })
 
-    await act(async () => root.render(<HookHarness />))
+    renderMonitor()
     await flush()
 
     expect(useStatusStore.getState().runStatus.phase).toBe('idle')
@@ -156,7 +145,7 @@ describe('useRunStatusMonitor', () => {
       })
       .mockResolvedValue({ success: true, data: { run: null, lastRun: null } })
 
-    await act(async () => root.render(<HookHarness />))
+    renderMonitor()
     await flush()
     expect(mocks.getCurrentRun).toHaveBeenCalledTimes(1)
 
@@ -180,7 +169,7 @@ describe('useRunStatusMonitor', () => {
       })
       .mockRejectedValue(new Error('网络错误'))
 
-    await act(async () => root.render(<HookHarness />))
+    renderMonitor()
     await flush()
     expect(useStatusStore.getState().runStatus.isRunning).toBe(true)
 

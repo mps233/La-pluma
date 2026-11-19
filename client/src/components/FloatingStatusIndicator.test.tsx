@@ -1,11 +1,9 @@
 // @vitest-environment jsdom
 
-import { Activity, act, forwardRef, type HTMLAttributes } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { Activity, forwardRef, type HTMLAttributes } from 'react'
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const mocks = vi.hoisted(() => ({
   fetchWithAuth: vi.fn(),
@@ -59,7 +57,8 @@ vi.mock('../utils/statusMessage', () => ({
 
 let host: HTMLDivElement
 let container: HTMLDivElement
-let root: Root
+
+afterEach(cleanup)
 
 describe('FloatingStatusIndicator', () => {
   beforeEach(() => {
@@ -78,24 +77,24 @@ describe('FloatingStatusIndicator', () => {
     container = document.createElement('div')
     host.appendChild(container)
     document.body.appendChild(host)
-    root = createRoot(container)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
+  afterEach(() => {
+    cleanup()
     host.remove()
     vi.restoreAllMocks()
   })
 
   it('reuses the anchored status pill without creating a dismissible overlay', async () => {
-    await act(async () => root.render(
+    render(
       <>
         <FloatingStatusIndicator />
         <FloatingStatusIndicator />
       </>,
-    ))
+      { container },
+    )
+    await waitFor(() => expect(mocks.fetchWithAuth).toHaveBeenCalledTimes(1))
     await act(async () => { await Promise.resolve() })
-    expect(mocks.fetchWithAuth).toHaveBeenCalledTimes(1)
 
     const indicator = container.querySelector<HTMLElement>('.floating-status-indicator')
     const visibleText = container.querySelector<HTMLElement>('.floating-status-text')
@@ -120,7 +119,7 @@ describe('FloatingStatusIndicator', () => {
     mocks.status.message = ''
     mocks.status.messageType = null
 
-    await act(async () => root.render(<FloatingStatusIndicator />))
+    render(<FloatingStatusIndicator />, { container })
     await act(async () => { await Promise.resolve() })
 
     const dot = container.querySelector<HTMLElement>('.floating-status-dot')
@@ -138,7 +137,7 @@ describe('FloatingStatusIndicator', () => {
       detail: '正在执行: 理智作战',
     }
 
-    await act(async () => root.render(<FloatingStatusIndicator />))
+    render(<FloatingStatusIndicator />, { container })
     await act(async () => { await Promise.resolve() })
 
     expect(container.querySelector<HTMLElement>('.floating-status-text')?.textContent).toBe('正在执行: 理智作战')
@@ -146,7 +145,7 @@ describe('FloatingStatusIndicator', () => {
   })
 
   it('floats a non-ready status after its docked slot scrolls under the navbar', async () => {
-    await act(async () => root.render(<FloatingStatusIndicator />))
+    render(<FloatingStatusIndicator />, { container })
     await act(async () => { await Promise.resolve() })
 
     const anchor = container.querySelector<HTMLElement>('.floating-status-anchor')
@@ -164,7 +163,8 @@ describe('FloatingStatusIndicator', () => {
       left: 0,
       toJSON: () => ({}),
     } as DOMRect)
-    await act(async () => { host.dispatchEvent(new Event('scroll')) })
+    fireEvent.scroll(host)
+    await act(async () => { await Promise.resolve() })
     expect(container.querySelector('.floating-status-overlay')).toBeNull()
 
     vi.mocked(anchor!.getBoundingClientRect).mockReturnValue({
@@ -179,7 +179,8 @@ describe('FloatingStatusIndicator', () => {
       toJSON: () => ({}),
     } as DOMRect)
 
-    await act(async () => { host.dispatchEvent(new Event('scroll')) })
+    fireEvent.scroll(host)
+    await act(async () => { await Promise.resolve() })
 
     const overlay = container.querySelector<HTMLElement>('.floating-status-overlay')
     expect(overlay).not.toBeNull()
@@ -198,7 +199,8 @@ describe('FloatingStatusIndicator', () => {
       left: 0,
       toJSON: () => ({}),
     } as DOMRect)
-    await act(async () => { host.dispatchEvent(new Event('scroll')) })
+    fireEvent.scroll(host)
+    await act(async () => { await Promise.resolve() })
 
     expect(container.querySelector('.floating-status-overlay')).toBeNull()
   })
@@ -207,7 +209,7 @@ describe('FloatingStatusIndicator', () => {
     mocks.status.message = ''
     mocks.status.messageType = null
 
-    await act(async () => root.render(<FloatingStatusIndicator />))
+    render(<FloatingStatusIndicator />, { container })
     await act(async () => { await Promise.resolve() })
 
     const anchor = container.querySelector<HTMLElement>('.floating-status-anchor')!
@@ -223,24 +225,27 @@ describe('FloatingStatusIndicator', () => {
       toJSON: () => ({}),
     } as DOMRect)
 
-    await act(async () => { host.dispatchEvent(new Event('scroll')) })
+    fireEvent.scroll(host)
+    await act(async () => { await Promise.resolve() })
 
     expect(container.querySelector('.floating-status-overlay')).toBeNull()
   })
 
   it('does not float from a zero-sized anchor in an inactive workspace', async () => {
-    await act(async () => root.render(<FloatingStatusIndicator />))
+    render(<FloatingStatusIndicator />, { container })
     await act(async () => { await Promise.resolve() })
 
-    await act(async () => { host.dispatchEvent(new Event('scroll')) })
+    fireEvent.scroll(host)
+    await act(async () => { await Promise.resolve() })
 
     expect(container.querySelector('.floating-status-overlay')).toBeNull()
   })
 
   it('clears a stale floating copy when a hidden workspace is shown again', async () => {
-    await act(async () => root.render(
+    const { rerender } = render(
       <Activity mode="visible"><FloatingStatusIndicator /></Activity>,
-    ))
+      { container },
+    )
     await act(async () => { await Promise.resolve() })
 
     const anchor = container.querySelector<HTMLElement>('.floating-status-anchor')!
@@ -255,12 +260,11 @@ describe('FloatingStatusIndicator', () => {
       left: 0,
       toJSON: () => ({}),
     } as DOMRect)
-    await act(async () => { host.dispatchEvent(new Event('scroll')) })
+    fireEvent.scroll(host)
+    await act(async () => { await Promise.resolve() })
     expect(container.querySelector('.floating-status-overlay')).not.toBeNull()
 
-    await act(async () => root.render(
-      <Activity mode="hidden"><FloatingStatusIndicator /></Activity>,
-    ))
+    rerender(<Activity mode="hidden"><FloatingStatusIndicator /></Activity>)
     vi.mocked(anchor.getBoundingClientRect).mockReturnValue({
       x: 0,
       y: 96,
@@ -272,10 +276,9 @@ describe('FloatingStatusIndicator', () => {
       left: 0,
       toJSON: () => ({}),
     } as DOMRect)
-    await act(async () => root.render(
-      <Activity mode="visible"><FloatingStatusIndicator /></Activity>,
-    ))
-    await act(async () => { host.dispatchEvent(new Event('scroll')) })
+    rerender(<Activity mode="visible"><FloatingStatusIndicator /></Activity>)
+    fireEvent.scroll(host)
+    await act(async () => { await Promise.resolve() })
 
     expect(container.querySelector('.floating-status-overlay')).toBeNull()
   })

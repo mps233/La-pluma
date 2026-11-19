@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
 
-import { act, type ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import type { ReactNode } from 'react'
+import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TrainingOperator, TrainingQueueItem, TrainingSettings } from '@/types/components'
 import OperatorTraining from './OperatorTraining'
 import { installMobileMatchMedia, swipe } from '../test/swipe'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const mocks = vi.hoisted(() => ({
   getOperatorList: vi.fn(),
@@ -94,8 +93,9 @@ vi.mock('../store/statusStore', () => {
 
 vi.mock('./FloatingStatusIndicator', () => ({ default: () => null }))
 
-let container: HTMLDivElement
-let root: Root
+let container: HTMLElement
+
+afterEach(cleanup)
 
 const settings: TrainingSettings = {
   useMedicine: 0,
@@ -144,18 +144,11 @@ const flush = async () => {
   })
 }
 
-const click = async (element: HTMLElement) => {
-  await act(async () => {
-    element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  })
-  await flush()
-}
-
 const renderComponent = async () => {
-  await act(async () => {
-    root.render(<OperatorTraining />)
-  })
+  const view = render(<OperatorTraining />)
+  container = view.container
   await flush()
+  return view
 }
 
 const switchByLabel = (label: string) =>
@@ -213,14 +206,10 @@ describe('OperatorTraining async interactions', () => {
     mocks.generateTrainingPlan.mockReset()
     mocks.applyTrainingPlan.mockReset()
     mocks.setMessage.mockReset()
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
+    cleanup()
     vi.restoreAllMocks()
   })
 
@@ -238,11 +227,14 @@ describe('OperatorTraining async interactions', () => {
     expect(container.querySelector('.app-page-header.is-mobile-inline')).not.toBeNull()
     expect(container.querySelector('.training-operator-column')).not.toBeNull()
     expect(container.querySelector('.training-support-column')).not.toBeNull()
-    expect(container.querySelector('.training-current-card[data-smooth-corners="true"]')).not.toBeNull()
+    await waitFor(() => {
+      expect(container.querySelector('.training-current-card[data-smooth-corners="true"]')).not.toBeNull()
+    })
     expect(container.querySelector('.training-settings-panel[data-smooth-corners="true"]')).not.toBeNull()
   })
 
   it('shows retryable errors instead of empty states when initial reads fail', async () => {
+    const user = userEvent.setup()
     mocks.getOperatorList.mockRejectedValueOnce(new Error('干员服务暂不可用'))
     mocks.getTrainingQueue
       .mockRejectedValueOnce(new Error('队列服务暂不可用'))
@@ -259,12 +251,11 @@ describe('OperatorTraining async interactions', () => {
 
     const queueAlert = Array.from(container.querySelectorAll<HTMLElement>('[role="alert"]'))
       .find(alert => alert.textContent?.includes('队列服务暂不可用'))
-    const queueRetry = queueAlert?.querySelector<HTMLButtonElement>('button')
-    expect(queueRetry).not.toBeNull()
-    await click(queueRetry!)
+    const queueRetry = within(queueAlert!).getByRole('button')
+    await user.click(queueRetry)
 
-    expect(mocks.getTrainingQueue).toHaveBeenCalledTimes(2)
-    expect(document.body.textContent).not.toContain('队列服务暂不可用')
+    await waitFor(() => expect(mocks.getTrainingQueue).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(document.body.textContent).not.toContain('队列服务暂不可用'))
     expect(document.body.textContent).toContain('养成队列还是空的')
   })
 
@@ -310,14 +301,14 @@ describe('OperatorTraining async interactions', () => {
 
     const allButton = buttons.find(button => button.textContent?.includes('全部'))
     expect(allButton).toBeDefined()
-    await click(allButton!)
+    // The segmented control selects through its native click listener; jsdom's
+    // zero-size layout makes userEvent's pointer simulation suppress it.
+    fireEvent.click(allButton!)
 
-    expect(allButton?.getAttribute('aria-selected')).toBe('true')
+    await waitFor(() => expect(allButton?.getAttribute('aria-selected')).toBe('true'))
     expect(buttons[0]?.getAttribute('aria-selected')).toBe('false')
 
-    await act(async () => {
-      allButton?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
-    })
+    fireEvent.keyDown(allButton!, { key: 'Home', bubbles: true })
     await flush()
 
     expect(buttons[0]?.getAttribute('aria-selected')).toBe('true')
@@ -337,12 +328,13 @@ describe('OperatorTraining async interactions', () => {
     await swipe(container.querySelector<HTMLElement>('.training-operator-column')!, 240, 200, 120, 204)
     await flush()
 
-    expect(buttons[1]?.getAttribute('aria-selected')).toBe('true')
+    await waitFor(() => expect(buttons[1]?.getAttribute('aria-selected')).toBe('true'))
     expect(container.querySelector('.swipe-mode-slide:not([aria-hidden="true"])')?.textContent)
       .toContain('还没有已拥有干员')
   })
 
   it('serializes settings writes so an older response cannot overwrite the latest value on disk', async () => {
+    const user = userEvent.setup()
     const firstRequest = deferred<{ success: boolean; data: TrainingSettings }>()
     mocks.updateTrainingSettings
       .mockReturnValueOnce(firstRequest.promise)
@@ -352,19 +344,18 @@ describe('OperatorTraining async interactions', () => {
     const autoSwitch = switchByLabel('自动切换')
     expect(autoSwitch?.getAttribute('aria-checked')).toBe('true')
 
-    await click(autoSwitch!)
-    expect(autoSwitch?.getAttribute('aria-checked')).toBe('false')
-    await click(autoSwitch!)
-    expect(mocks.updateTrainingSettings).toHaveBeenCalledOnce()
+    await user.click(autoSwitch!)
+    await waitFor(() => expect(autoSwitch?.getAttribute('aria-checked')).toBe('false'))
+    await user.click(autoSwitch!)
+    await waitFor(() => expect(mocks.updateTrainingSettings).toHaveBeenCalledOnce())
     expect(autoSwitch?.getAttribute('aria-checked')).toBe('true')
 
     await act(async () => firstRequest.resolve({
       success: true,
       data: { ...settings, autoSwitch: false },
     }))
-    await flush()
 
-    expect(mocks.updateTrainingSettings).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(mocks.updateTrainingSettings).toHaveBeenCalledTimes(2))
     expect(mocks.updateTrainingSettings).toHaveBeenLastCalledWith(settings)
     expect(autoSwitch?.getAttribute('aria-checked')).toBe('true')
   })
@@ -382,6 +373,10 @@ describe('OperatorTraining async interactions', () => {
       .find(button => button.textContent?.trim() === '添加') as HTMLButtonElement | undefined
     expect(addButton).toBeDefined()
 
+    await waitFor(() => expect(addButton?.disabled).toBe(false))
+
+    // Both clicks land before React commits the pending state, matching a user
+    // double-clicking the add action.
     await act(async () => {
       addButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       addButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -394,6 +389,7 @@ describe('OperatorTraining async interactions', () => {
   })
 
   it('restores a removed middle queue item at its original index through the undo action', async () => {
+    const user = userEvent.setup()
     const current = queueItem('char_current', '阿米娅')
     const removed = queueItem('char_removed', '能天使')
     const last = queueItem('char_last', '艾雅法拉')
@@ -418,20 +414,20 @@ describe('OperatorTraining async interactions', () => {
     await renderComponent()
     const removeButton = document.querySelector<HTMLButtonElement>('button[aria-label="移除能天使"]')
     expect(removeButton).not.toBeNull()
-    await click(removeButton!)
+    await user.click(removeButton!)
 
-    expect(mocks.removeFromTrainingQueue).toHaveBeenCalledWith('char_removed')
-    expect(document.body.textContent).toContain('已移除 能天使')
+    await waitFor(() => expect(mocks.removeFromTrainingQueue).toHaveBeenCalledWith('char_removed'))
+    await waitFor(() => expect(document.body.textContent).toContain('已移除 能天使'))
     const undoButton = Array.from(document.querySelectorAll('button'))
       .find(button => button.textContent?.trim() === '撤销') as HTMLButtonElement | undefined
     expect(undoButton).toBeDefined()
-    await click(undoButton!)
+    await user.click(undoButton!)
 
-    expect(mocks.addToTrainingQueue).toHaveBeenCalledWith({
+    await waitFor(() => expect(mocks.addToTrainingQueue).toHaveBeenCalledWith({
       operatorId: 'char_removed',
       currentElite: 1,
       targetElite: 2,
-    })
+    }))
     expect(mocks.updateTrainingQueueOrder).toHaveBeenCalledWith([
       'char_current',
       'char_removed',
@@ -442,11 +438,12 @@ describe('OperatorTraining async interactions', () => {
       'char_removed',
       'char_last',
     ])
-    expect(document.body.textContent).not.toContain('已移除 能天使')
+    await waitFor(() => expect(document.body.textContent).not.toContain('已移除 能天使'))
     expect(document.body.textContent).toContain('能天使')
   })
 
   it('ignores a slow initial queue response after a newer post-add refresh', async () => {
+    const user = userEvent.setup()
     const initialRequest = deferred<{
       success: boolean
       data: { queue: TrainingQueueItem[]; settings: TrainingSettings }
@@ -465,9 +462,10 @@ describe('OperatorTraining async interactions', () => {
     await renderComponent()
     const addButton = Array.from(document.querySelectorAll('button'))
       .find(button => button.textContent?.trim() === '添加') as HTMLButtonElement | undefined
-    await click(addButton!)
+    await waitFor(() => expect(addButton?.disabled).toBe(false))
+    await user.click(addButton!)
 
-    expect(document.querySelector('button[aria-label="移除能天使"]')).not.toBeNull()
+    await waitFor(() => expect(document.querySelector('button[aria-label="移除能天使"]')).not.toBeNull())
     await act(async () => initialRequest.resolve({
       success: true,
       data: { queue: [], settings: { ...settings, autoSwitch: false } },
@@ -479,6 +477,7 @@ describe('OperatorTraining async interactions', () => {
   })
 
   it('keeps the local queue truthful and warns when a successful add cannot be refreshed', async () => {
+    const user = userEvent.setup()
     mocks.getOperatorList.mockResolvedValue({
       success: true,
       data: { operators: [operator('char_added', '能天使')] },
@@ -491,9 +490,10 @@ describe('OperatorTraining async interactions', () => {
     await renderComponent()
     const addButton = Array.from(document.querySelectorAll('button'))
       .find(button => button.textContent?.trim() === '添加') as HTMLButtonElement | undefined
-    await click(addButton!)
+    await waitFor(() => expect(addButton?.disabled).toBe(false))
+    await user.click(addButton!)
 
-    expect(document.body.textContent).toContain('能天使')
+    await waitFor(() => expect(document.body.textContent).toContain('能天使'))
     expect(mocks.setMessage).toHaveBeenCalledWith(
       '能天使 已添加，但队列刷新失败，请稍后重试',
       'warning',
@@ -510,16 +510,19 @@ describe('OperatorTraining async interactions', () => {
     expect(buttons[0]?.getAttribute('aria-selected')).toBe('true')
     expect(container.textContent).toContain('添加干员')
 
-    await click(buttons[1]!)
-    expect(buttons[1]?.getAttribute('aria-selected')).toBe('true')
+    // The segmented control selects through its native click listener; jsdom's
+    // zero-size layout makes userEvent's pointer simulation suppress it.
+    fireEvent.click(buttons[1]!)
+    await waitFor(() => expect(buttons[1]?.getAttribute('aria-selected')).toBe('true'))
     expect(container.textContent).toContain('添加专精目标')
     expect(container.textContent).toContain('自动专精')
 
-    await click(buttons[0]!)
-    expect(container.textContent).toContain('添加干员')
+    fireEvent.click(buttons[0]!)
+    await waitFor(() => expect(container.textContent).toContain('添加干员'))
   })
 
   it('removes the local item and warns when a successful delete cannot be refreshed', async () => {
+    const user = userEvent.setup()
     const current = queueItem('char_current', '阿米娅')
     const removed = queueItem('char_removed', '能天使')
     mocks.getTrainingQueue
@@ -528,9 +531,12 @@ describe('OperatorTraining async interactions', () => {
     mocks.removeFromTrainingQueue.mockResolvedValue({ success: true })
 
     await renderComponent()
-    await click(document.querySelector<HTMLButtonElement>('button[aria-label="移除能天使"]')!)
+    await waitFor(() => expect(document.querySelector('button[aria-label="移除能天使"]')).not.toBeNull())
+    const removeButton = document.querySelector<HTMLButtonElement>('button[aria-label="移除能天使"]')
+    expect(removeButton).not.toBeNull()
+    await user.click(removeButton!)
 
-    expect(document.querySelector('button[aria-label="移除能天使"]')).toBeNull()
+    await waitFor(() => expect(document.querySelector('button[aria-label="移除能天使"]')).toBeNull())
     expect(document.body.textContent).toContain('已移除 能天使')
     expect(mocks.setMessage).toHaveBeenCalledWith(
       '已移除，但队列刷新失败，请稍后重试',

@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
 
-import { act, type ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import type { ReactNode } from 'react'
+import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import LogViewer from './LogViewer'
 import { installMobileMatchMedia, swipe } from '../test/swipe'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const mocks = vi.hoisted(() => ({
   getRealtimeLogs: vi.fn(),
@@ -35,25 +34,14 @@ vi.mock('../services/api', () => ({
 
 vi.mock('./FloatingStatusIndicator', () => ({ default: () => null }))
 
-let container: HTMLDivElement
-let root: Root
+let container: HTMLElement
 
-const flush = async () => {
-  await act(async () => {
-    await Promise.resolve()
-    await Promise.resolve()
-    await Promise.resolve()
-  })
-}
+afterEach(cleanup)
 
 const renderComponent = async () => {
-  await act(async () => root.render(<LogViewer />))
-  await flush()
-}
-
-const click = async (element: HTMLElement) => {
-  await act(async () => element.click())
-  await flush()
+  const view = render(<LogViewer />)
+  container = view.container
+  return view
 }
 
 describe('LogViewer recovery and controls', () => {
@@ -72,18 +60,15 @@ describe('LogViewer recovery and controls', () => {
     mocks.getLogFiles.mockReset().mockResolvedValue({ success: true, data: [] })
     mocks.readLogFile.mockReset()
     mocks.cleanupLogs.mockReset()
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
+    cleanup()
     vi.restoreAllMocks()
   })
 
   it('shows a retry action when realtime logs fail and replaces the error after recovery', async () => {
+    const user = userEvent.setup()
     mocks.getRealtimeLogs
       .mockResolvedValueOnce({ success: false, message: '实时日志暂不可用' })
       .mockResolvedValueOnce({
@@ -92,6 +77,7 @@ describe('LogViewer recovery and controls', () => {
       })
 
     await renderComponent()
+    await waitFor(() => expect(container.querySelector('.log-console-state.is-error')).not.toBeNull())
 
     expect(container.querySelector('.log-viewer')?.classList.contains('ios-borderless-cards')).toBe(true)
     expect(container.querySelector('h1')?.textContent).toBe('日志')
@@ -99,12 +85,11 @@ describe('LogViewer recovery and controls', () => {
     const error = container.querySelector<HTMLElement>('.log-console-state.is-error')
     expect(error?.textContent).toContain('实时日志暂不可用')
     expect(container.textContent).not.toContain('暂无实时日志，等待任务执行')
-    const realtimeRetry = error?.querySelector<HTMLButtonElement>('button')
-    expect(realtimeRetry).not.toBeNull()
-    await click(realtimeRetry!)
+    const realtimeRetry = within(error!).getByRole('button')
+    await user.click(realtimeRetry)
 
-    expect(mocks.getRealtimeLogs).toHaveBeenCalledTimes(2)
-    expect(container.querySelector('.log-console-state.is-error')).toBeNull()
+    await waitFor(() => expect(mocks.getRealtimeLogs).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(container.querySelector('.log-console-state.is-error')).toBeNull())
     expect(container.textContent).toContain('TaskChainStart')
     const modeShell = container.querySelector('.log-mode-shell')
     expect(modeShell?.querySelector('.lg-track[role="tablist"]')?.getAttribute('aria-label')).toBe('日志内容模式')
@@ -116,14 +101,13 @@ describe('LogViewer recovery and controls', () => {
     expect(modeTabs[0]?.getAttribute('aria-selected')).toBe('true')
     expect(modeTabs.every(button => button.getAttribute('role') === 'tab')).toBe(true)
     expect(modeTabs.every(button => button.getAttribute('aria-controls') === 'log-console-panel')).toBe(true)
-    await click(modeTabs[1]!)
-    expect(modeTabs[1]?.getAttribute('aria-selected')).toBe('true')
+    // The segmented control selects through its native click listener; jsdom's
+    // zero-size layout makes userEvent's pointer simulation suppress it.
+    fireEvent.click(modeTabs[1]!)
+    await waitFor(() => expect(modeTabs[1]?.getAttribute('aria-selected')).toBe('true'))
 
-    await act(async () => {
-      modeTabs[1]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
-    })
-    await flush()
-    expect(modeTabs[0]?.getAttribute('aria-selected')).toBe('true')
+    fireEvent.keyDown(modeTabs[1]!, { key: 'Home', bubbles: true })
+    await waitFor(() => expect(modeTabs[0]?.getAttribute('aria-selected')).toBe('true'))
     expect(document.activeElement).toBe(modeTabs[0])
 
     const switches = Array.from(
@@ -137,12 +121,14 @@ describe('LogViewer recovery and controls', () => {
   })
 
   it('pauses following when the user scrolls up and offers a jump to latest', async () => {
+    const user = userEvent.setup()
     mocks.getRealtimeLogs.mockResolvedValue({
       success: true,
       data: [{ time: '2026-07-22T10:11:12.000Z', level: 'INFO', message: '滚动测试日志' }],
     })
 
     await renderComponent()
+    await waitFor(() => expect(container.querySelector('.log-row')?.textContent).toContain('滚动测试日志'))
 
     const consoleElement = container.querySelector<HTMLElement>('.log-console')
     expect(consoleElement).not.toBeNull()
@@ -150,10 +136,8 @@ describe('LogViewer recovery and controls', () => {
     Object.defineProperty(consoleElement, 'clientHeight', { configurable: true, value: 400 })
     consoleElement!.scrollTop = 200
 
-    await act(async () => {
-      consoleElement!.dispatchEvent(new Event('scroll'))
-    })
-    await flush()
+    fireEvent.scroll(consoleElement!)
+    await waitFor(() => expect(container.querySelector('.log-console-jump button')).not.toBeNull())
 
     const jump = container.querySelector<HTMLButtonElement>('.log-console-jump button')
     const autoScrollSwitch = container.querySelector<HTMLButtonElement>('[role="switch"][aria-label="自动滚动"]')
@@ -161,10 +145,10 @@ describe('LogViewer recovery and controls', () => {
     expect(container.querySelector('.log-console-fade.is-bottom')?.classList.contains('is-visible')).toBe(true)
     expect(autoScrollSwitch?.getAttribute('aria-checked')).toBe('false')
 
-    await click(jump!)
+    await user.click(jump!)
 
     expect(consoleElement!.scrollTop).toBe(1000)
-    expect(container.querySelector('.log-console-jump')).toBeNull()
+    await waitFor(() => expect(container.querySelector('.log-console-jump')).toBeNull())
     expect(autoScrollSwitch?.getAttribute('aria-checked')).toBe('true')
   })
 
@@ -176,12 +160,11 @@ describe('LogViewer recovery and controls', () => {
     const modeTabs = Array.from(
       container.querySelectorAll<HTMLButtonElement>('.log-mode-shell .lg-track:not([data-lg-copy]) > .lg-track__item'),
     )
-    expect(modeTabs[0]?.getAttribute('aria-selected')).toBe('true')
+    await waitFor(() => expect(modeTabs[0]?.getAttribute('aria-selected')).toBe('true'))
 
     await swipe(container.querySelector<HTMLElement>('.log-viewer')!, 240, 200, 120, 204)
-    await flush()
 
-    expect(modeTabs[1]?.getAttribute('aria-selected')).toBe('true')
+    await waitFor(() => expect(modeTabs[1]?.getAttribute('aria-selected')).toBe('true'))
   })
 
   it('keeps existing realtime rows visible when a background refresh fails', async () => {
@@ -193,17 +176,17 @@ describe('LogViewer recovery and controls', () => {
       .mockResolvedValueOnce({ success: false, message: '后台刷新暂不可用' })
 
     await renderComponent()
-    expect(container.querySelector('.log-row')?.textContent).toContain('保留这条实时日志')
+    await waitFor(() => expect(container.querySelector('.log-row')?.textContent).toContain('保留这条实时日志'))
 
-    await act(async () => document.dispatchEvent(new Event('visibilitychange')))
-    await flush()
+    fireEvent(document, new Event('visibilitychange'))
 
-    expect(mocks.getRealtimeLogs).toHaveBeenCalledTimes(2)
-    expect(container.querySelector('.log-console-state.is-error')?.textContent).toContain('后台刷新暂不可用')
+    await waitFor(() => expect(mocks.getRealtimeLogs).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(container.querySelector('.log-console-state.is-error')?.textContent).toContain('后台刷新暂不可用'))
     expect(container.querySelector('.log-row')?.textContent).toContain('保留这条实时日志')
   })
 
   it('offers retry for both the history list and a selected history file', async () => {
+    const user = userEvent.setup()
     const historyFile = {
       name: 'maa.log',
       path: '/logs/maa.log',
@@ -218,27 +201,28 @@ describe('LogViewer recovery and controls', () => {
       .mockResolvedValueOnce({ success: true, data: { content: '[2026-07-22 10:11:12][INFO] recovered' } })
 
     await renderComponent()
+    await waitFor(() => expect(container.querySelector('.log-history-state.is-error')).not.toBeNull())
+
     const historyError = container.querySelector<HTMLElement>('.log-history-state.is-error')
     expect(historyError?.textContent).toContain('历史列表读取失败')
     expect(container.textContent).not.toContain('暂无历史日志文件')
-    const historyRetry = historyError?.querySelector<HTMLButtonElement>('button')
-    expect(historyRetry).not.toBeNull()
-    await click(historyRetry!)
+    const historyRetry = within(historyError!).getByRole('button')
+    await user.click(historyRetry)
 
+    await waitFor(() => expect(container.querySelector('.log-history-row')?.textContent).toContain('maa.log'))
     const historyRow = container.querySelector<HTMLButtonElement>('.log-history-row')
-    expect(historyRow?.textContent).toContain('maa.log')
-    await click(historyRow!)
-    expect(historyRow?.getAttribute('aria-current')).toBe('true')
+    await user.click(historyRow!)
+    await waitFor(() => expect(historyRow?.getAttribute('aria-current')).toBe('true'))
     expect(container.querySelector('.log-console-content .surface-soft')?.textContent).toContain('maa.log')
 
+    await waitFor(() => expect(container.querySelector('.log-console-state.is-error')).not.toBeNull())
     const fileError = container.querySelector<HTMLElement>('.log-console-state.is-error')
     expect(fileError?.textContent).toContain('日志文件读取失败')
-    const fileRetry = fileError?.querySelector<HTMLButtonElement>('button')
-    expect(fileRetry).not.toBeNull()
-    await click(fileRetry!)
+    const fileRetry = within(fileError!).getByRole('button')
+    await user.click(fileRetry)
 
-    expect(mocks.readLogFile).toHaveBeenCalledTimes(2)
-    expect(container.querySelector('.log-console-state.is-error')).toBeNull()
+    await waitFor(() => expect(mocks.readLogFile).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(container.querySelector('.log-console-state.is-error')).toBeNull())
     expect(container.textContent).toContain('recovered')
   })
 })

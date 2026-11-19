@@ -1,65 +1,37 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AccessTokenGate from './AccessTokenGate'
 import { ACCESS_TOKEN_STORAGE_KEY, AUTH_REQUIRED_EVENT } from '@/utils/accessToken'
 
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+beforeEach(() => {
+  localStorage.clear()
+})
 
-let container: HTMLDivElement
-let root: Root
-
-const flush = async () => {
-  await act(async () => {
-    await Promise.resolve()
-  })
-}
-
-const setInputValue = async (input: HTMLInputElement, value: string) => {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-  await act(async () => {
-    setter?.call(input, value)
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-  })
-  await flush()
-}
+afterEach(cleanup)
 
 describe('AccessTokenGate', () => {
-  beforeEach(async () => {
-    localStorage.clear()
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
-    await act(async () => root.render(<AccessTokenGate />))
-    await flush()
-  })
-
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
-  })
-
   it('opens on a 401 signal and saves the entered token', async () => {
-    await act(async () => {
-      window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT))
-    })
-    await flush()
+    render(<AccessTokenGate />)
 
-    const dialog = document.querySelector('[role="alertdialog"]')
-    expect(dialog?.textContent).toContain('需要访问令牌')
+    fireEvent(window, new Event(AUTH_REQUIRED_EVENT))
 
-    const input = document.querySelector<HTMLInputElement>('input[placeholder="请输入访问令牌"]')!
-    await setInputValue(input, 'phone-token')
-    const save = Array.from(document.querySelectorAll('button'))
-      .find(item => item.textContent?.trim() === '保存并重试')
+    const dialog = screen.getByRole('alertdialog', { name: '需要访问令牌' })
+    expect(dialog.textContent).toContain('需要访问令牌')
+
+    const input = screen.getByLabelText('访问令牌') as HTMLInputElement
+    const user = userEvent.setup()
+    await user.type(input, 'phone-token')
+
+    const save = screen.getByRole('button', { name: '保存并重试' })
     const reload = vi.fn()
     Object.defineProperty(window, 'location', {
       configurable: true,
       value: { ...window.location, reload },
     })
-    await act(async () => save?.click())
+    await user.click(save)
 
     expect(localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)).toBe('phone-token')
   })

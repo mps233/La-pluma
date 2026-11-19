@@ -227,6 +227,23 @@
 
 
 
+.drop-records-chart {
+  margin: 0 0 var(--app-space-4);
+}
+
+.drop-records-chart-canvas {
+  height: 280px;
+  min-width: 0;
+}
+
+.drop-records-chart .recharts-text {
+  fill: var(--app-text-secondary);
+}
+
+.drop-records-chart .recharts-bar-rectangle path {
+  fill: var(--app-accent);
+}
+
 .drop-records-item-row,
   .drop-records-stage-row {
     border-radius: var(--app-radius-lg);
@@ -481,6 +498,13 @@
   min-width: 0;
   flex-direction: column;
   gap: var(--app-space-2);
+}
+
+/* The non-virtual fallback can skip off-screen layout work. The virtual grid
+   is already windowed by react-virtuoso, so it must not add containment. */
+.depot-item-grid-static .depot-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 6.5rem;
 }
 
 .depot-item-icon {

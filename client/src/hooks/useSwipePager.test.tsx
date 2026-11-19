@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 
-import { act, useState } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { useState } from 'react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useSwipePager } from './useSwipePager'
 
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+afterEach(cleanup)
 
 function Harness() {
   const [index, setIndex] = useState(0)
@@ -33,15 +33,10 @@ function touchEvent(type: string, x: number, y: number, target: Element): Event 
   return event
 }
 
-async function swipe(element: Element, fromX: number, fromY: number, toX: number, toY: number) {
-  await act(async () => {
-    element.dispatchEvent(touchEvent('touchstart', fromX, fromY, element))
-    element.dispatchEvent(touchEvent('touchend', toX, toY, element))
-  })
+function swipe(element: Element, fromX: number, fromY: number, toX: number, toY: number) {
+  fireEvent(element, touchEvent('touchstart', fromX, fromY, element))
+  fireEvent(element, touchEvent('touchend', toX, toY, element))
 }
-
-let container: HTMLDivElement
-let root: Root
 
 function installMobileMatchMedia(matches = true) {
   window.matchMedia = vi.fn((query: string) => ({
@@ -57,58 +52,63 @@ function installMobileMatchMedia(matches = true) {
 }
 
 describe('useSwipePager', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     installMobileMatchMedia()
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
-    await act(async () => root.render(<Harness />))
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  const pager = () => container.querySelector<HTMLElement>('[data-testid="pager"]')!
-  const index = () => container.querySelector<HTMLElement>('[data-testid="index"]')?.textContent
+  const renderPager = () => render(<Harness />)
+  const pager = () => screen.getByTestId('pager')
+  const index = () => screen.getByTestId('index').textContent
 
-  it('advances on a left swipe and goes back on a right swipe', async () => {
-    await swipe(pager(), 200, 200, 100, 205)
+  it('advances on a left swipe and goes back on a right swipe', () => {
+    renderPager()
+
+    swipe(pager(), 200, 200, 100, 205)
     expect(index()).toBe('1')
 
-    await swipe(pager(), 100, 200, 180, 200)
+    swipe(pager(), 100, 200, 180, 200)
     expect(index()).toBe('0')
   })
 
-  it('ignores mostly vertical drags', async () => {
-    await swipe(pager(), 200, 200, 180, 300)
+  it('ignores mostly vertical drags', () => {
+    renderPager()
+
+    swipe(pager(), 200, 200, 180, 300)
     expect(index()).toBe('0')
   })
 
-  it('ignores swipes that start on an interactive control', async () => {
-    const button = container.querySelector<HTMLElement>('[data-testid="button"]')!
-    await swipe(button, 200, 200, 100, 200)
+  it('ignores swipes that start on an interactive control', () => {
+    renderPager()
+
+    const button = screen.getByTestId('button')
+    swipe(button, 200, 200, 100, 200)
     expect(index()).toBe('0')
   })
 
-  it('clamps at the last page', async () => {
-    await swipe(pager(), 200, 200, 100, 200)
-    await swipe(pager(), 200, 200, 100, 200)
+  it('clamps at the last page', () => {
+    renderPager()
+
+    swipe(pager(), 200, 200, 100, 200)
+    swipe(pager(), 200, 200, 100, 200)
     expect(index()).toBe('2')
 
-    await swipe(pager(), 200, 200, 100, 200)
+    swipe(pager(), 200, 200, 100, 200)
     expect(index()).toBe('2')
   })
 
-  it('stays idle outside mobile viewports', async () => {
+  it('stays idle outside mobile viewports', () => {
+    renderPager()
+
     installMobileMatchMedia(false)
-    await swipe(pager(), 200, 200, 100, 200)
+    swipe(pager(), 200, 200, 100, 200)
     expect(index()).toBe('0')
   })
 
-  it('ignores gestures that start on the extra ignore selector', async () => {
+  it('ignores gestures that start on the extra ignore selector', () => {
     function Probe() {
       const [index, setIndex] = useState(0)
       const handlers = useSwipePager<HTMLDivElement>({
@@ -126,17 +126,17 @@ describe('useSwipePager', () => {
       )
     }
 
-    await act(async () => root.render(<Probe />))
-    const ignored = container.querySelector<HTMLElement>('[data-testid="ignored"]')!
+    render(<Probe />)
+    const ignored = screen.getByTestId('ignored')
 
-    await swipe(ignored, 200, 200, 100, 200)
-    expect(container.querySelector<HTMLElement>('[data-testid="probe-index"]')?.textContent).toBe('0')
+    swipe(ignored, 200, 200, 100, 200)
+    expect(screen.getByTestId('probe-index').textContent).toBe('0')
 
-    await swipe(container.querySelector<HTMLElement>('[data-testid="probe"]')!, 200, 200, 100, 200)
-    expect(container.querySelector<HTMLElement>('[data-testid="probe-index"]')?.textContent).toBe('1')
+    swipe(screen.getByTestId('probe'), 200, 200, 100, 200)
+    expect(screen.getByTestId('probe-index').textContent).toBe('1')
   })
 
-  it('reports drag offsets and release commits without changing the index', async () => {
+  it('reports drag offsets and release commits without changing the index', () => {
     const onChange = vi.fn()
     const onMove = vi.fn()
     const onRelease = vi.fn()
@@ -153,18 +153,14 @@ describe('useSwipePager', () => {
       return <div data-testid="probe" {...handlers} />
     }
 
-    await act(async () => root.render(<Probe />))
-    const probe = container.querySelector<HTMLElement>('[data-testid="probe"]')!
+    render(<Probe />)
+    const probe = screen.getByTestId('probe')
 
-    await act(async () => {
-      probe.dispatchEvent(touchEvent('touchstart', 200, 200, probe))
-      probe.dispatchEvent(touchEvent('touchmove', 120, 200, probe))
-    })
+    fireEvent(probe, touchEvent('touchstart', 200, 200, probe))
+    fireEvent(probe, touchEvent('touchmove', 120, 200, probe))
     expect(onMove).toHaveBeenLastCalledWith(-80)
 
-    await act(async () => {
-      probe.dispatchEvent(touchEvent('touchend', 120, 200, probe))
-    })
+    fireEvent(probe, touchEvent('touchend', 120, 200, probe))
     expect(onRelease).toHaveBeenLastCalledWith({ direction: 1, nextIndex: 1 })
     expect(onChange).not.toHaveBeenCalled()
   })

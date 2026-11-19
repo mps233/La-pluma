@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
 
-import { act, type ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUIStore } from '@/stores'
 import Layout from './Layout'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const mocks = vi.hoisted(() => ({
   loadDailyOperatorQuote: vi.fn(),
@@ -54,8 +53,56 @@ vi.mock('@/services/operatorQuotes', () => ({
   loadDailyOperatorQuote: mocks.loadDailyOperatorQuote,
 }))
 
-let container: HTMLDivElement
-let root: Root
+// The real palette renders through react-modal's portal, which needs layout
+// APIs jsdom does not provide. Keep a minimal controlled stand-in that exposes
+// the same `open` / `commands` / `onRequestClose` contract Layout relies on.
+vi.mock('react-command-palette', async () => {
+  const React = await import('react')
+  type MockCommand = { id: number; name: string; command: () => void }
+  type MockPaletteProps = {
+    open: boolean
+    commands: MockCommand[]
+    onRequestClose: () => void
+  }
+
+  function MockCommandPalette({ open, commands, onRequestClose }: MockPaletteProps) {
+    React.useEffect(() => {
+      if (!open) return
+      const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') onRequestClose()
+      }
+      window.addEventListener('keydown', handleKeyDown)
+      return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [open, onRequestClose])
+
+    if (!open) return null
+
+    return React.createElement(
+      'div',
+      { role: 'dialog', 'aria-label': '命令面板' },
+      React.createElement(
+        'button',
+        { type: 'button', key: 'close', onClick: onRequestClose },
+        '关闭命令面板',
+      ),
+      commands.map(command => React.createElement(
+        'button',
+        { type: 'button', key: command.id, onClick: command.command },
+        command.name,
+      )),
+    )
+  }
+
+  return { default: MockCommandPalette }
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
+afterEach(cleanup)
+
+let container: HTMLElement
 let currentScrollY = 0
 let availableScroll = Number.POSITIVE_INFINITY
 let frameClock = 0
@@ -89,13 +136,15 @@ function installScrollModel() {
   })
 }
 
-async function renderLayout() {
-  await act(async () => root.render(
+function renderLayout() {
+  const view = render(
     <Layout>
       {({ activeTab }) => <output data-testid="active-tab">{activeTab}</output>}
     </Layout>,
-  ))
+  )
+  container = view.container
   installScrollModel()
+  return view
 }
 
 function desktopLink(tab: string) {
@@ -139,23 +188,14 @@ describe('top-level application navigation', () => {
       quote: '战术安排已就绪',
     })
     useUIStore.setState({ activeTab: 'dashboard' })
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
-  })
-
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
-    vi.unstubAllGlobals()
-    vi.restoreAllMocks()
   })
 
   it('syncs tab selection with the URL and restores scroll per tab on popstate', async () => {
-    await renderLayout()
+    const user = userEvent.setup()
+    renderLayout()
     currentScrollY = 240
 
-    await act(async () => desktopLink('automation').click())
+    await user.click(desktopLink('automation'))
 
     expect(window.location.pathname).toBe('/app/automation')
     expect(container.querySelector('[data-testid="active-tab"]')?.textContent).toBe('automation')
@@ -163,48 +203,44 @@ describe('top-level application navigation', () => {
     expect(getScrollHost().scrollTop).toBe(0)
 
     currentScrollY = 510
-    await act(async () => {
-      window.history.replaceState({}, '', '/app/dashboard')
-      window.dispatchEvent(new PopStateEvent('popstate'))
-    })
+    window.history.replaceState({}, '', '/app/dashboard')
+    fireEvent.popState(window)
 
     expect(container.querySelector('[data-testid="active-tab"]')?.textContent).toBe('dashboard')
     expect(getScrollHost().scrollTop).toBe(240)
 
-    await act(async () => {
-      window.history.replaceState({}, '', '/app/automation')
-      window.dispatchEvent(new PopStateEvent('popstate'))
-    })
+    window.history.replaceState({}, '', '/app/automation')
+    fireEvent.popState(window)
     expect(container.querySelector('[data-testid="active-tab"]')?.textContent).toBe('automation')
     expect(getScrollHost().scrollTop).toBe(510)
   })
 
   it('keeps the installed-app URL stable while restoring tabs from history state', async () => {
+    const user = userEvent.setup()
     window.matchMedia = vi.fn((query: string) => mediaQueryList(
       query,
       query === '(display-mode: standalone)',
     ))
-    await renderLayout()
+    renderLayout()
 
-    await act(async () => desktopLink('automation').click())
+    await user.click(desktopLink('automation'))
 
     expect(window.location.pathname).toBe('/app/dashboard')
     expect(window.history.state.laPlumaTab).toBe('automation')
     expect(container.querySelector('[data-testid="active-tab"]')?.textContent).toBe('automation')
 
-    await act(async () => {
-      const state = { ...window.history.state, laPlumaTab: 'dashboard' }
-      window.history.replaceState(state, '', '/app/dashboard')
-      window.dispatchEvent(new PopStateEvent('popstate', { state }))
-    })
+    const state = { ...window.history.state, laPlumaTab: 'dashboard' }
+    window.history.replaceState(state, '', '/app/dashboard')
+    fireEvent.popState(window, { state })
 
     expect(window.location.pathname).toBe('/app/dashboard')
     expect(container.querySelector('[data-testid="active-tab"]')?.textContent).toBe('dashboard')
   })
 
   it('retries scroll restoration when lazy content grows after navigation', async () => {
+    const user = userEvent.setup()
     availableScroll = 1000
-    let resizeCallback: ResizeObserverCallback | null = null
+    let resizeCallback!: ResizeObserverCallback | null
     class ResizeObserverMock {
       constructor(callback: ResizeObserverCallback) {
         resizeCallback = callback
@@ -215,43 +251,41 @@ describe('top-level application navigation', () => {
     }
     vi.stubGlobal('ResizeObserver', ResizeObserverMock)
 
-    await renderLayout()
+    renderLayout()
     currentScrollY = 640
-    await act(async () => desktopLink('automation').click())
+    await user.click(desktopLink('automation'))
 
     availableScroll = 0
-    await act(async () => {
-      window.history.replaceState({}, '', '/app/dashboard')
-      window.dispatchEvent(new PopStateEvent('popstate'))
-    })
+    window.history.replaceState({}, '', '/app/dashboard')
+    fireEvent.popState(window)
     expect(getScrollHost().scrollTop).toBe(0)
 
     availableScroll = 1000
-    await act(async () => resizeCallback?.([], {} as ResizeObserver))
+    resizeCallback?.([], {} as ResizeObserver)
     expect(getScrollHost().scrollTop).toBe(640)
   })
 
   it('captures scroll before a shorter lazy page can clamp the viewport', async () => {
-    await renderLayout()
+    const user = userEvent.setup()
+    renderLayout()
     currentScrollY = 420
     const unsubscribe = useUIStore.subscribe((state, previousState) => {
       if (state.activeTab !== previousState.activeTab) currentScrollY = 0
     })
 
-    await act(async () => desktopLink('automation').click())
+    await user.click(desktopLink('automation'))
     expect(getScrollHost().scrollTop).toBe(0)
 
-    await act(async () => {
-      window.history.replaceState({}, '', '/app/dashboard')
-      window.dispatchEvent(new PopStateEvent('popstate'))
-    })
+    window.history.replaceState({}, '', '/app/dashboard')
+    fireEvent.popState(window)
 
     expect(getScrollHost().scrollTop).toBe(420)
     unsubscribe()
   })
 
   it('groups and filters desktop workspaces without changing the mobile destinations', async () => {
-    await renderLayout()
+    const user = userEvent.setup()
+    renderLayout()
 
     const sidebar = container.querySelector<HTMLElement>('.la-pluma-sidebar')!
     const groups = [...sidebar.querySelectorAll<HTMLElement>('[role="group"]')]
@@ -283,32 +317,28 @@ describe('top-level application navigation', () => {
     expect(container.querySelectorAll('a[href^="/app/"]')).toHaveLength(0)
 
     const search = sidebar.querySelector<HTMLInputElement>('input[aria-label="搜索工作区"]')!
-    const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-    await act(async () => {
-      setInputValue?.call(search, '数据')
-      search.dispatchEvent(new Event('input', { bubbles: true }))
-    })
+    await user.type(search, '数据')
 
     const filteredLinks = [...sidebar.querySelectorAll<HTMLButtonElement>('.la-pluma-sidebar-nav button[data-app-tab]')]
     expect(filteredLinks.map(button => button.dataset.appTab)).toEqual(['statistics'])
     expect(mobileDestinations).toHaveLength(4)
 
-    await act(async () => filteredLinks[0]?.click())
+    await user.click(filteredLinks[0]!)
     expect(sidebar.querySelectorAll('[aria-current="page"]')).toHaveLength(1)
     expect(sidebar.querySelector<HTMLElement>('[aria-current="page"]')?.dataset.appTab).toBe('statistics')
     expect(container.querySelector('.la-pluma-tabbar-more-anchor')?.classList.contains('is-active')).toBe(true)
     expect(container.querySelector('.la-pluma-tabbar-nav .lg-track:not([data-lg-copy]) > [data-lg-item][aria-selected="true"]')).toBeNull()
 
-    await act(async () => {
-      sidebar.querySelector<HTMLButtonElement>('button[aria-label="Clear"]')?.click()
-    })
+    await user.click(sidebar.querySelector<HTMLButtonElement>('button[aria-label="Clear"]')!)
     expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(9)
   })
 
   it('shows the daily operator portrait, name, and quote in the desktop identity area', async () => {
-    await renderLayout()
-    await act(async () => {
-      await Promise.resolve()
+    renderLayout()
+
+    await waitFor(() => {
+      expect(container.querySelector<HTMLElement>('.la-pluma-sidebar-identity')?.getAttribute('aria-label'))
+        .toBe('银灰：战术安排已就绪')
     })
 
     const identity = container.querySelector<HTMLElement>('.la-pluma-sidebar-identity')!
@@ -323,10 +353,9 @@ describe('top-level application navigation', () => {
 
   it('keeps the fallback operator identity when the daily quote cannot load', async () => {
     mocks.loadDailyOperatorQuote.mockRejectedValueOnce(new Error('offline'))
-    await renderLayout()
-    await act(async () => {
-      await Promise.resolve()
-    })
+    renderLayout()
+
+    await waitFor(() => expect(mocks.loadDailyOperatorQuote).toHaveBeenCalledTimes(1))
 
     const identity = container.querySelector<HTMLElement>('.la-pluma-sidebar-identity')!
     expect(identity.getAttribute('aria-label')).toBe('阿米娅：今天也请多指教')
@@ -335,8 +364,8 @@ describe('top-level application navigation', () => {
     expect(identity.querySelector('img')?.getAttribute('src')).toContain('/avatar/char_002_amiya')
   })
 
-  it('exposes the GitHub repository as a secure external action', async () => {
-    await renderLayout()
+  it('exposes the GitHub repository as a secure external action', () => {
+    renderLayout()
 
     const githubLink = container.querySelector<HTMLAnchorElement>('.la-pluma-github-link')!
     expect(githubLink.getAttribute('aria-label')).toBe('打开 GitHub 仓库')
@@ -346,12 +375,71 @@ describe('top-level application navigation', () => {
     expect(githubLink.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(1)
   })
 
+  it('opens the command palette from the 快速跳转 sidebar trigger', async () => {
+    const user = userEvent.setup()
+    renderLayout()
+
+    const trigger = screen.getByRole('button', { name: '打开命令面板' })
+    expect(within(trigger).getByText('快速跳转')).toBeTruthy()
+    expect(trigger.getAttribute('aria-keyshortcuts')).toBe('Meta+K Control+K')
+    expect(screen.queryByRole('dialog', { name: '命令面板' })).toBeNull()
+
+    await user.click(trigger)
+
+    const palette = await screen.findByRole('dialog', { name: '命令面板' })
+    const commandNames = within(palette).getAllByRole('button').map(button => button.textContent)
+    expect(commandNames).toEqual([
+      '关闭命令面板',
+      '控制台',
+      '自动化',
+      '作业',
+      '肉鸽',
+      '养成',
+      '小工具',
+      '日志',
+      '数据',
+      '配置',
+    ])
+
+    await user.click(within(palette).getByRole('button', { name: '关闭命令面板' }))
+    expect(screen.queryByRole('dialog', { name: '命令面板' })).toBeNull()
+  })
+
+  it('toggles the command palette with Cmd+K and closes it on Escape', async () => {
+    const user = userEvent.setup()
+    renderLayout()
+
+    expect(screen.queryByRole('dialog', { name: '命令面板' })).toBeNull()
+
+    await user.keyboard('{Meta>}k{/Meta}')
+    expect(screen.getByRole('dialog', { name: '命令面板' })).toBeTruthy()
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: '命令面板' })).toBeNull()
+  })
+
+  it('navigates to the destination selected in the command palette', async () => {
+    const user = userEvent.setup()
+    renderLayout()
+
+    await user.click(screen.getByRole('button', { name: '打开命令面板' }))
+    const palette = await screen.findByRole('dialog', { name: '命令面板' })
+
+    await user.click(within(palette).getByRole('button', { name: '日志' }))
+
+    expect(screen.queryByRole('dialog', { name: '命令面板' })).toBeNull()
+    expect(container.querySelector('[data-testid="active-tab"]')?.textContent).toBe('logs')
+    expect(window.location.pathname).toBe('/app/logs')
+    expect(desktopLink('logs').getAttribute('aria-current')).toBe('page')
+  })
+
   it('opens the overflow menu, navigates, and restores trigger focus on Escape', async () => {
-    await renderLayout()
+    const user = userEvent.setup()
+    renderLayout()
     const trigger = mobileMoreTrigger()
     trigger.focus()
 
-    await act(async () => trigger.click())
+    await user.click(trigger)
 
     const anchor = container.querySelector<HTMLElement>('.la-pluma-tabbar-more-anchor')!
     const menu = anchor.querySelector<HTMLElement>('[role="menu"]')
@@ -368,17 +456,19 @@ describe('top-level application navigation', () => {
     expect(document.activeElement).toBe(items[0])
     expect(anchor.classList.contains('is-active')).toBe(false)
 
-    await act(async () => items[0]?.click())
-    await act(async () => {
-      await Promise.resolve()
+    // GlassMenu only runs its item handler for keyboard-style clicks
+    // (event.detail === 0); pointer clicks resolve through layout coordinates
+    // jsdom cannot compute.
+    fireEvent.click(items[0]!)
+    await waitFor(() => {
+      expect(container.querySelector('[data-testid="active-tab"]')?.textContent).toBe('roguelike')
     })
 
-    expect(container.querySelector('[data-testid="active-tab"]')?.textContent).toBe('roguelike')
     expect(anchor.classList.contains('is-active')).toBe(true)
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
 
-    await act(async () => trigger.click())
-    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    await user.click(trigger)
+    await user.keyboard('{Escape}')
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
     expect(document.activeElement).toBe(trigger)
   })

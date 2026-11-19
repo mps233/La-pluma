@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
-import { Activity, act, type ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { Activity, type ReactNode } from 'react'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RoguelikeTasks from './RoguelikeTasks'
 import { installMobileMatchMedia, swipe } from '../test/swipe'
 
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+afterEach(cleanup)
 
 const mocks = vi.hoisted(() => ({
   getTaskStatus: vi.fn(),
@@ -62,8 +63,7 @@ vi.mock('../hooks/useBackendStatusMonitor', () => ({
 vi.mock('./FloatingStatusIndicator', () => ({ default: () => null }))
 vi.mock('./ScreenMonitor', () => ({ default: () => <div data-testid="screen-monitor" /> }))
 
-let container: HTMLDivElement
-let root: Root
+let container: HTMLElement
 
 const deferred = <T,>() => {
   let resolve!: (value: T) => void
@@ -80,6 +80,12 @@ const flush = async () => {
   })
 }
 
+const renderView = () => {
+  const view = render(<RoguelikeTasks />)
+  container = view.container
+  return view
+}
+
 const buttonByText = (text: string) => {
   const find = (root: ParentNode) => Array.from(root.querySelectorAll('button'))
     .find(button => button.textContent?.trim() === text) as HTMLButtonElement | undefined
@@ -89,24 +95,12 @@ const buttonByText = (text: string) => {
   return (activeSlide ? find(activeSlide) : undefined) ?? find(document)
 }
 
-const click = async (element: HTMLElement) => {
-  await act(async () => {
-    element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  })
-}
-
-const keyDown = async (element: HTMLElement, key: string) => {
-  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
-  await act(async () => {
-    element.dispatchEvent(event)
-  })
-  return event
-}
-
 const runningStatus = () => ({
   success: true,
   data: { isRunning: true, taskType: 'roguelike', taskName: '集成战略', startTime: Date.now() },
 })
+
+const user = () => userEvent.setup({ delay: null })
 
 describe('RoguelikeTasks execution recovery', () => {
   beforeEach(() => {
@@ -128,20 +122,15 @@ describe('RoguelikeTasks execution recovery', () => {
     mocks.executeCommand.mockReset()
     mocks.setMessage.mockReset()
     mocks.setActive.mockReset()
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
     vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
   it('uses the shared iOS workspace surfaces for configuration and preview', async () => {
-    await act(async () => root.render(<RoguelikeTasks />))
+    renderView()
     await flush()
 
     const page = container.querySelector('.roguelike-page')
@@ -181,24 +170,26 @@ describe('RoguelikeTasks execution recovery', () => {
     )
     expect(modeButtons.map(button => button.tabIndex)).toEqual([0, -1])
     modeButtons[0]?.focus()
-    await keyDown(modeButtons[0]!, 'End')
+    fireEvent.keyDown(modeButtons[0]!, { key: 'End' })
     expect(modeButtons[1]?.getAttribute('aria-selected')).toBe('true')
     expect(document.activeElement).toBe(modeButtons[1])
 
-    const arrowDownEvent = await keyDown(modeButtons[1]!, 'ArrowDown')
-    expect(arrowDownEvent.defaultPrevented).toBe(false)
+    const arrowDownNotPrevented = fireEvent.keyDown(modeButtons[1]!, { key: 'ArrowDown' })
+    expect(arrowDownNotPrevented).toBe(true)
     expect(modeButtons[1]?.getAttribute('aria-selected')).toBe('true')
   })
 
   it('keeps mode selection and its configuration panel in sync', async () => {
-    await act(async () => root.render(<RoguelikeTasks />))
+    renderView()
     await flush()
 
     const reclamationMode = Array.from(
       container.querySelectorAll<HTMLButtonElement>('.roguelike-mode-shell > .lg-track > .lg-track__item'),
     ).find(button => button.textContent?.includes('生息演算'))
     expect(reclamationMode).toBeDefined()
-    await click(reclamationMode!)
+    // The Liquid Glass tablist commits on click (detail 0) and suppresses the
+    // click that follows its own pointer gesture, so dispatch the click alone.
+    fireEvent.click(reclamationMode!)
 
     expect(reclamationMode?.getAttribute('aria-selected')).toBe('true')
     expect(container.querySelectorAll('.roguelike-mode-shell > .lg-track > .lg-track__item[aria-selected="true"]')).toHaveLength(1)
@@ -209,7 +200,7 @@ describe('RoguelikeTasks execution recovery', () => {
 
   it('switches the roguelike mode with a horizontal swipe', async () => {
     installMobileMatchMedia()
-    await act(async () => root.render(<RoguelikeTasks />))
+    renderView()
     await flush()
 
     const modeButtons = Array.from(
@@ -227,14 +218,12 @@ describe('RoguelikeTasks execution recovery', () => {
   it('keeps an unsynced local draft across remounts and retries the save', async () => {
     vi.useFakeTimers()
     mocks.saveUserConfig.mockRejectedValueOnce(new Error('网络连接中断'))
-    await act(async () => root.render(<RoguelikeTasks />))
+    const view = renderView()
     await flush()
 
     const themeInput = container.querySelector<HTMLInputElement>('input[name="maa-roguelike-theme"]')
+    fireEvent.change(themeInput!, { target: { value: 'Phantom' } })
     await act(async () => {
-      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      valueSetter?.call(themeInput, 'Phantom')
-      themeInput?.dispatchEvent(new Event('input', { bubbles: true }))
       await vi.advanceTimersByTimeAsync(300)
     })
     await flush()
@@ -243,17 +232,18 @@ describe('RoguelikeTasks execution recovery', () => {
     expect(JSON.parse(localStorage.getItem('roguelikeTaskInputs') || '{}')).toMatchObject({ roguelike: 'Phantom' })
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('网络连接中断')
 
-    await act(async () => root.unmount())
-    root = createRoot(container)
+    view.unmount()
     mocks.loadUserConfig.mockClear()
-    await act(async () => root.render(<RoguelikeTasks />))
+    const remounted = render(<RoguelikeTasks />)
+    container = remounted.container
     await flush()
 
     expect(mocks.loadUserConfig).not.toHaveBeenCalled()
     expect(container.querySelector<HTMLInputElement>('input[name="maa-roguelike-theme"]')?.value).toBe('Phantom')
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('尚未同步到服务器')
 
-    await click(buttonByText('重新同步')!)
+    // userEvent awaits timer-backed work that fake timers never advance here.
+    fireEvent.click(buttonByText('重新同步')!)
     await flush()
 
     expect(mocks.saveUserConfig).toHaveBeenCalledTimes(2)
@@ -269,15 +259,13 @@ describe('RoguelikeTasks execution recovery', () => {
     mocks.saveUserConfig
       .mockReturnValueOnce(olderSave.promise)
       .mockReturnValueOnce(newerSave.promise)
-    await act(async () => root.render(<RoguelikeTasks />))
+    renderView()
     await flush()
 
     const themeInput = container.querySelector<HTMLInputElement>('input[name="maa-roguelike-theme"]')!
     const setTheme = async (value: string) => {
+      fireEvent.change(themeInput, { target: { value } })
       await act(async () => {
-        const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-        valueSetter?.call(themeInput, value)
-        themeInput.dispatchEvent(new Event('input', { bubbles: true }))
         await vi.advanceTimersByTimeAsync(300)
       })
     }
@@ -303,28 +291,29 @@ describe('RoguelikeTasks execution recovery', () => {
       success: true,
       data: { taskInputs: { roguelike: 'Phantom' }, advancedParams: {} },
     })
-    const renderMode = async (mode: 'visible' | 'hidden') => {
-      await act(async () => {
-        root.render(
-          <Activity mode={mode}>
-            <RoguelikeTasks />
-          </Activity>,
-        )
-        await Promise.resolve()
-        await Promise.resolve()
-      })
-    }
+    const view = render(
+      <Activity mode="visible">
+        <RoguelikeTasks />
+      </Activity>,
+    )
+    container = view.container
+    await flush()
 
-    await renderMode('visible')
     const themeInput = container.querySelector<HTMLInputElement>('input[name="maa-roguelike-theme"]')!
-    await act(async () => {
-      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      valueSetter?.call(themeInput, 'Sami')
-      themeInput.dispatchEvent(new Event('input', { bubbles: true }))
-    })
+    fireEvent.change(themeInput, { target: { value: 'Sami' } })
+    const renderMode = async (mode: 'visible' | 'hidden') => {
+      view.rerender(
+        <Activity mode={mode}>
+          <RoguelikeTasks />
+        </Activity>,
+      )
+      await flush()
+    }
     await renderMode('hidden')
     await renderMode('visible')
-    await act(async () => vi.advanceTimersByTimeAsync(300))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300)
+    })
     await flush()
 
     expect(mocks.loadUserConfig).toHaveBeenCalledOnce()
@@ -333,7 +322,9 @@ describe('RoguelikeTasks execution recovery', () => {
 
     await renderMode('hidden')
     await renderMode('visible')
-    await act(async () => vi.advanceTimersByTimeAsync(300))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300)
+    })
     await flush()
     expect(mocks.saveUserConfig).toHaveBeenCalledOnce()
   })
@@ -343,7 +334,7 @@ describe('RoguelikeTasks execution recovery', () => {
       success: true,
       data: { isRunning: true, taskType: 'combat', taskName: '自动战斗', startTime: Date.now() },
     })
-    await act(async () => root.render(<RoguelikeTasks />))
+    renderView()
     await flush()
 
     expect(mocks.setActive).toHaveBeenCalledWith(true)
@@ -352,7 +343,7 @@ describe('RoguelikeTasks execution recovery', () => {
   })
 
   it('associates form controls with labels and exposes 44px touch targets', async () => {
-    await act(async () => root.render(<RoguelikeTasks />))
+    renderView()
     await flush()
 
     const controls = Array.from(container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input, select'))
@@ -382,11 +373,8 @@ describe('RoguelikeTasks execution recovery', () => {
       .mockRejectedValueOnce(new Error('temporary 3'))
       .mockResolvedValueOnce({ success: true, data: { isRunning: false } })
 
-    await act(async () => {
-      root.render(<RoguelikeTasks />)
-      await Promise.resolve()
-      await Promise.resolve()
-    })
+    renderView()
+    await flush()
     expect(buttonByText('终止执行')).toBeDefined()
 
     for (let index = 0; index < 3; index += 1) {
@@ -413,15 +401,13 @@ describe('RoguelikeTasks execution recovery', () => {
     mocks.getTaskStatus.mockResolvedValueOnce(runningStatus())
     mocks.stopTask.mockReturnValueOnce(stopRequest.promise)
 
-    await act(async () => {
-      root.render(<RoguelikeTasks />)
-    })
+    renderView()
     await flush()
 
     const stopButton = buttonByText('终止执行')
     expect(stopButton).toBeDefined()
-    await click(stopButton!)
-    stopButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await user().click(stopButton!)
+    fireEvent.click(stopButton!)
 
     expect(mocks.stopTask).toHaveBeenCalledOnce()
     expect(buttonByText('正在终止')?.disabled).toBe(true)
@@ -444,9 +430,9 @@ describe('RoguelikeTasks execution recovery', () => {
         },
       },
     })
-    await act(async () => root.render(<RoguelikeTasks />))
+    renderView()
     await flush()
-    await click(buttonByText('立即执行')!)
+    await user().click(buttonByText('立即执行')!)
 
     expect(mocks.executeCommand).toHaveBeenCalledWith(
       'run',
@@ -477,9 +463,9 @@ describe('RoguelikeTasks execution recovery', () => {
       success: true,
       data: { taskInputs: { roguelike: 'JieGarden' }, advancedParams: { roguelike: { mode: '20001' } } },
     })
-    await act(async () => root.render(<RoguelikeTasks />))
+    renderView()
     await flush()
-    await click(buttonByText('立即执行')!)
+    await user().click(buttonByText('立即执行')!)
 
     expect(mocks.executeCommand).toHaveBeenCalledWith(
       'run',
@@ -509,9 +495,9 @@ describe('RoguelikeTasks execution recovery', () => {
         },
       },
     })
-    await act(async () => root.render(<RoguelikeTasks />))
+    renderView()
     await flush()
-    await click(buttonByText('立即执行')!)
+    await user().click(buttonByText('立即执行')!)
 
     expect(mocks.executeCommand).toHaveBeenCalledWith(
       'run',
@@ -535,9 +521,9 @@ describe('RoguelikeTasks execution recovery', () => {
       success: true,
       data: { taskInputs: { roguelike: 'BlackFlow' }, advancedParams: { roguelike: { mode: '30003' } } },
     })
-    await act(async () => root.render(<RoguelikeTasks />))
+    renderView()
     await flush()
-    await click(buttonByText('立即执行')!)
+    await user().click(buttonByText('立即执行')!)
 
     expect(mocks.executeCommand).toHaveBeenCalledWith(
       'run',
@@ -569,9 +555,9 @@ describe('RoguelikeTasks execution recovery', () => {
         },
       },
     })
-    await act(async () => root.render(<RoguelikeTasks />))
+    renderView()
     await flush()
-    await click(buttonByText('立即执行')!)
+    await user().click(buttonByText('立即执行')!)
 
     expect(mocks.executeCommand).toHaveBeenCalledWith(
       'run',
@@ -602,14 +588,14 @@ describe('RoguelikeTasks execution recovery', () => {
         advancedParams: { reclamation: { mode: '48' } },
       },
     })
-    await act(async () => root.render(<RoguelikeTasks />))
+    renderView()
     await flush()
 
     const reclamationMode = Array.from(
       container.querySelectorAll<HTMLButtonElement>('.roguelike-mode-shell > .lg-track > .lg-track__item'),
     ).find(button => button.textContent?.includes('生息演算'))
-    await click(reclamationMode!)
-    await click(buttonByText('立即执行')!)
+    fireEvent.click(reclamationMode!)
+    await user().click(buttonByText('立即执行')!)
 
     expect(mocks.executeCommand).toHaveBeenCalledWith(
       'run',
@@ -632,16 +618,12 @@ describe('RoguelikeTasks execution recovery', () => {
   it('keeps the task running until a wait-for-completion request settles', async () => {
     const execution = deferred<{ success: boolean }>()
     mocks.executeCommand.mockReturnValueOnce(execution.promise)
-    await act(async () => root.render(<RoguelikeTasks />))
+    renderView()
     await flush()
 
-    const themeInput = document.querySelector<HTMLInputElement>('input[placeholder="输入主题代号"]')
-    await act(async () => {
-      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      valueSetter?.call(themeInput, 'Phantom')
-      themeInput?.dispatchEvent(new Event('input', { bubbles: true }))
-    })
-    await click(buttonByText('立即执行')!)
+    const themeInput = container.querySelector<HTMLInputElement>('input[placeholder="输入主题代号"]')
+    fireEvent.change(themeInput!, { target: { value: 'Phantom' } })
+    await user().click(buttonByText('立即执行')!)
 
     expect(mocks.executeCommand).toHaveBeenCalledWith(
       'run',
@@ -670,9 +652,9 @@ describe('RoguelikeTasks execution recovery', () => {
       .mockReturnValueOnce(idleStatus.promise)
     mocks.stopTask.mockReturnValueOnce(stopRequest.promise)
 
-    await act(async () => root.render(<RoguelikeTasks />))
+    renderView()
     await flush()
-    await click(buttonByText('终止执行')!)
+    await user().click(buttonByText('终止执行')!)
     await act(async () => stopRequest.resolve({ success: true, data: { task: { success: true } } }))
     await flush()
 
@@ -690,10 +672,13 @@ describe('RoguelikeTasks execution recovery', () => {
       .mockResolvedValueOnce(runningStatus())
       .mockResolvedValue({ success: true, data: { isRunning: true } })
 
-    await act(async () => root.render(<RoguelikeTasks />))
+    renderView()
     await flush()
-    await click(buttonByText('终止执行')!)
-    await act(async () => vi.advanceTimersByTimeAsync(15_000))
+    // userEvent's async wrapper does not settle while fake timers are frozen.
+    fireEvent.click(buttonByText('终止执行')!)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000)
+    })
 
     expect(mocks.setMessage).toHaveBeenCalledWith(
       '终止失败: 终止请求已发送，但尚未确认任务停止',
@@ -701,7 +686,7 @@ describe('RoguelikeTasks execution recovery', () => {
     )
     expect(buttonByText('终止执行')?.disabled).toBe(false)
 
-    await click(buttonByText('终止执行')!)
+    fireEvent.click(buttonByText('终止执行')!)
     expect(mocks.stopTask).toHaveBeenCalledTimes(2)
   })
 })

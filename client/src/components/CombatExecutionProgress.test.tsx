@@ -1,28 +1,11 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import CombatExecutionProgress from './CombatExecutionProgress'
 import type { AgentRun } from '../types/run'
 
-let root: Root | null = null
-let container: HTMLDivElement | null = null
-
-function render(run: AgentRun | null, visible = true) {
-  container = document.createElement('div')
-  document.body.appendChild(container)
-  root = createRoot(container)
-  act(() => root?.render(<CombatExecutionProgress run={run} visible={visible} />))
-  return container
-}
-
-afterEach(() => {
-  act(() => root?.unmount())
-  container?.remove()
-  root = null
-  container = null
-})
+afterEach(cleanup)
 
 const activeRun: AgentRun = {
   runId: 'run-1',
@@ -39,16 +22,25 @@ const activeRun: AgentRun = {
 
 describe('CombatExecutionProgress', () => {
   it('shows the queue position, stage and elapsed time for an active run', () => {
-    const node = render(activeRun)
-    expect(node.textContent).toContain('本次执行进度')
-    expect(node.textContent).toContain('正在执行 第 3 / 10 项')
-    expect(node.textContent).toContain('关卡 TL-3')
-    expect(node.textContent).toContain('已用时 1 分')
+    render(<CombatExecutionProgress run={activeRun} visible />)
+
+    const section = screen.getByRole('region', { name: '本次执行进度' })
+    expect(section.textContent).toContain('本次执行进度')
+    expect(section.textContent).toContain('正在执行 第 3 / 10 项')
+    expect(section.textContent).toContain('关卡 TL-3')
+    expect(section.textContent).toContain('已用时 1 分')
   })
 
   it('hides when the run is not active or the set is not current', () => {
-    expect(render({ ...activeRun, state: 'succeeded' }).textContent).toBe('')
-    expect(render(activeRun, false).textContent).toBe('')
-    expect(render(null).textContent).toBe('')
+    const { container, rerender } = render(
+      <CombatExecutionProgress run={{ ...activeRun, state: 'succeeded' }} visible />,
+    )
+    expect(container.textContent).toBe('')
+
+    rerender(<CombatExecutionProgress run={activeRun} visible={false} />)
+    expect(container.textContent).toBe('')
+
+    rerender(<CombatExecutionProgress run={null} visible />)
+    expect(container.textContent).toBe('')
   })
 })

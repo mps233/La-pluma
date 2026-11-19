@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
 
-import { Activity, act, type ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { Activity, type ComponentType, type ReactNode } from 'react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import DataStatistics from './DataStatistics'
 import { installMobileMatchMedia, swipe } from '../test/swipe'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const mocks = vi.hoisted(() => ({
   getAllOperators: vi.fn(),
@@ -28,6 +27,57 @@ vi.mock('framer-motion', async () => {
     motion: { div: MotionDiv },
     useReducedMotion: () => true,
   }
+})
+
+// The virtual grids need a measurable scroll viewport, which jsdom cannot
+// provide. Render their data through the same custom components instead.
+vi.mock('react-virtuoso', async () => {
+  const React = await import('react')
+
+  interface MockGridComponentProps {
+    children?: ReactNode
+    className?: string
+    context?: unknown
+    'data-index'?: number
+  }
+
+  type MockGridComponent = (props: MockGridComponentProps) => ReactNode
+
+  interface MockVirtuosoGridProps<T, C> {
+    data?: readonly T[]
+    context?: C
+    components?: { List?: MockGridComponent; Item?: MockGridComponent }
+    itemContent?: (index: number, item: T) => ReactNode
+    listClassName?: string
+  }
+
+  const FallbackList = ({ children, className }: MockGridComponentProps) =>
+    React.createElement('ul', { className }, children)
+  const FallbackItem = ({ children }: MockGridComponentProps) =>
+    React.createElement('li', null, children)
+
+  const VirtuosoGrid = <T, C,>({
+    data = [],
+    context,
+    components,
+    itemContent,
+    listClassName,
+  }: MockVirtuosoGridProps<T, C>) => {
+    const List = components?.List ?? FallbackList
+    const Item = components?.Item ?? FallbackItem
+
+    return React.createElement(
+      List as ComponentType<MockGridComponentProps>,
+      { className: components?.List ? undefined : listClassName, context },
+      data.map((item, index) => React.createElement(
+        Item as ComponentType<MockGridComponentProps>,
+        { key: index, 'data-index': index, context },
+        itemContent?.(index, item),
+      )),
+    )
+  }
+
+  return { VirtuosoGrid }
 })
 
 vi.mock('../services/api', () => ({
@@ -82,8 +132,8 @@ vi.mock('./FloatingStatusIndicator', () => ({
   ),
 }))
 
-let container: HTMLDivElement
-let root: Root
+let container: HTMLElement
+let user: ReturnType<typeof userEvent.setup>
 
 const flush = async () => {
   await act(async () => {
@@ -92,13 +142,27 @@ const flush = async () => {
   })
 }
 
+const renderPage = (ui: ReactNode = <DataStatistics />) => {
+  const result = render(ui)
+  container = result.container
+  return result
+}
+
 const click = async (element: HTMLElement) => {
-  await act(async () => element.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  await user.click(element)
   await flush()
 }
 
 const findButton = (label: string) => Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
   .find(button => button.textContent?.includes(label))
+
+// The liquid-glass segmented track owns native pointer and click listeners.
+// jsdom has no layout, so a pointer sequence would suppress the click; dispatch
+// the click directly as the component's track expects.
+const clickTab = async (label: string) => {
+  fireEvent.click(findButton(label)!)
+  await flush()
+}
 
 const activePanel = () => container.querySelector<HTMLElement>('.swipe-mode-slide:not([aria-hidden="true"])')
 
@@ -118,6 +182,7 @@ describe('DataStatistics layout surfaces', () => {
       return 1
     })
     window.cancelAnimationFrame = vi.fn()
+    user = userEvent.setup()
     mocks.getAllOperators.mockReset().mockResolvedValue({ success: true, data: [] })
     mocks.getDepotData.mockReset().mockResolvedValue({
       success: true,
@@ -135,14 +200,11 @@ describe('DataStatistics layout surfaces', () => {
     mocks.getDropStatistics.mockReset().mockResolvedValue({ success: false })
     mocks.getOperBoxData.mockReset().mockResolvedValue({ success: false })
     mocks.setMessage.mockReset()
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
+    cleanup()
+    document.querySelectorAll('.la-pluma-scroll-host').forEach(host => host.remove())
     vi.unstubAllGlobals()
   })
 
@@ -160,7 +222,7 @@ describe('DataStatistics layout surfaces', () => {
       },
     })
 
-    await act(async () => root.render(<DataStatistics />))
+    renderPage()
     await flush()
 
     const page = container.querySelector('.data-statistics-page')
@@ -204,7 +266,8 @@ describe('DataStatistics layout surfaces', () => {
 
     const depotTab = tabs.find(tab => tab.textContent?.includes('仓库识别'))
     expect(depotTab).toBeDefined()
-    await act(async () => tabs[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })))
+    // The segmented control listens for arrow keys on its native track.
+    fireEvent.keyDown(tabs[0]!, { key: 'ArrowRight' })
     await flush()
     expect(depotTab?.getAttribute('aria-selected')).toBe('true')
     expect(document.activeElement).toBe(depotTab)
@@ -241,13 +304,13 @@ describe('DataStatistics layout surfaces', () => {
 
   it('filters the depot inventory by category and search', async () => {
     window.history.replaceState(null, '', '/?tab=depot')
-    await act(async () => root.render(<DataStatistics />))
+    renderPage()
     await flush()
 
     const panel = activePanel()!
     const grid = () => panel.querySelector('.depot-item-grid')
     const meta = () => panel.querySelector('.depot-inventory-meta')?.textContent ?? ''
-    const search = panel.querySelector<HTMLInputElement>('input[aria-label="搜索仓库物品"]')!
+    const search = within(panel).getByLabelText<HTMLInputElement>('搜索仓库物品')
 
     expect(grid()?.querySelectorAll('.depot-item')).toHaveLength(4)
     expect(panel.querySelectorAll('.depot-filter-chip')).toHaveLength(4)
@@ -262,12 +325,8 @@ describe('DataStatistics layout surfaces', () => {
     expect(meta()).toMatch(/15\s+件/)
 
     const typeSearch = async (value: string) => {
-      await act(async () => {
-        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
-        setter.call(search, value)
-        search.dispatchEvent(new Event('input', { bubbles: true }))
-      })
-      await flush()
+      await user.clear(search)
+      await user.type(search, value)
     }
 
     await typeSearch('固源岩组')
@@ -293,7 +352,7 @@ describe('DataStatistics layout surfaces', () => {
 
   it('switches statistics views with a horizontal swipe', async () => {
     installMobileMatchMedia()
-    await act(async () => root.render(<DataStatistics />))
+    renderPage()
     await flush()
 
     const track = container.querySelector('[role="tablist"][aria-label="数据统计视图"]')
@@ -313,11 +372,10 @@ describe('DataStatistics layout surfaces', () => {
     mocks.getAllOperators.mockReturnValueOnce(new Promise(() => {}))
     mocks.getOperBoxData.mockReturnValueOnce(new Promise(() => {}))
 
-    await act(async () => root.render(<DataStatistics />))
+    const firstRender = renderPage()
     expect(container.textContent).toContain('正在读取干员数据')
 
-    await act(async () => root.unmount())
-    root = createRoot(container)
+    firstRender.unmount()
 
     mocks.getAllOperators.mockResolvedValue({
       success: true,
@@ -333,19 +391,19 @@ describe('DataStatistics layout surfaces', () => {
         },
       })
 
-    await act(async () => root.render(<DataStatistics />))
+    renderPage()
     await flush()
 
-    const alert = activePanel()?.querySelector('[role="alert"]')
-    expect(alert?.textContent).toContain('干员数据读取失败')
-    expect(alert?.textContent).not.toContain('Internal Server Error')
+    const panel = activePanel()!
+    const alert = within(panel).getByRole('alert')
+    expect(alert.textContent).toContain('干员数据读取失败')
+    expect(alert.textContent).not.toContain('Internal Server Error')
 
-    const retry = alert?.querySelector<HTMLButtonElement>('button')
-    expect(retry).toBeDefined()
-    await click(retry!)
+    const retry = within(alert).getByRole<HTMLButtonElement>('button')
+    await click(retry)
 
     expect(mocks.getOperBoxData).toHaveBeenCalledTimes(3)
-    expect(activePanel()?.querySelector('[role="alert"]')).toBeNull()
+    expect(within(activePanel()!).queryByRole('alert')).toBeNull()
     expect(container.textContent).toContain('测试干员')
   })
 
@@ -362,15 +420,15 @@ describe('DataStatistics layout surfaces', () => {
       },
     })
 
-    await act(async () => root.render(<DataStatistics />))
+    renderPage()
     await flush()
 
     const trigger = findButton('拥有状态')!
     trigger.focus()
     await click(trigger)
 
-    let menu = document.body.querySelector<HTMLElement>('[role="menu"]')!
-    let options = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
+    let menu = screen.getByRole('menu')
+    let options = within(menu).getAllByRole<HTMLButtonElement>('menuitemradio')
     expect(trigger.classList.contains('min-h-11')).toBe(true)
     expect(menu.classList.contains('fixed')).toBe(true)
     expect(menu.style.width).toBe('88px')
@@ -379,18 +437,18 @@ describe('DataStatistics layout surfaces', () => {
     expect(trigger.getAttribute('aria-expanded')).toBe('true')
     expect(document.activeElement).toBe(options[0])
 
-    await act(async () => options[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })))
+    await user.keyboard('{ArrowDown}')
     expect(document.activeElement).toBe(options[1])
 
-    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
-    expect(document.body.querySelector('[role="menu"]')).toBeNull()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('menu')).toBeNull()
     expect(document.activeElement).toBe(trigger)
 
     await click(trigger)
-    menu = document.body.querySelector<HTMLElement>('[role="menu"]')!
-    options = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
+    menu = screen.getByRole('menu')
+    options = within(menu).getAllByRole<HTMLButtonElement>('menuitemradio')
     await click(options[1]!)
-    expect(document.body.querySelector('[role="menu"]')).toBeNull()
+    expect(screen.queryByRole('menu')).toBeNull()
     expect(document.activeElement).toBe(trigger)
     expect(trigger.textContent).toContain('已拥有')
     const resetButton = findButton('重置')
@@ -399,9 +457,9 @@ describe('DataStatistics layout surfaces', () => {
     expect(resetButton?.classList.contains('app-glass-button')).toBe(true)
 
     await click(trigger)
-    expect(document.body.querySelector('[role="menu"]')).not.toBeNull()
-    await act(async () => document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })))
-    expect(document.body.querySelector('[role="menu"]')).toBeNull()
+    expect(screen.queryByRole('menu')).not.toBeNull()
+    fireEvent.pointerDown(document.body)
+    expect(screen.queryByRole('menu')).toBeNull()
   })
 
   it('right-aligns end-of-row menus on phones without changing desktop alignment', async () => {
@@ -417,7 +475,7 @@ describe('DataStatistics layout surfaces', () => {
       },
     })
 
-    await act(async () => root.render(<DataStatistics />))
+    renderPage()
     await flush()
 
     for (const label of ['职业', '排序']) {
@@ -439,8 +497,8 @@ describe('DataStatistics layout surfaces', () => {
       trigger.focus()
       await click(trigger)
 
-      const menu = document.body.querySelector<HTMLElement>('[role="menu"]')!
-      const options = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
+      const menu = screen.getByRole('menu')
+      const options = within(menu).getAllByRole<HTMLButtonElement>('menuitemradio')
       expect(menu.classList.contains('fixed')).toBe(true)
       expect(menu.style.left).toBe(`${300 - expectedWidth}px`)
       expect(menu.style.width).toBe(`${expectedWidth}px`)
@@ -448,8 +506,8 @@ describe('DataStatistics layout surfaces', () => {
       expect(options.every(option => option.classList.contains('min-h-11'))).toBe(true)
       expect(document.activeElement).toBe(options[0])
 
-      await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
-      expect(document.body.querySelector('[role="menu"]')).toBeNull()
+      await user.keyboard('{Escape}')
+      expect(screen.queryByRole('menu')).toBeNull()
       expect(document.activeElement).toBe(trigger)
     }
   })
@@ -467,15 +525,16 @@ describe('DataStatistics layout surfaces', () => {
         },
       })
 
-    await act(async () => root.render(<DataStatistics />))
+    renderPage()
     await flush()
-    await click(findButton('掉落记录')!)
+    await clickTab('掉落记录')
 
-    const alert = container.querySelector('[data-testid="drop-records"] [role="alert"]')
-    expect(alert?.textContent).toContain('暂时无法读取掉落记录')
-    expect(alert?.textContent).not.toContain('Internal Server Error')
+    const panel = container.querySelector<HTMLElement>('[data-testid="drop-records"]')!
+    const alert = within(panel).getByRole('alert')
+    expect(alert.textContent).toContain('暂时无法读取掉落记录')
+    expect(alert.textContent).not.toContain('Internal Server Error')
 
-    await click(findButton('重新加载掉落记录')!)
+    await click(within(panel).getByRole<HTMLButtonElement>('button', { name: '重新加载掉落记录' }))
     expect(mocks.getDropStatistics).toHaveBeenCalledTimes(2)
     expect(container.textContent).toContain('掉落数据已加载')
   })
@@ -492,20 +551,20 @@ describe('DataStatistics layout surfaces', () => {
         },
       })
 
-    await act(async () => root.render(<DataStatistics />))
+    renderPage()
     await flush()
-    await click(findButton('仓库识别')!)
+    await clickTab('仓库识别')
 
-    const alert = activePanel()?.querySelector('[role="alert"]')
-    expect(alert?.textContent).toContain('仓库数据读取失败')
-    expect(activePanel()?.textContent).not.toContain('还没有仓库识别结果')
-    expect(alert?.textContent).not.toContain('Internal Server Error')
+    const panel = activePanel()!
+    const alert = within(panel).getByRole('alert')
+    expect(alert.textContent).toContain('仓库数据读取失败')
+    expect(panel.textContent).not.toContain('还没有仓库识别结果')
+    expect(alert.textContent).not.toContain('Internal Server Error')
 
-    const depotRetry = alert?.querySelector<HTMLButtonElement>('button')
-    expect(depotRetry).toBeDefined()
-    await click(depotRetry!)
+    const depotRetry = within(alert).getByRole<HTMLButtonElement>('button')
+    await click(depotRetry)
     expect(mocks.getDepotData).toHaveBeenCalledTimes(2)
-    expect(activePanel()?.querySelector('[role="alert"]')).toBeNull()
+    expect(within(activePanel()!).queryByRole('alert')).toBeNull()
     expect(activePanel()?.textContent).toContain('物品种类')
   })
 
@@ -530,24 +589,24 @@ describe('DataStatistics layout surfaces', () => {
       .mockReturnValueOnce(oldCatalog.promise)
       .mockReturnValueOnce(newCatalog.promise)
 
-    await act(async () => root.render(
+    const view = renderPage(
       <Activity mode="visible">
         <DataStatistics />
       </Activity>,
-    ))
+    )
     await flush()
 
-    await act(async () => root.render(
+    view.rerender(
       <Activity mode="hidden">
         <DataStatistics />
       </Activity>,
-    ))
+    )
     await flush()
-    await act(async () => root.render(
+    view.rerender(
       <Activity mode="visible">
         <DataStatistics />
       </Activity>,
-    ))
+    )
     await flush()
 
     expect(mocks.getDepotData).toHaveBeenCalledTimes(2)
@@ -580,7 +639,7 @@ describe('DataStatistics layout surfaces', () => {
 
     expect(container.textContent).toContain('正在读取干员数据')
     expect(container.textContent).not.toContain('旧干员')
-    await click(findButton('仓库识别')!)
+    await clickTab('仓库识别')
     expect(container.textContent).toContain('正在读取仓库数据')
     expect(container.textContent).not.toContain('旧仓库物品')
 
@@ -610,25 +669,63 @@ describe('DataStatistics layout surfaces', () => {
 
     expect(container.textContent).toContain('新仓库物品')
     expect(container.textContent).not.toContain('旧仓库物品')
-    await click(findButton('干员识别')!)
+    await clickTab('干员识别')
     expect(container.textContent).toContain('新干员')
     expect(container.textContent).not.toContain('旧干员')
   })
 
   it('renders a React-owned fallback when a depot image fails', async () => {
-    await act(async () => root.render(<DataStatistics />))
+    renderPage()
     await flush()
-    await click(findButton('仓库识别')!)
+    await clickTab('仓库识别')
 
     const image = container.querySelector<HTMLImageElement>('.depot-item-image')
     expect(image).not.toBeNull()
     expect(image?.getAttribute('alt')).toBe('')
     const tile = image?.closest('.depot-item')
     expect(tile).not.toBeNull()
-    await act(async () => image?.dispatchEvent(new Event('error', { bubbles: true })))
+    fireEvent.error(image!)
     await flush()
 
     expect(tile?.querySelector('img')).toBeNull()
     expect(tile?.querySelector('[role="img"][aria-label="固源岩图标不可用"]')).not.toBeNull()
+  })
+
+  it('renders the operator and depot grids through the virtual path when the scroll host exists', async () => {
+    const scrollHost = document.createElement('div')
+    scrollHost.className = 'la-pluma-scroll-host'
+    document.body.appendChild(scrollHost)
+    window.history.replaceState(null, '', '/?tab=depot')
+
+    mocks.getAllOperators.mockResolvedValue({
+      success: true,
+      data: [{ id: 'char_001', name: '测试干员', rarity: 6, profession: 'SNIPER' }],
+    })
+    mocks.getOperBoxData.mockResolvedValue({
+      success: true,
+      data: {
+        operCount: 1,
+        data: [{ id: 'char_001', name: '测试干员', rarity: 6, level: 80, elite: 2, potential: 1 }],
+        timestamp: '2026-07-20T08:00:00.000Z',
+      },
+    })
+
+    renderPage()
+    await flush()
+
+    const panel = activePanel()!
+    const depotGrid = panel.querySelector<HTMLUListElement>('ul.depot-item-grid')
+    expect(depotGrid).not.toBeNull()
+    expect(depotGrid?.getAttribute('aria-label')).toBe('全部物品')
+    const depotItems = within(depotGrid!).getAllByRole('listitem')
+    expect(depotItems).toHaveLength(4)
+    expect(depotItems[0]?.textContent).toContain('固源岩')
+    expect(depotGrid?.querySelectorAll('.depot-item')).toHaveLength(4)
+
+    const operatorGrid = container.querySelector<HTMLUListElement>('ul.data-statistics-item-grid')
+    expect(operatorGrid).not.toBeNull()
+    expect(operatorGrid?.querySelectorAll('.data-statistics-operator-item')).toHaveLength(1)
+    expect(operatorGrid?.textContent).toContain('测试干员')
+    expect(container.querySelector('div.data-statistics-item-grid')).toBeNull()
   })
 })

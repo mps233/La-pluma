@@ -1,14 +1,9 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useDashboardFlowLayout } from './useDashboardFlowLayout'
 
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-
-let container: HTMLDivElement
-let root: Root
 let resizeCallback: ResizeObserverCallback | null = null
 let flowHeight = 474
 
@@ -50,9 +45,6 @@ describe('useDashboardFlowLayout', () => {
   beforeEach(() => {
     flowHeight = 474
     resizeCallback = null
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
 
     vi.stubGlobal('matchMedia', () => ({
       matches: true,
@@ -80,20 +72,19 @@ describe('useDashboardFlowLayout', () => {
     })
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
+    cleanup()
     vi.unstubAllGlobals()
   })
 
   it('keeps the columns stable when transient feedback is removed', async () => {
-    await act(async () => root.render(<Harness showFeedback />))
+    const { rerender } = render(<Harness showFeedback />)
 
-    const grid = container.querySelector<HTMLElement>('[data-testid="grid"]')!
-    const flow = container.querySelector<HTMLElement>('[data-testid="flow"]')!
-    const feedback = container.querySelector<HTMLElement>('[data-dashboard-flow-feedback]')!
-    const previewCard = container.querySelector<HTMLElement>('[data-dashboard-preview-card]')!
-    const previewFrame = container.querySelector<HTMLElement>('[data-dashboard-preview-frame]')!
+    const grid = screen.getByTestId('grid')
+    const flow = screen.getByTestId('flow')
+    const feedback = document.querySelector<HTMLElement>('[data-dashboard-flow-feedback]')!
+    const previewCard = document.querySelector<HTMLElement>('[data-dashboard-preview-card]')!
+    const previewFrame = document.querySelector<HTMLElement>('[data-dashboard-preview-frame]')!
 
     grid.getBoundingClientRect = () => rect(1116, flowHeight)
     flow.getBoundingClientRect = () => rect(390, flowHeight)
@@ -107,7 +98,7 @@ describe('useDashboardFlowLayout', () => {
     expect(grid.style.getPropertyValue('--dashboard-flow-columns')).toBe(stableColumns)
 
     flowHeight = 437
-    await act(async () => root.render(<Harness showFeedback={false} />))
+    rerender(<Harness showFeedback={false} />)
     await act(async () => resizeCallback?.([], {} as ResizeObserver))
 
     expect(grid.style.getPropertyValue('--dashboard-flow-columns')).toBe(stableColumns)
