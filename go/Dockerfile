@@ -6,11 +6,9 @@ ARG VITE_BASE_PATH=/
 ENV VITE_BASE_PATH=${VITE_BASE_PATH}
 WORKDIR /app/client
 COPY client/package*.json ./
-# npmmirror 加速国内拉取，但 @zakisheriff 等新发布的包在镜像站可能缺失或滞后，
-# 显式把该 scope 指回官方 registry，避免 npm ci 404。
-RUN npm config set registry https://registry.npmmirror.com \
- && npm config set @zakisheriff:registry https://registry.npmjs.org \
- && npm ci
+# CI 与 Docker 统一使用官方 registry。npmmirror 缺少部分新发布的 scoped 包
+# （例如 @zakisheriff/liquid-glass@4.0.3），曾导致镜像构建 404。
+RUN npm ci --registry=https://registry.npmjs.org
 COPY client/ ./
 RUN npm run build
 
