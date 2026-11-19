@@ -34,3 +34,6 @@ client/tsconfig.tsbuildinfo
 
 # .agents 下的 skill 副本（.claude/skills 为规范位置）
 .agents/skills/islandcn/
+
+# 本地 agent 工作流（仅本机使用，不进版本库）
+.agents/upstream-watch/
