@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
-import { act, forwardRef, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUIStore } from '@/stores'
 import ThemeToggle from './ThemeToggle'
 
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+afterEach(cleanup)
 
 vi.mock('framer-motion', () => ({
   AnimatePresence: ({ children }: { children: ReactNode }) => children,
@@ -29,9 +30,6 @@ vi.mock('framer-motion', () => ({
   },
 }))
 
-let container: HTMLDivElement
-let root: Root
-
 const mediaQueryList = (query: string): MediaQueryList => ({
   matches: query === '(prefers-color-scheme: dark)',
   media: query,
@@ -43,62 +41,70 @@ const mediaQueryList = (query: string): MediaQueryList => ({
   dispatchEvent: vi.fn(),
 })
 
+let frameRunning = false
+
 describe('ThemeToggle mobile menu', () => {
   beforeEach(() => {
+    frameRunning = false
     window.matchMedia = vi.fn(mediaQueryList)
     window.requestAnimationFrame = vi.fn(callback => {
-      callback(0)
+      // Liquid Glass keeps scheduling its own animation frames. Run each
+      // outer frame synchronously for focus assertions, but drop re-entrant
+      // frames so the synchronous stub cannot recurse forever.
+      if (frameRunning) return 1
+      frameRunning = true
+      try {
+        callback(0)
+      } finally {
+        frameRunning = false
+      }
       return 1
     })
     window.cancelAnimationFrame = vi.fn()
     useUIStore.getState().setTheme('system')
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
     vi.restoreAllMocks()
   })
 
   it('opens an anchored radio menu and applies the selected theme', async () => {
-    await act(async () => root.render(<ThemeToggle />))
-    const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!
+    const user = userEvent.setup({ delay: null })
+    render(<ThemeToggle />)
+    const trigger = screen.getByRole('button', { name: '切换界面主题，当前跟随系统' })
 
-    await act(async () => trigger.click())
-    const menu = container.querySelector<HTMLElement>('[role="menu"]')!
-    const selectedOption = menu.querySelector<HTMLElement>('[role="menuitemradio"][aria-checked="true"]')
-    expect(selectedOption?.textContent).toContain('跟随系统')
+    await user.click(trigger)
+    const menu = screen.getByRole('menu', { name: '选择界面主题' })
+    const selectedOption = within(menu).getByRole('menuitemradio', { checked: true })
+    expect(selectedOption.textContent).toContain('跟随系统')
     expect(document.activeElement).toBe(selectedOption)
 
-    const lightOption = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
-      .find(option => option.textContent?.includes('亮色模式'))!
-    await act(async () => lightOption.click())
+    const lightOption = within(menu).getByRole('menuitemradio', { name: '亮色模式' })
+    await user.click(lightOption)
 
     expect(useUIStore.getState().theme).toBe('light')
-    expect(container.querySelector('[role="menu"]')).toBeNull()
+    expect(screen.queryByRole('menu')).toBeNull()
     expect(document.activeElement).toBe(trigger)
   })
 
   it('keeps the desktop segmented control and store selection in sync', async () => {
-    await act(async () => root.render(<ThemeToggle />))
+    const user = userEvent.setup({ delay: null })
+    render(<ThemeToggle />)
 
-    const group = container.querySelector<HTMLElement>('.la-pluma-theme-desktop[role="group"][aria-label="界面主题"]')!
-    const buttons = Array.from(group.querySelectorAll<HTMLButtonElement>('button'))
+    const group = screen.getByRole('group', { name: '界面主题' })
+    const buttons = within(group).getAllByRole('button')
 
     expect(buttons.map(button => button.getAttribute('aria-label'))).toEqual([
       '亮色模式',
       '暗色模式',
       '跟随系统',
     ])
-    expect(buttons.every(button => button.type === 'button')).toBe(true)
+    expect(buttons.every(button => (button as HTMLButtonElement).type === 'button')).toBe(true)
     expect(group.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(3)
     expect(buttons.filter(button => button.getAttribute('aria-pressed') === 'true')).toEqual([buttons[2]])
     expect(group.dataset.theme).toBe('system')
 
-    await act(async () => buttons[0]?.click())
+    await user.click(buttons[0]!)
 
     expect(useUIStore.getState().theme).toBe('light')
     expect(group.dataset.theme).toBe('light')
@@ -106,43 +112,47 @@ describe('ThemeToggle mobile menu', () => {
   })
 
   it('closes with Escape and restores focus to the trigger', async () => {
-    await act(async () => root.render(<ThemeToggle />))
-    const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!
-    await act(async () => trigger.click())
+    const user = userEvent.setup({ delay: null })
+    render(<ThemeToggle />)
+    const trigger = screen.getByRole('button', { name: '切换界面主题，当前跟随系统' })
+    await user.click(trigger)
 
-    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    await user.keyboard('{Escape}')
 
-    expect(container.querySelector('[role="menu"]')).toBeNull()
+    expect(screen.queryByRole('menu')).toBeNull()
     expect(document.activeElement).toBe(trigger)
   })
 
   it('moves through options with arrow keys and closes when tabbing away', async () => {
-    await act(async () => root.render(
+    const user = userEvent.setup({ delay: null })
+    render(
       <div className="la-pluma-navbar-actions">
         <ThemeToggle />
         <a href="https://github.com/mps233/La-pluma" className="la-pluma-github-link">GitHub</a>
       </div>,
-    ))
-    const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!
-    const githubLink = container.querySelector<HTMLAnchorElement>('.la-pluma-github-link')!
-    await act(async () => trigger.click())
+    )
+    const trigger = screen.getByRole('button', { name: '切换界面主题，当前跟随系统' })
+    const githubLink = screen.getByRole('link', { name: 'GitHub' })
+    await user.click(trigger)
 
-    const options = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
+    const options = screen.getAllByRole('menuitemradio')
     expect(document.activeElement).toBe(options[2])
 
-    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })))
+    await user.keyboard('{ArrowDown}')
     expect(document.activeElement).toBe(options[0])
 
-    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true })))
+    await user.keyboard('{End}')
     expect(document.activeElement).toBe(options[2])
 
-    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })))
-    expect(container.querySelector('[role="menu"]')).toBeNull()
+    // Tab is handled by the menu itself (focus trap + close), so dispatch the
+    // keydown directly instead of letting userEvent perform its own traversal.
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(screen.queryByRole('menu')).toBeNull()
     expect(document.activeElement).toBe(githubLink)
 
-    await act(async () => trigger.click())
-    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true })))
-    expect(container.querySelector('[role="menu"]')).toBeNull()
+    await user.click(trigger)
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(screen.queryByRole('menu')).toBeNull()
     expect(document.activeElement).toBe(trigger)
   })
 })

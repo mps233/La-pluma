@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
-import { act, useEffect, useState, type ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { act, cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { useEffect, useState, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+afterEach(cleanup)
 
 const appMocks = vi.hoisted(() => ({
   navigate: null as null | ((tab: string) => void),
@@ -95,9 +96,6 @@ vi.mock('./components/LogViewer', () => ({ default: () => <div>logs</div> }))
 vi.mock('./components/DataStatistics', () => ({ default: () => <div>statistics</div> }))
 vi.mock('./components/ConfigManager', () => ({ default: () => <div>config</div> }))
 
-let container: HTMLDivElement
-let root: Root
-
 function mediaQueryList(query: string): MediaQueryList {
   return {
     matches: false,
@@ -114,9 +112,6 @@ function mediaQueryList(query: string): MediaQueryList {
 describe('App motion preferences', () => {
   beforeEach(() => {
     window.matchMedia = vi.fn(mediaQueryList)
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
     appMocks.navigate = null
     appMocks.dashboardEffectStarts = 0
     appMocks.dashboardEffectStops = 0
@@ -126,29 +121,19 @@ describe('App motion preferences', () => {
     appMocks.automationShouldThrow = false
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
-  })
-
-  it('renders the app shell without a global animation provider', async () => {
-    await act(async () => root.render(<App />))
-    await act(async () => { await Promise.resolve() })
+  it('renders the app shell without a global animation provider', () => {
+    const { container } = render(<App />)
 
     expect(container.querySelector('#app-root')?.className).toContain('la-pluma-app')
-    expect(container.querySelector('[data-testid="motion-config"]')).toBeNull()
+    expect(screen.queryByTestId('motion-config')).toBeNull()
   })
 
   it('preserves page state while pausing effects on hidden workspaces', async () => {
-    await act(async () => root.render(<App />))
-    await act(async () => { await Promise.resolve() })
+    const user = userEvent.setup()
+    const { container } = render(<App />)
 
-    const draft = container.querySelector<HTMLInputElement>('[aria-label="控制台草稿"]')!
-    await act(async () => {
-      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      valueSetter?.call(draft, '未保存的连接地址')
-      draft.dispatchEvent(new Event('input', { bubbles: true }))
-    })
+    const draft = screen.getByLabelText('控制台草稿') as HTMLInputElement
+    await user.type(draft, '未保存的连接地址')
     expect(draft.value).toBe('未保存的连接地址')
     expect(appMocks.dashboardEffectStarts).toBe(1)
     expect(appMocks.automationEffectStarts).toBe(0)
@@ -159,14 +144,13 @@ describe('App motion preferences', () => {
     expect(appMocks.automationEffectStarts).toBe(1)
 
     await act(async () => appMocks.navigate?.('dashboard'))
-    expect(container.querySelector<HTMLInputElement>('[aria-label="控制台草稿"]')?.value).toBe('未保存的连接地址')
+    expect((screen.getByLabelText('控制台草稿') as HTMLInputElement).value).toBe('未保存的连接地址')
     expect(appMocks.dashboardEffectStarts).toBe(2)
     expect(appMocks.automationEffectStops).toBe(1)
   })
 
   it('keeps only the most recent workspaces mounted', async () => {
-    await act(async () => root.render(<App />))
-    await act(async () => { await Promise.resolve() })
+    const { container } = render(<App />)
 
     for (const tab of ['automation', 'combat', 'roguelike', 'training', 'tools']) {
       await act(async () => appMocks.navigate?.(tab))
@@ -181,8 +165,7 @@ describe('App motion preferences', () => {
   it('recovers a failed page after navigating away and back', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     appMocks.dashboardShouldThrow = true
-    await act(async () => root.render(<App />))
-    await act(async () => { await Promise.resolve() })
+    const { container } = render(<App />)
 
     expect(container.textContent).toContain('页面渲染失败：dashboard render failed')
 
@@ -190,7 +173,7 @@ describe('App motion preferences', () => {
     await act(async () => appMocks.navigate?.('automation'))
     await act(async () => appMocks.navigate?.('dashboard'))
 
-    expect(container.querySelector('[aria-label="控制台草稿"]')).not.toBeNull()
+    expect(screen.queryByLabelText('控制台草稿')).not.toBeNull()
     consoleError.mockRestore()
   })
 
@@ -198,8 +181,7 @@ describe('App motion preferences', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     appMocks.automationShouldThrow = true
 
-    await act(async () => root.render(<App />))
-    await act(async () => { await Promise.resolve() })
+    const { container } = render(<App />)
 
     expect(container.querySelector('[aria-label="控制台草稿"]')).not.toBeNull()
     expect(container.textContent).not.toContain('automation render failed')

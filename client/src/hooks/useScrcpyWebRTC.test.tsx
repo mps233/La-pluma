@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { Activity, act, useEffect, useRef } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { Activity, useEffect, useRef } from 'react'
+import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   bindInputChannelReadiness,
@@ -17,7 +17,7 @@ import {
   type ScrcpyCommandResult,
 } from './useScrcpyWebRTC'
 
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+afterEach(cleanup)
 
 class MockWebSocket {
   static readonly CONNECTING = 0
@@ -59,8 +59,7 @@ class MockWebSocket {
 type WebrtcHook = ReturnType<typeof useScrcpyWebRTC>
 
 let hook: WebrtcHook | null = null
-let root: Root
-let container: HTMLDivElement
+let view: ReturnType<typeof render>
 
 function Harness({ signalingUrl = 'ws://old-host:8443', passive = false }: { signalingUrl?: string; passive?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -88,7 +87,7 @@ async function connectAndOpenSocket() {
 }
 
 describe('useScrcpyWebRTC startup', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.useFakeTimers()
     MockWebSocket.instances = []
     vi.stubGlobal('WebSocket', MockWebSocket)
@@ -98,15 +97,11 @@ describe('useScrcpyWebRTC startup', () => {
       json: vi.fn().mockResolvedValue({ token: 'fresh-token' })
     }))
     window.localStorage.clear()
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
-    await act(async () => root.render(<Harness />))
+    view = render(<Harness />)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
+    cleanup()
     hook = null
     vi.unstubAllGlobals()
     vi.useRealTimers()
@@ -530,7 +525,7 @@ describe('WebRTC touch transport safeguards', () => {
 
 
 describe('useScrcpyWebRTC preview grace', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.useFakeTimers()
     MockWebSocket.instances = []
     vi.stubGlobal('WebSocket', MockWebSocket)
@@ -540,15 +535,11 @@ describe('useScrcpyWebRTC preview grace', () => {
       json: vi.fn().mockResolvedValue({ token: 'fresh-token' })
     }))
     window.localStorage.clear()
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
-    await act(async () => root.render(<Activity mode="visible"><Harness /></Activity>))
+    view = render(<Activity mode="visible"><Harness /></Activity>)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
+    cleanup()
     hook = null
     vi.unstubAllGlobals()
     vi.useRealTimers()
@@ -558,7 +549,7 @@ describe('useScrcpyWebRTC preview grace', () => {
     const socket = await connectAndOpenSocket()
     const renderMode = async (mode: 'visible' | 'hidden') => {
       await act(async () => {
-        root.render(<Activity mode={mode}><Harness /></Activity>)
+        view.rerender(<Activity mode={mode}><Harness /></Activity>)
       })
       await flushAsyncWork()
     }
@@ -667,7 +658,7 @@ describe('useScrcpyWebRTC input recovery', () => {
 
   const originalHidden = Object.getOwnPropertyDescriptor(document, 'hidden')
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.useFakeTimers()
     MockWebSocket.instances = []
     MockPeerConnection.instances = []
@@ -681,15 +672,11 @@ describe('useScrcpyWebRTC input recovery', () => {
       json: vi.fn().mockResolvedValue({ token: 'fresh-token' })
     }))
     window.localStorage.clear()
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
-    await act(async () => root.render(<Harness />))
+    view = render(<Harness />)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
+    cleanup()
     hook = null
     vi.unstubAllGlobals()
     vi.useRealTimers()
@@ -1106,7 +1093,7 @@ describe('useScrcpyWebRTC input recovery', () => {
   })
 
   it('does not connect in passive mode', async () => {
-    await act(async () => root.render(<Harness passive />))
+    view.rerender(<Harness passive />)
     await settleAsyncWork()
 
     act(() => hook!.connect())
@@ -1125,9 +1112,7 @@ describe('useScrcpyWebRTC input recovery', () => {
     const { channel } = await connectWithInputChannel()
 
     act(() => channel.close())
-    await act(async () => {
-      root.render(<></>)
-    })
+    view.rerender(<></>)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_000)
     })

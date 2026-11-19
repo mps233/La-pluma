@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
 
-import { act, type ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import type { ReactNode } from 'react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MasteryTrainingWorkspace from './MasteryTrainingWorkspace'
 import type { MasteryCandidate, MasteryOperatorDetail, MasteryQueueItem, MasteryQueueStatus } from '@/types/components'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const mocks = vi.hoisted(() => ({
   getMasteryPreflight: vi.fn(),
@@ -76,9 +75,6 @@ vi.mock('../../services/api', () => ({
 vi.mock('../../services/operatorQuotes', () => ({
   getOperatorAvatarUrl: (id: string) => `/avatars/${id}.png`,
 }))
-
-let container: HTMLDivElement
-let root: Root
 
 const candidate: MasteryCandidate = {
   id: 'char_test',
@@ -179,6 +175,15 @@ const queuedItem: MasteryQueueItem = {
   skippedAt: null,
 }
 
+const secondQueuedItem: MasteryQueueItem = {
+  ...queuedItem,
+  id: 'char_test:2',
+  skillIndex: 2,
+  skillId: 'skchr_test_2',
+  skillName: '测试技能二',
+  order: 2,
+}
+
 const status: MasteryQueueStatus = {
   campaign: {
     status: 'idle',
@@ -204,10 +209,18 @@ const status: MasteryQueueStatus = {
   scheduler: { running: true, tickMs: 60_000, lastTickAt: null, lastTickError: null, tickInFlight: false },
 }
 
+const buildStatus = (items: MasteryQueueItem[]): MasteryQueueStatus => ({
+  ...status,
+  items,
+  counts: { total: items.length, queued: items.length, training: 0, blocked: 0, completed: 0 },
+  nextActionableItem: items[0] ?? null,
+})
+
+const renderWorkspace = () => render(<MasteryTrainingWorkspace />)
+
+const findCandidateButton = () => screen.findByRole('button', { name: '测试干员，添加专精目标' })
+
 beforeEach(() => {
-  container = document.createElement('div')
-  document.body.appendChild(container)
-  root = createRoot(container)
   mocks.getMasteryPreflight.mockReset().mockResolvedValue({
     success: true,
     data: {
@@ -261,22 +274,11 @@ beforeEach(() => {
   mocks.clearSklandCredentials.mockReset().mockResolvedValue({ success: true })
 })
 
-afterEach(() => {
-  act(() => root.unmount())
-  container.remove()
-  document.body.innerHTML = ''
-})
-
-async function settle() {
-  await act(async () => {
-    await new Promise(resolve => setTimeout(resolve, 0))
-    await Promise.resolve()
-    await Promise.resolve()
-  })
-}
+afterEach(cleanup)
 
 describe('MasteryTrainingWorkspace', () => {
   it('shows synced mastery levels on cards and in the target dialog', async () => {
+    const user = userEvent.setup({ delay: null })
     mocks.getSklandStatus.mockResolvedValue({
       success: true,
       data: { configured: true, uid: 'uid-1', nickname: 'Dr. Test', characterCount: 2, lastSyncedAt: '2026-11-17T00:00:00.000Z' },
@@ -299,35 +301,27 @@ describe('MasteryTrainingWorkspace', () => {
         },
       },
     })
-    await act(async () => {
-      root.render(<MasteryTrainingWorkspace />)
-    })
-    await settle()
+    const view = renderWorkspace()
+    await waitFor(() => expect(view.container.textContent).toContain('专精 1/2 · 最高 M2'))
 
-    expect(container.textContent).toContain('专精 1/2 · 最高 M2')
-
-    const candidateButton = Array.from(container.querySelectorAll('button'))
-      .find(button => button.getAttribute('aria-label')?.includes('添加专精目标'))
-    await act(async () => {
-      candidateButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-    await settle()
-    expect(document.body.textContent).toContain('已专精 M2')
+    const candidateButton = await findCandidateButton()
+    await user.click(candidateButton)
+    await waitFor(() => expect(document.body.textContent).toContain('已专精 M2'))
   })
 
   it('renders the mastery picker and empty queue', async () => {
-    await act(async () => {
-      root.render(<MasteryTrainingWorkspace />)
-    })
-    await settle()
+    const view = renderWorkspace()
+    await findCandidateButton()
+    await screen.findByText('还没有专精目标')
 
-    expect(container.textContent).toContain('添加专精目标')
-    expect(container.textContent).toContain('自动专精')
-    expect(container.textContent).toContain('测试干员')
-    expect(container.textContent).toContain('还没有专精目标')
+    expect(view.container.textContent).toContain('添加专精目标')
+    expect(view.container.textContent).toContain('自动专精')
+    expect(view.container.textContent).toContain('测试干员')
+    expect(view.container.textContent).toContain('还没有专精目标')
   })
 
   it('marks a queued skill and asks before removing a target', async () => {
+    const user = userEvent.setup({ delay: null })
     mocks.getMasteryStatus.mockResolvedValue({
       success: true,
       data: {
@@ -337,85 +331,100 @@ describe('MasteryTrainingWorkspace', () => {
         nextActionableItem: queuedItem,
       },
     })
-    await act(async () => {
-      root.render(<MasteryTrainingWorkspace />)
-    })
-    await settle()
+    const view = renderWorkspace()
 
-    const candidateButton = Array.from(container.querySelectorAll('button'))
-      .find(button => button.getAttribute('aria-label')?.includes('添加专精目标'))
-    await act(async () => {
-      candidateButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-    await settle()
+    const candidateButton = await findCandidateButton()
+    await user.click(candidateButton)
+    await waitFor(() => expect(document.body.textContent).toContain('等待执行 · M0→M3'))
+    expect(view.container.textContent).toContain('受阻通知')
 
-    expect(document.body.textContent).toContain('等待执行 · M0→M3')
-    expect(container.textContent).toContain('受阻通知')
+    const targetDialog = await screen.findByRole('dialog', { name: '设置专精目标' })
+    await user.click(within(targetDialog).getByRole('button', { name: '取消' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '设置专精目标' })).toBeNull())
 
-    const closeButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent === '取消')
-    await act(async () => {
-      closeButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-    await settle()
-
-    const removeButton = Array.from(container.querySelectorAll('button'))
-      .find(button => button.getAttribute('aria-label')?.startsWith('移除'))
-    expect(removeButton).toBeTruthy()
-    await act(async () => {
-      removeButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-    await settle()
+    const removeButton = await screen.findByRole('button', { name: '移除 测试干员 · 测试技能一' })
+    await user.click(removeButton)
     expect(mocks.removeMasteryTarget).not.toHaveBeenCalled()
     expect(document.body.textContent).toContain('移除专精目标')
 
-    const confirmButton = Array.from(document.querySelectorAll('button'))
-      .find(button => button.textContent?.includes('移除目标'))
-    await act(async () => {
-      confirmButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-    await settle()
-    expect(mocks.removeMasteryTarget).toHaveBeenCalledWith('char_test:1')
+    const confirmDialog = await screen.findByRole('alertdialog', { name: '移除专精目标' })
+    await user.click(within(confirmDialog).getByRole('button', { name: '移除目标' }))
+    await waitFor(() => expect(mocks.removeMasteryTarget).toHaveBeenCalledWith('char_test:1'))
   })
 
   it('shows the preflight loading note instead of a failure', async () => {
     mocks.getMasteryPreflight.mockReturnValue(new Promise(() => {}))
-    await act(async () => {
-      root.render(<MasteryTrainingWorkspace />)
-    })
-    await settle()
-    expect(container.textContent).toContain('正在检查运行环境...')
-    expect(container.textContent).not.toContain('专精运行前检查未通过')
+    const view = renderWorkspace()
+    await screen.findByText('还没有专精目标')
+
+    expect(view.container.textContent).toContain('正在检查运行环境...')
+    expect(view.container.textContent).not.toContain('专精运行前检查未通过')
   })
 
   it('opens the target dialog and adds a selected skill', async () => {
-    await act(async () => {
-      root.render(<MasteryTrainingWorkspace />)
-    })
-    await settle()
+    const user = userEvent.setup({ delay: null })
+    renderWorkspace()
 
-    const candidateButton = Array.from(container.querySelectorAll('button'))
-      .find(button => button.getAttribute('aria-label')?.includes('添加专精目标'))
+    const candidateButton = await findCandidateButton()
     expect(candidateButton).toBeTruthy()
 
-    await act(async () => {
-      candidateButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await user.click(candidateButton)
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('设置专精目标')
+      expect(document.body.textContent).toContain('技能 1 · 测试技能一')
     })
-    await settle()
 
-    expect(document.body.textContent).toContain('设置专精目标')
-    expect(document.body.textContent).toContain('技能 1 · 测试技能一')
-
-    const addButton = Array.from(document.querySelectorAll('button'))
-      .find(button => button.textContent?.includes('加入专精队列'))
+    const targetDialog = await screen.findByRole('dialog', { name: '设置专精目标' })
+    const addButton = within(targetDialog).getByRole('button', { name: /加入专精队列/ })
     expect(addButton).toBeTruthy()
 
-    await act(async () => {
-      addButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-    await settle()
+    await user.click(addButton)
+    await waitFor(() => expect(mocks.addMasteryTargets).toHaveBeenCalledTimes(1))
 
-    expect(mocks.addMasteryTargets).toHaveBeenCalledTimes(1)
     const [items] = mocks.addMasteryTargets.mock.calls[0] as [Array<{ operatorId: string; skillIndex: number; targetLevel: number; declaredLevel: number }>]
     expect(items).toEqual([{ operatorId: 'char_test', skillIndex: 1, targetLevel: 3, declaredLevel: 0 }])
+  })
+
+  it('exposes a drag handle for every queue item', async () => {
+    mocks.getMasteryStatus.mockResolvedValue({ success: true, data: buildStatus([queuedItem, secondQueuedItem]) })
+    renderWorkspace()
+
+    const firstHandle = await screen.findByLabelText('拖动排序 测试干员 · 测试技能一')
+    const secondHandle = screen.getByLabelText('拖动排序 测试干员 · 测试技能二')
+
+    expect(firstHandle.tagName).toBe('SPAN')
+    expect(secondHandle.tagName).toBe('SPAN')
+    expect(firstHandle.getAttribute('title')).toBe('拖动排序')
+    expect(secondHandle.getAttribute('title')).toBe('拖动排序')
+    expect(firstHandle.getAttribute('aria-disabled')).not.toBe('true')
+    expect(secondHandle.getAttribute('aria-disabled')).not.toBe('true')
+    expect(screen.getAllByLabelText(/^拖动排序 /)).toHaveLength(2)
+  })
+
+  it('keeps the up and down reorder buttons working', async () => {
+    const user = userEvent.setup({ delay: null })
+    const itemsById: Record<string, MasteryQueueItem> = {
+      [queuedItem.id]: queuedItem,
+      [secondQueuedItem.id]: secondQueuedItem,
+    }
+    let currentItems = [queuedItem, secondQueuedItem]
+    mocks.getMasteryStatus.mockImplementation(async () => ({ success: true, data: buildStatus(currentItems) }))
+    mocks.reorderMasteryTargets.mockImplementation(async (ids: string[]) => {
+      currentItems = ids.flatMap((id, index) => {
+        const item = itemsById[id]
+        return item ? [{ ...item, order: index + 1 }] : []
+      })
+      return { success: true, data: { items: currentItems } }
+    })
+    renderWorkspace()
+
+    const downButton = await screen.findByRole('button', { name: '下移 测试干员 · 测试技能一' })
+    await user.click(downButton)
+    await waitFor(() => expect(mocks.reorderMasteryTargets).toHaveBeenCalledWith(['char_test:2', 'char_test:1']))
+
+    const upButton = await screen.findByRole('button', { name: '上移 测试干员 · 测试技能一' }) as HTMLButtonElement
+    await waitFor(() => expect(upButton.disabled).toBe(false))
+    await user.click(upButton)
+    await waitFor(() => expect(mocks.reorderMasteryTargets).toHaveBeenLastCalledWith(['char_test:1', 'char_test:2']))
   })
 })

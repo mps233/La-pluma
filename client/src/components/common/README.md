@@ -331,8 +331,17 @@ Props：
 
 页面结构、组件选型和重构顺序见 `DESIGN.md` 的「重构建议」，本文件不再重复该清单。
 
+## 测试约定
+
+新增组件测试优先使用 `@testing-library/react` + `@testing-library/user-event`：
+
+- 按 role、label、text 查询，不依赖实现细节。
+- 用 `userEvent` 模拟真实点击、键盘和输入序列。
+- 测试文件内显式 `afterEach(cleanup)`；不要把 cleanup 塞进全局 setup（node 环境的测试也会加载）。
+- 不要重新引入 `createRoot + act + dispatchEvent` 的样板；客户端测试已全部迁移到 RTL。
+
 ---
 
 **创建时间**：2026-02-09
-**最后更新**：2026-11-01
+**最后更新**：2026-11-20
 **维护者**：@mps233

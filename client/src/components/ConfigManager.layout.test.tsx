@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
-import { act, type ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ConfigManager from './ConfigManager'
 import { installMobileMatchMedia, swipe } from '../test/swipe'
 
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+afterEach(cleanup)
 
 const mocks = vi.hoisted(() => ({
   getConfig: vi.fn(),
@@ -68,8 +69,7 @@ vi.mock('../store/statusStore', () => {
 
 vi.mock('./FloatingStatusIndicator', () => ({ default: () => null }))
 
-let container: HTMLDivElement
-let root: Root
+let user: ReturnType<typeof userEvent.setup>
 
 const flush = async () => {
   await act(async () => {
@@ -89,6 +89,7 @@ const deferred = <T,>() => {
 describe('ConfigManager layout surfaces', () => {
   beforeEach(() => {
     localStorage.clear()
+    user = userEvent.setup()
     mocks.getConfig.mockReset().mockResolvedValue({
       success: true,
       data: {
@@ -115,19 +116,14 @@ describe('ConfigManager layout surfaces', () => {
     mocks.updateMaaCli.mockReset().mockResolvedValue({ success: true })
     mocks.hotUpdateResources.mockReset().mockResolvedValue({ success: true })
     mocks.setMessage.mockReset()
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
     vi.restoreAllMocks()
   })
 
   it('uses the shared liquid segments and continuous corners for the configuration workspace', async () => {
-    await act(async () => root.render(<ConfigManager />))
+    const { container } = render(<ConfigManager />)
     await flush()
 
     const page = container.querySelector('.ios-workspace-page')
@@ -169,10 +165,10 @@ describe('ConfigManager layout surfaces', () => {
     expect(page?.querySelector('.smooth-panel-shell')).toBeNull()
     expect(page?.querySelector('.app-card .app-info-card')).toBeNull()
 
-    const autoUpdateToggle = page?.querySelector<HTMLButtonElement>('[aria-label="启用自动更新"]')
-    expect(autoUpdateToggle?.getAttribute('role')).toBe('switch')
-    expect(autoUpdateToggle?.classList.contains('lg-switch')).toBe(true)
-    expect(autoUpdateToggle?.querySelector('.lg-switch__track')).not.toBeNull()
+    const autoUpdateToggle = screen.getByRole('switch', { name: '启用自动更新' }) as HTMLButtonElement
+    expect(autoUpdateToggle.getAttribute('role')).toBe('switch')
+    expect(autoUpdateToggle.classList.contains('lg-switch')).toBe(true)
+    expect(autoUpdateToggle.querySelector('.lg-switch__track')).not.toBeNull()
     const reconnectRow = page?.querySelector('.config-reconnect-row')
     expect(reconnectRow).not.toBeNull()
     expect(reconnectRow?.classList.contains('surface-soft')).toBe(false)
@@ -184,7 +180,7 @@ describe('ConfigManager layout surfaces', () => {
 
   it('switches configuration sections with a horizontal swipe', async () => {
     installMobileMatchMedia()
-    await act(async () => root.render(<ConfigManager />))
+    const { container } = render(<ConfigManager />)
     await flush()
 
     const navigationTrack = container.querySelector('[data-config-sections] .lg-track[role="tablist"]')
@@ -203,25 +199,23 @@ describe('ConfigManager layout surfaces', () => {
   it('shows a retryable config-directory error instead of an endless loading label', async () => {
     mocks.getConfigDir.mockResolvedValueOnce({ success: false, message: '目录服务暂不可用' })
 
-    await act(async () => root.render(<ConfigManager />))
+    const { container } = render(<ConfigManager />)
     await flush()
 
     expect(container.textContent).not.toContain('正在读取目录...')
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('配置目录读取失败: 目录服务暂不可用')
-    const openButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
-      .find(button => button.textContent?.includes('打开目录'))
-    const retryButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
-      .find(button => button.textContent?.trim() === '重试')
-    expect(openButton?.disabled).toBe(true)
+    const openButton = screen.getByRole('button', { name: '打开目录' }) as HTMLButtonElement
+    const retryButton = screen.getByRole('button', { name: '重试' }) as HTMLButtonElement
+    expect(openButton.disabled).toBe(true)
     expect(retryButton).toBeDefined()
 
     mocks.getConfigDir.mockResolvedValueOnce({ success: true, data: '/tmp/recovered-config' })
-    await act(async () => retryButton?.click())
+    await user.click(retryButton)
     await flush()
 
     expect(container.textContent).toContain('/tmp/recovered-config')
     expect(container.querySelector('[role="alert"]')).toBeNull()
-    expect(openButton?.disabled).toBe(false)
+    expect(openButton.disabled).toBe(false)
   })
 
   it('keeps auto-update edits local until the user explicitly saves them', async () => {
@@ -230,34 +224,26 @@ describe('ConfigManager layout surfaces', () => {
       data: { enabled: true, time: '04:00', updateCore: true, updateCli: false },
     })
 
-    await act(async () => root.render(<ConfigManager />))
+    const { container } = render(<ConfigManager />)
     await flush()
 
     expect(mocks.setupAutoUpdate).not.toHaveBeenCalled()
 
-    const timeInput = container.querySelector<HTMLInputElement>('input[placeholder="HH:MM"]')
+    const timeInput = screen.getByPlaceholderText<HTMLInputElement>('HH:MM')
     expect(timeInput).not.toBeNull()
 
-    await act(async () => {
-      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      valueSetter?.call(timeInput, '05:30')
-      timeInput?.dispatchEvent(new Event('input', { bubbles: true }))
-    })
+    await user.clear(timeInput)
+    await user.type(timeInput, '05:30')
 
     expect(mocks.saveUserConfig).not.toHaveBeenCalled()
     expect(mocks.setupAutoUpdate).not.toHaveBeenCalled()
     expect(container.textContent).toContain('有尚未保存的更改')
 
-    const saveButton = Array.from(container.querySelectorAll('button')).find(button =>
-      button.textContent?.includes('保存自动更新')
-    )
-    expect(saveButton?.disabled).toBe(false)
+    const saveButton = screen.getByRole('button', { name: '保存自动更新' }) as HTMLButtonElement
+    expect(saveButton.disabled).toBe(false)
 
-    await act(async () => {
-      saveButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      await Promise.resolve()
-      await Promise.resolve()
-    })
+    await user.click(saveButton)
+    await flush()
 
     const expectedConfig = { enabled: true, time: '05:30', updateCore: true, updateCli: false }
     expect(mocks.saveUserConfig).toHaveBeenCalledWith('auto-update', expectedConfig)
@@ -269,15 +255,12 @@ describe('ConfigManager layout surfaces', () => {
   it('shows connection save failures in place and in the global status', async () => {
     mocks.saveConfig.mockResolvedValue({ success: false, message: '磁盘只读' })
 
-    await act(async () => root.render(<ConfigManager />))
+    const { container } = render(<ConfigManager />)
     await flush()
 
-    const saveButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.trim() === '保存')
-    await act(async () => {
-      saveButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      await Promise.resolve()
-      await Promise.resolve()
-    })
+    const saveButton = screen.getByRole('button', { name: '保存' }) as HTMLButtonElement
+    await user.click(saveButton)
+    await flush()
 
     const inlineError = container.querySelector('[role="alert"]')
     expect(inlineError?.textContent).toContain('连接配置保存失败: 磁盘只读')
@@ -291,28 +274,20 @@ describe('ConfigManager layout surfaces', () => {
     })
     mocks.saveUserConfig.mockResolvedValue({ success: false, message: '配置目录不可写' })
 
-    await act(async () => root.render(<ConfigManager />))
+    const { container } = render(<ConfigManager />)
     await flush()
 
-    const timeInput = container.querySelector<HTMLInputElement>('input[placeholder="HH:MM"]')
-    await act(async () => {
-      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      valueSetter?.call(timeInput, '06:15')
-      timeInput?.dispatchEvent(new Event('input', { bubbles: true }))
-    })
+    const timeInput = screen.getByPlaceholderText<HTMLInputElement>('HH:MM')
+    await user.clear(timeInput)
+    await user.type(timeInput, '06:15')
 
-    const saveButton = Array.from(container.querySelectorAll('button')).find(button =>
-      button.textContent?.includes('保存自动更新')
-    )
-    await act(async () => {
-      saveButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      await Promise.resolve()
-      await Promise.resolve()
-    })
+    const saveButton = screen.getByRole('button', { name: '保存自动更新' }) as HTMLButtonElement
+    await user.click(saveButton)
+    await flush()
 
     expect(mocks.setupAutoUpdate).not.toHaveBeenCalled()
-    expect(timeInput?.value).toBe('06:15')
-    expect(saveButton?.disabled).toBe(false)
+    expect(timeInput.value).toBe('06:15')
+    expect(saveButton.disabled).toBe(false)
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('自动更新设置保存失败: 配置目录不可写')
     expect(mocks.setMessage).toHaveBeenCalledWith('自动更新设置保存失败: 配置目录不可写', 'error')
   })
@@ -325,22 +300,17 @@ describe('ConfigManager layout surfaces', () => {
     })
     mocks.saveUserConfig.mockReturnValueOnce(pendingSave.promise)
 
-    await act(async () => root.render(<ConfigManager />))
+    const { container } = render(<ConfigManager />)
     await flush()
 
-    const timeInput = container.querySelector<HTMLInputElement>('input[placeholder="HH:MM"]')!
+    const timeInput = screen.getByPlaceholderText<HTMLInputElement>('HH:MM')!
     const setTime = async (value: string) => {
-      await act(async () => {
-        const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-        valueSetter?.call(timeInput, value)
-        timeInput.dispatchEvent(new Event('input', { bubbles: true }))
-      })
+      await user.clear(timeInput)
+      await user.type(timeInput, value)
     }
     await setTime('05:30')
-    const saveButton = Array.from(container.querySelectorAll('button')).find(button =>
-      button.textContent?.includes('保存自动更新')
-    )!
-    await act(async () => saveButton.click())
+    const saveButton = screen.getByRole('button', { name: '保存自动更新' }) as HTMLButtonElement
+    await user.click(saveButton)
     await setTime('06:45')
 
     await act(async () => pendingSave.resolve({ success: true }))
@@ -360,16 +330,13 @@ describe('ConfigManager layout surfaces', () => {
     }>()
     mocks.getConfig.mockReturnValueOnce(pendingConfig.promise)
 
-    await act(async () => root.render(<ConfigManager />))
+    render(<ConfigManager />)
     await flush()
 
-    const addressInput = Array.from(container.querySelectorAll<HTMLInputElement>('input'))
-      .find(input => input.value === '127.0.0.1:16384')!
-    await act(async () => {
-      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      valueSetter?.call(addressInput, '127.0.0.1:5555')
-      addressInput.dispatchEvent(new Event('input', { bubbles: true }))
-    })
+    const addressInput = screen.getByLabelText<HTMLInputElement>('连接地址')
+    expect(addressInput.value).toBe('127.0.0.1:16384')
+    await user.clear(addressInput)
+    await user.type(addressInput, '127.0.0.1:5555')
 
     await act(async () => pendingConfig.resolve({
       success: true,
@@ -383,17 +350,13 @@ describe('ConfigManager layout surfaces', () => {
   it('serializes component updates behind one shared busy state', async () => {
     const pendingCoreUpdate = deferred<{ success: boolean; message: string }>()
     mocks.updateMaaCore.mockReturnValueOnce(pendingCoreUpdate.promise)
-    await act(async () => root.render(<ConfigManager />))
+    render(<ConfigManager />)
     await flush()
 
-    const coreButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
-      .find(button => button.textContent?.trim() === '更新 MaaCore')!
-    const cliButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
-      .find(button => button.textContent?.trim() === '更新 MAA CLI')!
-    await act(async () => {
-      coreButton.click()
-      cliButton.click()
-    })
+    const coreButton = screen.getByRole('button', { name: '更新 MaaCore' }) as HTMLButtonElement
+    const cliButton = screen.getByRole('button', { name: '更新 MAA CLI' }) as HTMLButtonElement
+    await user.click(coreButton)
+    await user.click(cliButton)
 
     expect(mocks.updateMaaCore).toHaveBeenCalledOnce()
     expect(mocks.updateMaaCli).not.toHaveBeenCalled()
@@ -410,19 +373,17 @@ describe('ConfigManager layout surfaces', () => {
       message: '资源同步失败',
       error: { details: { failedStep: 'resources', coreUpdated: true } },
     })
-    await act(async () => root.render(<ConfigManager />))
+    render(<ConfigManager />)
     await flush()
 
-    const coreButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
-      .find(button => button.textContent?.trim() === '更新 MaaCore')!
-    await act(async () => coreButton.click())
+    const coreButton = screen.getByRole('button', { name: '更新 MaaCore' }) as HTMLButtonElement
+    await user.click(coreButton)
     await flush()
 
-    const retryButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
-      .find(button => button.textContent?.trim() === '重试资源同步')
-    expect(retryButton?.classList.contains('!min-h-11')).toBe(true)
-    expect(retryButton?.classList.contains('lg:!min-h-0')).toBe(true)
-    expect(retryButton?.classList.contains('!min-h-0')).toBe(false)
+    const retryButton = screen.getByRole('button', { name: '重试资源同步' }) as HTMLButtonElement
+    expect(retryButton.classList.contains('!min-h-11')).toBe(true)
+    expect(retryButton.classList.contains('lg:!min-h-0')).toBe(true)
+    expect(retryButton.classList.contains('!min-h-0')).toBe(false)
   })
 
   it('does not report success when the scheduler rejects an enabled setting', async () => {
@@ -435,33 +396,25 @@ describe('ConfigManager layout surfaces', () => {
       data: { success: false, message: '无法创建定时任务' },
     })
 
-    await act(async () => root.render(<ConfigManager />))
+    const { container } = render(<ConfigManager />)
     await flush()
 
-    const coreCheckbox = Array.from(container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'))
-      .find(input => input.parentElement?.textContent?.includes('更新 MaaCore'))
-    await act(async () => {
-      coreCheckbox?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
+    const coreCheckbox = screen.getByRole('checkbox', { name: '更新 MaaCore' }) as HTMLInputElement
+    await user.click(coreCheckbox)
 
-    const saveButton = Array.from(container.querySelectorAll('button')).find(button =>
-      button.textContent?.includes('保存自动更新')
-    )
-    await act(async () => {
-      saveButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      await Promise.resolve()
-      await Promise.resolve()
-    })
+    const saveButton = screen.getByRole('button', { name: '保存自动更新' }) as HTMLButtonElement
+    await user.click(saveButton)
+    await flush()
 
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('自动更新设置应用失败: 无法创建定时任务')
-    expect(saveButton?.disabled).toBe(false)
+    expect(saveButton.disabled).toBe(false)
     expect(mocks.setMessage).toHaveBeenCalledWith('自动更新设置应用失败: 无法创建定时任务', 'error')
   })
 
   it('renders unsupported resource and instance settings as honest read-only guidance', async () => {
     localStorage.setItem('laPlumaConfigSection', 'resource')
 
-    await act(async () => root.render(<ConfigManager />))
+    const { container } = render(<ConfigManager />)
     await flush()
 
     const activeEditor = () => container.querySelector('.swipe-mode-slide:not([aria-hidden="true"]) .config-editor-card')
@@ -470,10 +423,10 @@ describe('ConfigManager layout surfaces', () => {
     expect(editor?.querySelector('select')).toBeNull()
     expect(Array.from(editor?.querySelectorAll('button') ?? []).some(button => button.textContent?.trim() === '保存')).toBe(false)
 
-    const instanceButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('实例'))
-    await act(async () => {
-      instanceButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
+    const instanceButton = screen.getByRole('tab', { name: '实例' })
+    // GlassSegmented derives the pointer-up index from layout geometry, which is
+    // zero-sized in jsdom; a direct click exercises the same onChange path.
+    fireEvent.click(instanceButton)
     await flush()
 
     const instanceEditor = activeEditor()

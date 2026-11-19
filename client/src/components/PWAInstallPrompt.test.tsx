@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { hasDocumentBuildChanged } from '@/utils/pwaUpdate'
 import { PWA_INSTALL_REQUEST_EVENT } from '@/utils/pwaInstallPrompt'
@@ -25,15 +25,15 @@ vi.mock('virtual:pwa-register/react', () => ({
   },
 }))
 
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-
 interface InstallPromptEvent extends Event {
   prompt: ReturnType<typeof vi.fn>
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
-let container: HTMLDivElement
-let root: Root
+let view: ReturnType<typeof render>
+let container: HTMLElement
+
+afterEach(cleanup)
 
 const setNavigator = (userAgent: string, maxTouchPoints = 0) => {
   Object.defineProperty(window.navigator, 'userAgent', {
@@ -54,18 +54,13 @@ const createInstallPromptEvent = (outcome: 'accepted' | 'dismissed' = 'accepted'
 }
 
 const renderPrompt = async () => {
-  await act(async () => {
-    root.render(<PWAInstallPrompt />)
-  })
+  view = render(<PWAInstallPrompt />)
+  container = view.container
 }
 
 const clickButton = async (label: string) => {
-  const button = Array.from(container.querySelectorAll('button'))
-    .find(candidate => candidate.textContent?.includes(label) || candidate.getAttribute('aria-label') === label)
-  expect(button).toBeDefined()
-  await act(async () => {
-    button!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  })
+  const button = screen.getByRole('button', { name: label })
+  await userEvent.setup().click(button)
 }
 
 describe('PWAInstallPrompt', () => {
@@ -87,15 +82,10 @@ describe('PWAInstallPrompt', () => {
       dispatchEvent: vi.fn(),
     }))
     setNavigator('Mozilla/5.0 Chrome/126.0 Safari/537.36')
-
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
+    cleanup()
     vi.useRealTimers()
     vi.restoreAllMocks()
   })
@@ -104,23 +94,23 @@ describe('PWAInstallPrompt', () => {
     await renderPrompt()
     const installEvent = createInstallPromptEvent()
 
-    act(() => window.dispatchEvent(installEvent))
+    fireEvent(window, installEvent)
     expect(container.textContent).toContain('安装 La Pluma')
 
     await clickButton('安装')
-    expect(installEvent.prompt).toHaveBeenCalledOnce()
+    await waitFor(() => expect(installEvent.prompt).toHaveBeenCalledOnce())
   })
 
   it('reopens the install card when another surface requests installation', async () => {
     await renderPrompt()
 
-    act(() => window.dispatchEvent(createInstallPromptEvent()))
+    fireEvent(window, createInstallPromptEvent())
     expect(container.querySelector('.pwa-install-prompt')).not.toBeNull()
 
     await clickButton('稍后')
-    expect(container.querySelector('.pwa-install-prompt')).toBeNull()
+    await waitFor(() => expect(container.querySelector('.pwa-install-prompt')).toBeNull())
 
-    act(() => window.dispatchEvent(new Event(PWA_INSTALL_REQUEST_EVENT)))
+    fireEvent(window, new Event(PWA_INSTALL_REQUEST_EVENT))
     expect(container.querySelector('.pwa-install-prompt')).not.toBeNull()
   })
 
@@ -157,14 +147,14 @@ describe('PWAInstallPrompt', () => {
       dispatchEvent: vi.fn(),
     }))
     await renderPrompt()
-    act(() => window.dispatchEvent(createInstallPromptEvent()))
+    fireEvent(window, createInstallPromptEvent())
 
-    const installEntry = container.querySelector<HTMLButtonElement>('[aria-label="安装 La Pluma"]')
+    const installEntry = screen.getByRole('button', { name: '安装 La Pluma' })
     expect(installEntry).not.toBeNull()
     expect(container.querySelector('.pwa-install-prompt')).toBeNull()
 
     await clickButton('安装 La Pluma')
-    expect(container.querySelector('.pwa-install-entry')).toBeNull()
+    await waitFor(() => expect(container.querySelector('.pwa-install-entry')).toBeNull())
     expect(container.querySelector('.pwa-install-prompt')).not.toBeNull()
   })
 
@@ -172,22 +162,20 @@ describe('PWAInstallPrompt', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-07-01T00:00:00Z'))
     await renderPrompt()
-    act(() => window.dispatchEvent(createInstallPromptEvent()))
-    await clickButton('稍后')
+    fireEvent(window, createInstallPromptEvent())
+    fireEvent.click(screen.getByRole('button', { name: '稍后' }))
 
     expect(window.localStorage.getItem('pwa-install-dismissed-at')).toBe(String(Date.now()))
 
-    await act(async () => root.unmount())
-    root = createRoot(container)
+    view.unmount()
     await renderPrompt()
-    act(() => window.dispatchEvent(createInstallPromptEvent()))
+    fireEvent(window, createInstallPromptEvent())
     expect(container.textContent).not.toContain('安装 La Pluma')
 
-    await act(async () => root.unmount())
-    root = createRoot(container)
+    view.unmount()
     vi.advanceTimersByTime(7 * 24 * 60 * 60 * 1000)
     await renderPrompt()
-    act(() => window.dispatchEvent(createInstallPromptEvent()))
+    fireEvent(window, createInstallPromptEvent())
     expect(container.textContent).toContain('安装 La Pluma')
   })
 
@@ -200,12 +188,12 @@ describe('PWAInstallPrompt', () => {
     expect(updateRegion?.getAttribute('aria-labelledby')).toBe('pwa-prompt-title')
     expect(container.querySelector('[role="status"]')?.textContent).toContain('发现新版本')
     await clickButton('稍后')
-    expect(container.textContent).toContain('应用更新')
+    await waitFor(() => expect(container.textContent).toContain('应用更新'))
 
     await clickButton('应用更新')
-    expect(container.textContent).toContain('发现新版本')
+    await waitFor(() => expect(container.textContent).toContain('发现新版本'))
     await clickButton('立即更新')
-    expect(swMock.updateServiceWorker).toHaveBeenCalledWith(true)
+    await waitFor(() => expect(swMock.updateServiceWorker).toHaveBeenCalledWith(true))
   })
 
   it('checks for an update when the app returns to the foreground', async () => {
@@ -220,23 +208,14 @@ describe('PWAInstallPrompt', () => {
     expect(onRegisteredSW).toBeTypeOf('function')
     onRegisteredSW?.('/sw.js', { update } as unknown as ServiceWorkerRegistration)
 
-    await act(async () => {
-      document.dispatchEvent(new Event('visibilitychange'))
-      await Promise.resolve()
-    })
+    fireEvent(document, new Event('visibilitychange'))
     expect(update).toHaveBeenCalledOnce()
 
-    await act(async () => {
-      window.dispatchEvent(new Event('pageshow'))
-      await Promise.resolve()
-    })
+    fireEvent(window, new Event('pageshow'))
     expect(update).toHaveBeenCalledOnce()
 
     vi.advanceTimersByTime(60 * 1000)
-    await act(async () => {
-      window.dispatchEvent(new Event('pageshow'))
-      await Promise.resolve()
-    })
+    fireEvent(window, new Event('pageshow'))
     expect(update).toHaveBeenCalledTimes(2)
   })
 

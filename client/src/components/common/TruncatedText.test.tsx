@@ -1,19 +1,13 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import TruncatedText from './TruncatedText'
 
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+afterEach(cleanup)
 
-let container: HTMLDivElement
-let root: Root
 let clientWidth = 96
 let scrollWidth = 240
-
-const getTrigger = () => container.querySelector<HTMLElement>('span.inline-flex')
-const getTooltip = () => document.querySelector<HTMLElement>('[role="tooltip"]')
 
 describe('TruncatedText', () => {
   beforeEach(() => {
@@ -32,59 +26,60 @@ describe('TruncatedText', () => {
       configurable: true,
       get: () => scrollWidth,
     })
-
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
+  afterEach(() => {
     vi.runOnlyPendingTimers()
     vi.useRealTimers()
     vi.unstubAllGlobals()
     Reflect.deleteProperty(HTMLElement.prototype, 'clientWidth')
     Reflect.deleteProperty(HTMLElement.prototype, 'scrollWidth')
-    container.remove()
   })
+
+  const renderTruncated = async (element: React.ReactElement) => {
+    const result = render(element)
+    // The component measures in a queued microtask after its layout effect.
+    await act(async () => {
+      await Promise.resolve()
+    })
+    return result
+  }
 
   it('shows the full text only when the line is actually cut', async () => {
     clientWidth = 96
     scrollWidth = 240
 
-    await act(async () => root.render(
+    const { container } = await renderTruncated(
       <TruncatedText tooltip="固源岩×10、基础作战记录×9">
         固源岩×10、基础作战记录×9
       </TruncatedText>,
-    ))
+    )
 
     expect(container.querySelector('.app-truncate')?.getAttribute('data-truncated')).toBe('true')
 
-    await act(async () => {
-      getTrigger()?.dispatchEvent(new MouseEvent('pointerover', { bubbles: true, relatedTarget: null }))
-    })
-    expect(getTooltip()).toBeNull()
+    fireEvent.pointerOver(screen.getByText('固源岩×10、基础作战记录×9'), { relatedTarget: null })
+    expect(screen.queryByRole('tooltip')).toBeNull()
 
-    await act(async () => {
+    act(() => {
       vi.advanceTimersByTime(400)
     })
-    expect(getTooltip()?.textContent).toBe('固源岩×10、基础作战记录×9')
+    expect(screen.getByRole('tooltip').textContent).toBe('固源岩×10、基础作战记录×9')
   })
 
   it('does not open a tooltip when the text fits', async () => {
     clientWidth = 200
     scrollWidth = 180
 
-    await act(async () => root.render(
+    const { container } = await renderTruncated(
       <TruncatedText tooltip="完整文本">完整文本</TruncatedText>,
-    ))
+    )
 
     expect(container.querySelector('.app-truncate')?.getAttribute('data-truncated')).toBeNull()
 
-    await act(async () => {
-      getTrigger()?.dispatchEvent(new MouseEvent('pointerover', { bubbles: true, relatedTarget: null }))
+    fireEvent.pointerOver(screen.getByText('完整文本'), { relatedTarget: null })
+    act(() => {
       vi.advanceTimersByTime(400)
     })
-    expect(getTooltip()).toBeNull()
+    expect(screen.queryByRole('tooltip')).toBeNull()
   })
 })

@@ -1,18 +1,12 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PageSkeleton } from './Loading'
 
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+afterEach(cleanup)
 
-let container: HTMLDivElement
-let root: Root
-
-const renderSkeleton = async (variant: string) => {
-  await act(async () => root.render(<PageSkeleton variant={variant} />))
-}
+const renderSkeleton = (variant: string) => render(<PageSkeleton variant={variant} />).container
 
 describe('PageSkeleton', () => {
   beforeEach(() => {
@@ -31,19 +25,14 @@ describe('PageSkeleton', () => {
       unobserve() {}
       disconnect() {}
     })
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
 
-  const expectCurrentPageHeader = () => {
+  const expectCurrentPageHeader = (container: HTMLElement) => {
     const header = container.querySelector('.app-page-header.is-mobile-inline')
     expect(header).not.toBeNull()
     expect(header?.querySelector('.app-page-heading')).not.toBeNull()
@@ -51,11 +40,11 @@ describe('PageSkeleton', () => {
     expect(header?.querySelector('.app-page-header-icon')).toBeNull()
   }
 
-  it('mirrors the automation workspace and support rail', async () => {
-    await renderSkeleton('automation')
+  it('mirrors the automation workspace and support rail', () => {
+    const container = renderSkeleton('automation')
 
-    expect(container.querySelector('[aria-label="页面内容加载中"]')).not.toBeNull()
-    expectCurrentPageHeader()
+    expect(screen.getByLabelText('页面内容加载中')).toBeTruthy()
+    expectCurrentPageHeader(container)
     expect(container.querySelector('.automation-workspace-grid')).not.toBeNull()
     expect(container.querySelector('.automation-support-column')).not.toBeNull()
     expect(container.querySelector('.automation-sequence-surface')).not.toBeNull()
@@ -69,28 +58,28 @@ describe('PageSkeleton', () => {
     expect(container.querySelectorAll('.automation-monitor-skeleton-toolbar .rounded-full')).toHaveLength(5)
   })
 
-  it('keeps dashboard material styling while data is loading', async () => {
-    await renderSkeleton('dashboard')
+  it('keeps dashboard material styling while data is loading', () => {
+    const container = renderSkeleton('dashboard')
 
-    const page = container.querySelector('[aria-label="控制台加载中"]')
-    expect(page?.classList.contains('dashboard-page')).toBe(true)
-    expectCurrentPageHeader()
-    expect(page?.querySelector('.dashboard-flow-card')).not.toBeNull()
-    expect(page?.querySelectorAll('.dashboard-flow-actions > .app-skeleton')).toHaveLength(2)
-    expect(page?.querySelector('[data-dashboard-preview-card].status-border-beam')).not.toBeNull()
-    expect(page?.querySelectorAll('.dashboard-device-card-shell')).toHaveLength(4)
-    expect(page?.querySelectorAll('.dashboard-temperature-skeleton')).toHaveLength(1)
-    expect(page?.querySelectorAll('.dashboard-summary-card')).toHaveLength(4)
-    expect(page?.querySelector('.dashboard-summary-card.is-status')).not.toBeNull()
-    expect(page?.querySelector('.dashboard-summary-card.is-stages')).not.toBeNull()
-    expect(page?.querySelector('.dashboard-summary-card.is-training')).not.toBeNull()
-    expect(page?.querySelector('.dashboard-summary-card.is-drops')).not.toBeNull()
+    const page = screen.getByLabelText('控制台加载中')
+    expect(page.classList.contains('dashboard-page')).toBe(true)
+    expectCurrentPageHeader(container)
+    expect(page.querySelector('.dashboard-flow-card')).not.toBeNull()
+    expect(page.querySelectorAll('.dashboard-flow-actions > .app-skeleton')).toHaveLength(2)
+    expect(page.querySelector('[data-dashboard-preview-card].status-border-beam')).not.toBeNull()
+    expect(page.querySelectorAll('.dashboard-device-card-shell')).toHaveLength(4)
+    expect(page.querySelectorAll('.dashboard-temperature-skeleton')).toHaveLength(1)
+    expect(page.querySelectorAll('.dashboard-summary-card')).toHaveLength(4)
+    expect(page.querySelector('.dashboard-summary-card.is-status')).not.toBeNull()
+    expect(page.querySelector('.dashboard-summary-card.is-stages')).not.toBeNull()
+    expect(page.querySelector('.dashboard-summary-card.is-training')).not.toBeNull()
+    expect(page.querySelector('.dashboard-summary-card.is-drops')).not.toBeNull()
   })
 
-  it('keeps the device preview aspect ratio for execution pages', async () => {
-    await renderSkeleton('combat')
+  it('keeps the device preview aspect ratio for execution pages', () => {
+    const container = renderSkeleton('combat')
 
-    expectCurrentPageHeader()
+    expectCurrentPageHeader(container)
     expect(container.querySelector('.ios-workspace-page .task-monitor-layout')).not.toBeNull()
     expect(container.querySelector('.combat-page')).not.toBeNull()
     expect(container.querySelector('.combat-mode-shell.glass-mode-skeleton')).not.toBeNull()
@@ -103,10 +92,10 @@ describe('PageSkeleton', () => {
     expect(container.querySelector('.combat-monitor-panel .aspect-video')).not.toBeNull()
   })
 
-  it('mirrors the three-column roguelike workspace while loading', async () => {
-    await renderSkeleton('roguelike')
+  it('mirrors the three-column roguelike workspace while loading', () => {
+    const container = renderSkeleton('roguelike')
 
-    expectCurrentPageHeader()
+    expectCurrentPageHeader(container)
     expect(container.querySelector('.roguelike-page')).not.toBeNull()
     expect(container.querySelector('.ios-workspace-page .roguelike-workspace-grid')).not.toBeNull()
     expect(container.querySelector('.roguelike-mode-area .roguelike-mode-shell.glass-mode-skeleton')).not.toBeNull()
@@ -121,10 +110,10 @@ describe('PageSkeleton', () => {
     expect(container.querySelector('.roguelike-monitor-panel .aspect-video')).not.toBeNull()
   })
 
-  it('mirrors the training operator grid and support column', async () => {
-    await renderSkeleton('training')
+  it('mirrors the training operator grid and support column', () => {
+    const container = renderSkeleton('training')
 
-    expectCurrentPageHeader()
+    expectCurrentPageHeader(container)
     expect(container.querySelector('.ios-workspace-page.ios-borderless-cards[data-page="training"]')).not.toBeNull()
     expect(container.querySelector('.training-operator-column')).not.toBeNull()
     expect(container.querySelector('.training-status-shell.glass-mode-skeleton')).not.toBeNull()
@@ -139,10 +128,10 @@ describe('PageSkeleton', () => {
     expect(container.querySelector('.training-plan-empty')).not.toBeNull()
   })
 
-  it('uses the current toolbar, console, and history log cards', async () => {
-    await renderSkeleton('logs')
+  it('uses the current toolbar, console, and history log cards', () => {
+    const container = renderSkeleton('logs')
 
-    expectCurrentPageHeader()
+    expectCurrentPageHeader(container)
     expect(container.querySelector('.log-viewer.ios-workspace-page.ios-borderless-cards')).not.toBeNull()
     expect(container.querySelectorAll('.log-toggle-control')).toHaveLength(2)
     expect(container.querySelector('.log-toggle-control.surface-soft')).toBeNull()
@@ -157,10 +146,10 @@ describe('PageSkeleton', () => {
     expect(container.querySelectorAll('.app-skeleton-shimmer').length).toBeGreaterThan(10)
   })
 
-  it('mirrors the statistics tabs and active task result card', async () => {
-    await renderSkeleton('statistics')
+  it('mirrors the statistics tabs and active task result card', () => {
+    const container = renderSkeleton('statistics')
 
-    expectCurrentPageHeader()
+    expectCurrentPageHeader(container)
     expect(container.querySelector('.data-statistics-page.ios-workspace-page.ios-borderless-cards')).not.toBeNull()
     expect(container.querySelector('.data-statistics-view-switcher.data-statistics-mode-shell.glass-mode-skeleton')).not.toBeNull()
     expect(container.querySelector('.data-statistics-view-switcher .glass-mode-skeleton-item.is-selected')).not.toBeNull()
@@ -169,10 +158,10 @@ describe('PageSkeleton', () => {
     expect(container.querySelectorAll('.data-statistics-result-grid > div')).toHaveLength(6)
   })
 
-  it('mirrors the config directory, updater, and editor workspace', async () => {
-    await renderSkeleton('config')
+  it('mirrors the config directory, updater, and editor workspace', () => {
+    const container = renderSkeleton('config')
 
-    expectCurrentPageHeader()
+    expectCurrentPageHeader(container)
     const page = container.querySelector('.app-page.ios-workspace-page.ios-borderless-cards.app-stack-section[data-page="config"]')
     expect(page).not.toBeNull()
     expect(page?.querySelector('[data-config-sections] .glass-mode-skeleton')).not.toBeNull()

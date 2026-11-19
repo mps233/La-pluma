@@ -1,10 +1,9 @@
 // @vitest-environment jsdom
 
-import { Activity, act, type ComponentType } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { Activity, type ComponentType } from 'react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const mocks = vi.hoisted(() => ({
   fetchWithAuth: vi.fn(),
@@ -47,41 +46,27 @@ const deferred = <T,>() => {
   return { promise, resolve }
 }
 
-let container: HTMLDivElement
-let root: Root
-let rootMounted: boolean
 let NotificationSettings: ComponentType
+let view: ReturnType<typeof render>
 
-const flush = async () => {
-  await act(async () => {
-    await Promise.resolve()
-    await Promise.resolve()
-    await Promise.resolve()
-  })
+afterEach(cleanup)
+
+const renderVisible = async () => {
+  view = render(
+    <Activity mode="visible">
+      <NotificationSettings />
+    </Activity>,
+  )
+  await waitFor(() => expect(mocks.fetchWithAuth).toHaveBeenCalled())
 }
 
 const renderMode = async (mode: 'visible' | 'hidden') => {
-  await act(async () => {
-    root.render(
-      <Activity mode={mode}>
-        <NotificationSettings />
-      </Activity>,
-    )
-  })
-  await flush()
+  view.rerender(
+    <Activity mode={mode}>
+      <NotificationSettings />
+    </Activity>,
+  )
 }
-
-const setInputValue = async (input: HTMLInputElement, value: string) => {
-  const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-  await act(async () => {
-    valueSetter?.call(input, value)
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-  })
-  await flush()
-}
-
-const buttonByText = (text: string) => Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
-  .find(button => button.textContent?.trim() === text)
 
 describe('NotificationSettings Activity lifecycle', () => {
   beforeEach(async () => {
@@ -89,15 +74,10 @@ describe('NotificationSettings Activity lifecycle', () => {
     mocks.fetchWithAuth.mockReset().mockResolvedValue({ success: true, data: loadedConfig })
     mocks.parseJsonResponse.mockClear()
     NotificationSettings = (await import('./NotificationSettings')).default
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
-    rootMounted = true
   })
 
-  afterEach(async () => {
-    if (rootMounted) await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
+    cleanup()
     vi.restoreAllMocks()
   })
 
@@ -105,7 +85,7 @@ describe('NotificationSettings Activity lifecycle', () => {
     const initialRequest = deferred<{ success: boolean; data: NotificationConfigFixture }>()
     mocks.fetchWithAuth.mockReturnValue(initialRequest.promise)
 
-    await renderMode('visible')
+    await renderVisible()
     expect(mocks.fetchWithAuth).toHaveBeenCalledOnce()
 
     await renderMode('hidden')
@@ -113,69 +93,81 @@ describe('NotificationSettings Activity lifecycle', () => {
     expect(mocks.fetchWithAuth).toHaveBeenCalledOnce()
 
     await act(async () => initialRequest.resolve({ success: true, data: loadedConfig }))
-    await flush()
 
-    expect(container.querySelector<HTMLInputElement>('input[placeholder="Telegram Bot Token"]')?.value).toBe('server-token')
+    await waitFor(() => {
+      expect((screen.getByPlaceholderText('Telegram Bot Token') as HTMLInputElement).value).toBe('server-token')
+    })
   })
 
   it('uses the same section switch treatment for notification controls', async () => {
-    await renderMode('visible')
+    await renderVisible()
+    await screen.findByRole('switch', { name: '任务通知' })
 
-    const notificationSwitch = container.querySelector<HTMLInputElement>('[aria-label="任务通知"]')
-    const telegramSwitch = container.querySelector<HTMLInputElement>('[aria-label="Telegram 通知"]')
+    const notificationSwitch = screen.getByRole('switch', { name: '任务通知' })
+    const telegramSwitch = screen.getByRole('switch', { name: 'Telegram 通知' })
 
-    expect(notificationSwitch?.closest('.automation-notification-heading')).not.toBeNull()
-    expect(telegramSwitch?.closest('.automation-notification-channel-heading')).not.toBeNull()
-    expect(notificationSwitch?.closest('.app-switch')?.classList.contains('automation-section-switch')).toBe(true)
-    expect(telegramSwitch?.closest('.app-switch')?.classList.contains('automation-section-switch')).toBe(true)
+    expect(notificationSwitch.closest('.automation-notification-heading')).not.toBeNull()
+    expect(telegramSwitch.closest('.automation-notification-channel-heading')).not.toBeNull()
+    expect(notificationSwitch.closest('.app-switch')?.classList.contains('automation-section-switch')).toBe(true)
+    expect(telegramSwitch.closest('.app-switch')?.classList.contains('automation-section-switch')).toBe(true)
   })
 
   it('does not replace an unsaved draft when Activity restores the loading effect', async () => {
-    await renderMode('visible')
-    const tokenInput = container.querySelector<HTMLInputElement>('input[placeholder="Telegram Bot Token"]')
-    expect(tokenInput?.value).toBe('server-token')
+    const user = userEvent.setup()
+    await renderVisible()
 
-    await setInputValue(tokenInput!, 'draft-token')
-    expect(tokenInput?.value).toBe('draft-token')
+    const tokenInput = screen.getByPlaceholderText('Telegram Bot Token') as HTMLInputElement
+    await waitFor(() => expect(tokenInput.value).toBe('server-token'))
+
+    await user.clear(tokenInput)
+    await user.type(tokenInput, 'draft-token')
+    expect(tokenInput.value).toBe('draft-token')
 
     await renderMode('hidden')
     await renderMode('visible')
 
     expect(mocks.fetchWithAuth).toHaveBeenCalledOnce()
-    expect(container.querySelector<HTMLInputElement>('input[placeholder="Telegram Bot Token"]')?.value).toBe('draft-token')
+    expect((screen.getByPlaceholderText('Telegram Bot Token') as HTMLInputElement).value).toBe('draft-token')
   })
 
   it('shows a retryable load error and blocks saving an empty fallback config', async () => {
+    const user = userEvent.setup()
     mocks.fetchWithAuth
       .mockResolvedValueOnce({ success: false, message: '通知配置暂不可用' })
       .mockResolvedValueOnce({ success: true, data: loadedConfig })
 
-    await renderMode('visible')
+    await renderVisible()
 
-    const alert = container.querySelector<HTMLElement>('[role="alert"]')
-    expect(alert?.textContent).toContain('通知配置暂不可用')
-    expect(buttonByText('保存')?.disabled).toBe(true)
-    const retryButton = buttonByText('重新加载')
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('通知配置暂不可用')
+    expect(screen.getByRole('button', { name: '保存' })).toHaveProperty('disabled', true)
+    const retryButton = screen.getByRole('button', { name: '重新加载' })
     expect(retryButton).toBeDefined()
 
-    await act(async () => retryButton?.click())
-    await flush()
+    await user.click(retryButton)
 
-    expect(mocks.fetchWithAuth).toHaveBeenCalledTimes(2)
-    expect(container.querySelector('[role="alert"]')).toBeNull()
-    expect(container.querySelector<HTMLInputElement>('input[placeholder="Telegram Bot Token"]')?.value).toBe('server-token')
-    expect(buttonByText('保存')?.disabled).toBe(false)
+    await waitFor(() => expect(mocks.fetchWithAuth).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+    expect((screen.getByPlaceholderText('Telegram Bot Token') as HTMLInputElement).value).toBe('server-token')
+    expect(screen.getByRole('button', { name: '保存' })).toHaveProperty('disabled', false)
   })
 
   it('keeps a pending save alive through Activity cleanup', async () => {
+    const user = userEvent.setup()
     const saveRequest = deferred<{ success: boolean; message: string }>()
     mocks.fetchWithAuth.mockImplementation((_url: string, init?: RequestInit) => (
       init?.method === 'POST' ? saveRequest.promise : Promise.resolve({ success: true, data: loadedConfig })
     ))
 
-    await renderMode('visible')
-    await act(async () => buttonByText('保存')?.click())
-    const saveCall = mocks.fetchWithAuth.mock.calls[mocks.fetchWithAuth.mock.calls.length - 1]
+    await renderVisible()
+    const saveButton = await screen.findByRole('button', { name: '保存' })
+    await waitFor(() => expect(saveButton).toHaveProperty('disabled', false))
+    await user.click(saveButton)
+
+    await waitFor(() => {
+      expect(mocks.fetchWithAuth.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'POST')).toBe(true)
+    })
+    const saveCall = mocks.fetchWithAuth.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'POST')
     const saveInit = saveCall?.[1] as RequestInit | undefined
     expect(saveInit?.signal?.aborted).toBe(false)
 
@@ -183,10 +175,10 @@ describe('NotificationSettings Activity lifecycle', () => {
     expect(saveInit?.signal?.aborted).toBe(false)
 
     await act(async () => saveRequest.resolve({ success: true, message: '已保存' }))
-    await flush()
   })
 
   it('aborts a pending notification test when the component effects are removed', async () => {
+    const user = userEvent.setup()
     const testRequest = deferred<{ success: boolean; message: string }>()
     mocks.fetchWithAuth.mockImplementation((url: string, init?: RequestInit) => (
       url.includes('test-notification-channel') && init?.method === 'POST'
@@ -194,17 +186,22 @@ describe('NotificationSettings Activity lifecycle', () => {
         : Promise.resolve({ success: true, data: loadedConfig })
     ))
 
-    await renderMode('visible')
-    await act(async () => buttonByText('测试')?.click())
-    const testCall = mocks.fetchWithAuth.mock.calls[mocks.fetchWithAuth.mock.calls.length - 1]
+    await renderVisible()
+    const testButton = await screen.findByRole('button', { name: '测试' })
+    await waitFor(() => expect(testButton).toHaveProperty('disabled', false))
+    await user.click(testButton)
+
+    await waitFor(() => {
+      const testCall = mocks.fetchWithAuth.mock.calls.find(([url]) => String(url).includes('test-notification-channel'))
+      expect(testCall).toBeDefined()
+    })
+    const testCall = mocks.fetchWithAuth.mock.calls.find(([url]) => String(url).includes('test-notification-channel'))
     const testInit = testCall?.[1] as RequestInit | undefined
     expect(testInit?.signal?.aborted).toBe(false)
 
-    await act(async () => root.unmount())
-    rootMounted = false
+    view.unmount()
     expect(testInit?.signal?.aborted).toBe(true)
 
     await act(async () => testRequest.resolve({ success: true, message: '已发送' }))
-    await flush()
   })
 })

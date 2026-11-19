@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
-import { Activity, act, type ReactNode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { Activity, type ReactNode } from 'react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AutomationTasks from './AutomationTasks'
 
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+afterEach(cleanup)
 
 const mocks = vi.hoisted(() => ({
   executeScheduleNow: vi.fn(),
@@ -85,8 +86,9 @@ class IntersectionObserverMock {
   disconnect() {}
 }
 
-let container: HTMLDivElement
-let root: Root
+let container: HTMLElement
+let view: ReturnType<typeof render> | null = null
+let user: ReturnType<typeof userEvent.setup>
 const originalScrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView')
 
 const taskFlowFixture = [
@@ -179,12 +181,34 @@ const pointerEvent = (
   return event
 }
 
+const renderTasks = async () => {
+  view = render(<AutomationTasks />)
+  container = view.container
+  await flush()
+  return view
+}
+
+const renderMode = async (mode: 'visible' | 'hidden') => {
+  const ui = (
+    <Activity mode={mode}>
+      <AutomationTasks />
+    </Activity>
+  )
+  if (view === null) {
+    view = render(ui)
+    container = view.container
+  } else {
+    view.rerender(ui)
+  }
+  await flush()
+}
+
 const clickSequenceTask = async (taskName: string) => {
   const button = Array.from(container.querySelectorAll<HTMLButtonElement>('.automation-sequence-select'))
     .find(candidate => candidate.textContent?.includes(taskName))
 
   expect(button).toBeDefined()
-  await act(async () => button?.click())
+  await user.click(button!)
   await flush()
   return button
 }
@@ -204,6 +228,8 @@ describe('AutomationTasks layout surfaces', () => {
       value: mocks.scrollIntoView,
     })
     localStorage.clear()
+    user = userEvent.setup()
+    view = null
     mocks.executeScheduleNow.mockReset().mockResolvedValue({ success: true })
     mocks.getActivity.mockReset().mockResolvedValue({ success: false })
     mocks.getScheduleExecutionStatus.mockReset().mockResolvedValue({ success: true, data: { isRunning: false } })
@@ -218,14 +244,11 @@ describe('AutomationTasks layout surfaces', () => {
     mocks.scrollIntoView.mockReset()
     mocks.setActive.mockReset()
     mocks.setMessage.mockReset()
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
+  afterEach(() => {
+    view = null
+    vi.useRealTimers()
     vi.unstubAllGlobals()
     if (originalScrollIntoView) {
       Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScrollIntoView)
@@ -235,8 +258,7 @@ describe('AutomationTasks layout surfaces', () => {
   })
 
   it('uses continuous corners only for the four primary workspace panels', async () => {
-    await act(async () => root.render(<AutomationTasks />))
-    await flush()
+    await renderTasks()
 
     const page = container.querySelector('[data-automation-tasks]')
     expect(page?.classList.contains('ios-workspace-page')).toBe(true)
@@ -284,8 +306,7 @@ describe('AutomationTasks layout surfaces', () => {
       },
     })
 
-    await act(async () => root.render(<AutomationTasks />))
-    await flush()
+    await renderTasks()
 
     expect(container.querySelector('[aria-label="定时执行"]')?.getAttribute('aria-checked')).toBe('true')
     expect(mocks.setupSchedule).not.toHaveBeenCalled()
@@ -294,17 +315,6 @@ describe('AutomationTasks layout surfaces', () => {
 
   it('keeps the hydrated task flow without reloading after Activity restore', async () => {
     mocks.loadUserConfig.mockResolvedValue({ success: true, data: { taskFlow: taskFlowFixture } })
-    const renderMode = async (mode: 'visible' | 'hidden') => {
-      await act(async () => {
-        root.render(
-          <Activity mode={mode}>
-            <AutomationTasks />
-          </Activity>,
-        )
-        await Promise.resolve()
-        await Promise.resolve()
-      })
-    }
 
     await renderMode('visible')
     expect(mocks.loadUserConfig).toHaveBeenCalledOnce()
@@ -322,8 +332,7 @@ describe('AutomationTasks layout surfaces', () => {
     localStorage.setItem('maa-schedule', JSON.stringify({ enabled: false, times: ['14:00'] }))
     localStorage.setItem('automationConfigSyncPending', 'pending-local-draft')
 
-    await act(async () => root.render(<AutomationTasks />))
-    await flush()
+    await renderTasks()
 
     expect(mocks.loadUserConfig).not.toHaveBeenCalled()
     expect(container.textContent).toContain('理智作战')
@@ -333,16 +342,6 @@ describe('AutomationTasks layout surfaces', () => {
   it('ignores an in-flight server response once a newer local draft exists', async () => {
     const serverLoad = deferred<{ success: boolean; data: { taskFlow: typeof taskFlowFixture } }>()
     mocks.loadUserConfig.mockReturnValueOnce(serverLoad.promise)
-    const renderMode = async (mode: 'visible' | 'hidden') => {
-      await act(async () => {
-        root.render(
-          <Activity mode={mode}>
-            <AutomationTasks />
-          </Activity>,
-        )
-        await Promise.resolve()
-      })
-    }
 
     await renderMode('visible')
     localStorage.setItem('maa-task-flow', JSON.stringify(taskFlowFixture))
@@ -368,23 +367,12 @@ describe('AutomationTasks layout surfaces', () => {
         }, { once: true })
       })
     ))
-    const renderMode = async (mode: 'visible' | 'hidden') => {
-      await act(async () => {
-        root.render(
-          <Activity mode={mode}>
-            <AutomationTasks />
-          </Activity>,
-        )
-        await Promise.resolve()
-        await Promise.resolve()
-      })
-    }
 
     await renderMode('visible')
     const testButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
       .find(button => button.textContent?.includes('测试连接'))
     expect(testButton).toBeDefined()
-    await act(async () => testButton?.click())
+    await user.click(testButton!)
     expect(container.textContent).toContain('正在检查')
 
     await renderMode('hidden')
@@ -399,8 +387,7 @@ describe('AutomationTasks layout surfaces', () => {
   it('scrolls the selected task editor into view on narrow screens', async () => {
     mocks.loadUserConfig.mockResolvedValue({ success: true, data: { taskFlow: taskFlowFixture } })
 
-    await act(async () => root.render(<AutomationTasks />))
-    await flush()
+    await renderTasks()
 
     const selectedButton = await clickSequenceTask('理智作战')
     const editor = container.querySelector('#automation-task-editor')
@@ -423,8 +410,7 @@ describe('AutomationTasks layout surfaces', () => {
       },
     })
 
-    await act(async () => root.render(<AutomationTasks />))
-    await flush()
+    await renderTasks()
     await flush()
 
     const selectedButton = await clickSequenceTask('自动公招')
@@ -460,8 +446,7 @@ describe('AutomationTasks layout surfaces', () => {
       },
     })
 
-    await act(async () => root.render(<AutomationTasks />))
-    await flush()
+    await renderTasks()
     await flush()
 
     const runningButton = Array.from(container.querySelectorAll<HTMLButtonElement>('.automation-sequence-select'))
@@ -493,8 +478,7 @@ describe('AutomationTasks layout surfaces', () => {
       },
     })
 
-    await act(async () => root.render(<AutomationTasks />))
-    await flush()
+    await renderTasks()
     await flush()
 
     const progress = container.querySelector('.automation-flow-progress')
@@ -520,8 +504,7 @@ describe('AutomationTasks layout surfaces', () => {
       },
     })
 
-    await act(async () => root.render(<AutomationTasks />))
-    await flush()
+    await renderTasks()
     await flush()
 
     const runningButton = Array.from(container.querySelectorAll<HTMLButtonElement>('.automation-sequence-select'))
@@ -542,8 +525,7 @@ describe('AutomationTasks layout surfaces', () => {
       },
     })
 
-    await act(async () => root.render(<AutomationTasks />))
-    await flush()
+    await renderTasks()
 
     const clientTypeLabel = container.querySelector<HTMLLabelElement>('label[for="automation-startup-1-clientType"]')
     expect(clientTypeLabel?.textContent).toContain('客户端类型')
@@ -580,13 +562,10 @@ describe('AutomationTasks layout surfaces', () => {
     expect(container.querySelector('[aria-label="定时执行"]')?.closest('.automation-schedule-actions')).not.toBeNull()
     expect(container.querySelector('[aria-label="定时执行"]')?.closest('.app-switch')?.classList.contains('automation-section-switch')).toBe(true)
 
-    const inputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-    await act(async () => {
-      inputValueSetter?.call(firstHourInput, '9')
-      firstHourInput?.dispatchEvent(new Event('input', { bubbles: true }))
-      inputValueSetter?.call(firstMinuteInput, '15')
-      firstMinuteInput?.dispatchEvent(new Event('input', { bubbles: true }))
-    })
+    await user.type(firstHourInput!, '9', { initialSelectionStart: 0, initialSelectionEnd: 1 })
+    // The minute field is re-rendered with zero padding between keystrokes, so
+    // userEvent cannot type "15" in one pass; change the controlled value once.
+    fireEvent.change(firstMinuteInput!, { target: { value: '15' } })
     await flush()
 
     expect(container.querySelector<HTMLInputElement>('#automation-schedule-hour-0')?.value).toBe('9')
@@ -596,7 +575,7 @@ describe('AutomationTasks layout surfaces', () => {
       times: ['09:15', '12:45'],
     })
 
-    await act(async () => deleteTimeButton?.click())
+    await user.click(deleteTimeButton!)
     await flush()
 
     expect(container.querySelectorAll('.automation-schedule-time-row')).toHaveLength(1)
@@ -646,24 +625,19 @@ describe('AutomationTasks layout surfaces', () => {
   it('keeps stage creation and deletion inside one grouped list', async () => {
     mocks.loadUserConfig.mockResolvedValue({ success: true, data: { taskFlow: taskFlowFixture } })
 
-    await act(async () => root.render(<AutomationTasks />))
-    await flush()
+    await renderTasks()
     await clickSequenceTask('理智作战')
 
     const stageEditor = container.querySelector('.automation-stage-editor')!
     expect(stageEditor.querySelectorAll('.automation-stage-item')).toHaveLength(2)
 
-    await act(async () => {
-      stageEditor.querySelector<HTMLButtonElement>('.automation-stage-add')?.click()
-    })
+    await user.click(stageEditor.querySelector<HTMLButtonElement>('.automation-stage-add')!)
     await flush()
 
     expect(stageEditor.querySelectorAll('.automation-stage-item')).toHaveLength(3)
     expect(stageEditor.querySelector('[aria-label="关卡 3"]')).not.toBeNull()
 
-    await act(async () => {
-      stageEditor.querySelector<HTMLButtonElement>('[aria-label="删除关卡 3"]')?.click()
-    })
+    await user.click(stageEditor.querySelector<HTMLButtonElement>('[aria-label="删除关卡 3"]')!)
     await flush()
 
     expect(stageEditor.querySelectorAll('.automation-stage-item')).toHaveLength(2)
@@ -675,7 +649,7 @@ describe('AutomationTasks layout surfaces', () => {
       .find(button => button.textContent === '撤销')
     expect(undoButton).not.toBeNull()
 
-    await act(async () => undoButton?.click())
+    await user.click(undoButton!)
     await flush()
 
     expect(stageEditor.querySelectorAll('.automation-stage-item')).toHaveLength(3)
@@ -697,16 +671,11 @@ describe('AutomationTasks layout surfaces', () => {
       },
     })
 
-    await act(async () => root.render(<AutomationTasks />))
-    await flush()
+    await renderTasks()
     await clickSequenceTask('理智作战')
 
     const addSmartStages = container.querySelector<HTMLButtonElement>('[aria-label="加入智能养成关卡"]')!
-    await act(async () => {
-      addSmartStages.click()
-      await Promise.resolve()
-      await Promise.resolve()
-    })
+    await user.click(addSmartStages)
     await flush()
 
     const stageEditor = container.querySelector('.automation-stage-editor')!
@@ -716,7 +685,7 @@ describe('AutomationTasks layout surfaces', () => {
     expect(mocks.generateTrainingPlan).toHaveBeenCalledWith({ mode: 'current' })
 
     const removeSmartStages = stageEditor.querySelector<HTMLButtonElement>('[aria-label="移除智能养成关卡"]')!
-    await act(async () => removeSmartStages.click())
+    await user.click(removeSmartStages)
     await flush()
 
     expect(stageEditor.querySelectorAll('.automation-stage-item.is-smart')).toHaveLength(0)
@@ -724,16 +693,15 @@ describe('AutomationTasks layout surfaces', () => {
   })
 
   it('opens the add-task dialog with a task grid', async () => {
-    await act(async () => root.render(<AutomationTasks />))
-    await flush()
+    await renderTasks()
 
     const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="dialog"]')!
     expect(trigger.textContent).toContain('添加任务')
 
-    await act(async () => trigger.click())
+    await user.click(trigger)
     await flush()
 
-    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!
+    const dialog = screen.getByRole('dialog')
     expect(dialog).not.toBeNull()
     expect(dialog.getAttribute('aria-modal')).toBe('true')
     const title = document.getElementById(dialog.getAttribute('aria-labelledby') ?? '')
@@ -744,49 +712,42 @@ describe('AutomationTasks layout surfaces', () => {
   })
 
   it('closes the add-task dialog with Escape and restores trigger focus', async () => {
-    await act(async () => root.render(<AutomationTasks />))
-    await flush()
+    await renderTasks()
 
     const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="dialog"]')!
     trigger.focus()
-    await act(async () => trigger.click())
+    await user.click(trigger)
     await flush()
     const firstCard = document.querySelector<HTMLButtonElement>('.automation-task-picker-card')!
     firstCard.focus()
     expect(document.activeElement).toBe(firstCard)
 
-    await act(async () => {
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-    })
+    await user.keyboard('{Escape}')
     await flush()
 
-    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(document.activeElement).toBe(trigger)
   })
 
   it('closes the add-task dialog when clicking the backdrop', async () => {
-    await act(async () => root.render(<AutomationTasks />))
-    await flush()
+    await renderTasks()
 
     const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="dialog"]')!
-    await act(async () => trigger.click())
+    await user.click(trigger)
     await flush()
-    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+    expect(screen.queryByRole('dialog')).not.toBeNull()
 
     const backdrop = document.querySelector<HTMLElement>('.app-modal-backdrop')!
-    await act(async () => {
-      backdrop.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
+    await user.click(backdrop)
     await flush()
 
-    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('moves a task with a floating ghost while dragging its handle', async () => {
     mocks.loadUserConfig.mockResolvedValue({ success: true, data: { taskFlow: taskFlowFixture } })
 
-    await act(async () => root.render(<AutomationTasks />))
-    await flush()
+    await renderTasks()
 
     const rowHeight = 88
     const items = Array.from(container.querySelectorAll<HTMLElement>('.automation-sequence-item'))
@@ -808,15 +769,10 @@ describe('AutomationTasks layout surfaces', () => {
     const handle = fightItem?.querySelector<HTMLButtonElement>('.automation-sequence-drag')
     expect(handle).toBeDefined()
 
-    await act(async () => {
-      handle?.dispatchEvent(pointerEvent('pointerdown', { pointerId: 7, clientX: 20, clientY: 132 }))
-    })
+    fireEvent(handle!, pointerEvent('pointerdown', { pointerId: 7, clientX: 20, clientY: 132 }))
     await flush()
 
-    await act(async () => {
-      window.dispatchEvent(pointerEvent('pointermove', { pointerId: 7, clientX: 20, clientY: 300 }))
-      await Promise.resolve()
-    })
+    fireEvent(window, pointerEvent('pointermove', { pointerId: 7, clientX: 20, clientY: 300 }))
     await flush()
 
     const ghost = document.body.querySelector<HTMLElement>('.automation-drag-ghost')
@@ -825,9 +781,7 @@ describe('AutomationTasks layout surfaces', () => {
     expect(ghost?.style.transform).toContain('translate3d')
     expect(document.body.classList.contains('automation-sorting')).toBe(true)
 
-    await act(async () => {
-      window.dispatchEvent(pointerEvent('pointerup', { pointerId: 7, clientX: 20, clientY: 300 }))
-    })
+    fireEvent(window, pointerEvent('pointerup', { pointerId: 7, clientX: 20, clientY: 300 }))
     await flush()
 
     expect(document.body.querySelector('.automation-drag-ghost')).toBeNull()
@@ -849,8 +803,7 @@ describe('AutomationTasks layout surfaces', () => {
       },
     })
 
-    await act(async () => root.render(<AutomationTasks />))
-    await flush()
+    await renderTasks()
     await flush()
 
     expect(buttonsByText('执行中')).toHaveLength(1)
@@ -864,7 +817,7 @@ describe('AutomationTasks layout surfaces', () => {
 
     const stopButton = buttonsByText('终止执行')[0]
     expect(stopButton).toBeDefined()
-    await act(async () => stopButton?.click())
+    await user.click(stopButton!)
     await flush()
 
     const stoppingButton = buttonsByText('正在终止')[0]
@@ -919,14 +872,13 @@ describe('AutomationTasks layout surfaces', () => {
         })
       })
 
-      await act(async () => root.render(<AutomationTasks />))
-      await flush()
+      await renderTasks()
       await flush()
 
       const stopButton = buttonsByText('终止执行')[0]
       expect(stopButton).toBeDefined()
       stopClicked = true
-      await act(async () => stopButton?.click())
+      fireEvent.click(stopButton!)
       await flush()
       expect(buttonsByText('正在终止')).toHaveLength(1)
 
@@ -939,7 +891,7 @@ describe('AutomationTasks layout surfaces', () => {
       phase = 'running'
       const runButton = buttonsByText('立即执行')[0]
       expect(runButton?.disabled).toBe(false)
-      await act(async () => runButton?.click())
+      fireEvent.click(runButton!)
       await flush()
 
       // Simulate the pre-fix status endpoint resolving the stale wait with the new run.
@@ -958,7 +910,7 @@ describe('AutomationTasks layout surfaces', () => {
 
       const nextStopButton = buttonsByText('终止执行')[0]
       expect(nextStopButton?.disabled).toBe(false)
-      await act(async () => nextStopButton?.click())
+      fireEvent.click(nextStopButton!)
       await flush()
       expect(mocks.stopTask).toHaveBeenCalledTimes(2)
     } finally {
@@ -981,8 +933,7 @@ describe('AutomationTasks layout surfaces', () => {
         },
       })
 
-      await act(async () => root.render(<AutomationTasks />))
-      await flush()
+      await renderTasks()
       await flush()
 
       mocks.getScheduleExecutionStatus.mockResolvedValue({
@@ -998,7 +949,7 @@ describe('AutomationTasks layout surfaces', () => {
 
       const stopButton = buttonsByText('终止执行')[0]
       expect(stopButton).toBeDefined()
-      await act(async () => stopButton?.click())
+      fireEvent.click(stopButton!)
       await flush()
       expect(buttonsByText('正在终止')).toHaveLength(1)
 
@@ -1018,7 +969,7 @@ describe('AutomationTasks layout surfaces', () => {
       )
       expect(buttonsByText('终止执行')[0]?.disabled).toBe(false)
 
-      await act(async () => buttonsByText('终止执行')[0]?.click())
+      fireEvent.click(buttonsByText('终止执行')[0]!)
       await flush()
       expect(mocks.stopTask).toHaveBeenCalledTimes(3)
     } finally {

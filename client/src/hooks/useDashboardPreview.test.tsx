@@ -1,12 +1,10 @@
 // @vitest-environment jsdom
 
-import { Activity, act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { Activity } from 'react'
+import { cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useDashboardPreview } from './useDashboardPreview'
 import { usePreviewStore } from '../stores'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const mocks = vi.hoisted(() => ({
   getWebrtcStatus: vi.fn(),
@@ -46,10 +44,15 @@ function PreviewHarness() {
   return <video ref={videoRef} data-preview-status={statusText} />
 }
 
-describe('useDashboardPreview Activity lifecycle', () => {
-  let container: HTMLDivElement
-  let root: Root
+function previewTree(mode: 'visible' | 'hidden') {
+  return (
+    <Activity mode={mode}>
+      <PreviewHarness />
+    </Activity>
+  )
+}
 
+describe('useDashboardPreview Activity lifecycle', () => {
   beforeEach(() => {
     usePreviewStore.setState({ mode: 'snapshot' })
     mocks.getWebrtcStatus.mockReset().mockResolvedValue({
@@ -62,29 +65,15 @@ describe('useDashboardPreview Activity lifecycle', () => {
     mocks.connect.mockReset()
     mocks.disconnect.mockReset()
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null)
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
   })
 
-  afterEach(async () => {
-    await act(async () => root.unmount())
+  afterEach(cleanup)
+
+  afterEach(() => {
+    cleanup()
     usePreviewStore.setState({ mode: 'off' })
-    container.remove()
     vi.restoreAllMocks()
   })
-
-  const renderMode = async (mode: 'visible' | 'hidden') => {
-    await act(async () => {
-      root.render(
-        <Activity mode={mode}>
-          <PreviewHarness />
-        </Activity>,
-      )
-      await Promise.resolve()
-      await Promise.resolve()
-    })
-  }
 
   it('prefers the preview service snapshot over an ADB screenshot', async () => {
     mocks.getWebrtcSnapshot.mockResolvedValue({
@@ -96,24 +85,19 @@ describe('useDashboardPreview Activity lifecycle', () => {
       },
     })
 
-    await renderMode('visible')
-    await act(async () => {
-      await Promise.resolve()
-      await Promise.resolve()
-      await Promise.resolve()
-    })
+    render(previewTree('visible'))
 
-    expect(mocks.getWebrtcSnapshot).toHaveBeenCalled()
+    await waitFor(() => expect(mocks.getWebrtcSnapshot).toHaveBeenCalled())
     expect(mocks.captureScreen).not.toHaveBeenCalled()
   })
 
   it('keeps the live connection across an Activity hide when the preview mode stays live', async () => {
     usePreviewStore.setState({ mode: 'live' })
-    await renderMode('visible')
-    expect(mocks.connect).toHaveBeenCalledOnce()
+    const { rerender } = render(previewTree('visible'))
+    await waitFor(() => expect(mocks.connect).toHaveBeenCalledOnce())
 
-    await renderMode('hidden')
-    await renderMode('visible')
+    rerender(previewTree('hidden'))
+    rerender(previewTree('visible'))
 
     expect(mocks.connect).toHaveBeenCalledOnce()
   })

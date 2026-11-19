@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { DragDropContext, Draggable, Droppable, type DropResult } from '@hello-pangea/dnd'
 import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  GripVertical,
   GraduationCap,
   Package,
   Pause,
@@ -757,6 +759,17 @@ export default function MasteryTrainingWorkspace() {
     () => [...(status?.items || [])].sort((a, b) => a.order - b.order),
     [status]
   )
+
+  const handleQueueDragEnd = (result: DropResult) => {
+    const destination = result.destination
+    if (!destination || destination.index === result.source.index) return
+    const next = [...queueItems]
+    const [moved] = next.splice(result.source.index, 1)
+    if (!moved) return
+    next.splice(destination.index, 0, moved)
+    void runAction('order:drag', () => reorderMasteryTargets(next.map(candidate => candidate.id)))
+  }
+
   const queuedKeys = useMemo(
     () => new Set((status?.items || []).map(item => item.operatorId + ':' + item.skillIndex)),
     [status]
@@ -1014,6 +1027,10 @@ export default function MasteryTrainingWorkspace() {
                   </div>
                 ) : (
                   <div className="max-h-[50vh] overflow-y-auto">
+                    <DragDropContext onDragEnd={handleQueueDragEnd}>
+                      <Droppable droppableId="mastery-queue">
+                        {(provided) => (
+                          <div ref={provided.innerRef} {...provided.droppableProps}>
                     {queueItems.map((item, index) => {
                       const isActive = status?.activeItem?.id === item.id
                       const tone = phaseTone(item.phase)
@@ -1021,10 +1038,13 @@ export default function MasteryTrainingWorkspace() {
                       const moveLocked = stepBusy || item.phase === 'training'
                       const canRetry = (item.phase === 'blocked' || item.phase === 'failed' || item.phase === 'interrupted') && item.blocked?.retryable !== false
                       return (
-                        <div
-                          key={item.id}
-                          className={`px-4 py-3 ${isActive ? 'bg-[var(--app-surface-muted)]' : ''}`}
-                        >
+                        <Draggable key={item.id} draggableId={item.id} index={index} isDragDisabled={moveLocked || actionPending !== null}>
+                          {(dragProvided, snapshot) => (
+                            <div
+                              ref={dragProvided.innerRef}
+                              {...dragProvided.draggableProps}
+                              className={`px-4 py-3 ${isActive ? 'bg-[var(--app-surface-muted)]' : ''}${snapshot.isDragging ? ' shadow-lg' : ''}`}
+                            >
                           <div className="flex items-start gap-3">
                             <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-xs font-semibold ${isActive ? 'brand-chip' : 'surface-soft text-secondary'}`}>
                               {index + 1}
@@ -1049,6 +1069,15 @@ export default function MasteryTrainingWorkspace() {
                               )}
                             </div>
                             <div className="flex flex-shrink-0 items-center gap-1">
+                              <span
+                                {...dragProvided.dragHandleProps}
+                                className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-tertiary transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--app-accent)] ${moveLocked || actionPending !== null ? 'cursor-not-allowed opacity-40' : 'cursor-grab active:cursor-grabbing'}`}
+                                title="拖动排序"
+                                aria-label={`拖动排序 ${item.operatorName} · ${item.skillName}`}
+                                aria-disabled={moveLocked || actionPending !== null}
+                              >
+                                <GripVertical size={15} strokeWidth={2} aria-hidden="true" />
+                              </span>
                               <IconButton
                                 icon={<ChevronUp size={15} strokeWidth={2} />}
                                 variant="ghost"
@@ -1098,9 +1127,16 @@ export default function MasteryTrainingWorkspace() {
                               />
                             </div>
                           </div>
-                        </div>
+                            </div>
+                          )}
+                        </Draggable>
                       )
                     })}
+                          {provided.placeholder}
+                          </div>
+                        )}
+                      </Droppable>
+                    </DragDropContext>
                   </div>
                 )}
 

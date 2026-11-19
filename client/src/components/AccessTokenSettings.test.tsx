@@ -1,12 +1,10 @@
 // @vitest-environment jsdom
 
-import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AccessTokenSettings from './AccessTokenSettings'
 import { ACCESS_TOKEN_STORAGE_KEY } from '@/utils/accessToken'
-
-;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const desktopMock = vi.hoisted(() => ({
   desktop: false,
@@ -22,88 +20,59 @@ vi.mock('@/desktop/bridge', () => ({
   },
 }))
 
-let container: HTMLDivElement
-let root: Root
+beforeEach(() => {
+  localStorage.clear()
+  vi.clearAllMocks()
+  desktopMock.desktop = false
+})
 
-const flush = async () => {
-  await act(async () => {
-    await Promise.resolve()
-    await Promise.resolve()
-  })
-}
-
-const renderPanel = async () => {
-  await act(async () => root.render(<AccessTokenSettings />))
-  await flush()
-}
-
-const setInputValue = async (input: HTMLInputElement, value: string) => {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-  await act(async () => {
-    setter?.call(input, value)
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-  })
-  await flush()
-}
-
-const button = (label: string) => Array.from(container.querySelectorAll('button'))
-  .find(item => item.textContent?.trim() === label)
+afterEach(cleanup)
 
 describe('AccessTokenSettings', () => {
-  beforeEach(() => {
-    localStorage.clear()
-    vi.clearAllMocks()
-    desktopMock.desktop = false
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
-  })
-
-  afterEach(async () => {
-    await act(async () => root.unmount())
-    container.remove()
-  })
-
   it('saves and clears a token in local storage', async () => {
-    await renderPanel()
-    const input = container.querySelector<HTMLInputElement>('input[placeholder="请输入访问令牌"]')!
-    await setInputValue(input, 'phone-token')
-    await act(async () => button('保存令牌')?.click())
+    render(<AccessTokenSettings />)
+    const user = userEvent.setup()
+
+    const input = screen.getByLabelText('访问令牌') as HTMLInputElement
+    await user.type(input, 'phone-token')
+    await user.click(screen.getByRole('button', { name: '保存令牌' }))
 
     expect(localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)).toBe('phone-token')
-    expect(container.textContent).toContain('已设置')
+    expect(screen.getByText('已设置')).toBeTruthy()
 
-    await act(async () => button('清除令牌')?.click())
+    await user.click(screen.getByRole('button', { name: '清除令牌' }))
     expect(localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)).toBeNull()
-    expect(container.textContent).toContain('未设置')
+    expect(screen.getByText('未设置')).toBeTruthy()
   })
 
   it('loads and updates the desktop token through the bridge', async () => {
     desktopMock.desktop = true
     desktopMock.getAccessToken.mockResolvedValue({ token: 'existing-token', source: 'settings' })
     desktopMock.setAccessToken.mockResolvedValue('new-token-123')
-    await renderPanel()
+    render(<AccessTokenSettings />)
 
-    const input = container.querySelector<HTMLInputElement>('input[type="password"]')!
+    const input = await screen.findByDisplayValue('existing-token') as HTMLInputElement
     expect(input.value).toBe('existing-token')
-    expect(container.textContent).toContain('已设置')
+    expect(screen.getByText('已设置')).toBeTruthy()
 
-    await setInputValue(input, 'new-token-123')
-    await act(async () => button('保存令牌')?.click())
-    await flush()
+    const user = userEvent.setup()
+    await user.clear(input)
+    await user.type(input, 'new-token-123')
+    await user.click(screen.getByRole('button', { name: '保存令牌' }))
+    await waitFor(() => expect(desktopMock.setAccessToken).toHaveBeenCalledWith('new-token-123'))
 
-    expect(desktopMock.setAccessToken).toHaveBeenCalledWith('new-token-123')
     expect(localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)).toBe('new-token-123')
-    expect(container.textContent).toContain('令牌已更新')
+    expect(await screen.findByText(/令牌已更新/)).toBeTruthy()
   })
 
   it('locks the desktop token when the environment sets it', async () => {
     desktopMock.desktop = true
     desktopMock.getAccessToken.mockResolvedValue({ token: 'env-token-123', source: 'env' })
-    await renderPanel()
+    render(<AccessTokenSettings />)
 
-    expect(container.textContent).toContain('环境变量')
-    const input = container.querySelector<HTMLInputElement>('input[type="password"]')!
+    await screen.findByDisplayValue('env-token-123')
+    expect(screen.getByText('环境变量')).toBeTruthy()
+    const input = screen.getByLabelText('访问令牌') as HTMLInputElement
     expect(input.disabled).toBe(true)
   })
 })
