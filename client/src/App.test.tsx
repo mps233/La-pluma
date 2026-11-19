@@ -213,7 +213,9 @@ describe('App motion preferences', () => {
     expect(hiddenError?.style.display).toBe('none')
 
     await act(async () => appMocks.navigate?.('automation'))
-    expect(hiddenError?.style.display).not.toBe('none')
+    const visibleError = Array.from(container.querySelectorAll<HTMLElement>('.p-6'))
+      .find(element => element.textContent?.includes('automation render failed'))
+    expect(visibleError?.style.display).not.toBe('none')
     consoleError.mockRestore()
   })
 })
