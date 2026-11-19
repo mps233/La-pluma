@@ -261,10 +261,12 @@ func (p *Publisher) handleInput(data []byte) {
 	width := uint16(message.Width)
 	height := uint16(message.Height)
 	if width == 0 {
-		width = uint16(p.session.Width)
+		sessionW, _ := p.session.FrameSize()
+		width = uint16(sessionW)
 	}
 	if height == 0 {
-		height = uint16(p.session.Height)
+		_, sessionH := p.session.FrameSize()
+		height = uint16(sessionH)
 	}
 	switch message.Type {
 	case "touch":
@@ -379,8 +381,15 @@ func (p *Publisher) Close() {
 		entry.pc.Close()
 	}
 }
-func (p *Publisher) SessionWidth() int  { return p.session.Width }
-func (p *Publisher) SessionHeight() int { return p.session.Height }
+func (p *Publisher) SessionWidth() int {
+	w, _ := p.session.FrameSize()
+	return w
+}
+
+func (p *Publisher) SessionHeight() int {
+	_, h := p.session.FrameSize()
+	return h
+}
 
 func (p *Publisher) SendKeyTap(keycode int) error { return p.session.SendKeyTap(keycode) }
 func (p *Publisher) SendText(text string) error   { return p.session.SendText(text) }

@@ -89,7 +89,7 @@ func New(cfg config.Config, logger *slog.Logger) *Service {
 	}
 	version := strings.TrimSpace(os.Getenv("LA_PLUMA_SCRCPY_SERVER_VERSION"))
 	if version == "" {
-		version = "3.3.4"
+		version = "5.0.1"
 	}
 	serverPath := resolveServerPath()
 	return &Service{
@@ -111,11 +111,11 @@ func resolveServerPath() string {
 		return value
 	}
 	candidates := []string{
-		"resources/scrcpy-server-v3.3.4",
+		"resources/scrcpy-server-v5.0.1",
 		"resources/scrcpy-server",
-		"../resources/scrcpy-server-v3.3.4",
+		"../resources/scrcpy-server-v5.0.1",
 		"../resources/scrcpy-server",
-		"/tmp/scrcpy-server-v3.3.4",
+		"/tmp/scrcpy-server-v5.0.1",
 	}
 	if executable, err := os.Executable(); err == nil {
 		dir := filepath.Dir(executable)
@@ -204,7 +204,8 @@ func (s *Service) Start(ctx context.Context, request StartRequest) (map[string]a
 		bitRate:   bitRate,
 		startedAt: time.Now(),
 	}
-	s.logger.Info("webrtc start", "address", address, "device_id", deviceID, "width", session.Width, "height", session.Height)
+	startWidth, startHeight := session.FrameSize()
+	s.logger.Info("webrtc start", "address", address, "device_id", deviceID, "width", startWidth, "height", startHeight)
 	return s.statusLocked(), nil
 }
 
@@ -302,8 +303,9 @@ func (s *Service) statusLocked() map[string]any {
 	if s.current != nil {
 		status["deviceId"] = s.current.deviceID
 		status["address"] = s.current.address
-		status["width"] = s.current.session.Width
-		status["height"] = s.current.session.Height
+		width, height := s.current.session.FrameSize()
+		status["width"] = width
+		status["height"] = height
 		status["viewers"] = s.current.publisher.PeerCount()
 		status["startedAt"] = s.current.startedAt.UTC().Format(time.RFC3339)
 		status["devices"] = []string{s.current.address}

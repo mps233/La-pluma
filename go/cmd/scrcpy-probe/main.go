@@ -16,8 +16,8 @@ func main() {
 	var (
 		adbPath = flag.String("adb", "/opt/homebrew/bin/adb", "adb executable")
 		serial  = flag.String("serial", "127.0.0.1:16384", "device serial")
-		server  = flag.String("server", "/tmp/scrcpy-server-v3.3.4", "scrcpy-server jar")
-		version = flag.String("version", "3.3.4", "scrcpy server version")
+		server  = flag.String("server", "/tmp/scrcpy-server-v5.0.1", "scrcpy-server jar")
+		version = flag.String("version", "5.0.1", "scrcpy server version")
 		packets = flag.Int("packets", 60, "video packets to read")
 		sendKey = flag.Bool("key", false, "send Home after the first packets")
 		forward = flag.Bool("forward", false, "use adb forward instead of reverse")

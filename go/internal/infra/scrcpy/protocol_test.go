@@ -1,17 +1,21 @@
 package scrcpy
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"testing"
 )
 
 func TestReadVideoHeaderAndPacket(t *testing.T) {
-	var header [12]byte
-	binary.BigEndian.PutUint32(header[0:4], CodecH264)
-	binary.BigEndian.PutUint32(header[4:8], 1280)
-	binary.BigEndian.PutUint32(header[8:12], 720)
-	parsed, err := ReadVideoHeader(bytes.NewReader(header[:]))
+	// v5 preamble: 4-byte codec id, then a 12-byte session packet that carries
+	// the frame size in the second and third words.
+	var preamble [16]byte
+	binary.BigEndian.PutUint32(preamble[0:4], CodecH264)
+	binary.BigEndian.PutUint32(preamble[4:8], uint32(FlagSession>>32))
+	binary.BigEndian.PutUint32(preamble[8:12], 1280)
+	binary.BigEndian.PutUint32(preamble[12:16], 720)
+	parsed, err := ReadVideoHeader(bytes.NewReader(preamble[:]))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,5 +67,34 @@ func TestControlEncoding(t *testing.T) {
 	}
 	if buffer.Bytes()[0] != CtrlInjectText || binary.BigEndian.Uint32(buffer.Bytes()[1:5]) != 6 {
 		t.Fatalf("unexpected text: %x", buffer.Bytes())
+	}
+}
+
+func TestReadVideoPacketAppliesSessionResize(t *testing.T) {
+	var stream bytes.Buffer
+	// flags: session bit + client resized bit
+	binary.Write(&stream, binary.BigEndian, uint32(0x80000001))
+	binary.Write(&stream, binary.BigEndian, uint32(1080))
+	binary.Write(&stream, binary.BigEndian, uint32(1920))
+
+	payload := []byte{7, 8, 9}
+	binary.Write(&stream, binary.BigEndian, uint64(FlagKeyFrame|42))
+	binary.Write(&stream, binary.BigEndian, uint32(len(payload)))
+	stream.Write(payload)
+
+	session := &Session{video: bufio.NewReader(bytes.NewReader(stream.Bytes()))}
+	header, data, err := session.ReadVideoPacket()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !header.IsKeyFrame() || header.PTS() != 42 {
+		t.Fatalf("unexpected packet: %+v", header)
+	}
+	if !bytes.Equal(data, payload) {
+		t.Fatalf("unexpected payload: %v", data)
+	}
+	width, height := session.FrameSize()
+	if width != 1080 || height != 1920 {
+		t.Fatalf("frame size = %dx%d, want 1080x1920", width, height)
 	}
 }

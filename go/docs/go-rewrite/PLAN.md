@@ -63,7 +63,7 @@ go/
   - [x] start-game, dynamic run-task (StartUp), and startup-only daily flow verified on real MuMu
   - [x] fight/copilot execution and recognition actions
 - [~] 4. Device preview/control replacement
-  - [x] scrcpy server push/launch/protocol (scrcpy-server 3.3.4)
+  - [x] scrcpy server push/launch/protocol (scrcpy-server 5.0.1)
   - [x] H.264 video socket -> Pion WebRTC track
   - [x] control socket touch/key/text base commands
   - [x] React client signaling compatibility verified in browser
