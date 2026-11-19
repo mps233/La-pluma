@@ -350,3 +350,26 @@ func TestRecordActivityCompletionPersists(t *testing.T) {
 		t.Fatalf("progress file = %#v", value)
 	}
 }
+
+func TestCheckReportsSpecialStageNavigation(t *testing.T) {
+	paths := testPaths(t)
+	writeStageActivity(t, paths, stageActivityFixture())
+	writeStagesCatalog(t, paths)
+	writeReadyStageTasks(t, paths)
+	writeJSON(t, filepath.Join(paths.DataDir, "stages.json"), map[string]any{
+		"EA-EX-8": map[string]any{"code": "EA-EX-8", "zoneName": "测试章节"},
+	})
+
+	service := NewWithOptions(Options{
+		Paths:       paths,
+		Now:         testNow,
+		ResourceDir: staticResourceDir{dir: filepath.Join(paths.MaaDataDir, "resource")},
+	})
+	result, err := service.Check(context.Background(), "Official")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.State != "ready" || result.Navigation == nil || !result.Navigation.SpecialStages {
+		t.Fatalf("result = %#v", result)
+	}
+}

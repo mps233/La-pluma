@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { maaApi } from '@/services/api'
+import { getSklandStatus, maaApi } from '@/services/api'
 import { projectSanity, type SanityProjection, type SanityReading } from '@/utils/maaSanity'
 
 const SANITY_POLL_MS = 30_000
@@ -12,9 +12,9 @@ const parseReportAt = (value: string): number => {
 }
 
 /**
- * The account's sanity, read from MaaCore's fight callbacks by the backend. Sanity only changes
- * while the game is driven, so the reading is polled slowly and projected forward at the natural
- * regeneration rate between callbacks. `enabled` stops both timers and the poll for narrow
+ * The account's sanity. While a task runs it comes from MaaCore's fight callbacks; otherwise the
+ * newest of that reading and the Skland `player/info` snapshot wins. Both are projected forward at
+ * the natural regeneration rate between reads. `enabled` stops both timers and the poll for narrow
  * viewports, which have no room to show the value.
  */
 export function useMaaSanity(running: boolean, enabled = true): SanityProjection | null {
@@ -37,12 +37,44 @@ export function useMaaSanity(running: boolean, enabled = true): SanityProjection
       if (disposed) return
       controller = new AbortController()
       try {
-        const result = await maaApi.getMaaCallbacks(500, controller.signal)
-        if (disposed || !result.success) return
-        const sanity = result.data?.sanity
-        if (sanity && Number.isFinite(sanity.current) && Number.isFinite(sanity.max) && sanity.max > 0) {
-          setReading({ current: sanity.current, max: sanity.max, reportAt: parseReportAt(sanity.reportAt ?? '') })
+        const [maaResult, sklandResult] = await Promise.all([
+          maaApi.getMaaCallbacks(500, controller.signal),
+          getSklandStatus().catch(() => null),
+        ])
+        if (disposed) return
+        let next: SanityReading | null = null
+        const maaSanity = maaResult.success ? maaResult.data?.sanity : null
+        if (maaSanity && Number.isFinite(maaSanity.current) && Number.isFinite(maaSanity.max) && maaSanity.max > 0) {
+          next = {
+            current: maaSanity.current,
+            max: maaSanity.max,
+            reportAt: parseReportAt(maaSanity.reportAt ?? ''),
+          }
         }
+        const sklandSanity = sklandResult?.success ? sklandResult.data?.sanity : null
+        if (sklandSanity && Number.isFinite(sklandSanity.current) && Number.isFinite(sklandSanity.max) && sklandSanity.max > 0) {
+          const parsedReportAt = Date.parse(sklandSanity.reportAt)
+          const reportAt = Number.isFinite(parsedReportAt) ? parsedReportAt : Date.now()
+          let current = sklandSanity.current
+          // Skland's raw current can lag completeRecoveryTime by several points (the
+          // same mismatch Mower corrects). Trust the countdown when they disagree.
+          if (sklandSanity.completeRecoveryTime && sklandSanity.completeRecoveryTime > 0) {
+            const remaining = sklandSanity.completeRecoveryTime * 1000 - reportAt
+            if (remaining > 0) {
+              const computed = Math.max(0, sklandSanity.max - Math.ceil(remaining / 360_000))
+              if (Math.abs(current - computed) > 1) current = computed
+            } else {
+              current = sklandSanity.max
+            }
+          }
+          const candidate: SanityReading = {
+            current,
+            max: sklandSanity.max,
+            reportAt,
+          }
+          if (!next || candidate.reportAt >= next.reportAt) next = candidate
+        }
+        if (next) setReading(next)
       } catch {
         // Keep the last reading: a failed poll does not mean sanity changed.
       } finally {

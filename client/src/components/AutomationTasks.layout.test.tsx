@@ -407,7 +407,7 @@ describe('AutomationTasks layout surfaces', () => {
 
     expect(selectedButton?.getAttribute('aria-controls')).toBe('automation-task-editor')
     expect(selectedButton?.getAttribute('aria-pressed')).toBe('true')
-    expect(editor?.textContent).toContain('理智作战')
+    expect(editor?.textContent).toContain('关卡计划')
     expect(mocks.scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' })
   })
 
@@ -555,7 +555,7 @@ describe('AutomationTasks layout surfaces', () => {
     expect(container.querySelector('#automation-startup-1-accountName')?.classList.contains('automation-text-control')).toBe(true)
 
     const taskDeleteButtons = container.querySelectorAll<HTMLButtonElement>('[aria-label="删除启动游戏"]')
-    expect(taskDeleteButtons).toHaveLength(2)
+    expect(taskDeleteButtons).toHaveLength(1)
     taskDeleteButtons.forEach(button => {
       expect(button.classList.contains('min-h-11')).toBe(true)
       expect(button.classList.contains('min-w-11')).toBe(true)

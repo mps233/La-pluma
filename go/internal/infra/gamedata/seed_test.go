@@ -24,8 +24,8 @@ func TestSeedFixtureAndIdempotence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if requests.Load() != 5 {
-		t.Fatalf("requests = %d, want 5", requests.Load())
+	if requests.Load() != 6 {
+		t.Fatalf("requests = %d, want 6", requests.Load())
 	}
 	if result.StageCount != 1 || result.ParadoxOperatorCount != 1 || result.OperatorMaterialsCount != 1 || result.MasteryOperatorCount != 1 || result.MasterySkillCount != 1 {
 		t.Fatalf("result = %#v", result)
@@ -47,8 +47,8 @@ func TestSeedFixtureAndIdempotence(t *testing.T) {
 	if _, err := Seed(context.Background(), client, outDir); err != nil {
 		t.Fatal(err)
 	}
-	if requests.Load() != 10 {
-		t.Fatalf("requests after second seed = %d, want 10", requests.Load())
+	if requests.Load() != 12 {
+		t.Fatalf("requests after second seed = %d, want 12", requests.Load())
 	}
 	for name, original := range first {
 		if current := readFileBytes(t, filepath.Join(outDir, name)); string(current) != string(original) {
@@ -60,6 +60,9 @@ func TestSeedFixtureAndIdempotence(t *testing.T) {
 	stage := mustRecord(t, stages["0-1"], "stage 0-1")
 	if stage["thumbnail"] != StageThumbnailBaseURL+"/main_00-01.png" {
 		t.Fatalf("stage = %#v", stage)
+	}
+	if stage["zoneName"] != "主线" {
+		t.Fatalf("zoneName = %#v", stage["zoneName"])
 	}
 
 	paradox := mustArray(t, decodeFile(t, filepath.Join(outDir, ParadoxOperatorsFileName)), "paradox")
@@ -188,6 +191,11 @@ func seedFixture() map[string]any {
 					"stageType":   "MAIN",
 					"zoneId":      "main_0",
 				},
+			},
+		},
+		"/excel/zone_table.json": map[string]any{
+			"zones": map[string]any{
+				"main_0": map[string]any{"zoneNameSecond": "主线"},
 			},
 		},
 		"/excel/handbook_info_table.json": map[string]any{

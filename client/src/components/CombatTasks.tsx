@@ -83,6 +83,25 @@ const parseCopilotUri = (value: string): CopilotUriInfo | null => {
 const formatCopilotUri = ({ id, isSet }: CopilotUriInfo): string =>
   isSet ? `prts://s${id}` : `prts://${id}`
 type CopilotSetSelections = Record<string, number[]>
+type ActivityNavigationContext = {
+  setId: string
+  state: string
+  code: string | null
+  name: string | null
+  stages: string[]
+  specialStages: boolean
+  reason: string | null
+}
+type ActivityNavigationMatch = {
+  matched: boolean
+  ready: boolean
+  autoNavigable: boolean
+  context: ActivityNavigationContext | null
+}
+// MAA's activity resource only provides home navigation for two-segment stage
+// codes. EX/S/MO/TR stages live in a separate chapter and must be entered
+// manually before the copilot starts.
+const AUTO_NAVIGABLE_ACTIVITY_STAGE = /^[A-Z0-9]+-\d+$/i
 type CombatMode = 'copilot' | 'ssscopilot' | 'paradoxcopilot'
 
 const combatModeOptions = [
@@ -235,6 +254,8 @@ export default function CombatTasks() {
   const lastQueuedConfigFingerprintRef = useRef<string | null>(null)
   const configHydratedRef = useRef(false)
   const previewRequestRef = useRef(0)
+  const activityNavigationRequestRef = useRef(0)
+  const activityNavigationInFlightRef = useRef<{ setId: string; promise: Promise<ActivityNavigationContext | null> } | null>(null)
   const copilotSearchRequestRef = useRef(0)
   const paradoxSearchRequestRef = useRef(0)
 
@@ -249,6 +270,7 @@ export default function CombatTasks() {
   const [copilotSetSelections, setCopilotSetSelections] = useState<CopilotSetSelections>({})
   const [activityPrefillSetId, setActivityPrefillSetId] = useState<string | null>(null)
   const [activityFallback, setActivityFallback] = useState(false)
+  const [activityNavigationContext, setActivityNavigationContext] = useState<ActivityNavigationContext | null>(null)
   const runTaskResults = currentRun?.taskResults ?? currentRun?.progress?.taskResults ?? []
   const runSetId = currentRun?.progress?.setId ?? null
   const runBelongsToSet = Boolean(currentRun && copilotSetInfo && (
@@ -470,6 +492,63 @@ export default function CombatTasks() {
       .map((_, index) => index)
       .filter(index => selectedCopilotIndexes.has(index))
   }
+
+  // A plain copilot set can still use the activity runner when every selected
+  // stage belongs to the current activity. The runner restarts the game and
+  // navigates to the selected stage before Copilot starts.
+  const matchActivityNavigationFor = (
+    context: ActivityNavigationContext | null,
+    indexes: number[]
+  ): ActivityNavigationMatch => {
+    if (copilotSetInfo?.type !== 'set' || !context || context.setId !== copilotSetInfo.id) {
+      return { matched: false, ready: false, autoNavigable: false, context: null }
+    }
+    if (indexes.length === 0 || context.stages.length === 0) {
+      return { matched: false, ready: context.state === 'ready', autoNavigable: false, context }
+    }
+    const stages = new Set(context.stages.map(stage => stage.toUpperCase()))
+    const activityPrefix = context.code ? `${context.code.toUpperCase()}-` : ''
+    let matched = true
+    let autoNavigable = true
+    for (const index of indexes) {
+      const stage = copilotSetInfo.copilots?.[index]?.stage?.trim()
+      if (!stage) {
+        matched = false
+        autoNavigable = false
+        continue
+      }
+      const upper = stage.toUpperCase()
+      if (!stages.has(upper) && !(activityPrefix && upper.startsWith(activityPrefix))) {
+        matched = false
+      }
+      if (!AUTO_NAVIGABLE_ACTIVITY_STAGE.test(stage) && !context.specialStages) {
+        autoNavigable = false
+      }
+    }
+    return { matched, ready: context.state === 'ready', autoNavigable, context }
+  }
+
+  const matchActivityNavigation = (indexes: number[]): ActivityNavigationMatch =>
+    matchActivityNavigationFor(activityNavigationContext, indexes)
+
+  const stagesAreAutoNavigable = (indexes: number[]): boolean => {
+    if (indexes.length === 0) return false
+    const context = activityNavigationContext?.setId === copilotSetInfo?.id ? activityNavigationContext : null
+    return indexes.every(index => {
+      const stage = copilotSetInfo?.copilots?.[index]?.stage?.trim()
+      if (!stage) return false
+      return AUTO_NAVIGABLE_ACTIVITY_STAGE.test(stage) || Boolean(context?.specialStages)
+    })
+  }
+
+  const isActivityPrefilledSet = Boolean(activityPrefillSetId && copilotSetInfo?.id === activityPrefillSetId)
+  const selectedIndexesForActivityNavigation = getSelectedCopilotIndexes()
+  const activityNavigationMatch = matchActivityNavigation(selectedIndexesForActivityNavigation)
+  const selectedStagesAutoNavigable = stagesAreAutoNavigable(selectedIndexesForActivityNavigation)
+  const showUnsupportedStageHint = selectedIndexesForActivityNavigation.length > 0 && !selectedStagesAutoNavigable
+  const canAutoNavigateActivity = activityNavigationMatch.matched
+    && activityNavigationMatch.ready
+    && activityNavigationMatch.autoNavigable
 
   const serializeSelectedCopilotIndexes = (indexes: Set<number>): number[] =>
     [...indexes].filter(Number.isInteger).sort((a, b) => a - b)
@@ -983,12 +1062,18 @@ export default function CombatTasks() {
 
     try {
       const raid = normalizeRaidValue(advancedParams.copilot?.raid)
-      const isActivityPrefill = Boolean(activityPrefillSetId && copilotSetInfo?.id === activityPrefillSetId)
+      let activityMatch = matchActivityNavigation(selectedIndexes)
+      if (!isActivityPrefilledSet && copilotSetInfo?.type === 'set' && !activityMatch.context) {
+        const activityContext = await ensureActivityNavigationContext(copilotSetInfo.id)
+        activityMatch = matchActivityNavigationFor(activityContext, selectedIndexes)
+      }
+      const useActivityNavigation = (isActivityPrefilledSet && stagesAreAutoNavigable(selectedIndexes))
+        || (activityMatch.matched && activityMatch.ready && activityMatch.autoNavigable)
       const executionOptions = {
         ignoreRequirements: advancedParams.copilot?.ignoreRequirements,
         loopTimes: advancedParams.copilot?.loopTimes,
-        useSanityPotion: isActivityPrefill ? true : advancedParams.copilot?.useSanityPotion,
-        ...(isActivityPrefill ? { nativeDelegation: false } : {}),
+        useSanityPotion: useActivityNavigation ? true : advancedParams.copilot?.useSanityPotion,
+        ...(useActivityNavigation ? { nativeDelegation: false } : {}),
         addTrust: advancedParams.copilot?.addTrust,
         formationIndex: advancedParams.copilot?.formationIndex,
         supportUsage: advancedParams.copilot?.supportUsage,
@@ -997,7 +1082,7 @@ export default function CombatTasks() {
         formationMode: getFormationMode(task.id)
       }
       const result = copilotSetInfo?.type === 'set'
-        ? isActivityPrefill
+        ? useActivityNavigation
           ? await maaApi.runActivitySet(copilotSetInfo.id, {
               raid,
               selectedIndexes,
@@ -1012,10 +1097,19 @@ export default function CombatTasks() {
 
       if (!isCurrentExecution(generation)) return
       if (result.success) {
-        const pendingEntries = (result.data as ScheduleExecutionResultData | undefined)?.pending
+        const executionData = result.data as ScheduleExecutionResultData | undefined
+        const pendingEntries = executionData?.pending
         const pendingIndexes = new Set<number>((pendingEntries || []).map(entry => entry.itemIndex))
         applySelectedCopilotIndexes(pendingIndexes, copilotSetInfo?.id)
-        setStatusMessage(pendingIndexes.size ? keepNumberWithUnit(`作业集已完成部分关卡，剩余 ${pendingIndexes.size} 个待执行`) : '作业集执行完成')
+        const substitutions = executionData?.substitutions || []
+        const skipped = executionData?.skipped || []
+        if (skipped.length > 0) {
+          setStatusMessage(keepNumberWithUnit(`作业集执行完成；${skipped.length} 关没有兼容作业，已跳过`), 'warning')
+        } else if (substitutions.length > 0) {
+          setStatusMessage(keepNumberWithUnit(`作业集执行完成；已自动替换 ${substitutions.length} 关作业`), 'success')
+        } else {
+          setStatusMessage(pendingIndexes.size ? keepNumberWithUnit(`作业集已完成部分关卡，剩余 ${pendingIndexes.size} 个待执行`) : '作业集执行完成')
+        }
       } else {
         setStatusMessage(`作业集执行失败: ${maaApi.getErrorMessage(result)}`)
       }
@@ -1490,6 +1584,52 @@ export default function CombatTasks() {
     return []
   }
 
+  // Read the current activity's stages and MAA navigation readiness. A failed
+  // probe must not block the set preview; it only disables auto navigation.
+  const fetchActivityNavigationContext = async (setId: string): Promise<ActivityNavigationContext | null> => {
+    try {
+      const result = await maaApi.getActivityPreflight()
+      const data = result.success ? result.data : undefined
+      const stages = Array.isArray(data?.activity?.stages)
+        ? data.activity.stages.filter((stage): stage is string => typeof stage === 'string')
+        : []
+      return {
+        setId,
+        state: typeof data?.state === 'string' ? data.state : 'blocked',
+        code: typeof data?.activity?.code === 'string' ? data.activity.code : null,
+        name: typeof data?.activity?.name === 'string' ? data.activity.name : null,
+        stages,
+        specialStages: data?.navigation?.specialStages === true,
+        reason: typeof data?.reason === 'string' ? data.reason : null
+      }
+    } catch {
+      return null
+    }
+  }
+
+  // Refresh in the background so the set preview is never blocked by activity
+  // detection. A newer set load discards the stale response.
+  const loadActivityNavigationContext = async (setId: string) => {
+    const requestId = ++activityNavigationRequestRef.current
+    const promise = fetchActivityNavigationContext(setId)
+    activityNavigationInFlightRef.current = { setId, promise }
+    const context = await promise
+    if (activityNavigationRequestRef.current !== requestId) return
+    activityNavigationInFlightRef.current = null
+    setActivityNavigationContext(context)
+  }
+
+  // Resolve on demand for the execution click when the background refresh has
+  // not finished yet, so a fast click still gets automatic navigation.
+  const ensureActivityNavigationContext = async (setId: string): Promise<ActivityNavigationContext | null> => {
+    if (activityNavigationContext?.setId === setId) return activityNavigationContext
+    const inFlight = activityNavigationInFlightRef.current
+    if (inFlight?.setId === setId) return inFlight.promise
+    const context = await fetchActivityNavigationContext(setId)
+    if (context) setActivityNavigationContext(context)
+    return context
+  }
+
   const applyCopilotUri = async (uri: string, options: { ignorePreviewGuard?: boolean } = {}) => {
     const normalizedUri = normalizeCopilotInput(uri).trim()
     setTaskInputs(prev => ({ ...prev, copilot: normalizedUri }))
@@ -1532,6 +1672,7 @@ export default function CombatTasks() {
             currentIndex: 0
           })
           restoreSelectedCopilots(copilotId, copilots)
+          void loadActivityNavigationContext(copilotId)
           setStatusMessage(keepNumberWithUnit(`已加载作业集：${copilots.length} 个作业`))
         } else {
           setStatusMessage('作业集不存在或为空')
@@ -1865,7 +2006,13 @@ export default function CombatTasks() {
                         <p className="pl-14 text-xs leading-relaxed text-tertiary">
                           {copilotSetExecutionMode === 'manual'
                             ? '每关完成后暂停，请先在游戏中进入下一关界面，再点击“开始下一关”。'
-                            : '自动完成整个作业集；中途需要逐关确认时，请切换到手动逐关。'}
+                            : showUnsupportedStageHint
+                              ? '所选关卡属于 EX/特殊关卡，MAA 导航资源不支持自动进入；请先手动进入活动关卡地图，再点“立即执行”。'
+                              : canAutoNavigateActivity
+                                ? `已匹配当前活动${activityNavigationMatch.context?.name ? `「${activityNavigationMatch.context.name}」` : ''}的关卡；执行时会先重启游戏，再自动进入活动并选中关卡。`
+                                : activityNavigationMatch.matched
+                                  ? (activityNavigationMatch.context?.reason || '这些关卡属于当前活动，但未找到自动导航资源；执行前请先手动进入活动关卡地图。')
+                                  : '自动完成整个作业集；中途需要逐关确认时，请切换到手动逐关。'}
                         </p>
                       </div>
 

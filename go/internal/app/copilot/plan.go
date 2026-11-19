@@ -33,14 +33,18 @@ type PlanItem struct {
 
 // PlanEntry is the execution projection of a plan item for one raid mode.
 type PlanEntry struct {
-	Key             string   `json:"key"`
-	ItemIndex       int      `json:"itemIndex"`
-	CopilotID       int      `json:"copilotId"`
-	StageID         string   `json:"stageId"`
-	DisplayStage    string   `json:"displayStage"`
-	APCost          *float64 `json:"apCost"`
-	Mode            string   `json:"mode"`
-	PresetFormation bool     `json:"presetFormation"`
+	Key       string `json:"key"`
+	ItemIndex int    `json:"itemIndex"`
+	CopilotID int    `json:"copilotId"`
+	// OriginalCopilotID is set when the activity runner substituted a
+	// box-compatible copilot for this entry. Key still points at the original
+	// set entry so progress remains stable.
+	OriginalCopilotID int      `json:"originalCopilotId,omitempty"`
+	StageID           string   `json:"stageId"`
+	DisplayStage      string   `json:"displayStage"`
+	APCost            *float64 `json:"apCost"`
+	Mode              string   `json:"mode"`
+	PresetFormation   bool     `json:"presetFormation"`
 	// Completed is nil for the cached plan and set to true/false by BuildPlan.
 	Completed *bool `json:"completed,omitempty"`
 }

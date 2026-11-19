@@ -1188,6 +1188,7 @@ const appliedExecutionRevisionRef = useRef(-1)
         medicine: 0,
         expiringMedicine: 0,
         medicineExpireDays: 0,
+        expiryUnit: 'days',
         server: '',
         stone: 0,
         series: '1',
@@ -1203,15 +1204,7 @@ const appliedExecutionRevisionRef = useRef(-1)
         { key: 'stages', label: '关卡', type: 'multi-stages', placeholder: '1-7 或 HD-7', timesPlaceholder: '次数', helper: '使用 HD-数字代表当前活动关卡；置顶关卡会优先执行。主线可在末尾加 -NORMAL/-HARD：10-14\u00A0章为标准/磨难，15\u00A0章后为常规/险地' },
         { key: 'drops', label: '掉落目标', type: 'text', placeholder: '30011=10,30062=5', helper: '任一物品达到目标数量后停止；格式为物品 ID=数量，多个目标用逗号分隔' },
         { key: 'medicine', label: '理智药', type: 'number', placeholder: '0', helper: '使用理智药数量' },
-        { key: 'expiringMedicine', label: '临期药数量', type: 'number', placeholder: '0', helper: '按瓶数设置可使用的临期理智药；建议改用临期药天数' },
-        { key: 'medicineExpireDays', label: '临期药天数', type: 'number', placeholder: '0', min: '0', helper: '使用指定天数内过期的理智药；设置后自动改用动态任务' },
-        { key: 'server', label: '掉落服务器', type: 'select', options: [
-          { value: '', label: '自动' },
-          { value: 'CN', label: '国服' },
-          { value: 'US', label: '美服' },
-          { value: 'JP', label: '日服' },
-          { value: 'KR', label: '韩服' }
-        ], helper: '外服资源可能只接受 -1~6\u00A0倍代理' },
+        { key: 'medicineExpireDays', label: '临期药', type: 'expiry-medicine', helper: '按天优先使用该天数内过期的理智药；按瓶直接指定临期药数量。0 表示不启用' },
         { key: 'stone', label: '源石', type: 'number', placeholder: '0', helper: '使用源石数量' },
         { key: 'series', label: '连战', type: 'select', options: [
           { value: '-1', label: '禁用' },
@@ -1273,12 +1266,6 @@ const appliedExecutionRevisionRef = useRef(-1)
         ], hiddenWhen: { key: 'mode', value: '10000' } },
         { key: 'threshold', label: '心情阈值', type: 'number', placeholder: '0.3', step: '0.1', min: '0', max: '1' },
         { key: 'replenish', label: '自动补货', type: 'checkbox' },
-        { key: 'fiammetta_recovery_enabled', label: '菲亚梅塔恢复', type: 'checkbox', helper: '第一轮宿舍优先配对菲亚梅塔；默认关闭' },
-        { key: 'fiammetta_targets', label: '恢复目标', type: 'text', placeholder: '清流,可露希尔,但书', helper: '多个干员用逗号分隔；留空使用默认名单', visibleWhen: { key: 'fiammetta_recovery_enabled', value: true } },
-        { key: 'use_pinus_sylvestris', label: '红松骑士团组合', type: 'checkbox', helper: '允许跨设施组合红松骑士团技能' },
-        { key: 'use_perception_information', label: '感知信息组合', type: 'checkbox', helper: '优先感知信息；会覆盖人间烟火组合' },
-        { key: 'use_worldly_plight', label: '人间烟火组合', type: 'checkbox', helper: '允许跨设施组合人间烟火技能' },
-        { key: 'use_abyssal_hunter', label: '深海猎人组合', type: 'checkbox', helper: '允许跨设施组合深海猎人技能' },
         { key: 'filename', label: '排班文件', type: 'text', placeholder: 'schedules/base.json', helper: '自定义换班使用的排班配置文件路径', visibleWhen: { key: 'mode', value: '10000' } },
         { key: 'plan_index', label: '方案序号', type: 'number', placeholder: '0', min: '0', helper: '配置文件中的方案序号，从 0 开始', visibleWhen: { key: 'mode', value: '10000' } },
       ],
@@ -1316,22 +1303,10 @@ const appliedExecutionRevisionRef = useRef(-1)
         { key: 'select', label: '招募星级', type: 'star-select', helper: '支持 6\u00A0星自动公招；勾选 6\u00A0星后会保留高价值标签并自动选择对应组合' },
         { key: 'confirm', label: '确认星级', type: 'star-select', helper: '建议至少保留 5/6\u00A0星确认，避免高价值标签被跳过' },
         { key: 'times', label: '招募次数', type: 'number', placeholder: '4' },
-        { key: 'calculationOnly', label: '仅计算公招（不招募）', type: 'checkbox', helper: '发送 times=0、confirm=[]，只计算标签组合' },
-        { key: 'set_time', label: '设置时间', type: 'checkbox' },
         { key: 'expedite', label: '使用加急', type: 'checkbox' },
         { key: 'expedite_times', label: '加急次数', type: 'number', placeholder: '0', visibleWhen: { key: 'expedite', value: true } },
         { key: 'preserve_tags', label: '保留标签', type: 'text', placeholder: '支援机械,高级资深干员', helper: '识别到任一标签时保留该公招槽位，多个标签用逗号分隔' },
         { key: 'level3_recruitment_permit_reserve', label: '3\u00A0星许可保留数', type: 'number', placeholder: '0', min: '0', helper: '剩余招聘许可不超过该值时跳过 3 星招募；0 表示禁用' },
-        { key: 'report_to_penguin', label: '上报企鹅数据', type: 'checkbox' },
-        { key: 'penguin_id', label: '企鹅 ID', type: 'text', placeholder: '留空匿名上报', visibleWhen: { key: 'report_to_penguin', value: true } },
-        { key: 'report_to_yituliu', label: '上报一图流', type: 'checkbox' },
-        { key: 'yituliu_id', label: '一图流 ID', type: 'text', placeholder: '留空匿名上报', visibleWhen: { key: 'report_to_yituliu', value: true } },
-        { key: 'server', label: '公招服务器', type: 'select', options: [
-          { value: 'CN', label: '国服' },
-          { value: 'US', label: '美服' },
-          { value: 'JP', label: '日服' },
-          { value: 'KR', label: '韩服' }
-        ], helper: '影响公招数据上报的服务器判定' },
       ],
       taskType: 'Recruit'
     },
@@ -1696,6 +1671,18 @@ const appliedExecutionRevisionRef = useRef(-1)
       })
     }
 
+    setTaskFlow(newFlow)
+    autoSave(newFlow, scheduleEnabled, scheduleEntries)
+  }
+
+  // 一次写入多个参数，避免切换计量方式时两次 setState 互相覆盖。
+  const updateTaskParams = (index: number, entries: Array<[string, TaskParamValue]>) => {
+    const newFlow = [...taskFlow]
+    const currentTask = newFlow[index]
+    if (!currentTask) return
+    for (const [key, value] of entries) {
+      currentTask.params[key] = value
+    }
     setTaskFlow(newFlow)
     autoSave(newFlow, scheduleEnabled, scheduleEntries)
   }
@@ -3230,37 +3217,6 @@ const appliedExecutionRevisionRef = useRef(-1)
                       key={task.id}
                       className={`automation-task-editor${currentStep === index ? ' is-current' : ''}${!task.enabled ? ' is-disabled' : ''}`}
                     >
-                      <div className="automation-flow-card-header">
-                        <div className="automation-flow-card-identity">
-                          <span className="automation-flow-sequence">{String(index + 1).padStart(2, '0')}</span>
-                          <span className="automation-flow-task-icon">{task.icon}</span>
-                          <span className="automation-flow-task-name">
-                            <TruncatedText as="strong" tooltip={task.name}>{task.name}</TruncatedText>
-                            <TruncatedText as="small" tooltip={currentStep === index ? '正在执行' : task.taskType || task.commandId}>{currentStep === index ? '正在执行' : task.taskType || task.commandId}</TruncatedText>
-                          </span>
-                        </div>
-                        <div className="automation-flow-card-controls">
-                          <Switch
-                            checked={task.enabled}
-                            onChange={() => toggleTaskEnabled(index)}
-                            disabled={isRunning}
-                            label={`${task.name}启用状态`}
-                          />
-                          {currentStep !== index && (
-                            <button
-                              type="button"
-                              onClick={() => removeTaskFromFlow(index)}
-                              disabled={isRunning}
-                              className="automation-delete-task min-h-11 min-w-11"
-                              title="删除任务"
-                              aria-label={`删除${task.name}`}
-                            >
-                              <Trash2 size={16} strokeWidth={1.9} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
                       {/* 参数配置区域 */}
                       {task.paramFields && task.paramFields.length > 0 && (
                         <div className={`automation-param-fields${usesGroupedParameterRows ? ' is-grouped' : ''}`}>
@@ -3437,7 +3393,53 @@ const appliedExecutionRevisionRef = useRef(-1)
                                     })}
                                   </div>
                                 </fieldset>
-                              ) : field.type === 'select' ? (
+                              ) : field.type === 'expiry-medicine' ? (() => {
+                                const storedUnit = task.params.expiryUnit
+                                const fallbackUnit = Number(task.params.medicineExpireDays) > 0
+                                  ? 'days'
+                                  : Number(task.params.expiringMedicine) > 0 ? 'bottles' : 'days'
+                                const unit = storedUnit === 'days' || storedUnit === 'bottles' ? storedUnit : fallbackUnit
+                                const activeKey = unit === 'bottles' ? 'expiringMedicine' : 'medicineExpireDays'
+                                const unitId = `${fieldId}-unit`
+                                return (
+                                  <div className="automation-field-row">
+                                    <label htmlFor={fieldId} className="automation-field-label">{field.label}</label>
+                                    <div className="automation-composite-control flex min-w-0 flex-1 items-center focus-within:shadow-[inset_0_0_0_1px_var(--app-accent)]">
+                                      <input
+                                        id={fieldId}
+                                        type="number"
+                                        min="0"
+                                        value={toTextInputValue(task.params[activeKey])}
+                                        placeholder="0"
+                                        onChange={(e) => updateTaskParam(index, activeKey, e.target.value)}
+                                        disabled={isRunning || !task.enabled}
+                                        className="min-w-0 flex-1 bg-transparent px-3 text-[1rem] text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                      />
+                                      <div className="h-6 w-px shrink-0 bg-[var(--app-border)]" />
+                                      <div className="relative flex-none self-stretch">
+                                        <select
+                                          id={unitId}
+                                          value={unit}
+                                          onChange={(e) => {
+                                            const nextUnit = e.target.value
+                                            updateTaskParams(index, [
+                                              ['expiryUnit', nextUnit],
+                                              [nextUnit === 'bottles' ? 'medicineExpireDays' : 'expiringMedicine', 0],
+                                            ])
+                                          }}
+                                          disabled={isRunning || !task.enabled}
+                                          aria-label={`${field.label}计量方式`}
+                                          className="automation-unit-select"
+                                        >
+                                          <option value="days">天</option>
+                                          <option value="bottles">瓶</option>
+                                        </select>
+                                        <ChevronDown size={14} strokeWidth={2} aria-hidden="true" className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-tertiary" />
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              })() : field.type === 'select' ? (
                                 <div className="automation-field-row">
                                   <label htmlFor={fieldId} className="automation-field-label">{field.label}</label>
                                   <div className="automation-select-control">
@@ -3575,9 +3577,31 @@ const appliedExecutionRevisionRef = useRef(-1)
                               />
                               <span>
                                 <span className="block">葛朗台碎石模式</span>
-                                <span className="mt-0.5 block text-xs text-tertiary">使用源石前等待自然恢复 1\u00A0点理智，尽量减少碎石浪费。</span>
+                                <span className="mt-0.5 block text-xs text-tertiary">使用源石前等待自然恢复 1{'\u00A0'}点理智，尽量减少碎石浪费。</span>
                               </span>
                             </label>
+
+                            <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
+                              <div className="flex items-center gap-2">
+                                <label htmlFor={`${task.id}-fight-server`} className="w-24 shrink-0 whitespace-nowrap text-sm text-secondary">掉落服务器:</label>
+                                <div className="automation-select-control min-w-0 flex-1">
+                                  <select
+                                    id={`${task.id}-fight-server`}
+                                    value={task.params.server || ''}
+                                    onChange={(e) => updateTaskParam(index, 'server', e.target.value)}
+                                    disabled={isRunning || !task.enabled}
+                                  >
+                                    <option value="">自动</option>
+                                    <option value="CN">国服</option>
+                                    <option value="US">美服</option>
+                                    <option value="JP">日服</option>
+                                    <option value="KR">韩服</option>
+                                  </select>
+                                  <ChevronDown size={15} strokeWidth={2} aria-hidden="true" />
+                                </div>
+                              </div>
+                              <p className="text-xs text-tertiary">外服资源可能只接受 -1~6 倍代理</p>
+                            </section>
 
                             <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
                               <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
@@ -3724,6 +3748,110 @@ const appliedExecutionRevisionRef = useRef(-1)
                                 </label>
                               </section>
                             )}
+                            {/* 跨设施干员组合 */}
+                            <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
+                              <h4 className="text-xs font-semibold text-secondary"><CjkText>干员组合</CjkText></h4>
+                              <div>
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(task.params.fiammetta_recovery_enabled)}
+                                    onChange={(e) => updateTaskParam(index, 'fiammetta_recovery_enabled', e.target.checked)}
+                                    disabled={isRunning || !task.enabled}
+                                    className="custom-checkbox cursor-pointer"
+                                  />
+                                  菲亚梅塔恢复
+                                </label>
+                                <p className="flex items-start gap-1.5 text-xs text-tertiary">
+                                  <Info size={13} strokeWidth={1.8} aria-hidden="true" className="mt-0.5 shrink-0" />
+                                  <span>第一轮宿舍优先配对菲亚梅塔；默认关闭</span>
+                                </p>
+                                {task.params.fiammetta_recovery_enabled && (
+                                  <>
+                                    <div className="mt-2 flex items-center gap-2 pl-6">
+                                      <label htmlFor={`${task.id}-fiammetta-targets`} className="w-20 shrink-0 whitespace-nowrap text-sm text-secondary">恢复目标:</label>
+                                      <input
+                                        id={`${task.id}-fiammetta-targets`}
+                                        type="text"
+                                        value={task.params.fiammetta_targets || ''}
+                                        onChange={(e) => updateTaskParam(index, 'fiammetta_targets', e.target.value)}
+                                        placeholder="清流,可露希尔,但书"
+                                        disabled={isRunning || !task.enabled}
+                                        className="automation-text-control min-w-0 flex-1"
+                                      />
+                                    </div>
+                                    <p className="mt-1.5 flex items-start gap-1.5 pl-6 text-xs text-tertiary">
+                                      <Info size={13} strokeWidth={1.8} aria-hidden="true" className="mt-0.5 shrink-0" />
+                                      <span>多个干员用逗号分隔；留空使用默认名单</span>
+                                    </p>
+                                  </>
+                                )}
+                              </div>
+                              <div>
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(task.params.use_pinus_sylvestris)}
+                                    onChange={(e) => updateTaskParam(index, 'use_pinus_sylvestris', e.target.checked)}
+                                    disabled={isRunning || !task.enabled}
+                                    className="custom-checkbox cursor-pointer"
+                                  />
+                                  红松骑士团组合
+                                </label>
+                                <p className="flex items-start gap-1.5 text-xs text-tertiary">
+                                  <Info size={13} strokeWidth={1.8} aria-hidden="true" className="mt-0.5 shrink-0" />
+                                  <span>允许跨设施组合红松骑士团技能</span>
+                                </p>
+                              </div>
+                              <div>
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(task.params.use_perception_information)}
+                                    onChange={(e) => updateTaskParam(index, 'use_perception_information', e.target.checked)}
+                                    disabled={isRunning || !task.enabled}
+                                    className="custom-checkbox cursor-pointer"
+                                  />
+                                  感知信息组合
+                                </label>
+                                <p className="flex items-start gap-1.5 text-xs text-tertiary">
+                                  <Info size={13} strokeWidth={1.8} aria-hidden="true" className="mt-0.5 shrink-0" />
+                                  <span>优先感知信息；会覆盖人间烟火组合</span>
+                                </p>
+                              </div>
+                              <div>
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(task.params.use_worldly_plight)}
+                                    onChange={(e) => updateTaskParam(index, 'use_worldly_plight', e.target.checked)}
+                                    disabled={isRunning || !task.enabled}
+                                    className="custom-checkbox cursor-pointer"
+                                  />
+                                  人间烟火组合
+                                </label>
+                                <p className="flex items-start gap-1.5 text-xs text-tertiary">
+                                  <Info size={13} strokeWidth={1.8} aria-hidden="true" className="mt-0.5 shrink-0" />
+                                  <span>允许跨设施组合人间烟火技能</span>
+                                </p>
+                              </div>
+                              <div>
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(task.params.use_abyssal_hunter)}
+                                    onChange={(e) => updateTaskParam(index, 'use_abyssal_hunter', e.target.checked)}
+                                    disabled={isRunning || !task.enabled}
+                                    className="custom-checkbox cursor-pointer"
+                                  />
+                                  深海猎人组合
+                                </label>
+                                <p className="flex items-start gap-1.5 text-xs text-tertiary">
+                                  <Info size={13} strokeWidth={1.8} aria-hidden="true" className="mt-0.5 shrink-0" />
+                                  <span>允许跨设施组合深海猎人技能</span>
+                                </p>
+                              </div>
+                            </section>
                           </div>
                         </details>
                       )}
@@ -3749,7 +3877,7 @@ const appliedExecutionRevisionRef = useRef(-1)
                                   disabled={isRunning || !task.enabled}
                                 >
                                   <option value="0">标准选择</option>
-                                  <option value="1">选满 3\u00A0个标签</option>
+                                  <option value="1">选满 3{'\u00A0'}个标签</option>
                                   <option value="2">尽量多选高星标签</option>
                                 </select>
                                 <ChevronDown size={15} strokeWidth={2} aria-hidden="true" />
@@ -3803,8 +3931,118 @@ const appliedExecutionRevisionRef = useRef(-1)
                                   )
                                 })}
                               </div>
-                              <p className="mt-1.5 text-xs text-tertiary">可设置 60\u00A0至 540\u00A0分钟，按 10\u00A0分钟调整；五星和六星固定为 540\u00A0分钟。</p>
+                              <p className="mt-1.5 text-xs text-tertiary">可设置 60{'\u00A0'}至 540{'\u00A0'}分钟，按 10{'\u00A0'}分钟调整；五星和六星固定为 540{'\u00A0'}分钟。</p>
                             </fieldset>
+
+                            {/* 公招执行方式与数据上报 */}
+                            <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
+                              <h4 className="text-xs font-semibold text-secondary"><CjkText>执行方式</CjkText></h4>
+                              <div>
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(task.params.calculationOnly)}
+                                    onChange={(e) => updateTaskParam(index, 'calculationOnly', e.target.checked)}
+                                    disabled={isRunning || !task.enabled}
+                                    className="custom-checkbox cursor-pointer"
+                                  />
+                                  仅计算公招（不招募）
+                                </label>
+                                <p className="flex items-start gap-1.5 text-xs text-tertiary">
+                                  <Info size={13} strokeWidth={1.8} aria-hidden="true" className="mt-0.5 shrink-0" />
+                                  <span>发送 times=0、confirm=[]，只计算标签组合</span>
+                                </p>
+                              </div>
+                              <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(task.params.set_time)}
+                                  onChange={(e) => updateTaskParam(index, 'set_time', e.target.checked)}
+                                  disabled={isRunning || !task.enabled}
+                                  className="custom-checkbox cursor-pointer"
+                                />
+                                设置时间
+                              </label>
+                            </section>
+
+                            <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
+                              <h4 className="text-xs font-semibold text-secondary"><CjkText>数据上报</CjkText></h4>
+                              <div>
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(task.params.report_to_penguin)}
+                                    onChange={(e) => updateTaskParam(index, 'report_to_penguin', e.target.checked)}
+                                    disabled={isRunning || !task.enabled}
+                                    className="custom-checkbox cursor-pointer"
+                                  />
+                                  上报企鹅数据
+                                </label>
+                                {task.params.report_to_penguin && (
+                                  <div className="mt-2 flex items-center gap-2 pl-6">
+                                    <label htmlFor={`${task.id}-penguin-id`} className="w-20 shrink-0 whitespace-nowrap text-sm text-secondary">企鹅 ID:</label>
+                                    <input
+                                      id={`${task.id}-penguin-id`}
+                                      type="text"
+                                      value={task.params.penguin_id || ''}
+                                      onChange={(e) => updateTaskParam(index, 'penguin_id', e.target.value)}
+                                      placeholder="留空匿名上报"
+                                      disabled={isRunning || !task.enabled}
+                                      className="automation-text-control min-w-0 flex-1"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(task.params.report_to_yituliu)}
+                                    onChange={(e) => updateTaskParam(index, 'report_to_yituliu', e.target.checked)}
+                                    disabled={isRunning || !task.enabled}
+                                    className="custom-checkbox cursor-pointer"
+                                  />
+                                  上报一图流
+                                </label>
+                                {task.params.report_to_yituliu && (
+                                  <div className="mt-2 flex items-center gap-2 pl-6">
+                                    <label htmlFor={`${task.id}-yituliu-id`} className="w-20 shrink-0 whitespace-nowrap text-sm text-secondary">一图流 ID:</label>
+                                    <input
+                                      id={`${task.id}-yituliu-id`}
+                                      type="text"
+                                      value={task.params.yituliu_id || ''}
+                                      onChange={(e) => updateTaskParam(index, 'yituliu_id', e.target.value)}
+                                      placeholder="留空匿名上报"
+                                      disabled={isRunning || !task.enabled}
+                                      className="automation-text-control min-w-0 flex-1"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <label htmlFor={`${task.id}-recruit-server`} className="w-20 shrink-0 whitespace-nowrap text-sm text-secondary">公招服务器:</label>
+                                  <div className="automation-select-control min-w-0 flex-1">
+                                    <select
+                                      id={`${task.id}-recruit-server`}
+                                      value={task.params.server || 'CN'}
+                                      onChange={(e) => updateTaskParam(index, 'server', e.target.value)}
+                                      disabled={isRunning || !task.enabled}
+                                    >
+                                      <option value="CN">国服</option>
+                                      <option value="US">美服</option>
+                                      <option value="JP">日服</option>
+                                      <option value="KR">韩服</option>
+                                    </select>
+                                    <ChevronDown size={15} strokeWidth={2} aria-hidden="true" />
+                                  </div>
+                                </div>
+                                <p className="flex items-start gap-1.5 text-xs text-tertiary mt-1.5">
+                                  <Info size={13} strokeWidth={1.8} aria-hidden="true" className="mt-0.5 shrink-0" />
+                                  <span>影响公招数据上报的服务器判定</span>
+                                </p>
+                              </div>
+                            </section>
                           </div>
                         </details>
                       )}

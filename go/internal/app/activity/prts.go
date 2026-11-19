@@ -120,21 +120,38 @@ func (c *prtsClient) GetCopilotWithRetry(ctx context.Context, id int) (map[strin
 // QueryCopilots reads /copilot/query and returns data.data only on an explicit
 // status_code 200 envelope.
 func (c *prtsClient) QueryCopilots(ctx context.Context, keyword string, page, limit int, orderBy string) ([]any, error) {
-	endpoint := fmt.Sprintf("%s/copilot/query?level_keyword=%s&page=%d&limit=%d&order_by=%s",
-		c.baseURL, url.QueryEscape(keyword), page, limit, url.QueryEscape(orderBy))
-	value, err := c.fetchJSON(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, err
+	var lastError error
+	for attempt := 0; attempt < c.maxAttempts; attempt++ {
+		endpoint := fmt.Sprintf("%s/copilot/query?level_keyword=%s&page=%d&limit=%d&order_by=%s",
+			c.baseURL, url.QueryEscape(keyword), page, limit, url.QueryEscape(orderBy))
+		value, err := c.fetchJSON(ctx, http.MethodGet, endpoint, nil)
+		if err == nil {
+			payload := asRecord(value)
+			status := -1.0
+			if payload != nil {
+				status = jsNumber(payload["status_code"])
+			}
+			if payload != nil && status == 200 {
+				data := asRecord(payload["data"])
+				if data == nil {
+					return []any{}, nil
+				}
+				return asArray(data["data"]), nil
+			}
+			lastError = fmt.Errorf("作业站查询失败: status_code %v", status)
+		} else {
+			lastError = err
+		}
+		if attempt < c.maxAttempts-1 {
+			if sleepErr := c.sleep(ctx, time.Duration(250*(attempt+1))*time.Millisecond); sleepErr != nil {
+				return nil, sleepErr
+			}
+		}
 	}
-	payload := asRecord(value)
-	if payload == nil || jsNumber(payload["status_code"]) != 200 {
-		return []any{}, nil
+	if lastError == nil {
+		lastError = fmt.Errorf("作业站查询失败")
 	}
-	data := asRecord(payload["data"])
-	if data == nil {
-		return []any{}, nil
-	}
-	return asArray(data["data"]), nil
+	return nil, lastError
 }
 
 // QuerySets reads /set/query and returns data.data only on an explicit

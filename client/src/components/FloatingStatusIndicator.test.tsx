@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, forwardRef, type HTMLAttributes } from 'react'
+import { Activity, act, forwardRef, type HTMLAttributes } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
@@ -143,5 +143,140 @@ describe('FloatingStatusIndicator', () => {
 
     expect(container.querySelector<HTMLElement>('.floating-status-text')?.textContent).toBe('正在执行: 理智作战')
     expect(container.querySelector<HTMLElement>('[role="status"]')?.textContent).toBe('正在执行: 理智作战')
+  })
+
+  it('floats a non-ready status after its docked slot scrolls under the navbar', async () => {
+    await act(async () => root.render(<FloatingStatusIndicator />))
+    await act(async () => { await Promise.resolve() })
+
+    const anchor = container.querySelector<HTMLElement>('.floating-status-anchor')
+    expect(anchor).not.toBeNull()
+
+    // Still inside the scroll host, even though it sits under the navbar.
+    vi.spyOn(anchor!, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 14,
+      width: 120,
+      height: 32,
+      top: 14,
+      right: 120,
+      bottom: 46,
+      left: 0,
+      toJSON: () => ({}),
+    } as DOMRect)
+    await act(async () => { host.dispatchEvent(new Event('scroll')) })
+    expect(container.querySelector('.floating-status-overlay')).toBeNull()
+
+    vi.mocked(anchor!.getBoundingClientRect).mockReturnValue({
+      x: 0,
+      y: -42,
+      width: 120,
+      height: 32,
+      top: -42,
+      right: 120,
+      bottom: -10,
+      left: 0,
+      toJSON: () => ({}),
+    } as DOMRect)
+
+    await act(async () => { host.dispatchEvent(new Event('scroll')) })
+
+    const overlay = container.querySelector<HTMLElement>('.floating-status-overlay')
+    expect(overlay).not.toBeNull()
+    expect(overlay?.getAttribute('aria-hidden')).toBe('true')
+    expect(overlay?.querySelector<HTMLElement>('.floating-status-text')?.textContent).toBe('保存失败，请重试')
+    expect(container.querySelectorAll('.floating-status-indicator')).toHaveLength(2)
+
+    vi.mocked(anchor!.getBoundingClientRect).mockReturnValue({
+      x: 0,
+      y: 96,
+      width: 120,
+      height: 32,
+      top: 96,
+      right: 120,
+      bottom: 128,
+      left: 0,
+      toJSON: () => ({}),
+    } as DOMRect)
+    await act(async () => { host.dispatchEvent(new Event('scroll')) })
+
+    expect(container.querySelector('.floating-status-overlay')).toBeNull()
+  })
+
+  it('keeps the idle quote docked when its slot scrolls out of view', async () => {
+    mocks.status.message = ''
+    mocks.status.messageType = null
+
+    await act(async () => root.render(<FloatingStatusIndicator />))
+    await act(async () => { await Promise.resolve() })
+
+    const anchor = container.querySelector<HTMLElement>('.floating-status-anchor')!
+    vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: -42,
+      width: 120,
+      height: 32,
+      top: -42,
+      right: 120,
+      bottom: -10,
+      left: 0,
+      toJSON: () => ({}),
+    } as DOMRect)
+
+    await act(async () => { host.dispatchEvent(new Event('scroll')) })
+
+    expect(container.querySelector('.floating-status-overlay')).toBeNull()
+  })
+
+  it('does not float from a zero-sized anchor in an inactive workspace', async () => {
+    await act(async () => root.render(<FloatingStatusIndicator />))
+    await act(async () => { await Promise.resolve() })
+
+    await act(async () => { host.dispatchEvent(new Event('scroll')) })
+
+    expect(container.querySelector('.floating-status-overlay')).toBeNull()
+  })
+
+  it('clears a stale floating copy when a hidden workspace is shown again', async () => {
+    await act(async () => root.render(
+      <Activity mode="visible"><FloatingStatusIndicator /></Activity>,
+    ))
+    await act(async () => { await Promise.resolve() })
+
+    const anchor = container.querySelector<HTMLElement>('.floating-status-anchor')!
+    vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: -42,
+      width: 120,
+      height: 32,
+      top: -42,
+      right: 120,
+      bottom: -10,
+      left: 0,
+      toJSON: () => ({}),
+    } as DOMRect)
+    await act(async () => { host.dispatchEvent(new Event('scroll')) })
+    expect(container.querySelector('.floating-status-overlay')).not.toBeNull()
+
+    await act(async () => root.render(
+      <Activity mode="hidden"><FloatingStatusIndicator /></Activity>,
+    ))
+    vi.mocked(anchor.getBoundingClientRect).mockReturnValue({
+      x: 0,
+      y: 96,
+      width: 120,
+      height: 32,
+      top: 96,
+      right: 120,
+      bottom: 128,
+      left: 0,
+      toJSON: () => ({}),
+    } as DOMRect)
+    await act(async () => root.render(
+      <Activity mode="visible"><FloatingStatusIndicator /></Activity>,
+    ))
+    await act(async () => { host.dispatchEvent(new Event('scroll')) })
+
+    expect(container.querySelector('.floating-status-overlay')).toBeNull()
   })
 })

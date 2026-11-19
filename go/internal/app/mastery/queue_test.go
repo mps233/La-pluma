@@ -1,6 +1,8 @@
 package mastery
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -282,17 +284,13 @@ func TestCampaignStartPauseResumeStop(t *testing.T) {
 		t.Fatalf("unexpected recovery: %+v", item.Recovery)
 	}
 
-	_, err = fixture.service.Queue.ResumeCampaign()
-	if appErr, ok := asAppError(err); !ok || appErr.Code != "AGENT_MASTERY_QUEUE_EMPTY" {
-		t.Fatalf("resume with no actionable item: %v", err)
-	}
-	retried, err := fixture.service.Queue.RetryItem(id)
-	if err != nil || retried.Phase != PhaseQueued || retried.Blocked != nil {
-		t.Fatalf("retry interrupted: %+v %v", retried, err)
-	}
 	status, err = fixture.service.Queue.ResumeCampaign()
 	if err != nil || status.Campaign.Status != CampaignRunning || status.ActiveItem == nil || status.ActiveItem.ID != id {
-		t.Fatalf("resume after retry: %+v %v", status, err)
+		t.Fatalf("resume interrupted item: %+v %v", status, err)
+	}
+	requeued, err := fixture.service.Queue.GetItem(id)
+	if err != nil || requeued == nil || requeued.Phase != PhaseQueued || requeued.Recovery != nil || requeued.ActiveRunID != nil {
+		t.Fatalf("interrupted item should be requeued: %+v %v", requeued, err)
 	}
 }
 
@@ -358,7 +356,7 @@ func TestOutcomeTransitions(t *testing.T) {
 	if err != nil || item.Phase != PhaseTraining || item.ConsecutiveFailures != 1 {
 		t.Fatalf("first recognition failure: %+v %v", item, err)
 	}
-	if item.LastErrorCode == nil || *item.LastErrorCode != "AGENT_MASTERY_RECOGNITIONFAILED" || item.NextProbeAt == nil {
+	if item.LastErrorCode == nil || *item.LastErrorCode != "AGENT_MASTERY_RECOGNITION_FAILED" || item.NextProbeAt == nil {
 		t.Fatalf("unexpected first failure details: %+v", item)
 	}
 	message := "日志无法确认"
@@ -414,11 +412,19 @@ func TestTrainingRoomBusyWithoutHistoryAndTransientReset(t *testing.T) {
 	id := added.Items[0].ID
 
 	item, err := fixture.service.Queue.ApplyStepOutcome(id, StepOutcome{ResultDetail: "TrainingRoomBusy"}, defaultQueueSettings)
-	if err != nil || item.Phase != PhaseBlocked || item.Blocked == nil {
-		t.Fatalf("busy without history: %+v %v", item, err)
+	if err != nil || item.Phase != PhaseQueued || item.Blocked == nil {
+		t.Fatalf("busy without history should wait: %+v %v", item, err)
 	}
-	if item.Blocked.Code != "AGENT_MASTERY_TRAINING_ROOM_BUSY" || !item.Blocked.Retryable || item.NextProbeAt != nil {
+	if item.Blocked.Code != "AGENT_MASTERY_TRAINING_ROOM_BUSY" || !item.Blocked.Retryable || item.NextProbeAt == nil {
 		t.Fatalf("unexpected busy info: %+v", item)
+	}
+	if probe, ok := parseTimestamp(*item.NextProbeAt); !ok || probe.Sub(fixture.clock.Now()) != 30*time.Minute {
+		t.Fatalf("expected a 30 minute retry window: %v", item.NextProbeAt)
+	}
+	_, _ = fixture.service.Queue.ApplyStepOutcome(id, StepOutcome{ResultDetail: "TrainingRoomBusy"}, defaultQueueSettings)
+	item, err = fixture.service.Queue.ApplyStepOutcome(id, StepOutcome{ResultDetail: "TrainingRoomBusy"}, defaultQueueSettings)
+	if err != nil || item.Phase != PhaseBlocked || item.Blocked == nil {
+		t.Fatalf("sustained busy should block: %+v %v", item, err)
 	}
 
 	retried, err := fixture.service.Queue.RetryItem(id)
@@ -471,6 +477,178 @@ func TestRecoverOnStartup(t *testing.T) {
 	}
 	if item.Recovery.PreviousPhase != PhaseStarting || item.Recovery.PreviousRunID == nil || *item.Recovery.PreviousRunID != "run-9" {
 		t.Fatalf("unexpected recovery: %+v", item.Recovery)
+	}
+}
+
+func TestAddItemsFailureLeavesNoPendingTargets(t *testing.T) {
+	fixture := newTestFixture(t, nil)
+	_, err := fixture.service.AddItems([]AddItemInput{
+		{OperatorID: "char_test", SkillIndex: 1, TargetLevel: 3, DeclaredLevel: 0},
+		{OperatorID: "char_missing", SkillIndex: 1, TargetLevel: 3, DeclaredLevel: 0},
+	}, CampaignContext{})
+	if err == nil {
+		t.Fatal("expected the second input to fail")
+	}
+	status, err := fixture.service.Queue.Status()
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	if len(status.Items) != 0 {
+		t.Fatalf("partial targets leaked into state: %+v", status.Items)
+	}
+}
+
+func TestUpdateItemEnabledKeepsCompleted(t *testing.T) {
+	fixture := newTestFixture(t, nil)
+	added := addDefaultItem(t, fixture.service, "char_test", 1, 1, 0)
+	id := added.Items[0].ID
+	item, err := fixture.service.Queue.ApplyStepOutcome(id, StepOutcome{
+		ResultDetail:         "AlreadySatisfied",
+		SkillMastery:         []*float64{floatPtr(1)},
+		LogCheckpointPresent: true,
+	}, defaultQueueSettings)
+	if err != nil || item.Phase != PhaseCompleted {
+		t.Fatalf("complete item: %+v %v", item, err)
+	}
+	disabled := false
+	updated, err := fixture.service.Queue.UpdateItem(id, ItemPatch{Enabled: &disabled})
+	if err != nil {
+		t.Fatalf("disable completed item: %v", err)
+	}
+	if updated.Phase != PhaseCompleted || updated.CompletedAt == nil || updated.Enabled {
+		t.Fatalf("enabled toggle must not reopen a completed target: %+v", updated)
+	}
+}
+
+func TestStatusCopiesActiveItem(t *testing.T) {
+	fixture := newTestFixture(t, nil)
+	addDefaultItem(t, fixture.service, "char_test", 1, 3, 0)
+	status, err := fixture.service.Queue.StartCampaign(CampaignContext{})
+	if err != nil || status.ActiveItem == nil {
+		t.Fatalf("start campaign: %+v %v", status, err)
+	}
+	status.ActiveItem.Phase = PhaseCompleted
+	again, err := fixture.service.Queue.Status()
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	if again.ActiveItem == nil || again.ActiveItem.Phase != PhaseQueued {
+		t.Fatalf("status aliases queue state: %+v", again.ActiveItem)
+	}
+}
+
+func TestStoppingCampaignIgnoresTickErrors(t *testing.T) {
+	fixture := newTestFixture(t, nil)
+	added := addDefaultItem(t, fixture.service, "char_test", 1, 3, 0)
+	id := added.Items[0].ID
+	if _, err := fixture.service.Queue.StartCampaign(CampaignContext{}); err != nil {
+		t.Fatalf("start campaign: %v", err)
+	}
+	if _, err := fixture.service.Queue.MarkItemStarting(id, MarkStartingInput{StepTarget: 1, RunID: "run-1", Attempt: 1}); err != nil {
+		t.Fatalf("mark starting: %v", err)
+	}
+	if err := fixture.service.Queue.MarkStopping(); err != nil {
+		t.Fatalf("mark stopping: %v", err)
+	}
+	fixture.service.Scheduler.handleTickError(context.Background(), errors.New("executor stopped"))
+	item, err := fixture.service.Queue.GetItem(id)
+	if err != nil || item == nil || item.Phase != PhaseStarting {
+		t.Fatalf("tick error overwrote a stopping target: %+v %v", item, err)
+	}
+	status, err := fixture.service.Queue.StopCampaign()
+	if err != nil || status.Campaign.Status != CampaignIdle {
+		t.Fatalf("stop campaign: %+v %v", status, err)
+	}
+	item, err = fixture.service.Queue.GetItem(id)
+	if err != nil || item == nil || item.Phase != PhaseInterrupted || item.Recovery == nil {
+		t.Fatalf("stopped target should be interrupted: %+v %v", item, err)
+	}
+}
+
+func TestAlreadySatisfiedUsesReportedLevel(t *testing.T) {
+	fixture := newTestFixture(t, nil)
+	added := addDefaultItem(t, fixture.service, "char_test", 1, 3, 0)
+	id := added.Items[0].ID
+	item, err := fixture.service.Queue.ApplyStepOutcome(id, StepOutcome{
+		ResultDetail: "AlreadySatisfied",
+		SkillMastery: []*float64{floatPtr(2), floatPtr(0), floatPtr(0)},
+	}, defaultQueueSettings)
+	if err != nil {
+		t.Fatalf("apply outcome: %v", err)
+	}
+	if item.ConfirmedLevel != 2 || !item.LevelVerified || item.Phase != PhaseQueued {
+		t.Fatalf("declared M0 must jump to the recognized M2: %+v", item)
+	}
+	item, err = fixture.service.Queue.ApplyStepOutcome(id, StepOutcome{
+		ResultDetail: "AlreadySatisfied",
+		SkillMastery: []*float64{floatPtr(3), floatPtr(0), floatPtr(0)},
+	}, defaultQueueSettings)
+	if err != nil || item.Phase != PhaseCompleted || item.ConfirmedLevel != 3 || item.CompletedAt == nil {
+		t.Fatalf("recognized M3 should complete the target: %+v %v", item, err)
+	}
+}
+
+func TestOperProgressPlanUsesMaaName(t *testing.T) {
+	role := "Caster"
+	item := MasteryQueueItem{
+		OperatorName: "アーミヤ",
+		NameForMaa:   "阿米娅",
+		SkillIndex:   1,
+		TargetLevel:  3,
+		Role:         &role,
+	}
+	config, err := BuildOperProgressTaskConfig(item, 2, "Official", TaskBuildOptions{StartGameEnabled: true})
+	if err != nil {
+		t.Fatalf("build config: %v", err)
+	}
+	tasks, ok := config["tasks"].([]any)
+	if !ok || len(tasks) != 2 {
+		t.Fatalf("unexpected tasks: %+v", config["tasks"])
+	}
+	progress, ok := tasks[1].(map[string]any)
+	if !ok || progress["type"] != "OperProgress" {
+		t.Fatalf("missing OperProgress task: %+v", tasks[1])
+	}
+	params, _ := progress["params"].(map[string]any)
+	plans, ok := params["plans"].([]any)
+	if !ok || len(plans) != 1 {
+		t.Fatalf("unexpected plans: %+v", params)
+	}
+	plan, _ := plans[0].(map[string]any)
+	if plan["name"] != "阿米娅" {
+		t.Fatalf("plan must use the official name, got %v", plan["name"])
+	}
+}
+
+func TestExtractResultPrefersMaaName(t *testing.T) {
+	log := strings.Join([]string{
+		`Assistant::append_callback | SubTaskExtraInfo {"what":"OperProgressDetail","details":{"name":"测试干员","result_detail":"Completed","skill_mastery":[2,0,0]}}`,
+		`Assistant::append_callback | SubTaskExtraInfo {"what":"OperProgressDetail","details":{"name":"其他干员","result_detail":"ResourceInsufficient","skill_mastery":[0,0,0]}}`,
+	}, "\n")
+	item := MasteryQueueItem{OperatorName: "测试干员（本地化）", NameForMaa: "测试干员", SkillIndex: 1}
+	detail := ExtractResultDetail(log, item)
+	if detail.ResultDetail != "Completed" {
+		t.Fatalf("callback must be matched by nameForMaa, got %q", detail.ResultDetail)
+	}
+}
+
+func TestTrainingRoomBusyExpiresStaleTraining(t *testing.T) {
+	fixture := newTestFixture(t, nil)
+	added := addDefaultItem(t, fixture.service, "char_test", 1, 3, 0)
+	id := added.Items[0].ID
+	if _, err := fixture.service.Queue.ApplyStepOutcome(id, StepOutcome{
+		ResultDetail: "Completed",
+		SkillMastery: []*float64{floatPtr(1), floatPtr(0), floatPtr(0)},
+	}, defaultQueueSettings); err != nil {
+		t.Fatalf("start training: %v", err)
+	}
+	fixture.clock.Advance(37 * time.Hour)
+	item, err := fixture.service.Queue.ApplyStepOutcome(id, StepOutcome{ResultDetail: "TrainingRoomBusy"}, defaultQueueSettings)
+	if err != nil {
+		t.Fatalf("stale busy: %v", err)
+	}
+	if item.Phase != PhaseFailed || item.Blocked == nil || item.Blocked.Code != "AGENT_MASTERY_TRAINING_STALE" {
+		t.Fatalf("stale training should need review: %+v", item)
 	}
 }
 

@@ -40,12 +40,32 @@
 
 ## 技能专精（OperProgress）
 
-MaaCore 6.21.4 / maa-cli 0.7.8 已支持 `OperProgress` 任务类型；La Pluma 的专精队列在 `autoStartGame` 开启时，每次步骤前附加 `CloseDown` + `StartUp`，强制回到主界面，避免上一次导航停留在设置/场景页时 `OperProgress` 误点；关闭该选项后只保留 `StartUp`，游戏未启动时不会自动拉起。La Pluma 只通过 `plans` 执行单级专精：每项计划使用 `name`、可选 `role`，以及一个长度为 3 的 `skill_mastery` 数组，只把本次要推进的技能槽设为下一级，其余为 0。
+MaaCore 6.21.4 / maa-cli 0.7.8 已支持 `OperProgress` 任务类型；专精队列每一步都附加 `StartUp`，`autoStartGame` 只控制 `start_game_enabled`（游戏未启动时是否拉起）。`CloseDown` 的构建能力仍保留，但生产装配没有注入游戏前台探测，当前不会附加该步骤，也不会强制重启游戏。La Pluma 只通过 `plans` 执行单级专精：每项计划使用 `name`、可选 `role`，以及一个长度为 3 的 `skill_mastery` 数组，只把本次要推进的技能槽设为下一级，其余为 0。
 
 - `Completed` / `PrerequisiteTraining` 只表示本次训练已经发起，不代表专精完成；只有 `AlreadySatisfied` 表示目标等级已到达。
 - 一次运行最多启动一级；训练室必须空闲；MAA 只在加工站合成仓库已有材料，不刷关卡。
 - 2026-11-08 已用本机 maa-cli 0.7.8 / MaaCore 6.21.4 验证：`maa run --dry-run` 接受合法 plans、拒绝非法 `skill_mastery`；真机单步观察到 `AlreadySatisfied`（`skill_mastery:[3,0,0]`）、`Completed`（训练已开始）、`TrainingRoomBusy`（训练中）、`PrerequisiteNotMet` 与 `RecognitionFailed` 回调。`Completed` / `PrerequisiteTraining` 只代表训练已开始，`AlreadySatisfied` 才代表目标等级已到达。
-- 专精数据由历史 Node 脚本生成到 `operator-mastery.json`；Go 运行时不依赖该脚本，Node 后端已归档移除。
+- 专精数据由 `go run ./cmd/tools seed` 生成到 `operator-mastery.json`；构建脚本会把它复制进 web 产物，运行时只读该文件。
+- `plans[].name` 必须是国服名：MaaCore 的 `BattleDataConfig::find_opers` 只比较 `battle_data.json` 的 `name`，不匹配 `name_en/name_jp/name_kr/name_tw`；传本地化名会让 `OperProgressTask::set_params` 直接失败。队列因此同时保存显示名 `operatorName` 与 MAA 名 `nameForMaa`。
+- 训练完成后 MaaCore 会先领取（`InfrastTrainingCompleted2`）再决定继续下一级；服务的轮询只负责触发一次新的 OperProgress，不额外实现领取。
+- `AlreadySatisfied` 的 `skill_mastery` 是现场识别的实际专精等级，服务端据此直接对齐已确认等级；`Completed` / `PrerequisiteTraining` 只表示本次已启动训练，仍需等待。
+
+## 森空岛数据源（专精等级 / 训练室）
+
+- `POST /api/agent/skland/credentials` 先用 `/api/v1/game/player/binding` 校验 cred/token，再把凭证用 AES-GCM 加密保存到 `user-configs/skland.json`；密钥在 `user-configs/skland.key`，两者权限都是 0600。接口返回的 `Status` 不包含 cred/token。
+- `POST /api/agent/skland/sync` 拉取 `/api/v1/game/cultivate/player`（`characters[].skills[].level` 是 0-3 专精等级）和 `/api/v1/game/player/info`（`building.training.trainee/remainSecs/slotState`），写入 `user-configs/skland-snapshot.json`。养成页用它显示每个技能的已知专精等级和训练室状态。
+- 这组路由是 UI 专用，不进入 Agent manifest/OpenAPI：它们处理账号凭证，不属于可被 Agent 自动调用的动作。
+- 支持两种接入方式：`POST /api/agent/skland/login` 用森空岛账号密码登录（登录时向数美申请设备标识），或用 `POST /api/agent/skland/credentials` 粘贴已有 `cred`/`token`。两者都会先用 binding 校验角色。账号密码登录会把密码和凭证一起加密保存在 `skland.json`；凭证过期时同步或训练探测会用密码自动重新登录，行为与 Mower 的 `refresh_session` 一致。手动 cred/token 不保存密码，过期后需要重新输入。
+- 设备指纹实现移植自 ArkMowers/arknights-mower 的 `SecuritySm`（MIT）；数美协议属于第三方且可能变更，失败时退回手动凭证。
+- 训练中的队列项在 `nextProbeAt` 到达时会调用 `player/info`：剩余时间大于 0 就把下次检查推到完成时间；训练室里的干员与目标不一致则标记为训练中断。
+- `player/info` 的 `status.ap` 会写入快照的 `sanity`；活动岛在空闲时取 MAA 回调与森空岛快照中较新的理智读数并按 6 分钟/点向前投影，运行中仍以 MAA 回调为准。
+
+## 活动章节导航（EX/特殊关卡）
+
+- 章节数据来自游戏数据：`excel/stage_table.json` 的 `zoneId` 加 `excel/zone_table.json` 的 `zoneNameSecond`，由 `gamedata.Seed` 写入 `data/stages.json` 的 `zoneName`；刷新训练材料时一并更新。
+- 显式作业集连续执行时，所选关卡若为 EX/S/MO/TR，先写入 `LaPlumaActivityPage` / `LaPlumaActivityChapter` 到 `config/resource/tasks/tasks.json`，再用 `maa run --user-resource` 打开活动章节页并按章节名 OCR 点击，最后由 Copilot 在当前章节地图里找关卡。
+- 新活动只需刷新游戏数据，不需要按活动改代码；缺少 `zoneName` 时返回明确错误，不会误进普通章节或长时间空滑。
+- 显式活动作业集执行前按 `operbox.json` 检查每个所选作业；不兼容时用 PRTS 同关卡候选替换（优先 0 缺干员，其次允许 1 缺 + 助战），找不到候选则跳过该关并保持待执行，其余关卡继续，不中断整单。
 
 ## 关键路径与数据源
 

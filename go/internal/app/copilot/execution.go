@@ -85,14 +85,16 @@ type EntriesExecution struct {
 // ExecutionEntryResult is one entry's outcome. Field names match the Node
 // execution result so API responses can merge it directly.
 type ExecutionEntryResult struct {
-	Key          string `json:"key,omitempty"`
-	ItemIndex    int    `json:"itemIndex"`
-	CopilotID    int    `json:"copilotId"`
-	StageID      string `json:"stageId,omitempty"`
-	DisplayStage string `json:"displayStage"`
-	Mode         string `json:"mode,omitempty"`
-	Success      bool   `json:"success"`
-	Error        string `json:"error,omitempty"`
+	Key               string `json:"key,omitempty"`
+	ItemIndex         int    `json:"itemIndex"`
+	CopilotID         int    `json:"copilotId"`
+	OriginalCopilotID int    `json:"originalCopilotId,omitempty"`
+	Substituted       bool   `json:"substituted,omitempty"`
+	StageID           string `json:"stageId,omitempty"`
+	DisplayStage      string `json:"displayStage"`
+	Mode              string `json:"mode,omitempty"`
+	Success           bool   `json:"success"`
+	Error             string `json:"error,omitempty"`
 }
 
 // ExecutionResult carries per-entry outcomes plus the transport projection.
@@ -756,11 +758,18 @@ func settleGroupFailure(
 			}
 			indexes = append(indexes, index)
 		}
-		success := currentIndex > 0 && len(indexes) > 0
-		for _, index := range indexes {
-			if index >= currentIndex {
-				success = false
-				break
+		// A multi-stage Copilot task can abort without a parseable stage index
+		// in its output. The progress tracker already marks earlier stages
+		// successful when the next stage starts, so keep those results instead
+		// of re-running completed stages on the activity retry.
+		success := tracker.statusOf(key) == ProgressSuccess
+		if !success {
+			success = currentIndex > 0 && len(indexes) > 0
+			for _, index := range indexes {
+				if index >= currentIndex {
+					success = false
+					break
+				}
 			}
 		}
 		started := false
@@ -832,26 +841,30 @@ func (s *Service) recordCompletedEntries(entries []PlanEntry, loopTimes int) {
 
 func succeededExecutionResult(entry PlanEntry) ExecutionEntryResult {
 	return ExecutionEntryResult{
-		Key:          entry.Key,
-		ItemIndex:    entry.ItemIndex,
-		CopilotID:    entry.CopilotID,
-		StageID:      entry.StageID,
-		DisplayStage: entry.DisplayStage,
-		Mode:         entry.Mode,
-		Success:      true,
+		Key:               entry.Key,
+		ItemIndex:         entry.ItemIndex,
+		CopilotID:         entry.CopilotID,
+		OriginalCopilotID: entry.OriginalCopilotID,
+		Substituted:       entry.OriginalCopilotID > 0,
+		StageID:           entry.StageID,
+		DisplayStage:      entry.DisplayStage,
+		Mode:              entry.Mode,
+		Success:           true,
 	}
 }
 
 func failedExecutionResult(entry PlanEntry, message string) ExecutionEntryResult {
 	return ExecutionEntryResult{
-		Key:          entry.Key,
-		ItemIndex:    entry.ItemIndex,
-		CopilotID:    entry.CopilotID,
-		StageID:      entry.StageID,
-		DisplayStage: entry.DisplayStage,
-		Mode:         entry.Mode,
-		Success:      false,
-		Error:        message,
+		Key:               entry.Key,
+		ItemIndex:         entry.ItemIndex,
+		CopilotID:         entry.CopilotID,
+		OriginalCopilotID: entry.OriginalCopilotID,
+		Substituted:       entry.OriginalCopilotID > 0,
+		StageID:           entry.StageID,
+		DisplayStage:      entry.DisplayStage,
+		Mode:              entry.Mode,
+		Success:           false,
+		Error:             message,
 	}
 }
 

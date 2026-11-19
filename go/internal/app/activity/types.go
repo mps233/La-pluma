@@ -66,6 +66,9 @@ type NavigationInfo struct {
 	StageFile  string `json:"stageFile"`
 	StageCount int    `json:"stageCount"`
 	EntryTask  string `json:"entryTask"`
+	// SpecialStages reports whether refreshed game data can resolve the chapter
+	// of EX/S/MO/TR stages, allowing the explicit set runner to enter them.
+	SpecialStages bool `json:"specialStages,omitempty"`
 }
 
 // NavigationResult mirrors getActivityRunPreflight / assessActivityNavigation.
@@ -105,8 +108,9 @@ type CombatCopilotPreferences struct {
 
 // SelectionContext is the local context used to filter activity copilots.
 type SelectionContext struct {
-	Preferences    CombatCopilotPreferences
-	OwnedOperators map[string]struct{}
+	Preferences     CombatCopilotPreferences
+	OwnedOperators  map[string]struct{}
+	UsableOperators map[string]struct{}
 }
 
 // Map returns the preference projection consumed by plan/run helpers.
@@ -251,9 +255,16 @@ type RunPlan struct {
 // CompletionEntry is the subset of an execution result used for local
 // activity progress.
 type CompletionEntry struct {
-	DisplayStage string `json:"displayStage,omitempty"`
-	Stage        string `json:"stage,omitempty"`
-	Success      *bool  `json:"success,omitempty"`
+	Key               string `json:"key,omitempty"`
+	ItemIndex         int    `json:"itemIndex,omitempty"`
+	CopilotID         int    `json:"copilotId,omitempty"`
+	OriginalCopilotID int    `json:"originalCopilotId,omitempty"`
+	StageID           string `json:"stageId,omitempty"`
+	Mode              string `json:"mode,omitempty"`
+	DisplayStage      string `json:"displayStage,omitempty"`
+	Stage             string `json:"stage,omitempty"`
+	Success           *bool  `json:"success,omitempty"`
+	Error             string `json:"error,omitempty"`
 }
 
 // ProgressSummary is summarizeActivityCompletion's output.
@@ -286,13 +297,16 @@ type PlanItem struct {
 
 // PlanEntry is one execution projection of a plan item.
 type PlanEntry struct {
-	Key             string `json:"key,omitempty"`
-	ItemIndex       int    `json:"itemIndex"`
-	CopilotID       int    `json:"copilotId"`
-	StageID         string `json:"stageId,omitempty"`
-	DisplayStage    string `json:"displayStage"`
-	Mode            string `json:"mode,omitempty"`
-	PresetFormation bool   `json:"presetFormation,omitempty"`
+	Key       string `json:"key,omitempty"`
+	ItemIndex int    `json:"itemIndex"`
+	CopilotID int    `json:"copilotId"`
+	// OriginalCopilotID is set when a box-compatible copilot replaced this
+	// entry. Key still points at the original set entry.
+	OriginalCopilotID int    `json:"originalCopilotId,omitempty"`
+	StageID           string `json:"stageId,omitempty"`
+	DisplayStage      string `json:"displayStage"`
+	Mode              string `json:"mode,omitempty"`
+	PresetFormation   bool   `json:"presetFormation,omitempty"`
 }
 
 // Plan is the minimal copilot plan contract the activity package consumes.
@@ -347,6 +361,9 @@ type PlanExecution struct {
 	SelectedIndexes []int
 	Options         map[string]any
 	Lifecycle       *Lifecycle
+	// Plan optionally supplies a modified plan (for example after replacing
+	// copilots that do not fit the local operator box).
+	Plan *Plan
 }
 
 // EntriesExecution is the executeSelectedCopilotEntries request.
@@ -371,6 +388,13 @@ type Executor interface {
 	RunTask(ctx context.Context, taskConfig map[string]any, wait bool) (domainrun.DTO, error)
 	RunCommand(ctx context.Context, command string, args []string, taskName, taskType string, wait bool) (domainrun.DTO, error)
 	Stop(ctx context.Context) error
+}
+
+// UserResourceExecutor runs a dynamic task with MAA's config/resource overlay.
+// Activity chapter navigation writes LaPlumaActivityPage and
+// LaPlumaActivityChapter there before running the preparation chain.
+type UserResourceExecutor interface {
+	RunUserTask(ctx context.Context, taskConfig map[string]any, wait bool) (domainrun.DTO, error)
 }
 
 // Preflight checks whether the installed MAA resource can navigate to the

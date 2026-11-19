@@ -22,6 +22,7 @@ type StageInfo struct {
 	StageType       any    `json:"stageType"`
 	Thumbnail       string `json:"thumbnail"`
 	ZoneID          any    `json:"zoneId"`
+	ZoneName        string `json:"zoneName,omitempty"`
 	IsMainStage     bool   `json:"isMainStage"`
 	IsActivityStage bool   `json:"isActivityStage"`
 	IsResourceStage bool   `json:"isResourceStage"`

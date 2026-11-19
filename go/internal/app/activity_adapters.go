@@ -40,6 +40,13 @@ func (e activityPlanExecutor) ExecutePlan(ctx context.Context, request activity.
 		SelectedIndexes: request.SelectedIndexes,
 		Options:         request.Options,
 	}
+	if request.Plan != nil {
+		var plan copilot.Plan
+		if err := convertJSON(request.Plan, &plan); err != nil {
+			return nil, err
+		}
+		converted.Plan = &plan
+	}
 	if request.Lifecycle != nil {
 		converted.Lifecycle = &copilot.ExecutionLifecycle{
 			RunID:     request.Lifecycle.RunID,

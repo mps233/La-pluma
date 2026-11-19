@@ -40,6 +40,7 @@ func Seed(ctx context.Context, client *Client, outDir string) (SeedResult, error
 	tables, err := client.fetchTables(
 		ctx,
 		"stage_table.json",
+		"zone_table.json",
 		"handbook_info_table.json",
 		"character_table.json",
 		"item_table.json",
@@ -52,6 +53,13 @@ func Seed(ctx context.Context, client *Client, outDir string) (SeedResult, error
 	characters := tables["character_table.json"]
 	itemTable := tables["item_table.json"]
 	stages := ParseStageData(tables["stage_table.json"])
+	zoneNames := ParseZoneNames(tables["zone_table.json"])
+	for code, stage := range stages {
+		if zoneID := strings.TrimSpace(jsString(stage.ZoneID)); zoneID != "" {
+			stage.ZoneName = zoneNames[zoneID]
+			stages[code] = stage
+		}
+	}
 	paradox := ParseParadoxOperators(tables["handbook_info_table.json"], characters)
 	now := client.Now()
 	operatorMaterials := BuildOperatorMaterialsFile(characters, itemTable, now)

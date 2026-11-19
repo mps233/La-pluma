@@ -17,6 +17,10 @@ import (
 
 const queueSchemaVersion = 1
 
+// masteryTrainingStaleAfter is a safety net for a stale TrainingStartedAt
+// (M1-M3 take at most 8/16/24 hours with any training-room level).
+const masteryTrainingStaleAfter = 36 * time.Hour
+
 var defaultQueueSettings = QueueSettings{
 	ProbeIntervalMinutes: 60,
 	OnItemBlocked:        "skip",
@@ -146,10 +150,15 @@ func (s *QueueService) normalizeItem(raw any) (MasteryQueueItem, bool) {
 	if !hasOperatorName {
 		operatorName = operatorID
 	}
+	nameForMaa, hasNameForMaa := record["nameForMaa"].(string)
+	if !hasNameForMaa || nameForMaa == "" {
+		nameForMaa = operatorName
+	}
 	item := MasteryQueueItem{
 		ID:                  fmt.Sprintf("%s:%d", operatorID, skillIndex),
 		OperatorID:          operatorID,
 		OperatorName:        operatorName,
+		NameForMaa:          nameForMaa,
 		SkillIndex:          skillIndex,
 		SkillName:           fmt.Sprintf("技能 %d", skillIndex),
 		TargetLevel:         targetLevel,
@@ -313,6 +322,17 @@ func (s *QueueService) normalizeQueueData(raw any) *MasteryQueueData {
 	}
 }
 
+// cloneQueueData copies the persisted queue so a failed save cannot leave the
+// in-memory state ahead of the file on disk.
+func cloneQueueData(data *MasteryQueueData) *MasteryQueueData {
+	clone := *data
+	clone.Items = make([]MasteryQueueItem, len(data.Items))
+	for index, item := range data.Items {
+		clone.Items[index] = copyItem(item)
+	}
+	return &clone
+}
+
 func (s *QueueService) loadLocked() (*MasteryQueueData, error) {
 	if s.loaded {
 		return s.state, nil
@@ -421,9 +441,36 @@ func (s *QueueService) statusLocked(data *MasteryQueueData) MasteryQueueStatus {
 		Items:    items,
 		Counts:   countsFor(data.Items),
 	}
-	status.ActiveItem = s.activeItemLocked(data)
-	status.NextActionableItem = firstActionable(data.Items, &data.Campaign)
+	// ActiveItem and NextActionableItem leave the lock with the caller, so they
+	// must not alias the persisted item slice.
+	if active := s.activeItemLocked(data); active != nil {
+		copied := copyItem(*active)
+		status.ActiveItem = &copied
+	}
+	if next := firstActionable(data.Items, &data.Campaign); next != nil {
+		copied := copyItem(*next)
+		status.NextActionableItem = &copied
+	}
 	return status
+}
+
+// resetInterruptedLocked returns interrupted targets to the queue so a resume
+// cannot skip them forever. Recovery data is dropped because the next step
+// re-verifies the in-game level.
+func (s *QueueService) resetInterruptedLocked(data *MasteryQueueData) {
+	now := s.nowISO()
+	for index := range data.Items {
+		item := &data.Items[index]
+		if item.Phase != PhaseInterrupted {
+			continue
+		}
+		item.Phase = PhaseQueued
+		item.Recovery = nil
+		item.Blocked = nil
+		item.NextProbeAt = nil
+		item.ActiveRunID = nil
+		item.UpdatedAt = now
+	}
 }
 
 // Status returns the campaign, items, counts and the next actionable target.
@@ -469,6 +516,7 @@ func (s *QueueService) AddItems(inputs []AddItemInput, dataService *DataService,
 	if err != nil {
 		return AddItemsResult{}, err
 	}
+	data = cloneQueueData(data)
 	existing := make(map[string]bool, len(data.Items))
 	for _, item := range data.Items {
 		existing[item.ID] = true
@@ -479,7 +527,8 @@ func (s *QueueService) AddItems(inputs []AddItemInput, dataService *DataService,
 			nextOrder = item.Order + 1
 		}
 	}
-	created := make([]MasteryQueueItem, 0, len(inputs))
+	pending := make([]MasteryQueueItem, 0, len(inputs))
+	detailCache := make(map[string]MasteryOperatorDetail, len(inputs))
 
 	for _, input := range inputs {
 		operatorID := strings.TrimSpace(input.OperatorID)
@@ -524,12 +573,18 @@ func (s *QueueService) AddItems(inputs []AddItemInput, dataService *DataService,
 			)
 		}
 
-		detail, detailErr := dataService.GetOperatorDetail(operatorID, OperatorDetailOptions{
-			ClientType:    derefString(context.ClientType),
-			DeclaredLevel: declaredLevel,
-		})
-		if detailErr != nil {
-			return AddItemsResult{}, detailErr
+		cacheKey := fmt.Sprintf("%s:%d", operatorID, declaredLevel)
+		detail, cached := detailCache[cacheKey]
+		if !cached {
+			loaded, detailErr := dataService.GetOperatorDetail(operatorID, OperatorDetailOptions{
+				ClientType:    derefString(context.ClientType),
+				DeclaredLevel: declaredLevel,
+			})
+			if detailErr != nil {
+				return AddItemsResult{}, detailErr
+			}
+			detail = loaded
+			detailCache[cacheKey] = detail
 		}
 		if !detail.Owned || !detail.OwnedStateKnown || detail.CurrentElite < 2 {
 			return AddItemsResult{}, apperrors.WithStatus(
@@ -584,6 +639,7 @@ func (s *QueueService) AddItems(inputs []AddItemInput, dataService *DataService,
 			ID:             id,
 			OperatorID:     operatorID,
 			OperatorName:   detail.Name,
+			NameForMaa:     firstStringNonEmpty(detail.NameForMaa, detail.Name, operatorID),
 			Role:           detail.Role,
 			SkillIndex:     skillIndex,
 			SkillID:        &skillID,
@@ -599,7 +655,14 @@ func (s *QueueService) AddItems(inputs []AddItemInput, dataService *DataService,
 		}
 		nextOrder++
 		existing[id] = true
-		data.Items = append(data.Items, item)
+		// Validate every input before touching the live state so a failed batch
+		// never leaves unpersisted targets behind.
+		pending = append(pending, item)
+	}
+
+	data.Items = append(data.Items, pending...)
+	created := make([]MasteryQueueItem, 0, len(pending))
+	for _, item := range pending {
 		created = append(created, copyItem(item))
 	}
 
@@ -631,6 +694,7 @@ func (s *QueueService) UpdateItem(id string, patch ItemPatch) (MasteryQueueItem,
 	if err != nil {
 		return MasteryQueueItem{}, err
 	}
+	data = cloneQueueData(data)
 	item, _ := s.findLocked(data, id)
 	if item == nil {
 		return MasteryQueueItem{}, itemNotFound(id)
@@ -666,11 +730,16 @@ func (s *QueueService) UpdateItem(id string, patch ItemPatch) (MasteryQueueItem,
 		}
 		item.TargetLevel = targetLevel
 	}
+	targetChanged := patch.TargetLevel != nil
 	if patch.Enabled != nil {
 		item.Enabled = *patch.Enabled
 	}
-	if item.Phase == PhaseCompleted {
+	// Only a higher target restarts a completed item; toggling enabled must not
+	// resurrect it with completedAt still set.
+	if targetChanged && item.Phase == PhaseCompleted {
 		item.Phase = PhaseQueued
+		item.CompletedAt = nil
+		item.SkippedAt = nil
 	}
 	item.UpdatedAt = s.nowISO()
 	if err := s.saveLocked(data); err != nil {
@@ -687,6 +756,7 @@ func (s *QueueService) RemoveItem(id string) error {
 	if err != nil {
 		return err
 	}
+	data = cloneQueueData(data)
 	item, _ := s.findLocked(data, id)
 	if item == nil {
 		return itemNotFound(id)
@@ -722,6 +792,7 @@ func (s *QueueService) Reorder(order []string) ([]MasteryQueueItem, error) {
 	if err != nil {
 		return nil, err
 	}
+	data = cloneQueueData(data)
 	active := s.activeItemLocked(data)
 	ids := make([]string, 0, len(data.Items))
 	known := make(map[string]bool, len(data.Items))
@@ -795,6 +866,7 @@ func (s *QueueService) UpdateSettings(patch map[string]any) (QueueSettings, erro
 	if err != nil {
 		return QueueSettings{}, err
 	}
+	data = cloneQueueData(data)
 	merged := toAnyMap(data.Campaign.Settings)
 	for key, value := range patch {
 		merged[key] = value
@@ -814,6 +886,8 @@ func (s *QueueService) StartCampaign(context CampaignContext) (MasteryQueueStatu
 	if err != nil {
 		return MasteryQueueStatus{}, err
 	}
+	data = cloneQueueData(data)
+	s.resetInterruptedLocked(data)
 	actionable := firstActionable(data.Items, &data.Campaign)
 	if actionable == nil {
 		return MasteryQueueStatus{}, queueEmpty()
@@ -834,15 +908,14 @@ func (s *QueueService) StartCampaign(context CampaignContext) (MasteryQueueStatu
 		value := *context.ClientProfileID
 		data.Campaign.ClientProfileID = &value
 	}
-	if actionable.Phase == PhaseBlocked {
-		actionable.Phase = PhaseQueued
-	}
 	if err := s.saveLocked(data); err != nil {
 		return MasteryQueueStatus{}, err
 	}
 	status := s.statusLocked(data)
-	status.ActiveItem = actionable
-	status.NextActionableItem = actionable
+	actionableCopy := copyItem(*actionable)
+	status.ActiveItem = &actionableCopy
+	nextCopy := copyItem(*actionable)
+	status.NextActionableItem = &nextCopy
 	return status, nil
 }
 
@@ -854,6 +927,7 @@ func (s *QueueService) PauseCampaign(reason *string) (MasteryQueueStatus, error)
 	if err != nil {
 		return MasteryQueueStatus{}, err
 	}
+	data = cloneQueueData(data)
 	if data.Campaign.Status == CampaignRunning {
 		data.Campaign.Status = CampaignPaused
 		message := "用户暂停"
@@ -876,8 +950,10 @@ func (s *QueueService) ResumeCampaign() (MasteryQueueStatus, error) {
 	if err != nil {
 		return MasteryQueueStatus{}, err
 	}
+	data = cloneQueueData(data)
 	switch data.Campaign.Status {
 	case CampaignPaused, CampaignBlocked, CampaignInterrupted, CampaignIdle:
+		s.resetInterruptedLocked(data)
 		actionable := firstActionable(data.Items, &data.Campaign)
 		if actionable == nil {
 			return MasteryQueueStatus{}, queueEmpty()
@@ -892,6 +968,24 @@ func (s *QueueService) ResumeCampaign() (MasteryQueueStatus, error) {
 	return s.statusLocked(data), nil
 }
 
+// MarkStopping records that the executor stop has been requested but the
+// in-flight tick has not finished yet. It keeps a late tick error from
+// overwriting the final stopped state.
+func (s *QueueService) MarkStopping() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	data, err := s.loadLocked()
+	if err != nil {
+		return err
+	}
+	if data.Campaign.Status != CampaignRunning {
+		return nil
+	}
+	data = cloneQueueData(data)
+	data.Campaign.Status = CampaignStopping
+	return s.saveLocked(data)
+}
+
 // StopCampaign returns to idle and interrupts any in-flight step.
 func (s *QueueService) StopCampaign() (MasteryQueueStatus, error) {
 	s.mu.Lock()
@@ -900,6 +994,7 @@ func (s *QueueService) StopCampaign() (MasteryQueueStatus, error) {
 	if err != nil {
 		return MasteryQueueStatus{}, err
 	}
+	data = cloneQueueData(data)
 	active := s.activeItemLocked(data)
 	data.Campaign.Status = CampaignIdle
 	data.Campaign.ActiveItemID = nil
@@ -937,6 +1032,7 @@ func (s *QueueService) MarkItemStarting(id string, input MarkStartingInput) (Mas
 	if err != nil {
 		return MasteryQueueItem{}, err
 	}
+	data = cloneQueueData(data)
 	item, _ := s.findLocked(data, id)
 	if item == nil {
 		return MasteryQueueItem{}, itemNotFound(id)
@@ -964,6 +1060,7 @@ func (s *QueueService) MarkItemStepRunning(id string, runID string) (MasteryQueu
 	if err != nil {
 		return MasteryQueueItem{}, err
 	}
+	data = cloneQueueData(data)
 	item, _ := s.findLocked(data, id)
 	if item == nil {
 		return MasteryQueueItem{}, itemNotFound(id)
@@ -989,6 +1086,7 @@ func (s *QueueService) ApplyStepOutcome(id string, outcome StepOutcome, settings
 	if err != nil {
 		return MasteryQueueItem{}, err
 	}
+	data = cloneQueueData(data)
 	item, _ := s.findLocked(data, id)
 	if item == nil {
 		return MasteryQueueItem{}, itemNotFound(id)
@@ -1024,8 +1122,14 @@ func (s *QueueService) ApplyStepOutcome(id string, outcome StepOutcome, settings
 
 	switch {
 	case detail == "AlreadySatisfied":
-		if stepTarget > item.ConfirmedLevel {
-			item.ConfirmedLevel = stepTarget
+		// MaaCore reports the level it actually recognized in skill_mastery, which
+		// can be several levels above the declared one.
+		satisfiedLevel := stepTarget
+		if reportedStartedLevel > 0 {
+			satisfiedLevel = maxInt(stepTarget, reportedStartedLevel)
+		}
+		if satisfiedLevel > item.ConfirmedLevel {
+			item.ConfirmedLevel = satisfiedLevel
 		}
 		item.LevelVerified = true
 		item.VerifyCount++
@@ -1057,17 +1161,45 @@ func (s *QueueService) ApplyStepOutcome(id string, outcome StepOutcome, settings
 		item.ConsecutiveFailures = 0
 	case detail == "TrainingRoomBusy":
 		if item.TrainingStartedAt != nil {
+			// A cancelled training can leave this stamp behind while another
+			// operator occupies the room. M3 takes at most 24h, so anything past
+			// 36h is stale and needs a human.
+			if startedAt, ok := parseTimestamp(*item.TrainingStartedAt); ok && s.now().Sub(startedAt) > masteryTrainingStaleAfter {
+				item.Phase = PhaseFailed
+				item.Blocked = &MasteryBlocked{
+					Code:      "AGENT_MASTERY_TRAINING_STALE",
+					Message:   "训练时间超过预期，请复核游戏内训练状态",
+					Retryable: true,
+					At:        now,
+				}
+				item.LastErrorCode = &item.Blocked.Code
+				item.NextProbeAt = nil
+				break
+			}
 			item.Phase = PhaseTraining
 			next := formatISO(s.now().Add(time.Duration(settings.ProbeIntervalMinutes) * time.Minute))
 			item.NextProbeAt = &next
+			item.Blocked = nil
+			item.ConsecutiveFailures = 0
 		} else {
-			item.Phase = PhaseBlocked
-			item.NextProbeAt = nil
+			// Another operator occupies the training room. Wait instead of
+			// marking the whole queue blocked; only a sustained busy state
+			// needs a human.
+			item.ConsecutiveFailures++
 			item.Blocked = &MasteryBlocked{
 				Code:      "AGENT_MASTERY_TRAINING_ROOM_BUSY",
-				Message:   "训练室正在被其他训练占用",
+				Message:   "训练室被其他训练占用，稍后自动重试",
 				Retryable: true,
 				At:        now,
+			}
+			if item.ConsecutiveFailures >= 3 {
+				item.Phase = PhaseBlocked
+				item.NextProbeAt = nil
+				item.Blocked.Message = "训练室持续被其他训练占用"
+			} else {
+				item.Phase = PhaseQueued
+				next := formatISO(s.now().Add(30 * time.Minute))
+				item.NextProbeAt = &next
 			}
 		}
 	case detail == "ResourceInsufficient" || detail == "FormulaLocked" || detail == "ChipNotCraftable" ||
@@ -1086,7 +1218,7 @@ func (s *QueueService) ApplyStepOutcome(id string, outcome StepOutcome, settings
 		item.ConsecutiveFailures++
 		code := "AGENT_MASTERY_UNKNOWN_RESULT"
 		if detail != "" {
-			code = "AGENT_MASTERY_" + strings.ToUpper(detail)
+			code = "AGENT_MASTERY_" + upperSnake(detail)
 		}
 		item.LastErrorCode = &code
 		if item.ConsecutiveFailures >= 2 {
@@ -1164,6 +1296,7 @@ func (s *QueueService) MarkCampaignBlocked(reason string) error {
 	if err != nil {
 		return err
 	}
+	data = cloneQueueData(data)
 	data.Campaign.Status = CampaignBlocked
 	data.Campaign.PausedReason = &reason
 	return s.saveLocked(data)
@@ -1177,6 +1310,7 @@ func (s *QueueService) MarkCampaignCompleted() error {
 	if err != nil {
 		return err
 	}
+	data = cloneQueueData(data)
 	data.Campaign.Status = CampaignCompleted
 	data.Campaign.ActiveItemID = nil
 	data.Campaign.ActiveStepRunID = nil
@@ -1199,6 +1333,7 @@ func (s *QueueService) ResetItemAfterTransientError(id string, input TransientRe
 	if err != nil {
 		return MasteryQueueItem{}, err
 	}
+	data = cloneQueueData(data)
 	item, _ := s.findLocked(data, id)
 	if item == nil {
 		return MasteryQueueItem{}, itemNotFound(id)
@@ -1231,6 +1366,62 @@ func (s *QueueService) ResetItemAfterTransientError(id string, input TransientRe
 	return copyItem(*item), nil
 }
 
+// ScheduleProbe moves the next check to the live training completion time.
+func (s *QueueService) ScheduleProbe(id string, next time.Time) (MasteryQueueItem, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	data, err := s.loadLocked()
+	if err != nil {
+		return MasteryQueueItem{}, err
+	}
+	data = cloneQueueData(data)
+	item, _ := s.findLocked(data, id)
+	if item == nil {
+		return MasteryQueueItem{}, itemNotFound(id)
+	}
+	now := s.nowISO()
+	nextISO := formatISO(next)
+	item.NextProbeAt = &nextISO
+	if item.Phase == PhaseTraining {
+		item.Blocked = nil
+	}
+	item.UpdatedAt = now
+	if err := s.saveLocked(data); err != nil {
+		return MasteryQueueItem{}, err
+	}
+	return copyItem(*item), nil
+}
+
+// MarkTrainingInterrupted records that another operator took the training room.
+func (s *QueueService) MarkTrainingInterrupted(id, reason string) (MasteryQueueItem, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	data, err := s.loadLocked()
+	if err != nil {
+		return MasteryQueueItem{}, err
+	}
+	data = cloneQueueData(data)
+	item, _ := s.findLocked(data, id)
+	if item == nil {
+		return MasteryQueueItem{}, itemNotFound(id)
+	}
+	now := s.nowISO()
+	item.Phase = PhaseFailed
+	item.Blocked = &MasteryBlocked{
+		Code:      "AGENT_MASTERY_TRAINING_INTERRUPTED",
+		Message:   reason,
+		Retryable: true,
+		At:        now,
+	}
+	item.LastErrorCode = &item.Blocked.Code
+	item.NextProbeAt = nil
+	item.UpdatedAt = now
+	if err := s.saveLocked(data); err != nil {
+		return MasteryQueueItem{}, err
+	}
+	return copyItem(*item), nil
+}
+
 // AdvanceCampaign selects the next actionable item or finishes the campaign.
 func (s *QueueService) AdvanceCampaign() (MasteryQueueStatus, error) {
 	s.mu.Lock()
@@ -1239,6 +1430,7 @@ func (s *QueueService) AdvanceCampaign() (MasteryQueueStatus, error) {
 	if err != nil {
 		return MasteryQueueStatus{}, err
 	}
+	data = cloneQueueData(data)
 	next := firstActionable(data.Items, &data.Campaign)
 	if next != nil {
 		data.Campaign.ActiveItemID = &next.ID
@@ -1249,7 +1441,7 @@ func (s *QueueService) AdvanceCampaign() (MasteryQueueStatus, error) {
 		hasBlocked := false
 		hasPending := false
 		for _, item := range data.Items {
-			if item.Phase == PhaseBlocked || item.Phase == PhaseFailed {
+			if item.Phase == PhaseBlocked || item.Phase == PhaseFailed || item.Phase == PhaseInterrupted {
 				hasBlocked = true
 			}
 			if item.Enabled && pendingPhases[item.Phase] {
@@ -1268,7 +1460,10 @@ func (s *QueueService) AdvanceCampaign() (MasteryQueueStatus, error) {
 		return MasteryQueueStatus{}, err
 	}
 	status := s.statusLocked(data)
-	status.NextActionableItem = next
+	if next != nil {
+		copied := copyItem(*next)
+		status.NextActionableItem = &copied
+	}
 	return status, nil
 }
 
@@ -1280,6 +1475,7 @@ func (s *QueueService) RetryItem(id string) (MasteryQueueItem, error) {
 	if err != nil {
 		return MasteryQueueItem{}, err
 	}
+	data = cloneQueueData(data)
 	item, _ := s.findLocked(data, id)
 	if item == nil {
 		return MasteryQueueItem{}, itemNotFound(id)
@@ -1298,6 +1494,10 @@ func (s *QueueService) RetryItem(id string) (MasteryQueueItem, error) {
 	item.NextProbeAt = nil
 	item.ConsecutiveFailures = 0
 	item.LastErrorCode = nil
+	// A manual retry starts a fresh step: the previous training may have been
+	// completed or cancelled in-game.
+	item.StartedLevel = nil
+	item.TrainingStartedAt = nil
 	item.UpdatedAt = s.nowISO()
 	if data.Campaign.ActiveItemID == nil {
 		data.Campaign.ActiveItemID = &item.ID
@@ -1308,25 +1508,6 @@ func (s *QueueService) RetryItem(id string) (MasteryQueueItem, error) {
 	return copyItem(*item), nil
 }
 
-// SetCampaignContext updates client metadata when a field is provided.
-func (s *QueueService) SetCampaignContext(context CampaignContext) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	data, err := s.loadLocked()
-	if err != nil {
-		return err
-	}
-	if context.ClientType != nil {
-		value := *context.ClientType
-		data.Campaign.ClientType = &value
-	}
-	if context.ClientProfileID != nil {
-		value := *context.ClientProfileID
-		data.Campaign.ClientProfileID = &value
-	}
-	return s.saveLocked(data)
-}
-
 // RecoverOnStartup converts active campaign/item state to interrupted.
 func (s *QueueService) RecoverOnStartup() error {
 	s.mu.Lock()
@@ -1335,6 +1516,7 @@ func (s *QueueService) RecoverOnStartup() error {
 	if err != nil {
 		return err
 	}
+	data = cloneQueueData(data)
 	changed := false
 	if data.Campaign.Status == CampaignRunning || data.Campaign.Status == CampaignStopping {
 		data.Campaign.Status = CampaignInterrupted
@@ -1421,6 +1603,15 @@ func itemNotFound(id string) error {
 
 func queueEmpty() error {
 	return apperrors.WithStatus("AGENT_MASTERY_QUEUE_EMPTY", "没有可执行的专精目标", http.StatusConflict, false, nil)
+}
+
+func firstStringNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func derefString(value *string) string {

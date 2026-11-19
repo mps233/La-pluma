@@ -537,6 +537,7 @@ func (s *Service) executeWithPreparation(
 	preflight NavigationResult,
 	clientType string,
 	navigationStage string,
+	zoneName string,
 	execute func(context.Context) (*ExecutionResult, error),
 ) (*ExecutionResult, error) {
 	if s.lease == nil {
@@ -548,7 +549,11 @@ func (s *Service) executeWithPreparation(
 		TaskName: "当前活动作业",
 		Command:  "activity-copilot",
 	}, func(leaseCtx context.Context) error {
-		if _, err := s.runActivityPreparation(leaseCtx, &Candidates{Preflight: preflight}, clientType, navigationStage); err != nil {
+		if strings.TrimSpace(zoneName) != "" {
+			if err := s.runActivityZonePreparation(leaseCtx, clientType, zoneName, preflight); err != nil {
+				return err
+			}
+		} else if _, err := s.runActivityPreparation(leaseCtx, &Candidates{Preflight: preflight}, clientType, navigationStage); err != nil {
 			return err
 		}
 		executed, err := execute(leaseCtx)
@@ -556,6 +561,124 @@ func (s *Service) executeWithPreparation(
 		return err
 	})
 	return result, err
+}
+
+// runActivityZonePreparation opens the event chapter page and clicks the
+// chapter card by its game-data zone name. This is the generic path for
+// EX/S/MO/TR stages, whose navigation tasks are not in MAA's base resource.
+func (s *Service) runActivityZonePreparation(
+	ctx context.Context,
+	clientType string,
+	zoneName string,
+	preflight NavigationResult,
+) error {
+	tasks := BuildActivityZonePreparationTasks(clientType, zoneName)
+	if len(tasks) == 0 {
+		return dependencyError("ACTIVITY_ZONE_NAVIGATION_UNAVAILABLE", "未找到活动章节信息，无法自动进入活动章节。")
+	}
+	userExecutor, ok := s.executor.(UserResourceExecutor)
+	if !ok {
+		return dependencyError("ACTIVITY_USER_RESOURCE_EXECUTOR_UNAVAILABLE", "MAA 用户资源任务服务未接入，无法自动进入活动章节。")
+	}
+	activityCode := navigationCode(preflight.Activity)
+	if err := s.ensureActivityZoneTasks(activityCode, zoneName); err != nil {
+		return err
+	}
+
+	checkpoint := ""
+	if s.navigationLog != nil {
+		checkpoint = s.navigationLog.Checkpoint(ctx)
+	}
+	taskConfig := map[string]any{"tasks": tasks}
+	if _, err := userExecutor.RunUserTask(ctx, taskConfig, true); err != nil {
+		if apperrors.IsTransientMAAUpdateFailure(err) && ctx.Err() == nil {
+			select {
+			case <-time.After(2 * time.Second):
+				if _, retryErr := userExecutor.RunUserTask(ctx, taskConfig, true); retryErr == nil {
+					err = nil
+				} else {
+					err = retryErr
+				}
+			case <-ctx.Done():
+				err = ctx.Err()
+			}
+		}
+		if err != nil {
+			return navigationFailedError(
+				"活动章节导航未完成，已停止活动作业："+errorMessage(err),
+				err,
+			)
+		}
+	}
+	logText := ""
+	if s.navigationLog != nil {
+		logText = s.navigationLog.ReadSince(ctx, checkpoint)
+	}
+	if !HasCompletedActivityNavigation(logText, len(tasks)) {
+		return navigationFailedError(
+			"活动章节导航未完成，已停止活动作业；请检查游戏是否已进入活动章节。",
+			nil,
+		)
+	}
+	return nil
+}
+
+// BuildActivityZonePreparationTasks is the chapter-aware preparation chain.
+// LaPlumaActivityPage and LaPlumaActivityChapter are written by
+// ensureActivityZoneTasks and loaded through MAA's --user-resource overlay.
+func BuildActivityZonePreparationTasks(clientType, zoneName string) []PreparationTask {
+	if strings.TrimSpace(zoneName) == "" {
+		return []PreparationTask{}
+	}
+	return []PreparationTask{
+		{Name: "关闭游戏", Type: "CloseDown", Params: map[string]any{"client_type": clientType}},
+		{Name: "启动游戏", Type: "StartUp", Params: map[string]any{"client_type": clientType, "start_game_enabled": true}},
+		{Name: "进入终端", Type: "Custom", Params: map[string]any{"task_names": []string{"Terminal-Entry"}}},
+		{Name: "等待终端加载", Type: "Custom", Params: map[string]any{"task_names": []string{"SleepThenStop"}}},
+		{Name: "等待终端加载 2", Type: "Custom", Params: map[string]any{"task_names": []string{"SleepThenStop"}}},
+		{Name: "打开活动页", Type: "Custom", Params: map[string]any{"task_names": []string{"LaPlumaActivityPage"}}},
+		{Name: "选择活动章节 " + zoneName, Type: "Custom", Params: map[string]any{"task_names": []string{"LaPlumaActivityChapter"}}},
+	}
+}
+
+// ensureActivityZoneTasks writes the two user-resource tasks used by the
+// chapter preparation. Existing user tasks (preset formation) are preserved.
+func (s *Service) ensureActivityZoneTasks(activityCode, zoneName string) error {
+	configDir := strings.TrimSpace(s.paths.MaaConfigDir)
+	if configDir == "" {
+		return dependencyError("ACTIVITY_CONFIG_UNAVAILABLE", "MAA 配置目录未接入，无法准备活动章节导航。")
+	}
+	tasksPath := filepath.Join(configDir, "resource", "tasks", "tasks.json")
+	value, err := jsonstore.Read(tasksPath, map[string]any{})
+	if err != nil {
+		value = map[string]any{}
+	}
+	existing := asRecord(value)
+	if existing == nil {
+		existing = map[string]any{}
+	}
+	existing["LaPlumaActivityPage"] = map[string]any{
+		"baseTask": strings.ToUpper(strings.TrimSpace(activityCode)) + "-OpenOcr",
+		"next":     []any{"Stop"},
+	}
+	existing["LaPlumaActivityChapter"] = map[string]any{
+		"algorithm": "OcrDetect",
+		"action":    "ClickSelf",
+		"text":      []any{strings.TrimSpace(zoneName)},
+		"roi":       []any{0, 0, 1280, 720},
+		"postDelay": 3000,
+		"next":      []any{"Stop"},
+	}
+	if err := jsonstore.Write(tasksPath, existing, true); err != nil {
+		return apperrors.WithStatus(
+			"ACTIVITY_ZONE_TASKS_WRITE_FAILED",
+			"写入活动章节导航任务失败",
+			http.StatusInternalServerError,
+			false,
+			map[string]any{"path": tasksPath, "error": err.Error()},
+		)
+	}
+	return nil
 }
 
 func (s *Service) runActivityPreparation(
@@ -631,6 +754,12 @@ func (s *Service) resolvePreparationStage(requestedStage, activityCode string) s
 		if stage == requested {
 			return requested
 		}
+	}
+	// EX/S/MO/TR stages use a different chapter than the numeric stage list.
+	// Selecting the nearest numeric stage would open the wrong map, so let the
+	// caller fall back to the activity entry task instead.
+	if requested != "" && !stagePattern.MatchString(requested) {
+		return ""
 	}
 	sort.SliceStable(available, func(i, j int) bool {
 		left, right := activityStageNumber(available[i]), activityStageNumber(available[j])
@@ -726,10 +855,56 @@ func (s *Service) RunCurrentActivitySet(ctx context.Context, input SetExecutionO
 	if err != nil {
 		return nil, err
 	}
-	selectedEntries := SelectActivitySetEntries(setPlan.Entries, activity.Stages, input.SelectedIndexes)
+	activityCode := navigationCode(activity)
+	allowedStages := append([]string{}, activity.Stages...)
+	for _, entry := range setPlan.Entries {
+		stage := strings.ToUpper(strings.TrimSpace(entry.DisplayStage))
+		if stage == "" || !strings.HasPrefix(stage, activityCode+"-") {
+			continue
+		}
+		if s.StageZoneName(stage) != "" {
+			allowedStages = append(allowedStages, stage)
+		}
+	}
+	selectedEntries := SelectActivitySetEntries(setPlan.Entries, allowedStages, input.SelectedIndexes)
 	if len(selectedEntries) == 0 {
 		return nil, apperrors.Validation("ACTIVITY_SET_STAGE_MISMATCH", "作业集不包含当前活动关卡", nil)
 	}
+	zoneName := ""
+	specialStages := map[string]struct{}{}
+	selectedStageSet := map[string]struct{}{}
+	for _, entry := range selectedEntries {
+		stage := strings.ToUpper(strings.TrimSpace(entry.DisplayStage))
+		if stage == "" {
+			continue
+		}
+		selectedStageSet[stage] = struct{}{}
+		if !autoNavigableStagePattern.MatchString(stage) {
+			specialStages[stage] = struct{}{}
+		}
+	}
+	if len(specialStages) > 0 {
+		if len(specialStages) != len(selectedStageSet) {
+			return nil, apperrors.Validation(
+				"ACTIVITY_MIXED_NAVIGATION_UNSUPPORTED",
+				"普通关卡与 EX/特殊关卡混选暂不支持，请分开执行。",
+				nil,
+			)
+		}
+		firstStage := selectedEntries[0].DisplayStage
+		zoneName = s.StageZoneName(firstStage)
+		if zoneName == "" {
+			return nil, apperrors.WithStatus(
+				"ACTIVITY_ZONE_UNAVAILABLE",
+				"未找到该关卡的章节信息，请先刷新游戏数据或手动进入活动关卡地图。",
+				http.StatusConflict,
+				false,
+				map[string]any{"stage": firstStage},
+			)
+		}
+	}
+	selection := s.LoadActivitySelectionContext(ctx)
+	executablePlan, substitutions, skipped := s.resolveSetSubstitutions(ctx, setPlan, selectedEntries, selection)
 	selectedIndexes := uniqueItemIndexes(selectedEntries)
 	navigationStage := ""
 	if len(selectedEntries) > 0 {
@@ -741,42 +916,258 @@ func (s *Service) RunCurrentActivitySet(ctx context.Context, input SetExecutionO
 		executionOptions["navigationStage"] = navigationStage
 	}
 
-	result, err := s.executeWithPreparation(ctx, preflight, clientType, navigationStage, func(execCtx context.Context) (*ExecutionResult, error) {
-		return s.planExecutor.ExecutePlan(execCtx, PlanExecution{
-			SetID:           setID,
-			Raid:            raid,
-			SelectedIndexes: selectedIndexes,
-			Options:         executionOptions,
-			Lifecycle:       lifecycle,
-		})
-	})
-	if err != nil {
-		entries := []CompletionEntry{}
-		if result != nil {
-			entries = append(entries, result.Results...)
-		}
-		entries = append(entries, partialResultsFromError(err)...)
-		_ = s.recordActivityCompletion(activity, completedEntries(entries))
-		return nil, err
+	substitutionByItem := map[int]ActivitySubstitution{}
+	for _, substitution := range substitutions {
+		substitutionByItem[substitution.ItemIndex] = substitution
 	}
-	if result == nil {
-		return nil, dependencyError("ACTIVITY_PLAN_RESULT_MISSING", "作业集执行未返回结果。")
-	}
-	if err := s.recordActivityCompletion(activity, completedEntries(result.Results)); err != nil {
-		return nil, err
+	skippedByItem := map[int]ActivitySkippedStage{}
+	for _, skip := range skipped {
+		skippedByItem[skip.ItemIndex] = skip
 	}
 
-	response := executionMap(result)
-	response["executed"] = true
-	response["source"] = "matching-set"
-	response["activity"] = activity
-	planMap := map[string]any{}
-	if existing, ok := response["plan"].(map[string]any); ok {
-		planMap = copyRecord(existing)
+	var finalResult *ExecutionResult
+	var finalErr error
+	allResults := make([]CompletionEntry, 0)
+	tried := map[int]map[int]struct{}{}
+	for attempt := 0; attempt < 8; attempt++ {
+		currentPlan := executablePlan
+		currentPlan.Entries = append([]PlanEntry(nil), executablePlan.Entries...)
+		result, err := s.executeWithPreparation(ctx, preflight, clientType, navigationStage, zoneName, func(execCtx context.Context) (*ExecutionResult, error) {
+			return s.planExecutor.ExecutePlan(execCtx, PlanExecution{
+				SetID:           setID,
+				Raid:            raid,
+				SelectedIndexes: selectedIndexes,
+				Options:         executionOptions,
+				Lifecycle:       lifecycle,
+				Plan:            &currentPlan,
+			})
+		})
+		finalResult, finalErr = result, err
+		if err == nil || isStoppedActivityAttempt(err) || ctx.Err() != nil {
+			break
+		}
+		failed := firstFailedCompletion(result)
+		if failed == nil {
+			break
+		}
+		itemIndex := failed.ItemIndex
+		if tried[itemIndex] == nil {
+			tried[itemIndex] = map[int]struct{}{}
+		}
+		failedEntry := PlanEntry{
+			ItemIndex:    itemIndex,
+			StageID:      failed.StageID,
+			DisplayStage: failed.DisplayStage,
+			Mode:         failed.Mode,
+		}
+		for _, entry := range executablePlan.Entries {
+			if entry.ItemIndex != itemIndex {
+				continue
+			}
+			failedEntry = entry
+			tried[itemIndex][entry.CopilotID] = struct{}{}
+			if entry.OriginalCopilotID > 0 {
+				tried[itemIndex][entry.OriginalCopilotID] = struct{}{}
+			}
+			break
+		}
+		allResults = append(allResults, result.Results...)
+		operators := selection.UsableOperators
+		if len(operators) == 0 {
+			operators = selection.OwnedOperators
+		}
+		candidateSelection := selection
+		candidateSelection.OwnedOperators = operators
+		candidate := s.nextStageCandidate(ctx, failedEntry, tried[itemIndex], candidateSelection)
+		if candidate != nil {
+			originalID := failedEntry.OriginalCopilotID
+			if originalID == 0 {
+				originalID = failedEntry.CopilotID
+			}
+			for index := range executablePlan.Entries {
+				if executablePlan.Entries[index].ItemIndex != itemIndex {
+					continue
+				}
+				if executablePlan.Entries[index].OriginalCopilotID == 0 {
+					executablePlan.Entries[index].OriginalCopilotID = originalID
+				}
+				executablePlan.Entries[index].CopilotID = candidate.ID
+				executablePlan.Entries[index].PresetFormation = candidate.PresetFormation
+			}
+			substitutionByItem[itemIndex] = ActivitySubstitution{
+				ItemIndex:         itemIndex,
+				Stage:             failedEntry.DisplayStage,
+				Mode:              failedEntry.Mode,
+				OriginalCopilotID: originalID,
+				CopilotID:         candidate.ID,
+				Title:             candidate.Title,
+			}
+			continue
+		}
+		// No candidate left: skip this stage and let the rest continue.
+		executablePlan = removePlanItem(executablePlan, itemIndex)
+		reason := "自动替换的作业仍无法编队，已跳过该关"
+		if strings.TrimSpace(failed.Error) != "" {
+			reason = "作业执行失败，已跳过该关：" + failed.Error
+		}
+		originalID := failedEntry.OriginalCopilotID
+		if originalID == 0 {
+			originalID = failedEntry.CopilotID
+		}
+		skippedByItem[itemIndex] = ActivitySkippedStage{
+			ItemIndex: itemIndex,
+			Stage:     failedEntry.DisplayStage,
+			Mode:      failedEntry.Mode,
+			CopilotID: originalID,
+			Reason:    reason,
+		}
+		if !planHasSelectedEntries(executablePlan, selectedIndexes) {
+			break
+		}
 	}
-	planMap["activity"] = activity
-	response["plan"] = planMap
-	return response, nil
+
+	substitutions = sortedSubstitutions(substitutionByItem)
+	skipped = sortedSkippedStages(skippedByItem)
+	if finalErr == nil && finalResult != nil {
+		if len(skipped) > 0 {
+			appendSkippedPending(finalResult, setPlan, skipped)
+		}
+		completed := append([]CompletionEntry{}, allResults...)
+		completed = append(completed, finalResult.Results...)
+		if err := s.recordActivityCompletion(activity, completedEntries(completed)); err != nil {
+			return nil, err
+		}
+
+		response := executionMap(finalResult)
+		response["executed"] = true
+		response["source"] = "matching-set"
+		response["activity"] = activity
+		if len(substitutions) > 0 {
+			response["substitutions"] = substitutions
+		}
+		if len(skipped) > 0 {
+			response["skipped"] = skipped
+		}
+		planMap := map[string]any{}
+		if existing, ok := response["plan"].(map[string]any); ok {
+			planMap = copyRecord(existing)
+		}
+		planMap["activity"] = activity
+		response["plan"] = planMap
+		return response, nil
+	}
+	if len(skipped) > 0 {
+		synthetic := &ExecutionResult{
+			Results: allResults,
+			Data: map[string]any{
+				"setId":     setID,
+				"name":      setPlan.Name,
+				"plan":      setPlan,
+				"results":   allResults,
+				"completed": []any{},
+				"pending":   []any{},
+				"loopTimes": 1,
+				"source":    "dynamic",
+			},
+		}
+		appendSkippedPending(synthetic, setPlan, skipped)
+		_ = s.recordActivityCompletion(activity, completedEntries(allResults))
+		response := executionMap(synthetic)
+		response["executed"] = false
+		response["source"] = "matching-set"
+		response["activity"] = activity
+		response["reason"] = "所选关卡没有可执行的兼容作业，已保留为待执行。"
+		if len(substitutions) > 0 {
+			response["substitutions"] = substitutions
+		}
+		response["skipped"] = skipped
+		planMap := map[string]any{}
+		if existing, ok := response["plan"].(map[string]any); ok {
+			planMap = copyRecord(existing)
+		}
+		planMap["activity"] = activity
+		response["plan"] = planMap
+		return response, nil
+	}
+
+	entries := []CompletionEntry{}
+	if finalResult != nil {
+		entries = append(entries, finalResult.Results...)
+	}
+	entries = append(entries, partialResultsFromError(finalErr)...)
+	_ = s.recordActivityCompletion(activity, completedEntries(entries))
+	return nil, finalErr
+}
+
+func firstFailedCompletion(result *ExecutionResult) *CompletionEntry {
+	if result == nil {
+		return nil
+	}
+	for index := range result.Results {
+		entry := result.Results[index]
+		if entry.Success == nil || *entry.Success {
+			continue
+		}
+		return &entry
+	}
+	return nil
+}
+
+func isStoppedActivityAttempt(err error) bool {
+	if err == nil {
+		return false
+	}
+	if appErr, ok := apperrors.As(err); ok {
+		if appErr.Code == "COPILOT_PLAN_STOPPED" {
+			return true
+		}
+		if stopped, _ := appErr.Details["stopped"].(bool); stopped {
+			return true
+		}
+	}
+	return false
+}
+
+func removePlanItem(plan Plan, itemIndex int) Plan {
+	filtered := plan
+	filtered.Entries = make([]PlanEntry, 0, len(plan.Entries))
+	for _, entry := range plan.Entries {
+		if entry.ItemIndex != itemIndex {
+			filtered.Entries = append(filtered.Entries, entry)
+		}
+	}
+	return filtered
+}
+
+func planHasSelectedEntries(plan Plan, indexes []int) bool {
+	selected := make(map[int]struct{}, len(indexes))
+	for _, index := range indexes {
+		selected[index] = struct{}{}
+	}
+	for _, entry := range plan.Entries {
+		if _, ok := selected[entry.ItemIndex]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func sortedSubstitutions(values map[int]ActivitySubstitution) []ActivitySubstitution {
+	result := make([]ActivitySubstitution, 0, len(values))
+	for _, value := range values {
+		result = append(result, value)
+	}
+	sort.SliceStable(result, func(i, j int) bool { return result[i].ItemIndex < result[j].ItemIndex })
+	return result
+}
+
+func sortedSkippedStages(values map[int]ActivitySkippedStage) []ActivitySkippedStage {
+	result := make([]ActivitySkippedStage, 0, len(values))
+	for _, value := range values {
+		result = append(result, value)
+	}
+	sort.SliceStable(result, func(i, j int) bool { return result[i].ItemIndex < result[j].ItemIndex })
+	return result
 }
 
 func uniqueItemIndexes(entries []PlanEntry) []int {
@@ -981,7 +1372,7 @@ func (s *Service) RunCurrentActivityCopilotsWithConnection(ctx context.Context, 
 			}
 		}
 
-		result, err := s.executeWithPreparation(ctx, candidates.Preflight, clientType, navigationStage, func(execCtx context.Context) (*ExecutionResult, error) {
+		result, err := s.executeWithPreparation(ctx, candidates.Preflight, clientType, navigationStage, "", func(execCtx context.Context) (*ExecutionResult, error) {
 			return s.planExecutor.ExecutePlan(execCtx, PlanExecution{
 				SetID:           set.ID,
 				Raid:            preferences.Raid,
@@ -1029,7 +1420,7 @@ func (s *Service) RunCurrentActivityCopilotsWithConnection(ctx context.Context, 
 	if len(plan.Entries) > 0 {
 		navigationStage = plan.Entries[0].DisplayStage
 	}
-	result, err := s.executeWithPreparation(ctx, candidates.Preflight, clientType, navigationStage, func(execCtx context.Context) (*ExecutionResult, error) {
+	result, err := s.executeWithPreparation(ctx, candidates.Preflight, clientType, navigationStage, "", func(execCtx context.Context) (*ExecutionResult, error) {
 		return s.planExecutor.ExecuteSelectedEntries(execCtx, EntriesExecution{
 			PlanID:    planID,
 			Name:      activityDisplayName(activity) + " 活动作业",

@@ -256,6 +256,17 @@ func (e maaServiceAdapter) RunTask(ctx context.Context, taskConfig map[string]an
 	return run, err
 }
 
+// RunUserTask runs a dynamic task with the user resource overlay, which the
+// activity chapter navigation tasks require.
+func (e maaServiceAdapter) RunUserTask(ctx context.Context, taskConfig map[string]any, wait bool) (domainrun.DTO, error) {
+	address, _ := taskConfig["address"].(string)
+	run, _, err := e.service.RunTaskWithOptions(ctx, taskConfig, wait, nil, maaapp.RunTaskOptions{
+		Address:      address,
+		UserResource: true,
+	})
+	return run, err
+}
+
 func (e maaServiceAdapter) RunCommand(ctx context.Context, command string, args []string, taskName, taskType string, wait bool) (domainrun.DTO, error) {
 	run, _, err := e.service.Run(ctx, maaapp.RunRequest{
 		OperationID: "run_task",

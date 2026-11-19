@@ -120,6 +120,14 @@ func New(application *app.App, logger *slog.Logger) *Handler {
 	mux.HandleFunc("POST /operator-mastery/resume", handler.resumeMastery)
 	mux.HandleFunc("POST /operator-mastery/stop", handler.stopMastery)
 	mux.HandleFunc("POST /operator-mastery/items/{id}/retry", handler.retryMasteryItem)
+	// Skland routes are UI-only credential/data-source endpoints. They stay out
+	// of the Agent manifest because they exchange account credentials.
+	mux.HandleFunc("GET /skland/status", handler.sklandStatus)
+	mux.HandleFunc("GET /skland/snapshot", handler.sklandSnapshot)
+	mux.HandleFunc("POST /skland/login", handler.sklandLogin)
+	mux.HandleFunc("POST /skland/credentials", handler.saveSklandCredentials)
+	mux.HandleFunc("DELETE /skland/credentials", handler.clearSklandCredentials)
+	mux.HandleFunc("POST /skland/sync", handler.syncSkland)
 	mux.HandleFunc("GET /version", handler.version)
 	mux.HandleFunc("GET /activity", handler.activity)
 	mux.HandleFunc("GET /activity/preflight", handler.activityPreflight)
@@ -3101,10 +3109,14 @@ func anySlice(value any) []any {
 }
 
 func (h *Handler) masteryPreflight(w http.ResponseWriter, r *http.Request) {
-	clientType := firstNonEmpty(r.URL.Query().Get("clientType"), "Official")
+	connection, err := h.resolveRequestConnectionFor(r, nil)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	value, err := h.app.Mastery.Preflight(ctx, clientType)
+	value, err := h.app.Mastery.Preflight(ctx, connection.ClientType)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -3124,8 +3136,13 @@ func (h *Handler) masteryCatalog(w http.ResponseWriter, r *http.Request) {
 	if status != "eligible" && status != "owned" {
 		status = "all"
 	}
+	connection, err := h.resolveRequestConnectionFor(r, nil)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
 	value, err := h.app.Mastery.Catalog(mastery.CatalogOptions{
-		ClientType: query.Get("clientType"),
+		ClientType: connection.ClientType,
 		Search:     query.Get("search"),
 		Rarity:     rarity,
 		Status:     mastery.MasteryCandidateStatus(status),
@@ -3143,8 +3160,13 @@ func (h *Handler) masteryOperator(w http.ResponseWriter, r *http.Request) {
 	if raw := r.URL.Query().Get("declaredLevel"); raw != "" {
 		declaredLevel, _ = strconv.Atoi(raw)
 	}
+	connection, err := h.resolveRequestConnectionFor(r, nil)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
 	value, err := h.app.Mastery.OperatorDetail(r.PathValue("operatorId"), mastery.OperatorDetailOptions{
-		ClientType: r.URL.Query().Get("clientType"), DeclaredLevel: declaredLevel,
+		ClientType: connection.ClientType, DeclaredLevel: declaredLevel,
 	})
 	if err != nil {
 		writeError(w, err)
@@ -3179,12 +3201,14 @@ func (h *Handler) addMasteryItems(w http.ResponseWriter, r *http.Request) {
 			DeclaredLevel: intField(record, "declaredLevel"),
 		})
 	}
-	clientType := firstNonEmpty(stringField(body, "clientType"), "Official")
-	profileID := stringField(body, "profileId")
-	context := mastery.CampaignContext{ClientType: &clientType}
-	if profileID != "" {
-		context.ClientProfileID = &profileID
+	connection, err := h.resolveRequestConnection(body)
+	if err != nil {
+		writeError(w, err)
+		return
 	}
+	clientType := connection.ClientType
+	profileID := firstNonEmpty(stringField(body, "profileId"), appconfig.DefaultProfileName)
+	context := mastery.CampaignContext{ClientType: &clientType, ClientProfileID: &profileID}
 	result, err := h.app.Mastery.AddItems(inputs, context)
 	if err != nil {
 		writeError(w, err)
@@ -3200,9 +3224,7 @@ func (h *Handler) updateMasteryItem(w http.ResponseWriter, r *http.Request) {
 		target := int(value)
 		patch.TargetLevel = &target
 	}
-	if value, ok := body["enabled"].(bool); ok && value {
-		patch.Enabled = &value
-	} else if value, ok := body["enabled"].(bool); ok {
+	if value, ok := body["enabled"].(bool); ok {
 		patch.Enabled = &value
 	}
 	item, err := h.app.Mastery.UpdateItem(r.PathValue("id"), patch)
@@ -3250,15 +3272,17 @@ func (h *Handler) updateMasterySettings(w http.ResponseWriter, r *http.Request) 
 func (h *Handler) startMastery(w http.ResponseWriter, r *http.Request) {
 	body := decodeBody(r)
 	if dryRun, _ := body["dryRun"].(bool); dryRun {
-		httpx.Success(w, http.StatusOK, map[string]any{"action": "start-operator-mastery-campaign", "sideEffects": []string{"consume_mastery_materials", "start_training_room_training"}}, "Dry run only", nil)
+		httpx.Success(w, http.StatusOK, map[string]any{"action": "start-operator-mastery-campaign", "sideEffects": []string{"consume_mastery_materials", "start_training_room_training"}}, "仅预演，未执行任何操作", nil)
 		return
 	}
-	clientType := firstNonEmpty(stringField(body, "clientType"), "Official")
-	profileID := stringField(body, "profileId")
-	context := mastery.CampaignContext{ClientType: &clientType}
-	if profileID != "" {
-		context.ClientProfileID = &profileID
+	connection, err := h.resolveRequestConnection(body)
+	if err != nil {
+		writeError(w, err)
+		return
 	}
+	clientType := connection.ClientType
+	profileID := firstNonEmpty(stringField(body, "profileId"), appconfig.DefaultProfileName)
+	context := mastery.CampaignContext{ClientType: &clientType, ClientProfileID: &profileID}
 	status, err := h.app.Mastery.StartCampaign(r.Context(), context)
 	if err != nil {
 		writeError(w, err)
@@ -3308,6 +3332,80 @@ func (h *Handler) retryMasteryItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.Success(w, http.StatusOK, item, "已重试专精目标", nil)
+}
+
+func (h *Handler) sklandStatus(w http.ResponseWriter, r *http.Request) {
+	value, err := h.app.Skland.Status()
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, value, "", nil)
+}
+
+func (h *Handler) sklandSnapshot(w http.ResponseWriter, r *http.Request) {
+	snapshot, available, err := h.app.Skland.Snapshot()
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, map[string]any{
+		"available": available,
+		"snapshot":  snapshot,
+	}, "", nil)
+}
+
+func (h *Handler) sklandLogin(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer cancel()
+	status, err := h.app.Skland.Login(
+		ctx,
+		stringField(body, "account"),
+		stringField(body, "password"),
+		stringField(body, "uid"),
+	)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, status, "森空岛登录成功", nil)
+}
+
+func (h *Handler) saveSklandCredentials(w http.ResponseWriter, r *http.Request) {
+	body := decodeBody(r)
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	status, err := h.app.Skland.SaveCredentials(
+		ctx,
+		stringField(body, "cred"),
+		stringField(body, "token"),
+		stringField(body, "uid"),
+	)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, status, "森空岛凭证已保存", nil)
+}
+
+func (h *Handler) clearSklandCredentials(w http.ResponseWriter, r *http.Request) {
+	if err := h.app.Skland.ClearCredentials(); err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, nil, "森空岛凭证已清除", nil)
+}
+
+func (h *Handler) syncSkland(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 40*time.Second)
+	defer cancel()
+	status, err := h.app.Skland.Sync(ctx)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.Success(w, http.StatusOK, status, "森空岛数据已同步", nil)
 }
 
 func intField(record map[string]any, key string) int {

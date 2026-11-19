@@ -4,7 +4,7 @@ import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MasteryTrainingWorkspace from './MasteryTrainingWorkspace'
-import type { MasteryCandidate, MasteryOperatorDetail, MasteryQueueStatus } from '@/types/components'
+import type { MasteryCandidate, MasteryOperatorDetail, MasteryQueueItem, MasteryQueueStatus } from '@/types/components'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -23,6 +23,12 @@ const mocks = vi.hoisted(() => ({
   resumeMasteryCampaign: vi.fn(),
   stopMasteryCampaign: vi.fn(),
   retryMasteryTarget: vi.fn(),
+  getSklandStatus: vi.fn(),
+  getSklandSnapshot: vi.fn(),
+  saveSklandCredentials: vi.fn(),
+  loginSkland: vi.fn(),
+  syncSkland: vi.fn(),
+  clearSklandCredentials: vi.fn(),
   getItemIconUrl: vi.fn((id: string | number) => `/items/${id}.png`),
 }))
 
@@ -58,6 +64,12 @@ vi.mock('../../services/api', () => ({
   startMasteryCampaign: mocks.startMasteryCampaign,
   stopMasteryCampaign: mocks.stopMasteryCampaign,
   updateMasterySettings: mocks.updateMasterySettings,
+  getSklandStatus: mocks.getSklandStatus,
+  getSklandSnapshot: mocks.getSklandSnapshot,
+  saveSklandCredentials: mocks.saveSklandCredentials,
+  loginSkland: mocks.loginSkland,
+  syncSkland: mocks.syncSkland,
+  clearSklandCredentials: mocks.clearSklandCredentials,
   getItemIconUrl: mocks.getItemIconUrl,
 }))
 
@@ -133,6 +145,40 @@ const detail: MasteryOperatorDetail = {
   ],
 }
 
+const queuedItem: MasteryQueueItem = {
+  id: 'char_test:1',
+  operatorId: 'char_test',
+  operatorName: '测试干员',
+  role: 'Caster',
+  skillIndex: 1,
+  skillId: 'skchr_test_1',
+  skillName: '测试技能一',
+  targetLevel: 3,
+  declaredLevel: 0,
+  confirmedLevel: 0,
+  levelVerified: false,
+  startedLevel: null,
+  phase: 'queued',
+  enabled: true,
+  order: 1,
+  verifyCount: 0,
+  attempts: 0,
+  consecutiveFailures: 0,
+  lastErrorCode: null,
+  lastOutcome: null,
+  trainingStartedAt: null,
+  nextProbeAt: null,
+  probeBackoffIndex: 0,
+  blocked: null,
+  activeRunId: null,
+  lastRunId: null,
+  recovery: null,
+  addedAt: '2026-11-07T00:00:00.000Z',
+  updatedAt: '2026-11-07T00:00:00.000Z',
+  completedAt: null,
+  skippedAt: null,
+}
+
 const status: MasteryQueueStatus = {
   campaign: {
     status: 'idle',
@@ -195,6 +241,24 @@ beforeEach(() => {
   mocks.retryMasteryTarget.mockReset().mockResolvedValue({ success: true, data: null })
   mocks.removeMasteryTarget.mockReset().mockResolvedValue({ success: true })
   mocks.reorderMasteryTargets.mockReset().mockResolvedValue({ success: true, data: { items: [] } })
+  mocks.getSklandStatus.mockReset().mockResolvedValue({ success: true, data: { configured: false, characterCount: 0 } })
+  mocks.getSklandSnapshot.mockReset().mockResolvedValue({
+    success: true,
+    data: { available: false, snapshot: { fetchedAt: '', uid: '', characters: [] } },
+  })
+  mocks.saveSklandCredentials.mockReset().mockResolvedValue({
+    success: true,
+    data: { configured: true, uid: 'uid-1', characterCount: 0 },
+  })
+  mocks.loginSkland.mockReset().mockResolvedValue({
+    success: true,
+    data: { configured: true, uid: 'uid-1', characterCount: 0 },
+  })
+  mocks.syncSkland.mockReset().mockResolvedValue({
+    success: true,
+    data: { configured: true, uid: 'uid-1', characterCount: 2 },
+  })
+  mocks.clearSklandCredentials.mockReset().mockResolvedValue({ success: true })
 })
 
 afterEach(() => {
@@ -212,6 +276,45 @@ async function settle() {
 }
 
 describe('MasteryTrainingWorkspace', () => {
+  it('shows synced mastery levels on cards and in the target dialog', async () => {
+    mocks.getSklandStatus.mockResolvedValue({
+      success: true,
+      data: { configured: true, uid: 'uid-1', nickname: 'Dr. Test', characterCount: 2, lastSyncedAt: '2026-11-17T00:00:00.000Z' },
+    })
+    mocks.getSklandSnapshot.mockResolvedValue({
+      success: true,
+      data: {
+        available: true,
+        snapshot: {
+          fetchedAt: '2026-11-17T00:00:00.000Z',
+          uid: 'uid-1',
+          characters: [{
+            id: 'char_test',
+            name: '测试干员',
+            evolvePhase: 2,
+            level: 60,
+            skills: [{ id: 'skchr_test_1', level: 2 }, { id: 'skchr_test_2', level: 0 }],
+          }],
+          training: null,
+        },
+      },
+    })
+    await act(async () => {
+      root.render(<MasteryTrainingWorkspace />)
+    })
+    await settle()
+
+    expect(container.textContent).toContain('专精 1/2 · 最高 M2')
+
+    const candidateButton = Array.from(container.querySelectorAll('button'))
+      .find(button => button.getAttribute('aria-label')?.includes('添加专精目标'))
+    await act(async () => {
+      candidateButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await settle()
+    expect(document.body.textContent).toContain('已专精 M2')
+  })
+
   it('renders the mastery picker and empty queue', async () => {
     await act(async () => {
       root.render(<MasteryTrainingWorkspace />)
@@ -222,6 +325,66 @@ describe('MasteryTrainingWorkspace', () => {
     expect(container.textContent).toContain('自动专精')
     expect(container.textContent).toContain('测试干员')
     expect(container.textContent).toContain('还没有专精目标')
+  })
+
+  it('marks a queued skill and asks before removing a target', async () => {
+    mocks.getMasteryStatus.mockResolvedValue({
+      success: true,
+      data: {
+        ...status,
+        items: [queuedItem],
+        counts: { total: 1, queued: 1, training: 0, blocked: 0, completed: 0 },
+        nextActionableItem: queuedItem,
+      },
+    })
+    await act(async () => {
+      root.render(<MasteryTrainingWorkspace />)
+    })
+    await settle()
+
+    const candidateButton = Array.from(container.querySelectorAll('button'))
+      .find(button => button.getAttribute('aria-label')?.includes('添加专精目标'))
+    await act(async () => {
+      candidateButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await settle()
+
+    expect(document.body.textContent).toContain('等待执行 · M0→M3')
+    expect(container.textContent).toContain('受阻通知')
+
+    const closeButton = Array.from(document.querySelectorAll('button')).find(button => button.textContent === '取消')
+    await act(async () => {
+      closeButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await settle()
+
+    const removeButton = Array.from(container.querySelectorAll('button'))
+      .find(button => button.getAttribute('aria-label')?.startsWith('移除'))
+    expect(removeButton).toBeTruthy()
+    await act(async () => {
+      removeButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await settle()
+    expect(mocks.removeMasteryTarget).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('移除专精目标')
+
+    const confirmButton = Array.from(document.querySelectorAll('button'))
+      .find(button => button.textContent?.includes('移除目标'))
+    await act(async () => {
+      confirmButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await settle()
+    expect(mocks.removeMasteryTarget).toHaveBeenCalledWith('char_test:1')
+  })
+
+  it('shows the preflight loading note instead of a failure', async () => {
+    mocks.getMasteryPreflight.mockReturnValue(new Promise(() => {}))
+    await act(async () => {
+      root.render(<MasteryTrainingWorkspace />)
+    })
+    await settle()
+    expect(container.textContent).toContain('正在检查运行环境...')
+    expect(container.textContent).not.toContain('专精运行前检查未通过')
   })
 
   it('opens the target dialog and adds a selected skill', async () => {

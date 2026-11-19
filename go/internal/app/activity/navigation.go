@@ -216,7 +216,11 @@ func (s *Service) Check(ctx context.Context, clientType string) (NavigationResul
 	if err != nil {
 		return blockedNavigation(activityRecordFromInfo(info), "navigation-resource-unavailable", fmt.Sprintf("未找到 %s 的活动导航资源，未准备活动作业。", *info.Code)), nil
 	}
-	return AssessActivityNavigation(activityRecordFromInfo(info), tasks), nil
+	result := AssessActivityNavigation(activityRecordFromInfo(info), tasks)
+	if result.Navigation != nil {
+		result.Navigation.SpecialStages = s.supportsSpecialStageNavigation(code)
+	}
+	return result, nil
 }
 
 // GetActivityRunPreflight is the Node-name alias for Check.
@@ -246,15 +250,23 @@ func loadActivityStageTasks(resourceDir, code string) (any, error) {
 	return readJSONFile(stageFile)
 }
 
-// ResourceDir resolves the MAA resource directory. It prefers the explicit
-// provider, then `maa dir resource`, then Paths.MaaDataDir/resource.
+// ResourceDir resolves the MAA resource directory. The static MaaDataDir
+// resource is preferred because it does not contend with the shared MAA
+// execution lease; `maa dir resource` is only a fallback for unusual installs.
 func (s *Service) ResourceDir(ctx context.Context) (string, error) {
 	if s.resourceDir != nil {
 		return s.resourceDir.ResourceDir(ctx)
 	}
+	staticDir := s.resource.ResourceDir()
+	if info, err := os.Stat(filepath.Join(staticDir, "tasks", "Stages")); err == nil && info.IsDir() {
+		return staticDir, nil
+	}
 	if s.executor != nil {
 		run, err := s.executor.RunCommand(ctx, "dir", []string{"resource"}, "", "", true)
 		if err != nil {
+			if info, statErr := os.Stat(staticDir); statErr == nil && info.IsDir() {
+				return staticDir, nil
+			}
 			return "", err
 		}
 		resourceDir := strings.TrimSpace(commandStdout(run))
@@ -263,7 +275,7 @@ func (s *Service) ResourceDir(ctx context.Context) (string, error) {
 		}
 		return resourceDir, nil
 	}
-	return s.resource.ResourceDir(), nil
+	return staticDir, nil
 }
 
 type navigationLogToken struct {

@@ -91,14 +91,18 @@ func (s *Service) LoadActivitySelectionContext(ctx context.Context) SelectionCon
 	}
 	preferences := GetCombatCopilotPreferences(config)
 
-	var owned map[string]struct{}
+	var owned, usable map[string]struct{}
 	if s.operBoxLoader != nil {
 		box, err := s.operBoxLoader.LoadOperBox(ctx)
 		if err == nil {
 			owned = ownedOperatorNames(box)
+			usable = usableOperatorNames(box)
 		}
 	}
-	return SelectionContext{Preferences: preferences, OwnedOperators: owned}
+	if len(usable) == 0 {
+		usable = owned
+	}
+	return SelectionContext{Preferences: preferences, OwnedOperators: owned, UsableOperators: usable}
 }
 
 func ownedOperatorNames(box any) map[string]struct{} {
@@ -138,6 +142,41 @@ func ownedOperatorNames(box any) map[string]struct{} {
 		if name != "" {
 			names[name] = struct{}{}
 		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	return names
+}
+
+// usableOperatorNames drops operators the box reports as owned but that are
+// still at level 0/1 with no elite promotion. MAA's quick formation cannot
+// field those reliably, so substitution prefers candidates that do not need
+// them.
+func usableOperatorNames(box any) map[string]struct{} {
+	boxRecord := asRecord(box)
+	if boxRecord == nil {
+		return nil
+	}
+	names := map[string]struct{}{}
+	for _, raw := range asArray(boxRecord["data"]) {
+		record := asRecord(raw)
+		if record == nil {
+			continue
+		}
+		if own, ok := record["own"].(bool); ok && !own {
+			continue
+		}
+		name := strings.TrimSpace(jsStringOrEmpty(record["name"]))
+		if name == "" {
+			continue
+		}
+		elite := jsNumber(record["elite"])
+		level := jsNumber(record["level"])
+		if elite <= 0 && level <= 1 {
+			continue
+		}
+		names[name] = struct{}{}
 	}
 	if len(names) == 0 {
 		return nil

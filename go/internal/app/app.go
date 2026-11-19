@@ -23,6 +23,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/app/quotes"
 	"github.com/mps233/la-pluma/go/internal/app/recognition"
 	"github.com/mps233/la-pluma/go/internal/app/scheduler"
+	"github.com/mps233/la-pluma/go/internal/app/skland"
 	"github.com/mps233/la-pluma/go/internal/app/training"
 	"github.com/mps233/la-pluma/go/internal/app/updates"
 	webrtcapp "github.com/mps233/la-pluma/go/internal/app/webrtc"
@@ -60,6 +61,7 @@ type App struct {
 	Recognition   *recognition.Service
 	Updates       *updates.Service
 	Mastery       *mastery.Service
+	Skland        *skland.Service
 	Assets        *assets.Handler
 	WebRTC        *webrtcapp.Service
 	Bot           *notifications.Bot
@@ -148,7 +150,8 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Runner: maaServiceAdapter{service: maaActions},
 	})
 	schedulerService := newScheduler(cfg, logger, runs, maaActions, dropService, trainingService, activityService, recognitionService, notificationService, configStore, updatesAutoUpdater{service: updatesService})
-	masteryService := newMasteryService(cfg, logger, maaServiceAdapter{service: maaActions}, executionManager, notificationService)
+	sklandService := skland.NewService(skland.Options{Paths: cfg.Paths, Logger: logger})
+	masteryService := newMasteryService(cfg, logger, maaServiceAdapter{service: maaActions}, executionManager, notificationService, masteryTrainingProbe{service: sklandService})
 	connectionService := connectionapp.New(connectionapp.Options{Logger: logger})
 	profiles := configapp.NewProfiles(cfg.Paths.MaaConfigDir)
 	maaActions.SetLineHandler(func(stream, line string) {
@@ -182,6 +185,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Recognition:   recognitionService,
 		Updates:       updatesService,
 		Mastery:       masteryService,
+		Skland:        sklandService,
 		Assets:        assetsHandler,
 		WebRTC:        webrtcapp.New(cfg, logger),
 		instanceLock:  instanceLock,

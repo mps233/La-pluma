@@ -15,10 +15,11 @@ import (
 )
 
 type fakeExecutor struct {
-	mu          sync.Mutex
-	taskCalls   []map[string]any
-	commandArgs [][]string
-	taskErr     error
+	mu            sync.Mutex
+	taskCalls     []map[string]any
+	userTaskCalls []map[string]any
+	commandArgs   [][]string
+	taskErr       error
 }
 
 func (f *fakeExecutor) RunTask(_ context.Context, taskConfig map[string]any, _ bool) (domainrun.DTO, error) {
@@ -33,6 +34,13 @@ func (f *fakeExecutor) RunCommand(_ context.Context, command string, args []stri
 	f.commandArgs = append(f.commandArgs, append([]string{command}, args...))
 	f.mu.Unlock()
 	return domainrun.DTO{State: domainrun.StatusSucceeded, Result: map[string]any{"stdout": ""}}, nil
+}
+
+func (f *fakeExecutor) RunUserTask(_ context.Context, taskConfig map[string]any, _ bool) (domainrun.DTO, error) {
+	f.mu.Lock()
+	f.userTaskCalls = append(f.userTaskCalls, taskConfig)
+	f.mu.Unlock()
+	return domainrun.DTO{State: domainrun.StatusSucceeded}, f.taskErr
 }
 
 func (f *fakeExecutor) Stop(context.Context) error { return nil }
@@ -322,5 +330,75 @@ func TestRunCurrentActivityCopilotsMatchingSet(t *testing.T) {
 	progress := service.LoadActivityProgress()
 	if len(progress["EA"].Stages) != 2 {
 		t.Fatalf("progress = %#v", progress)
+	}
+}
+
+func TestRunCurrentActivitySetUsesZoneChapterForEXStage(t *testing.T) {
+	paths := testPaths(t)
+	writeStageActivity(t, paths, stageActivityFixture())
+	writeStagesCatalog(t, paths)
+	writeReadyStageTasks(t, paths)
+	writeJSON(t, filepath.Join(paths.DataDir, "stages.json"), map[string]any{
+		"EA-EX-8": map[string]any{"code": "EA-EX-8", "zoneName": "测试章节"},
+	})
+
+	executor := &fakeExecutor{}
+	lease := &fakeLease{}
+	planExecutor := &fakePlanExecutor{result: completionFixture("EA-EX-8")}
+	provider := &fakePlanProvider{plan: Plan{
+		SetID: "set-1",
+		Name:  "套装",
+		Entries: []PlanEntry{
+			{ItemIndex: 0, CopilotID: 1, DisplayStage: "EA-6", Mode: "normal"},
+			{ItemIndex: 1, CopilotID: 2, DisplayStage: "EA-EX-8", Mode: "normal"},
+		},
+	}}
+	options := runOptions(t, paths, executor, lease, planExecutor)
+	options.PlanProvider = provider
+	options.PlanExecutor = planExecutor
+	options.NavigationLog = &fakeNavigationLog{text: "TaskChainCompleted {\"taskchain\":\"Custom\",\"taskid\":7}\n"}
+	service := NewWithOptions(options)
+
+	result, err := service.RunCurrentActivitySet(context.Background(), SetExecutionOptions{
+		SetID:           "set-1",
+		SelectedIndexes: []int{1},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result["executed"] != true {
+		t.Fatalf("result = %#v", result)
+	}
+	if len(executor.taskCalls) != 0 {
+		t.Fatalf("normal preparation must not run for a zone stage: %#v", executor.taskCalls)
+	}
+	if len(executor.userTaskCalls) != 1 {
+		t.Fatalf("user task calls = %#v", executor.userTaskCalls)
+	}
+	tasks, ok := executor.userTaskCalls[0]["tasks"].([]PreparationTask)
+	if !ok || len(tasks) != 7 || tasks[6].Name != "选择活动章节 测试章节" {
+		t.Fatalf("tasks = %#v", executor.userTaskCalls[0]["tasks"])
+	}
+
+	value, err := readJSONFile(filepath.Join(paths.MaaConfigDir, "resource", "tasks", "tasks.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	userTasks := asRecord(value)
+	page := asRecord(userTasks["LaPlumaActivityPage"])
+	chapter := asRecord(userTasks["LaPlumaActivityChapter"])
+	if asString(page["baseTask"]) != "EA-OpenOcr" {
+		t.Fatalf("page task = %#v", page)
+	}
+	text, _ := chapter["text"].([]any)
+	if len(text) != 1 || asString(text[0]) != "测试章节" {
+		t.Fatalf("chapter task = %#v", chapter)
+	}
+	if len(planExecutor.planRequests) != 1 {
+		t.Fatalf("plan requests = %#v", planExecutor.planRequests)
+	}
+	request := planExecutor.planRequests[0]
+	if len(request.SelectedIndexes) != 1 || request.SelectedIndexes[0] != 1 {
+		t.Fatalf("selected indexes = %#v", request.SelectedIndexes)
 	}
 }

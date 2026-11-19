@@ -6,7 +6,7 @@ import {
 import { useShallow } from 'zustand/react/shallow'
 import { useStatusStore } from '../store/statusStore'
 import { detectStatusMessageType, getStatusVisualConfig } from '../utils/statusMessage'
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 
 interface FloatingStatusIndicatorProps {
@@ -17,7 +17,7 @@ interface FloatingStatusIndicatorProps {
 /**
  * 全局悬浮状态指示器
  * "就绪"状态始终显示在原位置
- * 其他状态在原位置可见时显示在原位置，不可见时悬浮到右上角
+ * 其他状态在原位置可见时显示在原位置，滚出页面可视区后悬浮到右上角
  */
 export default function FloatingStatusIndicator({ className = '', textClassName = '' }: FloatingStatusIndicatorProps) {
   const { message, messageType, isActive, runStatus, backendStatus, backendMessage } = useStatusStore(useShallow(state => ({
@@ -30,6 +30,8 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
   })))
   const isOnline = useOnlineStatus()
   const [readyQuote, setReadyQuote] = useState<OperatorQuote>(DEFAULT_RANDOM_OPERATOR_QUOTE)
+  const [isDockedOutOfView, setIsDockedOutOfView] = useState(false)
+  const anchorRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let subscribed = true
@@ -38,6 +40,47 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
     })
     return () => {
       subscribed = false
+    }
+  }, [])
+
+  // The page header belongs to the scrolling workspace. Keep the pill docked
+  // while that slot is visible, then hand it to a fixed copy once the slot
+  // leaves the scroll host, so notifications stay reachable without moving the
+  // pill's default position.
+  useEffect(() => {
+    const anchor = anchorRef.current
+    if (!anchor) return
+
+    const scrollHost = anchor.closest<HTMLElement>('.la-pluma-scroll-host')
+    const navbar = anchor.closest<HTMLElement>('.la-pluma-page')?.querySelector<HTMLElement>('.la-pluma-navbar')
+      ?? document.querySelector<HTMLElement>('.la-pluma-navbar')
+    let lastFloating: boolean | null = null
+
+    const measure = () => {
+      const rect = anchor.getBoundingClientRect()
+      // Wait for the docked pill to leave the scroll host completely. The host
+      // masks its top edge, so it stays partially visible under the navbar
+      // until its bottom clears the host; floating earlier would show two
+      // copies of the same pulsing pill.
+      const hostTop = scrollHost?.getBoundingClientRect().top
+      const visibleTop = hostTop ?? navbar?.getBoundingClientRect().bottom ?? 0
+      // React Activity keeps hidden workspaces mounted with a zero-sized box.
+      // Never float a notification from a workspace the user cannot see.
+      const next = rect.width > 0 && rect.height > 0 && rect.bottom <= visibleTop + 1
+      // Compare against a local marker, not the surviving state: an Activity
+      // remount must re-apply a stale `true` back to `false`.
+      if (next === lastFloating) return
+      lastFloating = next
+      setIsDockedOutOfView(next)
+    }
+
+    measure()
+    const scrollTarget: HTMLElement | Window = scrollHost ?? window
+    scrollTarget.addEventListener('scroll', measure, { passive: true })
+    window.addEventListener('resize', measure, { passive: true })
+    return () => {
+      scrollTarget.removeEventListener('scroll', measure)
+      window.removeEventListener('resize', measure)
     }
   }, [])
 
@@ -103,9 +146,17 @@ export default function FloatingStatusIndicator({ className = '', textClassName 
         {displayText}
       </span>
 
-      <div className="floating-status-anchor inline-block min-h-[1px] min-w-[1px]">
+      <div ref={anchorRef} className="floating-status-anchor inline-block min-h-[1px] min-w-[1px]">
         {indicatorContent}
       </div>
+
+      {/* The docked copy is off-screen here; the live region above already
+          announced the message, so the fixed copy stays hidden from AT. */}
+      {!isReady && isDockedOutOfView && (
+        <div className="floating-status-overlay" aria-hidden="true">
+          {indicatorContent}
+        </div>
+      )}
     </>
   )
 }

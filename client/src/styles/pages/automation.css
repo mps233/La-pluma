@@ -38,84 +38,6 @@
   font-weight: 700;
 }
 
-.automation-delete-task:focus-visible {
-  outline: 2px solid var(--app-accent);
-  outline-offset: 2px;
-}
-
-.automation-flow-task-icon svg {
-  width: 1.125rem;
-  height: 1.125rem;
-}
-
-.automation-flow-sequence {
-  flex: 0 0 auto;
-  color: var(--app-accent);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: var(--app-font-meta);
-  font-weight: 700;
-}
-
-.automation-flow-task-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  flex: 0 0 auto;
-  border-radius: var(--app-radius-md);
-  background: var(--app-accent-soft);
-  color: var(--app-accent);
-}
-
-.automation-flow-task-name {
-  min-width: 0;
-  display: grid;
-  gap: 0.125rem;
-}
-
-.automation-flow-task-name strong {
-  overflow: hidden;
-  color: var(--app-text);
-  font-size: var(--app-font-body);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.automation-flow-task-name small {
-  overflow: hidden;
-  color: var(--app-text-soft);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: var(--app-font-meta);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.automation-delete-task {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border: 0;
-  border-radius: var(--app-radius-md);
-  background: transparent;
-  padding: 0;
-  color: var(--app-text-soft);
-  transition: color 160ms ease, background 160ms ease;
-}
-
-.automation-delete-task:hover {
-  background: rgba(239, 68, 68, 0.09);
-  color: rgb(239, 68, 68);
-}
-
-.automation-delete-task:disabled {
-  cursor: not-allowed;
-  opacity: 0.35;
-}
 
 .automation-monitor-panel {
   width: 100%;
@@ -934,6 +856,21 @@ button.automation-schedule-add:disabled {
 
 .automation-composite-control {
   overflow: hidden;
+}
+
+/* 单位下拉嵌在复合控件内：关闭全局 select 的内置箭头背景，改用相邻的 ChevronDown */
+.automation-composite-control select.automation-unit-select {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  padding: 0 1.75rem 0 0.75rem;
+  background: transparent;
+  background-image: none;
+  box-shadow: none;
+  color: var(--app-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  outline: 0;
 }
 
 .automation-composite-control > input[type="text"],

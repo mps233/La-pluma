@@ -81,7 +81,7 @@ func isPresetFormation(content map[string]any) bool {
 func escapeRegExp(value string) string { return regexp.QuoteMeta(value) }
 
 func stageTitleMatches(title any, stage any) bool {
-	pattern := `(?i)(?:^|[\s\-_【（(】])` + escapeRegExp(jsStringOrEmpty(stage)) + `(?:\s|$|[-_:：,【（(])`
+	pattern := `(?i)(?:^|[\s\-_【（(】\[])` + escapeRegExp(jsStringOrEmpty(stage)) + `(?:\s|$|[-_:：,【（(】\]])`
 	return regexp.MustCompile(pattern).MatchString(jsStringOrEmpty(title))
 }
 
@@ -382,6 +382,13 @@ func (s *Service) findMatchingCopilotSets(
 
 // RankActivityCopilots mirrors rankActivityCopilots.
 func RankActivityCopilots(items []any, stage string, selection *SelectionContext) []CopilotCandidate {
+	return RankActivityCopilotsForStage(items, stage, "", selection)
+}
+
+// RankActivityCopilotsForStage also accepts the internal stage id, so
+// candidates whose title omits the display code can still be matched by their
+// content.stage_name.
+func RankActivityCopilotsForStage(items []any, stage, stageID string, selection *SelectionContext) []CopilotCandidate {
 	candidates := make([]CopilotCandidate, 0)
 	for _, rawItem := range items {
 		item := asRecord(rawItem)
@@ -420,7 +427,11 @@ func RankActivityCopilots(items []any, stage string, selection *SelectionContext
 		if !idOK || id <= 0 {
 			continue
 		}
-		if !allowed || !stageTitleMatches(title, stage) {
+		stageName := strings.TrimSpace(contentStageName(content))
+		if !allowed {
+			continue
+		}
+		if !stageTitleMatches(title, stage) && (stageID == "" || stageName != stageID) {
 			continue
 		}
 		candidates = append(candidates, CopilotCandidate{
@@ -428,7 +439,7 @@ func RankActivityCopilots(items []any, stage string, selection *SelectionContext
 			URI:                  fmt.Sprintf("prts://%d", id),
 			Stage:                stage,
 			Title:                title,
-			StageName:            strings.TrimSpace(contentStageName(content)),
+			StageName:            stageName,
 			PresetFormation:      isPresetFormation(content),
 			Uploader:             uploader,
 			UploadTime:           uploadTime,
@@ -494,43 +505,117 @@ func (s *Service) queryStageCandidates(ctx context.Context, stage string, select
 			keywords = append(keywords, stage)
 		}
 	}
+	return s.queryStageCandidatesForKeywords(ctx, stage, stageID, keywords, selection, 50, false, 1)
+}
 
+// queryStageCandidatesByID uses a known internal stage id, which lets EX and
+// other special stages be queried even when MAA's base stage catalog omits
+// them. Both the internal id and the display code are queried and merged so a
+// retry can find candidates beyond the first hot page.
+func (s *Service) queryStageCandidatesByID(ctx context.Context, stageID, stage string, selection *SelectionContext) (*StageCandidateResult, error) {
+	keywords := make([]string, 0, 2)
+	seen := map[string]struct{}{}
+	var stageIDPtr *string
+	if stageID != "" {
+		stageIDPtr = stringPtr(stageID)
+	}
+	// The display stage keyword is the primary query; the internal id is a
+	// fallback/merge source. PRTS search often omits special stages from the
+	// internal-id hot page.
+	if stage != "" {
+		keywords = append(keywords, stage)
+		seen[stage] = struct{}{}
+	}
+	if stageID != "" {
+		if _, exists := seen[stageID]; !exists {
+			keywords = append(keywords, stageID)
+		}
+	}
+	return s.queryStageCandidatesForKeywords(ctx, stage, stageIDPtr, keywords, selection, 100, true, 2)
+}
+
+func (s *Service) queryStageCandidatesForKeywords(
+	ctx context.Context,
+	stage string,
+	stageID *string,
+	keywords []string,
+	selection *SelectionContext,
+	limit int,
+	merge bool,
+	pages int,
+) (*StageCandidateResult, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if pages <= 0 {
+		pages = 1
+	}
+	stageIDValue := ""
+	if stageID != nil {
+		stageIDValue = *stageID
+	}
 	var lastQuery *string
 	var lastError error
 	succeeded := false
+	reliable := make([]any, 0, len(keywords)*limit)
+	seenIDs := map[int]struct{}{}
 	for _, keyword := range keywords {
-		queryURL := fmt.Sprintf("%s/copilot/query?level_keyword=%s&page=1&limit=50&order_by=hot",
-			s.prts.BaseURL(), url.QueryEscape(keyword))
-		query := queryURL
-		lastQuery = &query
-		items, err := s.prts.QueryCopilots(ctx, keyword, 1, 50, "hot")
-		if err != nil {
-			if status, ok := err.(*httpStatusError); ok {
-				lastError = fmt.Errorf("作业站请求失败: HTTP %d", status.status)
-			} else {
-				lastError = err
+		keywordReliable := make([]any, 0, limit*pages)
+		for pageNumber := 1; pageNumber <= pages; pageNumber++ {
+			queryURL := fmt.Sprintf("%s/copilot/query?level_keyword=%s&page=%d&limit=%d&order_by=hot",
+				s.prts.BaseURL(), url.QueryEscape(keyword), pageNumber, limit)
+			query := queryURL
+			lastQuery = &query
+			items, err := s.prts.QueryCopilots(ctx, keyword, pageNumber, limit, "hot")
+			if err != nil {
+				if status, ok := err.(*httpStatusError); ok {
+					lastError = fmt.Errorf("作业站请求失败: HTTP %d", status.status)
+				} else {
+					lastError = err
+				}
+				continue
 			}
-			continue
+			succeeded = true
+			for _, raw := range items {
+				record := asRecord(raw)
+				if record == nil {
+					continue
+				}
+				if available, ok := record["available"].(bool); ok && !available {
+					continue
+				}
+				if asString(record["status"]) != "PUBLIC" {
+					continue
+				}
+				if record["not_enough_rating"] == true {
+					continue
+				}
+				if id, ok := integerValue(record["id"]); ok {
+					if _, exists := seenIDs[id]; exists {
+						continue
+					}
+					seenIDs[id] = struct{}{}
+				}
+				keywordReliable = append(keywordReliable, raw)
+				if merge {
+					reliable = append(reliable, raw)
+				}
+			}
 		}
-		succeeded = true
-		reliable := make([]any, 0, len(items))
-		for _, raw := range items {
-			record := asRecord(raw)
-			if record == nil {
-				continue
+		if !merge {
+			candidates := RankActivityCopilotsForStage(keywordReliable, stage, stageIDValue, selection)
+			if len(candidates) > 0 {
+				return &StageCandidateResult{
+					Stage:      stage,
+					StageID:    stageID,
+					Query:      lastQuery,
+					Candidates: candidates,
+				}, nil
 			}
-			if available, ok := record["available"].(bool); ok && !available {
-				continue
-			}
-			if asString(record["status"]) != "PUBLIC" {
-				continue
-			}
-			if record["not_enough_rating"] == true {
-				continue
-			}
-			reliable = append(reliable, raw)
 		}
-		candidates := RankActivityCopilots(reliable, stage, selection)
+	}
+	if merge && len(reliable) > 0 {
+		candidates := RankActivityCopilotsForStage(reliable, stage, stageIDValue, selection)
 		if len(candidates) > 0 {
 			return &StageCandidateResult{
 				Stage:      stage,

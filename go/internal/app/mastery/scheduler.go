@@ -37,6 +37,7 @@ type SchedulerOptions struct {
 	TickInterval      time.Duration
 	ExternalExecution ExternalExecutionProbe
 	Notifier          Notifier
+	Training          TrainingProbe
 }
 
 // SchedulerService runs the mastery queue tick loop. All side effects go
@@ -49,6 +50,7 @@ type SchedulerService struct {
 	tickInterval time.Duration
 	probe        ExternalExecutionProbe
 	notifier     Notifier
+	training     TrainingProbe
 
 	mu            sync.Mutex
 	cancel        context.CancelFunc
@@ -80,6 +82,7 @@ func NewSchedulerService(queue *QueueService, runs *RunService, options Schedule
 		tickInterval: interval,
 		probe:        options.ExternalExecution,
 		notifier:     options.Notifier,
+		training:     options.Training,
 	}
 }
 
@@ -230,6 +233,24 @@ func (s *SchedulerService) tick(ctx context.Context) error {
 		_, err := s.queue.AdvanceCampaign()
 		return err
 	}
+	if item.Phase == PhaseTraining && s.training != nil && nextProbeReached(item, s.now()) {
+		state, ok := s.training.TrainingState(ctx)
+		if ok {
+			if state.TraineeID != "" && state.TraineeID != item.OperatorID {
+				name := state.TraineeName
+				if name == "" {
+					name = state.TraineeID
+				}
+				_, err := s.queue.MarkTrainingInterrupted(item.ID, "训练室正在训练其他干员："+name)
+				return err
+			}
+			if state.TraineeID == item.OperatorID && state.RemainSecs > 0 && state.SlotState != 2 {
+				next := s.now().Add(time.Duration(state.RemainSecs)*time.Second + 2*time.Minute)
+				_, err := s.queue.ScheduleProbe(item.ID, next)
+				return err
+			}
+		}
+	}
 	if !nextProbeReached(item, s.now()) {
 		return nil
 	}
@@ -292,6 +313,10 @@ func (s *SchedulerService) handleTickError(ctx context.Context, err error) {
 
 	status, statusErr := s.queue.Status()
 	if statusErr != nil {
+		return
+	}
+	if status.Campaign.Status != CampaignRunning {
+		// A stop, pause or shutdown already owns the queue state.
 		return
 	}
 	active := status.ActiveItem

@@ -90,6 +90,9 @@ type Service struct {
 
 	refreshMu               sync.Mutex
 	resourceRefreshAttempts map[string]time.Time
+
+	zoneMu    sync.Mutex
+	zoneCache *stageZoneCache
 }
 
 // New returns a Service with default dependencies.

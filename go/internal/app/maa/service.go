@@ -214,6 +214,9 @@ func (s *Service) execute(ctx context.Context, run domainrun.DTO, request RunReq
 // fall back to ADB_ADDRESS and the local emulator default.
 type RunTaskOptions struct {
 	Address string
+	// UserResource loads tasks from MaaConfigDir/resource in addition to the
+	// installed resource. Activity chapter navigation needs this overlay.
+	UserResource bool
 }
 
 // RunTask writes a MAA dynamic task file and executes it with `maa run
@@ -252,6 +255,9 @@ func (s *Service) RunTaskWithOptions(ctx context.Context, input any, wait bool, 
 		address = "127.0.0.1:16384"
 	}
 	args := []string{"--batch", filepath.ToSlash(filepath.Join(dynamicTaskDir, taskID)), "--addr", address}
+	if options.UserResource {
+		args = append(args, "--user-resource")
+	}
 	run, replayed, err := s.Run(ctx, RunRequest{
 		OperationID:    "run_task",
 		Command:        "run",

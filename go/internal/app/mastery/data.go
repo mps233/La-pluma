@@ -107,12 +107,6 @@ func (s *DataService) MasteryDataPath() string {
 	return filepath.Join(s.paths.DataDir, "operator-mastery.json")
 }
 
-// OperatorMaterialsPath matches the Node export even though mastery views do
-// not read it.
-func (s *DataService) OperatorMaterialsPath() string {
-	return filepath.Join(s.paths.DataDir, "operator-materials.json")
-}
-
 // OperBoxPath is the OperBox snapshot file.
 func (s *DataService) OperBoxPath() string {
 	return filepath.Join(s.paths.DataDir, "operbox.json")
@@ -305,7 +299,7 @@ func (s *DataService) LoadMasteryData() (*MasteryDataFile, error) {
 	if normalized == nil {
 		return nil, apperrors.WithStatus(
 			"AGENT_MASTERY_DATA_MISSING",
-			"专精数据尚未生成，请先运行 npm run fetch-mastery --prefix server",
+			"专精数据不可用，请重新安装或更新应用后重试",
 			http.StatusServiceUnavailable,
 			true,
 			map[string]any{"path": path},
@@ -816,15 +810,21 @@ func (s *DataService) GetOperatorDetail(operatorID string, options OperatorDetai
 	if err != nil {
 		return MasteryOperatorDetail{}, err
 	}
-	nameForMaa, err := BattleName(battleData.Chars[operatorID], clientType)
+	displayName, err := BattleName(battleData.Chars[operatorID], clientType)
 	if err != nil {
 		return MasteryOperatorDetail{}, err
 	}
 	name := operator.Name
-	if nameForMaa != nil && *nameForMaa != "" {
-		name = *nameForMaa
+	if displayName != nil && *displayName != "" {
+		name = *displayName
 	} else if hasDetail && detail.Name != "" {
 		name = detail.Name
+	}
+	// MaaCore resolves plans against battle_data.json's official name. Prefer
+	// that exact string over character_table's copy.
+	maaName := operator.Name
+	if record := battleData.Chars[operatorID]; record != nil && record.Name != nil && *record.Name != "" {
+		maaName = *record.Name
 	}
 	rarity := operator.Rarity
 	if hasDetail && detail.Rarity != nil && *detail.Rarity != 0 {
@@ -866,9 +866,11 @@ func (s *DataService) GetOperatorDetail(operatorID string, options OperatorDetai
 	}
 
 	return MasteryOperatorDetail{
-		ID:              operator.ID,
-		Name:            name,
-		NameForMaa:      name,
+		ID:   operator.ID,
+		Name: name,
+		// MaaCore matches plans by the official-server name in battle_data.json,
+		// never by the localized display name.
+		NameForMaa:      maaName,
 		Role:            roleFromProfession(operator.ProfessionID),
 		Rarity:          rarity,
 		Profession:      operator.Profession,

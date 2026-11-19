@@ -1,5 +1,7 @@
 package mastery
 
+import "context"
+
 // MasteryMaterial is one material requirement inside a mastery level.
 type MasteryMaterial struct {
 	ID    string  `json:"id"`
@@ -221,9 +223,12 @@ type MasteryRecovery struct {
 // MasteryQueueItem is one persisted mastery target. JSON field names match the
 // Node implementation exactly; nullable fields stay present as null.
 type MasteryQueueItem struct {
-	ID                  string              `json:"id"`
-	OperatorID          string              `json:"operatorId"`
-	OperatorName        string              `json:"operatorName"`
+	ID           string `json:"id"`
+	OperatorID   string `json:"operatorId"`
+	OperatorName string `json:"operatorName"`
+	// NameForMaa is the official-server name MaaCore matches against
+	// battle_data.json. OperatorName stays the localized display name.
+	NameForMaa          string              `json:"nameForMaa"`
 	Role                *string             `json:"role"`
 	SkillIndex          int                 `json:"skillIndex"`
 	SkillID             *string             `json:"skillId"`
@@ -316,6 +321,19 @@ type ResultDetail struct {
 	Result               *string
 	SkillMastery         []*float64
 	LogCheckpointPresent bool
+}
+
+// TrainingState is the live training-room snapshot used to schedule probes.
+type TrainingState struct {
+	TraineeID   string
+	TraineeName string
+	RemainSecs  int
+	SlotState   int
+}
+
+// TrainingProbe returns the live training room when Skland is configured.
+type TrainingProbe interface {
+	TrainingState(ctx context.Context) (TrainingState, bool)
 }
 
 // SchedulerStatus is the scheduler telemetry exposed on /status.

@@ -856,3 +856,28 @@ func TestExecutePlanEmitsLiveCopilotStage(t *testing.T) {
 		t.Fatalf("stage results = %#v", stageResults)
 	}
 }
+
+func TestSettleGroupFailureKeepsCompletedStages(t *testing.T) {
+	entries := []PlanEntry{
+		{Key: "0:101:normal", ItemIndex: 0, CopilotID: 101, DisplayStage: "TL-S-1", Mode: "normal"},
+		{Key: "1:102:normal", ItemIndex: 1, CopilotID: 102, DisplayStage: "TL-S-2", Mode: "normal"},
+		{Key: "2:103:normal", ItemIndex: 2, CopilotID: 103, DisplayStage: "TL-S-3", Mode: "normal"},
+		{Key: "3:104:normal", ItemIndex: 3, CopilotID: 104, DisplayStage: "TL-S-4", Mode: "normal"},
+	}
+	tracker := NewProgressTracker(entries)
+	tracker.MarkRunning(entries[0])
+	tracker.MarkRunning(entries[1])
+	tracker.MarkRunning(entries[2])
+
+	results, successfulKeys := settleGroupFailure(tracker, entries, nil, "", "MAA 退出码 1", false)
+	if len(results) != 4 {
+		t.Fatalf("results = %#v", results)
+	}
+	if !results[0].Success || !results[1].Success || results[2].Success || results[3].Success {
+		t.Fatalf("results = %#v", results)
+	}
+	if len(successfulKeys) != 2 || successfulKeys[0] != entries[0].Key || successfulKeys[1] != entries[1].Key {
+		t.Fatalf("successfulKeys = %#v", successfulKeys)
+	}
+	assertStatuses(t, tracker, []ProgressStatus{ProgressSuccess, ProgressSuccess, ProgressFailed, ProgressPending})
+}

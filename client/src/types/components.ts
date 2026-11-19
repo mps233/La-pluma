@@ -19,6 +19,7 @@ type TaskParamFieldType =
   | 'stage-with-times'
   | 'star-select' 
   | 'facility-select'
+  | 'expiry-medicine'
 
 interface TaskParamField {
   key: string
@@ -721,6 +722,7 @@ export interface MasteryQueueItem {
   id: string
   operatorId: string
   operatorName: string
+  nameForMaa?: string
   role: string | null
   skillIndex: number
   skillId: string | null
@@ -795,6 +797,58 @@ export interface MasteryQueueStatus {
     lastTickError: string | null
     tickInFlight: boolean
   }
+}
+
+
+// ============================================
+// 森空岛数据源
+// ============================================
+
+export interface SklandTraining {
+  traineeId?: string
+  traineeName?: string
+  targetSkill: number
+  trainerId?: string
+  trainerName?: string
+  remainSecs: number
+  slotState: number
+}
+
+export interface SklandCharacter {
+  id: string
+  name: string
+  evolvePhase: number
+  level: number
+  skills: Array<{ id: string; level: number }>
+}
+
+export interface SklandSanity {
+  current: number
+  max: number
+  reportAt: string
+  completeRecoveryTime?: number
+}
+
+export interface SklandSnapshot {
+  fetchedAt: string
+  uid: string
+  nickname?: string
+  characters: SklandCharacter[]
+  training?: SklandTraining | null
+  sanity?: SklandSanity | null
+}
+
+export interface SklandStatus {
+  configured: boolean
+  uid?: string
+  channel?: string
+  nickname?: string
+  updatedAt?: string
+  lastSyncedAt?: string
+  characterCount: number
+  training?: SklandTraining | null
+  sanity?: SklandSanity | null
+  autoRefresh?: boolean
 }
 
 export interface MasteryPreflight {

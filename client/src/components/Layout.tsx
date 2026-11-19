@@ -421,6 +421,7 @@ export default function Layout({ children }: LayoutProps) {
                   role="group"
                   aria-label={group.label}
                 >
+                  <span className="la-pluma-sidebar-nav-label" aria-hidden="true">{group.label}</span>
                   {group.tabs.map(tab => (
                     <TabLink key={tab.id} tab={tab} active={activeTab === tab.id} onNavigate={navigateToTab} />
                   ))}

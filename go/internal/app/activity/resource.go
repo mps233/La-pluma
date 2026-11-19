@@ -16,7 +16,10 @@ import (
 
 const resourceCacheTTL = 5 * time.Minute
 
-var activityStagePattern = regexp.MustCompile(`-(\d+)$`)
+var (
+	activityStagePattern      = regexp.MustCompile(`-(\d+)$`)
+	autoNavigableStagePattern = regexp.MustCompile(`^[A-Z0-9]+-\d+$`)
+)
 
 type resourceCache struct {
 	expiresAt time.Time

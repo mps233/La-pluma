@@ -62,7 +62,6 @@ type RunOptions struct {
 	Logs        LogReader
 	GameState   GameStateProbe
 	Logger      *slog.Logger
-	Now         func() time.Time
 	StepTimeout time.Duration
 }
 
@@ -74,7 +73,6 @@ type RunService struct {
 	logs        LogReader
 	gameState   GameStateProbe
 	logger      *slog.Logger
-	now         func() time.Time
 	stepTimeout time.Duration
 }
 
@@ -84,10 +82,6 @@ func NewRunService(options RunOptions) *RunService {
 	logger := options.Logger
 	if logger == nil {
 		logger = slog.Default()
-	}
-	now := options.Now
-	if now == nil {
-		now = func() time.Time { return time.Now().UTC() }
 	}
 	stepTimeout := options.StepTimeout
 	if stepTimeout <= 0 {
@@ -99,7 +93,6 @@ func NewRunService(options RunOptions) *RunService {
 		logs:        options.Logs,
 		gameState:   options.GameState,
 		logger:      logger,
-		now:         now,
 		stepTimeout: stepTimeout,
 	}
 }
@@ -210,6 +203,15 @@ type TaskBuildOptions struct {
 	CloseDown        bool
 }
 
+// maaOperatorName is the official-server name MaaCore uses to resolve a plan
+// against battle_data.json. A localized display name would fail set_params.
+func maaOperatorName(item MasteryQueueItem) string {
+	if strings.TrimSpace(item.NameForMaa) != "" {
+		return item.NameForMaa
+	}
+	return item.OperatorName
+}
+
 // BuildOperProgressTaskConfig mirrors buildOperProgressTaskConfig. It targets
 // exactly one skill slot and never emits elite/skill-level actions.
 func BuildOperProgressTaskConfig(item MasteryQueueItem, stepTarget int, clientType string, options TaskBuildOptions) (map[string]any, error) {
@@ -241,7 +243,7 @@ func BuildOperProgressTaskConfig(item MasteryQueueItem, stepTarget int, clientTy
 		},
 	})
 	plan := map[string]any{
-		"name":          item.OperatorName,
+		"name":          maaOperatorName(item),
 		"skill_mastery": skillMastery,
 	}
 	if item.Role != nil && *item.Role != "" {
@@ -305,9 +307,10 @@ func ExtractResultDetail(logOutput string, item MasteryQueueItem) ResultDetail {
 		}
 	}
 	matching := make([]callbackPayload, 0, len(events))
+	maaName := maaOperatorName(item)
 	for _, event := range events {
 		name, _ := event.Details["name"].(string)
-		if name == "" || name == item.OperatorName {
+		if name == "" || name == maaName {
 			matching = append(matching, event)
 		}
 	}
@@ -548,9 +551,4 @@ func (s *RunService) Stop(ctx context.Context) error {
 		return nil
 	}
 	return s.executor.Stop(ctx)
-}
-
-// MinimumVersions exposes the OperProgress minimums.
-func MinimumVersions() (cli string, core string) {
-	return minimumCLIVersion, minimumCoreVersion
 }

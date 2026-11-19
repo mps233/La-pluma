@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   getCopilotInfo: vi.fn(),
   getCopilotSet: vi.fn(),
   getCopilotSetPlan: vi.fn(),
+  getActivityPreflight: vi.fn(),
   resetCopilotSetProgress: vi.fn(),
   searchCopilot: vi.fn(),
   searchParadoxCopilot: vi.fn(),
@@ -75,6 +76,7 @@ vi.mock('../services/api', () => ({
     getCopilotInfo: mocks.getCopilotInfo,
     getCopilotSet: mocks.getCopilotSet,
     getCopilotSetPlan: mocks.getCopilotSetPlan,
+    getActivityPreflight: mocks.getActivityPreflight,
     resetCopilotSetProgress: mocks.resetCopilotSetProgress,
     getErrorMessage: (result: { message?: string; error?: string }) => result.message || result.error || '未知错误',
   },
@@ -197,6 +199,10 @@ describe('CombatTasks execution recovery', () => {
     mocks.getCopilotInfo.mockReset()
     mocks.getCopilotSet.mockReset()
     mocks.getCopilotSetPlan.mockReset()
+    mocks.getActivityPreflight.mockReset().mockResolvedValue({
+      success: true,
+      data: { state: 'blocked', activity: { code: null, name: null, stages: [] } },
+    })
     mocks.resetCopilotSetProgress.mockReset()
     mocks.searchCopilot.mockReset()
     mocks.searchParadoxCopilot.mockReset()
@@ -898,6 +904,168 @@ describe('CombatTasks execution recovery', () => {
       selectedIndexes: [0, 1],
     }))
     expect(mocks.setMessage).toHaveBeenCalledWith('作业集执行完成')
+  })
+
+  it('auto-navigates a plain set into the current activity when the remaining stage belongs to it', async () => {
+    mocks.getCopilotSetPlan.mockResolvedValue({
+      success: true,
+      data: {
+        items: [
+          { id: 101, stage: 'CR-1', stageId: 'cr_1', supportsRaid: true },
+          { id: 108, stage: 'CR-8', stageId: 'cr_8', supportsRaid: true },
+        ],
+        entries: [
+          { itemIndex: 0, mode: 'normal', completed: true },
+          { itemIndex: 1, mode: 'normal', completed: false },
+        ],
+      },
+    })
+    mocks.getActivityPreflight.mockResolvedValue({
+      success: true,
+      data: {
+        state: 'ready',
+        activity: { code: 'CR', name: '水晶行动', stages: ['CR-1', 'CR-8'] },
+      },
+    })
+
+    await renderComponent()
+    const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      valueSetter?.call(input, 'prts://s48990')
+      input?.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(buttonsByText('预览')[0]!)
+    await flush()
+    await flush()
+
+    expect(mocks.getActivityPreflight).toHaveBeenCalled()
+    expect(container.textContent).toContain('已匹配当前活动')
+    expect(container.textContent).toContain('水晶行动')
+
+    await click(buttonsByText('立即执行')[0]!)
+    await flush()
+
+    expect(mocks.runActivitySet).toHaveBeenCalledWith('48990', expect.objectContaining({
+      selectedIndexes: [1],
+    }))
+    expect(mocks.executeCopilotSetPlan).not.toHaveBeenCalled()
+  })
+
+  it('keeps the plain plan when the activity stages have no navigation resource', async () => {
+    mocks.getCopilotSetPlan.mockResolvedValue({
+      success: true,
+      data: {
+        items: [{ id: 108, stage: 'CR-8', stageId: 'cr_8', supportsRaid: true }],
+        entries: [],
+      },
+    })
+    mocks.getActivityPreflight.mockResolvedValue({
+      success: true,
+      data: {
+        state: 'blocked',
+        reason: '未找到 CR 的活动导航资源。',
+        activity: { code: 'CR', name: '水晶行动', stages: ['CR-8'] },
+      },
+    })
+
+    await renderComponent()
+    const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      valueSetter?.call(input, 'prts://s48990')
+      input?.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(buttonsByText('预览')[0]!)
+    await flush()
+    await flush()
+
+    expect(container.textContent).toContain('未找到 CR 的活动导航资源')
+
+    await click(buttonsByText('立即执行')[0]!)
+    await flush()
+
+    expect(mocks.executeCopilotSetPlan).toHaveBeenCalledWith('48990', expect.objectContaining({
+      selectedIndexes: [0],
+    }))
+    expect(mocks.runActivitySet).not.toHaveBeenCalled()
+  })
+
+  it('keeps EX stages on the current map instead of attempting automatic navigation', async () => {
+    mocks.getCopilotSetPlan.mockResolvedValue({
+      success: true,
+      data: {
+        items: [{ id: 109659, stage: 'TL-EX-8', stageId: 'act55side_ex08', supportsRaid: true }],
+        entries: [],
+      },
+    })
+    mocks.getActivityPreflight.mockResolvedValue({
+      success: true,
+      data: {
+        state: 'ready',
+        activity: { code: 'TL', name: '时间啊，向前！', stages: ['TL-8'] },
+      },
+    })
+
+    await renderComponent()
+    const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      valueSetter?.call(input, 'prts://s57658')
+      input?.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(buttonsByText('预览')[0]!)
+    await flush()
+    await flush()
+
+    expect(container.textContent).toContain('EX/特殊关卡')
+
+    await click(buttonsByText('立即执行')[0]!)
+    await flush()
+
+    expect(mocks.executeCopilotSetPlan).toHaveBeenCalledWith('57658', expect.objectContaining({
+      selectedIndexes: [0],
+    }))
+    expect(mocks.runActivitySet).not.toHaveBeenCalled()
+  })
+
+  it('uses the activity runner for EX stages when the game data exposes their chapter', async () => {
+    mocks.getCopilotSetPlan.mockResolvedValue({
+      success: true,
+      data: {
+        items: [{ id: 109659, stage: 'TL-EX-8', stageId: 'act55side_ex08', supportsRaid: true }],
+        entries: [],
+      },
+    })
+    mocks.getActivityPreflight.mockResolvedValue({
+      success: true,
+      data: {
+        state: 'ready',
+        activity: { code: 'TL', name: '时间啊，向前！', stages: ['TL-8'] },
+        navigation: { specialStages: true },
+      },
+    })
+
+    await renderComponent()
+    const input = container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      valueSetter?.call(input, 'prts://s57658')
+      input?.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(buttonsByText('预览')[0]!)
+    await flush()
+    await flush()
+
+    expect(container.textContent).not.toContain('EX/特殊关卡')
+
+    await click(buttonsByText('立即执行')[0]!)
+    await flush()
+
+    expect(mocks.runActivitySet).toHaveBeenCalledWith('57658', expect.objectContaining({
+      selectedIndexes: [0],
+    }))
+    expect(mocks.executeCopilotSetPlan).not.toHaveBeenCalled()
   })
 
   it('moves the running status to the stage reported by the native set', async () => {

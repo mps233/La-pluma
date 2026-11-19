@@ -13,6 +13,7 @@ import (
 	"github.com/mps233/la-pluma/go/internal/app/execution"
 	"github.com/mps233/la-pluma/go/internal/app/mastery"
 	"github.com/mps233/la-pluma/go/internal/app/notifications"
+	"github.com/mps233/la-pluma/go/internal/app/skland"
 	"github.com/mps233/la-pluma/go/internal/config"
 )
 
@@ -32,15 +33,18 @@ func (v masteryVersionProvider) MAAVersion(ctx context.Context) (string, string,
 	cli, core := "", ""
 	for _, line := range strings.Split(string(output), "\n") {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(strings.ToLower(trimmed), "maa-cli") {
-			if match := regexp.MustCompile(`v?([0-9][0-9A-Za-z.+-]*)`).FindStringSubmatch(trimmed); match != nil {
-				cli = match[1]
-			}
+		lower := strings.ToLower(trimmed)
+		if !strings.HasPrefix(lower, "maa-cli") && !strings.HasPrefix(lower, "maacore") {
+			continue
 		}
-		if strings.HasPrefix(strings.ToLower(trimmed), "maacore") {
-			if match := regexp.MustCompile(`v?([0-9][0-9A-Za-z.+-]*)`).FindStringSubmatch(trimmed); match != nil {
-				core = match[1]
-			}
+		match := masteryVersionPattern.FindStringSubmatch(trimmed)
+		if match == nil {
+			continue
+		}
+		if strings.HasPrefix(lower, "maa-cli") {
+			cli = match[1]
+		} else {
+			core = match[1]
 		}
 	}
 	if cli == "" || core == "" {
@@ -63,6 +67,11 @@ func (r masteryLogReader) CreateCheckpoint(ctx context.Context) (*mastery.LogChe
 }
 
 func (r masteryLogReader) ReadSince(ctx context.Context, checkpoint *mastery.LogCheckpoint, maxBytes int64) (string, error) {
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	default:
+	}
 	if checkpoint == nil {
 		return "", nil
 	}
@@ -85,19 +94,17 @@ func (r masteryLogReader) ReadSince(ctx context.Context, checkpoint *mastery.Log
 	return string(buffer[:n]), nil
 }
 
+// masteryExternalExecution defers a tick while another MAA consumer holds the
+// shared execution lease. The lease is the only cross-service signal today.
 type masteryExternalExecution struct {
 	execution *execution.Manager
-	runs      interface{ Current() (interface{}, bool) }
 }
 
 func (e masteryExternalExecution) ExternalExecutionActive(ctx context.Context) bool {
-	if e.execution != nil {
-		state := e.execution.Status().State
-		if state == "held" || state == "stale" || state == "unknown" {
-			return state == "held"
-		}
+	if e.execution == nil {
+		return false
 	}
-	return false
+	return e.execution.Status().State == "held"
 }
 
 type masteryNotifier struct{ notifications *notifications.Service }
@@ -113,7 +120,25 @@ func (n masteryNotifier) Notify(ctx context.Context, title, content, level strin
 	return nil
 }
 
-func newMasteryService(cfg config.Config, logger *slog.Logger, executor maaServiceAdapter, executionManager *execution.Manager, notificationService *notifications.Service) *mastery.Service {
+type masteryTrainingProbe struct{ service *skland.Service }
+
+func (p masteryTrainingProbe) TrainingState(ctx context.Context) (mastery.TrainingState, bool) {
+	if p.service == nil {
+		return mastery.TrainingState{}, false
+	}
+	state, ok, err := p.service.Training(ctx)
+	if err != nil || !ok {
+		return mastery.TrainingState{}, false
+	}
+	return mastery.TrainingState{
+		TraineeID:   state.TraineeID,
+		TraineeName: state.TraineeName,
+		RemainSecs:  state.RemainSecs,
+		SlotState:   state.SlotState,
+	}, true
+}
+
+func newMasteryService(cfg config.Config, logger *slog.Logger, executor maaServiceAdapter, executionManager *execution.Manager, notificationService *notifications.Service, training mastery.TrainingProbe) *mastery.Service {
 	maaPath := os.Getenv("MAA_CLI_PATH")
 	if strings.TrimSpace(maaPath) == "" {
 		maaPath = "maa"
@@ -126,6 +151,7 @@ func newMasteryService(cfg config.Config, logger *slog.Logger, executor maaServi
 		Logs:              masteryLogReader{path: filepath.Join(cfg.Paths.MaaStateDir, "debug", "asst.log")},
 		ExternalExecution: masteryExternalExecution{execution: executionManager},
 		Notifier:          masteryNotifier{notifications: notificationService},
+		Training:          training,
 	})
 	if err := service.RecoverOnStartup(); err != nil {
 		logger.Warn("恢复专精队列状态失败", "error", err)

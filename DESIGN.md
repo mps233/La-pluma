@@ -797,11 +797,11 @@ className={`from-${tone}`}
 - **品牌内容层**：当前只有系统蓝；`--app-ink-wash`、品牌触点、`--game-rarity-*` 尚未落地。
 - **token 三层架构**：当前仍是 `index.css` / `ios-theme.css` 双文件字面值；primitive/semantic/component 分层是目标。
 - **连续圆角**：`SmoothPanel` / `SmoothSurface` 的 20/16 是 TS 常量，不是 token；组件源码已注明与 `--app-continuous-radius` / `-compact` 同步。
-- **`FloatingStatusIndicator`**：当前没有关闭按钮；错误不会自动收起，只能被下一次消息或页面生命周期清除。
+- **`FloatingStatusIndicator`**：当前没有关闭按钮；错误不会自动收起，只能被下一次消息或页面生命周期清除。页头滚出可视区后，非就绪状态（消息、连接异常、运行中）会在导航栏下方右上角以固定副本继续显示；就绪台词不悬浮。手机（<640px）沿用隐藏页头的规则，只保留读屏状态区。
 - **手写控件 `ring-2`**：现有约 10+ 处仍使用 `focus-visible:ring-2`；目标是迁移到 Button 的 outline 配方，新代码不要新增。
 
 ---
 
 **创建时间**：2026-02-09
-**最后更新**：2026-11-05
+**最后更新**：2026-11-18
 **维护者**：@mps233

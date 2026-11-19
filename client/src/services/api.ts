@@ -20,6 +20,8 @@ import type {
   MasteryQueueItem,
   MasteryQueueSettings,
   MasteryQueueStatus,
+  SklandSnapshot,
+  SklandStatus,
   TrainingOperator,
   TrainingPlan,
   TrainingQueueItem,
@@ -204,6 +206,27 @@ export interface ActivityData {
   [key: string]: unknown
 }
 
+export interface ActivityNavigationPreflightData {
+  state?: string
+  canPrepare?: boolean
+  canRun?: boolean
+  reasonCode?: string | null
+  reason?: string
+  activity?: {
+    code?: string | null
+    name?: string | null
+    source?: string | null
+    stages?: string[]
+  }
+  navigation?: {
+    source?: string
+    stageFile?: string
+    stageCount?: number
+    entryTask?: string
+    specialStages?: boolean
+  } | null
+}
+
 export interface StopTaskData {
   task?: {
     success?: boolean
@@ -226,6 +249,17 @@ export interface ScheduleExecutionResultData {
   runId?: string
   results?: unknown[]
   pending?: Array<{ itemIndex: number; [key: string]: unknown }>
+  substitutions?: Array<{
+    itemIndex?: number
+    stage?: string
+    originalCopilotId?: number
+    copilotId?: number
+  }>
+  skipped?: Array<{
+    itemIndex?: number
+    stage?: string
+    reason?: string
+  }>
 }
 
 export interface ManualCopilotSetResult {
@@ -629,6 +663,15 @@ export const maaApi = {
   async getActivity(clientType?: string): Promise<ApiResponse<ActivityData>> {
     const query = clientType ? `?clientType=${encodeURIComponent(clientType)}` : ''
     const response = await fetchWithAuth(`${API_BASE_URL}/agent/activity${query}`)
+    return parseJsonResponse(response)
+  },
+
+  /**
+   * 获取当前活动的关卡列表与 MAA 活动导航资源状态
+   */
+  async getActivityPreflight(clientType?: string): Promise<ApiResponse<ActivityNavigationPreflightData>> {
+    const query = clientType ? `?clientType=${encodeURIComponent(clientType)}` : ''
+    const response = await fetchWithAuth(`${API_BASE_URL}/agent/activity/preflight${query}`)
     return parseJsonResponse(response)
   },
 
@@ -1182,6 +1225,61 @@ export async function retryMasteryTarget(id: string): Promise<ApiResponse<Master
     `${API_BASE_URL}/agent/operator-mastery/items/${encodeURIComponent(id)}/retry`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }
   )
+  return parseJsonResponse(response)
+}
+
+
+// ========== 森空岛数据源 API ==========
+
+export async function getSklandStatus(): Promise<ApiResponse<SklandStatus>> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/skland/status`)
+  return parseJsonResponse(response)
+}
+
+export async function getSklandSnapshot(): Promise<ApiResponse<{ available: boolean; snapshot: SklandSnapshot }>> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/skland/snapshot`)
+  return parseJsonResponse(response)
+}
+
+export async function loginSkland(
+  account: string,
+  password: string,
+  uid?: string
+): Promise<ApiResponse<SklandStatus>> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/skland/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ account, password, uid: uid || '' }),
+  })
+  return parseJsonResponse(response)
+}
+
+export async function saveSklandCredentials(
+  cred: string,
+  token: string,
+  uid?: string
+): Promise<ApiResponse<SklandStatus>> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/skland/credentials`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cred, token, uid: uid || '' }),
+  })
+  return parseJsonResponse(response)
+}
+
+export async function clearSklandCredentials(): Promise<ApiResponse> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/skland/credentials`, {
+    method: 'DELETE',
+  })
+  return parseJsonResponse(response)
+}
+
+export async function syncSkland(): Promise<ApiResponse<SklandStatus>> {
+  const response = await fetchWithAuth(`${API_BASE_URL}/agent/skland/sync`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  })
   return parseJsonResponse(response)
 }
 

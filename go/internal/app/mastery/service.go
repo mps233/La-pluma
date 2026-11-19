@@ -30,6 +30,7 @@ type ServiceOptions struct {
 	GameState         GameStateProbe
 	ExternalExecution ExternalExecutionProbe
 	Notifier          Notifier
+	Training          TrainingProbe
 
 	TickInterval time.Duration
 	StepTimeout  time.Duration
@@ -63,7 +64,6 @@ func NewService(options ServiceOptions) *Service {
 		Logs:        options.Logs,
 		GameState:   options.GameState,
 		Logger:      options.Logger,
-		Now:         options.Now,
 		StepTimeout: options.StepTimeout,
 	})
 	scheduler := NewSchedulerService(queue, runs, SchedulerOptions{
@@ -72,6 +72,7 @@ func NewService(options ServiceOptions) *Service {
 		TickInterval:      options.TickInterval,
 		ExternalExecution: options.ExternalExecution,
 		Notifier:          options.Notifier,
+		Training:          options.Training,
 	})
 	return &Service{Data: data, Queue: queue, Run: runs, Scheduler: scheduler}
 }
@@ -181,6 +182,11 @@ func (s *Service) ResumeCampaign() (MasteryQueueStatus, error) {
 // StopCampaign stops the current MAA task on a best-effort basis and then
 // resets the queue to idle. In-game training is never canceled by this call.
 func (s *Service) StopCampaign(ctx context.Context) (MasteryQueueStatus, error) {
+	// Mark stopping first so a tick that unwinds with a stop error cannot write
+	// the target back to queued/blocked after the campaign is idle.
+	if err := s.Queue.MarkStopping(); err != nil {
+		s.logger().Warn("标记专精队列停止中失败", "error", err)
+	}
 	if err := s.Run.Stop(ctx); err != nil {
 		s.logger().Warn("停止专精 MAA 任务失败", "error", err)
 	}

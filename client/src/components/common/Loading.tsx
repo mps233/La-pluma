@@ -179,20 +179,6 @@ function AutomationEditorSkeleton() {
       <PanelHeadingSkeleton className="automation-editor-heading" />
       <div className="automation-editor-content">
         <div className="automation-task-editor space-y-4">
-          <div className="automation-flow-card-header flex-wrap">
-            <div className="automation-flow-card-identity min-w-0">
-              <Skeleton variant="circle" className="h-7 w-7 shrink-0" />
-              <Skeleton variant="rect" className="h-8 w-8 shrink-0 rounded-lg" />
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <Skeleton variant="text" className="h-3 w-28" />
-                <Skeleton variant="text" className="h-2.5 w-20" />
-              </div>
-            </div>
-            <div className="automation-flow-card-controls">
-              <Skeleton variant="rect" className="h-7 w-12 rounded-full" />
-              <Skeleton variant="circle" className="h-11 w-11" />
-            </div>
-          </div>
           {[1, 2, 3, 4].map((item) => (
             <div key={item} className="space-y-2">
               <Skeleton variant="text" className="h-2.5 w-20" />
