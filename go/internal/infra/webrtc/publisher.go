@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -79,7 +80,7 @@ func New(session *scrcpy.Session, logger *slog.Logger) (*Publisher, error) {
 		webrtc.RTPCodecCapability{
 			MimeType:    webrtc.MimeTypeH264,
 			ClockRate:   90000,
-			SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
+			SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42c029",
 		},
 		"video", "scrcpy-video",
 	)
@@ -105,6 +106,11 @@ func (p *Publisher) SetPeerStateListener(listener func(connected bool)) {
 // CreateOffer builds an offer, waits for ICE gathering to complete, and
 // returns the local SDP plus the gathered candidates.
 func (p *Publisher) CreateOffer(peerID string) (string, []webrtc.ICECandidateInit, error) {
+	// WebKit configures its H.264 decoder from the SDP profile-level-id. Wait
+	// briefly for the first SPS so the offer advertises the real level:
+	// 720p30 is level 4.1, not the level 3.1 baseline the track starts with.
+	p.waitForProfileLevel(2 * time.Second)
+
 	mediaEngine := &webrtc.MediaEngine{}
 	if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
 		return "", nil, err
@@ -437,6 +443,22 @@ func nalTypes(data []byte) []int {
 // applyProfileLevel replaces the hardcoded baseline/3.1 fmtp with the SPS's
 // real profile-level-id. WebKit configures its H.264 decoder from this value,
 // so advertising a lower level than the encoder emits can drop frames.
+var profileLevelIDPattern = regexp.MustCompile(`profile-level-id=[0-9a-fA-F]{6}`)
+
+// waitForProfileLevel gives FeedVideo a moment to cache the first SPS.
+func (p *Publisher) waitForProfileLevel(timeout time.Duration) {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		p.cacheMu.Lock()
+		profile := p.profileLevel
+		p.cacheMu.Unlock()
+		if profile != "" {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
 func (p *Publisher) applyProfileLevel(sdp string) string {
 	p.cacheMu.Lock()
 	profileLevel := p.profileLevel
@@ -444,7 +466,8 @@ func (p *Publisher) applyProfileLevel(sdp string) string {
 	if profileLevel == "" {
 		return sdp
 	}
-	return strings.ReplaceAll(sdp, "profile-level-id=42001f", "profile-level-id="+profileLevel)
+	// Always replace the value, whichever level the track was created with.
+	return profileLevelIDPattern.ReplaceAllString(sdp, "profile-level-id="+profileLevel)
 }
 
 // spsProfileLevelID returns profile_idc, constraint flags and level_idc from

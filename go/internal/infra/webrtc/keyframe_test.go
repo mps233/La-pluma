@@ -1,6 +1,7 @@
 package webrtc
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/pion/rtcp"
@@ -39,5 +40,22 @@ func TestRTCPWantsKeyframe(t *testing.T) {
 	}
 	if rtcpWantsKeyframe(nil) {
 		t.Fatal("empty packet list should not request a keyframe")
+	}
+}
+
+func TestApplyProfileLevelReplacesAnyLevel(t *testing.T) {
+	p := &Publisher{profileLevel: "42c029"}
+	sdp := "a=fmtp:102 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f\r\n"
+	got := p.applyProfileLevel(sdp)
+	if !strings.Contains(got, "profile-level-id=42c029") {
+		t.Fatalf("profile level not applied: %s", got)
+	}
+	if strings.Contains(got, "42001f") {
+		t.Fatalf("stale level left in SDP: %s", got)
+	}
+
+	empty := &Publisher{}
+	if got := empty.applyProfileLevel(sdp); got != sdp {
+		t.Fatalf("empty profile should leave SDP untouched")
 	}
 }
