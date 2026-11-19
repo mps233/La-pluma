@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v4"
 	"github.com/pion/webrtc/v4/pkg/media"
 
@@ -48,14 +49,26 @@ type Publisher struct {
 	lastConfig   []byte
 	lastKeyframe []byte
 	profileLevel string
+
+	keyframeMu      sync.Mutex
+	keyframePending bool
 }
 
 type peer struct {
 	pc      *webrtc.PeerConnection
 	input   *webrtc.DataChannel
+	sender  *webrtc.RTPSender
 	pending []webrtc.ICECandidateInit
 	answer  bool
 	mu      sync.Mutex
+}
+
+// keyframeRequests coalesces PLI/FIR bursts from viewers. scrcpy emits a
+// keyframe only every 10 seconds, so a lost packet would otherwise leave the
+// browser decoding against a broken reference frame until the next one.
+type keyframeRequests struct {
+	mu      sync.Mutex
+	pending bool
 }
 
 func New(session *scrcpy.Session, logger *slog.Logger) (*Publisher, error) {
@@ -103,10 +116,12 @@ func (p *Publisher) CreateOffer(peerID string) (string, []webrtc.ICECandidateIni
 	if err != nil {
 		return "", nil, fmt.Errorf("create peer connection: %w", err)
 	}
-	if _, err := pc.AddTrack(p.video); err != nil {
+	sender, err := pc.AddTrack(p.video)
+	if err != nil {
 		pc.Close()
 		return "", nil, fmt.Errorf("add video track: %w", err)
 	}
+	go p.watchKeyframeRequests(peerID, sender)
 	input, err := pc.CreateDataChannel("input-channel", nil)
 	if err != nil {
 		pc.Close()
@@ -166,7 +181,7 @@ func (p *Publisher) CreateOffer(peerID string) (string, []webrtc.ICECandidateIni
 	candidateMu.Unlock()
 
 	p.mu.Lock()
-	p.peers[peerID] = &peer{pc: pc, input: input}
+	p.peers[peerID] = &peer{pc: pc, input: input, sender: sender}
 	p.mu.Unlock()
 
 	return p.applyProfileLevel(pc.LocalDescription().SDP), gathered, nil
@@ -493,6 +508,62 @@ func (p *Publisher) watchVideo(lastPacket *atomic.Int64) {
 			p.logger.Warn("video stalled; reset capture", "idle", idle.String(), "attempt", resets)
 		}
 	}
+}
+
+// watchKeyframeRequests reads RTCP from one sender and asks scrcpy for a new
+// keyframe when the viewer reports packet loss.
+func (p *Publisher) watchKeyframeRequests(peerID string, sender *webrtc.RTPSender) {
+	for {
+		packets, _, err := sender.ReadRTCP()
+		if err != nil {
+			return
+		}
+		if !rtcpWantsKeyframe(packets) {
+			continue
+		}
+		p.logger.Info("viewer requested a keyframe", "peer", peerID)
+		p.requestKeyframe()
+	}
+}
+
+// rtcpWantsKeyframe reports whether any RTCP packet asks for a fresh
+// reference frame.
+func rtcpWantsKeyframe(packets []rtcp.Packet) bool {
+	for _, packet := range packets {
+		switch packet.(type) {
+		case *rtcp.PictureLossIndication, *rtcp.FullIntraRequest:
+			return true
+		}
+	}
+	return false
+}
+
+// beginKeyframeRequest admits one refresh at a time so a burst of PLIs from
+// several viewers does not reset the capture repeatedly.
+func (p *Publisher) beginKeyframeRequest() bool {
+	p.keyframeMu.Lock()
+	defer p.keyframeMu.Unlock()
+	if p.keyframePending {
+		return false
+	}
+	p.keyframePending = true
+	return true
+}
+
+func (p *Publisher) endKeyframeRequest() {
+	p.keyframeMu.Lock()
+	p.keyframePending = false
+	p.keyframeMu.Unlock()
+}
+
+func (p *Publisher) requestKeyframe() {
+	if !p.beginKeyframeRequest() {
+		return
+	}
+	go func() {
+		defer p.endKeyframeRequest()
+		p.refreshKeyframeForPeer()
+	}()
 }
 
 func (p *Publisher) refreshKeyframeForPeer() {
