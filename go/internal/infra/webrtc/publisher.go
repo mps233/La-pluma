@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v4"
 	"github.com/pion/webrtc/v4/pkg/media"
 
@@ -48,14 +50,26 @@ type Publisher struct {
 	lastConfig   []byte
 	lastKeyframe []byte
 	profileLevel string
+
+	keyframeMu      sync.Mutex
+	keyframePending bool
 }
 
 type peer struct {
 	pc      *webrtc.PeerConnection
 	input   *webrtc.DataChannel
+	sender  *webrtc.RTPSender
 	pending []webrtc.ICECandidateInit
 	answer  bool
 	mu      sync.Mutex
+}
+
+// keyframeRequests coalesces PLI/FIR bursts from viewers. scrcpy emits a
+// keyframe only every 10 seconds, so a lost packet would otherwise leave the
+// browser decoding against a broken reference frame until the next one.
+type keyframeRequests struct {
+	mu      sync.Mutex
+	pending bool
 }
 
 func New(session *scrcpy.Session, logger *slog.Logger) (*Publisher, error) {
@@ -66,7 +80,7 @@ func New(session *scrcpy.Session, logger *slog.Logger) (*Publisher, error) {
 		webrtc.RTPCodecCapability{
 			MimeType:    webrtc.MimeTypeH264,
 			ClockRate:   90000,
-			SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f",
+			SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42c029",
 		},
 		"video", "scrcpy-video",
 	)
@@ -92,6 +106,11 @@ func (p *Publisher) SetPeerStateListener(listener func(connected bool)) {
 // CreateOffer builds an offer, waits for ICE gathering to complete, and
 // returns the local SDP plus the gathered candidates.
 func (p *Publisher) CreateOffer(peerID string) (string, []webrtc.ICECandidateInit, error) {
+	// WebKit configures its H.264 decoder from the SDP profile-level-id. Wait
+	// briefly for the first SPS so the offer advertises the real level:
+	// 720p30 is level 4.1, not the level 3.1 baseline the track starts with.
+	p.waitForProfileLevel(2 * time.Second)
+
 	mediaEngine := &webrtc.MediaEngine{}
 	if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
 		return "", nil, err
@@ -103,10 +122,12 @@ func (p *Publisher) CreateOffer(peerID string) (string, []webrtc.ICECandidateIni
 	if err != nil {
 		return "", nil, fmt.Errorf("create peer connection: %w", err)
 	}
-	if _, err := pc.AddTrack(p.video); err != nil {
+	sender, err := pc.AddTrack(p.video)
+	if err != nil {
 		pc.Close()
 		return "", nil, fmt.Errorf("add video track: %w", err)
 	}
+	go p.watchKeyframeRequests(peerID, sender)
 	input, err := pc.CreateDataChannel("input-channel", nil)
 	if err != nil {
 		pc.Close()
@@ -166,7 +187,7 @@ func (p *Publisher) CreateOffer(peerID string) (string, []webrtc.ICECandidateIni
 	candidateMu.Unlock()
 
 	p.mu.Lock()
-	p.peers[peerID] = &peer{pc: pc, input: input}
+	p.peers[peerID] = &peer{pc: pc, input: input, sender: sender}
 	p.mu.Unlock()
 
 	return p.applyProfileLevel(pc.LocalDescription().SDP), gathered, nil
@@ -261,10 +282,12 @@ func (p *Publisher) handleInput(data []byte) {
 	width := uint16(message.Width)
 	height := uint16(message.Height)
 	if width == 0 {
-		width = uint16(p.session.Width)
+		sessionW, _ := p.session.FrameSize()
+		width = uint16(sessionW)
 	}
 	if height == 0 {
-		height = uint16(p.session.Height)
+		_, sessionH := p.session.FrameSize()
+		height = uint16(sessionH)
 	}
 	switch message.Type {
 	case "touch":
@@ -379,8 +402,15 @@ func (p *Publisher) Close() {
 		entry.pc.Close()
 	}
 }
-func (p *Publisher) SessionWidth() int  { return p.session.Width }
-func (p *Publisher) SessionHeight() int { return p.session.Height }
+func (p *Publisher) SessionWidth() int {
+	w, _ := p.session.FrameSize()
+	return w
+}
+
+func (p *Publisher) SessionHeight() int {
+	_, h := p.session.FrameSize()
+	return h
+}
 
 func (p *Publisher) SendKeyTap(keycode int) error { return p.session.SendKeyTap(keycode) }
 func (p *Publisher) SendText(text string) error   { return p.session.SendText(text) }
@@ -413,6 +443,22 @@ func nalTypes(data []byte) []int {
 // applyProfileLevel replaces the hardcoded baseline/3.1 fmtp with the SPS's
 // real profile-level-id. WebKit configures its H.264 decoder from this value,
 // so advertising a lower level than the encoder emits can drop frames.
+var profileLevelIDPattern = regexp.MustCompile(`profile-level-id=[0-9a-fA-F]{6}`)
+
+// waitForProfileLevel gives FeedVideo a moment to cache the first SPS.
+func (p *Publisher) waitForProfileLevel(timeout time.Duration) {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		p.cacheMu.Lock()
+		profile := p.profileLevel
+		p.cacheMu.Unlock()
+		if profile != "" {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
 func (p *Publisher) applyProfileLevel(sdp string) string {
 	p.cacheMu.Lock()
 	profileLevel := p.profileLevel
@@ -420,7 +466,8 @@ func (p *Publisher) applyProfileLevel(sdp string) string {
 	if profileLevel == "" {
 		return sdp
 	}
-	return strings.ReplaceAll(sdp, "profile-level-id=42001f", "profile-level-id="+profileLevel)
+	// Always replace the value, whichever level the track was created with.
+	return profileLevelIDPattern.ReplaceAllString(sdp, "profile-level-id="+profileLevel)
 }
 
 // spsProfileLevelID returns profile_idc, constraint flags and level_idc from
@@ -493,6 +540,62 @@ func (p *Publisher) watchVideo(lastPacket *atomic.Int64) {
 			p.logger.Warn("video stalled; reset capture", "idle", idle.String(), "attempt", resets)
 		}
 	}
+}
+
+// watchKeyframeRequests reads RTCP from one sender and asks scrcpy for a new
+// keyframe when the viewer reports packet loss.
+func (p *Publisher) watchKeyframeRequests(peerID string, sender *webrtc.RTPSender) {
+	for {
+		packets, _, err := sender.ReadRTCP()
+		if err != nil {
+			return
+		}
+		if !rtcpWantsKeyframe(packets) {
+			continue
+		}
+		p.logger.Info("viewer requested a keyframe", "peer", peerID)
+		p.requestKeyframe()
+	}
+}
+
+// rtcpWantsKeyframe reports whether any RTCP packet asks for a fresh
+// reference frame.
+func rtcpWantsKeyframe(packets []rtcp.Packet) bool {
+	for _, packet := range packets {
+		switch packet.(type) {
+		case *rtcp.PictureLossIndication, *rtcp.FullIntraRequest:
+			return true
+		}
+	}
+	return false
+}
+
+// beginKeyframeRequest admits one refresh at a time so a burst of PLIs from
+// several viewers does not reset the capture repeatedly.
+func (p *Publisher) beginKeyframeRequest() bool {
+	p.keyframeMu.Lock()
+	defer p.keyframeMu.Unlock()
+	if p.keyframePending {
+		return false
+	}
+	p.keyframePending = true
+	return true
+}
+
+func (p *Publisher) endKeyframeRequest() {
+	p.keyframeMu.Lock()
+	p.keyframePending = false
+	p.keyframeMu.Unlock()
+}
+
+func (p *Publisher) requestKeyframe() {
+	if !p.beginKeyframeRequest() {
+		return
+	}
+	go func() {
+		defer p.endKeyframeRequest()
+		p.refreshKeyframeForPeer()
+	}()
 }
 
 func (p *Publisher) refreshKeyframeForPeer() {

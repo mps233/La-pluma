@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	defaultServerVersion = "3.3.4"
+	defaultServerVersion = "5.0.1"
 	defaultBitRate       = 8_000_000
 	connectTimeout       = 10 * time.Second
 	remoteServerPath     = "/data/local/tmp/scrcpy-server.jar"
@@ -54,6 +54,8 @@ type Session struct {
 	VideoHeader VideoHeader
 	Width       int
 	Height      int
+	// widthMu guards Width/Height, which a mid-stream session header can change.
+	widthMu sync.RWMutex
 
 	videoConn net.Conn
 	ctrlConn  net.Conn
@@ -409,10 +411,30 @@ func (s *Session) readDeviceNameAndHeader() error {
 		return fmt.Errorf("unsupported scrcpy video codec: %08x", header.Codec)
 	}
 	s.VideoHeader = header
-	s.Width = int(header.Width)
-	s.Height = int(header.Height)
-	s.logger.Info("scrcpy session ready", "device", s.opts.Serial, "width", s.Width, "height", s.Height)
+	s.setFrameSize(header.Width, header.Height)
+	w, h := s.FrameSize()
+	s.logger.Info("scrcpy session ready", "device", s.opts.Serial, "width", w, "height", h)
 	return nil
+}
+
+func (s *Session) setFrameSize(width, height uint32) {
+	if width == 0 || height == 0 {
+		return
+	}
+	s.widthMu.Lock()
+	s.Width = int(width)
+	s.Height = int(height)
+	s.VideoHeader.Width = width
+	s.VideoHeader.Height = height
+	s.widthMu.Unlock()
+}
+
+// FrameSize returns the current stream size. It changes when the device
+// rotates or the client resizes the display.
+func (s *Session) FrameSize() (int, int) {
+	s.widthMu.RLock()
+	defer s.widthMu.RUnlock()
+	return s.Width, s.Height
 }
 
 func (s *Session) ReadVideoPacket() (PacketHeader, []byte, error) {
@@ -422,7 +444,20 @@ func (s *Session) ReadVideoPacket() (PacketHeader, []byte, error) {
 	if reader == nil {
 		return PacketHeader{}, nil, fmt.Errorf("video stream is not ready")
 	}
-	return ReadPacket(reader)
+	for {
+		header, data, session, err := ReadVideoPacket(reader)
+		if err != nil {
+			return PacketHeader{}, nil, err
+		}
+		if session != nil {
+			// A session header carries the new frame size and has no payload.
+			s.setFrameSize(uint32(session.PTSAndFlags), session.Size)
+			w, h := s.FrameSize()
+			s.logInfo("scrcpy stream resized", "width", w, "height", h)
+			continue
+		}
+		return header, data, nil
+	}
 }
 
 func (s *Session) SendTouch(action int, pointerID uint64, x, y int32, width, height uint16, pressure float32) error {

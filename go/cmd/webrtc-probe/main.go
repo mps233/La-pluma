@@ -95,8 +95,8 @@ func main() {
 	var (
 		adbPath = flag.String("adb", "/opt/homebrew/bin/adb", "adb executable")
 		serial  = flag.String("serial", "127.0.0.1:16384", "device serial")
-		server  = flag.String("server", "/tmp/scrcpy-server-v3.3.4", "scrcpy-server jar")
-		version = flag.String("version", "3.3.4", "scrcpy server version")
+		server  = flag.String("server", "/tmp/scrcpy-server-v5.0.1", "scrcpy-server jar")
+		version = flag.String("version", "5.0.1", "scrcpy server version")
 		port    = flag.Int("port", 9191, "HTTP port")
 		maxSize = flag.Int("max-size", 1280, "max video dimension")
 		maxFPS  = flag.Int("max-fps", 30, "max fps")
