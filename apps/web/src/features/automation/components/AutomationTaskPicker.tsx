@@ -1,6 +1,6 @@
-import { useState, type RefObject } from 'react'
-import { Menu as MenuPrimitive } from '@base-ui/react/menu'
+import { useState } from 'react'
 import { Plus } from 'lucide-react'
+import { Button } from '@/shared/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,36 +14,17 @@ interface AutomationTaskPickerProps {
   flow: readonly TaskFlowItem[]
   disabled: boolean
   onAddTask: (task: AutomationAvailableTask) => void
-  /** 页面把整条流程页脚传入：区域内按下指针不关闭菜单，保持原关闭区域。 */
-  regionRef: RefObject<HTMLDivElement | null>
 }
 
 export default function AutomationTaskPicker({
   flow,
   disabled,
   onAddTask,
-  regionRef,
 }: AutomationTaskPickerProps) {
   const [open, setOpen] = useState(false)
 
   if (disabled && open) setOpen(false)
   const isOpen = open && !disabled
-
-  const handleOpenChange = (
-    nextOpen: boolean,
-    eventDetails: MenuPrimitive.Root.ChangeEventDetails,
-  ) => {
-    if (
-      !nextOpen
-      && eventDetails.reason === 'outside-press'
-      && eventDetails.event.target instanceof Node
-      && regionRef.current?.contains(eventDetails.event.target)
-    ) {
-      eventDetails.cancel()
-      return
-    }
-    setOpen(nextOpen)
-  }
 
   const selectTask = (task: AutomationAvailableTask) => {
     onAddTask(task)
@@ -51,23 +32,22 @@ export default function AutomationTaskPicker({
   }
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={handleOpenChange} modal={false}>
+    <DropdownMenu open={isOpen} onOpenChange={setOpen} modal={false}>
       <DropdownMenuTrigger
-        className="automation-task-picker-toggle"
+        render={<Button type="button" variant="ghost" size="icon" />}
+        aria-label="添加任务"
+        title="添加任务"
         disabled={disabled}
       >
-        <Plus size={16} strokeWidth={2.1} />
-        <span>添加任务</span>
-        <small>{AVAILABLE_TASKS.length}</small>
+        <Plus size={16} strokeWidth={2.1} aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        side="top"
-        align="start"
+        side="bottom"
+        align="end"
         sideOffset={8}
         collisionPadding={12}
-        data-page-kind="automation"
         aria-label="可添加任务"
-        className="automation-task-picker max-h-[min(14rem,var(--available-height))] gap-0 rounded-xl bg-(--automation-picker-surface) p-1.5 shadow-(--automation-overlay-shadow) ring-0"
+        className="max-h-[min(14rem,var(--available-height))] w-60"
       >
         {AVAILABLE_TASKS.map(task => {
           const addedCount = flow.filter(flowTask => flowTask.commandId === task.id).length
@@ -76,7 +56,7 @@ export default function AutomationTaskPicker({
             <DropdownMenuItem
               key={task.id}
               onClick={() => selectTask(task)}
-              className="automation-task-picker-option grid cursor-pointer gap-2 rounded-none px-2 py-1.5 text-left"
+              className="automation-task-picker-option grid cursor-pointer gap-2 px-2 py-1.5 text-left"
             >
               <span>{task.icon}</span>
               <strong>{task.name}</strong>

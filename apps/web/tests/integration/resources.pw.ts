@@ -17,7 +17,8 @@ test('配置已保存而定时注册失败时，跨页保留草稿并只在显�
 
   state.scheduleFailuresRemaining = 1
   await page.getByRole('button', { name: '新增时间', exact: true }).click()
-  await expect(page.getByRole('alert')).toContainText('定时注册暂未确认，请重试')
+  const syncErrorToast = page.locator('[data-sonner-toast]').filter({ hasText: '定时注册暂未确认，请重试' })
+  await expect(syncErrorToast).toBeVisible()
   expect(state.automationSaveCalls).toHaveLength(1)
   expect(state.scheduleCalls).toHaveLength(1)
   const savedDraft = structuredClone(state.automationConfig)
@@ -25,11 +26,11 @@ test('配置已保存而定时注册失败时，跨页保留草稿并只在显�
 
   await navigateTo(page, 'dashboard')
   await navigateTo(page, 'automation')
-  await expect(page.getByRole('alert')).toContainText('定时注册暂未确认，请重试')
+  await expect(syncErrorToast).toBeVisible()
   await expect(page.getByLabel('已设置 3 个执行时间')).toBeVisible()
   expect(state.scheduleCalls).toHaveLength(1)
-  await page.getByRole('button', { name: '重新同步', exact: true }).click()
-  await expect(page.getByRole('alert')).toHaveCount(0)
+  await syncErrorToast.getByRole('button', { name: '重新同步', exact: true }).click()
+  await expect(syncErrorToast).toHaveCount(0)
   expect(state.automationSaveCalls).toHaveLength(2)
   expect(state.scheduleCalls).toHaveLength(2)
   expect(state.automationConfig).toEqual(savedDraft)
@@ -46,7 +47,7 @@ test('识别完成使隐藏养成与总览失效，应用计划后自动化读�
   await gotoScenario(page, 'dashboard')
   await expect(page.locator('[data-dashboard-summary="training"] [data-dashboard-summary-number]')).toHaveText('2')
   await navigateTo(page, 'automation')
-  await expect(page.getByRole('button', { name: '立即执行', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: '开始', exact: true })).toBeEnabled()
   await navigateTo(page, 'training')
   await expect(page.getByRole('button', { name: '预览刷图计划', exact: true })).toBeEnabled()
   const initialQueueReads = requestsFor(state, '/agent/training/queue', 'GET').length

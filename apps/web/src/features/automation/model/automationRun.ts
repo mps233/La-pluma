@@ -167,7 +167,7 @@ export function readAutomationScheduleSummary(snapshot: RunSnapshot | null): Aut
     skippedCount: record.skippedCount,
     durationMs: record.durationMs,
     ...(Array.isArray(record.taskResults)
-      ? { taskResults: record.taskResults as TaskExecutionResult[] }
+      ? { taskResults: readScheduleTaskResults(record.taskResults) }
       : {}),
     summaries: arrayOf('summaries'),
     reports: arrayOf('reports'),

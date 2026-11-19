@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Clock3, Plus, X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
+import { Input } from '@/shared/ui/input'
 import { Switch } from '@/shared/ui/switch'
 import { Card } from '@/shared/ui/card'
 import {
@@ -67,7 +68,7 @@ function ScheduleTimeField({ index, time, disabled, onCommit }: ScheduleTimeFiel
   }
 
   return (
-    <input
+    <Input
       type="text"
       inputMode="numeric"
       autoComplete="off"
@@ -149,8 +150,7 @@ export default function AutomationScheduleCard({
     <Card className="automation-side-card gap-0 p-0!">
       <div className="automation-side-card-heading">
         <div className="automation-side-card-heading-text">
-          <h3><Clock3 size={16} strokeWidth={1.8} aria-hidden="true" /><span>定时执行</span></h3>
-          <p>到点自动运行任务流程</p>
+          <h3><span>定时执行</span></h3>
         </div>
         <div className="automation-side-card-heading-actions">
           <span className="automation-schedule-count" aria-label={`已设置 ${entries.length} 个执行时间`}>

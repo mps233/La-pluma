@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { getErrorMessage } from '@/shared/api'
-import { executeScheduleNow } from '@/features/automation'
+import { executeScheduleNow, type TaskFlowWireItem } from '@/features/automation'
 import {
   executionController as defaultExecutionController,
   isActiveRunState,
@@ -35,7 +35,7 @@ export interface DashboardExecution {
   ownedRun: AgentRun | null
   /** 观察最后失败的原因，仅用于“无法确认”时的说明。 */
   observationError: string | null
-  startFlow: (flow: unknown[]) => Promise<DashboardFlowStartOutcome>
+  startFlow: (flow: TaskFlowWireItem[]) => Promise<DashboardFlowStartOutcome>
 }
 
 interface UseDashboardExecutionOptions {
@@ -76,7 +76,7 @@ export function useDashboardExecution({
     if (notice) notify(notice.message, notice.type, { id: EXECUTION_NOTICE_ID })
   }, [notify, ownedRun])
 
-  const startFlow = useCallback(async (flow: unknown[]): Promise<DashboardFlowStartOutcome> => {
+  const startFlow = useCallback(async (flow: TaskFlowWireItem[]): Promise<DashboardFlowStartOutcome> => {
     if (controller.getState().submission === 'pending') {
       return { ok: false, message: '正在提交上一次执行，请稍候。', type: 'info' }
     }

@@ -52,11 +52,6 @@ export function isSmartStage(stage: string | StageConfig): boolean {
   return typeof stage === 'object' && stage.smart === true
 }
 
-/** 只统计有关卡名的行，空白输入行不计入“N 个关卡”。 */
-export function countConfiguredStages(stages: readonly (string | StageConfig)[]): number {
-  return stages.filter(hasStageText).length
-}
-
 /** 最后一个带养成干员信息的智能关卡；旧关卡没有该字段时回退空列表。 */
 export function findTrainingOperators(stages: readonly (string | StageConfig)[]): string[] {
   const smartStages = stages.filter((stage): stage is StageConfig => isSmartStage(stage))

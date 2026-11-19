@@ -123,7 +123,6 @@ export function formatExecutionActionSummary(actions: unknown): string | undefin
       ? '游戏内培养'
       : normalizedActions.every(action => action.action === 'switchtheme') ? '更换游戏主题' : '游戏任务'
     const parts = [title]
-    if (successCount > 0) parts.push(`成功 ${successCount} 项`)
     if (skippedCount > 0) parts.push(`跳过 ${skippedCount} 项`)
     if (failedCount > 0) parts.push(`失败 ${failedCount} 项`)
     if (unconfirmed.length > 0) parts.push(`游戏结果未确认 ${unconfirmed.length} 项`)
@@ -230,7 +229,7 @@ export function formatExecutionActionSummary(actions: unknown): string | undefin
 
   const parts = [isAwardResult ? '奖励检查完成' : '流程执行完成']
 
-  if (successCount > 0) parts.push(`${isAwardResult ? '领取' : '成功'} ${successCount} 项`)
+  if (isAwardResult && successCount > 0) parts.push(`领取 ${successCount} 项`)
   if (skippedCount > 0) parts.push(`跳过 ${skippedCount} 项`)
   if (failedCount > 0) parts.push(`失败 ${failedCount} 项`)
   if (unconfirmed.length > 0) parts.push(`游戏结果未确认 ${unconfirmed.length} 项`)

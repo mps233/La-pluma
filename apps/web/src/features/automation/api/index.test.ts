@@ -1,7 +1,16 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { TaskFlowWireItem } from '../types'
 import { getActivity, getScheduleExecutionStatus, executeScheduleNow } from './index'
+
+const startupTask: TaskFlowWireItem = {
+  id: 'startup-1',
+  name: '启动游戏',
+  commandId: 'startup',
+  params: {},
+  enabled: true,
+}
 
 const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -23,17 +32,17 @@ describe('automation schedule execution api', () => {
   })
 
   it('keeps the legacy synchronous call unchanged', async () => {
-    await executeScheduleNow('default', [{ id: 'startup-1' }])
+    await executeScheduleNow('default', [startupTask])
 
     expect(fetchCall().input).toBe('http://localhost:3000/api/agent/schedules/default/execute')
     expect(fetchCall().init.method).toBe('POST')
     expect(readHeaders(fetchCall().init).get('Idempotency-Key')).toBeNull()
-    expect(JSON.parse(fetchCall().init.body as string)).toEqual({ taskFlow: [{ id: 'startup-1' }] })
+    expect(JSON.parse(fetchCall().init.body as string)).toEqual({ taskFlow: [startupTask] })
   })
 
   it('requests background execution with the controller idempotency key', async () => {
     const signal = new AbortController().signal
-    await executeScheduleNow('manual', [{ id: 'startup-1' }], {
+    await executeScheduleNow('manual', [startupTask], {
       waitForCompletion: false,
       idempotencyKey: 'run_daily_flow-20261025-01',
       signal,
@@ -42,7 +51,7 @@ describe('automation schedule execution api', () => {
     expect(readHeaders(fetchCall().init).get('Idempotency-Key')).toBe('run_daily_flow-20261025-01')
     expect(fetchCall().init.signal).toBe(signal)
     expect(JSON.parse(fetchCall().init.body as string)).toEqual({
-      taskFlow: [{ id: 'startup-1' }],
+      taskFlow: [startupTask],
       waitForCompletion: false,
     })
   })

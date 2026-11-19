@@ -326,13 +326,135 @@ describe('automation config adapter', () => {
     ['an array payload', []],
     ['a non-array task flow', { taskFlow: {} }],
     ['a task without an id', { taskFlow: [{ name: '启动游戏' }] }],
-    ['a task with non-object params', { taskFlow: [{ id: 'startup-1', params: [] }] }],
-    ['a task with a non-boolean enabled flag', { taskFlow: [{ id: 'startup-1', enabled: 'yes' }] }],
     ['a non-object schedule', { schedule: [] }],
     ['a non-boolean schedule flag', { schedule: { enabled: 'true' } }],
     ['a non-array times list', { schedule: { times: '08:00' } }],
   ])('rejects %s so the caller can fall back to the local draft', (_label, payload) => {
     expect(automationConfigAdapter.decodeDraft(payload)).toBeNull()
+  })
+
+  it('normalizes legacy tasks with catalog defaults, derived commands, and readable names', () => {
+    const decoded = automationConfigAdapter.decodeDraft({
+      taskFlow: [
+        { id: 'fight-1', params: { medicine: 2 } },
+        { id: 'startup-2' },
+        { id: 'custom-1', params: { legacy: true } },
+        { id: 'custom-2', name: '自定义任务' },
+      ],
+    })
+
+    expect(decoded).not.toBeNull()
+    const [fight, startup, custom, namedCustom] = decoded!.taskFlow
+    expect(fight).toMatchObject({
+      commandId: 'fight',
+      name: '理智作战',
+      description: '自动刷关卡消耗理智',
+      enabled: true,
+      params: {
+        medicine: 2,
+        stages: [{ stage: '1-7', times: '' }],
+        medicineExpireDays: 0,
+        DrGrandet: false,
+      },
+    })
+    expect(startup).toMatchObject({
+      commandId: 'startup',
+      name: '启动游戏',
+      enabled: true,
+      params: { clientType: 'Official', accountName: '', start_game_enabled: true },
+    })
+    expect(custom).toMatchObject({
+      commandId: 'custom',
+      name: 'custom',
+      enabled: true,
+      params: { legacy: true },
+    })
+    expect(namedCustom).toMatchObject({
+      commandId: 'custom',
+      name: '自定义任务',
+      enabled: true,
+      params: {},
+    })
+  })
+
+  it('keeps unknown command params through decode, local read, and encode', () => {
+    const params = { legacy: 7, nested: { mode: 'custom' } }
+    const decoded = automationConfigAdapter.decodeDraft({
+      taskFlow: [{ id: 'custom-1', name: '自定义任务', params }],
+    })!
+
+    expect(decoded.taskFlow[0]?.params).toEqual(params)
+
+    automationConfigAdapter.writeLocalDraft(decoded)
+    const local = automationConfigAdapter.readLocalDraft()!
+
+    expect(local.taskFlow[0]?.params).toEqual(params)
+    expect(automationConfigAdapter.encodeDraft(local).taskFlow[0]?.params).toEqual(params)
+  })
+
+  it('keeps explicit task fields and params over the catalog defaults', () => {
+    const decoded = automationConfigAdapter.decodeDraft({
+      taskFlow: [{
+        id: 'startup-1',
+        commandId: 'startup',
+        name: '自定义启动',
+        description: '自定义说明',
+        taskType: 'Manual',
+        enabled: false,
+        params: { clientType: 'Bilibili', accountName: 'doctor' },
+      }],
+    })
+
+    expect(decoded!.taskFlow[0]).toMatchObject({
+      commandId: 'startup',
+      name: '自定义启动',
+      description: '自定义说明',
+      taskType: 'Manual',
+      enabled: false,
+      params: {
+        clientType: 'Bilibili',
+        accountName: 'doctor',
+        start_game_enabled: true,
+      },
+    })
+  })
+
+  it('recovers tasks with non-object params and non-boolean enabled flags', () => {
+    const decoded = automationConfigAdapter.decodeDraft({
+      taskFlow: [{ id: 'startup-1', params: [], enabled: 'yes' }],
+    })
+
+    expect(decoded!.taskFlow[0]).toMatchObject({
+      commandId: 'startup',
+      enabled: true,
+      params: { clientType: 'Official', start_game_enabled: true },
+    })
+
+    const unknown = automationConfigAdapter.decodeDraft({
+      taskFlow: [{ id: 'custom-1', params: [] }],
+    })!
+    expect(unknown.taskFlow[0]?.params).toEqual({})
+  })
+
+  it('normalizes legacy local drafts on read', () => {
+    localStorage.setItem(
+      AUTOMATION_TASK_FLOW_KEY,
+      JSON.stringify([{ id: 'recruit-1', params: { times: '2' } }]),
+    )
+
+    const read = automationConfigAdapter.readLocalDraft()
+
+    expect(read?.taskFlow[0]).toMatchObject({
+      commandId: 'recruit',
+      name: '自动公招',
+      enabled: true,
+      params: {
+        times: '2',
+        refresh: true,
+        preserve_tags: '支援机械',
+        recruitment_time: { '3': 540, '4': 540 },
+      },
+    })
   })
 
   it('reads and writes the original local draft layout symmetrically', () => {

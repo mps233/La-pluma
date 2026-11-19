@@ -64,6 +64,8 @@ wire 内容未变的 `setDraft` 会被跳过（默认对 `encodeDraft` 结果做
 | `pending` | 本设备存在尚未被完整提交确认的草稿 |
 | `syncState` | `idle` / `queued`（等待去抖或队列）/ `saving`（正在提交）/ `failed`（当前草稿未完整持久化） |
 | `error` | 最近一次同步失败的可展示原因；完整提交成功后清空 |
+| `loadState` | `idle` / `loading` / `ready` / `failed`；表示读取与本地恢复的进度，不改变 `hydrated` 语义 |
+| `loadError` | 最近一次读取失败的可展示原因；开始新的读取时清空 |
 | `revision` | 每次接受新草稿递增 |
 | `lastSavedAt` | 最近一次完整提交成功的时间戳 |
 
@@ -151,7 +153,7 @@ function CombatWorkspace() {
 
 | 返回 | 说明 |
 | --- | --- |
-| `draft` / `hydrated` / `pending` / `syncState` / `error` / `revision` / `lastSavedAt` | 协调器状态；`useSyncExternalStore` 订阅，状态对象只在变化时替换 |
+| `draft` / `hydrated` / `pending` / `syncState` / `error` / `loadState` / `loadError` / `revision` / `lastSavedAt` | 协调器状态；`useSyncExternalStore` 订阅，状态对象只在变化时替换 |
 | `update(draft)` | 等价于通道 `setDraft`：写本地、刷新 revision/token、按策略提交 |
 | `retry()` | 立即提交当前草稿并等待**本次**尝试；返回当前 revision 是否已确认 |
 | `reload({ force })` | 重新读取；`force` 绕过已加载守卫 |
@@ -178,6 +180,7 @@ function CombatWorkspace() {
 - **迟到加载不写回**：加载返回时校验加载序号、`AbortSignal`、revision 与 pending 标记；任何一项变化都返回 `stale`。
 - **损坏草稿可回退**：单个损坏键由适配器清理；标记指向的草稿整体不可读时删除标记并读服务端，不会永久停在“本地优先”。
 - **读取失败会重试**：`failed` 不标记 `hydrated`，`Activity` 恢复或下次挂载会再次尝试；服务端失败且本地有草稿时静默回退，不打断编辑。
+- **读取状态可观察**：`loadState` 在读取开始时进入 `loading`，拿到服务端或本地草稿后进入 `ready`，没有可回退草稿时进入 `failed` 并带上 `loadError`；已有内存草稿时强制重读失败仍保持 `ready`，不会隐藏已有草稿的编辑器。`hydrated` 仍只表示“已有可用草稿”，三个状态与它各自独立。日常页只在 `ready` 时渲染编辑器，`loading`/`failed` 使用只读占位，`failed` 的重新加载走 `reload({ force: true })`。
 
 ### 跨页面读写的一致性
 
@@ -203,7 +206,7 @@ function CombatWorkspace() {
 - 工作区只订阅与编辑通道，不建立第二份 revision、pending 状态或保存队列。
 - `Activity` 隐藏/恢复只影响 Effects；`hydrate()` 的已加载守卫保证恢复时不重读，pending 草稿仍优先。
 - automation 订阅 `automation-config`/`automation-schedule` 失效后通过 `reload({ force: true })` 重读；返回 `local-draft` 时不得丢弃本地编辑。计划应用不再使用 window `training-plan-applied` 事件。
-- 成功/失败通知由页面通过 `notify` 发送，页内错误文案由页面从 `syncState`/`error` 和 `retry()` 结果派生；协调器不直接写 `statusStore` 或通知器。
+- 成功/失败通知由页面通过固定 id 的 `notify` 发送；automation 的保存/恢复失败使用 `automation-config-save`，成功清除错误后关闭同 id toast，页内不再派生错误文案；协调器不直接写 `statusStore` 或通知器。
 
 ### 6.1 肉鸽适配器
 
@@ -246,33 +249,33 @@ function CombatWorkspace() {
 | 身份 | key `automation-tasks`；pending 键 `automationConfigSyncPending` |
 | 本地草稿 | `maa-task-flow`（任务数组）与 `maa-schedule`（`{ enabled, times, entries }`）；单个键损坏清理后丢弃该部分，两个键都不可读才返回 null 并让协调器删除 pending 标记、改读服务端 |
 | wire | `{ taskFlow, schedule: { enabled, times } }`；task flow 去掉 `icon`/`paramFields` 等界面字段，其余旧字段（如 `name`、`description`、`defaultParams`、`taskType`）原样保留；`times` 只包含启用的时间点 |
-| 加载迁移 | 兼容 `maa-schedule.entries` 与旧 `times`；`times` 为空时保留默认执行时间；任务参数迁移（`skip_robot`→`preserve_tags`、新旧字段补齐）、启动/关闭客户端类型同步、关闭游戏置底都在解码与本地读取时执行 |
+| 加载迁移 | 兼容 `maa-schedule.entries` 与旧 `times`；`times` 为空时保留默认执行时间；任务条目在解码与本地读取时归一化：缺失 `commandId` 时从 `id` 前缀推导，已知任务用任务目录 `defaultParams` 补齐缺失参数且已有参数优先，`enabled` 缺省为 `true`，`name` 缺失时回退目录名称或 `commandId`，未知任务保留可读名称与已有参数（仅原始 `params` 不是对象时才回退 `{}`）。既有参数迁移（`skip_robot`→`preserve_tags`、新旧字段补齐）、启动/关闭客户端类型同步、关闭游戏置底仍在同一路径执行；只有 task flow 不是数组、条目不是对象或缺 `id` 时才拒绝整份草稿 |
 | 提交时机 | `commitDelayMs = 300` + `localWriteDelayMs = 250`；连续编辑只提交最后一次，本地草稿也只写最后一次；提交、`flush`、`dispose` 或页面卸载前强制落盘 |
 | 草稿等价 | 适配器 `fingerprint` 比较 task flow 与本地 `schedule.entries`，而不是只看 wire；编辑或删除禁用时间点仍会接受草稿、写回本地并触发提交，不会被协调器当成无变化而静默丢弃。wire 未变化时这次提交内容与上一次相同，属于幂等写入 |
 | 完整提交 | `saveUserConfig('automation-tasks', wire)` 成功后再执行 `setupSchedule('default', times, taskFlow)`（启用且存在时间点）或 `stopSchedule('default')`；任一步失败都返回 `ok: false`，协调器保留 pending 与“重新同步”入口，重试重跑整段提交 |
 | 过期提交保护 | 配置保存期间若协调器接受了更新的草稿，适配器在 schedule 步骤前比对最新 wire 指纹并跳过旧 schedule；即使旧提交已经写入配置，协调器也不会用它的结果确认新 revision |
 | 外部写入裁决 | training 应用计划前调用 `userConfigCoordinator.settle([USER_CONFIG_KEYS.automationTasks])`，等本设备已入队的保存落盘，并按 `USER_CONFIG_PENDING_KEYS` 检查未挂载页面的持久化标记；仍有 pending 时拒绝应用。`automation-config`/`automation-schedule` 失效到达后，页面先 `flush()` 再 `reload({ force: true })`：`loaded` 采用服务端副本并提示更新，`local-draft`/`stale` 保留本地草稿并提示。采用服务端副本时保留本设备独有的禁用时间点（`mergeLocalScheduleEntries`），避免非冲突的本地 schedule 编辑丢失。跨客户端同时写入仍是最后写入生效 |
-| 页面派生 | task flow 的图标与参数表单由 `AVAILABLE_TASKS` 派生；schedule 的启用状态与条目都从 `draft` 派生；错误文案取协调器 `error`，重试按钮的 loading 取 `syncState === 'saving'`；仅手动 `retry()` 返回 true 时提示“自动化配置已同步” |
-| 页面局部状态 | 拖拽中的顺序由 `hooks/useTaskFlowSorting` 渲染本地预览，松手时才作为一次编辑写入协调器；选中项、撤销与连接测试反馈归 `AutomationWorkspace`，picker 与执行详情分别归 `AutomationTaskPicker`、`AutomationExecutionSummary`；当前工作区仍只调用 `useUserConfig` 的 `update`，面板不持有保存队列 |
+| 页面派生 | task flow 的图标与参数表单由 `AVAILABLE_TASKS` 派生；schedule 的启用状态与条目都从 `draft` 派生；错误文案取协调器 `error`，保存/恢复失败以固定 id 的 error toast 展示并提供“重新同步” action，成功清除错误后关闭同 id toast |
+| 页面局部状态 | 拖拽中的顺序由 `hooks/useTaskFlowSorting` 渲染本地预览，松手时才作为一次编辑写入协调器；选中项、连接测试反馈与删除撤销 toast 归 `AutomationWorkspace`，picker 与执行详情分别归 `AutomationTaskPicker`、`AutomationExecutionSummary`；`isRunning`/`isSubmitting` 期间流程编辑锁定，定时与通知卡仍按各自状态独立保存；当前工作区仍只调用 `useUserConfig` 的 `update`，面板不持有保存队列 |
 
 pending 标记存在但本地草稿不可读时，协调器必须删除该标记并回退服务端；该行为由适配器回归固定。
 
-兼容约束：保留配置 key、本地键、pending 键与 wire 形状；服务端载荷中已知字段类型不合法时，整份载荷回退到本地草稿。保存失败时通过页内 alert 与“重新同步”入口反馈，保留 pending 草稿；跨会话恢复草稿时显示恢复提示和重试入口。不得为了回滚清理用户存储，也不得因配置加载失败覆盖未确认草稿。
+兼容约束：保留配置 key、本地键、pending 键与 wire 形状；服务端载荷只有不可恢复形状（非对象、task flow 非数组、条目缺 `id`）才整份回退本地草稿，单条任务的可恢复字段缺失由归一化补齐。保存失败时通过固定 id 的 error toast 与“重新同步” action 反馈，保留 pending 草稿；跨会话恢复草稿时同样以该 toast 提示并可重试。配置未 `ready` 时日常页不渲染可编辑表单；不得为了回滚清理用户存储，也不得因配置加载失败覆盖未确认草稿。
 
 ## 7. 回归证据
 
 | 测试 | 覆盖 |
 | --- | --- |
-| `features/user-config/model/configCoordinator.test.ts` | 非 React：服务端加载与迁移、未同步草稿优先、损坏草稿回退、迟到加载丢弃、强制刷新中止旧加载、提交串行与旧提交不确认新草稿、标记被外部替换、提交去抖合并、本地写去抖与提交/卸载前 flush、内容等价跳过、完整提交失败与重试防重入、编辑中断重试、跨重挂载队列与状态、异构适配器拒绝、`settle` 写入屏障等待在途提交并报告失败草稿 |
-| `features/user-config/hooks/useUserConfig.test.tsx` | 首次加载与订阅渲染、编辑写回、`autoHydrate: false`、失败提示与重试后清空 |
+| `features/user-config/model/configCoordinator.test.ts` | 非 React：服务端加载与迁移、加载/失败状态与恢复、未同步草稿优先、损坏草稿回退、迟到加载丢弃、强制刷新中止旧加载、提交串行与旧提交不确认新草稿、标记被外部替换、提交去抖合并、本地写去抖与提交/卸载前 flush、内容等价跳过、完整提交失败与重试防重入、编辑中断重试、跨重挂载队列与状态、异构适配器拒绝、`settle` 写入屏障等待在途提交并报告失败草稿 |
+| `features/user-config/hooks/useUserConfig.test.tsx` | 首次加载与订阅渲染、`loadState`/`loadError` 与恢复、编辑写回、`autoHydrate: false`、失败提示与重试后清空 |
 | `features/roguelike/model/roguelikeConfig.test.ts` | 肉鸽适配器：原 key/pending/本地键/300ms、wire 形状、缺省字段与非法载荷解码、本地键损坏清理、完整提交与读取失败信封 |
 | `pages/roguelike/RoguelikeTasks.test.tsx` | 页面接线：pending 跨 remount + 重试、重试防重入与成功提示、提交串行与旧响应保护、坏草稿回退服务端、迟到加载不覆盖编辑、Activity 隐藏/恢复 |
 | `features/combat/model/combatConfig.test.ts` | 作业适配器：原 key/pending/本地键/300ms、wire 形状、`app→cli` 与 raid `1`/`2` 迁移、缺省字段与非法载荷解码、本地键损坏清理、裸字符串执行方式、完整提交与读取失败信封 |
 | `pages/combat/CombatTasks.test.tsx` | 页面接线：pending 跨 remount + 重试、重试防重入与成功提示、提交串行与旧响应保护、迟到加载不覆盖编辑、坏草稿回退服务端、本地与服务端 `app→cli`/raid 迁移、set 模式与待执行索引回填、Activity 隐藏/恢复 |
-| `features/automation/model/automationConfig.test.ts` | 自动化适配器：原 key/pending/本地键、300ms 提交去抖 + 250ms 本地写去抖、wire 去掉界面字段、`entries`/`times` 兼容、任务参数迁移与客户端类型同步、非法载荷解码、本地键损坏清理、配置+schedule 完整提交、schedule 半失败、保存期间新草稿跳过旧 schedule、禁用项参与的本地草稿指纹、读取失败信封 |
-| `pages/automation/AutomationTasks.config.test.tsx` | 页面接线：配置/schedule 全成功才清 pending、保存失败不碰 schedule、半失败页内重试、禁用与全禁用 schedule、编辑/删除禁用时间点仍写回本地、跨 remount 串行提交与旧响应保护、迟到加载、stale pending 回退服务端、计划失效重读等待在途保存、Activity 恢复补发及本地禁用时间点保留 |
-| `pages/automation/AutomationTasks.layout.test.tsx` | pending 本地优先、在途服务端响应不覆盖新草稿、hydrate 不重建 schedule、Activity 恢复、拖拽/表单接线 |
-| `pages/automation/AutomationTasks.execution.test.tsx` | Run 提交、停止、流程进度与旧断点只观察不重提 |
+| `features/automation/model/automationConfig.test.ts` | 自动化适配器：原 key/pending/本地键、300ms 提交去抖 + 250ms 本地写去抖、wire 去掉界面字段、`entries`/`times` 兼容、任务条目归一化（缺 `commandId`/`params`/`name`/`enabled`、未知命令、显式参数优先）、任务参数迁移与客户端类型同步、不可恢复载荷拒绝、本地键损坏清理、配置+schedule 完整提交、schedule 半失败、保存期间新草稿跳过旧 schedule、禁用项参与的本地草稿指纹、读取失败信封 |
+| `pages/automation/AutomationTasks.config.test.tsx` | 页面接线：读取中/失败门控与强制重载恢复、配置/schedule 全成功才清 pending、保存失败不碰 schedule 且保留编辑、保存错误 toast 重试、禁用与全禁用 schedule、编辑/删除禁用时间点仍写回本地、跨 remount 串行提交与旧响应保护、stale pending 回退服务端、计划失效重读等待在途保存、Activity 恢复补发及本地禁用时间点保留 |
+| `pages/automation/AutomationTasks.layout.test.tsx` | pending 本地优先、hydrate 不重建 schedule、Activity 恢复、拖拽/表单接线、删除撤销与连接测试 toast |
+| `pages/automation/AutomationTasks.execution.test.tsx` | Run 提交、停止、提交期间流程编辑锁定、删除撤销在运行中拒绝、流程进度与旧断点只观察不重提 |
 
 复现命令（仓库根目录）：
 
@@ -280,7 +283,7 @@ pending 标记存在但本地草稿不可读时，协调器必须删除该标记
 pnpm --filter la-pluma-next-client verify
 ```
 
-三域必须保持既有配置 key、本地键与服务端 wire；自动化额外兼容 `entries`/`times` 及任务参数旧格式，无须手工迁移本地草稿。同步失败使用 `role="alert"` 显示重试入口，不改变成功路径的默认视觉。
+三域必须保持既有配置 key、本地键与服务端 wire；自动化额外兼容 `entries`/`times` 及任务参数旧格式，无须手工迁移本地草稿。automation 同步失败使用固定 id toast 与 action 重试；`role="alert"` 仅适用于仍保留页内反馈的域，不改变成功路径的默认视觉。
 
 ## 关联
 

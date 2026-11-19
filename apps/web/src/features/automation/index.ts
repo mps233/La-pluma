@@ -36,3 +36,4 @@ export type {
   AutomationActivityPayload,
 } from './model/activity'
 export type { AutomationScheduleExecutionPayload } from './model/queries'
+export type { TaskFlowWireItem } from './types'

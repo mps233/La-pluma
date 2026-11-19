@@ -933,13 +933,32 @@ describe('AutomationTasks layout surfaces', () => {
     const stageFieldset = findStageEditor()
     expect(stageFieldset).toBeDefined()
     expect(stageFieldset?.textContent).toContain('关卡计划')
-    expect(stageFieldset?.textContent).toContain('2 个关卡')
+    expect(stageFieldset?.textContent).not.toContain('个关卡')
     const stageHint = stageFieldset?.querySelector<HTMLButtonElement>('button[aria-label="关卡计划说明"]')
     expect(stageHint).not.toBeNull()
 
     // 说明段落不再常驻页面。
     const helperParagraphs = Array.from(container.querySelectorAll('p')).map(paragraph => paragraph.textContent)
     for (const [, copy] of expectedHints) expect(helperParagraphs).not.toContain(copy)
+  })
+
+  it('shows the connection test result as a toast without an inline feedback card', async () => {
+    mocks.loadUserConfig.mockResolvedValue({ success: true, data: { taskFlow: taskFlowFixture } })
+
+    await renderPage()
+    await act(async () => findButton('测试连接')?.click())
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 500))
+    })
+    await flush()
+
+    expect(mocks.notify).toHaveBeenCalledWith(
+      '连接正常',
+      'success',
+      { id: 'automation-connection-test' },
+    )
+    expect(findButton('重新测试')).toBeDefined()
+    expect(container.textContent).not.toContain('连接正常')
   })
 
   it('offers task removal from the flow list only', async () => {
@@ -957,14 +976,29 @@ describe('AutomationTasks layout surfaces', () => {
 
     expect(savedFlowIds()).toEqual(['fight-1', 'recruit-1'])
     expect(container.querySelectorAll('[aria-controls="automation-task-editor"]')).toHaveLength(2)
-    expect(container.textContent).toContain('已删除“启动游戏”')
+    expect(container.textContent).not.toContain('已删除“启动游戏”')
+    const deletedNotice = mocks.notify.mock.calls.find(([message]) => (
+      String(message).includes('已删除“启动游戏”')
+    ))
+    expect(deletedNotice).toEqual([
+      '已删除“启动游戏”',
+      'info',
+      {
+        id: 'automation-deleted-task',
+        action: { label: '恢复', onClick: expect.any(Function) },
+      },
+    ])
+    mocks.dismissNotice.mockClear()
 
-    await act(async () => findButton('恢复')?.click())
+    const { action } = deletedNotice![2] as {
+      action: { label: string; onClick: () => void }
+    }
+    await act(async () => action.onClick())
     await flush()
 
     expect(savedFlowIds()).toEqual(['startup-1', 'fight-1', 'recruit-1'])
     expect(container.querySelectorAll('[aria-controls="automation-task-editor"]')).toHaveLength(3)
-    expect(container.textContent).not.toContain('已删除“启动游戏”')
+    expect(mocks.dismissNotice).toHaveBeenCalledWith('automation-deleted-task')
     expect(container.querySelector('#automation-task-editor')?.textContent).toContain('启动游戏')
     expect(container.querySelector('#automation-task-editor [aria-label="删除启动游戏"]')).toBeNull()
   })
@@ -1363,8 +1397,13 @@ describe('AutomationTasks layout surfaces', () => {
     await renderPage()
 
     const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!
-    expect(trigger.textContent).toContain('添加任务')
+    expect(trigger.getAttribute('aria-label')).toBe('添加任务')
+    expect(trigger.getAttribute('title')).toBe('添加任务')
+    expect(trigger.textContent).toBe('')
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    const flowHeader = Array.from(container.querySelectorAll('h3'))
+      .find(heading => heading.textContent === '任务流程')?.parentElement?.parentElement
+    expect(flowHeader?.contains(trigger)).toBe(true)
 
     await act(async () => trigger.click())
     await flush()
@@ -1542,7 +1581,7 @@ describe('AutomationTasks layout surfaces', () => {
       ])
   })
 
-  it('closes the add-task picker when pressing outside its region', async () => {
+  it('closes the add-task picker when pressing outside it', async () => {
     await renderPage()
 
     const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!

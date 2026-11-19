@@ -626,15 +626,12 @@ test.describe('automation field hints', () => {
     await waitForPageReady(page, 'automation')
     await selectFightTask(page)
 
-    // 区块级提示位于「关卡计划」标题行内、关卡数量徽标右侧。
+    // 区块级提示位于「关卡计划」标题行内；标题只保留标题与说明入口，不显示关卡计数。
     const stageHint = page.getByRole('button', { name: '关卡计划说明', exact: true })
     const stageTitle = page.locator('.automation-stage-editor-title')
     await expect(stageTitle).toContainText('关卡计划')
-    await expect(stageTitle).toContainText('1 个关卡')
-    expect(await stageHint.evaluate((trigger) => {
-      const badge = trigger.previousElementSibling
-      return badge?.tagName === 'SPAN' && badge.textContent === '1 个关卡'
-    })).toBe(true)
+    await expect(stageTitle).not.toContainText('个关卡')
+    await expect(stageHint).toBeVisible()
 
     // 字段级提示紧贴各自标签，与其它已改造卡片一致。
     const labelHintGeometry = await page.evaluate(() => {

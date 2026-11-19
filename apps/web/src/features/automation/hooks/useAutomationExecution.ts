@@ -17,7 +17,7 @@ import {
   type ExecutionController,
 } from '@/features/task-execution'
 import { executeScheduleNow } from '../api'
-import type { TaskFlowItem } from '../types'
+import type { TaskFlowItem, TaskFlowWireItem } from '../types'
 import {
   describeAutomationRunTerminal,
   readAutomationExecutionSummary,
@@ -64,7 +64,7 @@ interface UseAutomationExecutionOptions {
   storage?: LegacyFlowCheckpointStorage | null
 }
 
-function cleanFlow(flow: TaskFlowItem[]) {
+function cleanFlow(flow: TaskFlowItem[]): TaskFlowWireItem[] {
   return flow.map(task => ({
     id: task.id,
     name: task.name,
@@ -73,6 +73,10 @@ function cleanFlow(flow: TaskFlowItem[]) {
     params: task.params,
     enabled: task.enabled,
   }))
+}
+
+function readErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : '未知错误'
 }
 
 function legacyCheckpointMessage(
@@ -254,7 +258,7 @@ export function useAutomationExecution({
       return true
     } catch (error) {
       // 传输失败时服务端可能已经接受执行，不能宣称失败或自动重提。
-      notify(`无法确认执行状态: ${(error as Error).message}`, 'warning', { id: EXECUTION_NOTICE_ID })
+      notify(`无法确认执行状态: ${readErrorMessage(error)}`, 'warning', { id: EXECUTION_NOTICE_ID })
       return false
     }
   }, [announceTerminal, controller, isRunning, notify])
@@ -283,7 +287,7 @@ export function useAutomationExecution({
       }
       setStopAcknowledged(!result.data?.alreadyTerminal)
     } catch (error) {
-      notify(`终止失败: ${(error as Error).message}`, 'error', { id: EXECUTION_NOTICE_ID })
+      notify(`终止失败: ${readErrorMessage(error)}`, 'error', { id: EXECUTION_NOTICE_ID })
       setStopAcknowledged(false)
     } finally {
       stopRequestRef.current = false

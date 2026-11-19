@@ -79,6 +79,12 @@ export interface ConfigPersistenceAdapter<TDraft, TWire = unknown> {
  */
 export type ConfigSyncState = 'idle' | 'queued' | 'saving' | 'failed'
 
+/**
+ * 读取状态：`idle` 表示尚未开始，`loading` 表示请求或本地恢复进行中，
+ * `ready` 表示已有可用草稿，`failed` 表示读取失败且没有可回退草稿。
+ */
+export type ConfigLoadState = 'idle' | 'loading' | 'ready' | 'failed'
+
 export interface ConfigCoordinatorState<TDraft> {
   /** 最近一次接受或加载的草稿；首次加载完成前为 null。 */
   readonly draft: TDraft | null
@@ -88,6 +94,9 @@ export interface ConfigCoordinatorState<TDraft> {
   readonly syncState: ConfigSyncState
   /** 最近一次同步失败的可展示原因；完整提交成功后清空。 */
   readonly error: string | null
+  readonly loadState: ConfigLoadState
+  /** 最近一次读取失败的可展示原因；开始新的读取时清空。 */
+  readonly loadError: string | null
   /** 每次接受新草稿递增；用于页面判断编辑与提交的对应关系。 */
   readonly revision: number
   readonly lastSavedAt: number | null
@@ -132,6 +141,7 @@ export interface ConfigChannel<TDraft> {
 }
 
 export const DEFAULT_RESTORED_MESSAGE = '上次更改已保存在此设备，但尚未同步到服务器。'
+export const DEFAULT_LOAD_FAILURE_MESSAGE = '无法读取配置，请稍后重试'
 const DEFAULT_FAILURE_PREFIX = '配置已保存在此设备，但尚未同步到服务器'
 
 interface CommitSnapshot<TDraft> {
@@ -205,6 +215,8 @@ class ConfigKeyState<TDraft, TWire> implements ConfigChannel<TDraft> {
     pending: false,
     syncState: 'idle' as ConfigSyncState,
     error: null,
+    loadState: 'idle' as ConfigLoadState,
+    loadError: null,
     revision: 0,
     lastSavedAt: null,
   })
@@ -214,6 +226,8 @@ class ConfigKeyState<TDraft, TWire> implements ConfigChannel<TDraft> {
   private pending = false
   private syncState: ConfigSyncState = 'idle'
   private error: string | null = null
+  private loadState: ConfigLoadState = 'idle'
+  private loadError: string | null = null
   private revision = 0
   private lastSavedAt: number | null = null
 
@@ -258,8 +272,14 @@ class ConfigKeyState<TDraft, TWire> implements ConfigChannel<TDraft> {
 
   readonly reload = (options: { force?: boolean } = {}): Promise<ConfigReloadOutcome> => {
     const force = options.force === true
-    if (this.hydrated && !force) return Promise.resolve({ reason: 'skipped' })
+    if (this.hydrated && !force && this.loadState !== 'failed') {
+      return Promise.resolve({ reason: 'skipped' })
+    }
     if (this.inflightLoad && !force) return this.inflightLoad
+
+    this.loadState = 'loading'
+    this.loadError = null
+    this.publish()
 
     const run = this.loadDraft()
     this.inflightLoad = run
@@ -327,6 +347,7 @@ class ConfigKeyState<TDraft, TWire> implements ConfigChannel<TDraft> {
         localDraft = this.adapter.readLocalDraft()
       } catch {
         // 有标记但读不出草稿时不能换成服务端副本，否则会静默丢掉本设备编辑。
+        this.failLoad(DEFAULT_LOAD_FAILURE_MESSAGE)
         return { reason: 'failed' }
       }
 
@@ -342,6 +363,7 @@ class ConfigKeyState<TDraft, TWire> implements ConfigChannel<TDraft> {
           this.error = this.adapter.restoredMessage ?? DEFAULT_RESTORED_MESSAGE
         }
         this.hydrated = true
+        this.markLoaded()
         this.publish()
         return { reason: 'local-draft' }
       }
@@ -357,19 +379,27 @@ class ConfigKeyState<TDraft, TWire> implements ConfigChannel<TDraft> {
     const startingRevision = this.revision
 
     let decoded: TDraft | null = null
+    let loadFailureMessage: string | null = null
     try {
       const result = await this.adapter.fetch({ signal: controller.signal })
       if (result.ok) decoded = this.decodeDraft(result.payload)
-    } catch {
+      else loadFailureMessage = result.message
+    } catch (error) {
       // 读取失败与载荷不可用同样回退本地草稿。
+      loadFailureMessage = error instanceof Error && error.message ? error.message : null
     } finally {
       if (this.loadAbort === controller) this.loadAbort = null
     }
 
-    if (!this.isCurrentLoad(sequence, startingRevision, controller)) {
+    if (sequence !== this.loadSequence || controller.signal.aborted) {
+      return { reason: 'stale' }
+    }
+
+    if (this.revision !== startingRevision || this.readPendingToken() !== null) {
       // 编辑已经发生：保留编辑，别把迟到的服务端副本写回页面。
       if (this.draft !== null) {
         this.hydrated = true
+        this.markLoaded()
         this.publish()
       }
       return { reason: 'stale' }
@@ -386,6 +416,7 @@ class ConfigKeyState<TDraft, TWire> implements ConfigChannel<TDraft> {
     try {
       localDraft = this.adapter.readLocalDraft()
     } catch {
+      this.failLoad(DEFAULT_LOAD_FAILURE_MESSAGE)
       return { reason: 'failed' }
     }
     if (localDraft !== null) {
@@ -396,6 +427,7 @@ class ConfigKeyState<TDraft, TWire> implements ConfigChannel<TDraft> {
     }
 
     // 没有可用草稿：不标记 hydrated，下次 hydrate（如 Activity 恢复）会重试。
+    this.failLoad(loadFailureMessage ?? DEFAULT_LOAD_FAILURE_MESSAGE)
     return { reason: 'failed' }
   }
 
@@ -406,19 +438,26 @@ class ConfigKeyState<TDraft, TWire> implements ConfigChannel<TDraft> {
     this.pending = false
     this.syncState = 'idle'
     this.error = null
+    this.markLoaded()
     this.cancelScheduledLocalWrite()
     this.writeLocalDraft(draft)
   }
 
-  private isCurrentLoad(
-    sequence: number,
-    startingRevision: number,
-    controller: AbortController,
-  ): boolean {
-    return sequence === this.loadSequence
-      && !controller.signal.aborted
-      && this.revision === startingRevision
-      && this.readPendingToken() === null
+  private markLoaded(): void {
+    this.loadState = 'ready'
+    this.loadError = null
+  }
+
+  private failLoad(message: string): void {
+    if (this.draft !== null) {
+      this.hydrated = true
+      this.markLoaded()
+      this.publish()
+      return
+    }
+    this.loadState = 'failed'
+    this.loadError = message
+    this.publish()
   }
 
   private scheduleLocalDraftWrite(draft: TDraft): void {
@@ -574,6 +613,8 @@ class ConfigKeyState<TDraft, TWire> implements ConfigChannel<TDraft> {
       pending: this.pending,
       syncState: this.syncState,
       error: this.error,
+      loadState: this.loadState,
+      loadError: this.loadError,
       revision: this.revision,
       lastSavedAt: this.lastSavedAt,
     })

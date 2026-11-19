@@ -210,6 +210,28 @@ describe('automation run results', () => {
     }))).toBeNull()
     expect(readAutomationScheduleSummary(snapshot())).toBeNull()
   })
+
+  it('drops malformed task results from the legacy schedule last result', () => {
+    const legacy = readAutomationScheduleSummary(snapshot({
+      schedule: {
+        lastResult: {
+          successCount: 1,
+          failedCount: 0,
+          skippedCount: 0,
+          durationMs: 3_000,
+          taskResults: [
+            { taskId: 'startup-1', task: '启动游戏', status: 'success' },
+            { taskId: 42, task: '无效任务', status: 'success' },
+            { taskId: 'fight-1', task: '理智作战', status: 'unknown' },
+          ],
+        },
+      },
+    }))
+
+    expect(legacy?.taskResults).toEqual([
+      { taskId: 'startup-1', task: '启动游戏', status: 'success' },
+    ])
+  })
 })
 
 describe('automation terminal notices', () => {

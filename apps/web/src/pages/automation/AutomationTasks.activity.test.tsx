@@ -259,7 +259,7 @@ it('keeps completed task marks after Activity hides a finishing run', async () =
 
   expect(container.querySelectorAll('[data-execution-state="completed"]')).toHaveLength(6)
   expect(container.querySelectorAll('[data-execution-state="running"]')).toHaveLength(0)
-  expect(container.querySelector('button[data-status-key="ready"]')?.textContent).toContain('立即执行')
+  expect(container.querySelector('button[data-status-key="ready"]')?.textContent).toContain('开始')
   expect(api.stopRun).not.toHaveBeenCalled()
   expect(mocks.executeScheduleNow).toHaveBeenCalledOnce()
 })

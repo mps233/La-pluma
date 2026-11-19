@@ -21,7 +21,7 @@ const definition = (
   icon: null,
   description: `${id}说明`,
   defaultParams,
-  paramFields: [{ key: 'note', label: '说明', type: 'text' }],
+  paramFields: [{ key: 'accountName', label: '说明', type: 'text' }],
   taskType: id === 'infrast' ? 'Infrast' : undefined,
 })
 

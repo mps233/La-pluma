@@ -309,9 +309,19 @@ describe('AutomationTasks config persistence', () => {
     expect(mocks.setupSchedule).not.toHaveBeenCalled()
     expect(mocks.stopSchedule).not.toHaveBeenCalled()
     expect(pendingDraft()).not.toBeNull()
-    expect(container.querySelector('[role="alert"]')?.textContent)
-      .toContain('配置已保存在此设备，但尚未同步到服务器：配置存储暂不可用')
-    expect(mocks.notify).not.toHaveBeenCalled()
+    expect(mocks.notify).toHaveBeenCalledWith(
+      '配置已保存在此设备，但尚未同步到服务器：配置存储暂不可用',
+      'error',
+      {
+        id: 'automation-config-save',
+        action: { label: '重新同步', onClick: expect.any(Function) },
+      },
+    )
+    expect(container.querySelector('[role="alert"]')).toBeNull()
+    expect(container.querySelector(
+      '[aria-label="启动游戏启用状态"][disabled], [aria-label="启动游戏启用状态"][aria-disabled="true"]',
+    )).toBeNull()
+    expect(container.querySelector('[aria-label="删除启动游戏"][disabled]')).toBeNull()
   })
 
   it('keeps the pending draft when the schedule step fails after the config save, then clears it on a later full success', async () => {
@@ -327,8 +337,14 @@ describe('AutomationTasks config persistence', () => {
     expect(mocks.saveUserConfig).toHaveBeenCalledOnce()
     expect(mocks.setupSchedule).toHaveBeenCalledOnce()
     expect(pendingDraft()).not.toBeNull()
-    expect(container.querySelector('[role="alert"]')?.textContent)
-      .toContain('配置已保存在此设备，但尚未同步到服务器：排班设置失败')
+    expect(mocks.notify).toHaveBeenCalledWith(
+      '配置已保存在此设备，但尚未同步到服务器：排班设置失败',
+      'error',
+      {
+        id: 'automation-config-save',
+        action: { label: '重新同步', onClick: expect.any(Function) },
+      },
+    )
 
     await act(async () => root.unmount())
     root = createRoot(container)
@@ -338,7 +354,14 @@ describe('AutomationTasks config persistence', () => {
     expect(mocks.loadUserConfig).not.toHaveBeenCalled()
     expect(pendingDraft()).not.toBeNull()
     expect(container.textContent).toContain('理智作战')
-    expect(container.textContent).toContain('配置已保存在此设备，但尚未同步到服务器：排班设置失败')
+    expect(mocks.notify).toHaveBeenCalledWith(
+      '配置已保存在此设备，但尚未同步到服务器：排班设置失败',
+      'error',
+      {
+        id: 'automation-config-save',
+        action: { label: '重新同步', onClick: expect.any(Function) },
+      },
+    )
 
     await click(scheduleSwitch())
     await settle()
@@ -501,7 +524,7 @@ describe('AutomationTasks config persistence', () => {
     expect(pendingDraft()).toBeNull()
   })
 
-  it('ignores a server load that settles after the user edits the schedule', async () => {
+  it('keeps the loading gate without editable controls until the server read settles', async () => {
     const serverLoad = deferred<{
       success: boolean
       data: { taskFlow: typeof taskFlowFixture }
@@ -509,14 +532,48 @@ describe('AutomationTasks config persistence', () => {
     mocks.loadUserConfig.mockReturnValueOnce(serverLoad.promise)
 
     await renderAutomation()
-    await click(scheduleSwitch())
+
+    expect(container.textContent).toContain('正在读取自动化配置…')
+    expect(container.querySelector('[role="status"]')?.textContent).toContain('正在读取自动化配置…')
+    expect(scheduleSwitch()).toBeNull()
+    expect(container.querySelector('[aria-haspopup="menu"]')).toBeNull()
+    expect(container.querySelector('[aria-controls="automation-task-editor"]')).toBeNull()
+    expect(JSON.parse(localStorage.getItem('maa-task-flow') || '[]')).toEqual([])
 
     await act(async () => serverLoad.resolve({ success: true, data: { taskFlow: taskFlowFixture } }))
     await settle()
 
-    expect(mocks.loadUserConfig).toHaveBeenCalledOnce()
-    expect(container.textContent).not.toContain('理智作战')
-    expect(JSON.parse(localStorage.getItem('maa-task-flow') || '[]')).toEqual([])
+    expect(container.textContent).toContain('理智作战')
+    expect(scheduleSwitch()).not.toBeNull()
+    expect(container.querySelector('[aria-haspopup="menu"]')).not.toBeNull()
+  })
+
+  it('shows a fixed-height load failure gate and recovers through a forced reload', async () => {
+    mocks.loadUserConfig
+      .mockResolvedValueOnce({ success: false, message: '配置读取失败' })
+      .mockResolvedValueOnce({ success: true, data: { taskFlow: taskFlowFixture } })
+
+    await renderAutomation()
+
+    const gate = container.querySelector<HTMLElement>('[role="alert"]')
+    expect(gate?.textContent).toContain('自动化配置暂时不可用')
+    expect(gate?.textContent).toContain('配置读取失败')
+    expect(scheduleSwitch()).toBeNull()
+    expect(container.querySelector('[aria-haspopup="menu"]')).toBeNull()
+    expect(container.querySelector('[aria-controls="automation-task-editor"]')).toBeNull()
+
+    const reloadButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find(button => button.textContent?.includes('重新加载'))
+    expect(reloadButton).toBeDefined()
+
+    await click(reloadButton!)
+    await settle()
+
+    expect(mocks.loadUserConfig).toHaveBeenCalledTimes(2)
+    expect(container.querySelector('[role="alert"]')).toBeNull()
+    expect(container.textContent).toContain('理智作战')
+    expect(scheduleSwitch()).not.toBeNull()
+    expect(container.querySelector('[aria-haspopup="menu"]')).not.toBeNull()
   })
 
   it('loads the server copy when a pending marker has no local draft', async () => {
@@ -530,7 +587,7 @@ describe('AutomationTasks config persistence', () => {
     expect(container.textContent).toContain('理智作战')
   })
 
-  it('retries the whole commit from the page alert after the schedule step fails', async () => {
+  it('retries the whole commit from the save error toast after the schedule step fails', async () => {
     mocks.loadUserConfig.mockResolvedValue({
       success: true,
       data: { taskFlow: taskFlowFixture, schedule: { enabled: false, times: ['08:00'] } },
@@ -541,18 +598,27 @@ describe('AutomationTasks config persistence', () => {
     await click(scheduleSwitch())
 
     expect(pendingDraft()).not.toBeNull()
-    const retryButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
-      .find(button => button.textContent?.includes('重新同步'))
-    expect(retryButton).toBeDefined()
+    const failedNotice = mocks.notify.mock.calls.find(([message]) => (
+      String(message).includes('排班设置失败')
+    ))
+    expect(failedNotice).toBeDefined()
+    const { action } = failedNotice![2] as {
+      action: { label: string; onClick: () => void }
+    }
+    expect(action.label).toBe('重新同步')
+    mocks.dismissNotice.mockClear()
 
-    await click(retryButton!)
+    await act(async () => {
+      action.onClick()
+      await Promise.resolve()
+    })
     await settle()
 
     expect(mocks.saveUserConfig).toHaveBeenCalledTimes(2)
     expect(mocks.setupSchedule).toHaveBeenCalledTimes(2)
     expect(pendingDraft()).toBeNull()
     expect(container.querySelector('[role="alert"]')).toBeNull()
-    expect(mocks.notify).toHaveBeenCalledWith('自动化配置已同步', 'success')
+    expect(mocks.dismissNotice).toHaveBeenCalledWith('automation-config-save')
   })
 
   it('does not confirm a newer revision when an older commit finishes late', async () => {
@@ -731,6 +797,9 @@ describe('AutomationTasks config persistence', () => {
 
     expect(mocks.loadUserConfig).toHaveBeenCalledTimes(2)
     expect(mocks.notify).toHaveBeenCalledWith('自动化配置刷新失败，请稍后重试', 'warning')
+    expect(container.textContent).toContain('理智作战')
+    expect(container.querySelector('[aria-haspopup="menu"]')).not.toBeNull()
+    expect(container.textContent).not.toContain('自动化配置暂时不可用')
   })
 
   it('reloads the automation flow when training applies a plan', async () => {

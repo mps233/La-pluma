@@ -34,10 +34,8 @@ export interface AutomationTaskFlowPanelProps {
   activeTaskId: string | null
   execution: AutomationFlowExecutionProjection
   sorting: AutomationFlowSortingProjection
-  lastDeletedTaskName: string | null
   onSelectTask: (taskId: string) => void
   onAddTask: (task: AutomationAvailableTask) => void
   onRemoveTask: (index: number) => void
   onToggleTask: (index: number) => void
-  onRestoreDeletedTask: () => void
 }

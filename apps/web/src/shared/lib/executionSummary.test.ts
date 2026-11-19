@@ -6,7 +6,7 @@ describe('execution summary formatting', () => {
     expect(formatExecutionActionSummary([
       { action: 'startup', status: 'success' },
       { action: 'operprogress', status: 'success', observed: false },
-    ])).toBe('流程执行完成 · 成功 1 项 · 游戏结果未确认 1 项')
+    ])).toBe('流程执行完成 · 游戏结果未确认 1 项')
   })
 
   it('keeps a failed process without game callbacks classified as failed', () => {
@@ -19,7 +19,7 @@ describe('execution summary formatting', () => {
     expect(formatExecutionActionSummary([
       { action: 'operprogress', status: 'success', message: '已启动专精训练' },
       { action: 'operprogress', status: 'failed' },
-    ])).toBe('游戏内培养 · 成功 1 项 · 失败 1 项')
+    ])).toBe('游戏内培养 · 失败 1 项')
     expect(formatExecutionActionSummary([{ action: 'switchtheme', status: 'skipped' }]))
       .toBe('更换游戏主题 · 跳过 1 项')
     expect(formatExecutionActionSummary([{ action: 'operprogress', status: 'success', observed: false, message: '培养进程已结束，游戏结果未确认' }]))
@@ -29,15 +29,15 @@ describe('execution summary formatting', () => {
   it('surfaces deferred mastery targets in the oper progress summary only', () => {
     expect(formatExecutionActionSummary([
       { action: 'operprogress', status: 'success', deferredCount: 1 },
-    ])).toBe('游戏内培养 · 成功 1 项 · 1 项专精待处理')
+    ])).toBe('游戏内培养 · 1 项专精待处理')
     expect(formatExecutionActionSummary([
       { action: 'operprogress', status: 'success' },
       { action: 'operprogress', status: 'success', deferredCount: 2 },
-    ])).toBe('游戏内培养 · 成功 2 项 · 2 项专精待处理')
+    ])).toBe('游戏内培养 · 2 项专精待处理')
     expect(formatExecutionActionSummary([
       { action: 'startup', status: 'success' },
       { action: 'operprogress', status: 'success', deferredCount: 1 },
-    ])).toBe('流程执行完成 · 成功 2 项 · 1 项专精待处理')
+    ])).toBe('流程执行完成 · 1 项专精待处理')
     expect(formatExecutionActionSummary([
       { action: 'fight', status: 'success', stage: '1-7', times: 1, deferredCount: 1 },
     ])).toBe('作战完成 · 1-7 1 次')
@@ -83,7 +83,7 @@ describe('execution summary formatting', () => {
     expect(formatExecutionActionSummary([
       { action: 'startup', status: 'success' },
       { action: 'closedown', status: 'failed' },
-    ])).toBe('流程执行完成 · 成功 1 项 · 失败 1 项')
+    ])).toBe('流程执行完成 · 失败 1 项')
   })
 
   it('formats recruit metrics without exposing the full tag list', () => {

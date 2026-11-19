@@ -56,6 +56,14 @@ function createAdapter(
   }
 }
 
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>(resolvePromise => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 let coordinator: UserConfigCoordinator
 let fetchMock: ReturnType<typeof vi.fn<(options: { signal: AbortSignal }) => Promise<ConfigLoadResult>>>
 let commitMock: ReturnType<typeof vi.fn<(wire: Wire) => Promise<ConfigCommitResult>>>
@@ -64,10 +72,18 @@ let container: HTMLDivElement
 let root: Root
 
 function Harness({ autoHydrate = true }: { autoHydrate?: boolean }) {
-  const { draft, hydrated, pending, syncState, error, update, retry, reload } = useUserConfig(
-    adapter,
-    { coordinator, autoHydrate },
-  )
+  const {
+    draft,
+    hydrated,
+    pending,
+    syncState,
+    error,
+    loadState,
+    loadError,
+    update,
+    retry,
+    reload,
+  } = useUserConfig(adapter, { coordinator, autoHydrate })
   return (
     <div>
       <span data-testid="draft">{draft?.value ?? 'empty'}</span>
@@ -75,6 +91,8 @@ function Harness({ autoHydrate = true }: { autoHydrate?: boolean }) {
       <span data-testid="pending">{String(pending)}</span>
       <span data-testid="sync">{syncState}</span>
       <span data-testid="error">{error ?? ''}</span>
+      <span data-testid="load-state">{loadState}</span>
+      <span data-testid="load-error">{loadError ?? ''}</span>
       <button data-testid="update" type="button" onClick={() => update({ value: 'edited' })}>update</button>
       <button data-testid="retry" type="button" onClick={() => { void retry() }}>retry</button>
       <button data-testid="reload" type="button" onClick={() => { void reload() }}>reload</button>
@@ -135,6 +153,36 @@ describe('useUserConfig', () => {
     })
     await flush()
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('exposes the loading and failed read states before a draft is available', async () => {
+    const load = deferred<ConfigLoadResult>()
+    fetchMock.mockReturnValueOnce(load.promise)
+
+    await act(async () => {
+      root.render(<Harness />)
+    })
+    await flush()
+
+    expect(text('load-state')).toBe('loading')
+    expect(text('load-error')).toBe('')
+    expect(text('hydrated')).toBe('false')
+    expect(text('draft')).toBe('empty')
+
+    load.resolve({ ok: false, message: '后端不可用' })
+    await flush()
+
+    expect(text('load-state')).toBe('failed')
+    expect(text('load-error')).toBe('后端不可用')
+    expect(text('hydrated')).toBe('false')
+
+    fetchMock.mockResolvedValueOnce({ ok: true, payload: { value: 'server' } })
+    await click('reload')
+
+    expect(text('load-state')).toBe('ready')
+    expect(text('load-error')).toBe('')
+    expect(text('hydrated')).toBe('true')
+    expect(text('draft')).toBe('server')
   })
 
   it('pushes accepted edits into the coordinator and re-renders subscribers', async () => {

@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   getNotificationConfig: vi.fn(),
   saveNotificationConfig: vi.fn(),
   testNotificationChannel: vi.fn(),
+  notify: vi.fn(),
+  dismissNotice: vi.fn(),
 }))
 
 vi.mock('../api', () => ({
@@ -21,6 +23,11 @@ vi.mock('../api', () => ({
   getNotificationConfig: mocks.getNotificationConfig,
   saveNotificationConfig: mocks.saveNotificationConfig,
   testNotificationChannel: mocks.testNotificationChannel,
+}))
+
+vi.mock('@/shared/notifications', () => ({
+  notify: mocks.notify,
+  dismissNotice: mocks.dismissNotice,
 }))
 
 interface NotificationConfigFixture {
@@ -117,6 +124,8 @@ describe('NotificationSettings Query lifecycle', () => {
     mocks.getNotificationConfig.mockReset().mockResolvedValue({ success: true, data: loadedConfig })
     mocks.saveNotificationConfig.mockReset().mockResolvedValue({ success: true, message: '通知配置已保存' })
     mocks.testNotificationChannel.mockReset().mockResolvedValue({ success: true, message: '测试通知已发送' })
+    mocks.notify.mockReset()
+    mocks.dismissNotice.mockReset()
     queryClient = createQueryClient()
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -156,25 +165,33 @@ describe('NotificationSettings Query lifecycle', () => {
     expect(saveButton()?.disabled).toBe(false)
   })
 
-  it('shows a retryable load error without rendering an empty config form', async () => {
+  it('routes a load error to a toast and keeps a fixed-height unavailable placeholder', async () => {
     mocks.getNotificationConfig
       .mockResolvedValueOnce({ success: false, message: '通知配置暂不可用' })
       .mockResolvedValueOnce({ success: true, data: loadedConfig })
 
     await renderMode('visible')
 
-    const alert = container.querySelector<HTMLElement>('[role="alert"]')
-    expect(alert?.textContent).toContain('通知配置暂不可用')
+    expect(mocks.notify).toHaveBeenCalledWith(
+      '通知配置暂不可用',
+      'error',
+      {
+        id: 'automation-notification-load',
+        action: { label: '重新加载', onClick: expect.any(Function) },
+      },
+    )
+    expect(container.querySelector('[role="alert"]')).toBeNull()
+    expect(container.textContent).toContain('通知配置暂不可用')
+    expect(container.querySelector('.automation-notification-loading')?.textContent).toBe('通知配置暂不可用')
     expect(tokenInput()).toBeNull()
     expect(saveButton()).toBeUndefined()
-    const retryButton = buttonByText('重新加载')
-    expect(retryButton).toBeDefined()
 
-    await act(async () => retryButton?.click())
+    const { action } = mocks.notify.mock.calls[0]![2]
+    await act(async () => action.onClick())
     await flush()
 
     expect(mocks.getNotificationConfig).toHaveBeenCalledTimes(2)
-    expect(container.querySelector('[role="alert"]')).toBeNull()
+    expect(mocks.dismissNotice).toHaveBeenCalledWith('automation-notification-load')
     expect(tokenInput()?.value).toBe('server-token')
     expect(saveButton()?.disabled).toBe(true)
 
@@ -198,7 +215,12 @@ describe('NotificationSettings Query lifecycle', () => {
 
     expect(mocks.saveNotificationConfig).toHaveBeenCalledOnce()
     expect(saveButton()?.disabled).toBe(true)
-    expect(container.textContent).toContain('保存完成')
+    expect(mocks.notify).toHaveBeenCalledWith(
+      '保存完成',
+      'success',
+      { id: 'automation-notification-save' },
+    )
+    expect(container.textContent).not.toContain('保存完成')
     expect(container.textContent).not.toContain('有未保存的更改')
   })
 
@@ -231,22 +253,57 @@ describe('NotificationSettings Query lifecycle', () => {
     expect(container.textContent).toContain('凭据不完整，不会发送')
   })
 
-  it('keeps test and save feedback in separate notices', async () => {
+  it('routes test and save feedback to separate fixed toast ids', async () => {
     mocks.testNotificationChannel.mockResolvedValue({ success: true, message: '测试消息已送达' })
+    mocks.saveNotificationConfig.mockResolvedValue({ success: true, message: '通知配置已保存' })
 
     await renderMode('visible')
     await act(async () => testButton()?.click())
     await flush()
-    expect(statusTexts()).toEqual(['测试消息已送达'])
+
+    expect(mocks.notify).toHaveBeenCalledWith(
+      '测试消息已送达',
+      'success',
+      { id: 'automation-notification-test' },
+    )
+    expect(statusTexts()).toEqual([])
+    expect(container.textContent).not.toContain('测试消息已送达')
 
     await setInputValue(tokenInput()!, 'draft-token')
-    expect(container.textContent).toContain('测试消息已送达')
-    expect(container.textContent).not.toContain('通知配置已保存')
-
     await act(async () => saveButton()?.click())
     await flush()
 
-    expect(statusTexts()).toEqual(['测试消息已送达', '通知配置已保存'])
+    expect(mocks.notify).toHaveBeenCalledWith(
+      '通知配置已保存',
+      'success',
+      { id: 'automation-notification-save' },
+    )
+    expect(statusTexts()).toEqual([])
+    expect(container.textContent).not.toContain('通知配置已保存')
+  })
+
+  it('routes failed test and save results to error toasts', async () => {
+    mocks.testNotificationChannel.mockResolvedValue({ success: false, message: '测试通知失败' })
+    mocks.saveNotificationConfig.mockResolvedValue({ success: false, message: '通知配置保存失败' })
+
+    await renderMode('visible')
+    await act(async () => testButton()?.click())
+    await flush()
+    expect(mocks.notify).toHaveBeenCalledWith(
+      '测试通知失败',
+      'error',
+      { id: 'automation-notification-test' },
+    )
+
+    await setInputValue(tokenInput()!, 'draft-token')
+    await act(async () => saveButton()?.click())
+    await flush()
+    expect(mocks.notify).toHaveBeenCalledWith(
+      '通知配置保存失败',
+      'error',
+      { id: 'automation-notification-save' },
+    )
+    expect(container.querySelector('[role="alert"]')).toBeNull()
   })
 
   it('finishes a pending save after Activity cleanup and writes the Query cache', async () => {

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import type { StageConfig } from '../types'
 import {
   buildSmartStages,
-  countConfiguredStages,
   createEmptyStage,
   findTrainingOperators,
   flattenStagesForEditing,
@@ -64,11 +63,6 @@ describe('stageEditing', () => {
     expect(flattened).toHaveLength(stages.length)
     expect(flattened.map(item => JSON.stringify(item)).sort())
       .toEqual(stages.map(item => JSON.stringify(item)).sort())
-  })
-
-  it('counts only rows with a stage name', () => {
-    expect(countConfiguredStages(['1-7', { stage: ' ', times: '' }, stage('CE-6'), { stage: '', times: '' }]))
-      .toBe(2)
   })
 
   it('reads the last smart stage with operator names and ignores older or empty entries', () => {

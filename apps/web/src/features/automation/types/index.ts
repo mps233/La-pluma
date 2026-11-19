@@ -8,7 +8,6 @@ export type TaskParamFieldType =
   | 'select'
   | 'checkbox'
   | 'multi-stages'
-  | 'stage-with-times'
   | 'star-select'
   | 'facility-select'
   | 'infrast-schedule'
@@ -24,7 +23,7 @@ export interface OperProgressPlan {
 }
 
 export interface TaskParamField {
-  key: string
+  key: TaskParamKey
   label: string
   type: TaskParamFieldType
   placeholder?: string
@@ -35,8 +34,8 @@ export interface TaskParamField {
   min?: string
   max?: string
   timesPlaceholder?: string
-  visibleWhen?: { key: string; value: string | number | boolean }
-  hiddenWhen?: { key: string; value: string | number | boolean }
+  visibleWhen?: { key: TaskParamKey; value: string | number | boolean }
+  hiddenWhen?: { key: TaskParamKey; value: string | number | boolean }
 }
 
 export interface StageConfig {
@@ -120,8 +119,20 @@ export interface TaskParams {
   mining?: boolean
   specialaccess?: boolean
   signinevent?: boolean
+}
 
-  [key: string]: any
+export type TaskParamKey = keyof TaskParams
+export type TaskParamValue = TaskParams[TaskParamKey]
+
+export interface TaskFlowWireItem {
+  id: string
+  name: string
+  commandId: TaskCommandId
+  taskType?: string
+  params: TaskParams
+  enabled: boolean
+  description?: string
+  defaultParams?: TaskParams
 }
 
 export interface AutomationAvailableTask {

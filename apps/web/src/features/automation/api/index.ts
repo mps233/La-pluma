@@ -6,6 +6,7 @@ import {
   readApiResponse,
   type ApiResponse,
 } from '@/shared/api'
+import type { TaskFlowWireItem } from '../types'
 
 const isActivityPayload = (payload: unknown): boolean => isRecord(payload)
 
@@ -37,7 +38,7 @@ export async function getActivity(clientType?: string, signal?: AbortSignal): Pr
 export async function setupSchedule(
   scheduleId: string = 'default',
   times: string[],
-  taskFlow: any[]
+  taskFlow: TaskFlowWireItem[]
 ): Promise<ApiResponse> {
   const response = await fetchWithAuth(`${API_BASE_URL}/agent/schedules`, {
     method: 'POST',
@@ -78,7 +79,7 @@ export interface ScheduleExecutionOptions {
 
 export async function executeScheduleNow(
   scheduleId: string = 'default',
-  taskFlow: any[],
+  taskFlow: TaskFlowWireItem[],
   options: ScheduleExecutionOptions = {},
 ): Promise<ApiResponse> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }

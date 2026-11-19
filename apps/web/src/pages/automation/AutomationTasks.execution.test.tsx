@@ -349,6 +349,9 @@ const click = async (element: HTMLElement | null) => {
   await flush()
 }
 
+const isDisabled = (element: Element | null) => Boolean(element && (
+  element.hasAttribute('disabled') || element.getAttribute('aria-disabled') === 'true'
+))
 const runButton = () => container.querySelector<HTMLButtonElement>(
   'button[data-status-key="ready"], button[data-status-key="running"]',
 )
@@ -448,7 +451,7 @@ describe('AutomationTasks execution', () => {
     api.fetchSnapshot.mockResolvedValue(ok(snapshot({ lastRun: dailyRun('run-1', 'succeeded', { result: { summary: result } }) })))
     await refreshController()
     expect(stopButton()).toBeNull()
-    expect(container.textContent).toContain('游戏任务 · 成功 1 项 · 跳过 1 项')
+    expect(container.textContent).toContain('游戏任务 · 跳过 1 项')
     await click(container.querySelector<HTMLButtonElement>('[aria-label="展开执行详情"]'))
     expect(container.textContent).toContain('已启动专精训练')
     expect(container.textContent).toContain('主题已设置')
@@ -477,9 +480,76 @@ describe('AutomationTasks execution', () => {
     expect(options.waitForCompletion).toBe(false)
     expect(options.idempotencyKey).toMatch(/^run_daily_flow-/)
     expect(stopButton()).not.toBeNull()
+    expect(stopButton()?.textContent?.trim()).toBe('终止')
+    expect(stopButton()?.querySelector('svg')).toBeNull()
+
+    expect(runButton()).toBeNull()
+    expect(mocks.executeScheduleNow).toHaveBeenCalledOnce()
+  })
+
+  it('moves focus to the stop action after this page starts the flow', async () => {
+    api.fetchSnapshot.mockResolvedValue(ok(snapshot()))
+    useIdentity()
+    await renderPage()
+    const submission = deferred<ApiResponse<Record<string, unknown>>>()
+    mocks.executeScheduleNow.mockReturnValue(submission.promise)
 
     await click(runButton())
-    expect(mocks.executeScheduleNow).toHaveBeenCalledOnce()
+
+    expect(runButton()?.textContent).toContain('正在启动')
+    document.body.tabIndex = -1
+    document.body.focus()
+    expect(document.activeElement).toBe(document.body)
+
+    api.fetchSnapshot.mockResolvedValue(ok(activeSnapshot()))
+    await act(async () => submission.resolve(ok({
+      accepted: true,
+      runId: 'run-1',
+      run: dailyRun('run-1', 'running'),
+    })))
+    await flush()
+
+    expect(runButton()).toBeNull()
+    expect(document.activeElement).toBe(stopButton())
+    document.body.removeAttribute('tabindex')
+  })
+
+  it('does not take focus when an external run appears after a rejected local start', async () => {
+    const invalidFlow: TaskFlowItem[] = [
+      flow[0]!,
+      {
+        id: 'infrast-1',
+        commandId: 'infrast',
+        name: '基建换班',
+        icon: null,
+        description: '自动基建换班收菜',
+        defaultParams: {},
+        paramFields: [],
+        params: { mode: '10000', filename: '' },
+        enabled: true,
+        taskType: 'Infrast',
+      },
+    ]
+    mocks.loadUserConfig.mockResolvedValue(ok({ taskFlow: invalidFlow }))
+    useIdentity()
+    await renderPage()
+
+    await click(runButton())
+
+    expect(mocks.executeScheduleNow).not.toHaveBeenCalled()
+    document.body.tabIndex = -1
+    document.body.focus()
+    expect(document.activeElement).toBe(document.body)
+
+    api.fetchSnapshot.mockResolvedValue(ok(activeSnapshot({ runId: 'run-ext' })))
+    await act(async () => {
+      mocks.controller.current.observeRun('run-ext', 'run_daily_flow', 'dashboard')
+    })
+    await flush()
+
+    expect(stopButton()).not.toBeNull()
+    expect(document.activeElement).toBe(document.body)
+    document.body.removeAttribute('tabindex')
   })
 
   it('closes the add-task picker when a run starts', async () => {
@@ -497,6 +567,153 @@ describe('AutomationTasks execution', () => {
 
     expect(document.querySelector('[role="menu"]')).toBeNull()
     expect(container.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')?.disabled).toBe(true)
+  })
+
+  it('locks flow editing while a submission is pending but keeps schedule editing available', async () => {
+    useIdentity()
+    await renderPage()
+    const submission = deferred<ApiResponse<Record<string, unknown>>>()
+    mocks.executeScheduleNow.mockReturnValue(submission.promise)
+
+    await click(runButton())
+
+    const submittingRunButton = runButton()
+    expect(submittingRunButton?.textContent).toContain('正在启动')
+    expect(submittingRunButton?.getAttribute('data-status-key')).toBe('running')
+    expect(submittingRunButton?.getAttribute('aria-busy')).toBe('true')
+    expect(submittingRunButton?.disabled).toBe(true)
+    const dragHandles = [...container.querySelectorAll('[aria-label^="调整"]')]
+    expect(dragHandles.length).toBeGreaterThan(0)
+    expect(dragHandles.every(isDisabled)).toBe(true)
+    expect(dragHandles[0]?.getAttribute('title')).toBe('执行或启动期间不能排序')
+    expect([...container.querySelectorAll('[aria-controls="automation-task-editor"]')].every(isDisabled)).toBe(true)
+    expect([...container.querySelectorAll('[role="switch"][aria-label$="启用状态"]')].every(isDisabled)).toBe(true)
+    expect([...container.querySelectorAll('[aria-label^="删除"]')].every(isDisabled)).toBe(true)
+    expect(isDisabled(container.querySelector('[aria-haspopup="menu"]'))).toBe(true)
+    expect(isDisabled(container.querySelector('#automation-startup-1-accountName'))).toBe(true)
+    expect(isDisabled(container.querySelector('[aria-label="启用定时执行"]'))).toBe(false)
+
+    await act(async () => submission.resolve(ok({
+      accepted: true,
+      runId: 'run-1',
+      run: dailyRun('run-1', 'running'),
+    })))
+    await flush()
+  })
+
+  it('hides flow delete actions while submitting or running and restores them when idle', async () => {
+    const deleteButtons = () => [...container.querySelectorAll<HTMLButtonElement>('[aria-label^="删除"]')]
+    const enabledSwitches = () => [...container.querySelectorAll('[role="switch"][aria-label$="启用状态"]')]
+
+    useIdentity()
+    await renderPage()
+    const submission = deferred<ApiResponse<Record<string, unknown>>>()
+    mocks.executeScheduleNow.mockReturnValue(submission.promise)
+
+    await click(runButton())
+
+    expect(deleteButtons().length).toBeGreaterThan(0)
+    expect(deleteButtons().every(isDisabled)).toBe(true)
+    expect(deleteButtons().every(button => button.getAttribute('aria-hidden') === 'true')).toBe(true)
+    expect(deleteButtons().every(button => button.classList.contains('is-execution-hidden'))).toBe(true)
+    expect(enabledSwitches().length).toBeGreaterThan(0)
+    expect(enabledSwitches().every(isDisabled)).toBe(true)
+    expect(enabledSwitches().every(element => element.getAttribute('aria-hidden') === null)).toBe(true)
+
+    api.fetchSnapshot.mockResolvedValue(ok(activeSnapshot()))
+    await act(async () => submission.resolve(ok({
+      accepted: true,
+      runId: 'run-1',
+      run: dailyRun('run-1', 'running'),
+    })))
+    await flush()
+
+    expect(stopButton()).not.toBeNull()
+    expect(runningItems()).toHaveLength(1)
+    expect(deleteButtons().length).toBeGreaterThan(0)
+    expect(deleteButtons().every(isDisabled)).toBe(true)
+    expect(deleteButtons().every(button => button.getAttribute('aria-hidden') === 'true')).toBe(true)
+    expect(deleteButtons().every(button => button.classList.contains('is-execution-hidden'))).toBe(true)
+    expect(enabledSwitches().length).toBeGreaterThan(0)
+    expect(enabledSwitches().every(isDisabled)).toBe(true)
+    expect(enabledSwitches().every(element => element.getAttribute('aria-hidden') === null)).toBe(true)
+
+    api.fetchSnapshot.mockResolvedValue(ok(terminalSnapshot('succeeded', {
+      message: '任务流程执行完成',
+      summary: summary(['success', 'success', 'success']),
+    })))
+    await refreshController()
+
+    expect(stopButton()).toBeNull()
+    expect(runButton()?.textContent).toContain('开始')
+    expect(deleteButtons().length).toBeGreaterThan(0)
+    expect(deleteButtons().every(button => button.getAttribute('aria-hidden') === null)).toBe(true)
+    expect(deleteButtons().every(button => !button.classList.contains('is-execution-hidden'))).toBe(true)
+    expect(deleteButtons().every(button => !isDisabled(button))).toBe(true)
+  })
+
+  it('keeps the deleted-task restore action from editing the flow during a run', async () => {
+    useIdentity()
+    await renderPage()
+
+    await click(container.querySelector<HTMLButtonElement>('[aria-label="删除启动游戏"]'))
+    const deletedNotice = mocks.notify.mock.calls.find(([message]) => (
+      String(message).includes('已删除“启动游戏”')
+    ))
+    expect(deletedNotice).toBeDefined()
+    const { action } = deletedNotice![2] as {
+      action: { label: string; onClick: () => void }
+    }
+
+    api.fetchSnapshot.mockResolvedValue(ok(activeSnapshot()))
+    await click(runButton())
+    expect(container.querySelectorAll('[aria-controls="automation-task-editor"]')).toHaveLength(2)
+
+    await act(async () => action.onClick())
+    await flush()
+
+    expect(mocks.notify).toHaveBeenCalledWith(
+      '执行或启动期间不能恢复已删除的任务',
+      'warning',
+      { id: 'automation-restore-blocked' },
+    )
+    expect(container.querySelectorAll('[aria-controls="automation-task-editor"]')).toHaveLength(2)
+  })
+
+  it('keeps the deleted-task restore action from editing the flow while a submission is pending', async () => {
+    useIdentity()
+    await renderPage()
+
+    await click(container.querySelector<HTMLButtonElement>('[aria-label="删除启动游戏"]'))
+    const deletedNotice = mocks.notify.mock.calls.find(([message]) => (
+      String(message).includes('已删除“启动游戏”')
+    ))
+    expect(deletedNotice).toBeDefined()
+    const { action } = deletedNotice![2] as {
+      action: { label: string; onClick: () => void }
+    }
+
+    const submission = deferred<ApiResponse<Record<string, unknown>>>()
+    mocks.executeScheduleNow.mockReturnValue(submission.promise)
+    await click(runButton())
+    expect(runButton()?.textContent).toContain('正在启动')
+
+    await act(async () => action.onClick())
+    await flush()
+
+    expect(mocks.notify).toHaveBeenCalledWith(
+      '执行或启动期间不能恢复已删除的任务',
+      'warning',
+      { id: 'automation-restore-blocked' },
+    )
+    expect(container.querySelectorAll('[aria-controls="automation-task-editor"]')).toHaveLength(2)
+
+    await act(async () => submission.resolve(ok({
+      accepted: true,
+      runId: 'run-1',
+      run: dailyRun('run-1', 'running'),
+    })))
+    await flush()
   })
 
   it('blocks a custom shift without a schedule file and selects it for editing', async () => {
@@ -556,6 +773,7 @@ describe('AutomationTasks execution', () => {
 
     expect(runningItems()).toHaveLength(1)
     expect(completedItems()).toHaveLength(0)
+    expect(runButton()).toBeNull()
     expect(stopButton()).not.toBeNull()
 
     api.fetchSnapshot.mockResolvedValue(ok(activeSnapshot({
@@ -566,6 +784,9 @@ describe('AutomationTasks execution', () => {
     expect(completedItems()).toHaveLength(1)
     expect(runningItems()).toHaveLength(1)
     expect(sequenceLabels()).toEqual(['已完成', '正在执行', '等待执行'])
+    const completedRow = container.querySelector<HTMLElement>('[data-execution-state="completed"]')
+    expect(completedRow?.querySelector('[role="img"][aria-label="已完成"]')).toBeNull()
+    expect(isDisabled(completedRow?.querySelector('button[aria-label^="删除"]') ?? null)).toBe(true)
 
     // 第二项已完成、流程处于两项之间的延迟：Run 仍活动，不能提前标成完成。
     api.fetchSnapshot.mockResolvedValue(ok(activeSnapshot({
@@ -588,7 +809,7 @@ describe('AutomationTasks execution', () => {
     expect(completedItems()).toHaveLength(3)
     expect(runningItems()).toHaveLength(0)
     expect(stopButton()).toBeNull()
-    expect(runButton()?.textContent).toContain('立即执行')
+    expect(runButton()?.textContent).toContain('开始')
     expect(container.textContent).toContain('最近执行')
     expect(mocks.notify).toHaveBeenLastCalledWith('任务流程执行完成', 'success', { id: 'execution' })
   })
@@ -620,9 +841,10 @@ describe('AutomationTasks execution', () => {
     useIdentity({ runId: 'run-1', operationId: 'run_daily_flow', scope: 'dashboard' })
     await renderPage()
 
-    expect(runButton()?.textContent).toContain('执行中')
-    expect(runButton()?.disabled).toBe(true)
+    expect(runButton()).toBeNull()
     expect(stopButton()).not.toBeNull()
+    expect(stopButton()?.textContent?.trim()).toBe('终止')
+    expect(document.activeElement).not.toBe(stopButton())
     expect(sequenceLabels()).toEqual(['正在执行', '等待执行', '等待执行'])
     expect(mocks.executeScheduleNow).not.toHaveBeenCalled()
 
@@ -644,7 +866,7 @@ describe('AutomationTasks execution', () => {
     useIdentity({ runId: 'run-1', operationId: 'run_task', scope: 'dashboard' })
     await renderPage()
 
-    expect(runButton()?.textContent).toContain('立即执行')
+    expect(runButton()?.textContent).toContain('开始')
     expect(stopButton()).toBeNull()
   })
 
@@ -821,8 +1043,9 @@ describe('AutomationTasks execution', () => {
     await renderPage()
 
     expect(container.textContent).toContain('最近执行')
-    expect(container.textContent).toContain('成功 6')
-    expect(container.textContent).toContain('跳过 1')
+    expect(container.textContent).toContain('用时 952 秒')
+    expect(container.textContent).toContain('1 项任务已跳过')
+    expect(container.textContent).not.toContain('成功 6')
     expect(mocks.executeScheduleNow).not.toHaveBeenCalled()
   })
 

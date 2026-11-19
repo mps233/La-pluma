@@ -10,6 +10,7 @@ import {
 } from '@/features/user-config'
 import { setupSchedule, stopSchedule } from '../api'
 import type { TaskFlowItem } from '../types'
+import { findAutomationTaskDefaults } from './automationTaskDefaults'
 import {
   activeScheduleTimes,
   createDefaultScheduleEntries,
@@ -250,6 +251,40 @@ export function toPersistedTaskFlow(
   return flow.map(toPersistedTaskFlowItem)
 }
 
+function normalizeTaskFlowItem(item: Record<string, unknown>): AutomationTaskFlowItem {
+  const id = item.id as string
+  const commandId = typeof item.commandId === 'string' && item.commandId.length > 0
+    ? item.commandId
+    : id.split('-')[0] || ''
+  const definition = findAutomationTaskDefaults(commandId)
+  const {
+    icon: _icon,
+    paramFields: _paramFields,
+    defaultParams: defaultParams,
+    ...rest
+  } = item
+  const params = isRecord(item.params) ? item.params : {}
+  const migrated = migrateTaskParams({ ...rest, commandId, params })
+  const migratedParams = isRecord(migrated.params) ? migrated.params : {}
+  const normalized: Record<string, unknown> = {
+    ...migrated,
+    commandId,
+    enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
+    name: typeof item.name === 'string' && item.name.length > 0
+      ? item.name
+      : definition?.name || commandId,
+    description: typeof item.description === 'string'
+      ? item.description
+      : definition?.description ?? '',
+    params: definition ? { ...definition.defaultParams, ...migratedParams } : migratedParams,
+  }
+  if (isRecord(defaultParams)) normalized.defaultParams = defaultParams
+  if (typeof item.taskType === 'string') normalized.taskType = item.taskType
+  else if (definition?.taskType) normalized.taskType = definition.taskType
+  else delete normalized.taskType
+  return normalized as AutomationTaskFlowItem
+}
+
 function parseTaskFlow(value: unknown): AutomationTaskFlowItem[] | null {
   if (!Array.isArray(value)) return null
 
@@ -257,16 +292,7 @@ function parseTaskFlow(value: unknown): AutomationTaskFlowItem[] | null {
   for (const item of value) {
     if (!isRecord(item)) return null
     if (typeof item.id !== 'string' || item.id.length === 0) return null
-    if (item.params !== undefined && !isRecord(item.params)) return null
-    if (item.enabled !== undefined && typeof item.enabled !== 'boolean') return null
-    if (item.name !== undefined && typeof item.name !== 'string') return null
-    if (item.description !== undefined && typeof item.description !== 'string') return null
-    if (item.commandId !== undefined && typeof item.commandId !== 'string') return null
-    if (item.taskType !== undefined && typeof item.taskType !== 'string') return null
-    if (item.defaultParams !== undefined && !isRecord(item.defaultParams)) return null
-
-    const { icon: _icon, paramFields: _paramFields, ...rest } = item
-    tasks.push(migrateTaskParams(rest) as AutomationTaskFlowItem)
+    tasks.push(normalizeTaskFlowItem(item))
   }
 
   return placeClosedownLast(synchronizeConnectionParams(tasks))

@@ -1,4 +1,11 @@
-import type { AutomationAvailableTask, StageConfig, TaskFlowItem, TaskParams } from '../types'
+import type {
+  AutomationAvailableTask,
+  StageConfig,
+  TaskFlowItem,
+  TaskParamKey,
+  TaskParams,
+  TaskParamValue,
+} from '../types'
 import { parseDropTargets } from './dropTargets'
 import { flattenStagesForEditing, splitStagesForEditing } from './stageEditing'
 import { placeClosedownLast } from './taskFlowSort'
@@ -115,6 +122,14 @@ export function orderStagesForEditing(
   return flattenStagesForEditing(splitStagesForEditing(stages))
 }
 
+export function setTaskParam(
+  params: TaskParams,
+  key: TaskParamKey,
+  value: TaskParamValue,
+): TaskParams {
+  return { ...params, [key]: value }
+}
+
 /**
  * 更新单个任务的参数。
  *
@@ -125,8 +140,8 @@ export function orderStagesForEditing(
 export function updateTaskFlowParams<T extends TaskFlowEntry>(
   flow: T[],
   index: number,
-  key: string,
-  value: unknown,
+  key: TaskParamKey,
+  value: TaskParamValue,
 ): T[] {
   const currentTask = flow[index]
   if (!currentTask) return flow
@@ -134,7 +149,7 @@ export function updateTaskFlowParams<T extends TaskFlowEntry>(
   const nextValue = key === 'stages' && Array.isArray(value)
     ? orderStagesForEditing(value as Array<string | StageConfig>)
     : value
-  const nextParams: TaskParams = { ...(currentTask.params ?? {}), [key]: nextValue }
+  const nextParams = setTaskParam(currentTask.params ?? {}, key, nextValue)
   const syncsConnectionType = key === 'clientType'
 
   return flow.map((task, taskIndex) => {
@@ -147,7 +162,7 @@ export function updateTaskFlowParams<T extends TaskFlowEntry>(
         || (currentTask.commandId === 'closedown' && task.commandId === 'startup')
       )
     ) {
-      return { ...task, params: { ...(task.params ?? {}), clientType: value } }
+      return { ...task, params: setTaskParam(task.params ?? {}, key, value) }
     }
     return task
   })

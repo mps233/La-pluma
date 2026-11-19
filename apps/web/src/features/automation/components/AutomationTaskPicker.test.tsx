@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, useRef } from 'react'
+import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AutomationAvailableTask, TaskFlowItem } from '../types'
@@ -30,17 +30,13 @@ function Host({ disabled = false, flow = [] as TaskFlowItem[] }: {
   disabled?: boolean
   flow?: TaskFlowItem[]
 }) {
-  const regionRef = useRef<HTMLDivElement>(null)
-
   return (
-    <div ref={regionRef} data-testid="footer-region">
+    <div>
       <AutomationTaskPicker
         flow={flow}
         disabled={disabled}
         onAddTask={onAddTask}
-        regionRef={regionRef}
       />
-      <button type="button">立即执行</button>
     </div>
   )
 }
@@ -97,6 +93,9 @@ describe('AutomationTaskPicker', () => {
     await act(async () => root.render(<Host />))
     await openPicker()
 
+    expect(trigger().getAttribute('aria-label')).toBe('添加任务')
+    expect(trigger().getAttribute('title')).toBe('添加任务')
+    expect(trigger().textContent).toBe('')
     expect(trigger().getAttribute('aria-expanded')).toBe('true')
     const surface = menu()!
     expect(surface).not.toBeNull()
@@ -130,17 +129,13 @@ describe('AutomationTaskPicker', () => {
     expect(fightOption.textContent).toContain('2')
   })
 
-  it('stays open for presses inside the shared footer and closes outside it', async () => {
+  it('closes when pressing outside the menu', async () => {
     await act(async () => root.render(<Host />))
     await openPicker()
 
-    const runButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
-      .find(button => button.textContent === '立即执行')!
-    await dispatchPointerDown(runButton)
-    expect(menu()).not.toBeNull()
-
     await dispatchPointerDown(document.body)
     expect(menu()).toBeNull()
+    expect(trigger().getAttribute('aria-expanded')).toBe('false')
   })
 
   it('closes with Escape and restores trigger focus', async () => {

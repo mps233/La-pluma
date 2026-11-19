@@ -42,6 +42,7 @@ export type GuardrailRule =
   | 'domain-cycle'
   | 'deep-import'
   | 'layer-direction'
+  | 'model-component-dependency'
   | 'task-execution-reverse'
   | 'page-transport'
   | 'page-storage'
@@ -558,6 +559,15 @@ export function analyzeDependencies(files: readonly SourceFile[]): DependencyAna
         rule: 'layer-direction',
         file: edge.from,
         message: `features 不得依赖根入口模块：${edge.specifier}`,
+      })
+      continue
+    }
+
+    if (/^features\/[^/]+\/model\//.test(edge.from) && /^features\/[^/]+\/components\//.test(edge.to)) {
+      violations.push({
+        rule: 'model-component-dependency',
+        file: edge.from,
+        message: `features model 不得依赖 components：${edge.specifier}`,
       })
       continue
     }

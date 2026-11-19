@@ -16,19 +16,18 @@ test('停止中切页、断线重连和刷新都保留同一 Run，旧终态不�
   state.runState = 'succeeded'
   await installIntegrationScenario(page, state)
   await gotoScenario(page, 'automation')
-  await expect(page.getByRole('button', { name: '立即执行', exact: true })).toBeEnabled()
-  await expect(page.getByRole('button', { name: '开始', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '开始', exact: true })).toBeEnabled()
 
   // 同一个真实浏览器流程中只提交一次，Activity 切换不会创建第二个流程引擎。
-  await page.getByRole('button', { name: '立即执行', exact: true }).click()
+  await page.getByRole('button', { name: '开始', exact: true }).click()
   await expect.poll(() => state.submissions.length).toBe(1)
-  await expect(page.getByRole('button', { name: '终止执行', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '终止', exact: true })).toBeVisible()
   await expect(page.locator('[data-sonner-toast]').getByText('正在执行跨页场景任务', { exact: true })).toBeVisible()
   await navigateTo(page, 'dashboard')
   await expect(page.locator('[data-dashboard-flow-command]').getByText('正在执行跨页场景任务', { exact: true })).toBeVisible()
   await navigateTo(page, 'automation')
 
-  await page.getByRole('button', { name: '终止执行', exact: true }).click()
+  await page.getByRole('button', { name: '终止', exact: true }).click()
   await expect.poll(() => state.stopCalls).toEqual([state.runId])
 
   // 停止确认尚未到达终态时切到总览：页面组合层仍反映同一快照。
@@ -72,8 +71,8 @@ test('停止中切页、断线重连和刷新都保留同一 Run，旧终态不�
 
   state.runState = 'stopped'
   await page.evaluate(() => window.dispatchEvent(new Event('focus')))
-  await expect(page.getByRole('button', { name: '立即执行', exact: true })).toBeVisible()
-  await expect(page.getByRole('region', { name: '最近执行结果' })).toContainText('成功 1')
+  await expect(page.getByRole('button', { name: '开始', exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: '最近执行结果' })).toContainText('用时 12 秒')
   await navigateTo(page, 'dashboard')
   await expect(page.locator('[data-dashboard-flow-command]').getByText('准备就绪', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '开始', exact: true })).toBeEnabled()
@@ -103,11 +102,11 @@ test('停止中切页、断线重连和刷新都保留同一 Run，旧终态不�
     await expect.poll(() => oldReadStarted).toBe(true)
     await navigateTo(page, 'automation')
     expect(state.stopCalls).toEqual(previousStopCalls)
-    await expect(page.getByRole('button', { name: '终止执行', exact: true })).toBeVisible()
-    await page.getByRole('button', { name: '终止执行', exact: true }).click()
+    await expect(page.getByRole('button', { name: '终止', exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '终止', exact: true }).click()
     await expect.poll(() => state.stopCalls).toEqual([...previousStopCalls, state.staleRunId])
     releaseOldRead()
-    await expect(page.getByRole('button', { name: '终止执行', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '终止', exact: true })).toHaveCount(0)
     await navigateTo(page, 'dashboard')
     await expect(page.locator('[data-dashboard-flow-command]').getByText('正在执行跨页场景任务', { exact: true })).toBeVisible()
     expect(state.runState).toBe('running')
@@ -133,17 +132,17 @@ test('概览发起的今日流程由日常页接管并可直接停止', async ({
 
   // 同一 run_daily_flow 身份：日常页按操作标识接管概览发起的执行，入口不再可提交。
   await navigateTo(page, 'automation')
-  await expect(page.getByRole('button', { name: '执行中', exact: true })).toBeDisabled()
-  await expect(page.getByRole('button', { name: '终止执行', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '执行中', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '终止', exact: true })).toBeVisible()
   await expect(page.locator('[data-execution-state="running"]')).toHaveCount(1)
   expect(state.submissions).toHaveLength(1)
 
-  await page.getByRole('button', { name: '终止执行', exact: true }).click()
+  await page.getByRole('button', { name: '终止', exact: true }).click()
   await expect.poll(() => state.stopCalls).toEqual([state.runId])
 
   state.runState = 'stopped'
   await page.evaluate(() => window.dispatchEvent(new Event('focus')))
-  await expect(page.getByRole('button', { name: '立即执行', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '开始', exact: true })).toBeVisible()
   expect(state.submissions).toHaveLength(1)
 
   await navigateTo(page, 'dashboard')

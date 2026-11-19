@@ -203,13 +203,57 @@ describe('AutomationStageEditor', () => {
     ])
   })
 
+  it('keeps each stage row to one name field, one times field, and paired steppers', async () => {
+    await renderEditor(['1-7', stage('CE-6', '2')])
+
+    const nameInput = container.querySelector<HTMLInputElement>('#automation-fight-1-stages-1')!
+    const timesInput = container.querySelector<HTMLInputElement>('#automation-fight-1-stages-1-times')!
+    expect(nameInput.getAttribute('type')).toBe('text')
+    expect(timesInput.getAttribute('type')).toBe('number')
+    const row = nameInput.parentElement!
+    expect(row.querySelectorAll('input')).toHaveLength(2)
+    const timesWrapper = timesInput.parentElement!
+    expect(timesWrapper.classList.contains('number-input-wrapper')).toBe(true)
+    const timesGroup = timesInput.closest('.automation-stage-times')
+    expect(timesGroup).not.toBeNull()
+    expect(timesGroup?.contains(timesWrapper)).toBe(true)
+    expect(timesGroup?.querySelectorAll('input')).toHaveLength(1)
+    expect(timesGroup?.textContent).toContain('次')
+
+    const decrease = container.querySelector<HTMLButtonElement>('[aria-label="减少关卡 2 的执行次数"]')!
+    const increase = container.querySelector<HTMLButtonElement>('[aria-label="增加关卡 2 的执行次数"]')!
+    expect(decrease.parentElement).toBe(increase.parentElement)
+    expect(decrease.parentElement).toBe(timesWrapper.querySelector('.number-input-controls'))
+    expect(decrease.parentElement?.querySelectorAll('button')).toHaveLength(2)
+  })
+
+  it('keeps smart stage inputs disabled without row actions or steppers', async () => {
+    await renderEditor([stage('AP-5', '3', { smart: true, trainingOperators: ['阿米娅'] })])
+
+    const nameInput = container.querySelector<HTMLInputElement>('#automation-fight-1-stages-0')!
+    const timesInput = container.querySelector<HTMLInputElement>('#automation-fight-1-stages-0-times')!
+    expect(nameInput.disabled).toBe(true)
+    expect(timesInput.disabled).toBe(true)
+    const timesWrapper = timesInput.parentElement!
+    expect(timesWrapper.classList.contains('number-input-wrapper')).toBe(true)
+    expect(timesWrapper.querySelector('.number-input-controls')).toBeNull()
+    const deleteSlot = timesWrapper.parentElement?.nextElementSibling
+    expect(deleteSlot?.tagName).toBe('SPAN')
+    expect(deleteSlot?.getAttribute('aria-hidden')).toBe('true')
+    expect(deleteSlot?.querySelector('button')).toBeNull()
+    expect(container.querySelector('[aria-label="增加关卡 1 的执行次数"]')).toBeNull()
+    expect(container.querySelector('[aria-label="删除关卡 1"]')).toBeNull()
+  })
+
   it('renders the stage hint as a focusable tooltip on the stage fieldset', async () => {
     const stageHint = '使用 HD-数字代表当前活动关卡；置顶关卡会优先执行。次数为该关卡的累计作战局数上限（连战中的每一局都计 1），留空表示不限制局数'
     await renderEditor(['1-7', stage('CE-6', '2')], false, stageHint)
 
     const fieldset = container.querySelector('fieldset')
     expect(fieldset?.querySelector('legend')?.textContent).toBe('关卡计划')
-    expect(fieldset?.textContent).toContain('2 个关卡')
+    const title = fieldset?.querySelector('.automation-stage-editor-title')
+    expect(title?.textContent).toContain('关卡计划')
+    expect(title?.textContent).not.toContain('个关卡')
     const trigger = fieldset?.querySelector<HTMLButtonElement>('button[aria-label="关卡计划说明"]')
     expect(trigger).not.toBeNull()
     expect(trigger?.getAttribute('aria-describedby')).toBeNull()

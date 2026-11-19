@@ -4,6 +4,7 @@ export { USER_CONFIG_KEYS, USER_CONFIG_PENDING_KEYS } from './model/configKeys'
 export type { UserConfigKey } from './model/configKeys'
 
 export {
+  DEFAULT_LOAD_FAILURE_MESSAGE,
   DEFAULT_RESTORED_MESSAGE,
   UserConfigCoordinator,
   createConfigKeyStorage,
@@ -15,6 +16,7 @@ export type {
   ConfigCoordinatorState,
   ConfigKeyStorage,
   ConfigLoadResult,
+  ConfigLoadState,
   ConfigPersistenceAdapter,
   ConfigReloadOutcome,
   ConfigReloadReason,

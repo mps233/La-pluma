@@ -8,7 +8,6 @@ import { loadUserConfig } from '@/features/user-config'
 import type { StageConfig, TaskFlowItem, TaskParamField } from '../types'
 import {
   buildSmartStages,
-  countConfiguredStages,
   findTrainingOperators,
   insertSmartStages,
   isSmartStage,
@@ -28,7 +27,7 @@ interface AutomationStageEditorProps {
   taskIndex: number
   isRunning: boolean
   hint?: string
-  onUpdate: (taskIndex: number, key: string, value: Array<string | StageConfig>) => void
+  onUpdate: (taskIndex: number, key: 'stages', value: Array<string | StageConfig>) => void
   onSuccess: (message: string) => void
   onError: (message: string) => void
 }
@@ -68,7 +67,6 @@ export default function AutomationStageEditor({
   const stageControlsDisabled = controlsDisabled || isSmartStageLoading
   const smartStages = stages.filter(isSmartStage)
   const hasSmartStages = smartStages.length > 0
-  const validStageCount = countConfiguredStages(stages)
   const trainingOperators = findTrainingOperators(stages)
   const smartStageDescription = hasSmartStages
     ? trainingOperators.length > 0
@@ -149,7 +147,6 @@ export default function AutomationStageEditor({
       <div className="automation-stage-editor-header">
         <div className="automation-stage-editor-title">
           <label htmlFor={`${fieldId}-0`}>{field.label}计划</label>
-          <span>{validStageCount > 0 ? `${validStageCount} 个关卡` : '尚未配置'}</span>
           {hint && <FieldHint id={`${fieldId}-hint`} label={`${field.label}计划`} hint={hint} />}
         </div>
       </div>
@@ -180,7 +177,7 @@ export default function AutomationStageEditor({
                     variant="ghost"
                     onClick={() => togglePinned(stageIndex)}
                     disabled={stageControlsDisabled}
-                    className={`automation-stage-pin min-h-11 min-w-11${isPinnedStage ? ' is-active' : ''}`}
+                    className={`automation-stage-pin${isPinnedStage ? ' is-active' : ''}`}
                     title={isPinnedStage ? '取消置顶' : '置顶'}
                     aria-label={`${isPinnedStage ? '取消置顶' : '置顶'}：${field.label} ${stageIndex + 1}`}
                   >
@@ -198,7 +195,7 @@ export default function AutomationStageEditor({
                   onChange={event => updateStageName(stageIndex, event.target.value)}
                   placeholder={field.placeholder}
                   disabled={stageControlsDisabled || isSmartStageRow}
-                  className="automation-stage-name-input h-auto min-w-0 flex-1 rounded-none border-0 bg-transparent px-1.5 shadow-none md:text-sm focus-visible:ring-0"
+                  className={`min-w-0 flex-1${isSmartStageRow ? ' disabled:opacity-100 disabled:text-foreground' : ''}`}
                   data-automation-stage-name
                 />
                 <datalist id={suggestionsId}>
@@ -208,54 +205,57 @@ export default function AutomationStageEditor({
                 </datalist>
 
                 <div className="automation-stage-times">
-                  <Input
-                    id={`${fieldId}-${stageIndex}-times`}
-                    type="number"
-                    autoComplete="off"
-                    aria-label={`${field.label} ${stageIndex + 1} 执行次数`}
-                    value={stageTimes}
-                    onChange={event => updateStageTimes(stageIndex, event.target.value)}
-                    placeholder="0"
-                    disabled={stageControlsDisabled || isSmartStageRow}
-                    min="0"
-                    className="h-full min-w-0 rounded-none border-0 bg-transparent px-1 text-center shadow-none focus-visible:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
+                  <div className="number-input-wrapper automation-stage-times-input w-16 shrink-0 workbench:w-32">
+                    <Input
+                      id={`${fieldId}-${stageIndex}-times`}
+                      type="number"
+                      autoComplete="off"
+                      aria-label={`${field.label} ${stageIndex + 1} 执行次数`}
+                      value={stageTimes}
+                      onChange={event => updateStageTimes(stageIndex, event.target.value)}
+                      placeholder="0"
+                      disabled={stageControlsDisabled || isSmartStageRow}
+                      min="0"
+                      className={`min-w-0 text-center tabular-nums workbench:pr-16${isSmartStageRow ? ' disabled:opacity-100 disabled:text-foreground' : ''}`}
+                    />
+                    {!isSmartStageRow && (
+                      <div className="number-input-controls hidden workbench:flex">
+                        <button
+                          type="button"
+                          onClick={() => adjustStageTimes(stageIndex, -1)}
+                          disabled={stageControlsDisabled || Number(stageTimes) <= 0}
+                          aria-label={`减少${field.label} ${stageIndex + 1} 的执行次数`}
+                        >
+                          <Minus size={14} strokeWidth={2.1} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => adjustStageTimes(stageIndex, 1)}
+                          disabled={stageControlsDisabled}
+                          aria-label={`增加${field.label} ${stageIndex + 1} 的执行次数`}
+                        >
+                          <Plus size={14} strokeWidth={2.1} aria-hidden="true" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <span aria-hidden="true">次</span>
                 </div>
 
-                {!isSmartStageRow && (
-                  <div className="automation-stage-stepper hidden workbench:flex">
-                    <button
-                      type="button"
-                      onClick={() => adjustStageTimes(stageIndex, -1)}
-                      disabled={stageControlsDisabled || Number(stageTimes) <= 0}
-                      aria-label={`减少${field.label} ${stageIndex + 1} 的执行次数`}
-                    >
-                      <Minus size={14} strokeWidth={2.1} aria-hidden="true" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => adjustStageTimes(stageIndex, 1)}
-                      disabled={stageControlsDisabled}
-                      aria-label={`增加${field.label} ${stageIndex + 1} 的执行次数`}
-                    >
-                      <Plus size={14} strokeWidth={2.1} aria-hidden="true" />
-                    </button>
-                  </div>
-                )}
-
-                {canDeleteStage && (
+                {canDeleteStage ? (
                   <Button
                     size="icon"
                     variant="ghost"
                     onClick={() => deleteStage(stageIndex)}
                     disabled={stageControlsDisabled}
-                    className="automation-stage-delete min-h-11 min-w-11"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                     title="删除此关卡"
                     aria-label={`删除${field.label} ${stageIndex + 1}`}
                   >
                     <Trash2 size={16} strokeWidth={1.9} aria-hidden="true" />
                   </Button>
+                ) : (
+                  <span aria-hidden="true" className="size-8 shrink-0" />
                 )}
               </div>
             </div>
@@ -266,7 +266,7 @@ export default function AutomationStageEditor({
           variant="ghost"
           onClick={() => updateStages([...stages, { stage: '', times: '' }])}
           disabled={stageControlsDisabled}
-          className="automation-stage-add w-full"
+          className="automation-stage-add w-full justify-start"
         >
           <ListPlus size={17} strokeWidth={1.9} aria-hidden="true" />
           添加关卡
