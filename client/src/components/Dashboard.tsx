@@ -1,6 +1,6 @@
 import { getErrorMessage } from '@/utils/errorMessage'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Activity, Bot, CalendarDays, CheckCircle2, ChevronRight, Cpu, HardDrive, Database, PackageOpen, Play, ServerOff, Target, Thermometer, WifiOff } from 'lucide-react'
+import { Activity, Bot, CalendarDays, CheckCircle2, ChevronRight, Compass, Cpu, HardDrive, Database, PackageOpen, Play, ServerOff, Target, Thermometer, WifiOff } from 'lucide-react'
 import { getOpenTodayStages, getTodayDrops, getTrainingQueue, maaApi } from '../services/api'
 import Icons from './Icons'
 import { PageHeader, Card, Button, IconButton, SmoothPanel, CjkText, TruncatedText } from './common'
@@ -9,6 +9,7 @@ import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useUIStore } from '@/stores'
 import { useDashboardFlowLayout } from '../hooks/useDashboardFlowLayout'
 import DashboardPreviewEntry from './DashboardPreviewEntry'
+import OnboardingDialog from './OnboardingDialog'
 import { formatActivitySubtitle } from '../utils/activitySummary'
 import { keepNumberWithUnit } from '../utils/typography'
 import { formatExecutionSummary, getExecutionLastTask } from '../utils/executionSummary'
@@ -17,6 +18,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useStatusStore } from '../store/statusStore'
 import { useDashboardStore, type DashboardBusinessSnapshot } from '../store/dashboardStore'
 import { probeBackendAvailability } from '../hooks/useBackendStatusMonitor'
+import { hasSeenOnboarding, markOnboardingSeen } from '../utils/onboarding'
 import type { StatusMessageType } from '../utils/statusMessage'
 
 const sectionTitleClass = 'app-card-title text-base font-bold text-primary'
@@ -334,6 +336,12 @@ export default function Dashboard() {
   const [activityRunStatus, setActivityRunStatus] = useState('')
   const [quickStartMessage, setQuickStartMessage] = useState('')
   const [quickStartMessageType, setQuickStartMessageType] = useState<StatusMessageType>('default')
+  const [onboardingOpen, setOnboardingOpen] = useState(() => !hasSeenOnboarding())
+  const openOnboarding = useCallback(() => setOnboardingOpen(true), [])
+  const closeOnboarding = useCallback(() => {
+    markOnboardingSeen()
+    setOnboardingOpen(false)
+  }, [])
 
   const serviceStatus = isOnline ? backendStatus : 'offline'
   const automationAvailable = serviceStatus === 'available'
@@ -662,13 +670,24 @@ export default function Dashboard() {
           subtitle="当前活动、自动化进度、养成与掉落总览"
           mobileLayout="inline"
           actions={
-            <div className="dashboard-page-actions flex w-full items-center sm:w-auto">
+            <div className="dashboard-page-actions flex w-full items-center gap-2 sm:w-auto">
               <div className="dashboard-status-slot min-w-0 flex-1 sm:flex-none">
                 <FloatingStatusIndicator className="dashboard-status-indicator w-full sm:w-auto" textClassName="truncate whitespace-nowrap" />
               </div>
+              <IconButton
+                onClick={openOnboarding}
+                icon={<Compass className="h-4 w-4" aria-hidden="true" />}
+                variant="ghost"
+                size="sm"
+                title="新手引导"
+                tooltip="新手引导"
+                aria-label="新手引导"
+                className="dashboard-onboarding-entry shrink-0"
+              />
             </div>
           }
         />
+        <OnboardingDialog isOpen={onboardingOpen} onClose={closeOnboarding} />
 
         {(serviceStatus === 'offline' || serviceStatus === 'unavailable') && (
           <SmoothPanel

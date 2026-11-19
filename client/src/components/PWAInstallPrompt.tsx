@@ -5,6 +5,7 @@ import { useStatusStore } from '@/store/statusStore'
 import { GlassCard } from '@zakisheriff/liquid-glass'
 import { Button, CjkText, IconButton } from '@/components/common'
 import { hasDocumentBuildChanged } from '@/utils/pwaUpdate'
+import { PWA_INSTALL_REQUEST_EVENT } from '@/utils/pwaInstallPrompt'
 import { isDesktopRuntime } from '@/desktop/desktopMode'
 
 interface BeforeInstallPromptEvent extends Event {
@@ -173,6 +174,18 @@ function PWAInstallPromptWeb() {
       window.removeEventListener('appinstalled', handleAppInstalled)
     }
   }, [setStatusMessage])
+
+  useEffect(() => {
+    const handleInstallRequest = () => {
+      if (isStandalone() || !canOfferInstallation()) return
+      if (!deferredPrompt && !isIos) return
+      setShowInstallPrompt(true)
+      setIsInstallExpanded(true)
+    }
+
+    window.addEventListener(PWA_INSTALL_REQUEST_EVENT, handleInstallRequest)
+    return () => window.removeEventListener(PWA_INSTALL_REQUEST_EVENT, handleInstallRequest)
+  }, [deferredPrompt, isIos])
 
   const handleInstall = async () => {
     if (!deferredPrompt) return

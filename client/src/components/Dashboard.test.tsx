@@ -84,6 +84,16 @@ vi.mock('./common', () => ({
   CjkText: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   TruncatedText: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   Card: ({ children }: { children: React.ReactNode }) => <section>{children}</section>,
+  Modal: ({ isOpen, onClose, title, children }: { isOpen: boolean; onClose: () => void; title?: string; children: React.ReactNode }) => (
+    isOpen
+      ? (
+        <div role="dialog" aria-label={title}>
+          <button type="button" aria-label="关闭对话框" onClick={onClose}>关闭</button>
+          {children}
+        </div>
+      )
+      : null
+  ),
   SmoothPanel: ({
     children,
     className = '',
@@ -98,7 +108,7 @@ vi.mock('./common', () => ({
   Button: ({ children, icon: _icon, loading, loadingText, statusKey: _statusKey, variant: _variant, size: _size, className: _className, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { loading?: boolean; loadingText?: React.ReactNode; statusKey?: string; variant?: string; size?: string; icon?: React.ReactNode }) => (
     <button {...props}>{loading ? loadingText : children}</button>
   ),
-  IconButton: ({ icon: _icon, variant: _variant, size: _size, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: React.ReactNode; variant?: string; size?: string }) => <button {...props} />,
+  IconButton: ({ icon: _icon, variant: _variant, size: _size, tooltip: _tooltip, tooltipSide: _tooltipSide, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: React.ReactNode; variant?: string; size?: string; tooltip?: string; tooltipSide?: string }) => <button {...props} />,
 }))
 
 let online = true
@@ -141,6 +151,7 @@ describe('Dashboard connectivity state', () => {
     useStatusStore.getState().clearMessage()
     useStatusStore.getState().setActive(false)
     useStatusStore.getState().setBackendStatus('unknown')
+    window.localStorage.setItem('onboarding-seen-at', '1')
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
@@ -153,6 +164,7 @@ describe('Dashboard connectivity state', () => {
     useStatusStore.getState().clearMessage()
     useStatusStore.getState().setActive(false)
     useStatusStore.getState().setBackendStatus('unknown')
+    window.localStorage.removeItem('onboarding-seen-at')
     vi.clearAllMocks()
   })
 
@@ -560,6 +572,7 @@ describe('Dashboard drop summary navigation', () => {
     useStatusStore.getState().clearMessage()
     useStatusStore.getState().setActive(false)
     useStatusStore.getState().setBackendStatus('unknown')
+    window.localStorage.setItem('onboarding-seen-at', '1')
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
@@ -570,6 +583,7 @@ describe('Dashboard drop summary navigation', () => {
   afterEach(() => {
     act(() => root.unmount())
     container.remove()
+    window.localStorage.removeItem('onboarding-seen-at')
   })
 
   it('opens the drops tab instead of the default statistics tab', () => {
@@ -578,5 +592,92 @@ describe('Dashboard drop summary navigation', () => {
     act(() => open?.click())
     expect(uiMocks.setStatisticsTab).toHaveBeenCalledWith('drops')
     expect(uiMocks.setActiveTab).toHaveBeenCalledWith('statistics')
+  })
+})
+
+describe('Dashboard onboarding', () => {
+  beforeEach(() => {
+    online = true
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => online })
+    apiMocks.getTaskStatus.mockResolvedValue({ success: true, data: { isRunning: false } })
+    apiMocks.getDeviceStats.mockResolvedValue({ success: false })
+    apiMocks.getActivity.mockResolvedValue({ success: true, data: { available: false } })
+    apiMocks.getScheduleExecutionStatus.mockResolvedValue({ success: true, data: { isRunning: false } })
+    apiMocks.getTrainingQueue.mockResolvedValue({ success: true, data: { queue: [] } })
+    apiMocks.getTodayDrops.mockResolvedValue({ success: true, data: [] })
+    apiMocks.getOpenTodayStages.mockResolvedValue({ success: true, data: { open: [], closed: [] } })
+    apiMocks.getActivityCopilotCandidates.mockResolvedValue({ success: true, data: { matchingSets: [] } })
+    uiMocks.setActiveTab.mockReset()
+    uiMocks.setStatisticsTab.mockReset()
+    useDashboardStore.getState().reset()
+    useStatusStore.getState().clearMessage()
+    useStatusStore.getState().setActive(false)
+    useStatusStore.getState().setBackendStatus('unknown')
+    window.localStorage.removeItem('onboarding-seen-at')
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+  })
+
+  afterEach(async () => {
+    await act(async () => root.unmount())
+    container.remove()
+    useDashboardStore.getState().reset()
+    window.localStorage.removeItem('onboarding-seen-at')
+    vi.clearAllMocks()
+  })
+
+  const renderDashboard = async () => {
+    await act(async () => root.render(<Dashboard />))
+    await flushDashboard()
+  }
+
+  const getOnboardingDialog = () => document.querySelector<HTMLElement>('[role="dialog"]')
+
+  it('shows the onboarding dialog on the first dashboard visit', async () => {
+    await renderDashboard()
+
+    expect(getOnboardingDialog()).not.toBeNull()
+    expect(getOnboardingDialog()?.getAttribute('aria-label')).toBe('新手引导')
+    expect(getOnboardingDialog()?.textContent).toContain('创建第一个自动化任务')
+  })
+
+  it('writes onboarding-seen-at when the dialog is closed', async () => {
+    await renderDashboard()
+    expect(window.localStorage.getItem('onboarding-seen-at')).toBeNull()
+
+    await act(async () => {
+      getOnboardingDialog()?.querySelector<HTMLButtonElement>('button[aria-label="关闭对话框"]')?.click()
+    })
+
+    expect(getOnboardingDialog()).toBeNull()
+    const seenAt = Number(window.localStorage.getItem('onboarding-seen-at'))
+    expect(seenAt).toBeGreaterThan(0)
+  })
+
+  it('does not auto-show after closing and mounting the dashboard again', async () => {
+    await renderDashboard()
+    await act(async () => {
+      getOnboardingDialog()?.querySelector<HTMLButtonElement>('button[aria-label="关闭对话框"]')?.click()
+    })
+
+    await act(async () => root.render(<div>其他页面</div>))
+    await renderDashboard()
+
+    expect(getOnboardingDialog()).toBeNull()
+  })
+
+  it('reopens from the PageHeader entry regardless of the seen marker', async () => {
+    window.localStorage.setItem('onboarding-seen-at', String(Date.now()))
+    await renderDashboard()
+
+    expect(getOnboardingDialog()).toBeNull()
+
+    const entry = container.querySelector<HTMLButtonElement>('button[aria-label="新手引导"]')
+    expect(entry).not.toBeNull()
+    await act(async () => entry?.click())
+
+    expect(getOnboardingDialog()).not.toBeNull()
+    expect(getOnboardingDialog()?.getAttribute('aria-label')).toBe('新手引导')
   })
 })
