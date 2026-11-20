@@ -1,3 +1,9 @@
+import { configure } from '@testing-library/react'
+
+// Vitest 5 starts one worker per file; under a cold 65-worker run, a mocked
+// catalog can take longer than Testing Library's 1s default to settle.
+configure({ asyncUtilTimeout: 5000 })
+
 // jsdom has no ResizeObserver; the Liquid Glass components observe their
 // surfaces on mount. Keep a no-op implementation for every test file.
 if (typeof globalThis.ResizeObserver === 'undefined') {
