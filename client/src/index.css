@@ -5086,3 +5086,53 @@ html.is-standalone-pwa body {
   margin-block-end: 0;
 }
 
+/* The compact task monitor caps an empty frame at 17rem, but the dashboard
+   preview must keep the full 16:9 ratio and fill its grid column. This used to
+   live in @layer components; native CSS layers in Tailwind 4 made it lose to
+   the unlayered cap. Keep it unlayered so it wins in both themes. */
+.la-pluma-content .dashboard-preview-surface .task-monitor-panel.is-compact
+  .scrcpy-video-frame.is-empty {
+  height: auto;
+  max-height: none;
+  aspect-ratio: 16 / 9;
+}
+
+
+/* At the two-column dashboard breakpoint the preview card must share the
+   flow card's row height. Stretching the grid item and letting the frame take
+   the remaining flex space keeps both cards aligned even when the 16:9 width
+   would be wider than the available column. Mobile keeps the normal aspect
+   ratio because this block is desktop-only. */
+@media (min-width: 1280px) {
+  .dashboard-flow-layout {
+    align-items: stretch;
+  }
+
+  .la-pluma-content .dashboard-preview-card,
+  .la-pluma-content .dashboard-preview-surface,
+  .la-pluma-content .dashboard-preview-surface .task-monitor-panel.is-compact,
+  .la-pluma-content .dashboard-preview-surface .scrcpy-device-layout.is-compact,
+  .la-pluma-content .dashboard-preview-surface .space-y-3 {
+    height: 100%;
+  }
+
+  .la-pluma-content .dashboard-preview-surface .space-y-3 {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: var(--scrcpy-compact-inset, 0.375rem);
+  }
+
+  .la-pluma-content .dashboard-preview-surface .scrcpy-view-header,
+  .la-pluma-content .dashboard-preview-surface .dashboard-preview-settings {
+    flex: none;
+  }
+
+  .la-pluma-content .dashboard-preview-surface .scrcpy-video-frame {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    flex: 1 1 auto;
+    aspect-ratio: auto;
+  }
+}
