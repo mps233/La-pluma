@@ -21,7 +21,7 @@
     "@zakisheriff/liquid-glass": "^4.0.3",
     "budoux": "^0.10.4",
     "framer-motion": "^12.29.2",
-    "lucide-react": "^1.75.0",
+    "lucide-react": "^1.76.0",
     "react": "^19.3.1",
     "react-command-palette": "^0.22.2",
     "react-dom": "^19.3.1",
