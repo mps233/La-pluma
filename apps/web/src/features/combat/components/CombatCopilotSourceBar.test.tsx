@@ -24,6 +24,19 @@ const click = async (element: HTMLElement) => {
   })
 }
 
+const flushTimers = async () => {
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) })
+}
+
+const findButton = (name: string): HTMLButtonElement | undefined => (
+  Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
+    .find(button => button.textContent?.trim() === name)
+)
+
+const helpPanel = (): HTMLElement | null => (
+  document.querySelector<HTMLElement>('[role="dialog"][aria-label="作业输入说明"]')
+)
+
 const setSelectValue = async (select: HTMLSelectElement, value: string) => {
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set?.call(select, value)
@@ -78,8 +91,10 @@ const search = (overrides: Partial<CombatCopilotSearchProjection> = {}): CombatC
   result: null,
   searching: false,
   refreshing: false,
+  error: null,
   addingUri: null,
   onSearch: () => {},
+  onRetrySearch: () => {},
   onLoadMore: async () => null,
   onCancel: () => {},
   onPreviewUri: () => {},
@@ -265,7 +280,70 @@ describe('CombatCopilotSourceBar', () => {
     expect(container.querySelector('label[for="combat-copilot-uri"]')?.textContent)
       .toBe('作业链接，或粘贴 JSON 作业文件')
     expect(container.textContent).not.toContain('支持作业链接，或粘贴/导入本地 JSON 文件。')
-    expect(container.textContent).toContain('可直接粘贴或导入本地 JSON 文件')
+
+    await click(findButton('说明')!)
+    expect(helpPanel()?.textContent).toContain('可直接粘贴或导入本地 JSON 文件')
+  })
+
+  it('opens the input help as a focusable popover with the source guidance', async () => {
+    await renderBar()
+
+    const trigger = findButton('说明')
+    expect(trigger).not.toBeUndefined()
+    expect(trigger?.tagName).toBe('BUTTON')
+    expect(trigger?.getAttribute('aria-expanded')).toBe('false')
+    trigger?.focus()
+    expect(document.activeElement).toBe(trigger)
+
+    await click(trigger!)
+
+    const panel = helpPanel()
+    expect(panel).not.toBeNull()
+    expect(trigger?.getAttribute('aria-expanded')).toBe('true')
+    expect(panel?.textContent).toContain('在 prts.plus 获取作业链接')
+    expect(panel?.textContent).toContain('单作业：prts://1234；作业集：prts://s1234')
+    expect(panel?.textContent).toContain('作业站链接会自动识别')
+    expect(panel?.textContent).toContain('识别方式可强制按单个作业或作业集读取')
+    expect(panel?.textContent).toContain('点击“发现”可按关键词、关卡和干员搜索作业站作业')
+
+    const link = panel?.querySelector<HTMLAnchorElement>('a[href="https://prts.plus/"]')
+    expect(link?.textContent).toBe('prts.plus')
+    expect(link?.target).toBe('_blank')
+    expect(Array.from(panel?.querySelectorAll('code') ?? []).map(code => code.textContent))
+      .toEqual(['prts://1234', 'prts://s1234'])
+  })
+
+  it('closes the input help with Escape and returns focus to the trigger', async () => {
+    await renderBar()
+    const trigger = findButton('说明')!
+
+    await click(trigger)
+    expect(helpPanel()).not.toBeNull()
+
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    await flushTimers()
+
+    expect(helpPanel()).toBeNull()
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('closes the input help on an outside click', async () => {
+    await renderBar()
+    const trigger = findButton('说明')!
+
+    await click(trigger)
+    expect(helpPanel()).not.toBeNull()
+
+    await act(async () => {
+      document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await flushTimers()
+
+    expect(helpPanel()).toBeNull()
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
   })
 
   it('offers a labelled JSON file picker through an icon inside the URI field', async () => {

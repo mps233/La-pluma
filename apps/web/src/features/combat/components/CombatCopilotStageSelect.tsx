@@ -1,5 +1,6 @@
 import { useMemo, useState, type UIEvent } from 'react'
 import { Search } from 'lucide-react'
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/shared/ui/alert'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover'
@@ -94,7 +95,7 @@ export default function CombatCopilotStageSelect({
           sideOffset={8}
           collisionPadding={12}
           aria-label="选择关卡"
-          className="combat-copilot-discovery-stage-panel grid w-(--combat-stage-panel-width) gap-2 bg-card p-3 shadow-(--combat-stage-panel-shadow) ring-0"
+          className="combat-copilot-discovery-stage-panel grid w-(--combat-stage-panel-width) gap-2"
         >
           <div className="relative">
             <Search size={17} strokeWidth={1.9} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" />
@@ -112,10 +113,13 @@ export default function CombatCopilotStageSelect({
           {loading && <p className="combat-copilot-discovery-stage-state" role="status">关卡数据加载中…</p>}
 
           {error && (
-            <div className="combat-copilot-discovery-stage-error" role="alert">
-              <span>{error}</span>
-              <Button size="sm" variant="secondary" onClick={onRetryData}>重试</Button>
-            </div>
+            <Alert variant="destructive">
+              <AlertTitle>关卡数据读取失败</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+              <AlertAction>
+                <Button size="sm" variant="secondary" onClick={onRetryData}>重试</Button>
+              </AlertAction>
+            </Alert>
           )}
 
           {!loading && !error && (

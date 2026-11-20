@@ -25,6 +25,7 @@ export interface DialogFrameProps {
   onOpenChange?: (open: boolean) => void
   title: ReactNode
   description?: ReactNode
+  toolbar?: ReactNode
   children: ReactNode
   footer?: ReactNode
   layers?: ReactNode
@@ -40,6 +41,7 @@ export function DialogFrame({
   onOpenChange,
   title,
   description,
+  toolbar,
   children,
   footer,
   layers,
@@ -75,7 +77,7 @@ export function DialogFrame({
           className,
         )}
       >
-        <DialogHeader className="flex-row items-center justify-between gap-3 border-b px-4 py-3">
+        <DialogHeader className="flex-row items-center justify-between gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0 space-y-1">
             <DialogTitle>{title}</DialogTitle>
             {description && (
@@ -88,6 +90,11 @@ export function DialogFrame({
             <X className="size-4" aria-hidden="true" />
           </DialogClose>
         </DialogHeader>
+        {toolbar && (
+          <div data-slot="dialog-toolbar" className="shrink-0 border-b border-border px-4 py-3">
+            {toolbar}
+          </div>
+        )}
         {children}
         {footer}
       </DialogContent>

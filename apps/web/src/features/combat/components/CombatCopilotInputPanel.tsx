@@ -1,6 +1,7 @@
 import { useRef, type ChangeEvent, type ClipboardEvent } from 'react'
 import { Compass, ListPlus, LoaderCircle, Upload, X } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover'
 import type { CopilotPreviewMode } from '../model/copilotPreview'
 import { COPILOT_DISCOVERY_DIALOG_ID } from './combatPanelTypes'
 import type { CombatCopilotFileImportProjection } from './combatPanelTypes'
@@ -193,16 +194,32 @@ export default function CombatCopilotInputPanel({
           <Compass size={15} aria-hidden="true" />
           发现
         </Button>
-        <details className="combat-copilot-help">
-          <summary className="combat-copilot-help-trigger">说明</summary>
-          <div className="combat-copilot-help-body">
-            <p>• 在 <a href="https://prts.plus/" target="_blank" rel="noopener noreferrer" className="brand-text hover:underline">prts.plus</a> 获取作业链接</p>
-            <p>• 单作业：<code className="combat-copilot-code">prts://1234</code>；作业集：<code className="combat-copilot-code">prts://s1234</code></p>
-            <p>• 作业站链接会自动识别，也可直接粘贴或导入本地 JSON 文件</p>
-            <p>• 识别方式可强制按单个作业或作业集读取，默认按链接判断</p>
-            <p>• 点击“发现”可按关键词、关卡和干员搜索作业站作业</p>
-          </div>
-        </details>
+        <Popover>
+          <PopoverTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="sm"
+                className="min-h-11 min-w-11 px-2 text-xs text-primary-strong"
+              />
+            }
+          >
+            说明
+          </PopoverTrigger>
+          <PopoverContent
+            aria-label="作业输入说明"
+            align="end"
+            sideOffset={8}
+            collisionPadding={12}
+            className="w-[min(18rem,calc(100vw-3rem))] text-xs text-muted-foreground"
+          >
+            <p className="m-0 leading-normal">• 在 <a href="https://prts.plus/" target="_blank" rel="noopener noreferrer" className="brand-text hover:underline">prts.plus</a> 获取作业链接</p>
+            <p className="m-0 leading-normal">• 单作业：<code className="combat-copilot-code">prts://1234</code>；作业集：<code className="combat-copilot-code">prts://s1234</code></p>
+            <p className="m-0 leading-normal">• 作业站链接会自动识别，也可直接粘贴或导入本地 JSON 文件</p>
+            <p className="m-0 leading-normal">• 识别方式可强制按单个作业或作业集读取，默认按链接判断</p>
+            <p className="m-0 leading-normal">• 点击“发现”可按关键词、关卡和干员搜索作业站作业</p>
+          </PopoverContent>
+        </Popover>
       </div>
     </div>
   )

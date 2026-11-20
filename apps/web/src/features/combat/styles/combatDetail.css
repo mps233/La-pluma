@@ -18,8 +18,29 @@
     border-radius: var(--radius-sm);
     background: var(--primary-soft);
     color: var(--primary-strong);
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     line-height: 1.4;
+  }
+
+  .combat-copilot-detail-state.is-active,
+  .combat-copilot-detail-state.is-neutral {
+    background: var(--primary-soft);
+    color: var(--primary-strong);
+  }
+
+  .combat-copilot-detail-state.is-success {
+    background: color-mix(in srgb, var(--success) 12%, transparent);
+    color: var(--success-text);
+  }
+
+  .combat-copilot-detail-state.is-warning {
+    background: color-mix(in srgb, var(--warning) 12%, transparent);
+    color: var(--warning);
+  }
+
+  .combat-copilot-detail-state.is-danger {
+    background: color-mix(in srgb, var(--destructive) 12%, transparent);
+    color: var(--destructive);
   }
 
   .combat-copilot-detail-grid {
@@ -97,18 +118,6 @@
   .combat-copilot-detail-description {
     margin: 0;
     color: var(--muted-foreground);
-    font-size: 0.875rem;
-    line-height: 1.6;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-
-  .combat-copilot-detail-error {
-    margin: 0;
-    padding: 0.75rem;
-    border-radius: var(--radius-lg);
-    background: color-mix(in srgb, var(--destructive) 10%, transparent);
-    color: var(--destructive);
     font-size: 0.875rem;
     line-height: 1.6;
     white-space: pre-wrap;

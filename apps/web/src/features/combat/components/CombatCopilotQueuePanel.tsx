@@ -1,10 +1,33 @@
-import { Check, ChevronDown, ChevronUp, ListChecks, LoaderCircle, RotateCcw, SkipForward, Trash2 } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { ChevronDown, ChevronUp, ListChecks, LoaderCircle, RotateCcw, SkipForward, Trash2 } from 'lucide-react'
+import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
-import { EmptyState } from '@/shared/components'
+import { Checkbox } from '@/shared/ui/checkbox'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip'
+import { ConfirmAlertDialog, EmptyState } from '@/shared/components'
 import { firstErrorLine } from '../model/copilotDetail'
 import type { CopilotQueueEntry } from '../model/copilotQueue'
 import { COPILOT_DETAIL_LAYER_ID, type CombatCopilotQueueProjection } from './combatPanelTypes'
 import { describeQueueRowState, describeQueueSource, describeQueueTitle } from './copilotQueuePresentation'
+
+function UnavailableAction({
+  action,
+  reason,
+  children,
+}: {
+  action: string
+  reason: string
+  children: ReactNode
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span tabIndex={0} className="inline-flex" aria-label={`${action}：${reason}`} />}>
+        {children}
+      </TooltipTrigger>
+      <TooltipContent role="tooltip">{reason}</TooltipContent>
+    </Tooltip>
+  )
+}
 
 function submitsAsSet(
   entries: readonly CopilotQueueEntry[],
@@ -30,6 +53,7 @@ interface CombatCopilotQueuePanelProps {
 
 export default function CombatCopilotQueuePanel({ queue, detailEntryId, onOpenDetail }: CombatCopilotQueuePanelProps) {
   const { entries, selected } = queue
+  const [isClearDialogOpen, setIsClearDialogOpen] = useState(false)
   const checkedCount = entries.filter(entry => selected.has(entry.id)).length
   const locked = queue.isRunning || queue.isSubmitting
   const waitingForNext = queue.queueRun?.isWaiting === true
@@ -42,6 +66,12 @@ export default function CombatCopilotQueuePanel({ queue, detailEntryId, onOpenDe
   const failedEntries = queue.queueRun?.isTerminal
     ? entries.filter(entry => queue.queueRun?.statuses.get(entry.id)?.status === 'failed')
     : []
+  const unavailableReason = !queue.automationAvailable ? queue.unavailableMessage : ''
+  const withUnavailableHint = (action: string, node: ReactNode) => (
+    unavailableReason
+      ? <UnavailableAction action={action} reason={unavailableReason}>{node}</UnavailableAction>
+      : node
+  )
 
   return (
     <section
@@ -51,19 +81,21 @@ export default function CombatCopilotQueuePanel({ queue, detailEntryId, onOpenDe
       <header className="combat-copilot-panel-head">
         <div className="combat-copilot-panel-title">
           <ListChecks size={16} className="brand-text" aria-hidden="true" />
-          <h5>作业队列</h5>
+          <h3>作业队列</h3>
           <span className="combat-copilot-kicker">共 {entries.length} 项</span>
         </div>
 
         <div className="combat-copilot-panel-actions">
-          <button
+          <Button
             type="button"
-            onClick={queue.onClear}
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsClearDialogOpen(true)}
             disabled={locked || entries.length === 0}
-            className="combat-copilot-text-action"
+            className="min-h-11"
           >
             清空
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -73,7 +105,13 @@ export default function CombatCopilotQueuePanel({ queue, detailEntryId, onOpenDe
           className="combat-copilot-empty"
           icon={<ListChecks size={24} strokeWidth={1.7} />}
           title="队列为空"
-          description="从作业链接、关卡搜索或本地文件加入作业；输入作业集链接会自动展开到队列。"
+          description={(
+            <>
+              从作业链接、关卡搜索或本地文件加入作业；
+              <br />
+              输入作业集链接会自动展开到队列。
+            </>
+          )}
         />
       ) : (
         <>
@@ -87,49 +125,50 @@ export default function CombatCopilotQueuePanel({ queue, detailEntryId, onOpenDe
             <div className="combat-copilot-panel-actions px-3 pb-2">
               {waitingForNext && (
                 <>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={queue.onContinueQueue}
-                    disabled={!queue.automationAvailable || queue.isContinuing}
-                    aria-busy={queue.isContinuing || undefined}
-                    title={!queue.automationAvailable ? queue.unavailableMessage : undefined}
-                  >
-                    {queue.isContinuing
-                      ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在开始</>
-                      : `开始下一项${nextModeLabel}`}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={queue.onSkipEntry}
-                    disabled={!queue.automationAvailable || queue.isSkipping}
-                    aria-busy={queue.isSkipping || undefined}
-                    title={!queue.automationAvailable ? queue.unavailableMessage : undefined}
-                  >
-                    {queue.isSkipping
-                      ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在跳过</>
-                      : (
-                        <>
-                          <SkipForward size={14} aria-hidden="true" />
-                          跳过此项
-                        </>
-                      )}
-                  </Button>
+                  {withUnavailableHint(`开始下一项${nextModeLabel}`, (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={queue.onContinueQueue}
+                      disabled={!queue.automationAvailable || queue.isContinuing}
+                      aria-busy={queue.isContinuing || undefined}
+                    >
+                      {queue.isContinuing
+                        ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在开始</>
+                        : `开始下一项${nextModeLabel}`}
+                    </Button>
+                  ))}
+                  {withUnavailableHint('跳过此项', (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={queue.onSkipEntry}
+                      disabled={!queue.automationAvailable || queue.isSkipping}
+                      aria-busy={queue.isSkipping || undefined}
+                    >
+                      {queue.isSkipping
+                        ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在跳过</>
+                        : (
+                          <>
+                            <SkipForward size={14} aria-hidden="true" />
+                            跳过此项
+                          </>
+                        )}
+                    </Button>
+                  ))}
                 </>
               )}
-              {failedEntries.length > 0 && (
+              {failedEntries.length > 0 && withUnavailableHint('重试失败项', (
                 <Button
                   size="sm"
                   variant="secondary"
                   onClick={queue.onRetryFailed}
                   disabled={locked || !queue.automationAvailable}
-                  title={!queue.automationAvailable ? queue.unavailableMessage : undefined}
                 >
                   <RotateCcw size={14} aria-hidden="true" />
                   重试失败项
                 </Button>
-              )}
+              ))}
             </div>
           )}
           <div role="list" aria-label="作业队列" className="combat-copilot-mine-list">
@@ -139,6 +178,7 @@ export default function CombatCopilotQueuePanel({ queue, detailEntryId, onOpenDe
               const expanded = detailEntryId === entry.id
               const state = describeQueueRowState(entry, queue)
               const errorLine = firstErrorLine(state.error)
+              const checkboxId = `combat-copilot-queue-check-${entry.id}`
 
               return (
                 <div
@@ -147,18 +187,15 @@ export default function CombatCopilotQueuePanel({ queue, detailEntryId, onOpenDe
                   data-copilot-set-item-index={entry.setItemIndex}
                   className="combat-copilot-mine-row"
                 >
-                  <button
-                    type="button"
-                    onClick={() => queue.onToggle(entry.id)}
-                    disabled={locked}
-                    aria-pressed={checked}
-                    aria-label={`${checked ? '取消选择' : '选择'}队列第 ${index + 1} 项 ${title}`}
-                    className="combat-copilot-mine-check"
-                  >
-                    <span className={`combat-copilot-mine-check-box${checked ? ' is-selected' : ''}`}>
-                      {checked && <Check size={12} strokeWidth={3} aria-hidden="true" />}
-                    </span>
-                  </button>
+                  <label htmlFor={checkboxId} className="combat-copilot-mine-check">
+                    <Checkbox
+                      id={checkboxId}
+                      checked={checked}
+                      onCheckedChange={() => queue.onToggle(entry.id)}
+                      disabled={locked}
+                      aria-label={`${checked ? '取消选择' : '选择'}队列第 ${index + 1} 项 ${title}`}
+                    />
+                  </label>
 
                   <span className="combat-copilot-mine-marker" aria-hidden="true">{index + 1}</span>
 
@@ -173,19 +210,21 @@ export default function CombatCopilotQueuePanel({ queue, detailEntryId, onOpenDe
                   >
                     <span className="combat-copilot-mine-title">{title}</span>
                     <span className="combat-copilot-mine-meta">
-                      <span className="combat-copilot-mine-tag">{describeQueueSource(entry)}</span>
+                      <Badge variant="secondary" className="bg-muted text-tertiary">
+                        {describeQueueSource(entry)}
+                      </Badge>
                       {entry.stage && <span>{entry.stage}</span>}
                       {entry.source === 'file' && entry.fileName && <span>{entry.fileName}</span>}
                       {entry.completedModes?.map(mode => (
-                        <span key={mode} className="combat-copilot-mine-tag is-complete">
+                        <Badge key={mode} variant="secondary" className="bg-muted text-success-text">
                           {mode === 'raid' ? '突袭已完成' : '普通已完成'}
-                        </span>
+                        </Badge>
                       ))}
                       {errorLine && <span className="form-error-text">{errorLine}</span>}
                     </span>
                   </button>
 
-                  <span className="combat-copilot-mine-status">{state.label}</span>
+                  <span className={`combat-copilot-mine-status is-${state.tone}`}>{state.label}</span>
 
                   <div className="combat-copilot-mine-actions">
                     <Button
@@ -225,6 +264,16 @@ export default function CombatCopilotQueuePanel({ queue, detailEntryId, onOpenDe
           </div>
         </>
       )}
+
+      <ConfirmAlertDialog
+        isOpen={isClearDialogOpen}
+        onClose={() => setIsClearDialogOpen(false)}
+        onConfirm={queue.onClear}
+        title="清空作业队列？"
+        message="已加入的作业会被移除，此操作不可撤销。"
+        confirmText="确认清空"
+        variant="danger"
+      />
     </section>
   )
 }

@@ -6,6 +6,7 @@ import {
   deriveCopilotStageOption,
   describeCopilotStage,
   filterCopilotSearchItems,
+  formatCopilotHotScore,
   formatCopilotUploadTime,
   hasCopilotSearchCriteria,
   stripCopilotStageSuffix,
@@ -136,6 +137,23 @@ describe('filterCopilotSearchItems', () => {
 
   it('treats the default modes as ready, borrow, train and check', () => {
     expect(DEFAULT_COPILOT_MATCH_MODES).toEqual(['ready', 'borrow', 'train', 'check'])
+  })
+})
+
+describe('formatCopilotHotScore', () => {
+  it.each([
+    [0, '0'],
+    [4.5, '4.5'],
+    [9, '9'],
+    [98, '98'],
+    [16853.43055304006, '16853.4'],
+    [Number.NaN, '0'],
+    [Number.POSITIVE_INFINITY, '0'],
+    [Number.NEGATIVE_INFINITY, '0'],
+    [-0, '0'],
+    [-1, '0'],
+  ])('formats %s as %s', (value, expected) => {
+    expect(formatCopilotHotScore(value)).toBe(expected)
   })
 })
 

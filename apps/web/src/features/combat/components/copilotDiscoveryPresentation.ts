@@ -113,6 +113,11 @@ function pad(value: number): string {
   return String(value).padStart(2, '0')
 }
 
+export function formatCopilotHotScore(value: number): string {
+  if (!Number.isFinite(value) || value < 0) return '0'
+  return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
+
 /** 上传时间按本地时区压成短日期，缺失或无法解析时返回 null。 */
 export function formatCopilotUploadTime(value: string | undefined): string | null {
   if (!value) return null

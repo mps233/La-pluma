@@ -1,4 +1,4 @@
-import type { CopilotDetailTarget } from '../model/copilotDetail'
+import type { CopilotDetailTarget, CopilotDetailTone } from '../model/copilotDetail'
 import type { CopilotQueueEntry, CopilotQueueSource } from '../model/copilotQueue'
 import type { CopilotQueueItemStatus } from '../model/copilotQueueRun'
 import type { CopilotSetItemStatus } from '../model/copilotSetRun'
@@ -24,8 +24,18 @@ const QUEUE_STATUS_LABELS: Record<CopilotQueueItemStatus, string> = {
   failed: '执行失败',
 }
 
+const STATUS_TONES: Record<CopilotSetItemStatus, CopilotDetailTone> = {
+  pending: 'neutral',
+  running: 'active',
+  success: 'success',
+  failed: 'danger',
+  skipped: 'neutral',
+  stopped: 'warning',
+}
+
 interface QueueRowState {
   label: string
+  tone: CopilotDetailTone
   error?: string
 }
 
@@ -35,16 +45,26 @@ export function describeQueueRowState(
 ): QueueRowState {
   const queueState = queue.queueRun?.statuses.get(entry.id)
   if (queueState) {
-    return { label: QUEUE_STATUS_LABELS[queueState.status], error: queueState.error }
+    return {
+      label: QUEUE_STATUS_LABELS[queueState.status],
+      tone: STATUS_TONES[queueState.status],
+      error: queueState.error,
+    }
   }
   if (entry.setId && entry.setId === queue.setId && entry.setItemIndex !== undefined) {
     const status = queue.itemStatuses.get(entry.setItemIndex)
     if (status) {
-      return { label: STATUS_LABELS[status], error: queue.itemErrors.get(entry.setItemIndex) }
+      return {
+        label: STATUS_LABELS[status],
+        tone: STATUS_TONES[status],
+        error: queue.itemErrors.get(entry.setItemIndex),
+      }
     }
   }
-  if (queue.isRunning && queue.submittedEntryIds.has(entry.id)) return { label: '本次已提交' }
-  return { label: '待执行' }
+  if (queue.isRunning && queue.submittedEntryIds.has(entry.id)) {
+    return { label: '本次已提交', tone: 'active' }
+  }
+  return { label: '待执行', tone: 'neutral' }
 }
 
 export function describeQueueSource(entry: CopilotQueueEntry): string {
@@ -76,6 +96,7 @@ export function buildQueueDetailTarget(
     operators: entry.operatorDetails ?? entry.operators?.map(name => ({ name })),
     groups: entry.groups,
     statusLabel: state.label,
+    statusTone: state.tone,
     ...(state.error ? { error: state.error } : {}),
   }
 }

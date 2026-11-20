@@ -134,6 +134,37 @@ describe('CombatCopilotQueueSummary', () => {
     expect(container.textContent).toContain('本次已执行 3 个')
   })
 
+  it('exposes the completed ratio through an accessible progressbar', async () => {
+    await renderSummary(createView(
+      [[0, 'success'], [1, 'failed'], [2, 'stopped'], [3, 'skipped']],
+    ))
+
+    const progressbar = container.querySelector<HTMLElement>('[role="progressbar"]')
+    expect(progressbar).not.toBeNull()
+    expect(progressbar?.getAttribute('aria-label')).toBe('作业集进度')
+    expect(progressbar?.getAttribute('aria-valuemin')).toBe('0')
+    expect(progressbar?.getAttribute('aria-valuemax')).toBe('100')
+    expect(progressbar?.getAttribute('aria-valuenow')).toBe('25')
+  })
+
+  it('reports zero progress when no stage is complete', async () => {
+    await renderSummary(createView(null, { selected: new Set([1, 2]) }))
+
+    expect(container.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('0')
+  })
+
+  it('reports full progress when every stage is complete', async () => {
+    await renderSummary(createView(null, {
+      selected: new Set(),
+      copilots: [
+        { id: 101, name: '第一关', stage: 'MAIN-1', completedModes: ['normal'] },
+        { id: 102, name: '第二关', stage: 'MAIN-2', completedModes: ['normal'] },
+      ],
+    }))
+
+    expect(container.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('100')
+  })
+
   it('hides the stopped and skipped chips when their counts are zero', async () => {
     await renderSummary(createView(null, { selected: new Set([1, 2]) }))
 

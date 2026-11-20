@@ -121,8 +121,10 @@ const createProjection = (overrides: Partial<CombatCopilotSearchProjection> = {}
   result: RESULT,
   searching: false,
   refreshing: false,
+  error: null,
   addingUri: null,
   onSearch: vi.fn(),
+  onRetrySearch: vi.fn(),
   onLoadMore: vi.fn(async () => null),
   onCancel: vi.fn(),
   onPreviewUri: vi.fn(),
@@ -289,6 +291,22 @@ describe('CombatCopilotDiscoveryDialog', () => {
       page: 1,
       limit: 30,
     })
+  })
+
+  it('keeps the search controls in a fixed toolbar above the scrollable results', async () => {
+    await renderDialog()
+
+    const dialog = findDialogByTitle('发现作业')
+    expect(dialog).not.toBeNull()
+    const toolbar = dialog!.querySelector<HTMLElement>('[data-slot="dialog-toolbar"]')
+    expect(toolbar).not.toBeNull()
+    expect(toolbar!.querySelector('[aria-label="作业搜索"]')).not.toBeNull()
+    expect(toolbar!.contains(keywordInput())).toBe(true)
+
+    const body = discoveryBody()
+    expect(body.querySelector('[aria-label="作业搜索"]')).toBeNull()
+    expect(body.textContent).toContain('共 3 条')
+    expect(toolbar!.textContent).not.toContain('共 3 条')
   })
 
   it('cancels in-flight searches while typing and submits on Enter', async () => {
@@ -473,6 +491,34 @@ describe('CombatCopilotDiscoveryDialog', () => {
     expect(document.body.textContent).not.toContain('正在加载作业')
   })
 
+  it('shows the search failure with retry instead of stale results or a synthetic empty state', async () => {
+    const onRetrySearch = vi.fn()
+    await renderDialog({ error: '网络错误: timeout', onRetrySearch })
+
+    const alert = document.querySelector('[role="alert"]')
+    expect(alert?.textContent).toContain('搜索失败')
+    expect(alert?.textContent).toContain('网络错误: timeout')
+    expect(document.body.textContent).not.toContain('共 3 条')
+    expect(document.body.textContent).not.toContain('突袭 1-7 挂机')
+    expect(document.body.textContent).not.toContain('暂无作业')
+    expect(document.body.textContent).not.toContain('没有匹配结果')
+
+    await click(findButton('重试'))
+    expect(onRetrySearch).toHaveBeenCalledOnce()
+
+    await renderDialog({ error: '服务不可用', result: null })
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('服务不可用')
+    expect(document.body.textContent).not.toContain('暂无作业')
+  })
+
+  it('keeps the searching placeholder above a stale search error', async () => {
+    await renderDialog({ error: '上一次搜索失败', searching: true })
+
+    expect(document.body.textContent).toContain('正在搜索作业')
+    expect(document.body.textContent).not.toContain('上一次搜索失败')
+    expect(document.querySelector('[role="alert"]')).toBeNull()
+  })
+
   it('cancels in-flight work and closes the dialog', async () => {
     const search = await renderDialog()
 
@@ -507,6 +553,32 @@ describe('CombatCopilotDiscoveryDialog', () => {
     await click(findButton('关闭'))
     expect(findButton('匹配').getAttribute('aria-pressed')).toBe('true')
     expect(document.body.textContent).toContain('匹配 3 条')
+  })
+
+  it('marks ownership unknown and shows the operator loading state when recognition is pending', async () => {
+    await renderDialog({ operatorsLoading: true })
+
+    expect(document.querySelector('[title="阿米娅（拥有状态未知）"]')).not.toBeNull()
+    expect(document.querySelector('[title="陈（拥有状态未知）"]')).not.toBeNull()
+    expect(document.querySelector('[title="陈（未拥有）"]')).toBeNull()
+
+    await click(findButton('匹配'))
+
+    expect(document.body.textContent).toContain('正在识别持有干员…')
+    expect(document.querySelector('[role="switch"]')?.getAttribute('aria-disabled')).toBe('true')
+  })
+
+  it('marks ownership unknown and offers operator retry when recognition fails', async () => {
+    const search = await renderDialog({ operatorsError: '网络错误' })
+
+    expect(document.querySelector('[title="阿米娅（拥有状态未知）"]')).not.toBeNull()
+    expect(document.querySelector('[title="陈（未拥有）"]')).toBeNull()
+
+    await click(findButton('匹配'))
+
+    expect(document.body.textContent).toContain('持有干员读取失败：网络错误')
+    await click(findButton('重试'))
+    expect(search.onRetryData).toHaveBeenCalledOnce()
   })
 
   it('disables the match switch until owned operators are recognized', async () => {

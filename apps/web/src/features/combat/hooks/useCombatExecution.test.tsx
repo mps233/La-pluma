@@ -254,6 +254,155 @@ function queueController(run: AgentRun | null): ExecutionController {
   } as unknown as ExecutionController
 }
 
+function taskRun(state: AgentRun['state']): AgentRun {
+  return {
+    runId: 'run-task',
+    operationId: 'run_task',
+    state,
+    links: { self: '/api/agent/runs/run-task' },
+  } as unknown as AgentRun
+}
+
+describe('useCombatExecution terminal results', () => {
+  const flush = async () => {
+    await act(async () => {
+      for (let index = 0; index < 6; index += 1) await Promise.resolve()
+    })
+  }
+
+  const renderHarness = async (controller: ExecutionController) => {
+    await act(async () => {
+      root.render(<Harness controller={controller} stopOnFailure={false} />)
+    })
+    await flush()
+  }
+
+  const controllerFor = () => ({
+    getState: () => controllerState.current,
+  } as unknown as ExecutionController)
+
+  beforeEach(() => {
+    messages.length = 0
+    notifications.notifyProgress.mockReset()
+    rerender = null
+    latest = null
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+  })
+
+  afterEach(async () => {
+    await act(async () => root.unmount())
+    container.remove()
+  })
+
+  it('exposes the set terminal result to the page', async () => {
+    controllerState.current = combatState(manualRun('running', [entry(0, 'running')]))
+    await renderHarness(controllerFor())
+
+    controllerState.current = combatState(manualRun('succeeded', [entry(0, 'success')]))
+    await act(async () => rerender?.())
+    await flush()
+
+    expect(latest?.terminalResult).toEqual({
+      runId: 'run-manual',
+      state: 'succeeded',
+      message: '作业集执行完成 (1/1 成功)',
+      type: 'success',
+    })
+  })
+
+  it('exposes the queue terminal result to the page', async () => {
+    controllerState.current = combatState(queueRun('running', {
+      queueId: 'copilot-queue',
+      taskResults: [{ clientId: 'queue-a', itemIndex: 0, status: 'running' }],
+    }))
+    await renderHarness(controllerFor())
+
+    controllerState.current = combatState(queueRun('succeeded', {
+      queueId: 'copilot-queue',
+      totalSteps: 1,
+      successCount: 1,
+      taskResults: [{ clientId: 'queue-a', itemIndex: 0, status: 'success' }],
+    }))
+    await act(async () => rerender?.())
+    await flush()
+
+    expect(latest?.terminalResult).toEqual({
+      runId: 'run-queue',
+      state: 'succeeded',
+      message: '作业队列执行完成 (1/1 成功)',
+      type: 'success',
+    })
+  })
+
+  it('exposes a single task terminal result without a saved label', async () => {
+    controllerState.current = combatState(taskRun('running'))
+    await renderHarness(controllerFor())
+
+    controllerState.current = combatState(taskRun('succeeded'))
+    await act(async () => rerender?.())
+    await flush()
+
+    expect(latest?.terminalResult).toEqual({
+      runId: 'run-task',
+      state: 'succeeded',
+      message: '任务执行成功',
+      type: 'success',
+    })
+  })
+
+  it('does not create a result for a terminal run this page never observed active', async () => {
+    controllerState.current = combatState(manualRun('succeeded', [entry(0, 'success')]))
+    await renderHarness(controllerFor())
+
+    expect(latest?.terminalResult).toBeNull()
+    expect(messages).toEqual([])
+  })
+
+  it('clears the previous terminal result when a new submission starts', async () => {
+    const terminal = queueRun('succeeded', {
+      queueId: 'copilot-queue',
+      totalSteps: 1,
+      successCount: 1,
+      taskResults: [{ clientId: 'queue-a', itemIndex: 0, status: 'success' }],
+    })
+    controllerState.current = combatState(queueRun('running', {
+      queueId: 'copilot-queue',
+      taskResults: [{ clientId: 'queue-a', itemIndex: 0, status: 'running' }],
+    }))
+    await renderHarness(controllerFor())
+
+    controllerState.current = combatState(terminal)
+    await act(async () => rerender?.())
+    await flush()
+    expect(latest?.terminalResult?.runId).toBe('run-queue')
+
+    apiMocks.executeCopilotQueue.mockResolvedValue({
+      success: true,
+      data: { runId: 'run-next', accepted: true },
+    })
+    const controller = queueController(terminal)
+    await renderHarness(controller)
+
+    let submitted = false
+    await act(async () => {
+      submitted = await latest!.submitQueue({
+        queueId: 'copilot-queue',
+        name: '作业队列',
+        mode: 'continuous',
+        failurePolicy: 'continue',
+        entries: [{ clientId: 'queue-a', source: 'prts', copilotId: 101 }],
+        options: {},
+        taskName: '自动战斗作业',
+      })
+    })
+
+    expect(submitted).toBe(true)
+    expect(latest?.terminalResult).toBeNull()
+  })
+})
+
 describe('useCombatExecution queue submissions', () => {
   const flush = async () => {
     await act(async () => {

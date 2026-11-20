@@ -9,13 +9,9 @@ interface CombatModeTabsProps {
 const options: readonly SegmentedTabOption<CombatMode>[] = COMBAT_MODE_OPTIONS.map(({
   id,
   title,
-  desc,
-  icon,
 }) => ({
   value: id,
   label: title,
-  description: desc,
-  icon,
 }))
 
 export default function CombatModeTabs({ activeMode }: CombatModeTabsProps) {
@@ -25,10 +21,7 @@ export default function CombatModeTabs({ activeMode }: CombatModeTabsProps) {
       value={activeMode}
       options={options}
       className="combat-mode-shell"
-      indicatorClassName="combat-mode-highlight"
-      indicatorTestId="combat-mode-highlight"
-      tabClassName="combat-mode-button min-h-11"
-      iconClassName="combat-mode-icon"
+      tabClassName="min-h-11"
       tabId={id => `combat-mode-tab-${id}`}
       panelId={id => (id === activeMode ? `combat-mode-panel-${id}` : undefined)}
     />

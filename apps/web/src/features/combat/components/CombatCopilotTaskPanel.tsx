@@ -82,6 +82,15 @@ export default function CombatCopilotTaskPanel({
     : pendingTarget ?? (queueEntry ? buildQueueDetailTarget(queueEntry, queue) : null)
   const detailTarget = useResolvedCopilotDetailTarget(baseDetailTarget)
   const detailLoading = detail?.type === 'preview' && previewInfo === null && preview.loading
+  const checkedQueueCount = queue.entries.filter(entry => queue.selected.has(entry.id)).length
+  const isExecuteIdle = !execution.isRunning && !execution.isWaitingForNext && !execution.isSubmitting
+  const executeHint = isExecuteIdle && queue.entries.length > 0
+    ? checkedQueueCount > 0
+      ? `将执行已勾选队列（${checkedQueueCount} 项）`
+      : '队列非空，请先勾选要执行的作业'
+    : undefined
+  const hasQueueExecution = queue.entries.length > 0
+    || (preview.info?.type === 'set' && (preview.info.copilots?.length ?? 0) > 0)
 
   return (
     <Card
@@ -89,7 +98,6 @@ export default function CombatCopilotTaskPanel({
     >
       <CombatTaskHeading
         task={task}
-        buttonClassName="combat-task-run-button min-h-11 px-4 text-sm sm:px-6"
         automationAvailable={execution.automationAvailable}
         unavailableMessage={execution.unavailableMessage}
         isRunning={execution.isRunning}
@@ -100,6 +108,7 @@ export default function CombatCopilotTaskPanel({
         onExecute={execution.onExecute}
         onStop={execution.onStop}
         onStartNext={execution.onStartNext}
+        executeHint={executeHint}
       />
 
       <CombatCopilotSourceBar
@@ -150,6 +159,7 @@ export default function CombatCopilotTaskPanel({
             raid={config.raid}
             setExecutionMode={config.setExecutionMode}
             advanced={config.advanced}
+            showSetExecutionMode={hasQueueExecution}
             onFormationChange={config.onFormationChange}
             onRaidChange={value => config.onAdvancedChange('raid', value)}
             onSetExecutionModeChange={config.onSetExecutionModeChange}

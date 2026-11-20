@@ -53,6 +53,7 @@ function TestDialog({
   description,
   onFooterAction = vi.fn(),
   footer,
+  toolbar,
 }: TestDialogProps) {
   const [open, setOpen] = useState(true)
   return (
@@ -65,6 +66,7 @@ function TestDialog({
       title="测试对话框"
       description={description}
       closeDisabled={closeDisabled}
+      toolbar={toolbar}
       footer={footer ?? (
         <DialogFrameFooter>
           <Button onClick={onFooterAction}>完成</Button>
@@ -119,6 +121,26 @@ describe('DialogFrame', () => {
       .toBe('测试对话框')
     expect(document.getElementById(dialog?.getAttribute('aria-describedby') || '')?.textContent)
       .toBe('用于编辑排班')
+  })
+
+  it('renders the toolbar between the header and the scrollable body', async () => {
+    await renderDialog({ toolbar: <div>对话框工具栏</div> })
+
+    const dialog = document.querySelector<HTMLElement>('[data-slot="dialog-content"]')
+    expect(dialog).not.toBeNull()
+    const header = dialog!.querySelector('[data-slot="dialog-header"]')
+    const toolbar = dialog!.querySelector('[data-slot="dialog-toolbar"]')
+    const body = dialog!.querySelector('[data-slot="dialog-body"]')
+    expect(toolbar).not.toBeNull()
+    expect(toolbar?.textContent).toContain('对话框工具栏')
+    expect(header?.nextElementSibling).toBe(toolbar)
+    expect(toolbar?.nextElementSibling).toBe(body)
+  })
+
+  it('omits the toolbar slot when no toolbar is provided', async () => {
+    await renderDialog()
+
+    expect(document.querySelector('[data-slot="dialog-toolbar"]')).toBeNull()
   })
 
   it('closes from the header close button', async () => {

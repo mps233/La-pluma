@@ -7,15 +7,18 @@ import { getCombatAdvancedOptions, type AdvancedValues } from '../model/combatCo
 interface CombatAdvancedFieldsProps {
   taskId: string
   advanced: AdvancedValues
+  hiddenKeys?: readonly string[]
   onChange: (key: string, value: string | number | boolean) => void
 }
 
 export default function CombatAdvancedFields({
   taskId,
   advanced,
+  hiddenKeys,
   onChange,
 }: CombatAdvancedFieldsProps) {
-  const options = getCombatAdvancedOptions(taskId)
+  const hidden = new Set(hiddenKeys)
+  const options = getCombatAdvancedOptions(taskId).filter(option => !hidden.has(option.key))
   if (options.length === 0) return null
 
   return (

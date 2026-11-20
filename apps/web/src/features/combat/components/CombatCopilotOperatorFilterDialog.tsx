@@ -1,6 +1,8 @@
 import { useMemo, useState, type UIEvent } from 'react'
 import { Search } from 'lucide-react'
 import { getOperatorAvatarUrl, useItemIconCacheVersion } from '@/features/game-data'
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/shared/ui/alert'
+import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { DialogBody, DialogFrame, EmptyState, Loading } from '@/shared/components'
 import { Checkbox } from '@/shared/ui/checkbox'
@@ -136,9 +138,12 @@ function OperatorSection({
                     {option.rarity ? `${option.rarity}★` : '未知稀有度'}
                   </span>
                 </span>
-                <span className={`combat-copilot-operator-ownership${option.owned ? ' is-owned' : ' is-missing'}`}>
+                <Badge
+                  variant="secondary"
+                  className={`bg-transparent${option.owned ? ' text-success-text' : ' text-tertiary'}`}
+                >
                   {option.owned ? '已拥有' : '未拥有'}
-                </span>
+                </Badge>
               </button>
             </li>
           ))}
@@ -193,10 +198,13 @@ function OperatorFilterForm({
 
   if (operatorsError) {
     return (
-      <div className="combat-copilot-operator-error" role="alert">
-        <span>{operatorsError}</span>
-        <Button size="sm" variant="secondary" onClick={onRetryData}>重试</Button>
-      </div>
+      <Alert variant="destructive">
+        <AlertTitle>干员数据读取失败</AlertTitle>
+        <AlertDescription>{operatorsError}</AlertDescription>
+        <AlertAction>
+          <Button size="sm" variant="secondary" onClick={onRetryData}>重试</Button>
+        </AlertAction>
+      </Alert>
     )
   }
 

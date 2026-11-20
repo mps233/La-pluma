@@ -194,6 +194,10 @@ describe('CombatCopilotOperatorFilterDialog', () => {
       onRetryData: props.onRetryData,
     })
     expect(document.body.textContent).toContain('干员目录读取失败')
+    const alert = document.querySelector('[role="alert"]')
+    expect(alert).not.toBeNull()
+    expect(alert?.textContent).toContain('干员数据读取失败')
+    expect(alert?.textContent).toContain('干员目录读取失败')
 
     await click(findButton('重试'))
     expect(retryProps.onRetryData).toHaveBeenCalled()

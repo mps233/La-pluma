@@ -4,7 +4,12 @@
 // 重放，默认缓存与已成功结果保留。`reset` 只清显式检索状态，不删除默认查询缓存。
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
+import {
+  isCancelledError,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query'
 import { ApiRequestError, isAbortError, type ApiFailureKind } from '@/shared/api'
 import type { CopilotSearchResult, ParadoxSearchResult } from '../types'
 import type { CopilotSearchRequest } from '../model/copilotDiscovery'
@@ -30,12 +35,16 @@ export interface UseCopilotSearchResult<TInput, TResult> {
   readonly searching: boolean
   /** 默认查询是否在读取；仅用于无缓存首次加载的占位。 */
   readonly refreshing: boolean
+  /** 最近一次显式搜索或默认列表读取的可读失败原因；取消、重置与成功读取后清空。 */
+  readonly error: string | null
   /** 提交一次搜索；返回本次代次是否仍当前以及成功/失败结论。 */
   readonly search: (input: TInput) => Promise<CopilotSearchOutcome<TResult>>
   /** 读取指定页但不推进代次、不改当前结果；失败返回 null。 */
   readonly loadMore: (input: TInput) => Promise<TResult | null>
-  /** 更新默认请求并在后台刷新；失败静默保留旧缓存。 */
+  /** 更新默认请求并在后台刷新；失败设置错误并保留旧缓存。 */
   readonly refreshDefault: (next: TInput) => void
+  /** 重跑最后一次显式搜索；没有显式搜索时重试当前默认列表。 */
+  readonly retry: () => void
   /** 取消在途显式搜索；保留默认查询与上次成功结果。 */
   readonly cancel: () => void
   /** 清空显式检索状态；保留默认查询缓存。 */
@@ -49,6 +58,15 @@ interface CombatSearchSpec<TInput> {
 }
 
 const DEFAULT_STALE_TIME_MS = 5 * 60_000
+
+interface CombatSearchFailure {
+  readonly source: 'explicit' | 'default'
+  readonly message: string
+}
+
+const isSearchCancellation = (error: unknown): boolean => (
+  isAbortError(error) || isCancelledError(error)
+)
 
 function describeSearchFailure(
   error: unknown,
@@ -73,7 +91,11 @@ function useCombatSearch<TInput, TResult>(
   const [input, setInput] = useState<TInput | null>(null)
   const [defaultRequest, setDefaultRequest] = useState<TInput | null>(initialDefaultRequest ?? null)
   const [pending, setPending] = useState(false)
+  const [failure, setFailure] = useState<CombatSearchFailure | null>(null)
   const generation = useRef(0)
+  const explicitEpoch = useRef(0)
+  const defaultFlight = useRef(0)
+  const defaultEpoch = useRef(0)
   const explicitKey = useRef<readonly unknown[] | null>(null)
 
   const defaultQuery = useQuery({
@@ -87,9 +109,26 @@ function useCombatSearch<TInput, TResult>(
     enabled: input !== null,
   } as never) as UseQueryResult<TResult>
 
+  useEffect(() => {
+    if (!defaultQuery.isError || isSearchCancellation(defaultQuery.error)) return
+    if (defaultEpoch.current !== explicitEpoch.current) return
+    const { message } = describeSearchFailure(defaultQuery.error)
+    setFailure(current => (
+      current?.source === 'explicit' ? current : { source: 'default', message }
+    ))
+  }, [defaultQuery.error, defaultQuery.isError])
+
+  useEffect(() => {
+    if (!defaultQuery.isSuccess) return
+    setFailure(current => (current?.source === 'default' ? null : current))
+  }, [defaultQuery.isSuccess])
+
   const cancel = useCallback(() => {
     generation.current += 1
+    explicitEpoch.current += 1
+    defaultFlight.current += 1
     setPending(false)
+    setFailure(current => (current?.source === 'explicit' ? null : current))
     if (explicitKey.current) {
       void client.cancelQueries({ queryKey: explicitKey.current, exact: true })
     }
@@ -97,7 +136,10 @@ function useCombatSearch<TInput, TResult>(
 
   const reset = useCallback(() => {
     generation.current += 1
+    explicitEpoch.current += 1
+    defaultFlight.current += 1
     setPending(false)
+    setFailure(null)
     setInput(null)
     if (explicitKey.current) {
       void client.cancelQueries({ queryKey: explicitKey.current, exact: true })
@@ -108,22 +150,38 @@ function useCombatSearch<TInput, TResult>(
   // Activity 隐藏与真正卸载都会走清理；只取消显式搜索，不打断默认预取。
   useEffect(() => cancel, [cancel])
 
-  const refreshDefault = useCallback((next: TInput) => {
+  const loadDefault = useCallback((next: TInput) => {
+    const requestId = ++defaultFlight.current
+    defaultEpoch.current = explicitEpoch.current
     setDefaultRequest(next)
+    setFailure(current => (current?.source === 'default' ? null : current))
     void client.fetchQuery({
       ...toOptions(next),
       staleTime: 0,
-    } as never).catch(() => {
-      // 后台刷新失败时保留旧缓存，错误不进入显式搜索状态。
-    })
+    } as never).then(
+      () => {
+        if (defaultFlight.current !== requestId) return
+        setFailure(current => (current?.source === 'default' ? null : current))
+      },
+      (error: unknown) => {
+        if (defaultFlight.current !== requestId || isSearchCancellation(error)) return
+        if (defaultEpoch.current !== explicitEpoch.current) return
+        const { message } = describeSearchFailure(error)
+        setFailure(current => (
+          current?.source === 'explicit' ? current : { source: 'default', message }
+        ))
+      },
+    )
   }, [client, toOptions])
 
   const search = useCallback(async (next: TInput): Promise<CopilotSearchOutcome<TResult>> => {
     const requestId = ++generation.current
+    explicitEpoch.current += 1
     const options = toOptions(next) as { queryKey: readonly unknown[] }
     explicitKey.current = options.queryKey
     setInput(next)
     setPending(true)
+    setFailure(null)
     try {
       // 显式搜索总是重新读取；被取消或取代的 Promise 由代次裁决。
       const result = await client.fetchQuery({
@@ -131,12 +189,16 @@ function useCombatSearch<TInput, TResult>(
         staleTime: 0,
       } as never) as TResult
       if (generation.current !== requestId) return { status: 'cancelled' }
+      explicitEpoch.current += 1
+      setFailure(null)
       return { status: 'success', result }
     } catch (error) {
-      if (generation.current !== requestId || isAbortError(error)) {
+      if (generation.current !== requestId || isSearchCancellation(error)) {
         return { status: 'cancelled' }
       }
-      return { status: 'failed', ...describeSearchFailure(error) }
+      const failure = describeSearchFailure(error)
+      setFailure({ source: 'explicit', message: failure.message })
+      return { status: 'failed', ...failure }
     } finally {
       if (generation.current === requestId) setPending(false)
     }
@@ -153,13 +215,24 @@ function useCombatSearch<TInput, TResult>(
     }
   }, [client, toOptions])
 
+  const retry = useCallback(() => {
+    if (input !== null) {
+      void search(input)
+      return
+    }
+    if (defaultRequest === null) return
+    loadDefault(defaultRequest)
+  }, [defaultRequest, input, loadDefault, search])
+
   return {
     result: query.data ?? defaultQuery.data ?? null,
     searching: pending,
     refreshing: defaultQuery.isFetching,
+    error: failure?.message ?? null,
     search,
     loadMore,
-    refreshDefault,
+    refreshDefault: loadDefault,
+    retry,
     cancel,
     reset,
   }

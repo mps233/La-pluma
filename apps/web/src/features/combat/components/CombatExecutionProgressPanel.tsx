@@ -38,7 +38,7 @@ export default function CombatExecutionProgressPanel({
   return (
     <section className="combat-workspace-section" aria-label="本次执行进度">
       <div className="flex items-center justify-between gap-3.5">
-        <h5 className="text-sm font-semibold text-foreground">本次执行进度</h5>
+        <h2 className="text-sm font-semibold text-foreground">本次执行进度</h2>
         {elapsed && <span className="text-xs text-tertiary">已用时 {elapsed}</span>}
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs">

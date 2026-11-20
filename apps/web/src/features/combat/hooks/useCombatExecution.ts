@@ -15,6 +15,7 @@ import {
   useExecutionSnapshot,
   type AgentRun,
   type ExecutionController,
+  type TerminalRunState,
 } from '@/features/task-execution'
 import {
   continueCopilotQueue,
@@ -74,6 +75,13 @@ export interface CombatQueueSubmission {
   taskName: string
 }
 
+export interface CombatTerminalResult {
+  runId: string
+  state: TerminalRunState
+  message: string
+  type: 'success' | 'warning' | 'error'
+}
+
 export interface CombatExecution {
   /** 本页发起且仍处于活动的 run（含等待下一关），或身份已持久化但快照尚未解析出来。 */
   isRunning: boolean
@@ -91,6 +99,8 @@ export interface CombatExecution {
   setRun: CopilotSetRunProjection | null
   queueRun: CopilotQueueRunProjection | null
   run: AgentRun | null
+  /** 本页观察到的最近一次终态结果；新提交开始时清空。 */
+  terminalResult: CombatTerminalResult | null
   submitTask: (request: CombatTaskSubmission) => Promise<boolean>
   submitSet: (request: CombatSetSubmission) => Promise<boolean>
   submitQueue: (request: CombatQueueSubmission) => Promise<boolean>
@@ -159,6 +169,7 @@ export function useCombatExecution({
   const [stopAcknowledged, setStopAcknowledged] = useState(false)
   const [isContinuing, setIsContinuing] = useState(false)
   const [isSkipping, setIsSkipping] = useState(false)
+  const [terminalResult, setTerminalResult] = useState<CombatTerminalResult | null>(null)
   const [autoStoppingRunId, setAutoStoppingRunId] = useState<string | null>(null)
   const stopRequestRef = useRef(false)
   const continuingRef = useRef(false)
@@ -188,17 +199,22 @@ export function useCombatExecution({
   }, [ownedRunId])
 
   const announceTerminal = useCallback((run: AgentRun) => {
+    if (!isTerminalRunState(run.state)) return
     announcedRunRef.current = run.runId
     const queueProjection = readCopilotQueueRunProjection(run)
-    if (queueProjection) {
-      const notice = describeCopilotQueueRunTerminal(run, queueProjection)
-      notify(notice.message, notice.type, { id: EXECUTION_NOTICE_ID })
-      return
+    let notice = queueProjection ? describeCopilotQueueRunTerminal(run, queueProjection) : null
+    if (!notice) {
+      const projection = readCopilotSetRunProjection(run)
+      notice = projection
+        ? describeCopilotSetRunTerminal(run, projection)
+        : describeCombatTaskTerminal(run, runLabelsRef.current.get(run.runId))
     }
-    const projection = readCopilotSetRunProjection(run)
-    const notice = projection
-      ? describeCopilotSetRunTerminal(run, projection)
-      : describeCombatTaskTerminal(run, runLabelsRef.current.get(run.runId))
+    setTerminalResult({
+      runId: run.runId,
+      state: run.state,
+      message: notice.message,
+      type: notice.type,
+    })
     notify(notice.message, notice.type, { id: EXECUTION_NOTICE_ID })
   }, [notify])
 
@@ -321,6 +337,7 @@ export function useCombatExecution({
   const submitTask = useCallback(async ({ command, args, taskName }: CombatTaskSubmission) => {
     if (isRunning || controller.getState().submission === 'pending') return false
 
+    setTerminalResult(null)
     notifyProgress(`正在执行: ${taskName}`, EXECUTION_NOTICE_ID)
     try {
       const result = await controller.submitExecution(
@@ -368,6 +385,7 @@ export function useCombatExecution({
       return false
     }
 
+    setTerminalResult(null)
     notifyProgress(request.mode === 'manual' ? '正在执行作业集（手动逐关）' : '正在连续执行作业集', EXECUTION_NOTICE_ID)
     try {
       const result = await controller.submitExecution(
@@ -411,6 +429,7 @@ export function useCombatExecution({
       return false
     }
 
+    setTerminalResult(null)
     notifyProgress(request.mode === 'manual' ? '正在执行作业队列（手动逐项）' : '正在连续执行作业队列', EXECUTION_NOTICE_ID)
     try {
       const result = await controller.submitExecution(
@@ -580,6 +599,7 @@ export function useCombatExecution({
     setRun,
     queueRun,
     run: trackedRun,
+    terminalResult,
     submitTask,
     submitSet,
     submitQueue,

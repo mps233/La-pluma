@@ -3,6 +3,7 @@ import { LayoutGrid, List, LoaderCircle, Power, Search, X } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
+import { ToggleGroup, ToggleGroupItem } from '@/shared/ui/toggle-group'
 import {
   COPILOT_SEARCH_ORDERS,
   COPILOT_SEARCH_ORDER_LABELS,
@@ -183,30 +184,23 @@ export default function CombatCopilotSearchBar({
           </SelectContent>
         </Select>
 
-        <div className="combat-copilot-discovery-view-toggle" role="group" aria-label="结果视图">
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className={`combat-copilot-discovery-view-button${view === 'grid' ? ' is-active' : ''}`}
-            aria-label="网格视图"
-            title="网格视图"
-            aria-pressed={view === 'grid'}
-            onClick={() => onViewChange('grid')}
-          >
+        <ToggleGroup
+          value={[view]}
+          onValueChange={next => {
+            const nextView = next[0]
+            if (nextView === 'grid' || nextView === 'list') onViewChange(nextView)
+          }}
+          multiple={false}
+          aria-label="结果视图"
+          spacing={0.5}
+        >
+          <ToggleGroupItem value="grid" aria-label="网格视图" title="网格视图">
             <LayoutGrid className="h-4 w-4" aria-hidden="true" />
-          </Button>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className={`combat-copilot-discovery-view-button${view === 'list' ? ' is-active' : ''}`}
-            aria-label="列表视图"
-            title="列表视图"
-            aria-pressed={view === 'list'}
-            onClick={() => onViewChange('list')}
-          >
+          </ToggleGroupItem>
+          <ToggleGroupItem value="list" aria-label="列表视图" title="列表视图">
             <List className="h-4 w-4" aria-hidden="true" />
-          </Button>
-        </div>
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
     </section>
   )

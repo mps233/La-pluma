@@ -132,6 +132,47 @@ describe('CombatCopilotMatchDialog', () => {
     expect(props.onChange).not.toHaveBeenCalled()
   })
 
+  it('shows the recognition loading state and keeps the persisted switch unchecked', async () => {
+    const props = await renderDialog({
+      settings: { enabled: true, modes: DEFAULT_COPILOT_MATCH_MODES },
+      operatorsLoading: true,
+      operatorsError: '读取失败',
+    })
+
+    expect(document.body.textContent).toContain('正在识别持有干员…')
+    expect(document.body.textContent).not.toContain('持有干员读取失败')
+
+    const toggle = document.querySelector('[role="switch"]')
+    expect(toggle?.getAttribute('aria-disabled')).toBe('true')
+    expect(toggle?.getAttribute('aria-checked')).toBe('false')
+
+    await click(toggle)
+    expect(props.onChange).not.toHaveBeenCalled()
+  })
+
+  it('shows the recognition failure with a retry action and disables matching', async () => {
+    const onRetryData = vi.fn()
+    const props = await renderDialog({
+      settings: { enabled: true, modes: DEFAULT_COPILOT_MATCH_MODES },
+      operatorsError: '网络错误',
+      onRetryData,
+    })
+
+    expect(document.body.textContent).toContain('持有干员读取失败')
+    expect(document.body.textContent).not.toContain('正在识别持有干员')
+    expect(document.body.textContent).not.toContain('先识别持有干员')
+
+    const toggle = document.querySelector('[role="switch"]')
+    expect(toggle?.getAttribute('aria-disabled')).toBe('true')
+    expect(toggle?.getAttribute('aria-checked')).toBe('false')
+
+    await click(toggle)
+    expect(props.onChange).not.toHaveBeenCalled()
+
+    await click(findButton('重试'))
+    expect(onRetryData).toHaveBeenCalledTimes(1)
+  })
+
   it('closes from the footer', async () => {
     const props = await renderDialog()
 

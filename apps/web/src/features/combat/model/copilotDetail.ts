@@ -7,6 +7,8 @@ import { parseCopilotUri } from '../utils/copilotUri'
 
 export type { CopilotDetailOperator } from '../types'
 
+export type CopilotDetailTone = 'neutral' | 'active' | 'success' | 'warning' | 'danger'
+
 export interface CopilotDetailTarget {
   title: string
   details?: string
@@ -22,6 +24,7 @@ export interface CopilotDetailTarget {
   operators?: CopilotDetailOperator[]
   groups?: string[]
   statusLabel?: string
+  statusTone?: CopilotDetailTone
   error?: string
 }
 

@@ -3,17 +3,10 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .combat-segment-active {
-    background: var(--primary-soft);
-    color: var(--primary-strong);
-    box-shadow: none;
-  }
-
   .combat-mode-shell {
     width: 100%;
   }
 
-  .combat-copilot-layout,
   .combat-special-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -33,32 +26,11 @@
     background: transparent;
   }
 
-  .combat-task-icon {
-    display: flex;
-    width: 2.25rem;
-    height: 2.25rem;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.75rem;
-    background: var(--primary-soft);
-    color: var(--primary-strong);
-    box-shadow: none;
-  }
-
-  .combat-task-icon > * {
-    width: 2.25rem;
-    height: 2.25rem;
-    background: transparent;
-    box-shadow: none;
-  }
-
   .combat-task-run-button {
     min-width: 7.5rem;
     flex: none;
   }
 
-  .combat-copilot-layout > *,
   .combat-special-layout > * {
     position: relative;
     min-width: 0;
@@ -69,7 +41,7 @@
     min-width: 0;
     border-radius: var(--radius-xl);
     padding: 0.875rem;
-    background: color-mix(in srgb, var(--muted) 86%, transparent);
+    background: var(--muted);
   }
 
   .combat-copilot-source-bar {
@@ -77,8 +49,6 @@
     display: grid;
     gap: 0.75rem;
     padding: 1rem;
-    border-bottom: 1px solid var(--border);
-    background: color-mix(in srgb, var(--muted) 45%, transparent);
   }
 
   .combat-copilot-input {
@@ -91,12 +61,7 @@
     display: flex;
     min-width: 0;
     flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
-  .combat-copilot-search-row {
-    display: flex;
-    min-width: 0;
+    align-items: center;
     gap: 0.5rem;
   }
 
@@ -117,7 +82,7 @@
 
   .combat-copilot-uri-field:focus-within {
     background: color-mix(in srgb, var(--primary-soft) 22%, var(--muted));
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 50%, transparent);
   }
 
   .combat-copilot-uri-input {
@@ -192,123 +157,6 @@
     box-shadow: inset 1px 0 0 var(--border);
   }
 
-  .combat-copilot-search {
-    display: grid;
-    min-width: 0;
-    gap: 0.5rem;
-  }
-
-  .combat-copilot-search-results {
-    display: grid;
-    max-height: 9rem;
-    gap: 0.375rem;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-
-  .combat-copilot-search-result {
-    display: flex;
-    min-width: 0;
-    min-height: 2.75rem;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.25rem 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--card);
-    text-align: left;
-    transition: border-color 160ms ease, background-color 160ms ease;
-  }
-
-  .combat-copilot-search-result:hover {
-    border-color: var(--primary);
-  }
-
-  .combat-copilot-search-result.is-active {
-    border-color: var(--primary);
-    background: var(--primary-soft);
-  }
-
-  .combat-copilot-search-result-main {
-    display: flex;
-    min-width: 0;
-    min-height: 2.75rem;
-    flex: 1 1 auto;
-    align-self: stretch;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .combat-copilot-search-result-add {
-    min-height: 2.75rem;
-    flex: none;
-    padding: 0 0.5rem;
-    border: 0;
-    border-left: 1px solid var(--border);
-    background: transparent;
-    color: var(--primary-strong);
-    font-size: 0.6875rem;
-    font-weight: 500;
-    cursor: pointer;
-  }
-
-  .combat-copilot-search-result-add:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .combat-copilot-help-trigger {
-    display: inline-flex;
-    min-width: 2.75rem;
-    min-height: 2.75rem;
-    align-items: center;
-    justify-content: center;
-    padding: 0 0.5rem;
-    border-radius: var(--radius-lg);
-    color: var(--primary-strong);
-    font-size: 0.75rem;
-    font-weight: 500;
-    cursor: pointer;
-    list-style: none;
-  }
-
-  .combat-copilot-help-body {
-    position: absolute;
-    z-index: 20;
-    right: 0;
-    display: none;
-    width: min(18rem, calc(100vw - 3rem));
-    margin-top: 0.5rem;
-    padding: 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--card);
-    box-shadow: 0 12px 32px color-mix(in srgb, var(--foreground) 16%, transparent);
-  }
-
-  .combat-copilot-help[open] .combat-copilot-help-body {
-    display: block;
-  }
-
-  .combat-copilot-help-body p {
-    margin: 0;
-    color: var(--tertiary-foreground);
-    font-size: 0.75rem;
-    line-height: 1.5;
-  }
-
-  .combat-copilot-help-body p + p {
-    margin-top: 0.375rem;
-  }
-
   .combat-copilot-code {
     padding: 0 0.25rem;
     border-radius: var(--radius-sm);
@@ -372,34 +220,9 @@
     flex: none;
     align-items: center;
     justify-content: center;
-    border: 0;
     border-radius: var(--radius-lg);
-    background: transparent;
     cursor: pointer;
     transition: background-color 160ms ease;
-  }
-
-  .combat-copilot-mine-check:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .combat-copilot-mine-check-box {
-    display: flex;
-    width: 1rem;
-    height: 1rem;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid var(--input);
-    border-radius: var(--radius-sm);
-    background: var(--card);
-    color: transparent;
-  }
-
-  .combat-copilot-mine-check-box.is-selected {
-    border-color: var(--primary);
-    background: var(--primary);
-    color: #fff;
   }
 
   .combat-copilot-mine-marker {
@@ -415,25 +238,31 @@
     font-size: 0.6875rem;
   }
 
-  .combat-copilot-mine-tag {
-    display: inline-flex;
-    align-items: center;
-    padding: 0 0.25rem;
-    border-radius: var(--radius-sm);
-    background: var(--muted);
-    color: var(--tertiary-foreground);
-    white-space: nowrap;
-  }
-
-  .combat-copilot-mine-tag.is-complete {
-    color: var(--success);
-  }
-
   .combat-copilot-mine-status {
     flex: none;
     color: var(--tertiary-foreground);
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     white-space: nowrap;
+  }
+
+  .combat-copilot-mine-status.is-active {
+    color: var(--primary-strong);
+  }
+
+  .combat-copilot-mine-status.is-success {
+    color: var(--success-text);
+  }
+
+  .combat-copilot-mine-status.is-warning {
+    color: var(--warning);
+  }
+
+  .combat-copilot-mine-status.is-danger {
+    color: var(--destructive);
+  }
+
+  .combat-copilot-mine-status.is-neutral {
+    color: var(--tertiary-foreground);
   }
 
   .combat-copilot-mine-body {
@@ -467,7 +296,7 @@
     align-items: center;
     gap: 0.125rem 0.5rem;
     color: var(--tertiary-foreground);
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
   }
 
   .combat-copilot-mine-actions {
@@ -485,7 +314,7 @@
     overflow: hidden;
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
-    background: color-mix(in srgb, var(--muted) 48%, transparent);
+    background: var(--card);
   }
 
   .combat-copilot-panel-head {
@@ -505,7 +334,7 @@
     gap: 0.5rem;
   }
 
-  .combat-copilot-panel-title h5 {
+  .combat-copilot-panel-title h3 {
     margin: 0;
     color: var(--foreground);
     font-size: 0.875rem;
@@ -514,7 +343,7 @@
 
   .combat-copilot-kicker {
     color: var(--tertiary-foreground);
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     font-weight: 500;
   }
 
@@ -525,247 +354,13 @@
     gap: 0.5rem;
   }
 
-  .combat-copilot-text-action {
-    min-height: 2.75rem;
-    padding: 0 0.25rem;
-    border: 0;
-    background: transparent;
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-    cursor: pointer;
-  }
-
-  .combat-copilot-text-action.is-accent {
-    color: var(--primary-strong);
-  }
-
-  .combat-copilot-text-action:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .combat-copilot-divider {
-    width: 1px;
-    height: 0.75rem;
-    background: var(--border);
-  }
-
-  .combat-copilot-queue-list {
-    display: flex;
-    max-height: 24rem;
-    flex-direction: column;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-
-  .combat-copilot-row {
-    border-top: 1px solid var(--border);
-  }
-
-  .combat-copilot-row:first-child {
-    border-top: 0;
-  }
-
-  .combat-copilot-row-main {
-    display: flex;
-    min-height: 3.5rem;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.25rem 0.625rem;
-  }
-
-  .combat-copilot-row:hover {
-    background: var(--muted);
-  }
-
-  .combat-copilot-row.is-current {
-    background: var(--primary-soft);
-  }
-
-  .combat-copilot-row.is-success {
-    background: color-mix(in srgb, var(--success) 10%, transparent);
-  }
-
-  .combat-copilot-row.is-failed {
-    background: color-mix(in srgb, var(--destructive) 9%, transparent);
-  }
-
-  .combat-copilot-row.is-stopped {
-    background: var(--muted);
-  }
-
-  .combat-copilot-row.is-muted {
-    opacity: 0.72;
-  }
-
-  .combat-copilot-check {
-    display: inline-flex;
-    width: 2.75rem;
-    height: 2.75rem;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    border: 0;
-    border-radius: var(--radius-lg);
-    background: transparent;
-    cursor: pointer;
-    transition: background-color 160ms ease;
-  }
-
-  .combat-copilot-check:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .combat-copilot-check-box {
-    display: flex;
-    width: 1rem;
-    height: 1rem;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid var(--input);
-    border-radius: var(--radius-sm);
-    background: var(--card);
-    color: transparent;
-  }
-
-  .combat-copilot-check-box.is-selected {
-    border-color: var(--primary);
-    background: var(--primary);
-    color: #fff;
-  }
-
-  .combat-copilot-marker {
-    display: flex;
-    width: 1rem;
-    height: 1rem;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    border-radius: 9999px;
-    background: var(--muted);
-    color: var(--tertiary-foreground);
-    font-size: 0.6875rem;
-  }
-
-  .combat-copilot-row.is-current .combat-copilot-marker {
-    background: var(--primary);
-    color: #fff;
-  }
-
-  .combat-copilot-row.is-success .combat-copilot-marker {
-    background: var(--success);
-    color: #fff;
-  }
-
-  .combat-copilot-row.is-failed .combat-copilot-marker {
-    background: var(--destructive);
-    color: #fff;
-  }
-
-  .combat-copilot-row-body {
-    display: grid;
-    min-width: 0;
-    flex: 1 1 auto;
-    gap: 0.125rem;
-  }
-
-  .combat-copilot-row-name {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: 0.375rem;
-  }
-
-  .combat-copilot-row-title {
-    overflow: hidden;
-    color: var(--foreground);
-    font-size: 0.75rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .combat-copilot-row-meta {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--tertiary-foreground);
-    font-size: 0.75rem;
-  }
-
-  .combat-copilot-row-id {
-    display: none;
-    margin-left: auto;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.6875rem;
-    white-space: nowrap;
-  }
-
-  .combat-copilot-status {
-    display: inline-flex;
-    min-width: 4rem;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    padding: 0.125rem 0.5rem;
-    border-radius: var(--radius-sm);
-    background: var(--muted);
-    color: var(--muted-foreground);
-    font-size: 0.6875rem;
-    line-height: 1.4;
-    white-space: nowrap;
-  }
-
-  .combat-copilot-row.is-current .combat-copilot-status {
-    background: var(--primary);
-    color: #fff;
-  }
-
-  .combat-copilot-row.is-success .combat-copilot-status {
-    background: color-mix(in srgb, var(--success) 12%, transparent);
-    color: var(--success-text);
-  }
-
-  .combat-copilot-row.is-failed .combat-copilot-status {
-    background: color-mix(in srgb, var(--destructive) 12%, transparent);
-    color: var(--destructive);
-  }
-
-  .combat-copilot-expand {
-    display: inline-flex;
-    width: 2.75rem;
-    height: 2.75rem;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    border: 0;
-    border-radius: var(--radius-lg);
-    background: transparent;
-    color: var(--tertiary-foreground);
-    cursor: pointer;
-  }
-
-  .combat-copilot-expand:hover {
-    background: var(--muted);
-    color: var(--foreground);
-  }
-
-  .combat-copilot-expand-icon {
-    transition: transform 160ms ease;
-  }
-
-  .combat-copilot-expand-icon.is-expanded {
-    transform: rotate(180deg);
-  }
-
   .combat-copilot-tag {
     flex: none;
     padding: 0.125rem 0.375rem;
     border-radius: var(--radius-sm);
     background: var(--primary-soft);
     color: var(--primary-strong);
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     line-height: 1.4;
     white-space: nowrap;
   }
@@ -773,10 +368,6 @@
   .combat-copilot-tag.is-complete {
     background: color-mix(in srgb, var(--success) 12%, transparent);
     color: var(--success-text);
-  }
-
-  .combat-copilot-row-name .combat-copilot-tag {
-    display: none;
   }
 
   .combat-copilot-summary {
@@ -825,46 +416,6 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.375rem;
-  }
-
-  .combat-copilot-chip {
-    padding: 0.125rem 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--muted-foreground);
-    font-size: 0.6875rem;
-    line-height: 1.4;
-    white-space: nowrap;
-  }
-
-  .combat-copilot-chip.is-pending {
-    border-color: transparent;
-    background: var(--primary-soft);
-    color: var(--primary-strong);
-  }
-
-  .combat-copilot-chip.is-failed {
-    border-color: color-mix(in srgb, var(--destructive) 30%, transparent);
-    background: color-mix(in srgb, var(--destructive) 10%, transparent);
-    color: var(--destructive);
-  }
-
-  .combat-copilot-chip.is-muted {
-    color: var(--tertiary-foreground);
-  }
-
-  .combat-copilot-progress {
-    overflow: hidden;
-    height: 0.375rem;
-    border-radius: 9999px;
-    background: var(--muted);
-  }
-
-  .combat-copilot-progress-bar {
-    height: 100%;
-    border-radius: 9999px;
-    background: var(--primary);
-    transition: width 300ms ease;
   }
 
   .combat-copilot-resume {
@@ -948,47 +499,6 @@
     padding: 1rem;
   }
 
-  .combat-copilot-detail-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.75rem 1rem;
-    margin: 0;
-  }
-
-  .combat-copilot-detail-field {
-    display: grid;
-    min-width: 0;
-    gap: 0.125rem;
-  }
-
-  .combat-copilot-detail-wide {
-    grid-column: 1 / -1;
-  }
-
-  .combat-copilot-detail-label {
-    color: var(--tertiary-foreground);
-    font-size: 0.6875rem;
-  }
-
-  .combat-copilot-detail-value {
-    margin: 0;
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-  }
-
-  .combat-copilot-detail-link {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .combat-copilot-detail-link code {
-    color: var(--primary-strong);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.75rem;
-  }
-
   .combat-copilot-params {
     display: flex;
     min-width: 0;
@@ -996,7 +506,7 @@
     padding: 0.875rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
-    background: color-mix(in srgb, var(--muted) 48%, transparent);
+    background: var(--card);
   }
 
   .combat-copilot-params > .combat-workspace-section {
@@ -1010,8 +520,8 @@
 
   .combat-advanced-disclosure {
     overflow: hidden;
-    border-radius: 0.875rem;
-    background: color-mix(in srgb, var(--card) 58%, transparent);
+    border-radius: var(--radius-lg);
+    background: var(--muted);
   }
 
   .combat-advanced-disclosure > :not(summary) {
@@ -1019,15 +529,8 @@
     margin-left: 0.75rem;
   }
 
-  .combat-copilot-check:focus-visible,
-  .combat-copilot-expand:focus-visible,
-  .combat-copilot-text-action:focus-visible,
-  .combat-copilot-search-result-main:focus-visible,
-  .combat-copilot-search-result-add:focus-visible,
-  .combat-copilot-mine-body:focus-visible,
-  .combat-copilot-mine-check:focus-visible,
-  .combat-copilot-help-trigger:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--primary) 62%, transparent);
+  .combat-copilot-mine-body:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--ring) 50%, transparent);
     outline-offset: 2px;
   }
 
@@ -1038,10 +541,6 @@
   }
 
   @container (min-width: 40rem) {
-    .combat-copilot-layout {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    }
-
     .combat-special-layout {
       grid-template-columns: minmax(0, 1fr) minmax(18rem, 21.25rem);
     }
@@ -1052,15 +551,6 @@
   }
 
   @container (min-width: 40rem) {
-    .combat-copilot-row-id {
-      display: inline;
-    }
-
-    .combat-copilot-row-name .combat-copilot-tag {
-      display: inline-flex;
-      align-items: center;
-    }
-
     .combat-copilot-detail-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -1082,7 +572,6 @@
       width: 100%;
     }
 
-    .combat-copilot-layout,
     .combat-special-layout {
       gap: 0.375rem;
       padding: 0.375rem;
@@ -1096,24 +585,6 @@
       gap: 0.375rem;
       padding: 0.375rem;
     }
-
-    .combat-copilot-row-main {
-      padding-inline: 0.5rem;
-    }
-  }
-
-  .combat-copilot-text-action:enabled:hover {
-    color: var(--primary-strong);
-  }
-
-  .combat-copilot-check:enabled:hover {
-    background: var(--primary-soft);
-  }
-
-  .combat-task-icon svg {
-    /* S3: 图标尺寸随任务图标容器缩放，需要压过图标上的 w-* / h-* utilities。 */
-    width: 1.125rem !important;
-    height: 1.125rem !important;
   }
 
   .combat-copilot-discovery {
@@ -1209,15 +680,6 @@
 
   .combat-copilot-discovery-stage-panel {
     --combat-stage-panel-width: min(24rem, calc(100vw - 4rem));
-    --combat-stage-panel-shadow: 0 12px 32px color-mix(in srgb, var(--foreground) 16%, transparent);
-
-    display: grid;
-    width: var(--combat-stage-panel-width);
-    gap: 0.5rem;
-    padding: 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--combat-stage-panel-shadow);
   }
 
   .combat-copilot-discovery-stage-list {
@@ -1283,33 +745,8 @@
     font-size: 0.75rem;
   }
 
-  .combat-copilot-discovery-stage-error {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    color: var(--destructive);
-    font-size: 0.75rem;
-  }
-
   .combat-copilot-discovery-toggle.is-active {
     background: var(--primary-soft);
-    color: var(--primary-strong);
-  }
-
-  .combat-copilot-discovery-view-toggle {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    gap: 0.125rem;
-    padding: 0.125rem;
-    border-radius: var(--radius-lg);
-    background: var(--muted);
-  }
-
-  .combat-copilot-discovery-view-button.is-active {
-    background: var(--card);
     color: var(--primary-strong);
   }
 
@@ -1380,46 +817,6 @@
     gap: 0.25rem;
   }
 
-  .combat-copilot-discovery-badge {
-    padding: 0.125rem 0.375rem;
-    border-radius: var(--radius-sm);
-    background: var(--muted);
-    color: var(--muted-foreground);
-    font-size: 0.6875rem;
-    line-height: 1.4;
-    white-space: nowrap;
-  }
-
-  .combat-copilot-discovery-badge.is-match {
-    background: var(--primary-soft);
-    color: var(--primary-strong);
-  }
-
-  .combat-copilot-discovery-badge.is-match.is-ready {
-    background: color-mix(in srgb, var(--success) 12%, transparent);
-    color: var(--success-text);
-  }
-
-  .combat-copilot-discovery-badge.is-match.is-train {
-    background: color-mix(in srgb, var(--warning) 14%, transparent);
-    color: var(--warning);
-  }
-
-  .combat-copilot-discovery-badge.is-match.is-check {
-    background: var(--muted);
-    color: var(--muted-foreground);
-  }
-
-  .combat-copilot-discovery-badge.is-match.is-blocked {
-    background: color-mix(in srgb, var(--destructive) 12%, transparent);
-    color: var(--destructive);
-  }
-
-  .combat-copilot-discovery-badge.is-recommended {
-    background: color-mix(in srgb, var(--success) 12%, transparent);
-    color: var(--success-text);
-  }
-
   .combat-copilot-discovery-card-stage {
     display: flex;
     min-width: 0;
@@ -1469,7 +866,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     color: var(--muted-foreground);
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     line-height: 1.4;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1482,6 +879,11 @@
   }
 
   .combat-copilot-discovery-operator-chip.is-missing {
+    color: var(--tertiary-foreground);
+  }
+
+  .combat-copilot-discovery-operator-chip.is-unknown {
+    background: var(--muted);
     color: var(--tertiary-foreground);
   }
 
@@ -1503,6 +905,7 @@
 
   .combat-copilot-discovery-card-unmatched {
     color: var(--warning);
+    font-size: 0.75rem;
   }
 
   .combat-copilot-discovery-card-actions {
@@ -1534,7 +937,7 @@
     padding: 0.75rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    background: color-mix(in srgb, var(--muted) 45%, transparent);
+    background: var(--muted);
   }
 
   .combat-copilot-operator-section-heading {
@@ -1578,7 +981,7 @@
     border-radius: var(--radius-sm);
     background: var(--primary-soft);
     color: var(--primary-strong);
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     cursor: pointer;
   }
 
@@ -1656,20 +1059,6 @@
     font-size: 0.6875rem;
   }
 
-  .combat-copilot-operator-ownership {
-    flex: none;
-    font-size: 0.6875rem;
-    white-space: nowrap;
-  }
-
-  .combat-copilot-operator-ownership.is-owned {
-    color: var(--success-text);
-  }
-
-  .combat-copilot-operator-ownership.is-missing {
-    color: var(--tertiary-foreground);
-  }
-
   .combat-copilot-operator-actions {
     display: flex;
     flex-wrap: wrap;
@@ -1704,7 +1093,7 @@
     padding: 0.75rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    background: color-mix(in srgb, var(--muted) 45%, transparent);
+    background: var(--muted);
   }
 
   .combat-copilot-match-toggle-copy {
@@ -1721,7 +1110,7 @@
 
   .combat-copilot-match-toggle-hint {
     color: var(--tertiary-foreground);
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
   }
 
   .combat-copilot-match-warning {
@@ -1758,7 +1147,7 @@
   .combat-copilot-discovery-stage-option:focus-visible,
   .combat-copilot-operator-option:focus-visible,
   .combat-copilot-operator-chip:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--primary) 62%, transparent);
+    outline: 3px solid color-mix(in srgb, var(--ring) 50%, transparent);
     outline-offset: 2px;
   }
 

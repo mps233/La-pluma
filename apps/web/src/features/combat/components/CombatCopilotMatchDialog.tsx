@@ -1,4 +1,4 @@
-import { DialogBody, DialogFrame, DialogFrameFooter } from '@/shared/components'
+import { DialogBody, DialogFrame, DialogFrameFooter, Loading } from '@/shared/components'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
 import { Switch } from '@/shared/ui/switch'
@@ -12,6 +12,9 @@ export interface CombatCopilotMatchDialogProps {
   isOpen: boolean
   settings: CombatCopilotMatchSettings
   ownedOperatorNames: ReadonlySet<string>
+  operatorsLoading?: boolean
+  operatorsError?: string | null
+  onRetryData?: () => void
   onChange: (settings: CombatCopilotMatchSettings) => void
   onClose: () => void
 }
@@ -22,10 +25,15 @@ export default function CombatCopilotMatchDialog({
   isOpen,
   settings,
   ownedOperatorNames,
+  operatorsLoading = false,
+  operatorsError = null,
+  onRetryData,
   onChange,
   onClose,
 }: CombatCopilotMatchDialogProps) {
   const hasOwnedOperators = ownedOperatorNames.size > 0
+  const unavailable = operatorsLoading || Boolean(operatorsError)
+  const matchingAvailable = hasOwnedOperators && !unavailable
 
   const handleEnabledChange = (enabled: boolean) => {
     onChange({ ...settings, enabled })
@@ -59,17 +67,24 @@ export default function CombatCopilotMatchDialog({
             </div>
             <Switch
               aria-label="按持有干员匹配"
-              checked={settings.enabled}
-              disabled={!hasOwnedOperators}
+              checked={matchingAvailable ? settings.enabled : false}
+              disabled={!matchingAvailable}
               onCheckedChange={handleEnabledChange}
             />
           </div>
 
-          {!hasOwnedOperators && (
+          {operatorsLoading ? (
+            <Loading size="sm" text="正在识别持有干员…" />
+          ) : operatorsError ? (
+            <div className="combat-copilot-operator-error" role="alert">
+              <span>{`持有干员读取失败：${operatorsError}`}</span>
+              <Button size="sm" variant="secondary" onClick={() => onRetryData?.()}>重试</Button>
+            </div>
+          ) : !hasOwnedOperators ? (
             <p className="combat-copilot-match-warning" role="status">
               还没有识别到持有干员，先识别持有干员后再启用匹配。
             </p>
-          )}
+          ) : null}
 
           <p className="combat-copilot-match-note">
             按精英化阶段与等级估算；技能等级与模组尚未识别，相关作业统一归入“待确认”。

@@ -4,7 +4,9 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CopilotSearchItem } from '../types'
-import CombatCopilotDiscoveryCard from './CombatCopilotDiscoveryCard'
+import CombatCopilotDiscoveryCard, {
+  type CombatCopilotDiscoveryCardProps,
+} from './CombatCopilotDiscoveryCard'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -22,7 +24,10 @@ const ITEM: CopilotSearchItem = {
   match: { mode: 'ready', missing: [], training: [], check: [], totalSlots: 2 },
 }
 
-const renderCard = async (overrides: Partial<CopilotSearchItem> = {}) => {
+const renderCard = async (
+  overrides: Partial<CopilotSearchItem> = {},
+  props: Partial<CombatCopilotDiscoveryCardProps> = {},
+) => {
   const onPreview = vi.fn()
   const onAddToQueue = vi.fn()
   const container = document.createElement('div')
@@ -39,6 +44,7 @@ const renderCard = async (overrides: Partial<CopilotSearchItem> = {}) => {
         ownedOperatorNames={new Set(['阿米娅'])}
         onPreview={onPreview}
         onAddToQueue={onAddToQueue}
+        {...props}
       />,
     )
   })
@@ -104,6 +110,23 @@ describe('CombatCopilotDiscoveryCard', () => {
     await card.unmount()
   })
 
+  it('shows the formatted hot score in the card meta', async () => {
+    const card = await renderCard()
+
+    expect(card.container.textContent).toMatch(/热度 98(?!\d)/)
+    await card.unmount()
+
+    const decimalCard = await renderCard({ hotScore: 4.5 })
+
+    expect(decimalCard.container.textContent).toMatch(/热度 4\.5(?!\d)/)
+    await decimalCard.unmount()
+
+    const noisyCard = await renderCard({ hotScore: 16853.43055304006 })
+
+    expect(noisyCard.container.textContent).toMatch(/热度 16853\.4(?!\d)/)
+    await noisyCard.unmount()
+  })
+
   it('labels owned and missing operators in the card chips', async () => {
     const card = await renderCard()
 
@@ -111,6 +134,18 @@ describe('CombatCopilotDiscoveryCard', () => {
     const chips = Array.from(cardMain?.querySelectorAll<HTMLElement>('[title]') ?? [])
     expect(chips.map(chip => chip.textContent)).toEqual(['阿米娅', '陈'])
     expect(chips.map(chip => chip.getAttribute('title'))).toEqual(['阿米娅（已拥有）', '陈（未拥有）'])
+    await card.unmount()
+  })
+
+  it('labels every operator as unknown instead of missing when ownership is unavailable', async () => {
+    const card = await renderCard({}, { ownershipKnown: false })
+
+    const cardMain = card.container.querySelector('button[aria-label="查看作业 突袭 1-7 挂机"]')
+    const chips = Array.from(cardMain?.querySelectorAll<HTMLElement>('[title]') ?? [])
+    expect(chips.map(chip => chip.textContent)).toEqual(['阿米娅', '陈'])
+    expect(chips.map(chip => chip.getAttribute('title')))
+      .toEqual(['阿米娅（拥有状态未知）', '陈（拥有状态未知）'])
+    expect(chips.some(chip => chip.getAttribute('title')?.includes('未拥有'))).toBe(false)
     await card.unmount()
   })
 })

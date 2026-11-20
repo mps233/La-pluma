@@ -213,6 +213,66 @@ loading 不是 `Button` 的 prop：调用点用 `disabled` 阻止重复提交，
 
 ---
 
+### Progress - 进度条
+
+**文件位置**：`apps/web/src/shared/ui/progress.tsx`（shadcn 生成物，随上游原文保留）
+
+**适用场景**：任务、队列与资源同步等进度的只读展示。`Progress` 使用 Base UI 的 progressbar 语义，Root 自动输出 `role="progressbar"`、`aria-valuemin`、`aria-valuemax` 与 `aria-valuenow`；不要再手写 track、填充宽度或进度条 ARIA。
+
+```tsx
+import { Progress, ProgressLabel, ProgressValue } from '@/shared/ui/progress'
+
+<Progress value={completedCount} max={totalCount}>
+  <ProgressLabel>作业集进度</ProgressLabel>
+  <ProgressValue />
+</Progress>
+```
+
+`value` 传 `null` 时表示不确定进度；`max` 省略时按 100 计算。`Progress` 总会渲染默认的 `ProgressTrack` 与 `ProgressIndicator`，不要把它们作为 children 再传入（会重复渲染）；需要完全自定义轨道或填充结构时，改用 `@base-ui/react/progress` 的 Root 自行组合这两个原语，仅调整颜色或尺寸则在调用点用 `className` 覆盖（可配合 `data-slot` 选择器）。`ProgressLabel` / `ProgressValue` 生成可见标签与格式化数值；没有可见标签时用 `aria-label` 提供可访问名称。测试用 `getByRole('progressbar')` 断言 `aria-valuenow`，不要断言内联宽度或 CSS 类名。
+
+---
+
+### Badge - 状态标签
+
+**文件位置**：`apps/web/src/shared/ui/badge.tsx`（shadcn 生成物，随上游原文保留）
+
+**适用场景**：只读的状态、来源与分类 pill。`Badge` 默认渲染非交互的 `span`，不承担筛选、勾选或点击；交互 chip 使用 `Button`、`ToggleGroup` 或 `Checkbox`。
+
+```tsx
+import { Badge } from '@/shared/ui/badge'
+
+<Badge>推荐</Badge>
+<Badge variant="secondary">已拥有</Badge>
+<Badge variant="outline" className="border-success/30 bg-success/10 text-success-text">已完成</Badge>
+```
+
+`variant` 为 `default`、`secondary`、`destructive`、`outline`、`ghost`、`link`；不提供 success/warning 等业务变体。状态色由调用点通过 `className` 覆盖（或搭配无背景冲突的 variant 复用 `status-*` 语义类），不要向共享原语添加 tone prop。Badge 默认作为非交互状态 pill 使用；确需链接语义时用 `render={<a href="..." />}` 渲染为链接，不要用 `onClick` 模拟按钮。图标作为 children 直接渲染，装饰图标加 `aria-hidden="true"`。
+
+---
+
+### Alert - 常驻提示
+
+**文件位置**：`apps/web/src/shared/ui/alert.tsx`（shadcn 生成物，随上游原文保留）
+
+**适用场景**：需要持续显示、直到用户处理或重试的错误与警告块，例如目录加载失败、详情读取失败。`Alert` 是页面内提示，不是弹窗：必须显式确认的操作使用 `AlertDialog`，需要确认流程时使用 `ConfirmAlertDialog`；加载中、筛选无结果等短时提示继续使用 `role="status"`。
+
+```tsx
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/shared/ui/alert'
+import { Button } from '@/shared/ui/button'
+
+<Alert variant="destructive">
+  <AlertTitle>干员目录加载失败</AlertTitle>
+  <AlertDescription>请检查连接后重试。</AlertDescription>
+  <AlertAction>
+    <Button size="sm" variant="outline">重试</Button>
+  </AlertAction>
+</Alert>
+```
+
+根节点固定输出 `role="alert"`，不要改成 `role="status"`，也不要在其中再包一层 alert 角色。`variant` 只有 `default` 与 `destructive`；不提供 success/warning 业务变体，其他状态用 `className` 覆盖。标题、描述与右上角操作分别使用 `AlertTitle`、`AlertDescription` 与 `AlertAction`。图标作为根节点的直接子元素渲染，装饰图标加 `aria-hidden="true"`。
+
+---
+
 ### Input / Select / Checkbox / Switch
 
 **文件位置**：`apps/web/src/shared/ui/input.tsx`、`apps/web/src/shared/ui/select.tsx`、`apps/web/src/shared/ui/checkbox.tsx`、`apps/web/src/shared/ui/switch.tsx`（均为 shadcn 生成物）
@@ -371,7 +431,7 @@ import { DialogBody, DialogFrame, DialogFrameFooter } from '@/shared/components'
 </DialogFrame>
 ```
 
-`DialogFrame` 的 props：`open`、`onOpenChange`、`title`、`description`、`children`、`footer`、`layers`、`size`（`md` 为默认，另有 `lg`、`4xl`）、`closeDisabled`、`disablePointerDismissal`、`id`、`className`。`closeDisabled` 禁用标题栏关闭按钮，并拒绝 Escape、遮罩点击与关闭请求；保存或提交等待期间使用。`layers` 承载与对话框同一 Base UI root 的嵌套弹层（如发现作业中的详情抽屉），以保持 Escape 顺序与层级关系。`DialogBody` 是唯一可滚动内容区，透传原生 `div` 属性（如 `onScroll`）；`DialogFrameFooter` 透传 `div` 属性，`align` 为 `end`（默认）或 `between`。
+`DialogFrame` 的 props：`open`、`onOpenChange`、`title`、`description`、`toolbar`、`children`、`footer`、`layers`、`size`（`md` 为默认，另有 `lg`、`4xl`）、`closeDisabled`、`disablePointerDismissal`、`id`、`className`。`toolbar` 在标题栏与可滚动内容之间渲染固定工具栏（`data-slot="dialog-toolbar"`），不随 `DialogBody` 滚动；发现作业用它固定搜索与筛选条。`closeDisabled` 禁用标题栏关闭按钮，并拒绝 Escape、遮罩点击与关闭请求；保存或提交等待期间使用。`layers` 承载与对话框同一 Base UI root 的嵌套弹层（如发现作业中的详情抽屉），以保持 Escape 顺序与层级关系。`DialogBody` 是唯一可滚动内容区，透传原生 `div` 属性（如 `onScroll`）；`DialogFrameFooter` 透传 `div` 属性，`align` 为 `end`（默认）或 `between`。
 
 ---
 

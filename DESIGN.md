@@ -141,7 +141,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 浅色主题读起来像冷调纸面与分层表面，深色主题则是近黑石墨与同一支蓝色信号。密度是刻意保留的：信息可以很满，但层级必须由字重、1px 发丝线和间距 token 建立，而不是由彩色卡片、渐变或投影堆出来。强调色是稀缺资源，只出现在当前导航项、主操作、焦点和运行中的状态上。
 
 **Key Characteristics:**
-- 原生语义优先：`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card`、`Dialog`、`AlertDialog`、`Sheet` 使用 `shared/ui` 的 shadcn 生成物，`ConfirmAlertDialog`、`Loading` 等应用组件位于 `shared/components`；两者都使用真实语义元素，浏览器、jsdom、SSR 和嵌入式场景渲染一致。
+- 原生语义优先：`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Progress`、`Badge`、`Alert`、`Card`、`Dialog`、`AlertDialog`、`Sheet` 使用 `shared/ui` 的 shadcn 生成物，`ConfirmAlertDialog`、`Loading` 等应用组件位于 `shared/components`；两者都使用真实语义元素，浏览器、jsdom、SSR 和嵌入式场景渲染一致。
 - 单强调色：系统蓝承担品牌、主操作、焦点和选中态；状态色只表达成功、警告、危险和信息。
 - 分层而不炫技：普通内容面保持平整，只有 chrome、弹层和可点击卡片使用抬升或 hover 阴影；玻璃由后续主题层提供。
 - 4px 节奏：布局间距使用 Tailwind 原生档位与组件类；圆角使用 `--radius` 派生档位。
@@ -152,7 +152,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 - `apps/web/src/styles/index.css`：语义 token 的**唯一来源**（base 层）、Tailwind 入口、`@theme` 圆角派生与 `@theme inline` 颜色映射、通用组件类与跨域 keyframes；页面样式由各功能域自持。
 - `apps/web/src/styles/layout.css`：结构几何与 `--layout-*` token（视口、navbar 与安全区高度、侧栏、内容宽度与留白、内容 sticky 顶部偏移、tabbar 安全区与浮动内容底部偏移）；应用 chrome 的尺寸、定位、网格、滚动宿主与 skip link 可访问性样式都在这里，不承载页面级颜色、材质或控件外观。
 - `apps/web/src/styles/ios-theme.css`：只保留默认主题的 chrome 材质 token（`--glass-*`）与对应视觉样式（含 PWA 安装入口与分段控件）；共享设备画面的 surface 与紧凑玻璃按钮材质归 `apps/web/src/features/device-mirror/styles/device-mirror.css`；默认基线不依赖玻璃材质，液态玻璃由后续主题提供。
-- `apps/web/src/shared/components`：`PageShell`、`ConfirmAlertDialog`、`EmptyState`、`Loading` 等应用级通用组件；`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Card`、`Dialog`、`AlertDialog`、`Sheet` 等 shadcn 生成物位于 `apps/web/src/shared/ui`（sidebar 也在该目录）。
+- `apps/web/src/shared/components`：`PageShell`、`ConfirmAlertDialog`、`EmptyState`、`Loading` 等应用级通用组件；`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Progress`、`Badge`、`Alert`、`Card`、`Dialog`、`AlertDialog`、`Sheet` 等 shadcn 生成物位于 `apps/web/src/shared/ui`（sidebar 也在该目录）。
 
 本文件描述规则；语义 token 的具体数值以 `apps/web/src/styles/index.css` 为准，布局与结构几何 token 以 `apps/web/src/styles/layout.css` 为准，chrome 材质 token 以 `apps/web/src/styles/ios-theme.css` 为准。调整 token 时同步更新本文件的表格与说明。
 

@@ -1,5 +1,6 @@
 import { SearchX } from 'lucide-react'
 import { EmptyState, Loading } from '@/shared/components'
+import { Button } from '@/shared/ui/button'
 import type { CopilotSearchItem } from '../types'
 import CombatCopilotDiscoveryCard from './CombatCopilotDiscoveryCard'
 import type {
@@ -25,10 +26,29 @@ export default function CombatCopilotDiscoveryResults({
   match,
   recommendedUri,
 }: CombatCopilotDiscoveryResultsProps) {
+  const ownershipKnown = !search.operatorsLoading && !search.operatorsError
+
   if (search.searching) {
     return (
       <div className="combat-copilot-discovery-loading">
         <Loading text="正在搜索作业…" />
+      </div>
+    )
+  }
+
+  if (search.error) {
+    return (
+      <div
+        className="form-error-surface flex flex-col items-start gap-3 rounded-xl p-4 sm:flex-row sm:items-center sm:justify-between"
+        role="alert"
+      >
+        <div className="min-w-0">
+          <p className="font-semibold text-foreground">搜索失败</p>
+          <p className="mt-1 wrap-break-word text-sm leading-6 wrap-anywhere form-error-text">{search.error}</p>
+        </div>
+        <Button size="sm" variant="secondary" onClick={search.onRetrySearch}>
+          重试
+        </Button>
       </div>
     )
   }
@@ -79,6 +99,7 @@ export default function CombatCopilotDiscoveryResults({
           adding={search.addingUri === item.uri}
           matchEnabled={match.enabled}
           ownedOperatorNames={search.ownedOperatorNames}
+          ownershipKnown={ownershipKnown}
           onPreview={search.onPreviewUri}
           onAddToQueue={search.onAddToQueue}
         />

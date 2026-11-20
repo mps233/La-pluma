@@ -1,5 +1,3 @@
-import type { ReactNode } from 'react'
-
 /** 作业页的三种入口；模式切换不写入配置。 */
 export type CombatMode = 'copilot' | 'ssscopilot' | 'paradoxcopilot'
 
@@ -8,9 +6,7 @@ export interface CombatTask {
   name: string
   command: string
   placeholder: string
-  icon: ReactNode
   hasAdvanced: boolean
-  description: string
 }
 
 export interface CombatAdvancedOption {

@@ -15,6 +15,7 @@ interface CombatSettingsPanelProps {
   raid: CopilotRaid
   setExecutionMode: CopilotSetExecutionMode
   advanced: AdvancedValues
+  showSetExecutionMode?: boolean
   onFormationChange: (mode: FormationMode) => void
   onRaidChange: (raid: CopilotRaid) => void
   onSetExecutionModeChange: (mode: CopilotSetExecutionMode) => void
@@ -39,12 +40,15 @@ const SET_EXECUTION_MODE_OPTIONS: readonly SegmentedControlOption<CopilotSetExec
   { value: 'manual', label: '手动逐关' },
 ]
 
+const SINGLE_TASK_HIDDEN_ADVANCED_KEYS = ['executionStrategy'] as const
+
 export default function CombatSettingsPanel({
   task,
   formationMode,
   raid,
   setExecutionMode,
   advanced,
+  showSetExecutionMode = true,
   onFormationChange,
   onRaidChange,
   onSetExecutionModeChange,
@@ -52,13 +56,13 @@ export default function CombatSettingsPanel({
 }: CombatSettingsPanelProps) {
   return (
     <div className="combat-workspace-section">
-      <h5 className="mb-3 flex items-center space-x-2 text-sm font-semibold text-foreground">
-        <svg className="w-4 h-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <h3 className="mb-3 flex items-center space-x-2 text-sm font-semibold text-foreground">
+        <svg aria-hidden="true" className="w-4 h-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
         <span>执行设置</span>
-      </h5>
+      </h3>
 
       <div className="mb-3">
         <div className="mb-1.5 flex items-center gap-1">
@@ -97,23 +101,25 @@ export default function CombatSettingsPanel({
         </Select>
       </div>
 
-      <div>
-        <div className="mb-1.5 flex items-center gap-1">
-          <span className="text-xs text-muted-foreground">执行方式</span>
-          <FieldHint
-            id="combat-copilot-set-mode-hint"
-            label="执行方式"
-            hint="连续执行会自动开始下一项。手动逐关需要在每个执行步骤后确认。"
+      {showSetExecutionMode && (
+        <div>
+          <div className="mb-1.5 flex items-center gap-1">
+            <span className="text-xs text-muted-foreground">执行方式</span>
+            <FieldHint
+              id="combat-copilot-set-mode-hint"
+              label="执行方式"
+              hint="连续执行会自动开始下一项。手动逐关需要在每个执行步骤后确认。"
+            />
+          </div>
+          <SegmentedControl
+            ariaLabel="执行方式"
+            value={setExecutionMode === 'app' ? 'cli' : setExecutionMode}
+            options={SET_EXECUTION_MODE_OPTIONS}
+            onChange={onSetExecutionModeChange}
+            fullWidth
           />
         </div>
-        <SegmentedControl
-          ariaLabel="执行方式"
-          value={setExecutionMode === 'app' ? 'cli' : setExecutionMode}
-          options={SET_EXECUTION_MODE_OPTIONS}
-          onChange={onSetExecutionModeChange}
-          fullWidth
-        />
-      </div>
+      )}
 
       {task.hasAdvanced && (
         <details className="combat-advanced-disclosure mt-4">
@@ -123,6 +129,7 @@ export default function CombatSettingsPanel({
           <CombatAdvancedFields
             taskId={task.id}
             advanced={advanced}
+            hiddenKeys={showSetExecutionMode ? undefined : SINGLE_TASK_HIDDEN_ADVANCED_KEYS}
             onChange={onAdvancedChange}
           />
         </details>
