@@ -1014,7 +1014,7 @@ export default function LogViewer() {
         <Card className="log-card log-toolbar-card !p-0" smoothCorners>
           <CardContent className="log-toolbar">
             <div className="log-toolbar-controls">
-              <div className={`log-toggle-control flex min-h-11 min-w-0 items-center justify-between gap-3 ${viewingHistory ? 'opacity-50' : ''}`}>
+              <div className={`log-toggle-control flex min-h-11 min-w-0 items-center justify-between gap-4 ${viewingHistory ? 'opacity-50' : ''}`}>
                 <span className="truncate text-xs font-medium text-secondary">自动滚动</span>
                 <Switch
                   compact
@@ -1024,7 +1024,7 @@ export default function LogViewer() {
                   disabled={viewingHistory}
                 />
               </div>
-              <div className={`log-toggle-control flex min-h-11 min-w-0 items-center justify-between gap-3 ${currentRunId ? '' : 'opacity-50'}`}>
+              <div className={`log-toggle-control flex min-h-11 min-w-0 items-center justify-between gap-4 ${currentRunId ? '' : 'opacity-50'}`}>
                 <span className="truncate text-xs font-medium text-secondary">仅本次运行</span>
                 <Switch
                   compact
@@ -1034,7 +1034,7 @@ export default function LogViewer() {
                   disabled={!currentRunId}
                 />
               </div>
-              <div className="log-toggle-control flex min-h-11 min-w-0 items-center justify-between gap-3">
+              <div className="log-toggle-control flex min-h-11 min-w-0 items-center justify-between gap-4">
                 <span className="truncate text-xs font-medium text-secondary">折叠重复</span>
                 <Switch
                   compact

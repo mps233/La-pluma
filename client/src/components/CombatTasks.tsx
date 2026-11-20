@@ -1900,7 +1900,7 @@ export default function CombatTasks() {
                 className="combat-task-card !p-0"
               >
                 <div className="combat-task-heading flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex min-w-0 items-center gap-4">
                     <div className="combat-task-icon">
                       {task.icon}
                     </div>
@@ -2085,7 +2085,7 @@ export default function CombatTasks() {
                       </div>
                       {copilotSearchResult && copilotSearchResult.copilots && (
                         <div className="mt-3 border-t border-[var(--app-border)] pt-3">
-                          <div className="mb-2 flex items-center justify-between gap-3 px-1">
+                          <div className="mb-2 flex items-center justify-between gap-4 px-1">
                             <h5 id="combat-copilot-search-heading" className="text-xs font-semibold text-secondary">搜索结果</h5>
                             <span id="combat-copilot-search-count" className="shrink-0 whitespace-nowrap text-xs tabular-nums text-tertiary">
                               {copilotSearchResult.copilots.length} 个作业 · 点击预览
@@ -2139,7 +2139,7 @@ export default function CombatTasks() {
 
                     {/* 作业列表 - 占据剩余空间 */}
                     <div className="combat-workspace-section combat-job-list-section flex flex-1 flex-col">
-                      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-4">
                         <h5 className="flex items-center space-x-2 text-sm font-semibold text-primary">
                           <svg className="w-4 h-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
@@ -2186,7 +2186,7 @@ export default function CombatTasks() {
                             const nextCopilot = nextIndex >= 0 ? copilotSetInfo.copilots[nextIndex] : null
                             return (
                               <div className="mb-3 border-y border-[var(--app-border)] py-3">
-                                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                   <div className="min-w-0">
                                     <div className="text-xs font-medium text-tertiary">续跑进度</div>
                                     <div className="mt-1 text-sm font-semibold text-primary">
@@ -2375,7 +2375,7 @@ export default function CombatTasks() {
                               }
 
                               return (
-                                <div key={`${copilot.id}-${idx}`} data-copilot-index={idx} data-copilot-item-index={idx} className={`flex items-center justify-between gap-3 px-2.5 py-2 text-xs transition-colors ${
+                                <div key={`${copilot.id}-${idx}`} data-copilot-index={idx} data-copilot-item-index={idx} className={`flex items-center justify-between gap-4 px-2.5 py-2 text-xs transition-colors ${
                                   isCurrent ? 'bg-[var(--app-accent-soft)]' :
                                   isCompleted && !isRunQuiet ? (isSuccess ? 'bg-[color-mix(in_srgb,var(--app-success)_10%,transparent)]' : 'bg-[color-mix(in_srgb,var(--app-danger)_10%,transparent)]') :
                                   isPersistedDone || isRunQuiet ? 'bg-black/[0.025] opacity-70 dark:bg-white/[0.035]' :
@@ -2485,7 +2485,7 @@ export default function CombatTasks() {
                   className="combat-task-card !p-0"
                 >
                   <div className="combat-task-heading flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-4">
                       <div className="combat-task-icon">
                         {task.icon}
                       </div>
@@ -2526,7 +2526,7 @@ export default function CombatTasks() {
                   <div className="combat-special-layout">
                     <div className="min-w-0 space-y-4">
                       <div className="combat-workspace-section">
-                        <div className="mb-3 flex items-center justify-between gap-3">
+                        <div className="mb-3 flex items-center justify-between gap-4">
                           <h5 className="flex items-center gap-2 text-sm font-semibold text-primary">
                             <svg className="h-4 w-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -2674,16 +2674,16 @@ export default function CombatTasks() {
                       <div className="combat-workspace-section">
                         <h5 className="mb-3 text-sm font-semibold text-primary">参数概览</h5>
                         <div className="space-y-2 text-xs">
-                          <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center justify-between gap-4">
                             <span className="text-tertiary">命令</span>
                             <span className="font-mono brand-text">{task.command}</span>
                           </div>
-                          <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center justify-between gap-4">
                             <span className="text-tertiary">输入</span>
                             <span className="text-primary">{taskUris.length ? `${taskUris.length} 项` : '待填写'}</span>
                           </div>
                           {isParadox && (
-                            <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center justify-between gap-4">
                               <span className="text-tertiary">队列策略</span>
                               <span className="text-primary">
                                 {advancedParams.paradoxcopilot?.executionStrategy === 'stop' ? '失败停止' : '失败继续'}
@@ -2720,7 +2720,7 @@ export default function CombatTasks() {
         {configSyncError && (
           <div
             role="alert"
-            className="status-warning flex min-h-11 flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm leading-5"
+            className="status-warning flex min-h-11 flex-wrap items-center justify-between gap-4 rounded-lg px-3 py-2 text-sm leading-5"
           >
             <span className="min-w-0 flex-1">{configSyncError}</span>
             <Button

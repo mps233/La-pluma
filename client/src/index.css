@@ -1,12 +1,41 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@source "../index.html";
+@source "./";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Tailwind v4 theme bridge: preserve the v3 token mapping used by utilities. */
+@theme {
+  --radius: var(--app-radius-xs);
+  --radius-xs: var(--app-radius-xs);
+  --radius-sm: var(--app-radius-xs);
+  --radius-md: var(--app-radius-sm);
+  --radius-lg: var(--app-radius-md);
+  --radius-xl: var(--app-radius-lg);
+  --radius-2xl: var(--app-radius-lg);
+  --radius-3xl: var(--app-radius-lg);
+  --radius-full: var(--app-radius-pill);
+  --spacing-4: var(--app-space-card);
+  --spacing-5: var(--app-space-section);
+  --spacing-6: var(--app-space-section);
+}
+
 @property --app-status-beam-angle {
   syntax: '<angle>';
   inherits: false;
   initial-value: 0deg;
 }
 @layer base {
+  /* Tailwind v3 used gray-200 as the default border color; v4 inherits currentColor. */
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: #e5e7eb;
+  }
+
   :root {
     --app-bg: #f6f8fb;
     --app-bg-soft: #edf3f7;
@@ -647,8 +676,8 @@
   box-shadow: none;
   padding: 0;
 }
-.automation-monitor-surface .scrcpy-device-layout.is-compact > .space-y-3 > :not([hidden]) ~ :not([hidden]) {
-  margin-top: 0;
+.automation-monitor-surface .scrcpy-device-layout.is-compact > .space-y-3 > :not(:last-child) {
+  margin-block-end: 0;
 }
 .automation-monitor-surface .scrcpy-view-header.is-compact {
   min-height: 3.25rem;
@@ -4550,8 +4579,8 @@ svg.w-5.h-5 {
     inset: -0.25rem;
   }
 
-  .task-monitor-panel.is-compact .scrcpy-device-layout.is-compact > .space-y-3 > :not([hidden]) ~ :not([hidden]) {
-    margin-top: var(--scrcpy-compact-inset);
+  .task-monitor-panel.is-compact .scrcpy-device-layout.is-compact > .space-y-3 > :not(:last-child) {
+    margin-block-end: var(--scrcpy-compact-inset);
   }
 
   .task-monitor-panel.is-compact .scrcpy-video-frame {
@@ -4571,8 +4600,8 @@ svg.w-5.h-5 {
     transform: none;
   }
 
-  .task-monitor-panel.is-compact .scrcpy-device-layout.is-compact > .space-y-3 > .scrcpy-preview-toolbar {
-    margin-top: 0;
+  .task-monitor-panel.is-compact .scrcpy-device-layout.is-compact > .space-y-3 > .scrcpy-video-frame {
+    margin-block-end: 0;
   }
 
   @media (min-width: 1280px) {
@@ -5053,7 +5082,7 @@ html.is-standalone-pwa body {
    settings divider below it. Outside @layer components so it beats the
    Tailwind space-y utility on the same node. */
 .la-pluma-content .dashboard-preview-surface .task-monitor-panel.is-compact
-  .scrcpy-device-layout.is-compact > .space-y-3 > .scrcpy-video-frame {
-  margin-top: 0;
+  .scrcpy-device-layout.is-compact > .space-y-3 > .scrcpy-view-header {
+  margin-block-end: 0;
 }
 

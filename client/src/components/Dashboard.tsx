@@ -693,7 +693,7 @@ export default function Dashboard() {
           <SmoothPanel
             cornerSize="compact"
             className="dashboard-connection-alert"
-            surfaceClassName={`app-info-card flex min-w-0 flex-wrap items-center gap-3 ${serviceStatus === 'offline' ? 'status-warning' : 'status-danger'}`}
+            surfaceClassName={`app-info-card flex min-w-0 flex-wrap items-center gap-4 ${serviceStatus === 'offline' ? 'status-warning' : 'status-danger'}`}
             role="alert"
           >
             {serviceStatus === 'offline'
@@ -718,7 +718,7 @@ export default function Dashboard() {
 
         {(activitySummary.status === 'unavailable' || activitySummary.status === 'stale') && (
           <div
-            className={`flex flex-wrap items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm ${activitySummary.status === 'stale' ? 'status-warning' : 'status-danger'}`}
+            className={`flex flex-wrap items-center justify-between gap-4 rounded-xl px-3 py-2 text-sm ${activitySummary.status === 'stale' ? 'status-warning' : 'status-danger'}`}
             role="status"
           >
             <span>
@@ -749,7 +749,7 @@ export default function Dashboard() {
             >
               <Card smoothCorners className="dashboard-flow-card !p-0">
               <div className="dashboard-flow-header">
-                <div className="flex min-w-0 items-center gap-3">
+                <div className="flex min-w-0 items-center gap-4">
                   <div className="dashboard-flow-mark" aria-hidden="true">
                     <Activity className="h-4 w-4" strokeWidth={1.8} />
                   </div>
@@ -895,7 +895,7 @@ export default function Dashboard() {
               </div>
 
               <div className="dashboard-flow-stages">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-2">
                     <span className="dashboard-flow-rail-dot" />
                     <span className="text-xs font-semibold text-primary">今日开放关卡</span>

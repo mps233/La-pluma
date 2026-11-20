@@ -151,7 +151,7 @@ function MaterialPreview({ nodes }: { nodes: Array<{ id: string; name: string; i
     <div className="flex flex-wrap gap-2">
       {nodes.map(node => (
         <div key={node.id} className="flex min-h-9 items-center gap-2 rounded-lg px-2 py-1 surface-soft" title={`${node.name} ${node.have}/${node.needed}`}>
-          <span className="relative flex h-6 w-6 flex-shrink-0 items-center justify-center overflow-hidden rounded-md surface-panel text-tertiary">
+          <span className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-md surface-panel text-tertiary">
             <Package size={12} aria-hidden="true" />
             <img
               src={getItemIconUrl(node.iconId)}
@@ -258,7 +258,7 @@ function TargetForm({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4">
         <img
           src={getOperatorAvatarUrl(detail.id)}
           alt=""
@@ -829,7 +829,7 @@ export default function MasteryTrainingWorkspace() {
             </div>
           </div>
 
-          <div ref={catalogTopRef} className="flex flex-col gap-3">
+          <div ref={catalogTopRef} className="flex flex-col gap-4">
             <Input
               type="text"
               aria-label="搜索干员名称"
@@ -887,7 +887,7 @@ export default function MasteryTrainingWorkspace() {
               )}
             />
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
               {catalog.slice(0, visibleCount).map(candidate => {
                 const queuedItems = queuedByOperator.get(candidate.id) || []
                 const queuedCount = queuedItems.length
@@ -1045,8 +1045,8 @@ export default function MasteryTrainingWorkspace() {
                               {...dragProvided.draggableProps}
                               className={`px-4 py-3 ${isActive ? 'bg-[var(--app-surface-muted)]' : ''}${snapshot.isDragging ? ' shadow-lg' : ''}`}
                             >
-                          <div className="flex items-start gap-3">
-                            <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-xs font-semibold ${isActive ? 'brand-chip' : 'surface-soft text-secondary'}`}>
+                          <div className="flex items-start gap-4">
+                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold ${isActive ? 'brand-chip' : 'surface-soft text-secondary'}`}>
                               {index + 1}
                             </div>
                             <div className="min-w-0 flex-1">
@@ -1068,7 +1068,7 @@ export default function MasteryTrainingWorkspace() {
                                 <div className="mt-2 text-xs leading-5 status-warning">{item.blocked.message}</div>
                               )}
                             </div>
-                            <div className="flex flex-shrink-0 items-center gap-1">
+                            <div className="flex shrink-0 items-center gap-1">
                               <span
                                 {...dragProvided.dragHandleProps}
                                 className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-tertiary transition-colors hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--app-accent)] ${moveLocked || actionPending !== null ? 'cursor-not-allowed opacity-40' : 'cursor-grab active:cursor-grabbing'}`}

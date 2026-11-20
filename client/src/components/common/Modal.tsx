@@ -280,7 +280,7 @@ function ModalLayer({
             </div>
 
             {footer && (
-              <div className="flex flex-wrap items-center justify-end gap-3 px-5 py-4 shadow-[inset_0_1px_0_var(--app-border)] sm:px-6">
+              <div className="flex flex-wrap items-center justify-end gap-4 px-5 py-4 shadow-[inset_0_1px_0_var(--app-border)] sm:px-6">
                 {footer}
               </div>
             )}

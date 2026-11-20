@@ -1,35 +1,4 @@
-import type { Config } from 'tailwindcss'
-
-export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
-  darkMode: 'class',
-  theme: {
-    extend: {
-      borderRadius: {
-        DEFAULT: 'var(--app-radius-xs)',
-        sm: 'var(--app-radius-xs)',
-        md: 'var(--app-radius-sm)',
-        lg: 'var(--app-radius-md)',
-        xl: 'var(--app-radius-lg)',
-        '2xl': 'var(--app-radius-lg)',
-        '3xl': 'var(--app-radius-lg)',
-        full: 'var(--app-radius-pill)',
-      },
-      gap: {
-        3: 'var(--app-space-card)',
-        4: 'var(--app-space-card)',
-        5: 'var(--app-space-section)',
-        6: 'var(--app-space-section)',
-      },
-      space: {
-        4: 'var(--app-space-card)',
-        5: 'var(--app-space-section)',
-        6: 'var(--app-space-section)',
-      },
-    },
-  },
-  plugins: [],
-} satisfies Config
+// Tailwind CSS v4 is configured CSS-first in `src/index.css` (`@theme`,
+// `@custom-variant`, `@source`). This file is intentionally unused and kept
+// only as a compatibility placeholder.
+export default {}

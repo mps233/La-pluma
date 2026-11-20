@@ -856,7 +856,7 @@ function AutomationStageEditor({
         </Button>
 
         {lastDeletedStage?.taskId === task.id && (
-          <div className="flex min-h-11 items-center justify-between gap-3 border-t border-[var(--app-border)] px-1 text-xs text-secondary" role="status">
+          <div className="flex min-h-11 items-center justify-between gap-4 border-t border-[var(--app-border)] px-1 text-xs text-secondary" role="status">
             <span className="min-w-0 truncate">
               已删除关卡{deletedStageName ? `「${deletedStageName}」` : ''}
             </span>
@@ -2948,7 +2948,7 @@ const appliedExecutionRevisionRef = useRef(-1)
               )}
 
               {lastDeletedTask && (
-                <div className="mx-3.5 flex min-h-11 items-center justify-between gap-3 border-t border-[var(--app-border)] text-xs text-secondary sm:mx-4" role="status">
+                <div className="mx-3.5 flex min-h-11 items-center justify-between gap-4 border-t border-[var(--app-border)] text-xs text-secondary sm:mx-4" role="status">
                   <span className="min-w-0 truncate">已删除“{lastDeletedTask.task.name}”</span>
                   <button
                     type="button"
@@ -3536,7 +3536,7 @@ const appliedExecutionRevisionRef = useRef(-1)
 
                       {task.commandId === 'fight' && (
                         <details className="group mt-3 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] px-3 py-2">
-                          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-primary marker:hidden [&::-webkit-details-marker]:hidden">
+                          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 text-sm font-medium text-primary marker:hidden [&::-webkit-details-marker]:hidden">
                             <span className="flex items-center gap-2">
                               <SlidersHorizontal size={15} strokeWidth={1.9} />
                               高级设置
@@ -3662,7 +3662,7 @@ const appliedExecutionRevisionRef = useRef(-1)
 
                       {task.commandId === 'infrast' && (
                         <details className="group mt-3 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] px-3 py-2">
-                          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-primary marker:hidden [&::-webkit-details-marker]:hidden">
+                          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 text-sm font-medium text-primary marker:hidden [&::-webkit-details-marker]:hidden">
                             <span className="flex items-center gap-2">
                               <SlidersHorizontal size={15} strokeWidth={1.9} />
                               高级设置
@@ -3858,7 +3858,7 @@ const appliedExecutionRevisionRef = useRef(-1)
 
                       {task.commandId === 'recruit' && (
                         <details className="group mt-3 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-muted)] px-3 py-2">
-                          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-primary marker:hidden [&::-webkit-details-marker]:hidden">
+                          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 text-sm font-medium text-primary marker:hidden [&::-webkit-details-marker]:hidden">
                             <span className="flex items-center gap-2">
                               <SlidersHorizontal size={15} strokeWidth={1.9} />
                               高级设置

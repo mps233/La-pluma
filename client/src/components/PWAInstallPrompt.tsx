@@ -249,7 +249,7 @@ function PWAInstallPromptWeb() {
             padding="16px"
             radius="var(--app-radius-lg)"
           >
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-4">
               <img
                 src={logoUrl}
                 alt=""

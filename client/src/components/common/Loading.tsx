@@ -266,7 +266,7 @@ function CombatSkeleton() {
         <div className="app-stack-section">
           <Card smoothCorners className="combat-task-card combat-task-skeleton !p-0">
             <div className="combat-task-heading flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="flex min-w-0 items-center gap-3">
+              <div className="flex min-w-0 items-center gap-4">
                 <Skeleton variant="rect" className="h-10 w-10 shrink-0 rounded-xl" />
                 <div className="min-w-0 space-y-2">
                   <Skeleton variant="text" className="h-4 w-32 max-w-full" />
@@ -386,7 +386,7 @@ function TrainingSkeleton() {
             <Skeleton variant="rect" className="h-11 w-24 rounded-xl" />
           </div>
           <div className="min-h-[260px]">
-            <div className="training-operator-grid grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-4 2xl:grid-cols-6">
+            <div className="training-operator-grid grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-4 2xl:grid-cols-6">
               {Array.from({ length: 12 }, (_, index) => (
                 <div key={index} className="training-operator-skeleton relative overflow-hidden rounded-xl p-2.5 surface-soft">
                   <Skeleton variant="rect" className="mb-2.5 aspect-square h-auto w-full rounded-xl" />
@@ -427,7 +427,7 @@ function TrainingSkeleton() {
           <CardHeaderSkeleton actionWidth="w-16" />
           <div className="divide-y divide-[var(--app-border)] px-4">
             {[1, 2, 3].map(item => (
-              <div key={item} className="flex min-h-16 items-center gap-3 py-3">
+              <div key={item} className="flex min-h-16 items-center gap-4 py-3">
                 <Skeleton variant="rect" className="h-8 w-8 shrink-0 rounded-lg" />
                 <div className="min-w-0 flex-1 space-y-2">
                   <Skeleton variant="text" className="h-3 w-24" />
@@ -457,7 +457,7 @@ function LogsSkeleton() {
         <div className="app-card-content log-toolbar">
           <div className="log-toolbar-controls">
             {[1, 2].map(item => (
-              <div key={item} className="log-toggle-control flex min-h-11 min-w-0 items-center justify-between gap-3">
+              <div key={item} className="log-toggle-control flex min-h-11 min-w-0 items-center justify-between gap-4">
                 <Skeleton variant="text" className="h-3 w-14" />
                 <Skeleton variant="rect" className="h-5 w-8 rounded-full" />
               </div>
@@ -515,7 +515,7 @@ function StatisticsSkeleton() {
       <div className="min-w-0 app-stack-section">
         <Card smoothCorners className="data-statistics-task-card !p-0">
           <div className="data-statistics-task-content">
-            <div className="data-statistics-task-header mb-4 flex items-start gap-3">
+            <div className="data-statistics-task-header mb-4 flex items-start gap-4">
               <div className="min-w-0 flex-1 space-y-2">
                 <div className="flex items-center gap-2">
                   <Skeleton variant="rect" className="h-8 w-8 rounded-xl" />
@@ -529,7 +529,7 @@ function StatisticsSkeleton() {
                 <Skeleton variant="rect" className="h-10 w-28 rounded-xl" />
               </div>
             </div>
-            <div className="data-statistics-result-grid grid grid-cols-3 gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            <div className="data-statistics-result-grid grid grid-cols-3 gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {Array.from({ length: 6 }, (_, index) => (
                 <div key={index} className="rounded-2xl border border-transparent p-3 surface-soft">
                   <Skeleton variant="rect" className="aspect-square h-auto w-full rounded-xl" />
@@ -565,8 +565,8 @@ function ConfigSkeleton() {
               </div>
             ))}
           </div>
-          <div className="flex min-h-20 flex-wrap items-center justify-between gap-3 rounded-xl p-4 surface-soft">
-            <div className="flex min-w-0 items-center gap-3">
+          <div className="flex min-h-20 flex-wrap items-center justify-between gap-4 rounded-xl p-4 surface-soft">
+            <div className="flex min-w-0 items-center gap-4">
               <Skeleton variant="rect" className="h-9 w-9 shrink-0 rounded-xl" />
               <div className="space-y-2">
                 <Skeleton variant="text" className="h-3 w-24" />
@@ -584,7 +584,7 @@ function ConfigSkeleton() {
               <Skeleton variant="rect" className="h-11 w-full rounded-xl" />
               <Skeleton variant="text" className="h-2.5 w-48 max-w-full" />
             </div>
-            <div className="config-reconnect-row flex min-h-[3.5rem] items-center justify-between gap-3 py-1">
+            <div className="config-reconnect-row flex min-h-[3.5rem] items-center justify-between gap-4 py-1">
               <div className="space-y-2">
                 <Skeleton variant="text" className="h-3 w-20" />
                 <Skeleton variant="text" className="h-2.5 w-36 max-w-full" />
@@ -596,8 +596,8 @@ function ConfigSkeleton() {
       </Card>
       <Card smoothCorners className="config-directory-card !p-0">
         <div className="app-card-content">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex min-w-0 flex-1 items-center gap-4">
               <Skeleton variant="rect" className="h-10 w-10 shrink-0 rounded-xl" />
               <div className="min-w-0 flex-1 space-y-2">
                 <Skeleton variant="title" className="h-4 w-24" />
@@ -615,7 +615,7 @@ function ConfigSkeleton() {
         <div className="app-card-content app-stack-card">
           <section className="rounded-xl p-4 surface-soft">
             <div className="flex items-center justify-between gap-4">
-              <div className="flex min-w-0 items-center gap-3">
+              <div className="flex min-w-0 items-center gap-4">
                 <Skeleton variant="rect" className="h-9 w-9 shrink-0 rounded-xl" />
                 <div className="space-y-2">
                   <Skeleton variant="text" className="h-4 w-24" />
@@ -799,7 +799,7 @@ export function DashboardSkeleton() {
             <div className="dashboard-flow-glow-shell status-border-beam">
               <Card smoothCorners className="dashboard-flow-card dashboard-flow-skeleton !p-0">
                 <div className="dashboard-flow-header">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-4">
                     <Skeleton variant="rect" className="h-8 w-8 rounded-lg" />
                     <div className="space-y-1.5">
                       <Skeleton variant="text" className="h-2.5 w-24" />
@@ -878,7 +878,7 @@ export function DashboardSkeleton() {
               <div className="task-monitor-panel is-compact">
                 <div className="scrcpy-device-layout is-compact">
                   <div className="space-y-3 min-w-0">
-                    <div className="scrcpy-view-header is-compact flex items-center justify-between gap-3">
+                    <div className="scrcpy-view-header is-compact flex items-center justify-between gap-4">
                       <div className="min-w-0">
                         <Skeleton variant="text" className="mb-1 h-2.5 w-16" />
                         <div className="scrcpy-view-title-row flex min-w-0 items-center gap-2">
