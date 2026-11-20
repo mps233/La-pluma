@@ -57,7 +57,12 @@ process.env.FAKE_MAA_CONFIG_DIR = configDir;
 process.env.FAKE_MAA_HOT_UPDATE_FAIL_MARKER = hotUpdateFailMarker;
 process.env.FAKE_MAA_DATA_FAIL_MARKER = dataFailMarker;
 
-const { getMaaResourceDirs, getMaaResourceInfo, selectMirrorChyanSnapshotDir } = await import('../resourceUpdateService.ts');
+const {
+  createResourceUpdateService,
+  getMaaResourceDirs,
+  getMaaResourceInfo,
+  selectMirrorChyanSnapshotDir
+} = await import('../resourceUpdateService.ts');
 const { loggerManager } = await import('../../utils/logger.ts');
 
 loggerManager.getLogger('MaaService').enableConsole = false;
@@ -98,14 +103,16 @@ test('lists the Git checkout for the Git source', async () => {
 
 test('locates the active MirrorChyan snapshot instead of the idle Git checkout', async () => {
   await writeResourceSourceConfig('mirrorchyan');
+  const fixedNow = new Date('2026-11-06T00:00:00.000Z');
   const snapshotResourceDir = await writeSnapshotGeneration('snapshot-abc123', '2026-11-05 10:00:00.000');
   try {
     assert.deepEqual(await getMaaResourceDirs(), [
       resourceDir,
       snapshotResourceDir
     ]);
-    const info = await getMaaResourceInfo();
+    const info = await createResourceUpdateService({ now: () => fixedNow }).getResourceInfo();
     assert.equal(info.lastUpdated, '2026-11-05 10:00:00.000');
+    assert.equal(info.ageDays, 0);
     assert.equal(info.status, 'current');
   } finally {
     await rm(snapshotRoot, { recursive: true, force: true });
