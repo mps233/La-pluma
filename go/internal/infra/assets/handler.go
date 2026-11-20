@@ -183,7 +183,8 @@ func (h *Handler) sendAsset(w http.ResponseWriter, r *http.Request, file string)
 		if conversionErr != nil {
 			h.logger.Warn("MaaResource 图像转换 WebP 失败", "sourcePath", file, "error", conversionErr)
 		}
-		if data != nil {
+		// Never make a client download more bytes than the original PNG.
+		if data != nil && int64(len(data)) < info.Size() {
 			w.Header().Set("Content-Type", "image/webp")
 			http.ServeContent(w, r, filepath.Base(file)+".webp", info.ModTime(), bytes.NewReader(data))
 			return

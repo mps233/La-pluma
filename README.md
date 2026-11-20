@@ -235,6 +235,8 @@ curl -X POST http://localhost:3000/api/agent/runs/<runId>/stop
 
 When `LA_PLUMA_TOKEN` is set, send `Authorization: Bearer <token>` or `X-La-Pluma-Token`. `/health` and the read-only `/api/maa-assets` image routes stay public so the UI can load item and avatar images.
 
+The Go asset routes negotiate WebP automatically when the client sends `Accept: image/webp`: item icons use lossless WebP, avatars use lossy WebP at Q90 with alpha preserved. Conversions are cached in memory and any encoding failure falls back to the original PNG. Set `LA_PLUMA_ASSET_WEBP_GO=0` to disable WebP for a deployment.
+
 ## Project structure
 
 ```text

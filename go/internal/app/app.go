@@ -137,7 +137,16 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	quotesService := quotes.New(cfg.Paths, logger)
 	customToolsService := customtools.New(cfg.Paths, maaServiceAdapter{service: maaActions})
 	recognitionService := recognition.New(recognition.Options{Paths: cfg.Paths, Logger: logger})
-	assetsHandler := assets.New(cfg.Paths, assets.Config{Logger: logger})
+	assetConfig := assets.Config{
+		Logger:      logger,
+		WebPEncoder: assets.NewPureGoWebPEncoder(),
+	}
+	// WebP is on by default; keep a kill switch for deployments that need to
+	// fall back to the original PNGs.
+	if os.Getenv("LA_PLUMA_ASSET_WEBP_GO") == "0" {
+		assetConfig.WebPEncoder = nil
+	}
+	assetsHandler := assets.New(cfg.Paths, assetConfig)
 	notificationService := notifications.New(notifications.Options{Paths: cfg.Paths, Logger: logger})
 	if loaded, err := notificationService.Load(); err == nil {
 		notificationService.SetConfig(loaded)
