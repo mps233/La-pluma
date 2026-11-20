@@ -786,8 +786,8 @@ export default function ConfigManager() {
                   </div>
 
                   <section className="surface-soft rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]" aria-label="模拟器查找与连接测试">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="flex min-w-0 items-start gap-4">
                         <span className="icon-well flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] brand-text">
                           <Cable size={18} aria-hidden="true" />
                         </span>
@@ -848,7 +848,7 @@ export default function ConfigManager() {
                               type="button"
                               disabled={!selectable || testingConnection}
                               onClick={() => void handleUseDiscoveredDevice(device)}
-                              className="flex min-h-12 w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[var(--app-accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50"
+                              className="flex min-h-12 w-full items-center justify-between gap-4 px-3 py-2.5 text-left transition-colors hover:bg-[var(--app-accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <span className="min-w-0">
                                 <TruncatedText as="span" className="block text-sm font-medium text-primary" tooltip={device.address}>{device.address}</TruncatedText>
@@ -937,7 +937,7 @@ export default function ConfigManager() {
                       ]}
                       hint="对应 instance_options.touch_mode；自动时不写入"
                     />
-                    <div className="config-reconnect-row flex min-h-[3.5rem] items-center justify-between gap-3 py-1 md:col-span-2">
+                    <div className="config-reconnect-row flex min-h-[3.5rem] items-center justify-between gap-4 py-1 md:col-span-2">
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-primary">自动重连</div>
                         <div className="mt-1 text-xs leading-5 text-tertiary">连接中断后自动尝试恢复</div>
@@ -955,7 +955,7 @@ export default function ConfigManager() {
               )}
 
               {section === 'resource' && (
-                <section className="surface-soft flex items-start gap-3 rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]" aria-labelledby="resource-config-readonly-title">
+                <section className="surface-soft flex items-start gap-4 rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]" aria-labelledby="resource-config-readonly-title">
                   <span className="icon-well flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] brand-text">
                     <LockKeyhole size={18} aria-hidden="true" />
                   </span>
@@ -967,7 +967,7 @@ export default function ConfigManager() {
               )}
 
               {section === 'instance' && (
-                <section className="surface-soft flex items-start gap-3 rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]" aria-labelledby="instance-config-readonly-title">
+                <section className="surface-soft flex items-start gap-4 rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]" aria-labelledby="instance-config-readonly-title">
                   <span className="icon-well flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] brand-text">
                     <LockKeyhole size={18} aria-hidden="true" />
                   </span>
@@ -984,8 +984,8 @@ export default function ConfigManager() {
 
       <Card smoothCorners className="config-directory-card !p-0">
         <CardContent>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 items-start gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-4">
               <span className="icon-well flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] brand-text">
                 <FolderOpen size={20} aria-hidden="true" />
               </span>
@@ -1034,7 +1034,7 @@ export default function ConfigManager() {
         <CardContent className="app-stack-card">
           <section className="surface-soft rounded-[var(--app-radius-lg)] p-[var(--app-space-panel)]">
             <div className="flex items-center justify-between gap-4">
-              <div className="flex min-w-0 items-start gap-3">
+              <div className="flex min-w-0 items-start gap-4">
                 <span className="icon-well flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] brand-text">
                   <Clock3 size={18} aria-hidden="true" />
                 </span>
@@ -1098,7 +1098,7 @@ export default function ConfigManager() {
               </div>
             )}
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--app-border)] pt-4">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--app-border)] pt-4">
               <p className="text-xs text-tertiary">{autoUpdateDirty ? '有尚未保存的更改' : '设置会在保存后生效'}</p>
               <Button
                 type="button"

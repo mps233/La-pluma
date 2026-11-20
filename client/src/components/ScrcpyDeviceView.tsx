@@ -423,7 +423,7 @@ export default function ScrcpyDeviceView({
     <>
     <div className={`scrcpy-device-layout ${isCompact ? 'is-compact' : ''}`}>
       <div className="space-y-3 min-w-0">
-        <div className={`scrcpy-view-header flex items-start justify-between gap-3 flex-wrap ${isCompact ? 'is-compact' : ''}`}>
+        <div className={`scrcpy-view-header flex items-start justify-between gap-4 flex-wrap ${isCompact ? 'is-compact' : ''}`}>
           <div className="min-w-0">
             <div className="scrcpy-view-title-row flex items-center gap-2">
               <span className={`scrcpy-view-status-dot h-2 w-2 rounded-full ${statusDotClass}`} />
@@ -465,7 +465,7 @@ export default function ScrcpyDeviceView({
         </div>}
 
         <div
-          className={`scrcpy-video-frame status-border-beam relative aspect-video overflow-hidden flex items-center justify-center shadow-sm ${
+          className={`scrcpy-video-frame status-border-beam relative aspect-video overflow-hidden flex items-center justify-center shadow-xs ${
             previewBusy ? 'is-active ' : ''
           }${
             webrtc.status === 'connected'

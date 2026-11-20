@@ -502,7 +502,7 @@ function FilterMenu({
 function InlineDataError({ title, description, isRetrying, onRetry }: InlineDataErrorProps) {
   return (
     <div
-      className="form-error-surface flex flex-col items-start gap-3 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between"
+      className="form-error-surface flex flex-col items-start gap-4 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between"
       role="alert"
     >
       <div className="min-w-0">
@@ -1343,8 +1343,8 @@ export default function DataStatistics() {
               className={taskPanelClass(activeTask === 'operbox' && isRunning)}
             >
               <div className="data-statistics-task-content app-stack-card">
-            <div className="data-statistics-task-header flex items-start gap-3 sm:items-center">
-              <div className="flex w-full min-w-0 flex-1 items-center gap-3 sm:w-auto">
+            <div className="data-statistics-task-header flex items-start gap-4 sm:items-center">
+              <div className="flex w-full min-w-0 flex-1 items-center gap-4 sm:w-auto">
                 <div className="flex h-10 w-10 flex-none items-center justify-center rounded-[var(--app-radius-md)] surface-soft text-secondary" aria-hidden="true">
                   <Users size={20} strokeWidth={1.9} />
                 </div>
@@ -1356,7 +1356,7 @@ export default function DataStatistics() {
                 </div>
               </div>
 
-              <div className="data-statistics-task-actions flex flex-shrink-0 items-center gap-2">
+              <div className="data-statistics-task-actions flex shrink-0 items-center gap-2">
                 <Button
                   onClick={handleFetchMaterials}
                   disabled={isRunning}
@@ -1432,7 +1432,7 @@ export default function DataStatistics() {
                 />
 
                 <section className="data-statistics-filter-section" aria-labelledby="operator-filter-title">
-                  <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="mb-3 flex items-center justify-between gap-4">
                     <h3 id="operator-filter-title" className="min-w-0 text-sm font-semibold text-primary"><CjkText>筛选与排序</CjkText></h3>
                     <p className="shrink-0 text-xs text-secondary" aria-live="polite">
                       显示 <span className="font-semibold text-primary">{getFilteredAndSortedOperators.length}</span>{'\u00A0'}项
@@ -1558,12 +1558,12 @@ export default function DataStatistics() {
                     itemContent={(_, oper) => (
                       <OperatorCard oper={oper} owned={oper.level > 0 || ownedOperatorIds.has(oper.id)} />
                     )}
-                    listClassName="data-statistics-item-grid grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+                    listClassName="data-statistics-item-grid grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
                     itemClassName="min-w-0"
                     increaseViewportBy={400}
                   />
                 ) : (
-                  <div className="data-statistics-item-grid grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                  <div className="data-statistics-item-grid grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                     {getFilteredAndSortedOperators.map((oper) => (
                       <OperatorCard
                         key={oper.id}
@@ -1594,8 +1594,8 @@ export default function DataStatistics() {
               className={taskPanelClass(activeTask === 'depot' && isRunning)}
             >
               <div className="data-statistics-task-content app-stack-card">
-            <div className="data-statistics-task-header flex items-start gap-3 sm:items-center">
-              <div className="flex w-full min-w-0 flex-1 items-center gap-3 sm:w-auto">
+            <div className="data-statistics-task-header flex items-start gap-4 sm:items-center">
+              <div className="flex w-full min-w-0 flex-1 items-center gap-4 sm:w-auto">
                 <div className="flex h-10 w-10 flex-none items-center justify-center rounded-[var(--app-radius-md)] surface-soft text-secondary" aria-hidden="true">
                   <PackageIcon size={20} strokeWidth={1.9} />
                 </div>
@@ -1607,7 +1607,7 @@ export default function DataStatistics() {
                 </div>
               </div>
 
-              <div className="data-statistics-task-actions flex-shrink-0">
+              <div className="data-statistics-task-actions shrink-0">
                 <Button
                   onClick={executeDepot}
                   disabled={isRunning}

@@ -128,7 +128,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
       <div className="task-monitor-panel is-compact">
         <div className="scrcpy-device-layout is-compact">
           <div className="space-y-3 min-w-0">
-            <div className="scrcpy-view-header is-compact flex items-center justify-between gap-3">
+            <div className="scrcpy-view-header is-compact flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <div className="dashboard-preview-eyebrow">Preview</div>
                 <div className="scrcpy-view-title-row flex min-w-0 items-center gap-2">
@@ -162,7 +162,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
 
             <div
               data-dashboard-preview-frame
-              className={`scrcpy-video-frame status-border-beam relative flex aspect-video w-full items-center justify-center overflow-hidden shadow-sm ${
+              className={`scrcpy-video-frame status-border-beam relative flex aspect-video w-full items-center justify-center overflow-hidden shadow-xs ${
                 isConnecting ? 'is-active ' : ''
               }${hasFrame ? 'is-connected bg-black' : 'is-empty ring-1 ring-inset ring-[var(--app-border)]'}`}
               aria-busy={isConnecting}

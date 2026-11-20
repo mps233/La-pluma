@@ -97,9 +97,9 @@ export default function OnboardingDialog({ isOpen, onClose }: OnboardingDialogPr
           {steps.map((step, index) => (
             <li
               key={step.id}
-              className="surface-soft flex flex-col gap-3 rounded-[var(--app-radius-lg)] p-3 sm:flex-row sm:items-center"
+              className="surface-soft flex flex-col gap-4 rounded-[var(--app-radius-lg)] p-3 sm:flex-row sm:items-center"
             >
-              <div className="flex min-w-0 flex-1 items-start gap-3">
+              <div className="flex min-w-0 flex-1 items-start gap-4">
                 <span
                   className="icon-well flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--app-radius-md)] brand-text"
                   aria-hidden="true"

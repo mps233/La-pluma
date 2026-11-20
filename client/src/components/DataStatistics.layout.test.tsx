@@ -259,7 +259,7 @@ describe('DataStatistics layout surfaces', () => {
     expect(operatorCard?.querySelector('.data-statistics-filter-section')?.classList.contains('surface-soft')).toBe(false)
     const operatorGrid = operatorCard?.querySelector('.data-statistics-item-grid')
     expect(operatorGrid?.classList.contains('surface-soft')).toBe(false)
-    expect(operatorGrid?.classList.contains('gap-3')).toBe(true)
+    expect(operatorGrid?.classList.contains('gap-4')).toBe(true)
     const operatorItem = operatorCard?.querySelector('.data-statistics-operator-item')
     expect(operatorItem?.classList.contains('surface-soft')).toBe(false)
     expect(operatorItem?.classList.contains('border')).toBe(false)

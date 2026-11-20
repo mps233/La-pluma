@@ -23,7 +23,7 @@ function DropRecordsError({ description, onRetry }: DropRecordsErrorProps) {
   return (
     <Card smoothCorners className="drop-records-panel !p-0">
       <div className="drop-records-panel-content">
-        <div className="form-error-surface flex flex-col items-start gap-3 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between" role="alert">
+        <div className="form-error-surface flex flex-col items-start gap-4 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between" role="alert">
           <div className="min-w-0">
             <p className="font-semibold text-primary">掉落记录读取失败</p>
             <p className="mt-1 break-words text-sm leading-6 [overflow-wrap:anywhere] form-error-text">{description}</p>
@@ -116,7 +116,7 @@ export default function DropRecords({
   return (
     <div className="app-stack-section">
       {error && (
-        <div className="form-error-surface flex flex-col items-start gap-3 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between" role="alert">
+        <div className="form-error-surface flex flex-col items-start gap-4 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between" role="alert">
           <div className="min-w-0">
             <p className="font-semibold text-primary">掉落记录刷新失败</p>
             <p className="mt-1 break-words text-sm leading-6 [overflow-wrap:anywhere] form-error-text">{error}</p>
@@ -216,15 +216,15 @@ export default function DropRecords({
             description="切换统计周期或完成作战后再查看。"
           />
         ) : (
-        <div className="drop-records-item-grid grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        <div className="drop-records-item-grid grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {sortedItems.slice(0, 20).map(([itemName, itemData]) => (
             <div
               key={itemName}
-              className="drop-records-item-row flex min-w-0 items-center gap-3 p-3"
+              className="drop-records-item-row flex min-w-0 items-center gap-4 p-3"
             >
               {/* 物品图标 */}
               {itemData.iconId && (
-                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--app-surface-muted)]">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[var(--app-surface-muted)]">
                   {failedItemImages[itemName] ? (
                     <span role="img" aria-label={`${itemName}图标不可用`}>
                       <PackageIcon className="h-6 w-6 brand-text" aria-hidden="true" />
@@ -282,7 +282,7 @@ export default function DropRecords({
             description="切换统计周期或完成作战后再查看。"
           />
         ) : (
-        <div className="drop-records-stage-list flex min-w-0 flex-col gap-3">
+        <div className="drop-records-stage-list flex min-w-0 flex-col gap-4">
           {sortedStages.map(([stageName, stageData]) => (
             <div
               key={stageName}

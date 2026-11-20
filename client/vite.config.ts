@@ -1,8 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import type { ConfigEnv, Plugin, UserConfig } from 'vite'
 import type { ManifestOptions, Options } from 'vite-plugin-pwa'
-import tailwindcss from 'tailwindcss'
-import autoprefixer from 'autoprefixer'
+import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
@@ -46,7 +45,7 @@ export const createWorkboxConfig = (basePath: string): Options['workbox'] => {
       // downloaded at install time.
       'assets/index-*.css',
       '**/*.{html,ico,svg,woff,woff2}',
-      'assets/{index,react-vendor,motion-vendor,workbox-window.prod.es5}-*.js',
+      'assets/{index,rolldown-runtime,react-vendor,motion-vendor,workbox-window.prod.es5}-*.js',
     ],
     navigateFallbackDenylist: createNavigateFallbackDenylist(basePath),
     runtimeCaching: [
@@ -224,6 +223,7 @@ export const createViteConfig = (basePath: string): UserConfig => ({
   plugins: [
     createDevPwaSupportPlugin(basePath),
     react(),
+    tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
       // Windows/PWA use the explicit useRegisterSW hook; the MyGo desktop
@@ -237,11 +237,6 @@ export const createViteConfig = (basePath: string): UserConfig => ({
       workbox: createWorkboxConfig(basePath)
     })
   ],
-  css: {
-    postcss: {
-      plugins: [tailwindcss(), autoprefixer()]
-    }
-  },
   build: {
     rollupOptions: {
       output: {

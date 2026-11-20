@@ -140,7 +140,7 @@ export default function DesktopSettings() {
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-3 border-t border-[var(--app-border-subtle)] pt-3">
+        <div className="flex items-center justify-between gap-4 border-t border-[var(--app-border-subtle)] pt-3">
           <div>
             <div className="text-sm text-primary">登录时启动 La Pluma</div>
             <div className="text-xs text-tertiary">在系统登录后自动保持托盘与调度服务运行</div>

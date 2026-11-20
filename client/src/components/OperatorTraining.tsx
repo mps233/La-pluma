@@ -63,9 +63,9 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
       <div className="space-y-3 rounded-xl p-3 surface-soft">
         {/* 顶层材料 */}
         <div className="rounded-xl p-1">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             {/* 材料图标 */}
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl surface-panel">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl surface-panel">
               {node.iconId && !iconFailed ? (
                 <img
                   src={getItemIconUrl(node.iconId)}
@@ -101,7 +101,7 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
               </div>
               
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 text-xs">
+                <div className="flex items-center gap-4 text-xs">
                   <div>
                     <span className="text-tertiary">拥有 </span>
                     <span className="font-bold text-[var(--app-success-text)]">{node.have}</span>
@@ -144,7 +144,7 @@ function MaterialHierarchyNode({ node, depth = 0 }: MaterialHierarchyNodeProps) 
     <div className={`rounded-lg p-2.5 ${getBgColorByDepth()}`}>
       <div className="flex items-center gap-2">
         {/* 材料图标 */}
-        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg surface-panel">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg surface-panel">
           {node.iconId && !iconFailed ? (
             <img
               src={getItemIconUrl(node.iconId)}
@@ -231,9 +231,9 @@ function MaterialGapList({
       {visibleMaterials.map((material) => (
         <div
           key={material.id}
-          className="flex min-h-[60px] items-center gap-3 rounded-xl px-3 py-2 surface-soft"
+          className="flex min-h-[60px] items-center gap-4 rounded-xl px-3 py-2 surface-soft"
         >
-          <div className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl surface-panel text-tertiary">
+          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl surface-panel text-tertiary">
             <Package size={16} strokeWidth={1.8} aria-hidden="true" />
             {material.iconId && (
               <img
@@ -1112,7 +1112,7 @@ export default function OperatorTraining() {
             </div>
         <div className="space-y-4">
           {/* 搜索和过滤 */}
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
             <div className="training-status-shell" ref={trainingStatusShellRef}>
               <GlassSegmented
                 options={TRAINING_STATUS_OPTIONS.map((option) => {
@@ -1329,8 +1329,8 @@ export default function OperatorTraining() {
                       key={item.operatorId}
                       className="px-4 py-3 transition-colors hover:bg-[var(--app-surface-muted)]"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-xs font-semibold surface-soft text-secondary">
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold surface-soft text-secondary">
                           #{index + 2}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -1390,7 +1390,7 @@ export default function OperatorTraining() {
             <>
               <Card smoothCorners className="training-plan-summary-card !p-0">
                 <div className="px-4 py-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-xs font-semibold uppercase brand-text">今日流程</div>
                       <h3 className="mt-1 text-lg font-semibold text-primary"><CjkText>{planFocusName}</CjkText></h3>
@@ -1398,7 +1398,7 @@ export default function OperatorTraining() {
                         {keepNumberWithUnit(`可刷 ${openStageCount} 个关卡 · 预计 ${todayRunCount} 次 · 完整计划约 ${plan.totalSanity || 0} 理智`)}
                       </div>
                     </div>
-                    <div className="flex-shrink-0">
+                    <div className="shrink-0">
                       <Button
                         onClick={handleApplyPlan}
                         disabled={loading || openStageCount === 0}
@@ -1425,9 +1425,9 @@ export default function OperatorTraining() {
                 {previewStages.length > 0 ? (
                   <div className="divide-y divide-[var(--app-border)]">
                     {previewStages.map((stage, idx) => (
-                      <div key={`${stage.stage}-${idx}`} className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-[var(--app-surface-muted)]">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-xs font-semibold surface-soft text-secondary">
+                      <div key={`${stage.stage}-${idx}`} className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-[var(--app-surface-muted)]">
+                        <div className="flex min-w-0 items-center gap-4">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-semibold surface-soft text-secondary">
                             {idx + 1}
                           </div>
                           <div className="min-w-0">
@@ -1441,7 +1441,7 @@ export default function OperatorTraining() {
                             </TruncatedText>
                           </div>
                         </div>
-                        <div className="flex-shrink-0 rounded-full px-2.5 py-1 text-sm font-bold brand-chip">×{stage.totalTimes || 0}</div>
+                        <div className="shrink-0 rounded-full px-2.5 py-1 text-sm font-bold brand-chip">×{stage.totalTimes || 0}</div>
                       </div>
                     ))}
                     {hiddenStageCount > 0 && (
@@ -1476,7 +1476,7 @@ export default function OperatorTraining() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {plan.closedStages.map((stage, idx) => (
                           <div key={`${stage.stage}-${idx}`} className="rounded-xl px-3 py-2.5 surface-soft">
-                            <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center justify-between gap-4">
                               <div>
                                 <div className="text-sm font-bold text-primary">{stage.stage}</div>
                                 <div className="mt-1 text-xs text-tertiary">
@@ -1520,7 +1520,7 @@ export default function OperatorTraining() {
                           >
                             <div className="relative">
                               <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-4">
                                   <div className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
                                     stage.isOpen !== false
                                       ? 'brand-chip'
@@ -1561,7 +1561,7 @@ export default function OperatorTraining() {
       </div>
       {recentlyRemoved && createPortal(
         <div
-          className="fixed bottom-24 left-1/2 z-[90] flex min-h-11 w-[min(92vw,28rem)] -translate-x-1/2 items-center justify-between gap-3 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-solid)] px-4 py-3 text-sm shadow-lg"
+          className="fixed bottom-24 left-1/2 z-[90] flex min-h-11 w-[min(92vw,28rem)] -translate-x-1/2 items-center justify-between gap-4 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-solid)] px-4 py-3 text-sm shadow-lg"
           role="status"
           aria-live="polite"
         >

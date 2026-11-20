@@ -33,6 +33,9 @@ interface WorkerEvent {
 
 type WorkerListener = (event: WorkerEvent) => void
 
+type ConfigureServerHook = (server: ViteDevServer) => void
+type TransformIndexHtmlHook = (html: string, context: { path: string; filename: string }) => unknown
+
 const captureDevMiddleware = (plugin: Plugin): DevMiddleware => {
   let middleware: DevMiddleware | undefined
   const server = {
@@ -42,7 +45,10 @@ const captureDevMiddleware = (plugin: Plugin): DevMiddleware => {
       },
     },
   } as unknown as ViteDevServer
-  const configureServer = plugin.configureServer
+  const configureServer = plugin.configureServer as unknown as
+    | ConfigureServerHook
+    | { handler: ConfigureServerHook }
+    | undefined
   if (typeof configureServer === 'function') {
     configureServer(server)
   } else {
@@ -104,7 +110,7 @@ describe('PWA base path configuration', () => {
     if (!(urlPattern instanceof RegExp)) throw new Error('Expected a RegExp url pattern')
 
     expect(workbox.cleanupOutdatedCaches).toBe(true)
-    expect(workbox.globPatterns).toContain('assets/{index,react-vendor,motion-vendor,workbox-window.prod.es5}-*.js')
+    expect(workbox.globPatterns).toContain('assets/{index,rolldown-runtime,react-vendor,motion-vendor,workbox-window.prod.es5}-*.js')
     expect(workbox.globPatterns).not.toContain('**/*.{js,css,html,ico,png,svg,woff,woff2}')
     expect(matchesWorkboxRegExpRoute(
       urlPattern,
@@ -164,7 +170,7 @@ describe('PWA base path configuration', () => {
     const plugin = createDevPwaSupportPlugin('/la-pluma/')
     const middleware = captureDevMiddleware(plugin)
 
-    const transformIndexHtml = plugin.transformIndexHtml
+    const transformIndexHtml = plugin.transformIndexHtml as unknown as TransformIndexHtmlHook | undefined
     if (typeof transformIndexHtml !== 'function') throw new Error('Expected a transformIndexHtml hook')
     expect(await transformIndexHtml('', { path: '/', filename: '/index.html' })).toEqual([{
       tag: 'link',

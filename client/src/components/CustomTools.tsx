@@ -178,7 +178,7 @@ export default function CustomTools() {
             description="当前 MAA 版本没有返回可用的小工具。"
           />
         ) : (
-          <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {tools.map(tool => {
               const selected = tool.id === selectedId
               return (
@@ -203,7 +203,7 @@ export default function CustomTools() {
 
       {selectedTool && (
         <Card smoothCorners className="min-w-0">
-          <div className="app-card-header flex flex-wrap items-start justify-between gap-3">
+          <div className="app-card-header flex flex-wrap items-start justify-between gap-4">
             <div className="flex min-w-0 items-center gap-2">
               <span className="shrink-0 brand-text">
                 {TOOL_ICONS[selectedTool.id] || <Wrench size={18} aria-hidden="true" />}
@@ -283,7 +283,7 @@ export default function CustomTools() {
                     })}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-4">
                     <Button
                       variant="secondary"
                       size="sm"
