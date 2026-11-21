@@ -7,8 +7,6 @@ export interface RoguelikeTask {
   command: string
   placeholder: string
   icon: string
-  hasAdvanced: boolean
-  description: string
 }
 
 /** 下拉项：value 是写入命令的原始值，label 是界面文案。 */
@@ -54,8 +52,6 @@ export interface RoguelikeAdvancedOption {
    */
   defaultValue?: string
   hint?: string
-  /** hint 的呈现位置：默认显示在控件下方，tooltip 收敛为标签旁的 ⓘ 提示。 */
-  hintPlacement?: 'below' | 'tooltip'
   /** 字段在设置栅格中的跨度；省略时占一列，'full' 时独占一整行。 */
   span?: 'full'
   /** number 字段的闭区间；省略时按 CLI 的 i32 范围校验。 */

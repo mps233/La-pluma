@@ -220,7 +220,9 @@ function CombatWorkspace() {
 | wire | `{ taskInputs, advancedParams }`；解码时缺少字段按空草稿补齐并应用上述迁移，字段存在但类型不合法时整份载荷不可用并回退本地草稿 |
 | 提交时机 | `commitDelayMs = 300`，连续编辑只提交最后一次 |
 | 完整提交 | `saveUserConfig('roguelike-tasks', wire)` 成功即完成；失败或传输异常保留 pending 与重试入口 |
-| 页面派生 | `taskInputs`/`advancedParams` 从 `draft` 派生；错误文案取协调器 `error`，重试按钮的 loading 取 `syncState === 'saving'`；仅手动 `retry()` 返回 true 时提示“肉鸽配置已同步” |
+| 页面派生 | `taskInputs`/`advancedParams` 从 `draft` 派生；错误文案只经固定 id `roguelike-config-save` 的 error toast 展示，「重新同步」action 调用 `retry()`，`syncState === 'saving'` 期间忽略重复触发；错误清空时关闭同 id toast，仅手动 `retry()` 返回 true 时提示“肉鸽配置已同步”。页面不再派生页内同步 alert 或重试按钮的 loading |
+
+配置未 `ready`（读取中或失败）时，工作区仍渲染外壳、执行进度面板与停止 footer，只门控可编辑区；`loadState === 'failed'` 时以页内 `role="alert"` 展示 `loadError` 并提供「重新加载」，重试调用 `reload({ force: true })`。
 
 兼容约束：保留配置 key、本地键、pending 键与 wire 形状；迟到加载须由协调器按 revision/pending 裁决，不得覆盖当前编辑。默认值补齐只增加 `reclamation.mode` 与集成战略的 `roles`，显式值与未知扩展字段原样保留；只使用集成战略的草稿在提交时也会携带 `reclamation.mode`。新增高级字段（如 `incrementMode`、`clearStore`、黑流树海参数）不需要迁移：旧草稿缺失时按未设置处理，不触发额外保存。
 
@@ -283,7 +285,7 @@ pending 标记存在但本地草稿不可读时，协调器必须删除该标记
 pnpm --filter la-pluma-next-client verify
 ```
 
-三域必须保持既有配置 key、本地键与服务端 wire；自动化额外兼容 `entries`/`times` 及任务参数旧格式，无须手工迁移本地草稿。automation 同步失败使用固定 id toast 与 action 重试；`role="alert"` 仅适用于仍保留页内反馈的域，不改变成功路径的默认视觉。
+三域必须保持既有配置 key、本地键与服务端 wire；自动化额外兼容 `entries`/`times` 及任务参数旧格式，无须手工迁移本地草稿。automation 与 roguelike 的同步失败使用固定 id toast 与 action 重试；combat 等仍保留页内反馈的域继续使用 `role="alert"`，不改变成功路径的默认视觉。
 
 ## 关联
 

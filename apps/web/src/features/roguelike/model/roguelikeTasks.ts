@@ -19,13 +19,6 @@ export { getRoguelikeAdvancedOptions, getRoguelikeOptionChoices } from './roguel
 
 export const DEFAULT_ROGUELIKE_MODE: RoguelikeMode = 'roguelike'
 
-/**
- * 生息演算默认模式与 CLI 一致：`-m` 缺省为 1（有存档时制作工具）。
- * 模式 0 仅在没有存档时使用，已有存档时可能丢失进度。
- * 重启锚点主题没有 `1`，草稿归一化会回落到该主题模式候选的首项 `16`。
- */
-export const DEFAULT_RECLAMATION_MODE = '1'
-
 export const ROGUELIKE_TASKS: readonly RoguelikeTask[] = [
   {
     id: 'roguelike',
@@ -33,8 +26,6 @@ export const ROGUELIKE_TASKS: readonly RoguelikeTask[] = [
     command: 'roguelike',
     placeholder: '输入主题代号',
     icon: 'Map',
-    hasAdvanced: true,
-    description: '自动刷集成战略（肉鸽），支持多个主题',
   },
   {
     id: 'reclamation',
@@ -42,12 +33,10 @@ export const ROGUELIKE_TASKS: readonly RoguelikeTask[] = [
     command: 'reclamation',
     placeholder: '输入主题代号',
     icon: 'Plant',
-    hasAdvanced: true,
-    description: '自动生息演算模式',
   },
 ]
 
-export { ROGUELIKE_THEME_PRESETS } from './roguelikeOptionCatalog'
+export { DEFAULT_RECLAMATION_MODE, ROGUELIKE_THEME_PRESETS } from './roguelikeOptionCatalog'
 export type { RoguelikeThemePreset } from './roguelikeOptionCatalog'
 
 /** 主题代号是否属于该任务已知的主题目录；隐藏字段与命令构造都以它为准。 */
@@ -211,6 +200,19 @@ export function readActiveRoguelikeOptions(
     active.push({ option, value })
   }
   return active
+}
+
+/**
+ * 主题输入是自由文本，输入过程中会经过 `S`、`Sark` 等未知中间态。
+ * 只有确认主题属于当前任务的目录时才归一化模式，否则保留草稿并在执行前由校验拒绝。
+ */
+export function normalizeRoguelikeModeForKnownTheme(
+  taskId: string,
+  theme: string,
+  advancedParams: RoguelikeAdvancedParams,
+): RoguelikeAdvancedParams {
+  if (!isKnownRoguelikeTheme(taskId, theme)) return advancedParams
+  return normalizeRoguelikeModeForTheme(taskId, theme, advancedParams)
 }
 
 /**

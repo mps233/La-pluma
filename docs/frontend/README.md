@@ -25,7 +25,7 @@
 | --- | --- | --- |
 | Run 身份、生命周期和终态 | 服务端 Run；前端 [ExecutionController](../../apps/web/src/features/task-execution/controller/executionController.ts)持有提交意图、持久化身份、观察和按身份停止 | 页面订阅控制器；不从请求结束、断网、页面隐藏或旧进程字段推断完成 |
 | 后端健康与全局运行展示 | [健康探针](../../apps/web/src/features/runtime-status/hooks/useBackendStatusMonitor.ts)写连接健康；[运行投影](../../apps/web/src/features/runtime-status/hooks/useRunStatusProjection.ts)从控制器写 `statusStore.runStatus` | 健康与运行分开；`tasks/status.isRunning` 不写运行字段 |
-| 运行环境诊断 | [诊断会话](../../apps/web/src/features/runtime-status/hooks/useRuntimeDiagnostics.ts)与 `RuntimeDiagnosticsPanel`（`runtime-status` 域） | 懒加载只读诊断，单在途、可取消；不进入 Query、`statusStore` 或持久化 |
+| 运行环境诊断 | [诊断会话](../../apps/web/src/features/runtime-status/hooks/useRuntimeDiagnostics.ts)与 `RuntimeDiagnosticsPanel`（`runtime-status` 域） | 保留能力，当前无页面挂载；重新接入时沿用懒加载、单在途、可取消，且不进入 Query、`statusStore` 或持久化 |
 | 自动化、作业和肉鸽配置草稿与提交 | [user-config 协调器](../../apps/web/src/features/user-config/model/configCoordinator.ts)按 key 管理通道，域适配器负责 wire 编解码和完整提交 | 页面不建第二份串行队列；自动化配置与 schedule 两步均成功才确认同步 |
 | 设置与养成配置、命令 | settings 的 `connectionConfig`、`autoUpdateConfig`、`deviceConnection`、`updateCommands`；training 的 `queueCommands`、`settingsCommands`、`planCommands`、`planValidity` | 模块级所有者裁决迟到结果、pending 与计划前提；表单和面板只编辑、订阅、发送意图 |
 | 服务端只读资源 | 所属领域的 Query 定义与 key | 不在页面或 Zustand 再存一份可写资源；配置草稿、Run、日志和 WebRTC 会话不放进 Query |

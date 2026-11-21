@@ -6,6 +6,8 @@ import {
   buildRoguelikeResultSummary,
   isRoguelikeCommand
 } from '../roguelikeResultService.ts';
+import type { RoguelikeProgressSnapshot } from '../roguelikeProgressService.ts';
+import type { RoguelikeBlackFlowProgress } from '../blackFlowProgressService.ts';
 
 function callback(taskchain: string, type: string, payload: Record<string, unknown> = {}): string {
   return `[2026-11-06 09:00:00.000][INF] Assistant::append_callback | ${type} ${JSON.stringify({
@@ -16,6 +18,35 @@ function callback(taskchain: string, type: string, payload: Record<string, unkno
 
 function extra(taskchain: string, what: string, details: Record<string, unknown> = {}): string {
   return callback(taskchain, 'SubTaskExtraInfo', { what, details });
+}
+
+function progressSnapshot(overrides: Partial<RoguelikeProgressSnapshot> = {}): RoguelikeProgressSnapshot {
+  return {
+    command: 'roguelike',
+    theme: 'Sarkaz',
+    mode: 0,
+    phase: 'exploring',
+    currentRound: 1,
+    roundStartedAt: new Date(0).toISOString(),
+    targetRounds: 3,
+    roundsStarted: 1,
+    roundsEnded: 0,
+    roundsSettled: 0,
+    roundsPassed: 0,
+    settlementSupported: true,
+    currentAction: 'StartExplore',
+    lastEventKind: 'round',
+    lastEventName: null,
+    lastEventAt: new Date(0).toISOString(),
+    combatCount: 0,
+    investment: null,
+    recentRounds: [],
+    blackflow: null,
+    updatedAt: new Date(0).toISOString(),
+    degraded: false,
+    observed: true,
+    ...overrides
+  };
 }
 
 describe('roguelike result summary', () => {
@@ -231,6 +262,105 @@ describe('roguelike result summary', () => {
     assert.equal(isRoguelikeCommand('reclamation'), true);
     assert.equal(isRoguelikeCommand('fight'), false);
     assert.equal(isRoguelikeCommand(undefined), false);
+  });
+
+  it('keeps progress null and the legacy fields unchanged without a tracker snapshot', () => {
+    const log = [
+      extra('Roguelike', 'RoguelikeSettlement', { floor: 2, score: 64 }),
+      callback('Roguelike', 'TaskChainCompleted')
+    ].join('\n');
+
+    const summary = buildRoguelikeResultSummary(log, { command: 'roguelike', args: ['Mizuki'] });
+
+    assert.equal(summary.progress, null);
+    assert.equal(summary.settlement?.floor, 2);
+    assert.equal(summary.settlement?.score, 64);
+    assert.equal(summary.status, 'success');
+  });
+
+  it('writes the final progress snapshot and keeps its observation', () => {
+    const progress = progressSnapshot();
+    const summary = buildRoguelikeResultSummary('', { command: 'roguelike', args: ['Sarkaz'] }, progress);
+
+    assert.equal(summary.progress, progress);
+    assert.equal(summary.observed, true);
+    assert.equal(summary.status, 'incomplete');
+    assert.equal(summary.settlement, null);
+  });
+
+  it('keeps the black flow projection on the final snapshot without changing observation', () => {
+    const blackflow: RoguelikeBlackFlowProgress = {
+      floor: 2,
+      floorAt: new Date(0).toISOString(),
+      currentNode: { id: '281475010265088', name: '作战', type: 'battle_normal' },
+      currentNodeAt: new Date(0).toISOString(),
+      actionPoints: { before: 5, after: 4, at: new Date(0).toISOString() },
+      lastRoute: null,
+      lastNodeResolution: null,
+      milestones: [],
+      strategy: null,
+      updatedAt: new Date(0).toISOString()
+    };
+    const progress = progressSnapshot({ blackflow });
+    const summary = buildRoguelikeResultSummary('', { command: 'roguelike', args: ['Sarkaz'] }, progress);
+
+    assert.deepEqual(summary.progress?.blackflow, blackflow);
+    assert.equal(summary.observed, true);
+
+    const unobserved = buildRoguelikeResultSummary(
+      '',
+      { command: 'roguelike', args: ['Sarkaz'] },
+      progressSnapshot({ observed: false, blackflow })
+    );
+    assert.equal(unobserved.observed, false);
+    assert.deepEqual(unobserved.progress?.blackflow, blackflow);
+  });
+
+  it('describes a progress-only incomplete run without claiming no callbacks were read', () => {
+    const log = callback('Roguelike', 'SubTaskStart', {
+      details: { task: 'StartExplore', exec_times: 1 }
+    });
+    const observed = buildRoguelikeResultSummary(
+      log,
+      { command: 'roguelike', args: ['Sarkaz'] },
+      progressSnapshot({ observed: true })
+    );
+
+    assert.equal(observed.status, 'incomplete');
+    assert.equal(observed.settlement, null);
+    assert.equal(observed.observed, true);
+    assert.equal(observed.message, '已观察到执行进度，但未读取到任务链终态');
+
+    const unobserved = buildRoguelikeResultSummary(log, { command: 'roguelike', args: ['Sarkaz'] });
+    assert.equal(unobserved.observed, false);
+    assert.equal(unobserved.message, '未读取到任务回调，无法确认执行结果');
+
+    const notObservedProgress = buildRoguelikeResultSummary(
+      log,
+      { command: 'roguelike', args: ['Sarkaz'] },
+      progressSnapshot({ observed: false })
+    );
+    assert.equal(notObservedProgress.observed, false);
+    assert.equal(notObservedProgress.message, '未读取到任务回调，无法确认执行结果');
+  });
+
+  it('merges progress observation into an otherwise empty log summary', () => {
+    const progress = progressSnapshot({ observed: true });
+    const summary = buildRoguelikeResultSummary('unrelated log line\n', { command: 'roguelike', args: ['Sarkaz'] }, progress);
+    const result = attachRoguelikeResultSummary({ stdout: '' }, summary);
+
+    assert.equal(summary.observed, true);
+    assert.equal((result as { summary?: unknown }).summary, summary);
+  });
+
+  it('does not observe a progress snapshot that has not seen any callback', () => {
+    const progress = progressSnapshot({ observed: false });
+    const summary = buildRoguelikeResultSummary('', { command: 'roguelike', args: ['Sarkaz'] }, progress);
+    const result = { stdout: '' };
+
+    assert.equal(summary.observed, false);
+    assert.equal(summary.progress, progress);
+    assert.equal(attachRoguelikeResultSummary(result, summary), result);
   });
 });
 

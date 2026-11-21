@@ -47,7 +47,7 @@ import {
   </CardFooter>
 </Card>
 
-<Card className="roguelike-theme-panel gap-0 p-0!">
+<Card className="gap-0 p-0!">
   <div className="border-b border-border px-4 py-3.5">分节标题</div>
   <div className="px-4 py-4">自管理内边距的面板内容</div>
 </Card>
@@ -211,6 +211,8 @@ import { LoaderCircle, RefreshCw, Save } from 'lucide-react'
 
 loading 不是 `Button` 的 prop：调用点用 `disabled` 阻止重复提交，加 `aria-busy`，并用 `LoaderCircle` 与进行中文案替换原内容；不存在 `loadingText`。同一操作不要叠加第二个旋转图标。
 
+工作流页的页面级主执行/停止按钮允许在调用点使用 `min-h-11`（44px）作为触达高度例外；它不是新的 `size` 档位，也不得用其它高度工具类改写其他控件度量。规则见[设计规范](../../DESIGN.md#buttons)。
+
 ---
 
 ### Progress - 进度条
@@ -246,7 +248,23 @@ import { Badge } from '@/shared/ui/badge'
 <Badge variant="outline" className="border-success/30 bg-success/10 text-success-text">已完成</Badge>
 ```
 
-`variant` 为 `default`、`secondary`、`destructive`、`outline`、`ghost`、`link`；不提供 success/warning 等业务变体。状态色由调用点通过 `className` 覆盖（或搭配无背景冲突的 variant 复用 `status-*` 语义类），不要向共享原语添加 tone prop。Badge 默认作为非交互状态 pill 使用；确需链接语义时用 `render={<a href="..." />}` 渲染为链接，不要用 `onClick` 模拟按钮。图标作为 children 直接渲染，装饰图标加 `aria-hidden="true"`。
+`variant` 为 `default`、`secondary`、`destructive`、`outline`、`ghost`、`link`；不提供 success/warning 等业务变体。状态色由调用点通过 `className` 覆盖（或搭配无背景冲突的 variant 复用 `status-*` 语义类），不要向共享原语添加 tone prop。Badge 默认作为非交互状态 pill 使用；确需链接语义时用 `render={<a href="..." />}` 渲染为链接，不要用 `onClick` 模拟按钮。图标作为 children 直接渲染，装饰图标加 `aria-hidden="true"`。肉鸽执行进度面板用非交互 `Badge` 展示未开始、启动中、运行中、正在停止、已完成、失败、已停止与已中断；通关/未通关放在独立结果行，不与任务状态混在同一个徽章里。
+
+---
+
+### Separator - 分隔线
+
+**文件位置**：`apps/web/src/shared/ui/separator.tsx`（shadcn 生成物，基于 Base UI Separator）
+
+**适用场景**：区分同一面板内的不同内容区块。需要结构语义时直接使用默认输出（`role="separator"` 与 `aria-orientation`）；纯视觉分隔传 `aria-hidden="true"` 从可访问树中隐藏，不要手写 `<hr>`、`border-*` 分隔线或自定义 role。
+
+```tsx
+import { Separator } from '@/shared/ui/separator'
+
+<Separator aria-hidden="true" className="mb-3.5" />
+```
+
+`orientation` 默认为 `horizontal`；垂直分隔传 `vertical`，并用 `className` 约束高度。肉鸽执行进度面板不再使用装饰性分隔。
 
 ---
 
@@ -316,7 +334,7 @@ import { Switch } from '@/shared/ui/switch'
 </label>
 ```
 
-`Input`、`Select`、`Checkbox`、`Switch` 直接导入 `@/shared/ui/*`，原语不提供 `label`、`error`、`hint` 或 `hintPlacement` props。字段行由各 feature 的 field helper 组合标签、控件与错误态；说明提示使用下方 `FieldHint`，不要给原语另加说明参数。多行文本使用原生 `textarea`。
+`Input`、`Select`、`Checkbox`、`Switch` 直接导入 `@/shared/ui/*`，原语不提供 `label`、`error` 或 `hint` props。字段行由各 feature 的 field helper 组合标签、控件与错误态；说明提示使用下方 `FieldHint`，不要给原语另加说明参数。多行文本使用原生 `textarea`。
 
 错误态给控件传 `aria-invalid`，需要与错误文本建立关联时再传 `aria-errormessage`；错误文本使用 `form-error-text`，不要在页面里单独手写红色边框。`Select` 由 Root、`SelectTrigger`、`SelectValue`、`SelectContent` 与 `SelectItem` 组合，受控值通过 `value` / `onValueChange` 传递；选项数组传给 Root 的 `items`，`SelectValue` 才能显示当前标签。
 
@@ -369,7 +387,7 @@ import { FieldHint } from '@/shared/components'
 
 组件在打开时才挂载提示内容，内容带 `role="tooltip"`，触发器的 `aria-describedby` 仅在打开时指向内容 id；触发器保留 `${label}说明` 的 `aria-label`，并同时支持悬停、聚焦、点击与触屏点按。粗指针设备忽略 Base UI 合成的 hover 开关，提示由点按、点击或聚焦打开，直到 Escape、外部点按或 blur 关闭。提示内容只承载文本，使用 `pointer-events-none`，根节点设置 `disableHoverablePopup`，避免覆盖相邻控件时吞掉悬停或点击。
 
-自定义触发器时，用 `@/shared/ui/tooltip` 组合 `Tooltip`、`TooltipTrigger`（通过 `render` 承载按钮）与 `TooltipContent`，并保持上述受控 `open`、点击/触屏打开、`role`/`aria-describedby` 与非遮挡约定。
+自定义触发器时，用 `@/shared/ui/tooltip` 组合 `Tooltip`、`TooltipTrigger`（通过 `render` 承载按钮）与 `TooltipContent`，并保持上述受控 `open`、点击/触屏打开、`role`/`aria-describedby` 与非遮挡约定。肉鸽的字段说明统一放在标签旁的 `FieldHint`；开关说明同时提供 `sr-only` 常驻描述，供 `aria-describedby` 关联。不可用执行入口则用可聚焦的 `Tooltip` 触发器说明原因。
 
 ---
 
@@ -512,7 +530,7 @@ notifyProgress(message: string, id: string): string
 dismissNotice(id?: string): void
 ```
 
-同一流程复用固定 id，后续更新会替换原通知而不是堆叠。固定 id：`execution`（自动化、作业、肉鸽与 Dashboard 执行）、`statistics`（识别与材料）、`settings-update`（组件更新）、`settings-update-channel`（更新渠道保存）、`settings-auto-update`（自动更新保存）、`settings-config:connection` / `settings-config:instance` / `settings-config:resource-source`（设置草稿保存）、`combat-preview`（作业预览）、`combat-queue-preview`（搜索作业加入队列）、`combat-paradox-search`（悖论模拟搜索）、`dashboard-connection`（概览连接告警）、`automation-config-save`（自动化配置保存/恢复）、`automation-connection-test`（测试连接）、`automation-deleted-task`（删除任务撤销）、`automation-restore-blocked`（运行中拒绝恢复）、`automation-notification-load`（通知配置读取）、`automation-notification-test`（测试通知）、`automation-notification-save`（通知配置保存）。开始用 `notifyProgress(message, id)`；有终态文案时用同一 id 的 `notify(..., { id })` 替换；没有终态文案时才 `dismissNotice(id)` 收起进度。不传 `type` 时按文案推断；错误默认常驻到用户关闭，成功默认约 2.5 秒，警告与信息默认约 4 秒。`duration` 可显式覆盖，进度通知默认不自动消失。`description` 与 `action` 原样传给 sonner，只用于需要补充说明或内联动作的通知。应用最多同时显示 3 条通知；`AppToaster` 为每条通知提供关闭按钮（无障碍名称「关闭通知」）。
+同一流程复用固定 id，后续更新会替换原通知而不是堆叠。固定 id：`execution`（自动化、作业、肉鸽与 Dashboard 执行）、`statistics`（识别与材料）、`settings-update`（组件更新）、`settings-update-channel`（更新渠道保存）、`settings-auto-update`（自动更新保存）、`settings-config:connection` / `settings-config:instance` / `settings-config:resource-source`（设置草稿保存）、`combat-preview`（作业预览）、`combat-queue-preview`（搜索作业加入队列）、`combat-paradox-search`（悖论模拟搜索）、`dashboard-connection`（概览连接告警）、`roguelike-config-save`（肉鸽配置保存/恢复）、`automation-config-save`（自动化配置保存/恢复）、`automation-connection-test`（测试连接）、`automation-deleted-task`（删除任务撤销）、`automation-restore-blocked`（运行中拒绝恢复）、`automation-notification-load`（通知配置读取）、`automation-notification-test`（测试通知）、`automation-notification-save`（通知配置保存）。开始用 `notifyProgress(message, id)`；有终态文案时用同一 id 的 `notify(..., { id })` 替换；没有终态文案时才 `dismissNotice(id)` 收起进度。不传 `type` 时按文案推断；错误默认常驻到用户关闭，成功默认约 2.5 秒，警告与信息默认约 4 秒。`duration` 可显式覆盖，进度通知默认不自动消失。`description` 与 `action` 原样传给 sonner，只用于需要补充说明或内联动作的通知。应用最多同时显示 3 条通知；`AppToaster` 为每条通知提供关闭按钮（无障碍名称「关闭通知」）。
 
 概览的连接告警使用常驻 toast：`offline` 时以固定 id `dashboard-connection` 发送 warning 与 `description`，不附带 action；`unavailable` 时发送 error、`description` 与「重试连接」action。连接恢复自动 `dismissNotice`；toast 由应用根渲染，不参与页面布局。
 

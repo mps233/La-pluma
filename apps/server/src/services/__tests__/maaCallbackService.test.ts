@@ -91,6 +91,46 @@ describe('Maa callback parsing', () => {
   });
 });
 
+describe('Maa callback timestamps', () => {
+  it('attaches local epoch milliseconds from a complete line timestamp', () => {
+    const log = '[2026-11-06 09:00:00.123][INF][Px1][Tx2] Assistant::append_callback | SubTaskStart {"taskchain":"Recruit","details":{}}';
+
+    const [event] = parseMaaCallbackEvents(log, 'Recruit');
+
+    assert.equal(event.atMs, new Date(2026, 10, 6, 9, 0, 0, 123).getTime());
+  });
+
+  it('keeps the event shape unchanged without a timestamp', () => {
+    const log = '[INF] Assistant::append_callback | SubTaskStart {"taskchain":"Recruit","details":{}}';
+
+    const [event] = parseMaaCallbackEvents(log, 'Recruit');
+
+    assert.deepEqual(event, {
+      taskchain: 'Recruit',
+      details: {},
+      callback: 'SubTaskStart'
+    });
+    assert.equal('atMs' in event, false);
+  });
+
+  it('ignores invalid, incomplete, or unprefixed timestamps', () => {
+    const lines = [
+      '[2026-02-30 09:00:00.000][INF] Assistant::append_callback | SubTaskStart {"taskchain":"Recruit","details":{}}',
+      '[2026-13-01 09:00:00.000][INF] Assistant::append_callback | SubTaskStart {"taskchain":"Recruit","details":{}}',
+      '[2026-11-06 25:00:00.000][INF] Assistant::append_callback | SubTaskStart {"taskchain":"Recruit","details":{}}',
+      '[2026-11-06 09:00:00.00][INF] Assistant::append_callback | SubTaskStart {"taskchain":"Recruit","details":{}}',
+      '[INF] [2026-11-06 09:00:00.000] Assistant::append_callback | SubTaskStart {"taskchain":"Recruit","details":{}}'
+    ];
+
+    const events = parseMaaCallbackEvents(lines.join('\n'), 'Recruit');
+
+    assert.equal(events.length, lines.length);
+    for (const event of events) {
+      assert.equal('atMs' in event, false);
+    }
+  });
+});
+
 describe('Maa callback accessors', () => {
   it('treats missing or mistyped fields as absent', () => {
     const [event] = parseMaaCallbackEvents(

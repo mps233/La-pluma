@@ -38,6 +38,12 @@ import type { ExecutionShutdownRuntime } from '../executionShutdownService.ts';
 import { createRuntimeLifecycle } from '../runtimeLifecycleService.ts';
 import { executeScheduledTaskFromCron } from '../schedulerService.ts';
 import {
+  configureRoguelikeProgressTrackerRuntimeForTests,
+  getRoguelikeProgress,
+  resetRoguelikeProgressTrackerForTests,
+  startRoguelikeProgressTracker
+} from '../roguelikeProgressTrackerService.ts';
+import {
   configureCopilotSetRuntimeForTests,
   continueManualCopilotSet,
   hasCopilotSetSession,
@@ -79,6 +85,7 @@ beforeEach(async () => {
   }
   resetCopilotSetRunStateForTests();
   resetAgentRunsForTests();
+  resetRoguelikeProgressTrackerForTests();
   clearExecutionAdmissionGateForTests();
   await initializeAgentRunStore({ filePath: storePath, runtimeLogger: quietLogger });
 });
@@ -87,6 +94,7 @@ afterEach(async () => {
   clearExecutionAdmissionGateForTests();
   resetCopilotSetRunStateForTests();
   resetAgentRunsForTests();
+  resetRoguelikeProgressTrackerForTests();
   try {
     await shutdownAgentRunStoreForTests();
   } catch {
@@ -261,6 +269,72 @@ describe('execution shutdown coordination', () => {
     assert.equal(summary.budgetMs, 0);
     assert.deepEqual(summary.interruptedRunIds, [run.runId]);
     assert.equal(requireRun(run.runId).state, 'interrupted');
+    assert.equal(summary.flush.ok, true);
+  });
+
+  it('releases roguelike progress trackers while draining', async () => {
+    configureRoguelikeProgressTrackerRuntimeForTests({
+      schedule: () => ({ cancel() {} })
+    });
+    const { run } = beginAgentRun({ operationId: 'run_task' });
+    startAgentRun(run.runId);
+    assert.equal(startRoguelikeProgressTracker({
+      runId: run.runId,
+      checkpoint: { logPath: '/virtual/asst.log', size: 0 },
+      command: 'roguelike',
+      theme: 'JieGarden',
+      mode: null,
+      targetRounds: null,
+      settlementSupported: null,
+      startedAtMs: Date.now()
+    }), true);
+    assert.ok(getRoguelikeProgress(run.runId));
+
+    const service = createExecutionShutdownService({
+      logger: quietLogger,
+      runtime: realRunRuntime({ sleep: async () => {} })
+    });
+    const summary = await service.drain({ reason: 'test', timeoutMs: 0 });
+
+    assert.equal(getRoguelikeProgress(run.runId), null);
+    assert.equal(summary.flush.ok, true);
+  });
+
+  it('records roguelike progress release failures and finishes the remaining cleanup', async () => {
+    const { run } = beginAgentRun({ operationId: 'fight' });
+    startAgentRun(run.runId);
+    let stopIntentReleases = 0;
+    let runStops = 0;
+    const service = createExecutionShutdownService({
+      logger: quietLogger,
+      settleIntervalMs: 5,
+      flushReserveMs: 20,
+      defaultDrainBudgetMs: 500,
+      runtime: realRunRuntime({
+        releaseStopIntents: () => {
+          stopIntentReleases += 1;
+        },
+        releaseRoguelikeProgress: () => {
+          throw new Error('fixture tracker release failed');
+        },
+        requestRunStop: runId => {
+          runStops += 1;
+          return { disposition: requestAgentRunStop(runId).disposition };
+        },
+        stopDeviceTask: () => stopAgentRun(run.runId, { message: 'stopped' })
+      })
+    });
+
+    const summary = await service.drain({ reason: 'test', timeoutMs: 500 });
+
+    assert.ok(
+      summary.errors.some(error => error.includes('释放肉鸽进度跟踪失败')
+        && error.includes('fixture tracker release failed')),
+      `errors should contain the progress release failure: ${JSON.stringify(summary.errors)}`
+    );
+    assert.equal(stopIntentReleases, 1);
+    assert.equal(runStops, 1);
+    assert.equal(requireRun(run.runId).state, 'stopped');
     assert.equal(summary.flush.ok, true);
   });
 

@@ -3,39 +3,27 @@ import {
   parseMaaCallbackEvents
 } from './maaCallbackService.ts';
 import type { MaaCallbackEvent } from './maaCallbackService.ts';
+import {
+  readRoguelikeEvent,
+  readRoguelikeInvestment,
+  readRoguelikeSettlement
+} from './roguelikeCallbackReaders.ts';
+import type {
+  RoguelikeEventSummary,
+  RoguelikeInvestmentSummary,
+  RoguelikeSettlementSummary
+} from './roguelikeCallbackReaders.ts';
+import type { RoguelikeProgressSnapshot } from './roguelikeProgressService.ts';
+
+export type {
+  RoguelikeEventSummary,
+  RoguelikeInvestmentSummary,
+  RoguelikeSettlementSummary
+} from './roguelikeCallbackReaders.ts';
 
 export type RoguelikeCommand = 'roguelike' | 'reclamation';
 
 export type RoguelikeRunStatus = 'success' | 'failed' | 'stopped' | 'incomplete';
-
-export interface RoguelikeSettlementSummary {
-  gamePass: boolean | null;
-  floor: number | null;
-  step: number | null;
-  combat: number | null;
-  recruit: number | null;
-  collection: number | null;
-  boss: number | null;
-  emergency: number | null;
-  difficulty: number | null;
-  score: number | null;
-  exp: number | null;
-  skill: string | null;
-}
-
-export interface RoguelikeInvestmentSummary {
-  rounds: number;
-  count: number;
-  total: number | null;
-  deposit: number | null;
-  reachedLimit: boolean;
-  reachedFull: boolean;
-}
-
-export interface RoguelikeEventSummary {
-  name: string;
-  option: string | null;
-}
 
 export interface RoguelikeCopperExchangeSummary {
   toDiscard: string;
@@ -50,7 +38,8 @@ export interface RoguelikeStrategySummary {
 
 /**
  * 单次肉鸽/生息演算执行的结果投影：字段只来自本次执行日志中的结构化回调，
- * 缺失字段保持 null/空数组，不用 UI 文案或假数据补齐。
+ * 缺失字段保持 null/空数组，不用 UI 文案或假数据补齐；progress 是执行结束时
+ * 由同一段日志归并出的最终进度快照。
  */
 export interface RoguelikeResultSummary {
   command: RoguelikeCommand;
@@ -66,6 +55,7 @@ export interface RoguelikeResultSummary {
   warnings: string[];
   strategy: RoguelikeStrategySummary | null;
   combats: number;
+  progress: RoguelikeProgressSnapshot | null;
   taskChain: {
     started: boolean;
     completed: boolean;
@@ -106,39 +96,12 @@ const MILESTONE_MESSAGES: Record<string, string> = {
   MonthlySquadCompleted: '月度小队已完成'
 };
 
-const SETTLEMENT_NUMBER_FIELDS = [
-  'floor',
-  'step',
-  'combat',
-  'recruit',
-  'collection',
-  'boss',
-  'emergency',
-  'difficulty',
-  'score'
-] as const;
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function readCount(value: unknown): number | null {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
-}
-
-function readSignedCount(value: unknown): number | null {
-  return typeof value === 'number' && Number.isSafeInteger(value) ? value : null;
-}
-
 function readText(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
-}
-
-function readNumericText(value: unknown): number | null {
-  const text = readText(value);
-  if (text === null) return null;
-  const parsed = Number.parseInt(text.replace(/[^0-9-]/g, ''), 10);
-  return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
 export function isRoguelikeCommand(command: unknown): command is RoguelikeCommand {
@@ -152,75 +115,6 @@ export function getRoguelikeTaskchain(command: RoguelikeCommand): string {
 export function readRoguelikeTheme(args: readonly string[] = []): string {
   const theme = args[0];
   return typeof theme === 'string' ? theme.trim() : '';
-}
-
-function readSettlement(event: MaaCallbackEvent): RoguelikeSettlementSummary | null {
-  const details = getCallbackDetails(event);
-  if (!details) return null;
-
-  const settlement: RoguelikeSettlementSummary = {
-    gamePass: typeof details.game_pass === 'boolean' ? details.game_pass : null,
-    floor: null,
-    step: null,
-    combat: null,
-    recruit: null,
-    collection: null,
-    boss: null,
-    emergency: null,
-    difficulty: null,
-    score: null,
-    exp: readNumericText(details.exp),
-    skill: readText(details.skill)
-  };
-
-  for (const field of SETTLEMENT_NUMBER_FIELDS) {
-    settlement[field] = readSignedCount(details[field]);
-  }
-
-  const observed = Object.values(settlement).some(value => value !== null);
-  return observed ? settlement : null;
-}
-
-function readInvestment(
-  event: MaaCallbackEvent,
-  current: RoguelikeInvestmentSummary | null
-): RoguelikeInvestmentSummary {
-  const details = getCallbackDetails(event) ?? {};
-  const count = readSignedCount(details.count);
-  const deposit = readSignedCount(details.deposit);
-  const base: RoguelikeInvestmentSummary = current ?? {
-    rounds: 0,
-    count: 0,
-    total: null,
-    deposit: null,
-    reachedLimit: false,
-    reachedFull: false
-  };
-
-  return {
-    ...base,
-    rounds: base.rounds + 1,
-    count: base.count + (count !== null && count >= 0 ? count : 0),
-    total: readSignedCount(details.total) ?? base.total,
-    deposit: deposit !== null && deposit >= 0 ? deposit : base.deposit
-  };
-}
-
-function readEventName(event: MaaCallbackEvent): string | null {
-  const details = getCallbackDetails(event);
-  return details ? readText(details.name) : null;
-}
-
-function readChoiceLabel(value: unknown): string | null {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1
-    ? `选项 ${value}`
-    : null;
-}
-
-function readSelectedOption(event: MaaCallbackEvent): string | null {
-  const details = getCallbackDetails(event);
-  if (!details) return null;
-  return readText(details.option_text) ?? readChoiceLabel(details.choose_option);
 }
 
 function readStrategy(event: MaaCallbackEvent): RoguelikeStrategySummary {
@@ -255,7 +149,8 @@ function formatStatusMessage(
   command: RoguelikeCommand,
   status: RoguelikeRunStatus,
   settlement: RoguelikeSettlementSummary | null,
-  taskChainError: string | null
+  taskChainError: string | null,
+  progressObserved: boolean
 ): string {
   const label = COMMAND_LABELS[command];
   if (status === 'failed') {
@@ -263,8 +158,9 @@ function formatStatusMessage(
   }
   if (status === 'stopped') return `${label}任务已停止`;
   if (status === 'incomplete') {
-    return settlement
-      ? `${formatSettlementMessage(settlement)} · 未观察到任务链终态`
+    if (settlement) return `${formatSettlementMessage(settlement)} · 未观察到任务链终态`;
+    return progressObserved
+      ? '已观察到执行进度，但未读取到任务链终态'
       : '未读取到任务回调，无法确认执行结果';
   }
   if (settlement) return formatSettlementMessage(settlement);
@@ -279,7 +175,8 @@ function formatStatusMessage(
  */
 export function buildRoguelikeResultSummary(
   logOutput: string | null | undefined,
-  capture: RoguelikeResultCapture
+  capture: RoguelikeResultCapture,
+  progress: RoguelikeProgressSnapshot | null = null
 ): RoguelikeResultSummary {
   const command: RoguelikeCommand = capture.command === 'reclamation' ? 'reclamation' : 'roguelike';
   const taskchain = TASKCHAIN_BY_COMMAND[command];
@@ -323,12 +220,12 @@ export function buildRoguelikeResultSummary(
 
     const what = typeof event.what === 'string' ? event.what : '';
     if (what === 'RoguelikeSettlement') {
-      settlement = readSettlement(event) ?? settlement;
+      settlement = readRoguelikeSettlement(event) ?? settlement;
       observed = true;
       continue;
     }
     if (what === 'RoguelikeInvestment') {
-      investment = readInvestment(event, investment);
+      investment = readRoguelikeInvestment(event, investment);
       observed = true;
       continue;
     }
@@ -343,28 +240,25 @@ export function buildRoguelikeResultSummary(
       continue;
     }
     if (what === 'RoguelikeEvent') {
-      const name = readEventName(event);
-      if (name) {
-        const details = getCallbackDetails(event);
-        const option = details ? readChoiceLabel(details.choose_option) : null;
-        const existing = roguelikeEvents.find(item => item.name === name);
+      const parsed = readRoguelikeEvent(event);
+      if (parsed) {
+        const existing = roguelikeEvents.find(item => item.name === parsed.name);
         if (existing) {
-          if (existing.option === null && option !== null) existing.option = option;
+          if (existing.option === null && parsed.option !== null) existing.option = parsed.option;
         } else {
-          roguelikeEvents.push({ name, option });
+          roguelikeEvents.push({ name: parsed.name, option: parsed.option });
         }
         observed = true;
       }
       continue;
     }
     if (what === 'RoguelikeEventSelected') {
-      const name = readEventName(event);
-      if (!name) continue;
-      const option = readSelectedOption(event);
-      const existing = roguelikeEvents.find(item => item.name === name);
+      const parsed = readRoguelikeEvent(event);
+      if (!parsed) continue;
+      const existing = roguelikeEvents.find(item => item.name === parsed.name);
       if (existing) {
-        if (option !== null) existing.option = option;
-      } else roguelikeEvents.push({ name, option });
+        if (parsed.option !== null) existing.option = parsed.option;
+      } else roguelikeEvents.push({ name: parsed.name, option: parsed.option });
       observed = true;
       continue;
     }
@@ -403,6 +297,8 @@ export function buildRoguelikeResultSummary(
     if (warning && !warnings.includes(warning)) warnings.push(warning);
   }
 
+  observed = observed || Boolean(progress?.observed);
+
   let status: RoguelikeRunStatus = 'incomplete';
   if (lastTaskChainEvent === 'completed') status = 'success';
   else if (lastTaskChainEvent === 'failed') status = 'failed';
@@ -424,7 +320,13 @@ export function buildRoguelikeResultSummary(
     theme: readRoguelikeTheme(capture.args),
     status,
     observed,
-    message: formatStatusMessage(command, status, settlement, taskChainError),
+    message: formatStatusMessage(
+      command,
+      status,
+      settlement,
+      taskChainError,
+      progress?.observed === true
+    ),
     settlement,
     investment,
     events: roguelikeEvents,
@@ -433,6 +335,7 @@ export function buildRoguelikeResultSummary(
     warnings,
     strategy,
     combats,
+    progress,
     taskChain
   };
 }

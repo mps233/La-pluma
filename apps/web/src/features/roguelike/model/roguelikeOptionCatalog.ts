@@ -18,6 +18,13 @@ export const ROGUELIKE_THEMES: readonly string[] = [
 
 export const RECLAMATION_THEMES: readonly string[] = ['Tales', 'RelaunchAnchor']
 
+/**
+ * 生息演算默认模式与 CLI 一致：`-m` 缺省为 1（有存档时制作工具）。
+ * 模式 0 仅在没有存档时使用，已有存档时可能丢失进度。
+ * 重启锚点主题没有 `1`，草稿归一化会回落到该主题模式候选的首项 `16`。
+ */
+export const DEFAULT_RECLAMATION_MODE = '1'
+
 export interface RoguelikeThemePreset {
   value: string
   label: string

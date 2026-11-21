@@ -43,7 +43,7 @@ for (const theme of THEMES) {
 
       const panel = page.locator('.roguelike-settings-panel')
       await expect(panel).toBeVisible()
-      await expect(page.getByRole('button', { name: '核心干员', exact: true })).toBeVisible()
+      await expect(page.getByRole('group', { name: '核心干员' })).toBeVisible()
 
       const geometry = await page.evaluate(() => {
         const grid = document.querySelector<HTMLElement>('[data-device-monitor-layout="mode"]')!

@@ -18,6 +18,7 @@ import {
   type TaskConfig,
 } from '@/features/task-execution'
 import { describeRoguelikeTerminalRun, projectRoguelikeStopState } from '../model/executionState'
+import { readRoguelikeRunProgress, type RoguelikeCommand } from '../model/runProgress'
 
 export const ROGUELIKE_EXECUTION_SCOPE = 'roguelike'
 
@@ -47,8 +48,18 @@ export interface RoguelikeExecution {
   pendingStopMode: StopMode | null
   /** 启动请求在途；按钮保持禁用，重复点击不会产生第二个提交。 */
   isSubmitting: boolean
-  /** 本页 owned 的 run（活动或终态），供结果面板读取结构化摘要。 */
+  /** 本页 owned 的 run（活动或终态），供执行进度面板读取进度与摘要。 */
   trackedRun: AgentRun | null
+  /** 本页发起该 run 时记录的任务名；刷新后无法恢复时为 null。 */
+  trackedRunLabel: string | null
+  /** 服务端最近一次终态 run；不保证属于本页或当前模式。 */
+  lastRun: AgentRun | null
+  /** 执行快照是否已经到达；用于区分“尚未加载”和“确实没有执行”。 */
+  hasSnapshot: boolean
+  /** 本页身份已恢复但 run 详情尚未取回；用于避免误报空闲或旧结果。 */
+  resolvingIdentity: boolean
+  /** 活动 run 的进度模式；只有活动 run 提供进度时才有值。 */
+  trackedCommand: RoguelikeCommand | null
   execute: (request: RoguelikeExecutionRequest) => Promise<void>
   stop: (mode?: StopMode) => Promise<void>
 }
@@ -67,6 +78,9 @@ export function useRoguelikeExecution({
   const ownedRunId = owned ? execution.trackedRunId : null
   const trackedRun = owned ? execution.trackedRun : null
   const activeRun = trackedRun && isActiveRunState(trackedRun.state) ? trackedRun : null
+  const lastRun = execution.snapshot?.lastRun ?? null
+  const hasSnapshot = execution.snapshot !== null
+  const trackedCommand = activeRun ? readRoguelikeRunProgress(activeRun)?.command ?? null : null
   // 身份已持久化但快照还没返回：保守地按运行中处理，刷新后不能因此重复提交。
   const unresolved = owned && Boolean(ownedRunId) && execution.identity === 'tracked' && !trackedRun
   const isRunning = Boolean(activeRun) || unresolved
@@ -80,6 +94,9 @@ export function useRoguelikeExecution({
   const observedActiveRunRef = useRef<string | null>(null)
   const announcedRunRef = useRef<string | null>(null)
   const runLabelsRef = useRef(new Map<string, string>())
+  const trackedRunLabel = trackedRun
+    ? runLabelsRef.current.get(trackedRun.runId) ?? null
+    : null
 
   const isLeaving = trackedRun?.state === 'stopping'
   const { isWaitingForCombat, isStopping } = projectRoguelikeStopState({
@@ -166,7 +183,7 @@ export function useRoguelikeExecution({
         runLabelsRef.current.set(runId, taskName)
         observedActiveRunRef.current = runId
       } else {
-        notify(`${taskName} 已提交`, 'info', { id: EXECUTION_NOTICE_ID })
+        notify('服务端未返回运行身份，无法确认本次执行状态', 'warning', { id: EXECUTION_NOTICE_ID })
       }
     } catch (error) {
       // 传输失败时服务端可能已经接受执行，不能宣称失败或自动重提。
@@ -223,6 +240,11 @@ export function useRoguelikeExecution({
     pendingStopMode,
     isSubmitting,
     trackedRun,
+    trackedRunLabel,
+    lastRun,
+    hasSnapshot,
+    resolvingIdentity: unresolved,
+    trackedCommand,
     execute,
     stop,
   }

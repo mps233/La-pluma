@@ -29,6 +29,7 @@ import {
 import { requestCopilotSetRunStop } from './copilotSetRunService.ts';
 import { getTaskStatus, stopCurrentTask } from './maaProcessService.ts';
 import { releaseAllRoguelikeStopIntents } from './roguelikeStopIntentService.ts';
+import { releaseAllRoguelikeProgressTrackers } from './roguelikeProgressTrackerService.ts';
 import { getScheduleExecutionStatus, stopScheduleExecution } from './schedulerService.ts';
 import type {
   RuntimeLifecycle,
@@ -53,6 +54,7 @@ export interface ExecutionShutdownRuntime {
   stopDeviceTask(options: { forceKillDelayMs: number }): unknown;
   stopScheduleFlow(): unknown;
   releaseStopIntents(): void;
+  releaseRoguelikeProgress(): void;
   isDeviceTaskRunning(): boolean;
   isScheduleRunning(): boolean;
   now(): number;
@@ -115,6 +117,7 @@ function createDefaultRuntime(): ExecutionShutdownRuntime {
     stopDeviceTask: ({ forceKillDelayMs }) => stopCurrentTask({ forceKillDelayMs }),
     stopScheduleFlow: () => stopScheduleExecution(),
     releaseStopIntents: () => releaseAllRoguelikeStopIntents(),
+    releaseRoguelikeProgress: () => releaseAllRoguelikeProgressTrackers(),
     isDeviceTaskRunning: () => Boolean(getTaskStatus().isRunning),
     isScheduleRunning: () => Boolean(getScheduleExecutionStatus().isRunning),
     now: () => Date.now(),
@@ -163,6 +166,11 @@ export function createExecutionShutdownService(
       runtime.releaseStopIntents();
     } catch (error) {
       recordError(`释放等待战斗结束的停止意图失败: ${describeError(error)}`);
+    }
+    try {
+      runtime.releaseRoguelikeProgress();
+    } catch (error) {
+      recordError(`释放肉鸽进度跟踪失败: ${describeError(error)}`);
     }
     const stoppedRuns: Array<{ runId: string; disposition: string }> = [];
     const seenRunIds = new Set<string>();
@@ -296,16 +304,16 @@ export function createExecutionShutdownService(
         flush,
         errors: [...errorMessages]
       });
-      throw new Error(`执行关闭未完全成功: ${[...errorMessages].join('; ')}`);
+    } else {
+      logger.info?.('执行关闭已完成', {
+        reason,
+        budgetMs,
+        stoppedRuns: stoppedRuns.length,
+        interruptedRunIds,
+        deviceStopCalls,
+        durationMs: runtime.now() - startedAt
+      });
     }
-    logger.info?.('执行关闭已完成', {
-      reason,
-      budgetMs,
-      stoppedRuns: stoppedRuns.length,
-      interruptedRunIds,
-      deviceStopCalls,
-      durationMs: runtime.now() - startedAt
-    });
     return summary;
   }
 
@@ -331,10 +339,16 @@ export function attachExecutionShutdownToLifecycle(
   const service = createExecutionShutdownService(options);
   lifecycle.register({
     name: 'execution-shutdown',
-    close: (context: RuntimeLifecycleCloseContext) => service.drain({
-      reason: context?.reason,
-      timeoutMs: context?.timeoutMs
-    })
+    close: async (context: RuntimeLifecycleCloseContext) => {
+      const summary = await service.drain({
+        reason: context?.reason,
+        timeoutMs: context?.timeoutMs
+      });
+      if (summary.errors.length > 0) {
+        throw new Error(`执行关闭未完全成功: ${summary.errors.join('; ')}`);
+      }
+      return summary;
+    }
   });
   attachedLifecycles.set(lifecycle, service);
   return { attached: true, duplicate: false, service };

@@ -10,6 +10,7 @@ import {
   getRoguelikeOptionChoices,
   isRoguelikeOptionVisible,
   normalizeRoguelikeAdvancedParams,
+  normalizeRoguelikeModeForKnownTheme,
   normalizeRoguelikeModeForTheme,
   resolveRoguelikeAdvancedValue,
   splitRoguelikeListValue,
@@ -87,16 +88,6 @@ describe('roguelike task catalog', () => {
         ['clearStore', undefined],
       ])
     expect(getRoguelikeAdvancedOptions('unknown')).toEqual([])
-  })
-
-  it('collects only the difficulty and starting roles guidance into label tooltips', () => {
-    const tooltipOptions = getRoguelikeAdvancedOptions('roguelike')
-      .filter(entry => entry.hintPlacement === 'tooltip')
-    expect(tooltipOptions.map(entry => entry.key)).toEqual(['difficulty', 'roles'])
-    expect(tooltipOptions.map(entry => entry.hint)).toEqual([
-      '不切换时沿用游戏内当前难度；指定未解锁的难度会被降到已解锁上限。',
-      '决定开局能招募的职业；核心干员的职业必须在组合内，例如维什戴尔（狙击）需要稳扎稳打。',
-    ])
   })
 
   it('names the roguelike mode options after their MaaCore behavior', () => {
@@ -625,6 +616,45 @@ describe('normalizeRoguelikeModeForTheme', () => {
       expect(draft).toEqual({ [taskId]: { ...retained, mode } })
     },
   )
+})
+
+describe('normalizeRoguelikeModeForKnownTheme', () => {
+  it('leaves the draft untouched while the theme is unknown or still being typed', () => {
+    const roguelikeDraft: RoguelikeAdvancedParams = {
+      roguelike: { mode: '5', expectedCollapsalParadigms: '目空一些' },
+    }
+    for (const theme of ['', '   ', 'S', 'Sark']) {
+      expect(normalizeRoguelikeModeForKnownTheme('roguelike', theme, roguelikeDraft))
+        .toBe(roguelikeDraft)
+    }
+
+    const reclamationDraft: RoguelikeAdvancedParams = { reclamation: { mode: '1' } }
+    expect(normalizeRoguelikeModeForKnownTheme('reclamation', 'Relaunch', reclamationDraft))
+      .toBe(reclamationDraft)
+  })
+
+  it('normalizes the mode once the theme is known', () => {
+    const draft: RoguelikeAdvancedParams = {
+      roguelike: { mode: '5', expectedCollapsalParadigms: '目空一些' },
+    }
+    expect(normalizeRoguelikeModeForKnownTheme('roguelike', 'Sarkaz', draft)).toEqual({
+      roguelike: { mode: '0', expectedCollapsalParadigms: '目空一些' },
+    })
+    expect(draft).toEqual({ roguelike: { mode: '5', expectedCollapsalParadigms: '目空一些' } })
+
+    const relaunch: RoguelikeAdvancedParams = { reclamation: { mode: '1' } }
+    expect(normalizeRoguelikeModeForKnownTheme('reclamation', 'RelaunchAnchor', relaunch))
+      .toEqual({ reclamation: { mode: '16' } })
+    expect(relaunch).toEqual({ reclamation: { mode: '1' } })
+  })
+
+  it('keeps a supported mode and untouched drafts by reference', () => {
+    const supported: RoguelikeAdvancedParams = { roguelike: { mode: '5' } }
+    expect(normalizeRoguelikeModeForKnownTheme('roguelike', 'Sami', supported)).toBe(supported)
+
+    const untouched: RoguelikeAdvancedParams = { roguelike: { mode: '4' } }
+    expect(normalizeRoguelikeModeForKnownTheme('reclamation', 'Tales', untouched)).toBe(untouched)
+  })
 })
 
 describe('validateRoguelikeTaskInput', () => {

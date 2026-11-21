@@ -57,32 +57,10 @@
     border-bottom: 1px solid var(--border);
   }
 
-  .roguelike-panel-heading h3 {
+  .roguelike-panel-heading h2 {
     color: var(--foreground);
     font-size: 1rem;
-    font-weight: 650;
-  }
-
-  .roguelike-panel-heading p {
-    overflow: hidden;
-    margin-top: 0.2rem;
-    color: var(--tertiary-foreground);
-    font-size: 0.75rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .roguelike-panel-heading > span {
-    display: inline-flex;
-    min-height: 1.75rem;
-    flex: none;
-    align-items: center;
-    border-radius: 9999px;
-    padding: 0 0.625rem;
-    background: var(--muted);
-    color: var(--tertiary-foreground);
-    font-size: 0.6875rem;
-    font-weight: 700;
+    font-weight: 600;
   }
 
   .roguelike-panel-body {
@@ -94,119 +72,98 @@
     padding: 0 1rem 1rem;
   }
 
-  .roguelike-result-body {
+  .roguelike-progress-body {
     display: grid;
     gap: 0.875rem;
   }
 
-  .roguelike-result-content {
+  .roguelike-progress-blackflow {
     display: grid;
-    gap: 0.875rem;
-  }
-
-  .roguelike-result-active {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
     gap: 0.5rem;
-    border-radius: var(--radius-lg);
-    padding: 0.75rem 0.875rem;
-    background: var(--primary-soft);
-  }
-
-  .roguelike-result-message {
-    color: var(--foreground);
-    font-size: 0.875rem;
-    font-weight: 550;
-    line-height: 1.5;
-    overflow-wrap: anywhere;
-  }
-
-  .roguelike-result-metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
-    gap: 0.5rem;
-  }
-
-  .roguelike-result-metric {
-    display: grid;
-    min-width: 0;
-    gap: 0.15rem;
-    border-radius: 0.75rem;
-    padding: 0.5rem 0.625rem;
-    background: color-mix(in srgb, var(--muted) 88%, transparent);
-  }
-
-  .roguelike-result-list {
-    display: grid;
-    gap: 0.375rem;
-  }
-
-  .roguelike-result-previous {
     border-top: 1px solid var(--border);
     padding-top: 0.875rem;
   }
 
-  .roguelike-result-previous-note,
-  .roguelike-result-missing {
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-    line-height: 1.5;
-  }
-
-  .roguelike-result-diagnostics {
-    border-top: 1px solid var(--border);
-    padding-top: 0.875rem;
-  }
-
-  .roguelike-result-active strong {
-    color: var(--primary-strong);
-    font-size: 0.875rem;
-    font-weight: 650;
-  }
-
-  .roguelike-result-active p {
-    min-width: 0;
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-    line-height: 1.5;
-    overflow-wrap: anywhere;
-  }
-
-  .roguelike-result-metric dt {
-    color: var(--tertiary-foreground);
-    font-size: 0.6875rem;
-  }
-
-  .roguelike-result-metric dd {
-    min-width: 0;
+  .roguelike-progress-blackflow h3 {
     color: var(--foreground);
     font-size: 0.875rem;
     font-weight: 600;
-    overflow-wrap: anywhere;
+    line-height: 1.5;
   }
 
-  .roguelike-result-list h4 {
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-    font-weight: 650;
-  }
-
-  .roguelike-result-list ul {
-    display: grid;
-    gap: 0.25rem;
-    padding-left: 1rem;
+  .roguelike-progress-owner,
+  .roguelike-progress-loading,
+  .roguelike-progress-note {
     color: var(--muted-foreground);
     font-size: 0.75rem;
     line-height: 1.5;
-    list-style: disc;
+  }
+
+  .roguelike-progress-empty {
+    min-height: 6.25rem;
+    padding: 0.875rem 1rem;
+  }
+
+  .roguelike-progress-status {
+    color: var(--foreground);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  .roguelike-progress-timing,
+  .roguelike-progress-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem 0.875rem;
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
+  }
+
+  .roguelike-progress-action,
+  .roguelike-progress-result {
+    color: var(--foreground);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .roguelike-progress-message {
+    color: var(--foreground);
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.5;
     overflow-wrap: anywhere;
   }
 
-  .roguelike-result-previous h4 {
-    color: var(--tertiary-foreground);
+  .roguelike-progress-rounds {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .roguelike-progress-round {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.625rem;
+    color: var(--muted-foreground);
     font-size: 0.75rem;
-    font-weight: 650;
+    line-height: 1.5;
+  }
+
+  .roguelike-progress-round-index {
+    color: var(--foreground);
+    font-weight: 600;
+  }
+
+  .roguelike-progress-error {
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
   }
 
   .roguelike-stop-actions {
@@ -242,19 +199,18 @@
     gap: 0.5rem;
     border-radius: 0.75rem;
     padding: 0.5rem 0.75rem;
-    background: color-mix(in srgb, var(--muted) 88%, transparent);
+    background: var(--muted);
     color: var(--muted-foreground);
-    box-shadow: none;
     text-align: left;
     transition: color 160ms ease, background 160ms ease;
   }
 
-  .roguelike-theme-option:hover:not(.is-active) {
+  .roguelike-theme-option:hover:not([aria-pressed="true"]) {
     background: color-mix(in srgb, var(--primary-soft) 45%, var(--muted));
     color: var(--foreground);
   }
 
-  .roguelike-theme-option.is-active {
+  .roguelike-theme-option[aria-pressed="true"] {
     background: var(--primary-soft);
     color: var(--primary-strong);
   }
@@ -280,7 +236,7 @@
   .roguelike-theme-copy strong {
     color: inherit;
     font-size: 0.875rem;
-    font-weight: 650;
+    font-weight: 600;
   }
 
   .roguelike-theme-copy small {
@@ -289,7 +245,7 @@
     font-size: 0.6875rem;
   }
 
-  .roguelike-theme-option.is-active small {
+  .roguelike-theme-option[aria-pressed="true"] small {
     color: color-mix(in srgb, var(--primary-strong) 68%, var(--muted-foreground));
   }
 
@@ -362,7 +318,7 @@
     margin-top: 1rem;
     overflow: hidden;
     border-radius: var(--radius-xl);
-    background: color-mix(in srgb, var(--muted) 86%, transparent);
+    background: var(--muted);
   }
 
   .roguelike-toggle-row {
@@ -383,12 +339,12 @@
     display: flex;
     min-height: 2.75rem;
     min-width: 0;
-    flex: 1;
+    flex: none;
     cursor: pointer;
     align-items: center;
     color: var(--muted-foreground);
     font-size: 0.875rem;
-    font-weight: 550;
+    font-weight: 500;
   }
 
   @container (min-width: 32rem) {

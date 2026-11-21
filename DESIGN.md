@@ -363,6 +363,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ### Buttons
 - **Shape:** `rounded-lg`（12px），无边框；`Button` 的尺寸档位由 shadcn base-nova 提供。
 - **Sizes:** `xs` 24px、`sm` 28px、`default` 32px、`lg` 36px；图标档 `icon-xs` 24px、`icon-sm` 28px、`icon` 32px、`icon-lg` 36px。手机断点和粗指针设备沿用同一紧凑档位，不额外放大。
+- **Workflow primary action:** 工作流页的页面级主执行/停止按钮允许在调用点使用 `min-h-11`（44px）作为触达高度例外；它不是新的 size 档位，也不得用 `h-*`/`px-*`/`py-*` 改写其他控件度量。
 - **Primary:** shadcn `bg-primary`（浅色 `#007aff`、深色 `#0a84ff`、白字）；hover 使用 `bg-primary/80`，不增加渐变或光晕。
 - **Secondary / Outline:** Secondary 使用 `bg-secondary`；Outline 使用 `border-border bg-background`，hover 使用 `bg-muted`。
 - **Danger:** 使用 `destructive` variant（`bg-destructive/10` + `text-destructive`），语义必须与操作后果一致。

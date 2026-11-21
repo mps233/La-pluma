@@ -50,6 +50,14 @@ export interface MaaLogIncrement {
   text: string;
 }
 
+/** 向前读取的日志块；`nextCheckpoint` 只前进到最后一个完整行，未完成行留待下次。 */
+export interface MaaLogChunk {
+  status: MaaLogIncrementStatus;
+  text: string;
+  nextCheckpoint: MaaLogCheckpoint;
+  caughtUp: boolean;
+}
+
 export interface MaaLogFileStats {
   size: number;
   dev?: number;
@@ -58,6 +66,9 @@ export interface MaaLogFileStats {
 
 /** 检查点保留的边界前摘要长度；取会话内容而不是固定日志头，又不随文件增长变大。 */
 const LOG_ANCHOR_BYTES = 256;
+
+/** 每次向前读取日志的默认预算；按真实回调日志约 8 KB/s 留有充足余量。 */
+const LOG_CHUNK_DEFAULT_BYTES = 256 * 1024;
 
 export interface MaaLogFileHandle {
   stat?(): Promise<MaaLogFileStats>;
@@ -349,6 +360,177 @@ export async function readMaaLogSince(
   ports: MaaLogReadPorts = {}
 ): Promise<string> {
   return (await readMaaLogIncrement(checkpoint, maxBytes, ports)).text;
+}
+
+function resolveLogChunkBudget(maxBytes: number): number {
+  return Number.isFinite(maxBytes) && maxBytes > 0
+    ? Math.max(1, Math.floor(maxBytes))
+    : LOG_CHUNK_DEFAULT_BYTES;
+}
+
+async function readLogBytesAt(
+  handle: MaaLogFileHandle,
+  position: number,
+  length: number
+): Promise<{ buffer: Buffer; bytesRead: number }> {
+  if (length <= 0) return { buffer: Buffer.alloc(0), bytesRead: 0 };
+  const buffer = Buffer.alloc(length);
+  const { bytesRead } = await handle.read(buffer, 0, length, position);
+  const safeBytes = Math.max(0, Math.min(bytesRead, length));
+  return { buffer: buffer.subarray(0, safeBytes), bytesRead: safeBytes };
+}
+
+async function buildLogChunkCheckpoint(
+  handle: MaaLogFileHandle,
+  checkpoint: MaaLogCheckpoint,
+  size: number,
+  stats: MaaLogFileStats,
+  reuseMissing: boolean
+): Promise<MaaLogCheckpoint> {
+  const nextCheckpoint: MaaLogCheckpoint = { logPath: checkpoint.logPath, size };
+  const identity = readLogIdentity(stats);
+  if (identity) nextCheckpoint.identity = identity;
+  else if (reuseMissing && checkpoint.identity) nextCheckpoint.identity = checkpoint.identity;
+  const anchor = await readLogAnchor(handle, size);
+  if (anchor) nextCheckpoint.anchor = anchor;
+  else if (reuseMissing && size === checkpoint.size && checkpoint.anchor) nextCheckpoint.anchor = checkpoint.anchor;
+  return nextCheckpoint;
+}
+
+async function readRotationBackupBytes(
+  checkpoint: MaaLogCheckpoint,
+  maxBytes: number,
+  ports: Required<MaaLogReadPorts>
+): Promise<Buffer> {
+  if (!checkpoint.identity || (checkpoint.size > 0 && !checkpoint.anchor) || basename(checkpoint.logPath) !== 'asst.log') {
+    return Buffer.alloc(0);
+  }
+
+  const backupPath = join(dirname(checkpoint.logPath), 'asst.bak.log');
+  let backup: MaaLogFileHandle | null = null;
+  try {
+    backup = await ports.open(backupPath, 'r').catch((error: unknown) => {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null;
+      throw error;
+    });
+    if (!backup) return Buffer.alloc(0);
+
+    const backupStats = await (backup.stat?.() ?? ports.stat(backupPath));
+    if (backupStats.size < checkpoint.size
+      || !sameLogIdentity(checkpoint.identity, readLogIdentity(backupStats))
+      || !(await matchesCheckpointAnchor(backup, checkpoint))) {
+      return Buffer.alloc(0);
+    }
+
+    const availableBytes = backupStats.size - checkpoint.size;
+    const { buffer } = await readLogBytesAt(backup, checkpoint.size, Math.min(availableBytes, maxBytes));
+    return buffer;
+  } catch {
+    return Buffer.alloc(0);
+  } finally {
+    if (backup) await backup.close().catch(() => undefined);
+  }
+}
+
+async function readRotatedLogChunk(
+  checkpoint: MaaLogCheckpoint,
+  current: OpenMaaLog,
+  maxBytes: number,
+  ports: Required<MaaLogReadPorts>
+): Promise<MaaLogChunk> {
+  const backupBytes = await readRotationBackupBytes(checkpoint, maxBytes, ports);
+  const activeBudget = Math.max(0, maxBytes - backupBytes.length);
+  const active = await readLogBytesAt(current.handle, 0, Math.min(current.stats.size, activeBudget));
+  const combined = Buffer.concat([backupBytes, active.buffer]);
+  const lastNewline = combined.lastIndexOf(0x0a);
+  const nextSize = lastNewline >= 0 ? Math.max(0, lastNewline + 1 - backupBytes.length) : 0;
+  const nextCheckpoint = await buildLogChunkCheckpoint(current.handle, checkpoint, nextSize, current.stats, false);
+  return {
+    status: 'rotated',
+    text: lastNewline >= 0 ? combined.subarray(0, lastNewline + 1).toString('utf-8') : '',
+    nextCheckpoint,
+    caughtUp: active.bytesRead === current.stats.size
+  };
+}
+
+async function readRotatedLogChunkFromPath(
+  checkpoint: MaaLogCheckpoint,
+  maxBytes: number,
+  ports: Required<MaaLogReadPorts>
+): Promise<MaaLogChunk> {
+  const handle = await ports.open(checkpoint.logPath, 'r');
+  try {
+    const stats = await (handle.stat?.() ?? ports.stat(checkpoint.logPath));
+    return await readRotatedLogChunk(checkpoint, { handle, stats }, maxBytes, ports);
+  } finally {
+    await handle.close();
+  }
+}
+
+async function readMaaLogChunkInternal(
+  checkpoint: MaaLogCheckpoint,
+  maxBytes: number,
+  ports: Required<MaaLogReadPorts>,
+  allowRotationRetry: boolean
+): Promise<MaaLogChunk> {
+  try {
+    const handle = await ports.open(checkpoint.logPath, 'r');
+    try {
+      const logStats = await (handle.stat?.() ?? ports.stat(checkpoint.logPath));
+      const identity = readLogIdentity(logStats);
+      const identityChanged = checkpoint.identity !== undefined
+        && identity !== null
+        && !sameLogIdentity(checkpoint.identity, identity);
+      const rotated = identityChanged
+        || logStats.size < checkpoint.size
+        || !(await matchesCheckpointAnchor(handle, checkpoint));
+      if (rotated) {
+        return await readRotatedLogChunk(checkpoint, { handle, stats: logStats }, maxBytes, ports);
+      }
+
+      const availableBytes = logStats.size - checkpoint.size;
+      const read = await readLogBytesAt(handle, checkpoint.size, Math.min(availableBytes, maxBytes));
+      if (!(await isCurrentLog(checkpoint.logPath, logStats, ports.stat))) {
+        if (allowRotationRetry) return await readMaaLogChunkInternal(checkpoint, maxBytes, ports, false);
+        return await readRotatedLogChunkFromPath(checkpoint, maxBytes, ports);
+      }
+
+      const caughtUp = read.bytesRead === availableBytes;
+      const lastNewline = read.buffer.lastIndexOf(0x0a);
+      const nextSize = lastNewline >= 0 ? checkpoint.size + lastNewline + 1 : checkpoint.size;
+      const nextCheckpoint = await buildLogChunkCheckpoint(handle, checkpoint, nextSize, logStats, true);
+      return {
+        status: caughtUp ? 'ok' : 'truncated',
+        text: lastNewline >= 0 ? read.buffer.subarray(0, lastNewline + 1).toString('utf-8') : '',
+        nextCheckpoint,
+        caughtUp
+      };
+    } finally {
+      await handle.close();
+    }
+  } catch (error) {
+    logger.debug('无法读取 Maa 日志块', { error: error instanceof Error ? error.message : String(error) });
+    return { status: 'unreadable', text: '', nextCheckpoint: checkpoint, caughtUp: false };
+  }
+}
+
+/**
+ * 从检查点向前读取日志，只返回完整行组成的块。
+ *
+ * 与 `readMaaLogIncrement` 不同，超出 `maxBytes` 时保留起点而不是退化为尾部窗口；
+ * `nextCheckpoint` 停在最后一个完整换行，末尾半行留给下次读取。检测到轮转时尽量从
+ * `asst.bak.log` 补齐，并让 `nextCheckpoint` 始终指向当前 `asst.log` 的可继续位置。
+ */
+export async function readMaaLogChunk(
+  checkpoint: MaaLogCheckpoint,
+  maxBytes: number,
+  ports: MaaLogReadPorts = {}
+): Promise<MaaLogChunk> {
+  const readPorts: Required<MaaLogReadPorts> = {
+    stat: ports.stat || stat,
+    open: ports.open || open
+  };
+  return readMaaLogChunkInternal(checkpoint, resolveLogChunkBudget(maxBytes), readPorts, true);
 }
 
 export async function getLogFiles(): Promise<MaaLogFileEntry[]> {

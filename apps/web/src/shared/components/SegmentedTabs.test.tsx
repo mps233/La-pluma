@@ -28,9 +28,11 @@ const options = [
 
 function Harness({
   keepMounted = false,
+  disabled = false,
   onValueChange,
 }: {
   keepMounted?: boolean
+  disabled?: boolean
   onValueChange?: (value: DemoValue) => void
 }) {
   const [value, setValue] = useState<DemoValue>('first')
@@ -46,6 +48,7 @@ function Harness({
         ariaLabel="示例视图"
         value={value}
         options={options}
+        disabled={disabled}
         tabId={item => `demo-tab-${item}`}
         panelId={item => (keepMounted || item === value ? `demo-panel-${item}` : undefined)}
       />
@@ -88,9 +91,10 @@ const flush = async () => {
 const renderHarness = async (
   keepMounted = false,
   onValueChange?: (value: DemoValue) => void,
+  disabled = false,
 ) => {
   await act(async () => root.render(
-    <Harness keepMounted={keepMounted} onValueChange={onValueChange} />,
+    <Harness keepMounted={keepMounted} disabled={disabled} onValueChange={onValueChange} />,
   ))
   await flush()
 }
@@ -281,5 +285,25 @@ describe('SegmentedTabs', () => {
     await click(tab('第二')!)
     expect(container.querySelector<HTMLInputElement>('input[aria-label="第二面板草稿"]')?.value)
       .toBe('保留的草稿')
+  })
+
+  it('disables every tab and rejects pointer and keyboard activation', async () => {
+    const onValueChange = vi.fn()
+    await renderHarness(false, onValueChange, true)
+
+    const tabs = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+    expect(tabs).toHaveLength(3)
+    expect(tabs.every(candidate => candidate.getAttribute('aria-disabled') === 'true')).toBe(true)
+
+    const first = tab('第一')!
+    const second = tab('第二')!
+    await focus(first)
+    await keyDown(first, 'ArrowRight')
+    await keyDown(second, 'Enter')
+    await click(second)
+
+    expect(onValueChange).not.toHaveBeenCalled()
+    expect(first.getAttribute('aria-selected')).toBe('true')
+    expect(second.getAttribute('aria-selected')).toBe('false')
   })
 })

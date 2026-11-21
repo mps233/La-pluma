@@ -28,6 +28,7 @@ export interface SegmentedTabNavProps<T extends string> {
   indicatorTestId?: string
   tabClassName?: string
   iconClassName?: string
+  disabled?: boolean
   tabId?: (value: T) => string
   panelId?: (value: T) => string | undefined
 }
@@ -102,6 +103,7 @@ export function SegmentedTabNav<T extends string>({
   indicatorTestId,
   tabClassName,
   iconClassName,
+  disabled,
   tabId,
   panelId,
 }: SegmentedTabNavProps<T>) {
@@ -140,6 +142,7 @@ export function SegmentedTabNav<T extends string>({
             <TabsTrigger
               key={option.value}
               value={option.value}
+              disabled={disabled}
               ref={(element) => {
                 setTabRef(option.value)(element)
               }}

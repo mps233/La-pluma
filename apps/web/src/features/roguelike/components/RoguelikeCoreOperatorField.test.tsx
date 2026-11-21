@@ -94,7 +94,15 @@ const dialogChoiceNames = () => Array.from(
   dialog()?.querySelectorAll<HTMLButtonElement>('button[aria-label^="选择"]') ?? [],
 ).map(button => (button.getAttribute('aria-label') ?? '').replace(/^选择/, ''))
 
-function Harness({ initialValue = '' }: { initialValue?: string }) {
+function Harness({
+  initialValue = '',
+  error,
+  disabled,
+}: {
+  initialValue?: string
+  error?: string
+  disabled?: boolean
+}) {
   const [value, setValue] = useState(initialValue)
   return (
     <>
@@ -102,6 +110,8 @@ function Harness({ initialValue = '' }: { initialValue?: string }) {
         id="core-operator"
         label="核心干员"
         value={value}
+        error={error}
+        disabled={disabled}
         onChange={setValue}
       />
       <output data-testid="core-operator-value">{value}</output>
@@ -109,11 +119,14 @@ function Harness({ initialValue = '' }: { initialValue?: string }) {
   )
 }
 
-const renderField = async (initialValue = '') => {
+const renderField = async (
+  initialValue = '',
+  options: { error?: string; disabled?: boolean } = {},
+) => {
   await act(async () => {
     root.render(
       <QueryClientProvider client={client}>
-        <Harness initialValue={initialValue} />
+        <Harness initialValue={initialValue} {...options} />
       </QueryClientProvider>,
     )
   })
@@ -158,6 +171,47 @@ describe('roguelike core operator field', () => {
     expect(container.textContent).not.toContain('自动选择')
     expect(document.querySelector('[id$="-hint"]')).toBeNull()
     expect(buttonWithText('选择干员')).toBeDefined()
+  })
+
+  it('names the field group and the trigger after the core operator', async () => {
+    await renderField()
+
+    const group = container.querySelector<HTMLElement>('[role="group"]')
+    expect(group?.getAttribute('aria-labelledby')).toBe('core-operator-label')
+    expect(document.getElementById('core-operator-label')?.textContent).toBe('核心干员')
+    expect(buttonWithLabel('选择核心干员')).not.toBeNull()
+    expect(buttonWithText('选择干员')).toBeDefined()
+  })
+
+  it('includes the current operator in the replacement trigger name', async () => {
+    await renderField('维什戴尔')
+
+    expect(buttonWithLabel('更换核心干员（当前：维什戴尔）')).not.toBeNull()
+  })
+
+  it('marks the trigger with the field error message', async () => {
+    await renderField('', { error: '核心干员不在当前账号的可选范围内' })
+
+    const trigger = buttonWithLabel('选择核心干员')!
+    expect(trigger.getAttribute('aria-invalid')).toBe('true')
+    expect(trigger.getAttribute('aria-errormessage')).toBe('core-operator-error')
+    expect(document.getElementById('core-operator-error')?.textContent)
+      .toBe('核心干员不在当前账号的可选范围内')
+  })
+
+  it('does not open the picker while disabled', async () => {
+    await renderField('', { disabled: true })
+
+    const trigger = buttonWithLabel('选择核心干员')!
+    expect(trigger.disabled).toBe(true)
+    await click(trigger, '选择核心干员')
+    expect(dialog()).toBeNull()
+  })
+
+  it('disables clearing while locked', async () => {
+    await renderField('维什戴尔', { disabled: true })
+
+    expect(buttonWithLabel('清除核心干员')?.disabled).toBe(true)
   })
 
   it('lists only recognized operators when a snapshot exists', async () => {

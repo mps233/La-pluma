@@ -84,6 +84,13 @@ import {
 } from '../services/roguelikeResultService.ts';
 import type { RoguelikeResultSummary } from '../services/roguelikeResultService.ts';
 import {
+  finalizeRoguelikeProgressTracker,
+  releaseRoguelikeProgressTracker,
+  startRoguelikeProgressTracker
+} from '../services/roguelikeProgressTrackerService.ts';
+import type { RoguelikeProgressTrackerInput } from '../services/roguelikeProgressTrackerService.ts';
+import type { RoguelikeProgressSnapshot } from '../services/roguelikeProgressService.ts';
+import {
   beginRoguelikeStopIntent,
   cancelRoguelikeStopIntent,
   releaseAllRoguelikeStopIntents
@@ -1996,6 +2003,9 @@ export async function runFight(
 interface RoguelikeResultTarget {
   command: 'roguelike' | 'reclamation';
   args: readonly string[];
+  theme: string;
+  startCount: number | null;
+  mode: number | null;
 }
 
 interface RoguelikeResultCapture {
@@ -2010,15 +2020,55 @@ export interface RoguelikeTaskCapturePorts {
   runWithLease?<T>(lease: MaaExecutionLease, callback: () => T): T;
   createCheckpoint?(): Promise<MaaLogCheckpoint | null>;
   readLogSince?(checkpoint: MaaLogCheckpoint | null): Promise<string>;
+  startProgress?(input: RoguelikeProgressTrackerInput): boolean;
+  finalizeProgress?(runId: string): Promise<RoguelikeProgressSnapshot | null>;
+  releaseProgress?(runId: string): void;
 }
 
 /** 一次肉鸽/生息演算执行：调用方提供 Run 生命周期、租约元数据与实际执行函数。 */
 export interface RoguelikeTaskCaptureRun {
+  runId: string;
   target: RoguelikeResultTarget;
   lease: MaaExecutionLeaseRequest;
   waitForCompletion: boolean;
   lifecycle: TrackedExecutionLifecycle;
   execute(lifecycle: TrackedExecutionLifecycle): Promise<unknown>;
+}
+
+const ROGUELIKE_UNBOUNDED_START_COUNT = 2147483647;
+const ROGUELIKE_START_COUNT_FLAGS = ['--starts-count', '--start-count'] as const;
+
+function readSafeInteger(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) ? value : null;
+}
+
+function readStartCount(value: unknown): number | null {
+  const count = readSafeInteger(value);
+  return count !== null && count > 0 && count !== ROGUELIKE_UNBOUNDED_START_COUNT ? count : null;
+}
+
+function readIntegerText(value: string | undefined): number | null {
+  if (value === undefined || !/^-?\d+$/.test(value)) return null;
+  return readSafeInteger(Number(value));
+}
+
+function readCliIntegerArg(args: readonly string[], flags: readonly string[]): number | null {
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index];
+    const separator = token.indexOf('=');
+    const flag = separator >= 0 ? token.slice(0, separator) : token;
+    if (!flags.includes(flag)) continue;
+    const value = separator >= 0 ? token.slice(separator + 1) : args[index + 1];
+    const parsed = readIntegerText(value);
+    if (parsed !== null) return parsed;
+  }
+  return null;
+}
+
+function resolveRoguelikeSettlementSupported(target: RoguelikeResultTarget): boolean | null {
+  if (target.command === 'reclamation') return false;
+  if (target.mode === null) return null;
+  return target.mode === 0 || target.mode === 30001 || target.mode === 30003;
 }
 
 function resolveRoguelikeResultTarget(
@@ -2027,15 +2077,24 @@ function resolveRoguelikeResultTarget(
   const taskConfig = request.taskConfig;
   if (taskConfig) {
     if (taskConfig.type !== 'Roguelike' && taskConfig.type !== 'Reclamation') return null;
-    const theme = taskConfig.params.theme;
+    const theme = typeof taskConfig.params.theme === 'string' ? taskConfig.params.theme.trim() : '';
     return {
       command: taskConfig.type === 'Reclamation' ? 'reclamation' : 'roguelike',
-      args: [typeof theme === 'string' ? theme.trim() : '']
+      args: [theme],
+      theme,
+      startCount: readStartCount(taskConfig.params.starts_count),
+      mode: readSafeInteger(taskConfig.params.mode)
     };
   }
-  return isRoguelikeCommand(request.command)
-    ? { command: request.command, args: request.args }
-    : null;
+  if (!isRoguelikeCommand(request.command)) return null;
+
+  return {
+    command: request.command,
+    args: request.args,
+    theme: request.args[0]?.trim() ?? '',
+    startCount: readStartCount(readCliIntegerArg(request.args, ROGUELIKE_START_COUNT_FLAGS)),
+    mode: readCliIntegerArg(request.args, ['--mode'])
+  };
 }
 
 /** 租约元数据与执行器自行申请时保持一致，运行状态与诊断仍能看到真实任务。 */
@@ -2058,16 +2117,28 @@ function roguelikeTaskLeaseRequest(request: NormalizedAgentTaskRequest): MaaExec
  * 肉鸽/生息演算摘要只从本次执行新增的 MaaCore 日志读取。检查点在取得执行租约
  * 之后创建，摘要在释放租约之前采集：被设备占用拒绝的请求不会读到其它 Run 的
  * 日志，没有真正启动的执行直接跳过采集。检查点创建失败时保留执行本身，只是
- * 不产出摘要，不能用整份历史日志冒充本次结果。
+ * 不产出摘要，不能用整份历史日志冒充本次结果。同一检查点也供进度跟踪器使用：
+ * 跟踪器在 spawn 后启动，在释放租约之前收尾。
  */
 export async function runRoguelikeTaskWithCapture(
-  { target, lease: leaseRequest, waitForCompletion, lifecycle, execute }: RoguelikeTaskCaptureRun,
+  {
+    runId,
+    target,
+    lease: leaseRequest,
+    waitForCompletion,
+    lifecycle,
+    execute
+  }: RoguelikeTaskCaptureRun,
   ports: RoguelikeTaskCapturePorts = {}
 ): Promise<unknown> {
   const acquireLease = ports.acquireLease || acquireMaaExecutionLease;
   const runWithLease = ports.runWithLease || runWithMaaExecutionLeaseContext;
   const createCheckpoint = ports.createCheckpoint || createMaaLogCheckpoint;
   const readLogSince = ports.readLogSince || readMaaLogSince;
+  const startProgress = ports.startProgress || startRoguelikeProgressTracker;
+  const finalizeProgress = ports.finalizeProgress || finalizeRoguelikeProgressTracker;
+  const releaseProgress = ports.releaseProgress || releaseRoguelikeProgressTracker;
+  const settlementSupported = resolveRoguelikeSettlementSupported(target);
 
   const lease = await acquireLease(leaseRequest);
   let released = false;
@@ -2085,10 +2156,29 @@ export async function runRoguelikeTaskWithCapture(
     capture = { target, checkpoint: null, started: false };
   }
 
-  const readSummary = async (): Promise<RoguelikeResultSummary | null> => {
+  let progressStarted = false;
+  let progressFinalized = false;
+  let progressSnapshot: RoguelikeProgressSnapshot | null = null;
+
+  const finalizeProgressOnce = async (): Promise<RoguelikeProgressSnapshot | null> => {
+    if (!progressStarted) return null;
+    if (progressFinalized) return progressSnapshot;
+    progressFinalized = true;
+    try {
+      progressSnapshot = await finalizeProgress(runId);
+    } catch (error) {
+      logger.warn('收尾肉鸽进度跟踪失败', { error: errorMessageOf(error) });
+      progressSnapshot = null;
+    }
+    return progressSnapshot;
+  };
+
+  const readSummary = async (
+    progress: RoguelikeProgressSnapshot | null
+  ): Promise<RoguelikeResultSummary | null> => {
     if (!capture.started || !capture.checkpoint) return null;
     try {
-      return buildRoguelikeResultSummary(await readLogSince(capture.checkpoint), target);
+      return buildRoguelikeResultSummary(await readLogSince(capture.checkpoint), target, progress);
     } catch (error) {
       logger.warn('读取肉鸽任务结果失败', { error: errorMessageOf(error) });
       return null;
@@ -2097,15 +2187,17 @@ export async function runRoguelikeTaskWithCapture(
 
   const settleWithSummary = lifecycle.onSettled && !waitForCompletion
     ? async (outcome: ExecutionOutcome): Promise<void> => {
-        const summary = await readSummary();
-        const enriched: ExecutionOutcome = {
-          ...outcome,
-          result: attachRoguelikeResultSummary(outcome.result, summary),
-          error: attachRoguelikeErrorSummary(outcome.error, summary)
-        };
         try {
+          const progress = await finalizeProgressOnce();
+          const summary = await readSummary(progress);
+          const enriched: ExecutionOutcome = {
+            ...outcome,
+            result: attachRoguelikeResultSummary(outcome.result, summary),
+            error: attachRoguelikeErrorSummary(outcome.error, summary)
+          };
           await lifecycle.onSettled?.(enriched);
         } finally {
+          releaseProgress(runId);
           await releaseLease();
         }
       }
@@ -2115,6 +2207,22 @@ export async function runRoguelikeTaskWithCapture(
     ...lifecycle,
     onStarted: () => {
       capture.started = true;
+      if (!progressStarted && capture.checkpoint) {
+        try {
+          progressStarted = startProgress({
+            runId,
+            checkpoint: capture.checkpoint,
+            command: target.command,
+            theme: target.theme,
+            mode: target.mode,
+            targetRounds: target.startCount,
+            settlementSupported,
+            startedAtMs: Date.now()
+          });
+        } catch (error) {
+          logger.warn('启动肉鸽进度跟踪失败', { error: errorMessageOf(error) });
+        }
+      }
       lifecycle.onStarted?.();
     },
     ...(settleWithSummary ? { onSettled: settleWithSummary } : {})
@@ -2125,15 +2233,21 @@ export async function runRoguelikeTaskWithCapture(
       try {
         const result = await execute(capturedLifecycle);
         if (!waitForCompletion) return result;
-        return attachRoguelikeResultSummary(result, await readSummary());
+        const progress = await finalizeProgressOnce();
+        return attachRoguelikeResultSummary(result, await readSummary(progress));
       } catch (error) {
         if (!waitForCompletion) throw error;
-        throw attachRoguelikeErrorSummary(error, await readSummary());
+        const progress = await finalizeProgressOnce();
+        throw attachRoguelikeErrorSummary(error, await readSummary(progress));
       }
     });
   } finally {
-    // 后台执行把租约交给 settle 回调释放；同步完成与未启动的执行在此释放。
-    if (waitForCompletion || !capture.started || !settleWithSummary) await releaseLease();
+    // 后台执行把租约交给 settle 回调释放；同步完成、未启动与缺少 settle 的执行在此收尾。
+    if (waitForCompletion || !capture.started || !settleWithSummary) {
+      await finalizeProgressOnce();
+      releaseProgress(runId);
+      await releaseLease();
+    }
   }
 }
 
@@ -2162,12 +2276,13 @@ export async function runTask(
     input: { ...(isRecord(req.body) ? req.body : {}), waitForCompletion },
     waitForCompletion,
     metadata: { taskName: request.taskName, taskType: request.taskType },
-    execute: async lifecycle => {
+    execute: async (lifecycle, { runId }) => {
       const target = resolveRoguelikeResultTarget(request);
       if (!target) {
         return executePreflightAgentTask(request, agentTaskDependencies(lifecycle));
       }
       return runRoguelikeTaskWithCapture({
+        runId,
         target,
         lease: roguelikeTaskLeaseRequest(request),
         waitForCompletion,

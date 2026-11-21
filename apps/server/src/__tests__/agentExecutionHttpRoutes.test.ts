@@ -59,8 +59,12 @@ const finish = () => {
     fs.appendFileSync(path.join(process.env.FAKE_MAA_LOG_DIR, 'asst.log'), process.env.FAKE_MAA_CALLBACK + '\\n');
   }
   process.stdout.write('fake output\\n');
-  process.exit(0);
+  process.exit(Number(process.env.FAKE_MAA_EXIT_CODE || 0));
 };
+if (process.env.FAKE_MAA_EARLY_CALLBACK) {
+  const path = require('node:path');
+  fs.appendFileSync(path.join(process.env.FAKE_MAA_LOG_DIR, 'asst.log'), process.env.FAKE_MAA_EARLY_CALLBACK + '\\n');
+}
 const delay = Number(process.env.FAKE_MAA_SLEEP_MS || 0);
 if (delay > 0) {
   setTimeout(finish, delay);
@@ -93,6 +97,10 @@ process.env.LA_PLUMA_COPILOT_PROGRESS_STORE = join(fixtureDir, 'copilot-progress
 
 const { createLaPlumaApp } = await import('../app.ts');
 const { listAgentRuns } = await import('../services/agentRunService.ts');
+const {
+  getRoguelikeProgress,
+  resetRoguelikeProgressTrackerForTests
+} = await import('../services/roguelikeProgressTrackerService.ts');
 const { WEBRTC_SIGNALING_PATH } = await import('../services/webrtcSignalingGateway.ts');
 const { loggerManager } = await import('../utils/logger.ts');
 
@@ -103,9 +111,43 @@ for (const loggerName of ['Api', 'MaaService', 'AgentRoutes', 'Scheduler', 'Agen
 
 const servers: Server[] = [];
 
+interface RoguelikeBlackFlowPayload {
+  floor: number | null;
+  currentNode: { id: string; name: string | null; type: string | null } | null;
+  actionPoints: { before: number | null; after: number | null; at: string | null } | null;
+  lastRoute: { target: { id: string; name: string | null; type: string | null } | null } | null;
+  strategy: { profile: string | null; outcome: string | null } | null;
+}
+
+interface RoguelikeProgressPayload {
+  command: string;
+  theme: string;
+  phase: string;
+  currentRound: number | null;
+  targetRounds: number | null;
+  roundsStarted: number;
+  roundsEnded: number;
+  roundsSettled: number;
+  roundsPassed: number;
+  settlementSupported: boolean | null;
+  observed: boolean;
+  degraded: boolean;
+  blackflow?: RoguelikeBlackFlowPayload | null;
+}
+
+interface RunProgressPayload {
+  message: string;
+  currentTask: string | null;
+  roguelike?: RoguelikeProgressPayload;
+}
+
 interface RunSnapshotPayload {
-  run: { runId: string; state: string } | null;
+  run: { runId: string; state: string; progress?: RunProgressPayload } | null;
   activeRuns: Array<{ runId: string }>;
+  lastRun?: {
+    runId: string;
+    result?: { summary?: RunSummaryPayload };
+  } | null;
 }
 
 interface RunSummaryPayload {
@@ -115,6 +157,7 @@ interface RunSummaryPayload {
   observed: boolean;
   message: string;
   settlement: { floor: number | null; step: number | null; score: number | null } | null;
+  progress?: RoguelikeProgressPayload | null;
 }
 
 interface RunLookupPayload {
@@ -253,9 +296,51 @@ async function waitForRunState(
   throw new Error(`run ${runId} did not reach ${states.join('/')} before timeout`);
 }
 
+async function waitForRoguelikeProgress(
+  baseUrl: string,
+  runId: string,
+  predicate: (progress: RoguelikeProgressPayload) => boolean,
+  timeoutMs = 8000
+): Promise<{ run: { runId: string; state: string; progress?: RunProgressPayload } }> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const response = await fetch(`${baseUrl}/api/agent/runs/current`, {
+      headers: authorizedHeaders()
+    });
+    if (response.ok) {
+      const body = await readSuccess<RunSnapshotPayload>(response);
+      const run = body.data.run;
+      if (run?.runId === runId && run.progress?.roguelike && predicate(run.progress.roguelike)) {
+        return { run };
+      }
+    }
+    await new Promise<void>(resolve => setTimeout(resolve, 50));
+  }
+  throw new Error(`run ${runId} did not expose the expected roguelike progress before timeout`);
+}
+
+async function currentSnapshot(baseUrl: string): Promise<RunSnapshotPayload> {
+  const response = await fetch(`${baseUrl}/api/agent/runs/current`, {
+    headers: authorizedHeaders()
+  });
+  return (await readSuccess<RunSnapshotPayload>(response)).data;
+}
+
+async function waitForProgressRelease(runId: string, timeoutMs = 3000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (getRoguelikeProgress(runId) === null) return;
+    await new Promise<void>(resolve => setTimeout(resolve, 10));
+  }
+  assert.fail(`roguelike progress tracker for ${runId} was not released before timeout`);
+}
+
 afterEach(async () => {
   delete process.env.FAKE_MAA_SLEEP_MS;
   delete process.env.FAKE_MAA_CALLBACK;
+  delete process.env.FAKE_MAA_EARLY_CALLBACK;
+  delete process.env.FAKE_MAA_EXIT_CODE;
+  resetRoguelikeProgressTrackerForTests();
   while (servers.length) {
     const server = servers.pop();
     assert.ok(server);
@@ -957,6 +1042,192 @@ describe('agent execution HTTP adapter', () => {
     }
   });
 
+  it('projects live roguelike progress and copies the final snapshot into the terminal summary', async () => {
+    process.env.FAKE_MAA_EARLY_CALLBACK = [
+      'Assistant::append_callback | SubTaskExtraInfo {"taskchain":"Roguelike","what":"BlackFlowStrategyStarted","details":{"profile":"burn_with_investment"}}',
+      'Assistant::append_callback | TaskChainStart {"taskchain":"Roguelike"}',
+      'Assistant::append_callback | SubTaskStart {"taskchain":"Roguelike","details":{"task":"StartExplore","exec_times":1,"max_times":3}}',
+      'Assistant::append_callback | SubTaskExtraInfo {"taskchain":"Roguelike","what":"BlackFlowMapSummary","details":{"run_revision":2,"map_revision":1,"observation_id":"BF-O1","floor":1,"current_node":281475010265088}}',
+      'Assistant::append_callback | SubTaskExtraInfo {"taskchain":"Roguelike","what":"BlackFlowRoutingDecision","details":{"run_revision":2,"map_revision":1,"observation_id":"BF-O1","floor":1,"decision_id":"BF-D2-1","transaction_id":"BF-T2-1","profile":"burn_with_investment","source":281475010265088,"target":281475010265090,"landing":281475010265090,"node_name":"作战","node_type":"battle_normal","movement":"walk","exact_cost":1,"predicted_cost":1,"action_points_before":5,"action_points_after":4}}',
+      'Assistant::append_callback | SubTaskExtraInfo {"taskchain":"Roguelike","what":"RoguelikeSettlement","details":{"game_pass":true,"floor":4,"score":128}}',
+      'Assistant::append_callback | SubTaskStart {"taskchain":"Roguelike","details":{"task":"StartExplore","exec_times":2,"max_times":3}}',
+      'Assistant::append_callback | TaskChainCompleted {"taskchain":"Roguelike"}'
+    ].join('\n');
+    process.env.FAKE_MAA_SLEEP_MS = '2000';
+    const port = await listen(createLaPlumaApp({
+      env: {},
+      signalingGateway: stubSignalingGateway()
+    }));
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const response = await postJson(`${baseUrl}/api/agent/actions/run-task`, {
+      command: 'roguelike',
+      args: ['Mizuki', '--start-count', '3', '--mode', '0'],
+      waitForCompletion: false,
+      taskType: 'roguelike'
+    });
+    assert.equal(response.status, 202);
+    const runId = (await readSuccess<TaskExecutorPayload>(response)).data.runId;
+
+    const live = await waitForRoguelikeProgress(
+      baseUrl,
+      runId,
+      progress => progress.roundsStarted === 2 && progress.currentRound === 2
+    );
+    assert.equal(live.run.progress?.message, '集成战略执行中');
+    assert.equal(typeof live.run.progress?.currentTask, 'string');
+    const liveProgress = live.run.progress?.roguelike;
+    assert.ok(liveProgress);
+    assert.equal(liveProgress.command, 'roguelike');
+    assert.equal(liveProgress.theme, 'Mizuki');
+    assert.equal(liveProgress.targetRounds, 3);
+    assert.equal(liveProgress.settlementSupported, true);
+    assert.equal(liveProgress.roundsSettled, 1);
+    assert.equal(liveProgress.roundsPassed, 1);
+    assert.equal(liveProgress.observed, true);
+    assert.equal(liveProgress.blackflow?.floor, 1);
+    assert.deepEqual(liveProgress.blackflow?.currentNode, {
+      id: '281475010265088',
+      name: null,
+      type: null
+    });
+    assert.deepEqual(liveProgress.blackflow?.actionPoints, {
+      before: 5,
+      after: 4,
+      at: null
+    });
+    assert.deepEqual(liveProgress.blackflow?.lastRoute?.target, {
+      id: '281475010265090',
+      name: '作战',
+      type: 'battle_normal'
+    });
+    assert.equal(liveProgress.blackflow?.strategy?.profile, 'burn_with_investment');
+
+    const terminal = await waitForRunState(baseUrl, runId, ['succeeded'], 12_000);
+    assert.equal(terminal.result?.summary?.progress?.roundsStarted, 2);
+    assert.equal(terminal.result?.summary?.progress?.roundsSettled, 1);
+    assert.equal(terminal.result?.summary?.progress?.targetRounds, 3);
+    assert.equal(terminal.result?.summary?.progress?.settlementSupported, true);
+    assert.equal(terminal.result?.summary?.progress?.blackflow?.floor, 1);
+    assert.deepEqual(terminal.result?.summary?.progress?.blackflow?.lastRoute?.target, {
+      id: '281475010265090',
+      name: '作战',
+      type: 'battle_normal'
+    });
+
+    const snapshot = await currentSnapshot(baseUrl);
+    assert.equal(snapshot.lastRun?.runId, runId);
+    assert.equal(snapshot.lastRun?.result?.summary?.progress?.roundsStarted, 2);
+    await waitForProgressRelease(runId);
+  });
+
+  it('reads CLI target flags in the equals form', async () => {
+    process.env.FAKE_MAA_EARLY_CALLBACK = [
+      'Assistant::append_callback | TaskChainStart {"taskchain":"Roguelike"}',
+      'Assistant::append_callback | SubTaskStart {"taskchain":"Roguelike","details":{"task":"StartExplore","exec_times":1}}'
+    ].join('\n');
+    process.env.FAKE_MAA_SLEEP_MS = '3000';
+    const port = await listen(createLaPlumaApp({
+      env: {},
+      signalingGateway: stubSignalingGateway()
+    }));
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const startRun = async (args: string[]): Promise<string> => {
+      const response = await postJson(`${baseUrl}/api/agent/actions/run-task`, {
+        command: 'roguelike',
+        args,
+        waitForCompletion: false,
+        taskType: 'roguelike'
+      });
+      assert.equal(response.status, 202);
+      return (await readSuccess<TaskExecutorPayload>(response)).data.runId;
+    };
+
+    const measuredRunId = await startRun(['Phantom', '--start-count=3', '--mode=0']);
+    const measured = await waitForRoguelikeProgress(
+      baseUrl,
+      measuredRunId,
+      progress => progress.observed
+    );
+    assert.equal(measured.run.progress?.roguelike?.targetRounds, 3);
+    assert.equal(measured.run.progress?.roguelike?.settlementSupported, true);
+
+    const stopMeasured = await postJson(`${baseUrl}/api/agent/actions/stop`, { runId: measuredRunId });
+    assert.equal(stopMeasured.status, 200);
+    await waitForRunState(baseUrl, measuredRunId, ['stopped']);
+    await waitForProgressRelease(measuredRunId);
+
+    const unboundedRunId = await startRun(['Phantom', '--starts-count=2147483647', '--mode=0']);
+    const unbounded = await waitForRoguelikeProgress(
+      baseUrl,
+      unboundedRunId,
+      progress => progress.observed
+    );
+    assert.equal(unbounded.run.progress?.roguelike?.targetRounds, null);
+    assert.equal(unbounded.run.progress?.roguelike?.settlementSupported, true);
+
+    const stopUnbounded = await postJson(`${baseUrl}/api/agent/actions/stop`, { runId: unboundedRunId });
+    assert.equal(stopUnbounded.status, 200);
+    await waitForRunState(baseUrl, unboundedRunId, ['stopped']);
+    await waitForProgressRelease(unboundedRunId);
+  });
+
+  it('releases roguelike progress after a stopped background run', async () => {
+    process.env.FAKE_MAA_EARLY_CALLBACK = [
+      'Assistant::append_callback | TaskChainStart {"taskchain":"Roguelike"}',
+      'Assistant::append_callback | SubTaskStart {"taskchain":"Roguelike","details":{"task":"StartExplore","exec_times":1}}'
+    ].join('\n');
+    process.env.FAKE_MAA_SLEEP_MS = '3000';
+    const port = await listen(createLaPlumaApp({
+      env: {},
+      signalingGateway: stubSignalingGateway()
+    }));
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const response = await postJson(`${baseUrl}/api/agent/actions/run-task`, {
+      command: 'roguelike',
+      args: ['Mizuki'],
+      waitForCompletion: false,
+      taskType: 'roguelike'
+    });
+    assert.equal(response.status, 202);
+    const runId = (await readSuccess<TaskExecutorPayload>(response)).data.runId;
+    await waitForRoguelikeProgress(baseUrl, runId, progress => progress.roundsStarted === 1);
+
+    const stop = await postJson(`${baseUrl}/api/agent/actions/stop`, { runId });
+    assert.equal(stop.status, 200);
+    await waitForRunState(baseUrl, runId, ['stopped']);
+    await waitForProgressRelease(runId);
+  });
+
+  it('releases roguelike progress after a failed background run and keeps the error summary', async () => {
+    process.env.FAKE_MAA_EARLY_CALLBACK = [
+      'Assistant::append_callback | TaskChainStart {"taskchain":"Roguelike"}',
+      'Assistant::append_callback | SubTaskStart {"taskchain":"Roguelike","details":{"task":"StartExplore","exec_times":1}}'
+    ].join('\n');
+    process.env.FAKE_MAA_SLEEP_MS = '300';
+    process.env.FAKE_MAA_EXIT_CODE = '3';
+    const port = await listen(createLaPlumaApp({
+      env: {},
+      signalingGateway: stubSignalingGateway()
+    }));
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const response = await postJson(`${baseUrl}/api/agent/actions/run-task`, {
+      command: 'roguelike',
+      args: ['Mizuki'],
+      waitForCompletion: false,
+      taskType: 'roguelike'
+    });
+    assert.equal(response.status, 202);
+    const runId = (await readSuccess<TaskExecutorPayload>(response)).data.runId;
+
+    const terminal = await waitForRunState(baseUrl, runId, ['failed']);
+    assert.equal(terminal.error?.details.summary?.progress?.roundsStarted, 1);
+    await waitForProgressRelease(runId);
+  });
+
   it('attaches roguelike and reclamation result summaries to dynamic run taskConfigs', async () => {
     const port = await listen(createLaPlumaApp({
       env: {},
@@ -970,9 +1241,11 @@ describe('agent execution HTTP adapter', () => {
     const scenarios = [
       {
         taskId: 'roguelike',
-        config: { name: '萨卡兹肉鸽', type: 'Roguelike', params: { theme: 'Sarkaz', mode: 10001 } },
+        config: { name: '萨卡兹肉鸽', type: 'Roguelike', params: { theme: 'Sarkaz', mode: 10001, starts_count: 3 } },
         command: 'roguelike',
         theme: 'Sarkaz',
+        targetRounds: 3,
+        settlementSupported: false,
         callbacks: [
           'Assistant::append_callback | SubTaskStart {"taskchain":"Roguelike"}',
           'Assistant::append_callback | SubTaskExtraInfo {"taskchain":"Roguelike","what":"RoguelikeSettlement","details":{"floor":5,"step":31,"score":256}}',
@@ -985,6 +1258,8 @@ describe('agent execution HTTP adapter', () => {
         config: { name: '界园肉鸽', type: 'Roguelike', params: { theme: 'JieGarden', mode: 20001, find_playTime_target: 1 } },
         command: 'roguelike',
         theme: 'JieGarden',
+        targetRounds: null,
+        settlementSupported: false,
         callbacks: roguelikeCallbacks,
         settlement: null
       },
@@ -993,6 +1268,8 @@ describe('agent execution HTTP adapter', () => {
         config: { name: '黑流树海', type: 'Roguelike', params: { theme: 'BlackFlow', mode: 30001 } },
         command: 'roguelike',
         theme: 'BlackFlow',
+        targetRounds: null,
+        settlementSupported: true,
         callbacks: roguelikeCallbacks,
         settlement: null
       },
@@ -1001,10 +1278,17 @@ describe('agent execution HTTP adapter', () => {
         config: {
           name: '黑流树海 终局',
           type: 'Roguelike',
-          params: { theme: 'BlackFlow', mode: 30003, blackflow_start_animals: [], blackflow_start_rewards: 0 }
+          params: {
+            theme: 'BlackFlow',
+            mode: 30003,
+            blackflow_start_animals: [],
+            blackflow_start_rewards: 0
+          }
         },
         command: 'roguelike',
         theme: 'BlackFlow',
+        targetRounds: null,
+        settlementSupported: true,
         callbacks: roguelikeCallbacks,
         settlement: null
       },
@@ -1013,6 +1297,8 @@ describe('agent execution HTTP adapter', () => {
         config: { name: '重塑锚点', type: 'Reclamation', params: { theme: 'RelaunchAnchor', mode: 16 } },
         command: 'reclamation',
         theme: 'RelaunchAnchor',
+        targetRounds: null,
+        settlementSupported: false,
         callbacks: [
           'Assistant::append_callback | SubTaskStart {"taskchain":"Reclamation"}',
           'Assistant::append_callback | TaskChainCompleted {"taskchain":"Reclamation"}'
@@ -1024,6 +1310,8 @@ describe('agent execution HTTP adapter', () => {
         config: { name: '默认主题肉鸽', type: 'Roguelike', params: { mode: 0 } },
         command: 'roguelike',
         theme: '',
+        targetRounds: null,
+        settlementSupported: true,
         callbacks: roguelikeCallbacks,
         settlement: null
       }
@@ -1048,6 +1336,8 @@ describe('agent execution HTTP adapter', () => {
         assert.equal(terminal.result?.summary?.theme, scenario.theme);
         assert.equal(terminal.result?.summary?.status, 'success');
         assert.equal(terminal.result?.summary?.observed, true);
+        assert.equal(terminal.result?.summary?.progress?.targetRounds, scenario.targetRounds);
+        assert.equal(terminal.result?.summary?.progress?.settlementSupported, scenario.settlementSupported);
         if (scenario.settlement) {
           assert.equal(terminal.result?.summary?.settlement?.floor, scenario.settlement.floor);
           assert.equal(terminal.result?.summary?.settlement?.step, scenario.settlement.step);
@@ -1065,6 +1355,105 @@ describe('agent execution HTTP adapter', () => {
     assert.match(submittedTasks, /find_playTime_target = 1/);
     assert.match(submittedTasks, /blackflow_start_animals = \[\]/);
     assert.match(submittedTasks, /mode = 30003/);
+  });
+
+  it('resolves dynamic target round and settlement boundaries', async () => {
+    const port = await listen(createLaPlumaApp({
+      env: {},
+      signalingGateway: stubSignalingGateway()
+    }));
+    const baseUrl = `http://127.0.0.1:${port}`;
+    process.env.FAKE_MAA_CALLBACK = [
+      'Assistant::append_callback | TaskChainStart {"taskchain":"Roguelike"}',
+      'Assistant::append_callback | TaskChainCompleted {"taskchain":"Roguelike"}'
+    ].join('\n');
+    process.env.FAKE_MAA_SLEEP_MS = '0';
+    const scenarios = [
+      {
+        name: '缺失起点与模式',
+        params: { theme: 'Phantom' },
+        targetRounds: null,
+        settlementSupported: null
+      },
+      {
+        name: '合法正整数起点',
+        params: { theme: 'Phantom', starts_count: 3 },
+        targetRounds: 3,
+        settlementSupported: null
+      },
+      {
+        name: '无限起点哨兵',
+        params: { theme: 'Phantom', starts_count: 2147483647 },
+        targetRounds: null,
+        settlementSupported: null
+      },
+      {
+        name: '模式 0',
+        params: { theme: 'Phantom', mode: 0 },
+        targetRounds: null,
+        settlementSupported: true
+      },
+      {
+        name: '模式 1',
+        params: { theme: 'Phantom', mode: 1 },
+        targetRounds: null,
+        settlementSupported: false
+      },
+      {
+        name: '模式 30001',
+        params: { theme: 'BlackFlow', mode: 30001 },
+        targetRounds: null,
+        settlementSupported: true
+      },
+      {
+        name: '模式 30003',
+        params: {
+          theme: 'BlackFlow',
+          mode: 30003,
+          blackflow_start_animals: [],
+          blackflow_start_rewards: 0
+        },
+        targetRounds: null,
+        settlementSupported: true
+      }
+    ];
+
+    for (const scenario of scenarios) {
+      const response = await postJson(`${baseUrl}/api/agent/actions/run-task`, {
+        command: 'run',
+        args: ['roguelike'],
+        taskConfig: { name: scenario.name, type: 'Roguelike', params: scenario.params },
+        taskName: scenario.name,
+        waitForCompletion: true
+      });
+      assert.equal(response.status, 200, scenario.name);
+      const runId = (await readSuccess<TaskExecutorPayload>(response)).data.runId;
+      const terminal = await waitForRunState(baseUrl, runId, ['succeeded']);
+
+      assert.equal(terminal.result?.summary?.progress?.targetRounds, scenario.targetRounds, scenario.name);
+      assert.equal(terminal.result?.summary?.progress?.settlementSupported, scenario.settlementSupported, scenario.name);
+    }
+
+    const runCountBefore = listAgentRuns({ operationId: 'run_task' }).length;
+    const invalid = await postJson(`${baseUrl}/api/agent/actions/run-task`, {
+      command: 'run',
+      args: ['roguelike'],
+      taskConfig: {
+        name: '非法起点',
+        type: 'Roguelike',
+        params: { theme: 'Phantom', starts_count: 1.5 }
+      },
+      waitForCompletion: true
+    });
+    assert.equal(invalid.status, 400);
+    const failure = await readError(invalid);
+    assert.equal(failure.error.code, 'AGENT_VALIDATION_TASK_CONFIG_INVALID');
+    assert.match(failure.message, /starts_count/);
+    assert.equal(listAgentRuns({ operationId: 'run_task' }).length, runCountBefore);
+
+    const snapshot = await currentSnapshot(baseUrl);
+    assert.equal(snapshot.run, null);
+    assert.deepEqual(snapshot.activeRuns, []);
   });
 
   it('rejects a run while the device lease is held without reusing the holder summary', async () => {

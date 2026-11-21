@@ -601,7 +601,7 @@ export const AGENT_OPERATIONS: readonly RegisteredAgentOperation[] = Object.free
     id: 'get_current_run',
     method: 'GET',
     path: '/api/agent/runs/current',
-    description: 'Return the current run, all active run identities, the latest terminal run, device occupancy (run, external, pending, idle or unknown), schedule execution state, and recent logs for polling.',
+    description: 'Return the current run, all active run identities, the latest terminal run, device occupancy (run, external, pending, idle or unknown), schedule execution state, and recent logs for polling. An active Roguelike/Reclamation run_task carries a live progress snapshot in run.progress.roguelike (MaaCore mode, rounds started/ended/settled/passed, current round and action, recent events, settlement support, degraded/observed flags, and a blackflow projection with floor, current node, action points, last route, last node resolution, milestones and strategy when BlackFlow callbacks were observed); stopping runs still expose it. The final snapshot is copied into result.summary.progress or error.details.summary.progress of the terminal run; lastRun never carries progress.',
     tags: ['Status'],
     responseKind: 'run-snapshot',
     query_schema: {
@@ -1080,6 +1080,261 @@ export function buildOpenApiSpec(defaults: AgentRuntimeDefaults = {}): OpenApiDo
           },
           additionalProperties: false
         },
+        RoguelikeBlackFlowNode: {
+          type: 'object',
+          required: ['id', 'name', 'type'],
+          properties: {
+            id: { type: 'string' },
+            name: { type: ['string', 'null'] },
+            type: { type: ['string', 'null'] }
+          },
+          additionalProperties: false
+        },
+        RoguelikeBlackFlowActionPoints: {
+          type: 'object',
+          required: ['before', 'after', 'at'],
+          properties: {
+            before: { type: ['number', 'null'] },
+            after: { type: ['number', 'null'] },
+            at: { type: ['string', 'null'], format: 'date-time' }
+          },
+          additionalProperties: false
+        },
+        RoguelikeBlackFlowRoute: {
+          type: 'object',
+          required: [
+            'at',
+            'floor',
+            'target',
+            'landing',
+            'movement',
+            'actionPointsBefore',
+            'actionPointsAfter',
+            'exactCost',
+            'predictedCost',
+            'arrived'
+          ],
+          properties: {
+            at: { type: ['string', 'null'], format: 'date-time' },
+            floor: { type: ['integer', 'null'] },
+            target: {
+              oneOf: [
+                { $ref: '#/components/schemas/RoguelikeBlackFlowNode' },
+                { type: 'null' }
+              ]
+            },
+            landing: {
+              oneOf: [
+                { $ref: '#/components/schemas/RoguelikeBlackFlowNode' },
+                { type: 'null' }
+              ]
+            },
+            movement: { type: ['string', 'null'] },
+            actionPointsBefore: { type: ['number', 'null'] },
+            actionPointsAfter: { type: ['number', 'null'] },
+            exactCost: { type: ['number', 'null'] },
+            predictedCost: { type: ['number', 'null'] },
+            arrived: { type: 'boolean' }
+          },
+          additionalProperties: false
+        },
+        RoguelikeBlackFlowNodeResolution: {
+          type: 'object',
+          required: ['at', 'floor', 'node', 'eventName', 'progress'],
+          properties: {
+            at: { type: ['string', 'null'], format: 'date-time' },
+            floor: { type: ['integer', 'null'] },
+            node: {
+              oneOf: [
+                { $ref: '#/components/schemas/RoguelikeBlackFlowNode' },
+                { type: 'null' }
+              ]
+            },
+            eventName: { type: ['string', 'null'] },
+            progress: {
+              type: ['string', 'null'],
+              enum: ['active', 'completed', 'removed', null]
+            }
+          },
+          additionalProperties: false
+        },
+        RoguelikeBlackFlowMilestone: {
+          type: 'object',
+          required: ['id', 'floor', 'progress', 'status', 'at'],
+          properties: {
+            id: { type: 'string' },
+            floor: { type: ['integer', 'null'] },
+            progress: { type: ['integer', 'null'] },
+            status: { type: 'string' },
+            at: { type: ['string', 'null'], format: 'date-time' }
+          },
+          additionalProperties: false
+        },
+        RoguelikeBlackFlowStrategy: {
+          type: 'object',
+          required: ['at', 'profile', 'outcome', 'terminationReason', 'nextAction', 'succeeded'],
+          properties: {
+            at: { type: ['string', 'null'], format: 'date-time' },
+            profile: { type: ['string', 'null'] },
+            outcome: { type: ['string', 'null'] },
+            terminationReason: { type: ['string', 'null'] },
+            nextAction: { type: ['string', 'null'] },
+            succeeded: { type: ['boolean', 'null'] }
+          },
+          additionalProperties: false
+        },
+        RoguelikeBlackFlowProgress: {
+          type: 'object',
+          required: [
+            'floor',
+            'floorAt',
+            'currentNode',
+            'currentNodeAt',
+            'actionPoints',
+            'lastRoute',
+            'lastNodeResolution',
+            'milestones',
+            'strategy',
+            'updatedAt'
+          ],
+          properties: {
+            floor: { type: ['integer', 'null'] },
+            floorAt: { type: ['string', 'null'], format: 'date-time' },
+            currentNode: {
+              oneOf: [
+                { $ref: '#/components/schemas/RoguelikeBlackFlowNode' },
+                { type: 'null' }
+              ]
+            },
+            currentNodeAt: { type: ['string', 'null'], format: 'date-time' },
+            actionPoints: {
+              oneOf: [
+                { $ref: '#/components/schemas/RoguelikeBlackFlowActionPoints' },
+                { type: 'null' }
+              ]
+            },
+            lastRoute: {
+              oneOf: [
+                { $ref: '#/components/schemas/RoguelikeBlackFlowRoute' },
+                { type: 'null' }
+              ]
+            },
+            lastNodeResolution: {
+              oneOf: [
+                { $ref: '#/components/schemas/RoguelikeBlackFlowNodeResolution' },
+                { type: 'null' }
+              ]
+            },
+            milestones: {
+              type: 'array',
+              description: 'Newest black flow milestones first; the server keeps at most 5 entries.',
+              maxItems: 5,
+              items: { $ref: '#/components/schemas/RoguelikeBlackFlowMilestone' }
+            },
+            strategy: {
+              oneOf: [
+                { $ref: '#/components/schemas/RoguelikeBlackFlowStrategy' },
+                { type: 'null' }
+              ]
+            },
+            updatedAt: { type: ['string', 'null'], format: 'date-time' }
+          },
+          additionalProperties: false
+        },
+        RoguelikeProgress: {
+          type: 'object',
+          required: [
+            'command',
+            'theme',
+            'mode',
+            'phase',
+            'currentRound',
+            'roundStartedAt',
+            'targetRounds',
+            'roundsStarted',
+            'roundsEnded',
+            'roundsSettled',
+            'roundsPassed',
+            'settlementSupported',
+            'currentAction',
+            'lastEventKind',
+            'lastEventName',
+            'lastEventAt',
+            'combatCount',
+            'investment',
+            'recentRounds',
+            'blackflow',
+            'updatedAt',
+            'degraded',
+            'observed'
+          ],
+          properties: {
+            command: { type: 'string', enum: ['roguelike', 'reclamation'] },
+            theme: { type: 'string' },
+            mode: { type: ['integer', 'null'] },
+            phase: { type: 'string', enum: ['starting', 'exploring', 'ended', 'unknown'] },
+            currentRound: { type: ['integer', 'null'], minimum: 1 },
+            roundStartedAt: { type: ['string', 'null'], format: 'date-time' },
+            targetRounds: { type: ['integer', 'null'], minimum: 1 },
+            roundsStarted: { type: 'integer', minimum: 0 },
+            roundsEnded: { type: 'integer', minimum: 0 },
+            roundsSettled: { type: 'integer', minimum: 0 },
+            roundsPassed: { type: 'integer', minimum: 0 },
+            settlementSupported: { type: ['boolean', 'null'] },
+            currentAction: { type: ['string', 'null'] },
+            lastEventKind: {
+              type: ['string', 'null'],
+              enum: ['round', 'combat', 'event', 'investment', 'task', null]
+            },
+            lastEventName: { type: ['string', 'null'] },
+            lastEventAt: { type: ['string', 'null'], format: 'date-time' },
+            combatCount: { type: 'integer', minimum: 0 },
+            investment: {
+              oneOf: [
+                {
+                  type: 'object',
+                  required: ['rounds', 'count', 'total', 'deposit'],
+                  properties: {
+                    rounds: { type: 'integer', minimum: 0 },
+                    count: { type: 'integer', minimum: 0 },
+                    total: { type: ['integer', 'null'] },
+                    deposit: { type: ['integer', 'null'] }
+                  },
+                  additionalProperties: false
+                },
+                { type: 'null' }
+              ]
+            },
+            recentRounds: {
+              type: 'array',
+              description: 'Closed rounds newest first; the server keeps at most 5 entries.',
+              items: {
+                type: 'object',
+                required: ['index', 'outcome', 'settled', 'floor', 'score', 'endedAt'],
+                properties: {
+                  index: { type: ['integer', 'null'], minimum: 1 },
+                  outcome: { type: 'string', enum: ['passed', 'not_passed', 'unknown'] },
+                  settled: { type: 'boolean' },
+                  floor: { type: ['integer', 'null'] },
+                  score: { type: ['integer', 'null'] },
+                  endedAt: { type: ['string', 'null'], format: 'date-time' }
+                },
+                additionalProperties: false
+              }
+            },
+            blackflow: {
+              oneOf: [
+                { $ref: '#/components/schemas/RoguelikeBlackFlowProgress' },
+                { type: 'null' }
+              ],
+              description: 'Black flow projection; null unless at least one BlackFlow callback was observed.'
+            },
+            updatedAt: { type: 'string', format: 'date-time' },
+            degraded: { type: 'boolean' },
+            observed: { type: 'boolean' }
+          },
+          additionalProperties: false
+        },
         RunProgress: {
           type: 'object',
           properties: {
@@ -1089,6 +1344,7 @@ export function buildOpenApiSpec(defaults: AgentRuntimeDefaults = {}): OpenApiDo
             currentTask: {},
             shouldStop: { type: 'boolean' },
             message: { type: ['string', 'null'] },
+            roguelike: { $ref: '#/components/schemas/RoguelikeProgress' },
             stopIntent: {
               type: 'object',
               required: ['mode', 'requestedAt', 'deadline', 'combat'],

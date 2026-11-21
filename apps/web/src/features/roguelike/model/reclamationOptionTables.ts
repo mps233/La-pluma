@@ -1,5 +1,5 @@
 import type { RoguelikeAdvancedOption } from '../types'
-import { MAA_CLI_I32_MAX } from './roguelikeOptionCatalog'
+import { DEFAULT_RECLAMATION_MODE, MAA_CLI_I32_MAX } from './roguelikeOptionCatalog'
 
 export const RECLAMATION_OPTIONS: readonly RoguelikeAdvancedOption[] = [
   {
@@ -10,7 +10,7 @@ export const RECLAMATION_OPTIONS: readonly RoguelikeAdvancedOption[] = [
     coreParam: 'mode',
     coreType: 'number',
     choices: 'modes',
-    defaultValue: '1',
+    defaultValue: DEFAULT_RECLAMATION_MODE,
     hint: '沙洲遗闻：模式 0 仅在没有存档时使用（有存档可能丢失进度），需在主界面右下角出现「开始演算」后启动；模式 1 需要已有存档，需在能看到驻扎地的页面启动。重启锚点：16 为 RA-1 精耕细作循环，32 为 RA-15 六十杀任务，48 为 RA-4 解锁区域并击杀 Boss。',
   },
   {

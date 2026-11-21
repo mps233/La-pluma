@@ -1,6 +1,6 @@
 import './styles/roguelike.css'
 
-export { default as RoguelikeResultPanel } from './components/RoguelikeResultPanel'
+export { default as RoguelikeProgressPanel } from './components/RoguelikeProgressPanel'
 export { default as RoguelikeWorkspace } from './components/RoguelikeWorkspace'
 export {
   describeRoguelikeRunSummary,

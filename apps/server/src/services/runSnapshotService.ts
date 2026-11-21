@@ -12,6 +12,8 @@ import { getScheduleExecutionStatus } from './schedulerService.ts';
 import type { ScheduleExecutionStatus } from './scheduleFlowExecution.ts';
 import { getRoguelikeStopIntent } from './roguelikeStopIntentService.ts';
 import type { RoguelikeStopIntent } from './roguelikeStopIntentService.ts';
+import { getRoguelikeProgress } from './roguelikeProgressTrackerService.ts';
+import type { RoguelikeProgressSnapshot } from './roguelikeProgressService.ts';
 import { resolveBoundedInteger } from '../utils/numericQueryHelper.ts';
 
 /**
@@ -46,6 +48,8 @@ export interface AgentRunProgressProjection {
   shouldStop?: boolean;
   /** 仅肉鸽/生息演算战斗结束后的延后停止带。 */
   stopIntent?: RoguelikeStopIntent;
+  /** 肉鸽/生息演算 run_task 的运行中进度快照。 */
+  roguelike?: RoguelikeProgressSnapshot;
 }
 
 /**
@@ -208,6 +212,25 @@ export function enrichAgentRun(run: AgentRunDto | null): AgentRunSnapshotEntry |
             : task.isRunning ? `${updateLabel}进行中` : '更新执行中'
       }
     };
+  }
+  if (run.operationId === 'run_task') {
+    const roguelike = getRoguelikeProgress(run.runId);
+    if (roguelike) {
+      const stopIntent = run.state === 'running' ? getRoguelikeStopIntent(run.runId) : null;
+      return {
+        ...run,
+        progress: {
+          currentStep: null,
+          totalSteps: null,
+          currentTask: roguelike.currentAction,
+          message: stopIntent
+            ? '等待战斗结束后终止'
+            : roguelike.command === 'reclamation' ? '生息演算执行中' : '集成战略执行中',
+          roguelike,
+          ...(stopIntent ? { stopIntent } : {})
+        }
+      };
+    }
   }
   const stopIntent = run.state === 'running' ? getRoguelikeStopIntent(run.runId) : null;
   return {

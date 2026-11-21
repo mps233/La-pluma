@@ -20,7 +20,6 @@ export const ROGUELIKE_OPTIONS: readonly RoguelikeAdvancedOption[] = [
     choices: 'difficulty',
     themes: NUMERIC_DIFFICULTY_THEMES,
     hint: '不切换时沿用游戏内当前难度；指定未解锁的难度会被降到已解锁上限。',
-    hintPlacement: 'tooltip',
   },
   { key: 'squad', label: '起始分队', type: 'select', param: '--squad', coreParam: 'squad', choices: 'squads' },
   {
@@ -32,7 +31,6 @@ export const ROGUELIKE_OPTIONS: readonly RoguelikeAdvancedOption[] = [
     choices: 'roles',
     defaultValue: '稳扎稳打',
     hint: '决定开局能招募的职业；核心干员的职业必须在组合内，例如维什戴尔（狙击）需要稳扎稳打。',
-    hintPlacement: 'tooltip',
   },
   {
     key: 'coreChar',

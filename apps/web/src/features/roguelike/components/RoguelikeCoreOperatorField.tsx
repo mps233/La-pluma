@@ -14,6 +14,8 @@ export interface RoguelikeCoreOperatorFieldProps {
   label: string
   /** 已保存的中文干员名；空字符串表示由 MAA 按练度自动选择。 */
   value: string
+  error?: string
+  disabled?: boolean
   onChange: (value: string) => void
 }
 
@@ -21,11 +23,15 @@ export default function RoguelikeCoreOperatorField({
   id,
   label,
   value,
+  error,
+  disabled,
   onChange,
 }: RoguelikeCoreOperatorFieldProps) {
   const [isOpen, setIsOpen] = useState(false)
   const itemIconVersion = useItemIconCacheVersion()
   const operatorName = value.trim()
+  const labelId = `${id}-label`
+  const errorId = `${id}-error`
   const catalogQuery = useQuery({
     ...operatorCatalogQueryOptions(),
     enabled: operatorName !== '',
@@ -39,10 +45,20 @@ export default function RoguelikeCoreOperatorField({
     onChange(selected.name)
   }
 
+  const handleOpen = () => {
+    if (disabled) return
+    setIsOpen(true)
+  }
+
+  const handleClear = () => {
+    if (disabled) return
+    onChange('')
+  }
+
   return (
     <div>
-      <label htmlFor={id} className="mb-2 block text-sm font-medium text-muted-foreground">{label}</label>
-      <div className="roguelike-core-operator-control">
+      <span id={labelId} className="mb-2 block text-sm font-medium text-muted-foreground">{label}</span>
+      <div role="group" aria-labelledby={labelId} className="roguelike-core-operator-control">
         {operatorName === '' ? (
           <span className="roguelike-core-operator-placeholder">未选择</span>
         ) : (
@@ -67,7 +83,11 @@ export default function RoguelikeCoreOperatorField({
           type="button"
           variant="secondary"
           size="sm"
-          onClick={() => setIsOpen(true)}
+          onClick={handleOpen}
+          disabled={disabled}
+          aria-label={operatorName === '' ? '选择核心干员' : `更换核心干员（当前：${operatorName}）`}
+          aria-invalid={error ? true : undefined}
+          aria-errormessage={error ? errorId : undefined}
         >
           <UserRoundSearch size={15} strokeWidth={1.9} aria-hidden="true" />
           {operatorName === '' ? '选择干员' : '更换'}
@@ -78,14 +98,16 @@ export default function RoguelikeCoreOperatorField({
             variant="ghost"
             title="清除核心干员"
             aria-label="清除核心干员"
-            onClick={() => onChange('')}
+            onClick={handleClear}
+            disabled={disabled}
           >
             <X size={16} aria-hidden="true" />
           </Button>
         )}
       </div>
+      {error && <p id={errorId} className="mt-2 text-xs form-error-text">{error}</p>}
       <OperatorSelectModal
-        isOpen={isOpen}
+        isOpen={isOpen && !disabled}
         onClose={() => setIsOpen(false)}
         onConfirm={handleSelect}
         title="选择核心干员"
