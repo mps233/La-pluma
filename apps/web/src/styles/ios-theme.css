@@ -302,7 +302,7 @@
   .la-pluma-sidebar-brand {
     display: flex;
     min-width: 0;
-    min-height: 2.75rem;
+    height: 1lh;
     align-items: center;
     gap: 0.625rem;
     padding: 0 0.5rem;

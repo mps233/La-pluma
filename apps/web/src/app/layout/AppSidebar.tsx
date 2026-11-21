@@ -73,7 +73,7 @@ export default function AppSidebar({ activeTab, onNavigate }: AppSidebarProps) {
         style={{ '--sidebar-width': 'var(--layout-sidebar-width)' } as CSSProperties}
       >
         <Sidebar className="la-pluma-sidebar-body">
-          <SidebarHeader>
+          <SidebarHeader className="px-2 py-6">
             <div data-region="sidebar-brand" className="la-pluma-sidebar-brand">
               <img
                 src={`${import.meta.env.BASE_URL}logo-graphite.svg?v=1`}
@@ -85,7 +85,7 @@ export default function AppSidebar({ activeTab, onNavigate }: AppSidebarProps) {
             </div>
           </SidebarHeader>
           <SidebarContent>
-            <SidebarGroup>
+            <SidebarGroup className="px-2 py-1">
               <SidebarGroupContent>
                 <nav
                   id="app-sidebar-navigation"
