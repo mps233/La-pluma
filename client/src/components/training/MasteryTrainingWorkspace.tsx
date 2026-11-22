@@ -33,6 +33,7 @@ import {
   TruncatedText,
 } from '../common'
 import { getResponseErrorMessage } from '../../utils/errorMessage'
+import { useMasteryStore } from '../../store/masteryStore'
 import { getOperatorAvatarUrl } from '../../services/operatorQuotes'
 import {
   addMasteryTargets,
@@ -479,6 +480,7 @@ export default function MasteryTrainingWorkspace() {
         return
       }
       setStatus(response.data)
+      useMasteryStore.getState().applyStatus(response.data)
       setStatusError(null)
     } catch (error) {
       setStatusError(getErrorMessageText(error))
