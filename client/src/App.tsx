@@ -7,6 +7,7 @@ import { PageSkeleton } from './components/common'
 import { isDesktopRuntime } from './desktop/bridge'
 import { useBackendStatusMonitor } from './hooks/useBackendStatusMonitor'
 import { useRunStatusMonitor } from './hooks/useRunStatusMonitor'
+import { useMasteryStatusMonitor } from './hooks/useMasteryStatusMonitor'
 import { useUIStore } from './stores'
 import { PreviewSessionProvider } from './contexts/PreviewSessionContext'
 import { IslandProvider } from '@/lib/island'
@@ -105,6 +106,7 @@ function App() {
   useBackendStatusMonitor()
   const desktopShell = isDesktopRuntime()
   useRunStatusMonitor()
+  useMasteryStatusMonitor()
   const theme = useUIStore(state => state.theme)
   const isDark = theme === 'dark'
     || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)

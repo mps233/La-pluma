@@ -5,6 +5,7 @@ import ThemeToggle from './ThemeToggle'
 import RunIsland from './RunIsland'
 import SanityBatteryIsland from './SanityBatteryIsland'
 import MaaUpdateIsland from './MaaUpdateIsland'
+import MasteryIsland from './MasteryIsland'
 import AeroBackdrop from './backgrounds/AeroBackdrop'
 import { Island } from '@/lib/island'
 import { IslandContext } from '@/lib/island/context'
@@ -404,6 +405,7 @@ export default function Layout({ children }: LayoutProps) {
                 <Island placement="container" label="La Pluma 活动" />
                 <RunIsland />
                 <MaaUpdateIsland />
+                <MasteryIsland />
                 <SanityBatteryIsland />
               </div>
             )}
