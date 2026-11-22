@@ -46,7 +46,7 @@ test.describe('dialog frame', () => {
     const environment = await installDeterministicEnvironment(page, { fixtures: dialogFrameFixtures })
     await page.goto('/app/training')
     await waitForPageReady(page, 'training')
-    await page.getByRole('button', { name: '继续添加', exact: true }).click()
+    await page.getByRole('button', { name: '添加干员', exact: true }).click()
 
     const dialog = page.getByRole('dialog', { name: '添加干员', exact: true })
     await expect(dialog).toBeVisible()

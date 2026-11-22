@@ -6,6 +6,7 @@ import type { OperatorTrainingService } from '../../services/operatorTrainingSer
 import { DEFAULT_TRAINING_SETTINGS } from '../../services/operatorTrainingModel.ts';
 import type { TrainingOperatorFilters } from '../../services/operatorTrainingModel.ts';
 import type {
+  ApplyPlanResult,
   FlowSyncState,
   QueueMutationResult
 } from '../../services/operatorTrainingApplication.ts';
@@ -200,5 +201,47 @@ describe('training queue route contract', () => {
 
     assert.deepEqual(received, { autoSwitch: 'yes', extraField: { nested: true } });
     assert.deepEqual(dataOf<{ extraField: unknown }>(res.body).extraField, { nested: true });
+  });
+
+  it('passes the plan and settings through apply with the resolved connection context', async () => {
+    const plan = {
+      queueRevision: 'revision-1',
+      openStages: [{ stage: 'S3-2', totalTimes: 2 }],
+      summary: { gameDate: '2026-10-28', clientType: 'YoStarEN' }
+    };
+    const settings = { useMedicine: 2 };
+    const applied: ApplyPlanResult = {
+      success: true,
+      stageCount: 1,
+      totalStages: 1,
+      hasFallback: false,
+      flowName: '自动任务',
+      taskName: '理智作战',
+      flowSync: syncedFlow(),
+      scheduleSync: { attempted: false, success: true, message: null }
+    };
+    const captured: Array<{
+      plan?: unknown;
+      settings?: unknown;
+      options?: { clientType?: string; now?: Date };
+    }> = [];
+    training.applyPlanToTasks = async (receivedPlan, receivedSettings, options) => {
+      captured.push({ plan: receivedPlan, settings: receivedSettings, options });
+      return applied;
+    };
+
+    const res = response();
+    await handler('post', '/actions/apply-training-plan')({
+      headers: {},
+      query: { clientType: 'YoStarEN' },
+      body: { plan, settings }
+    }, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(dataOf<ApplyPlanResult>(res.body).success, true);
+    assert.deepEqual(captured[0]?.plan, plan);
+    assert.deepEqual(captured[0]?.settings, settings);
+    assert.equal(captured[0]?.options?.clientType, 'YoStarEN');
+    assert.ok(captured[0]?.options?.now instanceof Date);
   });
 });

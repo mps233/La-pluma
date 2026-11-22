@@ -11,6 +11,10 @@ import {
   TRAINING_PLAN_BLOCKED_CONFIG_MESSAGE,
   TRAINING_PLAN_PARTIAL_REFRESH_MESSAGE,
   TRAINING_PLAN_PARTIAL_SCHEDULE_MESSAGE,
+  TRAINING_PLAN_STALE_CLIENT_TYPE_MESSAGE,
+  TRAINING_PLAN_STALE_GAME_DAY_MESSAGE,
+  TRAINING_PLAN_STALE_MESSAGE,
+  TRAINING_PLAN_STALE_STAGE_CLOSED_MESSAGE,
   TrainingPlanOwner,
   type TrainingPlanQueueContext,
 } from './planCommands'
@@ -58,14 +62,19 @@ const snapshot = (
   revision = 'queue-1',
   queue: TrainingQueueItem[] = [queueItem('char_current', '阿米娅')],
   sync: TrainingFlowSync = flowSync('not_applied'),
+  context: { gameDate?: string; clientType?: string } = {},
 ): TrainingQueueSnapshot => ({
   queue,
   revision,
   settings: { ...baseSettings },
   flowSync: sync,
+  ...context,
 })
 
-const plan = (revision = 'queue-1'): TrainingPlan => ({
+const plan = (
+  revision = 'queue-1',
+  summary?: TrainingPlan['summary'],
+): TrainingPlan => ({
   mode: 'current',
   queueRevision: revision,
   focusOperator: { id: 'char_current', name: '阿米娅', rarity: 6 },
@@ -75,6 +84,20 @@ const plan = (revision = 'queue-1'): TrainingPlan => ({
   ],
   openStages: [{ stage: '1-7', totalTimes: 5, isOpen: true }],
   totalSanity: 30,
+  ...(summary ? { summary } : {}),
+})
+
+const staleResponse = (
+  details: { reason?: string; closedStages?: string[] },
+  code: string | null = 'AGENT_TRAINING_PLAN_STALE',
+): ApiResponse => ({
+  success: false,
+  message: '计划已过期',
+  errorInfo: {
+    ...(code ? { code } : {}),
+    message: '计划已过期',
+    details,
+  },
 })
 
 interface Deferred<T> {
@@ -236,7 +259,53 @@ describe('plan generation', () => {
     expect(harness.owner.getState().basis).toEqual({
       queueRevision: 'queue-1',
       settingsRevision: 0,
+      gameDate: null,
+      clientType: null,
     })
+  })
+
+  it('freezes the game day and client type from the generated plan summary', async () => {
+    const context = { gameDate: '2026-11-22', clientType: 'Official' }
+    harness.setSnapshot(snapshot('queue-1', undefined, flowSync('not_applied'), context))
+    harness.generatePlan.mockResolvedValueOnce({
+      success: true,
+      data: plan('queue-1', { gameDate: '2026-11-22', clientType: 'Official' }),
+    })
+
+    await expect(harness.owner.generate('current', harness.context)).resolves.toMatchObject({
+      status: 'generated',
+      basis: {
+        queueRevision: 'queue-1',
+        settingsRevision: 0,
+        gameDate: '2026-11-22',
+        clientType: 'Official',
+      },
+    })
+    expect(harness.owner.getState().basis).toEqual({
+      queueRevision: 'queue-1',
+      settingsRevision: 0,
+      gameDate: '2026-11-22',
+      clientType: 'Official',
+    })
+  })
+
+  it('discards a generated plan whose summary belongs to another game day', async () => {
+    harness.setSnapshot(snapshot(
+      'queue-1',
+      undefined,
+      flowSync('not_applied'),
+      { gameDate: '2026-11-23', clientType: 'Official' },
+    ))
+    harness.generatePlan.mockResolvedValueOnce({
+      success: true,
+      data: plan('queue-1', { gameDate: '2026-11-22', clientType: 'Official' }),
+    })
+
+    await expect(harness.owner.generate('current', harness.context)).resolves.toEqual({
+      status: 'failed',
+      message: TRAINING_PLAN_BASIS_CHANGED_MESSAGE,
+    })
+    expect(harness.owner.getState().plan).toBeNull()
   })
 
   it('refuses to generate when the forced queue refresh fails', async () => {
@@ -398,9 +467,10 @@ describe('plan application', () => {
     })
     expect(harness.applyPlan).not.toHaveBeenCalled()
     expect(harness.owner.getState().plan).toBeNull()
+    expect(harness.owner.getState().error).toBe(TRAINING_PLAN_BASIS_CHANGED_MESSAGE)
   })
 
-  it('does not apply a plan whose basis is no longer current', async () => {
+  it('does not apply a plan whose queue revision is no longer current', async () => {
     await generatePreview()
     harness.setSnapshot(snapshot('queue-2'))
 
@@ -409,7 +479,35 @@ describe('plan application', () => {
       message: TRAINING_PLAN_BASIS_CHANGED_MESSAGE,
     })
     expect(harness.applyPlan).not.toHaveBeenCalled()
-    expect(harness.owner.getState().plan).toBeNull()
+    expect(harness.owner.getState().plan).not.toBeNull()
+  })
+
+  it('does not apply a plan when only the queue game context changed', async () => {
+    harness.setSnapshot(snapshot(
+      'queue-1',
+      undefined,
+      flowSync('not_applied'),
+      { gameDate: '2026-11-22', clientType: 'Official' },
+    ))
+    harness.generatePlan.mockResolvedValueOnce({
+      success: true,
+      data: plan('queue-1', { gameDate: '2026-11-22', clientType: 'Official' }),
+    })
+    await generatePreview()
+
+    harness.setSnapshot(snapshot(
+      'queue-1',
+      undefined,
+      flowSync('not_applied'),
+      { gameDate: '2026-11-23', clientType: 'Official' },
+    ))
+
+    await expect(harness.owner.apply(harness.context)).resolves.toEqual({
+      status: 'failed',
+      message: TRAINING_PLAN_BASIS_CHANGED_MESSAGE,
+    })
+    expect(harness.applyPlan).not.toHaveBeenCalled()
+    expect(harness.owner.getState().plan).not.toBeNull()
   })
 
   it('serializes duplicate applies into a single request', async () => {
@@ -440,6 +538,98 @@ describe('plan application', () => {
     expect(harness.refetch).toHaveBeenCalledTimes(2)
     expect(harness.owner.getState().plan).toBeNull()
     expect(harness.owner.getState().error).toBe('养成队列已变化，请重新生成计划后应用')
+  })
+
+  it('clears the preview and reports the closed stages when the server rejects a stale plan', async () => {
+    await generatePreview()
+    harness.applyPlan.mockResolvedValueOnce(staleResponse({
+      reason: 'stage_closed',
+      closedStages: ['CE-6'],
+    }))
+
+    await expect(harness.owner.apply(harness.context)).resolves.toEqual({
+      status: 'failed',
+      message: '计划中的资源关卡已关闭（CE-6），请重新预览计划后再应用',
+    })
+    expect(harness.owner.getState()).toMatchObject({
+      plan: null,
+      basis: null,
+      error: '计划中的资源关卡已关闭（CE-6），请重新预览计划后再应用',
+    })
+  })
+
+  it('uses the generic closed-stage message when the server omits stage codes', async () => {
+    await generatePreview()
+    harness.applyPlan.mockResolvedValueOnce(staleResponse({ reason: 'stage_closed' }))
+
+    await expect(harness.owner.apply(harness.context)).resolves.toEqual({
+      status: 'failed',
+      message: TRAINING_PLAN_STALE_STAGE_CLOSED_MESSAGE,
+    })
+  })
+
+  it.each([
+    ['game_day', TRAINING_PLAN_STALE_GAME_DAY_MESSAGE],
+    ['client_type', TRAINING_PLAN_STALE_CLIENT_TYPE_MESSAGE],
+  ])('reports the %s stale reason from the server rejection', async (reason, message) => {
+    await generatePreview()
+    harness.applyPlan.mockResolvedValueOnce(staleResponse({ reason }))
+
+    await expect(harness.owner.apply(harness.context)).resolves.toEqual({
+      status: 'failed',
+      message,
+    })
+    expect(harness.owner.getState().plan).toBeNull()
+    expect(harness.owner.getState().basis).toBeNull()
+    expect(harness.owner.getState().error).toBe(message)
+  })
+
+  it('recognizes a stale rejection from its reason even without the stable code', async () => {
+    await generatePreview()
+    harness.applyPlan.mockResolvedValueOnce(staleResponse({ reason: 'game_day' }, null))
+
+    await expect(harness.owner.apply(harness.context)).resolves.toEqual({
+      status: 'failed',
+      message: TRAINING_PLAN_STALE_GAME_DAY_MESSAGE,
+    })
+  })
+
+  it('reports a generic stale message for an unknown stale reason', async () => {
+    await generatePreview()
+    harness.applyPlan.mockResolvedValueOnce(staleResponse({ reason: 'unknown' }))
+
+    await expect(harness.owner.apply(harness.context)).resolves.toEqual({
+      status: 'failed',
+      message: TRAINING_PLAN_STALE_MESSAGE,
+    })
+  })
+
+  it('keeps an earlier schedule warning when a retry is rejected as stale', async () => {
+    await generatePreview()
+    harness.applyPlan.mockResolvedValueOnce({
+      success: true,
+      data: {
+        stageCount: 1,
+        flowName: '自动任务',
+        flowSync: flowSync('synced'),
+        scheduleSync: { attempted: true, success: false, message: '定时任务设置失败' },
+      },
+    })
+    await harness.owner.apply(harness.context)
+    expect(harness.owner.getState().warning).toContain(TRAINING_PLAN_PARTIAL_SCHEDULE_MESSAGE)
+
+    harness.applyPlan.mockResolvedValueOnce(staleResponse({ reason: 'game_day' }))
+    await expect(harness.owner.apply(harness.context)).resolves.toEqual({
+      status: 'failed',
+      message: TRAINING_PLAN_STALE_GAME_DAY_MESSAGE,
+    })
+
+    expect(harness.owner.getState()).toMatchObject({
+      plan: null,
+      basis: null,
+      error: TRAINING_PLAN_STALE_GAME_DAY_MESSAGE,
+    })
+    expect(harness.owner.getState().warning).toContain(TRAINING_PLAN_PARTIAL_SCHEDULE_MESSAGE)
   })
 
   it('keeps a schedule partial warning until the plan is applied again', async () => {
@@ -581,5 +771,29 @@ describe('version observation and invalidation', () => {
       error: null,
       warning: null,
     })
+  })
+
+  it('keeps a partial schedule warning when an unrelated invalidation clears the preview', async () => {
+    await harness.owner.generate('current', harness.context)
+    harness.applyPlan.mockResolvedValueOnce({
+      success: true,
+      data: {
+        stageCount: 1,
+        flowName: '自动任务',
+        flowSync: flowSync('synced'),
+        scheduleSync: { attempted: true, success: false, message: '定时任务设置失败' },
+      },
+    })
+    await harness.owner.apply(harness.context)
+    expect(harness.owner.getState().warning).toContain(TRAINING_PLAN_PARTIAL_SCHEDULE_MESSAGE)
+
+    harness.owner.invalidate()
+
+    expect(harness.owner.getState()).toMatchObject({
+      plan: null,
+      basis: null,
+      error: null,
+    })
+    expect(harness.owner.getState().warning).toContain(TRAINING_PLAN_PARTIAL_SCHEDULE_MESSAGE)
   })
 })

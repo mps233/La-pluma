@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 interface FluidTabRect {
   x: number
@@ -14,8 +14,11 @@ export function measureFluidTabRect(
   activeElement: HTMLElement,
 ): FluidTabRect {
   const transform = window.getComputedStyle(activeElement).transform
-  if (!transform || transform === 'none') {
-    const containerRect = container.getBoundingClientRect()
+  const containerRect = container.getBoundingClientRect()
+  const containerGeometryDistorted = container.offsetWidth > 0
+    && (Math.abs(containerRect.width - container.offsetWidth) > 1
+      || Math.abs(containerRect.height - container.offsetHeight) > 1)
+  if ((!transform || transform === 'none') && !containerGeometryDistorted) {
     const tabRect = activeElement.getBoundingClientRect()
     return {
       x: tabRect.left - containerRect.left,
@@ -33,35 +36,39 @@ export function measureFluidTabRect(
   }
 }
 
-export function useFluidTabIndicator<T extends string>(activeTab: T) {
-  const containerRef = useRef<HTMLDivElement>(null)
+export function useFluidTabIndicator<T extends string>(activeTab: T, layoutKey?: unknown) {
+  const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null)
   const tabRefs = useRef<Partial<Record<T, HTMLElement | null>>>({})
   const [activeRect, setActiveRect] = useState<FluidTabRect>(emptyRect)
 
   useLayoutEffect(() => {
     const syncActiveRect = () => {
-      const container = containerRef.current
       const activeElement = tabRefs.current[activeTab]
-      if (!container || !activeElement) {
+      if (!containerElement || !activeElement) {
         setActiveRect(emptyRect)
         return
       }
 
-      setActiveRect(measureFluidTabRect(container, activeElement))
+      setActiveRect(measureFluidTabRect(containerElement, activeElement))
     }
 
     syncActiveRect()
     const observer = typeof ResizeObserver === 'undefined'
       ? null
       : new ResizeObserver(syncActiveRect)
-    if (containerRef.current) observer?.observe(containerRef.current)
-    if (tabRefs.current[activeTab]) observer?.observe(tabRefs.current[activeTab]!)
+    if (containerElement) observer?.observe(containerElement)
+    const activeElement = tabRefs.current[activeTab]
+    if (activeElement) observer?.observe(activeElement)
     window.addEventListener('resize', syncActiveRect)
     return () => {
       observer?.disconnect()
       window.removeEventListener('resize', syncActiveRect)
     }
-  }, [activeTab])
+  }, [activeTab, containerElement, layoutKey])
+
+  const setContainerRef = useCallback((element: HTMLDivElement | null) => {
+    setContainerElement(element)
+  }, [])
 
   const setTabRef = (tab: T) => (element: HTMLElement | null) => {
     tabRefs.current[tab] = element
@@ -95,5 +102,5 @@ export function useFluidTabIndicator<T extends string>(activeTab: T) {
     tabRefs.current[nextTab]?.focus({ preventScroll: true })
   }
 
-  return { containerRef, activeRect, setTabRef, handleTabKeyDown }
+  return { containerRef: setContainerRef, activeRect, setTabRef, handleTabKeyDown }
 }

@@ -112,7 +112,7 @@ publishResourceInvalidation({
 | `catalog` | 干员目录或资源元数据变化 |
 | `materials` | 养成材料数据/派生进度变化 |
 | `training-queue` | 队列顺序、成员或进度变化 |
-| `training-plan` | 已生成计划的前提（队列版本、材料、设置）变化 |
+| `training-plan` | 已生成计划的前提（队列版本、设置、材料、游戏日与客户端类型）变化 |
 | `automation-config` | 自动化任务流程配置变化 |
 | `automation-schedule` | 服务端定时配置变化 |
 | `drops` | 今日掉落记录变化 |
@@ -153,6 +153,8 @@ publishResourceInvalidation({
 | `AutomationTasks` | `automation-config`、`automation-schedule` | 等到配置通道空闲后 `reload({ force: true })`；pending 失败草稿保留本地并提示；采用服务端副本时保留本设备独有的禁用时间点 |
 | `Dashboard` | `dashboard-snapshot` | 调用完整快照刷新（`force`），五项全部有效才提交；单路失败保留旧快照与 `lastUpdate`；设备采样由 `device-mirror` 独立轮询 |
 | `StatisticsWorkspace`（统计页） | `depot`、`operbox`、`catalog`、`drops` | 按作用域 `invalidateQueries` 对应资源；识别命令由 `features/statistics` 的命令所有者提交，`hooks/useStatisticsCommands.ts` 把解析快照写入 Query 并发布作用域 |
+
+计划应用返回 409 过期属于应用响应分支，不是失效订阅动作：计划所有者清空预览并重读队列，详见[养成设置与计划有效期](../frontend/domains/training.md#设置与计划有效期)。
 
 队列写入、计划应用与设置提交的命令生命周期分别见[养成队列命令](../frontend/domains/training.md#队列命令)和[养成设置与计划有效期](../frontend/domains/training.md#设置与计划有效期)；本页第 5–6 节统一维护其跨域发布与接收映射。
 

@@ -109,7 +109,9 @@ export async function retryTrainingSync(): Promise<ApiResponse> {
   return parseJsonResponse(response)
 }
 
-export async function updateTrainingSettings(settings: TrainingSettings): Promise<ApiResponse> {
+export async function updateTrainingSettings(
+  settings: Partial<TrainingSettings>,
+): Promise<ApiResponse> {
   const response = await fetchWithAuth(`${API_BASE_URL}/agent/training/settings`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },

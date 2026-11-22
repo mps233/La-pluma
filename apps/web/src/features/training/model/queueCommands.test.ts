@@ -312,6 +312,81 @@ describe('TrainingQueueCommandOwner', () => {
     expect(harness.publish).toHaveBeenCalledOnce()
   })
 
+  it('applies a remove to the latest cache when the refresh fails', async () => {
+    const harness = createHarness([
+      queueItem('char_a', '阿米娅'),
+      queueItem('char_b', '能天使'),
+    ])
+    const removed = harness.getCommitted()!.queue[1]!
+    harness.remove.mockResolvedValueOnce(success({ queueRevision: 'revision-2' }))
+    harness.readQueue.mockRejectedValueOnce(new Error('队列服务暂不可用'))
+
+    const outcome = await harness.owner.run(
+      { type: 'remove', operatorId: 'char_b' },
+      harness.context,
+    )
+
+    expect(outcome.status).toBe('uncertain')
+    if (outcome.status !== 'uncertain') return
+    expect(outcome.snapshot.queue.map(item => item.operatorId)).toEqual(['char_a'])
+    expect(outcome.snapshot.revision).toBe('revision-2')
+    expect(outcome.snapshot.uncertain).toBe(TRAINING_QUEUE_UNCERTAIN_MESSAGE)
+    expect(outcome.removed).toEqual({ item: removed, index: 1 })
+  })
+
+  it('deduplicates fallback adds and keeps the revision advanced during the write', async () => {
+    const harness = createHarness([queueItem('char_a', '阿米娅')])
+    const write = deferred<ApiResponse<TrainingQueueMutationData>>()
+    harness.add.mockReturnValueOnce(write.promise)
+    harness.readQueue.mockRejectedValueOnce(new Error('队列服务暂不可用'))
+
+    const pending = harness.owner.run(
+      { type: 'add', operator: operator('char_added', '能天使') },
+      harness.context,
+    )
+    await flush()
+
+    const externallyAdded = { ...queueItem('char_added', '能天使'), progress: 60 }
+    harness.setCommitted({
+      queue: [queueItem('char_a', '阿米娅'), externallyAdded],
+      settings,
+      revision: 'revision-3',
+      lastUpdated: '2026-10-26T00:00:02.000Z',
+    })
+
+    write.resolve(success({ queueRevision: 'revision-2' }))
+    const outcome = await pending
+
+    expect(outcome.status).toBe('uncertain')
+    if (outcome.status !== 'uncertain') return
+    expect(outcome.snapshot.queue.map(item => item.operatorId))
+      .toEqual(['char_a', 'char_added'])
+    expect(outcome.snapshot.queue[1]).toBe(externallyAdded)
+    expect(outcome.snapshot.revision).toBe('revision-3')
+    expect(outcome.snapshot.uncertain).toBe(TRAINING_QUEUE_UNCERTAIN_MESSAGE)
+  })
+
+  it('ignores undo when the latest snapshot already contains the operator', async () => {
+    const harness = createHarness([])
+    const restored = queueItem('char_b', '能天使')
+    harness.setCommitted({
+      queue: [queueItem('char_a', '阿米娅'), restored],
+      settings,
+      revision: 'revision-3',
+      lastUpdated: '2026-10-26T00:00:02.000Z',
+    })
+
+    const outcome = await harness.owner.run(
+      { type: 'undo', item: restored, index: 1 },
+      harness.context,
+    )
+
+    expect(outcome).toEqual({ status: 'ignored', type: 'undo', operatorId: 'char_b' })
+    expect(harness.add).not.toHaveBeenCalled()
+    expect(harness.readQueue).not.toHaveBeenCalled()
+    expect(harness.publish).not.toHaveBeenCalled()
+  })
+
   it('keeps the cached queue untouched and publishes nothing when the write fails', async () => {
     const harness = createHarness([queueItem('char_a', '阿米娅')])
     const before = harness.getCommitted()

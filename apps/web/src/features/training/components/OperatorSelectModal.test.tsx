@@ -365,4 +365,44 @@ describe('shared operator select modal', () => {
     expect(dialog()?.textContent).toContain('没有找到符合条件的干员')
     expect(dialog()?.textContent).toContain('换个名称再试。')
   })
+
+  it('moves search and profession filters into the fixed dialog toolbar', async () => {
+    mocks.getOperBoxData.mockResolvedValue({ success: true, data: { data: RECOGNIZED_OPERATORS } })
+    mocks.getAllOperators.mockResolvedValue({ success: true, data: OPERATOR_CATALOG })
+
+    await renderModal('asc')
+
+    const toolbar = document.querySelector<HTMLElement>('[data-slot="dialog-toolbar"]')
+    const body = document.querySelector<HTMLElement>('[data-slot="dialog-body"]')
+    expect(toolbar).not.toBeNull()
+    expect(body).not.toBeNull()
+    expect(toolbar!.querySelector('input[aria-label="搜索干员名称"]')).not.toBeNull()
+    expect(toolbar!.querySelector('[aria-label="职业筛选"]')).not.toBeNull()
+    expect(body!.querySelector('input[aria-label="搜索干员名称"]')).toBeNull()
+    expect(body!.querySelector('[aria-label="职业筛选"]')).toBeNull()
+  })
+
+  it('keeps the toolbar usable while loading and renders the empty state in the body', async () => {
+    let resolveOperBox!: (value: { success: boolean; data: { data: OwnedFixture[] } }) => void
+    mocks.getOperBoxData.mockReturnValue(new Promise(resolve => {
+      resolveOperBox = resolve
+    }))
+    mocks.getAllOperators.mockResolvedValue({ success: true, data: [] })
+
+    await renderModal()
+
+    const toolbar = document.querySelector<HTMLElement>('[data-slot="dialog-toolbar"]')
+    const body = document.querySelector<HTMLElement>('[data-slot="dialog-body"]')
+    expect(toolbar?.querySelector('input[aria-label="搜索干员名称"]')).not.toBeNull()
+    expect(body?.textContent).toContain('正在读取干员')
+    expect(body?.textContent).not.toContain('没有可选择的干员')
+
+    await act(async () => {
+      resolveOperBox({ success: true, data: { data: [] } })
+    })
+    await flush()
+
+    expect(body?.textContent).toContain('没有可选择的干员')
+    expect(body?.querySelector('input[aria-label="搜索干员名称"]')).toBeNull()
+  })
 })

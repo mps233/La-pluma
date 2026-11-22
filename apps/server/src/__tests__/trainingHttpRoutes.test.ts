@@ -11,7 +11,7 @@ import type {
   OperatorTrainingService,
   TrainingQueueSnapshot
 } from '../services/operatorTrainingService.ts'
-import { DEFAULT_TRAINING_SETTINGS } from '../services/operatorTrainingModel.ts'
+import { DEFAULT_TRAINING_SETTINGS, trainingError } from '../services/operatorTrainingModel.ts'
 import type { ApplyPlanResult, FlowSyncState } from '../services/operatorTrainingApplication.ts'
 import type { TrainingPlan } from '../services/operatorTrainingPlan.ts'
 import { LocalResourceError } from '../services/operatorTrainingStore.ts'
@@ -74,6 +74,8 @@ function emptyQueueSnapshot(overrides: Partial<TrainingQueueSnapshot> = {}): Tra
     settings: { ...DEFAULT_TRAINING_SETTINGS },
     lastUpdated: '2026-01-01T00:00:00.000Z',
     revision: 'revision-1',
+    gameDate: '2026-01-01',
+    clientType: 'Official',
     flowSync: { status: 'not_applied', flowName: '自动任务', taskName: '理智作战' },
     ...overrides
   }
@@ -216,6 +218,79 @@ describe('training routes over real HTTP', () => {
     const defaultMode = await postJson(agentUrl(port, '/training/plan'), {})
     assert.equal(defaultMode.status, 200)
     assert.deepEqual(modes, ['all', 'current'])
+  })
+
+  it('passes the resolved client type and captured time to plan application and preserves stale-plan details', async () => {
+    const app = createLaPlumaApp({ env: {} })
+    const port = await startHttpServer(app, servers)
+    const captured: Array<{
+      plan: unknown
+      settings: unknown
+      options?: { clientType?: string; now?: Date }
+    }> = []
+    operatorTraining.applyPlanToTasks = async (plan, settings, options) => {
+      captured.push({ plan, settings, options })
+      throw trainingError('养成计划已过期，请重新生成计划后应用', 409, {
+        code: 'AGENT_TRAINING_PLAN_STALE',
+        details: {
+          reason: 'stage_closed',
+          gameDate: '2026-10-28',
+          planGameDate: '2026-10-28',
+          clientType: 'YoStarEN',
+          planClientType: 'YoStarEN',
+          closedStages: ['CE-6']
+        }
+      })
+    }
+
+    const requestedAt = Date.now()
+    const response = await postJson(
+      agentUrl(port, '/actions/apply-training-plan?clientType=YoStarEN'),
+      { plan: { queueRevision: 'revision-1' }, settings: { useMedicine: 2 } }
+    )
+    const receivedAt = Date.now()
+
+    assert.equal(response.status, 409)
+    const body = await readEnvelope(response)
+    assert.equal(body.success, false)
+    assert.equal(body.message, '养成计划已过期，请重新生成计划后应用')
+    assert.equal(body.error?.code, 'AGENT_TRAINING_PLAN_STALE')
+    assert.deepEqual(body.error?.details, {
+      reason: 'stage_closed',
+      gameDate: '2026-10-28',
+      planGameDate: '2026-10-28',
+      clientType: 'YoStarEN',
+      planClientType: 'YoStarEN',
+      closedStages: ['CE-6']
+    })
+    assert.equal(body.error?.retryable, false)
+
+    const applied = captured[0]
+    assert.ok(applied)
+    assert.deepEqual(applied.plan, { queueRevision: 'revision-1' })
+    assert.deepEqual(applied.settings, { useMedicine: 2 })
+    const appliedOptions = applied.options
+    assert.equal(appliedOptions?.clientType, 'YoStarEN')
+    assert.ok(appliedOptions?.now instanceof Date)
+    assert.ok(appliedOptions.now.getTime() >= requestedAt)
+    assert.ok(appliedOptions.now.getTime() <= receivedAt)
+  })
+
+  it('returns the current game day and client type with the queue snapshot', async () => {
+    const app = createLaPlumaApp({ env: {} })
+    const port = await startHttpServer(app, servers)
+    operatorTraining.getTrainingQueue = async () => emptyQueueSnapshot({
+      gameDate: '2026-10-28',
+      clientType: 'YoStarEN'
+    })
+
+    const response = await fetch(agentUrl(port, '/training/queue'))
+
+    assert.equal(response.status, 200)
+    const body = await readEnvelope<{ gameDate: string; clientType: string }>(response)
+    assert.equal(body.success, true)
+    assert.equal(body.data?.gameDate, '2026-10-28')
+    assert.equal(body.data?.clientType, 'YoStarEN')
   })
 
   it('keeps a saved queue distinguishable from failed flow and schedule synchronization', async () => {

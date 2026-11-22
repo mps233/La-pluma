@@ -31,6 +31,7 @@ import {
   captureTrainingPlanBasis,
   isTrainingPlanBasisCurrent,
   type TrainingPlanBasis,
+  type TrainingPlanBasisContext,
 } from './planValidity'
 import {
   trainingSettingsOwner,
@@ -67,6 +68,16 @@ export const TRAINING_PLAN_BLOCKED_CONFIG_MESSAGE =
   '自动化配置仍有未同步的本地编辑，请先完成同步后再应用计划'
 
 export const TRAINING_PLAN_BASIS_CHANGED_MESSAGE = '计划前提已变化，请重新预览计划'
+
+export const TRAINING_PLAN_STALE_MESSAGE = '计划已过期，请重新预览计划后再应用'
+
+export const TRAINING_PLAN_STALE_GAME_DAY_MESSAGE = '游戏日已变化，请重新预览计划后再应用'
+
+export const TRAINING_PLAN_STALE_CLIENT_TYPE_MESSAGE = '客户端区服已变化，请重新预览计划后再应用'
+
+export const TRAINING_PLAN_STALE_STAGE_CLOSED_MESSAGE = '计划中的资源关卡已关闭，请重新预览计划后再应用'
+
+const TRAINING_PLAN_STALE_CODE = 'AGENT_TRAINING_PLAN_STALE'
 
 export const DEFAULT_TRAINING_FLOW_SYNC: TrainingFlowSync = {
   status: 'not_applied',
@@ -175,6 +186,47 @@ const readResponseData = (response: ApiResponse): Record<string, unknown> => (
   isRecord(response.data) ? response.data : {}
 )
 
+const readPlanBasisContext = (plan: TrainingPlan): TrainingPlanBasisContext => {
+  const summary: unknown = plan.summary
+  if (!isRecord(summary)) return { gameDate: null, clientType: null }
+  return {
+    gameDate: typeof summary.gameDate === 'string' ? summary.gameDate : null,
+    clientType: typeof summary.clientType === 'string' ? summary.clientType : null,
+  }
+}
+
+const readClosedStages = (details: unknown): string[] => {
+  if (!isRecord(details) || !Array.isArray(details.closedStages)) return []
+  return details.closedStages
+    .filter((stage): stage is string => typeof stage === 'string' && stage.trim() !== '')
+    .map(stage => stage.trim())
+}
+
+const describeStalePlanMessage = (response: ApiResponse): string | null => {
+  const errorInfo = response.errorInfo
+  if (!isRecord(errorInfo)) return null
+  const details: unknown = errorInfo.details
+  const reason = isRecord(details) ? details.reason : null
+  const codeIsStale = errorInfo.code === TRAINING_PLAN_STALE_CODE
+  if (
+    !codeIsStale
+    && reason !== 'game_day'
+    && reason !== 'client_type'
+    && reason !== 'stage_closed'
+  ) {
+    return null
+  }
+  if (reason === 'game_day') return TRAINING_PLAN_STALE_GAME_DAY_MESSAGE
+  if (reason === 'client_type') return TRAINING_PLAN_STALE_CLIENT_TYPE_MESSAGE
+  if (reason === 'stage_closed') {
+    const closedStages = readClosedStages(details)
+    return closedStages.length > 0
+      ? `计划中的资源关卡已关闭（${closedStages.join('、')}），请重新预览计划后再应用`
+      : TRAINING_PLAN_STALE_STAGE_CLOSED_MESSAGE
+  }
+  return TRAINING_PLAN_STALE_MESSAGE
+}
+
 const defaultSettleAutomationConfig = (): Promise<ConfigSettleResult> => (
   userConfigCoordinator.settle([USER_CONFIG_KEYS.automationTasks])
 )
@@ -241,13 +293,12 @@ export class TrainingPlanOwner {
   /** 作废旧计划与提示；递增 generation 使迟到的生成响应失效。 */
   invalidate(): void {
     this.generation += 1
-    if (!this.state.plan && !this.state.basis && !this.state.error && !this.state.warning) return
+    if (!this.state.plan && !this.state.basis && !this.state.error) return
     this.state = {
       ...this.state,
       plan: null,
       basis: null,
       error: null,
-      warning: null,
     }
     this.notify()
   }
@@ -343,8 +394,13 @@ export class TrainingPlanOwner {
         return { status: 'failed', message }
       }
 
+      const planBasis = captureTrainingPlanBasis(
+        basis.queueRevision,
+        basis.settingsRevision,
+        readPlanBasisContext(generated),
+      )
       // 生成期间若有版本变化但页面 Effect 尚未运行，响应返回时仍按实时版本裁决。
-      if (!isTrainingPlanBasisCurrent(basis, this.currentBasis(context))) {
+      if (!isTrainingPlanBasisCurrent(planBasis, this.currentBasis(context))) {
         await this.refreshQueue(context)
         const message = TRAINING_PLAN_BASIS_CHANGED_MESSAGE
         this.setError(message)
@@ -354,12 +410,12 @@ export class TrainingPlanOwner {
       this.state = {
         ...this.state,
         plan: generated,
-        basis,
+        basis: planBasis,
         error: null,
         warning: null,
       }
       this.notify()
-      return { status: 'generated', plan: generated, basis }
+      return { status: 'generated', plan: generated, basis: planBasis }
     } catch (error) {
       const message = describeError(error, '生成计划失败，请重试')
       if (request === this.generation || !this.state.error) this.setError(message)
@@ -385,7 +441,6 @@ export class TrainingPlanOwner {
     })
     if (!available) {
       const message = TRAINING_PLAN_BASIS_CHANGED_MESSAGE
-      this.invalidate()
       this.setError(message)
       return { status: 'failed', message }
     }
@@ -393,6 +448,7 @@ export class TrainingPlanOwner {
     const todayPlan = getOpenStagePlan(plan)
     if (!todayPlan.stages?.length) return { status: 'ignored' }
 
+    const warningBeforeApply = this.state.warning
     this.state = { ...this.state, operation: 'apply', error: null, warning: null }
     this.notify()
 
@@ -416,7 +472,6 @@ export class TrainingPlanOwner {
         || context.isRefreshFailed()
       ) {
         const message = TRAINING_PLAN_BASIS_CHANGED_MESSAGE
-        this.invalidate()
         this.setError(message)
         return { status: 'failed', message }
       }
@@ -426,6 +481,18 @@ export class TrainingPlanOwner {
         settings: this.readSettings().settings,
       })
       if (!response.success) {
+        const staleMessage = describeStalePlanMessage(response)
+        if (staleMessage) {
+          this.invalidate()
+          await this.refreshQueue(context)
+          this.state = {
+            ...this.state,
+            error: staleMessage,
+            warning: warningBeforeApply,
+          }
+          this.notify()
+          return { status: 'failed', message: staleMessage }
+        }
         throw new Error(resolveFailureMessage(response, '应用失败，请重新预览后重试'))
       }
 
@@ -568,9 +635,14 @@ export class TrainingPlanOwner {
   }
 
   private currentBasis(context: TrainingPlanQueueContext): TrainingPlanBasis {
+    const snapshot = context.getSnapshot()
     return captureTrainingPlanBasis(
-      context.getSnapshot()?.revision,
+      snapshot?.revision,
       this.readSettings().revision,
+      {
+        gameDate: snapshot?.gameDate,
+        clientType: snapshot?.clientType,
+      },
     )
   }
 

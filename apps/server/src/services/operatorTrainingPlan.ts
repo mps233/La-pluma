@@ -7,10 +7,17 @@ import { createLogger } from '../utils/logger.ts';
 import { getTodayOpenStages, isStageOpenToday } from './notificationService.ts';
 import type { DailyOpenStage } from './notificationService.ts';
 import { isResourceCollectionOpen } from './maaActivityService.ts';
+import type { CachedResourceCollectionWindow, ResourceCollectionWindow } from './maaActivityService.ts';
+import { getGameDay, resolveGameZone } from './gameCalendar.ts';
 import { resolveConnection } from './connectionService.ts';
 import { findBestFarmStage, getStageEstimate, loadPenguinDropData } from './dropDataService.ts';
 import type { PenguinDropData, PenguinDropMetadata, StageDropEstimate } from './dropDataService.ts';
-import { calculateOperatorMaterials, trainingError } from './operatorTrainingModel.ts';
+import {
+  calculateOperatorMaterials,
+  getApplicableStages,
+  isRecord,
+  trainingError
+} from './operatorTrainingModel.ts';
 import type {
   DepotSnapshot,
   MaterialFormulas,
@@ -661,5 +668,90 @@ export async function generateTrainingPlan(
       todayOpenResourceStages: todayOpen.open,
       todayClosedResourceStages: todayOpen.closed
     }
+  };
+}
+
+export interface TrainingPlanApplyContextOptions {
+  now?: Date;
+  clientType?: string;
+}
+
+export interface TrainingPlanApplyContext {
+  gameDate: string;
+  clientType: string;
+  planGameDate: string | null;
+  planClientType: string | null;
+  gameDateMismatch: boolean;
+  clientTypeMismatch: boolean;
+  intendedStages: string[];
+  closedStages: string[];
+}
+
+export async function resolveTrainingPlanApplyContext(
+  plan: unknown,
+  options: TrainingPlanApplyContextOptions = {}
+): Promise<TrainingPlanApplyContext> {
+  const now = options.now ?? new Date();
+  const clientType = resolveGameZone(options.clientType).clientType;
+  const gameDate = getGameDay(now, clientType).date;
+
+  const planRecord = isRecord(plan) ? plan : {};
+  const summary = isRecord(planRecord.summary) ? planRecord.summary : null;
+  const rawPlanGameDate = summary?.gameDate;
+  const planGameDate = typeof rawPlanGameDate === 'string' && rawPlanGameDate.trim() !== ''
+    ? rawPlanGameDate.trim()
+    : null;
+  const rawPlanClientType = summary?.clientType;
+  const planClientType = typeof rawPlanClientType === 'string' && rawPlanClientType.trim() !== ''
+    ? resolveGameZone(rawPlanClientType).clientType
+    : null;
+  const gameDateMismatch = planGameDate !== null && planGameDate !== gameDate;
+  const clientTypeMismatch = planClientType !== null && planClientType !== clientType;
+
+  const intendedStages: string[] = [];
+  const seenStages = new Set<string>();
+  for (const applicable of getApplicableStages(planRecord)) {
+    const code = applicable.stage.trim();
+    const key = code.toUpperCase();
+    if (!code || seenStages.has(key)) continue;
+    seenStages.add(key);
+    intendedStages.push(code);
+  }
+
+  const activityCache = new Map<string, CachedResourceCollectionWindow>();
+  const activityRequests = new Map<string, Promise<ResourceCollectionWindow | null>>();
+  const allResourceStagesOpen = await isResourceCollectionOpen(clientType, {
+    now: () => now.getTime(),
+    cache: activityCache,
+    inflight: activityRequests
+  });
+  const activityUnreadable = [...activityCache.values()].some(entry => entry.failed);
+
+  const summaryOpenStages = new Set<string>();
+  if (activityUnreadable && planGameDate === gameDate && planClientType === clientType) {
+    const entries = summary && Array.isArray(summary.todayOpenResourceStages)
+      ? summary.todayOpenResourceStages
+      : [];
+    for (const entry of entries) {
+      if (!isRecord(entry) || typeof entry.stage !== 'string') continue;
+      const code = entry.stage.trim().toUpperCase();
+      if (code) summaryOpenStages.add(code);
+    }
+  }
+
+  const closedStages = intendedStages.filter(stage => {
+    const { isOpen } = isStageOpenToday(stage, { now, clientType, allResourceStagesOpen });
+    return !isOpen && !summaryOpenStages.has(stage.toUpperCase());
+  });
+
+  return {
+    gameDate,
+    clientType,
+    planGameDate,
+    planClientType,
+    gameDateMismatch,
+    clientTypeMismatch,
+    intendedStages,
+    closedStages
   };
 }

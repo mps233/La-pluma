@@ -36,10 +36,24 @@ const KNOWN_SETTING_KEYS = new Set([
 /** 领域错误：沿用既有 statusCode 约定（400 参数无效、409 计划过期）。 */
 export interface TrainingError extends Error {
   statusCode: number;
+  code?: string;
+  details?: Record<string, unknown>;
 }
 
-export function trainingError(message: string, statusCode = 400): TrainingError {
-  return Object.assign(new Error(message), { statusCode });
+export interface TrainingErrorOptions {
+  code?: string;
+  details?: Record<string, unknown>;
+}
+
+export function trainingError(
+  message: string,
+  statusCode = 400,
+  options: TrainingErrorOptions = {}
+): TrainingError {
+  const error: TrainingError = Object.assign(new Error(message), { statusCode });
+  if (options.code !== undefined) error.code = options.code;
+  if (options.details !== undefined) error.details = options.details;
+  return error;
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -244,12 +258,12 @@ export interface ApplicableStage {
 }
 
 /**
- * 从计划中挑选可执行的关卡：优先 openStages，否则取标记开放的 stages。
+ * 从计划中挑选可执行的关卡：openStages 存在（包括空数组）即权威，否则取标记开放的 stages。
  * 关卡代号与非正数次数在解析时被丢弃。
  */
 export function getApplicableStages(plan: unknown = {}): ApplicableStage[] {
   const record = isRecord(plan) ? plan : {};
-  const candidateStages = Array.isArray(record.openStages) && record.openStages.length > 0
+  const candidateStages = Array.isArray(record.openStages)
     ? record.openStages
     : Array.isArray(record.stages)
       ? record.stages.filter(stage => !isRecord(stage) || stage.isOpen !== false)

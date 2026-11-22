@@ -93,6 +93,11 @@ import { DeviceMonitorLayout } from '@/features/device-mirror'
   <WorkspaceContent />
 </DeviceMonitorLayout>
 
+// standard + support：右列设备画面下方追加该页的辅助内容
+<DeviceMonitorLayout variant="standard" support={<PageSupportPanel />}>
+  <WorkspaceContent />
+</DeviceMonitorLayout>
+
 // workbench：任务流程 / 任务配置 / 支撑列（日常）
 <DeviceMonitorLayout
   variant="workbench"
@@ -109,11 +114,13 @@ import { DeviceMonitorLayout } from '@/features/device-mirror'
 />
 ```
 
-Props 是 discriminated union：`standard` 接收 `children`；`workbench` 接收 `sequence`、`editor`、`support`；`mode` 接收 `mode`、`content`。不提供列数、区域、间距或画面位置等通用网格配置。
+Props 是 discriminated union：`standard` 接收 `children` 与可选 `support`；`workbench` 接收 `sequence`、`editor`、`support`；`mode` 接收 `mode`、`content`。不提供列数、区域、间距或画面位置等通用网格配置。
 
-根节点输出 `data-device-monitor-layout="standard|workbench|mode"`，区域输出 `data-monitor-area`（`main`、`monitor`、`sequence`、`editor`、`support`、`mode`、`settings`）。`standard` 的 `main`/`monitor` 和各 variant 的 `monitor` 由布局渲染；`workbench` 的 `sequence`/`editor`、`mode` 的 `mode` 以及 `main`/`settings` 由页面提供的根节点携带，布局不克隆或包裹这些节点。`mode` 的 `content` 保持页面传入的 `display: contents` 面板，由内部的 `main`/`settings` 参与网格。
+`standard` 提供 `support` 时，右列由布局渲染 `[data-monitor-area="support"]` 容器，容器内先渲染设备画面 `aside[data-monitor-area="monitor"]`，再渲染 `support` 内容；容器本身不带 landmark role，页面仍只有一个 `data-region="monitor"`。不提供 `support`（`undefined` 或 `null`）时 DOM 与未引入该属性前一致：`main` 之后是直接的 `aside[data-monitor-area="monitor"]`，不出现 `support` 容器。
 
-`standard` 的 monitor 列在视口小于 1360px 且内容宽度超过 48rem 时使用 `max-width: 48rem` 并居中；视口达到 1360px 后改用三列网格并解除该上限。组件持有 grid 根节点 DOM、`monitor` 区域与 monitor 列；`workbench`/`mode` 的页面网格模板与断点仍由对应页面样式（`automation.css` / `roguelike.css`）提供，页面只通过 `data-monitor-area` 提供具名区域。
+根节点输出 `data-device-monitor-layout="standard|workbench|mode"`，区域输出 `data-monitor-area`（`main`、`monitor`、`sequence`、`editor`、`support`、`mode`、`settings`）。`standard` 的 `main`/`monitor`（以及提供 `support` 时的 `support` 容器）和各 variant 的 `monitor` 由布局渲染；`workbench` 的 `sequence`/`editor`、`mode` 的 `mode` 以及 `main`/`settings` 由页面提供的根节点携带，布局不克隆或包裹这些节点。`mode` 的 `content` 保持页面传入的 `display: contents` 面板，由内部的 `main`/`settings` 参与网格。
+
+`standard` 的 monitor 列与 `support` 容器在视口小于 1360px 且内容宽度超过 48rem 时使用 `max-width: 48rem` 并居中；视口达到 1360px 后改用三列网格并解除该上限。组件持有 grid 根节点 DOM、`monitor` 区域与 monitor 列；`workbench`/`mode` 的页面网格模板与断点仍由对应页面样式（`automation.css` / `roguelike.css`）提供，页面只通过 `data-monitor-area` 提供具名区域。
 
 `data-region="monitor"` 仍只由 `DeviceMonitorPanel` 的卡片输出，每个页面恰好一个。概览页的设备卡片不纳入此布局，不输出 `data-device-monitor-layout`，也不渲染 `data-region="monitor"`。
 
@@ -151,7 +158,7 @@ import { SegmentedTabs, SegmentedTabNav, SegmentedTabPanel } from '@/shared/comp
 ```
 
 - `SegmentedTabs` 的根节点使用 `display: contents`，不引入额外布局层；tab 导航与面板可以继续作为原网格或弹性布局的直接子项。
-- `SegmentedTabNav` 保留 `app-workspace-segments`、`app-liquid-tab-pill`、`app-workspace-segment-list`、`app-workspace-segment-indicator`、`app-workspace-segment(-icon|-copy)`、`is-selected` 与流体高亮。`className`、`listClassName`、`indicatorClassName`、`tabClassName`、`iconClassName` 只承载页面差异；测量复用 `useFluidTabIndicator`，不要逐页复制。
+- `SegmentedTabNav` 保留 `app-workspace-segments`、`app-workspace-segment-list`、`app-workspace-segment-indicator`、`app-workspace-segment(-icon|-copy)`、`is-selected` 与流体高亮；分段容器保持透明，高亮指示器使用语义 token（`--muted` 背景与 `--border` 内描边），不再消费 `--glass-*` 或页面级玻璃类名。`className`、`listClassName`、`indicatorClassName`、`tabClassName`、`iconClassName` 只承载页面差异；测量复用 `useFluidTabIndicator`，不要逐页复制。
 - 标签使用 Base UI 的 tablist/tab 语义，`activateOnFocus` 固定为 `false`：左右方向键、Home、End 只移动 roving focus，Enter、Space 或点击才切换选中项。不要恢复方向键直接激活的旧行为。
 - `tabId` / `panelId` 可选：传入时提供稳定 id 与 `aria-controls`，省略时由 Base UI 生成并注册关联。`panelId` 只能指向当前实际渲染的面板；默认卸载的页面只在当前 tab 上返回 `panelId`，避免 `aria-controls` 指向不存在的元素。`SegmentedTabPanel` 的 `id` 同样可选；输出 `role="tabpanel"` 与 `aria-labelledby`。如果给面板传 `id`，对应 tab 必须传相同的 `panelId`；或者两侧都省略，交给 Base UI 生成。只传一侧会破坏关联。不传 `keepMounted` 时隐藏面板卸载，传 `true` 时保留 DOM 并设置 `hidden`。配置与统计需要保留草稿、反馈、Query 与统计周期，使用 `keepMounted`；作业使用默认卸载；肉鸽使用始终打开的单个 `contents` 面板承载跨 grid-area 内容。
 - 无法把整块内容包进面板时（例如肉鸽网格的多个 grid-area），保留原网格，把模式相关区域放进单个 `className="contents"` 的面板，并让所有 tab 指向同一个 `panelId`。
@@ -287,7 +294,7 @@ import { Button } from '@/shared/ui/button'
 </Alert>
 ```
 
-根节点固定输出 `role="alert"`，不要改成 `role="status"`，也不要在其中再包一层 alert 角色。`variant` 只有 `default` 与 `destructive`；不提供 success/warning 业务变体，其他状态用 `className` 覆盖。标题、描述与右上角操作分别使用 `AlertTitle`、`AlertDescription` 与 `AlertAction`。图标作为根节点的直接子元素渲染，装饰图标加 `aria-hidden="true"`。
+根节点固定输出 `role="alert"`，不要改成 `role="status"`，也不要在其中再包一层 alert 角色。`variant` 只有 `default` 与 `destructive`；不提供 success/warning 业务变体，其他状态用 `className` 覆盖。`destructive` variant 的标题与描述文字使用 `--destructive-text`（Tailwind `text-destructive-text`），背景仍为 `bg-card`；这是有意的共享语义修正，会同时影响 combat 等所有 `Alert` 调用点。标题、描述与右上角操作分别使用 `AlertTitle`、`AlertDescription` 与 `AlertAction`。图标作为根节点的直接子元素渲染，装饰图标加 `aria-hidden="true"`。
 
 ---
 

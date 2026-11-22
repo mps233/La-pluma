@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { notify } from '@/shared/notifications'
 import { useResourceInvalidation } from '@/features/resource-invalidation'
@@ -27,6 +27,7 @@ import type {
   TrainingOperator,
   TrainingPlanMode,
   TrainingQueueItem,
+  TrainingQueueSnapshot,
   TrainingSettings,
 } from '../types'
 
@@ -52,6 +53,7 @@ export default function TrainingWorkspace() {
   const queueQuery = useQuery(queueOptions)
   const queueSnapshot = queueQuery.data
   const queue = queueSnapshot?.queue ?? EMPTY_TRAINING_QUEUE
+  const settingsReady = Boolean(queueSnapshot?.settings)
   // 首次读取失败后重试期间保持加载态，避免错误页与请求进度同时出现。
   const queueLoading = queueQuery.isPending
     || (queueQuery.isFetching && !queueSnapshot && queueQuery.isError)
@@ -81,7 +83,9 @@ export default function TrainingWorkspace() {
     recordFlowSync,
   } = useTrainingPlan({ queueSnapshot })
   const {
-    pendingOperatorIds,
+    pendingAdds,
+    pendingRemoves,
+    pendingUndoOperatorIds,
     queueMutationPending,
     run: runQueueCommand,
   } = useTrainingQueueCommands()
@@ -140,8 +144,7 @@ export default function TrainingWorkspace() {
     if (outcome.status === 'failed') {
       setOperationError(outcome.message)
       showError(outcome.message)
-      // 命令开始时会取消在途读取；若当时还没有快照，失败后重新建立首屏读取。
-      if (!queueSnapshot) void queueQuery.refetch()
+      void reloadQueue()
       return null
     }
     recordFlowSync(outcome.flowSync)
@@ -154,6 +157,27 @@ export default function TrainingWorkspace() {
     () => new Set(queue.map(item => item.operatorId)),
     [queue],
   )
+
+  useEffect(() => {
+    const queueKey = trainingKeys.resource('queue')
+    return queryClient.getQueryCache().subscribe(event => {
+      if (event.type !== 'updated' || event.action.type !== 'success') return
+      if (event.query.queryKey.length !== queueKey.length) return
+      if (event.query.queryKey[0] !== queueKey[0] || event.query.queryKey[1] !== queueKey[1]) return
+      const snapshot = event.query.state.data as TrainingQueueSnapshot | undefined
+      if (!snapshot) return
+      setRecentlyRemoved(current => (
+        current && snapshot.queue.some(item => item.operatorId === current.item.operatorId)
+          ? null
+          : current
+      ))
+    })
+  }, [queryClient])
+
+  const isQueuedInLatestSnapshot = (operatorId: string): boolean => {
+    const snapshot = queryClient.getQueryData<TrainingQueueSnapshot>(trainingKeys.resource('queue'))
+    return Boolean(snapshot?.queue.some(item => item.operatorId === operatorId))
+  }
 
   const handleAddToQueue = async (operator: TrainingOperator) => {
     if (queueOperatorIds.has(operator.id)) return
@@ -171,7 +195,9 @@ export default function TrainingWorkspace() {
     const outcome = await runQueueCommand({ type: 'remove', operatorId })
     const settled = settleQueueOutcome(outcome)
     if (!settled?.removed) return false
-    setRecentlyRemoved(settled.removed)
+    if (!isQueuedInLatestSnapshot(settled.removed.item.operatorId)) {
+      setRecentlyRemoved(settled.removed)
+    }
     return true
   }
 
@@ -186,6 +212,10 @@ export default function TrainingWorkspace() {
       item: snapshot.item,
       index: snapshot.index,
     })
+    if (outcome.status === 'ignored') {
+      setRecentlyRemoved(null)
+      return false
+    }
     const settled = settleQueueOutcome(outcome)
     if (!settled) return false
     setRecentlyRemoved(null)
@@ -211,10 +241,12 @@ export default function TrainingWorkspace() {
 
   // 可生成/可应用条件与版本前提由领域所有者再次校验；这里的值只驱动按钮状态。
   const handleGeneratePlan = (mode: TrainingPlanMode) => {
+    if (!settingsReady) return
     void generatePlan(mode)
   }
 
   const handleApplyPlan = async () => {
+    if (!settingsReady) return
     const outcome = await applyPlan()
     if (outcome.status === 'applied') {
       showSuccess(`养成计划已应用到${outcome.flowName}`)
@@ -228,10 +260,10 @@ export default function TrainingWorkspace() {
     if (outcome.status === 'partial') notify(outcome.message, 'warning')
   }
 
-  const handleUpdateSettings = (newSettings: TrainingSettings) => {
+  const handleUpdateSettings = (patch: Partial<TrainingSettings>) => {
     // 编辑立即作废旧计划：即使随后写入失败，旧计划也不能继续被应用。
     invalidatePlan()
-    void updateSettings(newSettings).then(outcome => {
+    void updateSettings(patch).then(outcome => {
       if (outcome.status === 'failed' && !outcome.superseded) {
         showError(TRAINING_SETTINGS_FAILURE_MESSAGE)
       }
@@ -243,12 +275,23 @@ export default function TrainingWorkspace() {
     && isTrainingPlanBasisCurrent(planBasis, {
       queueRevision: queueSnapshot?.revision ?? null,
       settingsRevision,
+      gameDate: queueSnapshot?.gameDate ?? null,
+      clientType: queueSnapshot?.clientType ?? null,
     }))
   const currentTarget = queue[0] ?? null
 
   return (
     <>
-      <DeviceMonitorLayout variant="standard">
+      <DeviceMonitorLayout
+        variant="standard"
+        support={(
+          <TrainingSettingsPanel
+            settings={settings}
+            settingsReady={settingsReady}
+            onUpdate={handleUpdateSettings}
+          />
+        )}
+      >
         <div className="training-workspace-grid">
           <TrainingQueuePanel
             queue={queue}
@@ -258,8 +301,8 @@ export default function TrainingWorkspace() {
             refreshError={refreshError}
             operationError={operationError}
             busy={busy}
-            pendingOperatorIds={pendingOperatorIds}
-            queueMutationPending={queueMutationPending}
+            pendingRemoveOperatorIds={pendingRemoves}
+            pendingUndoOperatorIds={pendingUndoOperatorIds}
             recentlyRemoved={recentlyRemoved}
             onRemove={handleRemoveFromQueue}
             onReorder={handleReorder}
@@ -271,7 +314,7 @@ export default function TrainingWorkspace() {
           />
 
           <div className="training-detail-column">
-            <TrainingMaterialsPanel target={currentTarget} />
+            <TrainingMaterialsPanel target={currentTarget} queuePending={queueLoading} queueError={queueError} />
 
             <TrainingPlanPanel
               plan={plan}
@@ -286,7 +329,10 @@ export default function TrainingWorkspace() {
               hasQueue={queue.length > 0 && !queueError}
               refreshFailed={refreshError}
               queueLength={queue.length}
+              queuePending={queueLoading}
+              queueError={queueError}
               currentTarget={currentTarget}
+              settingsReady={settingsReady}
               onGenerate={handleGeneratePlan}
               onApply={handleApplyPlan}
               onRetrySync={handleRetrySync}
@@ -295,8 +341,6 @@ export default function TrainingWorkspace() {
             />
           </div>
         </div>
-
-        <TrainingSettingsPanel settings={settings} onUpdate={handleUpdateSettings} />
       </DeviceMonitorLayout>
 
       <OperatorPicker
@@ -306,7 +350,7 @@ export default function TrainingWorkspace() {
         queueLength={queue.length}
         busy={busy}
         operationError={operationError}
-        pendingOperatorIds={pendingOperatorIds}
+        pendingOperatorIds={pendingAdds}
         onAdd={handleAddToQueue}
       />
     </>

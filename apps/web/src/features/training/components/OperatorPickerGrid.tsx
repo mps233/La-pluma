@@ -27,7 +27,7 @@ function OperatorPickerCard({ item, eager }: OperatorPickerCardProps) {
 
   return (
     <div className={`training-operator-item relative overflow-hidden p-2.5 ${isOwned ? '' : 'opacity-75'}`}>
-      <div className="relative mb-2.5 aspect-square w-full overflow-hidden rounded-xl surface-panel">
+      <div className="relative mb-2.5 aspect-square w-full overflow-hidden rounded-xl bg-muted">
         {item.id ? (
           <>
             {!imageLoaded && (
@@ -65,7 +65,7 @@ function OperatorPickerCard({ item, eager }: OperatorPickerCardProps) {
           </div>
         )}
         {item.rarity > 0 && (
-          <div className="absolute right-2 top-2 rounded-full px-2 py-0.5 text-xs font-semibold surface-panel brand-text">
+          <div className="absolute right-2 top-2 rounded-full px-2 py-0.5 text-xs font-semibold brand-chip brand-text">
             {item.rarity}★
           </div>
         )}
@@ -77,7 +77,7 @@ function OperatorPickerCard({ item, eager }: OperatorPickerCardProps) {
         </div>
         <div className="flex min-h-5 flex-wrap items-center justify-center gap-1 text-xs">
           {isOwned && item.elite !== undefined && (
-            <span className="whitespace-nowrap rounded-full px-2 py-0.5 surface-panel text-muted-foreground">
+            <span className="whitespace-nowrap rounded-full px-2 py-0.5 surface-soft text-muted-foreground">
               精{item.elite}{item.level ? ` · ${item.level} 级` : ''}
             </span>
           )}

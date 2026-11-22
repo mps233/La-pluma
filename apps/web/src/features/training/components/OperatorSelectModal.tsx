@@ -49,7 +49,7 @@ function OperatorEmptyState({ title, description }: { title: string; description
   return (
     <EmptyState
       compact
-      className="py-8"
+      className="min-h-60 py-8"
       icon={<UserRoundSearch size={21} strokeWidth={1.8} />}
       title={title}
       description={description}
@@ -178,6 +178,38 @@ export default function OperatorSelectModal({
       onOpenChange={open => { if (!open) handleClose() }}
       title={title}
       size="4xl"
+      toolbar={(
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search size={17} strokeWidth={1.9} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" />
+            <Input
+              type="text"
+              autoComplete="off"
+              aria-label="搜索干员名称"
+              placeholder="搜索干员"
+              value={searchTerm}
+              onChange={event => handleSearchChange(event.target.value)}
+              className="w-full pl-9"
+            />
+          </div>
+          {professionFilterVisible && (
+            <Select
+              items={[...OPERATOR_PROFESSION_FILTERS]}
+              value={professionFilter}
+              onValueChange={(next, details) => { if (details.reason !== 'none' && next !== null) handleProfessionFilterChange(next) }}
+            >
+              <SelectTrigger aria-label="职业筛选" className="w-36 shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[...OPERATOR_PROFESSION_FILTERS].map(item => (
+                  <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      )}
       footer={(
         <DialogFrameFooter align="between">
           <span className="text-sm text-muted-foreground">
@@ -191,63 +223,30 @@ export default function OperatorSelectModal({
       )}
     >
       <DialogBody>
-        <div className="space-y-3.5">
-            <div className="flex items-center gap-2">
-              <div className="relative min-w-0 flex-1">
-                <Search size={17} strokeWidth={1.9} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" />
-                <Input
-                  type="text"
-                  autoComplete="off"
-                  aria-label="搜索干员名称"
-                  placeholder="搜索干员"
-                  value={searchTerm}
-                  onChange={event => handleSearchChange(event.target.value)}
-                  className="w-full pl-9"
-                />
-              </div>
-              {professionFilterVisible && (
-                <Select
-                  items={[...OPERATOR_PROFESSION_FILTERS]}
-                  value={professionFilter}
-                  onValueChange={(next, details) => { if (details.reason !== 'none' && next !== null) handleProfessionFilterChange(next) }}
-                >
-                  <SelectTrigger aria-label="职业筛选" className="w-36 shrink-0">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[...OPERATOR_PROFESSION_FILTERS].map(item => (
-                      <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-
-            {loading ? (
-              <div className="flex min-h-65 items-center justify-center">
-                <Loading text="正在读取干员..." />
-              </div>
-            ) : hasError ? (
-              <TrainingLoadError
-                title="干员列表加载失败"
-                description={LOAD_ERROR_MESSAGE}
-                onRetry={handleRetry}
-              />
-            ) : emptyState ? (
-              <OperatorEmptyState
-                title={hasActiveFilter ? '没有找到符合条件的干员' : '没有可选择的干员'}
-                description={hasActiveFilter ? emptyDescription : undefined}
-              />
-            ) : (
-              <OperatorPickerGrid
-                items={gridItems}
-                visibleCount={visibleOperators.length}
-                totalCount={filteredOperators.length}
-                hiddenCount={hiddenCount}
-                onShowMore={() => setVisibleLimit(nextOperatorRenderLimit)}
-              />
-            )}
-            </div>
+        {loading ? (
+          <div className="flex min-h-60 items-center justify-center">
+            <Loading text="正在读取干员..." />
+          </div>
+        ) : hasError ? (
+          <TrainingLoadError
+            title="干员列表加载失败"
+            description={LOAD_ERROR_MESSAGE}
+            onRetry={handleRetry}
+          />
+        ) : emptyState ? (
+          <OperatorEmptyState
+            title={hasActiveFilter ? '没有找到符合条件的干员' : '没有可选择的干员'}
+            description={hasActiveFilter ? emptyDescription : undefined}
+          />
+        ) : (
+          <OperatorPickerGrid
+            items={gridItems}
+            visibleCount={visibleOperators.length}
+            totalCount={filteredOperators.length}
+            hiddenCount={hiddenCount}
+            onShowMore={() => setVisibleLimit(nextOperatorRenderLimit)}
+          />
+        )}
       </DialogBody>
     </DialogFrame>
   )

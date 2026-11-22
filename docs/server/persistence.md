@@ -56,6 +56,8 @@
 
 - 队列文件包含 `queue`、`settings` 与 `lastUpdated`，未知顶层字段原样保留回写（`apps/server/src/services/operatorTrainingStore.ts:73-81,193-208`）。解析时缺少 `operatorId` 的条目忽略并告警；JSON 语法错误由 `readJsonFile` 抛出，不被吞掉（`apps/server/src/services/operatorTrainingStore.ts:177-209`）。
 - 队列内容指纹 `queueRevision` 是条目列表的 SHA-256（`apps/server/src/services/operatorTrainingStore.ts:211-217`）；养成计划应用必须校验它，并保留「队列已保存但流程/定时同步失败」的部分成功结果，不伪装成全成功。
+- 养成计划不落盘：服务端没有计划存储、版本或迁移。应用时在写入 automation 配置与队列之前，按当前连接 profile 的客户端类型、当前游戏日和活动窗口重新校验计划上下文；游戏日、客户端类型或打算应用的关卡已失效时返回 409 并保持零写入。
+- `GET /training/queue` 的计划上下文 `gameDate`/`clientType` 只读取连接 profile 与游戏日历，不读取活动表，也不改变队列文件。
 - 自动化任务配置读取时校验最小结构（对象、`taskFlow` 数组、任务 `params/stages` 形态），无效抛错；写回经 fileHelper 路径队列整体替换，不丢弃本领域未读取的字段（`apps/server/src/services/operatorTrainingStore.ts:493-533`）。
 - 养成数据快照（材料库、合成配方、干员材料、OperBox、仓库）结构不符时按空表处理并告警，不抛错（`apps/server/src/services/operatorTrainingStore.ts:288-300,335-366,441-481`）。
 - `operbox.json` 在 `data`（已识别拥有）之外可带 `allOpers`（识别目录，含 `owned` 标记与多语言名称）、`operTotal` 与 `recognition`；`recognition.status` 是写入时唯一的完整度信号，读取时不从目录存在与否反推，缺少该字段的快照一律按部分识别处理（`allOpers` 缺失不视为损坏），消费方据此区分已拥有、确认未拥有与未知（`apps/server/src/services/operatorCatalogModel.ts`、`apps/server/src/services/dataParserService.ts`、`apps/server/src/services/operatorTrainingService.ts`）。

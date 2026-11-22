@@ -3,12 +3,13 @@ import {
   trainingSettingsOwner,
   type TrainingSettingsOwner,
   type TrainingSettingsOwnerState,
+  type TrainingSettingsPatch,
   type TrainingSettingsWriteOutcome,
 } from '../model/settingsCommands'
 import type { TrainingSettings } from '../types'
 
 export interface TrainingSettingsController extends TrainingSettingsOwnerState {
-  readonly update: (settings: TrainingSettings) => Promise<TrainingSettingsWriteOutcome>
+  readonly update: (patch: TrainingSettingsPatch) => Promise<TrainingSettingsWriteOutcome>
   readonly hydrate: (settings?: TrainingSettings | null) => boolean
   readonly adopt: (settings?: TrainingSettings | null) => boolean
   readonly readState: () => TrainingSettingsOwnerState
@@ -20,7 +21,7 @@ export function useTrainingSettings(
   const state = useSyncExternalStore(owner.subscribe, owner.getState, owner.getState)
 
   const update = useCallback(
-    (settings: TrainingSettings) => owner.update(settings),
+    (patch: TrainingSettingsPatch) => owner.update(patch),
     [owner],
   )
   const hydrate = useCallback(

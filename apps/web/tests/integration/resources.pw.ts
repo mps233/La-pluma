@@ -63,7 +63,9 @@ test('识别完成使隐藏养成与总览失效，应用计划后自动化读�
   expect(state.submissions).toHaveLength(1)
 
   await navigateTo(page, 'training')
-  await expect(page.getByRole('heading', { name: '养成队列 1', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '养成队列', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '添加干员', exact: true })).toBeVisible()
+  await expect(page.getByText('继续添加', { exact: true })).toHaveCount(0)
   await expect.poll(() => requestsFor(state, '/agent/training/queue', 'GET').length).toBeGreaterThan(initialQueueReads)
   await page.getByRole('button', { name: '预览刷图计划', exact: true }).click()
   await expect(page.getByRole('button', { name: '应用到自动任务', exact: true })).toBeEnabled()

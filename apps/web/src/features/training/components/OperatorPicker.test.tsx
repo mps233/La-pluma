@@ -130,15 +130,42 @@ const buttonWithText = (text: string): HTMLButtonElement | undefined => Array.fr
 // 卡片容器本身没有语义 role，用每张卡片唯一的“添加”按钮可访问名计数行数。
 const renderedCards = () => document.querySelectorAll('[role="dialog"] button[aria-label^="添加"]').length
 
-function Harness() {
-  const [open, setOpen] = useState(true)
+const statusSegment = (label: string) => Array.from(
+  document.querySelectorAll<HTMLButtonElement>('[role="toolbar"][aria-label="干员范围"] button'),
+).find(button => button.textContent?.includes(label))
+
+const statusCount = (label: string) =>
+  statusSegment(label)?.querySelector<HTMLElement>('span[aria-label$=" 名"]')?.textContent
+
+const dialogToolbar = () => document.querySelector<HTMLElement>('[role="dialog"] [data-slot="dialog-toolbar"]')
+
+const rectOf = (left: number, top: number, width: number, height: number): DOMRect => ({
+  bottom: top + height,
+  height,
+  left,
+  right: left + width,
+  top,
+  width,
+  x: left,
+  y: top,
+  toJSON: () => ({}),
+})
+
+function Harness({
+  queueOperatorIds = new Set<string>(),
+  initialOpen = true,
+}: {
+  queueOperatorIds?: ReadonlySet<string>
+  initialOpen?: boolean
+}) {
+  const [open, setOpen] = useState(initialOpen)
   return <>
     <button type="button" onClick={() => setOpen(true)}>打开选择器</button>
     <OperatorPicker
       isOpen={open}
       onClose={() => setOpen(false)}
-      queueOperatorIds={new Set<string>()}
-      queueLength={0}
+      queueOperatorIds={queueOperatorIds}
+      queueLength={queueOperatorIds.size}
       busy={false}
       operationError={null}
       pendingOperatorIds={new Set<string>()}
@@ -308,5 +335,239 @@ describe('training operator picker', () => {
     expect(input?.value).toBe('干员')
     expect(renderedCards()).toBe(80)
     expect(buttonWithText('继续显示 8 个')).toBeUndefined()
+  })
+
+  it('keeps status and filter controls in the fixed dialog toolbar', async () => {
+    mocks.getOperatorList.mockResolvedValue({
+      success: true,
+      data: { operators: [operator('char_amiya', '阿米娅'), operator('char_exusiai', '能天使')] },
+    })
+
+    await act(async () => root.render(<QueryClientProvider client={client}><Harness /></QueryClientProvider>))
+    await flush()
+
+    const toolbar = dialogToolbar()
+    const body = document.querySelector<HTMLElement>('[role="dialog"] [data-slot="dialog-body"]')
+    expect(toolbar).not.toBeNull()
+    expect(body).not.toBeNull()
+    expect(toolbar!.querySelector('[role="toolbar"][aria-label="干员范围"]')).not.toBeNull()
+    expect(toolbar!.querySelector('input[aria-label="搜索干员名称"]')).not.toBeNull()
+    expect(toolbar!.querySelector('[aria-label="职业"]')).not.toBeNull()
+    expect(toolbar!.querySelector('[aria-label="稀有度"]')).not.toBeNull()
+    expect(buttonWithText('未精二')?.closest('[data-slot="dialog-toolbar"]')).toBe(toolbar)
+    expect(body!.querySelector('input[aria-label="搜索干员名称"]')).toBeNull()
+    expect(body!.querySelector('[role="toolbar"]')).toBeNull()
+
+    const buttons = Array.from(toolbar!.querySelectorAll<HTMLButtonElement>('[role="toolbar"] button'))
+    expect(buttons).toHaveLength(3)
+    expect(buttons.filter(button => button.tabIndex === 0)).toHaveLength(1)
+    expect(buttons[0]?.tabIndex).toBe(0)
+
+    await act(async () => {
+      buttons[0]!.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))
+    })
+    await flush()
+    expect(buttons[1]?.getAttribute('aria-pressed')).toBe('true')
+    expect(document.activeElement).toBe(buttons[1])
+
+    body!.scrollTop = 200
+    await act(async () => {
+      body!.dispatchEvent(new Event('scroll'))
+    })
+    expect(toolbar!.querySelector('input[aria-label="搜索干员名称"]')).not.toBeNull()
+  })
+
+  it('shows unknown counts on the first failure and recovers through the count retry', async () => {
+    let failCounts = true
+    mocks.getOperatorList.mockImplementation(async (filters: { status?: string } = {}) => {
+      if (failCounts && filters.status === 'owned') throw new Error('计数服务不可用')
+      if (filters.status === 'trainable') {
+        return { success: true, data: { operators: [operator('char_amiya', '阿米娅')] } }
+      }
+      return { success: true, data: { operators: [] } }
+    })
+
+    await act(async () => root.render(<QueryClientProvider client={client}><Harness /></QueryClientProvider>))
+    await flush()
+
+    expect(statusCount('可养成')).toBe('-')
+    expect(statusCount('已拥有')).toBe('-')
+
+    failCounts = false
+    await click(buttonWithText('重试计数')!)
+
+    expect(statusCount('可养成')).toBe('1')
+    expect(statusCount('已拥有')).toBe('0')
+  })
+
+  it('retries candidates and counts together from the candidate error state', async () => {
+    let failing = true
+    mocks.getOperatorList.mockImplementation(async (filters: { status?: string } = {}) => {
+      if (failing) throw new Error('干员服务不可用')
+      if (filters.status === 'trainable') {
+        return { success: true, data: { operators: [operator('char_amiya', '阿米娅')] } }
+      }
+      return { success: true, data: { operators: [] } }
+    })
+
+    await act(async () => root.render(<QueryClientProvider client={client}><Harness /></QueryClientProvider>))
+    await flush()
+
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!
+    expect(dialog.textContent).toContain('干员列表加载失败')
+    expect(statusCount('可养成')).toBe('-')
+
+    failing = false
+    await click(buttonWithText('重新加载')!)
+
+    expect(dialog.textContent).toContain('阿米娅')
+    expect(statusCount('可养成')).toBe('1')
+  })
+
+  it('includes the operator name in every add button label', async () => {
+    mocks.getOperatorList.mockResolvedValue({
+      success: true,
+      data: {
+        operators: [
+          operator('char_amiya', '阿米娅'),
+          {
+            ...operator('char_unknown', '未知干员'),
+            owned: false,
+            ownership: 'unknown',
+            canTrain: false,
+            disabledReason: 'unrecognized',
+            trainingStatus: 'unrecognized',
+          },
+        ],
+      },
+    })
+
+    await act(async () => root.render(
+      <QueryClientProvider client={client}>
+        <Harness queueOperatorIds={new Set(['char_amiya'])} />
+      </QueryClientProvider>,
+    ))
+    await flush()
+
+    const added = document.querySelector<HTMLButtonElement>('button[aria-label="已添加阿米娅"]')
+    expect(added).not.toBeNull()
+    expect(added!.disabled).toBe(true)
+    expect(added!.textContent?.trim()).toBe('已添加')
+
+    const unknown = document.querySelector<HTMLButtonElement>('button[aria-label="未识别未知干员"]')
+    expect(unknown).not.toBeNull()
+    expect(unknown!.disabled).toBe(true)
+    expect(unknown!.textContent?.trim()).toBe('未识别')
+  })
+
+  it('renders operator tiles without the surface-panel material', async () => {
+    mocks.getOperatorList.mockResolvedValue({
+      success: true,
+      data: { operators: [operator('char_amiya', '阿米娅')] },
+    })
+
+    await act(async () => root.render(<QueryClientProvider client={client}><Harness /></QueryClientProvider>))
+    await flush()
+
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!
+    expect(dialog.querySelector('.surface-panel')).toBeNull()
+  })
+})
+
+describe('training operator picker status indicator', () => {
+  beforeEach(() => {
+    mocks.getOperatorList.mockReset()
+    mocks.getAllOperators.mockReset().mockResolvedValue({ success: true, data: [] })
+    mocks.getOperBoxData.mockReset().mockResolvedValue({ success: true, data: { data: [] } })
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(prefers-reduced-motion: reduce)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+    client = createQueryClient()
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+  })
+
+  afterEach(async () => {
+    await act(async () => root.unmount())
+    client.clear()
+    container.remove()
+    vi.restoreAllMocks()
+  })
+
+  const mockSegmentGeometry = () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.getAttribute('aria-label') === '干员范围') return rectOf(0, 0, 600, 52)
+      if (this.closest('[role="toolbar"][aria-label="干员范围"]')) {
+        return this.getAttribute('aria-pressed') === 'true'
+          ? rectOf(200, 0, 200, 52)
+          : rectOf(0, 0, 200, 52)
+      }
+      return rectOf(0, 0, 0, 0)
+    })
+  }
+
+  const indicator = () => document.querySelector('[data-testid="training-status-indicator"]')
+
+  it('renders the indicator on the first open, drops it on close, and restores it on reopen', async () => {
+    mockSegmentGeometry()
+    mocks.getOperatorList.mockResolvedValue({
+      success: true,
+      data: { operators: [operator('char_amiya', '阿米娅')] },
+    })
+
+    await act(async () => root.render(
+      <QueryClientProvider client={client}>
+        <Harness initialOpen={false} />
+      </QueryClientProvider>,
+    ))
+    await flush()
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(indicator()).toBeNull()
+
+    await click(buttonWithText('打开选择器')!)
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+    expect(indicator()).not.toBeNull()
+    expect(indicator()!.closest('[role="toolbar"][aria-label="干员范围"]')).not.toBeNull()
+
+    await click(buttonWithText('完成选择')!)
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(indicator()).toBeNull()
+
+    await click(buttonWithText('打开选择器')!)
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+    expect(indicator()).not.toBeNull()
+  })
+
+  it('keeps the indicator mounted when the status filter changes', async () => {
+    mockSegmentGeometry()
+    mocks.getOperatorList.mockResolvedValue({
+      success: true,
+      data: { operators: [operator('char_amiya', '阿米娅')] },
+    })
+
+    await act(async () => root.render(
+      <QueryClientProvider client={client}>
+        <Harness initialOpen={false} />
+      </QueryClientProvider>,
+    ))
+    await flush()
+
+    await click(buttonWithText('打开选择器')!)
+    expect(indicator()).not.toBeNull()
+    expect(statusSegment('可养成')?.getAttribute('aria-pressed')).toBe('true')
+
+    await click(statusSegment('已拥有')!)
+    expect(statusSegment('已拥有')?.getAttribute('aria-pressed')).toBe('true')
+    expect(statusSegment('可养成')?.getAttribute('aria-pressed')).toBe('false')
+    expect(indicator()).not.toBeNull()
+    expect(indicator()!.closest('[role="toolbar"][aria-label="干员范围"]')).not.toBeNull()
   })
 })

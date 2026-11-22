@@ -48,7 +48,12 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/features/device-mirror', () => ({
-  DeviceMonitorLayout: ({ children }: { children: ReactNode }) => children,
+  DeviceMonitorLayout: ({ children, support }: { children: ReactNode; support?: ReactNode }) => (
+    <div>
+      <div data-monitor-area="main">{children}</div>
+      <div data-monitor-area="support">{support}</div>
+    </div>
+  ),
 }))
 
 vi.mock('framer-motion', async () => {
@@ -172,6 +177,31 @@ const queueResponse = (
   },
 })
 
+const queueResponseWithContext = (
+  queue: TrainingQueueItem[],
+  context: { gameDate: string; clientType: string },
+  revision = 'queue-1',
+  settingsValue: TrainingSettings = settings,
+) => ({
+  ...queueResponse(queue, revision, settingsValue),
+  data: {
+    ...queueResponse(queue, revision, settingsValue).data,
+    ...context,
+  },
+})
+
+const queueResponseWithoutSettings = (
+  queue: TrainingQueueItem[],
+  revision = 'queue-1',
+) => ({
+  success: true,
+  data: {
+    queue: [...queue],
+    revision,
+    flowSync: { status: 'not_applied', flowName: '自动任务', taskName: 'Fight' },
+  },
+})
+
 const mockMutableQueue = (initialQueue: TrainingQueueItem[]) => {
   let queue = [...initialQueue]
   mocks.getTrainingQueue.mockImplementation(async () => queueResponse(queue))
@@ -255,6 +285,11 @@ const queueButton = (label: string) => {
   return button!
 }
 
+const queueAddButton = () => queueButton('添加干员')
+
+const buttonTexts = () => Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+  .map(button => button.textContent?.trim())
+
 const queueOrder = () => Array.from(container.querySelectorAll<HTMLButtonElement>('button[aria-label^="移除"]'))
   .map(button => button.getAttribute('aria-label')?.replace(/^移除/, ''))
 
@@ -313,12 +348,8 @@ const chooseSelectOption = async (name: string, label: string) => {
 }
 
 const openPicker = async () => {
-  const opener = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
-    .find(button => {
-      const label = button.textContent?.trim()
-      return label === '选择干员' || label === '继续添加'
-    })
-  expect(opener, 'operator picker opener').toBeDefined()
+  const opener = container.querySelector<HTMLButtonElement>('button[aria-label="添加干员"]')
+  expect(opener, 'operator picker opener').not.toBeNull()
   opener!.focus()
   await click(opener!)
   const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
@@ -403,8 +434,13 @@ describe('OperatorTraining queue workspace', () => {
     expect(queueOrder()).toEqual(['阿米娅'])
   })
 
-  it('opens the operator picker from the empty queue and the non-empty queue footer', async () => {
+  it('opens the operator picker from the empty queue and the non-empty queue header', async () => {
     await renderComponent()
+
+    expect(container.querySelector('button[aria-label="添加干员"]')).not.toBeNull()
+    expect(queueAddButton().textContent?.trim()).toBe('')
+    expect(buttonTexts()).not.toContain('选择干员')
+    expect(buttonTexts()).not.toContain('继续添加')
 
     const { dialog: emptyDialog } = await openPicker()
     expect(emptyDialog.querySelector('input[aria-label="搜索干员名称"]')).not.toBeNull()
@@ -419,6 +455,10 @@ describe('OperatorTraining queue workspace', () => {
       publishResourceInvalidation({ resources: ['training-queue'], cause: 'training-queue' })
     })
     await flush()
+
+    expect(queueOrder()).toEqual(['阿米娅'])
+    expect(container.querySelector('button[aria-label="添加干员"]')).not.toBeNull()
+    expect(buttonTexts()).not.toContain('继续添加')
 
     const { dialog: nonEmptyDialog } = await openPicker()
     expect(nonEmptyDialog.querySelector('input[aria-label="搜索干员名称"]')).not.toBeNull()
@@ -435,11 +475,17 @@ describe('OperatorTraining queue workspace', () => {
 
     await renderComponent()
 
+    const materialsPanel = container.querySelector<HTMLElement>('[aria-labelledby="training-materials-title"]')
     expect(document.body.textContent).toContain('养成队列加载失败')
     expect(document.body.textContent).toContain('队列服务暂不可用')
     expect(document.body.textContent).not.toContain('养成队列还是空的')
-    expect(container.textContent).not.toContain('选择干员')
-    expect(container.textContent).not.toContain('继续添加')
+    expect(materialsPanel?.textContent).toContain('队列读取失败，暂时无法显示材料进度。')
+    expect(materialsPanel?.textContent).not.toContain('还没有需要筹备的材料')
+    expect(planPanelText()).toContain('队列读取失败，暂时无法预览刷图计划。')
+    expect(planPanelText()).not.toContain('选择养成目标后')
+    expect(buttonTexts()).not.toContain('选择干员')
+    expect(buttonTexts()).not.toContain('继续添加')
+    expect(queueAddButton().disabled).toBe(false)
 
     const queueAlert = Array.from(container.querySelectorAll<HTMLElement>('[role="alert"]'))
       .find(alert => alert.textContent?.includes('队列服务暂不可用'))
@@ -450,6 +496,8 @@ describe('OperatorTraining queue workspace', () => {
     expect(mocks.getTrainingQueue).toHaveBeenCalledTimes(2)
     expect(document.body.textContent).not.toContain('队列服务暂不可用')
     expect(document.body.textContent).toContain('养成队列还是空的')
+    expect(materialsPanel?.textContent).toContain('还没有需要筹备的材料。')
+    expect(planPanelText()).toContain('选择养成目标后，即可计算材料缺口与推荐关卡。')
 
     await openPicker()
 
@@ -467,6 +515,29 @@ describe('OperatorTraining queue workspace', () => {
     expect(document.body.textContent).toContain('没有可养成干员')
   })
 
+  it('keeps material and plan panels indeterminate until the first queue read settles', async () => {
+    const queueRequest = deferred<ReturnType<typeof queueResponse>>()
+    mocks.getTrainingQueue.mockReturnValue(queueRequest.promise)
+
+    await renderComponent()
+
+    const materialsPanel = container.querySelector<HTMLElement>('[aria-labelledby="training-materials-title"]')
+    expect(materialsPanel?.textContent).not.toContain('还没有需要筹备的材料')
+    expect(materialsPanel?.querySelector('[aria-busy="true"]')).not.toBeNull()
+    expect(materialsPanel?.querySelector('[data-slot="skeleton"]')).not.toBeNull()
+    expect(planPanelText()).not.toContain('选择养成目标后')
+    expect(planPanel().querySelector('[aria-busy="true"]')).not.toBeNull()
+    expect(planPanel().querySelector('[data-slot="skeleton"]')).not.toBeNull()
+    expect(container.textContent).toContain('正在读取养成队列...')
+
+    await act(async () => queueRequest.resolve(queueResponse([])))
+    await flush()
+
+    expect(container.textContent).toContain('养成队列还是空的')
+    expect(materialsPanel?.textContent).toContain('还没有需要筹备的材料。')
+    expect(planPanelText()).toContain('选择养成目标后，即可计算材料缺口与推荐关卡。')
+  })
+
   it('keeps the picker, plan, and automation controls accessible', async () => {
     mocks.getTrainingQueue.mockResolvedValue(queueResponse([queueItem('char_current', '阿米娅')]))
 
@@ -480,6 +551,43 @@ describe('OperatorTraining queue workspace', () => {
     expect(planModeSelect).not.toBeNull()
     expect(switchByLabel('自动切换')).not.toBeNull()
     expect(switchByLabel('完成通知')).not.toBeNull()
+  })
+
+  it('places the automation settings in the device-monitor support column', async () => {
+    await renderComponent()
+
+    const main = container.querySelector('[data-monitor-area="main"]')
+    const support = container.querySelector('[data-monitor-area="support"]')
+    const settingsTitle = container.querySelector('#training-settings-title')
+
+    expect(main).not.toBeNull()
+    expect(support).not.toBeNull()
+    expect(settingsTitle?.textContent).toContain('自动化设置')
+    expect(main?.contains(settingsTitle)).toBe(false)
+    expect(support?.contains(settingsTitle)).toBe(true)
+    expect(switchByLabel('自动切换')).not.toBeNull()
+    expect(switchByLabel('完成通知')).not.toBeNull()
+  })
+
+  it('renders the automation settings expanded with both switches always visible', async () => {
+    await renderComponent()
+
+    const panel = container.querySelector<HTMLElement>('[aria-labelledby="training-settings-title"]')
+    expect(panel).not.toBeNull()
+    expect(panel?.querySelector('details, summary')).toBeNull()
+    const title = panel?.querySelector('#training-settings-title')
+    expect(title?.textContent).toBe('自动化设置')
+    expect(title?.parentElement?.textContent).not.toContain('自动切换与完成通知')
+    expect(panel?.querySelector('#training-settings-status')).toBeNull()
+
+    const rows = [...(panel?.querySelectorAll('label') ?? [])]
+    expect(rows).toHaveLength(2)
+    expect(rows.map(row => row.textContent)).toEqual([
+      expect.stringContaining('自动切换'),
+      expect.stringContaining('完成通知'),
+    ])
+    expect(rows.every(row => row.querySelector('[role="switch"]'))).toBe(true)
+    expect(rows.map(row => row.querySelector('[role="switch"]')?.getAttribute('aria-label'))).toEqual(['自动切换', '完成通知'])
   })
 
   it('supports keyboard navigation of the operator scope inside the picker', async () => {
@@ -530,8 +638,77 @@ describe('OperatorTraining queue workspace', () => {
     await flush()
 
     expect(mocks.updateTrainingSettings).toHaveBeenCalledTimes(2)
-    expect(mocks.updateTrainingSettings).toHaveBeenLastCalledWith(settings)
+    expect(mocks.updateTrainingSettings).toHaveBeenLastCalledWith({ autoSwitch: true })
     expect(isSwitchChecked(autoSwitch)).toBe(true)
+  })
+
+  it('keeps settings and preview gated until the queue snapshot carries settings', async () => {
+    const queueRequest = deferred<ReturnType<typeof queueResponse>>()
+    mocks.getTrainingQueue.mockReturnValue(queueRequest.promise)
+
+    await renderComponent()
+
+    const pendingSwitch = switchByLabel('自动切换') as HTMLElement
+    const pendingNotify = switchByLabel('完成通知') as HTMLElement
+    expect(pendingSwitch.getAttribute('aria-disabled')).toBe('true')
+    expect(pendingSwitch.getAttribute('aria-describedby')).toBe('training-settings-status')
+    expect(pendingNotify.getAttribute('aria-describedby')).toBe('training-settings-status')
+    const pendingStatus = container.querySelector('#training-settings-status')
+    expect(pendingStatus?.textContent).toBe('设置尚未读取完成，暂不可编辑')
+    expect(container.querySelector('#training-settings-title')?.parentElement?.textContent).not.toContain('自动切换与完成通知')
+    expect(buttonWithText('预览刷图计划', container).disabled).toBe(true)
+    await click(pendingSwitch)
+    expect(mocks.updateTrainingSettings).not.toHaveBeenCalled()
+    expect(mocks.generateTrainingPlan).not.toHaveBeenCalled()
+
+    await act(async () => queueRequest.resolve(queueResponse(
+      [queueItem('char_current', '阿米娅')],
+      'queue-1',
+      { ...settings, useMedicine: 5 },
+    )))
+    await flush()
+
+    const readySwitch = switchByLabel('自动切换') as HTMLElement
+    expect(readySwitch.getAttribute('aria-disabled')).toBeNull()
+    expect(readySwitch.hasAttribute('aria-describedby')).toBe(false)
+    expect(switchByLabel('完成通知')?.hasAttribute('aria-describedby')).toBe(false)
+    expect(container.querySelector('#training-settings-status')).toBeNull()
+    expect(buttonWithText('预览刷图计划', container).disabled).toBe(false)
+
+    mocks.updateTrainingSettings.mockResolvedValue({
+      success: true,
+      data: { ...settings, useMedicine: 5, autoSwitch: false },
+    })
+    await click(readySwitch)
+
+    expect(mocks.updateTrainingSettings).toHaveBeenCalledOnce()
+    expect(mocks.updateTrainingSettings).toHaveBeenCalledWith({ autoSwitch: false })
+  })
+
+  it('blocks applying a preview when the latest snapshot no longer carries settings', async () => {
+    mockMutableQueue([queueItem('char_current', '阿米娅')])
+
+    await renderComponent()
+    await click(buttonWithText('预览刷图计划', container))
+    expect(buttonWithText('应用到自动任务', container).disabled).toBe(false)
+
+    mocks.getTrainingQueue.mockResolvedValueOnce(queueResponseWithoutSettings([queueItem('char_current', '阿米娅')]))
+    await act(async () => {
+      publishResourceInvalidation({ resources: ['training-queue'], cause: 'training-queue' })
+    })
+    await flush()
+
+    expect(switchByLabel('自动切换')?.getAttribute('aria-disabled')).toBe('true')
+    expect(buttonWithText('应用到自动任务', container).disabled).toBe(true)
+
+    mocks.getTrainingQueue.mockResolvedValue(queueResponse([queueItem('char_current', '阿米娅')]))
+    await act(async () => {
+      publishResourceInvalidation({ resources: ['training-queue'], cause: 'training-queue' })
+    })
+    await flush()
+
+    expect(switchByLabel('自动切换')?.getAttribute('aria-disabled')).toBeNull()
+    expect(buttonWithText('应用到自动任务', container).disabled).toBe(false)
   })
 
   it('serializes duplicate queue additions while a request is pending and recovers from failure', async () => {
@@ -688,6 +865,32 @@ describe('OperatorTraining queue workspace', () => {
     expect(statusCount('可养成')).toBe('2')
     expect(statusCount('已拥有')).toBe('1')
     expect(statusCount('全部')).toBe('2')
+  })
+
+  it('shows unknown status counts on the first failure and recovers through the count retry', async () => {
+    let failCounts = true
+    mocks.getOperatorList.mockImplementation(async (filters: { status?: string } = {}) => {
+      if (failCounts && filters.status === 'owned') throw new Error('计数服务不可用')
+      if (filters.status === 'trainable') {
+        return { success: true, data: { operators: [operator('char_a', '阿米娅')] } }
+      }
+      return { success: true, data: { operators: [] } }
+    })
+
+    await renderComponent()
+    await openPicker()
+
+    expect(statusCount('可养成')).toBe('-')
+    expect(statusCount('已拥有')).toBe('-')
+
+    failCounts = false
+    const retry = Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
+      .find(button => button.textContent?.trim() === '重试计数')
+    expect(retry).toBeDefined()
+    await click(retry!)
+
+    expect(statusCount('可养成')).toBe('1')
+    expect(statusCount('已拥有')).toBe('0')
   })
 
   it('clears the candidate list on failure while keeping the last status counts', async () => {
@@ -895,6 +1098,55 @@ describe('OperatorTraining queue workspace', () => {
     expect(mocks.addToTrainingQueue).not.toHaveBeenCalled()
   })
 
+  it('dismisses the undo toast when the removed operator is back in the authoritative queue', async () => {
+    let server = [queueItem('char_current', '阿米娅'), queueItem('char_removed', '能天使')]
+    mocks.getTrainingQueue.mockImplementation(async () => queueResponse([...server]))
+    mocks.removeFromTrainingQueue.mockImplementation(async (operatorId: string) => {
+      server = server.filter(item => item.operatorId !== operatorId)
+      return { success: true, data: { queueUpdated: true, queueRevision: 'queue-2' } }
+    })
+
+    await renderComponent()
+    await click(queueButton('移除能天使'))
+    expect(document.body.textContent).toContain('已移除 能天使')
+
+    server = [queueItem('char_current', '阿米娅'), queueItem('char_removed', '能天使')]
+    await act(async () => {
+      publishResourceInvalidation({ resources: ['training-queue'], cause: 'training-queue' })
+    })
+    await flush()
+    await settleToastRemoval()
+
+    expect(queueOrder()).toEqual(['阿米娅', '能天使'])
+    expect(undoToast()).toBeNull()
+    expect(mocks.addToTrainingQueue).not.toHaveBeenCalled()
+  })
+
+  it('does not send an add when undo finds the operator already back in the queue', async () => {
+    mockMutableQueue([queueItem('char_current', '阿米娅'), queueItem('char_removed', '能天使')])
+
+    await renderComponent()
+    await click(queueButton('移除能天使'))
+    const toast = undoToast()
+    expect(toast).not.toBeNull()
+    expect(document.body.textContent).toContain('已移除 能天使')
+
+    const undoButton = buttonWithText('撤销', toast!)
+    await act(async () => {
+      client.setQueryData(
+        trainingKeys.resource('queue'),
+        queueResponse([queueItem('char_current', '阿米娅'), queueItem('char_removed', '能天使')]).data,
+      )
+      undoButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await flush()
+    await settleToastRemoval()
+
+    expect(mocks.addToTrainingQueue).not.toHaveBeenCalled()
+    expect(undoToast()).toBeNull()
+    expect(mocks.notify).not.toHaveBeenCalledWith(expect.stringContaining('失败'), 'error')
+  })
+
   it('expires the undo toast after eight seconds and pauses expiry while it has keyboard focus', async () => {
     mockMutableQueue([queueItem('char_current', '阿米娅')])
 
@@ -995,6 +1247,79 @@ describe('OperatorTraining queue workspace', () => {
     expect(queueOrder()).toEqual(['阿米娅', '能天使', '艾雅法拉'])
   })
 
+  it('marks only the adding operator row in the picker as busy', async () => {
+    mockMutableQueue([queueItem('char_current', '阿米娅')])
+    mocks.getOperatorList.mockResolvedValue({
+      success: true,
+      data: { operators: [operator('char_added', '能天使')] },
+    })
+    const addRequest = deferred<{ success: boolean }>()
+    mocks.addToTrainingQueue.mockReturnValueOnce(addRequest.promise)
+
+    await renderComponent()
+    const { dialog } = await openPicker()
+    const addButton = buttonWithText('添加', dialog)
+    await act(async () => {
+      addButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+    await flush()
+
+    expect(addButton.textContent).toContain('添加中')
+    expect(addButton.getAttribute('aria-busy')).toBe('true')
+    expect(queueButton('移除阿米娅').getAttribute('aria-busy')).toBeNull()
+
+    await act(async () => addRequest.resolve({ success: true }))
+    await flush()
+  })
+
+  it('marks only the removing queue row as busy', async () => {
+    mockMutableQueue([queueItem('char_current', '阿米娅'), queueItem('char_removed', '能天使')])
+    mocks.getOperatorList.mockResolvedValue({
+      success: true,
+      data: { operators: [operator('char_other', '艾雅法拉')] },
+    })
+    const removeRequest = deferred<{ success: boolean }>()
+    mocks.removeFromTrainingQueue.mockReturnValueOnce(removeRequest.promise)
+
+    await renderComponent()
+    await click(queueButton('移除能天使'))
+
+    expect(queueButton('移除能天使').getAttribute('aria-busy')).toBe('true')
+    expect(queueButton('移除阿米娅').getAttribute('aria-busy')).toBeNull()
+
+    const { dialog } = await openPicker()
+    expect(buttonWithText('添加', dialog).getAttribute('aria-busy')).toBeNull()
+
+    await act(async () => removeRequest.resolve({ success: true }))
+    await flush()
+  })
+
+  it('keeps undo available while a reorder is in flight', async () => {
+    mockMutableQueue([
+      queueItem('char_current', '阿米娅'),
+      queueItem('char_middle', '能天使'),
+      queueItem('char_last', '艾雅法拉'),
+    ])
+
+    await renderComponent()
+    await click(queueButton('移除艾雅法拉'))
+    expect(undoToast()).not.toBeNull()
+
+    const reorderRequest = deferred<{ success: boolean }>()
+    mocks.updateTrainingQueueOrder.mockReturnValueOnce(reorderRequest.promise)
+    await click(queueButton('上移能天使'))
+
+    const toast = undoToast()
+    expect(toast).not.toBeNull()
+    const undoButton = buttonWithText('撤销', toast!)
+    expect(undoButton.disabled).toBe(false)
+    expect(undoButton.getAttribute('aria-busy')).toBeNull()
+
+    await act(async () => reorderRequest.resolve({ success: true }))
+    await flush()
+  })
+
   it('keeps the queue unchanged and allows retry when a removal fails', async () => {
     mockMutableQueue([queueItem('char_current', '阿米娅')])
     mocks.removeFromTrainingQueue.mockResolvedValueOnce({ success: false })
@@ -1008,6 +1333,29 @@ describe('OperatorTraining queue workspace', () => {
     expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent === '撤销')).toBe(false)
     await click(queueButton('移除阿米娅'))
     expect(queueOrder()).toEqual([])
+  })
+
+  it('re-reads the authoritative queue after a failed write and surfaces the reload failure', async () => {
+    let server = [queueItem('char_current', '阿米娅'), queueItem('char_removed', '能天使')]
+    mocks.getTrainingQueue.mockImplementation(async () => queueResponse([...server]))
+    mocks.removeFromTrainingQueue.mockResolvedValue({ success: false })
+
+    await renderComponent()
+    server = [queueItem('char_current', '阿米娅')]
+    await click(queueButton('移除能天使'))
+
+    expect(queueOrder()).toEqual(['阿米娅'])
+    expect(container.textContent).toContain('删除失败，请重试')
+
+    mocks.getTrainingQueue.mockRejectedValueOnce(new Error('队列服务暂不可用'))
+    await click(queueButton('移除阿米娅'))
+
+    expect(queueOrder()).toEqual(['阿米娅'])
+    expect(container.textContent).toContain('删除失败，请重试')
+    const reloadWarning = Array.from(container.querySelectorAll<HTMLElement>('[role="alert"]'))
+      .find(alert => alert.textContent?.includes('刷新失败'))
+    expect(reloadWarning, 'queue reload warning').toBeDefined()
+    expect(buttonWithText('重新加载', reloadWarning!)).toBeDefined()
   })
 
   it('invalidates an old preview as soon as a queue change starts', async () => {
@@ -1041,6 +1389,49 @@ describe('OperatorTraining queue workspace', () => {
     expect(container.textContent).not.toContain('1-7')
     expect(Array.from(container.querySelectorAll('button')).some(button => button.textContent?.trim() === '应用到自动任务')).toBe(false)
     expect(mocks.applyTrainingPlan).not.toHaveBeenCalled()
+  })
+
+  it('requires the preview basis game date and client type to match the queue snapshot', async () => {
+    let gameDate = '2026-11-22'
+    let clientType = 'Official'
+    const queued = [queueItem('char_current', '阿米娅')]
+    mocks.getTrainingQueue.mockImplementation(async () => (
+      queueResponseWithContext(queued, { gameDate, clientType })
+    ))
+    mocks.generateTrainingPlan.mockImplementation(async () => ({
+      success: true,
+      data: { ...plan(), summary: { gameDate, clientType } },
+    }))
+
+    await renderComponent()
+    await click(buttonWithText('预览刷图计划', container))
+    expect(buttonWithText('应用到自动任务', container).disabled).toBe(false)
+
+    gameDate = '2026-11-23'
+    await act(async () => {
+      publishResourceInvalidation({ resources: ['training-queue'], cause: 'training-queue' })
+    })
+    await flush()
+
+    expect(Array.from(container.querySelectorAll('button'))
+      .some(button => button.textContent?.trim() === '应用到自动任务')).toBe(false)
+
+    gameDate = '2026-11-22'
+    await act(async () => {
+      publishResourceInvalidation({ resources: ['training-queue'], cause: 'training-queue' })
+    })
+    await flush()
+
+    expect(buttonWithText('应用到自动任务', container).disabled).toBe(false)
+
+    clientType = 'Bilibili'
+    await act(async () => {
+      publishResourceInvalidation({ resources: ['training-queue'], cause: 'training-queue' })
+    })
+    await flush()
+
+    expect(Array.from(container.querySelectorAll('button'))
+      .some(button => button.textContent?.trim() === '应用到自动任务')).toBe(false)
   })
 
   it('refreshes an externally advanced queue before generating a preview for its current target', async () => {
@@ -1216,7 +1607,10 @@ describe('OperatorTraining queue workspace', () => {
 
     expect(container.textContent).toContain('当前目标材料已集齐，可在游戏内完成养成。')
     expect(container.querySelector('[role="table"][aria-label="材料筹备明细"]')).toBeNull()
-    expect(container.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('100')
+    const materialsPanel = container.querySelector<HTMLElement>('[aria-labelledby="training-materials-title"]')
+    expect(materialsPanel?.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('100')
+    const queueProgress = container.querySelector('[aria-labelledby="training-queue-title"] [role="progressbar"]')
+    expect(queueProgress?.getAttribute('aria-label')).toBe('阿米娅材料筹备进度')
   })
 
   it('shows a remaining LMD gap even when the target needs no other materials', async () => {
@@ -1612,7 +2006,7 @@ describe('OperatorTraining queue workspace', () => {
     await flush()
 
     expect(mocks.updateTrainingSettings).toHaveBeenCalledTimes(2)
-    expect(mocks.updateTrainingSettings).toHaveBeenLastCalledWith(settings)
+    expect(mocks.updateTrainingSettings).toHaveBeenLastCalledWith({ autoSwitch: true })
     expect(isSwitchChecked(switchByLabel('自动切换'))).toBe(true)
   })
 
@@ -1856,6 +2250,36 @@ describe('OperatorTraining queue workspace', () => {
 
     expect(mocks.applyTrainingPlan).toHaveBeenCalledTimes(2)
     expect(planSection!.textContent).not.toContain('定时任务刷新失败')
+  })
+
+  it('keeps the partial schedule warning across scope and settings changes', async () => {
+    mockMutableQueue([queueItem('char_current', '阿米娅')])
+    mocks.applyTrainingPlan.mockResolvedValueOnce({
+      success: true,
+      data: {
+        stageCount: 1,
+        flowName: '日常刷图',
+        taskName: 'Fight',
+        flowSync: { status: 'synced', flowName: '日常刷图', taskName: 'Fight' },
+        scheduleSync: { attempted: true, success: false, message: '定时任务设置失败' },
+      },
+    })
+    mocks.updateTrainingSettings.mockResolvedValue({
+      success: true,
+      data: { ...settings, autoSwitch: false },
+    })
+
+    await renderComponent()
+    await click(buttonWithText('预览刷图计划', container))
+    await click(buttonWithText('应用到自动任务', container))
+    expect(planPanelText()).toContain('定时任务刷新失败')
+
+    await chooseSelectOption('计划范围', '全部队列')
+    expect(planPanelText()).toContain('定时任务刷新失败')
+    expect(planPanelText()).not.toContain('今日可刷')
+
+    await click(switchByLabel('自动切换')!)
+    expect(planPanelText()).toContain('定时任务刷新失败')
   })
 
   it('does not show a plan whose settings changed while it was generating', async () => {

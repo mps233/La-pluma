@@ -176,7 +176,7 @@ function CombatWorkspace() {
 
 关键约束：
 
-- **未确认草稿优先**：`force` 也不覆盖它。外部写入（如养成计划应用）在应用前通过 `UserConfigCoordinator.settle()` 排空本设备 automation 的在途保存；仍有未确认草稿时 training 拒绝应用。应用后的 `automation-config`/`automation-schedule` 失效由 automation 页面处理：先 `flush()` 通道，再 `reload({ force: true })`；返回 `local-draft`/`stale` 时保留本地并提示。
+- **未确认草稿优先**：`force` 也不覆盖它。外部写入（如养成计划应用）在应用前通过 `UserConfigCoordinator.settle()` 排空本设备 automation 的在途保存；仍有未确认草稿时 training 拒绝应用。服务端 apply 还可能因游戏日、客户端类型或关卡开放变化返回 `409 AGENT_TRAINING_PLAN_STALE`；这两种拒绝都不会写入 automation 配置。应用后的 `automation-config`/`automation-schedule` 失效由 automation 页面处理：先 `flush()` 通道，再 `reload({ force: true })`；返回 `local-draft`/`stale` 时保留本地并提示。
 - **迟到加载不写回**：加载返回时校验加载序号、`AbortSignal`、revision 与 pending 标记；任何一项变化都返回 `stale`。
 - **损坏草稿可回退**：单个损坏键由适配器清理；标记指向的草稿整体不可读时删除标记并读服务端，不会永久停在“本地优先”。
 - **读取失败会重试**：`failed` 不标记 `hydrated`，`Activity` 恢复或下次挂载会再次尝试；服务端失败且本地有草稿时静默回退，不打断编辑。

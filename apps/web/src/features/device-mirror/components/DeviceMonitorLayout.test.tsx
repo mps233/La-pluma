@@ -42,6 +42,50 @@ describe('DeviceMonitorLayout', () => {
     expect(container.querySelectorAll('[data-region="monitor"]')).toHaveLength(1)
     expect(container.querySelector('[data-monitor-area="main"]')?.textContent).toContain('标准内容')
     expect(container.querySelector('[data-monitor-area="monitor"] [data-region="monitor"]')).not.toBeNull()
+    expect(container.querySelector('[data-monitor-area="support"]')).toBeNull()
+  })
+
+  it('keeps the legacy standard layout when support is null', async () => {
+    await renderLayout(
+      <DeviceMonitorLayout variant="standard" support={null}>
+        <p>标准内容</p>
+      </DeviceMonitorLayout>,
+    )
+
+    const layout = container.querySelector('[data-device-monitor-layout="standard"]')
+    const monitor = container.querySelector('[data-monitor-area="monitor"]')
+    expect(container.querySelector('[data-monitor-area="support"]')).toBeNull()
+    expect(monitor?.parentElement).toBe(layout)
+    expect(monitor?.getAttribute('aria-label')).toBe('设备画面')
+    expect(container.querySelectorAll('[data-region="monitor"]')).toHaveLength(1)
+  })
+
+  it('stacks standard support content below the monitor in the same column', async () => {
+    await renderLayout(
+      <DeviceMonitorLayout
+        variant="standard"
+        support={<div data-testid="support-content">设置内容</div>}
+      >
+        <p>标准内容</p>
+      </DeviceMonitorLayout>,
+    )
+
+    const layout = container.querySelector('[data-device-monitor-layout="standard"]')
+    const main = container.querySelector('[data-monitor-area="main"]')
+    const support = container.querySelector('[data-monitor-area="support"]')
+    const monitor = support?.querySelector('[data-monitor-area="monitor"]')
+    const content = container.querySelector('[data-testid="support-content"]')
+
+    expect(layout).not.toBeNull()
+    expect(main?.parentElement).toBe(layout)
+    expect(support?.parentElement).toBe(layout)
+    expect(container.querySelectorAll('[data-region="monitor"]')).toHaveLength(1)
+    expect(monitor?.getAttribute('aria-label')).toBe('设备画面')
+    expect(monitor?.querySelector('[data-region="monitor"]')).not.toBeNull()
+    expect(support?.getAttribute('role')).toBeNull()
+    expect(content?.parentElement).toBe(support)
+    expect(main!.compareDocumentPosition(support!) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+    expect(monitor!.compareDocumentPosition(content!) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
   })
 
   it('renders workbench areas and keeps the monitor at the top of the support column', async () => {

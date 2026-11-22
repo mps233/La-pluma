@@ -324,7 +324,11 @@ export class TrainingQueueCommandOwner {
       context,
       before,
       response,
-      buildFallback: queue => [...queue, buildFallbackQueueItem(operator)],
+      buildFallback: queue => (
+        queue.some(entry => entry.operatorId === operator.id)
+          ? [...queue]
+          : [...queue, buildFallbackQueueItem(operator)]
+      ),
       messages: {
         success: `${operator.name} 已加入养成队列`,
         uncertain: `${operator.name} 已添加，但队列刷新失败，请重试`,
@@ -372,6 +376,10 @@ export class TrainingQueueCommandOwner {
     context: TrainingQueueCommandContext,
   ): Promise<TrainingQueueCommandOutcome> {
     const { item, index } = command
+    if (before?.queue.some(entry => entry.operatorId === item.operatorId)) {
+      return { status: 'ignored', type: 'undo', operatorId: item.operatorId }
+    }
+
     const position = Math.min(
       Math.max(index, 0),
       before?.queue.length ?? Math.max(index, 0),
@@ -507,10 +515,11 @@ export class TrainingQueueCommandOwner {
     }
 
     const latest = context.getSnapshot() ?? before
+    const cacheAdvanced = latest !== before || latest?.revision !== before?.revision
     const snapshot: TrainingQueueSnapshot = {
       ...latest,
       queue: buildFallback(latest?.queue ?? []),
-      revision: writeRevision ?? latest?.revision,
+      revision: cacheAdvanced ? latest?.revision : writeRevision ?? latest?.revision,
       flowSync: writeFlowSync ?? latest?.flowSync,
       uncertain: TRAINING_QUEUE_UNCERTAIN_MESSAGE,
     }

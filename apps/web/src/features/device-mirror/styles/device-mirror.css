@@ -603,6 +603,16 @@
     justify-self: center;
   }
 
+  .task-monitor-support {
+    display: grid;
+    min-width: 0;
+    width: 100%;
+    max-width: 48rem;
+    justify-self: center;
+    align-content: start;
+    gap: 1.125rem;
+  }
+
   .device-monitor-column {
     min-width: 0;
   }
@@ -678,6 +688,10 @@
     }
 
     .task-monitor-column {
+      max-width: none;
+    }
+
+    .task-monitor-support {
       max-width: none;
     }
   }

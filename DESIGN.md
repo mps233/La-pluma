@@ -21,7 +21,9 @@ colors:
   success-text: "#1f7a36"
   success-action: "#248a3d"
   warning: "#ff9500"
+  warning-text: "#8a4b00"
   danger: "#ff3b30"
+  danger-text: "#c40012"
   danger-action: "#d70015"
   info: "#5856d6"
   dark-bg: "#000000"
@@ -38,7 +40,9 @@ colors:
   dark-accent-soft: "rgba(10, 132, 255, 0.2)"
   dark-success: "#30d158"
   dark-warning: "#ff9f0a"
+  dark-warning-text: "#ff9f0a"
   dark-danger: "#ff453a"
+  dark-danger-text: "#ff453a"
   dark-info: "#5e5ce6"
 typography:
   page-title:
@@ -151,7 +155,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 - `apps/web/src/styles/index.css`：语义 token 的**唯一来源**（base 层）、Tailwind 入口、`@theme` 圆角派生与 `@theme inline` 颜色映射、通用组件类与跨域 keyframes；页面样式由各功能域自持。
 - `apps/web/src/styles/layout.css`：结构几何与 `--layout-*` token（视口、navbar 与安全区高度、侧栏、内容宽度与留白、内容 sticky 顶部偏移、tabbar 安全区与浮动内容底部偏移）；应用 chrome 的尺寸、定位、网格、滚动宿主与 skip link 可访问性样式都在这里，不承载页面级颜色、材质或控件外观。
-- `apps/web/src/styles/ios-theme.css`：只保留默认主题的 chrome 材质 token（`--glass-*`）与对应视觉样式（含 PWA 安装入口与分段控件）；共享设备画面的 surface 与紧凑玻璃按钮材质归 `apps/web/src/features/device-mirror/styles/device-mirror.css`；默认基线不依赖玻璃材质，液态玻璃由后续主题提供。
+- `apps/web/src/styles/ios-theme.css`：只保留默认主题的 chrome 材质 token（`--glass-*`）与对应视觉样式（含 PWA 安装入口）；分段控件不在此处提供材质，其容器保持透明、高亮指示器使用 `--muted` 与 `--border` 语义 token；共享设备画面的 surface 与紧凑玻璃按钮材质归 `apps/web/src/features/device-mirror/styles/device-mirror.css`；默认基线不依赖玻璃材质，液态玻璃由后续主题提供。
 - `apps/web/src/shared/components`：`PageShell`、`ConfirmAlertDialog`、`EmptyState`、`Loading` 等应用级通用组件；`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Progress`、`Badge`、`Alert`、`Card`、`Dialog`、`AlertDialog`、`Sheet` 等 shadcn 生成物位于 `apps/web/src/shared/ui`（sidebar 也在该目录）。
 
 本文件描述规则；语义 token 的具体数值以 `apps/web/src/styles/index.css` 为准，布局与结构几何 token 以 `apps/web/src/styles/layout.css` 为准，chrome 材质 token 以 `apps/web/src/styles/ios-theme.css` 为准。调整 token 时同步更新本文件的表格与说明。
@@ -216,8 +220,8 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 ### Secondary
 - **Status Green** (`#34c759`；深色 `#30d158`)：成功、完成、已连接。
-- **Status Amber** (`#ff9500`；深色 `#ff9f0a`)：警告、需要确认的中间态。
-- **Status Red** (`#ff3b30`；深色 `#ff453a`)：错误、危险操作、不可逆动作。
+- **Status Amber** (`#ff9500`；深色 `#ff9f0a`)：警告、需要确认的中间态；文字使用 `--warning-text`（浅色 `#8a4b00`、深色 `#ff9f0a`），背景与边框仍使用 `--warning`。
+- **Status Red** (`#ff3b30`；深色 `#ff453a`)：错误、危险操作、不可逆动作；文字使用 `--destructive-text`（浅色 `#c40012`、深色 `#ff453a`），背景与边框仍使用 `--destructive`。
 - **Status Indigo** (`#5856d6`；深色 `#5e5ce6`)：信息、提示和中性强调。
 
 游戏资源稀有度是唯一允许的领域色例外，但应封装在资源组件内部，不能扩散成页面主题。
@@ -338,7 +342,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ### Named Rules
 **The Flat-By-Default Rule.** 普通卡片、列表和页面区块在静止状态保持平整。阴影只用于表达层级、可点击性或状态，不要给静态内容卡片加投影闪动或位移。
 
-**The Liquid Glass Theme.** 液态玻璃是后续主题层的能力，不属于默认 chrome。shell chrome 的玻璃材质由后续主题提供；现有分段控件与召唤层（Dialog/Sheet、主题菜单、PWA 提示等）的材质保持不变。设备画面紧凑玻璃按钮的材质由 device-mirror 域持有，不随页面 kind 或样式加载顺序变化。普通卡片始终不透明，避免整页都是玻璃导致可读性下降。
+**The Liquid Glass Theme.** 液态玻璃是后续主题层的能力，不属于默认 chrome。shell chrome 的玻璃材质由后续主题提供；召唤层（Dialog/Sheet、主题菜单、PWA 提示等）的材质保持不变，分段控件不再消费 `--glass-*`，其高亮指示器由 `--muted` 与 `--border` 语义 token 提供。设备画面紧凑玻璃按钮的材质由 device-mirror 域持有，不随页面 kind 或样式加载顺序变化。普通卡片始终不透明，避免整页都是玻璃导致可读性下降。
 
 **The Single Beam Rule.** `status-border-beam` 仅用于启动、连接或执行中的局部状态反馈，并通过 `is-active` 控制；完成、空闲和静态卡片不得常驻光效，也不要叠加第二条可见边框。
 

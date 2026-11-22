@@ -46,6 +46,8 @@ export function isTrainingSettingsInvalidation(
 
 export type TrainingSettingsSyncState = 'idle' | 'saving' | 'failed'
 
+export type TrainingSettingsPatch = Partial<TrainingSettings>
+
 export interface TrainingSettingsOwnerState {
   /** 页面当前显示并会随计划应用提交的设置。 */
   readonly settings: TrainingSettings
@@ -66,11 +68,25 @@ export interface TrainingSettingsWriteOutcome {
 }
 
 export interface TrainingSettingsOwnerOptions {
-  write?: (settings: TrainingSettings) => Promise<ApiResponse<unknown>>
+  write?: (settings: TrainingSettingsPatch) => Promise<ApiResponse<unknown>>
   publish?: (invalidation: ResourceInvalidation) => void
 }
 
 const cloneSettings = (settings: TrainingSettings): TrainingSettings => ({ ...settings })
+
+const copyPatch = (patch: TrainingSettingsPatch): TrainingSettingsPatch => {
+  const next: TrainingSettingsPatch = {}
+  if (patch.useMedicine !== undefined) next.useMedicine = patch.useMedicine
+  if (patch.useStone !== undefined) next.useStone = patch.useStone
+  if (patch.autoSwitch !== undefined) next.autoSwitch = patch.autoSwitch
+  if (patch.notifyOnComplete !== undefined) next.notifyOnComplete = patch.notifyOnComplete
+  return next
+}
+
+const mergeSettings = (
+  settings: TrainingSettings,
+  patch: TrainingSettingsPatch,
+): TrainingSettings => ({ ...settings, ...patch })
 
 const settingsEqual = (left: TrainingSettings, right: TrainingSettings): boolean => (
   left.useMedicine === right.useMedicine
@@ -113,7 +129,7 @@ const describeError = (error: unknown): string => (
  * 写入仍在执行时插入第二个并发写。
  */
 export class TrainingSettingsOwner {
-  private readonly writeRequest: (settings: TrainingSettings) => Promise<ApiResponse<unknown>>
+  private readonly writeRequest: (settings: TrainingSettingsPatch) => Promise<ApiResponse<unknown>>
   private readonly publishInvalidation: (invalidation: ResourceInvalidation) => void
 
   private tail: Promise<void> = Promise.resolve()
@@ -203,9 +219,10 @@ export class TrainingSettingsOwner {
    * 立即更新页面值与 revision（计划据此失效）；写入完成时只有仍是最新编辑的
    * 响应可以确认或回滚页面值。旧响应只更新内部 persisted，供后续失败回滚。
    */
-  update(next: TrainingSettings): Promise<TrainingSettingsWriteOutcome> {
-    const requested = cloneSettings(next)
-    if (settingsEqual(requested, this.state.settings)) {
+  update(patch: TrainingSettingsPatch): Promise<TrainingSettingsWriteOutcome> {
+    const requested = copyPatch(patch)
+    const next = mergeSettings(this.state.settings, requested)
+    if (settingsEqual(next, this.state.settings)) {
       return Promise.resolve({
         status: 'ignored',
         settings: this.state.settings,
@@ -218,7 +235,7 @@ export class TrainingSettingsOwner {
     this.touched = true
     this.state = {
       ...this.state,
-      settings: requested,
+      settings: next,
       revision,
       syncState: 'saving',
       error: null,
@@ -232,7 +249,10 @@ export class TrainingSettingsOwner {
       try {
         const response = await this.writeRequest(requested)
         if (response.success) {
-          saved = coerceSettings(response.data, requested)
+          saved = coerceSettings(
+            response.data,
+            mergeSettings(this.state.persisted, requested),
+          )
         } else {
           failure = resolveFailureMessage(response)
         }
@@ -251,7 +271,7 @@ export class TrainingSettingsOwner {
 
       const latest = revision === this.state.revision
       if (saved) {
-        const normalized = coerceSettings(saved, requested)
+        const normalized = saved
         const changed = !settingsEqual(normalized, this.state.settings)
         this.state = {
           ...this.state,

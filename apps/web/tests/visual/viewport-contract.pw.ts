@@ -130,7 +130,7 @@ test.describe('viewport contract', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/app/training')
     await waitForPageReady(page, 'training')
-    await page.getByRole('button', { name: '继续添加', exact: true }).click()
+    await page.getByRole('button', { name: '添加干员', exact: true }).click()
 
     const dialog = page.getByRole('dialog').filter({ hasText: '添加干员' })
     await expect(dialog).toBeVisible()

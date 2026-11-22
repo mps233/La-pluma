@@ -8,8 +8,32 @@ import {
   type TrainingQueueCommandOutcome,
   type TrainingQueueCommandOwner,
   type TrainingQueueCommandState,
+  type TrainingQueuePendingCommand,
 } from '../model/queueCommands'
 import type { TrainingQueueSnapshot } from '../types'
+
+export interface TrainingQueuePendingGroups {
+  readonly pendingAdds: ReadonlySet<string>
+  readonly pendingRemoves: ReadonlySet<string>
+  readonly pendingUndoOperatorIds: ReadonlySet<string>
+}
+
+export function selectTrainingQueuePendingGroups(
+  pending: readonly TrainingQueuePendingCommand[],
+): TrainingQueuePendingGroups {
+  const pendingAdds = new Set<string>()
+  const pendingRemoves = new Set<string>()
+  const pendingUndoOperatorIds = new Set<string>()
+  for (const entry of pending) {
+    switch (entry.type) {
+      case 'add': pendingAdds.add(entry.operatorId); break
+      case 'remove': pendingRemoves.add(entry.operatorId); break
+      case 'undo': pendingUndoOperatorIds.add(entry.operatorId); break
+      case 'reorder': break
+    }
+  }
+  return { pendingAdds, pendingRemoves, pendingUndoOperatorIds }
+}
 
 export function useTrainingQueueCommandState(
   owner: TrainingQueueCommandOwner = trainingQueueCommandOwner,
@@ -17,7 +41,7 @@ export function useTrainingQueueCommandState(
   return useSyncExternalStore(owner.subscribe, owner.getState, owner.getState)
 }
 
-export interface TrainingQueueCommands {
+export interface TrainingQueueCommands extends TrainingQueuePendingGroups {
   readonly pending: TrainingQueueCommandState['pending']
   readonly pendingOperatorIds: ReadonlySet<string>
   readonly queueMutationPending: boolean
@@ -48,6 +72,11 @@ export function useTrainingQueueCommands(
     [state.pending],
   )
 
+  const pendingGroups = useMemo(
+    () => selectTrainingQueuePendingGroups(state.pending),
+    [state.pending],
+  )
+
   const run = useCallback(
     (command: TrainingQueueCommand) => owner.run(command, context),
     [context, owner],
@@ -56,6 +85,7 @@ export function useTrainingQueueCommands(
   return {
     pending: state.pending,
     pendingOperatorIds,
+    ...pendingGroups,
     queueMutationPending: state.pending.length > 0,
     run,
   }

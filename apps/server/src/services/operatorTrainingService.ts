@@ -54,6 +54,8 @@ import {
 import type { TrainingQueueItem } from './operatorTrainingStore.ts';
 import { generateTrainingPlan } from './operatorTrainingPlan.ts';
 import type { TrainingPlan, TrainingPlanOptions } from './operatorTrainingPlan.ts';
+import { getGameDay, resolveGameZone } from './gameCalendar.ts';
+import { resolveConnection } from './connectionService.ts';
 import {
   applyPlanToTasks,
   finishQueueMutation,
@@ -96,6 +98,8 @@ export interface TrainingQueueSnapshot {
   settings: TrainingSettings;
   lastUpdated: string;
   revision: string;
+  gameDate: string;
+  clientType: string;
   flowSync: FlowSyncState;
 }
 
@@ -248,10 +252,25 @@ async function getOperatorList(filters: TrainingOperatorFilters = {}): Promise<T
   };
 }
 
+async function resolveQueueContext(): Promise<{ gameDate: string; clientType: string }> {
+  let rawClientType: string | undefined;
+  try {
+    rawClientType = (await resolveConnection()).clientType;
+  } catch (error) {
+    logger.warn('读取连接配置失败，养成队列上下文按默认客户端计算', { error: errorMessage(error) });
+  }
+  const clientType = resolveGameZone(rawClientType).clientType;
+  return {
+    gameDate: getGameDay(new Date(), clientType).date,
+    clientType
+  };
+}
+
 async function getTrainingQueue(): Promise<TrainingQueueSnapshot> {
   const queueData = await loadTrainingQueue();
   const depot = await loadDepot();
   const operatorMaterialsData = await loadOperatorMaterials();
+  const context = await resolveQueueContext();
 
   const enrichedQueue: TrainingQueueItemDetail[] = [];
 
@@ -294,6 +313,8 @@ async function getTrainingQueue(): Promise<TrainingQueueSnapshot> {
     settings: queueData.settings,
     lastUpdated: queueData.lastUpdated,
     revision: getQueueRevision(queueData),
+    gameDate: context.gameDate,
+    clientType: context.clientType,
     flowSync: await getQueueFlowSync(queueData)
   };
 }

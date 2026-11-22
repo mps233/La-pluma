@@ -73,10 +73,15 @@ export async function generatePlan(req: TrainingRequest, res: ApiResponseWriter)
   return sendSuccess(res, req, payload);
 }
 
-/** `/actions/apply-training-plan` 的计划应用：`queueRevision` 冲突由领域返回 409。 */
+/** `/actions/apply-training-plan` 的计划应用：队列变化或计划上下文过期由领域返回 409。 */
 export async function applyPlan(req: TrainingRequest, res: ApiResponseWriter): Promise<void> {
   const { plan, settings } = parseApplyPlanBody(req.body);
-  const payload: ApplyPlanResult = await operatorTrainingService.applyPlanToTasks(plan, settings);
+  const now = new Date();
+  const { clientType } = await resolveRequestConnection(req, { allowOverrides: true });
+  const payload: ApplyPlanResult = await operatorTrainingService.applyPlanToTasks(plan, settings, {
+    clientType,
+    now
+  });
   return sendSuccess(res, req, payload, '养成计划已应用到任务流程');
 }
 

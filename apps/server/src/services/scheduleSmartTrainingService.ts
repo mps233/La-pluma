@@ -81,7 +81,7 @@ function errorMessageOf(error: unknown): string {
 export function getPlanOpenStages(
   plan: SmartTrainingPlanSource = {}
 ): Array<SmartTrainingStageSource & { stage: string }> {
-  const stages: SmartTrainingStageSource[] = Array.isArray(plan.openStages) && plan.openStages.length > 0
+  const stages: SmartTrainingStageSource[] = Array.isArray(plan.openStages)
     ? plan.openStages
     : Array.isArray(plan.stages)
       ? plan.stages.filter(stage => stage?.isOpen !== false)

@@ -8,6 +8,7 @@ import {
   DEFAULT_TRAINING_SETTINGS,
   TRAINING_SETTINGS_FAILURE_MESSAGE,
   TrainingSettingsOwner,
+  type TrainingSettingsPatch,
 } from './settingsCommands'
 
 interface DeferredResult<T> {
@@ -34,7 +35,7 @@ const settle = async <T,>(target: DeferredResult<T>, value: T): Promise<void> =>
 }
 
 const createOwner = (
-  write: (value: TrainingSettings) => Promise<ApiResponse<unknown>> = vi.fn(async () => ({ success: true })),
+  write: (value: TrainingSettingsPatch) => Promise<ApiResponse<unknown>> = vi.fn(async () => ({ success: true })),
   publish: (invalidation: ResourceInvalidation) => void = vi.fn(),
 ) => new TrainingSettingsOwner({ write, publish })
 
@@ -55,7 +56,7 @@ describe('training settings owner', () => {
   it('serializes edits and never lets an older response overwrite the latest value', async () => {
     const first = deferred<ApiResponse<unknown>>()
     const second = deferred<ApiResponse<unknown>>()
-    const write = vi.fn((_value: TrainingSettings) => first.promise)
+    const write = vi.fn((_value: TrainingSettingsPatch) => first.promise)
     write.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
     const owner = createOwner(write)
 
@@ -104,7 +105,7 @@ describe('training settings owner', () => {
   it('rolls back only the latest failed edit and ignores an older failure', async () => {
     const first = deferred<ApiResponse<unknown>>()
     const second = deferred<ApiResponse<unknown>>()
-    const write = vi.fn((_value: TrainingSettings) => first.promise)
+    const write = vi.fn((_value: TrainingSettingsPatch) => first.promise)
     write.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
     const owner = createOwner(write)
 
@@ -137,7 +138,7 @@ describe('training settings owner', () => {
   })
 
   it('uses the server-normalized value only for the latest edit', async () => {
-    const write = vi.fn(async (_value: TrainingSettings) => ({
+    const write = vi.fn(async (_value: TrainingSettingsPatch) => ({
       success: true,
       data: settings({ useMedicine: 0 }),
     }))
@@ -161,6 +162,106 @@ describe('training settings owner', () => {
     expect(owner.getState()).toMatchObject({
       settings: settings({ notifyOnComplete: false }),
       persisted: settings({ notifyOnComplete: false }),
+      syncState: 'idle',
+    })
+  })
+
+  it('submits only the fields provided by a patch', async () => {
+    const write = vi.fn(async (_value: TrainingSettingsPatch) => ({
+      success: true,
+      data: settings({ autoSwitch: false }),
+    }))
+    const owner = createOwner(write)
+
+    await owner.update({ autoSwitch: false })
+
+    expect(write).toHaveBeenCalledOnce()
+    expect(write).toHaveBeenCalledWith({ autoSwitch: false })
+  })
+
+  it('merges a patch into hydrated settings and adopts hidden response fields', async () => {
+    const pending = deferred<ApiResponse<unknown>>()
+    const owner = createOwner(vi.fn(async () => pending.promise))
+
+    owner.hydrate(settings({ useMedicine: 5, useStone: 3 }))
+    const update = owner.update({ autoSwitch: false })
+
+    expect(owner.getState()).toMatchObject({
+      settings: settings({ useMedicine: 5, useStone: 3, autoSwitch: false }),
+      persisted: settings({ useMedicine: 5, useStone: 3 }),
+      syncState: 'saving',
+    })
+
+    await settle(pending, {
+      success: true,
+      data: { useMedicine: 7, useStone: 3, autoSwitch: false },
+    })
+    await update
+
+    expect(owner.getState()).toMatchObject({
+      settings: settings({ useMedicine: 7, useStone: 3, autoSwitch: false }),
+      persisted: settings({ useMedicine: 7, useStone: 3, autoSwitch: false }),
+      syncState: 'idle',
+    })
+  })
+
+  it('serializes patches and keeps persisted at the last confirmed value when the later patch fails', async () => {
+    const first = deferred<ApiResponse<unknown>>()
+    const second = deferred<ApiResponse<unknown>>()
+    const write = vi.fn((_value: TrainingSettingsPatch) => first.promise)
+    write.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    const owner = createOwner(write)
+
+    const firstUpdate = owner.update({ autoSwitch: false })
+    const secondUpdate = owner.update({ notifyOnComplete: false })
+    await Promise.resolve()
+
+    expect(write).toHaveBeenCalledOnce()
+    expect(write).toHaveBeenLastCalledWith({ autoSwitch: false })
+
+    await settle(first, {
+      success: true,
+      data: settings({ autoSwitch: false }),
+    })
+    expect(await firstUpdate).toMatchObject({ status: 'saved', superseded: true })
+    expect(owner.getState()).toMatchObject({
+      settings: settings({ autoSwitch: false, notifyOnComplete: false }),
+      persisted: settings({ autoSwitch: false }),
+      syncState: 'saving',
+    })
+
+    await Promise.resolve()
+    expect(write).toHaveBeenCalledTimes(2)
+    expect(write).toHaveBeenLastCalledWith({ notifyOnComplete: false })
+
+    await settle(second, { success: false, message: '设置服务不可用' })
+    expect(await secondUpdate).toMatchObject({
+      status: 'failed',
+      superseded: false,
+      message: '设置服务不可用',
+    })
+    expect(owner.getState()).toMatchObject({
+      settings: settings({ autoSwitch: false }),
+      persisted: settings({ autoSwitch: false }),
+      syncState: 'failed',
+      error: '设置服务不可用',
+    })
+  })
+
+  it('still accepts a complete settings object', async () => {
+    const write = vi.fn(async (_value: TrainingSettingsPatch) => ({
+      success: true,
+      data: settings({ autoSwitch: false }),
+    }))
+    const owner = createOwner(write)
+
+    await owner.update(settings({ autoSwitch: false }))
+
+    expect(write).toHaveBeenCalledOnce()
+    expect(write).toHaveBeenCalledWith(settings({ autoSwitch: false }))
+    expect(owner.getState()).toMatchObject({
+      settings: settings({ autoSwitch: false }),
+      persisted: settings({ autoSwitch: false }),
       syncState: 'idle',
     })
   })

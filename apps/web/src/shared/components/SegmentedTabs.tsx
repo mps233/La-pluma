@@ -111,7 +111,7 @@ export function SegmentedTabNav<T extends string>({
   const { containerRef, activeRect, setTabRef } = useFluidTabIndicator(value)
 
   return (
-    <div className={cn('app-workspace-segments app-liquid-tab-pill', className)}>
+    <div className={cn('app-workspace-segments', className)}>
       <TabsList
         ref={containerRef}
         activateOnFocus={false}

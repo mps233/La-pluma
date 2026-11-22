@@ -400,74 +400,6 @@
     box-shadow: none;
   }
 
-  /* Shared with in-page mode pickers: the liquid material is app-wide, the
-     navigation geometry lives in layout.css. */
-  .la-pluma-app .app-liquid-tab-pill {
-    --glass-liquid-surface: color-mix(
-      in srgb,
-      var(--glass-bg) 42%,
-      transparent
-    );
-    box-sizing: border-box;
-    border: 1px solid transparent;
-    background:
-      linear-gradient(
-        var(--glass-liquid-surface-lift),
-        var(--glass-liquid-surface-lift)
-      ),
-      var(--glass-liquid-surface);
-    -webkit-backdrop-filter: blur(6px) saturate(140%);
-    backdrop-filter: blur(6px) saturate(140%);
-    box-shadow: var(--glass-tabbar-shadow);
-    pointer-events: auto;
-  }
-
-  .la-pluma-app .app-liquid-tab-pill::before {
-    position: absolute;
-    z-index: 2;
-    inset: 0;
-    padding: 0.5px;
-    border-radius: inherit;
-    background: conic-gradient(
-      from 0deg,
-      var(--glass-edge-light) 0deg,
-      var(--glass-edge-light) 72deg,
-      var(--glass-edge-high) 73deg,
-      var(--glass-edge-mid) 75deg,
-      var(--glass-edge-faint) 77deg,
-      var(--glass-edge-clear) 79deg,
-      var(--glass-edge-faint) 82deg,
-      var(--glass-edge-mid) 84deg,
-      var(--glass-edge-high) 87deg,
-      var(--glass-edge-light) 90deg,
-      var(--glass-edge-light) 252deg,
-      var(--glass-edge-high) 253deg,
-      var(--glass-edge-mid) 255deg,
-      var(--glass-edge-faint) 257deg,
-      var(--glass-edge-clear) 259deg,
-      var(--glass-edge-faint) 262deg,
-      var(--glass-edge-mid) 264deg,
-      var(--glass-edge-high) 267deg,
-      var(--glass-edge-light) 270deg,
-      var(--glass-edge-light) 360deg
-    );
-    -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    content: '';
-    pointer-events: none;
-  }
-
-  .la-pluma-app .app-liquid-tab-pill > * {
-    position: relative;
-    z-index: 1;
-  }
-
   .la-pluma-app .la-pluma-tabbar-pill {
     border: 1px solid var(--border);
     border-radius: 999px;
@@ -841,7 +773,6 @@
 
   @media (prefers-reduced-transparency: reduce) {
     .la-pluma-app .la-pluma-tabbar,
-    .la-pluma-app .app-liquid-tab-pill,
     .la-pluma-app .la-pluma-tabbar-pill,
     .la-pluma-app .la-pluma-tabbar-more,
     .la-pluma-app .la-pluma-theme-desktop,
@@ -851,21 +782,6 @@
       background: var(--card);
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
-    }
-
-    .la-pluma-app .app-liquid-tab-pill::before {
-      display: none;
-    }
-  }
-
-  @media (prefers-contrast: more) {
-    .la-pluma-app .app-liquid-tab-pill {
-      border-color: var(--input);
-      background: var(--card);
-    }
-
-    .la-pluma-app .app-liquid-tab-pill::before {
-      display: none;
     }
   }
 

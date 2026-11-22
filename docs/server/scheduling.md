@@ -88,6 +88,8 @@ cron 触发在执行前经 `beginAgentRun` 创建 `run_daily_flow` Run，`onBefo
 4. 计划为空时按设置自动切换到下一个干员（移出已完成项并重新生成计划），未开启自动切换或队列只剩一项则移除智能关卡。
 5. 今天没有开放关卡时移除智能关卡；否则用开放的智能关卡替换，保留固定（`pinned`）关卡与普通关卡（`apps/server/src/services/scheduleSmartTrainingService.ts:116-125`）。
 
+回写只重新生成自己的计划，不消费客户端待应用的计划；客户端 apply 因游戏日、客户端类型或关卡关闭被拒绝时，不影响已注册的 cron，也不影响任何已有 Run。重建智能关卡时计划 `openStages` 存在（包括空数组）即为权威，只有缺失时才回退到 `stages` 中未标记关闭的条目。
+
 写回的智能关卡条目为 `{stage, times, smart: true, trainingOperators}`（`apps/server/src/services/scheduleSmartTrainingService.ts:35-41`）。
 
 ## 重启恢复

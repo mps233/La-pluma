@@ -226,6 +226,7 @@ export const apiFixtures: ApiFixture[] = [
           settings: { useMedicine: 0, useStone: 0, autoSwitch: false, notifyOnComplete: false },
         },
       ],
+      settings: { useMedicine: 0, useStone: 0, autoSwitch: true, notifyOnComplete: true },
       revision: 'visual-baseline-1',
       flowSync: false,
     }),

@@ -95,6 +95,8 @@ export interface TrainingQueueSnapshot {
   settings?: TrainingSettings
   revision?: string
   lastUpdated?: string
+  gameDate?: string
+  clientType?: string
   flowSync?: TrainingFlowSync
   /**
    * 仅在队列写入成功、但写后刷新失败时由领域命令写入。
@@ -165,7 +167,7 @@ export interface TrainingPlan {
     }>
   }>
   totalSanity?: number
-  estimatedTime?: string
+  estimatedTime?: number
   warnings?: string[]
   summary?: {
     totalStages?: number
@@ -174,6 +176,18 @@ export interface TrainingPlan {
     backlogCount?: number
     openStageCount?: number
     closedStageCount?: number
+    gameDate?: string
+    clientType?: string
+    todayOpenResourceStages?: Array<{
+      stage: string
+      name: string
+      isOpen: boolean
+    }>
+    todayClosedResourceStages?: Array<{
+      stage: string
+      name: string
+      isOpen: boolean
+    }>
   }
 }
 

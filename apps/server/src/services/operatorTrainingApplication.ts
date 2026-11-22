@@ -29,7 +29,7 @@ import type {
   TrainingFlowBinding,
   TrainingQueueData
 } from './operatorTrainingStore.ts';
-import { generateTrainingPlan } from './operatorTrainingPlan.ts';
+import { generateTrainingPlan, resolveTrainingPlanApplyContext } from './operatorTrainingPlan.ts';
 import { resolveConnection } from './connectionService.ts';
 
 const logger = createLogger('OperatorTraining');
@@ -67,6 +67,8 @@ export interface ApplyPlanOptions {
   automatic?: boolean;
   target?: FlowTarget;
   refreshSchedule?: ((config: CombatTasksConfig) => Promise<ScheduleSyncResult>) | null;
+  clientType?: string;
+  now?: Date;
 }
 
 /** 计划应用成功的结果；定时注册失败仍返回 success=true 并单独标记。 */
@@ -279,6 +281,15 @@ function readPlanOperatorNames(planRecord: Record<string, unknown>): string[] {
   return names;
 }
 
+async function resolveApplyClientType(): Promise<string | undefined> {
+  try {
+    return (await resolveConnection()).clientType;
+  } catch (error) {
+    logger.warn('读取连接配置失败，养成计划按默认客户端校验', { error: errorMessage(error) });
+    return undefined;
+  }
+}
+
 export async function applyPlanToTasks(
   plan: unknown,
   settings: unknown = {},
@@ -290,6 +301,32 @@ export async function applyPlanToTasks(
   if (typeof planRevision !== 'string' || !planRevision || planRevision !== getQueueRevision(queueData)) {
     throw trainingError('养成队列已变化，请重新生成计划后应用', 409);
   }
+
+  const applyContext = await resolveTrainingPlanApplyContext(planRecord, {
+    clientType: options.clientType ?? await resolveApplyClientType(),
+    now: options.now
+  });
+  const staleReason = applyContext.gameDateMismatch
+    ? 'game_day'
+    : applyContext.clientTypeMismatch
+      ? 'client_type'
+      : applyContext.closedStages.length > 0
+        ? 'stage_closed'
+        : null;
+  if (staleReason) {
+    throw trainingError('养成计划已过期，请重新生成计划后应用', 409, {
+      code: 'AGENT_TRAINING_PLAN_STALE',
+      details: {
+        reason: staleReason,
+        gameDate: applyContext.gameDate,
+        planGameDate: applyContext.planGameDate,
+        clientType: applyContext.clientType,
+        planClientType: applyContext.planClientType,
+        closedStages: applyContext.closedStages
+      }
+    });
+  }
+
   const effectiveSettings = normalizeTrainingSettings({
     ...queueData.settings,
     ...(isRecord(settings) ? settings : {})

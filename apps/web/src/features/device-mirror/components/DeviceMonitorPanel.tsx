@@ -15,6 +15,7 @@ export function DeviceMonitorPanel({ className = '' }: { className?: string }) {
 interface StandardDeviceMonitorLayoutProps {
   variant?: 'standard'
   children: ReactNode
+  support?: ReactNode
 }
 
 interface WorkbenchDeviceMonitorLayoutProps {
@@ -66,9 +67,18 @@ export function DeviceMonitorLayout(props: DeviceMonitorLayoutProps) {
   return (
     <div className="task-monitor-layout" data-device-monitor-layout="standard">
       <div className="task-monitor-main" data-monitor-area="main">{props.children}</div>
-      <aside className="task-monitor-column" aria-label="设备画面" data-monitor-area="monitor">
-        <DeviceMonitorPanel />
-      </aside>
+      {props.support != null ? (
+        <div className="task-monitor-support" data-monitor-area="support">
+          <aside className="task-monitor-column" aria-label="设备画面" data-monitor-area="monitor">
+            <DeviceMonitorPanel />
+          </aside>
+          {props.support}
+        </div>
+      ) : (
+        <aside className="task-monitor-column" aria-label="设备画面" data-monitor-area="monitor">
+          <DeviceMonitorPanel />
+        </aside>
+      )}
     </div>
   )
 }

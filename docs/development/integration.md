@@ -33,6 +33,8 @@ PR/main 的 `browser-checks` job 在 `client-build` 成功后下载当前工作�
 | 实时预览跨页共享 | 在启动请求未完成时连续切日常、肉鸽、作业和养成，再切数据、日志、总览、设置并返回 | 只启动、登录与建立一个 socket/peer；各预览页绑定同一可播放视频流；显式关闭释放一次，页面切换不释放 |
 | 日志固定范围与本地清屏 | 选择 Run 后推进终态与新活动 Run；清屏后轮询、隐藏日志页并释放迟到请求，再恢复 | 固定 Run 范围下事件集合不随终态或新活动 Run 漂移；不调用共享清空接口；旧记录不重现，隐藏期间不轮询，迟到响应不覆盖恢复窗口 |
 
+训练计划的应用还受服务端游戏日、客户端类型与关卡开放门禁约束：跨日或切换客户端区服后应用旧计划会返回 409 `AGENT_TRAINING_PLAN_STALE`，客户端应清空预览并重新生成。该路径目前由服务端 HTTP 回归与前端计划所有者测试覆盖，尚未纳入上表的浏览器集成场景；契约见 [Agent API 的养成计划段](../api/agent.md#养成材料筹备队列与任务流程)。
+
 测试文件为 `apps/web/tests/integration/execution.pw.ts`、`resources.pw.ts`、`logs.pw.ts` 与 `preview.pw.ts`。服务端目标停止保护的关键回归在 `apps/server/src/routes/__tests__/agentRoutes.test.ts`；Run 状态、持久化、快照与契约分别由 `agentRunService.test.ts`、`agentRunPersistence.test.ts`、`runSnapshotService.test.ts`、`agentContract.test.ts` 与 `agentContractHttp.test.ts` 覆盖。
 
 ## 契约与覆盖边界

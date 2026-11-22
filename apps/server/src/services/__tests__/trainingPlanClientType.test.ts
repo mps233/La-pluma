@@ -62,6 +62,7 @@ if (args[0] === 'dir' && args[1] === 'config') {
 `, { mode: 0o755 });
 
 const { default: training } = await import('../operatorTrainingService.ts');
+const { buildSmartTrainingStages } = await import('../scheduleSmartTrainingService.ts');
 const { loggerManager } = await import('../../utils/logger.ts');
 loggerManager.getLogger('OperatorTraining').enableConsole = false;
 loggerManager.getLogger('DropData').enableConsole = false;
@@ -72,6 +73,36 @@ const queuePath = path.join(dataDirectory, 'user-configs/training-queue.json');
 
 async function writeJson(filePath: string, value: unknown): Promise<void> {
   await writeFile(filePath, JSON.stringify(value));
+}
+
+async function writeProfile(clientType: string): Promise<void> {
+  await writeFile(path.join(maaConfigDir, 'profiles', 'default.toml'), [
+    '[connection]',
+    'adb_path = "/fixture/adb"',
+    'address = "127.0.0.1:5555"',
+    `client_type = "${clientType}"`,
+    ''
+  ].join('\n'));
+}
+
+async function fileSnapshot(): Promise<{ queue: string; config: string }> {
+  return {
+    queue: await readFile(queuePath, 'utf8'),
+    config: await readFile(configPath, 'utf8')
+  };
+}
+
+interface DomainError {
+  statusCode?: number;
+  code?: string;
+  details?: Record<string, unknown>;
+}
+
+async function rejectionOf(promise: Promise<unknown>): Promise<DomainError> {
+  return promise.then(
+    () => assert.fail('expected apply to be rejected'),
+    error => (typeof error === 'object' && error !== null ? error : {}) as DomainError
+  );
 }
 
 async function smartStages(): Promise<CombatStageObject[]> {
@@ -168,5 +199,205 @@ describe('training plan client game day', () => {
     } finally {
       t.mock.timers.reset();
     }
+  });
+});
+
+describe('training plan apply context', () => {
+  it('reports the queue game day and normalized client type from the current profile', async (t) => {
+    await writeProfile('yostaren');
+    t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 9, 28, 8, 0, 0) });
+    try {
+      const queue = await training.getTrainingQueue();
+      assert.equal(queue.gameDate, '2026-10-27');
+      assert.equal(queue.clientType, 'YoStarEN');
+    } finally {
+      await writeProfile('YoStarEN');
+      t.mock.timers.reset();
+    }
+  });
+
+  it('applies a plan when the captured game day and client type still match', async (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 9, 28, 8, 0, 0) });
+    try {
+      await training.addToQueue('beta');
+      const plan = await training.generateTrainingPlan();
+      assert.equal(plan.summary?.gameDate, '2026-10-27');
+      assert.equal(plan.summary?.clientType, 'YoStarEN');
+
+      const applied = await training.applyPlanToTasks(plan);
+
+      assert.equal(applied.success, true);
+      assert.deepEqual((await smartStages()).map(stage => stage.stage), ['S3-2']);
+    } finally {
+      t.mock.timers.reset();
+    }
+  });
+
+  it('rejects apply after the game day advances without writing queue or automation config', async (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 9, 28, 8, 0, 0) });
+    try {
+      await training.addToQueue('beta');
+      const plan = await training.generateTrainingPlan();
+      assert.equal(plan.summary?.gameDate, '2026-10-27');
+
+      t.mock.timers.setTime(Date.UTC(2026, 9, 29, 8, 0, 0));
+      const before = await fileSnapshot();
+      let refreshCalls = 0;
+      const error = await rejectionOf(training.applyPlanToTasks(plan, {}, {
+        refreshSchedule: async () => {
+          refreshCalls += 1;
+          return { attempted: true, success: true, message: null };
+        }
+      }));
+
+      assert.equal(error.statusCode, 409);
+      assert.equal(error.code, 'AGENT_TRAINING_PLAN_STALE');
+      assert.equal(error.details?.reason, 'game_day');
+      assert.equal(error.details?.gameDate, '2026-10-28');
+      assert.equal(error.details?.planGameDate, '2026-10-27');
+      assert.equal(error.details?.clientType, 'YoStarEN');
+      assert.equal(error.details?.planClientType, 'YoStarEN');
+      assert.deepEqual(error.details?.closedStages, []);
+      assert.equal(refreshCalls, 0);
+      assert.deepEqual(await fileSnapshot(), before);
+    } finally {
+      t.mock.timers.reset();
+    }
+  });
+
+  it('rejects apply when the connection client type changes within the same game day', async (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 9, 28, 18, 0, 0) });
+    try {
+      await training.addToQueue('beta');
+      const plan = await training.generateTrainingPlan();
+      assert.equal(plan.summary?.gameDate, '2026-10-28');
+      assert.equal(plan.summary?.clientType, 'YoStarEN');
+
+      await writeProfile('Official');
+      const before = await fileSnapshot();
+      const error = await rejectionOf(training.applyPlanToTasks(plan));
+
+      assert.equal(error.statusCode, 409);
+      assert.equal(error.code, 'AGENT_TRAINING_PLAN_STALE');
+      assert.equal(error.details?.reason, 'client_type');
+      assert.equal(error.details?.gameDate, '2026-10-28');
+      assert.equal(error.details?.planGameDate, '2026-10-28');
+      assert.equal(error.details?.clientType, 'Official');
+      assert.equal(error.details?.planClientType, 'YoStarEN');
+      assert.deepEqual(error.details?.closedStages, []);
+      assert.deepEqual(await fileSnapshot(), before);
+    } finally {
+      await writeProfile('YoStarEN');
+      t.mock.timers.reset();
+    }
+  });
+
+  it('rejects apply when an intended resource stage closes with the activity window', async (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 9, 27, 12, 0, 0) });
+    try {
+      await writeJson(path.join(dataDirectory, 'materials.json'), {
+        materials: {
+          test_alpha: { id: 'test_alpha', name: '夜烟材料', bestStage: 'AP-5' },
+          test_beta: { id: 'test_beta', name: '调香师材料', bestStage: 'S3-2' }
+        }
+      });
+      await training.addToQueue('alpha');
+      const plan = await training.generateTrainingPlan();
+      assert.deepEqual((plan.openStages ?? []).map(stage => stage.stage), ['AP-5']);
+
+      t.mock.timers.setTime(Date.UTC(2026, 9, 28, 1, 0, 0));
+      const before = await fileSnapshot();
+      const error = await rejectionOf(training.applyPlanToTasks(plan));
+
+      assert.equal(error.statusCode, 409);
+      assert.equal(error.code, 'AGENT_TRAINING_PLAN_STALE');
+      assert.equal(error.details?.reason, 'stage_closed');
+      assert.equal(error.details?.gameDate, '2026-10-27');
+      assert.equal(error.details?.planGameDate, '2026-10-27');
+      assert.equal(error.details?.clientType, 'YoStarEN');
+      assert.equal(error.details?.planClientType, 'YoStarEN');
+      assert.deepEqual(error.details?.closedStages, ['AP-5']);
+      assert.deepEqual(await fileSnapshot(), before);
+    } finally {
+      t.mock.timers.reset();
+    }
+  });
+
+  it('applies a legacy plan without summary when all intended stages remain open', async (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 9, 28, 8, 0, 0) });
+    try {
+      await training.addToQueue('beta');
+      const plan = await training.generateTrainingPlan();
+      Reflect.deleteProperty(plan, 'summary');
+
+      const applied = await training.applyPlanToTasks(plan);
+
+      assert.equal(applied.success, true);
+      assert.deepEqual((await smartStages()).map(stage => stage.stage), ['S3-2']);
+    } finally {
+      t.mock.timers.reset();
+    }
+  });
+
+  it('rejects a legacy plan without summary when an intended stage is closed', async (t) => {
+    await writeProfile('Official');
+    t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 9, 28, 8, 0, 0) });
+    try {
+      const added = await training.addToQueue('alpha');
+      const before = await fileSnapshot();
+      const error = await rejectionOf(training.applyPlanToTasks({
+        queueRevision: added.queueRevision,
+        openStages: [{ stage: 'CE-6', totalTimes: 1 }]
+      }));
+
+      assert.equal(error.statusCode, 409);
+      assert.equal(error.code, 'AGENT_TRAINING_PLAN_STALE');
+      assert.equal(error.details?.reason, 'stage_closed');
+      assert.equal(error.details?.planGameDate, null);
+      assert.equal(error.details?.planClientType, null);
+      assert.deepEqual(error.details?.closedStages, ['CE-6']);
+      assert.deepEqual(await fileSnapshot(), before);
+    } finally {
+      await writeProfile('YoStarEN');
+      t.mock.timers.reset();
+    }
+  });
+
+  it('treats an empty openStages array as authoritative when applying a legacy plan', async (t) => {
+    await writeProfile('Official');
+    t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 9, 28, 8, 0, 0) });
+    try {
+      const added = await training.addToQueue('alpha');
+      const applied = await training.applyPlanToTasks({
+        queueRevision: added.queueRevision,
+        openStages: [],
+        stages: [{ stage: 'CE-6', totalTimes: 1, isOpen: true }]
+      });
+
+      assert.equal(applied.success, true);
+      assert.equal(applied.stageCount, 0);
+      assert.deepEqual(await smartStages(), []);
+    } finally {
+      await writeProfile('YoStarEN');
+      t.mock.timers.reset();
+    }
+  });
+
+  it('treats an empty openStages array as authoritative in smart stage rebuilds', () => {
+    assert.deepEqual(buildSmartTrainingStages({
+      openStages: [],
+      stages: [{ stage: 'S3-2', times: '3', isOpen: true }]
+    }), []);
+  });
+
+  it('falls back to open stages in smart stage rebuilds only when openStages is absent', () => {
+    assert.deepEqual(buildSmartTrainingStages({
+      stages: [
+        { stage: 'CE-6', times: '2', isOpen: false },
+        { stage: 'S3-2', times: '3' }
+      ]
+    }), [
+      { stage: 'S3-2', times: '3', smart: true, trainingOperators: [] }
+    ]);
   });
 });
