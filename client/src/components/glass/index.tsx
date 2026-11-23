@@ -43,6 +43,7 @@ import {
   GlassDropdownMenuTrigger,
 } from '../liquid-glass/glass-dropdown-menu'
 import { GlassButtonGroup, GlassButtonGroupItem } from '../liquid-glass/glass-button-group'
+export { GlassButtonGroup, GlassButtonGroupItem } from '../liquid-glass/glass-button-group'
 import { GlassSelect as KitSelect, type GlassSelectOption } from '../liquid-glass/glass-select'
 import { Checkbox as KitCheckbox } from '../liquid-glass/controls/Checkbox'
 export { GlassSelect, type GlassSelectOption, type GlassSelectProps } from '../liquid-glass/glass-select'

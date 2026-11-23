@@ -590,15 +590,17 @@ html.la-pluma-standalone #app-root .page {
   }
 
   .la-pluma-app .la-pluma-theme-desktop {
-    --theme-toggle-item-size: 2rem;
-    --theme-toggle-gap: 0.25rem;
-    --theme-toggle-pad: 0.25rem;
+    --theme-toggle-item-size: 36px;
+    --theme-toggle-gap: 4px;
+    --theme-toggle-pad: 4px;
     display: flex;
-    height: calc(var(--theme-toggle-item-size) + var(--theme-toggle-pad) * 2);
+    /* Match the 44px GitHub control beside it: the group's own padding is the
+       only vertical space, so the shell is exactly the item plus two pads. */
+    height: 44px;
+    box-sizing: border-box;
     align-items: center;
     gap: var(--theme-toggle-gap);
     padding: var(--theme-toggle-pad);
-    border: 0;
     border-radius: 999px;
   }
 
