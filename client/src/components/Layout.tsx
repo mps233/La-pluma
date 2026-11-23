@@ -363,6 +363,8 @@ export default function Layout({ children }: LayoutProps) {
       <div ref={pageRef} className="page no-swipeback la-pluma-page" data-name="la-pluma">
         <AsciiFieldBackdrop />
         <div className="la-pluma-sidebar-frame" aria-hidden="true">
+          {/* Static colour for the clear GlassCard to frost; the animated ASCII field is left to the page. */}
+          <div className="la-pluma-sidebar-aurora" />
           <GlassCard variant="clear" className="la-pluma-sidebar-surface h-full w-full rounded-[1.625rem]" />
         </div>
         <header className="navbar la-pluma-navbar">
