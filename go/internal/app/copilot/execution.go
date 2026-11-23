@@ -437,7 +437,7 @@ func (s *Service) executeDynamicEntries(ctx context.Context, execution dynamicEx
 				buildErr = err
 				break
 			}
-			content := ParseCopilotContent(data)
+			content := NormalizeCopilotContentForMAA(ParseCopilotContent(data))
 			for _, file := range BuildCopilotRepeatFiles(RepeatSource{
 				ItemIndex: entry.ItemIndex,
 				CopilotID: entry.CopilotID,
