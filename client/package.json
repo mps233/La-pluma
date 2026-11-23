@@ -18,7 +18,8 @@
     "@hugeicons/core-free-icons": "^4.4.0",
     "@hugeicons/react": "^1.1.10",
     "@lisse/react": "^0.7.3",
-    "@zakisheriff/liquid-glass": "^4.0.3",
+    "@ui-sdk/core": "0.1.0-beta.13",
+    "@ui-sdk/react": "0.1.0-beta.13",
     "budoux": "^0.10.4",
     "framer-motion": "^12.29.2",
     "lucide-react": "^1.77.0",
@@ -27,6 +28,7 @@
     "react-dom": "^19.3.1",
     "react-virtuoso": "^4.18.24",
     "recharts": "^3.11.0",
+    "three": "^0.185.1",
     "zustand": "^5.1.0"
   },
   "devDependencies": {
@@ -38,6 +40,7 @@
     "@types/react": "^19.3.0",
     "@types/react-command-palette": "^0.18.4",
     "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "^6.3.0",
     "@vitest/coverage-v8": "^5.1.1",
     "eslint": "^9.39.1",

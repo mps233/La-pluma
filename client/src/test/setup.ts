@@ -28,3 +28,21 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
     dispatchEvent: () => false,
   })) as unknown as typeof window.matchMedia
 }
+
+// jsdom does not implement pointer capture or Web Animations. The Liquid Glass
+// registry calls both from pointer handlers and presence transitions; no-op
+// stubs keep component tests focused on app behavior.
+if (typeof Element !== 'undefined') {
+  if (typeof Element.prototype.setPointerCapture !== 'function') {
+    Element.prototype.setPointerCapture = () => {}
+  }
+  if (typeof Element.prototype.releasePointerCapture !== 'function') {
+    Element.prototype.releasePointerCapture = () => {}
+  }
+  if (typeof Element.prototype.hasPointerCapture !== 'function') {
+    Element.prototype.hasPointerCapture = () => false
+  }
+  if (typeof Element.prototype.getAnimations !== 'function') {
+    Element.prototype.getAnimations = () => []
+  }
+}

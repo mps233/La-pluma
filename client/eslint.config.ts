@@ -6,7 +6,10 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'coverage']),
+  // The Liquid Glass registry is installed byte-for-byte and must not be edited;
+  // its hooks/refresh rules are the kit's own, so keep it out of app lint.
+  // Vendored component kits keep their upstream file layout and export surface.
+  globalIgnores(['dist', 'coverage', 'src/components/liquid-glass', 'src/components/uibrik']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

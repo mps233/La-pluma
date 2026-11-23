@@ -86,17 +86,17 @@ iOS / macOS 27 的 Liquid Glass 是 iOS 26 材质的精修，不是换一套语�
 
 ### Liquid Glass 材质
 
-所有玻璃材质统一使用 `@zakisheriff/liquid-glass`；不再引入或使用 Glasswork / `.glass` 材质类。桌面浮动 chrome 与页面内控件使用同一套包材质：
+所有玻璃材质统一使用 shadcn 安装的 Liquid Glass UI registry（`client/src/components/liquid-glass/`），并且只通过 `@/components/glass` 适配器使用；不要直接改 registry 文件，也不要再引入 `@zakisheriff/liquid-glass` 或 Glasswork / `.glass` 材质类。桌面浮动 chrome 与页面内控件使用同一套材质：
 
-- 桌面侧栏框架使用 `GlassCard`（`la-pluma-sidebar-surface`），按需设置 `--lg-glass-fill` / `--lg-glass-blur`；侧栏导航项使用 `GlassButton`：选中态 `variant="filled"` + `--app-accent-action`（实色 accent、白字），未选中态 `variant="clear"`（包的轻量玻璃，hover/focus 由包处理）。
+- 桌面侧栏框架使用 `GlassCard`（`la-pluma-sidebar-surface`），材质由 registry 绘制，应用 CSS 只负责框架尺寸和减少透明度 / 增强对比度降级；侧栏导航项使用 `GlassButton`：选中态 `variant="filled"` + `--app-accent-action`（实色 accent、白字），未选中态 `variant="clear"`（轻量玻璃，hover/focus 由组件处理）。
 - 顶栏主题胶囊使用 `GlassCard` 作为材质容器，内部保留三按钮和蓝色选中指示；GitHub、品牌、移动端主题触发器使用 `GlassButton`（GitHub 使用 `href`，品牌桌面保持裸链、移动端为 44px 圆钮）。
 - 移动端顶栏的品牌、主题、GitHub 圆形入口使用同一套 `GlassButton` 材质。
-- `prefers-reduced-transparency: reduce` 下包材质退化为实色，并为 `GlassCard` 的 `::before` 同步关闭 backdrop-filter；`prefers-contrast: more` 通过 `--lg-edge` 加强边缘。
+- `prefers-reduced-transparency: reduce` 下由 `ios-theme.css` 把应用 chrome 退化为实色并关闭 backdrop-filter；`prefers-contrast: more` 通过应用类加强边框和文字，不依赖 registry 的内部 token。
 - 页面和组件不要新增手写玻璃或 Glasswork 类；需要新玻璃面时使用 `GlassCard`、`GlassButton`、`GlassSegmented`、`GlassNav`、`GlassMenu`、`GlassSwitch`。
-- 页面内分段控件统一使用 `@zakisheriff/liquid-glass` 的 `GlassSegmented`（作业类型、肉鸽模式、预览模式、日志内容、数据视图、养成方式、养成状态、配置分区），不再使用 `app-liquid-tab-pill` 胶囊或手写高亮层。作业类型与预览卡的 wrapper 通过 `data-theme` 继承明暗主题（`system` 时交给媒体查询）；预览控件使用 `size="sm"`；页面级轨道统一铺满容器，粗指针设备由 CSS 把分段高度提升到 44px。整行作业类型轨道的背景模糊已关闭（背后是均匀的页面底色），否则透镜动画每帧重算模糊会把帧率减半；小号预览控件保留模糊。
-- 移动端底部导航使用同一库的 `GlassNav`（控制台、自动化、作业、配置四个 Tab）+ 独立圆形 `GlassMenu`（更多）；「更多」不是第五个 Tab，点击后从按钮向左上展开工作区菜单，当前溢出页面在菜单中带勾选，溢出页面激活时按钮使用 accent 色。tabbar wrapper 绑定 `data-theme`，保留 `--la-pluma-tabbar-*` 高度与安全区 token，内容区留白和滚动遮罩继续使用这些 token。
-- 全局 `Button` / `IconButton` 也由 `GlassButton` 承载：primary → filled + `--app-accent-action`，danger → filled + `--app-danger-action`，success → filled + `--app-success-action`，secondary / outline → glass，ghost → clear；loading 时用内置活动指示器填入 icon 并保留 `loadingText`。尺寸映射为 36 / 44 / 48px，粗指针下小号提升到 44px。明暗主题通过 `applyThemePreference` 在 `html[data-theme]` 统一解析，按钮不再逐个包裹主题属性。
-- 公共 `Switch` 由同一库的 `GlassSwitch` 承载：保留 `checked` / `onChange` / `label` / `compact` / `disabled` API，`label` 只作 `aria-label`，开启色使用 `--app-accent`；`id` 落在按钮上，外部 `<label htmlFor>` 仍可正常关联。`compact` 通过 0.8 缩放并补偿触摸区域，粗指针下命中高度保持约 44px。
+- 页面内分段控件统一使用 `GlassSegmented` 适配器（作业类型、肉鸽模式、日志内容、数据视图、养成方式、养成状态、配置分区），不再使用 `app-liquid-tab-pill` 胶囊或手写高亮层。预览卡直接使用 registry 的 `GlassTabs`（`client/src/components/liquid-glass/glass-tabs.tsx`，见 `PreviewModeControls`）；不要把这个例外扩散到其他页面。作业类型 wrapper 通过 `data-theme` 继承明暗主题（`system` 时交给媒体查询）；页面级轨道由 `.lg-segmented` 适配器铺满容器。
+- 移动端底部导航使用 `GlassNav`（控制台、自动化、作业、配置四个 Tab）+ 独立圆形 `GlassMenu`（更多）；「更多」不是第五个 Tab，点击后从按钮向左上展开工作区菜单，当前溢出页面在菜单中带勾选，溢出页面激活时按钮使用 accent 色。tabbar wrapper 绑定 `data-theme`，保留 `--la-pluma-tabbar-*` 高度与安全区 token，内容区留白和滚动遮罩继续使用这些 token。
+- 全局 `Button` / `IconButton` 也由 `GlassButton` 承载：primary → filled + `--app-accent-action`，danger → filled + `--app-danger-action`，success → filled + `--app-success-action`，secondary / outline → glass，ghost → clear；loading 时用内置活动指示器填入 icon 并保留 `loadingText`。尺寸映射为 36 / 44 / 52px，粗指针下小号提升到 44px。明暗主题通过 `applyThemePreference` 在 `html[data-theme]` 统一解析，按钮不再逐个包裹主题属性。
+- 公共 `Switch` 由 `GlassSwitch` 适配器承载：保留 `checked` / `onChange` / `label` / `compact` / `disabled` API，`label` 只作 `aria-label`，开启色使用 `--app-accent`；`id` 落在按钮上，外部 `<label htmlFor>` 仍可正常关联。`compact` 通过 0.8 缩放并补偿触摸区域，粗指针下命中高度保持约 44px。
 
 ---
 
@@ -466,7 +466,7 @@ Tailwind 映射：
 - 普通按钮：使用 `Button`
 - 图标按钮：使用 `IconButton`
 
-普通按钮与图标按钮统一由 `@zakisheriff/liquid-glass` 的 `GlassButton` 承载（见“Liquid Glass 材质”下的 Button 条目），页面不要再写 `app-button` / `app-icon-button` 之类的按钮外观类。
+普通按钮与图标按钮统一由 `@/components/glass` 的 `GlassButton` 适配器承载（见“Liquid Glass 材质”下的 Button 条目），页面不要再写 `app-button` / `app-icon-button` 之类的按钮外观类。
 
 iOS 风格三档 `Button` 高度由 `Button` 的 `size` 统一管理，经 `app-glass-button-*` 映射为桌面 36、44、48px 的玻璃胶囊；`Input` 和 `Select` 为 44px。手机断点和粗指针设备会把所有标准按钮、图标按钮与表单点击区提升到至少 44px。不要在调用处再叠加 `h-*`、`px-*`、`py-*` 缩小标准控件；图标专用工具条只有在桌面高密度场景才可明确使用更紧凑的尺寸，且不能承载文字。
 
@@ -532,7 +532,7 @@ iOS 风格三档 `Button` 高度由 `Button` 的 `size` 统一管理，经 `app-
 | Switch 轨道 / 滑块 | 复用 `GlassSwitch` 内置 spring |
 | 菜单、下拉 | 复用现有组件：主题菜单 spring `440/38/0.7`；添加任务使用 `Modal` 的弹层 spring |
 | 弹窗 | spring `stiffness: 380, damping: 34, mass: 0.82` |
-| 分段高亮 | 复用 `GlassSegmented` 内置 spring，不要另写 |
+| 分段高亮 | 复用 `GlassSegmented`（预览卡为 `GlassTabs`）内置 spring，不要另写 |
 | 更多菜单 | 复用 `GlassMenu` 内置 spring |
 
 - 退出比进入快约 30–40%；浮层从触发点 origin 展开；优先使用可反向中断的过渡。
@@ -695,17 +695,17 @@ iOS 风格三档 `Button` 高度由 `Button` 的 `size` 统一管理，经 `app-
 | 不可逆操作确认 | `ConfirmDialog` |
 | 局部加载 | `Loading`；懒加载路由用 `PageSkeleton`；控制台骨架从 `@/components/common/Loading` 直接导入 |
 | 任务状态环 | `StatusMark`（从 `@/components/common` 导出） |
-| 动态分段标签 | `GlassSegmented`（来自 `@zakisheriff/liquid-glass`；作业类型、肉鸽模式、预览模式、日志、数据、养成、配置共用） |
+| 动态分段标签 | `GlassSegmented`（来自 `@/components/glass` 适配器；作业类型、肉鸽模式、日志、数据、养成、配置共用）；预览卡例外直接使用 registry 的 `GlassTabs` |
 | 覆盖层 | 先看「模式库 / 覆盖层」；移动端更多菜单由 `Layout` 的 `GlassMenu` 提供，不是公共组件 |
 
 ### GlassSegmented
 
-**来源**：`@zakisheriff/liquid-glass`；样式表在 `client/src/main.tsx` 全局导入一次。
+**来源**：`@/components/glass` 适配器（registry 位于 `client/src/components/liquid-glass/`，由 shadcn 原样安装）；适配器说明见 `client/src/components/glass/README.md`。
 
-**适用场景**：页面内的互斥视图切换，例如作业类型、肉鸽模式、预览模式、日志内容、数据视图、养成方式、养成状态和配置分区。选中态是液态玻璃透镜，指针拖动、方向键 / Home / End、`prefers-reduced-motion` 都由组件处理；不要手写 Framer Motion 高亮层、`ResizeObserver`、坐标计算或 `app-liquid-tab-pill` 胶囊。
+**适用场景**：页面内的互斥视图切换，例如作业类型、肉鸽模式、日志内容、数据视图、养成方式、养成状态和配置分区。选中态是液态玻璃透镜，指针拖动、方向键 / Home / End、`prefers-reduced-motion` 都由组件处理；不要手写 Framer Motion 高亮层、`ResizeObserver`、坐标计算或 `app-liquid-tab-pill` 胶囊。预览卡的分段控件是例外，直接使用 registry 的 `GlassTabs`；本节的 `GlassSegmented` 规则不适用于它。
 
 ```tsx
-import { GlassSegmented } from '@zakisheriff/liquid-glass'
+import { GlassSegmented } from '@/components/glass'
 
 const tabs = [
   { id: 'copilot', label: '普通作业', icon: <FileText className="h-4 w-4" aria-hidden="true" /> },
@@ -736,10 +736,10 @@ const activeIndex = Math.max(0, tabs.findIndex(tab => tab.id === activeTab))
 
 - `value` 是索引；`onChange` 必须把索引映射回业务值，找不到时回退到 `0`，不要直接存索引。
 - 必须传 `aria-label`；标签写业务名称，不要写“选项一”。
-- 全宽轨道由 wrapper 的 CSS 控制：`.xxx-shell > .lg-track { width: 100%; grid-auto-columns: minmax(0, 1fr); }`；粗指针设备用 `.xxx-shell > .lg-track.lg-track--segmented { --lg-item-h: 44px; }`。这些声明必须放在 `@layer` 之外：库的 `.lg-track--segmented` 是未分层样式，会压过 `@layer components`；省略 `.lg-track--segmented` 时预览的 `size="sm"` 会退回 28px。参考 `client/src/index.css` 中 `.combat-mode-shell`、`.log-mode-shell` 等规则。
+- 全宽轨道由适配器 `.lg-segmented` 铺满容器；页面只为自己的 shell 补充布局（参考 `client/src/index.css` 的 `.combat-mode-shell`、`.preview-mode-shell`），不要把尺寸写进 registry。
 - 需要局部强制主题时，wrapper 设 `data-theme={theme === 'system' ? undefined : theme}`；其余页面直接继承 `html[data-theme]`。
-- 紧凑场景（预览卡）使用 `size="sm"`。
-- 整行轨道在背后底色均匀时可以关闭背景模糊（参考 `.combat-mode-shell .combat-mode-segmented .lg-track__glass { backdrop-filter: none; }`），否则透镜动画每帧重算模糊会把帧率减半；小号控件和其余分段控件保留模糊。
+- 紧凑场景使用 `size="sm"`。
+- 分段轨道的模糊由 registry 绘制；页面不要覆盖 registry 内部类名来关模糊，性能问题通过组件 `blur` / `live` 参数或适配器处理。
 - 骨架屏沿用 wrapper 类名和 `glass-mode-skeleton` 结构（见 `Loading.tsx` 的 `GlassModeSkeleton`），让占位高度与真实控件一致。
 - 手机端页面支持左右滑动切换相邻分段（作业类型、肉鸽模式、日志内容、数据视图、养成状态、配置分区）：养成页的页面级「养成方式」是 tap-only 模式切换，不参与滑动，避免与页面内的「养成状态」轨道争抢同一手势。手势与跟手卡片轨道复用 `useSwipeModeTrack` + `SwipeModePager`，宿主加 `app-swipe-surface`，并通过 `extraIgnoreSelector` 排除分段控件外壳、设备预览和页面内的次要操作区；拖拽时轨道跟手，松手后弹簧落到相邻分段，不在首尾循环。分段高亮仍用 `GlassSegmented` 内置 spring。
 
