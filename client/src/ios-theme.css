@@ -853,7 +853,7 @@ html.la-pluma-standalone #app-root .page {
   align-items: center;
   justify-content: flex-start;
   gap: 0.625rem;
-  border-radius: 0.875rem;
+  border-radius: 999px;
   padding: 0 0.75rem !important;
   color: var(--app-text) !important;
   font-size: 0.9375rem;
