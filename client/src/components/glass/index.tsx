@@ -34,6 +34,7 @@ import {
 } from 'react'
 
 import { GlassButton as KitButton } from '../liquid-glass/glass-button'
+import { GlassLayer } from '../liquid-glass/glass-layer'
 import { GlassCard as KitCard } from '../liquid-glass/glass-card'
 import { GlassTabs as KitTabs, type GlassTabOption } from '../liquid-glass/glass-tabs'
 import { Switch as KitSwitch } from '../liquid-glass/controls/Switch'
@@ -69,6 +70,8 @@ export interface GlassButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEl
   variant?: GlassButtonVariant
   /** Value for tinted / filled: any CSS colour. */
   tint?: string
+  /** Clear glass only: repaint the page snapshot every frame instead of throttling it. */
+  live?: boolean
   destructive?: boolean
   href?: string
   target?: string
@@ -105,6 +108,14 @@ const TINTED_SURFACE: CSSProperties = {
   borderColor: 'var(--app-border)',
   color: 'var(--app-text)',
 }
+/* The kit button's base classes; the live-clear host below renders its own button. */
+const BUTTON_BASE =
+  'inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full font-semibold whitespace-nowrap select-none outline-none focus-visible:ring-2 focus-visible:ring-[#3291FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 aria-disabled:opacity-40 [&_svg]:shrink-0'
+
+/* Mirrors the kit button's clear fallback for the custom live host below. */
+const BUTTON_CLEAR_FALLBACK =
+  'border border-black/10 bg-white/60 text-neutral-900 shadow-sm backdrop-blur-md dark:border-white/15 dark:bg-white/10 dark:text-white data-[glass-tone=dark]:text-white data-[glass-tone=light]:text-neutral-900'
+
 const BUTTON_TINTED_SURFACE = TINTED_SURFACE
 
 function buttonLook(variant: GlassButtonVariant, tint?: string, destructive?: boolean): { material: 'clear' | 'tinted'; style?: CSSProperties } {
@@ -133,6 +144,7 @@ export const GlassButton = forwardRef<HTMLButtonElement, GlassButtonProps>(funct
   size = 'md',
   variant = 'glass',
   tint,
+  live = false,
   destructive = false,
   href,
   target,
@@ -175,6 +187,45 @@ export const GlassButton = forwardRef<HTMLButtonElement, GlassButtonProps>(funct
     ...(isIconOnly ? { 'data-icon-only': '' } : {}),
     ...(ref ? { ref } : {}),
   } as ComponentProps<typeof KitButton>
+  // The kit button never forwards `live` to its GlassLayer. For the small
+  // header icons that sit over scrolling content, render the same clear host
+  // with a live layer so the content under the glass moves at display rate.
+  if (live && look.material === 'clear') {
+    const hostClasses = `${BUTTON_BASE} ${classes} ${BUTTON_CLEAR_FALLBACK} relative`
+    if (href) {
+      return (
+        <a
+          {...(rest as React.AnchorHTMLAttributes<HTMLAnchorElement>)}
+          data-glass-host=""
+          {...(isIconOnly ? { 'data-icon-only': '' } : {})}
+          href={href}
+          target={target}
+          rel={rel ?? (target === '_blank' ? 'noopener noreferrer' : undefined)}
+          className={hostClasses}
+          style={mergedStyle}
+          onClick={handleClick as unknown as React.MouseEventHandler<HTMLAnchorElement>}
+        >
+          <GlassLayer material="clear" live />
+          {content}
+        </a>
+      )
+    }
+    return (
+      <button
+        {...rest}
+        data-glass-host=""
+        {...(isIconOnly ? { 'data-icon-only': '' } : {})}
+        ref={ref}
+        type={type}
+        className={hostClasses}
+        style={mergedStyle}
+        onClick={handleClick}
+      >
+        <GlassLayer material="clear" live />
+        {content}
+      </button>
+    )
+  }
   if (href) {
     return (
       <KitButton asChild {...kitProps} onClick={handleClick} material={look.material} className={classes} style={mergedStyle}>

@@ -683,6 +683,7 @@ export default function Dashboard() {
                 onClick={openOnboarding}
                 icon={<Compass className="h-4 w-4" aria-hidden="true" />}
                 variant="clear-glass"
+                live
                 size="sm"
                 title="新手引导"
                 aria-label="新手引导"
