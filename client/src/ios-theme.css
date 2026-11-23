@@ -2422,7 +2422,8 @@ html.dark .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .sm
   color: var(--app-accent-strong);
 }
 
-/* "More" menu trigger in the tab bar: a circle matching the floating bar. */
+/* "More" menu trigger in the tab bar: a circle matching the floating bar and
+   the same tinted surface as every other app button. */
 .lg-menu .lg-button[data-icon-only] {
   flex: 0 0 auto;
   box-sizing: border-box;
@@ -2430,7 +2431,9 @@ html.dark .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .sm
   height: var(--la-pluma-tabbar-floating-height, 2.75rem);
   min-width: var(--la-pluma-tabbar-floating-height, 2.75rem);
   padding: 0;
+  border: 1px solid var(--app-border);
   border-radius: var(--app-radius-pill);
+  background: var(--app-surface-muted);
   color: var(--app-text);
   font-size: var(--app-font-caption, 0.75rem);
   font-weight: 600;

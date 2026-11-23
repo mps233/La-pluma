@@ -98,11 +98,12 @@ const BUTTON_ICON_ONLY: Record<GlassButtonSize, string> = {
  * tinted surface instead. Opt in with `variant="clear"` only when the content
  * behind the button is static.
  */
-const BUTTON_TINTED_SURFACE: CSSProperties = {
-  backgroundColor: "var(--app-surface-muted)",
+const TINTED_SURFACE: CSSProperties = {
+  backgroundColor: 'var(--app-surface-muted)',
   borderColor: 'var(--app-border)',
   color: 'var(--app-text)',
 }
+const BUTTON_TINTED_SURFACE = TINTED_SURFACE
 
 function buttonLook(variant: GlassButtonVariant, tint?: string, destructive?: boolean): { material: 'clear' | 'tinted'; style?: CSSProperties } {
   if (destructive) return { material: 'tinted', style: { backgroundColor: 'var(--app-danger-action)', color: '#fff' } }
@@ -205,7 +206,11 @@ export interface GlassCardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'ch
   padding?: string
   /** Corner radius; ignored when `className` brings its own `rounded-*`. */
   radius?: string
-  /** `regular` is the old frosted panel; `clear` and `tinted` map straight onto the kit. */
+  /**
+   * `tinted` (default) matches the button surface; `clear` refracts the page
+   * behind the card (opt in only when that content is static); `regular` keeps
+   * the old frosted-panel meaning and is treated as clear.
+   */
   variant?: 'regular' | 'clear' | 'tinted'
   /** Repaint the glass over moving content behind it. */
   live?: boolean
@@ -217,7 +222,7 @@ export function GlassCard({
   children,
   padding,
   radius,
-  variant = 'regular',
+  variant = 'tinted',
   live = false,
   blur = 12,
   className = '',
@@ -227,13 +232,14 @@ export function GlassCard({
   return (
     <KitCard
       {...rest}
-      material={variant === 'tinted' ? 'tinted' : 'clear'}
+      material={variant === 'clear' || variant === 'regular' ? 'clear' : 'tinted'}
       live={live}
       blur={blur}
       className={`${HOST} lg-card ${className}`.trim()}
       style={{
         ...(padding ? { padding } : {}),
         ...(radius ? { borderRadius: radius } : {}),
+        ...(variant === 'tinted' ? TINTED_SURFACE : {}),
         ...style,
       }}
     >
