@@ -609,7 +609,6 @@ iOS 风格三档 `Button` 高度由 `Button` 的 `size` 统一管理，经 `app-
 | 长表单、多分组 | 独立路由页 | 不要塞进 Modal；保存条固定在页面或 section |
 | 筛选、排序 | 页内筛选菜单（参考 DataStatistics 的 FilterMenu，不是公共组件） | 不遮挡主内容；关闭后焦点回触发按钮 |
 | 页面导航 | `Layout` 的 tabbar / `GlassMenu` | 移动端更多菜单是 Layout 内部组件，不是 `@/components/common` 的公共导出；页面不要自行复刻 |
-| 全局快速跳转 | `CommandPalette`（`react-command-palette`） | 侧栏按钮、移动端更多菜单或 Cmd/Ctrl+K 打开；只列工作区导航，不执行破坏性操作；solid surface + overlay，不套玻璃；Esc / 选择 / 点击遮罩关闭并把焦点还给触发元素 |
 | 详情 | 路由 + 返回 | 返回保持列表滚动位置 |
 
 ### 设置页
@@ -653,7 +652,6 @@ iOS 风格三档 `Button` 高度由 `Button` 的 `size` 统一管理，经 `app-
 | Menu | 方向键、Enter/Space、Escape 关闭并归还焦点 |
 | Dialog | 打开聚焦第一个可操作项，破坏性操作默认聚焦取消；Esc 关闭；关闭归还触发元素 |
 | 路由切换 | 焦点移到 main 或 h1，播报页面名 |
-| 全局命令 | 侧栏“快速跳转”、移动端更多菜单或 Cmd/Ctrl+K 打开；输入过滤，方向键/Enter 选择，Esc 关闭；焦点归还触发元素 |
 | 表单错误 | `aria-invalid` + `aria-describedby`；错误摘要可聚焦 |
 | 全局播报 | 只保留一个 polite live region；`role="alert"` 只用于需要用户处理的错误 |
 | 列表 | 选中/当前项有 `aria-selected` / `aria-current`；批量操作有可读数量 |
@@ -805,11 +803,10 @@ className={`from-${tone}`}
 - **连续圆角**：`SmoothPanel` / `SmoothSurface` 的 20/16 是 TS 常量，不是 token；组件源码已注明与 `--app-continuous-radius` / `-compact` 同步。
 - **`FloatingStatusIndicator`**：当前没有关闭按钮；错误不会自动收起，只能被下一次消息或页面生命周期清除。页头滚出可视区后，非就绪状态（消息、连接异常、运行中）会在导航栏下方右上角以固定副本继续显示；就绪台词不悬浮。手机（<640px）沿用隐藏页头的规则，只保留读屏状态区。
 - **手写控件 `ring-2`**：现有约 10+ 处仍使用 `focus-visible:ring-2`；目标是迁移到 Button 的 outline 配方，新代码不要新增。
-- **命令面板**：`react-command-palette` 的 `contentLabel` 固定为英文，`CommandPalette.tsx` 在 `onAfterOpen` 覆盖为“命令面板”/“搜索工作区”；该库仍使用已弃用的生命周期，开发模式会打印提示。面板按需加载，不进入首屏主包。
 - **图表与虚拟网格**：`recharts` 由 `DropTrendChart` 懒加载，`react-virtuoso` 用于统计页的大网格；没有 `.la-pluma-scroll-host` 时保留普通网格回退。两者都不单独引入页面色板。
 
 ---
 
 **创建时间**：2026-02-09
-**最后更新**：2026-11-20
+**最后更新**：2026-11-24
 **维护者**：@mps233

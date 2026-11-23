@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, Search, Settings2, Swords, Wrench } from 'lucide-react'
 import { GlassButton, GlassCard, GlassInput, GlassMenu, GlassNav } from '@/components/glass'
 import ThemeToggle from './ThemeToggle'
@@ -19,7 +19,6 @@ import {
 } from '@/services/operatorQuotes'
 
 
-const CommandPalette = lazy(() => import('./CommandPalette'))
 
 interface LayoutProps {
   children: (props: { activeTab: string }) => ReactNode
@@ -135,8 +134,6 @@ export default function Layout({ children }: LayoutProps) {
   const activeTab: AppTab = isAppTab(storedActiveTab) ? storedActiveTab : 'dashboard'
   const [sidebarQuery, setSidebarQuery] = useState('')
   const [sidebarIdentity, setSidebarIdentity] = useState(DEFAULT_OPERATOR_QUOTE)
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
-  const [commandPaletteMounted, setCommandPaletteMounted] = useState(false)
   const pageRef = useRef<HTMLDivElement>(null)
   const scrollPositions = useRef(new Map<AppTab, number>())
   const previousTab = useRef<AppTab>(activeTab)
@@ -285,39 +282,6 @@ export default function Layout({ children }: LayoutProps) {
     }
   }
 
-  const prefetchCommandPalette = () => {
-    void import('./CommandPalette')
-  }
-
-  const openCommandPalette = () => {
-    void import('./CommandPalette')
-    setCommandPaletteMounted(true)
-    setCommandPaletteOpen(true)
-  }
-
-  useEffect(() => {
-    const handleCommandPaletteKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 'k') {
-        event.preventDefault()
-        void import('./CommandPalette')
-        setCommandPaletteMounted(true)
-        setCommandPaletteOpen(open => !open)
-      }
-    }
-    window.addEventListener('keydown', handleCommandPaletteKey)
-    return () => window.removeEventListener('keydown', handleCommandPaletteKey)
-  }, [])
-
-  const commandList = tabs.map((tab, index) => ({
-    id: index,
-    color: 'var(--app-accent)',
-    name: tab.name,
-    command: () => {
-      setCommandPaletteOpen(false)
-      navigateToTab(tab.id)
-    },
-  }))
-
   const activePrimaryMobileIndex = mobileTabs.findIndex(tab => tab.id === activeTab)
   const isOverflowActive = overflowTabs.some(tab => tab.id === activeTab)
   const mobileNavItems = mobileTabs.map(tab => ({
@@ -332,11 +296,6 @@ export default function Layout({ children }: LayoutProps) {
       checked: tab.id === activeTab,
       onSelect: () => navigateToTab(tab.id),
     })),
-    {
-      label: '快速跳转',
-      icon: <Search className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" />,
-      onSelect: () => setCommandPaletteOpen(true),
-    },
   ]
   const handleMobileNavChange = (index: number) => {
     const tab = mobileTabs[index]
@@ -420,6 +379,7 @@ export default function Layout({ children }: LayoutProps) {
             <search className="la-pluma-sidebar-search" role="search">
               <GlassInput
                 type="search"
+                icon={<Search aria-hidden="true" />}
                 value={sidebarQuery}
                 onChange={(event) => setSidebarQuery(event.target.value)}
                 onKeyDown={(event) => {
@@ -437,22 +397,6 @@ export default function Layout({ children }: LayoutProps) {
                 spellCheck={false}
               />
             </search>
-
-            <button
-              type="button"
-              className="la-pluma-command-trigger"
-              onClick={openCommandPalette}
-              onPointerEnter={prefetchCommandPalette}
-              onFocus={prefetchCommandPalette}
-              aria-label="打开命令面板"
-              aria-keyshortcuts="Meta+K Control+K"
-            >
-              <span className="la-pluma-command-trigger-label">
-                <Search className="h-4 w-4" strokeWidth={1.9} aria-hidden="true" />
-                快速跳转
-              </span>
-              <kbd className="la-pluma-command-trigger-key" aria-hidden="true">⌘K</kbd>
-            </button>
 
             <div
               className="la-pluma-sidebar-identity"
@@ -529,15 +473,6 @@ export default function Layout({ children }: LayoutProps) {
           </div>
         </footer>
 
-        {commandPaletteMounted && (
-          <Suspense fallback={null}>
-            <CommandPalette
-              open={commandPaletteOpen}
-              commands={commandList}
-              onClose={() => setCommandPaletteOpen(false)}
-            />
-          </Suspense>
-        )}
       </div>
     </div>
   )

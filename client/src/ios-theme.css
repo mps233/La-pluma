@@ -757,55 +757,6 @@ html.la-pluma-standalone #app-root .page {
   width: 100%;
 }
 
-.la-pluma-command-trigger {
-  display: flex;
-  width: 100%;
-  min-height: var(--app-control-height-sm);
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--app-space-2);
-  margin-top: var(--app-space-2);
-  border: 0;
-  border-radius: var(--app-radius-md);
-  padding: 0 var(--app-space-3);
-  background: transparent;
-  color: var(--app-text-muted);
-  font: inherit;
-  font-size: var(--app-font-caption);
-  cursor: pointer;
-  transition: background 160ms ease, color 160ms ease;
-}
-
-.la-pluma-command-trigger:hover {
-  background: var(--app-surface-muted);
-  color: var(--app-text);
-}
-
-.la-pluma-command-trigger:focus-visible {
-  outline: 2px solid var(--app-accent);
-  outline-offset: 2px;
-}
-
-.la-pluma-command-trigger-label {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--app-space-2);
-}
-
-.la-pluma-command-trigger-key {
-  flex: none;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-sm);
-  padding: 0 0.3rem;
-  background: var(--app-surface-muted);
-  color: var(--app-text-soft);
-  font-family: inherit;
-  font-size: var(--app-font-meta);
-  font-variant-numeric: tabular-nums;
-  line-height: 1.6;
-}
-
 .la-pluma-sidebar-identity {
   display: flex;
   min-width: 0;

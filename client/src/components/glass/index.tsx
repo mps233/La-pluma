@@ -580,7 +580,7 @@ export function GlassInput({
 }: GlassInputProps) {
   const id = useId()
   return (
-    <GlassCard blur={8} className={`lg-input rounded-full ${className}`.trim()} padding="0">
+    <GlassCard variant="clear" blur={8} className={`lg-input rounded-full ${className}`.trim()} padding="0">
       <label
         htmlFor={id}
         className="lg-input-row flex min-h-9 w-full items-center gap-2 rounded-full px-3 text-sm transition-shadow focus-within:ring-2 focus-within:ring-[var(--app-accent)]"
