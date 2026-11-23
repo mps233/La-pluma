@@ -2479,11 +2479,13 @@ html.dark .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .sm
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  background:
+  /* Opaque base: the clear GlassCard must not sample the animated ASCII field
+     through this layer while scrolling, only these static colours. */
+  background-color: var(--app-surface-solid);
+  background-image:
     radial-gradient(65% 42% at 16% 8%, color-mix(in srgb, var(--app-accent) 55%, transparent) 0%, transparent 72%),
     radial-gradient(55% 40% at 88% 26%, color-mix(in srgb, var(--app-info) 42%, transparent) 0%, transparent 76%),
     radial-gradient(70% 38% at 54% 94%, color-mix(in srgb, var(--app-success) 26%, transparent) 0%, transparent 78%);
-  opacity: 0.85;
 }
 
 /* ── Liquid Glass adapter corrections ───────────────────────────────────── */
