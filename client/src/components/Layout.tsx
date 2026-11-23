@@ -1,6 +1,6 @@
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, Search, Settings2, Swords, Wrench } from 'lucide-react'
-import { GlassButton, GlassCard, GlassInput, GlassMenu, GlassNav } from '@/components/glass'
+import { GlassButton, GlassCard, GlassInput, GlassLiveCardButton, GlassMenu, GlassNav } from '@/components/glass'
 import ThemeToggle from './ThemeToggle'
 import RunIsland from './RunIsland'
 import SanityBatteryIsland from './SanityBatteryIsland'
@@ -331,18 +331,15 @@ export default function Layout({ children }: LayoutProps) {
           <div className="navbar-inner">
             <div className="left">
               <div className="la-pluma-navbar-left">
-                <GlassButton
+                <GlassLiveCardButton
                   type="button"
                   className="link la-pluma-brand"
                   icon={<img src={`${import.meta.env.BASE_URL}logo-graphite.svg?v=1`} alt="" className="la-pluma-brand-mark" />}
-                  variant="clear-glass"
-                  live
-                  size="md"
                   aria-label="La Pluma 控制台"
                   onClick={() => navigateToTab('dashboard')}
                 >
                   <span>La Pluma</span>
-                </GlassButton>
+                </GlassLiveCardButton>
               </div>
             </div>
             <div className="title">
@@ -351,15 +348,12 @@ export default function Layout({ children }: LayoutProps) {
             <div className="right">
               <div className="la-pluma-navbar-actions">
                 <ThemeToggle />
-                <GlassButton
+                <GlassLiveCardButton
                   href="https://github.com/mps233/La-pluma"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="link la-pluma-github-link"
+                  className="link la-pluma-github-link h-11 w-11"
                   icon={<GitHubMark />}
-                  variant="clear-glass"
-                  live
-                  size="md"
                   aria-label="打开 GitHub 仓库"
                 />
               </div>

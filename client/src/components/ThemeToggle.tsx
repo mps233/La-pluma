@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Check, Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
-import { GlassButton, GlassButtonGroup, GlassButtonGroupItem, GlassCard } from '@/components/glass'
+import { GlassButtonGroup, GlassButtonGroupItem, GlassCard, GlassLiveCardButton } from '@/components/glass'
 import { useUIStore } from '@/stores'
 
 type ThemeMode = 'light' | 'dark' | 'system'
@@ -138,14 +138,11 @@ export default function ThemeToggle() {
       </GlassButtonGroup>
 
       <div className="la-pluma-theme-mobile relative flex-none">
-        <GlassButton
+        <GlassLiveCardButton
           ref={mobileTriggerRef}
           type="button"
           onClick={() => setMobileMenuOpen(open => !open)}
           icon={<CurrentThemeIcon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />}
-          variant="clear-glass"
-          live
-          size="md"
           className={`la-pluma-theme-trigger${mobileMenuOpen ? ' text-primary' : ''}`}
           title={`主题：${currentTheme.label}`}
           aria-label={`切换界面主题，当前${currentTheme.label}`}

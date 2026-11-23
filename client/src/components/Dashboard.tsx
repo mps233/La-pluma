@@ -5,7 +5,7 @@ import { getOpenTodayStages, getTodayDrops, getTrainingQueue, maaApi } from '../
 import Icons from './Icons'
 import { PageHeader, Card, Button, SmoothPanel, CjkText, TruncatedText } from './common'
 import ActivityIndicator from './common/ActivityIndicator'
-import { GlassButton } from '@/components/glass'
+import { GlassButton, GlassLiveCardButton } from '@/components/glass'
 import { GlassActionButton } from '@/components/liquid-glass/glass-action-button'
 import { DashboardSkeleton } from './common/Loading'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
@@ -679,15 +679,12 @@ export default function Dashboard() {
               <div className="dashboard-status-slot min-w-0 flex-1 sm:flex-none">
                 <FloatingStatusIndicator className="dashboard-status-indicator w-full sm:w-auto" textClassName="truncate whitespace-nowrap" />
               </div>
-              <GlassButton
+              <GlassLiveCardButton
                 onClick={openOnboarding}
                 icon={<Compass className="h-4 w-4" aria-hidden="true" />}
-                variant="clear-glass"
-                live
-                size="sm"
                 title="新手引导"
                 aria-label="新手引导"
-                className="dashboard-onboarding-entry shrink-0"
+                className="dashboard-onboarding-entry h-9 w-9 shrink-0"
               />
             </div>
           }
