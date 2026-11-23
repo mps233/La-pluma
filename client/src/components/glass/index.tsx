@@ -404,6 +404,12 @@ export interface GlassMenuProps {
 }
 
 
+const MENU_TRIGGER_SIZES: Record<NonNullable<GlassMenuProps['size']>, string> = {
+  sm: '!h-9 !w-9',
+  md: '!h-11 !w-11',
+  lg: '!h-[3.25rem] !w-[3.25rem]',
+}
+
 export function GlassMenu({
   icon,
   items,
@@ -434,17 +440,12 @@ export function GlassMenu({
   return (
     <div ref={setContainer} className={`${HOST} lg-menu relative inline-flex ${className}`.trim()}>
       <GlassDropdownMenu container={container}>
-        <GlassDropdownMenuTrigger asChild aria-label={ariaLabel}>
-          <GlassButton
-            type="button"
-            variant="tinted"
-            size={size}
-            icon={icon}
-            iconOnly
-            aria-label={ariaLabel}
-            data-icon-only=""
-            className={`lg-button !h-[var(--la-pluma-tabbar-floating-height)] !w-[var(--la-pluma-tabbar-floating-height)] !px-0 bg-[var(--app-chrome-bg)] text-[var(--app-text)]`}
-          />
+        <GlassDropdownMenuTrigger
+          aria-label={ariaLabel}
+          data-icon-only=""
+          className={`lg-button ${MENU_TRIGGER_SIZES[size]} !h-[var(--la-pluma-tabbar-floating-height)] !w-[var(--la-pluma-tabbar-floating-height)] !px-0`}
+        >
+          {icon}
         </GlassDropdownMenuTrigger>
         <GlassDropdownMenuContent align={align} aria-label={ariaLabel} className={menuClassName}>
           {items.map((item, index) => {
@@ -522,9 +523,9 @@ export function GlassNav({
       <GlassButtonGroup
         role="tablist"
         aria-label={ariaLabel}
-        material="tinted"
+        material="clear"
         size="lg"
-        className={`lg-track h-[var(--la-pluma-tabbar-floating-height)] w-full bg-[var(--app-chrome-bg)] text-[var(--app-text)] ${className}`.trim()}
+        className={`lg-track h-[var(--la-pluma-tabbar-floating-height)] w-full text-[var(--app-text)] ${className}`.trim()}
       >
         {items.map((item, index) => {
           const active = index === activeIndex
