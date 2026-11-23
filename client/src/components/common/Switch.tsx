@@ -1,5 +1,5 @@
 import { useId, type ButtonHTMLAttributes } from 'react'
-import { GlassSwitch } from '@zakisheriff/liquid-glass'
+import { GlassSwitch } from '@/components/glass'
 
 interface SwitchProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onChange' | 'type' | 'value'> {
   checked: boolean
@@ -19,8 +19,8 @@ export default function Switch({
   onChange,
   compact = false,
   disabled = false,
+  name,
   className = '',
-  ...props
 }: SwitchProps) {
   const generatedId = useId()
   const switchId = id ?? `switch-${generatedId}`
@@ -30,13 +30,13 @@ export default function Switch({
       className={`app-switch${compact ? ' app-switch-compact' : ''}${disabled ? ' is-disabled' : ''}${className ? ` ${className}` : ''}`}
     >
       <GlassSwitch
-        {...props}
-        id={switchId}
         checked={checked}
         disabled={disabled}
         onChange={onChange}
-        tint="var(--app-accent)"
-        aria-label={label}
+        label={label}
+        id={switchId}
+        name={name}
+        compact={compact}
         className="app-switch-control"
       />
     </span>

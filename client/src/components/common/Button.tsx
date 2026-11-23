@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { GlassButton } from '@zakisheriff/liquid-glass'
+import { GlassButton } from '@/components/glass'
 import ActivityIndicator from './ActivityIndicator'
 import Tooltip from './Tooltip'
 
@@ -125,6 +125,7 @@ export function IconButton({
       title={tooltip ? undefined : title}
       aria-label={props['aria-label'] ?? title}
       icon={icon}
+      iconOnly
       variant={glassVariant.variant}
       tint={glassVariant.tint}
       destructive={glassVariant.destructive}

@@ -287,17 +287,17 @@ describe('OperatorTraining async interactions', () => {
   it('uses the shared liquid segment control for operator scope', async () => {
     await renderComponent()
 
-    const toolbar = container.querySelector<HTMLElement>('[role="tablist"][aria-label="干员范围"]')
+    const toolbar = container.querySelector<HTMLElement>('[role="radiogroup"][aria-label="干员范围"]')
     expect(toolbar).not.toBeNull()
-    expect(toolbar?.parentElement?.className).toContain('training-status-shell')
+    expect(toolbar?.closest('.training-status-shell')).not.toBeNull()
 
     const buttons = Array.from(
-      toolbar?.querySelectorAll<HTMLButtonElement>(':scope > .lg-track__item') ?? [],
+      toolbar?.querySelectorAll<HTMLButtonElement>(':scope > [role="radio"]') ?? [],
     )
     expect(buttons).toHaveLength(3)
-    expect(buttons.every(button => button.getAttribute('role') === 'tab')).toBe(true)
+    expect(buttons.every(button => button.getAttribute('role') === 'radio')).toBe(true)
     expect(buttons[0]?.getAttribute('aria-label')).toMatch(/^可养成，(数量读取中|\d+ 名)$/)
-    expect(buttons[0]?.getAttribute('aria-selected')).toBe('true')
+    expect(buttons[0]?.getAttribute('aria-checked')).toBe('true')
 
     const allButton = buttons.find(button => button.textContent?.includes('全部'))
     expect(allButton).toBeDefined()
@@ -305,13 +305,14 @@ describe('OperatorTraining async interactions', () => {
     // zero-size layout makes userEvent's pointer simulation suppress it.
     fireEvent.click(allButton!)
 
-    await waitFor(() => expect(allButton?.getAttribute('aria-selected')).toBe('true'))
-    expect(buttons[0]?.getAttribute('aria-selected')).toBe('false')
+    await waitFor(() => expect(allButton?.getAttribute('aria-checked')).toBe('true'))
+    expect(buttons[0]?.getAttribute('aria-checked')).toBe('false')
 
-    fireEvent.keyDown(allButton!, { key: 'Home', bubbles: true })
+    fireEvent.keyDown(allButton!, { key: 'ArrowLeft', bubbles: true })
+    fireEvent.keyDown(buttons[1]!, { key: 'ArrowLeft', bubbles: true })
     await flush()
 
-    expect(buttons[0]?.getAttribute('aria-selected')).toBe('true')
+    expect(buttons[0]?.getAttribute('aria-checked')).toBe('true')
     expect(document.activeElement).toBe(buttons[0])
   })
 
@@ -319,16 +320,16 @@ describe('OperatorTraining async interactions', () => {
     installMobileMatchMedia()
     await renderComponent()
 
-    const toolbar = container.querySelector<HTMLElement>('[role="tablist"][aria-label="干员范围"]')
+    const toolbar = container.querySelector<HTMLElement>('[role="radiogroup"][aria-label="干员范围"]')
     const buttons = Array.from(
-      toolbar?.querySelectorAll<HTMLButtonElement>(':scope > .lg-track__item') ?? [],
+      toolbar?.querySelectorAll<HTMLButtonElement>(':scope > [role="radio"]') ?? [],
     )
-    expect(buttons[0]?.getAttribute('aria-selected')).toBe('true')
+    expect(buttons[0]?.getAttribute('aria-checked')).toBe('true')
 
     await swipe(container.querySelector<HTMLElement>('.training-operator-column')!, 240, 200, 120, 204)
     await flush()
 
-    await waitFor(() => expect(buttons[1]?.getAttribute('aria-selected')).toBe('true'))
+    await waitFor(() => expect(buttons[1]?.getAttribute('aria-checked')).toBe('true'))
     expect(container.querySelector('.swipe-mode-slide:not([aria-hidden="true"])')?.textContent)
       .toContain('还没有已拥有干员')
   })
@@ -384,7 +385,11 @@ describe('OperatorTraining async interactions', () => {
     })
 
     expect(mocks.addToTrainingQueue).toHaveBeenCalledOnce()
-    expect(mocks.setMessage).toHaveBeenCalledWith('养成队列正在更新，请稍候')
+    // The native button is disabled by `loading` after the first click, so a
+    // second click never reaches the queue-mutation guard; the guard remains
+    // for non-button callers that can race the pending ref.
+    expect(addButton?.disabled).toBe(true)
+    expect(mocks.setMessage).toHaveBeenCalledWith('正在添加干员...')
     await act(async () => addRequest.resolve({ success: false }))
   })
 
@@ -503,17 +508,17 @@ describe('OperatorTraining async interactions', () => {
   it('switches between elite and mastery workspaces', async () => {
     await renderComponent()
 
-    const toolbar = container.querySelector<HTMLElement>('[role="tablist"][aria-label="养成方式"]')
+    const toolbar = container.querySelector<HTMLElement>('[role="radiogroup"][aria-label="养成方式"]')
     expect(toolbar).not.toBeNull()
-    const buttons = Array.from(toolbar?.querySelectorAll<HTMLButtonElement>(':scope > .lg-track__item') ?? [])
+    const buttons = Array.from(toolbar?.querySelectorAll<HTMLButtonElement>(':scope > [role="radio"]') ?? [])
     expect(buttons).toHaveLength(2)
-    expect(buttons[0]?.getAttribute('aria-selected')).toBe('true')
+    expect(buttons[0]?.getAttribute('aria-checked')).toBe('true')
     expect(container.textContent).toContain('添加干员')
 
     // The segmented control selects through its native click listener; jsdom's
     // zero-size layout makes userEvent's pointer simulation suppress it.
     fireEvent.click(buttons[1]!)
-    await waitFor(() => expect(buttons[1]?.getAttribute('aria-selected')).toBe('true'))
+    await waitFor(() => expect(buttons[1]?.getAttribute('aria-checked')).toBe('true'))
     expect(container.textContent).toContain('添加专精目标')
     expect(container.textContent).toContain('自动专精')
 

@@ -1,12 +1,12 @@
 import { lazy, Suspense, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, Search, Settings2, Swords, Wrench } from 'lucide-react'
-import { GlassButton, GlassCard, GlassInput, GlassMenu, GlassNav } from '@zakisheriff/liquid-glass'
+import { GlassButton, GlassCard, GlassInput, GlassMenu, GlassNav } from '@/components/glass'
 import ThemeToggle from './ThemeToggle'
 import RunIsland from './RunIsland'
 import SanityBatteryIsland from './SanityBatteryIsland'
 import MaaUpdateIsland from './MaaUpdateIsland'
 import MasteryIsland from './MasteryIsland'
-import AeroBackdrop from './backgrounds/AeroBackdrop'
+import AsciiFieldBackdrop from './backgrounds/AsciiFieldBackdrop'
 import { Island } from '@/lib/island'
 import { IslandContext } from '@/lib/island/context'
 import { useUIStore } from '@/stores'
@@ -321,6 +321,7 @@ export default function Layout({ children }: LayoutProps) {
   const activePrimaryMobileIndex = mobileTabs.findIndex(tab => tab.id === activeTab)
   const isOverflowActive = overflowTabs.some(tab => tab.id === activeTab)
   const mobileNavItems = mobileTabs.map(tab => ({
+    id: tab.id,
     label: tab.name,
     icon: <TabIcon tab={tab} size="h-6 w-6" />,
   }))
@@ -360,9 +361,9 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className="view view-main la-pluma-view">
       <div ref={pageRef} className="page no-swipeback la-pluma-page" data-name="la-pluma">
-        <AeroBackdrop />
+        <AsciiFieldBackdrop />
         <div className="la-pluma-sidebar-frame" aria-hidden="true">
-          <GlassCard className="la-pluma-sidebar-surface" padding="0" radius="1.625rem" />
+          <GlassCard className="la-pluma-sidebar-surface h-full w-full rounded-[1.625rem]" />
         </div>
         <header className="navbar la-pluma-navbar">
           <div className="navbar-bg" aria-hidden="true" />

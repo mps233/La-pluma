@@ -297,7 +297,7 @@ describe('top-level application navigation', () => {
     expect(sidebar.querySelectorAll('.la-pluma-sidebar-icon > svg[aria-hidden="true"]')).toHaveLength(9)
 
     const mobileNav = container.querySelector<HTMLElement>('.la-pluma-tabbar-nav')!
-    const mobileTrack = mobileNav.querySelector<HTMLElement>('.lg-track:not([data-lg-copy])')!
+    const mobileTrack = mobileNav.querySelector<HTMLElement>('.lg-track')!
     const mobileDestinations = [...mobileTrack.querySelectorAll<HTMLButtonElement>(':scope > [data-lg-item]')]
       .map(button => button.getAttribute('aria-label'))
     const dashboardIcon = mobileTrack.querySelector('[data-lg-item="0"] svg')
@@ -327,7 +327,7 @@ describe('top-level application navigation', () => {
     expect(sidebar.querySelectorAll('[aria-current="page"]')).toHaveLength(1)
     expect(sidebar.querySelector<HTMLElement>('[aria-current="page"]')?.dataset.appTab).toBe('statistics')
     expect(container.querySelector('.la-pluma-tabbar-more-anchor')?.classList.contains('is-active')).toBe(true)
-    expect(container.querySelector('.la-pluma-tabbar-nav .lg-track:not([data-lg-copy]) > [data-lg-item][aria-selected="true"]')).toBeNull()
+    expect(container.querySelector('.la-pluma-tabbar-nav .lg-track > [data-lg-item][aria-selected="true"]')).toBeNull()
 
     await user.click(sidebar.querySelector<HTMLButtonElement>('button[aria-label="Clear"]')!)
     expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(9)
@@ -444,7 +444,9 @@ describe('top-level application navigation', () => {
     const anchor = container.querySelector<HTMLElement>('.la-pluma-tabbar-more-anchor')!
     const menu = anchor.querySelector<HTMLElement>('[role="menu"]')
     expect(menu?.getAttribute('aria-label')).toBe('更多工作区')
-    const items = [...(menu?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? [])]
+    // UI SDK's menu part fixes the item role to menuitem; the adapter still
+    // supplies aria-checked and the visual check for the radio-style entries.
+    const items = [...(menu?.querySelectorAll<HTMLElement>('[role^="menuitem"][aria-checked]') ?? [])]
     expect(items.map(item => item.textContent)).toEqual([
       expect.stringContaining('肉鸽'),
       expect.stringContaining('养成'),
@@ -453,7 +455,7 @@ describe('top-level application navigation', () => {
       expect.stringContaining('数据'),
     ])
     expect(trigger.getAttribute('aria-expanded')).toBe('true')
-    expect(document.activeElement).toBe(items[0])
+    expect(menu?.contains(document.activeElement)).toBe(true)
     expect(anchor.classList.contains('is-active')).toBe(false)
 
     // GlassMenu only runs its item handler for keyboard-style clicks

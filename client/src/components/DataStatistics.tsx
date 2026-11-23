@@ -8,7 +8,7 @@ import type { GridComponents, GridItemProps, GridListProps } from 'react-virtuos
 import { maaApi, getAllOperators, getDropStatistics, getItemIconUrl, getOperBoxData, fetchOperatorMaterials, getTrainingQueue } from '../services/api'
 import { getOperatorAvatarUrl } from '../services/operatorQuotes'
 import { motion, useReducedMotion } from 'framer-motion'
-import { GlassCard, GlassSegmented } from '@zakisheriff/liquid-glass'
+import { GlassCard, GlassSegmented } from '@/components/glass'
 import {
   ChevronDown,
   Download,
@@ -685,7 +685,7 @@ export default function DataStatistics() {
 
   useEffect(() => {
     const buttons = statisticsTabsRef.current?.querySelectorAll<HTMLButtonElement>(
-      '.lg-track:not([data-lg-copy]) > [data-lg-item]',
+      '[role="radiogroup"] > [role="radio"]',
     )
     buttons?.forEach((button, index) => {
       const tab = statisticsTabs[index]

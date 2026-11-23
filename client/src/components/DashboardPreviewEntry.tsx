@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { Play, Radio, RotateCw, Smartphone } from 'lucide-react'
-import { Button, SmoothPanel } from './common'
+import { SmoothPanel } from './common'
+import { GlassButton } from '@/components/glass'
 import PreviewModeControls, { PreviewAutoStartToggle } from './PreviewModeControls'
 import { useDashboardPreview } from '../hooks/useDashboardPreview'
 import { useScrcpyInput } from '../hooks/useScrcpyInput'
@@ -44,15 +45,18 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
         title: '预览已关闭',
         description: '选择“快照”或“实时”开始查看模拟器。',
         action: (
-          <Button
+          <GlassButton
             size="sm"
-            variant="primary"
-            className="scrcpy-empty-action min-w-32 px-4"
+            variant="tinted"
+            tint="var(--app-accent-action)"
+            className="scrcpy-empty-action min-w-32"
+            style={{ height: 36 }}
             icon={<Play className="h-3.5 w-3.5" strokeWidth={1.8} />}
+            iconPosition="start"
             onClick={() => setMode('live')}
           >
             启动预览
-          </Button>
+          </GlassButton>
         ),
       }
     }
@@ -61,15 +65,16 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
         title: '等待画面快照',
         description: '快照每 10\u00A0秒刷新一次，仅可查看；切换到实时画面即可直接操作。',
         action: (
-          <Button
+          <GlassButton
             size="sm"
-            variant="secondary"
-            className="scrcpy-empty-action min-w-32 px-4"
+            className="scrcpy-empty-action min-w-32"
+            style={{ height: 36 }}
             icon={<Radio className="h-3.5 w-3.5" strokeWidth={1.8} />}
+            iconPosition="start"
             onClick={() => setMode('live')}
           >
             改用实时
-          </Button>
+          </GlassButton>
         ),
       }
     }
@@ -78,15 +83,18 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
         title: '预览连接失败',
         description: connectionError,
         action: (
-          <Button
+          <GlassButton
             size="sm"
-            variant="primary"
-            className="scrcpy-empty-action min-w-32 px-4"
+            variant="tinted"
+            tint="var(--app-accent-action)"
+            className="scrcpy-empty-action min-w-32"
+            style={{ height: 36 }}
             icon={<RotateCw className="h-3.5 w-3.5" strokeWidth={1.8} />}
+            iconPosition="start"
             onClick={reconnectPreview}
           >
             重试预览
-          </Button>
+          </GlassButton>
         ),
       }
     }
@@ -101,15 +109,16 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
       title: '等待实时画面',
       description: '若设备息屏，请先唤醒设备。',
       action: (
-        <Button
+        <GlassButton
           size="sm"
-          variant="secondary"
-          className="scrcpy-empty-action min-w-32 px-4"
+          className="scrcpy-empty-action min-w-32"
+          style={{ height: 36 }}
           icon={<RotateCw className="h-3.5 w-3.5" strokeWidth={1.8} />}
+          iconPosition="start"
           onClick={reconnectPreview}
         >
           重试预览
-        </Button>
+        </GlassButton>
       ),
     }
   })()

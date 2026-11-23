@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { maaApi } from '../services/api'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { GlassSegmented } from '@zakisheriff/liquid-glass'
+import { GlassSegmented } from '@/components/glass'
 import {
   Cable,
   Clock3,

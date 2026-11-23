@@ -1,18 +1,25 @@
-# Aero Shards ambient background
+# Ambient backgrounds
 
-This is a local visual experiment based on ReactBits `AeroShards`
-(https://reactbits.dev/c/backgrounds/aero-shards).
+## ASCII field (active)
 
-The live WebGPU shader is **not** loaded at runtime. It was rendered once and
-baked into theme-specific static stills:
+`AsciiFieldBackdrop` is the ambient layer mounted by `Layout`. It wraps the
+vendored uibrik WebGL2 `AsciiField` component in
+`components/uibrik/ascii-field`, so the background uses the original shader
+field, glyph atlas, pointer lens, fading wake trail, and click rings.
 
-- `client/public/ambient/aero-shards-dark.jpg`
-- `client/public/ambient/aero-shards-light.jpg`
+The wrapper keeps the app's own stacking, opacity, and theme rules:
 
-The stills are 1600×856 and preserve the original shader framing. The runtime
-component renders only the matching still, so there is no WebGPU, video
-decoding, animation loop, or loop seam. It is disabled below 768px.
+| Prop | Default | Purpose |
+| --- | --- | --- |
+| `color` | theme accent | Ink colour for a single-tone field. |
+| `colors` | none | 2-6 stops from faintest to densest; overrides `color`. |
+| `pattern` | `flow` | `flow`, `waves`, or `rings` shape family. |
+| `characters` | `" .:-=+*#%@"` | Glyph ramp from empty to dense. |
+| `cellSize` | `14` | Row height in CSS pixels. |
+| `density` / `fade` | `0.64` / `0.56` | Share of the field carrying glyphs and edge falloff. |
+| `glow` / `twinkle` | `0.5` / `0.42` | Tint under dense areas and occasional flares. |
+| `interactive` | `true` | Pointer lens, trail, and click rings. |
+| `intensity` | CSS default (`0.16` light / `0.2` dark) | Layer opacity override. |
 
-The original component is MIT + Commons Clause. The exported image is used as
-part of the application; do not redistribute it as a standalone background
-pack.
+`AsciiBackdrop.tsx` remains the previous in-house canvas 2D implementation and
+is kept as a reference; `Layout` mounts `AsciiFieldBackdrop`.

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { Activity, type ReactNode } from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AutomationTasks from './AutomationTasks'
@@ -24,6 +24,38 @@ const mocks = vi.hoisted(() => ({
   testConnection: vi.fn(),
   scrollIntoView: vi.fn(),
 }))
+
+// The kit's Select opens a top-layer popover that jsdom cannot present. The
+// browser verification covers the real component; here a native select keeps
+// the page's option mapping and add-task wiring under test.
+vi.mock('@/components/glass', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/components/glass')>()
+  const React = await import('react')
+  type Option = { value: string; label: ReactNode }
+  const MockGlassSelect = ({ label, options, onValueChange, placeholder, disabled }: {
+    label?: ReactNode
+    options?: Option[]
+    onValueChange?: (value: string | null) => void
+    placeholder?: string
+    disabled?: boolean
+  }) => React.createElement(
+    'label',
+    null,
+    React.createElement('span', { className: 'sr-only' }, label),
+    React.createElement(
+      'select',
+      {
+        'aria-label': '添加任务',
+        disabled,
+        defaultValue: '',
+        onChange: (event: React.ChangeEvent<HTMLSelectElement>) => onValueChange?.(event.target.value || null),
+      },
+      React.createElement('option', { value: '' }, placeholder),
+      (options ?? []).map(option => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+    ),
+  )
+  return { ...actual, GlassSelect: MockGlassSelect }
+})
 
 vi.mock('framer-motion', async () => {
   const React = await import('react')
@@ -692,56 +724,29 @@ describe('AutomationTasks layout surfaces', () => {
     expect(stageEditor.querySelector('[aria-label="加入智能养成关卡"]')).not.toBeNull()
   })
 
-  it('opens the add-task dialog with a task grid', async () => {
+  it('renders the add-task select with the available tasks', async () => {
     await renderTasks()
 
-    const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="dialog"]')!
-    expect(trigger.textContent).toContain('添加任务')
-
-    await user.click(trigger)
-    await flush()
-
-    const dialog = screen.getByRole('dialog')
-    expect(dialog).not.toBeNull()
-    expect(dialog.getAttribute('aria-modal')).toBe('true')
-    const title = document.getElementById(dialog.getAttribute('aria-labelledby') ?? '')
-    expect(title?.textContent).toContain('添加任务')
-    expect(dialog.querySelectorAll('.automation-task-picker-card')).toHaveLength(7)
-    expect(dialog.textContent).toContain('启动游戏')
-    expect(dialog.textContent).toContain('关闭游戏')
+    const select = container.querySelector<HTMLSelectElement>('.automation-task-select-shell select')
+    expect(select).not.toBeNull()
+    expect(select?.getAttribute('aria-label')).toBe('添加任务')
+    expect(select?.options).toHaveLength(8)
+    expect(select?.textContent).toContain('启动游戏')
+    expect(select?.textContent).toContain('关闭游戏')
   })
 
-  it('closes the add-task dialog with Escape and restores trigger focus', async () => {
+  it('adds a task when an option is selected', async () => {
     await renderTasks()
 
-    const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="dialog"]')!
-    trigger.focus()
-    await user.click(trigger)
-    await flush()
-    const firstCard = document.querySelector<HTMLButtonElement>('.automation-task-picker-card')!
-    firstCard.focus()
-    expect(document.activeElement).toBe(firstCard)
+    const select = container.querySelector<HTMLSelectElement>('.automation-task-select-shell select')!
+    const before = container.querySelectorAll('.automation-sequence-item').length
+    const option = Array.from(select.options).find(candidate => candidate.textContent?.includes('启动游戏'))
+    expect(option).toBeDefined()
 
-    await user.keyboard('{Escape}')
+    fireEvent.change(select, { target: { value: option!.value } })
     await flush()
 
-    expect(screen.queryByRole('dialog')).toBeNull()
-    expect(document.activeElement).toBe(trigger)
-  })
-
-  it('closes the add-task dialog when clicking the backdrop', async () => {
-    await renderTasks()
-
-    const trigger = container.querySelector<HTMLButtonElement>('[aria-haspopup="dialog"]')!
-    await user.click(trigger)
-    await flush()
-    expect(screen.queryByRole('dialog')).not.toBeNull()
-
-    const backdrop = document.querySelector<HTMLElement>('.app-modal-backdrop')!
-    await user.click(backdrop)
-    await flush()
-
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(container.querySelectorAll('.automation-sequence-item')).toHaveLength(before + 1)
   })
 
   it('moves a task with a floating ghost while dragging its handle', async () => {

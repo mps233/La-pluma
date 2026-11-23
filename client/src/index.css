@@ -186,8 +186,7 @@
   
   /* 深色主题的表单元素 */
   input[type="text"],
-  input[type="number"],
-  select {
+  input[type="number"] {
     background-color: var(--app-surface-solid);
     border-color: var(--app-border-strong);
     color: var(--app-text);
@@ -195,8 +194,7 @@
   }
   
   .dark input[type="text"],
-  .dark input[type="number"],
-  .dark select {
+  .dark input[type="number"] {
     background-color: var(--app-surface-muted);
     color: var(--app-text);
   }
@@ -204,33 +202,6 @@
   /* 移除全局 hover 样式，使用 Tailwind 类控制 */
   
   /* 移除全局 focus 样式，使用 Tailwind 类控制 */
-  
-  select {
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    background-image: var(--app-select-chevron);
-    background-position: right 0.625rem center;
-    background-repeat: no-repeat;
-    background-size: 1rem 1rem;
-    padding-right: 2.5rem;
-    cursor: pointer;
-  }
-
-  select:disabled {
-    cursor: not-allowed;
-  }
-  
-  select option {
-    background-color: white;
-    color: rgb(17, 24, 39);
-    padding: 0.5rem;
-  }
-  
-  .dark select option {
-    background-color: var(--app-surface-solid);
-    color: rgb(229 231 235);
-  }
   
   /* 隐藏原生数字输入框箭头 */
   input[type="number"]::-webkit-inner-spin-button,
@@ -374,7 +345,6 @@
     time,
     output,
     [role='timer'],
-    .app-numeric,
     [data-numeric],
     .data-readout-value,
     .data-readout-detail,
@@ -420,7 +390,6 @@
     pre,
     input,
     textarea,
-    select,
     [contenteditable='true'],
     .font-mono
   ):lang(zh) {
@@ -586,11 +555,6 @@
   .app-input {
     min-height: 2.75rem !important;
     height: 2.75rem !important;
-  }
-
-  .la-pluma-app .app-glass-button-sm,
-  .la-pluma-app .app-glass-icon-button-sm {
-    --lg-h: 2.75rem;
   }
 
   .app-checkbox {
@@ -852,12 +816,6 @@
 
 .scrcpy-preview-control.is-active {
   color: var(--app-accent-strong);
-}
-
-.scrcpy-immersive-control.lg-button {
-  --lg-tint: #fff;
-  --lg-glass-fill: rgb(255 255 255 / 0.12);
-  --lg-glass-blur: 4px;
 }
 
 .automation-workspace-grid .automation-schedule-panel {
@@ -1156,14 +1114,17 @@ body.automation-sorting {
   height: 1.4rem;
 }
 .app-switch-control {
+  position: relative;
   flex: none;
   transform-origin: center;
 }
-.app-switch-compact .app-switch-control {
-  transform: scale(0.8);
+/* The kit switch is canvas-only; extend its hit area to the 44px touch target
+   without changing the 28px visual track. */
+.app-switch-control::before {
+  content: '';
+  position: absolute;
+  inset: -8px -4px;
 }
-/* GlassSwitch draws a larger pointer target than its visual track; compact
-   mode scales that target down, so restore the 44px touch height here. */
 .app-switch-compact .app-switch-control::before {
   inset: -14px -6px;
 }
@@ -1174,15 +1135,6 @@ body.automation-sorting {
 .app-switch.is-disabled .app-switch-control {
   opacity: 0.42;
   cursor: not-allowed;
-}
-/* WebKit composites the lifted switch thumb's backdrop-filter as black while
-   the package's mirrored lens is active. The mirrored refraction already
-   supplies the lens, so drop the redundant backdrop blur on WebKit only. */
-@supports (-webkit-touch-callout: none) {
-  .lg-switch .lg-switch__thumb.lg-glass {
-    -webkit-backdrop-filter: none !important;
-    backdrop-filter: none !important;
-  }
 }
 .dark .automation-schedule-list-heading small,
 html.dark .automation-schedule-list-heading small {
@@ -1249,17 +1201,7 @@ html.dark button.automation-schedule-add:hover:not(:disabled) {
   color: var(--app-text-soft);
   font-size: var(--app-font-caption);
 }
-.automation-notification-heading > label:not(.app-switch),
-.automation-notification-channel-heading > label:not(.app-switch) {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 0.35rem;
-  color: var(--app-text-muted);
-  font-size: var(--app-font-caption);
-  font-weight: 700;
-  cursor: pointer;
-}
+
 .automation-notification-heading .custom-checkbox,
 .automation-notification-channel-heading .custom-checkbox {
   width: 1rem;
@@ -1357,7 +1299,6 @@ html.dark button.automation-schedule-add:hover:not(:disabled) {
 }
 .automation-task-editor.is-disabled :is(
   .automation-text-control:disabled,
-  .automation-select-control select:disabled,
   .number-input-wrapper:has(input:disabled),
   .automation-composite-control:has(input:disabled)
 ) {
@@ -1390,7 +1331,6 @@ html.dark button.automation-schedule-add:hover:not(:disabled) {
   min-height: 3.25rem;
 }
 .automation-param-fields.is-grouped :is(
-  .automation-select-control select,
   .automation-text-control,
   .number-input-wrapper
 ) {
@@ -1408,7 +1348,6 @@ html.dark button.automation-schedule-add:hover:not(:disabled) {
   background: color-mix(in srgb, var(--app-accent-soft) 22%, transparent);
 }
 .automation-param-fields.is-grouped :is(
-  .automation-select-control:has(select:focus-visible) select,
   .automation-text-control:focus-visible,
   .number-input-wrapper:has(input:focus-visible)
 ) {
@@ -1499,10 +1438,6 @@ html.dark button.automation-schedule-add:hover:not(:disabled) {
   background: color-mix(in srgb, var(--app-accent-soft) 52%, var(--app-surface-muted));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 22%, var(--app-border));
 }
-.automation-param-field.is-multi-stages .automation-field-helper {
-  margin-top: 0.625rem;
-  padding-left: 0;
-}
 @media (max-width: 899px) {
   .automation-sequence-panel,
   .automation-editor-panel,
@@ -1516,7 +1451,6 @@ html.dark button.automation-schedule-add:hover:not(:disabled) {
   }
 
   .automation-text-control,
-  .automation-select-control select,
   .automation-task-editor .number-input-wrapper,
   .automation-composite-control {
     min-height: 2.75rem;
@@ -1527,11 +1461,8 @@ html.dark button.automation-schedule-add:hover:not(:disabled) {
     padding-right: 0.875rem;
   }
 }
-@media (max-width: 639px) {
-  .automation-param-field.is-multi-stages .automation-field-helper {
-    padding-left: 0;
-  }
 
+@media (max-width: 639px) {
   .automation-sequence-surface > .automation-flow-header {
     align-items: center;
     flex-direction: row;
@@ -1569,15 +1500,9 @@ html.dark button.automation-schedule-add:hover:not(:disabled) {
    preview controls behave as overlapping glass. */
 [data-automation-tasks] {
   --automation-hairline: rgba(60, 60, 67, 0.1);
-  --automation-overlay-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.1),
-    0 30px 80px rgba(0, 0, 0, 0.2);
 }
 .dark [data-automation-tasks] {
   --automation-hairline: rgba(235, 235, 245, 0.12);
-  --automation-overlay-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.24),
-    0 30px 80px rgba(0, 0, 0, 0.44);
 }
 [data-automation-tasks] :is(
   .automation-flow-header,
@@ -2345,7 +2270,9 @@ svg.w-5.h-5 {
 
   .dashboard-flow-actions {
     display: flex;
-    min-width: 8.75rem;
+    /* Experiment: the vendored action button needs a little more room than the
+       design-system button so its label never clips beside the droplet. */
+    min-width: 9.5rem;
     flex-direction: column;
     align-items: stretch;
     gap: 0.5rem;
@@ -2368,6 +2295,74 @@ svg.w-5.h-5 {
     transition-duration: 100ms;
   }
 
+  /* Experiment: the vendored WebGL buttons own their press animation through `scale`. */
+  .dashboard-flow-action-button[data-glass-ready]:active:not(:disabled),
+  .dashboard-flow-activity-action[data-glass-ready]:active:not(:disabled) {
+    transform: none;
+  }
+
+  .dashboard-flow-action-button[data-glass-host] {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .dashboard-flow-activity-action[data-glass-host] {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .dashboard-flow-action-button[data-glass-ready] {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .dashboard-flow-activity-action[data-glass-ready] {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .dashboard-flow-action-button[data-glass-ready]:focus-visible,
+  .dashboard-flow-activity-action[data-glass-ready]:focus-visible {
+    --tw-ring-color: var(--app-accent);
+  }
+
+  /* Experiment: the action button's droplet already has its own right padding;
+     the kit's extra "apart" spacer would push the label off-centre in this small
+     column. Keep the label centred and let the droplet sit in the padding. */
+  .dashboard-flow-primary-action > span.shrink-0:not(.absolute) {
+    width: 0 !important;
+  }
+
+  /* The kit measures the label into a fixed-width, overflow-hidden box; at some
+     font/DPR combinations that clips the last glyph. Let the label size itself. */
+  .dashboard-flow-primary-action > span.relative {
+    width: max-content !important;
+    overflow: visible !important;
+  }
+
+  /* The kit assumes the host is exactly as tall as its droplet (40px). This button
+     keeps the design-system 44px height: the shader draws a 44px droplet centred at
+     h/2 from the right, while the DOM droplet box is 40px at right:0. Centring the
+     box vertically and pulling it 2px left puts the icon in the drawn disc. */
+  .dashboard-flow-primary-action [data-glass-drop] {
+    top: 50% !important;
+    right: 2px !important;
+    transform: translateY(-50%) !important;
+  }
+
+  /* The kit's GLASS_CSS hides its plain-CSS divider once the glass draws; that rule
+     was not copied with the host rules, so hide it here. */
+  .dashboard-flow-action-button[data-glass-ready] [data-glass-fallback],
+  .dashboard-flow-activity-action[data-glass-ready] [data-glass-fallback] {
+    visibility: hidden;
+  }
+
   .dashboard-flow-activity-completed-label,
   .dashboard-flow-activity-run-label {
     display: none;
@@ -2387,37 +2382,11 @@ svg.w-5.h-5 {
     display: inline;
   }
 
-  .dashboard-flow-shining-action {
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, white 12%, transparent),
-      0 8px 20px rgba(0, 0, 0, 0.18);
-  }
-
-  .dashboard-flow-shining-action:not(:disabled):hover {
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, white 14%, transparent),
-      0 9px 22px rgba(0, 0, 0, 0.22);
-  }
-
-  .dashboard-flow-shining-action:not(:disabled) svg {
-    transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .dashboard-flow-shining-action:not(:disabled):hover svg {
-    transform: translateX(0.18rem) scale(1.08);
-  }
-
   @media (prefers-reduced-motion: reduce) {
     .dashboard-flow-activity-action:active:not(:disabled) {
       transform: none;
     }
 
-    .dashboard-flow-shining-action:not(:disabled) svg {
-      transition: none;
-    }
   }
 
   .dashboard-flow-metrics {
@@ -3229,17 +3198,14 @@ svg.w-5.h-5 {
   }
 
   .la-pluma-app .app-glass-button-sm {
-    --lg-h: var(--app-control-height-sm);
     font-size: 0.75rem;
   }
 
   .la-pluma-app .app-glass-button-md {
-    --lg-h: var(--app-control-height-md);
     font-size: 0.875rem;
   }
 
   .la-pluma-app .app-glass-button-lg {
-    --lg-h: var(--app-control-height-lg);
     font-size: 1rem;
   }
 
@@ -3499,10 +3465,6 @@ svg.w-5.h-5 {
     transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease;
   }
 
-  select.app-input {
-    padding-right: 2.5rem;
-  }
-
   .app-input:focus,
   .app-input:focus-visible {
     outline: none;
@@ -3669,19 +3631,8 @@ svg.w-5.h-5 {
   }
 
   input.control-surface:not(.app-native-control),
-  textarea.control-surface:not(.app-native-control),
-  select.control-surface:not(.app-native-control) {
+  textarea.control-surface:not(.app-native-control) {
     border-color: transparent !important;
-  }
-
-  select.control-surface,
-  select.control-surface:hover:not(:disabled),
-  .dark select.control-surface,
-  .dark select.control-surface:hover:not(:disabled) {
-    background-image: var(--app-select-chevron);
-    background-position: right 0.625rem center;
-    background-repeat: no-repeat;
-    background-size: 1rem 1rem;
   }
 
   .app-input.control-surface:focus,
@@ -3720,20 +3671,9 @@ svg.w-5.h-5 {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-success) 22%, transparent);
   }
 
-  .status-success-action {
-    background: var(--app-success-action);
-    color: white;
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, white 12%, transparent),
-      0 5px 14px rgba(0, 0, 0, 0.16);
-  }
 
-  .status-success-action:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--app-success-action) 82%, black);
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, white 14%, transparent),
-      0 7px 18px rgba(0, 0, 0, 0.2);
-  }
+
+
 
   .status-warning {
     color: var(--app-warning-text);
@@ -3747,20 +3687,9 @@ svg.w-5.h-5 {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-danger) 22%, transparent);
   }
 
-  .status-danger-action {
-    background: var(--app-danger-action);
-    color: white;
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, white 12%, transparent),
-      0 5px 14px rgba(0, 0, 0, 0.16);
-  }
 
-  .status-danger-action:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--app-danger-action) 82%, black);
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, white 14%, transparent),
-      0 7px 18px rgba(0, 0, 0, 0.2);
-  }
+
+
 
   .status-info {
     color: var(--app-info-text);
@@ -4960,46 +4889,15 @@ svg.w-5.h-5 {
     min-width: 0;
   }
 }
-/* Liquid Glass 分段控件：页面级轨道铺满容器并统一触摸尺寸。
-   这些声明必须留在 @layer 之外：库的 .lg-track--segmented 是未分层样式，
-   会压过 @layer components 里的同属性规则。 */
-.combat-mode-shell > .lg-track,
-.roguelike-mode-shell > .lg-track,
-.training-mode-shell > .lg-track,
-.training-status-shell > .lg-track,
-.log-mode-shell > .lg-track,
-.data-statistics-view-switcher > .lg-track,
-[data-config-sections] > .lg-track,
-.preview-mode-shell > .lg-track {
-  width: 100%;
-  grid-auto-columns: minmax(0, 1fr);
-}
 .preview-mode-shell {
   min-width: 0;
   width: 100%;
 }
-@media (pointer: coarse), (max-width: 639px) {
-  /* Page-level segmented controls stay close to the iOS compact height.
-     The preview control keeps its smaller size="sm" geometry. */
-  .combat-mode-shell > .lg-track.lg-track--segmented,
-  .roguelike-mode-shell > .lg-track.lg-track--segmented,
-  .training-mode-shell > .lg-track.lg-track--segmented,
-  .training-status-shell > .lg-track.lg-track--segmented,
-  .log-mode-shell > .lg-track.lg-track--segmented,
-  .data-statistics-view-switcher > .lg-track.lg-track--segmented,
-  [data-config-sections] > .lg-track.lg-track--segmented {
-    --lg-item-h: 32px;
-    font-size: 14px;
-  }
+.preview-mode-glass-tabs > [role='radio'] {
+  flex: 1 1 0;
 }
-/* The full-width track's backdrop blur is re-evaluated every frame while the
-   selection lens animates, halving the frame rate. The surface behind this
-   control is uniform, so keep the fill and rim but drop the blur. The small
-   preview control keeps its blur. */
-.combat-mode-shell .combat-mode-segmented .lg-track__glass,
-.training-mode-shell .lg-track__glass {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+.preview-mode-glass-tabs [role='radio']:focus-visible {
+  --tw-ring-color: var(--app-accent);
 }
 
 .training-mode-row {

@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import '../styles/pages/roguelike.css'
-import { GlassSegmented } from '@zakisheriff/liquid-glass'
+import { GlassSegmented } from '@/components/glass'
 import { Check, Play, Square } from 'lucide-react'
 import { maaApi } from '../services/api'
 import { PageHeader, Input, Select, Button, SmoothPanel, Switch, CjkText, TruncatedText, SwipeModePager } from './common'
+import { CheckboxField } from '@/components/glass'
 import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import { useRunStore } from '../store/runStore'
@@ -817,12 +818,10 @@ export default function RoguelikeTasks() {
                   htmlFor={`roguelike-${task.id}-${fieldSlug}-${index}-support`}
                   className="flex min-h-11 items-center gap-2 whitespace-nowrap text-xs text-secondary"
                 >
-                  <input
+                  <CheckboxField
                     id={`roguelike-${task.id}-${fieldSlug}-${index}-support`}
-                    type="checkbox"
                     checked={row.use_support}
-                    onChange={(event) => updateCoreChar(option.key, index, { use_support: event.target.checked })}
-                    className="custom-checkbox cursor-pointer"
+                    onChange={(checked) => updateCoreChar(option.key, index, { use_support: checked })}
                   />
                   助战
                 </label>
@@ -844,17 +843,15 @@ export default function RoguelikeTasks() {
               htmlFor={`roguelike-${task.id}-blackflow-reward-${reward.value}`}
               className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-[var(--app-border)] px-2 py-1.5 text-xs text-secondary"
             >
-              <input
+              <CheckboxField
                 id={`roguelike-${task.id}-blackflow-reward-${reward.value}`}
-                type="checkbox"
                 checked={(rewardMask & reward.value) === reward.value}
-                onChange={(event) => {
-                  const next = event.target.checked
+                onChange={(checked) => {
+                  const next = checked
                     ? rewardMask | reward.value
                     : rewardMask & ~reward.value
                   handleAdvancedChange(task.id, 'blackflowStartRewards', next)
                 }}
-                className="custom-checkbox cursor-pointer"
               />
               {reward.label}
             </label>
@@ -879,15 +876,13 @@ export default function RoguelikeTasks() {
                 htmlFor={`roguelike-${task.id}-collectible-${reward.key}`}
                 className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-[var(--app-border)] px-2 py-1.5 text-xs text-secondary"
               >
-                <input
+                <CheckboxField
                   id={`roguelike-${task.id}-collectible-${reward.key}`}
-                  type="checkbox"
                   checked={Boolean(selectedMap[reward.key])}
-                  onChange={(event) => handleAdvancedChange(task.id, 'collectibleModeStartList', {
+                  onChange={(checked) => handleAdvancedChange(task.id, 'collectibleModeStartList', {
                     ...selectedMap,
-                    [reward.key]: event.target.checked,
+                    [reward.key]: checked,
                   })}
-                  className="custom-checkbox cursor-pointer"
                 />
                 {reward.label}
               </label>

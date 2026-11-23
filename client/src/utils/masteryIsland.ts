@@ -95,17 +95,6 @@ export function masteryStateText(status: MasteryQueueStatus | null): string {
   }
 }
 
-export function masteryDetail(status: MasteryQueueStatus | null): string {
-  if (!status) return ''
-  const progress = masteryProgressOf(status)
-  const state = masteryStateText(status)
-  const summary = progress.total > 0 ? `已确认 ${progress.done}/${progress.total} 级` : '还没有专精目标'
-  const item = masteryActiveItem(status)
-  const next = item?.nextProbeAt && item.phase === 'training'
-    ? ` · 下次检查 ${new Date(item.nextProbeAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
-    : ''
-  return `${state} · ${summary}${next}`
-}
 
 export function masteryCampaignCounts(status: MasteryQueueStatus | null): string {
   if (!status) return ''

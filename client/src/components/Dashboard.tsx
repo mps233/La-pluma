@@ -4,6 +4,9 @@ import { Activity, Bot, CalendarDays, CheckCircle2, ChevronRight, Compass, Cpu, 
 import { getOpenTodayStages, getTodayDrops, getTrainingQueue, maaApi } from '../services/api'
 import Icons from './Icons'
 import { PageHeader, Card, Button, IconButton, SmoothPanel, CjkText, TruncatedText } from './common'
+import ActivityIndicator from './common/ActivityIndicator'
+import { GlassButton } from '@/components/glass'
+import { GlassActionButton } from '@/components/liquid-glass/glass-action-button'
 import { DashboardSkeleton } from './common/Loading'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
 import { useUIStore } from '@/stores'
@@ -422,11 +425,11 @@ export default function Dashboard() {
     wasOnlineRef.current = isOnline
   }, [isOnline])
 
-  const runTodayFlow = async () => {
+  const runTodayFlow = async (): Promise<boolean> => {
     if (!automationAvailable) {
       setQuickStartMessage(serviceStatus === 'offline' ? '当前网络已断开，恢复连接后再试。' : '后端服务暂不可用，请重试连接。')
       setQuickStartMessageType('warning')
-      return
+      return false
     }
     setQuickStartLoading(true)
     setQuickStartMessage('')
@@ -438,7 +441,7 @@ export default function Dashboard() {
         setQuickStartMessage('还没有配置今日流程，先去自动化页保存任务流。')
         setQuickStartMessageType('warning')
         setActiveTab('automation')
-        return
+        return false
       }
 
       const result = await maaApi.executeScheduleNow('dashboard-quick-start', savedFlow)
@@ -446,13 +449,15 @@ export default function Dashboard() {
         setQuickStartMessage(result.message || '今日流程已开始执行')
         setQuickStartMessageType('success')
         await loadDashboardData()
-      } else {
-        setQuickStartMessage(result.message || '今日流程启动失败')
-        setQuickStartMessageType('error')
+        return true
       }
+      setQuickStartMessage(result.message || '今日流程启动失败')
+      setQuickStartMessageType('error')
+      return false
     } catch (error) {
       setQuickStartMessage(getErrorMessage(error) || '今日流程启动失败')
       setQuickStartMessageType('error')
+      return false
     } finally {
       setQuickStartLoading(false)
     }
@@ -802,40 +807,53 @@ export default function Dashboard() {
                 </div>
                 <div className="dashboard-flow-actions">
                   {activitySummary.available && (
-                    <Button
+                    <GlassButton
                       onClick={prepareCurrentActivity}
-                      variant="secondary"
+                      size="md"
+                      variant="tinted"
+                      style={{ height: 44 }}
                       disabled={quickStartLoading || activityPreflightLoading || flowIsRunning || !automationAvailable}
-                      loading={activityPreflightLoading}
-                      loadingText="准备中"
-                      statusKey={activityPreflightLoading ? 'running' : 'ready'}
-                      className={`dashboard-flow-activity-action justify-center whitespace-nowrap ${activityCompleted ? 'is-completed' : ''}`}
+                      aria-busy={activityPreflightLoading || undefined}
+                      data-status-key={activityPreflightLoading ? 'running' : 'ready'}
+                      className={`dashboard-flow-activity-action dashboard-flow-action-button justify-center whitespace-nowrap ${activityCompleted ? 'is-completed' : ''}`}
                       title={activityCompleted ? '重新准备当前活动作业（不会立即开战）' : '获取当前活动作业集并填入自动战斗页'}
                       aria-label={activityCompleted ? '重新执行当前活动' : '打当前活动'}
-                      icon={activityCompleted
-                        ? <CheckCircle2 className="h-4 w-4" strokeWidth={2} />
-                        : <Target className="h-4 w-4" strokeWidth={2} />}
+                      iconPosition="start"
+                      icon={activityPreflightLoading
+                        ? <ActivityIndicator size="sm" />
+                        : activityCompleted
+                          ? <CheckCircle2 className="h-4 w-4" strokeWidth={2} />
+                          : <Target className="h-4 w-4" strokeWidth={2} />}
                     >
-                      {activityCompleted ? (
+                      {activityPreflightLoading ? '准备中' : activityCompleted ? (
                         <>
                           <span className="dashboard-flow-activity-completed-label">活动已通关</span>
                           <span className="dashboard-flow-activity-run-label">打当前活动</span>
                         </>
                       ) : '打当前活动'}
-                    </Button>
+                    </GlassButton>
                   )}
-                  <Button
-                    onClick={runTodayFlow}
-                    variant="primary"
+                  <GlassActionButton
+                    onAction={async () => {
+                      const started = await runTodayFlow()
+                      // A handled failure already set the user-facing message; throw only so the
+                      // droplet splits back to idle instead of claiming success.
+                      if (!started) throw new Error('今日流程未启动')
+                    }}
+                    onActionError={() => {}}
+                    material="tinted"
+                    size="md"
+                    style={{ height: 44, paddingLeft: 10, paddingRight: 65, backgroundColor: 'var(--app-accent-action)', color: '#fff' }}
                     disabled={quickStartLoading || activityPreflightLoading || flowIsRunning || !automationAvailable}
-                    loading={quickStartLoading}
-                    loadingText="启动中"
-                    statusKey={quickStartLoading ? 'starting' : flowIsRunning ? 'running' : 'ready'}
-                    className="dashboard-flow-primary-action dashboard-flow-shining-action justify-center whitespace-nowrap"
-                    icon={<Play className="h-4 w-4" strokeWidth={2} />}
+                    data-status-key={quickStartLoading ? 'starting' : flowIsRunning ? 'running' : 'ready'}
+                    className="dashboard-flow-primary-action dashboard-flow-action-button justify-center whitespace-nowrap"
+                    title={flowIsRunning ? '今日流程正在运行' : '立即执行今日流程'}
+                    pendingLabel="启动中"
+                    successLabel="已启动"
+                    resetAfter={2400}
                   >
                     {flowIsRunning ? '正在运行' : '开始今日流程'}
-                  </Button>
+                  </GlassActionButton>
                 </div>
               </div>
 
@@ -1117,14 +1135,15 @@ export default function Dashboard() {
                   <div className={`mt-0.5 text-xs ${labelClass}`}>当前优先培养的干员目标</div>
                 </div>
               </div>
-              <IconButton
+              <GlassButton
                 onClick={() => setActiveTab('training')}
                 icon={<ChevronRight className="h-4 w-4" />}
-                variant="ghost"
+                iconOnly
                 size="sm"
                 title="打开养成"
                 aria-label="打开养成"
                 className="dashboard-summary-action"
+                style={{ width: 36, height: 36, padding: 0 }}
               />
             </div>
             <div className="dashboard-summary-body">
@@ -1168,14 +1187,15 @@ export default function Dashboard() {
                   <div className={`mt-0.5 text-xs ${labelClass}`}>最近作战产出</div>
                 </div>
               </div>
-              <IconButton
+              <GlassButton
                 onClick={openDropStatistics}
                 icon={<ChevronRight className="h-4 w-4" />}
-                variant="ghost"
+                iconOnly
                 size="sm"
                 title="打开掉落记录"
                 aria-label="打开掉落记录"
                 className="dashboard-summary-action"
+                style={{ width: 36, height: 36, padding: 0 }}
               />
             </div>
             <div className="dashboard-summary-body">

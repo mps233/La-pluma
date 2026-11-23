@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Check, Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
-import { GlassButton, GlassCard } from '@zakisheriff/liquid-glass'
+import { GlassButton, GlassCard } from '@/components/glass'
 import { useUIStore } from '@/stores'
 
 type ThemeMode = 'light' | 'dark' | 'system'

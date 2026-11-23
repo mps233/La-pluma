@@ -8,7 +8,8 @@ import { AlertTriangle, Cable, Check, CheckCircle2, ChevronDown, ChevronUp, Circ
 import Icons from './Icons'
 import ScreenMonitor from './ScreenMonitor'
 import NotificationSettings from './NotificationSettings'
-import { EmptyState, PageHeader, Button, IconButton, Modal, SmoothPanel, Switch, CjkText, TruncatedText } from './common'
+import { EmptyState, PageHeader, Button, IconButton, SmoothPanel, Switch, CjkText, TruncatedText, Select } from './common'
+import { CheckboxField, GlassSelect } from '@/components/glass'
 import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import { useRunStore } from '../store/runStore'
@@ -934,7 +935,6 @@ export default function AutomationTasks() {
   const [taskFlow, setTaskFlow] = useState<TaskFlowItem[]>([])
   const taskFlowRef = useRef<TaskFlowItem[]>([])
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
-  const [taskPickerOpen, setTaskPickerOpen] = useState(false)
   const [scheduleEnabled, setScheduleEnabled] = useState(false)
   const [scheduleEntries, setScheduleEntries] = useState<ScheduleTimeEntry[]>(DEFAULT_SCHEDULE_ENTRIES)
   const [currentStep, setCurrentStep] = useState(-1)
@@ -991,10 +991,6 @@ const appliedExecutionRevisionRef = useRef(-1)
       })
     })
   }
-
-  useEffect(() => {
-    if (isRunning) setTaskPickerOpen(false)
-  }, [isRunning])
 
   useEffect(() => {
     taskFlowRef.current = taskFlow
@@ -1413,7 +1409,6 @@ const appliedExecutionRevisionRef = useRef(-1)
 
     setTaskFlow(newFlow)
     setSelectedTaskId(newTask.id)
-    setTaskPickerOpen(false)
     autoSave(newFlow, scheduleEnabled, scheduleEntries)
   }
 
@@ -2963,17 +2958,34 @@ const appliedExecutionRevisionRef = useRef(-1)
 
               <div className="automation-sequence-footer">
                 <div className="automation-sequence-actions">
-                  <Button
-                    type="button"
-                    onClick={() => setTaskPickerOpen(true)}
+                  <div className="automation-task-select-shell">
+                  <GlassSelect
+                    label={<span className="sr-only">添加任务</span>}
+                    placeholder="添加任务"
+                    value={null}
                     disabled={isRunning}
-                    variant="secondary"
-                    className="automation-task-add-button w-full justify-center whitespace-nowrap"
-                    icon={<Plus size={16} strokeWidth={2.1} aria-hidden="true" />}
-                    aria-haspopup="dialog"
-                  >
-                    添加任务
-                  </Button>
+                    className="automation-task-select !w-full !gap-0"
+                    onValueChange={(value: string | null) => {
+                      if (!value) return
+                      const task = availableTasks.find(candidate => candidate.id === value)
+                      if (task) addTaskToFlow(task)
+                    }}
+                    options={availableTasks.map((task) => {
+                      const addedCount = taskFlow.filter(flowTask => flowTask.commandId === task.id).length
+                      return {
+                        value: task.id,
+                        label: (
+                          <span className="automation-task-select-option">
+                            <span className="automation-task-select-name">{task.name}</span>
+                            {addedCount > 0 && (
+                              <span className="automation-task-select-count">已添加 {addedCount}</span>
+                            )}
+                          </span>
+                        ),
+                      }
+                    })}
+                  />
+                  </div>
                   {!(isRunning && isStopping) && (
                     <Button
                       onClick={executeTaskFlow}
@@ -3006,51 +3018,6 @@ const appliedExecutionRevisionRef = useRef(-1)
                 </div>
               </div>
 
-              <Modal
-                isOpen={taskPickerOpen}
-                onClose={() => setTaskPickerOpen(false)}
-                title="添加任务"
-                size="md"
-                footer={(
-                  <Button onClick={() => setTaskPickerOpen(false)} variant="primary" size="md">
-                    完成
-                  </Button>
-                )}
-              >
-                <p className="automation-task-picker-hint">选择任务加入流程，可重复添加。</p>
-                <div className="automation-task-picker-grid">
-                  {availableTasks.map(task => {
-                    const addedCount = taskFlow.filter(flowTask => flowTask.commandId === task.id).length
-
-                    return (
-                      <button
-                        key={task.id}
-                        type="button"
-                        onClick={() => addTaskToFlow(task)}
-                        disabled={isRunning}
-                        className="automation-task-picker-card"
-                        aria-label={`${task.name}${addedCount > 0 ? `，已添加 ${addedCount} 次` : ''}，点击添加`}
-                        data-autofocus={task.id === availableTasks[0]?.id ? '' : undefined}
-                      >
-                        <span className="automation-task-picker-card-head">
-                          <span className="automation-task-picker-card-icon" aria-hidden="true">{task.icon}</span>
-                          {addedCount > 0 && (
-                            <span className="automation-task-picker-card-count">{addedCount}</span>
-                          )}
-                        </span>
-                        <span className="automation-task-picker-card-copy">
-                          <strong>{task.name}</strong>
-                          <small>{task.description}</small>
-                        </span>
-                        <span className="automation-task-picker-card-add">
-                          <Plus size={14} strokeWidth={2.2} aria-hidden="true" />
-                          <span>添加</span>
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </Modal>
 
               {lastExecutionSummary && (
                 <section className="border-t border-[var(--app-border)] px-3.5 py-3 sm:px-4" aria-label="最近执行结果">
@@ -3232,13 +3199,11 @@ const appliedExecutionRevisionRef = useRef(-1)
                             <div key={field.key} className={`automation-param-field is-${field.type}`}>
                               {field.type === 'checkbox' ? (
                                 <label htmlFor={fieldId} className="group flex min-h-11 cursor-pointer items-center space-x-2 text-sm text-secondary">
-                                  <input
+                                  <CheckboxField
                                     id={fieldId}
-                                    type="checkbox"
                                     checked={Boolean(task.params[field.key])}
-                                    onChange={(e) => updateTaskParam(index, field.key, e.target.checked)}
+                                    onChange={(checked) => updateTaskParam(index, field.key, checked)}
                                     disabled={isRunning || !task.enabled}
-                                    className="custom-checkbox cursor-pointer"
                                   />
                                   <span className="group-hover:text-[var(--app-accent)] transition-colors">{field.label}</span>
                                 </label>
@@ -3323,18 +3288,16 @@ const appliedExecutionRevisionRef = useRef(-1)
                                       const optionId = `${fieldId}-${star}`
                                       return (
                                         <label key={star} htmlFor={optionId} className="group flex min-h-11 cursor-pointer items-center space-x-1 text-sm text-secondary">
-                                          <input
+                                          <CheckboxField
                                             id={optionId}
-                                            type="checkbox"
                                             checked={isChecked}
-                                            onChange={(e) => {
-                                              const newValue = e.target.checked
+                                            onChange={(checked) => {
+                                              const newValue = checked
                                                 ? [...currentValue, star].sort()
                                                 : currentValue.filter((s: number) => s !== star);
                                               updateTaskParam(index, field.key, newValue);
                                             }}
                                             disabled={isRunning || !task.enabled}
-                                            className="custom-checkbox cursor-pointer"
                                           />
                                           <span className="group-hover:text-[var(--app-accent)] transition-colors flex items-center space-x-1">
                                             <span>{star}</span>
@@ -3374,18 +3337,16 @@ const appliedExecutionRevisionRef = useRef(-1)
                                       const optionId = `${fieldId}-${facility.value}`
                                       return (
                                         <label key={facility.value} htmlFor={optionId} className="group flex min-h-11 cursor-pointer items-center space-x-1 text-sm text-secondary">
-                                          <input
+                                          <CheckboxField
                                             id={optionId}
-                                            type="checkbox"
                                             checked={isChecked}
-                                            onChange={(e) => {
-                                              const newValue = e.target.checked
+                                            onChange={(checked) => {
+                                              const newValue = checked
                                                 ? [...currentValue, facility.value]
                                                 : currentValue.filter((f: string) => f !== facility.value);
                                               updateTaskParam(index, field.key, newValue);
                                             }}
                                             disabled={isRunning || !task.enabled}
-                                            className="custom-checkbox cursor-pointer"
                                           />
                                           <span className="group-hover:text-[var(--app-accent)] transition-colors">{facility.label}</span>
                                         </label>
@@ -3417,11 +3378,11 @@ const appliedExecutionRevisionRef = useRef(-1)
                                       />
                                       <div className="h-6 w-px shrink-0 bg-[var(--app-border)]" />
                                       <div className="relative flex-none self-stretch">
-                                        <select
+                                        <Select
                                           id={unitId}
                                           value={unit}
-                                          onChange={(e) => {
-                                            const nextUnit = e.target.value
+                                          onChange={(value) => {
+                                            const nextUnit = value
                                             updateTaskParams(index, [
                                               ['expiryUnit', nextUnit],
                                               [nextUnit === 'bottles' ? 'medicineExpireDays' : 'expiringMedicine', 0],
@@ -3429,12 +3390,12 @@ const appliedExecutionRevisionRef = useRef(-1)
                                           }}
                                           disabled={isRunning || !task.enabled}
                                           aria-label={`${field.label}计量方式`}
-                                          className="automation-unit-select"
-                                        >
-                                          <option value="days">天</option>
-                                          <option value="bottles">瓶</option>
-                                        </select>
-                                        <ChevronDown size={14} strokeWidth={2} aria-hidden="true" className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-tertiary" />
+                                          options={[
+                                            { value: 'days', label: '天' },
+                                            { value: 'bottles', label: '瓶' },
+                                          ]}
+                                          className="automation-unit-select-field w-20 flex-none"
+                                        />
                                       </div>
                                     </div>
                                   </div>
@@ -3443,19 +3404,18 @@ const appliedExecutionRevisionRef = useRef(-1)
                                 <div className="automation-field-row">
                                   <label htmlFor={fieldId} className="automation-field-label">{field.label}</label>
                                   <div className="automation-select-control">
-                                    <select
+                                    <Select
                                       id={fieldId}
                                       value={toTextInputValue(task.params[field.key]) || (Array.isArray(field.options) && field.options.length > 0 ? (typeof field.options[0] === 'object' ? field.options[0].value : field.options[0]) : '')}
-                                      onChange={(e) => updateTaskParam(index, field.key, e.target.value)}
+                                      onChange={(value) => updateTaskParam(index, field.key, value)}
                                       disabled={isRunning || !task.enabled}
-                                    >
-                                      {Array.isArray(field.options) && field.options.map((opt) => {
+                                      options={(Array.isArray(field.options) ? field.options : []).map((opt) => {
                                         const value = typeof opt === 'object' ? opt.value : opt
                                         const label = typeof opt === 'object' ? opt.label : opt
-                                        return <option key={String(value)} value={String(value)}>{label}</option>
+                                        return { value: String(value), label: String(label) }
                                       })}
-                                    </select>
-                                    <ChevronDown size={15} strokeWidth={2} aria-hidden="true" />
+                                      className="min-w-0 flex-1"
+                                    />
                                   </div>
                                 </div>
                               ) : (
@@ -3548,32 +3508,32 @@ const appliedExecutionRevisionRef = useRef(-1)
                             <div className="flex items-center gap-2">
                               <label htmlFor={`${task.id}-fight-client-type`} className="w-24 shrink-0 whitespace-nowrap text-sm text-secondary">闪退重启:</label>
                               <div className="automation-select-control min-w-0 flex-1">
-                                <select
+                                <Select
                                   id={`${task.id}-fight-client-type`}
                                   value={task.params.clientType || ''}
-                                  onChange={(e) => updateTaskParam(index, 'clientType', e.target.value)}
+                                  onChange={(value) => updateTaskParam(index, 'clientType', value)}
                                   disabled={isRunning || !task.enabled}
-                                >
-                                  <option value="">不启用</option>
-                                  <option value="Official">官服</option>
-                                  <option value="Bilibili">B服</option>
-                                  <option value="YoStarEN">美服</option>
-                                  <option value="YoStarJP">日服</option>
-                                  <option value="YoStarKR">韩服</option>
-                                  <option value="Txwy">繁中服</option>
-                                </select>
-                                <ChevronDown size={15} strokeWidth={2} aria-hidden="true" />
+                                  options={[
+                                    { value: '', label: '不启用' },
+                                    { value: 'Official', label: '官服' },
+                                    { value: 'Bilibili', label: 'B服' },
+                                    { value: 'YoStarEN', label: '美服' },
+                                    { value: 'YoStarJP', label: '日服' },
+                                    { value: 'YoStarKR', label: '韩服' },
+                                    { value: 'Txwy', label: '繁中服' },
+                                  ]}
+                                  className="min-w-0 flex-1"
+                                />
                               </div>
                             </div>
                             <p className="text-xs text-tertiary">选择客户端后，游戏闪退时会自动重新启动。</p>
 
                             <label className="flex min-h-11 cursor-pointer items-start gap-2 text-sm text-secondary">
-                              <input
-                                type="checkbox"
+                              <CheckboxField
                                 checked={Boolean(task.params.DrGrandet)}
-                                onChange={(e) => updateTaskParam(index, 'DrGrandet', e.target.checked)}
+                                onChange={(checked) => updateTaskParam(index, 'DrGrandet', checked)}
                                 disabled={isRunning || !task.enabled}
-                                className="custom-checkbox mt-0.5 cursor-pointer"
+                                className="mt-0.5"
                               />
                               <span>
                                 <span className="block">葛朗台碎石模式</span>
@@ -3585,19 +3545,20 @@ const appliedExecutionRevisionRef = useRef(-1)
                               <div className="flex items-center gap-2">
                                 <label htmlFor={`${task.id}-fight-server`} className="w-24 shrink-0 whitespace-nowrap text-sm text-secondary">掉落服务器:</label>
                                 <div className="automation-select-control min-w-0 flex-1">
-                                  <select
+                                  <Select
                                     id={`${task.id}-fight-server`}
                                     value={task.params.server || ''}
-                                    onChange={(e) => updateTaskParam(index, 'server', e.target.value)}
+                                    onChange={(value) => updateTaskParam(index, 'server', value)}
                                     disabled={isRunning || !task.enabled}
-                                  >
-                                    <option value="">自动</option>
-                                    <option value="CN">国服</option>
-                                    <option value="US">美服</option>
-                                    <option value="JP">日服</option>
-                                    <option value="KR">韩服</option>
-                                  </select>
-                                  <ChevronDown size={15} strokeWidth={2} aria-hidden="true" />
+                                    options={[
+                                      { value: '', label: '自动' },
+                                      { value: 'CN', label: '国服' },
+                                      { value: 'US', label: '美服' },
+                                      { value: 'JP', label: '日服' },
+                                      { value: 'KR', label: '韩服' },
+                                    ]}
+                                    className="min-w-0 flex-1"
+                                  />
                                 </div>
                               </div>
                               <p className="text-xs text-tertiary">外服资源可能只接受 -1~6 倍代理</p>
@@ -3605,12 +3566,10 @@ const appliedExecutionRevisionRef = useRef(-1)
 
                             <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
                               <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
-                                <input
-                                  type="checkbox"
+                                <CheckboxField
                                   checked={Boolean(task.params.report_to_penguin)}
-                                  onChange={(e) => updateTaskParam(index, 'report_to_penguin', e.target.checked)}
+                                  onChange={(checked) => updateTaskParam(index, 'report_to_penguin', checked)}
                                   disabled={isRunning || !task.enabled}
-                                  className="custom-checkbox cursor-pointer"
                                 />
                                 汇报掉落至企鹅物流
                               </label>
@@ -3632,12 +3591,10 @@ const appliedExecutionRevisionRef = useRef(-1)
 
                             <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
                               <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
-                                <input
-                                  type="checkbox"
+                                <CheckboxField
                                   checked={Boolean(task.params.report_to_yituliu)}
-                                  onChange={(e) => updateTaskParam(index, 'report_to_yituliu', e.target.checked)}
+                                  onChange={(checked) => updateTaskParam(index, 'report_to_yituliu', checked)}
                                   disabled={isRunning || !task.enabled}
-                                  className="custom-checkbox cursor-pointer"
                                 />
                                 汇报掉落至一图流
                               </label>
@@ -3675,22 +3632,18 @@ const appliedExecutionRevisionRef = useRef(-1)
                               <section className="space-y-2">
                                 <h4 className="text-xs font-semibold text-secondary"><CjkText>宿舍</CjkText></h4>
                                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
-                                  <input
-                                    type="checkbox"
+                                  <CheckboxField
                                     checked={Boolean(task.params.dorm_notstationed_enabled)}
-                                    onChange={(e) => updateTaskParam(index, 'dorm_notstationed_enabled', e.target.checked)}
+                                    onChange={(checked) => updateTaskParam(index, 'dorm_notstationed_enabled', checked)}
                                     disabled={isRunning || !task.enabled}
-                                    className="custom-checkbox cursor-pointer"
                                   />
                                   使用“未进驻”筛选
                                 </label>
                                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
-                                  <input
-                                    type="checkbox"
+                                  <CheckboxField
                                     checked={Boolean(task.params.dorm_trust_enabled)}
-                                    onChange={(e) => updateTaskParam(index, 'dorm_trust_enabled', e.target.checked)}
+                                    onChange={(checked) => updateTaskParam(index, 'dorm_trust_enabled', checked)}
                                     disabled={isRunning || !task.enabled}
-                                    className="custom-checkbox cursor-pointer"
                                   />
                                   空位补入未满信赖干员
                                 </label>
@@ -3701,32 +3654,26 @@ const appliedExecutionRevisionRef = useRef(-1)
                               <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
                                 <h4 className="text-xs font-semibold text-secondary"><CjkText>会客室</CjkText></h4>
                                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
-                                  <input
-                                    type="checkbox"
+                                  <CheckboxField
                                     checked={Boolean(task.params.reception_message_board)}
-                                    onChange={(e) => updateTaskParam(index, 'reception_message_board', e.target.checked)}
+                                    onChange={(checked) => updateTaskParam(index, 'reception_message_board', checked)}
                                     disabled={isRunning || !task.enabled}
-                                    className="custom-checkbox cursor-pointer"
                                   />
                                   领取信息板信用
                                 </label>
                                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
-                                  <input
-                                    type="checkbox"
+                                  <CheckboxField
                                     checked={Boolean(task.params.reception_clue_exchange)}
-                                    onChange={(e) => updateTaskParam(index, 'reception_clue_exchange', e.target.checked)}
+                                    onChange={(checked) => updateTaskParam(index, 'reception_clue_exchange', checked)}
                                     disabled={isRunning || !task.enabled}
-                                    className="custom-checkbox cursor-pointer"
                                   />
                                   发起线索交流
                                 </label>
                                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
-                                  <input
-                                    type="checkbox"
+                                  <CheckboxField
                                     checked={Boolean(task.params.reception_send_clue)}
-                                    onChange={(e) => updateTaskParam(index, 'reception_send_clue', e.target.checked)}
+                                    onChange={(checked) => updateTaskParam(index, 'reception_send_clue', checked)}
                                     disabled={isRunning || !task.enabled}
-                                    className="custom-checkbox cursor-pointer"
                                   />
                                   自动赠送线索
                                 </label>
@@ -3737,12 +3684,10 @@ const appliedExecutionRevisionRef = useRef(-1)
                               <section className="space-y-2 border-t border-[var(--app-border)] pt-3">
                                 <h4 className="text-xs font-semibold text-secondary"><CjkText>训练室</CjkText></h4>
                                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
-                                  <input
-                                    type="checkbox"
+                                  <CheckboxField
                                     checked={Boolean(task.params.continue_training)}
-                                    onChange={(e) => updateTaskParam(index, 'continue_training', e.target.checked)}
+                                    onChange={(checked) => updateTaskParam(index, 'continue_training', checked)}
                                     disabled={isRunning || !task.enabled}
-                                    className="custom-checkbox cursor-pointer"
                                   />
                                   完成后继续专精
                                 </label>
@@ -3753,12 +3698,10 @@ const appliedExecutionRevisionRef = useRef(-1)
                               <h4 className="text-xs font-semibold text-secondary"><CjkText>干员组合</CjkText></h4>
                               <div>
                                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
-                                  <input
-                                    type="checkbox"
+                                  <CheckboxField
                                     checked={Boolean(task.params.fiammetta_recovery_enabled)}
-                                    onChange={(e) => updateTaskParam(index, 'fiammetta_recovery_enabled', e.target.checked)}
+                                    onChange={(checked) => updateTaskParam(index, 'fiammetta_recovery_enabled', checked)}
                                     disabled={isRunning || !task.enabled}
-                                    className="custom-checkbox cursor-pointer"
                                   />
                                   菲亚梅塔恢复
                                 </label>
@@ -3789,12 +3732,10 @@ const appliedExecutionRevisionRef = useRef(-1)
                               </div>
                               <div>
                                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
-                                  <input
-                                    type="checkbox"
+                                  <CheckboxField
                                     checked={Boolean(task.params.use_pinus_sylvestris)}
-                                    onChange={(e) => updateTaskParam(index, 'use_pinus_sylvestris', e.target.checked)}
+                                    onChange={(checked) => updateTaskParam(index, 'use_pinus_sylvestris', checked)}
                                     disabled={isRunning || !task.enabled}
-                                    className="custom-checkbox cursor-pointer"
                                   />
                                   红松骑士团组合
                                 </label>
@@ -3805,12 +3746,10 @@ const appliedExecutionRevisionRef = useRef(-1)
                               </div>
                               <div>
                                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
-                                  <input
-                                    type="checkbox"
+                                  <CheckboxField
                                     checked={Boolean(task.params.use_perception_information)}
-                                    onChange={(e) => updateTaskParam(index, 'use_perception_information', e.target.checked)}
+                                    onChange={(checked) => updateTaskParam(index, 'use_perception_information', checked)}
                                     disabled={isRunning || !task.enabled}
-                                    className="custom-checkbox cursor-pointer"
                                   />
                                   感知信息组合
                                 </label>
@@ -3821,12 +3760,10 @@ const appliedExecutionRevisionRef = useRef(-1)
                               </div>
                               <div>
                                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
-                                  <input
-                                    type="checkbox"
+                                  <CheckboxField
                                     checked={Boolean(task.params.use_worldly_plight)}
-                                    onChange={(e) => updateTaskParam(index, 'use_worldly_plight', e.target.checked)}
+                                    onChange={(checked) => updateTaskParam(index, 'use_worldly_plight', checked)}
                                     disabled={isRunning || !task.enabled}
-                                    className="custom-checkbox cursor-pointer"
                                   />
                                   人间烟火组合
                                 </label>
@@ -3837,12 +3774,10 @@ const appliedExecutionRevisionRef = useRef(-1)
                               </div>
                               <div>
                                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
-                                  <input
-                                    type="checkbox"
+                                  <CheckboxField
                                     checked={Boolean(task.params.use_abyssal_hunter)}
-                                    onChange={(e) => updateTaskParam(index, 'use_abyssal_hunter', e.target.checked)}
+                                    onChange={(checked) => updateTaskParam(index, 'use_abyssal_hunter', checked)}
                                     disabled={isRunning || !task.enabled}
-                                    className="custom-checkbox cursor-pointer"
                                   />
                                   深海猎人组合
                                 </label>
@@ -3870,17 +3805,18 @@ const appliedExecutionRevisionRef = useRef(-1)
                             <div className="flex items-center gap-2">
                               <label htmlFor={`${task.id}-extra-tags-mode`} className="w-20 shrink-0 whitespace-nowrap text-sm text-secondary">额外标签:</label>
                               <div className="automation-select-control min-w-0 flex-1">
-                                <select
+                                <Select
                                   id={`${task.id}-extra-tags-mode`}
                                   value={String(task.params.extra_tags_mode ?? 0)}
-                                  onChange={(e) => updateTaskParam(index, 'extra_tags_mode', Number(e.target.value))}
+                                  onChange={(value) => updateTaskParam(index, 'extra_tags_mode', Number(value))}
                                   disabled={isRunning || !task.enabled}
-                                >
-                                  <option value="0">标准选择</option>
-                                  <option value="1">选满 3{'\u00A0'}个标签</option>
-                                  <option value="2">尽量多选高星标签</option>
-                                </select>
-                                <ChevronDown size={15} strokeWidth={2} aria-hidden="true" />
+                                  options={[
+                                    { value: '0', label: '标准选择' },
+                                    { value: '1', label: '选满 3 个标签' },
+                                    { value: '2', label: '尽量多选高星标签' },
+                                  ]}
+                                  className="min-w-0 flex-1"
+                                />
                               </div>
                             </div>
 
@@ -3939,12 +3875,10 @@ const appliedExecutionRevisionRef = useRef(-1)
                               <h4 className="text-xs font-semibold text-secondary"><CjkText>执行方式</CjkText></h4>
                               <div>
                                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
-                                  <input
-                                    type="checkbox"
+                                  <CheckboxField
                                     checked={Boolean(task.params.calculationOnly)}
-                                    onChange={(e) => updateTaskParam(index, 'calculationOnly', e.target.checked)}
+                                    onChange={(checked) => updateTaskParam(index, 'calculationOnly', checked)}
                                     disabled={isRunning || !task.enabled}
-                                    className="custom-checkbox cursor-pointer"
                                   />
                                   仅计算公招（不招募）
                                 </label>
@@ -3954,12 +3888,10 @@ const appliedExecutionRevisionRef = useRef(-1)
                                 </p>
                               </div>
                               <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
-                                <input
-                                  type="checkbox"
+                                <CheckboxField
                                   checked={Boolean(task.params.set_time)}
-                                  onChange={(e) => updateTaskParam(index, 'set_time', e.target.checked)}
+                                  onChange={(checked) => updateTaskParam(index, 'set_time', checked)}
                                   disabled={isRunning || !task.enabled}
-                                  className="custom-checkbox cursor-pointer"
                                 />
                                 设置时间
                               </label>
@@ -3969,12 +3901,10 @@ const appliedExecutionRevisionRef = useRef(-1)
                               <h4 className="text-xs font-semibold text-secondary"><CjkText>数据上报</CjkText></h4>
                               <div>
                                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
-                                  <input
-                                    type="checkbox"
+                                  <CheckboxField
                                     checked={Boolean(task.params.report_to_penguin)}
-                                    onChange={(e) => updateTaskParam(index, 'report_to_penguin', e.target.checked)}
+                                    onChange={(checked) => updateTaskParam(index, 'report_to_penguin', checked)}
                                     disabled={isRunning || !task.enabled}
-                                    className="custom-checkbox cursor-pointer"
                                   />
                                   上报企鹅数据
                                 </label>
@@ -3995,12 +3925,10 @@ const appliedExecutionRevisionRef = useRef(-1)
                               </div>
                               <div>
                                 <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-secondary">
-                                  <input
-                                    type="checkbox"
+                                  <CheckboxField
                                     checked={Boolean(task.params.report_to_yituliu)}
-                                    onChange={(e) => updateTaskParam(index, 'report_to_yituliu', e.target.checked)}
+                                    onChange={(checked) => updateTaskParam(index, 'report_to_yituliu', checked)}
                                     disabled={isRunning || !task.enabled}
-                                    className="custom-checkbox cursor-pointer"
                                   />
                                   上报一图流
                                 </label>
@@ -4023,18 +3951,19 @@ const appliedExecutionRevisionRef = useRef(-1)
                                 <div className="flex items-center gap-2">
                                   <label htmlFor={`${task.id}-recruit-server`} className="w-20 shrink-0 whitespace-nowrap text-sm text-secondary">公招服务器:</label>
                                   <div className="automation-select-control min-w-0 flex-1">
-                                    <select
+                                    <Select
                                       id={`${task.id}-recruit-server`}
                                       value={task.params.server || 'CN'}
-                                      onChange={(e) => updateTaskParam(index, 'server', e.target.value)}
+                                      onChange={(value) => updateTaskParam(index, 'server', value)}
                                       disabled={isRunning || !task.enabled}
-                                    >
-                                      <option value="CN">国服</option>
-                                      <option value="US">美服</option>
-                                      <option value="JP">日服</option>
-                                      <option value="KR">韩服</option>
-                                    </select>
-                                    <ChevronDown size={15} strokeWidth={2} aria-hidden="true" />
+                                      options={[
+                                        { value: 'CN', label: '国服' },
+                                        { value: 'US', label: '美服' },
+                                        { value: 'JP', label: '日服' },
+                                        { value: 'KR', label: '韩服' },
+                                      ]}
+                                      className="min-w-0 flex-1"
+                                    />
                                   </div>
                                 </div>
                                 <p className="flex items-start gap-1.5 text-xs text-tertiary mt-1.5">
