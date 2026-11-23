@@ -335,7 +335,7 @@ export default function Layout({ children }: LayoutProps) {
                   type="button"
                   className="link la-pluma-brand"
                   icon={<img src={`${import.meta.env.BASE_URL}logo-graphite.svg?v=1`} alt="" className="la-pluma-brand-mark" />}
-                  variant="clear"
+                  variant="clear-glass"
                   size="md"
                   aria-label="La Pluma 控制台"
                   onClick={() => navigateToTab('dashboard')}
@@ -356,7 +356,7 @@ export default function Layout({ children }: LayoutProps) {
                   rel="noopener noreferrer"
                   className="link la-pluma-github-link"
                   icon={<GitHubMark />}
-                  variant="glass"
+                  variant="clear-glass"
                   size="md"
                   aria-label="打开 GitHub 仓库"
                 />

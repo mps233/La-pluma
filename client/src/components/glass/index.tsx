@@ -6,7 +6,8 @@
 // verbatim in src/components/liquid-glass.
 //
 // Material mapping:
-//   old glass / clear / ghost  → GlassButton clear (bends the page behind it)
+//   old glass / clear / ghost  → tinted app surface (stable over motion)
+//   clear-glass                → the kit's true clear material (bends the page)
 //   old filled / tinted        → GlassButton tinted with a solid background
 //   old <GlassCard>            → GlassCard clear
 //   old <GlassSegmented>       → GlassTabs
@@ -55,7 +56,7 @@ const HOST = 'lg-host'
 /* ── GlassButton ─────────────────────────────────────────────────────────── */
 
 export type GlassButtonSize = 'sm' | 'md' | 'lg' | 'xl'
-export type GlassButtonVariant = 'glass' | 'clear' | 'ghost' | 'tinted' | 'tinted-filled' | 'filled' | 'destructive'
+export type GlassButtonVariant = 'glass' | 'clear' | 'ghost' | 'clear-glass' | 'tinted' | 'tinted-filled' | 'filled' | 'destructive'
 
 export interface GlassButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'type' | 'onClick'> {
   /** Leading icon; with no children the button becomes a circle. */
@@ -64,7 +65,7 @@ export interface GlassButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEl
   iconOnly?: boolean
   /** Height preset: 36 / 44 / 52 px, matching the old sizes. */
   size?: GlassButtonSize
-  /** `clear` bends the page; `filled` is a solid button; `tinted` a soft wash. */
+  /** `clear-glass` is the kit's true clear material (bends the page); `clear`/`glass` keep the tinted app surface. */
   variant?: GlassButtonVariant
   /** Value for tinted / filled: any CSS colour. */
   tint?: string
@@ -115,6 +116,8 @@ function buttonLook(variant: GlassButtonVariant, tint?: string, destructive?: bo
       return { material: 'tinted', style: tint ? { backgroundColor: tint, color: '#fff' } : undefined }
     case 'tinted-filled':
       return { material: 'tinted', style: tint ? { backgroundColor: `color-mix(in srgb, ${tint} 18%, transparent)`, color: tint } : undefined }
+    case 'clear-glass':
+      return { material: 'clear' }
     case 'clear':
     case 'ghost':
     default:

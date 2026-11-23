@@ -682,7 +682,7 @@ export default function Dashboard() {
               <GlassButton
                 onClick={openOnboarding}
                 icon={<Compass className="h-4 w-4" aria-hidden="true" />}
-                variant="glass"
+                variant="clear-glass"
                 size="sm"
                 title="新手引导"
                 aria-label="新手引导"

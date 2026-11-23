@@ -143,7 +143,7 @@ export default function ThemeToggle() {
           type="button"
           onClick={() => setMobileMenuOpen(open => !open)}
           icon={<CurrentThemeIcon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />}
-          variant="glass"
+          variant="clear-glass"
           size="md"
           className={`la-pluma-theme-trigger${mobileMenuOpen ? ' text-primary' : ''}`}
           title={`主题：${currentTheme.label}`}
