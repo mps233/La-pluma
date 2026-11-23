@@ -820,7 +820,7 @@ html.la-pluma-standalone #app-root .page {
 .la-pluma-sidebar-nav-group {
   display: flex;
   flex-direction: column;
-  gap: 0.1875rem;
+  gap: var(--app-space-2);
 }
 
 .la-pluma-sidebar-nav-label {
