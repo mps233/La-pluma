@@ -1,7 +1,6 @@
 package gamedata
 
 import (
-	"context"
 	"regexp"
 )
 
@@ -70,10 +69,3 @@ func ParseStageData(stageTable any) map[string]StageInfo {
 }
 
 // FetchStages fetches and parses excel/stage_table.json.
-func (c *Client) FetchStages(ctx context.Context) (map[string]StageInfo, error) {
-	stageTable, err := c.fetchExcelJSON(ctx, "stage_table.json")
-	if err != nil {
-		return nil, err
-	}
-	return ParseStageData(stageTable), nil
-}

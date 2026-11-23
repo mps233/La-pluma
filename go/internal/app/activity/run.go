@@ -22,11 +22,6 @@ type PartialResultsError interface {
 
 // ShouldRefreshActivityNavigation mirrors shouldRefreshActivityNavigation
 // with the fixed six-hour retry interval.
-func ShouldRefreshActivityNavigation(preflight NavigationResult, lastAttemptAt, now time.Time) bool {
-	return preflight.ReasonCode != nil && *preflight.ReasonCode == "navigation-resource-unavailable" &&
-		preflight.Activity.Code != nil && *preflight.Activity.Code != "" &&
-		now.Sub(lastAttemptAt) >= defaultResourceRefreshInterval
-}
 
 func shouldRefreshWithInterval(preflight NavigationResult, lastAttemptAt, now time.Time, interval time.Duration) bool {
 	if interval <= 0 {

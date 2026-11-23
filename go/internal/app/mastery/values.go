@@ -81,10 +81,6 @@ func formatISO(value time.Time) string {
 	return value.UTC().Format("2006-01-02T15:04:05.000Z")
 }
 
-func nowISO(now func() time.Time) string {
-	return formatISO(now())
-}
-
 // ageDays mirrors Date.parse + Math.round against the current clock.
 func ageDays(timestamp *string, now time.Time) *int {
 	if timestamp == nil || *timestamp == "" {

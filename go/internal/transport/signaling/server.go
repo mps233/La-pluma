@@ -35,9 +35,6 @@ type Server struct {
 
 	iceMu       sync.RWMutex
 	iceProvider func() []any
-
-	viewerMu sync.Mutex
-	viewers  int
 }
 
 func New(provider func() *scwebrtc.Publisher, logger *slog.Logger) *Server {
@@ -147,9 +144,6 @@ func (s *Server) Connect(w http.ResponseWriter, r *http.Request) {
 	}
 	client := &wsClient{conn: conn, server: s, peerID: peerID}
 	defer client.close()
-	s.addViewer()
-	defer s.removeViewer()
-
 	client.writeJSON(map[string]any{"type": "config", "ice_servers": s.iceServers()})
 
 	for {
@@ -186,26 +180,6 @@ func (s *Server) SetDeviceID(deviceID string) {
 	s.mu.Lock()
 	s.deviceID = deviceID
 	s.mu.Unlock()
-}
-
-func (s *Server) ViewerCount() int {
-	s.viewerMu.Lock()
-	defer s.viewerMu.Unlock()
-	return s.viewers
-}
-
-func (s *Server) addViewer() {
-	s.viewerMu.Lock()
-	s.viewers++
-	s.viewerMu.Unlock()
-}
-
-func (s *Server) removeViewer() {
-	s.viewerMu.Lock()
-	if s.viewers > 0 {
-		s.viewers--
-	}
-	s.viewerMu.Unlock()
 }
 
 func (s *Server) consumeTicket(token string) bool {

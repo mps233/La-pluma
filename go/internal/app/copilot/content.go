@@ -110,13 +110,6 @@ func ContentStageName(content Content) string {
 }
 
 // ContentDocTitle returns the doc title when it is a string.
-func ContentDocTitle(content Content) string {
-	doc := asRecord(content["doc"])
-	if doc == nil {
-		return ""
-	}
-	return asString(doc["title"])
-}
 
 func ContentOpers(content Content) []any {
 	return asArray(content["opers"])

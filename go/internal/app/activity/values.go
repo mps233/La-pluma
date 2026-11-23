@@ -228,12 +228,6 @@ func integerValue(value any) (int, bool) {
 	return int(parsed), true
 }
 
-func decodeJSON(data []byte, target any) error {
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.UseNumber()
-	return decoder.Decode(target)
-}
-
 func parseJSONValue(data []byte) (any, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
@@ -289,21 +283,6 @@ func strictStringSlice(value any) []string {
 func stringPtr(value string) *string {
 	copyValue := value
 	return &copyValue
-}
-
-func optionalStringPtr(value any) *string {
-	text, ok := value.(string)
-	if !ok {
-		return nil
-	}
-	return stringPtr(text)
-}
-
-func truthyPtr(value any) *string {
-	if !truthy(value) {
-		return nil
-	}
-	return stringPtr(jsString(value))
 }
 
 // errorMessage mirrors getErrorMessage for plain errors.

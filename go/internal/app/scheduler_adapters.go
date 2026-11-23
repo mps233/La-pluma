@@ -337,6 +337,10 @@ func newScheduler(cfg config.Config, logger *slog.Logger, runs *runapp.Service, 
 		},
 		DepotRecognizer:    depotRecognizerAdapter{service: recognitionService},
 		SmartStagesUpdater: trainingSmartStagesUpdater{service: trainingService},
+		// Startup preflight/post-checks go through the same saved-profile ADB
+		// path the rest of the app uses, so an emulator-bundled adb works.
+		DeviceProbe:        adbDeviceProbe{},
+		CompletionNotifier: taskCompletionNotifier{service: notificationService}.Notify,
 	})
 	service.RestoreFromConfig()
 	return service

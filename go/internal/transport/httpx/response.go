@@ -2,7 +2,6 @@ package httpx
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 )
 
@@ -72,10 +71,3 @@ func Failure(w http.ResponseWriter, status int, err *APIError) {
 }
 
 // ErrorCode extracts the stable code from an error when it carries one.
-func ErrorCode(err error) string {
-	var apiErr *APIError
-	if errors.As(err, &apiErr) && apiErr != nil {
-		return apiErr.Code
-	}
-	return ""
-}

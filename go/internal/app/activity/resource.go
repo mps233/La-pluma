@@ -37,10 +37,6 @@ type ResourceIndex struct {
 	cache *resourceCache
 }
 
-func NewResourceIndex(paths config.Paths) *ResourceIndex {
-	return NewResourceIndexWithNow(paths, time.Now)
-}
-
 func NewResourceIndexWithNow(paths config.Paths, now func() time.Time) *ResourceIndex {
 	if now == nil {
 		now = time.Now

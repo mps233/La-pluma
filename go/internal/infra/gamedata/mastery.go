@@ -1,7 +1,6 @@
 package gamedata
 
 import (
-	"context"
 	"strings"
 	"time"
 )
@@ -237,18 +236,6 @@ func BuildMasteryFile(characterData any, skillTable any, itemTable any, now time
 
 // FetchMastery fetches the three source tables and builds
 // operator-mastery.json.
-func (c *Client) FetchMastery(ctx context.Context, now time.Time) (MasteryFile, error) {
-	tables, err := c.fetchTables(ctx, "character_table.json", "skill_table.json", "item_table.json")
-	if err != nil {
-		return MasteryFile{}, err
-	}
-	return BuildMasteryFile(
-		tables["character_table.json"],
-		tables["skill_table.json"],
-		tables["item_table.json"],
-		now,
-	), nil
-}
 
 func masteryRarity(value any) int {
 	if number, ok := numericValue(value); ok {

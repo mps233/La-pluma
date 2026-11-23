@@ -121,9 +121,6 @@ type Service struct {
 }
 
 // New returns a Service with default PRTS client, clock and caches.
-func New(paths config.Paths) *Service {
-	return NewWithOptions(ServiceOptions{Paths: paths})
-}
 
 // NewWithOptions returns a fully configurable Service. Tests inject an
 // httptest-backed PRTS client and a fake clock; production uses defaults.

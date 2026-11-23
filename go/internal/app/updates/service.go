@@ -119,9 +119,6 @@ type resourceUpdateCall struct {
 }
 
 // New returns a Service with default clock, platform and system runner.
-func New(paths config.Paths, logger *slog.Logger, runner CommandRunner) *Service {
-	return NewWithOptions(Options{Paths: paths, Logger: logger, Runner: runner})
-}
 
 // NewWithOptions returns a fully configurable Service.
 func NewWithOptions(options Options) *Service {

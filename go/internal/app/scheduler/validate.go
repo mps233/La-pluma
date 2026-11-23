@@ -106,19 +106,3 @@ func BuildScheduledTaskFlowPlan(taskFlow any, defaults ConnectionDefaults) PlanR
 
 // needsConnection reports whether the flow contains an enabled startup or
 // closedown task, matching getScheduledTaskFlowPlan.
-func needsConnection(taskFlow any) bool {
-	tasks, isArray := taskFlowSlice(taskFlow)
-	if !isArray {
-		return false
-	}
-	for _, task := range tasks {
-		if !taskEnabled(task) {
-			continue
-		}
-		commandID := taskCommandID(task)
-		if commandID == "startup" || commandID == "closedown" {
-			return true
-		}
-	}
-	return false
-}

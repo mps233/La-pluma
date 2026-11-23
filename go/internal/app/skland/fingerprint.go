@@ -152,10 +152,6 @@ func sensebotTN(target []browserKV) string {
 	return md5Hex(builder.String())
 }
 
-func sensebotSMID(uid string) string {
-	return sensebotSMIDAt(uid, time.Now())
-}
-
 func sensebotSMIDAt(uid string, now time.Time) string {
 	prefix := fmt.Sprintf("%04d%02d%02d%02d%02d%02d", now.Year(), int(now.Month()), now.Day(), now.Hour(), now.Minute(), now.Second())
 	value := prefix + md5Hex(uid) + "00"
