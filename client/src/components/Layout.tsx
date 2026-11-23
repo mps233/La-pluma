@@ -363,7 +363,7 @@ export default function Layout({ children }: LayoutProps) {
       <div ref={pageRef} className="page no-swipeback la-pluma-page" data-name="la-pluma">
         <AsciiFieldBackdrop />
         <div className="la-pluma-sidebar-frame" aria-hidden="true">
-          <GlassCard className="la-pluma-sidebar-surface h-full w-full rounded-[1.625rem]" />
+          <GlassCard variant="clear" className="la-pluma-sidebar-surface h-full w-full rounded-[1.625rem]" />
         </div>
         <header className="navbar la-pluma-navbar">
           <div className="navbar-bg" aria-hidden="true" />
