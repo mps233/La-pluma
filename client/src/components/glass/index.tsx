@@ -89,7 +89,21 @@ const BUTTON_ICON_ONLY: Record<GlassButtonSize, string> = {
   xl: 'h-16 w-16 p-0',
 }
 
-/** Filled glass paints its own background; tint / tinted-filled wash the glass. */
+/**
+ * Filled glass paints its own background; tint / tinted-filled wash the glass.
+ *
+ * Clear glass keeps a Canvas2D snapshot of the page behind it and only repaints
+ * it on a throttle or when the glass itself moves. Over the animated Ascii
+ * field that reads as a stuttering backdrop, so app buttons default to the
+ * tinted surface instead. Opt in with `variant="clear"` only when the content
+ * behind the button is static.
+ */
+const BUTTON_TINTED_SURFACE: CSSProperties = {
+  backgroundColor: "var(--app-surface-muted)",
+  borderColor: 'var(--app-border)',
+  color: 'var(--app-text)',
+}
+
 function buttonLook(variant: GlassButtonVariant, tint?: string, destructive?: boolean): { material: 'clear' | 'tinted'; style?: CSSProperties } {
   if (destructive) return { material: 'tinted', style: { backgroundColor: 'var(--app-danger-action)', color: '#fff' } }
   switch (variant) {
@@ -98,9 +112,11 @@ function buttonLook(variant: GlassButtonVariant, tint?: string, destructive?: bo
     case 'tinted':
       return { material: 'tinted', style: tint ? { backgroundColor: tint, color: '#fff' } : undefined }
     case 'tinted-filled':
-      return { material: 'clear', style: tint ? { backgroundColor: `color-mix(in srgb, ${tint} 18%, transparent)`, color: tint } : undefined }
+      return { material: 'tinted', style: tint ? { backgroundColor: `color-mix(in srgb, ${tint} 18%, transparent)`, color: tint } : undefined }
+    case 'clear':
+    case 'ghost':
     default:
-      return { material: 'clear' }
+      return { material: 'tinted', style: BUTTON_TINTED_SURFACE }
   }
 }
 
