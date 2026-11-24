@@ -290,6 +290,35 @@ describe('top-level application navigation', () => {
     expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(9)
   })
 
+  it('drops a saved value written into the sidebar search while it is unfocused', () => {
+    renderLayout()
+
+    const sidebar = container.querySelector<HTMLElement>('.la-pluma-sidebar')!
+    const search = sidebar.querySelector<HTMLInputElement>('input[aria-label="搜索工作区"]')!
+
+    // Browsers and password managers write remembered form values into a field
+    // they never focused; that value must not become a workspace filter and
+    // hide every destination.
+    fireEvent.change(search, { target: { value: 'admin@la-pluma' } })
+
+    expect(search.value).toBe('')
+    expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(9)
+    expect(sidebar.querySelector('.la-pluma-sidebar-empty')).toBeNull()
+  })
+
+  it('clears a DOM-only saved value when the sidebar search receives focus', () => {
+    renderLayout()
+
+    const sidebar = container.querySelector<HTMLElement>('.la-pluma-sidebar')!
+    const search = sidebar.querySelector<HTMLInputElement>('input[aria-label="搜索工作区"]')!
+    search.value = 'admin@la-pluma'
+
+    fireEvent.focus(search)
+
+    expect(search.value).toBe('')
+    expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(9)
+  })
+
   it('shows the daily operator portrait, name, and quote in the desktop identity area', async () => {
     renderLayout()
 

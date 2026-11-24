@@ -2313,6 +2313,27 @@ html.dark .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .sm
   appearance: none;
 }
 
+/* Chrome/Safari paint their own fill colour onto an autofilled field, which
+   turns the transparent search input into a solid rectangle inside the capsule.
+   The workspace search is not a credential field, so clip that fill to the
+   glyphs and keep the app text colour; an opaque shadow here would only swap
+   one solid block for another. */
+.lg-input .lg-input-field:-webkit-autofill,
+.lg-input .lg-input-field:-webkit-autofill:hover,
+.lg-input .lg-input-field:-webkit-autofill:focus,
+.lg-input .lg-input-field:-webkit-autofill:active {
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: var(--app-text);
+  caret-color: var(--app-accent);
+}
+
+/* The fill colour above would otherwise force the placeholder to full-strength
+   text; keep the muted placeholder the empty field is defined with. */
+.lg-input .lg-input-field:-webkit-autofill::placeholder {
+  -webkit-text-fill-color: var(--app-text-soft);
+}
+
 .lg-input .lg-input-field::placeholder {
   color: var(--app-text-soft);
   opacity: 1;

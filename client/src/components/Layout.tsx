@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, Search, Settings2, Swords, Wrench } from 'lucide-react'
 import { GlassButton, GlassCard } from '@/components/liquid-glass'
 import { GlassLiveCardButton } from '@/components/common/GlassLiveCardButton'
@@ -284,6 +284,19 @@ export default function Layout({ children }: LayoutProps) {
     }
   }
 
+  // Browser form restore and password managers can write a saved value into the
+  // search field while it is not focused. Such a value is not a workspace filter
+  // and would hide every destination, so it is dropped and the controlled value
+  // is written back instead of becoming sidebar state.
+  const handleSidebarQueryChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget
+    if (document.activeElement !== input) {
+      input.value = sidebarQuery
+      return
+    }
+    setSidebarQuery(input.value)
+  }
+
   const activePrimaryMobileIndex = mobileTabs.findIndex(tab => tab.id === activeTab)
   const isOverflowActive = overflowTabs.some(tab => tab.id === activeTab)
   const mobileNavItems = mobileTabs.map(tab => ({
@@ -379,20 +392,32 @@ export default function Layout({ children }: LayoutProps) {
                 type="search"
                 icon={<Search aria-hidden="true" />}
                 value={sidebarQuery}
-                onChange={(event) => setSidebarQuery(event.target.value)}
+                onChange={handleSidebarQueryChange}
                 onKeyDown={(event) => {
                   if (event.key === 'Escape' && sidebarQuery) {
                     event.preventDefault()
                     setSidebarQuery('')
                   }
                 }}
+                onFocus={(event) => {
+                  // A value written without an input event (some password
+                  // managers only touch the DOM) never reaches sidebar state;
+                  // clear it as soon as the user focuses the real field.
+                  const input = event.currentTarget
+                  if (input.value !== sidebarQuery) input.value = sidebarQuery
+                }}
                 onClear={() => setSidebarQuery('')}
                 placeholder="搜索工作区"
                 aria-label="搜索工作区"
+                name="workspace-search"
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="none"
                 spellCheck={false}
+                data-lpignore="true"
+                data-1p-ignore="true"
+                data-bwignore="true"
+                data-form-type="other"
               />
             </search>
 
