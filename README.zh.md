@@ -106,12 +106,6 @@ La Pluma 是一个自托管的《明日方舟》自动化 Web 控制台。它把
   <em>桌面端自动化工作台</em>
 </p>
 
-<p align="center">
-  <img src="screenshots/automation-mobile-theme-split.png" alt="手机端自动化工作台，亮色与暗色主题并排展示" width="36%" />
-  <br />
-  <em>同一工作台在手机上的布局</em>
-</p>
-
 ## 快速开始
 
 ### 环境要求

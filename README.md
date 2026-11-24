@@ -107,12 +107,6 @@ The project is named after La Pluma, the five-star Guard in Arknights.
   <em>Automation workspace on desktop</em>
 </p>
 
-<p align="center">
-  <img src="screenshots/automation-mobile-theme-split.png" alt="Automation workspace on a phone with light and dark themes side by side" width="36%" />
-  <br />
-  <em>The same workspace on a phone</em>
-</p>
-
 ## Quick start
 
 ### Requirements
