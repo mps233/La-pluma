@@ -110,17 +110,96 @@ func TestMissingCLI(t *testing.T) {
 	}
 }
 
-func TestMaaFailureMessageClassifiesKnownFailures(t *testing.T) {
-	message, retryable := maaFailureMessage(1, "Error: Failed to add task with params: invalid params")
-	if retryable || !strings.Contains(message, "热更新") {
-		t.Fatalf("invalid params: message = %q, retryable = %v", message, retryable)
+func TestClassifyMAAFailureKnownFailures(t *testing.T) {
+	failure := classifyMAAFailure(1, "Error: Failed to add task with params: invalid params", "")
+	if failure.Retryable || !strings.Contains(failure.Message, "热更新") || failure.Kind != "invalid_params" {
+		t.Fatalf("invalid params: %+v", failure)
 	}
-	message, retryable = maaFailureMessage(1, "Error: Network error\nCaused by:\n    io: unexpected end of file\n")
-	if !retryable || !strings.Contains(message, "网络失败") {
-		t.Fatalf("network failure: message = %q, retryable = %v", message, retryable)
+	failure = classifyMAAFailure(1, "Error: Network error\nCaused by:\n    io: unexpected end of file\n", "")
+	if !failure.Retryable || !strings.Contains(failure.Message, "网络失败") || failure.Kind != "network" {
+		t.Fatalf("network failure: %+v", failure)
 	}
-	message, retryable = maaFailureMessage(1, "some other failure")
-	if !retryable || message != "MAA 退出码 1" {
-		t.Fatalf("other failure: message = %q, retryable = %v", message, retryable)
+	failure = classifyMAAFailure(1, "some other failure", "")
+	if !failure.Retryable || failure.Message != "MAA 退出码 1" || failure.Kind != "exit_code" {
+		t.Fatalf("other failure: %+v", failure)
+	}
+}
+
+// The real-world copilot set failure: MaaCore prints the offending operator to
+// asst.log, and the generic "invalid params" branch must not win over it.
+func TestClassifyMAAFailureCopilotOperElite(t *testing.T) {
+	logText := `[2026-11-22 17:57:24.440][ERR][Px24425][Tx22887] parse_oper_usage | Oper 狮蝎 has higher elite requirement: 2 , but elite requirement is set to 1
+[2026-11-22 17:57:24.440][ERR][Px24425][Tx22887] parse_groups | Failed to parse oper {
+    "name": "狮蝎",
+    "requirements": {
+        "elite": 1,
+        "level": 70,
+        "module": 1,
+        "skill_level": 7
+    },
+    "skill": 1,
+    "skill_usage": 0
+}
+[2026-11-22 17:57:24.440][ERR][Px24425][Tx22887] CopilotConfig parse failed
+[2026-11-22 17:57:24.441][ERR][Px24425][Tx22887] append_task | invalid params: {`
+	failure := classifyMAAFailure(1, "MaaCore returned an error, check its log", logText)
+	if failure.Retryable || failure.Kind != "copilot_oper_requirement" {
+		t.Fatalf("unexpected failure: %+v", failure)
+	}
+	for _, want := range []string{"狮蝎", "模组", "精二"} {
+		if !strings.Contains(failure.Message, want) {
+			t.Fatalf("message %q missing %q", failure.Message, want)
+		}
+	}
+	if failure.Details["oper"] != "狮蝎" || failure.Details["requiredElite"] != 2 || failure.Details["declaredElite"] != 1 {
+		t.Fatalf("unexpected details: %#v", failure.Details)
+	}
+}
+
+func TestClassifyMAAFailureCopilotConfigWithoutOperator(t *testing.T) {
+	failure := classifyMAAFailure(1, "", "[ERR] CopilotConfig parse failed\n")
+	if failure.Retryable || failure.Kind != "copilot_config_invalid" || !strings.Contains(failure.Message, "作业配置错误") {
+		t.Fatalf("unexpected failure: %+v", failure)
+	}
+}
+
+func TestParseFailedOperEntryStopsAtJSON(t *testing.T) {
+	entry, ok := parseFailedOperEntry("parse_groups | Failed to parse oper {\n  \"name\": \"怒潮凛冬\",\n  \"requirements\": {\"elite\": 1, \"module\": 1}\n}\n[ERR] next line")
+	if !ok || entry.Name != "怒潮凛冬" || entry.Requirements.Module == nil || *entry.Requirements.Module != 1 {
+		t.Fatalf("unexpected entry: %+v ok=%v", entry, ok)
+	}
+	if entry.Requirements.Elite == nil || *entry.Requirements.Elite != 1 {
+		t.Fatalf("unexpected elite: %+v", entry.Requirements)
+	}
+}
+
+func TestExecFailureUsesFailureLogTail(t *testing.T) {
+	logPath := filepath.Join(t.TempDir(), "asst.log")
+	stale := "parse_oper_usage | Oper 旧错误 has higher elite requirement: 2 , but elite requirement is set to 1\n"
+	if err := os.WriteFile(logPath, []byte(stale), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	script := `printf '%s\n' 'parse_oper_usage | Oper 狮蝎 has higher elite requirement: 2 , but elite requirement is set to 1' >> "$MAA_TEST_LOG"
+printf '%s\n' 'parse_groups | Failed to parse oper {"name":"狮蝎","requirements":{"elite":1,"module":1}}' >> "$MAA_TEST_LOG"
+echo boom >&2
+exit 1`
+	runner := New(fakeMAA(t, script), testLogger())
+	runner.SetLogPath(logPath)
+	_, err := runner.Exec(context.Background(), "copilot", nil, ExecOptions{
+		Wait: true,
+		Env:  append(os.Environ(), "MAA_TEST_LOG="+logPath),
+	})
+	if err == nil {
+		t.Fatal("expected failure")
+	}
+	appErr, ok := apperrors.As(err)
+	if !ok || appErr.Code != "MAA_COMMAND_FAILED" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(appErr.Message, "旧错误") || !strings.Contains(appErr.Message, "狮蝎") || !strings.Contains(appErr.Message, "模组") {
+		t.Fatalf("message should only describe the new failure: %q", appErr.Message)
+	}
+	if appErr.Retryable {
+		t.Fatalf("copilot config failure must not be retryable: %+v", appErr)
 	}
 }

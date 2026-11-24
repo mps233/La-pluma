@@ -189,8 +189,7 @@
 
 
 
-.data-statistics-filter-section,
-  .data-statistics-category-section {
+.data-statistics-filter-section {
     min-width: 0;
   }
 

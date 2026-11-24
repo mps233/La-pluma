@@ -151,10 +151,6 @@ type Service struct {
 	statsCache map[int]statsCacheEntry
 }
 
-func New(paths config.Paths) *Service {
-	return NewWithOptions(paths, Options{})
-}
-
 func NewWithOptions(paths config.Paths, options Options) *Service {
 	service := &Service{
 		recordsDir: filepath.Join(paths.DataDir, "drop-records"),

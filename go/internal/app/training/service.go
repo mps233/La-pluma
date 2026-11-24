@@ -61,9 +61,6 @@ type Service struct {
 }
 
 // New returns a Service with the default clock and no material fetcher.
-func New(paths config.Paths, logger *slog.Logger) *Service {
-	return NewWithOptions(Options{Paths: paths, Logger: logger})
-}
 
 // NewWithOptions returns a fully configurable Service.
 func NewWithOptions(options Options) *Service {

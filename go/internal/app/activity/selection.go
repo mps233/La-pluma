@@ -108,20 +108,6 @@ func CanRunWithOperators(missing *MissingOperatorInfo, preferences any) bool {
 
 // AverageRatingLevel averages ratingLevel over the given records (0 for an
 // empty list).
-func AverageRatingLevel(items []any) float64 {
-	if len(items) == 0 {
-		return 0
-	}
-	total := 0.0
-	for _, item := range items {
-		record := asRecord(item)
-		if record == nil {
-			continue
-		}
-		total += jsNumber(record["ratingLevel"])
-	}
-	return total / float64(len(items))
-}
 
 func averageRunPlanRating(entries []RunPlanEntry) float64 {
 	if len(entries) == 0 {

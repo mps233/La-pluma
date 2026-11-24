@@ -502,9 +502,6 @@ func randomSuffix() string {
 }
 
 // MarshalTaskConfig is exported for diagnostics/tests.
-func MarshalTaskConfig(value map[string]any) ([]byte, error) {
-	return json.MarshalIndent(value, "", "  ")
-}
 
 func asAnyArray(value any) ([]any, bool) {
 	if value == nil {

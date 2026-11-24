@@ -92,26 +92,26 @@ describe('LogViewer recovery and controls', () => {
     await waitFor(() => expect(container.querySelector('.log-console-state.is-error')).toBeNull())
     expect(container.textContent).toContain('TaskChainStart')
     const modeShell = container.querySelector('.log-mode-shell')
-    expect(modeShell?.querySelector('.lg-track[role="tablist"]')?.getAttribute('aria-label')).toBe('日志内容模式')
+    expect(modeShell?.querySelector('[role="radiogroup"]')?.getAttribute('aria-label')).toBe('日志内容模式')
     expect(container.querySelector('.log-toolbar .log-mode-shell')).toBeNull()
     const modeTabs = Array.from(
-      modeShell?.querySelectorAll<HTMLButtonElement>('.lg-track:not([data-lg-copy]) > .lg-track__item') ?? [],
+      modeShell?.querySelectorAll<HTMLButtonElement>('[role="radiogroup"] > [role="radio"]') ?? [],
     )
     expect(modeTabs).toHaveLength(2)
-    expect(modeTabs[0]?.getAttribute('aria-selected')).toBe('true')
-    expect(modeTabs.every(button => button.getAttribute('role') === 'tab')).toBe(true)
+    expect(modeTabs[0]?.getAttribute('aria-checked')).toBe('true')
+    expect(modeTabs.every(button => button.getAttribute('role') === 'radio')).toBe(true)
     expect(modeTabs.every(button => button.getAttribute('aria-controls') === 'log-console-panel')).toBe(true)
     // The segmented control selects through its native click listener; jsdom's
     // zero-size layout makes userEvent's pointer simulation suppress it.
     fireEvent.click(modeTabs[1]!)
-    await waitFor(() => expect(modeTabs[1]?.getAttribute('aria-selected')).toBe('true'))
+    await waitFor(() => expect(modeTabs[1]?.getAttribute('aria-checked')).toBe('true'))
 
-    fireEvent.keyDown(modeTabs[1]!, { key: 'Home', bubbles: true })
-    await waitFor(() => expect(modeTabs[0]?.getAttribute('aria-selected')).toBe('true'))
+    fireEvent.keyDown(modeTabs[1]!, { key: 'ArrowLeft' })
+    await waitFor(() => expect(modeTabs[0]?.getAttribute('aria-checked')).toBe('true'))
     expect(document.activeElement).toBe(modeTabs[0])
 
     const switches = Array.from(
-      container.querySelectorAll<HTMLButtonElement>('[role="switch"]:not([data-lg-copy])'),
+      container.querySelectorAll<HTMLButtonElement>('[role="switch"]'),
     )
     expect(switches.map(control => control.getAttribute('aria-label'))).toEqual(['自动滚动', '仅显示本次运行日志', '折叠重复日志'])
     expect(switches.map(control => control.getAttribute('aria-checked'))).toEqual(['true', 'false', 'true'])
@@ -158,13 +158,13 @@ describe('LogViewer recovery and controls', () => {
     await renderComponent()
 
     const modeTabs = Array.from(
-      container.querySelectorAll<HTMLButtonElement>('.log-mode-shell .lg-track:not([data-lg-copy]) > .lg-track__item'),
+      container.querySelectorAll<HTMLButtonElement>('.log-mode-shell [role="radiogroup"] > [role="radio"]'),
     )
-    await waitFor(() => expect(modeTabs[0]?.getAttribute('aria-selected')).toBe('true'))
+    await waitFor(() => expect(modeTabs[0]?.getAttribute('aria-checked')).toBe('true'))
 
     await swipe(container.querySelector<HTMLElement>('.log-viewer')!, 240, 200, 120, 204)
 
-    await waitFor(() => expect(modeTabs[1]?.getAttribute('aria-selected')).toBe('true'))
+    await waitFor(() => expect(modeTabs[1]?.getAttribute('aria-checked')).toBe('true'))
   })
 
   it('keeps existing realtime rows visible when a background refresh fails', async () => {

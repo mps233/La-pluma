@@ -3,7 +3,6 @@ package maa
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -27,6 +26,7 @@ const (
 type Runner struct {
 	mu      sync.Mutex
 	path    string
+	logPath string
 	logger  *slog.Logger
 	current *Task
 }
@@ -58,6 +58,7 @@ type Task struct {
 	stderr    *boundedBuffer
 	stdoutLog *lineWriter
 	stderrLog *lineWriter
+	logOffset int64
 	startedAt time.Time
 	done      chan struct{}
 	mu        sync.Mutex
@@ -86,6 +87,15 @@ func (r *Runner) SetPath(path string) {
 	r.mu.Unlock()
 }
 
+// SetLogPath sets MaaCore's asst.log path. It is used after a non-zero exit to
+// explain what MaaCore rejected; an empty path keeps the generic exit-code
+// message.
+func (r *Runner) SetLogPath(path string) {
+	r.mu.Lock()
+	r.logPath = strings.TrimSpace(path)
+	r.mu.Unlock()
+}
+
 func (r *Runner) Exec(ctx context.Context, command string, args []string, options ExecOptions) (*Task, error) {
 	r.mu.Lock()
 	executable := r.path
@@ -105,6 +115,7 @@ func (r *Runner) Exec(ctx context.Context, command string, args []string, option
 	stderr := &boundedBuffer{limit: maxStderrBytes}
 	stdoutLog := &lineWriter{stream: "stdout", onLine: options.OnLine}
 	stderrLog := &lineWriter{stream: "stderr", onLine: options.OnLine}
+	logOffset := r.failureLogOffset()
 
 	env := options.Env
 	if env == nil {
@@ -128,6 +139,7 @@ func (r *Runner) Exec(ctx context.Context, command string, args []string, option
 		stderr:    stderr,
 		stdoutLog: stdoutLog,
 		stderrLog: stderrLog,
+		logOffset: logOffset,
 		startedAt: time.Now(),
 		done:      make(chan struct{}),
 		result:    Result{Started: true},
@@ -150,8 +162,18 @@ func (r *Runner) Exec(ctx context.Context, command string, args []string, option
 		if waitErr != nil && exitCode < 0 {
 			task.result.Err = apperrors.WithStatus("MAA_PROCESS_EXITED", "MAA 进程异常退出", 503, true, map[string]any{"error": waitErr.Error()})
 		} else if exitCode != 0 && !task.stopped {
-			message, retryable := maaFailureMessage(exitCode, stderr.String())
-			task.result.Err = apperrors.WithStatus("MAA_COMMAND_FAILED", message, 500, retryable, map[string]any{"exitCode": exitCode, "stdout": stdout.String(), "stderr": stderr.String()})
+			failure := classifyMAAFailure(exitCode, stderr.String(), r.readFailureLog(task.logOffset))
+			details := map[string]any{"exitCode": exitCode, "stdout": stdout.String(), "stderr": stderr.String()}
+			if failure.Kind != "" {
+				details["failureKind"] = failure.Kind
+			}
+			for key, value := range failure.Details {
+				details[key] = value
+			}
+			if path := r.failureLogPath(); path != "" {
+				details["logPath"] = path
+			}
+			task.result.Err = apperrors.WithStatus("MAA_COMMAND_FAILED", failure.Message, 500, failure.Retryable, details)
 		}
 		task.mu.Unlock()
 		close(task.done)
@@ -325,20 +347,4 @@ func (w *lineWriter) emit(line string) {
 		return
 	}
 	w.onLine(w.stream, line)
-}
-
-// maaFailureMessage turns the CLI exit into a user-facing message. MaaCore
-// rejects a Copilot task whose stages are missing from the resource with
-// "invalid params"; retrying the same command cannot help until the resource
-// is refreshed. A network failure during the automatic resource update is
-// transient and retryable.
-func maaFailureMessage(exitCode int, stderr string) (string, bool) {
-	text := strings.ToLower(stderr)
-	if strings.Contains(text, "invalid params") {
-		return "MAA 拒绝了任务参数，请先热更新 MAA 资源或检查作业配置", false
-	}
-	if strings.Contains(text, "network error") || strings.Contains(text, "unexpected end of file") {
-		return "MAA 检查资源更新时网络失败，请稍后重试", true
-	}
-	return fmt.Sprintf("MAA 退出码 %d", exitCode), true
 }

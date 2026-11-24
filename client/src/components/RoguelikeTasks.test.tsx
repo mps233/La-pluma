@@ -139,7 +139,7 @@ describe('RoguelikeTasks execution recovery', () => {
     expect(page?.querySelector('.app-page-header-icon')).toBeNull()
 
     const modeShell = page?.querySelector('.roguelike-mode-shell')
-    expect(modeShell?.querySelector('.lg-track[role="tablist"]')?.getAttribute('aria-label')).toBe('肉鸽模式')
+    expect(modeShell?.querySelector('[role="radiogroup"]')?.getAttribute('aria-label')).toBe('肉鸽模式')
 
     const panels = page?.querySelectorAll('.roguelike-theme-panel, .roguelike-settings-panel, .roguelike-monitor-panel')
     expect(panels).toHaveLength(5)
@@ -152,8 +152,8 @@ describe('RoguelikeTasks execution recovery', () => {
     expect(monitor?.closest('.roguelike-monitor-surface')).not.toBeNull()
     expect(monitor?.closest('.roguelike-monitor-panel')).not.toBeNull()
 
-    expect(modeShell?.querySelector('.lg-track[role="tablist"]')).not.toBeNull()
-    const selectedModes = page?.querySelectorAll('.roguelike-mode-shell > .lg-track > .lg-track__item[aria-selected="true"]')
+    expect(modeShell?.querySelector('[role="radiogroup"]')).not.toBeNull()
+    const selectedModes = page?.querySelectorAll('.roguelike-mode-shell [role="radio"][aria-checked="true"]')
     expect(selectedModes).toHaveLength(1)
 
     const toggleTextLabel = page?.querySelector<HTMLLabelElement>('.roguelike-toggle-label')
@@ -166,17 +166,18 @@ describe('RoguelikeTasks execution recovery', () => {
     })
 
     const modeButtons = Array.from(
-      page?.querySelectorAll<HTMLButtonElement>('.roguelike-mode-shell > .lg-track > .lg-track__item') ?? [],
+      page?.querySelectorAll<HTMLButtonElement>('.roguelike-mode-shell [role="radio"]') ?? [],
     )
     expect(modeButtons.map(button => button.tabIndex)).toEqual([0, -1])
     modeButtons[0]?.focus()
-    fireEvent.keyDown(modeButtons[0]!, { key: 'End' })
-    expect(modeButtons[1]?.getAttribute('aria-selected')).toBe('true')
+    fireEvent.keyDown(modeButtons[0]!, { key: 'ArrowRight' })
+    expect(modeButtons[1]?.getAttribute('aria-checked')).toBe('true')
     expect(document.activeElement).toBe(modeButtons[1])
 
-    const arrowDownNotPrevented = fireEvent.keyDown(modeButtons[1]!, { key: 'ArrowDown' })
-    expect(arrowDownNotPrevented).toBe(true)
-    expect(modeButtons[1]?.getAttribute('aria-selected')).toBe('true')
+    const arrowDownEvent = fireEvent.keyDown(modeButtons[1]!, { key: 'ArrowDown' })
+    // All arrow keys move the control; on the last option Down wraps to the first.
+    expect(arrowDownEvent).toBe(false)
+    expect(modeButtons[0]?.getAttribute('aria-checked')).toBe('true')
   })
 
   it('keeps mode selection and its configuration panel in sync', async () => {
@@ -184,15 +185,15 @@ describe('RoguelikeTasks execution recovery', () => {
     await flush()
 
     const reclamationMode = Array.from(
-      container.querySelectorAll<HTMLButtonElement>('.roguelike-mode-shell > .lg-track > .lg-track__item'),
+      container.querySelectorAll<HTMLButtonElement>('.roguelike-mode-shell [role="radio"]'),
     ).find(button => button.textContent?.includes('生息演算'))
     expect(reclamationMode).toBeDefined()
-    // The Liquid Glass tablist commits on click (detail 0) and suppresses the
-    // click that follows its own pointer gesture, so dispatch the click alone.
+    // The Liquid Glass radiogroup commits on click and keeps its own pointer
+    // gesture, so dispatch the click alone.
     fireEvent.click(reclamationMode!)
 
-    expect(reclamationMode?.getAttribute('aria-selected')).toBe('true')
-    expect(container.querySelectorAll('.roguelike-mode-shell > .lg-track > .lg-track__item[aria-selected="true"]')).toHaveLength(1)
+    expect(reclamationMode?.getAttribute('aria-checked')).toBe('true')
+    expect(container.querySelectorAll('.roguelike-mode-shell [role="radio"][aria-checked="true"]')).toHaveLength(1)
     expect(container.querySelector('input[name="maa-reclamation-theme"]')).not.toBeNull()
     expect(Array.from(container.querySelectorAll('.roguelike-theme-option'))
       .some(option => option.textContent?.includes('沙洲遗闻'))).toBe(true)
@@ -204,14 +205,14 @@ describe('RoguelikeTasks execution recovery', () => {
     await flush()
 
     const modeButtons = Array.from(
-      container.querySelectorAll<HTMLButtonElement>('.roguelike-mode-shell > .lg-track > .lg-track__item'),
+      container.querySelectorAll<HTMLButtonElement>('.roguelike-mode-shell [role="radio"]'),
     )
-    expect(modeButtons[0]?.getAttribute('aria-selected')).toBe('true')
+    expect(modeButtons[0]?.getAttribute('aria-checked')).toBe('true')
 
     await swipe(container.querySelector<HTMLElement>('.roguelike-page')!, 240, 200, 120, 204)
     await flush()
 
-    expect(modeButtons[1]?.getAttribute('aria-selected')).toBe('true')
+    expect(modeButtons[1]?.getAttribute('aria-checked')).toBe('true')
     expect(container.querySelector('.swipe-mode-slide:not([aria-hidden="true"]) input[name="maa-reclamation-theme"]')).not.toBeNull()
   })
 
@@ -347,6 +348,10 @@ describe('RoguelikeTasks execution recovery', () => {
     await flush()
 
     const controls = Array.from(container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input, select'))
+      // Segmented controls and switches render hidden form mirrors; they are
+      // not page form controls and carry no app label.
+      .filter(control => control.getAttribute('aria-hidden') !== 'true')
+      .filter(control => !control.closest('[role="radiogroup"], [role="switch"]'))
     expect(controls.length).toBeGreaterThan(0)
     controls.forEach(control => {
       expect(control.id).not.toBe('')
@@ -592,7 +597,7 @@ describe('RoguelikeTasks execution recovery', () => {
     await flush()
 
     const reclamationMode = Array.from(
-      container.querySelectorAll<HTMLButtonElement>('.roguelike-mode-shell > .lg-track > .lg-track__item'),
+      container.querySelectorAll<HTMLButtonElement>('.roguelike-mode-shell [role="radio"]'),
     ).find(button => button.textContent?.includes('生息演算'))
     fireEvent.click(reclamationMode!)
     await user().click(buttonByText('立即执行')!)

@@ -1,7 +1,6 @@
 package gamedata
 
 import (
-	"context"
 	"strings"
 	"time"
 )
@@ -181,13 +180,6 @@ func BuildOperatorMaterialsFile(characterData any, itemTable any, now time.Time)
 
 // FetchOperatorMaterials fetches character_table.json and item_table.json and
 // builds operator-materials.json.
-func (c *Client) FetchOperatorMaterials(ctx context.Context, now time.Time) (OperatorMaterialsFile, error) {
-	tables, err := c.fetchTables(ctx, "character_table.json", "item_table.json")
-	if err != nil {
-		return OperatorMaterialsFile{}, err
-	}
-	return BuildOperatorMaterialsFile(tables["character_table.json"], tables["item_table.json"], now), nil
-}
 
 func operatorRarity(value any) int {
 	switch typed := value.(type) {

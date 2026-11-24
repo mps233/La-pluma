@@ -75,7 +75,6 @@ func NewClient(options ClientOptions) *Client {
 }
 
 // BaseURL returns the resolved gamedata root, without a trailing slash.
-func (c *Client) BaseURL() string { return c.baseURL }
 
 // Now returns the injected clock (UTC conversion happens at the call site).
 func (c *Client) Now() time.Time { return c.now() }

@@ -3,7 +3,7 @@ import '../styles/pages/training.css'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, useReducedMotion } from 'framer-motion'
-import { GlassSegmented } from '@zakisheriff/liquid-glass'
+import { GlassSegmented } from '@/components/glass'
 import {
   AlertCircle,
   Check,
@@ -453,10 +453,10 @@ export default function OperatorTraining() {
     setVisibleOperatorLimit(OPERATOR_RENDER_BATCH_SIZE);
   }, [filters.status, filters.rarity, filters.needsElite2, searchTerm]);
 
-  // GlassSegmented 会用自己的 aria-label 覆盖按钮内容，数量需要手动补进可访问名称。
+  // 分段控件的选项只暴露可见文字，数量需要手动补进可访问名称。
   useEffect(() => {
     const items = trainingStatusShellRef.current?.querySelectorAll<HTMLButtonElement>(
-      '.lg-track:not([data-lg-copy]) > .lg-track__item',
+      '[role="radio"]',
     )
     items?.forEach((item, index) => {
       const option = TRAINING_STATUS_OPTIONS[index]

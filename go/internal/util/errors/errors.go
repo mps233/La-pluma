@@ -43,10 +43,6 @@ func NotFound(code, message string, details map[string]any) *Error {
 	return WithStatus(code, message, http.StatusNotFound, false, details)
 }
 
-func Conflict(code, message string, details map[string]any) *Error {
-	return WithStatus(code, message, http.StatusConflict, true, details)
-}
-
 func As(err error) (*Error, bool) {
 	var target *Error
 	if stderrors.As(err, &target) {

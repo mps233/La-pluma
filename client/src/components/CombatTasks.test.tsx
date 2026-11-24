@@ -231,32 +231,34 @@ describe('CombatTasks execution recovery', () => {
     expect(page?.querySelector('.app-page-header')?.classList.contains('is-mobile-inline')).toBe(true)
 
     const modeShell = page?.querySelector('.combat-mode-shell')
-    const modeTrack = modeShell?.querySelector('.lg-track[role="tablist"]')
+    const modeTrack = modeShell?.querySelector('[role="radiogroup"]')
     expect(modeTrack?.getAttribute('aria-label')).toBe('作业类型')
-    const modeButtons = modeTrack?.querySelectorAll(':scope > .lg-track__item') ?? []
+    const modeButtons = modeTrack?.querySelectorAll(':scope > [role="radio"]') ?? []
     expect(modeButtons).toHaveLength(3)
     expect(Array.from(modeButtons).map(button => button.textContent)).toEqual([
       expect.stringContaining('普通作业'),
       expect.stringContaining('保全派驻'),
       expect.stringContaining('悖论模拟'),
     ])
-    expect(modeTrack?.querySelectorAll(':scope > .lg-track__item[aria-selected="true"]')).toHaveLength(1)
+    expect(modeTrack?.querySelectorAll(':scope > [role="radio"][aria-checked="true"]')).toHaveLength(1)
     expect(Array.from(modeButtons).map(button => button.getAttribute('tabindex'))).toEqual(['0', '-1', '-1'])
 
     const firstModeButton = modeButtons[0] as HTMLButtonElement
     const secondModeButton = modeButtons[1] as HTMLButtonElement
     firstModeButton.focus()
     keyDown(firstModeButton, 'ArrowRight')
-    expect(secondModeButton.getAttribute('aria-selected')).toBe('true')
+    expect(secondModeButton.getAttribute('aria-checked')).toBe('true')
     expect(document.activeElement).toBe(secondModeButton)
 
-    keyDown(secondModeButton, 'Home')
-    expect(firstModeButton.getAttribute('aria-selected')).toBe('true')
+    keyDown(secondModeButton, 'ArrowLeft')
+    expect(firstModeButton.getAttribute('aria-checked')).toBe('true')
     expect(document.activeElement).toBe(firstModeButton)
 
     const arrowDownEvent = keyDown(firstModeButton, 'ArrowDown')
-    expect(arrowDownEvent.defaultPrevented).toBe(false)
-    expect(firstModeButton.getAttribute('aria-selected')).toBe('true')
+    // All arrow keys move the horizontal control; from the first option Down
+    // advances to the next one.
+    expect(arrowDownEvent.defaultPrevented).toBe(true)
+    expect(secondModeButton.getAttribute('aria-checked')).toBe('true')
 
     const copilotCard = page?.querySelector('.combat-task-card')
     expect(copilotCard?.getAttribute('data-smooth-corners')).toBe('true')
@@ -265,7 +267,7 @@ describe('CombatTasks execution recovery', () => {
     expect(Array.from(copilotCard?.querySelectorAll('summary') ?? [])
       .some(summary => summary.textContent?.trim() === '说明')).toBe(false)
 
-    const sssModeButton = Array.from(container.querySelectorAll<HTMLButtonElement>('.lg-track > .lg-track__item'))
+    const sssModeButton = Array.from(container.querySelectorAll<HTMLButtonElement>('.combat-mode-shell [role="radio"]'))
       .find(button => button.textContent?.includes('保全派驻'))
     expect(sssModeButton).toBeDefined()
     click(sssModeButton!)
@@ -408,7 +410,7 @@ describe('CombatTasks execution recovery', () => {
     expect(stageSearchButton?.disabled).toBe(false)
     expect(stageSearchButton?.textContent).toContain('搜索')
 
-    const paradoxModeButton = Array.from(container.querySelectorAll<HTMLButtonElement>('.lg-track > .lg-track__item'))
+    const paradoxModeButton = Array.from(container.querySelectorAll<HTMLButtonElement>('.combat-mode-shell [role="radio"]'))
       .find(button => button.textContent?.includes('悖论模拟'))
     click(paradoxModeButton!)
     const paradoxInput = container.querySelector<HTMLInputElement>('input[name="maa-paradox-operator"]')!
@@ -681,6 +683,9 @@ describe('CombatTasks execution recovery', () => {
     await renderComponent()
 
     const controls = Array.from(container.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('input, select, textarea'))
+      // The segmented control renders its own hidden radio inputs; they are
+      // not page form controls and carry no app label.
+      .filter(control => !control.closest('[role="radiogroup"]'))
     expect(controls.length).toBeGreaterThan(0)
     controls.forEach(control => {
       expect(control.id).not.toBe('')

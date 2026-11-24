@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Check, Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
-import { GlassButton, GlassCard } from '@zakisheriff/liquid-glass'
+import { GlassButtonGroup, GlassButtonGroupItem, GlassCard, GlassLiveCardButton } from '@/components/glass'
 import { useUIStore } from '@/stores'
 
 type ThemeMode = 'light' | 'dark' | 'system'
@@ -110,20 +110,19 @@ export default function ThemeToggle() {
 
   return (
     <>
-      <GlassCard
-        className="la-pluma-theme-desktop"
+      <GlassButtonGroup
+        className="la-pluma-theme-desktop bg-[var(--app-surface-muted)] text-[var(--app-text)]"
         data-pill
-        role="group"
         aria-label="界面主题"
         data-theme={theme}
-        padding="0.25rem"
-        radius="999px"
+        material="tinted"
+        size="md"
       >
         {themeOptions.map(option => {
           const ThemeIcon = option.icon
           const selected = theme === option.value
           return (
-            <button
+            <GlassButtonGroupItem
               key={option.value}
               type="button"
               onClick={() => handleThemeChange(option.value)}
@@ -133,19 +132,17 @@ export default function ThemeToggle() {
               aria-pressed={selected}
             >
               <ThemeIcon strokeWidth={1.8} aria-hidden="true" />
-            </button>
+            </GlassButtonGroupItem>
           )
         })}
-      </GlassCard>
+      </GlassButtonGroup>
 
       <div className="la-pluma-theme-mobile relative flex-none">
-        <GlassButton
+        <GlassLiveCardButton
           ref={mobileTriggerRef}
           type="button"
           onClick={() => setMobileMenuOpen(open => !open)}
           icon={<CurrentThemeIcon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />}
-          variant="glass"
-          size="md"
           className={`la-pluma-theme-trigger${mobileMenuOpen ? ' text-primary' : ''}`}
           title={`主题：${currentTheme.label}`}
           aria-label={`切换界面主题，当前${currentTheme.label}`}

@@ -1,8 +1,8 @@
 import { useId } from 'react'
 import { Camera, EyeOff, Radio } from 'lucide-react'
-import { GlassSegmented } from '@zakisheriff/liquid-glass'
-import { usePreviewStore, useUIStore, type PreviewMode } from '../stores'
+import { usePreviewStore, type PreviewMode } from '../stores'
 import { Switch } from './common'
+import GlassTabs from '@/components/liquid-glass/glass-tabs'
 
 const PREVIEW_MODES: ReadonlyArray<{
   value: PreviewMode
@@ -18,37 +18,24 @@ const PREVIEW_MODES: ReadonlyArray<{
  * 预览模式开关，使用 Liquid Glass 分段控件；模式只在当前会话内保留。
  * 自动恢复是单独的显式偏好。
  */
-export function PreviewModeControls() {
-  const theme = useUIStore(state => state.theme)
+function PreviewModeControls() {
   const mode = usePreviewStore(state => state.mode)
   const setMode = usePreviewStore(state => state.setMode)
-  const activeIndex = Math.max(0, PREVIEW_MODES.findIndex(option => option.value === mode))
-  const options = PREVIEW_MODES.map(({ label, Icon }) => ({
+  const options = PREVIEW_MODES.map(({ value, label, Icon }) => ({
+    value,
     label,
-    icon: (
-      <Icon
-        className="h-3.5 w-3.5"
-        strokeWidth={1.8}
-        aria-hidden="true"
-      />
-    ),
+    icon: <Icon strokeWidth={1.8} aria-hidden="true" />,
   }))
 
   return (
-    <div
-      className="preview-mode-shell"
-      data-theme={theme === 'system' ? undefined : theme}
-    >
-      <GlassSegmented
-        size="sm"
-        options={options}
-        value={activeIndex}
-        onChange={(index) => {
-          const nextMode = PREVIEW_MODES[index]?.value
-          if (nextMode) setMode(nextMode)
-        }}
+    <div className="preview-mode-shell">
+      <GlassTabs
         aria-label="预览模式"
-        className="preview-mode-segmented"
+        size="sm"
+        value={mode}
+        onValueChange={setMode}
+        options={options}
+        className="preview-mode-glass-tabs w-full"
       />
     </div>
   )

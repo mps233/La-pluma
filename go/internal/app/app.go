@@ -103,6 +103,9 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		maaPath = "maa"
 	}
 	runner := maa.New(maaPath, logger)
+	if cfg.Paths.MaaStateDir != "" {
+		runner.SetLogPath(filepath.Join(cfg.Paths.MaaStateDir, "debug", "asst.log"))
+	}
 	maaActions := maaapp.NewService(cfg, logger, runner, executionManager, runs)
 	logService := logs.New(5000)
 	configStore := configapp.NewStorage(cfg.Paths)

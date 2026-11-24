@@ -1,12 +1,12 @@
-import { lazy, Suspense, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, Search, Settings2, Swords, Wrench } from 'lucide-react'
-import { GlassButton, GlassCard, GlassInput, GlassMenu, GlassNav } from '@zakisheriff/liquid-glass'
+import { GlassButton, GlassCard, GlassInput, GlassLiveCardButton, GlassMenu, GlassNav } from '@/components/glass'
 import ThemeToggle from './ThemeToggle'
 import RunIsland from './RunIsland'
 import SanityBatteryIsland from './SanityBatteryIsland'
 import MaaUpdateIsland from './MaaUpdateIsland'
 import MasteryIsland from './MasteryIsland'
-import AeroBackdrop from './backgrounds/AeroBackdrop'
+import AsciiFieldBackdrop from './backgrounds/AsciiFieldBackdrop'
 import { Island } from '@/lib/island'
 import { IslandContext } from '@/lib/island/context'
 import { useUIStore } from '@/stores'
@@ -19,7 +19,6 @@ import {
 } from '@/services/operatorQuotes'
 
 
-const CommandPalette = lazy(() => import('./CommandPalette'))
 
 interface LayoutProps {
   children: (props: { activeTab: string }) => ReactNode
@@ -135,8 +134,6 @@ export default function Layout({ children }: LayoutProps) {
   const activeTab: AppTab = isAppTab(storedActiveTab) ? storedActiveTab : 'dashboard'
   const [sidebarQuery, setSidebarQuery] = useState('')
   const [sidebarIdentity, setSidebarIdentity] = useState(DEFAULT_OPERATOR_QUOTE)
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
-  const [commandPaletteMounted, setCommandPaletteMounted] = useState(false)
   const pageRef = useRef<HTMLDivElement>(null)
   const scrollPositions = useRef(new Map<AppTab, number>())
   const previousTab = useRef<AppTab>(activeTab)
@@ -285,42 +282,10 @@ export default function Layout({ children }: LayoutProps) {
     }
   }
 
-  const prefetchCommandPalette = () => {
-    void import('./CommandPalette')
-  }
-
-  const openCommandPalette = () => {
-    void import('./CommandPalette')
-    setCommandPaletteMounted(true)
-    setCommandPaletteOpen(true)
-  }
-
-  useEffect(() => {
-    const handleCommandPaletteKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 'k') {
-        event.preventDefault()
-        void import('./CommandPalette')
-        setCommandPaletteMounted(true)
-        setCommandPaletteOpen(open => !open)
-      }
-    }
-    window.addEventListener('keydown', handleCommandPaletteKey)
-    return () => window.removeEventListener('keydown', handleCommandPaletteKey)
-  }, [])
-
-  const commandList = tabs.map((tab, index) => ({
-    id: index,
-    color: 'var(--app-accent)',
-    name: tab.name,
-    command: () => {
-      setCommandPaletteOpen(false)
-      navigateToTab(tab.id)
-    },
-  }))
-
   const activePrimaryMobileIndex = mobileTabs.findIndex(tab => tab.id === activeTab)
   const isOverflowActive = overflowTabs.some(tab => tab.id === activeTab)
   const mobileNavItems = mobileTabs.map(tab => ({
+    id: tab.id,
     label: tab.name,
     icon: <TabIcon tab={tab} size="h-6 w-6" />,
   }))
@@ -331,11 +296,6 @@ export default function Layout({ children }: LayoutProps) {
       checked: tab.id === activeTab,
       onSelect: () => navigateToTab(tab.id),
     })),
-    {
-      label: '快速跳转',
-      icon: <Search className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" />,
-      onSelect: () => setCommandPaletteOpen(true),
-    },
   ]
   const handleMobileNavChange = (index: number) => {
     const tab = mobileTabs[index]
@@ -360,26 +320,26 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className="view view-main la-pluma-view">
       <div ref={pageRef} className="page no-swipeback la-pluma-page" data-name="la-pluma">
-        <AeroBackdrop />
+        <AsciiFieldBackdrop />
         <div className="la-pluma-sidebar-frame" aria-hidden="true">
-          <GlassCard className="la-pluma-sidebar-surface" padding="0" radius="1.625rem" />
+          {/* Static colour for the clear GlassCard to frost; the animated ASCII field is left to the page. */}
+          <div className="la-pluma-sidebar-aurora" />
+          <GlassCard variant="clear" className="la-pluma-sidebar-surface h-full w-full rounded-[1.625rem]" />
         </div>
         <header className="navbar la-pluma-navbar">
           <div className="navbar-bg" aria-hidden="true" />
           <div className="navbar-inner">
             <div className="left">
               <div className="la-pluma-navbar-left">
-                <GlassButton
+                <GlassLiveCardButton
                   type="button"
                   className="link la-pluma-brand"
                   icon={<img src={`${import.meta.env.BASE_URL}logo-graphite.svg?v=1`} alt="" className="la-pluma-brand-mark" />}
-                  variant="clear"
-                  size="md"
                   aria-label="La Pluma 控制台"
                   onClick={() => navigateToTab('dashboard')}
                 >
                   <span>La Pluma</span>
-                </GlassButton>
+                </GlassLiveCardButton>
               </div>
             </div>
             <div className="title">
@@ -388,14 +348,12 @@ export default function Layout({ children }: LayoutProps) {
             <div className="right">
               <div className="la-pluma-navbar-actions">
                 <ThemeToggle />
-                <GlassButton
+                <GlassLiveCardButton
                   href="https://github.com/mps233/La-pluma"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="link la-pluma-github-link"
+                  className="link la-pluma-github-link h-11 w-11"
                   icon={<GitHubMark />}
-                  variant="glass"
-                  size="md"
                   aria-label="打开 GitHub 仓库"
                 />
               </div>
@@ -417,6 +375,7 @@ export default function Layout({ children }: LayoutProps) {
             <search className="la-pluma-sidebar-search" role="search">
               <GlassInput
                 type="search"
+                icon={<Search aria-hidden="true" />}
                 value={sidebarQuery}
                 onChange={(event) => setSidebarQuery(event.target.value)}
                 onKeyDown={(event) => {
@@ -434,22 +393,6 @@ export default function Layout({ children }: LayoutProps) {
                 spellCheck={false}
               />
             </search>
-
-            <button
-              type="button"
-              className="la-pluma-command-trigger"
-              onClick={openCommandPalette}
-              onPointerEnter={prefetchCommandPalette}
-              onFocus={prefetchCommandPalette}
-              aria-label="打开命令面板"
-              aria-keyshortcuts="Meta+K Control+K"
-            >
-              <span className="la-pluma-command-trigger-label">
-                <Search className="h-4 w-4" strokeWidth={1.9} aria-hidden="true" />
-                快速跳转
-              </span>
-              <kbd className="la-pluma-command-trigger-key" aria-hidden="true">⌘K</kbd>
-            </button>
 
             <div
               className="la-pluma-sidebar-identity"
@@ -526,15 +469,6 @@ export default function Layout({ children }: LayoutProps) {
           </div>
         </footer>
 
-        {commandPaletteMounted && (
-          <Suspense fallback={null}>
-            <CommandPalette
-              open={commandPaletteOpen}
-              commands={commandList}
-              onClose={() => setCommandPaletteOpen(false)}
-            />
-          </Suspense>
-        )}
       </div>
     </div>
   )

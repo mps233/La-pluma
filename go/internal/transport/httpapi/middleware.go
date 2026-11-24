@@ -41,10 +41,6 @@ func RequestID() Middleware {
 }
 
 // RequestIDFrom returns the id installed by RequestID.
-func RequestIDFrom(ctx context.Context) string {
-	id, _ := ctx.Value(requestIDKey{}).(string)
-	return id
-}
 
 // Recover turns panics into a 500 envelope and a structured log entry.
 func Recover(logger *slog.Logger) Middleware {
@@ -148,9 +144,6 @@ func requiresAuth(path string) bool {
 }
 
 // Auth enforces the optional bearer / X-La-Pluma-Token contract.
-func Auth(token string) Middleware {
-	return AuthSource(func() string { return token })
-}
 
 // AuthSource is Auth with a token read per request, so the desktop app can
 // change its access token without restarting the loopback server. A source

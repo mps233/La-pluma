@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import '../styles/pages/logs.css'
-import { GlassSegmented } from '@zakisheriff/liquid-glass'
+import { GlassSegmented } from '@/components/glass'
 import {
   AlertCircle,
   ArrowDown,
@@ -830,7 +830,7 @@ export default function LogViewer() {
 
   useEffect(() => {
     const buttons = logModeRef.current?.querySelectorAll<HTMLButtonElement>(
-      '.lg-track:not([data-lg-copy]) > [data-lg-item]',
+      '[role="radiogroup"] > [role="radio"]',
     )
     buttons?.forEach(button => button.setAttribute('aria-controls', 'log-console-panel'))
   }, [])

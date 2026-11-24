@@ -1,5 +1,5 @@
 import { useId, type InputHTMLAttributes, type SelectHTMLAttributes, type ReactNode, type ChangeEvent } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { SelectField, CheckboxField } from '@/components/glass'
 
 /**
  * 输入框组件 Props
@@ -135,6 +135,7 @@ export function Select({
   'aria-describedby': ariaDescribedBy,
   'aria-errormessage': ariaErrorMessage,
   'aria-invalid': ariaInvalid,
+  'aria-label': ariaLabel,
   ...props
 }: SelectProps) {
   const generatedId = useId()
@@ -144,9 +145,6 @@ export function Select({
   const describedBy = [ariaDescribedBy, error ? errorId : hint ? hintId : undefined]
     .filter(Boolean)
     .join(' ') || undefined
-  const baseStyles = 'input app-input app-native-control control-surface'
-  const errorStyles = 'form-error-surface'
-  
   return (
     <div className={className}>
       {label && (
@@ -154,39 +152,26 @@ export function Select({
           {label}
         </label>
       )}
-      
-      <div className="app-select-shell relative">
-        <select
-          id={selectId}
-          value={value}
-          onChange={(e: ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)}
-          disabled={disabled}
-          aria-invalid={error ? true : ariaInvalid}
-          aria-describedby={describedBy}
-          aria-errormessage={error ? (ariaErrorMessage ?? errorId) : ariaErrorMessage}
-          className={`${baseStyles} app-select-control ${error ? errorStyles : ''}`}
-          {...props}
-        >
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <span
-          className={`app-select-trailing-icon ${disabled ? 'is-disabled' : ''}`}
-          aria-hidden="true"
-        >
-          <ChevronDown className="h-4 w-4" strokeWidth={1.9} />
-        </span>
-      </div>
-      
+
+      <SelectField
+        id={selectId}
+        name={props.name}
+        label={label ?? ariaLabel}
+        value={value}
+        onChange={onChange}
+        options={options}
+        disabled={disabled}
+        describedBy={describedBy}
+        invalid={!!error || !!ariaInvalid}
+        errorMessage={error ? (ariaErrorMessage ?? errorId) : ariaErrorMessage}
+      />
+
       {error && (
         <p id={errorId} className="form-error-text mt-2 text-xs" role="alert">
           {error}
         </p>
       )}
-      
+
       {hint && !error && (
         <p id={hintId} className="mt-2 text-xs text-tertiary">
           {hint}
@@ -205,17 +190,18 @@ export function Checkbox({
   onChange,
   disabled = false,
   className = '',
-  ...props
+  id,
+  name,
 }: CheckboxProps) {
   return (
-    <label className={`app-checkbox group ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
-      <input
-        type="checkbox"
+    <label className={`app-checkbox group ${disabled ? 'cursor-not-allowed opacity-50' : ''} ${className}`}>
+      <CheckboxField
+        id={id}
+        name={name}
         checked={checked}
-        onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.checked)}
+        onChange={onChange}
         disabled={disabled}
-        className="custom-checkbox cursor-pointer"
-        {...props}
+        label={label}
       />
       {label && (
         <span className="text-sm text-secondary transition-colors group-hover:text-[var(--app-accent)]">

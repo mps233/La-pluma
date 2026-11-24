@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mps233/la-pluma/go/internal/app/activity"
+	"github.com/mps233/la-pluma/go/internal/app/scheduler"
 	"github.com/mps233/la-pluma/go/internal/config"
 )
 
@@ -45,5 +47,19 @@ func TestReplaceActivityCodeUsesCurrentActivityPrefix(t *testing.T) {
 	}
 	if got := replaceActivityCode(service, "1-7", "Official"); got != "1-7" {
 		t.Fatalf("plain stage = %q", got)
+	}
+}
+
+func TestAdbDeviceProbeImplementsSchedulerProbe(t *testing.T) {
+	var _ scheduler.DeviceProbe = adbDeviceProbe{}
+}
+
+func TestTaskCompletionNotifierToleratesMissingService(t *testing.T) {
+	notifier := taskCompletionNotifier{}
+	if err := notifier.Notify(context.Background(), "schedule-1", nil); err != nil {
+		t.Fatalf("nil summary = %v", err)
+	}
+	if err := notifier.Notify(context.Background(), "schedule-1", &scheduler.ExecutionSummary{SuccessCount: 1}); err != nil {
+		t.Fatalf("nil service = %v", err)
 	}
 }

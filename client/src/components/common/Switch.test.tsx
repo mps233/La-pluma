@@ -33,8 +33,10 @@ describe('Switch', () => {
     expect(externalLabel.control).toBe(control)
     expect(wrapper?.classList.contains('app-switch-compact')).toBe(true)
     expect(wrapper?.classList.contains('toggle')).toBe(false)
-    expect(wrapper?.querySelectorAll('.app-switch-control:not([data-lg-copy]) > .lg-switch__track')).toHaveLength(1)
-    expect(wrapper?.querySelectorAll('.app-switch-control:not([data-lg-copy]) > .lg-switch__thumb')).toHaveLength(1)
+    const visual = wrapper?.querySelector<HTMLElement>('.app-switch-control')
+    expect(visual?.classList.contains('lg-switch')).toBe(true)
+    expect(visual?.querySelector('[role="switch"]')).not.toBeNull()
+    expect(visual?.querySelector('canvas[aria-hidden="true"]')).not.toBeNull()
     expect(wrapper?.querySelector('.toggle-icon')).toBeNull()
 
     await user.click(externalLabel)

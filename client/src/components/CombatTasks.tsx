@@ -2,10 +2,11 @@ import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
 import '../styles/pages/combat.css'
 import { maaApi, searchCopilot, searchParadoxCopilot, type ManualCopilotSetResult, type ScheduleExecutionResultData } from '../services/api'
 import { motion } from 'framer-motion'
-import { GlassSegmented } from '@zakisheriff/liquid-glass'
+import { GlassSegmented } from '@/components/glass'
 import { ChevronRight, FileText, Info, Play, Puzzle, Search, ShieldCheck, Square } from 'lucide-react'
 import Icons from './Icons'
-import { PageHeader, Button, Card, ConfirmDialog, EmptyState, SmoothPanel, StatusMark, TruncatedText, SwipeModePager } from './common'
+import { PageHeader, Button, Card, ConfirmDialog, EmptyState, SmoothPanel, StatusMark, TruncatedText, SwipeModePager, Select } from './common'
+import { CheckboxField } from '@/components/glass'
 import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import { useRunStore } from '../store/runStore'
@@ -1837,29 +1838,24 @@ export default function CombatTasks() {
           <div key={option.key} className="min-w-0">
             {option.type === 'checkbox' ? (
               <label htmlFor={controlId} className="group flex min-h-11 w-full min-w-0 cursor-pointer items-center gap-2 py-2 text-sm text-secondary">
-                <input
+                <CheckboxField
                   id={controlId}
-                  type="checkbox"
                   checked={advanced[option.key] as boolean || false}
-                  onChange={(e) => handleAdvancedChange(task.id, option.key, e.target.checked)}
-                  className="custom-checkbox h-4 w-4 cursor-pointer"
+                  onChange={(checked) => handleAdvancedChange(task.id, option.key, checked)}
                 />
                 <span className="min-w-0 truncate transition-colors group-hover:text-[var(--app-accent)]">{option.label}</span>
               </label>
             ) : option.type === 'select' && option.options ? (
               <div className="grid min-w-0 gap-1.5 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center">
                 <label htmlFor={controlId} className="text-sm text-secondary">{option.label}</label>
-                <select
+                <Select
                   id={controlId}
                   name={`maa-${task.id}-${option.key}`}
                   value={(advanced[option.key] as string) || (option.options[0]?.value || '')}
-                  onChange={(e) => handleAdvancedChange(task.id, option.key, e.target.value)}
-                  className="app-input app-native-control min-h-11 min-w-0 control-surface"
-                >
-                  {option.options.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                  onChange={(value) => handleAdvancedChange(task.id, option.key, value)}
+                  options={option.options.map(opt => ({ value: opt.value, label: opt.label }))}
+                  className="min-w-0"
+                />
               </div>
             ) : (
               <div className="grid min-w-0 gap-1.5 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center">
@@ -1955,17 +1951,18 @@ export default function CombatTasks() {
                       <div className="mb-3 space-y-1.5">
                         <div className="flex items-center space-x-2">
                           <label htmlFor="combat-copilot-formation" className="w-12 shrink-0 text-xs text-secondary">编队</label>
-                          <select
+                          <Select
                             id="combat-copilot-formation"
                             name="maa-copilot-formation"
                             value={getFormationMode(task.id)}
-                            onChange={(e) => setAutoFormation({ ...autoFormation, [task.id]: e.target.value as FormationMode })}
-                            className="app-input app-native-control min-h-11 min-w-0 flex-1 control-surface"
-                          >
-                            <option value="auto">自动决定</option>
-                            <option value="on">自动编队</option>
-                            <option value="off">保留当前编队</option>
-                          </select>
+                            onChange={(value) => setAutoFormation({ ...autoFormation, [task.id]: value as FormationMode })}
+                            options={[
+                              { value: 'auto', label: '自动决定' },
+                              { value: 'on', label: '自动编队' },
+                              { value: 'off', label: '保留当前编队' },
+                            ]}
+                            className="min-w-0 flex-1"
+                          />
                         </div>
                         <p className="pl-14 text-xs leading-relaxed text-tertiary">
                           作业集拆分执行时，“自动决定”会启用自动编队；单作业会使用默认设置。
@@ -1975,33 +1972,35 @@ export default function CombatTasks() {
                       {/* 突袭模式 */}
                       <div className="mb-3 flex items-center space-x-2">
                         <label htmlFor="combat-copilot-raid" className="w-12 shrink-0 text-xs text-secondary">模式</label>
-                        <select
+                        <Select
                           id="combat-copilot-raid"
                           name="maa-copilot-raid"
                           value={normalizeRaidValue(advancedParams[task.id]?.raid)}
-                          onChange={(e) => handleAdvancedChange(task.id, 'raid', e.target.value)}
-                          className="app-input app-native-control min-h-11 min-w-0 flex-1 control-surface"
-                        >
-                          <option value="normal">普通模式</option>
-                          <option value="raid">突袭模式</option>
-                          <option value="both">普通+突袭</option>
-                        </select>
+                          onChange={(value) => handleAdvancedChange(task.id, 'raid', value)}
+                          options={[
+                            { value: 'normal', label: '普通模式' },
+                            { value: 'raid', label: '突袭模式' },
+                            { value: 'both', label: '普通+突袭' },
+                          ]}
+                          className="min-w-0 flex-1"
+                        />
                       </div>
 
                       {/* 作业集执行方式 */}
                       <div className="space-y-1.5">
                         <div className="flex items-center space-x-2">
                           <label htmlFor="combat-copilot-set-mode" className="w-12 shrink-0 text-xs text-secondary">作业集</label>
-                          <select
+                          <Select
                             id="combat-copilot-set-mode"
                             name="maa-copilot-set-mode"
                             value={copilotSetExecutionMode}
-                            onChange={(e) => setCopilotSetExecutionMode(e.target.value as CopilotSetExecutionMode)}
-                            className="app-input app-native-control min-h-11 min-w-0 flex-1 control-surface"
-                          >
-                            <option value="cli">连续执行</option>
-                            <option value="manual">手动逐关</option>
-                          </select>
+                            onChange={(value) => setCopilotSetExecutionMode(value as CopilotSetExecutionMode)}
+                            options={[
+                              { value: 'cli', label: '连续执行' },
+                              { value: 'manual', label: '手动逐关' },
+                            ]}
+                            className="min-w-0 flex-1"
+                          />
                         </div>
                         <p className="pl-14 text-xs leading-relaxed text-tertiary">
                           {copilotSetExecutionMode === 'manual'

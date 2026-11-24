@@ -154,21 +154,22 @@ describe('ConfigManager layout surfaces', () => {
     expect(cards[0]?.querySelector(':scope > .app-card-smooth-surface > .app-card-content')).not.toBeNull()
 
     const navigation = page?.querySelector('[data-config-sections]')
-    const navigationTrack = navigation?.querySelector('.lg-track[role="tablist"]')
+    const navigationTrack = navigation?.querySelector('[role="radiogroup"]')
     expect(navigationTrack?.getAttribute('aria-label')).toBe('配置类型')
     const navigationItems = Array.from(
-      navigationTrack?.querySelectorAll<HTMLButtonElement>(':scope > .lg-track__item') ?? [],
+      navigationTrack?.querySelectorAll<HTMLButtonElement>(':scope > [role="radio"]') ?? [],
     )
     expect(navigationItems).toHaveLength(3)
-    expect(navigationItems[0]?.getAttribute('aria-selected')).toBe('true')
+    expect(navigationItems[0]?.getAttribute('aria-checked')).toBe('true')
     expect(navigationItems[0]?.textContent).toContain('连接')
     expect(page?.querySelector('.smooth-panel-shell')).toBeNull()
     expect(page?.querySelector('.app-card .app-info-card')).toBeNull()
 
     const autoUpdateToggle = screen.getByRole('switch', { name: '启用自动更新' }) as HTMLButtonElement
     expect(autoUpdateToggle.getAttribute('role')).toBe('switch')
-    expect(autoUpdateToggle.classList.contains('lg-switch')).toBe(true)
-    expect(autoUpdateToggle.querySelector('.lg-switch__track')).not.toBeNull()
+    expect(autoUpdateToggle.getAttribute('aria-checked')).toBe('false')
+    expect(autoUpdateToggle.closest('.lg-switch')).not.toBeNull()
+    expect(autoUpdateToggle.querySelector('canvas')).not.toBeNull()
     const reconnectRow = page?.querySelector('.config-reconnect-row')
     expect(reconnectRow).not.toBeNull()
     expect(reconnectRow?.classList.contains('surface-soft')).toBe(false)
@@ -183,16 +184,16 @@ describe('ConfigManager layout surfaces', () => {
     const { container } = render(<ConfigManager />)
     await flush()
 
-    const navigationTrack = container.querySelector('[data-config-sections] .lg-track[role="tablist"]')
+    const navigationTrack = container.querySelector('[data-config-sections] [role="radiogroup"]')
     const navigationItems = Array.from(
-      navigationTrack?.querySelectorAll<HTMLButtonElement>(':scope > .lg-track__item') ?? [],
+      navigationTrack?.querySelectorAll<HTMLButtonElement>(':scope > [role="radio"]') ?? [],
     )
-    expect(navigationItems[0]?.getAttribute('aria-selected')).toBe('true')
+    expect(navigationItems[0]?.getAttribute('aria-checked')).toBe('true')
 
     await swipe(container.querySelector<HTMLElement>('.ios-workspace-page')!, 240, 200, 120, 204)
     await flush()
 
-    expect(navigationItems[1]?.getAttribute('aria-selected')).toBe('true')
+    expect(navigationItems[1]?.getAttribute('aria-checked')).toBe('true')
     expect(localStorage.getItem('laPlumaConfigSection')).toBe('resource')
   })
 
@@ -423,7 +424,7 @@ describe('ConfigManager layout surfaces', () => {
     expect(editor?.querySelector('select')).toBeNull()
     expect(Array.from(editor?.querySelectorAll('button') ?? []).some(button => button.textContent?.trim() === '保存')).toBe(false)
 
-    const instanceButton = screen.getByRole('tab', { name: '实例' })
+    const instanceButton = screen.getByRole('radio', { name: '实例' })
     // GlassSegmented derives the pointer-up index from layout geometry, which is
     // zero-sized in jsdom; a direct click exercises the same onChange path.
     fireEvent.click(instanceButton)

@@ -6,7 +6,7 @@ import {
   type CSSProperties,
   type RefObject,
 } from 'react'
-import { createSpring, springFrom, type Spring } from '@zakisheriff/liquid-glass'
+import { createSpring, springFrom, type Spring } from '@/components/glass/spring'
 import { useSwipePager, type SwipePagerCommit, type SwipePagerHandlers } from './useSwipePager'
 
 const MODE_TRACK_SPRING = springFrom(0.36, 0.86)

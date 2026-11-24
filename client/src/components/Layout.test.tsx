@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -52,49 +52,6 @@ vi.mock('@/services/operatorQuotes', () => ({
     `/api/maa-assets/avatar/${operatorId}`,
   loadDailyOperatorQuote: mocks.loadDailyOperatorQuote,
 }))
-
-// The real palette renders through react-modal's portal, which needs layout
-// APIs jsdom does not provide. Keep a minimal controlled stand-in that exposes
-// the same `open` / `commands` / `onRequestClose` contract Layout relies on.
-vi.mock('react-command-palette', async () => {
-  const React = await import('react')
-  type MockCommand = { id: number; name: string; command: () => void }
-  type MockPaletteProps = {
-    open: boolean
-    commands: MockCommand[]
-    onRequestClose: () => void
-  }
-
-  function MockCommandPalette({ open, commands, onRequestClose }: MockPaletteProps) {
-    React.useEffect(() => {
-      if (!open) return
-      const handleKeyDown = (event: KeyboardEvent) => {
-        if (event.key === 'Escape') onRequestClose()
-      }
-      window.addEventListener('keydown', handleKeyDown)
-      return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [open, onRequestClose])
-
-    if (!open) return null
-
-    return React.createElement(
-      'div',
-      { role: 'dialog', 'aria-label': '命令面板' },
-      React.createElement(
-        'button',
-        { type: 'button', key: 'close', onClick: onRequestClose },
-        '关闭命令面板',
-      ),
-      commands.map(command => React.createElement(
-        'button',
-        { type: 'button', key: command.id, onClick: command.command },
-        command.name,
-      )),
-    )
-  }
-
-  return { default: MockCommandPalette }
-})
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -297,7 +254,7 @@ describe('top-level application navigation', () => {
     expect(sidebar.querySelectorAll('.la-pluma-sidebar-icon > svg[aria-hidden="true"]')).toHaveLength(9)
 
     const mobileNav = container.querySelector<HTMLElement>('.la-pluma-tabbar-nav')!
-    const mobileTrack = mobileNav.querySelector<HTMLElement>('.lg-track:not([data-lg-copy])')!
+    const mobileTrack = mobileNav.querySelector<HTMLElement>('.lg-track')!
     const mobileDestinations = [...mobileTrack.querySelectorAll<HTMLButtonElement>(':scope > [data-lg-item]')]
       .map(button => button.getAttribute('aria-label'))
     const dashboardIcon = mobileTrack.querySelector('[data-lg-item="0"] svg')
@@ -327,7 +284,7 @@ describe('top-level application navigation', () => {
     expect(sidebar.querySelectorAll('[aria-current="page"]')).toHaveLength(1)
     expect(sidebar.querySelector<HTMLElement>('[aria-current="page"]')?.dataset.appTab).toBe('statistics')
     expect(container.querySelector('.la-pluma-tabbar-more-anchor')?.classList.contains('is-active')).toBe(true)
-    expect(container.querySelector('.la-pluma-tabbar-nav .lg-track:not([data-lg-copy]) > [data-lg-item][aria-selected="true"]')).toBeNull()
+    expect(container.querySelector('.la-pluma-tabbar-nav .lg-track > [data-lg-item][aria-selected="true"]')).toBeNull()
 
     await user.click(sidebar.querySelector<HTMLButtonElement>('button[aria-label="Clear"]')!)
     expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(9)
@@ -375,64 +332,6 @@ describe('top-level application navigation', () => {
     expect(githubLink.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(1)
   })
 
-  it('opens the command palette from the 快速跳转 sidebar trigger', async () => {
-    const user = userEvent.setup()
-    renderLayout()
-
-    const trigger = screen.getByRole('button', { name: '打开命令面板' })
-    expect(within(trigger).getByText('快速跳转')).toBeTruthy()
-    expect(trigger.getAttribute('aria-keyshortcuts')).toBe('Meta+K Control+K')
-    expect(screen.queryByRole('dialog', { name: '命令面板' })).toBeNull()
-
-    await user.click(trigger)
-
-    const palette = await screen.findByRole('dialog', { name: '命令面板' })
-    const commandNames = within(palette).getAllByRole('button').map(button => button.textContent)
-    expect(commandNames).toEqual([
-      '关闭命令面板',
-      '控制台',
-      '自动化',
-      '作业',
-      '肉鸽',
-      '养成',
-      '小工具',
-      '日志',
-      '数据',
-      '配置',
-    ])
-
-    await user.click(within(palette).getByRole('button', { name: '关闭命令面板' }))
-    expect(screen.queryByRole('dialog', { name: '命令面板' })).toBeNull()
-  })
-
-  it('toggles the command palette with Cmd+K and closes it on Escape', async () => {
-    const user = userEvent.setup()
-    renderLayout()
-
-    expect(screen.queryByRole('dialog', { name: '命令面板' })).toBeNull()
-
-    await user.keyboard('{Meta>}k{/Meta}')
-    expect(screen.getByRole('dialog', { name: '命令面板' })).toBeTruthy()
-
-    await user.keyboard('{Escape}')
-    expect(screen.queryByRole('dialog', { name: '命令面板' })).toBeNull()
-  })
-
-  it('navigates to the destination selected in the command palette', async () => {
-    const user = userEvent.setup()
-    renderLayout()
-
-    await user.click(screen.getByRole('button', { name: '打开命令面板' }))
-    const palette = await screen.findByRole('dialog', { name: '命令面板' })
-
-    await user.click(within(palette).getByRole('button', { name: '日志' }))
-
-    expect(screen.queryByRole('dialog', { name: '命令面板' })).toBeNull()
-    expect(container.querySelector('[data-testid="active-tab"]')?.textContent).toBe('logs')
-    expect(window.location.pathname).toBe('/app/logs')
-    expect(desktopLink('logs').getAttribute('aria-current')).toBe('page')
-  })
-
   it('opens the overflow menu, navigates, and restores trigger focus on Escape', async () => {
     const user = userEvent.setup()
     renderLayout()
@@ -444,7 +343,9 @@ describe('top-level application navigation', () => {
     const anchor = container.querySelector<HTMLElement>('.la-pluma-tabbar-more-anchor')!
     const menu = anchor.querySelector<HTMLElement>('[role="menu"]')
     expect(menu?.getAttribute('aria-label')).toBe('更多工作区')
-    const items = [...(menu?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? [])]
+    // UI SDK's menu part fixes the item role to menuitem; the adapter still
+    // supplies aria-checked and the visual check for the radio-style entries.
+    const items = [...(menu?.querySelectorAll<HTMLElement>('[role^="menuitem"][aria-checked]') ?? [])]
     expect(items.map(item => item.textContent)).toEqual([
       expect.stringContaining('肉鸽'),
       expect.stringContaining('养成'),
@@ -453,7 +354,7 @@ describe('top-level application navigation', () => {
       expect.stringContaining('数据'),
     ])
     expect(trigger.getAttribute('aria-expanded')).toBe('true')
-    expect(document.activeElement).toBe(items[0])
+    expect(menu?.contains(document.activeElement)).toBe(true)
     expect(anchor.classList.contains('is-active')).toBe(false)
 
     // GlassMenu only runs its item handler for keyboard-style clicks

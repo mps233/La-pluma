@@ -25,19 +25,17 @@ const (
 	PTSMask uint64 = FlagKeyFrame - 1
 
 	// Control message types (client -> device).
-	CtrlInjectKeycode           byte = 0
-	CtrlInjectText              byte = 1
-	CtrlInjectTouchEvent        byte = 2
-	CtrlInjectScrollEvent       byte = 3
-	CtrlBackOrScreenOn          byte = 4
-	CtrlExpandNotificationPanel byte = 5
-	CtrlExpandSettingsPanel     byte = 6
-	CtrlCollapsePanels          byte = 7
-	CtrlGetClipboard            byte = 8
-	CtrlSetClipboard            byte = 9
-	CtrlSetDisplayPower         byte = 10
-	CtrlRotateDevice            byte = 11
-	CtrlResetVideo              byte = 17
+	CtrlInjectKeycode     byte = 0
+	CtrlInjectText        byte = 1
+	CtrlInjectTouchEvent  byte = 2
+	CtrlInjectScrollEvent byte = 3
+	CtrlBackOrScreenOn    byte = 4
+
+	CtrlGetClipboard    byte = 8
+	CtrlSetClipboard    byte = 9
+	CtrlSetDisplayPower byte = 10
+
+	CtrlResetVideo byte = 17
 
 	// Device-to-client message types.
 	DeviceMsgClipboard    byte = 0
@@ -260,26 +258,6 @@ func WriteText(w io.Writer, text string) error {
 
 func WriteBackOrScreenOn(w io.Writer, action int) error {
 	_, err := w.Write([]byte{CtrlBackOrScreenOn, byte(action)})
-	return err
-}
-
-func WriteCollapsePanels(w io.Writer) error {
-	_, err := w.Write([]byte{CtrlCollapsePanels})
-	return err
-}
-
-func WriteExpandNotificationPanel(w io.Writer) error {
-	_, err := w.Write([]byte{CtrlExpandNotificationPanel})
-	return err
-}
-
-func WriteExpandSettingsPanel(w io.Writer) error {
-	_, err := w.Write([]byte{CtrlExpandSettingsPanel})
-	return err
-}
-
-func WriteRotateDevice(w io.Writer) error {
-	_, err := w.Write([]byte{CtrlRotateDevice})
 	return err
 }
 

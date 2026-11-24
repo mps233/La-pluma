@@ -96,9 +96,6 @@ type Service struct {
 }
 
 // New returns a Service with default dependencies.
-func New(paths config.Paths) *Service {
-	return NewWithOptions(Options{Paths: paths})
-}
 
 // NewWithOptions builds the activity service. Tests inject httptest URLs,
 // fake clocks, temp Paths and fake executors/leases.

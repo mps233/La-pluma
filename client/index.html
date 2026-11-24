@@ -2,6 +2,11 @@
 <html lang="zh-CN" class="dark">
   <head>
     <meta charset="UTF-8" />
+    <!-- Pin Tailwind's cascade-layer order before any component style mounts.
+         Liquid Glass renders its own <style> with `@layer components`; without
+         this statement that style can establish `components` before `base`,
+         which lets the reset wipe component-layer spacing across the app. -->
+    <style>@layer properties, theme, base, components, utilities;</style>
     <link rel="icon" type="image/png" href="%BASE_URL%favicon-graphite.png?v=1" />
     <link rel="apple-touch-icon" href="%BASE_URL%apple-touch-icon-graphite.png?v=1" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />

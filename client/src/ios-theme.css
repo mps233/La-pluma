@@ -6,12 +6,6 @@
   --app-glass-bg: rgba(255, 255, 255, 0.68);
   --app-glass-border: rgba(60, 60, 67, 0.18);
   --app-glass-shadow: 0 12px 32px rgba(60, 60, 67, 0.12);
-  /* Shared neutral glass: the in-page selected segment and glass cards. */
-  --app-neutral-glass-tint: color-mix(in srgb, var(--app-text) 30%, var(--app-surface-solid));
-  --app-neutral-glass-alpha: 0.17;
-  --app-neutral-glass-blur: 16;
-  --app-neutral-glass-saturate: 1.8;
-  --app-neutral-glass-brightness: 1.06;
   /* The simulator viewport's empty surface, shared with content cards. */
   --app-preview-frame-bg: color-mix(
     in srgb,
@@ -82,34 +76,6 @@
   --la-pluma-navbar-fade-color: #ffffff;
   --la-pluma-sidebar-width: 17rem;
   --la-pluma-sidebar-selection: var(--app-accent-action);
-  --la-pluma-sidebar-selection-fill: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--app-accent-action) 92%, white) 0%,
-    var(--app-accent-action) 58%,
-    color-mix(in srgb, var(--app-accent-action) 88%, black) 100%
-  );
-  --la-pluma-sidebar-selection-glow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.48),
-    inset 0 -0.5px 0 rgba(0, 0, 0, 0.16),
-    0 2px 6px rgba(0, 0, 0, 0.24);
-  --la-pluma-liquid-surface-lift: rgba(255, 255, 255, 0.04);
-  --la-pluma-liquid-edge-light: rgba(255, 255, 255, 0.48);
-  --la-pluma-liquid-edge-clear: rgba(255, 255, 255, 0);
-  --la-pluma-liquid-edge-high: color-mix(
-    in srgb,
-    var(--la-pluma-liquid-edge-light) 75%,
-    var(--la-pluma-liquid-edge-clear)
-  );
-  --la-pluma-liquid-edge-mid: color-mix(
-    in srgb,
-    var(--la-pluma-liquid-edge-light) 50%,
-    var(--la-pluma-liquid-edge-clear)
-  );
-  --la-pluma-liquid-edge-faint: color-mix(
-    in srgb,
-    var(--la-pluma-liquid-edge-light) 25%,
-    var(--la-pluma-liquid-edge-clear)
-  );
 }
 
 /* Safari's dynamic viewport is intentionally used in a normal browser so
@@ -147,10 +113,6 @@ html.dark,
   --app-glass-bg: rgba(28, 28, 30, 0.72);
   --app-glass-border: rgba(235, 235, 245, 0.18);
   --app-glass-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
-  --app-neutral-glass-tint: color-mix(in srgb, var(--app-text) 18%, var(--app-bg-soft));
-  --app-neutral-glass-alpha: 0.31;
-  --app-neutral-glass-saturate: 1.6;
-  --app-neutral-glass-brightness: 0.8;
   --app-bg: #101318;
   --app-bg-soft: #1c1c1e;
   --app-surface: rgba(28, 28, 30, 0.72);
@@ -179,18 +141,6 @@ html.dark,
   --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.3);
   --la-pluma-navbar-fade-color: #101318;
   --la-pluma-sidebar-selection: var(--app-accent-action);
-  --la-pluma-sidebar-selection-fill: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--app-accent-action) 92%, white) 0%,
-    var(--app-accent-action) 58%,
-    color-mix(in srgb, var(--app-accent-action) 88%, black) 100%
-  );
-  --la-pluma-sidebar-selection-glow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.48),
-    inset 0 -0.5px 0 rgba(0, 0, 0, 0.16),
-    0 2px 6px rgba(0, 0, 0, 0.24);
-  --la-pluma-liquid-surface-lift: rgba(255, 255, 255, 0.05);
-  --la-pluma-liquid-edge-light: rgba(255, 255, 255, 0.18);
 }
 
 @media (prefers-contrast: more) {
@@ -474,19 +424,25 @@ html.la-pluma-standalone #app-root .page {
     width: calc(var(--la-pluma-sidebar-width) - 1.5rem);
     border-radius: 1.625rem;
     pointer-events: none;
+    /* Experiment: the vendored GlassCard paints a padded canvas; clip it to the
+       frame and carry its depth on the frame instead. */
+    overflow: hidden;
+    box-shadow: var(--app-glass-shadow);
   }
 
-  .la-pluma-app .la-pluma-sidebar-surface.lg-card.lg-glass {
+  .la-pluma-app .la-pluma-sidebar-surface[data-glass-host] {
+    position: relative;
     width: 100%;
     height: 100%;
-    --lg-glass-fill: color-mix(in srgb, var(--app-surface-solid) 62%, transparent);
-    --lg-glass-blur: 18px;
+    isolation: isolate;
   }
 
-  /* Keep a little more separation from the page in the light theme, where a
-     translucent white panel washes out faster than the dark surface. */
-  :root[data-theme='light'] .la-pluma-app .la-pluma-sidebar-surface.lg-card.lg-glass {
-    --lg-glass-fill: color-mix(in srgb, var(--app-surface-solid) 70%, transparent);
+  .la-pluma-app .la-pluma-sidebar-surface[data-glass-ready] {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
   }
 
   .la-pluma-app .la-pluma-sidebar {
@@ -605,8 +561,6 @@ html.la-pluma-standalone #app-root .page {
   /* The brand is a glass circle only in the mobile navbar; keep the desktop
      wordmark on the bare chrome. */
   .la-pluma-app .la-pluma-brand.lg-button {
-    --lg-glass-fill: transparent;
-    --lg-glass-blur: 0px;
     border-radius: 0;
     box-shadow: none;
     -webkit-backdrop-filter: none;
@@ -636,15 +590,17 @@ html.la-pluma-standalone #app-root .page {
   }
 
   .la-pluma-app .la-pluma-theme-desktop {
-    --theme-toggle-item-size: 2rem;
-    --theme-toggle-gap: 0.25rem;
-    --theme-toggle-pad: 0.25rem;
+    --theme-toggle-item-size: 36px;
+    --theme-toggle-gap: 4px;
+    --theme-toggle-pad: 4px;
     display: flex;
-    height: calc(var(--theme-toggle-item-size) + var(--theme-toggle-pad) * 2);
+    /* Match the 44px GitHub control beside it: the group's own padding is the
+       only vertical space, so the shell is exactly the item plus two pads. */
+    height: 44px;
+    box-sizing: border-box;
     align-items: center;
     gap: var(--theme-toggle-gap);
     padding: var(--theme-toggle-pad);
-    border: 0;
     border-radius: 999px;
   }
 
@@ -744,33 +700,10 @@ html.la-pluma-standalone #app-root .page {
   }
 }
 
-/* The package's GlassCard defaults to a 62% fill, which lets dense page text
-   show through menus. App glass panels use a denser surface so overlays stay
-   readable while keeping the package's blur and rim. */
-.app-glass-panel.lg-card.lg-glass {
-  --lg-glass-fill: color-mix(in srgb, var(--app-surface-solid) 95%, transparent);
-}
-
-/* Modal content must stay above the glass fill even when a stale package
-   stylesheet is missing `.lg-glass > * { position: relative; z-index: 1 }`. */
+/* Modal content must stay above the glass fill. */
 .app-modal-layer .app-glass-panel > * {
   position: relative;
   z-index: 1;
-}
-
-@media (prefers-reduced-transparency: reduce) {
-  .app-glass-panel.lg-card.lg-glass,
-  .app-glass-panel.lg-card.lg-glass::before {
-    --lg-glass-fill: var(--app-surface-solid);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-}
-
-@media (prefers-contrast: more) {
-  .app-glass-panel.lg-card.lg-glass {
-    --lg-edge: var(--app-border-strong);
-  }
 }
 
 .la-pluma-github-link:hover,
@@ -808,13 +741,6 @@ html.la-pluma-standalone #app-root .page {
   scrollbar-width: none;
 }
 
-.la-pluma-eyebrow {
-  color: var(--app-text-soft);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
 
 .la-pluma-sidebar-nav {
   display: flex;
@@ -829,55 +755,6 @@ html.la-pluma-standalone #app-root .page {
 .la-pluma-sidebar-search {
   display: block;
   width: 100%;
-}
-
-.la-pluma-command-trigger {
-  display: flex;
-  width: 100%;
-  min-height: var(--app-control-height-sm);
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--app-space-2);
-  margin-top: var(--app-space-2);
-  border: 0;
-  border-radius: var(--app-radius-md);
-  padding: 0 var(--app-space-3);
-  background: transparent;
-  color: var(--app-text-muted);
-  font: inherit;
-  font-size: var(--app-font-caption);
-  cursor: pointer;
-  transition: background 160ms ease, color 160ms ease;
-}
-
-.la-pluma-command-trigger:hover {
-  background: var(--app-surface-muted);
-  color: var(--app-text);
-}
-
-.la-pluma-command-trigger:focus-visible {
-  outline: 2px solid var(--app-accent);
-  outline-offset: 2px;
-}
-
-.la-pluma-command-trigger-label {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--app-space-2);
-}
-
-.la-pluma-command-trigger-key {
-  flex: none;
-  border: 1px solid var(--app-border);
-  border-radius: var(--app-radius-sm);
-  padding: 0 0.3rem;
-  background: var(--app-surface-muted);
-  color: var(--app-text-soft);
-  font-family: inherit;
-  font-size: var(--app-font-meta);
-  font-variant-numeric: tabular-nums;
-  line-height: 1.6;
 }
 
 .la-pluma-sidebar-identity {
@@ -943,7 +820,7 @@ html.la-pluma-standalone #app-root .page {
 .la-pluma-sidebar-nav-group {
   display: flex;
   flex-direction: column;
-  gap: 0.1875rem;
+  gap: var(--app-space-2);
 }
 
 .la-pluma-sidebar-nav-label {
@@ -976,7 +853,7 @@ html.la-pluma-standalone #app-root .page {
   align-items: center;
   justify-content: flex-start;
   gap: 0.625rem;
-  border-radius: 0.875rem;
+  border-radius: 999px;
   padding: 0 0.75rem !important;
   color: var(--app-text) !important;
   font-size: 0.9375rem;
@@ -1118,35 +995,12 @@ html.la-pluma-standalone #app-root .page {
   min-width: 0;
 }
 
-.la-pluma-tabbar-glass.lg-track {
-  width: 100%;
-  grid-auto-columns: minmax(0, 1fr);
-  --lg-track-active: var(--app-accent-strong);
-}
-
 .la-pluma-tabbar-more-anchor {
   flex: 0 0 auto;
 }
 
-.la-pluma-tabbar-more-anchor .lg-button[data-icon-only] {
-  --lg-h: var(--la-pluma-tabbar-floating-height);
-}
-
 .la-pluma-tabbar-more-anchor.is-active .lg-button {
   color: var(--app-accent-strong);
-}
-
-/* The menu lives at the bottom-right of the viewport, so it grows upward and
-   leftward instead of dropping below the screen. */
-
-.la-pluma-tabbar-more-anchor .lg-menu-surface {
-  top: auto;
-  bottom: 0;
-}
-
-.la-pluma-tabbar-more-anchor .lg-menu.lg-glass,
-.la-pluma-tabbar-more-anchor .lg-menu__content {
-  transform-origin: bottom right;
 }
 
 .la-pluma-app .app-page {
@@ -1440,11 +1294,6 @@ html.la-pluma-standalone #app-root .page {
     pointer-events: auto;
   }
 
-  .la-pluma-app .la-pluma-brand.lg-button {
-    --lg-glass-fill: color-mix(in srgb, var(--app-surface-solid) 55%, transparent);
-    --lg-glass-blur: 12px;
-  }
-
   .la-pluma-app .la-pluma-brand .lg-button__label {
     display: none;
   }
@@ -1467,14 +1316,6 @@ html.la-pluma-standalone #app-root .page {
   .la-pluma-app .la-pluma-theme-trigger,
   .la-pluma-app .la-pluma-github-link {
     pointer-events: auto;
-  }
-
-  .la-pluma-app .la-pluma-theme-trigger:hover,
-  .la-pluma-app .la-pluma-theme-trigger:focus-visible,
-  .la-pluma-app .la-pluma-theme-trigger[aria-expanded='true'],
-  .la-pluma-app .la-pluma-github-link:hover,
-  .la-pluma-app .la-pluma-github-link:focus-visible {
-    --la-pluma-liquid-surface: var(--app-surface-muted);
   }
 
   .la-pluma-app .la-pluma-page-body {
@@ -1995,15 +1836,6 @@ html.la-pluma-standalone #app-root .page {
     backdrop-filter: none;
   }
 
-  .la-pluma-app .la-pluma-theme-desktop.lg-card.lg-glass,
-  .la-pluma-app .la-pluma-theme-desktop.lg-card.lg-glass::before,
-  .la-pluma-app .la-pluma-sidebar-surface.lg-card.lg-glass,
-  .la-pluma-app .la-pluma-sidebar-surface.lg-card.lg-glass::before {
-    --lg-glass-fill: var(--app-surface-solid);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-
   .la-pluma-app .la-pluma-sidebar {
     background: transparent;
     -webkit-backdrop-filter: none;
@@ -2022,19 +1854,16 @@ html.la-pluma-standalone #app-root .page {
     background: transparent;
   }
 
-  .la-pluma-tabbar-nav .lg-glass,
   .la-pluma-tabbar-more-anchor .lg-button,
-  .la-pluma-tabbar-more-anchor .lg-menu,
-  .la-pluma-app .combat-mode-shell .lg-track__glass,
-  .la-pluma-app .roguelike-mode-shell .lg-track__glass,
-  .la-pluma-app .training-status-shell .lg-track__glass,
-  .la-pluma-app .log-mode-shell .lg-track__glass,
-  .la-pluma-app .data-statistics-view-switcher .lg-track__glass,
-  .la-pluma-app [data-config-sections] .lg-track__glass,
-  .la-pluma-app .preview-mode-shell .lg-track__glass {
+  .la-pluma-app .preview-mode-glass-tabs {
     background: var(--app-surface-solid);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
+  }
+
+  .la-pluma-app .preview-mode-glass-tabs [data-glass-highlight] {
+    background: var(--app-accent-soft);
+    box-shadow: inset 0 0 0 1px var(--app-border-strong);
   }
 }
 
@@ -2052,25 +1881,16 @@ html.la-pluma-standalone #app-root .page {
     box-shadow: inset 0 0 0 1px var(--app-border-strong);
   }
 
-  .la-pluma-app .la-pluma-theme-desktop.lg-card.lg-glass,
-  .la-pluma-app .la-pluma-sidebar-surface.lg-card.lg-glass {
-    --lg-glass-fill: var(--app-surface-solid);
-    --lg-edge: var(--app-border-strong);
-  }
-
-  .la-pluma-tabbar-nav .lg-glass,
   .la-pluma-tabbar-more-anchor .lg-button,
-  .la-pluma-tabbar-more-anchor .lg-menu,
-  .la-pluma-app .combat-mode-shell .lg-track__glass,
-  .la-pluma-app .roguelike-mode-shell .lg-track__glass,
-  .la-pluma-app .training-status-shell .lg-track__glass,
-  .la-pluma-app .log-mode-shell .lg-track__glass,
-  .la-pluma-app .data-statistics-view-switcher .lg-track__glass,
-  .la-pluma-app [data-config-sections] .lg-track__glass,
-  .la-pluma-app .preview-mode-shell .lg-track__glass {
+  .la-pluma-app .preview-mode-glass-tabs {
     background: var(--app-surface-solid);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
+    box-shadow: inset 0 0 0 1px var(--app-border-strong);
+  }
+
+  .la-pluma-app .preview-mode-glass-tabs [data-glass-highlight] {
+    background: var(--app-accent-soft);
     box-shadow: inset 0 0 0 1px var(--app-border-strong);
   }
 
@@ -2260,7 +2080,6 @@ html.dark .la-pluma-app .la-pluma-content .app-native-control,
    hairlines used by the former desktop control treatment. */
 
 .la-pluma-app [data-automation-tasks] :is(
-  .automation-select-control select,
   .automation-task-editor .automation-text-control,
   .automation-task-editor .number-input-wrapper,
   .automation-composite-control,
@@ -2271,7 +2090,6 @@ html.dark .la-pluma-app .la-pluma-content .app-native-control,
 }
 
 .la-pluma-app [data-automation-tasks] :is(
-  .automation-select-control:hover select,
   .automation-task-editor .automation-text-control:hover,
   .automation-task-editor .number-input-wrapper:hover,
   .automation-composite-control:hover
@@ -2280,7 +2098,6 @@ html.dark .la-pluma-app .la-pluma-content .app-native-control,
 }
 
 .la-pluma-app [data-automation-tasks] .automation-notification-field input:focus,
-.la-pluma-app [data-automation-tasks] .automation-select-control:has(select:focus) select,
 .la-pluma-app [data-automation-tasks] .automation-task-editor .automation-text-control:focus,
 .la-pluma-app [data-automation-tasks] .automation-task-editor .number-input-wrapper:has(input:focus),
 .la-pluma-app [data-automation-tasks] .automation-composite-control:has(input:focus) {
@@ -2347,4 +2164,397 @@ html.dark .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .sm
        close to the lights instead of leaving a large dead band. */
     padding-top: calc(1.125rem + clamp(28px, var(--mygo-titlebar-height, 0px), 40px));
   }
+}
+
+/* ── Liquid Glass UI adapters (src/components/glass) ───────────────────────
+   The adapters expose app-level classes over the registry installed in
+   src/components/liquid-glass. This block supplies only the semantic geometry
+   those compositions need. Keep the `.lg-host` scoping on rules that restate
+   kit geometry so an app class at the call site cannot be overridden by a
+   later generic `.lg-*` rule. */
+
+/* Buttons: the adapter's 36 / 44 / 52 / 64 px presets are expressed by its
+   Tailwind height classes; these rules restore the semantic app geometry and
+   let inline variant styles keep their own colour. */
+.lg-button.lg-host {
+  height: var(--lg-h);
+  min-width: var(--lg-h);
+  padding-inline: var(--app-space-3);
+  color: var(--app-text);
+  font-family: var(--app-font-family, inherit);
+  font-weight: 600;
+  touch-action: manipulation;
+}
+
+.lg-button.lg-host.h-9 {
+  --lg-h: var(--app-control-height-sm, 2.25rem);
+  padding-inline: var(--app-space-3);
+  font-size: 0.8125rem;
+}
+
+.lg-button.lg-host.h-11 {
+  --lg-h: var(--app-control-height-md, 2.75rem);
+  padding-inline: var(--app-space-4);
+  font-size: var(--app-font-body, 0.875rem);
+}
+
+.lg-button.lg-host.h-\[3\.25rem\] {
+  --lg-h: 3.25rem;
+  padding-inline: var(--app-space-5);
+  font-size: 0.9375rem;
+}
+
+.lg-button.lg-host.h-16 {
+  --lg-h: 4rem;
+  padding-inline: 2rem;
+  font-size: 1rem;
+}
+
+/* Icon-only adapters emit p-0; keep the button a fixed square. */
+.lg-button.lg-host.p-0 {
+  padding: 0;
+}
+
+.lg-button.lg-host[data-glass-tone='dark'] {
+  color: #ffffff;
+}
+
+.lg-button.lg-host[data-glass-tone='light'] {
+  color: var(--app-text);
+}
+
+@media (pointer: coarse) {
+  /* Compact buttons keep a 44 px touch target on touch devices. */
+  .lg-button.lg-host.h-9 {
+    --lg-h: var(--app-control-height-md, 2.75rem);
+  }
+}
+
+/* Input: the adapter renders GlassCard > label > input, so draw one 44 px
+   pill. The card itself paints the material; focus is an outline because the
+   glass layer suppresses box-shadow once it is ready. */
+.lg-input.lg-host {
+  display: block;
+  width: 100%;
+  color: var(--app-text);
+  font-family: var(--app-font-family, inherit);
+}
+
+.lg-input.lg-host:focus-within {
+  outline: 2px solid color-mix(in srgb, var(--app-accent) 62%, transparent);
+  outline-offset: 2px;
+}
+
+.lg-input .lg-input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2);
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--app-control-height-md, 2.5rem);
+  min-height: var(--app-control-height-md, 2.5rem);
+  padding: 0 var(--app-space-3);
+  color: inherit;
+  cursor: text;
+}
+
+.lg-input .lg-input-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--app-text-soft);
+}
+
+.lg-input .lg-input-icon > svg {
+  width: 100%;
+  height: 100%;
+}
+
+.lg-input .lg-input-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--app-text);
+  font: inherit;
+  font-size: var(--app-font-body, 0.875rem);
+  font-weight: 500;
+  line-height: 1.25;
+  caret-color: var(--app-accent);
+  appearance: none;
+}
+
+.lg-input .lg-input-field::placeholder {
+  color: var(--app-text-soft);
+  opacity: 1;
+}
+
+.lg-input .lg-input-field::-webkit-search-cancel-button,
+.lg-input .lg-input-field::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.lg-input .lg-input-clear {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--app-radius-pill);
+  background: var(--app-surface-muted);
+  color: var(--app-text-muted);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* Keep the 28 px glyph but give it a 44 px touch target. */
+.lg-input .lg-input-clear::before {
+  content: '';
+  position: absolute;
+  inset: -0.5rem;
+  border-radius: inherit;
+}
+
+.lg-input .lg-input-clear:hover {
+  background: var(--app-border);
+  color: var(--app-text);
+}
+
+.lg-input .lg-input-clear:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--app-accent) 62%, transparent);
+  outline-offset: 2px;
+}
+
+/* Mobile tab bar. The Layout footer owns the viewport inset and already
+   applies it through --la-pluma-tabbar-*; the nav only reserves it when it is
+   used as its own fixed bar outside that footer. */
+.lg-nav {
+  --lg-nav-safe-pad: env(safe-area-inset-bottom, 0px);
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding-bottom: var(--lg-nav-safe-pad);
+}
+
+.la-pluma-tabbar .lg-nav {
+  --lg-nav-safe-pad: 0px;
+}
+
+/* The kit group carries the legacy `lg-track` hook the app CSS already sizes.
+   Fill the tabbar slot. */
+.lg-nav > .lg-track {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--la-pluma-tabbar-floating-height, 4.25rem);
+}
+
+.lg-nav .lg-nav-item {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Selected/current tab: surface fill plus accent text, not colour alone —
+   the adapter also sets aria-current="page" and aria-selected on the item. */
+.lg-nav .lg-nav-item.is-active {
+  background: var(--la-pluma-tabbar-active-bg);
+  color: var(--app-accent-strong);
+}
+
+/* "More" menu trigger in the tab bar: a circle matching the floating bar and
+   the same tinted surface as every other app button. */
+.lg-menu .lg-button[data-icon-only] {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: var(--la-pluma-tabbar-floating-height, 2.75rem);
+  height: var(--la-pluma-tabbar-floating-height, 2.75rem);
+  min-width: var(--la-pluma-tabbar-floating-height, 2.75rem);
+  padding: 0;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-pill);
+  background: var(--app-surface-muted);
+  color: var(--app-text);
+  font-size: var(--app-font-caption, 0.75rem);
+  font-weight: 600;
+}
+
+.lg-menu .lg-button[data-icon-only] svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.lg-menu.is-active .lg-button[data-icon-only],
+.lg-menu .lg-button[data-icon-only][aria-expanded='true'] {
+  color: var(--app-accent-strong);
+}
+
+/* The kit Switch sizes its own canvas; the adapter wrapper only lays it out. */
+.lg-switch.lg-host {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  height: auto;
+  vertical-align: middle;
+}
+
+/* Page-level segmented controls keep filling their shell now that the adapter
+   adds a wrapper element between the shell and the kit control. */
+.lg-segmented {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.lg-segmented > [data-glass-host] {
+  width: 100%;
+  min-width: 0;
+}
+
+.la-pluma-sidebar-aurora {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  /* Opaque base: the clear GlassCard must not sample the animated ASCII field
+     through this layer while scrolling, only these static colours. */
+  background-color: var(--app-surface-solid);
+  background-image:
+    radial-gradient(65% 42% at 16% 8%, color-mix(in srgb, var(--app-accent) 55%, transparent) 0%, transparent 72%),
+    radial-gradient(55% 40% at 88% 26%, color-mix(in srgb, var(--app-info) 42%, transparent) 0%, transparent 76%),
+    radial-gradient(70% 38% at 54% 94%, color-mix(in srgb, var(--app-success) 26%, transparent) 0%, transparent 78%);
+}
+
+/* ── Liquid Glass adapter corrections ───────────────────────────────────── */
+
+/* The kit's segmented items size to their labels; page-level tracks need every
+   item to share the row so the whole segment is a hit target. */
+.lg-segmented [role='radiogroup'] {
+  display: flex;
+  width: 100%;
+}
+
+.lg-segmented [role='radiogroup'] > [role='radio'] {
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: center;
+}
+
+/* DESIGN.md: the desktop brand is a bare wordmark, not a glass pill. The kit
+   always paints its layer, so hide it on the desktop breakpoint. */
+@media (min-width: 1024px) {
+  .la-pluma-brand > canvas {
+    display: none !important;
+  }
+
+  .la-pluma-brand[data-glass-ready] {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .la-pluma-brand {
+    padding-right: 0 !important;
+    padding-left: 0 !important;
+  }
+}
+
+/* The sidebar search sits under the navbar's full-width layer. Let empty navbar
+   space pass clicks through; the actual controls stay interactive. */
+.la-pluma-navbar,
+.la-pluma-navbar .navbar-bg,
+.la-pluma-navbar .navbar-inner {
+  pointer-events: none;
+}
+
+.la-pluma-navbar .navbar-inner :is(a, button, [role='button'], input, label) {
+  pointer-events: auto;
+}
+
+/* Add-task control: the kit Select sizes itself to content; the footer slot is
+   full width and the trigger matches the other 44px action buttons. */
+.automation-task-select-shell {
+  width: 100%;
+  min-width: 0;
+}
+
+.automation-task-select-shell > * {
+  width: 100%;
+}
+
+.automation-task-select {
+  width: 100%;
+}
+
+.automation-task-select [data-glass-host] {
+  height: 2.75rem;
+}
+
+.automation-task-select-option {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.automation-task-select-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-task-select-count {
+  margin-left: auto;
+  padding-left: 0.5rem;
+  color: var(--app-text-muted);
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+
+/* The kit Select matches its trigger width; the footer trigger is narrow, so
+   give the task list enough room for names and counts. */
+.automation-task-select-shell [data-glass-popup] {
+  min-width: 16rem;
+}
+
+/* SelectField: the kit Select fills the caller's slot and takes the app's
+   control surface instead of the kit's neutral fallback. */
+.glass-select-field {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.glass-select-field > div {
+  width: 100%;
+  gap: 0;
+}
+
+.glass-select-field [data-glass-host] {
+  height: 2.75rem;
+  background: var(--app-surface-muted);
+  border-color: var(--app-border);
+  color: var(--app-text);
+}
+
+.glass-select-field [data-glass-popup] {
+  min-width: 12rem;
 }

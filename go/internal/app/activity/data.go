@@ -43,7 +43,6 @@ func NormalizeClientType(clientType string) string {
 }
 
 // NormalizeActivityClientType is the Node-name alias for NormalizeClientType.
-func NormalizeActivityClientType(clientType string) string { return NormalizeClientType(clientType) }
 
 // ParseStageActivityTime parses "YYYY/MM/DD HH:mm:ss" at the given UTC offset
 // in hours (default 8).

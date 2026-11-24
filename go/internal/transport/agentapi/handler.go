@@ -2344,23 +2344,6 @@ func (h *Handler) activityPreflight(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, http.StatusOK, result, "", nil)
 }
 
-func defaultADBPath() string {
-	if value := os.Getenv("ADB_PATH"); strings.TrimSpace(value) != "" {
-		return strings.TrimSpace(value)
-	}
-	if runtime.GOOS == "darwin" {
-		return "/opt/homebrew/bin/adb"
-	}
-	return "adb"
-}
-
-func defaultADBAddress() string {
-	if value := os.Getenv("ADB_ADDRESS"); strings.TrimSpace(value) != "" {
-		return strings.TrimSpace(value)
-	}
-	return "127.0.0.1:16384"
-}
-
 func (h *Handler) testConnection(w http.ResponseWriter, r *http.Request) {
 	body := decodeBody(r)
 	connection, err := h.resolveRequestConnection(body)
@@ -2511,13 +2494,6 @@ func (h *Handler) operboxRecognition(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sendRunResponse(w, run, replayed, false, structMap(run.Result))
-}
-
-func (h *Handler) copilotUnsupported(w http.ResponseWriter, r *http.Request) {
-	httpx.Failure(w, http.StatusNotImplemented, &httpx.APIError{
-		Code: "COPILOT_EXECUTION_UNSUPPORTED", Message: "作业执行尚未接入 Go 后端",
-		Retryable: false, Details: map[string]any{"todo": "wire copilot PlanExecutor"},
-	})
 }
 
 func (h *Handler) updateCore(w http.ResponseWriter, r *http.Request) {
@@ -2783,13 +2759,6 @@ func mapField(value any) map[string]any {
 		return record
 	}
 	return map[string]any{}
-}
-
-func (h *Handler) copilotManualUnsupported(w http.ResponseWriter, r *http.Request) {
-	httpx.Failure(w, http.StatusNotImplemented, &httpx.APIError{
-		Code: "COPILOT_MANUAL_UNSUPPORTED", Message: "手动作业集尚未接入 Go 后端",
-		Retryable: false,
-	})
 }
 
 func (h *Handler) paradoxSearch(w http.ResponseWriter, r *http.Request) {

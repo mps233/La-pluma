@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mps233/la-pluma/go/internal/config"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
 )
@@ -271,6 +270,3 @@ func toolFromDefinition(definition Definition) Tool {
 }
 
 // customToolsPath exposes the directory for diagnostics and tests.
-func customToolsPath(paths config.Paths) string {
-	return filepath.Join(paths.DataDir, customToolsDir)
-}

@@ -237,15 +237,15 @@ describe('DataStatistics layout surfaces', () => {
 
     const tabShell = page?.querySelector('.data-statistics-view-switcher')
     expect(tabShell?.classList.contains('data-statistics-mode-shell')).toBe(true)
-    const tabList = tabShell?.querySelector('.lg-track[role="tablist"]')
-    expect(tabList?.getAttribute('aria-label')).toBe('数据统计视图')
+    const tabGroup = tabShell?.querySelector('[role="radiogroup"]')
+    expect(tabGroup?.getAttribute('aria-label')).toBe('数据统计视图')
     const tabs = Array.from(
-      tabList?.querySelectorAll<HTMLButtonElement>(':scope > .lg-track__item') ?? [],
+      tabGroup?.querySelectorAll<HTMLButtonElement>(':scope > [role="radio"]') ?? [],
     )
     expect(tabs).toHaveLength(3)
-    expect(tabs.every(tab => tab.getAttribute('role') === 'tab')).toBe(true)
+    expect(tabs.every(tab => tab.getAttribute('role') === 'radio')).toBe(true)
     expect(tabs.every(tab => tab.getAttribute('aria-controls')?.startsWith('data-statistics-panel-'))).toBe(true)
-    expect(tabs[0]?.getAttribute('aria-selected')).toBe('true')
+    expect(tabs[0]?.getAttribute('aria-checked')).toBe('true')
     expect(tabs[0]?.tabIndex).toBe(0)
     expect(tabs[1]?.tabIndex).toBe(-1)
 
@@ -269,7 +269,7 @@ describe('DataStatistics layout surfaces', () => {
     // The segmented control listens for arrow keys on its native track.
     fireEvent.keyDown(tabs[0]!, { key: 'ArrowRight' })
     await flush()
-    expect(depotTab?.getAttribute('aria-selected')).toBe('true')
+    expect(depotTab?.getAttribute('aria-checked')).toBe('true')
     expect(document.activeElement).toBe(depotTab)
 
     const depotCard = activePanel()?.querySelector('.data-statistics-task-card')
@@ -355,16 +355,16 @@ describe('DataStatistics layout surfaces', () => {
     renderPage()
     await flush()
 
-    const track = container.querySelector('[role="tablist"][aria-label="数据统计视图"]')
+    const track = container.querySelector('[role="radiogroup"][aria-label="数据统计视图"]')
     const items = Array.from(
-      track?.querySelectorAll<HTMLButtonElement>(':scope > .lg-track__item') ?? [],
+      track?.querySelectorAll<HTMLButtonElement>(':scope > [role="radio"]') ?? [],
     )
-    expect(items[0]?.getAttribute('aria-selected')).toBe('true')
+    expect(items[0]?.getAttribute('aria-checked')).toBe('true')
 
     await swipe(container.querySelector<HTMLElement>('.data-statistics-page')!, 240, 200, 120, 204)
     await flush()
 
-    expect(items[1]?.getAttribute('aria-selected')).toBe('true')
+    expect(items[1]?.getAttribute('aria-checked')).toBe('true')
     expect(items[1]?.textContent).toContain('仓库识别')
   })
 

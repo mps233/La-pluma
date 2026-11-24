@@ -1,7 +1,6 @@
 package gamedata
 
 import (
-	"context"
 	"sort"
 	"unicode"
 
@@ -100,14 +99,3 @@ func collationRank(text string) int {
 
 // FetchParadoxOperators fetches the handbook and character tables and builds
 // paradox-operators.json.
-func (c *Client) FetchParadoxOperators(ctx context.Context) ([]ParadoxOperator, error) {
-	handbook, err := c.fetchExcelJSON(ctx, "handbook_info_table.json")
-	if err != nil {
-		return nil, err
-	}
-	characters, err := c.fetchExcelJSON(ctx, "character_table.json")
-	if err != nil {
-		return nil, err
-	}
-	return ParseParadoxOperators(handbook, characters), nil
-}
