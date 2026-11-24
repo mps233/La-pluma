@@ -2,7 +2,7 @@ import { keepPreviousData, queryOptions, type QueryClient } from '@tanstack/reac
 import { unwrapApiResponse } from '@/shared/api'
 import {
   operBoxQueryOptions,
-  operatorCatalogQueryOptions,
+  operatorCatalogWithSourceQueryOptions,
   type OperatorDetailed,
 } from '@/features/game-data'
 import { getOperatorList, getTrainingQueue } from '../api'
@@ -77,13 +77,14 @@ const readOperatorCatalog = async (
   client: QueryClient,
   signal: AbortSignal,
 ): Promise<OperatorDetailed[]> => {
-  const options = operatorCatalogQueryOptions()
-  return client.fetchQuery({
+  const options = operatorCatalogWithSourceQueryOptions()
+  const catalog = await client.fetchQuery({
     ...options,
     // fetchQuery 没有外置 signal 参数；把调用方 signal 交给共享 queryFn，
     // 训练请求取消时同时中止底层目录读取。
     queryFn: context => options.queryFn!({ ...context, signal }),
   })
+  return catalog.operators
 }
 
 const readOperBoxRows = async (

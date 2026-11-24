@@ -92,7 +92,7 @@ const depot = unwrapApiResponse(result)
 | 函数 | 端点 | 载荷校验 |
 | --- | --- | --- |
 | `getTodayDrops(signal?)` | `GET /agent/drops/today` | 日记录对象（`records` 数组 + `summary` 对象）或旧版记录数组；拒绝业务错误信封 |
-| `getDropStatistics(days?, signal?)` | `GET /agent/drops/statistics?days=` | `total`/`items`/`stages` 对象；`dailyTrend` 为可选数组；拒绝业务错误信封 |
+| `getDropStatistics(days?, signal?)` | `GET /agent/drops/statistics?days=` | `total` 必须为对象且必含 `sanity`/`battles`/`medicine`/`stone` 四个数值；`items` 必须为对象；`stages` 必须为对象且每项必含数值 `battles` 与对象 `items`；`dailyTrend` 为可选数组；拒绝业务错误信封 |
 | `getOpenTodayStages(signal?)` | `GET /agent/stages/open-today` | `open`/`closed` 数组 |
 
 识别解析命令 `parseDepotData(signal?)` / `parseOperBoxData(signal?)` 仍是只写命令，留在 statistics；启动、等待日志可解析、超时与取消由[统计识别命令与失效联动](../frontend/domains/statistics.md#识别命令)的命令所有者接线。取消只结束本地等待，不撤销服务端解析。

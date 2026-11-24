@@ -32,8 +32,17 @@ const mocks = vi.hoisted(() => ({
   dismissNotice: vi.fn(),
 }))
 
+const availability = vi.hoisted(() => ({ available: true, message: '' }))
+
 vi.mock('@/features/device-mirror', () => ({
   DeviceMonitorLayout: ({ children }: { children: ReactNode }) => children,
+}))
+
+vi.mock('@/features/runtime-status', () => ({
+  useAutomationAvailability: () => ({
+    isAvailable: availability.available,
+    unavailableMessage: availability.message,
+  }),
 }))
 
 vi.mock('framer-motion', async () => {
@@ -103,31 +112,6 @@ vi.mock('@/shared/notifications', () => ({
   SETTINGS_UPDATE_NOTICE_ID: 'settings-update',
 }))
 
-vi.mock('@/features/statistics/components/DropRecords', () => ({
-  default: ({
-    dropStatistics,
-    isLoading,
-    error,
-    onRefresh,
-  }: {
-    dropStatistics: unknown
-    isLoading?: boolean
-    error?: string | null
-    onRefresh: () => void
-  }) => (
-    <div data-testid="drop-records">
-      {isLoading && <span>正在读取掉落记录</span>}
-      {error && (
-        <div role="alert">
-          <span>{error}</span>
-          <button type="button" onClick={onRefresh}>重新加载掉落记录</button>
-        </div>
-      )}
-      {Boolean(dropStatistics) && <span>掉落数据已加载</span>}
-    </div>
-  ),
-}))
-
 let client: ReturnType<typeof createQueryClient>
 let container: HTMLDivElement
 let root: Root
@@ -181,6 +165,9 @@ const click = async (element: HTMLElement) => {
 
 const findButton = (label: string) => Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
   .find(button => button.textContent?.includes(label))
+
+const findExactButton = (label: string) => Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+  .find(button => button.textContent === label)
 
 const selectTab = async (tab: string) => {
   const target = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
@@ -242,6 +229,8 @@ describe('DataStatistics layout surfaces', () => {
       return 1
     })
     window.cancelAnimationFrame = vi.fn()
+    availability.available = true
+    availability.message = ''
     Object.values(mocks).forEach(mock => mock.mockReset())
     mocks.getAllOperators.mockResolvedValue({ success: true, data: [] })
     mocks.getDepotData.mockResolvedValue({
@@ -284,6 +273,9 @@ describe('DataStatistics layout surfaces', () => {
     expect(container.querySelector('[role="tablist"]')?.getAttribute('aria-label')).toBe('数据统计视图')
     const tabs = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
     expect(tabs).toHaveLength(3)
+    expect(tabs.map(tab => tab.textContent)).toEqual(['干员识别', '仓库识别', '掉落记录'])
+    expect(tabs[0]?.querySelector('svg')).toBeNull()
+    expect(tabs[0]?.querySelector('small')).toBeNull()
     expect(tabs[0]?.getAttribute('aria-selected')).toBe('true')
     expect(tabs[0]?.tabIndex).toBe(0)
     expect(tabs[1]?.tabIndex).toBe(-1)
@@ -308,6 +300,101 @@ describe('DataStatistics layout surfaces', () => {
     expect(container.querySelector('#data-statistics-panel-depot')?.hasAttribute('hidden')).toBe(false)
     expect(container.querySelector('#data-statistics-panel-operbox')?.hasAttribute('hidden')).toBe(true)
     expect(container.querySelector('#data-statistics-panel-depot')?.textContent).toContain('仓库识别')
+  })
+
+  it('uses one recognition label for both operator and depot panels', async () => {
+    mocks.getAllOperators.mockResolvedValue(catalogFixture)
+    mocks.getOperBoxData.mockResolvedValue(ownedOperatorFixture)
+
+    await renderPage()
+    await flush()
+
+    const recognitionLabels = () => Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .map(button => button.textContent)
+      .filter(label => label === '识别' || label === '立即执行' || label === '重试识别')
+
+    expect(recognitionLabels()).toEqual(['识别'])
+
+    await selectTab('仓库识别')
+    expect(recognitionLabels()).toEqual(['识别'])
+  })
+
+  it('disables both recognition actions with a reason while automation is unavailable', async () => {
+    availability.available = false
+    availability.message = '后端服务暂不可用，请确认服务已启动'
+
+    await renderPage()
+    await flush()
+
+    const recognition = findExactButton('识别')
+    const materials = findExactButton('获取材料数据')
+    expect(recognition?.disabled).toBe(true)
+    expect(materials?.disabled).toBe(true)
+    expect(container.querySelector('[aria-label="识别：后端服务暂不可用，请确认服务已启动"]')).not.toBeNull()
+    expect(container.querySelector('[aria-label="获取材料数据：后端服务暂不可用，请确认服务已启动"]')).not.toBeNull()
+
+    await selectTab('仓库识别')
+
+    const depotRecognition = findExactButton('识别')
+    expect(depotRecognition?.disabled).toBe(true)
+    expect(depotRecognition?.closest('[aria-label="识别：后端服务暂不可用，请确认服务已启动"]')).not.toBeNull()
+  })
+
+  it('shows operator KPI values derived from the owned snapshot and the trusted catalogue', async () => {
+    mocks.getAllOperators.mockResolvedValue({
+      success: true,
+      data: [
+        { id: 'char_001', name: '测试干员', rarity: 6, profession: 'SNIPER' },
+        { id: 'char_002', name: '第二位干员', rarity: 5, profession: 'MEDIC' },
+        { id: 'char_003', name: '第三位干员', rarity: 4, profession: 'TANK' },
+      ],
+    })
+    mocks.getOperBoxData.mockResolvedValue({
+      success: true,
+      data: {
+        operCount: 2,
+        data: [
+          { id: 'char_001', name: '测试干员', rarity: 6, profession: 'SNIPER', level: 80, elite: 2, potential: 1 },
+          { id: 'char_002', name: '第二位干员', rarity: 5, profession: 'MEDIC', level: 50, elite: 1, potential: 2 },
+        ],
+        timestamp: '2026-07-20T08:00:00.000Z',
+      },
+    })
+
+    await renderPage()
+    await flush()
+
+    const overview = () => container.querySelector('[role="group"][aria-label="干员数据概览"]')
+    expect(Array.from(overview()?.querySelectorAll('dt') ?? []).map(term => term.textContent))
+      .toEqual(['已识别', '干员资料', '档案覆盖'])
+    expect(Array.from(overview()?.querySelectorAll('dd') ?? []).map(value => value.textContent))
+      .toEqual(['2', '3', '67%'])
+  })
+
+  it('shows an unknown coverage instead of a stale snapshot ratio', async () => {
+    mocks.getAllOperators.mockResolvedValue({ success: false, message: '目录服务不可用' })
+    mocks.getOperBoxData.mockResolvedValue({
+      success: true,
+      data: {
+        operCount: 2,
+        data: [
+          { id: 'char_001', name: '测试干员', rarity: 6, profession: 'SNIPER', level: 80, elite: 2, potential: 1 },
+          { id: 'char_002', name: '第二位干员', rarity: 5, profession: 'MEDIC', level: 50, elite: 1, potential: 2 },
+        ],
+        allOpers: [
+          { id: 'char_001', name: '测试干员', rarity: 6, owned: true },
+          { id: 'char_002', name: '第二位干员', rarity: 5, owned: true },
+        ],
+        timestamp: '2026-07-20T08:00:00.000Z',
+      },
+    })
+
+    await renderPage()
+    await flush()
+
+    const overview = () => container.querySelector('[role="group"][aria-label="干员数据概览"]')
+    expect(Array.from(overview()?.querySelectorAll('dd') ?? []).map(value => value.textContent))
+      .toEqual(['2', '—', '—'])
   })
 
   it('keeps the drops tab and panel ids linked across visibility transitions', async () => {
@@ -359,7 +446,9 @@ describe('DataStatistics layout surfaces', () => {
     await flush()
 
     expect(selectedTab()?.textContent).toContain('掉落记录')
-    expect(container.querySelector('[data-testid="drop-records"]')?.textContent).toContain('掉落数据已加载')
+    const dropsPanel = container.querySelector('#data-statistics-panel-drops')
+    expect(dropsPanel?.textContent).toContain('总理智消耗')
+    expect(dropsPanel?.textContent).toContain('42')
   })
 
   it('switches to the tab of a later navigation without reloading the page', async () => {
@@ -466,8 +555,8 @@ describe('DataStatistics layout surfaces', () => {
         success: true,
         data: {
           total: { sanity: 42, battles: 3, medicine: 0, stone: 0 },
-          items: {},
-          stages: {},
+          items: { 固源岩: { count: 6, iconId: 'rock' } },
+          stages: { '1-7': { battles: 3, sanity: 42, items: { 固源岩: 6 } } },
           dateRange: { start: '2026-07-20', end: '2026-07-20', days: 1 },
         },
       })
@@ -476,13 +565,16 @@ describe('DataStatistics layout surfaces', () => {
     await flush()
     await selectTab('掉落记录')
 
-    const alert = container.querySelector('[data-testid="drop-records"] [role="alert"]')
+    const alert = container.querySelector('#data-statistics-panel-drops [role="alert"]')
+    expect(alert?.textContent).toContain('掉落记录读取失败')
     expect(alert?.textContent).toContain('暂时无法读取掉落记录')
     expect(alert?.textContent).not.toContain('Internal Server Error')
 
-    await click(findButton('重新加载掉落记录')!)
+    await click(findButton('重新加载')!)
     expect(mocks.getDropStatistics).toHaveBeenCalledTimes(2)
-    expect(container.textContent).toContain('掉落数据已加载')
+    expect(container.querySelector('#data-statistics-panel-drops [role="alert"]')).toBeNull()
+    expect(container.textContent).toContain('总理智消耗')
+    expect(container.textContent).toContain('固源岩')
   })
 
   it('keeps a depot read failure distinct from an empty result and retries it', async () => {
@@ -598,7 +690,7 @@ describe('DataStatistics layout surfaces', () => {
     await renderPage()
     await flush()
     await selectTab('仓库识别')
-    await click(findButton('立即执行')!)
+    await click(findExactButton('识别')!)
     await flush()
 
     expect(mocks.executeCommand).toHaveBeenCalledOnce()
@@ -636,7 +728,7 @@ describe('DataStatistics layout surfaces', () => {
     await renderPage()
     await flush()
     await selectTab('干员识别')
-    await click(findButton('立即执行')!)
+    await click(findExactButton('识别')!)
 
     // 运行中按钮由领域命令状态切换为 loading/disabled，不会产生第二个设备命令。
     const runningButton = findButton('正在执行')
@@ -657,6 +749,83 @@ describe('DataStatistics layout surfaces', () => {
     })
   })
 
+  it('recovers a failed operator panel from the snapshot catalogue after recognition', async () => {
+    mocks.executeCommand.mockResolvedValue({ success: true })
+    mocks.parseOperBoxData.mockResolvedValue({
+      success: true,
+      data: {
+        operCount: 2,
+        data: [
+          { id: 'char_001', name: '识别后的干员', rarity: 6, profession: 'SNIPER', level: 80, elite: 2, potential: 1 },
+          { id: 'char_002', name: '另一位干员', rarity: 5, profession: 'MEDIC', level: 70, elite: 1, potential: 0 },
+        ],
+        allOpers: [
+          { id: 'char_001', name: '识别后的干员', rarity: 6, owned: true },
+          { id: 'char_002', name: '另一位干员', rarity: 5, owned: true },
+          { id: 'char_003', name: '未拥有干员', rarity: 4, owned: false },
+        ],
+        path: 'operbox.json',
+      },
+    })
+    mocks.getAllOperators.mockResolvedValue({ success: false, message: '目录服务不可用' })
+    mocks.getOperBoxData.mockResolvedValue({ success: false })
+
+    await renderPage()
+    await flush()
+
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('干员数据读取失败')
+    expect(mocks.getAllOperators).toHaveBeenCalledTimes(1)
+    expect(mocks.getOperBoxData).toHaveBeenCalledTimes(1)
+
+    await selectTab('干员识别')
+    await click(findExactButton('识别')!)
+    await flush()
+
+    expect(mocks.parseOperBoxData).toHaveBeenCalledOnce()
+    expect(mocks.getAllOperators).toHaveBeenCalledTimes(2)
+    expect(mocks.getOperBoxData).toHaveBeenCalledTimes(1)
+    expect(container.querySelector('[role="alert"]')).toBeNull()
+    expect(container.textContent).toContain('识别后的干员')
+    expect(container.textContent).toContain('未拥有干员')
+  })
+
+  it('refreshes an empty snapshot catalogue after a later recognition', async () => {
+    mocks.executeCommand.mockResolvedValue({ success: true })
+    mocks.parseOperBoxData.mockResolvedValue({
+      success: true,
+      data: {
+        operCount: 1,
+        data: [{ id: 'char_new', name: '新识别的干员', rarity: 6, profession: 'SNIPER', level: 80, elite: 2, potential: 1 }],
+        allOpers: [{ id: 'char_new', name: '新识别的干员', rarity: 6, owned: true }],
+        path: 'operbox.json',
+      },
+    })
+    mocks.getOperBoxData.mockResolvedValue({
+      success: true,
+      data: {
+        operCount: 1,
+        data: [{ id: 'char_old', name: '旧快照干员', rarity: 6, profession: 'SNIPER', level: 80, elite: 2, potential: 1 }],
+        allOpers: [{ id: 'char_old', name: '旧快照干员', rarity: 6, owned: true }],
+        timestamp: '2026-07-20T08:00:00.000Z',
+      },
+    })
+
+    await renderPage()
+    await flush()
+
+    expect(container.textContent).toContain('旧快照干员')
+    expect(mocks.getAllOperators).toHaveBeenCalledTimes(1)
+
+    await selectTab('干员识别')
+    await click(findExactButton('识别')!)
+    await flush()
+
+    expect(mocks.getAllOperators).toHaveBeenCalledTimes(2)
+    expect(mocks.getOperBoxData).toHaveBeenCalledTimes(1)
+    expect(container.textContent).toContain('新识别的干员')
+    expect(container.textContent).not.toContain('旧快照干员')
+  })
+
   it('offers to continue parsing after a parse timeout without executing the command again', async () => {
     vi.useFakeTimers()
     mocks.executeCommand.mockResolvedValue({ success: true })
@@ -671,7 +840,7 @@ describe('DataStatistics layout surfaces', () => {
     await renderPage()
     await flush()
     await selectTab('仓库识别')
-    await click(findButton('立即执行')!)
+    await click(findExactButton('识别')!)
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30_500)
@@ -722,7 +891,7 @@ describe('DataStatistics layout surfaces', () => {
     await renderPage()
     await flush()
     await selectTab('仓库识别')
-    await click(findButton('立即执行')!)
+    await click(findExactButton('识别')!)
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5 * 60_000 + 500)
@@ -730,9 +899,9 @@ describe('DataStatistics layout surfaces', () => {
     await flush()
 
     expect(mocks.executeCommand).toHaveBeenCalledTimes(1)
-    expect(findButton('重试识别')).toBeDefined()
+    expect(findExactButton('重新识别')).toBeDefined()
 
-    await click(findButton('重试识别')!)
+    await click(findExactButton('重新识别')!)
     await flush()
 
     // 继续的是同一逻辑命令：幂等键复用由 commandOwner 覆盖，页面只重新展示解析结果。

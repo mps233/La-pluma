@@ -116,7 +116,7 @@ key 中只放服务端资源身份：筛选/排序等会改变响应的输入放
 | --- | --- | --- |
 | 仓库 `depotQueryOptions()` | `['game-data','depot']` | 默认；保留 `null` 空快照 |
 | 持有干员 `operBoxQueryOptions()` | `['game-data','operbox']` | 默认；保留 `null` 空快照；快照可带识别目录与 `recognition` 概要 |
-| 干员目录 `operatorCatalogQueryOptions()` | `['game-data','catalog']` | 默认 |
+| 干员目录 `operatorCatalogQueryOptions()` / `operatorCatalogWithSourceQueryOptions()` | `['game-data','catalog']` | 两者共用同一 key，缓存值为 `{ operators, source }`，`source` 为 `remote` 或 `snapshot`：`operatorCatalogQueryOptions()` 用 `select` 只取 `operators`（仅供 `useQuery` 观察者），`operatorCatalogWithSourceQueryOptions()` 返回完整 tagged 形状（需要区分远端或快照来源时使用，如统计页观察者与 training 的 `fetchQuery`）。远端目录读取失败或为空时回退到 operbox 快照的 `allOpers`：快照已在 Query 缓存中则直接取用，未命中才单次 `fetchQuery` 读取快照（`retry: false`）；远端失败且快照也为空时抛出远端错误，远端成功但为空且快照也为空时返回空列表（`source: 'snapshot'`） |
 | 掉落 `dropStatisticsQueryOptions(days)` | `['statistics','drops',days]` | `placeholderData: keepPreviousData` |
 | 今日掉落 `todayDropsQueryOptions()` | `['statistics','today-drops']` | 默认；总览协调读取时强制新鲜且不重试 |
 | 今日开放关卡 `openTodayStagesQueryOptions()` | `['statistics','open-stages']` | 同上 |

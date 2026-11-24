@@ -1,27 +1,29 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   depotQueryOptions,
   getItemIconUrl,
   useItemIconCacheVersion,
 } from '@/features/game-data'
+import { useAutomationAvailability } from '@/features/runtime-status'
 import { motion, useReducedMotion } from 'framer-motion'
-import { LoaderCircle, Package as PackageIcon, Play } from 'lucide-react'
-import Icons from '@/shared/components/Icons'
+import { ArrowUp, LoaderCircle, Package as PackageIcon } from 'lucide-react'
+import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
-import { Card } from '@/shared/ui/card'
+import { Card, CardAction, CardHeader, CardTitle } from '@/shared/ui/card'
 import { EmptyState, Loading } from '@/shared/components'
 import { getDepotTypeLabel, summarizeDepot } from '../model/depotSummary'
-import InlineDataError from './InlineDataError'
+import { usePanelScrollTop } from '../hooks/usePanelScrollTop'
+import StatisticsQueryError from './StatisticsQueryError'
+import UnavailableAction from './UnavailableAction'
 import type { StatisticsCommands } from '../hooks/useStatisticsCommands'
 
 const DEPOT_READ_ERROR = '暂时无法读取仓库数据，请检查服务连接后重试。'
 
 const taskPanelClass = (isActive: boolean) =>
-  `data-statistics-task-card gap-0 p-0! transition-colors${isActive ? ' bg-info/5 ring-info/30' : ''}`
+  `gap-0 p-0! transition-colors${isActive ? ' bg-primary/5 ring-primary/30' : ''}`
 
 const statCardClass = 'data-statistics-kpi'
-const chipClass = 'control-surface rounded-full px-2 py-0.5 text-xs whitespace-nowrap'
 
 interface DepotPanelProps {
   isActive: boolean
@@ -30,10 +32,21 @@ interface DepotPanelProps {
 
 export default function DepotPanel({ isActive, command }: DepotPanelProps) {
   const shouldReduceMotion = useReducedMotion()
+  const { isAvailable, unavailableMessage } = useAutomationAvailability()
+  const {
+    setScrollNode,
+    setContentBandNode,
+    isScrolled,
+    isInContentBand,
+    scrollMetrics,
+    handleScroll,
+    scrollToTop,
+  } = usePanelScrollTop(shouldReduceMotion)
   // 资源更新成功后推进，使同一图标的 `<img src>` 换到新的浏览器缓存身份。
   const itemIconVersion = useItemIconCacheVersion()
   const depotQuery = useQuery(depotQueryOptions())
   const [failedDepotImages, setFailedDepotImages] = useState<Record<string, boolean>>({})
+  const [failedDepotImagesVersion, setFailedDepotImagesVersion] = useState(itemIconVersion)
 
   const depotData = depotQuery.data ?? null
   const depotDataLoading = depotQuery.isPending
@@ -41,9 +54,23 @@ export default function DepotPanel({ isActive, command }: DepotPanelProps) {
   const depotDataError = depotQuery.isError ? DEPOT_READ_ERROR : null
   const overview = useMemo(() => summarizeDepot(depotData), [depotData])
 
+  if (failedDepotImagesVersion !== itemIconVersion) {
+    setFailedDepotImagesVersion(itemIconVersion)
+    setFailedDepotImages({})
+  }
+
   if (!isActive) return null
 
   const isRecognizing = command.activeKind === 'depot' && command.isRunning
+  const unavailableReason = !isAvailable ? unavailableMessage : ''
+  const withUnavailableHint = (action: string, node: ReactNode) => (
+    unavailableReason
+      ? <UnavailableAction action={action} reason={unavailableReason}>{node}</UnavailableAction>
+      : node
+  )
+  const latestRecognition = depotData?.timestamp
+    ? new Date(depotData.timestamp).toLocaleString('zh-CN')
+    : '-'
 
   return (
     <motion.div
@@ -53,47 +80,51 @@ export default function DepotPanel({ isActive, command }: DepotPanelProps) {
       className="min-w-0"
     >
       <Card
-        className={taskPanelClass(command.activeTask === 'depot')}
+        role="region"
+        aria-labelledby="depot-panel-title"
+        data-scroll-clip="panel"
+        className={`${taskPanelClass(command.activeTask === 'depot')} overflow-clip`}
       >
+        <CardHeader className="px-4 pt-4 pb-0">
+          <CardTitle
+            id="depot-panel-title"
+            role="heading"
+            aria-level={2}
+            className="text-lg font-semibold"
+          >
+            仓库识别
+          </CardTitle>
+          <CardAction>
+            {isRecognizing
+              ? (
+                <Button
+                  onClick={() => command.startRecognition('depot')}
+                  disabled
+                  aria-busy
+                >
+                  <LoaderCircle className="animate-spin" aria-hidden="true" />
+                  正在执行
+                </Button>
+              )
+              : withUnavailableHint(command.actionLabel('depot'), (
+                <Button
+                  onClick={() => command.startRecognition('depot')}
+                  disabled={!isAvailable || command.isRunning}
+                >
+                  {command.actionLabel('depot')}
+                </Button>
+              ))}
+          </CardAction>
+        </CardHeader>
+
         <div className="data-statistics-task-content app-stack-card">
-          <div className="data-statistics-task-header flex items-start gap-3.5 sm:items-center">
-            <div className="flex w-full min-w-0 flex-1 items-center gap-3.5 sm:w-auto">
-              <div className="flex h-10 w-10 flex-none items-center justify-center" aria-hidden="true">
-                <Icons.Package />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-lg font-semibold text-foreground">仓库识别</h2>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  汇总物品库存、材料分类与数量
-                </p>
-              </div>
-            </div>
-
-            <div className="data-statistics-task-actions shrink-0">
-              <Button
-                onClick={() => command.startRecognition('depot')}
-                disabled={command.isRunning || isRecognizing}
-                aria-busy={isRecognizing || undefined}
-              >
-                {isRecognizing
-                  ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在执行</>
-                  : (
-                    <>
-                      <Play size={15} fill="currentColor" aria-hidden="true" />
-                      {command.actionLabel('depot')}
-                    </>
-                  )}
-              </Button>
-            </div>
-          </div>
-
-          {!depotDataError && !depotData && (depotDataLoading || command.activeTask === 'depot') && (
-            <div className="rounded-xl py-12 surface-soft" aria-live="polite">
+          {depotDataLoading && (
+            <div className="rounded-xl py-12 surface-soft">
               <Loading text={command.activeTask === 'depot' ? '正在识别仓库数据' : '正在读取仓库数据'} />
             </div>
           )}
           {depotDataError && (
-            <InlineDataError
+            <StatisticsQueryError
               title="仓库数据读取失败"
               description={depotDataError}
               isRetrying={depotDataRefreshing}
@@ -102,11 +133,11 @@ export default function DepotPanel({ isActive, command }: DepotPanelProps) {
               }}
             />
           )}
-          {!depotDataLoading && !depotDataError && !command.isRunning && !depotData && (
+          {!depotDataLoading && !depotDataError && !depotData && (
             <EmptyState
               compact
               className="py-10"
-              icon={<Icons.Package />}
+              icon={<PackageIcon size={24} strokeWidth={1.7} />}
               title="还没有仓库识别结果"
               description="完成一次仓库识别后，物品清单会显示在这里。"
             />
@@ -114,7 +145,8 @@ export default function DepotPanel({ isActive, command }: DepotPanelProps) {
           {depotData && (
             <div className="app-stack-card">
               <div
-                className="data-statistics-kpi-grid grid grid-cols-2 md:grid-cols-3"
+                className="data-statistics-kpi-grid data-statistics-kpi-grid-depot grid grid-cols-2 md:grid-cols-3"
+                role="group"
                 aria-label="仓库数据概览"
               >
                 <div className={statCardClass}>
@@ -141,20 +173,22 @@ export default function DepotPanel({ isActive, command }: DepotPanelProps) {
                     {overview.totalCount.toLocaleString()}
                   </p>
                 </div>
-                <div className={statCardClass}>
-                  <p className="text-xs text-muted-foreground">库存最多</p>
-                  <p className="mt-1 truncate text-sm font-semibold text-foreground">
-                    {overview.topItem?.name ?? '-'}
-                  </p>
-                </div>
-                {depotData.timestamp && (
-                  <div className={statCardClass}>
-                    <p className="text-xs text-muted-foreground">最近识别</p>
-                    <p className="mt-1 truncate text-sm font-semibold text-foreground">
-                      {new Date(depotData.timestamp).toLocaleString('zh-CN')}
-                    </p>
+                <div className={`${statCardClass} data-statistics-kpi-split-cell col-span-2`}>
+                  <div className="data-statistics-kpi-split grid h-full grid-cols-2">
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground">库存最多</p>
+                      <p className="mt-1 truncate text-sm font-semibold text-foreground">
+                        {overview.topItem?.name ?? '-'}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground">最近识别</p>
+                      <p className="mt-1 truncate text-sm font-semibold text-foreground">
+                        {latestRecognition}
+                      </p>
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
 
               {overview.groups.length > 0 && (
@@ -162,64 +196,124 @@ export default function DepotPanel({ isActive, command }: DepotPanelProps) {
                   <h3 id="depot-category-title" className="mb-2 text-sm font-semibold text-foreground">分类汇总</h3>
                   <div className="flex flex-wrap gap-2">
                     {overview.groups.map((group) => (
-                      <div key={group.type} className="control-surface rounded-full px-3 py-1.5 text-xs text-muted-foreground">
+                      <Badge
+                        key={group.type}
+                        variant="outline"
+                        className="h-auto max-w-full flex-wrap gap-0 whitespace-normal py-1 text-muted-foreground"
+                      >
                         <span className="font-medium">{group.label}</span>
                         <span className="mx-1 brand-text">·</span>
                         <span>{group.kinds} 种</span>
                         <span className="mx-1 brand-text">/</span>
                         <span>{group.count.toLocaleString()} 件</span>
-                      </div>
+                      </Badge>
                     ))}
                   </div>
                 </section>
               )}
 
               {depotData.items && depotData.items.length > 0 && (
-                <div className="data-statistics-item-grid grid grid-cols-1 overflow-hidden rounded-xl surface-soft sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-                  {depotData.items.map((item) => {
-                    const itemKey = item.id || item.iconId
-                    const imageKey = `${itemKey}:${item.iconId}`
-
-                    return (
-                      <div
-                        key={itemKey}
-                        className="data-statistics-depot-item flex min-w-0 items-center gap-3.5 p-3"
+                <div className="min-w-0">
+                  <div
+                    ref={setContentBandNode}
+                    data-scroll-anchor="back-to-top"
+                    className="flex items-start"
+                    style={{
+                      position: 'sticky',
+                      top: 'var(--layout-content-sticky-top)',
+                      zIndex: 'var(--layout-z-sticky)',
+                      height: '1.75rem',
+                      marginBottom: '-1.75rem',
+                      justifyContent: 'center',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    {isScrolled && isInContentBand && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="bg-popover shadow-md dark:bg-popover"
+                        style={{ pointerEvents: 'auto' }}
+                        onClick={scrollToTop}
                       >
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted">
-                          {failedDepotImages[imageKey] ? (
-                            <span role="img" aria-label={`${item.name}图标不可用`}>
-                              <PackageIcon className="h-6 w-6 brand-text" aria-hidden="true" />
-                            </span>
-                          ) : (
-                            <img
-                              src={getItemIconUrl(item.id, itemIconVersion)}
-                              alt={item.name}
-                              className="w-full h-full object-cover"
-                              onError={() => {
-                                setFailedDepotImages(previous => ({ ...previous, [imageKey]: true }))
-                              }}
-                            />
-                          )}
-                        </div>
+                        <ArrowUp size={14} aria-hidden="true" />
+                        回到顶部
+                      </Button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <div
+                      ref={setScrollNode}
+                      role="list"
+                      aria-label="仓库物品清单"
+                      tabIndex={0}
+                      onScroll={handleScroll}
+                      className="data-statistics-scroll-area data-statistics-item-grid grid grid-cols-1 rounded-xl surface-soft sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4"
+                    >
+                      {depotData.items.map((item) => {
+                        const itemKey = item.id || item.iconId
+                        const imageKey = `${itemKey}:${item.iconId}`
 
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-bold text-foreground truncate" title={item.name}>
-                            {item.name}
+                        return (
+                          <div
+                            key={itemKey}
+                            role="listitem"
+                            className="data-statistics-depot-item flex min-w-0 items-center gap-3.5 p-3"
+                          >
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted">
+                              {failedDepotImages[imageKey] ? (
+                                <span role="img" aria-label={`${item.name}图标不可用`}>
+                                  <PackageIcon className="h-6 w-6 brand-text" aria-hidden="true" />
+                                </span>
+                              ) : (
+                                <img
+                                  src={getItemIconUrl(item.id, itemIconVersion)}
+                                  alt={item.name}
+                                  className="w-full h-full object-cover"
+                                  onError={() => {
+                                    setFailedDepotImages(previous => ({ ...previous, [imageKey]: true }))
+                                  }}
+                                />
+                              )}
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-bold text-foreground truncate" title={item.name}>
+                                {item.name}
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                {item.classifyType && (
+                                  <Badge variant="outline">
+                                    {getDepotTypeLabel(item.classifyType)}
+                                  </Badge>
+                                )}
+                                <Badge variant="outline" className="font-semibold">
+                                  ×{item.count.toLocaleString()}
+                                </Badge>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            {item.classifyType && (
-                              <span className={chipClass}>
-                                {getDepotTypeLabel(item.classifyType)}
-                              </span>
-                            )}
-                            <span className={`${chipClass} font-semibold`}>
-                              ×{item.count.toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
+                        )
+                      })}
+                    </div>
+                    {scrollMetrics.hasOverflow && (
+                      <div
+                        aria-hidden="true"
+                        data-scroll-indicator="track"
+                        className="data-statistics-scroll-indicator"
+                      >
+                        <div
+                          data-scroll-indicator="thumb"
+                          className="data-statistics-scroll-thumb"
+                          style={{
+                            height: `${scrollMetrics.viewportRatio * 100}%`,
+                            top: `${scrollMetrics.progress * (1 - scrollMetrics.viewportRatio) * 100}%`,
+                          }}
+                        />
                       </div>
-                    )
-                  })}
+                    )}
+                  </div>
                 </div>
               )}
             </div>

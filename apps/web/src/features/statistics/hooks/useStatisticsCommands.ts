@@ -92,8 +92,8 @@ export function useStatisticsCommands(): StatisticsCommands {
   }
 
   const actionLabel = (kind: StatisticsRecognitionKind) => {
-    if (isRunning || commandState.kind !== kind || !commandState.resumeMode) return '立即执行'
-    return commandState.resumeMode === 'parse' ? '继续解析' : '重试识别'
+    if (isRunning || commandState.kind !== kind || !commandState.resumeMode) return '识别'
+    return commandState.resumeMode === 'parse' ? '继续解析' : '重新识别'
   }
 
   // 材料刷新是统计域持有的脚本命令，不进入 Query，也不读一次目录当作完成条件。

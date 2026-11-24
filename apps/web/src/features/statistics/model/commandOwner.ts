@@ -64,8 +64,6 @@ export type StatisticsCommandResumeMode = 'parse' | 'command' | null
 export interface StatisticsCommandState {
   readonly kind: StatisticsCommandKind | null
   readonly phase: StatisticsCommandPhase
-  readonly message: string | null
-  readonly runId: string | null
   readonly resumeMode: StatisticsCommandResumeMode
 }
 
@@ -161,6 +159,7 @@ const DEPOT_RECOGNITION_SCOPES = [
 
 const OPERBOX_RECOGNITION_SCOPES = [
   'operbox',
+  'catalog',
   'materials',
   'training-queue',
   'dashboard-snapshot',
@@ -193,8 +192,6 @@ const RECOGNITION_LABELS = {
 const idleState = (): StatisticsCommandState => ({
   kind: null,
   phase: 'idle',
-  message: null,
-  runId: null,
   resumeMode: null,
 })
 
@@ -543,7 +540,9 @@ export class StatisticsCommandOwner {
       if (isTerminalRunState(submittedRun.state)) {
         return this.finishFailure(kind, describeRunFailure(submittedRun), null, options)
       }
-      if (!isActiveRunState(submittedRun.state)) return null
+      if (!isActiveRunState(submittedRun.state)) {
+        return this.finishFailure(kind, '无法确认识别命令的执行结果', 'command', options)
+      }
     }
 
     operation.arm(this.timeouts.run)
@@ -647,8 +646,6 @@ export class StatisticsCommandOwner {
     this.setState({
       kind: 'materials',
       phase: 'running',
-      message,
-      runId: null,
       resumeMode: null,
     })
     this.emit(options, message)
@@ -713,8 +710,6 @@ export class StatisticsCommandOwner {
     this.setState({
       kind,
       phase,
-      message,
-      runId: this.resumable?.runId ?? null,
       resumeMode: this.resumable?.commandSucceeded ? 'parse' : 'command',
     })
     this.emit(options, message)
@@ -734,19 +729,19 @@ export class StatisticsCommandOwner {
     const resumeMode: StatisticsCommandResumeMode = commandSucceeded ? 'parse' : 'command'
     const cancelled = operation.cancelled
     const waitingForRun = this.state.phase === 'waiting'
-    const message = cancelled
-      ? '已取消等待识别结果'
-      : commandSucceeded
-        ? waitingForRun
-          ? '识别命令仍在执行，可继续等待结果'
-          : '识别完成，但等待解析结果超时'
-        : '等待识别命令结果超时'
+    const message = kind === 'materials'
+      ? (cancelled ? '已取消等待材料数据' : '等待材料数据结果超时')
+      : cancelled
+        ? '已取消等待识别结果'
+        : commandSucceeded
+          ? waitingForRun
+            ? '识别命令仍在执行，可继续等待结果'
+            : '识别完成，但等待解析结果超时'
+          : '等待识别命令结果超时'
 
     this.setState({
       kind,
       phase: cancelled ? 'cancelled' : 'timed-out',
-      message,
-      runId: this.resumable?.runId ?? null,
       resumeMode: kind === 'materials' ? null : resumeMode,
     })
     this.emit(options, message)
@@ -768,8 +763,6 @@ export class StatisticsCommandOwner {
     this.setState({
       kind,
       phase: 'failed',
-      message,
-      runId: this.resumable?.runId ?? null,
       resumeMode,
     })
     this.emit(options, message)
@@ -785,8 +778,6 @@ export class StatisticsCommandOwner {
     this.setState({
       kind,
       phase: 'succeeded',
-      message,
-      runId: null,
       resumeMode: null,
     })
     this.emit(options, message)

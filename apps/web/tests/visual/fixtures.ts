@@ -247,7 +247,7 @@ export const apiFixtures: ApiFixture[] = [
     }),
   },
   {
-    // 此端点的 data 是裸数组（DataStatistics 直接 Array.isArray 消费），
+    // 此端点的 data 是裸数组：game-data 的 getAllOperators 以 Array.isArray 校验，
     // 训练页的 extractOperatorRows 两种形状都兼容。
     path: '/agent/data/operators',
     payload: ok([
@@ -263,16 +263,13 @@ export const apiFixtures: ApiFixture[] = [
   {
     path: '/agent/data/operbox',
     payload: ok({
-      operCount: 128,
+      operCount: 5,
       data: [
         { id: 'char_010_chen', name: '陈', rarity: 6, profession: 'WARRIOR', position: 'MELEE', level: 90, elite: 2, potential: 5 },
         { id: 'char_103_angel', name: '能天使', rarity: 6, profession: 'SNIPER', position: 'RANGED', level: 85, elite: 2, potential: 2 },
         { id: 'char_180_amgoat', name: '艾雅法拉', rarity: 6, profession: 'CASTER', position: 'RANGED', level: 80, elite: 1, potential: 3 },
         { id: 'char_202_demkni', name: '塞雷娅', rarity: 6, profession: 'TANK', position: 'MELEE', level: 60, elite: 0, potential: 1 },
         { id: 'char_002_amiya', name: '阿米娅', rarity: 5, profession: 'CASTER', position: 'RANGED', level: 70, elite: 1, potential: 6 },
-        { id: 'char_326_glacus', name: '格劳克斯', rarity: 5, profession: 'SPECIAL', position: 'MELEE', level: 55, elite: 1, potential: 4 },
-        { id: 'char_286_cast3', name: '夜烟', rarity: 3, profession: 'CASTER', position: 'RANGED', level: 40, elite: 0, potential: 2 },
-        { id: 'char_121_lava', name: '炎熔', rarity: 3, profession: 'CASTER', position: 'RANGED', level: 35, elite: 0, potential: 1 },
       ],
       allOpers: [
         { id: 'char_010_chen', name: '陈', rarity: 6, owned: true },
@@ -283,7 +280,7 @@ export const apiFixtures: ApiFixture[] = [
         { id: 'char_326_glacus', name: '格劳克斯', rarity: 5, owned: false },
       ],
       operTotal: 6,
-      recognition: { status: 'complete', total: 6, owned: 8 },
+      recognition: { status: 'complete', total: 6, owned: 5 },
       timestamp: '2026-10-24 04:00:00',
     }),
   },

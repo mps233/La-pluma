@@ -36,15 +36,28 @@ const isTodayDropsPayload = (payload: unknown): boolean =>
     && Array.isArray(payload.records)
     && isRecord(payload.summary))
 
+const isDropStatisticsTotal = (value: unknown): boolean =>
+  isRecord(value)
+  && typeof value.sanity === 'number'
+  && typeof value.battles === 'number'
+  && typeof value.medicine === 'number'
+  && typeof value.stone === 'number'
+
+const isDropStatisticsStage = (value: unknown): boolean =>
+  isRecord(value)
+  && typeof value.battles === 'number'
+  && isRecord(value.items)
+
 /**
  * `dailyTrend` 不由掉落面板消费；旧服务端/固定数据可能省略，不能据此判坏。
  */
 const isDropStatisticsPayload = (payload: unknown): boolean =>
   isRecord(payload)
   && payload.success !== false
-  && isRecord(payload.total)
+  && isDropStatisticsTotal(payload.total)
   && isRecord(payload.items)
   && isRecord(payload.stages)
+  && Object.values(payload.stages).every(isDropStatisticsStage)
   && (payload.dailyTrend === undefined || Array.isArray(payload.dailyTrend))
 
 const isOpenTodayStagesPayload = (payload: unknown): boolean =>

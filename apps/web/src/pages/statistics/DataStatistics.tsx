@@ -4,7 +4,7 @@ import { DeviceMonitorLayout } from '@/features/device-mirror'
 
 export default function DataStatistics() {
   return (
-    <PageShell pageKind="statistics" layout="workspace" surface="borderless" className="data-statistics-page">
+    <PageShell pageKind="statistics" layout="workspace" surface="borderless">
       <DeviceMonitorLayout variant="standard">
         <StatisticsWorkspace />
       </DeviceMonitorLayout>

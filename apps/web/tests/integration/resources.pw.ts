@@ -53,13 +53,13 @@ test('识别完成使隐藏养成与总览失效，应用计划后自动化读�
   const initialQueueReads = requestsFor(state, '/agent/training/queue', 'GET').length
   const initialDashboardReads = requestsFor(state, '/agent/drops/today', 'GET').length
   await navigateTo(page, 'statistics')
-  await expect(page.getByRole('button', { name: '立即执行', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: '识别', exact: true })).toBeEnabled()
 
   // 解析成功后权威队列变化，识别命令只能提交一次。
   state.trainingQueue = { ...state.trainingQueue, queue: (state.trainingQueue.queue as unknown[]).slice(0, 1) }
-  await page.getByRole('button', { name: '立即执行', exact: true }).click()
+  await page.getByRole('button', { name: '识别', exact: true }).click()
   await expect.poll(() => requestsFor(state, '/agent/actions/operbox-recognition', 'POST').length).toBe(1)
-  await expect(page.getByRole('button', { name: '立即执行', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: '识别', exact: true })).toBeEnabled()
   expect(state.submissions).toHaveLength(1)
 
   await navigateTo(page, 'training')

@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion, useReducedMotion } from 'framer-motion'
+import { notify } from '@/shared/notifications'
 import { dropStatisticsQueryOptions } from '../model/queries'
 import DropRecords from './DropRecords'
 
 const DROP_READ_ERROR = '暂时无法读取掉落记录，请检查服务连接后重试。'
+const DROP_PERIOD_FALLBACK_NOTICE = '统计周期读取失败，已回退到最近成功的周期'
+const DEFAULT_DROP_DAYS = 7
 
 interface DropPanelProps {
   isActive: boolean
@@ -12,8 +15,32 @@ interface DropPanelProps {
 
 export default function DropPanel({ isActive }: DropPanelProps) {
   const shouldReduceMotion = useReducedMotion()
-  const [dropDays, setDropDays] = useState(7)
+  const [dropDays, setDropDays] = useState(DEFAULT_DROP_DAYS)
+  const [lastSuccessfulDays, setLastSuccessfulDays] = useState<number | null>(null)
+  const [fallbackCount, setFallbackCount] = useState(0)
   const dropQuery = useQuery(dropStatisticsQueryOptions(dropDays))
+
+  const hasSuccessfulRead = dropQuery.isSuccess
+    && !dropQuery.isPlaceholderData
+    && dropQuery.data !== undefined
+    && dropQuery.fetchStatus === 'idle'
+  if (hasSuccessfulRead && lastSuccessfulDays !== dropDays) {
+    setLastSuccessfulDays(dropDays)
+  }
+
+  const isSettledError = dropQuery.isError && dropQuery.fetchStatus === 'idle'
+  const fallbackTarget = isSettledError && lastSuccessfulDays !== null && lastSuccessfulDays !== dropDays
+    ? lastSuccessfulDays
+    : null
+  if (fallbackTarget !== null) {
+    setDropDays(fallbackTarget)
+    setFallbackCount(count => count + 1)
+  }
+
+  useEffect(() => {
+    if (fallbackCount === 0) return
+    notify(DROP_PERIOD_FALLBACK_NOTICE, 'warning')
+  }, [fallbackCount])
 
   if (!isActive) return null
 
@@ -32,7 +59,9 @@ export default function DropPanel({ isActive }: DropPanelProps) {
           void dropQuery.refetch()
         }}
         isLoading={dropQuery.isFetching}
-        error={dropQuery.isError ? DROP_READ_ERROR : null}
+        isPlaceholderData={dropQuery.isPlaceholderData}
+        fetchStatus={dropQuery.fetchStatus}
+        error={isSettledError && fallbackTarget === null ? DROP_READ_ERROR : null}
       />
     </motion.div>
   )

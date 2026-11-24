@@ -142,16 +142,16 @@ import { SegmentedTabs, SegmentedTabNav, SegmentedTabPanel } from '@/shared/comp
     ariaLabel="数据统计视图"
     value={activeTab}
     options={options}
-    tabId={id => `statistics-tab-${id}`}
-    panelId={id => `statistics-panel-${id}`}
+    tabId={id => `data-statistics-tab-${id}`}
+    panelId={id => `data-statistics-panel-${id}`}
   />
-  <SegmentedTabPanel value="operbox" id="statistics-panel-operbox" keepMounted>
+  <SegmentedTabPanel value="operbox" id="data-statistics-panel-operbox" keepMounted>
     干员面板
   </SegmentedTabPanel>
-  <SegmentedTabPanel value="depot" id="statistics-panel-depot" keepMounted>
+  <SegmentedTabPanel value="depot" id="data-statistics-panel-depot" keepMounted>
     仓库面板
   </SegmentedTabPanel>
-  <SegmentedTabPanel value="drops" id="statistics-panel-drops" keepMounted>
+  <SegmentedTabPanel value="drops" id="data-statistics-panel-drops" keepMounted>
     <DropPanel isActive={activeTab === 'drops'} />
   </SegmentedTabPanel>
 </SegmentedTabs>

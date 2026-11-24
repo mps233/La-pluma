@@ -867,58 +867,6 @@
     opacity: 1;
   }
 
-  .la-pluma-app .la-pluma-content .app-native-button {
-    /* 原生按钮的 iOS 尺寸/排版是组件基线，需压过页面级按钮覆盖。 */
-    display: inline-flex;
-    min-height: 2.75rem !important;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem !important;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg) !important;
-    background: var(--muted);
-    color: var(--foreground) !important;
-    box-shadow: none !important;
-    font: inherit !important;
-    font-weight: 600 !important;
-    letter-spacing: 0;
-    -webkit-tap-highlight-color: transparent;
-    transition: background 180ms ease, border-color 180ms ease, color 180ms ease, transform 120ms ease;
-  }
-
-  .la-pluma-app .la-pluma-content .app-native-button:hover:not(:disabled) {
-    border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
-    background: color-mix(in srgb, var(--primary-soft) 34%, var(--muted));
-    color: var(--primary);
-  }
-
-  .la-pluma-app .la-pluma-content .app-native-button:active:not(:disabled) {
-    transform: scale(0.97);
-  }
-
-  .la-pluma-app .la-pluma-content .app-native-button:focus-visible {
-    outline: 2px solid var(--primary);
-    outline-offset: 2px;
-  }
-
-  .la-pluma-app .la-pluma-content .app-native-button:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
-  }
-
-  .la-pluma-app .la-pluma-content .app-native-button-primary {
-    /* 主按钮的前景色是组件语义，需压过页面级 .is-primary 覆盖。 */
-    border-color: var(--primary-action);
-    background: var(--primary-action);
-    color: #fff !important;
-  }
-
-  .la-pluma-app .la-pluma-content .app-native-button-primary:hover:not(:disabled) {
-    border-color: var(--primary-action-pressed) !important;
-    background: var(--primary-action-pressed) !important;
-    color: #fff !important;
-  }
-
   html.dark .la-pluma-app .la-pluma-content .app-native-control,
   .la-pluma-app.dark .la-pluma-content .app-native-control {
     background: color-mix(in srgb, var(--muted) 92%, transparent);

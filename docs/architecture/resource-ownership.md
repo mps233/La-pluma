@@ -134,7 +134,7 @@ publishResourceInvalidation({
 | 触发 | 应发布作用域 | 发布方 |
 | --- | --- | --- |
 | 仓库识别成功并解析完成 | `depot`、`materials`、`training-queue`、`dashboard-snapshot` | `statistics` 识别命令 |
-| 干员识别成功并解析完成 | `operbox`、`materials`、`training-queue`、`dashboard-snapshot` | `statistics` 识别命令 |
+| 干员识别成功并解析完成 | `operbox`、`catalog`、`materials`、`training-queue`、`dashboard-snapshot` | `statistics` 识别命令 |
 | 材料刷新成功 | `materials`、`training-queue`、`dashboard-snapshot` | `statistics` 材料命令 |
 | 队列增删/排序/撤销成功 | `training-queue`、`materials`、`training-plan`、`dashboard-snapshot`；任务流程确认 synced 时额外 `automation-config`（自动同步不重注册 cron，不发布 `automation-schedule`） | 养成队列命令 |
 | 养成设置保存成功 | `training-plan`（设置值参与计划应用前提） | `training` 设置所有者 |

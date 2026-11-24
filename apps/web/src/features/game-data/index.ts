@@ -12,7 +12,9 @@ export {
   depotQueryOptions,
   operBoxQueryOptions,
   operatorCatalogQueryOptions,
+  operatorCatalogWithSourceQueryOptions,
 } from './model/queries'
+export type { OperatorCatalogSource, OperatorCatalogWithSource } from './model/queries'
 export type { GameDataResource } from './model/queryKeys'
 export type {
   DepotDataDetailed,

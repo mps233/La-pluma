@@ -135,6 +135,42 @@ describe('training candidate query options', () => {
     ])
   })
 
+  it('rebuilds the status=all list from the snapshot fallback when the catalog endpoint is empty', async () => {
+    apiMocks.getOperatorList.mockResolvedValue({ success: true, data: { operators: [] } })
+    apiMocks.getAllOperators.mockResolvedValue({ success: true, data: [] })
+    apiMocks.getOperBoxData.mockResolvedValue({
+      success: true,
+      data: {
+        operCount: 0,
+        data: [],
+        allOpers: [{ id: 'char_unowned', name: '未拥有', rarity: 5, owned: false }],
+        timestamp: '2026-10-26T00:00:00.000Z',
+      },
+    })
+
+    const data = await createQueryClient().fetchQuery(
+      trainingCandidatesQueryOptions({ status: 'all' }),
+    )
+
+    expect(data.operators).toEqual([
+      {
+        id: 'char_unowned',
+        name: '未拥有',
+        rarity: 5,
+        profession: '未知',
+        currentElite: 0,
+        currentLevel: 0,
+        targetElite: 2,
+        owned: false,
+        hasMaterialData: false,
+        canTrain: false,
+        disabledReason: 'unowned',
+        trainingStatus: 'unowned',
+      },
+    ])
+    expect(apiMocks.getOperBoxData).toHaveBeenCalledOnce()
+  })
+
   it('reuses the shared game-data snapshots for the all-status fallback', async () => {
     apiMocks.getOperatorList.mockResolvedValue({ success: true, data: { operators: [] } })
     apiMocks.getAllOperators.mockResolvedValue({ success: true, data: [] })
@@ -208,9 +244,12 @@ describe('training status count query options', () => {
   it('reads catalogue and operbox from the existing game-data cache', async () => {
     apiMocks.getOperatorList.mockResolvedValue({ success: true, data: { operators: [operatorRow('char_a')] } })
     const client = createQueryClient()
-    client.setQueryData(gameDataKeys.resource('catalog'), [
-      { id: 'char_a', name: 'A', rarity: 6, profession: 'SNIPER', level: 0, elite: 0, potential: 0 },
-    ])
+    client.setQueryData(gameDataKeys.resource('catalog'), {
+      operators: [
+        { id: 'char_a', name: 'A', rarity: 6, profession: 'SNIPER', level: 0, elite: 0, potential: 0 },
+      ],
+      source: 'remote',
+    })
     client.setQueryData(gameDataKeys.resource('operbox'), {
       operCount: 1,
       data: [{ id: 'char_a', name: 'A', rarity: 6, profession: 'SNIPER', level: 80, elite: 2, potential: 0 }],

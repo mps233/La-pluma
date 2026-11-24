@@ -206,9 +206,30 @@ describe('statistics command owner', () => {
     expect(result).toMatchObject({ status: 'succeeded', kind: 'operbox', operBox: { operCount: 1 } })
     expect(harness.parseDepot).not.toHaveBeenCalled()
     expect(harness.publish).toHaveBeenCalledWith({
-      resources: ['operbox', 'materials', 'training-queue', 'dashboard-snapshot'],
+      resources: ['operbox', 'catalog', 'materials', 'training-queue', 'dashboard-snapshot'],
       cause: 'recognition',
     })
+  })
+
+  it('invalidates the shared catalog after operbox recognition so a snapshot fallback is re-read', async () => {
+    const hub = new ResourceInvalidationHub()
+    const harness = createOwner({ publish: invalidation => hub.publish(invalidation) })
+    const catalogue = vi.fn()
+    hub.subscribe(event => {
+      if (event.resources.includes('catalog')) catalogue(event.resources)
+    })
+    harness.runCommand.mockResolvedValue({ success: true, data: {} })
+    harness.parseOperBox.mockResolvedValue(operBoxPayload)
+
+    await harness.owner.run('operbox')
+
+    expect(catalogue).toHaveBeenCalledWith([
+      'operbox',
+      'catalog',
+      'materials',
+      'training-queue',
+      'dashboard-snapshot',
+    ])
   })
 
   it('refreshes materials once and publishes the resources derived from material data', async () => {
@@ -225,6 +246,42 @@ describe('statistics command owner', () => {
       resources: ['materials', 'training-queue', 'dashboard-snapshot'],
       cause: 'recognition',
     })
+  })
+
+  it('reports a materials-specific message when the materials refresh times out', async () => {
+    const harness = createOwner({
+      timeouts: { command: 1_000, run: 1_000, parse: 1_000, materials: 20 },
+    })
+    harness.fetchMaterials.mockImplementation((signal: AbortSignal) => abortable(signal))
+
+    const promise = harness.owner.run('materials')
+    await vi.advanceTimersByTimeAsync(30)
+    const result = await promise
+
+    expect(result).toMatchObject({
+      status: 'timed-out',
+      kind: 'materials',
+      message: '等待材料数据结果超时',
+    })
+    expect(harness.owner.getState()).toMatchObject({ phase: 'timed-out', resumeMode: null })
+    expect(harness.publish).not.toHaveBeenCalled()
+  })
+
+  it('reports a materials-specific message when the materials wait is cancelled', async () => {
+    const harness = createOwner()
+    harness.fetchMaterials.mockImplementation((signal: AbortSignal) => abortable(signal))
+
+    const promise = harness.owner.run('materials')
+    await vi.advanceTimersByTimeAsync(1)
+    harness.owner.cancel()
+    const result = await promise
+
+    expect(result).toMatchObject({
+      status: 'cancelled',
+      kind: 'materials',
+      message: '已取消等待材料数据',
+    })
+    expect(harness.owner.getState()).toMatchObject({ phase: 'cancelled', resumeMode: null })
   })
 
   it('does not submit a second device command while one is in flight', async () => {
@@ -357,6 +414,23 @@ describe('statistics command owner', () => {
     expect(harness.parseDepot).not.toHaveBeenCalled()
     expect(harness.publish).not.toHaveBeenCalled()
     expect(harness.owner.getState()).toMatchObject({ resumeMode: null })
+  })
+
+  it('fails an unclassifiable submitted run state without parsing or publishing', async () => {
+    const harness = createOwner()
+    harness.runCommand.mockResolvedValue(submittedRun('run-1', 'teleported'))
+    harness.parseDepot.mockResolvedValue(depotPayload)
+
+    const result = await harness.owner.run('depot')
+
+    expect(result).toMatchObject({
+      status: 'failed',
+      kind: 'depot',
+      message: '无法确认识别命令的执行结果',
+    })
+    expect(harness.parseDepot).not.toHaveBeenCalled()
+    expect(harness.publish).not.toHaveBeenCalled()
+    expect(harness.owner.getState()).toMatchObject({ phase: 'failed', resumeMode: 'command' })
   })
 
   it('treats a rejected command as a definite failure and allows a fresh intent later', async () => {

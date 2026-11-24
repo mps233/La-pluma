@@ -61,13 +61,53 @@ describe('statistics resource reads', () => {
     expect(result.data).toHaveLength(1)
   })
 
-  it('keeps the legacy drop statistics payload without dailyTrend', async () => {
+  it('rejects a drop statistics payload whose total omits medicine and stone', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
       success: true,
       data: {
         total: { sanity: 2456, battles: 89 },
         items: { 固源岩: { count: 145 } },
-        stages: { '1-7': { battles: 42 } },
+        stages: { '1-7': { battles: 42, sanity: 336, items: { 固源岩: 61 } } },
+        dateRange: { start: '2026-10-18', end: '2026-10-24', days: 7 },
+      },
+    }))
+
+    const result = await getDropStatistics(7)
+
+    expect(result.success).toBe(false)
+    expect(result.errorInfo).toMatchObject({
+      code: 'INVALID_DOMAIN_PAYLOAD',
+      message: '掉落统计数据格式不正确',
+    })
+  })
+
+  it('rejects a drop statistics payload whose stage omits item counts', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      success: true,
+      data: {
+        total: { sanity: 2456, battles: 89, medicine: 12, stone: 3 },
+        items: { 固源岩: { count: 145 } },
+        stages: { '1-7': { battles: 42, sanity: 336 } },
+        dateRange: { start: '2026-10-18', end: '2026-10-24', days: 7 },
+      },
+    }))
+
+    const result = await getDropStatistics(7)
+
+    expect(result.success).toBe(false)
+    expect(result.errorInfo).toMatchObject({
+      code: 'INVALID_DOMAIN_PAYLOAD',
+      message: '掉落统计数据格式不正确',
+    })
+  })
+
+  it('accepts a drop statistics payload with the four required totals and stage items', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({
+      success: true,
+      data: {
+        total: { sanity: 2456, battles: 89, medicine: 12, stone: 3 },
+        items: { 固源岩: { count: 145 } },
+        stages: { '1-7': { battles: 42, sanity: 336, items: { 固源岩: 61 } } },
         dateRange: { start: '2026-10-18', end: '2026-10-24', days: 7 },
       },
     }))

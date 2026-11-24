@@ -3,7 +3,11 @@
 // 不应用精英化/潜能筛选且等级固定 0；非「已拥有」视图按星级降序、同名按中文名排序，
 // 忽略等级/潜能排序。
 
-import type { OperBoxData, OperatorDetailed } from '@/features/game-data'
+import type {
+  OperBoxData,
+  OperatorCatalogSource,
+  OperatorDetailed,
+} from '@/features/game-data'
 
 export type FilterRarity = 'all' | '1' | '2' | '3' | '4' | '5' | '6'
 export type FilterElite = 'all' | '0' | '1' | '2'
@@ -75,6 +79,7 @@ export const isUnknownOperator = (
 
 export interface OperatorSelectionInput {
   catalog: readonly OperatorDetailed[]
+  catalogSource: OperatorCatalogSource
   operBox: OperBoxData | null
   filters: OperatorFilters
 }
@@ -145,6 +150,12 @@ const buildDataSource = ({
   })
 }
 
+export const isProfessionFilterUnavailable = ({
+  catalogSource,
+  filters,
+}: Pick<OperatorSelectionInput, 'catalogSource' | 'filters'>): boolean =>
+  catalogSource === 'snapshot' && filters.profession !== 'all'
+
 /** 应用筛选并排序；返回新数组，不修改传入的目录或持有快照。 */
 export function selectOperators(input: OperatorSelectionInput): OperatorDetailed[] {
   const { filters } = input
@@ -153,8 +164,16 @@ export function selectOperators(input: OperatorSelectionInput): OperatorDetailed
 
   if (filters.ownership === 'owned' && !input.operBox?.data) return []
   if (filters.ownership !== 'owned' && catalog.length === 0) return []
+  if (isProfessionFilterUnavailable(input)) return []
 
   let filtered = buildDataSource({ ...input, catalog })
+
+  const structuredFiltersActive = !unownedView
+    && (filters.elite !== 'all' || filters.potential !== 'all')
+  if (input.catalogSource === 'snapshot' && structuredFiltersActive) {
+    const ownedIds = buildOwnedOperatorIdSet(input.operBox)
+    filtered = filtered.filter(operator => ownedIds.has(operator.id))
+  }
 
   if (filters.rarity !== 'all') {
     const rarity = Number(filters.rarity)

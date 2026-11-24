@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { OperBoxData, OperatorDetailed } from '@/features/game-data'
+import type { OperBoxData, OperatorCatalogSource, OperatorDetailed } from '@/features/game-data'
 import {
   AMIYA_FORM_IDS,
   DEFAULT_OPERATOR_FILTERS,
@@ -10,6 +10,7 @@ import {
   isUnknownOperator,
   selectOperators,
   type OperatorFilters,
+  type OperatorSelectionInput,
 } from './operatorFilters'
 
 const operator = (
@@ -85,6 +86,10 @@ const filters = (overrides: Partial<OperatorFilters> = {}): OperatorFilters => (
 
 const ids = (operators: readonly OperatorDetailed[]) => operators.map(op => op.id)
 
+const select = (
+  input: Omit<OperatorSelectionInput, 'catalogSource'> & { catalogSource?: OperatorCatalogSource },
+): OperatorDetailed[] => selectOperators({ catalogSource: 'remote', ...input })
+
 describe('Amiya form ownership', () => {
   it('expands all three forms when any one is owned', () => {
     const ownedIds = buildOwnedOperatorIdSet(ownedBox)
@@ -113,7 +118,7 @@ describe('Amiya form ownership', () => {
 
 describe('operator selection', () => {
   it('excludes every Amiya form from the unowned view', () => {
-    const result = selectOperators({
+    const result = select({
       catalog,
       operBox: ownedBox,
       filters: filters({ ownership: 'unowned' }),
@@ -127,7 +132,7 @@ describe('operator selection', () => {
   })
 
   it('fills missing Amiya forms from the owned form in the owned view', () => {
-    const result = selectOperators({
+    const result = select({
       catalog,
       operBox: ownedBox,
       filters: filters({ ownership: 'owned', sortBy: 'level' }),
@@ -142,7 +147,7 @@ describe('operator selection', () => {
   })
 
   it('uses catalog metadata for owned operators and zero stats for the rest in the all view', () => {
-    const result = selectOperators({
+    const result = select({
       catalog,
       operBox: ownedBox,
       filters: filters({ ownership: 'all', profession: 'SNIPER' }),
@@ -154,7 +159,7 @@ describe('operator selection', () => {
   })
 
   it('fills missing Amiya forms with owned stats in the all view', () => {
-    const result = selectOperators({
+    const result = select({
       catalog,
       operBox: ownedBox,
       filters: filters({ ownership: 'all', profession: 'CASTER' }),
@@ -165,12 +170,12 @@ describe('operator selection', () => {
   })
 
   it('returns an empty list when the required source is absent', () => {
-    expect(selectOperators({
+    expect(select({
       catalog,
       operBox: null,
       filters: filters({ ownership: 'owned' }),
     })).toEqual([])
-    expect(selectOperators({
+    expect(select({
       catalog: [],
       operBox: ownedBox,
       filters: filters(),
@@ -180,7 +185,7 @@ describe('operator selection', () => {
 
 describe('operator filters', () => {
   it('clamps rarity above six before comparing', () => {
-    const result = selectOperators({
+    const result = select({
       catalog: [
         operator('char_six', '六星', { rarity: 6 }),
         operator('char_over', '超限', { rarity: 8 }),
@@ -194,7 +199,7 @@ describe('operator filters', () => {
   })
 
   it('ignores elite and potential filters in the unowned view', () => {
-    const result = selectOperators({
+    const result = select({
       catalog,
       operBox: ownedBox,
       filters: filters({ ownership: 'unowned', elite: '2', potential: '3' }),
@@ -204,12 +209,12 @@ describe('operator filters', () => {
   })
 
   it('applies elite and potential filters outside the unowned view', () => {
-    const elite = selectOperators({
+    const elite = select({
       catalog,
       operBox: ownedBox,
       filters: filters({ ownership: 'owned', elite: '2' }),
     })
-    const potential = selectOperators({
+    const potential = select({
       catalog,
       operBox: ownedBox,
       filters: filters({ ownership: 'owned', potential: '1' }),
@@ -218,7 +223,7 @@ describe('operator filters', () => {
     expect(elite).toHaveLength(4)
     expect(ids(potential)).toEqual(['char_alpha'])
 
-    const allElite = selectOperators({
+    const allElite = select({
       catalog,
       operBox: ownedBox,
       filters: filters({ ownership: 'all', elite: '2' }),
@@ -231,7 +236,7 @@ describe('operator filters', () => {
 
 describe('operator sorting', () => {
   it('keeps the owned snapshot order for the default sort', () => {
-    const result = selectOperators({
+    const result = select({
       catalog,
       operBox: ownedBox,
       filters: filters({ ownership: 'owned' }),
@@ -246,17 +251,17 @@ describe('operator sorting', () => {
   })
 
   it('sorts owned operators by level, rarity, or potential', () => {
-    const byLevel = selectOperators({
+    const byLevel = select({
       catalog,
       operBox: ownedBox,
       filters: filters({ ownership: 'owned', sortBy: 'level' }),
     })
-    const byRarity = selectOperators({
+    const byRarity = select({
       catalog,
       operBox: ownedBox,
       filters: filters({ ownership: 'owned', sortBy: 'rarity' }),
     })
-    const byPotential = selectOperators({
+    const byPotential = select({
       catalog,
       operBox: ownedBox,
       filters: filters({ ownership: 'owned', sortBy: 'potential' }),
@@ -273,7 +278,7 @@ describe('operator sorting', () => {
       operator('char_high_b', '乙高', { rarity: 5 }),
       operator('char_high_a', '甲高', { rarity: 5 }),
     ]
-    const result = selectOperators({
+    const result = select({
       catalog: unownedCatalog,
       operBox: recognizedBox([], unownedCatalog, 'complete'),
       filters: filters({ ownership: 'unowned', sortBy: 'level' }),
@@ -289,7 +294,7 @@ describe('operator sorting', () => {
     ]
     const before = ids(unsorted)
 
-    selectOperators({ catalog: unsorted, operBox: null, filters: filters() })
+    select({ catalog: unsorted, operBox: null, filters: filters() })
 
     expect(ids(unsorted)).toEqual(before)
   })
@@ -318,7 +323,7 @@ describe('operator recognition coverage', () => {
   it('keeps operators outside a partial snapshot out of the unowned view', () => {
     const box = partialBox([ownedAlpha], ['char_alpha'])
 
-    const result = selectOperators({
+    const result = select({
       catalog,
       operBox: box,
       filters: filters({ ownership: 'unowned' }),
@@ -328,7 +333,7 @@ describe('operator recognition coverage', () => {
   })
 
   it('treats every non-owned operator as unknown when the snapshot carries no signal', () => {
-    const result = selectOperators({
+    const result = select({
       catalog,
       operBox: operBox([ownedAlpha]),
       filters: filters({ ownership: 'unowned' }),
@@ -338,7 +343,7 @@ describe('operator recognition coverage', () => {
   })
 
   it('confirms unowned entries listed by a complete snapshot', () => {
-    const result = selectOperators({
+    const result = select({
       catalog,
       operBox: ownedBox,
       filters: filters({ ownership: 'unowned' }),
@@ -353,5 +358,143 @@ describe('filter activity', () => {
     expect(hasActiveOperatorFilters(DEFAULT_OPERATOR_FILTERS)).toBe(false)
     expect(hasActiveOperatorFilters(filters({ sortBy: 'rarity' }))).toBe(true)
     expect(hasActiveOperatorFilters(filters({ ownership: 'owned' }))).toBe(true)
+  })
+})
+
+describe('fallback catalogue participation', () => {
+  const snapshotCatalog: readonly OperatorDetailed[] = [
+    operator('char_owned', '已拥有干员', { rarity: 6, profession: '', level: 0, elite: 0, potential: 0 }),
+    operator('char_missing', '未拥有干员', { rarity: 5, profession: '', level: 0, elite: 0, potential: 0 }),
+  ]
+  const snapshotOwnedEntry = {
+    id: 'char_owned',
+    name: '已拥有干员',
+    rarity: 6,
+    level: 80,
+    elite: 2,
+    potential: 3,
+  } as OperatorDetailed
+  const snapshotBox: OperBoxData = {
+    operCount: 1,
+    data: [snapshotOwnedEntry],
+    allOpers: snapshotCatalog.map(entry => ({
+      id: entry.id,
+      name: entry.name,
+      rarity: entry.rarity,
+      owned: entry.id === 'char_owned',
+    })),
+    operTotal: snapshotCatalog.length,
+    recognition: { status: 'complete', total: snapshotCatalog.length, owned: 1 },
+    timestamp: '2026-10-25T00:00:00.000Z',
+  }
+
+  it('browses snapshot fallback entries by name and rarity', () => {
+    const all = selectOperators({
+      catalog: snapshotCatalog,
+      catalogSource: 'snapshot',
+      operBox: snapshotBox,
+      filters: filters(),
+    })
+    const rarity = selectOperators({
+      catalog: snapshotCatalog,
+      catalogSource: 'snapshot',
+      operBox: snapshotBox,
+      filters: filters({ rarity: '5' }),
+    })
+
+    expect(ids(all).sort()).toEqual(['char_missing', 'char_owned'])
+    expect(all.every(entry => entry.name.length > 0 && entry.rarity > 0)).toBe(true)
+    expect(ids(rarity)).toEqual(['char_missing'])
+  })
+
+  it('drops placeholder fallback entries once an elite or potential filter is active', () => {
+    const eliteZero = selectOperators({
+      catalog: snapshotCatalog,
+      catalogSource: 'snapshot',
+      operBox: snapshotBox,
+      filters: filters({ elite: '0' }),
+    })
+    const potentialOne = selectOperators({
+      catalog: snapshotCatalog,
+      catalogSource: 'snapshot',
+      operBox: snapshotBox,
+      filters: filters({ potential: '1' }),
+    })
+
+    expect(ids(eliteZero)).toEqual([])
+    expect(ids(potentialOne)).toEqual([])
+  })
+
+  it('keeps elite and potential filters on owned snapshot entries', () => {
+    const elite = selectOperators({
+      catalog: snapshotCatalog,
+      catalogSource: 'snapshot',
+      operBox: snapshotBox,
+      filters: filters({ ownership: 'owned', elite: '2' }),
+    })
+    const potential = selectOperators({
+      catalog: snapshotCatalog,
+      catalogSource: 'snapshot',
+      operBox: snapshotBox,
+      filters: filters({ ownership: 'owned', potential: '3' }),
+    })
+
+    expect(ids(elite)).toEqual(['char_owned'])
+    expect(ids(potential)).toEqual(['char_owned'])
+  })
+
+  it('keeps the unowned view unrestricted by elite and potential filters', () => {
+    const elite = selectOperators({
+      catalog: snapshotCatalog,
+      catalogSource: 'snapshot',
+      operBox: snapshotBox,
+      filters: filters({ ownership: 'unowned', elite: '0' }),
+    })
+    const potential = selectOperators({
+      catalog: snapshotCatalog,
+      catalogSource: 'snapshot',
+      operBox: snapshotBox,
+      filters: filters({ ownership: 'unowned', potential: '1' }),
+    })
+
+    expect(ids(elite)).toEqual(['char_missing'])
+    expect(ids(potential)).toEqual(['char_missing'])
+  })
+
+  it('does not filter snapshot entries by profession', () => {
+    const withProfession = snapshotCatalog.map(entry => ({ ...entry, profession: 'SNIPER' }))
+    const all = selectOperators({
+      catalog: withProfession,
+      catalogSource: 'snapshot',
+      operBox: snapshotBox,
+      filters: filters({ profession: 'SNIPER' }),
+    })
+    const owned = selectOperators({
+      catalog: withProfession,
+      catalogSource: 'snapshot',
+      operBox: snapshotBox,
+      filters: filters({ ownership: 'owned', profession: 'SNIPER' }),
+    })
+    const unowned = selectOperators({
+      catalog: withProfession,
+      catalogSource: 'snapshot',
+      operBox: snapshotBox,
+      filters: filters({ ownership: 'unowned', profession: 'SNIPER' }),
+    })
+
+    expect(all).toEqual([])
+    expect(owned).toEqual([])
+    expect(unowned).toEqual([])
+  })
+
+  it('keeps profession filtering for a trusted catalogue', () => {
+    const result = selectOperators({
+      catalog: snapshotCatalog.map(entry => ({ ...entry, profession: 'SNIPER' })),
+      catalogSource: 'remote',
+      operBox: snapshotBox,
+      filters: filters({ profession: 'SNIPER' }),
+    })
+
+    expect(ids(result).sort()).toEqual(['char_missing', 'char_owned'])
   })
 })
