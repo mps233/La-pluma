@@ -1668,18 +1668,25 @@ html.la-pluma-standalone #app-root .page {
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
 }
 
-/* Day-mode cards were flat; in dark, give every dashboard card the same
-   cool raised surface, hairline and top light so the workspace reads as one
-   material instead of a mix of system greys. */
-html.dark .la-pluma-app .dashboard-page .app-card-smooth-surface,
-html.dark .la-pluma-app .dashboard-page .smooth-panel-surface,
-html.dark .la-pluma-app .dashboard-page .dashboard-device-card-shell.surface-panel {
+/* In dark mode every card uses one cool raised surface with a hairline and a
+   top light, instead of mixing system greys with the page backdrop. */
+html.dark .la-pluma-app .app-card-smooth-surface,
+html.dark .la-pluma-app .smooth-panel-surface {
+  border: 0;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0) 18%),
     var(--app-surface-solid);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+html.dark .la-pluma-app .app-card:not([data-smooth-corners='true']),
+html.dark .la-pluma-app .surface-panel:not(.smooth-panel-shell):not(.app-card) {
+  border: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0) 18%),
+    var(--app-surface-solid);
 }
 
 /* In-card media wells sit one step below the card they live in, so the
