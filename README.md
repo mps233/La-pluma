@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="screenshots/cover.png" alt="La Pluma: logo and the automation workspace in light and dark themes" width="100%">
+  <img src="screenshots/hero-theme.gif" alt="La Pluma: the console switching between dark and light themes" width="100%">
 </p>
 
 <h1 align="center">La Pluma</h1>
