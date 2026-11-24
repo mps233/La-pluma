@@ -939,11 +939,19 @@ html.la-pluma-standalone #app-root .page {
 }
 
 .la-pluma-sidebar-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.625rem;
   margin: 0;
   padding: 1.25rem 0.75rem;
   color: var(--app-text-soft);
   font-size: 0.8125rem;
   text-align: center;
+}
+
+.la-pluma-sidebar-empty > p {
+  margin: 0;
 }
 
 .la-pluma-scroll-host {

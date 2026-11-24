@@ -319,6 +319,26 @@ describe('top-level application navigation', () => {
     expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(9)
   })
 
+  it('offers a clear action when the sidebar filter matches no workspace', async () => {
+    const user = userEvent.setup()
+    renderLayout()
+
+    const sidebar = container.querySelector<HTMLElement>('.la-pluma-sidebar')!
+    const search = sidebar.querySelector<HTMLInputElement>('input[aria-label="搜索工作区"]')!
+    await user.type(search, 'zzz')
+
+    const empty = sidebar.querySelector<HTMLElement>('.la-pluma-sidebar-empty')!
+    expect(empty.textContent).toContain('没有匹配的工作区')
+    const clear = empty.querySelector<HTMLButtonElement>('button')!
+    expect(clear.textContent).toBe('清除搜索')
+
+    await user.click(clear)
+
+    expect(search.value).toBe('')
+    expect(sidebar.querySelectorAll('.la-pluma-sidebar-nav button[data-app-tab]')).toHaveLength(9)
+    expect(sidebar.querySelector('.la-pluma-sidebar-empty')).toBeNull()
+  })
+
   it('shows the daily operator portrait, name, and quote in the desktop identity area', async () => {
     renderLayout()
 

@@ -460,7 +460,17 @@ export default function Layout({ children }: LayoutProps) {
                 </div>
               ))}
               {visibleDesktopTabCount === 0 && (
-                <p className="la-pluma-sidebar-empty" role="status">没有匹配的工作区</p>
+                <div className="la-pluma-sidebar-empty" role="status">
+                  <p>没有匹配的工作区</p>
+                  <GlassButton
+                    type="button"
+                    size="sm"
+                    material="tinted"
+                    onClick={() => setSidebarQuery('')}
+                  >
+                    清除搜索
+                  </GlassButton>
+                </div>
               )}
             </nav>
           </aside>
