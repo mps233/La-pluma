@@ -122,9 +122,6 @@ func NewWithOptions(options Options) *Service {
 	}
 }
 
-// DataPath is the absolute quotes JSON path.
-func (s *Service) DataPath() string { return s.path }
-
 // Load reads and normalizes the quotes file. A missing, empty, corrupt or
 // fully invalid file yields a copy of DefaultQuotes.
 func (s *Service) Load() []OperatorQuote {

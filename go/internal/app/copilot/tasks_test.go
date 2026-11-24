@@ -285,19 +285,6 @@ func containsString(values []string, want string) bool {
 	return false
 }
 
-func TestBuildCurrentMapStageTasks(t *testing.T) {
-	tasks := BuildCurrentMapStageTasks([]any{"bd-1", "BD-2", "BD-1", " "})
-	if len(tasks) != 2 {
-		t.Fatalf("tasks = %#v", tasks)
-	}
-	if task, ok := tasks["BD-1"]; !ok || len(task.Text) != 1 || task.Text[0] != "BD-1" {
-		t.Fatalf("BD-1 task = %#v", task)
-	}
-	if _, ok := tasks["BD-2"]; !ok {
-		t.Fatalf("BD-2 missing: %#v", tasks)
-	}
-}
-
 func TestEnsureCurrentMapActivityResource(t *testing.T) {
 	configDir := t.TempDir()
 	resource, err := EnsureCurrentMapActivityResource(configDir, "bd", []any{"bd-1", "BD-2"})

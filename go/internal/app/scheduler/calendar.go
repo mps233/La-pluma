@@ -12,10 +12,6 @@ import (
 	_ "time/tzdata" // Embed the IANA database so LoadLocation works on every host.
 )
 
-// GameDayStartHour is the in-game daily reset hour. "Today" is measured in the
-// client service zone at 04:00, matching server/services/gameCalendar.ts.
-const GameDayStartHour = 4
-
 // GameZone is the fixed UTC offset and IANA time zone for a client type. The
 // offsets are fixed because the game servers do not observe daylight saving.
 type GameZone struct {
@@ -39,28 +35,6 @@ func ResolveGameZone(clientType string) GameZone {
 		return zone
 	}
 	return gameZones["official"]
-}
-
-// GameTimeZoneForClientType returns the IANA zone used for cron registration.
-func GameTimeZoneForClientType(clientType string) string {
-	return ResolveGameZone(clientType).TimeZone
-}
-
-// GameDay is the game date and weekday (0 = Sunday) for an instant.
-type GameDay struct {
-	Date    string `json:"date"`
-	Weekday int    `json:"weekday"`
-}
-
-// GetGameDay computes the game day for now using a fixed offset and the 04:00
-// reset, without consulting the host process time zone.
-func GetGameDay(now time.Time, clientType string) GameDay {
-	zone := ResolveGameZone(clientType)
-	shifted := now.UTC().Add(time.Duration(zone.UTCOffsetHours-GameDayStartHour) * time.Hour)
-	return GameDay{
-		Date:    shifted.Format("2006-01-02"),
-		Weekday: int(shifted.Weekday()),
-	}
 }
 
 var locationCache sync.Map

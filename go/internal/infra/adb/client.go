@@ -372,15 +372,6 @@ func (c *Client) RemoveReverse(ctx context.Context, serial, remote string) error
 	return err
 }
 
-// RemoveAllReverse removes all reverse tunnels for the device.
-func (c *Client) RemoveAllReverse(ctx context.Context, serial string) error {
-	if err := validateToken("serial", "ADB 设备标识", serial); err != nil {
-		return err
-	}
-	_, err := c.run(ctx, "-s", serial, "reverse", "--remove-all")
-	return err
-}
-
 // RemoveForward removes one forward tunnel.
 func (c *Client) RemoveForward(ctx context.Context, serial, local string) error {
 	if err := validateToken("serial", "ADB 设备标识", serial); err != nil {

@@ -386,7 +386,7 @@ export interface DropRecordsProps {
   onRefresh: () => void
 }
 
-export interface DropDailyTrend {
+interface DropDailyTrend {
   date: string
   sanity: number
   medicine: number
@@ -446,7 +446,7 @@ export interface DepotDataDetailed {
   complete?: boolean;
 }
 
-export interface OperatorCatalogEntry {
+interface OperatorCatalogEntry {
   id: string;
   name: string;
   rarity: number;
@@ -622,7 +622,7 @@ export interface TrainingPlan {
 
 export type MasteryCandidateStatus = 'eligible' | 'owned' | 'all'
 
-export type MasteryDisabledReason =
+type MasteryDisabledReason =
   | 'unowned'
   | 'state_unknown'
   | 'not_elite2'
@@ -645,11 +645,11 @@ export interface MasteryCandidate {
   disabledReason: MasteryDisabledReason | null
 }
 
-export interface MasteryLevelMaterial extends MaterialNode {
+interface MasteryLevelMaterial extends MaterialNode {
   iconId: string
 }
 
-export interface MasterySkillDetail {
+interface MasterySkillDetail {
   index: number
   skillId: string
   name: string
@@ -766,7 +766,7 @@ export interface MasteryQueueItem {
   skippedAt: string | null
 }
 
-export interface MasteryCampaign {
+interface MasteryCampaign {
   status: MasteryCampaignStatus
   activeItemId: string | null
   activeStepRunId: string | null
@@ -804,7 +804,7 @@ export interface MasteryQueueStatus {
 // 森空岛数据源
 // ============================================
 
-export interface SklandTraining {
+interface SklandTraining {
   traineeId?: string
   traineeName?: string
   targetSkill: number
@@ -814,7 +814,7 @@ export interface SklandTraining {
   slotState: number
 }
 
-export interface SklandCharacter {
+interface SklandCharacter {
   id: string
   name: string
   evolvePhase: number
@@ -822,7 +822,7 @@ export interface SklandCharacter {
   skills: Array<{ id: string; level: number }>
 }
 
-export interface SklandSanity {
+interface SklandSanity {
   current: number
   max: number
   reportAt: string

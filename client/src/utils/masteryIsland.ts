@@ -2,14 +2,14 @@ import type { MasteryQueueItem, MasteryQueueStatus } from '../types/components'
 
 export const MASTERY_ACTIVITY_ID = 'la-pluma-mastery'
 
-export interface MasteryProgress {
+interface MasteryProgress {
   value: number
   percent: number
   done: number
   total: number
 }
 
-export type MasteryTone = 'running' | 'success' | 'warning' | 'paused' | 'neutral'
+type MasteryTone = 'running' | 'success' | 'warning' | 'paused' | 'neutral'
 
 const ACTIVE_PHASES = new Set(['starting', 'running', 'training', 'verifying'])
 

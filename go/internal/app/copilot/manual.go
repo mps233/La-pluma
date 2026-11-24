@@ -86,12 +86,6 @@ type ManualManager struct {
 	sessions map[string]*manualSessionState
 }
 
-// NewManualManager creates a session manager. A nil executor leaves manual
-// sessions deliberately unsupported.
-func NewManualManager(build PlanBuilder, execute StepExecutor) *ManualManager {
-	return NewManualManagerWithOptions(build, execute, ManualOptions{})
-}
-
 func NewManualManagerWithOptions(build PlanBuilder, execute StepExecutor, options ManualOptions) *ManualManager {
 	now := options.Now
 	if now == nil {

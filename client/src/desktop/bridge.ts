@@ -5,7 +5,7 @@ export interface DesktopAppInfo {
   userData: string
 }
 
-export interface DesktopAccessToken {
+interface DesktopAccessToken {
   token: string
   source: 'env' | 'settings'
 }

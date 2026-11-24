@@ -248,7 +248,7 @@ La-pluma/
 │  └─ public/              PWA 图标与 Logo
 ├─ go/                     Go 后端与 MyGo 桌面外壳
 │  ├─ cmd/server/          headless HTTP 服务
-│  ├─ cmd/desktop/         MyGo 桌面入口
+│  ├─ main.go              MyGo 桌面入口
 │  ├─ internal/app/        MAA、调度、Run、WebRTC、养成、通知
 │  ├─ internal/infra/      ADB、MAA、scrcpy 与 WebRTC 适配
 │  └─ internal/transport/  HTTP、Agent API 与信令

@@ -9,7 +9,7 @@ export const pageLoaders = {
   config: () => import('../components/ConfigManager'),
 } as const
 
-export type PageId = keyof typeof pageLoaders
+type PageId = keyof typeof pageLoaders
 
 const preloadedPages = new Set<PageId>()
 

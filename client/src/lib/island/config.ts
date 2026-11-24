@@ -2,7 +2,7 @@ import { islandMetrics, type IslandMetrics } from "./metrics";
 import { type BlurSkirt, type BubbleSettle, type ContentMotion, type CornerLead, type ExpandedRegion, islandMotion, type IslandMotion, type NeckTip, type RegionLag, type ShapeTail, type ShapeTransition, shapeTransitions, type TailLegs } from "./motion";
 
 /** Every key optional, at every depth. Used for metrics and motion overrides. */
-export type DeepPartial<T> = { [K in keyof T]?: T[K] extends number ? number : DeepPartial<T[K]> };
+type DeepPartial<T> = { [K in keyof T]?: T[K] extends number ? number : DeepPartial<T[K]> };
 
 export type IslandMetricsOverrides = DeepPartial<IslandMetrics>;
 export type IslandMotionOverrides = DeepPartial<IslandMotion>;

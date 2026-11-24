@@ -18,9 +18,6 @@ type Message struct {
 	Image   string         `json:"image,omitempty"`
 }
 
-// NotificationMessage mirrors the Node type name.
-type NotificationMessage = Message
-
 // SendResult mirrors the Node sendToAll result. Results and Errors are
 // pointers so the disabled-notification response can omit both arrays while a
 // normal send still serializes empty arrays, matching JSON.stringify output.

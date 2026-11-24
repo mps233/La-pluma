@@ -5,7 +5,7 @@
  * 这里把外部文本改写成可读摘要，未识别的行返回 null，由调用方保留原文。
  */
 
-export interface LogMessageRewrite {
+interface LogMessageRewrite {
   message: string
   level?: 'ERROR' | 'WARN' | 'INFO' | 'DEBUG'
 }

@@ -8,8 +8,6 @@ import (
 
 var (
 	loadedCopilotFilePattern = regexp.MustCompile(`"file_name"\s*:\s*"([^"]+)"(?s:.{0,500}?)"what"\s*:\s*"CopilotListLoadTaskFileSuccess"`)
-	copilotLoadEventPattern  = regexp.MustCompile(`"what"\s*:\s*"CopilotListLoadTaskFileSuccess"`)
-	battleTotalPattern       = regexp.MustCompile(`Kills:\s*\d+\s*/\s*(\d+)`)
 	battleProgressPattern    = regexp.MustCompile(`Kills:\s*(\d{1,4})\s*/\s*(\d{1,4})`)
 )
 
@@ -25,25 +23,6 @@ func ExtractLoadedCopilotFiles(logText string) []string {
 		}
 	}
 	return files
-}
-
-// ParseCopilotBattleTotal reads the enemy total after the latest copilot stage
-// load. Values outside 1..500 are rejected so a result-screen counter cannot
-// become the expected battle total.
-func ParseCopilotBattleTotal(logText string) *int {
-	segment := logText
-	if events := copilotLoadEventPattern.FindAllStringIndex(logText, -1); len(events) > 0 {
-		segment = logText[events[len(events)-1][0]:]
-	}
-	matches := battleTotalPattern.FindAllStringSubmatch(segment, -1)
-	if len(matches) == 0 {
-		return nil
-	}
-	total, err := strconv.Atoi(matches[len(matches)-1][1])
-	if err != nil || total <= 0 || total > 500 {
-		return nil
-	}
-	return &total
 }
 
 // ParseBattleProgress reads the latest `Kills: X / Y` line from MAA's trace

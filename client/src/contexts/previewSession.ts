@@ -8,9 +8,9 @@ import {
 import { useScrcpyWebRTC } from '../hooks/useScrcpyWebRTC'
 
 export type PreviewSession = ReturnType<typeof useScrcpyWebRTC>
-export type PreviewHookOptions = Omit<Parameters<typeof useScrcpyWebRTC>[0], 'videoRef'>
+type PreviewHookOptions = Omit<Parameters<typeof useScrcpyWebRTC>[0], 'videoRef'>
 
-export interface PreviewSessionContextValue {
+interface PreviewSessionContextValue {
   session: PreviewSession
   /** 当前可见页面挂载的 video；连接本身不随页面切换销毁。 */
   activeVideoRef: RefObject<HTMLVideoElement | null>

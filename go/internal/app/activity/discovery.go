@@ -380,11 +380,6 @@ func (s *Service) findMatchingCopilotSets(
 	return matches, nil
 }
 
-// RankActivityCopilots mirrors rankActivityCopilots.
-func RankActivityCopilots(items []any, stage string, selection *SelectionContext) []CopilotCandidate {
-	return RankActivityCopilotsForStage(items, stage, "", selection)
-}
-
 // RankActivityCopilotsForStage also accepts the internal stage id, so
 // candidates whose title omits the display code can still be matched by their
 // content.stage_name.

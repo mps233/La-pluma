@@ -342,10 +342,6 @@ func (s *Service) effectiveAddress() string {
 	return address
 }
 
-func (s *Service) Devices(ctx context.Context) ([]string, error) {
-	return s.DevicesWithConnection(ctx, "")
-}
-
 // DevicesWithConnection lists online devices with an optional ADB override.
 func (s *Service) DevicesWithConnection(ctx context.Context, adbPath string) ([]string, error) {
 	client := adb.New(firstNonEmpty(adbPath, s.defaultADBPath()))
@@ -362,10 +358,6 @@ func (s *Service) DevicesWithConnection(ctx context.Context, adbPath string) ([]
 	return result, nil
 }
 
-func (s *Service) DeviceStats(ctx context.Context) (*adb.DeviceStats, error) {
-	return s.DeviceStatsWithConnection(ctx, "", "")
-}
-
 // DeviceStatsWithConnection reads device stats with optional connection
 // overrides. Empty values fall back to the service defaults.
 func (s *Service) DeviceStatsWithConnection(ctx context.Context, adbPath, address string) (*adb.DeviceStats, error) {
@@ -380,10 +372,6 @@ func (s *Service) Screenshot(ctx context.Context) ([]byte, error) {
 // overrides. Empty values fall back to the service defaults.
 func (s *Service) ScreenshotWithConnection(ctx context.Context, adbPath, address string) ([]byte, error) {
 	return adb.New(firstNonEmpty(adbPath, s.defaultADBPath())).Screenshot(ctx, firstNonEmpty(address, s.effectiveAddress()))
-}
-
-func (s *Service) Snapshot(ctx context.Context, deviceID string) (map[string]any, error) {
-	return s.SnapshotWithConnection(ctx, deviceID, "", "")
 }
 
 // SnapshotWithConnection captures a base64 snapshot with optional connection

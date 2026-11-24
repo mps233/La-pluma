@@ -22,11 +22,6 @@ var (
 	}
 )
 
-// GetCurrentActivity is the Node-name alias for CurrentActivity.
-func (s *Service) GetCurrentActivity(ctx context.Context, clientType string) (*Info, error) {
-	return s.CurrentActivity(ctx, clientType)
-}
-
 // CurrentActivity mirrors maaService.getCurrentActivity: memory cache,
 // persisted activity-cache, StageActivityV2, `maa activity`, penguin-stats,
 // then a stale fallback. It never fails because every source is optional.

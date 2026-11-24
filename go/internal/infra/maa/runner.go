@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -27,14 +26,12 @@ type Runner struct {
 	mu      sync.Mutex
 	path    string
 	logPath string
-	logger  *slog.Logger
 	current *Task
 }
 
 type ExecOptions struct {
 	TaskName string
 	Wait     bool
-	Timeout  time.Duration
 	Dir      string
 	Env      []string
 	OnLine   func(stream, line string)
@@ -44,20 +41,14 @@ type Result struct {
 	ExitCode int
 	Stdout   string
 	Stderr   string
-	Started  bool
 	Stopped  bool
 	Err      error
 	Duration time.Duration
 }
 
 type Task struct {
-	runner    *Runner
 	name      string
 	process   *process.Process
-	stdout    *boundedBuffer
-	stderr    *boundedBuffer
-	stdoutLog *lineWriter
-	stderrLog *lineWriter
 	logOffset int64
 	startedAt time.Time
 	done      chan struct{}
@@ -66,11 +57,8 @@ type Task struct {
 	stopped   bool
 }
 
-func New(path string, logger *slog.Logger) *Runner {
-	if logger == nil {
-		logger = slog.Default()
-	}
-	return &Runner{path: path, logger: logger}
+func New(path string) *Runner {
+	return &Runner{path: path}
 }
 
 func (r *Runner) Path() string {
@@ -132,17 +120,12 @@ func (r *Runner) Exec(ctx context.Context, command string, args []string, option
 		return nil, apperrors.WithStatus("MAA_CLI_NOT_FOUND", "无法启动 MAA CLI: "+err.Error(), 503, false, map[string]any{"path": executable, "error": err.Error()})
 	}
 	task := &Task{
-		runner:    r,
 		name:      options.TaskName,
 		process:   child,
-		stdout:    stdout,
-		stderr:    stderr,
-		stdoutLog: stdoutLog,
-		stderrLog: stderrLog,
 		logOffset: logOffset,
 		startedAt: time.Now(),
 		done:      make(chan struct{}),
-		result:    Result{Started: true},
+		result:    Result{},
 	}
 	r.mu.Lock()
 	r.current = task

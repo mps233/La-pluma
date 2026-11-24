@@ -32,7 +32,7 @@ interface UseScrcpyWebRTCOptions {
   passive?: boolean
 }
 
-export interface VideoStats {
+interface VideoStats {
   fps: string | number
   bitrate: string | number
   rtt: string | number
@@ -304,7 +304,7 @@ function candidateHasIpv4(candidate: string) {
   return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(candidateAddress(candidate))
 }
 
-export function candidateIsLoopback(candidate: string) {
+function candidateIsLoopback(candidate: string) {
   const address = candidateAddress(candidate)
   return address.startsWith('127.') || address === '::1'
 }

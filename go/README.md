@@ -50,7 +50,7 @@ Desktop development:
 ```bash
 cd go
 go run .                    # MyGo window loads the in-process loopback server
-mygo build -skip-dmg        # or: go run github.com/egoist/mygo/cmd/mygo@v0.8.3 build
+mygo build -skip-dmg        # or: go run github.com/egoist/mygo/cmd/mygo@v0.10.0 build
 ```
 
 The desktop build embeds `web/dist` (built by `scripts/build-web.sh`) and copies

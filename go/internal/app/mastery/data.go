@@ -50,11 +50,6 @@ type operBoxFile struct {
 	Timestamp *string
 }
 
-type depotItem struct {
-	ID    string
-	Count float64
-}
-
 type depotFile struct {
 	Items     map[string]float64
 	Timestamp *string
@@ -617,11 +612,6 @@ func BattleName(record *BattleRecord, clientType string) (*string, error) {
 		return nil, nil
 	}
 	return value, nil
-}
-
-// RoleFromProfession maps a profession id to the MaaCore role name.
-func RoleFromProfession(professionID string) *string {
-	return roleFromProfession(professionID)
 }
 
 // CatalogOptions is the query for GetCandidates.

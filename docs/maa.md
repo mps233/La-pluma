@@ -83,7 +83,7 @@ MaaCore 6.21.4 / maa-cli 0.7.8 已支持 `OperProgress` 任务类型；专精队
 | 日志/截图 | `maa dir log`（`asst.log`、`asst.bak.log`、`debug/`） |
 | 项目 Agent Run 存储 | `<LA_PLUMA_DATA_DIR>/agent-runs.json` |
 
-`paradox-operators.json` 和 `stages.json` 旧文件已不再参与运行时；悖论干员与关卡名都从 MaaResource 推导，两个旧文件仅保留为历史数据。
+`stages.json` 和 `paradox-operators.json` 仍参与部分回退路径：前者用于活动章节名解析（`internal/app/activity/zones.go`），后者由 `/api/agent/paradox/search` 读取（`internal/transport/agentapi/handler.go`）。MaaResource 仍是关卡与悖论干员的主要数据源。
 
 `/api/maa-assets/{item,avatar}/:key` 是只读的 MaaResource 图片路由，挂在 `LA_PLUMA_TOKEN` 鉴权之前（`<img>` 无法附带 bearer 头）；它只接受受限文件名，并且只暴露 `template/items` 与 `template/avatar`。
 

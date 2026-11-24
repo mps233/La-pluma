@@ -16,20 +16,6 @@ func asRecord(value any) map[string]any {
 	return nil
 }
 
-// coalesceValue mirrors the nullish coalescing operator: it returns the first
-// key that is present with a non-nil value.
-func coalesceValue(record map[string]any, keys ...string) any {
-	if record == nil {
-		return nil
-	}
-	for _, key := range keys {
-		if value, ok := record[key]; ok && value != nil {
-			return value
-		}
-	}
-	return nil
-}
-
 // hasField reports whether the key exists, regardless of its value. JavaScript
 // treats an absent key and an explicit null differently in a few places.
 func hasField(record map[string]any, key string) bool {
@@ -166,11 +152,6 @@ func truthyString(value any) string {
 	return stringValue(value)
 }
 
-// trimTruthyString mirrors String(value || ”).trim().
-func trimTruthyString(value any) string {
-	return strings.TrimSpace(truthyString(value))
-}
-
 // numberValue approximates Number(value) and reports whether the result is
 // finite. A nil value maps to 0, matching Number(null); callers that need to
 // distinguish a missing field check hasField first.
@@ -231,25 +212,6 @@ func numberValue(value any) (float64, bool) {
 	}
 }
 
-// nativeNumber converts decoder-owned json.Number values to float64 so Go
-// callers and JSON marshaling see the same numeric shape as Node.
-func nativeNumber(value any) any {
-	if number, ok := value.(json.Number); ok {
-		if parsed, err := number.Float64(); err == nil {
-			return parsed
-		}
-	}
-	return value
-}
-
-func numberOrZero(value any) float64 {
-	number, ok := numberValue(value)
-	if !ok {
-		return 0
-	}
-	return number
-}
-
 // lookupNumber converts a field that must exist. Missing and NaN-like values
 // report false; an explicit null reports (0, true) like Number(null).
 func lookupNumber(record map[string]any, key string) (float64, bool) {
@@ -257,106 +219,4 @@ func lookupNumber(record map[string]any, key string) (float64, bool) {
 		return 0, false
 	}
 	return numberValue(record[key])
-}
-
-// indexOrNil mirrors Number(value) || null.
-func indexOrNil(value any) any {
-	number, ok := numberValue(value)
-	if !ok || number == 0 {
-		return nil
-	}
-	return number
-}
-
-// asAnySlice accepts both parser-produced []any and hand-built []string.
-func asAnySlice(value any) ([]any, bool) {
-	switch typed := value.(type) {
-	case []any:
-		return typed, true
-	case []string:
-		values := make([]any, len(typed))
-		for index, item := range typed {
-			values[index] = item
-		}
-		return values, true
-	default:
-		return nil, false
-	}
-}
-
-func stringSlice(value any) []string {
-	values, ok := asAnySlice(value)
-	if !ok {
-		return nil
-	}
-	result := make([]string, len(values))
-	for index, item := range values {
-		result[index] = stringValue(item)
-	}
-	return result
-}
-
-func uniqueStrings(values []string) []string {
-	result := make([]string, 0, len(values))
-	seen := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		if value == "" {
-			continue
-		}
-		if _, exists := seen[value]; exists {
-			continue
-		}
-		seen[value] = struct{}{}
-		result = append(result, value)
-	}
-	return result
-}
-
-// uniqueNonEmptyStrings mirrors the Node helper that keeps non-empty strings
-// from arbitrary mixed arrays.
-func uniqueNonEmptyStrings(values []any) []string {
-	result := make([]string, 0, len(values))
-	seen := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		text, ok := value.(string)
-		if !ok || strings.TrimSpace(text) == "" {
-			continue
-		}
-		if _, exists := seen[text]; exists {
-			continue
-		}
-		seen[text] = struct{}{}
-		result = append(result, text)
-	}
-	return result
-}
-
-func firstTruthy(values ...any) any {
-	for _, value := range values {
-		if truthy(value) {
-			return value
-		}
-	}
-	return nil
-}
-
-func containsString(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
-}
-
-func itoa(value int) string {
-	return strconv.Itoa(value)
-}
-
-func pushCapped[T any](values []T, value T, limit int) []T {
-	values = append(values, value)
-	if len(values) > limit {
-		values = values[len(values)-limit:]
-	}
-	return values
 }

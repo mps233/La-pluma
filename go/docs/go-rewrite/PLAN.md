@@ -22,7 +22,7 @@ emulator.
 
 ```text
 go/
-├─ cmd/desktop/          MyGo desktop entry
+├─ main.go               MyGo desktop entry
 ├─ cmd/server/           headless Docker/NAS/PWA entry
 ├─ internal/app/         use cases
 ├─ internal/domain/      pure types/rules

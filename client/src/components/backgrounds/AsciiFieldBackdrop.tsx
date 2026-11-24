@@ -14,7 +14,7 @@ function subscribeTheme(callback: () => void) {
 
 const getIsDark = () => document.documentElement.classList.contains('dark')
 
-export interface AsciiFieldBackdropProps extends Omit<AsciiFieldProps, 'color' | 'colors' | 'background' | 'backgroundDark'> {
+interface AsciiFieldBackdropProps extends Omit<AsciiFieldProps, 'color' | 'colors' | 'background' | 'backgroundDark'> {
   /** Ink colour for a single-tone field. Defaults to the project accent. */
   color?: string
   /** Two to six hex colours, faintest glyphs first. Overrides color. */

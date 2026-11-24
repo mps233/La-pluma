@@ -3,7 +3,6 @@ package httpapi
 import (
 	"bufio"
 	"compress/gzip"
-	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
@@ -19,8 +18,6 @@ import (
 
 type Middleware func(http.Handler) http.Handler
 
-type requestIDKey struct{}
-
 // RequestID attaches a stable request id for logs and envelopes.
 func RequestID() Middleware {
 	return func(next http.Handler) http.Handler {
@@ -35,12 +32,10 @@ func RequestID() Middleware {
 				}
 			}
 			w.Header().Set("X-Request-Id", id)
-			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), requestIDKey{}, id)))
+			next.ServeHTTP(w, r)
 		})
 	}
 }
-
-// RequestIDFrom returns the id installed by RequestID.
 
 // Recover turns panics into a 500 envelope and a structured log entry.
 func Recover(logger *slog.Logger) Middleware {

@@ -1,9 +1,9 @@
 import React, { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { animate, useMotionValue, useReducedMotion } from 'framer-motion'
 
-export type StatusMarkStatus = 'pending' | 'running' | 'done' | 'failed' | 'cancelled'
+type StatusMarkStatus = 'pending' | 'running' | 'done' | 'failed' | 'cancelled'
 
-export interface StatusMarkProps {
+interface StatusMarkProps {
   status?: StatusMarkStatus
   progress?: number
   label?: ReactNode

@@ -9,7 +9,7 @@ const COARSE_POINTER_QUERY = '(pointer: coarse)'
 const PHONE_WIDTH_QUERY = '(max-width: 639px)'
 const DEFAULT_SWIPE_THRESHOLD = 56
 
-export const DEFAULT_SWIPE_IGNORE_SELECTOR = [
+const DEFAULT_SWIPE_IGNORE_SELECTOR = [
   'a',
   'button',
   'input',
@@ -30,7 +30,7 @@ export interface SwipePagerCommit {
   nextIndex: number
 }
 
-export interface UseSwipePagerOptions {
+interface UseSwipePagerOptions {
   count: number
   index: number
   onChange: (index: number) => void

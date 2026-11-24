@@ -35,7 +35,7 @@ func newTestService(t *testing.T) (*Service, string) {
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	cfg := config.Config{Paths: config.Paths{DataDir: dataDir, MaaConfigDir: maaConfigDir}}
-	runner := infraMaa.New(script, logger)
+	runner := infraMaa.New(script)
 	manager := execution.NewManager(filepath.Join(dataDir, "maa-execution.lock"), "test-host", logger)
 	runs := runapp.New(filepath.Join(dataDir, "agent-runs.json"), logger)
 	if _, err := runs.Initialize(); err != nil {

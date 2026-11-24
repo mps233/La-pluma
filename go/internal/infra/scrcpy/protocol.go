@@ -29,7 +29,6 @@ const (
 	CtrlInjectText        byte = 1
 	CtrlInjectTouchEvent  byte = 2
 	CtrlInjectScrollEvent byte = 3
-	CtrlBackOrScreenOn    byte = 4
 
 	CtrlGetClipboard    byte = 8
 	CtrlSetClipboard    byte = 9
@@ -63,10 +62,9 @@ const (
 // VideoHeader is the stream header scrcpy v5 sends before the first frame:
 // a 4-byte codec id followed by a session packet carrying the frame size.
 type VideoHeader struct {
-	Codec        uint32
-	Width        uint32
-	Height       uint32
-	ClientResize bool
+	Codec  uint32
+	Width  uint32
+	Height uint32
 }
 
 type PacketHeader struct {
@@ -114,15 +112,14 @@ func ReadVideoHeader(r io.Reader) (VideoHeader, error) {
 	if err != nil {
 		return VideoHeader{}, err
 	}
-	_, width, height, clientResize, err := ReadSessionHeader(r)
+	_, width, height, _, err := ReadSessionHeader(r)
 	if err != nil {
 		return VideoHeader{}, err
 	}
 	return VideoHeader{
-		Codec:        codec,
-		Width:        width,
-		Height:       height,
-		ClientResize: clientResize,
+		Codec:  codec,
+		Width:  width,
+		Height: height,
 	}, nil
 }
 
@@ -156,17 +153,6 @@ func ReadVideoPacket(r io.Reader) (header PacketHeader, data []byte, session *Pa
 		return PacketHeader{}, nil, nil, fmt.Errorf("read packet data: %w", err)
 	}
 	return header, data, nil, nil
-}
-
-func ReadPacket(r io.Reader) (PacketHeader, []byte, error) {
-	header, data, session, err := ReadVideoPacket(r)
-	if err != nil {
-		return PacketHeader{}, nil, err
-	}
-	if session != nil {
-		return PacketHeader{}, nil, fmt.Errorf("unexpected scrcpy session header")
-	}
-	return header, data, nil
 }
 
 func WriteKeycode(w io.Writer, action, keycode, repeat, metaState int) error {
@@ -253,11 +239,6 @@ func WriteText(w io.Writer, text string) error {
 	binary.BigEndian.PutUint32(buffer[1:5], uint32(len(bytes)))
 	copy(buffer[5:], bytes)
 	_, err := w.Write(buffer)
-	return err
-}
-
-func WriteBackOrScreenOn(w io.Writer, action int) error {
-	_, err := w.Write([]byte{CtrlBackOrScreenOn, byte(action)})
 	return err
 }
 

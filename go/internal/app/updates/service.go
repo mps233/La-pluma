@@ -159,15 +159,6 @@ func NewWithOptions(options Options) *Service {
 	}
 }
 
-// Platform exposes the effective Node-style platform for response messages.
-func (s *Service) Platform() string { return s.platform() }
-
-// IsDocker reports whether the service treats the runtime as a Docker image.
-func (s *Service) IsDocker() bool { return s.isDocker() }
-
-// MaaCLIPath returns the CLI command used in update plans.
-func (s *Service) MaaCLIPath() string { return s.maaCLIPath }
-
 // MaaVersionInfo mirrors getMaaVersion(true) in maaService.ts.
 type MaaVersionInfo struct {
 	Raw  string `json:"raw"`
@@ -631,22 +622,6 @@ func (s *Service) runAutoCLIUpdate(ctx context.Context) error {
 	}
 	s.logger.Info("MAA CLI 更新完成", "platform", plan.Platform)
 	return nil
-}
-
-// AutoUpdateStatus mirrors getAutoUpdateStatus. Timer state stays in the
-// scheduler; this type keeps the response shape with the update service.
-type AutoUpdateStatus struct {
-	Enabled bool    `json:"enabled"`
-	Time    *string `json:"time"`
-}
-
-// BuildAutoUpdateStatus builds the /auto-update/status shape. A disabled or
-// clock-less registration reports time null.
-func BuildAutoUpdateStatus(enabled bool, clock string) AutoUpdateStatus {
-	if !enabled || clock == "" {
-		return AutoUpdateStatus{Enabled: false, Time: nil}
-	}
-	return AutoUpdateStatus{Enabled: true, Time: &clock}
 }
 
 func (s *Service) runMAA(ctx context.Context, command string, args []string, taskName, taskType string) (domainrun.DTO, error) {

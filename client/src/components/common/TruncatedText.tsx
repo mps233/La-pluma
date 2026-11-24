@@ -10,7 +10,7 @@ import Tooltip from './Tooltip'
 
 type TruncatedTextTag = 'span' | 'div' | 'strong' | 'small' | 'p' | 'h3' | 'h4'
 
-export interface TruncatedTextProps extends HTMLAttributes<HTMLElement> {
+interface TruncatedTextProps extends HTMLAttributes<HTMLElement> {
   as?: TruncatedTextTag
   children: ReactNode
   /** Full text for the tooltip. Defaults to string/number children. */

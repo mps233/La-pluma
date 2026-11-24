@@ -4,8 +4,6 @@ package maa
 
 import (
 	"context"
-	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,10 +12,6 @@ import (
 
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 )
-
-func testLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(io.Discard, nil))
-}
 
 func fakeMAA(t *testing.T, body string) string {
 	t.Helper()
@@ -36,7 +30,7 @@ func errorCode(err error) string {
 }
 
 func TestExecWaitCaptureAndLines(t *testing.T) {
-	runner := New(fakeMAA(t, "echo 'Assistant::append_callback | {\"type\":\"TaskStarted\"}'\necho done\nexit 0"), testLogger())
+	runner := New(fakeMAA(t, "echo 'Assistant::append_callback | {\"type\":\"TaskStarted\"}'\necho done\nexit 0"))
 	var lines []string
 	task, err := runner.Exec(context.Background(), "run", nil, ExecOptions{
 		TaskName: "daily",
@@ -49,7 +43,7 @@ func TestExecWaitCaptureAndLines(t *testing.T) {
 		t.Fatal(err)
 	}
 	result := task.Wait(context.Background())
-	if result.ExitCode != 0 || !result.Started || result.Err != nil {
+	if result.ExitCode != 0 || result.Err != nil {
 		t.Fatalf("unexpected result: %+v", result)
 	}
 	if len(lines) != 2 || lines[0] != `stdout:Assistant::append_callback | {"type":"TaskStarted"}` || lines[1] != "stdout:done" {
@@ -58,7 +52,7 @@ func TestExecWaitCaptureAndLines(t *testing.T) {
 }
 
 func TestExecAsyncAndStop(t *testing.T) {
-	runner := New(fakeMAA(t, "trap '' TERM; sleep 30"), testLogger())
+	runner := New(fakeMAA(t, "trap '' TERM; sleep 30"))
 	task, err := runner.Exec(context.Background(), "run", nil, ExecOptions{TaskName: "long"})
 	if err != nil {
 		t.Fatal(err)
@@ -82,7 +76,7 @@ func TestExecAsyncAndStop(t *testing.T) {
 }
 
 func TestExecFailure(t *testing.T) {
-	runner := New(fakeMAA(t, "echo boom >&2; exit 7"), testLogger())
+	runner := New(fakeMAA(t, "echo boom >&2; exit 7"))
 	task, err := runner.Exec(context.Background(), "run", nil, ExecOptions{Wait: true})
 	if err == nil || errorCode(err) != "MAA_COMMAND_FAILED" {
 		t.Fatalf("expected command failure, got %v", err)
@@ -93,7 +87,7 @@ func TestExecFailure(t *testing.T) {
 }
 
 func TestSetPath(t *testing.T) {
-	runner := New("old-maa", nil)
+	runner := New("old-maa")
 	if runner.Path() != "old-maa" {
 		t.Fatalf("path = %s", runner.Path())
 	}
@@ -104,7 +98,7 @@ func TestSetPath(t *testing.T) {
 }
 
 func TestMissingCLI(t *testing.T) {
-	runner := New(filepath.Join(t.TempDir(), "missing-maa"), testLogger())
+	runner := New(filepath.Join(t.TempDir(), "missing-maa"))
 	if _, err := runner.Exec(context.Background(), "run", nil, ExecOptions{Wait: true}); err == nil || errorCode(err) != "MAA_CLI_NOT_FOUND" {
 		t.Fatalf("expected CLI not found, got %v", err)
 	}
@@ -183,7 +177,7 @@ func TestExecFailureUsesFailureLogTail(t *testing.T) {
 printf '%s\n' 'parse_groups | Failed to parse oper {"name":"狮蝎","requirements":{"elite":1,"module":1}}' >> "$MAA_TEST_LOG"
 echo boom >&2
 exit 1`
-	runner := New(fakeMAA(t, script), testLogger())
+	runner := New(fakeMAA(t, script))
 	runner.SetLogPath(logPath)
 	_, err := runner.Exec(context.Background(), "copilot", nil, ExecOptions{
 		Wait: true,

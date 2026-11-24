@@ -31,7 +31,7 @@ func newManualHarness(t *testing.T, completed map[int]bool) (*ManualManager, *[]
 		completed[request.ItemIndex] = true
 		return []any{map[string]any{"itemIndex": request.ItemIndex}}, nil
 	}
-	return NewManualManager(build, execute), executed
+	return NewManualManagerWithOptions(build, execute, ManualOptions{}), executed
 }
 
 func TestManualSetWaitsBetweenEntriesAndContinues(t *testing.T) {
@@ -96,9 +96,9 @@ func TestManualSetCanBeStoppedWhileWaiting(t *testing.T) {
 }
 
 func TestManualSetWithoutExecutorIsUnsupported(t *testing.T) {
-	manager := NewManualManager(func(ctx context.Context, setID, raid string) (*Plan, error) {
+	manager := NewManualManagerWithOptions(func(ctx context.Context, setID, raid string) (*Plan, error) {
 		return &Plan{SetID: setID}, nil
-	}, nil)
+	}, nil, ManualOptions{})
 	_, err := manager.StartManualSet(context.Background(), ManualStartRequest{SetID: "set-1"})
 	appError, ok := apperrors.As(err)
 	if !ok || appError.Code != "COPILOT_MANUAL_UNSUPPORTED" {

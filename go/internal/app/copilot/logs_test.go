@@ -23,33 +23,6 @@ func TestFindCopilotStageProgressMapsLatestFile(t *testing.T) {
 	}
 }
 
-func TestParseCopilotBattleTotalUsesLatestStageLoad(t *testing.T) {
-	stageLoad := `{"details":{"file_name":"/tmp/2-102-normal-1.json"},"what":"CopilotListLoadTaskFileSuccess"}`
-	logText := strings.Join([]string{
-		"Kills: 0 / 22",
-		`{"details":{"file_name":"/tmp/1-101-normal-1.json"},"what":"CopilotListLoadTaskFileSuccess"}`,
-		"Kills: 11 / 35",
-		"Kills: 0 / 41",
-		stageLoad,
-		"Kills: 0 / 52",
-	}, "\n")
-	if total := ParseCopilotBattleTotal(logText); total == nil || *total != 52 {
-		t.Fatalf("total = %#v", total)
-	}
-	if total := ParseCopilotBattleTotal("Kills: 0 / 41"); total == nil || *total != 41 {
-		t.Fatalf("plain total = %#v", total)
-	}
-	if ParseCopilotBattleTotal("Kills: 0 / 0") != nil {
-		t.Fatal("zero total must be rejected")
-	}
-	if ParseCopilotBattleTotal("Kills: 0 / 501") != nil {
-		t.Fatal("out-of-range total must be rejected")
-	}
-	if ParseCopilotBattleTotal("no battle lines") != nil {
-		t.Fatal("missing battle lines must return nil")
-	}
-}
-
 func TestParseBattleProgressUsesLatestCounter(t *testing.T) {
 	logText := strings.Join([]string{
 		"[2026-11-04 03:11:00.000][TRC][Px1][Tx1] Kills: 0 / 35",

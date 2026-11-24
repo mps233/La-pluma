@@ -36,7 +36,7 @@ export { parseJsonResponse } from '@/utils/apiResponse'
 /**
  * 自动检测 API 地址
  * 始终使用当前页面同源地址。
- * 开发环境由 Vite proxy 转发 /api，生产环境由 Express 同源服务前端和 API。
+ * 开发环境由 Vite proxy 转发 /api，生产环境由 Go server 同源服务前端和 API。
  */
 const getApiBaseUrl = (): string => {
   return `${window.location.origin}/api`
@@ -178,7 +178,7 @@ export interface ScheduleExecutionStatusData {
   lastResultRevision?: number
 }
 
-export interface MaaSanityReadingData {
+interface MaaSanityReadingData {
   current: number
   max: number
   reportAt: string
@@ -291,16 +291,6 @@ export interface ApplyTrainingPlanResult {
   stageCount: number
   totalStages?: number
   hasFallback?: boolean
-}
-
-export interface ScreenCaptureData {
-  image: string
-  mediaType?: string
-  width?: number
-  height?: number
-  adbPath?: string
-  address?: string
-  profileId?: string
 }
 
 export interface LogFileContentData {
@@ -628,16 +618,6 @@ export const maaApi = {
     return parseJsonResponse(response)
   },
 
-  async captureScreen(profileId: string = 'default'): Promise<ApiResponse<ScreenCaptureData>> {
-    const response = await fetchWithAuth(`${API_BASE_URL}/agent/screen/screenshot`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profileId })
-    })
-    return parseJsonResponse(response)
-  },
-
-  /** Binary, downscaled snapshot used by the dashboard preview fallback. */
   async captureScreenFrame(profileId: string = 'default', signal?: AbortSignal): Promise<Blob> {
     const response = await fetchWithAuth(
       `${API_BASE_URL}/agent/screen/frame?profileId=${encodeURIComponent(profileId)}`,

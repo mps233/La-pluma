@@ -10,7 +10,6 @@ import (
 
 const (
 	resourceCollectionCacheWindow = 60 * time.Second
-	stageActivityTimeLayout       = "2006/01/02 15:04:05"
 )
 
 var (
@@ -41,8 +40,6 @@ func NormalizeClientType(clientType string) string {
 		return "Official"
 	}
 }
-
-// NormalizeActivityClientType is the Node-name alias for NormalizeClientType.
 
 // ParseStageActivityTime parses "YYYY/MM/DD HH:mm:ss" at the given UTC offset
 // in hours (default 8).
@@ -226,9 +223,6 @@ func SelectCurrentStageActivity(data any, clientType string, now time.Time) *Sta
 	}
 	return active[0].activity
 }
-
-// StageActivityPath is the resolved StageActivityV2.json location.
-func (s *Service) StageActivityPath() string { return s.stageActivityPath }
 
 // GetStageActivityInfo reads StageActivityV2.json and selects the current
 // activity for the client. File and JSON errors are returned to the caller,

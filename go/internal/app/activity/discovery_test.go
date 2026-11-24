@@ -79,7 +79,7 @@ func TestRankActivityCopilots(t *testing.T) {
 		}(),
 	}
 
-	candidates := RankActivityCopilots(items, "EA-6", &SelectionContext{
+	candidates := RankActivityCopilotsForStage(items, "EA-6", "", &SelectionContext{
 		OwnedOperators: map[string]struct{}{"A": {}},
 		Preferences: CombatCopilotPreferences{
 			Raid:                    "normal",
@@ -96,7 +96,7 @@ func TestRankActivityCopilots(t *testing.T) {
 		t.Fatalf("uri = %q", candidates[0].URI)
 	}
 
-	all := RankActivityCopilots(items, "EA-6", nil)
+	all := RankActivityCopilotsForStage(items, "EA-6", "", nil)
 	if len(all) != 3 {
 		t.Fatalf("all = %#v", all)
 	}

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 export type MaaUpdateKind = 'core' | 'cli' | 'resources'
-export type MaaUpdateState = 'running' | 'success' | 'error'
+type MaaUpdateState = 'running' | 'success' | 'error'
 
 export const MAA_UPDATE_LABELS: Record<MaaUpdateKind, string> = {
   core: 'MaaCore',

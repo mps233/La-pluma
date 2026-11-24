@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react'
 
-export interface ReadoutStat {
+interface ReadoutStat {
   label: string
   value: ReactNode
   unit?: string
   muted?: boolean
 }
 
-export interface ReadoutMeta {
+interface ReadoutMeta {
   label?: string
   value: ReactNode
 }

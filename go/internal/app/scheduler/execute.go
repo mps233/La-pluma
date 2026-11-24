@@ -22,7 +22,6 @@ type flowExecution struct {
 	scheduleID string
 
 	errors    []TaskErrorEntry
-	skipped   []TaskSkipEntry
 	summaries []TaskSummary
 	reports   []FightReportResult
 	actions   []TaskActionResult
@@ -33,13 +32,11 @@ type flowExecution struct {
 
 	lastSuccess int
 	lastFailed  int
-	lastSkipped int
 }
 
 func newFlowExecution() *flowExecution {
 	return &flowExecution{
 		errors:      make([]TaskErrorEntry, 0),
-		skipped:     make([]TaskSkipEntry, 0),
 		summaries:   make([]TaskSummary, 0),
 		reports:     make([]FightReportResult, 0),
 		actions:     make([]TaskActionResult, 0),
@@ -58,19 +55,13 @@ func (e *flowExecution) recordError(task string, err error) {
 	e.errors = append(e.errors, TaskErrorEntry{Task: task, Error: err.Error()})
 }
 
-func (e *flowExecution) recordSkip(task, reason string) {
-	e.skipped = append(e.skipped, TaskSkipEntry{Task: task, Reason: reason})
-}
-
-// addFightAction mirrors the Node addFightAction: failed/skipped actions feed
-// the error/skip lists, while counting is deferred to the stage group.
+// addFightAction mirrors the Node addFightAction: failed actions feed the
+// error list, while counting is deferred to the stage group.
 func (e *flowExecution) addFightAction(action TaskActionResult) {
 	e.actions = append(e.actions, action)
 	switch action.Status {
 	case "failed":
 		e.errors = append(e.errors, TaskErrorEntry{Task: action.Task, Error: action.Message})
-	case "skipped":
-		e.skipped = append(e.skipped, TaskSkipEntry{Task: action.Task, Reason: action.Message})
 	}
 }
 
@@ -122,7 +113,6 @@ func (e *flowExecution) finalizeActive(forcedState, now string) {
 	entry.FinishedAt = now
 	e.lastSuccess = e.successCount
 	e.lastFailed = e.failedCount
-	e.lastSkipped = e.skippedCount
 	e.activeIndex = -1
 }
 
@@ -265,7 +255,6 @@ func (s *Service) StartDailyFlow(ctx context.Context, request DailyFlowRequest) 
 		if startupFailed && commandID != "closedown" {
 			reason := "启动游戏失败，已跳过后续游戏任务"
 			e.skippedCount++
-			e.recordSkip(name, reason)
 			e.recordAction(TaskActionResult{
 				Task:    name,
 				Action:  commandID,
@@ -580,7 +569,6 @@ func (s *Service) executeSimpleCommand(ctx context.Context, e *flowExecution, ta
 	}
 	if skipReason != "" {
 		e.skippedCount++
-		e.recordSkip(name, skipReason)
 		e.recordAction(TaskActionResult{Task: name, Action: kind, Status: "skipped", Message: skipReason})
 		return false
 	}

@@ -18,7 +18,7 @@ export const previewQualityPresets = {
   ultra: { label: '超清', fps: 60, maxSize: 1920, bitrateMbps: 20, maxBitrateMbps: 32 },
 } as const
 
-export type PreviewQualityPreset = keyof typeof previewQualityPresets
+type PreviewQualityPreset = keyof typeof previewQualityPresets
 export type PreviewQuality = PreviewQualityPreset | 'custom'
 
 interface PreviewPreferences {

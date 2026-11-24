@@ -20,6 +20,3 @@ The wrapper keeps the app's own stacking, opacity, and theme rules:
 | `glow` / `twinkle` | `0.5` / `0.42` | Tint under dense areas and occasional flares. |
 | `interactive` | `true` | Pointer lens, trail, and click rings. |
 | `intensity` | CSS default (`0.16` light / `0.2` dark) | Layer opacity override. |
-
-`AsciiBackdrop.tsx` remains the previous in-house canvas 2D implementation and
-is kept as a reference; `Layout` mounts `AsciiFieldBackdrop`.

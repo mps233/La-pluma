@@ -308,15 +308,6 @@ type CurrentMapTask struct {
 	Text []string `json:"text"`
 }
 
-// BuildCurrentMapStageTasks maps normalized stage codes to OCR tasks.
-func BuildCurrentMapStageTasks(stages []any) map[string]CurrentMapTask {
-	tasks := map[string]CurrentMapTask{}
-	for _, stage := range normalizedStageList(stages) {
-		tasks[stage] = CurrentMapTask{Text: []string{stage}}
-	}
-	return tasks
-}
-
 // CurrentMapResource is the written Stages resource file.
 type CurrentMapResource struct {
 	StageFile string   `json:"stageFile"`

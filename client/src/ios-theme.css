@@ -25,7 +25,6 @@
   --app-accent: #007aff;
   --app-accent-strong: #005ecb;
   --app-accent-action: #0066cc;
-  --app-accent-action-pressed: #0055b3;
   --app-accent-soft: rgba(0, 122, 255, 0.12);
   --app-success: #34c759;
   --app-success-text: #1c7331;
@@ -126,7 +125,6 @@ html.dark,
   --app-accent: #0a84ff;
   --app-accent-strong: #64b5ff;
   --app-accent-action: #0066cc;
-  --app-accent-action-pressed: #0055b3;
   --app-accent-soft: rgba(10, 132, 255, 0.2);
   --app-success: #30d158;
   --app-success-text: #30d158;
@@ -688,11 +686,6 @@ html.la-pluma-standalone #app-root .page {
 
   .la-pluma-app .la-pluma-github-link:hover {
     color: var(--app-text) !important;
-  }
-
-  .la-pluma-app .la-pluma-github-link:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--app-accent) 72%, transparent);
-    outline-offset: 2px;
   }
 
   .la-pluma-theme-mobile {

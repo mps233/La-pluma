@@ -54,7 +54,7 @@ function canBreakBetween(previous: string, next: string) {
   return true
 }
 
-export interface CjkTextProps {
+interface CjkTextProps {
   children: ReactNode
   lang?: string
   className?: string

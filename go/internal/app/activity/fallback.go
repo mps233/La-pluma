@@ -170,12 +170,11 @@ func SelectCurrentPenguinActivity(zones any, stages any, server string, now int6
 	}
 
 	type activeZone struct {
-		zone     map[string]any
-		window   *activityExistence
-		position int
+		zone   map[string]any
+		window *activityExistence
 	}
 	activeZones := make([]activeZone, 0)
-	for position, rawZone := range zoneList {
+	for _, rawZone := range zoneList {
 		zone := asRecord(rawZone)
 		if zone == nil || zone["type"] != "ACTIVITY" {
 			continue
@@ -184,7 +183,7 @@ func SelectCurrentPenguinActivity(zones any, stages any, server string, now int6
 		if window == nil {
 			continue
 		}
-		activeZones = append(activeZones, activeZone{zone: zone, window: window, position: position})
+		activeZones = append(activeZones, activeZone{zone: zone, window: window})
 	}
 	sort.SliceStable(activeZones, func(i, j int) bool {
 		return activeZones[i].window.openTime > activeZones[j].window.openTime

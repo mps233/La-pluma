@@ -10,7 +10,6 @@ import (
 	"math/rand/v2"
 	"net"
 	"os"
-	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -523,15 +522,6 @@ func (s *Session) SendScroll(x, y int32, width, height uint16, hScroll, vScroll 
 	return WriteScroll(s.ctrlConn, x, y, width, height, hScroll, vScroll, buttons)
 }
 
-func (s *Session) SendBackOrScreenOn(action int) error {
-	s.ctrlMu.Lock()
-	defer s.ctrlMu.Unlock()
-	if s.ctrlConn == nil {
-		return fmt.Errorf("scrcpy control is disabled")
-	}
-	return WriteBackOrScreenOn(s.ctrlConn, action)
-}
-
 func (s *Session) Close() error {
 	s.mu.Lock()
 	if s.closed {
@@ -583,14 +573,6 @@ func (s *Session) cleanupTunnel(ctx context.Context) {
 	if s.reverseUsed {
 		_ = s.adb.RemoveReverse(ctx, s.opts.Serial, "localabstract:"+s.socket)
 	}
-}
-
-func (s *Session) ServerPath() string {
-	absolute, err := filepath.Abs(s.opts.ServerPath)
-	if err != nil {
-		return s.opts.ServerPath
-	}
-	return absolute
 }
 
 type logWriter struct {

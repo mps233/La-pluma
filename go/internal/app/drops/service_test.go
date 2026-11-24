@@ -256,26 +256,6 @@ func TestRecordDropsErrorsAndEmptyData(t *testing.T) {
 	}
 }
 
-func TestMaterialsFromDatabase(t *testing.T) {
-	database := map[string]any{
-		"materials": map[string]any{
-			"one": map[string]any{"name": "固源岩", "iconId": "30012", "rarity": 1},
-			"two": map[string]any{"name": ""},
-			"bad": "not-an-object",
-		},
-	}
-	materials := MaterialsFromDatabase(database)
-	if len(materials) != 1 {
-		t.Fatalf("materials = %+v", materials)
-	}
-	if materials["固源岩"].IconID != "30012" || materials["固源岩"].Rarity != 1 {
-		t.Fatalf("material = %+v", materials["固源岩"])
-	}
-	if len(MaterialsFromDatabase(nil)) != 0 {
-		t.Fatal("nil database should produce no materials")
-	}
-}
-
 func TestDropStatisticsJSONShape(t *testing.T) {
 	dataDir := t.TempDir()
 	service := NewWithOptions(config.Paths{DataDir: dataDir}, Options{

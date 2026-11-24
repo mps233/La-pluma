@@ -146,14 +146,11 @@ func New(application *app.App, logger *slog.Logger) *Handler {
 	mux.HandleFunc("GET /notifications/config", handler.notificationConfig)
 	mux.HandleFunc("POST /notifications/config", handler.saveNotificationConfig)
 	mux.HandleFunc("POST /actions/test-notification-channel", handler.testNotificationChannel)
-	mux.HandleFunc("POST /actions/send-notification", handler.sendNotification)
 	mux.HandleFunc("GET /stages/open-today", handler.openStages)
 	mux.HandleFunc("GET /data/operators", handler.operatorsData)
 	mux.HandleFunc("GET /data/operbox", handler.operboxData)
 	mux.HandleFunc("GET /data/depot", handler.depotData)
 	mux.HandleFunc("POST /preview/orientation", handler.previewOrientation)
-	mux.HandleFunc("GET /changelog/core", handler.changelogCore)
-	mux.HandleFunc("GET /changelog/cli", handler.changelogCLI)
 	mux.HandleFunc("POST /actions/test-connection", handler.testConnection)
 	mux.HandleFunc("GET /actions/discover-devices", handler.discoverDevices)
 	mux.HandleFunc("POST /actions/open-config-directory", handler.openConfigDirectory)
@@ -175,11 +172,8 @@ func New(application *app.App, logger *slog.Logger) *Handler {
 	mux.HandleFunc("GET /device-stats", handler.deviceStats)
 	mux.HandleFunc("GET /clipboard", handler.getClipboard)
 	mux.HandleFunc("POST /clipboard", handler.setClipboard)
-	mux.HandleFunc("GET /paradox/operators", handler.paradoxOperators)
 	mux.HandleFunc("GET /custom-tools", handler.customTools)
 	mux.HandleFunc("POST /actions/run-custom-tool", handler.runCustomTool)
-	mux.HandleFunc("GET /auto-update/status", handler.autoUpdateStatus)
-	mux.HandleFunc("GET /debug-screenshots", handler.debugScreenshots)
 	mux.HandleFunc("GET /screen/frame", handler.screenFrame)
 	mux.HandleFunc("POST /screen/screenshot", handler.screenScreenshot)
 	mux.HandleFunc("GET /webrtc/status", handler.webrtcStatus)
@@ -1845,38 +1839,6 @@ func (h *Handler) testNotificationChannel(w http.ResponseWriter, r *http.Request
 	httpx.Success(w, http.StatusOK, map[string]any{"channel": body.Channel, "result": result}, result.Message, nil)
 }
 
-func (h *Handler) sendNotification(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Channel string         `json:"channel"`
-		Title   string         `json:"title"`
-		Content string         `json:"content"`
-		Level   string         `json:"level"`
-		Data    map[string]any `json:"data"`
-	}
-	_ = json.NewDecoder(r.Body).Decode(&body)
-	message := notifications.Message{
-		Title:   firstNonEmpty(body.Title, "测试通知"),
-		Content: firstNonEmpty(body.Content, "这是一条测试通知"),
-		Level:   firstNonEmpty(body.Level, "info"),
-		Data:    body.Data,
-	}
-	if strings.TrimSpace(body.Channel) != "" {
-		result, err := h.app.Notifications.SendToChannel(r.Context(), body.Channel, message)
-		if err != nil {
-			writeError(w, err)
-			return
-		}
-		httpx.Success(w, http.StatusOK, result, "通知已发送到指定渠道", nil)
-		return
-	}
-	result := h.app.Notifications.Send(r.Context(), message)
-	if !result.Success {
-		httpx.Failure(w, http.StatusBadRequest, &httpx.APIError{Code: "AGENT_NOTIFICATION_SEND_FAILED", Message: result.Message, Retryable: false})
-		return
-	}
-	httpx.Success(w, http.StatusOK, result, "通知已发送", nil)
-}
-
 func (h *Handler) openStages(w http.ResponseWriter, r *http.Request) {
 	clientType := firstNonEmpty(r.URL.Query().Get("clientType"), "Official")
 	value := h.app.Training.TodayOpenStages(clientType, h.app.Training.ResourceCollectionOpen(clientType))
@@ -2247,15 +2209,6 @@ func (h *Handler) operatorsData(w http.ResponseWriter, r *http.Request) {
 	httpx.Success(w, http.StatusOK, operators, "", nil)
 }
 
-func (h *Handler) paradoxOperators(w http.ResponseWriter, r *http.Request) {
-	value, err := jsonstore.Read(filepath.Join(h.app.Config().Paths.DataDir, "paradox-operators.json"), []any{})
-	if err != nil {
-		writeError(w, err)
-		return
-	}
-	httpx.Success(w, http.StatusOK, value, "", nil)
-}
-
 func (h *Handler) customTools(w http.ResponseWriter, r *http.Request) {
 	tools, err := h.app.CustomTools.ListTools()
 	if err != nil {
@@ -2295,26 +2248,6 @@ func (h *Handler) runCustomTool(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sendRunResponse(w, run, false, !wait, nil)
-}
-
-func (h *Handler) autoUpdateStatus(w http.ResponseWriter, r *http.Request) {
-	config, _ := h.app.ConfigStore.Load("auto-update")
-	enabled, _ := config["enabled"].(bool)
-	clock, _ := config["time"].(string)
-	status := updates.BuildAutoUpdateStatus(enabled, clock)
-	httpx.Success(w, http.StatusOK, map[string]any{"config": config, "status": status}, "", nil)
-}
-
-func (h *Handler) debugScreenshots(w http.ResponseWriter, r *http.Request) {
-	dir := filepath.Join(h.app.Config().Paths.DataDir, "debug")
-	entries, _ := os.ReadDir(dir)
-	files := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			files = append(files, entry.Name())
-		}
-	}
-	httpx.Success(w, http.StatusOK, map[string]any{"files": files, "path": dir}, "", nil)
 }
 
 func (h *Handler) activity(w http.ResponseWriter, r *http.Request) {
@@ -3436,62 +3369,4 @@ func (h *Handler) previewOrientation(w http.ResponseWriter, r *http.Request) {
 		results = append(results, result)
 	}
 	httpx.Success(w, http.StatusOK, map[string]any{"action": "preview-orientation", "orientation": orientation, "adbPath": adbPath, "address": address, "commands": commands, "results": results}, "屏幕方向已设置", nil)
-}
-
-func (h *Handler) changelogCore(w http.ResponseWriter, r *http.Request) {
-	h.changelog(w, r, "MaaAssistantArknights/MaaAssistantArknights")
-}
-
-func (h *Handler) changelogCLI(w http.ResponseWriter, r *http.Request) {
-	h.changelog(w, r, "MaaAssistantArknights/maa-cli")
-}
-
-func (h *Handler) changelog(w http.ResponseWriter, r *http.Request, repo string) {
-	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
-	defer cancel()
-	request, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/"+repo+"/releases?per_page=30", nil)
-	request.Header.Set("Accept", "application/vnd.github+json")
-	request.Header.Set("User-Agent", "la-pluma-go")
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		httpx.Failure(w, http.StatusBadGateway, &httpx.APIError{Code: "AGENT_CHANGELOG_FETCH_FAILED", Message: "获取更新日志失败", Retryable: true})
-		return
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		httpx.Failure(w, http.StatusBadGateway, &httpx.APIError{Code: "AGENT_CHANGELOG_FETCH_FAILED", Message: "获取更新日志失败", Retryable: true, Details: map[string]any{"status": response.StatusCode}})
-		return
-	}
-	var releases []struct {
-		TagName     string `json:"tag_name"`
-		Name        string `json:"name"`
-		Body        string `json:"body"`
-		PublishedAt string `json:"published_at"`
-		HTMLURL     string `json:"html_url"`
-		Prerelease  bool   `json:"prerelease"`
-	}
-	if err := json.NewDecoder(response.Body).Decode(&releases); err != nil {
-		httpx.Failure(w, http.StatusBadGateway, &httpx.APIError{Code: "AGENT_CHANGELOG_FETCH_FAILED", Message: "更新日志格式无效", Retryable: true})
-		return
-	}
-	out := make([]map[string]any, 0, 2)
-	var stable, beta *int
-	for index := range releases {
-		if releases[index].Prerelease && beta == nil {
-			value := index
-			beta = &value
-		}
-		if !releases[index].Prerelease && stable == nil {
-			value := index
-			stable = &value
-		}
-	}
-	for _, index := range []*int{beta, stable} {
-		if index == nil {
-			continue
-		}
-		release := releases[*index]
-		out = append(out, map[string]any{"version": release.TagName, "name": release.Name, "body": release.Body, "publishedAt": release.PublishedAt, "htmlUrl": release.HTMLURL, "prerelease": release.Prerelease})
-	}
-	httpx.Success(w, http.StatusOK, out, "", nil)
 }

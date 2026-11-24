@@ -28,9 +28,12 @@ func TestReadVideoHeaderAndPacket(t *testing.T) {
 	binary.BigEndian.PutUint64(packet[0:8], FlagConfig|FlagKeyFrame|12345)
 	binary.BigEndian.PutUint32(packet[8:12], uint32(len(payload)))
 	copy(packet[12:], payload)
-	packetHeader, data, err := ReadPacket(bytes.NewReader(packet))
+	packetHeader, data, session, err := ReadVideoPacket(bytes.NewReader(packet))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if session != nil {
+		t.Fatal("unexpected session header")
 	}
 	if !packetHeader.IsConfig() || !packetHeader.IsKeyFrame() || packetHeader.PTS() != 12345 {
 		t.Fatalf("unexpected packet flags: %+v", packetHeader)

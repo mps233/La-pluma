@@ -172,12 +172,6 @@ func (m *Manager) CloseAdmission(reason string) {
 	m.admissionReason = reason
 }
 
-func (m *Manager) AdmissionClosed() bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.admissionClosed
-}
-
 func (m *Manager) Status() Snapshot {
 	m.mu.Lock()
 	defer m.mu.Unlock()

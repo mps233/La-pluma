@@ -2068,7 +2068,7 @@ export interface NeckTip {
   until: number;
 }
 
-export interface IdleWiden {
+interface IdleWiden {
   /** Points the pill widens toward, both ends together. */
   by: number;
   rise: SpringConfig;

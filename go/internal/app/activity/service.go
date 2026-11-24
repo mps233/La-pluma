@@ -14,7 +14,6 @@ import (
 
 const (
 	defaultPRTSBaseURL             = "https://prts.maa.plus"
-	defaultActivityCacheTTL        = 24 * time.Hour
 	defaultResourceRefreshInterval = 6 * time.Hour
 )
 
@@ -194,25 +193,9 @@ func (s *Service) Now() time.Time {
 	return s.now()
 }
 
-func (s *Service) Paths() config.Paths        { return s.paths }
-func (s *Service) Fallback() *FallbackService { return s.fallback }
-func (s *Service) Resource() *ResourceIndex   { return s.resource }
-
 // ProgressPath is activity-copilot-progress.json under Paths.DataDir.
 func (s *Service) ProgressPath() string {
 	return filepath.Join(s.paths.DataDir, "activity-copilot-progress.json")
-}
-
-// ActivityCachePath is the persisted activity cache file.
-func (s *Service) ActivityCachePath() string {
-	return filepath.Join(s.paths.DataDir, "user-configs", "activity-cache.json")
-}
-
-func (s *Service) CurrentProvider() ActivityProvider {
-	if s.currentSource != nil {
-		return s.currentSource
-	}
-	return s
 }
 
 // fileConfigLoader reads <DataDir>/user-configs/<type>.json.

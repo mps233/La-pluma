@@ -20,8 +20,8 @@ const APP_TABS = [
 export type AppTab = typeof APP_TABS[number]
 
 type ThemeMode = 'light' | 'dark' | 'system'
-export type StatisticsTab = 'operbox' | 'depot' | 'drops'
-export type TrainingMode = 'elite' | 'mastery'
+type StatisticsTab = 'operbox' | 'depot' | 'drops'
+type TrainingMode = 'elite' | 'mastery'
 
 export interface CombatCopilotPrefill {
   setId: string

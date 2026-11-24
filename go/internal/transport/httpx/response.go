@@ -69,5 +69,3 @@ func Failure(w http.ResponseWriter, status int, err *APIError) {
 	}
 	WriteJSON(w, status, Envelope{Success: false, Error: err})
 }
-
-// ErrorCode extracts the stable code from an error when it carries one.

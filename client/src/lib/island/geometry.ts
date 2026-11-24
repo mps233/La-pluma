@@ -89,7 +89,7 @@ export const bubbleTrailing = (detached: SlotPair, bubbleWidth: number, metrics:
 };
 
 /** Extents of the compact pill beyond the sensor on each side, `balance` applied (0 for an empty side). */
-export const compactSides = (measure: Pick<ContentMeasure, "leading" | "trailing">, metrics: IslandMetrics) => {
+const compactSides = (measure: Pick<ContentMeasure, "leading" | "trailing">, metrics: IslandMetrics) => {
   const c = metrics.compact;
   const side = (slot: number, inner: number) => (slot > 0 ? inner + Math.min(slot, c.maxSlotWidth) + c.edgePadding : 0);
   const leading = side(measure.leading, c.innerPadding.leading);

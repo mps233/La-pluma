@@ -251,7 +251,7 @@ La-pluma/
 │  └─ public/              PWA icons and logo
 ├─ go/                     Go backend and MyGo desktop shell
 │  ├─ cmd/server/          headless HTTP server
-│  ├─ cmd/desktop/         MyGo desktop entry
+│  ├─ main.go              MyGo desktop entry
 │  ├─ internal/app/        MAA, scheduler, runs, WebRTC, training, notifications
 │  ├─ internal/infra/      ADB, MAA, scrcpy and WebRTC adapters
 │  └─ internal/transport/  HTTP, Agent API and signaling

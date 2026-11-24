@@ -229,15 +229,10 @@ type TaskActionResult struct {
 	SanityDepleted bool    `json:"sanityDepleted,omitempty"`
 }
 
-// TaskErrorEntry and TaskSkipEntry mirror the Node execution entries.
+// TaskErrorEntry mirrors the Node execution error entry.
 type TaskErrorEntry struct {
 	Task  string `json:"task,omitempty"`
 	Error string `json:"error"`
-}
-
-type TaskSkipEntry struct {
-	Task   string `json:"task,omitempty"`
-	Reason string `json:"reason"`
 }
 
 // ScheduleTaskResult is one task-result lifecycle entry.

@@ -60,13 +60,13 @@ func TestNormalizeMasteryData(t *testing.T) {
 }
 
 func TestRoleAndBattleName(t *testing.T) {
-	if got := RoleFromProfession("CASTER"); got == nil || *got != "Caster" {
+	if got := roleFromProfession("CASTER"); got == nil || *got != "Caster" {
 		t.Fatalf("CASTER role: %v", got)
 	}
-	if got := RoleFromProfession("SUPPORT"); got == nil || *got != "Support" {
+	if got := roleFromProfession("SUPPORT"); got == nil || *got != "Support" {
 		t.Fatalf("SUPPORT role: %v", got)
 	}
-	if RoleFromProfession("UNKNOWN") != nil {
+	if roleFromProfession("UNKNOWN") != nil {
 		t.Fatal("unknown profession must not map")
 	}
 

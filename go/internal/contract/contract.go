@@ -6,9 +6,6 @@ package contract
 // APIVersion is the Agent API contract version.
 const APIVersion = "2026-07-12"
 
-// API_VERSION mirrors the Node oracle's exported constant name.
-const API_VERSION = APIVersion
-
 // Safety describes the side-effect profile of an operation.
 type Safety struct {
 	Level                   string

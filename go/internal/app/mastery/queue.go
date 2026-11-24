@@ -1302,21 +1302,6 @@ func (s *QueueService) MarkCampaignBlocked(reason string) error {
 	return s.saveLocked(data)
 }
 
-// MarkCampaignCompleted finishes the campaign.
-func (s *QueueService) MarkCampaignCompleted() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	data, err := s.loadLocked()
-	if err != nil {
-		return err
-	}
-	data = cloneQueueData(data)
-	data.Campaign.Status = CampaignCompleted
-	data.Campaign.ActiveItemID = nil
-	data.Campaign.ActiveStepRunID = nil
-	return s.saveLocked(data)
-}
-
 // TransientReset is the input for ResetItemAfterTransientError.
 type TransientReset struct {
 	Code      string

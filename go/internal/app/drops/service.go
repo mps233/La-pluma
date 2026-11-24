@@ -169,9 +169,6 @@ func NewWithOptions(paths config.Paths, options Options) *Service {
 	return service
 }
 
-// RecordsDir is the directory holding one JSON file per business date.
-func (s *Service) RecordsDir() string { return s.recordsDir }
-
 func statsTTLFromEnv() time.Duration {
 	raw := strings.TrimSpace(os.Getenv("LA_PLUMA_DROP_STATS_TTL_MS"))
 	if raw == "" {
@@ -513,36 +510,6 @@ func LoadMaterials(resourceDir string) (map[string]MaterialInfo, error) {
 		result[name] = MaterialInfo{Name: name, IconID: iconID, Rarity: rarity}
 	}
 	return result, nil
-}
-
-// MaterialsFromDatabase adapts a decoded MAA material database (the shape
-// returned by maaResourceDataService) into the map keyed by material name.
-func MaterialsFromDatabase(database any) map[string]MaterialInfo {
-	result := map[string]MaterialInfo{}
-	databaseRecord := asRecord(database)
-	if databaseRecord == nil {
-		return result
-	}
-	materials, ok := databaseRecord["materials"].(map[string]any)
-	if !ok {
-		return result
-	}
-	for _, rawItem := range materials {
-		item := asRecord(rawItem)
-		if item == nil {
-			continue
-		}
-		name, ok := item["name"].(string)
-		if !ok || name == "" {
-			continue
-		}
-		result[name] = MaterialInfo{
-			Name:   name,
-			IconID: item["iconId"],
-			Rarity: item["rarity"],
-		}
-	}
-	return result
 }
 
 func processRecordForStatistics(record DropRecordEntry, statistics *DropStatistics, materialsMap map[string]MaterialInfo) {

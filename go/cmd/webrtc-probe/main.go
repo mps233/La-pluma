@@ -134,7 +134,6 @@ func main() {
 	go publisher.FeedVideo()
 
 	signalServer := signaling.New(func() *scwebrtc.Publisher { return publisher }, logger)
-	signalServer.SetDeviceID(*serial)
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/login", signalServer.Login)
 	mux.HandleFunc("GET /connect_client", signalServer.Connect)

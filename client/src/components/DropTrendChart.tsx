@@ -1,6 +1,6 @@
 import { Bar, BarChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from 'recharts'
 
-export interface DropTrendPoint {
+interface DropTrendPoint {
   name: string
   count: number
 }

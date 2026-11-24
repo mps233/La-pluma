@@ -74,8 +74,6 @@ func NewClient(options ClientOptions) *Client {
 	return &Client{httpClient: client, baseURL: baseURL, timeout: timeout, now: now}
 }
 
-// BaseURL returns the resolved gamedata root, without a trailing slash.
-
 // Now returns the injected clock (UTC conversion happens at the call site).
 func (c *Client) Now() time.Time { return c.now() }
 

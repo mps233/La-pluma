@@ -28,7 +28,6 @@ const (
 type Server struct {
 	provider func() *scwebrtc.Publisher
 	logger   *slog.Logger
-	deviceID string
 
 	mu      sync.Mutex
 	tickets map[string]time.Time
@@ -174,12 +173,6 @@ func (s *Server) Connect(w http.ResponseWriter, r *http.Request) {
 			client.handleCommand(message)
 		}
 	}
-}
-
-func (s *Server) SetDeviceID(deviceID string) {
-	s.mu.Lock()
-	s.deviceID = deviceID
-	s.mu.Unlock()
 }
 
 func (s *Server) consumeTicket(token string) bool {

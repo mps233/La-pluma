@@ -32,7 +32,7 @@ export interface RunTaskResult {
   [key: string]: unknown
 }
 
-export interface AgentRunProgress {
+interface AgentRunProgress {
   setId?: string | null
   currentStage?: string | null
   currentTask?: string | null
@@ -72,7 +72,7 @@ export interface AgentRun {
 }
 
 /** The schedule executor's live status; currentStep is zero-based here. */
-export interface RunScheduleProgress {
+interface RunScheduleProgress {
   isRunning?: boolean
   scheduleId?: string | null
   currentStep?: number | null
@@ -87,7 +87,7 @@ export interface RunScheduleProgress {
 }
 
 /** The legacy task snapshot the server keeps beside the Run. */
-export interface LegacyRunTaskProgress {
+interface LegacyRunTaskProgress {
   isRunning?: boolean
   currentStage?: string | null
   currentTask?: string | null
@@ -111,7 +111,7 @@ export interface CurrentRunSnapshot {
   [key: string]: unknown
 }
 
-export type GlobalRunPhase = 'idle' | 'running' | 'stopping' | 'unknown'
+type GlobalRunPhase = 'idle' | 'running' | 'stopping' | 'unknown'
 
 export interface GlobalRunStatus {
   phase: GlobalRunPhase

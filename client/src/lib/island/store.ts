@@ -64,7 +64,7 @@ const shownOf = (snapshot: Pick<IslandSnapshot, "activities" | "front">, group: 
 };
 
 /** Whether an activity shows: ungrouped ones always, grouped ones in turn and never mid-handoff. */
-export const isShown = (snapshot: Pick<IslandSnapshot, "activities" | "front" | "handoff">, activity: Activity) =>
+const isShown = (snapshot: Pick<IslandSnapshot, "activities" | "front" | "handoff">, activity: Activity) =>
   activity.group === null || (snapshot.handoff !== activity.group && shownOf(snapshot, activity.group) === activity.id);
 
 export const deriveScene = (snapshot: IslandSnapshot): IslandScene => {

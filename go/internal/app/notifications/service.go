@@ -32,9 +32,6 @@ type Config struct {
 	Channels map[string]ChannelConfig `json:"channels"`
 }
 
-// NotificationConfig mirrors the Node type name.
-type NotificationConfig = Config
-
 // DefaultConfig is the state used before any notification.json exists.
 func DefaultConfig() Config {
 	return Config{

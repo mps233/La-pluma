@@ -60,10 +60,7 @@ type BeginInput struct {
 }
 
 type Summary struct {
-	FilePath        string
-	RestoredRuns    int
 	InterruptedRuns int
-	PrunedRuns      int
 }
 
 type storeSnapshot struct {
@@ -108,17 +105,17 @@ func (s *Service) Initialize() (Summary, error) {
 	raw, err := jsonstore.Read(s.filePath, map[string]any{"version": storeVersion, "runs": []any{}})
 	if err != nil {
 		s.persistErr = err
-		return Summary{FilePath: s.filePath}, apperrors.WithStatus("AGENT_RUN_PERSISTENCE_FAILED", "Agent run 存储读取失败", 503, true, map[string]any{"filePath": s.filePath})
+		return Summary{}, apperrors.WithStatus("AGENT_RUN_PERSISTENCE_FAILED", "Agent run 存储读取失败", 503, true, map[string]any{"filePath": s.filePath})
 	}
 	snapshot, err := decodeSnapshot(raw)
 	if err != nil {
 		s.persistErr = err
-		return Summary{FilePath: s.filePath}, err
+		return Summary{}, err
 	}
 	records, sequence, terminalSeq, interrupted, err := validateSnapshot(snapshot, s.now())
 	if err != nil {
 		s.persistErr = err
-		return Summary{FilePath: s.filePath}, err
+		return Summary{}, err
 	}
 
 	s.runs = make(map[string]*agentrun.Record, len(records))
@@ -138,10 +135,10 @@ func (s *Service) Initialize() (Summary, error) {
 	s.enabled = true
 	if err := s.persistLocked(); err != nil {
 		s.enabled = false
-		return Summary{FilePath: s.filePath}, err
+		return Summary{}, err
 	}
 	s.logger.Info("agent run store restored", "file", s.filePath, "runs", len(s.runs), "interrupted", interrupted, "pruned", pruned)
-	return Summary{FilePath: s.filePath, RestoredRuns: len(s.runs), InterruptedRuns: interrupted, PrunedRuns: pruned}, nil
+	return Summary{InterruptedRuns: interrupted}, nil
 }
 
 func decodeSnapshot(raw any) (*storeSnapshot, error) {
@@ -554,27 +551,6 @@ func (s *Service) ReleaseIdempotency(runID string) (agentrun.DTO, error) {
 		return agentrun.DTO{}, err
 	}
 	return record.Run.ToDTO(), nil
-}
-
-func (s *Service) Discard(runID string) (agentrun.DTO, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	record, ok := s.runs[runID]
-	if !ok {
-		return agentrun.DTO{}, notFoundError(runID)
-	}
-	dto := record.Run.ToDTO()
-	delete(s.runs, runID)
-	if record.Run.IdempotencyKey != nil {
-		key := idempotencyKey(record.Run.OperationID, *record.Run.IdempotencyKey)
-		if entry, ok := s.idempotency[key]; ok && entry.RunID == runID {
-			delete(s.idempotency, key)
-		}
-	}
-	if err := s.persistLocked(); err != nil {
-		return agentrun.DTO{}, err
-	}
-	return dto, nil
 }
 
 func (s *Service) Get(runID string) (agentrun.DTO, bool) {

@@ -50,7 +50,6 @@
     --app-accent: #0e7490;
     --app-accent-strong: #155e75;
     --app-accent-action: #155e75;
-    --app-accent-action-pressed: #164e63;
     --app-accent-soft: rgba(14, 116, 144, 0.1);
     --app-preview-empty-bg: color-mix(in srgb, var(--app-border) 52%, transparent);
     --app-success: #059669;
@@ -110,7 +109,6 @@
     --app-accent: #0e7490;
     --app-accent-strong: #67e8f9;
     --app-accent-action: #0e7490;
-    --app-accent-action-pressed: #155e75;
     --app-accent-soft: rgba(14, 116, 144, 0.2);
     --app-preview-empty-bg: color-mix(in srgb, var(--app-bg) 94%, var(--app-accent) 6%);
     --app-success: #34d399;

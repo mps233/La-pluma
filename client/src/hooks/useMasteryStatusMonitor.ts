@@ -74,7 +74,6 @@ export function useMasteryStatusMonitor() {
         }
       } catch (error) {
         if (disposed || (error instanceof Error && error.name === 'AbortError')) return
-        useMasteryStore.getState().applyError(error instanceof Error ? error.message : '网络错误')
       } finally {
         if (!disposed) {
           inFlight = false

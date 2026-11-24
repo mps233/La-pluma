@@ -105,7 +105,6 @@ type Service struct {
 
 	battleSampler  BattleProgressSampler
 	battleInterval time.Duration
-	manualExecutor StepExecutor
 	executor       Executor
 	lease          LeaseRunner
 	dropRecorder   DropRecorder
@@ -116,11 +115,8 @@ type Service struct {
 
 	progressMu sync.Mutex
 
-	manualOnce sync.Once
-	manual     *ManualManager
+	manual *ManualManager
 }
-
-// New returns a Service with default PRTS client, clock and caches.
 
 // NewWithOptions returns a fully configurable Service. Tests inject an
 // httptest-backed PRTS client and a fake clock; production uses defaults.
@@ -164,7 +160,6 @@ func NewWithOptions(options ServiceOptions) *Service {
 	if manualExecutor == nil {
 		manualExecutor = service.ManualStepExecutor()
 	}
-	service.manualExecutor = manualExecutor
 	service.manual = NewManualManagerWithOptions(
 		service.BuildPlan,
 		manualExecutor,
@@ -356,13 +351,6 @@ func (s *Service) BuildPlanUncached(ctx context.Context, setId, raid string) (*P
 		name = "作业集 " + setId
 	}
 	return &Plan{SetID: setId, Name: name, Items: items, Entries: entries}, nil
-}
-
-// ClearPlanCache drops cached plans; tests use it to model TTL expiry.
-func (s *Service) ClearPlanCache() {
-	s.planMu.Lock()
-	s.planCache = map[string]planCacheEntry{}
-	s.planMu.Unlock()
 }
 
 // LoadProgress reads copilot-progress.json. Read errors and malformed shapes

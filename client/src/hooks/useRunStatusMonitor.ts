@@ -19,7 +19,7 @@ const HIDDEN_RUN_POLL_MS = 10_000
  * 把服务端 Run 投影成全局可读状态。
  * Run 是运行身份和终态的唯一来源；只有活动状态才产生忙状态。
  */
-export function runToGlobalStatus(run: AgentRun | null): GlobalRunStatus {
+function runToGlobalStatus(run: AgentRun | null): GlobalRunStatus {
   if (!run || !isActiveRunState(run.state)) return IDLE_RUN_STATUS
 
   const message = typeof run.progress?.message === 'string' ? run.progress.message.trim() : ''

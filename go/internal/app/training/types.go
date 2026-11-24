@@ -147,12 +147,6 @@ type GeneratePlanRequest struct {
 	ClientType string `json:"clientType,omitempty"`
 }
 
-// ApplyPlanRequest mirrors POST /api/agent/actions/apply-training-plan.
-type ApplyPlanRequest struct {
-	Plan     TrainingPlan   `json:"plan"`
-	Settings map[string]any `json:"settings,omitempty"`
-}
-
 // PlanOperator is one operator section of a generated plan.
 type PlanOperator struct {
 	ID           string               `json:"id"`

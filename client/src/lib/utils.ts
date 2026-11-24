@@ -1,4 +1,4 @@
-export type ClassValue = string | number | null | undefined | false;
+type ClassValue = string | number | null | undefined | false;
 
 /** Minimal shadcn-compatible class name joiner. */
 export function cn(...classes: ClassValue[]) {

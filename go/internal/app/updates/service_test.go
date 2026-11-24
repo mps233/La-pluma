@@ -851,25 +851,6 @@ func TestParseAutoUpdateConfig(t *testing.T) {
 	}
 }
 
-func TestBuildAutoUpdateStatus(t *testing.T) {
-	enabled := BuildAutoUpdateStatus(true, "09:15")
-	if !enabled.Enabled || enabled.Time == nil || *enabled.Time != "09:15" {
-		t.Fatalf("enabled = %+v", enabled)
-	}
-	for _, status := range []AutoUpdateStatus{
-		BuildAutoUpdateStatus(false, "09:15"),
-		BuildAutoUpdateStatus(true, ""),
-	} {
-		encoded, err := json.Marshal(status)
-		if err != nil {
-			t.Fatalf("marshal: %v", err)
-		}
-		if string(encoded) != `{"enabled":false,"time":null}` {
-			t.Fatalf("status json = %s", encoded)
-		}
-	}
-}
-
 func TestPlanUpdateCoreChannels(t *testing.T) {
 	current := PlanUpdateCore("")
 	if current.Steps[0].TargetChannel != "current" || current.Steps[0].Command != "update" {
@@ -981,14 +962,6 @@ func TestActionPayloadJSONShapes(t *testing.T) {
 	}
 	if string(hotPlan) != `{"action":"hot-update-resources","command":"hot-update"}` {
 		t.Fatalf("hot plan json = %s", hotPlan)
-	}
-
-	status, err := json.Marshal(BuildAutoUpdateStatus(true, "09:15"))
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	if string(status) != `{"enabled":true,"time":"09:15"}` {
-		t.Fatalf("status json = %s", status)
 	}
 }
 

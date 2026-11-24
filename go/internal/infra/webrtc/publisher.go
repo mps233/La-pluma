@@ -20,18 +20,16 @@ import (
 )
 
 type TouchMessage struct {
-	Type       string  `json:"type"`
-	ID         uint64  `json:"id"`
-	Sequence   uint64  `json:"seq"`
-	ClientTSMS int64   `json:"client_ts_ms"`
-	Action     int     `json:"action"`
-	X          float64 `json:"x"`
-	Y          float64 `json:"y"`
-	Width      float64 `json:"w"`
-	Height     float64 `json:"h"`
-	HScroll    float64 `json:"hscroll"`
-	VScroll    float64 `json:"vscroll"`
-	Buttons    int     `json:"buttons"`
+	Type    string  `json:"type"`
+	ID      uint64  `json:"id"`
+	Action  int     `json:"action"`
+	X       float64 `json:"x"`
+	Y       float64 `json:"y"`
+	Width   float64 `json:"w"`
+	Height  float64 `json:"h"`
+	HScroll float64 `json:"hscroll"`
+	VScroll float64 `json:"vscroll"`
+	Buttons int     `json:"buttons"`
 }
 
 type Publisher struct {
@@ -42,12 +40,10 @@ type Publisher struct {
 	logger  *slog.Logger
 	stop    chan struct{}
 	closed  sync.Once
-	onPeer  func(connected bool)
 	onEnded func()
 	ended   sync.Once
 
 	cacheMu      sync.Mutex
-	lastConfig   []byte
 	lastKeyframe []byte
 	profileLevel string
 
@@ -57,19 +53,9 @@ type Publisher struct {
 
 type peer struct {
 	pc      *webrtc.PeerConnection
-	input   *webrtc.DataChannel
-	sender  *webrtc.RTPSender
 	pending []webrtc.ICECandidateInit
 	answer  bool
 	mu      sync.Mutex
-}
-
-// keyframeRequests coalesces PLI/FIR bursts from viewers. scrcpy emits a
-// keyframe only every 10 seconds, so a lost packet would otherwise leave the
-// browser decoding against a broken reference frame until the next one.
-type keyframeRequests struct {
-	mu      sync.Mutex
-	pending bool
 }
 
 func New(session *scrcpy.Session, logger *slog.Logger) (*Publisher, error) {
@@ -94,13 +80,6 @@ func New(session *scrcpy.Session, logger *slog.Logger) (*Publisher, error) {
 		logger:  logger,
 		stop:    make(chan struct{}),
 	}, nil
-}
-
-// SetPeerStateListener observes peer connect/disconnect for viewer counts.
-func (p *Publisher) SetPeerStateListener(listener func(connected bool)) {
-	p.mu.Lock()
-	p.onPeer = listener
-	p.mu.Unlock()
 }
 
 // CreateOffer builds an offer, waits for ICE gathering to complete, and
@@ -160,7 +139,6 @@ func (p *Publisher) CreateOffer(peerID string) (string, []webrtc.ICECandidateIni
 		p.logger.Debug("peer state", "peer", peerID, "state", state)
 		switch state {
 		case webrtc.PeerConnectionStateConnected:
-			p.notifyPeer(true)
 			p.writeCachedKeyframe()
 			// A late peer may only have the first (often black) keyframe cached,
 			// while scrcpy sends no frames for a static screen. Force a fresh
@@ -168,7 +146,6 @@ func (p *Publisher) CreateOffer(peerID string) (string, []webrtc.ICECandidateIni
 			go p.refreshKeyframeForPeer()
 		case webrtc.PeerConnectionStateFailed, webrtc.PeerConnectionStateClosed, webrtc.PeerConnectionStateDisconnected:
 			p.RemovePeer(peerID)
-			p.notifyPeer(false)
 		}
 	})
 
@@ -187,7 +164,7 @@ func (p *Publisher) CreateOffer(peerID string) (string, []webrtc.ICECandidateIni
 	candidateMu.Unlock()
 
 	p.mu.Lock()
-	p.peers[peerID] = &peer{pc: pc, input: input, sender: sender}
+	p.peers[peerID] = &peer{pc: pc}
 	p.mu.Unlock()
 
 	return p.applyProfileLevel(pc.LocalDescription().SDP), gathered, nil
@@ -265,15 +242,6 @@ func (p *Publisher) notifyEnded() {
 	})
 }
 
-func (p *Publisher) notifyPeer(connected bool) {
-	p.mu.RLock()
-	listener := p.onPeer
-	p.mu.RUnlock()
-	if listener != nil {
-		listener(connected)
-	}
-}
-
 func (p *Publisher) handleInput(data []byte) {
 	var message TouchMessage
 	if err := json.Unmarshal(data, &message); err != nil {
@@ -333,7 +301,6 @@ func (p *Publisher) FeedVideo() {
 			configData = append([]byte(nil), data...)
 			profileLevel := spsProfileLevelID(data)
 			p.cacheMu.Lock()
-			p.lastConfig = append([]byte(nil), data...)
 			p.profileLevel = profileLevel
 			p.cacheMu.Unlock()
 			p.logger.Info("video config", "bytes", len(data), "nals", nalTypes(data), "profile_level_id", profileLevel)

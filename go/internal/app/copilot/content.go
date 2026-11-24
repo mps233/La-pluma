@@ -38,31 +38,6 @@ func ParseCopilotContent(data any) Content {
 	}
 }
 
-// ParseEmbeddedContent is used by discovery, where the item itself carries a
-// `content` field that may be a string or an object. Unlike plan parsing it
-// does not normalize the shape because fallback fields are read elsewhere.
-func ParseEmbeddedContent(item any) Content {
-	record := asRecord(item)
-	if record == nil {
-		return Content{}
-	}
-	switch content := record["content"].(type) {
-	case string:
-		var parsed any
-		if err := decodeJSON([]byte(content), &parsed); err != nil {
-			return Content{}
-		}
-		if value, ok := parsed.(map[string]any); ok {
-			return value
-		}
-		return Content{}
-	case map[string]any:
-		return content
-	default:
-		return Content{}
-	}
-}
-
 // normalizeContent mirrors normalizeCopilotContent: unknown fields are kept,
 // while known fields are deleted when they have the wrong JSON type.
 func normalizeContent(value map[string]any) Content {

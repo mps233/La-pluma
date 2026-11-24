@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 
 	"github.com/mps233/la-pluma/go/internal/app/activity"
 	"github.com/mps233/la-pluma/go/internal/app/agentrun"
@@ -35,7 +34,8 @@ import (
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
 )
 
-// App is the composition root shared by cmd/server and cmd/desktop. It owns
+// App is the composition root shared by cmd/server and the MyGo desktop
+// entry (go/main.go). It owns
 // the durable run store, the single MAA execution lease and the MAA CLI
 // runner. HTTP handlers call these services; desktop bindings do too.
 type App struct {
@@ -68,7 +68,6 @@ type App struct {
 
 	instanceLock *instancelock.Lock
 
-	startedAt time.Time
 	closeOnce sync.Once
 }
 
@@ -102,7 +101,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	if maaPath == "" {
 		maaPath = "maa"
 	}
-	runner := maa.New(maaPath, logger)
+	runner := maa.New(maaPath)
 	if cfg.Paths.MaaStateDir != "" {
 		runner.SetLogPath(filepath.Join(cfg.Paths.MaaStateDir, "debug", "asst.log"))
 	}
@@ -201,7 +200,6 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Assets:        assetsHandler,
 		WebRTC:        webrtcapp.New(cfg, logger),
 		instanceLock:  instanceLock,
-		startedAt:     time.Now(),
 	}
 	application.Bot = notifications.NewBot(notifications.BotOptions{
 		Paths:   cfg.Paths,
@@ -286,8 +284,6 @@ func instanceRole() string {
 	}
 	return "la-pluma"
 }
-
-func (a *App) StartedAt() time.Time { return a.startedAt }
 
 // MAAServiceService exposes the MAA action service to transport layers.
 func (a *App) MAAServiceService() *maaapp.Service { return a.MAAService }

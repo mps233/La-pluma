@@ -15,8 +15,6 @@ import (
 //   - /api and /api/agent are token-protected when LA_PLUMA_TOKEN is set
 //   - the SPA lives under basePath and never receives API paths
 type Server struct {
-	cfg     config.Config
-	logger  *slog.Logger
 	handler http.Handler
 }
 
@@ -131,7 +129,7 @@ func New(cfg config.Config, logger *slog.Logger, options ...Option) *Server {
 		Gzip(),
 		AuthSource(tokenSource),
 	)
-	return &Server{cfg: cfg, logger: logger, handler: handler}
+	return &Server{handler: handler}
 }
 
 func (s *Server) Handler() http.Handler {
