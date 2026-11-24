@@ -7,8 +7,15 @@
          this statement that style can establish `components` before `base`,
          which lets the reset wipe component-layer spacing across the app. -->
     <style>@layer properties, theme, base, components, utilities;</style>
-    <link rel="icon" type="image/png" href="%BASE_URL%favicon-graphite.png?v=1" />
-    <link rel="apple-touch-icon" href="%BASE_URL%apple-touch-icon-graphite.png?v=1" />
+    <link
+      rel="icon"
+      type="image/png"
+      data-brand-favicon
+      data-dark-href="%BASE_URL%favicon-graphite.png?v=7"
+      data-light-href="%BASE_URL%favicon-graphite-light.png?v=7"
+      href="%BASE_URL%favicon-graphite.png?v=7"
+    />
+    <link rel="apple-touch-icon" href="%BASE_URL%apple-touch-icon-graphite.png?v=7" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     
     <!-- PWA Meta Tags -->
@@ -365,6 +372,16 @@
           document.documentElement.style.backgroundColor = dark ? '#101318' : '#f2f2f7'
           document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#101318' : '#f6f8fb')
           document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.setAttribute('content', dark ? 'black-translucent' : 'default')
+
+          // The tab icon is the one brand asset a running page can swap, so a
+          // light-theme user does not get a black square in the tab strip.
+          // Installed icons (apple-touch-icon, manifest) are snapshotted at
+          // install time by the browser and stay on the single static file.
+          const favicon = document.querySelector('link[data-brand-favicon]')
+          if (favicon) {
+            const next = dark ? favicon.dataset.darkHref : favicon.dataset.lightHref
+            if (next && favicon.getAttribute('href') !== next) favicon.setAttribute('href', next)
+          }
         }
         window.__LA_PLUMA_APPLY_THEME__ = applyTheme
         try {

@@ -158,6 +158,25 @@ export const createWebManifest = (basePath: string): Partial<ManifestOptions> =>
       sizes: '512x512',
       type: 'image/png',
       purpose: 'maskable'
+    },
+    // Light-appearance variants. The browser picks one at install time and
+    // bakes it into the home screen, so the theme is only advisory; shipping
+    // both keeps a light-theme install from getting a black square.
+    {
+      src: 'pwa-graphite-light-192x192.png',
+      sizes: '192x192',
+      type: 'image/png'
+    },
+    {
+      src: 'pwa-graphite-light-512x512.png',
+      sizes: '512x512',
+      type: 'image/png'
+    },
+    {
+      src: 'pwa-maskable-light-512x512.png',
+      sizes: '512x512',
+      type: 'image/png',
+      purpose: 'maskable'
     }
   ]
 })
@@ -232,7 +251,13 @@ export const createViteConfig = (basePath: string): UserConfig => ({
       devOptions: {
         enabled: false // 开发模式下禁用 Service Worker
       },
-      includeAssets: ['favicon-graphite.png', 'apple-touch-icon-graphite.png'],
+      includeAssets: [
+        'favicon-graphite.png',
+        'favicon-graphite-light.png',
+        'apple-touch-icon-graphite.png',
+        'logo-graphite-dark.png',
+        'logo-graphite-light.png',
+      ],
       manifest: createWebManifest(basePath),
       workbox: createWorkboxConfig(basePath)
     })

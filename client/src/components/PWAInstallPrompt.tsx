@@ -7,6 +7,8 @@ import { Button, CjkText, IconButton } from '@/components/common'
 import { hasDocumentBuildChanged } from '@/utils/pwaUpdate'
 import { PWA_INSTALL_REQUEST_EVENT } from '@/utils/pwaInstallPrompt'
 import { isDesktopRuntime } from '@/desktop/desktopMode'
+import { useResolvedTheme } from '@/hooks/useResolvedTheme'
+import { brandMarkUrl } from '@/utils/brandAssets'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -228,7 +230,7 @@ function PWAInstallPromptWeb() {
     : showInstallPrompt
       ? (isIos ? '可以将 La Pluma 添加到主屏幕' : '可以安装 La Pluma')
       : ''
-  const logoUrl = `${import.meta.env.BASE_URL}logo-graphite.svg?v=1`
+  const logoUrl = brandMarkUrl(useResolvedTheme())
 
   return (
     <>

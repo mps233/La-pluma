@@ -13,6 +13,8 @@ import { Island } from '@/lib/island'
 import { IslandContext } from '@/lib/island/context'
 import { useUIStore } from '@/stores'
 import { appTabFromPath, appTabPath, isAppTab, type AppTab } from '@/stores/uiStore'
+import { useResolvedTheme } from '@/hooks/useResolvedTheme'
+import { brandMarkUrl } from '@/utils/brandAssets'
 import { preloadPage } from '@/utils/pagePreload'
 import {
   DEFAULT_OPERATOR_QUOTE,
@@ -132,6 +134,8 @@ export default function Layout({ children }: LayoutProps) {
   const storedActiveTab = useUIStore(state => state.activeTab)
   const setActiveTab = useUIStore(state => state.setActiveTab)
   const theme = useUIStore(state => state.theme)
+  const resolvedTheme = useResolvedTheme()
+  const brandMark = brandMarkUrl(resolvedTheme)
   const hasIslandProvider = useContext(IslandContext) !== null
   const activeTab: AppTab = isAppTab(storedActiveTab) ? storedActiveTab : 'dashboard'
   const [sidebarQuery, setSidebarQuery] = useState('')
@@ -349,7 +353,7 @@ export default function Layout({ children }: LayoutProps) {
                 <GlassLiveCardButton
                   type="button"
                   className="link la-pluma-brand"
-                  icon={<img src={`${import.meta.env.BASE_URL}logo-graphite.svg?v=1`} alt="" className="la-pluma-brand-mark" />}
+                  icon={<img src={brandMark} alt="" className="la-pluma-brand-mark" />}
                   aria-label="La Pluma 控制台"
                   onClick={() => navigateToTab('dashboard')}
                 >
@@ -435,7 +439,7 @@ export default function Layout({ children }: LayoutProps) {
                     const target = event.currentTarget
                     if (target.dataset.fallbackApplied === 'true') return
                     target.dataset.fallbackApplied = 'true'
-                    target.src = `${import.meta.env.BASE_URL}logo-graphite.svg?v=1`
+                    target.src = brandMark
                   }}
                 />
               </span>

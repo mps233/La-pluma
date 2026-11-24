@@ -292,8 +292,8 @@ html.la-pluma-standalone #app-root .page {
 .la-pluma-brand {
   display: inline-flex !important;
   align-items: center;
-  gap: 0.625rem;
-  min-height: 2.75rem;
+  gap: 0.75rem;
+  min-height: 3rem;
   padding: 0 0.25rem !important;
   font-size: 1rem;
   font-weight: 700;
@@ -301,22 +301,24 @@ html.la-pluma-standalone #app-root .page {
   color: var(--app-text) !important;
 }
 
-/* Let the wordmark breathe at the pill's right edge. The mobile rule below
-   keeps its square 44px geometry. */
+/* The mark is drawn edge-to-edge in its own file, so the inset has to come from
+   the pill: give the icon more room on both sides and let it grow into it. */
 .la-pluma-app .la-pluma-brand {
-  padding-right: 0.75rem !important;
+  padding-right: 1.25rem !important;
+  padding-left: 1rem !important;
 }
 
+/* The brand mark is a cut-out illustration, not an app icon: it carries no
+   plate, so no corner radius and no inset ring — those would draw a frame
+   around a shape that has none. */
 .la-pluma-brand-mark {
-  width: 1.875rem;
-  height: 1.875rem;
+  width: 2.25rem;
+  height: 2.25rem;
   object-fit: contain;
-  border-radius: 50%;
 }
 
 .la-pluma-app .la-pluma-brand .lg-button__icon {
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow: none;
 }
 
 .la-pluma-navbar-title {
@@ -1323,7 +1325,6 @@ html.la-pluma-standalone #app-root .page {
   .la-pluma-app .la-pluma-brand-mark {
     width: 100%;
     height: 100%;
-    border-radius: 50%;
   }
 
   .la-pluma-app .la-pluma-navbar-actions {

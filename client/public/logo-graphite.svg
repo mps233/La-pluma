@@ -1,31 +1,141 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="La Pluma">
-  <rect width="512" height="512" rx="116" fill="#071014"/>
-  <rect x="14" y="14" width="484" height="484" rx="104" fill="none" stroke="#17323b" stroke-width="4"/>
+  <defs>
+    <path id="pluma-square" d="M256 32L380 32C436 32 480 76 480 132L480 380C480 436 436 480 380 480L132 480C76 480 32 436 32 380L32 132C32 76 76 32 132 32Z"/>
+    <clipPath id="pluma-icon"><use href="#pluma-square"/></clipPath>
+    <linearGradient id="pluma-base" x1="0.08" y1="0" x2="0.92" y2="1">
+      <stop offset="0" stop-color="#1d5a69"/>
+      <stop offset="0.32" stop-color="#0b303c"/>
+      <stop offset="0.68" stop-color="#07161e"/>
+      <stop offset="1" stop-color="#030b10"/>
+    </linearGradient>
+    <linearGradient id="pluma-rim" x1="0.12" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#f6feff" stop-opacity="0.95"/>
+      <stop offset="0.18" stop-color="#a8f0ff" stop-opacity="0.7"/>
+      <stop offset="0.5" stop-color="#3d8ba1" stop-opacity="0.32"/>
+      <stop offset="0.8" stop-color="#0b2834" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#7ee7ff" stop-opacity="0.55"/>
+    </linearGradient>
+    <linearGradient id="pluma-blade" x1="0.08" y1="0.95" x2="0.9" y2="0.1">
+      <stop offset="0" stop-color="#6d8494"/>
+      <stop offset="0.2" stop-color="#d8f0fb"/>
+      <stop offset="0.44" stop-color="#fbfeff"/>
+      <stop offset="0.63" stop-color="#d8ccff"/>
+      <stop offset="0.8" stop-color="#a9efd7"/>
+      <stop offset="1" stop-color="#7e9eae"/>
+    </linearGradient>
+    <linearGradient id="pluma-handle" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#20343a"/>
+      <stop offset="0.5" stop-color="#0b171c"/>
+      <stop offset="1" stop-color="#13262d"/>
+    </linearGradient>
+    <linearGradient id="pluma-nib" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f3fdff"/>
+      <stop offset="0.5" stop-color="#9feaff"/>
+      <stop offset="1" stop-color="#0e7490"/>
+    </linearGradient>
+    <linearGradient id="pluma-green" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#e1ff9a"/>
+      <stop offset="0.55" stop-color="#b6ff5c"/>
+      <stop offset="1" stop-color="#5ee83b"/>
+    </linearGradient>
+    <linearGradient id="pluma-tuft" x1="0.2" y1="0.8" x2="0.8" y2="0.2">
+      <stop offset="0" stop-color="#7d97a6"/>
+      <stop offset="0.5" stop-color="#e9f4fa"/>
+      <stop offset="1" stop-color="#8be7ef"/>
+    </linearGradient>
+    <linearGradient id="pluma-vane" x1="0.12" y1="0.9" x2="0.86" y2="0.08">
+      <stop offset="0" stop-color="#8ea6b4"/>
+      <stop offset="0.24" stop-color="#dcf3fc"/>
+      <stop offset="0.5" stop-color="#fcfefe"/>
+      <stop offset="0.7" stop-color="#d6e6ff"/>
+      <stop offset="0.86" stop-color="#b4f0de"/>
+      <stop offset="1" stop-color="#7f9baa"/>
+    </linearGradient>
+    <linearGradient id="pluma-vane-back" x1="0.1" y1="0.9" x2="0.9" y2="0.1">
+      <stop offset="0" stop-color="#12313b"/>
+      <stop offset="0.55" stop-color="#0a222c"/>
+      <stop offset="1" stop-color="#173842"/>
+    </linearGradient>
+    <linearGradient id="pluma-shaft" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#0a6d86"/>
+      <stop offset="0.55" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#d8fbff"/>
+    </linearGradient>
+    <mask id="pluma-vane-mask">
+      <path fill="#fff" d="M168 360C186 306 216 254 256 208C298 160 346 118 400 92C398 130 390 164 378 194L360 198C368 216 364 234 352 250L332 252C338 270 328 290 312 304L292 304C296 320 284 336 264 346C242 358 214 364 190 358L168 360Z"/>
+    </mask>
+    <radialGradient id="pluma-aurora" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#22d3ee" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="pluma-violet" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#818cf8" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#818cf8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="pluma-mint" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#8dff79" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#8dff79" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="pluma-sheen" x1="0.1" y1="0" x2="0.9" y2="0.9">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/>
+      <stop offset="0.32" stop-color="#ffffff" stop-opacity="0.06"/>
+      <stop offset="0.68" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="pluma-spec" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.82"/>
+      <stop offset="0.5" stop-color="#dffaff" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#dffaff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="pluma-blur" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="24"/>
+    </filter>
+    <filter id="pluma-soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+    <mask id="pluma-scythe">
+      <path fill="#fff" d="M402 108C350 128 296 166 250 214C206 260 176 308 158 354C192 318 230 280 274 240C318 200 362 160 402 132Z"/>
+      <path fill="#000" d="M238 282L258 256L248 294ZM278 240L298 214L288 252ZM318 198L338 172L328 210Z"/>
+    </mask>
+  </defs>
 
-  <g transform="translate(-38.4 -38.4) scale(1.15)">
-    <path
-      fill="#f7fbfc"
-      d="M128 405c18-50 43-110 78-160 51-75 127-132 215-150-8 74-45 143-105 197-47 42-103 68-163 77l-25 36Z"
-    />
+  <g clip-path="url(#pluma-icon)">
+    <use href="#pluma-square" fill="url(#pluma-base)"/>
+    <ellipse cx="130" cy="360" rx="230" ry="180" fill="url(#pluma-aurora)" filter="url(#pluma-blur)"/>
+    <ellipse cx="400" cy="120" rx="170" ry="150" fill="url(#pluma-violet)" filter="url(#pluma-blur)"/>
+    <ellipse cx="370" cy="410" rx="150" ry="120" fill="url(#pluma-mint)" filter="url(#pluma-blur)"/>
 
-    <path
-      fill="#071014"
-      d="m175 328-41 2 58-52 26 7-43 43Zm44-71-43-3 62-48 25 11-44 40Zm74 55 15-31 54 1-69 30Zm41-49 10-31 52-15-62 46Zm32-53 5-31 35-21-40 52Z"
-    />
+    <path d="M64 56C200 6 402 40 472 168 408 94 244 70 64 56Z" fill="url(#pluma-sheen)" opacity="0.85"/>
+    <path d="M32 300C120 432 344 490 488 352 380 438 170 424 32 300Z" fill="#73e4ff" opacity="0.12" filter="url(#pluma-soft)"/>
 
-    <path
-      fill="#071014"
-      d="M139 405c24-38 51-75 81-111 48-58 99-105 154-141-45 43-89 91-129 144-27 36-51 73-72 111l-34-3Z"
-    />
+    <!-- A full quill: broad layered vane, feather splits, shaft, nib and the operator's green fitting. -->
+    <g>
+      <path d="M168 360C186 306 216 254 256 208C298 160 346 118 400 92C398 130 390 164 378 194L360 198C368 216 364 234 352 250L332 252C338 270 328 290 312 304L292 304C296 320 284 336 264 346C242 358 214 364 190 358L168 360Z" fill="url(#pluma-vane-back)" transform="translate(-8 9)"/>
+      <path d="M168 360C186 306 216 254 256 208C298 160 346 118 400 92C398 130 390 164 378 194L360 198C368 216 364 234 352 250L332 252C338 270 328 290 312 304L292 304C296 320 284 336 264 346C242 358 214 364 190 358L168 360Z" fill="url(#pluma-vane)" mask="url(#pluma-vane-mask)"/>
+      <path d="M168 360C186 306 216 254 256 208C298 160 346 118 400 92C398 130 390 164 378 194L360 198C368 216 364 234 352 250L332 252C338 270 328 290 312 304L292 304C296 320 284 336 264 346C242 358 214 364 190 358L168 360Z" fill="none" stroke="#e9faff" stroke-opacity="0.5" stroke-width="2.5"/>
+      <path d="M174 352C156 348 140 338 130 324C148 328 168 336 188 342C194 348 186 356 174 352Z" fill="url(#pluma-tuft)"/>
+      <path d="M190 336C170 326 156 306 154 284C170 296 184 310 196 326Z" fill="url(#pluma-tuft)"/>
+      <path d="M198 330C184 314 176 294 178 274C190 288 200 304 206 320Z" fill="url(#pluma-tuft)" opacity="0.82"/>
+      <path d="M208 324C200 308 198 292 204 278C210 292 214 306 214 318Z" fill="url(#pluma-tuft)" opacity="0.58"/>
 
-    <path
-      fill="#22d3ee"
-      d="M111 420c8-21 22-45 43-71 33-42 77-87 130-132-39 44-72 84-99 122-20 28-34 53-43 75l-31 6Z"
-    />
+      <path d="M192 334C226 284 268 238 314 192C340 166 366 140 390 116" fill="none" stroke="#ffffff" stroke-opacity="0.52" stroke-width="4" stroke-linecap="round"/>
 
-    <path
-      fill="#a5f3fc"
-      d="M117 412c10-18 24-38 42-60 16-21 35-42 57-64-18 23-34 45-48 66-14 21-25 38-32 53l-19 5Z"
-    />
+      <path d="M140 436C212 366 300 250 400 92" fill="none" stroke="url(#pluma-shaft)" stroke-width="7" stroke-linecap="round"/>
+      <path d="M140 436C212 366 300 250 400 92" fill="none" stroke="#e9fcff" stroke-opacity="0.57" stroke-width="2.4" stroke-linecap="round"/>
+
+      <path d="M174 352C166 370 156 392 146 414L158 426C170 402 182 376 192 358Z" fill="url(#pluma-handle)" stroke="#1b3a43" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M166 388L188 370" stroke="url(#pluma-green)" stroke-width="4" stroke-linecap="round"/>
+      <path d="M146 414L130 444L164 426Z" fill="url(#pluma-nib)" stroke="#d9f8ff" stroke-opacity="0.45" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M150 426L142 440" fill="none" stroke="#0b2a36" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round"/>
+
+      <circle cx="180" cy="352" r="12.5" fill="#081419" stroke="#b6ff5c" stroke-opacity="0.78" stroke-width="2"/>
+      <circle cx="180" cy="352" r="4.2" fill="#0f2c33"/>
+    </g>
+
+    <ellipse cx="144" cy="96" rx="138" ry="62" transform="rotate(-24 144 96)" fill="url(#pluma-spec)" filter="url(#pluma-soft)" opacity="0.82"/>
+    <ellipse cx="188" cy="72" rx="48" ry="20" transform="rotate(-24 188 72)" fill="#ffffff" opacity="0.28" filter="url(#pluma-soft)"/>
+    <path d="M56 300C132 430 350 468 468 340" fill="none" stroke="#a9f1ff" stroke-opacity="0.2" stroke-width="10" filter="url(#pluma-soft)"/>
   </g>
+
+  <use href="#pluma-square" fill="none" stroke="url(#pluma-rim)" stroke-width="5"/>
+  <use href="#pluma-square" fill="none" stroke="#ffffff" stroke-opacity="0.13" stroke-width="2" transform="translate(256 256) scale(0.956) translate(-256 -256)"/>
 </svg>
