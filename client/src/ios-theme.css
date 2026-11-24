@@ -301,10 +301,22 @@ html.la-pluma-standalone #app-root .page {
   color: var(--app-text) !important;
 }
 
+/* Let the wordmark breathe at the pill's right edge. The mobile rule below
+   keeps its square 44px geometry. */
+.la-pluma-app .la-pluma-brand {
+  padding-right: 0.75rem !important;
+}
+
 .la-pluma-brand-mark {
   width: 1.875rem;
   height: 1.875rem;
   object-fit: contain;
+  border-radius: 50%;
+}
+
+.la-pluma-app .la-pluma-brand .lg-button__icon {
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .la-pluma-navbar-title {
