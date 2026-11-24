@@ -31,11 +31,26 @@
 // Without WebGL2 it is a plain frosted list.
 
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger, type MenuProps } from '@ui-sdk/react/menu'
-import { Children, cloneElement, isValidElement, useContext, type CSSProperties, type ComponentProps, type ReactElement, type ReactNode } from 'react'
+import { Children, cloneElement, createContext, isValidElement, useContext, type CSSProperties, type ComponentProps, type ReactElement, type ReactNode } from 'react'
 
-import { GlassPopupAnchor, GlassPopupContext, GlassPopupSurface, useGlassPopup } from './glass-popup'
+import { GlassPopupAnchor, GlassPopupContext, GlassPopupSurface, OVER_CENTER, OVER_EDGE, spellLabel, useGlassPopup } from './glass-popup'
 
-export type GlassDropdownMenuProps = MenuProps
+export type GlassDropdownMenuProps = MenuProps & {
+  /**
+   * The control itself unfolds into the menu (Popover's opening). `center`: the menu lies around
+   * it. `edge`: from the control's own edge, growing away from it. Left out, the list swells out
+   * of the control on a neck.
+   */
+  over?: 'center' | 'edge'
+  /**
+   * With `over`: which way the menu comes into place. `top` (default): the control is thrown down
+   * and the menu comes down from above. `bottom`: the other way up.
+   */
+  from?: 'top' | 'bottom'
+}
+
+/** Where this menu lies over its control, if it does. */
+const OverContext = createContext<'center' | 'edge' | undefined>(undefined)
 
 export type GlassDropdownMenuTriggerProps = {
   children?: ReactNode
@@ -48,11 +63,13 @@ export type GlassDropdownMenuContentProps = { children?: ReactNode; className?: 
 
 export type GlassDropdownMenuItemProps = { className?: string } & Omit<ComponentProps<typeof MenuItem>, 'className' | 'render'>
 
-export function GlassDropdownMenu({ children, ...options }: GlassDropdownMenuProps) {
-  const popup = useGlassPopup()
+export function GlassDropdownMenu({ children, over, from = 'top', ...options }: GlassDropdownMenuProps) {
+  const popup = useGlassPopup({ opening: over ? 'morph' : 'stretch', from })
   return (
     <Menu {...options}>
-      <GlassPopupContext.Provider value={popup}>{children}</GlassPopupContext.Provider>
+      <OverContext.Provider value={over}>
+        <GlassPopupContext.Provider value={popup}>{children}</GlassPopupContext.Provider>
+      </OverContext.Provider>
     </Menu>
   )
 }
@@ -60,6 +77,7 @@ export function GlassDropdownMenu({ children, ...options }: GlassDropdownMenuPro
 /** The control that opens the menu: a glass button of its own, or with `asChild` your own element inside a GlassButtonGroup. */
 export function GlassDropdownMenuTrigger({ children, asChild = false, className = '', ...rest }: GlassDropdownMenuTriggerProps) {
   const popup = useContext(GlassPopupContext)
+  const over = useContext(OverContext)
   if (asChild || !popup) return <MenuTrigger render={Children.only(children) as ReactElement} {...rest} />
   return (
     <MenuTrigger
@@ -68,23 +86,26 @@ export function GlassDropdownMenuTrigger({ children, asChild = false, className 
       {...rest}
     >
       <GlassPopupAnchor popup={popup} />
-      {/* One element, so the label sways with the glass when the neck pulls and snaps. */}
-      <span className="inline-flex items-center gap-[inherit]">{children}</span>
+      {/* One element, so the label sways with the glass when the neck pulls and snaps. With `over` the label leaves, and its text comes back letter by letter. */}
+      <span className="inline-flex items-center gap-[inherit]">{over ? spellLabel(children) : children}</span>
     </MenuTrigger>
   )
 }
 
-/** The list, centred on its control unless `align` says otherwise. Its children are items and separators; they arrive one after another. */
-export function GlassDropdownMenuContent({ children, className = '', sideOffset = 12, align = 'center', ...rest }: GlassDropdownMenuContentProps) {
+/** The list, centred on its control unless `align` says otherwise. Its children are items and separators; they arrive one after another (with `over`, together). */
+export function GlassDropdownMenuContent({ children, className = '', sideOffset, align = 'center', ...rest }: GlassDropdownMenuContentProps) {
   const popup = useContext(GlassPopupContext)
+  const over = useContext(OverContext)
+  const centered = over === 'center'
   return (
     <MenuContent
       data-glass-popup=""
       data-glass-skip=""
-      sideOffset={sideOffset}
+      sideOffset={sideOffset ?? (over ? 0 : 12)}
       align={align}
-      className={`group/glass min-w-44 rounded-3xl p-1.5 text-[15px] text-neutral-900 outline-none data-[glass-tone=dark]:text-white data-[glass-tone=light]:text-neutral-900 ${className}`}
+      className={`group/glass min-w-44 rounded-3xl p-1.5 text-[15px] text-neutral-900 outline-none data-[glass-tone=dark]:text-white data-[glass-tone=light]:text-neutral-900 ${over && sideOffset === undefined ? (centered ? OVER_CENTER : OVER_EDGE) : ''} ${className}`}
       {...rest}
+      {...(centered ? { side: 'bottom' as const } : null)}
     >
       {popup && <GlassPopupSurface popup={popup} />}
       <div data-glass-list="" className="flex flex-col">

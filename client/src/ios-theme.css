@@ -396,7 +396,9 @@ html.la-pluma-standalone #app-root .page {
 
 .la-pluma-github-link.lg-button {
   --lg-h: 2.75rem;
-  flex: 0 0 var(--lg-h);
+  flex: none;
+  width: var(--lg-h);
+  height: var(--lg-h);
   color: var(--app-text-muted) !important;
 }
 
@@ -672,8 +674,10 @@ html.la-pluma-standalone #app-root .page {
   }
 
   .la-pluma-app .la-pluma-github-link.lg-button {
-    --lg-h: 2.5rem;
-    flex-basis: var(--lg-h);
+    --lg-h: 2.75rem;
+    flex: none;
+    width: var(--lg-h);
+    height: var(--lg-h);
     color: var(--app-text-muted) !important;
   }
 

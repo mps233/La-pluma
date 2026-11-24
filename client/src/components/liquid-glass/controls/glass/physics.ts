@@ -1,3 +1,5 @@
+// Springs and the rest → pressed lens morph, ported from the hero slider engine.
+
 export type Spring = { x: number; v: number }
 
 /** Damped spring toward `target` (omega = speed, zeta = damping ratio; 1 = critical). */

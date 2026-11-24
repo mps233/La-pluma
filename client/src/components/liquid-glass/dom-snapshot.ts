@@ -1,3 +1,18 @@
+// dom-snapshot — paints a DOM subtree into a Canvas2D context at its on-screen position.
+//
+// A WebGL lens cannot read the page's pixels, so glass that bends the page needs the
+// page as a texture. This paints a good-enough picture of it: backgrounds (colours,
+// gradients and images, with their size, position and repeat), rounded borders, text,
+// inline SVG icons, canvases, images and video (with object-fit) and backdrop blur.
+// Siblings are painted in CSS order: negative z-index, content, positioned, positive z-index.
+// It is not a browser renderer: no shadows, conic gradients, masks, rotation or
+// ::before/::after. An image from another origin is requested again with CORS; if its
+// server does not allow that it is left out, because a canvas such an image has touched
+// can never become a WebGL texture. Used by `material="clear"` glass, by GlassBadge and,
+// through `drawAround`, for what every rim mirrors of the page around it.
+//
+// COPY THIS FILE VERBATIM. MIT — https://github.com/bilalgursen/liquid-glass
+
 type Box = { x: number; y: number; w: number; h: number }
 type Drawable = HTMLImageElement | HTMLCanvasElement | HTMLVideoElement
 

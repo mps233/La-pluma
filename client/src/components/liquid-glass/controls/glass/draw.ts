@@ -1,3 +1,5 @@
+// Canvas2D helpers for the layers beneath the glass. Coordinates are CSS px.
+
 export function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   const rr = Math.max(0, Math.min(r, w / 2, h / 2))
   ctx.beginPath()

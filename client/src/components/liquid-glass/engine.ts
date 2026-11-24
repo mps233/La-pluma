@@ -1,3 +1,20 @@
+// Liquid Glass engine — one shared WebGL2 context that draws every glass surface on the
+// page and copies each result into the surface's own 2D <canvas>, so a page full of
+// glass never hits the browser's WebGL context limit.
+//
+// Zero dependencies. A GLSL lens with tinted glass, a 1 px border, a frosted resting
+// state, an opt-in gooey droplet and an opt-in frosted blur (cards). The rim mirrors what
+// surrounds the glass: a colourful neighbour shows on the side that faces it.
+//
+// Cost model: the loop runs only while a spring moves, a surface is dirty or the
+// cursor light changes; at rest it stops completely. Off-screen surfaces are not
+// drawn, and neither is a frame that would come out exactly as the one on the canvas.
+// `prefers-reduced-motion` freezes every spring at its target.
+// If WebGL2 is missing or the context is lost, every surface falls back to plain CSS.
+//
+// COPY THIS FILE VERBATIM. Do not rewrite or "simplify" the shader: the look comes
+// from the exact constants below. MIT — https://github.com/bilalgursen/liquid-glass
+
 export type Rgb = [number, number, number]
 export type Rgba = [number, number, number, number]
 
@@ -282,6 +299,10 @@ export const MIRROR = {
  */
 export const GLOW_SMALL: typeof GLOW = { ...GLOW, reach: 0.7, spread: 0.7, riseSpeed: 24, coverUntil: 0.5 }
 
+/** The light on a morphing control (Popover): GLOW's, staying longer and adding up a little further. */
+export const MORPH_GLOW: typeof GLOW = { ...GLOW, stack: 3.5, hold: 0.5 }
+export const MORPH_GLOW_SMALL: typeof GLOW = { ...GLOW_SMALL, stack: MORPH_GLOW.stack, hold: MORPH_GLOW.hold }
+
 /** Every spring the kit uses. Hover width/height bounce out of phase: the glass wobbles like a drop. */
 export const SPRINGS = {
   press: { omega: 16, zeta: 0.6 },
@@ -341,6 +362,92 @@ export const GOOEY = {
   smallEdgeReach: 0.5,
   smallNeck: 0.6,
   smallNeckWide: 1.2,
+}
+
+/**
+ * The morphing popup: a control that becomes its surface. The surface (Card's glass, as in the
+ * gooey popup) comes out over the control itself: round all the way, a little past its own box,
+ * then settled, while the control lets go of its label and its glass gives way to the card. The
+ * surface's content comes into focus inside it as it grows. Closing is a calmer motion of its
+ * own: the content goes first and the surface slides back into the control, slowing as it lands. Used by GlassPopup with `opening: 'morph'` (`glass-popup.tsx`). These values are the
+ * look: do not tune them casually.
+ */
+export const MORPH = {
+  /** The side that grows the most: its speed, and damping (below 1 it lands past the surface and comes back). */
+  openSpeed: 30,
+  openDamping: 1,
+  /** The other side follows on a slower spring with more bounce. */
+  crossSpeed: 16,
+  crossDamping: 0.58,
+  /**
+   * While the first side runs ahead of the other, the glass is this much thinner across (× how
+   * far ahead, 0–1); as the other catches up and passes it, as much wider.
+   */
+  pinch: 0,
+  /** Corners, frost and the content's focus follow at this speed, without a bounce. */
+  calmSpeed: 12,
+  /** Closing replays the opening backwards, at this × its pace. */
+  closePace: 1.7,
+  /** The control's label is gone once the surface is this far out (0–1). */
+  labelOut: 0.02,
+  /** The content fades in with the calm follow, and is fully visible once that is this far (0–1). */
+  contentFade: 0.75,
+  /** How soft the label gets as it goes, and the content as it starts (a blur, CSS px). */
+  labelBlur: 0,
+  contentBlur: 5.5,
+  /** How much of the surface's growth the content takes: 1 = it is as small as the glass is, 0 = full size from the start, only cut to the glass. */
+  zoom: 1,
+  /**
+   * Not gooey: the surface and the control are two shapes laid over each other, with a clean
+   * edge where they meet. `gooey: 1` melts them there instead, by `softness` CSS px.
+   */
+  gooey: 0,
+  softness: 40,
+  /** How the surface starts, in the control's middle: 0 = a circle as tall as the control, 1 = the control's own box. */
+  seed: 1,
+  /** It stays round all the way until the calm follow is this far (0–1); its own corners come after. */
+  cornersFrom: 0.3,
+  /**
+   * Its weight. At the press the control is thrown down (`kick`: how hard; `throw`: how far a
+   * throw of 1 carries it, CSS px) and swings back at `swingSpeed`, dying out by `swingDamping`
+   * (below 1 it swings to and fro). Heavier glass is thrown less and swings slower.
+   */
+  weight: 8,
+  kick: 8,
+  swingSpeed: 17.5,
+  swingDamping: 0.6,
+  throw: 80,
+  /** The surface comes out this long after the press (seconds): the control is thrown first. */
+  openDelay: 0.1,
+  /**
+   * The surface's way into place: as it grows it is carried up to `drop` CSS px above its place
+   * (negative: below), and comes down `dropDelay` seconds after the press on a soft spring
+   * (`dropSpeed`; `dropDamping` 1 = no bounce). 0 px = it grows where it is.
+   */
+  drop: 60,
+  dropDelay: 0.2,
+  dropSpeed: 9,
+  dropDamping: 1,
+  /** Asked to close, the surface stays as it is this long (seconds) before it goes back in. */
+  closeDelay: 0,
+  /**
+   * `closeSoft: 1`: closing is a motion of its own (`0`: the opening played backwards). The
+   * surface goes back into the control on one spring with no bounce (`closeSpeed`), slowing as it
+   * lands, and the control takes it with a small swell: it is not thrown and does not light up. The content
+   * does not wait for the glass: it is gone `closeFade` seconds after the close begins. A choice's
+   * light comes into the control with the surface and narrows to `closeGlowReach` (× the control's
+   * height) as it does, so it does not flood the control. `closeKick`:
+   * with the opening played backwards, how much of the throw the control takes once the surface
+   * is back in (× `kick`; 0 = it stays still).
+   */
+  closeSoft: 1,
+  closeSpeed: 14,
+  closeFade: 0.12,
+  closeGlowReach: 1,
+  closeKick: 1,
+  /** The control's own glass (clear, lit) gives way to the card's between these two points of the calm follow (0–1). */
+  frostFrom: 0,
+  frostTo: 0.05,
 }
 
 export const lerp = (a: number, b: number, t: number) => a + (b - a) * t

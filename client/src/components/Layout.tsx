@@ -1,6 +1,8 @@
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { BarChart3, Bot, Dices, Ellipsis, FileText, GraduationCap, LayoutGrid, Search, Settings2, Swords, Wrench } from 'lucide-react'
-import { GlassButton, GlassCard, GlassInput, GlassLiveCardButton, GlassMenu, GlassNav } from '@/components/glass'
+import { GlassButton, GlassCard } from '@/components/liquid-glass'
+import { GlassLiveCardButton } from '@/components/common/GlassLiveCardButton'
+import { GlassInput, GlassMenu, GlassNav } from './LayoutGlassChrome'
 import ThemeToggle from './ThemeToggle'
 import RunIsland from './RunIsland'
 import SanityBatteryIsland from './SanityBatteryIsland'
@@ -116,10 +118,10 @@ function TabLink({
       onFocus={() => preloadPage(tab.id)}
       onClick={() => onNavigate(tab.id)}
       icon={<span className="la-pluma-sidebar-icon"><TabIcon tab={tab} size="h-4 w-4" /></span>}
-      variant={active ? 'filled' : 'clear'}
-      tint={active ? 'var(--app-accent-action)' : undefined}
+      iconPosition="start"
+      material="tinted"
       size="md"
-      className={`la-pluma-tab-link link is-desktop-tab ${active ? 'is-active' : ''}`}
+      className={`lg-host lg-button la-pluma-tab-link link is-desktop-tab ${active ? 'is-active bg-[var(--app-accent-action)] text-white' : 'bg-[var(--app-surface-muted)] text-[var(--app-text)]'}`}
     >
       <span className="la-pluma-sidebar-label">{tab.name}</span>
     </GlassButton>
@@ -324,7 +326,7 @@ export default function Layout({ children }: LayoutProps) {
         <div className="la-pluma-sidebar-frame" aria-hidden="true">
           {/* Static colour for the clear GlassCard to frost; the animated ASCII field is left to the page. */}
           <div className="la-pluma-sidebar-aurora" />
-          <GlassCard variant="clear" className="la-pluma-sidebar-surface h-full w-full rounded-[1.625rem]" />
+          <GlassCard material="clear" className="lg-host lg-card la-pluma-sidebar-surface h-full w-full rounded-[1.625rem]" />
         </div>
         <header className="navbar la-pluma-navbar">
           <div className="navbar-bg" aria-hidden="true" />

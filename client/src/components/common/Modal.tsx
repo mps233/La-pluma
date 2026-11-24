@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { GlassCard } from '@/components/glass'
+import { GlassCard } from '@/components/liquid-glass'
 import { AlertCircle, X } from 'lucide-react'
 import {
   useEffect,
@@ -252,9 +252,8 @@ function ModalLayer({
           className={`pointer-events-auto flex max-h-[calc(100dvh-2rem)] w-full flex-col ${sizeStyles[size]}`}
         >
           <GlassCard
-            className="app-glass-panel flex min-h-0 w-full flex-1 flex-col overflow-hidden"
-            padding="0"
-            radius="var(--app-radius-lg)"
+            material="tinted"
+            className="lg-host lg-card app-glass-panel flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-[var(--app-radius-lg)] bg-[var(--app-surface-muted)] p-0"
           >
             {(title || showClose) && (
               <div className="flex min-h-14 items-center justify-between gap-4 px-5 py-3 shadow-[inset_0_-1px_0_var(--app-border)] sm:px-6">

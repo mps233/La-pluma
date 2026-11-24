@@ -8,7 +8,8 @@ import type { GridComponents, GridItemProps, GridListProps } from 'react-virtuos
 import { maaApi, getAllOperators, getDropStatistics, getItemIconUrl, getOperBoxData, fetchOperatorMaterials, getTrainingQueue } from '../services/api'
 import { getOperatorAvatarUrl } from '../services/operatorQuotes'
 import { motion, useReducedMotion } from 'framer-motion'
-import { GlassCard, GlassSegmented } from '@/components/glass'
+import { GlassCard } from '@/components/liquid-glass'
+import { GlassSegmented } from '@/components/common/Segmented'
 import {
   ChevronDown,
   Download,
@@ -470,9 +471,8 @@ function FilterMenu({
           onKeyDown={handleMenuKeyDown}
         >
           <GlassCard
-            className="app-glass-panel data-statistics-menu-card flex max-h-full min-h-0 flex-col overflow-hidden"
-            padding="4px"
-            radius="var(--app-radius-lg)"
+            material="tinted"
+            className="lg-host lg-card app-glass-panel data-statistics-menu-card flex max-h-full min-h-0 flex-col overflow-hidden rounded-[var(--app-radius-lg)] bg-[var(--app-surface-muted)] p-1"
           >
             <div className="data-statistics-menu-scroll">
               {options.map(option => (

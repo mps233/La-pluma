@@ -1,3 +1,10 @@
+// One shared WebGL2 renderer (three.js WebGPURenderer, WebGL backend + TSL) draws
+// every glass control and copies the result into each control's own <canvas>, so a
+// page full of controls never runs into the browser's GPU context limit.
+//
+// A view supplies its scene as two Canvas2D layers — `bg` (what sits beneath the
+// glass: tracks, fills, labels) and `fg` (crisp content above it) — plus one lens in
+// design units. The lens shader is a port of the hero slider's glass pass.
 import * as THREE from 'three/webgpu'
 import {
   Fn,
@@ -131,8 +138,7 @@ const RIM_WIDTH = 1.1
 function createMaterial(u: ReturnType<typeof createUniforms>, bgTex: any, fgTex: any) {
   const sdRoundRect = Fn(([p, half, r]: any[]) => {
     const q = abs(p).sub(half).add(r)
-    // `q` is a TSL node; its swizzles are not in the three typings.
-    return length(max(q, 0)).add(min(max((q as any).x, (q as any).y), 0)).sub(r)
+    return length(max(q, 0)).add(min(max(q.x, q.y), 0)).sub(r)
   })
   // The three/webgpu shim is untyped (src/types/three-webgpu.d.ts), hence the `any`s.
   // design units → texture uv (CanvasTexture is flipped: top row at v = 1)

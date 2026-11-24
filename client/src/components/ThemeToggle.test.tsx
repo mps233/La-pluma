@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react'
+import { forwardRef, useCallback, useEffect, useRef, useState, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -29,6 +29,109 @@ vi.mock('framer-motion', () => ({
     }),
   },
 }))
+
+// The UI SDK menu opens in the top layer, which jsdom does not implement. Keep
+// a controlled stand-in with the same trigger/menu/radio contract so the theme
+// picker's selection and focus behaviour stay covered.
+vi.mock('./LayoutGlassChrome', () => {
+  type MockItem = { label: string; icon?: ReactNode; checked?: boolean; onSelect?: () => void }
+
+  function MockGlassMenu({ icon, items, 'aria-label': ariaLabel }: { icon: ReactNode; items: MockItem[]; 'aria-label': string }) {
+    const [open, setOpen] = useState(false)
+    const triggerRef = useRef<HTMLButtonElement>(null)
+    const menuRef = useRef<HTMLDivElement>(null)
+
+    const close = useCallback((restoreFocus = false) => {
+      setOpen(false)
+      if (restoreFocus) {
+        requestAnimationFrame(() => triggerRef.current?.focus({ preventScroll: true }))
+      }
+    }, [])
+
+    useEffect(() => {
+      if (!open) return
+      const frame = requestAnimationFrame(() => {
+        menuRef.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus({ preventScroll: true })
+      })
+      const handleKeyDown = (event: KeyboardEvent) => {
+        const buttons = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? [])
+        const currentIndex = Math.max(0, buttons.indexOf(document.activeElement as HTMLButtonElement))
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          close(true)
+          return
+        }
+        if (event.key === 'Tab') {
+          event.preventDefault()
+          const nextTarget = event.shiftKey
+            ? triggerRef.current
+            : triggerRef.current?.closest('.la-pluma-navbar-actions')?.querySelector<HTMLElement>('.la-pluma-github-link') ?? triggerRef.current
+          setOpen(false)
+          requestAnimationFrame(() => nextTarget?.focus({ preventScroll: true }))
+          return
+        }
+        if (buttons.length === 0) return
+        let nextIndex: number | null = null
+        if (event.key === 'ArrowDown' || event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % buttons.length
+        else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + buttons.length) % buttons.length
+        else if (event.key === 'Home') nextIndex = 0
+        else if (event.key === 'End') nextIndex = buttons.length - 1
+        if (nextIndex === null) return
+        event.preventDefault()
+        buttons[nextIndex]?.focus({ preventScroll: true })
+      }
+      document.addEventListener('keydown', handleKeyDown)
+      return () => {
+        cancelAnimationFrame(frame)
+        document.removeEventListener('keydown', handleKeyDown)
+      }
+    }, [close, open])
+
+    return (
+      <div className="la-pluma-theme-mobile relative flex-none">
+        <button
+          ref={triggerRef}
+          type="button"
+          className="la-pluma-theme-trigger"
+          aria-label={ariaLabel}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          onClick={() => setOpen(value => !value)}
+        >
+          {icon}
+        </button>
+        {open && (
+          <div
+            ref={menuRef}
+            role="menu"
+            aria-label="选择界面主题"
+            className="theme-menu-popover absolute right-0 top-[calc(100%+0.5rem)] z-[60] w-40 origin-top-right"
+          >
+            {items.map(item => (
+              <button
+                key={item.label}
+                type="button"
+                role="menuitemradio"
+                aria-checked={item.checked}
+                className="flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 text-sm"
+                onClick={() => {
+                  item.onSelect?.()
+                  close(true)
+                }}
+              >
+                {item.icon}
+                <span className="flex-1 text-left">{item.label}</span>
+                {item.checked ? <span aria-hidden>✓</span> : null}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return { GlassMenu: MockGlassMenu }
+})
 
 const mediaQueryList = (query: string): MediaQueryList => ({
   matches: query === '(prefers-color-scheme: dark)',

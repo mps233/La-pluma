@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { Play, Radio, RotateCw, Smartphone } from 'lucide-react'
 import { SmoothPanel } from './common'
-import { GlassButton } from '@/components/glass'
+import { GlassButton } from '@/components/liquid-glass'
 import PreviewModeControls, { PreviewAutoStartToggle } from './PreviewModeControls'
 import { useDashboardPreview } from '../hooks/useDashboardPreview'
 import { useScrcpyInput } from '../hooks/useScrcpyInput'
@@ -47,9 +47,8 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
         action: (
           <GlassButton
             size="sm"
-            variant="tinted"
-            tint="var(--app-accent-action)"
-            className="scrcpy-empty-action min-w-32"
+            material="tinted"
+            className="lg-host lg-button scrcpy-empty-action min-w-32 bg-[var(--app-accent-action)] text-white"
             style={{ height: 36 }}
             icon={<Play className="h-3.5 w-3.5" strokeWidth={1.8} />}
             iconPosition="start"
@@ -67,7 +66,8 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
         action: (
           <GlassButton
             size="sm"
-            className="scrcpy-empty-action min-w-32"
+            material="tinted"
+            className="lg-host lg-button scrcpy-empty-action min-w-32 bg-[var(--app-surface-muted)] text-[var(--app-text)]"
             style={{ height: 36 }}
             icon={<Radio className="h-3.5 w-3.5" strokeWidth={1.8} />}
             iconPosition="start"
@@ -85,9 +85,8 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
         action: (
           <GlassButton
             size="sm"
-            variant="tinted"
-            tint="var(--app-accent-action)"
-            className="scrcpy-empty-action min-w-32"
+            material="tinted"
+            className="lg-host lg-button scrcpy-empty-action min-w-32 bg-[var(--app-accent-action)] text-white"
             style={{ height: 36 }}
             icon={<RotateCw className="h-3.5 w-3.5" strokeWidth={1.8} />}
             iconPosition="start"

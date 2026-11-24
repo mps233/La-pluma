@@ -9,7 +9,7 @@ import Icons from './Icons'
 import ScreenMonitor from './ScreenMonitor'
 import NotificationSettings from './NotificationSettings'
 import { EmptyState, PageHeader, Button, IconButton, SmoothPanel, Switch, CjkText, TruncatedText, Select } from './common'
-import { CheckboxField, GlassSelect } from '@/components/glass'
+import { CheckboxField, GlassSelectWithFill } from '@/components/common/fields'
 import { keepNumberWithUnit } from '../utils/typography'
 import { useStatusStore } from '../store/statusStore'
 import { useRunStore } from '../store/runStore'
@@ -2959,7 +2959,7 @@ const appliedExecutionRevisionRef = useRef(-1)
               <div className="automation-sequence-footer">
                 <div className="automation-sequence-actions">
                   <div className="automation-task-select-shell">
-                  <GlassSelect
+                  <GlassSelectWithFill
                     label={<span className="sr-only">添加任务</span>}
                     placeholder="添加任务"
                     value={null}

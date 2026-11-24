@@ -40,11 +40,11 @@ type ButtonVariant = NonNullable<ButtonProps['variant']>
 // through className the same way the official demos colour tinted glass.
 const glassVariants: Record<ButtonVariant, { material: 'tinted' | 'clear'; className: string }> = {
   primary: { material: 'tinted', className: 'bg-[var(--app-accent-action)] text-white' },
-  secondary: { material: 'tinted', className: 'bg-[var(--app-surface-muted)] text-[var(--app-text)]' },
+  secondary: { material: 'tinted', className: 'bg-[var(--app-surface-solid)] text-[var(--app-text)]' },
   danger: { material: 'tinted', className: 'bg-[var(--app-danger-action)] text-white' },
   success: { material: 'tinted', className: 'bg-[var(--app-success-action)] text-white' },
-  ghost: { material: 'tinted', className: 'bg-[var(--app-surface-muted)] text-[var(--app-text)]' },
-  outline: { material: 'tinted', className: 'bg-[var(--app-surface-muted)] text-[var(--app-text)]' },
+  ghost: { material: 'tinted', className: 'bg-[var(--app-surface-solid)] text-[var(--app-text)]' },
+  outline: { material: 'tinted', className: 'bg-[var(--app-surface-solid)] text-[var(--app-text)]' },
 }
 
 /**
@@ -85,6 +85,7 @@ export default function Button({
       aria-busy={loading || undefined}
       data-status-key={statusKey ?? undefined}
       icon={leadingIcon}
+      iconPosition="start"
       material={glassVariant.material}
       size={size}
       className={`app-glass-button app-glass-button-${size} ${glassVariant.className} ${fullWidth ? 'w-full' : ''} ${loading ? 'is-loading' : ''} ${className}`.trim()}

@@ -1,5 +1,6 @@
-import { useId, type ButtonHTMLAttributes } from 'react'
-import { GlassSwitch } from '@/components/glass'
+import { useEffect, useRef, useState, type ButtonHTMLAttributes } from 'react'
+
+import { Switch as OfficialSwitch } from '@/components/liquid-glass/controls/Switch'
 
 interface SwitchProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onChange' | 'type' | 'value'> {
   checked: boolean
@@ -9,8 +10,8 @@ interface SwitchProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onC
 }
 
 /**
- * Liquid Glass switch with native button semantics. `label` is the accessible
- * name only; visible titles stay in the surrounding setting row.
+ * Official Liquid Glass switch with native button semantics. `label` is the
+ * accessible name only; visible titles stay in the surrounding setting row.
  */
 export default function Switch({
   id,
@@ -22,23 +23,45 @@ export default function Switch({
   name,
   className = '',
 }: SwitchProps) {
-  const generatedId = useId()
-  const switchId = id ?? `switch-${generatedId}`
+  const hostRef = useRef<HTMLSpanElement>(null)
+  const [accent, setAccent] = useState('#007aff')
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const root = document.documentElement
+    const read = () => {
+      const value = window.getComputedStyle(root).getPropertyValue('--app-accent').trim()
+      if (value) setAccent(value)
+    }
+    read()
+    if (typeof MutationObserver === 'undefined') return
+    const observer = new MutationObserver(read)
+    observer.observe(root, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] })
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const control = hostRef.current?.querySelector<HTMLElement>('[role="switch"]')
+    if (!control) return
+    if (id) control.id = id
+    if (label) control.setAttribute('aria-label', label)
+  }, [id, label])
 
   return (
     <span
       className={`app-switch${compact ? ' app-switch-compact' : ''}${disabled ? ' is-disabled' : ''}${className ? ` ${className}` : ''}`}
     >
-      <GlassSwitch
-        checked={checked}
-        disabled={disabled}
-        onChange={onChange}
-        label={label}
-        id={switchId}
-        name={name}
-        compact={compact}
-        className="app-switch-control"
-      />
+      <span ref={hostRef} className="lg-host lg-switch app-switch-control inline-flex items-center">
+        <OfficialSwitch
+          checked={checked}
+          onChange={onChange}
+          disabled={disabled}
+          size={compact ? 'sm' : 'md'}
+          color={accent}
+          label=""
+          name={name}
+        />
+      </span>
     </span>
   )
 }

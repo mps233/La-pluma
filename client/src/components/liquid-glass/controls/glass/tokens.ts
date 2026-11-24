@@ -1,3 +1,4 @@
+// Theme colors shared by every canvas glass control; light/dark match the hero slider.
 export type GlassThemeName = 'light' | 'dark'
 
 export type GlassTokens = {

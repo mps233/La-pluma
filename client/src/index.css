@@ -4586,7 +4586,7 @@ svg.w-5.h-5 {
 
   @container (min-width: 40rem) {
     .combat-copilot-layout {
-      grid-template-columns: minmax(16rem, 17rem) minmax(0, 1fr);
+      grid-template-columns: minmax(20rem, 22rem) minmax(0, 1fr);
     }
 
     .combat-copilot-layout > :first-child {

@@ -5,7 +5,8 @@ import { getOpenTodayStages, getTodayDrops, getTrainingQueue, maaApi } from '../
 import Icons from './Icons'
 import { PageHeader, Card, Button, SmoothPanel, CjkText, TruncatedText } from './common'
 import ActivityIndicator from './common/ActivityIndicator'
-import { GlassButton, GlassLiveCardButton } from '@/components/glass'
+import { GlassButton } from '@/components/liquid-glass'
+import { GlassLiveCardButton } from '@/components/common/GlassLiveCardButton'
 import { GlassActionButton } from '@/components/liquid-glass/glass-action-button'
 import { DashboardSkeleton } from './common/Loading'
 import FloatingStatusIndicator from './FloatingStatusIndicator'
@@ -807,12 +808,12 @@ export default function Dashboard() {
                     <GlassButton
                       onClick={prepareCurrentActivity}
                       size="md"
-                      variant="tinted"
+                      material="tinted"
                       style={{ height: 44 }}
                       disabled={quickStartLoading || activityPreflightLoading || flowIsRunning || !automationAvailable}
                       aria-busy={activityPreflightLoading || undefined}
                       data-status-key={activityPreflightLoading ? 'running' : 'ready'}
-                      className={`dashboard-flow-activity-action dashboard-flow-action-button justify-center whitespace-nowrap ${activityCompleted ? 'is-completed' : ''}`}
+                      className={`lg-host lg-button dashboard-flow-activity-action dashboard-flow-action-button justify-center whitespace-nowrap bg-[var(--app-surface-muted)] text-[var(--app-text)] ${activityCompleted ? 'is-completed' : ''}`}
                       title={activityCompleted ? '重新准备当前活动作业（不会立即开战）' : '获取当前活动作业集并填入自动战斗页'}
                       aria-label={activityCompleted ? '重新执行当前活动' : '打当前活动'}
                       iconPosition="start"
@@ -1135,11 +1136,11 @@ export default function Dashboard() {
               <GlassButton
                 onClick={() => setActiveTab('training')}
                 icon={<ChevronRight className="h-4 w-4" />}
-                iconOnly
+                material="tinted"
                 size="sm"
                 title="打开养成"
                 aria-label="打开养成"
-                className="dashboard-summary-action"
+                className="lg-host lg-button p-0 dashboard-summary-action bg-[var(--app-surface-muted)] text-[var(--app-text)]"
                 style={{ width: 36, height: 36, padding: 0 }}
               />
             </div>
@@ -1187,11 +1188,11 @@ export default function Dashboard() {
               <GlassButton
                 onClick={openDropStatistics}
                 icon={<ChevronRight className="h-4 w-4" />}
-                iconOnly
+                material="tinted"
                 size="sm"
                 title="打开掉落记录"
                 aria-label="打开掉落记录"
-                className="dashboard-summary-action"
+                className="lg-host lg-button p-0 dashboard-summary-action bg-[var(--app-surface-muted)] text-[var(--app-text)]"
                 style={{ width: 36, height: 36, padding: 0 }}
               />
             </div>

@@ -6,14 +6,14 @@ import {
   type CSSProperties,
   type RefObject,
 } from 'react'
-import { createSpring, springFrom, type Spring } from '@/components/glass/spring'
+import { createSpring, springFrom, type Spring } from '@/lib/spring'
 import { useSwipePager, type SwipePagerCommit, type SwipePagerHandlers } from './useSwipePager'
 
 const MODE_TRACK_SPRING = springFrom(0.36, 0.86)
 const SPRING_SETTLE_TIMEOUT = 900
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
 
-export interface UseSwipeModeTrackOptions {
+interface UseSwipeModeTrackOptions {
   count: number
   index: number
   /** Receives the committed index after the release animation settles. */

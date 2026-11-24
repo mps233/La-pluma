@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Download, RefreshCw, Share2, SquarePlus } from 'lucide-react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { useStatusStore } from '@/store/statusStore'
-import { GlassCard } from '@/components/glass'
+import { GlassCard } from '@/components/liquid-glass'
 import { Button, CjkText, IconButton } from '@/components/common'
 import { hasDocumentBuildChanged } from '@/utils/pwaUpdate'
 import { PWA_INSTALL_REQUEST_EVENT } from '@/utils/pwaInstallPrompt'
@@ -245,9 +245,8 @@ function PWAInstallPromptWeb() {
           className="pwa-install-prompt app-pop-in fixed z-50 sm:w-96"
         >
           <GlassCard
-            className="app-glass-panel w-full"
-            padding="16px"
-            radius="var(--app-radius-lg)"
+            material="tinted"
+            className="lg-host lg-card app-glass-panel w-full rounded-[var(--app-radius-lg)] bg-[var(--app-surface-muted)] p-4"
           >
             <div className="flex items-start gap-4">
               <img
