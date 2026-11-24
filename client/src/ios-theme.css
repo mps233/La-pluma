@@ -108,20 +108,20 @@ html.dark,
   /* Keep this canvas color in sync with --boot-bg in client/index.html and the
      dark theme-color writers in index.html, uiStore.ts, and vite.config.ts. */
   --app-chrome-page-bg: #101318;
-  --app-chrome-bg: rgba(28, 28, 30, 0.74);
-  --app-glass-bg: rgba(28, 28, 30, 0.72);
-  --app-glass-border: rgba(235, 235, 245, 0.18);
+  --app-chrome-bg: rgba(21, 26, 33, 0.74);
+  --app-glass-bg: rgba(21, 26, 33, 0.72);
+  --app-glass-border: rgba(235, 245, 255, 0.12);
   --app-glass-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
   --app-bg: #101318;
-  --app-bg-soft: #1c1c1e;
-  --app-surface: rgba(28, 28, 30, 0.72);
-  --app-surface-solid: #1c1c1e;
-  --app-surface-muted: rgba(118, 118, 128, 0.24);
-  --app-border: rgba(235, 235, 245, 0.18);
-  --app-border-strong: rgba(235, 235, 245, 0.28);
-  --app-text: #f2f2f7;
-  --app-text-muted: #aeaeb2;
-  --app-text-soft: #a1a1a6;
+  --app-bg-soft: #151a21;
+  --app-surface: rgba(21, 26, 33, 0.78);
+  --app-surface-solid: #151a21;
+  --app-surface-muted: rgba(148, 163, 184, 0.1);
+  --app-border: rgba(235, 245, 255, 0.09);
+  --app-border-strong: rgba(235, 245, 255, 0.16);
+  --app-text: #edf3f8;
+  --app-text-muted: #9aa8b5;
+  --app-text-soft: #82909e;
   --app-accent: #0a84ff;
   --app-accent-strong: #64b5ff;
   --app-accent-action: #0066cc;
@@ -136,7 +136,7 @@ html.dark,
   --app-danger-action: #d70015;
   --app-info: #5e5ce6;
   --app-info-text: #a5a3ff;
-  --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.3);
+  --la-pluma-tabbar-active-bg: rgba(148, 163, 184, 0.26);
   --la-pluma-navbar-fade-color: #101318;
   --la-pluma-sidebar-selection: var(--app-accent-action);
 }
@@ -1646,6 +1646,31 @@ html.la-pluma-standalone #app-root .page {
 .dark .la-pluma-app .dashboard-page .surface-panel,
 .dark .la-pluma-app .dashboard-page .app-info-card {
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+}
+
+/* Day-mode cards were flat; in dark, give every dashboard card the same
+   cool raised surface, hairline and top light so the workspace reads as one
+   material instead of a mix of system greys. */
+html.dark .la-pluma-app .dashboard-page .app-card-smooth-surface,
+html.dark .la-pluma-app .dashboard-page .smooth-panel-surface,
+html.dark .la-pluma-app .dashboard-page .dashboard-device-card-shell.surface-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0) 18%),
+    var(--app-surface-solid);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* In-card media wells sit one step below the card they live in, so the
+   simulator viewport and the dense infobox do not read as a second card. */
+html.dark .la-pluma-app .dashboard-page .scrcpy-video-frame.is-empty {
+  background: color-mix(in srgb, var(--app-bg) 78%, var(--app-accent) 4%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+html.dark .la-pluma-app .dashboard-page .dashboard-summary-card .surface-soft {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 .dark .la-pluma-app .dashboard-page .app-info-card.status-warning {
