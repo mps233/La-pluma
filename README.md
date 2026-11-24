@@ -1,5 +1,6 @@
 <p align="center">
-  <img src="screenshots/hero-theme.png" alt="La Pluma: the console in dark and light themes" width="100%">
+  <img src="screenshots/hero-light.png" alt="La Pluma in the light theme" width="49%">
+  <img src="screenshots/hero-dark.png" alt="La Pluma in the dark theme" width="49%">
 </p>
 
 <h1 align="center">La Pluma</h1>
@@ -102,9 +103,10 @@ The project is named after La Pluma, the five-star Guard in Arknights.
 ## Screenshots
 
 <p align="center">
-  <img src="screenshots/automation-web-theme-split.png" alt="Automation workspace on desktop with light and dark themes side by side" width="92%" />
+  <img src="screenshots/automation-light.png" alt="Automation workspace in the light theme" width="49%">
+  <img src="screenshots/automation-dark.png" alt="Automation workspace in the dark theme" width="49%">
   <br />
-  <em>Automation workspace on desktop</em>
+  <em>The automation workspace in both themes</em>
 </p>
 
 ## Quick start

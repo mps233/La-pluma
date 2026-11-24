@@ -1,5 +1,6 @@
 <p align="center">
-  <img src="screenshots/hero-theme.png" alt="La Pluma：控制台在暗色与亮色主题下的界面" width="100%">
+  <img src="screenshots/hero-light.png" alt="La Pluma 亮色主题下的控制台" width="49%">
+  <img src="screenshots/hero-dark.png" alt="La Pluma 暗色主题下的控制台" width="49%">
 </p>
 
 <h1 align="center">La Pluma</h1>
@@ -101,9 +102,10 @@ La Pluma 是一个自托管的《明日方舟》自动化 Web 控制台。它把
 ## 界面截图
 
 <p align="center">
-  <img src="screenshots/automation-web-theme-split.png" alt="桌面端自动化工作台，亮色与暗色主题并排展示" width="92%" />
+  <img src="screenshots/automation-light.png" alt="亮色主题下的自动化工作台" width="49%">
+  <img src="screenshots/automation-dark.png" alt="暗色主题下的自动化工作台" width="49%">
   <br />
-  <em>桌面端自动化工作台</em>
+  <em>自动化工作台在两种主题下的界面</em>
 </p>
 
 ## 快速开始
