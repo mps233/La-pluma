@@ -458,6 +458,12 @@ export type ShaderSurfaceProps = {
   plainShader?: string;
   maxDpr?: number;
   maxFps?: number;
+  /**
+   * Lowest fraction of the device pixel ratio that adaptive quality may drop to.
+   * `1` pins the canvas at full resolution; smaller values trade sharpness for
+   * frame time on slow machines.
+   */
+  minResolutionScale?: number;
   fallback?: (dark: boolean, background: string) => string;
   className?: string;
   style?: CSSProperties;
@@ -501,6 +507,7 @@ export function ShaderSurface({
   plainShader,
   maxDpr = 1.5,
   maxFps = 60,
+  minResolutionScale = 0.5,
   fallback,
   className,
   style,
@@ -527,6 +534,7 @@ export function ShaderSurface({
     prepass,
     maxDpr,
     maxFps,
+    minResolutionScale,
     dark,
     colorKey: colors.join(","),
   };
@@ -598,8 +606,14 @@ export function ShaderSurface({
             const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
             let cssWidth = 1;
             let cssHeight = 1;
+            // Adaptive quality may only pick steps at or above the caller's floor,
+            // so a crisp background never turns into a half-resolution blur.
+            const resolutionScales: number[] = RESOLUTION_STEPS.filter(
+              (scale) => scale >= configRef.current.minResolutionScale,
+            );
+            if (resolutionScales.length === 0) resolutionScales.push(1);
             let resolutionStep = 0;
-            let resolutionScale: number = RESOLUTION_STEPS[0];
+            let resolutionScale: number = resolutionScales[0];
             let visible = true;
             let contextLost = false;
             let frame = 0;
@@ -787,13 +801,13 @@ export function ShaderSurface({
 
               upload();
 
-              if (running && dt > 0 && age > 0.75 && resolutionStep < RESOLUTION_STEPS.length - 1) {
+              if (running && dt > 0 && age > 0.75 && resolutionStep < resolutionScales.length - 1) {
                 themeAcc += dt;
                 themeCount += 1;
                 if (themeAcc >= 1) {
                   if (themeAcc / themeCount > Math.max(MIN_FRAME, 1.25 / configRef.current.maxFps)) {
                     resolutionStep += 1;
-                    resolutionScale = RESOLUTION_STEPS[resolutionStep];
+                    resolutionScale = resolutionScales[resolutionStep];
                     resize();
                   }
                   themeAcc = 0;

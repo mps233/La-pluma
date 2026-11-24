@@ -19,4 +19,15 @@ The wrapper keeps the app's own stacking, opacity, and theme rules:
 | `density` / `fade` | `0.64` / `0.56` | Share of the field carrying glyphs and edge falloff. |
 | `glow` / `twinkle` | `0.5` / `0.42` | Tint under dense areas and occasional flares. |
 | `interactive` | `true` | Pointer lens, trail, and click rings. |
-| `intensity` | CSS default (`0.16` light / `0.2` dark) | Layer opacity override. |
+| `intensity` | CSS default (`0.18` light / `0.24` dark) | Layer opacity override. |
+
+Sharpness is pinned by two values the wrapper sets on the renderer:
+
+- `minResolutionScale={1}` disables the renderer's adaptive downscale, which
+  otherwise drops the canvas to 75% / 50% of the device pixel ratio on a slow
+  frame budget and stretches it back up — the source of the earlier blur.
+- `lodBias={-0.6}` samples the glyph atlas closer to its native size so the
+  type stays legible instead of dissolving into a soft dot grid.
+
+`maxFps={40}` pays for the extra pixels: the field drifts slowly, so the cap is
+invisible while the full-resolution frames are not.

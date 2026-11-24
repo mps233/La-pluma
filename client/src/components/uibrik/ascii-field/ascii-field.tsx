@@ -20,6 +20,7 @@ uniform float u_radius;  // reach of the pointer lens, css px
 uniform float u_magnify; // how much the lens enlarges the field under it
 uniform float u_wake;    // strength of the trail the pointer leaves
 uniform float u_pattern; // 0 flow, 1 waves, 2 rings
+uniform float u_lodBias; // sharpness of the glyph atlas sampling; negative is crisper
 
 float fbm(vec3 p) {
   float sum = 0.0;
@@ -61,7 +62,7 @@ float glyph(float idx, vec2 local, float ch) {
   return smoothstep(r, r - 0.08, d) * step(0.5, idx);
 #else
   vec2 uv = vec2((idx + local.x) / u_glyphs, 1.0 - local.y);
-  float lod = max(log2(96.0 / ch), 0.0);
+  float lod = max(log2(96.0 / ch) + u_lodBias, 0.0);
   return textureLod(u_tex, uv, lod).r;
 #endif
 }
@@ -184,6 +185,8 @@ export type AsciiFieldProps = Omit<
   magnify?: number;
   /** Strength of the fading trail the pointer leaves. */
   wake?: number;
+  /** Glyph atlas sampling bias; negative keeps type crisper, positive softens it. */
+  lodBias?: number;
 };
 
 export function AsciiField({
@@ -204,6 +207,7 @@ export function AsciiField({
   animate = true,
   interactive = true,
   seed = 0,
+  lodBias = 0,
   background,
   ...rest
 }: AsciiFieldProps) {
@@ -275,6 +279,7 @@ export function AsciiField({
         u_magnify: magnify,
         u_wake: wake,
         u_pattern: PATTERNS[pattern] ?? 0,
+        u_lodBias: lodBias,
       }}
       colors={palette}
       speed={speed}

@@ -5,13 +5,13 @@
   overflow: hidden;
   pointer-events: none;
   color: var(--app-accent);
-  opacity: var(--ascii-field-opacity, 0.16);
+  opacity: var(--ascii-field-opacity, 0.18);
   contain: paint;
 }
 
 html.dark .ascii-field {
   color: var(--app-accent-strong);
-  --ascii-field-opacity: 0.2;
+  --ascii-field-opacity: 0.24;
 }
 
 @media (max-width: 767px) {

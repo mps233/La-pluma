@@ -65,6 +65,13 @@ export default function AsciiFieldBackdrop({
     fade: 0.56,
     glow: 0.5,
     twinkle: 0.42,
+    // The field animates slowly, so a lower frame budget is invisible while it
+    // keeps the canvas at full device resolution instead of dropping to 50%.
+    maxFps: 40,
+    minResolutionScale: 1,
+    // Sample the glyph atlas closer to its native size so the type reads as
+    // type instead of a soft dot grid.
+    lodBias: -0.6,
     ...props,
     color: color ?? theme.accent,
     ...(colors ? { colors: [...colors] } : {}),
