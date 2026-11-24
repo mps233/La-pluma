@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="screenshots/hero-theme.gif" alt="La Pluma：控制台在暗色与亮色主题之间切换" width="100%">
+  <img src="screenshots/hero-theme.png" alt="La Pluma：控制台在暗色与亮色主题下的界面" width="100%">
 </p>
 
 <h1 align="center">La Pluma</h1>
