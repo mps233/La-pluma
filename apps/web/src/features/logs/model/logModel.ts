@@ -19,6 +19,30 @@ export interface VisibleLog {
   readonly message: string
   readonly count: number
   readonly members: readonly LogAnnotation[]
+  readonly routine?: RoutineGroup
+}
+
+export type RoutineGroup = 'oper-roles' | 'blackflow-resources' | 'task-json'
+
+const ROUTINE_GROUP_LABELS: Record<RoutineGroup, string> = {
+  'oper-roles': '干员多职业标签警告',
+  'blackflow-resources': 'BlackFlow 可选资源缺失警告',
+  'task-json': '任务参数（JSON）',
+}
+
+function classifyRoutineGroup(annotation: LogAnnotation): RoutineGroup | null {
+  const record = annotation.record
+  const message = record.message.trim()
+  if (record.level === 'WARN' && /^parse oper: .+ has multiple roles, but still not specific any$/.test(message)) {
+    return 'oper-roles'
+  }
+  if (record.level === 'WARN' && /^Optional BlackFlow map (?:model|perception metadata) is missing, path: /.test(message)) {
+    return 'blackflow-resources'
+  }
+  if (record.level === 'INFO' && record.time === '' && (/^"[^"]+"\s*:/.test(message) || /^(?:\{|\}|\[|\]|,)+$/.test(message))) {
+    return 'task-json'
+  }
+  return null
 }
 
 export interface LogViewOptions {
@@ -241,8 +265,26 @@ function canCollapse(previous: LogAnnotation, next: LogAnnotation): boolean {
     && previous.record.source === next.record.source
 }
 
+function canMergeRoutine(previous: VisibleLog, next: LogAnnotation): boolean {
+  if (!previous.routine || classifyRoutineGroup(next) !== previous.routine) return false
+  const lastMember = previous.members[previous.members.length - 1]
+  if (!lastMember) return false
+  return lastMember.level === next.level
+    && lastMember.record.level === next.record.level
+    && lastMember.record.runId === next.record.runId
+    && lastMember.record.operationId === next.record.operationId
+    && lastMember.record.source === next.record.source
+}
+
+export interface CollapseRepeatedLogsOptions {
+  readonly groupRoutine?: boolean
+}
+
 /** 分组保留所有成员的事实和时间，既不跨 Run，也不合并不同载荷。 */
-export function collapseRepeatedLogs(annotations: readonly LogAnnotation[]): VisibleLog[] {
+export function collapseRepeatedLogs(
+  annotations: readonly LogAnnotation[],
+  options: CollapseRepeatedLogsOptions = {},
+): VisibleLog[] {
   const groups: VisibleLog[] = []
   for (const annotation of annotations) {
     const previous = groups[groups.length - 1]
@@ -250,6 +292,13 @@ export function collapseRepeatedLogs(annotations: readonly LogAnnotation[]): Vis
     if (previous && lastMember && canCollapse(lastMember, annotation)) {
       groups[groups.length - 1] = {
         ...previous,
+        count: previous.count + 1,
+        members: [...previous.members, annotation],
+      }
+    } else if (options.groupRoutine && previous && canMergeRoutine(previous, annotation)) {
+      groups[groups.length - 1] = {
+        ...previous,
+        message: ROUTINE_GROUP_LABELS[previous.routine!],
         count: previous.count + 1,
         members: [...previous.members, annotation],
       }
@@ -267,6 +316,7 @@ function presentLog(annotation: LogAnnotation): VisibleLog {
     message: annotation.summary,
     count: 1,
     members: [annotation],
+    routine: classifyRoutineGroup(annotation) ?? undefined,
   }
 }
 
@@ -306,7 +356,7 @@ export function buildLogView(logs: readonly LogEntry[], options: LogViewOptions)
     annotations,
     selected: selectedAnnotations.map(annotation => annotation.record),
     visible: options.collapseRepeats
-      ? collapseRepeatedLogs(selectedAnnotations)
+      ? collapseRepeatedLogs(selectedAnnotations, { groupRoutine: options.events === 'key' })
       : selectedAnnotations.map(presentLog),
     hiddenMatchCount: query ? matches.length - selectedAnnotations.length : 0,
   }

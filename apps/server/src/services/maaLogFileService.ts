@@ -546,30 +546,41 @@ export async function getLogFiles(): Promise<MaaLogFileEntry[]> {
   }
 }
 
-export async function cleanupLogs(maxSizeMB: unknown = 10): Promise<MaaLogCleanupResult> {
+export interface MaaLogCleanupPorts {
+  resolveLogDir?: () => Promise<string>;
+  collectFiles?: (logDir: string) => Promise<MaaLogFileEntry[]>;
+  remove?: (path: string) => Promise<void>;
+}
+
+export async function cleanupLogs(
+  maxSizeMB: unknown = 10,
+  ports: MaaLogCleanupPorts = {}
+): Promise<MaaLogCleanupResult> {
   try {
     const sizeLimit = Number(maxSizeMB);
     if (!Number.isFinite(sizeLimit) || sizeLimit < 1 || sizeLimit > 1024) {
       throw new Error('日志保留上限必须在 1 到 1024 MB 之间');
     }
 
-    const logDir = await getMaaLogDir();
-    const files = await collectMaaLogFiles(logDir);
+    const resolveLogDir = ports.resolveLogDir || getMaaLogDir;
+    const collectFiles = ports.collectFiles || collectMaaLogFiles;
+    const remove = ports.remove || unlink;
+    const logDir = await resolveLogDir();
+    const files = await collectFiles(logDir);
     files.sort((a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime());
 
     const maxSize = sizeLimit * 1024 * 1024;
-    let totalSize = 0;
+    let remainingSize = files.reduce((sum, file) => sum + file.size, 0);
     const filesToDelete: MaaLogFileEntry[] = [];
 
-    for (const file of files) {
-      totalSize += file.size;
-      if (totalSize > maxSize) {
-        filesToDelete.push(file);
-      }
+    for (let index = files.length - 1; index > 0 && remainingSize > maxSize; index -= 1) {
+      const file = files[index]!;
+      filesToDelete.push(file);
+      remainingSize -= file.size;
     }
 
     for (const file of filesToDelete) {
-      await unlink(file.path);
+      await remove(file.path);
     }
 
     return {

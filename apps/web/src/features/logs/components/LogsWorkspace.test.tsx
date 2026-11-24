@@ -32,8 +32,23 @@ const fixtureLogs: readonly LogEntry[] = [
 ]
 let realtimeLogs = fixtureLogs
 let viewingHistory = false
+let coverageNotice: string | null = null
 let trackedRun: AgentRun | null = null
 const clearScreen = vi.fn()
+const reloadFiles = vi.fn(async () => 'ready' as const)
+const notifications = vi.hoisted(() => ({
+  notify: vi.fn(),
+  dismissNotice: vi.fn(),
+}))
+
+vi.mock('@/shared/notifications', () => ({
+  notify: notifications.notify,
+  dismissNotice: notifications.dismissNotice,
+  LOGS_NOTICE_ID: 'logs',
+  LOGS_COVERAGE_NOTICE_ID: 'logs-coverage',
+  LOGS_HIDDEN_MATCHES_NOTICE_ID: 'logs-hidden-matches',
+  LOGS_REFRESH_NOTICE_ID: 'logs-refresh',
+}))
 
 vi.mock('../hooks/useLogsSession', () => ({
   useLogsSession: () => ({
@@ -41,6 +56,8 @@ vi.mock('../hooks/useLogsSession', () => ({
       logs: realtimeLogs,
       error: null,
       paused: false,
+      hasLoaded: true,
+      coverageNotice,
       start: () => {},
       stop: () => {},
       refresh: () => {},
@@ -59,7 +76,7 @@ vi.mock('../hooks/useLogsSession', () => ({
       error: null,
       selectFile: () => {},
       backToRealtime: () => {},
-      reloadFiles: async () => 'ready' as const,
+      reloadFiles,
       retry: () => {},
       reconcileSelection: () => false,
     },
@@ -72,6 +89,7 @@ vi.mock('../hooks/useLogsSession', () => ({
 
 vi.mock('@/features/task-execution', () => ({
   useExecutionSnapshot: () => ({ trackedRun }),
+  isTerminalRunState: (state: string) => ['succeeded', 'failed', 'stopped', 'interrupted'].includes(state),
 }))
 
 let container: HTMLDivElement
@@ -108,7 +126,11 @@ describe('LogsWorkspace observation scope', () => {
     trackedRun = null
     realtimeLogs = fixtureLogs
     viewingHistory = false
+    coverageNotice = null
     clearScreen.mockClear()
+    reloadFiles.mockClear()
+    notifications.notify.mockClear()
+    notifications.dismissNotice.mockClear()
   })
 
   afterEach(async () => {
@@ -143,6 +165,16 @@ describe('LogsWorkspace observation scope', () => {
     expect(container.querySelector('[aria-label="执行范围"]')?.textContent).toContain('Run · run-1')
   })
 
+  it('reloads history files when the tracked run reaches a terminal state', async () => {
+    trackedRun = activeRun('run-1')
+    await renderWorkspace()
+    expect(reloadFiles).not.toHaveBeenCalled()
+
+    trackedRun = { ...activeRun('run-1'), state: 'succeeded' }
+    await renderWorkspace()
+    expect(reloadFiles).toHaveBeenCalledTimes(1)
+  })
+
   it('returns to all logs explicitly and preserves pinned choice across file browsing', async () => {
     await renderWorkspace()
     await selectRun('run-1')
@@ -164,7 +196,25 @@ describe('LogsWorkspace observation scope', () => {
     await act(async () => clear?.click())
     expect(clearScreen).toHaveBeenCalledOnce()
     expect(container.querySelector('[role="dialog"]')).toBeNull()
-    expect(container.textContent).toContain('已清屏，后续到达的日志会继续显示')
+    expect(notifications.notify).toHaveBeenCalledWith(
+      '已清屏，后续到达的日志会继续显示',
+      'success',
+      { id: 'logs' },
+    )
+  })
+
+  it('reports realtime continuity loss through the fixed coverage toast', async () => {
+    coverageNotice = '实时日志窗口已失去连续性'
+    await renderWorkspace()
+    expect(notifications.notify).toHaveBeenCalledWith(
+      coverageNotice,
+      'warning',
+      { id: 'logs-coverage', duration: Infinity },
+    )
+
+    coverageNotice = null
+    await renderWorkspace()
+    expect(notifications.dismissNotice).toHaveBeenCalledWith('logs-coverage')
   })
 
   it('offers matching diagnostic events hidden by the key-event filter', async () => {
@@ -175,10 +225,13 @@ describe('LogsWorkspace observation scope', () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(search, 'diagnostic-needle')
       search.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    expect(container.textContent).toContain('1 条匹配日志被关键事件筛选隐藏')
-    const showAll = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
-      .find(button => button.textContent === '显示全部事件')
-    await act(async () => showAll?.click())
+    const hiddenNotice = notifications.notify.mock.calls.find(
+      ([, type, options]) => type === 'info' && options?.id === 'logs-hidden-matches',
+    )
+    expect(hiddenNotice?.[0]).toBe('1 条匹配日志被关键事件筛选隐藏')
+    const showAll = hiddenNotice?.[2]?.action?.onClick
+    expect(showAll).toBeTypeOf('function')
+    await act(async () => showAll?.())
     expect(logText()).toContain('load diagnostic-needle')
     expect(container.querySelector('[aria-label="事件范围"]')?.textContent).toContain('全部事件')
   })

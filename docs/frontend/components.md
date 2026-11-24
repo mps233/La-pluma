@@ -341,11 +341,39 @@ import { Switch } from '@/shared/ui/switch'
 </label>
 ```
 
-`Input`、`Select`、`Checkbox`、`Switch` 直接导入 `@/shared/ui/*`，原语不提供 `label`、`error` 或 `hint` props。字段行由各 feature 的 field helper 组合标签、控件与错误态；说明提示使用下方 `FieldHint`，不要给原语另加说明参数。多行文本使用原生 `textarea`。
+`Input`、`Select`、`Checkbox`、`Switch` 直接导入 `@/shared/ui/*`，原语不提供 `label`、`error` 或 `hint` props。字段行由各 feature 的 field helper 组合标签、控件与错误态；说明提示使用下方 `FieldHint`，不要给原语另加说明参数。多行文本使用 `@/shared/ui/textarea` 生成物；存量原生 `textarea` 可逐步迁移。
 
 错误态给控件传 `aria-invalid`，需要与错误文本建立关联时再传 `aria-errormessage`；错误文本使用 `form-error-text`，不要在页面里单独手写红色边框。`Select` 由 Root、`SelectTrigger`、`SelectValue`、`SelectContent` 与 `SelectItem` 组合，受控值通过 `value` / `onValueChange` 传递；选项数组传给 Root 的 `items`，`SelectValue` 才能显示当前标签。
 
 `autoComplete="off"` 是消费点（feature field helper 或直接调用处）的契约，不是 `@/shared/ui/input` 原语的默认值。配置值与搜索词在新增输入时显式关闭浏览器自动填充历史，确实需要浏览器记住输入时才改为显式传入其他值。
+
+---
+
+### InputGroup / Textarea / ScrollArea
+
+**文件位置**：`apps/web/src/shared/ui/input-group.tsx`、`apps/web/src/shared/ui/textarea.tsx`、`apps/web/src/shared/ui/scroll-area.tsx`（均为 shadcn 生成物）
+
+**适用场景**：带前后缀或清除按钮的输入、多行文本与需要独立滚动的区域。
+
+```tsx
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/shared/ui/input-group'
+import { ScrollArea } from '@/shared/ui/scroll-area'
+import { Textarea } from '@/shared/ui/textarea'
+
+<InputGroup>
+  <InputGroupAddon align="inline-start"><Search aria-hidden="true" /></InputGroupAddon>
+  <InputGroupInput aria-label="搜索日志内容" autoComplete="off" />
+  <InputGroupAddon align="inline-end">
+    <InputGroupButton size="icon-xs" aria-label="清除搜索">…</InputGroupButton>
+  </InputGroupAddon>
+</InputGroup>
+
+<ScrollArea className="h-64">
+  <div className="p-4">可独立滚动的内容</div>
+</ScrollArea>
+```
+
+`InputGroupInput` 已内置无边框与焦点环处理，不要再套一层原生 `Input`。`ScrollArea` 只负责滚动容器，尺寸和内容留白由调用点提供；不要在页面里再手写 `overflow-y-auto` 的平行滚动宿主。需要由输入内容决定高度上限的多行文本使用 `Textarea`。
 
 ---
 
@@ -579,7 +607,7 @@ Hook 返回高亮容器 ref、当前高亮矩形、标签 ref 设置器与方向
 
 1. 页面根使用 `PageShell`；它提供 `app-stack-section` 承载内容，页面内容直接进入工作区。
 2. 大面板使用 `Card` 组合；分节自持内边距时给 `Card` 加 `gap-0 p-0!`。
-3. 表单使用 `@/shared/ui` 的 `Input`、`Select`、`Checkbox`、`Switch` 原语，并用所属 feature 的 field helper 组合标签与错误；多行文本使用原生 `textarea`。
+3. 表单使用 `@/shared/ui` 的 `Input`、`Select`、`Checkbox`、`Switch` 原语，并用所属 feature 的 field helper 组合标签与错误；多行文本使用 `@/shared/ui/textarea`。
 4. 没有内容时使用 `EmptyState`，不要重复手写空状态。
 5. 页面级分段导航使用 `SegmentedTabs` + `SegmentedTabNav` + `SegmentedTabPanel`；表单内单值分段使用 `SegmentedControl`。不要复制测量逻辑，也不要自建 tablist。
 6. 全局执行结果、错误与进度使用 `notify` / `notifyProgress`；局部状态使用既有 `status-*` 语义类并紧邻相关操作。

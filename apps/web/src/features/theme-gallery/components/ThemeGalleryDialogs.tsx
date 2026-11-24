@@ -164,7 +164,7 @@ export function ThemeGalleryDialogs() {
           <AlertDialogHeader>
             <AlertDialogTitle>清理旧日志文件？</AlertDialogTitle>
             <AlertDialogDescription>
-              只保留最新的 10 MB 日志，已删除的文件无法恢复。
+              保留最新日志并清理较旧文件，已删除的文件无法恢复。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

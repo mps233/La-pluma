@@ -39,7 +39,11 @@ const createViteConfig = (basePath: string, env: Record<string, string | undefin
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')
-    }
+    },
+    dedupe: ['react', 'react-dom']
+  },
+  optimizeDeps: {
+    exclude: ['@tanstack/react-virtual']
   },
   test: {
     maxWorkers: resolveTestWorkers(process.env.LA_PLUMA_TEST_WORKERS)

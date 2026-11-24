@@ -2,7 +2,7 @@ import { isAbortError, type ApiResponse } from '@/shared/api'
 import { cleanupLogs as defaultCleanupLogs } from '../api'
 import type { HistoryFilesOutcome } from './historyLogSession'
 
-/** 与页面既有确认文案一致：只保留最新的 10 MB。 */
+/** 清理上限：保留最新日志，较旧文件按上限清理。 */
 export const LOG_CLEANUP_MAX_SIZE_MB = 10
 
 export type LogCommandOutcome =

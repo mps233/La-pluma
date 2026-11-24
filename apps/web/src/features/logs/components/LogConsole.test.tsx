@@ -2,7 +2,7 @@
 
 import { act, type ComponentProps } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import LogConsole from './LogConsole'
 import type { LogEntry } from '../types'
 import { buildLogView } from '../model/logModel'
@@ -21,11 +21,15 @@ const baseProps = (logs: readonly LogEntry[]): ConsoleProps => ({
   loading: false,
   error: null,
   logs,
+  unfilteredLogCount: logs.length,
   view: buildLogView(logs, { events: 'all', level: 'all', search: '', collapseRepeats: true }),
   autoScroll: true,
   paused: false,
   onRetry: () => {},
   onBackToRealtime: () => {},
+  onClearFilters: () => {},
+  onShowAllRuns: () => {},
+  onOpenHistory: () => {},
 })
 
 let container: HTMLDivElement
@@ -260,6 +264,51 @@ describe('LogConsole scroll following', () => {
     expect(findFollowIndicator()).toBeUndefined()
   })
 
+  it('keeps a background refresh error out of the visible rows', async () => {
+    await renderConsole(initialLogs, { error: '后台刷新暂不可用' })
+    expect(container.querySelector('[role="alert"]')).toBeNull()
+    expect(container.textContent).toContain('第一行')
+  })
+
+  it('offers all runs when the pinned run has no logs', async () => {
+    const onShowAllRuns = vi.fn()
+    await renderConsole([], { unfilteredLogCount: 1, onShowAllRuns })
+    expect(container.textContent).toContain('当前执行范围内没有日志')
+    const button = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find(candidate => candidate.textContent === '显示全部执行')
+    await act(async () => button?.click())
+    expect(onShowAllRuns).toHaveBeenCalledOnce()
+  })
+
+  it('offers to clear filters when the visible result is empty', async () => {
+    const view = buildLogView(initialLogs, {
+      events: 'all',
+      level: 'ERROR',
+      search: '',
+      collapseRepeats: true,
+    })
+    const onClearFilters = vi.fn()
+    await renderConsole(initialLogs, { view, onClearFilters })
+    expect(container.textContent).toContain('没有符合当前筛选条件的日志')
+    const button = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find(candidate => candidate.textContent === '清除筛选')
+    await act(async () => button?.click())
+    expect(onClearFilters).toHaveBeenCalledOnce()
+  })
+
+  it('switches large windows to the virtualized row surface', async () => {
+    class ResizeObserverMock {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    ;(globalThis as typeof globalThis & { ResizeObserver: typeof ResizeObserver }).ResizeObserver =
+      ResizeObserverMock as unknown as typeof ResizeObserver
+
+    const logs = Array.from({ length: 130 }, (_, index) => entry(`第 ${index} 行`))
+    await renderConsole(logs)
+    expect(container.querySelector('[data-log-virtualized="true"]')).not.toBeNull()
+  })
 })
 
 describe('LogConsole record details', () => {
@@ -287,7 +336,7 @@ describe('LogConsole record details', () => {
     await renderConsole([record], {
       view: buildLogView([record], { events: 'all', level: 'all', search: '', collapseRepeats: true }),
     })
-    expect(container.querySelector('summary')?.textContent).toBe('原文与详情')
+    expect(container.querySelector('summary')?.textContent).toBe('原文')
     expect(container.querySelector('pre')?.textContent).toBe(record.sourceText)
     expect(container.textContent).toContain('2026-11-03T10:00:00.123Z')
     expect(container.textContent).toContain('Run：run-1 · Operation：op-1')

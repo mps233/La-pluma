@@ -282,6 +282,52 @@ describe('unified log selection and grouping', () => {
     expect(view.visible[0]!.members.map(member => member.record)).toEqual(members)
   })
 
+  it('groups consecutive routine warnings in the key-event view but not in all events', () => {
+    const operWarning = (name: string) => entry(
+      `parse oper: ${name} has multiple roles, but still not specific any`,
+      'WARN',
+    )
+    const logs = [operWarning('A'), operWarning('B'), operWarning('C')]
+    const key = buildLogView(logs, { ...options, collapseRepeats: true })
+    expect(key.visible).toHaveLength(1)
+    expect(key.visible[0]).toMatchObject({
+      message: '干员多职业标签警告',
+      count: 3,
+      level: 'WARN',
+    })
+    expect(key.visible[0]!.members.map(member => member.record)).toEqual(logs)
+    expect(key.selected).toEqual(logs)
+
+    const all = buildLogView(logs, { ...options, events: 'all', collapseRepeats: true })
+    expect(all.visible).toHaveLength(3)
+  })
+
+  it('groups BlackFlow resource warnings and task JSON continuations separately', () => {
+    const logs = [
+      entry('Optional BlackFlow map model is missing, path: /a', 'WARN'),
+      entry('Optional BlackFlow map perception metadata is missing, path: /b', 'WARN'),
+      entry('"credit_fight": false,', 'INFO', ''),
+      entry('"shopping": true', 'INFO', ''),
+      entry('}', 'INFO', ''),
+    ]
+    const view = buildLogView(logs, { ...options, collapseRepeats: true })
+    expect(view.visible.map(group => [group.message, group.count])).toEqual([
+      ['BlackFlow 可选资源缺失警告', 2],
+      ['任务参数（JSON）', 3],
+    ])
+  })
+
+  it('does not group routine warnings across runs or timestamped JSON lines', () => {
+    const logs = [
+      { ...entry('parse oper: A has multiple roles, but still not specific any', 'WARN'), runId: 'run-a' },
+      { ...entry('parse oper: B has multiple roles, but still not specific any', 'WARN'), runId: 'run-b' },
+      entry('"credit_fight": false,', 'INFO'),
+      entry('"shopping": true', 'INFO'),
+    ]
+    const view = buildLogView(logs, { ...options, collapseRepeats: true })
+    expect(view.visible).toHaveLength(4)
+  })
+
   it('does not fold across Run, operation or distinct payloads with the same summary', () => {
     const source = callback('TaskChainCompleted', { taskchain: 'Fight', taskid: 1 })
     const otherPayload = callback('TaskChainCompleted', { taskchain: 'Fight', taskid: 2 })

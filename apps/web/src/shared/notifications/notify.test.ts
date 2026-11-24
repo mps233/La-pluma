@@ -3,6 +3,10 @@ import {
   DASHBOARD_CONNECTION_NOTICE_ID,
   dismissNotice,
   EXECUTION_NOTICE_ID,
+  LOGS_COVERAGE_NOTICE_ID,
+  LOGS_HIDDEN_MATCHES_NOTICE_ID,
+  LOGS_NOTICE_ID,
+  LOGS_REFRESH_NOTICE_ID,
   notify,
   notifyProgress,
   STATISTICS_NOTICE_ID,
@@ -113,6 +117,11 @@ describe('notify', () => {
     expect(toastMock.success).not.toHaveBeenCalled()
     expect(toastMock.loading).not.toHaveBeenCalled()
     expect(toastMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps the log notice ids stable', () => {
+    expect([LOGS_NOTICE_ID, LOGS_COVERAGE_NOTICE_ID, LOGS_HIDDEN_MATCHES_NOTICE_ID, LOGS_REFRESH_NOTICE_ID])
+      .toEqual(['logs', 'logs-coverage', 'logs-hidden-matches', 'logs-refresh'])
   })
 })
 

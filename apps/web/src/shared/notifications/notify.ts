@@ -13,6 +13,10 @@ export const COMBAT_PREVIEW_NOTICE_ID = 'combat-preview'
 export const COMBAT_QUEUE_PREVIEW_NOTICE_ID = 'combat-queue-preview'
 export const COMBAT_PARADOX_SEARCH_NOTICE_ID = 'combat-paradox-search'
 export const DASHBOARD_CONNECTION_NOTICE_ID = 'dashboard-connection'
+export const LOGS_NOTICE_ID = 'logs'
+export const LOGS_COVERAGE_NOTICE_ID = 'logs-coverage'
+export const LOGS_HIDDEN_MATCHES_NOTICE_ID = 'logs-hidden-matches'
+export const LOGS_REFRESH_NOTICE_ID = 'logs-refresh'
 
 export interface NoticeOptions {
   id?: string

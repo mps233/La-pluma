@@ -34,7 +34,6 @@ const baseProps = (): ToolbarProps => ({
   viewingHistory: false,
   paused: false,
   onTogglePause: () => {},
-  actionBusy: false,
   canExport: true,
   onClear: () => {},
   onExport: () => {},
@@ -109,8 +108,24 @@ describe('LogsToolbar', () => {
   it('disables run scope and following for files and keeps event selection available', async () => {
     await renderToolbar({ viewingHistory: true })
     expect((container.querySelector('[aria-label="执行范围"]') as HTMLButtonElement)?.disabled).toBe(true)
+    expect(container.querySelector('[aria-label="执行范围"]')?.textContent).toContain('历史文件不区分 Run')
     expect((container.querySelector('[aria-label="事件范围"]') as HTMLButtonElement)?.disabled).toBe(false)
     expect(findSwitchByLabel('自动滚动')?.getAttribute('aria-disabled')).toBe('true')
+    expect(container.querySelector('[aria-label="自动滚动：历史文件不提供自动滚动"]')).not.toBeNull()
+  })
+
+  it('explains why export is unavailable', async () => {
+    await renderToolbar({ canExport: false })
+    expect(container.querySelector('[aria-label="导出筛选结果：当前筛选没有可导出的日志"]')).not.toBeNull()
+  })
+
+  it('clears the search from the input group', async () => {
+    const onSearchChange = vi.fn()
+    await renderToolbar({ search: 'needle', onSearchChange })
+    const clear = container.querySelector<HTMLElement>('[aria-label="清除搜索"]')
+    expect(clear).not.toBeNull()
+    await act(async () => clear?.click())
+    expect(onSearchChange).toHaveBeenCalledWith('')
   })
 
   it('turns browser autofill off for the log search field', async () => {

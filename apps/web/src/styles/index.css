@@ -67,7 +67,7 @@
 /*
  * Tailwind v4 preflight 与 v3 对齐：v4 移除了按钮 pointer 与 :disabled 的 default cursor，
  * 将 placeholder 改为 currentColor/50%，并把默认 border-color 改为 currentColor。
- * 这里在 base 层恢复 v3 的默认值；utilities / 未分层样式仍按原有优先级覆盖。
+ * 这里在 base 层使用语义 token 作为默认边框色；utilities / 未分层样式仍按原有优先级覆盖。
  */
 @layer base {
   *,
@@ -75,7 +75,7 @@
   ::after,
   ::backdrop,
   ::file-selector-button {
-    border-color: #e5e7eb;
+    border-color: var(--border);
   }
 
   button,

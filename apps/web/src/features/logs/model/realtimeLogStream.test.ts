@@ -40,12 +40,14 @@ describe('RealtimeLogStream', () => {
     const read = vi.fn<(lines: number, signal?: AbortSignal) => Promise<ApiResponse<unknown>>>()
       .mockResolvedValue({ success: true, data: [realtimeRow('first')] })
     const stream = new RealtimeLogStream({ read })
+    expect(stream.getState().hasLoaded).toBe(false)
 
     stream.start()
     await flush()
 
     expect(read).toHaveBeenCalledTimes(1)
     expect(read.mock.calls[0]?.[0]).toBe(REALTIME_LOG_LINES)
+    expect(stream.getState().hasLoaded).toBe(true)
     expect(stream.getState().logs).toMatchObject([{ time: '10:11:12', level: 'INFO', message: 'first' }])
     expect(stream.getState().error).toBeNull()
 
@@ -59,6 +61,20 @@ describe('RealtimeLogStream', () => {
     await vi.advanceTimersByTimeAsync(REALTIME_LOG_INTERVAL_MS)
     expect(stream.getState().logs).toMatchObject([{ time: '10:11:12', level: 'INFO', message: 'second' }])
 
+    stream.stop()
+  })
+
+  it('marks the first empty snapshot as loaded', async () => {
+    const read = vi.fn<(lines: number, signal?: AbortSignal) => Promise<ApiResponse<unknown>>>()
+      .mockResolvedValue({ success: true, data: [] })
+    const stream = new RealtimeLogStream({ read })
+
+    stream.start()
+    await flush()
+
+    expect(stream.getState().hasLoaded).toBe(true)
+    expect(stream.getState().logs).toEqual([])
+    expect(stream.getState().error).toBeNull()
     stream.stop()
   })
 
@@ -131,6 +147,26 @@ describe('RealtimeLogStream', () => {
     await flush()
     expect(stream.getState().logs[0]?.message).toBe('恢复')
     expect(stream.getState().error).toBeNull()
+
+    stream.stop()
+  })
+
+  it('does not publish an identical refresh failure twice', async () => {
+    const read = vi.fn<(lines: number, signal?: AbortSignal) => Promise<ApiResponse<unknown>>>()
+      .mockResolvedValue({ success: false, message: '后台刷新暂不可用' })
+    const stream = new RealtimeLogStream({ read })
+    const listener = vi.fn()
+    stream.subscribe(listener)
+
+    stream.start()
+    await flush()
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(stream.getState().error).toBe('后台刷新暂不可用')
+
+    await vi.advanceTimersByTimeAsync(REALTIME_LOG_INTERVAL_MS)
+    await flush()
+    expect(read).toHaveBeenCalledTimes(2)
+    expect(listener).toHaveBeenCalledTimes(1)
 
     stream.stop()
   })
