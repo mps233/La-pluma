@@ -22,6 +22,8 @@ export interface UpdateRunTerminal {
   readonly state: UpdateRunTerminalState
   readonly message: string | null
   readonly errorDetails: Record<string, unknown>
+  /** 服务端 Run 终态结果；成功载荷里的领域事实（如 `channelPersisted`）从这里读取。 */
+  readonly result: unknown
 }
 
 export type SettingsUpdateRunOperationId = 'update_core' | 'update_cli' | 'update_resources'
@@ -70,13 +72,14 @@ const UNKNOWN_TERMINAL: UpdateRunTerminal = {
   state: 'unknown',
   message: null,
   errorDetails: {},
+  result: null,
 }
 
 function terminalOf(run: AgentRun): UpdateRunTerminal {
   if (!isTerminalRunState(run.state)) return UNKNOWN_TERMINAL
   const message = typeof run.error?.message === 'string' ? run.error.message : null
   const errorDetails = isRecord(run.error?.details) ? run.error.details : {}
-  return { state: run.state, message, errorDetails }
+  return { state: run.state, message, errorDetails, result: run.result ?? null }
 }
 
 export function createSettingsUpdateRunPort(

@@ -63,6 +63,24 @@ export const coreChannelLabel = (
   CORE_UPDATE_CHANNEL_LABELS[version]
 )
 
+/** 服务端只在渠道回写失败时显式返回 `channelPersisted === false`；缺失按已持久化处理。 */
+export const isChannelPersisted = (result: unknown): boolean => (
+  !(isRecord(result) && result.channelPersisted === false)
+)
+
+export const coreUpdateMessage = (channelPersisted: boolean): string => (
+  channelPersisted ? 'MaaCore 和资源已更新' : 'MaaCore 和资源已更新，但渠道配置未能持久化'
+)
+
+export const coreChannelUpdateMessage = (
+  version: CoreUpdateChannel,
+  channelPersisted: boolean,
+): string => (
+  channelPersisted
+    ? `已切换到 ${coreChannelLabel(version)} 渠道并同步最新资源`
+    : `MaaCore 已更新并同步最新资源，但 ${coreChannelLabel(version)} 渠道配置未能持久化，后续更新可能仍使用原渠道`
+)
+
 /** 由已安装版本推断当前渠道；版本读取失败（`null`）时按正式版处理。 */
 export const resolveCoreChannel = (currentCore: string | null | undefined): CoreUpdateChannel => {
   if (typeof currentCore !== 'string') return 'stable'
@@ -175,10 +193,8 @@ export const TERMINAL_FAILURE_POLICIES: Record<UpdateOperation, TerminalFailureP
   resources: { resourceRetry: () => true, showFeedback: true },
 }
 
-/** 恢复的 run 看不到提交响应，成功文案与失效范围按操作类型回填。 */
-export const RESUMED_SUCCESS_EXECUTIONS: Record<UpdateOperation, UpdateExecution> = {
-  core: succeededExecution('MaaCore 和资源已更新', true, true),
-  'core-channel': succeededExecution('MaaCore 和资源已更新', true, true),
+/** 恢复的 run 看不到提交响应；core 成功文案由终态结果决定，这里只回填 CLI 与资源。 */
+export const RESUMED_SUCCESS_EXECUTIONS: Record<'cli' | 'resources', UpdateExecution> = {
   cli: succeededExecution('MAA CLI 更新成功', false, true),
   resources: succeededExecution('资源已更新', true, true),
 }

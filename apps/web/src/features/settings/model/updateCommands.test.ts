@@ -380,6 +380,7 @@ describe('SettingsUpdateOwner run semantics', () => {
     state: 'succeeded',
     message: null,
     errorDetails: {},
+    result: null,
     ...overrides,
   })
 
@@ -437,6 +438,24 @@ describe('SettingsUpdateOwner run semantics', () => {
     })
     expect(released).toEqual(['run-core'])
     expect(owner.getState()).toMatchObject({ running: null, canceling: false })
+  })
+
+  it('does not claim a channel switch when the terminal result says the channel was not persisted', async () => {
+    const runPort = createRunPort(() => Promise.resolve(terminal({
+      result: { channelPersisted: false },
+    })))
+    const { owner } = createOwner({ updateCore: submitted('run-channel') }, runPort)
+
+    const outcome = await owner.updateCore('beta')
+
+    expect(outcome).toMatchObject({
+      status: 'succeeded',
+      operation: 'core-channel',
+      message: 'MaaCore 已更新并同步最新资源，但 Beta 渠道配置未能持久化，后续更新可能仍使用原渠道',
+      resourcesChanged: true,
+      versionChanged: true,
+    })
+    expect(outcome.message).not.toContain('已切换到')
   })
 
   it('maps a failed run to the existing failure feedback and resource retry policy', async () => {

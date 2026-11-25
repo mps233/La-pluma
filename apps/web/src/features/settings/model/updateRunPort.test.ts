@@ -14,6 +14,7 @@ const UNKNOWN_TERMINAL: UpdateRunTerminal = {
   state: 'unknown',
   message: null,
   errorDetails: {},
+  result: null,
 }
 
 const createRun = (overrides: Partial<AgentRun> = {}): AgentRun => ({
@@ -92,6 +93,24 @@ describe('settings update run port', () => {
       state: 'failed',
       message: '资源同步失败',
       errorDetails: { failedStep: 'resources' },
+      result: null,
+    })
+  })
+
+  it('exposes the terminal result so callers can read success payload facts', async () => {
+    const { controller, run } = createHarness({
+      state: 'succeeded',
+      result: { channelPersisted: false },
+    })
+    const port = createSettingsUpdateRunPort(controller)
+    const runId = port.adopt(submission(run), 'update_core')
+    if (!runId) throw new Error('expected an adopted run id')
+
+    await expect(port.wait(runId)).resolves.toEqual({
+      state: 'succeeded',
+      message: null,
+      errorDetails: {},
+      result: { channelPersisted: false },
     })
   })
 
@@ -135,6 +154,7 @@ describe('settings update run port', () => {
       state: 'succeeded',
       message: null,
       errorDetails: {},
+      result: null,
     })
   })
 
@@ -197,6 +217,31 @@ describe('settings update run port', () => {
       versionChanged: true,
     })
     expect(owner.getState()).toMatchObject({ running: null, canceling: false })
+    stopObserving()
+  })
+
+  it('keeps the channel persistence warning when recovering a tracked channel switch', async () => {
+    const { controller, run, api } = createHarness()
+    const port = createSettingsUpdateRunPort(controller)
+    controller.adoptSubmission(submission(run), 'update_core', { scope: 'settings' })
+
+    const owner = new SettingsUpdateOwner({ runPort: port })
+    const outcomes: UpdateCommandOutcome[] = []
+    const stopObserving = owner.observeTrackedRun(outcome => outcomes.push(outcome))
+
+    api.fetchRun.mockResolvedValue({
+      success: true,
+      data: { ...run, state: 'succeeded', result: { channelPersisted: false } },
+    } as ApiResponse<AgentRun>)
+    await controller.refresh('reconnect')
+
+    await vi.waitFor(() => expect(outcomes).toHaveLength(1))
+    expect(outcomes[0]).toMatchObject({
+      status: 'succeeded',
+      message: 'MaaCore 和资源已更新，但渠道配置未能持久化',
+      resourcesChanged: true,
+      versionChanged: true,
+    })
     stopObserving()
   })
 

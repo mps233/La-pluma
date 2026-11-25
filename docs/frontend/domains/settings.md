@@ -401,7 +401,7 @@ ConfigManager（app-page > app-stack-section > SettingsWorkspace）
 | 能力 | 唯一所有者 | 形态 | 不负责 |
 | --- | --- | --- | --- |
 | core 更新 / 渠道切换 / CLI 更新 / 资源热更新 | `features/settings/model/updateCommands.ts` 的 `SettingsUpdateOwner` | 显式 POST 提交服务端 Run；共用一条在途槽位，按 `runId` 等待终态；不进入 Query | 版本读取、跨域失效发布 |
-| 更新 Run 的观察与停止 | `features/settings/model/updateRunPort.ts` | 采纳 `runId`、等待终态、解除身份、按目标停止；复用 `task-execution` 控制器 | 服务端 Run 身份与状态机 |
+| 更新 Run 的观察与停止 | `features/settings/model/updateRunPort.ts` | 采纳 `runId`、等待终态并读取终态结果、解除身份、按目标停止；复用 `task-execution` 控制器 | 服务端 Run 身份与状态机 |
 | 更新后的版本同步 | `features/settings/hooks/useSettingsUpdates.ts` 调用 `useSettingsVersion().reload()` | 后者 `invalidateQueries` 同一 `settings/version` | 伪造版本快照 |
 | 更新后的跨域失效 | 同一 hook | 成功确认后推进物品图标 epoch，并按[失效端口](../../architecture/resource-ownership.md)发布（`cause: resource-update`） | 清空 Query 缓存、轮询 |
 | 自动更新策略草稿与完整提交 | `features/settings/model/autoUpdateConfig.ts` 的 `AutoUpdateConfigOwner` | 模块级草稿；自动保存 = 写 user config + 应用调度 | 定时任务本身的执行 |
@@ -454,7 +454,7 @@ ConfigManager（app-page > app-stack-section > SettingsWorkspace）
 
 资源重试入口的判定条件 `failedStep === 'resources' || coreUpdated === true` 不再只兼容旧服务端与旧 Run 记录：core/渠道切换命令已成功、但资源状态无法确认时，服务端写入 `{ version, failedStep: 'resources', coreUpdated: true }`；core 命令成功后版本刷新失败写入 `{ version, failedStep: 'runtime', coreUpdated: true }`。两者都满足该判定，error toast 因此显示“重试资源同步” action。只有 core 命令本身失败才写 `{ version, failedStep: 'core', coreUpdated: false }`，不提供该入口；独立的资源热更新失败同样提供该 action，升级前写入的旧 Run 沿用同一判定。
 
-成功载荷的 `steps` 由实测状态派生（`steps.core.success`、`steps.resources.success` 均为布尔值，不再固定为 `true`），`channelPersisted` 标记请求的渠道是否已写入 `cli.toml`。`channelPersisted === false` 时更新本身仍算成功，但文案必须说明“已更新，但渠道配置未能持久化”，不得声称已切换到目标渠道，后续不带版本的更新可能仍沿用原渠道。
+成功载荷的 `steps` 由实测状态派生（`steps.core.success`、`steps.resources.success` 均为布尔值，不再固定为 `true`），`channelPersisted` 标记请求的渠道是否已写入 `cli.toml`。`channelPersisted === false` 时更新本身仍算成功，但文案必须说明“已更新，但渠道配置未能持久化”，不得声称已切换到目标渠道，后续不带版本的更新可能仍沿用原渠道。带 `runId` 的命令从 Run 终态结果读取 `channelPersisted`；刷新后恢复观察的 core/渠道切换同样按终态结果选择文案。
 
 ### 3. 成功后的版本与资源失效
 

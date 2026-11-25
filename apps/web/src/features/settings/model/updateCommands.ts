@@ -14,9 +14,11 @@ import {
   updateMaaCore as defaultUpdateMaaCore,
 } from '../api'
 import {
-  coreChannelLabel,
+  coreChannelUpdateMessage,
+  coreUpdateMessage,
   failedExecution,
   initialUpdateState,
+  isChannelPersisted,
   shouldRetryUpdateResources,
   succeededExecution,
   terminalExecution,
@@ -97,10 +99,11 @@ export class SettingsUpdateOwner {
         const outcome = terminalExecution(terminal, TERMINAL_FAILURE_POLICIES[operation])
         if (outcome) return outcome
       }
+      const channelPersisted = isChannelPersisted(terminal?.result)
       const message = version
-        ? `已切换到 ${coreChannelLabel(version)} 渠道并同步最新资源`
+        ? coreChannelUpdateMessage(version, channelPersisted)
         : terminal
-          ? 'MaaCore 和资源已更新'
+          ? coreUpdateMessage(channelPersisted)
           : (response.message || 'MaaCore 和资源已更新')
       return succeededExecution(message, true, true)
     })
@@ -216,8 +219,16 @@ export class SettingsUpdateOwner {
     this.activeRunId = runId
     try {
       const terminal = await this.runPort.wait(runId)
-      return terminalExecution(terminal, TERMINAL_FAILURE_POLICIES[operation])
-        ?? RESUMED_SUCCESS_EXECUTIONS[operation]
+      const failure = terminalExecution(terminal, TERMINAL_FAILURE_POLICIES[operation])
+      if (failure) return failure
+      if (operation === 'core' || operation === 'core-channel') {
+        return succeededExecution(
+          coreUpdateMessage(isChannelPersisted(terminal.result)),
+          true,
+          true,
+        )
+      }
+      return RESUMED_SUCCESS_EXECUTIONS[operation]
     } finally {
       this.activeRunId = null
       this.runPort.release(runId)
