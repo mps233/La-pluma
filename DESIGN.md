@@ -155,7 +155,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 - `apps/web/src/styles/index.css`：语义 token 的**唯一来源**（base 层）、Tailwind 入口、`@theme` 圆角派生与 `@theme inline` 颜色映射、通用组件类与跨域 keyframes；页面样式由各功能域自持。
 - `apps/web/src/styles/layout.css`：结构几何与 `--layout-*` token（视口、navbar 与安全区高度、侧栏、内容宽度与留白、内容 sticky 顶部偏移、tabbar 安全区与浮动内容底部偏移）；应用 chrome 的尺寸、定位、网格、滚动宿主与 skip link 可访问性样式都在这里，不承载页面级颜色、材质或控件外观。
-- `apps/web/src/styles/ios-theme.css`：只保留默认主题的 chrome 材质 token（`--glass-*`）与对应视觉样式（含 PWA 安装入口）；分段控件不在此处提供材质，其容器保持透明、高亮指示器使用 `--muted` 与 `--border` 语义 token；共享设备画面的 surface 与紧凑玻璃按钮材质归 `apps/web/src/features/device-mirror/styles/device-mirror.css`；默认基线不依赖玻璃材质，液态玻璃由后续主题提供。
+- `apps/web/src/styles/ios-theme.css`：只保留默认主题的 chrome 材质 token（`--glass-*`）与对应视觉样式（含 PWA 安装入口）；分段控件不在此处提供材质，共享 `SegmentedControl` 使用 `control-surface` 容器与品牌动作色选中态；共享设备画面的 surface 与扁平控件样式归 `apps/web/src/features/device-mirror/styles/device-mirror.css`，该域不提供玻璃材质；默认基线不依赖玻璃材质，液态玻璃由后续主题提供。
 - `apps/web/src/shared/components`：`PageShell`、`ConfirmAlertDialog`、`EmptyState`、`Loading` 等应用级通用组件；`Button`、`Input`、`Select`、`Checkbox`、`Switch`、`Progress`、`Badge`、`Alert`、`Card`、`Dialog`、`AlertDialog`、`Sheet` 等 shadcn 生成物位于 `apps/web/src/shared/ui`（sidebar 也在该目录）。
 
 本文件描述规则；语义 token 的具体数值以 `apps/web/src/styles/index.css` 为准，布局与结构几何 token 以 `apps/web/src/styles/layout.css` 为准，chrome 材质 token 以 `apps/web/src/styles/ios-theme.css` 为准。调整 token 时同步更新本文件的表格与说明。
@@ -170,7 +170,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ```
 
 - **utilities 永远赢**：`page` 位于 `components` 之后、`utilities` 之前；页面 CSS 可以覆盖 base/preflight 与 components，但普通声明不再压过 utilities。确实需要压过 utilities 的页面/组件规则使用 `!important` 并在原位注释原因。
-- **page 层**：每个功能域自持自己的页面样式，放在 `features/<domain>/styles/<domain>.css`，由该域 `index.ts` 导入一次，全部位于 `@layer page`；`index.css` 只保留跨域 keyframes，`layout.css` 只保留应用壳层的布局几何与结构 token，`ios-theme.css` 只保留应用 chrome 材质与跨域 page-kind 材质（`[data-page-layout="workspace"]`、`[data-page-surface="borderless"]`、`.la-pluma-content` 控件、浮层）；automation 的 `[data-page-kind="automation"]` 材质归 `features/automation/styles/automation.css` 自持；共享设备画面（surface、紧凑玻璃按钮）材质归 `features/device-mirror/styles/device-mirror.css`，不以页面 kind 切换；通用组件类留在 `@layer components`。
+- **page 层**：每个功能域自持自己的页面样式，放在 `features/<domain>/styles/<domain>.css`，由该域 `index.ts` 导入一次，全部位于 `@layer page`；`index.css` 只保留跨域 keyframes，`layout.css` 只保留应用壳层的布局几何与结构 token，`ios-theme.css` 只保留应用 chrome 材质与跨域 page-kind 材质（`[data-page-layout="workspace"]`、`[data-page-surface="borderless"]`、`.la-pluma-content` 控件、浮层）；automation 的 `[data-page-kind="automation"]` 材质归 `features/automation/styles/automation.css` 自持；共享设备画面（surface、扁平控件）样式归 `features/device-mirror/styles/device-mirror.css`，不以页面 kind 切换；通用组件类留在 `@layer components`。
 - **域内 CSS 按普通 CSS 处理**：功能域样式文件不经过 Tailwind 入口的编译与降级流水线，不要在其中使用 `@apply`/`@theme` 等 Tailwind 指令；需要厂商前缀的能力按现有写法显式补齐（如 `-webkit-backdrop-filter`），浏览器下限仍以 v4 目标为准。
 - **token 单源**：语义 token（颜色、圆角、间距、字号、控件高度等）只在 `index.css` 的 `:root` / `html.dark, #app-root.dark` / 媒体查询中定义一次；结构布局 token（`--layout-*`）只由 `layout.css` 定义。浅色、深色、`prefers-contrast`、`prefers-reduced-transparency` 的最终生效值都写在这里；`ios-theme.css` 不再出现同名重定义。
 - **深色切换**：主题仍同时给 `html` 与 `#app-root` 加 `.dark`；`html.dark` 与 `#app-root.dark` 都保留为有效选择器。
@@ -273,7 +273,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 页面根统一由 `shared/components` 的 `PageShell` 提供：根节点输出 `data-region="page"` 与 `data-page-kind`，工作台页追加 `data-page-layout="workspace"`，无边框卡片页追加 `data-page-surface="borderless"`；`PageShell` 内部固定一个 `app-stack-section`，页面只提供内容，不自建标题或页头。布局、视觉与浏览器测试通过 `data-region` / `data-page-*` 定位，不依赖实现类名。
 
 - 应用壳的稳定 region 锚点：`page`、`page-header`、`page-title`、`page-content`、`scroll`、`monitor`、`toolbar`、`navbar`、`sidebar`、`tabbar`；滚动宿主固定为 `[data-region="scroll"]`。
-- 工作区设备画面布局由 `DeviceMonitorLayout` 输出 `data-device-monitor-layout="standard|workbench|mode"` 与 `data-monitor-area` 区域锚点；共享设备画面类名为 `device-monitor-surface`，`workbench`/`mode` 的 monitor 列与面板为 `device-monitor-column` / `device-monitor-panel`，紧凑玻璃按钮为 `device-preview-glass-button`；`data-region="monitor"` 仍只由 `DeviceMonitorPanel` 卡片输出，每页恰好一个。
+- 工作区设备画面布局由 `DeviceMonitorLayout` 输出 `data-device-monitor-layout="standard|workbench|mode"` 与 `data-monitor-area` 区域锚点；共享设备画面类名为 `device-monitor-surface`，`workbench`/`mode` 的 monitor 列与面板为 `device-monitor-column` / `device-monitor-panel`，工具栏使用 shared `Button` / `Tooltip`，不提供玻璃材质类；`data-region="monitor"` 仍只由 `DeviceMonitorPanel` 卡片输出，每页恰好一个。
 - 内容最大宽度 `112rem`（`--layout-content-max`），两侧对称居中。
 - 页面左右留白由 `--layout-page-gutter` 提供：桌面（`1024px` 及以上）`32px`；平板（`640px` 及以上且小于 `1024px`）`20px`；移动（小于 `640px`）`14px`。安全区取 `max(gutter, env(safe-area-inset-*))`，不叠加第二份 inset。
 - 基础节奏为 4px。页面外层用 `app-page`，区块之间用 `app-stack-section` / `app-grid-section`，卡片内部用 `app-stack-card` / `app-grid-card`。
@@ -339,7 +339,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ### Shadow Vocabulary
 - **Panel rest (light)** (`0 0 0 1px rgba(60, 60, 67, 0.18), 0 1px 3px rgba(15, 23, 42, 0.05), 0 14px 40px rgba(15, 23, 42, 0.05)`)：`surface-panel` 召唤层与独立面板的默认抬升。
 - **Panel rest (dark)** (`inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px rgba(235, 235, 245, 0.18), 0 16px 40px rgba(0, 0, 0, 0.28)`)：深色主题的同等层级。
-- **Glass chrome** (`0 12px 32px rgba(60, 60, 67, 0.12)`；深色 `0 14px 34px rgba(0, 0, 0, 0.34)`)：仅用于液态玻璃主题下的移动 tabbar 与悬浮 chrome，默认基线不启用。设备画面紧凑玻璃按钮的 base material 与 workbench 变体材质由 `features/device-mirror/styles/device-mirror.css` 持有，不借用通用 chrome 材质。
+- **Glass chrome** (`0 12px 32px rgba(60, 60, 67, 0.12)`；深色 `0 14px 34px rgba(0, 0, 0, 0.34)`)：仅用于液态玻璃主题下的移动 tabbar 与悬浮 chrome，默认基线不启用。设备画面默认扁平，不借用通用 chrome 玻璃材质。
 - **Summoned layer** (`0 2px 8px rgba(0, 0, 0, 0.1), 0 30px 80px rgba(0, 0, 0, 0.24)`)：Dialog/Sheet、主题菜单、PWA 提示等被召唤的叠加层，配合 `blur(24px) saturate(165%)`。
 - **Control rest** (`inset 0 0 0 1px rgba(60, 60, 67, 0.28), 0 1px 2px rgba(15, 23, 42, 0.025)`)：输入框、选择框和次级按钮的静态边界。
 
@@ -348,7 +348,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 ### Named Rules
 **The Flat-By-Default Rule.** 普通卡片、列表和页面区块在静止状态保持平整。阴影只用于表达层级、可点击性或状态，不要给静态内容卡片加投影闪动或位移。
 
-**The Liquid Glass Theme.** 液态玻璃是后续主题层的能力，不属于默认 chrome。shell chrome 的玻璃材质由后续主题提供；召唤层（Dialog/Sheet、主题菜单、PWA 提示等）的材质保持不变，分段控件不再消费 `--glass-*`，其高亮指示器由 `--muted` 与 `--border` 语义 token 提供。设备画面紧凑玻璃按钮的材质由 device-mirror 域持有，不随页面 kind 或样式加载顺序变化。普通卡片始终不透明，避免整页都是玻璃导致可读性下降。
+**The Liquid Glass Theme.** 液态玻璃是后续主题层的能力，不属于默认 chrome。shell chrome 的玻璃材质由后续主题提供；召唤层（Dialog/Sheet、主题菜单、PWA 提示等）的材质保持不变，分段控件不再消费 `--glass-*`，共享 `SegmentedControl` 使用 `control-surface` 容器与品牌动作色选中态。设备画面默认扁平，由 device-mirror 域持有 surface 与控件样式，不随页面 kind 或样式加载顺序变化，也不消费主题玻璃。普通卡片始终不透明，避免整页都是玻璃导致可读性下降。
 
 **The Single Beam Rule.** `status-border-beam` 仅用于启动、连接或执行中的局部状态反馈，并通过 `is-active` 控制；完成、空闲和静态卡片不得常驻光效，也不要叠加第二条可见边框。
 

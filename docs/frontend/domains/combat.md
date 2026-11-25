@@ -78,7 +78,7 @@ CombatTasks（app-page > app-stack-section > CombatWorkspace）
 ```
 
 - 模式 tab 使用 `combat-mode-tab-*` 与当前渲染面板的 `combat-mode-panel-*` 建立 `aria-controls`/`aria-labelledby` 配对；默认卸载的隐藏模式不输出 `aria-controls`，因此每个渲染出的 `aria-controls` 都指向存在的元素。方向键/Home/End 只移动 roving focus，Enter/Space 或点击才切换。`copilot` 与特殊任务面板使用默认卸载，切换作业类型时卡片 DOM 卸载；活动状态仍只由 `CombatWorkspace` 的 `activeCombatMode` 决定。
-- 工作区网格与设备画面由 `DeviceMonitorLayout(standard)` 持有：模式导航、执行进度与当前模式面板进入 main 列，`DeviceMonitorPanel` 位于 monitor 列；页面不再声明 `combat-workspace-grid` 或 monitor aside，设备画面类名与材质归 device-mirror 域。作业页改用 `DeviceMonitorLayout(standard)` 后，standard monitor 在内容宽度超过 48rem 且视口小于 1360px 时使用 `max-width: 48rem` 并居中；这是标准化后的有意变化，1280 视口已有几何断言覆盖。
+- 工作区网格与设备画面由 `DeviceMonitorLayout(standard)` 持有：模式导航、执行进度与当前模式面板进入 main 列，`DeviceMonitorPanel` 位于 monitor 列；页面不再声明 `combat-workspace-grid` 或 monitor aside，设备画面类名与样式归 device-mirror 域。作业页改用 `DeviceMonitorLayout(standard)` 后，standard monitor 在内容宽度超过 48rem 且视口小于 1360px 时使用 `max-width: 48rem` 并居中；这是标准化后的有意变化，1280 视口已有几何断言覆盖。
 
 | 状态 | 所有者 | 切换作业类型 | Activity 隐藏/恢复 | 真正卸载/刷新 |
 | --- | --- | --- | --- | --- |
@@ -102,7 +102,7 @@ CombatTasks（app-page > app-stack-section > CombatWorkspace）
 | 续跑/失败/下一关视图 | `deriveCopilotSetView` 每次渲染派生 | — | — | — |
 
 - **配置只有一个订阅。** 工作区调用一次 `useUserConfig(combatConfigAdapter)`，把草稿字段与更新回调传给卡片；面板不直接调用 `saveUserConfig`/`loadUserConfig` 或写配置 localStorage；队列持久化只由 `useCopilotQueue` 负责。
-- **配置读取门控。** 工作区消费 `loadState`/`loadError`/`reload`：`idle`/`loading` 渲染固定高度的加载面板，`failed` 且无本地草稿时渲染错误面板与「重新加载」按钮，重试走 `reload({ force: true })` 而不是保存重试 `retry`；只有 `loadState === 'ready'` 才渲染编辑器、执行入口与设备画面。未 ready 时配置更新与终态 reconciliation 不推进草稿 revision，避免把默认草稿当成可编辑或可执行配置。
+- **配置读取门控。** 工作区消费 `loadState`/`loadError`/`reload`：`idle`/`loading` 渲染固定高度的加载面板，`failed` 且无本地草稿时渲染错误面板与「重新加载」按钮，重试走 `reload({ force: true })` 而不是保存重试 `retry`；只有 `loadState === 'ready'` 才渲染编辑器与执行入口，配置读取中/失败时设备画面仍通过 `DeviceMonitorLayout(standard)` 保留，`ConfigLoadCard` 位于主列。未 ready 时配置更新与终态 reconciliation 不推进草稿 revision，避免把默认草稿当成可编辑或可执行配置。
 - **预览/搜索/执行各只有一个实例。** 工作区调用一次 `useCopilotPreview`、两个搜索 hook 与一次 `useCombatExecution`；卡片拿到的都是投影与动作，不创建第二份状态机。
 - **队列选择与作业集选择分开。** `useCopilotQueue` 持有队列条目与勾选，列表勾选、排序与执行都读它；`selectedCopilotIndexes` 只在预览作业集时恢复计划待执行项，并通过 `syncQueueSet` 同步到队列，不再直接驱动列表行。
 - **详情层不复制业务状态。** 打开项只记队列条目 id；详情目标每次由条目静态字段、`queueRun.statuses`/`queueRun.summaryErrors`、`itemStatuses` 与 `itemErrors` 派生，条目被删除或预览重建后找不到时关闭，不切换到同索引的其他作业。

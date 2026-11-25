@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getErrorMessage } from '@/shared/api'
-import { AlertTriangle, LoaderCircle } from 'lucide-react'
+import { LoaderCircle } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { Card } from '@/shared/ui/card'
-import { ConfirmAlertDialog, SegmentedTabs, SegmentedTabPanel } from '@/shared/components'
+import { ConfigLoadCard, ConfirmAlertDialog, SegmentedTabs, SegmentedTabPanel } from '@/shared/components'
 import {
   COMBAT_PARADOX_SEARCH_NOTICE_ID,
   COMBAT_PREVIEW_NOTICE_ID,
@@ -1074,39 +1073,17 @@ export default function CombatWorkspace() {
   }
 
   if (configLoadState !== 'ready') {
-    const loadFailed = configLoadState === 'failed'
     return (
-      <Card
-        role={loadFailed ? 'alert' : 'status'}
-        aria-live={loadFailed ? 'assertive' : 'polite'}
-        className="h-40 gap-0 overflow-hidden p-0!"
-      >
-        <div className="flex h-full flex-col items-center justify-center gap-3 px-4 py-4 text-center">
-          {loadFailed
-            ? <AlertTriangle size={22} strokeWidth={1.9} className="text-destructive" aria-hidden="true" />
-            : <LoaderCircle size={22} strokeWidth={1.9} className="animate-spin" aria-hidden="true" />}
-          <div className="w-full min-w-0 space-y-1">
-            <p className="text-sm font-medium">
-              {loadFailed ? '作业配置暂时不可用' : '正在读取作业配置…'}
-            </p>
-            {loadFailed && (
-              <p className="line-clamp-2 wrap-break-word text-xs text-muted-foreground">
-                {configLoadError ?? '请稍后重新加载'}
-              </p>
-            )}
-          </div>
-          {loadFailed && (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => void reloadConfig({ force: true })}
-            >
-              重新加载
-            </Button>
-          )}
-        </div>
-      </Card>
+      <DeviceMonitorLayout variant="standard">
+        <ConfigLoadCard
+          failed={configLoadState === 'failed'}
+          title="作业配置"
+          loadingMessage="正在读取作业配置…"
+          failedMessage="作业配置暂时不可用"
+          error={configLoadError}
+          onRetry={() => void reloadConfig({ force: true })}
+        />
+      </DeviceMonitorLayout>
     )
   }
 

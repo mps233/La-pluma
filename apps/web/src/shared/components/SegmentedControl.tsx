@@ -16,6 +16,7 @@ export interface SegmentedControlProps<T extends string> {
   fullWidth?: boolean
   disabled?: boolean
   className?: string
+  itemClassName?: string
 }
 
 const segmentedControlGroupVariants = cva(
@@ -71,6 +72,7 @@ export function SegmentedControl<T extends string>({
   fullWidth = false,
   disabled = false,
   className,
+  itemClassName,
 }: SegmentedControlProps<T>) {
   return (
     <ToggleGroup
@@ -90,10 +92,10 @@ export function SegmentedControl<T extends string>({
           key={option.value}
           value={option.value}
           disabled={option.disabled}
-          className={segmentedControlItemVariants({
+          className={cn(segmentedControlItemVariants({
             fullWidth,
             selected: option.value === value,
-          })}
+          }), itemClassName)}
         >
           {option.label}
         </ToggleGroupItem>

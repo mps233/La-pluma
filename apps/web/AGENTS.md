@@ -36,7 +36,7 @@
 - 通用控件从 `@/shared/ui` 复用；新增或调整公共组件时同步公开导出和组件 API 文档，不在页面复制已有控件。高度受限的表单、选择器与发现弹窗使用 shared `DialogFrame` / `DialogBody` / `DialogFrameFooter`，不复制标题栏、关闭按钮与滚动体壳层；无高度上限的简单弹窗仍可直接组合生成原语。
 - 页面根统一使用 `PageShell`；壳层、样式与测试通过 `data-region` / `data-page-*` 定位，不恢复 legacy 页面类或属性。页面不自建标题或页头。
 - 页面设备画面布局统一使用 `@/features/device-mirror` 的 `DeviceMonitorLayout`（`standard`/`workbench`/`mode`）：页面只提供具名区域，不新建页面级设备网格或自行渲染 `DeviceMonitorPanel`。
-- 共享设备画面样式归 `features/device-mirror`：使用 `device-monitor-*` / `device-preview-glass-button` 命名，不在页面样式或组件中使用 `automation-*` / `roguelike-*` monitor 类，也不以 `data-page-kind` 作为设备画面样式开关。
+- 共享设备画面样式归 `features/device-mirror`：使用 `device-monitor-*` / `device-preview-*` 命名（不新增玻璃材质类），不在页面样式或组件中使用 `automation-*` / `roguelike-*` monitor 类，也不以 `data-page-kind` 作为设备画面样式开关。
 - 避免不必要的辅助标签与说明。让布局本身发挥解释作用。
 - 全局语义 token 与层序归 `src/styles/`；`index.css`、`layout.css`、`ios-theme.css` 不接收页面选择器。领域样式置于 `features/<domain>/styles/`，由域入口导入并收进 `@layer page`。
 - 保持 `theme, base, components, page, utilities` 层序，使用现有语义 token 和 Tailwind v4 canonical 类名；动态状态使用完整类名映射，不拼接 Tailwind 类名。

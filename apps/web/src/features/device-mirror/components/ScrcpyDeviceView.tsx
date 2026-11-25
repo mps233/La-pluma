@@ -1,43 +1,21 @@
-import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from 'react'
-import { ArrowLeft, Gauge, Home, LoaderCircle, Maximize2, Minimize2, Package, PanelsTopLeft, Plug, RotateCw, Server, SlidersHorizontal, Smartphone, Unplug } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { cn } from 'cn'
+import { ArrowLeft, Home, Maximize2, Minimize2, PanelsTopLeft, SlidersHorizontal, Smartphone } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
+import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/shared/ui/dialog'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip'
+import { EmptyState } from '@/shared/components'
 import { usePreviewSession } from '../hooks/usePreviewSession'
 import { usePreviewSnapshot } from '../hooks/usePreviewSnapshot'
-import { usePreviewStore } from '../store/previewStore'
-import { qualityPresets, fpsOptions, type QualityPreset } from '../constants'
-import PreviewModeControls, { PreviewModeSegmented } from './PreviewModeControls'
+import { derivePreviewStatus, type PreviewLiveStatus } from '../model/previewStatus'
+import type { usePreviewInfrastructureView } from '../hooks/usePreviewInfrastructureView'
+import { PreviewModeSegmented } from './PreviewModeSegmented'
+import { PreviewSettingsDialog } from './PreviewSettingsDialog'
 
 interface ScrcpyDeviceViewProps {
-  enabled: boolean
-  automationAvailable?: boolean
-  automationUnavailableMessage?: string
-  variant?: 'full' | 'compact'
-  autoConnect?: boolean
-  onStatusChange?: (status: string, stats: any, error: string | null) => void
-  infrastructureStatus?: {
-    installed?: boolean
-    built?: boolean
-    serverRunning?: boolean
-    agentRunning?: boolean
-  } | null
-  infrastructureStatusState?: 'loading' | 'ready' | 'error'
-  infrastructureLoading?: string | null
-  infrastructureError?: string | null
-  onInstall?: () => Promise<void> | void
-  onToggleServer?: () => Promise<void> | void
-  onToggleAgent?: () => Promise<void> | void
-}
-
-const statusLabel: Record<string, string> = {
-  idle: '未连接',
-  connecting: '连接中',
-  signaling: '信令中',
-  waiting_offer: '等待画面',
-  connecting_webrtc: '建立 WebRTC',
-  connected: '已连接',
-  disconnected: '已断开',
-  error: '连接失败'
+  infrastructure: ReturnType<typeof usePreviewInfrastructureView>
 }
 
 const deviceNavigationActions = [
@@ -51,30 +29,35 @@ function DeviceNavigationButtons({
   automationAvailable,
   automationUnavailableMessage,
   immersive = false,
-  compact = false,
   onCommand,
 }: {
   connected: boolean
   automationAvailable: boolean
   automationUnavailableMessage: string
   immersive?: boolean
-  compact?: boolean
   onCommand: (command: string) => void
 }) {
   return deviceNavigationActions.map(({ label, command, Icon }) => (
-    <button
-      key={label}
-      type="button"
-      onClick={() => onCommand(command)}
-      disabled={!connected || !automationAvailable}
-      title={!automationAvailable ? automationUnavailableMessage : label}
-      aria-label={label}
-      className={immersive
-        ? 'group flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-xs transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-35'
-        : `control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-35 ${compact ? 'device-preview-glass-button' : ''}`}
-    >
-      <Icon className="h-3.5 w-3.5" strokeWidth={1.8} />
-    </button>
+    <Tooltip key={label}>
+      <TooltipTrigger
+        render={(
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => onCommand(command)}
+            disabled={!connected || !automationAvailable}
+            aria-label={label}
+            className={immersive
+              ? 'size-11 rounded-full border border-white/30 bg-black/50 text-white hover:bg-black/70'
+              : 'size-11 rounded-full text-muted-foreground hover:text-primary'}
+          >
+            <Icon aria-hidden="true" strokeWidth={1.8} />
+          </Button>
+        )}
+      />
+      <TooltipContent>{!automationAvailable ? automationUnavailableMessage : label}</TooltipContent>
+    </Tooltip>
   ))
 }
 
@@ -84,24 +67,12 @@ interface TrackedPointer {
   target: HTMLVideoElement
 }
 
-function formatStatistic(value: number | null | undefined, unit: string) {
-  if (value === undefined || value === null || !Number.isFinite(value)) return '--'
-  return `${value} ${unit}`
-}
-
-export default function ScrcpyDeviceView({
-  automationAvailable = true,
-  automationUnavailableMessage = '后端服务暂不可用，请稍后重试',
-  variant = 'full',
-  onStatusChange,
-  infrastructureStatus,
-  infrastructureStatusState,
-  infrastructureLoading,
-  infrastructureError,
-  onInstall,
-  onToggleServer,
-  onToggleAgent
-}: ScrcpyDeviceViewProps) {
+export default function ScrcpyDeviceView({ infrastructure }: ScrcpyDeviceViewProps) {
+  const {
+    automationAvailable,
+    automationUnavailableMessage = '后端服务暂不可用，请稍后重试',
+    infrastructureError,
+  } = infrastructure
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const immersiveVideoRef = useRef<HTMLVideoElement | null>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
@@ -109,20 +80,9 @@ export default function ScrcpyDeviceView({
   const trackedPointersRef = useRef(new Map<number, TrackedPointer>())
   const pendingPointerMovesRef = useRef(new Map<number, TrackedPointer>())
   const pointerMoveFrameRef = useRef<number | null>(null)
-  const quality = usePreviewStore(state => state.quality)
-  const customFps = usePreviewStore(state => state.fps)
-  const customMaxSize = usePreviewStore(state => state.maxSize)
-  const customBitrateMbps = usePreviewStore(state => state.bitrateMbps)
-  const setQuality = usePreviewStore(state => state.setQuality)
-  const setCustomFps = usePreviewStore(state => state.setCustomFps)
-  const setCustomMaxSize = usePreviewStore(state => state.setCustomMaxSize)
-  const setCustomBitrateMbps = usePreviewStore(state => state.setCustomBitrateMbps)
-  const [settingsDirty, setSettingsDirty] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [immersiveMode, setImmersiveMode] = useState(false)
   const [immersiveVideoMounted, setImmersiveVideoMounted] = useState(false)
-  const [compactControlsOpen, setCompactControlsOpen] = useState(false)
-  const compactControlsId = `scrcpy-controls-${useId().replace(/:/g, '')}`
-  const bitrateProgress = ((customBitrateMbps - 1) / (32 - 1)) * 100
   const webrtc = usePreviewSession({
     videoRef,
   })
@@ -131,50 +91,44 @@ export default function ScrcpyDeviceView({
   useEffect(() => {
     sendTouchRef.current = webrtc.sendTouch
   }, [webrtc.sendTouch])
-  const isCompact = variant === 'compact'
-  const isConnecting = webrtc.isConnecting
-  const previewBusy = infrastructureLoading === 'preview' || isConnecting
-  const canDisconnect = webrtc.mode !== 'off' || previewBusy || !['idle', 'disconnected'].includes(webrtc.status)
-  const resolvedInfrastructureState = infrastructureStatusState || (infrastructureStatus ? 'ready' : 'loading')
-  const infrastructureKnown = infrastructureStatus !== null && infrastructureStatus !== undefined
-  const infrastructureBusy = infrastructureLoading !== null && infrastructureLoading !== undefined
-  const visibleError = (webrtc.mode === 'live' ? webrtc.error : snapshot.error) || infrastructureError
-  const previewStatusLabel = webrtc.mode === 'off' ? '预览已关闭' : webrtc.paused ? '后台已暂停' : webrtc.mode === 'snapshot' ? '画面快照 · 10s' : webrtc.starting ? '正在启动' : statusLabel[webrtc.status] || webrtc.status
-  const statusDotClass = visibleError
-    ? 'bg-red-400'
-    : webrtc.status === 'connected'
-    ? 'bg-emerald-400'
-    : isConnecting
-        ? 'bg-amber-400'
-        : 'bg-gray-400'
+  const previewBusy = infrastructure.infrastructureLoading === 'preview' || webrtc.isConnecting
+  const status = derivePreviewStatus({
+    mode: webrtc.mode,
+    available: automationAvailable,
+    paused: webrtc.paused,
+    liveStatus: webrtc.status as PreviewLiveStatus,
+    liveError: webrtc.error,
+    snapshotHasImage: Boolean(snapshot.image),
+    snapshotError: snapshot.error,
+    infrastructureError: infrastructureError ?? null,
+  })
+  const setStatsEnabled = webrtc.setStatsEnabled
 
-  const applyPreset = (preset: QualityPreset) => {
-    setQuality(preset)
-    setSettingsDirty(true)
+  useEffect(() => {
+    setStatsEnabled(settingsOpen)
+    return () => setStatsEnabled(false)
+  }, [setStatsEnabled, settingsOpen])
+
+  const retryPreview = () => {
+    switch (status.retry?.target) {
+      case 'snapshot':
+        snapshot.retry()
+        break
+      case 'live':
+        webrtc.connect()
+        break
+      case 'infrastructure':
+        setSettingsOpen(true)
+        break
+    }
   }
 
-  const connectFromControl = () => {
-    if (!automationAvailable) return
-    webrtc.connect()
-    setSettingsDirty(false)
-  }
-
-  const runInfrastructureAction = (
-    action: (() => Promise<void> | void) | undefined,
-    allowWhenUnavailable = false
-  ) => {
-    if (!action || (!automationAvailable && !allowWhenUnavailable)) return
-    void action()
-  }
+  const retryLabel = status.retry?.target === 'infrastructure' ? '打开设置' : status.retry?.label
 
   const sendDeviceCommand = (command: string) => {
     if (!automationAvailable) return
     webrtc.sendCommand(command)
   }
-
-  useEffect(() => {
-    onStatusChange?.(webrtc.status, webrtc.stats, webrtc.error)
-  }, [onStatusChange, webrtc.error, webrtc.stats, webrtc.status])
 
   const flushPointerMoves = useCallback(() => {
     pointerMoveFrameRef.current = null
@@ -321,89 +275,47 @@ export default function ScrcpyDeviceView({
     setImmersiveVideoMounted(node !== null)
   }, [])
 
-  const statusCards: [string, string | number, string?][] = [
-    ['信令', statusLabel[webrtc.status] || webrtc.status],
-    ['ICE', webrtc.stats?.iceState || '--'],
-    ['视频', webrtc.stats?.videoLive ? 'live' : '--'],
-    ['分辨率', webrtc.stats?.width ? `${webrtc.stats.width}×${webrtc.stats.height}` : '--'],
-    ['FPS', webrtc.stats?.fps ?? '--'],
-    ['码率', formatStatistic(webrtc.stats?.bitrate, 'kbps')],
-    ['网络 RTT', formatStatistic(webrtc.stats?.rtt, 'ms'), 'ICE 网络往返时间，不含设备输入处理与画面反馈时间'],
-    ['触控', webrtc.inputReady ? 'ready' : webrtc.status === 'connected' ? '等待触控信息' : '--']
-  ]
-  const unavailableInfrastructureLabel = resolvedInfrastructureState === 'loading' ? '检查中' : '未知'
-  const componentStatusLabel = infrastructureKnown
-    ? infrastructureStatus.built ? '已安装' : infrastructureStatus.installed ? '待构建' : '未安装'
-    : unavailableInfrastructureLabel
-  const serverStatusLabel = infrastructureKnown
-    ? infrastructureStatus.serverRunning ? '运行中' : '已停止'
-    : unavailableInfrastructureLabel
-  const agentStatusLabel = infrastructureKnown
-    ? infrastructureStatus.agentRunning ? '运行中' : '已停止'
-    : unavailableInfrastructureLabel
-
   return (
     <>
-    <div className={`scrcpy-device-layout ${isCompact ? 'is-compact' : ''}`}>
-      <div className="space-y-3 min-w-0">
-        <div className={`scrcpy-view-header flex items-center justify-between gap-3.5 ${isCompact ? 'is-compact' : 'flex-wrap'}`}>
-          <div className="min-w-0">
-            <div className="scrcpy-view-title-row flex items-center gap-2">
-              <span
-                className={`scrcpy-view-status-dot h-2 w-2 rounded-full ${statusDotClass}`}
-                role="img"
-                aria-label={previewStatusLabel}
-                title={previewStatusLabel}
-              />
-              <span className="scrcpy-view-title text-sm font-semibold text-gray-900 dark:text-white!">设备画面</span>
-              {!isCompact && (
-                <span className="scrcpy-view-status text-xs text-gray-500 dark:text-gray-400" role="status" aria-live="polite">
-                  {previewStatusLabel}
-                </span>
-              )}
-            </div>
-          </div>
-          {isCompact ? (
-            <PreviewModeSegmented unavailable={!automationAvailable} />
-          ) : (
-            <div className="flex flex-wrap gap-2 text-xs justify-end">
-              <span className="surface-soft rounded-full px-2 py-1 text-muted-foreground">
-                组件：{componentStatusLabel}
-              </span>
-              <span className="surface-soft rounded-full px-2 py-1 text-muted-foreground">
-                服务：{serverStatusLabel}
-              </span>
-              <span className="surface-soft rounded-full px-2 py-1 text-muted-foreground">
-                Agent：{agentStatusLabel}
-              </span>
-              {visibleError && (
-                <span className="px-2 py-1 rounded-full bg-red-100 dark:bg-red-500/10 dark:text-red-300 text-red-600">{visibleError}</span>
-              )}
-            </div>
+    <div className="flex min-w-0 flex-col">
+      <div className="scrcpy-view-header flex items-center justify-between gap-3.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span
+            className={`preview-status-light is-${status.tone}`}
+            aria-hidden="true"
+          />
+          <h2 className="truncate text-base font-semibold text-foreground">设备画面</h2>
+          {status.phase !== 'off' && (
+            <span className="ml-auto min-w-0 truncate text-xs font-medium text-tertiary" role="status" aria-live="polite" aria-atomic="true">
+              {status.label}
+            </span>
           )}
         </div>
+        <PreviewModeSegmented unavailable={!automationAvailable} />
+      </div>
 
-        {!isCompact && <PreviewModeControls unavailable={!automationAvailable} />}
-
-        {!isCompact && <div className="scrcpy-status-grid">
-          {statusCards.map(([label, value, description]) => (
-            <div key={label} title={description} className="surface-soft rounded-lg px-2 py-1.5">
-              <div className="text-tertiary">{label}</div>
-              <div className="truncate font-medium text-foreground">{value}</div>
+      {status.error && status.hasFrame && (
+        <Alert variant="destructive" className="mx-4 mb-3">
+          <AlertTitle>{status.error.title}</AlertTitle>
+          <AlertDescription>{status.error.message}</AlertDescription>
+          {status.retry && (
+            <div className="mt-1.5">
+              <Button type="button" variant="secondary" size="sm" className="min-h-11" onClick={retryPreview}>
+                {retryLabel}
+              </Button>
             </div>
-          ))}
-        </div>}
+          )}
+        </Alert>
+      )}
 
-        <div
-          className={`scrcpy-video-frame status-border-beam relative aspect-video overflow-hidden flex items-center justify-center shadow-xs ${
-            previewBusy ? 'is-active ' : ''
-          }${
-            webrtc.status === 'connected'
-              ? 'is-connected bg-black'
-              : 'is-empty ring-1 ring-inset ring-border'
-          }`}
-          aria-busy={previewBusy}
-        >
+      <div
+        className={cn(
+          'scrcpy-video-frame status-border-beam relative flex aspect-video items-center justify-center overflow-hidden',
+          previewBusy && 'is-active',
+          status.hasFrame ? 'is-connected bg-black' : 'is-empty ring-1 ring-inset ring-border',
+        )}
+        aria-busy={previewBusy}
+      >
           <video
             ref={videoRef}
             autoPlay
@@ -419,258 +331,84 @@ export default function ScrcpyDeviceView({
             onLostPointerCapture={onLostPointerCapture}
           />
           {snapshot.image && <img src={snapshot.image} alt="模拟器画面快照" className="pointer-events-none absolute inset-0 h-full w-full object-contain" />}
-          {webrtc.status === 'connected' && !webrtc.inputReady && (
-            <div
-              className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-md bg-black/70 px-2.5 py-1.5 text-xs text-white/90"
-              role="status"
-              aria-live="polite"
-            >
+          {status.snapshotStale && (
+            <Badge variant="secondary" className="absolute left-2 top-2 border-white/20 bg-black/70 text-white">
+              上次成功画面 · 可能已过期
+            </Badge>
+          )}
+          {webrtc.status === 'connected' && !webrtc.inputReady && !immersiveMode && (
+            <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-md bg-black/70 px-2.5 py-1.5 text-xs text-white/90">
               触控连接中，画面暂不可操作
             </div>
           )}
-          {webrtc.status !== 'connected' && !snapshot.image && (
-            <div
-              className="scrcpy-empty-state absolute inset-0 flex items-center justify-center px-6 text-center"
-              role={visibleError ? 'alert' : 'status'}
-              aria-live="polite"
-            >
-              <div className="scrcpy-empty-content w-full max-w-sm">
-                <div className="device-preview-empty-icon mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-lg">
-                  <Smartphone className="h-5 w-5" strokeWidth={1.6} aria-hidden="true" />
-                </div>
-                <div className="scrcpy-empty-title mb-1 text-sm font-semibold text-foreground">
-                  {webrtc.mode === 'off' ? '预览已关闭' : visibleError ? '预览启动失败' : previewBusy ? '正在连接实时画面' : webrtc.mode === 'snapshot' ? '正在获取快照' : '等待实时画面'}
-                </div>
-                {(visibleError || !automationAvailable) && (
-                  <div className="scrcpy-empty-description mx-auto max-w-md text-xs leading-5 text-muted-foreground">
-                    {visibleError || automationUnavailableMessage}
-                  </div>
-                )}
-              </div>
-            </div>
+          {!status.hasFrame && (
+            <EmptyState
+              compact
+              role={status.error ? 'alert' : undefined}
+              icon={<Smartphone className="size-5" strokeWidth={1.6} />}
+              title={status.emptyTitle}
+              description={status.error?.message ?? (!automationAvailable ? automationUnavailableMessage : undefined)}
+              action={status.retry ? (
+                <Button type="button" variant="secondary" size="sm" className="min-h-11" onClick={retryPreview}>
+                  {retryLabel}
+                </Button>
+              ) : undefined}
+              className="scrcpy-empty-state absolute inset-0"
+            />
           )}
         </div>
-        <div className="scrcpy-preview-toolbar flex items-center justify-center gap-2 bg-transparent px-2 py-1" role="toolbar" aria-label="模拟器导航">
+        <div className="scrcpy-preview-toolbar flex items-center justify-center" role="toolbar" aria-label="模拟器导航">
           <DeviceNavigationButtons
             connected={webrtc.status === 'connected'}
             automationAvailable={automationAvailable}
             automationUnavailableMessage={automationUnavailableMessage}
-            compact={isCompact}
             onCommand={sendDeviceCommand}
           />
-          <button
-            type="button"
-            onClick={fullscreen}
-            disabled={webrtc.status !== 'connected'}
-            title="全屏"
-            aria-label="全屏"
-            className={`control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-35 ${isCompact ? 'device-preview-glass-button' : ''}`}
-          >
-            <Maximize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
-          </button>
-          {isCompact && (
-            <button
-              type="button"
-              onClick={() => setCompactControlsOpen(open => !open)}
-              title={compactControlsOpen ? '收起预览设置' : '预览设置'}
-              aria-label={compactControlsOpen ? '收起预览设置' : '打开预览设置'}
-              aria-expanded={compactControlsOpen}
-              aria-controls={compactControlsId}
-              className={`device-preview-glass-button control-surface flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full text-muted-foreground${compactControlsOpen ? ' is-active' : ''}`}
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.8} />
-            </button>
-          )}
+          <Tooltip>
+            <TooltipTrigger
+              render={(
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={fullscreen}
+                  disabled={webrtc.status !== 'connected'}
+                  aria-label="全屏"
+                  className="size-11 rounded-full text-muted-foreground hover:text-primary"
+                >
+                  <Maximize2 aria-hidden="true" strokeWidth={1.8} />
+                </Button>
+              )}
+            />
+            <TooltipContent>全屏</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={(
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSettingsOpen(true)}
+                  aria-label="打开预览设置"
+                  aria-haspopup="dialog"
+                  className="size-11 rounded-full text-muted-foreground hover:text-primary"
+                >
+                  <SlidersHorizontal aria-hidden="true" strokeWidth={1.8} />
+                </Button>
+              )}
+            />
+            <TooltipContent>预览设置</TooltipContent>
+          </Tooltip>
         </div>
 
       </div>
-
-      {(!isCompact || compactControlsOpen) && <aside id={compactControlsId} className={`scrcpy-control-rail surface-soft${isCompact ? ' is-compact' : ''}`}>
-        <section className="scrcpy-control-section">
-          <div className="scrcpy-control-header">
-            <div className="scrcpy-control-title">
-              <Plug className="h-4 w-4" strokeWidth={1.8} />
-              <span>连接与服务</span>
-            </div>
-            <span className="scrcpy-inline-status" role="status" aria-live="polite">
-              <span className={`h-1.5 w-1.5 rounded-full ${statusDotClass}`} />
-              {previewStatusLabel}
-            </span>
-          </div>
-
-          <p className="text-xs leading-5 text-muted-foreground">停止服务或 Agent 会断开其他观看者。</p>
-
-          {webrtc.status === 'connected' && (
-            <Button
-              size="sm"
-              variant="secondary"
-              className="scrcpy-preview-action w-full"
-              onClick={connectFromControl}
-              disabled={!automationAvailable || infrastructureBusy}
-              title={!automationAvailable ? automationUnavailableMessage : undefined}
-              aria-busy={infrastructureLoading === 'preview' || undefined}
-            >
-              {infrastructureLoading === 'preview'
-                ? <><LoaderCircle className="animate-spin" aria-hidden="true" />加载中...</>
-                : (
-                  <>
-                    <RotateCw className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
-                    重连预览
-                  </>
-                )}
-            </Button>
-          )}
-
-          <div className="scrcpy-service-grid">
-            {[
-              { label: infrastructureStatus?.serverRunning ? '停止服务' : '启动服务', icon: Server, onClick: onToggleServer, disabled: !infrastructureKnown || infrastructureBusy || (!infrastructureStatus?.serverRunning && !automationAvailable), allowWhenUnavailable: !!infrastructureStatus?.serverRunning, loading: infrastructureLoading === 'server' },
-              { label: infrastructureStatus?.agentRunning ? '停止 Agent' : '连接 Agent', icon: Smartphone, onClick: onToggleAgent, disabled: !infrastructureKnown || infrastructureBusy || (infrastructureStatus?.agentRunning ? false : !infrastructureStatus?.serverRunning || !automationAvailable), allowWhenUnavailable: !!infrastructureStatus?.agentRunning, loading: infrastructureLoading === 'agent' }
-            ].map(action => {
-              const Icon = action.icon
-              return (
-                <button
-                  key={action.label}
-                  type="button"
-                  onClick={() => runInfrastructureAction(action.onClick, action.allowWhenUnavailable)}
-                  disabled={action.disabled}
-                  title={action.disabled && !automationAvailable ? automationUnavailableMessage : action.label}
-                  className="scrcpy-service-action control-surface min-h-11"
-                >
-                  <Icon className="h-3.5 w-3.5" strokeWidth={1.7} />
-                  <span>{action.loading ? '处理中' : action.label}</span>
-                </button>
-              )
-            })}
-          </div>
-
-          <div className="scrcpy-service-utilities">
-            <button
-              type="button"
-              onClick={webrtc.disconnect}
-              disabled={!canDisconnect}
-              className="scrcpy-utility-action min-h-11"
-            >
-              <Unplug className="h-3.5 w-3.5" strokeWidth={1.8} />
-              <span>{previewBusy ? '取消启动' : '断开'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => runInfrastructureAction(onInstall)}
-              disabled={!automationAvailable || infrastructureBusy || !infrastructureKnown}
-              title={!automationAvailable ? automationUnavailableMessage : undefined}
-              className="scrcpy-utility-action min-h-11"
-            >
-              <Package className="h-3.5 w-3.5" strokeWidth={1.8} />
-              <span>{infrastructureLoading === 'install' ? '安装中' : infrastructureStatus?.built ? '重装组件' : '安装组件'}</span>
-            </button>
-          </div>
-        </section>
-
-        <section className="scrcpy-control-section">
-          <div className="scrcpy-quality-header">
-            <div className="scrcpy-control-title">
-              <SlidersHorizontal className="h-4 w-4" strokeWidth={1.8} />
-              <span>画质设置</span>
-            </div>
-            <span className="scrcpy-quality-current">{quality === 'custom' ? '自定义 · ' : ''}最长边 {customMaxSize}px · {customFps} FPS</span>
-          </div>
-
-          <div className="scrcpy-quality-content">
-            <div className="scrcpy-quality-body">
-              <div className="scrcpy-setting-group">
-                <div className="scrcpy-setting-label">画质预设</div>
-                <div className="scrcpy-preset-grid" role="group" aria-label="画质预设">
-                  {Object.entries(qualityPresets).map(([key, preset]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => applyPreset(key as QualityPreset)}
-                      aria-pressed={quality === key}
-                      aria-label={`${preset.label}画质`}
-                      title={`最长边 ${preset.maxSize}px · ${preset.fps} FPS · 码率 ${preset.bitrateMbps} Mbps`}
-                      className={`scrcpy-preset-option ${quality === key ? 'is-active' : ''}`}
-                    >
-                      <span>{preset.label}</span>
-                      <small>{preset.maxSize}px · {preset.fps} FPS · {preset.bitrateMbps}M</small>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="scrcpy-setting-group">
-                <div className="scrcpy-setting-label">帧率</div>
-                <div className="scrcpy-fps-segment" role="group" aria-label="视频帧率">
-                  {fpsOptions.map(fps => (
-                    <button
-                      key={fps}
-                      type="button"
-                      onClick={() => {
-                        setCustomFps(fps)
-                        setQuality('custom')
-                        setSettingsDirty(true)
-                      }}
-                      aria-pressed={customFps === fps}
-                      aria-label={`${fps} FPS`}
-                      className={`${customFps === fps ? 'is-active ' : ''}min-h-11!`}
-                    >
-                      {fps}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <label className="scrcpy-setting-group text-xs text-muted-foreground">
-                最长边
-                <select aria-label="视频最长边" value={customMaxSize} className="control-surface min-h-11 rounded-md px-3 text-foreground" onChange={event => {
-                  setCustomMaxSize(Number(event.target.value))
-                  setSettingsDirty(true)
-                }}>
-                  {[640, 960, 1280, 1600, 1920].map(size => <option key={size} value={size}>{size}px</option>)}
-                </select>
-              </label>
-
-              <div className="scrcpy-bitrate-control">
-                <div className="scrcpy-bitrate-header">
-                  <span className="scrcpy-bitrate-label">
-                    <Gauge className="h-3.5 w-3.5" strokeWidth={1.8} />码率
-                  </span>
-                  <output htmlFor="scrcpy-bitrate" className="scrcpy-bitrate-value">
-                    <strong>{customBitrateMbps}</strong>
-                    <span>Mbps</span>
-                  </output>
-                </div>
-                <div
-                  className="scrcpy-bitrate-slider min-h-11"
-                  style={{ '--scrcpy-range-progress': `${bitrateProgress}%` } as CSSProperties}
-                >
-                  <div className="scrcpy-bitrate-track" aria-hidden="true">
-                    <span className="scrcpy-bitrate-fill" />
-                    <span className="scrcpy-bitrate-handle" />
-                  </div>
-                  <input
-                    id="scrcpy-bitrate"
-                    type="range"
-                    min={1}
-                    max={32}
-                    step={0.5}
-                    value={customBitrateMbps}
-                    aria-label="视频码率"
-                    onChange={(event) => {
-                      setCustomBitrateMbps(Number(event.target.value))
-                      setQuality('custom')
-                      setSettingsDirty(true)
-                    }}
-                  />
-                </div>
-              </div>
-              <p className={`text-xs leading-5 ${settingsDirty ? 'text-primary' : 'text-muted-foreground'}`} role="status">
-                {settingsDirty ? '画质已修改，重连预览后生效' : '画质调整会在下次连接时生效'}
-              </p>
-            </div>
-          </div>
-        </section>
-      </aside>}
-    </div>
+    <PreviewSettingsDialog
+      open={settingsOpen}
+      onOpenChange={setSettingsOpen}
+      session={webrtc}
+      infrastructure={infrastructure}
+    />
     <Dialog open={immersiveMode} onOpenChange={open => { if (!open) exitImmersive() }}>
       <DialogContent
         data-scrcpy-immersive-layer="true"
@@ -716,15 +454,23 @@ export default function ScrcpyDeviceView({
             immersive
             onCommand={sendDeviceCommand}
           />
-          <button
-            type="button"
-            onClick={exitImmersive}
-            title="退出全屏"
-            aria-label="退出全屏"
-            className="group flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-xs transition hover:bg-white/20 disabled:opacity-35 disabled:cursor-not-allowed"
-          >
-            <Minimize2 className="h-3.5 w-3.5" strokeWidth={1.8} />
-          </button>
+          <Tooltip>
+            <TooltipTrigger
+              render={(
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={exitImmersive}
+                  aria-label="退出全屏"
+                  className="size-11 rounded-full border border-white/30 bg-black/50 text-white hover:bg-black/70"
+                >
+                  <Minimize2 aria-hidden="true" strokeWidth={1.8} />
+                </Button>
+              )}
+            />
+            <TooltipContent>退出全屏</TooltipContent>
+          </Tooltip>
         </div>
       </DialogContent>
     </Dialog>

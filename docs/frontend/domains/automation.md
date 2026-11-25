@@ -85,7 +85,7 @@ AutomationTasks（app-page > app-stack-section > AutomationWorkspace）
          └─ NotificationSettings（独立通知卡；显式保存）
 ```
 
-工作区网格与设备画面由 `DeviceMonitorLayout(workbench)` 持有；`AutomationTaskFlowPanel` 根节点输出 `data-monitor-area="sequence"`，任务编辑列输出 `data-monitor-area="editor"`，页面只提供三个具名区域，不自行渲染 `DeviceMonitorPanel` 或复制支撑列布局。monitor 列与面板由布局输出 `device-monitor-column` / `device-monitor-panel`，画面材质归 device-mirror 域，本页不定义 monitor 专属玻璃或骨架样式。
+工作区网格与设备画面由 `DeviceMonitorLayout(workbench)` 持有；`AutomationTaskFlowPanel` 根节点输出 `data-monitor-area="sequence"`，任务编辑列输出 `data-monitor-area="editor"`，页面只提供三个具名区域，不自行渲染 `DeviceMonitorPanel` 或复制支撑列布局。monitor 列与面板由布局输出 `device-monitor-column` / `device-monitor-panel`，画面样式归 device-mirror 域（默认扁平），本页不定义 monitor 专属玻璃或骨架样式。
 
 | 状态 | 所有者 | Activity 隐藏/恢复 | 真正卸载/刷新 |
 | --- | --- | --- | --- |
@@ -103,6 +103,7 @@ AutomationTasks（app-page > app-stack-section > AutomationWorkspace）
 - **读取完成前只读。** 工作区消费 `useUserConfig` 的 `loadState`：`idle`/`loading`
   显示固定高度的读取占位，`failed` 显示固定高度错误态与“重新加载”
   （`reload({ force: true })`），两者都不渲染编辑器、添加任务或定时控件；
+  设备画面仍通过 `DeviceMonitorLayout(standard)` 保留，加载/失败卡位于主列。
   只有 `ready` 才进入正常编辑。保存失败不回退为只读，草稿仍可编辑，
   并以固定 id 的 error toast 提供“重新同步” action。
 - **提交期间锁定流程编辑。** `isSubmitting || isRunning` 时排序、添加/删除、

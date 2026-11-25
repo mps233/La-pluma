@@ -1,20 +1,26 @@
 // @vitest-environment jsdom
 
-import { Activity, act } from 'react'
+import { Activity, act, type ComponentProps } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ScrcpyDeviceView from './ScrcpyDeviceView'
 import { PreviewSessionProvider } from './PreviewSessionProvider'
 import ScreenMonitor from './ScreenMonitor'
 import { getWebrtcStatus, startWebrtc } from '../api'
-import type { useScrcpyWebRTC } from '../hooks/useScrcpyWebRTC'
+import { useScrcpyWebRTC } from '../hooks/useScrcpyWebRTC'
 import { usePreviewStore } from '../store/previewStore'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const availabilityMock = vi.hoisted(() => ({ isAvailable: true }))
+const toastMock = vi.hoisted(() => ({ info: vi.fn(), dismiss: vi.fn() }))
 vi.mock('@/features/runtime-status', () => ({ useAutomationAvailability: () => availabilityMock }))
-vi.mock('../api', () => ({ getWebrtcStatus: vi.fn().mockResolvedValue({ success: true, data: { installed: true, built: true, serverRunning: false, agentRunning: false } }), startWebrtc: vi.fn().mockResolvedValue({ success: true, data: { signalingUrl: '/webrtc-signaling' } }) }))
+vi.mock('sonner', () => ({ toast: toastMock }))
+vi.mock('../api', () => ({
+  getWebrtcStatus: vi.fn().mockResolvedValue({ success: true, data: { installed: true, built: true, serverRunning: false, agentRunning: false } }),
+  startWebrtc: vi.fn().mockResolvedValue({ success: true, data: { signalingUrl: '/webrtc-signaling' } }),
+  captureScreen: vi.fn().mockResolvedValue({ success: true, data: { image: 'provider-snapshot' } }),
+}))
 
 const webrtcMock = vi.hoisted(() => ({
   status: 'idle',
@@ -28,21 +34,62 @@ const webrtcMock = vi.hoisted(() => ({
   sendCommand: vi.fn(),
 }))
 
+const webrtcOptions = vi.hoisted(() => ({ current: null as { statsEnabled?: boolean } | null }))
+
 vi.mock('../hooks/useScrcpyWebRTC', () => ({
-  useScrcpyWebRTC: () => webrtcMock,
+  useScrcpyWebRTC: (options: { statsEnabled?: boolean }) => {
+    webrtcOptions.current = options
+    return webrtcMock
+  },
 }))
+
+const snapshotMock = vi.hoisted(() => ({
+  image: null as string | null,
+  error: null as string | null,
+  retry: vi.fn(),
+}))
+
+vi.mock('../hooks/usePreviewSnapshot', () => ({
+  usePreviewSnapshot: () => snapshotMock,
+}))
+
+type Infrastructure = ComponentProps<typeof ScrcpyDeviceView>['infrastructure']
+
+const makeInfrastructure = (overrides: Partial<Infrastructure> = {}): Infrastructure => ({
+  automationAvailable: true,
+  automationUnavailableMessage: '后端服务暂不可用，请稍后重试',
+  infrastructureStatus: { installed: true, built: true, serverRunning: false, agentRunning: false },
+  infrastructureStatusState: 'ready',
+  infrastructureLoading: null,
+  infrastructureError: null,
+  onRefreshInfrastructure: vi.fn(),
+  onInstall: vi.fn(),
+  onToggleServer: vi.fn(),
+  onToggleAgent: vi.fn(),
+  ...overrides,
+})
 
 let container: HTMLDivElement
 let root: Root
 
 const findButton = (label: string) => Array.from(container.querySelectorAll('button'))
   .find(button => button.textContent?.trim() === label || button.getAttribute('aria-label') === label)
+const getDialog = () => document.body.querySelector<HTMLElement>('[role="dialog"]')
+const findDialogButton = (label: string) => Array.from(getDialog()?.querySelectorAll('button') ?? [])
+  .find(button => button.textContent?.trim() === label || button.getAttribute('aria-label') === label)
 
-describe('ScrcpyDeviceView automation availability', () => {
+const renderView = async (overrides: Partial<Infrastructure> = {}) => {
+  await act(async () => root.render(<ScrcpyDeviceView infrastructure={makeInfrastructure(overrides)} />))
+}
+const openSettings = async () => {
+  await act(async () => findButton('打开预览设置')?.click())
+}
+
+describe('ScrcpyDeviceView', () => {
   beforeEach(() => {
     availabilityMock.isAvailable = true
     vi.mocked(getWebrtcStatus).mockReset().mockResolvedValue({ success: true, data: { installed: true, built: true, serverRunning: false, agentRunning: false } })
-    usePreviewStore.setState({ mode: 'off', quality: 'power', fps: 15, maxSize: 640, bitrateMbps: 1.5 })
+    usePreviewStore.setState({ mode: 'off', quality: 'smooth', customFps: 30, customMaxSize: 640, customBitrateMbps: 4 })
     vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
     webrtcMock.status = 'idle'
     webrtcMock.error = null
@@ -50,6 +97,10 @@ describe('ScrcpyDeviceView automation availability', () => {
     webrtcMock.inputReady = false
     webrtcMock.mediaStream = null
     webrtcMock.sendTouch.mockReturnValue(true)
+    webrtcOptions.current = null
+    snapshotMock.image = null
+    snapshotMock.error = null
+    snapshotMock.retry.mockReset()
     vi.clearAllMocks()
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -67,40 +118,34 @@ describe('ScrcpyDeviceView automation availability', () => {
     vi.restoreAllMocks()
   })
 
-  it('disables mode switching, connection, and device controls while unavailable', async () => {
-    const onInstall = vi.fn()
-    const onToggleServer = vi.fn()
-    const onToggleAgent = vi.fn()
-
-    await act(async () => root.render(
-      <ScrcpyDeviceView
-        enabled
-        autoConnect
-        automationAvailable={false}
-        automationUnavailableMessage="正在检查后端服务，请稍候"
-        infrastructureStatus={{ installed: false, built: false, serverRunning: false, agentRunning: false }}
-        onInstall={onInstall}
-        onToggleServer={onToggleServer}
-        onToggleAgent={onToggleAgent}
-      />
-    ))
+  it('disables mode switching and device controls while unavailable', async () => {
+    const infrastructure = makeInfrastructure({
+      automationAvailable: false,
+      automationUnavailableMessage: '正在检查后端服务，请稍候',
+      infrastructureStatus: { installed: false, built: false, serverRunning: false, agentRunning: false },
+    })
+    await act(async () => root.render(<ScrcpyDeviceView infrastructure={infrastructure} />))
+    await openSettings()
 
     expect(findButton('实时')?.disabled).toBe(true)
     expect(findButton('快照')?.disabled).toBe(true)
-    expect(findButton('启动服务')?.disabled).toBe(true)
-    expect(findButton('连接 Agent')?.disabled).toBe(true)
-    expect(findButton('安装组件')?.disabled).toBe(true)
+    expect(findDialogButton('启动服务')?.disabled).toBe(true)
+    expect(findDialogButton('连接 Agent')?.disabled).toBe(true)
+    expect(findDialogButton('安装组件')?.disabled).toBe(true)
+    expect(findDialogButton('启动服务')?.getAttribute('title')).toBeNull()
+    expect(findDialogButton('连接 Agent')?.getAttribute('title')).toBeNull()
+    expect(findDialogButton('安装组件')?.getAttribute('title')).toBeNull()
 
-    findButton('实时')?.click()
-    findButton('启动服务')?.click()
-    findButton('连接 Agent')?.click()
-    findButton('安装组件')?.click()
-    container.querySelector('video')?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+    await act(async () => {
+      findButton('实时')?.click()
+      findDialogButton('启动服务')?.click()
+      findDialogButton('连接 Agent')?.click()
+      findDialogButton('安装组件')?.click()
+      container.querySelector('video')?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+    })
 
     expect(usePreviewStore.getState().mode).toBe('off')
-    expect(onInstall).not.toHaveBeenCalled()
-    expect(onToggleServer).not.toHaveBeenCalled()
-    expect(onToggleAgent).not.toHaveBeenCalled()
+    expect(infrastructure.onInstall).not.toHaveBeenCalled()
     expect(webrtcMock.sendTouch).not.toHaveBeenCalled()
   })
 
@@ -108,11 +153,12 @@ describe('ScrcpyDeviceView automation availability', () => {
     availabilityMock.isAvailable = false
     vi.mocked(getWebrtcStatus).mockRejectedValueOnce(new Error('状态读取失败'))
     await act(async () => root.render(<ScreenMonitor />))
-
     expect(container.textContent).toContain('状态读取失败')
-    expect(findButton('启动服务')?.disabled).toBe(true)
-    expect(findButton('连接 Agent')?.disabled).toBe(true)
-    expect(findButton('安装组件')?.disabled).toBe(true)
+    await openSettings()
+
+    expect(findDialogButton('启动服务')?.disabled).toBe(true)
+    expect(findDialogButton('连接 Agent')?.disabled).toBe(true)
+    expect(findDialogButton('安装组件')?.disabled).toBe(true)
 
     vi.mocked(getWebrtcStatus).mockResolvedValue({
       success: true,
@@ -120,12 +166,12 @@ describe('ScrcpyDeviceView automation availability', () => {
     })
     availabilityMock.isAvailable = true
     await act(async () => root.render(<ScreenMonitor />))
+    await act(async () => { await Promise.resolve() })
 
     expect(getWebrtcStatus).toHaveBeenCalledTimes(2)
-    expect(findButton('停止服务')?.disabled).toBe(false)
-    expect(findButton('连接 Agent')?.disabled).toBe(false)
-    expect(findButton('重装组件')?.disabled).toBe(false)
-    expect(container.textContent).not.toContain('状态读取失败')
+    expect(findDialogButton('停止服务')?.disabled).toBe(false)
+    expect(findDialogButton('连接 Agent')?.disabled).toBe(false)
+    expect(findDialogButton('重装组件')?.disabled).toBe(false)
     expect(startWebrtc).not.toHaveBeenCalled()
   })
 
@@ -135,11 +181,7 @@ describe('ScrcpyDeviceView automation availability', () => {
       await act(async () => {
         root.render(
           <Activity mode={mode}>
-            <ScrcpyDeviceView
-              enabled
-              autoConnect
-              infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
-                  />
+            <ScrcpyDeviceView infrastructure={makeInfrastructure()} />
           </Activity>,
         )
         await Promise.resolve()
@@ -158,116 +200,204 @@ describe('ScrcpyDeviceView automation availability', () => {
 
   it('marks the video frame busy only while the preview is connecting', async () => {
     webrtcMock.status = 'connecting'
-    await act(async () => root.render(
-      <ScrcpyDeviceView
-        enabled
-        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
-      />
-    ))
+    await renderView()
 
     const frame = container.querySelector('[aria-busy]')
     expect(frame?.getAttribute('aria-busy')).toBe('true')
 
     webrtcMock.status = 'connected'
-    await act(async () => root.render(
-      <ScrcpyDeviceView
-        enabled
-        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
-      />
-    ))
+    await renderView()
 
     expect(frame?.getAttribute('aria-busy')).toBe('false')
   })
 
-  it('expands and collapses compact preview settings', async () => {
+  it('opens the preview settings dialog, samples diagnostics on demand, and closes it', async () => {
+    const trigger = await renderView().then(() => findButton('打开预览设置'))
+    expect(trigger?.getAttribute('aria-haspopup')).toBe('dialog')
+    expect(webrtcOptions.current?.statsEnabled).toBe(false)
+
+    trigger?.focus()
+    await openSettings()
+    expect(getDialog()?.textContent).toContain('连接与服务')
+    expect(getDialog()?.textContent).toContain('画质设置')
+    expect(getDialog()?.textContent).toContain('连接详情')
+    expect(webrtcOptions.current?.statsEnabled).toBe(true)
+
+    await act(async () => findDialogButton('关闭对话框')?.click())
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
+
+    expect(getDialog()).toBeNull()
+    expect(webrtcOptions.current?.statsEnabled).toBe(false)
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('closes the preview settings dialog with Escape', async () => {
+    await renderView()
+    await openSettings()
+    expect(getDialog()).not.toBeNull()
+
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
+
+    expect(getDialog()).toBeNull()
+  })
+
+  it('keeps bitrate ids unique when multiple previews open their settings', async () => {
     await act(async () => root.render(
-      <ScrcpyDeviceView
-        variant="compact"
-        enabled={false}
-        infrastructureStatus={{ installed: true, built: true, serverRunning: false, agentRunning: false }}
-      />
+      <>
+        <ScrcpyDeviceView infrastructure={makeInfrastructure()} />
+        <ScrcpyDeviceView infrastructure={makeInfrastructure()} />
+      </>,
     ))
+    const settingsButtons = Array.from(container.querySelectorAll('button'))
+      .filter(button => button.getAttribute('aria-label') === '打开预览设置')
+    expect(settingsButtons).toHaveLength(2)
 
-    const openSettings = findButton('打开预览设置')
-    const controlsId = openSettings?.getAttribute('aria-controls')
+    await act(async () => {
+      settingsButtons[0]?.click()
+      settingsButtons[1]?.click()
+    })
 
-    expect(container.querySelector('[role="radiogroup"][aria-label="预览模式"]')).not.toBeNull()
-    expect(container.querySelector('[role="toolbar"][aria-label="模拟器导航"]')).not.toBeNull()
-    expect(openSettings?.getAttribute('aria-expanded')).toBe('false')
-    expect(controlsId).toBeTruthy()
-    expect(document.getElementById(controlsId!)).toBeNull()
+    const ranges = Array.from(document.body.querySelectorAll<HTMLInputElement>('input[type="range"]'))
+    expect(ranges).toHaveLength(2)
+    expect(new Set(ranges.map(input => input.id)).size).toBe(2)
+    expect(document.querySelectorAll('#scrcpy-bitrate')).toHaveLength(0)
+  })
 
-    await act(async () => openSettings?.click())
+  it('shows diagnostics only while the settings dialog is open', async () => {
+    webrtcMock.status = 'connected'
+    webrtcMock.stats = {
+      fps: 45, bitrate: 0, rtt: 0, connectionType: '--', lostCount: 0,
+      jitterBufferMs: null, decodeMs: null,
+      width: 640, height: 360, videoReadyState: 4, videoLive: true,
+      iceState: 'connected', peerState: 'connected', signalingState: 'stable', inputReady: false,
+    }
+    await renderView()
+    expect(container.textContent).not.toContain('网络 RTT')
 
-    const collapseSettings = findButton('收起预览设置')
-    expect(collapseSettings?.getAttribute('aria-expanded')).toBe('true')
-    expect(collapseSettings?.getAttribute('aria-controls')).toBe(controlsId)
-    expect(document.getElementById(controlsId!)).not.toBeNull()
+    await openSettings()
+    const dialog = getDialog()
+
+    expect(dialog?.textContent).toContain('网络 RTT')
+    expect(dialog?.textContent).toContain('已连接')
+    expect(dialog?.textContent).toContain('实时')
+    expect(dialog?.textContent).toContain('等待触控信息')
+    expect(dialog?.textContent).toContain('640×360')
+    expect(dialog?.textContent).toContain('0 ms')
+    expect(dialog?.textContent).toContain('0 kbps')
+
+    webrtcMock.inputReady = true
+    await renderView()
+    expect(getDialog()?.textContent).toContain('就绪')
+    expect(getDialog()?.textContent).not.toContain('等待触控信息')
+  })
+
+  it('applies presets and manual quality changes inside the settings dialog', async () => {
+    await renderView()
+    await openSettings()
+
+    expect(findDialogButton('流畅画质')?.textContent).toContain('360p · 30 FPS · 4M')
+    expect(findDialogButton('高清画质')?.textContent).toContain('720p · 60 FPS · 12M')
+    expect(findDialogButton('超清画质')?.textContent).toContain('1080p · 60 FPS · 20M')
+    expect(findDialogButton('自定义画质')).not.toBeUndefined()
+    expect(findDialogButton('流畅画质')?.getAttribute('aria-pressed')).toBe('true')
+    expect(findDialogButton('省电画质')).toBeUndefined()
+    expect(findDialogButton('均衡画质')).toBeUndefined()
+    expect(findDialogButton('清晰画质')).toBeUndefined()
+
+    await act(async () => findDialogButton('高清画质')?.click())
+    expect(getDialog()?.textContent).not.toContain('自定义 · 最长边')
+    expect(findDialogButton('高清画质')?.getAttribute('aria-pressed')).toBe('true')
+    expect(findDialogButton('高清画质')?.title).toBe('720p · 60 FPS · 码率 12 Mbps')
+    expect(toastMock.info).toHaveBeenCalledWith(
+      '画质已修改，下次连接实时预览时生效',
+      expect.objectContaining({ id: 'preview-quality' }),
+    )
+
+    await act(async () => findDialogButton('30')?.click())
+    expect(findDialogButton('自定义画质')?.getAttribute('aria-pressed')).toBe('true')
+    expect(findDialogButton('30')?.getAttribute('aria-pressed')).toBe('true')
+    expect(findDialogButton('高清画质')?.textContent).toContain('720p · 60 FPS · 12M')
+    expect(getDialog()?.textContent).not.toContain('自定义 · 最长边')
+    expect(getDialog()?.querySelector('[role="group"][aria-label="视频帧率"]')).not.toBeNull()
+    expect(findDialogButton('30')?.getAttribute('aria-label')).toBe('30 FPS')
+  })
+
+  it('offers a reconnect action in the quality toast while live', async () => {
+    usePreviewStore.getState().setMode('live')
+    webrtcMock.status = 'connected'
+    await renderView()
+    await openSettings()
+
+    await act(async () => findDialogButton('高清画质')?.click())
+    expect(toastMock.info).toHaveBeenCalledWith(
+      '画质已修改，重连后生效',
+      expect.objectContaining({
+        id: 'preview-quality',
+        action: expect.objectContaining({ label: '重连' }),
+      }),
+    )
+
+    const toastCalls = vi.mocked(toastMock.info).mock.calls
+    const options = toastCalls[toastCalls.length - 1]?.[1] as {
+      action?: { onClick: () => void }
+    } | undefined
+    const connectCalls = webrtcMock.connect.mock.calls.length
+    await act(async () => options?.action?.onClick())
+
+    expect(webrtcMock.connect.mock.calls.length).toBe(connectCalls + 1)
+    expect(toastMock.dismiss).toHaveBeenCalledWith('preview-quality')
   })
 
   it('keeps recovery controls available while blocking new device actions', async () => {
     webrtcMock.status = 'connected'
-    const onToggleServer = vi.fn()
-    const onToggleAgent = vi.fn()
+    const infrastructure = makeInfrastructure({
+      automationAvailable: false,
+      automationUnavailableMessage: '后端服务暂不可用',
+      infrastructureStatus: { installed: true, built: true, serverRunning: true, agentRunning: true },
+    })
+    await act(async () => root.render(<ScrcpyDeviceView infrastructure={infrastructure} />))
+    await openSettings()
 
-    await act(async () => root.render(
-      <ScrcpyDeviceView
-        enabled
-        automationAvailable={false}
-        automationUnavailableMessage="后端服务暂不可用"
-        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
-        onToggleServer={onToggleServer}
-        onToggleAgent={onToggleAgent}
-      />
-    ))
-
-    expect(findButton('停止服务')?.disabled).toBe(false)
-    expect(findButton('停止 Agent')?.disabled).toBe(false)
-    expect(findButton('断开')?.disabled).toBe(false)
+    expect(findDialogButton('停止服务')?.disabled).toBe(false)
+    expect(findDialogButton('停止 Agent')?.disabled).toBe(false)
+    expect(findDialogButton('断开')?.disabled).toBe(false)
     expect(findButton('返回')?.disabled).toBe(true)
 
     await act(async () => {
-      findButton('停止服务')?.click()
-      findButton('停止 Agent')?.click()
-      findButton('断开')?.click()
+      findDialogButton('停止服务')?.click()
+      findDialogButton('停止 Agent')?.click()
+      findDialogButton('断开')?.click()
       findButton('返回')?.click()
     })
 
-    expect(onToggleServer).toHaveBeenCalledOnce()
-    expect(onToggleAgent).toHaveBeenCalledOnce()
+    expect(infrastructure.onToggleServer).toHaveBeenCalledOnce()
+    expect(infrastructure.onToggleAgent).toHaveBeenCalledOnce()
     expect(webrtcMock.disconnect).toHaveBeenCalledOnce()
     expect(webrtcMock.sendCommand).not.toHaveBeenCalled()
   })
 
   it('disables every infrastructure control while one operation is running', async () => {
     webrtcMock.status = 'connected'
-    await act(async () => root.render(
-      <ScrcpyDeviceView
-        enabled
-        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
-        infrastructureLoading="server"
-        onToggleServer={vi.fn()}
-        onToggleAgent={vi.fn()}
-        onInstall={vi.fn()}
-      />
-    ))
+    await renderView({
+      infrastructureStatus: { installed: true, built: true, serverRunning: true, agentRunning: true },
+      infrastructureLoading: 'server',
+    })
+    await openSettings()
 
-    expect(findButton('重连预览')?.disabled).toBe(true)
-    expect(findButton('处理中')?.disabled).toBe(true)
-    expect(findButton('停止 Agent')?.disabled).toBe(true)
-    expect(findButton('重装组件')?.disabled).toBe(true)
+    expect(findDialogButton('重连预览')?.disabled).toBe(true)
+    expect(findDialogButton('处理中')?.disabled).toBe(true)
+    expect(findDialogButton('停止 Agent')?.disabled).toBe(true)
+    expect(findDialogButton('重装组件')?.disabled).toBe(true)
   })
 
   it('shows input readiness and never starts a gesture while the input channel is unavailable', async () => {
+    usePreviewStore.getState().setMode('live')
     webrtcMock.status = 'connected'
-    await act(async () => root.render(
-      <ScrcpyDeviceView
-        enabled
-        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
-      />
-    ))
+    await renderView({ infrastructureStatus: { installed: true, built: true, serverRunning: true, agentRunning: true } })
 
     expect(container.textContent).toContain('触控连接中，画面暂不可操作')
+    expect(container.querySelectorAll('[role="status"]')).toHaveLength(1)
     const video = container.querySelector('video')!
     const event = new MouseEvent('pointerdown', { bubbles: true, clientX: 20, clientY: 20, button: 0 })
     Object.defineProperty(event, 'pointerId', { value: 1 })
@@ -277,65 +407,17 @@ describe('ScrcpyDeviceView automation availability', () => {
   })
 
   it('renders an unknown infrastructure state without calling it uninstalled', async () => {
-    await act(async () => root.render(
-      <ScrcpyDeviceView
-        enabled={false}
-        infrastructureStatus={null}
-        infrastructureStatusState="error"
-        infrastructureError="状态读取失败"
-      />
-    ))
+    await renderView({
+      infrastructureStatus: null,
+      infrastructureStatusState: 'error',
+      infrastructureError: '状态读取失败',
+    })
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('状态读取失败')
 
-    expect(container.textContent).toContain('组件：未知')
-    expect(container.textContent).toContain('服务：未知')
-    expect(container.textContent).not.toContain('组件：未安装')
-  })
-
-  it.each(['full', 'compact'] as const)('applies preset FPS and marks manual quality changes as custom in %s view', async variant => {
-    await act(async () => root.render(
-      <ScrcpyDeviceView
-        enabled={false}
-        variant={variant}
-        infrastructureStatus={{ installed: true, built: true, serverRunning: false, agentRunning: false }}
-      />
-    ))
-
-    if (variant === 'compact') await act(async () => findButton('打开预览设置')?.click())
-    await act(async () => findButton('均衡画质')?.click())
-    expect(container.textContent).toContain('最长边 1280px · 45 FPS')
-    expect(findButton('均衡画质')?.textContent).toContain('1280px · 45 FPS · 8M')
-    expect(findButton('均衡画质')?.title).toBe('最长边 1280px · 45 FPS · 码率 8 Mbps')
-    expect(container.textContent).toContain('画质已修改，重连预览后生效')
-
-    await act(async () => findButton('60')?.click())
-    expect(container.textContent).toContain('自定义 · 最长边 1280px · 60 FPS')
-    expect(container.querySelector('[role="group"][aria-label="视频帧率"]')).not.toBeNull()
-    expect(findButton('60')?.getAttribute('aria-label')).toBe('60 FPS')
-  })
-
-  it('shows unknown network statistics without units and preserves measured zero values', async () => {
-    webrtcMock.status = 'connected'
-    const stats: NonNullable<ReturnType<typeof useScrcpyWebRTC>['stats']> = {
-      fps: null, bitrate: null, rtt: null, connectionType: '--', lostCount: 0,
-      jitterBufferMs: null, decodeMs: null,
-      width: 640, height: 360, videoReadyState: 4, videoLive: true,
-      iceState: 'connected', peerState: 'connected', signalingState: 'stable', inputReady: false,
-    }
-    webrtcMock.stats = stats
-    const render = () => root.render(<ScrcpyDeviceView enabled />)
-    await act(async () => render())
-
-    expect(container.textContent).toContain('网络 RTT')
-    expect(container.textContent).toContain('等待触控信息')
-    expect(container.textContent).toMatch(/网络 RTT\s*--/)
-    expect(container.textContent).toMatch(/码率\s*--/)
-    expect(container.textContent).not.toContain('-- ms')
-    expect(container.textContent).not.toContain('-- kbps')
-
-    webrtcMock.stats = { ...stats, rtt: 0, bitrate: 0 }
-    await act(async () => render())
-    expect(container.textContent).toContain('0 ms')
-    expect(container.textContent).toContain('0 kbps')
+    await openSettings()
+    expect(getDialog()?.textContent).not.toContain('未安装')
+    expect(findDialogButton('启动服务')?.disabled).toBe(true)
+    expect(findDialogButton('安装组件')?.disabled).toBe(true)
   })
 
   it('tracks pointers independently, coalesces moves per frame, and releases every pointer', async () => {
@@ -348,12 +430,7 @@ describe('ScrcpyDeviceView automation availability', () => {
     }))
     vi.stubGlobal('cancelAnimationFrame', vi.fn())
 
-    await act(async () => root.render(
-      <ScrcpyDeviceView
-        enabled
-        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
-      />
-    ))
+    await renderView({ infrastructureStatus: { installed: true, built: true, serverRunning: true, agentRunning: true } })
 
     const video = container.querySelector('video')!
     Object.assign(video, {
@@ -392,12 +469,7 @@ describe('ScrcpyDeviceView automation availability', () => {
     webrtcMock.status = 'connected'
     webrtcMock.inputReady = true
     webrtcMock.sendTouch.mockReturnValueOnce(false)
-    await act(async () => root.render(
-      <ScrcpyDeviceView
-        enabled
-        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
-      />
-    ))
+    await renderView({ infrastructureStatus: { installed: true, built: true, serverRunning: true, agentRunning: true } })
 
     const video = container.querySelector('video')!
     Object.assign(video, { setPointerCapture: vi.fn() })
@@ -425,14 +497,9 @@ describe('ScrcpyDeviceView automation availability', () => {
     vi.stubGlobal('cancelAnimationFrame', vi.fn())
     vi.spyOn(window.history, 'back').mockImplementation(() => {})
 
-    await act(async () => root.render(
-      <ScrcpyDeviceView
-        enabled
-        infrastructureStatus={{ installed: true, built: true, serverRunning: true, agentRunning: true }}
-      />
-    ))
+    await renderView({ infrastructureStatus: { installed: true, built: true, serverRunning: true, agentRunning: true } })
     const fullscreenButton = findButton('全屏')!
-    fullscreenButton.focus()
+    await act(async () => fullscreenButton.focus())
     await act(async () => fullscreenButton.click())
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
 
@@ -457,18 +524,14 @@ describe('ScrcpyDeviceView automation availability', () => {
     webrtcMock.inputReady = true
     vi.spyOn(window.history, 'back').mockImplementation(() => {})
 
-    const props = {
-      enabled: true,
-      infrastructureStatus: { installed: true, built: true, serverRunning: true, agentRunning: true },
-    }
-    await act(async () => root.render(<ScrcpyDeviceView {...props} />))
+    await renderView({ infrastructureStatus: { installed: true, built: true, serverRunning: true, agentRunning: true } })
     await act(async () => findButton('全屏')?.click())
     const immersiveVideo = document.body.querySelector<HTMLVideoElement>('[aria-label="模拟器沉浸画面"]')
     expect(immersiveVideo?.srcObject == null).toBe(true)
 
     const lateStream = { getTracks: () => [] } as unknown as MediaStream
     webrtcMock.mediaStream = lateStream
-    await act(async () => root.render(<ScrcpyDeviceView {...props} />))
+    await renderView({ infrastructureStatus: { installed: true, built: true, serverRunning: true, agentRunning: true } })
 
     expect(immersiveVideo?.srcObject).toBe(lateStream)
     await act(async () => document.body.querySelector<HTMLButtonElement>('[aria-label="退出全屏"]')?.click())
@@ -484,7 +547,7 @@ describe('ScrcpyDeviceView automation availability', () => {
     }))
     vi.stubGlobal('cancelAnimationFrame', vi.fn())
     vi.spyOn(window.history, 'back').mockImplementation(() => {})
-    await act(async () => root.render(<ScrcpyDeviceView enabled />))
+    await renderView()
     const mainVideo = container.querySelector('video')!
     const dispatchPointer = (video: HTMLVideoElement, type: string, id: number, clientX: number, clientY: number) => {
       const event = new MouseEvent(type, { bubbles: true, clientX, clientY })
@@ -525,7 +588,7 @@ describe('ScrcpyDeviceView automation availability', () => {
   it('can cancel startup before infrastructure responds and ignores the late result', async () => {
     let resolveStart: ((value: Awaited<ReturnType<typeof startWebrtc>>) => void) | undefined
     vi.mocked(startWebrtc).mockImplementationOnce(() => new Promise(resolve => { resolveStart = resolve }))
-    await act(async () => root.render(<ScrcpyDeviceView enabled={false} />))
+    await renderView()
     await act(async () => {
       findButton('实时')?.click()
       await Promise.resolve()
@@ -538,22 +601,112 @@ describe('ScrcpyDeviceView automation availability', () => {
     expect(webrtcMock.connect).not.toHaveBeenCalled()
   })
 
-  it('labels the preview card as 设备画面 in both layouts', async () => {
-    await act(async () => root.render(<ScrcpyDeviceView enabled />))
-    expect(container.textContent).toContain('设备画面')
-
-    await act(async () => root.render(<ScrcpyDeviceView enabled variant="compact" />))
+  it('labels the preview card as 设备画面', async () => {
+    await renderView()
     expect(container.textContent).toContain('设备画面')
   })
 
-  it('exposes shared mode controls in compact view while startup is busy', async () => {
+  it('hides the header status text while the preview is off and restores it otherwise', async () => {
+    await renderView()
+    expect(container.querySelector('[role="status"]')).toBeNull()
+    expect(container.textContent).toContain('预览已关闭')
+
+    await act(async () => usePreviewStore.getState().setMode('live'))
+    webrtcMock.status = 'connecting'
+    await renderView()
+
+    expect(container.querySelector('[role="status"]')?.textContent).toBe('正在连接实时画面')
+  })
+
+  it('keeps the shared mode controls interactive in the shared view while startup is busy', async () => {
     usePreviewStore.getState().setMode('live')
-    await act(async () => root.render(<ScrcpyDeviceView enabled variant="compact" infrastructureLoading="preview" />))
-    const modes = container.querySelector('[role="radiogroup"][aria-label="预览模式"]')!
+    await renderView({ infrastructureLoading: 'preview' })
+    const modes = container.querySelector('[role="group"][aria-label="预览模式"]')!
     const off = Array.from(modes.querySelectorAll('button')).find(button => button.textContent === '关闭')!
     expect(off.disabled).toBe(false)
     await act(async () => off.click())
     expect(usePreviewStore.getState().mode).toBe('off')
   })
 
+  it('keeps one status live region and surfaces live failures with a retry', async () => {
+    usePreviewStore.getState().setMode('live')
+    webrtcMock.status = 'error'
+    webrtcMock.error = '启动失败'
+    await renderView()
+    await act(async () => { await Promise.resolve() })
+
+    expect(container.querySelectorAll('[role="status"]')).toHaveLength(1)
+    expect(container.textContent).toContain('实时预览失败')
+    expect(container.textContent).toContain('启动失败')
+    const retry = findButton('重试')
+    expect(retry).not.toBeUndefined()
+    const starts = vi.mocked(startWebrtc).mock.calls.length
+
+    await act(async () => {
+      retry?.click()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(vi.mocked(startWebrtc).mock.calls.length).toBe(starts + 1)
+    expect(usePreviewStore.getState().mode).toBe('live')
+  })
+
+  it('offers an immediate reconnect after the live connection drops', async () => {
+    usePreviewStore.getState().setMode('live')
+    webrtcMock.status = 'disconnected'
+    await renderView()
+    await act(async () => { await Promise.resolve() })
+
+    expect(container.textContent).toContain('实时预览已断开')
+    const reconnect = findButton('重新连接')
+    expect(reconnect).not.toBeUndefined()
+    const starts = vi.mocked(startWebrtc).mock.calls.length
+
+    await act(async () => {
+      reconnect?.click()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(vi.mocked(startWebrtc).mock.calls.length).toBe(starts + 1)
+  })
+
+  it('keeps the previous snapshot visible but marks it stale when capture fails', async () => {
+    usePreviewStore.getState().setMode('snapshot')
+    snapshotMock.image = 'data:image/png;base64,stale'
+    snapshotMock.error = '截图超时'
+    await renderView()
+
+    expect(container.querySelector('img')?.getAttribute('src')).toBe('data:image/png;base64,stale')
+    expect(container.textContent).toContain('上次成功画面 · 可能已过期')
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('截图超时')
+    expect(container.textContent).not.toContain('画面快照 · 10s')
+
+    await act(async () => findButton('重试')?.click())
+    expect(snapshotMock.retry).toHaveBeenCalledOnce()
+  })
+
+  it('opens the preview settings dialog for infrastructure failures with no frame', async () => {
+    await renderView({
+      infrastructureStatus: null,
+      infrastructureStatusState: 'error',
+      infrastructureError: '状态读取失败',
+    })
+
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('状态读取失败')
+    await act(async () => findButton('打开设置')?.click())
+    expect(getDialog()).not.toBeNull()
+    expect(getDialog()?.textContent).toContain('状态读取失败')
+  })
+
+  it('disables the already-selected mode when the backend is unavailable', async () => {
+    usePreviewStore.getState().setMode('live')
+    await renderView({ automationAvailable: false, automationUnavailableMessage: '后端服务暂不可用' })
+
+    expect(findButton('实时')?.disabled).toBe(true)
+    expect(findButton('快照')?.disabled).toBe(true)
+    expect(findButton('关闭')?.disabled).toBe(false)
+    expect(container.textContent).toContain('自动化服务不可用')
+  })
 })

@@ -415,7 +415,7 @@ test.describe('feature overlay behavior', () => {
     await page.goto('/app/logs')
     await waitForPageReady(page, 'logs')
 
-    await page.getByRole('radio', { name: '实时', exact: true }).click()
+    await page.getByRole('button', { name: '实时', exact: true }).click()
     const fullscreen = page.getByRole('button', { name: '全屏', exact: true })
     await expect(fullscreen).toBeEnabled({ timeout: 20_000 })
 

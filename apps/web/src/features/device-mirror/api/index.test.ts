@@ -2,7 +2,17 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { API_BASE_URL } from '@/shared/api'
-import { getDeviceStats, getWebrtcStatus, startWebrtc } from './index'
+import {
+  captureScreen,
+  getDeviceStats,
+  getWebrtcStatus,
+  installWebrtc,
+  startWebrtc,
+  startWebrtcAgent,
+  startWebrtcServer,
+  stopWebrtcAgent,
+  stopWebrtcServer,
+} from './index'
 
 const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -35,6 +45,32 @@ describe('device-mirror WebRTC preview', () => {
       body: JSON.stringify({ profileId: 'default', deviceId: 'mumu-la-pluma' })
     }))
     expect(result.data?.signalingUrl).toBe('ws://192.168.1.2:8443')
+  })
+
+  it('posts each infrastructure and capture action to its preview endpoint', async () => {
+    const endpoints: [string, () => Promise<unknown>, string, unknown?][] = [
+      ['install', () => installWebrtc(), '/agent/webrtc/install'],
+      ['start-server', () => startWebrtcServer(), '/agent/webrtc/start-server'],
+      ['stop-server', () => stopWebrtcServer(), '/agent/webrtc/stop-server'],
+      ['start-agent', () => startWebrtcAgent('default'), '/agent/webrtc/start-agent', { profileId: 'default' }],
+      ['stop-agent', () => stopWebrtcAgent(), '/agent/webrtc/stop-agent'],
+      ['capture-screen', () => captureScreen('default'), '/agent/screen/screenshot', { profileId: 'default' }],
+    ]
+
+    for (const [name, action, path, body] of endpoints) {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ success: true }))
+      const result = await action()
+
+      expect(fetchMock, name).toHaveBeenCalledWith(
+        `${API_BASE_URL}${path}`,
+        expect.objectContaining({
+          method: 'POST',
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        }),
+      )
+      expect(result, name).toMatchObject({ success: true })
+      fetchMock.mockRestore()
+    }
   })
 
   it('forwards the signal when reading WebRTC status', async () => {

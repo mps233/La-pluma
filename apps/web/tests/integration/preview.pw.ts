@@ -131,13 +131,13 @@ test('实时预览启动中及连接后切换工作区共用同一视频会话�
 
   try {
     await gotoScenario(page, 'automation')
-    await page.getByRole('radio', { name: '实时', exact: true }).click()
+    await page.getByRole('button', { name: '实时', exact: true }).click()
     await expect.poll(() => startups).toBe(1)
 
     // Hiding the initiating page must leave its in-flight startup intact.
     for (const tab of ['roguelike', 'combat', 'training']) {
       await navigatePreviewPage(page, tab)
-      await expect(page.getByRole('radio', { name: '实时', exact: true })).toBeChecked()
+      await expect(page.getByRole('button', { name: '实时', exact: true })).toHaveAttribute('aria-pressed', 'true')
       expect(startups).toBe(1)
     }
     finishStartup()
@@ -157,7 +157,7 @@ test('实时预览启动中及连接后切换工作区共用同一视频会话�
     await navigatePreviewPage(page, 'automation')
     await expect.poll(() => visibleStreamId(page)).toBe(streamId)
 
-    await page.getByRole('radio', { name: '关闭', exact: true }).click()
+    await page.getByRole('button', { name: '关闭', exact: true }).click()
     await expect.poll(() => transportState(page)).toEqual({ peers: 1, closedPeers: 1, stoppedTracks: 1 })
     await expect.poll(() => closedSockets).toBe(1)
     expect({ startups, logins, sockets }).toEqual({ startups: 1, logins: 1, sockets: 1 })

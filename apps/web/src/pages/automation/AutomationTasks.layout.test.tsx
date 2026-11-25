@@ -145,10 +145,10 @@ type DeviceMonitorLayoutMockProps = {
 
 vi.mock('@/features/device-mirror', () => ({
   DeviceMonitorPanel: () => (
-    <div data-testid="screen-monitor" data-variant="compact" />
+    <div data-testid="screen-monitor" data-region="monitor" />
   ),
   DeviceMonitorLayout: ({ variant, children, sequence, editor, support, mode, content }: DeviceMonitorLayoutMockProps) => {
-    const monitor = <div data-testid="screen-monitor" data-variant="compact" />
+    const monitor = <div data-testid="screen-monitor" data-region="monitor" />
     if (variant === 'workbench') return <>{sequence}{editor}<div>{monitor}{support}</div></>
     if (variant === 'mode') return <>{mode}{content}{monitor}</>
     return <>{children}{monitor}</>
@@ -352,7 +352,7 @@ describe('AutomationTasks layout surfaces', () => {
   it('uses the compact device monitor in the automation workspace', async () => {
     await renderPage()
 
-    expect(container.querySelector('[data-testid="screen-monitor"]')?.getAttribute('data-variant')).toBe('compact')
+    expect(container.querySelectorAll('[data-region="monitor"]')).toHaveLength(1)
   })
 
   it('hydrates an enabled schedule without rebuilding the server schedule', async () => {

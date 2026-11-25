@@ -3,6 +3,7 @@ import { Card } from '@/shared/ui/card'
 import { Separator } from '@/shared/ui/separator'
 import { Skeleton } from '@/shared/ui/skeleton'
 import { useDashboardFlowLayout } from '../hooks/useDashboardFlowLayout'
+import { DashboardPreviewCard, DashboardPreviewFrame } from './DashboardPreviewShell'
 
 function DashboardSummarySkeleton({ variant }: { variant: 'training' | 'drops' }) {
   return (
@@ -101,7 +102,7 @@ export function DashboardSkeleton() {
           </div>
 
           <div ref={flowPreviewRef} className="min-w-0">
-            <Card data-dashboard-preview-card className="status-border-beam gap-0 p-0!" aria-hidden="true">
+            <DashboardPreviewCard aria-hidden="true">
               <div className="dashboard-preview-header flex items-center justify-between gap-3.5 border-b border-border px-4 py-2.5">
                 <div className="flex items-center gap-2">
                   <Skeleton className="rounded-full h-1.5 w-1.5" />
@@ -109,10 +110,10 @@ export function DashboardSkeleton() {
                 </div>
                 <Skeleton className="h-11 w-24 rounded-xl" />
               </div>
-              <div data-dashboard-preview-frame className="dashboard-preview-frame relative aspect-video w-full overflow-hidden bg-black">
+              <DashboardPreviewFrame className="bg-black">
                 <Skeleton className="absolute inset-[12%] h-auto w-auto rounded-xl opacity-60" />
-              </div>
-            </Card>
+              </DashboardPreviewFrame>
+            </DashboardPreviewCard>
           </div>
         </div>
 

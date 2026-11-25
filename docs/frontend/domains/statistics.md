@@ -16,7 +16,7 @@
 
 | 内容 | 唯一归属 | 说明 |
 | --- | --- | --- |
-| 页面壳与工作区组合 | `pages/statistics/DataStatistics.tsx` | 只渲染 `app-page`/`app-stack-section` 与工作区；工作区内容经 `DeviceMonitorLayout(standard)` 与设备画面并列，设备画面类名与材质归 device-mirror 域 |
+| 页面壳与工作区组合 | `pages/statistics/DataStatistics.tsx` | 只渲染 `app-page`/`app-stack-section` 与工作区；工作区内容经 `DeviceMonitorLayout(standard)` 与设备画面并列，设备画面类名与样式归 device-mirror 域 |
 | 当前 tab、命令投影与失效订阅 | `features/statistics/components/StatisticsWorkspace.tsx` | 跨面板唯一容器；tab 由 URL 查询串 `?tab=` 承载 |
 | tab 分段控件的键盘与高亮 | `features/statistics/components/StatisticsTabs.tsx` | 组合共享 `SegmentedTabNav`：tablist/tab 语义、方向键移动焦点、Enter/Space 激活与流体高亮；tab 只渲染标题文字，不传 `description`/`icon` |
 | 干员读取、筛选/排序、筛选菜单、头像缓存 | `features/statistics/components/OperatorPanel.tsx` | 读取 `operbox` 与 `catalog` 两路 Query |

@@ -12,13 +12,18 @@ vi.mock('../hooks/useDashboardPreview', () => ({
   useDashboardPreview: () => ({
     videoRef: { current: null },
     fallbackSnapshot: null,
-    showLivePreview: false,
     isConnecting: false,
-    connectionState: 'off',
-    statusText: '预览已关闭',
-    headerStatusText: '预览已关闭',
+    status: {
+      phase: 'off',
+      label: '预览已关闭',
+      emptyTitle: '预览已关闭',
+      tone: 'neutral',
+      error: null,
+      retry: null,
+      hasFrame: false,
+      snapshotStale: false,
+    },
     retry: vi.fn(),
-    error: null,
     available: true,
   }),
 }))
@@ -81,7 +86,7 @@ describe('DashboardFlowSection preview lifecycle', () => {
     await act(async () => frame?.click())
     expect(onOpenAutomation).not.toHaveBeenCalled()
 
-    const live = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="radio"]'))
+    const live = Array.from(container.querySelectorAll<HTMLButtonElement>('[aria-pressed]'))
       .find(button => button.textContent === '实时')
     await act(async () => live?.click())
 

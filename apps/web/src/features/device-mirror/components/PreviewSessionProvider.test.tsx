@@ -290,7 +290,7 @@ describe('PreviewSessionProvider workspace lifetime', () => {
   it('reconnects once when quality settings are explicitly applied from the current view', async () => {
     await selectMode('live')
     await renderWorkspace()
-    await act(async () => usePreviewStore.getState().setQuality('balanced'))
+    await act(async () => usePreviewStore.getState().setQuality('hd'))
     expect(mocks.startWebrtc).toHaveBeenCalledOnce()
     await act(async () => session.connect())
     expect(mocks.startWebrtc).toHaveBeenCalledTimes(2)

@@ -11,7 +11,7 @@ docs/
 ├── api/             # Agent 接口使用
 ├── server/          # 服务端架构与运行时
 ├── frontend/        # 前端架构、兼容与组件 API
-│   └── domains/     # 八个领域各维护一份文档
+│   └── domains/     # 页面领域与跨页共享域各维护一份文档
 └── development/     # 开发、检查、集成与维护
 ```
 
@@ -63,6 +63,7 @@ docs/
 | [养成](frontend/domains/training.md) | 队列、候选/计数、设置提交与计划有效期 |
 | [日志](frontend/domains/logs.md) | 页面交互、实时流、历史会话与清理 |
 | [设置](frontend/domains/settings.md) | 配置编辑、设备命令、系统资源与组件更新 |
+| [设备画面与预览](frontend/domains/device-mirror.md) | 共享设备画面的入口、状态模型、生命周期、预览设置模态窗与扁平表面 |
 
 ## 开发与维护
 

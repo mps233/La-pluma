@@ -15,7 +15,7 @@
 | `features/<domain>/` | 自持领域组件、hooks、纯模型、API、类型、样式与状态所有者 | 每个域以 `index.ts` 为唯一对外入口；域内使用相对 import；不依赖 `pages` 或 `app` |
 | `shared/` | 通用 UI、协议传输、Query 基础设施、路由词汇、通用 hooks 与纯函数 | 不感知业务域；`shared/api` 不新增业务端点，`shared/query` 不持有领域资源 |
 
-页面域包括 [dashboard](domains/dashboard.md)、[automation](domains/automation.md)、[combat](domains/combat.md)、[roguelike](domains/roguelike.md)、[training](domains/training.md)、[statistics](domains/statistics.md)、[logs](domains/logs.md)、[settings](domains/settings.md)，各领域的面板、模型、命令和回归入口集中维护在对应文档。跨页能力独立为非页面域：`task-execution`、`user-config`、`game-data`、`resource-invalidation`、`runtime-status`、`device-mirror`、`operator-quotes`。非页面域仍有明确业务边界，不能成为任意端点的集合。
+页面域包括 [dashboard](domains/dashboard.md)、[automation](domains/automation.md)、[combat](domains/combat.md)、[roguelike](domains/roguelike.md)、[training](domains/training.md)、[statistics](domains/statistics.md)、[logs](domains/logs.md)、[settings](domains/settings.md)，各领域的面板、模型、命令和回归入口集中维护在对应文档。跨页能力独立为非页面域：`task-execution`、`user-config`、`game-data`、`resource-invalidation`、`runtime-status`、[device-mirror](domains/device-mirror.md)、`operator-quotes`。非页面域仍有明确业务边界，不能成为任意端点的集合。
 
 允许领域之间按公开面单向协作，例如 `statistics → training` 使用队列与材料命令、`runtime-status → task-execution` 消费运行投影；不要求领域之间零 import。`task-execution` 是特殊下层，只能依赖自身与 `shared`。细则和自动检查见[依赖与职责护栏](../development/guardrails.md)及其[实现](../../apps/web/scripts/guardrails.ts)。
 
@@ -31,7 +31,7 @@
 | 服务端只读资源 | 所属领域的 Query 定义与 key | 不在页面或 Zustand 再存一份可写资源；配置草稿、Run、日志和 WebRTC 会话不放进 Query |
 | Dashboard 完整展示快照 | [snapshotRefresher](../../apps/web/src/features/dashboard/model/snapshotRefresher.ts)、[snapshot](../../apps/web/src/features/dashboard/model/snapshot.ts)与 `dashboardStore` 投影 | 五路业务读取全部成功且载荷有效才原子提交；单路失败保留上一份完整快照 |
 | 实时与历史日志 | [realtimeLogStream](../../apps/web/src/features/logs/model/realtimeLogStream.ts)、[historyLogSession](../../apps/web/src/features/logs/model/historyLogSession.ts)及日志命令 | 页面不另建轮询或缓冲；过滤、折叠和导出是独立纯模型与受控展示 |
-| 设备预览与采样 | `device-mirror` 的预览会话、transport 和设备 Query | 预览暂停或断连不等于停止任务；Dashboard 只投影设备样本 |
+| 设备预览与采样 | `device-mirror` 的预览会话、transport、截图采样、基础设施操作和设备 Query | 预览暂停或断连不等于停止任务；Dashboard 只投影设备样本与同一状态源 |
 | 跨域写后刷新 | [resource-invalidation](../../apps/web/src/features/resource-invalidation/index.ts)端口 | 写成功后发布精确作用域；端口不传资源数据、不持有缓存，消费域决定刷新方式 |
 | 面板局部状态 | 最近的面板或工作区 | 搜索词、选中项、展开状态等按实际共享范围上移；不提升为第二份业务真相 |
 
@@ -46,7 +46,7 @@
 - `game-data` 唯一持有仓库、持有干员、干员目录及图标版本；training 与 statistics 共用其公开面。
 - `training` 持有队列、候选列表、状态计数、设置、计划与材料命令；`statistics` 持有掉落、开放关卡及识别命令编排。
 - `automation` 持有活动与 schedule 执行投影；[Dashboard 查询组合](../../apps/web/src/features/dashboard/model/queries.ts)经领域 Query 并发读取活动、schedule 执行、队列、今日掉落、今日开放关卡。协调读取强制新鲜且不叠加重试，避免把部分新值混入旧快照。
-- `settings` 持有连接、版本与配置目录；`device-mirror` 持有设备采样。
+- `settings` 持有连接、版本与配置目录；`device-mirror` 持有预览会话、截图采样、基础设施操作与设备采样。
 
 配置与命令写入不经过只读 Query 生命周期。写成功后，领域命令刷新自己的缓存，并经失效端口通知受影响资源；失败不发布虚假成功。失效 hook 在 Activity 隐藏时注销，恢复后按 revision 补发隐藏期间错过的失效。作用域、发布方和消费方的完整映射见[共享资源归属与失效端口](../architecture/resource-ownership.md)，Query key 和错误约定见[Query 缓存与键规范](../architecture/query-cache.md)。
 
@@ -62,14 +62,14 @@ Activity 隐藏保留页面 React 状态并清理 Effects；它与真正卸载�
 | 模块级配置和命令所有者 | 已接受草稿、串行提交、更新与计划命令继续由原所有者持有 | 订阅恢复；迟到响应仍须通过 revision 或版本裁决 |
 | Query 观察者 | 随 Effect 注销；取消行为由具体 Query 与使用的 signal 决定 | 按缓存新鲜度重取，不由页面另建一轮请求 |
 | 日志会话 | 实时流取消在途读取、停止计时并保留缓冲；历史会话取消读取并保留选择 | 立即重读实时；历史重读列表并重试被取消的当前读取；手动暂停不被恢复事件清除 |
-| 设备预览 | 应用级 `PreviewSessionProvider` 保持同一连接、截图采样与基础设施操作；页面只解除视频绑定 | 切页复用同一视频流；文档隐藏先保留 3 分钟缓冲，期间恢复继续使用同一连接，超时才释放并在恢复可见时重连；真正卸载立即释放资源，不影响 Run 身份或设备任务 |
+| 设备预览 | 应用级 `PreviewSessionProvider` 保持同一连接、截图采样与基础设施操作；页面只解除视频绑定 | 切页复用同一视频流；文档隐藏时，已开始信令/WebRTC 的 live 连接（含正在建立）保留 3 分钟缓冲，期间恢复继续使用同一连接，超时才释放并在恢复可见时重连；仅尚在等待启动接口返回时立即中止，snapshot 立即暂停并在恢复可见时立即重拍；真正卸载立即释放资源，不影响 Run 身份或设备任务 |
 | 排序与模态交互 | 清理 document 事件、pointer/rAF、焦点与滚动副作用 | 保留的 UI 状态由所属面板恢复；不能留下后台交互监听 |
 
-更细的当前行为见[执行客户端](../architecture/execution-client.md)、[配置持久化协调器](../architecture/config-persistence.md)、[日志实时流](domains/logs.md#实时流生命周期)、[日志历史与清理](domains/logs.md#历史会话与清理)、[总览快照与设备采样](domains/dashboard.md#完整快照与设备采样)。默认 Query 策略不意味着所有会话都会随 `document.hidden` 停止；日志、预览及业务刷新各自有明确契约。
+更细的当前行为见[执行客户端](../architecture/execution-client.md)、[配置持久化协调器](../architecture/config-persistence.md)、[日志实时流](domains/logs.md#实时流生命周期)、[日志历史与清理](domains/logs.md#历史会话与清理)、[设备画面状态与预览设置](domains/device-mirror.md)、[总览快照与设备采样](domains/dashboard.md#完整快照与设备采样)。默认 Query 策略不意味着所有会话都会随 `document.hidden` 停止；日志、预览及业务刷新各自有明确契约。
 
 ## 预览偏好与信令凭据
 
-`PreviewSessionProvider` 位于页面 Activity 边界之外，统一持有实时会话、截图采样与预览基础设施操作。总览、日常、作业、肉鸽、养成、数据和日志页经 `usePreviewSession` 绑定同一 MediaStream；切换到设置页也保留连接，不重复启动服务。日常、作业、肉鸽、养成、数据和日志使用相同的 `DeviceMonitorPanel`，宽屏右侧占工作区三分之一，窄屏改为纵向排列。显式关闭、后端不可用或应用真正卸载会立即释放当前连接；文档隐藏先进入 3 分钟缓冲，超时才释放。
+`PreviewSessionProvider` 位于页面 Activity 边界之外，统一持有实时会话、截图采样与预览基础设施操作。总览、日常、作业、肉鸽、养成、数据和日志页经 `usePreviewSession` 绑定同一 MediaStream；切换到设置页也保留连接，不重复启动服务。日常、作业、肉鸽、养成、数据和日志使用相同的 `DeviceMonitorPanel`，宽屏右侧占工作区三分之一，窄屏改为纵向排列。工具栏“预览设置”打开模态窗承载连接与服务、画质与按需采样的连接详情，不再有常显控制轨或独立的完整控制台布局。显式关闭、后端不可用或应用真正卸载会立即释放当前连接；文档隐藏时，已开始信令/WebRTC 的 live 连接（含正在建立）进入 3 分钟缓冲，仅尚在等待启动接口返回时立即中止，snapshot 立即暂停并在恢复可见时重拍。
 
 [`previewStore`](../../apps/web/src/features/device-mirror/store/previewStore.ts)以 `preview-storage` version 2 持久化 `mode`、`quality`、`fps`、`maxSize`、`bitrateMbps`。`off`、`snapshot`、`live` 的选择本身即偏好：新应用加载时恢复上次合法模式（`off` 也合法），导航切页保留运行时偏好。v1 旧数据仅在旧 `autoStart === true` 时沿用其中的 `mode`（该字段随版本 2 移除），否则升级后首次加载从 `off` 开始，此后选择直接持久化。多标签页之间不做实时同步：每次偏好动作只把本次涉及的字段合并进最新落盘值——`setMode` 只写模式，预设画质写整组数值，自定义画质只写 `quality` 与被修改的数值字段——因此另一标签页的无关改动不会回退字段，各标签页在刷新后收敛到同一份偏好，同一瞬间的双页并发写入仍以最后落盘者为准。预设画质使用预设数值，自定义值须通过字段范围校验。恢复、迁移与坏值回退见[偏好测试](../../apps/web/src/features/device-mirror/store/previewStore.test.ts)。
 

@@ -46,4 +46,16 @@ describe('device monitor naming', () => {
 
     expect(source).not.toContain('data-page-kind')
   })
+
+  it('keeps the shared preview surface flat', () => {
+    const sources = collectSourceFiles(join(SOURCE_ROOT, 'features/device-mirror'))
+    const problems = sources.flatMap((file) => {
+      const source = readFileSync(file, 'utf8')
+      return ['device-preview-glass-button', '--glass-', 'backdrop-filter']
+        .filter(fragment => source.includes(fragment))
+        .map(fragment => `${webPath(file)}: ${fragment}`)
+    })
+
+    expect(problems, problems.join('\n')).toEqual([])
+  })
 })

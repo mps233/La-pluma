@@ -1,15 +1,15 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
-import { qualityPresets, type QualityPreset, type QualitySelection } from '../constants'
+import { qualityPresets, SNAPSHOT_INTERVAL_SECONDS, type QualityPreset, type QualitySelection } from '../constants'
 
 export type PreviewMode = 'off' | 'snapshot' | 'live'
 
 interface PreviewPreferences {
   mode: PreviewMode
   quality: QualitySelection
-  fps: number
-  maxSize: number
-  bitrateMbps: number
+  customFps: number
+  customMaxSize: number
+  customBitrateMbps: number
 }
 
 interface PreviewState extends PreviewPreferences {
@@ -21,14 +21,22 @@ interface PreviewState extends PreviewPreferences {
 }
 
 const PREVIEW_STORAGE_KEY = 'preview-storage'
-const PREVIEW_STORAGE_VERSION = 2
+const PREVIEW_STORAGE_VERSION = 3
 
 const defaultPreferences: PreviewPreferences = {
   mode: 'off',
-  quality: 'power',
-  fps: qualityPresets.power.fps,
-  maxSize: qualityPresets.power.maxSize,
-  bitrateMbps: qualityPresets.power.bitrateMbps,
+  quality: 'smooth',
+  customFps: qualityPresets.smooth.fps,
+  customMaxSize: qualityPresets.smooth.maxSize,
+  customBitrateMbps: qualityPresets.smooth.bitrateMbps,
+}
+
+const LEGACY_PRESET_KEYS: Record<string, QualityPreset> = {
+  power: 'smooth',
+  smooth: 'smooth',
+  balanced: 'hd',
+  crisp: 'hd',
+  ultra: 'ultra',
 }
 
 function isPreviewMode(value: unknown): value is PreviewMode {
@@ -40,7 +48,7 @@ function isQualityPreset(value: unknown): value is QualityPreset {
 }
 
 function isFps(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 120
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 240
 }
 
 function isMaxSize(value: unknown): value is number {
@@ -51,25 +59,60 @@ function isBitrate(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 1 && value <= 32
 }
 
+function resolveStoredQuality(value: unknown, legacy: boolean): QualitySelection {
+  if (value === 'custom') return 'custom'
+  if (!legacy && isQualityPreset(value)) return value
+  if (legacy && typeof value === 'string' && Object.prototype.hasOwnProperty.call(LEGACY_PRESET_KEYS, value)) {
+    const mapped = LEGACY_PRESET_KEYS[value]
+    if (mapped !== undefined) return mapped
+  }
+  return defaultPreferences.quality
+}
+
 function restorePreferences(persisted: unknown, modeRequiresAutoStart: boolean): PreviewPreferences {
   if (!persisted || typeof persisted !== 'object' || Array.isArray(persisted)) {
     return { ...defaultPreferences }
   }
 
   const stored = persisted as Record<string, unknown>
-  const quality = stored.quality === 'custom' || isQualityPreset(stored.quality)
-    ? stored.quality
-    : defaultPreferences.quality
-  const preset = quality === 'custom' ? defaultPreferences : qualityPresets[quality]
+  const legacy = !Object.prototype.hasOwnProperty.call(stored, 'customMaxSize')
+  const quality = resolveStoredQuality(stored.quality, legacy)
+  const fallback = quality === 'custom'
+    ? {
+        fps: defaultPreferences.customFps,
+        maxSize: defaultPreferences.customMaxSize,
+        bitrateMbps: defaultPreferences.customBitrateMbps,
+      }
+    : qualityPresets[quality]
   const savedMode = isPreviewMode(stored.mode) ? stored.mode : 'off'
   const mode = modeRequiresAutoStart && stored.autoStart !== true ? 'off' : savedMode
+
+  if (!legacy) {
+    return {
+      mode,
+      quality,
+      customFps: isFps(stored.customFps) ? stored.customFps : fallback.fps,
+      customMaxSize: isMaxSize(stored.customMaxSize) ? stored.customMaxSize : fallback.maxSize,
+      customBitrateMbps: isBitrate(stored.customBitrateMbps) ? stored.customBitrateMbps : fallback.bitrateMbps,
+    }
+  }
+
+  if (quality !== 'custom') {
+    return {
+      mode,
+      quality,
+      customFps: qualityPresets[quality].fps,
+      customMaxSize: qualityPresets[quality].maxSize,
+      customBitrateMbps: qualityPresets[quality].bitrateMbps,
+    }
+  }
 
   return {
     mode,
     quality,
-    fps: quality === 'custom' && isFps(stored.fps) ? stored.fps : preset.fps,
-    maxSize: quality === 'custom' && isMaxSize(stored.maxSize) ? stored.maxSize : preset.maxSize,
-    bitrateMbps: quality === 'custom' && isBitrate(stored.bitrateMbps) ? stored.bitrateMbps : preset.bitrateMbps,
+    customFps: isFps(stored.fps) ? stored.fps : fallback.fps,
+    customMaxSize: isMaxSize(stored.maxSize) ? stored.maxSize : fallback.maxSize,
+    customBitrateMbps: isBitrate(stored.bitrateMbps) ? stored.bitrateMbps : fallback.bitrateMbps,
   }
 }
 
@@ -116,8 +159,8 @@ function readPersistedPreferences(): PreviewPreferences | null {
     if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) return null
     const { state, version } = envelope as { state?: unknown; version?: unknown }
     if (!state || typeof state !== 'object' || Array.isArray(state)) return null
-    const legacy = typeof version === 'number' ? version < PREVIEW_STORAGE_VERSION : true
-    return restorePreferences(state, legacy || hasLegacyAutoStart(state))
+    const legacyMode = typeof version === 'number' ? version < 2 : true
+    return restorePreferences(state, legacyMode || hasLegacyAutoStart(state))
   } catch {
     return null
   }
@@ -156,9 +199,23 @@ const previewStorage: StateStorage = {
   removeItem: (name) => removeStorageItem(name),
 }
 
-export function buildScrcpyOptions({ fps, maxSize, bitrateMbps, quality }: Pick<PreviewPreferences, 'fps' | 'maxSize' | 'bitrateMbps' | 'quality'>) {
+type QualityPreferences = Pick<PreviewPreferences, 'quality' | 'customFps' | 'customMaxSize' | 'customBitrateMbps'>
+
+export function resolveQualitySelection(preferences: QualityPreferences) {
+  if (preferences.quality === 'custom') {
+    return {
+      fps: preferences.customFps,
+      maxSize: preferences.customMaxSize,
+      bitrateMbps: preferences.customBitrateMbps,
+    }
+  }
+  return qualityPresets[preferences.quality]
+}
+
+export function buildScrcpyOptions(preferences: QualityPreferences) {
+  const { fps, maxSize, bitrateMbps } = resolveQualitySelection(preferences)
   const bitrate = Math.round(bitrateMbps * 1000000)
-  const preset = quality === 'custom' ? null : qualityPresets[quality]
+  const preset = preferences.quality === 'custom' ? null : qualityPresets[preferences.quality]
 
   return {
     max_fps: fps,
@@ -168,13 +225,13 @@ export function buildScrcpyOptions({ fps, maxSize, bitrateMbps, quality }: Pick<
     max_bitrate: Math.round(Math.max(bitrateMbps, preset?.maxBitrateMbps ?? bitrateMbps) * 1000000),
     bwe: true,
     audio: false,
-    snapshot_interval: 10,
+    snapshot_interval: SNAPSHOT_INTERVAL_SECONDS,
   }
 }
 
 export const usePreviewStore = create<PreviewState>()(
   persist(
-    (set) => {
+    (set, get) => {
       const commit = (partial: Partial<PreviewPreferences>) => {
         pendingPreferenceKeys = Object.keys(partial)
         try {
@@ -184,25 +241,34 @@ export const usePreviewStore = create<PreviewState>()(
         }
       }
 
+      const updateCustom = (patch: Partial<QualityPreferences>) => {
+        const state = get()
+        if (state.quality === 'custom') {
+          commit(patch)
+          return
+        }
+        const active = resolveQualitySelection(state)
+        commit({
+          quality: 'custom',
+          customFps: active.fps,
+          customMaxSize: active.maxSize,
+          customBitrateMbps: active.bitrateMbps,
+          ...patch,
+        })
+      }
+
       return {
         ...defaultPreferences,
         setMode: (mode) => commit({ mode }),
-        setQuality: (quality) => {
-          if (quality === 'custom') {
-            commit({ quality })
-            return
-          }
-          const { fps, maxSize, bitrateMbps } = qualityPresets[quality]
-          commit({ quality, fps, maxSize, bitrateMbps })
-        },
+        setQuality: (quality) => commit({ quality }),
         setCustomFps: (fps) => {
-          if (isFps(fps)) commit({ quality: 'custom', fps })
+          if (isFps(fps)) updateCustom({ customFps: fps })
         },
         setCustomMaxSize: (maxSize) => {
-          if (isMaxSize(maxSize)) commit({ quality: 'custom', maxSize })
+          if (isMaxSize(maxSize)) updateCustom({ customMaxSize: maxSize })
         },
         setCustomBitrateMbps: (bitrateMbps) => {
-          if (isBitrate(bitrateMbps)) commit({ quality: 'custom', bitrateMbps })
+          if (isBitrate(bitrateMbps)) updateCustom({ customBitrateMbps: bitrateMbps })
         },
       }
     },
@@ -210,10 +276,10 @@ export const usePreviewStore = create<PreviewState>()(
       name: PREVIEW_STORAGE_KEY,
       storage: createJSONStorage(() => previewStorage),
       version: PREVIEW_STORAGE_VERSION,
-      partialize: ({ mode, quality, fps, maxSize, bitrateMbps }) => ({
-        mode, quality, fps, maxSize, bitrateMbps,
+      partialize: ({ mode, quality, customFps, customMaxSize, customBitrateMbps }) => ({
+        mode, quality, customFps, customMaxSize, customBitrateMbps,
       }),
-      migrate: (persistedState, version) => restorePreferences(persistedState, version < PREVIEW_STORAGE_VERSION),
+      migrate: (persistedState, version) => restorePreferences(persistedState, version < 2),
       merge: (persistedState, currentState) => ({
         ...currentState,
         ...restorePreferences(persistedState, hasLegacyAutoStart(persistedState)),

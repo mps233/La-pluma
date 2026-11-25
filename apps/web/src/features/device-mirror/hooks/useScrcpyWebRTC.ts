@@ -30,6 +30,7 @@ interface UseScrcpyWebRTCOptions {
   connectionPath?: 'auto' | 'relay' | 'direct'
   ipPreference?: 'auto' | 'ipv4' | 'ipv6'
   scrcpyOptions?: ScrcpyOptions
+  statsEnabled?: boolean
 }
 
 interface VideoStats extends WebRTCStatsMetrics {
@@ -206,7 +207,8 @@ export function useScrcpyWebRTC({
   videoRef,
   connectionPath = 'relay',
   ipPreference = 'ipv4',
-  scrcpyOptions = {}
+  scrcpyOptions = {},
+  statsEnabled = true
 }: UseScrcpyWebRTCOptions) {
   const scrcpyOptionsRef = useRef(scrcpyOptions)
   useEffect(() => {
@@ -672,11 +674,14 @@ export function useScrcpyWebRTC({
   }, [deviceId])
 
   useEffect(() => {
-    // 媒体流只在 PeerConnection 创建后存在；预览关闭或连接清理后不再保留空转计时器。
-    if (!mediaStream) return
+    if (!statsEnabled || !mediaStream) {
+      prevStatsRef.current = null
+      setStats(null)
+      return
+    }
     let cancelled = false
     let sampling = false
-    const timer = window.setInterval(async () => {
+    const sample = async () => {
       const pc = pcRef.current
       if (!pc || sampling) return
       sampling = true
@@ -701,12 +706,13 @@ export function useScrcpyWebRTC({
       // 每秒采样通常只有计数器变化而展示值不变：值相等时保留旧对象，
       // 避免宿主组件与面板按固定频率重渲染。
       setStats(previous => isSameVideoStats(previous, nextStats) ? previous : nextStats)
-    }, 1000)
+    }
+    const timer = window.setInterval(() => { void sample() }, 1000)
     return () => {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [inputReady, mediaStream, videoRef])
+  }, [inputReady, mediaStream, statsEnabled, videoRef])
 
   useEffect(() => disconnect, [disconnect])
 

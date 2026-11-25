@@ -120,13 +120,13 @@ type DeviceMonitorLayoutMockProps = {
 }
 
 vi.mock('@/features/device-mirror', () => ({
-  DeviceMonitorPanel: () => <div data-testid="screen-monitor" />,
+  DeviceMonitorPanel: () => <div data-testid="screen-monitor" data-region="monitor" />,
   DeviceMonitorLayout: ({ variant, children, sequence, editor, support, mode, content }: DeviceMonitorLayoutMockProps) => {
     if (variant === 'workbench') {
-      return <>{sequence}{editor}<div><div data-testid="screen-monitor" />{support}</div></>
+      return <>{sequence}{editor}<div><div data-testid="screen-monitor" data-region="monitor" />{support}</div></>
     }
-    if (variant === 'mode') return <>{mode}{content}<div data-testid="screen-monitor" /></>
-    return <>{children}<div data-testid="screen-monitor" /></>
+    if (variant === 'mode') return <>{mode}{content}<div data-testid="screen-monitor" data-region="monitor" /></>
+    return <>{children}<div data-testid="screen-monitor" data-region="monitor" /></>
   },
 }))
 vi.mock('@/features/automation/components/NotificationSettings', () => ({ default: () => <div /> }))
@@ -535,6 +535,7 @@ describe('AutomationTasks config persistence', () => {
 
     expect(container.textContent).toContain('正在读取自动化配置…')
     expect(container.querySelector('[role="status"]')?.textContent).toContain('正在读取自动化配置…')
+    expect(container.querySelector('[data-region="monitor"]')).not.toBeNull()
     expect(scheduleSwitch()).toBeNull()
     expect(container.querySelector('[aria-haspopup="menu"]')).toBeNull()
     expect(container.querySelector('[aria-controls="automation-task-editor"]')).toBeNull()
@@ -558,6 +559,7 @@ describe('AutomationTasks config persistence', () => {
     const gate = container.querySelector<HTMLElement>('[role="alert"]')
     expect(gate?.textContent).toContain('自动化配置暂时不可用')
     expect(gate?.textContent).toContain('配置读取失败')
+    expect(container.querySelector('[data-region="monitor"]')).not.toBeNull()
     expect(scheduleSwitch()).toBeNull()
     expect(container.querySelector('[aria-haspopup="menu"]')).toBeNull()
     expect(container.querySelector('[aria-controls="automation-task-editor"]')).toBeNull()

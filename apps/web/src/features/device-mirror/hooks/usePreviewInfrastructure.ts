@@ -167,6 +167,7 @@ export function usePreviewInfrastructure() {
       infrastructureStatusState: webrtcStatusState,
       infrastructureLoading: webrtcLoading,
       infrastructureError: webrtcActionError || webrtcStatusError,
+      onRefreshInfrastructure: () => { void refreshWebrtcStatus() },
       onInstall: () => runWebrtcAction('install', () => installWebrtc()),
       onToggleServer: () => runWebrtcAction(
         'server',

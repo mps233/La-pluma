@@ -19,17 +19,21 @@ const HIDDEN_PREVIEW_STOP_DELAY_MS = 180_000
 export function usePreviewSessionOwner({ automationAvailable = true, infrastructureBusy = false, startInfrastructure, cancelInfrastructure, ...options }: Options) {
   const mode = usePreviewStore(state => state.mode)
   const quality = usePreviewStore(state => state.quality)
-  const fps = usePreviewStore(state => state.fps)
-  const maxSize = usePreviewStore(state => state.maxSize)
-  const bitrateMbps = usePreviewStore(state => state.bitrateMbps)
+  const customFps = usePreviewStore(state => state.customFps)
+  const customMaxSize = usePreviewStore(state => state.customMaxSize)
+  const customBitrateMbps = usePreviewStore(state => state.customBitrateMbps)
   const visible = usePageVisible()
   const [attempt, setAttempt] = useState(0)
   const [starting, setStarting] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
+  const [statsEnabled, setStatsEnabled] = useState(false)
   const hiddenStopTimerRef = useRef<number | null>(null)
   const connectionActiveRef = useRef(false)
-  const scrcpyOptions = useMemo(() => buildScrcpyOptions({ quality, fps, maxSize, bitrateMbps }), [quality, fps, maxSize, bitrateMbps])
-  const transport = useScrcpyWebRTC({ ...options, scrcpyOptions })
+  const scrcpyOptions = useMemo(
+    () => buildScrcpyOptions({ quality, customFps, customMaxSize, customBitrateMbps }),
+    [quality, customFps, customMaxSize, customBitrateMbps],
+  )
+  const transport = useScrcpyWebRTC({ ...options, scrcpyOptions, statsEnabled })
   const disconnectTransport = transport.disconnect
   const transportStatus = transport.status
 
@@ -141,5 +145,6 @@ export function usePreviewSessionOwner({ automationAvailable = true, infrastruct
     starting,
     isConnecting: starting || (mode === 'live' && visible && automationAvailable && infrastructureBusy) || CONNECTING_STATUSES.has(transport.status),
     error: startError || transport.error,
+    setStatsEnabled,
   }
 }

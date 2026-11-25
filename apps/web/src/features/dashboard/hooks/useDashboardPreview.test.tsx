@@ -54,9 +54,9 @@ vi.mock('@/shared/api', async (importOriginal) => {
 let retryPreview: () => void
 
 function PreviewHarness() {
-  const { videoRef, statusText, connectionState, retry } = useDashboardPreview()
+  const { videoRef, status, retry } = useDashboardPreview()
   useEffect(() => { retryPreview = retry })
-  return <video ref={videoRef} data-preview-status={statusText} data-preview-connection={connectionState} />
+  return <video ref={videoRef} data-preview-status={status.label} data-preview-phase={status.phase} />
 }
 
 describe('useDashboardPreview Activity lifecycle', () => {
@@ -125,7 +125,7 @@ describe('useDashboardPreview Activity lifecycle', () => {
     expect(signalingConnections).toHaveLength(0)
     expect(screenshotCalls()).toHaveLength(0)
     expect(container.querySelector('video')?.dataset.previewStatus).toBe('预览已关闭')
-    expect(container.querySelector('video')?.dataset.previewConnection).toBe('off')
+    expect(container.querySelector('video')?.dataset.previewPhase).toBe('off')
   })
 
   it('reports a connecting state while the first snapshot is pending', async () => {
@@ -133,7 +133,7 @@ describe('useDashboardPreview Activity lifecycle', () => {
     usePreviewStore.getState().setMode('snapshot')
     await renderMode('visible')
 
-    expect(container.querySelector('video')?.dataset.previewConnection).toBe('connecting')
+    expect(container.querySelector('video')?.dataset.previewPhase).toBe('snapshot-loading')
   })
 
   it('stays off after the user closes preview and changes workspaces', async () => {
@@ -150,7 +150,7 @@ describe('useDashboardPreview Activity lifecycle', () => {
     usePreviewStore.getState().setMode('snapshot')
     await renderMode('visible')
 
-    expect(container.querySelector('video')?.dataset.previewConnection).toBe('error')
+    expect(container.querySelector('video')?.dataset.previewPhase).toBe('snapshot-error')
     const captures = screenshotCalls().length
 
     await act(async () => {

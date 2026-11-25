@@ -172,13 +172,13 @@ type DeviceMonitorLayoutMockProps = {
 }
 
 vi.mock('@/features/device-mirror', () => ({
-  DeviceMonitorPanel: () => <div data-testid="screen-monitor" />,
+  DeviceMonitorPanel: () => <div data-testid="screen-monitor" data-region="monitor" />,
   DeviceMonitorLayout: ({ variant, children, sequence, editor, support, mode, content }: DeviceMonitorLayoutMockProps) => {
     if (variant === 'workbench') {
-      return <>{sequence}{editor}<div><div data-testid="screen-monitor" />{support}</div></>
+      return <>{sequence}{editor}<div><div data-testid="screen-monitor" data-region="monitor" />{support}</div></>
     }
-    if (variant === 'mode') return <>{mode}{content}<div data-testid="screen-monitor" /></>
-    return <>{children}<div data-testid="screen-monitor" /></>
+    if (variant === 'mode') return <>{mode}{content}<div data-testid="screen-monitor" data-region="monitor" /></>
+    return <>{children}<div data-testid="screen-monitor" data-region="monitor" /></>
   },
 }))
 
@@ -2226,6 +2226,7 @@ describe('CombatTasks execution', () => {
 
     expect(container.textContent).toContain('正在读取作业配置…')
     expect(container.querySelector('[role="status"]')?.textContent).toContain('正在读取作业配置…')
+    expect(container.querySelector('[data-region="monitor"]')).not.toBeNull()
     expect(container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')).toBeNull()
     expect(buttonByText('立即执行')).toBeUndefined()
     expect(buttonByText('预览')).toBeUndefined()
@@ -2248,6 +2249,7 @@ describe('CombatTasks execution', () => {
     const gate = container.querySelector<HTMLElement>('[role="alert"]')
     expect(gate?.textContent).toContain('作业配置暂时不可用')
     expect(gate?.textContent).toContain('配置读取失败')
+    expect(container.querySelector('[data-region="monitor"]')).not.toBeNull()
     expect(container.querySelector<HTMLInputElement>('input[name="maa-copilot-uri"]')).toBeNull()
     expect(buttonByText('立即执行')).toBeUndefined()
     expect(mocks.executePredefinedTaskArgs).not.toHaveBeenCalled()

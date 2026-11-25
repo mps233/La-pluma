@@ -9,157 +9,45 @@
     transition: background-color 180ms ease, opacity 180ms ease, box-shadow 180ms ease;
   }
 
-  .preview-status-light.is-connecting {
-    background: var(--primary);
-    opacity: 1;
-    animation: preview-status-pulse 1.6s ease-in-out infinite;
-  }
-
-  .preview-status-light.is-snapshot {
+  .preview-status-light.is-info {
     background: var(--primary);
     opacity: 1;
   }
 
-  .preview-status-light.is-live {
+  .preview-status-light.is-success {
     background: var(--success);
     opacity: 1;
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 16%, transparent);
   }
 
-  .preview-status-light.is-idle {
+  .preview-status-light.is-warning {
     background: var(--warning);
     opacity: 1;
   }
 
-  .preview-status-light.is-error {
+  .preview-status-light.is-danger {
     background: var(--destructive);
     opacity: 1;
-  }
-
-  .preview-mode-segmented {
-    --preview-mode-height: 2rem;
-    --preview-mode-column: 2.75rem;
-
-    position: relative;
-    display: inline-grid;
-    grid-template-columns: repeat(3, var(--preview-mode-column));
-    gap: 2px;
-    height: var(--preview-mode-height);
-    flex: 0 0 auto;
-    padding: 2px;
-    border-radius: 999px;
-    background: var(--muted);
-    box-shadow: inset 0 0 0 1px var(--border);
-  }
-
-  .preview-mode-segmented-thumb {
-    position: absolute;
-    top: 2px;
-    bottom: 2px;
-    left: 2px;
-    width: calc((100% - 8px) / 3);
-    border-radius: 999px;
-    background: var(--glass-tabbar-active-bg);
-    box-shadow: var(--glass-tabbar-active-edge);
-    transform: translateX(0);
-    transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
-    pointer-events: none;
-  }
-
-  .preview-mode-segmented[data-active-index='1'] .preview-mode-segmented-thumb {
-    transform: translateX(calc(100% + 2px));
-  }
-
-  .preview-mode-segmented[data-active-index='2'] .preview-mode-segmented-thumb {
-    transform: translateX(calc(200% + 4px));
-  }
-
-  .preview-mode-segmented button {
-    position: relative;
-    z-index: 1;
-    height: 100%;
-    min-width: 0;
-    border-radius: 999px;
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-    font-weight: 600;
-    line-height: 1;
-    white-space: nowrap;
-    transition: color 160ms ease, opacity 120ms ease;
-  }
-
-  .preview-mode-segmented button[aria-checked='true'] {
-    color: var(--primary-strong);
-  }
-
-  .preview-mode-segmented button:hover:not(:disabled) {
-    color: var(--foreground);
-  }
-
-  .preview-mode-segmented button:active:not(:disabled) {
-    opacity: 0.72;
-  }
-
-  .preview-mode-segmented button:focus-visible {
-    outline: 2px solid var(--primary);
-    outline-offset: -2px;
-  }
-
-  .preview-mode-segmented button:disabled {
-    cursor: not-allowed;
-    opacity: 0.4;
-  }
-
-  @media (pointer: coarse) {
-    .preview-mode-segmented {
-      --preview-mode-height: 2.25rem;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .preview-status-light.is-connecting,
-    .preview-mode-segmented-thumb {
-      animation: none;
-      transition: none;
-    }
   }
 
   .scrcpy-device-container {
     container-type: inline-size;
   }
 
-  .scrcpy-device-layout {
-    --scrcpy-control-well-bg: color-mix(in srgb, var(--border) 52%, transparent);
-
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    align-items: start;
-    gap: 0.875rem;
-  }
-
-  .scrcpy-status-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1px;
-    overflow: hidden;
-    border-radius: var(--radius-lg);
-    background: var(--border);
-    box-shadow: inset 0 0 0 1px var(--border);
-    font-size: 0.75rem;
-  }
-
-  .scrcpy-status-grid > .surface-soft {
-    border-radius: 0;
-    background: color-mix(in srgb, var(--card) 88%, transparent);
-    box-shadow: none;
+  .scrcpy-view-header {
+    min-height: 3.25rem;
+    padding: 0.625rem 1rem;
   }
 
   .scrcpy-video-frame {
+    width: calc(100% - 1.5rem);
+    margin-inline: 0.75rem;
     border-radius: var(--radius-xl);
   }
 
   .scrcpy-video-frame.is-empty {
-    background: color-mix(in srgb, var(--border) 52%, transparent);
+    max-height: 17rem;
+    background: color-mix(in srgb, var(--muted) 86%, var(--card));
   }
 
   html.dark .scrcpy-video-frame.is-empty {
@@ -167,417 +55,38 @@
   }
 
   .scrcpy-empty-state {
-    background: transparent;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 1rem;
+    justify-content: safe center;
+    scrollbar-width: none;
   }
 
-  .scrcpy-control-rail {
-    overflow: hidden;
-    border-top: 1px solid var(--border);
-    border-radius: 0;
-    container-type: inline-size;
+  .scrcpy-empty-state::-webkit-scrollbar {
+    display: none;
   }
 
-  .scrcpy-control-rail.surface-soft {
-    background: transparent;
-    box-shadow: none;
+  .scrcpy-empty-state .app-empty-state-icon {
+    margin-bottom: 0.625rem;
   }
 
-  .scrcpy-control-section {
-    padding: 0.875rem;
+  .scrcpy-empty-state strong {
+    font-size: 0.875rem;
+    font-weight: 600;
   }
 
-  .scrcpy-control-section + .scrcpy-control-section {
-    border-top: 1px solid var(--border);
+  .scrcpy-empty-state > span {
+    max-width: 28rem;
+    color: var(--tertiary-foreground);
+    font-size: 0.75rem;
+    line-height: 1.5;
   }
 
-  .scrcpy-control-header,
-  .scrcpy-quality-header {
-    display: flex;
+  .scrcpy-preview-toolbar {
     width: 100%;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-  }
-
-  .scrcpy-quality-header {
-    flex-wrap: wrap;
-  }
-
-  .scrcpy-control-title {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--foreground);
-    font-size: 0.8125rem;
-    font-weight: 650;
-    line-height: 1.25rem;
-  }
-
-  .scrcpy-control-title svg {
-    flex: 0 0 auto;
-    color: var(--tertiary-foreground);
-  }
-
-  .scrcpy-inline-status {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    gap: 0.375rem;
-    color: var(--muted-foreground);
-    font-size: 0.6875rem;
-    font-weight: 600;
-  }
-
-  .scrcpy-preview-action {
-    min-height: 2.375rem;
-    margin-top: 0.75rem;
-    border-radius: var(--radius-lg);
-  }
-
-  .scrcpy-service-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.375rem;
-    margin-top: 0.5rem;
-  }
-
-  .scrcpy-service-action {
-    display: flex;
-    min-width: 0;
-    min-height: 2.25rem;
-    align-items: center;
-    justify-content: center;
-    gap: 0.375rem;
-    border-radius: var(--radius-lg);
-    color: var(--muted-foreground);
-    font-size: 0.6875rem;
-    font-weight: 600;
-    transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
-  }
-
-  .scrcpy-service-action span,
-  .scrcpy-utility-action span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .scrcpy-service-action:hover:not(:disabled) {
-    color: var(--foreground);
-  }
-
-  .scrcpy-service-action:disabled,
-  .scrcpy-utility-action:disabled {
-    cursor: not-allowed;
-    opacity: 0.38;
-  }
-
-  .scrcpy-service-utilities {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    margin-top: 0.375rem;
-  }
-
-  .scrcpy-utility-action {
-    display: inline-flex;
-    min-width: 0;
-    min-height: 2rem;
-    flex: 1 1 0;
-    align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    border-radius: var(--radius-lg);
-    color: var(--muted-foreground);
-    font-size: 0.6875rem;
-    font-weight: 600;
-    transition: background 160ms ease, color 160ms ease;
-  }
-
-  .scrcpy-utility-action:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--primary-soft) 34%, transparent);
-    color: var(--foreground);
-  }
-
-  .scrcpy-service-action:focus-visible,
-  .scrcpy-utility-action:focus-visible,
-  .scrcpy-preset-option:focus-visible,
-  .scrcpy-fps-segment button:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 40%, transparent);
-  }
-
-  .scrcpy-quality-current {
-    flex: 0 0 auto;
-    color: var(--tertiary-foreground);
-    font-size: 0.6875rem;
-    font-weight: 600;
-    line-height: 1rem;
-    white-space: nowrap;
-  }
-
-  .scrcpy-quality-content {
-    overflow: visible;
-  }
-
-  .scrcpy-quality-body {
-    display: grid;
-    gap: 0.875rem;
-    padding-top: 0.875rem;
-  }
-
-  .scrcpy-setting-group {
-    display: grid;
-    gap: 0.375rem;
-  }
-
-  .scrcpy-setting-label {
-    color: var(--muted-foreground);
-    font-size: 0.6875rem;
-    font-weight: 600;
-  }
-
-  .scrcpy-preset-grid,
-  .scrcpy-fps-segment {
-    display: grid;
-    gap: 0.125rem;
-    padding: 0.1875rem;
-    border-radius: var(--radius-lg);
-    background: var(--scrcpy-control-well-bg);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--input) 72%, transparent);
-  }
-
-  .scrcpy-preset-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .scrcpy-preset-option {
-    display: flex;
-    min-width: 0;
-    min-height: 2.75rem;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-    gap: 0.125rem;
-    padding: 0.375rem 0.5rem;
-    border-radius: calc(var(--radius-lg) - 0.125rem);
-    color: var(--muted-foreground);
-    text-align: left;
-    transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
-  }
-
-  .scrcpy-preset-option:hover:not(.is-active) {
-    background: color-mix(in srgb, var(--card) 48%, transparent);
-    color: var(--foreground);
-  }
-
-  .scrcpy-preset-option.is-active {
-    background: var(--primary-soft);
-    color: var(--primary-strong);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 22%, transparent);
-  }
-
-  .scrcpy-preset-option span {
-    font-size: 0.6875rem;
-    font-weight: 650;
-  }
-
-  .scrcpy-preset-option small {
-    overflow: hidden;
-    max-width: 100%;
-    color: var(--tertiary-foreground);
-    font-size: 0.6875rem;
-    line-height: 0.875rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .scrcpy-preset-option.is-active small {
-    color: color-mix(in srgb, var(--primary-strong) 72%, var(--muted-foreground));
-  }
-
-  .scrcpy-fps-segment {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .scrcpy-fps-segment button {
-    min-width: 0;
-    min-height: 2.125rem;
-    border-radius: calc(var(--radius-lg) - 0.125rem);
-    color: var(--muted-foreground);
-    font-size: 0.6875rem;
-    font-weight: 650;
-    transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
-  }
-
-  .scrcpy-fps-segment button:hover:not(.is-active) {
-    background: color-mix(in srgb, var(--card) 48%, transparent);
-    color: var(--foreground);
-  }
-
-  .scrcpy-fps-segment button.is-active {
-    background: var(--primary-soft);
-    color: var(--primary-strong);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 22%, transparent);
-  }
-
-  .scrcpy-bitrate-control {
-    display: grid;
-    gap: 0.375rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--border);
-  }
-
-  .scrcpy-bitrate-header {
-    display: flex;
-    min-height: 1.5rem;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-  }
-
-  .scrcpy-bitrate-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    color: var(--muted-foreground);
-    font-size: 0.6875rem;
-    font-weight: 600;
-  }
-
-  .scrcpy-bitrate-value {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0.25rem;
-    color: var(--foreground);
-  }
-
-  .scrcpy-bitrate-value strong {
-    font-size: 0.8125rem;
-    font-weight: 700;
-    line-height: 1rem;
-  }
-
-  .scrcpy-bitrate-value span {
-    color: var(--tertiary-foreground);
-    font-size: 0.6875rem;
-    font-weight: 600;
-  }
-
-  .scrcpy-bitrate-slider {
-    position: relative;
-    width: 100%;
-    height: 1.375rem;
-    border-radius: var(--radius-lg);
-  }
-
-  .scrcpy-bitrate-track {
-    position: absolute;
-    top: 50%;
-    right: 0;
-    left: 0;
-    height: 0.1875rem;
-    overflow: visible;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--input) 62%, transparent);
-    transform: translateY(-50%);
-  }
-
-  .scrcpy-bitrate-fill {
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: var(--scrcpy-range-progress);
-    border-radius: inherit;
-    background: var(--primary);
-  }
-
-  .scrcpy-bitrate-handle {
-    position: absolute;
-    top: 50%;
-    left: var(--scrcpy-range-progress);
-    width: 0.3125rem;
-    height: 0.8125rem;
-    border-radius: 999px;
-    background: var(--primary);
-    box-shadow: 0 0 0 2px var(--card);
-    transform: translate(-50%, -50%);
-  }
-
-  .scrcpy-bitrate-slider input {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    padding: 0;
-    margin: 0;
-    appearance: none;
-    opacity: 0;
-    cursor: pointer;
-  }
-
-  .scrcpy-bitrate-slider input::-webkit-slider-runnable-track {
-    height: 100%;
-    background: transparent;
-  }
-
-  .scrcpy-bitrate-slider input::-webkit-slider-thumb {
-    width: 1rem;
-    height: 1.375rem;
-    appearance: none;
-    border: 0;
-    background: transparent;
-  }
-
-  .scrcpy-bitrate-slider input::-moz-range-track {
-    height: 100%;
-    border: 0;
-    background: transparent;
-  }
-
-  .scrcpy-bitrate-slider input::-moz-range-thumb {
-    width: 1rem;
-    height: 1.375rem;
-    border: 0;
-    background: transparent;
-  }
-
-  .scrcpy-bitrate-slider:focus-within {
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 28%, transparent);
-  }
-
-  .scrcpy-bitrate-slider:has(input:disabled) {
-    cursor: not-allowed;
-    opacity: 0.45;
-  }
-
-  @container (min-width: 20rem) {
-    .scrcpy-status-grid {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-  }
-
-  @container (min-width: 40rem) {
-    .scrcpy-device-layout:not(.is-compact) {
-      grid-template-columns: minmax(0, 1fr) 14rem;
-    }
-
-    .scrcpy-control-rail {
-      border-top: 0;
-      border-left: 1px solid var(--border);
-    }
-  }
-
-  @container (min-width: 44rem) {
-    .scrcpy-status-grid {
-      grid-template-columns: repeat(8, minmax(0, 1fr));
-    }
-  }
-
-  @container (min-width: 64rem) {
-    .scrcpy-device-layout:not(.is-compact) {
-      grid-template-columns: minmax(0, 1fr) 15rem;
-    }
+    min-height: 4rem;
+    gap: clamp(0.25rem, 2cqw, 0.75rem);
+    padding: 0.625rem 1rem 0.75rem;
   }
 
   .task-monitor-layout {
@@ -613,69 +122,54 @@
     gap: 1.125rem;
   }
 
-  .device-monitor-column {
-    min-width: 0;
-  }
-
+  .device-monitor-column,
   .device-monitor-panel {
-    width: 100%;
     min-width: 0;
-  }
-
-  .task-monitor-panel {
-    border-radius: var(--radius-xl);
-    padding: 1rem;
-  }
-
-  .task-monitor-panel.is-compact {
-    --scrcpy-compact-inset: 0.375rem;
-
-    position: relative;
-    overflow: visible;
-    padding: var(--scrcpy-compact-inset);
-    padding-bottom: 0;
-  }
-
-  .scrcpy-view-header.is-compact {
-    position: relative;
-    min-height: 3.25rem;
-    padding: 0.625rem 1rem;
-    align-items: center;
-    flex-wrap: nowrap;
-  }
-
-  .task-monitor-panel.is-compact .scrcpy-device-layout.is-compact > .space-y-3 > :not([hidden]) ~ :not([hidden]) {
-    /* S3: 紧凑投屏布局用 --scrcpy-compact-inset 接管 space-y-3 的间距。 */
-    margin-top: var(--scrcpy-compact-inset) !important;
-  }
-
-  .task-monitor-panel.is-compact .scrcpy-video-frame {
-    width: calc(100% + (var(--scrcpy-compact-inset) * 2));
-    margin-right: calc(var(--scrcpy-compact-inset) * -1);
-    margin-left: calc(var(--scrcpy-compact-inset) * -1);
-    border-radius: 0 0 var(--radius-xl) var(--radius-xl);
-  }
-
-  .task-monitor-panel.is-compact .scrcpy-preview-toolbar {
-    position: static;
     width: 100%;
-    min-height: 3.75rem;
-    margin: 0;
-    padding: 0.5rem 0 0.75rem;
-    background: transparent;
-    transform: none;
   }
 
-  .task-monitor-panel.is-compact .scrcpy-device-layout.is-compact > .space-y-3 > .scrcpy-preview-toolbar {
-    /* S3: 工具栏由自身 padding 控制间距，需压过 space-y-3 的 end margin。 */
-    margin-top: 0 !important;
-  }
+  @container (min-width: 34rem) {
+    .scrcpy-video-frame.is-empty {
+      height: 13.5rem;
+      max-height: none;
+      aspect-ratio: auto;
+    }
 
-  .task-monitor-panel.is-compact .scrcpy-preview-toolbar button {
-    box-shadow:
-      inset 0 0 0 1px var(--border),
-      0 8px 18px rgb(15 23 42 / 12%);
-    backdrop-filter: blur(14px) saturate(140%);
+    .scrcpy-empty-state {
+      display: grid;
+      grid-template-columns: 2.75rem minmax(0, 1fr);
+      grid-template-areas:
+        "icon title"
+        "icon description"
+        "icon action";
+      align-content: center;
+      align-items: center;
+      column-gap: 1rem;
+      text-align: left;
+    }
+
+    .scrcpy-empty-state .app-empty-state-icon {
+      grid-area: icon;
+      margin: 0;
+    }
+
+    .scrcpy-empty-state strong {
+      grid-area: title;
+      align-self: end;
+    }
+
+    .scrcpy-empty-state > span {
+      grid-area: description;
+      align-self: start;
+      max-width: none;
+      margin: 0;
+    }
+
+    .scrcpy-empty-state .app-empty-state-action {
+      grid-area: action;
+      justify-self: start;
+      margin-top: 0.5rem;
+    }
   }
 
   @media (width >= 1360px) {
@@ -687,294 +181,9 @@
       grid-column: span 2;
     }
 
-    .task-monitor-column {
-      max-width: none;
-    }
-
+    .task-monitor-column,
     .task-monitor-support {
       max-width: none;
     }
   }
-
-  .device-monitor-surface {
-    padding: 0;
-  }
-
-  .device-monitor-surface > .task-monitor-panel.is-compact {
-    --scrcpy-compact-inset: 0.75rem;
-
-    background: transparent;
-    box-shadow: none;
-    padding: 0;
-  }
-
-  .device-monitor-surface .task-monitor-panel.is-compact .scrcpy-device-layout.is-compact > .space-y-3 > :not([hidden]) ~ :not([hidden]) {
-    /* S3: 共享设备画面的紧凑投屏取消 space-y-3 间距（提高特异性以压过通用紧凑 inset）。 */
-    margin-top: 0 !important;
-  }
-
-  .device-monitor-surface .scrcpy-view-header.is-compact {
-    min-height: 3.25rem;
-    padding: 0.625rem 1rem;
-  }
-
-  .device-monitor-surface .scrcpy-view-header.is-compact > .min-w-0 {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .device-monitor-surface .scrcpy-view-title-row {
-    width: 100%;
-    min-width: 0;
-    gap: 0.5rem;
-  }
-
-  .device-monitor-surface .scrcpy-view-status-dot {
-    /* S3: 紧凑投屏的状态点保持 6px，需压过调用处的 h-2 / w-2。 */
-    width: 0.375rem !important;
-    height: 0.375rem !important;
-    flex: 0 0 0.375rem;
-  }
-
-  .device-monitor-surface .scrcpy-view-title {
-    /* S3: 紧凑投屏标题使用 15px 与语义前景色，压过调用处的 text-sm / text-gray-900。 */
-    overflow: hidden;
-    color: var(--foreground) !important;
-    font-size: 0.9375rem !important;
-    line-height: 1.25rem !important;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  html.dark .device-monitor-surface .scrcpy-view-title {
-    /* 深色标题保持白色（与 dark:text-white! 一致），需要显式压过上面的语义色。 */
-    color: #fff !important;
-  }
-
-  .device-monitor-surface .scrcpy-view-status {
-    margin-left: auto;
-    flex: none;
-    color: var(--tertiary-foreground);
-    font-size: 0.6875rem;
-    font-weight: 500;
-    line-height: 1rem;
-  }
-
-  .device-monitor-surface .task-monitor-panel.is-compact .scrcpy-video-frame {
-    /* S3: 共享设备画面的紧凑投屏移除阴影，需压过调用处的 shadow-xs。 */
-    width: calc(100% - 1.5rem);
-    margin-right: 0.75rem;
-    margin-left: 0.75rem;
-    border-radius: var(--radius-xl);
-    box-shadow: none !important;
-  }
-
-  .device-monitor-surface .task-monitor-panel.is-compact .scrcpy-video-frame.is-empty {
-    max-height: 17rem;
-    background: color-mix(in srgb, var(--muted) 86%, var(--card));
-  }
-
-  .device-monitor-surface .scrcpy-empty-state {
-    /* S3: 空状态使用 16px 内边距与 safe center，需压过 px-6 / justify-center。 */
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 1rem !important;
-    justify-content: safe center !important;
-    scrollbar-width: none;
-  }
-
-  .device-monitor-surface .scrcpy-empty-state::-webkit-scrollbar {
-    display: none;
-  }
-
-  .device-monitor-surface .scrcpy-empty-content {
-    /* S3: 紧凑空状态限制 18rem，需压过 max-w-sm。 */
-    max-width: 18rem !important;
-  }
-
-  .device-monitor-surface .device-preview-empty-icon {
-    width: 2.75rem;
-    height: 2.75rem;
-
-    /* S3: 紧凑空状态图标使用 10px 下间距与 14px 圆角，压过 mb-3 / rounded-lg。 */
-    margin-bottom: 0.625rem !important;
-    border-radius: 0.875rem !important;
-    background: color-mix(in srgb, var(--card) 90%, var(--primary-soft));
-    box-shadow:
-      inset 0 0 0 0.5px color-mix(in srgb, var(--border) 65%, transparent),
-      0 2px 7px rgb(60 60 67 / 8%);
-  }
-
-  .device-monitor-surface .scrcpy-empty-description {
-    color: var(--tertiary-foreground);
-  }
-
-  .device-monitor-surface .task-monitor-panel.is-compact .scrcpy-preview-toolbar {
-    /* S3: 工具栏间距与内边距由紧凑投屏接管，需压过 gap-2 / px-2 / py-1。 */
-    width: 100%;
-    min-height: 4rem;
-    gap: clamp(0.25rem, 2cqw, 0.75rem) !important;
-    padding: 0.625rem 1rem 0.75rem !important;
-  }
-
-  .device-monitor-surface .scrcpy-preview-toolbar svg {
-    /* S3: 工具栏图标固定 16px，需压过图标上的 w-3.5。 */
-    width: 1rem !important;
-    height: 1rem !important;
-  }
-
-  /* S3: 紧凑投屏的宽容器覆盖需压过 max-w-sm / 工具类间距，important 仅限本容器内。 */
-  @container (min-width: 34rem) {
-    .device-monitor-surface .task-monitor-panel.is-compact .scrcpy-video-frame.is-empty {
-      height: 13.5rem;
-      max-height: none;
-      aspect-ratio: auto;
-    }
-
-    .device-monitor-surface .scrcpy-empty-content {
-      display: grid;
-
-      /* S3: 宽容器下放宽到 34rem，同样需要压过 max-w-sm。 */
-      max-width: 34rem !important;
-      grid-template-columns: 2.75rem minmax(0, 1fr);
-      grid-template-areas:
-        "icon title"
-        "icon description";
-      align-items: center;
-      column-gap: 1rem;
-      text-align: left;
-    }
-
-    .device-monitor-surface .device-preview-empty-icon {
-      grid-area: icon;
-      margin: 0 !important;
-    }
-
-    .device-monitor-surface .scrcpy-empty-title {
-      grid-area: title;
-      align-self: end;
-    }
-
-    .device-monitor-surface .scrcpy-empty-description {
-      grid-area: description;
-      align-self: start;
-      margin: 0;
-    }
-  }
-
-  @media (width < 1024px) {
-    .la-pluma-app .device-preview-glass-button {
-      --glass-liquid-surface: color-mix(
-        in srgb,
-        var(--glass-bg) 42%,
-        transparent
-      );
-
-      position: relative;
-      isolation: isolate;
-      border-color: transparent;
-      background:
-        linear-gradient(
-          var(--glass-liquid-surface-lift),
-          var(--glass-liquid-surface-lift)
-        ),
-        var(--glass-liquid-surface);
-      -webkit-backdrop-filter: blur(6px) saturate(140%); /* stylelint-disable-line property-no-vendor-prefix -- Safari 仍需前缀 */
-      backdrop-filter: blur(6px) saturate(140%);
-    }
-
-    .la-pluma-app .device-preview-glass-button::before {
-      position: absolute;
-      inset: 0;
-      padding: 0.5px;
-      border-radius: inherit;
-      background: conic-gradient(
-        from 0deg,
-        var(--glass-edge-light) 0deg,
-        var(--glass-edge-light) 26deg,
-        var(--glass-edge-high) 32deg,
-        var(--glass-edge-mid) 38deg,
-        var(--glass-edge-faint) 44deg,
-        var(--glass-edge-clear) 50deg,
-        var(--glass-edge-faint) 56deg,
-        var(--glass-edge-mid) 62deg,
-        var(--glass-edge-high) 68deg,
-        var(--glass-edge-light) 74deg,
-        var(--glass-edge-light) 206deg,
-        var(--glass-edge-high) 212deg,
-        var(--glass-edge-mid) 218deg,
-        var(--glass-edge-faint) 224deg,
-        var(--glass-edge-clear) 230deg,
-        var(--glass-edge-faint) 236deg,
-        var(--glass-edge-mid) 242deg,
-        var(--glass-edge-high) 248deg,
-        var(--glass-edge-light) 254deg,
-        var(--glass-edge-light) 360deg
-      );
-      /* stylelint-disable-next-line property-no-vendor-prefix -- Safari 仍需前缀 */
-      -webkit-mask:
-        linear-gradient(#000 0 0) content-box,
-        linear-gradient(#000 0 0);
-      mask:
-        linear-gradient(#000 0 0) content-box,
-        linear-gradient(#000 0 0);
-      -webkit-mask-composite: xor; /* stylelint-disable-line property-no-vendor-prefix -- Safari 仍需前缀 */
-      mask-composite: exclude;
-      content: '';
-      pointer-events: none;
-    }
-  }
-
-  @media (prefers-reduced-transparency: reduce) {
-    .la-pluma-app .device-preview-glass-button::before {
-      display: none;
-    }
-  }
-
-  .la-pluma-app .task-monitor-panel.is-compact .device-preview-glass-button {
-    position: relative;
-    width: 2.75rem;
-    min-width: 2.75rem;
-    height: 2.75rem;
-    min-height: 2.75rem;
-    flex: 0 0 2.75rem;
-    overflow: hidden;
-    border: 1px solid transparent;
-    border-color: transparent !important;
-
-    /* S3: 紧凑预览玻璃按钮固定为圆形，压过 rounded-full。 */
-    border-radius: 50% !important;
-    padding: 0;
-    background: var(--glass-bg);
-    backdrop-filter: blur(6px) saturate(140%);
-    box-shadow: var(--glass-shadow);
-    transition: color 160ms ease, background 160ms ease, transform 120ms ease;
-  }
-
-  .la-pluma-app [data-device-monitor-layout="workbench"] .device-monitor-surface .device-preview-glass-button {
-    background: color-mix(in srgb, var(--glass-bg) 84%, transparent);
-    -webkit-backdrop-filter: blur(12px) saturate(150%); /* stylelint-disable-line property-no-vendor-prefix -- Safari 仍需前缀 */
-    backdrop-filter: blur(12px) saturate(150%);
-    box-shadow:
-      inset 0 0 0 0.5px color-mix(in srgb, var(--glass-border) 55%, transparent),
-      0 3px 10px rgb(60 60 67 / 8%);
-  }
-
-  .la-pluma-app.dark [data-device-monitor-layout="workbench"] .device-monitor-surface .device-preview-glass-button,
-  html.dark .la-pluma-app [data-device-monitor-layout="workbench"] .device-monitor-surface .device-preview-glass-button {
-    box-shadow:
-      inset 0 0 0 0.5px color-mix(in srgb, var(--glass-border) 42%, transparent),
-      0 3px 10px rgb(0 0 0 / 20%);
-  }
-
-  .la-pluma-app .task-monitor-panel.is-compact .device-preview-glass-button:active:not(:disabled) {
-    transform: scale(0.94);
-  }
-
-  .la-pluma-app .task-monitor-panel.is-compact .device-preview-glass-button:hover:not(:disabled),
-  .la-pluma-app .task-monitor-panel.is-compact .device-preview-glass-button.is-active {
-    color: var(--primary);
-    background: color-mix(in srgb, var(--glass-bg) 76%, var(--primary-soft));
-  }
-
 }

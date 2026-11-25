@@ -31,6 +31,7 @@ export interface DialogFrameProps {
   layers?: ReactNode
   size?: DialogFrameSize
   closeDisabled?: boolean
+  closeClassName?: string
   disablePointerDismissal?: boolean
   id?: string
   className?: string
@@ -47,6 +48,7 @@ export function DialogFrame({
   layers,
   size = 'md',
   closeDisabled = false,
+  closeClassName,
   disablePointerDismissal = false,
   id,
   className,
@@ -85,7 +87,7 @@ export function DialogFrame({
             )}
           </div>
           <DialogClose
-            render={<Button size="icon" variant="ghost" aria-label="关闭对话框" disabled={closeDisabled} />}
+            render={<Button size="icon" variant="ghost" aria-label="关闭对话框" className={closeClassName} disabled={closeDisabled} />}
           >
             <X className="size-4" aria-hidden="true" />
           </DialogClose>

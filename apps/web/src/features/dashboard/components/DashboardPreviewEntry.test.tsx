@@ -4,17 +4,15 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import DashboardPreviewEntry from './DashboardPreviewEntry'
-import { usePreviewStore } from '@/features/device-mirror'
+import { usePreviewStore, type PreviewStatus } from '@/features/device-mirror'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const preview = vi.hoisted(() => ({
   fallbackSnapshot: 'data:image/png;base64,c25hcHNob3Q=' as string | null,
-  showLivePreview: false,
   isConnecting: false,
-  connectionState: 'snapshot' as 'off' | 'connecting' | 'snapshot' | 'live' | 'idle' | 'error',
-  statusText: '快照可用',
-  error: null as string | null,
+  status: {} as PreviewStatus,
+  retry: vi.fn(),
   available: true,
 }))
 
@@ -22,13 +20,9 @@ vi.mock('../hooks/useDashboardPreview', () => ({
   useDashboardPreview: () => ({
     videoRef: { current: null },
     fallbackSnapshot: preview.fallbackSnapshot,
-    showLivePreview: preview.showLivePreview,
     isConnecting: preview.isConnecting,
-    connectionState: preview.connectionState,
-    statusText: preview.statusText,
-    headerStatusText: '已连接',
-    retry: vi.fn(),
-    error: preview.error,
+    status: preview.status,
+    retry: preview.retry,
     available: preview.available,
   }),
 }))
@@ -36,15 +30,25 @@ vi.mock('../hooks/useDashboardPreview', () => ({
 let container: HTMLDivElement
 let root: Root
 
+const makeStatus = (overrides: Partial<PreviewStatus> = {}): PreviewStatus => ({
+  phase: 'snapshot-ready',
+  label: '画面快照 · 10s',
+  emptyTitle: '画面快照',
+  tone: 'info',
+  error: null,
+  retry: null,
+  hasFrame: true,
+  snapshotStale: false,
+  ...overrides,
+})
+
 describe('DashboardPreviewEntry', () => {
   beforeEach(() => {
     preview.fallbackSnapshot = 'data:image/png;base64,c25hcHNob3Q='
-    preview.showLivePreview = false
     preview.isConnecting = false
-    preview.connectionState = 'snapshot'
-    preview.statusText = '快照可用'
-    preview.error = null
+    preview.status = makeStatus()
     preview.available = true
+    preview.retry.mockReset()
     usePreviewStore.setState({ mode: 'off' })
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -56,10 +60,15 @@ describe('DashboardPreviewEntry', () => {
     container.remove()
   })
 
-  it('renders the closed preview without a navigation action', async () => {
+  it('renders the closed preview without a recovery action', async () => {
     preview.fallbackSnapshot = null
-    preview.connectionState = 'off'
-    preview.statusText = '预览已关闭'
+    preview.status = makeStatus({
+      phase: 'off',
+      label: '预览已关闭',
+      emptyTitle: '预览已关闭',
+      tone: 'neutral',
+      hasFrame: false,
+    })
     await act(async () => root.render(<DashboardPreviewEntry />))
 
     const frame = container.querySelector('[data-dashboard-preview-frame]')
@@ -75,65 +84,102 @@ describe('DashboardPreviewEntry', () => {
     expect(container.querySelector('[data-dashboard-preview-card]')?.getAttribute('aria-busy')).toBe('true')
   })
 
-  it('names the preview card header', async () => {
+  it('names the preview card header and announces the shared status', async () => {
     await act(async () => root.render(<DashboardPreviewEntry />))
 
     expect(container.textContent).toContain('画面预览')
+    expect(container.querySelector('[role="status"]')?.textContent).toBe('画面快照 · 10s')
   })
 
-  it('names the status light from the connection state', async () => {
+  it('reflects the shared status phase and label', async () => {
     preview.fallbackSnapshot = null
-    preview.connectionState = 'off'
-    preview.statusText = '预览已关闭'
+    preview.status = makeStatus({
+      phase: 'off',
+      label: '预览已关闭',
+      emptyTitle: '预览已关闭',
+      tone: 'neutral',
+      hasFrame: false,
+    })
     await act(async () => root.render(<DashboardPreviewEntry />))
 
-    expect(container.querySelector('[data-preview-status="off"]')?.getAttribute('aria-label')).toBe('预览已关闭')
+    expect(container.querySelector('[data-preview-status="off"]')).not.toBeNull()
+    expect(container.querySelector('[role="status"]')).toBeNull()
+    expect(container.textContent).toContain('预览已关闭')
 
     await act(async () => root.unmount())
     root = createRoot(container)
-    preview.connectionState = 'live'
-    preview.statusText = '实时画面'
-    preview.showLivePreview = true
+    preview.status = makeStatus({
+      phase: 'live-connected',
+      label: '实时画面',
+      emptyTitle: '实时画面',
+      tone: 'success',
+    })
     await act(async () => root.render(<DashboardPreviewEntry />))
 
-    expect(container.querySelector('[data-preview-status="live"]')?.getAttribute('aria-label')).toBe('实时画面')
+    expect(container.querySelector('[data-preview-status="live-connected"]')).not.toBeNull()
+    expect(container.querySelector('[role="status"]')?.textContent).toBe('实时画面')
   })
 
   it('switches preview mode through the compact segmented control', async () => {
     await act(async () => root.render(<DashboardPreviewEntry />))
 
-    const group = container.querySelector('[role="radiogroup"][aria-label="预览模式"]')
+    const group = container.querySelector('[role="group"][aria-label="预览模式"]')
     expect(group).not.toBeNull()
-    expect(group?.getAttribute('data-active-index')).toBe('0')
     const live = Array.from(group?.querySelectorAll('button') || []).find(button => button.textContent === '实时')
-    expect(live?.getAttribute('aria-checked')).toBe('false')
+    expect(live?.getAttribute('aria-pressed')).toBe('false')
 
     await act(async () => live?.click())
 
     expect(usePreviewStore.getState().mode).toBe('live')
-    expect(group?.getAttribute('data-active-index')).toBe('2')
+    expect(live?.getAttribute('aria-pressed')).toBe('true')
   })
 
   it('disables snapshot and live modes while automation is unavailable', async () => {
     preview.available = false
     await act(async () => root.render(<DashboardPreviewEntry />))
 
-    const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="radio"]'))
+    const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('[aria-pressed]'))
     expect(buttons.find(button => button.textContent === '关闭')?.disabled).toBe(false)
     expect(buttons.find(button => button.textContent === '快照')?.disabled).toBe(true)
     expect(buttons.find(button => button.textContent === '实时')?.disabled).toBe(true)
   })
 
-  it('labels the failed-preview action without mode-specific wording', async () => {
+  it('offers the same retry action in the error empty state', async () => {
     preview.fallbackSnapshot = null
-    preview.connectionState = 'error'
-    preview.statusText = '服务器内部错误'
-    preview.error = '服务器内部错误'
+    preview.status = makeStatus({
+      phase: 'snapshot-error',
+      label: '画面快照失败',
+      emptyTitle: '画面快照失败',
+      tone: 'danger',
+      error: { scope: 'snapshot', title: '画面快照失败', message: '服务器内部错误' },
+      retry: { target: 'snapshot', label: '重试' },
+      hasFrame: false,
+    })
     await act(async () => root.render(<DashboardPreviewEntry />))
 
+    const error = container.querySelector('[role="alert"]')
+    expect(error?.textContent).toContain('服务器内部错误')
     const retry = Array.from(container.querySelectorAll('button')).find(button => button.textContent === '重试')
     expect(retry).not.toBeUndefined()
-    expect(container.querySelector('.dashboard-preview-empty')?.contains(retry ?? null)).toBe(true)
-    expect(container.textContent).not.toContain('重试实时预览')
+    await act(async () => retry?.click())
+    expect(preview.retry).toHaveBeenCalledOnce()
+  })
+
+  it('keeps a stale snapshot visible with a warning and an alert retry', async () => {
+    preview.status = makeStatus({
+      phase: 'snapshot-stale',
+      label: '画面快照更新失败',
+      emptyTitle: '画面快照更新失败',
+      tone: 'danger',
+      error: { scope: 'snapshot', title: '画面快照失败', message: '截图超时' },
+      retry: { target: 'snapshot', label: '重试' },
+      snapshotStale: true,
+    })
+    await act(async () => root.render(<DashboardPreviewEntry />))
+
+    expect(container.querySelector('img')?.getAttribute('src')).toBe(preview.fallbackSnapshot)
+    expect(container.textContent).toContain('上次成功画面 · 可能已过期')
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('截图超时')
+    expect(Array.from(container.querySelectorAll('button')).filter(button => button.textContent === '重试')).toHaveLength(1)
   })
 })

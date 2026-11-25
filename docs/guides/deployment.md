@@ -94,7 +94,7 @@ docker run -d \
 
 ### PWA、HTTPS 与实时预览
 
-概览和日常的预览默认关闭，需手动选择快照或实时。自动回收通过同源 `/webrtc-signaling` 网关统计观看者，并在释放前核对上游设备的 `client_count` / `clients`。旧版上游若仅返回设备 ID 字符串，只能根据网关观看者判断；未携带设备 ID 的旧网关连接会保守阻止自动回收。项目仍使用单个受管设备 Agent，自动回收仅停止匹配的设备，不关闭信令和 TURN 服务。
+概览、日常、作业、肉鸽、养成、数据与日志页共用预览，默认关闭，需手动选择快照或实时。自动回收通过同源 `/webrtc-signaling` 网关统计观看者，并在释放前核对上游设备的 `client_count` / `clients`。旧版上游若仅返回设备 ID 字符串，只能根据网关观看者判断；未携带设备 ID 的旧网关连接会保守阻止自动回收。项目仍使用单个受管设备 Agent，自动回收仅停止匹配的设备，不关闭信令和 TURN 服务。
 
 预览启停只释放本实例启动的资源：停止接口与服务关闭流程都不会终止启动前已存在的信令服务、TURN 或设备端 Agent。`/api/agent/webrtc/*` 状态中的 `ownership` 以 `managed`、`external`、`none` 标注 server、turn 与 agent 的归属，停止响应的 `released` 列出本次实际释放的 `server`、`turn`、`agent-deployment` 与 `device-agent`；需要接管外部启动的组件时先手动停止它，再由本服务启动。
 

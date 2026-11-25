@@ -1,12 +1,16 @@
 export const qualityPresets = {
-  power: { label: '省电', fps: 15, maxSize: 640, bitrateMbps: 1.5, maxBitrateMbps: 3 },
-  smooth: { label: '流畅', fps: 30, maxSize: 960, bitrateMbps: 4, maxBitrateMbps: 8 },
-  balanced: { label: '均衡', fps: 45, maxSize: 1280, bitrateMbps: 8, maxBitrateMbps: 16 },
-  crisp: { label: '清晰', fps: 60, maxSize: 1600, bitrateMbps: 14, maxBitrateMbps: 24 },
+  smooth: { label: '流畅', fps: 30, maxSize: 640, bitrateMbps: 4, maxBitrateMbps: 8 },
+  hd: { label: '高清', fps: 60, maxSize: 1280, bitrateMbps: 12, maxBitrateMbps: 16 },
   ultra: { label: '超清', fps: 60, maxSize: 1920, bitrateMbps: 20, maxBitrateMbps: 32 },
 } as const
 
-export const fpsOptions = [10, 15, 30, 45, 60, 90, 120] as const
+export function maxSizeToShortSide(maxSize: number): number {
+  return Math.round(maxSize * 9 / 16)
+}
+
+export const fpsOptions = [10, 15, 30, 45, 60, 90, 120, 240] as const
+
+export const SNAPSHOT_INTERVAL_SECONDS = 10
 
 /** 总览设备采样的轮询间隔；失败静默保留上一份样本。 */
 export const DEVICE_STATS_POLL_INTERVAL_MS = 5_000

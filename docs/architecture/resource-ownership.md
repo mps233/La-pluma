@@ -16,6 +16,7 @@
 | 养成队列、设置、计划、材料刷新端点 | `features/training` | 队列/设置/计划的写入与领域语义仍归 training；材料刷新的命令编排归 statistics |
 | 掉落统计、今日掉落、今日开放关卡、识别/材料命令所有者 | `features/statistics` | 只读掉落/关卡供 Dashboard 使用；统计页使用领域 Query，识别/材料命令所有者及失效范围见[统计识别命令与失效联动](../frontend/domains/statistics.md#识别命令) |
 | 设备采样 | `features/device-mirror` | `device-stats` 只读轮询资源；总览只订阅样本并写入自己的投影 |
+| 预览会话、截图采样与基础设施操作 | `features/device-mirror` 的 `PreviewSessionProvider` | 应用级单例，位于页面 `Activity` 之外；页面只绑定/解除视频，总览只投影同一状态源；不进入 Query |
 | Query 客户端、默认策略 | `shared/query` | 见 [Query 缓存与键规范](query-cache.md) |
 
 关键约束：
@@ -49,6 +50,7 @@ import {
 | 养成队列（含材料进度） | `training` | TrainingWorkspace、Dashboard 快照 |
 | 掉落/今日开放关卡 | `statistics` | StatisticsWorkspace、Dashboard 快照 |
 | 设备采样 | `device-mirror` | Dashboard |
+| 预览会话、transport 与截图采样 | `device-mirror` 的 `PreviewSessionProvider` / `usePreviewSessionOwner` / `usePreviewSnapshotOwner` | 七个共享画面的页面经 `usePreviewSession` 绑定视频；Dashboard 经同一会话投影状态 |
 
 Query key、参数与缓存策略集中见[Query 缓存与键规范](query-cache.md)。物品图标与干员头像由浏览器 HTTP/图片缓存；`getItemIconUrl` / `getOperatorAvatarUrl` 带 `?v=<epoch>`，epoch 存储在 `laPlumaItemIconVersion`，使用 `useItemIconCacheVersion()` 的组件随 epoch 重渲染。
 

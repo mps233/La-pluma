@@ -18,6 +18,7 @@ export const LOGS_NOTICE_ID = 'logs'
 export const LOGS_COVERAGE_NOTICE_ID = 'logs-coverage'
 export const LOGS_HIDDEN_MATCHES_NOTICE_ID = 'logs-hidden-matches'
 export const LOGS_REFRESH_NOTICE_ID = 'logs-refresh'
+export const PREVIEW_QUALITY_NOTICE_ID = 'preview-quality'
 
 export interface NoticeOptions {
   id?: string

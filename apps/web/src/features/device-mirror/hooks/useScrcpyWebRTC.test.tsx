@@ -102,9 +102,9 @@ let hook: WebrtcHook | null = null
 let root: Root
 let container: HTMLDivElement
 
-function Harness({ signalingUrl = 'ws://old-host:8443' }: { signalingUrl?: string }) {
+function Harness({ signalingUrl = 'ws://old-host:8443', statsEnabled = true }: { signalingUrl?: string; statsEnabled?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const currentHook = useScrcpyWebRTC({ signalingUrl, videoRef })
+  const currentHook = useScrcpyWebRTC({ signalingUrl, videoRef, statsEnabled })
   useEffect(() => {
     hook = currentHook
   }, [currentHook])
@@ -542,6 +542,26 @@ describe('useScrcpyWebRTC startup', () => {
     expect(container.querySelector('video')!.srcObject).toBeNull()
     expect(hook!.mediaStream).toBeNull()
     expect(hook!.status).toBe('disconnected')
+  })
+
+  it('samples statistics only while enabled and clears them when disabled', async () => {
+    await openSignalingConnection()
+    const pc = await receiveOffer()
+    receiveTrack(pc)
+
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(pc.getStats).toHaveBeenCalledTimes(1)
+    expect(hook!.stats).not.toBeNull()
+
+    await act(async () => root.render(<Activity mode="visible"><Harness statsEnabled={false} /></Activity>))
+    expect(hook!.stats).toBeNull()
+    const callsWhenDisabled = pc.getStats.mock.calls.length
+    await act(async () => vi.advanceTimersByTimeAsync(3000))
+    expect(pc.getStats).toHaveBeenCalledTimes(callsWhenDisabled)
+
+    await act(async () => root.render(<Activity mode="visible"><Harness statsEnabled /></Activity>))
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(pc.getStats).toHaveBeenCalledTimes(callsWhenDisabled + 1)
   })
 
   it('does not overlap slow statistics requests', async () => {

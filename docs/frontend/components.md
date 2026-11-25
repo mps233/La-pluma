@@ -116,15 +116,15 @@ import { DeviceMonitorLayout } from '@/features/device-mirror'
 
 Props 是 discriminated union：`standard` 接收 `children` 与可选 `support`；`workbench` 接收 `sequence`、`editor`、`support`；`mode` 接收 `mode`、`content`。不提供列数、区域、间距或画面位置等通用网格配置。
 
-`standard` 提供 `support` 时，右列由布局渲染 `[data-monitor-area="support"]` 容器，容器内先渲染设备画面 `aside[data-monitor-area="monitor"]`，再渲染 `support` 内容；容器本身不带 landmark role，页面仍只有一个 `data-region="monitor"`。不提供 `support`（`undefined` 或 `null`）时 DOM 与未引入该属性前一致：`main` 之后是直接的 `aside[data-monitor-area="monitor"]`，不出现 `support` 容器。
+`standard` 始终渲染右列 `[data-monitor-area="support"]` 容器，容器内先渲染设备画面 `aside[aria-label="设备画面"]`，再渲染可选的 `support` 内容；容器本身不带 landmark role，页面仍只有一个 `data-region="monitor"`。`workbench` 的 monitor 同样使用 `aside[aria-label="设备画面"]`，`mode` 保持既有 `aside`。
 
-根节点输出 `data-device-monitor-layout="standard|workbench|mode"`，区域输出 `data-monitor-area`（`main`、`monitor`、`sequence`、`editor`、`support`、`mode`、`settings`）。`standard` 的 `main`/`monitor`（以及提供 `support` 时的 `support` 容器）和各 variant 的 `monitor` 由布局渲染；`workbench` 的 `sequence`/`editor`、`mode` 的 `mode` 以及 `main`/`settings` 由页面提供的根节点携带，布局不克隆或包裹这些节点。`mode` 的 `content` 保持页面传入的 `display: contents` 面板，由内部的 `main`/`settings` 参与网格。
+根节点输出 `data-device-monitor-layout="standard|workbench|mode"`，区域输出 `data-monitor-area`（`main`、`monitor`、`sequence`、`editor`、`support`、`mode`、`settings`）。`standard` 的 `main`、`monitor` 与 `support` 容器和各 variant 的 `monitor` 由布局渲染；`workbench` 的 `sequence`/`editor`、`mode` 的 `mode` 以及 `main`/`settings` 由页面提供的根节点携带，布局不克隆或包裹这些节点。`mode` 的 `content` 保持页面传入的 `display: contents` 面板，由内部的 `main`/`settings` 参与网格。
 
 `standard` 的 monitor 列与 `support` 容器在视口小于 1360px 且内容宽度超过 48rem 时使用 `max-width: 48rem` 并居中；视口达到 1360px 后改用三列网格并解除该上限。组件持有 grid 根节点 DOM、`monitor` 区域与 monitor 列；`workbench`/`mode` 的页面网格模板与断点仍由对应页面样式（`automation.css` / `roguelike.css`）提供，页面只通过 `data-monitor-area` 提供具名区域。
 
 `data-region="monitor"` 仍只由 `DeviceMonitorPanel` 的卡片输出，每个页面恰好一个。概览页的设备卡片不纳入此布局，不输出 `data-device-monitor-layout`，也不渲染 `data-region="monitor"`。
 
-共享设备画面样式归 `features/device-mirror/styles/device-mirror.css`：画面根节点为 `device-monitor-surface`，`workbench`/`mode` 的 monitor 列与面板为 `device-monitor-column` / `device-monitor-panel`，紧凑玻璃按钮为 `device-preview-glass-button`；`standard` 继续使用 `task-monitor-*` 布局类。页面不得新增 `automation-*` / `roguelike-*` monitor 类，也不得按 `data-page-kind` 切换设备画面样式。
+共享设备画面样式归 `features/device-mirror/styles/device-mirror.css`：画面根节点为 `device-monitor-surface`，`workbench`/`mode` 的 monitor 列与面板为 `device-monitor-column` / `device-monitor-panel`；`standard` 继续使用 `task-monitor-*` 布局类。默认表面扁平，不再提供 `device-preview-glass-button` 或 `--glass-*` 材质；设备画面的状态、模态窗与生命周期契约见[设备画面与预览](domains/device-mirror.md)。页面不得新增 `automation-*` / `roguelike-*` monitor 类，也不得按 `data-page-kind` 切换设备画面样式。
 
 ---
 
@@ -189,7 +189,7 @@ const FORMATION_OPTIONS: readonly SegmentedControlOption<FormationMode>[] = [
 />
 ```
 
-Props：`ariaLabel`、`value`、`options`（每项 `value`、`label`、可选 `disabled`）、`onChange`、`fullWidth`、`disabled`、`className`。控件使用 `role="group"` 与 `aria-pressed`，单选且始终保留一个选中项；点击已选项不会清空选择。按钮保持 `min-h-11` 触达高度，选中态沿用 `brand-action` 视觉。
+Props：`ariaLabel`、`value`、`options`（每项 `value`、`label`、可选 `disabled`）、`onChange`、`fullWidth`、`disabled`、`className`、`itemClassName`。`itemClassName` 用于调用点补充分段项的局部尺寸，不改变共享默认档位：设备预览用它把模式分段降到 32px 高、12px 字号（粗指针 36px），同时保留每项 44px 宽度。控件使用 `role="group"` 与 `aria-pressed`，单选且始终保留一个选中项；点击已选项不会清空选择。按钮默认 `min-h-11`，选中态沿用 `brand-action` 视觉。
 
 ---
 
@@ -505,8 +505,34 @@ Props：
 - `action` (ReactNode) - 可选操作，如刷新或新建。
 - `compact` (boolean) - 用于卡片内部的紧凑布局，默认 `false`。
 - `className` (string) - 仅在页面结构需要额外布局约束时使用。
+- 其余原生 `div` 属性（如 `role`、`aria-hidden`、`aria-live`）透传到根节点，用于错误空态与覆盖层过渡。
 
-卡片内部使用 `compact`，页面级空状态保留默认尺寸。已有自动化流程和掉落记录页使用该组件。
+卡片内部使用 `compact`，页面级空状态保留默认尺寸。已有自动化流程、掉落记录与设备画面使用该组件；设备画面在宽容器中通过域内 CSS 覆盖为横向布局。
+
+---
+
+### ConfigLoadCard
+
+**文件位置**：`apps/web/src/shared/components/ConfigLoadCard.tsx`
+
+**适用场景**：工作区配置读取中或读取失败时占住主列，同时保留 `DeviceMonitorLayout` 的设备画面。自动化与作业共用同一张加载/失败卡，避免两页各写一份固定高度面板。
+
+```tsx
+import { ConfigLoadCard } from '@/shared/components'
+
+<DeviceMonitorLayout variant="standard">
+  <ConfigLoadCard
+    failed={loadState === 'failed'}
+    title="自动化配置"
+    loadingMessage="正在读取自动化配置…"
+    failedMessage="自动化配置暂时不可用"
+    error={loadError}
+    onRetry={() => void reload({ force: true })}
+  />
+</DeviceMonitorLayout>
+```
+
+Props：`failed`、`title`（同时作为状态区无障碍名称）、`loadingMessage`、`failedMessage`、`error`、`retryLabel`（默认“重新加载”）与 `onRetry`。读取中输出 `role="status"`，失败输出 `role="alert"`；卡片高度固定，主列内容不因加载态跳变。
 
 ---
 
@@ -535,7 +561,7 @@ import { DialogBody, DialogFrame, DialogFrameFooter } from '@/shared/components'
 </DialogFrame>
 ```
 
-`DialogFrame` 的 props：`open`、`onOpenChange`、`title`、`description`、`toolbar`、`children`、`footer`、`layers`、`size`（`md` 为默认，另有 `lg`、`4xl`）、`closeDisabled`、`disablePointerDismissal`、`id`、`className`。`toolbar` 在标题栏与可滚动内容之间渲染固定工具栏（`data-slot="dialog-toolbar"`），不随 `DialogBody` 滚动；发现作业用它固定搜索与筛选条。`closeDisabled` 禁用标题栏关闭按钮，并拒绝 Escape、遮罩点击与关闭请求；保存或提交等待期间使用。`layers` 承载与对话框同一 Base UI root 的嵌套弹层（如发现作业中的详情抽屉），以保持 Escape 顺序与层级关系。`DialogBody` 是唯一可滚动内容区，透传原生 `div` 属性（如 `onScroll`）；`DialogFrameFooter` 透传 `div` 属性，`align` 为 `end`（默认）或 `between`。
+`DialogFrame` 的 props：`open`、`onOpenChange`、`title`、`description`、`toolbar`、`children`、`footer`、`layers`、`size`（`md` 为默认，另有 `lg`、`4xl`）、`closeDisabled`、`closeClassName`、`disablePointerDismissal`、`id`、`className`。`closeClassName` 只给标题栏关闭按钮追加调用点局部尺寸（例如预览模态窗的 44px 触达目标），不改变共享默认档位。`toolbar` 在标题栏与可滚动内容之间渲染固定工具栏（`data-slot="dialog-toolbar"`），不随 `DialogBody` 滚动；发现作业用它固定搜索与筛选条。`closeDisabled` 禁用标题栏关闭按钮，并拒绝 Escape、遮罩点击与关闭请求；保存或提交等待期间使用。`layers` 承载与对话框同一 Base UI root 的嵌套弹层（如发现作业中的详情抽屉），以保持 Escape 顺序与层级关系。`DialogBody` 是唯一可滚动内容区，透传原生 `div` 属性（如 `onScroll`）；`DialogFrameFooter` 透传 `div` 属性，`align` 为 `end`（默认）或 `between`。
 
 ---
 

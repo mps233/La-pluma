@@ -82,6 +82,16 @@ export const apiFixtures: ApiFixture[] = [
     }),
   },
   { path: '/agent/webrtc/status', payload: ok({ installed: true, built: true, serverRunning: false, agentRunning: false }) },
+  {
+    path: '/agent/config/resource-source',
+    payload: ok({
+      autoUpdate: true,
+      warnOnUpdateFailure: true,
+      source: 'git',
+      git: { backend: 'git', url: 'https://github.com/MaaAssistantArknights/MaaResource.git', branch: 'main' },
+      mirrorchyan: { cdkKind: 'none', checkInterval: 600 },
+    }),
+  },
 
   {
     path: '/agent/drops/today',

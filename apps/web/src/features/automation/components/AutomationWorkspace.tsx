@@ -2,13 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getErrorMessage, isRecord } from '@/shared/api'
 import { BREAKPOINTS } from '@/shared/lib/breakpoints'
 import { useReducedMotion } from 'framer-motion'
-import {
-  AlertTriangle,
-  LoaderCircle,
-} from 'lucide-react'
+import { ConfigLoadCard } from '@/shared/components'
 import { DeviceMonitorLayout } from '@/features/device-mirror'
-import { Button } from '@/shared/ui/button'
-import { Card } from '@/shared/ui/card'
 import { dismissNotice, notify } from '@/shared/notifications'
 import { useAutomationAvailability } from '@/features/runtime-status'
 import { useUserConfig } from '@/features/user-config'
@@ -408,39 +403,17 @@ export default function AutomationWorkspace() {
   }, [reloadConfig])
 
   if (configLoadState !== 'ready') {
-    const loadFailed = configLoadState === 'failed'
     return (
-      <Card
-        role={loadFailed ? 'alert' : 'status'}
-        aria-live={loadFailed ? 'assertive' : 'polite'}
-        className="h-40 gap-0 overflow-hidden p-0!"
-      >
-        <div className="flex h-full flex-col items-center justify-center gap-3 px-4 py-4 text-center">
-          {loadFailed
-            ? <AlertTriangle size={22} strokeWidth={1.9} className="text-destructive" aria-hidden="true" />
-            : <LoaderCircle size={22} strokeWidth={1.9} className="animate-spin" aria-hidden="true" />}
-          <div className="w-full min-w-0 space-y-1">
-            <p className="text-sm font-medium">
-              {loadFailed ? '自动化配置暂时不可用' : '正在读取自动化配置…'}
-            </p>
-            {loadFailed && (
-              <p className="line-clamp-2 wrap-break-word text-xs text-muted-foreground">
-                {configLoadError ?? '请稍后重新加载'}
-              </p>
-            )}
-          </div>
-          {loadFailed && (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => void reloadConfig({ force: true })}
-            >
-              重新加载
-            </Button>
-          )}
-        </div>
-      </Card>
+      <DeviceMonitorLayout variant="standard">
+        <ConfigLoadCard
+          failed={configLoadState === 'failed'}
+          title="自动化配置"
+          loadingMessage="正在读取自动化配置…"
+          failedMessage="自动化配置暂时不可用"
+          error={configLoadError}
+          onRetry={() => void reloadConfig({ force: true })}
+        />
+      </DeviceMonitorLayout>
     )
   }
 

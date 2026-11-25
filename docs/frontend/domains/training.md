@@ -51,7 +51,7 @@ OperatorTraining（app-page > app-stack-section > TrainingWorkspace）
 ```
 
 - **页面无请求。** `OperatorTraining` 不导入 API、Query、领域命令或 localStorage；它只组合页面壳与工作区，页面标题由顶栏统一提供。选择器开关仍在工作区；添加入口是队列卡右上角的纯 `+` 图标按钮（`aria-label="添加干员"`），空态不另设按钮，底部也没有「继续添加」行；读取中或读取失败时该图标按钮同样可用。
-- **设备画面由共享布局渲染。** 工作区内容放在 `DeviceMonitorLayout(standard)` 的 main 列，`DeviceMonitorPanel` 由布局放在 monitor 列；工作区不自建设备画面网格或画面卡片，设备画面类名与材质归 device-mirror 域。
+- **设备画面由共享布局渲染。** 工作区内容放在 `DeviceMonitorLayout(standard)` 的 main 列，`DeviceMonitorPanel` 由布局放在 monitor 列；工作区不自建设备画面网格或画面卡片，设备画面类名与样式归 device-mirror 域。
 - **共享版本边界在工作区（页面侧）。** 工作区是页面侧唯一同时持有队列快照、设置 revision 与计划 basis 的位置：队列供队列面板/材料面板/计划面板/选择器共用，`queueRevision`、`settingsRevision` 与队列快照中的 `gameDate`/`clientType` 在页面侧合流；计划所有者生成/应用前还会用 `currentBasis` 做同样的四项合并校验。
 - **队列写入仍归领域命令。** 工作区把 QueryClient 注入 `useTrainingQueueCommands()`，并把 `add`/`remove`/`undo`/`reorder` 的意图交给模块级命令所有者；写后刷新、重复合并、`uncertain` fallback 与失效发布都不在组件里。写入失败后的权威重读由工作区统一收尾触发，命令所有者本身只报告失败。
 - **面板可调用所属领域 hook；展示组件只接 props。** 选择器持有候选/计数 Query 与自身交互状态；计划、设置、队列面板只接收工作区投影与回调。计划范围切换、队列行操作、撤销提示关闭等局部交互都在最近的使用点。
