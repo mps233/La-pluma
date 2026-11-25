@@ -132,7 +132,7 @@ describe('AutoUpdateConfigOwner load', () => {
     expect(owner.getState().dirty).toBe(true)
     expect(owner.getState().feedback).toEqual({
       type: 'warning',
-      message: '自动更新设置读取失败: 配置目录不可读，已显示此设备上次保存的设置，请保存后重试',
+      message: '自动更新设置读取失败: 配置目录不可读，已显示此设备上次保存的设置，修改后将自动同步',
     })
   })
 
@@ -159,7 +159,7 @@ describe('AutoUpdateConfigOwner load', () => {
     expect(owner.getState().draft).toEqual(enabledConfig)
     expect(owner.getState().feedback).toEqual({
       type: 'warning',
-      message: '已载入此设备上次保存的自动更新设置，请保存后应用',
+      message: '已载入此设备上次保存的自动更新设置，修改后将自动同步',
     })
   })
 
@@ -191,6 +191,19 @@ describe('AutoUpdateConfigOwner draft', () => {
       feedback: null,
     })
     expect(store.get(AUTO_UPDATE_STORAGE_KEY)).toBe(JSON.stringify(owner.getState().draft))
+  })
+
+  it('ignores an edit that does not change any field', async () => {
+    const { owner, writeLocal } = createOwner()
+    await owner.load()
+    const before = owner.getState().draft
+    writeLocal.mockClear()
+
+    owner.update({ enabled: false, time: '04:00', updateCore: true, updateCli: true })
+
+    expect(owner.getState().draft).toBe(before)
+    expect(owner.getState().dirty).toBe(false)
+    expect(writeLocal).not.toHaveBeenCalled()
   })
 })
 
@@ -231,7 +244,7 @@ describe('AutoUpdateConfigOwner save', () => {
   it('still requires a successful scheduler call when auto-update is disabled', async () => {
     const { owner, schedule } = createOwner()
     schedule.mockResolvedValue({ success: false, message: '无法停止任务' })
-    owner.update({ enabled: false })
+    owner.update({ enabled: false, time: '05:30' })
 
     const outcome = await owner.save()
 

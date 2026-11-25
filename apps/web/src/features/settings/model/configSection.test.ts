@@ -4,17 +4,14 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   CONFIG_SECTION_EVENT,
   CONFIG_SECTION_STORAGE_KEY,
-  DEFAULT_CONFIG_SECTION,
   isConfigSectionId,
-  readConfigSection,
   subscribeConfigSection,
   writeConfigSection,
 } from './configSection'
 
-const createStorage = (initial: Record<string, string> = {}) => {
-  const values = new Map(Object.entries(initial))
+const createStorage = () => {
+  const values = new Map<string, string>()
   return {
-    getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => {
       values.set(key, value)
     },
@@ -22,25 +19,13 @@ const createStorage = (initial: Record<string, string> = {}) => {
   }
 }
 
-describe('config section state', () => {
+describe('config section compatibility', () => {
   it('keeps the existing storage key and window event names', () => {
     expect(CONFIG_SECTION_STORAGE_KEY).toBe('laPlumaConfigSection')
     expect(CONFIG_SECTION_EVENT).toBe('la-pluma-config-section')
-    expect(DEFAULT_CONFIG_SECTION).toBe('connection')
   })
 
-  it('reads only known sections and falls back to connection', () => {
-    expect(readConfigSection(createStorage({ [CONFIG_SECTION_STORAGE_KEY]: 'resource' }))).toBe('resource')
-    expect(readConfigSection(createStorage({ [CONFIG_SECTION_STORAGE_KEY]: 'unknown' }))).toBe('connection')
-    expect(readConfigSection(createStorage())).toBe('connection')
-    expect(readConfigSection({
-      getItem: () => {
-        throw new Error('storage unavailable')
-      },
-    })).toBe('connection')
-  })
-
-  it('persists section changes without propagating storage failures', () => {
+  it('persists the active section without propagating storage failures', () => {
     const storage = createStorage()
     writeConfigSection('instance', storage)
     expect(storage.values.get(CONFIG_SECTION_STORAGE_KEY)).toBe('instance')

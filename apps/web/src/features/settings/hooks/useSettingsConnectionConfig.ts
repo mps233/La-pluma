@@ -13,7 +13,7 @@ export interface UseSettingsConnectionConfigResult extends ConnectionConfigState
   /** 初始读取失败的错误；已有服务端数据或草稿时不再报告后台刷新失败。 */
   readonly loadError: string | null
   readonly update: (patch: Partial<MaaConnectionConfig>) => void
-  readonly restoreDefaults: () => boolean
+  readonly getState: () => ConnectionConfigState
   readonly save: () => Promise<ConnectionConfigSaveOutcome>
   /** 初始读取失败后的显式重试入口。 */
   readonly reload: () => void
@@ -43,8 +43,6 @@ export function useSettingsConnectionConfig(
     owner.update(patch)
   }, [owner])
 
-  const restoreDefaults = useCallback(() => owner.restoreDefaults(), [owner])
-
   const save = useCallback(() => owner.save(), [owner])
 
   const reload = useCallback(() => {
@@ -59,7 +57,7 @@ export function useSettingsConnectionConfig(
     ...state,
     loadError,
     update,
-    restoreDefaults,
+    getState: owner.getState,
     save,
     reload,
   }

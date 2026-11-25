@@ -10,13 +10,11 @@ import { useConfigDraftPanel, type ConfigDraftPanelOptions } from './useConfigDr
 
 const notifications = vi.hoisted(() => ({
   notify: vi.fn(),
-  notifyProgress: vi.fn(),
   dismissNotice: vi.fn(),
 }))
 
 vi.mock('@/shared/notifications', () => ({
   notify: notifications.notify,
-  notifyProgress: notifications.notifyProgress,
   dismissNotice: notifications.dismissNotice,
 }))
 
@@ -39,10 +37,9 @@ const baseOptions = (
 ): ConfigDraftPanelOptions<Record<string, unknown>> => ({
   label: '连接配置',
   noticeId: 'settings-config:connection',
-  savingMessage: '正在保存配置...',
   loadError: null,
-  loaded: true,
-  saving: false,
+  syncState: 'idle',
+  error: null,
   save: async () => ({ status: 'saved', config: {}, superseded: false }),
   ...overrides,
 })
@@ -63,7 +60,6 @@ const runSave = async () => {
 describe('useConfigDraftPanel notices', () => {
   beforeEach(() => {
     notifications.notify.mockReset()
-    notifications.notifyProgress.mockReset()
     notifications.dismissNotice.mockReset()
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -76,7 +72,22 @@ describe('useConfigDraftPanel notices', () => {
     container.remove()
   })
 
-  it('dismisses the progress notice when the save is ignored', async () => {
+  it('keeps automatic save success silent', async () => {
+    const save = vi.fn(async (): Promise<ConfigSaveOutcome<Record<string, unknown>>> => ({
+      status: 'saved',
+      config: {},
+      superseded: false,
+    }))
+    await renderPanel(baseOptions({ save }))
+
+    await runSave()
+
+    expect(notifications.dismissNotice).toHaveBeenCalledWith('settings-config:connection')
+    expect(notifications.notify).not.toHaveBeenCalled()
+    expect(latest?.feedback).toBeNull()
+  })
+
+  it('ignores an in-flight save without clearing other notices', async () => {
     const save = vi.fn(async (): Promise<ConfigSaveOutcome<Record<string, unknown>>> => ({
       status: 'ignored',
       config: {},
@@ -86,15 +97,35 @@ describe('useConfigDraftPanel notices', () => {
 
     await runSave()
 
-    expect(notifications.notifyProgress).toHaveBeenCalledWith(
-      '正在保存配置...',
-      'settings-config:connection',
-    )
-    expect(notifications.dismissNotice).toHaveBeenCalledWith('settings-config:connection')
     expect(notifications.notify).not.toHaveBeenCalled()
+    expect(notifications.dismissNotice).not.toHaveBeenCalled()
   })
 
-  it('replaces the progress notice when the save throws', async () => {
+  it('reports a failed save with a retry action', async () => {
+    const save = vi.fn(async (): Promise<ConfigSaveOutcome<Record<string, unknown>>> => ({
+      status: 'failed',
+      config: {},
+      superseded: false,
+      message: '磁盘只读',
+    }))
+    await renderPanel(baseOptions({ save }))
+
+    await runSave()
+
+    const action = notifications.notify.mock.calls[0]?.[2]?.action
+    expect(notifications.notify).toHaveBeenCalledWith(
+      '连接配置保存失败: 磁盘只读',
+      'error',
+      { id: 'settings-config:connection', action },
+    )
+    expect(action?.label).toBe('重试保存')
+
+    save.mockClear()
+    await act(async () => action.onClick())
+    expect(save).toHaveBeenCalledOnce()
+  })
+
+  it('reports a thrown save without an outcome', async () => {
     await renderPanel(baseOptions({
       save: async () => {
         throw new Error('disk offline')
@@ -106,29 +137,33 @@ describe('useConfigDraftPanel notices', () => {
     expect(notifications.notify).toHaveBeenCalledWith(
       '连接配置保存失败: disk offline',
       'error',
-      { id: 'settings-config:connection' },
+      expect.objectContaining({ id: 'settings-config:connection' }),
     )
+    expect(latest?.feedback).toBeNull()
   })
 
-  it('uses a non-progress notice for load failures and blocks save without starting progress', async () => {
-    const save = vi.fn()
-    await renderPanel(baseOptions({ loadError: 'offline', loaded: false, save }))
+  it('derives load and save feedback for the card', async () => {
+    await renderPanel(baseOptions({
+      loadError: 'offline',
+      syncState: 'failed',
+      error: '磁盘只读',
+    }))
 
-    expect(notifications.notify).toHaveBeenCalledWith(
-      '连接配置读取失败: offline（保存已禁用，请重试读取）',
-      'error',
-    )
+    expect(latest?.feedback).toEqual({
+      type: 'error',
+      message: '连接配置读取失败: offline',
+      retry: 'load',
+    })
+    expect(notifications.notify).toHaveBeenCalledWith('连接配置读取失败: offline', 'error')
 
-    notifications.notify.mockClear()
-    notifications.notifyProgress.mockClear()
-    await runSave()
+    await act(async () => {
+      root.render(<Harness {...baseOptions({ syncState: 'failed', error: '磁盘只读' })} />)
+    })
 
-    expect(notifications.notify).toHaveBeenCalledWith(
-      '连接配置读取失败，暂时无法保存',
-      'warning',
-      { id: 'settings-config:connection' },
-    )
-    expect(notifications.notifyProgress).not.toHaveBeenCalled()
-    expect(save).not.toHaveBeenCalled()
+    expect(latest?.feedback).toEqual({
+      type: 'error',
+      message: '连接配置保存失败: 磁盘只读',
+      retry: 'save',
+    })
   })
 })

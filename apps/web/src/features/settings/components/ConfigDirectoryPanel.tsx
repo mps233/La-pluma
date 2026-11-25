@@ -2,6 +2,7 @@ import { FolderOpen, RefreshCw } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
 import { notify } from '@/shared/notifications'
+import SettingsFeedback from './SettingsFeedback'
 import { useSettingsConfigDirectory } from '../hooks/useSettingsConfigDirectory'
 
 export default function ConfigDirectoryPanel() {
@@ -19,48 +20,42 @@ export default function ConfigDirectoryPanel() {
   }
 
   return (
-    <Card className="config-directory-card gap-0 p-0!">
-      <CardContent className="py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3.5">
-          <div className="flex min-w-0 items-start gap-3.5">
-            <span className="icon-well flex h-10 w-10 shrink-0 items-center justify-center rounded-lg brand-text">
-              <FolderOpen size={20} aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <h2 className="text-base font-semibold text-foreground">配置目录</h2>
-              {configDirStatus === 'error' ? (
-                <p className="mt-1 wrap-break-word text-sm text-danger wrap-anywhere" role="alert">{configDirError}</p>
-              ) : (
-                <p className="mt-1 wrap-break-word font-mono text-xs leading-5 text-muted-foreground wrap-anywhere" aria-live="polite">
-                  {configDirStatus === 'loading' ? '正在读取目录...' : configDir}
-                </p>
+    <Card>
+      <CardContent className="flex flex-wrap items-center justify-between gap-3.5">
+        <div className="min-w-0 flex-1">
+          {configDirStatus === 'error' ? (
+            <SettingsFeedback
+              tone="error"
+              message={configDirError ?? '配置目录读取失败'}
+              action={(
+                <Button
+                  onClick={() => void reloadConfigDir()}
+                  variant="outline"
+                  size="sm"
+                >
+                  <RefreshCw size={16} aria-hidden="true" />
+                  重试
+                </Button>
               )}
+            />
+          ) : (
+            <div className="flex min-w-0 items-start gap-2">
+              <FolderOpen size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-muted-foreground" />
+              <p className="min-w-0 wrap-break-word font-mono text-xs leading-5 text-muted-foreground wrap-anywhere" aria-live="polite">
+                {configDirStatus === 'loading' ? '正在读取目录...' : configDir}
+              </p>
             </div>
-          </div>
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-            {configDirStatus === 'error' && (
-              <Button
-                onClick={() => void reloadConfigDir()}
-                variant="outline"
-                size="sm"
-                className="flex-1 sm:flex-none"
-              >
-                <RefreshCw size={16} aria-hidden="true" />
-                重试
-              </Button>
-            )}
-            <Button
-              onClick={handleOpenConfigDir}
-              variant="outline"
-              size="sm"
-              className="flex-1 sm:flex-none"
-              disabled={configDirStatus !== 'ready' || !configDir}
-            >
-              <FolderOpen size={16} aria-hidden="true" />
-              打开目录
-            </Button>
-          </div>
+          )}
         </div>
+        <Button
+          onClick={handleOpenConfigDir}
+          variant="outline"
+          size="sm"
+          className="w-full sm:w-auto"
+          disabled={configDirStatus !== 'ready' || !configDir}
+        >
+          打开目录
+        </Button>
       </CardContent>
     </Card>
   )

@@ -1,8 +1,8 @@
 // 命令确认成功后依次：推进物品图标缓存 epoch；发布 catalog/materials/training-plan/
 // dashboard-snapshot 失效（CLI 更新不发布）；重取 settings/version。完成提示在 HTTP
-// 返回后立即发出，版本重取在后台继续；失败只展示反馈，不自动重发。
+// 返回后立即发出，版本重取在后台继续；失败只发全局提示，不自动重发。
 
-import { useCallback, useEffect, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react'
 import { invalidateItemIconCache } from '@/features/game-data'
 import { publishResourceInvalidation } from '@/features/resource-invalidation'
 import {
@@ -14,23 +14,19 @@ import {
 } from '@/shared/notifications'
 import {
   SETTINGS_UPDATE_RESOURCE_SCOPES,
-  resolveCoreChannelSwitch,
+  coreChannelLabel,
   settingsUpdateOwner,
   type SettingsUpdateOwner,
   type UpdateCommandOutcome,
-  type UpdateFeedback,
   type UpdateOperation,
 } from '../model/updateCommands'
+import type { CoreUpdateChannel } from '../types'
 
 export interface UseSettingsUpdatesResult {
   readonly running: UpdateOperation | null
-  readonly feedback: UpdateFeedback | null
   readonly busy: boolean
   readonly canceling: boolean
-  readonly updateCore: () => Promise<UpdateCommandOutcome>
-  readonly switchCoreChannel: (
-    currentCore?: string | null,
-  ) => Promise<UpdateCommandOutcome>
+  readonly updateCore: (version?: CoreUpdateChannel) => Promise<UpdateCommandOutcome>
   readonly updateCli: (channel?: string) => Promise<UpdateCommandOutcome>
   readonly updateResources: () => Promise<UpdateCommandOutcome>
   /** 停止在途更新；停止意图记录后仍等待 run 终态，不把请求返回当作已停止。 */
@@ -43,11 +39,19 @@ export function useSettingsUpdates(
   owner: SettingsUpdateOwner = settingsUpdateOwner,
 ): UseSettingsUpdatesResult {
   const state = useSyncExternalStore(owner.subscribe, owner.getState, owner.getState)
+  const retryResourcesRef = useRef<(() => void) | null>(null)
 
   const finish = useCallback(async (outcome: UpdateCommandOutcome) => {
     if (outcome.message) {
+      const action = outcome.feedback?.resourceRetry
+        ? {
+            label: '重试资源同步',
+            onClick: () => { retryResourcesRef.current?.() },
+          }
+        : undefined
       notify(outcome.message, outcome.messageType ?? detectNoticeType(outcome.message), {
         id: SETTINGS_UPDATE_NOTICE_ID,
+        ...(action ? { action } : {}),
       })
     } else {
       dismissNotice(SETTINGS_UPDATE_NOTICE_ID)
@@ -91,25 +95,26 @@ export function useSettingsUpdates(
     })
   ), [finish, owner])
 
-  const updateCore = useCallback(() => (
-    run('正在更新 MaaCore 并同步最新资源（大包下载最长可能需要约 15 分钟）...', () => owner.updateCore())
-  ), [owner, run])
-
-  const switchCoreChannel = useCallback((currentCore?: string | null) => {
-    const target = resolveCoreChannelSwitch(currentCore)
-    return run(
-      `正在切换到 ${target.label} 渠道（大包下载最长可能需要约 15 分钟）...`,
-      () => owner.switchCoreChannel(currentCore),
+  const updateCore = useCallback((version?: CoreUpdateChannel) => (
+    run(
+      version
+        ? `正在切换到 ${coreChannelLabel(version)} 渠道（大包下载最长可能需要约 15 分钟）...`
+        : '正在更新 MaaCore 并同步最新资源（大包下载最长可能需要约 15 分钟）...',
+      () => owner.updateCore(version),
     )
-  }, [owner, run])
+  ), [owner, run])
 
   const updateCli = useCallback((channel?: string) => (
     run('正在更新 MAA CLI...', () => owner.updateCli(channel))
   ), [owner, run])
 
   const updateResources = useCallback(() => (
-    run('正在热更新资源文件...', () => owner.updateResources())
+    run('正在更新资源...', () => owner.updateResources())
   ), [owner, run])
+
+  useEffect(() => {
+    retryResourcesRef.current = () => { void updateResources() }
+  }, [updateResources])
 
   const cancelUpdate = useCallback(async () => {
     const result = await owner.cancel()
@@ -124,11 +129,9 @@ export function useSettingsUpdates(
 
   return {
     running: state.running,
-    feedback: state.feedback,
     busy: state.running !== null,
     canceling: state.canceling,
     updateCore,
-    switchCoreChannel,
     updateCli,
     updateResources,
     cancelUpdate,

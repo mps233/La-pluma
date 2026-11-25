@@ -1,6 +1,3 @@
-import type { ReactNode } from 'react'
-import type { ConfigSectionId } from '../model/configSection'
-
 /** maa-cli `[connection].preset` 的受支持取值；`PlayTools` 读取时归一为 `PlayCover`。 */
 export const MAA_CONNECTION_PRESETS = ['ADB', 'MuMuPro', 'PlayCover', 'Waydroid', 'Androws'] as const
 export type MaaConnectionPreset = (typeof MAA_CONNECTION_PRESETS)[number]
@@ -106,10 +103,4 @@ export const CLI_UPDATE_CHANNEL_LABELS = {
 export interface UpdateChannels {
   core: CoreUpdateChannel
   cli: CliUpdateChannel
-}
-
-export interface ConfigSection {
-  id: ConfigSectionId
-  name: string
-  icon: ReactNode
 }

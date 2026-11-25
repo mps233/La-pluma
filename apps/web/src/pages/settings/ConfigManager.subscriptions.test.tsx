@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createQueryClient } from '@/shared/query'
+import { ThemeProvider } from '@/shared/theme/ThemeProvider'
 import { settingsAutoUpdateOwner } from '@/features/settings/model/autoUpdateConfig'
 import { settingsConnectionOwner } from '@/features/settings/model/connectionConfig'
 import { settingsDeviceConnectionOwner } from '@/features/settings/model/deviceConnection'
@@ -182,9 +183,11 @@ const settle = async () => {
 }
 
 const page = () => (
-  <QueryClientProvider client={queryClient}>
-    <ConfigManager />
-  </QueryClientProvider>
+  <ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ConfigManager />
+    </QueryClientProvider>
+  </ThemeProvider>
 )
 
 const buttonByText = (text: string) => (
@@ -210,6 +213,16 @@ const snapshot = () => ({ ...renderCounts })
 describe('ConfigManager panel subscriptions', () => {
   beforeEach(() => {
     localStorage.clear()
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
     mocks.getConfig.mockReset().mockResolvedValue({
       success: true,
       data: {
@@ -280,7 +293,7 @@ describe('ConfigManager panel subscriptions', () => {
     expect(initial.updates).toBeGreaterThan(0)
     expect(initial.autoUpdate).toBeGreaterThan(0)
 
-    await act(async () => buttonByText('查找模拟器')?.click())
+    await act(async () => buttonByText('查找设备')?.click())
     await flush()
 
     const afterDevice = snapshot()

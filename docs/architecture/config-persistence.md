@@ -186,7 +186,7 @@ function CombatWorkspace() {
 
 三域的未确认草稿始终优先于服务端读取；页面隐藏或卸载只清理 UI Effects，不取消协调器已经接受的串行提交。成功写入只有在 revision 与 pending 令牌仍匹配当前草稿时才能清除标记。迟到加载须同时通过加载序号、AbortSignal、revision 与 pending 校验，不得覆盖编辑。
 
-自动化的配置和 schedule 更新是一个完整提交单元：配置成功但 schedule 失败时必须保留 pending，显式重试整段操作，不得展示已同步状态。跨域应用养成计划前须先排空本设备的配置写入，若草稿仍未确认则拒绝覆盖；计划应用成功后使用失效端口强制重读，未确认草稿继续保留。设置页 MAA connection 不属于这个协调器，其读取令牌与草稿语义由[设置配置编辑与保存](../frontend/domains/settings.md#配置编辑与保存)独立约束。跨页失效作用域见[共享资源归属与失效端口](resource-ownership.md)，总览的原子快照规则见[总览完整快照与设备采样](../frontend/domains/dashboard.md#完整快照与设备采样)。
+自动化的配置和 schedule 更新是一个完整提交单元：配置成功但 schedule 失败时必须保留 pending，显式重试整段操作，不得展示已同步状态。跨域应用养成计划前须先排空本设备的配置写入，若草稿仍未确认则拒绝覆盖；计划应用成功后使用失效端口强制重读，未确认草稿继续保留。设置页 MAA connection 不属于这个协调器，其读取令牌与草稿语义由[设置配置编辑与保存](../frontend/domains/settings.md#配置编辑与保存)独立约束；该页的自动保存由 `features/settings/hooks/useAutoSave.ts` 在 `ConfigDraftOwner` 之上做防抖与冲刷，只读 owner 的 revision/dirty，不建立第二份草稿、revision 或保存队列。跨页失效作用域见[共享资源归属与失效端口](resource-ownership.md)，总览的原子快照规则见[总览完整快照与设备采样](../frontend/domains/dashboard.md#完整快照与设备采样)。
 
 ## 6. 三域适配边界
 

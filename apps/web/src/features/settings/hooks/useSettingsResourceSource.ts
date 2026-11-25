@@ -13,7 +13,7 @@ export interface UseSettingsResourceSourceResult extends ResourceSourceState {
   /** 初始读取失败的错误；已有服务端数据或草稿时不再报告后台刷新失败。 */
   readonly loadError: string | null
   readonly update: (patch: Partial<ResourceSourceDraft>) => void
-  readonly restoreDefaults: () => boolean
+  readonly getState: () => ResourceSourceState
   readonly save: () => Promise<ResourceSourceSaveOutcome>
   /** 初始读取失败后的显式重试入口。 */
   readonly reload: () => void
@@ -25,11 +25,9 @@ const describeLoadError = (error: unknown): string => (
 
 export function useSettingsResourceSource(
   owner: ResourceSourceOwner = settingsResourceSourceOwner,
-  enabled = true,
 ): UseSettingsResourceSourceResult {
   const options = useMemo(() => resourceSourceQueryOptions(owner), [owner])
-  // 面板常驻挂载但只有可见 section 需要读取；未启用时不发起请求。
-  const query = useQuery({ ...options, enabled })
+  const query = useQuery(options)
   const { refetch } = query
   const queryClient = useQueryClient()
   const state = useSyncExternalStore(owner.subscribe, owner.getState, owner.getState)
@@ -41,8 +39,6 @@ export function useSettingsResourceSource(
   const update = useCallback((patch: Partial<ResourceSourceDraft>) => {
     owner.update(patch)
   }, [owner])
-
-  const restoreDefaults = useCallback(() => owner.restoreDefaults(), [owner])
 
   const save = useCallback(async () => {
     const outcome = await owner.save()
@@ -65,7 +61,7 @@ export function useSettingsResourceSource(
     ...state,
     loadError,
     update,
-    restoreDefaults,
+    getState: owner.getState,
     save,
     reload,
   }

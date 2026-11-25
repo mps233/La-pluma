@@ -15,7 +15,7 @@ export type UpdateOperation = 'core' | 'core-channel' | 'cli' | 'resources'
 /**
  * 组件/资源更新成功后受影响的作用域。
  *
- * core 更新与渠道切换在服务端同时同步资源，因此与“仅同步游戏资源”一样发布
+ * core 更新与渠道切换在服务端同时同步资源，因此与“更新资源”一样发布
  * 目录、材料、计划前提与总览；CLI 更新只改变版本，不发布任何资源失效。
  * 不在这里清空缓存，也不发布未受影响的 `depot`/`operbox` 等识别快照。
  */
@@ -57,31 +57,18 @@ export interface UpdateCommandOutcome {
   readonly versionChanged: boolean
 }
 
-export interface CoreChannelSwitch {
-  readonly version: CoreUpdateChannel
-  readonly label: (typeof CORE_UPDATE_CHANNEL_LABELS)[CoreUpdateChannel]
-}
-
-export const coreChannelLabel = (version: CoreUpdateChannel): CoreChannelSwitch['label'] => (
+export const coreChannelLabel = (
+  version: CoreUpdateChannel,
+): (typeof CORE_UPDATE_CHANNEL_LABELS)[CoreUpdateChannel] => (
   CORE_UPDATE_CHANNEL_LABELS[version]
 )
 
 /** 由已安装版本推断当前渠道；版本读取失败（`null`）时按正式版处理。 */
-export const resolveCoreChannel = (currentCore: string | null | undefined): CoreUpdateChannel => (
-  typeof currentCore === 'string' && (currentCore.includes('beta') || currentCore.includes('alpha'))
-    ? 'beta'
-    : 'stable'
-)
-
-/**
- * 根据当前 core 版本决定切换目标：beta/alpha 切回正式版，其余切到 Beta。
- * 版本读取失败（`null`）时沿用迁移前的默认目标 Beta。
- */
-export const resolveCoreChannelSwitch = (
-  currentCore: string | null | undefined,
-): CoreChannelSwitch => {
-  const version: CoreUpdateChannel = resolveCoreChannel(currentCore) === 'beta' ? 'stable' : 'beta'
-  return { version, label: coreChannelLabel(version) }
+export const resolveCoreChannel = (currentCore: string | null | undefined): CoreUpdateChannel => {
+  if (typeof currentCore !== 'string') return 'stable'
+  if (currentCore.includes('alpha')) return 'alpha'
+  if (currentCore.includes('beta')) return 'beta'
+  return 'stable'
 }
 
 export const readUpdateFailureDetails = (
@@ -193,5 +180,5 @@ export const RESUMED_SUCCESS_EXECUTIONS: Record<UpdateOperation, UpdateExecution
   core: succeededExecution('MaaCore 和资源已更新', true, true),
   'core-channel': succeededExecution('MaaCore 和资源已更新', true, true),
   cli: succeededExecution('MAA CLI 更新成功', false, true),
-  resources: succeededExecution('资源文件更新成功', true, true),
+  resources: succeededExecution('资源已更新', true, true),
 }

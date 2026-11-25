@@ -143,7 +143,7 @@ publishResourceInvalidation({
 
 `detail` 可选，例如应用计划时携带 `{ stageCount }`；接收方不得依赖未声明字段。队列命令的 `detail.source = 'training-queue-command'` 与设置所有者的 `detail.source = 'training-settings-owner'` 是各自领域协议约定的字段，供本页忽略自己的发布；外部发布不需要携带它。
 
-资源更新由 `features/settings` 的 `SettingsUpdateOwner` 在服务端确认成功后发布：core 更新与渠道切换在服务端同时同步资源，和“仅同步游戏资源”一样发布上表四个作用域，并推进物品图标缓存 epoch 使同一路径的新图换用新 URL；CLI 更新只改变 CLI 版本，不发布任何资源作用域，也不推进图标 epoch。失败、取消与参数校验失败不发布。版本刷新由同一适配层失效 `settings/version`，不经过该端口。
+资源更新由 `features/settings` 的 `SettingsUpdateOwner` 在服务端确认成功后发布：core 更新与渠道切换在服务端同时同步资源，和“更新资源”一样发布上表四个作用域，并推进物品图标缓存 epoch 使同一路径的新图换用新 URL；CLI 更新只改变 CLI 版本，不发布任何资源作用域，也不推进图标 epoch。失败、取消与参数校验失败不发布。版本刷新由同一适配层失效 `settings/version`，不经过该端口。
 
 ## 6. 各消费页面的失效接收
 

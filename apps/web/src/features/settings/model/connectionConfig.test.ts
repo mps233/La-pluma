@@ -257,46 +257,6 @@ describe('connection config owner', () => {
     }))
   })
 
-  it('restores the page defaults as a draft without writing the server', async () => {
-    const write = vi.fn<WriteRequest>(async () => ({ success: true }))
-    const owner = createOwner(write)
-    const token = owner.beginRead()
-    owner.adoptServer({
-      config: connection({ address: '10.0.0.2:5555' }),
-      readToken: token,
-    })
-    owner.update({ address: '127.0.0.1:5555' })
-
-    expect(owner.restoreDefaults()).toBe(true)
-    expect(owner.getState()).toMatchObject({
-      draft: DEFAULT_CONNECTION_CONFIG,
-      persisted: connection({ address: '10.0.0.2:5555' }),
-      dirty: true,
-      syncState: 'idle',
-    })
-    expect(write).not.toHaveBeenCalled()
-
-    const revisionBefore = owner.getState().revision
-    expect(owner.restoreDefaults()).toBe(false)
-    expect(owner.getState().revision).toBe(revisionBefore + 1)
-  })
-
-  it('ignores reset while a save is in flight', async () => {
-    const pending = deferred<ApiResponse<unknown>>()
-    const owner = createOwner(() => pending.promise)
-    adoptDefaultServer(owner)
-    owner.update({ address: '127.0.0.1:5555' })
-    const saving = owner.save()
-    const revisionBefore = owner.getState().revision
-
-    expect(owner.restoreDefaults()).toBe(false)
-    expect(owner.getState().draft.address).toBe('127.0.0.1:5555')
-    expect(owner.getState().revision).toBe(revisionBefore)
-
-    pending.resolve({ success: true })
-    await saving
-  })
-
   it('resets all owner state for a new session', () => {
     const owner = createOwner()
     adoptDefaultServer(owner)

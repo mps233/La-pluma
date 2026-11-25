@@ -132,7 +132,7 @@ Props 是 discriminated union：`standard` 接收 `children` 与可选 `support`
 
 **文件位置**：`apps/web/src/shared/components/SegmentedTabs.tsx`（组合 `@/shared/ui/tabs` 的 shadcn Base UI 原语）
 
-**适用场景**：页面内一级视图切换，例如配置 section、作业类型、肉鸽模式与统计视图。三个同源导出必须一起使用：`SegmentedTabs` 提供受控 Tabs 上下文，`SegmentedTabNav` 渲染分段标签，`SegmentedTabPanel` 渲染对应面板。页面不再手写 tablist、`aria-pressed` 按钮或高亮测量。
+**适用场景**：页面内一级视图切换，例如作业类型、肉鸽模式与统计视图。三个同源导出必须一起使用：`SegmentedTabs` 提供受控 Tabs 上下文，`SegmentedTabNav` 渲染分段标签，`SegmentedTabPanel` 渲染对应面板。页面不再手写 tablist、`aria-pressed` 按钮或高亮测量。
 
 ```tsx
 import { SegmentedTabs, SegmentedTabNav, SegmentedTabPanel } from '@/shared/components'
@@ -160,7 +160,7 @@ import { SegmentedTabs, SegmentedTabNav, SegmentedTabPanel } from '@/shared/comp
 - `SegmentedTabs` 的根节点使用 `display: contents`，不引入额外布局层；tab 导航与面板可以继续作为原网格或弹性布局的直接子项。
 - `SegmentedTabNav` 保留 `app-workspace-segments`、`app-workspace-segment-list`、`app-workspace-segment-indicator`、`app-workspace-segment(-icon|-copy)`、`is-selected` 与流体高亮；分段容器保持透明，高亮指示器使用语义 token（`--muted` 背景与 `--border` 内描边），不再消费 `--glass-*` 或页面级玻璃类名。`className`、`listClassName`、`indicatorClassName`、`tabClassName`、`iconClassName` 只承载页面差异；测量复用 `useFluidTabIndicator`，不要逐页复制。
 - 标签使用 Base UI 的 tablist/tab 语义，`activateOnFocus` 固定为 `false`：左右方向键、Home、End 只移动 roving focus，Enter、Space 或点击才切换选中项。不要恢复方向键直接激活的旧行为。
-- `tabId` / `panelId` 可选：传入时提供稳定 id 与 `aria-controls`，省略时由 Base UI 生成并注册关联。`panelId` 只能指向当前实际渲染的面板；默认卸载的页面只在当前 tab 上返回 `panelId`，避免 `aria-controls` 指向不存在的元素。`SegmentedTabPanel` 的 `id` 同样可选；输出 `role="tabpanel"` 与 `aria-labelledby`。如果给面板传 `id`，对应 tab 必须传相同的 `panelId`；或者两侧都省略，交给 Base UI 生成。只传一侧会破坏关联。不传 `keepMounted` 时隐藏面板卸载，传 `true` 时保留 DOM 并设置 `hidden`。配置与统计需要保留草稿、反馈、Query 与统计周期，使用 `keepMounted`；作业使用默认卸载；肉鸽使用始终打开的单个 `contents` 面板承载跨 grid-area 内容。
+- `tabId` / `panelId` 可选：传入时提供稳定 id 与 `aria-controls`，省略时由 Base UI 生成并注册关联。`panelId` 只能指向当前实际渲染的面板；默认卸载的页面只在当前 tab 上返回 `panelId`，避免 `aria-controls` 指向不存在的元素。`SegmentedTabPanel` 的 `id` 同样可选；输出 `role="tabpanel"` 与 `aria-labelledby`。如果给面板传 `id`，对应 tab 必须传相同的 `panelId`；或者两侧都省略，交给 Base UI 生成。只传一侧会破坏关联。不传 `keepMounted` 时隐藏面板卸载，传 `true` 时保留 DOM 并设置 `hidden`。统计需要保留周期与反馈，使用 `keepMounted`；作业使用默认卸载；肉鸽使用始终打开的单个 `contents` 面板承载跨 grid-area 内容。
 - 无法把整块内容包进面板时（例如肉鸽网格的多个 grid-area），保留原网格，把模式相关区域放进单个 `className="contents"` 的面板，并让所有 tab 指向同一个 `panelId`。
 
 ---
@@ -216,7 +216,7 @@ import { LoaderCircle, RefreshCw, Save } from 'lucide-react'
 
 图标作为按钮的 children 直接渲染，并添加 `aria-hidden="true"`；图标尺寸由生成组件的内建规则处理，不要在调用处传旧的 `icon` prop 或覆盖图标与文字间距。无文字操作使用 `size="icon"` 档位，调用时必须同时提供 `title` 和 `aria-label`。
 
-loading 不是 `Button` 的 prop：调用点用 `disabled` 阻止重复提交，加 `aria-busy`，并用 `LoaderCircle` 与进行中文案替换原内容；不存在 `loadingText`。同一操作不要叠加第二个旋转图标。
+loading 不是 `Button` 的 prop：调用点用 `disabled` 阻止重复提交，加 `aria-busy`，并用 `LoaderCircle` 与进行中文案替换原内容；不存在 `loadingText`。同一操作不要叠加第二个旋转图标。需要保持文案稳定的局部命令按钮（如设备面板的查找与测试按钮）可只禁用并设置 `aria-busy`，不替换文案、不加图标。
 
 工作流页的页面级主执行/停止按钮允许在调用点使用 `min-h-11`（44px）作为触达高度例外；它不是新的 `size` 档位，也不得用其它高度工具类改写其他控件度量。规则见[设计规范](../../DESIGN.md#buttons)。
 
@@ -272,6 +272,34 @@ import { Separator } from '@/shared/ui/separator'
 ```
 
 `orientation` 默认为 `horizontal`；垂直分隔传 `vertical`，并用 `className` 约束高度。肉鸽执行进度面板不再使用装饰性分隔。
+
+---
+
+### Item - 列表项容器
+
+**文件位置**：`apps/web/src/shared/ui/item.tsx`（shadcn 生成物）
+
+**适用场景**：列表、搜索结果的只读或可点击行。组合 `ItemMedia`、`ItemContent`、`ItemTitle`、`ItemDescription`、`ItemActions` 统一行内布局；可点击行通过 `render={<button type="button" />}` 渲染为按钮，不要用 `div` 加 `onClick`。
+
+```tsx
+import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from '@/shared/ui/item'
+import { Badge } from '@/shared/ui/badge'
+
+<Item
+  render={<button type="button" onClick={() => selectDevice(device.address)} />}
+  className="text-left"
+>
+  <ItemContent className="min-w-0">
+    <ItemTitle className="block w-full truncate">{device.address}</ItemTitle>
+    <ItemDescription className="line-clamp-1 text-xs">{device.details}</ItemDescription>
+  </ItemContent>
+  <ItemActions>
+    <Badge variant="ghost" className="status-success">已连接</Badge>
+  </ItemActions>
+</Item>
+```
+
+`ItemGroup` 固定输出 `role="list"`，只适合子项也是列表语义的场景；把 `Item` 渲染成 `button` 时用普通容器包裹，避免 `list` 下出现 `button` 子项。行内有状态标签时使用非交互 `Badge`，不要再用自绘 `span`。
 
 ---
 
@@ -346,6 +374,29 @@ import { Switch } from '@/shared/ui/switch'
 错误态给控件传 `aria-invalid`，需要与错误文本建立关联时再传 `aria-errormessage`；错误文本使用 `form-error-text`，不要在页面里单独手写红色边框。`Select` 由 Root、`SelectTrigger`、`SelectValue`、`SelectContent` 与 `SelectItem` 组合，受控值通过 `value` / `onValueChange` 传递；选项数组传给 Root 的 `items`，`SelectValue` 才能显示当前标签。
 
 `autoComplete="off"` 是消费点（feature field helper 或直接调用处）的契约，不是 `@/shared/ui/input` 原语的默认值。配置值与搜索词在新增输入时显式关闭浏览器自动填充历史，确实需要浏览器记住输入时才改为显式传入其他值。
+
+---
+
+### Field / Label - 表单字段布局
+
+**文件位置**：`apps/web/src/shared/ui/field.tsx`、`apps/web/src/shared/ui/label.tsx`（shadcn 生成物）
+
+**适用场景**：组合字段标签、控件、说明与错误。`Field` 提供 `vertical` / `horizontal` / `responsive` 三种方向；`FieldLabel`、`FieldDescription`、`FieldError` 分别承担标签、说明与错误；`Label` 用于包裹单个 `Checkbox` 等控件。
+
+```tsx
+import { Field, FieldContent, FieldDescription, FieldLabel } from '@/shared/ui/field'
+import { Switch } from '@/shared/ui/switch'
+
+<Field orientation="horizontal" className="min-h-11">
+  <FieldContent className="gap-1">
+    <FieldLabel htmlFor="auto-reconnect" className="text-foreground">自动重连</FieldLabel>
+    <FieldDescription className="text-xs text-muted-foreground">连接中断后自动尝试恢复</FieldDescription>
+  </FieldContent>
+  <Switch id="auto-reconnect" aria-label="自动重连" checked={autoReconnect} onCheckedChange={setAutoReconnect} />
+</Field>
+```
+
+新表单优先用 `Field` 组合，不要再用裸 `<label>` + `<p>` 手写字段行。开关行使用 `orientation="horizontal"`，标签与说明放 `FieldContent`，控件作为兄弟节点；多行字段使用默认纵向布局。`FieldGroup` 的默认间距是 `gap-5`，需要 14px 卡片节奏时在调用点显式覆盖（`gap-3.5!`）。`Field` 的 `gap-*` 同样会与生成物默认值竞争，必要时使用 `!` 明确覆盖。
 
 ---
 
@@ -565,7 +616,7 @@ notifyProgress(message: string, id: string): string
 dismissNotice(id?: string): void
 ```
 
-同一流程复用固定 id，后续更新会替换原通知而不是堆叠。固定 id：`execution`（自动化、作业、肉鸽与 Dashboard 执行）、`statistics`（识别与材料）、`settings-update`（组件更新）、`settings-update-channel`（更新渠道保存）、`settings-auto-update`（自动更新保存）、`settings-config:connection` / `settings-config:instance` / `settings-config:resource-source`（设置草稿保存）、`combat-preview`（作业预览）、`combat-queue-preview`（搜索作业加入队列）、`combat-paradox-search`（悖论模拟搜索）、`dashboard-connection`（概览连接告警）、`roguelike-config-save`（肉鸽配置保存/恢复）、`automation-config-save`（自动化配置保存/恢复）、`automation-connection-test`（测试连接）、`automation-deleted-task`（删除任务撤销）、`automation-restore-blocked`（运行中拒绝恢复）、`automation-notification-load`（通知配置读取）、`automation-notification-test`（测试通知）、`automation-notification-save`（通知配置保存）。开始用 `notifyProgress(message, id)`；有终态文案时用同一 id 的 `notify(..., { id })` 替换；没有终态文案时才 `dismissNotice(id)` 收起进度。不传 `type` 时按文案推断；错误默认常驻到用户关闭，成功默认约 2.5 秒，警告与信息默认约 4 秒。`duration` 可显式覆盖，进度通知默认不自动消失。`description` 与 `action` 原样传给 sonner，只用于需要补充说明或内联动作的通知。应用最多同时显示 3 条通知；`AppToaster` 为每条通知提供关闭按钮（无障碍名称「关闭通知」）。
+同一流程复用固定 id，后续更新会替换原通知而不是堆叠。固定 id：`execution`（自动化、作业、肉鸽与 Dashboard 执行）、`statistics`（识别与材料）、`settings-update`（组件更新）、`settings-update-channel`（更新渠道保存）、`settings-auto-update`（自动更新保存）、`settings-config:connection` / `settings-config:instance` / `settings-config:resource-source`（设置草稿保存）、`settings-connection-test`（设置连接测试）、`combat-preview`（作业预览）、`combat-queue-preview`（搜索作业加入队列）、`combat-paradox-search`（悖论模拟搜索）、`dashboard-connection`（概览连接告警）、`roguelike-config-save`（肉鸽配置保存/恢复）、`automation-config-save`（自动化配置保存/恢复）、`automation-connection-test`（测试连接）、`automation-deleted-task`（删除任务撤销）、`automation-restore-blocked`（运行中拒绝恢复）、`automation-notification-load`（通知配置读取）、`automation-notification-test`（测试通知）、`automation-notification-save`（通知配置保存）。开始用 `notifyProgress(message, id)`；有终态文案时用同一 id 的 `notify(..., { id })` 替换；没有终态文案时才 `dismissNotice(id)` 收起进度。不传 `type` 时按文案推断；错误默认常驻到用户关闭，成功默认约 2.5 秒，警告与信息默认约 4 秒。`duration` 可显式覆盖，进度通知默认不自动消失。`description` 与 `action` 原样传给 sonner，只用于需要补充说明或内联动作的通知。应用最多同时显示 3 条通知；`AppToaster` 为每条通知提供关闭按钮（无障碍名称「关闭通知」）。
 
 概览的连接告警使用常驻 toast：`offline` 时以固定 id `dashboard-connection` 发送 warning 与 `description`，不附带 action；`unavailable` 时发送 error、`description` 与「重试连接」action。连接恢复自动 `dismissNotice`；toast 由应用根渲染，不参与页面布局。
 

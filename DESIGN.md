@@ -250,8 +250,9 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 
 ### Hierarchy
 - **Page title / chrome 页面标题** (600, `1.5rem` / `1.35`)：顶栏唯一的 `h1`，直接使用当前工作区名称；桌面与移动端同字号，`document.title` 使用同一来源，页面内不再重复页头。
-- **Headline / 区块标题** (600, `1.125rem` / `1.45`)：`CardHeader`、主要内容区标题。
-- **Title / 卡片标题** (600, `1rem` / `1.4`)：紧凑区块、列表分组和卡片内标题。
+- **Headline / 区块标题** (600, `1.125rem` / `1.45`)：卡片外的页面区块标题（如设置页的 `h2`）与主要内容区标题。
+- **Title / 卡片标题** (600, `1rem` / `1.4`)：紧凑区块、列表分组和卡片内标题；设置页的卡片不再重复区块标题。
+- **Subsection / 卡片子区块** (500, `0.875rem` / `1.5`)：卡片内 `h3` 子区块与设置行标签使用同一字重，靠语义与位置区分，不额外加粗。
 - **Body / 正文与表单标签** (400–500, `0.875rem` / `1.5`)：描述、输入标签、普通按钮；多行正文使用 `leading-6` 或 `1.6`。
 - **Caption / 辅助说明** (400, `0.75rem` / `1.5`)：元数据、提示、筛选标签。
 - **Meta / 微标签** (500, `0.6875rem` / `1.4`)：序号、时间戳、短 ID；`11px` 是正文类文字的下限。
@@ -262,6 +263,8 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 **The No-Tracking Rule.** 中文标题、正文和按钮不新增 letter spacing；只有英文全大写微标签可以使用更宽字距。
 
 **The 11px Floor Rule.** `8px` 至 `10px` 不得承载中文正文、操作名或重要状态；`11px` 仅用于序号、时间戳和短元数据。
+
+**The Row Label Rule.** 设置行统一单行：标签在左、控件在右；标签使用 `text-sm font-medium text-foreground`。卡片内 `h3` 子区块（如设备连接、自动更新、MaaCore、MAA CLI）沿用同一字号与字重。不要标签在上、控件在下，也不要在不同卡片混用 muted、foreground 或额外加粗的标签。
 
 ## Layout
 
@@ -277,6 +280,9 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 - 卡片内边距 `16px`；卡片内部紧密间距 `14px`（`gap-3.5`）；区块间距 `18px`（`gap-4.5`）；页面外层 `20px`，移动端 `14px`。不要用大量 `space-y-6`、`gap-6`、`p-6` 手写版式基准。
 - 常规信息卡片使用 `repeat(2, minmax(0, 1fr))`；主次栏建议保持约 `1.1–1.75 : 0.9–1`，工具/筛选窄栏最小约 `16rem`。每一列都要有 `minmax(0, ...)` 或 `min-w-0`，避免长文本横向溢出。
 - 阅读型长文本在自己的内容区单独限制行宽；不要把整页内容压成一条窄栏，也不要在内容容器内重复收窄整页宽度。
+- 页内目录用于长表单页（当前为设置页）：`xl` 及以上在右侧使用 `13rem` sticky 目录，小于 `xl` 隐藏；目录不设可见标题、图标、描述或胶囊底，当前项使用 2px 主色左引导线与 foreground 文字，其余为 muted。高亮由滚动位置驱动，跳转复用 `--layout-content-sticky-top` 偏移。
+- 带页内目录的页面允许在内容区使用 `max-w-6xl` 的局部宽度，确保表单行与目录不被拉满；普通工作台页仍不嵌套同用途的 `max-w-*`。
+- 设置页区块之间使用 `2.5rem`，区块标题与卡片之间 `0.75rem`，目录与内容列之间 `2.5rem`。区块标题在卡片外，使用 Headline；卡片不再重复标题。卡片内子区块使用 Subsection，设置行遵循 The Row Label Rule。
 
 ### Responsive Shell
 
@@ -288,7 +294,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 - 页面内提供 skip links：`跳到主要内容` 指向 `#main-content`；`跳到主导航` 在桌面（`1024px` 及以上）指向侧栏 `#app-sidebar-navigation`，在移动/平板指向 tabbar `#app-tabbar-navigation`。链接默认移出视口，`:focus` 时固定显示在左上角并避开安全区；未聚焦时不占布局，不可用的那一个在对应断点 `display: none`，不进入焦点顺序。
 - 路由 pathname 变化后，焦点移到 `<main id="main-content" tabIndex="-1">`，并通过常驻的 `#page-announcement`（`role="status"`、`aria-live="polite"`、`aria-atomic="true"`）播报 `已切换到<页面名>`。首次挂载不聚焦、不播报；启动期 URL 归一化（replace）同样不触发。当前焦点位于 `role="dialog"` / `role="alertdialog"` 内时不抢焦点。`document.title` 继续使用同一页面标题源。
 - 移动 tabbar 的 `<footer>` 保持在 `<main>` 之后，以维持 landmark 与阅读顺序；不要为了 DOM 顺序把 footer 移到 main 之前，直达导航由 `跳到主导航` skip link 提供。
-- 主题由 `useUIStore` 的 `light`、`dark`、`system` 管理，并同步到文档根节点和 `.la-pluma-app`。组件或页面不要直接操作 `.dark`，也不要创建局部主题开关。
+- 明暗与主题由 `ThemeProvider` / `lpn-ui` 管理：顶栏 `ThemeToggle` 只切换 `light`、`dark`、`system`；主题（`themeId`）由设置页「外观」卡片切换。两者都同步到文档根节点和 `.la-pluma-app`。组件或页面不要直接操作 `.dark`，也不要创建局部主题开关。
 - `apps/web/index.html` 使用 `viewport-fit=cover`。`Layout` 通过统一 token 管理 navbar、移动 tabbar 和对应安全区高度；自定义 fixed/sticky 层只有在不属于这些 chrome 时才使用 `env(safe-area-inset-*)`，内容区不要重复叠加顶部或底部 inset。
 - `--layout-navbar-safe-height` 等于 navbar 高度加顶部安全区，是 navbar 最小高度、滚动宿主高度、内容顶部留白与滚动遮罩的共同来源；页面样式不要手写 navbar 高度或重新拼接 `env(safe-area-inset-top)`。
 - 内容 sticky 顶部偏移统一使用 `--layout-content-sticky-top`：桌面为 `1rem`，移动/平板壳层（小于 `1024px`，navbar 覆盖滚动宿主）为 `calc(var(--layout-navbar-safe-height) + 1rem)`。移动壳层内的 sticky 内容从 navbar 与安全区之下开始，滚动时保持在 tabbar 预留区域之上，不进入尾部渐隐遮罩。
@@ -373,7 +379,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 - **Danger:** 使用 `destructive` variant（`bg-destructive/10` + `text-destructive`），语义必须与操作后果一致。
 - **Ghost:** 透明底、文字继承 `foreground`；hover 使用 `bg-muted`。
 - **Focus:** `focus-visible:border-ring` 与 `focus-visible:ring-3 focus-visible:ring-ring/50`；所有可点击元素都必须有明确的 `focus-visible` 状态。
-- **Disabled / Loading:** disabled 使用 `pointer-events-none`、`opacity-50`，关闭点击与 hover；loading 由调用点用 `disabled` + `aria-busy` 表达，并以 `LoaderCircle` 和进行中文案替换内容。不要在调用处叠加 `h-*`、`px-*`、`py-*` 缩小标准控件。
+- **Disabled / Loading:** disabled 使用 `pointer-events-none`、`opacity-50`，关闭点击与 hover；loading 默认由调用点用 `disabled` + `aria-busy` 表达，并以 `LoaderCircle` 和进行中文案替换内容。需要保持文案稳定的局部命令按钮（如设备面板的查找与测试按钮、渠道切换）可只禁用并设置 `aria-busy`，不替换文案、不加图标。不要在调用处叠加 `h-*`、`px-*`、`py-*` 缩小标准控件。
 
 ### Inputs / Fields
 - **Style:** 32px 高（`h-8`）、`rounded-lg`（12px）的 shadcn `Input`；`bg-transparent`、边框与状态色使用 shadcn 语义 token，深色模式由生成物的 `dark:bg-input/30` 叠加。
@@ -414,7 +420,7 @@ La Pluma Next 是一个高密度的本地自动化控制台，不是营销页面
 | 局部内容正在读取 | `Loading` |
 | 列表、流程或卡片无数据 | `EmptyState`，按容器选择 `compact` |
 | 区域读取失败 | 在原区域显示可恢复的错误与重试操作；不要改成空状态 |
-| 全局结果与错误 | `notify`（sonner `AppToaster`）；错误常驻到关闭，其他类型按默认时长收起，最多同时显示 3 条。同一流程使用固定 id 复用通知（`execution`、`statistics`、`settings-update`、`settings-update-channel`、`settings-auto-update`、`settings-config:connection`、`settings-config:instance`、`settings-config:resource-source`、`combat-preview`、`combat-queue-preview`、`combat-paradox-search`、`logs`、`logs-coverage`、`logs-hidden-matches`、`logs-refresh`），进度用 `notifyProgress`；有终态文案时用同一 id 替换，没有终态文案时才 `dismissNotice` |
+| 全局结果与错误 | `notify`（sonner `AppToaster`）；错误常驻到关闭，其他类型按默认时长收起，最多同时显示 3 条。同一流程使用固定 id 复用通知（`execution`、`statistics`、`settings-update`、`settings-update-channel`、`settings-auto-update`、`settings-config:connection`、`settings-config:instance`、`settings-config:resource-source`、`settings-connection-test`、`combat-preview`、`combat-queue-preview`、`combat-paradox-search`、`logs`、`logs-coverage`、`logs-hidden-matches`、`logs-refresh`），进度用 `notifyProgress`；有终态文案时用同一 id 替换，没有终态文案时才 `dismissNotice` |
 | 删除、清空等不可逆操作 | 使用 `AlertDialog` 或应用层 `ConfirmAlertDialog`；新代码不得使用 `window.confirm` |
 
 日志控制台、养成筛选空结果等固定高度或高密度区域可保留专用状态样式。局部表单成功提示、日志提示等需要紧邻操作区或可手动关闭时，也可保留在面板内。全局通知统一走 `shared/notifications` 的 `notify`、`notifyProgress` 与 `dismissNotice`，由应用根挂载的 sonner `AppToaster` 渲染；撤销提示使用 `UndoToastCard`，不要让页面自建第二套 toast。

@@ -9,7 +9,7 @@ export type ConfigSyncState = 'idle' | 'saving' | 'failed'
 export interface ConfigDraftState<T extends Record<string, unknown>> {
   readonly draft: T
   readonly persisted: T
-  /** 草稿可观察版本；编辑、重置、采用服务端值与保存成功都会推进。 */
+  /** 草稿可观察版本；编辑、采用服务端值与保存成功都会推进。 */
   readonly revision: number
   readonly dirty: boolean
   readonly syncState: ConfigSyncState
@@ -217,29 +217,7 @@ export class ConfigDraftOwner<T extends Record<string, unknown>> {
   }
 
   /**
-   * 恢复页面原有默认值。只改草稿，不写服务端；即使内容没变也推进 revision，
-   * 使重置前发出的读取不能把服务端旧值带回来。首次读取被采纳前与保存进行中时忽略。
-   */
-  restoreDefaults(): boolean {
-    if (!this.state.loaded) return false
-    if (this.state.syncState === 'saving') return false
-
-    const next = this.clone(this.createDefault())
-    const changed = !this.equal(next, this.state.draft)
-    this.state = {
-      ...this.state,
-      draft: next,
-      revision: this.state.revision + 1,
-      dirty: !this.equal(next, this.state.persisted),
-      syncState: 'idle',
-      error: null,
-    }
-    this.notify()
-    return changed
-  }
-
-  /**
-   * 显式保存当前草稿。
+   * 保存当前草稿。
    *
    * 首次服务端读取被采纳前（`loaded` 为 false）拒绝保存，避免把页面默认值
    * 写回服务端；保存期间允许继续编辑：响应返回时只有 revision 未变才把当前

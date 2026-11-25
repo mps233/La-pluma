@@ -13,7 +13,7 @@ export interface UseSettingsInstanceOptionsResult extends InstanceOptionsState {
   /** 初始读取失败的错误；已有服务端数据或草稿时不再报告后台刷新失败。 */
   readonly loadError: string | null
   readonly update: (patch: Partial<MaaInstanceOptions>) => void
-  readonly restoreDefaults: () => boolean
+  readonly getState: () => InstanceOptionsState
   readonly save: () => Promise<InstanceOptionsSaveOutcome>
   /** 初始读取失败后的显式重试入口。 */
   readonly reload: () => void
@@ -26,14 +26,12 @@ const describeLoadError = (error: unknown): string => (
 export function useSettingsInstanceOptions(
   owner: InstanceOptionsOwner = settingsInstanceOptionsOwner,
   profileName = 'default',
-  enabled = true,
 ): UseSettingsInstanceOptionsResult {
   const options = useMemo(
     () => instanceOptionsQueryOptions(profileName, owner),
     [owner, profileName],
   )
-  // 面板常驻挂载但只有可见 section 需要读取；未启用时不发起请求。
-  const query = useQuery({ ...options, enabled })
+  const query = useQuery(options)
   const { refetch } = query
   const state = useSyncExternalStore(owner.subscribe, owner.getState, owner.getState)
 
@@ -44,8 +42,6 @@ export function useSettingsInstanceOptions(
   const update = useCallback((patch: Partial<MaaInstanceOptions>) => {
     owner.update(patch)
   }, [owner])
-
-  const restoreDefaults = useCallback(() => owner.restoreDefaults(), [owner])
 
   const save = useCallback(() => owner.save(), [owner])
 
@@ -61,7 +57,7 @@ export function useSettingsInstanceOptions(
     ...state,
     loadError,
     update,
-    restoreDefaults,
+    getState: owner.getState,
     save,
     reload,
   }

@@ -12,11 +12,7 @@ let container: HTMLDivElement
 let root: Root
 
 const baseProps: ConfigEditorCardProps = {
-  title: '连接配置',
   feedback: null,
-  saving: false,
-  onSave: () => {},
-  onReset: () => {},
   children: <div>表单内容</div>,
 }
 
@@ -31,7 +27,7 @@ const findButton = (label: string): HTMLButtonElement => {
   return button
 }
 
-describe('ConfigEditorCard save gating', () => {
+describe('ConfigEditorCard auto save shell', () => {
   beforeEach(() => {
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -43,74 +39,52 @@ describe('ConfigEditorCard save gating', () => {
     container.remove()
   })
 
-  it('disables save and exposes the blocked reason while the config is not loaded', async () => {
-    const onSave = vi.fn()
-    await renderCard({
-      saveDisabled: true,
-      saveBlockedReason: '连接配置正在读取，加载完成后才能保存',
-      onSave,
-    })
+  it('renders no save or reset buttons', async () => {
+    await renderCard()
 
-    const saveButton = findButton('保存')
-    expect(saveButton.disabled).toBe(true)
-
-    const blocked = container.querySelector('[role="status"]')
-    expect(blocked?.textContent).toBe('连接配置正在读取，加载完成后才能保存')
-
-    await act(async () => saveButton.click())
-    expect(onSave).not.toHaveBeenCalled()
-  })
-
-  it('enables save and drops the blocked reason once the config is loaded', async () => {
-    const onSave = vi.fn()
-    await renderCard({
-      saveDisabled: false,
-      saveBlockedReason: null,
-      onSave,
-    })
-
-    const saveButton = findButton('保存')
-    expect(saveButton.disabled).toBe(false)
-    expect(container.querySelector('[role="status"]')).toBeNull()
-
-    await act(async () => saveButton.click())
-    expect(onSave).toHaveBeenCalledOnce()
-  })
-
-  it('does not stack the blocked reason on top of an existing load error feedback', async () => {
-    await renderCard({
-      feedback: { type: 'error', message: '连接配置读取失败: 网络错误' },
-      saveDisabled: true,
-      saveBlockedReason: '连接配置读取失败，暂时无法保存',
-    })
-
-    expect(container.querySelector('[role="status"]')).toBeNull()
-    const errorFeedback = container.querySelector('[role="alert"]')
-    expect(errorFeedback?.textContent).toBe('连接配置读取失败: 网络错误')
-  })
-
-  it('disables reset while the first server read is not adopted yet', async () => {
-    const onReset = vi.fn()
-    await renderCard({ editingDisabled: true, onReset })
-
-    const resetButton = findButton('重置')
-    expect(resetButton.disabled).toBe(true)
-
-    await act(async () => resetButton.click())
-    expect(onReset).not.toHaveBeenCalled()
+    const labels = [...container.querySelectorAll('button')].map(button => button.textContent?.trim())
+    expect(labels).not.toContain('保存')
+    expect(labels).not.toContain('重置')
   })
 
   it('offers an explicit retry entry after a failed read', async () => {
     const onRetryLoad = vi.fn()
     await renderCard({
-      feedback: { type: 'error', message: '连接配置读取失败: 配置不可读' },
+      feedback: { type: 'error', message: '连接配置读取失败: 配置不可读', retry: 'load' },
       onRetryLoad,
     })
 
-    const retryButton = findButton('重新读取')
-    expect(retryButton.disabled).toBe(false)
+    expect(container.querySelector('[role="status"]')).toBeNull()
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('连接配置读取失败: 配置不可读')
 
-    await act(async () => retryButton.click())
+    await act(async () => findButton('重新读取').click())
     expect(onRetryLoad).toHaveBeenCalledOnce()
+  })
+
+  it('offers a retry entry after a failed automatic save', async () => {
+    const onRetrySave = vi.fn()
+    await renderCard({
+      feedback: { type: 'error', message: '连接配置保存失败: 磁盘只读', retry: 'save' },
+      onRetrySave,
+    })
+
+    await act(async () => findButton('重试保存').click())
+    expect(onRetrySave).toHaveBeenCalledOnce()
+  })
+
+  it('flushes when a field inside the card loses focus', async () => {
+    const onFieldBlur = vi.fn()
+    await renderCard({
+      onFieldBlur,
+      children: <input aria-label="地址" />,
+    })
+
+    const input = container.querySelector('input')
+    if (!input) throw new Error('找不到输入框')
+    await act(async () => {
+      input.focus()
+      input.blur()
+    })
+    expect(onFieldBlur).toHaveBeenCalled()
   })
 })

@@ -1,5 +1,5 @@
 // 自动更新是“保存用户配置 + 应用服务端调度”的完整提交：读取先走服务端 auto-update，
-// 失败回退本机草稿；只有显式保存才写服务端，两步都成功才算成功，调度失败不回滚配置。
+// 失败回退本机草稿；保存由自动保存调度触发，两步都成功才算成功，调度失败不回滚配置。
 // 读取携带开始时的 revision 与 touched 守卫；保存期间允许编辑，响应仅 revision 未变时才确认。
 
 import {
@@ -172,8 +172,8 @@ export class AutoUpdateConfigOwner {
 
         if (config) {
           const message = serverError
-            ? `${serverError}，已显示此设备上次保存的设置，请保存后重试`
-            : '已载入此设备上次保存的自动更新设置，请保存后应用'
+            ? `${serverError}，已显示此设备上次保存的设置，修改后将自动同步`
+            : '已载入此设备上次保存的自动更新设置，修改后将自动同步'
           return this.setFeedback('local-fallback', { type: 'warning', message })
         }
       }
@@ -188,9 +188,15 @@ export class AutoUpdateConfigOwner {
     return { status: 'empty', feedback: null }
   }
 
-  /** 接受一次策略编辑；任何编辑都推进 revision 并写本地草稿。 */
+  /** 接受一次策略编辑；内容未变化的编辑不推进 revision，也不触发自动保存。 */
   update(patch: Partial<AutoUpdateConfig>): void {
     const next = { ...this.state.draft, ...patch }
+    if (
+      next.enabled === this.state.draft.enabled
+      && next.time === this.state.draft.time
+      && next.updateCore === this.state.draft.updateCore
+      && next.updateCli === this.state.draft.updateCli
+    ) return
     this.touched = true
     this.revision += 1
     this.state = {

@@ -14,6 +14,7 @@ export interface UseSettingsDeviceConnectionResult {
   readonly discovery: DeviceDiscoveryState
   readonly test: ConnectionTestState
   readonly discover: (adbPath: string) => void
+  readonly cancelDiscovery: () => void
   readonly testConnection: (adbPath: string, address: string) => void
   readonly selectDevice: (device: DiscoveredDevice) => void
   readonly clearTestFeedback: () => void
@@ -26,6 +27,10 @@ export function useSettingsDeviceConnection(
 
   const discover = useCallback((adbPath: string) => {
     void owner.discover(adbPath)
+  }, [owner])
+
+  const cancelDiscovery = useCallback(() => {
+    owner.cancelDiscovery()
   }, [owner])
 
   const testConnection = useCallback((adbPath: string, address: string) => {
@@ -44,6 +49,7 @@ export function useSettingsDeviceConnection(
     discovery: state.discovery,
     test: state.test,
     discover,
+    cancelDiscovery,
     testConnection,
     selectDevice,
     clearTestFeedback,

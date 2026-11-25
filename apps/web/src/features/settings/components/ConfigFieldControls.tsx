@@ -1,7 +1,11 @@
 import type { ComponentProps } from 'react'
+import { cn } from 'cn'
 import { Checkbox } from '@/shared/ui/checkbox'
+import { Field, FieldDescription, FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
+
+const controlClassName = 'min-w-0 flex-1 sm:max-w-72'
 
 export function ConfigFieldInput({
   id,
@@ -17,11 +21,19 @@ export function ConfigFieldInput({
 } & ComponentProps<'input'>) {
   const hintId = `${id}-hint`
   return (
-    <div className={className}>
-      <label htmlFor={id} className="mb-2 block text-sm font-medium text-muted-foreground">{label}</label>
-      <Input id={id} autoComplete="off" aria-describedby={hint ? hintId : undefined} {...inputProps} />
-      {hint && <p id={hintId} className="mt-2 text-xs text-tertiary">{hint}</p>}
-    </div>
+    <Field orientation="horizontal" className={cn('min-h-11 gap-3.5', className)}>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <FieldLabel htmlFor={id} className="text-sm font-medium whitespace-nowrap text-foreground">{label}</FieldLabel>
+        {hint && <FieldDescription id={hintId} className="text-xs leading-5 text-muted-foreground">{hint}</FieldDescription>}
+      </div>
+      <Input
+        id={id}
+        autoComplete="off"
+        aria-describedby={hint ? hintId : undefined}
+        className={controlClassName}
+        {...inputProps}
+      />
+    </Field>
   )
 }
 
@@ -48,15 +60,18 @@ export function ConfigFieldSelect({
 }: ConfigFieldSelectProps) {
   const hintId = `${id}-hint`
   return (
-    <div className={className}>
-      <label htmlFor={id} className="mb-2 block text-sm font-medium text-muted-foreground">{label}</label>
+    <Field orientation="horizontal" className={cn('min-h-11 gap-3.5', className)}>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <FieldLabel htmlFor={id} className="text-sm font-medium whitespace-nowrap text-foreground">{label}</FieldLabel>
+        {hint && <FieldDescription id={hintId} className="text-xs leading-5 text-muted-foreground">{hint}</FieldDescription>}
+      </div>
       <Select
         items={items}
         value={value}
         onValueChange={(next, details) => { if (details.reason === 'none' || next === null) return; onValueChange(next) }}
         disabled={disabled}
       >
-        <SelectTrigger id={id} aria-describedby={hint ? hintId : undefined} className="w-full">
+        <SelectTrigger id={id} aria-describedby={hint ? hintId : undefined} className={controlClassName}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -65,26 +80,32 @@ export function ConfigFieldSelect({
           ))}
         </SelectContent>
       </Select>
-      {hint && <p id={hintId} className="mt-2 text-xs text-tertiary">{hint}</p>}
-    </div>
+    </Field>
   )
 }
 
 export function ConfigFieldCheckbox({
+  id,
   label,
   checked,
   disabled,
   onCheckedChange,
 }: {
+  id: string
   label: string
   checked: boolean
   disabled?: boolean
   onCheckedChange: (checked: boolean) => void
 }) {
   return (
-    <label className="group flex min-h-11 cursor-pointer items-center gap-2 text-sm text-muted-foreground">
-      <Checkbox checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} />
-      <span className="transition-colors group-hover:text-primary">{label}</span>
-    </label>
+    <Field orientation="horizontal" className="min-h-11 gap-3.5">
+      <FieldLabel htmlFor={id} className="text-sm font-medium whitespace-nowrap text-foreground">{label}</FieldLabel>
+      <Checkbox
+        id={id}
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        disabled={disabled}
+      />
+    </Field>
   )
 }

@@ -25,7 +25,6 @@ export interface SegmentedTabNavProps<T extends string> {
   className?: string
   listClassName?: string
   indicatorClassName?: string
-  indicatorTestId?: string
   tabClassName?: string
   iconClassName?: string
   disabled?: boolean
@@ -100,7 +99,6 @@ export function SegmentedTabNav<T extends string>({
   className,
   listClassName,
   indicatorClassName,
-  indicatorTestId,
   tabClassName,
   iconClassName,
   disabled,
@@ -120,7 +118,6 @@ export function SegmentedTabNav<T extends string>({
       >
         {activeRect.width > 0 && (
           <motion.div
-            data-testid={indicatorTestId}
             aria-hidden="true"
             className={cn('app-workspace-segment-indicator', indicatorClassName)}
             initial={false}

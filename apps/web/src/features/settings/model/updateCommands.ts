@@ -7,15 +7,16 @@ import {
   getErrorMessage,
   type ApiResponse,
 } from '@/shared/api'
+import type { CoreUpdateChannel } from '../types'
 import {
   hotUpdateResources as defaultHotUpdateResources,
   updateMaaCli as defaultUpdateMaaCli,
   updateMaaCore as defaultUpdateMaaCore,
 } from '../api'
 import {
+  coreChannelLabel,
   failedExecution,
   initialUpdateState,
-  resolveCoreChannelSwitch,
   shouldRetryUpdateResources,
   succeededExecution,
   terminalExecution,
@@ -78,45 +79,29 @@ export class SettingsUpdateOwner {
     this.notify()
   }
 
-  /** 普通 core 更新：不传版本，服务端使用 `maa update` 并同步资源。 */
-  async updateCore(): Promise<UpdateCommandOutcome> {
-    return this.run('core', async () => {
+  /**
+   * 普通 core 更新不传版本，服务端使用 `maa update` 并同步资源；传入渠道时
+   * 服务端以 `install <channel> --force` 安装并持久化渠道。
+   */
+  async updateCore(version?: CoreUpdateChannel): Promise<UpdateCommandOutcome> {
+    const operation: UpdateOperation = version ? 'core-channel' : 'core'
+    return this.run(operation, async () => {
       const { response, terminal } = await this.submitAndWait(
         'update_core',
-        () => this.updateCoreRequest(),
+        () => this.updateCoreRequest(version),
       )
       if (!response.success) {
         return failedExecution(getErrorMessage(response), shouldRetryUpdateResources(response))
       }
       if (terminal) {
-        const outcome = terminalExecution(terminal, TERMINAL_FAILURE_POLICIES.core)
+        const outcome = terminalExecution(terminal, TERMINAL_FAILURE_POLICIES[operation])
         if (outcome) return outcome
       }
-      const message = terminal
-        ? 'MaaCore 和资源已更新'
-        : (response.message || 'MaaCore 和资源已更新')
-      return succeededExecution(message, true, true)
-    })
-  }
-
-  /** 切换 core 渠道；服务端以 install --force 安装并同步资源。 */
-  async switchCoreChannel(
-    currentCore: string | null | undefined,
-  ): Promise<UpdateCommandOutcome> {
-    const target = resolveCoreChannelSwitch(currentCore)
-    return this.run('core-channel', async () => {
-      const { response, terminal } = await this.submitAndWait(
-        'update_core',
-        () => this.updateCoreRequest(target.version),
-      )
-      if (!response.success) {
-        return failedExecution(getErrorMessage(response), shouldRetryUpdateResources(response))
-      }
-      const message = `已切换到 ${target.label} 渠道并同步最新资源`
-      if (terminal) {
-        const outcome = terminalExecution(terminal, TERMINAL_FAILURE_POLICIES['core-channel'])
-        if (outcome) return outcome
-      }
+      const message = version
+        ? `已切换到 ${coreChannelLabel(version)} 渠道并同步最新资源`
+        : terminal
+          ? 'MaaCore 和资源已更新'
+          : (response.message || 'MaaCore 和资源已更新')
       return succeededExecution(message, true, true)
     })
   }
@@ -143,7 +128,7 @@ export class SettingsUpdateOwner {
     })
   }
 
-  /** 仅同步游戏资源；任何失败都可以直接重试资源同步。 */
+  /** 更新资源；任何失败都可以直接重试资源同步。 */
   async updateResources(): Promise<UpdateCommandOutcome> {
     return this.run('resources', async () => {
       const { response, terminal } = await this.submitAndWait(
@@ -157,8 +142,7 @@ export class SettingsUpdateOwner {
         const outcome = terminalExecution(terminal, TERMINAL_FAILURE_POLICIES.resources)
         if (outcome) return outcome
       }
-      const message = terminal ? '资源文件更新成功' : (response.message || '资源文件更新成功')
-      return succeededExecution(message, true, true)
+      return succeededExecution('资源已更新', true, true)
     })
   }
 

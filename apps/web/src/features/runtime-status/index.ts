@@ -26,5 +26,5 @@ export type {
   RuntimeDiagnosticsLoadStatus,
   RuntimeDiagnosticsState,
 } from './hooks/useRuntimeDiagnostics'
-export { useStatusStore } from './store/statusStore'
+export { IDLE_RUN_STATUS, useStatusStore } from './store/statusStore'
 export { isRunStatusBusy } from './utils/runStatus'

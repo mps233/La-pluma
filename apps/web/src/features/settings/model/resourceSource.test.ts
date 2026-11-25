@@ -124,7 +124,7 @@ describe('resource source owner', () => {
     apiMocks.saveResourceSource.mockReset()
   })
 
-  it('tracks nested edits and detects a restore to the persisted value', () => {
+  it('tracks nested edits', () => {
     const owner = createOwner()
     const token = owner.beginRead()
     owner.adoptServer({ config: normalizeResourceSourceDraft(serverView())!, readToken: token })
@@ -133,8 +133,7 @@ describe('resource source owner', () => {
       mirrorchyan: { ...owner.getState().draft.mirrorchyan, checkInterval: 60 },
     })).toBe(true)
     expect(owner.getState().dirty).toBe(true)
-    expect(owner.restoreDefaults()).toBe(true)
-    expect(owner.getState().draft).toEqual(DEFAULT_RESOURCE_SOURCE_DRAFT)
+    expect(owner.getState().draft.mirrorchyan.checkInterval).toBe(60)
   })
 
   it('saves through the resource source endpoint and keeps nested values intact', async () => {

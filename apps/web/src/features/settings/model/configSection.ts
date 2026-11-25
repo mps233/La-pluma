@@ -2,19 +2,17 @@ export const CONFIG_SECTION_IDS = ['connection', 'resource', 'instance'] as cons
 
 export type ConfigSectionId = (typeof CONFIG_SECTION_IDS)[number]
 
-/** 兼容既有本地存储键；改名会让用户的 section 选择失效。 */
+/** 兼容既有本地存储键；改名会让外部读取的上次停留记录失效。 */
 export const CONFIG_SECTION_STORAGE_KEY = 'laPlumaConfigSection'
 
-/** 兼容既有 window 事件；外部代码可据此把设置页切到指定 section。 */
+/** 兼容既有 window 事件；外部代码可据此把设置页滚到指定 section。 */
 export const CONFIG_SECTION_EVENT = 'la-pluma-config-section'
-
-export const DEFAULT_CONFIG_SECTION: ConfigSectionId = 'connection'
 
 export const isConfigSectionId = (value: unknown): value is ConfigSectionId => (
   typeof value === 'string' && (CONFIG_SECTION_IDS as readonly string[]).includes(value)
 )
 
-const defaultStorage = (): Pick<Storage, 'getItem' | 'setItem'> | null => {
+const defaultStorage = (): Pick<Storage, 'setItem'> | null => {
   try {
     return typeof localStorage === 'undefined' ? null : localStorage
   } catch {
@@ -30,20 +28,7 @@ const defaultTarget = (): Pick<Window, 'addEventListener' | 'removeEventListener
   }
 }
 
-/** 读取已保存的 section；缺失、非法或存储不可用时回退 connection。 */
-export function readConfigSection(
-  storage: Pick<Storage, 'getItem'> | null = defaultStorage(),
-): ConfigSectionId {
-  if (!storage) return DEFAULT_CONFIG_SECTION
-  try {
-    const saved = storage.getItem(CONFIG_SECTION_STORAGE_KEY)
-    return isConfigSectionId(saved) ? saved : DEFAULT_CONFIG_SECTION
-  } catch {
-    return DEFAULT_CONFIG_SECTION
-  }
-}
-
-/** 写入 section；存储失败不应阻断页面内切换。 */
+/** 记录当前停留的配置 section；存储失败不应阻断页面内滚动。 */
 export function writeConfigSection(
   section: ConfigSectionId,
   storage: Pick<Storage, 'setItem'> | null = defaultStorage(),
@@ -52,12 +37,12 @@ export function writeConfigSection(
   try {
     storage.setItem(CONFIG_SECTION_STORAGE_KEY, section)
   } catch {
-    // 本地存储不可用时 section 只在当前页面实例内生效。
+    // 本地存储不可用时只保留当前页面内的高亮状态。
   }
 }
 
 /**
- * 订阅外部 section 切换。忽略非法 detail；返回注销函数，调用方必须在
+ * 订阅外部 section 定位请求。忽略非法 detail；返回注销函数，调用方必须在
  * Effect cleanup 中执行，避免 Activity 隐藏或页面卸载后遗留监听。
  */
 export function subscribeConfigSection(
