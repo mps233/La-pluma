@@ -1,4 +1,5 @@
-import { ChevronDown, Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
+import { Disclosure } from '@/shared/components'
 import { Button } from '@/shared/ui/button'
 import { FieldFlagCheckbox, FieldInput, FieldSelect } from './InfrastScheduleFieldControls'
 import {
@@ -203,65 +204,57 @@ export default function InfrastScheduleRoomsEditor({ plan, disabled, onChange }:
         const state = getInfrastFacilityState(plan, facility.key)
         const rooms = readInfrastFacilityRooms(plan, facility.key)
         return (
-          <details key={facility.key} className="group rounded-lg border border-border px-3 py-2">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3.5 text-sm font-medium text-foreground marker:hidden [&::-webkit-details-marker]:hidden">
-              <span className="flex items-center gap-2">
-                <ChevronDown size={15} strokeWidth={2} className="transition-transform group-open:rotate-180" aria-hidden="true" />
-                {facility.label}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {facilityStateLabels[state]}{state === 'rooms' ? ` · ${rooms.length} 间` : ''}
-              </span>
-            </summary>
+          <Disclosure
+            key={facility.key}
+            label={facility.label}
+            meta={`${facilityStateLabels[state]}${state === 'rooms' ? ` · ${rooms.length} 间` : ''}`}
+          >
+            <FieldSelect
+              id={`${facility.key}-facility-state`}
+              label="设施处理方式"
+              ariaLabel={`${facility.label}设施处理方式`}
+              items={facilityStateOptions}
+              value={state}
+              disabled={disabled}
+              onValueChange={value => onChange(setInfrastFacilityState(plan, facility.key, value as InfrastFacilityState))}
+            />
 
-            <div className="mt-3 space-y-3 border-t border-border pt-3">
-              <FieldSelect
-                id={`${facility.key}-facility-state`}
-                label="设施处理方式"
-                ariaLabel={`${facility.label}设施处理方式`}
-                items={facilityStateOptions}
-                value={state}
-                disabled={disabled}
-                onValueChange={value => onChange(setInfrastFacilityState(plan, facility.key, value as InfrastFacilityState))}
-              />
-
-              {state === 'default' && (
-                <p className="text-xs leading-5 text-muted-foreground">未配置该设施，MAA 使用默认算法换班。</p>
-              )}
-              {state === 'keep' && (
-                <p className="text-xs leading-5 text-muted-foreground">
-                  整个设施保持原样，不换人也不换产物；会客室线索、训练室继续训练等设施级操作照常执行。
-                </p>
-              )}
-              {state === 'rooms' && (
-                <>
-                  {rooms.map((room, index) => (
-                    <RoomEditor
-                      key={index}
-                      facility={facility.key}
-                      index={index}
-                      room={room}
-                      disabled={disabled}
-                      onChange={next => onChange(updateInfrastFacilityRoom(plan, facility.key, index, next))}
-                      onRemove={() => onChange(removeInfrastFacilityRoom(plan, facility.key, index))}
-                    />
-                  ))}
-                  {rooms.length === 0 && (
-                    <p className="text-xs leading-5 text-muted-foreground">添加房间后按序号生效；数组短于实际房间数时，剩余房间保持原样。</p>
-                  )}
-                  <Button
-                    variant="secondary"
-                    size="sm"
+            {state === 'default' && (
+              <p className="text-xs leading-5 text-muted-foreground">未配置该设施，MAA 使用默认算法换班。</p>
+            )}
+            {state === 'keep' && (
+              <p className="text-xs leading-5 text-muted-foreground">
+                整个设施保持原样，不换人也不换产物；会客室线索、训练室继续训练等设施级操作照常执行。
+              </p>
+            )}
+            {state === 'rooms' && (
+              <>
+                {rooms.map((room, index) => (
+                  <RoomEditor
+                    key={index}
+                    facility={facility.key}
+                    index={index}
+                    room={room}
                     disabled={disabled}
-                    onClick={() => onChange(appendInfrastFacilityRoom(plan, facility.key))}
-                  >
-                    <Plus size={15} aria-hidden="true" />
-                    添加房间
-                  </Button>
-                </>
-              )}
-            </div>
-          </details>
+                    onChange={next => onChange(updateInfrastFacilityRoom(plan, facility.key, index, next))}
+                    onRemove={() => onChange(removeInfrastFacilityRoom(plan, facility.key, index))}
+                  />
+                ))}
+                {rooms.length === 0 && (
+                  <p className="text-xs leading-5 text-muted-foreground">添加房间后按序号生效；数组短于实际房间数时，剩余房间保持原样。</p>
+                )}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={disabled}
+                  onClick={() => onChange(appendInfrastFacilityRoom(plan, facility.key))}
+                >
+                  <Plus size={15} aria-hidden="true" />
+                  添加房间
+                </Button>
+              </>
+            )}
+          </Disclosure>
         )
       })}
     </div>

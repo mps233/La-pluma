@@ -1,6 +1,7 @@
 import { LoaderCircle } from 'lucide-react'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
+import { Item, ItemContent, ItemTitle } from '@/shared/ui/item'
 import type { CopilotMatchMode, CopilotSearchItem } from '../types'
 import type { CombatCopilotDiscoveryView } from './combatPanelTypes'
 import {
@@ -26,7 +27,7 @@ export interface CombatCopilotDiscoveryCardProps {
 const MATCH_BADGE_TONES: Readonly<Record<CopilotMatchMode, string>> = {
   ready: 'bg-success/10 text-success-text',
   borrow: 'bg-primary-soft text-primary-strong',
-  train: 'bg-warning/15 text-warning',
+  train: 'bg-warning/15 text-warning-text',
   check: 'bg-muted text-muted-foreground',
   blocked: 'bg-destructive/10 text-destructive',
 }
@@ -71,49 +72,56 @@ export default function CombatCopilotDiscoveryCard({
         </div>
       )}
 
-      <button
-        type="button"
-        className="combat-copilot-discovery-card-main"
-        aria-label={`查看作业 ${title}`}
-      >
-        <span className="combat-copilot-discovery-card-stage">
-          <span className="combat-copilot-discovery-card-code">{stage.code}</span>
-          {stage.label && <span className="combat-copilot-discovery-card-label">{stage.label}</span>}
-        </span>
-        <span className="combat-copilot-discovery-card-title">{title}</span>
-        {operators.length > 0 && (
-          <span className="combat-copilot-discovery-card-operators">
-            {visibleOperators.map((name, index) => {
-              const owned = ownedOperatorNames.has(name)
-              const ownershipClass = !ownershipKnown
-                ? 'is-unknown'
-                : owned ? 'is-owned' : 'is-missing'
-              const ownershipLabel = !ownershipKnown
-                ? '拥有状态未知'
-                : owned ? '已拥有' : '未拥有'
-              return (
-                <span
-                  key={`${name}-${index}`}
-                  className={`combat-copilot-discovery-operator-chip ${ownershipClass}`}
-                  title={`${name}（${ownershipLabel}）`}
-                >
-                  {name}
-                </span>
-              )
-            })}
-            {hiddenOperatorCount > 0 && (
-              <span className="combat-copilot-discovery-operator-chip is-more">+{hiddenOperatorCount}</span>
-            )}
-          </span>
+      <Item
+        render={(
+          <button
+            type="button"
+            aria-label={`查看作业 ${title}`}
+          />
         )}
-        <span className="combat-copilot-discovery-card-meta">
-          <span>作者 {item.uploader?.trim() || '未知'}</span>
-          <span>浏览 {item.views}</span>
-          <span>热度 {formatCopilotHotScore(item.hotScore)}</span>
-          {uploadedAt && <span>上传 {uploadedAt}</span>}
-          {unrecognized && <span className="combat-copilot-discovery-card-unmatched">未识别</span>}
-        </span>
-      </button>
+        className="min-w-0 px-0 py-0 text-left"
+      >
+        <ItemContent className="gap-1.5">
+          <span className="combat-copilot-discovery-card-stage">
+            <span className="combat-copilot-discovery-card-code">{stage.code}</span>
+            {stage.label && <span className="combat-copilot-discovery-card-label">{stage.label}</span>}
+          </span>
+          <ItemTitle className="block w-full truncate text-sm leading-snug font-semibold">{title}</ItemTitle>
+          {operators.length > 0 && (
+            <span className="combat-copilot-discovery-card-operators">
+              {visibleOperators.map((name, index) => {
+                const owned = ownedOperatorNames.has(name)
+                const ownershipClass = !ownershipKnown
+                  ? 'bg-muted text-tertiary'
+                  : owned ? 'bg-success/10 text-success-text' : 'bg-transparent text-tertiary'
+                const ownershipLabel = !ownershipKnown
+                  ? '拥有状态未知'
+                  : owned ? '已拥有' : '未拥有'
+                return (
+                  <Badge
+                    key={`${name}-${index}`}
+                    variant="secondary"
+                    className={ownershipClass}
+                    title={`${name}（${ownershipLabel}）`}
+                  >
+                    {name}
+                  </Badge>
+                )
+              })}
+              {hiddenOperatorCount > 0 && (
+                <Badge variant="secondary" className="bg-muted text-tertiary">+{hiddenOperatorCount}</Badge>
+              )}
+            </span>
+          )}
+          <span className="combat-copilot-discovery-card-meta">
+            <span>作者 {item.uploader?.trim() || '未知'}</span>
+            <span>浏览 {item.views}</span>
+            <span>热度 {formatCopilotHotScore(item.hotScore)}</span>
+            {uploadedAt && <span>上传 {uploadedAt}</span>}
+            {unrecognized && <span className="combat-copilot-discovery-card-unmatched">未识别</span>}
+          </span>
+        </ItemContent>
+      </Item>
 
       <div
         className="combat-copilot-discovery-card-actions"

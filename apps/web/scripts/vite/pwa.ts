@@ -8,7 +8,6 @@ export interface WorkboxConfig {
   // precaches every JS asset and the app stays fully usable offline.
   globPatterns: string[]
   navigateFallbackDenylist: RegExp[]
-  importScripts: string[]
 }
 
 export const createNavigateFallbackDenylist = (basePath: string): RegExp[] => {
@@ -35,7 +34,6 @@ export const createWorkboxConfig = (basePath: string): WorkboxConfig => ({
     'assets/{index,react-vendor,motion-vendor,ui-vendor,workbox-window.prod.es5,rolldown-runtime}-*.js',
   ],
   navigateFallbackDenylist: createNavigateFallbackDenylist(basePath),
-  importScripts: [`${basePath}legacy-page-cache-cleanup.js`],
 })
 
 export const createWebManifest = (basePath: string): Partial<ManifestOptions> => ({

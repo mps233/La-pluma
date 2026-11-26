@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { LoaderCircle } from 'lucide-react'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
-import { Field } from '@/shared/ui/field'
+import { Field, FieldContent, FieldDescription, FieldLabel, FieldTitle } from '@/shared/ui/field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { notify, notifyProgress, SETTINGS_UPDATE_CHANNEL_NOTICE_ID } from '@/shared/notifications'
+import { InlineAlert } from '@/shared/components'
 import { saveUpdateChannel } from '../api'
 import { resolveCoreChannel } from '../model/updateCommandPolicy'
 import {
@@ -106,17 +107,17 @@ export default function ComponentUpdatePanel() {
   return (
     <>
       <Field orientation="horizontal" className="min-h-11 gap-3.5">
-        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-2">
-          <h3 className="text-sm font-medium text-foreground">MAA CLI</h3>
-          {versionInfo && <span className="text-sm text-muted-foreground">{versionInfo.cli}</span>}
-        </div>
+        <FieldContent className="gap-0.5">
+          <FieldLabel htmlFor="settings-cli-channel" className="text-sm font-medium text-foreground">MAA CLI</FieldLabel>
+          {versionInfo && <FieldDescription className="text-sm text-muted-foreground">{versionInfo.cli}</FieldDescription>}
+        </FieldContent>
         <Select
           items={CLI_CHANNEL_OPTIONS}
           value={cliChannel}
           onValueChange={(value, details) => { if (details.reason !== 'none' && value !== null) void handleChannelChange('cli', value) }}
           disabled={channelSavingBusy}
         >
-          <SelectTrigger aria-label="MAA CLI 更新渠道" className="min-w-0 flex-1 sm:max-w-72">
+          <SelectTrigger id="settings-cli-channel" aria-label="MAA CLI 更新渠道" className="min-w-0 flex-1 sm:max-w-72">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -128,17 +129,17 @@ export default function ComponentUpdatePanel() {
       </Field>
 
       <Field orientation="horizontal" className="min-h-11 gap-3.5">
-        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-2">
-          <h3 className="text-sm font-medium text-foreground">MaaCore</h3>
-          {versionInfo && <span className="text-sm text-muted-foreground">{versionInfo.core}</span>}
-        </div>
+        <FieldContent className="gap-0.5">
+          <FieldLabel htmlFor="settings-core-channel" className="text-sm font-medium text-foreground">MaaCore</FieldLabel>
+          {versionInfo && <FieldDescription className="text-sm text-muted-foreground">{versionInfo.core}</FieldDescription>}
+        </FieldContent>
         <Select
           items={CORE_CHANNEL_OPTIONS}
           value={coreChannel}
           onValueChange={(value, details) => { if (details.reason !== 'none' && value !== null) void handleChannelChange('core', value) }}
           disabled={channelSavingBusy}
         >
-          <SelectTrigger aria-label="MaaCore 更新渠道" className="min-w-0 flex-1 sm:max-w-72">
+          <SelectTrigger id="settings-core-channel" aria-label="MaaCore 更新渠道" className="min-w-0 flex-1 sm:max-w-72">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -151,10 +152,10 @@ export default function ComponentUpdatePanel() {
 
       {resource && (
         <Field orientation="horizontal" className="min-h-11 gap-3.5">
-          <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-2">
-            <h3 className="text-sm font-medium text-foreground">游戏资源</h3>
-            <span className="text-sm text-muted-foreground">{formatResourceTime(resource.lastUpdated)}</span>
-          </div>
+          <FieldContent className="gap-0.5">
+            <FieldTitle className="text-sm font-medium text-foreground">游戏资源</FieldTitle>
+            <FieldDescription className="text-sm text-muted-foreground">{formatResourceTime(resource.lastUpdated)}</FieldDescription>
+          </FieldContent>
           <Badge
             variant="ghost"
             className={`shrink-0 ${resource.status === 'current' ? 'status-success' : 'status-warning'}`}
@@ -165,7 +166,9 @@ export default function ComponentUpdatePanel() {
       )}
 
       {resource && resource.status !== 'current' && (
-        <p className="text-xs leading-5 text-warning">{resource.message}</p>
+        <InlineAlert tone="warning" className="text-xs [&_[data-slot=alert-description]]:text-xs">
+          {resource.message}
+        </InlineAlert>
       )}
 
       <div className="flex min-h-11 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">

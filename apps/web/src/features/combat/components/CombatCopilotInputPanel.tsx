@@ -1,7 +1,9 @@
 import { useRef, type ChangeEvent, type ClipboardEvent } from 'react'
 import { Compass, ListPlus, LoaderCircle, Upload, X } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
+import { Label } from '@/shared/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import type { CopilotPreviewMode } from '../model/copilotPreview'
 import { COPILOT_DISCOVERY_DIALOG_ID } from './combatPanelTypes'
 import type { CombatCopilotFileImportProjection } from './combatPanelTypes'
@@ -72,8 +74,7 @@ export default function CombatCopilotInputPanel({
   return (
     <div className="combat-copilot-input">
       <div className="combat-copilot-input-row">
-        <label htmlFor="combat-copilot-uri" className="sr-only">作业链接，或粘贴 JSON 作业文件</label>
-        <label htmlFor="combat-copilot-preview-mode" className="sr-only">识别方式</label>
+        <Label htmlFor="combat-copilot-uri" className="sr-only">作业链接，或粘贴 JSON 作业文件</Label>
         <div className="combat-copilot-uri-field">
           <input
             id="combat-copilot-uri"
@@ -107,7 +108,7 @@ export default function CombatCopilotInputPanel({
           <div className="combat-copilot-uri-trailing">
             {fileImport && (
               <>
-                <label htmlFor="combat-copilot-file" className="sr-only">导入 JSON 作业文件</label>
+                <Label htmlFor="combat-copilot-file" className="sr-only">导入 JSON 作业文件</Label>
                 <input
                   id="combat-copilot-file"
                   ref={fileInputRef}
@@ -133,19 +134,29 @@ export default function CombatCopilotInputPanel({
                 </Button>
               </>
             )}
-            <select
-              id="combat-copilot-preview-mode"
-              name="maa-copilot-preview-mode"
-              value={previewMode}
-              onChange={(e) => onPreviewModeChange(e.target.value as CopilotPreviewMode)}
-              className="combat-copilot-mode-select"
-            >
-              {PREVIEW_MODE_OPTIONS.map(option => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
           </div>
         </div>
+        <Select
+          name="maa-copilot-preview-mode"
+          items={PREVIEW_MODE_OPTIONS}
+          value={previewMode}
+          onValueChange={(next, details) => {
+            if (details.reason !== 'none' && next !== null) onPreviewModeChange(next as CopilotPreviewMode)
+          }}
+        >
+          <SelectTrigger
+            id="combat-copilot-preview-mode"
+            aria-label="识别方式"
+            className="combat-copilot-mode-select"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PREVIEW_MODE_OPTIONS.map(option => (
+              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button
           onClick={onPreview}
           aria-haspopup="dialog"

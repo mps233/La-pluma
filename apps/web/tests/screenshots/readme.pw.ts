@@ -47,7 +47,6 @@ test('README automation screenshot', async ({ page }, testInfo) => {
   await page.getByText('7/7', { exact: true }).first().waitFor({ state: 'visible' })
   await page.getByText('关闭游戏', { exact: true }).first().waitFor({ state: 'visible' })
   await page.getByLabel('第 3 个执行时间').waitFor({ state: 'visible' })
-  await page.getByText('博士，情报已经同步完毕', { exact: false }).first().waitFor({ state: 'visible' })
   await expect(page.getByText('最近执行', { exact: true })).toHaveCount(0)
 
   if (testInfo.project.name === 'web') {

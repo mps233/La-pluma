@@ -1,14 +1,24 @@
 import { Copy } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
+import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
-import { Loading } from '@/shared/components'
+import { FieldGroup } from '@/shared/ui/field'
+import { Item, ItemActions, ItemGroup, ItemTitle } from '@/shared/ui/item'
+import { InlineAlert, Loading } from '@/shared/components'
 import { notify } from '@/shared/notifications'
-import type { CopilotDetailOperator, CopilotDetailTarget } from '../model/copilotDetail'
+import type { CopilotDetailOperator, CopilotDetailTarget, CopilotDetailTone } from '../model/copilotDetail'
 import { DetailField, DetailSection } from './CombatCopilotDetailSection'
 import CopilotDescription from './CopilotDescription'
 
 const RECOMMENDED_MODE_LABELS = { normal: '普通', raid: '突袭', both: '普通+突袭' }
+
+const STATUS_TONE_CLASS: Record<CopilotDetailTone, string> = {
+  neutral: 'bg-primary-soft text-primary-strong',
+  active: 'bg-primary-soft text-primary-strong',
+  success: 'bg-success/10 text-success-text',
+  warning: 'bg-warning/10 text-warning-text',
+  danger: 'bg-destructive/10 text-destructive',
+}
 
 function groupOperators(
   operators: readonly CopilotDetailOperator[],
@@ -51,12 +61,15 @@ export function DetailBody({ target, children }: { target: CopilotDetailTarget; 
   return (
     <div className="combat-copilot-detail-content">
       {target.statusLabel && (
-        <span className={`combat-copilot-detail-state${target.statusTone ? ` is-${target.statusTone}` : ''}`}>
+        <Badge
+          variant="secondary"
+          className={`justify-self-start ${STATUS_TONE_CLASS[target.statusTone ?? 'neutral']}`}
+        >
           {target.statusLabel}
-        </span>
+        </Badge>
       )}
 
-      <dl className="combat-copilot-detail-grid">
+      <FieldGroup className="combat-copilot-detail-grid grid gap-3">
         {stageLabel && (
           <DetailField label="关卡">
             <span>{stageLabel}</span>
@@ -86,9 +99,9 @@ export function DetailBody({ target, children }: { target: CopilotDetailTarget; 
           <DetailField label="已完成模式" wide>
             <span className="combat-copilot-detail-tags">
               {target.completedModes.map(mode => (
-                <span key={mode} className="combat-copilot-tag is-complete">
+                <Badge key={mode} variant="secondary" className="bg-success/10 text-success-text">
                   {mode === 'raid' ? '突袭已完成' : '普通已完成'}
-                </span>
+                </Badge>
               ))}
             </span>
           </DetailField>
@@ -103,13 +116,13 @@ export function DetailBody({ target, children }: { target: CopilotDetailTarget; 
                 size="sm"
                 className="min-h-11 shrink-0"
               >
-                <Copy size={14} aria-hidden="true" />
+                <Copy data-icon="inline-start" aria-hidden="true" />
                 复制链接
               </Button>
             </span>
           </DetailField>
         )}
-      </dl>
+      </FieldGroup>
 
       {target.details && (
         <DetailSection title="作业描述">
@@ -118,12 +131,13 @@ export function DetailBody({ target, children }: { target: CopilotDetailTarget; 
       )}
 
       {target.error && (
-        <Alert variant="destructive">
-          <AlertTitle>失败原因</AlertTitle>
-          <AlertDescription className="whitespace-pre-wrap [overflow-wrap:anywhere]">
-            {target.error}
-          </AlertDescription>
-        </Alert>
+        <InlineAlert
+          tone="error"
+          title="失败原因"
+          className="whitespace-pre-wrap [overflow-wrap:anywhere]"
+        >
+          {target.error}
+        </InlineAlert>
       )}
 
       {operators.length > 0 && (
@@ -132,18 +146,30 @@ export function DetailBody({ target, children }: { target: CopilotDetailTarget; 
             {groupedOperators.map(([group, members]) => (
               <div key={group || 'fixed'} className="combat-copilot-detail-operator-group">
                 {group && <h4 className="combat-copilot-detail-operator-group-name">{group}</h4>}
-                <ul className="combat-copilot-detail-operator-list">
-                  {members.map((operator, index) => (
-                    <li key={`${operator.name}-${index}`} className="combat-copilot-detail-operator">
-                      <span className="combat-copilot-detail-operator-name">{operator.name}</span>
-                      <span className="combat-copilot-detail-requirements">
-                        {requirementLabels(operator).map(label => (
-                          <span key={label} className="combat-copilot-detail-requirement">{label}</span>
-                        ))}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <ItemGroup className="gap-2">
+                  {members.map((operator, index) => {
+                    const requirements = requirementLabels(operator)
+                    return (
+                      <Item
+                        key={`${operator.name}-${index}`}
+                        role="listitem"
+                        size="xs"
+                        className="gap-x-2 gap-y-1.5 rounded-none border-0 px-0 py-0.5"
+                      >
+                        <ItemTitle className="text-[0.8125rem] text-foreground">{operator.name}</ItemTitle>
+                        {requirements.length > 0 && (
+                          <ItemActions className="flex-wrap gap-1">
+                            {requirements.map(label => (
+                              <Badge key={label} variant="secondary" className="bg-muted text-tertiary">
+                                {label}
+                              </Badge>
+                            ))}
+                          </ItemActions>
+                        )}
+                      </Item>
+                    )
+                  })}
+                </ItemGroup>
               </div>
             ))}
           </div>
@@ -154,7 +180,9 @@ export function DetailBody({ target, children }: { target: CopilotDetailTarget; 
         <DetailSection title="干员组">
           <ul className="combat-copilot-detail-group-list">
             {groups.map(group => (
-              <li key={group} className="combat-copilot-detail-group">{group}</li>
+              <li key={group}>
+                <Badge variant="secondary" className="bg-primary-soft text-primary-strong">{group}</Badge>
+              </li>
             ))}
           </ul>
         </DetailSection>

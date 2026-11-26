@@ -70,6 +70,9 @@ console.log(
   + `${styleFiles.length} 个样式文件与 ${layoutTestFiles.length} 个布局测试；`
   + `${featureDomains.size} 个功能域，${dependencyAnalysis.cycles.length} 个依赖环。`,
 )
+if (layoutTestFiles.length === 0) {
+  console.log('提示：未发现 *.layout.test.tsx，布局测试细节检查已跳过。')
+}
 if (violations.length > 0) {
   console.error(`发现 ${violations.length} 项违规：`)
   printViolations(violations)

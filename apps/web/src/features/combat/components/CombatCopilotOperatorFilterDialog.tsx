@@ -1,12 +1,11 @@
 import { useMemo, useState, type UIEvent } from 'react'
-import { Search } from 'lucide-react'
 import { getOperatorAvatarUrl, useItemIconCacheVersion } from '@/features/game-data'
-import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/shared/ui/alert'
+import { DialogBody, DialogFrame, EmptyState, InlineAlert, Loading, SearchField } from '@/shared/components'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
-import { DialogBody, DialogFrame, EmptyState, Loading } from '@/shared/components'
 import { Checkbox } from '@/shared/ui/checkbox'
-import { Input } from '@/shared/ui/input'
+import { Field, FieldLabel } from '@/shared/ui/field'
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/shared/ui/item'
 import {
   filterOperatorOptions,
   normalizeOperatorSelection,
@@ -67,7 +66,7 @@ function OperatorSection({
     setLimit(OPERATOR_RENDER_BATCH)
   }
 
-  const handleScroll = (event: UIEvent<HTMLUListElement>) => {
+  const handleScroll = (event: UIEvent<HTMLDivElement>) => {
     const list = event.currentTarget
     if (list.scrollHeight - list.scrollTop - list.clientHeight > OPERATOR_SCROLL_EDGE) return
     setLimit(current => Math.min(current + OPERATOR_RENDER_BATCH, filtered.length))
@@ -84,47 +83,55 @@ function OperatorSection({
       {selected.length > 0 && (
         <div className="combat-copilot-operator-chips">
           {selected.map(name => (
-            <button
+            <Button
               key={name}
               type="button"
+              variant="ghost"
+              size="xs"
               className="combat-copilot-operator-chip"
               aria-label={`移除 ${name}`}
               onClick={() => onRemove(name)}
             >
               {name}
               <span aria-hidden="true">×</span>
-            </button>
+            </Button>
           ))}
         </div>
       )}
 
-      <div className="relative">
-        <Search size={17} strokeWidth={1.9} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" />
-        <Input
-          type="text"
-          autoComplete="off"
-          aria-label={`搜索${title}`}
-          placeholder="搜索干员名称或拼音"
-          value={term}
-          onChange={event => handleTermChange(event.target.value)}
-          className="pl-9"
-        />
-      </div>
+      <SearchField
+        ariaLabel={`搜索${title}`}
+        placeholder="搜索干员名称或拼音"
+        value={term}
+        onValueChange={handleTermChange}
+        onClear={() => setLimit(OPERATOR_RENDER_BATCH)}
+        clearable
+        clearLabel={`清除${title}搜索`}
+      />
 
       {filtered.length === 0 ? (
-        <p className="combat-copilot-operator-hint">
-          {selected.length > 0 ? '没有其他符合条件的干员。' : '没有符合条件的干员。'}
-        </p>
+        <EmptyState
+          compact
+          title={selected.length > 0 ? '没有其他符合条件的干员' : '没有符合条件的干员'}
+          description="换个名称或拼音再试。"
+        />
       ) : (
-        <ul className="combat-copilot-operator-options" onScroll={handleScroll}>
+        <div className="combat-copilot-operator-options" onScroll={handleScroll}>
           {visible.map(option => (
-            <li key={option.id}>
-              <button
-                type="button"
-                className="combat-copilot-operator-option"
-                aria-label={`${addLabel} ${option.name}`}
-                onClick={() => onAdd(option)}
-              >
+            <Item
+              key={option.id}
+              render={(
+                <button
+                  type="button"
+                  aria-label={`${addLabel} ${option.name}`}
+                  onClick={() => onAdd(option)}
+                />
+              )}
+              size="xs"
+              variant="outline"
+              className="combat-copilot-operator-option text-left hover:bg-muted"
+            >
+              <ItemMedia>
                 <img
                   className="combat-copilot-operator-avatar"
                   src={getOperatorAvatarUrl(option.id, 'base', iconVersion)}
@@ -132,22 +139,24 @@ function OperatorSection({
                   loading="lazy"
                   decoding="async"
                 />
-                <span className="combat-copilot-operator-copy">
-                  <span className="combat-copilot-operator-name">{option.name}</span>
-                  <span className="combat-copilot-operator-meta">
-                    {option.rarity ? `${option.rarity}★` : '未知稀有度'}
-                  </span>
-                </span>
+              </ItemMedia>
+              <ItemContent className="min-w-0 gap-0">
+                <ItemTitle className="w-full text-xs">{option.name}</ItemTitle>
+                <ItemDescription className="text-[0.6875rem]">
+                  {option.rarity ? `${option.rarity}★` : '未知稀有度'}
+                </ItemDescription>
+              </ItemContent>
+              <ItemActions>
                 <Badge
                   variant="secondary"
                   className={`bg-transparent${option.owned ? ' text-success-text' : ' text-tertiary'}`}
                 >
                   {option.owned ? '已拥有' : '未拥有'}
                 </Badge>
-              </button>
-            </li>
+              </ItemActions>
+            </Item>
           ))}
-        </ul>
+        </div>
       )}
     </section>
   )
@@ -198,22 +207,18 @@ function OperatorFilterForm({
 
   if (operatorsError) {
     return (
-      <Alert variant="destructive">
-        <AlertTitle>干员数据读取失败</AlertTitle>
-        <AlertDescription>{operatorsError}</AlertDescription>
-        <AlertAction>
-          <Button size="sm" variant="secondary" onClick={onRetryData}>重试</Button>
-        </AlertAction>
-      </Alert>
+      <InlineAlert title="干员数据读取失败" onRetry={onRetryData}>
+        {operatorsError}
+      </InlineAlert>
     )
   }
 
   return (
     <div className="combat-copilot-operator-filter">
       {!enabled && (
-        <p className="combat-copilot-operator-hint" role="status">
+        <InlineAlert tone="info">
           干员筛选已停用，本次搜索不会使用包含/排除条件；已选干员仍会保留。
-        </p>
+        </InlineAlert>
       )}
 
       {operators.length === 0 ? (
@@ -245,13 +250,19 @@ function OperatorFilterForm({
         </>
       )}
 
-      <label className="group flex min-h-11 cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+      <Field orientation="horizontal" className="min-h-11 gap-2">
         <Checkbox
+          id="combat-copilot-operator-remember"
           checked={remember}
           onCheckedChange={setRemember}
         />
-        <span className="transition-colors group-hover:text-primary">记住筛选结果</span>
-      </label>
+        <FieldLabel
+          htmlFor="combat-copilot-operator-remember"
+          className="cursor-pointer text-sm font-normal text-muted-foreground"
+        >
+          记住筛选结果
+        </FieldLabel>
+      </Field>
 
       <div className="combat-copilot-operator-actions">
         <span className="combat-copilot-operator-summary">

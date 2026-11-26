@@ -1,6 +1,7 @@
 import { Check } from 'lucide-react'
 import { Badge } from '@/shared/ui/badge'
 import { Card } from '@/shared/ui/card'
+import { Field, FieldError, FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { ROGUELIKE_THEME_PRESETS } from '../model/roguelikeTasks'
 import type { RoguelikeTask } from '../types'
@@ -58,10 +59,14 @@ export default function RoguelikeThemePanel({
             )
           })}
         </div>
-        <div className="roguelike-custom-theme">
-          <label htmlFor={inputId} className="mb-2 block text-sm font-medium text-muted-foreground">
+        <Field
+          className="roguelike-custom-theme"
+          data-invalid={error ? true : undefined}
+          data-disabled={disabled ? true : undefined}
+        >
+          <FieldLabel htmlFor={inputId} className="text-muted-foreground">
             自定义主题代号
-          </label>
+          </FieldLabel>
           <Input
             id={inputId}
             name={`maa-${task.id}-theme`}
@@ -74,8 +79,8 @@ export default function RoguelikeThemePanel({
             aria-errormessage={error ? errorId : undefined}
             onChange={event => handleThemeChange(event.target.value)}
           />
-          {error && <p id={errorId} className="mt-2 text-xs form-error-text">{error}</p>}
-        </div>
+          {error && <FieldError id={errorId} className="text-xs text-destructive-text">{error}</FieldError>}
+        </Field>
       </div>
     </Card>
   )

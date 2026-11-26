@@ -262,7 +262,8 @@ describe('TrainingQueueCommandOwner', () => {
       detail: { source: TRAINING_QUEUE_MUTATION_SOURCE },
     })
     // 自动同步不重注册 cron，因此不能声明 automation-schedule 已变化。
-    expect((harness.publish.mock.calls[0]?.[0] as { resources: readonly string[] }).resources)
+    const firstCall = harness.publish.mock.calls[0]!
+    expect((firstCall[0] as { resources: readonly string[] }).resources)
       .not.toContain('automation-schedule')
   })
 

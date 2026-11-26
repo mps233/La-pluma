@@ -156,7 +156,6 @@ export function useRoguelikeExecution({
   const execute = useCallback(async ({ command, params, taskConfig, taskName }: RoguelikeExecutionRequest) => {
     if (isRunning || controller.getState().submission === 'pending') return
 
-    notifyProgress('正在执行命令...', EXECUTION_NOTICE_ID)
     try {
       const result = await controller.submitExecution(
         'run_task',

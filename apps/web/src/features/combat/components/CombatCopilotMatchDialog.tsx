@@ -1,6 +1,7 @@
-import { DialogBody, DialogFrame, DialogFrameFooter, Loading } from '@/shared/components'
+import { DialogBody, DialogFrame, DialogFrameFooter, InlineAlert, Loading } from '@/shared/components'
 import { Button } from '@/shared/ui/button'
 import { Checkbox } from '@/shared/ui/checkbox'
+import { Field, FieldContent, FieldDescription, FieldLabel, FieldTitle } from '@/shared/ui/field'
 import { Switch } from '@/shared/ui/switch'
 import {
   COPILOT_MATCH_MODES,
@@ -60,30 +61,29 @@ export default function CombatCopilotMatchDialog({
     >
       <DialogBody>
         <div className="combat-copilot-match">
-          <div className="combat-copilot-match-toggle">
-            <div className="combat-copilot-match-toggle-copy">
-              <span className="combat-copilot-match-toggle-title">按持有干员匹配</span>
-              <span className="combat-copilot-match-toggle-hint">使用最近一次持有干员识别结果</span>
-            </div>
+          <Field orientation="horizontal" className="combat-copilot-match-toggle items-center! gap-3">
+            <FieldContent className="gap-0.5">
+              <FieldTitle className="text-[0.8125rem] font-semibold text-foreground">按持有干员匹配</FieldTitle>
+              <FieldDescription className="text-xs">使用最近一次持有干员识别结果</FieldDescription>
+            </FieldContent>
             <Switch
               aria-label="按持有干员匹配"
               checked={matchingAvailable ? settings.enabled : false}
               disabled={!matchingAvailable}
               onCheckedChange={handleEnabledChange}
             />
-          </div>
+          </Field>
 
           {operatorsLoading ? (
             <Loading size="sm" text="正在识别持有干员…" />
           ) : operatorsError ? (
-            <div className="combat-copilot-operator-error" role="alert">
-              <span>{`持有干员读取失败：${operatorsError}`}</span>
-              <Button size="sm" variant="secondary" onClick={() => onRetryData?.()}>重试</Button>
-            </div>
+            <InlineAlert title="持有干员读取失败" onRetry={() => onRetryData?.()}>
+              {operatorsError}
+            </InlineAlert>
           ) : !hasOwnedOperators ? (
-            <p className="combat-copilot-match-warning" role="status">
+            <InlineAlert tone="warning">
               还没有识别到持有干员，先识别持有干员后再启用匹配。
-            </p>
+            </InlineAlert>
           ) : null}
 
           <p className="combat-copilot-match-note">
@@ -92,16 +92,22 @@ export default function CombatCopilotMatchDialog({
           </p>
 
           <div className="combat-copilot-match-modes" role="group" aria-label="匹配模式">
-            <span className="combat-copilot-match-modes-title">显示以下匹配结论</span>
+            <FieldTitle className="text-xs font-normal text-muted-foreground">显示以下匹配结论</FieldTitle>
             <div className="combat-copilot-match-mode-list">
               {COPILOT_MATCH_MODES.map(({ mode, label }) => (
-                <label key={mode} className="group flex min-h-11 cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                <Field key={mode} orientation="horizontal" className="min-h-11 gap-2">
                   <Checkbox
+                    id={`combat-copilot-match-${mode}`}
                     checked={settings.modes.includes(mode)}
                     onCheckedChange={checked => handleModeChange(mode, checked)}
                   />
-                  <span className="transition-colors group-hover:text-primary">{label}</span>
-                </label>
+                  <FieldLabel
+                    htmlFor={`combat-copilot-match-${mode}`}
+                    className="cursor-pointer text-sm font-normal text-muted-foreground transition-colors hover:text-primary"
+                  >
+                    {label}
+                  </FieldLabel>
+                </Field>
               ))}
             </div>
           </div>

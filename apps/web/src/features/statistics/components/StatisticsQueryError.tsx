@@ -1,6 +1,4 @@
-import { LoaderCircle, RefreshCw } from 'lucide-react'
-import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/shared/ui/alert'
-import { Button } from '@/shared/ui/button'
+import { InlineAlert } from '@/shared/components'
 
 interface StatisticsQueryErrorProps {
   title: string
@@ -16,28 +14,14 @@ export default function StatisticsQueryError({
   onRetry,
 }: StatisticsQueryErrorProps) {
   return (
-    <Alert variant="destructive">
-      <AlertTitle>{title}</AlertTitle>
-      <AlertDescription className="wrap-break-word wrap-anywhere">{description}</AlertDescription>
-      <AlertAction>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={isRetrying}
-          aria-busy={isRetrying || undefined}
-          onClick={onRetry}
-        >
-          {isRetrying
-            ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在重试...</>
-            : (
-              <>
-                <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                重新加载
-              </>
-            )}
-        </Button>
-      </AlertAction>
-    </Alert>
+    <InlineAlert
+      tone="error"
+      title={title}
+      onRetry={onRetry}
+      retryLabel="重新加载"
+      retrying={isRetrying}
+    >
+      <span className="wrap-break-word wrap-anywhere">{description}</span>
+    </InlineAlert>
   )
 }

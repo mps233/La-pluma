@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, type RefObject } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { AlertCircle, ArrowDown, ArrowLeft, ChevronRight, FileText, Filter, History, Search } from 'lucide-react'
+import { AlertCircle, ArrowDown, ArrowLeft, FileText, Filter, History, Search } from 'lucide-react'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
-import { FieldHint, Loading } from '@/shared/components'
+import { Disclosure, FieldHint, Loading } from '@/shared/components'
 import { HISTORY_LOG_LINES } from '../model/historyLogSession'
 import { countAppendedRows, initialLogFollowState, reduceLogFollow } from '../model/logFollow'
 import { formatLogFileSize } from '../model/logFileSize'
@@ -38,11 +38,12 @@ function LogRow({ log }: { log: VisibleLog }) {
             {`x${log.count}`}
           </Badge>
         )}
-        <details className="log-raw">
-          <summary>
-            <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>{log.count > 1 ? `查看 ${log.count} 条原文` : '原文'}</span>
-          </summary>
+        <Disclosure
+          className="log-raw rounded-none border-0 p-0"
+          label={log.count > 1 ? `查看 ${log.count} 条原文` : '原文'}
+          summaryClassName="w-fit min-h-6 text-xs font-semibold text-muted-foreground hover:text-primary-strong max-sm:min-h-11"
+          contentClassName="mt-0 gap-0 border-t-0 pt-0"
+        >
           {log.members.map((annotation, index) => {
             const record = annotation.record
             return (
@@ -59,7 +60,7 @@ function LogRow({ log }: { log: VisibleLog }) {
               </div>
             )
           })}
-        </details>
+        </Disclosure>
       </div>
     </div>
   )

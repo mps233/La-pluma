@@ -85,6 +85,7 @@ WebRTC 安装会从 `hqw700/ScrcpyOverWebRTC` 的 GitHub Release 下载 `cloudph
 | 界面视觉、交互与设计 token | 根 [DESIGN.md](../../DESIGN.md)；[组件库](../frontend/components.md)只维护组件 API 和用法 |
 | 系统技术栈与目录结构 | [整体架构](../architecture/README.md) |
 | 前端分层、状态所有者、URL 与 Activity | [前端架构](../frontend/README.md) |
+| 主题注册、三层模型、`data-theme` 与新增主题契约 | [主题系统](../frontend/themes.md) |
 | Agent 对接流程与鉴权 | [Agent API](../api/agent.md) |
 | 服务端 Run 协议 / 前端控制器 | [执行生命周期](../architecture/execution-lifecycle.md) / [执行客户端](../architecture/execution-client.md) |
 | 服务端分层与请求契约 | [服务端架构与请求契约](../server/README.md) |

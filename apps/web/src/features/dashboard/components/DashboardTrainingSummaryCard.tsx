@@ -1,4 +1,5 @@
 import { ChevronRight } from 'lucide-react'
+import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { Card } from '@/shared/ui/card'
 import { useDashboardStore } from '../store/dashboardStore'
@@ -48,7 +49,13 @@ export default function DashboardTrainingSummaryCard({ onOpenTraining }: Dashboa
           {trainingSummary.topNames.length > 0 ? (
             <div className="dashboard-stage-list">
               {trainingSummary.topNames.map(name => (
-                <span key={name} className="dashboard-stage-chip is-accent">{name}</span>
+                <Badge
+                  key={name}
+                  variant="ghost"
+                  className="dashboard-stage-chip is-accent rounded-lg border-0 px-2 py-1 font-semibold hover:text-foreground"
+                >
+                  {name}
+                </Badge>
               ))}
             </div>
           ) : (

@@ -286,7 +286,7 @@ export default function ScrcpyDeviceView({ infrastructure }: ScrcpyDeviceViewPro
           />
           <h2 className="truncate text-base font-semibold text-foreground">设备画面</h2>
           {status.phase !== 'off' && (
-            <span className="ml-auto min-w-0 truncate text-xs font-medium text-tertiary" role="status" aria-live="polite" aria-atomic="true">
+            <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
               {status.label}
             </span>
           )}

@@ -16,15 +16,15 @@
 | 页面裸副作用 | 页面文件不得直接持有传输、存储或轮询原语 | 失败并指出原语/import |
 | 布局壳层锚点 | `Layout`、导航壳与 `PageShell` 的稳定 `data-region` / `data-page-*` 锚点必须存在 | 失败并指出文件与缺失锚点 |
 | 全局样式作用域 | 三个全局样式文件不得包含页面/领域选择器 | 失败并指出文件、行号与命中片段 |
-| 布局测试细节 | `src/**/*.layout.test.tsx` 不得锁定类名、内联样式、类选择器、兄弟顺序或精确滚动参数 | 失败并指出文件与行号 |
+| 布局测试细节 | `src/**/*.layout.test.tsx` 不得锁定类名、内联样式、类选择器、兄弟顺序或精确滚动参数 | 存在布局测试时失败并指出文件与行号；未发现时跳过 |
 
 范围：
 
 - 依赖检查读取 `apps/web/src/**/*.{ts,tsx}` 的生产源码；`*.test.*` 与 `*.spec.*` 不进入运行时依赖图。测试可以为隔离而接触内部实现，不会进入生产包。
 - 页面检查只针对 `pages/*/*.{ts,tsx}` 生产文件；`components/`、`hooks/`、`model/` 等领域容器不受页面限制。
 - 布局锚点检查读取五个固定壳层文件；文件或锚点缺失即失败，只检查存在性，不声称唯一性。
-- 全局样式检查读取 `src/styles/index.css`、`layout.css`、`ios-theme.css`；剥离注释后只匹配 `{` 前的选择器 prelude，文件缺失即失败。
-- 布局测试检查读取 `src/**/*.layout.test.tsx`；未发现任何布局测试时同样失败，避免过滤或 glob 失效后静默通过。
+- 全局样式检查读取 `src/styles/index.css`、`layout.css`、`chrome.css`；剥离注释后只匹配 `{` 前的选择器 prelude，文件缺失即失败。
+- 布局测试检查读取 `src/**/*.layout.test.tsx`；未发现任何布局测试时跳过细节检查，CLI 会打印提示，壳层锚点仍由布局锚点检查独立核对。
 
 ## 2. 依赖与公开面
 
@@ -52,9 +52,9 @@
 
 依赖图按 import 说明符建边，不区分 `import type` 与内联 `type` 说明符；因此 `features/a/model/**` 对 `features/a/components/**` 的纯类型导入也会触发 `model-component-dependency`。这是保守策略：类型依赖同样意味着模型与组件层耦合，共享类型应放到 `model` 或 `shared`。
 
-### 2.2 与 ESLint 的分工
+### 2.2 与 oxlint 的分工
 
-`apps/web/eslint.config.js` 继续负责编辑器内的快速反馈：拦截 `@/features/<domain>/...` 深路径、features/shared 反向依赖 app 或 pages、shared 依赖 features/pages，以及 pages 反向依赖 app。页面测试（`src/pages/**/*.test.tsx`）允许深路径到被测域内部以构造领域状态，不进入产物；CLI 的生产依赖图同样跳过测试文件。CLI 额外解析相对路径、目录 index 与动态 import，因此能发现 ESLint 字符串规则看不到的公开面绕过与真实域环。两处规则的权威事实都来自 `app → pages → features → shared`，新增边界时先更新本文与脚本，再考虑 ESLint 的即时提示。
+`apps/web/.oxlintrc.json` 继续负责编辑器内的快速反馈：拦截 `@/features/<domain>/...` 深路径、features/shared 反向依赖 app 或 pages、shared 依赖 features/pages，以及 pages 反向依赖 app。页面测试（`src/pages/**/*.test.tsx`）允许深路径到被测域内部以构造领域状态，不进入产物；CLI 的生产依赖图同样跳过测试文件。CLI 额外解析相对路径、目录 index 与动态 import，因此能发现 oxlint 字符串规则看不到的公开面绕过与真实域环。两处规则的权威事实都来自 `app → pages → features → shared`，新增边界时先更新本文与脚本，再考虑 oxlint 的即时提示。
 
 ## 3. 页面职责
 
@@ -86,7 +86,7 @@
 
 ## 5. 全局样式作用域
 
-`global-style-scope` 检查 `src/styles/index.css`、`src/styles/layout.css` 与 `src/styles/ios-theme.css` 的选择器 prelude（`{` 之前、剥离 CSS 注释后）。禁止：
+`global-style-scope` 检查 `src/styles/index.css`、`src/styles/layout.css` 与 `src/styles/chrome.css` 的选择器 prelude（`{` 之前、剥离 CSS 注释后）。禁止：
 
 - `[data-page-kind` 属性选择器；
 - 领域类前缀：`automation-`、`combat-`、`roguelike-`、`training-`、`statistics-`、`logs-`、`dashboard-`、`settings-`、`config-`。
@@ -95,7 +95,7 @@
 
 ## 6. 布局测试细节
 
-`layout-test-detail` 检查 `src/**/*.layout.test.tsx`，禁止锁定以下实现细节：
+`layout-test-detail` 检查 `src/**/*.layout.test.tsx`，禁止锁定以下实现细节。未发现布局测试时跳过该检查，由 CLI 打印提示；布局壳层锚点仍由 §4 独立检查。
 
 | 禁止项 | 原因 |
 | --- | --- |
@@ -106,7 +106,7 @@
 | `previousElementSibling`、`nextElementSibling` | 依赖 DOM 兄弟顺序 |
 | `toHaveBeenCalledWith`、`toHaveBeenLastCalledWith` 中包含 `behavior` / `block` | 锁定 `scrollIntoView` 的精确参数 |
 
-`scrollIntoView` 仅作为 jsdom prototype stub 出现是允许的；注释不参与匹配。失败信息包含文件与行号。
+`scrollIntoView` 仅作为 jsdom prototype stub 出现是允许的；注释不参与匹配。失败信息包含文件与行号；未发现布局测试时跳过检查并打印提示。
 
 ## 7. 接入与验证
 

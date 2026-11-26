@@ -180,7 +180,7 @@ Activity 语义：隐藏会清理订阅 Effect，期间发布不会直接刷新�
 pnpm --filter la-pluma-next-client exec vitest run src/features/resource-invalidation
 ```
 
-端点与 signal 回归见[资源请求契约](resource-requests.md)，key 与缓存回归见[Query 规范](query-cache.md)，领域命令测试由对应领域契约维护。完整检查使用 `pnpm --filter la-pluma-next-client verify`，视觉检查范围与方式见[开发指南](../development/README.md)。
+端点与 signal 回归见[资源请求契约](resource-requests.md)，key 与缓存回归见[Query 规范](query-cache.md)，领域命令测试由对应领域契约维护。完整检查使用 `pnpm --filter la-pluma-next-client verify`，浏览器集成检查范围与方式见[开发指南](../development/README.md)。
 
 ## 关联
 

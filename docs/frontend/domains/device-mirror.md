@@ -58,7 +58,7 @@
 | 10 | snapshot + 有帧 | `snapshot-ready` | 画面快照 · 10s | info |
 | 11 | snapshot 其余 | `snapshot-loading` | 正在获取快照 | info |
 
-错误同一时刻只显示一个，优先级为 live → snapshot → infrastructure；基础设施错误在 live/快照错误存在时不重复展示。`off` 状态不渲染头部状态文案 live region，只保留模式控件的“关闭”选中态和空态标题；基础设施错误仍由空态的 `role="alert"` 播报。
+错误同一时刻只显示一个，优先级为 live → snapshot → infrastructure；基础设施错误在 live/快照错误存在时不重复展示。`off` 状态不渲染状态 live region，只保留模式控件的“关闭”选中态和空态标题；其余状态的状态文案只以 `sr-only` live region 提供给辅助技术，不在标题行可见展示；基础设施错误仍由空态的 `role="alert"` 播报。
 
 恢复动作：
 

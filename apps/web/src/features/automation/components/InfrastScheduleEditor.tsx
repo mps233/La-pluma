@@ -1,8 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, LoaderCircle, Save } from 'lucide-react'
+import { LoaderCircle, Save } from 'lucide-react'
 import { getErrorMessage, isRecord } from '@/shared/api'
-import { DialogBody, DialogFrame, DialogFrameFooter } from '@/shared/components'
+import { DialogBody, DialogFrame, DialogFrameFooter, InlineAlert } from '@/shared/components'
 import { Button } from '@/shared/ui/button'
 import { FieldInput } from './InfrastScheduleFieldControls'
 import { saveInfrastSchedule } from '../api'
@@ -158,12 +158,7 @@ export default function InfrastScheduleEditor({
     >
       <DialogBody>
         <div className="@container space-y-3.5">
-          {error && (
-            <div role="alert" className="status-danger flex items-start gap-2 rounded-lg px-3 py-2 text-sm leading-5">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>{error}</span>
-            </div>
-          )}
+          {error && <InlineAlert tone="error">{error}</InlineAlert>}
 
           <section className="space-y-3">
             <div className="flex flex-wrap items-end gap-2">

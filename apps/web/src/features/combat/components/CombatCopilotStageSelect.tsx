@@ -1,8 +1,8 @@
 import { useMemo, useState, type UIEvent } from 'react'
-import { Search } from 'lucide-react'
-import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/shared/ui/alert'
+import { cn } from 'cn'
+import { EmptyState, InlineAlert, Loading, SearchField } from '@/shared/components'
 import { Button } from '@/shared/ui/button'
-import { Input } from '@/shared/ui/input'
+import { Item } from '@/shared/ui/item'
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover'
 import type { CopilotStageCandidate } from '../types'
 import {
@@ -60,7 +60,7 @@ export default function CombatCopilotStageSelect({
     setRenderedCount(COPILOT_DISCOVERY_STAGE_PAGE_SIZE)
   }
 
-  const handleScroll = (event: UIEvent<HTMLUListElement>) => {
+  const handleScroll = (event: UIEvent<HTMLDivElement>) => {
     const list = event.currentTarget
     if (list.scrollHeight - list.scrollTop - list.clientHeight > STAGE_LIST_SCROLL_THRESHOLD_PX) return
     setRenderedCount(count => (
@@ -97,75 +97,77 @@ export default function CombatCopilotStageSelect({
           aria-label="选择关卡"
           className="combat-copilot-discovery-stage-panel grid w-(--combat-stage-panel-width) gap-2"
         >
-          <div className="relative">
-            <Search size={17} strokeWidth={1.9} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" />
-            <Input
-              type="text"
-              autoComplete="off"
-              aria-label="搜索关卡"
-              placeholder="搜索关卡代号或名称"
-              value={term}
-              onChange={event => handleTermChange(event.target.value)}
-              className="pl-9"
-            />
-          </div>
+          <SearchField
+            ariaLabel="搜索关卡"
+            placeholder="搜索关卡代号或名称"
+            value={term}
+            onValueChange={handleTermChange}
+            onClear={() => setRenderedCount(COPILOT_DISCOVERY_STAGE_PAGE_SIZE)}
+            clearable
+          />
 
-          {loading && <p className="combat-copilot-discovery-stage-state" role="status">关卡数据加载中…</p>}
+          {loading && <Loading size="sm" text="关卡数据加载中…" />}
 
           {error && (
-            <Alert variant="destructive">
-              <AlertTitle>关卡数据读取失败</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-              <AlertAction>
-                <Button size="sm" variant="secondary" onClick={onRetryData}>重试</Button>
-              </AlertAction>
-            </Alert>
+            <InlineAlert title="关卡数据读取失败" onRetry={onRetryData}>
+              {error}
+            </InlineAlert>
           )}
 
           {!loading && !error && (
             <>
-              <ul className="combat-copilot-discovery-stage-list" onScroll={handleScroll}>
-                <li>
-                  <button
-                    type="button"
-                    className={`combat-copilot-discovery-stage-option${value ? '' : ' is-selected'}`}
-                    onClick={() => handleSelect(null)}
-                  >
-                    全部关卡
-                  </button>
-                </li>
+              <div className="combat-copilot-discovery-stage-list" onScroll={handleScroll}>
+                <Item
+                  render={(
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(null)}
+                    />
+                  )}
+                  className={cn('combat-copilot-discovery-stage-option', !value && 'is-selected')}
+                >
+                  全部关卡
+                </Item>
                 {visibleStages.slice(0, renderedCount).map((candidate) => {
                   const option = deriveCopilotStageOption(candidate)
                   const optionLabel = ['选择关卡', option.code, option.name, option.zone]
                     .filter(Boolean)
                     .join(' ')
                   return (
-                    <li key={candidate.stageId}>
-                      <button
-                        type="button"
-                        className={`combat-copilot-discovery-stage-option${
-                          candidate.stageId === value ? ' is-selected' : ''
-                        }`}
-                        aria-label={optionLabel}
-                        onClick={() => handleSelect(candidate)}
-                      >
-                        {option.code && (
-                          <span className="combat-copilot-discovery-stage-code">{option.code}</span>
-                        )}
-                        {option.name && (
-                          <span className="combat-copilot-discovery-stage-name">{option.name}</span>
-                        )}
-                        {option.zone && (
-                          <span className="combat-copilot-discovery-stage-zone">{option.zone}</span>
-                        )}
-                      </button>
-                    </li>
+                    <Item
+                      key={candidate.stageId}
+                      render={(
+                        <button
+                          type="button"
+                          aria-label={optionLabel}
+                          onClick={() => handleSelect(candidate)}
+                        />
+                      )}
+                      className={cn(
+                        'combat-copilot-discovery-stage-option',
+                        candidate.stageId === value && 'is-selected',
+                      )}
+                    >
+                      {option.code && (
+                        <span className="combat-copilot-discovery-stage-code">{option.code}</span>
+                      )}
+                      {option.name && (
+                        <span className="combat-copilot-discovery-stage-name">{option.name}</span>
+                      )}
+                      {option.zone && (
+                        <span className="combat-copilot-discovery-stage-zone">{option.zone}</span>
+                      )}
+                    </Item>
                   )
                 })}
-              </ul>
+              </div>
 
               {visibleStages.length === 0 && (
-                <p className="combat-copilot-discovery-stage-state">没有符合条件的关卡。</p>
+                <EmptyState
+                  compact
+                  title="没有符合条件的关卡"
+                  description="换个关卡代号或名称再试。"
+                />
               )}
             </>
           )}

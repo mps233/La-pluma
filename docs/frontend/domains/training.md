@@ -24,7 +24,7 @@
 | 刷图计划展示与范围选择 | `features/training/components/TrainingPlanPanel.tsx` | 持有 `current`/`all` 这一局部状态；生成/应用/同步仍调用工作区回调 |
 | 自动化设置开关 | `features/training/components/TrainingSettingsPanel.tsx` | 只把实际变更字段作为 patch 交给设置所有者；设置快照未就绪时禁用并给出可访问说明 |
 | 添加干员选择器 | `features/training/components/OperatorPicker.tsx` | 候选/计数 Query、状态筛选、职业、稀有度、未精二、搜索、分批渲染与头像缓存 |
-| 材料表格与合成树 | `features/training/components/MaterialViews.tsx` | 纯展示；图标失败时隐藏图片保留占位 |
+| 材料表格与合成树 | `features/training/components/MaterialViews.tsx` | 纯展示；缺口表使用 shared `Table`，合成树由使用方的 shared `Disclosure` 包裹；图标失败时隐藏图片保留占位 |
 | 撤销提示 | `features/training/components/TrainingUndoToast.tsx`、`shared/components/UndoToastCard.tsx` | `TrainingUndoToast` 通过 sonner 挂载；`UndoToastCard` 负责 8 秒自动关闭、悬停/焦点/pending 暂停 |
 | 干员行规则 | `features/training/model/operatorRows.ts` | 搜索匹配、分批、空态文案与卡片动作 |
 | 材料规则 | `features/training/model/materials.ts` | 龙门币追加、缺口筛选与当前目标摘要 |
@@ -35,7 +35,7 @@
 
 - 保持队列、候选、计数三类 Query 的 key、默认读取时机与失效作用域；失败语义按本页规则：计数首次失败可见且可重试、有旧值保留，队列写入失败后由工作区重读权威快照。
 - 不持久化筛选、搜索、分批游标、计划范围或选择器开关；真正卸载/刷新后回到默认值。
-- 保留语义、`id`、`aria-*`、焦点回归与交互契约；面板已改用 `Card` 等结构，组件类名、CSS、布局与默认态视觉可继续演进，视觉基线按实际变化更新。
+- 保留语义、`id`、`aria-*`、焦点回归与交互契约；面板已改用 `Card` 等结构，组件类名、CSS、布局与默认态视觉可继续演进，视觉变更按实际改动在浏览器中人工核对。
 - 不新增页面级 `useTrainingPage` 之类的整页 hook；读取仍由各面板各自的 hook/Query 持有。
 
 ### 2. 组合与状态边界
@@ -121,23 +121,37 @@ OperatorTraining（app-page > app-stack-section > TrainingWorkspace）
 
 ### 6. 面板、选择器与视觉契约
 
-四个主面板都以 `Card` 为根，根节点保留 `role="region"`、`aria-labelledby` 与既有标题 `id`；队列、材料、计划三面板使用 `CardHeader`/`CardTitle`/`CardDescription`/`CardAction`/`CardContent` 组织内容，队列标题保留 `tabIndex={-1}` 与操作后的焦点回归，`CardTitle` 使用 `role="heading" aria-level={2}`。设置面板不折叠、标题下无副标题：`h2#training-settings-title` 常驻，`#training-settings-status` 仅在设置快照未就绪时渲染“设置尚未读取完成，暂不可编辑”并作为两个开关的 `aria-describedby`；两个开关各占一行纵向排列（宽屏也不并排），开关行使用 `<label>` 与 `min-h-11`（44px）触达区域。
+四个主面板都以 `Card` 为根，根节点保留 `role="region"`、`aria-labelledby` 与既有标题 `id`；队列、材料、计划三面板使用 `CardHeader`/`CardTitle`/`CardDescription`/`CardAction`/`CardContent` 组织内容，队列标题保留 `tabIndex={-1}` 与操作后的焦点回归，`CardTitle` 使用 `role="heading" aria-level={2}`。设置面板不折叠、标题下无副标题：`h2#training-settings-title` 常驻，`#training-settings-status` 仅在设置快照未就绪时渲染“设置尚未读取完成，暂不可编辑”并作为两个开关的 `aria-describedby`；两个开关各占一行纵向排列（宽屏也不并排），开关行使用 `FieldGroup` + `Field orientation="horizontal"` + `FieldContent` 组织 `FieldLabel`/`FieldDescription`，`FieldLabel.htmlFor` 关联 `Switch.id`，并保留 `min-h-11`（44px）触达区域。
 
-- 队列行在 `<640px` 为块布局，操作区位于身份信息下方并保留 8px 上间距；`>=640px` 改为身份信息 + 操作区两列同行；`>=1280px` 操作区纵向排列。
+- 队列行在 `<640px` 为块布局，操作区位于身份信息下方并保留 8px 上间距；`>=640px` 改为身份信息 + 操作区两列同行；`>=1280px` 操作区纵向排列。身份信息使用 `Field` + `FieldTitle`（保留 `role="heading" aria-level={3}` 与 `data-training-operator-name`）+ `FieldDescription` 组织干员名、精英目标与缺口计数，进度条保留可访问名称。
 - 自动化设置经 `DeviceMonitorLayout(standard)` 的 support 槽位渲染在右列设备画面下方（`>=1360px` 宽屏三列）；`<1360px` 为单列，顺序为主内容 → 设备画面 → 自动化设置。
-- 主面板的加载、空态与队列就绪前错误状态统一 240px 高；选择器 loading/empty/error 同样 240px，列表容器保留 260px。
-- 材料与队列进度使用共享 `Progress` 并设置可访问名称；`TrainingLoadError` 使用 `Alert variant="destructive"`（单一 `role="alert"`）；队列移除等待使用 `LoaderCircle`，不再手写 spinner。
+- 主面板的加载、空态与队列就绪前状态统一 240px 高（`training-state`）；选择器 loading/empty 同样 240px，列表容器保留 260px。列表加载失败改用紧凑 `InlineAlert`，不再占满 240px。
+- 材料与队列进度使用共享 `Progress` 并设置可访问名称；`TrainingLoadError` 组合 shared `InlineAlert`（`tone="error"`，重试文案“重新加载”），内部 `Alert` 承载唯一 `role="alert"`；队列/计划的操作错误与刷新、部分成功 warning 同样使用 `InlineAlert`；队列移除等待使用 `LoaderCircle`，不再手写 spinner。
+- 只读状态与计数使用非交互 `Badge`：干员 tile 的稀有度与精英/等级、队列行的“当前”、今日关卡次数、材料表的“已齐”与合成树的“缺 N/已齐”；`Badge` 不承担筛选或点击。
+- 搜索、职业、稀有度与计划范围由 `Field`/`FieldLabel`（`sr-only`）包裹控件，`aria-label` 继续保留；计划摘要、应用说明与设置说明使用 `FieldTitle`/`FieldDescription`，不再手写 `<label>`/`<p>` 字段行。
 - 训练页 warning/danger 文案使用 `--warning-text`/`--destructive-text` 文字 token；填充、边框与图标仍使用原 warning/destructive token。
 - 干员 tile 使用 `bg-muted` 头像、`brand-chip brand-text` 稀有度与 `surface-soft` 精英/等级；网格外层保留 `surface-soft`，不再使用 `surface-panel`。
 - 移除按钮使用 destructive 文字与 hover 背景语义；“应用到{flowName}”允许截断，但 `aria-label` 保留完整流程名。
+
+材料表格契约：
+
+- 缺口表由 shared `Table`（`TableHeader`/`TableBody`/`TableRow`/`TableHead`/`TableCell`）渲染，根节点保留 `aria-label="材料筹备明细"`，四个表头均带 `scope="col"`。
+- 首列吸收剩余宽度并允许 `wrap-anywhere`，三列数字右对齐并使用 `tabular-nums`；表头 36px、数据行 56px，首尾列保留 1rem 水平内边距。
+- 表格外观只来自 shared 生成物与调用点布局类；领域 CSS 不再定义手写 grid table。缺口为 0 时单元格渲染 `Badge` “已齐”。
+- 空缺口由调用方渲染 `EmptyState compact`；`MaterialTable` 只接收仍有缺口的材料。
+
+折叠区契约：
+
+- `TrainingPlanPanel` 的“查看完整材料、未开放关卡与计算详情”与 `TrainingMaterialsPanel` 的“查看全部材料与合成需求”使用 shared `Disclosure`，保留默认开合状态、48px summary 行高、顶部边框与 1rem 水平内边距。
+- 展开内容不额外增加内部分隔线或顶部内边距；原块间距继续由 `.training-closed-stages` 等内容自身维持。
 
 选择器交互：
 
 - `Dialog`（Base UI）负责 portal、背景 `aria-hidden`/滚动锁定、Tab 循环、Escape 关闭与触发器焦点归还；队列卡右上角的 `+` 图标按钮是唯一的选择器入口，空态与非空态共用。
 - 状态分段、搜索、职业、稀有度与未精二整体位于 `DialogFrame.toolbar`；toolbar 固定在滚动列表之外，打开弹窗与滚动列表不会带走筛选栏。状态分段保留 `role="toolbar"`、`aria-pressed`、roving `tabIndex` 与方向键/Home/End 导航；高亮测量仍由 `useFluidTabIndicator` 持有。
-- 搜索框 `aria-label="搜索干员名称"`、职业 `select[aria-label="职业"]`、稀有度 `select[aria-label="稀有度"]` 保持；添加按钮的 `aria-label` 始终包含干员名（不可添加时如“未识别${name}”），可见文案与禁用条件不变。
+- 搜索框保留 `aria-label="搜索干员名称"`，职业、稀有度与单干员选择弹窗的职业筛选保留各自的 `aria-label`；搜索框改为 shared `SearchField`（`InputGroup` + 清除按钮），清除后焦点回到输入框，拼音过滤与游标复位行为不变。添加按钮的 `aria-label` 始终包含干员名（不可添加时如“未识别${name}”），可见文案与禁用条件不变。
 - 分批按钮仍显示 `继续显示 N 个` 与 `已显示 X / Y`；搜索或筛选变化会把游标复位到 72。
-- 错误分支的可重试失败使用 `TrainingLoadError`（内部以 `Alert variant="destructive"` 承载单一 `role="alert"`），不把失败呈现为空列表；成功空态使用 `EmptyState` 或中性文案，材料与计划面板在队列就绪前用 Skeleton/中性状态，不显示确定空态。
+- 错误分支的可重试失败使用 `TrainingLoadError`（组合 shared `InlineAlert`，内部 `Alert` 承载单一 `role="alert"`），不把失败呈现为空列表；成功空态使用 `EmptyState compact` 或中性文案，计划/材料在队列就绪前用 Skeleton/中性状态，不显示确定空态。
 
 ### 7. Activity 与卸载
 
@@ -149,7 +163,8 @@ OperatorTraining（app-page > app-stack-section > TrainingWorkspace）
 
 - Query key、默认读取时机、失效作用域与 `uncertain` 保旧语义保持；新增失败行为仅限计数首次失败可见/可重试与队列写入失败后的权威重读。选择器关闭不改变候选/计数读取的启动时机。
 - 端点路径与失效发布作用域未变；队列命令 API 未变，设置所有者 `update` 接受字段 patch，计划 basis 扩为四项并新增 context 捕获参数；`training-plan-applied` window 事件仍未恢复。
-- 保留表单 `id` 前缀、`aria-*`、焦点回归与交互契约；工作区已采用四面板 `Card` 与新的布局/间距，组件类名、CSS 与默认态视觉可继续演进并按实际变化更新视觉基线。页面壳统一为 `app-page > app-stack-section > Workspace`；选择器焦点、标签和交互由下列组件/页面回归测试覆盖。
+- 保留表单 `id` 前缀、`aria-*`、焦点回归与交互契约；工作区已采用四面板 `Card` 与新的布局/间距，组件类名、CSS 与默认态视觉可继续演进并按实际改动在浏览器中人工核对。页面壳统一为 `app-page > app-stack-section > Workspace`；选择器焦点、标签和交互由下列组件/页面回归测试覆盖。
+- 材料缺口表、折叠区与字段行分别由 shared `Table`、`Disclosure`、`Field`/`Badge`/`InlineAlert`/`SearchField` 承担；手写 table、原生 details 与队列/计划字段行类已删除，训练页 CSS 只保留工作区、队列、阶段、设置与状态容器布局。
 - `getOpenStagePlan` 归 `planDisplay.ts`；它不是 feature 公开面成员，供渲染层与计划所有者使用。
 
 ## 队列命令
@@ -394,7 +409,7 @@ applyTrainingPlan({ plan: getOpenStagePlan(plan), settings: 所有者当前 sett
 - 端点路径与服务端存储未改变；设置请求体允许只带变更字段，服务端合并后返回完整设置，仍写入训练队列文件中的 `settings` 字段；`PUT /agent/training/settings` 的返回形状不变。应用计划的响应新增可选 `scheduleSync` 字段，其余响应形状不变，旧客户端会忽略新字段。
 - 未新增 localStorage、Query key 或持久化版本；设置 revision 与计划 basis 只存在于模块内存，刷新页面随计划一起丢失；计划不落盘，服务端不保存计划版本。
 - 旧服务端队列快照缺少 `gameDate`/`clientType` 时，前端对应上下文为 `null`，不主动判旧；旧计划缺少 `summary` 时由服务端按 `openStages`/`stages` 重算。队列快照持续不返回 `settings` 时，设置编辑与计划生成/应用入口保持禁用。
-- 默认态已采用四面板 `Card` 与更新后的布局/间距；保留语义 `id`、`aria-*`、焦点与交互契约，视觉基线按实际变化更新。新增的“计划已应用但读取/定时刷新失败”提示条与
+- 默认态已采用四面板 `Card` 与更新后的布局/间距；保留语义 `id`、`aria-*`、焦点与交互契约，视觉变更按实际改动在浏览器中人工核对。新增的“计划已应用但读取/定时刷新失败”提示条与
  “重新加载”入口只在部分成功状态出现；计划失效时隐藏详情是当前行为。
 - 新的应用发布复用既有作用域与 `detail` 可选字段；automation 与 Dashboard 不依赖 window 事件。
   它不跨浏览器标签页，也不替代服务端 revision。
@@ -411,7 +426,7 @@ applyTrainingPlan({ plan: getOpenStagePlan(plan), settings: 所有者当前 sett
 - 队列命令串行且执行时读取最新快照：重复添加合并、排序不合并，写成功与刷新成功分开（`uncertain` fallback），写前取消在途读取，目标干员消失时拒绝排序；撤销在最新快照已含该干员时短路为 `ignored`，写失败后工作区重读权威快照。
 - 设置所有者串行提交并裁决旧响应：每次只提交变更字段的 patch，只有最新编辑能改变页面值，最新失败回滚到 `persisted`，首次 hydrate 只采用一次；设置快照未就绪时不写入默认隐藏字段。
 - 计划有效期：`{ queueRevision, settingsRevision, gameDate, clientType }` 任一变化即作废旧计划（单侧缺失的 context 交给服务端兜底），队列命令开始即作废；应用前等待 automation 配置排空并在 pending 时拒绝；部分成功（schedule 注册失败、应用后重读失败）保留计划并提示，warning 不被无关 `invalidate()` 清除。
-- UI 契约：四个面板保留 `role="region"`/`aria-labelledby` 与既有标题 `id`，队列标题可接收焦点并在移除/排序/撤销后回归；空队列文案保留而不提供独立按钮，添加入口是队列卡右上角的 `aria-label="添加干员"` 图标按钮；选择器 toolbar 保留 `role="toolbar"`、roving `tabIndex` 与方向键/Home/End；`data-training-operator-name` 与 `data-training-stage-row` 集成锚点不变。
+- UI 契约：四个面板保留 `role="region"`/`aria-labelledby` 与既有标题 `id`，队列标题可接收焦点并在移除/排序/撤销后回归；空队列文案保留而不提供独立按钮，添加入口是队列卡右上角的 `aria-label="添加干员"` 图标按钮；选择器 toolbar 保留 `role="toolbar"`、roving `tabIndex` 与方向键/Home/End；`data-training-operator-name` 与 `data-training-stage-row` 集成锚点不变；材料表保留 `aria-label="材料筹备明细"`、`scope="col"` 表头与可换行材料名。
 - 失效发布：写成功才发布，本页忽略自己的 `detail.source` 发布；显式应用发布 automation/调度/总览三类作用域，synced 队列写入只发布 `automation-config`。
 
 ### 验证命令

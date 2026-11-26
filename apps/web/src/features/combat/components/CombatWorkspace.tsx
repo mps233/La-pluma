@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getErrorMessage } from '@/shared/api'
 import { LoaderCircle } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { ConfigLoadCard, ConfirmAlertDialog, SegmentedTabs, SegmentedTabPanel } from '@/shared/components'
+import { ConfigLoadCard, ConfirmAlertDialog, InlineAlert, SegmentedTabs, SegmentedTabPanel } from '@/shared/components'
 import {
   COMBAT_PARADOX_SEARCH_NOTICE_ID,
   COMBAT_PREVIEW_NOTICE_ID,
@@ -1090,25 +1090,26 @@ export default function CombatWorkspace() {
   return (
     <>
       {configSyncError && (
-        <div
-          role="alert"
-          className="status-warning flex min-h-11 flex-wrap items-center justify-between gap-3.5 rounded-lg px-3 py-2 text-sm leading-5"
+        <InlineAlert
+          tone="warning"
+          action={(
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => void handleRetryConfigSave()}
+              disabled={isRetryingConfigSave}
+              aria-busy={isRetryingConfigSave || undefined}
+              className="min-h-11 shrink-0"
+            >
+              {isRetryingConfigSave
+                ? <><LoaderCircle className="animate-spin" data-icon="inline-start" aria-hidden="true" />同步中</>
+                : '重新同步'}
+            </Button>
+          )}
         >
-          <span className="min-w-0 flex-1">{configSyncError}</span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => void handleRetryConfigSave()}
-            disabled={isRetryingConfigSave}
-            aria-busy={isRetryingConfigSave || undefined}
-            className="min-h-11 shrink-0"
-          >
-            {isRetryingConfigSave
-              ? <><LoaderCircle className="animate-spin" aria-hidden="true" />同步中</>
-              : '重新同步'}
-          </Button>
-        </div>
+          {configSyncError}
+        </InlineAlert>
       )}
 
       <SegmentedTabs value={activeCombatMode} onValueChange={handleModeSelect}>

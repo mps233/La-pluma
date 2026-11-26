@@ -49,7 +49,7 @@ docs/
 
 ## 前端与领域
 
-先读[前端架构与所有权](frontend/README.md)，了解分层、状态所有者、URL 与 Activity。旧入口消费者及移除规则见[兼容约束](frontend/compatibility.md)，组件 API 见[通用组件库](frontend/components.md)。界面规范统一维护在根 [DESIGN.md](../DESIGN.md)。
+先读[前端架构与所有权](frontend/README.md)，了解分层、状态所有者、URL 与 Activity。旧入口消费者及移除规则见[兼容约束](frontend/compatibility.md)，组件 API 见[通用组件库](frontend/components.md)，主题注册与新增主题契约见[主题系统](frontend/themes.md)。界面规范统一维护在根 [DESIGN.md](../DESIGN.md)。
 
 领域内的面板、模型、命令和回归入口合并在同一文档：
 

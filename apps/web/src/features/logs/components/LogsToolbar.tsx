@@ -1,6 +1,7 @@
 import { Download, Pause, Play, Search, Trash2, X } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
+import { Field, FieldLabel } from '@/shared/ui/field'
 import {
   InputGroup,
   InputGroupAddon,
@@ -9,8 +10,8 @@ import {
 } from '@/shared/ui/input-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { Switch } from '@/shared/ui/switch'
+import { UnavailableAction } from '@/shared/components'
 import type { LogEventFilter, LogFilter } from '../model/logModel'
-import LogsUnavailableAction from './LogsUnavailableAction'
 
 interface LogsToolbarProps {
   readonly autoScroll: boolean
@@ -63,16 +64,22 @@ export default function LogsToolbar({
       ]
 
   const autoScrollControl = (
-    <div className="log-toggle-control flex min-h-11 min-w-0 items-center justify-between gap-3.5">
-      <span className={`truncate text-xs font-medium text-muted-foreground ${viewingHistory ? 'opacity-50' : ''}`}>自动滚动</span>
+    <Field
+      orientation="horizontal"
+      className={`log-toggle-control min-h-11 w-auto shrink-0 gap-3.5 ${viewingHistory ? 'opacity-50' : ''}`}
+    >
+      <FieldLabel htmlFor="logs-auto-scroll" className="truncate text-xs font-medium text-muted-foreground">
+        自动滚动
+      </FieldLabel>
       <Switch
+        id="logs-auto-scroll"
         size="sm"
         checked={autoScroll}
         onCheckedChange={onAutoScrollChange}
         aria-label="自动滚动"
         disabled={viewingHistory}
       />
-    </div>
+    </Field>
   )
 
   const exportButton = (
@@ -179,23 +186,26 @@ export default function LogsToolbar({
         <div className="log-toolbar-footer">
           <div className="log-toolbar-toggles">
             {viewingHistory ? (
-              <LogsUnavailableAction
+              <UnavailableAction
                 action="自动滚动"
                 reason="历史文件不提供自动滚动"
                 className="inline-flex min-w-0"
               >
                 {autoScrollControl}
-              </LogsUnavailableAction>
+              </UnavailableAction>
             ) : autoScrollControl}
-            <div className="log-toggle-control flex min-h-11 min-w-0 items-center justify-between gap-3.5">
-              <span className="truncate text-xs font-medium text-muted-foreground">折叠重复</span>
+            <Field orientation="horizontal" className="log-toggle-control min-h-11 w-auto shrink-0 gap-3.5">
+              <FieldLabel htmlFor="logs-collapse-repeats" className="truncate text-xs font-medium text-muted-foreground">
+                折叠重复
+              </FieldLabel>
               <Switch
+                id="logs-collapse-repeats"
                 size="sm"
                 checked={collapseRepeats}
                 onCheckedChange={onCollapseRepeatsChange}
                 aria-label="折叠重复日志"
               />
-            </div>
+            </Field>
           </div>
           <div className="log-toolbar-actions">
             {!viewingHistory && (
@@ -222,12 +232,12 @@ export default function LogsToolbar({
               </Button>
             )}
             {canExport ? exportButton : (
-              <LogsUnavailableAction
+              <UnavailableAction
                 action="导出筛选结果"
                 reason="当前筛选没有可导出的日志"
               >
                 {exportButton}
-              </LogsUnavailableAction>
+              </UnavailableAction>
             )}
           </div>
         </div>

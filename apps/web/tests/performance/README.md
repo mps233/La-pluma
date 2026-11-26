@@ -8,13 +8,13 @@ node apps/web/scripts/performance-docker.ts
 PERFORMANCE_SKIP_BUILD=1 node apps/web/scripts/performance-docker.ts
 ```
 
-入口使用已安装的 Playwright 对应官方 `-noble` 镜像，以 `--pull=never` 运行；缺依赖或镜像即失败，不安装、不升级。需要 Docker socket 访问权限。浏览器与静态服务位于同一个容器的默认隔离网络中，使用容器内端口 4317，不发布宿主端口，也不继承宿主 `PORT`；临时结果放在容器 `/tmp/la-pluma-performance-results`。必须在 verify、视觉及集成检查结束后独占串行采样；采样期间不构建、不覆盖 dist、不运行其他高负载任务，其他 worktree 的任务也会争用宿主资源。
+入口使用已安装的 Playwright 对应官方 `-noble` 镜像，以 `--pull=never` 运行；缺依赖或镜像即失败，不安装、不升级。需要 Docker socket 访问权限。浏览器与静态服务位于同一个容器的默认隔离网络中，使用容器内端口 4317，不发布宿主端口，也不继承宿主 `PORT`；临时结果放在容器 `/tmp/la-pluma-performance-results`。必须在 verify 与集成检查结束后独占串行采样；采样期间不构建、不覆盖 dist、不运行其他高负载任务，其他 worktree 的任务也会争用宿主资源。
 
 ## 固定环境与完成语义
 
-四类代表场景各 5 次，另加成功键盘排序对照 5 次，共 25 个新 browser context；一个 worker、无重试。固定 Chromium、1440×900、DPR 1、深色主题、zh-CN、上海时区、2026-10-24 04:00 的 Date、减弱动态效果、固定图片与 API。计时器与 `performance.now()` 为真实时间。交互 fixture 人工延时 25ms，既有视觉 fixture 即时应答。
+四类代表场景各 5 次，另加成功键盘排序对照 5 次，共 25 个新 browser context；一个 worker、无重试。固定 Chromium、1440×900、DPR 1、深色主题、zh-CN、上海时区、2026-10-24 04:00 的 Date、减弱动态效果、固定图片与 API。计时器与 `performance.now()` 为真实时间。交互 fixture 人工延时 25ms，既有共享 fixture 即时应答。
 
-性能环境显式选择 `nativeClock: true`：只替换无参数 Date/Date.now，保留带参数 Date、静态 parse/UTC 与原生 performance.now、setTimeout、requestAnimationFrame，并逐样本断言原生函数身份。默认视觉环境使用 Playwright `setFixedTime`，其 clock facade 按真实时间推进、精度为整毫秒。性能对照须使用相同 Date-only 协议，不能将不同计时协议的样本直接视为严格成对比较。
+性能环境显式选择 `nativeClock: true`：只替换无参数 Date/Date.now，保留带参数 Date、静态 parse/UTC 与原生 performance.now、setTimeout、requestAnimationFrame，并逐样本断言原生函数身份。默认浏览器测试环境使用 Playwright `setFixedTime`，其 clock facade 按真实时间推进、精度为整毫秒。性能对照须使用相同 Date-only 协议，不能将不同计时协议的样本直接视为严格成对比较。
 
 | 场景 | 固定输入 | 完成断言 |
 | --- | --- | --- |
@@ -74,5 +74,5 @@ node apps/web/scripts/performance-docker.ts
 
 ```sh
 pnpm --filter la-pluma-next-client type-check
-pnpm --filter la-pluma-next-client exec eslint tests/performance scripts/performance-build.ts scripts/performance-docker.ts tests/visual/static-server.ts
+pnpm --filter la-pluma-next-client exec oxlint --deny-warnings tests/performance scripts/performance-build.ts scripts/performance-docker.ts tests/visual/static-server.ts
 ```

@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { CircleMinus, CirclePlus, GraduationCap, ListPlus, LoaderCircle, Minus, Pin, Plus, Trash2 } from 'lucide-react'
+import { CircleMinus, CirclePlus, GraduationCap, ListPlus, LoaderCircle, Pin, Trash2 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
-import { FieldHint } from '@/shared/components'
+import { FieldHint, NumberField } from '@/shared/components'
 import { generateTrainingPlan } from '@/features/training'
 import { loadUserConfig } from '@/features/user-config'
 import type { StageConfig, TaskFlowItem, TaskParamField } from '../types'
@@ -16,7 +16,6 @@ import {
   resolveStageList,
   setStageName,
   setStageTimes,
-  stepStageTimes,
   toggleStagePinned,
 } from '../model/stageEditing'
 
@@ -90,10 +89,6 @@ export default function AutomationStageEditor({
 
   const updateStageTimes = (stageIndex: number, times: string) => {
     updateStages(setStageTimes(stages, stageIndex, times))
-  }
-
-  const adjustStageTimes = (stageIndex: number, delta: number) => {
-    updateStages(stepStageTimes(stages, stageIndex, delta))
   }
 
   const deleteStage = (stageIndex: number) => {
@@ -205,40 +200,20 @@ export default function AutomationStageEditor({
                 </datalist>
 
                 <div className="automation-stage-times">
-                  <div className="number-input-wrapper automation-stage-times-input w-16 shrink-0 workbench:w-32">
-                    <Input
-                      id={`${fieldId}-${stageIndex}-times`}
-                      type="number"
-                      autoComplete="off"
-                      aria-label={`${field.label} ${stageIndex + 1} 执行次数`}
-                      value={stageTimes}
-                      onChange={event => updateStageTimes(stageIndex, event.target.value)}
-                      placeholder="0"
-                      disabled={stageControlsDisabled || isSmartStageRow}
-                      min="0"
-                      className={`min-w-0 text-center tabular-nums workbench:pr-16${isSmartStageRow ? ' disabled:opacity-100 disabled:text-foreground' : ''}`}
-                    />
-                    {!isSmartStageRow && (
-                      <div className="number-input-controls hidden workbench:flex">
-                        <button
-                          type="button"
-                          onClick={() => adjustStageTimes(stageIndex, -1)}
-                          disabled={stageControlsDisabled || Number(stageTimes) <= 0}
-                          aria-label={`减少${field.label} ${stageIndex + 1} 的执行次数`}
-                        >
-                          <Minus size={14} strokeWidth={2.1} aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => adjustStageTimes(stageIndex, 1)}
-                          disabled={stageControlsDisabled}
-                          aria-label={`增加${field.label} ${stageIndex + 1} 的执行次数`}
-                        >
-                          <Plus size={14} strokeWidth={2.1} aria-hidden="true" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <NumberField
+                    id={`${fieldId}-${stageIndex}-times`}
+                    label={`${field.label} ${stageIndex + 1} 执行次数`}
+                    value={stageTimes}
+                    onValueChange={value => updateStageTimes(stageIndex, value)}
+                    placeholder="0"
+                    disabled={stageControlsDisabled || isSmartStageRow}
+                    min="0"
+                    autoComplete="off"
+                    aria-label={`${field.label} ${stageIndex + 1} 执行次数`}
+                    className="w-16 shrink-0 workbench:w-32"
+                    inputClassName={`min-w-0 text-center${isSmartStageRow ? ' disabled:opacity-100 disabled:text-foreground' : ''}`}
+                    controlsClassName={isSmartStageRow ? 'hidden' : 'hidden workbench:flex'}
+                  />
                   <span aria-hidden="true">次</span>
                 </div>
 

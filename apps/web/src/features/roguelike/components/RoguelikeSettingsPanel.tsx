@@ -1,12 +1,12 @@
-import { useEffect, useRef, type ComponentProps, type ReactNode } from 'react'
-import { AlertTriangle, LoaderCircle } from 'lucide-react'
+import { useEffect, useRef, type ComponentProps } from 'react'
+import { LoaderCircle } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Card } from '@/shared/ui/card'
-import { FieldHint } from '@/shared/components'
+import { Field, FieldError, FieldLabel } from '@/shared/ui/field'
+import { FieldHint, InlineAlert, Loading, UnavailableAction } from '@/shared/components'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { Switch } from '@/shared/ui/switch'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip'
 import type { ConfigLoadState } from '@/features/user-config'
 import type { StopMode } from '@/features/task-execution'
 import {
@@ -18,25 +18,6 @@ import {
 import type { RoguelikeFieldError } from '../model/roguelikeValidation'
 import RoguelikeCoreOperatorField from './RoguelikeCoreOperatorField'
 import type { RoguelikeAdvancedOption, RoguelikeAdvancedValues, RoguelikeTask } from '../types'
-
-function UnavailableAction({
-  action,
-  reason,
-  children,
-}: {
-  action: string
-  reason: string
-  children: ReactNode
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger render={<span tabIndex={0} className="flex w-full min-w-0" aria-label={`${action}：${reason}`} />}>
-        {children}
-      </TooltipTrigger>
-      <TooltipContent role="tooltip">{reason}</TooltipContent>
-    </Tooltip>
-  )
-}
 
 interface RoguelikeSelectProps {
   id: string
@@ -64,9 +45,9 @@ function RoguelikeSelect({
   const hintId = `${id}-hint`
   const errorId = `${id}-error`
   return (
-    <div>
-      <div className="mb-2 flex items-center gap-1">
-        <label htmlFor={id} className="text-sm font-medium text-muted-foreground">{label}</label>
+    <Field data-invalid={error ? true : undefined} data-disabled={disabled ? true : undefined}>
+      <div className="flex items-center gap-1">
+        <FieldLabel htmlFor={id} className="text-muted-foreground">{label}</FieldLabel>
         {hint && <FieldHint id={hintId} label={label} hint={hint} />}
       </div>
       <Select
@@ -93,8 +74,8 @@ function RoguelikeSelect({
           ))}
         </SelectContent>
       </Select>
-      {error && <p id={errorId} className="mt-2 text-xs form-error-text">{error}</p>}
-    </div>
+      {error && <FieldError id={errorId} className="text-xs text-destructive-text">{error}</FieldError>}
+    </Field>
   )
 }
 
@@ -117,9 +98,13 @@ function RoguelikeFieldInput({
   const hintId = `${id}-hint`
   const errorId = `${id}-error`
   return (
-    <div className={className}>
-      <div className="mb-2 flex items-center gap-1">
-        <label htmlFor={id} className="text-sm font-medium text-muted-foreground">{label}</label>
+    <Field
+      className={className}
+      data-invalid={error ? true : undefined}
+      data-disabled={inputProps.disabled ? true : undefined}
+    >
+      <div className="flex items-center gap-1">
+        <FieldLabel htmlFor={id} className="text-muted-foreground">{label}</FieldLabel>
         {hint && <FieldHint id={hintId} label={label} hint={hint} />}
       </div>
       <Input
@@ -129,8 +114,8 @@ function RoguelikeFieldInput({
         aria-errormessage={error ? errorId : undefined}
         {...inputProps}
       />
-      {error && <p id={errorId} className="mt-2 text-xs form-error-text">{error}</p>}
-    </div>
+      {error && <FieldError id={errorId} className="text-xs text-destructive-text">{error}</FieldError>}
+    </Field>
   )
 }
 
@@ -225,7 +210,7 @@ export default function RoguelikeSettingsPanel({
       className="roguelike-run-button min-h-11"
     >
       {execution.isSubmitting
-        ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在启动</>
+        ? <><LoaderCircle className="animate-spin" data-icon="inline-start" aria-hidden="true" />正在启动</>
         : '开始'}
     </Button>
   )
@@ -293,9 +278,14 @@ export default function RoguelikeSettingsPanel({
                 {toggleOptions.map(option => {
                   const switchId = `roguelike-${task.id}-${option.key}`
                   return (
-                    <div key={option.key} className="roguelike-toggle-row">
+                    <Field
+                      key={option.key}
+                      orientation="horizontal"
+                      className="roguelike-toggle-row"
+                      data-disabled={!editable ? true : undefined}
+                    >
                       <div className="flex min-w-0 flex-1 items-center gap-1">
-                        <label htmlFor={switchId} className="roguelike-toggle-label min-h-11">{option.label}</label>
+                        <FieldLabel htmlFor={switchId} className="roguelike-toggle-label">{option.label}</FieldLabel>
                         {option.hint && (
                           <>
                             <span id={`${switchId}-description`} className="sr-only">{option.hint}</span>
@@ -312,37 +302,24 @@ export default function RoguelikeSettingsPanel({
                         aria-label={option.label}
                         aria-describedby={option.hint ? `${switchId}-description` : undefined}
                       />
-                    </div>
+                    </Field>
                   )
                 })}
               </div>
             )}
           </>
         ) : configLoadState === 'failed' ? (
-          <div
-            role="alert"
-            aria-live="assertive"
-            className="flex min-h-40 flex-col items-center justify-center gap-3 px-4 py-4 text-center"
+          <InlineAlert
+            tone="error"
+            title="肉鸽配置暂时不可用"
+            onRetry={onReloadConfig}
+            retryLabel="重新加载"
           >
-            <AlertTriangle size={22} strokeWidth={1.9} className="text-destructive" aria-hidden="true" />
-            <div className="w-full min-w-0 space-y-1">
-              <p className="text-sm font-medium">肉鸽配置暂时不可用</p>
-              <p className="line-clamp-2 wrap-break-word text-xs text-muted-foreground">
-                {configLoadError ?? '请稍后重新加载'}
-              </p>
-            </div>
-            <Button type="button" variant="secondary" size="sm" onClick={onReloadConfig}>
-              重新加载
-            </Button>
-          </div>
+            <span className="wrap-anywhere">{configLoadError ?? '请稍后重新加载'}</span>
+          </InlineAlert>
         ) : (
-          <div
-            role="status"
-            aria-live="polite"
-            className="flex min-h-40 flex-col items-center justify-center gap-3 px-4 py-4 text-center"
-          >
-            <LoaderCircle size={22} strokeWidth={1.9} className="animate-spin" aria-hidden="true" />
-            <p className="text-sm font-medium">正在读取肉鸽配置…</p>
+          <div className="flex min-h-40 items-center justify-center px-4 py-4">
+            <Loading text="正在读取肉鸽配置…" />
           </div>
         )}
       </div>
@@ -358,11 +335,15 @@ export default function RoguelikeSettingsPanel({
               className="roguelike-run-button min-h-11"
             >
               {execution.pendingStopMode === 'now' || (execution.isStopping && execution.pendingStopMode !== 'after-combat')
-                ? <><LoaderCircle className="animate-spin" aria-hidden="true" />正在终止</>
+                ? <><LoaderCircle className="animate-spin" data-icon="inline-start" aria-hidden="true" />正在终止</>
                 : '终止'}
             </Button>
             {execution.isWaitingForCombat ? (
-              <UnavailableAction action="等待战斗结束" reason="最多等待 10 分钟">
+              <UnavailableAction
+                action="等待战斗结束"
+                reason="最多等待 10 分钟"
+                className="flex w-full min-w-0"
+              >
                 <Button
                   onClick={() => handleStopClick('after-combat')}
                   disabled
@@ -370,7 +351,7 @@ export default function RoguelikeSettingsPanel({
                   variant="secondary"
                   className="roguelike-run-button min-h-11"
                 >
-                  <><LoaderCircle className="animate-spin" aria-hidden="true" />等待战斗结束</>
+                  <><LoaderCircle className="animate-spin" data-icon="inline-start" aria-hidden="true" />等待战斗结束</>
                 </Button>
               </UnavailableAction>
             ) : (
@@ -387,7 +368,11 @@ export default function RoguelikeSettingsPanel({
         ) : execution.automationAvailable ? (
           executeButton
         ) : (
-          <UnavailableAction action="开始" reason={execution.unavailableMessage}>
+          <UnavailableAction
+            action="开始"
+            reason={execution.unavailableMessage}
+            className="flex w-full min-w-0"
+          >
             {executeButton}
           </UnavailableAction>
         )}

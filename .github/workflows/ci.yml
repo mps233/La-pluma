@@ -155,21 +155,6 @@ jobs:
         env:
           INTEGRATION_SKIP_BUILD: '1'
         run: pnpm --filter la-pluma-next-client test:integration
-      - name: Detect frontend changes
-        id: visual-changes
-        if: github.event_name == 'pull_request'
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          git fetch --depth=1 origin "$BASE_SHA"
-          if git diff --name-only "$BASE_SHA" HEAD | grep -Eq '^(apps/web/|scripts/visual|pnpm-lock\.yaml)'; then
-            echo "visual=true" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Visual baseline comparison
-        if: github.event_name != 'pull_request' || steps.visual-changes.outputs.visual == 'true'
-        env:
-          VISUAL_SKIP_BUILD: '1'
-        run: pnpm visual
       - name: Upload browser failure evidence
         if: failure()
         uses: actions/upload-artifact@v7

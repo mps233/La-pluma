@@ -1,4 +1,9 @@
+import { cn } from 'cn'
+import { InlineAlert } from '@/shared/components'
+import { Badge } from '@/shared/ui/badge'
 import { Card } from '@/shared/ui/card'
+import { Field, FieldLabel } from '@/shared/ui/field'
+import { Textarea } from '@/shared/ui/textarea'
 import type { AdvancedValues } from '../model/combatCommands'
 import { splitCopilotInputToArgs } from '../utils/copilotUri'
 import type { CombatTask } from '../types'
@@ -52,42 +57,47 @@ export default function CombatSpecialTaskPanel({
       <div className="combat-special-layout">
         <div className="min-w-0 space-y-3.5">
           <div className="combat-workspace-section">
-            <div className="mb-3 flex items-center justify-between gap-3.5">
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <svg aria-hidden="true" className="h-4 w-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span>作业输入</span>
-              </h3>
-              <span className={`shrink-0 rounded-md px-2 py-1 text-xs ${isSss && taskUris.length > 1 ? 'bg-warning/10 text-warning' : 'brand-chip'}`}>
-                {isSss ? `${taskUris.length}/1 URI` : `${taskUris.length} 个 URI`}
-              </span>
-            </div>
-            <label htmlFor={`combat-${task.id}-uris`} className="sr-only">
-              {task.name}作业链接或本地路径
-            </label>
-            <textarea
-              id={`combat-${task.id}-uris`}
-              name={`maa-${task.id}-uris`}
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              placeholder={
-                isSss
-                  ? `${task.placeholder}\n一次只支持一个 SSS 作业 URI`
-                  : `${task.placeholder}\n支持多行，每行一个作业 URI`
-              }
-              value={input}
-              onChange={(e) => onInputChange(e.target.value)}
-              rows={isSss ? 4 : 5}
-              className="app-native-control w-full resize-none rounded-lg px-4 py-3 font-mono text-sm font-medium text-foreground control-surface focus-visible:outline-hidden focus-visible:ring-3 focus-visible:ring-ring/50"
-            />
-            {isSss && taskUris.length > 1 && (
-              <div className="mt-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-                保全派驻当前只会执行一个 SSS 作业 URI。
+            <Field className="gap-3">
+              <div className="flex items-center justify-between gap-3.5">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <svg aria-hidden="true" className="h-4 w-4 brand-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span>作业输入</span>
+                </h3>
+                <Badge
+                  variant="ghost"
+                  className={cn(isSss && taskUris.length > 1 ? 'bg-warning/10 text-warning-text' : 'brand-chip')}
+                >
+                  {isSss ? `${taskUris.length}/1 URI` : `${taskUris.length} 个 URI`}
+                </Badge>
               </div>
-            )}
+              <FieldLabel htmlFor={`combat-${task.id}-uris`} className="sr-only">
+                {task.name}作业链接或本地路径
+              </FieldLabel>
+              <Textarea
+                id={`combat-${task.id}-uris`}
+                name={`maa-${task.id}-uris`}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                placeholder={
+                  isSss
+                    ? `${task.placeholder}\n一次只支持一个 SSS 作业 URI`
+                    : `${task.placeholder}\n支持多行，每行一个作业 URI`
+                }
+                value={input}
+                onChange={(e) => onInputChange(e.target.value)}
+                rows={isSss ? 4 : 5}
+                className="field-sizing-fixed resize-none font-mono text-sm font-medium"
+              />
+              {isSss && taskUris.length > 1 && (
+                <InlineAlert tone="warning">
+                  保全派驻当前只会执行一个 SSS 作业 URI。
+                </InlineAlert>
+              )}
+            </Field>
           </div>
 
           {task.hasAdvanced && (
@@ -111,7 +121,7 @@ export default function CombatSpecialTaskPanel({
               <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card text-xs">
                 <div className="flex items-center justify-between px-3 py-2">
                   <span className="text-tertiary">作业数量</span>
-                  <span className={taskUris.length > 1 ? 'text-warning' : 'text-foreground'}>{taskUris.length || 0}</span>
+                  <span className={taskUris.length > 1 ? 'text-warning-text' : 'text-foreground'}>{taskUris.length || 0}</span>
                 </div>
                 <div className="flex items-center justify-between px-3 py-2">
                   <span className="text-tertiary">循环次数</span>

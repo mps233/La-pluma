@@ -1,6 +1,9 @@
 import { LoaderCircle } from 'lucide-react'
+import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
+import { FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
+import { Item, ItemContent } from '@/shared/ui/item'
 import { usePanelState } from '../hooks/usePanelState'
 import type { PanelStateStore } from '../model/panelState'
 import type { ParadoxSearchResult } from '../types'
@@ -40,7 +43,7 @@ export default function CombatParadoxSearchPanel({
         <span>干员搜索</span>
       </h3>
       <div className="flex items-center gap-2">
-        <label htmlFor="combat-paradox-operator" className="sr-only">搜索悖论模拟干员</label>
+        <FieldLabel htmlFor="combat-paradox-operator" className="sr-only">搜索悖论模拟干员</FieldLabel>
         <Input
           id="combat-paradox-operator"
           type="text"
@@ -80,23 +83,30 @@ export default function CombatParadoxSearchPanel({
           </div>
           <div className="max-h-56 divide-y divide-border overflow-hidden overflow-y-auto rounded-lg border border-border bg-card">
             {result.copilots.map((copilot, idx) => (
-              <button
+              <Item
                 key={copilot.id}
-                onClick={() => onSelectUri(copilot.uri)}
-                className="min-h-11 w-full px-3 py-2 text-left text-xs transition-colors hover:bg-muted focus-visible:outline-hidden focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50"
+                render={(
+                  <button
+                    type="button"
+                    onClick={() => onSelectUri(copilot.uri)}
+                  />
+                )}
+                className="min-h-11 rounded-none px-3 py-2 text-left text-xs hover:bg-muted"
               >
-                <div className="flex min-w-0 items-center justify-between gap-2">
-                  <span className="truncate font-mono brand-text">{copilot.uri}</span>
-                  {idx === 0 && (
-                    <span className="shrink-0 rounded-md px-2 py-0.5 text-xs font-medium brand-chip">推荐</span>
-                  )}
-                </div>
-                <div className="mt-1 flex items-center space-x-2 text-muted-foreground">
-                  <span>浏览 {copilot.views.toLocaleString()}</span>
-                  <span>/</span>
-                  <span>热度 {formatCopilotHotScore(copilot.hotScore)}</span>
-                </div>
-              </button>
+                <ItemContent className="gap-1">
+                  <span className="flex min-w-0 items-center justify-between gap-2">
+                    <span className="truncate font-mono brand-text">{copilot.uri}</span>
+                    {idx === 0 && (
+                      <Badge variant="ghost" className="brand-chip shrink-0">推荐</Badge>
+                    )}
+                  </span>
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <span>浏览 {copilot.views.toLocaleString()}</span>
+                    <span>/</span>
+                    <span>热度 {formatCopilotHotScore(copilot.hotScore)}</span>
+                  </span>
+                </ItemContent>
+              </Item>
             ))}
           </div>
         </div>

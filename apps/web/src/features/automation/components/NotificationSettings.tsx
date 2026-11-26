@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { LoaderCircle, Save, Send } from 'lucide-react'
 import type { ApiResponse } from '@/shared/api'
+import { InlineAlert, Loading } from '@/shared/components'
+import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
+import { Field, FieldDescription, FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { Switch } from '@/shared/ui/switch'
 import { Card } from '@/shared/ui/card'
@@ -192,9 +195,13 @@ export default function NotificationSettings() {
       </div>
 
       {loading ? (
-        <div className="automation-notification-loading min-h-24" role="status">读取通知配置…</div>
+        <div className="min-h-24 p-4">
+          <Loading size="sm" text="读取通知配置…" />
+        </div>
       ) : loadError ? (
-        <div className="automation-notification-loading min-h-24" role="status">通知配置暂不可用</div>
+        <div className="min-h-24 p-4">
+          <InlineAlert tone="error">通知配置暂不可用</InlineAlert>
+        </div>
       ) : (
         <>
           <div className={`automation-notification-channel${config.enabled ? '' : ' is-parent-disabled'}`}>
@@ -214,9 +221,10 @@ export default function NotificationSettings() {
 
             {telegram.enabled && (
               <div className="automation-notification-details">
-                <label className="automation-notification-field">
-                  <span>Bot Token</span>
+                <Field data-disabled={!config.enabled || saving || undefined}>
+                  <FieldLabel htmlFor="automation-notification-bot-token" className="text-muted-foreground">Bot Token</FieldLabel>
                   <Input
+                    id="automation-notification-bot-token"
                     type="text"
                     value={telegram.botToken}
                     onChange={(event) => updateTelegram({ botToken: event.target.value })}
@@ -224,11 +232,12 @@ export default function NotificationSettings() {
                     disabled={!config.enabled || saving}
                     autoComplete="off"
                   />
-                </label>
+                </Field>
 
-                <label className="automation-notification-field">
-                  <span>Chat ID</span>
+                <Field data-disabled={!config.enabled || saving || undefined}>
+                  <FieldLabel htmlFor="automation-notification-chat-id" className="text-muted-foreground">Chat ID</FieldLabel>
                   <Input
+                    id="automation-notification-chat-id"
                     type="text"
                     value={telegram.chatId}
                     onChange={(event) => updateTelegram({ chatId: event.target.value })}
@@ -236,14 +245,14 @@ export default function NotificationSettings() {
                     disabled={!config.enabled || saving}
                     autoComplete="off"
                   />
-                </label>
+                </Field>
               </div>
             )}
 
             {config.enabled && !canSend && (
-              <p className="automation-notification-hint" role="status">
+              <InlineAlert tone="warning" showIcon={false}>
                 {telegram.enabled ? '凭据不完整，不会发送' : '未启用渠道，不会发送'}
-              </p>
+              </InlineAlert>
             )}
 
             <div className="automation-notification-actions">
@@ -264,20 +273,20 @@ export default function NotificationSettings() {
                   )}
               </Button>
               {config.enabled && testBlockedReason && (
-                <small className="automation-notification-hint">{testBlockedReason}</small>
+                <FieldDescription className="text-xs">{testBlockedReason}</FieldDescription>
               )}
             </div>
 
           </div>
 
           {!config.enabled && (
-            <small className="automation-notification-hint">{testBlockedReason}</small>
+            <FieldDescription className="mt-0 px-4 pb-3 text-xs">{testBlockedReason}</FieldDescription>
           )}
 
           <div className="automation-side-card-footer">
-            <span className="automation-notification-status">
+            <Badge variant="secondary" className="font-normal text-tertiary">
               {saving ? '保存中…' : dirty ? '有未保存的更改' : '已保存'}
-            </span>
+            </Badge>
             <Button
               size="sm"
               onClick={() => void saveConfig()}

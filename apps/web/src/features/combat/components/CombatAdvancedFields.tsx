@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { Checkbox } from '@/shared/ui/checkbox'
+import { Field, FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { getCombatAdvancedOptions, type AdvancedValues } from '../model/combatCommands'
@@ -33,17 +34,22 @@ export default function CombatAdvancedFields({
         return (
         <div key={option.key} className="min-w-0">
           {option.type === 'checkbox' ? (
-            <label className="group flex min-h-11 w-full min-w-0 cursor-pointer items-center gap-2 py-2 text-sm text-muted-foreground">
+            <Field orientation="horizontal" className="min-h-11 w-full min-w-0 gap-2 py-2">
               <Checkbox
                 id={controlId}
                 checked={advanced[option.key] as boolean || false}
                 onCheckedChange={(checked) => onChange(option.key, checked)}
               />
-              <span className="min-w-0 truncate transition-colors group-hover:text-primary">{option.label}</span>
-            </label>
+              <FieldLabel
+                htmlFor={controlId}
+                className="min-w-0 cursor-pointer truncate text-sm font-normal text-muted-foreground transition-colors hover:text-primary"
+              >
+                {option.label}
+              </FieldLabel>
+            </Field>
           ) : option.type === 'select' && option.options ? (
-            <div className="grid min-w-0 gap-1.5 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center">
-              <label htmlFor={controlId} className="text-sm text-muted-foreground">{option.label}</label>
+            <Field orientation="horizontal" className="grid min-w-0 gap-1.5 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center">
+              <FieldLabel htmlFor={controlId} className="text-sm font-normal text-muted-foreground">{option.label}</FieldLabel>
               <Select
                 name={`maa-${taskId}-${option.key}`}
                 items={option.options}
@@ -59,10 +65,10 @@ export default function CombatAdvancedFields({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           ) : (
-            <div className="grid min-w-0 gap-1.5 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center">
-              <label htmlFor={controlId} className="text-sm text-muted-foreground">{option.label}</label>
+            <Field orientation="horizontal" className="grid min-w-0 gap-1.5 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-center">
+              <FieldLabel htmlFor={controlId} className="text-sm font-normal text-muted-foreground">{option.label}</FieldLabel>
               <Input
                 id={controlId}
                 type={option.type}
@@ -76,7 +82,7 @@ export default function CombatAdvancedFields({
                 placeholder={option.placeholder}
                 className="min-w-0"
               />
-            </div>
+            </Field>
           )}
         </div>
         )

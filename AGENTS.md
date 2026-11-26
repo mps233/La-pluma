@@ -9,7 +9,7 @@ La Pluma Next 是面向《明日方舟》自动化的本地 Web 控制台：Reac
 | `apps/web/` | 前端应用、领域逻辑、共享 UI、浏览器测试与 PWA 构建 |
 | `apps/server/` | HTTP API、任务执行与调度、设备连接、通知与持久化 |
 | `docs/` | 现行架构、领域契约、开发与运维文档 |
-| `scripts/` | 根级 Docker 化视觉测试入口 |
+| `scripts/` | 根级 Docker 化 README 截图入口 |
 | `.github/workflows/` | 质量门禁、浏览器检查与镜像发布 |
 
 ## 环境与常用命令
@@ -22,13 +22,12 @@ La Pluma Next 是面向《明日方舟》自动化的本地 Web 控制台：Reac
 | 启动前后端 | `pnpm dev`；单独启动 `pnpm dev:client` / `pnpm dev:server` |
 | 构建 | `pnpm build`：客户端类型检查、构建与 precache 校验；服务端语法检查 |
 | 测试 | `pnpm test`：客户端 Vitest + 服务端 `node:test` |
-| 客户端快速回归 | `pnpm verify:fast`：客户端 guardrails、ESLint、类型检查与相对 `origin/main` 的改动测试（包含已提交改动；只验证未提交改动时直接运行 `vitest run --changed`）；不含样式预算、构建与服务端流程，全量回归仍用 `pnpm verify` |
-| 主要质量检查 | `pnpm verify`：两个包的 guardrails、类型检查、测试与构建，客户端另含 ESLint 与样式预算 |
+| 客户端快速回归 | `pnpm verify:fast`：客户端 guardrails、oxlint、类型检查与相对 `origin/main` 的改动测试（包含已提交改动；只验证未提交改动时直接运行 `vitest run --changed`）；不含样式预算、构建与服务端流程，全量回归仍用 `pnpm verify` |
+| 主要质量检查 | `pnpm verify`：两个包的 guardrails、类型检查、测试与构建，客户端另含 oxlint 与样式预算 |
 | 样式预算 | `pnpm --filter la-pluma-next-client stylelint:ratchet` |
-| 视觉基线比对 / 更新 | `pnpm visual` / `pnpm visual:update`（需 Docker） |
 | 生产启动 | `pnpm start` |
 
-`pnpm verify` 不覆盖浏览器集成、视觉比对、服务端覆盖率与容器启动检查；前端改动需自行补跑对应命令，CI 会全部执行。
+`pnpm verify` 不覆盖浏览器集成、服务端覆盖率与容器启动检查；前端改动需自行补跑对应命令，CI 会全部执行。
 
 ## 开发工作流
 
@@ -69,7 +68,7 @@ La Pluma Next 是面向《明日方舟》自动化的本地 Web 控制台：Reac
 - 修 Bug 先写失败测试：先补一个能在当前代码上复现问题的测试并确认它失败，再改实现。
 - 不得用 mock 把被测逻辑替换成恒真断言。mock 只允许替换真实边界依赖：子进程、网络、时钟、文件系统、浏览器 API。
 - 不得为覆盖率堆砌无意义测试。断言必须验证行为（输入 → 可观察结果），不锁实现细节、内部调用次数或私有字段。
-- 更新快照、像素基线或覆盖率阈值必须有对应的真实变化与结构依据，不得用重录或降阈值掩盖回归。
+- 更新快照或覆盖率阈值必须有对应的真实变化与结构依据，不得用重录或降阈值掩盖回归。
 
 ## 修改须知
 
@@ -85,14 +84,14 @@ La Pluma Next 是面向《明日方舟》自动化的本地 Web 控制台：Reac
 ## 重要约束与风险
 
 - 真实设备链路依赖 `maa` CLI、MaaCore 及资源、ADB；单元测试与 fixture 浏览器测试不能证明设备侧可用，交付时须写明未验证范围。
-- 本地 `pnpm verify` 是 CI 的子集：CI 另跑浏览器集成、视觉比对、服务端覆盖率与双架构容器启动。
+- 本地 `pnpm verify` 是 CI 的子集：CI 另跑浏览器集成、服务端覆盖率与双架构容器启动。
 - 执行是否完成只由 Run 终态决定，这是前后端共同契约：HTTP 返回、子进程 idle、断网或页面卸载都不构成完成信号。
 
 ## 提交前验证
 
 1. 跑定向检查：改动包的测试、类型检查与对应专项脚本。
 2. 跑 `pnpm verify`。
-3. 改前端样式、布局或构建配置时补 `pnpm visual`；样式预算已包含在 `pnpm verify` 中，改基线须说明依据。
+3. 改前端样式、布局或构建配置时人工核对受影响的页面与 README 截图；样式预算已包含在 `pnpm verify` 中。
 4. 纯文档改动核对命令、路径、链接与完整 diff；CI 不会替你发现文档事实错误。
 5. 交付说明写清实际执行过哪些检查、哪些仍未验证。
 

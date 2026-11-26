@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test'
 
 const browserErrors = new WeakMap<Page, string[]>()
 
-/** 从页面加载前开始记录脚本异常；视觉通过不能掩盖初始化错误。 */
+/** 从页面加载前开始记录脚本异常；截图通过不能掩盖初始化错误。 */
 export function recordBrowserErrors(page: Page): void {
   const errors: string[] = []
   browserErrors.set(page, errors)

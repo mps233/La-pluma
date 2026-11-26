@@ -1,4 +1,6 @@
 import { LoaderCircle, SkipForward } from 'lucide-react'
+import { cn } from 'cn'
+import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import type { CombatTerminalResult } from '../hooks/useCombatExecution'
 
@@ -140,9 +142,12 @@ export default function CombatExecutionStatusPanel({
         >
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="text-xs text-tertiary">本次执行结果</span>
-            <span className={`inline-flex min-h-6 items-center rounded-full px-2.5 text-xs font-semibold ${TERMINAL_TONES[terminalResult.type]}`}>
+            <Badge
+              variant="ghost"
+              className={cn('min-h-6 px-2.5 font-semibold', TERMINAL_TONES[terminalResult.type])}
+            >
               {TERMINAL_STATE_LABELS[terminalResult.state]}
-            </span>
+            </Badge>
           </div>
           <p className="mt-1.5 wrap-break-word text-sm leading-5 text-foreground">
             {terminalResult.message}

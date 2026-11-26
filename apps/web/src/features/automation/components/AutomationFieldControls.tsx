@@ -1,5 +1,6 @@
 import { FieldHint } from '@/shared/components'
 import { Checkbox } from '@/shared/ui/checkbox'
+import { Field, FieldLabel, FieldLegend } from '@/shared/ui/field'
 
 interface AutomationFieldLabelProps {
   htmlFor: string
@@ -8,34 +9,28 @@ interface AutomationFieldLabelProps {
 }
 
 export function AutomationFieldLabel({ htmlFor, label, hint }: AutomationFieldLabelProps) {
-  const labelElement = <label htmlFor={htmlFor} className="automation-field-label">{label}</label>
-
-  if (!hint) return labelElement
-
   return (
-    <span className="inline-flex min-w-max items-center gap-1">
-      {labelElement}
-      <FieldHint id={`${htmlFor}-hint`} label={label} hint={hint} />
-    </span>
+    <Field orientation="horizontal" className="min-w-max gap-1">
+      <FieldLabel htmlFor={htmlFor} className="text-muted-foreground">{label}</FieldLabel>
+      {hint && <FieldHint id={`${htmlFor}-hint`} label={label} hint={hint} />}
+    </Field>
   )
 }
 
 interface AutomationFieldLegendProps {
   label: string
-  hintId: string
+  hintId?: string
   hint?: string
 }
 
 export function AutomationFieldLegend({ label, hintId, hint }: AutomationFieldLegendProps) {
-  if (!hint) return <legend className="automation-field-label mb-2 block">{label}</legend>
-
   return (
-    <legend className="automation-field-label mb-2 block">
+    <FieldLegend variant="label" className="mb-2">
       <span className="inline-flex items-center gap-1">
         {label}
-        <FieldHint id={hintId} label={label} hint={hint} />
+        {hint && hintId && <FieldHint id={hintId} label={label} hint={hint} />}
       </span>
-    </legend>
+    </FieldLegend>
   )
 }
 
@@ -49,24 +44,25 @@ interface AutomationCheckboxFieldProps {
 }
 
 export function AutomationCheckboxField({ id, label, checked, disabled, hint, onChange }: AutomationCheckboxFieldProps) {
-  const control = (
-    <label className="group flex min-h-11 cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-      <Checkbox
-        id={id}
-        checked={checked}
-        onCheckedChange={nextChecked => onChange(nextChecked)}
-        disabled={disabled}
-      />
-      <span className="group-hover:text-primary transition-colors">{label}</span>
-    </label>
-  )
-
-  if (!hint) return control
-
   return (
-    <div className="flex items-center gap-1">
-      {control}
-      <FieldHint id={`${id}-hint`} label={label} hint={hint} />
-    </div>
+    <Field
+      orientation="horizontal"
+      data-disabled={disabled || undefined}
+      className="group min-h-11 w-fit gap-1"
+    >
+      <FieldLabel
+        htmlFor={id}
+        className="min-h-11 cursor-pointer gap-2 rounded-md text-sm font-normal text-gray-700 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50 has-data-checked:bg-transparent dark:text-gray-300 dark:has-data-checked:bg-transparent"
+      >
+        <Checkbox
+          id={id}
+          checked={checked}
+          onCheckedChange={nextChecked => onChange(nextChecked)}
+          disabled={disabled}
+        />
+        <span className="transition-colors group-hover:text-primary">{label}</span>
+      </FieldLabel>
+      {hint && <FieldHint id={`${id}-hint`} label={label} hint={hint} />}
+    </Field>
   )
 }

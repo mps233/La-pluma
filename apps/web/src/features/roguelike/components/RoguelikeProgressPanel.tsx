@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Badge } from '@/shared/ui/badge'
 import { Card } from '@/shared/ui/card'
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from '@/shared/ui/item'
 import { Progress, ProgressLabel } from '@/shared/ui/progress'
-import { EmptyState } from '@/shared/components'
+import { EmptyState, InlineAlert, Loading } from '@/shared/components'
 import type { AgentRun } from '@/features/task-execution'
 import {
   calculateRoguelikeSuccessRate,
@@ -427,10 +428,10 @@ function ActiveTiming({
 function InvestmentStats({ investment }: { investment: RoguelikeProgressInvestment }) {
   return (
     <div className="roguelike-progress-stats" role="group" aria-label="投资统计">
-      <span>投资轮次 {investment.rounds}</span>
-      <span>投资次数 {investment.count}</span>
-      {investment.total !== null && <span>投资总额 {investment.total}</span>}
-      {investment.deposit !== null && <span>投资存款 {investment.deposit}</span>}
+      <Badge variant="secondary">投资轮次 {investment.rounds}</Badge>
+      <Badge variant="secondary">投资次数 {investment.count}</Badge>
+      {investment.total !== null && <Badge variant="secondary">投资总额 {investment.total}</Badge>}
+      {investment.deposit !== null && <Badge variant="secondary">投资存款 {investment.deposit}</Badge>}
     </div>
   )
 }
@@ -452,11 +453,11 @@ function ProgressStats({ progress }: { progress: RoguelikeProgressSnapshot }) {
   return (
     <>
       <div className="roguelike-progress-stats">
-        {!settlementMode && <span>已开始 {progress.roundsStarted} 局</span>}
-        <span>已结束 {progress.roundsEnded} 局</span>
-        {showPassed && <span>通关 {progress.roundsPassed} 局</span>}
-        {showRate && <span>成功率 {rate}%</span>}
-        {showSettled && <span>已结算 {progress.roundsSettled} 局</span>}
+        {!settlementMode && <Badge variant="secondary">已开始 {progress.roundsStarted} 局</Badge>}
+        <Badge variant="secondary">已结束 {progress.roundsEnded} 局</Badge>
+        {showPassed && <Badge variant="secondary">通关 {progress.roundsPassed} 局</Badge>}
+        {showRate && <Badge variant="secondary">成功率 {rate}%</Badge>}
+        {showSettled && <Badge variant="secondary">已结算 {progress.roundsSettled} 局</Badge>}
         {settlementUnsupported && <span>该模式不提供结算数据</span>}
       </div>
       {showInvestment && progress.investment && <InvestmentStats investment={progress.investment} />}
@@ -477,18 +478,28 @@ function ProgressStats({ progress }: { progress: RoguelikeProgressSnapshot }) {
 function RecentRounds({ rounds }: { rounds: RoguelikeProgressRound[] }) {
   if (rounds.length === 0) return null
   return (
-    <ul className="roguelike-progress-rounds">
+    <ItemGroup className="gap-1">
       {rounds.slice(0, 5).map((round, index) => (
-        <li key={`${round.index ?? 'unknown'}-${index}`} className="roguelike-progress-round">
-          <span className="roguelike-progress-round-index">
-            {round.index === null ? '未知局' : `第 ${round.index} 局`}
-          </span>
-          <span>{describeRoguelikeRoundOutcome(round.outcome)}</span>
-          {round.floor !== null && <span>第 {round.floor} 层</span>}
-          {round.score !== null && <span>{round.score} 分</span>}
-        </li>
+        <Item
+          key={`${round.index ?? 'unknown'}-${index}`}
+          render={<div role="listitem" />}
+          size="xs"
+          variant="muted"
+          className="py-1 text-xs"
+        >
+          <ItemContent className="flex-row flex-wrap items-center gap-x-2.5 gap-y-1">
+            <ItemTitle className="text-xs">
+              {round.index === null ? '未知局' : `第 ${round.index} 局`}
+            </ItemTitle>
+            <ItemDescription className="text-xs">
+              {describeRoguelikeRoundOutcome(round.outcome)}
+            </ItemDescription>
+            {round.floor !== null && <span>第 {round.floor} 层</span>}
+            {round.score !== null && <span>{round.score} 分</span>}
+          </ItemContent>
+        </Item>
       ))}
-    </ul>
+    </ItemGroup>
   )
 }
 
@@ -511,7 +522,7 @@ function SettlementFallback({ summary }: { summary: RoguelikeRunSummary }) {
   if (parts.length === 0) return null
   return (
     <div className="roguelike-progress-stats">
-      {parts.map(part => <span key={part}>{part}</span>)}
+      {parts.map(part => <Badge key={part} variant="secondary">{part}</Badge>)}
     </div>
   )
 }
@@ -576,7 +587,7 @@ export default function RoguelikeProgressPanel({
         )}
 
         {status === 'loading' && (
-          <p className="roguelike-progress-loading" role="status">正在确认执行状态…</p>
+          <Loading size="sm" text="正在确认执行状态…" />
         )}
 
         {status === 'idle' && (
@@ -610,7 +621,9 @@ export default function RoguelikeProgressPanel({
                   <p className="roguelike-progress-action">{describeCurrentAction(progress)}</p>
                 )}
                 <RecentRounds rounds={progress.recentRounds} />
-                {progress.degraded && <p className="roguelike-progress-note">进度数据可能不完整</p>}
+                {progress.degraded && (
+                  <InlineAlert tone="warning">进度数据可能不完整</InlineAlert>
+                )}
               </>
             )}
           </>
@@ -626,7 +639,9 @@ export default function RoguelikeProgressPanel({
                   <LastRoundResult progress={progress} />
                   <ProgressStats progress={progress} />
                   <RecentRounds rounds={progress.recentRounds} />
-                  {progress.degraded && <p className="roguelike-progress-note">进度数据可能不完整</p>}
+                  {progress.degraded && (
+                    <InlineAlert tone="warning">进度数据可能不完整</InlineAlert>
+                  )}
                 </>
               ) : view.summary ? (
                 <>
@@ -645,7 +660,9 @@ export default function RoguelikeProgressPanel({
                 <p className="roguelike-progress-note">本次执行没有可用的结构化结果</p>
               )
             )}
-            {errorText && <p className="roguelike-progress-error">{errorText}</p>}
+            {errorText && (
+              <InlineAlert tone="error" title="执行错误">{errorText}</InlineAlert>
+            )}
           </>
         )}
       </div>

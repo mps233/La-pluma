@@ -244,7 +244,7 @@ pnpm --filter la-pluma-next-client exec vitest run \
   src/app/App.test.tsx
 ```
 
-领域 Query、页面接线、命令与会话回归由第 9–11 节链接的领域契约维护；跨域失效测试见[资源所有权](resource-ownership.md)。完整检查使用 `pnpm verify`，浏览器与视觉检查范围见[开发指南](../development/README.md)。
+领域 Query、页面接线、命令与会话回归由第 9–11 节链接的领域契约维护；跨域失效测试见[资源所有权](resource-ownership.md)。完整检查使用 `pnpm verify`，浏览器集成检查范围见[开发指南](../development/README.md)。
 
 ## 关联
 

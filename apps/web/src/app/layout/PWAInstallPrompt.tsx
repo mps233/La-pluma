@@ -227,13 +227,13 @@ export default function PWAInstallPrompt() {
             aria-busy={showUpdateCard && isUpdating}
             initial={shouldReduceMotion
               ? { opacity: 0 }
-              : { opacity: 0, y: 24, scale: 0.98, backdropFilter: 'blur(0px) saturate(100%)' }}
+              : { opacity: 0, y: 24, scale: 0.98 }}
             animate={shouldReduceMotion
               ? { opacity: 1 }
-              : { opacity: 1, y: 0, scale: 1, backdropFilter: 'blur(24px) saturate(165%)' }}
+              : { opacity: 1, y: 0, scale: 1 }}
             exit={shouldReduceMotion
               ? { opacity: 0 }
-              : { opacity: 0, y: 16, scale: 0.98, backdropFilter: 'blur(0px) saturate(100%)' }}
+              : { opacity: 0, y: 16, scale: 0.98 }}
             transition={shouldReduceMotion
               ? { duration: 0.08 }
               : { type: 'spring', stiffness: 390, damping: 35, mass: 0.8 }}

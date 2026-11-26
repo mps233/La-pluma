@@ -30,7 +30,9 @@
     --layout-sidebar-width: 17rem;
     --layout-content-max: 112rem;
     --layout-page-gutter: 2rem;
-    --layout-content-sticky-top: 1rem;
+    --layout-content-sticky-top: calc(
+      var(--layout-navbar-safe-height) + 1rem
+    );
     --layout-dialog-max-height: calc(100dvh - 2rem);
     --layout-sheet-max-height: 85dvh;
   }
@@ -46,9 +48,6 @@
   @media (width < 1024px) {
     :root {
       --layout-page-gutter: 1.25rem;
-      --layout-content-sticky-top: calc(
-        var(--layout-navbar-safe-height) + 1rem
-      );
     }
   }
 
@@ -286,13 +285,15 @@
 
   @media (width >= 1024px) {
     .la-pluma-app .la-pluma-navbar {
-      grid-area: header;
+      grid-area: main;
+      align-self: start;
       position: relative;
       top: auto;
       right: auto;
       left: auto;
       width: 100%;
-      z-index: auto;
+      z-index: var(--layout-z-chrome);
+      pointer-events: none;
     }
 
     .la-pluma-app .la-pluma-navbar-inner {
@@ -304,7 +305,6 @@
       height: var(--layout-viewport-height);
       min-height: var(--layout-viewport-height);
       grid-template:
-        'sidebar header' var(--layout-navbar-safe-height)
         'sidebar main' minmax(0, 1fr)
         / var(--layout-sidebar-width) minmax(0, 1fr);
     }
@@ -325,12 +325,13 @@
     }
 
     .la-pluma-app .la-pluma-content {
-      padding-top: 2rem;
+      padding-top: calc(var(--layout-navbar-safe-height) + 2rem);
       padding-bottom: 0.75rem;
     }
 
     .la-pluma-app .la-pluma-navbar-actions {
       gap: 0.625rem;
+      pointer-events: auto;
     }
   }
 

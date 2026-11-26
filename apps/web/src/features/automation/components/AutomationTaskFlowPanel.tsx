@@ -9,10 +9,11 @@ import {
   Minus,
   Trash2,
 } from 'lucide-react'
+import { EmptyState } from '@/shared/components'
+import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { Switch } from '@/shared/ui/switch'
 import { Card } from '@/shared/ui/card'
-import { EmptyState } from '@/shared/components'
 import AutomationTaskPicker from './AutomationTaskPicker'
 import AutomationExecutionSummary from './AutomationExecutionSummary'
 import {
@@ -64,9 +65,9 @@ export default function AutomationTaskFlowPanel({
             </h3>
           </div>
           <div className="flex flex-none items-center gap-2">
-            <span className="automation-flow-summary">
+            <Badge variant="secondary" className="tabular-nums">
               {enabledCount}/{tasks.length}
-            </span>
+            </Badge>
             <AutomationTaskPicker
               flow={tasks}
               disabled={editingLocked}
@@ -114,14 +115,15 @@ export default function AutomationTaskFlowPanel({
                 >
                   <GripVertical size={16} strokeWidth={1.8} />
                 </button>
-                <button
+                <Button
                   type="button"
-                  className="automation-sequence-select"
+                  variant="ghost"
                   onClick={() => onSelectTask(task.id)}
                   aria-controls="automation-task-editor"
                   aria-pressed={isSelectedTask}
                   aria-current={isCurrentStep ? 'step' : undefined}
                   disabled={editingLocked}
+                  className="automation-sequence-select grid h-auto min-h-11 w-full justify-start px-0 text-left font-normal disabled:opacity-100"
                 >
                   <span className="automation-sequence-node" aria-hidden="true">
                     <span>
@@ -140,7 +142,7 @@ export default function AutomationTaskFlowPanel({
                     <strong data-automation-sequence-name>{task.name}</strong>
                     <small data-automation-sequence-state-label>{describeFlowTaskExecutionState(executionState, execution.isRunning) || task.description}</small>
                   </span>
-                </button>
+                </Button>
                 <span className="automation-sequence-enabled">
                   <Switch
                     size="sm"
@@ -151,17 +153,19 @@ export default function AutomationTaskFlowPanel({
                   />
                 </span>
                 {!isCurrentStep ? (
-                  <button
+                  <Button
                     type="button"
+                    size="icon"
+                    variant="ghost"
                     onClick={() => onRemoveTask(index)}
                     disabled={editingLocked}
                     aria-hidden={editingLocked || undefined}
-                    className={`automation-sequence-delete min-h-11 min-w-11${editingLocked ? ' is-execution-hidden' : ''}`}
+                    className={`automation-sequence-delete min-h-11 min-w-11 hover:bg-destructive/10 hover:text-destructive disabled:opacity-0${editingLocked ? ' is-execution-hidden' : ''}`}
                     title="删除任务"
                     aria-label={`删除${task.name}`}
                   >
-                    <Trash2 size={14} strokeWidth={1.9} />
-                  </button>
+                    <Trash2 strokeWidth={1.9} aria-hidden="true" />
+                  </Button>
                 ) : null}
                 </motion.div>
               )

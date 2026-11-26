@@ -1,10 +1,9 @@
 import { memo } from 'react'
 import { cn } from 'cn'
 import { Smartphone } from 'lucide-react'
-import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
-import { EmptyState } from '@/shared/components'
+import { EmptyState, InlineAlert } from '@/shared/components'
 import { useDashboardPreview } from '../hooks/useDashboardPreview'
 import { useRetainedSnapshot } from '../hooks/useRetainedSnapshot'
 import { DashboardPreviewCard, DashboardPreviewFrame } from './DashboardPreviewShell'
@@ -31,7 +30,7 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
           <span className="truncate text-xs font-medium text-muted-foreground">画面预览</span>
           {status.phase !== 'off' && (
             <span
-              className="truncate text-xs text-muted-foreground"
+              className="sr-only"
               role="status"
               aria-live="polite"
               aria-atomic="true"
@@ -43,17 +42,20 @@ const DashboardPreviewEntry = memo(function DashboardPreviewEntry() {
         <PreviewModeSegmented unavailable={!available} />
       </div>
       {status.error && hasFrame && (
-        <Alert variant="destructive" className="mx-4 mt-3">
-          <AlertTitle>{status.error.title}</AlertTitle>
-          <AlertDescription>{status.error.message}</AlertDescription>
-          {status.retry && (
-            <div className="mt-1.5">
-              <Button onClick={retry} variant="secondary" size="sm" className="min-h-11">
-                {status.retry.label}
-              </Button>
-            </div>
-          )}
-        </Alert>
+        <InlineAlert
+          tone="error"
+          title={status.error.title}
+          className="mx-4 mt-3"
+          action={status.retry
+            ? (
+                <Button onClick={retry} variant="secondary" size="sm" className="min-h-11">
+                  {status.retry.label}
+                </Button>
+              )
+            : undefined}
+        >
+          {status.error.message}
+        </InlineAlert>
       )}
       <DashboardPreviewFrame className={hasFrame ? 'bg-black' : 'is-empty'}>
         <video

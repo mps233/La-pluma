@@ -8,6 +8,7 @@ import {
 } from '@/features/game-data'
 import { OperatorSelectModal, type OperatorPickerOption } from '@/features/training'
 import { Button } from '@/shared/ui/button'
+import { Field, FieldError, FieldTitle } from '@/shared/ui/field'
 
 export interface RoguelikeCoreOperatorFieldProps {
   id: string
@@ -56,9 +57,13 @@ export default function RoguelikeCoreOperatorField({
   }
 
   return (
-    <div>
-      <span id={labelId} className="mb-2 block text-sm font-medium text-muted-foreground">{label}</span>
-      <div role="group" aria-labelledby={labelId} className="roguelike-core-operator-control">
+    <Field
+      aria-labelledby={labelId}
+      data-invalid={error ? true : undefined}
+      data-disabled={disabled ? true : undefined}
+    >
+      <FieldTitle id={labelId} className="text-muted-foreground">{label}</FieldTitle>
+      <div className="roguelike-core-operator-control">
         {operatorName === '' ? (
           <span className="roguelike-core-operator-placeholder">未选择</span>
         ) : (
@@ -89,7 +94,7 @@ export default function RoguelikeCoreOperatorField({
           aria-invalid={error ? true : undefined}
           aria-errormessage={error ? errorId : undefined}
         >
-          <UserRoundSearch size={15} strokeWidth={1.9} aria-hidden="true" />
+          <UserRoundSearch data-icon="inline-start" aria-hidden="true" />
           {operatorName === '' ? '选择干员' : '更换'}
         </Button>
         {operatorName !== '' && (
@@ -101,11 +106,11 @@ export default function RoguelikeCoreOperatorField({
             onClick={handleClear}
             disabled={disabled}
           >
-            <X size={16} aria-hidden="true" />
+            <X aria-hidden="true" />
           </Button>
         )}
       </div>
-      {error && <p id={errorId} className="mt-2 text-xs form-error-text">{error}</p>}
+      {error && <FieldError id={errorId} className="text-xs text-destructive-text">{error}</FieldError>}
       <OperatorSelectModal
         isOpen={isOpen && !disabled}
         onClose={() => setIsOpen(false)}
@@ -115,6 +120,6 @@ export default function RoguelikeCoreOperatorField({
         selectedOperatorName={operatorName || null}
         defaultSortDirection="desc"
       />
-    </div>
+    </Field>
   )
 }

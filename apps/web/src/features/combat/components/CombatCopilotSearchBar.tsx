@@ -1,7 +1,7 @@
-import { useRef, type KeyboardEvent } from 'react'
-import { LayoutGrid, List, LoaderCircle, Power, Search, X } from 'lucide-react'
+import type { KeyboardEvent } from 'react'
+import { LayoutGrid, List, LoaderCircle, Power } from 'lucide-react'
+import { SearchField } from '@/shared/components'
 import { Button } from '@/shared/ui/button'
-import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/shared/ui/toggle-group'
 import {
@@ -67,12 +67,6 @@ export default function CombatCopilotSearchBar({
   onRetryData,
 }: CombatCopilotSearchBarProps) {
   const operatorCount = countOperatorSelection(operatorSelection.included, operatorSelection.excluded)
-  const keywordFieldRef = useRef<HTMLDivElement>(null)
-
-  const handleClearKeyword = () => {
-    onKeywordChange('')
-    keywordFieldRef.current?.querySelector('input')?.focus()
-  }
 
   const handleKeywordKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== 'Enter') return
@@ -88,33 +82,16 @@ export default function CombatCopilotSearchBar({
   return (
     <section className="combat-copilot-discovery-search" aria-label="作业搜索">
       <div className="combat-copilot-discovery-search-row">
-        <div ref={keywordFieldRef} className="combat-copilot-discovery-keyword-field">
-          <div className="relative">
-            <Search size={17} strokeWidth={1.9} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" />
-            <Input
-              type="text"
-              autoComplete="off"
-              className="combat-copilot-discovery-keyword pl-9"
-              aria-label="搜索作业关键词"
-              placeholder="搜索作业标题、说明"
-              value={keyword}
-              onChange={event => onKeywordChange(event.target.value)}
-              onKeyDown={handleKeywordKeyDown}
-            />
-          </div>
-          {keyword !== '' && (
-            <Button
-              size="icon"
-              variant="ghost"
-              title="清除搜索关键词"
-              aria-label="清除搜索关键词"
-              onClick={handleClearKeyword}
-              className="combat-copilot-discovery-clear"
-            >
-              <X size={15} aria-hidden="true" />
-            </Button>
-          )}
-        </div>
+        <SearchField
+          className="combat-copilot-discovery-keyword-field"
+          ariaLabel="搜索作业关键词"
+          placeholder="搜索作业标题、说明"
+          value={keyword}
+          onValueChange={onKeywordChange}
+          onKeyDown={handleKeywordKeyDown}
+          clearable
+          clearLabel="清除搜索关键词"
+        />
         <Button
           className="combat-copilot-discovery-submit"
           disabled={searching}

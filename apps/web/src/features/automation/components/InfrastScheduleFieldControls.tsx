@@ -1,5 +1,6 @@
-import type { ComponentProps } from 'react'
+import { useId, type ComponentProps } from 'react'
 import { Checkbox } from '@/shared/ui/checkbox'
+import { Field, FieldDescription, FieldLabel } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 
@@ -17,11 +18,11 @@ export function FieldInput({
 } & ComponentProps<'input'>) {
   const hintId = `${id}-hint`
   return (
-    <div className={className}>
-      <label htmlFor={id} className="mb-2 block text-sm font-medium text-muted-foreground">{label}</label>
+    <Field className={className} data-disabled={inputProps.disabled || undefined}>
+      <FieldLabel htmlFor={id} className="text-muted-foreground">{label}</FieldLabel>
       <Input id={id} autoComplete="off" aria-describedby={hint ? hintId : undefined} {...inputProps} />
-      {hint && <p id={hintId} className="mt-2 text-xs text-tertiary">{hint}</p>}
-    </div>
+      {hint && <FieldDescription id={hintId} className="text-xs text-tertiary">{hint}</FieldDescription>}
+    </Field>
   )
 }
 
@@ -50,8 +51,8 @@ export function FieldSelect({
 }: FieldSelectProps) {
   const hintId = `${id}-hint`
   return (
-    <div className={className}>
-      <label htmlFor={id} className="mb-2 block text-sm font-medium text-muted-foreground">{label}</label>
+    <Field className={className} data-disabled={disabled || undefined}>
+      <FieldLabel htmlFor={id} className="text-muted-foreground">{label}</FieldLabel>
       <Select
         items={items}
         value={value}
@@ -67,8 +68,8 @@ export function FieldSelect({
           ))}
         </SelectContent>
       </Select>
-      {hint && <p id={hintId} className="mt-2 text-xs text-tertiary">{hint}</p>}
-    </div>
+      {hint && <FieldDescription id={hintId} className="text-xs text-tertiary">{hint}</FieldDescription>}
+    </Field>
   )
 }
 
@@ -83,10 +84,15 @@ export function FieldFlagCheckbox({
   disabled?: boolean
   onCheckedChange: (checked: boolean) => void
 }) {
+  const id = useId().replace(/:/g, '')
   return (
-    <label className="group flex min-h-11 cursor-pointer items-center gap-2 text-sm text-muted-foreground">
-      <Checkbox checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} />
-      <span className="transition-colors group-hover:text-primary">{label}</span>
-    </label>
+    <Field
+      orientation="horizontal"
+      data-disabled={disabled || undefined}
+      className="group min-h-11 gap-2 text-sm text-muted-foreground"
+    >
+      <Checkbox id={id} checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} />
+      <FieldLabel htmlFor={id} className="cursor-pointer font-normal transition-colors group-hover:text-primary">{label}</FieldLabel>
+    </Field>
   )
 }

@@ -9,7 +9,7 @@ import {
 } from './fixtures'
 
 /**
- * 视觉基线 harness：固定数据、外部资源、时间、动效与主题种子。未匹配的 /api 请求
+ * 浏览器测试 harness：固定数据、外部资源、时间、动效与主题种子。未匹配的 /api 请求
  * 视为 harness 缺口直接失败，防止静默假状态；Service Worker 注册在文档起点被替换为
  * 永久挂起的 promise；page.clock.setFixedTime 不暂停/推进时钟，保持真实时间速率。
  */
@@ -52,7 +52,7 @@ const MOTION_FREEZE_CSS = `
 `
 
 const NO_SW_SCRIPT = `
-  // 阻断 service worker 注册（单页应用在基线环境下无需离线缓存）。
+  // 阻断 service worker 注册（单页应用在浏览器测试环境下无需离线缓存）。
   // 注册 promise 永久挂起：既不触发 PWAInstallPrompt 的注册失败提示，
   // 也不触发 offlineReady 提示（success 消息 1.5s 自动收起会造成时序抖动）。
   if (navigator.serviceWorker) {

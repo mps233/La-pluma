@@ -1,20 +1,21 @@
 import { Cpu, Database, HardDrive, Thermometer } from 'lucide-react'
+import { cn } from 'cn'
 import { Card } from '@/shared/ui/card'
+import { Progress } from '@/shared/ui/progress'
 import { useDashboardStore } from '../store/dashboardStore'
 import { buildTemperatureSeries, getUsageTone, type UsageTone } from '../model/deviceView'
 
 const labelClass = 'text-muted-foreground'
-const progressTrackClass = 'h-1.5 rounded-full bg-muted overflow-hidden'
 
-const getUsageBarClass = (tone: UsageTone) => {
-  if (tone === 'danger') return 'bg-destructive'
-  if (tone === 'warning') return 'bg-warning'
-  return 'bg-primary'
+const getUsageProgressClass = (tone: UsageTone) => {
+  if (tone === 'danger') return '[&_[data-slot=progress-indicator]]:bg-destructive'
+  if (tone === 'warning') return '[&_[data-slot=progress-indicator]]:bg-warning'
+  return '[&_[data-slot=progress-indicator]]:bg-primary'
 }
 
 const getUsageValueClass = (tone: UsageTone) => {
   if (tone === 'danger') return 'text-destructive'
-  if (tone === 'warning') return 'text-warning'
+  if (tone === 'warning') return 'text-warning-text'
   return 'text-foreground'
 }
 
@@ -86,9 +87,15 @@ export default function DashboardDeviceSection() {
                     <span className={`text-xs ${labelClass}`}>使用率</span>
                     <span className={`text-xs font-medium ${getUsageValueClass(tone)}`}>{pct}%</span>
                   </div>
-                  <div className={progressTrackClass}>
-                    <div className={`h-full rounded-full transition-all duration-700 ${getUsageBarClass(tone)}`} style={{ width: `${Math.min(pct, 100)}%` }} />
-                  </div>
+                  <Progress
+                    value={Math.min(Math.max(pct, 0), 100)}
+                    max={100}
+                    aria-label={`${label}使用率`}
+                    className={cn(
+                      'gap-0 [&_[data-slot=progress-track]]:h-1.5 [&_[data-slot=progress-indicator]]:duration-700',
+                      getUsageProgressClass(tone),
+                    )}
+                  />
                 </div>
               )}
             </Card>

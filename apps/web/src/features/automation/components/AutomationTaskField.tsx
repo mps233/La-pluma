@@ -1,5 +1,7 @@
-import { Info, Minus, Plus } from 'lucide-react'
+import { Info } from 'lucide-react'
+import { InlineAlert, NumberField } from '@/shared/components'
 import { Checkbox } from '@/shared/ui/checkbox'
+import { FieldDescription } from '@/shared/ui/field'
 import { Input } from '@/shared/ui/input'
 import AutomationStageEditor from './AutomationStageEditor'
 import AutomationSelectField from './AutomationSelectField'
@@ -126,14 +128,14 @@ export default function AutomationTaskField({
             })}
           </div>
           {task.id === 'recruit' && field.key === 'select' && Array.isArray(task.params.select) && task.params.select.includes(6) && (
-            <div className="mt-2 rounded-xl px-3 py-2 text-xs brand-chip">
+            <InlineAlert tone="info" showIcon={false} className="mt-2 px-3 py-2 text-xs">
               已开启 6 星自动公招：遇到高级资深干员等高价值标签时，会优先保留并自动选择。
-            </div>
+            </InlineAlert>
           )}
         </fieldset>
       ) : field.type === 'facility-select' ? (
         <fieldset>
-          <legend className="automation-field-label mb-2 block">{field.label}</legend>
+          <AutomationFieldLegend label={field.label} />
           <div className="grid grid-cols-2 gap-2">
             {[
               { value: 'Mfg', label: '制造站' },
@@ -185,51 +187,20 @@ export default function AutomationTaskField({
         <div className="automation-field-row">
           <AutomationFieldLabel htmlFor={fieldId} label={field.label} hint={helperTooltip} />
           {field.type === 'number' ? (
-            <div className="number-input-wrapper flex-1">
-              <Input
-                id={fieldId}
-                type="number"
-                autoComplete="off"
-                value={readInputValue(task.params[field.key])}
-                onChange={(e) => onUpdateParam(taskIndex, field.key, e.target.value)}
-                placeholder={field.placeholder}
-                step={field.step}
-                min={field.min}
-                max={field.max}
-                disabled={disabled}
-                className="min-w-0 workbench:pr-16"
-              />
-              <div className="number-input-controls hidden workbench:flex">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const currentValue = Number(task.params[field.key]) || 0;
-                    const step = Number(field.step) || 1;
-                    const min = field.min !== undefined ? Number(field.min) : -Infinity;
-                    const newValue = Math.max(currentValue - step, min);
-                    onUpdateParam(taskIndex, field.key, newValue.toString());
-                  }}
-                  disabled={disabled}
-                  aria-label={`减少${field.label}`}
-                >
-                  <Minus size={14} strokeWidth={2.2} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const currentValue = Number(task.params[field.key]) || 0;
-                    const step = Number(field.step) || 1;
-                    const max = field.max !== undefined ? Number(field.max) : Infinity;
-                    const newValue = Math.min(currentValue + step, max);
-                    onUpdateParam(taskIndex, field.key, newValue.toString());
-                  }}
-                  disabled={disabled}
-                  aria-label={`增加${field.label}`}
-                >
-                  <Plus size={14} strokeWidth={2.2} aria-hidden="true" />
-                </button>
-              </div>
-            </div>
+            <NumberField
+              id={fieldId}
+              label={field.label}
+              value={readInputValue(task.params[field.key])}
+              onValueChange={(value) => onUpdateParam(taskIndex, field.key, value)}
+              placeholder={field.placeholder}
+              step={field.step}
+              min={field.min}
+              max={field.max}
+              disabled={disabled}
+              autoComplete="off"
+              className="min-w-0"
+              controlsClassName="hidden workbench:flex"
+            />
           ) : (
             <Input
               id={fieldId}
@@ -247,10 +218,10 @@ export default function AutomationTaskField({
         </div>
       )}
       {field.helper && !helperTooltip && (
-        <p className="automation-field-helper">
+        <FieldDescription className="automation-field-helper mt-2 text-xs text-tertiary">
           <Info size={13} strokeWidth={1.8} aria-hidden="true" />
           <span>{field.helper}</span>
-        </p>
+        </FieldDescription>
       )}
     </div>
   )

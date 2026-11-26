@@ -1,7 +1,14 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { Check, Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
+import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
+import { cn } from 'cn'
 import { useTheme } from '@/shared/theme/useTheme'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/shared/ui/dropdown-menu'
+import { ToggleGroup, ToggleGroupItem } from '@/shared/ui/toggle-group'
 
 type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -19,182 +26,83 @@ const themeOptions: Array<{ value: ThemeMode; label: string; icon: LucideIcon }>
 
 export default function ThemeToggle() {
   const { mode: theme, setMode: setTheme } = useTheme()
-  const shouldReduceMotion = useReducedMotion()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const mobileTriggerRef = useRef<HTMLButtonElement>(null)
-  const mobileMenuRef = useRef<HTMLDivElement>(null)
-  const mobileMenuId = `theme-menu-${useId().replace(/:/g, '')}`
-
-  const closeMobileMenu = useCallback((restoreFocus = false) => {
-    setMobileMenuOpen(false)
-    if (restoreFocus) {
-      window.requestAnimationFrame(() => mobileTriggerRef.current?.focus({ preventScroll: true }))
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!mobileMenuOpen) return
-
-    const focusFrame = window.requestAnimationFrame(() => {
-      mobileMenuRef.current
-        ?.querySelector<HTMLElement>('[aria-checked="true"]')
-        ?.focus({ preventScroll: true })
-    })
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!mobileMenuRef.current?.contains(event.target as Node)
-        && !mobileTriggerRef.current?.contains(event.target as Node)) {
-        closeMobileMenu()
-      }
-    }
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const items = Array.from(
-        mobileMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? [],
-      )
-      const currentIndex = Math.max(0, items.indexOf(document.activeElement as HTMLButtonElement))
-
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        closeMobileMenu(true)
-        return
-      }
-
-      if (event.key === 'Tab') {
-        event.preventDefault()
-        const nextTarget = event.shiftKey
-          ? mobileTriggerRef.current
-          : mobileTriggerRef.current
-            ?.closest('.la-pluma-navbar-actions')
-            ?.querySelector<HTMLElement>('.la-pluma-github-link') ?? mobileTriggerRef.current
-        setMobileMenuOpen(false)
-        window.requestAnimationFrame(() => nextTarget?.focus({ preventScroll: true }))
-        return
-      }
-
-      if (items.length === 0) return
-
-      let nextIndex: number | null = null
-      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
-        nextIndex = (currentIndex + 1) % items.length
-      } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
-        nextIndex = (currentIndex - 1 + items.length) % items.length
-      } else if (event.key === 'Home') {
-        nextIndex = 0
-      } else if (event.key === 'End') {
-        nextIndex = items.length - 1
-      }
-
-      const nextItem = nextIndex === null ? undefined : items[nextIndex]
-      if (nextItem) {
-        event.preventDefault()
-        nextItem.focus({ preventScroll: true })
-      }
-    }
-
-    document.addEventListener('pointerdown', handlePointerDown)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.cancelAnimationFrame(focusFrame)
-      document.removeEventListener('pointerdown', handlePointerDown)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [closeMobileMenu, mobileMenuOpen])
-
-  const handleThemeChange = (newTheme: ThemeMode, fromMobileMenu = false) => {
-    setTheme(newTheme)
-    if (fromMobileMenu) closeMobileMenu(true)
-  }
 
   const currentTheme = themeOptions.find(option => option.value === theme) ?? systemThemeOption
   const CurrentThemeIcon = currentTheme.icon
 
   return (
     <>
-      <div
-        className="la-pluma-theme-desktop"
-        role="group"
+      <ToggleGroup
         aria-label="界面主题"
+        value={[theme]}
+        onValueChange={(next) => {
+          const nextTheme = next[0] as ThemeMode | undefined
+          if (nextTheme && nextTheme !== theme) setTheme(nextTheme)
+        }}
+        multiple={false}
         data-theme={theme}
+        className="la-pluma-theme-desktop max-lg:hidden gap-1! rounded-full!"
       >
         {themeOptions.map(option => {
           const ThemeIcon = option.icon
           const selected = theme === option.value
           return (
-            <motion.button
+            <ToggleGroupItem
               key={option.value}
-              type="button"
-              onClick={() => handleThemeChange(option.value)}
-              className={`theme-toggle-btn ${selected ? 'is-active' : ''}`}
-              whileTap={shouldReduceMotion ? {} : { scale: 0.94 }}
+              value={option.value}
               title={option.label}
               aria-label={option.label}
-              aria-pressed={selected}
+              className={cn(
+                'theme-toggle-btn p-0! hover:bg-card/38! aria-pressed:bg-transparent! aria-pressed:hover:bg-transparent! aria-pressed:hover:text-primary-foreground! [&_svg]:size-[1.125rem]!',
+                selected && 'is-active',
+              )}
             >
               <ThemeIcon strokeWidth={1.8} aria-hidden="true" />
-            </motion.button>
+            </ToggleGroupItem>
           )
         })}
-      </div>
+      </ToggleGroup>
 
       <div className="la-pluma-theme-mobile relative flex-none">
-        <motion.button
-          ref={mobileTriggerRef}
-          type="button"
-          onClick={() => setMobileMenuOpen(open => !open)}
-          className={`la-pluma-theme-trigger group text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary ${mobileMenuOpen ? 'bg-muted' : ''}`}
-          whileTap={shouldReduceMotion ? {} : { scale: 0.96 }}
-          title={`主题：${currentTheme.label}`}
-          aria-label={`切换界面主题，当前${currentTheme.label}`}
-          aria-haspopup="menu"
-          aria-expanded={mobileMenuOpen}
-          aria-controls={mobileMenuId}
-        >
-          <CurrentThemeIcon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
-        </motion.button>
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger
+            className="la-pluma-theme-trigger group text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary data-popup-open:bg-muted"
+            title={`主题：${currentTheme.label}`}
+            aria-label={`切换界面主题，当前${currentTheme.label}`}
+          >
+            <CurrentThemeIcon className="size-5" strokeWidth={1.8} aria-hidden="true" />
+          </DropdownMenuTrigger>
 
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.div
-              ref={mobileMenuRef}
-              id={mobileMenuId}
-              role="menu"
-              aria-label="选择界面主题"
-              initial={shouldReduceMotion
-                ? { opacity: 0 }
-                : { opacity: 0, y: -4, scale: 0.98, backdropFilter: 'blur(0px) saturate(100%)' }}
-              animate={shouldReduceMotion
-                ? { opacity: 1 }
-                : { opacity: 1, y: 0, scale: 1, backdropFilter: 'blur(24px) saturate(165%)' }}
-              exit={shouldReduceMotion
-                ? { opacity: 0 }
-                : { opacity: 0, y: -4, scale: 0.98, backdropFilter: 'blur(0px) saturate(100%)' }}
-              transition={shouldReduceMotion
-                ? { duration: 0.08 }
-                : { type: 'spring', stiffness: 440, damping: 38, mass: 0.7 }}
-              className="theme-menu-popover surface-panel absolute right-0 top-[calc(100%+0.5rem)] z-(--layout-z-portal) w-40 origin-top-right rounded-xl p-1.5"
+          <DropdownMenuContent
+            align="end"
+            sideOffset={8}
+            aria-label="选择界面主题"
+            className="w-40! p-1.5!"
+          >
+            <DropdownMenuRadioGroup
+              value={theme}
+              onValueChange={(next) => {
+                const nextTheme = next as ThemeMode | undefined
+                if (nextTheme) setTheme(nextTheme)
+              }}
             >
               {themeOptions.map(option => {
                 const ThemeIcon = option.icon
-                const selected = theme === option.value
                 return (
-                  <button
+                  <DropdownMenuRadioItem
                     key={option.value}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={selected}
-                    onClick={() => handleThemeChange(option.value, true)}
-                    className={`flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 text-sm transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary ${
-                      selected ? 'brand-action-subtle' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                    }`}
+                    value={option.value}
+                    closeOnClick
+                    className="min-h-11 gap-2.5! pl-3! pr-8 aria-checked:bg-primary-soft! aria-checked:text-primary-strong!"
                   >
-                    <ThemeIcon className="h-4 w-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+                    <ThemeIcon className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
                     <span className="flex-1 text-left">{option.label}</span>
-                    {selected && <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />}
-                  </button>
+                  </DropdownMenuRadioItem>
                 )
               })}
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </>
   )

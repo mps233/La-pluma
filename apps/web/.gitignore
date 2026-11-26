@@ -12,7 +12,6 @@ dist
 dist-ssr
 *.local
 
-.eslintcache
 .stylelintcache
 
 # Playwright artifacts

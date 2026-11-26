@@ -11,6 +11,7 @@ import { BREAKPOINTS } from '@/shared/lib/breakpoints'
 import {
   Sheet,
   SheetClose,
+  SheetContent,
   SheetTitle,
 } from '@/shared/ui/sheet'
 import type { CopilotDetailTarget } from '../model/copilotDetail'
@@ -19,7 +20,7 @@ import { DetailBody, DetailPlaceholder } from './CombatCopilotDetailBody'
 
 const MOBILE_DETAIL_QUERY = `(width < ${BREAKPOINTS.sm}px)`
 const DESKTOP_SHEET_CLASS = 'fixed inset-y-0 right-0 z-(--layout-z-portal) flex h-full w-[min(24rem,calc(100vw-1.5rem))] flex-col gap-0 overflow-hidden border-l bg-popover text-sm text-popover-foreground shadow-lg outline-none transition duration-200 ease-in-out data-ending-style:translate-x-[2.5rem] data-ending-style:opacity-0 data-starting-style:translate-x-[2.5rem] data-starting-style:opacity-0'
-const MOBILE_SHEET_CLASS = 'fixed inset-x-0 bottom-0 z-(--layout-z-portal) flex max-h-(--layout-sheet-max-height) flex-col gap-0 overflow-hidden border-t bg-popover text-sm text-popover-foreground shadow-lg outline-none transition duration-200 ease-in-out data-ending-style:translate-y-[2.5rem] data-ending-style:opacity-0 data-starting-style:translate-y-[2.5rem] data-starting-style:opacity-0'
+const MOBILE_SHEET_CONTENT_CLASS = 'z-(--layout-z-portal) max-h-(--layout-sheet-max-height) gap-0 overflow-hidden text-sm text-popover-foreground shadow-lg outline-none'
 
 export interface CombatCopilotDetailLayerProps {
   target: CopilotDetailTarget | null
@@ -63,7 +64,6 @@ export default function CombatCopilotDetailLayer({
   const isOpen = target !== null || loading
   const title = target?.title ?? PENDING_TITLE
   const isModalSheet = isMobile || stacked
-  const side = isMobile ? 'bottom' : 'right'
 
   useEffect(() => {
     onCloseRef.current = onClose
@@ -103,7 +103,7 @@ export default function CombatCopilotDetailLayer({
           {title}
         </SheetTitle>
         <SheetClose render={<Button size="icon" variant="ghost" aria-label="关闭详情" />}>
-          <X className="size-4" aria-hidden="true" />
+          <X aria-hidden="true" />
         </SheetClose>
       </header>
       <div className="combat-copilot-detail-scroll">
@@ -119,26 +119,31 @@ export default function CombatCopilotDetailLayer({
       modal={isModalSheet}
       disablePointerDismissal={!isModalSheet}
     >
-      <SheetPrimitive.Portal>
-        {isMobile && (
-          <SheetPrimitive.Backdrop
-            forceRender
-            data-slot="sheet-overlay"
-            className="fixed inset-0 z-(--layout-z-portal) bg-black/10 transition-opacity duration-150 supports-backdrop-filter:backdrop-blur-xs data-ending-style:opacity-0 data-starting-style:opacity-0"
-          />
-        )}
-        <SheetPrimitive.Popup
+      {isMobile ? (
+        <SheetContent
           id={COPILOT_DETAIL_LAYER_ID}
-          data-slot="sheet-content"
-          data-side={side}
-          aria-modal={isModalSheet ? 'true' : 'false'}
-          initialFocus={isMobile ? undefined : () => document.getElementById(COPILOT_DETAIL_LAYER_ID) ?? true}
-          className={isMobile ? MOBILE_SHEET_CLASS : DESKTOP_SHEET_CLASS}
-          style={isMobile ? { paddingBottom: 'env(safe-area-inset-bottom)' } : undefined}
+          side="bottom"
+          showCloseButton={false}
+          aria-modal="true"
+          className={MOBILE_SHEET_CONTENT_CLASS}
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           {panel}
-        </SheetPrimitive.Popup>
-      </SheetPrimitive.Portal>
+        </SheetContent>
+      ) : (
+        <SheetPrimitive.Portal>
+          <SheetPrimitive.Popup
+            id={COPILOT_DETAIL_LAYER_ID}
+            data-slot="sheet-content"
+            data-side="right"
+            aria-modal={isModalSheet ? 'true' : 'false'}
+            initialFocus={() => document.getElementById(COPILOT_DETAIL_LAYER_ID) ?? true}
+            className={DESKTOP_SHEET_CLASS}
+          >
+            {panel}
+          </SheetPrimitive.Popup>
+        </SheetPrimitive.Portal>
+      )}
     </Sheet>
   )
 }

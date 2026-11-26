@@ -92,7 +92,6 @@
   }
 
   .roguelike-progress-owner,
-  .roguelike-progress-loading,
   .roguelike-progress-note {
     color: var(--muted-foreground);
     font-size: 0.75rem;
@@ -133,35 +132,6 @@
     color: var(--foreground);
     font-size: 0.875rem;
     font-weight: 500;
-    line-height: 1.5;
-    overflow-wrap: anywhere;
-  }
-
-  .roguelike-progress-rounds {
-    display: grid;
-    gap: 0.25rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .roguelike-progress-round {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 0.625rem;
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-    line-height: 1.5;
-  }
-
-  .roguelike-progress-round-index {
-    color: var(--foreground);
-    font-weight: 600;
-  }
-
-  .roguelike-progress-error {
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
     line-height: 1.5;
     overflow-wrap: anywhere;
   }

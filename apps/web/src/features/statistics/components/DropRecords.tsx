@@ -7,6 +7,7 @@ import { getItemIconUrl, useItemIconCacheVersion } from '@/features/game-data'
 import { DROP_ITEM_DISPLAY_LIMIT, sortDropItems, sortDropStages } from '../model/dropRecords'
 import type { DropRecordsProps } from '../types'
 import { Button } from '@/shared/ui/button'
+import { Badge } from '@/shared/ui/badge'
 import { Card } from '@/shared/ui/card'
 import StatisticsQueryError from './StatisticsQueryError'
 
@@ -213,9 +214,12 @@ export default function DropRecords({
                           {itemData.name}
                         </div>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="brand-chip rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap">
+                          <Badge
+                            variant="ghost"
+                            className="brand-chip rounded-full border-0 px-2 py-0.5 text-xs font-semibold hover:bg-primary-soft hover:text-primary-strong"
+                          >
                             ×{itemData.count.toLocaleString()}
-                          </span>
+                          </Badge>
                         </div>
                       </div>
                     </div>
@@ -258,12 +262,18 @@ export default function DropRecords({
                         <span className="min-w-0 wrap-break-word text-lg font-bold text-foreground wrap-anywhere">
                           {stageData.name}
                         </span>
-                        <span className="shrink-0 whitespace-nowrap brand-chip rounded-full px-2 py-0.5 text-xs font-medium">
+                        <Badge
+                          variant="ghost"
+                          className="brand-chip shrink-0 rounded-full border-0 px-2 py-0.5 text-xs font-medium hover:bg-primary-soft hover:text-primary-strong"
+                        >
                           {stageData.battles} 次
-                        </span>
-                        <span className="shrink-0 whitespace-nowrap brand-chip rounded-full px-2 py-0.5 text-xs font-medium">
+                        </Badge>
+                        <Badge
+                          variant="ghost"
+                          className="brand-chip shrink-0 rounded-full border-0 px-2 py-0.5 text-xs font-medium hover:bg-primary-soft hover:text-primary-strong"
+                        >
                           {stageData.sanity} 理智
-                        </span>
+                        </Badge>
                       </div>
                     </div>
 

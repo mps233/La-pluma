@@ -1,8 +1,8 @@
 import { apiFixtures, ok, type ApiFixture } from '../visual/fixtures'
 
-// README 截图展示“尚无最近执行”的空闲状态，避免把视觉基线的示例执行结果带进主图。
+// README 截图展示“尚无最近执行”的空闲状态，避免把共享 fixture 的示例执行结果带进主图。
 const runsCurrentFixture = apiFixtures.find(fixture => fixture.path === '/agent/runs/current')
-if (!runsCurrentFixture) throw new Error('缺少 /agent/runs/current 视觉 fixture')
+if (!runsCurrentFixture) throw new Error('缺少 /agent/runs/current 共享 fixture')
 const runsCurrentPayload = runsCurrentFixture.payload as {
   success: boolean
   data: Record<string, unknown>
@@ -23,7 +23,7 @@ const noRecentExecutionFixture: ApiFixture = {
   },
 }
 
-// README 的侧栏身份固定为阿米娅，不随视觉基线 fixture 调整。
+// README 的侧栏身份固定为阿米娅，不随共享 fixture 调整。
 const dailyQuoteFixture: ApiFixture = {
   path: '/operator-quotes/daily',
   payload: ok({

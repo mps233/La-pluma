@@ -10,8 +10,8 @@
 | --- | --- | --- |
 | 页面壳 | `pages/logs/LogViewer.tsx` | `app-page`/`app-stack-section` 与工作区组合；工作区内容经 `DeviceMonitorLayout(standard)` 与设备画面并列，设备画面类名与样式归 device-mirror 域 |
 | 观察条件 | `features/logs/components/LogsWorkspace.tsx` | 事件范围、Run 范围、级别、搜索、折叠与导出 |
-| 受控面板 | `LogsToolbar`、`HistoryLogPicker` | 控件、键盘导航和用户动作回调；不获取日志；历史文件列表在 Sheet 内 |
-| 列表与跟随 | `LogConsole`、`model/logFollow.ts` | 单条“原文”详情、滚动容器、大窗口虚拟化、跟随与新日志提示 |
+| 受控面板 | `LogsToolbar`、`HistoryLogPicker` | 控件、键盘导航和用户动作回调；不获取日志；历史文件列表在 Sheet 内；开关行使用 shadcn `Field`，历史文件行使用 `Item` |
+| 列表与跟随 | `LogConsole`、`model/logFollow.ts` | 单条“原文”详情（shared `Disclosure`）、滚动容器、大窗口虚拟化、跟随与新日志提示 |
 | 实时会话 | `model/realtimeLogStream.ts`、`hooks/useRealtimeLogs.ts` | 缓冲、计时器、取消、暂停、本地清屏和覆盖提示 |
 | 历史会话 | `model/historyLogSession.ts`、`hooks/useHistoryLogs.ts` | 文件列表、选择、读取与迟到响应裁决 |
 | 会话组合与清理 | `hooks/useLogsSession.ts`、`model/logCommands.ts` | 切换来源、历史清理请求与选择协调 |
@@ -89,11 +89,13 @@ maa-cli 在命令结束时打印的 `Summary` 报告块由服务端合并为一�
 
 新增检测使用选中事实的事件身份，旧 API 使用内容多重集合降级。同一快照、无关 Run 更新、仅移除旧记录不产生未读；窗口外缺失不可计数，因此统一显示“有新日志”，不声称精确到达总数。点击提示或回到底部恢复跟随，切换观察范围清除旧未读状态。
 
-可见行超过 120 时列表切换为虚拟滚动，只渲染可视区与 overscan；展开“原文”会重新测量行高，小窗口保持直接渲染。
+可见行超过 120 时列表切换为虚拟滚动，只渲染可视区与 overscan；展开“原文”会重新测量行高，小窗口保持直接渲染。每条记录的“原文”详情由 shared `Disclosure` 承载，仍输出完整源文本、原始时间戳/级别/Run/operation 与实时信封，工具栏与滚动跟随不受影响。
 
 ## 历史会话与清理
 
 历史文件仍由独立读取生命周期管理，与实时共享事实模型、筛选、分组、详情和导出规则。历史文件列表由控制台标题旁的“历史日志”按钮以 Sheet 打开，列表使用独立 `ScrollArea`；选择文件后 Sheet 关闭并进入历史视图，加载、列表错误、刷新与清理入口都在 Sheet 内。
+
+历史文件行使用 shadcn `Item`（渲染为 button，`aria-current` 标记当前选择），文件图标、名称、时间/大小与尾部箭头分别由 `ItemMedia`、`ItemTitle`、`ItemDescription`、`ItemActions` 承载；滚动仍由 `ScrollArea` 负责。读取中与空态继续使用 `Loading` / `EmptyState compact`，列表失败使用 `InlineAlert`（`alert` 语义）并保留“重新加载”操作；不可用动作统一使用 shared `UnavailableAction`。
 
 | 项目 | 契约 |
 | --- | --- |
@@ -102,7 +104,7 @@ maa-cli 在命令结束时打印的 `Summary` 报告块由服务端合并为一�
 | 覆盖 | 文件尾部窗口；不能承诺完整文件或完整 Run |
 | 清理 | `POST /agent/logs/cleanup {maxSizeMB:10}`；保留最新文件，从最旧文件开始删除直到总量不超过上限；最新文件超过上限时单独保留；确认后刷新列表 |
 
-文件列表与读取各持独立请求序号和 AbortController。新选择、返回实时或 Activity 隐藏会取消旧读取，迟到响应不能覆盖新来源。列表首次读取显示加载态；刷新按钮可手动重读，tracked Run 进入终态时自动重读一次。列表失败保留旧列表，错误以区域内 `Alert` 显示；读取失败保留选择，允许重试或换文件。成功刷新列表会更新选中文件元数据，普通列表缺失不自动退出历史模式。
+文件列表与读取各持独立请求序号和 AbortController。新选择、返回实时或 Activity 隐藏会取消旧读取，迟到响应不能覆盖新来源。列表首次读取显示加载态；刷新按钮可手动重读，tracked Run 进入终态时自动重读一次。列表失败保留旧列表，错误以区域内 `InlineAlert` 显示；读取失败保留选择，允许重试或换文件。成功刷新列表会更新选中文件元数据，普通列表缺失不自动退出历史模式。
 
 Activity 隐藏取消进行中的读取并转为 `cancelled`，保留选择与已有内容；恢复重读列表，并只重试被取消的当前文件。已成功或明确失败的文件不在恢复时自动重读。文档隐藏不单独暂停历史请求。
 

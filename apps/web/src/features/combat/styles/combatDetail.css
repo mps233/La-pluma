@@ -12,37 +12,6 @@
     gap: 0.75rem;
   }
 
-  .combat-copilot-detail-state {
-    justify-self: start;
-    padding: 0.125rem 0.5rem;
-    border-radius: var(--radius-sm);
-    background: var(--primary-soft);
-    color: var(--primary-strong);
-    font-size: 0.75rem;
-    line-height: 1.4;
-  }
-
-  .combat-copilot-detail-state.is-active,
-  .combat-copilot-detail-state.is-neutral {
-    background: var(--primary-soft);
-    color: var(--primary-strong);
-  }
-
-  .combat-copilot-detail-state.is-success {
-    background: color-mix(in srgb, var(--success) 12%, transparent);
-    color: var(--success-text);
-  }
-
-  .combat-copilot-detail-state.is-warning {
-    background: color-mix(in srgb, var(--warning) 12%, transparent);
-    color: var(--warning);
-  }
-
-  .combat-copilot-detail-state.is-danger {
-    background: color-mix(in srgb, var(--destructive) 12%, transparent);
-    color: var(--destructive);
-  }
-
   .combat-copilot-detail-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -141,44 +110,6 @@
     font-weight: 600;
   }
 
-  .combat-copilot-detail-operator-list {
-    display: grid;
-    gap: 0.5rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .combat-copilot-detail-operator {
-    display: flex;
-    min-width: 0;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.375rem 0.5rem;
-  }
-
-  .combat-copilot-detail-operator-name {
-    color: var(--foreground);
-    font-size: 0.875rem;
-    font-weight: 500;
-  }
-
-  .combat-copilot-detail-requirements {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-  }
-
-  .combat-copilot-detail-requirement {
-    padding: 0.0625rem 0.375rem;
-    border-radius: var(--radius-sm);
-    background: var(--muted);
-    color: var(--tertiary-foreground);
-    font-size: 0.6875rem;
-    line-height: 1.4;
-    white-space: nowrap;
-  }
-
   .combat-copilot-detail-group-list {
     display: flex;
     flex-wrap: wrap;
@@ -186,56 +117,6 @@
     margin: 0;
     padding: 0;
     list-style: none;
-  }
-
-  .combat-copilot-detail-group {
-    padding: 0.125rem 0.5rem;
-    border-radius: var(--radius-sm);
-    background: var(--primary-soft);
-    color: var(--primary-strong);
-    font-size: 0.75rem;
-    line-height: 1.4;
-  }
-
-  .combat-copilot-failures {
-    display: grid;
-    gap: 0.5rem;
-    padding-top: 0.5rem;
-    border-top: 1px solid var(--border);
-  }
-
-  .combat-copilot-failures-label {
-    color: var(--destructive);
-    font-size: 0.75rem;
-    font-weight: 500;
-  }
-
-  .combat-copilot-failures-list {
-    display: grid;
-    gap: 0.5rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .combat-copilot-failure {
-    display: grid;
-    min-width: 0;
-    gap: 0.125rem;
-  }
-
-  .combat-copilot-failure-stage {
-    color: var(--foreground);
-    font-size: 0.75rem;
-  }
-
-  .combat-copilot-failure-reason {
-    margin: 0;
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-    line-height: 1.5;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
   }
 
   @media (width >= 640px) {

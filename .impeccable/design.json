@@ -163,16 +163,6 @@
         "purpose": "Equivalent surface-panel elevation in dark mode."
       },
       {
-        "name": "glass-chrome",
-        "value": "0 12px 32px rgba(60, 60, 67, 0.12)",
-        "purpose": "Sidebar frame, floating tabbar and chrome shells."
-      },
-      {
-        "name": "summoned-layer",
-        "value": "0 2px 8px rgba(0, 0, 0, 0.1), 0 30px 80px rgba(0, 0, 0, 0.24)",
-        "purpose": "Modals, theme menus, PWA prompts and other summoned overlays."
-      },
-      {
         "name": "control-rest",
         "value": "inset 0 0 0 1px rgba(60, 60, 67, 0.28), 0 1px 2px rgba(15, 23, 42, 0.025)",
         "purpose": "Inputs, selects and secondary buttons at rest."
@@ -322,8 +312,8 @@
         "section": "elevation"
       },
       {
-        "name": "The Liquid Glass Exception",
-        "body": "只有 chrome、Modal、主题菜单、PWA 提示和明确的浮层可以使用 backdrop-filter 与深阴影。普通卡片保持不透明，避免整页都是玻璃导致可读性下降。",
+        "name": "The Opaque Baseline Rule",
+        "body": "默认基线不使用 backdrop-filter 作为表面材质（弹层遮罩 scrim 除外），也不使用半透明玻璃材质；chrome、弹层与召唤层使用实色语义表面、发丝线和阴影。玻璃材质只允许出现在未来的独立主题包中，并满足可整体卸载契约。",
         "section": "elevation"
       },
       {
@@ -333,7 +323,7 @@
       }
     ],
     "dos": [
-      "Do 先读 apps/web/src/styles/index.css 和 apps/web/src/styles/ios-theme.css，再用语义类实现界面；新页面优先使用 Layout、Card、Button、Input 等现有组件。",
+      "Do 先读 apps/web/src/styles/index.css 和 apps/web/src/styles/chrome.css，再用语义类实现界面；新页面优先使用 Layout、Card、Button、Input 等现有组件。",
       "Do 把间距回到 --app-space-*、圆角回到 --app-radius-*，保持 4px 基线和 1px 发丝线。",
       "Do 让系统蓝保持稀缺：只用于当前项、主操作、焦点和运行中状态；状态色只表达语义。",
       "Do 在手机和粗指针设备上保证至少 44px 的点击区域，并检查 light/dark、loading、disabled、empty、error 以及长标题/长操作文案。",

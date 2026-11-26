@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import { AlertCircle } from 'lucide-react'
-import { Alert, AlertAction, AlertDescription } from '@/shared/ui/alert'
+import { cn } from 'cn'
+import { InlineAlert } from '@/shared/components'
 
 export type SettingsFeedbackTone = 'success' | 'error'
 
@@ -15,25 +15,16 @@ export default function SettingsFeedback({
   tone,
   message,
   action,
-  className = '',
+  className,
 }: SettingsFeedbackProps) {
-  if (tone === 'error') {
-    return (
-      <Alert variant="destructive" className={`text-xs ${className}`}>
-        <AlertCircle aria-hidden="true" />
-        <AlertDescription className="text-xs">{message}</AlertDescription>
-        {action && <AlertAction>{action}</AlertAction>}
-      </Alert>
-    )
-  }
-
-  const toneClass = 'status-success'
   return (
-    <div role="status" className={`rounded-lg px-3 py-2.5 text-xs leading-5 ${toneClass} ${className}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="min-w-0">{message}</p>
-        {action}
-      </div>
-    </div>
+    <InlineAlert
+      tone={tone}
+      role={tone === 'success' ? 'status' : 'alert'}
+      action={action}
+      className={cn('text-xs [&_[data-slot=alert-description]]:text-xs', className)}
+    >
+      {message}
+    </InlineAlert>
   )
 }

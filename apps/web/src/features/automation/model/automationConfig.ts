@@ -260,7 +260,7 @@ function normalizeTaskFlowItem(item: Record<string, unknown>): AutomationTaskFlo
   const {
     icon: _icon,
     paramFields: _paramFields,
-    defaultParams: defaultParams,
+    defaultParams,
     ...rest
   } = item
   const params = isRecord(item.params) ? item.params : {}

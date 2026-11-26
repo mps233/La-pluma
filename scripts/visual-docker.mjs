@@ -16,7 +16,7 @@ const image = process.env.PLAYWRIGHT_IMAGE || `mcr.microsoft.com/playwright:v${v
 function parseConfigArg(args) {
   const index = args.indexOf('--config')
   if (index === -1) {
-    return { configArg: 'apps/web/tests/visual/playwright.config.ts', args }
+    return { configArg: 'apps/web/tests/screenshots/playwright.config.ts', args }
   }
   const configArg = args[index + 1]
   if (!configArg) {
@@ -33,7 +33,7 @@ if (configPath.startsWith('..')) {
   process.exit(1)
 }
 
-// 基线截图只针对构建产物（与生产一致），先在宿主机构建（esbuild/rollup 的
+// 截图只针对构建产物（与生产一致），先在宿主机构建（esbuild/rollup 的
 // 原生二进制按宿主机环境安装，不在容器内复用）。
 if (!process.env.VISUAL_SKIP_BUILD) {
   const build = spawnSync('pnpm', ['--filter', 'la-pluma-next-client', 'build'], {

@@ -10,14 +10,13 @@
 pnpm --filter la-pluma-next-client test:integration
 pnpm verify
 pnpm --filter la-pluma-next-client stylelint:ratchet
-pnpm visual
 ```
 
-集成和视觉测试复用已安装 `@playwright/test` 对应版本的 `mcr.microsoft.com/playwright:v<version>-noble` 镜像。集成入口要求本机已有镜像，不自动拉取。默认先构建客户端；已经构建时可用 `INTEGRATION_SKIP_BUILD=1` 跳过。Docker 需要本机 daemon 权限。浏览器与静态服务运行在同一个容器内，使用 Docker 默认隔离网络，不发布宿主端口，也不继承宿主 `PORT`；集成端口在容器内为 4318，视觉端口为 4300。不同 worktree 可并行运行，各自使用独立的构建产物与结果目录；同一个 worktree 内仍应顺序运行，避免同时覆盖构建与测试产物。每次集成测试内部按顺序执行，避免共享场景竞态。
+集成测试复用已安装 `@playwright/test` 对应版本的 `mcr.microsoft.com/playwright:v<version>-noble` 镜像。集成入口要求本机已有镜像，不自动拉取。默认先构建客户端；已经构建时可用 `INTEGRATION_SKIP_BUILD=1` 跳过。Docker 需要本机 daemon 权限。浏览器与静态服务运行在同一个容器内，使用 Docker 默认隔离网络，不发布宿主端口，也不继承宿主 `PORT`；集成端口在容器内为 4318。不同 worktree 可并行运行，各自使用独立的构建产物与结果目录；同一个 worktree 内仍应顺序运行，避免同时覆盖构建与测试产物。每次集成测试内部按顺序执行，避免共享场景竞态。
 
-PR/main 的 `browser-checks` job 在 `client-build` 成功后下载当前工作流的前端产物，拉取匹配镜像，再跳过重建运行集成和视觉测试；它不等待其他源码检查，失败会阻止 `verify` 汇总通过。tag 发布不重复运行浏览器检查。CI 中禁止 `test.only`，避免意外只运行单个场景。
+PR/main 的 `browser-checks` job 在 `client-build` 成功后下载当前工作流的前端产物，拉取匹配镜像，再跳过重建运行集成测试；它不等待其他源码检查，失败会阻止 `verify` 汇总通过。tag 发布不重复运行浏览器检查。CI 中禁止 `test.only`，避免意外只运行单个场景。
 
-失败截图与 trace 保存在忽略入库的 `apps/web/integration-artifacts/`。`tests/integration/harness.ts` 记录每次 API 的方法、路径、正文以及提交、停止、配置保存、定时注册和应用次数。未登记 API 与浏览器 `pageerror` 都使测试失败。视觉测试也从文档加载前记录脚本异常，防止仅截图通过掩盖初始化错误。
+失败截图与 trace 保存在忽略入库的 `apps/web/integration-artifacts/`。`tests/integration/harness.ts` 记录每次 API 的方法、路径、正文以及提交、停止、配置保存、定时注册和应用次数。未登记 API 与浏览器 `pageerror` 都使测试失败。集成测试也从文档加载前记录脚本异常，防止页面异常被忽略。
 
 ## 场景及可观测结果
 
@@ -43,6 +42,6 @@ PR/main 的 `browser-checks` job 在 `client-build` 成功后下载当前工作�
 
 ## 测试环境与兼容
 
-视觉比对和基线更新规则见[开发指南](README.md)。共享视觉 harness 等待文档根可用后再插入冻结动效样式；初始化脚本异常也必须使测试失败。自动化旧断点的回归固定 `Date.now` 到 Run fixture 同一日期，避免运行当天超出断点接受期后使有效恢复场景过期。
+共享浏览器 harness 等待文档根可用后再插入冻结动效样式；初始化脚本异常也必须使测试失败。自动化旧断点的回归固定 `Date.now` 到 Run fixture 同一日期，避免运行当天超出断点接受期后使有效恢复场景过期。
 
 断线、身份恢复和停止的行为由[执行客户端](../architecture/execution-client.md)维护；浏览器 fixture 不能代替真实设备或服务端持久化契约测试。

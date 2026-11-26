@@ -32,8 +32,6 @@
     "test": "pnpm -r test",
     "verify": "pnpm -r verify",
     "verify:fast": "pnpm --filter la-pluma-next-client verify:fast",
-    "visual": "node scripts/visual-docker.mjs",
-    "visual:update": "node scripts/visual-docker.mjs --update-snapshots",
     "screenshots:readme": "node scripts/visual-docker.mjs --config apps/web/tests/screenshots/playwright.config.ts",
     "start": "pnpm --filter la-pluma-next-server start"
   }

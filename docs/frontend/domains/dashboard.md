@@ -25,7 +25,7 @@
 | 当前活动卡状态投影 | `features/dashboard/model/activityView.ts` | 纯函数：把活动快照、刷新状态与旧 v1 缺字段投影为 loading/active/none/unavailable/stale |
 | 流程操作入口 | `features/dashboard/hooks/useDashboardFlowActions.ts` | 组合 `useDashboardExecution` 与刷新回调；不写 store、不另发请求 |
 | 连接健康投影 | `features/dashboard/hooks/useDashboardServiceStatus.ts` | 把 `backendStatus` 与在线状态映射成文案；探针仍归 `runtime-status` |
-| 设备状态区域 | `features/dashboard/components/DashboardDeviceSection.tsx` | 只订阅 `deviceStats` 与 `temperatureHistory`；无样本时仍渲染四卡，数据为空 |
+| 设备状态区域 | `features/dashboard/components/DashboardDeviceSection.tsx` | 只订阅 `deviceStats` 与 `temperatureHistory`；无样本时仍渲染四卡，数据为空；CPU/内存/磁盘使用率由 shared `Progress` 输出进度语义 |
 | 摘要区域 | `components/DashboardSummarySection.tsx` | 养成与掉落卡片常驻 |
 | 养成摘要卡 / 掉落摘要卡 | `components/DashboardTrainingSummaryCard.tsx`、`DashboardDropSummaryCard.tsx` | 各自订阅自己的摘要切片与导航函数 |
 | 流程展示计算 | `features/dashboard/model/flowView.ts` | 纯函数：命令标题/说明、按钮文案、禁用与忙碌标记 |
@@ -43,6 +43,7 @@
 - 不把启动 loading 与流程展示计算写入 `dashboardStore`、Query、localStorage 或 URL。
 - 活动卡状态/失败文案、连接告警 toast 化与概览卡片收敛见“行为变化”；其余渲染结构与默认态视觉保持不变。
 - 总览没有展开/折叠交互；没有跨面板展开状态需要提升为共享状态。局部交互状态只有启动 loading，就近放在流程卡。
+- 设备使用率条、摘要只读 pill 与预览错误分别收敛到 shared `Progress`、`Badge`、`InlineAlert`：`Progress` 输出 `role="progressbar"`、`aria-valuenow` 与 `max=100`，可访问名为「{设备名}使用率」，颜色只覆盖 indicator；错误条保留 `alert` 语义与重试入口。
 
 ### 2. 组合与订阅边界
 
@@ -169,6 +170,7 @@ Dashboard（app-page > app-stack-section > DashboardWorkspace；首屏门禁与�
   10. **命令区改为内容高度。** 移除流程卡命令区的 100px 最小高度，高度由 16px padding 与标题、说明、主按钮决定；骨架同步使用与 live 一致的行高并移除 100px / 142px 固定高度。三段之间统一使用 shared `Separator`。
   11. **掉落摘要单行合并。** `buildDropSummary` 新增跨关卡 `items` 展示串，卡片不再显示关卡代号，物品按数量倒序单行排列；溢出时只保留完整物品并以“、…”结尾，不截断半个物品。`recent` 保留按关卡聚合用于缓存兼容。
   12. **设备无样本仍渲染四卡。** `deviceStats` 为 null 时不再整段返回 null，四卡照常显示但无使用率条、内存/磁盘显示 `-- / --`、温度显示 `--` 与“等待温度采样”。养成摘要底部名称 chips 改为单行，溢出省略。
+  13. **状态组件收敛。** CPU/内存/磁盘使用率改由 shared `Progress` 渲染，补齐 `role="progressbar"`、当前值与 `max=100` 以及「{设备名}使用率」可访问名，tone 只切换 indicator 颜色；养成摘要名称 chips 改用 `Badge`；掉落摘要的单行省略文本保持原样；预览已有画面时的错误条改用 `InlineAlert`，重试入口保留。
 
 ### 剩余边界
 
@@ -302,6 +304,7 @@ Dashboard（app-page > app-stack-section > DashboardWorkspace；首屏门禁与�
 - 活动卡 phase（loading/active/none/unavailable/stale）矩阵；`la-pluma-dashboard-cache` v1 的版本/形状/时钟偏差校验，失败刷新不覆盖成功缓存。
 - 设备采样：同一 `dataUpdatedAt` 的缓存回放不重复追加温度点，新时间戳逐次追加（最多 36 个），`null` 载荷与非法字段保旧。
 - 订阅隔离：采样投影返回 `null` 不推动兄弟区域重渲染，流程卡独占执行订阅与终态提示；预览入口不条件卸载、预览画面不导航。
+- 设备使用率条以 `progressbar` 语义暴露当前值/最大值与可访问名，tone 只影响 indicator；摘要 pill 使用非交互 `Badge`，掉落摘要单行省略文本不拆行。
 - 连接通知：仅 `offline`/`unavailable` 发送固定 id 的常驻 toast，`checking` 保持当前通知，恢复自动 dismiss；离线不带 action，后端不可用时的“重试连接”复用完整快照协调器；通知组件返回 `null`，不改变页面布局。
 - 掉落摘要：同关卡累加、跨关卡合并为 `items`、同物品按 `itemId` 合并；卡片不显示关卡代号，单行溢出省略；`recent` 保留按关卡聚合用于缓存兼容，原始逐条记录接口与数据页列表语义不变。
 

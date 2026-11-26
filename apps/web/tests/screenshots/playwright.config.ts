@@ -39,8 +39,8 @@ export default defineConfig({
     },
     {
       name: 'mobile',
-      // 440×956 是 iPhone 16 Pro Max 的全屏逻辑尺寸；这里沿用视觉基线的
-      // Chromium 移动端描述符，只改视口，避免 WebKit 与基线渲染差异。
+      // 440×956 是 iPhone 16 Pro Max 的全屏逻辑尺寸；这里沿用浏览器测试的
+      // Chromium 移动端描述符，只改视口，避免 WebKit 与 Chromium 渲染差异。
       use: { ...devices['Pixel 5'], viewport: { width: 440, height: 956 }, deviceScaleFactor: 1 },
     },
   ],

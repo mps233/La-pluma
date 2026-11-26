@@ -9,6 +9,7 @@ import {
 } from '@/features/game-data'
 import { OperatorSelectModal, type OperatorPickerOption } from '@/features/training'
 import { Button } from '@/shared/ui/button'
+import { Field, FieldDescription, FieldLegend, FieldLabel } from '@/shared/ui/field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import {
   OPER_PROGRESS_ROLES,
@@ -58,8 +59,8 @@ interface PlanSelectProps {
 
 function PlanSelect({ id, label, ariaLabel, items, value, disabled, onValueChange }: PlanSelectProps) {
   return (
-    <div className="min-w-0">
-      <label htmlFor={id} className="mb-2 block text-sm font-medium text-muted-foreground">{label}</label>
+    <Field className="min-w-0" data-disabled={disabled || undefined}>
+      <FieldLabel htmlFor={id} className="text-muted-foreground">{label}</FieldLabel>
       <Select items={items} value={value} onValueChange={(next, details) => { if (details.reason === 'none' || next === null) return; onValueChange(next) }} disabled={disabled}>
         <SelectTrigger id={id} aria-label={ariaLabel} className="w-full">
           <SelectValue />
@@ -70,7 +71,7 @@ function PlanSelect({ id, label, ariaLabel, items, value, disabled, onValueChang
           ))}
         </SelectContent>
       </Select>
-    </div>
+    </Field>
   )
 }
 
@@ -137,13 +138,13 @@ export default function OperProgressPlansEditor({ plans, disabled, onChange }: O
 
   return (
     <div className="@container space-y-3.5">
-      <p className="text-xs leading-5 text-muted-foreground">在游戏内提升干员，按精英阶段、技能等级、专精的顺序处理。执行会消耗已有资源，可能自动合成材料或用采购凭证购买芯片助剂；专精会占用训练室。每轮执行最多启动一项专精训练，其余专精目标留待后续执行。</p>
-      {plans.length === 0 && <p className="text-sm text-muted-foreground">添加干员并选择培养目标。</p>}
+      <FieldDescription className="text-xs leading-5">在游戏内提升干员，按精英阶段、技能等级、专精的顺序处理。执行会消耗已有资源，可能自动合成材料或用采购凭证购买芯片助剂；专精会占用训练室。每轮执行最多启动一项专精训练，其余专精目标留待后续执行。</FieldDescription>
+      {plans.length === 0 && <FieldDescription>添加干员并选择培养目标。</FieldDescription>}
       {plans.map((plan, index) => {
         const professionLabel = plan.name ? roleLabel(plan.role) : null
         return (
           <fieldset key={index} disabled={disabled} className="min-w-0 space-y-3 border-t border-border pt-3">
-            <legend className="px-1 text-sm font-semibold text-foreground">培养计划 {index + 1}</legend>
+            <FieldLegend variant="label" className="mb-0 px-1 font-semibold">培养计划 {index + 1}</FieldLegend>
             <div className="flex min-w-0 flex-wrap items-center gap-3.5">
               <PlanOperatorAvatar operatorId={planOperatorIds[index] ?? null} />
               <div className="min-w-0 flex-1">
@@ -218,7 +219,7 @@ export default function OperProgressPlansEditor({ plans, disabled, onChange }: O
         <Plus size={16} aria-hidden="true" />
         添加培养计划
       </Button>
-      <p className="text-xs leading-5 text-muted-foreground">只处理明确选择的目标。专精可能先启动前置等级，实际结果以执行详情为准。</p>
+      <FieldDescription className="text-xs leading-5">只处理明确选择的目标。专精可能先启动前置等级，实际结果以执行详情为准。</FieldDescription>
       <OperatorSelectModal
         isOpen={pickerPlanIndex !== null}
         onClose={() => setPickerPlanIndex(null)}

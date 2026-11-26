@@ -1,3 +1,4 @@
+import { EmptyState } from '@/shared/components'
 import { Button } from '@/shared/ui/button'
 import type { CopilotSetView } from '../model/copilotSetView'
 import type { CopilotSetInfo } from '../types'
@@ -35,8 +36,10 @@ export default function CombatCopilotSetPanel({
             </Button>
           )}
         </>
+      ) : preview.note ? (
+        <p className="combat-copilot-summary-note">{preview.note}</p>
       ) : (
-        <p className="combat-copilot-summary-note">{preview.note ?? '暂无作业明细'}</p>
+        <EmptyState compact title="暂无作业明细" description="该作业集暂时没有可展示的关卡。" />
       )}
     </section>
   )

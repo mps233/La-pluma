@@ -2,8 +2,8 @@ import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
 import type { ThemeMode } from '@/shared/theme/bootTheme'
 import { DEFAULT_THEME_ID } from '@/shared/theme/registry'
 import { useTheme } from '@/shared/theme/useTheme'
-import { Button } from '@/shared/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
+import { ToggleGroup, ToggleGroupItem } from '@/shared/ui/toggle-group'
 
 const modeOptions: Array<{ value: ThemeMode; label: string; icon: LucideIcon }> = [
   { value: 'light', label: '亮色', icon: Sun },
@@ -43,24 +43,31 @@ export function ThemeGalleryCurrentTheme() {
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="界面主题">
+        <ToggleGroup
+          aria-label="界面主题"
+          value={[mode]}
+          onValueChange={(next) => {
+            const nextMode = next[0] as ThemeMode | undefined
+            if (nextMode) setMode(nextMode)
+          }}
+          multiple={false}
+          className="w-full! flex-wrap"
+        >
           {modeOptions.map(option => {
             const ModeIcon = option.icon
-            const selected = mode === option.value
             return (
-              <Button
+              <ToggleGroupItem
                 key={option.value}
-                variant={selected ? 'default' : 'secondary'}
+                value={option.value}
                 size="sm"
-                aria-pressed={selected}
-                onClick={() => setMode(option.value)}
+                className="min-h-11 gap-1.5! px-3! aria-pressed:bg-primary! aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary-action-hover aria-pressed:hover:text-primary-foreground"
               >
                 <ModeIcon size={15} aria-hidden="true" />
                 {option.label}
-              </Button>
+              </ToggleGroupItem>
             )
           })}
-        </div>
+        </ToggleGroup>
 
         <p className="text-xs text-tertiary">
           生效{resolvedModeLabels[resolvedMode]}，html class {resolvedMode === 'dark' ? '含 dark' : '无 dark'}

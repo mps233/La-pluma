@@ -1,5 +1,7 @@
 import { Badge } from '@/shared/ui/badge'
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from '@/shared/ui/item'
 import { Progress } from '@/shared/ui/progress'
+import { InlineAlert } from '@/shared/components'
 import type { CopilotSetView } from '../model/copilotSetView'
 import type { CopilotSetInfo } from '../types'
 
@@ -66,20 +68,29 @@ export default function CombatCopilotQueueSummary({
       />
 
       {failures.length > 0 && (
-        <div className="combat-copilot-failures">
-          <span className="combat-copilot-failures-label">失败原因</span>
-          <ul className="combat-copilot-failures-list">
+        <InlineAlert tone="error" title="失败原因">
+          <ItemGroup className="gap-2">
             {failures.map((failure, index) => (
-              <li key={`${failure.itemIndex ?? 'unknown'}-${index}`} className="combat-copilot-failure">
-                <span className="combat-copilot-failure-stage">
-                  {failure.stage
-                    ?? (failure.itemIndex !== null ? `第 ${failure.itemIndex + 1} 个作业` : '未知阶段')}
-                </span>
-                <p className="combat-copilot-failure-reason">{failure.error}</p>
-              </li>
+              <Item
+                key={`${failure.itemIndex ?? 'unknown'}-${index}`}
+                role="listitem"
+                size="xs"
+                variant="muted"
+                className="rounded-none border-0 px-2 py-1.5"
+              >
+                <ItemContent className="gap-0.5">
+                  <ItemTitle className="text-[0.75rem]">
+                    {failure.stage
+                      ?? (failure.itemIndex !== null ? `第 ${failure.itemIndex + 1} 个作业` : '未知阶段')}
+                  </ItemTitle>
+                  <ItemDescription className="text-[0.75rem] whitespace-pre-wrap [overflow-wrap:anywhere]">
+                    {failure.error}
+                  </ItemDescription>
+                </ItemContent>
+              </Item>
             ))}
-          </ul>
-        </div>
+          </ItemGroup>
+        </InlineAlert>
       )}
 
       {nextCopilot ? (
@@ -97,7 +108,7 @@ export default function CombatCopilotQueueSummary({
       {view.waitingEntry && (
         <div className="combat-copilot-waiting">
           <div className="combat-copilot-waiting-head">
-            <span className="combat-copilot-tag">下一关</span>
+            <Badge variant="secondary" className="bg-primary-soft text-primary-strong">下一关</Badge>
             <span className="combat-copilot-waiting-index">
               第 {(view.waitingEntryIndex ?? 0) + 1} / {waitingTotal} 关
             </span>

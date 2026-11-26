@@ -1,29 +1,10 @@
 import type { ReactNode } from 'react'
 import { ChevronRight, LoaderCircle } from 'lucide-react'
+import { UnavailableAction } from '@/shared/components'
 import { Button } from '@/shared/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip'
 import type { CombatTask } from '../types'
 
 const RUN_ACTION_BUTTON_CLASS = 'combat-task-run-button min-h-11 px-4 text-sm sm:px-5'
-
-function UnavailableAction({
-  action,
-  reason,
-  children,
-}: {
-  action: string
-  reason: string
-  children: ReactNode
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger render={<span tabIndex={0} className="inline-flex" aria-label={`${action}：${reason}`} />}>
-        {children}
-      </TooltipTrigger>
-      <TooltipContent role="tooltip">{reason}</TooltipContent>
-    </Tooltip>
-  )
-}
 
 export interface CombatRunActionProps {
   automationAvailable: boolean

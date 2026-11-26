@@ -399,7 +399,7 @@ export const apiFixtures: ApiFixture[] = [
 export const EXTERNAL_IMAGE_HOSTS = ['raw.githubusercontent.com']
 
 /**
- * 1x1 灰蓝色 PNG（base64）。外部头像/物品图标在基线中统一渲染为该占位图，
+ * 1x1 灰蓝色 PNG（base64）。外部头像/物品图标在浏览器测试中统一渲染为该占位图，
  * 其加载路径（onError 回退等）因此完全确定。
  */
 export const PLACEHOLDER_PNG_BASE64 =

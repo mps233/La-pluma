@@ -1,17 +1,17 @@
 // 历史模式下清理入口保持禁用：清理成功后的选择裁决可能绕过页面的“返回实时”，
 // 在未恢复自动滚动前不开放该路径。
 
-import { AlertCircle, ChevronRight, FileText, LoaderCircle, RefreshCw, Trash2, X } from 'lucide-react'
-import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/shared/ui/alert'
+import { ChevronRight, FileText, LoaderCircle, RefreshCw, Trash2, X } from 'lucide-react'
+import { cn } from 'cn'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/shared/ui/item'
 import { ScrollArea } from '@/shared/ui/scroll-area'
 import { SheetClose, SheetDescription, SheetHeader, SheetTitle } from '@/shared/ui/sheet'
-import { EmptyState, Loading } from '@/shared/components'
+import { EmptyState, InlineAlert, Loading, UnavailableAction } from '@/shared/components'
 import type { HistoryFilesPhase } from '../model/historyLogSession'
 import { formatLogFileSize } from '../model/logFileSize'
 import type { LogFile } from '../types'
-import LogsUnavailableAction from './LogsUnavailableAction'
 
 interface HistoryLogPickerProps {
   readonly files: readonly LogFile[]
@@ -74,9 +74,9 @@ export default function HistoryLogPicker({
               : <RefreshCw className="h-4 w-4" aria-hidden="true" />}
           </Button>
           {cleanupDisabled && cleanupReason ? (
-            <LogsUnavailableAction action="清理旧日志" reason={cleanupReason}>
+            <UnavailableAction action="清理旧日志" reason={cleanupReason}>
               {cleanupButton}
-            </LogsUnavailableAction>
+            </UnavailableAction>
           ) : cleanupButton}
         </div>
         <SheetClose
@@ -88,16 +88,17 @@ export default function HistoryLogPicker({
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-3 p-4">
           {filesError && (
-            <Alert variant="destructive">
-              <AlertCircle aria-hidden="true" />
-              <AlertTitle>历史日志列表读取失败</AlertTitle>
-              <AlertDescription>{filesError}</AlertDescription>
-              <AlertAction>
+            <InlineAlert
+              tone="error"
+              title="历史日志列表读取失败"
+              action={(
                 <Button type="button" variant="outline" size="sm" onClick={onReload}>
                   重新加载
                 </Button>
-              </AlertAction>
-            </Alert>
+              )}
+            >
+              {filesError}
+            </InlineAlert>
           )}
           {loading && files.length === 0 && (
             <div className="log-history-state" aria-busy="true">
@@ -115,20 +116,35 @@ export default function HistoryLogPicker({
           {files.length > 0 && (
             <div className="log-history-list">
               {files.map(file => (
-                <button
-                  type="button"
+                <Item
                   key={file.path}
-                  onClick={() => onSelect(file)}
-                  className={`log-history-row ${selectedFile?.path === file.path ? 'is-active' : ''}`}
-                  aria-current={selectedFile?.path === file.path ? 'true' : undefined}
+                  render={(
+                    <button
+                      type="button"
+                      onClick={() => onSelect(file)}
+                      aria-current={selectedFile?.path === file.path ? 'true' : undefined}
+                    />
+                  )}
+                  className={cn(
+                    'log-history-row grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-none border-0 border-b border-border px-3.5 py-3 text-left last:border-b-0 sm:px-4 sm:py-3.5',
+                    selectedFile?.path === file.path && 'is-active',
+                  )}
                 >
-                  <span className="log-history-icon"><FileText className="h-4 w-4" aria-hidden="true" /></span>
-                  <span className="log-history-copy">
-                    <strong title={file.name}>{file.name}</strong>
-                    <small>{new Date(file.modified).toLocaleString('zh-CN')} · {formatLogFileSize(file.size)}</small>
-                  </span>
-                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                </button>
+                  <ItemMedia variant="icon" className="log-history-icon">
+                    <FileText aria-hidden="true" />
+                  </ItemMedia>
+                  <ItemContent className="log-history-copy grid min-w-0 gap-[0.2rem]">
+                    <ItemTitle className="w-full text-xs font-semibold text-foreground" title={file.name}>
+                      {file.name}
+                    </ItemTitle>
+                    <ItemDescription className="line-clamp-1 text-[0.6875rem]">
+                      {new Date(file.modified).toLocaleString('zh-CN')} · {formatLogFileSize(file.size)}
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <ChevronRight className="size-4" aria-hidden="true" />
+                  </ItemActions>
+                </Item>
               ))}
             </div>
           )}

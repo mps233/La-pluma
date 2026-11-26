@@ -19,22 +19,22 @@
 | 页面壳与工作区组合 | `pages/combat/CombatTasks.tsx` | 只渲染 `app-page`/`app-stack-section` 与工作区；不调用搜索/预览/执行 hook，不持有请求生命周期 |
 | 模式、配置订阅、预览/搜索入口、执行订阅、作业集选择、队列实例、同步反馈与重置弹层 | `features/combat/components/CombatWorkspace.tsx` | 跨面板唯一容器；`activeCombatMode`、`selectedCopilotIndexes`、`useCopilotQueue` 实例与面板会话存储在这里创建 |
 | 任务目录与模式展示项 | `features/combat/components/CombatTaskCatalog.tsx` | 任务条目的名称、命令、占位与高级字段标记，以及模式展示项的标题；模式标题由 `COMBAT_TASKS[id].name` 派生，普通作业的页签与卡片标题统一为「普通作业」；`taskName` 只是展示字符串，改名不迁移进行中/历史 Run 的旧文案；不读取配置/Query/执行状态 |
-| 模式分段控件的键盘与高亮 | `features/combat/components/CombatModeTabs.tsx` | 组合共享 `SegmentedTabNav`：tablist/tab 语义、方向键移动焦点、Enter/Space 激活与流体高亮 |
-| 执行设置、编队/突袭/作业集模式与高级字段 | `components/CombatSettingsPanel.tsx`、`components/CombatAdvancedFields.tsx` | 受控表单；选项表来自 `model/combatCommands.ts`。单作业且队列为空时隐藏只对队列/作业集生效的「执行方式」与「队列策略」，隐藏不改变配置值。 |
-| 作业来源栏（链接输入、预览、JSON 导入、识别方式、发现与说明） | `components/CombatCopilotSourceBar.tsx` + `components/CombatCopilotInputPanel.tsx` | 输入值来自配置草稿；JSON 导入按钮位于链接输入框内、识别方式下拉左侧，文件选择与从文件管理器复制后粘贴的 JSON 文件走同一上传通道；识别方式保存在面板会话存储；“发现”只打开独立弹窗，不在来源栏内嵌搜索 |
-| 发现作业弹窗（关键词、关卡、干员、排序、视图与结果卡片） | `components/CombatCopilotDiscoveryDialog.tsx` + `CombatCopilotSearchBar.tsx`、`CombatCopilotDiscoveryCard.tsx`、`CombatCopilotStageSelect.tsx` | 工作区在页面挂载时按已保存的干员偏好后台预取默认热度列表并缓存；打开弹窗先展示缓存，再在后台刷新，刷新不显示 loading、不阻塞输入；关键词/关卡/排序每次打开重置，干员包含/排除、匹配设置与视图按界面偏好恢复；请求统一经 `normalizeCopilotSearchRequest`，关卡/干员/排序变化立即重搜，视图与匹配模式只影响本地展示；关键词输入框在有关键词时显示右侧清除按钮，清空后焦点回到输入框；整张卡片可点击打开该条目的详情预览，不改写主输入，也不标记“已选中”；搜索在途优先显示搜索占位，显式搜索或默认列表读取失败时在弹窗内显示错误与「重试」，不再回退到旧结果、默认热度列表或「暂无作业」空态 |
-| 干员包含/排除与匹配设置 | `components/CombatCopilotOperatorFilterDialog.tsx`、`components/CombatCopilotMatchDialog.tsx` + `model/operatorFilter.ts` | 包含/排除互斥，选项来自识别快照的已拥有/未拥有干员并支持中文名、全拼与首字母；包含区按已拥有 + 练度降序、排除区按未拥有 + 练度升序（先精英等级再干员等级），选项区最多三行并随滚动自动追加；干员按钮内的电源开关可临时停用筛选而不清空选择；“记住筛选结果”决定下次是否恢复选择（关闭时只保留开关状态）；匹配是客户端过滤，服务端 `match` 缺失时保留卡片并标注未识别；持有快照读取中或失败时，结果卡片统一标记「拥有状态未知」而不是「未拥有」，匹配弹窗对应显示加载或读取失败与重试 |
+| 模式分段控件的键盘与焦点 | `features/combat/components/CombatModeTabs.tsx` | 组合共享 `SegmentedTabNav`：tablist/tab 语义、方向键移动焦点、Enter/Space 激活；选中态由 shadcn `TabsList`/`TabsTrigger` 渲染，不再有流体高亮指示器 |
+| 执行设置、编队/突袭/作业集模式与高级字段 | `components/CombatSettingsPanel.tsx`、`components/CombatAdvancedFields.tsx` | 受控表单；选项表来自 `model/combatCommands.ts`。编队/执行方式标签用 `Field` + `FieldTitle` + `FieldHint`，难度与高级下拉保持 `Select`，输入/选择行用 `Field` + `FieldLabel`；高级设置折叠为 shared `Disclosure`（原生 details，保留键盘与 summary 语义）。单作业且队列为空时隐藏只对队列/作业集生效的「执行方式」与「队列策略」，隐藏不改变配置值。 |
+| 作业来源栏（链接输入、预览、JSON 导入、识别方式、发现与说明） | `components/CombatCopilotSourceBar.tsx` + `components/CombatCopilotInputPanel.tsx` | 输入值来自配置草稿；JSON 导入按钮位于链接输入框内，文件选择与从文件管理器复制后粘贴的 JSON 文件走同一上传通道；识别方式使用 shadcn `Select`，触发器保留 `id="combat-copilot-preview-mode"`、`name="maa-copilot-preview-mode"` 与可访问名「识别方式」，值保存在面板会话存储；“发现”只打开独立弹窗，不在来源栏内嵌搜索 |
+| 发现作业弹窗（关键词、关卡、干员、排序、视图与结果卡片） | `components/CombatCopilotDiscoveryDialog.tsx` + `CombatCopilotSearchBar.tsx`、`CombatCopilotDiscoveryCard.tsx`、`CombatCopilotStageSelect.tsx` | 工作区在页面挂载时按已保存的干员偏好后台预取默认热度列表并缓存；打开弹窗先展示缓存，再在后台刷新，刷新不显示 loading、不阻塞输入；关键词/关卡/排序每次打开重置，干员包含/排除、匹配设置与视图按界面偏好恢复；请求统一经 `normalizeCopilotSearchRequest`，关卡/干员/排序变化立即重搜，视图与匹配模式只影响本地展示；三处搜索入口（关键词、关卡、干员包含/排除）统一使用 shared `SearchField`：内置 `InputGroup` 与清除按钮，清除只在有值时出现、清空后焦点回到输入框，并由 `onClear` 重置本地面板计数；关键词搜索仍按 Enter 提交，`aria-label="搜索作业关键词"` 与清除按钮「清除搜索关键词」保持不变；整张卡片可点击打开该条目的详情预览，不改写主输入，也不标记“已选中”；搜索在途优先显示搜索占位，显式搜索或默认列表读取失败时以 `InlineAlert` 显示错误与「重试」，不再回退到旧结果、默认热度列表或「暂无作业」空态 |
+| 干员包含/排除与匹配设置 | `components/CombatCopilotOperatorFilterDialog.tsx`、`components/CombatCopilotMatchDialog.tsx` + `model/operatorFilter.ts` | 包含/排除互斥，选项来自识别快照的已拥有/未拥有干员并支持中文名、全拼与首字母；包含区按已拥有 + 练度降序、排除区按未拥有 + 练度升序（先精英等级再干员等级），选项区最多三行并随滚动自动追加；两处搜索使用 shared `SearchField`，选项行为 `Item`（头像、名称/稀有度与已拥有 `Badge`），筛选无结果用 compact `EmptyState`；干员按钮内的电源开关可临时停用筛选而不清空选择（停用提示为 `InlineAlert tone="info"`）；“记住筛选结果”决定下次是否恢复选择（关闭时只保留开关状态），字段行用 `Field` + `FieldLabel`；匹配是客户端过滤，服务端 `match` 缺失时保留卡片并标注未识别；持有快照读取中或失败时，结果卡片统一标记「拥有状态未知」而不是「未拥有」，匹配弹窗对应显示 `Loading` 或 `InlineAlert` 失败与重试 |
 | 关卡目录与持有干员快照 | `model/queries.ts`（`copilotStageCatalogQueryOptions`）+ `game-data`（`operBoxQueryOptions`） | 工作区在发现弹窗首次打开时按需读取，弹窗只消费投影；不在弹窗内另建数据源；持有干员投影同时提供加载/失败状态，失败时卡片标记未知并可重试 |
 | 普通搜索与悖论搜索 | `hooks/useCopilotSearch.ts`、`components/CombatParadoxSearchPanel.tsx` | 普通搜索请求、代次与取消由工作区 hook 持有；悖论干员搜索词在面板侧；悖论结果一次渲染服务端返回的全部条目（最多 10 条），列表、标题与 Toast 数量一致，不再截断 6 条；结果与发现卡统一显示格式化后的「热度 X」，不换算星级；结果与推荐接线由工作区提供 |
 | 本次执行的条目位置、当前关卡、执行模式与已用时 | `components/CombatExecutionProgressPanel.tsx` | 只渲染 `deriveExecutionProgress`；不呈现运行状态、停止入口、逐项结果或计划计数 |
-| 页面级执行状态区（跨 tab 等待续跑与终态结果） | `components/CombatExecutionStatusPanel.tsx` | 只渲染工作区投影：等待区仅在保全派驻/悖论模拟 tab 提供继续/跳过，终止仍由当前卡片头部的执行按钮提供；普通作业 tab 仍由作业卡与队列面板提供；终态结果跨 tab 常驻，`role="status"`，不新建执行状态、Run 身份或终态契约 |
-| 作业队列（唯一列表：勾选、排序、删除、清空、等待续跑/跳过/重试入口） | `components/CombatCopilotQueuePanel.tsx` | 只渲染 `CombatCopilotQueueProjection`；行主体打开详情层；不持有第二份队列模型 |
+| 页面级执行状态区（跨 tab 等待续跑与终态结果） | `components/CombatExecutionStatusPanel.tsx` | 只渲染工作区投影：等待区仅在保全派驻/悖论模拟 tab 提供继续/跳过，终止仍由当前卡片头部的执行按钮提供；普通作业 tab 仍由作业卡与队列面板提供；终态结果跨 tab 常驻，容器保持 `role="status"`，状态文案以非交互 `Badge`（`status-success`/`status-warning`/`status-danger`）呈现，不新建执行状态、Run 身份或终态契约 |
+| 作业队列（唯一列表：勾选、排序、删除、清空、等待续跑/跳过/重试入口） | `components/CombatCopilotQueuePanel.tsx` | 只渲染 `CombatCopilotQueueProjection`；标题计数为 `Badge`，勾选行用 `Label` 包 `Checkbox`，行主体打开详情层；不可用动作统一用 shared `UnavailableAction`（可聚焦触发器 + 原因提示）；队列行仍是自定义拖拽/勾选/操作行，不改成通用 `Item`；不持有第二份队列模型 |
 | 队列模型、本地持久化与操作 | `model/copilotQueue.ts`、`model/copilotQueueStorage.ts`、`hooks/useCopilotQueue.ts` | 条目构造、URI 去重、排序、上限与 `la-pluma-copilot-queue-v1` 读写；勾选为会话状态 |
 | 队列 Run 投影 | `model/copilotQueueRun.ts` | 从 `run.progress` 与 `run.result.summary` 读取 `clientId` 状态、下一项、失败原因与计数；不新建执行身份 |
-| 作业集摘要（续跑目标、下一关、计数与失败原因） | `components/CombatCopilotSetPanel.tsx`（内部 `CombatCopilotQueueSummary`） | 作业集预览时在详情层内渲染 |
-| 作业详情层 | `components/CombatCopilotDetailLayer.tsx` + `model/copilotDetail.ts` | 普通作业预览、作业集摘要和队列行共用详情层。桌面非模态抽屉，手机 Sheet；目标未就绪时先渲染抽屉壳与加载态 |
-| 保全派驻 / 悖论模拟卡片 | `components/CombatSpecialTaskPanel.tsx` | 输入、URI 计数、高级字段、搜索与概览；保全派驻只接受单 URI，多 URI 以 warning 语义提示，不按破坏性错误呈现；不创建执行状态 |
-| 卡片头部与运行/停止按钮 | `components/CombatTaskHeading.tsx` | 共享两种卡片的标题与执行投影；普通作业卡可在执行按钮下方显示队列执行目标提示 |
+| 作业集摘要（续跑目标、下一关、计数与失败原因） | `components/CombatCopilotSetPanel.tsx`（内部 `CombatCopilotQueueSummary`） | 作业集预览时在详情层内渲染；计数与「下一关」为 `Badge`，失败原因用 `InlineAlert` + `ItemGroup`/`Item` 列表，未提供备注时用 compact `EmptyState`；无 copilots 且无备注不再渲染裸「暂无作业明细」文本 |
+| 作业详情层 | `components/CombatCopilotDetailLayer.tsx` + `model/copilotDetail.ts` | 普通作业预览、作业集摘要和队列行共用详情层。手机使用 shadcn `SheetContent`（含 overlay/scrim）；桌面（非模态与 stacked）使用 `Sheet` + `SheetPrimitive.Popup` 自组合，`modal` 由 stacked 决定，因为 `SheetContent` 会强制叠加 overlay 且无法关闭；目标未就绪时先渲染抽屉壳与加载态。详情字段不再输出 `dl`/`dt`/`dd`，改用 `Field`/`FieldTitle`/`FieldContent`；状态、已完成模式、干员需求与干员组为 `Badge`，干员列表为 `Item` |
+| 保全派驻 / 悖论模拟卡片 | `components/CombatSpecialTaskPanel.tsx` | 输入、URI 计数、高级字段、搜索与概览；作业输入用 `Textarea`（`field-sizing-fixed` 保留 `rows` 行高），URI 计数为 `Badge`，保全派驻只接受单 URI，多 URI 以 `InlineAlert tone="warning"` 提示，不按破坏性错误呈现；悖论结果行用 `Item` 与 `Badge`；不创建执行状态 |
+| 卡片头部与运行/停止按钮 | `components/CombatTaskHeading.tsx` | 共享两种卡片的标题与执行投影；自动化不可用时用 shared `UnavailableAction` 包裹执行按钮并提供原因提示；普通作业卡可在执行按钮下方显示队列执行目标提示 |
 | 作业集视图派生 | `model/copilotSetView.ts` | 纯模型：当前 Run 归属、按模式判定完成、待执行求差、续跑目标与下一关 |
 | 面板会话状态 | `model/panelState.ts` + `hooks/usePanelState.ts` | 工作区创建、面板订阅；页面卸载时销毁 |
 | 命令、URI 与载荷模型 | `model/combatCommands.ts`、`utils/copilotUri.ts`、`model/copilotPayload.ts` | 纯命令与载荷模型，不改变执行协议 |
@@ -54,18 +54,18 @@ CombatTasks（app-page > app-stack-section > CombatWorkspace）
 └─ CombatWorkspace（模式、配置、预览/搜索、执行、选择、同步反馈、重置弹层）
    └─ SegmentedTabs（模式受控上下文）
       └─ DeviceMonitorLayout(standard)（main + monitor）
-         ├─ CombatModeTabs（共享 SegmentedTabNav + 高亮）
+         ├─ CombatModeTabs（共享 SegmentedTabNav）
          ├─ CombatExecutionProgressPanel（本次执行条目位置 / 关卡 / 已用时）
          ├─ CombatExecutionStatusPanel（特殊 tab 等待续跑 / 跨 tab 终态结果）
          ├─ SegmentedTabPanel(copilot)
          │  └─ CombatCopilotTaskPanel（普通作业卡）
          │     ├─ CombatCopilotSourceBar（CombatCopilotInputPanel + CombatCopilotDiscoveryDialog）
-         │     │  ├─ CombatCopilotInputPanel（作业链接输入 + JSON 导入图标 + 识别方式下拉 + 预览 / 加入队列 / 发现 / 说明）
-         │     │  └─ CombatCopilotDiscoveryDialog（关键词 + 关卡 + 干员 + 排序 + 视图 + 匹配）
-         │     │     ├─ CombatCopilotSearchBar / CombatCopilotStageSelect
-         │     │     ├─ CombatCopilotDiscoveryCard（网格/列表）
-         │     │     ├─ CombatCopilotOperatorFilterDialog（包含/排除）
-         │     │     └─ CombatCopilotMatchDialog（匹配模式）
+         │     │  ├─ CombatCopilotInputPanel（作业链接输入 + JSON 导入图标 + 识别方式 Select + 预览 / 加入队列 / 发现 / 说明）
+         │     │  └─ CombatCopilotDiscoveryDialog（SearchField 关键词 + 关卡 + 干员 + 排序 + 视图 + 匹配）
+         │     │     ├─ CombatCopilotSearchBar / CombatCopilotStageSelect（SearchField + Item 关卡行）
+         │     │     ├─ CombatCopilotDiscoveryCard（网格/列表，Item 主体 + Badge）
+         │     │     ├─ CombatCopilotOperatorFilterDialog（SearchField + Item + 包含/排除）
+         │     │     └─ CombatCopilotMatchDialog（Field 开关/勾选行）
          │     ├─ CombatCopilotQueuePanel（唯一作业列表）
          │     ├─ CombatCopilotDetailLayer（预览 / 队列行详情 / 作业集摘要）
          │     └─ 参数区：CombatSettingsPanel → CombatAdvancedFields
@@ -161,7 +161,7 @@ CombatTasks（app-page > app-stack-section > CombatWorkspace）
 ### 5. 搜索、执行与页面路径
 
 - **默认列表**：进入作业页后由默认 Query 在后台预取热度列表并缓存；打开发现先渲染缓存，再后台刷新同一请求 key，刷新期间不显示 loading、不阻塞输入，失败时保留缓存但显示弹窗内错误与重试，不把旧缓存当作当前结果。关键词、关卡与排序在打开时重置，干员包含/排除、匹配模式与视图按界面偏好恢复。
-- **搜索选择**：发现弹窗以关键词（`document`）、关卡（`level`）、干员包含/排除（`operator`，排除项 `~` 前缀）与排序（`hot`/`latest`/`views`）请求作业站；关键词输入框右侧的清除按钮只在有关键词时出现，点击即清空关键词、取消在途搜索并保持焦点在输入框，不自动重搜；点击卡片只打开该条目的详情预览，`copilot.uri` 保持用户输入的原值，推荐标记帮助定位结果。列表条目已带说明、干员练度与分组，点击即以条目数据打开抽屉，随后的详情读取用于校验与补齐；详情未回来前抽屉先出壳与加载态，不用空白等待。卡片不再持有选中态，因此也没有“已选中”标记或高亮；重复点开同一条目只是重新读取详情。弹窗保持打开，详情抽屉以 Sheet 叠在其上（React 嵌套 Dialog，Base UI 管理焦点层序与 Escape 层级）；关闭抽屉后仍停留在原结果列表。结果的「加入队列」动作按 URI 读取作业信息后加入队列。匹配模式只过滤当前已加载结果，不改变服务端排序或结果总数。结果按 `page`/`limit` 分页：首屏请求 30 条，正文滚动近底且 `hasNext` 为真时追加下一页并按 URI 去重合并；新的关键词、关卡、干员或排序搜索丢弃已追加页，「已加载」显示合并后的数量。
+- **搜索选择**：发现弹窗以关键词（`document`）、关卡（`level`）、干员包含/排除（`operator`，排除项 `~` 前缀）与排序（`hot`/`latest`/`views`）请求作业站；关键词、关卡与干员搜索统一由 shared `SearchField` 渲染（内部 `InputGroup`，左侧搜索图标、右侧清除按钮），清除按钮只在有值时出现，点击即清空当前搜索词、调用 `onClear` 重置该面板的本地分页/渲染计数，取消在途搜索并把焦点留在输入框，不自动重搜；关键词搜索仍按 Enter 提交；点击卡片只打开该条目的详情预览，`copilot.uri` 保持用户输入的原值，推荐标记帮助定位结果。列表条目已带说明、干员练度与分组，点击即以条目数据打开抽屉，随后的详情读取用于校验与补齐；详情未回来前抽屉先出壳与加载态，不用空白等待。卡片不再持有选中态，因此也没有“已选中”标记或高亮；重复点开同一条目只是重新读取详情。弹窗保持打开，详情抽屉以 Sheet 叠在其上（React 嵌套 Dialog，Base UI 管理焦点层序与 Escape 层级）；关闭抽屉后仍停留在原结果列表。结果的「加入队列」动作按 URI 读取作业信息后加入队列。匹配模式只过滤当前已加载结果，不改变服务端排序或结果总数。结果按 `page`/`limit` 分页：首屏请求 30 条，正文滚动近底且 `hasNext` 为真时追加下一页并按 URI 去重合并；新的关键词、关卡、干员或排序搜索丢弃已追加页，「已加载」显示合并后的数量。
 - **JSON 作业导入**：链接输入框内的 JSON 导入按钮读取本地 JSON 文件；从文件管理器复制 JSON 文件后在输入框粘贴，文件交给同一导入通道。两条路径都提交 `POST /api/copilot-files`，成功后清空旧预览，并把 `doc.title`、`opers`、`groups` 解析成队列条目的标题与干员信息，关卡优先使用上传响应里的 `stage`/`stageId`（服务端按资源解析出的代号与原始标识），缺失时才回退文件里的 `stage_name`；解析失败仍按导入文件名入队，上传接口拒绝非法 JSON 时提示错误且不加入队列。本地文件与从作业站加入的单条作业都按与服务端一致的规则判定预设编队（无 `opers`/`groups` 且 `stage_name` 匹配 `_s<数字>` 结尾），命中时队列条目带 `presetFormation`，全局突袭设置下仍按普通模式提交。输入框只承载作业链接与 JSON 文件粘贴，不再接受服务端可见的文件路径。队列 Run 提交 `source: 'file'` 与服务端受管路径，由服务端重新读取受管文件并写入队列计划目录；受管路径不参与 PRTS 预览。
 - **执行设置**：页面提供连续执行与手动逐关，旧配置的 `app` 与 `cli` 都映射到 `continuous`，`manual` 保留逐步等待。难度选择 `auto` 时，作业集计划与显式队列由服务端读取作业的 `difficulty`；预览和详情保留可用的标注。手动指定难度使用用户的选择。单作业且队列为空时，只对队列/作业集生效的「执行方式」与高级设置中的「队列策略」不渲染；队列非空或预览作业集带成员时恢复显示。隐藏只影响渲染，已保存的 `executionStrategy` 与执行方式仍随配置提交，不清空。
 - **队列执行**：只勾选当前预览作业集的成员，且其 `setItemIndex` 严格递增时，走作业集提交（`submitSet` → `run_copilot_set`）：连续模式一次提交整组，手动模式等待服务端 `nextEntry`；`selectedIndexes` 来自队列勾选。混合来源、重排后的集合成员或本地文件走 `submitQueue` → `run_copilot_queue`。客户端按队列顺序提交 `{ clientId, source, copilotId|filename, mode }`，每个作业的 `mode` 来自全局突袭设置，预设编队作业提交 `normal`。服务端将适用的 `both` 展开为普通和突袭两个步骤。`executionStrategy` 映射为 `failurePolicy`：`stop` 首败停止，其他值按 `continue`。队列非空时卡片头部「立即执行」仍执行已勾选队列，按钮下方提示「将执行已勾选队列（N 项）」；无勾选时提示先勾选；运行、等待下一项或提交在途时不显示该提示。
@@ -174,7 +174,7 @@ CombatTasks（app-page > app-stack-section > CombatWorkspace）
 
 ### 6. Activity 与卸载
 
-- **Activity 隐藏/恢复**：搜索 hook 的清理取消在途 Query，预览会话 `stop()` 取消在途读取并保留已显示预览，执行 hook 清理停止确认与继续/跳过计时器，共享 `SegmentedTabNav` 清理 `ResizeObserver`/resize 监听；工作区与面板 state 保留。恢复时不自动重放搜索/预览/提交，Query 缓存按新鲜度复用，后台 Run 身份不变。
+- **Activity 隐藏/恢复**：搜索 hook 的清理取消在途 Query，预览会话 `stop()` 取消在途读取并保留已显示预览，执行 hook 清理停止确认与继续/跳过计时器，共享 `SegmentedTabNav` 不再维护高亮测量监听；工作区与面板 state 保留。恢复时不自动重放搜索/预览/提交，Query 缓存按新鲜度复用，后台 Run 身份不变。
 - **队列执行**：队列 Run 与作业集 Run 都由 `task-execution` 控制器观察；隐藏/恢复只重建观察，继续或跳过在途标记不带到新 Run，等待态与逐项结果始终从当前 Run 投影重新读取。
 - **切换作业类型**：卡片 DOM 卸载，面板会话存储与工作区预览/搜索/执行实例保留；返回时输入与识别方式恢复。
 - **真正卸载/刷新**：工作区与面板 store 销毁，搜索词/识别方式/搜索结果/选中索引/弹层重置；配置草稿、pending 队列和 Run 身份仍由应用级所有者持有，重新挂载后继续使用。
@@ -184,6 +184,8 @@ CombatTasks（app-page > app-stack-section > CombatWorkspace）
 - 既有端点、Query key、配置 key、既有本地存储键、pending 标记与 wire 形状均未变化；新增的 `la-pluma-copilot-queue-v1` 只保存本页作业队列，`/api/copilot-files` 只服务来源栏的 JSON 导入（文件选择或粘贴 JSON 文件），`/agent/copilot-queues/*` 与队列 continue/skip 只服务 Web UI 队列 Run，旧本地草稿与服务端配置可直接读取。
 - 服务端执行参数、作业集模式映射、幂等键与停止语义未变化；队列 Run 使用 `run_copilot_queue` 独立操作名与 `copilot-queue` 任务类型，不改变 `run_copilot_set`。
 - 保持作业输入/搜索的 `name`、状态文案与关键 `aria-*` 契约；队列面板不再有独立「执行队列」按钮，执行入口回到作业卡头部；DOM/CSS 类名和默认态视觉随卡片布局调整，但交互与局部状态边界由下列回归测试覆盖。
+- 面板控件统一组合 shadcn 生成原语与 shared 应用组件：搜索框一律 `SearchField`（`InputGroup` + 清除按钮，`aria-label`、`clearLabel` 由调用点给定）；多行作业输入用 `Textarea`（`field-sizing-fixed` 保留 `rows`）；识别方式、难度与高级参数用 `Select`（`items` + `SelectValue`，保留 `id`/`name`/可访问名）；字段标签与说明用 `Field`/`FieldLabel`/`FieldTitle`/`FieldDescription`，高级设置折叠用 `Disclosure`；只读状态、计数与来源 pill 用非交互 `Badge`；可点击的关卡、干员、悖论结果与发现卡主体用 `Item`（`render={<button type="button" />}`）；错误与警告块用 shared `InlineAlert`，局部加载/空态按容器大小用 `Loading` 或 compact `EmptyState`。队列行、拖拽把手与文件输入触发器属于自定义交互，保留原组合。
+- 详情层与弹层的层序契约：手机详情层使用 `SheetContent`（自带 overlay）；桌面（含 stacked）必须用 `Sheet` + `SheetPrimitive.Popup` 自组合，不能改用 `SheetContent`，否则会强制叠加 scrim；非模态时 `modal=false` 并保留外部点击关闭，stacked 时按模态焦点契约。详情字段不再输出 `dl`/`dt`/`dd`，由 `Field` 组合承担标签/值语义；作业集摘要的失败原因使用 `InlineAlert` + `ItemGroup`，计数与「下一关」使用 `Badge`。
 - 页面视觉回归入口见[开发指南](../../development/README.md)；面板行为与订阅隔离由下列回归测试覆盖。
 
 ## 搜索与预览
@@ -335,7 +337,7 @@ CombatTasks（app-page > app-stack-section > CombatWorkspace）
 - 执行路径：仅当前预览作业集的勾选成员且索引递增时走 `run_copilot_set`；混合来源、重排或本地文件走 `run_copilot_queue`（`submitQueue`），同一 Run 返回逐步状态。队列为空时可直接运行输入的单作业，非空队列无勾选时提示选择；队列非空时头部「立即执行」仍执行队列并提示执行目标。单作业隐藏执行方式与队列策略但保留已保存值。
 - 队列 Run：`run_copilot_queue` 的 `queueRun.statuses` 按 `clientId` 覆盖行状态，`nextEntry` 驱动 manual 的开始下一项/跳过，终态 `failed` 条目驱动重试失败项；`failurePolicy=stop|continue` 来自 `executionStrategy`，不改变作业集路径。
 - 等待与结果：等待态跨 tab 可继续，普通作业 tab 不重复渲染页面级等待区；终态结果跨 tab 常驻且使用 `role="status"`，运行中或等待中不显示旧结果；异集合等待不泄露「下一关」；进度面板职责不变。
-- 详情层：上方预览成功或点击队列行时打开同一个详情层。点击列表卡片时抽屉立即用条目数据打开，详情响应到达或失败后清空这份乐观目标；预览成功前先显示抽屉壳与加载态。桌面为非模态抽屉且焦点可归还，手机使用 Sheet 的模态焦点契约。作业集续跑摘要放在详情层，页面只有一个作业列表。
+- 详情层：上方预览成功或点击队列行时打开同一个详情层。点击列表卡片时抽屉立即用条目数据打开，详情响应到达或失败后清空这份乐观目标；预览成功前先显示抽屉壳与加载态。桌面（含 stacked）由 `Sheet` + `SheetPrimitive.Popup` 自组合：非模态时不带 scrim 且焦点可归还，stacked 时按模态焦点契约；手机使用 `SheetContent`（含 overlay）的模态焦点契约。详情字段使用 `Field`/`FieldTitle`/`FieldContent` 而非 `dl`/`dt`/`dd`，状态、完成模式、干员需求与干员组为 `Badge`，干员列表为 `Item`；作业集续跑摘要放在详情层，页面只有一个作业列表。
 - 局部状态隔离：搜索/识别方式输入不推动作业集列表渲染，面板会话跨卡片卸载保留。
 
 ### 验证命令

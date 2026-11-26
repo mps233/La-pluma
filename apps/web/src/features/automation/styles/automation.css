@@ -15,21 +15,6 @@
     font-weight: 600;
   }
 
-  .automation-flow-summary {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    min-height: 1.75rem;
-    border-radius: 999px;
-    padding: 0 0.625rem;
-    background: color-mix(in srgb, var(--muted) 88%, transparent);
-    color: var(--muted-foreground);
-    box-shadow: none;
-    font-size: 0.6875rem;
-    font-weight: 700;
-  }
-
   @media (width >= 1200px) {
     .automation-flow-card-header {
       align-items: flex-start;
@@ -664,22 +649,6 @@
     align-self: center;
   }
 
-  .automation-schedule-count {
-    display: inline-flex;
-    min-width: 2.5rem;
-    height: 1.5rem;
-    align-items: center;
-    justify-content: center;
-    border-radius: 9999px;
-    padding: 0 0.5rem;
-    background: var(--muted);
-    color: var(--muted-foreground);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.625rem;
-    font-variant-numeric: tabular-nums;
-    font-weight: 700;
-  }
-
   .automation-side-card-footer {
     display: flex;
     align-items: center;
@@ -699,17 +668,6 @@
     display: grid;
   }
 
-  .automation-schedule-time-row {
-    display: flex;
-    min-height: 2.75rem;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .automation-schedule-time-row + .automation-schedule-time-row {
-    border-top: 1px solid var(--border);
-  }
-
   .automation-schedule-time-row.is-off .automation-time-input {
     opacity: 0.55;
   }
@@ -720,10 +678,6 @@
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.04em;
     text-align: center;
-  }
-
-  .automation-schedule-row-switch {
-    margin-left: auto;
   }
 
   .automation-schedule-row-remove,
@@ -744,62 +698,12 @@
     display: block;
   }
 
-  .automation-schedule-add {
-    display: flex;
-    width: 100%;
-    min-height: 2.5rem;
-    align-items: center;
-    gap: 0.5rem;
-    border-radius: var(--radius-lg);
-    padding: 0 0.75rem;
-    background: color-mix(in srgb, var(--muted) 86%, transparent);
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-align: left;
-  }
-
-  .automation-schedule-add:hover:not(:disabled) {
-    background: var(--primary-soft);
-    color: var(--primary);
-  }
-
-  .automation-schedule-add:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
-  }
-
-  .automation-schedule-add small {
-    margin-left: auto;
-    color: var(--tertiary-foreground);
-    font-size: 0.625rem;
-    font-weight: 600;
-  }
-
-  .automation-schedule-empty {
-    padding: 0.5rem 0;
-    color: var(--tertiary-foreground);
-    font-size: 0.75rem;
-  }
-
   .automation-schedule-paused {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
     padding: 0.75rem 1rem;
-  }
-
-  .automation-schedule-paused-label {
-    display: inline-flex;
-    height: 1.5rem;
-    align-items: center;
-    border-radius: 9999px;
-    padding: 0 0.5rem;
-    background: var(--muted);
-    color: var(--muted-foreground);
-    font-size: 0.625rem;
-    font-weight: 700;
   }
 
   .automation-schedule-paused-times {
@@ -854,49 +758,11 @@
     gap: 0.625rem;
   }
 
-  .automation-notification-field {
-    display: grid;
-    gap: 0.35rem;
-  }
-
-  .automation-notification-field > span {
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-    font-weight: 700;
-  }
-
   .automation-notification-actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.625rem;
-  }
-
-  .automation-notification-hint {
-    color: var(--tertiary-foreground);
-    font-size: 0.75rem;
-    line-height: 1.45;
-  }
-
-  .automation-notification-channel + .automation-notification-hint {
-    display: block;
-    padding: 0 1rem 0.75rem;
-  }
-
-  .automation-notification-status {
-    color: var(--tertiary-foreground);
-    font-size: 0.75rem;
-    font-weight: 600;
-  }
-
-  .automation-notification-status.is-error {
-    color: var(--destructive);
-  }
-
-  .automation-notification-loading {
-    padding: 1rem;
-    color: var(--tertiary-foreground);
-    font-size: 0.75rem;
   }
 
   .automation-editor-empty {
@@ -968,14 +834,6 @@
     grid-template-columns: 8.5rem minmax(0, 1fr);
   }
 
-  .automation-field-label {
-    min-width: 0;
-    color: var(--muted-foreground);
-    font-size: 0.8125rem;
-    font-weight: 500;
-    line-height: 1.25rem;
-  }
-
   .automation-field-helper {
     display: grid;
     grid-template-columns: 0.875rem minmax(0, 1fr);
@@ -994,37 +852,6 @@
 
   .automation-param-field:is(.is-checkbox, .is-star-select, .is-facility-select) .automation-field-helper {
     padding-left: 0;
-  }
-
-  .automation-task-editor .number-input-controls {
-    width: 4rem;
-    flex-direction: row;
-    border-left-color: var(--border);
-  }
-
-  .automation-task-editor .number-input-controls button {
-    width: 2rem;
-    min-width: 2rem;
-    min-height: 0;
-    flex: 1 1 0;
-    border-radius: 0;
-    background: transparent;
-    color: var(--tertiary-foreground);
-  }
-
-  .automation-task-editor .number-input-controls button:hover {
-    background: var(--primary-soft);
-    color: var(--primary);
-  }
-
-  .automation-task-editor .number-input-controls button:first-child {
-    border-right: 1px solid var(--border);
-    border-bottom: 0;
-    border-radius: 0;
-  }
-
-  .automation-task-editor .number-input-controls button:last-child {
-    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
   }
 
   .automation-stage-editor {
@@ -1261,21 +1088,9 @@
       padding: 0.875rem;
     }
 
-    .automation-schedule-add {
-      min-height: 2.75rem;
-      padding: 0 0.875rem;
-      border-radius: var(--radius-xl);
-      font-size: 0.75rem;
-    }
-
     .automation-task-picker-option,
     .automation-sequence-select {
       min-height: 2.75rem;
-    }
-
-    .automation-schedule-add svg {
-      width: 1rem;
-      height: 1rem;
     }
 
     .automation-task-editor .automation-flow-card-header {
@@ -1312,7 +1127,6 @@
   }
 
   [data-page-kind="automation"] :is(
-    .automation-flow-summary,
     .automation-editor-heading > span,
     .automation-schedule-paused-times,
     .automation-sequence-node
@@ -1328,10 +1142,6 @@
   [data-page-kind="automation"] .automation-sequence-list {
     border-radius: 0;
     background: transparent;
-  }
-
-  [data-page-kind="automation"] .automation-schedule-time-row + .automation-schedule-time-row {
-    border-color: var(--automation-hairline);
   }
 
   [data-page-kind="automation"] .automation-sequence-item:not(:last-child)::after {

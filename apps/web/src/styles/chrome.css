@@ -1,0 +1,631 @@
+@layer components {
+  .la-pluma-app,
+  .la-pluma-app .view,
+  .la-pluma-app .page {
+    background: transparent;
+  }
+
+  .la-pluma-app .la-pluma-page {
+    color: var(--foreground);
+  }
+
+  .la-pluma-app .la-pluma-navbar {
+    color: var(--foreground);
+    background: var(--background);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .la-pluma-app .la-pluma-navbar::before {
+    display: block;
+    position: absolute;
+    z-index: 0;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 100%;
+    background: linear-gradient(
+      to bottom,
+      var(--background) 0%,
+      transparent 100%
+    );
+    content: '';
+    pointer-events: none;
+  }
+
+  .la-pluma-navbar-title {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--foreground);
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.35;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .la-pluma-app :is(.la-pluma-tabbar-link, .la-pluma-tabbar-more) {
+    appearance: none;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .la-pluma-theme-desktop {
+    display: none;
+  }
+
+  /* Keep the mobile theme control a real 44px hit target beside the repository
+     link, including on the narrowest supported viewport. */
+  .la-pluma-theme-mobile {
+    display: flex;
+
+    /* 44px 固定命中目标，压过 flex-none 工具类。 */
+    flex: 0 0 2.75rem !important;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .la-pluma-theme-trigger {
+    box-sizing: border-box;
+    display: inline-flex;
+    flex: 0 0 2.75rem;
+    width: 2.75rem !important;
+    min-width: 2.75rem !important;
+    height: 2.75rem !important;
+    min-height: 2.75rem !important;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 9999px;
+    background: transparent;
+  }
+
+  .la-pluma-github-link {
+    display: inline-flex !important;
+    flex: 0 0 2.75rem;
+    width: 2.75rem !important;
+    min-width: 2.75rem !important;
+    height: 2.75rem !important;
+    min-height: 2.75rem !important;
+    align-items: center;
+    justify-content: center;
+    padding: 0 !important;
+    border-radius: 999px;
+    color: var(--muted-foreground) !important;
+  }
+
+  .la-pluma-github-link svg {
+    display: block;
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  @media (width >= 1024px) {
+    .la-pluma-app .la-pluma-navbar {
+      background: transparent;
+      border-bottom: 0;
+    }
+
+    .la-pluma-app .la-pluma-sidebar-body {
+      border-right: 1px solid var(--sidebar-border);
+    }
+
+    .la-pluma-app .la-pluma-scroll-host {
+      -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        #000 var(--layout-navbar-safe-height)
+      );
+      mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        #000 var(--layout-navbar-safe-height)
+      );
+    }
+
+    .la-pluma-app .la-pluma-theme-desktop {
+      box-sizing: border-box;
+      position: relative;
+      isolation: isolate;
+      display: flex;
+      height: 2.5rem;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.25rem;
+      border: 0;
+      border-radius: 999px;
+      background: var(--card);
+      box-shadow: inset 0 0 0 1px var(--border);
+    }
+
+    .la-pluma-app .la-pluma-theme-desktop::after {
+      position: absolute;
+      z-index: 0;
+      top: 0.25rem;
+      left: 0.25rem;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      background: var(--primary);
+      content: '';
+      transform: translateX(0);
+      transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+      pointer-events: none;
+    }
+
+    .la-pluma-app .la-pluma-theme-desktop[data-theme='dark']::after {
+      transform: translateX(2.25rem);
+    }
+
+    .la-pluma-app .la-pluma-theme-desktop[data-theme='system']::after {
+      transform: translateX(4.5rem);
+    }
+
+    .la-pluma-app .theme-toggle-btn {
+      position: relative;
+      z-index: 1;
+      width: 2rem;
+      height: 2rem;
+      padding: 0;
+      border: 0;
+      border-radius: 0.75rem;
+      background: transparent;
+      color: var(--tertiary-foreground);
+      transition:
+        color 160ms ease,
+        background-color 160ms ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .la-pluma-app .theme-toggle-btn svg {
+      width: 1.125rem;
+      height: 1.125rem;
+    }
+
+    .la-pluma-app .theme-toggle-btn:hover:not(.is-active) {
+      background: color-mix(in srgb, var(--card) 38%, transparent);
+      color: var(--foreground);
+    }
+
+    .la-pluma-app .theme-toggle-btn.is-active {
+      color: var(--primary-foreground);
+    }
+
+    .la-pluma-app .theme-toggle-btn:focus-visible {
+      outline: 2px solid color-mix(in srgb, var(--primary) 72%, white);
+      outline-offset: -2px;
+    }
+
+    .la-pluma-app .la-pluma-github-link {
+      flex-basis: 2.5rem;
+      width: 2.5rem !important;
+      min-width: 2.5rem !important;
+      height: 2.5rem !important;
+      min-height: 2.5rem !important;
+      border-radius: 50%;
+      color: var(--muted-foreground) !important;
+    }
+
+    .la-pluma-app .la-pluma-github-link svg {
+      position: relative;
+      z-index: 1;
+      width: 1.25rem;
+      height: 1.25rem;
+    }
+
+    .la-pluma-theme-mobile {
+      display: none;
+    }
+  }
+
+  .la-pluma-github-link:hover,
+  .la-pluma-github-link:focus-visible {
+    background: var(--muted);
+    color: var(--foreground) !important;
+  }
+
+  .la-pluma-app .la-pluma-github-link:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--primary) 72%, transparent);
+    outline-offset: 2px;
+  }
+
+  .la-pluma-sidebar {
+    background: transparent;
+    scrollbar-width: none;
+  }
+
+  .la-pluma-sidebar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .la-pluma-sidebar-brand {
+    display: flex;
+    min-width: 0;
+    height: 1lh;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0 0.5rem;
+    color: var(--foreground);
+    font-size: 1rem;
+    font-weight: 700;
+    -webkit-user-select: none; /* stylelint-disable-line property-no-vendor-prefix -- Safari 仍需前缀覆盖拖选 */
+    user-select: none;
+  }
+
+  .la-pluma-sidebar-brand-mark {
+    width: 1.875rem;
+    height: 1.875rem;
+    flex: 0 0 1.875rem;
+    object-fit: contain;
+  }
+
+  .la-pluma-sidebar-brand span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .la-pluma-sidebar-identity {
+    display: flex;
+    min-width: 0;
+    min-height: 3.75rem;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0 0.625rem;
+  }
+
+  .la-pluma-sidebar-avatar {
+    display: inline-flex;
+    width: 2.5rem;
+    height: 2.5rem;
+    flex: 0 0 2.5rem;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 50%;
+    background: var(--muted);
+    box-shadow:
+      inset 0 0 0 1px var(--border),
+      0 1px 3px rgba(0, 0, 0, 0.14);
+  }
+
+  .la-pluma-sidebar-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .la-pluma-sidebar-identity-copy {
+    display: grid;
+    min-width: 0;
+    gap: 0.125rem;
+  }
+
+  .la-pluma-sidebar-identity-copy strong,
+  .la-pluma-sidebar-identity-copy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .la-pluma-sidebar-identity-copy strong {
+    color: var(--foreground);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .la-pluma-sidebar-identity-copy small {
+    color: var(--tertiary-foreground);
+    font-size: 0.75rem;
+    line-height: 1.35;
+  }
+
+  .la-pluma-scroll-host {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .la-pluma-scroll-host::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .la-pluma-tabbar {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .la-pluma-app .la-pluma-tabbar-pill {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--card);
+    box-shadow: var(--shadow-floating);
+  }
+
+  .la-pluma-app :where(.la-pluma-tabbar-link[data-app-tab='dashboard'].is-active) svg {
+    fill: currentColor;
+    stroke: none;
+  }
+
+  .la-pluma-app .la-pluma-tabbar-more {
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--card);
+    color: var(--foreground);
+    box-shadow: var(--shadow-floating);
+    transition: transform 180ms ease, background 180ms ease, color 180ms ease;
+  }
+
+  .la-pluma-app .la-pluma-tabbar-more:hover,
+  .la-pluma-app .la-pluma-tabbar-more:focus-visible,
+  .la-pluma-app .la-pluma-tabbar-more.is-active {
+    background: var(--muted);
+    color: var(--primary);
+  }
+
+  .la-pluma-app .la-pluma-tabbar-more:active {
+    transform: scale(0.94);
+  }
+
+  .la-pluma-app .la-pluma-tabbar-more svg {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  .la-pluma-app .la-pluma-tabbar-link {
+    border-radius: 999px;
+    color: var(--muted-foreground);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1;
+    text-align: center;
+    text-decoration: none;
+    transition: transform 180ms ease, background 180ms ease, color 180ms ease;
+  }
+
+  .la-pluma-app .la-pluma-tabbar-link .la-pluma-tabbar-label {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    font-size: inherit;
+    line-height: inherit;
+    white-space: nowrap;
+  }
+
+  .la-pluma-app .la-pluma-tabbar-link svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: 0 0 auto;
+  }
+
+  .la-pluma-app .la-pluma-tabbar-link.is-active {
+    background: var(--muted);
+    color: var(--primary-strong);
+    box-shadow: inset 0 0 0 0.5px var(--border);
+  }
+
+  .la-pluma-app .la-pluma-tabbar-link:hover {
+    color: var(--foreground);
+  }
+
+  .la-pluma-app .la-pluma-tabbar-link:active {
+    transform: scale(0.95);
+  }
+
+  .la-pluma-app .la-pluma-tabbar-link:focus-visible,
+  .la-pluma-app .la-pluma-tabbar-more:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -3px;
+  }
+
+  .la-pluma-more-sheet {
+    box-sizing: border-box;
+    max-height: min(28rem, 78vh);
+    padding: 0.75rem max(1rem, env(safe-area-inset-right)) max(1.25rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+    overflow: hidden;
+    border-radius: 1.25rem 1.25rem 0 0;
+  }
+
+  @supports (height: 78dvh) {
+    .la-pluma-more-sheet {
+      max-height: min(28rem, 78dvh);
+    }
+  }
+
+  .la-pluma-more-sheet-header [data-slot='sheet-title'] {
+    font-size: 1.375rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0;
+    line-height: 1.3;
+  }
+
+  .la-pluma-more-sheet-close {
+    appearance: none;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    width: 2.75rem;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    min-height: 2.75rem;
+    flex: 0 0 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: var(--muted-foreground);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .la-pluma-more-sheet-header .la-pluma-more-sheet-close svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .la-pluma-more-sheet-close:hover,
+  .la-pluma-more-sheet-close:focus-visible {
+    color: var(--foreground);
+    background: var(--muted);
+  }
+
+  .la-pluma-more-sheet-nav {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: 0.25rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .la-pluma-more-sheet-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .la-pluma-more-sheet .la-pluma-more-sheet-nav .la-pluma-tabbar-link {
+    appearance: none;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    color: var(--muted-foreground);
+    font: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    min-height: 3rem;
+    padding: 0 0.875rem;
+    font-size: 0.9375rem;
+    font-weight: 400;
+    line-height: inherit;
+    text-align: left;
+    text-decoration: none;
+    transition: transform 180ms ease, background 180ms ease, color 180ms ease;
+  }
+
+  .la-pluma-more-sheet .la-pluma-more-sheet-nav .la-pluma-tabbar-link:hover {
+    color: var(--foreground);
+  }
+
+  .la-pluma-more-sheet .la-pluma-more-sheet-nav .la-pluma-tabbar-link:active {
+    transform: scale(0.98);
+  }
+
+  .la-pluma-more-sheet .la-pluma-more-sheet-nav .la-pluma-tabbar-link.is-active {
+    background: var(--muted);
+    color: var(--primary-strong);
+    box-shadow: inset 0 0 0 0.5px var(--border);
+  }
+
+  .la-pluma-more-sheet .la-pluma-more-sheet-nav .la-pluma-tabbar-link:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -3px;
+  }
+
+  .la-pluma-more-sheet .la-pluma-more-sheet-nav .la-pluma-tabbar-link svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: 0 0 auto;
+  }
+
+  @media (width < 1024px) {
+    /* On phones the chrome floats as separate controls over the page material,
+       so each action owns one clear circular hit target. */
+    .la-pluma-app .la-pluma-navbar {
+      background: transparent;
+      border-bottom: 0;
+    }
+
+    .la-pluma-app .la-pluma-theme-mobile {
+      pointer-events: auto;
+    }
+
+    .la-pluma-app .la-pluma-theme-trigger,
+    .la-pluma-app .la-pluma-github-link {
+      border: 1px solid var(--border);
+      background: var(--card);
+      pointer-events: auto;
+    }
+
+    .la-pluma-app .la-pluma-tabbar::before {
+      display: block;
+      position: absolute;
+      z-index: 0;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      width: auto;
+      height: auto;
+      background: linear-gradient(
+        to bottom,
+        transparent 0%,
+        color-mix(in srgb, var(--background) 20%, transparent) 100%
+      );
+      content: '';
+      transform: none;
+      pointer-events: none;
+    }
+
+    .la-pluma-app .la-pluma-scroll-host {
+      -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        #000 var(--layout-navbar-safe-height),
+        #000 calc(100% - var(--layout-tabbar-reserved-height)),
+        transparent 100%
+      );
+      mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        #000 var(--layout-navbar-safe-height),
+        #000 calc(100% - var(--layout-tabbar-reserved-height)),
+        transparent 100%
+      );
+    }
+  }
+
+}
+
+@layer page {
+  @media (width < 640px) {
+    .la-pluma-app [data-page-layout="workspace"] {
+      padding-top: 0;
+      margin-right: 0.125rem;
+      margin-left: 0.125rem;
+    }
+
+    .la-pluma-app [data-page-layout="workspace"] > .app-stack-section,
+    .la-pluma-app [data-page-layout="workspace"].app-stack-section {
+      gap: 1rem;
+    }
+  }
+
+  .la-pluma-app [data-page-surface="borderless"] .surface-soft {
+    box-shadow: none;
+  }
+
+  @media (prefers-contrast: more) {
+    .la-pluma-app .pwa-install-prompt {
+      border-color: var(--input);
+    }
+  }
+
+}

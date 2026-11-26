@@ -13,7 +13,7 @@ import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { Card, CardAction, CardHeader, CardTitle } from '@/shared/ui/card'
 import { Skeleton } from '@/shared/ui/skeleton'
-import { EmptyState, Loading } from '@/shared/components'
+import { EmptyState, Loading, UnavailableAction } from '@/shared/components'
 import {
   DEFAULT_OPERATOR_FILTERS,
   buildKnownOperatorIdSet,
@@ -35,7 +35,6 @@ import { describeOperBoxRecognitionHint } from '../model/operatorRecognition'
 import { usePanelScrollTop } from '../hooks/usePanelScrollTop'
 import OperatorFilterMenu, { type FilterMenuOption } from './OperatorFilterMenu'
 import StatisticsQueryError from './StatisticsQueryError'
-import UnavailableAction from './UnavailableAction'
 import type { StatisticsCommands } from '../hooks/useStatisticsCommands'
 import type { OpenMenu } from '../types'
 
@@ -201,7 +200,6 @@ export default function OperatorPanel({ isActive, command }: OperatorPanelProps)
   useEffect(() => {
     const currentOperIds = new Set(filteredOperators.map(op => op.id))
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 有界缓存清理
     setLoadedImages(prev => {
       const loadedIds = Object.keys(prev)
 
@@ -596,9 +594,12 @@ export default function OperatorPanel({ isActive, command }: OperatorPanelProps)
                                 </div>
                               )}
                               {oper.rarity !== undefined && oper.rarity > 0 && (
-                                <div className="brand-chip absolute right-1.5 top-1.5 rounded-full px-2 py-0.5 text-xs font-semibold">
+                                <Badge
+                                  variant="ghost"
+                                  className="brand-chip absolute top-1.5 right-1.5 rounded-full border-0 px-2 py-0.5 text-xs font-semibold hover:bg-primary-soft hover:text-primary-strong"
+                                >
                                   {Math.min(oper.rarity, 6)}★
-                                </div>
+                                </Badge>
                               )}
                             </div>
 

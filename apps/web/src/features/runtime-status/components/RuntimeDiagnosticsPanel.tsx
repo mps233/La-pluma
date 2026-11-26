@@ -1,5 +1,7 @@
 import { AlertTriangle, CheckCircle2, CircleHelp, LoaderCircle, XCircle } from 'lucide-react'
+import { EmptyState, InlineAlert } from '@/shared/components'
 import { Button } from '@/shared/ui/button'
+import { Field, FieldContent, FieldDescription, FieldTitle } from '@/shared/ui/field'
 import type {
   RuntimeDiagnosticCheck,
   RuntimeDiagnosticCheckStatus,
@@ -69,13 +71,15 @@ export default function RuntimeDiagnosticsPanel({
       aria-label="辅助诊断"
       aria-busy={loading || undefined}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3.5">
-        <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-foreground">辅助诊断</h3>
-          <p className="mt-0.5 text-xs leading-5 text-tertiary">
+      <Field orientation="horizontal" className="gap-3.5">
+        <FieldContent className="gap-0.5">
+          <FieldTitle role="heading" aria-level={3} className="text-sm font-semibold text-foreground">
+            辅助诊断
+          </FieldTitle>
+          <FieldDescription className="text-xs leading-5 text-tertiary">
             检查运行环境、设备连接、资源与执行链路，不会启动任务。
-          </p>
-        </div>
+          </FieldDescription>
+        </FieldContent>
         <Button
           type="button"
           variant="secondary"
@@ -89,24 +93,17 @@ export default function RuntimeDiagnosticsPanel({
             ? <><LoaderCircle className="animate-spin" aria-hidden="true" />诊断中</>
             : '运行诊断'}
         </Button>
-      </div>
+      </Field>
 
       {error && (
-        <div
-          role="alert"
-          className="status-warning mt-3 flex min-h-11 flex-wrap items-center justify-between gap-3.5 rounded-lg px-3 py-2 text-sm leading-5"
+        <InlineAlert
+          tone="warning"
+          className="mt-3"
+          onRetry={start}
+          retrying={loading}
         >
-          <span className="min-w-0 flex-1">{error}</span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="min-h-11 shrink-0"
-            onClick={start}
-          >
-            重试
-          </Button>
-        </div>
+          {error}
+        </InlineAlert>
       )}
 
       <div className="mt-3" role="status" aria-live="polite">
@@ -114,7 +111,12 @@ export default function RuntimeDiagnosticsPanel({
           <p className="text-xs leading-5 text-tertiary">正在检查运行环境与执行链路…</p>
         )}
         {!report && status === 'idle' && (
-          <p className="text-xs leading-5 text-tertiary">尚未运行诊断。</p>
+          <EmptyState
+            compact
+            icon={<CircleHelp size={20} strokeWidth={1.8} aria-hidden="true" />}
+            title="尚未运行诊断"
+            description="运行诊断后会列出环境、连接与执行链路的检查结果。"
+          />
         )}
         {report && reportMeta && (
           <div className="min-w-0">

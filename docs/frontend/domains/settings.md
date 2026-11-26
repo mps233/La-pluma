@@ -26,7 +26,7 @@
 | 滚动定位与兼容事件 | `features/settings/hooks/useSettingsSectionNavigation.ts` | 监听滚动宿主、计算当前区块、跳转与兼容事件；不持有草稿 |
 | 外观主题 | `features/settings/components/AppearanceCard.tsx` | 读取 `useTheme()` 的 `themeId`/`resolvedMode`，通过 `setThemeId` 切换主题；选项来自 `THEMES`，不新增主题存储 |
 | 表单与开关行 | `features/settings/components/ConfigFieldControls.tsx`、`SwitchSettingRow.tsx` | 单行设置行：标签在左、控件在右；统一 44px 触达高度与提示排版 |
-| 配置面板页内反馈 | `features/settings/components/SettingsFeedback.tsx` | 错误用 `Alert`（可带重试 action），成功/警告用 `role="status"` 语义块；不重复全局通知正文；组件更新与自动更新不使用该组件 |
+| 配置面板页内反馈 | `features/settings/components/SettingsFeedback.tsx` | 错误使用 shared `InlineAlert`（`alert` 语义，可带重试 action），成功使用 success tone 并保留 `role="status"`；不重复全局通知正文；组件更新与自动更新不使用该组件 |
 | connection 表单、自动保存与读取反馈 | `features/settings/components/ConnectionConfigPanel.tsx` | Query/草稿适配、自动保存、迟到读取提示 |
 | 设备查找与连接测试 | `features/settings/components/DeviceConnectionPanel.tsx` | 命令 owner 订阅、查找弹窗入口与连接测试 toast；设备列表由 `DeviceConnectionDialog` 渲染 |
 | resource 资源源表单 | `features/settings/components/ResourceSourcePanel.tsx` | Git / MirrorChyan 来源、自动更新开关与 MirrorChyan CDK；MAA 运行中只读 |
@@ -43,7 +43,8 @@
 - 不改变 connection 字段与 wire；保存保持 600ms 防抖自动提交，失焦、Activity 隐藏、卸载与 `pagehide` 立即冲刷。自动更新仍先写 user config 再应用调度。
 - 不改变 Query key、失败/重试、失效作用域与展示文案；三个配置 Query 在页面挂载时一起读取。
 - 不改变设备发现/连接测试的迟到响应与草稿回填语义；查找弹窗关闭会取消在途查找，页面/Activity 则取消两条链；区块可见性与滚动位置不触发取消。
-- 不改变配置面板的字段结构与表单 id；保存保持自动保存，成功静默，失败保留页内 `Alert` 与带重试的 error toast；资源源在 MAA 运行中只读。页内导航使用右侧目录与滚动高亮。页面视觉已按设置页治理调整，视觉基线冻结至后续统一重生成。
+- 不改变配置面板的字段结构与表单 id；保存保持自动保存，成功静默，失败保留页内 `InlineAlert` 与带重试的 error toast；资源源在 MAA 运行中只读。页内导航使用右侧目录与滚动高亮。页面视觉已按设置页治理调整。
+- 设置页的状态组件统一走 shared 原语：页内失败与资源同步提示使用 `InlineAlert`，表单行使用 `Field` 系列，设备列表行使用 `Item`，状态标签与只读 pill 使用 `Badge`。
 
 ### 2. 组合与订阅边界
 
@@ -121,24 +122,25 @@ ConfigManager（app-page > app-stack-section > SettingsWorkspace）
 
 | 反馈 | 渲染位置 | 来源 |
 | --- | --- | --- |
-| 连接读取失败 | 编辑卡 `CardContent` 内 `Alert` + “重新读取” | `ConnectionConfigPanel` 本地反馈 + Query 初始失败 |
-| 连接保存失败 | 编辑卡 `CardContent` 内 `Alert` + “重试保存”；同一结果也发带重试 action 的全局 error toast | `ConfigDraftOwner` 结果 |
+| 连接读取失败 | 编辑卡 `CardContent` 内 `InlineAlert` + “重新读取” | `ConnectionConfigPanel` 本地反馈 + Query 初始失败 |
+| 连接保存失败 | 编辑卡 `CardContent` 内 `InlineAlert` + “重试保存”；同一结果也发带重试 action 的全局 error toast | `ConfigDraftOwner` 结果 |
 | 自动保存成功、`superseded` | 无提示；`superseded` 由后续自动保存补齐 | `ConfigDraftOwner` 结果 |
-| 设备查找失败/取消/空结果 | 查找弹窗内展示 | `DeviceConnectionOwner.discovery` |
+| 设备查找失败/取消/空结果 | 查找弹窗内展示；失败使用 `InlineAlert` | `DeviceConnectionOwner.discovery` |
 | 连接测试结果 | 全局 toast（成功/失败） | `DeviceConnectionOwner.test` |
-| 目录读取失败与重试 | 目录卡片内 `Alert` + `AlertAction` | `config-directory` Query 状态 |
+| 目录读取失败与重试 | 目录卡片内 `InlineAlert` + action | `config-directory` Query 状态 |
 | 自动更新读取/保存/调度失败 | 仅全局 error toast；保存/调度失败带“重试保存” action | `AutoUpdateConfigOwner` |
 | 自动更新非法时间 | 仅 error toast，不发请求 | `useAutoSave` 的 `canSave` 前置拦截 |
 | 自动更新保存成功 | 无提示；本地回退 warning 仍走全局 toast | `AutoUpdateConfigOwner` 结果 |
 | 组件更新失败与资源重试 | 仅全局 error toast；资源重试作为 toast action | `SettingsUpdateOwner` |
+| 游戏资源非 current 说明 | 更新卡片内 `InlineAlert` warning | `settings/version` 的 `resource.status` |
 | 组件更新成功 | 仅全局 toast | `SettingsUpdateOwner` 结果 |
 
-配置面板只渲染自己的页内反馈；一个用例的失败不会写入另一个面板的页内状态。组件更新与自动更新失败只写全局 toast，不再渲染页内 `Alert`。自动保存成功不发通知；失败由反馈 hook 发送带重试 action 的 error toast，读取失败仍只提示一次。
+配置面板只渲染自己的页内反馈；一个用例的失败不会写入另一个面板的页内状态。组件更新与自动更新失败只写全局 toast，不再渲染页内失败 `InlineAlert`。自动保存成功不发通知；失败由反馈 hook 发送带重试 action 的 error toast，读取失败仍只提示一次。
 
 ### 6. 兼容与维护约束
 
 - Query key、失效作用域、失败保旧、设备命令 wire、更新顺序与自动更新本地键均未变；三个配置 Query 改为页面挂载时一起读取。
-- 保持三个配置表单的标签关联、字段 id 与行为契约；DOM 使用 `Card` / `Field` / `Alert` 结构，页内目录滚动定位、草稿保留与保存反馈由下列回归测试覆盖。
+- 保持三个配置表单的标签关联、字段 id 与行为契约；DOM 使用 `Card` / `Field` / `InlineAlert` 结构，页内目录滚动定位、草稿保留与保存反馈由下列回归测试覆盖。
 - 设备面板常驻；在途命令只在 Activity 隐藏或页面卸载时取消，滚动与目录跳转不卸载面板。
 
 ## 配置编辑与保存
@@ -222,7 +224,7 @@ ConfigManager（app-page > app-stack-section > SettingsWorkspace）
 - 首次服务端读取被采纳前（`loaded=false`）不保存，表单控件禁用；读取失败时卡内显示错误与“重新读取”，不排程自动保存。
 - `revision=0`（尚未发生用户编辑）时不提交，避免把读取回退或默认值写回服务端。自动保存只读 owner 的 `dirty`/`syncState`/`revision`，不复制草稿。
 - 同一时刻只允许一次保存；保存期间仍可编辑。响应返回时只有 revision 未变才把当前草稿视为已保存；否则返回 `superseded`，静默保留新草稿，后续状态变化会再次排程提交最新值。
-- 保存成功清除 dirty、更新 `persisted` 与 `lastSavedAt`，并推进 revision 使保存前的读取失效；成功不发提示。保存失败保留草稿与 `failed`/`error`，卡内显示 `Alert`，同时发带“重试保存”action 的 error toast；下一次编辑或显式重试继续提交。
+- 保存成功清除 dirty、更新 `persisted` 与 `lastSavedAt`，并推进 revision 使保存前的读取失效；成功不发提示。保存失败保留草稿与 `failed`/`error`，卡内显示 `InlineAlert`，同时发带“重试保存”action 的 error toast；下一次编辑或显式重试继续提交。
 - 资源源保存受 MAA 执行租约约束：运行中表单只读并暂停自动保存，任务结束后脏草稿自动补交。
 - 服务端只返回成功信封，不回写 profile；页面按已发送快照确认，不伪造服务端归一化结果。
 
@@ -262,7 +264,7 @@ ConfigManager（app-page > app-stack-section > SettingsWorkspace）
 - `useSettingsConnectionConfig()` / `useSettingsInstanceOptions()` / `useSettingsResourceSource()` 返回各自的 `draft`、`dirty`、`syncState`、`error`、`loaded`、`loadError`、`update`、`getState`、`save`、`reload`；三个面板通过 `useAutoSave` 接线，卡片外壳共用 `ConfigEditorCard`。三个面板始终可见并读取各自 Query。
 - 页面不持有：`configData` state、`loadConfig()`、`connectionRevisionRef`、`connectionSaveInFlightRef`、区块 `localStorage` 读写与 window 监听。
 - 连接、实例与资源源表单字段都通过 `update(patch)` 写入各自 owner；编辑会清除 owner 的 `error`，页内保存错误由此消失。
-- 自动保存成功与 `superseded` 均静默；读取失败在卡内显示 `Alert` 并可“重新读取”，保存失败卡内显示 `Alert` 并可“重试保存”，同时发带 retry action 的 error toast。资源源在 MAA 运行中只读，重试按钮同时禁用。
+- 自动保存成功与 `superseded` 均静默；读取失败在卡内显示 `InlineAlert` 并可“重新读取”，保存失败卡内显示 `InlineAlert` 并可“重试保存”，同时发带 retry action 的 error toast。资源源在 MAA 运行中只读，重试按钮同时禁用。
 - 自动更新的读取/本地回退、touched/revision、保存后 `setupAutoUpdate` 与反馈由 `AutoUpdateConfigOwner` 和 `useSettingsAutoUpdate()` 持有；归一化与时间校验仍在 `model/configNormalization.ts`，见[设置组件更新与自动更新](#组件更新与自动更新)。
 - 设备发现、连接测试、版本、配置目录与打开目录归[设置设备连接与系统资源](#设备连接与系统资源)；组件更新与自动更新归[设置组件更新与自动更新](#组件更新与自动更新)。
 
@@ -272,7 +274,7 @@ ConfigManager（app-page > app-stack-section > SettingsWorkspace）
 - Query 快照只存在于内存，浏览器刷新随缓存丢失；key 与参数清单见[Query 缓存与键规范](../../architecture/query-cache.md)。没有新增 localStorage 数据。
 - 载荷校验比迁移前严格：已知字段类型不合法时整份读取失败并显示错误，而旧页面会把异常值放入受控输入。未知 connection 字段仍原样保留。
 - 已知字段缺失时显示页面默认值，而旧页面会显示空输入；这是归一化模型的要求，正常服务端载荷（`getConfig` 自带默认值）不受影响。
-- 默认渲染结构使用 shadcn `Card` / `Field` / `Item` / `Alert` / `Badge`；失败/`superseded` 提示只在非默认状态出现，行为契约不因结构调整改变。视觉基线冻结至后续统一重生成，本页不在本轮更新截图。
+- 默认渲染结构使用 shadcn `Card` / `Field` / `Item` / `InlineAlert` / `Badge`；失败/`superseded` 提示只在非默认状态出现，行为契约不因结构调整改变。
 
 ## 设备连接与系统资源
 
@@ -324,7 +326,7 @@ ConfigManager（app-page > app-stack-section > SettingsWorkspace）
 
 #### 2.2 查找弹窗、选择结果与草稿版本
 
-查找入口是面板的“查找设备”按钮：点击同时打开 `DeviceConnectionDialog` 并立即发起查找；关闭弹窗（X、Esc、遮罩或页脚“关闭”）会取消在途查找。再次打开会重新查找，查找期间保留上一次列表。
+查找入口是面板的“查找设备”按钮：点击同时打开 `DeviceConnectionDialog` 并立即发起查找；关闭弹窗（X、Esc 或遮罩）会取消在途查找。再次打开会重新查找，查找期间保留上一次列表。
 
 选择设备时：
 
@@ -382,9 +384,9 @@ ConfigManager（app-page > app-stack-section > SettingsWorkspace）
 
 - 端点、请求体与响应体未改变；未修改服务端。设备发现仍是 GET、连接测试与打开目录仍是 POST。
 - 新增 Query key 只存在于内存，浏览器刷新随缓存丢失；没有新增 localStorage 数据。
-- 查找弹窗使用 `DialogFrame` / `DialogBody` / `DialogFrameFooter`；设备列表行使用 shadcn `Item`（渲染为 button），状态标签使用 `Badge`；空结果显示 `EmptyState compact`。查找失败、取消与空结果在弹窗内展示，连接测试结果走 `settings-connection-test` toast；端点、请求体与响应体未改变。
+- 查找弹窗使用 `DialogFrame` / `DialogBody` / `DialogFrameFooter`；设备列表行使用 shadcn `Item`（渲染为 button），状态标签使用 `Badge`；空结果显示 `EmptyState compact`，查找失败使用 `InlineAlert`。连接测试结果走 `settings-connection-test` toast；端点、请求体与响应体未改变。
 - 设备发现反馈不再内联在连接卡片中；关闭查找弹窗会取消在途查找。连接测试反馈不再使用卡内 `SettingsFeedback`，改为全局 toast。
-- 视觉基线冻结至后续统一重生成；本页不在本轮更新截图。
+- 视觉按实际改动在浏览器中人工核对。
 - 行为差异：
   - 设备发现与连接测试请求现在在 Activity 隐藏/卸载时 abort；迁移前会继续完成并写页面 state。滚动与目录跳转不取消命令，设备面板常驻。
   - 非数组/坏设备条目被跳过而不是抛错；未知状态/来源回退为“状态未知”/ADB。
@@ -524,7 +526,7 @@ owner 的完整提交语义不变，同一时刻只有一次：
 | 自动更新 `autoUpdate`/`dirty`/`saving`/`feedback`、touched/revision、本地回退、保存 + 调度 | `AutoUpdateConfigOwner` + `useSettingsAutoUpdate()` |
 | 自动更新提示 | 失败：带重试 action 的 toast；成功：静默；非法时间：仅 toast |
 
-信息区按 MAA CLI、MaaCore、游戏资源三行排列；游戏资源使用独立一行展示更新时间与状态，不再挂在 MaaCore 下方。自动更新行与三行信息统一使用 `Field` 横排行（`min-h-11`，44px），控件保持 32px；动作区使用同样的 44px 行高与 `size="sm"` 按钮，三枚更新按钮统一为无图标的 `outline` 主题。按钮语义：core/资源/CLI 按钮显示各自 loading；全部更新按钮在任意命令运行期间禁用。所有动作统一放在卡片底部动作区，顺序为 MAA CLI、MaaCore、游戏资源；命令运行期间在同一区域追加“停止更新”（`canceling` 时显示停止中）。配置目录的文件夹图标位于路径文本左侧，“打开目录”按钮不显示图标。成功与失败都只走全局 toast，资源重试作为 toast action；卡片内不再渲染失败 `Alert`。
+信息区按 MAA CLI、MaaCore、游戏资源三行排列；游戏资源使用独立一行展示更新时间与状态，不再挂在 MaaCore 下方。自动更新行与三行信息统一使用 `Field` 横排行（`min-h-11`，44px），信息行内使用 `FieldContent` / `FieldLabel` / `FieldDescription`，控件保持 32px；游戏资源状态用 `Badge`，非 current 说明用 `InlineAlert` warning。动作区使用同样的 44px 行高与 `size="sm"` 按钮，三枚更新按钮统一为无图标的 `outline` 主题。按钮语义：core/资源/CLI 按钮显示各自 loading；全部更新按钮在任意命令运行期间禁用。所有动作统一放在卡片底部动作区，顺序为 MAA CLI、MaaCore、游戏资源；命令运行期间在同一区域追加“停止更新”（`canceling` 时显示停止中）。配置目录的文件夹图标位于路径文本左侧，“打开目录”按钮不显示图标。成功与失败都只走全局 toast，资源重试作为 toast action；卡片内不再渲染失败 `InlineAlert`。
 
 ### 6. 兼容与维护约束
 
@@ -548,7 +550,7 @@ owner 的完整提交语义不变，同一时刻只有一次：
 - 草稿隔离：connection/instance/resource 三个 owner 各自持有草稿与保存状态，三个配置 Query 同时读取；设备/更新/版本状态与全局通知不重渲染连接表单。
 - 页内导航：六个区块标题、右侧目录、滚动高亮、锚点跳转与兼容事件由 `useSettingsSectionNavigation` 的行为测试覆盖；目录项使用 `aria-current="location"`。
 
-视觉基线只覆盖默认 connection 页面；connection 表单新增「连接预设」后曾更新 6 张 config 基线，随后设置页治理（外观卡、Field/Item/Alert 替换、删除 settings.css）冻结基线，留待后续统一重生成。仓库内保留页内导航、草稿保留与保存反馈的行为回归。
+设置页保留页内导航、草稿保留与保存反馈的行为回归；页面视觉按实际改动在浏览器中人工核对。
 
 ### 验证命令
 

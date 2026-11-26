@@ -43,13 +43,25 @@
   为准；保持 `/agent/schedules/*`、通知端点和执行协议兼容。
 - 通知配置读取属于 automation Query（`['automation','notification-config']`）；保存成功后写回同一 key，不保留模块级永久缓存，也不把服务端配置复制进第二份可写状态。
 - 不改变任务参数默认值、智能养成参数、执行前校验顺序或执行身份。
-- 控件统一使用共享 `Input`/`Button`/`Select`/`Switch`/`Checkbox`；表单 `id`/`aria-label`、菜单 `id`/`role`、
-  焦点顺序与键盘行为保持。
+- 控件统一使用共享 `Input`/`NumberField`/`Button`/`Select`/`Switch`/`Checkbox`/`Field`/`Badge`/`Item`/`InlineAlert`/`Disclosure`；
+  表单 `id`/`aria-label`、菜单 `id`/`role`、焦点顺序与键盘行为保持，映射见[共享控件契约](#共享控件契约)。
 - 任务配置编辑器按职责拆分：`AutomationTaskEditor` 只组合任务卡、参数字段与
   高级设置，`AutomationTaskField` 负责单字段渲染，命令专属高级设置与 startup
   连接测试各自独立；它们只接收显式 props，不读取配置通道或执行控制器，
   也不建立第二份草稿。字段结构、表单 `id`、文案与参数规则保持不变。
 
+#### 共享控件契约
+
+| 场景 | 共享原语 | 约束 |
+| --- | --- | --- |
+| 数字字段（任务参数、关卡次数、排班方案序号） | `NumberField` | 输入值仍以字符串写回草稿，保留 `min`/`max`/`step`、禁用态与键盘输入；步进按钮在 `workbench` 以下隐藏，智能养成行隐藏步进控件 |
+| 操作按钮（新增时间、展开摘要、流程行选择/删除、关卡置顶/删除） | `Button` + 合适 `variant`/`size` | 保留 `aria-expanded`/`aria-pressed`/`aria-label`、禁用态与焦点顺序；拖拽排序手柄、原生文件输入与排班编辑器触发器不换成 `Button` |
+| 字段标签与说明 | `Field`/`FieldLabel`/`FieldDescription`/`FieldLegend` | 保留既有表单 `id`、`htmlFor` 关联、`aria-describedby` 与行密度 |
+| 内联错误、警告与提示 | `InlineAlert` | 通知配置读取失败使用 alert 语义；渠道凭据缺失、6 星公招说明与排班保存错误仍就近显示 |
+| 计数与状态胶囊 | `Badge` | 流程启用数、定时执行数/暂停、排班方案数与通知保存状态；单行省略的文件名保留 `truncate` |
+| 列表行 | `Item`/`ItemContent`/`ItemActions` | 定时时间行与排班文件行；拖拽排序行保留原序列网格 |
+| 可折叠分组 | `Disclosure` | 高级设置与排班设施分组；使用原生 `details`，不引入 Collapsible 动画 |
+| 小容器空态与加载 | `EmptyState compact` / `Loading` | 定时空列表、排班文件空目录与通知配置读取；编辑器级大容器保持现有空态 |
 
 **日常任务参数对齐。** `model/automationTaskDefaults.ts` 负责每类任务的名称、描述、`taskType` 与默认参数，`components/automationTaskCatalog.tsx` 只组合图标与参数字段；`automationConfig.migrateTaskParams` 在读取本地或服务端旧草稿时补齐缺失字段：
 
@@ -65,7 +77,7 @@
 
 **任务参数与 wire 类型。** `types/index.ts` 的 `TaskParams` 只显式声明本页已知参数，`TaskParamKey`/`TaskParamValue` 是字段键与写回值的派生类型：目录字段、可见性条件与参数写回链都收窄到这两类，动态写入集中到 `setTaskParam`。执行与定时请求的流程项由同一文件的 `TaskFlowWireItem` 描述，`cleanFlow` 与持久化流程必须满足该形状；wire 字段、序列化顺序与服务端契约不随之变化，参数清单仍以模型与目录源码为准。
 
-**控件与外观基准。** 日常页表单使用 32px 高、`rounded-lg` 的共享 `Input`，按钮使用共享 `Button` 的 `rounded-lg`；数字输入框的步进按钮叠放在输入框右侧，但输入框自身的高度、边框、内边距与聚焦态仍由共享 `Input` 决定。流程与侧栏卡片标题只保留文本，不再使用标题图标或副标题。任务挑选菜单使用不透明 `bg-popover` 表面，不使用 `backdrop-filter` 或玻璃材质。
+**控件与外观基准。** 日常页表单使用 32px 高、`rounded-lg` 的共享 `Input`，按钮使用共享 `Button` 的合适变体；数字字段、关卡次数与排班方案序号统一使用 shared `NumberField`，步进按钮位于输入框右侧，输入框自身的高度、边框、内边距与聚焦态仍由 `InputGroup` 决定。计数与状态胶囊使用 `Badge`，字段标签与说明使用 `Field` 系列，列表行使用 `Item`，可折叠分组使用 shared `Disclosure`，内联错误、警告与提示使用 `InlineAlert`。流程与侧栏卡片标题只保留文本，不再使用标题图标或副标题。任务挑选菜单使用不透明 `bg-popover` 表面，不使用 `backdrop-filter` 或玻璃材质。
 
 ### 2. 组合与状态边界
 
@@ -203,8 +215,8 @@ browser releases pointer capture”用例固定。性能复测采用[性能采�
 
 | 状态 | 行为 |
 | --- | --- |
-| 加载中 | 只显示固定高度的“读取通知配置…”占位，不渲染空配置，避免开关先显示为关闭再跳变 |
-| 加载失败 | 固定高度的“通知配置暂不可用”占位；错误详情走固定 id 的 error toast，并提供“重新加载” action；不渲染渠道与 footer |
+| 加载中 | 只显示固定高度的“读取通知配置…”加载态（`Loading`），不渲染空配置，避免开关先显示为关闭再跳变 |
+| 加载失败 | 固定高度的“通知配置暂不可用”错误提示（`InlineAlert`，alert 语义）；错误详情走固定 id 的 error toast，并提供“重新加载” action；不渲染渠道与 footer |
 | 总开关关闭 | 渠道开关、输入与测试禁用，并显示“先启用通知”等原因 |
 | 总开关开、无可用渠道/凭据 | 显示“未启用渠道，不会发送”或“凭据不完整，不会发送” |
 | 脏态 | 编辑后“保存”才可用；成功后回到“已保存”并再次禁用；保存失败保留草稿与脏态 |
@@ -333,7 +345,7 @@ browser releases pointer capture”用例固定。性能复测采用[性能采�
 | 流程列表、拖拽排序、页脚与执行摘要 | `components/AutomationTaskFlowPanel.tsx` + `hooks/useTaskFlowSorting.ts` | 只接只读 Run 投影；标题栏承载添加任务入口，排序预览与编辑器共享 |
 | 定时编辑 | `components/AutomationScheduleCard.tsx` | 绑定定时纯模型，经工作区唯一配置 owner 写入 |
 | 通知卡 | `components/NotificationSettings.tsx` | 独立卡片；Query、草稿与脏态归卡内，结果反馈走全局 toast |
-| 关卡列表编辑、内联次数步进、置顶、增删行 | `components/AutomationStageEditor.tsx` | 受控面板：参数经 `onUpdate(index, 'stages', value)` 写回工作区；智能行只读，步进与删除位以空白占位保持列对齐 |
+| 关卡列表编辑、内联次数步进、置顶、增删行 | `components/AutomationStageEditor.tsx` | 受控面板：参数经 `onUpdate(index, 'stages', value)` 写回工作区；次数使用 shared `NumberField`；智能行只读，步进控件隐藏、删除位以空白占位保持列对齐 |
 | 智能养成加入/移除与在途标记 | `components/AutomationStageEditor.tsx` + `model/stageEditing.ts` | 读取 `training-queue`、调用 `generateTrainingPlan({ mode: 'current' })`；合成规则在纯模型 |
 | 任务挑选菜单 | `components/AutomationTaskPicker.tsx` | 标题栏右侧的单个 `+` 图标按钮；菜单开关由组件持有，外部 pointerdown、Escape 与回焦交给 Base UI DropdownMenu，编辑锁态收起仍由面板派生 |
 | 可添加任务目录 | `components/automationTaskCatalog.tsx` + `model/automationTaskDefaults.ts` | 默认值模型负责名称、描述、`taskType` 与默认参数；目录只组合图标与参数字段，不读取配置/Query/执行状态 |
@@ -350,7 +362,7 @@ browser releases pointer capture”用例固定。性能复测采用[性能采�
 
 - 配置 key、pending、本地布局与 wire 形状以[配置持久化协调器](../../architecture/config-persistence.md)为准；保持 `/agent/schedules/*` 端点兼容。
 - 任务参数默认值、表单文案与旧配置迁移必须同步修改并在同一提交内补测试；智能养成计划生成参数、执行前校验顺序与执行身份保持不变。
-- 保持表单 `id`/`aria-label`、菜单 `role`/`aria-label`、焦点顺序与键盘行为；新增或调整控件统一使用共享 `Input`/`Button`/`Select`/`Switch`/`Checkbox`，不再复制页面级外观。菜单 `id` 与 `aria-controls` 由 Base UI 生成。视觉回归遵循[开发指南](../../development/README.md)。
+- 保持表单 `id`/`aria-label`、菜单 `role`/`aria-label`、焦点顺序与键盘行为；新增或调整控件统一使用[共享控件契约](#共享控件契约)中的原语，不再复制页面级外观。菜单 `id` 与 `aria-controls` 由 Base UI 生成。视觉回归遵循[开发指南](../../development/README.md)。
 - 添加任务入口位于流程标题栏右侧；在菜单及其触发器之外按下指针即关闭，Escape 与焦点归还由 Base UI 管理，不再为页脚保留例外。
 - 自定义排班编辑只改写用户实际触碰的字段；未编辑的房间、未识别的扩展字段与“保持原样”语义不得被默认值覆盖。排班文件本身仍由 MAA/maa-cli 执行侧读取。
 
@@ -403,7 +415,7 @@ AutomationTasks（app-page > app-stack-section > AutomationWorkspace）
 | 智能养成插入 | 置顶之后、普通关卡之前插入生成项，再交给 `updateTaskFlowParams` 的 `orderStagesForEditing` 统一顺序 |
 | 生成项 | 沿用计划的 `stage` 与 `totalTimes`，写 `smart: true` 与本次计划的干员名列表 |
 
-`AutomationStageEditor` 的 `updateStages` 只在模型返回新数组时调用 `onUpdate`；无效索引与智能关卡的不可达编辑不会产生配置写入。标题行只保留「关卡计划」与说明入口，不显示关卡计数；次数输入复用数值字段的内联步进，`次` 位于步进组右侧。所有行保持「置顶/图标位 → 名称 → 次数 → 删除位」同列：智能行不渲染步进与删除按钮，分别以固定宽度输入框的右侧留白与 `aria-hidden` 空白占位保持对齐。智能养成失败路径保持原文案与顺序：
+`AutomationStageEditor` 的 `updateStages` 只在模型返回新数组时调用 `onUpdate`；无效索引与智能关卡的不可达编辑不会产生配置写入。标题行只保留「关卡计划」与说明入口，不显示关卡计数；次数输入复用 shared `NumberField`，`次` 位于步进组右侧。所有行保持「置顶/图标位 → 名称 → 次数 → 删除位」同列：智能行禁用输入并隐藏步进控件，删除位以 `aria-hidden` 空白占位保持对齐。智能养成失败路径保持原文案与顺序：
 
 - 养成队列为空/读取失败 → “智能养成队列为空，请先添加干员”；
 - 生成计划失败 → “生成刷取计划失败”；

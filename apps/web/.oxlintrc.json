@@ -1,0 +1,183 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "react",
+    "typescript"
+  ],
+  "env": {
+    "browser": true
+  },
+  "categories": {
+    "correctness": "error"
+  },
+  "ignorePatterns": [
+    "dist/**",
+    "coverage/**"
+  ],
+  "rules": {
+    "no-control-regex": "off",
+    "no-empty-pattern": "off",
+    "no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^[A-Z_]",
+        "caughtErrors": "none",
+        "ignoreRestSiblings": true
+      }
+    ],
+    "typescript/no-explicit-any": "off",
+    "typescript/no-empty-object-type": "off",
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "warn",
+    "react/only-export-components": [
+      "error",
+      {
+        "allowConstantExport": true
+      }
+    ],
+    "react/set-state-in-effect": "off",
+    "react/refs": "off",
+    "react/no-did-update-set-state": "off",
+    "react/incompatible-library": "off"
+  },
+  "overrides": [
+    {
+      "files": [
+        "src/shared/ui/**/*.tsx"
+      ],
+      "rules": {
+        "react/only-export-components": "off"
+      }
+    },
+    {
+      "files": [
+        "scripts/**/*.ts",
+        "tests/**/*.ts",
+        "vite.config.ts"
+      ],
+      "env": {
+        "node": true
+      }
+    },
+    {
+      "files": [
+        "src/**/*.{ts,tsx}"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^@/features/[^/]+/.+",
+                "message": "功能域对外只有 index.ts 一个公开面，请改为 @/features/<domain> 根 import。"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/features/**/*.{ts,tsx}",
+        "src/shared/**/*.{ts,tsx}"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^@/features/[^/]+/.+",
+                "message": "功能域对外只有 index.ts 一个公开面，请改为 @/features/<domain> 根 import。"
+              },
+              {
+                "regex": "^@/app(?:/.*)?$",
+                "message": "app 是组装层，features/shared 不得反向依赖 @/app。"
+              },
+              {
+                "regex": "^@/pages(?:/.*)?$",
+                "message": "pages 是组合层，features/shared 不得反向依赖 @/pages。"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/shared/**/*.{ts,tsx}"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^@/features(?:/.*)?$",
+                "message": "shared 不感知 features，请把跨域能力留在所属域内或上移到 shared 的通用能力。"
+              },
+              {
+                "regex": "^@/app(?:/.*)?$",
+                "message": "app 是组装层，features/shared 不得反向依赖 @/app。"
+              },
+              {
+                "regex": "^@/pages(?:/.*)?$",
+                "message": "shared 不感知 pages，组合职责留在 pages/app。"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/pages/**/*.{ts,tsx}"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^@/features/[^/]+/.+",
+                "message": "页面只能经功能域根入口组合，请改为 @/features/<domain> 根 import。"
+              },
+              {
+                "regex": "^@/app(?:/.*)?$",
+                "message": "pages 是组合层，不得反向依赖 @/app。"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/pages/**/*.{test,spec}.{ts,tsx}"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^@/app(?:/.*)?$",
+                "message": "pages 是组合层，不得反向依赖 @/app。"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/shared/theme/bootTheme.test.ts"
+      ],
+      "rules": {
+        "no-eval": "off"
+      }
+    }
+  ]
+}

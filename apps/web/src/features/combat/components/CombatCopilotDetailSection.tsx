@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Field, FieldContent, FieldTitle } from '@/shared/ui/field'
 
 export function DetailField({
   label,
@@ -10,10 +11,15 @@ export function DetailField({
   wide?: boolean
 }) {
   return (
-    <div className={`combat-copilot-detail-field${wide ? ' combat-copilot-detail-wide' : ''}`}>
-      <dt className="combat-copilot-detail-label">{label}</dt>
-      <dd className="combat-copilot-detail-value">{children}</dd>
-    </div>
+    <Field
+      aria-label={label}
+      className={`combat-copilot-detail-field grid gap-0.5${wide ? ' combat-copilot-detail-wide' : ''}`}
+    >
+      <FieldTitle className="combat-copilot-detail-label text-xs font-normal">{label}</FieldTitle>
+      <FieldContent className="combat-copilot-detail-value flex-row flex-wrap gap-x-2 gap-y-1.5 leading-[1.6]">
+        {children}
+      </FieldContent>
+    </Field>
   )
 }
 

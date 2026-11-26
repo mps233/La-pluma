@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { AlertTriangle, CheckCircle2, ChevronDown, CircleMinus } from 'lucide-react'
+import { InlineAlert } from '@/shared/components'
+import { Badge } from '@/shared/ui/badge'
+import { Button } from '@/shared/ui/button'
 import { formatExecutionActionSummary, isUnconfirmedGameAction } from '@/shared/lib/executionSummary'
 import {
   executionSummaryHasFailure,
@@ -68,20 +71,22 @@ export default function AutomationExecutionSummary({
                 : '任务流程执行完成')}
         </span>
         {hasDetailContent && (
-          <button
+          <Button
             type="button"
+            size="icon"
+            variant="ghost"
             onClick={toggleDetails}
             aria-expanded={detailsOpen}
             aria-label={detailsOpen ? '收起执行详情' : '展开执行详情'}
             title={detailsOpen ? '收起详情' : '展开详情'}
-            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-200"
+            className="size-11 shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
           >
             <ChevronDown
-              size={15}
               strokeWidth={2}
               className={`${shouldReduceMotion ? '' : 'transition-transform duration-200'} ${detailsOpen ? 'rotate-180' : ''}`}
+              aria-hidden="true"
             />
-          </button>
+          </Button>
         )}
       </div>
 
@@ -166,7 +171,7 @@ export default function AutomationExecutionSummary({
                     )}
                     {action.action === 'operprogress' && action.deferredMastery && action.deferredMastery.length > 0 && (
                       <div className="mt-1 space-y-1 pl-5">
-                        <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">待处理</p>
+                        <Badge variant="secondary" className="bg-warning/10 text-warning-text">待处理</Badge>
                         {action.deferredMastery.map((entry, deferredIndex) => (
                           <div
                             key={`${entry.name}-${deferredIndex}`}
@@ -190,17 +195,15 @@ export default function AutomationExecutionSummary({
               return !lastSummary.actions?.some(action => action.status === 'failed' && action.task === taskName)
             })
             .map((error, errorIndex) => (
-              <p key={`${typeof error === 'string' ? error : error.task}-${errorIndex}`} className="mt-2 flex items-start gap-2 text-xs leading-5 text-red-600 dark:text-red-400">
-                <AlertTriangle size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
-                <span>{typeof error === 'string' ? error : `${error.task}：${error.error}`}</span>
-              </p>
+              <InlineAlert key={`${typeof error === 'string' ? error : error.task}-${errorIndex}`} tone="error" className="mt-2">
+                {typeof error === 'string' ? error : `${error.task}：${error.error}`}
+              </InlineAlert>
             ))}
 
           {lastSummary.warnings.map((warning, warningIndex) => (
-            <p key={`${warning}-${warningIndex}`} className="mt-2 flex items-start gap-2 text-xs leading-5 text-amber-600 dark:text-amber-400">
-              <AlertTriangle size={14} className="mt-0.5 shrink-0" strokeWidth={2} />
-              <span>{warning}</span>
-            </p>
+            <InlineAlert key={`${warning}-${warningIndex}`} tone="warning" className="mt-2">
+              {warning}
+            </InlineAlert>
           ))}
         </motion.div>
       )}

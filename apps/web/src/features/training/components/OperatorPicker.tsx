@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Filter, LoaderCircle, Search, UserRoundSearch } from 'lucide-react'
+import { Filter, LoaderCircle, UserRoundSearch } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
-import { DialogBody, DialogFrame, DialogFrameFooter, EmptyState, Loading } from '@/shared/components'
-import { Input } from '@/shared/ui/input'
+import { DialogBody, DialogFrame, DialogFrameFooter, EmptyState, InlineAlert, Loading, SearchField } from '@/shared/components'
+import { Field, FieldGroup, FieldLabel } from '@/shared/ui/field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { useFluidTabIndicator } from '@/shared/hooks/useFluidTabIndicator'
 import { trainingCandidatesQueryOptions, trainingStatusCountsQueryOptions } from '../model/queries'
@@ -128,7 +128,6 @@ export default function OperatorPicker({
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setVisibleOperatorLimit(OPERATOR_RENDER_BATCH_SIZE)
   }, [filters.status, filters.rarity, filters.needsElite2, professionFilter, searchTerm])
 
@@ -187,7 +186,7 @@ export default function OperatorPicker({
       title="添加干员"
       size="4xl"
       toolbar={(
-        <div className="space-y-3.5">
+        <div className="flex flex-col gap-3.5">
           <div className="flex items-center gap-2">
             <div className="app-workspace-segments min-w-0 flex-1">
               <div
@@ -260,57 +259,62 @@ export default function OperatorPicker({
             )}
           </div>
 
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_9rem_auto]">
-            <div className="relative min-w-0">
-              <Search size={17} strokeWidth={1.9} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" />
-              <Input
-                type="text"
-                autoComplete="off"
-                aria-label="搜索干员名称"
+          <FieldGroup className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_9rem_auto]">
+            <Field className="min-w-0 gap-0">
+              <FieldLabel htmlFor="training-operator-search" className="sr-only">搜索干员名称</FieldLabel>
+              <SearchField
+                id="training-operator-search"
+                ariaLabel="搜索干员名称"
                 placeholder="搜索干员"
                 value={searchTerm}
-                onChange={event => setSearchTerm(event.target.value)}
-                className="w-full pl-9"
+                onValueChange={setSearchTerm}
+                clearable
               />
-            </div>
-            <Select
-              items={[...OPERATOR_PROFESSION_FILTERS]}
-              value={professionFilter}
-              onValueChange={(next, details) => { if (details.reason !== 'none' && next !== null) handleProfessionFilterChange(next) }}
-            >
-              <SelectTrigger aria-label="职业" className="min-w-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[...OPERATOR_PROFESSION_FILTERS].map(item => (
-                  <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={filters.rarity}
-              onValueChange={(rarity, details) => { if (details.reason !== 'none' && rarity !== null) setFilters({ ...filters, rarity }) }}
-              items={[
-                { value: '', label: '全部稀有度' },
-                { value: '6', label: '6 星' },
-                { value: '5', label: '5 星' },
-                { value: '4', label: '4 星' },
-              ]}
-            >
-              <SelectTrigger aria-label="稀有度" className="min-w-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[
+            </Field>
+            <Field className="min-w-0 gap-0">
+              <FieldLabel htmlFor="training-operator-profession" className="sr-only">职业</FieldLabel>
+              <Select
+                items={[...OPERATOR_PROFESSION_FILTERS]}
+                value={professionFilter}
+                onValueChange={(next, details) => { if (details.reason !== 'none' && next !== null) handleProfessionFilterChange(next) }}
+              >
+                <SelectTrigger id="training-operator-profession" aria-label="职业" className="w-full min-w-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[...OPERATOR_PROFESSION_FILTERS].map(item => (
+                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field className="min-w-0 gap-0">
+              <FieldLabel htmlFor="training-operator-rarity" className="sr-only">稀有度</FieldLabel>
+              <Select
+                value={filters.rarity}
+                onValueChange={(rarity, details) => { if (details.reason !== 'none' && rarity !== null) setFilters({ ...filters, rarity }) }}
+                items={[
                   { value: '', label: '全部稀有度' },
                   { value: '6', label: '6 星' },
                   { value: '5', label: '5 星' },
                   { value: '4', label: '4 星' },
-                ].map(item => (
-                  <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                ]}
+              >
+                <SelectTrigger id="training-operator-rarity" aria-label="稀有度" className="w-full min-w-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[
+                    { value: '', label: '全部稀有度' },
+                    { value: '6', label: '6 星' },
+                    { value: '5', label: '5 星' },
+                    { value: '4', label: '4 星' },
+                  ].map(item => (
+                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
             <Button
               type="button"
               variant={filters.needsElite2 ? 'default' : 'secondary'}
@@ -321,7 +325,7 @@ export default function OperatorPicker({
               <Filter size={15} strokeWidth={1.9} aria-hidden="true" />
               未精二
             </Button>
-          </div>
+          </FieldGroup>
         </div>
       )}
       footer={(
@@ -332,8 +336,8 @@ export default function OperatorPicker({
       )}
     >
       <DialogBody>
-        <div className="space-y-3.5">
-          {operationError && <div role="alert" className="training-feedback status-danger">{operationError}</div>}
+        <div className="flex flex-col gap-3.5">
+          {operationError && <InlineAlert tone="error">{operationError}</InlineAlert>}
 
           {recognitionHint && (
             <div

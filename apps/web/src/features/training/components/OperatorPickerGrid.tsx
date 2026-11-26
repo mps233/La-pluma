@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { getOperatorAvatarUrl, useItemIconCacheVersion } from '@/features/game-data'
+import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { Skeleton } from '@/shared/ui/skeleton'
 import { OPERATOR_RENDER_BATCH_SIZE } from '../model/operatorRows'
@@ -65,21 +66,21 @@ function OperatorPickerCard({ item, eager }: OperatorPickerCardProps) {
           </div>
         )}
         {item.rarity > 0 && (
-          <div className="absolute right-2 top-2 rounded-full px-2 py-0.5 text-xs font-semibold brand-chip brand-text">
+          <Badge variant="outline" className="absolute right-2 top-2 border-transparent brand-chip brand-text font-semibold">
             {item.rarity}★
-          </div>
+          </Badge>
         )}
       </div>
 
-      <div className="space-y-2 text-center">
+      <div className="flex flex-col gap-2 text-center">
         <div className="truncate text-sm font-semibold text-foreground" title={item.name}>
           {item.name || '未知干员'}
         </div>
         <div className="flex min-h-5 flex-wrap items-center justify-center gap-1 text-xs">
           {isOwned && item.elite !== undefined && (
-            <span className="whitespace-nowrap rounded-full px-2 py-0.5 surface-soft text-muted-foreground">
+            <Badge variant="outline" className="border-transparent surface-soft text-muted-foreground">
               精{item.elite}{item.level ? ` · ${item.level} 级` : ''}
-            </span>
+            </Badge>
           )}
         </div>
 

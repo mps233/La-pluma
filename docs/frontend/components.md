@@ -53,7 +53,7 @@ import {
 </Card>
 ```
 
-`Card` 使用 shadcn 语义 token（`bg-card`、`ring-foreground/10`、`--card-spacing`）与普通圆角；标题、描述、操作分别使用 `CardTitle`、`CardDescription`、`CardAction`，页脚使用 `CardFooter`。需要分节面板且各分节自持内边距时，给 `Card` 加 `gap-0 p-0!`，不再引入独立面板包装组件。标题需要保留文档层级时，在 `CardTitle` 上使用 `role="heading"` 与 `aria-level`。紧凑提示容器使用语义类 `app-info-card` 配合对应状态类；`surface-panel` 继续用于主题菜单与 PWA 提示等应用自绘召唤层，不用于 `Card` 或 shadcn 生成弹层。
+`Card` 使用 shadcn 语义 token（`bg-card`、`ring-foreground/10`、`--card-spacing`）与普通圆角；标题、描述、操作分别使用 `CardTitle`、`CardDescription`、`CardAction`，页脚使用 `CardFooter`。需要分节面板且各分节自持内边距时，给 `Card` 加 `gap-0 p-0!`，不再引入独立面板包装组件。标题需要保留文档层级时，在 `CardTitle` 上使用 `role="heading"` 与 `aria-level`。紧凑提示容器使用 `Alert` 或 `status-*` 语义类组合；`surface-panel` 只用于 PWA 提示等应用自绘召唤层，不用于 `Card`、shadcn 生成弹层或已改用 `DropdownMenu` 的主题菜单。
 
 所有页面根统一使用下方的 `PageShell`：工作台页设置 `layout="workspace"`，无边框卡片页再设置 `surface="borderless"`。页面标题由 `Layout` 顶栏统一渲染，页面内不再声明标题或副标题。卡片材质统一由 shadcn 语义 token 控制，不要在页面级另造卡片材质。
 
@@ -158,7 +158,7 @@ import { SegmentedTabs, SegmentedTabNav, SegmentedTabPanel } from '@/shared/comp
 ```
 
 - `SegmentedTabs` 的根节点使用 `display: contents`，不引入额外布局层；tab 导航与面板可以继续作为原网格或弹性布局的直接子项。
-- `SegmentedTabNav` 保留 `app-workspace-segments`、`app-workspace-segment-list`、`app-workspace-segment-indicator`、`app-workspace-segment(-icon|-copy)`、`is-selected` 与流体高亮；分段容器保持透明，高亮指示器使用语义 token（`--muted` 背景与 `--border` 内描边），不再消费 `--glass-*` 或页面级玻璃类名。`className`、`listClassName`、`indicatorClassName`、`tabClassName`、`iconClassName` 只承载页面差异；测量复用 `useFluidTabIndicator`，不要逐页复制。
+- `SegmentedTabNav` 使用 shadcn `TabsList` / `TabsTrigger` 的默认视觉与语义：列表为 `bg-muted` 圆角容器，选中项为 `bg-background` 文本块，焦点环、禁用态与图标尺寸沿用生成原语。列表保留 `app-workspace-segment-list` 作为页面网格锚点，`listClassName` 与各页面样式可继续覆盖列模板；可选图标继续由 `app-workspace-segment-icon` 承载身份图标壳层。`className` 作用于外层容器，`tabClassName`、`iconClassName` 只承载页面差异。`indicatorClassName` 仅为兼容既有调用点保留，当前不再渲染流体指示器，也没有视觉效果。
 - 标签使用 Base UI 的 tablist/tab 语义，`activateOnFocus` 固定为 `false`：左右方向键、Home、End 只移动 roving focus，Enter、Space 或点击才切换选中项。不要恢复方向键直接激活的旧行为。
 - `tabId` / `panelId` 可选：传入时提供稳定 id 与 `aria-controls`，省略时由 Base UI 生成并注册关联。`panelId` 只能指向当前实际渲染的面板；默认卸载的页面只在当前 tab 上返回 `panelId`，避免 `aria-controls` 指向不存在的元素。`SegmentedTabPanel` 的 `id` 同样可选；输出 `role="tabpanel"` 与 `aria-labelledby`。如果给面板传 `id`，对应 tab 必须传相同的 `panelId`；或者两侧都省略，交给 Base UI 生成。只传一侧会破坏关联。不传 `keepMounted` 时隐藏面板卸载，传 `true` 时保留 DOM 并设置 `hidden`。统计需要保留周期与反馈，使用 `keepMounted`；作业使用默认卸载；肉鸽使用始终打开的单个 `contents` 面板承载跨 grid-area 内容。
 - 无法把整块内容包进面板时（例如肉鸽网格的多个 grid-area），保留原网格，把模式相关区域放进单个 `className="contents"` 的面板，并让所有 tab 指向同一个 `panelId`。
@@ -303,6 +303,14 @@ import { Badge } from '@/shared/ui/badge'
 
 ---
 
+### Table - 表格
+
+**文件位置**：`apps/web/src/shared/ui/table.tsx`（shadcn 生成物，随上游原文保留）
+
+**适用场景**：需要真实表头/行语义的二维只读数据，例如养成材料筹备明细。使用 `Table` + `TableHeader` / `TableBody` / `TableRow` / `TableHead` / `TableCell` 组合；表头加 `scope="col"`，数字列右对齐并使用 `tabular-nums`。可点击行用 `Item` 或 `Button` 组合，不要把整行做成伪表格。
+
+---
+
 ### Alert - 常驻提示
 
 **文件位置**：`apps/web/src/shared/ui/alert.tsx`（shadcn 生成物，随上游原文保留）
@@ -323,6 +331,87 @@ import { Button } from '@/shared/ui/button'
 ```
 
 根节点固定输出 `role="alert"`，不要改成 `role="status"`，也不要在其中再包一层 alert 角色。`variant` 只有 `default` 与 `destructive`；不提供 success/warning 业务变体，其他状态用 `className` 覆盖。`destructive` variant 的标题与描述文字使用 `--destructive-text`（Tailwind `text-destructive-text`），背景仍为 `bg-card`；这是有意的共享语义修正，会同时影响 combat 等所有 `Alert` 调用点。标题、描述与右上角操作分别使用 `AlertTitle`、`AlertDescription` 与 `AlertAction`。图标作为根节点的直接子元素渲染，装饰图标加 `aria-hidden="true"`。
+
+---
+
+### SearchField - 搜索输入
+
+**文件位置**：`apps/web/src/shared/components/SearchField.tsx`（组合 `@/shared/ui/input-group`）
+
+**适用场景**：页面、筛选器与选择弹窗的关键词搜索。统一 Search 图标、`InputGroupAddon` 与可选清除按钮，不要再手写绝对定位图标、`pl-9` 或清除按钮。
+
+```tsx
+import { SearchField } from '@/shared/components'
+
+<SearchField
+  ariaLabel="搜索干员名称"
+  value={query}
+  onValueChange={setQuery}
+  placeholder="搜索干员"
+  clearable
+  onClear={() => resetCursor()}
+/>
+```
+
+`className` 作用于 `InputGroup` 根，输入框自身样式用 `inputClassName`；不要同时传旧的 `pl-9`。`clearable` 且值非空时显示清除按钮；清除时先 `onValueChange('')`，再调用 `onClear`，最后把焦点还给输入框。
+
+---
+
+### NumberField - 数字步进
+
+**文件位置**：`apps/web/src/shared/components/NumberField.tsx`（组合 `@/shared/ui/input-group` 与 `Button`）
+
+**适用场景**：需要 `min` / `max` / `step` 的受控数字输入，例如关卡次数、培养目标、排班方案序号。不要再自绘数字步进按钮。
+
+```tsx
+import { NumberField } from '@/shared/components'
+
+<NumberField
+  id="stage-times"
+  label="关卡次数"
+  value={times}
+  onValueChange={setTimes}
+  min={1}
+  max={99}
+  step={1}
+/>
+```
+
+值以字符串回写；输入时不做 clamp，按钮到达边界时禁用。`controlsClassName` 可控制步进按钮容器的响应式显示（如小屏隐藏）。
+
+---
+
+### Disclosure - 原生折叠
+
+**文件位置**：`apps/web/src/shared/components/Disclosure.tsx`（原生 `<details>/<summary>`）
+
+**适用场景**：高级设置、原始日志、材料详情等轻量折叠区。统一 chevron、`min-h-11` 触达高度与 `focus-visible` 环，并透传原生 `details` 属性（`open`、`onToggle`、`id` 等）。
+
+不要为折叠引入 `Collapsible` 动画；需要紧凑内联时用 `className` / `summaryClassName` / `contentClassName` 覆盖容器装饰，不要复制 summary 结构。
+
+---
+
+### InlineAlert - 紧凑状态提示
+
+**文件位置**：`apps/web/src/shared/components/InlineAlert.tsx`（组合 `Alert`）
+
+**适用场景**：页面内的错误、警告、信息与成功反馈，替代各处手拼的 `status-*` 行。`tone` 支持 `error` / `warning` / `info` / `success`，可传 `title`、`action`、`onRetry` / `retryLabel` / `retrying`。
+
+默认 `role="alert"`；加载中、识别中等非错误状态仍使用 `role="status"`，不要用 `InlineAlert` 冒充。
+
+---
+
+### UnavailableAction - 不可用操作
+
+**文件位置**：`apps/web/src/shared/components/UnavailableAction.tsx`（组合 `Tooltip`）
+
+**适用场景**：动作因前置条件不可用、需要解释原因时包裹触发元素。`action` 与 `reason` 组成可访问名 `动作：原因`；内部触发节点是 `tabIndex=0` 的 span，不要再嵌套第二个可聚焦控件。
+
+```tsx
+<UnavailableAction action="加入队列" reason="请先选择作业">
+  <Button disabled>加入队列</Button>
+</UnavailableAction>
+```
 
 ---
 
@@ -588,7 +677,7 @@ import { ConfirmAlertDialog, Loading } from '@/shared/components'
 
 高度受限的表单、选择器与发现弹窗使用 shared `DialogFrame` + `DialogBody` + `DialogFrameFooter`；无高度上限的简单弹窗仍可直接组合生成原语：
 
-- `Sheet` 用于作业详情抽屉：桌面 `side="right"`、移动 `side="bottom"`；需要保留页面可交互时使用 Root 的 `modal={false}` 并自行处理外部点击关闭。
+- `Sheet` 用于作业详情抽屉：桌面 `side="right"`、移动 `side="bottom"`；需要保留页面可交互时使用 Root 的 `modal={false}` 并自行处理外部点击关闭。仓库的 `SheetContent` 会无条件渲染全屏 `SheetOverlay` 且没有关闭 overlay 的 prop，因此桌面非模态弹层需要组合 `Sheet` + `SheetPrimitive.Popup`，不能直接用 `SheetContent`。
 - `AlertDialog` 用于必须显式确认的操作；`role="alertdialog"` 由原语提供。
 - 嵌套弹层按 React 父子关系组合（如发现弹窗内的筛选弹窗、详情抽屉上的重置确认框），Base UI 依此管理 Escape 层级、焦点归还与滚动锁。
 - 弹层经 Base UI portal 挂到 `document.body`，层序使用 `--layout-z-portal`；应用自绘浮层按 [设计规范](../../DESIGN.md) 的 z-index scale 取 token，不在组件里补高位 z-index。
@@ -668,7 +757,7 @@ import Icons from '@/shared/components/Icons'
 
 **文件位置**：`apps/web/src/shared/hooks/useFluidTabIndicator.ts`
 
-**适用场景**：已有自定义分段按钮组需要复用高亮矩形测量与 roving focus 键盘处理时使用。页面级分段导航统一使用 `SegmentedTabs` / `SegmentedTabNav`，其内部复用本 Hook 的测量逻辑；不要在新页面复制 `ResizeObserver`、元素 ref 和坐标计算。
+**适用场景**：已有自定义分段按钮组需要复用高亮矩形测量与 roving focus 键盘处理时使用。页面级分段导航统一使用 `SegmentedTabs` / `SegmentedTabNav`，后者已改用 shadcn `Tabs` 默认语义，不再复用本 Hook；不要在新页面复制 `ResizeObserver`、元素 ref 和坐标计算。
 
 ```tsx
 const { containerRef, activeRect, setTabRef, handleTabKeyDown } = useFluidTabIndicator(activeTab)

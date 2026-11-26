@@ -1,10 +1,12 @@
 import { useRef } from 'react'
 import { ArrowDown, ArrowUp, ArrowUpToLine, ClipboardList, LoaderCircle, Plus, Trash2, UserRoundSearch } from 'lucide-react'
 import { getOperatorAvatarUrl, useItemIconCacheVersion } from '@/features/game-data'
+import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
+import { Field, FieldDescription, FieldTitle } from '@/shared/ui/field'
 import { Progress } from '@/shared/ui/progress'
-import { EmptyState, Loading } from '@/shared/components'
+import { EmptyState, InlineAlert, Loading } from '@/shared/components'
 import { getQueueMaterials, selectMissingMaterials } from '../model/materials'
 import TrainingLoadError from './TrainingLoadError'
 import TrainingUndoToast from './TrainingUndoToast'
@@ -87,20 +89,37 @@ export default function TrainingQueuePanel({
           </CardAction>
         </CardHeader>
         <CardContent className="p-0">
-          {operationError && <div role="alert" className="training-feedback status-danger mx-4">{operationError}</div>}
-          {refreshError && !error && <div role="alert" className="training-feedback status-warning mx-4"><span>{uncertain ?? '队列已更新，但刷新失败。重新加载后再预览计划。'}</span><Button variant="ghost" onClick={onReload} disabled={busy}>重新加载</Button></div>}
-          {loading ? <div className="training-state"><Loading text="正在读取养成队列..." /></div> : error ? <TrainingLoadError title="养成队列加载失败" description={error} onRetry={onRetryLoad} /> : queue.length === 0 ? (
+          {operationError && <InlineAlert tone="error" className="mx-4 mb-3">{operationError}</InlineAlert>}
+          {refreshError && !error && (
+            <InlineAlert
+              tone="warning"
+              className="mx-4 mb-3"
+              action={<Button variant="secondary" size="sm" disabled={busy} onClick={onReload}>重新加载</Button>}
+            >
+              {uncertain ?? '队列已更新，但刷新失败。重新加载后再预览计划。'}
+            </InlineAlert>
+          )}
+          {loading ? <div className="training-state"><Loading text="正在读取养成队列..." /></div> : error ? <div className="p-4"><TrainingLoadError title="养成队列加载失败" description={error} onRetry={onRetryLoad} /></div> : queue.length === 0 ? (
             <div className="training-state"><EmptyState compact icon={<ClipboardList size={24} />} title="养成队列还是空的" description="添加需要筹备材料的干员，按目标安排刷图。" /></div>
           ) : <ol className="training-queue-list">
             {queue.map((item, index) => <li key={item.operatorId} className="training-queue-row">
               <div className="training-queue-identity">
                 <span className="training-queue-rank">{String(index + 1).padStart(2, '0')}</span>
                 <span className="training-avatar"><UserRoundSearch size={22} aria-hidden="true" /><img src={getOperatorAvatarUrl(item.operatorId, 'base', itemIconVersion)} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none' }} /></span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1"><h3 className="training-operator-name" data-training-operator-name>{item.operator.name}</h3>{index === 0 && <span className="training-current-label">当前</span>}</div>
-                  <p className="training-queue-meta">精{item.currentElite} → 精{item.targetElite}<span>{selectMissingMaterials(getQueueMaterials(item)).length} 种缺口</span></p>
-                  <div className="training-row-progress"><Progress value={Math.min(100, Math.max(0, item.progress ?? 0))} aria-label={`${item.operator.name}材料筹备进度`} className="w-20 shrink-0" /><span>{item.progress ?? 0}%</span></div>
-                </div>
+                <Field className="min-w-0 flex-1 gap-2">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <FieldTitle role="heading" aria-level={3} data-training-operator-name className="max-w-full font-semibold wrap-anywhere">{item.operator.name}</FieldTitle>
+                    {index === 0 && <Badge variant="outline" className="border-transparent font-semibold text-primary">当前</Badge>}
+                  </div>
+                  <FieldDescription className="flex flex-wrap items-center gap-3 text-xs">
+                    精{item.currentElite} → 精{item.targetElite}
+                    <span>{selectMissingMaterials(getQueueMaterials(item)).length} 种缺口</span>
+                  </FieldDescription>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Progress value={Math.min(100, Math.max(0, item.progress ?? 0))} aria-label={`${item.operator.name}材料筹备进度`} className="w-20 shrink-0" />
+                    <span className="tabular-nums">{item.progress ?? 0}%</span>
+                  </div>
+                </Field>
               </div>
               <div className="training-queue-actions">
                 {index > 0 && <Button variant="ghost" disabled={busy} onClick={() => void handleReorder(item.operatorId, 0)} aria-label={`将${item.operator.name}设为当前`}><ArrowUpToLine size={15} aria-hidden="true" />设为当前</Button>}

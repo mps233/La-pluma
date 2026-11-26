@@ -92,38 +92,6 @@
     object-fit: cover;
   }
 
-  .training-operator-name {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--foreground);
-    overflow-wrap: anywhere;
-  }
-
-  .training-current-label {
-    font-size: 0.75rem;
-    color: var(--primary);
-    font-weight: 600;
-  }
-
-  .training-queue-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-top: 0.25rem;
-    font-size: 0.75rem;
-    color: var(--muted-foreground);
-  }
-
-  .training-row-progress {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-    font-variant-numeric: tabular-nums;
-  }
-
   .training-queue-actions {
     display: flex;
     flex-wrap: wrap;
@@ -150,45 +118,6 @@
     color: var(--muted-foreground);
   }
 
-  .training-material-table {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) repeat(3, minmax(2.7rem, max-content));
-    column-gap: 0.5rem;
-    padding: 0 1rem;
-  }
-
-  .training-material-line {
-    display: grid;
-    align-items: center;
-    grid-column: 1 / -1;
-    grid-template-columns: subgrid;
-    gap: 0.5rem;
-    min-height: 56px;
-    border-top: 1px solid var(--border);
-    font-size: 0.875rem;
-    font-variant-numeric: tabular-nums;
-    color: var(--foreground);
-  }
-
-  .training-material-line > span:not(:first-child) {
-    text-align: right;
-  }
-
-  .training-material-labels {
-    min-height: 36px;
-    border-top: 0;
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-  }
-
-  .training-material-name {
-    display: flex;
-    align-items: center;
-    min-width: 0;
-    gap: 0.5rem;
-    overflow-wrap: anywhere;
-  }
-
   .training-resource-icon {
     display: inline-flex;
     align-items: center;
@@ -206,29 +135,6 @@
     width: 100%;
     height: 100%;
     object-fit: contain;
-  }
-
-  .training-inline-empty {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 1rem;
-    color: var(--muted-foreground);
-    font-size: 0.875rem;
-    line-height: 1.7;
-  }
-
-  .training-disclosure {
-    border-top: 1px solid var(--border);
-    padding: 0 1rem 0.5rem;
-  }
-
-  .training-disclosure summary {
-    cursor: pointer;
-    min-height: 48px;
-    align-content: center;
-    color: var(--muted-foreground);
-    font-size: 0.875rem;
   }
 
   .training-material-tree {
@@ -257,31 +163,6 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 0.5rem;
     padding: 0 1rem 1rem;
-  }
-
-  .training-plan-overview {
-    padding: 1rem;
-    border-top: 1px solid var(--border);
-  }
-
-  .training-plan-overview p {
-    margin-top: 0.25rem;
-    font-size: 0.875rem;
-    line-height: 1.7;
-    color: var(--muted-foreground);
-  }
-
-  .training-plan-placeholder {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 240px;
-    padding: 1rem;
-    border-top: 1px solid var(--border);
-    color: var(--muted-foreground);
-    text-align: center;
-    font-size: 0.875rem;
-    line-height: 1.7;
   }
 
   .training-stage-list {
@@ -313,18 +194,6 @@
 
   .training-stage-row > span {
     flex-shrink: 0;
-  }
-
-  .training-apply {
-    padding: 1rem;
-  }
-
-  .training-apply p {
-    margin-top: 0.5rem;
-    color: var(--muted-foreground);
-    text-align: center;
-    font-size: 0.75rem;
-    line-height: 1.6;
   }
 
   .training-sync-status {
@@ -381,12 +250,6 @@
 
   .training-settings {
     padding: 1rem;
-  }
-
-  .training-settings-grid {
-    display: grid;
-    gap: 1rem;
-    margin-top: 1rem;
   }
 
   .training-feedback {
