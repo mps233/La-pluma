@@ -42,7 +42,7 @@ func ValidateConfigType(configType string) (string, error) {
 }
 
 func (s *Storage) dir() string {
-	return filepath.Join(s.paths.DataDir, "user-configs")
+	return s.paths.UserConfigDir()
 }
 
 func (s *Storage) pathFor(configType string) (string, error) {

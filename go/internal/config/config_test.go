@@ -77,6 +77,22 @@ func TestLoadLogBufferSize(t *testing.T) {
 	}
 }
 
+func TestPathsDataFiles(t *testing.T) {
+	paths := Paths{DataDir: "/data"}
+	if got := paths.OperBoxPath(); got != filepath.Join("/data", "operbox.json") {
+		t.Fatalf("OperBoxPath = %s", got)
+	}
+	if got := paths.DepotPath(); got != filepath.Join("/data", "depot.json") {
+		t.Fatalf("DepotPath = %s", got)
+	}
+	if got := paths.UserConfigDir(); got != filepath.Join("/data", "user-configs") {
+		t.Fatalf("UserConfigDir = %s", got)
+	}
+	if got := paths.UserConfigPath("notification.json"); got != filepath.Join("/data", "user-configs", "notification.json") {
+		t.Fatalf("UserConfigPath = %s", got)
+	}
+}
+
 func TestResolveMaaPathsPerOS(t *testing.T) {
 	t.Setenv("MAA_DATA_DIR", "")
 	env := map[string]string{}

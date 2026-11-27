@@ -209,7 +209,7 @@ func normalizeID(value any) string {
 }
 
 func (s *Service) loadOperBox() operBoxData {
-	value, err := jsonstore.Read(filepath.Join(s.paths.DataDir, "operbox.json"), map[string]any{"operators": []any{}})
+	value, err := jsonstore.Read(s.paths.OperBoxPath(), map[string]any{"operators": []any{}})
 	if err != nil {
 		s.logger.Error("加载 OperBox 数据失败", "error", err)
 		return operBoxData{Operators: []operBoxOperator{}, AllOpers: []operBoxCatalogOperator{}}
@@ -290,7 +290,7 @@ func normalizeOperBoxOperators(array []any) []operBoxOperator {
 
 func (s *Service) loadDepot() depotData {
 	result := depotData{Items: map[string]float64{}, Timestamp: nil}
-	value, err := jsonstore.Read(filepath.Join(s.paths.DataDir, "depot.json"), map[string]any{"items": []any{}, "timestamp": nil})
+	value, err := jsonstore.Read(s.paths.DepotPath(), map[string]any{"items": []any{}, "timestamp": nil})
 	if err != nil {
 		s.logger.Error("加载仓库数据失败", "error", err)
 		return result

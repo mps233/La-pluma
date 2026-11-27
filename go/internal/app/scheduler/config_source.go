@@ -1,8 +1,6 @@
 package scheduler
 
 import (
-	"path/filepath"
-
 	"github.com/mps233/la-pluma/go/internal/config"
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
 	"github.com/mps233/la-pluma/go/internal/util/jsonstore"
@@ -28,7 +26,7 @@ func (s *FileConfigSource) Load(configType string) (map[string]any, error) {
 	if _, ok := restorableConfigTypes[configType]; !ok {
 		return nil, apperrors.Validation("SCHEDULER_CONFIG_TYPE_INVALID", "定时任务无法读取该配置", map[string]any{"configType": configType})
 	}
-	path := filepath.Join(s.paths.DataDir, "user-configs", configType+".json")
+	path := s.paths.UserConfigPath(configType + ".json")
 	value, err := jsonstore.Read(path, nil)
 	if err != nil {
 		return nil, apperrors.WithStatus("SCHEDULER_CONFIG_LOAD_FAILED", "读取配置失败", 500, true, map[string]any{"configType": configType})

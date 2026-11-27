@@ -104,12 +104,12 @@ func (s *DataService) MasteryDataPath() string {
 
 // OperBoxPath is the OperBox snapshot file.
 func (s *DataService) OperBoxPath() string {
-	return filepath.Join(s.paths.DataDir, "operbox.json")
+	return s.paths.OperBoxPath()
 }
 
 // DepotPath is the depot snapshot file.
 func (s *DataService) DepotPath() string {
-	return filepath.Join(s.paths.DataDir, "depot.json")
+	return s.paths.DepotPath()
 }
 
 func (s *DataService) battleDataPath() string {

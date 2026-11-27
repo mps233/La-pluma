@@ -184,7 +184,7 @@ func (s *Service) RecognizeDepotRequest(ctx context.Context, request Request) (*
 		return items[left].SortID < items[right].SortID
 	})
 
-	outputPath := filepath.Join(s.effectiveDataDir(request), "depot.json")
+	outputPath := filepath.Join(s.effectiveDataDir(request), config.DepotFile)
 	output := DepotOutput{
 		Timestamp: s.timestamp(),
 		ItemCount: itemCount,
@@ -263,7 +263,7 @@ func (s *Service) RecognizeOperBoxRequest(ctx context.Context, request Request) 
 		}
 	}
 
-	outputPath := filepath.Join(s.effectiveDataDir(request), "operbox.json")
+	outputPath := filepath.Join(s.effectiveDataDir(request), config.OperBoxFile)
 	output := OperBoxOutput{
 		Timestamp:      s.timestamp(),
 		OperCount:      len(opers),

@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -630,5 +629,5 @@ func (noopCommandHandler) RunFlow(context.Context, string, []map[string]any) err
 
 // flowConfigPath is the persisted task-flow location.
 func (b *Bot) flowConfigPath(flowType string) string {
-	return filepath.Join(b.paths.DataDir, "user-configs", flowType+"-tasks.json")
+	return b.paths.UserConfigPath(flowType + "-tasks.json")
 }

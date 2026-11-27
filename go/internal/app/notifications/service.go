@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -159,7 +158,7 @@ func (s *Service) RegisterChannel(name string, factory ChannelFactory) {
 
 // ConfigPath is the persisted notification config location.
 func (s *Service) ConfigPath() string {
-	return filepath.Join(s.paths.DataDir, "user-configs", notificationConfigName+".json")
+	return s.paths.UserConfigPath(notificationConfigName + ".json")
 }
 
 // Load reads notification.json and applies it in memory. A missing file keeps

@@ -162,14 +162,14 @@ func NewWithOptions(options Options) *Service {
 		resourceRefreshAttempts: map[string]time.Time{},
 	}
 	if service.configLoader == nil {
-		service.configLoader = &fileConfigLoader{dir: filepath.Join(options.Paths.DataDir, "user-configs")}
+		service.configLoader = &fileConfigLoader{dir: options.Paths.UserConfigDir()}
 	}
 	if service.operBoxLoader == nil {
-		service.operBoxLoader = &fileOperBoxLoader{path: filepath.Join(options.Paths.DataDir, "operbox.json")}
+		service.operBoxLoader = &fileOperBoxLoader{path: options.Paths.OperBoxPath()}
 	}
 	if service.activityCache == nil {
 		service.activityCache = &fileActivityCacheStore{
-			path: filepath.Join(options.Paths.DataDir, "user-configs", "activity-cache.json"),
+			path: options.Paths.UserConfigPath("activity-cache.json"),
 		}
 	}
 	if service.stageResolver == nil {

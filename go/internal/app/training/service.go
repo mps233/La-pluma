@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -19,7 +18,6 @@ import (
 const (
 	trainingQueueFile  = "training-queue.json"
 	automationTaskFile = "automation-tasks.json"
-	userConfigDir      = "user-configs"
 )
 
 var materialFetchScripts = []string{
@@ -82,11 +80,11 @@ func NewWithOptions(options Options) *Service {
 }
 
 func (s *Service) queuePath() string {
-	return filepath.Join(s.paths.DataDir, userConfigDir, trainingQueueFile)
+	return s.paths.UserConfigPath(trainingQueueFile)
 }
 
 func (s *Service) automationTaskPath() string {
-	return filepath.Join(s.paths.DataDir, userConfigDir, automationTaskFile)
+	return s.paths.UserConfigPath(automationTaskFile)
 }
 
 func (s *Service) nowISO() string {

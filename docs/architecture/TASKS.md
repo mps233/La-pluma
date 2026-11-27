@@ -10,7 +10,7 @@ without re-investigation.
 | ID | P | Area | Task | Evidence |
 | --- | --- | --- | --- | --- |
 | G1 | P1 | go | Finish the `internal/util/jsval` migration: `drops`, `scheduler`, `notifications`, `updates`, `quotes`, `gamedata`, `maa/results`, `mastery`, `recognition`, `training`, `customtools`, `run_resume`, `agentapi` still carry local copies | `internal/util/jsval` now serves `activity` and `copilot`; compare each remaining helper body before mapping (`asString` is a type assertion → `jsval.Text`, not `jsval.String`) |
-| G3 | P1 | go | Typed owners for `operbox.json`, `depot.json`, and the `user-configs` path | written in `recognition/service.go:188,267`; read in `mastery/data.go:107,112`, `training/data.go:211,292`, `handler.go:1849,1858`; path composed in 7 packages |
+| G3 | P1 | go | Typed schemas for `operbox.json` and `depot.json` so the writer and readers share field definitions | `recognition/service.go` writes `OperBoxOutput`/`DepotOutput`; `training/data.go:212,293`, `mastery/data.go:107,112`, `handler.go:1849,1858` read untyped maps. Paths and filenames are now owned by `config.Paths` |
 | G2 | P1 | go | One PRTS client in `internal/infra/prts`; unify retry/timeout semantics | `activity/prts.go:50-223` vs `copilot/prts.go:73-473` |
 | G9 | P1 | go | Tests for `internal/app/logs` and composition-root wiring; raise agentapi route coverage | only `app/logs` lacks tests; `app.New` covered indirectly |
 | G11 | P1 | go | Read environment only in `internal/config`; document all vars and defaults | 17 undocumented vars; `MAA_CLI_PATH` read in 4 places; `ADB_PATH` hardcoded in `notifications/bot.go:186` |
@@ -62,3 +62,4 @@ without re-investigation.
 - `internal/util/timefmt` created; all API timestamp and date layout literals migrated.
 - Docs drift fixed (action count, state path, Docker ADB, go/README verify, PLAN stale entries); root package renamed.
 - `LA_PLUMA_MAX_REALTIME_LOGS` implemented and documented; buffer size now config-owned.
+- Storage filenames and the `user-configs` path owned by `config.Paths`; seven packages migrated.

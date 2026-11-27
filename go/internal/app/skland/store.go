@@ -36,7 +36,7 @@ func NewStore(paths config.Paths) *Store {
 }
 
 func (s *Store) userConfigPath(name string) string {
-	return filepath.Join(s.paths.DataDir, "user-configs", name)
+	return s.paths.UserConfigPath(name)
 }
 
 func (s *Store) credentialsPath() string {

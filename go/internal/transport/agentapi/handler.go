@@ -1846,7 +1846,7 @@ func (h *Handler) openStages(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) operboxData(w http.ResponseWriter, r *http.Request) {
-	value, err := jsonstore.Read(filepath.Join(h.app.Config().Paths.DataDir, "operbox.json"), map[string]any{})
+	value, err := jsonstore.Read(h.app.Config().Paths.OperBoxPath(), map[string]any{})
 	if err != nil {
 		writeError(w, err)
 		return
@@ -1855,7 +1855,7 @@ func (h *Handler) operboxData(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) depotData(w http.ResponseWriter, r *http.Request) {
-	value, err := jsonstore.Read(filepath.Join(h.app.Config().Paths.DataDir, "depot.json"), map[string]any{})
+	value, err := jsonstore.Read(h.app.Config().Paths.DepotPath(), map[string]any{})
 	if err != nil {
 		writeError(w, err)
 		return

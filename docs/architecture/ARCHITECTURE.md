@@ -56,7 +56,7 @@ transport → app → infra / domain
 | Run persistence, idempotency, restore | `internal/app/agentrun` | Single writer in-process |
 | MAA process lifecycle | `internal/infra/maa` + `internal/app/maa` | CLI spawn/stop/line capture |
 | MAA execution lease | `internal/app/execution` | Cross-process admission |
-| Data directory and env-derived paths | `internal/config` | Services should not read env directly (known deviations) |
+| Data directory and env-derived paths | `internal/config` | `Paths` also owns the on-disk file and directory names |
 | User configs, MAA profiles, `cli.toml` | `internal/app/config` | JSON + TOML; atomic writes via `jsonstore` |
 | JSON persistence and atomic file replace | `internal/util/jsonstore` | `Read`/`Write`/`WriteRaw` |
 | JS value coercion for upstream JSON | `internal/util/jsval` | `Record`/`Array`/`Text`/`String`/`Number`/`Truthy`; migrate remaining packages |

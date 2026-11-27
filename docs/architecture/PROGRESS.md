@@ -177,6 +177,19 @@ deleted, verification, and follow-ups.
   copilot wiring).
 - Verified: Go build/tests/vet in the touched packages.
 
+### Round 17 — own storage filenames in config.Paths (2026-11-28)
+
+- `operbox.json`, `depot.json`, and the `user-configs` directory were spelled
+  in twelve production sites, with two duplicate constants.
+- Added `OperBoxFile`/`DepotFile`/`UserConfigsDir` and
+  `OperBoxPath`/`DepotPath`/`UserConfigDir`/`UserConfigPath` to `config.Paths`;
+  migrated recognition, training, mastery, activity, scheduler, notifications,
+  skland, app config, and transport.
+- Deleted: two duplicate constants and five unused imports.
+- Verified: full Go test suite, vet, gofmt; added path tests.
+- Follow-up: the JSON schemas themselves remain untyped (G3).
+
+
 
 
 

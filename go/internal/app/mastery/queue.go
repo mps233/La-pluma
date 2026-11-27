@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -76,7 +75,7 @@ func NewQueueService(options QueueOptions) *QueueService {
 
 // QueuePath is the persisted queue file path.
 func (s *QueueService) QueuePath() string {
-	return filepath.Join(s.paths.DataDir, userConfigDir, "operator-mastery-queue.json")
+	return s.paths.UserConfigPath("operator-mastery-queue.json")
 }
 
 func (s *QueueService) nowISO() string {

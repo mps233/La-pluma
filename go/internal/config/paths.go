@@ -22,6 +22,29 @@ type Paths struct {
 
 type Getenv func(string) string
 
+// On-disk names inside Paths.DataDir. Recognition writes the snapshots and
+// training, mastery, activity, scheduling, notifications, and transport read
+// them, so the names live in one place rather than in every reader.
+const (
+	OperBoxFile    = "operbox.json"
+	DepotFile      = "depot.json"
+	UserConfigsDir = "user-configs"
+)
+
+// OperBoxPath is the operator-box snapshot file.
+func (p Paths) OperBoxPath() string { return filepath.Join(p.DataDir, OperBoxFile) }
+
+// DepotPath is the depot snapshot file.
+func (p Paths) DepotPath() string { return filepath.Join(p.DataDir, DepotFile) }
+
+// UserConfigDir is the directory holding saved user configuration documents.
+func (p Paths) UserConfigDir() string { return filepath.Join(p.DataDir, UserConfigsDir) }
+
+// UserConfigPath resolves one file inside UserConfigDir.
+func (p Paths) UserConfigPath(name string) string {
+	return filepath.Join(p.UserConfigDir(), name)
+}
+
 // ResolvePaths mirrors server/config/paths.ts and adds the la-pluma data and
 // client roots. Empty environment values are treated as unset.
 func ResolvePaths(getenv Getenv, osName, home, cwd string) Paths {

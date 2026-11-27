@@ -12,8 +12,6 @@ import (
 )
 
 const (
-	userConfigDir = "user-configs"
-
 	defaultClientType = "Official"
 
 	// The values are part of the Agent API contract used by preflight.
