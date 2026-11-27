@@ -87,8 +87,20 @@ deleted, verification, and follow-ups.
 - Added an ESLint `no-restricted-imports` rule to keep the boundary.
 - Deleted: `client/src/components/common/Segmented.tsx` (moved).
 
-### Round 9 — governance records (2026-11-28)
+### Round 9 — governance records (2026-11-28, `04f6bf8c`)
 
 - Added `ARCHITECTURE.md`, `INVARIANTS.md`, `TASKS.md`, and this log.
 - No production change.
+
+### Round 10 — extract the duplicated task restore monitor (2026-11-28)
+
+- CombatTasks and RoguelikeTasks carried the same 86-line run-restore and
+  2 s poll effect, differing only in task type and one warning string.
+- Added `hooks/useTaskRestoreMonitor` and `useTaskRestoreMonitor.test.ts`
+  (restore, non-matching type, stale run, three-failure warning).
+- Both page effects now only load configuration; polling has one owner.
+- Deleted: two inline copies of the effect (~170 lines total).
+- Verified: type-check, full client tests (73 files / 508 tests), lint at
+  the ratchet.
+
 

@@ -9,7 +9,6 @@ without re-investigation.
 
 | ID | P | Area | Task | Evidence |
 | --- | --- | --- | --- | --- |
-| C1 | P0 | client | Extract the duplicated run-restore + 2 s poll effect into `hooks/useTaskRestoreMonitor` | `CombatTasks.tsx:609-695`, `RoguelikeTasks.tsx:172-258` (86-line duplicate; only type/labels differ) |
 | C2 | P0 | client | One module for duration/timestamp/error formatting (`lib/format.ts`, `lib/errors.ts`) | `utils/runIsland.ts:114`, `CombatExecutionProgress.tsx:4`, `AutomationTasks.tsx:65`, `MasteryTrainingWorkspace.tsx:100,104,133`, `NotificationSettings.tsx:55`, `LogViewer.tsx:125` |
 | C3 | P0 | client | Move the notification API out of `NotificationSettings.tsx` into `services/api.ts`; merge the duplicated `AutoUpdateConfig` | `NotificationSettings.tsx:30-90,67,169,205`; `api.ts:90` vs `types/components.ts:338` |
 | C4 | P1 | client | Consolidate `store/` + `stores/` into one `src/state/` module with one barrel; migrate all imports | 46 imports to `store/`, 20 to `stores/`; 25 relative deep imports |
@@ -62,3 +61,4 @@ without re-investigation.
 - Dead `uibrik` background deleted, stale README rewritten (`d7736830`).
 - Client lint ratchet + verify dedupe (`e4843dda`).
 - Glass adapter boundary restored and enforced (`ffed77d2`).
+- Duplicated run-restore/poll effect extracted to `useTaskRestoreMonitor` with hook tests.

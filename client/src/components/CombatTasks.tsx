@@ -30,6 +30,7 @@ import type {
 } from '@/types/components'
 import { useAutomationAvailability } from '../hooks/useBackendStatusMonitor'
 import { useSwipeModeTrack } from '../hooks/useSwipeModeTrack'
+import { useTaskRestoreMonitor } from '../hooks/useTaskRestoreMonitor'
 import { useUIStore, type CombatCopilotPrefill } from '@/stores'
 
 type CopilotSetExecutionMode = 'manual' | 'cli'
@@ -606,89 +607,20 @@ export default function CombatTasks() {
     }
   }
 
-  // 页面加载时从服务器或 localStorage 加载配置和恢复执行状态
+  useTaskRestoreMonitor({
+    taskType: 'combat',
+    setRunning: setIsRunning,
+    setActiveStatus: setIsActiveStatus,
+    setStatusMessage,
+    unreachableWarning: '暂时无法确认作业状态，将继续重试；需要时可手动终止',
+  })
+
+  // 页面加载时从服务器或 localStorage 加载配置
   useEffect(() => {
     let cancelled = false
-    let pollInterval: ReturnType<typeof setInterval> | null = null
-    let pollFailures = 0
-    let pollRequestInFlight = false
-    const controller = new AbortController()
-
-    const stopStatusPolling = () => {
-      if (!pollInterval) return
-      clearInterval(pollInterval)
-      pollInterval = null
-    }
-
-    // 从后端获取真实的任务执行状态
-    const checkBackendStatus = async () => {
-      try {
-        const result = await maaApi.getTaskStatus(controller.signal)
-        if (cancelled) return
-        const taskStatus = result.data
-        if (result.success) {
-          const backendRunning = Boolean(taskStatus?.isRunning)
-          setIsActiveStatus(backendRunning)
-
-          if (!backendRunning || taskStatus?.taskType !== 'combat') {
-            setIsRunning(false)
-            return
-          }
-
-          // 后端确实有任务在运行
-          const { taskName, startTime, taskType } = taskStatus
-
-          // 只恢复属于自动战斗的任务
-          if (taskType === 'combat') {
-            const elapsedMinutes = (Date.now() - (startTime ?? 0)) / 1000 / 60
-            setIsRunning(true)
-            if (elapsedMinutes > 5) {
-              setStatusMessage(`${taskName} 可能已完成（${keepNumberWithUnit(`已运行 ${Math.floor(elapsedMinutes)} 分钟`)}）`)
-            } else {
-              setStatusMessage(`正在执行: ${taskName}`)
-            }
-
-            // 启动轮询，持续检查任务状态
-            pollInterval = setInterval(async () => {
-              if (pollRequestInFlight || document.hidden) return
-              pollRequestInFlight = true
-              try {
-                const statusResult = await maaApi.getTaskStatus(controller.signal)
-                if (cancelled) return
-                if (statusResult.success) {
-                  setIsActiveStatus(Boolean(statusResult.data?.isRunning))
-                }
-                if (statusResult.success && statusResult.data?.isRunning === false) {
-                  // 任务已完成
-                  setIsRunning(false)
-                  setStatusMessage('任务已完成')
-                  stopStatusPolling()
-                } else if (statusResult.success) {
-                  pollFailures = 0
-                }
-              } catch (error) {
-                if (cancelled || (error instanceof Error && error.name === 'AbortError')) return
-                pollFailures += 1
-                if (pollFailures === 3) {
-                  setStatusMessage('暂时无法确认作业状态，将继续重试；需要时可手动终止', 'warning')
-                }
-              } finally {
-                pollRequestInFlight = false
-              }
-            }, 2000) // 每2秒检查一次
-          }
-        }
-      } catch (error) {
-        // 静默失败，不影响用户体验
-      }
-    }
-
-    void checkBackendStatus()
 
     const cleanup = () => {
       cancelled = true
-      controller.abort()
-      stopStatusPolling()
     }
 
     if (configHydratedRef.current) return cleanup
@@ -791,7 +723,7 @@ export default function CombatTasks() {
       })
 
     return cleanup
-  }, [normalizeAdvancedConfig, setIsActiveStatus, setStatusMessage])
+  }, [normalizeAdvancedConfig, setStatusMessage])
 
   // 自动保存配置
   useEffect(() => {
