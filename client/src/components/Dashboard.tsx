@@ -352,7 +352,7 @@ export default function Dashboard() {
   useEffect(() => {
     let disposed = false
     let requestInFlight = false
-    const fetch = async () => {
+    const loadDeviceStats = async () => {
       if (requestInFlight || document.hidden) return
       requestInFlight = true
       try {
@@ -366,10 +366,10 @@ export default function Dashboard() {
         requestInFlight = false
       }
     }
-    void fetch()
-    const timer = window.setInterval(() => void fetch(), 15000)
+    void loadDeviceStats()
+    const timer = window.setInterval(() => void loadDeviceStats(), 15000)
     const handleVisibility = () => {
-      if (!document.hidden) void fetch()
+      if (!document.hidden) void loadDeviceStats()
     }
     document.addEventListener('visibilitychange', handleVisibility)
     return () => {

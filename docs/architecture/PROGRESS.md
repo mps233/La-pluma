@@ -39,7 +39,7 @@ concepts, with the old copies deleted:
 | Data file names and user-config dir | `config.Paths` | path tests |
 | Connection defaults | `app/config.ConnectionDefaultsFromEnv` | precedence tests |
 | Client global state | `client/src/state` + one barrel | type-check/tests |
-| Client HTTP access | `services/api.ts` | component tests + service boundary |
+| Client HTTP access | `services/api.ts` | `apiBoundary.test.ts` + component tests |
 | Client glass kit boundary | `components/glass` | ESLint `no-restricted-imports` |
 | Client formatting/errors | `utils/format.ts`, `utils/errorMessage.ts` | unit tests |
 | Client draft-sync protocol | `utils/configSync.ts` | gate tests |
@@ -295,6 +295,17 @@ deleted, verification, and follow-ups.
   direct config literals and tests keep their behavior; the read lives only
   in the config package.
 - Verified: full Go test suite, vet, gofmt; added config tests.
+
+### Round 24 — enforce the client API boundary (2026-11-28)
+
+- The only raw `fetch` outside `services/api.ts` was a local helper named
+  `fetch` in Dashboard; renamed it to `loadDeviceStats` to remove the
+  ambiguity.
+- Added `services/apiBoundary.test.ts`: a build-time glob scans application
+  sources (excluding vendored kits and tests) and fails if `fetch(` appears
+  outside the shared client.
+- Verified: type-check, 76 test files / 518 tests, lint at the ratchet.
+
 
 
 

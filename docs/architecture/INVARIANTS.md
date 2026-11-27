@@ -15,6 +15,7 @@ enforcement mechanism belongs in `TASKS.md`, not in this list.
 | Atomic file replacement has one implementation (0600 temp file, fsync, rename) | `internal/util/jsonstore/store_test.go` | `cd go && go test ./internal/util/jsonstore` |
 | Application code imports Liquid Glass only through `@/components/glass` (documented preview exception) | ESLint `no-restricted-imports` | `npm run lint --prefix client` |
 | Agent API endpoint files stay split by domain (≤ 800 production lines per file) | `TestAgentAPIFilesStaySmall` | `cd go && go test ./internal/archguard` |
+| Raw `fetch(` appears only in `services/api.ts`; everything else uses `fetchWithAuth`/`maaApi` | `services/apiBoundary.test.ts` | `npm run test --prefix client` |
 | Client lint does not exceed the current warning count | `--max-warnings 1` in `client/package.json` | `npm run lint --prefix client` |
 | Strict TypeScript, including `noUnusedLocals` and `noUnusedParameters` | `tsc --noEmit` | `npm run type-check --prefix client` |
 | Pages are code-split and PWA/page caching configuration is covered | `vite.config.test.ts` | `npm run test --prefix client` |
@@ -27,7 +28,6 @@ These are known gaps; do not treat them as guaranteed by CI:
 - Client lint/type-check/test on non-main branches (only `docker-publish.yml`
   runs the client; `.github/` is intentionally untouched).
 - No hard-coded hex colors outside the token files.
-- No direct `fetch` outside the API layer.
 - No page CSS selectors duplicated in global CSS.
 - No `net/http` handlers in `app`/`infra`.
 - Environment variables are only read by `internal/config`.
