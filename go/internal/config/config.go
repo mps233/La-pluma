@@ -22,6 +22,9 @@ type Config struct {
 
 	// LogBufferSize caps the in-memory realtime log buffer.
 	LogBufferSize int
+	// MAACLIPath is the resolved maa executable. Use MAAExecutable for the
+	// non-empty form.
+	MAACLIPath string
 
 	Paths Paths
 }
@@ -61,6 +64,15 @@ func Load(getenv Getenv, osName, home, cwd string) (Config, error) {
 		logBufferSize = parsed
 	}
 
+	maaCLIPath := read("MAA_CLI_PATH", "")
+	if maaCLIPath == "" {
+		if read("DOCKER_ENV", "") != "" {
+			maaCLIPath = "/usr/local/bin/maa"
+		} else {
+			maaCLIPath = "maa"
+		}
+	}
+
 	cert := strings.TrimSpace(getenv("LA_PLUMA_HTTPS_CERT_PATH"))
 	key := strings.TrimSpace(getenv("LA_PLUMA_HTTPS_KEY_PATH"))
 	if (cert == "") != (key == "") {
@@ -94,8 +106,22 @@ func Load(getenv Getenv, osName, home, cwd string) (Config, error) {
 		TLSCertFile:   cert,
 		TLSKeyFile:    key,
 		LogBufferSize: logBufferSize,
+		MAACLIPath:    maaCLIPath,
 		Paths:         paths,
 	}, nil
+}
+
+// MAAExecutable returns the configured maa executable. A zero-value Config
+// still honors MAA_CLI_PATH so direct Config literals (tests, embedded
+// callers) keep the previous behavior; the environment is read only here.
+func (c Config) MAAExecutable() string {
+	if value := strings.TrimSpace(c.MAACLIPath); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(os.Getenv("MAA_CLI_PATH")); value != "" {
+		return value
+	}
+	return "maa"
 }
 
 // NormalizeBasePath returns "/" or "/name/" with exactly one leading slash and

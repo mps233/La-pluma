@@ -133,7 +133,7 @@ func NewWithOptions(options Options) *Service {
 	}
 	maaCLIPath := options.MaaCLIPath
 	if maaCLIPath == "" {
-		maaCLIPath = defaultMaaCLIPath()
+		maaCLIPath = "maa"
 	}
 	platform := options.Platform
 	if platform == nil {
@@ -744,14 +744,4 @@ func defaultIsDocker() bool {
 	}
 	_, err := os.Stat("/.dockerenv")
 	return err == nil
-}
-
-func defaultMaaCLIPath() string {
-	if value := strings.TrimSpace(os.Getenv("MAA_CLI_PATH")); value != "" {
-		return value
-	}
-	if os.Getenv("DOCKER_ENV") != "" {
-		return "/usr/local/bin/maa"
-	}
-	return "maa"
 }

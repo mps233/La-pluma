@@ -267,6 +267,7 @@ func startDesktop() {
 		BasePath:      "/",
 		Token:         token,
 		LogBufferSize: 5000,
+		MAACLIPath:    strings.TrimSpace(os.Getenv("MAA_CLI_PATH")),
 		Paths:         defaultPaths,
 	}
 	application, err := app.New(cfg, logger)

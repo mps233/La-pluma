@@ -283,6 +283,20 @@ deleted, verification, and follow-ups.
 - Verified: quotes handler/service, httpapi, and full Go suite.
 - Follow-up: `infra/assets` still owns its router (G6 remainder).
 
+### Round 23 — resolve the MAA executable once (2026-11-28)
+
+- `MAA_CLI_PATH` was read by the composition root, the mastery adapter, the
+  updates service, and the desktop entry, with different Docker fallbacks.
+- Added `Config.MAACLIPath` (resolved in `Load`, including the Docker default)
+  and `Config.MAAExecutable()`; the composition root, mastery, and updates
+  now receive the resolved value. The desktop entry snapshots the env it
+  already discovers into the config.
+- A zero-value Config still honors `MAA_CLI_PATH` inside `MAAExecutable`, so
+  direct config literals and tests keep their behavior; the read lives only
+  in the config package.
+- Verified: full Go test suite, vet, gofmt; added config tests.
+
+
 
 
 

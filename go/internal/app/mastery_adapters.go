@@ -139,10 +139,7 @@ func (p masteryTrainingProbe) TrainingState(ctx context.Context) (mastery.Traini
 }
 
 func newMasteryService(cfg config.Config, logger *slog.Logger, executor maaServiceAdapter, executionManager *execution.Manager, notificationService *notifications.Service, training mastery.TrainingProbe) *mastery.Service {
-	maaPath := os.Getenv("MAA_CLI_PATH")
-	if strings.TrimSpace(maaPath) == "" {
-		maaPath = "maa"
-	}
+	maaPath := cfg.MAAExecutable()
 	service := mastery.NewService(mastery.ServiceOptions{
 		Paths:             cfg.Paths,
 		Logger:            logger,

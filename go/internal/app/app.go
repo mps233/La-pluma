@@ -97,11 +97,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		host = "la-pluma"
 	}
 	executionManager := execution.NewManager(filepath.Join(cfg.Paths.DataDir, "maa-execution.lock"), host, logger)
-	maaPath := os.Getenv("MAA_CLI_PATH")
-	if maaPath == "" {
-		maaPath = "maa"
-	}
-	runner := maa.New(maaPath)
+	runner := maa.New(cfg.MAAExecutable())
 	if cfg.Paths.MaaStateDir != "" {
 		runner.SetLogPath(filepath.Join(cfg.Paths.MaaStateDir, "debug", "asst.log"))
 	}
@@ -156,9 +152,10 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		logger.Debug("notification config not loaded", "error", err)
 	}
 	updatesService := updates.NewWithOptions(updates.Options{
-		Paths:  cfg.Paths,
-		Logger: logger,
-		Runner: maaServiceAdapter{service: maaActions},
+		Paths:      cfg.Paths,
+		Logger:     logger,
+		Runner:     maaServiceAdapter{service: maaActions},
+		MaaCLIPath: cfg.MAAExecutable(),
 	})
 	profiles := configapp.NewProfiles(cfg.Paths.MaaConfigDir)
 	schedulerService := newScheduler(cfg, logger, runs, maaActions, dropService, trainingService, activityService, recognitionService, notificationService, configStore, updatesAutoUpdater{service: updatesService}, profiles)

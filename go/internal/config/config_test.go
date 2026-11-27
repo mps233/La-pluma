@@ -33,6 +33,9 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.LogBufferSize != 5000 {
 		t.Fatalf("unexpected log buffer default: %d", cfg.LogBufferSize)
 	}
+	if cfg.MAAExecutable() != "maa" {
+		t.Fatalf("unexpected MAA executable default: %s", cfg.MAAExecutable())
+	}
 	if cfg.Paths.DataDir != filepath.Join("/repo", "server", "data") {
 		t.Fatalf("unexpected data dir: %s", cfg.Paths.DataDir)
 	}
@@ -90,6 +93,28 @@ func TestPathsDataFiles(t *testing.T) {
 	}
 	if got := paths.UserConfigPath("notification.json"); got != filepath.Join("/data", "user-configs", "notification.json") {
 		t.Fatalf("UserConfigPath = %s", got)
+	}
+}
+
+func TestLoadMaaCLIPath(t *testing.T) {
+	cfg, err := Load(func(key string) string {
+		if key == "MAA_CLI_PATH" {
+			return "/custom/maa"
+		}
+		return ""
+	}, "darwin", "/Users/test", "/repo")
+	if err != nil || cfg.MAAExecutable() != "/custom/maa" {
+		t.Fatalf("maa path = %q, err = %v", cfg.MAAExecutable(), err)
+	}
+
+	cfg, err = Load(func(key string) string {
+		if key == "DOCKER_ENV" {
+			return "1"
+		}
+		return ""
+	}, "linux", "/root", "/app")
+	if err != nil || cfg.MAAExecutable() != "/usr/local/bin/maa" {
+		t.Fatalf("docker maa path = %q, err = %v", cfg.MAAExecutable(), err)
 	}
 }
 
