@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -141,7 +140,7 @@ func NewWithOptions(options Options) *Service {
 	}
 	isDocker := options.IsDocker
 	if isDocker == nil {
-		isDocker = defaultIsDocker
+		isDocker = func() bool { return config.DefaultTuning().IsDocker }
 	}
 	now := options.Now
 	if now == nil {
@@ -733,15 +732,4 @@ func defaultPlatform() string {
 		return "win32"
 	}
 	return runtime.GOOS
-}
-
-func defaultIsDocker() bool {
-	// Docker writes /.dockerenv for every container; DOCKER_ENV is an explicit
-	// override for compatible runtimes that do not. NODE_ENV is a Node.js
-	// convention and is not set by the Go image, so it cannot be the signal.
-	if os.Getenv("DOCKER_ENV") != "" {
-		return true
-	}
-	_, err := os.Stat("/.dockerenv")
-	return err == nil
 }

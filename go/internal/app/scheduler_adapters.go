@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"regexp"
 	"strings"
 
@@ -234,10 +233,7 @@ func (e maaServiceAdapter) RunTask(ctx context.Context, taskConfig map[string]an
 				clientType = "Official"
 			}
 			if strings.TrimSpace(address) == "" {
-				address = os.Getenv("ADB_ADDRESS")
-			}
-			if strings.TrimSpace(address) == "" {
-				address = "127.0.0.1:16384"
+				address = e.service.DefaultAddress()
 			}
 			run, _, err := e.service.Run(ctx, maaapp.RunRequest{
 				OperationID: "run_task",

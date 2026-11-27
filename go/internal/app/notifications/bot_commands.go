@@ -50,11 +50,11 @@ func (b *Bot) handleCommand(ctx context.Context, chatID, command string, args []
 		text := b.getStatus(ctx)
 		response = &text
 	case "startup":
-		clientType := firstArg(args, 0, defaultClientType())
+		clientType := firstArg(args, 0, b.defaultClientType())
 		text, err := b.executeStartup(ctx, clientType)
 		response = commandResponse(text, err)
 	case "closedown":
-		clientType := firstArg(args, 0, defaultClientType())
+		clientType := firstArg(args, 0, b.defaultClientType())
 		text, err := b.executeClosedown(ctx, clientType)
 		response = commandResponse(text, err)
 	case "screenshot":
@@ -123,8 +123,8 @@ func firstArg(args []string, index int, fallback string) string {
 }
 
 // defaultClientType mirrors DEFAULT_CLIENT_TYPE in connectionDefaults.ts.
-func defaultClientType() string {
-	if value := strings.TrimSpace(os.Getenv("MAA_CLIENT_TYPE")); value != "" {
+func (b *Bot) defaultClientType() string {
+	if value := strings.TrimSpace(b.connection.MAAClientType); value != "" {
 		return value
 	}
 	return "Official"

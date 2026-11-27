@@ -344,6 +344,21 @@ deleted, verification, and follow-ups.
 - Verified: type-check, 76 test files / 518 tests, lint at the ratchet.
 - Follow-up: page skeletons still live in `Loading.tsx` (C10 remainder).
 
+### Round 28 — finish the environment-access migration (2026-11-28)
+
+- Added the remaining knobs to `config.Tuning`: ADB path/address, MAA client
+  type, Docker detection, and the five TURN settings.
+- WebRTC (connection + TURN), MAA (address fallback), scheduler, updates
+  (Docker), and the notification bot (connection + client type) now receive
+  resolved values; their env readers are gone.
+- `config.DetectDocker` replaces the updates-local check; its tests moved to
+  the config package.
+- Added `TestEnvironmentReadsStayInConfig`: production code outside
+  `internal/config` and `internal/app/config` must not call `os.Getenv` or
+  `os.LookupEnv`. Entry points remain allowed to snapshot paths into Config.
+- Verified: full Go test suite, vet, gofmt.
+
+
 
 
 

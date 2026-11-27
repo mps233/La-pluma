@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"testing"
 	"time"
 )
@@ -48,6 +49,28 @@ func TestLoadTuningValues(t *testing.T) {
 	}
 	if tuning.ScrcpyServerPath != "/tmp/scrcpy" || tuning.ScrcpyServerVersion != "6.0.0" || tuning.WebRTCDeviceID != "device-1" {
 		t.Fatalf("scrcpy/device = %#v", tuning)
+	}
+}
+
+func TestDetectDocker(t *testing.T) {
+	if !DetectDocker(func(key string) string {
+		if key == "DOCKER_ENV" {
+			return "1"
+		}
+		return ""
+	}) {
+		t.Fatal("DOCKER_ENV was ignored")
+	}
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return
+	}
+	if DetectDocker(func(key string) string {
+		if key == "NODE_ENV" {
+			return "production"
+		}
+		return ""
+	}) {
+		t.Fatal("NODE_ENV alone must not mark the process as Docker")
 	}
 }
 

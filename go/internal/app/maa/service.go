@@ -58,6 +58,18 @@ func NewService(cfg config.Config, logger *slog.Logger, runner *infraMaa.Runner,
 	return &Service{cfg: cfg, logger: logger, runner: runner, execution: executionManager, runs: runs}
 }
 
+// DefaultAddress is the configured ADB address fallback.
+func (s *Service) DefaultAddress() string {
+	return s.defaultAddress()
+}
+
+func (s *Service) defaultAddress() string {
+	if value := strings.TrimSpace(s.cfg.Tuning.ADBAddress); value != "" {
+		return value
+	}
+	return "127.0.0.1:16384"
+}
+
 func (s *Service) SetLineHandler(handler func(stream, line string)) {
 	s.mu.Lock()
 	s.onLine = handler
@@ -249,10 +261,7 @@ func (s *Service) RunTaskWithOptions(ctx context.Context, input any, wait bool, 
 	cleanup := func() { _ = os.Remove(taskPath) }
 	address := strings.TrimSpace(options.Address)
 	if address == "" {
-		address = strings.TrimSpace(os.Getenv("ADB_ADDRESS"))
-	}
-	if address == "" {
-		address = "127.0.0.1:16384"
+		address = s.defaultAddress()
 	}
 	args := []string{"--batch", filepath.ToSlash(filepath.Join(dynamicTaskDir, taskID)), "--addr", address}
 	if options.UserResource {
@@ -317,10 +326,7 @@ func (s *Service) StartGameWithOptions(ctx context.Context, options StartGameOpt
 	}
 	address := strings.TrimSpace(options.Address)
 	if address == "" {
-		address = strings.TrimSpace(os.Getenv("ADB_ADDRESS"))
-	}
-	if address == "" {
-		address = "127.0.0.1:16384"
+		address = s.defaultAddress()
 	}
 	accountName := strings.TrimSpace(options.AccountName)
 

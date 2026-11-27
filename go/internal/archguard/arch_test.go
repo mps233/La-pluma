@@ -191,6 +191,45 @@ func TestAppLayerHasNoHTTPHandlers(t *testing.T) {
 	}
 }
 
+// TestEnvironmentReadsStayInConfig keeps environment access in the config
+// layer. Services receive resolved values through their options; entry points
+// (main.go, cmd/*) may still discover paths before building a Config.
+func TestEnvironmentReadsStayInConfig(t *testing.T) {
+	root := moduleRoot(t)
+	allowed := []string{
+		filepath.Join("internal", "config"),
+		filepath.Join("internal", "app", "config"),
+	}
+	err := filepath.WalkDir(filepath.Join(root, "internal"), func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		for _, prefix := range allowed {
+			if strings.HasPrefix(rel, prefix+string(filepath.Separator)) {
+				return nil
+			}
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(data), "os.Getenv") || strings.Contains(string(data), "os.LookupEnv") {
+			t.Errorf("%s reads the environment; resolve it in internal/config", rel)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk internal: %v", err)
+	}
+}
+
 func TestLayersAreKnown(t *testing.T) {
 	root := moduleRoot(t)
 	entries, err := os.ReadDir(filepath.Join(root, "internal"))

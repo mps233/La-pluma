@@ -2,6 +2,8 @@ package config
 
 import (
 	"math"
+	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +23,15 @@ type Tuning struct {
 	ScrcpyServerPath     string
 	ScrcpyServerVersion  string
 	WebRTCDeviceID       string
+	ADBPath              string
+	ADBAddress           string
+	MAAClientType        string
+	IsDocker             bool
+	TurnDisabled         bool
+	TurnPort             int
+	TurnUsername         string
+	TurnPassword         string
+	TurnPublicIP         string
 }
 
 const (
@@ -34,6 +45,10 @@ const (
 	maxWebPConcurrency       = 16
 	defaultScrcpyVersion     = "5.0.1"
 	defaultWebRTCDeviceID    = "mumu-la-pluma"
+	defaultADBAddress        = "127.0.0.1:16384"
+	defaultMAAClientType     = "Official"
+	defaultTURNPort          = 3478
+	defaultTURNUsername      = "la-pluma"
 )
 
 // DefaultTuning is the zero-environment configuration.
@@ -46,6 +61,11 @@ func DefaultTuning() Tuning {
 		AssetWebPConcurrency: defaultWebPConcurrency,
 		ScrcpyServerVersion:  defaultScrcpyVersion,
 		WebRTCDeviceID:       defaultWebRTCDeviceID,
+		ADBPath:              platformADBPath(),
+		ADBAddress:           defaultADBAddress,
+		MAAClientType:        defaultMAAClientType,
+		TurnPort:             defaultTURNPort,
+		TurnUsername:         defaultTURNUsername,
 	}
 }
 
@@ -116,5 +136,50 @@ func LoadTuning(getenv Getenv) Tuning {
 	if value := read("LA_PLUMA_WEBRTC_DEVICE_ID"); value != "" {
 		tuning.WebRTCDeviceID = value
 	}
+	if value := read("ADB_PATH"); value != "" {
+		tuning.ADBPath = value
+	}
+	if value := read("ADB_ADDRESS"); value != "" {
+		tuning.ADBAddress = value
+	}
+	if value := read("MAA_CLIENT_TYPE"); value != "" {
+		tuning.MAAClientType = value
+	}
+	tuning.IsDocker = DetectDocker(getenv)
+	if read("LA_PLUMA_WEBRTC_TURN_DISABLED") == "1" {
+		tuning.TurnDisabled = true
+	}
+	if raw := read("LA_PLUMA_WEBRTC_TURN_PORT"); raw != "" {
+		if port, err := strconv.Atoi(raw); err == nil && port > 0 && port < 65536 {
+			tuning.TurnPort = port
+		}
+	}
+	if value := read("LA_PLUMA_WEBRTC_TURN_USERNAME"); value != "" {
+		tuning.TurnUsername = value
+	}
+	if value := read("LA_PLUMA_WEBRTC_TURN_PASSWORD"); value != "" {
+		tuning.TurnPassword = value
+	}
+	if value := read("LA_PLUMA_WEBRTC_TURN_PUBLIC_IP"); value != "" {
+		tuning.TurnPublicIP = value
+	}
 	return tuning
+}
+
+// DetectDocker reports whether the process runs inside a container. Docker
+// writes /.dockerenv; DOCKER_ENV is an explicit override for compatible
+// runtimes that do not.
+func DetectDocker(getenv Getenv) bool {
+	if getenv != nil && strings.TrimSpace(getenv("DOCKER_ENV")) != "" {
+		return true
+	}
+	_, err := os.Stat("/.dockerenv")
+	return err == nil
+}
+
+func platformADBPath() string {
+	if runtime.GOOS == "darwin" {
+		return "/opt/homebrew/bin/adb"
+	}
+	return "adb"
 }

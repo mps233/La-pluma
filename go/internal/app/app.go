@@ -161,6 +161,7 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Logger:     logger,
 		Runner:     maaServiceAdapter{service: maaActions},
 		MaaCLIPath: cfg.MAAExecutable(),
+		IsDocker:   func() bool { return cfg.Tuning.IsDocker },
 	})
 	profiles := configapp.NewProfiles(cfg.Paths.MaaConfigDir)
 	schedulerService := newScheduler(cfg, logger, runs, maaActions, dropService, trainingService, activityService, recognitionService, notificationService, configStore, updatesAutoUpdater{service: updatesService}, profiles)
@@ -204,9 +205,10 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		instanceLock:  instanceLock,
 	}
 	application.Bot = notifications.NewBot(notifications.BotOptions{
-		Paths:   cfg.Paths,
-		Logger:  logger,
-		Handler: telegramCommandHandler{app: application},
+		Paths:      cfg.Paths,
+		Connection: cfg.Tuning,
+		Logger:     logger,
+		Handler:    telegramCommandHandler{app: application},
 	})
 	if err := application.ConfigureTelegramBot(context.Background(), notificationService.GetConfig()); err != nil {
 		logger.Warn("Telegram Bot 启动失败", "error", err)

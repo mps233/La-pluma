@@ -7,13 +7,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
 
-	configapp "github.com/mps233/la-pluma/go/internal/app/config"
 	"github.com/mps233/la-pluma/go/internal/config"
 )
 
@@ -104,6 +101,7 @@ func BotConfigFromChannel(channel ChannelConfig) BotConfig {
 // base URLs and sleep hook so no real network or timer is used.
 type BotOptions struct {
 	Paths              config.Paths
+	Connection         config.Tuning
 	Config             BotConfig
 	Handler            CommandHandler
 	HTTPClient         *http.Client
@@ -118,12 +116,13 @@ type BotOptions struct {
 type Bot struct {
 	mu sync.Mutex
 
-	config  BotConfig
-	handler CommandHandler
-	paths   config.Paths
-	logger  *slog.Logger
-	sleep   func(ctx context.Context, duration time.Duration) error
-	now     func() time.Time
+	config     BotConfig
+	connection config.Tuning
+	handler    CommandHandler
+	paths      config.Paths
+	logger     *slog.Logger
+	sleep      func(ctx context.Context, duration time.Duration) error
+	now        func() time.Time
 
 	telegram *telegramClient
 	copilot  string
@@ -168,33 +167,34 @@ func NewBot(options BotOptions) *Bot {
 		sleep = contextSleep
 	}
 	config := options.Config
-	config.ADBPath, config.ADBAddress = withConnectionDefaults(config.ADBPath, config.ADBAddress)
+	config.ADBPath, config.ADBAddress = withConnectionDefaults(options.Connection, config.ADBPath, config.ADBAddress)
 	return &Bot{
-		config:   config,
-		handler:  handler,
-		paths:    options.Paths,
-		logger:   logger,
-		sleep:    sleep,
-		now:      now,
-		telegram: newTelegramClient(httpClient, telegramBase),
-		copilot:  strings.TrimRight(copilotBase, "/"),
-		http:     httpClient,
+		config:     config,
+		connection: options.Connection,
+		handler:    handler,
+		paths:      options.Paths,
+		logger:     logger,
+		sleep:      sleep,
+		now:        now,
+		telegram:   newTelegramClient(httpClient, telegramBase),
+		copilot:    strings.TrimRight(copilotBase, "/"),
+		http:       httpClient,
 	}
 }
 
-func withConnectionDefaults(adbPath, adbAddress string) (string, string) {
-	defaults := configapp.ConnectionDefaultsFromEnv(os.Getenv, runtime.GOOS)
+func withConnectionDefaults(tuning config.Tuning, adbPath, adbAddress string) (string, string) {
+	defaults := config.DefaultTuning()
+	if strings.TrimSpace(tuning.ADBPath) != "" {
+		defaults.ADBPath = tuning.ADBPath
+	}
+	if strings.TrimSpace(tuning.ADBAddress) != "" {
+		defaults.ADBAddress = tuning.ADBAddress
+	}
 	if strings.TrimSpace(adbPath) == "" {
-		adbPath = strings.TrimSpace(os.Getenv("ADB_PATH"))
-		if adbPath == "" {
-			adbPath = defaults.ADBPath
-		}
+		adbPath = defaults.ADBPath
 	}
 	if strings.TrimSpace(adbAddress) == "" {
-		adbAddress = strings.TrimSpace(os.Getenv("ADB_ADDRESS"))
-		if adbAddress == "" {
-			adbAddress = defaults.Address
-		}
+		adbAddress = defaults.ADBAddress
 	}
 	return adbPath, adbAddress
 }
@@ -232,7 +232,7 @@ func (b *Bot) Init(ctx context.Context, botConfig BotConfig) error {
 	if botConfig.ADBAddress == "" {
 		botConfig.ADBAddress = b.config.ADBAddress
 	}
-	botConfig.ADBPath, botConfig.ADBAddress = withConnectionDefaults(botConfig.ADBPath, botConfig.ADBAddress)
+	botConfig.ADBPath, botConfig.ADBAddress = withConnectionDefaults(b.connection, botConfig.ADBPath, botConfig.ADBAddress)
 	b.config = botConfig
 	enabled := botConfig.Enabled
 	b.mu.Unlock()

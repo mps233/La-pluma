@@ -1,6 +1,7 @@
 package webrtc
 
 import (
+	"github.com/mps233/la-pluma/go/internal/config"
 	"io"
 	"log/slog"
 	"net"
@@ -46,7 +47,10 @@ func TestEmbeddedTURNServesCredentials(t *testing.T) {
 	t.Setenv("LA_PLUMA_WEBRTC_TURN_PORT", strconv.Itoa(port))
 	t.Setenv("LA_PLUMA_WEBRTC_TURN_PUBLIC_IP", "127.0.0.1")
 
-	service := &Service{logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	service := &Service{
+		cfg:    config.Config{Tuning: config.LoadTuning(os.Getenv)},
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
 	service.ensureTURN()
 	t.Cleanup(service.stopTURN)
 	servers := service.ICEServers()
@@ -72,7 +76,10 @@ func TestEmbeddedTURNAllocatesRelay(t *testing.T) {
 	t.Setenv("LA_PLUMA_WEBRTC_TURN_USERNAME", "test-user")
 	t.Setenv("LA_PLUMA_WEBRTC_TURN_PASSWORD", "test-pass")
 
-	service := &Service{logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	service := &Service{
+		cfg:    config.Config{Tuning: config.LoadTuning(os.Getenv)},
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
 	service.ensureTURN()
 	t.Cleanup(service.stopTURN)
 	credentials := service.turnCredentials

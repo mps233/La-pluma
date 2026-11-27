@@ -7,14 +7,12 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/pion/turn/v5"
 
-	configapp "github.com/mps233/la-pluma/go/internal/app/config"
 	"github.com/mps233/la-pluma/go/internal/config"
 	"github.com/mps233/la-pluma/go/internal/infra/adb"
 	"github.com/mps233/la-pluma/go/internal/infra/scrcpy"
@@ -72,9 +70,15 @@ func New(cfg config.Config, logger *slog.Logger) *Service {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	connectionDefaults := configapp.ConnectionDefaultsFromEnv(os.Getenv, runtime.GOOS)
-	adbPath := connectionDefaults.ADBPath
-	address := connectionDefaults.Address
+	defaults := config.DefaultTuning()
+	adbPath := cfg.Tuning.ADBPath
+	if adbPath == "" {
+		adbPath = defaults.ADBPath
+	}
+	address := cfg.Tuning.ADBAddress
+	if address == "" {
+		address = defaults.ADBAddress
+	}
 	deviceID := cfg.Tuning.WebRTCDeviceID
 	if deviceID == "" {
 		deviceID = defaultDeviceID

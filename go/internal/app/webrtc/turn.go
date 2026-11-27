@@ -5,9 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
-	"strings"
 
 	"github.com/pion/turn/v5"
 )
@@ -33,20 +31,19 @@ func (s *Service) ensureTURN() {
 	if s.turnServer != nil && s.turnCredentials != nil {
 		return
 	}
-	if strings.TrimSpace(os.Getenv("LA_PLUMA_WEBRTC_TURN_DISABLED")) == "1" {
+	tuning := s.cfg.Tuning
+	if tuning.TurnDisabled {
 		return
 	}
-	port := defaultTURNPort
-	if raw := strings.TrimSpace(os.Getenv("LA_PLUMA_WEBRTC_TURN_PORT")); raw != "" {
-		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 && parsed < 65536 {
-			port = parsed
-		}
+	port := tuning.TurnPort
+	if port <= 0 {
+		port = defaultTURNPort
 	}
-	username := strings.TrimSpace(os.Getenv("LA_PLUMA_WEBRTC_TURN_USERNAME"))
+	username := tuning.TurnUsername
 	if username == "" {
 		username = "la-pluma"
 	}
-	password := strings.TrimSpace(os.Getenv("LA_PLUMA_WEBRTC_TURN_PASSWORD"))
+	password := tuning.TurnPassword
 	if password == "" {
 		var buffer [16]byte
 		if _, err := rand.Read(buffer[:]); err == nil {
@@ -55,7 +52,7 @@ func (s *Service) ensureTURN() {
 			password = "la-pluma-turn"
 		}
 	}
-	publicIP := net.ParseIP(strings.TrimSpace(os.Getenv("LA_PLUMA_WEBRTC_TURN_PUBLIC_IP")))
+	publicIP := net.ParseIP(tuning.TurnPublicIP)
 	if publicIP == nil {
 		publicIP = localIPv4()
 	}

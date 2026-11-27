@@ -12,7 +12,6 @@ without re-investigation.
 | G1 | P1 | go | Finish the `internal/util/jsval` migration: `drops`, `scheduler`, `notifications`, `updates`, `quotes`, `gamedata`, `maa/results`, `mastery`, `recognition`, `training`, `customtools`, `run_resume`, `agentapi` still carry local copies | `internal/util/jsval` now serves `activity` and `copilot`; compare each remaining helper body before mapping (`asString` is a type assertion → `jsval.Text`, not `jsval.String`) |
 | G3 | P1 | go | Typed schemas for `operbox.json` and `depot.json` so the writer and readers share field definitions | `recognition/service.go` writes `OperBoxOutput`/`DepotOutput`; `training/data.go:212,293`, `mastery/data.go:107,112`, `handler.go:1849,1858` read untyped maps. Paths and filenames are now owned by `config.Paths` |
 | G2 | P1 | go | One PRTS client in `internal/infra/prts`; unify retry/timeout semantics | `activity/prts.go:50-223` vs `copilot/prts.go:73-473` |
-| G11 | P1 | go | Move the remaining service-level env reads into `internal/config` (`ADB_ADDRESS` fallbacks in maa/scheduler, `DOCKER_ENV` in updates, `MAA_CLIENT_TYPE` in bot commands, TURN_* in webrtc) | Battle OCR, mastery tick, drop TTL/TZ, asset WebP, scrcpy path/version, WebRTC device id, MAA CLI, and bot/webrtc ADB defaults now resolve through config |
 | G12 | P2 | go | Raise `agentapi` route coverage beyond the current ~18 of 107 paths | `handler_test.go` exercises ~18 distinct routes; contract tests cover the registry, not handler behavior |
 
 ## Larger refactors
@@ -68,4 +67,5 @@ without re-investigation.
 - Quotes HTTP handler moved from `app/quotes` to `transport/quotesapi`; raw JSON contract preserved.
 - `MAA_CLI_PATH` resolved once by `config.Config.MAAExecutable`; services no longer read it.
 - Task tuning (battle OCR, mastery tick, drop TTL/TZ, WebP, scrcpy, device id) resolved by `config.Tuning`; services receive options.
+- Environment reads confined to the config layer: TURN, ADB defaults, Docker detection, and client type resolved by `config.Tuning`; archguard enforces it.
 - Common component barrel completed; all primitive deep imports migrated.
