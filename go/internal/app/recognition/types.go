@@ -5,6 +5,8 @@
 // device.
 package recognition
 
+import "github.com/mps233/la-pluma/go/internal/domain/snapshot"
+
 // Payload is one parsed MAA callback object. Recognition only depends on the
 // "what" and "details" fields, but keeping the full object avoids re-parsing.
 type Payload map[string]any
@@ -34,25 +36,11 @@ type Request struct {
 	Payloads []Payload
 }
 
-// DepotItem is one enriched depot entry. Count keeps the raw JSON value so a
-// numeric callback count is not re-encoded through float64.
-type DepotItem struct {
-	ID           string  `json:"id"`
-	Name         string  `json:"name"`
-	Count        any     `json:"count"`
-	Icon         any     `json:"icon"`
-	IconID       any     `json:"iconId"`
-	ClassifyType string  `json:"classifyType"`
-	SortID       float64 `json:"sortId"`
-}
+// The persisted document schema is owned by domain/snapshot; the aliases keep
+// the recognition API stable for handlers and tests.
+type DepotItem = snapshot.DepotItem
 
-// DepotOutput is the exact depot.json document shape.
-type DepotOutput struct {
-	Timestamp string      `json:"timestamp"`
-	ItemCount int         `json:"itemCount"`
-	Items     []DepotItem `json:"items"`
-	Complete  bool        `json:"complete"`
-}
+type DepotOutput = snapshot.DepotOutput
 
 // DepotData is the route-facing data payload for a depot recognition.
 type DepotData struct {
@@ -69,22 +57,9 @@ type DepotResult struct {
 	Written bool
 }
 
-// OperBoxRecord is the normalized operator entry retained for the OperBox UI.
-type OperBoxRecord struct {
-	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-	Rarity float64 `json:"rarity"`
-	Own    bool    `json:"own"`
-}
+type OperBoxRecord = snapshot.OperBoxRecord
 
-// OperBoxOutput is the exact operbox.json document shape.
-type OperBoxOutput struct {
-	Timestamp      string          `json:"timestamp"`
-	OperCount      int             `json:"operCount"`
-	TotalOperCount int             `json:"totalOperCount"`
-	Data           []any           `json:"data"`
-	AllOpers       []OperBoxRecord `json:"allOpers"`
-}
+type OperBoxOutput = snapshot.OperBoxOutput
 
 // OperBoxData is the route-facing data payload for an OperBox recognition.
 type OperBoxData struct {

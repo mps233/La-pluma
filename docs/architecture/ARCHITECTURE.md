@@ -53,6 +53,7 @@ transport → app → infra / domain
 | Concept | Owner | Notes |
 | --- | --- | --- |
 | Run status strings, record, DTO, links | `internal/domain/agentrun` | Public API contract; tested |
+| Persisted recognition schema | `internal/domain/snapshot` | operbox/depot document shapes; recognition aliases them |
 | Run persistence, idempotency, restore | `internal/app/agentrun` | Single writer in-process |
 | MAA process lifecycle | `internal/infra/maa` + `internal/app/maa` | CLI spawn/stop/line capture |
 | MAA execution lease | `internal/app/execution` | Cross-process admission |

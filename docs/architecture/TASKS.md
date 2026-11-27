@@ -10,7 +10,7 @@ without re-investigation.
 | ID | P | Area | Task | Evidence |
 | --- | --- | --- | --- | --- |
 | G1 | P1 | go | Finish the `internal/util/jsval` migration: `drops`, `scheduler`, `notifications`, `updates`, `quotes`, `gamedata`, `maa/results`, `mastery`, `recognition`, `training`, `customtools`, `run_resume`, `agentapi` still carry local copies | `internal/util/jsval` now serves `activity` and `copilot`; compare each remaining helper body before mapping (`asString` is a type assertion → `jsval.Text`, not `jsval.String`) |
-| G3 | P1 | go | Typed schemas for `operbox.json` and `depot.json` so the writer and readers share field definitions | `recognition/service.go` writes `OperBoxOutput`/`DepotOutput`; `training/data.go:212,293`, `mastery/data.go:107,112`, `handler.go:1849,1858` read untyped maps. Paths and filenames are now owned by `config.Paths` |
+| G3 | P1 | go | Wire the operbox/depot readers to `internal/domain/snapshot` so field definitions are shared | The document shapes now live in `domain/snapshot` (recognition aliases them); `training/data.go:212,293`, `mastery/data.go:107,112`, `handler.go:1849,1858` still read untyped maps |
 | G2 | P1 | go | One PRTS client in `internal/infra/prts`; unify retry/timeout semantics | `activity/prts.go:50-223` vs `copilot/prts.go:73-473` |
 | G12 | P2 | go | Raise `agentapi` route coverage beyond the current ~18 of 107 paths | `handler_test.go` exercises ~18 distinct routes; contract tests cover the registry, not handler behavior |
 
@@ -68,4 +68,5 @@ without re-investigation.
 - `MAA_CLI_PATH` resolved once by `config.Config.MAAExecutable`; services no longer read it.
 - Task tuning (battle OCR, mastery tick, drop TTL/TZ, WebP, scrcpy, device id) resolved by `config.Tuning`; services receive options.
 - Environment reads confined to the config layer: TURN, ADB defaults, Docker detection, and client type resolved by `config.Tuning`; archguard enforces it.
+- operbox/depot document shapes moved to `internal/domain/snapshot` with JSON tests; recognition aliases them.
 - Common component barrel completed; all primitive deep imports migrated.

@@ -367,6 +367,17 @@ deleted, verification, and follow-ups.
   untouched.
 - Verified: type-check and the boundary test.
 
+### Round 30 — own the recognition document schema (2026-11-28)
+
+- `DepotItem`, `DepotOutput`, `OperBoxRecord`, and `OperBoxOutput` were
+  defined inside the recognition service even though training, mastery, and
+  the Agent API read the same files.
+- Moved the definitions to `internal/domain/snapshot`, added JSON-shape tests,
+  and made recognition alias them so its API and tests are unchanged.
+- Verified: full Go test suite, vet, gofmt.
+- Follow-up: readers still decode untyped maps (G3 remainder).
+
+
 
 
 
