@@ -247,9 +247,30 @@ func buildDynamicFightTaskConfig(task map[string]any, defaults ConnectionDefault
 	}, nil
 }
 
+// taskTypeByCommandID resolves a task type for flows that carry no taskType
+// field. Older saved flows and API clients send only commandId, but maa-cli has
+// no infrast/recruit/mall/award subcommands: running the command id as a
+// subcommand only produces a usage error (exit code 2).
+var taskTypeByCommandID = map[string]string{
+	"infrast": "Infrast",
+	"recruit": "Recruit",
+	"mall":    "Mall",
+	"award":   "Award",
+	"depot":   "Depot",
+}
+
+// resolveTaskType prefers the explicit taskType and falls back to the task type
+// implied by the command id.
+func resolveTaskType(task map[string]any) string {
+	if taskType := stringField(task, "taskType"); taskType != "" {
+		return taskType
+	}
+	return taskTypeByCommandID[strings.ToLower(taskCommandID(task))]
+}
+
 // BuildScheduledTaskCommand mirrors buildScheduledTaskCommand.
 func BuildScheduledTaskCommand(task map[string]any, defaults ConnectionDefaults) (CommandSpec, error) {
-	if taskType := stringField(task, "taskType"); taskType != "" {
+	if taskType := resolveTaskType(task); taskType != "" {
 		params := copyMap(taskParams(task))
 		clientType := firstNonEmptyString(params["clientType"], params["client_type"], defaults.ClientType)
 		if clientType == "" {
@@ -414,6 +435,8 @@ func BuildScheduledTaskCommand(task map[string]any, defaults ConnectionDefaults)
 		}
 	}
 
+	// Remaining commands (startup/closedown/fight and explicit maa-cli
+	// subcommands) run against the CLI directly.
 	return CommandSpec{Command: commandID, Args: args}, nil
 }
 

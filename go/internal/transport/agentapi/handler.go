@@ -2075,20 +2075,6 @@ func (h *Handler) resetCopilotProgress(w http.ResponseWriter, r *http.Request) {
 
 var copilotTitleStagePattern = regexp.MustCompile(`^([A-Z]{2,4}-\d+[A-Z]?)`)
 
-func (h *Handler) resolveStageSearchKeyword(stage string) string {
-	record, ok, err := h.app.Copilot.Resource().StageByCode(stage)
-	if err != nil || !ok {
-		return stage
-	}
-	stageID, _ := record["stageId"].(string)
-	stageID = strings.ReplaceAll(stageID, "#f#", "")
-	stageID = strings.ReplaceAll(stageID, "#n#", "")
-	if strings.TrimSpace(stageID) == "" {
-		return stage
-	}
-	return stageID
-}
-
 func parseCopilotSearchItem(item any) map[string]any {
 	record, _ := item.(map[string]any)
 	if record == nil {
@@ -2126,6 +2112,12 @@ func parseCopilotSearchItem(item any) map[string]any {
 	}
 }
 
+const (
+	copilotSearchLimit    = 10
+	copilotSearchPageSize = 50
+	copilotSearchMaxPages = 5
+)
+
 func (h *Handler) searchCopilots(w http.ResponseWriter, r *http.Request) {
 	stage := strings.TrimSpace(r.URL.Query().Get("stage"))
 	if stage == "" {
@@ -2134,43 +2126,129 @@ func (h *Handler) searchCopilots(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	searchKeyword := h.resolveStageSearchKeyword(stage)
-	normalizedStage := strings.ToUpper(stage)
-	normalizedKeyword := strings.ToUpper(searchKeyword)
-	copilots := make([]map[string]any, 0, 10)
-	for page := 1; page <= 5 && len(copilots) < 10; page++ {
-		items, err := h.app.Copilot.PRTS().QueryCopilots(ctx, searchKeyword, page, 50, "hot")
-		if err != nil {
-			writeError(w, err)
-			return
-		}
-		if len(items) == 0 {
-			break
-		}
-		for _, item := range items {
-			parsed := parseCopilotSearchItem(item)
-			if parsed == nil {
-				continue
-			}
-			stageName := strings.ToUpper(strings.TrimSpace(stringField(parsed, "stageName")))
-			if stageName == "" {
-				stageName = normalizedStage
-			}
-			title := stringField(parsed, "title")
-			titleCode := copilotTitleStagePattern.FindString(strings.ToUpper(title))
-			if stageName == normalizedStage || stageName == normalizedKeyword || titleCode == normalizedStage {
-				copilots = append(copilots, parsed)
-				if len(copilots) >= 10 {
-					break
-				}
-			}
-		}
+	localIDs := h.app.Copilot.Resource().StageIDsByCode(stage)
+	copilots, keywords, err := searchCopilotsByKeywords(ctx, h.app.Copilot.PRTS(), stage, localIDs, copilotSearchLimit)
+	if err != nil {
+		writeError(w, err)
+		return
 	}
 	if len(copilots) == 0 {
-		httpx.Failure(w, http.StatusNotFound, &httpx.APIError{Code: "AGENT_COPILOT_NOT_FOUND", Message: fmt.Sprintf("未找到关卡%q的作业", stage), Retryable: false, Details: map[string]any{"stage": stage, "searchKeyword": searchKeyword}})
+		details := map[string]any{"stage": stage}
+		if len(keywords) > 0 {
+			details["searchKeyword"] = keywords[0]
+		}
+		httpx.Failure(w, http.StatusNotFound, &httpx.APIError{Code: "AGENT_COPILOT_NOT_FOUND", Message: fmt.Sprintf("未找到关卡%q的作业", stage), Retryable: false, Details: details})
 		return
 	}
 	httpx.Success(w, http.StatusOK, map[string]any{"stage": stage, "copilots": copilots, "recommended": copilots[0]}, "", nil)
+}
+
+// searchCopilotsByKeywords resolves the stage to PRTS internal level ids and
+// collects matching public copilots. Local catalogs are tried first, then the
+// live PRTS level table, then the raw query.
+//
+// PRTS does not report an unknown level keyword as an error: it silently
+// returns its global operation list. Every result therefore has to match the
+// operation's own stage_name (or a title that starts with the display code),
+// and a keyword that produces no matches simply lets the next candidate run.
+func searchCopilotsByKeywords(ctx context.Context, prts *copilot.PRTSClient, stage string, localIDs []string, limit int) ([]map[string]any, []string, error) {
+	if limit <= 0 {
+		limit = copilotSearchLimit
+	}
+	normalizedStage := strings.ToUpper(strings.TrimSpace(stage))
+	results := make([]map[string]any, 0, limit)
+	keywords := make([]string, 0, len(localIDs)+2)
+	seenIDs := map[string]struct{}{}
+	seenKeywords := map[string]struct{}{}
+	var lastErr error
+	succeeded := false
+
+	queryGroup := func(group []string) {
+		for _, keyword := range group {
+			keyword = strings.TrimSpace(keyword)
+			if keyword == "" {
+				continue
+			}
+			normalizedKeyword := strings.ToUpper(keyword)
+			if _, exists := seenKeywords[normalizedKeyword]; exists {
+				continue
+			}
+			seenKeywords[normalizedKeyword] = struct{}{}
+			keywords = append(keywords, keyword)
+			for page := 1; page <= copilotSearchMaxPages && len(results) < limit; page++ {
+				items, err := prts.QueryCopilots(ctx, keyword, page, copilotSearchPageSize, "hot")
+				if err != nil {
+					lastErr = err
+					break
+				}
+				succeeded = true
+				if len(items) == 0 {
+					break
+				}
+				pageHasStageNameMatch := false
+				for _, item := range items {
+					parsed := parseCopilotSearchItem(item)
+					if parsed == nil {
+						continue
+					}
+					if copilotSearchStageNameMatches(parsed, normalizedStage, normalizedKeyword) {
+						pageHasStageNameMatch = true
+					}
+					if !copilotSearchItemMatches(parsed, normalizedStage, normalizedKeyword) {
+						continue
+					}
+					id := fmt.Sprint(parsed["id"])
+					if _, exists := seenIDs[id]; exists {
+						continue
+					}
+					seenIDs[id] = struct{}{}
+					results = append(results, parsed)
+					if len(results) >= limit {
+						break
+					}
+				}
+				// PRTS applies level_keyword as a server-side level filter. When
+				// the keyword matches no level it silently returns the global
+				// list, so every page looks the same and later pages cannot
+				// match by stage name. Stop after the first page in that case.
+				if page == 1 && !pageHasStageNameMatch {
+					break
+				}
+				// A page shorter than the requested limit is the last page.
+				if len(items) < copilotSearchPageSize {
+					break
+				}
+			}
+			if len(results) >= limit {
+				return
+			}
+		}
+	}
+
+	queryGroup(localIDs)
+	if len(results) == 0 {
+		queryGroup(prts.ResolveStageIDs(ctx, stage))
+	}
+	if len(results) == 0 {
+		queryGroup([]string{stage})
+	}
+	if len(results) == 0 && !succeeded && lastErr != nil {
+		return nil, keywords, lastErr
+	}
+	return results, keywords, nil
+}
+
+func copilotSearchStageNameMatches(parsed map[string]any, normalizedStage, normalizedKeyword string) bool {
+	stageName := strings.ToUpper(strings.TrimSpace(stringField(parsed, "stageName")))
+	return stageName != "" && (stageName == normalizedKeyword || stageName == normalizedStage)
+}
+
+func copilotSearchItemMatches(parsed map[string]any, normalizedStage, normalizedKeyword string) bool {
+	if copilotSearchStageNameMatches(parsed, normalizedStage, normalizedKeyword) {
+		return true
+	}
+	titleCode := copilotTitleStagePattern.FindString(strings.ToUpper(stringField(parsed, "title")))
+	return titleCode != "" && titleCode == normalizedStage
 }
 
 func (h *Handler) version(w http.ResponseWriter, r *http.Request) {

@@ -289,8 +289,13 @@ func TestRunDailyFlowUsesSingleOuterRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(args), "recruit") {
+	// A flow without taskType still runs as a dynamic task document; passing
+	// the command id straight to maa-cli would only produce a usage error.
+	if !strings.Contains(string(args), "run --batch") {
 		t.Fatalf("maa args = %q", string(args))
+	}
+	if strings.Contains(string(args), "recruit") {
+		t.Fatalf("maa args should not run the command id as a subcommand: %q", string(args))
 	}
 }
 

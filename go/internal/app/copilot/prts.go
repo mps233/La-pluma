@@ -8,7 +8,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	apperrors "github.com/mps233/la-pluma/go/internal/util/errors"
@@ -18,6 +20,11 @@ const (
 	defaultPRTSBaseURL   = "https://prts.maa.plus"
 	defaultStageStatsURL = "https://penguin-stats.io/PenguinStats/api/v2/stages?server=CN"
 	PRTSRequestCode      = "COPILOT_PRTS_REQUEST_FAILED"
+
+	levelCatalogPath       = "/arknights/level?language=zh_cn"
+	levelCatalogTTL        = 6 * time.Hour
+	levelCatalogFailureTTL = time.Minute
+	levelCatalogTimeout    = 12 * time.Second
 )
 
 // HTTPClient is the narrow seam used by tests with httptest.Server. The
@@ -48,6 +55,19 @@ type PRTSClient struct {
 	timeout       time.Duration
 	maxAttempts   int
 	sleep         func(context.Context, time.Duration) error
+
+	levelMu    sync.Mutex
+	levelCache *levelCatalogCache
+}
+
+// levelCatalogCache maps display stage codes and exact stage names to the
+// internal level ids PRTS indexes. The public level table is the authority
+// for activity and newly released stages that local MAA/game-data catalogs
+// may not know yet, so it is fetched on demand and cached in memory.
+type levelCatalogCache struct {
+	expiresAt time.Time
+	byCode    map[string][]string
+	byName    map[string]string
 }
 
 func NewPRTSClient(options PRTSClientOptions) *PRTSClient {
@@ -161,6 +181,164 @@ func (c *PRTSClient) QuerySets(ctx context.Context, keyword string, page, limit 
 	}
 	data := asRecord(record["data"])
 	return append([]any{}, asArray(dataArray(data))...), nil
+}
+
+// ResolveStageIDs maps a display stage code (for example TL-EX-8) or an exact,
+// unambiguous stage name (for example 暴君) to the internal level ids accepted
+// by /copilot/query. The public level table is fetched on demand and cached;
+// callers should treat a nil result as "not resolved" and fall back to local
+// catalogs. Querying PRTS with an unknown level keyword is not an error: the
+// server silently returns its global operation list, so resolving first is
+// what makes the search filter effective.
+func (c *PRTSClient) ResolveStageIDs(ctx context.Context, query string) []string {
+	normalized := strings.ToUpper(strings.TrimSpace(query))
+	if normalized == "" {
+		return nil
+	}
+	catalog := c.levelCatalog(ctx)
+	if catalog == nil {
+		return nil
+	}
+	if ids, ok := catalog.byCode[normalized]; ok && len(ids) > 0 {
+		return append([]string(nil), ids...)
+	}
+	if id, ok := catalog.byName[strings.TrimSpace(query)]; ok && id != "" {
+		return []string{id}
+	}
+	return nil
+}
+
+func (c *PRTSClient) levelCatalog(ctx context.Context) *levelCatalogCache {
+	c.levelMu.Lock()
+	defer c.levelMu.Unlock()
+	now := time.Now()
+	if c.levelCache != nil && c.levelCache.expiresAt.After(now) {
+		if len(c.levelCache.byCode) == 0 && len(c.levelCache.byName) == 0 {
+			return nil
+		}
+		return c.levelCache
+	}
+	catalog, err := c.fetchLevelCatalog(ctx)
+	if err != nil {
+		// Cache the failure briefly so a burst of unresolved searches does not
+		// hammer a level endpoint that is already failing.
+		c.levelCache = &levelCatalogCache{expiresAt: now.Add(levelCatalogFailureTTL)}
+		return nil
+	}
+	c.levelCache = catalog
+	return catalog
+}
+
+func (c *PRTSClient) fetchLevelCatalog(ctx context.Context) (*levelCatalogCache, error) {
+	fetchCtx, cancel := context.WithTimeout(ctx, levelCatalogTimeout)
+	defer cancel()
+	payload, err := c.doJSON(fetchCtx, http.MethodGet, c.baseURL+levelCatalogPath, nil)
+	if err != nil {
+		return nil, err
+	}
+	record := asRecord(payload)
+	if record == nil {
+		return nil, fmt.Errorf("关卡列表格式无效")
+	}
+	if code, ok := numberValue(record["status_code"]); !ok || code != 200 {
+		return nil, fmt.Errorf("关卡列表返回失败")
+	}
+	items := asArray(record["data"])
+	if len(items) == 0 {
+		return nil, fmt.Errorf("关卡列表为空")
+	}
+
+	type codeCandidate struct {
+		id   string
+		rank int
+	}
+	codeCandidates := map[string][]codeCandidate{}
+	addCandidate := func(code, stageID string, rank int) {
+		if code == "" || stageID == "" {
+			return
+		}
+		codeCandidates[code] = append(codeCandidates[code], codeCandidate{id: stageID, rank: rank})
+	}
+	nameIDs := map[string]map[string]struct{}{}
+	for _, raw := range items {
+		level := asRecord(raw)
+		if level == nil {
+			continue
+		}
+		stageID := cleanStageSearchID(asString(level["stage_id"]))
+		if stageID == "" {
+			continue
+		}
+		display := strings.ToUpper(strings.TrimSpace(asString(level["cat_three"])))
+		if display != "" {
+			addCandidate(display, stageID, 0)
+			if base, rank := splitStageVariant(display); base != display {
+				addCandidate(base, stageID, rank)
+			}
+		}
+		if name := strings.TrimSpace(asString(level["name"])); name != "" {
+			ids := nameIDs[name]
+			if ids == nil {
+				ids = map[string]struct{}{}
+				nameIDs[name] = ids
+			}
+			ids[stageID] = struct{}{}
+		}
+	}
+
+	byCode := make(map[string][]string, len(codeCandidates))
+	for code, candidates := range codeCandidates {
+		sort.SliceStable(candidates, func(i, j int) bool {
+			return candidates[i].rank < candidates[j].rank
+		})
+		ids := make([]string, 0, len(candidates))
+		seen := map[string]struct{}{}
+		for _, candidate := range candidates {
+			if _, exists := seen[candidate.id]; exists {
+				continue
+			}
+			seen[candidate.id] = struct{}{}
+			ids = append(ids, candidate.id)
+		}
+		byCode[code] = ids
+	}
+	byName := map[string]string{}
+	for name, ids := range nameIDs {
+		if len(ids) != 1 {
+			// Ambiguous names (for example 坚城高墙) are left unresolved
+			// instead of guessing one difficulty variant.
+			continue
+		}
+		for id := range ids {
+			byName[name] = id
+		}
+	}
+	return &levelCatalogCache{
+		expiresAt: time.Now().Add(levelCatalogTTL),
+		byCode:    byCode,
+		byName:    byName,
+	}, nil
+}
+
+// splitStageVariant strips the localized difficulty suffix PRTS appends to
+// mainline codes. Plain codes rank first, then the standard variant, then the
+// easier and tougher variants.
+func splitStageVariant(display string) (string, int) {
+	variants := []struct {
+		suffix string
+		rank   int
+	}{
+		{"（标准）", 1},
+		{"（简单）", 2},
+		{"（磨难）", 3},
+	}
+	for _, variant := range variants {
+		if strings.HasSuffix(display, variant.suffix) {
+			base := strings.TrimSpace(strings.TrimSuffix(display, variant.suffix))
+			return base, variant.rank
+		}
+	}
+	return display, 0
 }
 
 // StageStats reads the PenguinStats stage table used as the last AP-cost

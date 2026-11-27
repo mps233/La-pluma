@@ -38,14 +38,20 @@ type tileNamesCache struct {
 
 type stageCatalogCache struct {
 	expiresAt time.Time
-	byCode    map[string]map[string]any
+	// byCode keeps every catalog record for a display code in source order:
+	// MaaResource stages.json first, then the generated game-data catalog.
+	// A code can occur more than once because MAA lists difficulty variants
+	// and because the two catalogs overlap.
+	byCode map[string][]map[string]any
 }
 
 // ResourceIndex reads MaaResource stages and Arknights-Tile-Pos metadata from
-// Paths.MaaDataDir/resource. It deliberately does not import the MAA service:
-// only local JSON files are consulted.
+// Paths.MaaDataDir/resource plus the generated game-data stage catalog in
+// Paths.DataDir. It deliberately does not import the MAA service: only local
+// JSON files are consulted.
 type ResourceIndex struct {
 	resourceDir string
+	gameDataDir string
 	now         func() time.Time
 
 	mu          sync.Mutex
@@ -57,6 +63,7 @@ type ResourceIndex struct {
 func NewResourceIndex(paths config.Paths) *ResourceIndex {
 	return &ResourceIndex{
 		resourceDir: filepath.Join(paths.MaaDataDir, "resource"),
+		gameDataDir: paths.DataDir,
 		now:         time.Now,
 		stageMaps:   map[string]stageMapCacheEntry{},
 		stageRecord: map[string]stageCatalogCache{},
@@ -96,48 +103,129 @@ func (r *ResourceIndex) HasStageTile(stageID string) bool {
 	return !inspected
 }
 
-// StageByCode looks up a stage record in MaaResource stages.json by display
-// code (case-insensitive). It mirrors getMaaStageByCode.
+// StageByCode looks up a stage record in the local catalogs by display code
+// (case-insensitive). MaaResource stages.json wins when both catalogs know the
+// code, matching the previous behavior; the generated game-data catalog fills
+// codes MAA does not ship (activity and newer mainline stages).
 func (r *ResourceIndex) StageByCode(code string) (map[string]any, bool, error) {
+	records, err := r.stageRecordsByCode(code)
+	if err != nil || len(records) == 0 {
+		return nil, false, err
+	}
+	return records[0], true, nil
+}
+
+// StageIDsByCode returns every distinct internal stage id the local catalogs
+// map to a display code, in source order. PRTS accepts the base stage id as a
+// level keyword; suffixes such as #f#/#s and MAA's _perm/_rep markers are not
+// part of the level id it indexes.
+func (r *ResourceIndex) StageIDsByCode(code string) []string {
+	records, err := r.stageRecordsByCode(code)
+	if err != nil || len(records) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(records))
+	seen := map[string]struct{}{}
+	for _, record := range records {
+		stageID := cleanStageSearchID(asString(record["stageId"]))
+		if stageID == "" {
+			stageID = cleanStageSearchID(asString(record["id"]))
+		}
+		if stageID == "" {
+			continue
+		}
+		if _, exists := seen[stageID]; exists {
+			continue
+		}
+		seen[stageID] = struct{}{}
+		ids = append(ids, stageID)
+	}
+	return ids
+}
+
+func (r *ResourceIndex) stageRecordsByCode(code string) ([]map[string]any, error) {
 	normalized := strings.ToUpper(strings.TrimSpace(code))
 	if normalized == "" {
-		return nil, false, nil
+		return nil, nil
 	}
 	catalog, err := r.loadStageCatalog()
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	record, ok := catalog[normalized]
-	return record, ok, nil
+	return catalog[normalized], nil
 }
 
-func (r *ResourceIndex) loadStageCatalog() (map[string]map[string]any, error) {
-	path := filepath.Join(r.resourceDir, "stages.json")
+func (r *ResourceIndex) loadStageCatalog() (map[string][]map[string]any, error) {
+	cacheKey := r.resourceDir + "\x00" + r.gameDataDir
 	r.mu.Lock()
-	if cached, ok := r.stageRecord[path]; ok && cached.expiresAt.After(r.now()) {
+	if cached, ok := r.stageRecord[cacheKey]; ok && cached.expiresAt.After(r.now()) {
 		byCode := cached.byCode
 		r.mu.Unlock()
 		return byCode, nil
 	}
 	r.mu.Unlock()
 
-	value, err := jsonstore.Read(path, nil)
-	if err != nil {
-		return nil, err
+	paths := []string{
+		filepath.Join(r.resourceDir, "stages.json"),
+		// maa hot-update keeps a newer checkout next to the base resource.
+		filepath.Join(filepath.Dir(r.resourceDir), "MaaResource", "resource", "stages.json"),
 	}
-	byCode := map[string]map[string]any{}
-	for _, record := range stageRecords(value) {
-		code := asString(record["code"])
-		if code == "" {
+	if strings.TrimSpace(r.gameDataDir) != "" {
+		paths = append(paths, filepath.Join(r.gameDataDir, "stages.json"))
+	}
+	byCode := map[string][]map[string]any{}
+	loaded := false
+	var lastErr error
+	for _, path := range paths {
+		value, err := jsonstore.Read(path, nil)
+		if err != nil {
+			lastErr = err
 			continue
 		}
-		byCode[strings.ToUpper(code)] = record
+		loaded = true
+		for _, record := range stageRecords(value) {
+			code := strings.ToUpper(strings.TrimSpace(asString(record["code"])))
+			if code == "" {
+				continue
+			}
+			// The generated game-data catalog stores the internal id as `id`
+			// while MaaResource uses `stageId`; normalize once here so callers
+			// only need to know one shape.
+			if strings.TrimSpace(asString(record["stageId"])) == "" {
+				if id := strings.TrimSpace(asString(record["id"])); id != "" {
+					record["stageId"] = id
+				}
+			}
+			byCode[code] = append(byCode[code], record)
+		}
+	}
+	if !loaded && lastErr != nil {
+		return nil, lastErr
 	}
 
 	r.mu.Lock()
-	r.stageRecord[path] = stageCatalogCache{expiresAt: r.now().Add(stageMapCacheTTL), byCode: byCode}
+	r.stageRecord[cacheKey] = stageCatalogCache{expiresAt: r.now().Add(stageMapCacheTTL), byCode: byCode}
 	r.mu.Unlock()
 	return byCode, nil
+}
+
+// cleanStageSearchID trims markers that identify a variant in local catalogs
+// but are absent from PRTS level keywords: #f#/#n#/#s suffixes and MAA's
+// _perm/_rep markers. PRTS indexes the base level id (for example a001_01 for
+// the permanent GT-1 stage), so querying the raw marker returns its global
+// list instead of a filtered one.
+func cleanStageSearchID(stageID string) string {
+	stageID = strings.TrimSpace(stageID)
+	if index := strings.IndexByte(stageID, '#'); index >= 0 {
+		stageID = stageID[:index]
+	}
+	for _, suffix := range []string{"_perm", "_rep"} {
+		if strings.HasSuffix(stageID, suffix) {
+			stageID = strings.TrimSuffix(stageID, suffix)
+			break
+		}
+	}
+	return strings.TrimSpace(stageID)
 }
 
 // StageCodeMap resolves display codes and AP costs for the requested internal

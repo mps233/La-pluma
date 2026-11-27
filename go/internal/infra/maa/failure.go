@@ -42,6 +42,15 @@ func classifyMAAFailure(exitCode int, stderr, logText string) maaFailure {
 	}
 	lowerStderr := strings.ToLower(stderr)
 	lowerLog := strings.ToLower(logText)
+	// maa-cli rejects an unknown task command during argument parsing, so the
+	// bare exit code is the only thing MaaCore never sees.
+	if strings.Contains(lowerStderr, "unrecognized subcommand") || strings.Contains(lowerStderr, "unexpected argument") {
+		return maaFailure{
+			Message:   "maa-cli 不接受该任务命令，请检查任务配置或更新 maa-cli",
+			Retryable: false,
+			Kind:      "invalid_command",
+		}
+	}
 	if strings.Contains(lowerStderr, "invalid params") || strings.Contains(lowerLog, "invalid params") {
 		return maaFailure{
 			Message:   "MAA 拒绝了任务参数，请先热更新 MAA 资源或检查作业配置",
