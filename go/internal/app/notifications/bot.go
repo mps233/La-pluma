@@ -8,10 +8,12 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 
+	configapp "github.com/mps233/la-pluma/go/internal/app/config"
 	"github.com/mps233/la-pluma/go/internal/config"
 )
 
@@ -181,16 +183,17 @@ func NewBot(options BotOptions) *Bot {
 }
 
 func withConnectionDefaults(adbPath, adbAddress string) (string, string) {
+	defaults := configapp.ConnectionDefaultsFromEnv(os.Getenv, runtime.GOOS)
 	if strings.TrimSpace(adbPath) == "" {
 		adbPath = strings.TrimSpace(os.Getenv("ADB_PATH"))
 		if adbPath == "" {
-			adbPath = "/opt/homebrew/bin/adb"
+			adbPath = defaults.ADBPath
 		}
 	}
 	if strings.TrimSpace(adbAddress) == "" {
 		adbAddress = strings.TrimSpace(os.Getenv("ADB_ADDRESS"))
 		if adbAddress == "" {
-			adbAddress = "127.0.0.1:16384"
+			adbAddress = defaults.Address
 		}
 	}
 	return adbPath, adbAddress

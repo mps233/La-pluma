@@ -210,6 +210,19 @@ deleted, verification, and follow-ups.
 - Verified: full Go test suite.
 - Follow-up: agentapi still exercises a minority of its routes (G9 remainder).
 
+### Round 20 — one connection-default resolver (2026-11-28)
+
+- The notification bot hard-coded the macOS ADB path on every platform;
+  WebRTC duplicated the same env/default ladder.
+- Both now call `app/config.ConnectionDefaultsFromEnv`, which owns
+  `ADB_PATH`, `ADB_ADDRESS`, `MAA_CLIENT_TYPE`, and the platform defaults.
+- Added precedence/platform tests for the bot helper.
+- Documented every remaining environment variable (advanced table) in both
+  READMEs, including the WebP, battle OCR, mastery tick, drop TTL, scrcpy,
+  and dev-proxy variables.
+- Verified: full Go test suite, vet, gofmt.
+
+
 
 
 

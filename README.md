@@ -191,6 +191,26 @@ Key environment variables:
 | `LA_PLUMA_WEBRTC_TURN_USERNAME` / `..._PASSWORD` | TURN credentials | `la-pluma` / generated |
 | `LA_PLUMA_WEBRTC_TURN_DISABLED` | Disable the embedded TURN server | unset |
 
+Advanced and integration variables:
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `LA_PLUMA_CACHE_DIR` | Cache root for assets and conversions | platform cache directory |
+| `MAA_DATA_DIR` / `MAA_STATE_DIR` / `MAA_CACHE_DIR` | MAA Core data, state and cache roots | platform MAA directories |
+| `MAA_CLIENT_TYPE` | Default client type for new connections | `Official` |
+| `LA_PLUMA_SCRCPY_SERVER_PATH` | scrcpy-server jar path | bundled `go/resources/scrcpy-server` |
+| `LA_PLUMA_SCRCPY_SERVER_VERSION` | scrcpy server protocol version | `5.0.1` |
+| `LA_PLUMA_WEBRTC_DEVICE_ID` | Device id the preview negotiates | `mumu-la-pluma` |
+| `LA_PLUMA_ASSET_WEBP_GO` | Set `0` to serve original PNGs instead of WebP | enabled |
+| `LA_PLUMA_ASSET_WEBP_CONCURRENCY` | Parallel WebP encoders (clamped to 16) | `4` |
+| `LA_PLUMA_BATTLE_OCR` | Battle-progress OCR sampling; `0` disables | enabled |
+| `LA_PLUMA_BATTLE_OCR_INTERVAL_MS` | Battle OCR interval (2–60 s) | `5000` |
+| `LA_PLUMA_MASTERY_TICK_MS` | Mastery scheduler tick | `60000` |
+| `LA_PLUMA_DROP_STATS_TTL_MS` | Drop-statistics cache TTL | `30000` |
+| `TZ` | Business timezone fallback for drop dates | `Asia/Shanghai` |
+| `DOCKER_ENV` | Marks a container when `/.dockerenv` is unavailable | unset |
+| `VITE_API_TARGET` | Vite dev-server proxy target | `http://localhost:3000` |
+
 <details>
 <summary>HTTPS, subpath hosting and WebRTC notes</summary>
 

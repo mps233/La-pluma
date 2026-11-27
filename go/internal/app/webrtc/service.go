@@ -14,6 +14,7 @@ import (
 
 	"github.com/pion/turn/v5"
 
+	configapp "github.com/mps233/la-pluma/go/internal/app/config"
 	"github.com/mps233/la-pluma/go/internal/config"
 	"github.com/mps233/la-pluma/go/internal/infra/adb"
 	"github.com/mps233/la-pluma/go/internal/infra/scrcpy"
@@ -71,18 +72,9 @@ func New(cfg config.Config, logger *slog.Logger) *Service {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	adbPath := strings.TrimSpace(os.Getenv("ADB_PATH"))
-	if adbPath == "" {
-		if runtime.GOOS == "darwin" {
-			adbPath = "/opt/homebrew/bin/adb"
-		} else {
-			adbPath = "adb"
-		}
-	}
-	address := strings.TrimSpace(os.Getenv("ADB_ADDRESS"))
-	if address == "" {
-		address = "127.0.0.1:16384"
-	}
+	connectionDefaults := configapp.ConnectionDefaultsFromEnv(os.Getenv, runtime.GOOS)
+	adbPath := connectionDefaults.ADBPath
+	address := connectionDefaults.Address
 	deviceID := strings.TrimSpace(os.Getenv("LA_PLUMA_WEBRTC_DEVICE_ID"))
 	if deviceID == "" {
 		deviceID = defaultDeviceID

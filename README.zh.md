@@ -190,6 +190,26 @@ docker run -d \
 | `LA_PLUMA_WEBRTC_TURN_USERNAME` / `..._PASSWORD` | TURN 凭据 | `la-pluma` / 自动生成 |
 | `LA_PLUMA_WEBRTC_TURN_DISABLED` | 关闭内嵌 TURN | 未设置 |
 
+高级与集成变量：
+
+| 变量 | 用途 | 默认 |
+| --- | --- | --- |
+| `LA_PLUMA_CACHE_DIR` | 资源与转换缓存根目录 | 平台缓存目录 |
+| `MAA_DATA_DIR` / `MAA_STATE_DIR` / `MAA_CACHE_DIR` | MaaCore 数据、状态与缓存目录 | 平台 MAA 目录 |
+| `MAA_CLIENT_TYPE` | 新连接的默认客户端类型 | `Official` |
+| `LA_PLUMA_SCRCPY_SERVER_PATH` | scrcpy-server jar 路径 | 内置 `go/resources/scrcpy-server` |
+| `LA_PLUMA_SCRCPY_SERVER_VERSION` | scrcpy 服务端协议版本 | `5.0.1` |
+| `LA_PLUMA_WEBRTC_DEVICE_ID` | 预览协商使用的设备标识 | `mumu-la-pluma` |
+| `LA_PLUMA_ASSET_WEBP_GO` | 设为 `0` 时改为返回原始 PNG | 启用 |
+| `LA_PLUMA_ASSET_WEBP_CONCURRENCY` | WebP 并行编码数（上限 16） | `4` |
+| `LA_PLUMA_BATTLE_OCR` | 作战进度 OCR 采样；`0` 关闭 | 启用 |
+| `LA_PLUMA_BATTLE_OCR_INTERVAL_MS` | 作战 OCR 间隔（2–60 秒） | `5000` |
+| `LA_PLUMA_MASTERY_TICK_MS` | 专精调度 tick | `60000` |
+| `LA_PLUMA_DROP_STATS_TTL_MS` | 掉落统计缓存 TTL | `30000` |
+| `TZ` | 掉落日期使用的业务时区回退 | `Asia/Shanghai` |
+| `DOCKER_ENV` | 无 `/.dockerenv` 时标记容器环境 | 未设置 |
+| `VITE_API_TARGET` | Vite 开发代理目标 | `http://localhost:3000` |
+
 <details>
 <summary>HTTPS、子路径与 WebRTC 说明</summary>
 
