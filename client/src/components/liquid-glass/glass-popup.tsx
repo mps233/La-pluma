@@ -170,9 +170,25 @@ const CSS = `
 `
 
 type Box = { L: number; T: number; W: number; H: number }
-type Page = { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D | null; key: string; at: number; stale: boolean; fill: string }
+type Page = {
+  canvas: HTMLCanvasElement
+  ctx: CanvasRenderingContext2D | null
+  key: string
+  at: number
+  stale: boolean
+  fill: string
+  // Where the glass and the page were when the picture was taken, and what the walk found:
+  // elements pinned to the viewport, and whether everything else scrolls as one piece.
+  size: string
+  left: number
+  top: number
+  sx: number
+  sy: number
+  pinned: Element[]
+  rigid: boolean
+}
 
-const newPage = (): Page => ({ canvas: document.createElement('canvas'), ctx: null, key: '', at: 0, stale: true, fill: '' })
+const newPage = (): Page => ({ canvas: document.createElement('canvas'), ctx: null, key: '', at: 0, stale: true, fill: '', size: '', left: 0, top: 0, sx: 0, sy: 0, pinned: [], rigid: false })
 
 /** The shared physics and shape of one popup: the anchor's canvas and the surface's both draw it. */
 function createMorph(matchWidth: boolean, opening: GlassPopupOpening, from: GlassPopupFrom) {
@@ -201,6 +217,12 @@ function createMorph(matchWidth: boolean, opening: GlassPopupOpening, from: Glas
   const drop: Spring = { x: 0, v: 0 }
   /** And seconds since it was asked to close: it may stay out a moment first. */
   let lingered = 0
+  /**
+   * A surface that grows or morphs is back in its control and has said so: its animations are
+   * finished and its glass is read again once, on the frame it lands. Said again on every frame
+   * it rests, it kept the engine's loop running for as long as the popup was on the page.
+   */
+  let landed = false
   // The control's own swell under the pointer, while the popup is shut.
   const swPress: Spring = { x: 0, v: 0 }
   const swX: Spring = { x: 0, v: 0 }
@@ -792,12 +814,30 @@ function createMorph(matchWidth: boolean, opening: GlassPopupOpening, from: Glas
           const key = `${target.width}:${target.height}:${box.L}:${box.T}:${Math.round(scrollX)}:${Math.round(scrollY)}`
           const now = performance.now()
           if (!page.ctx) page.ctx = page.canvas.getContext('2d')
+          const region = { left: box.L, top: box.T, right: box.L + box.W, bottom: box.T + box.H }
+          // Scrolling with the page, the glass keeps the same page behind it (as in GlassLayer): the
+          // picture it has is still right. Not when something in it moves by itself, or is pinned to
+          // the viewport (a sticky header) and touches the glass, now or when it was painted.
+          const rides =
+            page.rigid &&
+            page.size === `${target.width}:${target.height}` &&
+            Math.abs(box.L - page.left + scrollX - page.sx) < 0.05 &&
+            Math.abs(box.T - page.top + scrollY - page.sy) < 0.05 &&
+            !page.pinned.some((el) => {
+              const b = el.getBoundingClientRect()
+              return b.width > 0 && b.height > 0 && b.right > region.left && b.left < region.right && b.bottom > region.top && b.top < region.bottom
+            })
           // Never re-read the page mid-flight: that would drop frames.
-          const again = !!page.ctx && (page.stale || key !== page.key || (!moving && now - page.at > 120))
+          const again = !!page.ctx && (page.stale || (key !== page.key && !rides) || (!moving && now - page.at > 120))
           if (page.ctx && again) {
             page.stale = false
             page.key = key
             page.at = now
+            page.size = `${target.width}:${target.height}`
+            page.left = box.L
+            page.top = box.T
+            page.sx = scrollX
+            page.sy = scrollY
             if (page.canvas.width !== target.width || page.canvas.height !== target.height) {
               page.canvas.width = target.width
               page.canvas.height = target.height
@@ -805,15 +845,19 @@ function createMorph(matchWidth: boolean, opening: GlassPopupOpening, from: Glas
             page.ctx.setTransform(1, 0, 0, 1, 0, 0)
             page.ctx.clearRect(0, 0, target.width, target.height)
             page.ctx.setTransform(back.getTransform())
+            const found = { pinned: [] as Element[], touched: false, loose: false }
             drawDom(page.ctx, document.body, {
               origin: { left: box.L, top: box.T },
-              region: { left: box.L, top: box.T, right: box.L + box.W, bottom: box.T + box.H },
+              region,
               skip: (el) => el === host || el === content || el.hasAttribute('data-glass-skip'),
               onStale: () => {
                 page.stale = true
                 repaint()
               },
+              found,
             })
+            page.pinned = found.pinned
+            page.rigid = !found.loose && !found.touched
           }
           back.save()
           back.setTransform(1, 0, 0, 1, 0, 0)
@@ -941,11 +985,14 @@ function createMorph(matchWidth: boolean, opening: GlassPopupOpening, from: Glas
         // Back on the control, as good as still: the popup leaves.
         if (!goal && open.x <= 0.012 && Math.abs(open.v) <= 0.15) {
           open.x = open.v = 0
-          stepItems(0, dt, true)
-          release()
-          dirty()
+          if (!landed) {
+            landed = true
+            stepItems(0, dt, true)
+            release()
+            dirty()
+          }
           moving = false
-        }
+        } else landed = false
         return moving
       }
       // A morphing surface may stay as it is for a moment before it goes back in (MORPH.closeDelay).
@@ -1051,10 +1098,15 @@ function createMorph(matchWidth: boolean, opening: GlassPopupOpening, from: Glas
             recoil.x = recoil.v = 0
             rebounding = false
           }
-          release()
-          dirty()
+          // On every frame of the reaction, and once more as it comes to rest (see `landed`).
+          if (rebounding || !landed) {
+            release()
+            dirty()
+          }
+          landed = !rebounding
           return (moving = rebounding)
         }
+        landed = false
         moving = m1 || m2 || m3 || m4 || m5
         if (goal && moving && rec.length < 1500) {
           recT += dt

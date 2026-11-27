@@ -481,7 +481,8 @@ async function createRuntime() {
     const l = v.light
     const u = v.u.light.value
     if (!LIGHT.on && l.glow.x === 0 && u.w === 0) return { changed: false, moving: false }
-    if (LIGHT.on && v.lensHx > 0) {
+    // (Only a held pointer that has not lit this glass yet can light it: no other frame measures it.)
+    if (LIGHT.on && v.lensHx > 0 && beam.id !== -1 && !l.press) {
       const rect = v.canvas.getBoundingClientRect()
       const cx = rect.left + v.lensX * spec.unit
       const cy = rect.top + v.lensY * spec.unit
@@ -493,7 +494,7 @@ async function createRuntime() {
         beam.over instanceof Node &&
         host.contains(beam.over) &&
         !host.matches(':disabled, [data-disabled], [aria-disabled="true"]')
-      if (beam.id !== -1 && over && !l.press) {
+      if (over) {
         l.press = true
         l.x = beam.x - cx
         l.y = beam.y - cy
@@ -537,11 +538,15 @@ async function createRuntime() {
   }
 
   function present(v: View) {
-    if (glW !== v.devW || glH !== v.devH) {
-      renderer.setSize(v.devW, v.devH, false)
-      glW = v.devW
-      glH = v.devH
+    // The shared GL canvas only grows, and each view is drawn into its top-left corner (three
+    // measures a viewport from the top). Sizing it to every view in turn gave it a new drawing
+    // buffer for each control on each frame: the costliest call of a page with several controls.
+    if (glW < v.devW || glH < v.devH) {
+      glW = Math.max(glW, v.devW)
+      glH = Math.max(glH, v.devH)
+      renderer.setSize(glW, glH, false)
     }
+    renderer.setViewport(0, 0, v.devW, v.devH)
     renderer.render(v.scene, camera)
     v.ctx.clearRect(0, 0, v.devW, v.devH)
     v.ctx.drawImage(glCanvas, 0, 0, v.devW, v.devH, 0, 0, v.devW, v.devH)

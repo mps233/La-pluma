@@ -8,7 +8,8 @@
 //
 // Cost model: the loop runs only while a spring moves, a surface is dirty or the
 // cursor light changes; at rest it stops completely. Off-screen surfaces are not
-// drawn, and neither is a frame that would come out exactly as the one on the canvas.
+// drawn, and neither is a frame that would come out exactly as the one on the canvas:
+// nothing is asked of the GPU for it, and a frame that is drawn sends only what changed.
 // `prefers-reduced-motion` freezes every spring at its target.
 // If WebGL2 is missing or the context is lost, every surface falls back to plain CSS.
 //
@@ -752,6 +753,15 @@ uniform float uGlowBlob;
 uniform vec4 uLight;
 uniform vec4 uBlobMat;
 uniform vec3 uBlobLine;
+// The frost of large glass, worked out beforehand at a fraction of the size (FROST_PASS in the
+// engine). uFrostPass.x: 0 = no such picture, the frost is worked out here as ever; 1 = this draw
+// is that picture; 2 = this draw reads it. Then how many pixels one of its texels covers each
+// way, and 1 / (that x the picture's size), to find a pixel in it.
+uniform sampler2D uFrostPic;
+uniform vec4 uFrostPass;
+// How many halvings smaller the picture of the page was painted (BACK_SKIP in the engine): its
+// mip levels are read that many lower.
+uniform float uBackSkip;
 uniform float uCssPx;
 uniform sampler2D uAround;
 uniform vec4 uAroundBox;
@@ -782,7 +792,7 @@ vec2 toUv(vec2 d) {
   return clamp(vec2(q.x / uSize.x, 1.0 - q.y / uSize.y), vec2(0.0005), vec2(0.9995));
 }
 vec3 backdrop(vec2 st, float lod) {
-  vec4 c = textureLod(uBack, st, lod);
+  vec4 c = textureLod(uBack, st, max(lod - uBackSkip, 0.0));
   return c.rgb + (1.0 - c.a) * uSurface;
 }
 // What surrounds the glass (GlassLens.reflection), at a point of the canvas in design units and
@@ -919,9 +929,25 @@ vec3 frostedRadial(vec2 q, float dq, float sigma) {
   }
   return total > 1e-4 ? sum / total : backdrop(toUv(uCenter + q + radialBend(q, dq)), lod);
 }
+// How much of the frost this deep in the glass is read from the picture (0 = worked out here).
+// Within four of the picture's texels of the rim it is worked out in full: it changes too fast
+// there for a smaller picture. The picture fades in over the inner half of that band.
+float frostDeep(float d) {
+  if (uFrostPass.x < 1.5) return 0.0;
+  float band = 4.0 * uFrostPass.y * uDevicePx;
+  return 1.0 - smoothstep(-band, -0.5 * band, d);
+}
+vec3 frostPicture() {
+  return texture(uFrostPic, gl_FragCoord.xy * uFrostPass.zw).rgb;
+}
 
 void main() {
-  vec2 px = vec2(gl_FragCoord.x, uSize.y - gl_FragCoord.y);
+  // The frost's own pass draws one texel for every uFrostPass.y pixels each way, and a little
+  // past the rim, so that a pixel on the rim finds its neighbours in the picture.
+  bool pre = uFrostPass.x > 0.5 && uFrostPass.x < 1.5;
+  vec2 fc = pre ? gl_FragCoord.xy * uFrostPass.y : gl_FragCoord.xy;
+  float frostReach = pre ? 1.0 + 2.0 * uFrostPass.y * uDevicePx : 1.0;
+  vec2 px = vec2(fc.x, uSize.y - fc.y);
   vec2 local = px / uUnit - uCenter;
   float dist = shape(local);
 
@@ -1077,12 +1103,12 @@ void main() {
       if (uNearPair[i].x > 0.5) cover *= step(s, fade + 2.0 * uDevicePx);
       else cover *= smoothstep(fade, -fade, s);
     }
-    if (cover <= 0.0) {
+    if (cover <= 0.0 && !pre) {
       outColor = outsideCol * (1.0 - mask);
       return;
     }
   }
-  if (mask <= 0.0) {
+  if (mask <= 0.0 && !pre) {
     outColor = outsideCol;
     return;
   }
@@ -1112,8 +1138,14 @@ void main() {
     // Radial bend, then frost: the old SVG card's rim.
     float ratio = radialRatio(dist);
     float sharpLod = max(uBlurShift, 0.0);
-    if (uFrostBlur > 0.0 && dist < 1.0) {
-      vec3 frost = frostedRadial(local, dist, uFrostBlur * mix(1.0, uFrostEdge, pow(ratio, 1.3)));
+    if (uFrostBlur > 0.0 && dist < frostReach) {
+      float deep = frostDeep(dist);
+      vec3 frost = deep > 0.0 ? frostPicture() : vec3(0.0);
+      if (deep < 1.0) frost = mix(frostedRadial(local, dist, uFrostBlur * mix(1.0, uFrostEdge, pow(ratio, 1.3))), frost, deep);
+      if (pre) {
+        outColor = vec4(frost, 1.0);
+        return;
+      }
       glass = uFrostMix < 1.0 ? mix(bent(uCenter + local, radialBend(local, dist), uDisp * 0.35, sharpLod), frost, uFrostMix) : frost;
     } else {
       glass = bent(uCenter + local, radialBend(local, dist), uDisp * 0.35, sharpLod);
@@ -1136,10 +1168,16 @@ void main() {
     float split = uDisp * 0.35 * (1.0 - own);
     float lod = max(mix(uBlurCenter, uBlurEdge, pow(bendEdge, 1.3)) + blurShift, 0.0);
     vec2 at = uCenter + magnified;
-    if (frostBlur > 0.0 && dist < 1.0) {
+    if (frostBlur > 0.0 && dist < frostReach) {
       // Frosted (inside the glass only: outside, nothing of it shows). The frost hides the
       // colour split, so one bent point is enough; uFrostMix lets the sharp bend show through.
-      vec3 frost = frosted(at + bend, frostBlur * mix(1.0, uFrostEdge, pow(bendEdge, 1.3)));
+      float deep = frostDeep(dist);
+      vec3 frost = deep > 0.0 ? frostPicture() : vec3(0.0);
+      if (deep < 1.0) frost = mix(frosted(at + bend, frostBlur * mix(1.0, uFrostEdge, pow(bendEdge, 1.3))), frost, deep);
+      if (pre) {
+        outColor = vec4(frost, 1.0);
+        return;
+      }
       glass = uFrostMix < 1.0 ? mix(bent(at, bend, split, lod), frost, uFrostMix) : frost;
     } else {
       glass = bent(at, bend, split, lod);
@@ -1149,6 +1187,12 @@ void main() {
   } else {
     // Tinted glass: its own colour in the middle, thinning towards the rim.
     glass = mix(uSurface, uColor, 1.0 - edge * uEdgeClear);
+  }
+
+  // (The frost's own pass ends here: where there is no frost, its picture is empty.)
+  if (pre) {
+    outColor = vec4(0.0);
+    return;
   }
 
   // Top reflection.
@@ -1293,9 +1337,7 @@ function createEngine(): GlassEngine | null {
     if (!s) return null
     gl.shaderSource(s, src)
     gl.compileShader(s)
-    if (gl.getShaderParameter(s, gl.COMPILE_STATUS)) return s
-    console.warn('[liquid-glass] shader failed to compile', gl.getShaderInfoLog(s))
-    return null
+    return s
   }
   const vs = compile(gl.VERTEX_SHADER, VERTEX)
   const fs = compile(gl.FRAGMENT_SHADER, FRAGMENT)
@@ -1304,7 +1346,12 @@ function createEngine(): GlassEngine | null {
   gl.attachShader(program, vs)
   gl.attachShader(program, fs)
   gl.linkProgram(program)
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return null
+  // A shader's own status is asked for only when linking fails: every such question waits for
+  // the GPU, and a program that linked has answered it.
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    for (const s of [vs, fs]) if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.warn('[liquid-glass] shader failed to compile', gl.getShaderInfoLog(s))
+    return null
+  }
   gl.useProgram(program)
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer())
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
@@ -1312,34 +1359,109 @@ function createEngine(): GlassEngine | null {
   gl.enableVertexAttribArray(attr)
   gl.vertexAttribPointer(attr, 2, gl.FLOAT, false, 0, 0)
 
-  // Two shared canvases for textured lenses: what lies beneath, and what rides on top.
+  // Shared canvases for textured lenses: what lies beneath, and what rides on top.
   // Each view keeps its own pair of textures, so a frame that only moves the light re-uses them.
   const layer = () => {
     const canvas = document.createElement('canvas')
     return { canvas, ctx: canvas.getContext('2d') }
   }
-  const texture = (mipmapped: boolean) => {
-    const tex = gl.createTexture()
-    gl.bindTexture(gl.TEXTURE_2D, tex)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4))
+  const filters = (mipmapped: boolean) => {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, mipmapped ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR)
+  }
+  const texture = (mipmapped: boolean) => {
+    const tex = gl.createTexture()
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4))
+    filters(mipmapped)
     if (mipmapped) gl.generateMipmap(gl.TEXTURE_2D)
     return tex
+  }
+  /** A picture on the GPU, and the size its storage was made for (0 = none yet). */
+  type Picture = { tex: WebGLTexture | null; w: number; h: number }
+  /**
+   * Puts a canvas into a picture, on the texture unit that is active. Its storage is made once
+   * for a size (with every mip level, where the picture is seen blurred) and a canvas of that size
+   * is then written into it in place: asking for a new image on every upload makes the GPU give
+   * the texture new storage each time.
+   */
+  const upload = (to: Picture, from: HTMLCanvasElement, mipmapped: boolean) => {
+    const w = from.width
+    const h = from.height
+    if (!to.tex || to.w !== w || to.h !== h) {
+      if (to.tex) gl.deleteTexture(to.tex)
+      to.tex = gl.createTexture()
+      gl.bindTexture(gl.TEXTURE_2D, to.tex)
+      filters(mipmapped)
+      gl.texStorage2D(gl.TEXTURE_2D, mipmapped ? Math.floor(Math.log2(Math.max(w, h))) + 1 : 1, gl.RGBA8, w, h)
+      to.w = w
+      to.h = h
+    } else gl.bindTexture(gl.TEXTURE_2D, to.tex)
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, from)
+    if (mipmapped) gl.generateMipmap(gl.TEXTURE_2D)
   }
   const back = layer()
   const front = layer()
   if (!back.ctx || !front.ctx) return null
-  type Painted = { back: WebGLTexture | null; front: WebGLTexture | null; w: number; h: number; at: number }
+  // The pair is kept per size, for the sizes last drawn: one pair sized to every view in turn was
+  // given a new backing store for each of them, on every frame. The front canvas is made when a
+  // painter first asks for one.
+  type Layer = ReturnType<typeof layer>
+  type Layers = { back: Layer; front: Layer | null; used: number }
+  const LAYER_SIZES = 12
+  const layersOf = new Map<string, Layers>()
+  let layerUse = 0
+  const sized = (w: number, h: number) => {
+    const l = layer()
+    l.canvas.width = w
+    l.canvas.height = h
+    return l
+  }
+  const layersFor = (w: number, h: number, fw: number, fh: number) => {
+    const key = `${w}x${h}|${fw}x${fh}`
+    let l = layersOf.get(key)
+    if (!l) {
+      if (layersOf.size >= LAYER_SIZES) {
+        // The size drawn longest ago gives its canvases back.
+        let oldest = ''
+        let least = Infinity
+        for (const [k, o] of layersOf) if (o.used < least) [oldest, least] = [k, o.used]
+        const gone = layersOf.get(oldest)
+        for (const o of gone ? [gone.back, gone.front] : []) if (o) o.canvas.width = o.canvas.height = 0
+        layersOf.delete(oldest)
+      }
+      layersOf.set(key, (l = { back: sized(w, h), front: null, used: 0 }))
+    }
+    if (fw && !l.front) l.front = sized(fw, fh)
+    l.used = ++layerUse
+    return l
+  }
+  /**
+   * Glass frosted all over shows nothing of the page sharper than its frost: every reading of the
+   * page is at mip level log2(0.8 × the frost's softness in device px) − 0.5 or above (frosted in
+   * FRAGMENT). The levels beneath that are never read. So the page is painted that many halvings
+   * smaller to begin with, `most` at most, and the shader reads it that many levels lower
+   * (uBackSkip): a quarter or a sixteenth of the pixels to paint, upload and build mipmaps from,
+   * on every frame of live glass. Glass that shows the page sharp anywhere (no frost, a frost
+   * mixed with the sharp bend, a blob with a glass of its own) keeps the full picture.
+   */
+  const BACK_SKIP = { most: 2 }
+  const backSkipOf = (m: GlassLens, dpr: number) => {
+    const r = m.refraction
+    if (!r || m.blob?.material || clamp(r.blurMix ?? 1) < 1) return 0
+    const soft = Math.max(0, r.blur ?? 0) * Math.min(1, Math.max(0.05, m.tune?.frostEdge ?? 1)) * dpr
+    return soft > 0 ? clamp(Math.floor(Math.log2(soft * 0.8) - 0.5), 0, BACK_SKIP.most) : 0
+  }
+  type Painted = { back: Picture; front: Picture; w: number; h: number; skip: number; at: number }
   const painted = new Map<GlassView, Painted>()
   // A third, small one for what surrounds a lens (its reflection), and each view's own texture of it:
   // where the picture was taken (the canvas's box then, CSS px) and how far past it it reaches.
   const around = layer()
   if (!around.ctx) return null
   /** `busy`: a picture is due (or was taken) while something on the page moved or was lit: it is taken once all is still. */
-  type Mirrored = { tex: WebGLTexture | null; w: number; h: number; at: number; left: number; top: number; reach: number; due: boolean; timer: number; busy: boolean }
+  type Mirrored = { pic: Picture; w: number; h: number; at: number; left: number; top: number; reach: number; due: boolean; timer: number; busy: boolean }
   /** The pictures of the surroundings taken on this frame. */
   const pictured: Mirrored[] = []
   const mirrored = new Map<GlassView, Mirrored>()
@@ -1358,6 +1480,10 @@ function createEngine(): GlassEngine | null {
   let ranLast = false
   // What a lens without layers samples (and ignores): a texture unit is never left empty.
   const blank = { back: texture(true), front: texture(false) }
+  // (The frost's picture has a texture unit of its own, never left empty either.)
+  gl.activeTexture(gl.TEXTURE3)
+  gl.bindTexture(gl.TEXTURE_2D, blank.front)
+  gl.activeTexture(gl.TEXTURE0)
   /** The page behind a still lens is read again this often while only the light moves (ms). */
   const REPAINT_EVERY = 120
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
@@ -1365,21 +1491,80 @@ function createEngine(): GlassEngine | null {
   gl.uniform1i(gl.getUniformLocation(program, 'uBack'), 0)
   gl.uniform1i(gl.getUniformLocation(program, 'uFront'), 1)
   gl.uniform1i(gl.getUniformLocation(program, 'uAround'), 2)
+  /**
+   * The frost's own pass. Frost is 32 readings of the page for every pixel of the glass, most of
+   * what the GPU does for a frosted card. From `area` device px of glass up, and where the frost
+   * is at least `sigma` device px soft, it is first worked out into a picture a fraction of the
+   * size: one texel for every (its softness ÷ `texel`) px each way, `most` at most, since a frost
+   * that soft has nothing finer to show. The glass then reads that picture, except along its rim
+   * (frostDeep in FRAGMENT). Smaller glass gains nothing from a second pass and keeps the one.
+   * Measured on the same cards drawn both ways, the two pictures differ by 5 levels in 255 at
+   * most, and by more than 1 on fewer than one pixel in a thousand. A blob with a glass of its own (a surface that opens)
+   * frosts by a different amount at every point, and keeps the one pass too.
+   */
+  const FROST_PASS = { area: 150_000, sigma: 5, texel: 2.5, most: 3 }
+  gl.uniform1i(gl.getUniformLocation(program, 'uFrostPic'), 3)
+  const frostPassAt = gl.getUniformLocation(program, 'uFrostPass')
+  /** What uFrostPass.x holds now. */
+  let frostPassHeld = 0
+  const frostPic = { tex: null as WebGLTexture | null, fbo: null as WebGLFramebuffer | null, w: 0, h: 0, broken: false }
+  /** Makes room in the frost's picture for w × h texels (it only grows). False where this GPU cannot draw into it. */
+  const frostRoom = (w: number, h: number) => {
+    if (frostPic.broken) return false
+    if (frostPic.tex && frostPic.w >= w && frostPic.h >= h) return true
+    const tw = Math.max(frostPic.w, w)
+    const th = Math.max(frostPic.h, h)
+    if (frostPic.tex) gl.deleteTexture(frostPic.tex)
+    frostPic.tex = gl.createTexture()
+    gl.activeTexture(gl.TEXTURE3)
+    gl.bindTexture(gl.TEXTURE_2D, frostPic.tex)
+    filters(false)
+    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, tw, th)
+    frostPic.fbo ??= gl.createFramebuffer()
+    gl.bindFramebuffer(gl.FRAMEBUFFER, frostPic.fbo)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, frostPic.tex, 0)
+    // Asked once for each size the picture grows to: the answer waits for the GPU.
+    frostPic.broken = gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    frostPic.w = tw
+    frostPic.h = th
+    return !frostPic.broken
+  }
   const locations = new Map<string, WebGLUniformLocation | null>()
   const u = (name: string) => {
     if (!locations.has(name)) locations.set(name, gl.getUniformLocation(program, name))
     return locations.get(name) ?? null
   }
   // Every uniform of a frame goes through `set`, which keeps the values: a view whose frame
-  // would come out exactly as the one already on its canvas is not drawn again.
+  // would come out exactly as the one already on its canvas is not drawn again, and nothing is
+  // asked of the GPU for it. A frame that is drawn sends them with `send`: only those that differ
+  // from what the program (one for every view) already holds.
   const sent: number[] = []
+  const names: string[] = []
+  const sizes: number[] = []
   const set = (name: string, a: number, b?: number, c?: number, d?: number) => {
-    const at = u(name)
-    if (b === undefined) gl.uniform1f(at, a)
-    else if (c === undefined) gl.uniform2f(at, a, b)
-    else if (d === undefined) gl.uniform3f(at, a, b, c)
-    else gl.uniform4f(at, a, b, c, d)
+    names.push(name)
+    sizes.push(b === undefined ? 1 : c === undefined ? 2 : d === undefined ? 3 : 4)
     sent.push(a, b ?? 0, c ?? 0, d ?? 0)
+  }
+  const held = new Map<string, [number, number, number, number]>()
+  const send = () => {
+    for (let i = 0; i < names.length; i++) {
+      const at = i * 4
+      const a = sent[at]
+      const b = sent[at + 1]
+      const c = sent[at + 2]
+      const d = sent[at + 3]
+      let h = held.get(names[i])
+      if (h && h[0] === a && h[1] === b && h[2] === c && h[3] === d) continue
+      if (!h) held.set(names[i], (h = [a, b, c, d]))
+      else [h[0], h[1], h[2], h[3]] = [a, b, c, d]
+      const to = u(names[i])
+      if (sizes[i] === 1) gl.uniform1f(to, a)
+      else if (sizes[i] === 2) gl.uniform2f(to, a, b)
+      else if (sizes[i] === 3) gl.uniform3f(to, a, b, c)
+      else gl.uniform4f(to, a, b, c, d)
+    }
   }
   /** What a view's canvas shows now: its uniforms (empty = nothing usable) and its CSS box. */
   const shown = new WeakMap<GlassView, { sent: number[]; box: string }>()
@@ -1861,59 +2046,52 @@ function createEngine(): GlassEngine | null {
       v.canvas.height = devH
       on.sent.length = 0
     }
-    // The shared GL canvas only grows; each view is drawn into its bottom-left corner.
-    if (glCanvas.width < devW || glCanvas.height < devH) {
-      glCanvas.width = Math.max(glCanvas.width, devW)
-      glCanvas.height = Math.max(glCanvas.height, devH)
-    }
-    gl.viewport(0, 0, devW, devH)
 
+    // Nothing is asked of the GPU until this frame is known to differ from the one on the canvas:
+    // the layers are painted here, on plain 2D canvases, and put into their textures at the end.
     const unit = m.unit
     const r = m.refraction
     /** The layers are the ones this view was last drawn with. */
     let fresh = true
+    let p: Painted | undefined
+    /** The layers painted on this frame, to upload. */
+    let layers: Layers | undefined
+    // A painter that takes only `back` has no front layer: none is cleared or uploaded.
+    const fronted = !!r && r.paint.length > 1
+    const skip = backSkipOf(m, dpr)
     if (r) {
-      let p = painted.get(v)
-      if (!p) painted.set(v, (p = { back: texture(true), front: texture(false), w: 0, h: 0, at: 0 }))
+      p = painted.get(v)
+      if (!p) painted.set(v, (p = { back: { tex: null, w: 0, h: 0 }, front: { tex: null, w: 0, h: 0 }, w: 0, h: 0, skip: 0, at: 0 }))
       const now = performance.now()
-      const sized = p.w === devW && p.h === devH
-      // A painter that takes only `back` has no front layer: none is cleared or uploaded.
-      const fronted = r.paint.length > 1
+      const sized = p.w === devW && p.h === devH && p.skip === skip
       fresh = !repaint && sized && now - p.at < REPAINT_EVERY
-      gl.activeTexture(gl.TEXTURE0)
-      gl.bindTexture(gl.TEXTURE_2D, p.back)
       if (!fresh) {
-        for (const l of fronted ? [back, front] : [back]) {
-          if (l.canvas.width !== devW || l.canvas.height !== devH) {
-            l.canvas.width = devW
-            l.canvas.height = devH
-          }
-          l.ctx!.setTransform(1, 0, 0, 1, 0, 0)
-          l.ctx!.clearRect(0, 0, devW, devH)
-          l.ctx!.setTransform(dpr, 0, 0, dpr, 0, 0)
+        // The page's picture, smaller where the frost never reads it at full size (BACK_SKIP),
+        // and fitted to its canvas, so that it covers the glass's canvas exactly as before.
+        const bw = skip ? Math.max(2, Math.ceil(devW / 2 ** skip)) : devW
+        const bh = skip ? Math.max(2, Math.ceil(devH / 2 ** skip)) : devH
+        const l = layersFor(bw, bh, fronted ? devW : 0, fronted ? devH : 0)
+        l.back.ctx!.setTransform(1, 0, 0, 1, 0, 0)
+        l.back.ctx!.clearRect(0, 0, bw, bh)
+        if (skip) l.back.ctx!.setTransform(bw / m.width, 0, 0, bh / m.height, 0, 0)
+        else l.back.ctx!.setTransform(dpr, 0, 0, dpr, 0, 0)
+        if (fronted && l.front) {
+          l.front.ctx!.setTransform(1, 0, 0, 1, 0, 0)
+          l.front.ctx!.clearRect(0, 0, devW, devH)
+          l.front.ctx!.setTransform(dpr, 0, 0, dpr, 0, 0)
         }
         // A painter that says nothing changed keeps the textures it already has.
-        fresh = r.paint(back.ctx!, front.ctx!) === false && sized
+        fresh = r.paint(l.back.ctx!, (l.front ?? front).ctx!) === false && sized
+        if (!fresh) {
+          layers = l
+          p.w = devW
+          p.h = devH
+          p.skip = skip
+          p.at = now
+        }
       }
-      if (!fresh) {
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, back.canvas)
-        gl.generateMipmap(gl.TEXTURE_2D)
-      }
-      gl.activeTexture(gl.TEXTURE1)
-      gl.bindTexture(gl.TEXTURE_2D, fronted ? p.front : blank.front)
-      if (!fresh) {
-        if (fronted) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, front.canvas)
-        p.w = devW
-        p.h = devH
-        p.at = now
-      }
-    } else {
-      gl.activeTexture(gl.TEXTURE0)
-      gl.bindTexture(gl.TEXTURE_2D, blank.back)
-      gl.activeTexture(gl.TEXTURE1)
-      gl.bindTexture(gl.TEXTURE_2D, blank.front)
     }
-    sent.length = 0
+    sent.length = names.length = sizes.length = 0
     // The surroundings, for the reflection. The picture is taken when it is first needed, and
     // again when sizes and colours are re-read or the canvas changes size, AROUND_EVERY apart at
     // most (a change that comes sooner waits its turn). A scroll takes none: what surrounds the
@@ -1930,16 +2108,16 @@ function createEngine(): GlassEngine | null {
       const idle = mirrored.get(v)
       if (idle) idle.due = true
     }
-    gl.activeTexture(gl.TEXTURE2)
+    /** A picture of the surroundings taken on this frame, to upload. */
+    let picture: Mirrored | undefined
     if (f) {
       let a = mirrored.get(v)
-      if (!a) mirrored.set(v, (a = { tex: texture(true), w: 0, h: 0, at: 0, left: 0, top: 0, reach: 0, due: true, timer: 0, busy: false }))
+      if (!a) mirrored.set(v, (a = { pic: { tex: null, w: 0, h: 0 }, w: 0, h: 0, at: 0, left: 0, top: 0, reach: 0, due: true, timer: 0, busy: false }))
       const taken = a
       const reach = clamp(f.height * MIRROR.reach, MIRROR.reachMin, Math.max(MIRROR.reachMin, MIRROR.reachMax))
       const aw = Math.max(2, Math.ceil((m.width + 2 * reach) * AROUND_SCALE))
       const ah = Math.max(2, Math.ceil((m.height + 2 * reach) * AROUND_SCALE))
       const now = performance.now()
-      gl.bindTexture(gl.TEXTURE_2D, a.tex)
       if (refresh || (f.live && repaint) || a.w !== aw || a.h !== ah || a.reach !== reach) a.due = true
       if (a.due && a.w && busy && !f.live && now - a.at < AROUND_WAIT) {
         // It waits for all to be still (see AROUND_WAIT): the picture it has is kept meanwhile.
@@ -1966,8 +2144,7 @@ function createEngine(): GlassEngine | null {
         c.clearRect(0, 0, aw, ah)
         c.setTransform(AROUND_SCALE, 0, 0, AROUND_SCALE, reach * AROUND_SCALE, reach * AROUND_SCALE)
         f.paint(c, reach)
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, around.canvas)
-        gl.generateMipmap(gl.TEXTURE_2D)
+        picture = a
         a.w = aw
         a.h = ah
         a.at = now
@@ -1981,7 +2158,6 @@ function createEngine(): GlassEngine | null {
       set('uAroundScale', AROUND_SCALE * unit)
       set('uReach', reach / unit)
     } else {
-      gl.bindTexture(gl.TEXTURE_2D, blank.back)
       set('uAroundBox', 0, 0, 1, 1)
       set('uAroundScale', 1)
       set('uReach', 0)
@@ -1995,6 +2171,7 @@ function createEngine(): GlassEngine | null {
     // Blur level follows screen density (reference: 2.27 device px per design unit).
     set('uBlurShift', Math.log2(Math.max((unit * dpr) / 2.27, 1e-3)))
     set('uFrost', r?.frost ?? 0)
+    set('uBackSkip', skip)
     set('uFrostBlur', Math.max(0, r?.blur ?? 0) / unit)
     set('uFrostMix', clamp(r?.blurMix ?? 1))
     // Radial bend: a share of the viewport per axis, as the SVG card's map was.
@@ -2111,6 +2288,51 @@ function createEngine(): GlassEngine | null {
     // The same layers and the same uniforms as the frame on the canvas: nothing to draw.
     if (fresh && on.sent.length === sent.length && sent.every((value, i) => value === on.sent[i])) return
     on.sent = sent.slice()
+    // The shared GL canvas only grows; each view is drawn into its bottom-left corner.
+    if (glCanvas.width < devW || glCanvas.height < devH) {
+      glCanvas.width = Math.max(glCanvas.width, devW)
+      glCanvas.height = Math.max(glCanvas.height, devH)
+    }
+    gl.viewport(0, 0, devW, devH)
+    // What lies beneath, what rides on top and what surrounds the glass: the pictures taken on
+    // this frame are uploaded, the others are the ones this view already has.
+    gl.activeTexture(gl.TEXTURE0)
+    if (p && layers) upload(p.back, layers.back.canvas, true)
+    else gl.bindTexture(gl.TEXTURE_2D, p?.back.tex ?? blank.back)
+    gl.activeTexture(gl.TEXTURE1)
+    if (p && layers?.front && fronted) upload(p.front, layers.front.canvas, false)
+    else gl.bindTexture(gl.TEXTURE_2D, (fronted && p?.front.tex) || blank.front)
+    gl.activeTexture(gl.TEXTURE2)
+    if (picture) upload(picture.pic, around.canvas, true)
+    else gl.bindTexture(gl.TEXTURE_2D, (f && mirrored.get(v)?.pic.tex) || blank.back)
+    send()
+    // The frost's own pass (FROST_PASS): on large, softly frosted glass the frost is drawn first,
+    // into a smaller picture that the glass then reads.
+    const sigma = r && !blob?.material ? Math.max(0, r.blur ?? 0) * Math.min(1, Math.max(0.05, k.frostEdge ?? 1)) * dpr : 0
+    const texel = sigma >= FROST_PASS.sigma && 4 * m.hx * m.hy * dpr * dpr >= FROST_PASS.area ? Math.min(FROST_PASS.most, Math.floor(sigma / FROST_PASS.texel)) : 0
+    const fw = texel >= 2 ? Math.ceil(devW / texel) + 1 : 0
+    const fh = texel >= 2 ? Math.ceil(devH / texel) + 1 : 0
+    if (texel >= 2 && frostRoom(fw, fh)) {
+      const sx = 1 / (texel * frostPic.w)
+      const sy = 1 / (texel * frostPic.h)
+      // The picture is not bound while it is drawn into.
+      gl.activeTexture(gl.TEXTURE3)
+      gl.bindTexture(gl.TEXTURE_2D, blank.front)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, frostPic.fbo)
+      // Nothing of what it held is kept: a GPU that draws in tiles need not load it back.
+      gl.invalidateFramebuffer(gl.FRAMEBUFFER, [gl.COLOR_ATTACHMENT0])
+      gl.viewport(0, 0, fw, fh)
+      gl.uniform4f(frostPassAt, 1, texel, sx, sy)
+      gl.drawArrays(gl.TRIANGLES, 0, 3)
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+      gl.viewport(0, 0, devW, devH)
+      gl.bindTexture(gl.TEXTURE_2D, frostPic.tex)
+      gl.uniform4f(frostPassAt, 2, texel, sx, sy)
+      frostPassHeld = 2
+    } else if (frostPassHeld) {
+      gl.uniform4f(frostPassAt, 0, 1, 0, 0)
+      frostPassHeld = 0
+    }
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     v.ctx.clearRect(0, 0, devW, devH)
     v.ctx.drawImage(glCanvas, 0, glCanvas.height - devH, devW, devH, 0, 0, devW, devH)
@@ -2489,13 +2711,13 @@ function createEngine(): GlassEngine | null {
       if (a) {
         mirrored.delete(v)
         clearTimeout(a.timer)
-        gl.deleteTexture(a.tex)
+        gl.deleteTexture(a.pic.tex)
       }
       const p = painted.get(v)
       if (!p) return
       painted.delete(v)
-      gl.deleteTexture(p.back)
-      gl.deleteTexture(p.front)
+      gl.deleteTexture(p.back.tex)
+      gl.deleteTexture(p.front.tex)
     },
     wake,
     resolveColor,
