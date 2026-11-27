@@ -312,6 +312,21 @@ deleted, verification, and follow-ups.
   outside the shared client.
 - Verified: type-check, 76 test files / 518 tests, lint at the ratchet.
 
+### Round 25 — resolve task tuning in config (2026-11-28)
+
+- Battle OCR on/off and interval, mastery tick, drop-stat TTL and timezone,
+  asset WebP kill switch and concurrency, scrcpy path/version, and the WebRTC
+  device id were read from the environment inside five services.
+- Added `config.Tuning` and `LoadTuning`, with the same defaults, clamps, and
+  invalid-value behavior; `Config` carries it and the desktop entry loads it.
+- Wired the resolved values through the existing copilot/mastery/drops/assets/
+  WebRTC options; deleted the service-level env readers and their tests (the
+  parsing cases moved to `tuning_test.go`).
+- Verified: full Go test suite, vet, gofmt.
+- Follow-up: ADB address fallbacks, TURN settings, Docker detection, and
+  `MAA_CLIENT_TYPE` still read the env in services (G11 remainder).
+
+
 
 
 

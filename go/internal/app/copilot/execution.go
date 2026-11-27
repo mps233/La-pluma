@@ -992,12 +992,12 @@ func (s *Service) missingStageError(entries []PlanEntry) *apperrors.Error {
 // group cannot reuse its state.
 func (s *Service) startExecutionProgressSampler(ctx context.Context, lifecycle *ExecutionLifecycle, tracker *ProgressTracker, base map[string]any, items []StageProgressItem, stepByItem map[int]int, totalSteps int) func() {
 	noop := func() {}
-	if s == nil || s.battleSampler == nil || lifecycle == nil || lifecycle.OnProgress == nil || !BattleProgressEnabled() {
+	if s == nil || s.battleSampler == nil || lifecycle == nil || lifecycle.OnProgress == nil || s.battleDisabled {
 		return noop
 	}
 	interval := s.battleInterval
 	if interval <= 0 {
-		interval = BattleProgressInterval()
+		interval = defaultBattleProgressInterval
 	}
 	checkpoint := s.battleSampler.Checkpoint(ctx)
 	sampleCtx, cancel := context.WithCancel(ctx)

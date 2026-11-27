@@ -35,8 +35,7 @@ type Config struct {
 
 	// WebPEncoder is optional. A nil encoder always serves the original PNG.
 	WebPEncoder WebPEncoder
-	// WebP cache limits. Zero uses 256 entries, 64 MiB and the
-	// LA_PLUMA_ASSET_WEBP_CONCURRENCY default.
+	// WebP cache limits. Zero uses 256 entries, 64 MiB and 4 encoders.
 	WebPMaxEntries  int
 	WebPMaxBytes    int64
 	WebPConcurrency int

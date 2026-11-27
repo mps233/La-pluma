@@ -76,17 +76,18 @@ type planCacheEntry struct {
 // services. Executor and LeaseRunner may be nil until the MAA integration is
 // wired; plan execution then fails closed instead of touching a device.
 type ServiceOptions struct {
-	Paths          config.Paths
-	PRTS           *PRTSClient
-	PlanTTL        time.Duration
-	Now            func() time.Time
-	Logger         *slog.Logger
-	BattleSampler  BattleProgressSampler
-	BattleInterval time.Duration
-	ManualExecutor StepExecutor
-	Executor       Executor
-	LeaseRunner    LeaseRunner
-	DropRecorder   DropRecorder
+	Paths             config.Paths
+	PRTS              *PRTSClient
+	PlanTTL           time.Duration
+	Now               func() time.Time
+	Logger            *slog.Logger
+	BattleSampler     BattleProgressSampler
+	BattleInterval    time.Duration
+	BattleOCRDisabled bool
+	ManualExecutor    StepExecutor
+	Executor          Executor
+	LeaseRunner       LeaseRunner
+	DropRecorder      DropRecorder
 }
 
 // DropRecorder persists one completed copilot stage in the shared drop
@@ -106,6 +107,7 @@ type Service struct {
 
 	battleSampler  BattleProgressSampler
 	battleInterval time.Duration
+	battleDisabled bool
 	executor       Executor
 	lease          LeaseRunner
 	dropRecorder   DropRecorder
@@ -140,7 +142,7 @@ func NewWithOptions(options ServiceOptions) *Service {
 	}
 	battleInterval := options.BattleInterval
 	if battleInterval <= 0 {
-		battleInterval = BattleProgressInterval()
+		battleInterval = defaultBattleProgressInterval
 	}
 	service := &Service{
 		paths:          options.Paths,
@@ -151,6 +153,7 @@ func NewWithOptions(options ServiceOptions) *Service {
 		logger:         logger,
 		battleSampler:  options.BattleSampler,
 		battleInterval: battleInterval,
+		battleDisabled: options.BattleOCRDisabled,
 		executor:       options.Executor,
 		lease:          options.LeaseRunner,
 		dropRecorder:   options.DropRecorder,

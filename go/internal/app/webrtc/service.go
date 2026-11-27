@@ -75,15 +75,15 @@ func New(cfg config.Config, logger *slog.Logger) *Service {
 	connectionDefaults := configapp.ConnectionDefaultsFromEnv(os.Getenv, runtime.GOOS)
 	adbPath := connectionDefaults.ADBPath
 	address := connectionDefaults.Address
-	deviceID := strings.TrimSpace(os.Getenv("LA_PLUMA_WEBRTC_DEVICE_ID"))
+	deviceID := cfg.Tuning.WebRTCDeviceID
 	if deviceID == "" {
 		deviceID = defaultDeviceID
 	}
-	version := strings.TrimSpace(os.Getenv("LA_PLUMA_SCRCPY_SERVER_VERSION"))
+	version := cfg.Tuning.ScrcpyServerVersion
 	if version == "" {
 		version = "5.0.1"
 	}
-	serverPath := resolveServerPath()
+	serverPath := resolveServerPath(cfg.Tuning.ScrcpyServerPath)
 	return &Service{
 		cfg:           cfg,
 		logger:        logger,
@@ -98,8 +98,8 @@ func New(cfg config.Config, logger *slog.Logger) *Service {
 	}
 }
 
-func resolveServerPath() string {
-	if value := strings.TrimSpace(os.Getenv("LA_PLUMA_SCRCPY_SERVER_PATH")); value != "" {
+func resolveServerPath(configured string) string {
+	if value := strings.TrimSpace(configured); value != "" {
 		return value
 	}
 	candidates := []string{

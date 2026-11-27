@@ -5,10 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"math"
 	"os"
-	"strconv"
-	"strings"
 	"sync"
 )
 
@@ -24,24 +21,6 @@ const (
 // interface is optional and a nil encoder safely serves the original PNG.
 type WebPEncoder interface {
 	Encode(sourcePath string) ([]byte, error)
-}
-
-// maxWebPConcurrencyFromEnv mirrors LA_PLUMA_ASSET_WEBP_CONCURRENCY: a finite
-// positive value is truncated and clamped to 16, anything else uses 4.
-func maxWebPConcurrencyFromEnv() int {
-	raw := strings.TrimSpace(os.Getenv("LA_PLUMA_ASSET_WEBP_CONCURRENCY"))
-	value, err := strconv.ParseFloat(raw, 64)
-	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) || value <= 0 {
-		return defaultWebPConcurrency
-	}
-	concurrency := int(math.Trunc(value))
-	if concurrency < 1 {
-		concurrency = 1
-	}
-	if concurrency > maxWebPConcurrency {
-		concurrency = maxWebPConcurrency
-	}
-	return concurrency
 }
 
 type webPCacheEntry struct {
@@ -77,7 +56,7 @@ func newWebPCache(encoder WebPEncoder, maxEntries int, maxBytes int64, concurren
 		maxBytes = defaultWebPMaxBytes
 	}
 	if concurrency <= 0 {
-		concurrency = maxWebPConcurrencyFromEnv()
+		concurrency = defaultWebPConcurrency
 	}
 	if concurrency > maxWebPConcurrency {
 		concurrency = maxWebPConcurrency

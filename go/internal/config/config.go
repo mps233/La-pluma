@@ -26,6 +26,9 @@ type Config struct {
 	// non-empty form.
 	MAACLIPath string
 
+	// Tuning holds optional runtime knobs resolved from the environment.
+	Tuning Tuning
+
 	Paths Paths
 }
 
@@ -107,6 +110,7 @@ func Load(getenv Getenv, osName, home, cwd string) (Config, error) {
 		TLSKeyFile:    key,
 		LogBufferSize: logBufferSize,
 		MAACLIPath:    maaCLIPath,
+		Tuning:        LoadTuning(getenv),
 		Paths:         paths,
 	}, nil
 }

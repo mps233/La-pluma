@@ -8,9 +8,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
-	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -123,9 +121,8 @@ type MaterialInfo struct {
 type Options struct {
 	// TimeZone defaults to TZ or Asia/Shanghai.
 	TimeZone string
-	// StatsTTL overrides the statistics cache TTL. Zero uses the environment
-	// default (LA_PLUMA_DROP_STATS_TTL_MS or 30s); a negative value disables
-	// caching.
+	// StatsTTL overrides the statistics cache TTL. Zero uses 30s; a negative
+	// value disables caching.
 	StatsTTL time.Duration
 	Now      func() time.Time
 	// Materials supplies the MAA material map. A nil provider yields empty
@@ -165,21 +162,9 @@ func NewWithOptions(paths config.Paths, options Options) *Service {
 		service.now = time.Now
 	}
 	if service.statsTTL == 0 {
-		service.statsTTL = statsTTLFromEnv()
+		service.statsTTL = defaultStatsTTL
 	}
 	return service
-}
-
-func statsTTLFromEnv() time.Duration {
-	raw := strings.TrimSpace(os.Getenv("LA_PLUMA_DROP_STATS_TTL_MS"))
-	if raw == "" {
-		return defaultStatsTTL
-	}
-	value, err := strconv.ParseFloat(raw, 64)
-	if err != nil || math.IsNaN(value) || value < 0 {
-		return defaultStatsTTL
-	}
-	return time.Duration(math.Trunc(value)) * time.Millisecond
 }
 
 // NormalizeDropDays clamps a requested range to 1..365. A nil value mirrors an
@@ -214,9 +199,6 @@ func GetLocalDateString(at time.Time, timeZone string) (string, error) {
 
 func loadLocation(timeZone string) (*time.Location, error) {
 	zone := strings.TrimSpace(timeZone)
-	if zone == "" {
-		zone = strings.TrimSpace(os.Getenv("TZ"))
-	}
 	if zone == "" {
 		zone = defaultTimeZone
 	}

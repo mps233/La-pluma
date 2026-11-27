@@ -105,6 +105,8 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	logService := logs.New(cfg.LogBufferSize)
 	configStore := configapp.NewStorage(cfg.Paths)
 	dropService := drops.NewWithOptions(cfg.Paths, drops.Options{
+		TimeZone: cfg.Tuning.TimeZone,
+		StatsTTL: cfg.Tuning.DropStatsTTL,
 		Materials: func() (map[string]drops.MaterialInfo, error) {
 			return drops.LoadMaterials(filepath.Join(cfg.Paths.MaaDataDir, "resource"))
 		},
@@ -115,11 +117,13 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		Fetcher: trainingMaterialFetcher{paths: cfg.Paths},
 	})
 	copilotService := copilot.NewWithOptions(copilot.ServiceOptions{
-		Paths:         cfg.Paths,
-		Logger:        logger,
-		Executor:      maaServiceAdapter{service: maaActions},
-		DropRecorder:  dropsRecorder{service: dropService},
-		BattleSampler: newCopilotBattleSampler(cfg.Paths),
+		Paths:             cfg.Paths,
+		Logger:            logger,
+		Executor:          maaServiceAdapter{service: maaActions},
+		DropRecorder:      dropsRecorder{service: dropService},
+		BattleSampler:     newCopilotBattleSampler(cfg.Paths),
+		BattleOCRDisabled: cfg.Tuning.BattleOCRDisabled,
+		BattleInterval:    cfg.Tuning.BattleOCRInterval,
 	})
 	activityService := activity.NewWithOptions(activity.Options{
 		Paths:              cfg.Paths,
@@ -136,12 +140,13 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	customToolsService := customtools.New(cfg.Paths, maaServiceAdapter{service: maaActions})
 	recognitionService := recognition.New(recognition.Options{Paths: cfg.Paths, Logger: logger})
 	assetConfig := assets.Config{
-		Logger:      logger,
-		WebPEncoder: assets.NewPureGoWebPEncoder(),
+		Logger:          logger,
+		WebPEncoder:     assets.NewPureGoWebPEncoder(),
+		WebPConcurrency: cfg.Tuning.AssetWebPConcurrency,
 	}
 	// WebP is on by default; keep a kill switch for deployments that need to
 	// fall back to the original PNGs.
-	if os.Getenv("LA_PLUMA_ASSET_WEBP_GO") == "0" {
+	if cfg.Tuning.AssetWebPDisabled {
 		assetConfig.WebPEncoder = nil
 	}
 	assetsHandler := assets.New(cfg.Paths, assetConfig)

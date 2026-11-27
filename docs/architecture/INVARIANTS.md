@@ -30,4 +30,6 @@ These are known gaps; do not treat them as guaranteed by CI:
 - No hard-coded hex colors outside the token files.
 - No page CSS selectors duplicated in global CSS.
 - No `net/http` handlers in `app`/`infra`.
-- Environment variables are only read by `internal/config`.
+- Environment variables are read only by `internal/config` (remaining
+  exceptions: ADB address fallbacks, TURN settings, `DOCKER_ENV`, and
+  `MAA_CLIENT_TYPE` in specific services).

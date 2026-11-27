@@ -3,10 +3,7 @@ package mastery
 import (
 	"context"
 	"log/slog"
-	"math"
-	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -72,7 +69,7 @@ func NewSchedulerService(queue *QueueService, runs *RunService, options Schedule
 	}
 	interval := options.TickInterval
 	if interval <= 0 {
-		interval = tickIntervalFromEnvironment()
+		interval = defaultTickInterval
 	}
 	return &SchedulerService{
 		queue:        queue,
@@ -84,14 +81,6 @@ func NewSchedulerService(queue *QueueService, runs *RunService, options Schedule
 		notifier:     options.Notifier,
 		training:     options.Training,
 	}
-}
-
-func tickIntervalFromEnvironment() time.Duration {
-	value, err := strconv.ParseFloat(strings.TrimSpace(os.Getenv("LA_PLUMA_MASTERY_TICK_MS")), 64)
-	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) || value < 1000 {
-		return defaultTickInterval
-	}
-	return time.Duration(int64(value)) * time.Millisecond
 }
 
 // Start launches the tick loop and runs one immediate tick. Calling Start
