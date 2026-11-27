@@ -31,6 +31,7 @@ import {
   vec4,
 } from 'three/tsl'
 
+import { HANDED_ON, LIGHT, stepSpring, type Spring } from '../../engine'
 import type { LensState } from './physics'
 import { glassTokens, hexToRgb, type GlassThemeName, type GlassTokens } from './tokens'
 
@@ -88,6 +89,11 @@ type View = {
   lensY: number
   /** Where the cursor light last pointed, in half degrees (9999 = nowhere yet). */
   aim: number
+  /** Last lens half size in design units, as drawn (0 while it is hidden). */
+  lensHx: number
+  lensHy: number
+  /** Pointer light (LIGHT in engine.ts): how bright, where from the lens centre (CSS px), and why. */
+  light: { glow: Spring; x: number; y: number; press: boolean; key: boolean }
   renders: number
   renderMs: number
 }
@@ -124,6 +130,8 @@ function createUniforms() {
     // Cursor light: direction from the lens to the pointer and its fade-in amount.
     lightDir: uniform(new THREE.Vector2(0, -1)),
     lightMix: uniform(0),
+    // Pointer light: its centre from the lens centre and its radius (design units), and how white.
+    light: uniform(new THREE.Vector4(0, 0, 1, 0)),
     fgHide: uniform(0),
   }
 }
@@ -254,6 +262,11 @@ function createMaterial(u: ReturnType<typeof createUniforms>, bgTex: any, fgTex:
 
     // Caustic
     glass.addAssign(vec3(1, 0.92, 0.86).mul(smoothstep(0.72, 0.98, depth).mul(down).mul(u.caustic)))
+
+    // Pointer light (LIGHT in engine.ts): white laid over the glass, strongest under the
+    // pointer and falling off evenly to nothing at its radius.
+    const lightAt = max(oneMinus(length(p.sub(u.center).sub(u.light.xy)).div(max(u.light.z, 1e-3))), 0)
+    glass.assign(mix(glass, vec3(1), u.light.w.mul(lightAt)))
 
     const aa = max(fwidth(dist), 1e-4)
     const mask = smoothstep(aa, aa.negate(), dist).mul(u.lensOn).toVar()
@@ -407,6 +420,103 @@ async function createRuntime() {
     window.addEventListener(type, wake, { passive: true, capture: true })
   }
 
+  // Pointer light (LIGHT in engine.ts), as the kit's own engine does it: a held pointer (or
+  // Space / Enter on the focused control) lights the glass where the press landed, and the light
+  // stays at that point of the glass until it lets go. It follows nothing.
+  const beam = { x: 0, y: 0, over: null as EventTarget | null, id: -1 }
+  window.addEventListener(
+    'pointermove',
+    (e) => {
+      if (!LIGHT.on || e.pointerId !== beam.id) return
+      beam.x = e.clientX
+      beam.y = e.clientY
+      beam.over = e.target
+    },
+    { passive: true, capture: true },
+  )
+  window.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (!LIGHT.on || e.button !== 0 || HANDED_ON.has(e)) return
+      beam.x = e.clientX
+      beam.y = e.clientY
+      beam.over = e.target
+      beam.id = e.pointerId
+    },
+    { passive: true, capture: true },
+  )
+  const lift = (e: PointerEvent) => {
+    if (e.pointerId !== beam.id) return
+    beam.id = -1
+    for (const v of views) v.light.press = false
+  }
+  window.addEventListener('pointerup', lift, { passive: true, capture: true })
+  window.addEventListener('pointercancel', lift, { passive: true, capture: true })
+  const key = (e: KeyboardEvent) => {
+    if (e.key !== ' ' && e.key !== 'Enter') return
+    const down = e.type === 'keydown'
+    if (down && (!LIGHT.on || e.repeat)) return
+    const focused = document.activeElement
+    for (const v of views) {
+      const host = v.canvas.parentElement
+      const held = down && !!focused && !!host && (host.contains(focused) || focused.contains(host))
+      if (held && !v.light.key && !v.light.press) v.light.x = v.light.y = 0
+      v.light.key = held
+    }
+    wake()
+  }
+  window.addEventListener('keydown', key, true)
+  window.addEventListener('keyup', key, true)
+  window.addEventListener(
+    'focusout',
+    () => {
+      for (const v of views) v.light.key = false
+      wake()
+    },
+    true,
+  )
+
+  /** Works out and advances a view's pointer light. `changed`: it must be drawn again; `moving`: it still changes. */
+  function pointerLight(v: View, spec: GlassViewSpec, dt: number, still: boolean) {
+    const l = v.light
+    const u = v.u.light.value
+    if (!LIGHT.on && l.glow.x === 0 && u.w === 0) return { changed: false, moving: false }
+    if (LIGHT.on && v.lensHx > 0) {
+      const rect = v.canvas.getBoundingClientRect()
+      const cx = rect.left + v.lensX * spec.unit
+      const cy = rect.top + v.lensY * spec.unit
+      const host = v.canvas.parentElement
+      const over =
+        Math.abs(beam.x - cx) <= v.lensHx * spec.unit &&
+        Math.abs(beam.y - cy) <= v.lensHy * spec.unit &&
+        !!host &&
+        beam.over instanceof Node &&
+        host.contains(beam.over) &&
+        !host.matches(':disabled, [data-disabled], [aria-disabled="true"]')
+      if (beam.id !== -1 && over && !l.press) {
+        l.press = true
+        l.x = beam.x - cx
+        l.y = beam.y - cy
+      }
+    }
+    const held = l.press || l.key
+    const target = LIGHT.on && held ? LIGHT.press : 0
+    let moving = false
+    if (still) {
+      l.glow.x = target
+      l.glow.v = 0
+    } else {
+      moving = stepSpring(l.glow, target, held ? { omega: (2 * Math.PI) / Math.max(LIGHT.rise, 0.01), zeta: Math.min(1, Math.max(0.05, 1 - LIGHT.riseBounce)) } : { omega: (2 * Math.PI) / Math.max(LIGHT.fade, 0.01), zeta: 1 }, dt)
+    }
+    const shine = Math.min(1, Math.max(0, l.glow.x))
+    const strength = themeOf(v.canvas) === 'dark' ? LIGHT.strengthDark : LIGHT.strength
+    const span = Math.min(Math.max(LIGHT.sizeMin, LIGHT.sizeMax), Math.max(LIGHT.sizeMin, LIGHT.size * 2 * Math.max(v.lensHx, v.lensHy) * spec.unit))
+    const next = shine > 0 ? [l.x / spec.unit, l.y / spec.unit, span / spec.unit, shine * Math.min(1, Math.max(0, strength))] : [0, 0, 1, 0]
+    const changed = next[0] !== u.x || next[1] !== u.y || next[2] !== u.z || next[3] !== u.w
+    if (changed) u.set(next[0], next[1], next[2], next[3])
+    return { changed, moving }
+  }
+
   /** Aims the cursor light. False when it lands where it already was: nothing to draw again. */
   function aimLight(v: View, spec: GlassViewSpec) {
     const rect = v.canvas.getBoundingClientRect()
@@ -488,6 +598,8 @@ async function createRuntime() {
     u.fgHide.value = spec.fgUnderLens ?? 0
     v.lensX = lens.x
     v.lensY = lens.y
+    v.lensHx = lens.visible === false ? 0 : lens.hx * lens.stretchX
+    v.lensHy = lens.visible === false ? 0 : lens.hy * lens.stretchY
     aimLight(v, spec)
     present(v)
     v.renders++
@@ -527,6 +639,8 @@ async function createRuntime() {
       const moving = spec.step?.(dt, reducedMotion.matches) ?? false
       if (moving) running = true
       if (!v.visible) continue
+      const lit = pointerLight(v, spec, dt, reducedMotion.matches)
+      if (lit.moving) running = true
       if (moving || v.dirty || spec.alwaysRender) {
         const refresh = v.dirty
         v.dirty = false
@@ -536,8 +650,9 @@ async function createRuntime() {
       } else if (relight && v.devW > 0) {
         // Only the light moved: re-shade with the existing layers, no redraw or upload.
         const spec = v.spec()
-        if (!spec.cursorLight) continue
-        if (aimLight(v, spec)) present(v)
+        if ((spec.cursorLight && aimLight(v, spec)) || lit.changed) present(v)
+      } else if (lit.changed && v.devW > 0) {
+        present(v)
       }
     }
     if (running) raf = requestAnimationFrame(tick)
@@ -585,6 +700,9 @@ async function createRuntime() {
         lensX: 0,
         lensY: 0,
         aim: 9999,
+        lensHx: 0,
+        lensHy: 0,
+        light: { glow: { x: 0, v: 0 }, x: 0, y: 0, press: false, key: false },
         renders: 0,
         renderMs: 0,
       }

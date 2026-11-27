@@ -17,6 +17,11 @@ if (standalonePWA) {
   }
 }
 
+// Safari on iOS applies :active to a touched element only when the page
+// listens for touches. One empty passive listener gives every control its
+// pressed state without intercepting the gesture.
+document.addEventListener('touchstart', () => {}, { passive: true })
+
 // React 19 hoists <style href precedence> to the front of <head>. The Liquid
 // Glass components do the same for their GLASS_CSS, which declares
 // `@layer components`; if that is the first layer statement the browser sees,

@@ -314,9 +314,11 @@
 
 
 
-.drop-records-period-button:hover {
-    color: var(--app-text);
-  }
+@media (hover: hover) {
+  .drop-records-period-button:hover {
+      color: var(--app-text);
+    }
+}
 
 
 
@@ -418,9 +420,11 @@
   transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
 
-.depot-filter-chip:hover {
-  background: var(--app-surface-muted);
-  color: var(--app-text);
+@media (hover: hover) {
+  .depot-filter-chip:hover {
+    background: var(--app-surface-muted);
+    color: var(--app-text);
+  }
 }
 
 .depot-filter-chip:focus-visible {

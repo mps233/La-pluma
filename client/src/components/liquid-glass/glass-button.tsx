@@ -1,6 +1,8 @@
 'use client'
 
 // GlassButton — a button made of liquid glass. It swells under the pointer and grows when pressed.
+// A pointer that holds it and drags away pulls it after itself, stretched like gel (`pull={false}`
+// keeps it in its place).
 //
 //   <GlassButton icon={<ArrowRight />}>Get started</GlassButton>                     // clear glass
 //   <GlassButton material="tinted" className="bg-blue-500 text-white">Save</GlassButton>
@@ -31,6 +33,8 @@ export type GlassButtonProps = {
   iconPosition?: 'start' | 'end'
   /** Clear glass: how much tint covers the backdrop (0–1). */
   tint?: number
+  /** Hold and drag: the button follows the pointer a little way, stretches along the pull and swings back when let go. Default `true`. */
+  pull?: boolean
   /** Render the glass on the single child element (e.g. a router `<Link>`) instead of a `<button>`. */
   asChild?: boolean
   className?: string
@@ -58,6 +62,7 @@ export function GlassButton({
   icon,
   iconPosition = 'end',
   tint,
+  pull = true,
   asChild = false,
   className = '',
   type = 'button',
@@ -71,7 +76,7 @@ export function GlassButton({
   // The glass layer must be the host's first child.
   const content = (label: ReactNode) => (
     <>
-      <GlassLayer material={material} tint={tint} />
+      <GlassLayer material={material} tint={tint} pull={pull} />
       {icon && iconPosition === 'start' && icon}
       {label}
       {icon && iconPosition === 'end' && icon}

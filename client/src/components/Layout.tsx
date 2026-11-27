@@ -14,6 +14,7 @@ import { IslandContext } from '@/lib/island/context'
 import { useUIStore } from '@/stores'
 import { appTabFromPath, appTabPath, isAppTab, type AppTab } from '@/stores/uiStore'
 import { useResolvedTheme } from '@/hooks/useResolvedTheme'
+import { useTabBarFold } from '@/hooks/useTabBarFold'
 import { brandMarkUrl } from '@/utils/brandAssets'
 import { preloadPage } from '@/utils/pagePreload'
 import {
@@ -146,6 +147,24 @@ export default function Layout({ children }: LayoutProps) {
   const navigationSource = useRef<'initial' | 'store' | 'link' | 'popstate'>('initial')
   const restoreFrame = useRef<number | null>(null)
   const scrollRestoreCleanupRef = useRef<(() => void) | null>(null)
+  const { folded: tabBarFolded, open: openTabBar, barRef: tabBarRef } = useTabBarFold()
+  // Clear glass repaints on every scroll frame (and snapshots the page).
+  // A touch tab bar uses the fixed tinted body instead; a mouse keeps clear.
+  // (The tab bar is tinted in every compact layout, so the pointer type no longer decides its material.)
+
+  // The folded capsule is as wide as the current view's icon and label plus
+  // 14 px either side. Measuring it before paint lets max-width animate from
+  // the open plate instead of jumping to an arbitrary width.
+  useLayoutEffect(() => {
+    if (!tabBarFolded) return
+    const bar = tabBarRef.current
+    const content = bar?.querySelector<HTMLElement>('.lg-nav-item.is-active > span')
+    if (!bar || !content) return
+    const width = content.getBoundingClientRect().width
+    if (width > 0) {
+      bar.style.setProperty('--la-pluma-tabbar-fold-width', `${Math.ceil(width + 28)}px`)
+    }
+  }, [tabBarFolded, tabBarRef])
 
   useEffect(() => {
     let subscribed = true
@@ -276,8 +295,10 @@ export default function Layout({ children }: LayoutProps) {
 
     previousTab.current = activeTab
     navigationSource.current = 'store'
+    // Any view change (including browser back) leaves the bar open.
+    openTabBar()
     restoreScroll(activeTab)
-  }, [activeTab, restoreScroll, setActiveTab, storedActiveTab])
+  }, [activeTab, openTabBar, restoreScroll, setActiveTab, storedActiveTab])
 
   const navigateToTab = (tab: AppTab) => {
     if (tab !== activeTab) {
@@ -286,7 +307,17 @@ export default function Layout({ children }: LayoutProps) {
       navigationSource.current = 'link'
       setActiveTab(tab)
     }
+    // A view change or a repeat tap always leaves the bar open.
+    openTabBar()
   }
+
+  const scrollPageToTop = useCallback(() => {
+    const host = getScrollHost()
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+    const behavior: ScrollBehavior = reduce ? 'auto' : 'smooth'
+    if (host) host.scrollTo({ top: 0, behavior })
+    else window.scrollTo({ top: 0, left: 0, behavior })
+  }, [])
 
   // Browser form restore and password managers can write a saved value into the
   // search field while it is not focused. Such a value is not a workspace filter
@@ -311,14 +342,24 @@ export default function Layout({ children }: LayoutProps) {
   const overflowMenuItems = [
     ...overflowTabs.map(tab => ({
       label: tab.name,
-      icon: <TabIcon tab={tab} size="h-5 w-5" />,
+      // The kit sizes a menu row's icon with `size-4`, and `--spacing-4` is remapped to the
+      // app's card gap (12 px), so the row's icon is pinned to the kit's real 16 px here.
+      // `!` because the kit's descendant rule outranks a plain utility on the icon.
+      icon: <TabIcon tab={tab} size="!h-[1rem] !w-[1rem]" />,
       checked: tab.id === activeTab,
       onSelect: () => navigateToTab(tab.id),
     })),
   ]
   const handleMobileNavChange = (index: number) => {
     const tab = mobileTabs[index]
-    if (tab) navigateToTab(tab.id)
+    if (!tab) return
+    if (tab.id === activeTab) {
+      // Tapping the current view takes the page back to its top.
+      scrollPageToTop()
+      openTabBar()
+      return
+    }
+    navigateToTab(tab.id)
   }
   // Sidebar search is local to Layout; memoizing the page render keeps every
   // keystroke from re-rendering the active workspace.
@@ -486,7 +527,24 @@ export default function Layout({ children }: LayoutProps) {
           </main>
         </div>
 
-        <footer className="la-pluma-tabbar">
+        <footer
+          ref={tabBarRef}
+          className="la-pluma-tabbar"
+          data-folded={tabBarFolded ? 'true' : undefined}
+          onPointerDownCapture={(event) => {
+            // Folded, the bar's only job is to open on the next tap. A drag
+            // that starts on the capsule still scrolls the page.
+            if (!tabBarFolded) return
+            event.stopPropagation()
+          }}
+          onClickCapture={(event) => {
+            if (!tabBarFolded) return
+            event.preventDefault()
+            event.stopPropagation()
+            openTabBar()
+          }}
+          onFocusCapture={() => openTabBar()}
+        >
           <div
             className="la-pluma-tabbar-inner"
             data-theme={theme === 'system' ? undefined : theme}
@@ -497,6 +555,10 @@ export default function Layout({ children }: LayoutProps) {
                 activeIndex={activePrimaryMobileIndex}
                 onChange={handleMobileNavChange}
                 aria-label="主要功能"
+                // The bar only exists in the compact layout, where it sits over the page:
+                // a clear surface there bends the content behind it until controls show
+                // through it. Tinted keeps the bar reading as a surface, not a lens.
+                material="tinted"
                 className="la-pluma-tabbar-glass"
               />
             </div>
@@ -505,6 +567,7 @@ export default function Layout({ children }: LayoutProps) {
               icon={<Ellipsis strokeWidth={2.1} aria-hidden="true" />}
               aria-label="更多工作区"
               align="end"
+              plainTrigger
               className={`la-pluma-tabbar-more-anchor${isOverflowActive ? ' is-active' : ''}`}
             />
           </div>

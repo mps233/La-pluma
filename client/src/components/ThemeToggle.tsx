@@ -60,7 +60,7 @@ export default function ThemeToggle() {
           const ThemeIcon = option.icon
           return {
             label: option.label,
-            icon: <ThemeIcon className="h-4 w-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />,
+            icon: <ThemeIcon className="!h-[1rem] !w-[1rem] shrink-0" strokeWidth={1.8} aria-hidden="true" />,
             checked: theme === option.value,
             onSelect: () => setTheme(option.value),
           }
@@ -68,6 +68,7 @@ export default function ThemeToggle() {
         aria-label={`切换界面主题，当前${currentTheme.label}`}
         align="end"
         size="md"
+        plainTrigger
         className="la-pluma-theme-mobile flex-none"
         triggerClassName="la-pluma-theme-trigger !px-0"
       />

@@ -23,8 +23,9 @@ describe('UI navigation and theme state', () => {
       dispatchEvent: vi.fn(),
     }))
     document.head.innerHTML = [
-      '<meta name="theme-color" content="">',
-      '<meta name="apple-mobile-web-app-status-bar-style" content="">',
+      '<meta name="theme-color" media="(prefers-color-scheme: light)" content="">',
+      '<meta name="theme-color" media="(prefers-color-scheme: dark)" content="">',
+      '<meta name="apple-mobile-web-app-status-bar-style" content="default">',
     ].join('')
     document.documentElement.classList.remove('dark')
     document.documentElement.style.colorScheme = ''
@@ -48,13 +49,19 @@ describe('UI navigation and theme state', () => {
     expect(document.documentElement.classList.contains('dark')).toBe(true)
     expect(document.documentElement.dataset.theme).toBe('dark')
     expect(document.documentElement.style.colorScheme).toBe('dark')
-    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#101318')
+    const darkColors = Array.from(document.querySelectorAll('meta[name="theme-color"]'))
+      .map(meta => meta.getAttribute('content'))
+    expect(darkColors).toEqual(['#101318', '#101318'])
 
     systemDark = false
     useUIStore.getState().setTheme('system')
     expect(document.documentElement.classList.contains('dark')).toBe(false)
     expect(document.documentElement.dataset.theme).toBe('light')
     expect(document.documentElement.style.colorScheme).toBe('light')
+    const lightColors = Array.from(document.querySelectorAll('meta[name="theme-color"]'))
+      .map(meta => meta.getAttribute('content'))
+    expect(lightColors).toEqual(['#f2f2f7', '#f2f2f7'])
+    // The status-bar style is static; runtime theme changes must not rewrite it.
     expect(document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.getAttribute('content')).toBe('default')
   })
 })

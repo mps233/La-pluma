@@ -309,6 +309,7 @@ export function GlassLens({ value, disabled = false }: GlassLensProps) {
             frost,
           },
           cursorLight: true,
+          pointerLight: true,
           // What the lens's rim mirrors while it travels (clear): the page around the options.
           reflection: {
             height: tall,

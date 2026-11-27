@@ -14,7 +14,10 @@
   --radius-lg: var(--app-radius-md);
   --radius-xl: var(--app-radius-lg);
   --radius-2xl: var(--app-radius-lg);
-  --radius-3xl: var(--app-radius-lg);
+  /* The glass kit's popups and menus are drawn with `rounded-3xl` and the material
+     samples that radius for its edge, so it keeps the kit's own 24 px instead of the
+     app's panel radius. Only the four liquid-glass surfaces use this step. */
+  --radius-3xl: 1.5rem;
   --radius-full: var(--app-radius-pill);
   --spacing-4: var(--app-space-card);
   --spacing-5: var(--app-space-section);
@@ -34,6 +37,13 @@
   ::backdrop,
   ::file-selector-button {
     border-color: #e5e7eb;
+  }
+
+  /* iOS draws a translucent box over the whole tap area, which is larger than
+     the control when its hit area is padded. Every control carries its own
+     pressed state instead (see the touch feedback block at the end). */
+  html {
+    -webkit-tap-highlight-color: transparent;
   }
 
   :root {
@@ -270,9 +280,11 @@
     color: var(--app-accent);
   }
   
-  .number-input-controls button:hover {
-    background: var(--app-accent-soft);
-    color: var(--app-accent-strong);
+  @media (hover: hover) {
+    .number-input-controls button:hover {
+      background: var(--app-accent-soft);
+      color: var(--app-accent-strong);
+    }
   }
   
   .number-input-controls button:active {
@@ -904,8 +916,10 @@
   transform: scaleY(0.5);
   transform-origin: bottom;
 }
-.automation-sequence-item:not(.is-selected):not(.is-current):hover::before {
-  background: color-mix(in srgb, var(--app-surface-solid) 52%, transparent);
+@media (hover: hover) {
+  .automation-sequence-item:not(.is-selected):not(.is-current):hover::before {
+    background: color-mix(in srgb, var(--app-surface-solid) 52%, transparent);
+  }
 }
 .automation-sequence-item.is-selected {
   color: var(--app-text);
@@ -1148,10 +1162,12 @@ html.dark button.automation-schedule-add {
   color: rgba(235, 235, 245, 0.78);
   background: rgba(118, 118, 128, 0.28);
 }
-.dark button.automation-schedule-add:hover:not(:disabled),
-html.dark button.automation-schedule-add:hover:not(:disabled) {
-  color: rgba(235, 235, 245, 0.92);
-  background: rgba(118, 118, 128, 0.38);
+@media (hover: hover) {
+  .dark button.automation-schedule-add:hover:not(:disabled),
+  html.dark button.automation-schedule-add:hover:not(:disabled) {
+    color: rgba(235, 235, 245, 0.92);
+    background: rgba(118, 118, 128, 0.38);
+  }
 }
 .automation-schedule-empty {
   display: grid;
@@ -1277,11 +1293,13 @@ html.dark button.automation-schedule-add:hover:not(:disabled) {
   font-weight: 400;
   opacity: 1;
 }
-.automation-task-editor .automation-text-control:hover,
-.automation-task-editor .number-input-wrapper:hover,
-.automation-composite-control:hover {
-  background: color-mix(in srgb, var(--app-surface-muted) 86%, var(--app-surface-solid));
-  box-shadow: inset 0 0 0 0.5px var(--app-border-strong);
+@media (hover: hover) {
+  .automation-task-editor .automation-text-control:hover,
+  .automation-task-editor .number-input-wrapper:hover,
+  .automation-composite-control:hover {
+    background: color-mix(in srgb, var(--app-surface-muted) 86%, var(--app-surface-solid));
+    box-shadow: inset 0 0 0 0.5px var(--app-border-strong);
+  }
 }
 .automation-task-editor .automation-text-control:focus-visible,
 .automation-task-editor .number-input-wrapper:has(input:focus-visible),
@@ -1383,9 +1401,11 @@ html.dark button.automation-schedule-add:hover:not(:disabled) {
   background: transparent;
   color: var(--app-text-soft);
 }
-.automation-task-editor .number-input-controls button:hover {
-  background: var(--app-accent-soft);
-  color: var(--app-accent);
+@media (hover: hover) {
+  .automation-task-editor .number-input-controls button:hover {
+    background: var(--app-accent-soft);
+    color: var(--app-accent);
+  }
 }
 .automation-task-editor .number-input-controls button:first-child {
   border-right: 1px solid var(--app-border);
@@ -1409,8 +1429,10 @@ html.dark button.automation-schedule-add:hover:not(:disabled) {
   border-radius: 0;
   background: transparent;
 }
-.automation-composite-control > .border-l button:hover {
-  background: var(--app-accent-soft);
+@media (hover: hover) {
+  .automation-composite-control > .border-l button:hover {
+    background: var(--app-accent-soft);
+  }
 }
 .automation-stage-item.is-smart .automation-stage-row {
   background: color-mix(in srgb, var(--app-accent-soft) 42%, transparent);
@@ -1592,12 +1614,16 @@ html.dark button.automation-schedule-add:hover:not(:disabled) {
 .dark .custom-checkbox {
   background-color: var(--app-surface-muted);
 }
-.custom-checkbox:hover {
-  border-color: var(--app-accent);
-  box-shadow: 0 0 0 3px var(--app-accent-soft);
+@media (hover: hover) {
+  .custom-checkbox:hover {
+    border-color: var(--app-accent);
+    box-shadow: 0 0 0 3px var(--app-accent-soft);
+  }
 }
-.dark .custom-checkbox:hover {
-  background-color: var(--app-accent-soft);
+@media (hover: hover) {
+  .dark .custom-checkbox:hover {
+    background-color: var(--app-accent-soft);
+  }
 }
 .custom-checkbox:checked {
   background: linear-gradient(135deg, var(--app-accent), var(--app-accent-strong));
@@ -1655,8 +1681,10 @@ html.dark button.automation-schedule-add:hover:not(:disabled) {
     background: var(--scrollbar-thumb);
   }
 
-  ::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in srgb, var(--app-text) 48%, transparent);
+  @media (hover: hover) {
+    ::-webkit-scrollbar-thumb:hover {
+      background: color-mix(in srgb, var(--app-text) 48%, transparent);
+    }
   }
 }
 /* 确保正方形按钮不被挤压 */
@@ -1785,11 +1813,13 @@ svg.w-5.h-5 {
       0 5px 14px rgba(0, 0, 0, 0.16);
   }
 
-  .brand-action:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--app-accent) 78%, black);
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, white 14%, transparent),
-      0 7px 18px rgba(0, 0, 0, 0.2);
+  @media (hover: hover) {
+    .brand-action:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--app-accent) 78%, black);
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, white 14%, transparent),
+        0 7px 18px rgba(0, 0, 0, 0.2);
+    }
   }
 
   .brand-action-subtle {
@@ -2011,9 +2041,11 @@ svg.w-5.h-5 {
     inset: -0.5rem;
   }
 
-  .dashboard-preview-reconnect:hover {
-    background: var(--app-surface-muted);
-    color: var(--app-accent-strong);
+  @media (hover: hover) {
+    .dashboard-preview-reconnect:hover {
+      background: var(--app-surface-muted);
+      color: var(--app-accent-strong);
+    }
   }
 
   .dashboard-preview-settings {
@@ -2283,9 +2315,11 @@ svg.w-5.h-5 {
     box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent), 0 6px 16px rgba(0, 0, 0, 0.14);
   }
 
-  .dashboard-flow-activity-action:not(:disabled):hover {
-    background: color-mix(in srgb, var(--app-accent-soft) 88%, var(--app-surface));
-    box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent), 0 8px 18px rgba(0, 0, 0, 0.18);
+  @media (hover: hover) {
+    .dashboard-flow-activity-action:not(:disabled):hover {
+      background: color-mix(in srgb, var(--app-accent-soft) 88%, var(--app-surface));
+      box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent), 0 8px 18px rgba(0, 0, 0, 0.18);
+    }
   }
 
   .dashboard-flow-activity-action:active:not(:disabled) {
@@ -2370,14 +2404,24 @@ svg.w-5.h-5 {
     display: inline;
   }
 
-  .dashboard-flow-activity-action.is-completed:hover .dashboard-flow-activity-completed-label,
   .dashboard-flow-activity-action.is-completed:focus-visible .dashboard-flow-activity-completed-label {
     display: none;
   }
 
-  .dashboard-flow-activity-action.is-completed:hover .dashboard-flow-activity-run-label,
+  @media (hover: hover) {
+    .dashboard-flow-activity-action.is-completed:hover .dashboard-flow-activity-completed-label {
+      display: none;
+    }
+  }
+
   .dashboard-flow-activity-action.is-completed:focus-visible .dashboard-flow-activity-run-label {
     display: inline;
+  }
+
+  @media (hover: hover) {
+    .dashboard-flow-activity-action.is-completed:hover .dashboard-flow-activity-run-label {
+      display: inline;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -2486,9 +2530,11 @@ svg.w-5.h-5 {
     border-left: 1px solid var(--app-border);
   }
 
-  .dashboard-flow-shortcut:hover {
-    background: color-mix(in srgb, var(--app-surface-muted) 76%, var(--app-surface));
-    color: var(--app-text);
+  @media (hover: hover) {
+    .dashboard-flow-shortcut:hover {
+      background: color-mix(in srgb, var(--app-surface-muted) 76%, var(--app-surface));
+      color: var(--app-text);
+    }
   }
 
   .dashboard-flow-shortcut:focus-visible {
@@ -2511,10 +2557,12 @@ svg.w-5.h-5 {
     transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease;
   }
 
-  .dashboard-flow-shortcut:hover .dashboard-flow-shortcut-icon {
-    background: color-mix(in srgb, var(--app-surface-muted) 82%, var(--app-surface-solid));
-    color: var(--app-accent);
-    box-shadow: inset 0 0 0 1px var(--app-border-strong);
+  @media (hover: hover) {
+    .dashboard-flow-shortcut:hover .dashboard-flow-shortcut-icon {
+      background: color-mix(in srgb, var(--app-surface-muted) 82%, var(--app-surface-solid));
+      color: var(--app-accent);
+      box-shadow: inset 0 0 0 1px var(--app-border-strong);
+    }
   }
 
   .dashboard-flow-shortcut-arrow {
@@ -2524,9 +2572,11 @@ svg.w-5.h-5 {
     transition: color 180ms ease, transform 180ms ease;
   }
 
-  .dashboard-flow-shortcut:hover .dashboard-flow-shortcut-arrow {
-    color: var(--app-accent-strong);
-    transform: translateX(1px);
+  @media (hover: hover) {
+    .dashboard-flow-shortcut:hover .dashboard-flow-shortcut-arrow {
+      color: var(--app-accent-strong);
+      transform: translateX(1px);
+    }
   }
 
   .dashboard-flow-message {
@@ -2819,8 +2869,10 @@ svg.w-5.h-5 {
     transition: color 180ms ease;
   }
 
-  .dashboard-summary-link:hover {
-    color: var(--summary-accent);
+  @media (hover: hover) {
+    .dashboard-summary-link:hover {
+      color: var(--summary-accent);
+    }
   }
 
   .dashboard-summary-link:focus-visible {
@@ -3112,9 +3164,11 @@ svg.w-5.h-5 {
     transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
   }
 
-  .data-statistics-filter-trigger:hover {
-    background: var(--app-surface-muted);
-    color: var(--app-text);
+  @media (hover: hover) {
+    .data-statistics-filter-trigger:hover {
+      background: var(--app-surface-muted);
+      color: var(--app-text);
+    }
   }
 
   .data-statistics-filter-trigger.is-open {
@@ -3473,18 +3527,22 @@ svg.w-5.h-5 {
     opacity: 0.5;
   }
 
-  .app-input:disabled:hover {
-    background: color-mix(in srgb, var(--app-surface-solid) 78%, transparent);
-    box-shadow:
-      inset 0 0 0 1px var(--app-border-strong),
-      0 1px 2px rgba(15, 23, 42, 0.025);
+  @media (hover: hover) {
+    .app-input:disabled:hover {
+      background: color-mix(in srgb, var(--app-surface-solid) 78%, transparent);
+      box-shadow:
+        inset 0 0 0 1px var(--app-border-strong),
+        0 1px 2px rgba(15, 23, 42, 0.025);
+    }
   }
 
-  .dark .app-input:disabled:hover {
-    background: var(--app-surface-muted);
-    box-shadow:
-      inset 0 0 0 1px var(--app-border-strong),
-      0 1px 3px rgba(0, 0, 0, 0.18);
+  @media (hover: hover) {
+    .dark .app-input:disabled:hover {
+      background: var(--app-surface-muted);
+      box-shadow:
+        inset 0 0 0 1px var(--app-border-strong),
+        0 1px 3px rgba(0, 0, 0, 0.18);
+    }
   }
 
   .app-checkbox {
@@ -3584,19 +3642,23 @@ svg.w-5.h-5 {
     transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
   }
 
-  .surface-panel-hover:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.82),
-      0 0 0 1px color-mix(in srgb, var(--app-accent) 20%, var(--app-border)),
-      0 16px 38px color-mix(in srgb, var(--app-accent) 9%, rgba(15, 23, 42, 0.07));
+  @media (hover: hover) {
+    .surface-panel-hover:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.82),
+        0 0 0 1px color-mix(in srgb, var(--app-accent) 20%, var(--app-border)),
+        0 16px 38px color-mix(in srgb, var(--app-accent) 9%, rgba(15, 23, 42, 0.07));
+    }
   }
 
-  .dark .surface-panel-hover:hover:not(:disabled) {
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      0 0 0 1px color-mix(in srgb, var(--app-accent) 24%, var(--app-border)),
-      0 18px 44px rgba(0, 0, 0, 0.34);
+  @media (hover: hover) {
+    .dark .surface-panel-hover:hover:not(:disabled) {
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 0 0 1px color-mix(in srgb, var(--app-accent) 24%, var(--app-border)),
+        0 18px 44px rgba(0, 0, 0, 0.34);
+    }
   }
 
   .control-surface {
@@ -3607,11 +3669,13 @@ svg.w-5.h-5 {
       0 1px 2px rgba(15, 23, 42, 0.025);
   }
 
-  .control-surface:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--app-accent-soft) 24%, var(--app-surface-solid));
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 26%, var(--app-border-strong)),
-      0 2px 5px rgba(15, 23, 42, 0.045);
+  @media (hover: hover) {
+    .control-surface:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--app-accent-soft) 24%, var(--app-surface-solid));
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 26%, var(--app-border-strong)),
+        0 2px 5px rgba(15, 23, 42, 0.045);
+    }
   }
 
   .dark .control-surface {
@@ -3621,11 +3685,13 @@ svg.w-5.h-5 {
       0 1px 3px rgba(0, 0, 0, 0.18);
   }
 
-  .dark .control-surface:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--app-accent-soft) 20%, var(--app-surface-muted));
-    box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--app-accent-strong) 24%, var(--app-border-strong)),
-      0 2px 6px rgba(0, 0, 0, 0.24);
+  @media (hover: hover) {
+    .dark .control-surface:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--app-accent-soft) 20%, var(--app-surface-muted));
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--app-accent-strong) 24%, var(--app-border-strong)),
+        0 2px 6px rgba(0, 0, 0, 0.24);
+    }
   }
 
   input.control-surface:not(.app-native-control),
@@ -3888,10 +3954,16 @@ svg.w-5.h-5 {
     border-bottom: 0;
   }
 
-  .log-history-row:hover,
   .log-history-row.is-active {
     background: color-mix(in srgb, var(--app-accent-soft) 62%, transparent);
     color: var(--app-accent-strong);
+  }
+
+  @media (hover: hover) {
+    .log-history-row:hover {
+      background: color-mix(in srgb, var(--app-accent-soft) 62%, transparent);
+      color: var(--app-accent-strong);
+    }
   }
 
   .log-history-row:focus-visible {
@@ -4131,8 +4203,10 @@ svg.w-5.h-5 {
     white-space: nowrap;
   }
 
-  .scrcpy-service-action:hover:not(:disabled) {
-    color: var(--app-text);
+  @media (hover: hover) {
+    .scrcpy-service-action:hover:not(:disabled) {
+      color: var(--app-text);
+    }
   }
 
   .scrcpy-service-action:disabled,
@@ -4163,9 +4237,11 @@ svg.w-5.h-5 {
     transition: background 160ms ease, color 160ms ease;
   }
 
-  .scrcpy-utility-action:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--app-accent-soft) 34%, transparent);
-    color: var(--app-text);
+  @media (hover: hover) {
+    .scrcpy-utility-action:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--app-accent-soft) 34%, transparent);
+      color: var(--app-text);
+    }
   }
 
   .scrcpy-service-action:focus-visible,
@@ -4235,9 +4311,11 @@ svg.w-5.h-5 {
     transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
   }
 
-  .scrcpy-preset-option:hover:not(.is-active) {
-    background: color-mix(in srgb, var(--app-surface-solid) 48%, transparent);
-    color: var(--app-text);
+  @media (hover: hover) {
+    .scrcpy-preset-option:hover:not(.is-active) {
+      background: color-mix(in srgb, var(--app-surface-solid) 48%, transparent);
+      color: var(--app-text);
+    }
   }
 
   .scrcpy-preset-option.is-active {
@@ -4279,9 +4357,11 @@ svg.w-5.h-5 {
     transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
   }
 
-  .scrcpy-fps-segment button:hover:not(.is-active) {
-    background: color-mix(in srgb, var(--app-surface-solid) 48%, transparent);
-    color: var(--app-text);
+  @media (hover: hover) {
+    .scrcpy-fps-segment button:hover:not(.is-active) {
+      background: color-mix(in srgb, var(--app-surface-solid) 48%, transparent);
+      color: var(--app-text);
+    }
   }
 
   .scrcpy-fps-segment button.is-active {
@@ -4735,9 +4815,11 @@ svg.w-5.h-5 {
     transition: color 160ms ease, background 160ms ease;
   }
 
-  .roguelike-theme-option:hover:not(.is-active) {
-    background: color-mix(in srgb, var(--app-accent-soft) 45%, var(--app-surface-muted));
-    color: var(--app-text);
+  @media (hover: hover) {
+    .roguelike-theme-option:hover:not(.is-active) {
+      background: color-mix(in srgb, var(--app-accent-soft) 45%, var(--app-surface-muted));
+      color: var(--app-text);
+    }
   }
 
   .roguelike-theme-option.is-active {
@@ -5030,5 +5112,74 @@ html.is-standalone-pwa body {
     max-height: none;
     flex: 1 1 auto;
     aspect-ratio: auto;
+  }
+}
+
+/* Touch feedback. Hover now only applies under a mouse, so every control that
+   relied on it keeps an equivalent pressed look for a finger. Kept unlayered
+   so it wins over the component rules above, like the page overrides. */
+.dashboard-flow-shortcut:active {
+  background: color-mix(in srgb, var(--app-surface-muted) 76%, var(--app-surface));
+  color: var(--app-text);
+}
+
+.dashboard-flow-shortcut:active .dashboard-flow-shortcut-icon {
+  background: color-mix(in srgb, var(--app-surface-muted) 82%, var(--app-surface-solid));
+  color: var(--app-accent);
+  box-shadow: inset 0 0 0 1px var(--app-border-strong);
+}
+
+.surface-panel-hover:active:not(:disabled) {
+  transform: none;
+}
+
+.log-history-row:active {
+  background: color-mix(in srgb, var(--app-accent-soft) 62%, transparent);
+  color: var(--app-accent-strong);
+}
+
+.depot-filter-chip:active,
+.drop-records-period-button:active,
+.data-statistics-filter-trigger:active {
+  background: var(--app-surface-muted);
+  color: var(--app-text);
+}
+
+.automation-stage-row:active {
+  background: color-mix(in srgb, var(--app-surface-solid) 24%, transparent);
+}
+
+.automation-stage-pin:not(.is-active):active:not(:disabled) {
+  background: color-mix(in srgb, var(--app-surface-solid) 28%, transparent);
+  color: var(--app-text);
+}
+
+.custom-checkbox:active {
+  border-color: var(--app-accent);
+  box-shadow: 0 0 0 3px var(--app-accent-soft);
+}
+
+.app-native-control:active:not(:disabled) {
+  background-color: color-mix(in srgb, var(--app-accent-soft) 16%, var(--app-surface-muted));
+}
+
+.brand-action:active:not(:disabled),
+.scrcpy-service-action:active:not(:disabled),
+.scrcpy-utility-action:active:not(:disabled) {
+  color: var(--app-accent-strong);
+}
+
+.scrcpy-preset-option:active:not(.is-active),
+.scrcpy-fps-segment button:active:not(.is-active),
+.roguelike-theme-option:active:not(.is-active) {
+  color: var(--app-text);
+}
+
+/* Hover-only cues become permanent on touch, where there is no pointer to
+   reveal them. */
+@media (hover: none) {
+  .dashboard-flow-shortcut-arrow,
+  .log-history-row > svg:last-child {
+    color: var(--app-accent-strong);
   }
 }

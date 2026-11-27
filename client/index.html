@@ -19,12 +19,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     
     <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#101318" />
+    <!-- One per colour scheme so a browser without JS still gets the page's own
+         background; the boot script rewrites both to the app's chosen theme. -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f2f7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#101318" />
     <meta name="color-scheme" content="light dark" />
     <meta name="description" content="MAA CLI 的现代化 Web 界面 - 自动化明日方舟游戏任务" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- `default` keeps the status bar opaque; `black-translucent` let it float
+         over the page and made iOS pick the status text colour from the theme. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="La Pluma" />
     <style id="la-pluma-boot-style">
       :root {
@@ -370,8 +375,12 @@
           document.getElementById('app-root')?.classList.toggle('dark', dark)
           document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
           document.documentElement.style.backgroundColor = dark ? '#101318' : '#f2f2f7'
-          document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#101318' : '#f6f8fb')
-          document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.setAttribute('content', dark ? 'black-translucent' : 'default')
+          // Both metas carry the app's chosen theme; the media attributes only
+          // decide which one the browser reads, so a manual light/dark choice
+          // still wins over the system scheme.
+          document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+            meta.setAttribute('content', dark ? '#101318' : '#f2f2f7')
+          })
 
           // The tab icon is the one brand asset a running page can swap, so a
           // light-theme user does not get a black square in the tab strip.

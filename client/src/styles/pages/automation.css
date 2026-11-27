@@ -175,9 +175,11 @@
   transition: background 160ms ease, color 160ms ease;
 }
 
-.automation-sequence-delete:hover {
-  background: rgba(239, 68, 68, 0.09);
-  color: rgb(239, 68, 68);
+@media (hover: hover) {
+  .automation-sequence-delete:hover {
+    background: rgba(239, 68, 68, 0.09);
+    color: rgb(239, 68, 68);
+  }
 }
 
 .automation-sequence-select {
@@ -454,9 +456,11 @@
   cursor: pointer;
 }
 
-.automation-schedule-stepper-button:hover:not(:disabled) {
-  color: var(--app-text);
-  background: color-mix(in srgb, var(--app-surface-solid) 45%, transparent);
+@media (hover: hover) {
+  .automation-schedule-stepper-button:hover:not(:disabled) {
+    color: var(--app-text);
+    background: color-mix(in srgb, var(--app-surface-solid) 45%, transparent);
+  }
 }
 
 .automation-schedule-stepper-button:disabled {
@@ -501,10 +505,12 @@
   transition: background 120ms ease, color 120ms ease, transform 100ms ease;
 }
 
-.automation-schedule-remove:hover {
-  background: color-mix(in srgb, var(--app-danger) 10%, transparent);
-  color: var(--app-danger-text);
-  box-shadow: none;
+@media (hover: hover) {
+  .automation-schedule-remove:hover {
+    background: color-mix(in srgb, var(--app-danger) 10%, transparent);
+    color: var(--app-danger-text);
+    box-shadow: none;
+  }
 }
 
 .automation-schedule-remove:active:not(:disabled) {
@@ -564,9 +570,11 @@ button.automation-schedule-add .automation-schedule-add-plus {
   flex: none;
 }
 
-button.automation-schedule-add:hover:not(:disabled) {
-  color: var(--app-text);
-  background: rgba(118, 118, 128, 0.28);
+@media (hover: hover) {
+  button.automation-schedule-add:hover:not(:disabled) {
+    color: var(--app-text);
+    background: rgba(118, 118, 128, 0.28);
+  }
 }
 
 button.automation-schedule-add:focus-visible {
@@ -778,8 +786,10 @@ button.automation-schedule-add:disabled {
   transition: background 160ms ease;
 }
 
-.automation-stage-row:hover {
-  background: color-mix(in srgb, var(--app-surface-solid) 24%, transparent);
+@media (hover: hover) {
+  .automation-stage-row:hover {
+    background: color-mix(in srgb, var(--app-surface-solid) 24%, transparent);
+  }
 }
 
 .automation-stage-row:focus-within {
@@ -814,9 +824,11 @@ button.automation-schedule-add:disabled {
   transition: background 160ms ease, color 160ms ease;
 }
 
-.automation-stage-pin:not(.is-active):hover:not(:disabled) {
-  background: color-mix(in srgb, var(--app-surface-solid) 28%, transparent);
-  color: var(--app-text);
+@media (hover: hover) {
+  .automation-stage-pin:not(.is-active):hover:not(:disabled) {
+    background: color-mix(in srgb, var(--app-surface-solid) 28%, transparent);
+    color: var(--app-text);
+  }
 }
 
 .automation-stage-pin:disabled {
@@ -925,9 +937,11 @@ input.automation-stage-name-input:disabled,
   border-left: 1px solid var(--app-border);
 }
 
-.automation-stage-stepper button:hover:not(:disabled) {
-  background: var(--app-accent-soft);
-  color: var(--app-accent-strong);
+@media (hover: hover) {
+  .automation-stage-stepper button:hover:not(:disabled) {
+    background: var(--app-accent-soft);
+    color: var(--app-accent-strong);
+  }
 }
 
 .automation-stage-stepper button:focus-visible {
@@ -957,9 +971,11 @@ input.automation-stage-name-input:disabled,
   transition: background 160ms ease, color 160ms ease;
 }
 
-.automation-stage-delete:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--app-danger) 10%, transparent);
-  color: var(--app-danger-text);
+@media (hover: hover) {
+  .automation-stage-delete:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--app-danger) 10%, transparent);
+    color: var(--app-danger-text);
+  }
 }
 
 .automation-stage-delete:disabled {
@@ -983,9 +999,11 @@ input.automation-stage-name-input:disabled,
   box-shadow: none;
 }
 
-.automation-stage-add:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--app-accent-soft) 42%, transparent);
-  color: var(--app-accent-strong);
+@media (hover: hover) {
+  .automation-stage-add:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--app-accent-soft) 42%, transparent);
+    color: var(--app-accent-strong);
+  }
 }
 
 .automation-stage-list :is(

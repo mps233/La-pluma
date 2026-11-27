@@ -94,7 +94,9 @@ iOS / macOS 27 的 Liquid Glass 是 iOS 26 材质的精修，不是换一套语�
 - `prefers-reduced-transparency: reduce` 下由 `ios-theme.css` 把应用 chrome 退化为实色并关闭 backdrop-filter；`prefers-contrast: more` 通过应用类加强边框和文字，不依赖 registry 的内部 token。
 - 页面和组件不要新增手写玻璃或 Glasswork 类；需要新玻璃面时使用 `GlassCard`、`GlassButton`、`GlassSegmented`、`GlassNav`、`GlassMenu`、`GlassSwitch`。
 - 页面内分段控件统一使用 `GlassSegmented` 适配器（作业类型、肉鸽模式、日志内容、数据视图、养成方式、养成状态、配置分区），不再使用 `app-liquid-tab-pill` 胶囊或手写高亮层。预览卡直接使用 registry 的 `GlassTabs`（`client/src/components/liquid-glass/glass-tabs.tsx`，见 `PreviewModeControls`）；不要把这个例外扩散到其他页面。作业类型 wrapper 通过 `data-theme` 继承明暗主题（`system` 时交给媒体查询）；页面级轨道由 `.lg-segmented` 适配器铺满容器。
-- 移动端底部导航使用 `GlassNav`（控制台、自动化、作业、配置四个 Tab）+ 独立圆形 `GlassMenu`（更多）；「更多」不是第五个 Tab，点击后从按钮向左上展开工作区菜单，当前溢出页面在菜单中带勾选，溢出页面激活时按钮使用 accent 色。tabbar wrapper 绑定 `data-theme`，保留 `--la-pluma-tabbar-*` 高度与安全区 token，内容区留白和滚动遮罩继续使用这些 token。
+- 移动端底部导航使用 `GlassNav`（控制台、自动化、作业、配置四个 Tab）+ 独立圆形 `GlassMenu`（更多）；「更多」不是第五个 Tab，点击后从按钮向左上展开工作区菜单，当前溢出页面在菜单中带勾选，溢出页面激活时按钮使用 accent 色。tabbar wrapper 绑定 `data-theme`，保留 `--la-pluma-tabbar-*` 高度与安全区 token，内容区留白和滚动遮罩继续使用这些 token。移动 tabbar 的 `GlassNav` 固定使用 `tinted` 玻璃：`clear` 会随滚动逐帧重绘并抓取页面背景，`tinted` 是固定磨砂体，滚动时不再重绘。适配器默认仍是 `clear`，由调用处显式选择材质；不要在页面里另写媒体查询切换。
+- 移动 tabbar 的选中态是一块滑动胶囊（`.la-pluma-tabbar-indicator`，320ms ease-out；`prefers-reduced-motion` 下立即跳转），当前 Tab 不再各自绘制底色。重复点击当前 Tab 让页面平滑回到顶部。页面下滚 8px 后 tabbar 收起为屏幕中央的 40px 胶囊（独立安装 44px），上滚 8px、距顶 48px 内、点按胶囊或键盘聚焦时展开；收起后只有胶囊接收点击。折叠逻辑在 `useTabBarFold`，CSS 只读取 `data-folded`，不要在页面里另写滚动监听。
+- 独立安装（`display-mode: standalone`）下 tabbar 采用 iOS 标签栏尺度：62px 高、两侧与底部 21px、标签 10/13、图标 24px；普通浏览器里保持 68px 高、20px 边距、11px 标签、20px 图标。这些值全部来自 `--la-pluma-tabbar-*` token，不要在调用处写死。
 - 全局 `Button` / `IconButton` 也由 `GlassButton` 承载：primary → filled + `--app-accent-action`，danger → filled + `--app-danger-action`，success → filled + `--app-success-action`，secondary / outline → glass，ghost → clear；loading 时用内置活动指示器填入 icon 并保留 `loadingText`。尺寸映射为 36 / 44 / 52px，粗指针下小号提升到 44px。明暗主题通过 `applyThemePreference` 在 `html[data-theme]` 统一解析，按钮不再逐个包裹主题属性。
 - 公共 `Switch` 由 `GlassSwitch` 适配器承载：保留 `checked` / `onChange` / `label` / `compact` / `disabled` API，`label` 只作 `aria-label`，开启色使用 `--app-accent`；`id` 落在按钮上，外部 `<label htmlFor>` 仍可正常关联。`compact` 通过 0.8 缩放并补偿触摸区域，粗指针下命中高度保持约 44px。
 
@@ -109,6 +111,10 @@ iOS / macOS 27 的 Liquid Glass 是 iOS 26 材质的精修，不是换一套语�
 - 工具栏、tabbar、侧栏的背景由材质层绘制；页面不要给这些 chrome 画不透明底色、自定义渐变或第二层 glass。
 - 主题由 `useUIStore` 的 `light`、`dark`、`system` 管理，并同步到文档根节点和 `.la-pluma-app`。组件或页面不要直接操作 `.dark`，也不要创建局部主题开关。
 - `client/index.html` 使用 `viewport-fit=cover`。`Layout` 通过统一 token 管理 navbar、移动 tabbar 和对应安全区高度；自定义 fixed/sticky 层只有在不属于这些 chrome 时才使用 `env(safe-area-inset-*)`，内容区不要重复叠加顶部或底部 inset。
+- 所有 `:hover` 规则必须写在 `@media (hover: hover)` 内；与 `:focus-visible` / `:focus-within` 合并的选择器要拆开，让键盘态留在媒体查询外。触屏反馈使用 `:active`（`index.css` 末尾的触摸反馈块），不要靠 hover 表达按下态。全局关闭 iOS 点击高亮（`html { -webkit-tap-highlight-color: transparent }`），任何控件都不要依赖系统深色点击方块。
+- Safari 用页面边缘最上层的 fixed/sticky 元素背景给状态栏和工具栏取色：贴边 chrome 的底色、模糊和阴影画在 `::before` 上，元素本身保持透明；装饰性全屏层不要用 `position: fixed`（ASCII 场使用 `absolute`）；模态遮罩用页面坐标的 `absolute` 并在打开时锁住页面，不要用触底的 `fixed` 遮罩。
+- ASCII 背景场是装饰层：噪声场是静态画面，挂载、主题或尺寸变化时一次性画进 canvas，之后没有帧循环，也没有帧率或分辨率预算。画布带 `data-glass-skip`，避免 `material="clear"` 玻璃把这张全屏画布拷进背景快照。实现集中在 `AsciiFieldBackdrop.tsx`，不要在调用处另写媒体查询或帧率逻辑。
+- 触屏下菜单是阅读面，不是透镜：`[data-glass-popup]` 使用实心 `--app-surface-solid` 并隐藏玻璃 canvas，「更多」圆钮也用实心底色、无 backdrop blur。菜单不再透出页面，也不再逐次抓取背后内容；这是有意与桌面玻璃菜单不同的降级。
 - `Button`、`Card`、`Loading`、`Switch` 等 common 组件使用原生语义元素，在浏览器、jsdom、SSR 和嵌入式场景中渲染一致。不要按运行环境维护第二套组件 DOM。
 - 浏览器默认样式与第三方样式可能影响按钮宽度、卡片外边距和活动指示器尺寸；这类基础规则集中放在 `ios-theme.css`、`index.css` 或 common 组件中，调用处不要用局部覆盖扩散规则。
 

@@ -140,7 +140,11 @@ float pointerDist(vec2 p, float trail) {
 // strength) toward the oldest. Each segment between path points is a capsule.
 float trailField(vec2 p, float radius) {
   float best = 0.0;
-  for (int i = 0; i < 15; i++) {
+  // Seven segments, not fifteen. This loop runs twice per pixel of a full-screen
+  // canvas (the glyph and the ground halo), so each segment costs an exp() over
+  // ~1.2 Mpx every frame the pointer moves. Fewer, further-apart points cover the
+  // same trail length for half the work.
+  for (int i = 0; i < 7; i++) {
     if (i + 1 >= u_trailCount) break;
     vec3 a = u_trailPts[i];
     vec3 b = u_trailPts[i + 1];
@@ -793,9 +797,11 @@ export function ShaderSurface({
               while (trail.length && now - trail[trail.length - 1].t > cfg.trailLife) trail.pop();
               if (pointer.amt > 0 && cfg.interactive && !reduced) {
                 const head = trail[0];
-                if (!head || Math.hypot(head.x - pointer.x, head.y - pointer.y) > 6) {
+                // A point every 12 px instead of every 6: the shader walks seven
+                // segments, so twice the spacing keeps the same trail length.
+                if (!head || Math.hypot(head.x - pointer.x, head.y - pointer.y) > 12) {
                   trail.unshift({ x: pointer.x, y: pointer.y, t: now });
-                  if (trail.length > 16) trail.pop();
+                  if (trail.length > 8) trail.pop();
                 }
               }
 

@@ -1,6 +1,7 @@
 import { forwardRef, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type ReactNode } from 'react'
 
 import { GlassCard } from '@/components/liquid-glass'
+import { useCoarsePointer } from '@/hooks/useCoarsePointer'
 
 export interface GlassLiveCardButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'type'> {
   icon?: ReactNode
@@ -13,9 +14,16 @@ export interface GlassLiveCardButtonProps extends Omit<ButtonHTMLAttributes<HTML
 /**
  * The official pattern for clear glass over moving content: the kit's
  * GlassCard with `live`, holding one interactive control.
+ *
+ * `live` clear glass repaints every frame while visible. On a touch device
+ * that is a constant GPU/CPU cost for a decorative edge, so it falls back to
+ * the fixed tinted body (no live repaint, no backdrop snapshot); a mouse
+ * desktop keeps the clear, live material.
  */
 export const GlassLiveCardButton = forwardRef<HTMLButtonElement, GlassLiveCardButtonProps>(
   function GlassLiveCardButton({ icon, children, className = '', href, target, rel, type = 'button', ...rest }, ref) {
+    const coarsePointer = useCoarsePointer()
+    const material = coarsePointer ? 'tinted' : 'clear'
     const controlClass = `lg-button inline-flex items-center justify-center gap-2 rounded-full font-semibold whitespace-nowrap select-none outline-none focus-visible:ring-2 focus-visible:ring-[#3291FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${className}`.trim()
     const content = (
       <>
@@ -24,7 +32,13 @@ export const GlassLiveCardButton = forwardRef<HTMLButtonElement, GlassLiveCardBu
       </>
     )
     return (
-      <GlassCard material="clear" live blur={5} className="lg-host lg-card relative inline-flex rounded-full p-0">
+      <GlassCard
+        data-material={material}
+        material={material}
+        live={!coarsePointer}
+        blur={coarsePointer ? 0 : 5}
+        className={`lg-host lg-card relative inline-flex rounded-full p-0 ${coarsePointer ? 'bg-[var(--app-surface)]' : ''}`.trim()}
+      >
         {href ? (
           <a
             {...(rest as AnchorHTMLAttributes<HTMLAnchorElement>)}

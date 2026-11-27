@@ -77,8 +77,10 @@
       background: color-mix(in srgb, var(--app-text-soft) 60%, transparent);
     }
 
-    .combat-search-results-scroll::-webkit-scrollbar-thumb:hover {
-      background: color-mix(in srgb, var(--app-text-soft) 80%, transparent);
+    @media (hover: hover) {
+      .combat-search-results-scroll::-webkit-scrollbar-thumb:hover {
+        background: color-mix(in srgb, var(--app-text-soft) 80%, transparent);
+      }
     }
   }
 

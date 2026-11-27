@@ -182,6 +182,7 @@ export function GlassBadge({ children, dotColor, speed = 0.4, tint = 0.82, class
             frost: 0,
           },
           cursorLight: true,
+          pointerLight: true,
           // What the rim of a clear badge mirrors: the page around it. A badge in its own
           // colour (`tint` above a clear button's 0.6) mirrors nothing.
           reflection:

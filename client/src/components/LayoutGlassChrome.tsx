@@ -29,6 +29,11 @@ export interface GlassMenuProps {
   menuClassName?: string
   /** Override the trigger geometry (the tabbar More uses the floating height). */
   triggerClassName?: string
+  /**
+   * Keep the trigger's own tint instead of snapshotting the page behind it. A control
+   * that sits over scrolling content pays for that snapshot on a timer.
+   */
+  plainTrigger?: boolean
 }
 
 const MENU_TRIGGER_SIZES: Record<NonNullable<GlassMenuProps['size']>, string> = {
@@ -37,7 +42,7 @@ const MENU_TRIGGER_SIZES: Record<NonNullable<GlassMenuProps['size']>, string> = 
   lg: '!h-[3.25rem] !w-[3.25rem]',
 }
 
-export function GlassMenu({ icon, items, 'aria-label': ariaLabel, align = 'end', size = 'md', className = '', menuClassName = '', triggerClassName = '' }: GlassMenuProps) {
+export function GlassMenu({ icon, items, 'aria-label': ariaLabel, align = 'end', size = 'md', className = '', menuClassName = '', triggerClassName = '', plainTrigger = false }: GlassMenuProps) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -60,6 +65,7 @@ export function GlassMenu({ icon, items, 'aria-label': ariaLabel, align = 'end',
         <GlassDropdownMenuTrigger
           aria-label={ariaLabel}
           data-icon-only=""
+          {...(plainTrigger ? { 'data-glass-plain': '' } : {})}
           className={`lg-button ${MENU_TRIGGER_SIZES[size]} ${triggerClassName || '!h-[var(--la-pluma-tabbar-floating-height)] !w-[var(--la-pluma-tabbar-floating-height)] !px-0'}`}
         >
           {icon}
@@ -103,9 +109,15 @@ export interface GlassNavProps {
   onChange: (index: number) => void
   className?: string
   'aria-label'?: string
+  /**
+   * Body material. Tinted glass is a fixed frosted body; clear glass bends the
+   * page behind it and repaints on every scroll, so the touch tab bar uses
+   * tinted to keep scrolling cheap.
+   */
+  material?: 'clear' | 'tinted'
 }
 
-export function GlassNav({ items, activeIndex, onChange, className = '', 'aria-label': ariaLabel = '主导航' }: GlassNavProps) {
+export function GlassNav({ items, activeIndex, onChange, className = '', 'aria-label': ariaLabel = '主导航', material = 'clear' }: GlassNavProps) {
   const navRef = useRef<HTMLElement>(null)
   const moveTo = (index: number) => {
     if (index < 0 || index >= items.length) return
@@ -132,10 +144,21 @@ export function GlassNav({ items, activeIndex, onChange, className = '', 'aria-l
       <GlassButtonGroup
         role="tablist"
         aria-label={ariaLabel}
-        material="clear"
+        data-material={material}
+        material={material}
         size="lg"
-        className={`lg-track h-[var(--la-pluma-tabbar-floating-height)] w-full text-[var(--app-text)] ${className}`.trim()}
+        className={`lg-track h-[var(--la-pluma-tabbar-floating-height)] w-full text-[var(--app-text)] ${material === 'tinted' ? 'bg-[var(--app-surface)]' : ''} ${className}`.trim()}
       >
+        {/* The current-view capsule travels between equal-width items; it is
+            hidden while the bar is folded onto a single view. */}
+        <span
+          aria-hidden="true"
+          className="la-pluma-tabbar-indicator"
+          style={{
+            width: `calc((100% - 0.5rem) / ${items.length})`,
+            transform: `translateX(${activeIndex * 100}%)`,
+          }}
+        />
         {items.map((item, index) => {
           const active = index === activeIndex
           return (

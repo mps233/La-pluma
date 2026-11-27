@@ -6,7 +6,9 @@
 //
 //   idle      [ Deploy ]  ( → )      the arrow floats apart as a droplet
 //   pending   [ Deploying     ◌ ]    merged; a spinner turns where the arrow was
-//   success   [ Deployed      ✓ ]    still merged; a check draws itself in
+//   success   [ Deployed      ✓ ]    still merged; a check draws itself in, and the glass
+//                                    swells, stretching the label with it. It
+//                                    stays swollen until the label is in, waits, then lets go
 //
 //   <GlassActionButton
 //     material="tinted"
@@ -57,13 +59,19 @@ export type GlassActionButtonProps = {
 } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'className' | 'onClick'>
 
 // The droplet is as tall as the button. Apart, the body keeps 1.625 × that free at its end
-// (droplet + gap); merged, just the droplet's slot. The difference is a spacer that springs
+// (droplet + gap); merged, just the icon's slot (below). The difference is a spacer that springs
 // closed (a child, so the glass re-reading the host's colours never cuts its transition).
 const sizes = {
-  sm: { host: 'h-8 pl-4 text-[13px]', drop: 'size-8 [&_svg]:size-3.5', apart: 52, merged: 38, cap: 32 },
-  md: { host: 'h-10 pl-5 text-sm', drop: 'size-10 [&_svg]:size-4', apart: 65, merged: 46, cap: 40 },
-  lg: { host: 'h-12 pl-6 text-[15px]', drop: 'size-12 [&_svg]:size-[18px]', apart: 78, merged: 55, cap: 48 },
+  sm: { host: 'h-8 pl-4 text-[13px]', drop: 'size-8 [&_svg]:size-3.5', apart: 52, merged: 30, cap: 32 },
+  md: { host: 'h-10 pl-5 text-sm', drop: 'size-10 [&_svg]:size-4', apart: 65, merged: 36, cap: 40 },
+  lg: { host: 'h-12 pl-6 text-[15px]', drop: 'size-12 [&_svg]:size-[18px]', apart: 78, merged: 42, cap: 48 },
 }
+// Merged, the icon is no longer a droplet of its own: it sits by the label as an icon in a
+// button does. What is drawn of it ends 5/6 of the left padding from the edge (16 → 13,
+// 20 → 17, 24 → 20: a round end needs less room beside an icon than beside text) and starts a
+// third of the left padding after the label. `merged` is that slot, measured on the icon's box
+// (what is drawn sits an eighth of it inside); the icon moves this far in from the droplet's centre.
+const MERGED_SHIFT = 3
 
 const fallback: Record<GlassMaterial, string> = {
   // Text follows the glass's own tone once it draws, so it reads on any backdrop.
@@ -73,11 +81,29 @@ const fallback: Record<GlassMaterial, string> = {
 }
 
 // Letter by letter: each letter takes 0.4s and starts 0.01s after the one before it.
+const LETTER = { duration: 0.4, gap: 0.01 }
+// A label in one piece takes 0.38s (glass-in); the check has drawn itself 0.54s in (glass-draw).
+const RISE = 0.38
+const CHECK = 0.54
+// On a success the glass stays swollen until the label and the check are in, and this much longer (seconds).
+const SUCCESS_WAIT = 0.6
 const LETTERS_CSS = `
 @keyframes glass-letter{from{opacity:0;filter:blur(10px) brightness(0)}}
 [data-glass-letter]{animation:glass-letter .4s ease-out both;animation-delay:calc(var(--glass-c,0) * .01s)}
 @media (prefers-reduced-motion:reduce){[data-glass-letter]{animation:none}}
 `
+
+// The label's box fades out at its edges instead of cutting what is in it (a letter's blur).
+const fade = (to: string) => `linear-gradient(${to},transparent,#000 8px,#000 calc(100% - 8px),transparent)`
+const LABEL_MASK: CSSProperties = {
+  maskImage: `${fade('to right')},${fade('to bottom')}`,
+  maskComposite: 'intersect',
+  WebkitMaskImage: `${fade('to right')},${fade('to bottom')}`,
+  WebkitMaskComposite: 'source-in',
+}
+
+// When the action succeeds the glass swells once (GlassLayer's `pulse`): the label and the icon stretch with it.
+const BEND: CSSProperties = { scale: 'var(--glass-bend, 1)' }
 
 const ease = 'duration-300 ease-[cubic-bezier(.2,.8,.2,1)] motion-reduce:transition-none'
 
@@ -123,6 +149,8 @@ export function GlassActionButton({
   // Swaps animate only after the first press, never on page load.
   const [touched, setTouched] = useState(false)
   const [labelWidth, setLabelWidth] = useState<number>()
+  // Counts the successes: each one makes the glass swell once (GlassLayer's `pulse`).
+  const [landed, setLanded] = useState(0)
   const sizer = useRef<HTMLSpanElement>(null)
   const alive = useRef(true)
 
@@ -169,7 +197,10 @@ export function GlassActionButton({
     setState('pending')
     try {
       await onAction()
-      if (current()) setState('success')
+      if (current()) {
+        setState('success')
+        setLanded((n) => n + 1)
+      }
     } catch (error) {
       if (current()) setState('idle')
       onActionError?.(error)
@@ -179,6 +210,9 @@ export function GlassActionButton({
   const swap = touched ? { 'data-glass-in': '' } : {}
   // Plain text changes letter by letter: each letter is its own element, in a queue.
   const spelled = typeof label === 'string'
+  // How long the success swell holds: the label's own entrance (the check's, if longer), then the wait.
+  const entrance = !touched ? 0 : spelled ? LETTER.duration + LETTER.gap * Math.max(0, Array.from(label).length - 1) : RISE
+  const swollen = Math.max(entrance, touched ? CHECK : 0) + SUCCESS_WAIT
   return (
     <button
       type={type}
@@ -192,11 +226,13 @@ export function GlassActionButton({
       className={`inline-flex shrink-0 cursor-pointer items-center rounded-full font-semibold whitespace-nowrap outline-none select-none focus-visible:ring-2 focus-visible:ring-[#3291FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 aria-disabled:cursor-default ${s.host} ${fallback[material]} ${className}`}
       {...rest}
     >
-      <GlassLayer material={material} tint={tint} droplet={state === 'idle' ? 'apart' : 'merged'} />
+      <GlassLayer material={material} tint={tint} droplet={state === 'idle' ? 'apart' : 'merged'} pulse={landed} pulseHold={swollen} />
       <style href="liquid-glass-letters" precedence="default">
         {LETTERS_CSS}
       </style>
-      <span aria-hidden className={`relative inline-flex overflow-hidden transition-[width] ${ease}`} style={{ width: labelWidth }}>
+      {/* The label's box is 16px larger than the text on every side and fades out over its outer
+          8px: a letter's blur has room, and is never cut off at a hard edge. */}
+      <span aria-hidden className={`relative -m-4 box-content inline-flex overflow-hidden p-4 transition-[width] ${ease}`} style={{ width: labelWidth, ...LABEL_MASK, ...BEND }}>
         <span ref={sizer} className="invisible absolute">
           {label}
         </span>
@@ -219,7 +255,7 @@ export function GlassActionButton({
       {state === 'idle' && (
         <span aria-hidden data-glass-fallback="" className="pointer-events-none absolute inset-y-2 w-px bg-current opacity-20" style={{ right: s.cap }} />
       )}
-      <span aria-hidden data-glass-drop="" className={`pointer-events-none absolute top-0 right-0 flex items-center justify-center [&_svg]:shrink-0 ${s.drop}`}>
+      <span aria-hidden data-glass-drop="" className={`pointer-events-none absolute top-0 right-0 flex items-center justify-center transition-[translate] [&_svg]:shrink-0 ${ease} ${s.drop}`} style={{ ...BEND, translate: state === 'idle' ? undefined : `${-MERGED_SHIFT}px` }}>
         <span key={state} className="flex" {...swap}>
           {state === 'pending' ? <Spinner /> : state === 'success' ? <Check /> : (icon ?? <Arrow />)}
         </span>

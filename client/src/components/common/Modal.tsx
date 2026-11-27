@@ -212,10 +212,14 @@ function ModalLayer({
   }
 
   return (
+    // Absolute, not fixed: a fixed scrim reaching the window's foot makes
+    // Safari paint the strip behind its toolbar one flat colour, and that
+    // colour can outlive the dialog. The page behind is held still while the
+    // layer is open, so page coordinates equal the screen here.
     <div
       ref={layerRef}
       data-app-modal-layer="true"
-      className="app-modal-layer pointer-events-none fixed inset-0 z-[80]"
+      className="app-modal-layer pointer-events-none absolute inset-0 z-[80]"
     >
       <motion.div
         initial={{ opacity: 0 }}

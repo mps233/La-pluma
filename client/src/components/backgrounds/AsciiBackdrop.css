@@ -1,5 +1,9 @@
 .ascii-field {
-  position: fixed;
+  /* Absolute, not fixed: Safari samples the topmost fixed full-screen layer
+     for the status bar and toolbar colours, and this decorative field would
+     freeze them. The page itself does not scroll (the scroll host does), so
+     the field stays where it was. */
+  position: absolute;
   z-index: -1;
   inset: 0;
   overflow: hidden;
@@ -7,6 +11,15 @@
   color: var(--app-accent);
   opacity: var(--ascii-field-opacity, 0.18);
   contain: paint;
+}
+
+/* The field's glyphs, painted once into a 1x buffer and stretched to the layer. */
+.ascii-field-canvas {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 html.dark .ascii-field {

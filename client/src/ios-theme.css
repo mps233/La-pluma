@@ -72,6 +72,11 @@
     var(--la-pluma-tabbar-floating-height) + var(--la-pluma-tabbar-bottom-clearance)
   );
   --la-pluma-tabbar-active-bg: rgba(118, 118, 128, 0.16);
+  --la-pluma-tabbar-side-inset: 1.25rem;
+  --la-pluma-tabbar-label-size: 11px;
+  --la-pluma-tabbar-label-line: 1;
+  --la-pluma-tabbar-icon-size: 20px;
+  --la-pluma-tabbar-fold-height: 2.5rem;
   --la-pluma-navbar-fade-color: #ffffff;
   --la-pluma-sidebar-width: 17rem;
   --la-pluma-sidebar-selection: var(--app-accent-action);
@@ -101,6 +106,31 @@ html.la-pluma-standalone {
   html.la-pluma-standalone {
     --la-pluma-viewport-height: 100vh;
   }
+}
+
+/* Installed app: there is no browser toolbar below, so take iOS's own tab-bar
+   measure — 62 px tall, 21 px from the sides and the foot. The foot still
+   clears the home indicator through the max() with the safe-area inset. */
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  :root {
+    --la-pluma-tabbar-floating-height: 3.875rem;
+    --la-pluma-tabbar-side-inset: 1.3125rem;
+    --la-pluma-tabbar-bottom-clearance: max(1.3125rem, env(safe-area-inset-bottom, 0px));
+    --la-pluma-tabbar-label-size: 10px;
+    --la-pluma-tabbar-label-line: 13px;
+    --la-pluma-tabbar-icon-size: 24px;
+    --la-pluma-tabbar-fold-height: 2.75rem;
+  }
+}
+
+html.la-pluma-standalone {
+  --la-pluma-tabbar-floating-height: 3.875rem;
+  --la-pluma-tabbar-side-inset: 1.3125rem;
+  --la-pluma-tabbar-bottom-clearance: max(1.3125rem, env(safe-area-inset-bottom, 0px));
+  --la-pluma-tabbar-label-size: 10px;
+  --la-pluma-tabbar-label-line: 13px;
+  --la-pluma-tabbar-icon-size: 24px;
+  --la-pluma-tabbar-fold-height: 2.75rem;
 }
 
 html.dark,
@@ -586,12 +616,23 @@ html.la-pluma-standalone #app-root .page {
     display: none;
   }
 
-  .la-pluma-app .la-pluma-brand.lg-button:is(:hover, :focus-visible, [data-pressed]) {
+  /* Focus and press stay outside the hover query so keyboard use is unchanged. */
+  .la-pluma-app .la-pluma-brand.lg-button:is(:focus-visible, [data-pressed]) {
     background: transparent;
     background-color: transparent;
     box-shadow: none;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
+  }
+
+  @media (hover: hover) {
+    .la-pluma-app .la-pluma-brand.lg-button:hover {
+      background: transparent;
+      background-color: transparent;
+      box-shadow: none;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
   }
 
   #app-root.dark .la-pluma-brand.lg-button {
@@ -673,9 +714,11 @@ html.la-pluma-standalone #app-root .page {
     height: 1.125rem;
   }
 
-  .la-pluma-app .theme-toggle-btn:hover:not(.is-active) {
-    background: color-mix(in srgb, var(--app-surface-solid) 38%, transparent);
-    color: var(--app-text);
+  @media (hover: hover) {
+    .la-pluma-app .theme-toggle-btn:hover:not(.is-active) {
+      background: color-mix(in srgb, var(--app-surface-solid) 38%, transparent);
+      color: var(--app-text);
+    }
   }
 
   .la-pluma-app .theme-toggle-btn.is-active {
@@ -702,8 +745,10 @@ html.la-pluma-standalone #app-root .page {
     height: 1.25rem;
   }
 
-  .la-pluma-app .la-pluma-github-link:hover {
-    color: var(--app-text) !important;
+  @media (hover: hover) {
+    .la-pluma-app .la-pluma-github-link:hover {
+      color: var(--app-text) !important;
+    }
   }
 
   .la-pluma-theme-mobile {
@@ -717,9 +762,14 @@ html.la-pluma-standalone #app-root .page {
   z-index: 1;
 }
 
-.la-pluma-github-link:hover,
 .la-pluma-github-link:focus-visible {
   color: var(--app-text) !important;
+}
+
+@media (hover: hover) {
+  .la-pluma-github-link:hover {
+    color: var(--app-text) !important;
+  }
 }
 
 .la-pluma-app .la-pluma-github-link:focus-visible {
@@ -878,9 +928,14 @@ html.la-pluma-standalone #app-root .page {
     transform 180ms ease;
 }
 
-.la-pluma-tab-link.is-desktop-tab:hover:not(.is-active),
 .la-pluma-tab-link.is-desktop-tab:focus-visible:not(.is-active) {
   color: var(--app-text) !important;
+}
+
+@media (hover: hover) {
+  .la-pluma-tab-link.is-desktop-tab:hover:not(.is-active) {
+    color: var(--app-text) !important;
+  }
 }
 
 /* Only the active workspace keeps a filled pill. Unselected rows stay plain
@@ -897,18 +952,28 @@ html.la-pluma-standalone #app-root .page {
   display: none !important;
 }
 
-.la-pluma-app .la-pluma-tab-link.is-desktop-tab:not(.is-active):hover,
 .la-pluma-app .la-pluma-tab-link.is-desktop-tab:not(.is-active):focus-visible {
   background: color-mix(in srgb, var(--app-text) 6%, transparent) !important;
+}
+
+@media (hover: hover) {
+  .la-pluma-app .la-pluma-tab-link.is-desktop-tab:not(.is-active):hover {
+    background: color-mix(in srgb, var(--app-text) 6%, transparent) !important;
+  }
 }
 
 .la-pluma-tab-link.is-desktop-tab.is-active {
   color: #fff !important;
 }
 
-.la-pluma-tab-link.is-desktop-tab.is-active:hover,
 .la-pluma-tab-link.is-desktop-tab.is-active:focus-visible {
   color: #fff !important;
+}
+
+@media (hover: hover) {
+  .la-pluma-tab-link.is-desktop-tab.is-active:hover {
+    color: #fff !important;
+  }
 }
 
 .la-pluma-tab-link.is-desktop-tab:focus-visible {
@@ -1007,6 +1072,7 @@ html.la-pluma-standalone #app-root .page {
   width: min(100%, 31rem);
   margin: 0 auto;
   pointer-events: auto;
+  position: relative;
 }
 
 .la-pluma-tabbar-nav {
@@ -1020,6 +1086,120 @@ html.la-pluma-standalone #app-root .page {
 
 .la-pluma-tabbar-more-anchor.is-active .lg-button {
   color: var(--app-accent-strong);
+}
+
+/* The current view sits on a capsule that travels between equal-width items. */
+.la-pluma-tabbar-indicator {
+  position: absolute;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  left: 0.25rem;
+  border-radius: var(--app-radius-pill);
+  background: var(--la-pluma-tabbar-active-bg);
+  pointer-events: none;
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), opacity 100ms ease;
+}
+
+/* Folded onto the current view while the page scrolls down. The bar keeps its
+   place; the plate closes onto a capsule in the middle of the screen. */
+.la-pluma-tabbar-inner,
+.la-pluma-tabbar-nav,
+.la-pluma-tabbar .lg-track {
+  transition:
+    max-width 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.la-pluma-tabbar .lg-nav-item {
+  transition: opacity 180ms ease 180ms;
+}
+
+.la-pluma-tabbar-more-anchor {
+  transition: opacity 180ms ease 180ms, transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.la-pluma-tabbar[data-folded='true'] .la-pluma-tabbar-inner {
+  justify-content: center;
+  gap: 0;
+  /* Only the capsule takes taps; the rest of the strip passes through. */
+  pointer-events: none;
+}
+
+.la-pluma-tabbar[data-folded='true'] .la-pluma-tabbar-nav {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: var(--la-pluma-tabbar-fold-width, 12rem);
+  pointer-events: auto;
+  transition-delay: 100ms;
+}
+
+.la-pluma-tabbar[data-folded='true'] .lg-track {
+  width: auto;
+  height: var(--la-pluma-tabbar-fold-height, 2.5rem);
+  min-height: var(--la-pluma-tabbar-fold-height, 2.5rem);
+  padding: 0.125rem;
+  transition-delay: 100ms;
+}
+
+.la-pluma-tabbar[data-folded='true'] .la-pluma-tabbar-indicator {
+  opacity: 0;
+}
+
+/* Everything else fades out first, before the plate closes past it. */
+.la-pluma-tabbar[data-folded='true'] .lg-nav-item {
+  width: 0;
+  flex: 0 0 0;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 100ms ease;
+}
+
+.la-pluma-tabbar[data-folded='true'] .lg-nav-item.is-active {
+  width: auto;
+  flex: 1 1 auto;
+  padding: 0 0.875rem;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Icon left of its label, the label at 1.1×, 6 px apart. */
+.la-pluma-tabbar[data-folded='true'] .lg-nav-item.is-active > span {
+  flex-direction: row;
+  gap: 6px;
+  font-size: calc(var(--la-pluma-tabbar-label-size, 11px) * 1.1);
+  line-height: 1;
+}
+
+.la-pluma-tabbar[data-folded='true'] .la-pluma-tabbar-more-anchor {
+  /* Out of flow while it fades so the capsule can centre. */
+  position: absolute;
+  top: 0;
+  right: 0;
+  opacity: 0;
+  transform: scale(0.8);
+  pointer-events: none;
+  transition: opacity 100ms ease, transform 280ms cubic-bezier(0.22, 1, 0.36, 1) 100ms;
+}
+
+.la-pluma-tabbar[data-folded='true'] .lg-menu .lg-button[data-icon-only] {
+  width: var(--la-pluma-tabbar-fold-height, 2.5rem);
+  height: var(--la-pluma-tabbar-fold-height, 2.5rem);
+  min-width: var(--la-pluma-tabbar-fold-height, 2.5rem);
+  transition: width 280ms cubic-bezier(0.22, 1, 0.36, 1), height 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .la-pluma-tabbar-inner,
+  .la-pluma-tabbar-nav,
+  .la-pluma-tabbar .lg-track,
+  .la-pluma-tabbar .lg-nav-item,
+  .la-pluma-tabbar-more-anchor,
+  .la-pluma-tabbar-indicator {
+    transition: none;
+  }
 }
 
 .la-pluma-app .app-page {
@@ -1353,9 +1533,9 @@ html.la-pluma-standalone #app-root .page {
     bottom: 0;
     left: 0;
     box-sizing: border-box;
-    padding: 0 max(1.25rem, env(safe-area-inset-right, 0px))
+    padding: 0 max(var(--la-pluma-tabbar-side-inset, 1.25rem), env(safe-area-inset-right, 0px))
       var(--la-pluma-tabbar-bottom-clearance)
-      max(1.25rem, env(safe-area-inset-left, 0px));
+      max(var(--la-pluma-tabbar-side-inset, 1.25rem), env(safe-area-inset-left, 0px));
     isolation: isolate;
   }
 
@@ -1659,8 +1839,10 @@ html.la-pluma-standalone #app-root .page {
   display: none;
 }
 
-.la-pluma-app .dashboard-page .surface-panel-hover:hover:not(:disabled) {
-  transform: none;
+@media (hover: hover) {
+  .la-pluma-app .dashboard-page .surface-panel-hover:hover:not(:disabled) {
+    transform: none;
+  }
 }
 
 .dark .la-pluma-app .dashboard-page .app-card,
@@ -2048,13 +2230,15 @@ html.dark .la-pluma-app .la-pluma-content .app-native-control,
   box-shadow: none;
 }
 
-.la-pluma-app .la-pluma-content :is(
-  .ios-borderless-cards,
-  [data-automation-tasks],
-  [data-workbench-tasks]
-) .app-native-control:not(.form-error-surface):hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--app-accent-soft) 16%, var(--app-surface-muted));
-  box-shadow: none;
+@media (hover: hover) {
+  .la-pluma-app .la-pluma-content :is(
+    .ios-borderless-cards,
+    [data-automation-tasks],
+    [data-workbench-tasks]
+  ) .app-native-control:not(.form-error-surface):hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--app-accent-soft) 16%, var(--app-surface-muted));
+    box-shadow: none;
+  }
 }
 
 .la-pluma-app .la-pluma-content :is(
@@ -2082,12 +2266,14 @@ html.dark .la-pluma-app .la-pluma-content .app-native-control,
   font-weight: 500;
 }
 
-.la-pluma-app .la-pluma-content :is(
-  .ios-borderless-cards,
-  [data-automation-tasks],
-  [data-workbench-tasks]
-) select.app-native-control:not(.form-error-surface):hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--app-accent-soft) 22%, var(--app-surface-muted));
+@media (hover: hover) {
+  .la-pluma-app .la-pluma-content :is(
+    .ios-borderless-cards,
+    [data-automation-tasks],
+    [data-workbench-tasks]
+  ) select.app-native-control:not(.form-error-surface):hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--app-accent-soft) 22%, var(--app-surface-muted));
+  }
 }
 
 .la-pluma-app .la-pluma-content :is(
@@ -2116,13 +2302,18 @@ html.dark .la-pluma-app .la-pluma-content .app-native-control,
   .ios-borderless-cards,
   [data-automation-tasks],
   [data-workbench-tasks]
-) .app-select-shell:hover .app-select-trailing-icon,
-.la-pluma-app .la-pluma-content :is(
-  .ios-borderless-cards,
-  [data-automation-tasks],
-  [data-workbench-tasks]
 ) .app-select-shell:focus-within .app-select-trailing-icon {
   background: color-mix(in srgb, var(--app-accent) 16%, transparent);
+}
+
+@media (hover: hover) {
+  .la-pluma-app .la-pluma-content :is(
+    .ios-borderless-cards,
+    [data-automation-tasks],
+    [data-workbench-tasks]
+  ) .app-select-shell:hover .app-select-trailing-icon {
+    background: color-mix(in srgb, var(--app-accent) 16%, transparent);
+  }
 }
 
 /* Automation owns a few compact field implementations instead of the shared
@@ -2139,12 +2330,14 @@ html.dark .la-pluma-app .la-pluma-content .app-native-control,
   box-shadow: none;
 }
 
-.la-pluma-app [data-automation-tasks] :is(
-  .automation-task-editor .automation-text-control:hover,
-  .automation-task-editor .number-input-wrapper:hover,
-  .automation-composite-control:hover
-) {
-  box-shadow: none;
+@media (hover: hover) {
+  .la-pluma-app [data-automation-tasks] :is(
+    .automation-task-editor .automation-text-control:hover,
+    .automation-task-editor .number-input-wrapper:hover,
+    .automation-composite-control:hover
+  ) {
+    box-shadow: none;
+  }
 }
 
 .la-pluma-app [data-automation-tasks] .automation-notification-field input:focus,
@@ -2401,9 +2594,11 @@ html.dark .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .sm
   border-radius: inherit;
 }
 
-.lg-input .lg-input-clear:hover {
-  background: var(--app-border);
-  color: var(--app-text);
+@media (hover: hover) {
+  .lg-input .lg-input-clear:hover {
+    background: var(--app-border);
+    color: var(--app-text);
+  }
 }
 
 .lg-input .lg-input-clear:focus-visible {
@@ -2437,30 +2632,64 @@ html.dark .la-pluma-app :is([data-automation-tasks], [data-workbench-tasks]) .sm
 .lg-nav .lg-nav-item {
   flex: 1 1 0;
   min-width: 0;
+  position: relative;
+  z-index: 1;
 }
 
-/* Selected/current tab: surface fill plus accent text, not colour alone —
-   the adapter also sets aria-current="page" and aria-selected on the item. */
+/* Icon and label sizes come from the tab-bar tokens so the installed-app
+   measure (24 px icon, 10/13 label) stays one override. */
+.la-pluma-tabbar .lg-nav-item > span {
+  font-size: var(--la-pluma-tabbar-label-size, 11px);
+  line-height: var(--la-pluma-tabbar-label-line, 1);
+}
+
+.la-pluma-tabbar .lg-nav-item > span svg {
+  width: var(--la-pluma-tabbar-icon-size, 20px);
+  height: var(--la-pluma-tabbar-icon-size, 20px);
+}
+
+/* Selected/current tab: the travelling capsule carries the surface fill; the
+   item keeps the accent text and its ARIA state. */
 .lg-nav .lg-nav-item.is-active {
-  background: var(--la-pluma-tabbar-active-bg);
+  background: transparent;
   color: var(--app-accent-strong);
 }
 
 /* "More" menu trigger in the tab bar: a circle matching the floating bar and
    the same tinted surface as every other app button. */
 .lg-menu .lg-button[data-icon-only] {
+  position: relative;
   flex: 0 0 auto;
   box-sizing: border-box;
   width: var(--la-pluma-tabbar-floating-height, 2.75rem);
   height: var(--la-pluma-tabbar-floating-height, 2.75rem);
   min-width: var(--la-pluma-tabbar-floating-height, 2.75rem);
   padding: 0;
-  border: 1px solid var(--app-border);
+  border: 0;
   border-radius: var(--app-radius-pill);
-  background: var(--app-surface-muted);
+  /* The fill sits on a pseudo-element so the bar itself paints no background
+     at the foot, which is what Safari samples for its toolbar strip. The blur
+     is removed as well: a backdrop filter re-blurs the scrolling page every
+     frame, and this key only needs a frosted body. */
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   color: var(--app-text);
   font-size: var(--app-font-caption, 0.75rem);
   font-weight: 600;
+}
+
+.lg-menu .lg-button[data-icon-only]::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid var(--app-border);
+  border-radius: inherit;
+  /* The same surface the tab bar's own glass wears (--app-surface), so the key
+     reads as part of the bar instead of a solid plate laid on top of it. */
+  background: var(--app-surface);
+  content: '';
+  pointer-events: none;
 }
 
 .lg-menu .lg-button[data-icon-only] svg {

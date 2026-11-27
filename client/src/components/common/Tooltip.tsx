@@ -202,6 +202,10 @@ export default function Tooltip({
       if (top + tooltipRect.height > window.innerHeight - VIEWPORT_GAP) {
         top = Math.max(VIEWPORT_GAP, triggerRect.top - tooltipRect.height - TRIGGER_GAP)
       }
+      // Keep the tooltip clear of the foot: a fixed element touching that edge
+      // makes Safari paint its toolbar strip one flat colour.
+      top = Math.min(top, window.innerHeight - VIEWPORT_GAP - tooltipRect.height)
+      top = Math.max(VIEWPORT_GAP, top)
       const centeredLeft = triggerRect.left + triggerRect.width / 2 - tooltipRect.width / 2
       const left = Math.min(
         Math.max(VIEWPORT_GAP, centeredLeft),

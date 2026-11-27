@@ -148,9 +148,22 @@ export type GlassLens = {
    * it brightens the page's colour the same way. Without it nothing shows outside the glass.
    */
   glow?: { x: number; y: number; r: number; amount: number; blob?: number; halo?: { around: 'body' | 'blob'; amount: number } }
+  /** `false`: this glass does not take the light under the pointer (see LIGHT). Every other glass does, unless that light is turned off. */
+  pointerLight?: boolean
+  /**
+   * Another view this glass continues (one shape drawn by two canvases, each on its side of a
+   * seam): it takes that view's light of a press (LIGHT) as it is, where it is on screen, instead
+   * of one of its own, so the light does not stop at the seam.
+   */
+  lightOf?: GlassView
   /** Lens centre on screen, for aiming the cursor light. */
   screenX: number
   screenY: number
+  /**
+   * How large one CSS px of the canvas is on screen: the host's own CSS `scale` and its
+   * ancestors' (1 when omitted). Glass that melts into its neighbours (COHESION) is measured with it.
+   */
+  scale?: number
 }
 
 export type GlassView = {
@@ -171,6 +184,45 @@ export type GlassView = {
   drawn?: () => void
   /** The GPU context is gone: return to the plain CSS look. */
   lost: () => void
+  /**
+   * `true`: a pointer that holds this glass pulls it after itself (see PULL). Buttons ask for it;
+   * no other glass is pulled. A view may change it at any time: set back to `false`, held glass is let go.
+   */
+  pull?: boolean
+  /** Set by the engine: a pointer holds this glass and may be pulling it. The press lasts as long, outside the glass too. */
+  held?: boolean
+  /**
+   * The CSS scale this view wants on its host (1 = none), when it swells its host itself. The
+   * engine writes the host's `scale`: this, times the stretch of a pull. A view that sets it
+   * never writes `host.style.scale` itself.
+   */
+  grow?: number
+  /**
+   * `true`: this glass is a button (see "The light of a press", above GLOW). A press on it lets
+   * light in where it lands (GLOW), on top of the light every glass takes under a press (LIGHT).
+   * Left out, the glass is a surface (a card, a menu, a lens) and takes LIGHT alone. The engine
+   * hears the press and the keys itself: a view only says what it is.
+   */
+  button?: boolean
+  /** With `button`: the element a press must land in, when it is not the glass's host. */
+  pressArea?: Element
+  /**
+   * `false`: this surface does not take the engine's light around a choice pressed in it (see the
+   * rule above GLOW), because it brings that light itself (GlassPopup's lists do) or wants none.
+   */
+  choices?: boolean
+  /**
+   * Set by the engine: where a pull has this glass (px from its rest) and how it stretches its
+   * host (1 = not at all), as written on the host this frame. A view reads it to undo the stretch
+   * on its canvas and draw it in the glass instead (GlassLayer and GlassPopup do).
+   */
+  pulled?: { x: number; y: number; sx: number; sy: number }
+  /**
+   * Set by the engine: the hosts of the glass this one melts into (COHESION), or none. Melted,
+   * they are one body with it, so a view leaves them out of its picture of what lies behind
+   * (GlassLayer does). The list is replaced only when the glass it names changes.
+   */
+  near?: Element[]
 }
 
 export type GlassEngine = {
@@ -212,9 +264,30 @@ export function stepSpring(s: Spring, target: number, { omega, zeta }: { omega: 
 }
 
 /**
- * A press lets light into the glass where it lands. The light paints nothing: it brightens what
+ * The light of a press. The rule, kept here and applied by the engine:
+ *
+ * - A button is lit by GLOW: a press lets light in where it lands, the light holds a moment and
+ *   fades as it spreads. A view says `button: true` and the engine does the rest (Button, Action
+ *   Button and Button Group, through GlassLayer). The control of a surface that opens (GlassPopup)
+ *   is a button too and brings the same light itself (`glow` on its lens), because there it goes
+ *   on to open the surface.
+ * - A surface is lit by LIGHT alone: a soft white light where the press lands, for as long as it
+ *   is held. Every glass that is not a button is a surface: a card, a menu or a list that has
+ *   opened, a lens, a thumb, a badge. Nothing asks for it; `pointerLight: false` on a lens opts out.
+ * - A surface that holds choices also lights up around a choice pressed in it, with GLOW's
+ *   `select` values: a wide, soft light that stays inside the glass. A choice is an option, a
+ *   menu item, or anything marked `data-glass-item` or `data-glass-pick`. The engine does it for
+ *   every surface (a menu, a submenu, a card with rows); the lists of a Select, a Dropdown Menu
+ *   and a Popover bring the same light themselves (theirs leaves with the surface) and say
+ *   `choices: false`.
+ * - A button takes LIGHT too, beneath its GLOW. No light follows the pointer, and a pointer that
+ *   only rests on the glass lights nothing.
+ *
+ * A new component follows the rule by saying what it is: it never draws a light of its own.
+ *
+ * GLOW: a press lets light into the glass where it lands. The light paints nothing: it brightens what
  * is already there, keeping its colour (luminance L becomes L^(1 / (1 + amount)) at the centre,
- * so black stays black and white stays white). Used by GlassPopup (`glass-popup.tsx`). These are
+ * so black stays black and white stays white). These are
  * the values for wider controls; GLOW_SMALL, below, holds the same set for small ones.
  */
 export const GLOW = {
@@ -248,7 +321,7 @@ export const GLOW = {
   coverUntil: 0.1,
   coverFadeSpeed: 10,
   /** How much of the light spills past an open surface's edge (0 = none). */
-  halo: 1,
+  halo: 0.35,
 }
 /**
  * What the rim mirrors of the page around the glass. Each point of the rim looks outwards and
@@ -263,24 +336,24 @@ export const MIRROR = {
    * as thin as the one that leans towards the cursor), and in the band that begins inside it.
    */
   line: 1,
-  band: 0.45,
+  band: 0.7,
   /**
    * How deep that band goes: this × the glass's shorter half (or its reach, on taller glass).
    * The rim's edge looks `reach` far; the look shortens with depth and ends here, so a
    * neighbour's picture fills the band where it is near and thins out where the rim turns
    * away from it: a crescent on a round glass.
    */
-  depth: 1.1,
+  depth: 0.58,
   /** How fast the picture fades from the rim inwards, an exponent (1 = evenly, higher = it keeps closer to the rim). */
-  fall: 2,
+  fall: 1,
   /** How soft the picture is: the patch each point gathers, × the reach (0 = a sharp mirror). */
-  soft: 0.3,
+  soft: 1,
   /** How much more than its plain difference from the surface a neighbour counts. */
-  gain: 1.2,
+  gain: 1.8,
   /** How much a darker neighbour dims the rim (× the above; 0 = not at all). */
-  dim: 0.6,
+  dim: 0.65,
   /** How far the rim's edge looks: this × the glass's height, between `reachMin` and `reachMax` px. */
-  reach: 0.75,
+  reach: 0.55,
   reachMin: 24,
   reachMax: 96,
   /** What a point gathers along its look: shares from its near part, from further out and from its far end. */
@@ -303,6 +376,35 @@ export const GLOW_SMALL: typeof GLOW = { ...GLOW, reach: 0.7, spread: 0.7, riseS
 export const MORPH_GLOW: typeof GLOW = { ...GLOW, stack: 3.5, hold: 0.5 }
 export const MORPH_GLOW_SMALL: typeof GLOW = { ...GLOW_SMALL, stack: MORPH_GLOW.stack, hold: MORPH_GLOW.hold }
 
+/**
+ * LIGHT, the light every glass takes under a press and the only one a surface takes (the rule is
+ * above GLOW): glass lit from within, beginning where the press landed. A press (any
+ * pointer, or Space / Enter on the focused control) brings it up, and it stays at that point of
+ * the glass for as long as the press is held, wherever the pointer goes; let go, it sinks back.
+ * It follows nothing, and a pointer that only rests on the glass lights nothing. It is white laid over the
+ * glass: strongest at that point, falling off evenly to nothing at its radius, and it never
+ * leaves the glass. Every glass takes it: the kit's controls, and a surface that opens
+ * (GlassPopup), on top of its own light (GLOW). A lens that says `pointerLight: false` does not,
+ * and `on: false` turns it off everywhere. The light and its numbers are those of Glass HQ's liquid-glass 0.0.2 (MIT,
+ * https://github.com/Glass-HQ/liquid-glass). Read on every frame: do not tune them casually.
+ */
+export const LIGHT = {
+  on: true,
+  /** How white the glass is under the pointer at full light (0–1): on a light page, and on a dark one. */
+  strength: 0.3,
+  strengthDark: 0.16,
+  /** How much of the full light a press brings. */
+  press: 1,
+  /** The light's radius: `size ×` the glass's longer side, between `sizeMin` and `sizeMax` px. */
+  size: 0.9,
+  sizeMin: 36,
+  sizeMax: 180,
+  /** A press comes up in about `rise` seconds, overshooting a little (`riseBounce`: 0 = none), and sinks back in `fade` seconds, without bounce. */
+  rise: 0.24,
+  riseBounce: 0.2,
+  fade: 0.42,
+}
+
 /** Every spring the kit uses. Hover width/height bounce out of phase: the glass wobbles like a drop. */
 export const SPRINGS = {
   press: { omega: 16, zeta: 0.6 },
@@ -317,6 +419,109 @@ export const SPRINGS = {
   /** A dragged lens following the finger. */
   drag: { omega: 40, zeta: 0.999 },
 } as const
+
+/**
+ * Glass that a held pointer pulls after itself: press it, drag away, and it follows a little way
+ * through a rubber band, stretches along the pull and thins across it, then swings back like gel
+ * when let go. It is for buttons: the engine does it for glass whose view says `pull: true`
+ * (GlassLayer does, so Button, Action Button and Button Group; `pull={false}` there keeps one in
+ * its place), the innermost one under the press, by moving and stretching its host (CSS
+ * `translate` and `scale`, content included). The control of a surface that opens (GlassPopup:
+ * Select, Dropdown Menu, Popover, Menu) is a button too while it is shut, and opens when the press
+ * is let go on it. No other glass is pulled, and `on: false` here turns it off everywhere. The motion and its numbers are those of Glass HQ's liquid-glass 0.0.2 (MIT,
+ * https://github.com/Glass-HQ/liquid-glass). Read on every frame: do not tune them casually.
+ */
+export const PULL = {
+  on: true,
+  /**
+   * Glass whose longer side is at most this (px) is small: it follows the pointer from the point
+   * it was pressed at. Larger glass moves only once the pointer is past its edge, by how far past.
+   */
+  smallUntil: 72,
+  /** The furthest the pull moves small glass, px: `smallReach + smallReachPerPx × its longer side`. */
+  smallReach: 4,
+  smallReachPerPx: 0.15,
+  /** The same for larger glass, `reachMax` at most. */
+  reach: 3,
+  reachPerPx: 0.04,
+  reachMax: 10,
+  /** How fast the band stiffens: 0.55 is a scroll view's. */
+  resistance: 0.55,
+  /** Following the pointer takes `follow + followPerPx × the longer side` seconds, without bounce (larger glass is heavier). */
+  follow: 0.18,
+  followPerPx: 5e-4,
+  /** Let go: back to rest in about `release` seconds, overshooting like gel (`releaseBounce`: 0 = none, towards 1 = more). */
+  release: 0.5,
+  releaseBounce: 0.42,
+  /**
+   * The stretch along one axis: `stretch × the pull ÷ the glass's size that way`, plus
+   * `stretchPerSpeed ×` the pull's own speed and `stretchPerDrift ×` the speed the glass's place
+   * on the page moves at (px/s). Small glass stretches by `smallStretchMax` at most, larger by
+   * `stretchMax`. Across, the glass thins by the square root of the stretch.
+   */
+  stretch: 0.5,
+  stretchPerSpeed: 7e-5,
+  stretchPerDrift: 5e-5,
+  smallStretchMax: 0.2,
+  stretchMax: 0.12,
+  /** The drift speed is smoothed in at this rate while held, and dies out at `driftOut` (per second). */
+  driftIn: 12,
+  driftOut: 10,
+}
+
+/**
+ * Cohesion: the glass of two buttons that come near each other melts into one body, as two drops
+ * of liquid do. Within reach the sides that face each other lean out, nearer still a bridge forms
+ * between them, and it thins and lets go as they part, whatever brings them together: a pull, a
+ * swell, the layout. It is for buttons: the engine does it for glass whose view says
+ * `button: true` (GlassLayer's, so Button, Action Button and Button Group). A surface (a card, a
+ * menu, a lens) never melts, and a button never melts into glass it sits inside. Each canvas
+ * draws its own side of the bridge, up to the line where the two glasses are as near, and across
+ * the bridge they share their looks (bevel, bend, tint, shadow), so the line does not show. Joined,
+ * the light of a press on one runs on into the other (`light` says how much of it), as far as it
+ * reaches (GLOW and LIGHT, measured from where the press landed). The shape is a smooth union of
+ * the glasses' distance fields, the fusion of Liquid Glass Studio (MIT,
+ * https://github.com/iyinchao/liquid-glass-studio). `on: false` turns it off everywhere. Read on
+ * every frame: do not tune them casually.
+ */
+export const COHESION = {
+  on: true,
+  /**
+   * How soft the bridge is: `reach ×` the shorter glass's height, between `reachMin` and
+   * `reachMax` px. Two glasses begin to melt once the gap between them is under this (it eases in
+   * until the gap is half of it), and join into one once the gap is under half of it.
+   */
+  reach: 1.2,
+  reachMin: 2,
+  reachMax: 6,
+  /**
+   * How much of the light of a press on one glass runs on into a glass it has melted into, once
+   * the bridge between them has some body (0 = none: each keeps its own light; 1 = all of it, as
+   * one body). Short of that, the light crosses only where the two meet.
+   */
+  light: 0.07,
+  /** That light fades as it goes into the other glass, as a reflection would: it is down to a third this far from where the two meet (× that glass's half height). */
+  lightFade: 1,
+}
+
+/** The bridge's softness between glass of this height (px) and glass as tall or taller (COHESION); 0 while it is off. */
+export function cohesionSoftness(height: number) {
+  if (!COHESION.on) return 0
+  return Math.min(Math.max(COHESION.reach * height, COHESION.reachMin), Math.max(COHESION.reachMin, COHESION.reachMax))
+}
+
+/**
+ * Presses the kit sends itself: GlassPopup keeps a press that would open its surface and hands it
+ * on when it is let go. Such a press is no pointer holding the glass: nothing is pulled or lit by
+ * it, and no release follows it. Whoever dispatches one adds it here first.
+ */
+export const HANDED_ON = new WeakSet<Event>()
+
+/** A rubber band: a short pull follows almost one to one, a long one nears `limit` and never reaches it. */
+export function rubberBand(offset: number, limit: number, resistance = 0.55) {
+  if (!(limit > 0)) return 0
+  return Math.sign(offset) * limit * (1 - 1 / ((Math.abs(offset) * resistance) / limit + 1))
+}
 
 /**
  * The gooey popup: a surface (a list, a menu, a popover) that swells out of its anchor as one
@@ -433,7 +638,7 @@ export const MORPH = {
   /**
    * `closeSoft: 1`: closing is a motion of its own (`0`: the opening played backwards). The
    * surface goes back into the control on one spring with no bounce (`closeSpeed`), slowing as it
-   * lands, and the control takes it with a small swell: it is not thrown and does not light up. The content
+   * lands, and the control stays still: it is not thrown, does not swell and does not light up. The content
    * does not wait for the glass: it is gone `closeFade` seconds after the close begins. A choice's
    * light comes into the control with the surface and narrows to `closeGlowReach` (× the control's
    * height) as it does, so it does not flood the control. `closeKick`:
@@ -450,7 +655,54 @@ export const MORPH = {
   frostTo: 0.05,
 }
 
-export const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+/**
+ * The growing popup: a control whose glass becomes its menu. One shape on one spring: the
+ * control's own outline grows into the menu's, wherever the menu lies (below, above or beside
+ * it), and shrinks back along the same path to close. The side the menu lies on runs ahead and
+ * the other follows, so the glass pours towards its place instead of scaling up. The control's
+ * label goes as the glass leaves it; the menu's content stays where it is and the glass opens
+ * over it. A close that is interrupted carries on from where it is, at the speed it has. It takes
+ * no light from a press (GLOW is not used here). Used by
+ * GlassPopup with `opening: 'grow'` (`glass-popup.tsx`). The motion and its numbers are those of
+ * Glass HQ's liquid-glass 0.0.2 (MIT, https://github.com/Glass-HQ/liquid-glass). These values
+ * are the look: do not tune them casually.
+ */
+export const MENU = {
+  /** Opening takes about `open` seconds and lands a little past the menu (`openBounce`: 0 = not at all, towards 1 = more). */
+  open: 0.42,
+  openBounce: 0.18,
+  /** Closing: the same, on its own spring. */
+  close: 0.32,
+  closeBounce: 0.1,
+  /**
+   * The side the menu lies on leads and the other follows, both as exponents: the leading side
+   * goes as 1 − (1 − p)^lead, the other as p^follow (1 and 1: both sides grow evenly).
+   */
+  lead: 1.6,
+  follow: 1.4,
+  /**
+   * On the way the corners stay round: no tighter than `round` × the shape's shorter side, until
+   * the motion is `roundFrom` of the way (0–1), easing to the menu's own corners by `roundUntil`.
+   */
+  round: 0.34,
+  roundFrom: 0.35,
+  roundUntil: 0.8,
+  /** The control's label goes between these two points of the way (0–1), softening by `labelBlur` CSS px. */
+  labelFrom: 0.02,
+  labelTo: 0.3,
+  labelBlur: 3,
+  /** The menu's content shows between these two points, coming out of a blur of `contentBlur` CSS px (0 = none: the cheapest). */
+  contentFrom: 0.4,
+  contentTo: 0.9,
+  /** Closing, the content does not wait for the glass: it is gone this long (seconds) after the close begins. */
+  closeFade: 0.12,
+  contentBlur: 6,
+  /** The control's glass (clear, lit) gives way to the card's between these two points. Done by `labelTo`, so the label is gone before the menu's layer takes the glass over. */
+  frostFrom: 0,
+  frostTo: 0.3,
+}
+
+export const lerp =(a: number, b: number, t: number) => a + (b - a) * t
 export const clamp = (v: number, a = 0, b = 1) => Math.max(a, Math.min(b, v))
 export const smooth = (a: number, b: number, v: number) => {
   const t = clamp((v - a) / (b - a))
@@ -497,6 +749,7 @@ uniform vec2 uRadial;
 uniform vec4 uGlow;
 uniform vec2 uGlowHalo;
 uniform float uGlowBlob;
+uniform vec4 uLight;
 uniform vec4 uBlobMat;
 uniform vec3 uBlobLine;
 uniform float uCssPx;
@@ -506,6 +759,21 @@ uniform float uAroundScale, uReach;
 uniform vec4 uMirror, uSeen;
 uniform vec2 uBounce;
 uniform float uFall, uSoft;
+// The glass this one melts into (COHESION), up to four, in this glass's design units. uNear: centre
+// (from the lens centre) and half size. uNearShape: corner radius, the radius its bend follows (as
+// uFieldRadius), the bridge's softness, bevel. What the two share across the bridge: uNearTint
+// (tint colour and how much of it covers clear glass, or the colour of tinted glass), uNearLine
+// (rim line colour and opacity), uNearLook (bend, 1 = clear, rim line width, cursor light angle),
+// uNearShade (shadow, its softness and offset, its design unit in this glass's), uNearMirror (as
+// uMirror.z, uReach and uSoft, and how much it mirrors, × this glass's) and the light of a press,
+// uNearGlow and uNearLight (as uGlow and uLight).
+// uNearPair: 1 = that glass's canvas lies over this one's; how joined the two are (0 = apart, 1 =
+// the bridge between them has some body: the light of a press on either fills both).
+uniform float uNearCount;
+uniform vec4 uNear[4], uNearShape[4], uNearTint[4], uNearLine[4], uNearLook[4], uNearShade[4], uNearMirror[4], uNearGlow[4], uNearLight[4];
+uniform vec2 uNearPair[4];
+// How far the light of a press runs into the glass it reaches before it has faded (× its half height).
+uniform float uNearFade;
 out vec4 outColor;
 
 // design units -> texture uv (textures are uploaded flipped: top row at v = 1)
@@ -581,10 +849,24 @@ float blobSoft(vec2 p) {
   }
   return max(k, 1e-3);
 }
-float shape(vec2 p) {
+// The glass's own shape: the body, its droplet and its blob.
+float selfShape(vec2 p) {
   float s = bodyShape(p);
   if (uBlobShape.y <= 0.0) return s;
   return melt(roundRect(p - uBlob.xy, uBlob.zw, uBlobShape.x), s, blobSoft(p));
+}
+// A glass this one melts into (COHESION): a rounded box.
+float nearBox(int i, vec2 p) {
+  return roundRect(p - uNear[i].xy, uNear[i].zw, uNearShape[i].x);
+}
+// The shape: its own, melted into every glass within reach.
+float shape(vec2 p) {
+  float s = selfShape(p);
+  for (int i = 0; i < 4; i++) {
+    if (float(i) >= uNearCount) break;
+    s = melt(nearBox(i, p), s, max(uNearShape[i].z, 1e-3));
+  }
+  return s;
 }
 // What casts the drop shadow: the body alone once a blob has a glass of its own.
 float caster(vec2 p) {
@@ -593,14 +875,18 @@ float caster(vec2 p) {
 // The body with corners at least as round as the bend is deep (see uBand in main).
 float field(vec2 p) {
   float f = roundRect(p - vec2(uBodyX, 0.0), uHalf, uFieldRadius);
-  if (uBlobShape.y <= 0.0) return f;
-  return melt(roundRect(p - uBlob.xy, uBlob.zw, uBlobShape.x), f, blobSoft(p));
+  if (uBlobShape.y > 0.0) f = melt(roundRect(p - uBlob.xy, uBlob.zw, uBlobShape.x), f, blobSoft(p));
+  for (int i = 0; i < 4; i++) {
+    if (float(i) >= uNearCount) break;
+    f = melt(roundRect(p - uNear[i].xy, uNear[i].zw, uNearShape[i].y), f, max(uNearShape[i].z, 1e-3));
+  }
+  return f;
 }
 // The reference darkens linear colour; on sRGB values the same factor is k^(1/2.2).
 float dim(float k) { return pow(clamp(k, 0.0, 1.0), 1.0 / 2.2); }
 vec3 dim(vec3 k) { return pow(clamp(k, 0.0, 1.0), vec3(1.0 / 2.2)); }
-float height(vec2 p) {
-  float t = pow(clamp(-shape(p) / uBevel, 0.0, 1.0), 1.0 / 1.4);
+float height(vec2 p, float bevel) {
+  float t = pow(clamp(-shape(p) / bevel, 0.0, 1.0), 1.0 / 1.4);
   return sqrt(1.0 - (1.0 - t) * (1.0 - t));
 }
 // Radial bend (the SVG card's): towards the centre, strongest at the rim, fading over the
@@ -639,13 +925,119 @@ void main() {
   vec2 local = px / uUnit - uCenter;
   float dist = shape(local);
 
+  // Melted into other glass (COHESION), both canvases draw one body: each its own side of the line
+  // where the two glasses are as near (side: how much nearer the nearest neighbour is here). What
+  // the look depends on is shared across the bridge: a neighbour takes r / (1 + Σ r) of it, none
+  // deep in this glass, half on that line, all of it deep in its own glass. Both canvases work out
+  // the same values on the line, so it does not show. Without neighbours, each is this glass's own.
+  float side = -1.0;
+  float share = 1.0;
+  float mine = dist;
+  float nearTotal = 1.0;
+  float nearT[4] = float[4](0.0, 0.0, 0.0, 0.0);
+  float nearD[4] = float[4](0.0, 0.0, 0.0, 0.0);
+  float scale = 1.0;
+  float bevel = uBevel;
+  float refract = uRefract;
+  float blurShift = uBlurShift;
+  float shadowAmount = uShadow;
+  float shadowSoft = uShadowSoft;
+  float shadowOffset = uShadowOffset;
+  float ny = local.y / uHalf.y;
+  float nx = (local.x - uBodyX) / uHalf.x;
+  float ly = local.y;
+  vec2 lightDir = uLightDir;
+  vec3 lineColor = uBorder;
+  float lineAlpha = step(1e-4, uBorderWidth) * uBorderAlpha;
+  float lineWidth = uBorderWidth;
+  vec3 mirrorShape = vec3(uMirror.z, uReach, uSoft);
+  float glowNear = 0.0;
+  float lightNear = 0.0;
+  float ownLight = 1.0;
+  if (uNearCount > 0.0) {
+    mine = selfShape(local);
+    float nearest = 1e9;
+    float sumScale = 1.0;
+    float sumBevel = uBevel;
+    float sumRefract = uRefract;
+    vec3 sumShadow = vec3(uShadow, uShadowSoft, uShadowOffset);
+    vec3 sumPlace = vec3(ny, nx, ly);
+    vec2 sumDir = uLightDir;
+    vec3 sumLine = uBorder * lineAlpha;
+    float sumAlpha = lineAlpha;
+    float sumWidth = uBorderWidth * lineAlpha;
+    vec3 sumMirror = mirrorShape;
+    float apartAll = 0.0;
+    float glowJoined = 0.0;
+    float lightJoined = 0.0;
+    for (int i = 0; i < 4; i++) {
+      if (float(i) >= uNearCount) break;
+      float d = nearBox(i, local);
+      nearD[i] = d;
+      nearest = min(nearest, d);
+      // How far this point has gone over to the neighbour: 0 to 1 across the bridge's softness.
+      float t = clamp(0.5 + (mine - d) / max(uNearShape[i].z, 1e-3), 0.0, 1.0);
+      nearT[i] = t;
+      float r = t / max(1.0 - t, 1e-4);
+      nearTotal += r;
+      vec4 n = uNear[i];
+      sumScale += r * uNearShade[i].w;
+      sumBevel += r * uNearShape[i].w;
+      sumRefract += r * uNearLook[i].x;
+      sumShadow += r * uNearShade[i].xyz;
+      sumPlace += r * vec3((local.y - n.y) / n.w, (local.x - n.x) / n.z, local.y - n.y);
+      sumDir += r * vec2(cos(uNearLook[i].w), sin(uNearLook[i].w));
+      float a = uNearLine[i].w;
+      sumLine += r * a * uNearLine[i].rgb;
+      sumAlpha += r * a;
+      sumWidth += r * a * uNearLook[i].z;
+      sumMirror += r * uNearMirror[i].xyz;
+      // The light of a press on either glass: shared like the rest while they are apart, and all of
+      // it everywhere once they are joined, so it runs on through the whole body.
+      // ...fading as it goes deeper into this glass from the line between them, as a reflection would.
+      float join = uNearPair[i].y * exp(-max(d - mine, 0.0) / max(uHalf.y * uNearFade, 0.5));
+      float apart = r * (1.0 - join);
+      apartAll += apart;
+      vec2 gd = (local - uNearGlow[i].xy) / max(uNearGlow[i].z, 1.0);
+      float glow = uNearGlow[i].w * exp(-dot(gd, gd));
+      float light = uNearLight[i].w * max(1.0 - length(local - uNearLight[i].xy) / max(uNearLight[i].z, 1e-3), 0.0);
+      glowNear += apart * glow;
+      lightNear += apart * light;
+      glowJoined += join * glow;
+      lightJoined += join * light;
+    }
+    side = mine - nearest;
+    share = clamp(0.5 - side / (4.0 * uDevicePx), 0.0, 1.0);
+    // Lengths built into the look (in design units) follow the shared design unit.
+    scale = sumScale / nearTotal;
+    bevel = sumBevel / nearTotal;
+    refract = sumRefract / nearTotal;
+    blurShift = uBlurShift + log2(max(scale, 1e-3));
+    shadowAmount = sumShadow.x / nearTotal;
+    shadowSoft = sumShadow.y / nearTotal;
+    shadowOffset = sumShadow.z / nearTotal;
+    ny = sumPlace.x / nearTotal;
+    nx = sumPlace.y / nearTotal;
+    ly = sumPlace.z / nearTotal;
+    if (dot(sumDir, sumDir) > 1e-6) lightDir = normalize(sumDir);
+    lineAlpha = sumAlpha / nearTotal;
+    if (sumAlpha > 1e-4) {
+      lineColor = sumLine / sumAlpha;
+      lineWidth = sumWidth / sumAlpha;
+    }
+    mirrorShape = sumMirror / nearTotal;
+    glowNear = glowNear / nearTotal + glowJoined;
+    lightNear = lightNear / nearTotal + lightJoined;
+    ownLight = 1.0 - apartAll / nearTotal;
+  }
+
   // Drop shadow: tight + ambient, kept near the glass, faded before the canvas edge.
-  float vFade = smoothstep(-0.1, 0.9, local.y / uHalf.y) * 0.92 + 0.08;
-  float outside = smoothstep(-4.0, 14.0, dist);
-  float near = 1.0 - smoothstep(-6.0, uShadowSoft, caster(local - vec2(0.0, uShadowOffset)));
-  float far = 1.0 - smoothstep(-10.0, uShadowSoft * 1.5, caster(local - vec2(0.0, uShadowOffset * 1.6)));
+  float vFade = smoothstep(-0.1, 0.9, ny) * 0.92 + 0.08;
+  float outside = smoothstep(-4.0 * scale, 14.0 * scale, dist);
+  float near = 1.0 - smoothstep(-6.0 * scale, shadowSoft, caster(local - vec2(0.0, shadowOffset)));
+  float far = 1.0 - smoothstep(-10.0 * scale, shadowSoft * 1.5, caster(local - vec2(0.0, shadowOffset * 1.6)));
   float border = min(min(px.x, px.y), min(uSize.x - px.x, uSize.y - px.y));
-  float sh = clamp((near + far) * uShadow * vFade * outside, 0.0, 0.85) * smoothstep(0.0, 14.0, border);
+  float sh = clamp((near + far) * shadowAmount * vFade * outside, 0.0, 0.85) * smoothstep(0.0, 14.0, border);
   vec4 outsideCol = vec4(0.0, 0.0, 0.0, 1.0 - dim(1.0 - sh));
 
   // Glow (see below): its strength here. It stays inside the glass unless a halo is asked for
@@ -670,6 +1062,26 @@ void main() {
   // stops here, before the bevel, the bend and the light are worked out.
   float aa = max(fwidth(dist), 1e-4);
   float mask = 1.0 - smoothstep(-aa, aa, dist);
+  // Past the line, the neighbour's own canvas draws the body: here only this glass's share of the
+  // shadow the two cast together. Along the line the two canvases cross-fade over a few px: the
+  // one beneath draws its glass a little past the line, and the one above fades in over it, so
+  // what little the two pictures differ by (each blurs its own picture of the page) does not show
+  // as a line. cover: how much of the glass this canvas draws here.
+  float cover = 1.0;
+  if (uNearCount > 0.0) {
+    outsideCol *= share;
+    float fade = 4.0 * uCssPx;
+    for (int i = 0; i < 4; i++) {
+      if (float(i) >= uNearCount) break;
+      float s = mine - nearD[i];
+      if (uNearPair[i].x > 0.5) cover *= step(s, fade + 2.0 * uDevicePx);
+      else cover *= smoothstep(fade, -fade, s);
+    }
+    if (cover <= 0.0) {
+      outColor = outsideCol * (1.0 - mask);
+      return;
+    }
+  }
   if (mask <= 0.0) {
     outColor = outsideCol;
     return;
@@ -687,12 +1099,12 @@ void main() {
   float edgeBand = mix(uEdgeBand, uBlobMat.w, own);
 
   // Surface normal from the bevel height field.
-  float e = 1.25;
-  float h = height(local);
-  vec2 grad = vec2(height(local + vec2(e, 0.0)) - h, height(local + vec2(0.0, e)) - h) / e;
-  vec3 normal = normalize(vec3(-grad * 42.0, 1.0));
+  float e = 1.25 * scale;
+  float h = height(local, bevel);
+  vec2 grad = vec2(height(local + vec2(e, 0.0), bevel) - h, height(local + vec2(0.0, e), bevel) - h) / e;
+  vec3 normal = normalize(vec3(-grad * 42.0 * scale, 1.0));
   float depth = clamp(1.0 - h, 0.0, 1.0);
-  float edge = 1.0 - smoothstep(0.0, uBevel * edgeBand, -dist);
+  float edge = 1.0 - smoothstep(0.0, bevel * edgeBand, -dist);
   vec2 dir = normalize(vec2(shape(local + vec2(e, 0.0)) - dist, shape(local + vec2(0.0, e)) - dist) + 1e-6);
 
   vec3 glass;
@@ -720,9 +1132,9 @@ void main() {
       bendEdge = 1.0 - smoothstep(0.0, uBand, -fd);
     }
     vec2 magnified = local / (uMag * h + 1.0);
-    vec2 bend = -bendDir * uRefract * pow(bendEdge, bendCurve);
+    vec2 bend = -bendDir * refract * pow(bendEdge, bendCurve);
     float split = uDisp * 0.35 * (1.0 - own);
-    float lod = max(mix(uBlurCenter, uBlurEdge, pow(bendEdge, 1.3)) + uBlurShift, 0.0);
+    float lod = max(mix(uBlurCenter, uBlurEdge, pow(bendEdge, 1.3)) + blurShift, 0.0);
     vec2 at = uCenter + magnified;
     if (frostBlur > 0.0 && dist < 1.0) {
       // Frosted (inside the glass only: outside, nothing of it shows). The frost hides the
@@ -740,13 +1152,41 @@ void main() {
   }
 
   // Top reflection.
-  float ny = local.y / uHalf.y;
-  float nx = (local.x - uBodyX) / uHalf.x;
   float top = ((1.0 - smoothstep(-0.05, 0.75, ny)) * (1.0 - nx * 0.12) * uTopRefl * 0.6 + uTopBase) * lit;
-  glass *= dim(1.0 - vec3(1.0, 1.0, 0.72) * top);
+  vec3 topDim = dim(1.0 - vec3(1.0, 1.0, 0.72) * top);
+  glass *= topDim;
+  vec3 seenThrough = glass;
 
   // Frosted resting state: a still lens is the flat highlight colour.
   glass = mix(glass, uColor, frostCover * step(0.5, uTextured));
+  // Melted into a neighbour (COHESION), the glass turns into that one's tint or colour across the
+  // bridge. Clear glass beside tinted turns all the way by the line, for the tinted side cannot
+  // draw what lies behind: that one keeps its own look, and the clear side meets it there.
+  float mirrorShare = 1.0;
+  if (uNearCount > 0.0) {
+    vec3 sumLook = glass;
+    float sumW = 1.0;
+    float sumMirrors = 1.0;
+    for (int i = 0; i < 4; i++) {
+      if (float(i) >= uNearCount) break;
+      bool clearNear = uNearLook[i].y > 0.5;
+      float t = clearNear == (uTextured > 0.5) ? nearT[i] : (clearNear ? 0.0 : min(1.0, 2.0 * nearT[i]));
+      float w = t / max(1.0 - t, 1e-4);
+      vec3 look = clearNear ? mix(seenThrough, uNearTint[i].rgb, uNearTint[i].a) : mix(uSurface, uNearTint[i].rgb, 1.0 - edge * uEdgeClear) * topDim;
+      sumLook += w * look;
+      sumW += w;
+      sumMirrors += w * uNearMirror[i].w;
+    }
+    glass = sumLook / sumW;
+    // What it mirrors is shared the same way: towards tinted glass, which mirrors nothing, it fades
+    // out. Each canvas mirrors its own picture of the surroundings, so the mirror fades out across
+    // the bridge too, to nothing on the line: the middle of one body mirrors nothing anyway.
+    mirrorShare = sumMirrors / sumW;
+    for (int i = 0; i < 4; i++) {
+      if (float(i) >= uNearCount) break;
+      mirrorShare *= 1.0 - 4.0 * nearT[i] * (1.0 - nearT[i]);
+    }
+  }
 
   // Inner shading: just inside the rim, a wide band on the left, a deep ring.
   float up = clamp(-dir.y, 0.0, 1.0);
@@ -754,21 +1194,21 @@ void main() {
   float left = clamp(-dir.x, 0.0, 1.0);
   float down = clamp(dir.y, 0.0, 1.0);
   float inner = uInner * lit;
-  float innerBand = smoothstep(uBevel * -0.19, uBevel * -0.024, dist);
+  float innerBand = smoothstep(bevel * -0.19, bevel * -0.024, dist);
   glass *= dim(1.0 - innerBand * (up + left * 0.6 + right * 0.3 + down * 0.15) * inner * 2.2);
-  float deepBand = smoothstep(uBevel * -0.73, uBevel * -0.13, dist);
+  float deepBand = smoothstep(bevel * -0.73, bevel * -0.13, dist);
   glass *= dim(1.0 - deepBand * left * inner * 2.0);
-  float hx = (dist + uBevel * 0.45) / (uBevel * 0.26);
+  float hx = (dist + bevel * 0.45) / (bevel * 0.26);
   float ring = exp(-hx * hx);
   glass *= dim(1.0 - ring * (right * 0.9 + up * 0.5 + left * 0.4 + down * 0.3) * inner * 1.5);
 
   // Rim light + fresnel; leans a little towards the cursor when there is one.
   float fresnel = pow(clamp(1.0 - normal.z, 0.0, 1.0), 6.0);
-  float rimW = max(uDevicePx * 1.1, 1.0) * uRimWidth;
+  float rimW = max(uDevicePx * 1.1, scale) * uRimWidth;
   float rimLine = 1.0 - smoothstep(0.0, rimW * 1.6, abs(dist + rimW * 1.8));
-  float fall = exp(-(local.y / 30.0) * (local.y / 30.0));
+  float fall = exp(-(ly / (30.0 * scale)) * (ly / (30.0 * scale)));
   float studio = right * right * fall * 0.9 + down * down * 0.2 + left * left * 0.55;
-  float lightCos = dot(dir, uLightDir);
+  float lightCos = dot(dir, lightDir);
   float facing = clamp(lightCos, 0.0, 1.0);
   float away = clamp(-lightCos, 0.0, 1.0);
   float aimed = facing * facing * 0.9 + away * away * 0.55;
@@ -782,14 +1222,14 @@ void main() {
   // where it is nearest and thinner as the rim turns away from it: a crescent on a round glass,
   // on a pill a band that tapers round the ends. Each point gathers a soft patch of the
   // surroundings (uSoft wide) at three places along its look, so the picture has no hard edge.
-  float into = clamp(-dist / uMirror.z, 0.0, 1.0);
-  float look = uReach * (1.0 - into);
+  float into = clamp(-dist / mirrorShape.x, 0.0, 1.0);
+  float look = mirrorShape.y * (1.0 - into);
   vec2 rimAt = uCenter + local - dir * dist;
-  vec2 across = vec2(-dir.y, dir.x) * uSoft * 0.7;
+  vec2 across = vec2(-dir.y, dir.x) * mirrorShape.z * 0.7;
   vec3 seen = vec3(0.0);
   for (int i = 0; i < 3; i++) {
     vec2 at = rimAt + dir * look * (0.4 + 0.3 * float(i));
-    seen += (around(at, uSoft) * 0.4 + around(at + across, uSoft) * 0.3 + around(at - across, uSoft) * 0.3) * uSeen[i];
+    seen += (around(at, mirrorShape.z) * 0.4 + around(at + across, mirrorShape.z) * 0.3 + around(at - across, mirrorShape.z) * 0.3) * uSeen[i];
   }
   // The light is white where it lands; the far side and the bottom are lit by what bounces back
   // from the surroundings, and take their colour (white from anything dark or grey).
@@ -809,7 +1249,7 @@ void main() {
   much = min(much, 1.0);
   // On the rim it is the rim light's own line, no thicker; the band begins inside that line.
   float band = pow(1.0 - into, uFall) * uMirror.y * smoothstep(0.0, rimW * 1.8, -dist);
-  float mirror = min(lit * max(rimLine * uMirror.x, band), 1.0) * much;
+  float mirror = min(lit * max(rimLine * uMirror.x, band), 1.0) * much * mirrorShare;
   // What it lacks of the surface's colour is taken out of the glass; then the glass is lifted
   // towards the neighbour's colour: dark glass mirrors it on any page.
   glass *= 1.0 - max(-hue, 0.0) * mirror * uMirror.w;
@@ -818,19 +1258,28 @@ void main() {
   // Glow: light let in at one point, fading smoothly with distance. It brightens whatever glass
   // is near, evenly from the middle to the rim, a melted blob included (the halo is above),
   // unless the light is kept to the body (uGlowBlob: how much of it the blob takes).
+  // Melted, the light of a press on a neighbour runs on into this side of the bridge.
   float glassL = max(dot(glass, vec3(0.2126, 0.7152, 0.0722)), 1e-4);
-  glass *= pow(glassL, 1.0 / (1.0 + glowAt * mix(uGlowBlob, 1.0, lit))) / glassL;
+  float glowHere = glowAt * mix(uGlowBlob, 1.0, lit);
+  if (uNearCount > 0.0) glowHere = glowHere * ownLight + glowNear;
+  glass *= pow(glassL, 1.0 / (1.0 + glowHere)) / glassL;
+
+  // Pointer light (LIGHT): white laid over the glass, strongest where the press landed and falling
+  // off evenly to nothing at its radius. (uLight: its centre, its radius, how white.)
+  float white = uLight.w > 0.0 ? uLight.w * max(1.0 - length(local - uLight.xy) / max(uLight.z, 1e-3), 0.0) : 0.0;
+  if (uNearCount > 0.0) white = white * ownLight + lightNear;
+  if (white > 0.0) glass = mix(glass, vec3(1.0), min(white, 1.0));
 
   // Caustic: warm light gathering inside the bottom edge.
   glass += vec3(1.0, 0.92, 0.86) * smoothstep(0.72, 0.98, depth) * down * uCaustic * lit;
 
   // Bordered body (outline buttons): a flat line just inside the edge.
-  glass = mix(glass, uBorder, smoothstep(-uBorderWidth - aa, -uBorderWidth + aa, dist) * step(1e-4, uBorderWidth) * uBorderAlpha);
+  glass = mix(glass, lineColor, smoothstep(-lineWidth - aa, -lineWidth + aa, dist) * lineAlpha);
   // ...and the white line of a blob with its own glass.
   glass = mix(glass, vec3(1.0), smoothstep(-uBlobLine.x - aa, -uBlobLine.x + aa, dist) * uBlobLine.y * own);
-  vec4 col = mix(outsideCol, vec4(clamp(glass, 0.0, 1.0), 1.0), mask);
+  vec4 col = mix(outsideCol, vec4(clamp(glass, 0.0, 1.0), 1.0), mask * cover);
   // Front layer (selected labels) sits on the frosted pill and fades as the lens clears.
-  vec4 fg = texture(uFront, gl_FragCoord.xy / uSize) * mask * uFrost * step(0.5, uTextured);
+  vec4 fg = texture(uFront, gl_FragCoord.xy / uSize) * mask * cover * uFrost * step(0.5, uTextured);
   outColor = fg + col * (1.0 - fg.a);
 }
 `
@@ -889,12 +1338,24 @@ function createEngine(): GlassEngine | null {
   // where the picture was taken (the canvas's box then, CSS px) and how far past it it reaches.
   const around = layer()
   if (!around.ctx) return null
-  type Mirrored = { tex: WebGLTexture | null; w: number; h: number; at: number; left: number; top: number; reach: number; due: boolean; timer: number }
+  /** `busy`: a picture is due (or was taken) while something on the page moved or was lit: it is taken once all is still. */
+  type Mirrored = { tex: WebGLTexture | null; w: number; h: number; at: number; left: number; top: number; reach: number; due: boolean; timer: number; busy: boolean }
+  /** The pictures of the surroundings taken on this frame. */
+  const pictured: Mirrored[] = []
   const mirrored = new Map<GlassView, Mirrored>()
   /** Texels per CSS px of that picture: it is only ever seen blurred. */
   const AROUND_SCALE = 0.5
   /** It is taken again this often, at most (ms). */
   const AROUND_EVERY = 400
+  /**
+   * While something on the page moves or is lit, a picture already taken is kept, at most this long
+   * (ms), and taken again once all is still: taken half way, it would keep a neighbour lit by a
+   * press after its light has gone (until something took it again). `live` glass does not wait.
+   */
+  const AROUND_WAIT = 2000
+  /** Something on the page moved or was lit on the last frame, or so far on this one. */
+  let busy = false
+  let ranLast = false
   // What a lens without layers samples (and ignores): a texture unit is never left empty.
   const blank = { back: texture(true), front: texture(false) }
   /** The page behind a still lens is read again this often while only the light moves (ms). */
@@ -960,8 +1421,421 @@ function createEngine(): GlassEngine | null {
   // Cursor light: shared, fades in on the first mouse move, out when the pointer leaves.
   const pointer = { x: 0, y: 0, active: false, moved: false, mix: 0 }
 
-  const draw = (v: GlassView, refresh: boolean, repaint: boolean) => {
-    const m = v.lens(refresh)
+  // Pointer light (LIGHT). `beam` is the pointer that lights: where it is, what it is over
+  // and which pointer is held (`id`, -1 = none).
+  // Each lit view keeps its own light: how bright (a spring), where on the glass, and why.
+  const beam = { x: 0, y: 0, over: null as EventTarget | null, id: -1 }
+  type Lit = {
+    glow: Spring
+    /** The light's centre, relative to the lens centre (CSS px). */
+    x: number
+    y: number
+    press: boolean
+    key: boolean
+    /** The glass's host takes no pointer events (a badge): the pointer only has to be over the glass. */
+    free: boolean
+    /** The body on screen, as last drawn: centre, half size and its shift from the lens centre. */
+    sx: number
+    sy: number
+    hx: number
+    hy: number
+    bodyX: number
+    /** A second box melted into the body (a surface that has opened), as last drawn: its centre from the lens centre, and its half size. */
+    blob: { x: number; y: number; hx: number; hy: number } | null
+    /** The press landed on that box: the light takes its size from it. */
+    onBlob: boolean
+  }
+  const lights = new Map<GlassView, Lit>()
+  let relit = false
+  const hostOf = (v: GlassView) => v.canvas.parentElement
+  /** The pointer is on this glass: inside its body, and on its host (not on something lying over it). */
+  const onBlob = (s: Lit) => !!s.blob && Math.abs(beam.x - (s.sx - s.bodyX + s.blob.x)) <= s.blob.hx && Math.abs(beam.y - (s.sy + s.blob.y)) <= s.blob.hy
+  const under = (v: GlassView, s: Lit) => {
+    if ((Math.abs(beam.x - s.sx) > s.hx || Math.abs(beam.y - s.sy) > s.hy) && !onBlob(s)) return false
+    if (s.free) return true
+    const host = hostOf(v)
+    return !!host && beam.over instanceof Node && host.contains(beam.over) && !host.matches(':disabled, [data-disabled], [aria-disabled="true"]')
+  }
+  /** A press belongs to the innermost glass under it: a button on a card lights up, the card does not. */
+  const innermost = (v: GlassView) => {
+    const host = hostOf(v)
+    for (const [other, s] of lights) {
+      const inner = hostOf(other)
+      if (other !== v && !s.free && other.visible && host && inner && inner !== host && host.contains(inner) && under(other, s)) return false
+    }
+    return true
+  }
+  /** Advances a view's light; true while it still changes. */
+  const stepLight = (v: GlassView, dt: number, still: boolean) => {
+    const s = lights.get(v)
+    if (!s) return false
+    const held = s.press || s.key
+    const target = LIGHT.on && held ? LIGHT.press : 0
+    if (still) {
+      const changed = s.glow.x !== target
+      s.glow.x = target
+      s.glow.v = 0
+      return changed
+    }
+    return stepSpring(s.glow, target, held ? { omega: (2 * Math.PI) / Math.max(LIGHT.rise, 0.01), zeta: clamp(1 - LIGHT.riseBounce, 0.05, 1) } : { omega: (2 * Math.PI) / Math.max(LIGHT.fade, 0.01), zeta: 1 }, dt)
+  }
+
+  // The flash of a press on a button (GLOW): the rule above GLOW, applied. A view that says
+  // `button: true` is lit where a press lands on it (or at its centre, by Space / Enter): the
+  // light comes up, holds for as long as the press does (`hold` at least) and fades as it
+  // spreads. Each button keeps its own: how bright, how far it has spread, where it landed (from
+  // the host's centre, px), how long it still holds, how many presses' worth is asked for, how
+  // small the glass is (which set of values it takes), its height, and what holds it.
+  // A surface keeps one too, for a choice pressed in it (`choice`): the same light with GLOW's
+  // `select` values, measured in the choice's own height.
+  type Flash = { glow: Spring; spread: Spring; x: number; y: number; hold: number; level: number; small: number; height: number; by: number; key: boolean; choice: boolean }
+  /** What counts as a choice inside a surface. */
+  const CHOICES = ':is([role=option],[role=menuitem],[data-glass-item],[data-glass-pick])'
+  const flashes = new Map<GlassView, Flash>()
+  const flashTune = (small: number): typeof GLOW => {
+    if (small <= 0) return GLOW
+    if (small >= 1) return GLOW_SMALL
+    const mixed = { ...GLOW }
+    for (const name of Object.keys(mixed) as (keyof typeof GLOW)[]) mixed[name] = lerp(GLOW[name], GLOW_SMALL[name], small)
+    return mixed
+  }
+  /**
+   * Light on this glass at this point (viewport px), or at its centre. Presses that land before
+   * the last has faded add up. `choice`: the element chosen inside a surface, whose light it is.
+   */
+  const flash = (v: GlassView, x?: number, y?: number, choice?: HTMLElement) => {
+    const host = hostOf(v)
+    if (!host) return null
+    let f = flashes.get(v)
+    if (!f) flashes.set(v, (f = { glow: { x: 0, v: 0 }, spread: { x: 0, v: 0 }, x: 0, y: 0, hold: 0, level: 0, small: 0, height: 0, by: -1, key: false, choice: false }))
+    const r = host.getBoundingClientRect()
+    // A light that is still bright keeps spreading from where it is: only a fresh one starts small.
+    if (f.glow.x < 0.08) f.spread.x = f.spread.v = 0
+    f.x = x === undefined ? 0 : clamp(x - (r.left + r.width / 2), -r.width / 2, r.width / 2)
+    f.y = y === undefined ? 0 : clamp(y - (r.top + r.height / 2), -r.height / 2, r.height / 2)
+    f.choice = !!choice
+    f.height = (choice ?? host).offsetHeight
+    // (A surface takes the wide set of values, whatever its own shape.)
+    f.small = choice ? 0 : 1 - smooth(2, 2.4, host.offsetWidth / Math.max(f.height, 1))
+    const tune = flashTune(f.small)
+    f.level = Math.min(Math.max(f.glow.x, 0) + (choice ? tune.select : 1), tune.stack)
+    f.hold = tune.hold
+    wake()
+    return f
+  }
+  /** Advances a button's flash; true while it still changes. */
+  const stepFlash = (v: GlassView, dt: number, still: boolean) => {
+    const f = flashes.get(v)
+    if (!f) return false
+    if (still) {
+      const changed = f.glow.x !== 0
+      f.glow.x = f.glow.v = f.spread.x = f.spread.v = f.hold = 0
+      return changed
+    }
+    const lit = f.by !== -1 || f.key || f.hold > 0
+    const holding = f.hold > 0
+    f.hold = Math.max(0, f.hold - dt)
+    const tune = flashTune(f.small)
+    const a = stepSpring(f.glow, lit ? f.level : 0, { omega: lit ? tune.riseSpeed : tune.fadeSpeed, zeta: 1 }, dt)
+    const b = stepSpring(f.spread, lit || f.glow.x > 0.004 ? 1 : 0, { omega: tune.spreadSpeed, zeta: 1 }, dt)
+    // A press held still changes nothing: the loop rests until the hold runs out or the press ends.
+    return holding || a || (b && f.glow.x > 0.004)
+  }
+  /** The flash as a lens's `glow`, for a lens that brings none of its own. (The canvas is scaled with the host: the light is measured on the page, so it is divided by that scale.) */
+  const flashOf = (v: GlassView): GlassLens['glow'] => {
+    const f = flashes.get(v)
+    if (!f || f.glow.x <= 0.004) return undefined
+    const tune = flashTune(f.small)
+    const k = Math.max(0.5, v.grow ?? 1)
+    const far = clamp(f.spread.x)
+    const reach = f.choice ? tune.selectReach + tune.selectSpread * far : tune.reach + tune.spread * far
+    return { x: f.x / k, y: f.y / k, r: f.height * reach, amount: Math.max(0, f.glow.x) * tune.amount, blob: 1 }
+  }
+
+  // Pull (PULL): glass a held pointer drags after itself, where the view asks for it (buttons).
+  // One pointer holds one glass, the innermost under the press. The engine moves its host (CSS `translate`) and stretches it (CSS
+  // `scale`, times the view's own `grow`), and lets go when the pointer does.
+  type Pulled = {
+    /** How far the glass has come after the pointer, each way (px). */
+    x: Spring
+    y: Spring
+    /** The pointer that holds it: where it pressed, where it is, and where the glass rested then. */
+    by: { id: number; x: number; y: number; nowX: number; nowY: number; cx: number; cy: number; lastX: number; lastY: number; size: number } | null
+    /** How fast the glass's own place on the page moves while held (px/s, smoothed). */
+    driftX: number
+    driftY: number
+    /** The host's own CSS `translate` (a centring class), which the pull adds to. */
+    own: string[] | null
+    /** What the engine last wrote on the host. */
+    moved: string
+    scaled: string
+  }
+  const pulls = new Map<GlassView, Pulled>()
+  const pulledOf = (v: GlassView) => {
+    let p = pulls.get(v)
+    if (!p) pulls.set(v, (p = { x: { x: 0, v: 0 }, y: { x: 0, v: 0 }, by: null, driftX: 0, driftY: 0, own: null, moved: '', scaled: '' }))
+    return p
+  }
+  /** The centre of the glass on screen where it rests, without the pull. */
+  const restOf = (host: HTMLElement, p: Pulled) => {
+    const r = host.getBoundingClientRect()
+    return { x: r.left + r.width / 2 - p.x.x, y: r.top + r.height / 2 - p.y.x }
+  }
+  const letGo = (v: GlassView, p: Pulled) => {
+    p.by = null
+    v.held = false
+  }
+  /** Advances a view's pull and writes its host's `translate` and `scale`; true while it still moves. */
+  const stepPull = (v: GlassView, dt: number, still: boolean) => {
+    const p = pulls.get(v)
+    if (!p && v.grow === undefined) return false
+    const host = hostOf(v)
+    if (!host) return false
+    const s = p ?? pulledOf(v)
+    if (s.by && (v.pull !== true || !PULL.on)) letGo(v, s)
+    let sx = 1
+    let sy = 1
+    let moving = false
+    if (still) {
+      s.x.x = s.x.v = s.y.x = s.y.v = s.driftX = s.driftY = 0
+    } else if (s.by || s.x.x !== 0 || s.y.x !== 0 || s.x.v !== 0 || s.y.v !== 0 || s.driftX !== 0 || s.driftY !== 0) {
+      const w = Math.max(host.offsetWidth, 1)
+      const h = Math.max(host.offsetHeight, 1)
+      const size = Math.max(w, h)
+      const small = size <= PULL.smallUntil
+      let tx = 0
+      let ty = 0
+      const by = s.by
+      if (by) {
+        const at = restOf(host, s)
+        // Small glass: how far the pointer has gone since the press. Larger: how far past the edge it is.
+        const dx = small ? by.nowX - by.x - (at.x - by.cx) : by.nowX - clamp(by.nowX, at.x - w / 2, at.x + w / 2)
+        const dy = small ? by.nowY - by.y - (at.y - by.cy) : by.nowY - clamp(by.nowY, at.y - h / 2, at.y + h / 2)
+        const limit = small ? PULL.smallReach + PULL.smallReachPerPx * size : Math.min(PULL.reachMax, PULL.reach + PULL.reachPerPx * size)
+        tx = rubberBand(dx, limit, PULL.resistance)
+        ty = rubberBand(dy, limit, PULL.resistance)
+        if (dt > 0) {
+          s.driftX += ((at.x - by.lastX) / dt - s.driftX) * Math.min(1, dt * PULL.driftIn)
+          s.driftY += ((at.y - by.lastY) / dt - s.driftY) * Math.min(1, dt * PULL.driftIn)
+        }
+        by.lastX = at.x
+        by.lastY = at.y
+      } else {
+        s.driftX = Math.abs(s.driftX) < 1 ? 0 : s.driftX * Math.exp(-dt * PULL.driftOut)
+        s.driftY = Math.abs(s.driftY) < 1 ? 0 : s.driftY * Math.exp(-dt * PULL.driftOut)
+      }
+      const spring = by ? { omega: (2 * Math.PI) / (PULL.follow + PULL.followPerPx * by.size), zeta: 1 } : { omega: (2 * Math.PI) / PULL.release, zeta: 1 - PULL.releaseBounce }
+      const mx = stepSpring(s.x, tx, spring, dt)
+      const my = stepSpring(s.y, ty, spring, dt)
+      const most = small ? PULL.smallStretchMax : PULL.stretchMax
+      const along = (pull: Spring, length: number, drift: number) =>
+        Math.min(most, (PULL.stretch * Math.abs(pull.x)) / length + PULL.stretchPerSpeed * Math.abs(pull.v) + PULL.stretchPerDrift * Math.abs(drift))
+      const kx = along(s.x, w, s.driftX)
+      const ky = along(s.y, h, s.driftY)
+      sx = (1 + kx) / Math.sqrt(1 + ky)
+      sy = (1 + ky) / Math.sqrt(1 + kx)
+      moving = !!by || mx || my || s.driftX !== 0 || s.driftY !== 0
+    }
+    const on = Math.abs(s.x.x) > 0.01 || Math.abs(s.y.x) > 0.01
+    const px = `${s.x.x.toFixed(3)}px`
+    const py = `${s.y.x.toFixed(3)}px`
+    const moved = !on ? '' : s.own ? `calc(${s.own[0]} + ${px}) calc(${s.own[1] ?? '0px'} + ${py})` : `${px} ${py}`
+    const grow = v.grow ?? 1
+    const even = Math.abs(sx - 1) < 1e-4 && Math.abs(sy - 1) < 1e-4
+    const scaled = even ? (grow === 1 ? '' : grow.toFixed(4)) : `${(grow * sx).toFixed(5)} ${(grow * sy).toFixed(5)}`
+    // The frame that brings the host to rest is still drawn: a view that draws the pull itself (see `pulled`) must see it end.
+    if (moved !== s.moved || scaled !== s.scaled) moving = true
+    if (moved !== s.moved) host.style.translate = s.moved = moved
+    if (scaled !== s.scaled) host.style.scale = s.scaled = scaled
+    const at = v.pulled ?? (v.pulled = { x: 0, y: 0, sx: 1, sy: 1 })
+    at.x = on ? s.x.x : 0
+    at.y = on ? s.y.x : 0
+    at.sx = even ? 1 : sx
+    at.sy = even ? 1 : sy
+    return moving
+  }
+
+  /** The way the cursor light comes from for a lens (uLightDir, as an angle), and how much the rim leans to it (uLightMix). */
+  const aimOf = (m: GlassLens) => {
+    const dx = pointer.x - m.screenX
+    const dy = pointer.y - m.screenY
+    const d = Math.hypot(dx, dy)
+    // The light turns in half-degree steps (one step is less than a level of rim light on an
+    // 8-bit screen), and stays put while it is off: a cursor moving far away, or over glass
+    // without cursor light, leaves the frame as it is.
+    const mix = m.cursorLight ? pointer.mix : 0
+    const aim = mix > 0 && d > 0.5 ? (Math.round(Math.atan2(dy, dx) * (360 / Math.PI)) * Math.PI) / 360 : -Math.PI / 2
+    return { aim, mix }
+  }
+  /** A glass's light of a press (LIGHT) as its shader takes it (uLight): centre and radius (canvas px, from the lens centre) and how white; null while it is out. */
+  const shineOf = (lit: Lit, m: GlassLens): [number, number, number, number] | null => {
+    const shine = LIGHT.on && m.pointerLight !== false ? clamp(lit.glow.x) : 0
+    if (shine <= 0) return null
+    const pageL = 0.2126 * m.surface[0] + 0.7152 * m.surface[1] + 0.0722 * m.surface[2]
+    // (A press on a surface beside the control takes the surface's size, not the control's.)
+    const side = lit.onBlob && lit.blob ? Math.max(lit.blob.hx, lit.blob.hy) : Math.max(m.hx, m.hy)
+    const span = clamp(LIGHT.size * 2 * side, LIGHT.sizeMin, Math.max(LIGHT.sizeMin, LIGHT.sizeMax))
+    return [lit.x, lit.y, span, shine * clamp(lerp(LIGHT.strengthDark, LIGHT.strength, smooth(0.25, 0.6, pageL)))]
+  }
+
+  // Cohesion (COHESION): buttons near each other melt into one body. On a frame that changes a
+  // button, every button on screen is measured as it is (its body on the page, and what its look
+  // depends on), and each takes the ones within reach, nearest first, four at most. `nears` holds
+  // what its shader is given for them (uNear… in FRAGMENT): NEAR_VALUES numbers (nine vec4) for each.
+  type Melt = {
+    v: GlassView
+    m: GlassLens
+    host: Element
+    /** Screen px per canvas px, and the lens centre on screen (the canvas's own (cx, cy)). */
+    g: number
+    sx: number
+    sy: number
+    /** The body on screen: centre, half size, corner radius and the radius its bend follows (px). */
+    x: number
+    y: number
+    hx: number
+    hy: number
+    r: number
+    fr: number
+    /** Its height at rest, and one of its design units, on screen (px). */
+    rest: number
+    du: number
+  }
+  const NEAR = 4
+  const NEAR_NAMES = Array.from({ length: NEAR }, (_, i) =>
+    ['uNear', 'uNearShape', 'uNearTint', 'uNearLine', 'uNearLook', 'uNearShade', 'uNearMirror', 'uNearGlow', 'uNearLight'].map((name) => `${name}[${i}]`),
+  )
+  const NEAR_PAIR = Array.from({ length: NEAR }, (_, i) => `uNearPair[${i}]`)
+  /** Per neighbour: its vec4s, then whether its canvas lies over this one's and how joined the two are. */
+  const NEAR_VALUES = NEAR_NAMES[0].length * 4 + 2
+  /** How much a lens mirrors of its surroundings (see `mirror` in `draw`): only clear glass does. */
+  const mirrorOf = (m: GlassLens) => (m.refraction ? m.strength * Math.max(0, m.tune?.mirror ?? 1) * clamp((1 - m.refraction.frost) / 0.4) : 0)
+  /** How far into the glass the mirrored band goes, how far the rim looks, and how soft the picture is (CSS px; see uMirror.z, uReach and uSoft). */
+  const mirrorShapeOf = (m: GlassLens) => {
+    const reached = m.reflection ? clamp(m.reflection.height * MIRROR.reach, MIRROR.reachMin, Math.max(MIRROR.reachMin, MIRROR.reachMax)) : 0
+    const deep = Math.max(0.01, MIRROR.depth) * Math.max(1, Math.min(m.hx, m.hy, reached || Infinity))
+    return { deep, reach: mirrorOf(m) > 0 && m.reflection ? reached : 0, soft: Math.max(0, MIRROR.soft) * reached }
+  }
+  const nears = new Map<GlassView, number[]>()
+  /** The buttons that were on screen when they were last measured: one that comes or goes changes its neighbours. */
+  let shownButtons = new Set<GlassView>()
+  let meltsChanged = false
+  const measure = (v: GlassView, m: GlassLens | null | undefined): Melt | null => {
+    const host = hostOf(v)
+    if (!host || !m || m.width < 2 || m.height < 2) return null
+    const g = m.scale && m.scale > 0 ? m.scale : 1
+    const radius = Math.max(0, Math.min(m.radius, m.hx - 0.5, m.hy - 0.5))
+    const band = m.refraction ? (m.band ?? 0) * m.unit : 0
+    return {
+      v,
+      m,
+      host,
+      g,
+      sx: m.screenX,
+      sy: m.screenY,
+      x: m.screenX + m.bodyX * g,
+      y: m.screenY,
+      hx: Math.max(m.hx, 0.5 * m.unit) * g,
+      hy: Math.max(m.hy, 0.5 * m.unit) * g,
+      r: radius * g,
+      fr: Math.min(Math.max(radius, band), Math.max(0, Math.min(m.hx, m.hy) - 0.5)) * g,
+      rest: DESIGN_HEIGHT * m.unit * g,
+      du: m.unit * g,
+    }
+  }
+  /**
+   * What glass `a` takes for its neighbour `b` (see uNear… in FRAGMENT), in a's design units, at
+   * bridge softness `k` (screen px), the two `join`ed this much (0 = apart, 1 = one body for the light).
+   */
+  const nearValues = (a: Melt, b: Melt, k: number, join: number, out: number[]) => {
+    const to = 1 / a.du
+    const m = b.m
+    const r = m.refraction
+    const width = m.border ? Math.max(0, m.borderWidth ?? 1) : 0
+    const line = m.border ?? m.color
+    out.push((b.x - a.sx) * to, (b.y - a.sy) * to, b.hx * to, b.hy * to)
+    out.push(b.r * to, b.fr * to, Math.max(k * to, 1e-3), Math.max(m.bevel, 2) * b.du * to)
+    out.push(m.color[0], m.color[1], m.color[2], r ? clamp(r.frost) : 0)
+    out.push(line[0], line[1], line[2], width > 0 ? clamp(m.borderAlpha ?? 1) : 0)
+    out.push((r?.refract ?? 0) * b.du * to, r ? 1 : 0, width * b.g * to, aimOf(m).aim)
+    out.push(m.shadow * m.strength, m.shadowSoftness * b.du * to, m.shadowOffset * b.du * to, b.du * to)
+    const shapeB = mirrorShapeOf(m)
+    const mine = mirrorOf(a.m)
+    out.push(shapeB.deep * b.g * to, shapeB.reach * b.g * to, shapeB.soft * b.g * to, mine > 0 ? mirrorOf(m) / mine : 0)
+    // Its light of a press, where it is on screen.
+    const glow = m.glow ?? flashOf(b.v)
+    if (glow) out.push((b.sx + glow.x * b.g - a.sx) * to, (b.sy + glow.y * b.g - a.sy) * to, glow.r * b.g * to, Math.max(0, glow.amount))
+    else out.push(0, 0, 1, 0)
+    const lit = lights.get(b.v)
+    const light = lit ? shineOf(lit, m) : null
+    if (light) out.push((b.sx + light[0] * b.g - a.sx) * to, (b.sy + light[1] * b.g - a.sy) * to, light[2] * b.g * to, light[3])
+    else out.push(0, 0, 1, 0)
+    // Glass later on the page is painted over glass before it.
+    out.push(a.host.compareDocumentPosition(b.host) & Node.DOCUMENT_POSITION_FOLLOWING ? 1 : 0, join)
+  }
+  /**
+   * Measures every button on screen and works out each one's neighbours. `lensOf` holds the lenses
+   * already read this frame; any other is read now. Returns the views whose neighbours (as their
+   * shaders take them) changed, and those whose `near` changed, which must paint what lies behind again.
+   */
+  const cohere = (lensOf: Map<GlassView, GlassLens | null>) => {
+    const pool: Melt[] = []
+    const showing = new Set<GlassView>()
+    for (const v of views) {
+      if (v.button !== true || !v.visible) continue
+      showing.add(v)
+      let m = lensOf.get(v)
+      if (m === undefined) lensOf.set(v, (m = v.lens(false)))
+      const at = measure(v, m)
+      if (at) pool.push(at)
+    }
+    shownButtons = showing
+    const changed = new Set<GlassView>()
+    const regrouped = new Set<GlassView>()
+    const melted = new Set<GlassView>()
+    for (const a of pool) {
+      const found: { b: Melt; gap: number; k: number; join: number }[] = []
+      for (const b of pool) {
+        if (b === a || a.host.contains(b.host) || b.host.contains(a.host)) continue
+        const soft = cohesionSoftness(Math.min(a.rest, b.rest))
+        if (soft <= 0) continue
+        const gap = Math.max(Math.abs(b.x - a.x) - a.hx - b.hx, Math.abs(b.y - a.y) - a.hy - b.hy)
+        // The bridge eases in as they near each other: none at `soft` apart, all of it at half that.
+        const k = soft * (1 - smooth(0.5, 1, gap / soft))
+        // Joined from the moment the bridge forms (half of `soft` apart), fully once it has some body
+        // (a quarter of `soft` apart); for the light, by as much as COHESION.light lets it run on.
+        if (k > 0.05) found.push({ b, gap, k, join: (1 - smooth(soft / 4, soft / 2, gap)) * clamp(COHESION.light) })
+      }
+      found.sort((p, q) => p.gap - q.gap)
+      const values: number[] = []
+      const hosts: Element[] = []
+      for (const { b, k, join } of found.slice(0, NEAR)) {
+        nearValues(a, b, k, join, values)
+        hosts.push(b.host)
+      }
+      const was = nears.get(a.v)
+      if ((was?.length ?? 0) !== values.length || values.some((x, i) => x !== was![i])) changed.add(a.v)
+      if (values.length) {
+        nears.set(a.v, values)
+        melted.add(a.v)
+      } else nears.delete(a.v)
+      const before = a.v.near ?? []
+      if (before.length !== hosts.length || hosts.some((h) => !before.includes(h))) {
+        a.v.near = hosts.length ? hosts : undefined
+        regrouped.add(a.v)
+      }
+    }
+    // A button that has left the screen (or the page) melts into nothing any more.
+    for (const v of [...nears.keys()]) {
+      if (melted.has(v)) continue
+      nears.delete(v)
+      changed.add(v)
+    }
+    return { changed, regrouped }
+  }
+
+  const draw = (v: GlassView, refresh: boolean, repaint: boolean, read?: GlassLens | null) => {
+    const m = read !== undefined ? read : v.lens(refresh)
     let on = shown.get(v)
     if (!on) shown.set(v, (on = { sent: [], box: '' }))
     if (!m || m.width < 2 || m.height < 2) {
@@ -1059,7 +1933,7 @@ function createEngine(): GlassEngine | null {
     gl.activeTexture(gl.TEXTURE2)
     if (f) {
       let a = mirrored.get(v)
-      if (!a) mirrored.set(v, (a = { tex: texture(true), w: 0, h: 0, at: 0, left: 0, top: 0, reach: 0, due: true, timer: 0 }))
+      if (!a) mirrored.set(v, (a = { tex: texture(true), w: 0, h: 0, at: 0, left: 0, top: 0, reach: 0, due: true, timer: 0, busy: false }))
       const taken = a
       const reach = clamp(f.height * MIRROR.reach, MIRROR.reachMin, Math.max(MIRROR.reachMin, MIRROR.reachMax))
       const aw = Math.max(2, Math.ceil((m.width + 2 * reach) * AROUND_SCALE))
@@ -1067,7 +1941,10 @@ function createEngine(): GlassEngine | null {
       const now = performance.now()
       gl.bindTexture(gl.TEXTURE_2D, a.tex)
       if (refresh || (f.live && repaint) || a.w !== aw || a.h !== ah || a.reach !== reach) a.due = true
-      if (a.due && a.w && now - a.at < AROUND_EVERY) {
+      if (a.due && a.w && busy && !f.live && now - a.at < AROUND_WAIT) {
+        // It waits for all to be still (see AROUND_WAIT): the picture it has is kept meanwhile.
+        a.busy = true
+      } else if (a.due && a.w && now - a.at < AROUND_EVERY) {
         if (!a.timer)
           a.timer = window.setTimeout(
             () => {
@@ -1097,6 +1974,7 @@ function createEngine(): GlassEngine | null {
         a.left = m.left
         a.top = m.top
         a.reach = reach
+        pictured.push(a)
         fresh = false
       }
       set('uAroundBox', (a.left - m.left - a.reach) / unit, (a.top - m.top - a.reach) / unit, a.w / AROUND_SCALE / unit, a.h / AROUND_SCALE / unit)
@@ -1175,20 +2053,61 @@ function createEngine(): GlassEngine | null {
     set('uBorder', ...(m.border ?? m.color))
     set('uBorderWidth', m.border ? Math.max(0, m.borderWidth ?? 1) / unit : 0)
     set('uBorderAlpha', clamp(m.borderAlpha ?? 1))
-    const dx = pointer.x - m.screenX
-    const dy = pointer.y - m.screenY
-    const d = Math.hypot(dx, dy)
-    // The light turns in half-degree steps (one step is less than a level of rim light on an
-    // 8-bit screen), and stays put while it is off: a cursor moving far away, or over glass
-    // without cursor light, leaves the frame as it is.
-    const lightMix = m.cursorLight ? pointer.mix : 0
-    const aim = lightMix > 0 && d > 0.5 ? (Math.round(Math.atan2(dy, dx) * (360 / Math.PI)) * Math.PI) / 360 : -Math.PI / 2
+    const { aim, mix: lightMix } = aimOf(m)
     set('uLightDir', Math.cos(aim), Math.sin(aim))
     set('uLightMix', lightMix)
-    const glow = m.glow
+    const glow = m.glow ?? flashOf(v)
     set('uGlow', (glow?.x ?? 0) / unit, (glow?.y ?? 0) / unit, (glow?.r ?? 0) / unit, Math.max(0, glow?.amount ?? 0))
     set('uGlowHalo', glow?.halo ? (glow.halo.around === 'blob' && blob ? 2 : 1) : 0, clamp(glow?.halo?.amount ?? 0))
     set('uGlowBlob', clamp(glow?.blob ?? 1))
+    // Pointer light: what the pointer is doing to this glass is worked out here, where the
+    // glass's place on screen is fresh; the light itself is advanced once a frame (stepLight).
+    let lit = lights.get(v)
+    // A glass that continues another takes that one's light (see `lightOf`), measured from here.
+    const shared = m.lightOf && m.lightOf !== v ? lights.get(m.lightOf) : undefined
+    if (shared) {
+      lit = { ...shared, x: shared.x + shared.sx - shared.bodyX - m.screenX, y: shared.y + shared.sy - m.screenY }
+    } else if (LIGHT.on && m.pointerLight !== false) {
+      if (!lit) {
+        const host = hostOf(v)
+        lit = { glow: { x: 0, v: 0 }, x: 0, y: 0, press: false, key: false, free: !!host && getComputedStyle(host).pointerEvents === 'none', sx: 0, sy: 0, hx: 0, hy: 0, bodyX: 0, blob: null, onBlob: false }
+        lights.set(v, lit)
+      }
+      lit.sx = m.screenX + m.bodyX
+      lit.sy = m.screenY
+      lit.hx = m.hx
+      lit.hy = m.hy
+      lit.bodyX = m.bodyX
+      lit.blob = blob ? { x: blob.x, y: blob.y, hx: blob.hx, hy: blob.hy } : null
+      // A held pointer lights the glass it is on, or comes onto (a lens arriving under it), until it lets go.
+      // The light stays at the point of the glass it began at: it does not follow the pointer.
+      const press = lit.press || (beam.id !== -1 && under(v, lit) && innermost(v))
+      if (press !== lit.press) {
+        relit = true
+        if (press) {
+          lit.x = beam.x - m.screenX
+          lit.y = beam.y - m.screenY
+          lit.onBlob = onBlob(lit) && (Math.abs(beam.x - lit.sx) > lit.hx || Math.abs(beam.y - lit.sy) > lit.hy)
+        }
+      }
+      lit.press = press
+    }
+    const light = lit ? shineOf(lit, m) : null
+    if (light) set('uLight', light[0] / unit, light[1] / unit, light[2] / unit, light[3])
+    else set('uLight', 0, 0, 1, 0)
+    // The glass it melts into (COHESION), as its shader takes them (see uNear in FRAGMENT).
+    const near = v.button === true && COHESION.on ? nears.get(v) : undefined
+    const count = near ? Math.min(NEAR, near.length / NEAR_VALUES) : 0
+    set('uNearCount', count)
+    if (count) set('uNearFade', Math.max(0.01, COHESION.lightFade))
+    for (let i = 0; i < count; i++) {
+      const names = NEAR_NAMES[i]
+      for (let j = 0; j < names.length; j++) {
+        const at = i * NEAR_VALUES + j * 4
+        set(names[j], near![at], near![at + 1], near![at + 2], near![at + 3])
+      }
+      set(NEAR_PAIR[i], near![i * NEAR_VALUES + NEAR_VALUES - 2], near![i * NEAR_VALUES + NEAR_VALUES - 1])
+    }
     // The same layers and the same uniforms as the frame on the canvas: nothing to draw.
     if (fresh && on.sent.length === sent.length && sent.every((value, i) => value === on.sent[i])) return
     on.sent = sent.slice()
@@ -1213,24 +2132,78 @@ function createEngine(): GlassEngine | null {
     const relight = pointer.moved || pointer.mix !== before
     pointer.moved = false
     let running = pointer.mix !== target
+    busy = ranLast || running
+    // Buttons melt into each other (COHESION): they are drawn after the rest, once every one has
+    // been measured, so each melts into the others as they are on this frame.
+    const melting = COHESION.on
+    if (!melting && nears.size) {
+      for (const v of nears.keys()) {
+        v.near = undefined
+        v.dirty = true
+      }
+      nears.clear()
+    }
+    const due: { v: GlassView; refresh: boolean; repaint: boolean }[] = []
+    let regroup = meltsChanged
+    meltsChanged = false
     for (const v of views) {
-      const moving = v.step(dt, still)
-      if (moving) running = true
+      const stepped = v.step(dt, still)
+      // After the view's own springs: its `grow` is this frame's.
+      const pulled = stepPull(v, dt, still)
+      const moving = stepped || pulled
+      // (Both lights of a press: what a surface takes, and a button's flash.)
+      const lit = stepLight(v, dt, still)
+      const flashing = stepFlash(v, dt, still)
+      const glowing = lit || flashing
+      if (moving || glowing) running = busy = true
+      const melts = melting && v.button === true
+      if (melts && v.visible !== shownButtons.has(v)) regroup = true
       if (!v.visible) continue
       const again = v.repaint === true
-      if (moving || v.dirty || again || relight) {
+      if (moving || glowing || v.dirty || again || relight) {
         const refresh = v.dirty
         v.dirty = false
         v.repaint = false
         // Only the light moved: the layers are as they were, so they are not painted again.
-        draw(v, refresh, moving || refresh || again)
+        if (melts) due.push({ v, refresh, repaint: moving || refresh || again })
+        else draw(v, refresh, moving || refresh || again)
       }
+    }
+    if (melting && (due.length || regroup)) {
+      const lensOf = new Map<GlassView, GlassLens | null>()
+      for (const d of due) lensOf.set(d.v, d.v.lens(d.refresh))
+      const { changed, regrouped } = cohere(lensOf)
+      // A button whose neighbours moved is drawn again too; one that melts into other glass now (or
+      // no longer) paints what lies behind it again, leaving that glass out (or taking it back in).
+      for (const d of due) draw(d.v, d.refresh, d.repaint || regrouped.has(d.v), lensOf.get(d.v))
+      for (const v of changed) if (v.visible && !due.some((d) => d.v === v)) draw(v, false, regrouped.has(v), lensOf.get(v))
     }
     // A view may have woken the engine during this frame (a popup that has just gone back in
     // does): the next frame is then already asked for, and asking again would start a second
     // loop beside this one, for as long as anything on the page moves.
+    // A draw found the pointer on (or off) some glass: its light starts on the next frame.
+    if (relit) running = true
+    relit = false
+    // Pictures of the surroundings that waited while something moved or was lit (or were taken
+    // then, having waited as long as they may) are taken once all is still, at once: the glass
+    // that takes one is drawn again on the next frame.
+    if (running) for (const a of pictured) a.busy = true
+    pictured.length = 0
+    ranLast = running
     if (running) wake()
-    else if (!raf) last = 0
+    else {
+      if (!raf) last = 0
+      let again = false
+      for (const [v, a] of mirrored) {
+        if (!a.busy) continue
+        a.busy = false
+        a.due = true
+        a.at = 0
+        v.repaint = true
+        again = true
+      }
+      if (again) wake()
+    }
   }
   const wake = () => {
     if (!raf && !dead) raf = requestAnimationFrame(frame)
@@ -1240,15 +2213,23 @@ function createEngine(): GlassEngine | null {
     wake()
   }
 
+  // A mouse moving over the page asks for nothing by itself: the glass only takes the
+  // pointer's light while it is held (LIGHT, and `lightMoved` below), and the pointer's
+  // presence reaches the shader through `pointer.mix`, which settles at 1 and stays there.
+  // Setting `moved` here made every surface redraw on every frame the cursor travelled,
+  // for pixels that could not change: ~530 ms of script in three seconds of moving.
   window.addEventListener(
     'pointermove',
     (e) => {
       if (e.pointerType !== 'mouse') return
+      const entered = !pointer.active
       pointer.x = e.clientX
       pointer.y = e.clientY
       pointer.active = true
-      pointer.moved = true
-      wake()
+      // Only the pointer entering asks for frames: it starts `pointer.mix` moving, and
+      // that is the one thing a moving cursor changes in the shader. Waking on every
+      // move kept the shared loop running over all surfaces for no visible difference.
+      if (entered) wake()
     },
     { passive: true },
   )
@@ -1257,6 +2238,201 @@ function createEngine(): GlassEngine | null {
     pointer.moved = true
     wake()
   })
+  // Pull (PULL): a press holds the innermost glass under it that asks to be pulled, and it is
+  // followed over the whole window until it lets go.
+  window.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (!PULL.on || e.button !== 0 || reduced.matches || !(e.target instanceof Node) || HANDED_ON.has(e)) return
+      let held: GlassView | null = null
+      let heldHost: HTMLElement | null = null
+      for (const v of views) {
+        const host = hostOf(v)
+        if (v.pull !== true || !host || !host.contains(e.target) || host.matches(':disabled, [data-disabled], [aria-disabled="true"]')) continue
+        if (pulls.get(v)?.by) return
+        if (!heldHost || heldHost.contains(host)) {
+          held = v
+          heldHost = host
+        }
+      }
+      if (!held || !heldHost) return
+      const p = pulledOf(held)
+      // The host's own translate is read while the pull's is off it.
+      if (!p.moved) {
+        const own = getComputedStyle(heldHost).translate
+        p.own = !own || own === 'none' ? null : own.split(' ')
+      }
+      const at = restOf(heldHost, p)
+      p.by = { id: e.pointerId, x: e.clientX, y: e.clientY, nowX: e.clientX, nowY: e.clientY, cx: at.x, cy: at.y, lastX: at.x, lastY: at.y, size: Math.max(heldHost.offsetWidth, heldHost.offsetHeight) }
+      p.driftX = p.driftY = 0
+      held.held = true
+      wake()
+    },
+    { passive: true, capture: true },
+  )
+  window.addEventListener(
+    'pointermove',
+    (e) => {
+      for (const p of pulls.values()) {
+        if (p.by?.id !== e.pointerId) continue
+        p.by.nowX = e.clientX
+        p.by.nowY = e.clientY
+        wake()
+      }
+    },
+    { passive: true, capture: true },
+  )
+  const unhold = (e: PointerEvent) => {
+    for (const [v, p] of pulls) {
+      if (p.by?.id !== e.pointerId) continue
+      letGo(v, p)
+      wake()
+    }
+  }
+  window.addEventListener('pointerup', unhold, { passive: true, capture: true })
+  window.addEventListener('pointercancel', unhold, { passive: true, capture: true })
+  // Pointer light (LIGHT): where the lighting pointer is, what it is over and whether it is held.
+  // Which glass that lights is decided when each glass is drawn, so every change asks for a frame.
+  const lightMoved = () => {
+    pointer.moved = true
+    wake()
+  }
+  window.addEventListener(
+    'pointermove',
+    (e) => {
+      // Only the held pointer counts (a lens may come under it): one that moves over the page without pressing asks for nothing.
+      if (!LIGHT.on || e.pointerId !== beam.id) return
+      beam.x = e.clientX
+      beam.y = e.clientY
+      beam.over = e.target
+      lightMoved()
+    },
+    { passive: true, capture: true },
+  )
+  window.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (!LIGHT.on || e.button !== 0 || HANDED_ON.has(e)) return
+      beam.x = e.clientX
+      beam.y = e.clientY
+      beam.over = e.target
+      beam.id = e.pointerId
+      lightMoved()
+    },
+    { passive: true, capture: true },
+  )
+  const lift = (e: PointerEvent) => {
+    if (e.pointerId !== beam.id) return
+    beam.id = -1
+    for (const s of lights.values()) s.press = false
+    lightMoved()
+  }
+  window.addEventListener('pointerup', lift, { passive: true, capture: true })
+  window.addEventListener('pointercancel', lift, { passive: true, capture: true })
+  // A button's flash (GLOW): a press lights the innermost button under it where it lands, and
+  // holds it until that pointer lets go; Space or Enter lights the focused button's centre.
+  window.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (e.button !== 0 || HANDED_ON.has(e) || !(e.target instanceof Node)) return
+      // A choice pressed inside a surface lights that surface around it.
+      const choice = e.target instanceof Element ? e.target.closest<HTMLElement>(CHOICES) : null
+      const chosen = choice && !choice.matches('[data-disabled], [aria-disabled="true"]') ? choice : null
+      let hit: GlassView | null = null
+      let hitHost: HTMLElement | null = null
+      for (const v of views) {
+        const host = hostOf(v)
+        if (!host || host.matches(':disabled, [data-disabled], [aria-disabled="true"]')) continue
+        if (v.button === true ? !(v.pressArea ?? host).contains(e.target) : !chosen || v.choices === false || !v.visible || !host.contains(chosen)) continue
+        if (!hitHost || hitHost.contains(host)) {
+          hit = v
+          hitHost = host
+        }
+      }
+      const f = hit && flash(hit, e.clientX, e.clientY, hit.button === true ? undefined : (chosen ?? undefined))
+      if (f) f.by = e.pointerId
+    },
+    { passive: true, capture: true },
+  )
+  const unflash = (e: PointerEvent) => {
+    for (const f of flashes.values()) {
+      if (f.by !== e.pointerId) continue
+      f.by = -1
+      wake()
+    }
+  }
+  window.addEventListener('pointerup', unflash, { passive: true, capture: true })
+  window.addEventListener('pointercancel', unflash, { passive: true, capture: true })
+  const flashKey = (e: KeyboardEvent) => {
+    if (e.key !== ' ' && e.key !== 'Enter') return
+    const down = e.type === 'keydown'
+    if (down && e.repeat) return
+    if (!down) {
+      for (const f of flashes.values()) f.key = false
+      return wake()
+    }
+    const focused = document.activeElement
+    if (!focused) return
+    // On a surface, the key chooses the focused choice: the light starts at its middle.
+    const choice = focused.closest<HTMLElement>(CHOICES)
+    const chosen = choice && !choice.matches('[data-disabled], [aria-disabled="true"]') ? choice : null
+    let surface: GlassView | null = null
+    let surfaceHost: HTMLElement | null = null
+    for (const v of views) {
+      const host = hostOf(v)
+      if (!host || host.matches(':disabled, [data-disabled], [aria-disabled="true"]')) continue
+      if (v.button === true) {
+        if (!focused.contains(v.canvas)) continue
+        const f = flash(v)
+        if (f) f.key = true
+      } else if (chosen && v.choices !== false && v.visible && host.contains(chosen) && (!surfaceHost || surfaceHost.contains(host))) {
+        surface = v
+        surfaceHost = host
+      }
+    }
+    if (surface && chosen) {
+      const r = chosen.getBoundingClientRect()
+      const f = flash(surface, r.left + r.width / 2, r.top + r.height / 2, chosen)
+      if (f) f.key = true
+    }
+    wake()
+  }
+  window.addEventListener('keydown', flashKey, true)
+  window.addEventListener('keyup', flashKey, true)
+  window.addEventListener(
+    'focusout',
+    () => {
+      for (const f of flashes.values()) f.key = false
+      wake()
+    },
+    true,
+  )
+  // Space or Enter on the focused control lights the middle of its glass while the key is down.
+  const key = (e: KeyboardEvent) => {
+    if (e.key !== ' ' && e.key !== 'Enter') return
+    const down = e.type === 'keydown'
+    if (down && (!LIGHT.on || e.repeat)) return
+    const focused = document.activeElement
+    for (const [v, s] of lights) {
+      const held = down && !s.free && !!focused && focused.contains(v.canvas)
+      if (held && !s.key && !s.press) {
+        s.x = s.bodyX
+        s.y = 0
+      }
+      s.key = held
+    }
+    wake()
+  }
+  window.addEventListener('keydown', key, true)
+  window.addEventListener('keyup', key, true)
+  window.addEventListener(
+    'focusout',
+    () => {
+      for (const s of lights.values()) s.key = false
+      wake()
+    },
+    true,
+  )
   // Theme switches (class="dark", data-theme, color-scheme) re-read every colour.
   new MutationObserver(invalidateAll).observe(document.documentElement, {
     attributes: true,
@@ -1272,16 +2448,43 @@ function createEngine(): GlassEngine | null {
       v.lost()
       v.ctx.clearRect(0, 0, v.canvas.width, v.canvas.height)
     }
+    // No frame comes after this: the hosts get back what the engine wrote on them.
+    for (const [v, p] of pulls) {
+      const host = hostOf(v)
+      v.held = false
+      if (host && p.moved) host.style.translate = ''
+      if (host && p.scaled) host.style.scale = ''
+    }
+    pulls.clear()
     engine = undefined
   })
 
   return {
     add: (v) => {
       views.add(v)
+      meltsChanged = true
       wake()
     },
     remove: (v) => {
       views.delete(v)
+      lights.delete(v)
+      flashes.delete(v)
+      // The glass that melted into it lets go.
+      if (v.button === true) {
+        meltsChanged = true
+        wake()
+      }
+      nears.delete(v)
+      shownButtons.delete(v)
+      v.near = undefined
+      const pulled = pulls.get(v)
+      if (pulled) {
+        pulls.delete(v)
+        v.held = false
+        const host = hostOf(v)
+        if (host && pulled.moved) host.style.translate = ''
+        if (host && pulled.scaled) host.style.scale = ''
+      }
       const a = mirrored.get(v)
       if (a) {
         mirrored.delete(v)

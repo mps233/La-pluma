@@ -96,10 +96,11 @@ export function applyThemePreference(theme: ThemeMode) {
   root.dataset.theme = isDark ? 'dark' : 'light'
   document.getElementById('app-root')?.classList.toggle('dark', isDark)
   root.style.colorScheme = isDark ? 'dark' : 'light'
-  document.querySelector('meta[name="theme-color"]')
-    ?.setAttribute('content', isDark ? '#101318' : '#f6f8fb')
-  document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
-    ?.setAttribute('content', isDark ? 'black-translucent' : 'default')
+  // Both metas carry the app's chosen theme; the media attributes only decide
+  // which one the browser reads, so a manual choice still wins over the OS.
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+    meta.setAttribute('content', isDark ? '#101318' : '#f2f2f7')
+  })
 }
 
 export const useUIStore = create<UIState>()(

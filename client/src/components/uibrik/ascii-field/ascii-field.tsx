@@ -22,10 +22,14 @@ uniform float u_wake;    // strength of the trail the pointer leaves
 uniform float u_pattern; // 0 flow, 1 waves, 2 rings
 uniform float u_lodBias; // sharpness of the glyph atlas sampling; negative is crisper
 
+// Two octaves, not three. This runs twice for every pixel of a full-screen canvas,
+// and the third octave carries 11% of the amplitude at four times the frequency:
+// at 14 px glyph cells it lands below what the cell can show, while it costs a
+// third of the whole field's noise sampling budget.
 float fbm(vec3 p) {
   float sum = 0.0;
   float amp = 0.55;
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 2; i++) {
     sum += amp * snoise(p);
     p = p * 2.03 + vec3(3.1, 7.7, 0.0);
     amp *= 0.45;

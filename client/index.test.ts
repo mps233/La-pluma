@@ -20,8 +20,9 @@ function installThemeDocument() {
   document.documentElement.className = 'dark'
   document.documentElement.removeAttribute('style')
   document.head.innerHTML = `
-    <meta name="theme-color" content="#101318" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f2f7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#101318" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   `
   document.body.innerHTML = '<div id="root"></div>'
   Object.defineProperty(window.navigator, 'standalone', {
@@ -101,10 +102,10 @@ describe('PWA document boot shell', () => {
   })
 
   it.each([
-    { storedTheme: 'light', systemDark: false, dark: false, background: 'rgb(242, 242, 247)', themeColor: '#f6f8fb' },
+    { storedTheme: 'light', systemDark: false, dark: false, background: 'rgb(242, 242, 247)', themeColor: '#f2f2f7' },
     { storedTheme: 'dark', systemDark: false, dark: true, background: 'rgb(16, 19, 24)', themeColor: '#101318' },
     { storedTheme: 'system', systemDark: true, dark: true, background: 'rgb(16, 19, 24)', themeColor: '#101318' },
-    { storedTheme: 'system', systemDark: false, dark: false, background: 'rgb(242, 242, 247)', themeColor: '#f6f8fb' },
+    { storedTheme: 'system', systemDark: false, dark: false, background: 'rgb(242, 242, 247)', themeColor: '#f2f2f7' },
   ])('applies $storedTheme before external assets load', ({ storedTheme, systemDark, dark, background, themeColor }: ThemeCase) => {
     window.localStorage.setItem('ui-storage', JSON.stringify({ state: { theme: storedTheme } }))
 
@@ -113,7 +114,12 @@ describe('PWA document boot shell', () => {
     expect(document.documentElement.classList.contains('dark')).toBe(dark)
     expect(document.documentElement.style.colorScheme).toBe(dark ? 'dark' : 'light')
     expect(document.documentElement.style.backgroundColor).toBe(background)
-    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe(themeColor)
+    // Both media-scoped metas are rewritten, so either one the browser picks
+    // carries the app's chosen theme.
+    const themeColors = Array.from(document.querySelectorAll('meta[name="theme-color"]'))
+      .map(meta => meta.getAttribute('content'))
+    expect(themeColors).toEqual([themeColor, themeColor])
+    expect(document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.getAttribute('content')).toBe('default')
   })
 
   it('falls back to the default dark boot surface when stored state is corrupt', () => {

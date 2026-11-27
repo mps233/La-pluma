@@ -172,6 +172,42 @@ describe('top-level application navigation', () => {
     expect(getScrollHost().scrollTop).toBe(510)
   })
 
+  it('uses the fixed tinted body for the tab bar on touch devices', () => {
+    window.matchMedia = vi.fn((query: string) => mediaQueryList(
+      query,
+      query === '(pointer: coarse)',
+    ))
+    renderLayout()
+
+    const track = container.querySelector('.la-pluma-tabbar .lg-track')
+    expect(track?.getAttribute('data-material')).toBe('tinted')
+    // The navbar's live clear glass repaints every frame; the touch fallback
+    // is the fixed tinted body as well.
+    const brand = container.querySelector('.la-pluma-navbar .la-pluma-brand')
+    expect(brand?.closest('[data-glass-host]')?.getAttribute('data-material')).toBe('tinted')
+  })
+
+  it('takes the current view back to its top when its tab is tapped again', async () => {
+    const user = userEvent.setup()
+    renderLayout()
+    const host = getScrollHost()
+    const scrollTo = vi.fn((options: ScrollToOptions) => {
+      currentScrollY = options.top ?? 0
+    })
+    host.scrollTo = scrollTo as unknown as typeof host.scrollTo
+    currentScrollY = 320
+
+    const currentTab = container.querySelector<HTMLButtonElement>(
+      '.la-pluma-tabbar-nav [data-lg-item][aria-selected="true"]',
+    )
+    expect(currentTab).not.toBeNull()
+    await user.click(currentTab!)
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' })
+    expect(getScrollHost().scrollTop).toBe(0)
+    expect(container.querySelector('[data-testid="active-tab"]')?.textContent).toBe('dashboard')
+  })
+
   it('keeps the installed-app URL stable while restoring tabs from history state', async () => {
     const user = userEvent.setup()
     window.matchMedia = vi.fn((query: string) => mediaQueryList(

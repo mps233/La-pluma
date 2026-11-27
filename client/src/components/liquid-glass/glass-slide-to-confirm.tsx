@@ -683,6 +683,7 @@ export function GlassSlideToConfirm({
             frost,
           },
           cursorLight: true,
+          pointerLight: true,
           // With `mirror`, what the thumb's rim mirrors while it is held (clear): the page around the track.
           reflection: live.current.mirror
             ? {
